@@ -20,6 +20,8 @@ export class Hud {
       gateBar: $('gateBar'),
       gateFill: $('gateFill'),
       alerts: $('alerts'),
+      status: $('status'),
+      killGoal: document.querySelector('#counter .dim'),
       abilities: $('abilities'),
       hint: $('abilityHint'),
       debug: $('debugPanel'),
@@ -36,6 +38,7 @@ export class Hud {
 
     this.slots = [];
     this.alerts = [];
+    this.statusEls = new Map();
     this.hintTimer = 0;
     this.lastKills = -1;
     this.lastGoal = -1;
@@ -69,7 +72,7 @@ export class Hud {
       b.addEventListener('pointerdown', trigger);
       b.addEventListener('contextmenu', (e) => e.preventDefault());
       frag.appendChild(b);
-      this.slots.push({ el: b, fill: b.querySelector('.fill'), ready: null });
+      this.slots.push({ el: b, fill: b.querySelector('.fill'), ready: null, frac: -1 });
     });
     this.el.abilities.appendChild(frag);
   }
@@ -86,18 +89,22 @@ export class Hud {
   syncAbilities(abilities) {
     for (let i = 0; i < this.slots.length; i++) {
       const s = this.slots[i];
-      const f = abilities.readyFraction(i);
-      s.fill.style.transform = `scaleY(${1 - f})`;
-      const ready = f >= 1;
-      if (s.ready !== ready) {
-        s.ready = ready;
-        s.el.classList.toggle('ready', ready);
+      // Quantised so an idle bar isn't restyled sixty times a second.
+      const f = Math.round(abilities.readyFraction(i) * 100) / 100;
+      if (s.frac !== f) {
+        s.frac = f;
+        s.fill.style.transform = `scaleY(${1 - f})`;
+        const ready = f >= 1;
+        if (s.ready !== ready) {
+          s.ready = ready;
+          s.el.classList.toggle('ready', ready);
+        }
       }
     }
   }
 
   showHint(text) {
-    this.el.hint.innerHTML = text;
+    this.el.hint.textContent = text;
     this.el.hint.classList.add('show');
     this.hintTimer = 3.4;
   }
@@ -109,7 +116,7 @@ export class Hud {
     this.lastKills = n;
     this.lastGoal = goal;
     this.el.killNum.textContent = n;
-    this.el.counter.querySelector('.dim').textContent = goal ? `/${goal}` : '';
+    this.el.killGoal.textContent = goal ? `/${goal}` : '';
   }
 
   setPhase(label) {
@@ -151,15 +158,33 @@ export class Hud {
     }
   }
 
-  /** Sticky status pills for boss effects — refreshed every frame. */
+  /**
+   * Sticky pills for whatever is currently being done to you. Diffed against
+   * the live set so nothing is torn down and rebuilt every frame.
+   */
   syncStatus(world) {
-    const want = [];
-    if (world.attackers.size > 0) want.push(['BREACH · DESTROY MARKED OBJECT', 'breach']);
-    if (world.veil > 0) want.push(['VEIL', 'power']);
-    if (world.invert > 0) want.push(['AIM INVERTED', 'power']);
-    if (world.jam > 0) want.push(['FEED JAMMED', 'power']);
-    if (world.chrono > 0) want.push(['ROUNDS SLOWED', 'power']);
-    for (const [text, kind] of want) this.alert(text, kind, 0.2);
+    const want = new Map();
+    if (world.attackers.size > 0) want.set('BREACH · CLEAR THE MARKED OBJECT', 'breach');
+    if (world.veil > 0) want.set('VEIL', 'power');
+    if (world.invert > 0) want.set('AIM INVERTED', 'power');
+    if (world.jam > 0) want.set('FEED JAMMED', 'power');
+    if (world.chrono > 0) want.set('ROUNDS SLOWED', 'power');
+    if (world.boss && world.boss.recallActive) want.set('RECALL', 'power');
+
+    for (const [text, el] of this.statusEls) {
+      if (!want.has(text)) {
+        el.remove();
+        this.statusEls.delete(text);
+      }
+    }
+    for (const [text, kind] of want) {
+      if (this.statusEls.has(text)) continue;
+      const el = document.createElement('div');
+      el.className = `alert ${kind}`;
+      el.textContent = text;
+      this.el.status.appendChild(el);
+      this.statusEls.set(text, el);
+    }
   }
 
   updateAlerts(dt) {
@@ -182,6 +207,8 @@ export class Hud {
   clearAlerts() {
     for (const a of this.alerts) a.el.remove();
     this.alerts.length = 0;
+    for (const el of this.statusEls.values()) el.remove();
+    this.statusEls.clear();
   }
 
   // ------------------------------------------------------------------ debug
@@ -225,7 +252,6 @@ export class Hud {
       b.addEventListener('click', () => {
         g.world.debug[key] = !g.world.debug[key];
         b.classList.toggle('on', g.world.debug[key]);
-        g.onDebugToggle(key);
       });
       frag.appendChild(b);
     }
@@ -246,11 +272,6 @@ export class Hud {
   hideBoot() {
     this.el.boot.classList.add('out');
     setTimeout(() => { this.el.boot.hidden = true; }, 500);
-  }
-
-  showBoot() {
-    this.el.boot.hidden = false;
-    this.el.boot.classList.remove('out');
   }
 
   showEnding(lines) {

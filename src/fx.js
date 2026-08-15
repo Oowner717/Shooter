@@ -100,7 +100,7 @@ export function shard(x, y, vx, vy, color, life, r, sides = 3) {
   return p;
 }
 
-export function ember(x, y, vx, vy, color, life, r) {
+function ember(x, y, vx, vy, color, life, r) {
   if (fx.budgetLeft <= 0) return null;
   const p = fx.particles.spawn();
   p.x = x; p.y = y; p.vx = vx; p.vy = vy;
@@ -120,7 +120,9 @@ export function ring(x, y, r0, r1, life, color, w = 3, fill = 0) {
 }
 
 export function ripple(x, y, strength, radius) {
-  if (fx.ripples.length > 26) fx.ripples.shift();
+  // Bounded tightly: background.drawLattice walks this list once per ring
+  // vertex, so it is the one place where a long list would actually cost.
+  if (fx.ripples.length >= 12) fx.ripples.shift();
   fx.ripples.push({ x, y, t: 0, life: 1.5, strength, radius });
 }
 

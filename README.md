@@ -159,8 +159,15 @@ pre-rendered sprites, the nebula and the scanline/vignette overlay are cached
 layers, and particles are pooled. Physics runs on a fixed 1/120 s substep with
 an accumulator. A quality governor watches the rolling frame time and steps
 particle budget and device-pixel-ratio down (and back up) if a device
-struggles. Measured JS cost with a full field: ~0.9 ms of simulation and
-~0.8 ms of draw-call issuance per frame.
+struggles.
+
+Measured main-thread simulation cost with a full 44-object field is ~0.7 ms
+per frame, leaving the rest of the 16.7 ms budget to rasterization. Actual
+rasterization is GPU-side and cannot be measured meaningfully in the headless
+harness (which falls back to software rendering), so the fill-rate work is
+kept deliberately low rather than benchmarked: caching the nebula and overlay
+layers and dropping per-projectile gradients cut software raster time roughly
+in half.
 
 ## Verifying changes
 

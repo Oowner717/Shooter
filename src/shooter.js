@@ -12,16 +12,13 @@ export class Shooter {
     this.x = x;
     this.y = y;
     this.r = CFG.shooter.r;
-    // physics body fields (static)
+    // Static physics body: infinite mass, never integrated, so these are the
+    // only fields the solver touches.
     this.vx = 0;
     this.vy = 0;
-    this.mass = Infinity;
     this.invMass = 0;
     this.restitution = 0.55;
     this.friction = 0.4;
-    this.angle = 0;
-    this.av = 0;
-    this.cruise = 0;
     this.dead = false;
 
     this.aim = -Math.PI / 2;
@@ -30,7 +27,6 @@ export class Shooter {
     this.heat = 0;
     this.cooldown = 0;
     this.spin = 0;
-    this.fired = 0;
   }
 
   reset(x, y) {
@@ -40,7 +36,6 @@ export class Shooter {
     this.recoil = 0;
     this.heat = 0;
     this.cooldown = 0;
-    this.fired = 0;
   }
 
   aimAt(x, y, inverted) {
@@ -81,8 +76,7 @@ export class Shooter {
     });
     this.recoil = 1;
     this.heat = Math.min(1, this.heat + 0.14);
-    this.fired++;
-    if (world.jam > 0) this.cooldown = world.jamInterval;
+    if (world.jam > 0) this.cooldown = CFG.boss.jamInterval;
     audio.shot();
     shake(0.5);
     // ejected casing

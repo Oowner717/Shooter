@@ -69,7 +69,7 @@ class Audio {
     g.exponentialRampToValueAtTime(0.0001, t0 + attack + decay);
   }
 
-  tone({ type = 'square', f0 = 440, f1 = f0, dur = 0.12, gain = 0.2, attack = 0.004, detune = 0, dest = null }) {
+  tone({ type = 'square', f0 = 440, f1 = f0, dur = 0.12, gain = 0.2, attack = 0.004, detune = 0 }) {
     if (!this.ready || !this.enabled) return;
     const t0 = this.ctx.currentTime;
     const o = this.ctx.createOscillator();
@@ -80,7 +80,7 @@ class Audio {
     if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
     this._env(g, t0, attack, dur, gain);
     o.connect(g);
-    g.connect(dest || this.master);
+    g.connect(this.master);
     o.start(t0);
     o.stop(t0 + dur + attack + 0.03);
   }

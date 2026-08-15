@@ -15,7 +15,6 @@ const SHOTS = process.env.SHOT_DIR || '/tmp/sim7749-shots';
 mkdirSync(SHOTS, { recursive: true });
 
 const errors = [];
-const logs = [];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -28,10 +27,7 @@ const ctx = await browser.newContext({
 });
 const page = await ctx.newPage();
 
-page.on('console', (m) => {
-  logs.push(`${m.type()}: ${m.text()}`);
-  if (m.type() === 'error') errors.push(m.text());
-});
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}\n${e.stack}`));
 page.on('requestfailed', (r) => errors.push(`requestfailed: ${r.url()} ${r.failure()?.errorText}`));
 

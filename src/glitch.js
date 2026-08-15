@@ -10,7 +10,6 @@ import { clamp, rand, randInt, spread } from './util.js';
 class Glitch {
   constructor() {
     this.level = 0; // eased display level
-    this.target = 0;
     this.mode = 'normal'; // 'normal' | 'boss' | 'frozen'
     this.roll = 0;
     this.burst = 0;
@@ -18,7 +17,6 @@ class Glitch {
 
   reset() {
     this.level = 0;
-    this.target = 0;
     this.mode = 'normal';
     this.roll = 0;
     this.burst = 0;
@@ -30,10 +28,9 @@ class Glitch {
   }
 
   update(dt, target, mode) {
-    this.target = target;
     this.mode = mode;
     this.burst = Math.max(0, this.burst - dt * 1.4);
-    const goal = clamp(this.target + this.burst, 0, 1.2);
+    const goal = clamp(target + this.burst, 0, 1.2);
     // Rises fast, decays slow — corruption should feel sticky.
     const rate = goal > this.level ? 16 : 3.2;
     this.level += (goal - this.level) * clamp(rate * dt, 0, 1);
@@ -60,11 +57,10 @@ class Glitch {
 
     const intensity = frozen ? Math.max(L, 0.8) : L;
 
-    // --- base pass, optionally rolled vertically ---
+    // --- base pass, occasionally torn off its vertical origin ---
     let rollY = 0;
-    if (boss || frozen) {
-      rollY = Math.round(((this.roll % bh) + bh) % bh) * (intensity > 0.55 ? 1 : 0);
-      if (Math.random() > 0.06) rollY = 0; // roll only occasionally: a tear, not a scroll
+    if ((boss || frozen) && intensity > 0.55 && Math.random() < 0.06) {
+      rollY = Math.round(((this.roll % bh) + bh) % bh);
     }
     const jx = Math.round(spread(intensity * 7));
     if (rollY) {

@@ -43,16 +43,8 @@ export class Wall {
     this.rebuildBoxes();
   }
 
-  get closed() {
-    return this.state === 'closing' || this.state === 'sealed';
-  }
-
   get sealed() {
     return this.state === 'sealed';
-  }
-
-  get broken() {
-    return this.state === 'broken';
   }
 
   /** Half-width of the current opening (animates while the doors travel). */
@@ -86,7 +78,7 @@ export class Wall {
 
   damageGate(world, dmg, x, y) {
     if (this.state !== 'sealed') return;
-    this.hp -= dmg;
+    if (!world.debug.toughGate) this.hp -= dmg;
     this.shakeT = 0.12;
     if (this.hotspots.length < 40) this.hotspots.push({ x, y, t: 0 });
     if (this.cracks.length < 26 && Math.random() < 0.22) {
@@ -126,16 +118,8 @@ export class Wall {
 
     if (this.state === 'closing') {
       this.closeT += dt / CFG.gate.closeTime;
-      // shove anything caught in the doorway back out
-      const half = this.openHalf;
-      for (const e of world.enemies) {
-        if (e.y + e.r < this.y || e.y - e.r > this.y + this.thickness) continue;
-        const side = e.x < this.gateCx ? -1 : 1;
-        const edge = this.gateCx + side * half;
-        if (Math.abs(e.x - this.gateCx) < half) continue;
-        e.x = edge + side * (e.r + 2);
-        e.vx += side * 90;
-      }
+      // The wall segments grow inward as the doors travel; the solver ejects
+      // anything caught in the doorway on the next substep.
       this.rebuildBoxes();
       if (this.closeT >= 1) {
         this.closeT = 1;

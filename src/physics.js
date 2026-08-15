@@ -48,8 +48,11 @@ export class Grid {
   build(bodies) {
     this.clear();
     for (let i = 0; i < bodies.length; i++) {
-      bodies[i]._gi = i;
-      this.buckets[this._cy(bodies[i].y) * this.cols + this._cx(bodies[i].x)].push(bodies[i]);
+      const b = bodies[i];
+      b._gi = i;
+      b._cx = this._cx(b.x);
+      b._cy = this._cy(b.y);
+      this.buckets[b._cy * this.cols + b._cx].push(b);
     }
   }
 
@@ -58,8 +61,8 @@ export class Grid {
     const { cols, rows } = this;
     for (let i = 0; i < bodies.length; i++) {
       const a = bodies[i];
-      const cx = this._cx(a.x);
-      const cy = this._cy(a.y);
+      const cx = a._cx;
+      const cy = a._cy;
       for (let oy = -1; oy <= 1; oy++) {
         const gy = cy + oy;
         if (gy < 0 || gy >= rows) continue;
@@ -142,7 +145,7 @@ export function resolvePair(a, b) {
   const tx = -ny;
   const ty = nx;
   const vt = rvx * tx + rvy * ty;
-  const mu = Math.sqrt((a.friction || 0.25) * (b.friction || 0.25));
+  const mu = Math.sqrt(a.friction * b.friction);
   let jt = -vt / invSum;
   const maxJt = j * mu;
   jt = clamp(jt, -maxJt, maxJt);

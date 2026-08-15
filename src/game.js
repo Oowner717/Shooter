@@ -59,7 +59,6 @@ export class Game {
       timeScale: 1,
       kills: 0,
       phase: 'boot', // boot | staging | gate | boss | ending | frozen
-      phaseTime: 0,
 
       enemies: [],
       debris: [],
@@ -81,10 +80,10 @@ export class Game {
       veil: 0,
       invert: 0,
       jam: 0,
-      jamInterval: 0.4,
       chrono: 0,
       lockout: 0,
       bossContact: 0,
+      veilFade: 0, // eased so VEIL closes in rather than snapping
 
       nextStoryAt: CFG.storyEvery,
       sealed: false,
@@ -116,9 +115,9 @@ export class Game {
     w.time = 0;
     w.timeScale = 1;
     w.kills = 0;
-    w.phaseTime = 0;
     w.boss = null;
     w.stasis = w.veil = w.invert = w.jam = w.chrono = w.lockout = w.bossContact = 0;
+    w.veilFade = 0;
     w.nextStoryAt = CFG.storyEvery;
     w.sealed = false;
     w.phase = 'staging';
@@ -212,8 +211,6 @@ export class Game {
     // quarter-res mask used by the boss VEIL power
     this.veilMask = makeCanvas(Math.ceil(w / 2), Math.ceil(h / 2));
     this.veilCtx = this.veilMask.getContext('2d');
-
-    this.bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   qualityScale() {
@@ -295,7 +292,6 @@ export class Game {
     }
 
     w.time += dt;
-    w.phaseTime += dt;
 
     // ---- status timers ----
     w.stasis = Math.max(0, w.stasis - dt);
@@ -305,6 +301,7 @@ export class Game {
     w.chrono = Math.max(0, w.chrono - dt);
     w.lockout = Math.max(0, w.lockout - dt);
     w.bossContact = Math.max(0, w.bossContact - dt);
+    w.veilFade += ((w.veil > 0 ? 1 : 0) - w.veilFade) * clamp(dt * 3.4, 0, 1);
 
     // ---- sustained fire ----
     if (this.pointers.size > 0 && w.phase !== 'ending') {
@@ -390,8 +387,12 @@ export class Game {
 
     const boss = w.boss;
     for (const b of bodies) {
-      for (const box of w.wall.boxes) resolveBox(b, box);
-      clampToArena(b, w.width, STAGE_HEIGHT, w.floorY);
+      let impact = 0;
+      for (const box of w.wall.boxes) impact = Math.max(impact, resolveBox(b, box));
+      impact = Math.max(impact, clampToArena(b, w.width, STAGE_HEIGHT, w.floorY));
+      if (impact > 240) {
+        spark(b.x, b.y, spread(impact), spread(impact), b.type.glow, 0.18, 1.8);
+      }
       if (boss && !boss.dead && boss.intro >= 1) {
         const dx = b.x - boss.x;
         const dy = b.y - boss.y;
@@ -438,7 +439,6 @@ export class Game {
         ring(s.x, s.y, 10, 120, 0.3, '#ff2d55', 3);
       }
     }
-    for (const e of w.attackers) if (e.dead) w.attackers.delete(e);
   }
 
   sweep(list) {
@@ -468,19 +468,8 @@ export class Game {
     if (!w.sealed && w.kills >= CFG.killGoal) {
       w.sealed = true;
       w.phase = 'gate';
-      w.phaseTime = 0;
       w.wall.seal(w);
-      this.dissolveStaged();
       this.hud.setPhase('SEAL');
-    }
-  }
-
-  dissolveStaged() {
-    for (const e of this.world.enemies) {
-      if (e.staged && !e.dead) {
-        e.dead = true;
-        e.dissolved = true;
-      }
     }
   }
 
@@ -520,7 +509,6 @@ export class Game {
   onGateBroken() {
     const w = this.world;
     w.phase = 'boss';
-    w.phaseTime = 0;
     this.hud.setPhase('BOSS');
     this.hud.setGate(false);
     background.setMood('boss');
@@ -537,7 +525,6 @@ export class Game {
   onBossDead() {
     const w = this.world;
     w.phase = 'ending';
-    w.phaseTime = 0;
     w.timeScale = 0.3;
     w.lockout = 999;
     w.veil = w.invert = w.jam = w.chrono = 0;
@@ -624,8 +611,7 @@ export class Game {
     background.draw(ctx, W, H);
 
     // story sits behind every entity: it can never hide a target
-    const lines = w.narrator.lines ? w.narrator.lines.length : 2;
-    w.narrator.draw(ctx, W / 2, w.floorY - 24 - lines * 19, Math.min(W - 64, 380), background.mood.accent);
+    w.narrator.draw(ctx, W / 2, w.floorY - 24, Math.min(W - 64, 380), background.mood.accent);
 
     w.wall.draw(ctx, w);
 
@@ -645,7 +631,7 @@ export class Game {
     ctx.restore();
 
     if (w.stasis > 0) this.drawStasis(ctx, W, H);
-    if (w.veil > 0) this.drawVeil(ctx, W, H);
+    if (w.veilFade > 0.004) this.drawVeil(ctx, W, H);
     background.drawOverlay(ctx, W, H);
     drawFlash(ctx, W, H);
 
@@ -705,7 +691,7 @@ export class Game {
 
   drawVeil(ctx, W, H) {
     const w = this.world;
-    const a = clamp(w.veil / 0.9, 0, 1) * 0.93;
+    const a = w.veilFade * 0.93;
     const g = this.veilCtx;
     const vw = this.veilMask.width;
     const vh = this.veilMask.height;
@@ -776,10 +762,6 @@ export class Game {
   }
 
   // ---------------------------------------------------------------- debug
-
-  onDebugToggle(key) {
-    if (key === 'toughGate') this.world.wall.maxHp = this.world.debug.toughGate ? 1e9 : CFG.gate.hp;
-  }
 
   debugSkipToGate() {
     const w = this.world;

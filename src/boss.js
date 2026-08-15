@@ -1,13 +1,18 @@
 // MNEMOSYNE. It does not attack. It removes things from you — your sight,
 // your aim, your rate of fire — and walks, without hurry, toward the turret.
 
-import { CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
-import { TAU, clamp, rand, spread, pick, rgba, drawGlow, makeCanvas, smoothstep } from './util.js';
+import { CFG, ENEMY_TYPES } from './config.js';
+import { TAU, clamp, rand, spread, pick, rgba, drawGlow, makeCanvas, smoothstep, segClosest } from './util.js';
 import { spark, dot, shard as fxShard, ring, ripple, shake, flash, explode } from './fx.js';
 import { Enemy } from './enemies.js';
 import { audio } from './audio.js';
 
 const SPRITE = 512;
+const SHIELD_R = 22;
+
+// What it spits out. Bulwarks are excluded: they are wall-clearing work, not
+// pressure, and the boss fight already asks enough of the player's aim.
+const EMITTABLE = ENEMY_TYPES.filter((t) => t.id !== 'bulwark');
 
 const PALETTES = [
   { ring: '#ffd98a', spoke: '#fff3c4', iris: '#ffb347', core: '#fffaf0', halo: '#ff9f1c' },
@@ -29,7 +34,7 @@ const POWERS = [
   {
     id: 'jam',
     label: 'JAM · FEED THROTTLED',
-    apply(world) { world.jam = Math.max(world.jam, 8.5); world.jamInterval = 0.4; },
+    apply(world) { world.jam = Math.max(world.jam, 8.5); },
   },
   {
     id: 'choir',
@@ -166,20 +171,13 @@ export class Boss {
   castShields(ax, ay, bx, by, pr) {
     let best = null;
     let bestT = 2;
+    const rr = SHIELD_R + pr;
     for (const s of this.shields) {
       if (s.hp <= 0) continue;
       const sx = this.x + Math.cos(s.a) * s.dist;
       const sy = this.y + Math.sin(s.a) * s.dist;
-      const rr = 22 + pr;
-      const dx = bx - ax;
-      const dy = by - ay;
-      const len2 = dx * dx + dy * dy || 1;
-      let t = ((sx - ax) * dx + (sy - ay) * dy) / len2;
-      t = clamp(t, 0, 1);
-      const px = ax + dx * t;
-      const py = ay + dy * t;
-      const d2 = (sx - px) ** 2 + (sy - py) ** 2;
-      if (d2 <= rr * rr && t < bestT) { bestT = t; best = s; }
+      const c = segClosest(ax, ay, bx, by, sx, sy);
+      if (c.d2 <= rr * rr && c.t < bestT) { bestT = c.t; best = s; }
     }
     return best ? { t: bestT, shield: best } : null;
   }
@@ -292,7 +290,7 @@ export class Boss {
     if (world.enemies.length >= CFG.maxEnemies) return;
     const n = 2 + this.phase;
     for (let i = 0; i < n; i++) {
-      const type = pick(ENEMY_TYPES.filter((t) => t.id !== 'bulwark')) || TYPE_BY_ID.mote;
+      const type = pick(EMITTABLE);
       const a = rand(Math.PI * 0.1, Math.PI * 0.9);
       const px = this.x + Math.cos(a) * this.r * 0.9;
       const py = this.y + Math.sin(a) * this.r * 0.9;
@@ -433,8 +431,8 @@ export class Boss {
       ctx.beginPath();
       for (let i = 0; i < 3; i++) {
         const a = (i / 3) * TAU - Math.PI / 2;
-        const x = Math.cos(a) * 20;
-        const y = Math.sin(a) * 20;
+        const x = Math.cos(a) * SHIELD_R;
+        const y = Math.sin(a) * SHIELD_R;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.closePath();

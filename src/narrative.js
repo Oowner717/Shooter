@@ -2,7 +2,7 @@
 
 import { clamp, rgba } from './util.js';
 
-export const STORY = [
+const STORY = [
   'We built this room so that you would remember what your hands are for.',
   'Every shape you break makes something on the other side remember its name.',
   'You remember the wall. You do not remember agreeing to it.',
@@ -24,14 +24,15 @@ export const ENDING = [
 ];
 
 const SCRAMBLE = '▓▒░#%&@*<>/\\|=+-_01';
+const HOLD = 7.4; // seconds fully legible
+const DECAY = 1.6; // seconds spent corrupting away
+const LINE_H = 19;
 
 export class Narrator {
   constructor() {
     this.text = '';
     this.lines = null;
     this.t = 0;
-    this.hold = 7.4;
-    this.decay = 1.6;
     this.active = false;
     this.index = 0;
     this.wrapWidth = 0;
@@ -62,7 +63,7 @@ export class Narrator {
   update(dt) {
     if (!this.active) return;
     this.t += dt;
-    if (this.t > this.hold + this.decay) this.active = false;
+    if (this.t > HOLD + DECAY) this.active = false;
   }
 
   _wrap(ctx, maxWidth) {
@@ -85,21 +86,21 @@ export class Narrator {
 
   /**
    * Drawn *behind* every entity so it can never hide something you need to
-   * shoot. Centred on (cx, cy) as the block's top edge.
+   * shoot. `bottomY` is the baseline the block grows upward from, so a
+   * two-line and a three-line sentence share the same lower edge.
    */
-  draw(ctx, cx, cy, maxWidth, accent) {
+  draw(ctx, cx, bottomY, maxWidth, accent) {
     if (!this.active) return;
-    const font = '13px ui-monospace, "SF Mono", Menlo, monospace';
-    ctx.font = font;
+    ctx.font = '13px ui-monospace, "SF Mono", Menlo, monospace';
     if (!this.lines || this.wrapWidth !== maxWidth) this._wrap(ctx, maxWidth);
 
     const reveal = clamp(this.t / 0.55, 0, 1);
-    const dying = clamp((this.t - this.hold) / this.decay, 0, 1);
+    const dying = clamp((this.t - HOLD) / DECAY, 0, 1);
     const alpha = (1 - dying * dying) * clamp(this.t / 0.2, 0, 1);
     if (alpha <= 0.001) return;
 
-    const lh = 19;
-    const total = this.lines.length * lh;
+    const total = this.lines.length * LINE_H;
+    const cy = bottomY - total;
 
     ctx.save();
     ctx.textAlign = 'center';
@@ -132,7 +133,7 @@ export class Narrator {
         }
       }
       const jitter = dying > 0 ? (Math.random() - 0.5) * dying * 14 : 0;
-      const y = cy + i * lh;
+      const y = cy + i * LINE_H;
 
       if (dying > 0.15) {
         ctx.fillStyle = rgba('#ff2d6f', alpha * 0.5);

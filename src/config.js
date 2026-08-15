@@ -64,6 +64,7 @@ export const CFG = {
     approach: 13, // px/s of self-propulsion
     pushPerBolt: 5.6,
     contactGlitch: 2.6,
+    jamInterval: 0.4, // forced delay between shots while JAM is up
     powerInterval: [13, 9.5], // seconds between powers, phase 1 -> phase 3
     spawnInterval: 7.5,
   },

@@ -7,11 +7,12 @@ import { TAU, clamp, rand, randInt, spread, pick, weightedPick, rgba, drawGlow }
 import { explode, hitBurst, spark, shard as fxShard, ring, ripple } from './fx.js';
 import { audio } from './audio.js';
 
-let nextId = 1;
+/** WARDEN plate geometry — shared by drawing, hit tests and the broadphase. */
+const SHARD_ORBIT = 2.15; // multiples of the core radius
+export const SHARD_R = 12;
 
 export class Enemy {
   constructor(type, x, y, opts = {}) {
-    this.id = nextId++;
     this.type = type;
     this.isDebris = !!opts.debris;
     this.counts = !this.isDebris;
@@ -41,7 +42,6 @@ export class Enemy {
     this.dead = false;
     this.phase = rand(0, TAU);
     this.lurchTimer = rand(0, 2);
-    this.life = 0;
     this.ttl = this.isDebris ? rand(22, 30) : 0;
     this.spawnIn = opts.spawnIn ?? 0; // brief materialise animation
 
@@ -54,6 +54,15 @@ export class Enemy {
     }
   }
 
+  /** Radius the plates orbit at, and the reach a projectile must clear. */
+  get orbitR() {
+    return this.r * SHARD_ORBIT;
+  }
+
+  get hitReach() {
+    return this.shards ? this.orbitR + SHARD_R : this.r;
+  }
+
   // ------------------------------------------------------------- behaviour
 
   steer(world, dt) {
@@ -62,11 +71,11 @@ export class Enemy {
     let ty;
 
     if (this.staged) {
-      // Funnel toward the gate mouth, then dive through it.
+      // Funnel toward the gate mouth, then dive through it — including while
+      // the doors are travelling, which is the point of the doors travelling.
       const g = world.wall;
       tx = g.gateCx + Math.sin(t * 0.6 + this.phase) * g.gateHalf * 0.55;
       ty = g.y + g.thickness + 40;
-      if (world.wall.closed) ty = g.y - 90; // gate shut: mill about above it
     } else {
       tx = world.shooter.x;
       ty = world.shooter.y;
@@ -118,7 +127,6 @@ export class Enemy {
   }
 
   update(world, dt) {
-    this.life += dt;
     if (this.spawnIn > 0) this.spawnIn = Math.max(0, this.spawnIn - dt * 2.2);
     this.flash = Math.max(0, this.flash - dt * 4.5);
 
@@ -135,40 +143,37 @@ export class Enemy {
       }
     }
 
-    // Crossed the wall line? It is loose in the arena now.
-    if (this.staged && this.y - this.r > world.wall.y + world.wall.thickness) {
-      this.staged = false;
+    if (this.staged) {
+      if (this.y - this.r > world.wall.y + world.wall.thickness) {
+        // Crossed the wall line — it is loose in the arena now.
+        this.staged = false;
+      } else if (world.wall.sealed) {
+        // Doors shut with it still queued: reclaimed, and not counted.
+        this.dead = true;
+        this.dissolved = true;
+      }
     }
   }
 
   // ---------------------------------------------------------------- damage
 
+  /** A bolt stopped by one of the WARDEN's orbiting plates. */
+  hitShard(s, dmg, hx, hy, nx, ny) {
+    s.hp -= dmg;
+    if (s.hp > 0) {
+      hitBurst(hx, hy, nx, ny, '#ffffff');
+      return;
+    }
+    s.alive = false;
+    fxShard(hx, hy, spread(140), spread(140) - 40, this.type.color, 0.7, 7, 4);
+    spark(hx, hy, spread(200), spread(200), this.type.glow, 0.3, 2.4);
+    audio.reflect();
+  }
+
   /**
-   * @returns 'reflect' | 'shard' | 'hit'
+   * @returns 'reflect' | 'hit'
    */
   takeHit(world, dmg, hx, hy, nx, ny, impulse) {
-    // Warden plates eat the bolt entirely.
-    if (this.shards) {
-      const orbit = this.r * 2.15;
-      for (const s of this.shards) {
-        if (!s.alive) continue;
-        const sx = this.x + Math.cos(s.a) * orbit;
-        const sy = this.y + Math.sin(s.a) * orbit;
-        if ((hx - sx) ** 2 + (hy - sy) ** 2 < 15 * 15) {
-          s.hp -= dmg;
-          if (s.hp <= 0) {
-            s.alive = false;
-            fxShard(sx, sy, spread(140), spread(140) - 40, this.type.color, 0.7, 7, 4);
-            spark(sx, sy, spread(200), spread(200), this.type.glow, 0.3, 2.4);
-            audio.reflect();
-          } else {
-            hitBurst(sx, sy, nx, ny, '#ffffff');
-          }
-          return 'shard';
-        }
-      }
-    }
-
     // Prisms bounce glancing bolts; only a square-on hit lands.
     if (this.type.reflect) {
       const ndx = (hx - this.x) / this.r;
@@ -198,15 +203,12 @@ export class Enemy {
     if (this.hp <= 0) this.destroy(world);
   }
 
-  destroy(world, silent = false) {
+  destroy(world) {
     if (this.dead) return;
     this.dead = true;
     const t = this.type;
-
-    if (!silent) {
-      explode(this.x, this.y, this.r, t.color, t.glow, this.isDebris ? 0.55 : 1);
-      audio.pop(clamp(this.r / 22, 0.5, 2.4));
-    }
+    explode(this.x, this.y, this.r, t.color, t.glow, this.isDebris ? 0.55 : 1);
+    audio.pop(clamp(this.r / 22, 0.5, 2.4));
 
     if (this.isDebris) return;
 
@@ -225,6 +227,7 @@ export class Enemy {
     if (t.splits) {
       const child = TYPE_BY_ID[t.splits.type];
       for (let i = 0; i < t.splits.count; i++) {
+        // a little over the cap: a split should not be silently swallowed
         if (world.enemies.length >= CFG.maxEnemies + 8) break;
         const a = (i / t.splits.count) * TAU + rand(0, 1);
         const sp = rand(90, 190);
@@ -290,9 +293,13 @@ export class Enemy {
     }
 
     if (this.flash > 0.01) {
+      // A disc, not ctx.fill() on whatever sub-path the shape left behind —
+      // several of the shapes end on an open stroke path.
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = clamp(this.flash, 0, 1) * 0.85;
+      ctx.globalAlpha = clamp(this.flash, 0, 1) * 0.7;
       ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, 0, this.r * 0.92, 0, TAU);
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
@@ -302,22 +309,21 @@ export class Enemy {
 
     // orbiting plates (unrotated frame)
     if (this.shards) {
-      const orbit = this.r * 2.15;
+      const orbit = this.orbitR;
       ctx.strokeStyle = rgba(t.color, 0.9);
       ctx.lineWidth = 3;
+      ctx.beginPath();
       for (const sh of this.shards) {
         if (!sh.alive) continue;
-        const sx = this.x + Math.cos(sh.a) * orbit;
-        const sy = this.y + Math.sin(sh.a) * orbit;
-        ctx.save();
-        ctx.translate(sx, sy);
-        ctx.rotate(sh.a + Math.PI / 2);
-        ctx.beginPath();
-        ctx.moveTo(-9, 0);
-        ctx.lineTo(9, 0);
-        ctx.stroke();
-        ctx.restore();
+        const ca = Math.cos(sh.a);
+        const sa = Math.sin(sh.a);
+        const sx = this.x + ca * orbit;
+        const sy = this.y + sa * orbit;
+        // the plate is a bar tangent to its orbit
+        ctx.moveTo(sx + sa * 9, sy - ca * 9);
+        ctx.lineTo(sx - sa * 9, sy + ca * 9);
       }
+      ctx.stroke();
     }
 
     // damage arc — only on objects big enough to be worth tracking

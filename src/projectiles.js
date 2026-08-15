@@ -2,16 +2,15 @@
 // 1500 px/s, earliest-hit resolution so the nearest object always takes it.
 
 import { CFG } from './config.js';
-import { TAU, clamp, rand, spread, rgba, drawGlow, segClosest } from './util.js';
+import { TAU, rand, spread, rgba, drawGlow, segClosest } from './util.js';
 import { spark, dot, hitBurst } from './fx.js';
+import { SHARD_R } from './enemies.js';
 import { audio } from './audio.js';
 
-export class Projectile {
+class Projectile {
   constructor(x, y, vx, vy, opts = {}) {
     this.x = x;
     this.y = y;
-    this.px = x;
-    this.py = y;
     this.vx = vx;
     this.vy = vy;
     this.r = opts.r ?? CFG.bolt.r;
@@ -73,8 +72,6 @@ export function updateProjectiles(world, dt) {
     if (p.ignoreT > 0) p.ignoreT -= dt; else p.ignore = null;
 
     if (!p.dead) {
-      p.px = p.x;
-      p.py = p.y;
       let nx = p.x + p.vx * dt;
       let ny = p.y + p.vy * dt;
 
@@ -97,10 +94,10 @@ export function updateProjectiles(world, dt) {
 
         // side-wall ricochet
         if (p.x < p.r && p.vx < 0) {
-          if (p.bounces-- > 0) { p.x = p.r; p.vx = -p.vx; ricochetFx(p); }
+          if (p.bounces > 0) { p.bounces--; p.x = p.r; p.vx = -p.vx; ricochetFx(p); }
           else p.dead = true;
         } else if (p.x > W - p.r && p.vx > 0) {
-          if (p.bounces-- > 0) { p.x = W - p.r; p.vx = -p.vx; ricochetFx(p); }
+          if (p.bounces > 0) { p.bounces--; p.x = W - p.r; p.vx = -p.vx; ricochetFx(p); }
           else p.dead = true;
         }
         if (p.y < -world.stageHeight || p.y > world.floorY + 60) p.dead = true;
@@ -130,10 +127,28 @@ function resolveSegment(world, p, ax, ay, bx, by) {
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
       if (e.dead || e === p.ignore) continue;
+      // Reach covers orbiting plates, which live outside the core radius.
+      const reach = e.hitReach + p.r;
+      if (Math.min(ax, bx) - reach > e.x || Math.max(ax, bx) + reach < e.x) continue;
+      if (Math.min(ay, by) - reach > e.y || Math.max(ay, by) + reach < e.y) continue;
+
+      if (e.shards) {
+        const sr = SHARD_R + p.r;
+        const orbit = e.orbitR;
+        for (const s of e.shards) {
+          if (!s.alive) continue;
+          const sx = e.x + Math.cos(s.a) * orbit;
+          const sy = e.y + Math.sin(s.a) * orbit;
+          const cs = segClosest(ax, ay, bx, by, sx, sy);
+          if (cs.d2 <= sr * sr && cs.t < bestT) {
+            bestT = cs.t;
+            bestKind = 'shard';
+            bestTarget = { enemy: e, shard: s };
+          }
+        }
+      }
+
       const rr = e.r + p.r;
-      // cheap reject
-      if (Math.min(ax, bx) - rr > e.x || Math.max(ax, bx) + rr < e.x) continue;
-      if (Math.min(ay, by) - rr > e.y || Math.max(ay, by) + rr < e.y) continue;
       const c = segClosest(ax, ay, bx, by, e.x, e.y);
       if (c.d2 <= rr * rr && c.t < bestT) {
         bestT = c.t;
@@ -204,6 +219,11 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         return;
       }
       audio.hit();
+      p.dead = true;
+      return;
+    }
+    case 'shard': {
+      bestTarget.enemy.hitShard(bestTarget.shard, p.damage, hx, hy, -dirx, -diry);
       p.dead = true;
       return;
     }
@@ -281,4 +301,13 @@ export function fire(world, x, y, angle, opts = {}) {
   return p;
 }
 
-export const clampAim = (a) => clamp(a, -Math.PI / 2 - CFG.shooter.aimClamp, -Math.PI / 2 + CFG.shooter.aimClamp);
+/** Barrel travel is limited to the forward hemisphere. */
+export function clampAim(a) {
+  const up = -Math.PI / 2;
+  const limit = CFG.shooter.aimClamp;
+  // fold the angle into [-PI, PI) relative to straight up before clamping
+  let d = (a - up) % TAU;
+  if (d > Math.PI) d -= TAU;
+  if (d < -Math.PI) d += TAU;
+  return up + (d < -limit ? -limit : d > limit ? limit : d);
+}

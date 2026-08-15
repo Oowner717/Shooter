@@ -155,15 +155,27 @@ html, body {
 
 /* ---------------- alerts (breach / boss powers) ---------------- */
 
-#alerts {
+#alerts, #status {
   position: absolute;
-  top: calc(var(--safe-t) + 76px);
   left: 0;
   right: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 4px;
+}
+
+#alerts {
+  top: calc(var(--safe-t) + 76px);
+  flex-direction: column;
+}
+
+/* Sticky one-word pills for whatever the boss is currently doing to you.
+   Separate from #alerts so they never evict transient messages. */
+#status {
+  top: calc(var(--safe-t) + 150px);
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 0 12px;
 }
 
 .alert {
@@ -255,7 +267,6 @@ html, body {
   text-shadow: 0 0 10px #000;
 }
 #abilityHint.show { opacity: 1; }
-#abilityHint b { color: var(--accent); font-weight: 600; }
 
 /* ---------------- debug ---------------- */
 
@@ -417,6 +428,7 @@ html, body {
 body.ending #topbar,
 body.ending #abilities,
 body.ending #alerts,
+body.ending #status,
 body.ending #bossBar,
 body.ending #gateBar {
   opacity: 0;
