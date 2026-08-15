@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SIM 7749">
+<meta name="theme-color" content="#04050a">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="SIMULATION 7749 — a physics shooter about remembering.">
+<title>SIMULATION 7749</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="./icons/icon-192.png">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<div id="app">
+  <canvas id="stage"></canvas>
+
+  <!-- ============ HUD ============ -->
+  <div id="ui">
+
+    <header id="topbar">
+      <div id="counter" class="chip">
+        <span id="killNum">0</span><span class="dim">/500</span>
+        <em>OBJECTS</em>
+      </div>
+      <div id="phaseTag" class="chip ghost">STAGING</div>
+      <div class="spacer"></div>
+      <button id="muteBtn" class="chip btn" aria-label="Toggle sound">SND</button>
+      <button id="dbgBtn" class="chip btn" aria-label="Debug menu">DBG</button>
+    </header>
+
+    <div id="bossBar" hidden>
+      <div class="bossName"><span id="bossTitle">MNEMOSYNE</span><span id="bossSub">MEMORY OF EVERY OBJECT</span></div>
+      <div class="bar"><i id="bossFill"></i></div>
+    </div>
+
+    <div id="gateBar" hidden>
+      <div class="bossName"><span id="gateTitle">THE GATE</span><span id="gateSub">SEALED — BREAK IT OPEN</span></div>
+      <div class="bar gate"><i id="gateFill"></i></div>
+    </div>
+
+    <div id="alerts"></div>
+
+    <!-- ============ ABILITIES ============ -->
+    <div id="abilityHint"></div>
+    <nav id="abilities"></nav>
+
+    <!-- ============ DEBUG ============ -->
+    <section id="debugPanel" hidden>
+      <div class="dbgHead">
+        <strong>DEBUG</strong>
+        <button class="x" id="dbgClose" aria-label="Close">✕</button>
+      </div>
+      <div class="dbgGrid" id="dbgGrid"></div>
+      <div class="dbgStats" id="dbgStats"></div>
+    </section>
+
+    <!-- ============ BOOT SCREEN ============ -->
+    <section id="boot">
+      <div class="bootInner">
+        <div class="bootKicker">ANOMALOUS OBJECT CONTAINMENT</div>
+        <h1>SIMULATION<br><b>7749</b></h1>
+        <p class="bootBody">
+          A turret. A wall. A gate that opens one way.<br>
+          Five hundred objects are queued for release.<br>
+          You will be told a story while you work.
+        </p>
+        <ul class="bootKeys">
+          <li><span>TAP</span> anywhere ahead of the turret to fire. Hold to sustain.</li>
+          <li><span>ABILITIES</span> along the bottom. One tap, no cost, no upgrades.</li>
+          <li><span>CONTACT</span> will not kill you. It will corrupt the feed until you clear it.</li>
+        </ul>
+        <button id="startBtn">BEGIN SIMULATION</button>
+        <div class="bootFoot">Add to Home Screen for fullscreen playback.</div>
+      </div>
+    </section>
+
+    <!-- ============ END SCREEN ============ -->
+    <section id="endScreen" hidden>
+      <div id="endText"></div>
+      <button id="resetBtn" hidden>RESET SIMULATION</button>
+    </section>
+
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
