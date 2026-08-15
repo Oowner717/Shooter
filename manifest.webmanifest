@@ -2,7 +2,7 @@
   "name": "SIMULATION 7749",
   "short_name": "SIM 7749",
   "description": "A physics shooter about remembering. Five hundred objects, one gate, one god.",
-  "id": "/sim7749/",
+  "id": "./",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
