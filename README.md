@@ -129,8 +129,14 @@ serpentine, hooking or loitering — as a lateral offset that folds in as it
 closes. Two of the same type released together arrive by visibly different
 arcs, and all of them still arrive.
 
-Everything leaves **debris**: smaller bodies that are themselves destructible,
-pushable, and dangerous to each other.
+Everything leaves **fragments**: smaller bodies that are themselves
+destructible, pushable, and dangerous to each other. Up to 128 can be loose at
+once, and a bulwark alone sheds fourteen.
+
+Drift and fragments are budgeted **separately** from hostiles — `hostileCount()`
+is what the spawn director measures against `popStart`/`popEnd`, so the amount
+of harmless matter floating around can be changed freely without touching the
+pace of the run.
 
 ### The physics
 

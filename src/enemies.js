@@ -285,7 +285,7 @@ export class Enemy {
       const child = TYPE_BY_ID[t.splits.type];
       for (let i = 0; i < t.splits.count; i++) {
         // a little over the cap: a split should not be silently swallowed
-        if (world.enemies.length >= CFG.maxEnemies + 8) break;
+        if (hostileCount(world) >= CFG.maxEnemies + 8) break;
         const a = (i / t.splits.count) * TAU + rand(0, 1);
         const sp = rand(90, 190);
         world.enemies.push(new Enemy(child, this.x + Math.cos(a) * this.r * 0.7, this.y + Math.sin(a) * this.r * 0.7, {
@@ -598,6 +598,22 @@ function drawChip(ctx, r, phase) {
 
 const FORMATIONS = ['line', 'wedge', 'column', 'arc', 'cluster', 'ring'];
 
+/**
+ * Objects that actually count against the spawn budget. Harmless drift is
+ * tracked separately so raising its population can never slow the run down.
+ */
+export function hostileCount(world) {
+  let n = 0;
+  for (const e of world.enemies) if (!e.dead && !e.harmless) n++;
+  return n;
+}
+
+function driftCount(world) {
+  let n = 0;
+  for (const e of world.enemies) if (!e.dead && e.harmless) n++;
+  return n;
+}
+
 /** Types that have unlocked at the current kill count. */
 function availableTypes(kills) {
   return ENEMY_TYPES.filter((t) => kills >= (t.unlock || 0));
@@ -682,7 +698,7 @@ export class Director {
         { staged: false, spawnIn: rand(0.4, 1.4), vx: spread(20), vy: rand(0, 20) },
       );
     }
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 6; i++) {
       spawnDrift(world, {
         x: rand(60, world.width - 60),
         y: rand(top, Math.max(top + 60, bottom)),
@@ -696,9 +712,8 @@ export class Director {
     // A slow trickle of aimless matter, capped so it never crowds the field.
     this.driftTimer -= dt;
     if (this.driftTimer <= 0) {
-      this.driftTimer = rand(7, 13);
-      const drifting = world.enemies.reduce((n, e) => n + (e.harmless && !e.dead ? 1 : 0), 0);
-      if (drifting < CFG.maxDrift && world.enemies.length < CFG.maxEnemies) spawnDrift(world);
+      this.driftTimer = rand(3.5, 6.5);
+      if (driftCount(world) < CFG.maxDrift) spawnDrift(world);
     }
 
     const progress = clamp(world.kills / CFG.popRampKills, 0, 1);
@@ -709,10 +724,11 @@ export class Director {
     if (this.timer > 0) return;
     this.timer = interval * rand(0.8, 1.25);
 
-    if (world.enemies.length >= Math.min(popTarget, CFG.maxEnemies)) return;
+    const hostiles = hostileCount(world);
+    if (hostiles >= Math.min(popTarget, CFG.maxEnemies)) return;
 
     const kinds = availableTypes(world.kills);
-    const room = Math.min(popTarget, CFG.maxEnemies) - world.enemies.length;
+    const room = Math.min(popTarget, CFG.maxEnemies) - hostiles;
 
     if (room >= 4 && Math.random() < CFG.formationChance) {
       spawnFormation(world, kinds, randInt(3, Math.min(6, room)));

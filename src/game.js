@@ -7,7 +7,7 @@ import { fx, updateFx, drawFx, drawFlash, spark, ring, shake } from './fx.js';
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, spawnFormation, spawnDrift, applyBlast } from './enemies.js';
+import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast } from './enemies.js';
 import { Shooter } from './shooter.js';
 import { Wall } from './gate.js';
 import { Boss } from './boss.js';
@@ -723,7 +723,7 @@ export class Game {
         `fps    ${this.fps.toFixed(0)}\n`
         + `phase  ${w.phase}\n`
         + `kills  ${w.kills}\n`
-        + `obj    ${w.enemies.length} + ${w.debris.length} deb\n`
+        + `obj    ${hostileCount(w)} hostile + ${w.enemies.length - hostileCount(w)} drift + ${w.debris.length} frag\n`
         + `shots  ${w.projectiles.length}\n`
         + `parts  ${fx.particles.active.length}\n`
         + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}\n`
@@ -991,7 +991,7 @@ export class Game {
 
   debugFillField() {
     const w = this.world;
-    while (w.enemies.length < CFG.maxEnemies) {
+    while (hostileCount(w) < CFG.maxEnemies) {
       const t = weightedPick(ENEMY_TYPES);
       spawnOne(w, t, rand(t.r + 10, w.width - t.r - 10), rand(w.wall.y + 60, w.floorY - 120), {
         staged: false,
@@ -1002,8 +1002,10 @@ export class Game {
 
   debugClearField() {
     const w = this.world;
-    for (const e of w.enemies) if (!e.dead) e.destroy(w);
-    for (const e of w.debris) if (!e.dead) e.destroy(w);
+    // Snapshot first: destroying an object appends its fragments to w.debris,
+    // and a live for..of would walk straight into them and kill those too.
+    for (const e of [...w.enemies]) if (!e.dead) e.destroy(w);
+    for (const e of [...w.debris]) if (!e.dead) e.destroy(w);
   }
 
   debugThrowMine() {

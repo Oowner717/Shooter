@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '8';
+export const BUILD = '9';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -23,8 +23,8 @@ export const CFG = {
 
   // ---- population -----------------------------------------------------
   maxEnemies: 44,
-  maxDebris: 64,
-  maxDrift: 5, // aimless, harmless bodies alive at once
+  maxDebris: 128,
+  maxDrift: 10, // aimless, harmless bodies alive at once
   maxParticles: 620,
   popStart: 13,
   popEnd: 30, // population target ramps between these over the run
@@ -160,7 +160,7 @@ export const ENEMY_TYPES = [
     color: '#7ef9ff',
     glow: '#00d4ff',
     weight: 22,
-    debris: 2,
+    debris: 4,
   },
   {
     id: 'needle',
@@ -177,7 +177,7 @@ export const ENEMY_TYPES = [
     color: '#ffd166',
     glow: '#ff9f1c',
     weight: 14,
-    debris: 1,
+    debris: 2,
   },
   {
     id: 'lurcher',
@@ -195,7 +195,7 @@ export const ENEMY_TYPES = [
     color: '#b98cff',
     glow: '#8b5cf6',
     weight: 20,
-    debris: 4,
+    debris: 8,
   },
   {
     id: 'splitter',
@@ -212,7 +212,7 @@ export const ENEMY_TYPES = [
     color: '#7cffb2',
     glow: '#22d37a',
     weight: 12,
-    debris: 2,
+    debris: 4,
     splits: { type: 'mote', count: 4 },
   },
   {
@@ -230,7 +230,7 @@ export const ENEMY_TYPES = [
     color: '#ff5d8f',
     glow: '#ff2d6f',
     weight: 10,
-    debris: 3,
+    debris: 6,
     detonate: { radius: 132, damage: 96 },
   },
   {
@@ -249,7 +249,7 @@ export const ENEMY_TYPES = [
     color: '#9fb3c8',
     glow: '#5f7fa6',
     weight: 8,
-    debris: 7,
+    debris: 14,
   },
   {
     id: 'warden',
@@ -266,7 +266,7 @@ export const ENEMY_TYPES = [
     color: '#ff9f1c',
     glow: '#ff6b00',
     weight: 8,
-    debris: 3,
+    debris: 6,
     shards: 3, // orbiting plates that eat incoming bolts
   },
   {
@@ -287,7 +287,7 @@ export const ENEMY_TYPES = [
     color: '#8fa9c4',
     glow: '#4f6f92',
     weight: 0, // never chosen by the ordinary spawn roll
-    debris: 1,
+    debris: 2,
   },
   {
     id: 'prism',
@@ -304,7 +304,7 @@ export const ENEMY_TYPES = [
     color: '#e0aaff',
     glow: '#c77dff',
     weight: 6,
-    debris: 2,
+    debris: 4,
     reflect: 0.55, // glancing bolts bounce off instead of landing
   },
 ];
