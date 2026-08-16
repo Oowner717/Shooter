@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '5';
+export const BUILD = '6';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -45,6 +45,7 @@ export const CFG = {
     gripLen: 112, // world units from pivot to grip
     gripR: 24, // grip knob radius
     gripFireInterval: 0.2,
+    autoFireInterval: 0.22, // hands-off cadence; a shade behind driving it yourself
     gripReturn: 6.5, // rad/s spring back to neutral on release
   },
 

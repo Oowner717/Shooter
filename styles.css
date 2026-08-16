@@ -268,11 +268,52 @@ html, body {
   100% { box-shadow: inset 0 0 0 0 transparent; }
 }
 
+/* Assist toggles flank the lever: reachable by either thumb, clear of the
+   arc the grip swings through. */
+#autoToggles {
+  position: absolute;
+  left: calc(var(--safe-l) + 10px);
+  right: calc(var(--safe-r) + 10px);
+  bottom: calc(var(--safe-b) + var(--bar-h) + 14px);
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.toggleChip {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(6, 12, 22, 0.74);
+  color: var(--dim);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: transform 0.07s ease, color 0.15s, border-color 0.15s;
+}
+.toggleChip svg { width: 13px; height: 13px; display: block; }
+.toggleChip:active { transform: scale(0.93); }
+.toggleChip.on {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: rgba(12, 34, 52, 0.82);
+}
+.toggleChip.on svg { filter: drop-shadow(0 0 5px currentColor); }
+
+/* Above the lever's grip, not beside it — the grip owns the strip directly
+   over the ability bar. */
 #abilityHint {
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: calc(var(--safe-b) + var(--bar-h) + 12px);
+  left: 10px;
+  right: 10px;
+  bottom: calc(var(--safe-b) + var(--bar-h) + 118px);
   text-align: center;
   font-size: 10px;
   letter-spacing: 0.12em;
@@ -444,6 +485,7 @@ body.ending #topbar,
 body.ending #abilities,
 body.ending #alerts,
 body.ending #status,
+body.ending #autoToggles,
 body.ending #bossBar,
 body.ending #gateBar {
   opacity: 0;

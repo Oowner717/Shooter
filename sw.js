@@ -7,7 +7,7 @@
 // the game runs on a plane, not to save a round trip on every launch.
 //
 // BUILD must match CFG.build in src/config.js.
-const BUILD = '5';
+const BUILD = '6';
 const CACHE = `sim7749-${BUILD}`;
 const NET_TIMEOUT = 3500;
 

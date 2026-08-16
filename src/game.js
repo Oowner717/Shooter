@@ -1,7 +1,7 @@
 // World state, phase machine, physics stepping and the render pipeline.
 
 import { CFG, BUILD, ENEMY_TYPES } from './config.js';
-import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick } from './util.js';
+import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
 import { Grid, integrate, resolvePair, resolveBox, clampToArena, impactDamage } from './physics.js';
 import { fx, updateFx, drawFx, drawFlash, spark, ring, shake } from './fx.js';
 import { background } from './background.js';
@@ -33,9 +33,9 @@ export class Game {
     this.bodies = [];
     this.pointers = new Map();
     this.gripPointer = null;
-    this.gripTimer = 0;
+    this.fireTimer = 0;
     this.leverHinted = false;
-    this.holdTimer = 0;
+    this.autoHinted = { autoAim: false, autoFire: false };
     this.acc = 0;
     this.frameTimes = [];
     this.fps = 60;
@@ -90,6 +90,8 @@ export class Game {
       lockout: 0,
       bossContact: 0,
       gripDriven: false, // is the lever the control currently steering the barrel?
+      autoAim: false,
+      autoFire: false,
       veilFade: 0, // eased so VEIL closes in rather than snapping
 
       nextStoryAt: CFG.storyEvery,
@@ -254,10 +256,10 @@ export class Game {
         w.gripDriven = true;
         s.grabGrip(p.x, p.y, w.invert > 0);
         s.shoot(w);
-        this.gripTimer = CFG.shooter.gripFireInterval;
+        this.fireTimer = CFG.shooter.gripFireInterval;
         if (!this.leverHinted) {
           this.leverHinted = true;
-          this.hud.showHint('LEVER — swing it and hold. The barrel goes the other way, and it fires by itself.');
+          this.hud.showHint('LEVER — swing and hold. The barrel goes the other way.');
         }
       } else {
         this.pointers.set(ev.pointerId, p);
@@ -265,7 +267,7 @@ export class Game {
         s.aimAt(p.x, p.y, w.invert > 0);
         s.aim = s.targetAim; // taps are instant, drags slew
         s.shoot(w);
-        this.holdTimer = CFG.shooter.holdFireInterval;
+        this.fireTimer = CFG.shooter.holdFireInterval;
       }
       ev.preventDefault();
     }, { passive: false });
@@ -313,6 +315,92 @@ export class Game {
     if (res.first) this.hud.showHint(res.slot.def.hint);
   }
 
+  toggleAuto(key) {
+    const w = this.world;
+    w[key] = !w[key];
+    this.hud.setAuto(key, w[key]);
+    audio.chime(w[key] ? 760 : 430);
+    if (w[key] && !this.autoHinted[key]) {
+      this.autoHinted[key] = true;
+      this.hud.showHint(key === 'autoAim'
+        ? 'AUTO AIM — tracks and fires on the nearest breacher.'
+        : 'AUTO FIRE — keeps shooting wherever the barrel points.');
+    }
+  }
+
+  /**
+   * Nearest object that is currently corrupting the feed, falling back to the
+   * nearest live threat. Only considers bearings the barrel can actually
+   * reach, so auto aim never locks onto something behind the turret.
+   */
+  autoTarget() {
+    const w = this.world;
+    const s = w.shooter;
+    const limit = CFG.shooter.aimClamp + 0.04;
+    let best = null;
+    let bestScore = Infinity;
+    for (const e of w.enemies) {
+      if (e.dead || e.staged) continue;
+      const dx = e.x - s.x;
+      const dy = e.y - s.y;
+      if (Math.abs(angleDelta(-Math.PI / 2, Math.atan2(dy, dx))) > limit) continue;
+      // a marked breacher outranks anything four times closer
+      const score = Math.hypot(dx, dy) * (e.attacking ? 0.25 : 1);
+      if (score < bestScore) { bestScore = score; best = e; }
+    }
+    if (!best && w.boss && !w.boss.dead && w.boss.intro >= 1) best = w.boss;
+    return best;
+  }
+
+  /** Aim where the target will be, not where it is. */
+  aimLead(target) {
+    const w = this.world;
+    const s = w.shooter;
+    const speed = CFG.bolt.speed * (w.chrono > 0 ? 0.42 : 1);
+    const flight = Math.hypot(target.x - s.x, target.y - s.y) / speed;
+    s.aimAt(target.x + (target.vx || 0) * flight, target.y + (target.vy || 0) * flight, w.invert > 0);
+    // swing the lever to match, so the rod always shows where the barrel points
+    s.gripAngle = s.targetAim + Math.PI;
+  }
+
+  /**
+   * One cadence for every way of shooting. Manual input outranks the assists,
+   * and nothing fires twice in a frame.
+   */
+  updateFiring(dt) {
+    const w = this.world;
+    const s = w.shooter;
+    if (w.phase === 'ending' || w.phase === 'boot') return;
+
+    const dragging = this.pointers.size > 0;
+    const manual = s.gripHeld || dragging;
+    const target = w.autoAim ? this.autoTarget() : null;
+
+    if (!manual) {
+      if (target) {
+        this.aimLead(target);
+        w.gripDriven = false; // auto aim owns the barrel
+      } else {
+        w.gripDriven = true; // nothing steering: the lever springs to vertical
+      }
+    }
+
+    let interval = 0;
+    if (s.gripHeld) interval = CFG.shooter.gripFireInterval;
+    else if (dragging) interval = CFG.shooter.holdFireInterval;
+    else if (w.autoFire || target) interval = CFG.shooter.autoFireInterval;
+    if (interval <= 0) return;
+
+    this.fireTimer -= dt;
+    if (this.fireTimer > 0) return;
+    this.fireTimer = interval;
+    if (dragging && !s.gripHeld) {
+      const last = [...this.pointers.values()].pop();
+      if (last) s.aimAt(last.x, last.y, w.invert > 0);
+    }
+    s.shoot(w);
+  }
+
   // -------------------------------------------------------------- update
 
   update(dtRaw) {
@@ -344,27 +432,7 @@ export class Game {
     w.bossContact = Math.max(0, w.bossContact - dt);
     w.veilFade += ((w.veil > 0 ? 1 : 0) - w.veilFade) * clamp(dt * 3.4, 0, 1);
 
-    // ---- the lever fires on its own for as long as it is held ----
-    if (w.shooter.gripHeld && w.phase !== 'ending') {
-      this.gripTimer -= dt;
-      if (this.gripTimer <= 0) {
-        this.gripTimer = CFG.shooter.gripFireInterval;
-        w.shooter.shoot(w);
-      }
-    }
-
-    // ---- sustained fire from a held direct-aim touch ----
-    if (this.pointers.size > 0 && w.phase !== 'ending') {
-      this.holdTimer -= dt;
-      if (this.holdTimer <= 0) {
-        this.holdTimer = CFG.shooter.holdFireInterval;
-        const last = [...this.pointers.values()].pop();
-        if (last) {
-          w.shooter.aimAt(last.x, last.y, w.invert > 0);
-          w.shooter.shoot(w);
-        }
-      }
-    }
+    this.updateFiring(dt);
 
     w.abilities.update(dt);
     w.shooter.update(w, dt);

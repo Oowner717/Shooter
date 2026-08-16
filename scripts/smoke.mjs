@@ -29,7 +29,13 @@ const page = await ctx.newPage();
 
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}\n${e.stack}`));
-page.on('requestfailed', (r) => errors.push(`requestfailed: ${r.url()} ${r.failure()?.errorText}`));
+page.on('requestfailed', (r) => {
+  // A deliberate reload (the build-change escape hatch) aborts whatever was
+  // in flight; that is expected, not a failure.
+  const why = r.failure()?.errorText || '';
+  if (why.includes('ERR_ABORTED')) return;
+  errors.push(`requestfailed: ${r.url()} ${why}`);
+});
 
 await page.goto(BASE, { waitUntil: 'load' });
 await sleep(700);

@@ -1,7 +1,7 @@
 // Five abilities. No costs, no upgrades, no unlocks — they exist purely
 // because they are satisfying. Each one is legible from its first use.
 
-import { TAU, clamp, rand, spread, rgba, drawGlow, segClosest } from './util.js';
+import { TAU, clamp, rand, spread, smoothstep, rgba, drawGlow, segClosest } from './util.js';
 import { spark, dot, ring, ripple, shake, flash } from './fx.js';
 import { fire } from './projectiles.js';
 import { applyBlast } from './enemies.js';
@@ -48,82 +48,118 @@ class Beam {
   }
 }
 
+// The singularity runs in two acts: a long gather that drags everything into
+// one grinding knot, then a short collapse that crushes the knot and blows.
+// Most of the damage comes from the objects hitting each other on the way in.
+const WELL_GATHER = 2.5;
+const WELL_COLLAPSE = 0.6;
+const WELL_REACH = 430;
+
 class Well {
   constructor(x, y) {
     this.x = x;
     this.y = y;
-    this.life = 2.7;
-    this.max = 2.7;
-    this.r = 0;
+    this.max = WELL_GATHER + WELL_COLLAPSE;
+    this.life = this.max;
+    this.r = WELL_REACH * 0.3;
+    this.crush = 0;
     this.dead = false;
     this.spin = 0;
   }
 
   update(world, dt) {
     this.life -= dt;
-    this.spin += dt * 3.4;
-    const t = 1 - this.life / this.max;
-    this.r = 150 * Math.sin(clamp(t, 0, 1) * Math.PI) + 24;
+    const age = this.max - this.life;
+    this.crush = clamp((age - WELL_GATHER) / WELL_COLLAPSE, 0, 1);
+    const ramp = smoothstep(clamp(age / 0.8, 0, 1));
+    this.spin += dt * (2.6 + this.crush * 14);
+    // the event horizon draws in as it crushes
+    this.r = WELL_REACH * 0.3 * (1 - this.crush * 0.86) + 20;
 
-    const pull = 2600;
+    // A tractor beam rather than a gravity field: velocity is driven toward a
+    // fixed inward speed, so bodies converge instead of slingshotting into
+    // escape orbits. They still collide with each other the whole way in —
+    // that is where most of the damage comes from.
+    const blend = clamp(9 * ramp * dt, 0, 1);
+    const inward = 270 * (1 + this.crush * 1.6);
+    const swirl = 130 * (1 - this.crush);
+
     const grab = (list) => {
       for (const e of list) {
         if (e.dead) continue;
         const dx = this.x - e.x;
         const dy = this.y - e.y;
         const d = Math.hypot(dx, dy);
-        if (d > 320 || d < 1) continue;
-        const f = (pull / Math.max(d, 40)) * dt;
-        e.vx += (dx / d) * f;
-        e.vy += (dy / d) * f;
-        e.av += 0.6 * dt;
+        if (d > WELL_REACH || d < 0.5) continue;
+        const nx = dx / d;
+        const ny = dy / d;
+        // ease off inside the knot so they pack together instead of
+        // driving straight through the middle and out the far side
+        const closing = inward * Math.min(1, d / 70);
+        const tan = swirl * Math.min(1, d / 120);
+        const wantX = nx * closing - ny * tan;
+        const wantY = ny * closing + nx * tan;
+        e.vx += (wantX - e.vx) * blend;
+        e.vy += (wantY - e.vy) * blend;
+        e.av += 1.4 * dt;
       }
     };
     grab(world.enemies);
     grab(world.debris);
 
-    if (Math.random() < 0.7) {
+    // infalling matter
+    const streams = this.crush > 0 ? 3 : 1;
+    for (let i = 0; i < streams; i++) {
+      if (Math.random() > 0.7) continue;
       const a = rand(0, TAU);
-      const rr = rand(120, 260);
-      spark(this.x + Math.cos(a) * rr, this.y + Math.sin(a) * rr, -Math.cos(a) * 420, -Math.sin(a) * 420, '#c77dff', 0.3, 2);
+      const rr = rand(this.r * 1.4, WELL_REACH);
+      spark(this.x + Math.cos(a) * rr, this.y + Math.sin(a) * rr,
+        -Math.cos(a) * (380 + this.crush * 700), -Math.sin(a) * (380 + this.crush * 700),
+        this.crush > 0 ? '#ffffff' : '#c77dff', 0.3, 2);
     }
 
     if (this.life <= 0) {
       this.dead = true;
-      applyBlast(world, { x: this.x, y: this.y, r: 190, damage: 90, impulse: 900 });
-      ring(this.x, this.y, 10, 320, 0.4, '#e0aaff', 5);
-      ring(this.x, this.y, 0, 160, 0.25, '#ffffff', 2);
-      ripple(this.x, this.y, 1.8, 700);
-      flash(0.3, '#e0c2ff');
-      shake(11);
+      applyBlast(world, { x: this.x, y: this.y, r: 210, damage: 105, impulse: 1000 });
+      ring(this.x, this.y, 10, 340, 0.42, '#e0aaff', 5);
+      ring(this.x, this.y, 0, 170, 0.26, '#ffffff', 2);
+      ripple(this.x, this.y, 1.9, 720);
+      flash(0.32, '#e0c2ff');
+      shake(12);
       audio.boom();
     }
   }
 
   draw(ctx, world) {
-    const t = clamp(this.life / this.max, 0, 1);
+    const fade = clamp(this.life / 0.35, 0, 1);
+    const heat = this.crush;
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, '#7b2cbf', 0, 0, this.r * 2.4, 0.45 * t);
+    drawGlow(ctx, heat > 0 ? '#ffffff' : '#7b2cbf', 0, 0, this.r * (2.4 + heat * 1.6), (0.4 + heat * 0.5) * fade);
+
+    // accretion disc — tilts and tightens as the well crushes down
     ctx.rotate(this.spin);
-    ctx.strokeStyle = rgba('#e0aaff', 0.7 * t);
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = rgba('#e0aaff', 0.7 * fade);
+    ctx.lineWidth = 1.4 + heat * 2;
     for (let i = 0; i < 4; i++) {
       ctx.beginPath();
-      ctx.ellipse(0, 0, this.r * (0.5 + i * 0.22), this.r * (0.16 + i * 0.1), i * 0.8 + world.time, 0, TAU);
+      ctx.ellipse(0, 0, this.r * (0.5 + i * 0.22), this.r * (0.16 + i * 0.1) * (1 - heat * 0.6),
+        i * 0.8 + world.time, 0, TAU);
       ctx.stroke();
     }
     ctx.globalCompositeOperation = 'source-over';
+
+    // the hole itself
     ctx.fillStyle = '#05010a';
     ctx.beginPath();
-    ctx.arc(0, 0, Math.max(2, this.r * 0.2), 0, TAU);
+    ctx.arc(0, 0, Math.max(2, this.r * 0.22), 0, TAU);
     ctx.fill();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = rgba('#ffffff', 0.8 * t);
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = rgba('#ffffff', (0.8 + heat * 0.2) * fade);
+    ctx.lineWidth = 1.6 + heat * 2.4;
     ctx.beginPath();
-    ctx.arc(0, 0, Math.max(2.4, this.r * 0.22), 0, TAU);
+    ctx.arc(0, 0, Math.max(2.4, this.r * 0.24), 0, TAU);
     ctx.stroke();
     ctx.globalCompositeOperation = 'source-over';
     ctx.restore();
@@ -172,7 +208,7 @@ export const ABILITIES = [
     color: '#59e0ff',
     cooldown: 7,
     icon: ICON.pulse,
-    hint: 'PULSE — shockwave from the turret. Everything nearby gets shoved away.',
+    hint: 'PULSE — a shockwave. Shoves everything away from you.',
     run(world) {
       const s = world.shooter;
       applyBlast(world, { x: s.x, y: s.y, r: 340, damage: 58, impulse: 1050 });
@@ -194,13 +230,15 @@ export const ABILITIES = [
     color: '#7cffb2',
     cooldown: 5,
     icon: ICON.fan,
-    hint: 'FAN — 22 pellets in a wide spray. Good for crowds.',
+    hint: 'FAN — 25 pellets in a tight cone.',
     run(world) {
       const s = world.shooter;
-      for (let i = 0; i < 22; i++) {
-        const a = s.aim + ((i / 21) - 0.5) * 1.5 + spread(0.03);
+      const count = 25;
+      const arc = 1.12; // narrower than it was, so the pellets land together
+      for (let i = 0; i < count; i++) {
+        const a = s.aim + ((i / (count - 1)) - 0.5) * arc + spread(0.022);
         fire(world, s.muzzleX, s.muzzleY, a, {
-          speed: rand(900, 1240),
+          speed: rand(1000, 1230),
           r: 3,
           damage: 15,
           impulse: 34,
@@ -221,7 +259,7 @@ export const ABILITIES = [
     color: '#ffd166',
     cooldown: 12,
     icon: ICON.lance,
-    hint: 'LANCE — piercing beam. Locks onto the biggest thing on screen.',
+    hint: 'LANCE — piercing beam, locked to the biggest threat.',
     run(world) {
       const s = world.shooter;
       const target = bestTarget(world);
@@ -272,7 +310,7 @@ export const ABILITIES = [
     color: '#c77dff',
     cooldown: 19,
     icon: ICON.well,
-    hint: 'WELL — a singularity. Objects get dragged together and break each other.',
+    hint: 'WELL — drags everything into a knot, then collapses.',
     run(world) {
       const p = densestPoint(world);
       world.effects.push(new Well(p.x, p.y));
@@ -286,7 +324,7 @@ export const ABILITIES = [
     color: '#9fe8ff',
     cooldown: 21,
     icon: ICON.stasis,
-    hint: 'STASIS — objects freeze for four seconds. Your shots do not.',
+    hint: 'STASIS — objects freeze. Your shots do not.',
     run(world) {
       world.stasis = 4;
       for (const e of world.enemies) { e.vx *= 0.1; e.vy *= 0.1; e.av *= 0.1; }

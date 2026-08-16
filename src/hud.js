@@ -34,6 +34,8 @@ export class Hud {
       endText: $('endText'),
       resetBtn: $('resetBtn'),
       muteBtn: $('muteBtn'),
+      autoAimBtn: $('autoAimBtn'),
+      autoFireBtn: $('autoFireBtn'),
       dbgBtn: $('dbgBtn'),
     };
 
@@ -57,6 +59,15 @@ export class Hud {
     this.el.resetBtn.addEventListener('click', () => game.restart());
     this.el.muteBtn.addEventListener('click', () => game.toggleSound());
     this.el.dbgBtn.addEventListener('click', () => this.toggleDebug());
+    for (const key of ['autoAim', 'autoFire']) {
+      const el = this.el[`${key}Btn`];
+      el.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        game.toggleAuto(key);
+      });
+      el.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    }
     $('dbgClose').addEventListener('click', () => this.toggleDebug(false));
   }
 
@@ -303,6 +314,12 @@ export class Hud {
     this.el.endScreen.hidden = true;
     this.el.endText.innerHTML = '';
     this.el.resetBtn.hidden = true;
+  }
+
+  setAuto(key, on) {
+    const el = this.el[`${key}Btn`];
+    el.classList.toggle('on', on);
+    el.setAttribute('aria-pressed', String(on));
   }
 
   setSound(on) {

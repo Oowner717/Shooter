@@ -28,7 +28,7 @@
  * BUILD must match `BUILD` in src/config.js and sw.js.
  */
 (function () {
-  var BUILD = '5';
+  var BUILD = '6';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -36,13 +36,21 @@
       localStorage.setItem(KEY, BUILD);
       return;
     }
-    navigator.serviceWorker.getRegistrations()
-      .then(function (regs) { return Promise.all(regs.map(function (r) { return r.unregister(); })); })
-      .then(function () { return caches.keys(); })
-      .then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k); })); })
-      .then(function () {
-        localStorage.setItem(KEY, BUILD);
-        location.reload();
+    Promise.all([navigator.serviceWorker.getRegistrations(), caches.keys()])
+      .then(function (state) {
+        var regs = state[0];
+        var keys = state[1];
+        // Nothing cached yet — a first visit has nothing stale to escape.
+        if (!regs.length && !keys.length) {
+          localStorage.setItem(KEY, BUILD);
+          return null;
+        }
+        return Promise.all(regs.map(function (r) { return r.unregister(); }))
+          .then(function () { return Promise.all(keys.map(function (k) { return caches.delete(k); })); })
+          .then(function () {
+            localStorage.setItem(KEY, BUILD);
+            location.reload();
+          });
       })
       .catch(function () { localStorage.setItem(KEY, BUILD); });
   } catch (err) {
@@ -85,6 +93,18 @@
 
     <div id="alerts"></div>
     <div id="status"></div>
+
+    <!-- ============ ASSIST TOGGLES ============ -->
+    <div id="autoToggles">
+      <button id="autoAimBtn" class="toggleChip" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
+        <span>AUTO AIM</span>
+      </button>
+      <button id="autoFireBtn" class="toggleChip" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21V8"/><path d="M8.6 11.4 12 7l3.4 4.4"/><path d="M7 4h10" opacity=".7"/></svg>
+        <span>AUTO FIRE</span>
+      </button>
+    </div>
 
     <!-- ============ ABILITIES ============ -->
     <div id="abilityHint"></div>

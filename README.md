@@ -44,6 +44,21 @@ tap-rate limit — tap as fast as your thumb allows, or hold and drag to sustain
 fire. Both controls work at once, so you can drive the lever with one thumb
 and tap with the other.
 
+**Two assists** sit either side of the lever, both toggles, both off by
+default:
+
+- **AUTO FIRE** keeps shooting wherever the barrel happens to point. With no
+  hand on the lever the barrel rests straight up, so this alone is a fountain.
+- **AUTO AIM** tracks the nearest object currently corrupting your feed — a
+  marked breacher outranks anything four times closer — leads the shot for
+  flight time, and fires on it. The lever visibly swings to match. With no
+  target it holds fire and lets the barrel settle back to vertical.
+
+Your hands always win: while you are holding the lever or dragging, the
+assists stop steering. Auto fire runs a shade slower than driving it yourself,
+so playing actively is still worth it. The boss's INVERT power mirrors auto aim
+too — it corrupts targeting, not just fingers.
+
 **Five abilities** sit along the bottom, in the strip your thumb already rests
 on. One tap each, no cost, no upgrades, no unlocks. The first time you use one,
 a caption explains it.
@@ -51,9 +66,9 @@ a caption explains it.
 | | Ability | What it does | Cooldown |
 |---|---|---|---|
 | ◎ | **PULSE** | Shockwave from the turret; shoves everything away | 7 s |
-| Ψ | **FAN** | 22 pellets in a wide spray | 5 s |
+| Ψ | **FAN** | 25 pellets in a tight cone | 5 s |
 | ↑ | **LANCE** | Piercing beam, auto-locked to the biggest threat | 12 s |
-| ✳ | **WELL** | Singularity — drags objects together so they break each other | 19 s |
+| ✳ | **WELL** | Singularity — hauls everything into one grinding knot, then collapses | 19 s |
 | ❄ | **STASIS** | Objects freeze for four seconds; your shots do not | 21 s |
 
 **Contact does not kill you.** When an object touches the turret the feed
@@ -101,8 +116,9 @@ what light ones can't.
 
 **Collision damage is live.** Impacts above a threshold hurt *both* bodies in
 proportion to reduced mass and closing speed. Punting a mote into a lurcher
-hurts the lurcher. A WELL that slams six objects together kills most of them
-without you firing once.
+hurts the lurcher. WELL is built entirely on this: it drags everything within
+reach into one spinning knot and most of the kills happen on the way in,
+before the collapse goes off at all.
 
 ### The story
 

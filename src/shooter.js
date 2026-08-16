@@ -92,12 +92,14 @@ export class Shooter {
   }
 
   update(world, dt) {
-    if (!this.gripHeld) {
-      // sprung lever: the rod settles back to neutral when you let go
+    // `gripDriven` means the lever governs the barrel. While something else
+    // is steering — auto aim, a direct tap — the rod must not spring away
+    // from where that other thing put it.
+    if (!this.gripHeld && world.gripDriven) {
       const d = angleDelta(this.gripAngle, Math.PI / 2);
       const step = CFG.shooter.gripReturn * dt;
       this.gripAngle += clamp(d, -step, step);
-      if (world.gripDriven) this.targetAim = this.gripAngle - Math.PI;
+      this.targetAim = this.gripAngle - Math.PI;
     }
     this.gripGlow += ((this.gripHeld ? 1 : 0) - this.gripGlow) * clamp(dt * 12, 0, 1);
 
