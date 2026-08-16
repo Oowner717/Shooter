@@ -27,6 +27,11 @@ export class Shooter {
     this.heat = 0;
     this.cooldown = 0;
     this.spin = 0;
+
+    // --- lever ---
+    this.gripAngle = Math.PI / 2; // straight down = barrel straight up
+    this.gripHeld = false;
+    this.gripGlow = 0;
   }
 
   reset(x, y) {
@@ -36,6 +41,9 @@ export class Shooter {
     this.recoil = 0;
     this.heat = 0;
     this.cooldown = 0;
+    this.gripAngle = Math.PI / 2;
+    this.gripHeld = false;
+    this.gripGlow = 0;
   }
 
   aimAt(x, y, inverted) {
@@ -45,7 +53,54 @@ export class Shooter {
     this.targetAim = clampAim(Math.atan2(dy, dx));
   }
 
+  // ------------------------------------------------------------------ lever
+
+  get gripX() {
+    return this.x + Math.cos(this.gripAngle) * CFG.shooter.gripLen;
+  }
+
+  get gripY() {
+    return this.y + Math.sin(this.gripAngle) * CFG.shooter.gripLen;
+  }
+
+  /**
+   * Point the grip at (x, y). The rod is rigid, so the grip slides along its
+   * arc rather than following the finger exactly, and the barrel — being the
+   * other end of the same rod — swings the opposite way.
+   */
+  driveGrip(x, y, inverted) {
+    let dx = x - this.x;
+    if (inverted) dx = -dx;
+    const dy = y - this.y;
+    if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return;
+    // Clamp into the lower hemisphere, mirroring the barrel's own limit.
+    const down = Math.PI / 2;
+    const limit = CFG.shooter.aimClamp;
+    const d = clamp(angleDelta(down, Math.atan2(dy, dx)), -limit, limit);
+    this.gripAngle = down + d;
+    this.targetAim = this.gripAngle - Math.PI;
+  }
+
+  grabGrip(x, y, inverted) {
+    this.gripHeld = true;
+    this.driveGrip(x, y, inverted);
+    this.aim = this.targetAim; // the rod is already where your hand put it
+  }
+
+  releaseGrip() {
+    this.gripHeld = false;
+  }
+
   update(world, dt) {
+    if (!this.gripHeld) {
+      // sprung lever: the rod settles back to neutral when you let go
+      const d = angleDelta(this.gripAngle, Math.PI / 2);
+      const step = CFG.shooter.gripReturn * dt;
+      this.gripAngle += clamp(d, -step, step);
+      if (world.gripDriven) this.targetAim = this.gripAngle - Math.PI;
+    }
+    this.gripGlow += ((this.gripHeld ? 1 : 0) - this.gripGlow) * clamp(dt * 12, 0, 1);
+
     const d = angleDelta(this.aim, this.targetAim);
     const step = CFG.shooter.turnRate * dt;
     this.aim += clamp(d, -step, step);
@@ -91,24 +146,25 @@ export class Shooter {
     const t = world.time;
     const accent = bossHit ? '#ff2d55' : breached ? '#ff5d5d' : '#59e0ff';
 
-    // aim ray — also tells you what your thumb is standing on
+    // Aim ray. It reaches further while the lever is held, because that is
+    // when you are aiming by feel rather than by pointing at a target.
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const rayLen = 240;
-    const grad = ctx.createLinearGradient(
-      this.x, this.y,
-      this.x + Math.cos(this.aim) * rayLen,
-      this.y + Math.sin(this.aim) * rayLen,
-    );
-    grad.addColorStop(0, rgba(accent, 0.22));
+    const rayLen = 300 + this.gripGlow * 320;
+    const rx = this.x + Math.cos(this.aim) * rayLen;
+    const ry = this.y + Math.sin(this.aim) * rayLen;
+    const grad = ctx.createLinearGradient(this.x, this.y, rx, ry);
+    grad.addColorStop(0, rgba(accent, 0.2 + this.gripGlow * 0.22));
     grad.addColorStop(1, rgba(accent, 0));
     ctx.strokeStyle = grad;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(this.muzzleX, this.muzzleY);
-    ctx.lineTo(this.x + Math.cos(this.aim) * rayLen, this.y + Math.sin(this.aim) * rayLen);
+    ctx.lineTo(rx, ry);
     ctx.stroke();
     ctx.restore();
+
+    this.drawLever(ctx, accent, t);
 
     ctx.save();
     ctx.translate(this.x, this.y);
@@ -185,6 +241,77 @@ export class Shooter {
     ctx.arc(0, 0, 3.4, 0, TAU);
     ctx.fill();
     ctx.restore();
+  }
+
+  /**
+   * The half of the rod that hangs below the pivot, plus the grip on its end
+   * and the arc it travels. Drawn under the turret body so the rod reads as
+   * passing through it.
+   */
+  drawLever(ctx, accent, t) {
+    const len = CFG.shooter.gripLen;
+    const gx = this.gripX;
+    const gy = this.gripY;
+    const glow = this.gripGlow;
+
+    // travel arc — makes the control discoverable without being told
+    ctx.strokeStyle = rgba(accent, 0.17 + glow * 0.3);
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([7, 9]);
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, len, Math.PI / 2 - CFG.shooter.aimClamp, Math.PI / 2 + CFG.shooter.aimClamp);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // rod
+    ctx.strokeStyle = rgba('#4d6a86', 0.85);
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y);
+    ctx.lineTo(gx, gy);
+    ctx.stroke();
+    ctx.strokeStyle = rgba(accent, 0.5 + glow * 0.5);
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // grip
+    ctx.save();
+    ctx.translate(gx, gy);
+    ctx.rotate(this.gripAngle);
+    ctx.globalCompositeOperation = 'lighter';
+    drawGlow(ctx, accent, 0, 0, 46 + glow * 26, 0.22 + glow * 0.45);
+    ctx.globalCompositeOperation = 'source-over';
+
+    ctx.fillStyle = 'rgba(11,22,35,0.95)';
+    ctx.strokeStyle = rgba(accent, 0.75 + glow * 0.25);
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, 19, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+
+    // knurling, and a firing pulse while held
+    ctx.strokeStyle = rgba(accent, 0.35 + glow * 0.4);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU + t * 0.6;
+      ctx.moveTo(Math.cos(a) * 8, Math.sin(a) * 8);
+      ctx.lineTo(Math.cos(a) * 14, Math.sin(a) * 14);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    if (glow > 0.02) {
+      const pulse = (t % CFG.shooter.gripFireInterval) / CFG.shooter.gripFireInterval;
+      ctx.strokeStyle = rgba(accent, (1 - pulse) * glow * 0.75);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(gx, gy, 19 + pulse * 16, 0, TAU);
+      ctx.stroke();
+    }
   }
 }
 

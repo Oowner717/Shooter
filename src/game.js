@@ -17,10 +17,12 @@ import { Narrator, ENDING } from './narrative.js';
 import { Hud } from './hud.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
+const HUD_TOP_MIN = 20; // matches --hud-t: phones without a notch still have a status bar
 
 export class Game {
   constructor(canvas) {
     this.canvas = canvas;
+    this.safeProbe = document.getElementById('safeProbe');
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.buffer = makeCanvas(2, 2);
     this.bctx = this.buffer.getContext('2d', { alpha: false });
@@ -30,6 +32,9 @@ export class Game {
     this.grid = new Grid(96);
     this.bodies = [];
     this.pointers = new Map();
+    this.gripPointer = null;
+    this.gripTimer = 0;
+    this.leverHinted = false;
     this.holdTimer = 0;
     this.acc = 0;
     this.frameTimes = [];
@@ -51,8 +56,9 @@ export class Game {
   makeWorld() {
     const self = this;
     return {
-      width: 1,
+      width: 1, // world units, not screen pixels
       height: 1,
+      scale: CFG.zoom, // world units -> screen pixels
       stageHeight: STAGE_HEIGHT,
       floorY: 1,
       time: 0,
@@ -83,6 +89,7 @@ export class Game {
       chrono: 0,
       lockout: 0,
       bossContact: 0,
+      gripDriven: false, // is the lever the control currently steering the barrel?
       veilFade: 0, // eased so VEIL closes in rather than snapping
 
       nextStoryAt: CFG.storyEvery,
@@ -132,6 +139,10 @@ export class Game {
     background.setMood('staging');
     audio.setDroneMood(41, 320, 0.05);
 
+    this.pointers.clear();
+    this.gripPointer = null;
+    w.gripDriven = false;
+
     this.snapshot = null;
     this.endStage = 0;
     this.endTimer = 0;
@@ -171,45 +182,46 @@ export class Game {
   // -------------------------------------------------------------- layout
 
   get shooterY() {
-    return this.world.floorY - 118;
+    return this.world.floorY - CFG.shooter.standoff;
   }
 
   resize() {
-    const w = Math.max(320, Math.round(window.innerWidth));
-    const h = Math.max(420, Math.round(window.innerHeight));
+    const sw = Math.max(320, Math.round(window.innerWidth));
+    const sh = Math.max(420, Math.round(window.innerHeight));
     const dpr = clamp(window.devicePixelRatio || 1, 1, CFG.maxDpr) * this.qualityScale();
 
     this.dpr = dpr;
-    this.canvas.width = Math.round(w * dpr);
-    this.canvas.height = Math.round(h * dpr);
-    this.canvas.style.width = `${w}px`;
-    this.canvas.style.height = `${h}px`;
+    this.canvas.width = Math.round(sw * dpr);
+    this.canvas.height = Math.round(sh * dpr);
+    this.canvas.style.width = `${sw}px`;
+    this.canvas.style.height = `${sh}px`;
     this.buffer.width = this.canvas.width;
     this.buffer.height = this.canvas.height;
 
+    // Safe-area insets come from the probe's resolved padding; a custom
+    // property holding max()/env() is not guaranteed to parse as a number.
+    const probe = getComputedStyle(this.safeProbe);
+    const num = (v, fallback) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : fallback);
+    const safeTop = Math.max(num(probe.paddingTop, 0), HUD_TOP_MIN);
+    const safeBottom = num(probe.paddingBottom, 0);
+    const barH = num(getComputedStyle(document.documentElement).getPropertyValue('--bar-h'), 74);
+
+    // Everything below is in world units: screen pixels divided by the zoom.
     const world = this.world;
-    world.width = w;
-    world.height = h;
-
-    const css = getComputedStyle(document.documentElement);
-    const px = (name, fallback) => {
-      const v = parseFloat(css.getPropertyValue(name));
-      return Number.isFinite(v) ? v : fallback;
-    };
-    const safeTop = px('--safe-t', 0);
-    const safeBottom = px('--safe-b', 0);
-    const barH = px('--bar-h', 74);
-
-    world.floorY = h - (safeBottom + barH + 22);
-    world.wall.layout(w, Math.max(104, safeTop + 78));
-    world.shooter.x = w / 2;
+    const z = CFG.zoom;
+    world.scale = z;
+    world.width = sw / z;
+    world.height = sh / z;
+    world.floorY = (sh - (safeBottom + barH + 22)) / z;
+    world.wall.layout(world.width, Math.max(96, safeTop + 74) / z);
+    world.shooter.x = world.width / 2;
     world.shooter.y = this.shooterY;
 
-    this.grid.resize(w, h + STAGE_HEIGHT, 96);
-    background.resize(w, h, world.wall.gateCx, world.wall.y + world.wall.thickness);
+    this.grid.resize(world.width, world.height + STAGE_HEIGHT, 96);
+    background.resize(world.width, world.height, world.wall.gateCx, world.wall.y + world.wall.thickness);
 
-    // quarter-res mask used by the boss VEIL power
-    this.veilMask = makeCanvas(Math.ceil(w / 2), Math.ceil(h / 2));
+    // Soft darkness mask for the boss VEIL power, also in world units.
+    this.veilMask = makeCanvas(Math.ceil(world.width / 2), Math.ceil(world.height / 2));
     this.veilCtx = this.veilMask.getContext('2d');
   }
 
@@ -223,7 +235,8 @@ export class Game {
     const c = this.canvas;
     const pos = (ev) => {
       const r = c.getBoundingClientRect();
-      return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+      const z = this.world.scale;
+      return { x: (ev.clientX - r.left) / z, y: (ev.clientY - r.top) / z };
     };
 
     c.addEventListener('pointerdown', (ev) => {
@@ -231,24 +244,52 @@ export class Game {
       if (w.phase === 'boot' || w.phase === 'frozen') return;
       const p = pos(ev);
       if (p.y > w.floorY + 10) return; // ability strip belongs to the thumb
+      const s = w.shooter;
       c.setPointerCapture?.(ev.pointerId);
-      this.pointers.set(ev.pointerId, p);
-      w.shooter.aimAt(p.x, p.y, w.invert > 0);
-      w.shooter.aim = w.shooter.targetAim; // taps are instant, drags slew
-      w.shooter.shoot(w);
-      this.holdTimer = CFG.shooter.holdFireInterval;
+
+      // Anything at or behind the turret grabs the lever; anything ahead of it
+      // is a direct shot at the point you touched.
+      if (this.gripPointer === null && p.y > s.y - s.r) {
+        this.gripPointer = ev.pointerId;
+        w.gripDriven = true;
+        s.grabGrip(p.x, p.y, w.invert > 0);
+        s.shoot(w);
+        this.gripTimer = CFG.shooter.gripFireInterval;
+        if (!this.leverHinted) {
+          this.leverHinted = true;
+          this.hud.showHint('LEVER — swing it and hold. The barrel goes the other way, and it fires by itself.');
+        }
+      } else {
+        this.pointers.set(ev.pointerId, p);
+        w.gripDriven = false;
+        s.aimAt(p.x, p.y, w.invert > 0);
+        s.aim = s.targetAim; // taps are instant, drags slew
+        s.shoot(w);
+        this.holdTimer = CFG.shooter.holdFireInterval;
+      }
       ev.preventDefault();
     }, { passive: false });
 
     c.addEventListener('pointermove', (ev) => {
+      const w = this.world;
+      if (ev.pointerId === this.gripPointer) {
+        const p = pos(ev);
+        w.shooter.driveGrip(p.x, p.y, w.invert > 0);
+        ev.preventDefault();
+        return;
+      }
       if (!this.pointers.has(ev.pointerId)) return;
       const p = pos(ev);
       this.pointers.set(ev.pointerId, p);
-      this.world.shooter.aimAt(p.x, p.y, this.world.invert > 0);
+      w.shooter.aimAt(p.x, p.y, w.invert > 0);
       ev.preventDefault();
     }, { passive: false });
 
     const end = (ev) => {
+      if (ev.pointerId === this.gripPointer) {
+        this.gripPointer = null;
+        this.world.shooter.releaseGrip();
+      }
       this.pointers.delete(ev.pointerId);
     };
     c.addEventListener('pointerup', end);
@@ -303,7 +344,16 @@ export class Game {
     w.bossContact = Math.max(0, w.bossContact - dt);
     w.veilFade += ((w.veil > 0 ? 1 : 0) - w.veilFade) * clamp(dt * 3.4, 0, 1);
 
-    // ---- sustained fire ----
+    // ---- the lever fires on its own for as long as it is held ----
+    if (w.shooter.gripHeld && w.phase !== 'ending') {
+      this.gripTimer -= dt;
+      if (this.gripTimer <= 0) {
+        this.gripTimer = CFG.shooter.gripFireInterval;
+        w.shooter.shoot(w);
+      }
+    }
+
+    // ---- sustained fire from a held direct-aim touch ----
     if (this.pointers.size > 0 && w.phase !== 'ending') {
       this.holdTimer -= dt;
       if (this.holdTimer <= 0) {
@@ -601,7 +651,8 @@ export class Game {
       return;
     }
 
-    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    const k = this.dpr * w.scale;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
     ctx.fillStyle = '#04050a';
     ctx.fillRect(0, 0, W, H);
 
@@ -610,8 +661,17 @@ export class Game {
 
     background.draw(ctx, W, H);
 
-    // story sits behind every entity: it can never hide a target
-    w.narrator.draw(ctx, W / 2, w.floorY - 24, Math.min(W - 64, 380), background.mood.accent);
+    // Story sits in the quiet band under the wall, behind every entity, so it
+    // can never hide a target — and never competes with the lever for space.
+    const wallBottom = w.wall.y + w.wall.thickness;
+    w.narrator.draw(
+      ctx,
+      W / 2,
+      wallBottom + (w.shooter.y - wallBottom) * 0.46,
+      Math.min(W - 70, 470),
+      background.mood.accent,
+      13 / w.scale,
+    );
 
     w.wall.draw(ctx, w);
 

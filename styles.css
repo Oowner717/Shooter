@@ -12,6 +12,9 @@
   --accent-2: #ff5d8f;
   --warn: #ff4d6d;
   --safe-t: env(safe-area-inset-top, 0px);
+  /* Non-notch phones report 0 but still sit under a translucent status bar,
+     so the top furniture uses a floored value. */
+  --hud-t: max(env(safe-area-inset-top, 0px), 20px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
@@ -44,6 +47,18 @@ html, body {
   overflow: hidden;
 }
 
+#safeProbe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  visibility: hidden;
+  pointer-events: none;
+}
+
 #stage {
   position: absolute;
   inset: 0;
@@ -66,7 +81,7 @@ html, body {
 
 #topbar {
   position: absolute;
-  top: calc(var(--safe-t) + 8px);
+  top: calc(var(--hud-t) + 8px);
   left: calc(var(--safe-l) + 10px);
   right: calc(var(--safe-r) + 10px);
   display: flex;
@@ -117,7 +132,7 @@ html, body {
 
 #bossBar, #gateBar {
   position: absolute;
-  top: calc(var(--safe-t) + 40px);
+  top: calc(var(--hud-t) + 40px);
   left: calc(var(--safe-l) + 10px);
   right: calc(var(--safe-r) + 10px);
 }
@@ -165,14 +180,14 @@ html, body {
 }
 
 #alerts {
-  top: calc(var(--safe-t) + 76px);
+  top: calc(var(--hud-t) + 104px);
   flex-direction: column;
 }
 
 /* Sticky one-word pills for whatever the boss is currently doing to you.
    Separate from #alerts so they never evict transient messages. */
 #status {
-  top: calc(var(--safe-t) + 150px);
+  top: calc(var(--hud-t) + 136px);
   flex-wrap: wrap;
   justify-content: center;
   padding: 0 12px;
@@ -272,7 +287,7 @@ html, body {
 
 #debugPanel {
   position: absolute;
-  top: calc(var(--safe-t) + 40px);
+  top: calc(var(--hud-t) + 40px);
   right: calc(var(--safe-r) + 10px);
   width: min(280px, calc(100vw - 24px));
   background: rgba(4, 8, 14, 0.94);
@@ -338,7 +353,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: calc(var(--safe-t) + 24px) 26px calc(var(--safe-b) + 24px);
+  padding: calc(var(--hud-t) + 24px) 26px calc(var(--safe-b) + 24px);
   background: radial-gradient(120% 80% at 50% 30%, rgba(10, 20, 36, 0.86), rgba(2, 3, 7, 0.97) 70%);
   pointer-events: auto;
   z-index: 30;

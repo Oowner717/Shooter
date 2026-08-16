@@ -576,8 +576,11 @@ export class Director {
   /** Objects already loose in the arena when the simulation boots. */
   seed(world) {
     const kinds = availableTypes(0);
-    const top = world.wall.y + world.wall.thickness + 40;
-    const bottom = world.shooter.y - 190;
+    // Seed the upper half of the field only. The opening beat should be
+    // objects in the distance, never objects already on top of the turret.
+    const wallBottom = world.wall.y + world.wall.thickness;
+    const top = wallBottom + 50;
+    const bottom = wallBottom + (world.shooter.y - wallBottom) * 0.55;
     for (let i = 0; i < CFG.popStart; i++) {
       const t = weightedPick(kinds);
       spawnOne(

@@ -6,6 +6,12 @@ export const CFG = {
   killGoal: 500, // objects destroyed before the gate seals
   storyEvery: 50, // one story line per this many kills (10 lines total)
 
+  // ---- camera ---------------------------------------------------------
+  // World units per screen pixel. Below 1 the arena is drawn zoomed out, so
+  // the field is physically larger than the display and objects read smaller
+  // and further away. All game logic works in world units.
+  zoom: 0.76,
+
   // ---- frame / quality ------------------------------------------------
   maxDpr: 2,
   fixedStep: 1 / 120, // physics substep
@@ -25,9 +31,17 @@ export const CFG = {
   // ---- shooter --------------------------------------------------------
   shooter: {
     r: 26,
+    standoff: 168, // world units between the turret and the ability strip
     holdFireInterval: 0.2, // sustained-fire cadence; tapping faster is always allowed
     aimClamp: 1.36, // radians away from straight up that the barrel allows
     turnRate: 26, // rad/s barrel slew
+
+    // The lever. A rod runs through the turret's pivot: the grip hangs below
+    // it, the barrel sticks out above it, and pushing one swings the other
+    // the opposite way. Holding the grip fires on its own.
+    gripLen: 104, // world units from pivot to grip
+    gripFireInterval: 0.2,
+    gripReturn: 6.5, // rad/s spring back to neutral on release
   },
 
   // ---- projectiles ----------------------------------------------------

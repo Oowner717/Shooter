@@ -32,9 +32,17 @@ modules and the service worker both require an origin.)*
 
 ## How it plays
 
-**Tap anywhere ahead of the turret** and it fires there. There is no tap-rate
-limit — tap as fast as your thumb allows. **Hold and drag** to sustain fire at
-a steady cadence while you sweep the field.
+**The lever is the main control.** A rod runs through the turret's pivot: the
+grip hangs below it, the barrel sticks out above it. Grab the grip with your
+thumb, swing it, and the barrel swings the opposite way — push the handle left
+and you shoot right. It fires on its own for as long as you hold it, and
+springs back to neutral when you let go. Because your hand stays *behind* the
+turret, it never covers the thing you are shooting at.
+
+**Or tap anywhere ahead of the turret** and it fires there. There is no
+tap-rate limit — tap as fast as your thumb allows, or hold and drag to sustain
+fire. Both controls work at once, so you can drive the lever with one thumb
+and tap with the other.
 
 **Five abilities** sit along the bottom, in the strip your thumb already rests
 on. One tap each, no cost, no upgrades, no unlocks. The first time you use one,
@@ -99,7 +107,7 @@ without you firing once.
 ### The story
 
 Ten sentences, one per fifty objects destroyed. They share a single word. They
-appear below the turret, drawn *behind* every entity so they can never hide
+appear in the mid-field, drawn *behind* every entity so they can never hide
 something you need to shoot, and they corrupt away after a few seconds.
 
 ---
@@ -148,8 +156,14 @@ scripts/
 ## Tuning
 
 `src/config.js` is the only file you need for balance. The knobs that move run
-length most: `bolt.damage`, `shooter.holdFireInterval`, `gate.hp`, `boss.hp`,
+length most: `bolt.damage`, `shooter.gripFireInterval`, `gate.hp`, `boss.hp`,
 `popStart`/`popEnd`, and `spawnInterval`.
+
+`zoom` is the camera. Everything in the game runs in *world units*; the whole
+scene is drawn scaled by `zoom`, so lowering it pulls the camera back and
+enlarges the arena without touching a single gameplay number. `shooter.standoff`
+sets how far the turret sits above the ability strip, and `shooter.gripLen` is
+the length of the lever's lower arm.
 
 ## Performance
 

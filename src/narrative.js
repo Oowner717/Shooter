@@ -26,7 +26,6 @@ export const ENDING = [
 const SCRAMBLE = '▓▒░#%&@*<>/\\|=+-_01';
 const HOLD = 7.4; // seconds fully legible
 const DECAY = 1.6; // seconds spent corrupting away
-const LINE_H = 19;
 
 export class Narrator {
   constructor() {
@@ -36,6 +35,7 @@ export class Narrator {
     this.active = false;
     this.index = 0;
     this.wrapWidth = 0;
+    this.fontPx = 0;
   }
 
   reset() {
@@ -89,17 +89,22 @@ export class Narrator {
    * shoot. `bottomY` is the baseline the block grows upward from, so a
    * two-line and a three-line sentence share the same lower edge.
    */
-  draw(ctx, cx, bottomY, maxWidth, accent) {
+  draw(ctx, cx, bottomY, maxWidth, accent, fontPx = 13) {
     if (!this.active) return;
-    ctx.font = '13px ui-monospace, "SF Mono", Menlo, monospace';
-    if (!this.lines || this.wrapWidth !== maxWidth) this._wrap(ctx, maxWidth);
+    ctx.font = `${fontPx}px ui-monospace, "SF Mono", Menlo, monospace`;
+    if (!this.lines || this.wrapWidth !== maxWidth || this.fontPx !== fontPx) {
+      this.fontPx = fontPx;
+      this._wrap(ctx, maxWidth);
+    }
 
     const reveal = clamp(this.t / 0.55, 0, 1);
     const dying = clamp((this.t - HOLD) / DECAY, 0, 1);
     const alpha = (1 - dying * dying) * clamp(this.t / 0.2, 0, 1);
     if (alpha <= 0.001) return;
 
-    const total = this.lines.length * LINE_H;
+    const lineH = fontPx * 1.45;
+    const pad = fontPx * 1.2;
+    const total = this.lines.length * lineH;
     const cy = bottomY - total;
 
     ctx.save();
@@ -107,14 +112,18 @@ export class Narrator {
     ctx.textBaseline = 'top';
 
     // faint plate so the text stays readable over the lattice
+    const x0 = cx - maxWidth / 2 - pad;
+    const x1 = cx + maxWidth / 2 + pad;
+    const y0 = cy - pad;
+    const boxH = total + pad * 2;
     ctx.fillStyle = `rgba(2,6,12,${0.34 * alpha})`;
-    ctx.fillRect(cx - maxWidth / 2 - 12, cy - 16, maxWidth + 24, total + 26);
+    ctx.fillRect(x0, y0, x1 - x0, boxH);
     ctx.fillStyle = rgba(accent, 0.55 * alpha);
-    ctx.fillRect(cx - maxWidth / 2 - 12, cy - 16, 2, total + 26);
-    ctx.fillRect(cx + maxWidth / 2 + 10, cy - 16, 2, total + 26);
+    ctx.fillRect(x0, y0, 2, boxH);
+    ctx.fillRect(x1 - 2, y0, 2, boxH);
     // inline transmission marker, kept in the bracket so the block stays short
-    ctx.fillRect(cx - maxWidth / 2 - 12, cy - 16, 9, 2);
-    ctx.fillRect(cx + maxWidth / 2 + 3, cy + total + 8, 9, 2);
+    ctx.fillRect(x0, y0, 10, 2);
+    ctx.fillRect(x1 - 10, y0 + boxH - 2, 10, 2);
 
     let charBudget = Math.ceil(reveal * this.text.length);
 
@@ -133,7 +142,7 @@ export class Narrator {
         }
       }
       const jitter = dying > 0 ? (Math.random() - 0.5) * dying * 14 : 0;
-      const y = cy + i * LINE_H;
+      const y = cy + i * lineH;
 
       if (dying > 0.15) {
         ctx.fillStyle = rgba('#ff2d6f', alpha * 0.5);

@@ -19,6 +19,9 @@
 <body>
 
 <div id="app">
+  <!-- env() only resolves to a readable pixel value through a real computed
+       property, so layout code measures this instead of a CSS variable. -->
+  <div id="safeProbe" aria-hidden="true"></div>
   <canvas id="stage"></canvas>
 
   <!-- ============ HUD ============ -->
@@ -69,13 +72,13 @@
         <h1>SIMULATION<br><b>7749</b></h1>
         <p class="bootBody">
           A turret. A wall. A gate that opens one way.<br>
-          Five hundred objects are queued for release.<br>
-          You will be told a story while you work.
+          Five hundred objects are queued for release.
         </p>
         <ul class="bootKeys">
-          <li><span>TAP</span> anywhere ahead of the turret to fire. Hold to sustain.</li>
+          <li><span>LEVER</span> hold the grip below the turret and swing it. The barrel is the other end of the same rod, so it goes the opposite way — and it fires by itself.</li>
+          <li><span>TAP</span> anywhere ahead of the turret to shoot there instead. Hold to sustain.</li>
           <li><span>ABILITIES</span> along the bottom. One tap, no cost, no upgrades.</li>
-          <li><span>CONTACT</span> will not kill you. It will corrupt the feed until you clear it.</li>
+          <li><span>CONTACT</span> will not kill you. It corrupts the feed until you clear it.</li>
         </ul>
         <button id="startBtn">BEGIN SIMULATION</button>
         <div class="bootFoot">Add to Home Screen for fullscreen playback.</div>
