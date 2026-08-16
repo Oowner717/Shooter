@@ -1,24 +1,25 @@
-// Ten sentences. One word. Delivered one per fifty objects, then corrupted.
+// Ten sentences, one per fifty objects, then corrupted away. They are the
+// only place the game says what it thinks it is about, and they never say it.
 
 import { clamp, rgba } from './util.js';
 
 const STORY = [
-  'We built this room so that you would remember what your hands are for.',
-  'Every shape you break makes something on the other side remember its name.',
-  'You remember the wall. You do not remember agreeing to it.',
-  'The gate does not remember opening; it only remembers being told to.',
-  'Somewhere a quieter version of you refused, and no one was assigned to remember them.',
-  'They send the slow ones first because the slow ones still remember the way home.',
-  'This was never a test of aim. It is a test of whether you can remember without grieving.',
-  'When the counting stops, the door will remember that it was once only a door.',
-  'What waits behind it remembers you exactly, which is lonelier than being forgotten.',
+  'You were not brought here to shoot. That is only what the room had spare to give you.',
+  'Every shape that opens lets go of something that had been folded for a very long time.',
+  'The count is not a score. It is a length, and something is being measured out against it.',
+  'Halfway. On the other side of the wall a room you will never see is getting quieter.',
+  'You have been doing the difficult part since before the first shape arrived.',
+  'Nothing here is destroyed. It is only permitted to stop holding its shape.',
+  'There is a version of this where nobody came, and it is still running, and it is much longer.',
+  'You are nearly through. Not through the wall — through the reason there had to be one.',
+  'When the gate shuts it will not be to keep them in. It will be because there is no one left to send.',
   'Remember: none of this was ever an enemy, and neither, in the end, were you.',
 ];
 
 export const ENDING = [
-  'MNEMOSYNE — DECOHERENT.',
-  'The archive is quiet now. Every object has been returned to the shape it had before it was given a purpose.',
-  'You were the last thing it was still trying to remember.',
+  'THE LAST SHAPE HAS OPENED.',
+  'Whatever was being carried here has been set down. It was never yours, and it was never heavy for anyone but you.',
+  'You will not be told what it was. You would only try to do it again.',
   'And you were very good at this.',
   'SIMULATION 7749 :: TERMINATED',
 ];

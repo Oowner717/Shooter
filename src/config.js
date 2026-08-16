@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '7';
+export const BUILD = '8';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -24,6 +24,7 @@ export const CFG = {
   // ---- population -----------------------------------------------------
   maxEnemies: 44,
   maxDebris: 64,
+  maxDrift: 5, // aimless, harmless bodies alive at once
   maxParticles: 620,
   popStart: 13,
   popEnd: 30, // population target ramps between these over the run
@@ -47,6 +48,50 @@ export const CFG = {
     gripR: 24, // grip knob radius
     gripFireInterval: 0.2,
     autoFireInterval: 0.22, // hands-off cadence; a shade behind driving it yourself
+  },
+
+  // ---- rounds ---------------------------------------------------------
+  // Loadouts are mutually exclusive. Each buys its effect with rate of fire.
+  rounds: {
+    standard: { label: 'STD', rate: 1 },
+    explosive: {
+      label: 'HE',
+      rate: 2.1, // less than half the cadence
+      speed: 1040, // and slower in the air
+      damage: 15,
+      blast: { r: 96, damage: 44, impulse: 420 },
+    },
+    shotgun: {
+      label: 'SHOT',
+      rate: 1.55,
+      pellets: 5,
+      spread: 0.3,
+      speed: [1120, 1420],
+      damage: 12,
+      life: 0.5,
+    },
+  },
+
+  // ---- prism shell ----------------------------------------------------
+  prism: {
+    r: 300, // blast radius
+    damage: 110,
+    impulse: 700,
+    beams: 14,
+    beamLen: 900,
+    beamDamage: 85,
+  },
+
+  // ---- auto mines -----------------------------------------------------
+  mines: {
+    interval: 4.6, // seconds between throws while armed
+    max: 5,
+    flight: 0.85, // seconds from turret to landing site
+    arm: 0.4, // settling time before it can trigger
+    life: 26,
+    r: 13,
+    trigger: 26, // extra reach beyond the mine's own radius
+    blast: { r: 168, damage: 140, impulse: 760 },
   },
 
   // ---- projectiles ----------------------------------------------------
@@ -225,6 +270,26 @@ export const ENEMY_TYPES = [
     shards: 3, // orbiting plates that eat incoming bolts
   },
   {
+    // Harmless: it has no goal, it never breaches the turret, it does not
+    // count, and it triggers nothing. It is here to be pushed around.
+    id: 'drift',
+    unlock: 0,
+    name: 'DRIFT',
+    shape: 'drift',
+    harmless: true,
+    r: 17,
+    hp: 30,
+    density: 0.55,
+    speed: 34,
+    accel: 95,
+    restitution: 0.92,
+    wobble: 0,
+    color: '#8fa9c4',
+    glow: '#4f6f92',
+    weight: 0, // never chosen by the ordinary spawn roll
+    debris: 1,
+  },
+  {
     id: 'prism',
     unlock: 85, // kills before this type enters the rotation
     name: 'PRISM',
@@ -252,6 +317,21 @@ export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));
  * camera pulls back, but not below roughly one device pixel.
  */
 export const HAIRLINE = 1.25 / CFG.zoom;
+
+/**
+ * How an object crosses the field. Every one picks a route at spawn, so two
+ * lurchers released together take visibly different paths to the same turret.
+ * `width` is the lateral offset in world units at long range; it decays as the
+ * object closes, so every route still converges.
+ */
+export const ROUTES = [
+  { id: 'direct', weight: 26, width: 0, weave: 0, commit: 1 },
+  { id: 'sweep', weight: 20, width: 300, weave: 0, commit: 0.55 },
+  { id: 'wide', weight: 14, width: 480, weave: 0, commit: 0.35 },
+  { id: 'serpentine', weight: 16, width: 250, weave: 0.55, commit: 0.7 },
+  { id: 'hook', weight: 14, width: 420, weave: 0, commit: 1.9 },
+  { id: 'loiter', weight: 10, width: 180, weave: 0.25, commit: 0.5, dawdle: 0.55 },
+];
 
 /** Body mass from density and radius (area-proportional). */
 export const massOf = (type, r = type.r) => type.density * r * r * 0.006;

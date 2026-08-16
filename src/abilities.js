@@ -3,6 +3,7 @@
 
 import { TAU, clamp, rand, spread, smoothstep, rgba, drawGlow, segClosest } from './util.js';
 import { spark, dot, ring, ripple, shake, flash } from './fx.js';
+import { CFG } from './config.js';
 import { fire } from './projectiles.js';
 import { applyBlast } from './enemies.js';
 import { audio } from './audio.js';
@@ -13,6 +14,7 @@ const ICON = {
   lance: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 22V2"/><path d="M8.5 8 12 2l3.5 6"/><path d="M9.5 17h5" opacity=".6"/></svg>',
   well: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" opacity=".8"/><path d="M5 5l2.6 2.6M19 5l-2.6 2.6M5 19l2.6-2.6M19 19l-2.6-2.6" opacity=".5"/></svg>',
   stasis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2v20M3.4 7 20.6 17M20.6 7 3.4 17"/><circle cx="12" cy="12" r="3.2" fill="currentColor" fill-opacity=".2"/></svg>',
+  prism: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 3 19h18z"/><path d="M12 3v16" opacity=".55"/><path d="M7.5 19 12 11l4.5 8" opacity=".8"/></svg>',
 };
 
 // ------------------------------------------------------------------ effects
@@ -166,6 +168,54 @@ class Well {
   }
 }
 
+const SPECTRUM = ['#ff4d6d', '#ff9f1c', '#ffe066', '#7cffb2', '#59e0ff', '#8b5cf6', '#e0aaff'];
+
+/**
+ * Where a prism shell lands: a refraction. One wide shockwave, then a fan of
+ * coloured beams that each cut everything along their length.
+ */
+function prismBurst(world, x, y) {
+  const P = CFG.prism;
+  applyBlast(world, { x, y, r: P.r, damage: P.damage, impulse: P.impulse });
+
+  for (let i = 0; i < P.beams; i++) {
+    const a = (i / P.beams) * TAU + rand(0, 0.3);
+    const x1 = x + Math.cos(a) * P.beamLen;
+    const y1 = y + Math.sin(a) * P.beamLen;
+    world.effects.push(new Beam(x, y, x1, y1, SPECTRUM[i % SPECTRUM.length]));
+
+    const sweep = (list) => {
+      for (const e of list) {
+        if (e.dead) continue;
+        const c = segClosest(x, y, x1, y1, e.x, e.y);
+        const rr = e.r + 18;
+        if (c.d2 > rr * rr) continue;
+        e.applyDamage(world, P.beamDamage, Math.cos(a), Math.sin(a), 220);
+      }
+    };
+    sweep(world.enemies);
+    sweep(world.debris);
+    if (world.boss && !world.boss.dead) {
+      const c = segClosest(x, y, x1, y1, world.boss.x, world.boss.y);
+      if (c.d2 < (world.boss.r + 18) ** 2) world.boss.hurt(world, P.beamDamage * 2);
+    }
+  }
+
+  for (let i = 0; i < SPECTRUM.length; i++) {
+    ring(x, y, 8 + i * 6, P.r * (1.05 + i * 0.1), 0.45 + i * 0.05, SPECTRUM[i], 3);
+  }
+  for (let i = 0; i < 46; i++) {
+    const a = rand(0, TAU);
+    spark(x, y, Math.cos(a) * rand(200, 780), Math.sin(a) * rand(200, 780),
+      SPECTRUM[i % SPECTRUM.length], rand(0.25, 0.6), 2.8);
+  }
+  ripple(x, y, 2.1, P.r * 4);
+  flash(0.34, '#ffffff');
+  shake(14);
+  audio.boom();
+  audio.chime(880);
+}
+
 // -------------------------------------------------------------- definitions
 
 /** Highest-value target ahead of the turret, for auto-aimed abilities. */
@@ -316,6 +366,34 @@ export const ABILITIES = [
       world.effects.push(new Well(p.x, p.y));
       ring(p.x, p.y, 320, 30, 0.5, '#c77dff', 3);
       audio.ability('well');
+    },
+  },
+  {
+    id: 'prism',
+    name: 'PRISM',
+    color: '#ff9ff3',
+    cooldown: 16,
+    icon: ICON.prism,
+    hint: 'PRISM — a shell that refracts. Wide blast, then beams every way.',
+    run(world) {
+      const s = world.shooter;
+      // Fused, not ballistic: it refracts after a fixed run whether or not it
+      // hits anything, so the burst always lands somewhere you can see.
+      fire(world, s.muzzleX, s.muzzleY, s.aim, {
+        speed: 820,
+        r: 8,
+        damage: 30,
+        impulse: 120,
+        life: 0.7,
+        bounces: 0,
+        color: '#ffd6ff',
+        core: '#ffffff',
+        trail: 0.05,
+        burst: prismBurst,
+      });
+      s.recoil = 1.3;
+      shake(4);
+      audio.ability('lance');
     },
   },
   {

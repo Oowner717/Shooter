@@ -28,7 +28,7 @@
  * BUILD must match `BUILD` in src/config.js and sw.js.
  */
 (function () {
-  var BUILD = '7';
+  var BUILD = '8';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -94,15 +94,27 @@
     <div id="alerts"></div>
     <div id="status"></div>
 
-    <!-- ============ ASSIST TOGGLES ============ -->
-    <div id="autoToggles">
-      <button id="autoAimBtn" class="toggleChip" aria-pressed="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
-        <span>AUTO AIM</span>
+    <!-- ============ TOGGLE RACK ============ -->
+    <div id="toggleRack">
+      <button id="tgAutoAim" class="toggleChip" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
+        <span>AIM</span>
       </button>
-      <button id="autoFireBtn" class="toggleChip" aria-pressed="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21V8"/><path d="M8.6 11.4 12 7l3.4 4.4"/><path d="M7 4h10" opacity=".7"/></svg>
-        <span>AUTO FIRE</span>
+      <button id="tgAutoFire" class="toggleChip" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21V8"/><path d="M8.6 11.4 12 7l3.4 4.4"/><path d="M7 4h10" opacity=".7"/></svg>
+        <span>FIRE</span>
+      </button>
+      <button id="tgAutoMine" class="toggleChip" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="5"/><path d="M12 3v3M12 20v2M3.6 13h2.2M18.2 13h2.2M6 7l1.6 1.6M18 7l-1.6 1.6"/></svg>
+        <span>MINE</span>
+      </button>
+      <button id="tgExplosive" class="toggleChip" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 2 2.2 5.2L20 8l-4 3.6 1.2 5.6L12 14.6 6.8 17.2 8 11.6 4 8l5.8-.8z"/></svg>
+        <span>HE</span>
+      </button>
+      <button id="tgShotgun" class="toggleChip" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22V15"/><path d="M12 15 5 4M12 15l7-11M12 15 9.5 3M12 15l2.5-12"/></svg>
+        <span>SHOT</span>
       </button>
     </div>
 
@@ -123,11 +135,12 @@
     <!-- ============ BOOT SCREEN ============ -->
     <section id="boot">
       <div class="bootInner">
-        <div class="bootKicker">ANOMALOUS OBJECT CONTAINMENT</div>
+        <div class="bootKicker">UNATTRIBUTED LABOUR · SESSION 7749</div>
         <h1>SIMULATION<br><b>7749</b></h1>
         <p class="bootBody">
-          A turret. A wall. A gate that opens one way.<br>
-          Five hundred objects are queued for release.
+          A turret you did not ask for. A wall you did not build.<br>
+          Five hundred shapes are queued to be opened.<br>
+          The work will look like shooting. It is not the work.
         </p>
         <ul class="bootKeys">
           <li><span>LEVER</span> hold the grip below the turret and swing it. The barrel is the other end of the same rod, so it goes the opposite way — and it fires by itself.</li>

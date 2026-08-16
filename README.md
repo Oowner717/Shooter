@@ -44,8 +44,7 @@ tap-rate limit — tap as fast as your thumb allows, or hold and drag to sustain
 fire. Both controls work at once, so you can drive the lever with one thumb
 and tap with the other.
 
-**Two assists** sit either side of the lever, both toggles, both off by
-default:
+**Five toggles** sit in a rack just above the ability bar, all off by default:
 
 - **AUTO FIRE** keeps shooting wherever the barrel happens to point. With no
   hand on the lever the barrel rests straight up, so this alone is a fountain.
@@ -55,6 +54,20 @@ default:
   slower rate, easing off as it arrives, and holds fire until the barrel has
   come round; brackets tighten on the target while it swings. With no target
   it stops shooting and leaves the barrel where it is.
+
+- **AUTO MINE** lobs a mine onto a random patch of the field every few
+  seconds. It is completely inert in flight — it passes straight through
+  anything in the way — and only arms once it has settled. Drift never sets one
+  off; only something that could actually corrupt your feed does.
+- **HE** makes every round detonate on impact. It costs you better than half
+  your rate of fire and the shells travel slower, so single targets are no
+  easier — crowds are.
+- **SHOT** loads five pellets a shot in a tight cone at a slower cadence. The
+  pellets expire well short of the wall, so it is devastating up close and
+  useless at range.
+
+HE and SHOT are exclusive: choosing one clears the other, and tapping the lit
+one returns you to standard rounds.
 
 Your hands always win: while you are holding the lever or dragging, the
 assists stop steering. Auto fire runs a shade slower than driving it yourself,
@@ -72,6 +85,7 @@ a caption explains it.
 | ↑ | **LANCE** | Piercing beam, auto-locked to the biggest threat | 12 s |
 | ✳ | **WELL** | Singularity — hauls everything into one grinding knot, then collapses | 19 s |
 | ❄ | **STASIS** | Objects freeze for four seconds; your shots do not | 21 s |
+| ▲ | **PRISM** | Fused shell that refracts — wide blast plus beams in every colour | 16 s |
 
 **Contact does not kill you.** When an object touches the turret the feed
 corrupts — slice tearing, chroma ghosting, block noise — and *stays* corrupted
@@ -105,6 +119,15 @@ They unlock progressively as the count climbs.
 - **WARDEN** — three orbiting plates that eat bolts. Strip them first.
 - **PRISM** — reflects glancing shots. Hit it square, or bank the ricochet
   into something else.
+- **DRIFT** — harmless. No goal, no destination, no threat: it wanders on a
+  slow random walk, drifts back out through the gate as often as in, never
+  breaches the turret, never triggers a mine, is never auto-targeted and does
+  not count toward the tally. It is there to be shot at and shoved around.
+
+Every object picks a **route** when it spawns — direct, sweeping, wide,
+serpentine, hooking or loitering — as a lateral offset that folds in as it
+closes. Two of the same type released together arrive by visibly different
+arcs, and all of them still arrive.
 
 Everything leaves **debris**: smaller bodies that are themselves destructible,
 pushable, and dangerous to each other.
@@ -124,9 +147,11 @@ before the collapse goes off at all.
 
 ### The story
 
-Ten sentences, one per fifty objects destroyed. They share a single word. They
-appear in the mid-field, drawn *behind* every entity so they can never hide
-something you need to shoot, and they corrupt away after a few seconds.
+Ten sentences, one per fifty objects destroyed, then four more at the end.
+They appear in the mid-field, drawn *behind* every entity so they can never
+hide something you need to shoot, and they corrupt away after a few seconds.
+They are the only place the game says what it thinks it is about, and they
+never quite say it.
 
 ---
 
@@ -159,7 +184,8 @@ src/
   glitch.js             full-frame corruption compositor
   audio.js              WebAudio synth (no assets)
   enemies.js            object types, behaviour, death, spawn director
-  projectiles.js        swept-collision bolts
+  projectiles.js        swept-collision bolts and bursting rounds
+  mines.js              inert-in-flight auto mines
   shooter.js            the turret
   gate.js               wall + gate states
   boss.js               MNEMOSYNE

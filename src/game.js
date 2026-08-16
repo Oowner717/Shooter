@@ -7,12 +7,13 @@ import { fx, updateFx, drawFx, drawFlash, spark, ring, shake } from './fx.js';
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, spawnFormation, applyBlast } from './enemies.js';
+import { Director, spawnOne, spawnFormation, spawnDrift, applyBlast } from './enemies.js';
 import { Shooter } from './shooter.js';
 import { Wall } from './gate.js';
 import { Boss } from './boss.js';
 import { Abilities } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
+import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator, ENDING } from './narrative.js';
 import { Hud } from './hud.js';
 
@@ -34,9 +35,10 @@ export class Game {
     this.pointers = new Map();
     this.gripPointer = null;
     this.fireTimer = 0;
+    this.mineTimer = 0;
     this.autoLock = null;
     this.leverHinted = false;
-    this.autoHinted = { autoAim: false, autoFire: false };
+    this.autoHinted = {};
     this.acc = 0;
     this.frameTimes = [];
     this.fps = 60;
@@ -93,6 +95,9 @@ export class Game {
       autoSteering: false, // is auto aim traversing the barrel this frame?
       autoAim: false,
       autoFire: false,
+      autoMine: false,
+      round: 'standard', // standard | explosive | shotgun
+      mines: [],
       veilFade: 0, // eased so VEIL closes in rather than snapping
 
       nextStoryAt: CFG.storyEvery,
@@ -120,6 +125,7 @@ export class Game {
     w.debris.length = 0;
     w.projectiles.length = 0;
     w.effects.length = 0;
+    w.mines.length = 0;
     w.pendingBlasts.length = 0;
     w.attackers.clear();
     w.time = 0;
@@ -146,6 +152,7 @@ export class Game {
     this.gripPointer = null;
     w.autoSteering = false;
 
+    this.mineTimer = 0;
     this.snapshot = null;
     this.endStage = 0;
     this.endTimer = 0;
@@ -314,17 +321,36 @@ export class Game {
     if (res.first) this.hud.showHint(res.slot.def.hint);
   }
 
+  static HINTS = {
+    autoAim: 'AUTO AIM — tracks and fires on the nearest breacher.',
+    autoFire: 'AUTO FIRE — keeps shooting wherever the barrel points.',
+    autoMine: 'AUTO MINE — lobs inert mines that arm where they land.',
+    explosive: 'HE ROUNDS — every shot detonates. Half the rate of fire.',
+    shotgun: 'SHOT ROUNDS — five pellets a shot, close range, slower cadence.',
+  };
+
   toggleAuto(key) {
     const w = this.world;
     w[key] = !w[key];
-    this.hud.setAuto(key, w[key]);
-    audio.chime(w[key] ? 760 : 430);
-    if (w[key] && !this.autoHinted[key]) {
-      this.autoHinted[key] = true;
-      this.hud.showHint(key === 'autoAim'
-        ? 'AUTO AIM — tracks and fires on the nearest breacher.'
-        : 'AUTO FIRE — keeps shooting wherever the barrel points.');
-    }
+    this.hud.setToggle(key, w[key]);
+    if (key === 'autoMine' && w.autoMine) this.mineTimer = 0.2;
+    this.announceToggle(key, w[key]);
+  }
+
+  /** Loadouts are exclusive: picking one clears the other. */
+  toggleRound(kind) {
+    const w = this.world;
+    w.round = w.round === kind ? 'standard' : kind;
+    this.hud.setToggle('explosive', w.round === 'explosive');
+    this.hud.setToggle('shotgun', w.round === 'shotgun');
+    this.announceToggle(kind, w.round === kind);
+  }
+
+  announceToggle(key, on) {
+    audio.chime(on ? 760 : 430);
+    if (!on || this.autoHinted[key]) return;
+    this.autoHinted[key] = true;
+    this.hud.showHint(Game.HINTS[key]);
   }
 
   /**
@@ -339,7 +365,7 @@ export class Game {
     let best = null;
     let bestScore = Infinity;
     for (const e of w.enemies) {
-      if (e.dead || e.staged) continue;
+      if (e.dead || e.staged || e.harmless) continue;
       const dx = e.x - s.x;
       const dy = e.y - s.y;
       if (Math.abs(angleDelta(-Math.PI / 2, Math.atan2(dy, dx))) > limit) continue;
@@ -382,6 +408,8 @@ export class Game {
     else if (dragging) interval = CFG.shooter.holdFireInterval;
     else if (w.autoFire || target) interval = CFG.shooter.autoFireInterval;
     if (interval <= 0) return;
+    // heavier rounds buy their effect with cadence
+    interval *= CFG.rounds[w.round].rate;
 
     // Auto aim waits until the barrel has actually come round. Auto fire does
     // not — that toggle means "shoot wherever this is pointed", including
@@ -459,6 +487,8 @@ export class Game {
     if (steps === CFG.maxSubsteps) this.acc = 0;
 
     updateProjectiles(w, dt);
+    this.mineTimer = mineCadence(w, this.mineTimer, dt);
+    updateMines(w, dt);
     this.resolveBlasts();
     this.checkContact();
     this.sweep(w.enemies);
@@ -544,7 +574,7 @@ export class Game {
     if (w.phase === 'boot' || w.phase === 'ending') return;
     const s = w.shooter;
     for (const e of w.enemies) {
-      if (e.dead || e.attacking) continue;
+      if (e.dead || e.attacking || e.harmless) continue;
       const rr = e.r + s.r + 2;
       if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= rr * rr) {
         e.attacking = true;
@@ -697,6 +727,7 @@ export class Game {
         + `shots  ${w.projectiles.length}\n`
         + `parts  ${fx.particles.active.length}\n`
         + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}\n`
+        + `mines  ${w.mines.length}  round ${w.round}\n`
         + `build  ${BUILD}  zoom ${CFG.zoom}`,
       );
     }
@@ -745,6 +776,7 @@ export class Game {
     for (const e of w.enemies) e.draw(ctx, w);
     if (w.boss && !w.boss.dead) w.boss.draw(ctx);
 
+    drawMines(ctx, w);
     for (const e of w.effects) e.draw(ctx, w);
 
     this.drawAutoLock(ctx);
@@ -972,6 +1004,14 @@ export class Game {
     const w = this.world;
     for (const e of w.enemies) if (!e.dead) e.destroy(w);
     for (const e of w.debris) if (!e.dead) e.destroy(w);
+  }
+
+  debugThrowMine() {
+    throwMine(this.world);
+  }
+
+  debugSpawnDrift() {
+    spawnDrift(this.world);
   }
 
   debugGlitch() {

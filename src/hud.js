@@ -34,8 +34,13 @@ export class Hud {
       endText: $('endText'),
       resetBtn: $('resetBtn'),
       muteBtn: $('muteBtn'),
-      autoAimBtn: $('autoAimBtn'),
-      autoFireBtn: $('autoFireBtn'),
+      toggles: {
+        autoAim: $('tgAutoAim'),
+        autoFire: $('tgAutoFire'),
+        autoMine: $('tgAutoMine'),
+        explosive: $('tgExplosive'),
+        shotgun: $('tgShotgun'),
+      },
       dbgBtn: $('dbgBtn'),
     };
 
@@ -59,12 +64,12 @@ export class Hud {
     this.el.resetBtn.addEventListener('click', () => game.restart());
     this.el.muteBtn.addEventListener('click', () => game.toggleSound());
     this.el.dbgBtn.addEventListener('click', () => this.toggleDebug());
-    for (const key of ['autoAim', 'autoFire']) {
-      const el = this.el[`${key}Btn`];
+    for (const [key, el] of Object.entries(this.el.toggles)) {
+      const round = key === 'explosive' || key === 'shotgun';
       el.addEventListener('pointerdown', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        game.toggleAuto(key);
+        if (round) game.toggleRound(key); else game.toggleAuto(key);
       });
       el.addEventListener('contextmenu', (ev) => ev.preventDefault());
     }
@@ -243,6 +248,8 @@ export class Hud {
       ['FILL FIELD', () => g.debugFillField()],
       ['CLEAR FIELD', () => g.debugClearField()],
       ['GLITCH TEST', () => g.debugGlitch()],
+      ['THROW MINE', () => g.debugThrowMine()],
+      ['SPAWN DRIFT', () => g.debugSpawnDrift()],
       ['RESTART', () => g.restart()],
       ['END SCREEN', () => g.debugEnding()],
     ];
@@ -316,8 +323,9 @@ export class Hud {
     this.el.resetBtn.hidden = true;
   }
 
-  setAuto(key, on) {
-    const el = this.el[`${key}Btn`];
+  setToggle(key, on) {
+    const el = this.el.toggles[key];
+    if (!el) return;
     el.classList.toggle('on', on);
     el.setAttribute('aria-pressed', String(on));
   }

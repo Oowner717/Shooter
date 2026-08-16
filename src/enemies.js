@@ -2,7 +2,7 @@
 // and a hand-drawn look. Nothing here knows about the rest of the game beyond
 // the `world` handle it is given.
 
-import { CFG, ENEMY_TYPES, TYPE_BY_ID, HAIRLINE, massOf } from './config.js';
+import { CFG, ENEMY_TYPES, TYPE_BY_ID, ROUTES, HAIRLINE, massOf } from './config.js';
 import { TAU, clamp, rand, randInt, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
 import { explode, hitBurst, spark, shard as fxShard, ring, ripple } from './fx.js';
 import { audio } from './audio.js';
@@ -42,6 +42,15 @@ export class Enemy {
     this.dead = false;
     this.phase = rand(0, TAU);
     this.lurchTimer = rand(0, 2);
+
+    this.harmless = !!type.harmless;
+    if (this.harmless) this.counts = false;
+    // Every object picks its own way across the field.
+    this.route = opts.route || weightedPick(ROUTES);
+    this.routeSide = Math.random() < 0.5 ? -1 : 1;
+    this.routeScale = rand(0.7, 1.25);
+    this.wanderAngle = rand(0, TAU);
+    this.wanderTimer = 0;
     this.ttl = this.isDebris ? rand(22, 30) : 0;
     this.spawnIn = opts.spawnIn ?? 0; // brief materialise animation
 
@@ -65,7 +74,33 @@ export class Enemy {
 
   // ------------------------------------------------------------- behaviour
 
+  /** Aimless bodies: a slow random walk with no destination at all. */
+  wander(world, dt) {
+    this.wanderTimer -= dt;
+    if (this.wanderTimer <= 0) {
+      this.wanderTimer = rand(1.6, 4.2);
+      this.wanderAngle += spread(1.9);
+    }
+    const slow = world.stasis > 0 ? 0.12 : 1;
+    const cruise = this.cruise * slow;
+    const k = (this.type.accel / 100) * slow * 0.9;
+    const dx = Math.cos(this.wanderAngle);
+    const dy = Math.sin(this.wanderAngle);
+    this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);
+    this.vy += (dy * cruise - this.vy) * clamp(k * dt, 0, 1);
+    if (world.stasis > 0) {
+      const f = Math.exp(-1.6 * dt);
+      this.vx *= f;
+      this.vy *= f;
+    }
+  }
+
   steer(world, dt) {
+    if (this.harmless) {
+      this.wander(world, dt);
+      return;
+    }
+
     const t = world.time;
     let tx;
     let ty;
@@ -85,12 +120,29 @@ export class Enemy {
       }
     }
 
-    const wob = Math.sin(t * (0.7 + this.phase * 0.11) + this.phase) * (this.type.wobble || 1);
     let dx = tx - this.x;
     let dy = ty - this.y;
     const d = Math.hypot(dx, dy) || 1;
     dx /= d;
     dy /= d;
+
+    // Route offset: swing wide of the true bearing at long range and fold in
+    // as the object closes, so each one arrives by its own arc.
+    if (!this.staged) {
+      const r = this.route;
+      const reach = clamp(d / 520, 0, 1) ** r.commit;
+      let lateral = r.width * this.routeScale * this.routeSide * reach;
+      if (r.weave) lateral *= Math.sin(t * r.weave + this.phase);
+      tx += -dy * lateral;
+      ty += dx * lateral;
+      dx = tx - this.x;
+      dy = ty - this.y;
+      const nd = Math.hypot(dx, dy) || 1;
+      dx /= nd;
+      dy /= nd;
+    }
+
+    const wob = Math.sin(t * (0.7 + this.phase * 0.11) + this.phase) * (this.type.wobble || 1);
     // clumsy: the heading wanders around the true bearing
     const ang = Math.atan2(dy, dx) + wob * 0.24;
     dx = Math.cos(ang);
@@ -99,7 +151,12 @@ export class Enemy {
     const slow = world.stasis > 0 ? 0.12 : 1;
     // Something that has already breached the turret commits to it, so the
     // corruption it causes is always clearable.
-    const cruise = this.cruise * slow * (this.attacking ? 1.3 : 1);
+    let cruise = this.cruise * slow * (this.attacking ? 1.3 : 1);
+    // loiterers hang back at mid range before making their run
+    if (this.route.dawdle && !this.staged) {
+      const dist = Math.hypot(world.shooter.x - this.x, world.shooter.y - this.y);
+      if (dist > 260) cruise *= this.route.dawdle;
+    }
     const speed = Math.hypot(this.vx, this.vy);
     // Steering yields to physics while a body is flying — knockback stays fun.
     const authority = clamp(1 - (speed / Math.max(cruise, 1) - 1) / 3, 0.12, 1);
@@ -289,6 +346,7 @@ export class Enemy {
       case 'plated': drawPlated(ctx, this.r, hpFrac); break;
       case 'warden': drawWardenCore(ctx, this.r); break;
       case 'prism': drawPrism(ctx, this.r); break;
+      case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
       default: drawChip(ctx, this.r, this.phase);
     }
 
@@ -501,6 +559,26 @@ function drawPrism(ctx, r) {
   ctx.stroke();
 }
 
+/** Soft, dashed and unhurried — legibly not a threat. */
+function drawDrift(ctx, r, phase, time) {
+  ctx.setLineDash([r * 0.5, r * 0.42]);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  const pulse = 0.6 + 0.4 * Math.sin(time * 1.3 + phase);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.36 * pulse, 0, TAU);
+  ctx.stroke();
+  for (let i = 0; i < 3; i++) {
+    const a = phase + time * 0.35 + (i / 3) * TAU;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62, r * 0.1, 0, TAU);
+    ctx.fill();
+  }
+}
+
 function drawChip(ctx, r, phase) {
   ctx.beginPath();
   const n = 5;
@@ -564,13 +642,26 @@ export function spawnFormation(world, kinds, count) {
   return made;
 }
 
+/** Loose, aimless matter released through the gate along with everything else. */
+export function spawnDrift(world, opts = {}) {
+  const type = TYPE_BY_ID.drift;
+  const g = world.wall;
+  const x = opts.x ?? clamp(g.gateCx + spread(g.gateHalf * 0.8), type.r + 6, world.width - type.r - 6);
+  const y = opts.y ?? g.y + g.thickness + rand(10, 40);
+  const e = new Enemy(type, x, y, { staged: false, spawnIn: 1, vx: spread(30), vy: rand(10, 50) });
+  world.enemies.push(e);
+  return e;
+}
+
 export class Director {
   constructor() {
     this.timer = 1.2;
+    this.driftTimer = 3;
   }
 
   reset() {
     this.timer = 1.2;
+    this.driftTimer = 3;
   }
 
   /** Objects already loose in the arena when the simulation boots. */
@@ -591,10 +682,25 @@ export class Director {
         { staged: false, spawnIn: rand(0.4, 1.4), vx: spread(20), vy: rand(0, 20) },
       );
     }
+    for (let i = 0; i < 3; i++) {
+      spawnDrift(world, {
+        x: rand(60, world.width - 60),
+        y: rand(top, Math.max(top + 60, bottom)),
+      });
+    }
   }
 
   update(world, dt) {
     if (world.phase !== 'staging') return;
+
+    // A slow trickle of aimless matter, capped so it never crowds the field.
+    this.driftTimer -= dt;
+    if (this.driftTimer <= 0) {
+      this.driftTimer = rand(7, 13);
+      const drifting = world.enemies.reduce((n, e) => n + (e.harmless && !e.dead ? 1 : 0), 0);
+      if (drifting < CFG.maxDrift && world.enemies.length < CFG.maxEnemies) spawnDrift(world);
+    }
+
     const progress = clamp(world.kills / CFG.popRampKills, 0, 1);
     const popTarget = Math.round(CFG.popStart + (CFG.popEnd - CFG.popStart) * progress);
     const interval = CFG.spawnInterval[0] + (CFG.spawnInterval[1] - CFG.spawnInterval[0]) * progress;

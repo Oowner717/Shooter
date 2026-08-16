@@ -4,7 +4,8 @@
 import { CFG, HAIRLINE } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, angleDelta } from './util.js';
 import { fire, clampAim } from './projectiles.js';
-import { spark, shake } from './fx.js';
+import { spark, ring, shake } from './fx.js';
+import { applyBlast } from './enemies.js';
 import { audio } from './audio.js';
 
 export class Shooter {
@@ -130,13 +131,45 @@ export class Shooter {
     return this.cooldown <= 0 && world.lockout <= 0;
   }
 
-  /** One bolt. Returns true if it actually went out. */
+  /** One shot of whatever is loaded. Returns true if it actually went out. */
   shoot(world) {
     if (!this.canFire(world)) return false;
     const a = this.aim + spread(0.012);
-    fire(world, this.muzzleX, this.muzzleY, a, {
-      speed: CFG.bolt.speed * (world.chrono > 0 ? 0.42 : 1),
-    });
+    const slow = world.chrono > 0 ? 0.42 : 1;
+    const R = CFG.rounds;
+
+    if (world.round === 'shotgun') {
+      const g = R.shotgun;
+      for (let i = 0; i < g.pellets; i++) {
+        const off = ((i / (g.pellets - 1)) - 0.5) * g.spread + spread(0.02);
+        fire(world, this.muzzleX, this.muzzleY, a + off, {
+          speed: rand(g.speed[0], g.speed[1]) * slow,
+          r: 3.2,
+          damage: g.damage,
+          impulse: 44,
+          life: g.life,
+          bounces: 0,
+          color: '#ffd9a0',
+          trail: 0.03,
+        });
+      }
+    } else if (world.round === 'explosive') {
+      const g = R.explosive;
+      fire(world, this.muzzleX, this.muzzleY, a, {
+        speed: g.speed * slow,
+        r: 5.6,
+        damage: g.damage,
+        impulse: 70,
+        bounces: 0,
+        color: '#ff9f5c',
+        core: '#fff0d8',
+        trail: 0.03,
+        burst: heBurst,
+      });
+    } else {
+      fire(world, this.muzzleX, this.muzzleY, a, { speed: CFG.bolt.speed * slow });
+    }
+
     this.recoil = 1;
     this.heat = Math.min(1, this.heat + 0.14);
     if (world.jam > 0) this.cooldown = CFG.boss.jamInterval;
@@ -339,4 +372,17 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.lineTo(x, y + rr);
   ctx.arcTo(x, y, x + rr, y, rr);
   ctx.closePath();
+}
+
+/** Explosive round detonation, shared by every HE shot. */
+function heBurst(world, x, y) {
+  const b = CFG.rounds.explosive.blast;
+  applyBlast(world, { x, y, r: b.r, damage: b.damage, impulse: b.impulse });
+  ring(x, y, 4, b.r * 1.4, 0.26, '#ffb347', 3.4);
+  for (let i = 0; i < 12; i++) {
+    const a = rand(0, TAU);
+    spark(x, y, Math.cos(a) * rand(150, 460), Math.sin(a) * rand(150, 460), '#ffd166', rand(0.16, 0.36), 2.4);
+  }
+  shake(3);
+  audio.pop(1.3);
 }

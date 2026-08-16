@@ -21,6 +21,8 @@ class Projectile {
     this.color = opts.color || '#bff4ff';
     this.core = opts.core || '#ffffff';
     this.trail = opts.trail ?? 0.024;
+    // Called at the point of impact (or on timeout) for rounds that go off.
+    this.burst = opts.burst || null;
     this.dead = false;
     this.ignore = null; // body we just reflected off
     this.ignoreT = 0;
@@ -61,6 +63,12 @@ function segBox(ax, ay, bx, by, box, pad) {
  * Advance every projectile and resolve what it runs into.
  * Order of precedence is purely "whichever is nearest along the path".
  */
+/** End a projectile. `impacted` is false only when it simply leaves the field. */
+function endProjectile(world, p, x, y, impacted) {
+  p.dead = true;
+  if (impacted && p.burst) p.burst(world, x, y);
+}
+
 export function updateProjectiles(world, dt) {
   const list = world.projectiles;
   const W = world.width;
@@ -68,7 +76,8 @@ export function updateProjectiles(world, dt) {
   for (let i = list.length - 1; i >= 0; i--) {
     const p = list[i];
     p.life -= dt;
-    if (p.life <= 0) { p.dead = true; }
+    // a timed round goes off wherever it happens to be
+    if (p.life <= 0) endProjectile(world, p, p.x, p.y, true);
     if (p.ignoreT > 0) p.ignoreT -= dt; else p.ignore = null;
 
     if (!p.dead) {
@@ -95,10 +104,10 @@ export function updateProjectiles(world, dt) {
         // side-wall ricochet
         if (p.x < p.r && p.vx < 0) {
           if (p.bounces > 0) { p.bounces--; p.x = p.r; p.vx = -p.vx; ricochetFx(p); }
-          else p.dead = true;
+          else endProjectile(world, p, p.x, p.y, true);
         } else if (p.x > W - p.r && p.vx > 0) {
           if (p.bounces > 0) { p.bounces--; p.x = W - p.r; p.vx = -p.vx; ricochetFx(p); }
-          else p.dead = true;
+          else endProjectile(world, p, p.x, p.y, true);
         }
         if (p.y < -world.stageHeight || p.y > world.floorY + 60) p.dead = true;
       }
@@ -219,19 +228,19 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         return;
       }
       audio.hit();
-      p.dead = true;
+      endProjectile(world, p, hx, hy, true);
       return;
     }
     case 'shard': {
       bestTarget.enemy.hitShard(bestTarget.shard, p.damage, hx, hy, -dirx, -diry);
-      p.dead = true;
+      endProjectile(world, p, hx, hy, true);
       return;
     }
     case 'bossShield': {
       bestTarget.hp -= p.damage;
       hitBurst(hx, hy, -dirx, -diry, '#ffe9a8');
       audio.reflect();
-      p.dead = true;
+      endProjectile(world, p, hx, hy, true);
       return;
     }
     case 'boss': {
@@ -239,21 +248,21 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       world.boss.push(dirx, diry, CFG.boss.pushPerBolt);
       hitBurst(hx, hy, -dirx, -diry, world.boss.hitColor);
       audio.hit();
-      p.dead = true;
+      endProjectile(world, p, hx, hy, true);
       return;
     }
     case 'gate': {
       world.wall.damageGate(world, p.damage, hx, hy);
       hitBurst(hx, hy, -dirx, -diry, '#9fe8ff');
       audio.gateHit();
-      p.dead = true;
+      endProjectile(world, p, hx, hy, true);
       return;
     }
     default: {
       for (let i = 0; i < 3; i++) {
         spark(hx, hy, spread(160) - dirx * 90, spread(160) - diry * 90, '#8fb6d8', 0.2, 1.8);
       }
-      p.dead = true;
+      endProjectile(world, p, hx, hy, true);
     }
   }
 }
