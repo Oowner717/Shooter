@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '6';
+export const BUILD = '7';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -37,7 +37,8 @@ export const CFG = {
     standoff: 210, // world units between the turret and the ability strip
     holdFireInterval: 0.2, // sustained-fire cadence; tapping faster is always allowed
     aimClamp: 1.36, // radians away from straight up that the barrel allows
-    turnRate: 26, // rad/s barrel slew
+    turnRate: 26, // rad/s barrel slew under your own hand
+    autoTurnRate: 4.2, // rad/s while auto aim traverses between targets
 
     // The lever. A rod runs through the turret's pivot: the grip hangs below
     // it, the barrel sticks out above it, and pushing one swings the other
@@ -46,7 +47,6 @@ export const CFG = {
     gripR: 24, // grip knob radius
     gripFireInterval: 0.2,
     autoFireInterval: 0.22, // hands-off cadence; a shade behind driving it yourself
-    gripReturn: 6.5, // rad/s spring back to neutral on release
   },
 
   // ---- projectiles ----------------------------------------------------

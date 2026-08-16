@@ -35,9 +35,9 @@ modules and the service worker both require an origin.)*
 **The lever is the main control.** A rod runs through the turret's pivot: the
 grip hangs below it, the barrel sticks out above it. Grab the grip with your
 thumb, swing it, and the barrel swings the opposite way — push the handle left
-and you shoot right. It fires on its own for as long as you hold it, and
-springs back to neutral when you let go. Because your hand stays *behind* the
-turret, it never covers the thing you are shooting at.
+and you shoot right. It fires on its own for as long as you hold it. Let go
+and it stays exactly where you left it; nothing recentres. Because your hand
+stays *behind* the turret, it never covers the thing you are shooting at.
 
 **Or tap anywhere ahead of the turret** and it fires there. There is no
 tap-rate limit — tap as fast as your thumb allows, or hold and drag to sustain
@@ -51,8 +51,10 @@ default:
   hand on the lever the barrel rests straight up, so this alone is a fountain.
 - **AUTO AIM** tracks the nearest object currently corrupting your feed — a
   marked breacher outranks anything four times closer — leads the shot for
-  flight time, and fires on it. The lever visibly swings to match. With no
-  target it holds fire and lets the barrel settle back to vertical.
+  flight time, and fires on it. It *traverses* between targets at its own
+  slower rate, easing off as it arrives, and holds fire until the barrel has
+  come round; brackets tighten on the target while it swings. With no target
+  it stops shooting and leaves the barrel where it is.
 
 Your hands always win: while you are holding the lever or dragging, the
 assists stop steering. Auto fire runs a shade slower than driving it yourself,

@@ -34,6 +34,7 @@ export class Game {
     this.pointers = new Map();
     this.gripPointer = null;
     this.fireTimer = 0;
+    this.autoLock = null;
     this.leverHinted = false;
     this.autoHinted = { autoAim: false, autoFire: false };
     this.acc = 0;
@@ -89,7 +90,7 @@ export class Game {
       chrono: 0,
       lockout: 0,
       bossContact: 0,
-      gripDriven: false, // is the lever the control currently steering the barrel?
+      autoSteering: false, // is auto aim traversing the barrel this frame?
       autoAim: false,
       autoFire: false,
       veilFade: 0, // eased so VEIL closes in rather than snapping
@@ -143,7 +144,7 @@ export class Game {
 
     this.pointers.clear();
     this.gripPointer = null;
-    w.gripDriven = false;
+    w.autoSteering = false;
 
     this.snapshot = null;
     this.endStage = 0;
@@ -253,7 +254,6 @@ export class Game {
       // is a direct shot at the point you touched.
       if (this.gripPointer === null && p.y > s.y - s.r) {
         this.gripPointer = ev.pointerId;
-        w.gripDriven = true;
         s.grabGrip(p.x, p.y, w.invert > 0);
         s.shoot(w);
         this.fireTimer = CFG.shooter.gripFireInterval;
@@ -263,7 +263,6 @@ export class Game {
         }
       } else {
         this.pointers.set(ev.pointerId, p);
-        w.gripDriven = false;
         s.aimAt(p.x, p.y, w.invert > 0);
         s.aim = s.targetAim; // taps are instant, drags slew
         s.shoot(w);
@@ -359,8 +358,6 @@ export class Game {
     const speed = CFG.bolt.speed * (w.chrono > 0 ? 0.42 : 1);
     const flight = Math.hypot(target.x - s.x, target.y - s.y) / speed;
     s.aimAt(target.x + (target.vx || 0) * flight, target.y + (target.vy || 0) * flight, w.invert > 0);
-    // swing the lever to match, so the rod always shows where the barrel points
-    s.gripAngle = s.targetAim + Math.PI;
   }
 
   /**
@@ -376,20 +373,20 @@ export class Game {
     const manual = s.gripHeld || dragging;
     const target = w.autoAim ? this.autoTarget() : null;
 
-    if (!manual) {
-      if (target) {
-        this.aimLead(target);
-        w.gripDriven = false; // auto aim owns the barrel
-      } else {
-        w.gripDriven = true; // nothing steering: the lever springs to vertical
-      }
-    }
+    w.autoSteering = !manual && !!target;
+    this.autoLock = w.autoSteering ? target : null;
+    if (w.autoSteering) this.aimLead(target);
 
     let interval = 0;
     if (s.gripHeld) interval = CFG.shooter.gripFireInterval;
     else if (dragging) interval = CFG.shooter.holdFireInterval;
     else if (w.autoFire || target) interval = CFG.shooter.autoFireInterval;
     if (interval <= 0) return;
+
+    // Auto aim waits until the barrel has actually come round. Auto fire does
+    // not — that toggle means "shoot wherever this is pointed", including
+    // mid-sweep.
+    if (!manual && !w.autoFire && s.aimError > 0.14) return;
 
     this.fireTimer -= dt;
     if (this.fireTimer > 0) return;
@@ -750,6 +747,7 @@ export class Game {
 
     for (const e of w.effects) e.draw(ctx, w);
 
+    this.drawAutoLock(ctx);
     w.shooter.draw(ctx, w);
     drawProjectiles(ctx, w);
     drawFx(ctx);
@@ -805,6 +803,29 @@ export class Game {
         ctx.stroke();
       }
     }
+  }
+
+  /** Brackets that tighten as the barrel comes round onto the auto-aim target. */
+  drawAutoLock(ctx) {
+    const e = this.autoLock;
+    if (!e || e.dead) return;
+    const w = this.world;
+    const converged = clamp(1 - w.shooter.aimError / 0.9, 0, 1);
+    const r = (e.r || 40) + 16 + (1 - converged) * 42;
+    const a = 0.25 + converged * 0.5;
+    const spin = w.time * (0.7 + (1 - converged) * 2.4);
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.rotate(spin);
+    ctx.strokeStyle = rgba(converged > 0.85 ? '#7cffb2' : '#59e0ff', a);
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const base = (i / 4) * TAU;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, base - 0.22, base + 0.22);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   drawStasis(ctx, W, H) {

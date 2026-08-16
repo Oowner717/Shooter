@@ -91,21 +91,27 @@ export class Shooter {
     this.gripHeld = false;
   }
 
+  /** How far the barrel still has to travel to reach its target bearing. */
+  get aimError() {
+    return Math.abs(angleDelta(this.aim, this.targetAim));
+  }
+
   update(world, dt) {
-    // `gripDriven` means the lever governs the barrel. While something else
-    // is steering — auto aim, a direct tap — the rod must not spring away
-    // from where that other thing put it.
-    if (!this.gripHeld && world.gripDriven) {
-      const d = angleDelta(this.gripAngle, Math.PI / 2);
-      const step = CFG.shooter.gripReturn * dt;
-      this.gripAngle += clamp(d, -step, step);
-      this.targetAim = this.gripAngle - Math.PI;
-    }
     this.gripGlow += ((this.gripHeld ? 1 : 0) - this.gripGlow) * clamp(dt * 12, 0, 1);
 
+    // The barrel holds wherever it was last pointed. Auto aim traverses at its
+    // own slower rate, easing off as it arrives, so it sweeps between targets
+    // instead of jumping between them.
     const d = angleDelta(this.aim, this.targetAim);
-    const step = CFG.shooter.turnRate * dt;
-    this.aim += clamp(d, -step, step);
+    const rate = world.autoSteering && !this.gripHeld
+      ? Math.min(CFG.shooter.autoTurnRate, Math.max(0.9, Math.abs(d) * 3))
+      : CFG.shooter.turnRate;
+    this.aim += clamp(d, -rate * dt, rate * dt);
+
+    // The rod is rigid: unless a hand is on it, it is simply the far end of
+    // whatever the barrel is doing.
+    if (!this.gripHeld) this.gripAngle = this.aim + Math.PI;
+
     this.recoil = Math.max(0, this.recoil - dt * 6.5);
     this.heat = Math.max(0, this.heat - dt * 1.4);
     this.cooldown = Math.max(0, this.cooldown - dt);
