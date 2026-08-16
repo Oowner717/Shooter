@@ -67,6 +67,7 @@ export class Game {
       time: 0,
       timeScale: 1,
       kills: 0,
+      released: 0, // hostile objects let out so far; capped at CFG.killGoal
       phase: 'boot', // boot | staging | gate | boss | ending | frozen
 
       enemies: [],
@@ -131,6 +132,7 @@ export class Game {
     w.time = 0;
     w.timeScale = 1;
     w.kills = 0;
+    w.released = 0;
     w.boss = null;
     w.stasis = w.veil = w.invert = w.jam = w.chrono = w.lockout = w.bossContact = 0;
     w.veilFade = 0;
@@ -722,7 +724,7 @@ export class Game {
       this.hud.setStats(
         `fps    ${this.fps.toFixed(0)}\n`
         + `phase  ${w.phase}\n`
-        + `kills  ${w.kills}\n`
+        + `kills  ${w.kills}  released ${w.released}/${CFG.killGoal}\n`
         + `obj    ${hostileCount(w)} hostile + ${w.enemies.length - hostileCount(w)} drift + ${w.debris.length} frag\n`
         + `shots  ${w.projectiles.length}\n`
         + `parts  ${fx.particles.active.length}\n`
@@ -972,7 +974,12 @@ export class Game {
   }
 
   debugAddKills(n) {
-    for (let i = 0; i < n && this.world.phase === 'staging'; i++) this.registerKill();
+    const w = this.world;
+    for (let i = 0; i < n && w.phase === 'staging'; i++) {
+      // keep the release quota in step, or the director would keep spawning
+      w.released = Math.min(CFG.killGoal, w.released + 1);
+      this.registerKill();
+    }
   }
 
   debugNextStory() {

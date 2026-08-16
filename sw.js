@@ -6,8 +6,10 @@
 // Correctness beats a few milliseconds of startup here: the cache exists so
 // the game runs on a plane, not to save a round trip on every launch.
 //
-// BUILD must match CFG.build in src/config.js.
-const BUILD = '7';
+// The build is taken from the registration query string (main.js registers
+// './sw.js?b=<BUILD>'), so the cache name is derived from src/config.js rather
+// than duplicated here. A hand-copied constant silently drifted once already.
+const BUILD = new URL(self.location.href).searchParams.get('b') || 'dev';
 const CACHE = `sim7749-${BUILD}`;
 const NET_TIMEOUT = 3500;
 

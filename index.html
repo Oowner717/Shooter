@@ -25,10 +25,11 @@
  * on a build change it unregisters every worker, drops every cache and reloads
  * once. Costs one reload per deploy; the worker handles updates normally after.
  *
- * BUILD must match `BUILD` in src/config.js and sw.js.
+ * BUILD must match `BUILD` in src/config.js — scripts/check-build.mjs
+ * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '9';
+  var BUILD = '10';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;

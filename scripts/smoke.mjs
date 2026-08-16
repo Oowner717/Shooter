@@ -155,6 +155,8 @@ console.log('--- busy-field stats ---\n' + busyStats);
 console.log('--- boss stats ---\n' + bossStats);
 console.log('reset button appeared:', hasReset);
 console.log('phase after restart:', finalPhase);
+const runningBuild = await page.evaluate(() => document.querySelector('.bootFoot')?.textContent || '');
+console.log('running build:', runningBuild.replace(/^.*BUILD /, '') || '(unknown)');
 console.log('console errors:', errors.length);
 for (const e of errors.slice(0, 20)) console.log('  !', e);
 

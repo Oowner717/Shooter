@@ -1,6 +1,7 @@
 // Bootstrap: sizing, the frame loop, iOS gesture suppression, service worker.
 
 import { Game } from './game.js';
+import { BUILD } from './config.js';
 import { audio } from './audio.js';
 
 const canvas = document.getElementById('stage');
@@ -61,7 +62,7 @@ if ('serviceWorker' in navigator) {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
+    navigator.serviceWorker.register(`./sw.js?b=${BUILD}`)
       .then((reg) => reg.update().catch(() => {}))
       .catch(() => {});
   });

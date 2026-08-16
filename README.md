@@ -95,8 +95,14 @@ attackers, worse corruption.
 
 ### The run
 
-1. **STAGING** — objects pour out of the gate. Destroy 500.
-2. **GATE** — the doors slam shut. Now the gate is the target. Break it.
+1. **STAGING** — objects pour out of the gate. Exactly five hundred
+   glitch-causing objects exist across a whole run, splitter children
+   included; the director stops releasing once the quota is spent, so the
+   field drains toward the end and the last stragglers close in faster. When
+   the five hundredth dies there are no hostiles left on screen at all — only
+   harmless drift.
+2. **GATE** — the doors slam shut. Now the gate is the target. Every round
+   damages it, and blasts reach it at half weight.
 3. **BOSS** — **MNEMOSYNE** comes through the breach, slowly. It cannot hurt
    you. It takes things from you instead: your sight, your aim, your rate of
    fire. Shooting pushes it back; stop shooting and it keeps walking.
@@ -217,12 +223,19 @@ the length of the lever's lower arm.
 
 ## Shipping a change
 
-Bump the build number in **three** places — there is no build step to share a
-constant across a module, a service worker and an inline script:
+Bump the build number in **two** places, then run the guard:
 
-1. `BUILD` in `src/config.js` (shown on the title screen and in debug stats)
-2. `BUILD` in `sw.js` (names the cache)
-3. `BUILD` in the inline `<script>` at the top of `index.html`
+1. `BUILD` in `src/config.js` — the source of truth, shown on the title screen
+2. `BUILD` in the inline `<script>` at the top of `index.html`, which runs
+   before any module can load and so cannot import it
+
+```bash
+node scripts/check-build.mjs   # fails if the two disagree
+```
+
+`sw.js` no longer holds a copy: `main.js` registers it as `./sw.js?b=<BUILD>`
+and the worker derives its cache name from that query string. A hand-copied
+constant there silently drifted across three releases before this.
 
 The inline script is the recovery path: on a build change it unregisters every
 worker, drops every cache and reloads once, so a device can never be pinned to

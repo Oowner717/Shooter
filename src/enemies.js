@@ -51,6 +51,7 @@ export class Enemy {
     this.routeScale = rand(0.7, 1.25);
     this.wanderAngle = rand(0, TAU);
     this.wanderTimer = 0;
+    this.stagedFor = 0;
     this.ttl = this.isDebris ? rand(22, 30) : 0;
     this.spawnIn = opts.spawnIn ?? 0; // brief materialise animation
 
@@ -152,6 +153,9 @@ export class Enemy {
     // Something that has already breached the turret commits to it, so the
     // corruption it causes is always clearable.
     let cruise = this.cruise * slow * (this.attacking ? 1.3 : 1);
+    // Once nothing more will be released, whatever is left closes in, so the
+    // tail of the run is never a hunt across an empty field.
+    if (releasesLeft(world) <= 0) cruise *= 1.45;
     // loiterers hang back at mid range before making their run
     if (this.route.dawdle && !this.staged) {
       const dist = Math.hypot(world.shooter.x - this.x, world.shooter.y - this.y);
@@ -201,6 +205,17 @@ export class Enemy {
     }
 
     if (this.staged) {
+      // A wedged object above the wall would stall the run forever, since the
+      // gate only seals once every released object has been destroyed.
+      this.stagedFor += dt;
+      if (this.stagedFor > 10) {
+        const g = world.wall;
+        const dx = g.gateCx - this.x;
+        const dy = g.y + g.thickness + 40 - this.y;
+        const d = Math.hypot(dx, dy) || 1;
+        this.vx += (dx / d) * 130 * dt;
+        this.vy += (dy / d) * 130 * dt;
+      }
       if (this.y - this.r > world.wall.y + world.wall.thickness) {
         // Crossed the wall line — it is loose in the arena now.
         this.staged = false;
@@ -283,10 +298,13 @@ export class Enemy {
     // Splitter: children keep the parent's momentum.
     if (t.splits) {
       const child = TYPE_BY_ID[t.splits.type];
-      for (let i = 0; i < t.splits.count; i++) {
+      // Children are glitch-causing objects too, so they come out of the same
+      // quota. Near the end of the run a splitter simply sheds fewer.
+      const count = Math.min(t.splits.count, releasesLeft(world));
+      for (let i = 0; i < count; i++) {
         // a little over the cap: a split should not be silently swallowed
         if (hostileCount(world) >= CFG.maxEnemies + 8) break;
-        const a = (i / t.splits.count) * TAU + rand(0, 1);
+        const a = (i / count) * TAU + rand(0, 1);
         const sp = rand(90, 190);
         world.enemies.push(new Enemy(child, this.x + Math.cos(a) * this.r * 0.7, this.y + Math.sin(a) * this.r * 0.7, {
           vx: this.vx * 0.5 + Math.cos(a) * sp,
@@ -294,6 +312,7 @@ export class Enemy {
           staged: this.staged,
           spawnIn: 0.6,
         }));
+        world.released++;
       }
     }
 
@@ -619,10 +638,21 @@ function availableTypes(kills) {
   return ENEMY_TYPES.filter((t) => kills >= (t.unlock || 0));
 }
 
+/**
+ * Release one object into the run. Exactly `CFG.killGoal` glitch-causing
+ * objects exist across a whole run, so every hostile creation is counted here
+ * and the director stops once the quota is spent.
+ */
 export function spawnOne(world, type, x, y, opts = {}) {
   const e = new Enemy(type, x, y, { staged: true, spawnIn: 1, ...opts });
   world.enemies.push(e);
+  if (!e.harmless) world.released++;
   return e;
+}
+
+/** Hostiles still owed to the run. */
+export function releasesLeft(world) {
+  return Math.max(0, CFG.killGoal - world.released);
 }
 
 /** A formation queued above the screen, marching down to the gate. */
@@ -724,14 +754,17 @@ export class Director {
     if (this.timer > 0) return;
     this.timer = interval * rand(0.8, 1.25);
 
+    const quota = releasesLeft(world);
+    if (quota <= 0) return; // the whole allotment has been let out
+
     const hostiles = hostileCount(world);
     if (hostiles >= Math.min(popTarget, CFG.maxEnemies)) return;
 
     const kinds = availableTypes(world.kills);
-    const room = Math.min(popTarget, CFG.maxEnemies) - hostiles;
+    const room = Math.min(popTarget, CFG.maxEnemies, world.released + quota) - hostiles;
 
-    if (room >= 4 && Math.random() < CFG.formationChance) {
-      spawnFormation(world, kinds, randInt(3, Math.min(6, room)));
+    if (room >= 4 && quota >= 4 && Math.random() < CFG.formationChance) {
+      spawnFormation(world, kinds, randInt(3, Math.min(6, room, quota)));
     } else {
       const t = weightedPick(kinds);
       spawnOne(world, t, rand(t.r + 12, world.width - t.r - 12), -50 - rand(0, 40));
@@ -759,6 +792,16 @@ export function applyBlast(world, blast) {
   };
   hit(world.enemies);
   hit(world.debris);
+
+  // A sealed gate is a target like anything else; at half weight, since it is
+  // a wall and the bolts are meant to remain the honest way through it.
+  if (world.wall.sealed) {
+    const gy = world.wall.y + world.wall.thickness / 2;
+    const px = clamp(x, world.wall.gateCx - world.wall.gateHalf, world.wall.gateCx + world.wall.gateHalf);
+    const d = Math.hypot(x - px, y - gy);
+    if (d < r) world.wall.damageGate(world, damage * (1 - d / r) * 0.5, px, gy);
+  }
+
   if (world.boss && !world.boss.dead) {
     const dx = world.boss.x - x;
     const dy = world.boss.y - y;

@@ -59,7 +59,10 @@ export class Wall {
   }
 
   rebuildBoxes() {
-    const half = this.openHalf;
+    // When sealed the opening is zero, but the solid segments must still stop
+    // at the jambs — otherwise they span the whole wall, cover the gate box
+    // and swallow every shot aimed at it.
+    const half = this.sealed ? this.gateHalf : this.openHalf;
     const y0 = this.y;
     const y1 = this.y + this.thickness;
     this.boxes = [
