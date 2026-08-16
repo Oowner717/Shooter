@@ -1,7 +1,7 @@
 // The turret. Stationary, immortal, and the only thing in the arena with
 // infinite mass — everything else bounces off it.
 
-import { CFG } from './config.js';
+import { CFG, HAIRLINE } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, angleDelta } from './util.js';
 import { fire, clampAim } from './projectiles.js';
 import { spark, shake } from './fx.js';
@@ -171,7 +171,7 @@ export class Shooter {
 
     // anchor struts
     ctx.strokeStyle = rgba('#3d5871', 0.7);
-    ctx.lineWidth = 3;
+    ctx.lineWidth = HAIRLINE * 2.4;
     ctx.beginPath();
     for (let i = 0; i < 3; i++) {
       const a = Math.PI * 0.25 + (i / 2) * Math.PI * 0.5;
@@ -188,7 +188,7 @@ export class Shooter {
     // base
     ctx.fillStyle = 'rgba(10,20,32,0.95)';
     ctx.strokeStyle = rgba(accent, 0.85);
-    ctx.lineWidth = 2;
+    ctx.lineWidth = HAIRLINE * 1.8;
     ctx.beginPath();
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * TAU + Math.PI / 8;
@@ -254,10 +254,12 @@ export class Shooter {
     const gy = this.gripY;
     const glow = this.gripGlow;
 
+    const gr = CFG.shooter.gripR;
+
     // travel arc — makes the control discoverable without being told
     ctx.strokeStyle = rgba(accent, 0.17 + glow * 0.3);
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([7, 9]);
+    ctx.lineWidth = HAIRLINE * 1.4;
+    ctx.setLineDash([HAIRLINE * 6, HAIRLINE * 8]);
     ctx.beginPath();
     ctx.arc(this.x, this.y, len, Math.PI / 2 - CFG.shooter.aimClamp, Math.PI / 2 + CFG.shooter.aimClamp);
     ctx.stroke();
@@ -265,14 +267,14 @@ export class Shooter {
 
     // rod
     ctx.strokeStyle = rgba('#4d6a86', 0.85);
-    ctx.lineWidth = 7;
+    ctx.lineWidth = HAIRLINE * 6;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(this.x, this.y);
     ctx.lineTo(gx, gy);
     ctx.stroke();
     ctx.strokeStyle = rgba(accent, 0.5 + glow * 0.5);
-    ctx.lineWidth = 2.4;
+    ctx.lineWidth = HAIRLINE * 2;
     ctx.stroke();
     ctx.lineCap = 'butt';
 
@@ -281,25 +283,25 @@ export class Shooter {
     ctx.translate(gx, gy);
     ctx.rotate(this.gripAngle);
     ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, accent, 0, 0, 46 + glow * 26, 0.22 + glow * 0.45);
+    drawGlow(ctx, accent, 0, 0, gr * 2.4 + glow * 30, 0.22 + glow * 0.45);
     ctx.globalCompositeOperation = 'source-over';
 
     ctx.fillStyle = 'rgba(11,22,35,0.95)';
     ctx.strokeStyle = rgba(accent, 0.75 + glow * 0.25);
-    ctx.lineWidth = 2.4;
+    ctx.lineWidth = HAIRLINE * 2;
     ctx.beginPath();
-    ctx.arc(0, 0, 19, 0, TAU);
+    ctx.arc(0, 0, gr, 0, TAU);
     ctx.fill();
     ctx.stroke();
 
     // knurling, and a firing pulse while held
     ctx.strokeStyle = rgba(accent, 0.35 + glow * 0.4);
-    ctx.lineWidth = 1.6;
+    ctx.lineWidth = HAIRLINE * 1.3;
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU + t * 0.6;
-      ctx.moveTo(Math.cos(a) * 8, Math.sin(a) * 8);
-      ctx.lineTo(Math.cos(a) * 14, Math.sin(a) * 14);
+      ctx.moveTo(Math.cos(a) * gr * 0.42, Math.sin(a) * gr * 0.42);
+      ctx.lineTo(Math.cos(a) * gr * 0.74, Math.sin(a) * gr * 0.74);
     }
     ctx.stroke();
     ctx.restore();
@@ -307,9 +309,9 @@ export class Shooter {
     if (glow > 0.02) {
       const pulse = (t % CFG.shooter.gripFireInterval) / CFG.shooter.gripFireInterval;
       ctx.strokeStyle = rgba(accent, (1 - pulse) * glow * 0.75);
-      ctx.lineWidth = 2;
+      ctx.lineWidth = HAIRLINE * 1.6;
       ctx.beginPath();
-      ctx.arc(gx, gy, 19 + pulse * 16, 0, TAU);
+      ctx.arc(gx, gy, gr + pulse * 20, 0, TAU);
       ctx.stroke();
     }
   }

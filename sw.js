@@ -1,6 +1,15 @@
-// Offline cache. Bump CACHE when shipping changes.
-
-const CACHE = 'sim7749-v1';
+// Offline cache.
+//
+// Network-first for everything the app is made of. An earlier version served
+// scripts cache-first against a cache name that never changed, which pinned
+// players to whatever build they first loaded — new index.html, old modules.
+// Correctness beats a few milliseconds of startup here: the cache exists so
+// the game runs on a plane, not to save a round trip on every launch.
+//
+// BUILD must match CFG.build in src/config.js.
+const BUILD = '5';
+const CACHE = `sim7749-${BUILD}`;
+const NET_TIMEOUT = 3500;
 
 const ASSETS = [
   './',
@@ -34,7 +43,7 @@ self.addEventListener('install', (e) => {
     caches.open(CACHE)
       .then((c) => c.addAll(ASSETS))
       .then(() => self.skipWaiting())
-      .catch(() => {}),
+      .catch(() => self.skipWaiting()),
   );
 });
 
@@ -46,31 +55,32 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+/** Reject rather than hang forever on a stalled connection. */
+function fetchWithTimeout(req) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), NET_TIMEOUT);
+    fetch(req).then(
+      (res) => { clearTimeout(timer); resolve(res); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
-  // Network-first for navigations so an updated build is picked up promptly.
-  if (req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req)
-        .then((res) => {
+  e.respondWith(
+    fetchWithTimeout(req)
+      .then((res) => {
+        if (res && res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          return res;
-        })
-        .catch(() => caches.match(req).then((r) => r || caches.match('./index.html'))),
-    );
-    return;
-  }
-
-  e.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      if (res.ok) {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-      }
-      return res;
-    })),
+        }
+        return res;
+      })
+      .catch(() => caches.match(req).then(
+        (hit) => hit || (req.mode === 'navigate' ? caches.match('./index.html') : Promise.reject(new Error('offline'))),
+      )),
   );
 });

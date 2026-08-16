@@ -50,7 +50,19 @@ requestAnimationFrame(frame);
 // --------------------------------------------------------- service worker
 
 if ('serviceWorker' in navigator) {
+  // If a worker was already driving this page and a new one takes over, the
+  // modules currently in memory are the old build. Reload once so the running
+  // code and the cached code cannot disagree.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js')
+      .then((reg) => reg.update().catch(() => {}))
+      .catch(() => {});
   });
 }

@@ -165,6 +165,22 @@ enlarges the arena without touching a single gameplay number. `shooter.standoff`
 sets how far the turret sits above the ability strip, and `shooter.gripLen` is
 the length of the lever's lower arm.
 
+## Shipping a change
+
+Bump the build number in **three** places — there is no build step to share a
+constant across a module, a service worker and an inline script:
+
+1. `BUILD` in `src/config.js` (shown on the title screen and in debug stats)
+2. `BUILD` in `sw.js` (names the cache)
+3. `BUILD` in the inline `<script>` at the top of `index.html`
+
+The inline script is the recovery path: on a build change it unregisters every
+worker, drops every cache and reloads once, so a device can never be pinned to
+an old build. The worker itself is network-first with a cache fallback, so it
+serves the newest code whenever there is a connection and the game still runs
+offline. If the title screen shows an old build number, that is the signal
+something is stale.
+
 ## Performance
 
 Targets a stable 60 fps. Everything expensive is avoided by construction — no

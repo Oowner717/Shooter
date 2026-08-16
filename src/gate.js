@@ -9,7 +9,7 @@ import { audio } from './audio.js';
 export class Wall {
   constructor() {
     this.y = 0;
-    this.thickness = 26;
+    this.thickness = 32;
     this.gateCx = 0;
     this.gateHalf = 90;
     this.breachHalf = 0;
@@ -29,8 +29,11 @@ export class Wall {
     this.width = width;
     this.y = y;
     this.gateCx = width / 2;
-    this.gateHalf = Math.min(96, width * 0.25);
-    this.breachHalf = Math.min(width * 0.42, CFG.boss.r + 34);
+    // One wide mouth in the middle of the wall rather than a slot.
+    this.gateHalf = clamp(width * 0.28, 130, 190);
+    // The breach must read as the wall being torn *wider*, so it is always
+    // larger than the gate it replaces — and wide enough for what comes out.
+    this.breachHalf = Math.min(width * 0.45, Math.max(this.gateHalf + 46, CFG.boss.r + 42));
     this.rebuildBoxes();
   }
 

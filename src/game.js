@@ -1,6 +1,6 @@
 // World state, phase machine, physics stepping and the render pipeline.
 
-import { CFG, ENEMY_TYPES } from './config.js';
+import { CFG, BUILD, ENEMY_TYPES } from './config.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick } from './util.js';
 import { Grid, integrate, resolvePair, resolveBox, clampToArena, impactDamage } from './physics.js';
 import { fx, updateFx, drawFx, drawFlash, spark, ring, shake } from './fx.js';
@@ -631,7 +631,8 @@ export class Game {
         + `obj    ${w.enemies.length} + ${w.debris.length} deb\n`
         + `shots  ${w.projectiles.length}\n`
         + `parts  ${fx.particles.active.length}\n`
-        + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}`,
+        + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}\n`
+        + `build  ${BUILD}  zoom ${CFG.zoom}`,
       );
     }
   }

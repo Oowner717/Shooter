@@ -2,7 +2,7 @@
 // and a hand-drawn look. Nothing here knows about the rest of the game beyond
 // the `world` handle it is given.
 
-import { CFG, ENEMY_TYPES, TYPE_BY_ID, massOf } from './config.js';
+import { CFG, ENEMY_TYPES, TYPE_BY_ID, HAIRLINE, massOf } from './config.js';
 import { TAU, clamp, rand, randInt, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
 import { explode, hitBurst, spark, shard as fxShard, ring, ripple } from './fx.js';
 import { audio } from './audio.js';
@@ -278,7 +278,7 @@ export class Enemy {
     const dim = 0.45 + hpFrac * 0.55;
     ctx.fillStyle = rgba(t.color, 0.16 * dim);
     ctx.strokeStyle = rgba(t.color, 0.55 + 0.45 * dim);
-    ctx.lineWidth = Math.max(1, this.r * 0.09);
+    ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.09);
 
     switch (this.isDebris ? 'chip' : t.shape) {
       case 'shard': drawShard(ctx, this.r); break;
@@ -311,7 +311,7 @@ export class Enemy {
     if (this.shards) {
       const orbit = this.orbitR;
       ctx.strokeStyle = rgba(t.color, 0.9);
-      ctx.lineWidth = 3;
+      ctx.lineWidth = HAIRLINE * 2.2;
       ctx.beginPath();
       for (const sh of this.shards) {
         if (!sh.alive) continue;
@@ -329,7 +329,7 @@ export class Enemy {
     // damage arc — only on objects big enough to be worth tracking
     if (hpFrac < 0.98 && !this.isDebris && this.r >= 16) {
       ctx.strokeStyle = rgba(t.color, 0.8);
-      ctx.lineWidth = 2;
+      ctx.lineWidth = HAIRLINE * 1.5;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.r + 4, -Math.PI / 2, -Math.PI / 2 + TAU * hpFrac);
       ctx.stroke();
@@ -339,7 +339,7 @@ export class Enemy {
     if (this.attacking) {
       const p = 0.5 + 0.5 * Math.sin(world.time * 11);
       ctx.strokeStyle = rgba('#ff2d55', 0.5 + p * 0.5);
-      ctx.lineWidth = 2;
+      ctx.lineWidth = HAIRLINE * 1.6;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.r + 10 + p * 4, 0, TAU);
       ctx.stroke();

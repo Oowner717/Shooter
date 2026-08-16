@@ -2,6 +2,7 @@
 // be crisp, tappable and safe-area aware.
 
 import { ABILITIES } from './abilities.js';
+import { BUILD } from './config.js';
 import { clamp } from './util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -46,6 +47,11 @@ export class Hud {
 
     this.buildAbilities();
     this.buildDebug();
+
+    // Stamped where it is visible on launch: if this number is not the newest,
+    // the page is running a cached build.
+    const foot = document.querySelector('.bootFoot');
+    if (foot) foot.textContent = `${foot.textContent}  ·  BUILD ${BUILD}`;
 
     this.el.startBtn.addEventListener('click', () => game.start());
     this.el.resetBtn.addEventListener('click', () => game.restart());

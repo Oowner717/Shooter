@@ -15,6 +15,41 @@
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="./icons/icon-192.png">
 <link rel="stylesheet" href="./styles.css">
+
+<script>
+/*
+ * Cache escape hatch. An early service worker served scripts cache-first from
+ * a cache name that never changed, which could pin a device to the build it
+ * first loaded. index.html is always fetched from the network, so this inline
+ * check runs fresh even on a pinned device and can break the loop from inside:
+ * on a build change it unregisters every worker, drops every cache and reloads
+ * once. Costs one reload per deploy; the worker handles updates normally after.
+ *
+ * BUILD must match `BUILD` in src/config.js and sw.js.
+ */
+(function () {
+  var BUILD = '5';
+  var KEY = 'sim7749-build';
+  try {
+    if (localStorage.getItem(KEY) === BUILD) return;
+    if (!('serviceWorker' in navigator) || !('caches' in window)) {
+      localStorage.setItem(KEY, BUILD);
+      return;
+    }
+    navigator.serviceWorker.getRegistrations()
+      .then(function (regs) { return Promise.all(regs.map(function (r) { return r.unregister(); })); })
+      .then(function () { return caches.keys(); })
+      .then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k); })); })
+      .then(function () {
+        localStorage.setItem(KEY, BUILD);
+        location.reload();
+      })
+      .catch(function () { localStorage.setItem(KEY, BUILD); });
+  } catch (err) {
+    /* private mode has no localStorage — just load normally */
+  }
+}());
+</script>
 </head>
 <body>
 

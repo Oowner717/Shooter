@@ -1,6 +1,9 @@
 // Central tuning table. Everything balance-related lives here so the game can
 // be re-tuned without touching behaviour code.
 
+/** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
+export const BUILD = '5';
+
 export const CFG = {
   // ---- run structure -------------------------------------------------
   killGoal: 500, // objects destroyed before the gate seals
@@ -10,7 +13,7 @@ export const CFG = {
   // World units per screen pixel. Below 1 the arena is drawn zoomed out, so
   // the field is physically larger than the display and objects read smaller
   // and further away. All game logic works in world units.
-  zoom: 0.76,
+  zoom: 0.62,
 
   // ---- frame / quality ------------------------------------------------
   maxDpr: 2,
@@ -31,7 +34,7 @@ export const CFG = {
   // ---- shooter --------------------------------------------------------
   shooter: {
     r: 26,
-    standoff: 168, // world units between the turret and the ability strip
+    standoff: 210, // world units between the turret and the ability strip
     holdFireInterval: 0.2, // sustained-fire cadence; tapping faster is always allowed
     aimClamp: 1.36, // radians away from straight up that the barrel allows
     turnRate: 26, // rad/s barrel slew
@@ -39,7 +42,8 @@ export const CFG = {
     // The lever. A rod runs through the turret's pivot: the grip hangs below
     // it, the barrel sticks out above it, and pushing one swings the other
     // the opposite way. Holding the grip fires on its own.
-    gripLen: 104, // world units from pivot to grip
+    gripLen: 112, // world units from pivot to grip
+    gripR: 24, // grip knob radius
     gripFireInterval: 0.2,
     gripReturn: 6.5, // rad/s spring back to neutral on release
   },
@@ -74,7 +78,7 @@ export const CFG = {
   // ---- boss -----------------------------------------------------------
   boss: {
     hp: 16000,
-    r: 108,
+    r: 130,
     approach: 13, // px/s of self-propulsion
     pushPerBolt: 5.6,
     contactGlitch: 2.6,
@@ -240,6 +244,13 @@ export const ENEMY_TYPES = [
 ];
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));
+
+/**
+ * Minimum stroke width in world units that still resolves to a clean line on
+ * screen once the camera scale is applied. Outlines should thin out as the
+ * camera pulls back, but not below roughly one device pixel.
+ */
+export const HAIRLINE = 1.25 / CFG.zoom;
 
 /** Body mass from density and radius (area-proportional). */
 export const massOf = (type, r = type.r) => type.density * r * r * 0.006;
