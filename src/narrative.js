@@ -9,7 +9,7 @@ const STORY = [
   'Good. The hands work. That was the part we could not assume.',
   'The shapes are simple here. They are simple on purpose.',
   'You have not asked who is counting. That is being counted too.',
-  'Further in, the shapes stop being this polite about it.',
+  'Further in, the shapes stop being this polite.',
   'Halfway, and not once have you looked behind you. We noted that.',
   'The wall is thin. It was never built to hold anything for long.',
   'You are learning faster than this room can stay interesting.',
