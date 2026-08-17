@@ -53,23 +53,31 @@ interface keeps responding. Tap the scrim, the ✕ or Escape to resume.
 
 Three tabs:
 
-- **LOADOUT** — every round and every assist as a one-tap cell with a one-line
-  note. Rounds are exclusive; assists are any combination.
+- **LOADOUT** — **ROUNDS** (exclusive: one at a time) and **MINES** (either,
+  both or neither), each a one-tap cell with a one-line note.
 - **OBJECTS** — the glossary (below).
-- **SYSTEM** — sound, reset, the debug panel, and the build number.
+- **SYSTEM** — sound, reset, the debug panel, the controls, and the build
+  number.
 
-Beside the button is a **loadout readout** — `STD ◎✳` — so what is loaded and
-which assists are live can be read without opening anything.
+Beside the button is a **loadout readout** — `ARC ◈` — showing the round and
+only the things that are *not* already visible on the play screen, so the menu
+is never needed to check what is loaded.
 
 Everything in the sheet is built from data: the `SECTIONS` table in
-`src/menu.js` and `CODEX` in `src/codex.js`. A new round, assist or object is a
+`src/menu.js` and `CODEX` in `src/codex.js`. A new round, mine or object is a
 table entry and no markup, and the cells keep the ids the rest of the interface
 already looks up.
 
 This replaced a rack of eight chips that sat permanently over the field in two
 rows. The field is what the game is; the chips were in front of it.
 
-**Eight toggles**, all off by default, live in the menu's LOADOUT tab:
+### The two on the field
+
+**AUTO AIM** and **AUTO FIRE** are the only toggles you change *during* a
+fight, so they are not in the menu. Two chips sit centred just above the
+ability bar, clear of the lever's arc, and they work on `pointerdown` like the
+abilities do: the simulation never stops, the menu never opens, nothing pauses.
+Both are off by default.
 
 - **AUTO FIRE** keeps shooting wherever the barrel happens to point. With no
   hand on the lever the barrel rests straight up, so this alone is a fountain.
@@ -80,12 +88,17 @@ rows. The field is what the game is; the chips were in front of it.
   come round; brackets tighten on the target while it swings. With no target
   it stops shooting and leaves the barrel where it is.
 
-- **AUTO MINE** lobs a mine onto a random patch of the field every few
+### The six in the menu
+
+All off by default, all in the LOADOUT tab. The mines are the lay-and-forget
+kind — there is no reason to reach for them mid-wave:
+
+- **AUTO MINE** (BLAST) lobs a mine onto a random patch of the field every few
   seconds. It is completely inert in flight — it passes straight through
   anything in the way — and only arms once it has settled. Drift never sets one
   off; only something that could actually corrupt your feed does. One hard bang
   when it goes.
-- **AUTO SNARE** lays the other kind of mine, and it does not go off. It opens,
+- **AUTO SNARE** (SNARE) lays the other kind of mine, and it does not go off. It opens,
   hauls everything within 210 units into one pinned knot and holds it for three
   and a half seconds, wired visibly to whatever it has caught. It deals **zero**
   damage of its own — measured — because the damage is the objects grinding
@@ -109,8 +122,8 @@ rows. The field is what the game is; the chips were in front of it.
   a mote and made for the things that take a while: bulwarks, the gate, ORDINAL
   itself. The spines stick visibly out of whatever is wearing them.
 
-The four loadouts are exclusive: choosing one clears whichever was lit, and
-tapping the lit one returns you to standard rounds.
+The four special rounds are exclusive: choosing one clears whichever was lit,
+and tapping the lit one returns you to standard rounds.
 
 Your hands always win: while you are holding the lever or dragging, the
 assists stop steering. Auto fire runs a shade slower than driving it yourself,
@@ -167,8 +180,8 @@ attackers, worse corruption.
    *The fight* below — it is not a health bar.
 4. **END** — ending text on its own plate, with the turret dissolving
    underneath it, then the frame freezes mid-corruption and **RESET
-   SIMULATION** appears. Reset is a clean session: the toggle rack clears back
-   to standard rounds and no assists.
+   SIMULATION** appears. Reset is a clean session: every toggle clears, on the
+   field and in the menu, back to standard rounds and nothing running itself.
 
 A typical run is about fifteen minutes.
 
@@ -391,7 +404,7 @@ src/
   boss.js               ORDINAL: arrival, worn ledger, reprise, echo, tithe
   abilities.js          the eight abilities and their effects
   narrative.js          the ten sentences, and how they decay
-  hud.js                DOM interface
+  hud.js                DOM interface, incl. the two on-field quick toggles
   menu.js               the menu sheet, built from data
   codex.js              the glossary, and what has been recorded
 scripts/

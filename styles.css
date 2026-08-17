@@ -301,6 +301,8 @@ html, body {
 
 /* A new object went into the record. Said without a word. */
 .chip.menuBtn.recorded { animation: recorded 1.5s ease-out; }
+.menuCount.show { opacity: 1; }
+
 @keyframes recorded {
   0% { color: var(--ink); border-color: var(--accent); box-shadow: 0 0 0 0 rgba(89, 224, 255, 0.85); }
   18% { color: var(--accent); box-shadow: 0 0 0 7px rgba(89, 224, 255, 0); }
@@ -363,6 +365,8 @@ html, body {
 .menuTitle b { color: var(--accent); font-weight: 700; letter-spacing: 0.16em; }
 .menuCount {
   margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.18s ease;
   font-size: 9px;
   letter-spacing: 0.16em;
   color: var(--dim);
@@ -423,10 +427,15 @@ html, body {
 
 .menuGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  /* Two, fixed, at any width — an auto-fill count would break the last-row
+     rule below and gives no benefit on a phone. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 12px;
 }
+/* An odd number of cells leaves a hole at the end of the last row, which reads
+   as something missing. The odd one out takes the whole row instead. */
+.menuGrid > .menuCell:last-child:nth-child(odd) { grid-column: 1 / -1; }
 
 .menuCell {
   -webkit-appearance: none;
@@ -452,6 +461,20 @@ html, body {
 }
 .menuCell.on .cellName { color: var(--accent); }
 .menuCell.on .cellSub { color: rgba(89, 224, 255, 0.7); }
+
+.menuKeys { display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; }
+.menuKey {
+  border-left: 2px solid rgba(120, 190, 255, 0.2);
+  padding-left: 9px;
+}
+.menuKey span {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+.menuKey p { font-size: 8.5px; line-height: 1.55; color: var(--dim); }
 
 .menuNote {
   font-size: 8.5px;
@@ -506,9 +529,62 @@ html, body {
 
 /* Nothing on the field is interactive while the sheet is up. */
 body.menuOpen #abilities,
+body.menuOpen #quickBar,
 body.menuOpen #alerts,
 body.menuOpen #bossCaption { opacity: 0.25; transition: opacity 0.2s ease; }
-body.menuOpen #abilities { pointer-events: none; }
+body.menuOpen #abilities,
+body.menuOpen #quickBar { pointer-events: none; }
+
+/* ---------------- quick toggles ---------------- */
+
+/*
+ * The two toggles that stay on the play screen. They sit above the ability bar
+ * and below the lever's travel arc, so neither thumb position covers the other,
+ * and they never open or pause anything.
+ */
+#quickBar {
+  position: absolute;
+  left: calc(var(--safe-l) + 8px);
+  right: calc(var(--safe-r) + 8px);
+  /* Clear of the ability row: at 4px a thumb aiming for AUTO FIRE was landing
+     on PULSE. */
+  bottom: calc(var(--safe-b) + var(--bar-h) + 22px);
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.quickChip {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+  /* These are hit at speed, one-handed, with the field moving — so the box is
+     a thumb's worth tall even though the type in it is small. */
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  background: rgba(6, 12, 22, 0.82);
+  color: var(--dim);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+  transition: transform 0.07s ease, color 0.15s, border-color 0.15s, background 0.15s;
+}
+.quickChip svg { width: 14px; height: 14px; display: block; }
+.quickChip:active { transform: translateY(1px); }
+.quickChip.on {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: rgba(12, 34, 52, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(89, 224, 255, 0.2);
+}
+.quickChip.on svg { filter: drop-shadow(0 0 5px currentColor); }
 
 /* ---------------- abilities ---------------- */
 
@@ -766,6 +842,7 @@ body.ending #alerts,
 body.ending #bossBar,
 body.ending #gateBar,
 body.ending #abilityHint,
+body.ending #quickBar,
 body.ending #bossCaption {
   opacity: 0;
   transition: opacity 1.2s ease;
@@ -775,7 +852,8 @@ body.ending #bossCaption {
 /* Same treatment while the title screen is up: none of it is live yet. */
 body.booting #topbar,
 body.booting #abilities,
-body.booting #loadoutChip {
+body.booting #loadoutChip,
+body.booting #quickBar {
   opacity: 0;
   pointer-events: none;
 }

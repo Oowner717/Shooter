@@ -31,14 +31,15 @@ export const SECTIONS = [
     ],
   },
   {
-    title: 'ASSISTS',
-    note: 'any combination',
+    // AUTO AIM and AUTO FIRE used to live here. They are the two worth
+    // changing mid-fight, so they are on the play screen instead — see
+    // QUICK in hud.js. What is left is the things you lay and forget.
+    title: 'MINES',
+    note: 'laid on their own',
     kind: 'auto',
     cells: [
-      { key: 'autoAim', id: 'tgAutoAim', label: 'AIM', sub: 'tracks the nearest breach' },
-      { key: 'autoFire', id: 'tgAutoFire', label: 'FIRE', sub: 'shoots where it points' },
-      { key: 'autoMine', id: 'tgAutoMine', label: 'MINE', sub: 'lays blast mines' },
-      { key: 'autoSnare', id: 'tgAutoSnare', label: 'SNARE', sub: 'lays pinning traps' },
+      { key: 'autoMine', id: 'tgAutoMine', label: 'BLAST', sub: 'one hard bang' },
+      { key: 'autoSnare', id: 'tgAutoSnare', label: 'SNARE', sub: 'pins a crowd, no damage' },
     ],
   },
 ];
@@ -114,6 +115,9 @@ export class Menu {
     this.tab = tab;
     for (const b of this.el.tabs.children) b.classList.toggle('on', b.dataset.tab === tab);
     for (const p of this.el.panels.children) p.hidden = p.dataset.panel !== tab;
+    // The found count is about the glossary; on the other tabs it is a number
+    // with nothing to belong to.
+    this.el.found.classList.toggle('show', tab === 'codex');
     if (tab === 'codex') this.syncCodex();
   }
 
@@ -213,10 +217,23 @@ export class Menu {
     }
     p.appendChild(grid);
 
-    const abil = document.createElement('div');
-    abil.className = 'menuNote';
-    abil.textContent = `${ABILITIES.length} abilities · one tap each · no cost, no upgrades`;
-    p.appendChild(abil);
+    p.appendChild(heading('CONTROLS', 'the whole of it'));
+    const keys = document.createElement('div');
+    keys.className = 'menuKeys';
+    // The only other place these appear is the title screen, which is gone for
+    // the rest of the run.
+    for (const [k, v] of [
+      ['LEVER', 'hold the grip under the turret and swing. The barrel is the far end of the same rod, so it goes the opposite way — and fires on its own.'],
+      ['TAP', 'anywhere ahead of the turret and the shots go there instead. Hold to keep firing.'],
+      ['ABILITIES', `${ABILITIES.length} along the bottom edge. One tap each. Nothing to spend or upgrade; each comes back on its own.`],
+      ['CONTACT', 'does not kill you. It breaks up the feed you aim through, and it stays broken until you destroy what caused it.'],
+    ]) {
+      const row = document.createElement('div');
+      row.className = 'menuKey';
+      row.innerHTML = `<span>${k}</span><p>${v}</p>`;
+      keys.appendChild(row);
+    }
+    p.appendChild(keys);
 
     const foot = document.createElement('div');
     foot.className = 'menuNote dim';

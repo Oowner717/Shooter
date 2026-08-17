@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '19';
+  var BUILD = '20';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -99,6 +99,21 @@
 
     <div id="alerts"></div>
     <div id="bossCaption"></div>
+
+    <!-- ============ QUICK TOGGLES ============ -->
+    <!-- The two that have to be changeable mid-fight without opening anything
+         and without the simulation stopping. Everything else lives in the
+         menu; these sit above the ability bar, clear of the lever's arc. -->
+    <div id="quickBar">
+      <button id="tgAutoAim" class="quickChip" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
+        <span>AUTO AIM</span>
+      </button>
+      <button id="tgAutoFire" class="quickChip" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21V8"/><path d="M8.6 11.4 12 7l3.4 4.4"/><path d="M7 4h10" opacity=".7"/></svg>
+        <span>AUTO FIRE</span>
+      </button>
+    </div>
 
     <!-- ============ ABILITIES ============ -->
     <div id="abilityHint"></div>

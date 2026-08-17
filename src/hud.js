@@ -11,8 +11,15 @@ const $ = (id) => document.getElementById(id);
 /** Cells that select a loadout rather than an assist. Mutually exclusive. */
 export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'barb'];
 export const ASSIST_KEYS = ['autoAim', 'autoFire', 'autoMine', 'autoSnare'];
+/**
+ * The toggles that live on the play screen rather than in the menu. These two
+ * are the ones worth changing mid-fight, so they are one tap away and the
+ * simulation never stops for them.
+ */
+const QUICK = ['autoAim', 'autoFire'];
 const CFG_LABEL = { explosive: 'HE', shotgun: 'SHOT', arc: 'ARC', barb: 'BARB' };
-const ASSIST_MARK = { autoAim: '◎', autoFire: '↑', autoMine: '◈', autoSnare: '✳' };
+/** Only what is NOT already visible on the play screen. */
+const READOUT_MARK = { autoMine: '◈', autoSnare: '✳' };
 
 export class Hud {
   constructor(game) {
@@ -61,6 +68,21 @@ export class Hud {
     this.menu = new Menu(game);
     this.el.toggles = {};
     for (const [key, el] of this.menu.cells) this.el.toggles[key] = el;
+
+    // The on-screen pair. Bound here rather than in the menu because they are
+    // not in it: they are live during play and must not pause anything.
+    this.quick = [];
+    for (const key of QUICK) {
+      const el = $(`tg${key[0].toUpperCase()}${key.slice(1)}`);
+      if (!el) continue;
+      this.el.toggles[key] = el;
+      this.quick.push({ key, el, on: null });
+      el.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        game.toggleAuto(key);
+      });
+      el.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    }
     this.el.loadoutChip.addEventListener('click', () => {
       this.menu.show('loadout');
       this.menu.setOpen(true);
@@ -380,9 +402,19 @@ export class Hud {
    * live, so the menu is never needed just to check.
    */
   syncLoadout(world) {
+    // The two on-screen toggles show their own state; the chip carries what
+    // the play screen does not.
+    for (const q of this.quick) {
+      const on = !!world[q.key];
+      if (q.on === on) continue;
+      q.on = on;
+      q.el.classList.toggle('on', on);
+      q.el.setAttribute('aria-pressed', String(on));
+    }
+
     const round = ROUND_KEYS.find((k) => world.round === k);
     const label = round ? CFG_LABEL[round] : 'STD';
-    const on = ASSIST_KEYS.filter((k) => world[k]).map((k) => ASSIST_MARK[k]).join('');
+    const on = Object.keys(READOUT_MARK).filter((k) => world[k]).map((k) => READOUT_MARK[k]).join('');
     if (this.lastRoundLabel !== label) {
       this.lastRoundLabel = label;
       this.el.loadoutRound.textContent = label;
