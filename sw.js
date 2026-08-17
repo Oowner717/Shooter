@@ -39,6 +39,8 @@ const ASSETS = [
   './src/abilities.js',
   './src/narrative.js',
   './src/hud.js',
+  './src/menu.js',
+  './src/codex.js',
 ];
 
 self.addEventListener('install', (e) => {

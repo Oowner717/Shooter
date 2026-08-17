@@ -126,6 +126,18 @@ export function ripple(x, y, strength, radius) {
   fx.ripples.push({ x, y, t: 0, life: 1.5, strength, radius });
 }
 
+/**
+ * Let the screen-level effects finish while the world is held. A pause that
+ * freezes a white flash mid-decay looks like a broken frame rather than a
+ * paused one, so these two keep running even when nothing moves.
+ */
+export function settleScreen(dt) {
+  fx.shake = Math.max(0, fx.shake - fx.shake * 9 * dt - 6 * dt);
+  fx.shakeX = spread(fx.shake);
+  fx.shakeY = spread(fx.shake);
+  fx.flash = Math.max(0, fx.flash - dt * 2.6);
+}
+
 export function shake(amount) {
   fx.shake = Math.min(26, fx.shake + amount);
 }

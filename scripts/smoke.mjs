@@ -68,9 +68,18 @@ for (let i = 0; i < abilityCount; i++) {
   await page.screenshot({ path: `${SHOTS}/03-ability-${i}.png` });
 }
 
-// debug panel
-await page.click('#dbgBtn');
+// debug panel — reached through the menu now that the DBG chip is gone
+await page.click('#menuBtn');
+await sleep(300);
+await page.evaluate(() => window.__sim.hud.menu.show('system'));
 await sleep(200);
+await page.screenshot({ path: `${SHOTS}/03b-menu.png` });
+await page.evaluate(() => {
+  const b = [...document.querySelectorAll('[data-panel="system"] .menuCell')]
+    .find((c) => c.querySelector('.cellName').textContent === 'DEBUG');
+  b.click();
+});
+await sleep(300);
 await page.screenshot({ path: `${SHOTS}/04-debug.png` });
 
 const dbg = async (label) => {

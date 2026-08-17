@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '17';
+  var BUILD = '18';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -78,8 +78,13 @@
       </div>
       <div id="phaseTag" class="chip ghost">STAGING</div>
       <div class="spacer"></div>
-      <button id="muteBtn" class="chip btn" aria-label="Toggle sound">SND</button>
-      <button id="dbgBtn" class="chip btn" aria-label="Debug menu">DBG</button>
+      <!-- What is loaded, at a glance, so the menu is never needed to check. -->
+      <button id="loadoutChip" class="chip btn readout" aria-label="Open loadout">
+        <span id="loadoutRound">STD</span><em id="loadoutAssists">—</em>
+      </button>
+      <button id="menuBtn" class="chip btn menuBtn" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
     </header>
 
     <div id="bossBar" hidden>
@@ -95,51 +100,23 @@
     <div id="alerts"></div>
     <div id="bossCaption"></div>
 
-    <!-- ============ TOGGLE RACK ============ -->
-    <!-- Two rows: assists on top, loadout below. Seven chips will not fit on
-         one row at 320px, and a wrapped single row jumps about as it fills. -->
-    <div id="toggleRack">
-      <div class="rackRow">
-        <button id="tgAutoAim" class="toggleChip" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
-          <span>AIM</span>
-        </button>
-        <button id="tgAutoFire" class="toggleChip" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21V8"/><path d="M8.6 11.4 12 7l3.4 4.4"/><path d="M7 4h10" opacity=".7"/></svg>
-          <span>FIRE</span>
-        </button>
-        <button id="tgAutoMine" class="toggleChip" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="5"/><path d="M12 3v3M12 20v2M3.6 13h2.2M18.2 13h2.2M6 7l1.6 1.6M18 7l-1.6 1.6"/></svg>
-          <span>MINE</span>
-        </button>
-        <button id="tgAutoSnare" class="toggleChip" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><path d="M6 6l2.5 2.5M18 6l-2.5 2.5M6 18l2.5-2.5M18 18l-2.5-2.5" opacity=".65"/></svg>
-          <span>SNARE</span>
-        </button>
-      </div>
-      <div class="rackRow">
-        <button id="tgExplosive" class="toggleChip" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 2 2.2 5.2L20 8l-4 3.6 1.2 5.6L12 14.6 6.8 17.2 8 11.6 4 8l5.8-.8z"/></svg>
-          <span>HE</span>
-        </button>
-        <button id="tgShotgun" class="toggleChip" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22V15"/><path d="M12 15 5 4M12 15l7-11M12 15 9.5 3M12 15l2.5-12"/></svg>
-          <span>SHOT</span>
-        </button>
-        <button id="tgArc" class="toggleChip" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2 6 13h4l-1 9 8-12h-4z"/></svg>
-          <span>ARC</span>
-        </button>
-        <button id="tgBarb" class="toggleChip" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22V4"/><path d="M12 4 8 9M12 4l4 5"/><path d="M12 11 9 14M12 11l3 3M12 16l-2.5 2.5M12 16l2.5 2.5"/></svg>
-          <span>BARB</span>
-        </button>
-      </div>
-    </div>
-
     <!-- ============ ABILITIES ============ -->
     <div id="abilityHint"></div>
     <nav id="abilities"></nav>
+
+    <!-- ============ MENU ============ -->
+    <!-- Built from data in src/menu.js: a new round, assist or object needs a
+         table entry and no markup. -->
+    <div id="menuScrim"></div>
+    <section id="menu" aria-label="Menu">
+      <header class="menuBar">
+        <div class="menuTitle">SIMULATION <b>7749</b></div>
+        <div id="codexFound" class="menuCount">0/14</div>
+        <button id="menuClose" class="menuX" aria-label="Close menu">✕</button>
+      </header>
+      <nav id="menuTabs"></nav>
+      <div id="menuPanels"></div>
+    </section>
 
     <!-- ============ DEBUG ============ -->
     <section id="debugPanel" hidden>

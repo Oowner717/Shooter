@@ -44,8 +44,32 @@ tap-rate limit — tap as fast as your thumb allows, or hold and drag to sustain
 fire. Both controls work at once, so you can drive the lever with one thumb
 and tap with the other.
 
-**Eight toggles** sit in a rack just above the ability bar, all off by default —
-assists on the top row, loadout on the bottom:
+### The menu
+
+One button in the top bar opens a sheet over the bottom of the screen, where
+the thumb already is. **The simulation holds while it is open**, so changing a
+loadout mid-wave costs nothing — the field stays drawn, nothing moves, and the
+interface keeps responding. Tap the scrim, the ✕ or Escape to resume.
+
+Three tabs:
+
+- **LOADOUT** — every round and every assist as a one-tap cell with a one-line
+  note. Rounds are exclusive; assists are any combination.
+- **OBJECTS** — the glossary (below).
+- **SYSTEM** — sound, reset, the debug panel, and the build number.
+
+Beside the button is a **loadout readout** — `STD ◎✳` — so what is loaded and
+which assists are live can be read without opening anything.
+
+Everything in the sheet is built from data: the `SECTIONS` table in
+`src/menu.js` and `CODEX` in `src/codex.js`. A new round, assist or object is a
+table entry and no markup, and the cells keep the ids the rest of the interface
+already looks up.
+
+This replaced a rack of eight chips that sat permanently over the field in two
+rows. The field is what the game is; the chips were in front of it.
+
+**Eight toggles**, all off by default, live in the menu's LOADOUT tab:
 
 - **AUTO FIRE** keeps shooting wherever the barrel happens to point. With no
   hand on the lever the barrel rests straight up, so this alone is a fountain.
@@ -224,6 +248,23 @@ faster and casts twice as often, and nothing absorbs anything any more.
 The background turns over with it — near-black through the arrival, then gold,
 violet and crimson as it moves through its three aspects.
 
+### The glossary
+
+Every object has an entry in **OBJECTS**, and an entry unlocks the first time
+you destroy one of that kind — the boss included. Until then the name is blocks
+and the portrait is empty. The portraits are drawn with the field's own shape
+routines, so the glossary can never drift out of step with the thing itself,
+and each description is a field note in the same voice as the story.
+
+The record is kept in `localStorage` and **survives a reset**, because it was
+never yours: it belongs to whoever has been counting. Harmless DRIFT and a
+TOW's MASS both count for the glossary even though neither counts toward the
+five hundred — the record is of what has been destroyed, not of what was owed.
+
+A new entry says so without a word: the menu button pulses and its count goes
+up. An alert would have been text over the boss the moment ORDINAL emitted
+something new.
+
 ### The objects
 
 Twelve kinds, each with its own mass, speed, restitution and way of dying.
@@ -341,6 +382,8 @@ src/
   abilities.js          the eight abilities and their effects
   narrative.js          the ten sentences, and how they decay
   hud.js                DOM interface
+  menu.js               the menu sheet, built from data
+  codex.js              the glossary, and what has been recorded
 scripts/
   make-icons.mjs        regenerates icons/  (node scripts/make-icons.mjs)
   smoke.mjs             headless run through every phase (see below)

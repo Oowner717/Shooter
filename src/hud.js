@@ -4,11 +4,15 @@
 import { ABILITIES } from './abilities.js';
 import { BUILD } from './config.js';
 import { clamp } from './util.js';
+import { Menu } from './menu.js';
 
 const $ = (id) => document.getElementById(id);
 
-/** Chips that select a loadout rather than an assist. Mutually exclusive. */
+/** Cells that select a loadout rather than an assist. Mutually exclusive. */
 export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'barb'];
+export const ASSIST_KEYS = ['autoAim', 'autoFire', 'autoMine', 'autoSnare'];
+const CFG_LABEL = { explosive: 'HE', shotgun: 'SHOT', arc: 'ARC', barb: 'BARB' };
+const ASSIST_MARK = { autoAim: '◎', autoFire: '↑', autoMine: '◈', autoSnare: '✳' };
 
 export class Hud {
   constructor(game) {
@@ -37,18 +41,9 @@ export class Hud {
       endScreen: $('endScreen'),
       endText: $('endText'),
       resetBtn: $('resetBtn'),
-      muteBtn: $('muteBtn'),
-      toggles: {
-        autoAim: $('tgAutoAim'),
-        autoFire: $('tgAutoFire'),
-        autoMine: $('tgAutoMine'),
-        autoSnare: $('tgAutoSnare'),
-        explosive: $('tgExplosive'),
-        shotgun: $('tgShotgun'),
-        arc: $('tgArc'),
-        barb: $('tgBarb'),
-      },
-      dbgBtn: $('dbgBtn'),
+      loadoutChip: $('loadoutChip'),
+      loadoutRound: $('loadoutRound'),
+      loadoutAssists: $('loadoutAssists'),
     };
 
     this.slots = [];
@@ -60,6 +55,16 @@ export class Hud {
 
     this.buildAbilities();
     this.buildDebug();
+
+    // The menu owns the loadout cells now, so it is built before anything
+    // tries to read or set one.
+    this.menu = new Menu(game);
+    this.el.toggles = {};
+    for (const [key, el] of this.menu.cells) this.el.toggles[key] = el;
+    this.el.loadoutChip.addEventListener('click', () => {
+      this.menu.show('loadout');
+      this.menu.setOpen(true);
+    });
 
     // The boot copy is translucent enough to read the HUD through it, and on a
     // short screen the kicker sits level with the top chips. Nothing behind the
@@ -73,17 +78,6 @@ export class Hud {
 
     this.el.startBtn.addEventListener('click', () => game.start());
     this.el.resetBtn.addEventListener('click', () => game.restart());
-    this.el.muteBtn.addEventListener('click', () => game.toggleSound());
-    this.el.dbgBtn.addEventListener('click', () => this.toggleDebug());
-    for (const [key, el] of Object.entries(this.el.toggles)) {
-      const round = ROUND_KEYS.includes(key);
-      el.addEventListener('pointerdown', (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        if (round) game.toggleRound(key); else game.toggleAuto(key);
-      });
-      el.addEventListener('contextmenu', (ev) => ev.preventDefault());
-    }
     $('dbgClose').addEventListener('click', () => this.toggleDebug(false));
   }
 
@@ -296,6 +290,8 @@ export class Hud {
       ['SPAWN DRIFT', () => g.debugSpawnDrift()],
       ['RESTART', () => g.restart()],
       ['END SCREEN', () => g.debugEnding()],
+      ['CODEX ALL', () => g.debugCodexAll()],
+      ['CODEX WIPE', () => g.debugCodexWipe()],
     ];
     const toggles = [
       ['NO COOLDOWN', 'noCooldown'],
@@ -375,7 +371,51 @@ export class Hud {
     el.setAttribute('aria-pressed', String(on));
   }
 
-  setSound(on) {
-    this.el.muteBtn.classList.toggle('off', !on);
+  setSound() {
+    this.menu.syncSystem();
+  }
+
+  /**
+   * The loadout readout in the top bar: what is loaded and which assists are
+   * live, so the menu is never needed just to check.
+   */
+  syncLoadout(world) {
+    const round = ROUND_KEYS.find((k) => world.round === k);
+    const label = round ? CFG_LABEL[round] : 'STD';
+    const on = ASSIST_KEYS.filter((k) => world[k]).map((k) => ASSIST_MARK[k]).join('');
+    if (this.lastRoundLabel !== label) {
+      this.lastRoundLabel = label;
+      this.el.loadoutRound.textContent = label;
+      this.el.loadoutChip.classList.toggle('armed', label !== 'STD');
+    }
+    const marks = on || '—';
+    if (this.lastAssists !== marks) {
+      this.lastAssists = marks;
+      this.el.loadoutAssists.textContent = marks;
+    }
+  }
+
+  /**
+   * What still has to run while the simulation is held: the interface itself,
+   * so a cell lights the instant it is tapped and the readout keeps up.
+   */
+  syncHudLight(world) {
+    this.syncAbilities(world.abilities);
+    this.syncLoadout(world);
+    this.menu.sync(world);
+  }
+
+  /**
+   * First-ever kill of a type. Deliberately wordless: an alert here would be
+   * text over the boss the moment ORDINAL emits something new, which is the
+   * one thing the fight is not allowed to do. The menu button pulses and its
+   * count goes up, and the entry is waiting when the player looks.
+   */
+  noteCodex() {
+    this.menu.syncCodex();
+    const b = this.menu.el.btn;
+    b.classList.remove('recorded');
+    void b.offsetWidth;
+    b.classList.add('recorded');
   }
 }

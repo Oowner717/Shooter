@@ -7,6 +7,87 @@ import { TAU, clamp, rand, randInt, spread, pick, weightedPick, rgba, drawGlow }
 import { explode, hitBurst, spark, shard as fxShard, ring, ripple } from './fx.js';
 import { audio } from './audio.js';
 
+/**
+ * A specimen portrait for the glossary, drawn with the same shape routines the
+ * field uses so the two can never drift apart. Centred on the current
+ * transform; `r` is the radius to draw at.
+ */
+export function drawSpecimen(ctx, id, r) {
+  const t = TYPE_BY_ID[id];
+  ctx.save();
+  ctx.lineWidth = 1.6;
+  if (!t) {
+    // ORDINAL: an iris, in its first aspect's colours.
+    ctx.strokeStyle = rgba('#ffd98a', 0.95);
+    ctx.fillStyle = 'rgba(6,3,12,0.9)';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = rgba('#ffd98a', 0.6);
+    ctx.beginPath();
+    for (let i = 0; i < 20; i++) {
+      const a = (i / 20) * TAU;
+      ctx.moveTo(Math.cos(a) * r * 1.08, Math.sin(a) * r * 1.08);
+      ctx.lineTo(Math.cos(a) * r * (i % 4 === 0 ? 1.42 : 1.24), Math.sin(a) * r * (i % 4 === 0 ? 1.42 : 1.24));
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#02010a';
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.34, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = rgba('#fffaf0', 0.95);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.34, 0, TAU);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  ctx.strokeStyle = rgba(t.color, 0.95);
+  ctx.fillStyle = rgba(t.glow, 0.16);
+  switch (t.shape) {
+    case 'shard': drawShard(ctx, r); break;
+    case 'needle': drawNeedle(ctx, r); break;
+    case 'hex': drawHex(ctx, r); break;
+    case 'blob': drawBlob(ctx, r, 0.6, 0); break;
+    case 'bloom': drawBloom(ctx, r, 0.4, 0, t); break;
+    case 'plated': drawPlated(ctx, r, 1); break;
+    case 'warden': {
+      drawWardenCore(ctx, r);
+      // the plates are what the entry is about, so they are in the portrait
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * TAU;
+        const ca = Math.cos(a);
+        const sa = Math.sin(a);
+        const ox = ca * r * SHARD_ORBIT * 0.62;
+        const oy = sa * r * SHARD_ORBIT * 0.62;
+        ctx.moveTo(ox + sa * 6, oy - ca * 6);
+        ctx.lineTo(ox - sa * 6, oy + ca * 6);
+      }
+      ctx.stroke();
+      break;
+    }
+    case 'prism': drawPrism(ctx, r); break;
+    case 'herald': drawHerald(ctx, r, 0.5); break;
+    case 'glut': drawGlut(ctx, r, 6, 0.5, 0); break;
+    case 'tow': {
+      drawTowHead(ctx, r * 0.8);
+      ctx.strokeStyle = rgba('#8fa9c4', 0.7);
+      ctx.beginPath();
+      ctx.moveTo(0, r * 0.6);
+      ctx.lineTo(0, r * 1.6);
+      ctx.stroke();
+      break;
+    }
+    case 'mass': drawTowMass(ctx, r * 0.9, 1); break;
+    case 'drift': drawDrift(ctx, r, 0); break;
+    default: drawShard(ctx, r);
+  }
+  ctx.restore();
+}
+
 /** WARDEN plate geometry — shared by drawing, hit tests and the broadphase. */
 const SHARD_ORBIT = 2.15; // multiples of the core radius
 export const SHARD_R = 12;

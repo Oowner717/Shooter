@@ -3,7 +3,7 @@
 import { CFG, BUILD, ENEMY_TYPES } from './config.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
 import { Grid, integrate, resolvePair, resolveBox, clampToArena, impactDamage } from './physics.js';
-import { fx, updateFx, drawFx, drawFlash, spark, ring, shake } from './fx.js';
+import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, shake } from './fx.js';
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
@@ -16,6 +16,9 @@ import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator, ENDING } from './narrative.js';
 import { Hud, ROUND_KEYS } from './hud.js';
+import { codex } from './codex.js';
+import { drawSpecimen } from './enemies.js';
+import { registerCodexShape } from './menu.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 const HUD_TOP_MIN = 20; // matches --hud-t: phones without a notch still have a status bar
@@ -45,6 +48,9 @@ export class Game {
     this.frameTimes = [];
     this.fps = 60;
     this.qualityCooldown = 0;
+
+    // The glossary draws its specimens with the field's own shape routines.
+    registerCodexShape(drawSpecimen);
 
     this.world = this.makeWorld();
     this.hud = new Hud(this);
@@ -217,6 +223,15 @@ export class Game {
     audio.init();
     audio.setEnabled(!audio.enabled);
     this.hud.setSound(audio.enabled);
+  }
+
+  get soundOn() {
+    return audio.enabled;
+  }
+
+  /** The simulation holds while the menu is open, so a change costs nothing. */
+  get paused() {
+    return !!(this.hud && this.hud.menu && this.hud.menu.open);
   }
 
   // -------------------------------------------------------------- layout
@@ -473,6 +488,16 @@ export class Game {
 
   update(dtRaw) {
     const w = this.world;
+    // Held while the menu is open: the field keeps being drawn, nothing moves,
+    // and picking a round mid-wave costs nothing. The interface still runs.
+    if (this.paused) {
+      // Corruption is world state and stays frozen with the world, but a white
+      // flash caught mid-decay would read as a broken frame rather than a
+      // paused one, so the screen-level effects finish.
+      settleScreen(Math.min(dtRaw, CFG.maxFrameDelta));
+      this.hud.syncHudLight(w);
+      return;
+    }
     const real = Math.min(dtRaw, CFG.maxFrameDelta);
     let dt = real;
     if (w.debug.slowmo) dt *= 0.25;
@@ -649,6 +674,9 @@ export class Game {
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i];
       if (!e.dead) continue;
+      // The glossary records anything actually destroyed, including harmless
+      // drift and a TOW's mass, neither of which counts toward the tally.
+      if (!e.dissolved) this.noteDestroyed(e);
       if (e.counts && !e.dissolved) this.registerKill();
       if (e.dissolved) {
         for (let k = 0; k < 4; k++) spark(e.x, e.y, spread(60), spread(60), e.type.glow, 0.4, 1.6);
@@ -657,6 +685,12 @@ export class Game {
       list[i] = list[list.length - 1];
       list.pop();
     }
+  }
+
+  /** Everything destroyed passes through here for the record, counted or not. */
+  noteDestroyed(e) {
+    const id = e && e.type && e.type.id;
+    if (codex.record(id)) this.hud.noteCodex();
   }
 
   registerKill() {
@@ -759,6 +793,7 @@ export class Game {
 
   onBossDead() {
     const w = this.world;
+    if (codex.record('ordinal')) this.hud.noteCodex();
     w.phase = 'ending';
     w.timeScale = 0.3;
     w.lockout = 999;
@@ -807,6 +842,8 @@ export class Game {
     if (w.boss) this.hud.setLedger(w.ledger, CFG.killGoal);
     else this.hud.setKills(w.kills, w.phase === 'staging' ? CFG.killGoal : null);
     this.hud.syncAbilities(w.abilities);
+    this.hud.syncLoadout(w);
+    this.hud.menu.sync(w);
     this.hud.updateAlerts(dt);
     if (w.wall.sealed) this.hud.setGate(true, w.wall.hp / w.wall.maxHp);
     if (w.boss && !w.boss.dead) this.hud.setBoss(true, w.boss.hpFrac);
@@ -1181,6 +1218,16 @@ export class Game {
   debugGlitch() {
     glitch.kick(1);
     this.world.bossContact = 1.6;
+  }
+
+  debugCodexAll() {
+    codex.unlockAll();
+    this.hud.menu.syncCodex();
+  }
+
+  debugCodexWipe() {
+    codex.forget();
+    this.hud.menu.syncCodex();
   }
 
   debugEnding() {

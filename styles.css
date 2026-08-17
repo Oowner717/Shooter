@@ -269,6 +269,247 @@ html, body {
   to { transform: none; opacity: 1; }
 }
 
+
+/* ---------------- menu ---------------- */
+
+/*
+ * A sheet over the bottom of the screen, where the thumb already is. The
+ * simulation holds while it is open, so a loadout change mid-wave costs
+ * nothing. Everything inside is built from data in src/menu.js.
+ */
+
+#loadoutChip.readout {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+}
+#loadoutChip.readout #loadoutRound { color: var(--ink); font-size: 10px; }
+#loadoutChip.readout em {
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+#loadoutChip.armed { border-color: rgba(255, 207, 92, 0.5); }
+#loadoutChip.armed #loadoutRound { color: #ffcf5c; }
+
+.chip.menuBtn { padding: 4px 7px; }
+.chip.menuBtn svg { width: 15px; height: 15px; display: block; }
+.chip.menuBtn.on { border-color: var(--accent); color: var(--accent); }
+
+/* A new object went into the record. Said without a word. */
+.chip.menuBtn.recorded { animation: recorded 1.5s ease-out; }
+@keyframes recorded {
+  0% { color: var(--ink); border-color: var(--accent); box-shadow: 0 0 0 0 rgba(89, 224, 255, 0.85); }
+  18% { color: var(--accent); box-shadow: 0 0 0 7px rgba(89, 224, 255, 0); }
+  40% { color: var(--accent); box-shadow: 0 0 0 0 rgba(89, 224, 255, 0.6); }
+  60% { box-shadow: 0 0 0 7px rgba(89, 224, 255, 0); }
+  100% { color: var(--ink); }
+}
+
+#menuScrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 4, 9, 0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+  z-index: 24;
+}
+#menuScrim.on { opacity: 1; pointer-events: auto; }
+
+#menu {
+  position: absolute;
+  left: calc(var(--safe-l) + 8px);
+  right: calc(var(--safe-r) + 8px);
+  bottom: calc(var(--safe-b) + 8px);
+  max-height: 74%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(8, 15, 26, 0.97), rgba(3, 6, 12, 0.98));
+  border: 1px solid rgba(120, 190, 255, 0.22);
+  /* Cut corners rather than rounded: the whole interface is polygonal. */
+  clip-path: polygon(0 12px, 12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+  transform: translateY(112%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.26s cubic-bezier(0.2, 0.9, 0.2, 1), opacity 0.2s ease;
+  z-index: 25;
+  overflow: hidden;
+}
+#menu.open { transform: none; opacity: 1; pointer-events: auto; }
+
+/* faint scanlines, the same substrate as the field */
+#menu::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(120, 190, 255, 0.045) 0 1px, transparent 1px 3px);
+}
+
+.menuBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px 9px;
+  border-bottom: 1px solid rgba(120, 190, 255, 0.14);
+}
+.menuTitle { font-size: 10px; letter-spacing: 0.3em; color: var(--dim); }
+.menuTitle b { color: var(--accent); font-weight: 700; letter-spacing: 0.16em; }
+.menuCount {
+  margin-left: auto;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.menuX {
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 3px;
+}
+.menuX:active { color: var(--ink); border-color: var(--accent); }
+
+#menuTabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(120, 190, 255, 0.14);
+}
+.menuTab {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1 1 0;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--dim);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  padding: 10px 4px 8px;
+}
+.menuTab.on { color: var(--accent); border-bottom-color: var(--accent); background: rgba(89, 224, 255, 0.06); }
+
+#menuPanels { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.menuPanel { padding: 10px 12px 16px; }
+.menuPanel[hidden] { display: none; }
+
+.menuHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 6px 0 7px;
+  font-size: 9px;
+  letter-spacing: 0.26em;
+  color: var(--ink);
+}
+.menuHead em {
+  font-style: normal;
+  margin-left: auto;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: #45566a;
+}
+
+.menuGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.menuCell {
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  background: rgba(6, 12, 22, 0.7);
+  color: var(--dim);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.menuCell .cellName { font-size: 10px; letter-spacing: 0.16em; color: var(--ink); }
+.menuCell .cellSub { font-size: 8px; letter-spacing: 0.06em; color: #45566a; }
+.menuCell:active { transform: translateY(1px); }
+.menuCell.on {
+  border-color: var(--accent);
+  background: rgba(89, 224, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(89, 224, 255, 0.18);
+}
+.menuCell.on .cellName { color: var(--accent); }
+.menuCell.on .cellSub { color: rgba(89, 224, 255, 0.7); }
+
+.menuNote {
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  color: #45566a;
+  margin-top: 8px;
+}
+.menuNote.dim { color: #2f3d4c; }
+
+/* ---------------- object glossary ---------------- */
+
+.codexGrid { display: flex; flex-direction: column; gap: 6px; }
+
+.codexCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  background: rgba(6, 12, 22, 0.6);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+}
+.codexCell.boss { border-color: rgba(255, 207, 92, 0.4); background: rgba(24, 15, 6, 0.6); }
+
+.codexArt {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(120, 190, 255, 0.12);
+  background: rgba(2, 6, 12, 0.75);
+}
+.codexArt canvas { width: 36px; height: 36px; display: block; }
+
+.codexBody { min-width: 0; }
+.codexName { font-size: 10px; letter-spacing: 0.2em; color: var(--ink); }
+.codexCell.boss .codexName { color: #ffcf5c; }
+.codexLine {
+  font-size: 8.5px;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+/* Not yet destroyed: a name in blocks, and no portrait. */
+.codexCell.locked { border-color: rgba(120, 190, 255, 0.07); background: rgba(4, 8, 14, 0.5); }
+.codexCell.locked .codexName { color: #33414f; letter-spacing: 0.1em; }
+.codexCell.locked .codexLine { color: #2f3d4c; }
+.codexCell.locked .codexArt { border-style: dashed; }
+
+/* Nothing on the field is interactive while the sheet is up. */
+body.menuOpen #abilities,
+body.menuOpen #alerts,
+body.menuOpen #bossCaption { opacity: 0.25; transition: opacity 0.2s ease; }
+body.menuOpen #abilities { pointer-events: none; }
+
 /* ---------------- abilities ---------------- */
 
 #abilities {
@@ -309,7 +550,6 @@ html, body {
 @media (max-width: 372px) {
   .ab svg { width: 20px; height: 20px; }
   .ab .lbl { font-size: 7px; letter-spacing: 0.04em; }
-  .toggleChip { padding: 5px 6px; letter-spacing: 0.06em; }
 }
 
 .ab .fill {
@@ -332,54 +572,6 @@ html, body {
   0% { box-shadow: inset 0 0 0 40px color-mix(in srgb, currentColor 45%, transparent); }
   100% { box-shadow: inset 0 0 0 0 transparent; }
 }
-
-/* Toggle rack: a thin strip between the lever's grip and the ability bar. */
-#toggleRack {
-  position: absolute;
-  left: calc(var(--safe-l) + 8px);
-  right: calc(var(--safe-r) + 8px);
-  bottom: calc(var(--safe-b) + var(--bar-h) + 14px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  pointer-events: none;
-}
-/* Assists on the top row, loadout on the bottom. Seven chips do not fit on one
-   row at 320px, and letting a single row wrap makes it jump as it fills. */
-.rackRow {
-  display: flex;
-  justify-content: center;
-  gap: 5px;
-}
-
-.toggleChip {
-  -webkit-appearance: none;
-  appearance: none;
-  pointer-events: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 8px;
-  letter-spacing: 0.1em;
-  padding: 6px 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(6, 12, 22, 0.78);
-  color: var(--dim);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: transform 0.07s ease, color 0.15s, border-color 0.15s;
-}
-.toggleChip svg { width: 12px; height: 12px; display: block; }
-.toggleChip:active { transform: scale(0.92); }
-.toggleChip.on {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  background: rgba(12, 34, 52, 0.86);
-}
-.toggleChip.on svg { filter: drop-shadow(0 0 5px currentColor); }
-#tgExplosive.on, #tgShotgun.on { color: #ffb347; border-color: rgba(255, 179, 71, 0.6); }
 
 #abilityHint {
   position: absolute;
@@ -571,7 +763,6 @@ html, body {
 body.ending #topbar,
 body.ending #abilities,
 body.ending #alerts,
-body.ending #toggleRack,
 body.ending #bossBar,
 body.ending #gateBar,
 body.ending #abilityHint,
@@ -584,7 +775,7 @@ body.ending #bossCaption {
 /* Same treatment while the title screen is up: none of it is live yet. */
 body.booting #topbar,
 body.booting #abilities,
-body.booting #toggleRack {
+body.booting #loadoutChip {
   opacity: 0;
   pointer-events: none;
 }
