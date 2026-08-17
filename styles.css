@@ -123,6 +123,18 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * The counter after ORDINAL takes it over. Same chip, same place, wrong
+ * colour — the number the player watched climb for the whole run is now
+ * somebody else's and it is going down.
+ */
+#counter.ledger { border-color: rgba(255, 45, 111, 0.4); }
+#counter.ledger #killNum { color: var(--warn); }
+#counter.ledger em { color: rgba(255, 45, 111, 0.75); }
+#counter.spent #killNum,
+#counter.spent em { animation: spentPulse 1.4s infinite ease-in-out; }
+@keyframes spentPulse { 50% { opacity: 0.35; } }
+
 .chip.ghost { color: var(--dim); border-color: rgba(120, 190, 255, 0.1); }
 .chip.btn { -webkit-appearance: none; appearance: none; cursor: pointer; }
 .chip.btn:active { background: rgba(89, 224, 255, 0.2); }
@@ -205,6 +217,13 @@ html, body {
 .alert.breach { color: var(--warn); }
 .alert.power { color: #ffcf5c; }
 .alert.info { color: var(--accent); }
+/* The window to shoot the boss in. The only pill that is good news. */
+.alert.open {
+  color: #7cffb2;
+  border-color: rgba(124, 255, 178, 0.45);
+  animation: openPulse 0.7s infinite ease-in-out;
+}
+@keyframes openPulse { 50% { opacity: 0.6; } }
 .alert.fade { opacity: 0.55; }
 
 @keyframes alertIn {

@@ -244,10 +244,22 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       return;
     }
     case 'boss': {
-      world.boss.hurt(world, p.damage);
-      world.boss.push(dirx, diry, CFG.boss.pushPerBolt);
-      hitBurst(hx, hy, -dirx, -diry, world.boss.hitColor);
-      audio.hit();
+      // Aimed fire is gated by the gaze: full value while the eye is on you,
+      // a glance the rest of the time. The feedback has to be unmistakable or
+      // the rule reads as the gun being broken.
+      const boss = world.boss;
+      const open = boss.eyeOpen;
+      boss.hurt(world, p.damage, true);
+      boss.push(dirx, diry, CFG.boss.pushPerBolt * (open ? 1 : 0.35));
+      if (open) {
+        hitBurst(hx, hy, -dirx, -diry, boss.hitColor);
+        audio.hit();
+      } else {
+        for (let i = 0; i < 4; i++) {
+          spark(hx, hy, spread(150) - dirx * 130, spread(150) - diry * 130, boss.palette.ring, 0.24, 1.8);
+        }
+        audio.reflect();
+      }
       endProjectile(world, p, hx, hy, true);
       return;
     }

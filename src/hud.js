@@ -23,6 +23,7 @@ export class Hud {
       alerts: $('alerts'),
       status: $('status'),
       killGoal: document.querySelector('#counter .dim'),
+      counterLabel: document.querySelector('#counter em'),
       abilities: $('abilities'),
       hint: $('abilityHint'),
       debug: $('debugPanel'),
@@ -146,6 +147,27 @@ export class Hud {
     this.el.killGoal.textContent = goal ? `/${goal}` : '';
   }
 
+  /**
+   * The same chip, repurposed. It is the most-looked-at number on the screen
+   * for thirteen minutes, so taking it over says more than any alert can.
+   */
+  setLedgerMode(on) {
+    this.el.counter.classList.toggle('ledger', on);
+    if (!on) this.el.counter.classList.remove('spent');
+    this.el.counterLabel.textContent = on ? 'RECLAIMED' : 'OBJECTS';
+    // The memo exists to keep the DOM quiet; a mode change has to break it in
+    // both directions or the chip keeps the previous run's number.
+    this.lastKills = -1;
+    this.lastGoal = -1;
+  }
+
+  setLedger(n, of) {
+    this.setKills(n, of);
+    // Emptied: it stops reading as a quantity and starts reading as a state.
+    this.el.counter.classList.toggle('spent', n <= 0);
+    if (n <= 0) this.el.counterLabel.textContent = 'SPENT';
+  }
+
   setPhase(label) {
     if (label === this.lastPhase) return;
     this.lastPhase = label;
@@ -196,7 +218,15 @@ export class Hud {
     if (world.invert > 0) want.set('AIM INVERTED', 'power');
     if (world.jam > 0) want.set('FEED JAMMED', 'power');
     if (world.chrono > 0) want.set('ROUNDS SLOWED', 'power');
-    if (world.boss && world.boss.recallActive) want.set('RECALL', 'power');
+    const boss = world.boss;
+    if (boss && !boss.dead && boss.intro >= 1) {
+      if (boss.recallActive) want.set('RECALL', 'power');
+      // Only the actionable half is a pill. A permanent "eye closed" row would
+      // sit there the whole fight and teach nothing; the pupil and the
+      // sightline already say which way it is looking.
+      if (boss.eyeOpen) want.set('EYE OPEN · FIRE NOW', 'open');
+      if (boss.echo) want.set('ECHO FIRING · SHOOT IT DOWN', 'breach');
+    }
 
     for (const [text, el] of this.statusEls) {
       if (!want.has(text)) {
@@ -249,6 +279,9 @@ export class Hud {
       ['+50 KILLS', () => g.debugAddKills(50)],
       ['NEXT STORY', () => g.debugNextStory()],
       ['BOSS POWER', () => g.debugBossPower()],
+      ['REPRISE', () => g.debugReprise()],
+      ['ECHO', () => g.debugEcho()],
+      ['DRAIN LEDGER', () => g.debugDrainLedger()],
       ['SPAWN WAVE', () => g.debugSpawnWave()],
       ['FILL FIELD', () => g.debugFillField()],
       ['CLEAR FIELD', () => g.debugClearField()],

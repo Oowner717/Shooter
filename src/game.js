@@ -93,6 +93,9 @@ export class Game {
       chrono: 0,
       lockout: 0,
       bossContact: 0,
+      // What ORDINAL has left of the player's tally to spend. Set when it
+      // arrives, drained by everything it does.
+      ledger: 0,
       autoSteering: false, // is auto aim traversing the barrel this frame?
       autoAim: false,
       autoFire: false,
@@ -136,6 +139,7 @@ export class Game {
     w.boss = null;
     w.stasis = w.veil = w.invert = w.jam = w.chrono = w.lockout = w.bossContact = 0;
     w.veilFade = 0;
+    w.ledger = 0;
     w.nextStoryAt = CFG.storyEvery;
     w.sealed = false;
     w.phase = 'staging';
@@ -173,6 +177,7 @@ export class Game {
     this.hud.hideEnding();
     this.hud.setBoss(false);
     this.hud.setGate(false);
+    this.hud.setLedgerMode(false);
     this.hud.setKills(0, CFG.killGoal);
     this.hud.setPhase('STAGING');
     this.hud.syncAbilities(w.abilities);
@@ -675,8 +680,16 @@ export class Game {
     const bx = w.wall.gateCx;
     const by = w.wall.y + w.wall.thickness + CFG.boss.r * 0.4;
     w.boss = new Boss(bx, by);
+
+    // The reveal. Five hundred objects were not a score, they were a deposit,
+    // and the counter the player has been watching all run turns over and
+    // starts spending itself against them.
+    w.ledger = CFG.killGoal;
+    this.hud.setLedgerMode(true);
+
     this.hud.setBoss(true, 1, 'ORDINAL', 'FIRST OF ——');
     this.hud.alert('ORDINAL · ARRIVING', 'power', 4);
+    this.hud.alert('LEDGER · IT HAS YOUR FIVE HUNDRED', 'breach', 5);
   }
 
   onBossDead() {
@@ -724,7 +737,10 @@ export class Game {
 
   syncHud(dt) {
     const w = this.world;
-    this.hud.setKills(w.kills, w.phase === 'staging' ? CFG.killGoal : null);
+    // Once ORDINAL is on the field the counter is no longer the player's: it
+    // reads the ledger, and it falls.
+    if (w.boss) this.hud.setLedger(w.ledger, CFG.killGoal);
+    else this.hud.setKills(w.kills, w.phase === 'staging' ? CFG.killGoal : null);
     this.hud.syncAbilities(w.abilities);
     this.hud.syncStatus(w);
     this.hud.updateAlerts(dt);
@@ -740,6 +756,11 @@ export class Game {
         + `parts  ${fx.particles.active.length}\n`
         + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}\n`
         + `mines  ${w.mines.length}  round ${w.round}\n`
+        + (w.boss
+          ? `ledger ${w.ledger}  spent ${w.boss.spent}${w.boss.spentOut ? ' OUT' : ''}\n`
+            + `eye    ${w.boss.gazeOpen.toFixed(2)} ${w.boss.eyeOpen ? 'OPEN' : 'shut'}  x${w.boss.damageScale.toFixed(2)}\n`
+            + `rev    ${w.boss.reprises.length} reprise  ${w.boss.echo ? 'echo' : 'no echo'} ${w.boss.echoBolts.length} bolts\n`
+          : '')
         + `build  ${BUILD}  zoom ${CFG.zoom}`,
       );
     }
@@ -999,6 +1020,23 @@ export class Game {
   debugBossPower() {
     const w = this.world;
     if (w.boss && !w.boss.dead) w.boss.castPower(w);
+  }
+
+  debugReprise() {
+    const w = this.world;
+    if (w.boss && !w.boss.dead) w.boss.reprise(w);
+  }
+
+  debugEcho() {
+    const w = this.world;
+    if (w.boss && !w.boss.dead && !w.boss.echo) w.boss.raiseEcho(w);
+  }
+
+  /** Jump straight to the spent-ledger endgame without waiting it out. */
+  debugDrainLedger() {
+    const w = this.world;
+    if (!w.boss || w.boss.dead) return;
+    w.boss.spend(w, w.ledger);
   }
 
   debugSpawnWave() {

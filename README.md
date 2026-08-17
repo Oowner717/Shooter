@@ -105,12 +105,56 @@ attackers, worse corruption.
    damages it, and blasts reach it at half weight.
 3. **BOSS** — **ORDINAL** comes through the breach, slowly. It cannot hurt
    you. It takes things from you instead: your sight, your aim, your rate of
-   fire. Shooting pushes it back; stop shooting and it keeps walking.
+   fire. Shooting pushes it back; stop shooting and it keeps walking. See
+   *The fight* below — it is not a health bar.
 4. **END** — ending text, then the frame freezes mid-corruption and
    **RESET SIMULATION** appears. Reset is a clean session: the toggle rack
    clears back to standard rounds and no assists.
 
 A typical run is about fifteen minutes.
+
+### The fight
+
+ORDINAL has no more hit points than it ever did. It is harder for three other
+reasons.
+
+**The gaze.** It is an eye, so it is only open to you while it is looking at
+you. A bolt that lands while it is looking elsewhere does **4.2** damage; one
+that lands while it holds your eye does **49.4** — the same round, an 11.8×
+swing. Its pupil visibly tracks around the socket and a sightline is drawn out
+along whatever it is watching, so the tell is always readable even when the
+body is crowded up against the wall. There is a wind-up before it comes round
+to you, a green **EYE OPEN · FIRE NOW** pill for the window, and shots that
+glance ricochet with a different sound.
+
+Measured against the old fight: a player who simply holds the trigger does
+**0.80×** the damage, and a player who waits for the beat does **1.90×**.
+Harder if you ignore it, faster if you engage with it, and not one extra hit
+point either way. Abilities are deliberately *not* gated — all six land in
+full whenever you press them, so the timing game is about the turret only.
+
+**The ledger.** Everything ORDINAL does is paid for out of your own tally. The
+moment it arrives, the counter you have watched climb for the whole run turns
+red, relabels itself **RECLAIMED**, and starts falling: 18 for a power, 5 per
+object it emits, 34 for a reprise, 55 for an echo. Powers it can no longer
+afford drop out of its rotation, so the fight thins as its reserve runs down.
+At zero the chip reads **SPENT**, it stops rationing — it walks 2.4× faster,
+casts twice as often, and can no longer close its eye at all. Roughly two and
+a half minutes of spending, and it is a second health bar that you spent
+thirteen minutes filling on its behalf.
+
+**The reversal.** Two of its powers run the game backwards.
+
+- **REPRISE** un-kills. Fragments of things you already destroyed lift out of
+  the simulation, fly back together along visible seams, and land as whole
+  objects again. It prefers real debris near the assembly point and only makes
+  up the shortfall from itself, so on a littered field you watch your own work
+  undone.
+- **ECHO** stands a copy of *your* turret at the far end of the room and
+  shoots back with it. Its rounds cannot hurt you — nothing can — but they
+  corrupt the feed and throw your barrel off aim when they land. They travel
+  slowly and **can be shot down**, which makes your own rounds the counter to
+  your own turret.
 
 ### The objects
 
@@ -172,10 +216,15 @@ and the thing behind the gate is a lock rather than a finish line.
 ## Debug
 
 The **DBG** chip (top right) opens a panel: skip to the gate, skip to the boss,
-kill the boss, +50 kills, advance the story, force a boss power, spawn a
+kill the boss, +50 kills, advance the story, force a boss power, force a
+reprise, raise an echo, drain the ledger to the spent endgame, spawn a
 formation, fill the field, clear the field, trigger a glitch, jump to the end
 screen, restart — plus toggles for cooldowns, corruption, slow motion,
 hitboxes, a live stats readout, and an invulnerable gate.
+
+With **STATS** on, the boss fight adds three lines: the ledger and what has
+been spent, the gaze (`0.00 shut x0.16` … `1.00 OPEN x1.90`), and how many
+reprises and echo rounds are live.
 
 ---
 
@@ -202,7 +251,7 @@ src/
   mines.js              inert-in-flight auto mines
   shooter.js            the turret
   gate.js               wall + gate states
-  boss.js               ORDINAL
+  boss.js               ORDINAL: the gaze, the ledger, reprise, echo
   abilities.js          the six abilities and their effects
   narrative.js          the ten sentences, and how they decay
   hud.js                DOM interface
@@ -216,6 +265,12 @@ scripts/
 `src/config.js` is the only file you need for balance. The knobs that move run
 length most: `bolt.damage`, `shooter.gripFireInterval`, `gate.hp`, `boss.hp`,
 `popStart`/`popEnd`, and `spawnInterval`.
+
+The boss fight is tuned entirely under `boss.gaze`, `boss.ledger`,
+`boss.reprise` and `boss.echo` — `gaze.closed`/`gaze.open` set how much the
+timing game is worth, `gaze.hold`/`gaze.away` set how often the window comes
+round, and the `ledger.*` costs set how long the reserve lasts. Reach for those
+before `boss.hp`: raising hit points makes the fight longer, not harder.
 
 `zoom` is the camera. Everything in the game runs in *world units*; the whole
 scene is drawn scaled by `zoom`, so lowering it pulls the camera back and

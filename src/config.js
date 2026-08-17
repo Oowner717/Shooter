@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '12';
+export const BUILD = '13';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -131,6 +131,48 @@ export const CFG = {
     jamInterval: 0.4, // forced delay between shots while JAM is up
     powerInterval: [13, 9.5], // seconds between powers, phase 1 -> phase 3
     spawnInterval: 7.5,
+
+    // The gaze. ORDINAL is an eye, so it is only open to you while it is
+    // actually looking at you: bolts that arrive while it is looking
+    // elsewhere glance off. Firing blindly is worse than the old fight,
+    // firing on the beat is better, and the window narrows as it wakes up.
+    gaze: {
+      closed: 0.16, // damage multiplier while it is looking away
+      open: 1.9, // damage multiplier while it has your eye
+      hold: [2.1, 1.35], // seconds it holds you, aspect 1 -> 3
+      away: [2.5, 3.7], // seconds it looks elsewhere, aspect 1 -> 3
+      turn: 2.5, // rad/s the pupil travels
+      cone: 0.45, // radians of alignment that count as open
+      tell: 0.55, // seconds of wind-up before the eye arrives on you
+    },
+
+    // The ledger. Everything ORDINAL does is paid for out of the tally the
+    // player spent the whole run building — the counter stops being a score
+    // the moment it walks in, and starts being its reserve.
+    ledger: {
+      power: 18,
+      emit: 5,
+      reprise: 34,
+      echo: 55,
+      spentApproach: 2.4, // it stops conserving once there is nothing left
+      spentPowerScale: 0.5,
+    },
+
+    // Kills coming apart backwards: debris on the field flies together and
+    // becomes whole objects again.
+    reprise: { objects: [3, 6], gather: 1.2, reach: 640, perObject: 7 },
+
+    // A copy of your own turret, firing back. Its rounds cannot hurt you —
+    // they corrupt the feed and knock the barrel — and they can be shot down.
+    echo: {
+      life: 17,
+      interval: 1.45,
+      speed: 300,
+      r: 9,
+      intercept: 17,
+      glitch: 1.5,
+      knock: 0.42, // radians the barrel is thrown by a hit
+    },
   },
 
   // ---- feel -----------------------------------------------------------
