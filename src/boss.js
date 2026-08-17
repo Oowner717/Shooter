@@ -1,5 +1,6 @@
-// MNEMOSYNE. It does not attack. It removes things from you — your sight,
-// your aim, your rate of fire — and walks, without hurry, toward the turret.
+// ORDINAL. It does not attack. It removes things from you — your sight, your
+// aim, your rate of fire — and walks, without hurry, toward the turret. It is
+// the last item in this room, and it is numbered.
 
 import { CFG, ENEMY_TYPES } from './config.js';
 import { TAU, clamp, rand, spread, pick, rgba, drawGlow, makeCanvas, smoothstep, segClosest } from './util.js';
@@ -132,7 +133,7 @@ export class Boss {
       shake(16);
       ripple(this.x, this.y, 2.2, 900);
       audio.bossPower();
-      world.alert(`ASPECT ${this.phase + 1} · ${['REMEMBERING', 'REVISING', 'REFUSING'][this.phase]}`, 'power', 2.6);
+      world.alert(`ASPECT ${this.phase + 1} · ${['WATCHING', 'ADJUSTING', 'YIELDING'][this.phase]}`, 'power', 2.6);
       this.powerTimer = Math.min(this.powerTimer, 1.6);
       for (let i = 0; i < 40; i++) {
         const a = rand(0, TAU);

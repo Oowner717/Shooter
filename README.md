@@ -1,8 +1,8 @@
 # SIMULATION 7749
 
 A physics shooter for iPhone, played fullscreen from the home screen. One
-stationary turret, five hundred objects, a wall with a gate, and a god behind
-it. You cannot lose. You can only be corrupted.
+stationary turret, five hundred objects, a wall with a gate, and something
+numbered behind it. You cannot lose. You can only be corrupted.
 
 No build step, no dependencies, no network calls. Plain ES modules, one canvas.
 
@@ -74,7 +74,7 @@ assists stop steering. Auto fire runs a shade slower than driving it yourself,
 so playing actively is still worth it. The boss's INVERT power mirrors auto aim
 too — it corrupts targeting, not just fingers.
 
-**Five abilities** sit along the bottom, in the strip your thumb already rests
+**Six abilities** sit along the bottom, in the strip your thumb already rests
 on. One tap each, no cost, no upgrades, no unlocks. The first time you use one,
 a caption explains it.
 
@@ -103,17 +103,18 @@ attackers, worse corruption.
    harmless drift.
 2. **GATE** — the doors slam shut. Now the gate is the target. Every round
    damages it, and blasts reach it at half weight.
-3. **BOSS** — **MNEMOSYNE** comes through the breach, slowly. It cannot hurt
+3. **BOSS** — **ORDINAL** comes through the breach, slowly. It cannot hurt
    you. It takes things from you instead: your sight, your aim, your rate of
    fire. Shooting pushes it back; stop shooting and it keeps walking.
 4. **END** — ending text, then the frame freezes mid-corruption and
-   **RESET SIMULATION** appears.
+   **RESET SIMULATION** appears. Reset is a clean session: the toggle rack
+   clears back to standard rounds and no assists.
 
 A typical run is about fifteen minutes.
 
 ### The objects
 
-Eight kinds, each with its own mass, speed, restitution and way of dying.
+Nine kinds, each with its own mass, speed, restitution and way of dying.
 They unlock progressively as the count climbs.
 
 - **MOTE** — small, light, gets punted across the arena by a single bolt.
@@ -159,11 +160,12 @@ before the collapse goes off at all.
 
 ### The story
 
-Ten sentences, one per fifty objects destroyed, then four more at the end.
+Ten sentences, one per fifty objects destroyed, then six more at the end.
 They appear in the mid-field, drawn *behind* every entity so they can never
 hide something you need to shoot, and they corrupt away after a few seconds.
 They are the only place the game says what it thinks it is about, and they
-never quite say it.
+never quite say it — the shapes are simple on purpose, someone is counting,
+and the thing behind the gate is a lock rather than a finish line.
 
 ---
 
@@ -200,8 +202,8 @@ src/
   mines.js              inert-in-flight auto mines
   shooter.js            the turret
   gate.js               wall + gate states
-  boss.js               MNEMOSYNE
-  abilities.js          the five abilities and their effects
+  boss.js               ORDINAL
+  abilities.js          the six abilities and their effects
   narrative.js          the ten sentences, and how they decay
   hud.js                DOM interface
 scripts/

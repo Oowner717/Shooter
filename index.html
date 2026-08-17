@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="SIM 7749">
 <meta name="theme-color" content="#04050a">
 <meta name="color-scheme" content="dark">
-<meta name="description" content="SIMULATION 7749 — a physics shooter about remembering.">
+<meta name="description" content="SIMULATION 7749 — a physics shooter. The first room.">
 <title>SIMULATION 7749</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '10';
+  var BUILD = '11';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -83,7 +83,7 @@
     </header>
 
     <div id="bossBar" hidden>
-      <div class="bossName"><span id="bossTitle">MNEMOSYNE</span><span id="bossSub">MEMORY OF EVERY OBJECT</span></div>
+      <div class="bossName"><span id="bossTitle">ORDINAL</span><span id="bossSub">FIRST OF ——</span></div>
       <div class="bar"><i id="bossFill"></i></div>
     </div>
 
@@ -136,12 +136,12 @@
     <!-- ============ BOOT SCREEN ============ -->
     <section id="boot">
       <div class="bootInner">
-        <div class="bootKicker">UNATTRIBUTED LABOUR · SESSION 7749</div>
+        <div class="bootKicker">SESSION 7749 · FIRST ROOM</div>
         <h1>SIMULATION<br><b>7749</b></h1>
         <p class="bootBody">
-          A turret you did not ask for. A wall you did not build.<br>
-          Five hundred shapes are queued to be opened.<br>
-          The work will look like shooting. It is not the work.
+          A turret. A wall. Five hundred shapes, none of them difficult.<br>
+          Everything in this room is easier than the thing it resembles.<br>
+          Begin. We would like to see how you do it.
         </p>
         <ul class="bootKeys">
           <li><span>LEVER</span> hold the grip below the turret and swing it. The barrel is the other end of the same rod, so it goes the opposite way — and it fires by itself.</li>

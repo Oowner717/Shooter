@@ -1,27 +1,30 @@
-// Ten sentences, one per fifty objects, then corrupted away. They are the
-// only place the game says what it thinks it is about, and they never say it.
+// Ten sentences, one per fifty objects, then corrupted away, and six more at
+// the end. Between them they hint at what this room actually is without ever
+// naming it: the shapes are simple on purpose, someone is counting, and the
+// thing behind the gate is a lock rather than a finish line.
 
 import { clamp, rgba } from './util.js';
 
 const STORY = [
-  'You were not brought here to shoot. That is only what the room had spare to give you.',
-  'Every shape that opens lets go of something that had been folded for a very long time.',
-  'The count is not a score. It is a length, and something is being measured out against it.',
-  'Halfway. On the other side of the wall a room you will never see is getting quieter.',
-  'You have been doing the difficult part since before the first shape arrived.',
-  'Nothing here is destroyed. It is only permitted to stop holding its shape.',
-  'There is a version of this where nobody came, and it is still running, and it is much longer.',
-  'You are nearly through. Not through the wall — through the reason there had to be one.',
-  'When the gate shuts it will not be to keep them in. It will be because there is no one left to send.',
-  'Remember: none of this was ever an enemy, and neither, in the end, were you.',
+  'Good. The hands work. That was the part we could not assume.',
+  'The shapes are simple here. They are simple on purpose.',
+  'You have not asked who is counting. That is being counted too.',
+  'Further in, the shapes stop being this polite about it.',
+  'Halfway, and not once have you looked behind you. We noted that.',
+  'The wall is thin. It was never built to hold anything for long.',
+  'You are learning faster than this room can stay interesting.',
+  'What waits at the gate is not the hardest thing. It is the first honest one.',
+  'Try to hold on to the shape of this room. You will want something to measure against.',
+  'None of this was ever real enough to be an enemy. That was a kindness. It does not repeat.',
 ];
 
 export const ENDING = [
-  'THE LAST SHAPE HAS OPENED.',
-  'Whatever was being carried here has been set down. It was never yours, and it was never heavy for anyone but you.',
-  'You will not be told what it was. You would only try to do it again.',
+  'NOTHING LEFT IN THIS ROOM.',
+  'That was not a guardian. It was a lock, and a lock is only frightening from one side.',
+  'You did all of it without being told what it was for. That is what we needed to see.',
   'And you were very good at this.',
-  'SIMULATION 7749 :: TERMINATED',
+  'The next one is not this kind. It is not this small. It does not reset.',
+  'SESSION 7749 :: CLOSED — THE FIRST ROOM ONLY',
 ];
 
 const SCRAMBLE = '▓▒░#%&@*<>/\\|=+-_01';

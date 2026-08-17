@@ -140,6 +140,16 @@ export class Game {
     w.sealed = false;
     w.phase = 'staging';
 
+    // A reset is a fresh session: the rack goes back to standard rounds and
+    // no assists, matching what a first-time player is handed.
+    w.autoAim = false;
+    w.autoFire = false;
+    w.autoMine = false;
+    w.round = 'standard';
+    for (const key of ['autoAim', 'autoFire', 'autoMine', 'explosive', 'shotgun']) {
+      this.hud.setToggle(key, false);
+    }
+
     w.wall.reset();
     w.narrator.reset();
     w.abilities.reset();
@@ -665,8 +675,8 @@ export class Game {
     const bx = w.wall.gateCx;
     const by = w.wall.y + w.wall.thickness + CFG.boss.r * 0.4;
     w.boss = new Boss(bx, by);
-    this.hud.setBoss(true, 1, 'MNEMOSYNE', 'MEMORY OF EVERY OBJECT');
-    this.hud.alert('MNEMOSYNE · EMERGING', 'power', 4);
+    this.hud.setBoss(true, 1, 'ORDINAL', 'FIRST OF ——');
+    this.hud.alert('ORDINAL · ARRIVING', 'power', 4);
   }
 
   onBossDead() {
