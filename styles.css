@@ -397,7 +397,22 @@ html, body {
   background: radial-gradient(120% 80% at 50% 30%, rgba(10, 20, 36, 0.86), rgba(2, 3, 7, 0.97) 70%);
   pointer-events: auto;
   z-index: 30;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+
+/*
+ * The copy is centred while it fits and scrollable when it does not. A flex
+ * container that centres with `justify-content` clips the overflowing end
+ * instead of letting it scroll, which silently ate the build footer the first
+ * time the instruction rows grew. Auto margins collapse to zero once there is
+ * no free space, so the block starts at the top and the whole thing scrolls.
+ */
+#boot {
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.bootInner { margin-block: auto; }
 #boot[hidden], #endScreen[hidden] { display: none; }
 
 #boot.out { animation: bootOut 0.5s ease-in forwards; }
@@ -436,17 +451,17 @@ html, body {
 
 .bootBody {
   font-size: 12px;
-  line-height: 1.85;
+  line-height: 1.78;
   color: #a9c2da;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
-.bootKeys { list-style: none; margin-bottom: 26px; }
+.bootKeys { list-style: none; margin-bottom: 22px; }
 .bootKeys li {
   font-size: 10.5px;
   line-height: 1.6;
   color: var(--dim);
-  padding: 6px 0 6px 0;
+  padding: 5px 0 5px 0;
   border-top: 1px solid rgba(120, 190, 255, 0.09);
 }
 .bootKeys li span {
@@ -489,6 +504,14 @@ body.ending #bossBar,
 body.ending #gateBar {
   opacity: 0;
   transition: opacity 1.2s ease;
+  pointer-events: none;
+}
+
+/* Same treatment while the title screen is up: none of it is live yet. */
+body.booting #topbar,
+body.booting #abilities,
+body.booting #toggleRack {
+  opacity: 0;
   pointer-events: none;
 }
 

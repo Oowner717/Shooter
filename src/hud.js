@@ -55,6 +55,11 @@ export class Hud {
     this.buildAbilities();
     this.buildDebug();
 
+    // The boot copy is translucent enough to read the HUD through it, and on a
+    // short screen the kicker sits level with the top chips. Nothing behind the
+    // title screen is live yet, so hide it until the run starts.
+    document.body.classList.add('booting');
+
     // Stamped where it is visible on launch: if this number is not the newest,
     // the page is running a cached build.
     const foot = document.querySelector('.bootFoot');
@@ -294,6 +299,7 @@ export class Hud {
   // ------------------------------------------------------------- screens
 
   hideBoot() {
+    document.body.classList.remove('booting');
     this.el.boot.classList.add('out');
     setTimeout(() => { this.el.boot.hidden = true; }, 500);
   }

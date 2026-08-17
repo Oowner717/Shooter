@@ -2,6 +2,12 @@
 // the end. Between them they hint at what this room actually is without ever
 // naming it: the shapes are simple on purpose, someone is counting, and the
 // thing behind the gate is a lock rather than a finish line.
+//
+// The back half turns the gaze around. Through line 6 the observer is watching
+// the field; from line 7 it is watching the player, and line 8 promises the
+// same from whatever comes through the gate — which pays off in ORDINAL's iris
+// and its first aspect banner, ASPECT 1 · WATCHING. Every line has to survive
+// one reading at 13px behind moving objects, so the images stay single-step.
 
 import { clamp, rgba } from './util.js';
 
@@ -12,9 +18,9 @@ const STORY = [
   'Further in, the shapes stop being this polite.',
   'Halfway, and not once have you looked behind you. We noted that.',
   'The wall is thin. It was never built to hold anything for long.',
-  'You are learning faster than this room can stay interesting.',
-  'What waits at the gate is not the hardest thing. It is the first honest one.',
-  'Try to hold on to the shape of this room. You will want something to measure against.',
+  'We stopped watching the shapes a while ago.',
+  'Nothing that gate has sent has looked at you. The last one will.',
+  'You will describe this room to yourself later. You will leave most of it out.',
   'None of this was ever real enough to be an enemy. That was a kindness. It does not repeat.',
 ];
 
@@ -23,7 +29,7 @@ export const ENDING = [
   'That was not a guardian. It was a lock, and a lock is only frightening from one side.',
   'You did all of it without being told what it was for. That is what we needed to see.',
   'And you were very good at this.',
-  'The next one is not this kind. It is not this small. It does not reset.',
+  'The next one is not this kind. It is not this small. You are already expected.',
   'SESSION 7749 :: CLOSED — THE FIRST ROOM ONLY',
 ];
 
