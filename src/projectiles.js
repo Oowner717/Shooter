@@ -185,6 +185,17 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       bestKind = 'boss';
       bestTarget = boss;
     }
+    // The copy of your turret is a target like anything else.
+    const e = boss.echo;
+    if (e && e.born >= 1) {
+      const er = e.r + p.r;
+      const ec = segClosest(ax, ay, bx, by, e.x, e.y);
+      if (ec.d2 <= er * er && ec.t < bestT) {
+        bestT = ec.t;
+        bestKind = 'echo';
+        bestTarget = e;
+      }
+    }
   }
 
   // wall segments (including the gate when it is shut)
@@ -259,6 +270,13 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         hitBurst(hx, hy, -dirx, -diry, boss.hitColor);
         audio.hit();
       }
+      endProjectile(world, p, hx, hy, true);
+      return;
+    }
+    case 'echo': {
+      world.boss.hurtEcho(world, p.damage);
+      hitBurst(hx, hy, -dirx, -diry, world.boss.hitColor);
+      audio.hit();
       endProjectile(world, p, hx, hy, true);
       return;
     }

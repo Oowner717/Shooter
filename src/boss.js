@@ -85,6 +85,11 @@ const PALETTES = [
   { ring: '#ff9fb0', spoke: '#ffe1e6', iris: '#ff2d55', core: '#fff0f3', halo: '#ff2d6f' },
 ];
 
+/*
+ * `label` is documentation only — none of it is shown. Every one of these has
+ * a whole-screen consequence the player can see happening, and captioning it
+ * put a row of text over the boss for the length of the fight.
+ */
 const POWERS = [
   {
     id: 'reprise',
@@ -268,10 +273,11 @@ export class Boss {
       shake(16);
       ripple(this.x, this.y, 2.2, 900);
       audio.bossPower();
-      // the substrate turns over with it, not just the sprite
+      // The substrate turns over with it, not just the sprite. This is the
+      // whole announcement: no banner, because a whole-screen colour change
+      // is not something anyone needs told.
       world.background.setMood(['boss', 'boss2', 'boss3'][this.phase]);
       world.background.surge(1.8);
-      world.alert(`ASPECT ${this.phase + 1} · ${['WITHHOLDING', 'ADJUSTING', 'YIELDING'][this.phase]}`, 'power', 2.6);
       this.powerTimer = Math.min(this.powerTimer, 1.6);
       for (let i = 0; i < 40; i++) {
         const a = rand(0, TAU);
@@ -305,7 +311,7 @@ export class Boss {
     if (this.spentOut) return;
     world.ledger = Math.max(0, world.ledger - amount);
     this.spent += amount;
-    if (world.ledger <= 0) this.becomeSpent(world);
+    if (world.ledger <= 0) this.becomeSpent();
   }
 
   /** Whether it can still pay full price — governs which powers are in the deck. */
@@ -328,7 +334,7 @@ export class Boss {
     world.ledger -= took;
     this.reclaimed += took;
     world.reclaimed += took;
-    if (world.ledger <= 0) this.becomeSpent(world);
+    if (world.ledger <= 0) this.becomeSpent();
   }
 
   /** TITHE: it reaches back and takes some of what was reclaimed. */
@@ -353,7 +359,7 @@ export class Boss {
   }
 
   /** Nothing of yours left. It stops rationing and comes on. */
-  becomeSpent(world) {
+  becomeSpent() {
     if (this.spentOut) return;
     this.spentOut = true;
     this.powerTimer = Math.min(this.powerTimer, 1.2);
@@ -362,7 +368,6 @@ export class Boss {
     flash(0.5, this.palette.core);
     shake(20);
     audio.bossPower();
-    world.alert('IT HAS NOTHING OF YOURS LEFT', 'breach', 4.2);
   }
 
   // ---------------------------------------------------------------- arrival
@@ -416,7 +421,6 @@ export class Boss {
     ripple(this.x, this.y, 1.8, 700);
     audio.bossPower();
     audio.glitchOn();
-    world.alert('TOO NEAR · FEED REWRITTEN', 'breach', 2.4);
   }
 
   /** SUBTRACT: one of the six buttons goes dark for a while. */
@@ -553,6 +557,10 @@ export class Boss {
       y: clamp(this.y + this.r * 1.9, top + 130, top + (world.shooter.y - top) * 0.52),
       aim: Math.PI / 2,
       life: CFG.boss.echo.life,
+      hp: CFG.boss.echo.hp,
+      maxHp: CFG.boss.echo.hp,
+      r: CFG.boss.echo.bodyR,
+      flash: 0,
       fire: 0.9,
       born: 0,
       recoil: 0,
@@ -562,12 +570,51 @@ export class Boss {
     audio.bossPower();
   }
 
+  /**
+   * The copy takes damage like anything else and can be shot apart. Killing it
+   * also kills whatever it had in the air, so the reward is immediate and
+   * obvious without anything having to say so.
+   */
+  hurtEcho(world, dmg) {
+    const e = this.echo;
+    if (!e || e.born < 1) return 0;
+    e.hp -= dmg;
+    e.flash = Math.min(1, e.flash + dmg / 160);
+    if (e.hp <= 0) this.breakEcho(world, true);
+    return dmg;
+  }
+
+  breakEcho(world, destroyed) {
+    const e = this.echo;
+    if (!e) return;
+    const n = destroyed ? 26 : 14;
+    for (let i = 0; i < n; i++) {
+      fxShard(e.x, e.y, spread(destroyed ? 460 : 300), spread(destroyed ? 460 : 300),
+        this.palette.ring, 0.7, 8, 4);
+    }
+    ring(e.x, e.y, destroyed ? 8 : 40, destroyed ? 300 : 4, 0.5, this.palette.core, 4);
+    if (destroyed) {
+      explode(e.x, e.y, e.r * 1.4, this.palette.core, this.palette.halo, 1.1);
+      shake(14);
+      audio.boom();
+      // its rounds go with it
+      for (const b of this.echoBolts) {
+        for (let i = 0; i < 5; i++) spark(b.x, b.y, spread(200), spread(200), this.palette.ring, 0.3, 2);
+      }
+      this.echoBolts.length = 0;
+    } else {
+      audio.pop(1.2);
+    }
+    this.echo = null;
+  }
+
   updateEcho(world, dt) {
     const cfg = CFG.boss.echo;
     const e = this.echo;
     if (e) {
       e.born = Math.min(1, e.born + dt * 2.2);
       e.life -= dt;
+      e.flash = Math.max(0, e.flash - dt * 3);
       e.recoil = Math.max(0, e.recoil - dt * 4);
       const s = world.shooter;
       const want = Math.atan2(s.y - e.y, s.x - e.x);
@@ -587,12 +634,7 @@ export class Boss {
         });
         audio.shot();
       }
-      if (e.life <= 0) {
-        for (let i = 0; i < 14; i++) fxShard(e.x, e.y, spread(300), spread(300), this.palette.ring, 0.6, 7, 4);
-        ring(e.x, e.y, 40, 4, 0.4, this.palette.ring, 3);
-        audio.pop(1.2);
-        this.echo = null;
-      }
+      if (e.life <= 0) this.breakEcho(world, false);
     }
 
     // --- its rounds ---
@@ -637,7 +679,6 @@ export class Boss {
         flash(0.3, this.palette.halo);
         ring(s.x, s.y, 8, 240, 0.4, this.palette.halo, 4);
         audio.glitchOn();
-        world.alert('ECHO · AIM THROWN', 'breach', 2);
       }
 
       if (gone) {
@@ -654,6 +695,30 @@ export class Boss {
     if (e) {
       const k = e.born;
       const fade = clamp(e.life / 2, 0, 1);
+      const hpf = clamp(e.hp / e.maxHp, 0, 1);
+
+      // A ring around it that empties as it is shot apart — the only thing
+      // saying "this can be destroyed", and it says it without words.
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.globalAlpha = fade * k;
+      ctx.strokeStyle = rgba(p.ring, 0.22);
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, e.r * 1.5, 0, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = rgba('#ff4d6d', 0.9);
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, e.r * 1.5, -Math.PI / 2, -Math.PI / 2 + TAU * hpf);
+      ctx.stroke();
+      if (e.flash > 0.01) {
+        ctx.globalCompositeOperation = 'lighter';
+        drawGlow(ctx, '#ffffff', 0, 0, e.r * 2.4, e.flash * 0.8);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      ctx.restore();
+
       ctx.save();
       ctx.translate(e.x, e.y);
       ctx.rotate(e.aim + Math.PI / 2);
@@ -839,7 +904,6 @@ export class Boss {
     this.spend(world, costOf(power));
     this.lastPower = power.id;
     power.apply(world, this);
-    world.alert(power.label, 'power', 3);
     ring(this.x, this.y, this.r * 0.6, this.r * 5, 0.6, this.palette.halo, 4);
     flash(0.22, this.palette.iris);
     shake(7);

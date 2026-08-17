@@ -182,27 +182,21 @@ html, body {
 
 /* ---------------- alerts (breach / boss powers) ---------------- */
 
-#alerts, #status {
+/*
+ * Transient messages only. There used to be a second row of sticky status
+ * pills below this one describing everything the boss was doing; between the
+ * two of them they covered the boss completely, and every state they named was
+ * already visible on screen. They are gone: nothing here explains a mechanic.
+ */
+#alerts {
   position: absolute;
   left: 0;
   right: 0;
+  top: calc(var(--hud-t) + 104px);
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 4px;
-}
-
-#alerts {
-  top: calc(var(--hud-t) + 104px);
-  flex-direction: column;
-}
-
-/* Sticky one-word pills for whatever the boss is currently doing to you.
-   Separate from #alerts so they never evict transient messages. */
-#status {
-  top: calc(var(--hud-t) + 136px);
-  flex-wrap: wrap;
-  justify-content: center;
-  padding: 0 12px;
 }
 
 .alert {
@@ -260,13 +254,6 @@ html, body {
   transform-origin: center;
 }
 
-/* The window to shoot the boss in. The only pill that is good news. */
-.alert.open {
-  color: #7cffb2;
-  border-color: rgba(124, 255, 178, 0.45);
-  animation: openPulse 0.7s infinite ease-in-out;
-}
-@keyframes openPulse { 50% { opacity: 0.6; } }
 .alert.fade { opacity: 0.55; }
 
 @keyframes alertIn {
@@ -560,7 +547,6 @@ html, body {
 body.ending #topbar,
 body.ending #abilities,
 body.ending #alerts,
-body.ending #status,
 body.ending #toggleRack,
 body.ending #bossBar,
 body.ending #gateBar {
@@ -578,18 +564,60 @@ body.booting #toggleRack {
 }
 
 
-#endScreen { background: none; flex-direction: column; gap: 26px; }
+/*
+ * Same clipping trap as the boot screen: a column flex centred with
+ * `justify-content` cuts off the overflowing end instead of scrolling to it,
+ * and on a 320x568 screen that put the plate's top edge off screen and the
+ * RESET button below the fold. Auto margins collapse to zero when there is no
+ * free space, so the pair centres while it fits and scrolls when it does not.
+ */
+#endScreen {
+  background: none;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 26px;
+}
+#endText { margin-top: auto; }
+#resetBtn { margin-bottom: auto; }
 
+/*
+ * The closing text used to be drawn straight over the field, which put the
+ * final stamp on top of the turret and made it unreadable. It now sits on its
+ * own plate — and the turret fades out underneath it as the lines arrive, so
+ * there is nothing behind it to compete with either way.
+ */
 #endText {
-  font-size: 13px;
-  line-height: 2.1;
+  font-size: 12px;
+  line-height: 1.7;
   text-align: center;
   max-width: 420px;
   letter-spacing: 0.06em;
-  text-shadow: 0 0 24px rgba(0, 0, 0, 0.95);
+  padding: 16px 16px;
+  border-radius: 6px;
+  background: rgba(2, 4, 9, 0.82);
+  border: 1px solid rgba(120, 190, 255, 0.12);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  text-shadow: 0 0 18px rgba(0, 0, 0, 0.95);
 }
 #endText div { opacity: 0; animation: lineIn 0.9s ease-out forwards; }
-#endText div.term { color: var(--accent-2); letter-spacing: 0.24em; font-size: 11px; }
+#endText div + div { margin-top: 6px; }
+/* The closing stamp. Loose tracking wrapped it onto a second row, which is
+   what collided with the turret; it now fits on one line at every width. */
+#endText div.term {
+  color: var(--accent-2);
+  letter-spacing: 0.08em;
+  font-size: 9.5px;
+  margin-top: 12px;
+}
+
+/* Short screens: the six lines wrap more, so tighten again rather than scroll. */
+@media (max-height: 640px) {
+  #endText { font-size: 11px; line-height: 1.6; padding: 13px 13px; }
+  #endText div + div { margin-top: 4px; }
+  #endText div.term { margin-top: 9px; }
+  #endScreen { gap: 16px; }
+}
 @keyframes lineIn {
   from { opacity: 0; transform: translateY(6px); filter: blur(4px); }
   to { opacity: 1; transform: none; filter: none; }

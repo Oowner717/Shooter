@@ -811,5 +811,12 @@ export function applyBlast(world, blast) {
       world.boss.hurt(world, damage * falloff * 1.6);
       world.boss.push(dx / (d || 1), dy / (d || 1), impulse * falloff * 0.06);
     }
+    // The copy is destructible, so blasts have to reach it as well — without
+    // this, abilities were the one thing on the field that could not touch it.
+    const e = world.boss.echo;
+    if (e && e.born >= 1) {
+      const ed = Math.hypot(e.x - x, e.y - y);
+      if (ed < r + e.r) world.boss.hurtEcho(world, damage * clamp(1 - ed / (r + e.r), 0, 1) * 1.6);
+    }
   }
 }

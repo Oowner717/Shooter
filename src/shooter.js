@@ -282,6 +282,60 @@ export class Shooter {
     ctx.arc(0, 0, 3.4, 0, TAU);
     ctx.fill();
     ctx.restore();
+
+    this.drawInterference(ctx, world, t);
+  }
+
+  /**
+   * What is being done to the gun, drawn on the gun. VEIL, CHRONO and the
+   * corruption are all visible on their own; a throttled feed and a mirrored
+   * aim are the two that would otherwise read as the controls being broken, so
+   * they get a mark at the pivot instead of a caption over the boss.
+   */
+  drawInterference(ctx, world, t) {
+    const jam = world.jam > 0;
+    const inv = world.invert > 0;
+    if (!jam && !inv) return;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    const pulse = 0.55 + 0.45 * Math.sin(t * 9);
+
+    if (jam) {
+      // a bar across the muzzle: the barrel is stopped, not the finger
+      ctx.save();
+      ctx.rotate(this.aim);
+      ctx.strokeStyle = rgba('#ff4d6d', 0.55 + pulse * 0.4);
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(this.r * 1.5, -11);
+      ctx.lineTo(this.r * 1.5, 11);
+      ctx.moveTo(this.r * 1.25, -8);
+      ctx.lineTo(this.r * 1.75, 8);
+      ctx.moveTo(this.r * 1.75, -8);
+      ctx.lineTo(this.r * 1.25, 8);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (inv) {
+      // two arrows pointing at each other around the pivot: the axis is flipped
+      ctx.strokeStyle = rgba('#ffcf5c', 0.5 + pulse * 0.4);
+      ctx.lineWidth = 2.2;
+      const rr = this.r * 1.55;
+      for (const dir of [-1, 1]) {
+        const bx = dir * rr;
+        ctx.beginPath();
+        ctx.moveTo(bx, 0);
+        ctx.lineTo(bx - dir * 13, 0);
+        ctx.moveTo(bx - dir * 13, 0);
+        ctx.lineTo(bx - dir * 7, -5);
+        ctx.moveTo(bx - dir * 13, 0);
+        ctx.lineTo(bx - dir * 7, 5);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
 
   /**

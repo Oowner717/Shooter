@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '14';
+export const BUILD = '15';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -176,7 +176,9 @@ export const CFG = {
     // A copy of your own turret, firing back. Its rounds cannot hurt you —
     // they corrupt the feed and knock the barrel — and they can be shot down.
     echo: {
-      life: 17,
+      life: 26, // it now outlives its welcome unless you deal with it
+      hp: 460, // and it can be dealt with: destroy the copy
+      bodyR: 26, // hit radius, matching the player's own turret
       interval: 1.45,
       speed: 300,
       r: 9,

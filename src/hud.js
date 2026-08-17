@@ -21,7 +21,6 @@ export class Hud {
       gateBar: $('gateBar'),
       gateFill: $('gateFill'),
       alerts: $('alerts'),
-      status: $('status'),
       killGoal: document.querySelector('#counter .dim'),
       counterLabel: document.querySelector('#counter em'),
       bossCaption: $('bossCaption'),
@@ -48,7 +47,6 @@ export class Hud {
 
     this.slots = [];
     this.alerts = [];
-    this.statusEls = new Map();
     this.hintTimer = 0;
     this.lastKills = -1;
     this.lastGoal = -1;
@@ -233,49 +231,6 @@ export class Hud {
     }
   }
 
-  /**
-   * Sticky pills for whatever is currently being done to you. Diffed against
-   * the live set so nothing is torn down and rebuilt every frame.
-   */
-  syncStatus(world) {
-    const want = new Map();
-    if (world.attackers.size > 0) want.set('BREACH · CLEAR THE MARKED OBJECT', 'breach');
-    if (world.veil > 0) want.set('VEIL', 'power');
-    if (world.invert > 0) want.set('AIM INVERTED', 'power');
-    if (world.jam > 0) want.set('FEED JAMMED', 'power');
-    if (world.chrono > 0) want.set('ROUNDS SLOWED', 'power');
-    const boss = world.boss;
-    if (boss && !boss.dead && boss.intro >= 1) {
-      if (boss.recallActive) want.set('RECALL', 'power');
-      if (boss.echo) want.set('ECHO FIRING · SHOOT IT DOWN', 'breach');
-      if (boss.looming) want.set('IT IS TOO NEAR · PUSH IT BACK', 'breach');
-      if (world.abilities.slots.some((s) => s.locked > 0)) want.set('A BUTTON WITHHELD', 'power');
-      // The armour, as a number rather than a bar: how much of a hit the
-      // player's own count is currently soaking on ORDINAL's behalf.
-      if (world.ledger > 0) {
-        const soak = Math.round((1 - boss.damageScale(world)) * 100);
-        if (soak >= 12) want.set(`YOUR COUNT ABSORBS ${soak}%`, 'power');
-      } else {
-        want.set('NOTHING LEFT TO ABSORB', 'open');
-      }
-    }
-
-    for (const [text, el] of this.statusEls) {
-      if (!want.has(text)) {
-        el.remove();
-        this.statusEls.delete(text);
-      }
-    }
-    for (const [text, kind] of want) {
-      if (this.statusEls.has(text)) continue;
-      const el = document.createElement('div');
-      el.className = `alert ${kind}`;
-      el.textContent = text;
-      this.el.status.appendChild(el);
-      this.statusEls.set(text, el);
-    }
-  }
-
   updateAlerts(dt) {
     for (let i = this.alerts.length - 1; i >= 0; i--) {
       const a = this.alerts[i];
@@ -296,8 +251,6 @@ export class Hud {
   clearAlerts() {
     for (const a of this.alerts) a.el.remove();
     this.alerts.length = 0;
-    for (const el of this.statusEls.values()) el.remove();
-    this.statusEls.clear();
   }
 
   // ------------------------------------------------------------------ debug

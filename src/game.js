@@ -40,6 +40,7 @@ export class Game {
     this.leverHinted = false;
     this.autoHinted = {};
     this.acc = 0;
+    this.endFade = 1; // turret opacity; falls to 0 under the ending text
     this.frameTimes = [];
     this.fps = 60;
     this.qualityCooldown = 0;
@@ -176,6 +177,7 @@ export class Game {
     this.snapshot = null;
     this.endStage = 0;
     this.endTimer = 0;
+    this.endFade = 1;
     this.resetShown = false;
     this.hud.clearAlerts();
     this.hud.hideEnding();
@@ -650,6 +652,11 @@ export class Game {
   /** @param real unscaled seconds — the outro must not run at slow-mo speed. */
   updatePhase(real) {
     const w = this.world;
+    // Fades the turret out across the text, and snaps back on a reset.
+    const wantFade = w.phase === 'ending' && this.endStage >= 1 ? 0 : 1;
+    this.endFade += (wantFade - this.endFade) * clamp(real * 0.7, 0, 1);
+    if (wantFade === 1 && this.endFade > 0.995) this.endFade = 1;
+
     if (w.phase === 'ending') {
       this.endTimer += real;
       if (this.endStage === 0 && this.endTimer > 2.2) {
@@ -672,7 +679,6 @@ export class Game {
   onGateSealed() {
     this.hud.setPhase('GATE');
     this.hud.setGate(true, 1);
-    this.hud.alert('GATE SEALED · BREAK IT OPEN', 'info', 4);
     background.setMood('gate');
     background.surge(2);
     audio.setDroneMood(55, 480, 0.07);
@@ -711,7 +717,6 @@ export class Game {
     background.setMood('boss');
     background.surge(2);
     audio.setDroneMood(33, 260, 0.09);
-    this.hud.alert('IT WEARS YOUR COUNT · TAKE IT BACK', 'breach', 5.5);
   }
 
   onBossDead() {
@@ -764,7 +769,6 @@ export class Game {
     if (w.boss) this.hud.setLedger(w.ledger, CFG.killGoal);
     else this.hud.setKills(w.kills, w.phase === 'staging' ? CFG.killGoal : null);
     this.hud.syncAbilities(w.abilities);
-    this.hud.syncStatus(w);
     this.hud.updateAlerts(dt);
     if (w.wall.sealed) this.hud.setGate(true, w.wall.hp / w.wall.maxHp);
     if (w.boss && !w.boss.dead) this.hud.setBoss(true, w.boss.hpFrac);
@@ -836,7 +840,16 @@ export class Game {
     for (const e of w.effects) e.draw(ctx, w);
 
     this.drawAutoLock(ctx);
-    w.shooter.draw(ctx, w);
+    // The turret dissolves as the ending text comes up. It used to sit under
+    // the last line of the closing stamp, which made the stamp unreadable —
+    // and the session being over is a better reason for it to be gone than any
+    // amount of moving text around.
+    if (this.endFade > 0.002) {
+      ctx.save();
+      ctx.globalAlpha = this.endFade;
+      w.shooter.draw(ctx, w);
+      ctx.restore();
+    }
     drawProjectiles(ctx, w);
     drawFx(ctx);
     this.drawTouchAid(ctx);

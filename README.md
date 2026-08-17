@@ -107,9 +107,10 @@ attackers, worse corruption.
    you. It takes things from you instead: your sight, your aim, your rate of
    fire. Shooting pushes it back; stop shooting and it keeps walking. See
    *The fight* below — it is not a health bar.
-4. **END** — ending text, then the frame freezes mid-corruption and
-   **RESET SIMULATION** appears. Reset is a clean session: the toggle rack
-   clears back to standard rounds and no assists.
+4. **END** — ending text on its own plate, with the turret dissolving
+   underneath it, then the frame freezes mid-corruption and **RESET
+   SIMULATION** appears. Reset is a clean session: the toggle rack clears back
+   to standard rounds and no assists.
 
 A typical run is about fifteen minutes.
 
@@ -159,7 +160,11 @@ back out of that band again.
 - **ECHO** stands a copy of *your* turret across the field and shoots back with
   it. Its rounds cannot hurt you — nothing can — but they corrupt the feed and
   throw your barrel off aim when they land. They travel slowly and **can be
-  shot down**, which makes your own rounds the counter to your own turret.
+  shot down**, which makes your own rounds the counter to your own turret. The
+  copy itself is **destructible**: 460 hit points, a ring around it that empties
+  as you break it, and about eighteen bolts to finish. Killing it takes whatever
+  it had in the air with it. Blasts reach it too, so abilities are not the one
+  thing on the field that cannot touch it.
 - **TITHE** reaches back and takes some of what you reclaimed. It only does
   this once you are meaningfully ahead, and never once the ledger is spent.
 
@@ -167,6 +172,17 @@ back out of that band again.
 prefers one that is actually *ready*, because removing something already on
 cooldown would cost you nothing. The button goes dark and struck through. It
 still cannot damage you; it can only leave you with fewer options.
+
+**Nothing in the fight is captioned.** There used to be a row of sticky status
+pills naming every effect, plus a banner for each power as it fired; between
+them they covered the boss completely. Both are gone, and so is the row they
+lived in. Every state is legible from the screen instead: the tally shell thins,
+the background turns over on each aspect, a withheld button goes dark, the
+clone wears its own health ring, and the two effects that would otherwise read
+as a broken control get a mark on the gun rather than a caption over the boss —
+a cross across the muzzle for a throttled feed, and a pair of arrows facing
+inward for a mirrored axis. The only words in the whole fight are the four
+arrival captions, which are over before it starts.
 
 At zero the chip reads **SPENT** and it stops rationing entirely: it walks 2.4×
 faster and casts twice as often, and nothing absorbs anything any more.
