@@ -44,7 +44,8 @@ tap-rate limit — tap as fast as your thumb allows, or hold and drag to sustain
 fire. Both controls work at once, so you can drive the lever with one thumb
 and tap with the other.
 
-**Five toggles** sit in a rack just above the ability bar, all off by default:
+**Seven toggles** sit in a rack just above the ability bar, all off by default —
+assists on the top row, loadout on the bottom:
 
 - **AUTO FIRE** keeps shooting wherever the barrel happens to point. With no
   hand on the lever the barrel rests straight up, so this alone is a fountain.
@@ -65,9 +66,19 @@ and tap with the other.
 - **SHOT** loads five pellets a shot in a tight cone at a slower cadence. The
   pellets expire well short of the wall, so it is devastating up close and
   useless at range.
+- **ARC** is the weakest round in the rack on impact and the strongest through
+  a crowd: the hit jumps to the nearest thing it has not touched yet and on
+  again, up to four links, each a little weaker than the last. It works at any
+  range, which is the one thing neither HE nor SHOT does. Poor against anything
+  standing on its own.
+- **BARB** does almost nothing when it lands — it sinks in and starts biting,
+  20 damage every 0.28 s for four seconds, and a body will hold four of them at
+  once. It has the slowest cadence of anything you can load, so it is wasted on
+  a mote and made for the things that take a while: bulwarks, the gate, ORDINAL
+  itself. The spines stick visibly out of whatever is wearing them.
 
-HE and SHOT are exclusive: choosing one clears the other, and tapping the lit
-one returns you to standard rounds.
+The four loadouts are exclusive: choosing one clears whichever was lit, and
+tapping the lit one returns you to standard rounds.
 
 Your hands always win: while you are holding the lever or dragging, the
 assists stop steering. Auto fire runs a shade slower than driving it yourself,
@@ -192,7 +203,7 @@ violet and crimson as it moves through its three aspects.
 
 ### The objects
 
-Nine kinds, each with its own mass, speed, restitution and way of dying.
+Twelve kinds, each with its own mass, speed, restitution and way of dying.
 They unlock progressively as the count climbs.
 
 - **MOTE** — small, light, gets punted across the arena by a single bolt.
@@ -204,6 +215,18 @@ They unlock progressively as the count climbs.
 - **WARDEN** — three orbiting plates that eat bolts. Strip them first.
 - **PRISM** — reflects glancing shots. Hit it square, or bank the ricochet
   into something else.
+- **HERALD** — a beacon. It hardens the nearest few hostiles around it, and
+  shows you it is doing so: a thread out to each one and a shell on each of
+  them. Covered objects take 62% less. Kill the beacon, not the escort — the
+  cover lapses a frame after it dies.
+- **GLUT** — eats the mess. Every fragment it touches makes it bigger, heavier
+  and tougher, one visible seam per mouthful, from 16 units up to 52 and from
+  90 hit points up to 350. A littered field is its food supply, so it is the
+  only object whose threat you control.
+- **TOW** — a head dragging a heavy mass on a cable. Both halves are real
+  bodies under a distance constraint, so the pair swings across the field and
+  shoves whatever it catches, and both count — a TOW is **two** of the five
+  hundred. Cut either end and the cable goes slack.
 - **DRIFT** — harmless. No goal, no destination, no threat: it wanders on a
   slow random walk, drifts back out through the gate as often as in, never
   breaches the turret, never triggers a mine, is never auto-targeted and does
@@ -226,8 +249,9 @@ pace of the run.
 ### The physics
 
 Impulse-based circle dynamics: restitution, tangential friction (which is why
-things spin when they scrape), positional correction, and a uniform-grid
-broadphase. Mass is `density × area`, so heavy objects genuinely shrug off
+things spin when they scrape), positional correction, a uniform-grid
+broadphase, and distance constraints for TOW cables, solved after the contact
+pass so a towed pair cannot be pulled apart by whatever it just shoved. Mass is `density × area`, so heavy objects genuinely shrug off
 what light ones can't.
 
 **Collision damage is live.** Impacts above a threshold hurt *both* bodies in

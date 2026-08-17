@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '15';
+export const BUILD = '16';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -69,6 +69,32 @@ export const CFG = {
       speed: [1120, 1420],
       damage: 12,
       life: 0.5,
+    },
+    // Jumps from whatever it hits to the next thing near it, and on again.
+    // Poor against anything on its own; devastating through a cluster, at any
+    // range, which is the one thing neither HE nor SHOT does.
+    arc: {
+      label: 'ARC',
+      rate: 1.35,
+      speed: 1180,
+      damage: 11, // the first hit is the weakest part of it
+      jumps: 4,
+      jumpRange: 210,
+      jumpDamage: 25,
+      falloff: 0.86, // each link a little weaker than the last
+    },
+    // Sinks in and keeps working. Nothing happens on impact, so it is wasted
+    // on a mote — it is for the things that take a while: bulwarks, the gate,
+    // ORDINAL itself.
+    barb: {
+      label: 'BARB',
+      rate: 2.4, // the slowest thing in the rack
+      speed: 900,
+      damage: 6,
+      tick: 0.28, // seconds between bites
+      tickDamage: 20,
+      duration: 4.2,
+      maxPer: 4, // barbs one body will hold
     },
   },
 
@@ -343,6 +369,88 @@ export const ENEMY_TYPES = [
     glow: '#4f6f92',
     weight: 0, // never chosen by the ordinary spawn roll
     debris: 2,
+  },
+  {
+    // Hardens everything near it while it lives, and shows you exactly what it
+    // is doing: threads out to whatever it is covering, and a shell on each of
+    // them. Shoot the beacon, not the escort.
+    id: 'herald',
+    unlock: 70,
+    name: 'HERALD',
+    shape: 'herald',
+    r: 19,
+    hp: 76,
+    density: 0.8,
+    speed: 44,
+    accel: 150,
+    restitution: 0.62,
+    wobble: 1.2,
+    color: '#7cffb2',
+    glow: '#22d37a',
+    weight: 9,
+    debris: 4,
+    ward: { radius: 240, reduction: 0.62, max: 5 },
+  },
+  {
+    // Eats the mess. Every fragment it touches makes it bigger, heavier and
+    // harder, so a littered field is its food supply — kill it early or clear
+    // the floor. It is the only object whose threat you control.
+    id: 'glut',
+    unlock: 175,
+    name: 'GLUT',
+    shape: 'glut',
+    r: 16,
+    hp: 90,
+    density: 1.1,
+    speed: 30,
+    accel: 105,
+    restitution: 0.44,
+    wobble: 1.6,
+    color: '#ffd166',
+    glow: '#e07a00',
+    weight: 9,
+    debris: 6,
+    eat: { reach: 26, growth: 3.1, hpPer: 26, maxR: 52 },
+  },
+  {
+    // A head towing a heavy mass on a cable. The pair swings across the field
+    // and shoves everything it catches; both halves are real bodies and both
+    // count, so a TOW is two of the five hundred.
+    id: 'tow',
+    unlock: 210,
+    name: 'TOW',
+    shape: 'tow',
+    r: 18,
+    hp: 104,
+    density: 0.8,
+    speed: 52,
+    accel: 175,
+    restitution: 0.6,
+    wobble: 1.1,
+    color: '#9fb3c8',
+    glow: '#59e0ff',
+    weight: 8,
+    debris: 5,
+    tows: { type: 'towMass', length: 132 },
+  },
+  {
+    // The mass on the end of a TOW's cable. Never rolled for on its own.
+    id: 'towMass',
+    unlock: 0,
+    name: 'MASS',
+    shape: 'mass',
+    r: 27,
+    hp: 150,
+    density: 2.4,
+    speed: 26,
+    accel: 60,
+    restitution: 0.36,
+    wobble: 0.5,
+    armor: 0.2,
+    color: '#c8d6e5',
+    glow: '#7f9bb5',
+    weight: 0,
+    debris: 8,
   },
   {
     id: 'prism',

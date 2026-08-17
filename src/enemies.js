@@ -45,6 +45,10 @@ export class Enemy {
 
     this.harmless = !!type.harmless;
     if (this.harmless) this.counts = false;
+    this.ward = 0; // damage reduction granted by a HERALD
+    this.wardT = 0; // lapses unless refreshed
+    this.barbs = null; // BARB rounds currently sunk into it
+    this.tether = null; // the other half of a TOW, if any
     // Every object picks its own way across the field.
     this.route = opts.route || weightedPick(ROUTES);
     this.routeSide = Math.random() < 0.5 ? -1 : 1;
@@ -190,6 +194,10 @@ export class Enemy {
   update(world, dt) {
     if (this.spawnIn > 0) this.spawnIn = Math.max(0, this.spawnIn - dt * 2.2);
     this.flash = Math.max(0, this.flash - dt * 4.5);
+    if (this.wardT > 0) {
+      this.wardT -= dt;
+      if (this.wardT <= 0) this.ward = 0;
+    }
 
     if (this.shards) {
       const spin = world.stasis > 0 ? 0.12 : 1;
@@ -203,6 +211,10 @@ export class Enemy {
         this.dissolved = true;
       }
     }
+
+    if (this.type.ward) this.wardNearby(world, dt);
+    if (this.type.eat) this.feed(world);
+    this.updateBarbs(world, dt);
 
     if (this.staged) {
       // A wedged object above the wall would stall the run forever, since the
@@ -225,6 +237,96 @@ export class Enemy {
         this.dissolved = true;
       }
     }
+  }
+
+  // ------------------------------------------------------------ behaviours
+
+  /**
+   * HERALD. Covers the nearest few hostiles: while covered they take a
+   * fraction of incoming damage, and both the thread and the shell are drawn,
+   * so the beacon reads as the reason nothing else is dying.
+   */
+  wardNearby(world, dt) {
+    const cfg = this.type.ward;
+    this.warded = this.warded || [];
+    this.warded.length = 0;
+    if (this.staged || this.spawnIn > 0) return;
+    const r2 = cfg.radius * cfg.radius;
+    for (const e of world.enemies) {
+      if (e === this || e.dead || e.harmless || e.staged) continue;
+      const dx = e.x - this.x;
+      const dy = e.y - this.y;
+      if (dx * dx + dy * dy > r2) continue;
+      this.warded.push(e);
+      // Refreshed every frame it is in range, so it lapses the moment the
+      // beacon dies rather than needing a teardown pass.
+      e.ward = Math.max(e.ward || 0, cfg.reduction);
+      e.wardT = 0.12;
+      if (this.warded.length >= cfg.max) break;
+    }
+    this.wardSpin = (this.wardSpin || 0) + dt * 1.4;
+  }
+
+  /**
+   * GLUT. Eats fragments off the floor and gets bigger for it. Radius, mass
+   * and hit points all move together, so a fed one really is a different
+   * object by the time it arrives.
+   */
+  feed(world) {
+    const cfg = this.type.eat;
+    if (this.staged || this.spawnIn > 0) return;
+    if (this.r >= cfg.maxR) return;
+    for (const d of world.debris) {
+      if (d.dead) continue;
+      const reach = this.r + d.r + cfg.reach;
+      const dx = d.x - this.x;
+      const dy = d.y - this.y;
+      if (dx * dx + dy * dy > reach * reach) continue;
+      d.dead = true;
+      d.dissolved = true; // eaten, not destroyed: it must not score
+      this.r = Math.min(cfg.maxR, this.r + cfg.growth);
+      this.mass = massOf(this.type, this.r);
+      this.invMass = 1 / this.mass;
+      this.maxHp += cfg.hpPer;
+      this.hp += cfg.hpPer;
+      this.fed = (this.fed || 0) + 1;
+      for (let i = 0; i < 4; i++) {
+        spark(d.x, d.y, (this.x - d.x) * 2.2, (this.y - d.y) * 2.2, this.type.glow, 0.3, 2);
+      }
+      audio.pop(0.5);
+      if (this.r >= cfg.maxR) break;
+    }
+  }
+
+  /** BARB rounds sunk into this body, biting on their own clock. */
+  updateBarbs(world, dt) {
+    if (!this.barbs || !this.barbs.length) return;
+    const cfg = CFG.rounds.barb;
+    for (let i = this.barbs.length - 1; i >= 0; i--) {
+      const b = this.barbs[i];
+      b.life -= dt;
+      b.next -= dt;
+      if (b.next <= 0) {
+        b.next = cfg.tick;
+        spark(this.x + Math.cos(b.a) * this.r, this.y + Math.sin(b.a) * this.r,
+          spread(70), spread(70), '#ff9f1c', 0.22, 1.8);
+        this.applyDamage(world, cfg.tickDamage);
+        if (this.dead) return;
+      }
+      if (b.life <= 0) {
+        this.barbs[i] = this.barbs[this.barbs.length - 1];
+        this.barbs.pop();
+      }
+    }
+  }
+
+  /** @returns true if it took the barb. */
+  addBarb(angle) {
+    const cfg = CFG.rounds.barb;
+    this.barbs = this.barbs || [];
+    if (this.barbs.length >= cfg.maxPer) return false;
+    this.barbs.push({ a: angle, life: cfg.duration, next: cfg.tick });
+    return true;
   }
 
   // ---------------------------------------------------------------- damage
@@ -264,7 +366,11 @@ export class Enemy {
 
   applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0) {
     if (this.dead) return;
-    const real = Math.max(1, dmg * (1 - this.armor));
+    // A HERALD's cover, if one is refreshing it. It lapses a frame after the
+    // beacon stops covering, which is what makes killing the beacon feel like
+    // the answer rather than a statistic.
+    const ward = this.wardT > 0 ? (this.ward || 0) : 0;
+    const real = Math.max(1, dmg * (1 - this.armor) * (1 - ward));
     this.hp -= real;
     this.flash = Math.min(1, this.flash + 0.5 + real / 260);
     if (impulse) {
@@ -365,6 +471,10 @@ export class Enemy {
       case 'plated': drawPlated(ctx, this.r, hpFrac); break;
       case 'warden': drawWardenCore(ctx, this.r); break;
       case 'prism': drawPrism(ctx, this.r); break;
+      case 'herald': drawHerald(ctx, this.r, this.wardSpin || 0); break;
+      case 'glut': drawGlut(ctx, this.r, this.fed || 0, this.phase, world.time); break;
+      case 'tow': drawTowHead(ctx, this.r); break;
+      case 'mass': drawTowMass(ctx, this.r, hpFrac); break;
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
       default: drawChip(ctx, this.r, this.phase);
     }
@@ -399,6 +509,72 @@ export class Enemy {
         // the plate is a bar tangent to its orbit
         ctx.moveTo(sx + sa * 9, sy - ca * 9);
         ctx.lineTo(sx - sa * 9, sy + ca * 9);
+      }
+      ctx.stroke();
+    }
+
+    // The cable to the other half of a TOW pair, and the shell/threads of a
+    // HERALD's cover. Both are drawn in world space so they read as links
+    // between bodies rather than decoration on one.
+    if (this.tether && !this.tether.other.dead) {
+      const o = this.tether.other;
+      ctx.strokeStyle = rgba('#8fa9c4', 0.75);
+      ctx.lineWidth = HAIRLINE * 2;
+      ctx.beginPath();
+      ctx.moveTo(this.x, this.y);
+      ctx.lineTo(o.x, o.y);
+      ctx.stroke();
+      // links, so the cable does not read as a laser
+      const dx = o.x - this.x;
+      const dy = o.y - this.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const n = Math.min(9, Math.max(3, Math.round(d / 22)));
+      ctx.strokeStyle = rgba(t.glow, 0.5);
+      ctx.lineWidth = HAIRLINE * 3.2;
+      ctx.beginPath();
+      for (let i = 1; i < n; i++) {
+        const k = i / n;
+        const px = this.x + dx * k;
+        const py = this.y + dy * k;
+        ctx.moveTo(px - (dy / d) * 3, py + (dx / d) * 3);
+        ctx.lineTo(px + (dy / d) * 3, py - (dx / d) * 3);
+      }
+      ctx.stroke();
+    }
+
+    if (this.warded && this.warded.length) {
+      ctx.strokeStyle = rgba(t.glow, 0.34);
+      ctx.lineWidth = HAIRLINE * 1.4;
+      ctx.beginPath();
+      for (const e of this.warded) {
+        if (e.dead) continue;
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(e.x, e.y);
+      }
+      ctx.stroke();
+    }
+
+    // Covered by a HERALD: a shell, so the reason it is shrugging off hits is
+    // visible on the thing shrugging them off.
+    if (this.wardT > 0 && this.ward > 0) {
+      const pulse = 0.45 + 0.3 * Math.sin(world.time * 5 + this.phase);
+      ctx.strokeStyle = rgba('#7cffb2', pulse);
+      ctx.lineWidth = HAIRLINE * 2;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r + 7, 0, TAU);
+      ctx.stroke();
+    }
+
+    // BARB rounds sunk into it, and the bite they are about to take
+    if (this.barbs && this.barbs.length) {
+      ctx.strokeStyle = rgba('#ff9f1c', 0.9);
+      ctx.lineWidth = HAIRLINE * 2.2;
+      ctx.beginPath();
+      for (const b of this.barbs) {
+        const ca = Math.cos(b.a);
+        const sa = Math.sin(b.a);
+        ctx.moveTo(this.x + ca * (this.r - 3), this.y + sa * (this.r - 3));
+        ctx.lineTo(this.x + ca * (this.r + 9), this.y + sa * (this.r + 9));
       }
       ctx.stroke();
     }
@@ -558,6 +734,92 @@ function drawWardenCore(ctx, r) {
   ctx.fill();
 }
 
+/** HERALD: an open ring with a spinning inner cross — visibly a transmitter. */
+function drawHerald(ctx, r, spin) {
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0.5, Math.PI - 0.5);
+  ctx.arc(0, 0, r, Math.PI + 0.5, TAU - 0.5);
+  ctx.stroke();
+  ctx.save();
+  ctx.rotate(spin);
+  ctx.beginPath();
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * TAU;
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a) * r * 0.66, Math.sin(a) * r * 0.66);
+  }
+  ctx.stroke();
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.24, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+}
+
+/** GLUT: a lumpy sac whose seams multiply as it eats. */
+function drawGlut(ctx, r, fed, phase, t) {
+  const lobes = 7;
+  ctx.beginPath();
+  for (let i = 0; i <= lobes; i++) {
+    const a = (i / lobes) * TAU;
+    const bulge = 1 + Math.sin(a * 3 + phase + t * 0.8) * 0.1;
+    const x = Math.cos(a) * r * bulge;
+    const y = Math.sin(a) * r * bulge;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // one seam per mouthful, so how fed it is reads at a glance
+  const seams = Math.min(9, fed);
+  if (!seams) return;
+  ctx.beginPath();
+  for (let i = 0; i < seams; i++) {
+    const a = (i / 9) * TAU + phase;
+    ctx.moveTo(Math.cos(a) * r * 0.3, Math.sin(a) * r * 0.3);
+    ctx.lineTo(Math.cos(a) * r * 0.86, Math.sin(a) * r * 0.86);
+  }
+  ctx.stroke();
+}
+
+/** TOW head: a hook. */
+function drawTowHead(ctx, r) {
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.55, 0, TAU);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, r, -2.2, 1.1);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(Math.cos(1.1) * r, Math.sin(1.1) * r);
+  ctx.lineTo(Math.cos(1.1) * r * 1.5, Math.sin(1.1) * r * 0.4);
+  ctx.stroke();
+}
+
+/** The mass it drags: a banded weight. */
+function drawTowMass(ctx, r, hpFrac) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * TAU + Math.PI / 6;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  for (let i = -1; i <= 1; i++) {
+    const y = i * r * 0.42;
+    const half = Math.sqrt(Math.max(0, r * r - y * y)) * 0.82;
+    ctx.moveTo(-half, y);
+    ctx.lineTo(half, y);
+  }
+  ctx.globalAlpha = 0.35 + hpFrac * 0.4;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
 function drawPrism(ctx, r) {
   ctx.beginPath();
   for (let i = 0; i < 6; i++) {
@@ -635,7 +897,19 @@ function driftCount(world) {
 
 /** Types that have unlocked at the current kill count. */
 function availableTypes(kills) {
-  return ENEMY_TYPES.filter((t) => kills >= (t.unlock || 0));
+  // weight 0 means "never rolled for": drift and a TOW's mass are both placed
+  // by dedicated spawners, and weightedPick's fallback could otherwise return
+  // one of them.
+  return ENEMY_TYPES.filter((t) => t.weight > 0 && kills >= (t.unlock || 0));
+}
+
+/**
+ * Put one rolled type on the field. A TOW is the only type that is two bodies,
+ * so it is the only one that needs dispatching.
+ */
+function release(world, type, x, y, opts) {
+  if (type.tows) return spawnTow(world, x, y, opts)[0];
+  return spawnOne(world, type, x, y, opts);
 }
 
 /**
@@ -650,6 +924,61 @@ export function spawnOne(world, type, x, y, opts = {}) {
   return e;
 }
 
+/**
+ * A TOW and the mass it drags. Two real bodies joined by a constraint, so the
+ * pair swings and shoves — and two of the five hundred, the same way a
+ * splitter's children are.
+ */
+export function spawnTow(world, x, y, opts = {}) {
+  const head = TYPE_BY_ID.tow;
+  const massType = TYPE_BY_ID[head.tows.type];
+  const len = head.tows.length;
+  const a = spawnOne(world, head, x, y, opts);
+  const b = spawnOne(world, massType, x + spread(30), y - len, { ...opts, route: a.route });
+  a.tether = { other: b, len };
+  b.tether = { other: a, len };
+  return [a, b];
+}
+
+/** Distance constraints, resolved after the contact solver. */
+export function solveTethers(world) {
+  for (const e of world.enemies) {
+    const t = e.tether;
+    if (!t) continue;
+    const o = t.other;
+    // The cable goes slack the moment either end dies, and clearing both sides
+    // stops the survivor dragging a corpse around the field.
+    if (o.dead || e.dead) { e.tether = null; if (o) o.tether = null; continue; }
+    if (e.x > o.x || (e.x === o.x && e.y > o.y)) continue; // solve each pair once
+
+    let dx = o.x - e.x;
+    let dy = o.y - e.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1e-4) continue;
+    const err = d - t.len;
+    if (err <= 0) continue; // a cable pulls, it does not push
+    dx /= d;
+    dy /= d;
+    const inv = e.invMass + o.invMass;
+    if (inv <= 0) continue;
+    // Positional, weighted by inverse mass, plus a matching velocity
+    // correction so the pair swings instead of buzzing.
+    const push = err * 0.42;
+    e.x += dx * push * (e.invMass / inv);
+    e.y += dy * push * (e.invMass / inv);
+    o.x -= dx * push * (o.invMass / inv);
+    o.y -= dy * push * (o.invMass / inv);
+    const rel = (o.vx - e.vx) * dx + (o.vy - e.vy) * dy;
+    if (rel > 0) {
+      const j = rel / inv;
+      e.vx += dx * j * e.invMass;
+      e.vy += dy * j * e.invMass;
+      o.vx -= dx * j * o.invMass;
+      o.vy -= dy * j * o.invMass;
+    }
+  }
+}
+
 /** Hostiles still owed to the run. */
 export function releasesLeft(world) {
   return Math.max(0, CFG.killGoal - world.released);
@@ -660,7 +989,10 @@ export function spawnFormation(world, kinds, count) {
   const shape = pick(FORMATIONS);
   const half = world.wall.gateHalf;
   const cx = clamp(world.wall.gateCx + spread(half * 0.5), half, world.width - half);
-  const type = weightedPick(kinds);
+  // A formation is one type in a shape; a shape made of towed pairs is not a
+  // formation, it is a traffic jam, and it would cost double the allotment.
+  const single = kinds.filter((k) => !k.tows);
+  const type = weightedPick(single.length ? single : kinds);
   const gap = type.r * 2.5 + 8;
   const made = [];
 
@@ -766,8 +1098,11 @@ export class Director {
     if (room >= 4 && quota >= 4 && Math.random() < CFG.formationChance) {
       spawnFormation(world, kinds, randInt(3, Math.min(6, room, quota)));
     } else {
-      const t = weightedPick(kinds);
-      spawnOne(world, t, rand(t.r + 12, world.width - t.r - 12), -50 - rand(0, 40));
+      // A TOW costs two of the allotment, so it is off the table when only one
+      // release is left.
+      const affordable = quota >= 2 ? kinds : kinds.filter((k) => !k.tows);
+      const t = weightedPick(affordable);
+      release(world, t, rand(t.r + 12, world.width - t.r - 12), -50 - rand(0, 40));
     }
   }
 }

@@ -23,6 +23,8 @@ class Projectile {
     this.trail = opts.trail ?? 0.024;
     // Called at the point of impact (or on timeout) for rounds that go off.
     this.burst = opts.burst || null;
+    this.chain = !!opts.chain; // ARC: jumps on from whatever it hits
+    this.barb = !!opts.barb; // BARB: sinks in and keeps biting
     this.dead = false;
     this.ignore = null; // body we just reflected off
     this.ignoreT = 0;
@@ -118,6 +120,91 @@ export function updateProjectiles(world, dt) {
       list.pop();
     }
   }
+}
+
+/**
+ * ARC. Jumps from what it hit to the nearest thing it has not touched yet, and
+ * on again, drawing the link each time. Each link is a little weaker than the
+ * last, so a long chain is worth setting up but never free.
+ */
+function chainFrom(world, first, hx, hy) {
+  const g = CFG.rounds.arc;
+  const seen = new Set();
+  if (first) seen.add(first);
+  let x = hx;
+  let y = hy;
+  let damage = g.jumpDamage;
+  const r2 = g.jumpRange * g.jumpRange;
+
+  for (let jump = 0; jump < g.jumps; jump++) {
+    let best = null;
+    let bestD = r2;
+    const scan = (list) => {
+      for (const e of list) {
+        if (e.dead || seen.has(e)) continue;
+        const d2 = (e.x - x) ** 2 + (e.y - y) ** 2;
+        if (d2 < bestD) { bestD = d2; best = e; }
+      }
+    };
+    scan(world.enemies);
+    scan(world.debris);
+    if (!best) break;
+
+    seen.add(best);
+    world.effects.push(new Arc(x, y, best.x, best.y));
+    for (let i = 0; i < 3; i++) {
+      spark(best.x, best.y, spread(180), spread(180), '#9be7ff', 0.2, 2);
+    }
+    best.applyDamage(world, damage);
+    audio.reflect();
+    x = best.x;
+    y = best.y;
+    damage *= g.falloff;
+  }
+}
+
+/** A drawn link in an ARC chain. Pure decoration; the damage already landed. */
+class Arc {
+  constructor(x0, y0, x1, y1) {
+    this.x0 = x0; this.y0 = y0; this.x1 = x1; this.y1 = y1;
+    this.life = 0.22;
+    this.max = 0.22;
+    this.dead = false;
+    // one fixed kink so the bolt reads as electrical, not as a laser
+    this.kink = rand(-0.3, 0.3);
+  }
+
+  update(_world, dt) {
+    this.life -= dt;
+    if (this.life <= 0) this.dead = true;
+  }
+
+  draw(ctx) {
+    const t = Math.max(0, this.life / this.max);
+    const mx = (this.x0 + this.x1) / 2;
+    const my = (this.y0 + this.y1) / 2;
+    const dx = this.x1 - this.x0;
+    const dy = this.y1 - this.y0;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    for (const [w, c, a] of [[7, '#59e0ff', 0.3], [2.2, '#ffffff', 0.95]]) {
+      ctx.strokeStyle = rgba(c, a * t);
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(this.x0, this.y0);
+      ctx.quadraticCurveTo(mx - dy * this.kink, my + dx * this.kink, this.x1, this.y1);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+    ctx.globalCompositeOperation = 'source-over';
+  }
+}
+
+/** BARB. Sinks in at the angle it arrived and starts biting. */
+function sinkBarb(e, hx, hy) {
+  if (!e.addBarb) return;
+  const a = Math.atan2(hy - e.y, hx - e.x);
+  if (e.addBarb(a)) audio.gateHit();
 }
 
 function ricochetFx(p) {
@@ -238,6 +325,8 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         for (let i = 0; i < 4; i++) spark(hx, hy, spread(220), spread(220), '#e0aaff', 0.22, 2.2);
         return;
       }
+      if (p.chain) chainFrom(world, e, hx, hy);
+      if (p.barb) sinkBarb(e, hx, hy);
       audio.hit();
       endProjectile(world, p, hx, hy, true);
       return;
@@ -270,6 +359,9 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         hitBurst(hx, hy, -dirx, -diry, boss.hitColor);
         audio.hit();
       }
+      // ORDINAL cannot be barbed — nothing sinks into it — but an ARC round
+      // still jumps off it into whatever it has around it.
+      if (p.chain) chainFrom(world, null, hx, hy);
       endProjectile(world, p, hx, hy, true);
       return;
     }

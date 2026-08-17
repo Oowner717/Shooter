@@ -240,6 +240,14 @@ html, body {
   to { opacity: 1; transform: none; filter: none; }
 }
 
+/* The moment it is taken: a red jolt so the greying-out is not silent. */
+.ab.taken { animation: abTaken 0.55s ease-out; }
+@keyframes abTaken {
+  0% { transform: none; box-shadow: 0 0 0 0 rgba(255, 77, 109, 0.9); }
+  25% { transform: translateY(3px) scale(0.94); box-shadow: 0 0 0 8px rgba(255, 77, 109, 0.5); }
+  100% { transform: none; box-shadow: 0 0 0 16px rgba(255, 77, 109, 0); }
+}
+
 /* A button ORDINAL has taken away. */
 .ab.locked {
   opacity: 0.32;
@@ -322,11 +330,19 @@ html, body {
   position: absolute;
   left: calc(var(--safe-l) + 8px);
   right: calc(var(--safe-r) + 8px);
-  bottom: calc(var(--safe-b) + var(--bar-h) + 16px);
+  bottom: calc(var(--safe-b) + var(--bar-h) + 14px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  pointer-events: none;
+}
+/* Assists on the top row, loadout on the bottom. Seven chips do not fit on one
+   row at 320px, and letting a single row wrap makes it jump as it fills. */
+.rackRow {
   display: flex;
   justify-content: center;
   gap: 5px;
-  pointer-events: none;
 }
 
 .toggleChip {
@@ -549,7 +565,9 @@ body.ending #abilities,
 body.ending #alerts,
 body.ending #toggleRack,
 body.ending #bossBar,
-body.ending #gateBar {
+body.ending #gateBar,
+body.ending #abilityHint,
+body.ending #bossCaption {
   opacity: 0;
   transition: opacity 1.2s ease;
   pointer-events: none;
@@ -594,16 +612,18 @@ body.booting #toggleRack {
   letter-spacing: 0.06em;
   padding: 16px 16px;
   border-radius: 6px;
-  background: rgba(2, 4, 9, 0.82);
+  /* Opaque enough that a backdrop blur would be invisible, and a blur here
+     costs a full-screen readback every frame while the field is still live. */
+  background: rgba(2, 4, 9, 0.93);
   border: 1px solid rgba(120, 190, 255, 0.12);
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
   text-shadow: 0 0 18px rgba(0, 0, 0, 0.95);
 }
 #endText div { opacity: 0; animation: lineIn 0.9s ease-out forwards; }
 #endText div + div { margin-top: 6px; }
 /* The closing stamp. Loose tracking wrapped it onto a second row, which is
-   what collided with the turret; it now fits on one line at every width. */
+   what collided with the turret. It fits one row at 375 and up; on a 320
+   screen it still takes two, which is fine now there is a plate under it and
+   nothing behind it. */
 #endText div.term {
   color: var(--accent-2);
   letter-spacing: 0.08em;

@@ -7,6 +7,9 @@ import { clamp } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 
+/** Chips that select a loadout rather than an assist. Mutually exclusive. */
+export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'barb'];
+
 export class Hud {
   constructor(game) {
     this.game = game;
@@ -41,6 +44,8 @@ export class Hud {
         autoMine: $('tgAutoMine'),
         explosive: $('tgExplosive'),
         shotgun: $('tgShotgun'),
+        arc: $('tgArc'),
+        barb: $('tgBarb'),
       },
       dbgBtn: $('dbgBtn'),
     };
@@ -70,7 +75,7 @@ export class Hud {
     this.el.muteBtn.addEventListener('click', () => game.toggleSound());
     this.el.dbgBtn.addEventListener('click', () => this.toggleDebug());
     for (const [key, el] of Object.entries(this.el.toggles)) {
-      const round = key === 'explosive' || key === 'shotgun';
+      const round = ROUND_KEYS.includes(key);
       el.addEventListener('pointerdown', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
@@ -102,6 +107,15 @@ export class Hud {
       this.slots.push({ el: b, fill: b.querySelector('.fill'), ready: null, frac: -1, locked: null });
     });
     this.el.abilities.appendChild(frag);
+  }
+
+  /** ORDINAL taking a button: the same jolt as using one, in the wrong colour. */
+  flashTaken(i) {
+    const s = this.slots[i];
+    if (!s) return;
+    s.el.classList.remove('taken');
+    void s.el.offsetWidth;
+    s.el.classList.add('taken');
   }
 
   flashAbility(i) {
@@ -158,7 +172,9 @@ export class Hud {
   setLedgerMode(on) {
     this.el.counter.classList.toggle('ledger', on);
     if (!on) this.el.counter.classList.remove('spent');
-    this.el.counterLabel.textContent = on ? 'RECLAIMED' : 'OBJECTS';
+    // WITHHELD, not RECLAIMED: the number is what ORDINAL still has of yours,
+    // and it reads 500/500 at the moment nothing has come back yet.
+    this.el.counterLabel.textContent = on ? 'WITHHELD' : 'OBJECTS';
     // The memo exists to keep the DOM quiet; a mode change has to break it in
     // both directions or the chip keeps the previous run's number.
     this.lastKills = -1;

@@ -166,6 +166,32 @@ export class Shooter {
         trail: 0.03,
         burst: heBurst,
       });
+    } else if (world.round === 'arc') {
+      const g = R.arc;
+      fire(world, this.muzzleX, this.muzzleY, a, {
+        speed: g.speed * slow,
+        r: 4.6,
+        damage: g.damage,
+        impulse: 40,
+        bounces: 0,
+        color: '#9be7ff',
+        core: '#ffffff',
+        trail: 0.038,
+        chain: true,
+      });
+    } else if (world.round === 'barb') {
+      const g = R.barb;
+      fire(world, this.muzzleX, this.muzzleY, a, {
+        speed: g.speed * slow,
+        r: 4.4,
+        damage: g.damage,
+        impulse: 26,
+        bounces: 0,
+        color: '#ffb35c',
+        core: '#fff0d8',
+        trail: 0.05,
+        barb: true,
+      });
     } else {
       fire(world, this.muzzleX, this.muzzleY, a, { speed: CFG.bolt.speed * slow });
     }

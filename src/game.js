@@ -7,7 +7,7 @@ import { fx, updateFx, drawFx, drawFlash, spark, ring, shake } from './fx.js';
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast } from './enemies.js';
+import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast, solveTethers } from './enemies.js';
 import { Shooter } from './shooter.js';
 import { Wall } from './gate.js';
 import { Boss } from './boss.js';
@@ -15,7 +15,7 @@ import { Abilities } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator, ENDING } from './narrative.js';
-import { Hud } from './hud.js';
+import { Hud, ROUND_KEYS } from './hud.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 const HUD_TOP_MIN = 20; // matches --hud-t: phones without a notch still have a status bar
@@ -120,6 +120,7 @@ export class Game {
 
       alert: (text, kind, dur) => self.hud.alert(text, kind, dur),
       bossCaption: (text, hold) => self.hud.bossCaption(text, hold),
+      abilityTaken: (i) => self.hud.flashTaken(i),
       onGateSealed: () => self.onGateSealed(),
       onGateBroken: () => self.onGateBroken(),
       onBossDead: () => self.onBossDead(),
@@ -155,7 +156,7 @@ export class Game {
     w.autoFire = false;
     w.autoMine = false;
     w.round = 'standard';
-    for (const key of ['autoAim', 'autoFire', 'autoMine', 'explosive', 'shotgun']) {
+    for (const key of ['autoAim', 'autoFire', 'autoMine', ...ROUND_KEYS]) {
       this.hud.setToggle(key, false);
     }
 
@@ -341,7 +342,7 @@ export class Game {
     const res = w.abilities.trigger(w, i);
     if (!res) return;
     this.hud.flashAbility(i);
-    if (res.first) this.hud.showHint(res.slot.def.hint);
+    if (res.first && this.hintsAllowed) this.hud.showHint(res.slot.def.hint);
   }
 
   static HINTS = {
@@ -350,6 +351,8 @@ export class Game {
     autoMine: 'AUTO MINE — lobs inert mines that arm where they land.',
     explosive: 'HE ROUNDS — every shot detonates. Half the rate of fire.',
     shotgun: 'SHOT ROUNDS — five pellets a shot, close range, slower cadence.',
+    arc: 'ARC ROUNDS — the hit jumps on through anything nearby.',
+    barb: 'BARB ROUNDS — sinks in and keeps biting. Slowest cadence.',
   };
 
   toggleAuto(key) {
@@ -360,12 +363,11 @@ export class Game {
     this.announceToggle(key, w[key]);
   }
 
-  /** Loadouts are exclusive: picking one clears the other. */
+  /** Loadouts are exclusive: picking one clears whichever was lit. */
   toggleRound(kind) {
     const w = this.world;
     w.round = w.round === kind ? 'standard' : kind;
-    this.hud.setToggle('explosive', w.round === 'explosive');
-    this.hud.setToggle('shotgun', w.round === 'shotgun');
+    for (const k of ROUND_KEYS) this.hud.setToggle(k, w.round === k);
     this.announceToggle(kind, w.round === kind);
   }
 
@@ -373,7 +375,17 @@ export class Game {
     audio.chime(on ? 760 : 430);
     if (!on || this.autoHinted[key]) return;
     this.autoHinted[key] = true;
-    this.hud.showHint(Game.HINTS[key]);
+    if (this.hintsAllowed) this.hud.showHint(Game.HINTS[key]);
+  }
+
+  /**
+   * First-use captions are for learning the controls, which happens in the
+   * staging run. Nothing explains itself once ORDINAL is on the field — a hint
+   * lands in the same band as the boss, and it is the interface talking over
+   * the fight.
+   */
+  get hintsAllowed() {
+    return this.world.phase === 'staging' || this.world.phase === 'gate';
   }
 
   /**
@@ -559,6 +571,10 @@ export class Game {
     });
     bodies.pop(); // shooter is not integrated
 
+    // Cables, after the contact solver so a TOW pair cannot be pulled apart by
+    // whatever it just shoved.
+    solveTethers(w);
+
     const boss = w.boss;
     for (const b of bodies) {
       let impact = 0;
@@ -633,7 +649,10 @@ export class Game {
   registerKill() {
     const w = this.world;
     w.kills++;
-    while (w.kills >= w.nextStoryAt && w.narrator.index < 10) {
+    // Story beats belong to the staging run only. ORDINAL's own emissions push
+    // the count well past five hundred, and a sentence in the mid-field band is
+    // exactly the text that has no business being there.
+    while (w.phase === 'staging' && w.kills >= w.nextStoryAt && w.narrator.index < 10) {
       w.nextStoryAt += CFG.storyEvery;
       w.narrator.advance();
       audio.chime(520 + w.narrator.index * 30);
@@ -705,15 +724,21 @@ export class Game {
     w.reclaimed = 0;
     this.hud.setLedgerMode(true);
     this.hud.clearAlerts();
-    // All ten story beats are spent by five hundred kills; anything still
-    // decaying mid-field would sit under the arrival captions.
-    w.narrator.reset();
+    // All ten beats are spent by five hundred kills, but anything still
+    // decaying mid-field would sit under the arrival captions. Clear the line
+    // WITHOUT rewinding the script: reset() also zeroes the index, which
+    // re-armed all ten sentences to replay over the boss as its own emissions
+    // pushed the kill count past 550.
+    w.narrator.clear();
     this.hud.setBoss(true, 1, 'ORDINAL', 'FIRST OF ——');
     this.bossArmed = false;
   }
 
   /** Called once the arrival sequence finishes and the fight proper starts. */
   onBossArrived() {
+    // The last caption is still holding when the fight starts; from here on
+    // there are no words at all.
+    this.hud.bossCaption(null);
     background.setMood('boss');
     background.surge(2);
     audio.setDroneMood(33, 260, 0.09);
@@ -911,6 +936,11 @@ export class Game {
     const e = this.autoLock;
     if (!e || e.dead) return;
     const w = this.world;
+    // Under INVERT the barrel goes to the mirrored bearing, so brackets drawn
+    // on the true target point at somewhere the gun is not aiming — the
+    // reticle would be arguing with the muzzle mark. Drop them while the axis
+    // is flipped and let the barrel be the only claim about where fire goes.
+    if (w.invert > 0) return;
     const converged = clamp(1 - w.shooter.aimError / 0.9, 0, 1);
     const r = (e.r || 40) + 16 + (1 - converged) * 42;
     const a = 0.25 + converged * 0.5;
@@ -961,7 +991,13 @@ export class Game {
       g.fillRect(x / 2 - r / 2, y / 2 - r / 2, r, r);
     };
     hole(w.shooter.x, w.shooter.y, 400);
-    if (w.boss && !w.boss.dead) hole(w.boss.x, w.boss.y, w.boss.r * 4);
+    if (w.boss && !w.boss.dead) {
+      hole(w.boss.x, w.boss.y, w.boss.r * 4);
+      // and its copy — hiding the one thing that has to be shot down turns
+      // VEIL from "sight withdrawn" into "target removed"
+      const e = w.boss.echo;
+      if (e) hole(e.x, e.y, e.r * 3.4);
+    }
 
     ctx.globalAlpha = a;
     ctx.drawImage(this.veilMask, 0, 0, W, H);

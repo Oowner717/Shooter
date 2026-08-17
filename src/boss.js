@@ -426,7 +426,10 @@ export class Boss {
   /** SUBTRACT: one of the six buttons goes dark for a while. */
   subtract(world) {
     const slot = world.abilities.lockRandom(CFG.boss.subtract);
-    if (slot < 0) return;
+    if (slot < 0) return -1;
+    // The button going grey is easy to miss mid-fight, so the taking is shown:
+    // a pull from ORDINAL and a hit on the button that lost.
+    world.abilityTaken(slot);
     ring(this.x, this.y, this.r * 0.5, this.r * 4, 0.5, this.palette.iris, 3);
     audio.reflect();
     return slot;
@@ -552,9 +555,18 @@ export class Boss {
     // separating — an earlier version clamped it back up toward the boss and
     // the copy vanished into the halo.
     const top = wall.y + wall.thickness;
+    // On a narrow field the horizontal offset alone is not enough to clear the
+    // boss's spokes, so the vertical floor is pushed down until the pair are
+    // genuinely separated — the health ring is the only signal it can be
+    // destroyed and it must not sit inside the halo.
+    const ex = clamp(world.width * (right ? 0.85 : 0.15), 92, world.width - 92);
+    const need = this.r * 1.85;
+    const dx2 = (ex - this.x) ** 2;
+    const minDy = Math.sqrt(Math.max(0, need * need - dx2));
     this.echo = {
-      x: clamp(world.width * (right ? 0.85 : 0.15), 92, world.width - 92),
-      y: clamp(this.y + this.r * 1.9, top + 130, top + (world.shooter.y - top) * 0.52),
+      x: ex,
+      y: clamp(this.y + Math.max(this.r * 1.9, minDy),
+        top + 130, top + (world.shooter.y - top) * 0.62),
       aim: Math.PI / 2,
       life: CFG.boss.echo.life,
       hp: CFG.boss.echo.hp,
@@ -698,26 +710,32 @@ export class Boss {
       const hpf = clamp(e.hp / e.maxHp, 0, 1);
 
       // A ring around it that empties as it is shot apart — the only thing
-      // saying "this can be destroyed", and it says it without words.
-      ctx.save();
-      ctx.translate(e.x, e.y);
-      ctx.globalAlpha = fade * k;
-      ctx.strokeStyle = rgba(p.ring, 0.22);
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, e.r * 1.5, 0, TAU);
-      ctx.stroke();
-      ctx.strokeStyle = rgba('#ff4d6d', 0.9);
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, e.r * 1.5, -Math.PI / 2, -Math.PI / 2 + TAU * hpf);
-      ctx.stroke();
-      if (e.flash > 0.01) {
-        ctx.globalCompositeOperation = 'lighter';
-        drawGlow(ctx, '#ffffff', 0, 0, e.r * 2.4, e.flash * 0.8);
-        ctx.globalCompositeOperation = 'source-over';
+      // saying "this can be destroyed", and it says it without words. Drawn ON
+      // the hit radius, not outside it: at 1.5x, bolts visibly crossed the ring
+      // and registered nothing, which taught the opposite of what it means.
+      // It appears only once the copy is solid, because until then shots do
+      // pass straight through.
+      if (k >= 1) {
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        ctx.globalAlpha = fade;
+        ctx.strokeStyle = rgba(p.ring, 0.22);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, e.r, 0, TAU);
+        ctx.stroke();
+        ctx.strokeStyle = rgba('#ff4d6d', 0.9);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, e.r, -Math.PI / 2, -Math.PI / 2 + TAU * hpf);
+        ctx.stroke();
+        if (e.flash > 0.01) {
+          ctx.globalCompositeOperation = 'lighter';
+          drawGlow(ctx, '#ffffff', 0, 0, e.r * 2.2, e.flash * 0.8);
+          ctx.globalCompositeOperation = 'source-over';
+        }
+        ctx.restore();
       }
-      ctx.restore();
 
       ctx.save();
       ctx.translate(e.x, e.y);
@@ -726,8 +744,11 @@ export class Boss {
       ctx.globalAlpha = fade;
 
       ctx.globalCompositeOperation = 'lighter';
-      drawGlow(ctx, p.halo, 0, 0, 70, 0.4);
+      drawGlow(ctx, p.halo, 0, 0, 70, 0.4 * fade);
       ctx.globalCompositeOperation = 'source-over';
+      // drawGlow leaves globalAlpha at 1, so the fade has to be re-applied or
+      // the body stays fully solid while its ring fades out under it
+      ctx.globalAlpha = fade;
 
       // an upside-down turret: same silhouette, wrong colours, wrong way up
       ctx.fillStyle = 'rgba(6,3,12,0.9)';

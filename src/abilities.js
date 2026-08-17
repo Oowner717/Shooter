@@ -198,6 +198,12 @@ function prismBurst(world, x, y) {
     if (world.boss && !world.boss.dead) {
       const c = segClosest(x, y, x1, y1, world.boss.x, world.boss.y);
       if (c.d2 < (world.boss.r + 18) ** 2) world.boss.hurt(world, P.beamDamage * 2);
+      // the copy is a body too — beams used to cut through it for nothing
+      const e = world.boss.echo;
+      if (e && e.born >= 1) {
+        const ec = segClosest(x, y, x1, y1, e.x, e.y);
+        if (ec.d2 < (e.r + 14) ** 2) world.boss.hurtEcho(world, P.beamDamage * 2);
+      }
     }
   }
 
@@ -333,6 +339,11 @@ export const ABILITIES = [
       hitList(world.debris);
 
       if (world.boss && !world.boss.dead) {
+        const ec2 = world.boss.echo;
+        if (ec2 && ec2.born >= 1) {
+          const c3 = segClosest(s.x, s.y, x1, y1, ec2.x, ec2.y);
+          if (c3.d2 < (ec2.r + 20) ** 2) world.boss.hurtEcho(world, 900);
+        }
         const c = segClosest(s.x, s.y, x1, y1, world.boss.x, world.boss.y);
         if (c.d2 < (world.boss.r + 26) ** 2) {
           world.boss.hurt(world, 900);

@@ -52,10 +52,16 @@ export class Narrator {
     this.fontPx = 0;
   }
 
-  reset() {
+  /** Wipe the line on screen but keep our place in the script. */
+  clear() {
     this.text = '';
     this.lines = null;
     this.active = false;
+  }
+
+  /** Back to the top of the script — a new run, not a new phase. */
+  reset() {
+    this.clear();
     this.index = 0;
   }
 
