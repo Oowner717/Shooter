@@ -44,7 +44,7 @@ tap-rate limit — tap as fast as your thumb allows, or hold and drag to sustain
 fire. Both controls work at once, so you can drive the lever with one thumb
 and tap with the other.
 
-**Seven toggles** sit in a rack just above the ability bar, all off by default —
+**Eight toggles** sit in a rack just above the ability bar, all off by default —
 assists on the top row, loadout on the bottom:
 
 - **AUTO FIRE** keeps shooting wherever the barrel happens to point. With no
@@ -59,7 +59,15 @@ assists on the top row, loadout on the bottom:
 - **AUTO MINE** lobs a mine onto a random patch of the field every few
   seconds. It is completely inert in flight — it passes straight through
   anything in the way — and only arms once it has settled. Drift never sets one
-  off; only something that could actually corrupt your feed does.
+  off; only something that could actually corrupt your feed does. One hard bang
+  when it goes.
+- **AUTO SNARE** lays the other kind of mine, and it does not go off. It opens,
+  hauls everything within 210 units into one pinned knot and holds it for three
+  and a half seconds, wired visibly to whatever it has caught. It deals **zero**
+  damage of its own — measured — because the damage is the objects grinding
+  against each other on the way in, and whatever you choose to put into a pile
+  that cannot move. Slower to lay, three at a time, and it collapses a
+  165-unit spread down to about one.
 - **HE** makes every round detonate on impact. It costs you better than half
   your rate of fire and the shells travel slower, so single targets are no
   easier — crowds are.
@@ -85,7 +93,7 @@ assists stop steering. Auto fire runs a shade slower than driving it yourself,
 so playing actively is still worth it. The boss's INVERT power mirrors auto aim
 too — it corrupts targeting, not just fingers.
 
-**Six abilities** sit along the bottom, in the strip your thumb already rests
+**Eight abilities** sit along the bottom, in the strip your thumb already rests
 on. One tap each, no cost, no upgrades, no unlocks. The first time you use one,
 a caption explains it.
 
@@ -97,6 +105,21 @@ a caption explains it.
 | ✳ | **WELL** | Singularity — hauls everything into one grinding knot, then collapses | 19 s |
 | ❄ | **STASIS** | Objects freeze for four seconds; your shots do not | 21 s |
 | ▲ | **PRISM** | Fused shell that refracts — wide blast plus beams in every colour | 16 s |
+| ⚲ | **DECOY** | A turret that is not yours, 300 units up-field. Everything walks at it instead | 24 s |
+| ✷ | **SIPHON** | Hauls every loose fragment in and throws it back as a volley | 15 s |
+
+**DECOY** is the one defensive ability. It plants a hollow copy of your turret
+up-field; `Enemy.steer` picks it over you, so a scattered field becomes one pile
+somewhere that is not on top of you. It is a static physics body, so things heap
+up against it rather than drifting through, and it takes the collision damage of
+everything it catches — 900 hit points, nine seconds, and a 260-unit blast when
+it finally goes. Only one at a time; casting again detonates the old one.
+
+**SIPHON** is the one ability whose strength you build up yourself. It drags
+every fragment within 900 units into the muzzle and fires them back out in a
+fan across whatever arc the barrel is covering — one shot per fragment, so a
+littered floor is a wall of fire and a floor you have just cleared gives you the
+six-shot minimum. It also competes with a GLUT for the same food.
 
 **Contact does not kill you.** When an object touches the turret the feed
 corrupts — slice tearing, chroma ghosting, block noise — and *stays* corrupted
@@ -280,8 +303,8 @@ and the thing behind the gate is a lock rather than a finish line.
 The **DBG** chip (top right) opens a panel: skip to the gate, skip to the boss,
 kill the boss, +50 kills, advance the story, force a boss power, force a
 reprise, raise an echo, force a tithe or a subtract, drain the ledger to the
-spent endgame, skip the arrival, spawn a formation, fill the field, clear the field, trigger a glitch, jump to the end
-screen, restart — plus toggles for cooldowns, corruption, slow motion,
+spent endgame, skip the arrival, spawn a formation, fill the field, clear the field, trigger a glitch, throw either kind
+of mine, jump to the end screen, restart — plus toggles for cooldowns, corruption, slow motion,
 hitboxes, a live stats readout, and an invulnerable gate.
 
 With **STATS** on, the boss fight adds four lines: the ledger with how much
@@ -311,11 +334,11 @@ src/
   audio.js              WebAudio synth (no assets)
   enemies.js            object types, behaviour, death, spawn director
   projectiles.js        swept-collision bolts and bursting rounds
-  mines.js              inert-in-flight auto mines
+  mines.js              inert-in-flight mines: blast and snare
   shooter.js            the turret
   gate.js               wall + gate states
   boss.js               ORDINAL: arrival, worn ledger, reprise, echo, tithe
-  abilities.js          the six abilities and their effects
+  abilities.js          the eight abilities and their effects
   narrative.js          the ten sentences, and how they decay
   hud.js                DOM interface
 scripts/

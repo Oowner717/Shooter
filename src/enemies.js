@@ -119,6 +119,12 @@ export class Enemy {
     } else {
       tx = world.shooter.x;
       ty = world.shooter.y;
+      // A DECOY outranks the turret: that is the whole ability.
+      if (world.decoy && !world.decoy.dead) {
+        tx = world.decoy.x;
+        ty = world.decoy.y;
+      }
+      // ORDINAL's RECALL outranks both.
       if (world.boss && world.boss.recallActive) {
         tx = world.boss.x;
         ty = world.boss.y;

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '16';
+export const BUILD = '17';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -98,6 +98,32 @@ export const CFG = {
     },
   },
 
+  // ---- decoy ----------------------------------------------------------
+  // A second turret that is not yours and is not real. Everything that was
+  // walking at you walks at it instead, which turns a scattered field into one
+  // pile somewhere else — and the pile is not on top of you.
+  decoy: {
+    life: 9,
+    hp: 900,
+    r: 24,
+    ahead: 300, // world units up-field from the turret
+    blast: { r: 260, damage: 150, impulse: 900 }, // what it leaves behind
+  },
+
+  // ---- siphon ---------------------------------------------------------
+  // Your own wreckage, thrown back. Everything loose on the floor is dragged
+  // in and fired out as a volley, so the more mess there is the harder it
+  // hits — and a field you have just cleared has nothing to give.
+  siphon: {
+    gather: 0.5, // seconds of hauling before it fires
+    maxTake: 40,
+    reach: 900,
+    spread: 1.5, // radians of the outgoing fan
+    speed: [1180, 1600],
+    damagePer: 21,
+    minShots: 6, // it always finds something to throw
+  },
+
   // ---- prism shell ----------------------------------------------------
   prism: {
     r: 300, // blast radius
@@ -118,6 +144,24 @@ export const CFG = {
     r: 13,
     trigger: 26, // extra reach beyond the mine's own radius
     blast: { r: 168, damage: 140, impulse: 760 },
+  },
+
+  // ---- snares ---------------------------------------------------------
+  // The other kind of mine. It does not go off: it opens, hauls everything
+  // near it into one pinned knot, and holds. No damage of its own — the
+  // damage is the objects grinding against each other, and whatever you
+  // choose to put into the pile while it cannot move.
+  snare: {
+    interval: 7.4, // slower to lay than a blast mine
+    max: 3,
+    flight: 0.9,
+    arm: 0.6, // takes longer to settle
+    life: 30,
+    r: 14,
+    trigger: 34, // a wider mouth, because it wants a crowd
+    hold: 3.6, // seconds it keeps hold once it opens
+    reach: 210,
+    pull: 300, // inward speed it drives what it catches
   },
 
   // ---- projectiles ----------------------------------------------------

@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '16';
+  var BUILD = '17';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -111,6 +111,10 @@
         <button id="tgAutoMine" class="toggleChip" aria-pressed="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13" r="5"/><path d="M12 3v3M12 20v2M3.6 13h2.2M18.2 13h2.2M6 7l1.6 1.6M18 7l-1.6 1.6"/></svg>
           <span>MINE</span>
+        </button>
+        <button id="tgAutoSnare" class="toggleChip" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><path d="M6 6l2.5 2.5M18 6l-2.5 2.5M6 18l2.5-2.5M18 18l-2.5-2.5" opacity=".65"/></svg>
+          <span>SNARE</span>
         </button>
       </div>
       <div class="rackRow">

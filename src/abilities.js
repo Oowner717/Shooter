@@ -15,6 +15,8 @@ const ICON = {
   well: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" opacity=".8"/><path d="M5 5l2.6 2.6M19 5l-2.6 2.6M5 19l2.6-2.6M19 19l-2.6-2.6" opacity=".5"/></svg>',
   stasis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2v20M3.4 7 20.6 17M20.6 7 3.4 17"/><circle cx="12" cy="12" r="3.2" fill="currentColor" fill-opacity=".2"/></svg>',
   prism: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 3 19h18z"/><path d="M12 3v16" opacity=".55"/><path d="M7.5 19 12 11l4.5 8" opacity=".8"/></svg>',
+  decoy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 14V6"/><circle cx="12" cy="17" r="4"/><path d="M8.5 3.5h7" opacity=".7"/><path d="M5 20.5h14" opacity=".4" stroke-dasharray="2 2.5"/></svg>',
+  siphon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="2.6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><path d="M5.5 5.5 8 8M18.5 5.5 16 8M5.5 18.5 8 16M18.5 18.5 16 16" opacity=".55"/></svg>',
 };
 
 // ------------------------------------------------------------------ effects
@@ -164,6 +166,197 @@ class Well {
     ctx.arc(0, 0, Math.max(2.4, this.r * 0.24), 0, TAU);
     ctx.stroke();
     ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+  }
+}
+
+/**
+ * A second turret that is not yours and is not real. Everything that walks
+ * walks at it instead — Enemy.steer picks it over the shooter — so a scattered
+ * field becomes one pile somewhere that is not on top of you. It is a static
+ * body, so things pile up against it rather than through it, and it takes the
+ * collision damage of everything it catches. When it goes, it goes loudly.
+ */
+class Decoy {
+  constructor(x, y) {
+    const D = CFG.decoy;
+    this.x = x;
+    this.y = y;
+    this.r = D.r;
+    this.hp = D.hp;
+    this.maxHp = D.hp;
+    this.life = D.life;
+    this.dead = false;
+    this.flash = 0;
+    this.spin = 0;
+    this.born = 0;
+    // static physics body, exactly like the turret
+    this.vx = 0;
+    this.vy = 0;
+    this.invMass = 0;
+    this.mass = Infinity;
+    this.restitution = 0.5;
+    this.friction = 0.4;
+  }
+
+  /** The solver calls this on anything it damages. */
+  applyDamage(world, dmg) {
+    if (this.dead) return;
+    this.hp -= dmg;
+    this.flash = Math.min(1, this.flash + dmg / 200);
+    if (this.hp <= 0) this.expire(world);
+  }
+
+  expire(world) {
+    if (this.dead) return;
+    this.dead = true;
+    const B = CFG.decoy.blast;
+    applyBlast(world, { x: this.x, y: this.y, r: B.r, damage: B.damage, impulse: B.impulse });
+    ring(this.x, this.y, this.r, B.r * 1.5, 0.5, '#9be7ff', 6);
+    ring(this.x, this.y, 0, B.r * 0.7, 0.3, '#ffffff', 2.4);
+    ripple(this.x, this.y, 1.8, B.r * 4);
+    flash(0.24, '#bdf0ff');
+    shake(14);
+    for (let i = 0; i < 26; i++) {
+      const a = rand(0, TAU);
+      spark(this.x, this.y, Math.cos(a) * rand(240, 700), Math.sin(a) * rand(240, 700), '#9fe8ff', 0.45, 2.6);
+    }
+    audio.boom();
+    if (world.decoy === this) world.decoy = null;
+  }
+
+  update(world, dt) {
+    this.born = Math.min(1, this.born + dt * 3);
+    this.flash = Math.max(0, this.flash - dt * 3);
+    this.spin += dt * 1.6;
+    this.life -= dt;
+    if (this.life <= 0) this.expire(world);
+  }
+
+  draw(ctx, world) {
+    const k = this.born;
+    const hpf = clamp(this.hp / this.maxHp, 0, 1);
+    const going = clamp(this.life / 1.6, 0, 1);
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.globalAlpha = k * (0.45 + going * 0.55);
+
+    ctx.globalCompositeOperation = 'lighter';
+    drawGlow(ctx, '#59e0ff', 0, 0, this.r * 3.4, 0.28 + this.flash * 0.5);
+    ctx.globalCompositeOperation = 'source-over';
+
+    // the same silhouette as the real one, drawn hollow so it reads as a copy
+    ctx.strokeStyle = rgba('#9be7ff', 0.9);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.arc(0, 0, this.r, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(0, 0, this.r * 0.42, 0, TAU);
+    ctx.stroke();
+    ctx.save();
+    ctx.rotate(-Math.PI / 2);
+    ctx.strokeRect(-4, -this.r * 1.5, 8, this.r * 0.8);
+    ctx.restore();
+
+    // what is left of it
+    ctx.strokeStyle = rgba('#ffffff', 0.85);
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.r + 7, -Math.PI / 2, -Math.PI / 2 + TAU * hpf);
+    ctx.stroke();
+
+    // a lure sweeping outward, so it reads as calling rather than sitting
+    const sweep = (world.time * 1.2) % 1;
+    ctx.strokeStyle = rgba('#59e0ff', 0.3 * (1 - sweep));
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.r + 10 + sweep * 150, 0, TAU);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/**
+ * SIPHON. Hauls every loose fragment on the field into the muzzle and throws
+ * it back out as a volley, so the more wreckage there is the harder it hits.
+ * A field you have just cleared has almost nothing to give, which is the
+ * trade — and it is the one ability that competes with a GLUT for food.
+ */
+class Siphon {
+  constructor(world) {
+    const P = CFG.siphon;
+    const s = world.shooter;
+    this.x = s.x;
+    this.y = s.y;
+    this.t = 0;
+    this.fired = false;
+    this.dead = false;
+    this.taken = [];
+    const r2 = P.reach * P.reach;
+    for (const d of world.debris) {
+      if (d.dead) continue;
+      if ((d.x - this.x) ** 2 + (d.y - this.y) ** 2 > r2) continue;
+      this.taken.push({ x: d.x, y: d.y, color: d.type.glow, r: d.r });
+      d.dead = true;
+      d.dissolved = true; // taken, not destroyed: it must not score
+      if (this.taken.length >= P.maxTake) break;
+    }
+    this.shots = Math.max(P.minShots, this.taken.length);
+    audio.ability('well');
+  }
+
+  update(world, dt) {
+    const P = CFG.siphon;
+    this.t += dt;
+    const s = world.shooter;
+    this.x = s.x;
+    this.y = s.y;
+    if (this.t < P.gather) return;
+    if (this.fired) { this.dead = true; return; }
+    this.fired = true;
+
+    // Out again, fanned across the forward arc the barrel is covering.
+    const base = s.aim;
+    for (let i = 0; i < this.shots; i++) {
+      const off = ((i / Math.max(1, this.shots - 1)) - 0.5) * P.spread;
+      fire(world, s.x + Math.cos(base + off) * s.r, s.y + Math.sin(base + off) * s.r, base + off, {
+        speed: rand(P.speed[0], P.speed[1]),
+        r: 4.4,
+        damage: P.damagePer,
+        impulse: 80,
+        bounces: 1,
+        color: '#ffd9a0',
+        trail: 0.03,
+      });
+    }
+    ring(s.x, s.y, 14, 260, 0.34, '#ffd166', 4);
+    flash(0.14, '#ffe9c0');
+    shake(9);
+    audio.boom();
+  }
+
+  draw(ctx) {
+    const P = CFG.siphon;
+    const k = clamp(this.t / P.gather, 0, 1);
+    if (k >= 1) return;
+    const ease = k * k;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = rgba('#ffd166', 0.45 * (1 - ease));
+    ctx.lineWidth = 1.4;
+    for (const p of this.taken) {
+      const px = p.x + (this.x - p.x) * ease;
+      const py = p.y + (this.y - p.y) * ease;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(this.x, this.y);
+      ctx.stroke();
+      drawGlow(ctx, p.color, px, py, p.r * 2.6, 0.6);
+    }
+    drawGlow(ctx, '#ffd166', this.x, this.y, 20 + ease * 60, ease * 0.8);
     ctx.restore();
   }
 }
@@ -424,6 +617,40 @@ export const ABILITIES = [
         dot(rand(0, world.width), rand(0, world.height), 0, 0, '#d6f4ff', rand(0.4, 1.2), rand(3, 9));
       }
       audio.ability('stasis');
+    },
+  },
+  {
+    id: 'decoy',
+    name: 'DECOY',
+    color: '#9be7ff',
+    cooldown: 24,
+    icon: ICON.decoy,
+    hint: 'DECOY — a turret that is not yours. They go for it instead.',
+    run(world) {
+      // Only one at a time; a second would just split the pile.
+      if (world.decoy && !world.decoy.dead) world.decoy.expire(world);
+      const s = world.shooter;
+      const top = world.wall.y + world.wall.thickness + 60;
+      const d = new Decoy(s.x, clamp(s.y - CFG.decoy.ahead, top, s.y - 120));
+      world.decoy = d;
+      world.effects.push(d);
+      ring(d.x, d.y, 6, 300, 0.5, '#59e0ff', 4);
+      ripple(d.x, d.y, 1.2, 620);
+      shake(7);
+      audio.ability('pulse');
+    },
+  },
+  {
+    id: 'siphon',
+    name: 'SIPHON',
+    color: '#ffd166',
+    cooldown: 15,
+    icon: ICON.siphon,
+    hint: 'SIPHON — hauls the wreckage in and throws it back.',
+    run(world) {
+      world.effects.push(new Siphon(world));
+      ring(world.shooter.x, world.shooter.y, CFG.siphon.reach * 0.5, 20, 0.42, '#ffd166', 3);
+      shake(5);
     },
   },
 ];

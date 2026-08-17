@@ -278,7 +278,7 @@ html, body {
   bottom: calc(var(--safe-b) + 8px);
   height: var(--bar-h);
   display: flex;
-  gap: 6px;
+  gap: 4px;
   pointer-events: auto;
 }
 
@@ -302,7 +302,15 @@ html, body {
 }
 
 .ab svg { width: 24px; height: 24px; display: block; }
-.ab .lbl { font-size: 8.5px; letter-spacing: 0.13em; color: var(--dim); }
+.ab .lbl { font-size: 8.5px; letter-spacing: 0.13em; color: var(--dim); white-space: nowrap; }
+
+/* Eight buttons on a narrow phone: the six-letter labels (STASIS, SIPHON) run
+   past a 34px button at the default tracking, and .ab clips its overflow. */
+@media (max-width: 372px) {
+  .ab svg { width: 20px; height: 20px; }
+  .ab .lbl { font-size: 7px; letter-spacing: 0.04em; }
+  .toggleChip { padding: 5px 6px; letter-spacing: 0.06em; }
+}
 
 .ab .fill {
   position: absolute;

@@ -36,6 +36,7 @@ export class Game {
     this.gripPointer = null;
     this.fireTimer = 0;
     this.mineTimer = 0;
+    this.snareTimer = 0;
     this.autoLock = null;
     this.leverHinted = false;
     this.autoHinted = {};
@@ -102,8 +103,10 @@ export class Game {
       autoAim: false,
       autoFire: false,
       autoMine: false,
+      autoSnare: false,
       round: 'standard', // standard | explosive | shotgun
       mines: [],
+      decoy: null, // the DECOY ability's stand-in turret, while one is up
       veilFade: 0, // eased so VEIL closes in rather than snapping
 
       nextStoryAt: CFG.storyEvery,
@@ -145,6 +148,7 @@ export class Game {
     w.veilFade = 0;
     w.ledger = 0;
     w.reclaimed = 0;
+    w.decoy = null;
     this.hud.bossCaption(null);
     w.nextStoryAt = CFG.storyEvery;
     w.sealed = false;
@@ -155,8 +159,9 @@ export class Game {
     w.autoAim = false;
     w.autoFire = false;
     w.autoMine = false;
+    w.autoSnare = false;
     w.round = 'standard';
-    for (const key of ['autoAim', 'autoFire', 'autoMine', ...ROUND_KEYS]) {
+    for (const key of ['autoAim', 'autoFire', 'autoMine', 'autoSnare', ...ROUND_KEYS]) {
       this.hud.setToggle(key, false);
     }
 
@@ -175,6 +180,7 @@ export class Game {
     w.autoSteering = false;
 
     this.mineTimer = 0;
+    this.snareTimer = 0;
     this.snapshot = null;
     this.endStage = 0;
     this.endTimer = 0;
@@ -349,6 +355,7 @@ export class Game {
     autoAim: 'AUTO AIM — tracks and fires on the nearest breacher.',
     autoFire: 'AUTO FIRE — keeps shooting wherever the barrel points.',
     autoMine: 'AUTO MINE — lobs inert mines that arm where they land.',
+    autoSnare: 'AUTO SNARE — lays traps that pin a crowd instead of killing it.',
     explosive: 'HE ROUNDS — every shot detonates. Half the rate of fire.',
     shotgun: 'SHOT ROUNDS — five pellets a shot, close range, slower cadence.',
     arc: 'ARC ROUNDS — the hit jumps on through anything nearby.',
@@ -360,6 +367,7 @@ export class Game {
     w[key] = !w[key];
     this.hud.setToggle(key, w[key]);
     if (key === 'autoMine' && w.autoMine) this.mineTimer = 0.2;
+    if (key === 'autoSnare' && w.autoSnare) this.snareTimer = 0.2;
     this.announceToggle(key, w[key]);
   }
 
@@ -528,7 +536,8 @@ export class Game {
     if (steps === CFG.maxSubsteps) this.acc = 0;
 
     updateProjectiles(w, dt);
-    this.mineTimer = mineCadence(w, this.mineTimer, dt);
+    this.mineTimer = mineCadence(w, this.mineTimer, dt, 'blast');
+    this.snareTimer = mineCadence(w, this.snareTimer, dt, 'snare');
     updateMines(w, dt);
     this.resolveBlasts();
     this.checkContact();
@@ -554,6 +563,9 @@ export class Game {
     }
 
     bodies.push(w.shooter);
+    // The decoy is a static body too, so things pile up against it instead of
+    // drifting through it — and it takes the collision damage of the pile.
+    if (w.decoy && !w.decoy.dead) bodies.push(w.decoy);
     this.grid.build(bodies);
     this.grid.eachPair(bodies, (a, b) => {
       if (a.dead || b.dead) return;
@@ -569,6 +581,7 @@ export class Game {
       if (a.applyDamage) a.applyDamage(w, dmg);
       if (b.applyDamage) b.applyDamage(w, dmg);
     });
+    if (w.decoy && !w.decoy.dead) bodies.pop();
     bodies.pop(); // shooter is not integrated
 
     // Cables, after the contact solver so a TOW pair cannot be pulled apart by
@@ -1154,7 +1167,11 @@ export class Game {
   }
 
   debugThrowMine() {
-    throwMine(this.world);
+    throwMine(this.world, 'blast');
+  }
+
+  debugThrowSnare() {
+    throwMine(this.world, 'snare');
   }
 
   debugSpawnDrift() {
