@@ -202,11 +202,21 @@ Measured end to end, holding fire on it and nothing else: the armour phase
 lasts **58 s**, the whole fight **162 s**, and of the five hundred you take
 back 400 while it burns 100.
 
-**It keeps its distance.** It cannot reach the turret at all any more: it stops
-with **124 units of open space** between its edge and yours, across 180 units
-of travel from the wall. Instead it *looms* — inside the last 90 units of its
-approach the feed is rewritten on a timer, and shooting genuinely pushes it
-back out of that band again.
+**It does not advance.** It holds a station 410 units out — **254 units of open
+space** between its edge and yours — and it can never be nearer than that. The
+only reason it ever moves toward you is to close a gap *you* opened by shooting
+it: push it off station and it eases back over about ten seconds, then stops.
+Left alone for a minute it does not gain a single unit.
+
+While it is on station its presence rewrites the feed every seven seconds. Two
+seconds of sustained fire moves it 39 units, which clears the 30-unit band and
+stops the corruption. That is the whole exchange: keep it pushed clear, or wear
+it. There is no creep to out-race.
+
+The three numbers have to fit the field: the wall stops its centre at about 232
+and the turret sits at about 706, so the entire range it can occupy is roughly
+474 units. A station of 410 leaves ~57 units of travel, and a band wider than
+that would be one it could never push out of.
 
 **The reversal.** Three of its powers run the game backwards.
 
@@ -394,6 +404,10 @@ scripts/
 `src/config.js` is the only file you need for balance. The knobs that move run
 length most: `bolt.damage`, `shooter.gripFireInterval`, `gate.hp`, `boss.hp`,
 `popStart`/`popEnd`, and `spawnInterval`.
+
+`boss.hold`, `boss.pushBand` and `boss.pushPerBolt` are the three that decide
+how the boss fight *feels* in the hand. They are coupled: the band must be
+smaller than `topLimit − hold`, or it is a band the player can never leave.
 
 The boss fight is tuned entirely under `boss.ledger`, `boss.reprise`,
 `boss.echo`, `boss.standoff`/`boss.loom` and `boss.firstSpawn` —

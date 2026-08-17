@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '18';
+export const BUILD = '19';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -195,21 +195,36 @@ export const CFG = {
   boss: {
     hp: 16000,
     r: 130,
-    approach: 13, // px/s of self-propulsion
-    pushPerBolt: 5.6,
+    // Only ever used to close a gap the player opened, so it can be brisk
+    // without ever becoming a creep.
+    approach: 22,
+    // A bolt has to be able to shift it. At the old 5.6 three seconds of
+    // sustained fire moved it 28 units against a 110-unit band, which is the
+    // "cannot push it away fast enough" this model exists to fix.
+    pushPerBolt: 14,
     contactGlitch: 2.6,
     jamInterval: 0.4, // forced delay between shots while JAM is up
     powerInterval: [13, 9.5], // seconds between powers, phase 1 -> phase 3
 
-    // It keeps its distance. Closing all the way to the turret made the fight
-    // about a shape sitting on top of the barrel; it now stops with a clear
-    // gap and applies pressure by looming instead. The field between the wall
-    // and the turret is only about 520 units deep, so the standoff has to
-    // leave real travel in it — too large and it is pinned to the wall and
-    // the loom never lifts.
-    standoff: 150, // clear gap it will not close: ~124 units of open space
-    loom: 90, // this near its floor, its presence rewrites the feed
-    loomInterval: 5.2,
+    // It does not advance. It holds a station and returns to it — the only
+    // reason it ever moves toward the turret is to close a gap the player
+    // opened by shooting it. It can never be nearer than `hold`, so the fight
+    // is never about a shape sitting on the barrel, and there is no creep to
+    // out-race.
+    // Centre to centre; ~254 units of open space at its closest, against the
+    // 124 the old creep-to-the-barrel model ended at.
+    //
+    // These three numbers have to fit inside the field. The wall stops its
+    // centre at about 232 and the turret sits at about 706, so the whole
+    // range it can occupy is roughly 474 units — a station of 410 leaves ~57
+    // units of travel, and a band wider than that would be one it could never
+    // push out of, which is the trap this is here to avoid.
+    hold: 410,
+    // Push it further than this and its presence stops rewriting the feed.
+    // Let it settle back onto station and the corruption resumes on a timer,
+    // so the pressure is "keep it off you", not "it is arriving regardless".
+    pushBand: 30,
+    loomInterval: 7,
 
     // The flow of objects is held right back at the start of the fight, so
     // the opening is the player and ORDINAL and nothing else, then thickens.

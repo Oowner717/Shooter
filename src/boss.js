@@ -400,13 +400,13 @@ export class Boss {
   // ------------------------------------------------------------------ loom
 
   /**
-   * It no longer walks onto the turret. Getting near enough is the whole
-   * threat: inside this reach its presence rewrites the feed on a timer, and
-   * the only way to push it back out is to keep shooting.
+   * On station, its presence rewrites the feed on a timer. Shooting it off
+   * station stops that — which is the whole exchange now that it no longer
+   * advances: keep it pushed clear, or wear the corruption.
    */
   updateLoom(world, dt) {
     const s = world.shooter;
-    const reach = this.r + CFG.boss.standoff + CFG.boss.loom;
+    const reach = CFG.boss.hold + CFG.boss.pushBand;
     const d = Math.hypot(s.x - this.x, s.y - this.y);
     this.looming = d < reach;
     if (!this.looming) { this.loomTimer = 0; return; }
@@ -864,15 +864,23 @@ export class Boss {
 
     this.updateLoom(world, dt);
 
-    // --- movement: slow, inevitable, and genuinely pushable ---
+    // --- movement: it holds a station, it does not advance ---
+    // The only reason it ever moves toward the turret is to close a gap the
+    // player opened by shooting it. Past its station it eases to a stop, and
+    // it can never come nearer than `hold` — so there is no creep to out-race
+    // and no way for it to end up on top of the barrel.
     const s = world.shooter;
     let dx = s.x - this.x;
     let dy = s.y - this.y;
     const d = Math.hypot(dx, dy) || 1;
     dx /= d;
     dy /= d;
+    const over = d - CFG.boss.hold; // how far it has been pushed off station
+    // Eases in over the last stretch so it settles rather than bumping the
+    // clamp, and is worth nothing at all once it is home.
+    const closing = clamp(over / 40, 0, 1);
     const drift = CFG.boss.approach * (1 + this.phase * 0.22)
-      * (this.spentOut ? CFG.boss.ledger.spentApproach : 1);
+      * (this.spentOut ? CFG.boss.ledger.spentApproach : 1) * closing;
     this.vx += (dx * drift - this.vx) * clamp(1.1 * dt, 0, 1);
     this.vy += (dy * drift - this.vy) * clamp(1.1 * dt, 0, 1);
     const damp = Math.exp(-1.15 * dt);
@@ -882,9 +890,9 @@ export class Boss {
     this.y += this.vy * dt;
 
     const topLimit = world.wall.y + world.wall.thickness + this.r * 0.35;
-    // It stops well short of the turret. Sitting on top of the barrel made
-    // the fight about a shape in the way; the pressure is the looming.
-    const bottomLimit = s.y - this.r - CFG.boss.standoff;
+    // The hard floor. Straight up is the shortest line to the turret, so a
+    // clamp on y alone guarantees the centre-to-centre distance as well.
+    const bottomLimit = s.y - CFG.boss.hold;
     this.x = clamp(this.x, this.r * 0.6, world.width - this.r * 0.6);
     if (this.y < topLimit) { this.y = topLimit; this.vy = Math.max(this.vy, 0); }
     if (this.y > bottomLimit) { this.y = bottomLimit; this.vy = Math.min(this.vy, 0); }
