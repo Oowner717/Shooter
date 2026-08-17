@@ -9,7 +9,14 @@ import { fx } from './fx.js';
 const MOODS = {
   staging: { top: '#04060d', mid: '#071426', low: '#02040a', line: '#2f7fb8', neb: ['#0d3b66', '#14224a', '#062a3d'], accent: '#59e0ff' },
   gate: { top: '#0a0705', mid: '#231206', low: '#050304', line: '#b8762f', neb: ['#66300d', '#4a2a14', '#3d1c06'], accent: '#ffa347' },
-  boss: { top: '#08040f', mid: '#1b0b2e', low: '#04020a', line: '#9a5fd0', neb: ['#42117a', '#5c1040', '#1c0a4d'], accent: '#e6b3ff' },
+  // The arrival: everything drains out of the substrate and the only colour
+  // left is coming through the breach.
+  breach: { top: '#000000', mid: '#080407', low: '#000000', line: '#6b4a2a', neb: ['#1a0d05', '#120612', '#050308'], accent: '#ffd08a' },
+  // One per aspect, so the whole field turns over as it wakes up rather than
+  // only the boss sprite changing colour.
+  boss: { top: '#0b0703', mid: '#2b1a06', low: '#050301', line: '#c08a3a', neb: ['#6b3d08', '#4a2d10', '#2a1a04'], accent: '#ffd98a' },
+  boss2: { top: '#08040f', mid: '#1b0b2e', low: '#04020a', line: '#9a5fd0', neb: ['#42117a', '#5c1040', '#1c0a4d'], accent: '#cbb8ff' },
+  boss3: { top: '#0f0206', mid: '#320714', low: '#0a0103', line: '#e03a63', neb: ['#7a0c2c', '#5c1040', '#3d0416'], accent: '#ff9fb0' },
   ending: { top: '#000000', mid: '#0a0a0a', low: '#000000', line: '#555555', neb: ['#222222', '#111111', '#191919'], accent: '#cccccc' },
 };
 

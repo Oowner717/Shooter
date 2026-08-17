@@ -1,27 +1,24 @@
 // ORDINAL. It does not attack. It removes things from you — your sight, your
 // aim, your rate of fire — and walks, without hurry, toward the turret. It is
-// the last item in this room, and it is numbered.
+// the last item on this side of the wall, and it is numbered.
 //
 // Three things make it more than a health bar:
 //
-// THE GAZE. It is an eye, so it is only open to you while it is looking at
-// you. Bolts that land while it is looking elsewhere glance off for a sixth
-// of their damage; bolts that land while it holds your eye do nearly double.
-// Total damage per second is roughly unchanged for a player who just holds
-// the trigger, and much better for one who waits for the beat — the fight got
-// harder without a single extra hit point.
-//
-// THE LEDGER. Everything it does is paid for out of the player's own tally.
-// The counter that read 500/500 for the whole run becomes its reserve and
-// starts falling. Powers, objects, reprises and echoes all cost. When it runs
-// out it stops conserving, walks faster and casts twice as often, and it can
-// no longer close its eye — the ledger is a second, inverted health bar the
-// player spent thirteen minutes filling on its behalf.
+// THE LEDGER, WORN. It arrives holding the player's five hundred, and while it
+// holds them they absorb damage on its behalf: at a full ledger three quarters
+// of every hit is soaked, at an empty one none of it is. Damage takes count
+// back, and everything it spends is armour it no longer has — so the fight
+// opens hard, accelerates as the number comes home, and asks nothing of the
+// player's hands. The counter that read 500/500 all run is the thing being
+// fought over.
 //
 // THE REVERSAL. It does not only spawn: it un-kills. REPRISE drags the debris
 // of things the player already destroyed back together into whole objects,
-// and ECHO stands a copy of the player's own turret at the far end of the
-// room and shoots back with it.
+// ECHO stands a copy of the player's own turret across the field and shoots
+// back with it, and TITHE reaches out and takes reclaimed count back.
+//
+// SUBTRACTION. It cannot hurt the player, so it removes options: sight, aim,
+// rate of fire, and — SUBTRACT — one of the six ability buttons at a time.
 
 import { CFG, ENEMY_TYPES } from './config.js';
 import { TAU, clamp, rand, spread, pick, rgba, drawGlow, makeCanvas, smoothstep, segClosest, angleDelta } from './util.js';
@@ -35,6 +32,52 @@ const SHIELD_R = 22;
 // What it spits out. Bulwarks are excluded: they are wall-clearing work, not
 // pressure, and the boss fight already asks enough of the player's aim.
 const EMITTABLE = ENEMY_TYPES.filter((t) => t.id !== 'bulwark');
+
+/**
+ * The arrival, in beats, keyed on `intro` running 0 -> 1. It is deliberately
+ * unhurried: the whole point of the sequence is that nothing is coming out of
+ * the gate for a while and the player has time to read what is.
+ */
+const INTRO_TIME = 11.5; // seconds from breach to first action
+const INTRO = [
+  {
+    at: 0,
+    caption: 'THAT WAS THE LAST OF THE SIMPLE WORK.',
+    hold: 3.4,
+    run: (b) => { shake(10); ripple(b.x, b.y, 1.4, 520); audio.bossPower(); },
+  },
+  {
+    at: 0.28,
+    caption: 'IT HAS BEEN HOLDING YOUR FIVE HUNDRED SINCE THE FIRST ONE.',
+    hold: 3.8,
+    run: (b) => { ring(b.x, b.y, b.r * 0.3, b.r * 3.4, 0.8, b.palette.ring, 4); shake(8); },
+  },
+  {
+    at: 0.58,
+    caption: 'IT WILL NOT GIVE THEM BACK. TAKE THEM.',
+    hold: 3.6,
+    run: (b, w) => {
+      ring(b.x, b.y, b.r * 4, b.r * 0.6, 0.9, b.palette.core, 5);
+      ripple(b.x, b.y, 2.2, 900);
+      shake(15);
+      audio.bossPower();
+      w.background.surge(1.6);
+    },
+  },
+  {
+    at: 0.88,
+    caption: 'ORDINAL · FIRST OF ——',
+    hold: 3.2,
+    run: (b, w) => {
+      flash(0.55, b.palette.core);
+      ring(b.x, b.y, b.r, b.r * 7, 1, b.palette.halo, 7);
+      ripple(b.x, b.y, 2.8, 1200);
+      shake(22);
+      audio.boom();
+      w.background.surge(2);
+    },
+  },
+];
 
 const PALETTES = [
   { ring: '#ffd98a', spoke: '#fff3c4', iris: '#ffb347', core: '#fffaf0', halo: '#ff9f1c' },
@@ -57,6 +100,23 @@ const POWERS = [
     // a mirror and starts reading as noise.
     ready: (world, boss) => !boss.echo,
     apply(world, boss) { boss.raiseEcho(world); },
+  },
+  {
+    id: 'tithe',
+    label: 'TITHE · IT TAKES SOME BACK',
+    cost: () => 0, // this one is a gain, not a spend
+    // Only once the player is meaningfully ahead, so it reads as the fight
+    // pushing back rather than as the number refusing to move — and never
+    // after the ledger is spent, or the chip would say SPENT while the armour
+    // quietly came back and reclaim() refused to take it off again.
+    ready: (world, boss) => !boss.spentOut
+      && world.ledger < CFG.killGoal * CFG.boss.ledger.titheAbove,
+    apply(world, boss) { boss.tithe(world); },
+  },
+  {
+    id: 'subtract',
+    label: 'SUBTRACT · A BUTTON REMOVED',
+    apply(world, boss) { boss.subtract(world); },
   },
   {
     id: 'veil',
@@ -108,30 +168,28 @@ export class Boss {
     this.pupil = 0;
     this.recall = 0;
     this.shields = [];
-    this.powerTimer = 5.5;
-    this.spawnTimer = CFG.boss.spawnInterval;
+    this.powerTimer = 7.5;
+    this.spawnTimer = CFG.boss.firstSpawn;
     this.lastPower = '';
     this.contactCooldown = 0;
     this.sprites = null;
     this.palette = PALETTES[0];
     this.buildSprites();
 
-    // --- the gaze ---
-    // It starts looking down the field, away from the turret, so the first
-    // volley glances and the rule announces itself before anything says it.
-    this.gazeAngle = Math.PI / 2 + 0.9;
-    this.gazeWander = this.gazeAngle;
-    this.gazeLocked = false;
-    this.gazeTimer = 2.6;
-    this.gazeOpen = 0; // 0 looking away, 1 looking straight at the turret
-    this.gazeTell = 0; // wind-up flare as it swings onto you
-    this.turretDist = 600; // so the sightline can reach without a world ref
-    this.glance = 0; // flare on a shot that glanced off
-    this.taughtGlance = false;
-
     // --- the ledger ---
-    this.spent = 0;
-    this.spentOut = false; // nothing of the player's left to spend
+    this.spent = 0; // burned on its own powers
+    this.reclaimed = 0; // taken back off it by damage
+    this.reclaimBank = 0; // fractional carry, so small hits still count
+    this.spentOut = false; // nothing of the player's left
+    this.held = 1; // eased fraction of the tally still worn, for drawing
+    this.loomTimer = 0;
+    this.looming = false;
+
+    // --- arrival ---
+    // A staged entrance rather than a fade-in: the breach lights, it is
+    // hauled through, the rings assemble around it, and only then does it
+    // start acting. `intro` runs 0 -> 1 across the whole sequence.
+    this.introStage = -1;
 
     // --- reversal mechanics ---
     this.reprises = [];
@@ -161,18 +219,14 @@ export class Boss {
   }
 
   /**
-   * How much of a bolt actually lands. Closed it is a glance; open it is worth
-   * more than a bolt ever was, which is the whole trade. Once the ledger is
-   * spent the eye cannot close at all.
+   * How much of a hit actually lands. The player's own count is the armour:
+   * a full ledger soaks three quarters of everything, an empty one soaks
+   * nothing. No timing, no window — the number on the chip is the shield, and
+   * it is worth attacking because attacking it is what brings it down.
    */
-  get damageScale() {
-    const g = CFG.boss.gaze;
-    if (this.spentOut) return g.open;
-    return g.closed + (g.open - g.closed) * smoothstep(this.gazeOpen);
-  }
-
-  get eyeOpen() {
-    return this.spentOut || this.gazeOpen > 0.5;
+  damageScale(world) {
+    const held = clamp(world.ledger / CFG.killGoal, 0, 1);
+    return 1 - CFG.boss.ledger.armour * held;
   }
 
   // ------------------------------------------------------------- appearance
@@ -191,24 +245,14 @@ export class Boss {
   // ----------------------------------------------------------------- combat
 
   /**
-   * `gated` rounds are the ones the gaze applies to: aimed fire. Abilities go
-   * through ungated, so the six buttons stay worth pressing at any moment and
-   * the timing game is about the turret, not about everything.
-   * Returns the damage that actually landed.
+   * Everything goes through here: bolts, blasts and abilities alike, all
+   * scaled by the same armour, so there is one rule to learn and it is
+   * visible on the body. Returns the damage that actually landed.
    */
-  hurt(world, dmg, gated = false) {
+  hurt(world, dmg) {
     if (this.dead || this.intro < 1) return 0;
-    const scale = gated ? this.damageScale : 1;
-    if (gated && !this.eyeOpen) {
-      this.glance = 1;
-      // Said once, the first time a shot bounces. After that the pupil, the
-      // sightline and the ricochet are the explanation.
-      if (!this.taughtGlance) {
-        this.taughtGlance = true;
-        world.alert('IT IS ONLY OPEN WHILE IT LOOKS AT YOU', 'info', 5);
-      }
-    }
-    dmg *= scale;
+    dmg *= this.damageScale(world);
+    this.reclaim(world, dmg);
 
     this.hp -= dmg;
     this.flash = Math.min(1, this.flash + dmg / 900);
@@ -224,7 +268,10 @@ export class Boss {
       shake(16);
       ripple(this.x, this.y, 2.2, 900);
       audio.bossPower();
-      world.alert(`ASPECT ${this.phase + 1} · ${['WATCHING', 'ADJUSTING', 'YIELDING'][this.phase]}`, 'power', 2.6);
+      // the substrate turns over with it, not just the sprite
+      world.background.setMood(['boss', 'boss2', 'boss3'][this.phase]);
+      world.background.surge(1.8);
+      world.alert(`ASPECT ${this.phase + 1} · ${['WITHHOLDING', 'ADJUSTING', 'YIELDING'][this.phase]}`, 'power', 2.6);
       this.powerTimer = Math.min(this.powerTimer, 1.6);
       for (let i = 0; i < 40; i++) {
         const a = rand(0, TAU);
@@ -266,6 +313,45 @@ export class Boss {
     return this.spentOut || world.ledger >= amount;
   }
 
+  /**
+   * Damage takes the count back. Banked as a fraction so a shotgun pellet is
+   * worth its share rather than being rounded away, and so the chip only ever
+   * moves in whole numbers.
+   */
+  reclaim(world, dmg) {
+    if (this.spentOut || world.ledger <= 0) return;
+    this.reclaimBank += dmg * CFG.boss.ledger.reclaimPerDamage;
+    const whole = Math.floor(this.reclaimBank);
+    if (whole < 1) return;
+    this.reclaimBank -= whole;
+    const took = Math.min(whole, world.ledger);
+    world.ledger -= took;
+    this.reclaimed += took;
+    world.reclaimed += took;
+    if (world.ledger <= 0) this.becomeSpent(world);
+  }
+
+  /** TITHE: it reaches back and takes some of what was reclaimed. */
+  tithe(world) {
+    if (this.spentOut) return 0; // it has nothing of yours to reach for
+    const amount = Math.min(CFG.boss.ledger.tithe, CFG.killGoal - world.ledger);
+    if (amount <= 0) return 0;
+    world.ledger += amount;
+    this.reclaimed = Math.max(0, this.reclaimed - amount);
+    world.reclaimed = Math.max(0, world.reclaimed - amount);
+    const s = world.shooter;
+    for (let i = 0; i < 26; i++) {
+      const k = i / 26;
+      dot(s.x + spread(70), s.y + spread(70),
+        (this.x - s.x) * rand(0.5, 0.9), (this.y - s.y) * rand(0.5, 0.9),
+        this.palette.iris, 0.5 + k * 0.3, 2.6);
+    }
+    ring(s.x, s.y, 180, 10, 0.5, this.palette.iris, 3);
+    shake(11);
+    audio.bossPower();
+    return amount;
+  }
+
   /** Nothing of yours left. It stops rationing and comes on. */
   becomeSpent(world) {
     if (this.spentOut) return;
@@ -276,53 +362,70 @@ export class Boss {
     flash(0.5, this.palette.core);
     shake(20);
     audio.bossPower();
-    world.alert('LEDGER SPENT · IT KEEPS NOTHING BACK', 'breach', 4.2);
+    world.alert('IT HAS NOTHING OF YOURS LEFT', 'breach', 4.2);
   }
 
-  // ------------------------------------------------------------------- gaze
+  // ---------------------------------------------------------------- arrival
 
-  updateGaze(world, dt) {
-    const g = CFG.boss.gaze;
+  /**
+   * The entrance, in beats. Each stage lands its own sound and effect and
+   * hands a caption to the interface, so the fight starts with something
+   * happening rather than with a shape appearing at full size.
+   */
+  updateIntro(world, dt) {
+    this.intro = Math.min(1, this.intro + dt / INTRO_TIME);
+    const stage = INTRO.findIndex((b, i) => this.intro < (INTRO[i + 1]?.at ?? 2) && this.intro >= b.at);
+    if (stage > this.introStage) {
+      this.introStage = stage;
+      const beat = INTRO[stage];
+      if (beat.caption) world.bossCaption(beat.caption, beat.hold ?? 3);
+      if (beat.run) beat.run(this, world);
+    }
+
+    // matter drawn in through the breach the whole time it is arriving
+    if (Math.random() < 0.75) {
+      const a = rand(0, TAU);
+      const rr = rand(this.r * 1.5, this.r * 4.5);
+      spark(this.x + Math.cos(a) * rr, this.y + Math.sin(a) * rr,
+        -Math.cos(a) * rand(180, 420), -Math.sin(a) * rand(180, 420),
+        this.palette.ring, 0.55, 2.6);
+    }
+  }
+
+  // ------------------------------------------------------------------ loom
+
+  /**
+   * It no longer walks onto the turret. Getting near enough is the whole
+   * threat: inside this reach its presence rewrites the feed on a timer, and
+   * the only way to push it back out is to keep shooting.
+   */
+  updateLoom(world, dt) {
     const s = world.shooter;
-    const toTurret = Math.atan2(s.y - this.y, s.x - this.x);
+    const reach = this.r + CFG.boss.standoff + CFG.boss.loom;
+    const d = Math.hypot(s.x - this.x, s.y - this.y);
+    this.looming = d < reach;
+    if (!this.looming) { this.loomTimer = 0; return; }
 
-    this.gazeTell = Math.max(0, this.gazeTell - dt);
-    this.glance = Math.max(0, this.glance - dt * 3);
+    this.loomTimer -= dt;
+    if (this.loomTimer > 0) return;
+    this.loomTimer = CFG.boss.loomInterval;
+    world.bossContact = CFG.boss.contactGlitch;
+    shake(18);
+    flash(0.42, this.palette.core);
+    ring(s.x, s.y, 10, 460, 0.55, this.palette.halo, 5);
+    ripple(this.x, this.y, 1.8, 700);
+    audio.bossPower();
+    audio.glitchOn();
+    world.alert('TOO NEAR · FEED REWRITTEN', 'breach', 2.4);
+  }
 
-    if (this.spentOut) {
-      // It no longer bothers looking away.
-      this.gazeAngle = toTurret;
-      this.gazeOpen = 1;
-      this.gazeLocked = true;
-      return;
-    }
-
-    this.gazeTimer -= dt;
-    if (this.gazeTimer <= 0) {
-      this.gazeLocked = !this.gazeLocked;
-      const t = this.phase / 2;
-      const span = this.gazeLocked ? g.hold : g.away;
-      this.gazeTimer = (span[0] + (span[1] - span[0]) * t) * rand(0.88, 1.12);
-      if (this.gazeLocked) {
-        // The tell: it is coming round to you, and you have a moment to be
-        // ready for it. Without this the window is a reflex test.
-        this.gazeTell = g.tell;
-        audio.chime(300);
-        ring(this.x, this.y, this.r * 0.5, this.r * 2.2, 0.45, this.palette.core, 3);
-      } else {
-        // Look somewhere that is definitely not you.
-        this.gazeWander = toTurret + (Math.random() < 0.5 ? -1 : 1) * rand(0.9, 2.3);
-      }
-    }
-
-    const want = this.gazeLocked ? toTurret : this.gazeWander;
-    const d = angleDelta(this.gazeAngle, want); // signed, shortest way round
-    this.gazeAngle += clamp(d, -g.turn * dt, g.turn * dt);
-
-    const off = Math.abs(angleDelta(toTurret, this.gazeAngle));
-    this.gazeOpen = clamp(1 - off / g.cone, 0, 1);
-    // draw() only gets a context, and the sightline has to reach the turret
-    this.turretDist = Math.hypot(s.x - this.x, s.y - this.y);
+  /** SUBTRACT: one of the six buttons goes dark for a while. */
+  subtract(world) {
+    const slot = world.abilities.lockRandom(CFG.boss.subtract);
+    if (slot < 0) return;
+    ring(this.x, this.y, this.r * 0.5, this.r * 4, 0.5, this.palette.iris, 3);
+    audio.reflect();
+    return slot;
   }
 
   // --------------------------------------------------------------- reprise
@@ -432,7 +535,7 @@ export class Boss {
   // ------------------------------------------------------------------ echo
 
   /**
-   * A copy of the player's own turret, at the far end of the room. The player's
+   * A copy of the player's own turret, across the field. The player's
    * turret is fixed at the centre, so mirroring its x would stand the copy
    * exactly behind ORDINAL where nobody would ever see it — it goes to
    * whichever side ORDINAL is not on instead.
@@ -646,14 +749,12 @@ export class Boss {
     this.updateReprises(world, dt);
     this.updateEcho(world, dt);
 
+    // the tally shell, eased so it thins visibly rather than stepping
+    const heldNow = clamp(world.ledger / CFG.killGoal, 0, 1);
+    this.held += (heldNow - this.held) * clamp(dt * 2.6, 0, 1);
+
     if (this.intro < 1) {
-      this.intro = Math.min(1, this.intro + dt / 2.8);
-      if (Math.random() < 0.6) {
-        const a = rand(0, TAU);
-        const rr = rand(this.r * 1.4, this.r * 3);
-        spark(this.x + Math.cos(a) * rr, this.y + Math.sin(a) * rr,
-          -Math.cos(a) * 260, -Math.sin(a) * 260, this.palette.ring, 0.5, 2.4);
-      }
+      this.updateIntro(world, dt);
       return;
     }
 
@@ -675,7 +776,7 @@ export class Boss {
       }
     }
 
-    this.updateGaze(world, dt);
+    this.updateLoom(world, dt);
 
     // --- movement: slow, inevitable, and genuinely pushable ---
     const s = world.shooter;
@@ -695,24 +796,12 @@ export class Boss {
     this.y += this.vy * dt;
 
     const topLimit = world.wall.y + world.wall.thickness + this.r * 0.35;
-    const bottomLimit = s.y - this.r - 40;
+    // It stops well short of the turret. Sitting on top of the barrel made
+    // the fight about a shape in the way; the pressure is the looming.
+    const bottomLimit = s.y - this.r - CFG.boss.standoff;
     this.x = clamp(this.x, this.r * 0.6, world.width - this.r * 0.6);
     if (this.y < topLimit) { this.y = topLimit; this.vy = Math.max(this.vy, 0); }
     if (this.y > bottomLimit) { this.y = bottomLimit; this.vy = Math.min(this.vy, 0); }
-
-    // --- contact with the turret ---
-    if (d < this.r + s.r + 4 && this.contactCooldown <= 0) {
-      this.contactCooldown = 3.4;
-      world.bossContact = CFG.boss.contactGlitch;
-      this.vx -= dx * 240;
-      this.vy -= dy * 240;
-      shake(20);
-      flash(0.5, this.palette.core);
-      ring(s.x, s.y, 10, 420, 0.5, this.palette.halo, 5);
-      audio.bossPower();
-      audio.glitchOn();
-      world.alert('CONTACT · FEED REWRITTEN', 'breach', 2.4);
-    }
 
     // --- powers ---
     this.powerTimer -= dt;
@@ -724,9 +813,13 @@ export class Boss {
     }
 
     // --- it keeps producing objects, because that is what it is for ---
+    // Held right back at first: the opening of the fight is the player and
+    // ORDINAL and nothing else, and the field only thickens as it wakes up.
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
-      this.spawnTimer = CFG.boss.spawnInterval * rand(0.8, 1.2);
+      const ease = CFG.boss.earlySpawnScale;
+      const scale = ease + (1 - ease) * (this.phase / 2);
+      this.spawnTimer = CFG.boss.spawnInterval * scale * rand(0.8, 1.2);
       this.emit(world);
     }
   }
@@ -844,72 +937,39 @@ export class Boss {
     ctx.globalCompositeOperation = 'lighter';
     layer(sp.iris, this.spin * 1.1, 0.9, 1);
 
-    // pupil: a hole that constricts as it is hurt, and that looks where the
-    // gaze points. Its offset from centre is the entire tell for whether a
-    // shot will land — everything else on screen is decoration.
+    // pupil: a hole that constricts as it is hurt
     ctx.globalCompositeOperation = 'source-over';
-    const open = smoothstep(this.gazeOpen);
-    const pupilR = bodyR * (0.3 - this.pupil * 0.1 + Math.sin(this.time * 0.9) * 0.02) * (1 + open * 0.16);
-    const look = bodyR * 0.34 * (1 - open * 0.55);
-    const px = Math.cos(this.gazeAngle) * look;
-    const py = Math.sin(this.gazeAngle) * look;
+    const pupilR = bodyR * (0.3 - this.pupil * 0.1 + Math.sin(this.time * 0.9) * 0.02);
     ctx.fillStyle = '#02010a';
     ctx.beginPath();
-    ctx.arc(px, py, pupilR, 0, TAU);
+    ctx.arc(0, 0, pupilR, 0, TAU);
     ctx.fill();
     ctx.globalCompositeOperation = 'lighter';
     ctx.strokeStyle = rgba(p.core, 0.95);
-    ctx.lineWidth = 2.4 + open * 2;
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.arc(px, py, pupilR, 0, TAU);
+    ctx.arc(0, 0, pupilR, 0, TAU);
     ctx.stroke();
-    drawGlow(ctx, p.core, px, py, pupilR * (1.3 + open * 1.5), 0.55 + this.flash + open * 0.7);
+    drawGlow(ctx, p.core, 0, 0, pupilR * 1.3, 0.55 + this.flash);
 
-    // the wind-up, and the open eye: a widening bracket around the pupil as
-    // it swings onto you, then a hard bright rim once it has you
-    if (this.gazeTell > 0) {
-      const k = 1 - this.gazeTell / CFG.boss.gaze.tell;
-      ctx.strokeStyle = rgba(p.core, 0.75 * (1 - k));
-      ctx.lineWidth = 2;
+    // The armour, worn. A shell of tally marks around the body that thins as
+    // the count comes home: the one honest readout of what a hit is currently
+    // worth, and it lives on the thing being shot rather than in the HUD.
+    if (this.held > 0.005) {
+      const marks = 60;
+      const shellR = bodyR * 1.3;
+      ctx.strokeStyle = rgba(p.core, 0.18 + this.held * 0.5);
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(px, py, pupilR * (1.2 + (1 - k) * 2.6), 0, TAU);
+      for (let i = 0; i < marks; i++) {
+        if (i / marks > this.held) continue;
+        const a = (i / marks) * TAU - this.spin * 0.7;
+        const len = bodyR * 0.12;
+        ctx.moveTo(Math.cos(a) * shellR, Math.sin(a) * shellR);
+        ctx.lineTo(Math.cos(a) * (shellR + len), Math.sin(a) * (shellR + len));
+      }
       ctx.stroke();
-    }
-    if (open > 0.02) {
-      ctx.strokeStyle = rgba('#ffffff', 0.5 * open);
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.arc(px, py, pupilR * 1.5, 0, TAU);
-      ctx.stroke();
-      drawGlow(ctx, '#ffffff', px, py, pupilR * 2.6, 0.3 * open);
-    }
-    // The sightline. Early in the fight the eye sits high enough that the HUD
-    // crowds the pupil, and the pupil is the entire tell — so the direction it
-    // is looking is also drawn out into open space, and lands on the turret
-    // exactly when shots start counting.
-    {
-      const reach = this.turretDist;
-      const ex = Math.cos(this.gazeAngle);
-      const ey = Math.sin(this.gazeAngle);
-      const lit = 0.1 + open * 0.62;
-      const grad = ctx.createLinearGradient(px, py, px + ex * reach, py + ey * reach);
-      grad.addColorStop(0, rgba(open > 0.02 ? '#ffffff' : p.ring, lit));
-      grad.addColorStop(1, rgba(p.ring, 0));
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = 1 + open * 2.6;
-      ctx.beginPath();
-      ctx.moveTo(px + ex * pupilR, py + ey * pupilR);
-      ctx.lineTo(px + ex * reach, py + ey * reach);
-      ctx.stroke();
-    }
-
-    // a shot that glanced: the rim flares closed
-    if (this.glance > 0.01) {
-      ctx.strokeStyle = rgba(p.ring, 0.7 * this.glance);
-      ctx.lineWidth = 3 * this.glance;
-      ctx.beginPath();
-      ctx.arc(0, 0, bodyR * (1 + this.glance * 0.12), 0, TAU);
-      ctx.stroke();
+      drawGlow(ctx, p.core, 0, 0, shellR * 1.6, 0.12 * this.held);
     }
 
     // wings

@@ -93,9 +93,10 @@ export class Game {
       chrono: 0,
       lockout: 0,
       bossContact: 0,
-      // What ORDINAL has left of the player's tally to spend. Set when it
-      // arrives, drained by everything it does.
+      // What ORDINAL still holds of the player's tally. Set when it arrives,
+      // drained both by everything it does and by every hit that lands.
       ledger: 0,
+      reclaimed: 0,
       autoSteering: false, // is auto aim traversing the barrel this frame?
       autoAim: false,
       autoFire: false,
@@ -117,6 +118,7 @@ export class Game {
       },
 
       alert: (text, kind, dur) => self.hud.alert(text, kind, dur),
+      bossCaption: (text, hold) => self.hud.bossCaption(text, hold),
       onGateSealed: () => self.onGateSealed(),
       onGateBroken: () => self.onGateBroken(),
       onBossDead: () => self.onBossDead(),
@@ -140,6 +142,8 @@ export class Game {
     w.stasis = w.veil = w.invert = w.jam = w.chrono = w.lockout = w.bossContact = 0;
     w.veilFade = 0;
     w.ledger = 0;
+    w.reclaimed = 0;
+    this.hud.bossCaption(null);
     w.nextStoryAt = CFG.storyEvery;
     w.sealed = false;
     w.phase = 'staging';
@@ -491,7 +495,13 @@ export class Game {
 
     w.wall.update(w, dt);
     w.director.update(w, dt);
-    if (w.boss && !w.boss.dead) w.boss.update(w, dt);
+    if (w.boss && !w.boss.dead) {
+      w.boss.update(w, dt);
+      if (!this.bossArmed && w.boss.intro >= 1) {
+        this.bossArmed = true;
+        this.onBossArrived();
+      }
+    }
 
     // ---- physics substeps ----
     let steps = 0;
@@ -673,9 +683,10 @@ export class Game {
     w.phase = 'boss';
     this.hud.setPhase('BOSS');
     this.hud.setGate(false);
-    background.setMood('boss');
+    // The field goes dark for the arrival and only lights up again with it.
+    background.setMood('breach');
     background.surge(2);
-    audio.setDroneMood(33, 260, 0.09);
+    audio.setDroneMood(26, 180, 0.05);
 
     const bx = w.wall.gateCx;
     const by = w.wall.y + w.wall.thickness + CFG.boss.r * 0.4;
@@ -683,13 +694,24 @@ export class Game {
 
     // The reveal. Five hundred objects were not a score, they were a deposit,
     // and the counter the player has been watching all run turns over and
-    // starts spending itself against them.
+    // becomes the thing they now have to take back.
     w.ledger = CFG.killGoal;
+    w.reclaimed = 0;
     this.hud.setLedgerMode(true);
-
+    this.hud.clearAlerts();
+    // All ten story beats are spent by five hundred kills; anything still
+    // decaying mid-field would sit under the arrival captions.
+    w.narrator.reset();
     this.hud.setBoss(true, 1, 'ORDINAL', 'FIRST OF ——');
-    this.hud.alert('ORDINAL · ARRIVING', 'power', 4);
-    this.hud.alert('LEDGER · IT HAS YOUR FIVE HUNDRED', 'breach', 5);
+    this.bossArmed = false;
+  }
+
+  /** Called once the arrival sequence finishes and the fight proper starts. */
+  onBossArrived() {
+    background.setMood('boss');
+    background.surge(2);
+    audio.setDroneMood(33, 260, 0.09);
+    this.hud.alert('IT WEARS YOUR COUNT · TAKE IT BACK', 'breach', 5.5);
   }
 
   onBossDead() {
@@ -757,9 +779,10 @@ export class Game {
         + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}\n`
         + `mines  ${w.mines.length}  round ${w.round}\n`
         + (w.boss
-          ? `ledger ${w.ledger}  spent ${w.boss.spent}${w.boss.spentOut ? ' OUT' : ''}\n`
-            + `eye    ${w.boss.gazeOpen.toFixed(2)} ${w.boss.eyeOpen ? 'OPEN' : 'shut'}  x${w.boss.damageScale.toFixed(2)}\n`
+          ? `ledger ${w.ledger}  back ${w.reclaimed}  burnt ${w.boss.spent}${w.boss.spentOut ? ' OUT' : ''}\n`
+            + `armour x${w.boss.damageScale(w).toFixed(2)}  intro ${w.boss.intro.toFixed(2)}${w.boss.looming ? '  LOOMING' : ''}\n`
             + `rev    ${w.boss.reprises.length} reprise  ${w.boss.echo ? 'echo' : 'no echo'} ${w.boss.echoBolts.length} bolts\n`
+            + `locked ${w.abilities.slots.filter((s) => s.locked > 0).length}/6\n`
           : '')
         + `build  ${BUILD}  zoom ${CFG.zoom}`,
       );
@@ -1000,7 +1023,9 @@ export class Game {
     const w = this.world;
     if (w.boss && !w.boss.dead) {
       w.boss.intro = 1;
-      w.boss.hurt(w, w.boss.hp);
+      // Damage is scaled by whatever the armour is worth right now, so a
+      // debug kill has to divide it back out or it merely dents it.
+      w.boss.hurt(w, w.boss.hp / w.boss.damageScale(w) + 1);
     }
   }
 
@@ -1037,6 +1062,22 @@ export class Game {
     const w = this.world;
     if (!w.boss || w.boss.dead) return;
     w.boss.spend(w, w.ledger);
+  }
+
+  debugTithe() {
+    const w = this.world;
+    if (w.boss && !w.boss.dead) w.boss.tithe(w);
+  }
+
+  debugSubtract() {
+    const w = this.world;
+    if (w.boss && !w.boss.dead) w.boss.subtract(w);
+  }
+
+  /** Skip the arrival sequence when testing the fight itself. */
+  debugSkipIntro() {
+    const w = this.world;
+    if (w.boss && !w.boss.dead) w.boss.intro = 1;
   }
 
   debugSpawnWave() {

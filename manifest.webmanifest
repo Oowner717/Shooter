@@ -1,7 +1,7 @@
 {
   "name": "SIMULATION 7749",
   "short_name": "SIM 7749",
-  "description": "A physics shooter. Five hundred simple shapes, one wall, one lock. The first room.",
+  "description": "A physics shooter. Five hundred simple shapes, one wall, one lock. The shallow end of something.",
   "id": "./",
   "start_url": "./index.html",
   "scope": "./",

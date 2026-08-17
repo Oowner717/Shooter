@@ -24,6 +24,7 @@ export class Hud {
       status: $('status'),
       killGoal: document.querySelector('#counter .dim'),
       counterLabel: document.querySelector('#counter em'),
+      bossCaption: $('bossCaption'),
       abilities: $('abilities'),
       hint: $('abilityHint'),
       debug: $('debugPanel'),
@@ -100,7 +101,7 @@ export class Hud {
       b.addEventListener('pointerdown', trigger);
       b.addEventListener('contextmenu', (e) => e.preventDefault());
       frag.appendChild(b);
-      this.slots.push({ el: b, fill: b.querySelector('.fill'), ready: null, frac: -1 });
+      this.slots.push({ el: b, fill: b.querySelector('.fill'), ready: null, frac: -1, locked: null });
     });
     this.el.abilities.appendChild(frag);
   }
@@ -119,6 +120,7 @@ export class Hud {
       const s = this.slots[i];
       // Quantised so an idle bar isn't restyled sixty times a second.
       const f = Math.round(abilities.readyFraction(i) * 100) / 100;
+      const locked = abilities.isLocked(i);
       if (s.frac !== f) {
         s.frac = f;
         s.fill.style.transform = `scaleY(${1 - f})`;
@@ -127,6 +129,10 @@ export class Hud {
           s.ready = ready;
           s.el.classList.toggle('ready', ready);
         }
+      }
+      if (s.locked !== locked) {
+        s.locked = locked;
+        s.el.classList.toggle('locked', locked);
       }
     }
   }
@@ -172,6 +178,26 @@ export class Hud {
     if (label === this.lastPhase) return;
     this.lastPhase = label;
     this.el.phaseTag.textContent = label;
+  }
+
+  /**
+   * The arrival captions. Large, centred, one at a time — deliberately not an
+   * alert pill, because the point of the entrance is that the interface stops
+   * being busy for a moment. Pass null to clear.
+   */
+  bossCaption(text, hold = 3) {
+    const el = this.el.bossCaption;
+    clearTimeout(this.captionTimer);
+    if (!text) {
+      el.classList.remove('show');
+      el.textContent = '';
+      return;
+    }
+    el.textContent = text;
+    el.classList.remove('show');
+    void el.offsetWidth; // restart the entrance
+    el.classList.add('show');
+    this.captionTimer = setTimeout(() => el.classList.remove('show'), hold * 1000);
   }
 
   setBoss(visible, frac = 1, title, sub) {
@@ -221,11 +247,17 @@ export class Hud {
     const boss = world.boss;
     if (boss && !boss.dead && boss.intro >= 1) {
       if (boss.recallActive) want.set('RECALL', 'power');
-      // Only the actionable half is a pill. A permanent "eye closed" row would
-      // sit there the whole fight and teach nothing; the pupil and the
-      // sightline already say which way it is looking.
-      if (boss.eyeOpen) want.set('EYE OPEN · FIRE NOW', 'open');
       if (boss.echo) want.set('ECHO FIRING · SHOOT IT DOWN', 'breach');
+      if (boss.looming) want.set('IT IS TOO NEAR · PUSH IT BACK', 'breach');
+      if (world.abilities.slots.some((s) => s.locked > 0)) want.set('A BUTTON WITHHELD', 'power');
+      // The armour, as a number rather than a bar: how much of a hit the
+      // player's own count is currently soaking on ORDINAL's behalf.
+      if (world.ledger > 0) {
+        const soak = Math.round((1 - boss.damageScale(world)) * 100);
+        if (soak >= 12) want.set(`YOUR COUNT ABSORBS ${soak}%`, 'power');
+      } else {
+        want.set('NOTHING LEFT TO ABSORB', 'open');
+      }
     }
 
     for (const [text, el] of this.statusEls) {
@@ -281,7 +313,10 @@ export class Hud {
       ['BOSS POWER', () => g.debugBossPower()],
       ['REPRISE', () => g.debugReprise()],
       ['ECHO', () => g.debugEcho()],
+      ['TITHE', () => g.debugTithe()],
+      ['SUBTRACT', () => g.debugSubtract()],
       ['DRAIN LEDGER', () => g.debugDrainLedger()],
+      ['SKIP INTRO', () => g.debugSkipIntro()],
       ['SPAWN WAVE', () => g.debugSpawnWave()],
       ['FILL FIELD', () => g.debugFillField()],
       ['CLEAR FIELD', () => g.debugClearField()],

@@ -217,6 +217,49 @@ html, body {
 .alert.breach { color: var(--warn); }
 .alert.power { color: #ffcf5c; }
 .alert.info { color: var(--accent); }
+/*
+ * ORDINAL's arrival captions. Centred over the field, one line at a time,
+ * away from the pill stack — the entrance is the one moment the interface is
+ * supposed to go quiet.
+ */
+#bossCaption {
+  position: absolute;
+  left: calc(var(--safe-l) + 22px);
+  right: calc(var(--safe-r) + 22px);
+  top: 42%;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.7;
+  letter-spacing: 0.22em;
+  color: #f3e6ff;
+  text-shadow: 0 0 22px rgba(0, 0, 0, 0.95), 0 0 40px rgba(230, 179, 255, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.9s ease;
+}
+#bossCaption.show {
+  opacity: 1;
+  animation: captionIn 1s ease-out;
+}
+@keyframes captionIn {
+  from { opacity: 0; transform: translateY(10px); filter: blur(7px); letter-spacing: 0.5em; }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+/* A button ORDINAL has taken away. */
+.ab.locked {
+  opacity: 0.32;
+  filter: grayscale(1);
+}
+.ab.locked::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-top: 1.5px solid var(--warn);
+  transform: rotate(-32deg);
+  transform-origin: center;
+}
+
 /* The window to shoot the boss in. The only pill that is good news. */
 .alert.open {
   color: #7cffb2;

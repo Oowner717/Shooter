@@ -244,21 +244,20 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       return;
     }
     case 'boss': {
-      // Aimed fire is gated by the gaze: full value while the eye is on you,
-      // a glance the rest of the time. The feedback has to be unmistakable or
-      // the rule reads as the gun being broken.
+      // Its armour is the player's own tally. A hit that mostly gets soaked
+      // has to look different from one that lands, or the ramp is invisible.
       const boss = world.boss;
-      const open = boss.eyeOpen;
-      boss.hurt(world, p.damage, true);
-      boss.push(dirx, diry, CFG.boss.pushPerBolt * (open ? 1 : 0.35));
-      if (open) {
-        hitBurst(hx, hy, -dirx, -diry, boss.hitColor);
-        audio.hit();
-      } else {
+      const soaked = boss.damageScale(world) < 0.55;
+      boss.hurt(world, p.damage);
+      boss.push(dirx, diry, CFG.boss.pushPerBolt);
+      if (soaked) {
         for (let i = 0; i < 4; i++) {
           spark(hx, hy, spread(150) - dirx * 130, spread(150) - diry * 130, boss.palette.ring, 0.24, 1.8);
         }
         audio.reflect();
+      } else {
+        hitBurst(hx, hy, -dirx, -diry, boss.hitColor);
+        audio.hit();
       }
       endProjectile(world, p, hx, hy, true);
       return;

@@ -421,21 +421,51 @@ export const ABILITIES = [
 
 export class Abilities {
   constructor() {
-    this.slots = ABILITIES.map((def) => ({ def, cd: 0, used: false }));
+    this.slots = ABILITIES.map((def) => ({ def, cd: 0, used: false, locked: 0 }));
   }
 
   reset() {
-    for (const s of this.slots) { s.cd = 0; s.used = false; }
+    for (const s of this.slots) { s.cd = 0; s.used = false; s.locked = 0; }
   }
 
   update(dt) {
-    for (const s of this.slots) if (s.cd > 0) s.cd = Math.max(0, s.cd - dt);
+    for (const s of this.slots) {
+      if (s.cd > 0) s.cd = Math.max(0, s.cd - dt);
+      if (s.locked > 0) s.locked = Math.max(0, s.locked - dt);
+    }
+  }
+
+  /**
+   * ORDINAL's SUBTRACT. Takes an unlocked button away for a while, preferring
+   * one that is actually ready — removing something already on cooldown would
+   * cost the player nothing.
+   * @returns the index taken, or -1 if there was nothing worth taking.
+   */
+  lockRandom(seconds) {
+    const free = [];
+    const any = [];
+    for (let i = 0; i < this.slots.length; i++) {
+      const s = this.slots[i];
+      if (s.locked > 0) continue;
+      any.push(i);
+      if (s.cd <= 0) free.push(i);
+    }
+    const pool = free.length ? free : any;
+    if (!pool.length) return -1;
+    const i = pool[(Math.random() * pool.length) | 0];
+    this.slots[i].locked = seconds;
+    return i;
+  }
+
+  isLocked(i) {
+    const s = this.slots[i];
+    return !!s && s.locked > 0;
   }
 
   /** @returns the slot if it fired, otherwise null. */
   trigger(world, index) {
     const s = this.slots[index];
-    if (!s || s.cd > 0) return null;
+    if (!s || s.cd > 0 || s.locked > 0) return null;
     s.def.run(world);
     s.cd = s.def.cooldown * (world.debug.noCooldown ? 0 : 1);
     const first = !s.used;

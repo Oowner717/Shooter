@@ -1,13 +1,17 @@
 // Ten sentences, one per fifty objects, then corrupted away, and six more at
-// the end. Between them they hint at what this room actually is without ever
+// the end. Between them they hint at what this place actually is without ever
 // naming it: the shapes are simple on purpose, someone is counting, and the
 // thing behind the gate is a lock rather than a finish line.
 //
-// The back half turns the gaze around. Through line 6 the observer is watching
-// the field; from line 7 it is watching the player, and line 8 promises the
-// same from whatever comes through the gate — which pays off in ORDINAL's iris
-// and its first aspect banner, ASPECT 1 · WATCHING. Every line has to survive
-// one reading at 13px behind moving objects, so the images stay single-step.
+// It is deliberately never called a room. Where a noun is unavoidable it is
+// "the shallows" — open, shallow, and with something deeper past it — and
+// most lines avoid naming it at all.
+//
+// The back half turns the attention around. Through line 6 the observer is
+// watching the field; from line 7 it is watching the player, and line 8
+// promises the same from whatever comes through the gate. Every line has to
+// survive one reading at 13px behind moving objects, so the images stay
+// single-step.
 
 import { clamp, rgba } from './util.js';
 
@@ -20,17 +24,17 @@ const STORY = [
   'The wall is thin. It was never built to hold anything for long.',
   'We stopped watching the shapes a while ago.',
   'Nothing that gate has sent has looked at you. The last one will.',
-  'You will describe this room to yourself later. You will leave most of it out.',
+  'You will try to describe this later. You will leave most of it out.',
   'None of this was ever real enough to be an enemy. That was a kindness. It does not repeat.',
 ];
 
 export const ENDING = [
-  'NOTHING LEFT IN THIS ROOM.',
+  'NOTHING LEFT ON THIS SIDE.',
   'That was not a guardian. It was a lock, and a lock is only frightening from one side.',
   'You did all of it without being told what it was for. That is what we needed to see.',
   'And you were very good at this.',
   'The next one is not this kind. It is not this small. You are already expected.',
-  'SESSION 7749 :: CLOSED — THE FIRST ROOM ONLY',
+  'SESSION 7749 :: CLOSED — THE SHALLOWS ONLY',
 ];
 
 const SCRAMBLE = '▓▒░#%&@*<>/\\|=+-_01';

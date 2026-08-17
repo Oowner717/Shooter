@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '13';
+export const BUILD = '14';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -130,33 +130,44 @@ export const CFG = {
     contactGlitch: 2.6,
     jamInterval: 0.4, // forced delay between shots while JAM is up
     powerInterval: [13, 9.5], // seconds between powers, phase 1 -> phase 3
+
+    // It keeps its distance. Closing all the way to the turret made the fight
+    // about a shape sitting on top of the barrel; it now stops with a clear
+    // gap and applies pressure by looming instead. The field between the wall
+    // and the turret is only about 520 units deep, so the standoff has to
+    // leave real travel in it — too large and it is pinned to the wall and
+    // the loom never lifts.
+    standoff: 150, // clear gap it will not close: ~124 units of open space
+    loom: 90, // this near its floor, its presence rewrites the feed
+    loomInterval: 5.2,
+
+    // The flow of objects is held right back at the start of the fight, so
+    // the opening is the player and ORDINAL and nothing else, then thickens.
     spawnInterval: 7.5,
+    firstSpawn: 24, // seconds after it arrives before the first emission
+    earlySpawnScale: 1.75, // interval multiplier at aspect 1, easing to 1 by aspect 3
 
-    // The gaze. ORDINAL is an eye, so it is only open to you while it is
-    // actually looking at you: bolts that arrive while it is looking
-    // elsewhere glance off. Firing blindly is worse than the old fight,
-    // firing on the beat is better, and the window narrows as it wakes up.
-    gaze: {
-      closed: 0.16, // damage multiplier while it is looking away
-      open: 1.9, // damage multiplier while it has your eye
-      hold: [2.1, 1.35], // seconds it holds you, aspect 1 -> 3
-      away: [2.5, 3.7], // seconds it looks elsewhere, aspect 1 -> 3
-      turn: 2.5, // rad/s the pupil travels
-      cone: 0.45, // radians of alignment that count as open
-      tell: 0.55, // seconds of wind-up before the eye arrives on you
-    },
-
-    // The ledger. Everything ORDINAL does is paid for out of the tally the
-    // player spent the whole run building — the counter stops being a score
-    // the moment it walks in, and starts being its reserve.
+    // The ledger. ORDINAL walks in wearing the player's five hundred. While
+    // it holds them they absorb damage for it, so the opening is armoured and
+    // the fight accelerates as the count comes back — no timing, no window,
+    // just a number that is worth attacking. Everything it spends is armour
+    // it no longer has, and every hit takes some back.
     ledger: {
+      armour: 0.76, // damage reduction at a full ledger; none at an empty one
+      reclaimPerDamage: 0.12, // count returned per point of damage that lands
       power: 18,
       emit: 5,
       reprise: 34,
       echo: 55,
+      tithe: 46, // taken BACK off the player when it can afford nothing else
+      titheAbove: 0.62, // only below this fraction of the original count
       spentApproach: 2.4, // it stops conserving once there is nothing left
       spentPowerScale: 0.5,
     },
+
+    // Taking a button away. It cannot damage the player, so it removes
+    // options instead — the spec the whole boss is built on.
+    subtract: 11,
 
     // Kills coming apart backwards: debris on the field flies together and
     // becomes whole objects again.

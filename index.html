@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="SIM 7749">
 <meta name="theme-color" content="#04050a">
 <meta name="color-scheme" content="dark">
-<meta name="description" content="SIMULATION 7749 — a physics shooter. The first room.">
+<meta name="description" content="SIMULATION 7749 — a physics shooter. The shallow end of something.">
 <title>SIMULATION 7749</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '13';
+  var BUILD = '14';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -94,6 +94,7 @@
 
     <div id="alerts"></div>
     <div id="status"></div>
+    <div id="bossCaption"></div>
 
     <!-- ============ TOGGLE RACK ============ -->
     <div id="toggleRack">
@@ -136,7 +137,7 @@
     <!-- ============ BOOT SCREEN ============ -->
     <section id="boot">
       <div class="bootInner">
-        <div class="bootKicker">SESSION 7749 :: ROOM ONE OPEN</div>
+        <div class="bootKicker">SESSION 7749 :: SHALLOWS OPEN</div>
         <h1>SIMULATION<br><b>7749</b></h1>
         <p class="bootBody">
           A turret. A wall. Five hundred shapes, and none of them is the point.<br>

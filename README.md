@@ -115,46 +115,64 @@ A typical run is about fifteen minutes.
 
 ### The fight
 
-ORDINAL has no more hit points than it ever did. It is harder for three other
-reasons.
+ORDINAL has no more hit points than it ever did, and none of what follows asks
+anything of your hands.
 
-**The gaze.** It is an eye, so it is only open to you while it is looking at
-you. A bolt that lands while it is looking elsewhere does **4.2** damage; one
-that lands while it holds your eye does **49.4** — the same round, an 11.8×
-swing. Its pupil visibly tracks around the socket and a sightline is drawn out
-along whatever it is watching, so the tell is always readable even when the
-body is crowded up against the wall. There is a wind-up before it comes round
-to you, a green **EYE OPEN · FIRE NOW** pill for the window, and shots that
-glance ricochet with a different sound.
+**The arrival.** Breaking the gate does not start a fight. The substrate drains
+to black, ORDINAL is hauled through the breach over eleven seconds in four
+beats — each with its own sound, shock and caption — and *nothing comes out of
+the gate for another twenty-four seconds after that*. The opening of the fight
+is you and it and an empty field.
 
-Measured against the old fight: a player who simply holds the trigger does
-**0.80×** the damage, and a player who waits for the beat does **1.90×**.
-Harder if you ignore it, faster if you engage with it, and not one extra hit
-point either way. Abilities are deliberately *not* gated — all six land in
-full whenever you press them, so the timing game is about the turret only.
+> THAT WAS THE LAST OF THE SIMPLE WORK.
+> IT HAS BEEN HOLDING YOUR FIVE HUNDRED SINCE THE FIRST ONE.
+> IT WILL NOT GIVE THEM BACK. TAKE THEM.
+> ORDINAL · FIRST OF ——
 
-**The ledger.** Everything ORDINAL does is paid for out of your own tally. The
-moment it arrives, the counter you have watched climb for the whole run turns
-red, relabels itself **RECLAIMED**, and starts falling: 18 for a power, 5 per
-object it emits, 34 for a reprise, 55 for an echo. Powers it can no longer
-afford drop out of its rotation, so the fight thins as its reserve runs down.
-At zero the chip reads **SPENT**, it stops rationing — it walks 2.4× faster,
-casts twice as often, and can no longer close its eye at all. Roughly two and
-a half minutes of spending, and it is a second health bar that you spent
-thirteen minutes filling on its behalf.
+**It wears your count.** The five hundred are its armour. While it holds all of
+them, **76%** of every hit is soaked; at an empty ledger, none is. Twenty bolts
+into a full ledger do **130** damage; the same twenty at an empty one do
+**494**. Every hit that lands takes some count back, and everything it spends
+on its own powers is armour it no longer has — so the fight opens hard and
+accelerates as the number comes home. There is no window to hit and no timing
+to learn: the number on the chip *is* the shield, and shooting it is what
+brings it down. A ring of tally marks around its body thins as it goes, so the
+state is readable on the thing you are shooting rather than only in the HUD.
 
-**The reversal.** Two of its powers run the game backwards.
+Measured end to end, holding fire on it and nothing else: the armour phase
+lasts **58 s**, the whole fight **162 s**, and of the five hundred you take
+back 400 while it burns 100.
+
+**It keeps its distance.** It cannot reach the turret at all any more: it stops
+with **124 units of open space** between its edge and yours, across 180 units
+of travel from the wall. Instead it *looms* — inside the last 90 units of its
+approach the feed is rewritten on a timer, and shooting genuinely pushes it
+back out of that band again.
+
+**The reversal.** Three of its powers run the game backwards.
 
 - **REPRISE** un-kills. Fragments of things you already destroyed lift out of
   the simulation, fly back together along visible seams, and land as whole
   objects again. It prefers real debris near the assembly point and only makes
   up the shortfall from itself, so on a littered field you watch your own work
   undone.
-- **ECHO** stands a copy of *your* turret at the far end of the room and
-  shoots back with it. Its rounds cannot hurt you — nothing can — but they
-  corrupt the feed and throw your barrel off aim when they land. They travel
-  slowly and **can be shot down**, which makes your own rounds the counter to
-  your own turret.
+- **ECHO** stands a copy of *your* turret across the field and shoots back with
+  it. Its rounds cannot hurt you — nothing can — but they corrupt the feed and
+  throw your barrel off aim when they land. They travel slowly and **can be
+  shot down**, which makes your own rounds the counter to your own turret.
+- **TITHE** reaches back and takes some of what you reclaimed. It only does
+  this once you are meaningfully ahead, and never once the ledger is spent.
+
+**SUBTRACT** takes one of the six ability buttons away for eleven seconds — it
+prefers one that is actually *ready*, because removing something already on
+cooldown would cost you nothing. The button goes dark and struck through. It
+still cannot damage you; it can only leave you with fewer options.
+
+At zero the chip reads **SPENT** and it stops rationing entirely: it walks 2.4×
+faster and casts twice as often, and nothing absorbs anything any more.
+
+The background turns over with it — near-black through the arrival, then gold,
+violet and crimson as it moves through its three aspects.
 
 ### The objects
 
@@ -204,6 +222,10 @@ before the collapse goes off at all.
 
 ### The story
 
+It is never called a room. Where a noun is unavoidable it is *the shallows* —
+open, shallow, and with something deeper past it — and most lines avoid naming
+the place at all.
+
 Ten sentences, one per fifty objects destroyed, then six more at the end.
 They appear in the mid-field, drawn *behind* every entity so they can never
 hide something you need to shoot, and they corrupt away after a few seconds.
@@ -217,14 +239,15 @@ and the thing behind the gate is a lock rather than a finish line.
 
 The **DBG** chip (top right) opens a panel: skip to the gate, skip to the boss,
 kill the boss, +50 kills, advance the story, force a boss power, force a
-reprise, raise an echo, drain the ledger to the spent endgame, spawn a
-formation, fill the field, clear the field, trigger a glitch, jump to the end
+reprise, raise an echo, force a tithe or a subtract, drain the ledger to the
+spent endgame, skip the arrival, spawn a formation, fill the field, clear the field, trigger a glitch, jump to the end
 screen, restart — plus toggles for cooldowns, corruption, slow motion,
 hitboxes, a live stats readout, and an invulnerable gate.
 
-With **STATS** on, the boss fight adds three lines: the ledger and what has
-been spent, the gaze (`0.00 shut x0.16` … `1.00 OPEN x1.90`), and how many
-reprises and echo rounds are live.
+With **STATS** on, the boss fight adds four lines: the ledger with how much
+has been reclaimed and how much burnt, the current armour multiplier and
+arrival progress, how many reprises and echo rounds are live, and how many
+ability buttons are withheld.
 
 ---
 
@@ -251,7 +274,7 @@ src/
   mines.js              inert-in-flight auto mines
   shooter.js            the turret
   gate.js               wall + gate states
-  boss.js               ORDINAL: the gaze, the ledger, reprise, echo
+  boss.js               ORDINAL: arrival, worn ledger, reprise, echo, tithe
   abilities.js          the six abilities and their effects
   narrative.js          the ten sentences, and how they decay
   hud.js                DOM interface
@@ -266,11 +289,12 @@ scripts/
 length most: `bolt.damage`, `shooter.gripFireInterval`, `gate.hp`, `boss.hp`,
 `popStart`/`popEnd`, and `spawnInterval`.
 
-The boss fight is tuned entirely under `boss.gaze`, `boss.ledger`,
-`boss.reprise` and `boss.echo` — `gaze.closed`/`gaze.open` set how much the
-timing game is worth, `gaze.hold`/`gaze.away` set how often the window comes
-round, and the `ledger.*` costs set how long the reserve lasts. Reach for those
-before `boss.hp`: raising hit points makes the fight longer, not harder.
+The boss fight is tuned entirely under `boss.ledger`, `boss.reprise`,
+`boss.echo`, `boss.standoff`/`boss.loom` and `boss.firstSpawn` —
+`ledger.armour` sets how hard the opening is, `ledger.reclaimPerDamage` sets
+how fast the count comes home, and the `ledger.*` costs set how much it burns
+on its own account. Reach for those before `boss.hp`: raising hit points makes
+the fight longer, not harder.
 
 `zoom` is the camera. Everything in the game runs in *world units*; the whole
 scene is drawn scaled by `zoom`, so lowering it pulls the camera back and
