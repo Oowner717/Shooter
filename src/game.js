@@ -14,7 +14,7 @@ import { Abilities } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator, ENDING } from './narrative.js';
-import { Hud, ROUND_KEYS } from './hud.js';
+import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
 import { codex } from './codex.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
@@ -37,7 +37,6 @@ export class Game {
     this.gripPointer = null;
     this.fireTimer = 0;
     this.mineTimer = 0;
-    this.snareTimer = 0;
     this.autoLock = null;
     this.autoHinted = {};
     this.acc = 0;
@@ -104,8 +103,7 @@ export class Game {
       autoSteering: false, // is auto aim traversing the barrel this frame?
       autoAim: false,
       autoFire: false,
-      autoMine: false,
-      autoSnare: false,
+      mine: null, // the one kind of mine being laid, or none
       round: 'standard', // standard | explosive | shotgun
       mines: [],
       decoy: null, // the DECOY ability's stand-in turret, while one is up
@@ -160,11 +158,10 @@ export class Game {
     // — including the first-use captions, which a fresh session should get.
     w.autoAim = false;
     w.autoFire = false;
-    w.autoMine = false;
-    w.autoSnare = false;
+    w.mine = null;
     w.round = 'standard';
     this.autoHinted = {};
-    for (const key of ['autoAim', 'autoFire', 'autoMine', 'autoSnare', ...ROUND_KEYS]) {
+    for (const key of ['autoAim', 'autoFire', ...MINE_KEYS, ...ROUND_KEYS]) {
       this.hud.setToggle(key, false);
     }
     this.hud.setToggle('standard', true);
@@ -183,7 +180,6 @@ export class Game {
     w.autoSteering = false;
 
     this.mineTimer = 0;
-    this.snareTimer = 0;
     this.snapshot = null;
     this.endStage = 0;
     this.endTimer = 0;
@@ -371,8 +367,10 @@ export class Game {
     standard: 'BOLT — nothing done to it, and the fastest cadence there is.',
     autoAim: 'AUTO AIM — tracks and fires on the nearest breacher.',
     autoFire: 'AUTO FIRE — keeps shooting wherever the barrel points.',
-    autoMine: 'AUTO MINE — lobs inert mines that arm where they land.',
-    autoSnare: 'AUTO SNARE — lays traps that pin a crowd instead of killing it.',
+    blast: 'BLAST MINES — inert until they land, then one hard bang each.',
+    snare: 'SNARE MINES — they pin a crowd instead of killing it.',
+    wire: 'WIRE — a line across the field. Anything crossing it is cut.',
+    knell: 'KNELL — it does not wait to be touched. It goes off three times.',
     explosive: 'HE ROUNDS — every shot detonates. Half the rate of fire.',
     shotgun: 'SHOT ROUNDS — five pellets a shot, close range, slower cadence.',
     arc: 'ARC ROUNDS — the hit jumps on through anything nearby.',
@@ -383,9 +381,20 @@ export class Game {
     const w = this.world;
     w[key] = !w[key];
     this.hud.setToggle(key, w[key]);
-    if (key === 'autoMine' && w.autoMine) this.mineTimer = 0.2;
-    if (key === 'autoSnare' && w.autoSnare) this.snareTimer = 0.2;
     this.announceToggle(key, w[key]);
+  }
+
+  /**
+   * One kind of mine is laid at a time. There is no cell for "none", so
+   * tapping the lit one is how you stop laying them — unlike the rounds,
+   * where STANDARD is a cell of its own and re-picking is a no-op.
+   */
+  toggleMine(kind) {
+    const w = this.world;
+    w.mine = w.mine === kind ? null : kind;
+    for (const k of MINE_KEYS) this.hud.setToggle(k, w.mine === k);
+    if (w.mine) this.mineTimer = 0.2;
+    this.announceToggle(kind, w.mine === kind);
   }
 
   /**
@@ -581,8 +590,7 @@ export class Game {
     if (steps === CFG.maxSubsteps) this.acc = 0;
 
     updateProjectiles(w, dt);
-    this.mineTimer = mineCadence(w, this.mineTimer, dt, 'blast');
-    this.snareTimer = mineCadence(w, this.snareTimer, dt, 'snare');
+    this.mineTimer = mineCadence(w, this.mineTimer, dt);
     updateMines(w, dt);
     this.resolveBlasts();
     this.checkContact();
@@ -1222,12 +1230,8 @@ export class Game {
     for (const e of [...w.debris]) if (!e.dead) e.destroy(w);
   }
 
-  debugThrowMine() {
-    throwMine(this.world, 'blast');
-  }
-
-  debugThrowSnare() {
-    throwMine(this.world, 'snare');
+  debugThrowMine(kind = 'blast') {
+    throwMine(this.world, kind);
   }
 
   debugSpawnDrift() {

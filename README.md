@@ -47,11 +47,11 @@ and tap with the other.
 
 ### The strip
 
-**Nine cells sit above the ability bar and never go away.** The two **mines**
-stack at the left edge, the five kinds of **ammunition** stack at the right
-edge, and the two things that **run on their own** sit side by side in the
-middle. That is the whole of what you choose between, permanently on screen,
-one tap each.
+**Eleven cells sit above the ability bar and never go away.** The four
+**mines** stack at the left edge, the five kinds of **ammunition** stack at the
+right edge, and the two things that **run on their own** sit side by side in
+the middle. That is the whole of what you choose between, permanently on
+screen, one tap each.
 
 The stacks are at the edges because the middle of that band belongs to the
 lever: the turret sits above it and the grip swings through it. Both stacks
@@ -63,7 +63,9 @@ emptiest.
                                                             [  HE  ]
                                                             [ SHOT ]
 [BLAST]                                                     [ ARC  ]
-[SNARE]              [AUTO AIM][AUTO FIRE]                  [RECUR ]
+[SNARE]                                                     [RECUR ]
+[WIRE ]
+[KNELL]              [AUTO AIM][AUTO FIRE]
 [ PULSE ][  FAN  ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ SIPHON ]
 ```
 
@@ -75,13 +77,14 @@ never costs you the shot you were about to take.
 Ammunition is a radio button: exactly one is lit at all times, **BOLT** is a
 cell of its own, and re-picking the loaded one leaves it loaded. (It used to
 unload back to standard, which meant a fumbled double-tap silently dropped you
-to the weakest round in the middle of a fight.) The mines are independent
-toggles — either, both or neither.
+to the weakest round in the middle of a fight.) The mines are a radio button
+too, but with no "none" cell — tapping the lit one stops laying them.
 
 Only the middle pair has to fit the 46px band between the lever's grip at rest
-and the ability bar, so only it is height-constrained. Measured at 320, 375,
-390 and 430 wide: nothing clipped, every stack fully on screen, the middle pair
-6–8px clear of the grip.
+and the ability bar, so only it is height-constrained; the stacks grow upward
+along the edges instead. Measured at 320x480, 320x568 and 390x844: nothing
+clipped, both stacks fully on screen and clear of the ability bar, and neither
+reaching into the turret's column.
 
 The whole thing is built from `ARSENAL` in `src/arsenal.js`. A new round or
 mine is a table entry and no markup — it lands in its group's stack.
@@ -108,7 +111,7 @@ Both records are built from data — `ARSENAL` in `src/arsenal.js` and `CODEX` i
 
 This replaced a rack of eight chips that sat permanently over the field in two
 rows, and then a menu that held the same eight one layer down. The top bar used
-to carry a loadout readout as well; with all nine cells permanently on screen it
+to carry a loadout readout as well; with every cell permanently on screen it
 was a copy of something already visible, so it is gone.
 
 ### The two that run on their own
@@ -120,20 +123,34 @@ Both are off by default.
 
 ### The mines
 
-Both off by default. Neither is aimed and neither is thrown by you:
+**Four kinds, one laid at a time**, and all four can be off at once — there is
+no cell for "none", so tapping the lit one is how you stop. None of them is
+aimed and none is thrown by you: they are lobbed onto a random patch every few
+seconds, completely inert in flight — passing straight through anything in the
+way — and none does anything until it has settled. Harmless drift never sets
+one off.
 
-- **AUTO MINE** (BLAST) lobs a mine onto a random patch of the field every few
-  seconds. It is completely inert in flight — it passes straight through
-  anything in the way — and only arms once it has settled. Drift never sets one
-  off; only something that could actually corrupt your feed does. One hard bang
-  when it goes.
-- **AUTO SNARE** (SNARE) lays the other kind of mine, and it does not go off. It opens,
-  hauls everything within 210 units into one pinned knot and holds it for three
-  and a half seconds, wired visibly to whatever it has caught. It deals **zero**
-  damage of its own — measured — because the damage is the objects grinding
-  against each other on the way in, and whatever you choose to put into a pile
-  that cannot move. Slower to lay, three at a time, and it collapses a
+Switching kinds mid-run leaves whatever is already on the field to run out its
+own life rather than snatching it back.
+
+- **BLAST** goes off on contact: one hard bang, damage and knockback.
+- **SNARE** does not go off. It opens, hauls everything within 210 units into
+  one pinned knot and holds it for three and a half seconds, wired visibly to
+  whatever it has caught. It deals **zero** damage of its own — measured —
+  because the damage is the objects grinding against each other on the way in,
+  and whatever you choose to put into a pile that cannot move. It collapses a
   165-unit spread down to about one.
+- **WIRE** is the only one that is not a point. It unspools a 300-unit line
+  across the field and cuts whatever crosses it, 105 damage a second for as
+  long as that thing stays on it, shoving it off rather than parking it in the
+  beam. Nothing triggers it and nothing uses it up: it is a lane closed until
+  it expires. Measured: a body on the line takes damage, a body 260 units off
+  it takes none, and the wire is still there afterwards.
+- **KNELL** does not wait to be touched. It counts, and then it goes off three
+  times where it lies, each half again as wide as the last and worth 72% of its
+  damage. BLAST punishes what walks into it; KNELL denies the ground whether
+  anything is there or not — measured firing all three tolls with the field
+  empty.
 
 ### The ammunition
 

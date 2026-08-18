@@ -12,6 +12,8 @@ const $ = (id) => document.getElementById(id);
 
 /** Rounds that are not the default. Mutually exclusive with each other. */
 export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'recur'];
+/** Mines. Also mutually exclusive, but all of them can be off at once. */
+export const MINE_KEYS = ['blast', 'snare', 'wire', 'knell'];
 
 export class Hud {
   constructor(game) {
@@ -111,8 +113,7 @@ export class Hud {
       b.addEventListener('pointerdown', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        if (a.kind === 'round') this.game.toggleRound(a.key);
-        else this.game.toggleAuto(a.key);
+        this.pick(a);
       });
       b.addEventListener('contextmenu', (ev) => ev.preventDefault());
       // pointerdown alone is right for a thumb and wrong for everything else.
@@ -333,8 +334,10 @@ export class Hud {
       ['FILL FIELD', () => g.debugFillField()],
       ['CLEAR FIELD', () => g.debugClearField()],
       ['GLITCH TEST', () => g.debugGlitch()],
-      ['THROW MINE', () => g.debugThrowMine()],
-      ['THROW SNARE', () => g.debugThrowSnare()],
+      ['THROW MINE', () => g.debugThrowMine('blast')],
+      ['THROW SNARE', () => g.debugThrowMine('snare')],
+      ['THROW WIRE', () => g.debugThrowMine('wire')],
+      ['THROW KNELL', () => g.debugThrowMine('knell')],
       ['SPAWN DRIFT', () => g.debugSpawnDrift()],
       ['RESTART', () => g.restart()],
       ['END SCREEN', () => g.debugEnding()],
@@ -411,6 +414,13 @@ export class Hud {
     this.el.resetBtn.hidden = true;
   }
 
+  /** One place that turns a strip cell into the call it stands for. */
+  pick(a) {
+    if (a.kind === 'round') this.game.toggleRound(a.key);
+    else if (a.kind === 'mine') this.game.toggleMine(a.key);
+    else this.game.toggleAuto(a.key);
+  }
+
   /**
    * Immediate feedback on the tap that caused it. syncLoadout re-asserts the
    * same thing from world state on the next frame, so the cached value has to
@@ -434,7 +444,9 @@ export class Hud {
     // World state is the only truth here: a round is lit when it is loaded, a
     // mine or an assist when it is running. Every write is diffed.
     for (const q of this.strip) {
-      const on = q.kind === 'round' ? world.round === q.key : !!world[q.key];
+      const on = q.kind === 'round' ? world.round === q.key
+        : q.kind === 'mine' ? world.mine === q.key
+          : !!world[q.key];
       if (q.on === on) continue;
       q.on = on;
       q.el.classList.toggle('on', on);

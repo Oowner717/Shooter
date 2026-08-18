@@ -1,25 +1,43 @@
-// Auto-laid mines, in two kinds. Both are lobbed onto a random patch of
-// ground, both are inert for the whole flight — passing straight through
-// anything in the way — and both only arm once they have settled. Harmless
-// drift never sets either off.
+// Auto-laid mines, in four kinds. One kind is laid at a time. All four are
+// lobbed onto a random patch of ground, all four are inert for the whole
+// flight — passing straight through anything in the way — and none of them
+// does anything until it has settled. Harmless drift never sets one off.
 //
-// BLAST goes off: one hard bang, damage and knockback.
-// SNARE does not. It opens, hauls everything near it into one pinned knot and
-// holds it there. It deals no damage of its own; the damage is the objects
-// grinding against each other, and whatever you put into a pile that cannot
-// move.
+// BLAST goes off: one hard bang, damage and knockback, on contact.
+// SNARE does not go off. It opens, hauls everything near it into one pinned
+//   knot and holds it there. No damage of its own; the damage is the objects
+//   grinding against each other, and whatever you put into a pile that cannot
+//   move.
+// WIRE is the only one that is not a point. It unspools a taut line to either
+//   side of itself and cuts anything that crosses it, for as long as that
+//   thing stays on the line. Nothing triggers it and nothing consumes it: it
+//   is a lane closed until it expires.
+// KNELL does not wait to be touched. It counts, and then it goes off three
+//   times where it lies, each wider and weaker than the last. BLAST punishes
+//   what walks into it; this denies the ground whether anything is there or
+//   not.
 
 import { CFG, HAIRLINE } from './config.js';
-import { TAU, clamp, rand, spread, rgba, drawGlow } from './util.js';
+import { TAU, clamp, rand, spread, rgba, drawGlow, segClosest } from './util.js';
 import { applyBlast, ENTRY_Y } from './enemies.js';
 import { spark, dot, ring, ripple, shake, flash } from './fx.js';
 import { audio } from './audio.js';
 
 const M = CFG.mines;
 const S = CFG.snare;
+const W = CFG.wire;
+const K = CFG.knell;
 
-/** Per-kind timings and geometry. */
-const KIND = { blast: M, snare: S };
+/** Per-kind timings and geometry. Adding a kind is an entry here and a case. */
+const KIND = { blast: M, snare: S, wire: W, knell: K };
+
+/** What each kind shows on the field. */
+const TONE = {
+  blast: { live: '#ff9f1c', idle: '#9fb3c8', core: '#ff2d55' },
+  snare: { live: '#c77dff', idle: '#8fa9c4', core: '#e0aaff' },
+  wire: { live: '#7cffb2', idle: '#8fa9c4', core: '#c9ffe4' },
+  knell: { live: '#ff5d8f', idle: '#9fb3c8', core: '#ffd6e2' },
+};
 
 class Mine {
   constructor(kind, x0, y0, x1, y1) {
@@ -38,7 +56,15 @@ class Mine {
     this.dead = false;
     this.spin = rand(0, TAU);
     this.hold = 0; // snare only: seconds of grip left once it has opened
-    this.open = 0; // snare only: eased 0 -> 1 as the field comes up
+    this.open = 0; // snare and wire: eased 0 -> 1 as it comes up
+    // wire only: the two ends of the line, set when it lands
+    this.ax = x1;
+    this.ay = y1;
+    this.bx = x1;
+    this.by = y1;
+    // knell only: tolls left, and the clock to the next one
+    this.tolls = kind === 'knell' ? K.tolls : 0;
+    this.tollTimer = 0;
   }
 
   get cfg() {
@@ -57,6 +83,11 @@ class Mine {
   get gripping() {
     return this.hold > 0;
   }
+
+  /** Wire only: the line is out and cutting. */
+  get cutting() {
+    return this.kind === 'wire' && this.landed && this.settle >= W.arm;
+  }
 }
 
 /** Somewhere in the open field, clear of the top edge and of the turret itself. */
@@ -69,11 +100,28 @@ function landingSite(world) {
   };
 }
 
+const LAY_TONE = { blast: 300, snare: 240, wire: 380, knell: 200 };
+
 export function throwMine(world, kind = 'blast') {
   const s = world.shooter;
   const site = landingSite(world);
-  world.mines.push(new Mine(kind, s.x, s.y - 20, site.x, site.y));
-  audio.chime(kind === 'snare' ? 240 : 300);
+  const m = new Mine(kind, s.x, s.y - 20, site.x, site.y);
+  if (kind === 'wire') {
+    // The line is laid across the field, not along it, so it closes a lane
+    // rather than sitting parallel to everything coming down. Kept inside the
+    // arena even when the landing site is near an edge.
+    const half = Math.min(W.span, world.width / 2 - 30);
+    const cx = clamp(site.x, half + 24, world.width - half - 24);
+    m.ax = cx - half;
+    m.bx = cx + half;
+    m.ay = site.y;
+    m.by = site.y;
+    // The spool has to land on the middle of its own line, not on the landing
+    // site it was aimed at — clamping the line moved one and not the other.
+    m.x1 = cx;
+  }
+  world.mines.push(m);
+  audio.chime(LAY_TONE[kind] || 300);
 }
 
 /** How many of one kind are on the field. */
@@ -142,12 +190,64 @@ function grip(world, m, dt) {
   }
 }
 
+/**
+ * WIRE. Everything touching the line is cut for as long as it stays on it, and
+ * shoved off the way it was leaning — so a body crossing takes a slice rather
+ * than being parked in the beam and ground to nothing.
+ */
+function cut(world, m, dt) {
+  const reach = W.width * m.open;
+  const take = (list) => {
+    for (const e of list) {
+      if (e.dead || e.harmless || e.staged) continue;
+      const hit = segClosest(m.ax, m.ay, m.bx, m.by, e.x, e.y);
+      const rr = reach + e.r;
+      if (hit.d2 > rr * rr) continue;
+      const d = Math.sqrt(hit.d2) || 1;
+      const nx = (e.x - hit.px) / d;
+      const ny = (e.y - hit.py) / d;
+      e.applyDamage(world, W.damage * dt, nx, ny, W.shove * dt);
+      if (Math.random() < 12 * dt) {
+        spark(hit.px, hit.py, spread(180), spread(180), '#7cffb2', 0.24, 2);
+      }
+    }
+  };
+  take(world.enemies);
+  take(world.debris);
+}
+
+/** KNELL. One of three, each wider than the one before and worth less. */
+function toll(world, m) {
+  const i = K.tolls - m.tolls;
+  const r = K.blast.r * (1 + i * K.grow);
+  const damage = K.blast.damage * K.fade ** i;
+  m.tolls--;
+  m.tollTimer = K.gap;
+  applyBlast(world, { x: m.x, y: m.y, r, damage, impulse: K.blast.impulse });
+  ring(m.x, m.y, m.r, r * 1.4, 0.42, '#ff5d8f', 4);
+  ripple(m.x, m.y, 1.1 + i * 0.3, r * 3);
+  for (let k = 0; k < 14; k++) {
+    const a = rand(0, TAU);
+    spark(m.x, m.y, Math.cos(a) * rand(150, 480), Math.sin(a) * rand(150, 480), '#ffb3c8', rand(0.2, 0.45), 2.4);
+  }
+  flash(0.1 + i * 0.03, '#ffc8d8');
+  shake(6 + i * 3);
+  audio.boom();
+  if (m.tolls <= 0) m.dead = true;
+}
+
 export function updateMines(world, dt) {
   const list = world.mines;
   for (let i = list.length - 1; i >= 0; i--) {
     const m = list[i];
     m.spin += dt * (m.armed ? 2.4 : 0.8);
-    m.open += ((m.gripping ? 1 : 0) - m.open) * clamp(dt * 7, 0, 1);
+    if (m.kind === 'wire') {
+      // Linear, so it is actually out after W.open seconds rather than easing
+      // toward it forever.
+      m.open = clamp(m.open + (m.cutting ? dt / W.open : -dt * 4), 0, 1);
+    } else {
+      m.open += ((m.gripping ? 1 : 0) - m.open) * clamp(dt * 7, 0, 1);
+    }
 
     if (!m.landed) {
       // Inert arc. No collision at all until it comes to rest.
@@ -167,7 +267,27 @@ export function updateMines(world, dt) {
     m.settle += dt;
     m.life -= dt;
 
-    if (m.gripping) {
+    if (m.kind === 'wire') {
+      // Nothing triggers it and nothing consumes it; it runs out its life.
+      if (m.cutting) cut(world, m, dt);
+      if (m.life <= 0) {
+        m.dead = true;
+        for (let k = 0; k < 8; k++) {
+          spark(m.x, m.y, spread(140), spread(140), '#7cffb2', 0.4, 1.8);
+        }
+        audio.pop(1.1);
+      }
+    } else if (m.kind === 'knell') {
+      // It does not need anything to walk into it. Once armed it is a clock.
+      if (m.settle >= K.arm) {
+        m.tollTimer -= dt;
+        if (m.tollTimer <= 0) toll(world, m);
+      }
+      if (!m.dead && m.life <= 0) {
+        m.dead = true;
+        for (let k = 0; k < 6; k++) spark(m.x, m.y, spread(50), spread(50), '#6d829a', 0.5, 1.4);
+      }
+    } else if (m.gripping) {
       // Holding. It cannot be re-triggered and it does no damage itself.
       m.hold -= dt;
       grip(world, m, dt);
@@ -181,7 +301,7 @@ export function updateMines(world, dt) {
       // Expired rather than triggered: fizzles out without a bang.
       m.dead = true;
       for (let k = 0; k < 6; k++) spark(m.x, m.y, spread(50), spread(50), '#6d829a', 0.5, 1.4);
-    } else if (m.armed) {
+    } else if (m.armed && m.cfg.trigger) {
       const reach = m.r + m.cfg.trigger;
       for (const e of world.enemies) {
         // Only things that could corrupt the feed can set a mine off.
@@ -206,11 +326,12 @@ export function drawMines(ctx, world) {
     const flying = !m.landed;
     const armed = m.armed;
     const snare = m.kind === 'snare';
-    // Two kinds, two colours, and the snare's is the same violet as WELL
-    // because it does the same thing to a crowd.
-    const accent = snare
-      ? (m.gripping ? '#e0aaff' : armed ? '#c77dff' : '#8fa9c4')
-      : (armed ? '#ff9f1c' : '#9fb3c8');
+    const wire = m.kind === 'wire';
+    const knell = m.kind === 'knell';
+    const tone = TONE[m.kind];
+    // The snare's violet is WELL's, because it does the same thing to a crowd.
+    const live = snare ? m.gripping || armed : wire ? m.cutting : knell ? m.landed : armed;
+    const accent = live ? (snare && m.gripping ? tone.core : tone.live) : tone.idle;
 
     // The grip, drawn first so held bodies sit on top of it.
     if (snare && m.open > 0.01) {
@@ -237,10 +358,60 @@ export function drawMines(ctx, world) {
       ctx.restore();
     }
 
+    // The line, drawn before the body so the anchor sits on top of it.
+    if (wire && m.open > 0.01) {
+      const t = m.open;
+      const mx = (m.ax + m.bx) / 2;
+      const ax = mx + (m.ax - mx) * t;
+      const bx = mx + (m.bx - mx) * t;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineCap = 'round';
+      // A wide soft pass and a hard core, so it reads as taut rather than drawn
+      for (const [w2, alpha] of [[W.width * 2, 0.1 * t], [W.width * 0.8, 0.32 * t], [HAIRLINE * 1.4, 0.95 * t]]) {
+        ctx.strokeStyle = rgba('#7cffb2', alpha);
+        ctx.lineWidth = w2;
+        ctx.beginPath();
+        ctx.moveTo(ax, m.ay);
+        ctx.lineTo(bx, m.by);
+        ctx.stroke();
+      }
+      // the two ends it is strung between
+      for (const ex of [ax, bx]) {
+        drawGlow(ctx, '#7cffb2', ex, m.ay, 14, 0.4 * t);
+        ctx.strokeStyle = rgba('#c9ffe4', 0.9 * t);
+        ctx.lineWidth = HAIRLINE * 1.6;
+        ctx.beginPath();
+        ctx.moveTo(ex, m.ay - 9);
+        ctx.lineTo(ex, m.ay + 9);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.translate(m.x, m.y);
 
-    if (armed) {
+    // The countdown to the next toll, drawn as an arc closing on the body.
+    if (knell && m.landed && m.tolls > 0) {
+      const frac = m.settle < K.arm
+        ? clamp(m.settle / K.arm, 0, 1)
+        : 1 - clamp(m.tollTimer / K.gap, 0, 1);
+      ctx.strokeStyle = rgba('#ff5d8f', 0.75);
+      ctx.lineWidth = HAIRLINE * 2.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, m.r * 1.9, -Math.PI / 2, -Math.PI / 2 + frac * TAU);
+      ctx.stroke();
+      // one mark per toll it still owes
+      ctx.fillStyle = rgba('#ffd6e2', 0.9);
+      for (let k = 0; k < m.tolls; k++) {
+        ctx.beginPath();
+        ctx.arc(-6 + k * 6, -m.r * 2.9, 1.7, 0, TAU);
+        ctx.fill();
+      }
+    }
+
+    if (armed && m.cfg.trigger) {
       // trigger radius, so you can read where it will catch something
       const pulse = 0.5 + 0.5 * Math.sin(world.time * 4 + m.spin);
       ctx.strokeStyle = rgba(accent, 0.14 + pulse * 0.16);
@@ -261,7 +432,30 @@ export function drawMines(ctx, world) {
     ctx.strokeStyle = rgba(accent, 0.9);
     ctx.lineWidth = HAIRLINE * 1.6;
 
-    if (snare) {
+    if (wire) {
+      // a spool: a ring with the line running out of both sides of it
+      ctx.beginPath();
+      ctx.arc(0, 0, m.r * 0.6, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-m.r * 1.5, 0);
+      ctx.lineTo(m.r * 1.5, 0);
+      ctx.stroke();
+    } else if (knell) {
+      // a bell: a body that rings rather than a shell that bursts
+      ctx.beginPath();
+      ctx.moveTo(-m.r, m.r * 0.75);
+      ctx.quadraticCurveTo(-m.r * 0.95, -m.r * 0.9, 0, -m.r);
+      ctx.quadraticCurveTo(m.r * 0.95, -m.r * 0.9, m.r, m.r * 0.75);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, m.r * 0.75, m.r * 0.26, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+    } else if (snare) {
       // four jaws, splayed open once it has hold of something
       const spread2 = 0.34 + m.open * 0.5;
       ctx.beginPath();
@@ -300,7 +494,7 @@ export function drawMines(ctx, world) {
       }
     }
 
-    ctx.fillStyle = rgba(armed ? (snare ? '#e0aaff' : '#ff2d55') : '#59e0ff',
+    ctx.fillStyle = rgba(live ? tone.core : '#59e0ff',
       flying ? 0.5 : 0.4 + 0.6 * Math.abs(Math.sin(world.time * 5)));
     ctx.beginPath();
     ctx.arc(0, 0, m.r * 0.3, 0, TAU);
@@ -310,13 +504,14 @@ export function drawMines(ctx, world) {
 }
 
 /**
- * Cadence for one of the two auto-lay toggles. Returns the next timer value.
- * Each kind keeps its own count and its own clock, so both can run at once.
+ * Cadence for whichever kind is selected. One kind is laid at a time, so there
+ * is one clock; switching kinds mid-run leaves whatever is already on the
+ * field to run out its own life rather than snatching it back.
  */
-export function mineCadence(world, timer, dt, kind = 'blast') {
-  const on = kind === 'snare' ? world.autoSnare : world.autoMine;
+export function mineCadence(world, timer, dt) {
+  const kind = world.mine;
+  if (!kind || world.phase === 'ending' || world.phase === 'boot') return timer;
   const k = KIND[kind];
-  if (!on || world.phase === 'ending' || world.phase === 'boot') return timer;
   const next = timer - dt;
   if (next > 0) return next;
   if (countKind(world, kind) < k.max) throwMine(world, kind);

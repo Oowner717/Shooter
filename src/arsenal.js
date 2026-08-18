@@ -18,6 +18,10 @@ export const ICON = {
   blast: svg('<path d="M3 20h18"/><path d="M8 20a4 4 0 0 1 8 0"/><path d="M12 13.5V8M7.6 14.4 5.2 10.3M16.4 14.4l2.4-4.1"/>'),
   // The other kind: it opens instead of detonating.
   snare: svg('<circle cx="12" cy="12" r="7"/><path d="M12 5v14M5 12h14M7.1 7.1l9.8 9.8M16.9 7.1 7.1 16.9"/>', 1.5),
+  // A line strung between two ends, and something caught on it.
+  wire: svg('<path d="M2.5 12h19"/><path d="M4.5 8v8M19.5 8v8"/><path d="M12 8.4 10 12l2 3.6 2-3.6z" fill="currentColor" stroke="none"/>'),
+  // A bell, not a shell: it rings rather than bursts, three times.
+  knell: svg('<path d="M6 16.5c0-6 1.6-9.5 6-9.5s6 3.5 6 9.5z"/><path d="M4.4 16.5h15.2"/><circle cx="12" cy="19.4" r="1.6" fill="currentColor" stroke="none"/><path d="M12 7V4.2" opacity=".7"/>'),
   aim: svg('<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>'),
   fire: svg('<path d="M12 21.5V8"/><path d="M8.4 11.6 12 7.2l3.6 4.4"/><path d="M7 3.5h10" opacity=".65"/>'),
   // One round, nothing done to it.
@@ -41,12 +45,20 @@ export const ICON = {
  */
 export const ARSENAL = [
   {
-    key: 'autoMine', kind: 'auto', group: 'mines', label: 'BLAST', icon: ICON.blast, tone: '#ffb347',
+    key: 'blast', kind: 'mine', group: 'mines', label: 'BLAST', icon: ICON.blast, tone: '#ffb347',
     line: 'Lobbed onto a random patch every few seconds. Completely inert in flight and only arms where it settles. Drift never sets one off. One hard bang.',
   },
   {
-    key: 'autoSnare', kind: 'auto', group: 'mines', label: 'SNARE', icon: ICON.snare, tone: '#c77dff',
-    line: 'The other kind, and it does not go off. It opens, hauls everything near it into one pinned knot and holds it there. No damage of its own — the damage is what you put into a pile that cannot move.',
+    key: 'snare', kind: 'mine', group: 'mines', label: 'SNARE', icon: ICON.snare, tone: '#c77dff',
+    line: 'It does not go off. It opens, hauls everything near it into one pinned knot and holds it there. No damage of its own — the damage is what you put into a pile that cannot move.',
+  },
+  {
+    key: 'wire', kind: 'mine', group: 'mines', label: 'WIRE', icon: ICON.wire, tone: '#7cffb2',
+    line: 'The only one that is not a point. It unspools a taut line across the field and cuts whatever crosses it, for as long as that thing stays on it. Nothing triggers it and nothing uses it up: it is a lane closed until it expires.',
+  },
+  {
+    key: 'knell', kind: 'mine', group: 'mines', label: 'KNELL', icon: ICON.knell, tone: '#ff5d8f',
+    line: 'It does not wait to be touched. It counts, and then it goes off three times where it lies, each wider and weaker than the last. BLAST punishes what walks into it; this denies the ground whether anything is there or not.',
   },
   {
     key: 'autoAim', kind: 'auto', group: 'auto', label: 'AUTO AIM', icon: ICON.aim, wide: true, run: true,
@@ -81,6 +93,6 @@ export const ARSENAL = [
 /** Menu order: grouped, with the heading each group is filed under. */
 export const ARSENAL_GROUPS = [
   { id: 'ammo', title: 'AMMUNITION', note: 'one at a time' },
-  { id: 'mines', title: 'MINES', note: 'laid on their own' },
+  { id: 'mines', title: 'MINES', note: 'one kind at a time' },
   { id: 'auto', title: 'RUNNING', note: 'left on or left off' },
 ];

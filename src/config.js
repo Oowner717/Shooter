@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '27';
+export const BUILD = '28';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -164,6 +164,43 @@ export const CFG = {
     hold: 3.6, // seconds it keeps hold once it opens
     reach: 210,
     pull: 300, // inward speed it drives what it catches
+  },
+
+  // ---- wires -----------------------------------------------------------
+  // The third kind, and the only one that is not a point. It lands, unspools a
+  // taut line to either side of itself, and everything that crosses the line
+  // is cut for as long as it stays on it. Nothing triggers it and nothing
+  // consumes it: it is a lane closed for as long as it lasts.
+  wire: {
+    interval: 8.6,
+    max: 2,
+    flight: 0.95,
+    arm: 0.5,
+    life: 22,
+    r: 11,
+    span: 150, // half-length of the line, world units
+    open: 0.55, // seconds to unspool once it has settled
+    width: 8, // contact half-width
+    damage: 105, // per second of contact, per body
+    shove: 150, // pushed off the line rather than held on it
+  },
+
+  // ---- knells ----------------------------------------------------------
+  // The fourth kind. It does not wait to be touched — it counts, and then it
+  // goes off three times where it lies, each wider and weaker than the last.
+  // A blast mine punishes what walks into it; this one denies the ground.
+  knell: {
+    interval: 9.4,
+    max: 2,
+    flight: 0.9,
+    arm: 0.8,
+    life: 20,
+    r: 13,
+    tolls: 3,
+    gap: 1.15, // seconds between them
+    blast: { r: 118, damage: 74, impulse: 430 },
+    grow: 0.5, // each toll this much wider than the one before
+    fade: 0.72, // and this much of its damage
   },
 
   // ---- projectiles ----------------------------------------------------

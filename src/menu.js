@@ -221,7 +221,9 @@ export class Menu {
   /** Called every frame; cheap because every write is diffed. */
   sync(world) {
     for (const a of ARSENAL) {
-      const on = a.kind === 'round' ? world.round === a.key : !!world[a.key];
+      const on = a.kind === 'round' ? world.round === a.key
+        : a.kind === 'mine' ? world.mine === a.key
+          : !!world[a.key];
       const el = this.cells.get(a.key);
       if (!el || el._on === on) continue;
       el._on = on;
