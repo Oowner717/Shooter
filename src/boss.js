@@ -1,6 +1,6 @@
 // ORDINAL. It does not attack. It removes things from you — your sight, your
 // aim, your rate of fire — and walks, without hurry, toward the turret. It is
-// the last item on this side of the wall, and it is numbered.
+// the last item the simulation has to hand over, and it is numbered.
 //
 // Three things make it more than a health bar:
 //
@@ -23,20 +23,20 @@
 import { CFG, ENEMY_TYPES } from './config.js';
 import { TAU, clamp, rand, spread, pick, rgba, drawGlow, makeCanvas, smoothstep, segClosest, angleDelta } from './util.js';
 import { spark, dot, shard as fxShard, ring, ripple, shake, flash, explode } from './fx.js';
-import { Enemy } from './enemies.js';
+import { Enemy, ENTRY_Y } from './enemies.js';
 import { audio } from './audio.js';
 
 const SPRITE = 512;
 const SHIELD_R = 22;
 
-// What it spits out. Bulwarks are excluded: they are wall-clearing work, not
+// What it spits out. Bulwarks are excluded: they are grinding work, not
 // pressure, and the boss fight already asks enough of the player's aim.
 const EMITTABLE = ENEMY_TYPES.filter((t) => t.id !== 'bulwark');
 
 /**
  * The arrival, in beats, keyed on `intro` running 0 -> 1. It is deliberately
  * unhurried: the whole point of the sequence is that nothing is coming out of
- * the gate for a while and the player has time to read what is.
+ * the field for a while and the player has time to read what is.
  */
 const INTRO_TIME = 11.5; // seconds from breach to first action
 const INTRO = [
@@ -450,10 +450,10 @@ export class Boss {
 
     for (let n = 0; n < want; n++) {
       const type = pick(EMITTABLE);
-      // Somewhere between the wall and the turret, so the crowd lands in
+      // Somewhere between the top of the field and the turret, so the crowd lands in
       // front of the player rather than on top of them.
       const ax = clamp(this.x + spread(cfg.reach), 60, world.width - 60);
-      const ay = clamp(this.y + rand(60, cfg.reach * 0.55), world.wall.y + world.wall.thickness + 40,
+      const ay = clamp(this.y + rand(60, cfg.reach * 0.55), ENTRY_Y + 40,
         world.shooter.y - 190);
 
       const pieces = [];
@@ -548,13 +548,13 @@ export class Boss {
    * whichever side ORDINAL is not on instead.
    */
   raiseEcho(world) {
-    const wall = world.wall;
+
     const right = this.x < world.width / 2;
     // Clear of the drawn rings, not just the body: they read out to about
     // 1.5 radii. The arena is narrow, so the vertical offset does most of the
     // separating — an earlier version clamped it back up toward the boss and
     // the copy vanished into the halo.
-    const top = wall.y + wall.thickness;
+    const top = ENTRY_Y;
     // On a narrow field the horizontal offset alone is not enough to clear the
     // boss's spokes, so the vertical floor is pushed down until the pair are
     // genuinely separated — the health ring is the only signal it can be
@@ -889,7 +889,7 @@ export class Boss {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
-    const topLimit = world.wall.y + world.wall.thickness + this.r * 0.35;
+    const topLimit = ENTRY_Y + this.r * 0.35;
     // The hard floor. Straight up is the shortest line to the turret, so a
     // clamp on y alone guarantees the centre-to-centre distance as well.
     const bottomLimit = s.y - CFG.boss.hold;

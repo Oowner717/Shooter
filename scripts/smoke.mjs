@@ -123,9 +123,10 @@ await page.screenshot({ path: `${SHOTS}/05-full-field.png` });
 const stats = async () => page.evaluate(() => document.getElementById('dbgStats').textContent);
 const busyStats = await stats();
 
-await dbg('SKIP → GATE');
+// the five hundredth kill, then the lull: an empty field and nothing else
+await dbg('SKIP → COUNT');
 await sleep(2600);
-await page.screenshot({ path: `${SHOTS}/06-gate.png` });
+await page.screenshot({ path: `${SHOTS}/06-lull.png` });
 
 await dbg('SKIP → BOSS');
 await sleep(4000);

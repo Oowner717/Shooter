@@ -8,6 +8,13 @@ import { explode, hitBurst, spark, shard as fxShard, ring, ripple } from './fx.j
 import { audio } from './audio.js';
 
 /**
+ * The top of the visible field, in world units. Objects are queued above it
+ * and are not in play — not targetable, not collidable, not counted — until
+ * they have come all the way down past it.
+ */
+export const ENTRY_Y = 0;
+
+/**
  * A specimen portrait for the glossary, drawn with the same shape routines the
  * field uses so the two can never drift apart. Centred on the current
  * transform; `r` is the radius to draw at.
@@ -117,7 +124,7 @@ export class Enemy {
     this.hp = this.maxHp;
     this.armor = type.armor || 0;
 
-    this.staged = opts.staged || false; // still above the wall
+    this.staged = opts.staged || false; // still above the top of the screen
     this.attacking = false;
     this.flash = 0;
     this.dead = false;
@@ -192,11 +199,10 @@ export class Enemy {
     let ty;
 
     if (this.staged) {
-      // Funnel toward the gate mouth, then dive through it — including while
-      // the doors are travelling, which is the point of the doors travelling.
-      const g = world.wall;
-      tx = g.gateCx + Math.sin(t * 0.6 + this.phase) * g.gateHalf * 0.55;
-      ty = g.y + g.thickness + 40;
+      // Nothing to aim at yet: it is still off the top of the screen, so it
+      // simply comes down, drifting a little as it falls.
+      tx = this.x + Math.sin(t * 0.6 + this.phase) * 40;
+      ty = ENTRY_Y + 40;
     } else {
       tx = world.shooter.x;
       ty = world.shooter.y;
@@ -304,25 +310,12 @@ export class Enemy {
     this.updateBarbs(world, dt);
 
     if (this.staged) {
-      // A wedged object above the wall would stall the run forever, since the
-      // gate only seals once every released object has been destroyed.
+      // An object wedged above the screen would stall the run forever, since
+      // the count only completes once every released object is destroyed.
       this.stagedFor += dt;
-      if (this.stagedFor > 10) {
-        const g = world.wall;
-        const dx = g.gateCx - this.x;
-        const dy = g.y + g.thickness + 40 - this.y;
-        const d = Math.hypot(dx, dy) || 1;
-        this.vx += (dx / d) * 130 * dt;
-        this.vy += (dy / d) * 130 * dt;
-      }
-      if (this.y - this.r > world.wall.y + world.wall.thickness) {
-        // Crossed the wall line — it is loose in the arena now.
-        this.staged = false;
-      } else if (world.wall.sealed) {
-        // Doors shut with it still queued: reclaimed, and not counted.
-        this.dead = true;
-        this.dissolved = true;
-      }
+      if (this.stagedFor > 10) this.vy += 130 * dt;
+      // Fully on screen: it is loose in the arena now.
+      if (this.y - this.r > ENTRY_Y) this.staged = false;
     }
   }
 
@@ -1071,11 +1064,12 @@ export function releasesLeft(world) {
   return Math.max(0, CFG.killGoal - world.released);
 }
 
-/** A formation queued above the screen, marching down to the gate. */
+/** A formation queued above the screen, marching down into it. */
 export function spawnFormation(world, kinds, count) {
   const shape = pick(FORMATIONS);
-  const half = world.wall.gateHalf;
-  const cx = clamp(world.wall.gateCx + spread(half * 0.5), half, world.width - half);
+  // Somewhere across the width, with enough room either side for the shape.
+  const half = Math.min(world.width * 0.22, 190);
+  const cx = clamp(world.width / 2 + spread(world.width * 0.5), half, world.width - half);
   // A formation is one type in a shape; a shape made of towed pairs is not a
   // formation, it is a traffic jam, and it would cost double the allotment.
   const single = kinds.filter((k) => !k.tows);
@@ -1107,12 +1101,12 @@ export function spawnFormation(world, kinds, count) {
   return made;
 }
 
-/** Loose, aimless matter released through the gate along with everything else. */
+/** Loose, aimless matter that comes down with everything else. */
 export function spawnDrift(world, opts = {}) {
   const type = TYPE_BY_ID.drift;
-  const g = world.wall;
-  const x = opts.x ?? clamp(g.gateCx + spread(g.gateHalf * 0.8), type.r + 6, world.width - type.r - 6);
-  const y = opts.y ?? g.y + g.thickness + rand(10, 40);
+  const x = opts.x ?? clamp(world.width / 2 + spread(world.width * 0.8),
+    type.r + 6, world.width - type.r - 6);
+  const y = opts.y ?? ENTRY_Y + rand(10, 40);
   const e = new Enemy(type, x, y, { staged: false, spawnIn: 1, vx: spread(30), vy: rand(10, 50) });
   world.enemies.push(e);
   return e;
@@ -1120,39 +1114,15 @@ export function spawnDrift(world, opts = {}) {
 
 export class Director {
   constructor() {
-    this.timer = 1.2;
-    this.driftTimer = 3;
+    this.reset();
   }
 
   reset() {
-    this.timer = 1.2;
-    this.driftTimer = 3;
-  }
-
-  /** Objects already loose in the arena when the simulation boots. */
-  seed(world) {
-    const kinds = availableTypes(0);
-    // Seed the upper half of the field only. The opening beat should be
-    // objects in the distance, never objects already on top of the turret.
-    const wallBottom = world.wall.y + world.wall.thickness;
-    const top = wallBottom + 50;
-    const bottom = wallBottom + (world.shooter.y - wallBottom) * 0.55;
-    for (let i = 0; i < CFG.popStart; i++) {
-      const t = weightedPick(kinds);
-      spawnOne(
-        world,
-        t,
-        rand(t.r + 10, world.width - t.r - 10),
-        rand(top, Math.max(top + 60, bottom)),
-        { staged: false, spawnIn: rand(0.4, 1.4), vx: spread(20), vy: rand(0, 20) },
-      );
-    }
-    for (let i = 0; i < 6; i++) {
-      spawnDrift(world, {
-        x: rand(60, world.width - 60),
-        y: rand(top, Math.max(top + 60, bottom)),
-      });
-    }
+    // The field starts empty and stays empty for a few seconds. There is an
+    // interface to find and a lever to try, and the first thing a player does
+    // should not be react.
+    this.timer = CFG.openingGrace;
+    this.driftTimer = CFG.openingGrace + 2;
   }
 
   update(world, dt) {
@@ -1214,15 +1184,6 @@ export function applyBlast(world, blast) {
   };
   hit(world.enemies);
   hit(world.debris);
-
-  // A sealed gate is a target like anything else; at half weight, since it is
-  // a wall and the bolts are meant to remain the honest way through it.
-  if (world.wall.sealed) {
-    const gy = world.wall.y + world.wall.thickness / 2;
-    const px = clamp(x, world.wall.gateCx - world.wall.gateHalf, world.wall.gateCx + world.wall.gateHalf);
-    const d = Math.hypot(x - px, y - gy);
-    if (d < r) world.wall.damageGate(world, damage * (1 - d / r) * 0.5, px, gy);
-  }
 
   if (world.boss && !world.boss.dead) {
     const dx = world.boss.x - x;

@@ -2,14 +2,13 @@
 
 import { CFG, BUILD, ENEMY_TYPES } from './config.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
-import { Grid, integrate, resolvePair, resolveBox, clampToArena, impactDamage } from './physics.js';
+import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
 import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, shake } from './fx.js';
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast, solveTethers } from './enemies.js';
+import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast, solveTethers, ENTRY_Y } from './enemies.js';
 import { Shooter } from './shooter.js';
-import { Wall } from './gate.js';
 import { Boss } from './boss.js';
 import { Abilities } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
@@ -21,7 +20,6 @@ import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
-const HUD_TOP_MIN = 20; // matches --hud-t: phones without a notch still have a status bar
 
 export class Game {
   constructor(canvas) {
@@ -76,7 +74,7 @@ export class Game {
       timeScale: 1,
       kills: 0,
       released: 0, // hostile objects let out so far; capped at CFG.killGoal
-      phase: 'boot', // boot | staging | gate | boss | ending | frozen
+      phase: 'boot', // boot | staging | lull | boss | ending | frozen
 
       enemies: [],
       debris: [],
@@ -86,7 +84,6 @@ export class Game {
       attackers: new Set(),
 
       shooter: new Shooter(0, 0),
-      wall: new Wall(),
       boss: null,
       background,
       narrator: new Narrator(),
@@ -116,7 +113,7 @@ export class Game {
       veilFade: 0, // eased so VEIL closes in rather than snapping
 
       nextStoryAt: CFG.storyEvery,
-      sealed: false,
+      counted: false, // the five hundredth has fallen; the lull is running
 
       debug: {
         noCooldown: false,
@@ -124,14 +121,11 @@ export class Game {
         slowmo: false,
         hitboxes: false,
         stats: false,
-        toughGate: false,
       },
 
       alert: (text, kind, dur) => self.hud.alert(text, kind, dur),
       bossCaption: (text, hold) => self.hud.bossCaption(text, hold),
       abilityTaken: (i) => self.hud.flashTaken(i),
-      onGateSealed: () => self.onGateSealed(),
-      onGateBroken: () => self.onGateBroken(),
       onBossDead: () => self.onBossDead(),
     };
   }
@@ -157,7 +151,8 @@ export class Game {
     w.decoy = null;
     this.hud.bossCaption(null);
     w.nextStoryAt = CFG.storyEvery;
-    w.sealed = false;
+    w.counted = false;
+    this.lullTimer = 0;
     w.phase = 'staging';
 
     // A reset is a fresh session: the strip goes back to standard rounds and
@@ -174,7 +169,6 @@ export class Game {
     }
     this.hud.setToggle('standard', true);
 
-    w.wall.reset();
     w.narrator.reset();
     w.abilities.reset();
     w.director.reset();
@@ -198,13 +192,10 @@ export class Game {
     this.hud.clearAlerts();
     this.hud.hideEnding();
     this.hud.setBoss(false);
-    this.hud.setGate(false);
     this.hud.setLedgerMode(false);
     this.hud.setKills(0, CFG.killGoal);
     this.hud.setPhase('STAGING');
     this.hud.syncAbilities(w.abilities);
-
-    w.director.seed(w);
   }
 
   start() {
@@ -260,7 +251,6 @@ export class Game {
     // property holding max()/env() is not guaranteed to parse as a number.
     const probe = getComputedStyle(this.safeProbe);
     const num = (v, fallback) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : fallback);
-    const safeTop = Math.max(num(probe.paddingTop, 0), HUD_TOP_MIN);
     const safeBottom = num(probe.paddingBottom, 0);
     const barH = num(getComputedStyle(document.documentElement).getPropertyValue('--bar-h'), 74);
 
@@ -271,12 +261,11 @@ export class Game {
     world.width = sw / z;
     world.height = sh / z;
     world.floorY = (sh - (safeBottom + barH + 22)) / z;
-    world.wall.layout(world.width, Math.max(96, safeTop + 74) / z);
     world.shooter.x = world.width / 2;
     world.shooter.y = this.shooterY;
 
     this.grid.resize(world.width, world.height + STAGE_HEIGHT, 96);
-    background.resize(world.width, world.height, world.wall.gateCx, world.wall.y + world.wall.thickness);
+    background.resize(world.width, world.height, world.width / 2, ENTRY_Y);
 
     // Soft darkness mask for the boss VEIL power, also in world units.
     this.veilMask = makeCanvas(Math.ceil(world.width / 2), Math.ceil(world.height / 2));
@@ -423,7 +412,7 @@ export class Game {
    * the fight.
    */
   get hintsAllowed() {
-    return this.world.phase === 'staging' || this.world.phase === 'gate';
+    return this.world.phase === 'staging' || this.world.phase === 'lull';
   }
 
   /**
@@ -555,7 +544,6 @@ export class Game {
       if (w.effects[i].dead) w.effects.splice(i, 1);
     }
 
-    w.wall.update(w, dt);
     w.director.update(w, dt);
     if (w.boss && !w.boss.dead) {
       w.boss.update(w, dt);
@@ -630,9 +618,7 @@ export class Game {
 
     const boss = w.boss;
     for (const b of bodies) {
-      let impact = 0;
-      for (const box of w.wall.boxes) impact = Math.max(impact, resolveBox(b, box));
-      impact = Math.max(impact, clampToArena(b, w.width, STAGE_HEIGHT, w.floorY));
+      let impact = clampToArena(b, w.width, STAGE_HEIGHT, w.floorY);
       if (impact > 240) {
         spark(b.x, b.y, spread(impact), spread(impact), b.type.glow, 0.18, 1.8);
       }
@@ -720,11 +706,11 @@ export class Game {
       audio.chime(520 + w.narrator.index * 30);
       background.surge(0.7);
     }
-    if (!w.sealed && w.kills >= CFG.killGoal) {
-      w.sealed = true;
-      w.phase = 'gate';
-      w.wall.seal(w);
-      this.hud.setPhase('SEAL');
+    if (!w.counted && w.kills >= CFG.killGoal) {
+      w.counted = true;
+      w.phase = 'lull';
+      this.lullTimer = CFG.lull;
+      this.onLull();
     }
   }
 
@@ -737,6 +723,12 @@ export class Game {
     const wantFade = w.phase === 'ending' && this.endStage >= 1 ? 0 : 1;
     this.endFade += (wantFade - this.endFade) * clamp(real * 0.7, 0, 1);
     if (wantFade === 1 && this.endFade > 0.995) this.endFade = 1;
+
+    if (w.phase === 'lull') {
+      this.lullTimer -= real;
+      if (this.lullTimer <= 0) this.beginBoss();
+      return;
+    }
 
     if (w.phase === 'ending') {
       this.endTimer += real;
@@ -757,27 +749,28 @@ export class Game {
     }
   }
 
-  onGateSealed() {
-    this.hud.setPhase('GATE');
-    this.hud.setGate(true, 1);
-    background.setMood('gate');
+  /**
+   * Five hundred are down and nothing is falling. A few seconds of empty field
+   * is the whole of the transition — the run simply stops, and the light goes
+   * wrong.
+   */
+  onLull() {
+    this.hud.setPhase('—');
+    background.setMood('lull');
     background.surge(2);
     audio.setDroneMood(55, 480, 0.07);
   }
 
-  onGateBroken() {
+  beginBoss() {
     const w = this.world;
     w.phase = 'boss';
     this.hud.setPhase('BOSS');
-    this.hud.setGate(false);
     // The field goes dark for the arrival and only lights up again with it.
     background.setMood('breach');
     background.surge(2);
     audio.setDroneMood(26, 180, 0.05);
 
-    const bx = w.wall.gateCx;
-    const by = w.wall.y + w.wall.thickness + CFG.boss.r * 0.4;
-    w.boss = new Boss(bx, by);
+    w.boss = new Boss(w.width / 2, ENTRY_Y + CFG.boss.r * 0.4);
 
     // The reveal. Five hundred objects were not a score, they were a deposit,
     // and the counter the player has been watching all run turns over and
@@ -860,7 +853,6 @@ export class Game {
     this.hud.syncLoadout(w);
     this.hud.menu.sync(w);
     this.hud.updateAlerts(dt);
-    if (w.wall.sealed) this.hud.setGate(true, w.wall.hp / w.wall.maxHp);
     if (w.boss && !w.boss.dead) this.hud.setBoss(true, w.boss.hpFrac);
     if (w.debug.stats) {
       this.hud.setStats(
@@ -908,19 +900,16 @@ export class Game {
 
     background.draw(ctx, W, H);
 
-    // Story sits in the quiet band under the wall, behind every entity, so it
-    // can never hide a target — and never competes with the lever for space.
-    const wallBottom = w.wall.y + w.wall.thickness;
+    // Story sits in the quiet upper band, behind every entity, so it can never
+    // hide a target — and never competes with the lever for space.
     w.narrator.draw(
       ctx,
       W / 2,
-      wallBottom + (w.shooter.y - wallBottom) * 0.46,
+      ENTRY_Y + (w.shooter.y - ENTRY_Y) * 0.46,
       Math.min(W - 70, 470),
       background.mood.accent,
       13 / w.scale,
     );
-
-    w.wall.draw(ctx, w);
 
     for (const e of w.debris) e.draw(ctx, w);
     for (const e of w.enemies) e.draw(ctx, w);
@@ -1082,7 +1071,6 @@ export class Game {
     ctx.arc(w.shooter.x, w.shooter.y, w.shooter.r, 0, TAU);
     ctx.stroke();
     ctx.strokeStyle = 'rgba(255,80,80,0.6)';
-    for (const b of w.wall.boxes) ctx.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
     ctx.strokeStyle = 'rgba(255,220,0,0.5)';
     ctx.beginPath();
     ctx.moveTo(0, w.floorY);
@@ -1115,7 +1103,7 @@ export class Game {
 
   // ---------------------------------------------------------------- debug
 
-  debugSkipToGate() {
+  debugSkipToCount() {
     const w = this.world;
     if (w.phase !== 'staging') return;
     w.kills = CFG.killGoal - 1;
@@ -1127,10 +1115,9 @@ export class Game {
   debugSkipToBoss() {
     const w = this.world;
     if (w.phase === 'boss' || w.phase === 'ending') return;
-    if (w.phase === 'staging') this.debugSkipToGate();
-    w.wall.state = 'sealed';
-    w.wall.rebuildBoxes();
-    w.wall.breakOpen(w);
+    if (w.phase === 'staging') this.debugSkipToCount();
+    this.lullTimer = 0;
+    this.beginBoss();
   }
 
   debugKillBoss() {
@@ -1203,7 +1190,7 @@ export class Game {
     const w = this.world;
     while (hostileCount(w) < CFG.maxEnemies) {
       const t = weightedPick(ENEMY_TYPES);
-      spawnOne(w, t, rand(t.r + 10, w.width - t.r - 10), rand(w.wall.y + 60, w.floorY - 120), {
+      spawnOne(w, t, rand(t.r + 10, w.width - t.r - 10), rand(ENTRY_Y + 60, w.floorY - 120), {
         staged: false,
         spawnIn: 0.4,
       });
@@ -1248,7 +1235,7 @@ export class Game {
   debugEnding() {
     const w = this.world;
     if (!w.boss) {
-      w.boss = new Boss(w.wall.gateCx, w.wall.y + 120);
+      w.boss = new Boss(w.width / 2, ENTRY_Y + 120);
       w.boss.intro = 1;
     }
     w.boss.dead = true;

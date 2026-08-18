@@ -214,8 +214,9 @@ class Audio {
     this.tone({ type: 'sine', f0: 880, f1: 440, dur: 0.9, gain: 0.07 });
   }
 
-  gateHit() {
-    if (!this.ready || !this._gate('gate', 0.04)) return;
+  /** A dull knock: something sinking in rather than breaking. */
+  thud() {
+    if (!this.ready || !this._gate('thud', 0.04)) return;
     this.tone({ type: 'square', f0: rand(300, 420), f1: 120, dur: 0.08, gain: 0.07 });
     this.noise({ dur: 0.09, gain: 0.09, f0: 4000, f1: 700, type: 'bandpass', q: 3 });
   }

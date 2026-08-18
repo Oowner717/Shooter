@@ -5,7 +5,7 @@ import { TAU, clamp, rand, spread, smoothstep, rgba, drawGlow, segClosest } from
 import { spark, dot, ring, ripple, shake, flash } from './fx.js';
 import { CFG } from './config.js';
 import { fire } from './projectiles.js';
-import { applyBlast } from './enemies.js';
+import { applyBlast, ENTRY_Y } from './enemies.js';
 import { audio } from './audio.js';
 
 const ICON = {
@@ -543,12 +543,6 @@ export const ABILITIES = [
           world.boss.push(Math.cos(a), Math.sin(a), 46);
         }
       }
-      if (world.wall.sealed) {
-        const gx = world.wall.gateCx;
-        const gy = world.wall.y + world.wall.thickness / 2;
-        const c = segClosest(s.x, s.y, x1, y1, gx, gy);
-        if (c.d2 < (world.wall.gateHalf + 20) ** 2) world.wall.damageGate(world, 700, c.px, c.py);
-      }
 
       s.aim = a;
       s.targetAim = a;
@@ -630,7 +624,7 @@ export const ABILITIES = [
       // Only one at a time; a second would just split the pile.
       if (world.decoy && !world.decoy.dead) world.decoy.expire(world);
       const s = world.shooter;
-      const top = world.wall.y + world.wall.thickness + 60;
+      const top = ENTRY_Y + 60;
       const d = new Decoy(s.x, clamp(s.y - CFG.decoy.ahead, top, s.y - 120));
       world.decoy = d;
       world.effects.push(d);

@@ -34,7 +34,6 @@ const ASSETS = [
   './src/projectiles.js',
   './src/mines.js',
   './src/shooter.js',
-  './src/gate.js',
   './src/boss.js',
   './src/abilities.js',
   './src/arsenal.js',

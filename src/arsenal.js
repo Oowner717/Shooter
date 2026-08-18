@@ -65,7 +65,7 @@ export const ARSENAL = [
   },
   {
     key: 'shotgun', kind: 'round', group: 'ammo', label: 'SHOT', icon: ICON.shot,
-    line: 'Five pellets a shot in a tight cone. They expire well short of the wall: devastating up close, useless at range.',
+    line: 'Five pellets a shot in a tight cone. They expire well short of the top of the field: devastating up close, useless at range.',
   },
   {
     key: 'arc', kind: 'round', group: 'ammo', label: 'ARC', icon: ICON.arc,

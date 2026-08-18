@@ -2,11 +2,16 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '21';
+export const BUILD = '22';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
-  killGoal: 500, // objects destroyed before the gate seals
+  killGoal: 500, // objects destroyed before the last one arrives
+  // Seconds of empty field at the start of a run, and again after the last
+  // object falls, before the next thing happens. The field starts with nothing
+  // in it: the first beat is the interface, not a reaction.
+  openingGrace: 6,
+  lull: 4.5, // the pause between the five hundredth kill and the arrival
   storyEvery: 50, // one story line per this many kills (10 lines total)
 
   // ---- camera ---------------------------------------------------------
@@ -84,7 +89,7 @@ export const CFG = {
       falloff: 0.86, // each link a little weaker than the last
     },
     // Sinks in and keeps working. Nothing happens on impact, so it is wasted
-    // on a mote — it is for the things that take a while: bulwarks, the gate,
+    // on a mote — it is for the things that take a while: bulwarks and
     // ORDINAL itself.
     barb: {
       label: 'BARB',
@@ -171,7 +176,7 @@ export const CFG = {
     damage: 26,
     impulse: 90,
     life: 2.2,
-    bounces: 1, // ricochets off the arena side walls
+    bounces: 1, // ricochets off the arena side edges
   },
 
   // ---- physics --------------------------------------------------------
@@ -185,11 +190,6 @@ export const CFG = {
     collisionThreshold: 62, // impact speed below this is a harmless bump
   },
 
-  // ---- gate -----------------------------------------------------------
-  gate: {
-    hp: 5200,
-    closeTime: 1.6,
-  },
 
   // ---- boss -----------------------------------------------------------
   boss: {
@@ -214,7 +214,7 @@ export const CFG = {
     // Centre to centre; ~254 units of open space at its closest, against the
     // 124 the old creep-to-the-barrel model ended at.
     //
-    // These three numbers have to fit inside the field. The wall stops its
+    // These three numbers have to fit inside the field. The top edge stops its
     // centre at about 232 and the turret sits at about 706, so the whole
     // range it can occupy is roughly 474 units — a station of 410 leaves ~57
     // units of travel, and a band wider than that would be one it could never

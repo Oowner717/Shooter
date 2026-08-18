@@ -78,7 +78,7 @@ export const CODEX = [
     id: 'ordinal',
     name: 'ORDINAL',
     boss: true,
-    line: 'Wore your five hundred and would not hand them back. Not the hardest thing behind that wall — the first one.',
+    line: 'Wore your five hundred and would not hand them back. Not the hardest thing they have — the first one.',
   },
 ];
 

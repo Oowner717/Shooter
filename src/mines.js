@@ -11,7 +11,7 @@
 
 import { CFG, HAIRLINE } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow } from './util.js';
-import { applyBlast } from './enemies.js';
+import { applyBlast, ENTRY_Y } from './enemies.js';
 import { spark, dot, ring, ripple, shake, flash } from './fx.js';
 import { audio } from './audio.js';
 
@@ -59,9 +59,9 @@ class Mine {
   }
 }
 
-/** Somewhere in the open field, clear of the wall and of the turret itself. */
+/** Somewhere in the open field, clear of the top edge and of the turret itself. */
 function landingSite(world) {
-  const top = world.wall.y + world.wall.thickness + 70;
+  const top = ENTRY_Y + 70;
   const bottom = world.shooter.y - 130;
   return {
     x: rand(60, world.width - 60),
@@ -159,7 +159,7 @@ export function updateMines(world, dt) {
         for (let k = 0; k < 8; k++) {
           spark(m.x, m.y, spread(120), spread(120), '#9fb3c8', 0.3, 1.6);
         }
-        audio.gateHit();
+        audio.thud();
       }
       continue;
     }

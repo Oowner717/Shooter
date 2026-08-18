@@ -24,8 +24,6 @@ export class Hud {
       bossFill: $('bossFill'),
       bossTitle: $('bossTitle'),
       bossSub: $('bossSub'),
-      gateBar: $('gateBar'),
-      gateFill: $('gateFill'),
       alerts: $('alerts'),
       killGoal: document.querySelector('#counter .dim'),
       counterLabel: document.querySelector('#counter em'),
@@ -261,11 +259,6 @@ export class Hud {
     if (sub) this.el.bossSub.textContent = sub;
   }
 
-  setGate(visible, frac = 1) {
-    this.el.gateBar.hidden = !visible;
-    if (!visible) return;
-    this.el.gateFill.style.transform = `scaleX(${clamp(frac, 0, 1)})`;
-  }
 
   // ----------------------------------------------------------------- alerts
 
@@ -313,7 +306,7 @@ export class Hud {
   buildDebug() {
     const g = this.game;
     const actions = [
-      ['SKIP → GATE', () => g.debugSkipToGate()],
+      ['SKIP → COUNT', () => g.debugSkipToCount()],
       ['SKIP → BOSS', () => g.debugSkipToBoss()],
       ['KILL BOSS', () => g.debugKillBoss()],
       ['+50 KILLS', () => g.debugAddKills(50)],
@@ -343,7 +336,6 @@ export class Hud {
       ['SLOW-MO', 'slowmo'],
       ['HITBOXES', 'hitboxes'],
       ['STATS', 'stats'],
-      ['INVINCIBLE GATE', 'toughGate'],
     ];
 
     const frag = document.createDocumentFragment();

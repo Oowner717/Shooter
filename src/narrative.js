@@ -1,7 +1,7 @@
 // Ten sentences, one per fifty objects, then corrupted away, and six more at
 // the end. Between them they hint at what this place actually is without ever
 // naming it: the shapes are simple on purpose, someone is counting, and the
-// thing behind the gate is a lock rather than a finish line.
+// last thing to arrive is a lock rather than a finish line.
 //
 // It is deliberately never called a room. Where a noun is unavoidable it is
 // "the shallows" — open, shallow, and with something deeper past it — and
@@ -9,7 +9,7 @@
 //
 // The back half turns the attention around. Through line 6 the observer is
 // watching the field; from line 7 it is watching the player, and line 8
-// promises the same from whatever comes through the gate. Every line has to
+// promises the same from whatever comes down last. Every line has to
 // survive one reading at 13px behind moving objects, so the images stay
 // single-step.
 
@@ -21,9 +21,9 @@ const STORY = [
   'You have not asked who is counting. That is being counted too.',
   'Further in, the shapes stop being this polite.',
   'Halfway, and not once have you looked behind you. We noted that.',
-  'The wall is thin. It was never built to hold anything for long.',
+  'Nothing here was built to last. It was built to be counted.',
   'We stopped watching the shapes a while ago.',
-  'Nothing that gate has sent has looked at you. The last one will.',
+  'Nothing sent down so far has looked at you. The last one will.',
   'You will try to describe this later. You will leave most of it out.',
   'None of this was ever real enough to be an enemy. That was a kindness. It does not repeat.',
 ];

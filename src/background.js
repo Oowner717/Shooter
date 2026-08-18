@@ -1,4 +1,4 @@
-// The substrate. Everything radiates outward from the gate's vanishing point,
+// The substrate. Everything radiates outward from a vanishing point at the
 // so the whole world reads as something being emitted rather than a backdrop.
 // Cheap on purpose: one gradient, three cached nebula sprites, a polar
 // lattice, a few pre-rendered glyph columns and a dust field.
@@ -8,7 +8,7 @@ import { fx } from './fx.js';
 
 const MOODS = {
   staging: { top: '#04060d', mid: '#071426', low: '#02040a', line: '#2f7fb8', neb: ['#0d3b66', '#14224a', '#062a3d'], accent: '#59e0ff' },
-  gate: { top: '#0a0705', mid: '#231206', low: '#050304', line: '#b8762f', neb: ['#66300d', '#4a2a14', '#3d1c06'], accent: '#ffa347' },
+  lull: { top: '#0a0705', mid: '#231206', low: '#050304', line: '#b8762f', neb: ['#66300d', '#4a2a14', '#3d1c06'], accent: '#ffa347' },
   // The arrival: everything drains out of the substrate and the only colour
   // left is coming through the breach.
   breach: { top: '#000000', mid: '#080407', low: '#000000', line: '#6b4a2a', neb: ['#1a0d05', '#120612', '#050308'], accent: '#ffd08a' },
@@ -46,7 +46,7 @@ class Background {
     if (MOODS[name]) this.target = MOODS[name];
   }
 
-  /** A short bright bloom of the lattice — used on gate/boss beats. */
+  /** A short bright bloom of the lattice — used on the lull and boss beats. */
   surge(amount = 1) {
     this.pulse = Math.min(2, this.pulse + amount);
   }
@@ -187,7 +187,7 @@ class Background {
   }
 
   /**
-   * Polar lattice centred on the gate. Rings scroll outward and are displaced
+   * Polar lattice centred on the vanishing point. Rings scroll outward and are displaced
    * by explosion ripples, so every kill visibly disturbs the world itself.
    */
   drawLattice(ctx, w, h) {

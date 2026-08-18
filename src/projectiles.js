@@ -31,35 +31,6 @@ class Projectile {
   }
 }
 
-/** Ray/segment against an axis-aligned box; returns entry t in [0,1] or -1. */
-function segBox(ax, ay, bx, by, box, pad) {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const x0 = box.x0 - pad;
-  const x1 = box.x1 + pad;
-  const y0 = box.y0 - pad;
-  const y1 = box.y1 + pad;
-  let tmin = 0;
-  let tmax = 1;
-
-  for (let axis = 0; axis < 2; axis++) {
-    const p = axis === 0 ? ax : ay;
-    const d = axis === 0 ? dx : dy;
-    const lo = axis === 0 ? x0 : y0;
-    const hi = axis === 0 ? x1 : y1;
-    if (Math.abs(d) < 1e-9) {
-      if (p < lo || p > hi) return -1;
-    } else {
-      let t1 = (lo - p) / d;
-      let t2 = (hi - p) / d;
-      if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
-      if (t1 > tmin) tmin = t1;
-      if (t2 < tmax) tmax = t2;
-      if (tmin > tmax) return -1;
-    }
-  }
-  return tmin;
-}
 
 /**
  * Advance every projectile and resolve what it runs into.
@@ -103,7 +74,7 @@ export function updateProjectiles(world, dt) {
         p.x = nx;
         p.y = ny;
 
-        // side-wall ricochet
+        // arena-edge ricochet
         if (p.x < p.r && p.vx < 0) {
           if (p.bounces > 0) { p.bounces--; p.x = p.r; p.vx = -p.vx; ricochetFx(p); }
           else endProjectile(world, p, p.x, p.y, true);
@@ -204,7 +175,7 @@ class Arc {
 function sinkBarb(e, hx, hy) {
   if (!e.addBarb) return;
   const a = Math.atan2(hy - e.y, hx - e.x);
-  if (e.addBarb(a)) audio.gateHit();
+  if (e.addBarb(a)) audio.thud();
 }
 
 function ricochetFx(p) {
@@ -285,16 +256,6 @@ function resolveSegment(world, p, ax, ay, bx, by) {
     }
   }
 
-  // wall segments (including the gate when it is shut)
-  for (const box of world.wall.boxes) {
-    const t = segBox(ax, ay, bx, by, box, p.r);
-    if (t >= 0 && t < bestT) {
-      bestT = t;
-      bestKind = box.gate ? 'gate' : 'wall';
-      bestTarget = box;
-    }
-  }
-
   if (!bestKind) return;
 
   const hx = ax + (bx - ax) * bestT;
@@ -369,13 +330,6 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       world.boss.hurtEcho(world, p.damage);
       hitBurst(hx, hy, -dirx, -diry, world.boss.hitColor);
       audio.hit();
-      endProjectile(world, p, hx, hy, true);
-      return;
-    }
-    case 'gate': {
-      world.wall.damageGate(world, p.damage, hx, hy);
-      hitBurst(hx, hy, -dirx, -diry, '#9fe8ff');
-      audio.gateHit();
       endProjectile(world, p, hx, hy, true);
       return;
     }

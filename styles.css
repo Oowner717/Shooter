@@ -140,16 +140,16 @@ html, body {
 .chip.btn:active { background: rgba(89, 224, 255, 0.2); }
 .chip.btn.off { color: #45566a; text-decoration: line-through; }
 
-/* ---------------- boss / gate bars ---------------- */
+/* ---------------- boss bar ---------------- */
 
-#bossBar, #gateBar {
+#bossBar {
   position: absolute;
   top: calc(var(--hud-t) + 40px);
   left: calc(var(--safe-l) + 10px);
   right: calc(var(--safe-r) + 10px);
 }
 
-#bossBar[hidden], #gateBar[hidden] { display: none; }
+#bossBar[hidden] { display: none; }
 
 .bossName {
   display: flex;
@@ -178,7 +178,6 @@ html, body {
   box-shadow: 0 0 12px rgba(255, 160, 90, 0.7);
   transition: transform 0.12s linear;
 }
-.bar.gate i { background: linear-gradient(90deg, #9fe8ff, #59e0ff 50%, #2d7dff); box-shadow: 0 0 12px rgba(89, 224, 255, 0.6); }
 
 /* ---------------- alerts (breach / boss powers) ---------------- */
 
@@ -908,7 +907,6 @@ body.ending #topbar,
 body.ending #abilities,
 body.ending #alerts,
 body.ending #bossBar,
-body.ending #gateBar,
 body.ending #abilityHint,
 body.ending #quickBar,
 body.ending #bossCaption {
