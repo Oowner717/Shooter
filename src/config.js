@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '24';
+export const BUILD = '25';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -216,10 +216,11 @@ export const CFG = {
     //
     // These three numbers have to fit inside the field. The top edge stops its
     // centre at about 232 and the turret sits at about 706, so the whole
-    // range it can occupy is roughly 474 units — a station of 410 leaves ~57
+    // range it can occupy is roughly 474 units — a station of 360 leaves ~107
     // units of travel, and a band wider than that would be one it could never
-    // push out of, which is the trap this is here to avoid.
-    hold: 410,
+    // push out of, which is the trap this is here to avoid. At 360 the gap
+    // from its hull to the turret's is about 204 units.
+    hold: 360,
     // Push it further than this and its presence stops rewriting the feed.
     // Let it settle back onto station and the corruption resumes on a timer,
     // so the pressure is "keep it off you", not "it is arriving regardless".
