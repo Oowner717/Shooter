@@ -717,22 +717,40 @@ body.menuOpen #quickBar { pointer-events: none; }
 }
 
 /*
- * Centred on the field. It used to sit just above the lever, where it read as
- * a footnote to the turret rather than as the thing to read — and the opening
- * tutorial is the first text a player ever sees.
+ * First-use captions, in the quiet band just above the lever — out of the way
+ * of whatever is being shot at.
  */
 #abilityHint {
   position: absolute;
-  left: calc(var(--safe-l) + 18px);
-  right: calc(var(--safe-r) + 18px);
-  top: 44%;
+  left: 10px;
+  right: 10px;
+  bottom: calc(var(--safe-b) + var(--bar-h) + 190px);
   text-align: center;
   white-space: pre-line;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+  opacity: 0;
+  transition: opacity 0.25s;
+  text-shadow: 0 0 10px #000;
+}
+
+/*
+ * The opening tutorial uses the same element and is not the same thing: it is
+ * the first text a player ever sees, over an empty field, so it sits out in
+ * the open above the turret and is sized to be read rather than glanced at.
+ */
+#abilityHint.tutorial {
+  left: calc(var(--safe-l) + 18px);
+  right: calc(var(--safe-r) + 18px);
+  /* Measured off the same bottom as the hint band rather than as a percentage
+     of the viewport: the turret's height above the ability bar is fixed in
+     pixels, so a percentage put this on top of the turret on a short screen. */
+  bottom: calc(var(--safe-b) + var(--bar-h) + 230px);
   font-size: 12px;
   line-height: 1.85;
   letter-spacing: 0.14em;
   color: #9fb8cf;
-  opacity: 0;
   transition: opacity 0.35s;
   text-shadow: 0 0 14px #000, 0 0 30px #000;
 }

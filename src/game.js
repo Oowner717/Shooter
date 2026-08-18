@@ -537,7 +537,7 @@ export class Game {
     while (w.phase === 'staging'
       && this.openingLine < Game.OPENING.length
       && w.time >= Game.OPENING[this.openingLine][0]) {
-      this.hud.showHint(Game.OPENING[this.openingLine][1]);
+      this.hud.showHint(Game.OPENING[this.openingLine][1], true);
       this.openingLine++;
     }
 

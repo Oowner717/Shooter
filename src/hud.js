@@ -186,9 +186,11 @@ export class Hud {
     }
   }
 
-  showHint(text) {
+  /** @param tutorial the opening script, which sits lower and reads larger. */
+  showHint(text, tutorial = false) {
     // Lines are written with their own break, so they wrap where they read.
     this.el.hint.textContent = text;
+    this.el.hint.classList.toggle('tutorial', tutorial);
     this.el.hint.classList.add('show');
     // Long enough to finish reading it with a thumb on the lever.
     this.hintTimer = 9;
