@@ -556,7 +556,7 @@ export const ABILITIES = [
     id: 'well',
     name: 'WELL',
     color: '#c77dff',
-    cooldown: 19,
+    cooldown: 38,
     icon: ICON.well,
     hint: 'WELL — drags everything into a knot, then collapses.',
     run(world) {

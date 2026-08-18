@@ -24,7 +24,10 @@ class Projectile {
     // Called at the point of impact (or on timeout) for rounds that go off.
     this.burst = opts.burst || null;
     this.chain = !!opts.chain; // ARC: jumps on from whatever it hits
-    this.barb = !!opts.barb; // BARB: sinks in and keeps biting
+    // RECUR: how many more times this shot happens again after it lands,
+    // and how long it waits at the impact point before it does.
+    this.recur = opts.recur ?? 0;
+    this.hold = opts.hold ?? 0;
     this.dead = false;
     this.ignore = null; // body we just reflected off
     this.ignoreT = 0;
@@ -52,6 +55,15 @@ export function updateProjectiles(world, dt) {
     // a timed round goes off wherever it happens to be
     if (p.life <= 0) endProjectile(world, p, p.x, p.y, true);
     if (p.ignoreT > 0) p.ignoreT -= dt; else p.ignore = null;
+
+    // A recurrence sits where the last one landed for a moment before it goes
+    // on. That stutter is the whole read of the round: the line of light stops
+    // dead, then reappears deeper into the column.
+    if (!p.dead && p.hold > 0) {
+      p.hold -= dt;
+      dot(p.x, p.y, 0, 0, p.color, 0.06, 5);
+      continue;
+    }
 
     if (!p.dead) {
       let nx = p.x + p.vx * dt;
@@ -171,11 +183,31 @@ class Arc {
   }
 }
 
-/** BARB. Sinks in at the angle it arrived and starts biting. */
-function sinkBarb(e, hx, hy) {
-  if (!e.addBarb) return;
-  const a = Math.atan2(hy - e.y, hx - e.x);
-  if (e.addBarb(a)) audio.thud();
+/**
+ * RECUR. The shot happens again from where it landed, still travelling the way
+ * it was, after a short hold. It cannot hit the same body twice in a row, so a
+ * single object cannot farm it — it has to have something behind it.
+ */
+function recurFrom(world, p, hx, hy, dirx, diry, hit) {
+  const cfg = CFG.rounds.recur;
+  const a = Math.atan2(diry, dirx);
+  // Clear of the body it just landed on, or the recurrence lands on the same
+  // one again and the round never gets past the first thing it touches.
+  const off = (hit ? hit.r : 0) + p.r + 6;
+  const next = fire(world, hx + dirx * off, hy + diry * off, a, {
+    damage: p.damage * cfg.falloff,
+    speed: cfg.speed,
+    bounces: 0,
+    recur: p.recur - 1,
+    hold: cfg.hold,
+    color: '#c9b6ff',
+    core: '#ffffff',
+  });
+  if (next && hit) {
+    next.ignore = hit;
+    next.ignoreT = cfg.hold + 0.25;
+  }
+  audio.thud();
 }
 
 function ricochetFx(p) {
@@ -287,7 +319,7 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         return;
       }
       if (p.chain) chainFrom(world, e, hx, hy);
-      if (p.barb) sinkBarb(e, hx, hy);
+      if (p.recur > 0) recurFrom(world, p, hx, hy, dirx, diry, e);
       audio.hit();
       endProjectile(world, p, hx, hy, true);
       return;
@@ -320,9 +352,10 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         hitBurst(hx, hy, -dirx, -diry, boss.hitColor);
         audio.hit();
       }
-      // ORDINAL cannot be barbed — nothing sinks into it — but an ARC round
-      // still jumps off it into whatever it has around it.
+      // An ARC round still jumps off ORDINAL into whatever it has around it,
+      // and a RECUR round still happens again in front of it.
       if (p.chain) chainFrom(world, null, hx, hy);
+      if (p.recur > 0) recurFrom(world, p, hx, hy, dirx, diry);
       endProjectile(world, p, hx, hy, true);
       return;
     }

@@ -135,7 +135,6 @@ export class Enemy {
     if (this.harmless) this.counts = false;
     this.ward = 0; // damage reduction granted by a HERALD
     this.wardT = 0; // lapses unless refreshed
-    this.barbs = null; // BARB rounds currently sunk into it
     this.tether = null; // the other half of a TOW, if any
     // Every object picks its own way across the field.
     this.route = opts.route || weightedPick(ROUTES);
@@ -307,7 +306,6 @@ export class Enemy {
 
     if (this.type.ward) this.wardNearby(world, dt);
     if (this.type.eat) this.feed(world);
-    this.updateBarbs(world, dt);
 
     if (this.staged) {
       // An object wedged above the screen would stall the run forever, since
@@ -376,37 +374,6 @@ export class Enemy {
       audio.pop(0.5);
       if (this.r >= cfg.maxR) break;
     }
-  }
-
-  /** BARB rounds sunk into this body, biting on their own clock. */
-  updateBarbs(world, dt) {
-    if (!this.barbs || !this.barbs.length) return;
-    const cfg = CFG.rounds.barb;
-    for (let i = this.barbs.length - 1; i >= 0; i--) {
-      const b = this.barbs[i];
-      b.life -= dt;
-      b.next -= dt;
-      if (b.next <= 0) {
-        b.next = cfg.tick;
-        spark(this.x + Math.cos(b.a) * this.r, this.y + Math.sin(b.a) * this.r,
-          spread(70), spread(70), '#ff9f1c', 0.22, 1.8);
-        this.applyDamage(world, cfg.tickDamage);
-        if (this.dead) return;
-      }
-      if (b.life <= 0) {
-        this.barbs[i] = this.barbs[this.barbs.length - 1];
-        this.barbs.pop();
-      }
-    }
-  }
-
-  /** @returns true if it took the barb. */
-  addBarb(angle) {
-    const cfg = CFG.rounds.barb;
-    this.barbs = this.barbs || [];
-    if (this.barbs.length >= cfg.maxPer) return false;
-    this.barbs.push({ a: angle, life: cfg.duration, next: cfg.tick });
-    return true;
   }
 
   // ---------------------------------------------------------------- damage
@@ -642,20 +609,6 @@ export class Enemy {
       ctx.lineWidth = HAIRLINE * 2;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.r + 7, 0, TAU);
-      ctx.stroke();
-    }
-
-    // BARB rounds sunk into it, and the bite they are about to take
-    if (this.barbs && this.barbs.length) {
-      ctx.strokeStyle = rgba('#ff9f1c', 0.9);
-      ctx.lineWidth = HAIRLINE * 2.2;
-      ctx.beginPath();
-      for (const b of this.barbs) {
-        const ca = Math.cos(b.a);
-        const sa = Math.sin(b.a);
-        ctx.moveTo(this.x + ca * (this.r - 3), this.y + sa * (this.r - 3));
-        ctx.lineTo(this.x + ca * (this.r + 9), this.y + sa * (this.r + 9));
-      }
       ctx.stroke();
     }
 

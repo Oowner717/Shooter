@@ -179,18 +179,18 @@ export class Shooter {
         trail: 0.038,
         chain: true,
       });
-    } else if (world.round === 'barb') {
-      const g = R.barb;
+    } else if (world.round === 'recur') {
+      const g = R.recur;
       fire(world, this.muzzleX, this.muzzleY, a, {
         speed: g.speed * slow,
         r: 4.4,
         damage: g.damage,
         impulse: 26,
         bounces: 0,
-        color: '#ffb35c',
-        core: '#fff0d8',
+        color: '#c9b6ff',
+        core: '#ffffff',
         trail: 0.05,
-        barb: true,
+        recur: g.repeats,
       });
     } else {
       fire(world, this.muzzleX, this.muzzleY, a, { speed: CFG.bolt.speed * slow });

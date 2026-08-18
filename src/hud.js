@@ -10,7 +10,7 @@ import { Menu } from './menu.js';
 const $ = (id) => document.getElementById(id);
 
 /** Rounds that are not the default. Mutually exclusive with each other. */
-export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'barb'];
+export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'recur'];
 export const ASSIST_KEYS = ['autoAim', 'autoFire', 'autoMine', 'autoSnare'];
 
 export class Hud {
@@ -189,7 +189,8 @@ export class Hud {
   showHint(text) {
     this.el.hint.textContent = text;
     this.el.hint.classList.add('show');
-    this.hintTimer = 3.4;
+    // Long enough to finish reading it with a thumb on the lever.
+    this.hintTimer = 6.5;
   }
 
   // ----------------------------------------------------------------- meters

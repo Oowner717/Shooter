@@ -153,6 +153,7 @@ export class Game {
     w.nextStoryAt = CFG.storyEvery;
     w.counted = false;
     this.lullTimer = 0;
+    this.openingLine = 0;
     w.phase = 'staging';
 
     // A reset is a fresh session: the strip goes back to standard rounds and
@@ -358,8 +359,21 @@ export class Game {
     if (res.first && this.hintsAllowed) this.hud.showHint(res.slot.def.hint);
   }
 
+  /**
+   * The opening. The field is empty for CFG.openingGrace seconds, which is
+   * exactly long enough to say four things and have the player try each one
+   * before there is anything to react to. Times are seconds from the start of
+   * the run; the last line is still up when the first object comes down.
+   */
+  static OPENING = [
+    [0.8, 'Swing the grip under the turret. The barrel goes the other way.'],
+    [2.4, 'Or tap ahead of the turret and it shoots there.'],
+    [4.0, 'Rounds on the right, mines on the left, abilities along the bottom.'],
+    [5.6, 'Five hundred objects. You cannot lose. Begin.'],
+  ];
+
   static HINTS = {
-    standard: 'STANDARD ROUNDS — nothing done to them, and the fastest cadence there is.',
+    standard: 'BOLT — nothing done to it, and the fastest cadence there is.',
     autoAim: 'AUTO AIM — tracks and fires on the nearest breacher.',
     autoFire: 'AUTO FIRE — keeps shooting wherever the barrel points.',
     autoMine: 'AUTO MINE — lobs inert mines that arm where they land.',
@@ -367,7 +381,7 @@ export class Game {
     explosive: 'HE ROUNDS — every shot detonates. Half the rate of fire.',
     shotgun: 'SHOT ROUNDS — five pellets a shot, close range, slower cadence.',
     arc: 'ARC ROUNDS — the hit jumps on through anything nearby.',
-    barb: 'BARB ROUNDS — sinks in and keeps biting. Slowest cadence.',
+    recur: 'RECUR ROUNDS — the shot happens again, further down the same line.',
   };
 
   toggleAuto(key) {
@@ -518,6 +532,14 @@ export class Game {
     }
 
     w.time += dt;
+
+    // The opening script. Runs off the world clock so it holds with the menu.
+    while (w.phase === 'staging'
+      && this.openingLine < Game.OPENING.length
+      && w.time >= Game.OPENING[this.openingLine][0]) {
+      this.hud.showHint(Game.OPENING[this.openingLine][1]);
+      this.openingLine++;
+    }
 
     // ---- status timers ----
     w.stasis = Math.max(0, w.stasis - dt);

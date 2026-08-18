@@ -30,7 +30,8 @@ export const ICON = {
   // zigzag did not — it came out as a chevron.
   arc: svg('<path d="M13.6 2 5 13.4h5.6L9.8 22l8.6-11.4h-5.6z" fill="currentColor" stroke="none"/>'),
   // It stays in.
-  barb: svg('<path d="M12 22V3.5"/><path d="m12 3.5-3.1 3.6M12 3.5l3.1 3.6M12 9.4l-3.1 3.6M12 9.4l3.1 3.6M12 15.3l-3.1 3.6M12 15.3l3.1 3.6"/>', 1.6),
+  // The same shot, three places down the same line.
+  recur: svg('<circle cx="12" cy="4.5" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="11.5" r="2.2" fill="currentColor" stroke="none" opacity=".72"/><circle cx="12" cy="18.5" r="2.2" fill="currentColor" stroke="none" opacity=".45"/>'),
 };
 
 /**
@@ -56,7 +57,7 @@ export const ARSENAL = [
     line: 'Keeps shooting wherever the barrel happens to point. A shade slower than working the lever yourself, so playing is still worth it.',
   },
   {
-    key: 'standard', kind: 'round', group: 'ammo', label: 'STD', icon: ICON.std,
+    key: 'standard', kind: 'round', group: 'ammo', label: 'BOLT', icon: ICON.std,
     line: 'Nothing done to it, and the fastest cadence there is. Everything else buys its trick with rate of fire.',
   },
   {
@@ -72,8 +73,8 @@ export const ARSENAL = [
     line: 'The weakest thing you can load on impact and the strongest through a crowd. The hit jumps to the nearest thing it has not touched, up to four links, each a little weaker. Poor against anything standing on its own.',
   },
   {
-    key: 'barb', kind: 'round', group: 'ammo', label: 'BARB', icon: ICON.barb,
-    line: 'Almost nothing when it lands — it sinks in and starts biting, and a body will hold four at once. The slowest cadence of anything, so it is wasted on a mote and made for what takes a while.',
+    key: 'recur', kind: 'round', group: 'ammo', label: 'RECUR', icon: ICON.recur,
+    line: 'The shot happens again. Whatever it lands on, a moment later it is a little further along the same line, still travelling the way it was, three times over and weaker each time. Wasted on anything standing on its own; devastating down the length of a column.',
   },
 ];
 

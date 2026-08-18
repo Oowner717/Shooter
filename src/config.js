@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '22';
+export const BUILD = '23';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -58,7 +58,7 @@ export const CFG = {
   // ---- rounds ---------------------------------------------------------
   // Loadouts are mutually exclusive. Each buys its effect with rate of fire.
   rounds: {
-    standard: { label: 'STD', rate: 1 },
+    standard: { label: 'BOLT', rate: 1 },
     explosive: {
       label: 'HE',
       rate: 2.1, // less than half the cadence
@@ -88,18 +88,18 @@ export const CFG = {
       jumpDamage: 25,
       falloff: 0.86, // each link a little weaker than the last
     },
-    // Sinks in and keeps working. Nothing happens on impact, so it is wasted
-    // on a mote — it is for the things that take a while: bulwarks and
-    // ORDINAL itself.
-    barb: {
-      label: 'BARB',
-      rate: 2.4, // the slowest thing in the rack
-      speed: 900,
-      damage: 6,
-      tick: 0.28, // seconds between bites
-      tickDamage: 20,
-      duration: 4.2,
-      maxPer: 4, // barbs one body will hold
+    // The simulation stutters. Whatever it hits, the round happens again a
+    // fraction of a second later from the point of impact, still travelling
+    // the way it was — so a column coming straight down is hit once by every
+    // shot, all the way to the back of it. Useless on anything on its own.
+    recur: {
+      label: 'RECUR',
+      rate: 1.9,
+      speed: 1240,
+      damage: 18,
+      repeats: 3, // times it happens again after the first hit
+      hold: 0.11, // seconds it waits at the impact point before going on
+      falloff: 0.8, // each recurrence a little weaker
     },
   },
 
@@ -123,7 +123,7 @@ export const CFG = {
     gather: 0.5, // seconds of hauling before it fires
     maxTake: 40,
     reach: 900,
-    spread: 1.5, // radians of the outgoing fan
+    spread: 0.5, // radians of the outgoing fan — a jet, not a shrug
     speed: [1180, 1600],
     damagePer: 21,
     minShots: 6, // it always finds something to throw
