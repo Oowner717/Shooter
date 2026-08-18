@@ -645,14 +645,6 @@ body.menuOpen #quickBar { pointer-events: none; }
 /* A round is a choice; the middle two are a thing left running. Filled, not lit. */
 .qc.run.on { box-shadow: inset 0 0 0 40px color-mix(in srgb, var(--accent) 13%, transparent); }
 
-@media (max-width: 372px) {
-  .q_mines, .q_ammo { width: 56px; }
-  .qc { height: 28px; gap: 4px; padding: 0 5px; }
-  .qc.wide { height: 38px; width: 48px; }
-  .qc svg { width: 13px; height: 13px; }
-  .qc .qLbl { font-size: 6px; letter-spacing: 0.02em; }
-}
-
 /* ---------------- abilities ---------------- */
 
 #abilities {
@@ -687,13 +679,6 @@ body.menuOpen #quickBar { pointer-events: none; }
 
 .ab svg { width: 24px; height: 24px; display: block; }
 .ab .lbl { font-size: 8.5px; letter-spacing: 0.13em; color: var(--dim); white-space: nowrap; }
-
-/* Eight buttons on a narrow phone: the six-letter labels (STASIS, SIPHON) run
-   past a 34px button at the default tracking, and .ab clips its overflow. */
-@media (max-width: 372px) {
-  .ab svg { width: 20px; height: 20px; }
-  .ab .lbl { font-size: 7px; letter-spacing: 0.04em; }
-}
 
 .ab .fill {
   position: absolute;
@@ -1012,3 +997,22 @@ body.booting #quickBar {
 
 #resetBtn { max-width: 320px; animation: lineIn 0.6s ease-out; }
 #resetBtn[hidden] { display: none; }
+
+/* ---------------- narrow phones ---------------- */
+
+/*
+ * One block, not two. Everything that has to give up a few pixels on a 320px
+ * screen gives them up here: the strip's cells, and the ability labels, whose
+ * six-letter names (STASIS, SIPHON) run past a 34px button at the default
+ * tracking and get clipped by .ab's overflow.
+ */
+@media (max-width: 372px) {
+  .q_mines, .q_ammo { width: 56px; }
+  .qc { height: 28px; gap: 4px; padding: 0 5px; }
+  .qc.wide { height: 38px; width: 48px; }
+  .qc svg { width: 13px; height: 13px; }
+  .qc .qLbl { font-size: 6px; letter-spacing: 0.02em; }
+
+  .ab svg { width: 20px; height: 20px; }
+  .ab .lbl { font-size: 7px; letter-spacing: 0.04em; }
+}

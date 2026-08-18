@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '26';
+export const BUILD = '27';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -56,18 +56,17 @@ export const CFG = {
   },
 
   // ---- rounds ---------------------------------------------------------
-  // Loadouts are mutually exclusive. Each buys its effect with rate of fire.
+  // Mutually exclusive; each buys its effect with rate of fire. Names, marks
+  // and descriptions live in src/arsenal.js — this table is behaviour only.
   rounds: {
-    standard: { label: 'BOLT', rate: 1 },
+    standard: { rate: 1 },
     explosive: {
-      label: 'HE',
       rate: 2.1, // less than half the cadence
       speed: 1040, // and slower in the air
       damage: 15,
       blast: { r: 96, damage: 44, impulse: 420 },
     },
     shotgun: {
-      label: 'SHOT',
       rate: 1.55,
       pellets: 5,
       spread: 0.3,
@@ -79,7 +78,6 @@ export const CFG = {
     // Poor against anything on its own; devastating through a cluster, at any
     // range, which is the one thing neither HE nor SHOT does.
     arc: {
-      label: 'ARC',
       rate: 1.35,
       speed: 1180,
       damage: 11, // the first hit is the weakest part of it
@@ -93,7 +91,6 @@ export const CFG = {
     // the way it was — so a column coming straight down is hit once by every
     // shot, all the way to the back of it. Useless on anything on its own.
     recur: {
-      label: 'RECUR',
       rate: 1.9,
       speed: 1240,
       damage: 18,

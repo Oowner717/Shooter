@@ -177,3 +177,18 @@ export class Narrator {
     ctx.restore();
   }
 }
+
+/**
+ * The controls, in the only place they are written down. Two surfaces show
+ * them — the title screen and the menu's SYSTEM tab — and they used to be
+ * typed out in full in both, in index.html and in menu.js, where they could
+ * drift apart without anything noticing.
+ *
+ * `body` takes the ability count so the one number in it stays true.
+ */
+export const CONTROLS = [
+  ['LEVER', () => 'hold the grip under the turret and swing. The barrel is the far end of the same rod, so it goes the opposite way — and fires on its own.'],
+  ['TAP', () => 'anywhere ahead of the turret and the shots go there instead. Hold to keep firing.'],
+  ['ABILITIES', (n) => `${n} along the bottom edge. One tap each. Nothing to spend or upgrade; each comes back on its own.`],
+  ['CONTACT', () => 'does not kill you. It breaks up the feed you aim through, and it stays broken until you destroy what caused it.'],
+];

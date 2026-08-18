@@ -548,7 +548,6 @@ export class Boss {
    * whichever side ORDINAL is not on instead.
    */
   raiseEcho(world) {
-
     const right = this.x < world.width / 2;
     // Clear of the drawn rings, not just the body: they read out to about
     // 1.5 radii. The arena is narrow, so the vertical offset does most of the

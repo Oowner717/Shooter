@@ -169,58 +169,6 @@ export function impactDamage(a, b, impact) {
   return clamp((impact - P.collisionThreshold) * reduced * P.collisionDamage, 0, 300);
 }
 
-/**
- * Resolve a circle against a static axis-aligned box.
- * @returns impact speed (0 if no contact).
- */
-export function resolveBox(b, box) {
-  const cx = clamp(b.x, box.x0, box.x1);
-  const cy = clamp(b.y, box.y0, box.y1);
-  let dx = b.x - cx;
-  let dy = b.y - cy;
-  let d2 = dx * dx + dy * dy;
-  let nx;
-  let ny;
-  let pen;
-
-  if (d2 > 1e-9) {
-    if (d2 >= b.r * b.r) return 0;
-    const d = Math.sqrt(d2);
-    nx = dx / d;
-    ny = dy / d;
-    pen = b.r - d;
-  } else {
-    // Centre inside the box — eject along the shallowest axis.
-    const left = b.x - box.x0;
-    const right = box.x1 - b.x;
-    const top = b.y - box.y0;
-    const bottom = box.y1 - b.y;
-    const m = Math.min(left, right, top, bottom);
-    if (m === left) { nx = -1; ny = 0; pen = left + b.r; }
-    else if (m === right) { nx = 1; ny = 0; pen = right + b.r; }
-    else if (m === top) { nx = 0; ny = -1; pen = top + b.r; }
-    else { nx = 0; ny = 1; pen = bottom + b.r; }
-  }
-
-  b.x += nx * pen;
-  b.y += ny * pen;
-
-  const vn = b.vx * nx + b.vy * ny;
-  if (vn >= 0) return 0;
-  const j = -(1 + b.restitution) * vn;
-  b.vx += nx * j;
-  b.vy += ny * j;
-  // A little surface friction so bodies scrub and spin along walls.
-  const tx = -ny;
-  const ty = nx;
-  const vt = b.vx * tx + b.vy * ty;
-  const jt = clamp(-vt, -j * 0.3, j * 0.3);
-  b.vx += tx * jt;
-  b.vy += ty * jt;
-  b.av -= (2 * jt) / b.r;
-
-  return -vn;
-}
 
 /** Keep a body inside the arena's left/right/bottom edges. */
 export function clampToArena(b, w, h, floor) {

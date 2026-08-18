@@ -8,6 +8,7 @@
 // entry and no markup.
 
 import { CODEX, codex } from './codex.js';
+import { CONTROLS } from './narrative.js';
 import { ARSENAL, ARSENAL_GROUPS } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
 import { BUILD } from './config.js';
@@ -193,16 +194,11 @@ export class Menu {
     const keys = document.createElement('div');
     keys.className = 'menuKeys';
     // The only other place these appear is the title screen, which is gone for
-    // the rest of the run.
-    for (const [k, v] of [
-      ['LEVER', 'hold the grip under the turret and swing. The barrel is the far end of the same rod, so it goes the opposite way — and fires on its own.'],
-      ['TAP', 'anywhere ahead of the turret and the shots go there instead. Hold to keep firing.'],
-      ['ABILITIES', `${ABILITIES.length} along the bottom edge. One tap each. Nothing to spend or upgrade; each comes back on its own.`],
-      ['CONTACT', 'does not kill you. It breaks up the feed you aim through, and it stays broken until you destroy what caused it.'],
-    ]) {
+    // the rest of the run. Both read the same table.
+    for (const [k, body] of CONTROLS) {
       const row = document.createElement('div');
       row.className = 'menuKey';
-      row.innerHTML = `<span>${k}</span><p>${v}</p>`;
+      row.innerHTML = `<span>${k}</span><p>${body(ABILITIES.length)}</p>`;
       keys.appendChild(row);
     }
     p.appendChild(keys);

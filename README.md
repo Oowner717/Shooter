@@ -1,8 +1,9 @@
 # SIMULATION 7749
 
 A physics shooter for iPhone, played fullscreen from the home screen. One
-stationary turret, five hundred objects, a wall with a gate, and something
-numbered behind it. Nothing you do ends the run early. You can only be corrupted.
+stationary turret, five hundred objects falling in from above, and something
+numbered that comes down last. Nothing you do ends the run early. You can only
+be corrupted.
 
 No build step, no dependencies, no network calls. Plain ES modules, one canvas.
 
@@ -58,11 +59,11 @@ grow upward from the floor line, into the part of the field that stays
 emptiest.
 
 ```
-                                                            [ STD  ]
+                                                            [ BOLT ]
                                                             [  HE  ]
                                                             [ SHOT ]
 [BLAST]                                                     [ ARC  ]
-[SNARE]              [AUTO AIM][AUTO FIRE]                  [ BARB ]
+[SNARE]              [AUTO AIM][AUTO FIRE]                  [RECUR ]
 [ PULSE ][  FAN  ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ SIPHON ]
 ```
 
@@ -71,7 +72,7 @@ registers the instant the thumb lands, the simulation never stops, the menu
 never opens, and the tap never reaches the canvas — so changing rounds mid-wave
 never costs you the shot you were about to take.
 
-Ammunition is a radio button: exactly one is lit at all times, **STD** is a
+Ammunition is a radio button: exactly one is lit at all times, **BOLT** is a
 cell of its own, and re-picking the loaded one leaves it loaded. (It used to
 unload back to standard, which meant a fumbled double-tap silently dropped you
 to the weakest round in the middle of a fight.) The mines are independent
@@ -137,25 +138,26 @@ Both off by default. Neither is aimed and neither is thrown by you:
 ### The ammunition
 
 Five kinds, one loaded at a time. Every one of them buys its trick with rate of
-fire, so **STD** — nothing done to it — stays the right answer more often than
+fire, so **BOLT** — nothing done to it — stays the right answer more often than
 it looks.
 
 - **HE** makes every round detonate on impact. It costs you better than half
   your rate of fire and the shells travel slower, so single targets are no
   easier — crowds are.
 - **SHOT** loads five pellets a shot in a tight cone at a slower cadence. The
-  pellets expire well short of the wall, so it is devastating up close and
-  useless at range.
+  pellets expire well short of the top of the field, so it is devastating up
+  close and useless at range.
 - **ARC** is the weakest round in the rack on impact and the strongest through
   a crowd: the hit jumps to the nearest thing it has not touched yet and on
   again, up to four links, each a little weaker than the last. It works at any
   range, which is the one thing neither HE nor SHOT does. Poor against anything
   standing on its own.
-- **BARB** does almost nothing when it lands — it sinks in and starts biting,
-  20 damage every 0.28 s for four seconds, and a body will hold four of them at
-  once. It has the slowest cadence of anything you can load, so it is wasted on
-  a mote and made for the things that take a while: bulwarks, the gate, ORDINAL
-  itself. The spines stick visibly out of whatever is wearing them.
+- **RECUR** is the shot that happens again. A tenth of a second after it lands
+  it reappears a little further along the same line, still travelling the way it
+  was, three times over and weaker each time — so one shot hits every rank of a
+  column coming straight down. It cannot land on the same body twice, so a lone
+  object cannot farm it, and ORDINAL is immune to the recurrence entirely:
+  there is nothing behind it to reach.
 
 The five kinds are exclusive: picking one clears whichever was loaded, and
 picking the loaded one again is a no-op rather than a silent unload.
@@ -174,7 +176,7 @@ a caption explains it.
 | ◎ | **PULSE** | Shockwave from the turret; shoves everything away | 7 s |
 | Ψ | **FAN** | 25 pellets in a tight cone | 5 s |
 | ↑ | **LANCE** | Piercing beam, auto-locked to the biggest threat | 12 s |
-| ✳ | **WELL** | Singularity — hauls everything into one grinding knot, then collapses | 19 s |
+| ✳ | **WELL** | Singularity — hauls everything into one grinding knot, then collapses | 38 s |
 | ❄ | **STASIS** | Objects freeze for four seconds; your shots do not | 21 s |
 | ▲ | **PRISM** | Fused shell that refracts — wide blast plus beams in every colour | 16 s |
 | ⚲ | **DECOY** | A turret that is not yours, 300 units up-field. Everything walks at it instead | 24 s |
@@ -190,7 +192,7 @@ it finally goes. Only one at a time; casting again detonates the old one.
 **SIPHON** is the one ability whose strength you build up yourself. It drags
 every fragment within 900 units into the muzzle and fires them back out in a
 fan across whatever arc the barrel is covering — one shot per fragment, so a
-littered floor is a wall of fire and a floor you have just cleared gives you the
+littered floor is a barrage and a floor you have just cleared gives you the
 six-shot minimum. It also competes with a GLUT for the same food.
 
 **Contact does not kill you.** When an object touches the turret the feed
@@ -201,15 +203,19 @@ attackers, worse corruption.
 
 ### The run
 
-1. **STAGING** — objects pour out of the gate. Exactly five hundred
-   glitch-causing objects exist across a whole run, splitter children
-   included; the director stops releasing once the quota is spent, so the
-   field drains toward the end and the last stragglers close in faster. When
-   the five hundredth dies there are no hostiles left on screen at all — only
-   harmless drift.
-2. **GATE** — the doors slam shut. Now the gate is the target. Every round
-   damages it, and blasts reach it at half weight.
-3. **BOSS** — **ORDINAL** comes through the breach, slowly. It cannot hurt
+0. **THE OPENING** — the field starts completely empty and stays that way for
+   fifteen seconds while a four-line tutorial plays: the lever, the tap, where
+   the buttons are, what the run is. Nothing is falling, so the first thing you
+   do is try the controls rather than react to something.
+1. **STAGING** — objects come down from off the top of the screen, across the
+   whole width. Exactly five hundred glitch-causing objects exist across a whole
+   run, splitter children included; the director stops releasing once the quota
+   is spent, so the field drains toward the end and the last stragglers close in
+   faster. When the five hundredth dies there are no hostiles left on screen at
+   all — only harmless drift.
+2. **THE LULL** — a few seconds of empty field with the light going wrong. No
+   wall, no doors, no fight: the run simply stops.
+3. **BOSS** — **ORDINAL** comes down last, slowly. It cannot hurt
    you. It takes things from you instead: your sight, your aim, your rate of
    fire. Shooting pushes it back; stop shooting and it keeps walking. See
    *The fight* below — it is not a health bar.
@@ -225,11 +231,11 @@ A typical run is about fifteen minutes.
 ORDINAL has no more hit points than it ever did, and none of what follows asks
 anything of your hands.
 
-**The arrival.** Breaking the gate does not start a fight. The substrate drains
-to black, ORDINAL is hauled through the breach over eleven seconds in four
-beats — each with its own sound, shock and caption — and *nothing comes out of
-the gate for another twenty-four seconds after that*. The opening of the fight
-is you and it and an empty field.
+**The arrival.** The lull does not end in a fight. The substrate drains to
+black, ORDINAL is hauled down over eleven seconds in four beats — each with its
+own sound, shock and caption — and *nothing else falls for another twenty-four
+seconds after that*. The opening of the fight is you and it and an empty
+field.
 
 > THAT WAS THE LAST OF THE SIMPLE WORK.
 > IT HAS BEEN HOLDING YOUR FIVE HUNDRED SINCE THE FIRST ONE.
@@ -250,7 +256,7 @@ Measured end to end, holding fire on it and nothing else: the armour phase
 lasts **58 s**, the whole fight **162 s**, and of the five hundred you take
 back 400 while it burns 100.
 
-**It does not advance.** It holds a station 410 units out — **254 units of open
+**It does not advance.** It holds a station 360 units out — **204 units of open
 space** between its edge and yours — and it can never be nearer than that. The
 only reason it ever moves toward you is to close a gap *you* opened by shooting
 it: push it off station and it eases back over about ten seconds, then stops.
@@ -261,10 +267,10 @@ seconds of sustained fire moves it 39 units, which clears the 30-unit band and
 stops the corruption. That is the whole exchange: keep it pushed clear, or wear
 it. There is no creep to out-race.
 
-The three numbers have to fit the field: the wall stops its centre at about 232
-and the turret sits at about 706, so the entire range it can occupy is roughly
-474 units. A station of 410 leaves ~57 units of travel, and a band wider than
-that would be one it could never push out of.
+The three numbers have to fit the field: the top edge stops its centre at about
+46 and the turret sits at about 706, so the entire range it can occupy is
+roughly 474 units. A station of 360 leaves ~107 units of travel, and a band
+wider than that would be one it could never push out of.
 
 **The reversal.** Three of its powers run the game backwards.
 
@@ -350,7 +356,7 @@ They unlock progressively as the count climbs.
   shoves whatever it catches, and both count — a TOW is **two** of the five
   hundred. Cut either end and the cable goes slack.
 - **DRIFT** — harmless. No goal, no destination, no threat: it wanders on a
-  slow random walk, drifts back out through the gate as often as in, never
+  slow random walk, wanders back up the field as often as down, never
   breaches the turret, never triggers a mine, is never auto-targeted and does
   not count toward the tally. It is there to be shot at and shoved around.
 
@@ -393,18 +399,18 @@ They appear in the mid-field, drawn *behind* every entity so they can never
 hide something you need to shoot, and they corrupt away after a few seconds.
 They are the only place the game says what it thinks it is about, and they
 never quite say it — the shapes are simple on purpose, someone is counting,
-and the thing behind the gate is a lock rather than a finish line.
+and the thing that comes down last is a lock rather than a finish line.
 
 ---
 
 ## Debug
 
-The **DBG** chip (top right) opens a panel: skip to the gate, skip to the boss,
+The menu's SYSTEM tab opens the debug panel: skip to the count, skip to the boss,
 kill the boss, +50 kills, advance the story, force a boss power, force a
 reprise, raise an echo, force a tithe or a subtract, drain the ledger to the
 spent endgame, skip the arrival, spawn a formation, fill the field, clear the field, trigger a glitch, throw either kind
 of mine, jump to the end screen, restart — plus toggles for cooldowns, corruption, slow motion,
-hitboxes, a live stats readout, and an invulnerable gate.
+hitboxes, and a live stats readout.
 
 With **STATS** on, the boss fight adds four lines: the ledger with how much
 has been reclaimed and how much burnt, the current armour multiplier and
@@ -435,7 +441,6 @@ src/
   projectiles.js        swept-collision bolts and bursting rounds
   mines.js              inert-in-flight mines: blast and snare
   shooter.js            the turret
-  gate.js               wall + gate states
   boss.js               ORDINAL: arrival, worn ledger, reprise, echo, tithe
   abilities.js          the eight abilities and their effects
   narrative.js          the ten sentences, and how they decay
@@ -451,7 +456,7 @@ scripts/
 ## Tuning
 
 `src/config.js` is the only file you need for balance. The knobs that move run
-length most: `bolt.damage`, `shooter.gripFireInterval`, `gate.hp`, `boss.hp`,
+length most: `bolt.damage`, `shooter.gripFireInterval`, `openingGrace`, `boss.hp`,
 `popStart`/`popEnd`, and `spawnInterval`.
 
 `boss.hold`, `boss.pushBand` and `boss.pushPerBolt` are the three that decide
@@ -517,7 +522,7 @@ in half.
 ```bash
 npx http-server -p 8099 -c-1 .          # serve
 node scripts/smoke.mjs                  # headless run: play, abilities,
-                                        # gate, boss, powers, ending, restart
+                                        # lull, boss, powers, ending, restart
 ```
 The smoke test drives the game through every phase in an iPhone-sized viewport,
 writes screenshots to `/tmp/sim7749-shots`, and exits non-zero on any console

@@ -39,7 +39,6 @@ export class Game {
     this.mineTimer = 0;
     this.snareTimer = 0;
     this.autoLock = null;
-    this.leverHinted = false;
     this.autoHinted = {};
     this.acc = 0;
     this.endFade = 1; // turret opacity; falls to 0 under the ending text
@@ -302,10 +301,6 @@ export class Game {
         s.grabGrip(p.x, p.y, w.invert > 0);
         s.shoot(w);
         this.fireTimer = CFG.shooter.gripFireInterval;
-        if (!this.leverHinted) {
-          this.leverHinted = true;
-          this.hud.showHint('LEVER — swing and hold. The barrel goes the other way.');
-        }
       } else {
         this.pointers.set(ev.pointerId, p);
         s.aimAt(p.x, p.y, w.invert > 0);
@@ -890,7 +885,7 @@ export class Game {
           ? `ledger ${w.ledger}  back ${w.reclaimed}  burnt ${w.boss.spent}${w.boss.spentOut ? ' OUT' : ''}\n`
             + `armour x${w.boss.damageScale(w).toFixed(2)}  intro ${w.boss.intro.toFixed(2)}${w.boss.looming ? '  LOOMING' : ''}\n`
             + `rev    ${w.boss.reprises.length} reprise  ${w.boss.echo ? 'echo' : 'no echo'} ${w.boss.echoBolts.length} bolts\n`
-            + `locked ${w.abilities.slots.filter((s) => s.locked > 0).length}/6\n`
+            + `locked ${w.abilities.slots.filter((s) => s.locked > 0).length}/${w.abilities.slots.length}\n`
           : '')
         + `build  ${BUILD}  zoom ${CFG.zoom}`,
       );

@@ -352,10 +352,12 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         hitBurst(hx, hy, -dirx, -diry, boss.hitColor);
         audio.hit();
       }
-      // An ARC round still jumps off ORDINAL into whatever it has around it,
-      // and a RECUR round still happens again in front of it.
+      // An ARC round still jumps off ORDINAL into whatever it has around it.
+      // A RECUR round does not: the recurrence would land on the same hull a
+      // tenth of a second later and again after that, which farmed ORDINAL for
+      // twice a plain bolt off one shot. There is nothing behind it to reach,
+      // which is exactly the matchup the round is bad at.
       if (p.chain) chainFrom(world, null, hx, hy);
-      if (p.recur > 0) recurFrom(world, p, hx, hy, dirx, diry);
       endProjectile(world, p, hx, hy, true);
       return;
     }

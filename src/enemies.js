@@ -962,6 +962,7 @@ export function spawnOne(world, type, x, y, opts = {}) {
  * pair swings and shoves — and two of the five hundred, the same way a
  * splitter's children are.
  */
+/** Exported for the test suite, which builds a TOW pair directly. */
 export function spawnTow(world, x, y, opts = {}) {
   const head = TYPE_BY_ID.tow;
   const massType = TYPE_BY_ID[head.tows.type];
@@ -1013,7 +1014,7 @@ export function solveTethers(world) {
 }
 
 /** Hostiles still owed to the run. */
-export function releasesLeft(world) {
+function releasesLeft(world) {
   return Math.max(0, CFG.killGoal - world.released);
 }
 

@@ -3,6 +3,7 @@
 
 import { ABILITIES } from './abilities.js';
 import { ARSENAL } from './arsenal.js';
+import { CONTROLS } from './narrative.js';
 import { BUILD } from './config.js';
 import { clamp } from './util.js';
 import { Menu } from './menu.js';
@@ -11,7 +12,6 @@ const $ = (id) => document.getElementById(id);
 
 /** Rounds that are not the default. Mutually exclusive with each other. */
 export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'recur'];
-export const ASSIST_KEYS = ['autoAim', 'autoFire', 'autoMine', 'autoSnare'];
 
 export class Hud {
   constructor(game) {
@@ -58,6 +58,13 @@ export class Hud {
     // short screen the kicker sits level with the top chips. Nothing behind the
     // title screen is live yet, so hide it until the run starts.
     document.body.classList.add('booting');
+
+    const keys = document.querySelector('.bootKeys');
+    if (keys) {
+      keys.innerHTML = CONTROLS
+        .map(([k, body]) => `<li><span>${k}</span> ${body(ABILITIES.length)}</li>`)
+        .join('');
+    }
 
     // Stamped where it is visible on launch: if this number is not the newest,
     // the page is running a cached build.
