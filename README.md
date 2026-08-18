@@ -46,14 +46,24 @@ and tap with the other.
 
 ### The strip
 
-**Nine cells sit in one row above the ability bar, and they never go away.**
-Left to right: the two **mines**, the two things that **run on their own**, and
-then the five kinds of **ammunition**. That is the whole of what you choose
-between, permanently on screen, one tap each.
+**Nine cells sit above the ability bar and never go away.** The two **mines**
+stack at the left edge, the five kinds of **ammunition** stack at the right
+edge, and the two things that **run on their own** sit side by side in the
+middle. That is the whole of what you choose between, permanently on screen,
+one tap each.
+
+The stacks are at the edges because the middle of that band belongs to the
+lever: the turret sits above it and the grip swings through it. Both stacks
+grow upward from the floor line, into the part of the field that stays
+emptiest.
 
 ```
-[BLAST][SNARE]  [AUTO AIM][AUTO FIRE]  [STD][HE][SHOT][ARC][BARB]
-[  PULSE  ][  FAN  ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ SIPHON ]
+                                                            [ STD  ]
+                                                            [  HE  ]
+                                                            [ SHOT ]
+[BLAST]                                                     [ ARC  ]
+[SNARE]              [AUTO AIM][AUTO FIRE]                  [ BARB ]
+[ PULSE ][  FAN  ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ SIPHON ]
 ```
 
 Every cell is bound on `pointerdown`, like the ability buttons are: a tap
@@ -67,14 +77,13 @@ unload back to standard, which meant a fumbled double-tap silently dropped you
 to the weakest round in the middle of a fight.) The mines are independent
 toggles — either, both or neither.
 
-The row has to live in the band between the lever's grip at rest and the
-ability bar, which is 46px tall on the smallest phone it targets. So it is
-40px, the cells flex to the width available, and the two carrying a whole
-phrase are sized larger than the seven carrying a word. Measured at 320, 375,
-390 and 430 wide: nothing clipped, nothing overlapping the grip.
+Only the middle pair has to fit the 46px band between the lever's grip at rest
+and the ability bar, so only it is height-constrained. Measured at 320, 375,
+390 and 430 wide: nothing clipped, every stack fully on screen, the middle pair
+6–8px clear of the grip.
 
-The whole row is built from `ARSENAL` in `src/arsenal.js`. A new round or mine
-is a table entry and no markup.
+The whole thing is built from `ARSENAL` in `src/arsenal.js`. A new round or
+mine is a table entry and no markup — it lands in its group's stack.
 
 ### The menu
 

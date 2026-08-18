@@ -545,10 +545,11 @@ body.menuOpen #quickBar { pointer-events: none; }
 /* ---------------- the strip ---------------- */
 
 /*
- * One row above the ability bar: mines, the two that run on their own, then
- * ammunition. It has to live in the band between the lever's grip at rest and
- * the ability bar, which is about 46px tall on the smallest phone — so the row
- * is short, and everything in it is sized to fit rather than to be roomy.
+ * Mines stacked at the left edge, the two that run on their own side by side
+ * in the middle, ammunition stacked at the right edge. The stacks grow upward
+ * from the floor line along the edges, where the field is emptiest and the
+ * thumb is already resting; the turret and the whole of the lever's arc sit in
+ * the centre, between them.
  */
 #quickBar {
   position: absolute;
@@ -559,34 +560,35 @@ body.menuOpen #quickBar { pointer-events: none; }
      anything shorter than that the two part company — no phone this targets
      is, in either orientation.) */
   bottom: calc(var(--safe-b) + var(--bar-h) + 22px);
-  height: 40px;
-  /* On a phone the row already fills the width; on a tablet it would stretch
-     nine cells to 90px each around 6.5px type, which looks broken rather than
-     roomy. Absolutely positioned with both edges set, auto margins centre it. */
-  max-width: 560px;
-  margin-inline: auto;
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+  /* Only the groups take input; the space between them is still field, because
+     the middle of this band is where the lever is worked. */
+  pointer-events: none;
+}
+
+.qGroup {
+  display: flex;
+  flex-direction: column;
   gap: 3px;
-  /* The whole band swallows input, not just the nine cells. The gaps, the
-     group separators and the cut corners used to be holes onto the canvas, so
-     a near-miss between two cells grabbed the lever and took a shot. Nothing
-     is lost: the band sits on the floor line, below the grip's whole travel,
-     so there was never anything down here worth aiming at. */
+  /* Every gap and cut corner inside a group swallows input too — a near-miss
+     between two cells used to reach the canvas and take a shot. */
   pointer-events: auto;
 }
+.q_mines, .q_ammo { width: 62px; }
+.q_auto { flex-direction: row; gap: 4px; }
 
 .qc {
   -webkit-appearance: none;
   appearance: none;
-  pointer-events: auto;
-  flex: 1 1 0;
-  min-width: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 5px;
+  height: 30px;
+  padding: 0 6px;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(10, 18, 32, 0.86), rgba(4, 8, 15, 0.92));
   color: var(--dim);
@@ -599,16 +601,19 @@ body.menuOpen #quickBar { pointer-events: none; }
   transition: transform 0.07s ease, color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-/* The two that carry a whole phrase get the room for it. */
-.qc.wide { flex-grow: 1.75; }
-/* First of a group: the only thing separating mines from ammunition. */
-.qc.sep { margin-left: 10px; }
-/* The middle pair is not a choice between five — it reads as its own thing
-   even when both are off. */
+/* The two in the middle are the only ones stacked icon over label, so they
+   read as their own thing rather than as two more of the seven. */
+.qc.wide {
+  flex-direction: column;
+  gap: 2px;
+  height: 40px;
+  width: 52px;
+  padding: 0 4px;
+}
 .qc.run { border-color: rgba(120, 190, 255, 0.32); }
 .qc.run .qLbl { opacity: 1; }
 
-.qc svg { width: 15px; height: 15px; display: block; }
+.qc svg { width: 14px; height: 14px; display: block; flex: 0 0 auto; }
 .qc .qLbl {
   font-size: 6.5px;
   letter-spacing: 0.08em;
@@ -625,26 +630,26 @@ body.menuOpen #quickBar { pointer-events: none; }
 }
 .qc.on svg { filter: drop-shadow(0 0 5px currentColor); }
 .qc.on .qLbl { opacity: 1; }
-/* Which round is loaded is the one thing on this row that must be readable at
-   a glance, mid-fight, without looking directly at it. */
+/* Which round is loaded is the one thing here that must be readable at a
+   glance, mid-fight, without looking directly at it. */
 .qc.on::before {
   content: '';
   position: absolute;
   left: 0;
-  right: 0;
   top: 0;
-  height: 2px;
+  bottom: 0;
+  width: 2px;
   background: currentColor;
 }
+.qc.wide.on::before { left: 0; right: 0; bottom: auto; width: auto; height: 2px; }
 
-/* A round is a choice; these two are a thing left running. Filled, not lit. */
+/* A round is a choice; the middle two are a thing left running. Filled, not lit. */
 .qc.run.on { box-shadow: inset 0 0 0 40px color-mix(in srgb, var(--accent) 13%, transparent); }
 
-/* Nine cells on a 320px phone: the labels run past the box at the default
-   tracking, and .qc clips its overflow. */
 @media (max-width: 372px) {
-  #quickBar { gap: 2px; height: 38px; }
-  .qc.sep { margin-left: 7px; }
+  .q_mines, .q_ammo { width: 56px; }
+  .qc { height: 28px; gap: 4px; padding: 0 5px; }
+  .qc.wide { height: 38px; width: 48px; }
   .qc svg { width: 13px; height: 13px; }
   .qc .qLbl { font-size: 6px; letter-spacing: 0.02em; }
 }

@@ -80,20 +80,25 @@ export class Hud {
    * pauses or takes the shot the turret would otherwise have fired.
    */
   buildStrip() {
-    const frag = document.createDocumentFragment();
     this.strip = [];
     this.el.toggles = {};
-    let group = null;
+    // Three groups: mines stacked at the left edge, the two that run on their
+    // own side by side in the middle where the thumb rests, ammunition stacked
+    // at the right edge. The stacks grow upward from the floor line, along the
+    // edges, clear of the turret and the lever's arc in the centre.
+    const groups = {};
+    for (const g of ['mines', 'auto', 'ammo']) {
+      const d = document.createElement('div');
+      d.className = `qGroup q_${g}`;
+      groups[g] = d;
+      this.el.quickBar.appendChild(d);
+    }
     for (const a of ARSENAL) {
       const b = document.createElement('button');
       // Kept as the id the rest of the interface has always used, so a toggle
       // is still found by name wherever it is looked up.
       b.id = `tg${a.key[0].toUpperCase()}${a.key.slice(1)}`;
-      b.className = 'qc'
-        + (a.wide ? ' wide' : '')
-        + (a.run ? ' run' : '')
-        + (group && group !== a.group ? ' sep' : '');
-      group = a.group;
+      b.className = `qc${a.wide ? ' wide' : ''}${a.run ? ' run' : ''}`;
       if (a.tone) b.style.setProperty('--tone', a.tone);
       b.setAttribute('aria-pressed', 'false');
       b.setAttribute('aria-label', a.label);
@@ -114,11 +119,10 @@ export class Hud {
         if (a.kind === 'round') this.game.toggleRound(a.key);
         else this.game.toggleAuto(a.key);
       });
-      frag.appendChild(b);
+      groups[a.group].appendChild(b);
       this.strip.push({ key: a.key, kind: a.kind, el: b, on: null });
       this.el.toggles[a.key] = b;
     }
-    this.el.quickBar.appendChild(frag);
   }
 
   // ------------------------------------------------------------- abilities
