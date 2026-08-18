@@ -2,7 +2,7 @@
 
 A physics shooter for iPhone, played fullscreen from the home screen. One
 stationary turret, five hundred objects, a wall with a gate, and something
-numbered behind it. You cannot lose. You can only be corrupted.
+numbered behind it. Nothing you do ends the run early. You can only be corrupted.
 
 No build step, no dependencies, no network calls. Plain ES modules, one canvas.
 

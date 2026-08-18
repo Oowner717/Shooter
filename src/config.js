@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '23';
+export const BUILD = '24';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -10,7 +10,7 @@ export const CFG = {
   // Seconds of empty field at the start of a run, and again after the last
   // object falls, before the next thing happens. The field starts with nothing
   // in it: the first beat is the interface, not a reaction.
-  openingGrace: 6,
+  openingGrace: 15,
   lull: 4.5, // the pause between the five hundredth kill and the arrival
   storyEvery: 50, // one story line per this many kills (10 lines total)
 

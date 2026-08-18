@@ -187,10 +187,11 @@ export class Hud {
   }
 
   showHint(text) {
+    // Lines are written with their own break, so they wrap where they read.
     this.el.hint.textContent = text;
     this.el.hint.classList.add('show');
     // Long enough to finish reading it with a thumb on the lever.
-    this.hintTimer = 6.5;
+    this.hintTimer = 9;
   }
 
   // ----------------------------------------------------------------- meters

@@ -360,16 +360,16 @@ export class Game {
   }
 
   /**
-   * The opening. The field is empty for CFG.openingGrace seconds, which is
-   * exactly long enough to say four things and have the player try each one
+   * The opening. The field is empty for CFG.openingGrace seconds — long
+   * enough to say four things at reading pace and have the player try each one
    * before there is anything to react to. Times are seconds from the start of
    * the run; the last line is still up when the first object comes down.
    */
   static OPENING = [
-    [0.8, 'Swing the grip under the turret. The barrel goes the other way.'],
-    [2.4, 'Or tap ahead of the turret and it shoots there.'],
-    [4.0, 'Rounds on the right, mines on the left, abilities along the bottom.'],
-    [5.6, 'Five hundred objects. You cannot lose. Begin.'],
+    [1.2, 'Swing the grip under the turret.\nThe barrel goes the other way.'],
+    [4.8, 'Or tap ahead of the turret\nand it shoots there.'],
+    [8.4, 'Rounds on the right. Mines on the left.\nAbilities along the bottom.'],
+    [12.0, 'Five hundred objects are coming down.\nNone of them is the point.'],
   ];
 
   static HINTS = {

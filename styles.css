@@ -716,18 +716,25 @@ body.menuOpen #quickBar { pointer-events: none; }
   100% { box-shadow: inset 0 0 0 0 transparent; }
 }
 
+/*
+ * Centred on the field. It used to sit just above the lever, where it read as
+ * a footnote to the turret rather than as the thing to read — and the opening
+ * tutorial is the first text a player ever sees.
+ */
 #abilityHint {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: calc(var(--safe-b) + var(--bar-h) + 190px);
+  left: calc(var(--safe-l) + 18px);
+  right: calc(var(--safe-r) + 18px);
+  top: 44%;
   text-align: center;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  color: var(--dim);
+  white-space: pre-line;
+  font-size: 12px;
+  line-height: 1.85;
+  letter-spacing: 0.14em;
+  color: #9fb8cf;
   opacity: 0;
-  transition: opacity 0.25s;
-  text-shadow: 0 0 10px #000;
+  transition: opacity 0.35s;
+  text-shadow: 0 0 14px #000, 0 0 30px #000;
 }
 #abilityHint.show { opacity: 1; }
 

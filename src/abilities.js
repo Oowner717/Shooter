@@ -8,16 +8,32 @@ import { fire } from './projectiles.js';
 import { applyBlast, ENTRY_Y } from './enemies.js';
 import { audio } from './audio.js';
 
+/*
+ * Ability marks. Each one draws what the ability does to the field rather than
+ * a generic glyph, because the bar is read at a glance mid-fight and two
+ * abilities that look alike are two abilities that get pressed by mistake.
+ * WELL and SIPHON were both a circle in a ring of spikes; they are now the
+ * only two that could not be confused.
+ */
 const ICON = {
-  pulse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="2.4"/><circle cx="12" cy="12" r="6" opacity=".7"/><circle cx="12" cy="12" r="9.6" opacity=".35"/></svg>',
-  fan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 22V13"/><path d="M12 13 4 4"/><path d="M12 13 20 4"/><path d="M12 13 8.5 2.5"/><path d="M12 13 15.5 2.5"/></svg>',
-  lance: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 22V2"/><path d="M8.5 8 12 2l3.5 6"/><path d="M9.5 17h5" opacity=".6"/></svg>',
-  well: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" opacity=".8"/><path d="M5 5l2.6 2.6M19 5l-2.6 2.6M5 19l2.6-2.6M19 19l-2.6-2.6" opacity=".5"/></svg>',
-  stasis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2v20M3.4 7 20.6 17M20.6 7 3.4 17"/><circle cx="12" cy="12" r="3.2" fill="currentColor" fill-opacity=".2"/></svg>',
-  prism: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 3 19h18z"/><path d="M12 3v16" opacity=".55"/><path d="M7.5 19 12 11l4.5 8" opacity=".8"/></svg>',
-  decoy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 14V6"/><circle cx="12" cy="17" r="4"/><path d="M8.5 3.5h7" opacity=".7"/><path d="M5 20.5h14" opacity=".4" stroke-dasharray="2 2.5"/></svg>',
-  siphon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="2.6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><path d="M5.5 5.5 8 8M18.5 5.5 16 8M5.5 18.5 8 16M18.5 18.5 16 16" opacity=".55"/></svg>',
+  // A shockwave leaving the turret: a hard core and two arcs already gone.
+  pulse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><path d="M7.4 7.4a6.5 6.5 0 0 0 0 9.2" opacity=".8"/><path d="M16.6 7.4a6.5 6.5 0 0 1 0 9.2" opacity=".8"/><path d="M4.1 4.1a11.2 11.2 0 0 0 0 15.8" opacity=".38"/><path d="M19.9 4.1a11.2 11.2 0 0 1 0 15.8" opacity=".38"/></svg>',
+  // Everything the turret has, at once, across the whole arc.
+  fan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="21" r="1.7" fill="currentColor" stroke="none"/><path d="M12 21 4.6 9.4M12 21 8.7 7.2M12 21V6.6M12 21l3.3-13.8M12 21 19.4 9.4"/></svg>',
+  // One shot straight through everything in the column.
+  lance: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M11.4 2.4 7.4 10h8z" fill="currentColor" stroke="none"/><path d="M11.4 10.6v11"/><path d="M8.9 13.8h5" opacity=".5"/><path d="M9.7 17.4h3.4" opacity=".3"/></svg>',
+  // Everything on the field, dragged inward — the opposite of PULSE.
+  well: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 2.4v4.4M9.7 4.6 12 6.9l2.3-2.3"/><path d="M12 21.6v-4.4M9.7 19.4 12 17.1l2.3 2.3"/><path d="M2.4 12h4.4M4.6 9.7 6.9 12l-2.3 2.3"/><path d="M21.6 12h-4.4M19.4 9.7 17.1 12l2.3 2.3"/></svg>',
+  // Held. A crystal with something stopped inside it.
+  stasis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.6 20.1 7.3v9.4L12 21.4 3.9 16.7V7.3z"/><path d="M12 8.4 15.6 10.5v4.2L12 16.8l-3.6-2.1v-4.2z" fill="currentColor" fill-opacity=".3"/></svg>',
+  // A shell that breaks and leaves in every direction at once.
+  prism: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3.4 2.6 18.6h12z"/><path d="M13.4 8.4 21.6 5.2M14.8 12.2 22.4 11.6M16.2 15.8l5.6 3.4" opacity=".8"/></svg>',
+  // Two turrets. One of them is not there.
+  decoy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.8 4.6v4.2"/><path d="M2.9 12.4 6.8 8.9l3.9 3.5v5.9H2.9z"/><circle cx="6.8" cy="14.6" r="1.3" fill="currentColor" stroke="none"/><path d="M17.2 4.6v4.2" stroke-dasharray="2.2 1.9"/><path d="M13.3 12.4l3.9-3.5 3.9 3.5v5.9h-7.8z" stroke-dasharray="2.2 1.9" opacity=".85"/></svg>',
+  // Wreckage hauled up off the floor and thrown back out the top.
+  siphon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 20.6 8.9 16.2M19.4 20.6 15.1 16.2M12 22.2v-6" opacity=".7"/><path d="M8.8 15.4h6.4l-1.5-4.4h-3.4z" fill="currentColor" stroke="none"/><path d="M12 10.6V3.2"/><path d="M9.1 6 12 3.1 14.9 6"/></svg>',
 };
+
 
 // ------------------------------------------------------------------ effects
 
