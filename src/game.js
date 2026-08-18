@@ -160,16 +160,19 @@ export class Game {
     w.sealed = false;
     w.phase = 'staging';
 
-    // A reset is a fresh session: the rack goes back to standard rounds and
-    // no assists, matching what a first-time player is handed.
+    // A reset is a fresh session: the strip goes back to standard rounds and
+    // nothing running on its own, matching what a first-time player is handed
+    // — including the first-use captions, which a fresh session should get.
     w.autoAim = false;
     w.autoFire = false;
     w.autoMine = false;
     w.autoSnare = false;
     w.round = 'standard';
+    this.autoHinted = {};
     for (const key of ['autoAim', 'autoFire', 'autoMine', 'autoSnare', ...ROUND_KEYS]) {
       this.hud.setToggle(key, false);
     }
+    this.hud.setToggle('standard', true);
 
     w.wall.reset();
     w.narrator.reset();
@@ -367,6 +370,7 @@ export class Game {
   }
 
   static HINTS = {
+    standard: 'STANDARD ROUNDS — nothing done to them, and the fastest cadence there is.',
     autoAim: 'AUTO AIM — tracks and fires on the nearest breacher.',
     autoFire: 'AUTO FIRE — keeps shooting wherever the barrel points.',
     autoMine: 'AUTO MINE — lobs inert mines that arm where they land.',
@@ -386,19 +390,30 @@ export class Game {
     this.announceToggle(key, w[key]);
   }
 
-  /** Loadouts are exclusive: picking one clears whichever was lit. */
+  /**
+   * Rounds are exclusive: picking one clears whichever was loaded. STANDARD is
+   * a chip of its own on the strip, so tapping it loads standard rather than
+   * toggling back to it, and tapping the lit one is a no-op rather than a
+   * silent unload.
+   */
   toggleRound(kind) {
     const w = this.world;
-    w.round = w.round === kind ? 'standard' : kind;
-    for (const k of ROUND_KEYS) this.hud.setToggle(k, w.round === k);
+    w.round = kind;
+    // STANDARD is a chip too, so it lights on the same pass as the rest.
+    for (const k of ['standard', ...ROUND_KEYS]) this.hud.setToggle(k, w.round === k);
     this.announceToggle(kind, w.round === kind);
   }
 
   announceToggle(key, on) {
     audio.chime(on ? 760 : 430);
-    if (!on || this.autoHinted[key]) return;
+    const hint = Game.HINTS[key];
+    if (!on || !hint || this.autoHinted[key] || !this.hintsAllowed) return;
+    // Marked only once it has actually been shown. It used to be marked first,
+    // so picking a round during the boss fight — where captions are suppressed
+    // and where all five are now one tap away — spent that caption on nothing
+    // and never gave it back, not even across a reset.
     this.autoHinted[key] = true;
-    if (this.hintsAllowed) this.hud.showHint(Game.HINTS[key]);
+    this.hud.showHint(hint);
   }
 
   /**

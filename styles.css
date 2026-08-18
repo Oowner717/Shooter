@@ -278,22 +278,6 @@ html, body {
  * nothing. Everything inside is built from data in src/menu.js.
  */
 
-#loadoutChip.readout {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  letter-spacing: 0.14em;
-  color: var(--dim);
-}
-#loadoutChip.readout #loadoutRound { color: var(--ink); font-size: 10px; }
-#loadoutChip.readout em {
-  font-style: normal;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--accent);
-}
-#loadoutChip.armed { border-color: rgba(255, 207, 92, 0.5); }
-#loadoutChip.armed #loadoutRound { color: #ffcf5c; }
 
 .chip.menuBtn { padding: 4px 7px; }
 .chip.menuBtn svg { width: 15px; height: 15px; display: block; }
@@ -486,9 +470,11 @@ html, body {
 
 /* ---------------- object glossary ---------------- */
 
-.codexGrid { display: flex; flex-direction: column; gap: 6px; }
+.codexGrid,
+.armGrid { display: flex; flex-direction: column; gap: 6px; }
 
-.codexCell {
+.codexCell,
+.armRow {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -521,6 +507,27 @@ html, body {
   margin-top: 2px;
 }
 
+/* ARSENAL rows. Same shape as an object record, because that is what they
+   are: the reference for a thing, not the control for it. The control is the
+   strip on the play screen, and these light to match it. */
+.codexArt.arm { color: var(--dim); }
+.codexArt.arm svg { width: 20px; height: 20px; display: block; }
+.armRow.on { border-color: color-mix(in srgb, var(--tone, var(--accent)) 45%, transparent); }
+.armRow.on .codexArt {
+  color: var(--tone, var(--accent));
+  border-color: color-mix(in srgb, var(--tone, var(--accent)) 40%, transparent);
+}
+.armRow.on .codexArt svg { filter: drop-shadow(0 0 5px currentColor); }
+.armRow.on .codexName { color: var(--tone, var(--accent)); }
+/* Loaded right now, said without a word: a bar down the left edge. */
+.armRow.on::before {
+  content: '';
+  width: 2px;
+  align-self: stretch;
+  margin: -7px 0 -7px -9px;
+  background: var(--tone, var(--accent));
+}
+
 /* Not yet destroyed: a name in blocks, and no portrait. */
 .codexCell.locked { border-color: rgba(120, 190, 255, 0.07); background: rgba(4, 8, 14, 0.5); }
 .codexCell.locked .codexName { color: #33414f; letter-spacing: 0.1em; }
@@ -535,56 +542,112 @@ body.menuOpen #bossCaption { opacity: 0.25; transition: opacity 0.2s ease; }
 body.menuOpen #abilities,
 body.menuOpen #quickBar { pointer-events: none; }
 
-/* ---------------- quick toggles ---------------- */
+/* ---------------- the strip ---------------- */
 
 /*
- * The two toggles that stay on the play screen. They sit above the ability bar
- * and below the lever's travel arc, so neither thumb position covers the other,
- * and they never open or pause anything.
+ * One row above the ability bar: mines, the two that run on their own, then
+ * ammunition. It has to live in the band between the lever's grip at rest and
+ * the ability bar, which is about 46px tall on the smallest phone — so the row
+ * is short, and everything in it is sized to fit rather than to be roomy.
  */
 #quickBar {
   position: absolute;
   left: calc(var(--safe-l) + 8px);
   right: calc(var(--safe-r) + 8px);
-  /* Clear of the ability row: at 4px a thumb aiming for AUTO FIRE was landing
-     on PULSE. */
+  /* The floor line: world.floorY is derived from these same three numbers.
+     (game.js floors the viewport at 420px tall before doing that sum, so on
+     anything shorter than that the two part company — no phone this targets
+     is, in either orientation.) */
   bottom: calc(var(--safe-b) + var(--bar-h) + 22px);
+  height: 40px;
+  /* On a phone the row already fills the width; on a tablet it would stretch
+     nine cells to 90px each around 6.5px type, which looks broken rather than
+     roomy. Absolutely positioned with both edges set, auto margins centre it. */
+  max-width: 560px;
+  margin-inline: auto;
   display: flex;
-  justify-content: center;
-  gap: 10px;
-  pointer-events: none;
+  align-items: stretch;
+  gap: 3px;
+  /* The whole band swallows input, not just the nine cells. The gaps, the
+     group separators and the cut corners used to be holes onto the canvas, so
+     a near-miss between two cells grabbed the lever and took a shot. Nothing
+     is lost: the band sits on the floor line, below the grip's whole travel,
+     so there was never anything down here worth aiming at. */
+  pointer-events: auto;
 }
 
-.quickChip {
+.qc {
   -webkit-appearance: none;
   appearance: none;
   pointer-events: auto;
-  display: inline-flex;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  font-size: 8.5px;
-  letter-spacing: 0.16em;
-  /* These are hit at speed, one-handed, with the field moving — so the box is
-     a thumb's worth tall even though the type in it is small. */
-  min-height: 40px;
-  padding: 0 14px;
+  justify-content: center;
+  gap: 2px;
   border: 1px solid var(--line);
-  background: rgba(6, 12, 22, 0.82);
+  background: linear-gradient(180deg, rgba(10, 18, 32, 0.86), rgba(4, 8, 15, 0.92));
   color: var(--dim);
+  overflow: hidden;
+  position: relative;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+  /* Cut corners rather than rounded: the whole interface is polygonal. */
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
   transition: transform 0.07s ease, color 0.15s, border-color 0.15s, background 0.15s;
 }
-.quickChip svg { width: 14px; height: 14px; display: block; }
-.quickChip:active { transform: translateY(1px); }
-.quickChip.on {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-  background: rgba(12, 34, 52, 0.9);
-  box-shadow: inset 0 0 0 1px rgba(89, 224, 255, 0.2);
+
+/* The two that carry a whole phrase get the room for it. */
+.qc.wide { flex-grow: 1.75; }
+/* First of a group: the only thing separating mines from ammunition. */
+.qc.sep { margin-left: 10px; }
+/* The middle pair is not a choice between five — it reads as its own thing
+   even when both are off. */
+.qc.run { border-color: rgba(120, 190, 255, 0.32); }
+.qc.run .qLbl { opacity: 1; }
+
+.qc svg { width: 15px; height: 15px; display: block; }
+.qc .qLbl {
+  font-size: 6.5px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  color: inherit;
+  opacity: 0.85;
 }
-.quickChip.on svg { filter: drop-shadow(0 0 5px currentColor); }
+.qc:active { transform: translateY(1px); }
+
+.qc.on {
+  color: var(--tone, var(--accent));
+  border-color: color-mix(in srgb, var(--tone, var(--accent)) 58%, transparent);
+  background: rgba(11, 26, 42, 0.92);
+}
+.qc.on svg { filter: drop-shadow(0 0 5px currentColor); }
+.qc.on .qLbl { opacity: 1; }
+/* Which round is loaded is the one thing on this row that must be readable at
+   a glance, mid-fight, without looking directly at it. */
+.qc.on::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: currentColor;
+}
+
+/* A round is a choice; these two are a thing left running. Filled, not lit. */
+.qc.run.on { box-shadow: inset 0 0 0 40px color-mix(in srgb, var(--accent) 13%, transparent); }
+
+/* Nine cells on a 320px phone: the labels run past the box at the default
+   tracking, and .qc clips its overflow. */
+@media (max-width: 372px) {
+  #quickBar { gap: 2px; height: 38px; }
+  .qc.sep { margin-left: 7px; }
+  .qc svg { width: 13px; height: 13px; }
+  .qc .qLbl { font-size: 6px; letter-spacing: 0.02em; }
+}
 
 /* ---------------- abilities ---------------- */
 
@@ -852,7 +915,6 @@ body.ending #bossCaption {
 /* Same treatment while the title screen is up: none of it is live yet. */
 body.booting #topbar,
 body.booting #abilities,
-body.booting #loadoutChip,
 body.booting #quickBar {
   opacity: 0;
   pointer-events: none;

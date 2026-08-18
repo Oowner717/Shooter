@@ -44,54 +44,73 @@ tap-rate limit — tap as fast as your thumb allows, or hold and drag to sustain
 fire. Both controls work at once, so you can drive the lever with one thumb
 and tap with the other.
 
+### The strip
+
+**Nine cells sit in one row above the ability bar, and they never go away.**
+Left to right: the two **mines**, the two things that **run on their own**, and
+then the five kinds of **ammunition**. That is the whole of what you choose
+between, permanently on screen, one tap each.
+
+```
+[BLAST][SNARE]  [AUTO AIM][AUTO FIRE]  [STD][HE][SHOT][ARC][BARB]
+[  PULSE  ][  FAN  ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ SIPHON ]
+```
+
+Every cell is bound on `pointerdown`, like the ability buttons are: a tap
+registers the instant the thumb lands, the simulation never stops, the menu
+never opens, and the tap never reaches the canvas — so changing rounds mid-wave
+never costs you the shot you were about to take.
+
+Ammunition is a radio button: exactly one is lit at all times, **STD** is a
+cell of its own, and re-picking the loaded one leaves it loaded. (It used to
+unload back to standard, which meant a fumbled double-tap silently dropped you
+to the weakest round in the middle of a fight.) The mines are independent
+toggles — either, both or neither.
+
+The row has to live in the band between the lever's grip at rest and the
+ability bar, which is 46px tall on the smallest phone it targets. So it is
+40px, the cells flex to the width available, and the two carrying a whole
+phrase are sized larger than the seven carrying a word. Measured at 320, 375,
+390 and 430 wide: nothing clipped, nothing overlapping the grip.
+
+The whole row is built from `ARSENAL` in `src/arsenal.js`. A new round or mine
+is a table entry and no markup.
+
 ### The menu
 
 One button in the top bar opens a sheet over the bottom of the screen, where
-the thumb already is. **The simulation holds while it is open**, so changing a
-loadout mid-wave costs nothing — the field stays drawn, nothing moves, and the
-interface keeps responding. Tap the scrim, the ✕ or Escape to resume.
+the thumb already is. **The simulation holds while it is open** — the field
+stays drawn, nothing moves, and the interface keeps responding. Tap the scrim,
+the ✕ or Escape to resume.
 
-Three tabs:
+It explains rather than controls. Everything that gets chosen is chosen on the
+strip, so the sheet carries the two records instead:
 
-- **LOADOUT** — **ROUNDS** (exclusive: one at a time) and **MINES** (either,
-  both or neither), each a one-tap cell with a one-line note.
+- **ARSENAL** — every round, mine and assist, with the one-line reason for
+  reaching for it. It lights to match what is loaded right now, but it is a
+  reference: there is no second copy of a control in here.
 - **OBJECTS** — the glossary (below).
 - **SYSTEM** — sound, reset, the debug panel, the controls, and the build
   number.
 
-Beside the button is a **loadout readout** — `ARC ◈` — showing the round and
-only the things that are *not* already visible on the play screen, so the menu
-is never needed to check what is loaded.
-
-Everything in the sheet is built from data: the `SECTIONS` table in
-`src/menu.js` and `CODEX` in `src/codex.js`. A new round, mine or object is a
-table entry and no markup, and the cells keep the ids the rest of the interface
-already looks up.
+Both records are built from data — `ARSENAL` in `src/arsenal.js` and `CODEX` in
+`src/codex.js` — so a new round or object is a table entry and no markup.
 
 This replaced a rack of eight chips that sat permanently over the field in two
-rows. The field is what the game is; the chips were in front of it.
+rows, and then a menu that held the same eight one layer down. The top bar used
+to carry a loadout readout as well; with all nine cells permanently on screen it
+was a copy of something already visible, so it is gone.
 
-### The two on the field
+### The two that run on their own
 
-**AUTO AIM** and **AUTO FIRE** are the only toggles you change *during* a
-fight, so they are not in the menu. Two chips sit centred just above the
-ability bar, clear of the lever's arc, and they work on `pointerdown` like the
-abilities do: the simulation never stops, the menu never opens, nothing pauses.
+**AUTO AIM** and **AUTO FIRE** sit in the middle of the strip, between the
+mines and the ammunition, and they are marked apart from the seven around them
+because they are not a choice between things — they are left on or left off.
 Both are off by default.
 
-- **AUTO FIRE** keeps shooting wherever the barrel happens to point. With no
-  hand on the lever the barrel rests straight up, so this alone is a fountain.
-- **AUTO AIM** tracks the nearest object currently corrupting your feed — a
-  marked breacher outranks anything four times closer — leads the shot for
-  flight time, and fires on it. It *traverses* between targets at its own
-  slower rate, easing off as it arrives, and holds fire until the barrel has
-  come round; brackets tighten on the target while it swings. With no target
-  it stops shooting and leaves the barrel where it is.
+### The mines
 
-### The six in the menu
-
-All off by default, all in the LOADOUT tab. The mines are the lay-and-forget
-kind — there is no reason to reach for them mid-wave:
+Both off by default. Neither is aimed and neither is thrown by you:
 
 - **AUTO MINE** (BLAST) lobs a mine onto a random patch of the field every few
   seconds. It is completely inert in flight — it passes straight through
@@ -105,6 +124,13 @@ kind — there is no reason to reach for them mid-wave:
   against each other on the way in, and whatever you choose to put into a pile
   that cannot move. Slower to lay, three at a time, and it collapses a
   165-unit spread down to about one.
+
+### The ammunition
+
+Five kinds, one loaded at a time. Every one of them buys its trick with rate of
+fire, so **STD** — nothing done to it — stays the right answer more often than
+it looks.
+
 - **HE** makes every round detonate on impact. It costs you better than half
   your rate of fire and the shells travel slower, so single targets are no
   easier — crowds are.
@@ -122,16 +148,16 @@ kind — there is no reason to reach for them mid-wave:
   a mote and made for the things that take a while: bulwarks, the gate, ORDINAL
   itself. The spines stick visibly out of whatever is wearing them.
 
-The four special rounds are exclusive: choosing one clears whichever was lit,
-and tapping the lit one returns you to standard rounds.
+The five kinds are exclusive: picking one clears whichever was loaded, and
+picking the loaded one again is a no-op rather than a silent unload.
 
 Your hands always win: while you are holding the lever or dragging, the
 assists stop steering. Auto fire runs a shade slower than driving it yourself,
 so playing actively is still worth it. The boss's INVERT power mirrors auto aim
 too — it corrupts targeting, not just fingers.
 
-**Eight abilities** sit along the bottom, in the strip your thumb already rests
-on. One tap each, no cost, no upgrades, no unlocks. The first time you use one,
+**Eight abilities** sit along the very bottom, in the band your thumb already
+rests on. One tap each, no cost, no upgrades, no unlocks. The first time you use one,
 a caption explains it.
 
 | | Ability | What it does | Cooldown |
@@ -180,8 +206,8 @@ attackers, worse corruption.
    *The fight* below — it is not a health bar.
 4. **END** — ending text on its own plate, with the turret dissolving
    underneath it, then the frame freezes mid-corruption and **RESET
-   SIMULATION** appears. Reset is a clean session: every toggle clears, on the
-   field and in the menu, back to standard rounds and nothing running itself.
+   SIMULATION** appears. Reset is a clean session: the strip goes back to
+   STANDARD with nothing running on its own.
 
 A typical run is about fifteen minutes.
 
@@ -404,7 +430,8 @@ src/
   boss.js               ORDINAL: arrival, worn ledger, reprise, echo, tithe
   abilities.js          the eight abilities and their effects
   narrative.js          the ten sentences, and how they decay
-  hud.js                DOM interface, incl. the two on-field quick toggles
+  hud.js                DOM interface, incl. the nine-cell strip
+  arsenal.js            rounds, mines and assists: icons, notes, strip order
   menu.js               the menu sheet, built from data
   codex.js              the glossary, and what has been recorded
 scripts/

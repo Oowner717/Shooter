@@ -1,51 +1,21 @@
 // The menu. One button in the top bar opens a sheet over the bottom of the
-// screen, where the thumb already is; the simulation holds while it is open, so
-// changing a loadout mid-wave costs nothing.
+// screen, where the thumb already is; the simulation holds while it is open.
 //
-// Everything in it is built from data — the SECTIONS table below and CODEX —
-// so a new round, a new assist or a new object needs an entry and nothing else.
-// The cells keep the ids the rest of the interface already looks up, so adding
-// the menu did not change how a toggle is read or set.
+// It explains rather than controls. Everything that is chosen — rounds, mines,
+// the two that run on their own — is chosen on the play screen, so the sheet
+// carries the two records instead: what you shoot with, and what you have
+// shot. Both are built from data, so a new round or a new object is a table
+// entry and no markup.
 
 import { CODEX, codex } from './codex.js';
+import { ARSENAL, ARSENAL_GROUPS } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
 import { BUILD } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 
-/**
- * The quick-selection grid. `kind` decides which handler a cell calls, and
- * `key` is what gets passed. Add a row and it appears.
- */
-export const SECTIONS = [
-  {
-    title: 'ROUNDS',
-    note: 'one at a time',
-    kind: 'round',
-    cells: [
-      { key: 'standard', id: 'tgStandard', label: 'STANDARD', sub: 'baseline' },
-      { key: 'explosive', id: 'tgExplosive', label: 'HE', sub: 'detonates · half rate' },
-      { key: 'shotgun', id: 'tgShotgun', label: 'SHOT', sub: 'five pellets · close' },
-      { key: 'arc', id: 'tgArc', label: 'ARC', sub: 'jumps on · four links' },
-      { key: 'barb', id: 'tgBarb', label: 'BARB', sub: 'sinks in · keeps biting' },
-    ],
-  },
-  {
-    // AUTO AIM and AUTO FIRE used to live here. They are the two worth
-    // changing mid-fight, so they are on the play screen instead — see
-    // QUICK in hud.js. What is left is the things you lay and forget.
-    title: 'MINES',
-    note: 'laid on their own',
-    kind: 'auto',
-    cells: [
-      { key: 'autoMine', id: 'tgAutoMine', label: 'BLAST', sub: 'one hard bang' },
-      { key: 'autoSnare', id: 'tgAutoSnare', label: 'SNARE', sub: 'pins a crowd, no damage' },
-    ],
-  },
-];
-
 const TABS = [
-  { id: 'loadout', label: 'LOADOUT' },
+  { id: 'arsenal', label: 'ARSENAL' },
   { id: 'codex', label: 'OBJECTS' },
   { id: 'system', label: 'SYSTEM' },
 ];
@@ -63,16 +33,16 @@ export class Menu {
       found: $('codexFound'),
     };
     this.open = false;
-    this.tab = 'loadout';
+    this.tab = 'arsenal';
     this.cells = new Map(); // key -> element, for the active-state sync
     this.codexCells = new Map();
     this.lastFound = -1;
 
     this.buildTabs();
-    this.buildLoadout();
+    this.buildArsenal();
     this.buildCodex();
     this.buildSystem();
-    this.show('loadout');
+    this.show('arsenal');
 
     this.el.btn.addEventListener('click', () => this.toggle());
     this.el.close.addEventListener('click', () => this.setOpen(false));
@@ -129,26 +99,28 @@ export class Menu {
     return p;
   }
 
-  // ---------------------------------------------------------------- loadout
+  // ---------------------------------------------------------------- arsenal
 
-  buildLoadout() {
-    const p = this.panel('loadout');
-    for (const sec of SECTIONS) {
-      p.appendChild(heading(sec.title, sec.note));
+  /**
+   * A reference, not a rack. The strip on the play screen is where a round or
+   * a mine is chosen; this is the only place the one-line reason for choosing
+   * it is written down, and it lights to match whatever is loaded right now.
+   */
+  buildArsenal() {
+    const p = this.panel('arsenal', 'codex');
+    for (const g of ARSENAL_GROUPS) {
+      p.appendChild(heading(g.title, g.note));
       const grid = document.createElement('div');
-      grid.className = 'menuGrid';
-      for (const c of sec.cells) {
-        const b = document.createElement('button');
-        b.className = 'menuCell';
-        b.id = c.id;
-        b.setAttribute('aria-pressed', 'false');
-        b.innerHTML = `<span class="cellName">${c.label}</span><span class="cellSub">${c.sub}</span>`;
-        b.addEventListener('click', () => {
-          if (sec.kind === 'round') this.game.toggleRound(c.key);
-          else this.game.toggleAuto(c.key);
-        });
-        grid.appendChild(b);
-        this.cells.set(c.key, b);
+      grid.className = 'armGrid';
+      for (const a of ARSENAL.filter((x) => x.group === g.id)) {
+        const row = document.createElement('div');
+        row.className = 'armRow';
+        if (a.tone) row.style.setProperty('--tone', a.tone);
+        row.innerHTML = `<div class="codexArt arm">${a.icon}</div>`
+          + `<div class="codexBody"><div class="codexName">${a.label}</div>`
+          + `<div class="codexLine">${a.line}</div></div>`;
+        grid.appendChild(row);
+        this.cells.set(a.key, row);
       }
       p.appendChild(grid);
     }
@@ -252,15 +224,12 @@ export class Menu {
 
   /** Called every frame; cheap because every write is diffed. */
   sync(world) {
-    for (const sec of SECTIONS) {
-      for (const c of sec.cells) {
-        const on = sec.kind === 'round' ? world.round === c.key : !!world[c.key];
-        const el = this.cells.get(c.key);
-        if (el._on === on) continue;
-        el._on = on;
-        el.classList.toggle('on', on);
-        el.setAttribute('aria-pressed', String(on));
-      }
+    for (const a of ARSENAL) {
+      const on = a.kind === 'round' ? world.round === a.key : !!world[a.key];
+      const el = this.cells.get(a.key);
+      if (!el || el._on === on) continue;
+      el._on = on;
+      el.classList.toggle('on', on);
     }
   }
 }

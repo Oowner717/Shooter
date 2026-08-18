@@ -2,24 +2,16 @@
 // be crisp, tappable and safe-area aware.
 
 import { ABILITIES } from './abilities.js';
+import { ARSENAL } from './arsenal.js';
 import { BUILD } from './config.js';
 import { clamp } from './util.js';
 import { Menu } from './menu.js';
 
 const $ = (id) => document.getElementById(id);
 
-/** Cells that select a loadout rather than an assist. Mutually exclusive. */
+/** Rounds that are not the default. Mutually exclusive with each other. */
 export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'barb'];
 export const ASSIST_KEYS = ['autoAim', 'autoFire', 'autoMine', 'autoSnare'];
-/**
- * The toggles that live on the play screen rather than in the menu. These two
- * are the ones worth changing mid-fight, so they are one tap away and the
- * simulation never stops for them.
- */
-const QUICK = ['autoAim', 'autoFire'];
-const CFG_LABEL = { explosive: 'HE', shotgun: 'SHOT', arc: 'ARC', barb: 'BARB' };
-/** Only what is NOT already visible on the play screen. */
-const READOUT_MARK = { autoMine: '◈', autoSnare: '✳' };
 
 export class Hud {
   constructor(game) {
@@ -48,9 +40,7 @@ export class Hud {
       endScreen: $('endScreen'),
       endText: $('endText'),
       resetBtn: $('resetBtn'),
-      loadoutChip: $('loadoutChip'),
-      loadoutRound: $('loadoutRound'),
-      loadoutAssists: $('loadoutAssists'),
+      quickBar: $('quickBar'),
     };
 
     this.slots = [];
@@ -63,30 +53,8 @@ export class Hud {
     this.buildAbilities();
     this.buildDebug();
 
-    // The menu owns the loadout cells now, so it is built before anything
-    // tries to read or set one.
     this.menu = new Menu(game);
-    this.el.toggles = {};
-    for (const [key, el] of this.menu.cells) this.el.toggles[key] = el;
-
-    // The on-screen pair. Bound here rather than in the menu because they are
-    // not in it: they are live during play and must not pause anything.
-    this.quick = [];
-    for (const key of QUICK) {
-      const el = $(`tg${key[0].toUpperCase()}${key.slice(1)}`);
-      if (!el) continue;
-      this.el.toggles[key] = el;
-      this.quick.push({ key, el, on: null });
-      el.addEventListener('pointerdown', (ev) => {
-        ev.preventDefault();
-        game.toggleAuto(key);
-      });
-      el.addEventListener('contextmenu', (ev) => ev.preventDefault());
-    }
-    this.el.loadoutChip.addEventListener('click', () => {
-      this.menu.show('loadout');
-      this.menu.setOpen(true);
-    });
+    this.buildStrip();
 
     // The boot copy is translucent enough to read the HUD through it, and on a
     // short screen the kicker sits level with the top chips. Nothing behind the
@@ -101,6 +69,56 @@ export class Hud {
     this.el.startBtn.addEventListener('click', () => game.start());
     this.el.resetBtn.addEventListener('click', () => game.restart());
     $('dbgClose').addEventListener('click', () => this.toggleDebug(false));
+  }
+
+  // ----------------------------------------------------------------- strip
+
+  /**
+   * The row above the ability bar: mines, the two that run on their own, then
+   * ammunition. Everything here is bound on pointerdown, like the abilities
+   * are, so a tap registers the instant the thumb lands and nothing opens,
+   * pauses or takes the shot the turret would otherwise have fired.
+   */
+  buildStrip() {
+    const frag = document.createDocumentFragment();
+    this.strip = [];
+    this.el.toggles = {};
+    let group = null;
+    for (const a of ARSENAL) {
+      const b = document.createElement('button');
+      // Kept as the id the rest of the interface has always used, so a toggle
+      // is still found by name wherever it is looked up.
+      b.id = `tg${a.key[0].toUpperCase()}${a.key.slice(1)}`;
+      b.className = 'qc'
+        + (a.wide ? ' wide' : '')
+        + (a.run ? ' run' : '')
+        + (group && group !== a.group ? ' sep' : '');
+      group = a.group;
+      if (a.tone) b.style.setProperty('--tone', a.tone);
+      b.setAttribute('aria-pressed', 'false');
+      b.setAttribute('aria-label', a.label);
+      b.innerHTML = `${a.icon}<span class="qLbl">${a.label}</span>`;
+      b.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (a.kind === 'round') this.game.toggleRound(a.key);
+        else this.game.toggleAuto(a.key);
+      });
+      b.addEventListener('contextmenu', (ev) => ev.preventDefault());
+      // pointerdown alone is right for a thumb and wrong for everything else.
+      // These cells were menu buttons until this build and answered a keyboard;
+      // there is no click listener, so this cannot double-fire on a tap.
+      b.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        if (a.kind === 'round') this.game.toggleRound(a.key);
+        else this.game.toggleAuto(a.key);
+      });
+      frag.appendChild(b);
+      this.strip.push({ key: a.key, kind: a.kind, el: b, on: null });
+      this.el.toggles[a.key] = b;
+    }
+    this.el.quickBar.appendChild(frag);
   }
 
   // ------------------------------------------------------------- abilities
@@ -386,44 +404,34 @@ export class Hud {
     this.el.resetBtn.hidden = true;
   }
 
+  /**
+   * Immediate feedback on the tap that caused it. syncLoadout re-asserts the
+   * same thing from world state on the next frame, so the cached value has to
+   * move with it or the two disagree for a frame.
+   */
   setToggle(key, on) {
     const el = this.el.toggles[key];
     if (!el) return;
     el.classList.toggle('on', on);
     el.setAttribute('aria-pressed', String(on));
+    const q = this.strip.find((e) => e.key === key);
+    if (q) q.on = on;
   }
 
   setSound() {
     this.menu.syncSystem();
   }
 
-  /**
-   * The loadout readout in the top bar: what is loaded and which assists are
-   * live, so the menu is never needed just to check.
-   */
+  /** Lights the strip to match what is actually loaded and running. */
   syncLoadout(world) {
-    // The two on-screen toggles show their own state; the chip carries what
-    // the play screen does not.
-    for (const q of this.quick) {
-      const on = !!world[q.key];
+    // World state is the only truth here: a round is lit when it is loaded, a
+    // mine or an assist when it is running. Every write is diffed.
+    for (const q of this.strip) {
+      const on = q.kind === 'round' ? world.round === q.key : !!world[q.key];
       if (q.on === on) continue;
       q.on = on;
       q.el.classList.toggle('on', on);
       q.el.setAttribute('aria-pressed', String(on));
-    }
-
-    const round = ROUND_KEYS.find((k) => world.round === k);
-    const label = round ? CFG_LABEL[round] : 'STD';
-    const on = Object.keys(READOUT_MARK).filter((k) => world[k]).map((k) => READOUT_MARK[k]).join('');
-    if (this.lastRoundLabel !== label) {
-      this.lastRoundLabel = label;
-      this.el.loadoutRound.textContent = label;
-      this.el.loadoutChip.classList.toggle('armed', label !== 'STD');
-    }
-    const marks = on || '—';
-    if (this.lastAssists !== marks) {
-      this.lastAssists = marks;
-      this.el.loadoutAssists.textContent = marks;
     }
   }
 
