@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '43';
+export const BUILD = '44';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------

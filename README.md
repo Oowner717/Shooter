@@ -484,8 +484,24 @@ should be the player's to choose in the first minute rather than something the
 offers eventually get round to.
 
 The four other rounds, all four mines and six of the eight abilities start
-locked — drawn on the strip and the bar from the first frame, greyed and inert.
-A press on one nudges and does nothing.
+locked — drawn on the strip and the bar from the first frame. A press on one
+nudges and does nothing.
+
+There are **three states, not two**, and the middle one used to be missing. A
+cell you can press but have not selected looked all but identical to one you
+have not unlocked — both a grey outline with a grey label — so an AMENDMENT
+that opened SHOT changed almost nothing on screen. Anything unsealed now
+carries its own tone in the border, the icon and the label; `.on` is a further
+step up from there rather than the only step; and a locked cell is fully
+greyscaled and hatched, so it reads as scenery rather than as a dim button.
+(Hatched rather than dashed: the cells are clip-pathed, and a dashed outline
+breaks at the cut corner.)
+
+**And the one that just opened says so.** The offer sheet covers the screen
+while the card is being chosen and then closes, so without it the only sign of
+which of fourteen locked things had become yours was one cell somewhere
+stopping being grey while you were looking at a card. It blooms and then holds
+a glow for five seconds — long enough to be found after the sheet is gone.
 
 Every one of them is a **permanent upgrade**, bought from the AMENDMENT tier of
 the offer system. The shape of what a turret could become is on screen from the

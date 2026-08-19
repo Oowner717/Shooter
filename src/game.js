@@ -444,6 +444,11 @@ export class Game {
       audio.chime(920);
       background.surge(1.2);
       this.hud.syncAbilities(w.abilities);
+      // Point at the thing that just opened. After the scrim, so the bloom is
+      // not spent behind it.
+      if (opt.axis === 'UNLOCK' && opt.key) {
+        setTimeout(() => this.hud.flashUnlocked(opt.key), 260);
+      }
     }
     return opt;
   }

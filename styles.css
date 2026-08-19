@@ -292,16 +292,52 @@ html, body {
   transform-origin: center;
 }
 
-/* Not yet handed over by the opening. Visible on purpose — the shape of the
-   bar is part of what is being taught — but inert, and plainly so. */
+/*
+ * Not bought yet. Visible on purpose — the shape of what a turret can become
+ * is part of what the offers are for — but it has to read as scenery rather
+ * than as a dim button. Fully grey against neighbours that now carry colour,
+ * and hatched, which says "not a control" without depending on the border:
+ * the cells are clip-pathed, so a dashed outline breaks at the cut corner.
+ */
 .ab.sealed,
 .qc.sealed {
-  opacity: 0.3;
-  filter: saturate(0.15);
+  opacity: 0.4;
+  filter: grayscale(1) brightness(0.62);
+  border-color: rgba(120, 160, 200, 0.13);
   cursor: default;
 }
+.ab.sealed::after,
+.qc.sealed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(150, 180, 210, 0.07) 0 2px,
+    transparent 2px 6px);
+}
 .ab.sealed .fill { display: none; }
-.qc.sealed .qLbl { opacity: 0.7; }
+.qc.sealed .qLbl { opacity: 0.75; }
+
+/*
+ * The moment one opens. The offer sheet closes over the whole screen, so
+ * without this the only sign of which of fourteen things just became yours was
+ * a cell somewhere going from grey to not-grey while you were looking at the
+ * card. It blooms once and then keeps a glow for a few seconds, long enough to
+ * be found after the sheet is gone.
+ */
+.qc.justOpened, .ab.justOpened {
+  animation: justOpened 5.5s ease-out;
+  z-index: 2;
+}
+@keyframes justOpened {
+  0% { box-shadow: 0 0 0 0 currentColor; filter: brightness(2.6); }
+  8% { box-shadow: 0 0 22px 6px currentColor; filter: brightness(2.2); }
+  22% { box-shadow: 0 0 14px 1px currentColor; filter: none; }
+  36% { box-shadow: 0 0 22px 4px currentColor; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
 
 /* A press that was refused. Small, and over quickly: it says "not this",
    not "you did something wrong". */
@@ -313,7 +349,7 @@ html, body {
 }
 
 /* A row in the ARSENAL sheet for something not bought yet. */
-.armRow.sealed { opacity: 0.34; }
+.armRow.sealed { opacity: 0.4; filter: grayscale(1) brightness(0.7); }
 .armRow.sealed .codexName::after {
   content: ' — locked';
   font-size: 0.82em;
@@ -669,8 +705,8 @@ body.menuOpen #quickBar { pointer-events: none; }
   color: #ffcf5c;
   font-size: 9.5px;
   padding: 9px 13px;
-  box-shadow: 0 0 18px rgba(255, 207, 92, 0.28);
-  animation: pendingIn 0.3s ease-out, amendRemind 5.4s 0.3s infinite ease-out;
+  box-shadow: 0 0 13px rgba(255, 207, 92, 0.18);
+  animation: pendingIn 0.3s ease-out, amendRemind 7.5s 0.3s infinite ease-in-out;
 }
 #pendingBtn.large b {
   background: rgba(255, 207, 92, 0.24);
@@ -685,7 +721,7 @@ body.menuOpen #quickBar { pointer-events: none; }
 }
 
 /* The arrival itself: the plate blooms once and throws a ring off its edge. */
-#pendingBtn.flare { animation: amendFlare 1.5s ease-out, amendRemind 5.4s 1.5s infinite ease-out; }
+#pendingBtn.flare { animation: amendFlare 1.5s ease-out, amendRemind 7.5s 1.5s infinite ease-in-out; }
 @keyframes amendFlare {
   0% { opacity: 0; transform: scale(0.7); box-shadow: 0 0 0 0 rgba(255, 207, 92, 0.85); }
   22% { opacity: 1; transform: scale(1.22); box-shadow: 0 0 0 10px rgba(255, 207, 92, 0.4); }
@@ -694,11 +730,15 @@ body.menuOpen #quickBar { pointer-events: none; }
   100% { transform: scale(1); box-shadow: 0 0 0 22px rgba(255, 207, 92, 0); }
 }
 /* And every few seconds after, until it is taken. */
+/*
+ * A breath rather than a ping. The arrival is already loud — fanfare, gold
+ * frame, blooming plate — and this only has to stop the plate being forgotten
+ * about ten minutes later. Two hard rings every five seconds was reading as an
+ * alarm on a thing that is optional and never expires.
+ */
 @keyframes amendRemind {
-  0% { box-shadow: 0 0 18px rgba(255, 207, 92, 0.28), 0 0 0 0 rgba(255, 207, 92, 0.55); }
-  14% { box-shadow: 0 0 26px rgba(255, 207, 92, 0.5), 0 0 0 9px rgba(255, 207, 92, 0); }
-  28% { box-shadow: 0 0 18px rgba(255, 207, 92, 0.28), 0 0 0 0 rgba(255, 207, 92, 0.45); }
-  42%, 100% { box-shadow: 0 0 18px rgba(255, 207, 92, 0.28), 0 0 0 9px rgba(255, 207, 92, 0); }
+  0%, 100% { box-shadow: 0 0 13px rgba(255, 207, 92, 0.18); }
+  50% { box-shadow: 0 0 20px rgba(255, 207, 92, 0.34); }
 }
 
 @keyframes pendingIn {
@@ -922,6 +962,21 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   width: 52px;
   padding: 0 4px;
 }
+/*
+ * Three states, and the middle one used to be missing. A cell you can press
+ * but have not selected looked all but identical to one you have not unlocked
+ * — both were a grey outline with a grey label — so an AMENDMENT that opened
+ * SHOT changed almost nothing on screen. Anything unsealed now carries its own
+ * tone in the border, the icon and the label, and `.on` is a further step up
+ * from there rather than the only step.
+ */
+.qc:not(.sealed) {
+  color: color-mix(in srgb, var(--tone, var(--accent)) 58%, var(--dim));
+  border-color: color-mix(in srgb, var(--tone, var(--accent)) 34%, transparent);
+  background: linear-gradient(180deg, rgba(13, 24, 42, 0.88), rgba(5, 10, 19, 0.92));
+}
+.qc:not(.sealed) .qLbl { opacity: 1; }
+
 .qc.run { border-color: rgba(120, 190, 255, 0.32); }
 .qc.run .qLbl { opacity: 1; }
 

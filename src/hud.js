@@ -637,6 +637,24 @@ export class Hud {
   }
 
   /**
+   * Something just became available. The offer sheet covers the screen while
+   * it is being chosen and then closes, so without this the only sign of which
+   * of fourteen locked things is now yours was one cell somewhere stopping
+   * being grey while the player was looking at a card.
+   */
+  flashUnlocked(key) {
+    const el = this.el.toggles[key]
+      || (this.slots[ABILITIES.findIndex((d) => d.id === key)] || {}).el;
+    if (!el) return;
+    clearTimeout(this.openedTimers && this.openedTimers[key]);
+    el.classList.remove('justOpened');
+    void el.offsetWidth;
+    el.classList.add('justOpened');
+    this.openedTimers = this.openedTimers || {};
+    this.openedTimers[key] = setTimeout(() => el.classList.remove('justOpened'), 5600);
+  }
+
+  /**
    * Which of the nineteen controls the opening has handed over. Sealed is not
    * the same as ORDINAL's `locked`: locked is something taken away mid-fight,
    * sealed is something not yet given. Both are visible; only one is a loss.
