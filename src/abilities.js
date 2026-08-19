@@ -1,8 +1,9 @@
 // Eight abilities. Each one is legible from its first use, and each one says
 // what it is the first time it is used rather than in a manual.
 //
-// All but PULSE start locked and are handed over by the permanent tier of the
-// offer system, along with the rounds and the mines. A second use of any one
+// The turret is issued with PULSE and FAN — one that shoves a crowd off and
+// one that kills it. The other six are locked and handed over by the permanent
+// tier of the offer system, along with the rounds and the mines. A second use of any one
 // of them is bought the same way; until it is, an ability holds exactly one
 // charge and behaves as a plain cooldown, with nothing extra drawn on it.
 

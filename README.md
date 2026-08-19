@@ -297,8 +297,8 @@ button can then say AMENDMENT and mean it.
   which read as something missing rather than something simpler.
 - **AMENDMENT**, every 50 kills — ten in a counted run. Permanent for the run.
   Three cards, and while anything is still locked the first of them **opens
-  something**, because that is the spine of a run: the turret arrives with two
-  things and everything else is a choice made on the way. The second is a
+  something**, because that is the spine of a run: the turret arrives with
+  three things and everything else is a choice made on the way. The second is a
   **second charge** for an ability once there is an unlocked one worth
   doubling. The third is a stat, from one of three axes, so a pick is an
   identity rather than a number:
@@ -476,10 +476,11 @@ something new.
 ### The opening
 
 Almost nothing is said up front, because almost nothing is in hand. The turret
-is issued with **BOLT and PULSE** and nothing else. The four other rounds, all
-four mines, both of the ones that run on their own and seven of the eight
-abilities start locked — drawn on the strip and the bar from the first frame,
-greyed and inert. A press on one nudges and does nothing.
+is issued with **BOLT, PULSE and FAN** and nothing else — one round, one way to
+shove a crowd off, and one way to remove it. The four other rounds, all four
+mines, both of the ones that run on their own and six of the eight abilities
+start locked — drawn on the strip and the bar from the first frame, greyed and
+inert. A press on one nudges and does nothing.
 
 Every one of them is a **permanent upgrade**, bought from the AMENDMENT tier of
 the offer system. The shape of what a turret could become is on screen from the
@@ -536,8 +537,8 @@ reads ready while there is still one in hand.
 A charge is only ever offered for an ability that has actually been unlocked.
 **SUBTRACT only takes one that has been unlocked too** — taking away a button
 never bought costs the player nothing and reads as a greyed button going
-slightly greyer, and SUBTRACT is ORDINAL's whole character. Measured: with only
-PULSE open it takes nothing at all, because PULSE is never on the table.
+slightly greyer, and SUBTRACT is ORDINAL's whole character. PULSE is never on
+the table either, so a turret that has opened nothing can only lose FAN.
 
 ### The objects
 

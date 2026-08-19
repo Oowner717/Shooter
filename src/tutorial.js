@@ -74,15 +74,19 @@ export const FIRST_USE = {
   chorus: 'CHORUS. Ties the field together.\nWhatever kills one hurts the rest.',
 };
 
-/** What the turret is issued with. Everything else is bought. */
-export const STARTING = ['standard', 'pulse'];
+/**
+ * What the turret is issued with. Everything else is bought. PULSE shoves and
+ * FAN kills, so the pair is a way to answer a crowd and a way to remove one —
+ * a turret that opens with only PULSE has nothing it can point at anything.
+ */
+export const STARTING = ['standard', 'pulse', 'fan'];
 
 /** Rounds, mines and abilities, in the order the offers hand them out. */
 export const LOCKABLE = {
   rounds: ['explosive', 'shotgun', 'arc', 'recur'],
   mines: ['blast', 'snare', 'wire', 'knell'],
   autos: ['autoAim', 'autoFire'],
-  abilities: ['fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'chorus'],
+  abilities: ['lance', 'well', 'prism', 'stasis', 'decoy', 'chorus'],
 };
 
 /** Everything the run can ever hand over, for the debug panel and the tests. */
