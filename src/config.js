@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '42';
+export const BUILD = '43';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -179,9 +179,9 @@ export const CFG = {
     // The first one comes early, so the opening has a real ALLOCATION waiting
     // on the button at the moment it explains what one is.
     smallFirst: 22,
-    // Permanent ones. Sixteen things start locked and each AMENDMENT opens at
+    // Permanent ones. Fourteen things start locked and each AMENDMENT opens at
     // most one, so this is what decides how much of the turret a single run
-    // can assemble: at fifty, about ten of the sixteen, and the rest is what
+    // can assemble: at fifty, about ten of the fourteen, and the rest is what
     // the next run is for.
     large: 50,
   },

@@ -297,8 +297,8 @@ button can then say AMENDMENT and mean it.
   which read as something missing rather than something simpler.
 - **AMENDMENT**, every 50 kills — ten in a counted run. Permanent for the run.
   Three cards, and while anything is still locked the first of them **opens
-  something**, because that is the spine of a run: the turret arrives with
-  three things and everything else is a choice made on the way. The second is a
+  something**, because that is the spine of a run: the turret arrives with a
+  handful of things and everything else is a choice made on the way. The second is a
   **second charge** for an ability once there is an unlocked one worth
   doubling. The third is a stat, from one of three axes, so a pick is an
   identity rather than a number:
@@ -476,11 +476,16 @@ something new.
 ### The opening
 
 Almost nothing is said up front, because almost nothing is in hand. The turret
-is issued with **BOLT, PULSE and FAN** and nothing else — one round, one way to
-shove a crowd off, and one way to remove it. The four other rounds, all four
-mines, both of the ones that run on their own and six of the eight abilities
-start locked — drawn on the strip and the bar from the first frame, greyed and
-inert. A press on one nudges and does nothing.
+is issued with **BOLT, PULSE and FAN** — one round, one way to shove a crowd
+off, and one way to remove it — plus **AUTO AIM and AUTO FIRE**, both switched
+off. Those two are not power: they are the difference between playing this with
+a thumb on the lever and leaving it running, and which of those a session is
+should be the player's to choose in the first minute rather than something the
+offers eventually get round to.
+
+The four other rounds, all four mines and six of the eight abilities start
+locked — drawn on the strip and the bar from the first frame, greyed and inert.
+A press on one nudges and does nothing.
 
 Every one of them is a **permanent upgrade**, bought from the AMENDMENT tier of
 the offer system. The shape of what a turret could become is on screen from the

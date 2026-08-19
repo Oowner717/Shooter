@@ -75,17 +75,22 @@ export const FIRST_USE = {
 };
 
 /**
- * What the turret is issued with. Everything else is bought. PULSE shoves and
- * FAN kills, so the pair is a way to answer a crowd and a way to remove one —
- * a turret that opens with only PULSE has nothing it can point at anything.
+ * What the turret is issued with. Everything else is bought.
+ *
+ * PULSE shoves and FAN kills, so the pair is a way to answer a crowd and a way
+ * to remove one — a turret that opens with only PULSE has nothing it can point
+ * at anything. The two that run on their own come with it because they are not
+ * power: they are the difference between playing this with a thumb on the
+ * lever and leaving it running, and which of those a session is should be the
+ * player's to choose from the first minute rather than something the offers
+ * eventually get round to. Both start switched off.
  */
-export const STARTING = ['standard', 'pulse', 'fan'];
+export const STARTING = ['standard', 'pulse', 'fan', 'autoAim', 'autoFire'];
 
 /** Rounds, mines and abilities, in the order the offers hand them out. */
 export const LOCKABLE = {
   rounds: ['explosive', 'shotgun', 'arc', 'recur'],
   mines: ['blast', 'snare', 'wire', 'knell'],
-  autos: ['autoAim', 'autoFire'],
   abilities: ['lance', 'well', 'prism', 'stasis', 'decoy', 'chorus'],
 };
 
