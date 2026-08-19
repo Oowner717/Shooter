@@ -171,12 +171,16 @@ the player made, not one made for them.
   | HASTE | Ability cooldowns halved for 45s. |
   | SURGE | Double fire rate for 30s. |
   | YIELD | +150 salvage. |
-  | SEED | Lay 3 mines immediately. |
+  | SEED | Lay 3 mines now, random kind if none set. |
   | SHAKE OFF | Destroy everything gripping the turret. |
 - **AMENDMENT**, every 125 kills — four in a counted run. Permanent for the
   run, one option from each of AMMO, FIELD and TURRET.
 
-Twenty-four upgrades in `src/upgrades.js`, nine/eight/seven across the axes.
+Twenty-four upgrades in `src/upgrades.js`, nine/eight/seven across the axes,
+each with its own mark. The offer is read in the two seconds before a tap and a
+name is slower to recognise than a shape — especially for the repeatable ones,
+where what matters is "the one I already have three of". The card carries the
+stack count beside the mark for exactly that reason.
 
   **AMMO** — +25% damage · +15% fire rate · +35% round speed · +1 bounce ·
   2x knockback · +40% HE radius · ARC +1 jump · RECUR +1 repeat ·

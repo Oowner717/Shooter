@@ -34,7 +34,7 @@ const SMALL = [
     run(world) { world.salvage += 150; },
   },
   {
-    id: 'seed', name: 'SEED', line: 'Lay 3 mines immediately.',
+    id: 'seed', name: 'SEED', line: 'Lay 3 mines now, random kind if none set.',
     run(world) { world.pendingMines = (world.pendingMines || 0) + 3; },
   },
   {
@@ -87,8 +87,15 @@ export class Offers {
     }
     while (world.kills >= this.nextLarge) {
       this.nextLarge += CFG.events.large;
-      this.queue.push({ tier: 'large', options: rollLarge(this.taken) });
+      this.queue.push({ tier: 'large', options: rollLarge(this.taken), held: this.held() });
     }
+  }
+
+  /** How many of each upgrade is already stacked, by id. */
+  held() {
+    const out = {};
+    for (const id of this.taken) out[id] = (out[id] || 0) + 1;
+    return out;
   }
 
   /** @returns the option taken, or null. */

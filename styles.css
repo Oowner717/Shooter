@@ -581,17 +581,22 @@ body.menuOpen #quickBar { pointer-events: none; }
  */
 #pendingBtn {
   position: absolute;
-  top: calc(var(--hud-t) + 46px);
-  left: 50%;
-  transform: translateX(-50%);
+  /*
+   * Down where the thumb already is. Not centred: the turret owns the middle
+   * of the lower half, and the two text bands directly above it are spoken
+   * for. This sits at the left edge, just above the mine stack, which is the
+   * only place down here that is both free and reachable.
+   */
+  bottom: calc(var(--safe-b) + var(--bar-h) + 158px);
+  left: calc(var(--safe-l) + 8px);
   display: flex;
   align-items: center;
   gap: 7px;
   -webkit-appearance: none;
   appearance: none;
-  font-size: 9px;
-  letter-spacing: 0.24em;
-  padding: 7px 14px;
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  padding: 7px 10px;
   border: 1px solid rgba(124, 255, 178, 0.5);
   background: rgba(6, 20, 14, 0.9);
   color: #7cffb2;
@@ -617,8 +622,8 @@ body.menuOpen #quickBar { pointer-events: none; }
 }
 #pendingBtn.large b { background: rgba(255, 207, 92, 0.2); }
 @keyframes pendingIn {
-  from { opacity: 0; transform: translate(-50%, -8px); }
-  to { opacity: 1; transform: translateX(-50%); }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes pendingPulse { 50% { box-shadow: 0 0 0 4px rgba(124, 255, 178, 0.08); } }
 
@@ -682,9 +687,8 @@ body.menuOpen #quickBar { pointer-events: none; }
   -webkit-appearance: none;
   appearance: none;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
+  align-items: center;
+  gap: 11px;
   text-align: left;
   padding: 11px 12px;
   border: 1px solid var(--line);
@@ -694,6 +698,41 @@ body.menuOpen #quickBar { pointer-events: none; }
   transition: border-color 0.15s, background 0.15s, transform 0.07s ease;
 }
 .offerCard:active { transform: translateY(1px); background: rgba(89, 224, 255, 0.12); }
+/* The mark. Bigger than the type on purpose: it is what gets recognised. */
+.offerMark {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(120, 190, 255, 0.14);
+  background: rgba(2, 6, 12, 0.75);
+  color: var(--accent);
+}
+#offer.large .offerMark { color: #ffcf5c; }
+.offerMark svg { width: 22px; height: 22px; display: block; }
+
+.offerBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* Already stacked. The number is the point of the marks. */
+.offerHeld {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #ffcf5c;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 207, 92, 0.35);
+  background: rgba(255, 207, 92, 0.1);
+}
+
 .offerAxis {
   font-size: 7.5px;
   letter-spacing: 0.26em;

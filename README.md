@@ -265,7 +265,7 @@ untaken for eight hours is still there.
   | **HASTE** | Ability cooldowns halved for 45s. |
   | **SURGE** | Double fire rate for 30s. |
   | **YIELD** | +150 salvage. |
-  | **SEED** | Lay 3 mines immediately. |
+  | **SEED** | Lay 3 mines now — a random kind if none is selected. |
   | **SHAKE OFF** | Destroy everything gripping the turret. |
 - **AMENDMENT**, every 125 kills — four in a counted run. Permanent for the
   run, and it offers exactly one option from each of three axes, so a pick is
@@ -284,6 +284,11 @@ untaken for eight hours is still there.
   | FIFTH LINK | ARC +1 jump | INTAKE | +50% pickup range | SHRUG | throws objects off every 15s |
   | FOURTH TIME | RECUR +1 repeat | STANDING ORDER | -20% ability cooldowns | | |
   | SALVO | every 8th shot fires 3 | | | | |
+
+Each carries its own mark, and the card shows how many of it you already hold.
+An offer is read in the two seconds before a tap, and a shape is quicker to
+recognise than a name — especially for the repeatable ones, where the question
+is "which is the one I already have three of".
 
 Every one of them is a scalar on `world.up` read at the point of use — nothing
 in `src/upgrades.js` reaches into a subsystem — so adding one is a table entry

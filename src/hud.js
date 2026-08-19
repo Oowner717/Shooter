@@ -235,9 +235,16 @@ export class Hud {
     offer.options.forEach((opt, i) => {
       const b = document.createElement('button');
       b.className = 'offerCard';
-      b.innerHTML = (large ? `<span class="offerAxis">${opt.axis}</span>` : '')
+      const held = large ? offer.held[opt.id] || 0 : 0;
+      b.innerHTML = `<span class="offerMark">${opt.icon || ''}</span>`
+        + '<span class="offerBody">'
+        + (large ? `<span class="offerAxis">${opt.axis}</span>` : '')
         + `<span class="offerName">${opt.name}</span>`
-        + `<span class="offerLine">${opt.line}</span>`;
+        + `<span class="offerLine">${opt.line}</span>`
+        + '</span>'
+        // How many of this one is already stacked. The whole reason the marks
+        // exist: a repeatable upgrade is worth recognising by shape.
+        + (held ? `<span class="offerHeld">x${held}</span>` : '');
       b.addEventListener('click', () => this.game.takeOffer(i));
       this.el.offerCards.appendChild(b);
     });

@@ -655,7 +655,10 @@ export class Game {
     if (w.haste > 0) w.haste = Math.max(0, w.haste - dt);
     while (w.pendingMines > 0) {
       w.pendingMines--;
-      if (w.mine) throwMine(w, w.mine);
+      // With nothing selected SEED used to do nothing at all, which made it a
+      // dead option on any run that had not picked a mine yet. It lays a
+      // random kind instead.
+      throwMine(w, w.mine || MINE_KEYS[(Math.random() * MINE_KEYS.length) | 0]);
     }
     updateMines(w, dt);
     this.resolveBlasts();
