@@ -42,12 +42,16 @@ const TICK = {
  * The small tier. Everything here is tempo, not power: it changes the next
  * minute and nothing after it.
  *
- * `stacks: false` marks the two that are a switch rather than a quantity. Both
- * are `Math.max(remaining, n)` on a timer the game reads as a boolean — taking
- * a second one while the first is running neither compounds the effect nor
- * adds to the clock, it only refreshes it. The permanent tier has non-stacking
- * upgrades too, but those are simply never offered a second time, so the
- * question never comes up; these two come round again and again.
+ * `stacks: 'time'` marks the two that run on a clock. Their effect is a switch
+ * the game reads as a boolean — a flat halving while the timer is above zero —
+ * so taking a second one cannot make the turret shoot four times as fast. What
+ * it does do is add to the clock: two SURGEs are sixty seconds of double rate,
+ * not thirty. The card says which of the two it is, because "double fire rate"
+ * on its own invites the wrong guess in either direction.
+ *
+ * The permanent tier has non-stacking upgrades too, but those are simply never
+ * offered a second time, so the question never comes up; these two come round
+ * again and again.
  */
 const SMALL = [
   {
@@ -56,13 +60,13 @@ const SMALL = [
   },
   {
     id: 'haste', icon: TICK.haste, name: 'HASTE', line: 'Ability cooldowns halved for 45s.',
-    stacks: false,
-    run(world) { world.haste = Math.max(world.haste, 45); },
+    stacks: 'time',
+    run(world) { world.haste += 45; },
   },
   {
     id: 'surge', icon: TICK.surge, name: 'SURGE', line: 'Double fire rate for 30s.',
-    stacks: false,
-    run(world) { world.surge = Math.max(world.surge, 30); },
+    stacks: 'time',
+    run(world) { world.surge += 30; },
   },
   {
     id: 'yield', icon: TICK.yield, name: 'YIELD', line: '+150 salvage.',

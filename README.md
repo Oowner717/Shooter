@@ -191,9 +191,11 @@ it looks.
 - **HE** makes every round detonate on impact. It costs you better than half
   your rate of fire and the shells travel slower, so single targets are no
   easier — crowds are.
-- **SHOT** loads five pellets a shot in a tight cone at a slower cadence. The
-  pellets expire well short of the top of the field, so it is devastating up
-  close and useless at range.
+- **SHOT** loads five pellets a shot in a tight cone at a slower cadence. Range
+  is `speed x life` and nothing else, and life was cut a quarter in build 47:
+  measured, a pellet now covers about **474 units against a 1206-unit field**,
+  where a BOLT crosses 1267. It reaches a third of the way up, so it is
+  devastating up close and useless at anything else.
 - **ARC** is the weakest round in the rack on impact and the strongest through
   a crowd: the hit jumps to the nearest thing it has not touched yet and on
   again, up to four links, each a little weaker than the last. It works at any
@@ -314,19 +316,25 @@ button can then say AMENDMENT and mean it.
   | | |
   |---|---|
   | **RESET** | Every ability ready right now. |
-  | **HASTE** | Ability cooldowns halved for 45s. *Does not stack.* |
-  | **SURGE** | Double fire rate for 30s. *Does not stack.* |
+  | **HASTE** | Ability cooldowns halved for 45s. *Time stacks, effect does not.* |
+  | **SURGE** | Double fire rate for 30s. *Time stacks, rate does not.* |
   | **YIELD** | +150 salvage. |
   | **SEED** | Lay 3 mines now — a random unlocked kind if none is selected. |
   | **SHAKE OFF** | Destroy everything gripping the turret. |
 
-  **SURGE and HASTE carry a DOES NOT STACK tag.** Both are `Math.max(remaining,
-  n)` on a timer the game reads as a boolean, so a second one taken while the
-  first is running neither compounds the effect nor adds to the clock — it only
-  refreshes it. A card that reads "double fire rate" otherwise invites taking
-  two. The permanent tier has non-stacking upgrades as well, but those are
-  simply never offered twice, so the question never comes up; these two come
-  round again and again.
+  **SURGE and HASTE carry a TIME STACKS, NOT EFFECT tag.** Both run on a clock
+  and both effects are a switch the game reads as a boolean — a flat halving
+  while the timer is above zero — so a second one cannot make the turret shoot
+  four times as fast. What it does do is **add to the clock**: two SURGEs are
+  sixty seconds of double rate, not thirty. The card says which of the two it
+  is, because "double fire rate" on its own invites the wrong guess in either
+  direction. Neither is capped, so a player who banks offers can hold one long
+  window rather than several short ones — offers never expire, and that is the
+  point of them.
+
+  The permanent tier has non-stacking upgrades as well, but those are simply
+  never offered twice, so the question never comes up; these two come round
+  again and again.
 
   Each carries a mark, drawn the way the permanent ones are. A card is read in
   the two seconds before a tap and a shape lands before a name does; without

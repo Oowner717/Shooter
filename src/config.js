@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '46';
+export const BUILD = '47';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -90,7 +90,10 @@ export const CFG = {
       spread: 0.3,
       speed: [1120, 1420],
       damage: 12,
-      life: 0.5,
+      // Range is speed x life and nothing else, so this is the whole of it:
+      // 0.5 reached 560-710 units, which was most of the way up the field for
+      // a round whose whole trade is being murderous up close. A quarter off.
+      life: 0.375,
     },
     // Jumps from whatever it hits to the next thing near it, and on again.
     // Poor against anything on its own; devastating through a cluster, at any

@@ -453,9 +453,12 @@ export class Hud {
         + (large ? `<span class="offerAxis">${opt.axis}</span>` : '')
         + `<span class="offerName">${opt.name}</span>`
         + `<span class="offerLine">${opt.line}</span>`
-        // Said rather than implied: both of these come round again and again,
-        // and a card that reads "double fire rate" invites taking two.
-        + (opt.stacks === false ? '<span class="offerTag">DOES NOT STACK</span>' : '')
+        // Said rather than implied: these come round again and again, and a
+        // card reading "double fire rate" invites the wrong guess in either
+        // direction — that a second one is wasted, or that it is quadruple.
+        + (opt.stacks === 'time'
+          ? '<span class="offerTag">TIME STACKS, NOT EFFECT</span>'
+          : opt.stacks === false ? '<span class="offerTag">DOES NOT STACK</span>' : '')
         + '</span>'
         // How many of this one is already stacked. The whole reason the marks
         // exist: a repeatable upgrade is worth recognising by shape.
