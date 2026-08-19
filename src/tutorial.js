@@ -11,6 +11,8 @@
 // to use it on: it is the one thing that can never be taken away, and having
 // it from the start is the first fact about the game. Then ammunition, then
 // mines, then the two that run on their own, then the rest of the abilities.
+// The three things the run gives back — salvage, the tempo offer and the
+// permanent one — are said where they can be pointed at rather than listed.
 //
 // PACING. The count cannot pace this. Objects die slowly at first and very
 // fast later, so a script keyed only on kills hands out its hardest lines at
@@ -44,28 +46,41 @@ const SCRIPT = [
   { text: 'Something is coming down now.\nNone of it can kill you.' },
   { text: 'It only breaks up what you see through.\nFive hundred of them, and none is the point.' },
 
-  { key: 'explosive', at: 2, text: 'HE. Blows up where it lands. Slower to fire.' },
-  { key: 'shotgun', at: 5, text: 'SHOT. Five pellets. Close range only.' },
+  // The number starts moving the moment the first one comes apart, so this is
+  // the earliest it can be said and still be pointing at something.
+  { at: 2, text: 'The green number is SALVAGE.\nEverything you break gives some up.' },
+
+  { key: 'explosive', at: 4, text: 'HE. Blows up where it lands. Slower to fire.' },
+  { key: 'shotgun', at: 6, text: 'SHOT. Five pellets. Close range only.' },
   { key: 'arc', at: 8, text: 'ARC. The hit jumps on to the next thing, four times.' },
-  { key: 'recur', at: 11, text: 'RECUR. The shot happens three more times, further down.' },
+  { key: 'recur', at: 10, text: 'RECUR. The shot happens three more times, further down.' },
 
-  { key: 'blast', at: 14, text: 'BLAST. Mines lay themselves. This one bangs once, hard.' },
-  { key: 'snare', at: 17, text: 'SNARE. Never goes off. It pins a crowd in place.' },
-  { key: 'wire', at: 20, text: 'WIRE. A line across the field. It cuts what crosses.' },
-  { key: 'knell', at: 23, text: 'KNELL. Waits for nothing. Goes off three times.' },
+  { key: 'blast', at: 12, text: 'BLAST. Mines lay themselves. This one bangs once, hard.' },
+  { key: 'snare', at: 14, text: 'SNARE. Never goes off. It pins a crowd in place.' },
+  { key: 'wire', at: 16, text: 'WIRE. A line across the field. It cuts what crosses.' },
+  { key: 'knell', at: 18, text: 'KNELL. Waits for nothing. Goes off three times.' },
 
-  { key: 'autoAim', at: 26, text: 'AUTO AIM. It picks a target and leads the shot.' },
-  { key: 'autoFire', at: 29, text: 'AUTO FIRE. It keeps shooting where the barrel points.' },
+  { key: 'autoAim', at: 20, text: 'AUTO AIM. It picks a target and leads the shot.' },
+  { key: 'autoFire', at: 22, text: 'AUTO FIRE. It keeps shooting where the barrel points.' },
 
-  { key: 'fan', at: 32, text: 'FAN. Twenty-five pellets in one tight cone.' },
-  { key: 'lance', at: 35, text: 'LANCE. A beam through the biggest thing out there.' },
-  { key: 'well', at: 38, text: 'WELL. Drags everything into a knot, then collapses it.' },
-  { key: 'prism', at: 41, text: 'PRISM. A shell that bursts, then beams every way.' },
-  { key: 'stasis', at: 44, text: 'STASIS. Objects stop. Your shots do not.' },
-  { key: 'decoy', at: 47, text: 'DECOY. A turret that is not yours. They go there.' },
-  { key: 'siphon', at: 50, text: 'SIPHON. Hauls the wreckage in and throws it back.' },
+  // CFG.events.smallFirst is set so that one is genuinely sitting on the
+  // button by now. Explaining a reward you cannot point at is a manual.
+  { at: 24, text: 'ALLOCATION is waiting. Three offered, one taken.\nIt keeps. Open it whenever you want it.' },
 
-  { at: 56, text: 'That is all of it.\nThe rest of the run is yours.' },
+  { key: 'fan', at: 26, text: 'FAN. Twenty-five pellets in one tight cone.' },
+  { key: 'lance', at: 28, text: 'LANCE. A beam through the biggest thing out there.' },
+  { key: 'well', at: 30, text: 'WELL. Drags everything into a knot, then collapses it.' },
+  { key: 'prism', at: 32, text: 'PRISM. A shell that bursts, then beams every way.' },
+  { key: 'stasis', at: 34, text: 'STASIS. Objects stop. Your shots do not.' },
+  { key: 'decoy', at: 36, text: 'DECOY. A turret that is not yours. They go there.' },
+  { key: 'siphon', at: 38, text: 'SIPHON. Hauls the wreckage in and throws it back.' },
+
+  // The permanent tier is too far off to demonstrate, so it is described. It
+  // announces itself loudly enough when it does come that the player only
+  // needs to know the word.
+  { at: 40, text: 'Further in, an AMENDMENT is offered instead.\nThose ones you keep for the whole run.' },
+
+  { at: 42, text: 'That is all of it.\nThe rest of the run is yours.' },
 ];
 
 export const TUTORIAL = SCRIPT.map((e) => ({ ...e, hold: holdFor(e.text) }));
@@ -84,6 +99,14 @@ export const GAP = 0.7;
  * up the band by the next one rather than taken away.
  */
 export const ACK = 1.4;
+
+/**
+ * ...but never below this fraction of the line's own reading time. A player
+ * can tap the moment a button lights, faster than anyone can read, and without
+ * a floor the acknowledgement shortcut walked the tail of the script back to
+ * about two seconds a line — the exact failure the clock was added to fix.
+ */
+export const ACK_FLOOR = 0.65;
 
 /** How many lines the band keeps. The newest is at the bottom. */
 export const STACK = 2;

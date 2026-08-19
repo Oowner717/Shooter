@@ -472,11 +472,14 @@ control over and say what it is.
     PULSE                                 empty field
     BOLT                                  empty field
     what is coming, and that it cannot kill you
-    ammunition   HE, SHOT, ARC, RECUR     objects 2-11
-    mines        BLAST, SNARE, WIRE, KNELL objects 14-23
-    running      AUTO AIM, AUTO FIRE      objects 26-29
-    abilities    FAN through SIPHON       objects 32-50
-    a closing line                        object 56
+    SALVAGE, the number that counts up    object 2
+    ammunition   HE, SHOT, ARC, RECUR     objects 4-10
+    mines        BLAST, SNARE, WIRE, KNELL objects 12-18
+    running      AUTO AIM, AUTO FIRE      objects 20-22
+    ALLOCATION, with one on the button    object 24
+    abilities    FAN through SIPHON       objects 26-38
+    AMENDMENT, which is described         object 40
+    a closing line                        object 42
 
 **PULSE comes first**, before there is anything to use it on. It is the one
 thing ORDINAL can never take away, and having it in hand from the start is the
@@ -494,8 +497,11 @@ line before it to have been read. The reading time is `holdFor()` — a beat to
 notice the line, then about 180 words a minute — and it is what actually
 governs from the mines onward. Nothing is ever cut off, at any kill rate.
 
-**Acting on a line shortens the wait** to `ACK`, because using the thing is
-proof of having read about it. That makes the opening adaptive rather than
+**Acting on a line shortens the wait** to `ACK` — but never below `ACK_FLOOR`
+of the line's own reading time, because a tap lands faster than anyone reads
+and without the floor the shortcut walked the tail of the script back to about
+two seconds a line, the exact failure the clock was added to fix. Using the
+thing is proof of having read about it. That makes the opening adaptive rather than
 fixed: a player who tries each thing as it arrives is through in about 70
 seconds, one who ignores the strip entirely still gets every sentence in full
 and takes about 140. Nothing is skipped either way. The line itself is **not**
@@ -522,6 +528,25 @@ whichever comes first, because on kills alone a player who shoots nothing would
 sit in front of two objects indefinitely. LURCHER is held back to object 10, so
 the first things down are MOTEs and NEEDLEs and nothing else. Endless runs skip
 the warm-up entirely.
+
+**While the opening is still running it stays thinner than that** — capped at
+`teachPop` and spawning at `teachRate` of normal. Nineteen controls are being
+handed over with a sentence to read on each, and the field is there to give the
+new thing something to do, not to be survived. Measured over a full opening:
+about four hostiles on screen against a normal thirteen, and nineteen within
+half a minute of the last line.
+
+### The three things it gives back
+
+The opening says what they are where it can point at them rather than listing
+them:
+
+- **SALVAGE** at object 2, once the number has actually moved.
+- **ALLOCATION** at object 24, with a real one sitting on the button —
+  `events.smallFirst` exists so that is true rather than nearly true.
+- **AMENDMENT** at object 40, described rather than shown. The permanent tier
+  is a hundred objects further on, and by then it announces itself loudly
+  enough that the player only needs to know the word.
 
 Sealed is not the same as ORDINAL's `locked` — locked is a button taken away
 mid-fight, sealed is one not yet given. Both are visible; only one is a loss.

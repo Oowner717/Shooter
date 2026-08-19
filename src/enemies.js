@@ -1176,8 +1176,16 @@ export class Director {
       clamp(world.kills / CFG.warmKills, 0, 1),
       clamp((world.time - CFG.openingGrace) / CFG.warmSeconds, 0, 1),
     );
-    const popTarget = Math.round(CFG.warmPop + (target - CFG.warmPop) * warm);
+    let popTarget = Math.round(CFG.warmPop + (target - CFG.warmPop) * warm);
     interval /= CFG.warmRate + (1 - CFG.warmRate) * warm;
+
+    // And thinner still while the opening is running. Nineteen controls are
+    // being handed over with a sentence to read on each; the field is there to
+    // give the new thing something to do, not to be survived.
+    if (world.teaching) {
+      popTarget = Math.min(popTarget, CFG.teachPop);
+      interval /= CFG.teachRate;
+    }
 
     this.timer -= dt;
     if (this.timer > 0) return;

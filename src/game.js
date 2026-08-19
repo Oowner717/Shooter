@@ -18,7 +18,7 @@ import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
 import { codex, cleared, markCleared, forgetCleared, taught, markTaught, forgetTaught } from './codex.js';
 import { Offers } from './events.js';
 import { freshUpgrades } from './upgrades.js';
-import { TUTORIAL, ALL_KEYS, GAP, ACK, START } from './tutorial.js';
+import { TUTORIAL, ALL_KEYS, GAP, ACK, ACK_FLOOR, START } from './tutorial.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 
@@ -184,6 +184,8 @@ export class Game {
     // else in the opening moves until it passes; the first line is due at
     // START, which is what the initial value buys.
     this.lineUntil = START - GAP;
+    this.lineFrom = 0;
+    this.lineHold = 0;
     this.taughtKey = null;
     // The opening runs once, ever — unless it is asked for again from the
     // menu, which is the only way back to it. A cleared save is past it by
@@ -626,7 +628,10 @@ export class Game {
     // The opening script. Runs off the world clock so it holds with the menu.
     // The script waits on the count but is paced by the clock, so an entry
     // that is owed has to be checked every frame rather than only on the kill
-    // that earned it.
+    // that earned it. The director reads the flag off the world and thins the
+    // field while it is set; mirrored here rather than assigned at every place
+    // teaching changes, so the two can never drift apart.
+    w.teaching = this.teaching;
     if (this.teaching && w.phase === 'staging') this.teach();
 
     // ---- status timers ----
@@ -896,6 +901,8 @@ export class Game {
       this.taughtKey = null;
     }
     this.hud.showHint(step.text, true);
+    this.lineFrom = w.time;
+    this.lineHold = step.hold;
     this.lineUntil = w.time + step.hold;
 
     // The last entry is the one that says so. It stays up; only the teaching
@@ -918,7 +925,11 @@ export class Game {
     this.taughtKey = null;
     // The line stays. It is pushed up the band by the next one rather than
     // taken away — having acted on a sentence is not a reason to lose it.
-    this.lineUntil = Math.min(this.lineUntil, this.world.time + ACK);
+    // The floor is what keeps this from undoing the clock: a tap lands faster
+    // than anyone reads, so the shortcut can never take a line below most of
+    // its own reading time.
+    const floor = this.lineFrom + this.lineHold * ACK_FLOOR;
+    this.lineUntil = Math.min(this.lineUntil, Math.max(this.world.time + ACK, floor));
   }
 
   /**

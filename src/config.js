@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '38';
+export const BUILD = '39';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -22,6 +22,11 @@ export const CFG = {
   warmPop: 2,
   warmKills: 30,
   warmSeconds: 75, // ...or this long after the first release, whichever is sooner
+  // And while the opening is still running it stays thinner than that. There
+  // are nineteen controls being handed over with a sentence to read on each,
+  // and none of that should happen while dodging.
+  teachPop: 5,
+  teachRate: 0.62, // spawn attempts run this fraction of speed while teaching
   warmRate: 0.42, // spawn attempts run this fraction of normal speed at first
   lull: 4.5, // the pause between the five hundredth kill and the arrival
   storyEvery: 50, // one story line per this many kills (10 lines total)
@@ -144,6 +149,9 @@ export const CFG = {
   // that you can put it down.
   events: {
     small: 40, // kills between tempo offers — about twelve in a counted run
+    // The first one comes early, so the opening has a real ALLOCATION waiting
+    // on the button at the moment it explains what one is.
+    smallFirst: 22,
     large: 125, // kills between permanent ones — four in a counted run
   },
 

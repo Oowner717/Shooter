@@ -89,7 +89,7 @@ export class Offers {
 
   reset() {
     this.queue = []; // { tier, options } — oldest first, and none of them expire
-    this.nextSmall = CFG.events.small;
+    this.nextSmall = CFG.events.smallFirst;
     this.nextLarge = CFG.events.large;
     this.taken = []; // upgrade ids, so the one-offs are not offered twice
   }
