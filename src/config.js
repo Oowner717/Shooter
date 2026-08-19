@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '47';
+export const BUILD = '48';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -202,10 +202,18 @@ export const CFG = {
   // ---- auto mines -----------------------------------------------------
   mines: {
     interval: 4.6, // seconds between throws while armed
-    max: 5,
+    /*
+     * One cap for the whole field, not one per kind. Mines used to run out on
+     * their own, so the per-kind numbers were a rate limit on top of that and
+     * switching kinds mid-run left the old ones to expire. Nothing expires
+     * now, so without a single ceiling a player could switch round the four
+     * kinds and hold every cap at once. What differentiates the kinds is the
+     * lay interval instead: ten wires is eighty-six seconds of laying, ten
+     * blast mines is forty-six.
+     */
+    cap: 10,
     flight: 0.85, // seconds from turret to landing site
     arm: 0.4, // settling time before it can trigger
-    life: 26,
     r: 13,
     trigger: 26, // extra reach beyond the mine's own radius
     blast: { r: 168, damage: 140, impulse: 760 },
@@ -218,10 +226,8 @@ export const CFG = {
   // choose to put into the pile while it cannot move.
   snare: {
     interval: 7.4, // slower to lay than a blast mine
-    max: 3,
     flight: 0.9,
     arm: 0.6, // takes longer to settle
-    life: 30,
     r: 14,
     trigger: 34, // a wider mouth, because it wants a crowd
     hold: 3.6, // seconds it keeps hold once it opens
@@ -236,10 +242,8 @@ export const CFG = {
   // consumes it: it is a lane closed for as long as it lasts.
   wire: {
     interval: 8.6,
-    max: 2,
     flight: 0.95,
     arm: 0.5,
-    life: 22,
     r: 11,
     span: 150, // half-length of the line, world units
     open: 0.55, // seconds to unspool once it has settled
@@ -254,10 +258,8 @@ export const CFG = {
   // A blast mine punishes what walks into it; this one denies the ground.
   knell: {
     interval: 9.4,
-    max: 2,
     flight: 0.9,
     arm: 0.8,
-    life: 20,
     r: 13,
     tolls: 3,
     gap: 1.15, // seconds between them
@@ -381,7 +383,6 @@ export const CFG = {
     // A copy of your own turret, firing back. Its rounds cannot hurt you —
     // they corrupt the feed and knock the barrel — and they can be shot down.
     echo: {
-      life: 26, // it now outlives its welcome unless you deal with it
       hp: 460, // and it can be dealt with: destroy the copy
       bodyR: 26, // hit radius, matching the player's own turret
       interval: 1.45,

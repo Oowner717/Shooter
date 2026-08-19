@@ -160,8 +160,16 @@ seconds, completely inert in flight — passing straight through anything in the
 way — and none does anything until it has settled. Harmless drift never sets
 one off.
 
-Switching kinds mid-run leaves whatever is already on the field to run out its
-own life rather than snatching it back.
+**Nothing on the field expires.** A mine sits where it landed until something
+sets it off — which for a BLAST or a SNARE may be never. There is **one cap of
+ten across the whole field**, not one per kind: with nothing running out, a
+per-kind cap would let a player cycle the four kinds and hold four ceilings at
+once. Switching kinds mid-run leaves what is already down where it is; the new
+kind pushes the old off one at a time as it reaches the cap.
+
+What separates the kinds is the lay interval instead, and it is now the real
+cost of them: ten BLAST mines is forty-six seconds of laying, ten WIREs is
+eighty-six, and the mine slot is doing nothing else in the meantime.
 
 - **BLAST** goes off on contact: one hard bang, damage and knockback.
 - **SNARE** does not go off. It opens, hauls everything within 210 units into
@@ -173,9 +181,15 @@ own life rather than snatching it back.
 - **WIRE** is the only one that is not a point. It unspools a 300-unit line
   across the field and cuts whatever crosses it, 105 damage a second for as
   long as that thing stays on it, shoving it off rather than parking it in the
-  beam. Nothing triggers it and nothing uses it up: it is a lane closed until
-  it expires. Measured: a body on the line takes damage, a body 260 units off
-  it takes none, and the wire is still there afterwards.
+  beam. Nothing triggers it, nothing uses it up and it does not expire: it is a
+  lane closed for good. Measured: a body on the line takes damage, a body 260
+  units off it takes none, and the wire is still there afterwards.
+
+  This is the one kind that changes character with permanence. Ten of them —
+  about ninety seconds of laying, with the mine slot doing nothing else — cover
+  **80% of the field's width across four rows**, measured on a 629-unit field,
+  and stay there. They are still lines rather than walls: a body is shoved off
+  rather than held on, so it is sustained area denial and not a barrier.
 - **KNELL** does not wait to be touched. It counts, and then it goes off three
   times where it lies, each half again as wide as the last and worth 72% of its
   damage. BLAST punishes what walks into it; KNELL denies the ground whether
@@ -352,9 +366,9 @@ button can then say AMENDMENT and mean it.
 
   | AMMO | | FIELD | | TURRET | |
   |---|---|---|---|---|---|
-  | HOLLOWPOINT | +25% damage | DEEP MAGAZINE | +1 mine on the field | RATE | +20% fire rate |
+  | HOLLOWPOINT | +25% damage | DEEP MAGAZINE | +2 mines on the field | RATE | +20% fire rate |
   | HOT LOAD | +15% fire rate | QUICK LAY | +30% lay speed | HANDS OFF | auto fire matches manual |
-  | TRACER | +35% round speed | LONG FUSE | +50% mine lifetime | SLEW | +50% auto aim turn speed |
+  | TRACER | +35% round speed | DEEP CHARGE | +35% mine blast radius | SLEW | +50% auto aim turn speed |
   | RICOCHET | +1 wall bounce | WIDE MOUTH | +40% trigger range | OVERWATCH | +25% damage hands-off |
   | HEAVY | 2x knockback | SWEEP | blasts behind you every 20s | HARD CASING | 40 dmg/s to what touches you |
   | OVERPRESSURE | +40% HE radius | REFLEX | PULSE fires itself at 2+ grips | INSULATION | corruption costs half |

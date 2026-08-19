@@ -28,7 +28,7 @@ export function freshUpgrades() {
     // field
     mineMax: 0,
     mineRate: 1,
-    mineLife: 1,
+    mineBlast: 1, // radius of a blast mine and of a knell's tolls
     mineTrigger: 1,
     sweep: 0, // seconds between the turret clearing behind itself
     reflex: false, // PULSE answers a crowd on the turret by itself
@@ -68,7 +68,8 @@ const MARK = {
   // --- field ---
   deepmag: g('<ellipse cx="12" cy="7" rx="7.5" ry="2.8"/><path d="M4.5 7v5c0 1.6 3.4 2.8 7.5 2.8s7.5-1.2 7.5-2.8V7"/><path d="M4.5 12v5c0 1.6 3.4 2.8 7.5 2.8s7.5-1.2 7.5-2.8v-5"/>'),
   quicklay: g('<circle cx="15" cy="14" r="5"/><path d="M2 8h7M2 12h5M2 16h4" opacity=".7"/>'),
-  longfuse: g('<path d="M7 3h10M7 21h10"/><path d="M7 3c0 5 10 5 10 0M7 21c0-5 10-5 10 0"/><path d="M12 8v8" opacity=".5"/>'),
+  // A charge going off wider than it used to: the same centre, one ring further.
+  deepcharge: g('<circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="5.6"/><circle cx="12" cy="12" r="9.4" stroke-dasharray="2.6 2.8"/><path d="M12 2.6v1.6M12 19.8v1.6M2.6 12h1.6M19.8 12h1.6" opacity=".7"/>'),
   widemouth: g('<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9" stroke-dasharray="2.4 3"/>'),
   sweep: g('<path d="M12 4v7"/><path d="M8 11h8l1.5 5h-11z" fill="currentColor" stroke="none"/><path d="M3.5 15a9 9 0 0 0 17 0" stroke-dasharray="2.6 2.6"/>'),
   reflex: g('<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M6.5 6.5a7.7 7.7 0 0 0 0 11M17.5 6.5a7.7 7.7 0 0 1 0 11" opacity=".6"/><path d="M13.5 2 10 7.5h4L10.5 13" />'),
@@ -103,9 +104,9 @@ export const UPGRADES = {
     { id: 'salvo', name: 'SALVO', line: 'Every 8th shot fires 3 rounds.', apply: set('salvo', 8) , icon: MARK.salvo },
   ],
   FIELD: [
-    { id: 'deepmag', name: 'DEEP MAGAZINE', line: '+1 mine on the field at once.', apply: bump('mineMax', 1) , icon: MARK.deepmag },
+    { id: 'deepmag', name: 'DEEP MAGAZINE', line: '+2 mines on the field at once.', apply: bump('mineMax', 2) , icon: MARK.deepmag },
     { id: 'quicklay', name: 'QUICK LAY', line: '+30% mine lay speed.', apply: quicken('mineRate', 0.7) , icon: MARK.quicklay },
-    { id: 'longfuse', name: 'LONG FUSE', line: '+50% mine lifetime.', apply: scale('mineLife', 1.5) , icon: MARK.longfuse },
+    { id: 'deepcharge', name: 'DEEP CHARGE', line: '+35% mine blast radius.', apply: scale('mineBlast', 1.35) , icon: MARK.deepcharge },
     { id: 'widemouth', name: 'WIDE MOUTH', line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) , icon: MARK.widemouth },
     { id: 'sweep', name: 'SWEEP', line: 'Turret blasts behind itself every 20s.', apply: set('sweep', 20) , icon: MARK.sweep },
     { id: 'reflex', name: 'REFLEX', line: 'PULSE fires itself when 2+ objects grip you.', apply: set('reflex', true) , icon: MARK.reflex },

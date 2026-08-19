@@ -54,7 +54,7 @@ export const ARSENAL = [
   },
   {
     key: 'wire', kind: 'mine', group: 'mines', label: 'WIRE', icon: ICON.wire, tone: '#7cffb2',
-    line: 'The only one that is not a point. It unspools a taut line across the field and cuts whatever crosses it, for as long as that thing stays on it. Nothing triggers it and nothing uses it up: it is a lane closed until it expires.',
+    line: 'The only one that is not a point. It unspools a taut line across the field and cuts whatever crosses it, for as long as that thing stays on it. Nothing triggers it, nothing uses it up and it does not expire: it is a lane closed for good, or until the cap pushes it off for a newer one.',
   },
   {
     key: 'knell', kind: 'mine', group: 'mines', label: 'KNELL', icon: ICON.knell, tone: '#ff5d8f',
