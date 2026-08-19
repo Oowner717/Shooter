@@ -215,6 +215,12 @@ export class Game {
     w.mine = null;
     w.round = 'standard';
     this.autoHinted = {};
+    // The issued round is loaded from the first frame and the player has been
+    // shooting it for minutes by the time they tap its cell, so its first-use
+    // caption is spent before it can fire. Everything else in STARTING is
+    // either off (the two that run on their own) or unused until pressed (the
+    // abilities), so those still explain themselves the first time.
+    this.autoHinted[w.round] = true;
     for (const key of ['autoAim', 'autoFire', ...MINE_KEYS, ...ROUND_KEYS]) {
       this.hud.setToggle(key, false);
     }
@@ -541,16 +547,19 @@ export class Game {
    */
   toggleRound(kind) {
     const w = this.world;
+    const changed = w.round !== kind;
     w.round = kind;
     // STANDARD is a chip too, so it lights on the same pass as the rest.
     for (const k of ['standard', ...ROUND_KEYS]) this.hud.setToggle(k, w.round === k);
-    this.announceToggle(kind, w.round === kind);
+    // Re-picking the loaded round is a no-op, so it does not get a caption
+    // either — a first-use line is about the change, and nothing changed.
+    this.announceToggle(kind, w.round === kind, changed);
   }
 
-  announceToggle(key, on) {
+  announceToggle(key, on, changed = true) {
     audio.chime(on ? 760 : 430);
     const hint = FIRST_USE[key];
-    if (!on || !hint || this.autoHinted[key] || !this.hintsAllowed) return;
+    if (!changed || !on || !hint || this.autoHinted[key] || !this.hintsAllowed) return;
     // Marked only once it has actually been shown. It used to be marked first,
     // so picking a round during the boss fight — where captions are suppressed
     // and where all five are now one tap away — spent that caption on nothing

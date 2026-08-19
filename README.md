@@ -575,7 +575,17 @@ button, AMENDMENT at object 44, and a reminder at 120 that everything not in
 hand is still out there.
 
 **Everything else explains itself the first time it is used**, which is minutes
-after it was bought and only if the player reaches for it. `FIRST_USE` in
+after it was bought and only if the player reaches for it. The one exception is
+the issued round: BOLT is loaded from the first frame, so by the time anyone
+taps its cell they have been shooting it for minutes, and its caption is marked
+spent before the run starts. Re-picking whichever round is already loaded is
+silent for the same reason — a first-use line is about a change, and nothing
+changed. The one exception is
+the issued round: BOLT is loaded from the first frame, so by the time anyone
+taps its cell they have been shooting it for minutes, and its caption is marked
+spent before the run starts. Re-picking whichever round is already loaded is
+silent for the same reason — a first-use line is about a change, and nothing
+changed. `FIRST_USE` in
 `src/tutorial.js` holds one sentence per thing, and the unlock card carries the
 same sentence — so the card that hands you a round and the caption that greets
 you using it say the same thing, and neither has to be read twice.
