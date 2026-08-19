@@ -558,39 +558,6 @@ html, body {
   background: var(--tone, var(--accent));
 }
 
-/* The stock rows in ARSENAL: what a charge costs and how many are held. */
-.stockRow { align-items: center; }
-.stockFree {
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  color: var(--dim);
-  padding-left: 6px;
-}
-.stockBuy {
-  -webkit-appearance: none;
-  appearance: none;
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 9px;
-  border: 1px solid var(--line);
-  background: rgba(4, 8, 15, 0.9);
-  color: var(--dim);
-  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-.stockBuy .held { font-size: 11px; letter-spacing: 0.08em; color: var(--ink); font-weight: 700; }
-.stockBuy .price { font-size: 7.5px; letter-spacing: 0.12em; }
-/* Affordable and not already full. */
-.stockBuy.can {
-  color: #7cffb2;
-  border-color: rgba(124, 255, 178, 0.5);
-  background: rgba(8, 26, 18, 0.9);
-}
-.stockBuy.can:active { background: rgba(124, 255, 178, 0.22); }
-
 /* Not yet destroyed: a name in blocks, and no portrait. */
 .codexCell.locked { border-color: rgba(120, 190, 255, 0.07); background: rgba(4, 8, 14, 0.5); }
 .codexCell.locked .codexName { color: #33414f; letter-spacing: 0.1em; }
@@ -604,6 +571,145 @@ body.menuOpen #alerts,
 body.menuOpen #bossCaption { opacity: 0.25; transition: opacity 0.2s ease; }
 body.menuOpen #abilities,
 body.menuOpen #quickBar { pointer-events: none; }
+
+/* ---------------- offers ---------------- */
+
+/*
+ * The waiting button. Centred under the top bar, and only ever present when
+ * something is actually waiting — so it never competes with the field, and an
+ * unattended game is never blocked by it.
+ */
+#pendingBtn {
+  position: absolute;
+  top: calc(var(--hud-t) + 46px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  -webkit-appearance: none;
+  appearance: none;
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  padding: 7px 14px;
+  border: 1px solid rgba(124, 255, 178, 0.5);
+  background: rgba(6, 20, 14, 0.9);
+  color: #7cffb2;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  animation: pendingIn 0.3s ease-out, pendingPulse 2.4s 0.3s infinite ease-in-out;
+  z-index: 18;
+}
+#pendingBtn[hidden] { display: none; }
+#pendingBtn b {
+  font-size: 10px;
+  padding: 1px 5px;
+  background: rgba(124, 255, 178, 0.2);
+  border-radius: 2px;
+}
+#pendingBtn b[hidden] { display: none; }
+/* A permanent one is worth noticing more than a top-up. */
+#pendingBtn.large {
+  border-color: rgba(255, 207, 92, 0.6);
+  background: rgba(24, 16, 4, 0.92);
+  color: #ffcf5c;
+}
+#pendingBtn.large b { background: rgba(255, 207, 92, 0.2); }
+@keyframes pendingIn {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translateX(-50%); }
+}
+@keyframes pendingPulse { 50% { box-shadow: 0 0 0 4px rgba(124, 255, 178, 0.08); } }
+
+#offerScrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 4, 9, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+  z-index: 26;
+}
+#offerScrim.on { opacity: 1; pointer-events: auto; }
+#offerScrim[hidden] { display: none; }
+
+#offer {
+  position: absolute;
+  left: calc(var(--safe-l) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  top: 50%;
+  transform: translateY(-46%);
+  max-height: 78%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, rgba(8, 15, 26, 0.98), rgba(3, 6, 12, 0.99));
+  border: 1px solid rgba(120, 190, 255, 0.28);
+  clip-path: polygon(0 14px, 14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.26s cubic-bezier(0.2, 0.9, 0.2, 1), opacity 0.2s ease;
+  z-index: 27;
+  overflow: hidden;
+}
+#offer.open { transform: translateY(-50%); opacity: 1; pointer-events: auto; }
+#offer[hidden] { display: none; }
+#offer.large { border-color: rgba(255, 207, 92, 0.4); }
+
+.offerHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 13px 14px 10px;
+  border-bottom: 1px solid var(--line);
+}
+#offerKicker { font-size: 10px; letter-spacing: 0.26em; color: var(--accent); }
+#offer.large #offerKicker { color: #ffcf5c; }
+#offerNote { font-style: normal; font-size: 8px; letter-spacing: 0.2em; color: var(--dim); }
+
+#offerCards {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.offerCard {
+  -webkit-appearance: none;
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  text-align: left;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  background: rgba(6, 12, 22, 0.7);
+  color: var(--ink);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  transition: border-color 0.15s, background 0.15s, transform 0.07s ease;
+}
+.offerCard:active { transform: translateY(1px); background: rgba(89, 224, 255, 0.12); }
+.offerAxis {
+  font-size: 7.5px;
+  letter-spacing: 0.26em;
+  color: #ffcf5c;
+}
+.offerName { font-size: 12px; letter-spacing: 0.2em; }
+.offerLine {
+  font-size: 8.5px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+}
+
+/* Nothing on the field is live while an offer is up. */
+body.offerOpen #abilities,
+body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 
 /* ---------------- the strip ---------------- */
 
@@ -1006,6 +1112,7 @@ body.ending #alerts,
 body.ending #bossBar,
 body.ending #abilityHint,
 body.ending #quickBar,
+body.ending #pendingBtn,
 body.ending #bossCaption {
   opacity: 0;
   transition: opacity 1.2s ease;
@@ -1015,7 +1122,8 @@ body.ending #bossCaption {
 /* Same treatment while the title screen is up: none of it is live yet. */
 body.booting #topbar,
 body.booting #abilities,
-body.booting #quickBar {
+body.booting #quickBar,
+body.booting #pendingBtn {
   opacity: 0;
   pointer-events: none;
 }

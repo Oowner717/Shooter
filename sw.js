@@ -37,6 +37,8 @@ const ASSETS = [
   './src/boss.js',
   './src/abilities.js',
   './src/arsenal.js',
+  './src/events.js',
+  './src/upgrades.js',
   './src/narrative.js',
   './src/hud.js',
   './src/menu.js',

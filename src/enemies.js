@@ -1047,7 +1047,8 @@ function releasesLeft(world) {
 export function intakeRate(world) {
   const S = CFG.salvage;
   const n = Math.min(world.attackers.size, S.taxCap);
-  return Math.max(S.taxFloor, S.tax ** n);
+  const bite = 1 - (1 - S.tax) * world.up.insulation;
+  return Math.max(S.taxFloor, bite ** n);
 }
 
 function bank(world, amount, x, y) {
@@ -1066,7 +1067,8 @@ export function collectSalvage(world, dt) {
   const S = CFG.salvage;
   const s = world.shooter;
   const list = world.debris;
-  const reach = S.intake * S.intake;
+  const radius = S.intake * world.up.intake;
+  const reach = radius * radius;
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i];
     if (e.dead || !e.salvage) continue;

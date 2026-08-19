@@ -180,26 +180,31 @@ the price, and refuses at the cap without charging for it.
 Prices are a first guess against an unmeasured income. They are the first thing
 to re-tune once a full run has been played.
 
-## Phase 3 — small events
+## Phases 3 and 4 — offers — DONE, build 31
 
-- Fire on kill milestones. Persist until taken, never expire, stack without
-  limit.
-- Three cells, no pause, tapped or ignored.
-- Contents: charges and instant effects only. Free.
+Both tiers ended up sharing one surface, which is better than the two the plan
+described. Neither ever interrupts: they queue behind a button that only exists
+while something is waiting, and opening it is what holds the world — a choice
+the player made, not one made for them.
 
-Verify: several stack and can be taken in any order; nothing pauses; leaving
-one untaken for a long run does not lose it.
+- **ALLOCATION**, every 40 kills — twelve in a counted run. Tempo, free:
+  RESTOCK, PAIR, SPREAD, YIELD, SURGE, SEED.
+- **AMENDMENT**, every 125 kills — four in a counted run. Permanent for the
+  run, one option from each of AMMO, FIELD and TURRET.
 
-## Phase 4 — large events and the upgrade tables
+Twenty-four upgrades in `src/upgrades.js`, nine/eight/seven across the axes.
+Every one is a scalar on `world.up` read at the point of use; nothing in that
+file reaches into a subsystem, so adding one is an entry plus one place that
+reads it. The four that cannot stack are not offered twice.
 
-- A pending button rather than an interruption. Pressing it pauses and offers
-  three, one from each axis.
-- The tables live in data, the way ARSENAL does, so an upgrade is an entry.
-- Effects are run-long and stack where marked repeatable.
+Measured: 500 kills queues exactly twelve small and four large, each with three
+options; sixteen stacked at once and nothing paused on its own; opening holds
+the world and taking applies, closes and resumes; every one of the 24 changes
+`world.up`; HOLLOWPOINT moves a bolt from 26 to 32.5; SWEEP damages something
+behind the turret where the barrel cannot reach; HARD CASING hurts what is
+holding on; INSULATION takes one attacker's tax from 0.78 to 0.89.
 
-Verify: an unattended game is never blocked; queued events survive; each axis
-offers only its own; a taken upgrade measurably changes the thing it names and
-survives to the boss.
+The buy menu is gone — salvage has no sink for now, deliberately.
 
 ## Phase 5 — the bargain, and tuning
 

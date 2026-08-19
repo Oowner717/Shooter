@@ -499,7 +499,6 @@ export const ABILITIES = [
     color: '#7cffb2',
     cooldown: 5,
     cap: 6, // charges it will hold
-    price: 110, // salvage for one more
     icon: ICON.fan,
     hint: 'FAN — 25 pellets in a tight cone.',
     run(world) {
@@ -530,7 +529,6 @@ export const ABILITIES = [
     color: '#ffd166',
     cooldown: 12,
     cap: 4, // charges it will hold
-    price: 260, // salvage for one more
     icon: ICON.lance,
     hint: 'LANCE — piercing beam, locked to the biggest threat.',
     run(world) {
@@ -582,7 +580,6 @@ export const ABILITIES = [
     color: '#c77dff',
     cooldown: 38,
     cap: 2, // charges it will hold
-    price: 820, // salvage for one more
     icon: ICON.well,
     hint: 'WELL — drags everything into a knot, then collapses.',
     run(world) {
@@ -598,7 +595,6 @@ export const ABILITIES = [
     color: '#ff9ff3',
     cooldown: 16,
     cap: 3, // charges it will hold
-    price: 350, // salvage for one more
     icon: ICON.prism,
     hint: 'PRISM — a shell that refracts. Wide blast, then beams every way.',
     run(world) {
@@ -628,7 +624,6 @@ export const ABILITIES = [
     color: '#9fe8ff',
     cooldown: 21,
     cap: 3, // charges it will hold
-    price: 460, // salvage for one more
     icon: ICON.stasis,
     hint: 'STASIS — objects freeze. Your shots do not.',
     run(world) {
@@ -649,7 +644,6 @@ export const ABILITIES = [
     color: '#9be7ff',
     cooldown: 24,
     cap: 2, // charges it will hold
-    price: 520, // salvage for one more
     icon: ICON.decoy,
     hint: 'DECOY — a turret that is not yours. They go for it instead.',
     run(world) {
@@ -672,7 +666,6 @@ export const ABILITIES = [
     color: '#ffd166',
     cooldown: 15,
     cap: 3, // charges it will hold
-    price: 330, // salvage for one more
     icon: ICON.siphon,
     hint: 'SIPHON — hauls the wreckage in and throws it back.',
     run(world) {
@@ -708,28 +701,31 @@ export class Abilities {
     }
   }
 
-  update(dt) {
+  update(dt, world) {
+    const extra = world ? world.up.cap : 0;
     for (const s of this.slots) {
       if (s.cd > 0) s.cd = Math.max(0, s.cd - dt);
       if (s.locked > 0) s.locked = Math.max(0, s.locked - dt);
-      if (s.def.free || s.charges >= s.def.cap) continue;
+      const cap = s.def.cap + extra;
+      if (s.def.free || s.charges >= cap) continue;
       // One charge back every `cooldown` seconds — the same pacing the button
       // always had, except that it keeps going once you have one.
       s.regenT += dt;
       const per = s.def.cooldown * CFG.charges.regen;
-      while (s.regenT >= per && s.charges < s.def.cap) {
+      while (s.regenT >= per && s.charges < cap) {
         s.regenT -= per;
         s.charges++;
       }
-      if (s.charges >= s.def.cap) s.regenT = 0;
+      if (s.charges >= cap) s.regenT = 0;
     }
   }
 
   /** @returns true if there was room and it went in. */
-  addCharge(i, n = 1) {
+  addCharge(i, n = 1, extra = 0) {
     const s = this.slots[i];
-    if (!s || s.def.free || s.charges >= s.def.cap) return false;
-    s.charges = Math.min(s.def.cap, s.charges + n);
+    const cap = s ? s.def.cap + extra : 0;
+    if (!s || s.def.free || s.charges >= cap) return false;
+    s.charges = Math.min(cap, s.charges + n);
     return true;
   }
 

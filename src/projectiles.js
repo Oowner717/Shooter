@@ -24,6 +24,7 @@ class Projectile {
     // Called at the point of impact (or on timeout) for rounds that go off.
     this.burst = opts.burst || null;
     this.chain = !!opts.chain; // ARC: jumps on from whatever it hits
+    this.jumps = opts.jumps ?? CFG.rounds.arc.jumps;
     // RECUR: how many more times this shot happens again after it lands,
     // and how long it waits at the impact point before it does.
     this.recur = opts.recur ?? 0;
@@ -110,8 +111,9 @@ export function updateProjectiles(world, dt) {
  * on again, drawing the link each time. Each link is a little weaker than the
  * last, so a long chain is worth setting up but never free.
  */
-function chainFrom(world, first, hx, hy) {
+function chainFrom(world, first, hx, hy, jumps) {
   const g = CFG.rounds.arc;
+  const links = jumps ?? g.jumps;
   const seen = new Set();
   if (first) seen.add(first);
   let x = hx;
@@ -119,7 +121,7 @@ function chainFrom(world, first, hx, hy) {
   let damage = g.jumpDamage;
   const r2 = g.jumpRange * g.jumpRange;
 
-  for (let jump = 0; jump < g.jumps; jump++) {
+  for (let jump = 0; jump < links; jump++) {
     let best = null;
     let bestD = r2;
     const scan = (list) => {
@@ -318,7 +320,7 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         for (let i = 0; i < 4; i++) spark(hx, hy, spread(220), spread(220), '#e0aaff', 0.22, 2.2);
         return;
       }
-      if (p.chain) chainFrom(world, e, hx, hy);
+      if (p.chain) chainFrom(world, e, hx, hy, p.jumps);
       if (p.recur > 0) recurFrom(world, p, hx, hy, dirx, diry, e);
       audio.hit();
       endProjectile(world, p, hx, hy, true);
@@ -357,7 +359,7 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       // tenth of a second later and again after that, which farmed ORDINAL for
       // twice a plain bolt off one shot. There is nothing behind it to reach,
       // which is exactly the matchup the round is bad at.
-      if (p.chain) chainFrom(world, null, hx, hy);
+      if (p.chain) chainFrom(world, null, hx, hy, p.jumps);
       endProjectile(world, p, hx, hy, true);
       return;
     }

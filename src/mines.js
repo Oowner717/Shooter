@@ -40,7 +40,7 @@ const TONE = {
 };
 
 class Mine {
-  constructor(kind, x0, y0, x1, y1) {
+  constructor(kind, x0, y0, x1, y1, world0) {
     const k = KIND[kind];
     this.kind = kind;
     this.x0 = x0;
@@ -52,7 +52,7 @@ class Mine {
     this.r = k.r;
     this.t = 0; // flight progress, 0..1
     this.settle = 0; // seconds since landing
-    this.life = k.life;
+    this.life = k.life * world0.up.mineLife;
     this.dead = false;
     this.spin = rand(0, TAU);
     this.hold = 0; // snare only: seconds of grip left once it has opened
@@ -105,7 +105,7 @@ const LAY_TONE = { blast: 300, snare: 240, wire: 380, knell: 200 };
 export function throwMine(world, kind = 'blast') {
   const s = world.shooter;
   const site = landingSite(world);
-  const m = new Mine(kind, s.x, s.y - 20, site.x, site.y);
+  const m = new Mine(kind, s.x, s.y - 20, site.x, site.y, world);
   if (kind === 'wire') {
     // The line is laid across the field, not along it, so it closes a lane
     // rather than sitting parallel to everything coming down. Kept inside the
@@ -302,7 +302,7 @@ export function updateMines(world, dt) {
       m.dead = true;
       for (let k = 0; k < 6; k++) spark(m.x, m.y, spread(50), spread(50), '#6d829a', 0.5, 1.4);
     } else if (m.armed && m.cfg.trigger) {
-      const reach = m.r + m.cfg.trigger;
+      const reach = m.r + m.cfg.trigger * world.up.mineTrigger;
       for (const e of world.enemies) {
         // Only things that could corrupt the feed can set a mine off.
         if (e.dead || e.harmless || e.staged) continue;
@@ -514,6 +514,6 @@ export function mineCadence(world, timer, dt) {
   const k = KIND[kind];
   const next = timer - dt;
   if (next > 0) return next;
-  if (countKind(world, kind) < k.max) throwMine(world, kind);
-  return k.interval * rand(0.85, 1.15);
+  if (countKind(world, kind) < k.max + world.up.mineMax) throwMine(world, kind);
+  return k.interval * world.up.mineRate * rand(0.85, 1.15);
 }

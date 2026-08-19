@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '30';
+export const BUILD = '31';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -124,6 +124,15 @@ export const CFG = {
     speed: [1180, 1600],
     damagePer: 21,
     minShots: 6, // it always finds something to throw
+  },
+
+  // ---- offers ----------------------------------------------------------
+  // Kills are the clock. Neither tier ever interrupts: they queue behind a
+  // button and wait as long as it takes, because the point of this game is
+  // that you can put it down.
+  events: {
+    small: 40, // kills between tempo offers — about twelve in a counted run
+    large: 125, // kills between permanent ones — four in a counted run
   },
 
   // ---- ability charges -------------------------------------------------

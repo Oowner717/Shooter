@@ -249,6 +249,33 @@ counter loses its denominator and just climbs, the phase reads FIELD, and the
 field keeps coming. The counted run is the tutorial for the game underneath it.
 Nothing carries over — salvage starts at zero every time.
 
+### Offers
+
+**Nothing in this game ever interrupts you.** Both kinds of offer queue behind a
+button that only exists while something is waiting, and opening it is what
+holds the world — a choice you made, not one made for you. An offer left
+untaken for eight hours is still there.
+
+- **ALLOCATION**, every 40 kills — about twelve in a counted run. Free tempo,
+  gone in a minute: every ability back to full, two charges of one thing, one
+  charge of everything, a hundred and fifty salvage, thirty seconds at double
+  the rate of fire, three mines laid where they lie.
+- **AMENDMENT**, every 125 kills — four in a counted run. Permanent for the
+  run, and it offers exactly one option from each of three axes, so a pick is
+  an identity rather than a number:
+  **AMMO** sharpens what you shoot, **FIELD** is what happens without you, and
+  **TURRET** is the machine itself.
+
+Twenty-four upgrades live in `src/upgrades.js`. Every one of them is a scalar on
+`world.up` read at the point of use — nothing in that file reaches into a
+subsystem — so adding one is a table entry and one place that reads it. The four
+that cannot sensibly stack are never offered twice.
+
+Two of them are worth calling out. **SWEEP** makes the turret clear behind
+itself every twenty seconds, which is the one place the barrel cannot reach —
+so the flank problem becomes something you buy your way out of. **REFLEX**
+makes PULSE answer a crowd on the turret without being asked.
+
 ### Salvage
 
 Every object leaves fragments, and a fragment is worth something from the

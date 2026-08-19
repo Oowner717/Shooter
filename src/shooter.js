@@ -137,12 +137,28 @@ export class Shooter {
     const a = this.aim + spread(0.012);
     const slow = world.chrono > 0 ? 0.42 : 1;
     const R = CFG.rounds;
+    const up = world.up;
+
+    // Every ammo upgrade lands here rather than inside each round, so a round
+    // stays a description of what it does and the upgrades stay scalars.
+    const shot = (angle, opts) => fire(world, this.muzzleX, this.muzzleY, angle, {
+      ...opts,
+      speed: (opts.speed || CFG.bolt.speed) * up.speed,
+      damage: (opts.damage ?? CFG.bolt.damage) * up.damage
+        * (world.autoSteering || world.autoFire ? up.overwatch : 1),
+      impulse: (opts.impulse ?? CFG.bolt.impulse) * up.impulse,
+      bounces: (opts.bounces ?? CFG.bolt.bounces) + up.bounces,
+    });
+
+    // SALVO: every Nth shot leaves as three.
+    this.salvoCount = (this.salvoCount || 0) + 1;
+    const fan = up.salvo && this.salvoCount % up.salvo === 0 ? [-0.09, 0, 0.09] : [0];
 
     if (world.round === 'shotgun') {
       const g = R.shotgun;
       for (let i = 0; i < g.pellets; i++) {
         const off = ((i / (g.pellets - 1)) - 0.5) * g.spread + spread(0.02);
-        fire(world, this.muzzleX, this.muzzleY, a + off, {
+        shot(a + off, {
           speed: rand(g.speed[0], g.speed[1]) * slow,
           r: 3.2,
           damage: g.damage,
@@ -155,7 +171,7 @@ export class Shooter {
       }
     } else if (world.round === 'explosive') {
       const g = R.explosive;
-      fire(world, this.muzzleX, this.muzzleY, a, {
+      for (const f of fan) shot(a + f, {
         speed: g.speed * slow,
         r: 5.6,
         damage: g.damage,
@@ -168,7 +184,7 @@ export class Shooter {
       });
     } else if (world.round === 'arc') {
       const g = R.arc;
-      fire(world, this.muzzleX, this.muzzleY, a, {
+      for (const f of fan) shot(a + f, {
         speed: g.speed * slow,
         r: 4.6,
         damage: g.damage,
@@ -178,10 +194,11 @@ export class Shooter {
         core: '#ffffff',
         trail: 0.038,
         chain: true,
+        jumps: R.arc.jumps + up.arcJumps,
       });
     } else if (world.round === 'recur') {
       const g = R.recur;
-      fire(world, this.muzzleX, this.muzzleY, a, {
+      for (const f of fan) shot(a + f, {
         speed: g.speed * slow,
         r: 4.4,
         damage: g.damage,
@@ -190,10 +207,10 @@ export class Shooter {
         color: '#c9b6ff',
         core: '#ffffff',
         trail: 0.05,
-        recur: g.repeats,
+        recur: g.repeats + up.recur,
       });
     } else {
-      fire(world, this.muzzleX, this.muzzleY, a, { speed: CFG.bolt.speed * slow });
+      for (const f of fan) shot(a + f, { speed: CFG.bolt.speed * slow });
     }
 
     this.recoil = 1;
@@ -457,8 +474,9 @@ function roundRectPath(ctx, x, y, w, h, r) {
 /** Explosive round detonation, shared by every HE shot. */
 function heBurst(world, x, y) {
   const b = CFG.rounds.explosive.blast;
-  applyBlast(world, { x, y, r: b.r, damage: b.damage, impulse: b.impulse });
-  ring(x, y, 4, b.r * 1.4, 0.26, '#ffb347', 3.4);
+  const r = b.r * world.up.blastR;
+  applyBlast(world, { x, y, r, damage: b.damage * world.up.damage, impulse: b.impulse });
+  ring(x, y, 4, r * 1.4, 0.26, '#ffb347', 3.4);
   for (let i = 0; i < 12; i++) {
     const a = rand(0, TAU);
     spark(x, y, Math.cos(a) * rand(150, 460), Math.sin(a) * rand(150, 460), '#ffd166', rand(0.16, 0.36), 2.4);

@@ -109,7 +109,6 @@ export class Menu {
    */
   buildArsenal() {
     const p = this.panel('arsenal', 'codex');
-    this.buildAbilityStock(p);
     for (const g of ARSENAL_GROUPS) {
       p.appendChild(heading(g.title, g.note));
       const grid = document.createElement('div');
@@ -126,37 +125,6 @@ export class Menu {
       }
       p.appendChild(grid);
     }
-  }
-
-  /**
-   * The one place in the sheet that does something rather than explains. It is
-   * not a second copy of a control — there is nowhere else to buy a charge —
-   * and it is here because it is the only screen with room for a price.
-   */
-  buildAbilityStock(p) {
-    p.appendChild(heading('ABILITIES', 'stocked, not timed'));
-    const grid = document.createElement('div');
-    grid.className = 'armGrid';
-    this.stock = [];
-    ABILITIES.forEach((def, i) => {
-      const row = document.createElement('div');
-      row.className = 'armRow stockRow';
-      row.style.setProperty('--tone', def.color);
-      row.innerHTML = `<div class="codexArt arm">${def.icon}</div>`
-        + `<div class="codexBody"><div class="codexName">${def.name}</div>`
-        + `<div class="codexLine">${def.hint.replace(/^[A-Z ]+ — /, '')}</div></div>`
-        + (def.free
-          ? '<div class="stockFree">ALWAYS</div>'
-          : `<button class="stockBuy"><b class="held">0/${def.cap}</b>`
-            + `<span class="price">+1 · ${def.price}</span></button>`);
-      const btn = row.querySelector('.stockBuy');
-      if (btn) {
-        btn.addEventListener('click', () => this.game.buyCharge(i));
-        this.stock.push({ i, def, btn, held: btn.querySelector('.held'), last: null, can: null });
-      }
-      grid.appendChild(row);
-    });
-    p.appendChild(grid);
   }
 
   // ------------------------------------------------------------------ codex
@@ -252,18 +220,6 @@ export class Menu {
 
   /** Called every frame; cheap because every write is diffed. */
   sync(world) {
-    for (const st of this.stock || []) {
-      const n = world.abilities.chargesOf(st.i);
-      if (st.last !== n) {
-        st.last = n;
-        st.held.textContent = `${n}/${st.def.cap}`;
-      }
-      const can = n < st.def.cap && world.salvage >= st.def.price;
-      if (st.can !== can) {
-        st.can = can;
-        st.btn.classList.toggle('can', can);
-      }
-    }
     for (const a of ARSENAL) {
       const on = a.kind === 'round' ? world.round === a.key
         : a.kind === 'mine' ? world.mine === a.key

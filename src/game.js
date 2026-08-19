@@ -16,6 +16,8 @@ import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator, ENDING } from './narrative.js';
 import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
 import { codex, cleared, markCleared, forgetCleared } from './codex.js';
+import { Offers } from './events.js';
+import { freshUpgrades } from './upgrades.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 
@@ -106,6 +108,10 @@ export class Game {
       mine: null, // the one kind of mine being laid, or none
 
       salvage: 0, // banked; nothing carries across a reset
+      up: freshUpgrades(), // what the large offers have granted, this run only
+      offers: new Offers(),
+      surge: 0, // seconds of doubled cadence, from a SURGE offer
+      pendingMines: 0, // laid on the next tick, from a SEED offer
       // Set once ORDINAL has been beaten. Every run after it is endless: no
       // five hundred, no lull, no boss, no ending. The counted run is the
       // tutorial for the game underneath it.
@@ -156,6 +162,13 @@ export class Game {
     w.nextStoryAt = CFG.storyEvery;
     w.counted = false;
     w.salvage = 0;
+    w.up = freshUpgrades();
+    w.offers.reset();
+    w.surge = 0;
+    w.pendingMines = 0;
+    this.sweepTimer = 0;
+    this.shrugTimer = 0;
+    this.hud.setPending(0, null);
     w.endless = cleared();
     this.lullTimer = 0;
     this.openingLine = 0;
@@ -231,7 +244,7 @@ export class Game {
 
   /** The simulation holds while the menu is open, so a change costs nothing. */
   get paused() {
-    return !!(this.hud && this.hud.menu && this.hud.menu.open);
+    return !!this.offerOpen || !!(this.hud && this.hud.menu && this.hud.menu.open);
   }
 
   // -------------------------------------------------------------- layout
@@ -387,26 +400,29 @@ export class Game {
     recur: 'RECUR ROUNDS — the shot happens again, further down the same line.',
   };
 
-  /**
-   * One more charge, paid for out of salvage. The only sink there is until the
-   * large events land, so it is deliberately affordable.
-   * @returns true if it went through.
-   */
-  buyCharge(i) {
-    const w = this.world;
-    const slot = w.abilities.slots[i];
-    if (!slot || slot.def.free) return false;
-    const price = slot.def.price;
-    if (w.salvage < price || slot.charges >= slot.def.cap) {
-      audio.chime(200);
-      return false;
-    }
-    w.salvage -= price;
-    w.abilities.addCharge(i);
-    this.hud.syncAbilities(w.abilities);
-    this.hud.setSalvage(w.salvage);
-    audio.chime(880);
+  /** Opens whatever is at the front of the queue. Holds the world while it is up. */
+  openOffer() {
+    if (!this.world.offers.pending) return false;
+    this.offerOpen = true;
+    this.hud.showOffer(this.world.offers.next);
     return true;
+  }
+
+  closeOffer() {
+    this.offerOpen = false;
+    this.hud.hideOffer();
+  }
+
+  takeOffer(index) {
+    const w = this.world;
+    const opt = w.offers.take(w, index);
+    this.closeOffer();
+    if (opt) {
+      audio.chime(920);
+      background.surge(1.2);
+      this.hud.syncAbilities(w.abilities);
+    }
+    return opt;
   }
 
   toggleAuto(key) {
@@ -518,10 +534,14 @@ export class Game {
     let interval = 0;
     if (s.gripHeld) interval = CFG.shooter.gripFireInterval;
     else if (dragging) interval = CFG.shooter.holdFireInterval;
-    else if (w.autoFire || target) interval = CFG.shooter.autoFireInterval;
+    else if (w.autoFire || target) {
+      // HANDS OFF removes the penalty auto fire pays for not being your hand.
+      interval = w.up.handsOff ? CFG.shooter.gripFireInterval : CFG.shooter.autoFireInterval;
+    }
     if (interval <= 0) return;
     // heavier rounds buy their effect with cadence
-    interval *= CFG.rounds[w.round].rate;
+    interval *= CFG.rounds[w.round].rate * w.up.rate;
+    if (w.surge > 0) interval *= 0.5;
 
     // Auto aim waits until the barrel has actually come round. Auto fire does
     // not — that toggle means "shoot wherever this is pointed", including
@@ -589,7 +609,7 @@ export class Game {
 
     this.updateFiring(dt);
 
-    w.abilities.update(dt);
+    w.abilities.update(dt, w);
     w.shooter.update(w, dt);
     w.narrator.update(dt);
     background.update(dt);
@@ -628,6 +648,12 @@ export class Game {
     updateProjectiles(w, dt);
     this.mineTimer = mineCadence(w, this.mineTimer, dt);
     collectSalvage(w, dt);
+    this.runUpgrades(dt);
+    if (w.surge > 0) w.surge = Math.max(0, w.surge - dt);
+    while (w.pendingMines > 0) {
+      w.pendingMines--;
+      if (w.mine) throwMine(w, w.mine);
+    }
     updateMines(w, dt);
     this.resolveBlasts();
     this.checkContact();
@@ -705,6 +731,52 @@ export class Game {
     }
   }
 
+  /**
+   * The upgrades that are not a scalar somebody else reads: the ones that do
+   * something on a clock. All of them are off until an offer turns them on.
+   */
+  runUpgrades(dt) {
+    const w = this.world;
+    const up = w.up;
+    const s = w.shooter;
+
+    // HARD CASING: whatever is holding the turret pays for it.
+    if (up.casing > 0) {
+      for (const e of w.attackers) {
+        if (!e.dead) e.applyDamage(w, up.casing * dt);
+      }
+    }
+
+    // SWEEP: the barrel cannot reach behind the turret, so the turret does it
+    // itself. This is the upgrade that turns a chore into something you bought.
+    if (up.sweep > 0) {
+      this.sweepTimer -= dt;
+      if (this.sweepTimer <= 0) {
+        this.sweepTimer = up.sweep;
+        applyBlast(w, { x: s.x, y: s.y, r: 260, damage: 90, impulse: 780 });
+        ring(s.x, s.y, 20, 300, 0.4, '#7cffb2', 4);
+      }
+    }
+
+    // SHRUG: the same idea, without the damage — it just gets them off.
+    if (up.shrug > 0) {
+      this.shrugTimer -= dt;
+      if (this.shrugTimer <= 0) {
+        this.shrugTimer = up.shrug;
+        if (w.attackers.size) {
+          applyBlast(w, { x: s.x, y: s.y, r: 200, damage: 0, impulse: 1200 });
+          ring(s.x, s.y, 14, 220, 0.3, '#59e0ff', 3);
+        }
+      }
+    }
+
+    // REFLEX: PULSE answers a crowd on the turret without being asked.
+    if (up.reflex && w.attackers.size >= 2) {
+      const i = w.abilities.slots.findIndex((x) => x.def.free);
+      if (i >= 0 && w.abilities.usable(i, w)) this.useAbility(i);
+    }
+  }
+
   resolveBlasts() {
     const w = this.world;
     while (w.pendingBlasts.length) {
@@ -759,6 +831,7 @@ export class Game {
   registerKill() {
     const w = this.world;
     w.kills++;
+    w.offers.note(w);
     // Story beats belong to the staging run only. ORDINAL's own emissions push
     // the count well past five hundred, and a sentence in the mid-field band is
     // exactly the text that has no business being there.
@@ -918,6 +991,7 @@ export class Game {
     if (w.boss) this.hud.setLedger(w.ledger, CFG.killGoal);
     else this.hud.setKills(w.kills, !w.endless && w.phase === 'staging' ? CFG.killGoal : null);
     this.hud.setSalvage(w.salvage, intakeRate(w));
+    this.hud.setPending(w.offers.pending, w.offers.next);
     this.hud.syncAbilities(w.abilities);
     this.hud.syncLoadout(w);
     this.hud.menu.sync(w);

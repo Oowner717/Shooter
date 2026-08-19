@@ -31,6 +31,14 @@ export class Hud {
       salvage: $('salvageNum'),
       salvageChip: $('salvageChip'),
       phaseTagEl: $('phaseTag'),
+      pendingBtn: $('pendingBtn'),
+      pendingLabel: $('pendingLabel'),
+      pendingCount: $('pendingCount'),
+      offer: $('offer'),
+      offerScrim: $('offerScrim'),
+      offerCards: $('offerCards'),
+      offerKicker: $('offerKicker'),
+      offerNote: $('offerNote'),
       counterLabel: document.querySelector('#counter em'),
       bossCaption: $('bossCaption'),
       abilities: $('abilities'),
@@ -75,6 +83,9 @@ export class Hud {
     // the page is running a cached build.
     const foot = document.querySelector('.bootFoot');
     if (foot) foot.textContent = `${foot.textContent}  ·  BUILD ${BUILD}`;
+
+    this.el.pendingBtn.addEventListener('click', () => game.openOffer());
+    this.el.offerScrim.addEventListener('click', () => game.closeOffer());
 
     this.el.startBtn.addEventListener('click', () => game.start());
     this.el.resetBtn.addEventListener('click', () => game.restart());
@@ -210,6 +221,56 @@ export class Hud {
         }
       }
     }
+  }
+
+  /**
+   * The waiting button. It is only ever there when something is actually
+   * waiting, so it never competes with the field, and it says which tier is at
+   * the front of the queue because a permanent one deserves to be noticed.
+   */
+  setPending(n, next) {
+    const kind = next ? next.tier : '';
+    if (n === this.lastPending && kind === this.lastPendingKind) return;
+    this.lastPending = n;
+    this.lastPendingKind = kind;
+    this.el.pendingBtn.hidden = n <= 0;
+    this.el.pendingCount.textContent = n;
+    this.el.pendingCount.hidden = n < 2;
+    this.el.pendingLabel.textContent = kind === 'large' ? 'AMENDMENT' : 'ALLOCATION';
+    this.el.pendingBtn.classList.toggle('large', kind === 'large');
+  }
+
+  showOffer(offer) {
+    if (!offer) return;
+    const large = offer.tier === 'large';
+    this.el.offerKicker.textContent = large ? 'PERFORMANCE NOTED' : 'ALLOCATION AVAILABLE';
+    this.el.offerNote.textContent = large ? 'permanent · select one' : 'select one';
+    this.el.offer.classList.toggle('large', large);
+    this.el.offerCards.innerHTML = '';
+    offer.options.forEach((opt, i) => {
+      const b = document.createElement('button');
+      b.className = 'offerCard';
+      b.innerHTML = (large ? `<span class="offerAxis">${opt.axis}</span>` : '')
+        + `<span class="offerName">${opt.name}</span>`
+        + `<span class="offerLine">${opt.line}</span>`;
+      b.addEventListener('click', () => this.game.takeOffer(i));
+      this.el.offerCards.appendChild(b);
+    });
+    this.el.offer.hidden = false;
+    this.el.offerScrim.hidden = false;
+    // one frame, so the transition has something to run from
+    void this.el.offer.offsetWidth;
+    this.el.offer.classList.add('open');
+    this.el.offerScrim.classList.add('on');
+    document.body.classList.add('offerOpen');
+  }
+
+  hideOffer() {
+    this.el.offer.classList.remove('open');
+    this.el.offerScrim.classList.remove('on');
+    this.el.offer.hidden = true;
+    this.el.offerScrim.hidden = true;
+    document.body.classList.remove('offerOpen');
   }
 
   /** @param tutorial the opening script, which sits lower and reads larger. */

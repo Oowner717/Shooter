@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '30';
+  var BUILD = '31';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -92,6 +92,23 @@
 
     <div id="alerts"></div>
     <div id="bossCaption"></div>
+
+    <!-- ============ OFFERS ============ -->
+    <!-- Nothing here ever interrupts. The button appears when something is
+         waiting and waits as long as it takes; opening it is what holds the
+         world, and that is a choice the player made. -->
+    <button id="pendingBtn" hidden>
+      <span id="pendingLabel">EVALUATION</span><b id="pendingCount">1</b>
+    </button>
+
+    <div id="offerScrim" hidden></div>
+    <section id="offer" hidden aria-label="Offer">
+      <header class="offerHead">
+        <span id="offerKicker">PERFORMANCE NOTED</span>
+        <em id="offerNote">select one</em>
+      </header>
+      <div id="offerCards"></div>
+    </section>
 
     <!-- ============ THE STRIP ============ -->
     <!-- Mines, the two that run on their own, then ammunition. Built from
