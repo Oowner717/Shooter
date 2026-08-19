@@ -8,8 +8,15 @@ import { BUILD } from './config.js';
 import { clamp } from './util.js';
 import { Menu } from './menu.js';
 import { holdFor, STACK } from './tutorial.js';
+import { SLOTS, carried, freeSlot } from './loadout.js';
 
 const $ = (id) => document.getElementById(id);
+
+/** Sliders. The one shape that reads as "choose what goes here" at 14px. */
+const CONFIG_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+  + ' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+  + '<path d="M4 7h6M14 7h6M4 17h10M18 17h2"/>'
+  + '<circle cx="12" cy="7" r="2.1"/><circle cx="16" cy="17" r="2.1"/></svg>';
 
 /** Rounds that are not the default. Mutually exclusive with each other. */
 export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'recur'];
@@ -39,6 +46,12 @@ export class Hud {
       offer: $('offer'),
       offerScrim: $('offerScrim'),
       offerCards: $('offerCards'),
+      loadout: $('loadout'),
+      loadScrim: $('loadScrim'),
+      loadTitle: $('loadTitle'),
+      loadNote: $('loadNote'),
+      loadSlots: $('loadSlots'),
+      loadList: $('loadList'),
       offerKicker: $('offerKicker'),
       offerNote: $('offerNote'),
       counterLabel: document.querySelector('#counter em'),
@@ -87,6 +100,8 @@ export class Hud {
     const foot = document.querySelector('.bootFoot');
     if (foot) foot.textContent = `${foot.textContent}  ·  BUILD ${BUILD}`;
 
+    this.el.loadScrim.addEventListener('click', () => game.closeLoadout());
+    $('loadClose').addEventListener('click', () => game.closeLoadout());
     this.el.pendingBtn.addEventListener('click', () => game.openOffer());
     this.el.offerScrim.addEventListener('click', () => game.closeOffer());
 
@@ -104,47 +119,189 @@ export class Hud {
    * pauses or takes the shot the turret would otherwise have fired.
    */
   buildStrip() {
+    const w = this.game.world;
     this.strip = [];
     this.el.toggles = {};
-    // Three groups: mines stacked at the left edge, the two that run on their
-    // own side by side in the middle where the thumb rests, ammunition stacked
+    this.el.quickBar.innerHTML = '';
+
+    // Five bands: the mines stacked at the left edge, a button to choose which
+    // mines those are, the two that run on their own in the middle where the
+    // thumb rests, the same button for ammunition, and the ammunition stacked
     // at the right edge. The stacks grow upward from the floor line, along the
     // edges, clear of the turret and the lever's arc in the centre.
-    const groups = {};
-    for (const g of ['mines', 'auto', 'ammo']) {
+    const band = (cls) => {
       const d = document.createElement('div');
-      d.className = `qGroup q_${g}`;
-      groups[g] = d;
+      d.className = cls;
       this.el.quickBar.appendChild(d);
+      return d;
+    };
+    const mines = band('qGroup q_mines');
+    const cfgMines = band('qGroup q_cfg');
+    const auto = band('qGroup q_auto');
+    const cfgAmmo = band('qGroup q_cfg');
+    const ammo = band('qGroup q_ammo');
+
+    // Stacks read bottom-up on screen, so slot 0 is the bottom cell.
+    this.fillStack(mines, w, 'mines');
+    this.fillStack(ammo, w, 'ammo');
+    cfgMines.appendChild(this.configButton('mines'));
+    cfgAmmo.appendChild(this.configButton('ammo'));
+    for (const a of ARSENAL.filter((x) => x.group === 'auto')) {
+      auto.appendChild(this.cell(a));
     }
-    for (const a of ARSENAL) {
+  }
+
+  /** One stack of slots, filled from the loadout and padded with empties. */
+  fillStack(host, world, group) {
+    const keys = world.loadout[group];
+    // Column-reverse would put slot 0 at the bottom without this, but it also
+    // reverses the tab order; laying them out backwards keeps both honest.
+    for (let i = keys.length - 1; i >= 0; i--) {
+      const key = keys[i];
+      const a = key && ARSENAL.find((x) => x.key === key);
+      host.appendChild(a ? this.cell(a) : this.emptySlot(group, i));
+    }
+  }
+
+  /** A cell carrying something. */
+  cell(a) {
+    const b = document.createElement('button');
+    // Kept as the id the rest of the interface has always used, so a control
+    // is still found by name wherever it is looked up — and it follows the
+    // thing rather than the slot, so it survives being moved.
+    b.id = `tg${a.key[0].toUpperCase()}${a.key.slice(1)}`;
+    b.className = `qc${a.wide ? ' wide' : ''}${a.run ? ' run' : ''}`;
+    if (a.tone) b.style.setProperty('--tone', a.tone);
+    b.setAttribute('aria-pressed', 'false');
+    b.setAttribute('aria-label', a.label);
+    b.dataset.key = a.key;
+    b.innerHTML = `${a.icon}<span class="qLbl">${a.label}</span>`;
+    b.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.pick(a);
+    });
+    b.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    // pointerdown alone is right for a thumb and wrong for everything else.
+    b.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      this.pick(a);
+    });
+    this.strip.push({ key: a.key, kind: a.kind, el: b, on: null });
+    this.el.toggles[a.key] = b;
+    return b;
+  }
+
+  /**
+   * A cell with nothing in it. It opens the same screen the button beside the
+   * stack does, because an empty cell is a question and that screen is the
+   * answer — and it is drawn as an outline rather than a button so the stack
+   * still reads as four things long.
+   */
+  emptySlot(group, i) {
+    const b = document.createElement('button');
+    b.className = 'qc empty';
+    b.setAttribute('aria-label', `Empty ${group === 'mines' ? 'mine' : 'ammunition'} slot`);
+    b.innerHTML = '<span class="qLbl">—</span>';
+    b.dataset.slot = String(i);
+    b.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.game.openLoadout(group);
+    });
+    b.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    return b;
+  }
+
+  configButton(group) {
+    const b = document.createElement('button');
+    b.className = `qc wide cfg q_cfg_${group}`;
+    b.id = group === 'mines' ? 'cfgMines' : 'cfgAmmo';
+    b.setAttribute('aria-label', group === 'mines' ? 'Configure mines' : 'Configure ammunition');
+    b.innerHTML = `${CONFIG_ICON}<span class="qLbl">${group === 'mines' ? 'MINES' : 'AMMO'}</span>`;
+    b.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.game.openLoadout(group);
+    });
+    b.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    return b;
+  }
+
+
+  // -------------------------------------------------------------- loadout
+
+  /**
+   * The screen behind the two buttons on the strip. It is the only place the
+   * whole arsenal is visible at once, so it shows what is locked as well as
+   * what is owned — a stack of four with two things in it should say what the
+   * other two could be.
+   */
+  showLoadout(world, group) {
+    this.loadGroup = group;
+    this.el.loadTitle.textContent = group === 'mines' ? 'MINES' : 'AMMUNITION';
+    this.el.loadNote.textContent = `choose what sits on the strip · ${SLOTS[group]} slots`;
+    // Un-hidden first: syncLoadoutSheet does nothing while the sheet is down,
+    // so filling it before showing it filled nothing at all.
+    this.el.loadout.hidden = false;
+    this.el.loadScrim.hidden = false;
+    this.syncLoadoutSheet(world);
+    void this.el.loadout.offsetWidth;
+    this.el.loadout.classList.add('open');
+    this.el.loadScrim.classList.add('on');
+    document.body.classList.add('loadoutOpen');
+  }
+
+  hideLoadout() {
+    this.el.loadout.classList.remove('open');
+    this.el.loadScrim.classList.remove('on');
+    this.el.loadout.hidden = true;
+    this.el.loadScrim.hidden = true;
+    document.body.classList.remove('loadoutOpen');
+  }
+
+  syncLoadoutSheet(world) {
+    const group = this.loadGroup;
+    if (!group || this.el.loadout.hidden) return;
+    const keys = world.loadout[group];
+
+    // The slots, in the order they appear on the strip: bottom cell first.
+    this.el.loadSlots.innerHTML = '';
+    for (const key of keys) {
+      const a = key && ARSENAL.find((x) => x.key === key);
+      const d = document.createElement('div');
+      d.className = `loadSlot${a ? '' : ' empty'}`;
+      if (a && a.tone) d.style.setProperty('--tone', a.tone);
+      d.innerHTML = a
+        ? `${a.icon}<span>${a.label}</span>`
+        : '<span class="loadEmpty">EMPTY</span>';
+      this.el.loadSlots.appendChild(d);
+    }
+
+    // And everything of that kind, owned or not.
+    const full = freeSlot(world.loadout, group) < 0;
+    const lastAmmo = group === 'ammo' && keys.filter(Boolean).length <= 1;
+    this.el.loadList.innerHTML = '';
+    for (const a of ARSENAL.filter((x) => x.group === group)) {
+      const owned = world.unlocked.has(a.key);
+      const on = carried(world.loadout, a.key);
+      const stuck = on ? (lastAmmo && group === 'ammo') : full;
       const b = document.createElement('button');
-      // Kept as the id the rest of the interface has always used, so a toggle
-      // is still found by name wherever it is looked up.
-      b.id = `tg${a.key[0].toUpperCase()}${a.key.slice(1)}`;
-      b.className = `qc${a.wide ? ' wide' : ''}${a.run ? ' run' : ''}`;
+      b.className = `loadRow${owned ? '' : ' sealed'}${on ? ' on' : ''}${owned && stuck ? ' stuck' : ''}`;
+      b.id = `ld${a.key[0].toUpperCase()}${a.key.slice(1)}`;
       if (a.tone) b.style.setProperty('--tone', a.tone);
-      b.setAttribute('aria-pressed', 'false');
-      b.setAttribute('aria-label', a.label);
-      b.innerHTML = `${a.icon}<span class="qLbl">${a.label}</span>`;
-      b.addEventListener('pointerdown', (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        this.pick(a);
-      });
-      b.dataset.key = a.key;
-      b.addEventListener('contextmenu', (ev) => ev.preventDefault());
-      // pointerdown alone is right for a thumb and wrong for everything else.
-      // These cells were menu buttons until this build and answered a keyboard;
-      // there is no click listener, so this cannot double-fire on a tap.
-      b.addEventListener('keydown', (ev) => {
-        if (ev.key !== 'Enter' && ev.key !== ' ') return;
-        ev.preventDefault();
-        this.pick(a);
-      });
-      groups[a.group].appendChild(b);
-      this.strip.push({ key: a.key, kind: a.kind, el: b, on: null });
-      this.el.toggles[a.key] = b;
+      b.disabled = !owned;
+      b.innerHTML = `<span class="loadArt">${a.icon}</span>`
+        + `<span class="loadBody"><span class="loadName">${a.label}</span>`
+        + `<span class="loadLine">${owned ? a.line : 'Not yet unlocked.'}</span></span>`
+        + `<span class="loadState">${on ? 'ON STRIP' : owned ? (full ? 'NO SLOT' : 'ADD') : 'LOCKED'}</span>`;
+      if (owned) {
+        b.addEventListener('click', () => {
+          if (!this.game.toggleCarry(a.key)) this.refuse(b);
+        });
+      }
+      this.el.loadList.appendChild(b);
     }
   }
 

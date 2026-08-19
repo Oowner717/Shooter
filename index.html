@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '44';
+  var BUILD = '45';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -108,6 +108,21 @@
          at the edge of the screen so it collides with nothing, and it is inert
          to the touch. -->
     <div id="amendFlash" hidden></div>
+
+    <!-- ============ LOADOUT ============ -->
+    <!-- Which of the owned rounds and mines are on the strip. The strip has a
+         fixed number of cells and the arsenal does not, so the two stopped
+         being the same list. -->
+    <div id="loadScrim" hidden></div>
+    <section id="loadout" hidden aria-label="Loadout">
+      <header class="loadHead">
+        <span id="loadTitle">AMMUNITION</span>
+        <em id="loadNote">choose what sits on the strip</em>
+        <button id="loadClose" aria-label="Close">&#10005;</button>
+      </header>
+      <div id="loadSlots"></div>
+      <div id="loadList"></div>
+    </section>
 
     <div id="offerScrim" hidden></div>
     <section id="offer" hidden aria-label="Offer">

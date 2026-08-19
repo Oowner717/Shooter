@@ -19,6 +19,7 @@ import { codex, cleared, markCleared, forgetCleared, taught, markTaught, forgetT
 import { Offers } from './events.js';
 import { freshUpgrades } from './upgrades.js';
 import { SCRIPT, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 
@@ -122,6 +123,10 @@ export class Game {
       // ability button is on screen from the start; only what is in here can
       // actually be pressed. Full on any run after the opening.
       unlocked: new Set(),
+      // ...and the handful of it that is actually on the strip. Owning a round
+      // and having it under your thumb are two different things once there are
+      // more rounds than cells.
+      loadout: freshLoadout(),
       round: 'standard', // standard | explosive | shotgun
       mines: [],
       decoy: null, // the DECOY ability's stand-in turret, while one is up
@@ -142,6 +147,7 @@ export class Game {
       bossCaption: (text, hold) => self.hud.bossCaption(text, hold),
       abilityTaken: (i) => self.hud.flashTaken(i),
       announceOffer: (tier) => self.announceOffer(tier),
+      carry: (key) => self.carry(key),
       onBossDead: () => self.onBossDead(),
     };
   }
@@ -177,6 +183,7 @@ export class Game {
     this.sweepTimer = 0;
     this.shrugTimer = 0;
     this.hud.setPending(0, null);
+    this.loadoutOpen = null;
     w.endless = cleared();
     this.lullTimer = 0;
     this.scriptStep = 0;
@@ -193,6 +200,11 @@ export class Game {
     // mines, the two that run on their own and seven of the eight abilities —
     // is bought from the permanent tier, and nothing carries over.
     w.unlocked = new Set(STARTING);
+    // Issued kit goes straight onto the strip; there is room for all of it at
+    // the start, and an empty stack on the first frame would be a puzzle.
+    w.loadout = freshLoadout();
+    for (const k of STARTING) place(w.loadout, k);
+    if (this.hud) this.hud.buildStrip();
     w.phase = 'staging';
 
     // A reset is a fresh session: the strip goes back to standard rounds and
@@ -265,7 +277,8 @@ export class Game {
 
   /** The simulation holds while the menu is open, so a change costs nothing. */
   get paused() {
-    return !!this.offerOpen || !!(this.hud && this.hud.menu && this.hud.menu.open);
+    return !!this.offerOpen || !!this.loadoutOpen
+      || !!(this.hud && this.hud.menu && this.hud.menu.open);
   }
 
   // -------------------------------------------------------------- layout
@@ -421,6 +434,53 @@ export class Game {
     shake(1.8);
     this.hud.alert('PERMANENT UPGRADE', 'power', 5.5);
     this.hud.announceAmendment();
+  }
+
+  /**
+   * A round or a mine that has just been bought goes straight onto the strip
+   * if there is a free cell for it, because the alternative is buying a thing
+   * and watching nothing happen. If both its cells are full it stays owned and
+   * off the strip: which four mines are under the thumb is a decision, and
+   * this is not the moment to make it for the player.
+   * @returns the slot it took, or -1 if it is waiting in the loadout screen.
+   */
+  carry(key) {
+    const w = this.world;
+    if (!groupOf(key)) return -1;
+    const i = place(w.loadout, key);
+    if (i >= 0) this.hud.buildStrip();
+    return i;
+  }
+
+  /** Put one on the strip or take it off, from the loadout screen. */
+  toggleCarry(key) {
+    const w = this.world;
+    const g = groupOf(key);
+    if (!g || !w.unlocked.has(key)) return false;
+    if (carried(w.loadout, key)) {
+      // The turret has to keep something to shoot with.
+      if (g === 'ammo' && w.loadout.ammo.filter(Boolean).length <= 1) return false;
+      drop(w.loadout, key);
+      if (w.round === key) this.toggleRound(w.loadout.ammo.find(Boolean));
+      if (w.mine === key) w.mine = null;
+    } else {
+      if (freeSlot(w.loadout, g) < 0) return false;
+      place(w.loadout, key);
+    }
+    this.hud.buildStrip();
+    this.hud.syncLoadoutSheet(w);
+    audio.chime(carried(w.loadout, key) ? 760 : 430);
+    return true;
+  }
+
+  openLoadout(group) {
+    this.loadoutOpen = group;
+    this.hud.showLoadout(this.world, group);
+  }
+
+  closeLoadout() {
+    this.loadoutOpen = null;
+    this.hud.hideLoadout();
   }
 
   /** Opens whatever is at the front of the queue. Holds the world while it is up. */
@@ -1474,9 +1534,15 @@ export class Game {
    * things yet.
    */
   debugUnlockAll() {
-    for (const k of ALL_KEYS) this.world.unlocked.add(k);
+    const w = this.world;
+    for (const k of ALL_KEYS) w.unlocked.add(k);
+    // Owning is not carrying. Granting the arsenal without putting any of it
+    // on the strip left every cell empty, which is a state the offers can
+    // reach too but is never what this button means.
+    for (const k of ALL_KEYS) place(w.loadout, k);
+    this.hud.buildStrip();
     this.hud.syncSeals();
-    this.hud.syncAbilities(this.world.abilities);
+    this.hud.syncAbilities(w.abilities);
   }
 
   /** The same, plus the opening marked as seen. What the tests drive. */

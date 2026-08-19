@@ -87,7 +87,36 @@ clipped, both stacks fully on screen and clear of the ability bar, and neither
 reaching into the turret's column.
 
 The whole thing is built from `ARSENAL` in `src/arsenal.js`. A new round or
-mine is a table entry and no markup — it lands in its group's stack.
+mine is a table entry and no markup.
+
+### The loadout
+
+**The strip shows what you are carrying, not what you own.** Those were the
+same list while there were exactly as many rounds as there were cells, and they
+stop being the same list the moment there is a sixth round — so they are
+separated: `world.unlocked` is everything bought, and `world.loadout` in
+`src/loadout.js` is the handful of it the strip actually shows. Four mine cells
+and five ammunition cells, and **that count is fixed**: it is how many fit in
+the band between the lever's grip and the ability bar, and that band does not
+grow because the arsenal did.
+
+Two buttons sit between the stacks and the two that run on their own — one
+beside each stack — and open the loadout screen for that kind. It lists every
+round or every mine: the ones you own are rows you can tap on and off the
+strip, and the ones you do not are greyed and hatched in the same language the
+rest of the interface uses for locked things, so a stack with two things in it
+says what the other two could be. The slots themselves are drawn across the top
+of the sheet in strip order. An empty cell on the strip opens the same screen,
+because an empty cell is a question and that screen is the answer.
+
+**A newly bought round or mine takes a free cell by itself** — buying a thing
+and watching nothing happen is not a reward. **If both its cells are full it
+stays owned and off the strip**, because which four mines are under your thumb
+is a decision and that is not the moment to make it for you; it waits in the
+loadout screen with NO SLOT against it until you take something off.
+
+Two rules keep the state sane: the turret always keeps at least one round, and
+taking the loaded round off the strip moves it to whatever is left.
 
 ### The menu
 

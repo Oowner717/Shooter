@@ -156,7 +156,12 @@ export const UNLOCKS = Object.values(LOCKABLE).flat().map((key) => ({
   // paragraph and not two lines.
   line: (FIRST_USE[key] || '').replace(/^[A-Z ]+\. /, '').replace(/\s+/g, ' '),
   icon: armIcon(key),
-  apply: (up, world) => { world.unlocked.add(key); },
+  apply: (up, world) => {
+    world.unlocked.add(key);
+    // A round or a mine goes onto the strip if there is a free cell for it.
+    // The game does the placing, because it also has to rebuild the strip.
+    if (world.carry) world.carry(key);
+  },
 }));
 
 /**
