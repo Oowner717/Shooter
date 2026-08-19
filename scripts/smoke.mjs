@@ -48,6 +48,11 @@ await page.evaluate(() => {
 });
 await sleep(1200);
 
+// The opening hands the controls over one at a time over the first sixty
+// objects. The walk-through is not what this is testing, so take all of it.
+await page.evaluate(() => window.__sim.debugTeachAll());
+await sleep(120);
+
 // tap around the play field
 const vp = page.viewportSize();
 for (let i = 0; i < 25; i++) {

@@ -15,9 +15,10 @@ import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator, ENDING } from './narrative.js';
 import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
-import { codex, cleared, markCleared, forgetCleared } from './codex.js';
+import { codex, cleared, markCleared, forgetCleared, taught, markTaught, forgetTaught } from './codex.js';
 import { Offers } from './events.js';
 import { freshUpgrades } from './upgrades.js';
+import { INTRO, TUTORIAL, OUTRO, ALL_KEYS } from './tutorial.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 
@@ -117,6 +118,10 @@ export class Game {
       // five hundred, no lull, no boss, no ending. The counted run is the
       // tutorial for the game underneath it.
       endless: false,
+      // What the first run has handed over so far. Every strip cell and every
+      // ability button is on screen from the start; only what is in here can
+      // actually be pressed. Full on any run after the opening.
+      unlocked: new Set(),
       round: 'standard', // standard | explosive | shotgun
       mines: [],
       decoy: null, // the DECOY ability's stand-in turret, while one is up
@@ -174,6 +179,11 @@ export class Game {
     w.endless = cleared();
     this.lullTimer = 0;
     this.openingLine = 0;
+    this.tutorialStep = 0;
+    this.outroSaid = false;
+    // The opening runs once, ever. A cleared save is past it by definition.
+    this.teaching = !taught() && !cleared();
+    w.unlocked = new Set(this.teaching ? [] : ALL_KEYS);
     w.phase = 'staging';
 
     // A reset is a fresh session: the strip goes back to standard rounds and
@@ -361,7 +371,8 @@ export class Game {
 
     window.addEventListener('keydown', (ev) => {
       const n = parseInt(ev.key, 10);
-      if (n >= 1 && n <= 5) this.useAbility(n - 1);
+      // Sealed buttons are refused at every entry point, keyboard included.
+      if (n >= 1 && n <= 5 && !this.abilitySealed(n - 1)) this.useAbility(n - 1);
       if (ev.key === ' ') this.world.shooter.shoot(this.world);
     });
   }
@@ -375,18 +386,10 @@ export class Game {
     if (res.first && this.hintsAllowed) this.hud.showHint(res.slot.def.hint);
   }
 
-  /**
-   * The opening. The field is empty for CFG.openingGrace seconds — long
-   * enough to say four things at reading pace and have the player try each one
-   * before there is anything to react to. Times are seconds from the start of
-   * the run; the last line is still up when the first object comes down.
-   */
-  static OPENING = [
-    [1.2, 'Swing the grip under the turret.\nThe barrel goes the other way.'],
-    [4.8, 'Or tap ahead of the turret\nand it shoots there.'],
-    [8.4, 'Rounds on the right. Mines on the left.\nAbilities along the bottom.'],
-    [12.0, 'Five hundred objects are coming down.\nNone of them is the point.'],
-  ];
+  // The opening lines live in tutorial.js with the rest of the script. The
+  // field is empty for CFG.openingGrace seconds while they run — long enough
+  // to say four things at reading pace and try each one before there is
+  // anything to react to.
 
   static HINTS = {
     standard: 'BOLT — nothing done to it, and the fastest cadence there is.',
@@ -592,10 +595,11 @@ export class Game {
     w.time += dt;
 
     // The opening script. Runs off the world clock so it holds with the menu.
-    while (w.phase === 'staging'
-      && this.openingLine < Game.OPENING.length
-      && w.time >= Game.OPENING[this.openingLine][0]) {
-      this.hud.showHint(Game.OPENING[this.openingLine][1], true);
+    while (this.teaching
+      && w.phase === 'staging'
+      && this.openingLine < INTRO.length
+      && w.time >= INTRO[this.openingLine][0]) {
+      this.hud.showHint(INTRO[this.openingLine][1], true);
       this.openingLine++;
     }
 
@@ -834,10 +838,49 @@ export class Game {
     if (codex.record(id)) this.hud.noteCodex();
   }
 
+  /**
+   * The opening ladder. One control comes back per few objects, in the order
+   * the game wants them learned — ammunition, mines, the two that run on their
+   * own, then the abilities — each with a line. When the last of them is out
+   * the run stops teaching, and it never teaches again on this device.
+   */
+  teach() {
+    if (!this.teaching) return;
+    const w = this.world;
+    while (this.tutorialStep < TUTORIAL.length && w.kills >= TUTORIAL[this.tutorialStep].at) {
+      const step = TUTORIAL[this.tutorialStep++];
+      w.unlocked.add(step.key);
+      // The strip's own first-use caption would say the same thing a second
+      // time the moment the player tapped it. Spend it here instead.
+      this.autoHinted[step.key] = true;
+      this.hud.showHint(step.text, true);
+      audio.chime(680);
+      background.surge(0.5);
+    }
+    if (this.tutorialStep >= TUTORIAL.length && !this.outroSaid && w.kills >= OUTRO.at) {
+      this.outroSaid = true;
+      this.teaching = false;
+      markTaught();
+      this.hud.showHint(OUTRO.text, true);
+    }
+  }
+
+  /** Visible, on screen, and not yet handed over. */
+  isSealed(key) {
+    return this.teaching && !this.world.unlocked.has(key);
+  }
+
+  /** The same question by ability slot, which is how the bar and keys ask it. */
+  abilitySealed(i) {
+    const s = this.world.abilities.slots[i];
+    return !!s && this.isSealed(s.def.id);
+  }
+
   registerKill() {
     const w = this.world;
     w.kills++;
     w.offers.note(w);
+    this.teach();
     // Story beats belong to the staging run only. ORDINAL's own emissions push
     // the count well past five hundred, and a sentence in the mid-field band is
     // exactly the text that has no business being there.
@@ -1000,6 +1043,7 @@ export class Game {
     this.hud.setPending(w.offers.pending, w.offers.next);
     this.hud.syncAbilities(w.abilities);
     this.hud.syncLoadout(w);
+    this.hud.syncSeals();
     this.hud.menu.sync(w);
     this.hud.updateAlerts(dt);
     if (w.boss && !w.boss.dead) this.hud.setBoss(true, w.boss.hpFrac);
@@ -1365,6 +1409,21 @@ export class Game {
   debugGlitch() {
     glitch.kick(1);
     this.world.bossContact = 1.6;
+  }
+
+  /** Hand the whole interface over now, and keep it handed over across a reset. */
+  debugTeachAll() {
+    this.teaching = false;
+    this.outroSaid = true;
+    this.tutorialStep = TUTORIAL.length;
+    this.world.unlocked = new Set(ALL_KEYS);
+    markTaught();
+    this.hud.syncSeals();
+  }
+
+  /** Put the opening back, for looking at it again. */
+  debugForgetTaught() {
+    forgetTaught();
   }
 
   debugCodexAll() {

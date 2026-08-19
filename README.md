@@ -441,6 +441,36 @@ A new entry says so without a word: the menu button pulses and its count goes
 up. An alert would have been text over the boss the moment ORDINAL emitted
 something new.
 
+### The opening
+
+The first run, and only the first run, hands the interface over a piece at a
+time. Every strip cell and every ability button is on screen from the moment
+the run starts — the shape of the bar is part of what is being taught, and you
+should be able to see there are four mines before you have any of them — but
+they are **sealed**: visible, greyed, and inert. A press on one nudges and does
+nothing. The menu is the one control that is live throughout.
+
+Four lines run over the empty field during `openingGrace`, before anything
+falls. Then the count starts, and one control comes back every three objects
+with a single line each, in the order the game wants them learned:
+
+    ammunition   BOLT, HE, SHOT, ARC, RECUR      objects 2-14
+    mines        BLAST, SNARE, WIRE, KNELL       objects 17-26
+    running      AUTO AIM, AUTO FIRE             objects 29-32
+    abilities    PULSE through SIPHON            objects 35-56
+
+Abilities are deliberately last: by the time they arrive the turret is already
+looking after itself, and abilities are the part you are meant to be doing by
+hand. A closing line lands at sixty, and the run stops teaching.
+
+Sealed is not the same as ORDINAL's `locked` — locked is a button taken away
+mid-fight, sealed is one not yet given. Both are visible; only one is a loss.
+
+The whole script is `src/tutorial.js`: the four intro lines, the nineteen
+unlocks with their text and their counts, and the closing line. Completion is
+kept in `localStorage` under `sim7749-taught`, so every run after the first
+starts with all of it. A cleared save skips the opening outright.
+
 ### The objects
 
 Twelve kinds, each with its own mass, speed, restitution and way of dying.
@@ -560,6 +590,7 @@ src/
   arsenal.js            rounds, mines and assists: icons, notes, strip order
   menu.js               the menu sheet, built from data
   codex.js              the glossary, and what has been recorded
+  tutorial.js           the opening script: intro lines, unlock ladder, outro
 scripts/
   make-icons.mjs        regenerates icons/  (node scripts/make-icons.mjs)
   smoke.mjs             headless run through every phase (see below)

@@ -129,6 +129,7 @@ export class Hud {
         ev.stopPropagation();
         this.pick(a);
       });
+      b.dataset.key = a.key;
       b.addEventListener('contextmenu', (ev) => ev.preventDefault());
       // pointerdown alone is right for a thumb and wrong for everything else.
       // These cells were menu buttons until this build and answered a keyboard;
@@ -136,8 +137,7 @@ export class Hud {
       b.addEventListener('keydown', (ev) => {
         if (ev.key !== 'Enter' && ev.key !== ' ') return;
         ev.preventDefault();
-        if (a.kind === 'round') this.game.toggleRound(a.key);
-        else this.game.toggleAuto(a.key);
+        this.pick(a);
       });
       groups[a.group].appendChild(b);
       this.strip.push({ key: a.key, kind: a.kind, el: b, on: null });
@@ -158,7 +158,8 @@ export class Hud {
       const trigger = (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        this.game.useAbility(i);
+        if (this.game.abilitySealed(i)) return this.refuse(b);
+        return this.game.useAbility(i);
       };
       b.addEventListener('pointerdown', trigger);
       b.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -508,11 +509,27 @@ export class Hud {
     this.el.resetBtn.hidden = true;
   }
 
-  /** One place that turns a strip cell into the call it stands for. */
+  /**
+   * One place that turns a strip cell into the call it stands for, and the one
+   * place a sealed cell is refused. The gate is here rather than in the game's
+   * methods so that everything else — offers, resets, the debug panel — can
+   * still set the loadout while the opening is running.
+   */
   pick(a) {
+    if (this.game.isSealed(a.key)) return this.refuse(this.el.toggles[a.key]);
     if (a.kind === 'round') this.game.toggleRound(a.key);
     else if (a.kind === 'mine') this.game.toggleMine(a.key);
     else this.game.toggleAuto(a.key);
+    return true;
+  }
+
+  /** A press that does nothing still has to feel like it landed on something. */
+  refuse(el) {
+    if (!el) return false;
+    el.classList.remove('refused');
+    void el.offsetWidth;
+    el.classList.add('refused');
+    return false;
   }
 
   /**
@@ -531,6 +548,29 @@ export class Hud {
 
   setSound() {
     this.menu.syncSystem();
+  }
+
+  /**
+   * Which of the nineteen controls the opening has handed over. Sealed is not
+   * the same as ORDINAL's `locked`: locked is something taken away mid-fight,
+   * sealed is something not yet given. Both are visible; only one is a loss.
+   */
+  syncSeals() {
+    for (const q of this.strip) {
+      const sealed = this.game.isSealed(q.key);
+      if (q.sealed === sealed) continue;
+      q.sealed = sealed;
+      q.el.classList.toggle('sealed', sealed);
+      q.el.setAttribute('aria-disabled', String(sealed));
+    }
+    for (let i = 0; i < this.slots.length; i++) {
+      const s = this.slots[i];
+      const sealed = this.game.abilitySealed(i);
+      if (s.sealedNow === sealed) continue;
+      s.sealedNow = sealed;
+      s.el.classList.toggle('sealed', sealed);
+      s.el.setAttribute('aria-disabled', String(sealed));
+    }
   }
 
   /** Lights the strip to match what is actually loaded and running. */
@@ -555,6 +595,7 @@ export class Hud {
   syncHudLight(world) {
     this.syncAbilities(world.abilities);
     this.syncLoadout(world);
+    this.syncSeals();
     this.menu.sync(world);
   }
 

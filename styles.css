@@ -292,6 +292,26 @@ html, body {
   transform-origin: center;
 }
 
+/* Not yet handed over by the opening. Visible on purpose — the shape of the
+   bar is part of what is being taught — but inert, and plainly so. */
+.ab.sealed,
+.qc.sealed {
+  opacity: 0.3;
+  filter: saturate(0.15);
+  cursor: default;
+}
+.ab.sealed .fill { display: none; }
+.qc.sealed .qLbl { opacity: 0.7; }
+
+/* A press that was refused. Small, and over quickly: it says "not this",
+   not "you did something wrong". */
+.ab.refused, .qc.refused { animation: refused 0.26s ease-out; }
+@keyframes refused {
+  0%, 100% { transform: none; }
+  30% { transform: translateX(-2px); }
+  70% { transform: translateX(2px); }
+}
+
 .alert.fade { opacity: 0.55; }
 
 @keyframes alertIn {

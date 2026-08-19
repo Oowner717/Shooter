@@ -43,6 +43,7 @@ const ASSETS = [
   './src/hud.js',
   './src/menu.js',
   './src/codex.js',
+  './src/tutorial.js',
 ];
 
 self.addEventListener('install', (e) => {

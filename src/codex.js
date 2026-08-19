@@ -175,3 +175,32 @@ export function forgetCleared() {
     localStorage.removeItem(CLEARED);
   } catch { /* nothing to forget */ }
 }
+
+/**
+ * Whether the opening has been walked through once. The first run hands the
+ * interface over a piece at a time; every run after it starts with all of it,
+ * because being taught the same nineteen things twice is not teaching.
+ */
+const TAUGHT = 'sim7749-taught';
+
+export function taught() {
+  try {
+    return localStorage.getItem(TAUGHT) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markTaught() {
+  try {
+    localStorage.setItem(TAUGHT, '1');
+  } catch {
+    /* private mode: the run that is open keeps its unlocks either way */
+  }
+}
+
+export function forgetTaught() {
+  try {
+    localStorage.removeItem(TAUGHT);
+  } catch { /* nothing to forget */ }
+}
