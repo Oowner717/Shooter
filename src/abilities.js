@@ -1,5 +1,10 @@
-// Five abilities. No costs, no upgrades, no unlocks — they exist purely
-// because they are satisfying. Each one is legible from its first use.
+// Eight abilities. Each one is legible from its first use, and each one says
+// what it is the first time it is used rather than in a manual.
+//
+// All but PULSE start locked and are handed over by the permanent tier of the
+// offer system, along with the rounds and the mines. A second use of any one
+// of them is bought the same way; until it is, an ability holds exactly one
+// charge and behaves as a plain cooldown, with nothing extra drawn on it.
 
 import { TAU, clamp, rand, spread, smoothstep, rgba, drawGlow, segClosest } from './util.js';
 import { spark, dot, ring, ripple, shake, flash } from './fx.js';
@@ -31,7 +36,7 @@ const ICON = {
   // Two turrets. One of them is not there.
   decoy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.8 4.6v4.2"/><path d="M2.9 12.4 6.8 8.9l3.9 3.5v5.9H2.9z"/><circle cx="6.8" cy="14.6" r="1.3" fill="currentColor" stroke="none"/><path d="M17.2 4.6v4.2" stroke-dasharray="2.2 1.9"/><path d="M13.3 12.4l3.9-3.5 3.9 3.5v5.9h-7.8z" stroke-dasharray="2.2 1.9" opacity=".85"/></svg>',
   // Wreckage hauled up off the floor and thrown back out the top.
-  siphon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 20.6 8.9 16.2M19.4 20.6 15.1 16.2M12 22.2v-6" opacity=".7"/><path d="M8.8 15.4h6.4l-1.5-4.4h-3.4z" fill="currentColor" stroke="none"/><path d="M12 10.6V3.2"/><path d="M9.1 6 12 3.1 14.9 6"/></svg>',
+  chorus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.4" r="2.1"/><circle cx="4.6" cy="16" r="2.1"/><circle cx="19.4" cy="16" r="2.1"/><circle cx="12" cy="20.4" r="2.1" fill="currentColor" stroke="none"/><path d="M10.6 6.2 6 14M13.4 6.2 18 14M6.4 17.4l3.5 2.2M17.6 17.4l-3.5 2.2M12 6.5v11.8" opacity=".7"/></svg>',
 };
 
 
@@ -301,78 +306,142 @@ class Decoy {
  * A field you have just cleared has almost nothing to give, which is the
  * trade — and it is the one ability that competes with a GLUT for food.
  */
-class Siphon {
+/*
+ * CHORUS. Every hostile on the field is tied to every other one for a few
+ * seconds. Nothing happens on its own — the binding does no damage and holds
+ * nothing in place. But the moment one of them comes apart, the rest feel it,
+ * and on a crowded field one good shot walks all the way through the crowd
+ * without another round being fired.
+ *
+ * It is the only ability whose payoff is entirely in what the player does next.
+ */
+class Chorus {
   constructor(world) {
-    const P = CFG.siphon;
-    const s = world.shooter;
-    this.x = s.x;
-    this.y = s.y;
+    const P = CFG.chorus;
     this.t = 0;
-    this.fired = false;
     this.dead = false;
-    this.taken = [];
+    this.bound = [];
+    const s = world.shooter;
     const r2 = P.reach * P.reach;
-    for (const d of world.debris) {
-      if (d.dead) continue;
-      if ((d.x - this.x) ** 2 + (d.y - this.y) ** 2 > r2) continue;
-      this.taken.push({ x: d.x, y: d.y, color: d.type.glow, r: d.r });
-      d.dead = true;
-      d.dissolved = true; // taken, not destroyed: it must not score
-      if (this.taken.length >= P.maxTake) break;
+    for (const e of world.enemies) {
+      if (e.dead || e.staged || e.harmless) continue;
+      if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 > r2) continue;
+      this.bound.push(e);
+      if (this.bound.length >= P.maxBound) break;
     }
-    this.shots = Math.max(P.minShots, this.taken.length);
-    audio.ability('well');
+    // Remembered rather than read at the time: an echo is the size of what was
+    // lost, and by the time it is paid out the thing is already gone.
+    this.worth = new Map(this.bound.map((e) => [e, Math.min(P.cap, P.floor + (e.maxHp || e.hp) * P.share)]));
+    this.gen = new Map(); // how far out from the first death each one is
+    this.hops = 0;
+    this.arcs = []; // one short-lived line per echo, so the chain is watchable
+    this.linkT = 0;
+    this.links = [];
+    audio.ability('stasis');
   }
 
   update(world, dt) {
-    const P = CFG.siphon;
+    const P = CFG.chorus;
     this.t += dt;
-    const s = world.shooter;
-    this.x = s.x;
-    this.y = s.y;
-    if (this.t < P.gather) return;
-    if (this.fired) { this.dead = true; return; }
-    this.fired = true;
-
-    // Out again, fanned across the forward arc the barrel is covering.
-    const base = s.aim;
-    for (let i = 0; i < this.shots; i++) {
-      const off = ((i / Math.max(1, this.shots - 1)) - 0.5) * P.spread;
-      fire(world, s.x + Math.cos(base + off) * s.r, s.y + Math.sin(base + off) * s.r, base + off, {
-        speed: rand(P.speed[0], P.speed[1]),
-        r: 4.4,
-        damage: P.damagePer,
-        impulse: 80,
-        bounces: 1,
-        color: '#ffd9a0',
-        trail: 0.03,
-      });
+    for (let i = this.arcs.length - 1; i >= 0; i--) {
+      this.arcs[i].t += dt;
+      if (this.arcs[i].t > 0.3) this.arcs.splice(i, 1);
     }
-    ring(s.x, s.y, 14, 260, 0.34, '#ffd166', 4);
-    flash(0.14, '#ffe9c0');
-    shake(9);
-    audio.boom();
+    if (this.t >= P.life) { this.dead = true; return; }
+
+    for (let i = this.bound.length - 1; i >= 0; i--) {
+      const e = this.bound[i];
+      if (!e.dead) continue;
+      this.bound.splice(i, 1);
+      // Taken by something else entirely — dissolved bodies were never killed,
+      // so they are not a death the rest of the choir should answer.
+      if (e.dissolved) { this.worth.delete(e); continue; }
+      const g = this.gen.get(e) || 0;
+      const echo = (this.worth.get(e) || 0) * P.falloff ** g;
+      this.worth.delete(e);
+      this.gen.delete(e);
+      if (echo <= 1 || !this.bound.length || this.hops >= P.hops) continue;
+      this.hops++;
+
+      // The few nearest, not everything. This is what makes it a chain rather
+      // than a field-wide detonation: it travels through whatever is packed
+      // together and stops where the crowd thins out.
+      const near = this.bound
+        .filter((o) => !o.dead && (o.x - e.x) ** 2 + (o.y - e.y) ** 2 <= P.link * P.link)
+        .sort((a, b) => ((a.x - e.x) ** 2 + (a.y - e.y) ** 2) - ((b.x - e.x) ** 2 + (b.y - e.y) ** 2))
+        .slice(0, P.spread);
+      for (const o of near) {
+        o.hp -= echo;
+        o.flash = 1;
+        this.gen.set(o, g + 1);
+        this.arcs.push({ x1: e.x, y1: e.y, x2: o.x, y2: o.y, t: 0 });
+        spark(o.x, o.y, rand(-90, 90), rand(-90, 90), '#c9a7ff', 0.3, 2);
+        if (o.hp <= 0) o.dead = true; // and its own echo lands next frame
+      }
+      if (!near.length) continue;
+      ring(e.x, e.y, 8, 120, 0.28, '#c9a7ff', 2.2);
+      shake(1.6);
+      audio.pop(1.2);
+    }
+  }
+
+  /**
+   * Who an echo would reach from where. Recomputed a few times a second rather
+   * than every frame — forty bodies is sixteen hundred distance checks, and
+   * the shape does not change fast enough to be worth that at 60fps.
+   */
+  relink() {
+    const P = CFG.chorus;
+    const live = this.bound.filter((e) => !e.dead);
+    this.links = [];
+    for (const a of live) {
+      let best = null;
+      let bd = P.link * P.link;
+      for (const b of live) {
+        if (b === a) continue;
+        const d = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
+        if (d < bd) { bd = d; best = b; }
+      }
+      if (best) this.links.push([a, best]);
+    }
   }
 
   draw(ctx) {
-    const P = CFG.siphon;
-    const k = clamp(this.t / P.gather, 0, 1);
-    if (k >= 1) return;
-    const ease = k * k;
+    const P = CFG.chorus;
+    this.linkT -= 1 / 60;
+    if (this.linkT <= 0) { this.linkT = 0.25; this.relink(); }
+    // Fades in over the first beat and out over the last, so the field is not
+    // suddenly webbed and suddenly bare.
+    const k = Math.min(1, this.t / 0.35) * Math.min(1, (P.life - this.t) / 0.9);
+    const pulse = 0.5 + 0.5 * Math.sin(this.t * 5);
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = rgba('#ffd166', 0.45 * (1 - ease));
-    ctx.lineWidth = 1.4;
-    for (const p of this.taken) {
-      const px = p.x + (this.x - p.x) * ease;
-      const py = p.y + (this.y - p.y) * ease;
-      ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.lineTo(this.x, this.y);
-      ctx.stroke();
-      drawGlow(ctx, p.color, px, py, p.r * 2.6, 0.6);
+
+    // What is tied to what: each bound body to its nearest, so the picture is
+    // the shape of the crowd and you can see where a chain would stop.
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = rgba('#c9a7ff', 0.26 * k * (0.55 + 0.45 * pulse));
+    ctx.beginPath();
+    for (const [a, b] of this.links) {
+      if (a.dead || b.dead) continue;
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
     }
-    drawGlow(ctx, '#ffd166', this.x, this.y, 20 + ease * 60, ease * 0.8);
+    ctx.stroke();
+    for (const e of this.bound) {
+      if (!e.dead) drawGlow(ctx, '#c9a7ff', e.x, e.y, e.r * 1.5, 0.2 * k);
+    }
+
+    // And the chain actually travelling, one bright line per echo paid.
+    for (const a of this.arcs) {
+      const f = 1 - a.t / 0.3;
+      ctx.lineWidth = 1 + 2.2 * f;
+      ctx.strokeStyle = rgba('#e6d6ff', 0.9 * f);
+      ctx.beginPath();
+      ctx.moveTo(a.x1, a.y1);
+      ctx.lineTo(a.x2, a.y2);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 }
@@ -654,16 +723,16 @@ export const ABILITIES = [
     },
   },
   {
-    id: 'siphon',
-    name: 'SIPHON',
-    color: '#ffd166',
+    id: 'chorus',
+    name: 'CHORUS',
+    color: '#c9a7ff',
     cooldown: 15,
-    icon: ICON.siphon,
-    hint: 'SIPHON — hauls the wreckage in and throws it back.',
+    icon: ICON.chorus,
+    hint: 'CHORUS — ties the field together. Whatever kills one hurts the rest.',
     run(world) {
-      world.effects.push(new Siphon(world));
-      ring(world.shooter.x, world.shooter.y, CFG.siphon.reach * 0.5, 20, 0.42, '#ffd166', 3);
-      shake(5);
+      world.effects.push(new Chorus(world));
+      ring(world.shooter.x, world.shooter.y, 20, 520, 0.55, '#c9a7ff', 3);
+      shake(4);
     },
   },
 ];
@@ -672,23 +741,49 @@ export const ABILITIES = [
 
 export class Abilities {
   constructor() {
-    this.slots = ABILITIES.map((def) => ({ def, cd: 0, used: false, locked: 0 }));
+    // `max` is how many uses are held at once and `charges` is how many are
+    // left. Everything starts at one, which is the cooldown-only behaviour the
+    // game had before: a second charge is bought, one ability at a time, and
+    // until it is bought there is nothing extra on screen to explain.
+    this.slots = ABILITIES.map((def) => ({ def, cd: 0, used: false, locked: 0, max: 1, charges: 1 }));
   }
 
   reset() {
-    for (const s of this.slots) { s.cd = 0; s.used = false; s.locked = 0; }
+    for (const s of this.slots) {
+      s.cd = 0; s.used = false; s.locked = 0; s.max = 1; s.charges = 1;
+    }
+  }
+
+  /** A permanent second (or third) use of one ability, held in hand. */
+  grantCharge(id) {
+    const s = this.slots.find((a) => a.def.id === id);
+    if (!s) return false;
+    s.max += 1;
+    s.charges += 1; // the one just bought is in hand, not owed
+    return true;
   }
 
   update(dt) {
     for (const s of this.slots) {
-      if (s.cd > 0) s.cd = Math.max(0, s.cd - dt);
       if (s.locked > 0) s.locked = Math.max(0, s.locked - dt);
+      if (s.cd <= 0) continue;
+      s.cd = Math.max(0, s.cd - dt);
+      if (s.cd > 0 || s.charges >= s.max) continue;
+      // One charge back per cooldown, and the clock restarts while any are
+      // still owed — so a two-charge ability refills in two cooldowns, not one.
+      s.charges += 1;
+      if (s.charges < s.max) s.cd = this.lastCost(s);
     }
+  }
+
+  /** What the cooldown was set to last time, so a refill runs at the same rate. */
+  lastCost(s) {
+    return s.cost || s.def.cooldown;
   }
 
   /** Everything ready, now. */
   clearCooldowns() {
-    for (const s of this.slots) s.cd = 0;
+    for (const s of this.slots) { s.cd = 0; s.charges = s.max; }
   }
 
   /**
@@ -720,7 +815,7 @@ export class Abilities {
 
   usable(i) {
     const s = this.slots[i];
-    return !!s && s.cd <= 0 && s.locked <= 0;
+    return !!s && s.charges > 0 && s.locked <= 0;
   }
 
   /** @returns the slot if it fired, otherwise null. */
@@ -730,7 +825,11 @@ export class Abilities {
     s.def.run(world);
     // STANDING ORDER shortens every cooldown; HASTE halves them for a while.
     const scale = world.up.cooldown * (world.haste > 0 ? 0.5 : 1);
-    s.cd = s.def.cooldown * scale * (world.debug.noCooldown ? 0 : 1);
+    s.cost = s.def.cooldown * scale * (world.debug.noCooldown ? 0 : 1);
+    s.charges -= 1;
+    // The clock is already running if this was a held charge; starting it over
+    // would make the second use cost more than the first.
+    if (s.cd <= 0) s.cd = s.cost;
     const first = !s.used;
     s.used = true;
     return { slot: s, first };
@@ -739,6 +838,12 @@ export class Abilities {
   readyFraction(i) {
     const s = this.slots[i];
     if (s.cd <= 0) return 1;
-    return clamp(1 - s.cd / s.def.cooldown, 0, 1);
+    return clamp(1 - s.cd / this.lastCost(s), 0, 1);
+  }
+
+  /** For the pips, which only exist once something has more than one use. */
+  chargeState(i) {
+    const s = this.slots[i];
+    return s ? { charges: s.charges, max: s.max } : { charges: 0, max: 1 };
   }
 }

@@ -1,27 +1,15 @@
-// The first run, and only the first run.
+// What the game says about itself, and when.
 //
-// Everything is on screen from the start and almost none of it works. The
-// buttons are visible because the shape of the interface is part of what is
-// being taught — you should be able to see there are four mines before you
-// have any of them — and they are sealed because a wall of nineteen controls
-// handed over at once is not an introduction, it is a manual.
+// It used to be a ladder: nineteen controls handed over on a timer, each with
+// a sentence, all inside the first two minutes. That put the whole manual in
+// the opening and left the rest of the run silent.
 //
-// It is one ordered script. Some entries only say something; the rest hand a
-// control over and say what it is. PULSE comes first, before there is anything
-// to use it on: it is the one thing that can never be taken away, and having
-// it from the start is the first fact about the game. Then ammunition, then
-// mines, then the two that run on their own, then the rest of the abilities.
-// The three things the run gives back — salvage, the tempo offer and the
-// permanent one — are said where they can be pointed at rather than listed.
-//
-// PACING. The count cannot pace this. Objects die slowly at first and very
-// fast later, so a script keyed only on kills hands out its hardest lines at
-// its quickest moment — measured at build 35, KNELL had 0.71s on screen for
-// eleven words. So an entry needs two things: enough objects destroyed, and
-// enough time for the line before it to have been read. The clock is what
-// actually governs, and it is sized to the sentence. The opening entries ask
-// for nothing at all, so they run over the empty field before the first
-// object has been released.
+// Now almost nothing is said up front. The turret starts with BOLT and PULSE
+// and nothing else; every other round, mine and ability is a permanent upgrade,
+// taken from the offer that comes round every so often. A thing explains itself
+// the first time it is *used* — which is minutes after it was unlocked, and
+// only if the player actually reaches for it. The teaching is spread across
+// the whole run because the run hands things over across the whole run.
 
 /** Seconds a line of n words needs: a beat to notice it, then about 180wpm. */
 export function holdFor(text) {
@@ -30,89 +18,84 @@ export function holdFor(text) {
 }
 
 /**
- * The script. `text` is always said. `key` hands a control over. `at` is the
- * count it waits for, and defaults to none — an entry with no `at` is paced by
- * the clock alone, which is how the opening runs on an empty field.
+ * The opening, over an empty field. Four lines and then it stops talking: the
+ * grip, the shot, the one button that is always yours, and what is coming.
  */
-const SCRIPT = [
+const OPENING = [
   { text: 'Swing the grip under the turret.\nThe barrel goes the other way.' },
   { text: 'Or tap ahead of the turret\nand it shoots there.' },
-
-  // Before anything is coming. It costs nothing to fire at an empty field, and
-  // knowing it is there changes how the next ten minutes feel.
-  { key: 'pulse', text: 'PULSE. A shockwave that shoves everything away.\nNothing can ever take this one from you.' },
-  { key: 'standard', text: 'BOLT. Plain, and the fastest thing you can fire.' },
-
+  { text: 'PULSE is under your thumb.\nNothing can ever take it from you.' },
   { text: 'Something is coming down now.\nNone of it can kill you.' },
-  { text: 'It only breaks up what you see through.\nFive hundred of them, and none is the point.' },
-
-  // The number starts moving the moment the first one comes apart, so this is
-  // the earliest it can be said and still be pointing at something.
-  { at: 2, text: 'The green number is SALVAGE.\nEverything you break gives some up.' },
-
-  { key: 'explosive', at: 4, text: 'HE. Blows up where it lands. Slower to fire.' },
-  { key: 'shotgun', at: 6, text: 'SHOT. Five pellets. Close range only.' },
-  { key: 'arc', at: 8, text: 'ARC. The hit jumps on to the next thing, four times.' },
-  { key: 'recur', at: 10, text: 'RECUR. The shot happens three more times, further down.' },
-
-  { key: 'blast', at: 12, text: 'BLAST. Mines lay themselves. This one bangs once, hard.' },
-  { key: 'snare', at: 14, text: 'SNARE. Never goes off. It pins a crowd in place.' },
-  { key: 'wire', at: 16, text: 'WIRE. A line across the field. It cuts what crosses.' },
-  { key: 'knell', at: 18, text: 'KNELL. Waits for nothing. Goes off three times.' },
-
-  { key: 'autoAim', at: 20, text: 'AUTO AIM. It picks a target and leads the shot.' },
-  { key: 'autoFire', at: 22, text: 'AUTO FIRE. It keeps shooting where the barrel points.' },
-
-  // CFG.events.smallFirst is set so that one is genuinely sitting on the
-  // button by now. Explaining a reward you cannot point at is a manual.
-  { at: 24, text: 'ALLOCATION is waiting. Three offered, one taken.\nIt keeps. Open it whenever you want it.' },
-
-  { key: 'fan', at: 26, text: 'FAN. Twenty-five pellets in one tight cone.' },
-  { key: 'lance', at: 28, text: 'LANCE. A beam through the biggest thing out there.' },
-  { key: 'well', at: 30, text: 'WELL. Drags everything into a knot, then collapses it.' },
-  { key: 'prism', at: 32, text: 'PRISM. A shell that bursts, then beams every way.' },
-  { key: 'stasis', at: 34, text: 'STASIS. Objects stop. Your shots do not.' },
-  { key: 'decoy', at: 36, text: 'DECOY. A turret that is not yours. They go there.' },
-  { key: 'siphon', at: 38, text: 'SIPHON. Hauls the wreckage in and throws it back.' },
-
-  // The permanent tier is too far off to demonstrate, so it is described. It
-  // announces itself loudly enough when it does come that the player only
-  // needs to know the word.
-  { at: 40, text: 'Further in, an AMENDMENT is offered instead.\nThose ones you keep for the whole run.' },
-
-  { at: 42, text: 'That is all of it.\nThe rest of the run is yours.' },
 ];
 
-export const TUTORIAL = SCRIPT.map((e) => ({ ...e, hold: holdFor(e.text) }));
+/**
+ * And these, spread across the count, about the three things the run gives
+ * back. Each is said where it can be pointed at rather than described:
+ * CFG.events.smallFirst exists so there is a real ALLOCATION on the button by
+ * the time the second one is read.
+ */
+const NOTES = [
+  { at: 2, text: 'The green number is SALVAGE.\nEverything you break gives some up.' },
+  { at: 20, text: 'ALLOCATION is waiting. Three offered, one taken.\nIt keeps. Open it whenever you want it.' },
+  { at: 44, text: 'An AMENDMENT is the permanent one.\nNew rounds, new mines, new abilities.' },
+  { at: 120, text: 'Everything you are not carrying is still out there.\nThe offers are how you get it.' },
+];
+
+export const SCRIPT = [...OPENING, ...NOTES].map((e) => ({ ...e, hold: holdFor(e.text) }));
 
 /**
- * The quiet after a line has had its time, before the next thing opens. Short,
- * but it is the difference between being handed things and being buried.
+ * What each thing says the first time it is used. One sentence about what it
+ * does — no story, and nothing that leans on a mechanic not yet met. These are
+ * also the lines the unlock offers carry, so the card that hands you a round
+ * and the caption that greets you using it say the same thing.
+ */
+export const FIRST_USE = {
+  standard: 'BOLT. Plain, and the fastest thing you can fire.',
+  explosive: 'HE. Blows up where it lands. Slower to fire.',
+  shotgun: 'SHOT. Five pellets. Close range only.',
+  arc: 'ARC. The hit jumps on to the next thing, four times.',
+  recur: 'RECUR. The shot happens three more times, further down.',
+
+  blast: 'BLAST. Mines lay themselves. This one bangs once, hard.',
+  snare: 'SNARE. Never goes off. It pins a crowd in place.',
+  wire: 'WIRE. A line across the field. It cuts what crosses.',
+  knell: 'KNELL. Waits for nothing. Goes off three times.',
+
+  autoAim: 'AUTO AIM. It picks a target and leads the shot.',
+  autoFire: 'AUTO FIRE. It keeps shooting where the barrel points.',
+
+  pulse: 'PULSE. A shockwave. Shoves everything away from you.',
+  fan: 'FAN. Twenty-five pellets in one tight cone.',
+  lance: 'LANCE. A beam through the biggest thing out there.',
+  well: 'WELL. Drags everything into a knot, then collapses it.',
+  prism: 'PRISM. A shell that bursts, then beams every way.',
+  stasis: 'STASIS. Objects stop. Your shots do not.',
+  decoy: 'DECOY. A turret that is not yours. They go there.',
+  chorus: 'CHORUS. Ties the field together.\nWhatever kills one hurts the rest.',
+};
+
+/** What the turret is issued with. Everything else is bought. */
+export const STARTING = ['standard', 'pulse'];
+
+/** Rounds, mines and abilities, in the order the offers hand them out. */
+export const LOCKABLE = {
+  rounds: ['explosive', 'shotgun', 'arc', 'recur'],
+  mines: ['blast', 'snare', 'wire', 'knell'],
+  autos: ['autoAim', 'autoFire'],
+  abilities: ['fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'chorus'],
+};
+
+/** Everything the run can ever hand over, for the debug panel and the tests. */
+export const ALL_KEYS = [...STARTING, ...Object.values(LOCKABLE).flat()];
+
+/**
+ * The quiet after a line has had its time, before the next one is said. Short,
+ * but it is the difference between being told things and being buried.
  */
 export const GAP = 0.7;
-
-/**
- * Acting on a line is proof it was read. A player who taps the thing they were
- * just given does not sit through the rest of its hold — the wait shortens to
- * this instead, so someone engaged is moved along and someone passive still
- * gets the whole sentence. The line itself stays up either way; it is pushed
- * up the band by the next one rather than taken away.
- */
-export const ACK = 1.4;
-
-/**
- * ...but never below this fraction of the line's own reading time. A player
- * can tap the moment a button lights, faster than anyone can read, and without
- * a floor the acknowledgement shortcut walked the tail of the script back to
- * about two seconds a line — the exact failure the clock was added to fix.
- */
-export const ACK_FLOOR = 0.65;
 
 /** How many lines the band keeps. The newest is at the bottom. */
 export const STACK = 2;
 
 /** When the first line is said, in seconds from the start of the run. */
 export const START = 1.2;
-
-/** Everything the script ever hands over, for the runs that skip it. */
-export const ALL_KEYS = SCRIPT.filter((e) => e.key).map((e) => e.key);

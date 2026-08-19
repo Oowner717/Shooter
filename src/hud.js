@@ -166,8 +166,16 @@ export class Hud {
       };
       b.addEventListener('pointerdown', trigger);
       b.addEventListener('contextmenu', (e) => e.preventDefault());
+      // The pip row is built empty and stays empty until something has more
+      // than one use. An ability with a single charge shows nothing at all —
+      // an empty slot for a thing you have not bought is a nag, not a readout.
+      const pips = document.createElement('span');
+      pips.className = 'pips';
+      b.appendChild(pips);
       frag.appendChild(b);
-      this.slots.push({ el: b, fill: b.querySelector('.fill'), ready: null, frac: -1, locked: null });
+      this.slots.push({
+        el: b, fill: b.querySelector('.fill'), pips, ready: null, frac: -1, locked: null, held: -1, cap: -1,
+      });
     });
     this.el.abilities.appendChild(frag);
   }
@@ -199,7 +207,9 @@ export class Hud {
       if (s.frac !== f) {
         s.frac = f;
         s.fill.style.transform = `scaleY(${1 - f})`;
-        const ready = f >= 1;
+        // Ready means there is a use in hand, which with two charges is true
+        // while the bar is still filling the second one back up.
+        const ready = abilities.usable(i);
         if (s.ready !== ready) {
           s.ready = ready;
           s.el.classList.toggle('ready', ready);
@@ -208,6 +218,17 @@ export class Hud {
       if (s.locked !== locked) {
         s.locked = locked;
         s.el.classList.toggle('locked', locked);
+      }
+      const { charges, max } = abilities.chargeState(i);
+      if (s.held !== charges || s.cap !== max) {
+        s.held = charges;
+        s.cap = max;
+        // Nothing is drawn at all below two, which is where every ability
+        // starts and where most of them stay.
+        s.pips.innerHTML = max > 1
+          ? Array.from({ length: max }, (_, k) => `<i class="${k < charges ? 'on' : ''}"></i>`).join('')
+          : '';
+        s.el.classList.toggle('multi', max > 1);
       }
     }
   }
@@ -489,6 +510,7 @@ export class Hud {
       ['TITHE', () => g.debugTithe()],
       ['SUBTRACT', () => g.debugSubtract()],
       ['DRAIN LEDGER', () => g.debugDrainLedger()],
+      ['UNLOCK ALL', () => g.debugUnlockAll()],
       ['SKIP INTRO', () => g.debugSkipIntro()],
       ['SPAWN WAVE', () => g.debugSpawnWave()],
       ['FILL FIELD', () => g.debugFillField()],

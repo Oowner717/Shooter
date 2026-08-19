@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '39';
+export const BUILD = '40';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -27,6 +27,7 @@ export const CFG = {
   // and none of that should happen while dodging.
   teachPop: 5,
   teachRate: 0.62, // spawn attempts run this fraction of speed while teaching
+  teachKills: 26, // ...and that holds for this many objects, not the whole run
   warmRate: 0.42, // spawn attempts run this fraction of normal speed at first
   lull: 4.5, // the pause between the five hundredth kill and the arrival
   storyEvery: 50, // one story line per this many kills (10 lines total)
@@ -129,18 +130,44 @@ export const CFG = {
     blast: { r: 260, damage: 150, impulse: 900 }, // what it leaves behind
   },
 
-  // ---- siphon ---------------------------------------------------------
+  // ---- chorus ---------------------------------------------------------
   // Your own wreckage, thrown back. Everything loose on the floor is dragged
   // in and fired out as a volley, so the more mess there is the harder it
   // hits — and a field you have just cleared has nothing to give.
-  siphon: {
-    gather: 0.5, // seconds of hauling before it fires
-    maxTake: 40,
-    reach: 900,
-    spread: 0.5, // radians of the outgoing fan — a jet, not a shrug
-    speed: [1180, 1600],
-    damagePer: 21,
-    minShots: 6, // it always finds something to throw
+  // CHORUS. Everything on the field is tied to everything else for a while,
+  // and whatever kills one of them is felt by all the rest. On a thin field it
+  // is a modest tick of damage; on a crowded one, one good shot takes the
+  // whole thing apart in a cascade that runs on its own.
+  chorus: {
+    life: 6, // seconds the binding holds
+    maxBound: 40,
+    // The echo is self-amplifying: every death it causes echoes in turn, so
+    // this number has a cliff in it. A third of full health took a maximum
+    // field from 44 down to 4 — a bigger clear than anything else in the bar.
+    // A fifth killed one thing, because the echo off a 20hp NEEDLE cannot kill
+    // another NEEDLE and the chain never starts.
+    //
+    // The real fix was not a number. An echo that reaches every bound body at
+    // once scales as the square of the crowd, so it is all or nothing: either
+    // the first echo is too small to kill anything and the chain never starts,
+    // or it kills the weakest and the field ends. So an echo only reaches the
+    // few nearest instead, and CHORUS became a chain that travels — it runs as
+    // far as the crowd is packed and stalls where it thins out, which is a
+    // thing the player can arrange with WELL, with SNARE, or with the shot.
+    //
+    // Even as a chain it needed bounding: three seeds per death is a branching
+    // process above one, so a packed field either fizzled at two kills or ran
+    // the whole crowd. The echo now weakens by `falloff` at every hop and the
+    // whole binding pays out at most `hops` of them, which makes it reliably a
+    // handful and occasionally a lot, rather than two or forty.
+    spread: 3, // survivors each death reaches, nearest first
+    falloff: 0.62, // and each hop out from the first death lands softer
+    hops: 10, // total echoes one binding will ever pay
+    floor: 26, // always at least this, which is a MOTE and change
+    share: 0.22, // ...plus this much of the dead one's full health
+    cap: 62,
+    link: 620, // and no echo jumps further than this
+    reach: 1400, // effectively the whole field, but not the staged rows above it
   },
 
   // ---- offers ----------------------------------------------------------
@@ -152,7 +179,11 @@ export const CFG = {
     // The first one comes early, so the opening has a real ALLOCATION waiting
     // on the button at the moment it explains what one is.
     smallFirst: 22,
-    large: 125, // kills between permanent ones — four in a counted run
+    // Permanent ones. Seventeen things start locked and each AMENDMENT opens
+    // at most one, so this is what decides how much of the turret a single run
+    // can assemble: at fifty, about ten of the seventeen, and the rest is what
+    // the next run is for.
+    large: 50,
   },
 
   // ---- prism shell ----------------------------------------------------

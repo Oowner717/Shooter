@@ -9,6 +9,10 @@
 // adding an upgrade is an entry plus one place that reads it.
 
 /** Defaults. Anything not listed is off. */
+import { ARSENAL } from './arsenal.js';
+import { ABILITIES } from './abilities.js';
+import { LOCKABLE, FIRST_USE } from './tutorial.js';
+
 export function freshUpgrades() {
   return {
     // ammo
@@ -121,6 +125,52 @@ export const UPGRADES = {
 
 export const AXES = ['AMMO', 'FIELD', 'TURRET'];
 
+/*
+ * The other two kinds of permanent thing an AMENDMENT can be. They are not
+ * axes — a card is one of these or one of the three above — but they are what
+ * the tier is mostly for now: the turret starts with BOLT and PULSE, and every
+ * other round, mine and ability is bought here.
+ */
+
+/** The mark for a locked thing is the mark it will have once it is unlocked. */
+const armIcon = (key) => (ARSENAL.find((a) => a.key === key) || {}).icon
+  || (ABILITIES.find((a) => a.id === key) || {}).icon
+  || '';
+
+const armName = (key) => (ARSENAL.find((a) => a.key === key) || {}).label
+  || (ABILITIES.find((a) => a.id === key) || {}).name
+  || key.toUpperCase();
+
+/**
+ * One card per locked thing, carrying the same sentence the caption will give
+ * on first use — the card that hands you a round and the caption that greets
+ * you using it say the same thing, so neither has to be read twice.
+ */
+export const UNLOCKS = Object.values(LOCKABLE).flat().map((key) => ({
+  id: `open_${key}`,
+  key,
+  axis: 'UNLOCK',
+  name: armName(key),
+  line: (FIRST_USE[key] || '').replace(/^[A-Z ]+\. /, ''),
+  icon: armIcon(key),
+  apply: (up, world) => { world.unlocked.add(key); },
+}));
+
+/**
+ * A second use of one ability, held in hand. Only ever offered for an ability
+ * that has actually been unlocked, and only once each — offering a charge for
+ * something the player has never seen is a card that cannot be read.
+ */
+export const CHARGES = ABILITIES.map((a) => ({
+  id: `charge_${a.id}`,
+  key: a.id,
+  axis: 'CHARGE',
+  name: `${a.name} x2`,
+  line: 'Hold a second use of it, ready before the wait.',
+  icon: a.icon,
+  apply: (up, world) => { world.abilities.grantCharge(a.id); },
+}));
+
 /** Everything, flat, for the tests and the record. */
 export const ALL_UPGRADES = AXES.flatMap((a) => UPGRADES[a].map((u) => ({ ...u, axis: a })));
 
@@ -129,11 +179,37 @@ export const ALL_UPGRADES = AXES.flatMap((a) => UPGRADES[a].map((u) => ({ ...u, 
  * repeatable ones can come round again, which is what makes a long run able to
  * lean rather than merely collect.
  */
-export function rollLarge(taken) {
-  const once = new Set(['salvo', 'sweep', 'reflex', 'handsoff']);
-  return AXES.map((axis) => {
-    const pool = UPGRADES[axis].filter((u) => !(once.has(u.id) && taken.includes(u.id)));
-    if (!pool.length) return null;
-    return { ...pool[(Math.random() * pool.length) | 0], axis };
-  }).filter(Boolean);
+const ONCE = new Set(['salvo', 'sweep', 'reflex', 'handsoff']);
+
+const pick = (pool) => (pool.length ? pool[(Math.random() * pool.length) | 0] : null);
+
+/** The stat upgrades, one axis at a time, skipping what is already spent. */
+const statPool = (taken, axis) =>
+  UPGRADES[axis].filter((u) => !(ONCE.has(u.id) && taken.includes(u.id))).map((u) => ({ ...u, axis }));
+
+/**
+ * Three cards. While anything is still locked the first of them opens
+ * something, because that is the spine of a run: the turret arrives with two
+ * things and everything else is a choice made on the way. The second is a
+ * second use of an ability once there is an ability worth doubling, and the
+ * third is always a stat. Each falls through to a stat when its own pool is
+ * empty, and the three are never the same card twice.
+ */
+export function rollLarge(taken, world) {
+  const held = new Set(taken);
+  const unlocked = world && world.unlocked ? world.unlocked : new Set();
+  const out = [];
+  const add = (u) => { if (u && !out.some((o) => o.id === u.id)) out.push(u); };
+
+  add(pick(UNLOCKS.filter((u) => !unlocked.has(u.key))));
+  add(pick(CHARGES.filter((c) => unlocked.has(c.key) && !held.has(c.id))));
+
+  // Whatever is still missing comes off the stat table, one axis at a time so
+  // three stat cards are never three of the same kind.
+  const axes = [...AXES].sort(() => Math.random() - 0.5);
+  for (const axis of axes) {
+    if (out.length >= 3) break;
+    add(pick(statPool(taken, axis).filter((u) => !out.some((o) => o.id === u.id))));
+  }
+  return out;
 }

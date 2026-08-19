@@ -1182,7 +1182,7 @@ export class Director {
     // And thinner still while the opening is running. Nineteen controls are
     // being handed over with a sentence to read on each; the field is there to
     // give the new thing something to do, not to be survived.
-    if (world.teaching) {
+    if (world.teaching && world.kills < CFG.teachKills) {
       popTarget = Math.min(popTarget, CFG.teachPop);
       interval /= CFG.teachRate;
     }

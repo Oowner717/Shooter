@@ -1016,6 +1016,30 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 }
 .ab.essential .lbl { color: color-mix(in srgb, currentColor 70%, var(--dim)); }
 
+/*
+ * Charges. Nothing is drawn until an ability has more than one use, so a
+ * turret that has bought nothing shows no empty slots anywhere — an empty
+ * slot for a thing you do not have is a nag, not a readout.
+ */
+.pips {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2.5px;
+  pointer-events: none;
+}
+.pips i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+}
+.pips i.on {
+  background: currentColor;
+  box-shadow: 0 0 4px currentColor;
+}
+
 .ab.ready { border-color: color-mix(in srgb, currentColor 55%, transparent); }
 .ab.ready .lbl { color: var(--ink); }
 .ab.ready svg { filter: drop-shadow(0 0 6px currentColor); }

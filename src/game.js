@@ -18,7 +18,7 @@ import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
 import { codex, cleared, markCleared, forgetCleared, taught, markTaught, forgetTaught } from './codex.js';
 import { Offers } from './events.js';
 import { freshUpgrades } from './upgrades.js';
-import { TUTORIAL, ALL_KEYS, GAP, ACK, ACK_FLOOR, START } from './tutorial.js';
+import { SCRIPT, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 
@@ -179,21 +179,20 @@ export class Game {
     this.hud.setPending(0, null);
     w.endless = cleared();
     this.lullTimer = 0;
-    this.tutorialStep = 0;
+    this.scriptStep = 0;
     // World time at which the line now up has had its reading time. Nothing
     // else in the opening moves until it passes; the first line is due at
     // START, which is what the initial value buys.
     this.lineUntil = START - GAP;
-    this.lineFrom = 0;
-    this.lineHold = 0;
-    this.taughtKey = null;
-    // The opening runs once, ever — unless it is asked for again from the
-    // menu, which is the only way back to it. A cleared save is past it by
-    // definition, and asking overrides that too: the opening teaches the
-    // interface, which has nothing to do with having beaten ORDINAL.
+    // The opening lines run once, ever — unless asked for again from the menu,
+    // which is the only way back to them. A cleared save is past them by
+    // definition, and asking overrides that too.
     this.teaching = this.replayNext || (!taught() && !cleared());
     this.replayNext = false;
-    w.unlocked = new Set(this.teaching ? [] : ALL_KEYS);
+    // What the turret is issued with. Everything else — four rounds, four
+    // mines, the two that run on their own and seven of the eight abilities —
+    // is bought from the permanent tier, and nothing carries over.
+    w.unlocked = new Set(STARTING);
     w.phase = 'staging';
 
     // A reset is a fresh session: the strip goes back to standard rounds and
@@ -393,8 +392,10 @@ export class Game {
     const res = w.abilities.trigger(w, i);
     if (!res) return;
     this.hud.flashAbility(i);
-    this.ackTaught(res.slot.def.id);
-    if (res.first && this.hintsAllowed) this.hud.showHint(res.slot.def.hint);
+    // An ability says what it is the first time it is used, which is minutes
+    // after it was bought and only if the player actually reaches for it.
+    const line = FIRST_USE[res.slot.def.id];
+    if (res.first && line && this.hintsAllowed) this.hud.showHint(line, true);
   }
 
   // The opening lines live in tutorial.js with the rest of the script. The
@@ -402,19 +403,6 @@ export class Game {
   // to say four things at reading pace and try each one before there is
   // anything to react to.
 
-  static HINTS = {
-    standard: 'BOLT — nothing done to it, and the fastest cadence there is.',
-    autoAim: 'AUTO AIM — tracks and fires on the nearest breacher.',
-    autoFire: 'AUTO FIRE — keeps shooting wherever the barrel points.',
-    blast: 'BLAST MINES — inert until they land, then one hard bang each.',
-    snare: 'SNARE MINES — they pin a crowd instead of killing it.',
-    wire: 'WIRE — a line across the field. Anything crossing it is cut.',
-    knell: 'KNELL — it does not wait to be touched. It goes off three times.',
-    explosive: 'HE ROUNDS — every shot detonates. Half the rate of fire.',
-    shotgun: 'SHOT ROUNDS — five pellets a shot, close range, slower cadence.',
-    arc: 'ARC ROUNDS — the hit jumps on through anything nearby.',
-    recur: 'RECUR ROUNDS — the shot happens again, further down the same line.',
-  };
 
   /**
    * Something has come due. A top-up gets a chime and nothing else — it is
@@ -496,15 +484,14 @@ export class Game {
 
   announceToggle(key, on) {
     audio.chime(on ? 760 : 430);
-    if (on) this.ackTaught(key);
-    const hint = Game.HINTS[key];
+    const hint = FIRST_USE[key];
     if (!on || !hint || this.autoHinted[key] || !this.hintsAllowed) return;
     // Marked only once it has actually been shown. It used to be marked first,
     // so picking a round during the boss fight — where captions are suppressed
     // and where all five are now one tap away — spent that caption on nothing
     // and never gave it back, not even across a reset.
     this.autoHinted[key] = true;
-    this.hud.showHint(hint);
+    this.hud.showHint(hint, true);
   }
 
   /**
@@ -878,65 +865,27 @@ export class Game {
   teach() {
     if (!this.teaching) return;
     const w = this.world;
-    const step = TUTORIAL[this.tutorialStep];
+    const step = SCRIPT[this.scriptStep];
     if (!step) return;
-    // Two gates, and the clock is the one that governs. Enough destroyed to
-    // have earned it, and enough time for the line before it to have been
-    // read — one entry per pass, never a burst, however fast the field dies.
+    // Paced by the clock so nothing is ever cut off, and gated on the count so
+    // a line about salvage is not said before any has been banked.
     if (w.time < this.lineUntil + GAP) return;
     if (step.at !== undefined && w.kills < step.at) return;
 
-    this.tutorialStep++;
-    if (step.key) {
-      w.unlocked.add(step.key);
-      // Both of these would otherwise say the same thing a second time the
-      // moment the player used it. Spend them here instead.
-      this.autoHinted[step.key] = true;
-      const slot = w.abilities.slots.find((a) => a.def.id === step.key);
-      if (slot) slot.used = true;
-      this.taughtKey = step.key;
-      audio.chime(680);
-      background.surge(0.5);
-    } else {
-      this.taughtKey = null;
-    }
+    this.scriptStep++;
     this.hud.showHint(step.text, true);
-    this.lineFrom = w.time;
-    this.lineHold = step.hold;
     this.lineUntil = w.time + step.hold;
-
-    // The last entry is the one that says so. It stays up; only the teaching
-    // stops, and it never starts again on this device.
-    if (this.tutorialStep >= TUTORIAL.length) {
+    if (this.scriptStep >= SCRIPT.length) {
       this.teaching = false;
-      this.taughtKey = null;
       markTaught();
     }
   }
 
   /**
-   * The player used the thing they were just handed. That is proof the line
-   * was read, so it comes down and the ladder moves up — someone engaged is
-   * not made to sit through the rest of a sentence they have already acted on,
-   * and someone who ignores it still gets the whole thing.
-   */
-  ackTaught(key) {
-    if (!this.teaching || key !== this.taughtKey) return;
-    this.taughtKey = null;
-    // The line stays. It is pushed up the band by the next one rather than
-    // taken away — having acted on a sentence is not a reason to lose it.
-    // The floor is what keeps this from undoing the clock: a tap lands faster
-    // than anyone reads, so the shortcut can never take a line below most of
-    // its own reading time.
-    const floor = this.lineFrom + this.lineHold * ACK_FLOOR;
-    this.lineUntil = Math.min(this.lineUntil, Math.max(this.world.time + ACK, floor));
-  }
-
-  /**
-   * Run the opening again. It is remembered as done in localStorage, and a
-   * reset does not clear that on purpose — being taught the same nineteen
-   * things twice is not teaching. But there was no way back to it at all,
-   * which made it unreachable for anyone who had already seen it once.
+   * Run the opening lines again. They are remembered as said in localStorage
+   * and a reset does not clear that on purpose — being told the same four
+   * things twice is not teaching. But there was no way back to them at all,
+   * which made every later change to them invisible to anyone who had played.
    */
   replayOpening() {
     forgetTaught();
@@ -944,20 +893,23 @@ export class Game {
     this.restart();
   }
 
-  /** Hand over whatever is left and stop teaching, without a word. */
+  /** Stop the opening where it is, without a word. */
   finishTeaching() {
     if (!this.teaching) return;
     this.teaching = false;
-    this.taughtKey = null;
-    this.tutorialStep = TUTORIAL.length;
-    for (const k of ALL_KEYS) this.world.unlocked.add(k);
+    this.scriptStep = SCRIPT.length;
     this.hud.clearHint();
     markTaught();
   }
 
-  /** Visible, on screen, and not yet handed over. */
+  /**
+   * On screen and not yet bought. Every locked thing is drawn from the first
+   * frame — the shape of what a turret can become is part of what the offers
+   * are for, and a card that hands you WIRE means more when you have been
+   * looking at its cell for ten minutes.
+   */
   isSealed(key) {
-    return this.teaching && !this.world.unlocked.has(key);
+    return !this.world.unlocked.has(key);
   }
 
   /** The same question by ability slot, which is how the bar and keys ask it. */
@@ -1506,13 +1458,23 @@ export class Game {
     this.world.bossContact = 1.6;
   }
 
-  /** Hand the whole interface over now, and keep it handed over across a reset. */
-  debugTeachAll() {
-    this.teaching = false;
-    this.tutorialStep = TUTORIAL.length;
-    this.world.unlocked = new Set(ALL_KEYS);
-    markTaught();
+
+
+  /**
+   * Everything the run could ever hand over, now. The opening lines are
+   * skipped with it, because they are the one part that is about not having
+   * things yet.
+   */
+  debugUnlockAll() {
+    for (const k of ALL_KEYS) this.world.unlocked.add(k);
     this.hud.syncSeals();
+    this.hud.syncAbilities(this.world.abilities);
+  }
+
+  /** The same, plus the opening marked as seen. What the tests drive. */
+  debugTeachAll() {
+    this.finishTeaching();
+    this.debugUnlockAll();
   }
 
   /** Put the opening back, for looking at it again. */

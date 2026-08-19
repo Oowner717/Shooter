@@ -66,7 +66,7 @@ emptiest.
 [SNARE]                                                     [RECUR ]
 [WIRE ]
 [KNELL]              [AUTO AIM][AUTO FIRE]
-[ PULSE ][  FAN  ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ SIPHON ]
+[ PULSE ][  FAN  ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ CHORUS ]
 ```
 
 Every cell is bound on `pointerdown`, like the ability buttons are: a tap
@@ -197,7 +197,7 @@ a caption explains it.
 | ❄ | **STASIS** | Objects freeze for four seconds; your shots do not | 21 s |
 | ▲ | **PRISM** | Fused shell that refracts — wide blast plus beams in every colour | 16 s |
 | ⚲ | **DECOY** | A turret that is not yours, 300 units up-field. Everything walks at it instead | 24 s |
-| ✷ | **SIPHON** | Hauls every loose fragment in and throws it back as a volley | 15 s |
+| ✷ | **CHORUS** | Ties the field together; whatever kills one hurts the rest | 15 s |
 
 **DECOY** is the one defensive ability. It plants a hollow copy of your turret
 up-field; `Enemy.steer` picks it over you, so a scattered field becomes one pile
@@ -206,11 +206,23 @@ up against it rather than drifting through, and it takes the collision damage of
 everything it catches — 900 hit points, nine seconds, and a 260-unit blast when
 it finally goes. Only one at a time; casting again detonates the old one.
 
-**SIPHON** is the one ability whose strength you build up yourself. It drags
-every fragment within 900 units into the muzzle and fires them back out in a
-fan across whatever arc the barrel is covering — one shot per fragment, so a
-littered floor is a barrage and a floor you have just cleared gives you the
-six-shot minimum. It also competes with a GLUT for the same food.
+**CHORUS** is the only ability that does nothing on its own. It binds every
+hostile on the field for six seconds — no damage, no hold — and from then on,
+whenever one of them comes apart, the few nearest bound bodies feel it. It is
+the payoff for what the player does next.
+
+Getting the numbers right took three passes, and the mechanic changed rather
+than the constants. An echo that reached *every* bound body scaled as the
+square of the crowd, so it was all or nothing: at a third of full health one
+death took a maximum field from 44 objects to 4, and at a fifth the first echo
+could not kill a NEEDLE and the chain never started. Reaching only the nearest
+`spread` makes it a chain that **travels** — as far as the crowd is packed,
+stalling where it thins — which is a thing the player can arrange, with WELL,
+with SNARE, or just with where they shoot. Three seeds per death is still a
+branching process above one, so the echo weakens by `falloff` at every hop and
+one binding pays at most `hops` of them. It lands at a handful most times and a
+lot occasionally, off a single seeded death; in play the player is killing
+things throughout the six seconds, so the real reach is higher.
 
 **Contact does not kill you.** When an object touches the turret the feed
 corrupts — slice tearing, chroma ghosting, block noise — and *stays* corrupted
@@ -282,9 +294,13 @@ button can then say AMENDMENT and mean it.
   the two seconds before a tap and a shape lands before a name does; without
   them the small tier showed an empty box where the large tier showed a symbol,
   which read as something missing rather than something simpler.
-- **AMENDMENT**, every 125 kills — four in a counted run. Permanent for the
-  run, and it offers exactly one option from each of three axes, so a pick is
-  an identity rather than a number:
+- **AMENDMENT**, every 50 kills — ten in a counted run. Permanent for the run.
+  Three cards, and while anything is still locked the first of them **opens
+  something**, because that is the spine of a run: the turret arrives with two
+  things and everything else is a choice made on the way. The second is a
+  **second charge** for an ability once there is an unlocked one worth
+  doubling. The third is a stat, from one of three axes, so a pick is an
+  identity rather than a number:
   **AMMO** sharpens what you shoot, **FIELD** is what happens without you, and
   **TURRET** is the machine itself.
 
@@ -322,7 +338,7 @@ moment it drops until the moment it is collected. **Nothing decays.** What is on
 the floor is a backlog, not a clock.
 
 A fragment is collected by reaching the intake around the turret, or by being
-destroyed — shot, blasted, or eaten by SIPHON. An object's worth comes from its
+destroyed — shot, blasted, or crushed. An object's worth comes from its
 mass and is split across the fragments it leaves, so a bulwark pays about
 twenty-eight times what a mote does. The harmless drift pays a flat six: income
 the tally never sees.
@@ -458,110 +474,65 @@ something new.
 
 ### The opening
 
-The first run, and only the first run, hands the interface over a piece at a
-time. Every strip cell and every ability button is on screen from the moment
-the run starts — the shape of the bar is part of what is being taught, and you
-should be able to see there are four mines before you have any of them — but
-they are **sealed**: visible, greyed, and inert. A press on one nudges and does
-nothing. The menu is the one control that is live throughout.
+Almost nothing is said up front, because almost nothing is in hand. The turret
+is issued with **BOLT and PULSE** and nothing else. The four other rounds, all
+four mines, both of the ones that run on their own and seven of the eight
+abilities start locked — drawn on the strip and the bar from the first frame,
+greyed and inert. A press on one nudges and does nothing.
 
-It is one ordered script. Some entries only say something; the rest hand a
-control over and say what it is.
+Every one of them is a **permanent upgrade**, bought from the AMENDMENT tier of
+the offer system. The shape of what a turret could become is on screen from the
+start, which is what makes a card that hands you WIRE mean something after ten
+minutes of looking at its cell.
 
-    the grip, and tapping ahead of it     empty field
-    PULSE                                 empty field
-    BOLT                                  empty field
-    what is coming, and that it cannot kill you
-    SALVAGE, the number that counts up    object 2
-    ammunition   HE, SHOT, ARC, RECUR     objects 4-10
-    mines        BLAST, SNARE, WIRE, KNELL objects 12-18
-    running      AUTO AIM, AUTO FIRE      objects 20-22
-    ALLOCATION, with one on the button    object 24
-    abilities    FAN through SIPHON       objects 26-38
-    AMENDMENT, which is described         object 40
-    a closing line                        object 42
+Four lines run over the empty field — the grip, the shot, that PULSE can never
+be taken, and that what is coming cannot kill you — and then it stops talking.
+Four more are spread across the count for the three things the run gives back:
+SALVAGE at object 2, ALLOCATION at object 20 with a real one waiting on the
+button, AMENDMENT at object 44, and a reminder at 120 that everything not in
+hand is still out there.
 
-**PULSE comes first**, before there is anything to use it on. It is the one
-thing ORDINAL can never take away, and having it in hand from the start is the
-first fact about the game — its button carries a second ring inside the border
-so it reads as fixed rather than merely present. The rest of the abilities are
-deliberately last: by the time they arrive the turret is already looking after
-itself, and abilities are the part you are meant to be doing by hand.
+**Everything else explains itself the first time it is used**, which is minutes
+after it was bought and only if the player reaches for it. `FIRST_USE` in
+`src/tutorial.js` holds one sentence per thing, and the unlock card carries the
+same sentence — so the card that hands you a round and the caption that greets
+you using it say the same thing, and neither has to be read twice.
 
-**The count cannot pace this on its own.** Objects die slowly at the start and
-very fast later, so a ladder keyed only on kills hands out its hardest lines at
-its quickest moment — measured at build 35, KNELL had 0.71s on screen for
-eleven words and fifteen of twenty-three lines were gone before they could be
-read. So an unlock needs two things: the objects, *and* enough time for the
-line before it to have been read. The reading time is `holdFor()` — a beat to
-notice the line, then about 180 words a minute — and it is what actually
-governs from the mines onward. Nothing is ever cut off, at any kill rate.
+`holdFor()` sizes every line to itself — a beat to notice it, then about 180
+words a minute — and the band keeps `STACK` of them, the older pushed up and
+dimmed rather than taken away. The lines sit on a plate; they land among lit
+objects and two text-shadows were not enough to hold grey 12px type apart from
+that.
 
-**Acting on a line shortens the wait** to `ACK` — but never below `ACK_FLOOR`
-of the line's own reading time, because a tap lands faster than anyone reads
-and without the floor the shortcut walked the tail of the script back to about
-two seconds a line, the exact failure the clock was added to fix. Using the
-thing is proof of having read about it. That makes the opening adaptive rather than
-fixed: a player who tries each thing as it arrives is through in about 70
-seconds, one who ignores the strip entirely still gets every sentence in full
-and takes about 140. Nothing is skipped either way. The line itself is **not**
-taken away when it is used — it is pushed up the band and dimmed by the next
-one, so a sentence you have just acted on is still there while you look at
-what it gave you. The band keeps `STACK` of them.
-
-The lines sit on a plate rather than over bare field. They land among lit
-objects, and two text-shadows were not enough to hold grey 12px type apart
-from that.
+**RESET SIMULATION does not bring the opening back**, on purpose. **REPLAY
+OPENING**, in the menu's SYSTEM tab, does: it clears the flag and restarts, and
+it works on a cleared save too. **UNLOCK ALL**, in the debug panel, hands over
+every round, mine and ability at once.
 
 ### The first minute
 
-Nothing hostile is released for `openingGrace` seconds. The first four entries
-of the script ask for nothing but the clock, so the grip, the tap, PULSE and
-BOLT are all in hand — and have been played with — before the first object
-exists. Harmless **drift** starts at `driftStart`, well inside that, so there
-is something to shoot at while the field is still safe.
+Nothing hostile is released for `openingGrace` seconds. Harmless **drift**
+starts at `driftStart`, well inside that, so there is something to shoot at
+while the field is still safe.
 
-And then it arrives gently. Thirteen objects the moment the grace ends is the
-normal field, not an opening, so the population target and the spawn rate both
-climb from `warmPop` to normal over `warmKills` objects **or** `warmSeconds` —
-whichever comes first, because on kills alone a player who shoots nothing would
-sit in front of two objects indefinitely. LURCHER is held back to object 10, so
-the first things down are MOTEs and NEEDLEs and nothing else. Endless runs skip
-the warm-up entirely.
+And then it arrives gently. The population target and the spawn rate climb from
+`warmPop` to normal over `warmKills` objects **or** `warmSeconds` — whichever
+comes first, because on kills alone a player who shoots nothing would sit in
+front of two objects indefinitely. It is thinner still for the first
+`teachKills` objects, capped at `teachPop`. LURCHER is held back to object 10,
+so the first things down are MOTEs and NEEDLEs and nothing else. Endless runs
+skip the warm-up entirely.
 
-**While the opening is still running it stays thinner than that** — capped at
-`teachPop` and spawning at `teachRate` of normal. Nineteen controls are being
-handed over with a sentence to read on each, and the field is there to give the
-new thing something to do, not to be survived. Measured over a full opening:
-about four hostiles on screen against a normal thirteen, and nineteen within
-half a minute of the last line.
+### Charges
 
-### The three things it gives back
+An ability holds one use and behaves as a plain cooldown, and nothing extra is
+drawn on it. A **second use is a permanent upgrade**, one ability at a time,
+and only then do pips appear on that button — an empty slot for a thing you
+have not bought is a nag, not a readout. Charges refill one per cooldown, so a
+two-charge ability takes two cooldowns to come all the way back, and the button
+reads ready while there is still one in hand.
 
-The opening says what they are where it can point at them rather than listing
-them:
-
-- **SALVAGE** at object 2, once the number has actually moved.
-- **ALLOCATION** at object 24, with a real one sitting on the button —
-  `events.smallFirst` exists so that is true rather than nearly true.
-- **AMENDMENT** at object 40, described rather than shown. The permanent tier
-  is a hundred objects further on, and by then it announces itself loudly
-  enough that the player only needs to know the word.
-
-Sealed is not the same as ORDINAL's `locked` — locked is a button taken away
-mid-fight, sealed is one not yet given. Both are visible; only one is a loss.
-
-The whole script is `src/tutorial.js`: the four intro lines, the nineteen
-unlocks with their text and their counts, and the closing line. Completion is
-kept in `localStorage` under `sim7749-taught`, so every run after the first
-starts with all of it. A cleared save skips the opening outright.
-
-**RESET SIMULATION does not bring it back** — being taught the same nineteen
-things twice is not teaching. **REPLAY OPENING**, in the menu's SYSTEM tab,
-does: it clears the flag and restarts, and it works on a cleared save too,
-because the opening teaches the interface and that has nothing to do with
-having beaten ORDINAL. It is a single replay; the run after it is normal
-again.
+A charge is only ever offered for an ability that has actually been unlocked.
 
 ### The objects
 

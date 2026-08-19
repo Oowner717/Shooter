@@ -119,7 +119,7 @@ export class Offers {
       // steps in front of lose nothing by waiting — and the button can then
       // say AMENDMENT and mean it, instead of advertising the top-up that
       // happened to be queued first.
-      this.queue.unshift({ tier: 'large', options: rollLarge(this.taken), held: this.held() });
+      this.queue.unshift({ tier: 'large', options: rollLarge(this.taken, world), held: this.held() });
       if (world.announceOffer) world.announceOffer('large');
     }
   }
@@ -139,7 +139,9 @@ export class Offers {
     if (!opt) return null;
     this.queue.shift();
     if (offer.tier === 'large') {
-      opt.apply(world.up);
+      // Stat upgrades only ever touch world.up; the unlocks and the charges
+      // need the world itself, so both are handed over.
+      opt.apply(world.up, world);
       this.taken.push(opt.id);
     } else {
       opt.run(world);
