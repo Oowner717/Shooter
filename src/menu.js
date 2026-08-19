@@ -225,10 +225,15 @@ export class Menu {
       const on = a.kind === 'round' ? world.round === a.key
         : a.kind === 'mine' ? world.mine === a.key
           : !!world[a.key];
+      // The sheet is the record of what the turret has, and most of it starts
+      // locked. Listing all eleven with no mark said the turret owned them.
+      const sealed = !world.unlocked.has(a.key);
       const el = this.cells.get(a.key);
-      if (!el || el._on === on) continue;
+      if (!el || (el._on === on && el._sealed === sealed)) continue;
       el._on = on;
+      el._sealed = sealed;
       el.classList.toggle('on', on);
+      el.classList.toggle('sealed', sealed);
     }
   }
 }

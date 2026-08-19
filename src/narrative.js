@@ -187,8 +187,9 @@ export class Narrator {
  * `body` takes the ability count so the one number in it stays true.
  */
 export const CONTROLS = [
-  ['LEVER', () => 'hold the grip under the turret and swing. The barrel is the far end of the same rod, so it goes the opposite way — and fires on its own.'],
-  ['TAP', () => 'anywhere ahead of the turret and the shots go there instead. Hold to keep firing.'],
-  ['ABILITIES', (n) => `${n} along the bottom edge. One tap each. Nothing to spend or upgrade; each comes back on its own.`],
-  ['CONTACT', () => 'does not kill you. It breaks up the feed you aim through, and it stays broken until you destroy what caused it.'],
+  ['LEVER', () => 'hold the grip under the turret and swing. The barrel goes the other way, and fires while you hold it.'],
+  ['TAP', () => 'anywhere ahead of the turret to shoot there instead. Hold to keep firing.'],
+  ['ABILITIES', (n) => `PULSE to begin with, ${n - 1} more to open. One tap each; each comes back on its own.`],
+  ['OFFERS', () => 'a choice of three, every so often. Rounds, mines, abilities and upgrades all come from there.'],
+  ['CONTACT', () => 'does not kill you. It breaks up the feed you aim through until you destroy what caused it.'],
 ];

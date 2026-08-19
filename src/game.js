@@ -679,8 +679,12 @@ export class Game {
       w.pendingMines--;
       // With nothing selected SEED used to do nothing at all, which made it a
       // dead option on any run that had not picked a mine yet. It lays a
-      // random kind instead.
-      throwMine(w, w.mine || MINE_KEYS[(Math.random() * MINE_KEYS.length) | 0]);
+      // random kind instead — but only one that has actually been unlocked,
+      // or it hands out a mine the turret has not bought. The offer is not
+      // rolled at all when nothing is open, so the fallback is belt and braces.
+      const own = MINE_KEYS.filter((k) => w.unlocked.has(k));
+      if (w.mine) throwMine(w, w.mine);
+      else if (own.length) throwMine(w, own[(Math.random() * own.length) | 0]);
     }
     updateMines(w, dt);
     this.resolveBlasts();
@@ -1310,7 +1314,6 @@ export class Game {
     ctx.moveTo(w.shooter.x + w.shooter.r, w.shooter.y);
     ctx.arc(w.shooter.x, w.shooter.y, w.shooter.r, 0, TAU);
     ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,80,80,0.6)';
     ctx.strokeStyle = 'rgba(255,220,0,0.5)';
     ctx.beginPath();
     ctx.moveTo(0, w.floorY);

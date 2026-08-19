@@ -151,7 +151,10 @@ export const UNLOCKS = Object.values(LOCKABLE).flat().map((key) => ({
   key,
   axis: 'UNLOCK',
   name: armName(key),
-  line: (FIRST_USE[key] || '').replace(/^[A-Z ]+\. /, ''),
+  // The caption's own name prefix comes off — the card already has the name in
+  // its heading — and its authored line break with it, because a card is one
+  // paragraph and not two lines.
+  line: (FIRST_USE[key] || '').replace(/^[A-Z ]+\. /, '').replace(/\s+/g, ' '),
   icon: armIcon(key),
   apply: (up, world) => { world.unlocked.add(key); },
 }));

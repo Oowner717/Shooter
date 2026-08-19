@@ -312,6 +312,15 @@ html, body {
   70% { transform: translateX(2px); }
 }
 
+/* A row in the ARSENAL sheet for something not bought yet. */
+.armRow.sealed { opacity: 0.34; }
+.armRow.sealed .codexName::after {
+  content: ' — locked';
+  font-size: 0.82em;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+}
+
 .alert.fade { opacity: 0.55; }
 
 @keyframes alertIn {
@@ -1419,6 +1428,16 @@ body.booting #pendingBtn {
 
   .ab svg { width: 20px; height: 20px; }
   .ab .lbl { font-size: 7px; letter-spacing: 0.04em; }
+
+  /* The title screen scrolls rather than clipping, but a BEGIN button below
+     the fold on the smallest phone is a start button nobody finds. The copy
+     is the only thing here that can give ground. */
+  #boot h1 { font-size: 25px; margin-bottom: 12px; }
+  .bootKicker { margin-bottom: 10px; }
+  .bootBody { font-size: 10.5px; line-height: 1.6; margin-bottom: 14px; }
+  .bootKeys { margin-bottom: 14px; }
+  .bootKeys li { font-size: 9.5px; line-height: 1.5; padding: 4px 0; }
+  #startBtn { padding: 13px; }
 
   /* The opening lines carry their own break, and at 320 the plate's padding
      was enough to wrap each half again — four rendered lines for a two-line

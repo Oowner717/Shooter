@@ -228,7 +228,6 @@ export class Hud {
         s.pips.innerHTML = max > 1
           ? Array.from({ length: max }, (_, k) => `<i class="${k < charges ? 'on' : ''}"></i>`).join('')
           : '';
-        s.el.classList.toggle('multi', max > 1);
       }
     }
   }

@@ -425,7 +425,7 @@ export class Boss {
 
   /** SUBTRACT: one of the six buttons goes dark for a while. */
   subtract(world) {
-    const slot = world.abilities.lockRandom(CFG.boss.subtract);
+    const slot = world.abilities.lockRandom(CFG.boss.subtract, world.unlocked);
     if (slot < 0) return -1;
     // The button going grey is easy to miss mid-fight, so the taking is shown:
     // a pull from ORDINAL and a hit on the button that lost.

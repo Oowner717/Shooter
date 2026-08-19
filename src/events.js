@@ -73,8 +73,15 @@ const SMALL = [
 ];
 
 /** Three of the small tier, never the same one twice in one offer. */
-function rollSmall() {
-  const pool = [...SMALL];
+export function rollSmallFor(world) {
+  return rollSmall(world);
+}
+
+function rollSmall(world) {
+  // A turret with no mine unlocked has nowhere to put three of them, and an
+  // option that does nothing is worse than one fewer option.
+  const anyMine = ['blast', 'snare', 'wire', 'knell'].some((k) => world.unlocked.has(k));
+  const pool = SMALL.filter((o) => o.id !== 'seed' || anyMine);
   const out = [];
   for (let i = 0; i < 3 && pool.length; i++) {
     out.push(...pool.splice((Math.random() * pool.length) | 0, 1));
@@ -110,7 +117,7 @@ export class Offers {
   note(world) {
     while (world.kills >= this.nextSmall) {
       this.nextSmall += CFG.events.small;
-      this.queue.push({ tier: 'small', options: rollSmall() });
+      this.queue.push({ tier: 'small', options: rollSmall(world) });
       if (world.announceOffer) world.announceOffer('small');
     }
     while (world.kills >= this.nextLarge) {

@@ -100,8 +100,9 @@ It explains rather than controls. Everything that gets chosen is chosen on the
 strip, so the sheet carries the two records instead:
 
 - **ARSENAL** — every round, mine and assist, with the one-line reason for
-  reaching for it. It lights to match what is loaded right now, but it is a
-  reference: there is no second copy of a control in here.
+  reaching for it. It lights to match what is loaded right now and dims what
+  has not been unlocked yet, but it is a reference: there is no second copy of
+  a control in here.
 - **OBJECTS** — the glossary (below).
 - **SYSTEM** — sound, reset, the debug panel, the controls, and the build
   number.
@@ -287,7 +288,7 @@ button can then say AMENDMENT and mean it.
   | **HASTE** | Ability cooldowns halved for 45s. |
   | **SURGE** | Double fire rate for 30s. |
   | **YIELD** | +150 salvage. |
-  | **SEED** | Lay 3 mines now — a random kind if none is selected. |
+  | **SEED** | Lay 3 mines now — a random unlocked kind if none is selected. |
   | **SHAKE OFF** | Destroy everything gripping the turret. |
 
   Each carries a mark, drawn the way the permanent ones are. A card is read in
@@ -533,6 +534,10 @@ two-charge ability takes two cooldowns to come all the way back, and the button
 reads ready while there is still one in hand.
 
 A charge is only ever offered for an ability that has actually been unlocked.
+**SUBTRACT only takes one that has been unlocked too** — taking away a button
+never bought costs the player nothing and reads as a greyed button going
+slightly greyer, and SUBTRACT is ORDINAL's whole character. Measured: with only
+PULSE open it takes nothing at all, because PULSE is never on the table.
 
 ### The objects
 

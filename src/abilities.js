@@ -750,7 +750,7 @@ export class Abilities {
 
   reset() {
     for (const s of this.slots) {
-      s.cd = 0; s.used = false; s.locked = 0; s.max = 1; s.charges = 1;
+      s.cd = 0; s.used = false; s.locked = 0; s.max = 1; s.charges = 1; s.cost = 0;
     }
   }
 
@@ -789,15 +789,20 @@ export class Abilities {
   /**
    * ORDINAL's SUBTRACT. Takes an unlocked button away for a while, preferring
    * one that is actually ready — removing something already on cooldown would
-   * cost the player nothing. PULSE is never on the table.
+   * cost the player nothing, and neither would removing one never unlocked.
+   * PULSE is never on the table.
    * @returns the index taken, or -1 if there was nothing worth taking.
    */
-  lockRandom(seconds) {
+  lockRandom(seconds, unlocked) {
     const free = [];
     const any = [];
     for (let i = 0; i < this.slots.length; i++) {
       const s = this.slots[i];
       if (s.locked > 0 || s.def.essential) continue;
+      // Taking away something never bought costs the player nothing and reads
+      // as a greyed button going slightly greyer. SUBTRACT is ORDINAL's whole
+      // character; it has to land on something that was actually in hand.
+      if (unlocked && !unlocked.has(s.def.id)) continue;
       any.push(i);
       if (s.cd <= 0) free.push(i);
     }
