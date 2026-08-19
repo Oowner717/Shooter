@@ -40,7 +40,7 @@ const TONE = {
 };
 
 class Mine {
-  constructor(kind, x0, y0, x1, y1) {
+  constructor(kind, x0, y0, x1, y1, world0) {
     const k = KIND[kind];
     this.kind = kind;
     this.x0 = x0;
@@ -52,6 +52,7 @@ class Mine {
     this.r = k.r;
     this.t = 0; // flight progress, 0..1
     this.settle = 0; // seconds since landing
+    this.life = k.life * world0.up.mineLife;
     this.dead = false;
     this.spin = rand(0, TAU);
     this.hold = 0; // snare only: seconds of grip left once it has opened
@@ -62,7 +63,7 @@ class Mine {
     this.bx = x1;
     this.by = y1;
     // knell only: tolls left, and the clock to the next one
-    this.tolls = kind === 'knell' ? K.tolls : 0;
+    this.tolls = kind === 'knell' ? K.tolls + world0.up.mineTolls : 0;
     this.tollTimer = 0;
   }
 
@@ -104,7 +105,7 @@ const LAY_TONE = { blast: 300, snare: 240, wire: 380, knell: 200 };
 export function throwMine(world, kind = 'blast') {
   const s = world.shooter;
   const site = landingSite(world);
-  const m = new Mine(kind, s.x, s.y - 20, site.x, site.y);
+  const m = new Mine(kind, s.x, s.y - 20, site.x, site.y, world);
   if (kind === 'wire') {
     // The line is laid across the field, not along it, so it closes a lane
     // rather than sitting parallel to everything coming down. Kept inside the
@@ -138,7 +139,7 @@ function laidCount(world) {
 function detonate(world, m) {
   m.dead = true;
   const br = M.blast.r * world.up.mineBlast;
-  applyBlast(world, { x: m.x, y: m.y, r: br, damage: M.blast.damage, impulse: M.blast.impulse });
+  applyBlast(world, { x: m.x, y: m.y, r: br, damage: M.blast.damage * world.up.mineDamage, impulse: M.blast.impulse });
   ring(m.x, m.y, m.r, br * 1.5, 0.4, '#ffb347', 5);
   ring(m.x, m.y, 0, br * 0.7, 0.24, '#ffffff', 2);
   ripple(m.x, m.y, 1.4, br * 4);
@@ -153,7 +154,7 @@ function detonate(world, m) {
 
 /** A snare opening: it stops being a trigger and starts being a fist. */
 function snap(world, m) {
-  m.hold = S.hold;
+  m.hold = S.hold * world.up.mineHold;
   m.settle = 0;
   ring(m.x, m.y, S.reach, m.r * 2, 0.45, '#c77dff', 4);
   ripple(m.x, m.y, 1.1, S.reach * 3);
@@ -211,7 +212,7 @@ function cut(world, m, dt) {
       const d = Math.sqrt(hit.d2) || 1;
       const nx = (e.x - hit.px) / d;
       const ny = (e.y - hit.py) / d;
-      e.applyDamage(world, W.damage * dt, nx, ny, W.shove * dt);
+      e.applyDamage(world, W.damage * world.up.wireDamage * dt, nx, ny, W.shove * dt);
       if (Math.random() < 12 * dt) {
         spark(hit.px, hit.py, spread(180), spread(180), '#7cffb2', 0.24, 2);
       }
@@ -223,9 +224,9 @@ function cut(world, m, dt) {
 
 /** KNELL. One of three, each wider than the one before and worth less. */
 function toll(world, m) {
-  const i = K.tolls - m.tolls;
+  const i = (K.tolls + world.up.mineTolls) - m.tolls;
   const r = K.blast.r * (1 + i * K.grow) * world.up.mineBlast;
-  const damage = K.blast.damage * K.fade ** i;
+  const damage = K.blast.damage * K.fade ** i * world.up.mineDamage;
   m.tolls--;
   m.tollTimer = K.gap;
   applyBlast(world, { x: m.x, y: m.y, r, damage, impulse: K.blast.impulse });
@@ -270,17 +271,29 @@ export function updateMines(world, dt) {
     }
 
     m.settle += dt;
+    m.life -= dt;
 
     if (m.kind === 'wire') {
-      // Nothing triggers it and nothing consumes it. It is a lane closed until
-      // the field-wide cap pushes it off for something newer.
+      // Nothing triggers it and nothing consumes it; it runs out its life.
       if (m.cutting) cut(world, m, dt);
+      if (m.life <= 0) {
+        m.dead = true;
+        for (let k = 0; k < 8; k++) {
+          spark(m.x, m.y, spread(140), spread(140), '#7cffb2', 0.4, 1.8);
+        }
+        audio.pop(1.1);
+      }
     } else if (m.kind === 'knell') {
       // It does not need anything to walk into it. Once armed it is a clock,
-      // and it ends itself on the last of its three tolls.
+      // and it ends itself on the last of its tolls — the life is a backstop
+      // behind that, for a knell that never finished settling.
       if (m.settle >= K.arm) {
         m.tollTimer -= dt;
         if (m.tollTimer <= 0) toll(world, m);
+      }
+      if (!m.dead && m.life <= 0) {
+        m.dead = true;
+        for (let k = 0; k < 6; k++) spark(m.x, m.y, spread(50), spread(50), '#6d829a', 0.5, 1.4);
       }
     } else if (m.gripping) {
       // Holding. It cannot be re-triggered and it does no damage itself.
@@ -292,6 +305,10 @@ export function updateMines(world, dt) {
         for (let k = 0; k < 10; k++) spark(m.x, m.y, spread(180), spread(180), '#c77dff', 0.4, 2);
         audio.pop(0.9);
       }
+    } else if (m.life <= 0) {
+      // Expired rather than triggered: fizzles out without a bang.
+      m.dead = true;
+      for (let k = 0; k < 6; k++) spark(m.x, m.y, spread(50), spread(50), '#6d829a', 0.5, 1.4);
     } else if (m.armed && m.cfg.trigger) {
       const reach = m.r + m.cfg.trigger * world.up.mineTrigger;
       for (const e of world.enemies) {

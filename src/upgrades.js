@@ -28,7 +28,12 @@ export function freshUpgrades() {
     // field
     mineMax: 0,
     mineRate: 1,
+    mineLife: 1, // how long one sits before it fizzles
     mineBlast: 1, // radius of a blast mine and of a knell's tolls
+    mineDamage: 1, // and how hard both of them land
+    mineHold: 1, // seconds a snare keeps what it caught
+    mineTolls: 0, // extra rings on a knell
+    wireDamage: 1, // per second of contact on a wire
     mineTrigger: 1,
     sweep: 0, // seconds between the turret clearing behind itself
     reflex: false, // PULSE answers a crowd on the turret by itself
@@ -71,6 +76,16 @@ const MARK = {
   // A charge going off wider than it used to: the same centre, one ring further.
   deepcharge: g('<circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="5.6"/><circle cx="12" cy="12" r="9.4" stroke-dasharray="2.6 2.8"/><path d="M12 2.6v1.6M12 19.8v1.6M2.6 12h1.6M19.8 12h1.6" opacity=".7"/>'),
   widemouth: g('<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9" stroke-dasharray="2.4 3"/>'),
+  // A fuse with more of itself left to burn.
+  longfuse: g('<path d="M4 18h6.5"/><path d="M10.5 18c3.4 0 3.4-9 6.8-9" stroke-dasharray="2.4 2.4"/><circle cx="19.4" cy="8.6" r="2.2" fill="currentColor" stroke="none"/><path d="M3 15.6v4.8" opacity=".7"/>'),
+  // Fragments thrown out of a centre, rather than a wider ring.
+  shrapnel: g('<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 8.6 11 3.4M15.4 10.4 19.6 7M15.4 13.6l4.6 2.4M12 15.4l1.2 5.2M8.6 13.6 4 16.4M8.6 10.4 4.4 7"/>'),
+  // A weight on what has been caught: it stays down longer.
+  deadweight: g('<path d="M8.4 8h7.2l2.4 12H6z"/><path d="M9.6 8V6.2a2.4 2.4 0 0 1 4.8 0V8"/><path d="M3 22h18" opacity=".6"/>'),
+  // The line, with heat coming off it.
+  hotwire: g('<path d="M2.5 14h19"/><path d="M4.5 10.5v7M19.5 10.5v7"/><path d="M8.5 9.4c0-1.6 1.6-1.6 1.6-3.2M13.9 9.4c0-1.6 1.6-1.6 1.6-3.2" opacity=".85"/>'),
+  // One more ring than the bell had.
+  fourthbell: g('<path d="M7 15.4c0-5 1.3-8 5-8s5 3 5 8z"/><path d="M5.6 15.4h12.8"/><circle cx="12" cy="18" r="1.4" fill="currentColor" stroke="none"/><path d="M19.6 5.6a5.6 5.6 0 0 1 0 6.4M21.8 3.4a8.8 8.8 0 0 1 0 10.8" opacity=".6"/>'),
   sweep: g('<path d="M12 4v7"/><path d="M8 11h8l1.5 5h-11z" fill="currentColor" stroke="none"/><path d="M3.5 15a9 9 0 0 0 17 0" stroke-dasharray="2.6 2.6"/>'),
   reflex: g('<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M6.5 6.5a7.7 7.7 0 0 0 0 11M17.5 6.5a7.7 7.7 0 0 1 0 11" opacity=".6"/><path d="M13.5 2 10 7.5h4L10.5 13" />'),
   intake: g('<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 2.5v4M9.8 4.6 12 6.9l2.2-2.3"/><path d="M12 21.5v-4M9.8 19.4 12 17.1l2.2 2.3"/><path d="M2.5 12h4M4.6 9.8 6.9 12l-2.3 2.2"/><path d="M21.5 12h-4M19.4 9.8 17.1 12l2.3 2.2"/>'),
@@ -108,6 +123,11 @@ export const UPGRADES = {
     { id: 'quicklay', name: 'QUICK LAY', line: '+30% mine lay speed.', apply: quicken('mineRate', 0.7) , icon: MARK.quicklay },
     { id: 'deepcharge', name: 'DEEP CHARGE', line: '+35% mine blast radius.', apply: scale('mineBlast', 1.35) , icon: MARK.deepcharge },
     { id: 'widemouth', name: 'WIDE MOUTH', line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) , icon: MARK.widemouth },
+    { id: 'longfuse', name: 'LONG FUSE', line: '+60% mine lifetime.', apply: scale('mineLife', 1.6) , icon: MARK.longfuse },
+    { id: 'shrapnel', name: 'SHRAPNEL', line: '+45% mine blast damage.', apply: scale('mineDamage', 1.45) , icon: MARK.shrapnel },
+    { id: 'deadweight', name: 'DEAD WEIGHT', line: '+65% snare hold time.', apply: scale('mineHold', 1.65) , icon: MARK.deadweight },
+    { id: 'hotwire', name: 'HOT WIRE', line: '+50% wire damage.', apply: scale('wireDamage', 1.5) , icon: MARK.hotwire },
+    { id: 'fourthbell', name: 'FOURTH BELL', line: '+1 toll on every knell.', apply: bump('mineTolls', 1) , icon: MARK.fourthbell },
     { id: 'sweep', name: 'SWEEP', line: 'Turret blasts behind itself every 20s.', apply: set('sweep', 20) , icon: MARK.sweep },
     { id: 'reflex', name: 'REFLEX', line: 'PULSE fires itself when 2+ objects grip you.', apply: set('reflex', true) , icon: MARK.reflex },
     { id: 'intake', name: 'INTAKE', line: '+50% salvage pickup range.', apply: scale('intake', 1.5) , icon: MARK.intake },

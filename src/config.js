@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '49';
+export const BUILD = '50';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -212,11 +212,19 @@ export const CFG = {
      * blast mines is forty-six.
      */
     cap: 10,
+    // One lifetime for every kind. Build 48 took expiry off entirely and the
+    // field silted up: nothing ever left, so the cap was the only thing
+    // deciding how much was down, and ten permanent wires closed most of the
+    // field for good. Thirty seconds puts the cadence back in charge — the
+    // steady state is life over interval, so a blast stack settles around six
+    // and a half of the ten, and reaching the cap is what the upgrades are for.
+    life: 30,
     flight: 0.85, // seconds from turret to landing site
     arm: 0.4, // settling time before it can trigger
     r: 13,
     trigger: 26, // extra reach beyond the mine's own radius
-    blast: { r: 168, damage: 140, impulse: 760 },
+    // Nerfed in build 49 from 140; SHRAPNEL is the way back past it.
+    blast: { r: 168, damage: 95, impulse: 760 },
   },
 
   // ---- snares ---------------------------------------------------------
@@ -226,11 +234,12 @@ export const CFG = {
   // choose to put into the pile while it cannot move.
   snare: {
     interval: 7.4, // slower to lay than a blast mine
+    life: 30,
     flight: 0.9,
     arm: 0.6, // takes longer to settle
     r: 14,
     trigger: 34, // a wider mouth, because it wants a crowd
-    hold: 3.6, // seconds it keeps hold once it opens
+    hold: 2.4, // seconds it keeps hold once it opens — was 3.6; see DEAD WEIGHT
     reach: 210,
     pull: 300, // inward speed it drives what it catches
   },
@@ -242,13 +251,14 @@ export const CFG = {
   // consumes it: it is a lane closed for as long as it lasts.
   wire: {
     interval: 8.6,
+    life: 30,
     flight: 0.95,
     arm: 0.5,
     r: 11,
     span: 150, // half-length of the line, world units
     open: 0.55, // seconds to unspool once it has settled
     width: 8, // contact half-width
-    damage: 105, // per second of contact, per body
+    damage: 72, // per second of contact, per body — was 105; see HOT WIRE
     shove: 150, // pushed off the line rather than held on it
   },
 
@@ -258,10 +268,11 @@ export const CFG = {
   // A blast mine punishes what walks into it; this one denies the ground.
   knell: {
     interval: 9.4,
+    life: 30,
     flight: 0.9,
     arm: 0.8,
     r: 13,
-    tolls: 3,
+    tolls: 2, // was 3; FOURTH BELL buys the third back and a fourth beyond it
     gap: 1.15, // seconds between them
     blast: { r: 118, damage: 74, impulse: 430 },
     grow: 0.5, // each toll this much wider than the one before
