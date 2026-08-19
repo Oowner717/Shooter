@@ -453,6 +453,9 @@ export class Hud {
         + (large ? `<span class="offerAxis">${opt.axis}</span>` : '')
         + `<span class="offerName">${opt.name}</span>`
         + `<span class="offerLine">${opt.line}</span>`
+        // Said rather than implied: both of these come round again and again,
+        // and a card that reads "double fire rate" invites taking two.
+        + (opt.stacks === false ? '<span class="offerTag">DOES NOT STACK</span>' : '')
         + '</span>'
         // How many of this one is already stacked. The whole reason the marks
         // exist: a repeatable upgrade is worth recognising by shape.

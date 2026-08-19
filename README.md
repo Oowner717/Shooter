@@ -314,11 +314,19 @@ button can then say AMENDMENT and mean it.
   | | |
   |---|---|
   | **RESET** | Every ability ready right now. |
-  | **HASTE** | Ability cooldowns halved for 45s. |
-  | **SURGE** | Double fire rate for 30s. |
+  | **HASTE** | Ability cooldowns halved for 45s. *Does not stack.* |
+  | **SURGE** | Double fire rate for 30s. *Does not stack.* |
   | **YIELD** | +150 salvage. |
   | **SEED** | Lay 3 mines now — a random unlocked kind if none is selected. |
   | **SHAKE OFF** | Destroy everything gripping the turret. |
+
+  **SURGE and HASTE carry a DOES NOT STACK tag.** Both are `Math.max(remaining,
+  n)` on a timer the game reads as a boolean, so a second one taken while the
+  first is running neither compounds the effect nor adds to the clock — it only
+  refreshes it. A card that reads "double fire rate" otherwise invites taking
+  two. The permanent tier has non-stacking upgrades as well, but those are
+  simply never offered twice, so the question never comes up; these two come
+  round again and again.
 
   Each carries a mark, drawn the way the permanent ones are. A card is read in
   the two seconds before a tap and a shape lands before a name does; without

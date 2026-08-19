@@ -1058,6 +1058,17 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
   color: #ffcf5c;
 }
 .offerName { font-size: 12px; letter-spacing: 0.2em; }
+/* On a card whose effect is a switch, not a quantity. */
+.offerTag {
+  align-self: flex-start;
+  margin-top: 3px;
+  font-size: 6.5px;
+  letter-spacing: 0.16em;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  padding: 2px 5px;
+}
+
 .offerLine {
   font-size: 8.5px;
   line-height: 1.5;
