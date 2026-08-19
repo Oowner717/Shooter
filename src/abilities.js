@@ -472,6 +472,10 @@ export const ABILITIES = [
     name: 'PULSE',
     color: '#59e0ff',
     cooldown: 7,
+    // The one that is always there. It is the answer to something sitting
+    // on the turret where the barrel cannot reach, so it is never a resource
+    // and ORDINAL can never take it away.
+    free: true,
     icon: ICON.pulse,
     hint: 'PULSE — a shockwave. Shoves everything away from you.',
     run(world) {
@@ -494,6 +498,8 @@ export const ABILITIES = [
     name: 'FAN',
     color: '#7cffb2',
     cooldown: 5,
+    cap: 6, // charges it will hold
+    price: 110, // salvage for one more
     icon: ICON.fan,
     hint: 'FAN — 25 pellets in a tight cone.',
     run(world) {
@@ -523,6 +529,8 @@ export const ABILITIES = [
     name: 'LANCE',
     color: '#ffd166',
     cooldown: 12,
+    cap: 4, // charges it will hold
+    price: 260, // salvage for one more
     icon: ICON.lance,
     hint: 'LANCE — piercing beam, locked to the biggest threat.',
     run(world) {
@@ -573,6 +581,8 @@ export const ABILITIES = [
     name: 'WELL',
     color: '#c77dff',
     cooldown: 38,
+    cap: 2, // charges it will hold
+    price: 820, // salvage for one more
     icon: ICON.well,
     hint: 'WELL — drags everything into a knot, then collapses.',
     run(world) {
@@ -587,6 +597,8 @@ export const ABILITIES = [
     name: 'PRISM',
     color: '#ff9ff3',
     cooldown: 16,
+    cap: 3, // charges it will hold
+    price: 350, // salvage for one more
     icon: ICON.prism,
     hint: 'PRISM — a shell that refracts. Wide blast, then beams every way.',
     run(world) {
@@ -615,6 +627,8 @@ export const ABILITIES = [
     name: 'STASIS',
     color: '#9fe8ff',
     cooldown: 21,
+    cap: 3, // charges it will hold
+    price: 460, // salvage for one more
     icon: ICON.stasis,
     hint: 'STASIS — objects freeze. Your shots do not.',
     run(world) {
@@ -634,6 +648,8 @@ export const ABILITIES = [
     name: 'DECOY',
     color: '#9be7ff',
     cooldown: 24,
+    cap: 2, // charges it will hold
+    price: 520, // salvage for one more
     icon: ICON.decoy,
     hint: 'DECOY — a turret that is not yours. They go for it instead.',
     run(world) {
@@ -655,6 +671,8 @@ export const ABILITIES = [
     name: 'SIPHON',
     color: '#ffd166',
     cooldown: 15,
+    cap: 3, // charges it will hold
+    price: 330, // salvage for one more
     icon: ICON.siphon,
     hint: 'SIPHON — hauls the wreckage in and throws it back.',
     run(world) {
@@ -669,24 +687,56 @@ export const ABILITIES = [
 
 export class Abilities {
   constructor() {
-    this.slots = ABILITIES.map((def) => ({ def, cd: 0, used: false, locked: 0 }));
+    this.slots = ABILITIES.map((def) => ({
+      def, cd: 0, used: false, locked: 0,
+      // Charges, not cooldowns. The difference matters for a game you are
+      // meant to be able to leave running: a cooldown wastes the eight hours
+      // you were at work, a charge banks them. The cap is what stops that
+      // becoming five hundred of everything.
+      charges: def.free ? Infinity : CFG.charges.start,
+      regenT: 0,
+    }));
   }
 
   reset() {
-    for (const s of this.slots) { s.cd = 0; s.used = false; s.locked = 0; }
+    for (const s of this.slots) {
+      s.cd = 0;
+      s.used = false;
+      s.locked = 0;
+      s.charges = s.def.free ? Infinity : CFG.charges.start;
+      s.regenT = 0;
+    }
   }
 
   update(dt) {
     for (const s of this.slots) {
       if (s.cd > 0) s.cd = Math.max(0, s.cd - dt);
       if (s.locked > 0) s.locked = Math.max(0, s.locked - dt);
+      if (s.def.free || s.charges >= s.def.cap) continue;
+      // One charge back every `cooldown` seconds — the same pacing the button
+      // always had, except that it keeps going once you have one.
+      s.regenT += dt;
+      const per = s.def.cooldown * CFG.charges.regen;
+      while (s.regenT >= per && s.charges < s.def.cap) {
+        s.regenT -= per;
+        s.charges++;
+      }
+      if (s.charges >= s.def.cap) s.regenT = 0;
     }
+  }
+
+  /** @returns true if there was room and it went in. */
+  addCharge(i, n = 1) {
+    const s = this.slots[i];
+    if (!s || s.def.free || s.charges >= s.def.cap) return false;
+    s.charges = Math.min(s.def.cap, s.charges + n);
+    return true;
   }
 
   /**
    * ORDINAL's SUBTRACT. Takes an unlocked button away for a while, preferring
-   * one that is actually ready — removing something already on cooldown would
-   * cost the player nothing.
+   * one that could actually have been used — removing something already spent
+   * would cost the player nothing. PULSE is never on the table.
    * @returns the index taken, or -1 if there was nothing worth taking.
    */
   lockRandom(seconds) {
@@ -694,9 +744,9 @@ export class Abilities {
     const any = [];
     for (let i = 0; i < this.slots.length; i++) {
       const s = this.slots[i];
-      if (s.locked > 0) continue;
+      if (s.locked > 0 || s.def.free) continue;
       any.push(i);
-      if (s.cd <= 0) free.push(i);
+      if (this.usable(i)) free.push(i);
     }
     const pool = free.length ? free : any;
     if (!pool.length) return -1;
@@ -710,19 +760,41 @@ export class Abilities {
     return !!s && s.locked > 0;
   }
 
+  /** Could it be pressed right now? */
+  usable(i, world) {
+    const s = this.slots[i];
+    if (!s || s.locked > 0) return false;
+    if (s.def.free) return s.cd <= 0;
+    if (world && world.debug.noCooldown) return true;
+    return s.charges > 0;
+  }
+
   /** @returns the slot if it fired, otherwise null. */
   trigger(world, index) {
     const s = this.slots[index];
-    if (!s || s.cd > 0 || s.locked > 0) return null;
+    if (!s || !this.usable(index, world)) return null;
     s.def.run(world);
-    s.cd = s.def.cooldown * (world.debug.noCooldown ? 0 : 1);
+    if (s.def.free) s.cd = s.def.cooldown * (world.debug.noCooldown ? 0 : 1);
+    else if (!world.debug.noCooldown) s.charges = Math.max(0, s.charges - 1);
     const first = !s.used;
     s.used = true;
     return { slot: s, first };
   }
 
+  /**
+   * What the button's fill shows. A free ability counts down to ready the way
+   * it always did; a charged one is simply ready while it holds anything, and
+   * shows the wait for the next only once it is empty.
+   */
   readyFraction(i) {
     const s = this.slots[i];
-    return s.cd <= 0 ? 1 : 1 - s.cd / s.def.cooldown;
+    if (s.def.free) return s.cd <= 0 ? 1 : 1 - s.cd / s.def.cooldown;
+    if (s.charges > 0) return 1;
+    return clamp(s.regenT / (s.def.cooldown * CFG.charges.regen), 0, 1);
+  }
+
+  chargesOf(i) {
+    const s = this.slots[i];
+    return s.def.free ? Infinity : s.charges;
   }
 }

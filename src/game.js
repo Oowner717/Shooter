@@ -387,6 +387,28 @@ export class Game {
     recur: 'RECUR ROUNDS — the shot happens again, further down the same line.',
   };
 
+  /**
+   * One more charge, paid for out of salvage. The only sink there is until the
+   * large events land, so it is deliberately affordable.
+   * @returns true if it went through.
+   */
+  buyCharge(i) {
+    const w = this.world;
+    const slot = w.abilities.slots[i];
+    if (!slot || slot.def.free) return false;
+    const price = slot.def.price;
+    if (w.salvage < price || slot.charges >= slot.def.cap) {
+      audio.chime(200);
+      return false;
+    }
+    w.salvage -= price;
+    w.abilities.addCharge(i);
+    this.hud.syncAbilities(w.abilities);
+    this.hud.setSalvage(w.salvage);
+    audio.chime(880);
+    return true;
+  }
+
   toggleAuto(key) {
     const w = this.world;
     w[key] = !w[key];

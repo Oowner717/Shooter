@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '29';
+export const BUILD = '30';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -124,6 +124,15 @@ export const CFG = {
     speed: [1180, 1600],
     damagePer: 21,
     minShots: 6, // it always finds something to throw
+  },
+
+  // ---- ability charges -------------------------------------------------
+  // Abilities are stocked, not timed. A cooldown wastes the hours the game
+  // spent unattended; a charge banks them, which is the whole reason for the
+  // change. Caps and prices live on the abilities themselves.
+  charges: {
+    start: 1, // per ability at the top of a run, so the shop has a job on day one
+    regen: 1, // multiplier on each ability's old cooldown, per charge back
   },
 
   // ---- prism shell ----------------------------------------------------

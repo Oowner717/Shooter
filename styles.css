@@ -558,6 +558,39 @@ html, body {
   background: var(--tone, var(--accent));
 }
 
+/* The stock rows in ARSENAL: what a charge costs and how many are held. */
+.stockRow { align-items: center; }
+.stockFree {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: var(--dim);
+  padding-left: 6px;
+}
+.stockBuy {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  background: rgba(4, 8, 15, 0.9);
+  color: var(--dim);
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.stockBuy .held { font-size: 11px; letter-spacing: 0.08em; color: var(--ink); font-weight: 700; }
+.stockBuy .price { font-size: 7.5px; letter-spacing: 0.12em; }
+/* Affordable and not already full. */
+.stockBuy.can {
+  color: #7cffb2;
+  border-color: rgba(124, 255, 178, 0.5);
+  background: rgba(8, 26, 18, 0.9);
+}
+.stockBuy.can:active { background: rgba(124, 255, 178, 0.22); }
+
 /* Not yet destroyed: a name in blocks, and no portrait. */
 .codexCell.locked { border-color: rgba(120, 190, 255, 0.07); background: rgba(4, 8, 14, 0.5); }
 .codexCell.locked .codexName { color: #33414f; letter-spacing: 0.1em; }
@@ -677,6 +710,29 @@ body.menuOpen #quickBar { pointer-events: none; }
 .qc.run.on { box-shadow: inset 0 0 0 40px color-mix(in srgb, var(--accent) 13%, transparent); }
 
 /* ---------------- abilities ---------------- */
+
+/* Charges, as pips along the bottom edge of the button. */
+.ab .pips {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  pointer-events: none;
+}
+.ab .pips i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(120, 190, 255, 0.22);
+  transition: background 0.18s;
+}
+.ab .pips i.on { background: currentColor; box-shadow: 0 0 4px currentColor; }
+/* Out of stock: still there, still coming back, just not now. */
+.ab.empty { opacity: 0.42; }
+.ab.empty svg { filter: grayscale(0.7); }
 
 #abilities {
   position: absolute;

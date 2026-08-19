@@ -146,17 +146,39 @@ over about four when it dies, and everything below is scaled by it:
   faster the emptier its ledger gets — the background is a readout of how the
   fight is going without a word of text
 
-## Phase 2 — abilities become charges
+## Phase 2 — abilities become charges — DONE, build 30
 
-- Charges replace cooldowns: a per-ability cap, a slow regen toward that cap,
-  and a use spends one.
-- PULSE is exempt and stays as it is: always available, never lockable.
-- Charge pips on each ability button.
-- Salvage buys charges, from the menu at first.
+Every ability but PULSE holds charges instead of running a cooldown. A use
+spends one; one comes back every `cooldown` seconds up to a cap; the cap is
+what stops eight hours away becoming five hundred of everything.
 
-Verify: charges bank while unattended and stop at the cap; an ability at zero
-charges is unusable but recovers on its own; PULSE never runs dry and SUBTRACT
-cannot take it; buying deducts and adds.
+| | FAN | LANCE | WELL | PRISM | STASIS | DECOY | SIPHON |
+|---|---|---|---|---|---|---|---|
+| cap | 6 | 4 | 2 | 3 | 3 | 2 | 3 |
+| salvage per charge | 110 | 260 | 820 | 350 | 460 | 520 | 330 |
+
+A run starts with one of each, so the shop has a job from the first minute.
+
+PULSE is exempt in both directions: it keeps its cooldown, it is never a
+resource, and SUBTRACT can no longer take it. It is the answer to something
+sitting on the turret where the barrel cannot reach, so it has to be there.
+
+Charges show as pips along the bottom edge of each button, in the ability's own
+colour. An empty button dims rather than disappearing — it is coming back.
+
+Buying lives in the menu's ARSENAL tab, above the ammunition. It is the one
+thing in the sheet that acts rather than explains, and it is not a second copy
+of anything: there is nowhere else to buy a charge, and nowhere else with room
+for a price.
+
+Measured: eight hours of unattended regen puts every ability exactly at its
+cap and no higher; a use spends exactly one and zero refuses to fire but
+recovers on its own; PULSE fired 40 times out of 40 and survived 200 SUBTRACT
+draws that took all seven others; buying refuses when short, deducts exactly
+the price, and refuses at the cap without charging for it.
+
+Prices are a first guess against an unmeasured income. They are the first thing
+to re-tune once a full run has been played.
 
 ## Phase 3 — small events
 
