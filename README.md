@@ -460,9 +460,9 @@ should be able to see there are four mines before you have any of them — but
 they are **sealed**: visible, greyed, and inert. A press on one nudges and does
 nothing. The menu is the one control that is live throughout.
 
-Four lines run over the empty field during `openingGrace`, before anything
-falls. Then the count starts, and one control comes back every three objects
-with a single line each, in the order the game wants them learned:
+Four lines run over the field while it is still empty, then one control comes
+back at a time with a single line each, in the order the game wants them
+learned:
 
     ammunition   BOLT, HE, SHOT, ARC, RECUR      objects 2-14
     mines        BLAST, SNARE, WIRE, KNELL       objects 17-26
@@ -471,7 +471,27 @@ with a single line each, in the order the game wants them learned:
 
 Abilities are deliberately last: by the time they arrive the turret is already
 looking after itself, and abilities are the part you are meant to be doing by
-hand. A closing line lands at sixty, and the run stops teaching.
+hand. A closing line ends it, and the run stops teaching.
+
+**The count cannot pace this on its own.** Objects die slowly at the start and
+very fast later, so a ladder keyed only on kills hands out its hardest lines at
+its quickest moment — measured at build 35, KNELL had 0.71s on screen for
+eleven words and fifteen of twenty-three lines were gone before they could be
+read. So an unlock needs two things: the objects, *and* enough time for the
+line before it to have been read. The reading time is `holdFor()` — a beat to
+notice the line, then about 180 words a minute — and it is what actually
+governs from the mines onward. Nothing is ever cut off, at any kill rate.
+
+**Acting on a line ends it.** Tapping the control you were just handed takes
+the line down and shortens the wait to `ACK`, because using the thing is proof
+of having read about it. That makes the opening adaptive rather than fixed: a
+player who tries each thing as it arrives is through in about 70 seconds, one
+who ignores the strip entirely still gets every sentence in full and takes
+about 140. Nothing is ever skipped either way.
+
+The lines sit on a plate rather than over bare field. They land among lit
+objects, and two text-shadows were not enough to hold grey 12px type apart
+from that.
 
 Sealed is not the same as ORDINAL's `locked` — locked is a button taken away
 mid-fight, sealed is one not yet given. Both are visible; only one is a loss.

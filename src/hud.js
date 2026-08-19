@@ -7,6 +7,7 @@ import { CONTROLS } from './narrative.js';
 import { BUILD } from './config.js';
 import { clamp } from './util.js';
 import { Menu } from './menu.js';
+import { holdFor } from './tutorial.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -298,14 +299,23 @@ export class Hud {
     document.body.classList.remove('offerOpen');
   }
 
-  /** @param tutorial the opening script, which sits lower and reads larger. */
-  showHint(text, tutorial = false) {
+  /**
+   * @param tutorial the opening script, which sits lower and reads larger.
+   * @param hold seconds on screen. Sized to the sentence by default: a flat
+   *   nine seconds gave a four-word line the same time as a fifteen-word one.
+   */
+  showHint(text, tutorial = false, hold = holdFor(text)) {
     // Lines are written with their own break, so they wrap where they read.
     this.el.hint.textContent = text;
     this.el.hint.classList.toggle('tutorial', tutorial);
     this.el.hint.classList.add('show');
-    // Long enough to finish reading it with a thumb on the lever.
-    this.hintTimer = 9;
+    this.hintTimer = hold;
+  }
+
+  /** Take it down now — the player has acted on it, or the run has moved on. */
+  clearHint() {
+    this.hintTimer = 0;
+    this.el.hint.classList.remove('show');
   }
 
   // ----------------------------------------------------------------- meters

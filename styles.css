@@ -1039,9 +1039,25 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   font-size: 12px;
   line-height: 1.85;
   letter-spacing: 0.14em;
-  color: #9fb8cf;
+  color: #cfe2f2;
   transition: opacity 0.35s;
   text-shadow: 0 0 14px #000, 0 0 30px #000;
+  /*
+   * A plate, not just a shadow. These lines land over a field of lit objects
+   * and two shadows were not enough to hold them apart from it — measured
+   * against a full field, the grey-on-neon was close to unreadable. Sized to
+   * the sentence and centred: left, right and width are all set, so the auto
+   * margins split the slack evenly.
+   */
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 9px 15px;
+  background: rgba(4, 9, 17, 0.82);
+  border: 1px solid rgba(120, 170, 210, 0.22);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
 }
 /*
  * The AMENDMENT plate is 15px taller than the ALLOCATION chip and grows up
@@ -1337,4 +1353,16 @@ body.booting #pendingBtn {
 
   .ab svg { width: 20px; height: 20px; }
   .ab .lbl { font-size: 7px; letter-spacing: 0.04em; }
+
+  /* The opening lines carry their own break, and at 320 the plate's padding
+     was enough to wrap each half again — four rendered lines for a two-line
+     sentence. Tighter tracking and less inset, so the break stays where it
+     was written. */
+  #abilityHint.tutorial {
+    left: calc(var(--safe-l) + 10px);
+    right: calc(var(--safe-r) + 10px);
+    padding: 8px 11px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+  }
 }
