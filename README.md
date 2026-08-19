@@ -501,6 +501,13 @@ unlocks with their text and their counts, and the closing line. Completion is
 kept in `localStorage` under `sim7749-taught`, so every run after the first
 starts with all of it. A cleared save skips the opening outright.
 
+**RESET SIMULATION does not bring it back** — being taught the same nineteen
+things twice is not teaching. **REPLAY OPENING**, in the menu's SYSTEM tab,
+does: it clears the flag and restarts, and it works on a cleared save too,
+because the opening teaches the interface and that has nothing to do with
+having beaten ORDINAL. It is a single replay; the run after it is normal
+again.
+
 ### The objects
 
 Twelve kinds, each with its own mass, speed, restitution and way of dying.

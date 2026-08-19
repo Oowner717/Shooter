@@ -186,8 +186,12 @@ export class Game {
     // else in the opening moves until it passes.
     this.lineUntil = 0;
     this.taughtKey = null;
-    // The opening runs once, ever. A cleared save is past it by definition.
-    this.teaching = !taught() && !cleared();
+    // The opening runs once, ever — unless it is asked for again from the
+    // menu, which is the only way back to it. A cleared save is past it by
+    // definition, and asking overrides that too: the opening teaches the
+    // interface, which has nothing to do with having beaten ORDINAL.
+    this.teaching = this.replayNext || (!taught() && !cleared());
+    this.replayNext = false;
     w.unlocked = new Set(this.teaching ? [] : ALL_KEYS);
     w.phase = 'staging';
 
@@ -923,6 +927,18 @@ export class Game {
     this.taughtKey = null;
     this.hud.clearHint();
     this.lineUntil = Math.min(this.lineUntil, this.world.time + ACK);
+  }
+
+  /**
+   * Run the opening again. It is remembered as done in localStorage, and a
+   * reset does not clear that on purpose — being taught the same nineteen
+   * things twice is not teaching. But there was no way back to it at all,
+   * which made it unreachable for anyone who had already seen it once.
+   */
+  replayOpening() {
+    forgetTaught();
+    this.replayNext = true;
+    this.restart();
   }
 
   /** Hand over whatever is left and stop teaching, without a word. */

@@ -178,6 +178,7 @@ export class Menu {
     const rows = [
       ['SOUND', 'on or off', () => g.toggleSound(), () => g.soundOn],
       ['RESET SIMULATION', 'start the session again', () => { this.setOpen(false); g.restart(); }],
+      ['REPLAY OPENING', 'hand the controls over again', () => { this.setOpen(false); g.replayOpening(); }],
       ['DEBUG', 'developer panel', () => { this.setOpen(false); g.hud.toggleDebug(true); }],
     ];
     for (const [label, sub, run, state] of rows) {
