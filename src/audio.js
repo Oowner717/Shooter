@@ -221,6 +221,25 @@ class Audio {
     this.noise({ dur: 0.09, gain: 0.09, f0: 4000, f1: 700, type: 'bandpass', q: 3 });
   }
 
+  /**
+   * A permanent upgrade arriving. Deliberately the longest and largest thing
+   * the interface ever plays: three ascending fifths with a bloom under them,
+   * so it is not mistaken for the top-up chime even with the phone in a pocket.
+   */
+  amend() {
+    if (!this.ready) return;
+    const root = 523.25;
+    [0, 0.11, 0.24].forEach((t, i) => {
+      const f = root * [1, 1.5, 2][i];
+      setTimeout(() => {
+        this.tone({ type: 'sine', f0: f, f1: f, dur: 1.5, gain: 0.13, attack: 0.008 });
+        this.tone({ type: 'triangle', f0: f * 2, f1: f * 2, dur: 0.5, gain: 0.05, attack: 0.006 });
+      }, t * 1000);
+    });
+    this.tone({ type: 'sine', f0: root / 2, f1: root / 2, dur: 2.2, gain: 0.09, attack: 0.05 });
+    this.noise({ dur: 0.6, gain: 0.05, f0: 900, f1: 5200, type: 'bandpass', q: 1.2 });
+  }
+
   chime(f = 660) {
     if (!this.ready) return;
     this.tone({ type: 'sine', f0: f, f1: f, dur: 1.2, gain: 0.12, attack: 0.01 });

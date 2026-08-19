@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '34';
+  var BUILD = '35';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -98,8 +98,16 @@
          waiting and waits as long as it takes; opening it is what holds the
          world, and that is a choice the player made. -->
     <button id="pendingBtn" hidden>
-      <span id="pendingLabel">EVALUATION</span><b id="pendingCount">1</b>
+      <span class="pendingText">
+        <span id="pendingLabel">EVALUATION</span>
+        <i id="pendingSub">permanent · choose one</i>
+      </span><b id="pendingCount">1</b>
     </button>
+
+    <!-- The gold frame. Only a permanent upgrade ever lights it, it is drawn
+         at the edge of the screen so it collides with nothing, and it is inert
+         to the touch. -->
+    <div id="amendFlash" hidden></div>
 
     <div id="offerScrim" hidden></div>
     <section id="offer" hidden aria-label="Offer">

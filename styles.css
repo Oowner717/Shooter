@@ -624,6 +624,10 @@ body.menuOpen #quickBar { pointer-events: none; }
   -webkit-backdrop-filter: blur(6px);
   clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
   animation: pendingIn 0.3s ease-out, pendingPulse 2.4s 0.3s infinite ease-in-out;
+  /* The plate is anchored to the left edge, so it has to bloom out of that
+     edge. Growing from the centre put the arrival flare off-screen at 320. */
+  transform-origin: left center;
+  transition: bottom 0.3s ease;
   z-index: 18;
 }
 #pendingBtn[hidden] { display: none; }
@@ -634,18 +638,89 @@ body.menuOpen #quickBar { pointer-events: none; }
   border-radius: 2px;
 }
 #pendingBtn b[hidden] { display: none; }
-/* A permanent one is worth noticing more than a top-up. */
+.pendingText { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+/* Only the permanent tier says what it is; a top-up is one word. */
+#pendingSub { display: none; }
+
+/*
+ * A permanent one. Bigger plate, gold, and it says out loud what it is —
+ * the only thing in a run that is kept, against a queue of things that are
+ * not. It also never settles: the reminder pulse runs for as long as it is
+ * unclaimed, because an offer that never expires can otherwise be forgotten
+ * about ten minutes after the one moment it announced itself.
+ */
 #pendingBtn.large {
-  border-color: rgba(255, 207, 92, 0.6);
-  background: rgba(24, 16, 4, 0.92);
+  /* The plate is taller and wider than the chip, and at 320 its bottom-right
+     corner reached the turret's muzzle. It lifts clear rather than shrinking:
+     the size is the announcement. Measured at 320x568, the tightest. */
+  bottom: calc(var(--safe-b) + var(--bar-h) + 186px);
+  border-color: rgba(255, 207, 92, 0.85);
+  border-width: 1.5px;
+  background: rgba(30, 20, 4, 0.94);
   color: #ffcf5c;
+  font-size: 9.5px;
+  padding: 9px 13px;
+  box-shadow: 0 0 18px rgba(255, 207, 92, 0.28);
+  animation: pendingIn 0.3s ease-out, amendRemind 5.4s 0.3s infinite ease-out;
 }
-#pendingBtn.large b { background: rgba(255, 207, 92, 0.2); }
+#pendingBtn.large b {
+  background: rgba(255, 207, 92, 0.24);
+  font-size: 11px;
+}
+#pendingBtn.large #pendingSub {
+  display: block;
+  font-style: normal;
+  font-size: 6.5px;
+  letter-spacing: 0.14em;
+  color: rgba(255, 207, 92, 0.66);
+}
+
+/* The arrival itself: the plate blooms once and throws a ring off its edge. */
+#pendingBtn.flare { animation: amendFlare 1.5s ease-out, amendRemind 5.4s 1.5s infinite ease-out; }
+@keyframes amendFlare {
+  0% { opacity: 0; transform: scale(0.7); box-shadow: 0 0 0 0 rgba(255, 207, 92, 0.85); }
+  22% { opacity: 1; transform: scale(1.22); box-shadow: 0 0 0 10px rgba(255, 207, 92, 0.4); }
+  46% { transform: scale(1); box-shadow: 0 0 0 26px rgba(255, 207, 92, 0); }
+  60% { transform: scale(1.1); box-shadow: 0 0 0 0 rgba(255, 207, 92, 0.6); }
+  100% { transform: scale(1); box-shadow: 0 0 0 22px rgba(255, 207, 92, 0); }
+}
+/* And every few seconds after, until it is taken. */
+@keyframes amendRemind {
+  0% { box-shadow: 0 0 18px rgba(255, 207, 92, 0.28), 0 0 0 0 rgba(255, 207, 92, 0.55); }
+  14% { box-shadow: 0 0 26px rgba(255, 207, 92, 0.5), 0 0 0 9px rgba(255, 207, 92, 0); }
+  28% { box-shadow: 0 0 18px rgba(255, 207, 92, 0.28), 0 0 0 0 rgba(255, 207, 92, 0.45); }
+  42%, 100% { box-shadow: 0 0 18px rgba(255, 207, 92, 0.28), 0 0 0 9px rgba(255, 207, 92, 0); }
+}
+
 @keyframes pendingIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
 @keyframes pendingPulse { 50% { box-shadow: 0 0 0 4px rgba(124, 255, 178, 0.08); } }
+
+/*
+ * The frame. Drawn at the edge of the screen, so it is impossible to miss and
+ * impossible to collide with anything — it works over the field, over the boss
+ * bar, and on any size of phone. Twice, then gone.
+ */
+#amendFlash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 2px solid #ffcf5c;
+  box-shadow: inset 0 0 70px rgba(255, 207, 92, 0.4), 0 0 30px rgba(255, 207, 92, 0.3);
+  opacity: 0;
+  z-index: 24;
+  animation: amendFrame 1.9s ease-out;
+}
+#amendFlash[hidden] { display: none; }
+@keyframes amendFrame {
+  0% { opacity: 0; border-width: 14px; }
+  10% { opacity: 1; border-width: 3px; }
+  32% { opacity: 0.15; border-width: 2px; }
+  46% { opacity: 0.9; border-width: 3px; }
+  100% { opacity: 0; border-width: 2px; }
+}
 
 #offerScrim {
   position: absolute;
@@ -968,6 +1043,17 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   transition: opacity 0.35s;
   text-shadow: 0 0 14px #000, 0 0 30px #000;
 }
+/*
+ * The AMENDMENT plate is 15px taller than the ALLOCATION chip and grows up
+ * into this band. The plate stays where it is — it is the thing being pointed
+ * at, and it is placed where the thumb is — so the caption is what moves. It
+ * is a one-line first-use note that is up for nine seconds; nobody will see it
+ * shift. Measured at 320x568, where the gap is tightest.
+ */
+body.amendPending #abilityHint:not(.tutorial) {
+  bottom: calc(var(--safe-b) + var(--bar-h) + 242px);
+}
+
 #abilityHint.show { opacity: 1; }
 
 /* ---------------- debug ---------------- */

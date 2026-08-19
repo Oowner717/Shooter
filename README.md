@@ -256,6 +256,16 @@ button that only exists while something is waiting, and opening it is what
 holds the world — a choice you made, not one made for you. An offer left
 untaken for eight hours is still there.
 
+Not interrupting is not the same as being quiet. A **top-up gets a chime** and
+a small green chip, because it is tempo and it will keep. A **permanent one is
+the loudest thing the interface does**: a three-note fanfare, a gold frame
+around the whole screen, a pill that says PERMANENT UPGRADE, and a plate that
+blooms out of the corner and then keeps pulsing for as long as it is unclaimed
+— an offer that never expires is otherwise very easy to forget about ten
+minutes after the one moment it announced itself. A permanent one also **jumps
+the queue**: the top-ups it steps in front of lose nothing by waiting, and the
+button can then say AMENDMENT and mean it.
+
 - **ALLOCATION**, every 40 kills — about twelve in a counted run. Free tempo,
   gone in a minute.
 

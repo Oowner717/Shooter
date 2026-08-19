@@ -78,16 +78,23 @@ export class Offers {
 
   /**
    * Kills are the clock. Both tiers can come due on the same kill, and both go
-   * in the queue — nothing is ever skipped because something else arrived.
+   * in the queue — nothing is ever skipped because something else arrived. The
+   * permanent tier jumps ahead of the top-ups; see below.
    */
   note(world) {
     while (world.kills >= this.nextSmall) {
       this.nextSmall += CFG.events.small;
       this.queue.push({ tier: 'small', options: rollSmall() });
+      if (world.announceOffer) world.announceOffer('small');
     }
     while (world.kills >= this.nextLarge) {
       this.nextLarge += CFG.events.large;
-      this.queue.push({ tier: 'large', options: rollLarge(this.taken), held: this.held() });
+      // A permanent one goes to the front. Nothing expires, so the top-ups it
+      // steps in front of lose nothing by waiting — and the button can then
+      // say AMENDMENT and mean it, instead of advertising the top-up that
+      // happened to be queued first.
+      this.queue.unshift({ tier: 'large', options: rollLarge(this.taken), held: this.held() });
+      if (world.announceOffer) world.announceOffer('large');
     }
   }
 

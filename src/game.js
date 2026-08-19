@@ -141,6 +141,7 @@ export class Game {
       alert: (text, kind, dur) => self.hud.alert(text, kind, dur),
       bossCaption: (text, hold) => self.hud.bossCaption(text, hold),
       abilityTaken: (i) => self.hud.flashTaken(i),
+      announceOffer: (tier) => self.announceOffer(tier),
       onBossDead: () => self.onBossDead(),
     };
   }
@@ -404,6 +405,25 @@ export class Game {
     arc: 'ARC ROUNDS — the hit jumps on through anything nearby.',
     recur: 'RECUR ROUNDS — the shot happens again, further down the same line.',
   };
+
+  /**
+   * Something has come due. A top-up gets a chime and nothing else — it is
+   * tempo, it will keep. A permanent one is the only thing in the run that is
+   * yours for good, and it gets said properly: a fanfare, a gold frame across
+   * the whole screen, a pill that names it, and a button that blooms and then
+   * keeps pulsing until it is taken. The world is never interrupted for it.
+   */
+  announceOffer(tier) {
+    if (tier !== 'large') {
+      audio.chime(600);
+      return;
+    }
+    audio.amend();
+    background.surge(2.4);
+    shake(1.8);
+    this.hud.alert('PERMANENT UPGRADE', 'power', 5.5);
+    this.hud.announceAmendment();
+  }
 
   /** Opens whatever is at the front of the queue. Holds the world while it is up. */
   openOffer() {
