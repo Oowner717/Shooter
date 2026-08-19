@@ -1142,11 +1142,13 @@ export class Director {
   }
 
   reset() {
-    // The field starts empty and stays empty for a few seconds. There is an
-    // interface to find and a lever to try, and the first thing a player does
-    // should not be react.
+    // The field starts empty and stays empty. There is an interface to find, a
+    // lever to try and two things already in hand by the time the first object
+    // is released, and none of that should be done while reacting. Harmless
+    // drift comes well before any of it, so there is something to shoot at
+    // while the field is still safe.
     this.timer = CFG.openingGrace;
-    this.driftTimer = CFG.openingGrace + 2;
+    this.driftTimer = CFG.driftStart;
   }
 
   update(world, dt) {
@@ -1160,8 +1162,22 @@ export class Director {
     }
 
     const progress = clamp(world.kills / CFG.popRampKills, 0, 1);
-    const popTarget = Math.round(CFG.popStart + (CFG.popEnd - CFG.popStart) * progress);
-    const interval = CFG.spawnInterval[0] + (CFG.spawnInterval[1] - CFG.spawnInterval[0]) * progress;
+    const target = CFG.popStart + (CFG.popEnd - CFG.popStart) * progress;
+    let interval = CFG.spawnInterval[0] + (CFG.spawnInterval[1] - CFG.spawnInterval[0]) * progress;
+
+    // And then it arrives gently. Thirteen objects the moment the grace ends
+    // is the normal field, not an opening — for the first thirty the target
+    // and the rate both climb from well under it, so the first thing a new
+    // player deals with is one object at a time. Endless runs are past this.
+    // Whichever comes first. On kills alone a player who shoots nothing would
+    // sit in front of two objects indefinitely, which is not gentle, it is
+    // stalled; the clock guarantees the field fills either way.
+    const warm = world.endless ? 1 : Math.max(
+      clamp(world.kills / CFG.warmKills, 0, 1),
+      clamp((world.time - CFG.openingGrace) / CFG.warmSeconds, 0, 1),
+    );
+    const popTarget = Math.round(CFG.warmPop + (target - CFG.warmPop) * warm);
+    interval /= CFG.warmRate + (1 - CFG.warmRate) * warm;
 
     this.timer -= dt;
     if (this.timer > 0) return;

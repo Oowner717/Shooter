@@ -994,6 +994,28 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   pointer-events: none;
 }
 
+/*
+ * The one button ORDINAL can never take away. It is the thing you always
+ * still have when everything else has been subtracted, so it reads as fixed
+ * rather than merely present: a second ring set inside the border, a brighter
+ * frame, and a label that stays lit whether or not the button is ready.
+ */
+.ab.essential {
+  border-color: color-mix(in srgb, currentColor 34%, transparent);
+  background:
+    radial-gradient(120% 90% at 50% 108%, color-mix(in srgb, currentColor 12%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(12, 22, 38, 0.86), rgba(5, 9, 16, 0.9));
+}
+.ab.essential::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  pointer-events: none;
+}
+.ab.essential .lbl { color: color-mix(in srgb, currentColor 70%, var(--dim)); }
+
 .ab.ready { border-color: color-mix(in srgb, currentColor 55%, transparent); }
 .ab.ready .lbl { color: var(--ink); }
 .ab.ready svg { filter: drop-shadow(0 0 6px currentColor); }
@@ -1068,6 +1090,26 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
  */
 body.amendPending #abilityHint:not(.tutorial) {
   bottom: calc(var(--safe-b) + var(--bar-h) + 242px);
+}
+
+/*
+ * The opening's band keeps the line before. The new one arrives at the bottom
+ * and the old one is pushed up and dimmed rather than taken away — a sentence
+ * you have just acted on should still be there while you look at what it gave
+ * you.
+ */
+.hLine { display: block; }
+.hLine.now { animation: hLineIn 0.32s ease-out; }
+.hLine.past {
+  opacity: 0.4;
+  font-size: 0.86em;
+  padding-bottom: 3px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(120, 170, 210, 0.14);
+}
+@keyframes hLineIn {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
 }
 
 #abilityHint.show { opacity: 1; }

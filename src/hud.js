@@ -7,7 +7,7 @@ import { CONTROLS } from './narrative.js';
 import { BUILD } from './config.js';
 import { clamp } from './util.js';
 import { Menu } from './menu.js';
-import { holdFor } from './tutorial.js';
+import { holdFor, STACK } from './tutorial.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -59,6 +59,7 @@ export class Hud {
     this.slots = [];
     this.alerts = [];
     this.hintTimer = 0;
+    this.tutLines = []; // the opening's band keeps the line before
     this.lastKills = -1;
     this.lastGoal = -1;
     this.lastPhase = '';
@@ -153,7 +154,7 @@ export class Hud {
     const frag = document.createDocumentFragment();
     ABILITIES.forEach((def, i) => {
       const b = document.createElement('button');
-      b.className = 'ab';
+      b.className = `ab${def.essential ? ' essential' : ''}`;
       b.style.color = def.color;
       b.innerHTML = `<span class="fill"></span>${def.icon}<span class="lbl">${def.name}</span>`;
       b.setAttribute('aria-label', def.name);
@@ -306,14 +307,31 @@ export class Hud {
    */
   showHint(text, tutorial = false, hold = holdFor(text)) {
     // Lines are written with their own break, so they wrap where they read.
-    this.el.hint.textContent = text;
+    if (!tutorial) {
+      this.tutLines.length = 0;
+      this.el.hint.textContent = text;
+    } else {
+      // The opening keeps the line before. It is pushed up the band by the new
+      // one rather than replaced, so a sentence you have just acted on is
+      // still there while you are looking at what it gave you.
+      this.tutLines.push(text);
+      while (this.tutLines.length > STACK) this.tutLines.shift();
+      this.el.hint.innerHTML = '';
+      this.tutLines.forEach((line, i) => {
+        const d = document.createElement('div');
+        d.className = i === this.tutLines.length - 1 ? 'hLine now' : 'hLine past';
+        d.textContent = line;
+        this.el.hint.appendChild(d);
+      });
+    }
     this.el.hint.classList.toggle('tutorial', tutorial);
     this.el.hint.classList.add('show');
     this.hintTimer = hold;
   }
 
-  /** Take it down now — the player has acted on it, or the run has moved on. */
+  /** Take it down now — the run has moved on, or the opening was cut short. */
   clearHint() {
+    this.tutLines.length = 0;
     this.hintTimer = 0;
     this.el.hint.classList.remove('show');
   }
@@ -440,7 +458,12 @@ export class Hud {
     }
     if (this.hintTimer > 0) {
       this.hintTimer -= dt;
-      if (this.hintTimer <= 0) this.el.hint.classList.remove('show');
+      // The band going dark ends the stack: the next line after a silence
+      // starts on its own rather than under something said a minute ago.
+      if (this.hintTimer <= 0) {
+        this.el.hint.classList.remove('show');
+        this.tutLines.length = 0;
+      }
     }
   }
 

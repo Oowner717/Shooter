@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '37';
+export const BUILD = '38';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -10,7 +10,19 @@ export const CFG = {
   // Seconds of empty field at the start of a run, and again after the last
   // object falls, before the next thing happens. The field starts with nothing
   // in it: the first beat is the interface, not a reaction.
-  openingGrace: 15,
+  // The field stays empty this long. The opening's first four entries ask for
+  // nothing but the clock, so the grip, the tap, PULSE and BOLT are all in
+  // hand — and have been played with — before the first object is released.
+  openingGrace: 27,
+  // Harmless drift comes early regardless, so there is something to shoot at
+  // while the field is still safe.
+  driftStart: 7,
+  // And then it arrives gently: the population target and the spawn rate both
+  // start well under normal and reach it over this many objects.
+  warmPop: 2,
+  warmKills: 30,
+  warmSeconds: 75, // ...or this long after the first release, whichever is sooner
+  warmRate: 0.42, // spawn attempts run this fraction of normal speed at first
   lull: 4.5, // the pause between the five hundredth kill and the arrival
   storyEvery: 50, // one story line per this many kills (10 lines total)
 
@@ -387,7 +399,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'lurcher',
-    unlock: 0, // kills before this type enters the rotation
+    unlock: 10, // kills before this type enters the rotation
     name: 'LURCHER',
     shape: 'hex',
     r: 24,

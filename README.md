@@ -277,6 +277,11 @@ button can then say AMENDMENT and mean it.
   | **YIELD** | +150 salvage. |
   | **SEED** | Lay 3 mines now — a random kind if none is selected. |
   | **SHAKE OFF** | Destroy everything gripping the turret. |
+
+  Each carries a mark, drawn the way the permanent ones are. A card is read in
+  the two seconds before a tap and a shape lands before a name does; without
+  them the small tier showed an empty box where the large tier showed a symbol,
+  which read as something missing rather than something simpler.
 - **AMENDMENT**, every 125 kills — four in a counted run. Permanent for the
   run, and it offers exactly one option from each of three axes, so a pick is
   an identity rather than a number:
@@ -460,18 +465,25 @@ should be able to see there are four mines before you have any of them — but
 they are **sealed**: visible, greyed, and inert. A press on one nudges and does
 nothing. The menu is the one control that is live throughout.
 
-Four lines run over the field while it is still empty, then one control comes
-back at a time with a single line each, in the order the game wants them
-learned:
+It is one ordered script. Some entries only say something; the rest hand a
+control over and say what it is.
 
-    ammunition   BOLT, HE, SHOT, ARC, RECUR      objects 2-14
-    mines        BLAST, SNARE, WIRE, KNELL       objects 17-26
-    running      AUTO AIM, AUTO FIRE             objects 29-32
-    abilities    PULSE through SIPHON            objects 35-56
+    the grip, and tapping ahead of it     empty field
+    PULSE                                 empty field
+    BOLT                                  empty field
+    what is coming, and that it cannot kill you
+    ammunition   HE, SHOT, ARC, RECUR     objects 2-11
+    mines        BLAST, SNARE, WIRE, KNELL objects 14-23
+    running      AUTO AIM, AUTO FIRE      objects 26-29
+    abilities    FAN through SIPHON       objects 32-50
+    a closing line                        object 56
 
-Abilities are deliberately last: by the time they arrive the turret is already
-looking after itself, and abilities are the part you are meant to be doing by
-hand. A closing line ends it, and the run stops teaching.
+**PULSE comes first**, before there is anything to use it on. It is the one
+thing ORDINAL can never take away, and having it in hand from the start is the
+first fact about the game — its button carries a second ring inside the border
+so it reads as fixed rather than merely present. The rest of the abilities are
+deliberately last: by the time they arrive the turret is already looking after
+itself, and abilities are the part you are meant to be doing by hand.
 
 **The count cannot pace this on its own.** Objects die slowly at the start and
 very fast later, so a ladder keyed only on kills hands out its hardest lines at
@@ -482,16 +494,34 @@ line before it to have been read. The reading time is `holdFor()` — a beat to
 notice the line, then about 180 words a minute — and it is what actually
 governs from the mines onward. Nothing is ever cut off, at any kill rate.
 
-**Acting on a line ends it.** Tapping the control you were just handed takes
-the line down and shortens the wait to `ACK`, because using the thing is proof
-of having read about it. That makes the opening adaptive rather than fixed: a
-player who tries each thing as it arrives is through in about 70 seconds, one
-who ignores the strip entirely still gets every sentence in full and takes
-about 140. Nothing is ever skipped either way.
+**Acting on a line shortens the wait** to `ACK`, because using the thing is
+proof of having read about it. That makes the opening adaptive rather than
+fixed: a player who tries each thing as it arrives is through in about 70
+seconds, one who ignores the strip entirely still gets every sentence in full
+and takes about 140. Nothing is skipped either way. The line itself is **not**
+taken away when it is used — it is pushed up the band and dimmed by the next
+one, so a sentence you have just acted on is still there while you look at
+what it gave you. The band keeps `STACK` of them.
 
 The lines sit on a plate rather than over bare field. They land among lit
 objects, and two text-shadows were not enough to hold grey 12px type apart
 from that.
+
+### The first minute
+
+Nothing hostile is released for `openingGrace` seconds. The first four entries
+of the script ask for nothing but the clock, so the grip, the tap, PULSE and
+BOLT are all in hand — and have been played with — before the first object
+exists. Harmless **drift** starts at `driftStart`, well inside that, so there
+is something to shoot at while the field is still safe.
+
+And then it arrives gently. Thirteen objects the moment the grace ends is the
+normal field, not an opening, so the population target and the spawn rate both
+climb from `warmPop` to normal over `warmKills` objects **or** `warmSeconds` —
+whichever comes first, because on kills alone a player who shoots nothing would
+sit in front of two objects indefinitely. LURCHER is held back to object 10, so
+the first things down are MOTEs and NEEDLEs and nothing else. Endless runs skip
+the warm-up entirely.
 
 Sealed is not the same as ORDINAL's `locked` — locked is a button taken away
 mid-fight, sealed is one not yet given. Both are visible; only one is a loss.

@@ -18,7 +18,7 @@ import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
 import { codex, cleared, markCleared, forgetCleared, taught, markTaught, forgetTaught } from './codex.js';
 import { Offers } from './events.js';
 import { freshUpgrades } from './upgrades.js';
-import { INTRO, INTRO_ENDS, TUTORIAL, OUTRO, ALL_KEYS, GAP, ACK, holdFor } from './tutorial.js';
+import { TUTORIAL, ALL_KEYS, GAP, ACK, START } from './tutorial.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 
@@ -179,12 +179,11 @@ export class Game {
     this.hud.setPending(0, null);
     w.endless = cleared();
     this.lullTimer = 0;
-    this.openingLine = 0;
     this.tutorialStep = 0;
-    this.outroSaid = false;
     // World time at which the line now up has had its reading time. Nothing
-    // else in the opening moves until it passes.
-    this.lineUntil = 0;
+    // else in the opening moves until it passes; the first line is due at
+    // START, which is what the initial value buys.
+    this.lineUntil = START - GAP;
     this.taughtKey = null;
     // The opening runs once, ever — unless it is asked for again from the
     // menu, which is the only way back to it. A cleared save is past it by
@@ -625,17 +624,9 @@ export class Game {
     w.time += dt;
 
     // The opening script. Runs off the world clock so it holds with the menu.
-    while (this.teaching
-      && w.phase === 'staging'
-      && this.openingLine < INTRO.length
-      && w.time >= INTRO[this.openingLine][0]) {
-      const [, line] = INTRO[this.openingLine++];
-      this.hud.showHint(line, true);
-      this.lineUntil = w.time + holdFor(line);
-    }
-    // The ladder runs off the count, but its pacing runs off the clock, so an
-    // unlock that is owed has to be checked every frame rather than only on
-    // the kill that earned it.
+    // The script waits on the count but is paced by the clock, so an entry
+    // that is owed has to be checked every frame rather than only on the kill
+    // that earned it.
     if (this.teaching && w.phase === 'staging') this.teach();
 
     // ---- status timers ----
@@ -876,22 +867,22 @@ export class Game {
   /**
    * The opening ladder. One control comes back per few objects, in the order
    * the game wants them learned — ammunition, mines, the two that run on their
-   * own, then the abilities — each with a line. When the last of them is out
-   * the run stops teaching, and it never teaches again on this device.
+   * own, then the abilities — each with a line. When the last entry is out the
+   * run stops teaching, and it never teaches again on this device.
    */
   teach() {
     if (!this.teaching) return;
     const w = this.world;
-    // Two gates, and one of them is a clock. Enough destroyed to have earned
-    // it, and enough time for the line before it to have been read — one
-    // unlock per pass, never a burst, however fast the field is dying.
+    const step = TUTORIAL[this.tutorialStep];
+    if (!step) return;
+    // Two gates, and the clock is the one that governs. Enough destroyed to
+    // have earned it, and enough time for the line before it to have been
+    // read — one entry per pass, never a burst, however fast the field dies.
     if (w.time < this.lineUntil + GAP) return;
-    if (this.openingLine < INTRO.length || w.time < INTRO_ENDS) return;
+    if (step.at !== undefined && w.kills < step.at) return;
 
-    if (this.tutorialStep < TUTORIAL.length) {
-      const step = TUTORIAL[this.tutorialStep];
-      if (w.kills < step.at) return;
-      this.tutorialStep++;
+    this.tutorialStep++;
+    if (step.key) {
       w.unlocked.add(step.key);
       // Both of these would otherwise say the same thing a second time the
       // moment the player used it. Spend them here instead.
@@ -899,20 +890,20 @@ export class Game {
       const slot = w.abilities.slots.find((a) => a.def.id === step.key);
       if (slot) slot.used = true;
       this.taughtKey = step.key;
-      this.hud.showHint(step.text, true);
-      this.lineUntil = w.time + step.hold;
       audio.chime(680);
       background.surge(0.5);
-      return;
+    } else {
+      this.taughtKey = null;
     }
+    this.hud.showHint(step.text, true);
+    this.lineUntil = w.time + step.hold;
 
-    if (!this.outroSaid && w.kills >= OUTRO.at) {
-      this.outroSaid = true;
+    // The last entry is the one that says so. It stays up; only the teaching
+    // stops, and it never starts again on this device.
+    if (this.tutorialStep >= TUTORIAL.length) {
       this.teaching = false;
       this.taughtKey = null;
       markTaught();
-      this.hud.showHint(OUTRO.text, true);
-      this.lineUntil = w.time + holdFor(OUTRO.text);
     }
   }
 
@@ -925,7 +916,8 @@ export class Game {
   ackTaught(key) {
     if (!this.teaching || key !== this.taughtKey) return;
     this.taughtKey = null;
-    this.hud.clearHint();
+    // The line stays. It is pushed up the band by the next one rather than
+    // taken away — having acted on a sentence is not a reason to lose it.
     this.lineUntil = Math.min(this.lineUntil, this.world.time + ACK);
   }
 
@@ -1506,7 +1498,6 @@ export class Game {
   /** Hand the whole interface over now, and keep it handed over across a reset. */
   debugTeachAll() {
     this.teaching = false;
-    this.outroSaid = true;
     this.tutorialStep = TUTORIAL.length;
     this.world.unlocked = new Set(ALL_KEYS);
     markTaught();
