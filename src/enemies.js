@@ -4,7 +4,7 @@
 
 import { CFG, ENEMY_TYPES, TYPE_BY_ID, ROUTES, HAIRLINE, massOf } from './config.js';
 import { TAU, clamp, rand, randInt, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
-import { explode, hitBurst, spark, shard as fxShard, ring, ripple } from './fx.js';
+import { explode, hitBurst, spark, dot, shard as fxShard, ring, ripple } from './fx.js';
 import { audio } from './audio.js';
 
 /**
@@ -143,7 +143,14 @@ export class Enemy {
     this.wanderAngle = rand(0, TAU);
     this.wanderTimer = 0;
     this.stagedFor = 0;
-    this.ttl = this.isDebris ? rand(22, 30) : 0;
+    // Debris used to expire after 22-30s. It does not any more: a fragment
+    // carries salvage, and salvage that rots is a clock the player is losing
+    // to. The floor drains by being collected instead — pulled into the
+    // intake, shot, or blasted.
+    this.ttl = 0;
+    // Set when it is made, from the parent's mass. Banked whichever way it
+    // goes: reaching the turret, or being destroyed.
+    this.salvage = opts.salvage || 0;
     this.spawnIn = opts.spawnIn ?? 0; // brief materialise animation
 
     if (type.shards) {
@@ -432,6 +439,10 @@ export class Enemy {
     if (this.dead) return;
     this.dead = true;
     const t = this.type;
+    // Destroying a fragment is a way of collecting it, not a way of losing it.
+    if (this.salvage) bank(world, this.salvage, this.x, this.y);
+    // The harmless ones pay too. It is the one income the tally never sees.
+    else if (this.harmless) bank(world, CFG.salvage.drift, this.x, this.y);
     explode(this.x, this.y, this.r, t.color, t.glow, this.isDebris ? 0.55 : 1);
     audio.pop(clamp(this.r / 22, 0.5, 2.4));
 
@@ -470,7 +481,11 @@ export class Enemy {
     }
 
     // Debris chips: destructible, pushable, do not count toward the tally.
+    // They carry the object's salvage between them, so what a thing is worth
+    // is what it was made of.
     const n = t.debris || 0;
+    const worth = Math.max(n, Math.round(massOf(t, this.r) * CFG.salvage.perMass));
+    const each = Math.max(CFG.salvage.minValue, Math.round(worth / Math.max(1, n)));
     for (let i = 0; i < n; i++) {
       if (world.debris.length >= CFG.maxDebris) break;
       const a = rand(0, TAU);
@@ -483,6 +498,7 @@ export class Enemy {
         vx: this.vx * 0.4 + Math.cos(a) * sp,
         vy: this.vy * 0.4 + Math.sin(a) * sp,
         speedScale: 1.25,
+        salvage: each,
       }));
     }
   }
@@ -1013,9 +1029,61 @@ export function solveTethers(world) {
   }
 }
 
-/** Hostiles still owed to the run. */
+/**
+ * Hostiles still owed. Endless runs are never owed a last one, so the quota is
+ * unbounded — without this the director stops dead and every object keeps the
+ * closing-speed bonus meant for the final stragglers.
+ */
 function releasesLeft(world) {
+  if (world.endless) return Infinity;
   return Math.max(0, CFG.killGoal - world.released);
+}
+
+/**
+ * Salvage into the bank, at whatever rate the turret is managing. Objects
+ * attached to it are sitting on the intake: one costs about a fifth, five
+ * costs seventy per cent, and it never reaches nothing.
+ */
+export function intakeRate(world) {
+  const S = CFG.salvage;
+  const n = Math.min(world.attackers.size, S.taxCap);
+  return Math.max(S.taxFloor, S.tax ** n);
+}
+
+function bank(world, amount, x, y) {
+  const got = amount * intakeRate(world);
+  world.salvage += got;
+  world.salvageShown = world.salvageShown ?? 0;
+  if (got >= 1) dot(x, y, 0, -60, '#9fe8ff', 0.5, 3);
+}
+
+/**
+ * Fragments drift turret-ward on their own and bank when they arrive. Slowly:
+ * an unattended floor still pays, it just takes its time, and everything on it
+ * keeps its full value until it is collected.
+ */
+export function collectSalvage(world, dt) {
+  const S = CFG.salvage;
+  const s = world.shooter;
+  const list = world.debris;
+  const reach = S.intake * S.intake;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const e = list[i];
+    if (e.dead || !e.salvage) continue;
+    const dx = s.x - e.x;
+    const dy = s.y - e.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 <= reach) {
+      bank(world, e.salvage, e.x, e.y);
+      e.salvage = 0;
+      e.dead = true;
+      e.dissolved = true;
+      continue;
+    }
+    const d = Math.sqrt(d2) || 1;
+    e.vx += (dx / d) * S.pull * dt;
+    e.vy += (dy / d) * S.pull * dt;
+  }
 }
 
 /** A formation queued above the screen, marching down into it. */

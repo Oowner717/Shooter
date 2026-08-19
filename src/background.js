@@ -40,6 +40,36 @@ class Background {
     this.deepAge = 99;
     this.overlay = null;
     this.pulse = 0;
+
+    // --- the boss substrate ---
+    // While ORDINAL is on the field the world stops being something emitted
+    // and becomes something being drawn in. `dread` eases 0 -> 1 and back, and
+    // everything below it is scaled by that one number, so the whole change
+    // arrives and leaves as a transition rather than a cut.
+    this.dread = 0;
+    this.dreadTarget = 0;
+    this.dreadUrgency = 0; // 0 -> 1 as its ledger empties; the sweep speeds up
+    this.sweep = 0;
+    this.focusX = 0; // the vanishing point, eased toward whatever holds it
+    this.focusY = 0;
+    this.holdX = null; // where the boss is, while there is one
+    this.holdY = null;
+    this.digits = []; // the glyph rain, counting
+  }
+
+  /**
+   * @param on 0 or 1 — the target, not the state. It takes a few seconds.
+   * @param urgency 0..1, how far through the fight it is.
+   */
+  setDread(on, urgency = 0) {
+    this.dreadTarget = clamp(on, 0, 1);
+    this.dreadUrgency = clamp(urgency, 0, 1);
+  }
+
+  /** Where the world should radiate from. Null hands it back to the sky. */
+  setFocus(x, y) {
+    this.holdX = x;
+    this.holdY = y;
   }
 
   setMood(name) {
@@ -94,6 +124,26 @@ class Background {
       });
     }
 
+    if (!this.overlay) {
+      this.focusX = vpx;
+      this.focusY = vpy;
+    }
+
+    // A second set of rain columns, in numerals. Under dread the substrate
+    // stops muttering and starts counting.
+    this.digits.length = 0;
+    for (let i = 0; i < 5; i++) {
+      const c = makeCanvas(16, 460);
+      const g = c.getContext('2d');
+      g.font = '13px ui-monospace, Menlo, monospace';
+      g.textAlign = 'center';
+      for (let y = 12; y < 460; y += 16) {
+        g.fillStyle = `rgba(255,255,255,${rand(0.3, 1)})`;
+        g.fillText(String((Math.random() * 10) | 0), 8, y);
+      }
+      this.digits.push(c);
+    }
+
     this.deep = makeCanvas(Math.ceil(w / 2), Math.ceil(h / 2));
     this.deepCtx = this.deep.getContext('2d');
     this.deepAge = 99;
@@ -103,8 +153,25 @@ class Background {
   update(dt) {
     this.t += dt;
     this.deepAge++;
-    this.flow += dt * 26;
     this.pulse = Math.max(0, this.pulse - dt * 1.6);
+
+    // Dread in over about three seconds, out over about four.
+    const rate = this.dreadTarget > this.dread ? 0.34 : 0.26;
+    this.dread += (this.dreadTarget - this.dread) * (1 - Math.exp(-dt * rate * 3));
+    if (Math.abs(this.dreadTarget - this.dread) < 0.001) this.dread = this.dreadTarget;
+
+    // Rings are emitted outward normally and hauled inward under dread, and
+    // the reversal crosses through nothing rather than snapping.
+    this.flow += dt * 26 * (1 - this.dread * 2);
+    this.sweep += dt * (0.22 + this.dreadUrgency * 0.75);
+
+    // The vanishing point migrates to whatever is holding the world's
+    // attention, and back to the sky when nothing is.
+    const tx = this.holdX === null ? this.vpx : this.holdX;
+    const ty = this.holdY === null ? this.vpy : this.holdY;
+    const fk = 1 - Math.exp(-dt * 1.6);
+    this.focusX += (tx - this.focusX) * fk;
+    this.focusY += (ty - this.focusY) * fk;
 
     // Ease the palette toward the current phase.
     const k = 1 - Math.exp(-dt * 0.8);
@@ -143,14 +210,24 @@ class Background {
     //     be worth re-blending three screen-sized gradients every frame) ---
     this.drawNebula(ctx, w, h);
 
-    // --- glyph rain (deep background) ---
-    for (const c of this.columns) {
-      ctx.globalAlpha = c.alpha;
-      ctx.drawImage(c.img, c.x, c.y, 16 * c.scale, 460 * c.scale);
-    }
+    // --- glyph rain (deep background), counting once dread is up ---
+    const d = this.dread;
+    this.columns.forEach((c, i) => {
+      const cw = 16 * c.scale;
+      const ch = 460 * c.scale;
+      if (d < 0.999) {
+        ctx.globalAlpha = c.alpha * (1 - d);
+        ctx.drawImage(c.img, c.x, c.y, cw, ch);
+      }
+      if (d > 0.001 && this.digits[i]) {
+        ctx.globalAlpha = c.alpha * d * 1.8;
+        ctx.drawImage(this.digits[i], c.x, c.y, cw, ch);
+      }
+    });
     ctx.globalAlpha = 1;
 
     this.drawLattice(ctx, w, h);
+    if (this.dread > 0.002) this.drawSweep(ctx, w, h);
 
     // --- dust ---
     ctx.fillStyle = rgba(m.accent, 0.5);
@@ -192,8 +269,8 @@ class Background {
    */
   drawLattice(ctx, w, h) {
     const m = this.mood;
-    const vpx = this.vpx;
-    const vpy = this.vpy;
+    const vpx = this.focusX;
+    const vpy = this.focusY;
     const maxR = Math.hypot(Math.max(vpx, w - vpx), h - vpy) + 60;
     const ripples = fx.ripples;
     const bright = 1 + this.pulse * 1.6;
@@ -244,6 +321,47 @@ class Background {
       }
       ctx.stroke();
     }
+  }
+
+  /**
+   * Spokes turning out of the vanishing point, and a ring closing on it. Only
+   * while ORDINAL is up, and faster the further through the fight it is — so
+   * the substrate is a readout of how it is going without saying a word.
+   */
+  drawSweep(ctx, w, h) {
+    const d = this.dread;
+    const m = this.mood;
+    const x = this.focusX;
+    const y = this.focusY;
+    const maxR = Math.hypot(Math.max(x, w - x), Math.max(y, h - y)) + 60;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // three spokes, each dragging a short bright tail
+    for (let i = 0; i < 3; i++) {
+      const a = this.sweep + (i / 3) * Math.PI * 2;
+      const g = ctx.createLinearGradient(x, y, x + Math.cos(a) * maxR, y + Math.sin(a) * maxR);
+      g.addColorStop(0, rgba(m.accent, 0.16 * d));
+      g.addColorStop(0.5, rgba(m.accent, 0.05 * d));
+      g.addColorStop(1, rgba(m.accent, 0));
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * maxR, y + Math.sin(a) * maxR);
+      ctx.stroke();
+    }
+
+    // and one ring, drawn in rather than out
+    const period = 3.4;
+    const phase = 1 - ((this.t / period) % 1);
+    const rr = 40 + phase * maxR;
+    ctx.strokeStyle = rgba(m.accent, 0.22 * d * phase);
+    ctx.lineWidth = 1.6 + (1 - phase) * 2.4;
+    ctx.beginPath();
+    ctx.arc(x, y, rr, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   /** Scanlines + vignette, baked once into a single overlay blit. */

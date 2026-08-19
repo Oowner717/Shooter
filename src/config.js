@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '28';
+export const BUILD = '29';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -201,6 +201,28 @@ export const CFG = {
     blast: { r: 118, damage: 74, impulse: 430 },
     grow: 0.5, // each toll this much wider than the one before
     fade: 0.72, // and this much of its damage
+  },
+
+  // ---- salvage ---------------------------------------------------------
+  // Every object leaves fragments, and a fragment is worth something from the
+  // moment it drops until the moment it is collected. Nothing decays: what is
+  // on the floor is a backlog, not a clock. It is collected by reaching the
+  // intake or by being destroyed, so a present player can turn the barrel on
+  // the floor and cash it now, at the cost of the shots that are not going
+  // into what is coming down.
+  salvage: {
+    // A whole object's worth, from its mass, split across the fragments it
+    // leaves. Taken from the parent rather than the chip: a chip's own mass is
+    // small enough that every fragment in the game rounded to the same 1.
+    perMass: 3.6,
+    minValue: 1,
+    drift: 6, // flat, for the harmless ones — income the tally never sees
+    intake: 190, // world units; anything this close is banked
+    pull: 26, // units per second a fragment drifts turret-ward on its own
+    // Attached objects sit on the intake. Five is as bad as it gets.
+    tax: 0.78, // multiplier per attached object
+    taxFloor: 0.3,
+    taxCap: 5,
   },
 
   // ---- projectiles ----------------------------------------------------

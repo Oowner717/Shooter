@@ -146,3 +146,32 @@ class Codex {
 }
 
 export const codex = new Codex();
+
+/**
+ * Whether ORDINAL has been beaten. Kept the same way the glossary is, because
+ * it answers the same kind of question: what has this player already seen?
+ * Every run after the first clear is endless — no count, no boss, no ending.
+ */
+const CLEARED = 'sim7749-cleared';
+
+export function cleared() {
+  try {
+    return localStorage.getItem(CLEARED) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markCleared() {
+  try {
+    localStorage.setItem(CLEARED, '1');
+  } catch {
+    /* private mode: this run stays counted, which is the safe way to fail */
+  }
+}
+
+export function forgetCleared() {
+  try {
+    localStorage.removeItem(CLEARED);
+  } catch { /* nothing to forget */ }
+}

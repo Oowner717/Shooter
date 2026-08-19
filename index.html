@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '28';
+  var BUILD = '29';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -76,6 +76,7 @@
         <span id="killNum">0</span><span class="dim">/500</span>
         <em>OBJECTS</em>
       </div>
+      <div id="salvageChip" class="chip"><em>SALVAGE</em><span id="salvageNum">0</span></div>
       <div id="phaseTag" class="chip ghost">STAGING</div>
       <div class="spacer"></div>
       <button id="menuBtn" class="chip btn menuBtn" aria-label="Menu">

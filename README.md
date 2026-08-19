@@ -243,10 +243,54 @@ attackers, worse corruption.
 
 A typical run is about fifteen minutes.
 
+**And then it stops being that game.** Beating ORDINAL is remembered, and every
+run after it is endless: no five hundred, no lull, no boss, no ending. The
+counter loses its denominator and just climbs, the phase reads FIELD, and the
+field keeps coming. The counted run is the tutorial for the game underneath it.
+Nothing carries over — salvage starts at zero every time.
+
+### Salvage
+
+Every object leaves fragments, and a fragment is worth something from the
+moment it drops until the moment it is collected. **Nothing decays.** What is on
+the floor is a backlog, not a clock.
+
+A fragment is collected by reaching the intake around the turret, or by being
+destroyed — shot, blasted, or eaten by SIPHON. An object's worth comes from its
+mass and is split across the fragments it leaves, so a bulwark pays about
+twenty-eight times what a mote does. The harmless drift pays a flat six: income
+the tally never sees.
+
+Auto-aim never targets debris, and that is the whole of the active-versus-idle
+gap. Leave the game running and fragments drift in on their own — measured, 112
+salvage arriving from 600 units out in twenty-one seconds with nothing lost.
+Sit down and play and you can turn the barrel on the floor and cash it now, at
+the cost of the shots that are not going into what is coming down.
+
+**Corruption taxes the intake.** Whatever is stuck to the turret is sitting on
+the collection point:
+
+| attached | 0 | 1 | 2 | 3 | 4 | 5+ |
+|---|---|---|---|---|---|---|
+| intake | 100% | 78% | 61% | 47% | 37% | 30% |
+
+It floors at five and never reaches zero, so an unattended game always earns —
+just at up to a third of the rate. The salvage chip goes red when something is
+on the intake; it is the only place the corruption costs a number.
+
 ### The fight
 
 ORDINAL has no more hit points than it ever did, and none of what follows asks
 anything of your hands.
+
+**The substrate turns over.** ORDINAL does not just recolour the sky. The
+lattice's vanishing point leaves the top of the field and migrates onto the
+boss, following it; the rings reverse, hauled inward instead of emitted
+outward; the glyph rain cross-fades from characters to numerals — the substrate
+stops muttering and starts counting; and three spokes turn out of the vanishing
+point with a ring closing on it, both accelerating as its ledger empties. All of
+it rises over about three seconds and drains away over four when it dies. The
+background is a readout of how the fight is going, without a word of text.
 
 **The arrival.** The lull does not end in a fight. The substrate drains to
 black, ORDINAL is hauled down over eleven seconds in four beats — each with its

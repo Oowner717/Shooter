@@ -7,7 +7,7 @@ import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, shake } fro
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast, solveTethers, ENTRY_Y } from './enemies.js';
+import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast, solveTethers, collectSalvage, intakeRate, ENTRY_Y } from './enemies.js';
 import { Shooter } from './shooter.js';
 import { Boss } from './boss.js';
 import { Abilities } from './abilities.js';
@@ -15,7 +15,7 @@ import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator, ENDING } from './narrative.js';
 import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
-import { codex } from './codex.js';
+import { codex, cleared, markCleared, forgetCleared } from './codex.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 
@@ -104,6 +104,12 @@ export class Game {
       autoAim: false,
       autoFire: false,
       mine: null, // the one kind of mine being laid, or none
+
+      salvage: 0, // banked; nothing carries across a reset
+      // Set once ORDINAL has been beaten. Every run after it is endless: no
+      // five hundred, no lull, no boss, no ending. The counted run is the
+      // tutorial for the game underneath it.
+      endless: false,
       round: 'standard', // standard | explosive | shotgun
       mines: [],
       decoy: null, // the DECOY ability's stand-in turret, while one is up
@@ -149,6 +155,8 @@ export class Game {
     this.hud.bossCaption(null);
     w.nextStoryAt = CFG.storyEvery;
     w.counted = false;
+    w.salvage = 0;
+    w.endless = cleared();
     this.lullTimer = 0;
     this.openingLine = 0;
     w.phase = 'staging';
@@ -189,8 +197,10 @@ export class Game {
     this.hud.hideEnding();
     this.hud.setBoss(false);
     this.hud.setLedgerMode(false);
-    this.hud.setKills(0, CFG.killGoal);
-    this.hud.setPhase('STAGING');
+    this.hud.setKills(0, w.endless ? null : CFG.killGoal);
+    this.hud.setSalvage(0);
+    this.hud.setPhase(w.endless ? 'FIELD' : 'STAGING');
+    background.setDread(0);
     this.hud.syncAbilities(w.abilities);
   }
 
@@ -573,6 +583,10 @@ export class Game {
     w.director.update(w, dt);
     if (w.boss && !w.boss.dead) {
       w.boss.update(w, dt);
+      // The world radiates from whatever is holding its attention, and the
+      // sweep runs faster the emptier its ledger gets.
+      background.setFocus(w.boss.x, w.boss.y);
+      background.setDread(1, 1 - clamp(w.ledger / CFG.killGoal, 0, 1));
       if (!this.bossArmed && w.boss.intro >= 1) {
         this.bossArmed = true;
         this.onBossArrived();
@@ -591,6 +605,7 @@ export class Game {
 
     updateProjectiles(w, dt);
     this.mineTimer = mineCadence(w, this.mineTimer, dt);
+    collectSalvage(w, dt);
     updateMines(w, dt);
     this.resolveBlasts();
     this.checkContact();
@@ -725,13 +740,13 @@ export class Game {
     // Story beats belong to the staging run only. ORDINAL's own emissions push
     // the count well past five hundred, and a sentence in the mid-field band is
     // exactly the text that has no business being there.
-    while (w.phase === 'staging' && w.kills >= w.nextStoryAt && w.narrator.index < 10) {
+    while (!w.endless && w.phase === 'staging' && w.kills >= w.nextStoryAt && w.narrator.index < 10) {
       w.nextStoryAt += CFG.storyEvery;
       w.narrator.advance();
       audio.chime(520 + w.narrator.index * 30);
       background.surge(0.7);
     }
-    if (!w.counted && w.kills >= CFG.killGoal) {
+    if (!w.endless && !w.counted && w.kills >= CFG.killGoal) {
       w.counted = true;
       w.phase = 'lull';
       this.lullTimer = CFG.lull;
@@ -796,6 +811,7 @@ export class Game {
     audio.setDroneMood(26, 180, 0.05);
 
     w.boss = new Boss(w.width / 2, ENTRY_Y + CFG.boss.r * 0.4);
+    background.setDread(1);
 
     // The reveal. Five hundred objects were not a score, they were a deposit,
     // and the counter the player has been watching all run turns over and
@@ -825,6 +841,11 @@ export class Game {
   }
 
   onBossDead() {
+    markCleared();
+    // Hand the world back to the sky. Both eased, so it drains out of the
+    // substrate rather than cutting.
+    background.setDread(0);
+    background.setFocus(null, null);
     const w = this.world;
     if (codex.record('ordinal')) this.hud.noteCodex();
     w.phase = 'ending';
@@ -873,7 +894,8 @@ export class Game {
     // Once ORDINAL is on the field the counter is no longer the player's: it
     // reads the ledger, and it falls.
     if (w.boss) this.hud.setLedger(w.ledger, CFG.killGoal);
-    else this.hud.setKills(w.kills, w.phase === 'staging' ? CFG.killGoal : null);
+    else this.hud.setKills(w.kills, !w.endless && w.phase === 'staging' ? CFG.killGoal : null);
+    this.hud.setSalvage(w.salvage, intakeRate(w));
     this.hud.syncAbilities(w.abilities);
     this.hud.syncLoadout(w);
     this.hud.menu.sync(w);
@@ -1246,6 +1268,12 @@ export class Game {
   debugCodexAll() {
     codex.unlockAll();
     this.hud.menu.syncCodex();
+  }
+
+  debugEndless() {
+    const w = this.world;
+    if (w.endless) forgetCleared(); else markCleared();
+    this.restart();
   }
 
   debugCodexWipe() {

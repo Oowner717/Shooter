@@ -103,25 +103,48 @@ Five phases, each about one session. Each lands something playable and is
 verified before the next starts. Nothing after phase 1 is worth building if
 phase 1 does not feel good.
 
-## Phase 1 — the number goes up
+## Phase 1 — the number goes up — DONE, build 29
 
-The whole point: salvage accumulates and is visible. Nothing to spend it on yet.
+Salvage accumulates and is visible. Nothing to spend it on yet.
 
-- `world.remainder` (name pending), and a chip in the top bar beside the count.
-- Fragments carry a value set from the parent's mass at the moment they are
-  made. Drift pays a small flat amount when destroyed.
-- A constant slow pull on every fragment toward the turret.
-- An intake radius; fragments reaching it bank and vanish.
-- The corruption tax multiplies the intake rate, on the curve above.
+`world.salvage`, a chip in the top bar. A whole object's worth comes from its
+mass and is split across the fragments it leaves — taken from the parent, not
+from the chip, because a chip's own mass rounded every fragment in the game to
+the same 1. Drift pays a flat 6. Fragments drift turret-ward and bank on
+arrival, or bank whole if destroyed. Debris no longer expires.
 
-Verify: the number climbs unattended; the tax curve measures 100/80/62/48/38/30
-at zero through five attached; drift pays; a floor left alone fills to the cap
-and income settles rather than stopping; hauling a crowd in with WELL banks
-faster than waiting.
+Measured: the tax reads 1 / 0.78 / 0.608 / 0.475 / 0.37 / 0.30 across zero to
+five attached and floors there. A bulwark leaves 14 fragments worth 8 each; all
+14 survive 90 simulated seconds untouched; destroying one banks exactly its
+worth; left alone from 600 units out, all 112 arrive in 21s with nothing lost.
+Drift pays without touching the tally.
 
-Risk: the pull runs over up to 128 bodies every frame. It is the same shape as
-SNARE's grip, which measures at 0.02ms, so this is cheap — but it gets measured
-rather than assumed.
+Two things the plan had wrong, both caught before they shipped: debris carried
+a 22-30s expiry, which was the rejected decay hiding in the engine, and
+`releasesLeft` gated the director on the kill goal, which would have stopped an
+endless run dead.
+
+## Also in build 29 — the endless run
+
+Beating ORDINAL once is remembered the way the glossary is. Every run after it
+has no five hundred, no lull, no boss and no ending — the counter loses its
+denominator, the phase reads FIELD, the story beats stay put, and the director
+never runs out of quota. Nothing carries over: salvage starts at zero.
+
+## Also in build 29 — the boss substrate
+
+Not a palette swap; the palette already eased between moods on its own. A
+`dread` scalar rises over about three seconds when ORDINAL arrives and falls
+over about four when it dies, and everything below is scaled by it:
+
+- the lattice's vanishing point migrates from the sky to ORDINAL and follows it
+- the rings reverse — emitted outward normally, hauled inward under dread,
+  crossing through zero rather than snapping
+- the glyph rain cross-fades from characters to numerals: the substrate stops
+  muttering and starts counting
+- three spokes turn out of the vanishing point and a ring closes on it, both
+  faster the emptier its ledger gets — the background is a readout of how the
+  fight is going without a word of text
 
 ## Phase 2 — abilities become charges
 
@@ -162,8 +185,24 @@ survives to the boss.
   more. Never a loss, only a debt.
 - A balance pass over the whole economy with real runs.
 
-## Decide before phase 1
+## Decided
 
-- The currency's name. REMAINDER or SALVAGE.
-- Run-only or persistent across runs.
-- Whether the count and salvage should ever be the same number.
+- **SALVAGE** is the name.
+- **Nothing carries over.** A reset is a clean slate: salvage to zero,
+  upgrades gone.
+- **The count stays for the first run**, and the first run is the only one that
+  has it. Beat ORDINAL once and every run after it is endless: no five hundred,
+  no lull, no boss, no ending. Just the field, the salvage and the choices.
+  That makes the current run the tutorial for the game underneath it.
+
+## How a fragment banks
+
+A fragment carries its value from the moment it drops until the moment it is
+collected. It is collected by **reaching the intake**, or by **being destroyed** —
+shot, blasted, or eaten by SIPHON. It is never lost and it never expires.
+
+Auto-aim does not target debris. That is the whole active-versus-idle gap and
+it costs nothing to build: an unattended turret banks only what drifts in, and
+a present player can turn the barrel on the floor and cash it instantly, at the
+cost of the shots they are not putting into what is coming down.
+

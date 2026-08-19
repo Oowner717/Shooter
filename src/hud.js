@@ -28,6 +28,9 @@ export class Hud {
       bossSub: $('bossSub'),
       alerts: $('alerts'),
       killGoal: document.querySelector('#counter .dim'),
+      salvage: $('salvageNum'),
+      salvageChip: $('salvageChip'),
+      phaseTagEl: $('phaseTag'),
       counterLabel: document.querySelector('#counter em'),
       bossCaption: $('bossCaption'),
       abilities: $('abilities'),
@@ -215,6 +218,24 @@ export class Hud {
   }
 
   /**
+   * Banked salvage, beside the count. The chip dims when the intake is being
+   * sat on, because that is the only place the corruption costs anything the
+   * player can read.
+   */
+  setSalvage(n, rate = 1) {
+    const v = Math.floor(n);
+    if (v !== this.lastSalvage) {
+      this.lastSalvage = v;
+      this.el.salvage.textContent = v;
+    }
+    const choked = rate < 0.999;
+    if (choked !== this.lastChoked) {
+      this.lastChoked = choked;
+      this.el.salvageChip.classList.toggle('choked', choked);
+    }
+  }
+
+  /**
    * The same chip, repurposed. It is the most-looked-at number on the screen
    * for thirteen minutes, so taking it over says more than any alert can.
    */
@@ -265,6 +286,10 @@ export class Hud {
 
   setBoss(visible, frac = 1, title, sub) {
     this.el.bossBar.hidden = !visible;
+    // The phase chip reads BOSS directly above a bar that reads ORDINAL. One
+    // of them is redundant, and dropping it is also what keeps the top bar
+    // inside 320px now that salvage has a chip.
+    this.el.phaseTagEl.hidden = visible;
     if (!visible) return;
     this.el.bossFill.style.transform = `scaleX(${clamp(frac, 0, 1)})`;
     if (title) this.el.bossTitle.textContent = title;
@@ -319,6 +344,7 @@ export class Hud {
     const g = this.game;
     const actions = [
       ['SKIP → COUNT', () => g.debugSkipToCount()],
+      ['TOGGLE ENDLESS', () => g.debugEndless()],
       ['SKIP → BOSS', () => g.debugSkipToBoss()],
       ['KILL BOSS', () => g.debugKillBoss()],
       ['+50 KILLS', () => g.debugAddKills(50)],
