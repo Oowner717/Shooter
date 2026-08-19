@@ -29,7 +29,7 @@ export function freshUpgrades() {
     sweep: 0, // seconds between the turret clearing behind itself
     reflex: false, // PULSE answers a crowd on the turret by itself
     intake: 1,
-    cap: 0, // every ability holds this many more
+    cooldown: 1, // multiplier on every ability's cooldown
     // turret
     handsOff: false, // auto-fire at the manual cadence
     slew: 1,
@@ -48,34 +48,34 @@ const quicken = (key, by) => (up) => { up[key] *= by; };
 
 export const UPGRADES = {
   AMMO: [
-    { id: 'hollowpoint', name: 'HOLLOWPOINT', line: 'Every round hits a quarter harder.', apply: scale('damage', 1.25) },
-    { id: 'hotload', name: 'HOT LOAD', line: 'Every cadence fifteen per cent faster.', apply: quicken('rate', 0.85) },
-    { id: 'tracer', name: 'TRACER', line: 'Rounds travel a third faster. Less to lead.', apply: scale('speed', 1.35) },
-    { id: 'ricochet', name: 'RICOCHET', line: 'One more bounce off the arena edges.', apply: bump('bounces', 1) },
-    { id: 'heavy', name: 'HEAVY', line: 'Twice the shove. Hits knock things off their line.', apply: scale('impulse', 2) },
-    { id: 'overpressure', name: 'OVERPRESSURE', line: 'HE opens forty per cent wider.', apply: scale('blastR', 1.4) },
-    { id: 'fifthlink', name: 'FIFTH LINK', line: 'ARC jumps one more time.', apply: bump('arcJumps', 1) },
-    { id: 'fourthtime', name: 'FOURTH TIME', line: 'RECUR happens once more down the line.', apply: bump('recur', 1) },
-    { id: 'salvo', name: 'SALVO', line: 'Every eighth shot leaves as three.', apply: set('salvo', 8) },
+    { id: 'hollowpoint', name: 'HOLLOWPOINT', line: '+25% damage.', apply: scale('damage', 1.25) },
+    { id: 'hotload', name: 'HOT LOAD', line: '+15% fire rate.', apply: quicken('rate', 0.85) },
+    { id: 'tracer', name: 'TRACER', line: '+35% round speed.', apply: scale('speed', 1.35) },
+    { id: 'ricochet', name: 'RICOCHET', line: '+1 bounce off the arena edges.', apply: bump('bounces', 1) },
+    { id: 'heavy', name: 'HEAVY', line: '2x knockback on every hit.', apply: scale('impulse', 2) },
+    { id: 'overpressure', name: 'OVERPRESSURE', line: '+40% HE blast radius.', apply: scale('blastR', 1.4) },
+    { id: 'fifthlink', name: 'FIFTH LINK', line: 'ARC jumps 1 more time.', apply: bump('arcJumps', 1) },
+    { id: 'fourthtime', name: 'FOURTH TIME', line: 'RECUR repeats 1 more time.', apply: bump('recur', 1) },
+    { id: 'salvo', name: 'SALVO', line: 'Every 8th shot fires 3 rounds.', apply: set('salvo', 8) },
   ],
   FIELD: [
-    { id: 'deepmag', name: 'DEEP MAGAZINE', line: 'One more mine on the field at a time.', apply: bump('mineMax', 1) },
-    { id: 'quicklay', name: 'QUICK LAY', line: 'Mines laid a third faster.', apply: quicken('mineRate', 0.7) },
-    { id: 'longfuse', name: 'LONG FUSE', line: 'Mines wait half again as long before fizzling.', apply: scale('mineLife', 1.5) },
-    { id: 'widemouth', name: 'WIDE MOUTH', line: 'Mines catch things forty per cent further out.', apply: scale('mineTrigger', 1.4) },
-    { id: 'sweep', name: 'SWEEP', line: 'The turret clears behind itself every twenty seconds.', apply: set('sweep', 20) },
-    { id: 'reflex', name: 'REFLEX', line: 'PULSE answers a crowd on the turret without being asked.', apply: set('reflex', true) },
-    { id: 'intake', name: 'INTAKE', line: 'Salvage is collected half again as far out.', apply: scale('intake', 1.5) },
-    { id: 'chamber', name: 'SECOND CHAMBER', line: 'Every ability holds one more charge.', apply: bump('cap', 1) },
+    { id: 'deepmag', name: 'DEEP MAGAZINE', line: '+1 mine on the field at once.', apply: bump('mineMax', 1) },
+    { id: 'quicklay', name: 'QUICK LAY', line: '+30% mine lay speed.', apply: quicken('mineRate', 0.7) },
+    { id: 'longfuse', name: 'LONG FUSE', line: '+50% mine lifetime.', apply: scale('mineLife', 1.5) },
+    { id: 'widemouth', name: 'WIDE MOUTH', line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) },
+    { id: 'sweep', name: 'SWEEP', line: 'Turret blasts behind itself every 20s.', apply: set('sweep', 20) },
+    { id: 'reflex', name: 'REFLEX', line: 'PULSE fires itself when 2+ objects grip you.', apply: set('reflex', true) },
+    { id: 'intake', name: 'INTAKE', line: '+50% salvage pickup range.', apply: scale('intake', 1.5) },
+    { id: 'standing', name: 'STANDING ORDER', line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) },
   ],
   TURRET: [
-    { id: 'rate', name: 'RATE', line: 'The turret fires a fifth faster.', apply: quicken('rate', 0.8) },
-    { id: 'handsoff', name: 'HANDS OFF', line: 'Auto fire stops running slower than your own hand.', apply: set('handsOff', true) },
-    { id: 'slew', name: 'SLEW', line: 'Auto aim swings between targets half again as fast.', apply: scale('slew', 1.5) },
-    { id: 'overwatch', name: 'OVERWATCH', line: 'A quarter more damage while no hand is on the lever.', apply: scale('overwatch', 1.25) },
-    { id: 'casing', name: 'HARD CASING', line: 'Whatever is touching the turret takes damage for it.', apply: bump('casing', 40) },
-    { id: 'insulation', name: 'INSULATION', line: 'Corruption costs the intake half what it did.', apply: scale('insulation', 0.5) },
-    { id: 'shrug', name: 'SHRUG', line: 'The turret throws off whatever is holding it, every fifteen seconds.', apply: set('shrug', 15) },
+    { id: 'rate', name: 'RATE', line: '+20% fire rate.', apply: quicken('rate', 0.8) },
+    { id: 'handsoff', name: 'HANDS OFF', line: 'Auto fire matches your own fire rate.', apply: set('handsOff', true) },
+    { id: 'slew', name: 'SLEW', line: '+50% auto aim turn speed.', apply: scale('slew', 1.5) },
+    { id: 'overwatch', name: 'OVERWATCH', line: '+25% damage while hands off the lever.', apply: scale('overwatch', 1.25) },
+    { id: 'casing', name: 'HARD CASING', line: 'Objects touching you take 40 damage a second.', apply: bump('casing', 40) },
+    { id: 'insulation', name: 'INSULATION', line: 'Corruption costs half as much salvage.', apply: scale('insulation', 0.5) },
+    { id: 'shrug', name: 'SHRUG', line: 'Throws objects off the turret every 15s.', apply: set('shrug', 15) },
   ],
 };
 

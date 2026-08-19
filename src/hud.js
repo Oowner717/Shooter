@@ -153,8 +153,7 @@ export class Hud {
       const b = document.createElement('button');
       b.className = 'ab';
       b.style.color = def.color;
-      b.innerHTML = `<span class="fill"></span>${def.icon}<span class="lbl">${def.name}</span>`
-        + (def.free ? '' : `<span class="pips">${'<i></i>'.repeat(def.cap)}</span>`);
+      b.innerHTML = `<span class="fill"></span>${def.icon}<span class="lbl">${def.name}</span>`;
       b.setAttribute('aria-label', def.name);
       const trigger = (ev) => {
         ev.preventDefault();
@@ -164,12 +163,7 @@ export class Hud {
       b.addEventListener('pointerdown', trigger);
       b.addEventListener('contextmenu', (e) => e.preventDefault());
       frag.appendChild(b);
-      this.slots.push({
-        el: b,
-        fill: b.querySelector('.fill'),
-        pips: [...b.querySelectorAll('.pips i')],
-        ready: null, frac: -1, locked: null, charges: -1,
-      });
+      this.slots.push({ el: b, fill: b.querySelector('.fill'), ready: null, frac: -1, locked: null });
     });
     this.el.abilities.appendChild(frag);
   }
@@ -210,15 +204,6 @@ export class Hud {
       if (s.locked !== locked) {
         s.locked = locked;
         s.el.classList.toggle('locked', locked);
-      }
-      // Charges, as pips under the label. PULSE has none — it is not stocked.
-      if (s.pips.length) {
-        const n = abilities.chargesOf(i);
-        if (s.charges !== n) {
-          s.charges = n;
-          for (let k = 0; k < s.pips.length; k++) s.pips[k].classList.toggle('on', k < n);
-          s.el.classList.toggle('empty', n <= 0);
-        }
       }
     }
   }

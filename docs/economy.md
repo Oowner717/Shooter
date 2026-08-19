@@ -146,39 +146,15 @@ over about four when it dies, and everything below is scaled by it:
   faster the emptier its ledger gets — the background is a readout of how the
   fight is going without a word of text
 
-## Phase 2 — abilities become charges — DONE, build 30
+## Phase 2 — abilities become charges — REVERSED, build 32
 
-Every ability but PULSE holds charges instead of running a cooldown. A use
-spends one; one comes back every `cooldown` seconds up to a cap; the cap is
-what stops eight hours away becoming five hundred of everything.
+Built in build 30 and taken out again in build 32. Abilities are back to plain
+cooldowns and there is nothing to stock, buy or bank.
 
-| | FAN | LANCE | WELL | PRISM | STASIS | DECOY | SIPHON |
-|---|---|---|---|---|---|---|---|
-| cap | 6 | 4 | 2 | 3 | 3 | 2 | 3 |
-| salvage per charge | 110 | 260 | 820 | 350 | 460 | 520 | 330 |
-
-A run starts with one of each, so the shop has a job from the first minute.
-
-PULSE is exempt in both directions: it keeps its cooldown, it is never a
-resource, and SUBTRACT can no longer take it. It is the answer to something
-sitting on the turret where the barrel cannot reach, so it has to be there.
-
-Charges show as pips along the bottom edge of each button, in the ability's own
-colour. An empty button dims rather than disappearing — it is coming back.
-
-Buying lives in the menu's ARSENAL tab, above the ammunition. It is the one
-thing in the sheet that acts rather than explains, and it is not a second copy
-of anything: there is nowhere else to buy a charge, and nowhere else with room
-for a price.
-
-Measured: eight hours of unattended regen puts every ability exactly at its
-cap and no higher; a use spends exactly one and zero refuses to fire but
-recovers on its own; PULSE fired 40 times out of 40 and survived 200 SUBTRACT
-draws that took all seven others; buying refuses when short, deducts exactly
-the price, and refuses at the cap without charging for it.
-
-Prices are a first guess against an unmeasured income. They are the first thing
-to re-tune once a full run has been played.
+What survived it: PULSE is exempt from ORDINAL's SUBTRACT. That was agreed for
+its own reasons — it is the answer to something sitting on the turret where the
+barrel cannot reach, so it has to be there — and it is unrelated to how the
+other seven recover.
 
 ## Phases 3 and 4 — offers — DONE, build 31
 
@@ -187,12 +163,33 @@ described. Neither ever interrupts: they queue behind a button that only exists
 while something is waiting, and opening it is what holds the world — a choice
 the player made, not one made for them.
 
-- **ALLOCATION**, every 40 kills — twelve in a counted run. Tempo, free:
-  RESTOCK, PAIR, SPREAD, YIELD, SURGE, SEED.
+- **ALLOCATION**, every 40 kills — twelve in a counted run. Tempo, free.
+
+  | | |
+  |---|---|
+  | RESET | Every ability ready right now. |
+  | HASTE | Ability cooldowns halved for 45s. |
+  | SURGE | Double fire rate for 30s. |
+  | YIELD | +150 salvage. |
+  | SEED | Lay 3 mines immediately. |
+  | SHAKE OFF | Destroy everything gripping the turret. |
 - **AMENDMENT**, every 125 kills — four in a counted run. Permanent for the
   run, one option from each of AMMO, FIELD and TURRET.
 
 Twenty-four upgrades in `src/upgrades.js`, nine/eight/seven across the axes.
+
+  **AMMO** — +25% damage · +15% fire rate · +35% round speed · +1 bounce ·
+  2x knockback · +40% HE radius · ARC +1 jump · RECUR +1 repeat ·
+  every 8th shot fires 3.
+
+  **FIELD** — +1 mine on the field · +30% lay speed · +50% mine lifetime ·
+  +40% trigger range · turret blasts behind itself every 20s · PULSE fires
+  itself when 2+ grip you · +50% pickup range · -20% ability cooldowns.
+
+  **TURRET** — +20% fire rate · auto fire matches manual · +50% auto aim turn
+  speed · +25% damage hands-off · 40 dmg/s to whatever touches you ·
+  corruption costs half · throws objects off every 15s.
+
 Every one is a scalar on `world.up` read at the point of use; nothing in that
 file reaches into a subsystem, so adding one is an entry plus one place that
 reads it. The four that cannot stack are not offered twice.

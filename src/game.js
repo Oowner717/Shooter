@@ -111,6 +111,7 @@ export class Game {
       up: freshUpgrades(), // what the large offers have granted, this run only
       offers: new Offers(),
       surge: 0, // seconds of doubled cadence, from a SURGE offer
+      haste: 0, // seconds of halved ability cooldowns, from a HASTE offer
       pendingMines: 0, // laid on the next tick, from a SEED offer
       // Set once ORDINAL has been beaten. Every run after it is endless: no
       // five hundred, no lull, no boss, no ending. The counted run is the
@@ -165,6 +166,7 @@ export class Game {
     w.up = freshUpgrades();
     w.offers.reset();
     w.surge = 0;
+    w.haste = 0;
     w.pendingMines = 0;
     this.sweepTimer = 0;
     this.shrugTimer = 0;
@@ -609,7 +611,7 @@ export class Game {
 
     this.updateFiring(dt);
 
-    w.abilities.update(dt, w);
+    w.abilities.update(dt);
     w.shooter.update(w, dt);
     w.narrator.update(dt);
     background.update(dt);
@@ -650,6 +652,7 @@ export class Game {
     collectSalvage(w, dt);
     this.runUpgrades(dt);
     if (w.surge > 0) w.surge = Math.max(0, w.surge - dt);
+    if (w.haste > 0) w.haste = Math.max(0, w.haste - dt);
     while (w.pendingMines > 0) {
       w.pendingMines--;
       if (w.mine) throwMine(w, w.mine);
@@ -772,8 +775,8 @@ export class Game {
 
     // REFLEX: PULSE answers a crowd on the turret without being asked.
     if (up.reflex && w.attackers.size >= 2) {
-      const i = w.abilities.slots.findIndex((x) => x.def.free);
-      if (i >= 0 && w.abilities.usable(i, w)) this.useAbility(i);
+      const i = w.abilities.slots.findIndex((x) => x.def.essential);
+      if (i >= 0 && w.abilities.usable(i)) this.useAbility(i);
     }
   }
 

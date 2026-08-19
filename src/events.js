@@ -1,8 +1,8 @@
 // Offers. The simulation stops to evaluate you, and hands you something.
 //
-// Two tiers. SMALL comes often and gives tempo — charges, an instant effect,
-// salvage. LARGE comes rarely and is permanent for the run, one option from
-// each of the three axes.
+// Two tiers. SMALL comes often and gives tempo — a cooldown wiped, a burst of
+// rate, some salvage. LARGE comes rarely and is permanent for the run, one
+// option from each of the three axes.
 //
 // Neither one ever interrupts. Both queue up behind a button and wait
 // indefinitely, because the whole point of this game is that you can put it
@@ -18,51 +18,33 @@ import { rollLarge } from './upgrades.js';
  */
 const SMALL = [
   {
-    id: 'restock', name: 'RESTOCK', line: 'Every ability back to full.',
-    run(world) {
-      for (const s of world.abilities.slots) {
-        if (!s.def.free) s.charges = s.def.cap + world.up.cap;
-      }
-    },
+    id: 'reset', name: 'RESET', line: 'Every ability ready right now.',
+    run(world) { world.abilities.clearCooldowns(); },
   },
   {
-    id: 'pair', name: 'PAIR', line: 'Two charges of one thing, chosen for you.',
-    run(world) {
-      const i = pickChargeable(world);
-      if (i >= 0) world.abilities.addCharge(i, 2);
-    },
+    id: 'haste', name: 'HASTE', line: 'Ability cooldowns halved for 45s.',
+    run(world) { world.haste = Math.max(world.haste, 45); },
   },
   {
-    id: 'spread', name: 'SPREAD', line: 'One charge of everything.',
-    run(world) {
-      world.abilities.slots.forEach((s, i) => { if (!s.def.free) world.abilities.addCharge(i); });
-    },
-  },
-  {
-    id: 'yield', name: 'YIELD', line: 'A hundred and fifty salvage, straight in.',
-    run(world) { world.salvage += 150; },
-  },
-  {
-    id: 'surge', name: 'SURGE', line: 'Thirty seconds at double the rate of fire.',
+    id: 'surge', name: 'SURGE', line: 'Double fire rate for 30s.',
     run(world) { world.surge = Math.max(world.surge, 30); },
   },
   {
-    id: 'seed', name: 'SEED', line: 'Three mines laid where they lie, now.',
+    id: 'yield', name: 'YIELD', line: '+150 salvage.',
+    run(world) { world.salvage += 150; },
+  },
+  {
+    id: 'seed', name: 'SEED', line: 'Lay 3 mines immediately.',
     run(world) { world.pendingMines = (world.pendingMines || 0) + 3; },
   },
+  {
+    id: 'shake', name: 'SHAKE OFF', line: 'Destroy everything gripping the turret.',
+    run(world) {
+      for (const e of [...world.attackers]) if (!e.dead) e.destroy(world);
+      world.attackers.clear();
+    },
+  },
 ];
-
-function pickChargeable(world) {
-  const open = [];
-  world.abilities.slots.forEach((s, i) => {
-    if (!s.def.free && s.charges < s.def.cap + world.up.cap) open.push(i);
-  });
-  if (!open.length) {
-    const any = world.abilities.slots.map((s, i) => (s.def.free ? -1 : i)).filter((i) => i >= 0);
-    return any.length ? any[(Math.random() * any.length) | 0] : -1;
-  }
-  return open[(Math.random() * open.length) | 0];
-}
 
 /** Three of the small tier, never the same one twice in one offer. */
 function rollSmall() {

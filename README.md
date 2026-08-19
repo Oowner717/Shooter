@@ -257,19 +257,38 @@ holds the world — a choice you made, not one made for you. An offer left
 untaken for eight hours is still there.
 
 - **ALLOCATION**, every 40 kills — about twelve in a counted run. Free tempo,
-  gone in a minute: every ability back to full, two charges of one thing, one
-  charge of everything, a hundred and fifty salvage, thirty seconds at double
-  the rate of fire, three mines laid where they lie.
+  gone in a minute.
+
+  | | |
+  |---|---|
+  | **RESET** | Every ability ready right now. |
+  | **HASTE** | Ability cooldowns halved for 45s. |
+  | **SURGE** | Double fire rate for 30s. |
+  | **YIELD** | +150 salvage. |
+  | **SEED** | Lay 3 mines immediately. |
+  | **SHAKE OFF** | Destroy everything gripping the turret. |
 - **AMENDMENT**, every 125 kills — four in a counted run. Permanent for the
   run, and it offers exactly one option from each of three axes, so a pick is
   an identity rather than a number:
   **AMMO** sharpens what you shoot, **FIELD** is what happens without you, and
   **TURRET** is the machine itself.
 
-Twenty-four upgrades live in `src/upgrades.js`. Every one of them is a scalar on
-`world.up` read at the point of use — nothing in that file reaches into a
-subsystem — so adding one is a table entry and one place that reads it. The four
-that cannot sensibly stack are never offered twice.
+  | AMMO | | FIELD | | TURRET | |
+  |---|---|---|---|---|---|
+  | HOLLOWPOINT | +25% damage | DEEP MAGAZINE | +1 mine on the field | RATE | +20% fire rate |
+  | HOT LOAD | +15% fire rate | QUICK LAY | +30% lay speed | HANDS OFF | auto fire matches manual |
+  | TRACER | +35% round speed | LONG FUSE | +50% mine lifetime | SLEW | +50% auto aim turn speed |
+  | RICOCHET | +1 wall bounce | WIDE MOUTH | +40% trigger range | OVERWATCH | +25% damage hands-off |
+  | HEAVY | 2x knockback | SWEEP | blasts behind you every 20s | HARD CASING | 40 dmg/s to what touches you |
+  | OVERPRESSURE | +40% HE radius | REFLEX | PULSE fires itself at 2+ grips | INSULATION | corruption costs half |
+  | FIFTH LINK | ARC +1 jump | INTAKE | +50% pickup range | SHRUG | throws objects off every 15s |
+  | FOURTH TIME | RECUR +1 repeat | STANDING ORDER | -20% ability cooldowns | | |
+  | SALVO | every 8th shot fires 3 | | | | |
+
+Every one of them is a scalar on `world.up` read at the point of use — nothing
+in `src/upgrades.js` reaches into a subsystem — so adding one is a table entry
+and one place that reads it. The four that cannot sensibly stack are never
+offered twice.
 
 Two of them are worth calling out. **SWEEP** makes the turret clear behind
 itself every twenty seconds, which is the one place the barrel cannot reach —

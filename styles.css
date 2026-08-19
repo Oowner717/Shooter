@@ -817,29 +817,6 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 
 /* ---------------- abilities ---------------- */
 
-/* Charges, as pips along the bottom edge of the button. */
-.ab .pips {
-  position: absolute;
-  bottom: 4px;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  gap: 3px;
-  pointer-events: none;
-}
-.ab .pips i {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: rgba(120, 190, 255, 0.22);
-  transition: background 0.18s;
-}
-.ab .pips i.on { background: currentColor; box-shadow: 0 0 4px currentColor; }
-/* Out of stock: still there, still coming back, just not now. */
-.ab.empty { opacity: 0.42; }
-.ab.empty svg { filter: grayscale(0.7); }
-
 #abilities {
   position: absolute;
   left: calc(var(--safe-l) + 8px);
