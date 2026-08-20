@@ -4,7 +4,7 @@
 
 import { CFG, ENEMY_TYPES, TYPE_BY_ID, ROUTES, HAIRLINE, massOf } from './config.js';
 import { TAU, clamp, rand, randInt, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
-import { explode, hitBurst, spark, dot, shard as fxShard, ring, ripple, haul } from './fx.js';
+import { explode, hitBurst, spark, dot, shard as fxShard, ring, ripple } from './fx.js';
 import { audio } from './audio.js';
 
 /**
@@ -1075,54 +1075,50 @@ function bank(world, amount, x, y) {
   const got = amount * intakeRate(world);
   world.salvage += got;
   world.salvageShown = world.salvageShown ?? 0;
-  if (got < 1) return;
-  // Where it went, not just that it went. Two streaks home on the turret and
-  // brighten as they arrive; the turret's intake ring answers them. A single
-  // dot drifting upward was the whole of this, and it never once read as
-  // "that wreckage is now your salvage".
-  const s = world.shooter;
-  if (s) {
-    haul(x, y, s.x, s.y, '#9fe8ff', 0.5, 2.8);
-    haul(x + spread(9), y + spread(9), s.x, s.y, '#dff6ff', 0.55, 1.8);
-    s.intake = Math.min(1.1, (s.intake || 0) + 0.45);
-  }
-  ring(x, y, 3, 22, 0.3, '#9fe8ff', 1.6);
+  if (got >= 1) dot(x, y, 0, -60, '#9fe8ff', 0.5, 3);
 }
 
 /**
- * Fragments drift turret-ward on their own and bank when they arrive. Slowly:
- * an unattended floor still pays, it just takes its time, and everything on it
- * keeps its full value until it is collected.
+ * Wreckage comes to you, and what happens when it gets there is a decision.
+ *
+ * There is no collection radius. There was one -- an unmarked circle at 190
+ * units where a fragment silently stopped existing -- and it made the floor
+ * pay for itself while you looked the other way. Now a fragment drifts all the
+ * way in and lands on the turret, and it is still lying there: **the way to
+ * bank it is to destroy it**, which costs the shots that were going up the
+ * field instead. A floor you have not cleared is a pile physically on top of
+ * you, eating your own rounds until you spend some on it.
+ *
+ * INTAKE is the upgrade that ends that chore: with it, anything touching the
+ * turret is taken in on contact. It is the difference between wreckage being
+ * work and wreckage being income, which is worth a card.
  */
 export function collectSalvage(world, dt) {
   const S = CFG.salvage;
   const s = world.shooter;
   const list = world.debris;
-  const radius = S.intake * world.up.intake;
-  const reach = radius * radius;
+  const auto = world.up.intake;
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i];
     if (e.dead || !e.salvage) continue;
     const dx = s.x - e.x;
     const dy = s.y - e.y;
     const d2 = dx * dx + dy * dy;
-    if (d2 <= reach) {
-      bank(world, e.salvage, e.x, e.y);
-      e.salvage = 0;
-      e.dead = true;
-      e.dissolved = true;
-      continue;
+    if (auto) {
+      // Landed on the turret. Touching, not merely near: the reach is the two
+      // radii and a little, the same test contact uses for everything else.
+      const rr = s.r + e.r + 2;
+      if (d2 <= rr * rr) {
+        bank(world, e.salvage, e.x, e.y);
+        e.salvage = 0;
+        e.dead = true;
+        e.dissolved = true;
+        continue;
+      }
     }
     const d = Math.sqrt(d2) || 1;
     e.vx += (dx / d) * S.pull * dt;
     e.vy += (dy / d) * S.pull * dt;
-    // A sparse trail off the far side, so a floor full of wreckage visibly
-    // leans toward the turret instead of merely drifting. Sparse on purpose:
-    // there can be 128 fragments down there.
-    if (Math.random() < dt * 1.6) {
-      dot(e.x + (dx / d) * -e.r, e.y + (dy / d) * -e.r, (dx / d) * -18, (dy / d) * -18,
-        '#7fd4f0', 0.45, 1.5);
-    }
   }
 }
 

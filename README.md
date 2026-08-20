@@ -520,7 +520,7 @@ button can then say AMENDMENT and mean it.
   | RICOCHET | +1 wall bounce | WIDE MOUTH | +40% trigger range | OVERWATCH | +25% damage hands-off |
   | HEAVY | 2x knockback | SWEEP | blasts behind you every 20s | HARD CASING | 40 dmg/s to what touches you |
   | OVERPRESSURE | +40% HE radius | REFLEX | PULSE fires itself at 2+ grips | INSULATION | corruption costs half |
-  | FIFTH LINK | ARC +1 jump | INTAKE | +50% pickup range | SHRUG | throws objects off every 15s |
+  | FIFTH LINK | ARC +1 jump | INTAKE | wreckage that lands on you is collected | SHRUG | throws objects off every 15s |
   | LIEN | TITHE marks run to 14 | STANDING ORDER | -20% ability cooldowns | | |
   | COMPOUND | +60% tithe mark bite | | | | |
   | SALVO | every 8th shot fires 3 | | | | |
@@ -564,15 +564,14 @@ Every object leaves fragments, and a fragment is worth something from the
 moment it drops until the moment it is collected. **Nothing decays.** What is on
 the floor is a backlog, not a clock.
 
-A fragment is collected by reaching the intake around the turret, or by being
-destroyed — shot, blasted, or crushed. An object's worth comes from its
-mass and is split across the fragments it leaves, so a bulwark pays about
-twenty-eight times what a mote does. The harmless drift pays a flat six: income
-the tally never sees.
+**A fragment is collected by being destroyed** — shot, blasted or crushed. An
+object's worth comes from its mass and is split across the fragments it leaves,
+so a bulwark pays about twenty-eight times what a mote does. The harmless drift
+pays a flat six: income the tally never sees.
 
-Auto-aim never targets debris, and that is the whole of the active-versus-idle
-gap. Leave the game running and fragments drift in on their own — measured, 112
-salvage arriving from 600 units out in twenty-one seconds with nothing lost.
+Auto-aim never targets debris, so clearing the floor is always a decision you
+make with your own hand — barrel down, at the wreckage, and not up the field at
+what is coming.
 Sit down and play and you can turn the barrel on the floor and cash it now, at
 the cost of the shots that are not going into what is coming down.
 
@@ -792,40 +791,35 @@ holds at six until the opening finishes.
 
 ### Wreckage, and being paid for it
 
-Everything destroyed leaves fragments, and a fragment is worth something from
-the moment it drops until the moment it is collected. Nothing decays. They
-drift turret-ward at `salvage.pull` on their own and bank when they cross
-`salvage.intake`.
+Wreckage drifts turret-ward at `salvage.pull` and **lands on you**. It does not
+stop, it does not fade, and — as of build 59 — it is not taken in when it
+arrives. It sits there.
 
-That has always been true and, until build 58, was almost entirely invisible:
-the intake was an **unmarked boundary** at which wreckage silently vanished,
-and the whole of the feedback was one faint dot drifting upward. A player had
-no way to learn where the edge was, and no reason to believe the floor was
-worth anything.
+There used to be a **collection radius**: an unmarked circle at 190 units where
+a fragment silently stopped existing and its salvage appeared in the corner.
+Build 58 drew that circle and animated the pickup, which made the rule legible
+but did not make it a decision. Build 59 removed the rule instead.
 
-Four things now say it, and they are one motion end to end:
+What is left is simpler and asks something of the player. **The way to bank a
+fragment is to destroy it**, which costs the shots that were going up the field.
+An uncleared floor is not an abstraction any more — it is a heap physically on
+top of the turret, and it eats your own rounds. Measured against a
+twenty-five-piece pile: **14 of 20 shots aimed straight up the field still got
+through**, so it is a tax of roughly a third rather than a lockout, and the six
+that were stopped banked wreckage instead of being wasted. The pile clears
+itself as you fire into it.
 
-- **The intake is drawn.** A slow dashed ring at `salvage.intake * up.intake`,
-  around the turret, at rest barely there. It is the boundary made visible, and
-  it grows when INTAKE is taken.
-- **A fragment on its way in trails.** A sparse spark off its far side, so a
-  floor full of wreckage visibly leans toward the turret rather than merely
-  drifting. Sparse on purpose: there can be 128 fragments down there.
-- **Banking hauls.** Two streaks leave the pickup point and home on the turret,
-  *accelerating* as they close and brightening as they arrive — a new particle
-  kind, `KIND_HAUL` in `src/fx.js`, because everything else in that file flies
-  ballistically and a particle that decelerates on arrival reads as one that
-  was thrown and ran out.
-- **The turret and the chip answer.** The intake ring pulses, and the SALVAGE
-  chip in the HUD gives a 0.26s scale bump, so the streaks going in and the
-  number going up read as the same event.
+**INTAKE** is the upgrade that ends the chore: with it, anything touching the
+turret is taken in on contact — the same two-radii test contact uses for
+everything else. It used to be "+50% pickup range", a number on a rule that no
+longer exists; it is now the switch between wreckage being work and wreckage
+being income, which is worth a card on its own. One level, and it never comes
+round twice.
 
-And the opening now says it in words, gated on the first kill so there is
-wreckage on the floor to point at: *"Those pieces are wreckage, not enemies.
-They drift to you on their own."*, then *"The ring is your INTAKE. Wreckage
-that reaches it becomes SALVAGE — the green number."* Two lines rather than one
-because they answer two different questions a new player has in the same
-second — is that thing dangerous, and why is it moving toward me.
+The opening says the rule, gated on the first kill so there is wreckage on the
+floor to point at: *"Those pieces are wreckage, not enemies. They drift to you
+on their own."*, then *"Shoot wreckage to cash it in. SALVAGE is the green
+number."*
 
 ### Charges
 

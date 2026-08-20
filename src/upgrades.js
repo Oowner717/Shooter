@@ -64,7 +64,7 @@ export function freshUpgrades() {
     voidReach: 1, // VOID's mouth alone, which nothing else widens
     sweep: 0, // seconds between the turret clearing behind itself
     reflex: false, // PULSE answers a crowd on the turret by itself
-    intake: 1,
+    intake: false, // wreckage that touches the turret is taken in on contact
     cooldown: 1, // multiplier on every ability's cooldown
     // turret
     handsOff: false, // auto-fire at the manual cadence
@@ -238,7 +238,9 @@ export const UPGRADES = {
     { id: 'repulsor', name: 'REPULSOR', line: '+40% lode reach and push.', apply: (u) => { u.lodeReach *= 1.4; u.lodePush *= 1.4; } , icon: MARK.repulsor },
     { id: 'sweep', name: 'SWEEP', line: 'Turret blasts behind itself every 20s.', levels: 1, apply: set('sweep', 20) , icon: MARK.sweep },
     { id: 'reflex', name: 'REFLEX', line: 'PULSE fires itself when 2+ objects grip you.', levels: 1, apply: set('reflex', true) , icon: MARK.reflex },
-    { id: 'intake', name: 'INTAKE', line: '+50% salvage pickup range.', apply: scale('intake', 1.5) , icon: MARK.intake },
+    { id: 'intake', name: 'INTAKE', levels: 1,
+      line: 'Wreckage that lands on the turret is collected. No need to shoot it.',
+      apply: set('intake', true), icon: MARK.intake },
     { id: 'standing', name: 'STANDING ORDER', line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
   ],
   TURRET: [

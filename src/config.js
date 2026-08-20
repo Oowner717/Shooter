@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '58';
+export const BUILD = '59';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -417,7 +417,9 @@ export const CFG = {
     perMass: 3.6,
     minValue: 1,
     drift: 6, // flat, for the harmless ones — income the tally never sees
-    intake: 190, // world units; anything this close is banked
+    // No collection radius. Build 59 took it out: wreckage drifts the whole
+    // way in and lands on the turret, and banking it means destroying it --
+    // unless INTAKE has been taken, which collects anything that touches.
     pull: 26, // units per second a fragment drifts turret-ward on its own
     // Attached objects sit on the intake. Five is as bad as it gets.
     tax: 0.78, // multiplier per attached object

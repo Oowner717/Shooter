@@ -38,11 +38,12 @@ const OPENING = [
  */
 const NOTES = [
   // Said the moment there is wreckage on the floor to point at. Two lines
-  // rather than one because they answer two different questions a new player
-  // has in the same second — "is that thing dangerous" and "why is it moving
-  // toward me" — and the answer to the first is no.
+  // rather than one because they answer three questions a new player has in
+  // the same few seconds — is that thing dangerous, why is it moving toward
+  // me, and what am I supposed to do about it. No, it is coming to you, and
+  // shoot it. The INTAKE upgrade is what eventually removes the third.
   { at: 1, text: 'Those pieces are wreckage, not enemies.\nThey drift to you on their own.' },
-  { at: 2, text: 'The ring is your INTAKE. Wreckage that reaches it\nbecomes SALVAGE — the green number.' },
+  { at: 2, text: 'Shoot wreckage to cash it in.\nSALVAGE is the green number.' },
   { at: 20, text: 'ALLOCATION is waiting. Three offered, one taken.\nIt keeps. Open it whenever you want it.' },
   { at: 44, text: 'An AMENDMENT is the permanent one.\nNew rounds, new mines, new abilities.' },
   { at: 120, text: 'Everything you are not carrying is still out there.\nThe offers are how you get it.' },
