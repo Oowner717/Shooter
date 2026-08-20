@@ -1087,6 +1087,16 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
   border: 1px solid rgba(255, 207, 92, 0.35);
   background: rgba(255, 207, 92, 0.1);
 }
+/* LV 2/3 is longer than x2 and says something different: how much of this
+   upgrade there is left rather than how much of it you hold. Quieter, because
+   it is a fact about the card and not a score. */
+.offerHeld.lv {
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  color: rgba(255, 207, 92, 0.72);
+  background: transparent;
+}
 
 .offerAxis {
   font-size: 7.5px;

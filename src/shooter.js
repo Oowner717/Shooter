@@ -157,14 +157,18 @@ export class Shooter {
 
     if (world.round === 'shotgun') {
       const g = R.shotgun;
-      for (let i = 0; i < g.pellets; i++) {
-        const off = ((i / (g.pellets - 1)) - 0.5) * g.spread + spread(0.02);
+      // DOUBLE-O widens the count without widening the cone, so the extra
+      // pellets fill it in rather than spreading it out. LONG SHOT moves the
+      // cliff further away; it never removes it.
+      const pellets = g.pellets + up.shotPellets;
+      for (let i = 0; i < pellets; i++) {
+        const off = ((i / (pellets - 1)) - 0.5) * g.spread + spread(0.02);
         shot(a + off, {
           speed: rand(g.speed[0], g.speed[1]) * slow,
           r: 3.2,
           damage: g.damage,
           impulse: 44,
-          life: g.life,
+          life: g.life * up.shotRange,
           bounces: 0,
           color: '#ffd9a0',
           trail: 0.03,
@@ -235,7 +239,8 @@ export class Shooter {
         core: '#ffffff',
         trail: 0.05,
         pierce: g.pierce + up.pierce,
-        pierceFade: g.fade,
+        pierceFade: up.spineFade || g.fade,
+        shred: up.spineShred,
       });
     } else if (world.round === 'slug') {
       const g = R.slug;
@@ -324,7 +329,25 @@ export class Shooter {
         onHit: (w, e) => { e.sunder = Math.max(e.sunder, g.open * w.up.sunder); },
       });
     } else {
-      for (const f of fan) shot(a + f, { speed: CFG.bolt.speed * slow });
+      const g = R.standard;
+      // OVERSTUFFED rides on the bounce budget, so an extra ricochet is worth
+      // the same whether it comes off a wall or off a body. DOUBLE TAP and
+      // TRIPLE TAP hold their rounds at the muzzle rather than shortening the
+      // cadence: one trigger pull with a stutter in it, not a faster gun.
+      const taps = 1 + up.boltTap;
+      for (const f of fan) {
+        for (let t = 0; t < taps; t++) {
+          shot(a + f + (t ? spread(0.02) : 0), {
+            speed: CFG.bolt.speed * slow,
+            damage: CFG.bolt.damage * g.tapFade ** t,
+            life: CFG.bolt.life * up.boltLife,
+            bounces: CFG.bolt.bounces + up.boltBounce,
+            hold: t * g.tapGap,
+            rebound: up.boltRebound,
+            reboundFade: g.reboundFade,
+          });
+        }
+      }
     }
 
     this.recoil = 1;
@@ -590,6 +613,24 @@ function heBurst(world, x, y) {
   const b = CFG.rounds.explosive.blast;
   const r = b.r * world.up.blastR;
   applyBlast(world, { x, y, r, damage: b.damage * world.up.damage, impulse: b.impulse });
+  // CLUSTER. Four smaller ones thrown out around the first, so HE stops being
+  // a circle and becomes a patch of overlapping circles — the same total on
+  // one body, and a great deal more across a line of them.
+  if (world.up.cluster) {
+    const c = CFG.rounds.explosive.cluster;
+    for (let i = 0; i < c.n; i++) {
+      const a = (i / c.n) * TAU + Math.PI / 4;
+      const cx = x + Math.cos(a) * c.out;
+      const cy = y + Math.sin(a) * c.out;
+      applyBlast(world, {
+        x: cx, y: cy,
+        r: r * c.scale,
+        damage: b.damage * c.scale * world.up.damage,
+        impulse: b.impulse * c.scale,
+      });
+      ring(cx, cy, 3, r * c.scale * 1.3, 0.22, '#ff9f5c', 2.6);
+    }
+  }
   ring(x, y, 4, r * 1.4, 0.26, '#ffb347', 3.4);
   for (let i = 0; i < 12; i++) {
     const a = rand(0, TAU);

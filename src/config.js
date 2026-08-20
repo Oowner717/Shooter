@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '53';
+export const BUILD = '54';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -77,12 +77,26 @@ export const CFG = {
   // Mutually exclusive; each buys its effect with rate of fire. Names, marks
   // and descriptions live in src/arsenal.js — this table is behaviour only.
   rounds: {
-    standard: { rate: 1 },
+    standard: {
+      rate: 1,
+      // OVERSTUFFED. A BOLT that rebounds off a body instead of stopping in
+      // it. It keeps this much of its damage each time, so a round crossing
+      // four objects is worth roughly two and a half of them, not four.
+      reboundFade: 0.7,
+      // DOUBLE TAP / TRIPLE TAP. The follow-up rounds leave with the first
+      // and wait at the muzzle, so they read as one trigger pull with a
+      // stutter in it rather than as a faster cadence.
+      tapGap: 0.06,
+      tapFade: 0.6,
+    },
     explosive: {
       rate: 2.1, // less than half the cadence
       speed: 1040, // and slower in the air
       damage: 15,
       blast: { r: 96, damage: 44, impulse: 420 },
+      // CLUSTER. The burst throws four smaller ones outward, so HE stops
+      // being a circle and becomes a patch of overlapping circles.
+      cluster: { n: 4, out: 78, scale: 0.5 },
     },
     shotgun: {
       rate: 1.55,

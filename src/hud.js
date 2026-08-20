@@ -472,9 +472,13 @@ export class Hud {
           ? '<span class="offerTag">TIME STACKS, NOT EFFECT</span>'
           : opt.stacks === false ? '<span class="offerTag">DOES NOT STACK</span>' : '')
         + '</span>'
-        // How many of this one is already stacked. The whole reason the marks
-        // exist: a repeatable upgrade is worth recognising by shape.
-        + (held ? `<span class="offerHeld">x${held}</span>` : '');
+        // How far along this one is. An upgrade with a ceiling says which
+        // level is on the card and how many there are, because the question
+        // it raises is how much of it is left; one without a ceiling says how
+        // many you have, because that is the only number there is.
+        + (Number.isFinite(opt.levels)
+          ? `<span class="offerHeld lv">LV ${opt.level}/${opt.levels}</span>`
+          : held ? `<span class="offerHeld">x${held}</span>` : '');
       b.addEventListener('click', () => this.game.takeOffer(i));
       this.el.offerCards.appendChild(b);
     });

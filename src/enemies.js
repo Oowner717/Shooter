@@ -417,7 +417,7 @@ export class Enemy {
   /**
    * @returns 'reflect' | 'hit'
    */
-  takeHit(world, dmg, hx, hy, nx, ny, impulse) {
+  takeHit(world, dmg, hx, hy, nx, ny, impulse, shred = 0) {
     // Prisms bounce glancing bolts; only a square-on hit lands.
     if (this.type.reflect) {
       const ndx = (hx - this.x) / this.r;
@@ -429,12 +429,12 @@ export class Enemy {
       }
     }
 
-    this.applyDamage(world, dmg, nx, ny, impulse);
+    this.applyDamage(world, dmg, nx, ny, impulse, shred);
     hitBurst(hx, hy, -nx, -ny, this.type.glow);
     return 'hit';
   }
 
-  applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0) {
+  applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0, shred = 0) {
     if (this.dead) return;
     // A HERALD's cover, if one is refreshing it. It lapses a frame after the
     // beacon stops covering, which is what makes killing the beacon feel like
@@ -443,7 +443,10 @@ export class Enemy {
     // A sundered body has had its plating opened; everything lands harder,
     // not just the round that opened it.
     const open = this.sunder > 0 ? CFG.rounds.sunder.bite : 1;
-    const real = Math.max(1, dmg * (1 - this.armor) * (1 - ward) * open);
+    // RAILED lets a SPINE through the plate rather than into it: `shred` is
+    // the fraction of this body's armour the round simply does not meet.
+    const plate = this.armor * (1 - shred);
+    const real = Math.max(1, dmg * (1 - plate) * (1 - ward) * open);
     this.hp -= real;
     this.flash = Math.min(1, this.flash + 0.5 + real / 260);
     if (impulse) {

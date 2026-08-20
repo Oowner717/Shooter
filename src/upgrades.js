@@ -22,12 +22,24 @@ export function freshUpgrades() {
     bounces: 0,
     impulse: 1,
     blastR: 1,
+    cluster: false, // HE's burst throws four smaller ones outward
     arcJumps: 0,
+    arcFalloff: 0, // set, not scaled: what a link keeps when SUPERCONDUCTOR is in
+    arcRange: 1, // and how far a link will reach for the next body
+    // BOLT's own three. Nothing else in the rack reads them.
+    boltBounce: 0, // extra ricochets, off walls and now off bodies
+    boltLife: 1,
+    boltRebound: 0, // bodies a BOLT may bounce off instead of stopping in
+    boltTap: 0, // follow-up rounds behind every BOLT
+    shotPellets: 0, // extra pellets in a SHOT
+    shotRange: 1, // and how far they get before they expire
     haloMax: 0, // extra rounds HALO keeps in orbit
     haloLife: 1, // and how long they stay up
     titheStep: 1, // how fast TITHE's mark deepens its own bite
     salvo: 0, // every Nth shot fires three
     pierce: 0, // extra bodies a SPINE carries on through
+    spineFade: 0, // set, not scaled: what it keeps per body when ANNEALED is in
+    spineShred: 0, // fraction of a body's armour a SPINE ignores
     slug: 1, // how hard a SLUG shoves
     chill: 1, // how long RIME drags something down for
     patchR: 1, // and how wide, how long and how hard a SPORE patch burns
@@ -90,6 +102,25 @@ const MARK = {
   compound: g('<path d="M4 19.4 9 13l3.6 3.2L20 5.6"/><path d="M15.6 5.6H20v4.4" fill="none"/><circle cx="9" cy="13" r="1.6" fill="currentColor" stroke="none"/><circle cx="12.6" cy="16.2" r="1.6" fill="currentColor" stroke="none"/>'),
   fourthtime: g('<circle cx="4.5" cy="12" r="2.1" fill="currentColor" stroke="none"/><circle cx="11" cy="12" r="2.1" fill="currentColor" stroke="none" opacity=".7"/><circle cx="17.5" cy="12" r="2.1" fill="currentColor" stroke="none" opacity=".4"/>'),
   salvo: g('<path d="M5 21V7M12 21V4M19 21V7"/><path d="M2.6 9.4 5 7l2.4 2.4M9.6 6.4 12 4l2.4 2.4M16.6 9.4 19 7l2.4 2.4"/>'),
+  // --- build 54: BOLT, HE, SHOT, ARC and SPINE each get their own ---
+  // A round coming off a body at an angle rather than stopping in it.
+  overstuffed: g('<circle cx="17" cy="7.6" r="2.6"/><path d="M2.6 4.4 14.6 9.4"/><path d="M14.8 10.4 4.6 19.6"/><path d="M5.4 15.6 4 20.6l5-1.4" fill="currentColor" stroke="none"/>'),
+  // One trigger pull, two rounds out of it.
+  doubletap: g('<circle cx="8.4" cy="6.6" r="2.4" fill="currentColor" stroke="none"/><path d="M8.4 21V10.4"/><circle cx="16.6" cy="10.4" r="2.4" fill="currentColor" stroke="none" opacity=".7"/><path d="M16.6 21v-7.4" opacity=".7"/>'),
+  // One burst becoming five.
+  cluster: g('<circle cx="12" cy="12" r="2.8"/><circle cx="5" cy="6.4" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="6.4" r="1.8" fill="currentColor" stroke="none"/><circle cx="5" cy="17.6" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="17.6" r="1.8" fill="currentColor" stroke="none"/><path d="M9.9 9.9 6.4 7.4M14.1 9.9l3.5-2.5M9.9 14.1l-3.5 2.5M14.1 14.1l3.5 2.5" opacity=".45"/>'),
+  // More of them in the same cone.
+  doubleo: g('<path d="M12 21.4 6 9.6M12 21.4 9.6 8.6M12 21.4V8M12 21.4l2.4-13.4M12 21.4 18 9.6" opacity=".55"/><circle cx="7.4" cy="5.4" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="4" r="1.5" fill="currentColor" stroke="none"/><circle cx="16.6" cy="5.4" r="1.5" fill="currentColor" stroke="none"/>'),
+  // The same cone, arriving further away.
+  longshot: g('<path d="M12 21.6 8 11M12 21.6V10.4M12 21.6 16 11"/><path d="M6.6 7.4 12 2l5.4 5.4" opacity=".85"/><path d="M3.4 12h1.8M18.8 12h1.8" opacity=".4"/>'),
+  // A chain that does not weaken.
+  superconductor: g('<circle cx="4.6" cy="12" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><circle cx="19.4" cy="12" r="2.2" fill="currentColor" stroke="none"/><path d="M6.8 12h3M14.2 12h3"/><path d="M12 4.6v2.6M12 16.8v2.6" opacity=".5"/>'),
+  // A link that reaches further for the next one.
+  longlead: g('<circle cx="4.6" cy="17.4" r="2.2"/><circle cx="19.4" cy="6.6" r="2.2"/><path d="M6.4 16.1 17.6 7.9" stroke-dasharray="2.4 2.2"/><path d="M11.2 4.4 13 8.2l-4.2.4z" fill="currentColor" stroke="none" opacity=".8"/>'),
+  // A round that keeps its weight all the way through.
+  annealed: g('<path d="M2.4 12h19.2"/><circle cx="7.6" cy="12" r="2.4"/><circle cx="15" cy="12" r="2.4"/><path d="M3.4 8.6v6.8M20.6 8.6v6.8" opacity=".5"/>'),
+  // Straight through the plate rather than into it.
+  railed: g('<path d="M12 2.8 19 6v5.8c0 4-2.9 6.3-7 7.7-4.1-1.4-7-3.7-7-7.7V6z" stroke-dasharray="2.8 2.4"/><path d="M2 15h20"/><path d="M18.6 12.4 21.8 15l-3.2 2.6" fill="currentColor" stroke="none"/>'),
   // --- field ---
   deepmag: g('<ellipse cx="12" cy="7" rx="7.5" ry="2.8"/><path d="M4.5 7v5c0 1.6 3.4 2.8 7.5 2.8s7.5-1.2 7.5-2.8V7"/><path d="M4.5 12v5c0 1.6 3.4 2.8 7.5 2.8s7.5-1.2 7.5-2.8v-5"/>'),
   quicklay: g('<circle cx="15" cy="14" r="5"/><path d="M2 8h7M2 12h5M2 16h4" opacity=".7"/>'),
@@ -160,14 +191,43 @@ export const UPGRADES = {
     { id: 'deepfreeze', name: 'DEEP FREEZE', line: '+70% rime chill time.', apply: scale('chill', 1.7) , icon: MARK.deepfreeze },
     { id: 'levy', name: 'LEVY', line: '+50% tithe salvage mark.', apply: scale('bounty', 1.5) , icon: MARK.levy },
     { id: 'prybar', name: 'PRY BAR', line: '+60% sunder duration.', apply: scale('sunder', 1.6) , icon: MARK.prybar },
-    { id: 'salvo', name: 'SALVO', line: 'Every 8th shot fires 3 rounds.', apply: set('salvo', 8) , icon: MARK.salvo },
+    // --- build 54: the rounds that had nothing of their own ---
+    { id: 'overstuffed', name: 'OVERSTUFFED', levels: 3,
+      line: 'BOLT rebounds off bodies instead of stopping, weaker each time. +1 rebound, +30% life.',
+      apply: (u) => { u.boltRebound += 1; u.boltBounce += 1; u.boltLife *= 1.3; }, icon: MARK.overstuffed },
+    { id: 'doubletap', name: 'DOUBLE TAP', levels: 2,
+      line: 'A second BOLT follows every shot, a beat behind and 40% weaker.',
+      tiers: [null, { name: 'TRIPLE TAP', line: 'A third BOLT behind the second, weaker again. One trigger pull, three rounds.' }],
+      apply: bump('boltTap', 1), icon: MARK.doubletap },
+    { id: 'cluster', name: 'CLUSTER', levels: 1,
+      line: 'An HE burst throws four smaller ones outward.',
+      apply: set('cluster', true), icon: MARK.cluster },
+    { id: 'doubleo', name: 'DOUBLE-O', levels: 2,
+      line: '+3 pellets in every SHOT.',
+      apply: bump('shotPellets', 3), icon: MARK.doubleo },
+    { id: 'longshot', name: 'LONG SHOT', levels: 1,
+      line: '+55% SHOT range. The cone still ends, but further out.',
+      apply: scale('shotRange', 1.55), icon: MARK.longshot },
+    { id: 'superconductor', name: 'SUPERCONDUCTOR', levels: 1,
+      line: 'An ARC link keeps 95% of its damage instead of 86%.',
+      apply: set('arcFalloff', 0.95), icon: MARK.superconductor },
+    { id: 'longlead', name: 'LONG LEAD', levels: 1,
+      line: '+60% ARC jump range. It works on a spread field, not only a packed one.',
+      apply: scale('arcRange', 1.6), icon: MARK.longlead },
+    { id: 'annealed', name: 'ANNEALED', levels: 1,
+      line: 'A SPINE keeps 92% of its damage per body instead of 78%.',
+      apply: set('spineFade', 0.92), icon: MARK.annealed },
+    { id: 'railed', name: 'RAILED', levels: 1,
+      line: 'SPINE ignores armour completely.',
+      apply: set('spineShred', 1), icon: MARK.railed },
+    { id: 'salvo', name: 'SALVO', line: 'Every 8th shot fires 3 rounds.', levels: 1, apply: set('salvo', 8) , icon: MARK.salvo },
   ],
   FIELD: [
     { id: 'paired', name: 'PAIRED CHARGE', line: '+1 mine laid per throw.', apply: bump('mineSalvo', 1) , icon: MARK.deepmag },
-    { id: 'quickarm', name: 'QUICK ARM', line: 'Mines go live in half the time.', apply: scale('mineArm', 0.5) , icon: MARK.quicklay },
+    { id: 'quickarm', name: 'QUICK ARM', line: 'Mines go live in half the time.', levels: 1, apply: scale('mineArm', 0.5) , icon: MARK.quicklay },
     { id: 'deepcharge', name: 'DEEP CHARGE', line: '+35% mine blast radius.', apply: scale('mineBlast', 1.35) , icon: MARK.deepcharge },
     { id: 'widemouth', name: 'WIDE MOUTH', line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) , icon: MARK.widemouth },
-    { id: 'salted', name: 'SALTED', line: 'A spent mine goes off instead of fizzling.', apply: set('mineFizzle', true) , icon: MARK.longfuse },
+    { id: 'salted', name: 'SALTED', line: 'A spent mine goes off instead of fizzling.', levels: 1, apply: set('mineFizzle', true) , icon: MARK.longfuse },
     { id: 'shrapnel', name: 'SHRAPNEL', line: '+45% mine blast damage.', apply: scale('mineDamage', 1.45) , icon: MARK.shrapnel },
     { id: 'deadweight', name: 'DEAD WEIGHT', line: '+65% snare hold time.', apply: scale('mineHold', 1.65) , icon: MARK.deadweight },
     { id: 'hotwire', name: 'HOT WIRE', line: '+50% wire damage.', apply: scale('wireDamage', 1.5) , icon: MARK.hotwire },
@@ -175,14 +235,14 @@ export const UPGRADES = {
     { id: 'bloomout', name: 'BLOOM OUT', line: '+35% patch size, +45% burn.', apply: (u) => { u.patchR *= 1.35; u.patchDps *= 1.45; } , icon: MARK.bloomout },
     { id: 'buckshot', name: 'BUCKSHOT', line: '+60% spall pellets.', apply: scale('spallPellets', 1.6) , icon: MARK.buckshot },
     { id: 'repulsor', name: 'REPULSOR', line: '+40% lode reach and push.', apply: (u) => { u.lodeReach *= 1.4; u.lodePush *= 1.4; } , icon: MARK.repulsor },
-    { id: 'sweep', name: 'SWEEP', line: 'Turret blasts behind itself every 20s.', apply: set('sweep', 20) , icon: MARK.sweep },
-    { id: 'reflex', name: 'REFLEX', line: 'PULSE fires itself when 2+ objects grip you.', apply: set('reflex', true) , icon: MARK.reflex },
+    { id: 'sweep', name: 'SWEEP', line: 'Turret blasts behind itself every 20s.', levels: 1, apply: set('sweep', 20) , icon: MARK.sweep },
+    { id: 'reflex', name: 'REFLEX', line: 'PULSE fires itself when 2+ objects grip you.', levels: 1, apply: set('reflex', true) , icon: MARK.reflex },
     { id: 'intake', name: 'INTAKE', line: '+50% salvage pickup range.', apply: scale('intake', 1.5) , icon: MARK.intake },
     { id: 'standing', name: 'STANDING ORDER', line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
   ],
   TURRET: [
     { id: 'rate', name: 'RATE', line: '+20% fire rate.', apply: quicken('rate', 0.8) , icon: MARK.rate },
-    { id: 'handsoff', name: 'HANDS OFF', line: 'Auto fire matches your own fire rate.', apply: set('handsOff', true) , icon: MARK.handsoff },
+    { id: 'handsoff', name: 'HANDS OFF', line: 'Auto fire matches your own fire rate.', levels: 1, apply: set('handsOff', true) , icon: MARK.handsoff },
     { id: 'slew', name: 'SLEW', line: '+50% auto aim turn speed.', apply: scale('slew', 1.5) , icon: MARK.slew },
     { id: 'overwatch', name: 'OVERWATCH', line: '+25% damage while hands off the lever.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },
     { id: 'casing', name: 'HARD CASING', line: 'Objects touching you take 40 damage a second.', apply: bump('casing', 40) , icon: MARK.casing },
@@ -256,13 +316,33 @@ export const ALL_UPGRADES = AXES.flatMap((a) => UPGRADES[a].map((u) => ({ ...u, 
  * repeatable ones can come round again, which is what makes a long run able to
  * lean rather than merely collect.
  */
-const ONCE = new Set(['salvo', 'sweep', 'reflex', 'handsoff', 'salted', 'quickarm']);
+/*
+ * How many times one upgrade may ever be taken, and what its card says at each
+ * level. `levels` absent means without limit, which is still the right answer
+ * for a plain scalar — HOLLOWPOINT has no natural ceiling. `levels: 1` is the
+ * old one-shot: a switch cannot be thrown twice. Anything in between is an
+ * upgrade with a shape to it, and `tiers` lets a level be a different card:
+ * a third round out of one trigger pull is not "DOUBLE TAP again", it is
+ * TRIPLE TAP, and the offer should say so.
+ */
+const levelsOf = (u) => u.levels ?? Infinity;
+const heldCount = (taken, id) => taken.reduce((n, t) => n + (t === id ? 1 : 0), 0);
+
+/** The card as it reads at the level about to be offered. `n` is 0-based. */
+const atLevel = (u, n) => (u.tiers && u.tiers[n] ? { ...u, ...u.tiers[n] } : u);
 
 const pick = (pool) => (pool.length ? pool[(Math.random() * pool.length) | 0] : null);
 
 /** The stat upgrades, one axis at a time, skipping what is already spent. */
 const statPool = (taken, axis) =>
-  UPGRADES[axis].filter((u) => !(ONCE.has(u.id) && taken.includes(u.id))).map((u) => ({ ...u, axis }));
+  UPGRADES[axis].reduce((out, u) => {
+    const n = heldCount(taken, u.id);
+    // `level` and `levels` are for the card, which says LV 2/3 rather than x1
+    // when there is a ceiling: the question a levelled upgrade raises is how
+    // much of it is left, not how much of it you have.
+    if (n < levelsOf(u)) out.push({ ...atLevel(u, n), axis, level: n + 1, levels: levelsOf(u) });
+    return out;
+  }, []);
 
 /**
  * Three cards. While anything is still locked the first of them opens

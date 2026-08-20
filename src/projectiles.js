@@ -33,6 +33,13 @@ class Projectile {
     // each time it does.
     this.pierce = opts.pierce ?? 0;
     this.pierceFade = opts.pierceFade ?? 1;
+    // OVERSTUFFED: bodies this round may bounce off instead of stopping in,
+    // and what it keeps of its damage each time it does. A rebound is not a
+    // pierce — it comes back off the surface rather than out the far side.
+    this.rebound = opts.rebound ?? 0;
+    this.reboundFade = opts.reboundFade ?? 1;
+    // RAILED: the fraction of a body's armour this round simply ignores.
+    this.shred = opts.shred ?? 0;
     // Rounds that leave a mark on what they hit rather than only hurting it.
     this.onHit = opts.onHit || null;
     this.dead = false;
@@ -132,13 +139,17 @@ export function updateProjectiles(world, dt) {
  */
 function chainFrom(world, first, hx, hy, jumps) {
   const g = CFG.rounds.arc;
+  const up = world.up;
   const links = jumps ?? g.jumps;
+  // SUPERCONDUCTOR sets what a link keeps; LONG LEAD sets how far it reaches.
+  const fall = up.arcFalloff || g.falloff;
+  const range = g.jumpRange * up.arcRange;
   const seen = new Set();
   if (first) seen.add(first);
   let x = hx;
   let y = hy;
   let damage = g.jumpDamage;
-  const r2 = g.jumpRange * g.jumpRange;
+  const r2 = range * range;
 
   for (let jump = 0; jump < links; jump++) {
     let best = null;
@@ -163,7 +174,7 @@ function chainFrom(world, first, hx, hy, jumps) {
     audio.reflect();
     x = best.x;
     y = best.y;
-    damage *= g.falloff;
+    damage *= fall;
   }
 }
 
@@ -293,7 +304,7 @@ function resolveSegment(world, p, ax, ay, bx, by) {
   switch (bestKind) {
     case 'enemy': {
       const e = bestTarget;
-      const res = e.takeHit(world, p.damage, hx, hy, dirx, diry, p.impulse);
+      const res = e.takeHit(world, p.damage, hx, hy, dirx, diry, p.impulse, p.shred);
       if (res === 'reflect') {
         // mirror the velocity about the prism's surface normal
         let nx = (hx - e.x) / (e.r || 1);
@@ -323,6 +334,26 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         p.ignore = e;
         p.ignoreT = 0.06;
         for (let i = 0; i < 3; i++) spark(hx, hy, spread(140), spread(140), p.color, 0.18, 1.8);
+        return;
+      }
+      // ...and a rebounding one comes back off it, the way it comes off a
+      // wall. Same normal-mirror as a PRISM reflection, except this one hurt
+      // the thing it bounced off on the way past.
+      if (p.rebound > 0) {
+        p.rebound--;
+        p.damage *= p.reboundFade;
+        let nx = (hx - e.x) / (e.r || 1);
+        let ny = (hy - e.y) / (e.r || 1);
+        const nl = Math.hypot(nx, ny) || 1;
+        nx /= nl; ny /= nl;
+        const d = p.vx * nx + p.vy * ny;
+        p.vx -= 2 * d * nx;
+        p.vy -= 2 * d * ny;
+        p.x = hx + nx * (p.r + 1);
+        p.y = hy + ny * (p.r + 1);
+        p.ignore = e;
+        p.ignoreT = 0.08;
+        ricochetFx(p);
         return;
       }
       endProjectile(world, p, hx, hy, true);

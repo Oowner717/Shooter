@@ -250,6 +250,25 @@ Five kinds, one loaded at a time. Every one of them buys its trick with rate of
 fire, so **BOLT** — nothing done to it — stays the right answer more often than
 it looks.
 
+Build 54 gave the five that had nothing of their own something to grow into.
+BOLT gets **OVERSTUFFED**, three levels of it, and stops being a round that
+ends in the first thing it meets: it comes back off a body the way it comes off
+a wall, keeping 70% of its damage each time, so one round crosses up to four
+objects. It also gets **DOUBLE TAP** and, at its second level, **TRIPLE TAP** —
+follow-up rounds that wait 0.06s at the muzzle rather than shortening the
+cadence, which reads as one trigger pull with a stutter in it and not as a
+faster gun. HE gets **CLUSTER**, four smaller bursts thrown out around the
+first, which turns a circle into a patch of overlapping circles: measured, four
+bodies at 118 units that the plain burst does not reach at all. SHOT gets
+**DOUBLE-O** twice over — 5 pellets to 8 to 11, filling the cone in rather than
+widening it — and **LONG SHOT**, which moves the range cliff from a mean 467
+units out to 735 without ever removing it. ARC gets **SUPERCONDUCTOR**, which
+takes a link's falloff from 0.86 to 0.95 and keeps the far end of a chain
+worth having, and **LONG LEAD**, +60% jump range, which is what makes it work
+on a spread field rather than only a packed one. SPINE gets **ANNEALED**, 0.78
+to 0.92 per body, and **RAILED**, which puts it through armour entirely —
+measured at 13.2 to 20 against a BULWARK.
+
 - **HE** makes every round detonate on impact. It costs you better than half
   your rate of fire and the shells travel slower, so single targets are no
   easier — crowds are.
@@ -455,17 +474,37 @@ button can then say AMENDMENT and mean it.
   | OVERPRESSURE | +40% HE radius | REFLEX | PULSE fires itself at 2+ grips | INSULATION | corruption costs half |
   | FIFTH LINK | ARC +1 jump | INTAKE | +50% pickup range | SHRUG | throws objects off every 15s |
   | WIDER RING | HALO +2 in orbit | STANDING ORDER | -20% ability cooldowns | | |
+  | LONG ORBIT | +50% HALO duration | | | | |
+  | COMPOUND | +60% tithe mark bite | | | | |
   | SALVO | every 8th shot fires 3 | | | | |
+  | OVERSTUFFED (x3) | BOLT rebounds off bodies | | | | |
+  | DOUBLE / TRIPLE TAP (x2) | a second and third BOLT behind the first | | | | |
+  | CLUSTER | HE throws four smaller bursts | | | | |
+  | DOUBLE-O (x2) | +3 SHOT pellets | | | | |
+  | LONG SHOT | +55% SHOT range | | | | |
+  | SUPERCONDUCTOR | ARC links keep 95% | | | | |
+  | LONG LEAD | +60% ARC jump range | | | | |
+  | ANNEALED | SPINE keeps 92% per body | | | | |
+  | RAILED | SPINE ignores armour | | | | |
 
-Each carries its own mark, and the card shows how many of it you already hold.
-An offer is read in the two seconds before a tap, and a shape is quicker to
-recognise than a name — especially for the repeatable ones, where the question
-is "which is the one I already have three of".
+Each carries its own mark, and the card says how far along it is. An offer is
+read in the two seconds before a tap, and a shape is quicker to recognise than
+a name — especially for the repeatable ones, where the question is "which is
+the one I already have three of".
+
+**Three kinds of ceiling, and the card says which.** An upgrade with no
+`levels` field repeats without limit and its card counts what you hold: `x3`.
+`levels: 1` is a switch, and a switch cannot be thrown twice. In between is an
+upgrade with a shape to it — OVERSTUFFED runs to three, DOUBLE TAP to two —
+and those cards count what is left instead: `LV 2/3`, because that is the
+question a ceiling raises. A level may also be a **different card**: the second
+DOUBLE TAP is not "DOUBLE TAP again", it is **TRIPLE TAP**, with its own name
+and its own line, declared as a `tiers` entry on the same upgrade so the level
+history stays one id.
 
 Every one of them is a scalar on `world.up` read at the point of use — nothing
 in `src/upgrades.js` reaches into a subsystem — so adding one is a table entry
-and one place that reads it. The four that cannot sensibly stack are never
-offered twice.
+and one place that reads it.
 
 Two of them are worth calling out. **SWEEP** makes the turret clear behind
 itself every twenty seconds, which is the one place the barrel cannot reach —
