@@ -63,7 +63,7 @@ emptiest.
                                                             [  HE  ]
                                                             [ SHOT ]
 [BLAST]                                                     [ ARC  ]
-[SNARE]                                                     [ HALO ]
+[SNARE]                                                     [SPINE ]
 [WIRE ]
 [KNELL]              [AUTO AIM][AUTO FIRE]
 [ PULSE ][  FAN  ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ CHORUS ]
@@ -237,7 +237,11 @@ than something it starts with:
   has in one direction rather than all of them: measured at 14 pellets, every
   one of them up the field.
 - **VOID** removes one thing, whatever it is, and is then spent. It does not
-  care about armour or health or size — measured against a 99,999-hp body.
+  care about armour or health or size — measured against a 99,999-hp body. Its
+  mouth is deliberately small: 18 units of trigger, walked into rather than
+  approached, which is small enough that a VOID often expires unused. **EVENT
+  HORIZON** is the one upgrade that touches it and takes that to 39.6 — asked
+  per kind rather than folded into WIDE MOUTH, so it widens nothing else.
 - **KNELL** does not wait to be touched. It counts, and then it goes off three
   times where it lies, each half again as wide as the last and worth 72% of its
   damage. BLAST punishes what walks into it; KNELL denies the ground whether
@@ -297,23 +301,26 @@ measured at 13.2 to 20 against a BULWARK.
   it comes apart — 70 salvage against 20 for the same body unmarked — and the
   mark rides down onto the fragments, because that is where the salvage is. The
   ramp is what makes it an answer to one large thing without ever changing
-  ammunition, which is what a long fight against a single body needs.
-- **SUNDER** opens a body's plating: for a while everything lands harder on it,
-  including everything that is not this round. Measured at 132 damage before
-  and 211 after.
+  ammunition, which is what a long fight against a single body needs. **LIEN**
+  raises the ceiling from eight marks to fourteen: measured, a sixteenth hit
+  goes from 28.5 to 45.9 on the same body.
 - **ARC** is the weakest round in the rack on impact and the strongest through
   a crowd: the hit jumps to the nearest thing it has not touched yet and on
   again, up to four links, each a little weaker than the last. It works at any
   range, which is the one thing neither HE nor SHOT does. Poor against anything
   standing on its own.
-- **HALO** is the one round that does not leave. It enters a slow orbit around
-  the turret and stays there for seven seconds, cutting anything that comes
-  through the ring, and it does not stop on a hit — up to five can be circling
-  at once. Nothing else in the rack answers the thing already on top of you,
-  and this answers it without being aimed at all.
 
-The five kinds are exclusive: picking one clears whichever was loaded, and
-picking the loaded one again is a no-op rather than a silent unload.
+**Build 55 scrapped two of them.** HALO — the round that orbited the turret —
+went one build after it arrived: it answered a problem the rest of the rack
+answers, and a round that is not aimed is a round that does not play. SUNDER
+went with it, and nothing replaced it; opening a body's plating so that
+*everything else* lands harder is a setup round, and a setup round wants a
+second hand on the lever that this game does not have. Removing SUNDER took
+the whole mechanic with it — no body carries a plating timer any more — rather
+than leaving a multiplier in `applyDamage` that nothing could ever set.
+
+The kinds are exclusive: picking one clears whichever was loaded, and picking
+the loaded one again is a no-op rather than a silent unload.
 
 Your hands always win: while you are holding the lever or dragging, the
 assists stop steering. Auto fire runs a shade slower than driving it yourself,
@@ -461,7 +468,6 @@ button can then say AMENDMENT and mean it.
   | SLEDGE | +60% slug knockback | BUCKSHOT | +60% spall pellets | | |
   | DEEP FREEZE | +70% rime chill | REPULSOR | +40% lode reach and push | | |
   | LEVY | +50% tithe mark | | | | |
-  | PRY BAR | +60% sunder duration | | | | |
   | HOT LOAD | +15% fire rate | QUICK ARM | mines go live twice as fast | HANDS OFF | auto fire matches manual |
   | TRACER | +35% round speed | DEEP CHARGE | +35% mine blast radius | SLEW | +50% auto aim turn speed |
   | | | SALTED | a spent mine goes off | | |
@@ -473,8 +479,7 @@ button can then say AMENDMENT and mean it.
   | HEAVY | 2x knockback | SWEEP | blasts behind you every 20s | HARD CASING | 40 dmg/s to what touches you |
   | OVERPRESSURE | +40% HE radius | REFLEX | PULSE fires itself at 2+ grips | INSULATION | corruption costs half |
   | FIFTH LINK | ARC +1 jump | INTAKE | +50% pickup range | SHRUG | throws objects off every 15s |
-  | WIDER RING | HALO +2 in orbit | STANDING ORDER | -20% ability cooldowns | | |
-  | LONG ORBIT | +50% HALO duration | | | | |
+  | LIEN | TITHE marks run to 14 | STANDING ORDER | -20% ability cooldowns | | |
   | COMPOUND | +60% tithe mark bite | | | | |
   | SALVO | every 8th shot fires 3 | | | | |
   | OVERSTUFFED (x3) | BOLT rebounds off bodies | | | | |
@@ -485,7 +490,7 @@ button can then say AMENDMENT and mean it.
   | SUPERCONDUCTOR | ARC links keep 95% | | | | |
   | LONG LEAD | +60% ARC jump range | | | | |
   | ANNEALED | SPINE keeps 92% per body | | | | |
-  | RAILED | SPINE ignores armour | | | | |
+  | RAILED | SPINE ignores armour | EVENT HORIZON | VOID takes what comes near | | |
 
 Each carries its own mark, and the card says how far along it is. An offer is
 read in the two seconds before a tap, and a shape is quicker to recognise than

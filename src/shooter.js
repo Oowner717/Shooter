@@ -201,32 +201,6 @@ export class Shooter {
         chain: true,
         jumps: R.arc.jumps + up.arcJumps,
       });
-    } else if (world.round === 'halo') {
-      const g = R.halo;
-      // A ring rather than a stream: past the ceiling the oldest gives way, so
-      // holding the trigger keeps the halo turning rather than piling up.
-      const inOrbit = world.projectiles.filter((q) => q.orbit && !q.dead);
-      const cap = g.max + up.haloMax;
-      while (inOrbit.length >= cap) { const q = inOrbit.shift(); q.dead = true; }
-      for (const f of fan) {
-        const p = shot(a + f, {
-          r: 4.6,
-          damage: g.damage,
-          impulse: 30,
-          bounces: 0,
-          life: g.life * up.haloLife,
-          color: '#ffd166',
-          core: '#fff3d0',
-          trail: 0.04,
-          // It sweeps the same bodies pass after pass, so it must not be spent
-          // on the first one it touches.
-          pierce: 9999,
-          pierceFade: 1,
-          orbit: { a: a + f, r: g.r, w: g.spin },
-        });
-        p.x = this.x + Math.cos(a + f) * g.r;
-        p.y = this.y + Math.sin(a + f) * g.r;
-      }
     } else if (world.round === 'spine') {
       const g = R.spine;
       for (const f of fan) shot(a + f, {
@@ -311,22 +285,9 @@ export class Shooter {
            */
           const extra = e.marks * g.step * w.up.titheStep;
           if (extra > 0) e.applyDamage(w, g.damage * w.up.damage * extra, 0, 0, 0);
-          e.marks = Math.min(g.marks, e.marks + 1);
+          e.marks = Math.min(g.marks + w.up.titheMarks, e.marks + 1);
           e.bounty = Math.max(e.bounty, g.bounty * w.up.bounty);
         },
-      });
-    } else if (world.round === 'sunder') {
-      const g = R.sunder;
-      for (const f of fan) shot(a + f, {
-        speed: g.speed * slow,
-        r: 4.8,
-        damage: g.damage,
-        impulse: 34,
-        bounces: 0,
-        color: '#ffb0d8',
-        core: '#ffe6f2',
-        trail: 0.045,
-        onHit: (w, e) => { e.sunder = Math.max(e.sunder, g.open * w.up.sunder); },
       });
     } else {
       const g = R.standard;

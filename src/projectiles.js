@@ -25,9 +25,8 @@ class Projectile {
     this.burst = opts.burst || null;
     this.chain = !!opts.chain; // ARC: jumps on from whatever it hits
     this.jumps = opts.jumps ?? CFG.rounds.arc.jumps;
-    // HALO: a round that circles the turret instead of leaving. `a` is where
-    // it is on the ring, `w` how fast it goes round.
-    this.orbit = opts.orbit || null;
+    // DOUBLE TAP / TRIPLE TAP: a follow-up round waits this long at the
+    // muzzle before it sets off.
     this.hold = opts.hold ?? 0;
     // SPINE: bodies it carries on through, and what it keeps of its damage
     // each time it does.
@@ -69,22 +68,6 @@ export function updateProjectiles(world, dt) {
     // a timed round goes off wherever it happens to be
     if (p.life <= 0) endProjectile(world, p, p.x, p.y, true);
     if (p.ignoreT > 0) p.ignoreT -= dt; else p.ignore = null;
-
-    // HALO does not travel; it is carried round the turret and swept through
-    // whatever is standing in the ring. Handled before the flight code because
-    // none of that applies to it.
-    if (!p.dead && p.orbit) {
-      const o = p.orbit;
-      const s0 = world.shooter;
-      o.a += o.w * dt;
-      const px = p.x;
-      const py = p.y;
-      p.x = s0.x + Math.cos(o.a) * o.r;
-      p.y = s0.y + Math.sin(o.a) * o.r;
-      resolveSegment(world, p, px, py, p.x, p.y);
-      if (p.dead) { list[i] = list[list.length - 1]; list.pop(); }
-      continue;
-    }
 
     if (!p.dead && p.hold > 0) {
       p.hold -= dt;

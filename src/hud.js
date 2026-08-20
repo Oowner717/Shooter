@@ -18,10 +18,17 @@ const CONFIG_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
   + '<path d="M4 7h6M14 7h6M4 17h10M18 17h2"/>'
   + '<circle cx="12" cy="7" r="2.1"/><circle cx="16" cy="17" r="2.1"/></svg>';
 
+/*
+ * The two exclusive families, taken from the arsenal rather than written out
+ * again. They were hand-kept lists of four each, from back when four was all
+ * there was, and they had quietly stopped meaning what they say: SEED picks a
+ * mine from MINE_KEYS and so could only ever lay one of the first four.
+ */
 /** Rounds that are not the default. Mutually exclusive with each other. */
-export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'halo'];
+export const ROUND_KEYS = ARSENAL
+  .filter((a) => a.kind === 'round' && a.key !== 'standard').map((a) => a.key);
 /** Mines. Also mutually exclusive, but all of them can be off at once. */
-export const MINE_KEYS = ['blast', 'snare', 'wire', 'knell'];
+export const MINE_KEYS = ARSENAL.filter((a) => a.kind === 'mine').map((a) => a.key);
 
 export class Hud {
   constructor(game) {

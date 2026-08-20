@@ -33,8 +33,6 @@ export const ICON = {
   // It does not stop at what it hit. A bolt reads at 13px; three dots and a
   // zigzag did not — it came out as a chevron.
   arc: svg('<path d="M13.6 2 5 13.4h5.6L9.8 22l8.6-11.4h-5.6z" fill="currentColor" stroke="none"/>'),
-  // It does not leave: a ring around the turret, with one on it.
-  halo: svg('<circle cx="12" cy="12" r="7.6" opacity=".55"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="19.6" cy="12" r="2.4" fill="currentColor" stroke="none"/>'),
   // --- build 51: six more rounds ---
   // It does not stop at the first thing.
   spine: svg('<path d="M12 22V3.4"/><path d="M8.6 6.8 12 3.2l3.4 3.6"/><path d="M6.5 11h11M7.5 16h9" opacity=".55"/>'),
@@ -46,8 +44,6 @@ export const ICON = {
   spore: svg('<circle cx="12" cy="9.4" r="3.4"/><path d="M12 12.8V16"/><path d="M6 20c1.4-2.6 3.4-4 6-4s4.6 1.4 6 4"/><path d="M4.6 20h14.8" opacity=".6"/>'),
   // A mark that pays.
   tithe: svg('<path d="M12 3.2 20 8v8l-8 4.8L4 16V8z"/><path d="M12 8.4v7.2M9.4 10.4h5.2M9.4 13.6h5.2" opacity=".9"/>'),
-  // Plating opened.
-  sunder: svg('<path d="M12 2.6 20 6v6.6c0 4.6-3.4 7.2-8 8.8-4.6-1.6-8-4.2-8-8.8V6z"/><path d="M13.6 5.4 9.6 12h4.4l-3.8 6.4" fill="none"/>'),
   // --- build 51: four more mines ---
   // A burr that opens into ground you cannot stand on.
   thorn: svg('<circle cx="12" cy="12" r="2.6"/><path d="M12 9.4V4M12 14.6V20M9.4 12H4M14.6 12H20M9.9 9.9 6.2 6.2M14.1 9.9l3.7-3.7M9.9 14.1l-3.7 3.7M14.1 14.1l3.7 3.7"/>'),
@@ -135,10 +131,6 @@ export const ARSENAL = [
     dmg: '11, then 25 a jump', fx: 'The hit jumps to 4 more nearby, weaker each time.',
   },
   {
-    key: 'halo', kind: 'round', group: 'ammo', label: 'HALO', icon: ICON.halo, tone: '#ffd166',
-    dmg: '26 a pass', fx: 'Orbits the turret for 7s, cutting what comes through.',
-  },
-  {
     key: 'spine', kind: 'round', group: 'ammo', label: 'SPINE', icon: ICON.spine, tone: '#d8f1ff',
     dmg: '20, fading', fx: 'Punches through 3 more bodies behind the first.',
   },
@@ -157,10 +149,6 @@ export const ARSENAL = [
   {
     key: 'tithe', kind: 'round', group: 'ammo', label: 'TITHE', icon: ICON.tithe, tone: '#7cffb2',
     dmg: '8, and rising', fx: 'Marks a body: each mark hurts it more and pays more.',
-  },
-  {
-    key: 'sunder', kind: 'round', group: 'ammo', label: 'SUNDER', icon: ICON.sunder, tone: '#ffb0d8',
-    dmg: '12', fx: 'Opens plating for 5s. Everything lands 60% harder.',
   },
 ];
 

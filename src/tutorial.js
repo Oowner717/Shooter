@@ -88,7 +88,7 @@ export const STARTING = ['standard', 'pulse', 'fan', 'autoAim', 'autoFire'];
 
 /** Rounds, mines and abilities, in the order the offers hand them out. */
 export const LOCKABLE = {
-  rounds: ['explosive', 'shotgun', 'arc', 'halo', 'spine', 'slug', 'rime', 'spore', 'tithe', 'sunder'],
+  rounds: ['explosive', 'shotgun', 'arc', 'spine', 'slug', 'rime', 'spore', 'tithe'],
   mines: ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'],
   abilities: ['lance', 'well', 'prism', 'stasis', 'decoy', 'chorus'],
 };

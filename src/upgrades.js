@@ -33,9 +33,8 @@ export function freshUpgrades() {
     boltTap: 0, // follow-up rounds behind every BOLT
     shotPellets: 0, // extra pellets in a SHOT
     shotRange: 1, // and how far they get before they expire
-    haloMax: 0, // extra rounds HALO keeps in orbit
-    haloLife: 1, // and how long they stay up
     titheStep: 1, // how fast TITHE's mark deepens its own bite
+    titheMarks: 0, // and how deep it may go past the eight it starts with
     salvo: 0, // every Nth shot fires three
     pierce: 0, // extra bodies a SPINE carries on through
     spineFade: 0, // set, not scaled: what it keeps per body when ANNEALED is in
@@ -46,7 +45,6 @@ export function freshUpgrades() {
     patchLife: 1,
     patchDps: 1,
     bounty: 1, // TITHE's multiplier on a marked body
-    sunder: 1, // how long SUNDER keeps a body's plating open
     // field
     // The cap, the lifetime and the throw clock are fixed in config and no
     // upgrade may move any of them. What an upgrade may do is put more down
@@ -63,6 +61,7 @@ export function freshUpgrades() {
     lodePush: 1,
     wireDamage: 1, // per second of contact on a wire
     mineTrigger: 1,
+    voidReach: 1, // VOID's mouth alone, which nothing else widens
     sweep: 0, // seconds between the turret clearing behind itself
     reflex: false, // PULSE answers a crowd on the turret by itself
     intake: 1,
@@ -96,11 +95,8 @@ const MARK = {
   heavy: g('<rect x="13" y="8" width="8" height="8" rx="1"/><path d="M2 12h8"/><path d="M7 8.5 10.5 12 7 15.5"/>'),
   overpressure: g('<circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="6" opacity=".6"/><circle cx="12" cy="12" r="9.6" opacity=".3"/>'),
   fifthlink: g('<circle cx="5" cy="17" r="2.2"/><circle cx="12" cy="8" r="2.2"/><circle cx="19" cy="16" r="2.2"/><path d="M6.4 15.3 10.6 9.8M13.5 9.5l4.2 4.7"/>'),
-  // A ring that stays up longer.
-  longorbit: g('<circle cx="12" cy="12" r="8.4" stroke-dasharray="3 2.4"/><circle cx="20.4" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M12 8.6V12l2.6 1.6" opacity=".8"/>'),
   // A mark that compounds on itself.
   compound: g('<path d="M4 19.4 9 13l3.6 3.2L20 5.6"/><path d="M15.6 5.6H20v4.4" fill="none"/><circle cx="9" cy="13" r="1.6" fill="currentColor" stroke="none"/><circle cx="12.6" cy="16.2" r="1.6" fill="currentColor" stroke="none"/>'),
-  fourthtime: g('<circle cx="4.5" cy="12" r="2.1" fill="currentColor" stroke="none"/><circle cx="11" cy="12" r="2.1" fill="currentColor" stroke="none" opacity=".7"/><circle cx="17.5" cy="12" r="2.1" fill="currentColor" stroke="none" opacity=".4"/>'),
   salvo: g('<path d="M5 21V7M12 21V4M19 21V7"/><path d="M2.6 9.4 5 7l2.4 2.4M9.6 6.4 12 4l2.4 2.4M16.6 9.4 19 7l2.4 2.4"/>'),
   // --- build 54: BOLT, HE, SHOT, ARC and SPINE each get their own ---
   // A round coming off a body at an angle rather than stopping in it.
@@ -135,8 +131,6 @@ const MARK = {
   bloomout: g('<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.6" stroke-dasharray="2.2 2.6"/><circle cx="12" cy="12" r="10" stroke-dasharray="2.2 3.4" opacity=".6"/>'),
   // A mark worth more.
   levy: g('<path d="M12 3.4 19.4 8v8L12 20.6 4.6 16V8z"/><path d="M12 7.6v8.8M9.6 9.8h4.8M9.6 14.2h4.8"/><path d="M16.6 4.4h4M18.6 2.4v4" opacity=".8"/>'),
-  // Plating open longer.
-  prybar: g('<path d="M12 2.6 20 6v6.6c0 4.6-3.4 7.2-8 8.8-4.6-1.6-8-4.2-8-8.8V6z" stroke-dasharray="3 2.6"/><path d="M6.4 8.4 17 19"/><path d="M4.4 6.4 8 8l-1.6 2.4z" fill="currentColor" stroke="none"/>'),
   // More thrown, one way.
   buckshot: g('<path d="M4.6 20h14.8"/><path d="M12 16V9M8 16 6 9.6M16 16l2-6.4M4.6 15 3 10M19.4 15 21 10" opacity=".95"/><circle cx="12" cy="6.4" r="1.6" fill="currentColor" stroke="none"/>'),
   // A field that reaches further and shoves harder.
@@ -154,6 +148,10 @@ const MARK = {
   hotwire: g('<path d="M2.5 14h19"/><path d="M4.5 10.5v7M19.5 10.5v7"/><path d="M8.5 9.4c0-1.6 1.6-1.6 1.6-3.2M13.9 9.4c0-1.6 1.6-1.6 1.6-3.2" opacity=".85"/>'),
   // One more ring than the bell had.
   fourthbell: g('<path d="M7 15.4c0-5 1.3-8 5-8s5 3 5 8z"/><path d="M5.6 15.4h12.8"/><circle cx="12" cy="18" r="1.4" fill="currentColor" stroke="none"/><path d="M19.6 5.6a5.6 5.6 0 0 1 0 6.4M21.8 3.4a8.8 8.8 0 0 1 0 10.8" opacity=".6"/>'),
+  // A claim that runs deeper than it used to.
+  lien: g('<path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z"/><path d="M12 8v8M9.4 10.2h5.2M9.4 13.8h5.2" opacity=".9"/><path d="M12 20.8v-2M12 5.2v-2" opacity=".55"/>'),
+  // A mouth that reaches much further than the thing itself.
+  eventhorizon: g('<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="6.4" opacity=".6"/><circle cx="12" cy="12" r="10" stroke-dasharray="2.2 2.6"/><path d="M12 2v1.6M12 20.4V22M2 12h1.6M20.4 12H22" opacity=".7"/>'),
   sweep: g('<path d="M12 4v7"/><path d="M8 11h8l1.5 5h-11z" fill="currentColor" stroke="none"/><path d="M3.5 15a9 9 0 0 0 17 0" stroke-dasharray="2.6 2.6"/>'),
   reflex: g('<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M6.5 6.5a7.7 7.7 0 0 0 0 11M17.5 6.5a7.7 7.7 0 0 1 0 11" opacity=".6"/><path d="M13.5 2 10 7.5h4L10.5 13" />'),
   intake: g('<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 2.5v4M9.8 4.6 12 6.9l2.2-2.3"/><path d="M12 21.5v-4M9.8 19.4 12 17.1l2.2 2.3"/><path d="M2.5 12h4M4.6 9.8 6.9 12l-2.3 2.2"/><path d="M21.5 12h-4M19.4 9.8 17.1 12l2.3 2.2"/>'),
@@ -183,14 +181,14 @@ export const UPGRADES = {
     { id: 'heavy', name: 'HEAVY', line: '2x knockback on every hit.', apply: scale('impulse', 2) , icon: MARK.heavy },
     { id: 'overpressure', name: 'OVERPRESSURE', line: '+40% HE blast radius.', apply: scale('blastR', 1.4) , icon: MARK.overpressure },
     { id: 'fifthlink', name: 'FIFTH LINK', line: 'ARC jumps 1 more time.', apply: bump('arcJumps', 1) , icon: MARK.fifthlink },
-    { id: 'fourthtime', name: 'WIDER RING', line: '+2 halo rounds in orbit.', apply: bump('haloMax', 2) , icon: MARK.fourthtime },
-    { id: 'longorbit', name: 'LONG ORBIT', line: '+50% halo duration.', apply: scale('haloLife', 1.5) , icon: MARK.longorbit },
     { id: 'compound', name: 'COMPOUND', line: '+60% tithe mark bite.', apply: scale('titheStep', 1.6) , icon: MARK.compound },
     { id: 'throughandthrough', name: 'THROUGH AND THROUGH', line: '+2 bodies a spine pierces.', apply: bump('pierce', 2) , icon: MARK.throughandthrough },
     { id: 'sledge', name: 'SLEDGE', line: '+60% slug knockback.', apply: scale('slug', 1.6) , icon: MARK.sledge },
     { id: 'deepfreeze', name: 'DEEP FREEZE', line: '+70% rime chill time.', apply: scale('chill', 1.7) , icon: MARK.deepfreeze },
     { id: 'levy', name: 'LEVY', line: '+50% tithe salvage mark.', apply: scale('bounty', 1.5) , icon: MARK.levy },
-    { id: 'prybar', name: 'PRY BAR', line: '+60% sunder duration.', apply: scale('sunder', 1.6) , icon: MARK.prybar },
+    { id: 'lien', name: 'LIEN', levels: 1,
+      line: 'A TITHE mark runs to 14 instead of 8. Far more on one long body.',
+      apply: bump('titheMarks', 6), icon: MARK.lien },
     // --- build 54: the rounds that had nothing of their own ---
     { id: 'overstuffed', name: 'OVERSTUFFED', levels: 3,
       line: 'BOLT rebounds off bodies instead of stopping, weaker each time. +1 rebound, +30% life.',
@@ -227,6 +225,9 @@ export const UPGRADES = {
     { id: 'quickarm', name: 'QUICK ARM', line: 'Mines go live in half the time.', levels: 1, apply: scale('mineArm', 0.5) , icon: MARK.quicklay },
     { id: 'deepcharge', name: 'DEEP CHARGE', line: '+35% mine blast radius.', apply: scale('mineBlast', 1.35) , icon: MARK.deepcharge },
     { id: 'widemouth', name: 'WIDE MOUTH', line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) , icon: MARK.widemouth },
+    { id: 'eventhorizon', name: 'EVENT HORIZON', levels: 1,
+      line: 'A VOID takes what comes near it, not only what walks into it.',
+      apply: scale('voidReach', 2.2), icon: MARK.eventhorizon },
     { id: 'salted', name: 'SALTED', line: 'A spent mine goes off instead of fizzling.', levels: 1, apply: set('mineFizzle', true) , icon: MARK.longfuse },
     { id: 'shrapnel', name: 'SHRAPNEL', line: '+45% mine blast damage.', apply: scale('mineDamage', 1.45) , icon: MARK.shrapnel },
     { id: 'deadweight', name: 'DEAD WEIGHT', line: '+65% snare hold time.', apply: scale('mineHold', 1.65) , icon: MARK.deadweight },

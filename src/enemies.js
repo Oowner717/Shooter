@@ -153,7 +153,6 @@ export class Enemy {
     this.salvage = opts.salvage || 0;
     // Marks left on a body by the rounds that do not simply hurt it.
     this.chill = 0; // RIME: seconds of being dragged to a crawl
-    this.sunder = 0; // SUNDER: seconds of taking more from everything
     this.bounty = 1; // TITHE: what its salvage is worth when it goes
     this.marks = 0; // ...and how deep the mark is, which is what TITHE rides on
     this.spawnIn = opts.spawnIn ?? 0; // brief materialise animation
@@ -299,7 +298,7 @@ export class Enemy {
     if (this.spawnIn > 0) this.spawnIn = Math.max(0, this.spawnIn - dt * 2.2);
     this.flash = Math.max(0, this.flash - dt * 4.5);
 
-    // RIME and SUNDER both wear off on their own. The chill is a drag rather
+    // RIME wears off on its own. The chill is a drag rather
     // than a speed cap, so a heavy body coasts further out of it than a light
     // one — which is the same physics everything else here obeys.
     if (this.chill > 0) {
@@ -308,7 +307,6 @@ export class Enemy {
       this.vx *= k;
       this.vy *= k;
     }
-    if (this.sunder > 0) this.sunder -= dt;
     if (this.wardT > 0) {
       this.wardT -= dt;
       if (this.wardT <= 0) this.ward = 0;
@@ -440,13 +438,10 @@ export class Enemy {
     // beacon stops covering, which is what makes killing the beacon feel like
     // the answer rather than a statistic.
     const ward = this.wardT > 0 ? (this.ward || 0) : 0;
-    // A sundered body has had its plating opened; everything lands harder,
-    // not just the round that opened it.
-    const open = this.sunder > 0 ? CFG.rounds.sunder.bite : 1;
     // RAILED lets a SPINE through the plate rather than into it: `shred` is
     // the fraction of this body's armour the round simply does not meet.
     const plate = this.armor * (1 - shred);
-    const real = Math.max(1, dmg * (1 - plate) * (1 - ward) * open);
+    const real = Math.max(1, dmg * (1 - plate) * (1 - ward));
     this.hp -= real;
     this.flash = Math.min(1, this.flash + 0.5 + real / 260);
     if (impulse) {

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '54';
+export const BUILD = '55';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -190,33 +190,6 @@ export const CFG = {
       step: 0.55, // extra TITHE damage per mark already on it
       marks: 8, // and it stops deepening here
     },
-    /*
-     * SUNDER. Opens a body's plating: for a while everything lands harder on
-     * it, including everything that is not this round. Aimed at the things
-     * armour makes tedious, and worth nothing at all against the things it
-     * does not.
-     */
-    sunder: {
-      rate: 1.75,
-      speed: 1240,
-      damage: 12,
-      open: 5, // seconds the plating stays open
-      bite: 1.6, // and how much harder everything lands while it is
-    },
-    /*
-     * HALO. The one round that does not leave. It enters a slow orbit around
-     * the turret and stays there, cutting anything that comes through it, for
-     * as long as it lasts. Nothing else here answers the thing already on top
-     * of you; this does, and it does it without being aimed.
-     */
-    halo: {
-      rate: 2.2,
-      damage: 26,
-      life: 7, // seconds it circles for
-      r: 168, // orbit radius
-      spin: 2.6, // radians a second
-      max: 5, // rounds that can be in orbit at once
-    },
   },
 
   // ---- decoy ----------------------------------------------------------
@@ -318,7 +291,10 @@ export const CFG = {
     flight: 1,
     arm: 0.7,
     r: 12,
-    trigger: 18, // it has to be walked into, not merely approached
+    // It has to be walked into, not merely approached. At 18 that mouth is
+    // small enough that a VOID often expires unused, which is what EVENT
+    // HORIZON is for — it more than doubles this and nothing else.
+    trigger: 18,
   },
 
   // ---- offers ----------------------------------------------------------

@@ -438,7 +438,10 @@ export function updateMines(world, dt) {
       // SALTED has been taken.
       fizzle(world, m);
     } else if (m.armed && m.cfg.trigger) {
-      const reach = m.r + m.cfg.trigger * world.up.mineTrigger;
+      // EVENT HORIZON widens VOID's mouth and nothing else's, so it is asked
+      // per kind rather than folded into the shared trigger scalar.
+      const own = m.kind === 'void' ? world.up.voidReach : 1;
+      const reach = m.r + m.cfg.trigger * world.up.mineTrigger * own;
       for (const e of world.enemies) {
         // Only things that could corrupt the feed can set a mine off.
         if (e.dead || e.harmless || e.staged) continue;
