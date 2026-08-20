@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '62';
+export const BUILD = '63';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -63,6 +63,40 @@ export const CFG = {
   popRampKills: 320,
   spawnInterval: [1.05, 0.52], // seconds between spawn attempts, start -> end
   formationChance: 0.42,
+
+  // ---- what is on the field at once ------------------------------------
+  /*
+   * Eleven types unlock over a run and, until build 63, every one of them was
+   * in the roll from the moment it unlocked — so by the first few minutes the
+   * field was a handful of objects, each a different thing, none of them long
+   * enough on screen to be learned. A wave of six MOTEs teaches you what a
+   * MOTE is; six different objects teach you nothing and read as noise.
+   *
+   * So the director holds a small working set instead of the whole pool. It
+   * rotates one out every `cohortEvery` kills, and a newly unlocked type takes
+   * a place immediately — a reveal should be a reveal.
+   */
+  cohort: 3, // distinct types the roll may draw from at once
+  cohortEvery: 80, // kills before one of them is swapped out
+
+  // ---- scion / graft ---------------------------------------------------
+  // What a SCION leaves behind and what it does to whatever it reaches.
+  //
+  // Two at a time and no more, because the point of the object is the decision
+  // it forces and three of them at once is not a decision, it is noise. They
+  // are also held apart on release: two SCIONs side by side would seed the
+  // same host twice and read as one event.
+  graft: {
+    cap: 2, // on the field at once
+    apart: 320, // world units the second is kept from the first
+    seeds: 3, // thrown when one is destroyed
+    spread: 190, // how hard they are thrown clear before they start hunting
+    life: 13, // seconds a seed has to find a host
+    hunt: 480, // ...and how far it will look
+    grow: 1.35, // what grafting does to the host's radius
+    tough: 1.9, // ...and to its health
+    regen: 11, // health a grafted body closes per second
+  },
 
   // ---- drift ----------------------------------------------------------
   // The harmless ones, and where they end up.
@@ -564,7 +598,7 @@ export const CFG = {
 export const ENEMY_TYPES = [
   {
     id: 'mote',
-    unlock: 0, // kills before this type enters the rotation
+    unlock: 0,
     name: 'MOTE',
     shape: 'shard',
     r: 12,
@@ -576,12 +610,12 @@ export const ENEMY_TYPES = [
     wobble: 2.1,
     color: '#7ef9ff',
     glow: '#00d4ff',
-    weight: 22,
+    weight: 26,
     debris: 4,
   },
   {
     id: 'needle',
-    unlock: 0, // kills before this type enters the rotation
+    unlock: 0,
     name: 'NEEDLE',
     shape: 'needle',
     r: 10,
@@ -593,16 +627,17 @@ export const ENEMY_TYPES = [
     wobble: 0.8,
     color: '#ffd166',
     glow: '#ff9f1c',
-    weight: 14,
+    weight: 18,
     debris: 2,
   },
   {
     id: 'lurcher',
-    unlock: 10, // kills before this type enters the rotation
+    unlock: 18,
     name: 'LURCHER',
     shape: 'hex',
     r: 24,
-    hp: 98,
+    hp: 142,
+    large: true, // released more slowly, and worth more when it lands
     density: 1.35,
     speed: 38,
     accel: 120,
@@ -611,16 +646,17 @@ export const ENEMY_TYPES = [
     lurch: true,
     color: '#b98cff',
     glow: '#8b5cf6',
-    weight: 20,
+    weight: 12,
     debris: 8,
   },
   {
     id: 'splitter',
-    unlock: 25, // kills before this type enters the rotation
+    unlock: 45,
     name: 'SPLITTER',
     shape: 'blob',
     r: 29,
-    hp: 84,
+    hp: 122,
+    large: true, // released more slowly, and worth more when it lands
     density: 1.0,
     speed: 46,
     accel: 150,
@@ -628,17 +664,18 @@ export const ENEMY_TYPES = [
     wobble: 1.8,
     color: '#7cffb2',
     glow: '#22d37a',
-    weight: 12,
+    weight: 8,
     debris: 4,
     splits: { type: 'mote', count: 4 },
   },
   {
     id: 'bloom',
-    unlock: 55, // kills before this type enters the rotation
+    unlock: 85,
     name: 'BLOOM',
     shape: 'bloom',
     r: 33,
-    hp: 132,
+    hp: 190,
+    large: true, // released more slowly, and worth more when it lands
     density: 1.05,
     speed: 33,
     accel: 110,
@@ -646,17 +683,18 @@ export const ENEMY_TYPES = [
     wobble: 1.4,
     color: '#ff5d8f',
     glow: '#ff2d6f',
-    weight: 10,
+    weight: 6,
     debris: 6,
     detonate: { radius: 132, damage: 96 },
   },
   {
     id: 'bulwark',
-    unlock: 145, // kills before this type enters the rotation
+    unlock: 285,
     name: 'BULWARK',
     shape: 'plated',
     r: 45,
-    hp: 360,
+    hp: 520,
+    large: true, // released more slowly, and worth more when it lands
     density: 2.7,
     speed: 23,
     accel: 90,
@@ -665,12 +703,12 @@ export const ENEMY_TYPES = [
     armor: 0.34, // flat damage reduction
     color: '#9fb3c8',
     glow: '#5f7fa6',
-    weight: 8,
+    weight: 5,
     debris: 14,
   },
   {
     id: 'warden',
-    unlock: 115, // kills before this type enters the rotation
+    unlock: 205,
     name: 'WARDEN',
     shape: 'warden',
     r: 22,
@@ -685,6 +723,62 @@ export const ENEMY_TYPES = [
     weight: 8,
     debris: 6,
     shards: 3, // orbiting plates that eat incoming bolts
+  },
+  {
+    /*
+     * SCION. A large body that is worth more dead than alive, to everything
+     * else on the field.
+     *
+     * Kill it and it does not simply come apart: it throws SEEDs, and a SEED
+     * goes looking for another object to graft itself onto. What it finds gets
+     * bigger, tougher, and starts closing its own wounds. So the object you
+     * chose to shoot first decides what the rest of the wave becomes, which is
+     * the one decision the field did not previously ask for.
+     *
+     * The counterplay is the seeds themselves: they are slow, they are weak,
+     * and they are in the air for several seconds. Shoot them and nothing is
+     * grafted. Ignore them and you fight something you made.
+     */
+    id: 'scion',
+    unlock: 245,
+    name: 'SCION',
+    shape: 'scion',
+    r: 34,
+    hp: 300,
+    large: true,
+    density: 1.15,
+    speed: 26,
+    accel: 70,
+    restitution: 0.42,
+    wobble: 0.35,
+    color: '#c9a7ff',
+    glow: '#8b5cf6',
+    weight: 5,
+    // Never part of a formation. The cap is two on the field, and a formation
+    // releases three to six of one type in one go -- which is how five of
+    // them ended up on the screen at once the first time this was measured.
+    solo: true,
+    debris: 9,
+  },
+  {
+    // What a SCION leaves. Harmless in itself -- it never breaches the turret
+    // and it is not counted -- but it is not inert: it is looking for a host.
+    id: 'seed',
+    unlock: 0,
+    name: 'SEED',
+    shape: 'seed',
+    harmless: true,
+    r: 8,
+    hp: 14,
+    density: 0.5,
+    speed: 150,
+    accel: 200,
+    restitution: 0.5,
+    wobble: 0,
+    color: '#d9c2ff',
+    glow: '#a56bff',
+    weight: 0, // never rolled: a SCION places these
+    debris: 0,
   },
   {
     // Harmless: it has no goal, it never breaches the turret, it does not
@@ -711,7 +805,7 @@ export const ENEMY_TYPES = [
     // is doing: threads out to whatever it is covering, and a shell on each of
     // them. Shoot the beacon, not the escort.
     id: 'herald',
-    unlock: 70,
+    unlock: 125,
     name: 'HERALD',
     shape: 'herald',
     r: 19,
@@ -732,7 +826,7 @@ export const ENEMY_TYPES = [
     // harder, so a littered field is its food supply — kill it early or clear
     // the floor. It is the only object whose threat you control.
     id: 'glut',
-    unlock: 175,
+    unlock: 330,
     name: 'GLUT',
     shape: 'glut',
     r: 16,
@@ -753,7 +847,7 @@ export const ENEMY_TYPES = [
     // and shoves everything it catches; both halves are real bodies and both
     // count, so a TOW is two of the five hundred.
     id: 'tow',
-    unlock: 210,
+    unlock: 380,
     name: 'TOW',
     shape: 'tow',
     r: 18,
@@ -765,7 +859,7 @@ export const ENEMY_TYPES = [
     wobble: 1.1,
     color: '#9fb3c8',
     glow: '#59e0ff',
-    weight: 8,
+    weight: 5,
     debris: 5,
     tows: { type: 'towMass', length: 132 },
   },
@@ -776,7 +870,8 @@ export const ENEMY_TYPES = [
     name: 'MASS',
     shape: 'mass',
     r: 27,
-    hp: 150,
+    hp: 215,
+    large: true, // released more slowly, and worth more when it lands
     density: 2.4,
     speed: 26,
     accel: 60,
@@ -790,7 +885,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'prism',
-    unlock: 85, // kills before this type enters the rotation
+    unlock: 165,
     name: 'PRISM',
     shape: 'prism',
     r: 20,

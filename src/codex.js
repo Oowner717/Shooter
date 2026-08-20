@@ -70,6 +70,16 @@ export const CODEX = [
     line: 'The far end of a cable. It arrives by being swung, and it arrives regardless.',
   },
   {
+    id: 'scion',
+    name: 'SCION',
+    line: 'Worth more to the field dead than alive. What it throws goes looking for something to join.',
+  },
+  {
+    id: 'seed',
+    name: 'SEED',
+    line: 'Harmless on its own, and it is not on its own for long. Shoot it in the air or fight what it makes.',
+  },
+  {
     id: 'drift',
     name: 'DRIFT',
     line: 'No heading, no destination, no threat. It is not counted. It is here so the field is not only enemies.',

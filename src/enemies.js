@@ -90,6 +90,8 @@ export function drawSpecimen(ctx, id, r) {
     }
     case 'mass': drawTowMass(ctx, r * 0.9, 1); break;
     case 'drift': drawDrift(ctx, r, 0); break;
+    case 'scion': drawScion(ctx, r, 0, 0); break;
+    case 'seed': drawSeed(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
   }
   ctx.restore();
@@ -135,6 +137,14 @@ export class Enemy {
     if (this.harmless) this.counts = false;
     this.ward = 0; // damage reduction granted by a HERALD
     this.wardT = 0; // lapses unless refreshed
+    // GRAFT. A SEED is a harmless body that hunts a host instead of wandering;
+    // `grafted` is what it leaves behind, and a grafted body closes its own
+    // wounds until something finishes it.
+    this.seed = type.id === 'seed';
+    this.seedT = this.seed ? CFG.graft.life : 0;
+    this.host = null;
+    this.grafted = false;
+    this.graftGlow = 0;
     this.tether = null; // the other half of a TOW, if any
     // Every object picks its own way across the field.
     this.route = opts.route || weightedPick(ROUTES);
@@ -218,7 +228,57 @@ export class Enemy {
     }
   }
 
+  /**
+   * A SEED looking for a host. It takes the largest thing within reach rather
+   * than the nearest, so it reads as reinforcing the object that was already
+   * the problem — and it re-picks every frame, so shooting its target out from
+   * under it sends it somewhere else rather than stalling it.
+   */
+  hunt(world, dt) {
+    const G = CFG.graft;
+    this.seedT -= dt;
+    if (this.seedT <= 0) { this.dead = true; return; }
+
+    let best = null;
+    let bestScore = 0;
+    for (const e of world.enemies) {
+      // Not another SCION. It is the largest thing on the field, so it would
+      // win the pick nearly every time, and a SCION whose seeds reinforce the
+      // next SCION is a loop rather than a decision -- the object exists to
+      // give the ability away.
+      if (e === this || e.dead || e.seed || e.harmless || e.staged || e.grafted) continue;
+      if (e.type.id === 'scion') continue;
+      const d2 = (e.x - this.x) ** 2 + (e.y - this.y) ** 2;
+      if (d2 > G.hunt * G.hunt) continue;
+      // Biggest first, and closer breaks the tie.
+      const score = e.r * 1000 - Math.sqrt(d2);
+      if (score > bestScore) { bestScore = score; best = e; }
+    }
+    this.host = best;
+    if (!best) {
+      this.wander(world, dt);
+      return;
+    }
+
+    const dx = best.x - this.x;
+    const dy = best.y - this.y;
+    const d = Math.hypot(dx, dy) || 1;
+    if (d <= best.r + this.r + 2) {
+      graft(world, best);
+      this.dead = true;
+      this.dissolved = true;
+      return;
+    }
+    const k = (this.type.accel / 100) * dt;
+    this.vx += ((dx / d) * this.cruise - this.vx) * clamp(k, 0, 1);
+    this.vy += ((dy / d) * this.cruise - this.vy) * clamp(k, 0, 1);
+  }
+
   steer(world, dt) {
+    if (this.seed) {
+      this.hunt(world, dt);
+      return;
+    }
     if (this.harmless) {
       this.wander(world, dt);
       return;
@@ -317,6 +377,13 @@ export class Enemy {
   update(world, dt) {
     if (this.spawnIn > 0) this.spawnIn = Math.max(0, this.spawnIn - dt * 2.2);
     this.flash = Math.max(0, this.flash - dt * 4.5);
+
+    // A grafted body closes what you did not finish. Nothing else in the game
+    // heals, so this is the one object that punishes spreading fire around.
+    if (this.grafted) {
+      this.graftGlow = (this.graftGlow + dt * 2.2) % TAU;
+      if (this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + CFG.graft.regen * dt);
+    }
 
     // RIME wears off on its own. The chill is a drag rather
     // than a speed cap, so a heavy body coasts further out of it than a light
@@ -496,6 +563,25 @@ export class Enemy {
       });
     }
 
+    // SCION: it throws seeds rather than simply coming apart. They are
+    // harmless bodies and come out of nobody's quota — a SCION costs one of
+    // the five hundred whatever it does on the way out.
+    if (t.id === 'scion') {
+      const G = CFG.graft;
+      for (let i = 0; i < G.seeds; i++) {
+        const a = (i / G.seeds) * TAU + rand(0, TAU);
+        const seed = new Enemy(TYPE_BY_ID.seed, this.x, this.y, {
+          staged: false,
+          spawnIn: 0.5,
+          vx: this.vx + Math.cos(a) * G.spread,
+          vy: this.vy + Math.sin(a) * G.spread,
+        });
+        world.enemies.push(seed);
+      }
+      ring(this.x, this.y, this.r, this.r * 3.4, 0.5, '#c9a7ff', 4);
+      ripple(this.x, this.y, 1.4, this.r * 6);
+    }
+
     // Splitter: children keep the parent's momentum.
     if (t.splits) {
       const child = TYPE_BY_ID[t.splits.type];
@@ -579,7 +665,33 @@ export class Enemy {
       case 'tow': drawTowHead(ctx, this.r); break;
       case 'mass': drawTowMass(ctx, this.r, hpFrac); break;
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
+      case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
+      case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       default: drawChip(ctx, this.r, this.phase);
+    }
+
+    // Grafted: a turning ring round whatever it landed on. The body keeps its
+    // own shape and colour — the point is that it is still that object, and
+    // now it is a bigger one that heals.
+    if (this.grafted) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = rgba('#c9a7ff', 0.5);
+      ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.07);
+      ctx.setLineDash([this.r * 0.34, this.r * 0.28]);
+      ctx.lineDashOffset = -this.graftGlow * this.r * 0.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.r * 1.16, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (let i = 0; i < 3; i++) {
+        const a = this.graftGlow + (i / 3) * TAU;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * this.r * 1.16, Math.sin(a) * this.r * 1.16, this.r * 0.09, 0, TAU);
+        ctx.fillStyle = rgba('#d9c2ff', 0.85);
+        ctx.fill();
+      }
+      ctx.restore();
     }
 
     if (this.flash > 0.01) {
@@ -949,6 +1061,45 @@ function drawDrift(ctx, r, phase, time) {
   }
 }
 
+/**
+ * SCION. A shell with three pods held inside it, which is what it is: a body
+ * whose whole point is what comes out of it.
+ */
+function drawScion(ctx, r, phase, time) {
+  ctx.beginPath();
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU + phase * 0.2;
+    const rr = r * (i % 2 ? 0.86 : 1);
+    const px = Math.cos(a) * rr;
+    const py = Math.sin(a) * rr;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  const spin = time * 0.5 + phase;
+  for (let i = 0; i < 3; i++) {
+    const a = spin + (i / 3) * TAU;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * r * 0.42, Math.sin(a) * r * 0.42, r * 0.19, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
+/** A SEED in flight: small, and pointed at whatever it has chosen. */
+function drawSeed(ctx, r, phase, time) {
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  const t = 0.6 + 0.4 * Math.sin(time * 6 + phase);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.42 * t, 0, TAU);
+  ctx.fill();
+}
+
 function drawChip(ctx, r, phase) {
   ctx.beginPath();
   const n = 5;
@@ -985,6 +1136,21 @@ function driftCount(world) {
 }
 
 /** Types that have unlocked at the current kill count. */
+/**
+ * Where a second SCION comes down. Two of them arriving together would seed
+ * the same host twice and read as one event rather than two decisions, so the
+ * second is pushed to whichever side of the field the first is not on.
+ */
+function scionLane(world, type, x) {
+  const other = world.enemies.find((e) => !e.dead && e.type.id === 'scion');
+  if (!other) return x;
+  const lo = type.r + 12;
+  const hi = world.width - type.r - 12;
+  if (Math.abs(x - other.x) >= CFG.graft.apart) return x;
+  const away = other.x < world.width / 2 ? hi : lo;
+  return clamp(away + spread(60), lo, hi);
+}
+
 function availableTypes(kills) {
   // weight 0 means "never rolled for": drift and a TOW's mass are both placed
   // by dedicated spawners, and weightedPick's fallback could otherwise return
@@ -1203,6 +1369,44 @@ export class Director {
     // while the field is still safe.
     this.timer = CFG.openingGrace;
     this.driftTimer = CFG.driftStart;
+    // The working set, and the kill count the next rotation is due at.
+    this.cohort = [];
+    this.seen = new Set();
+    this.rotateAt = CFG.cohortEvery;
+  }
+
+  /**
+   * Keep the working set to `CFG.cohort` types. A type that has just unlocked
+   * always takes a place, because a reveal that has to wait its turn is not a
+   * reveal; otherwise one is swapped for another every `cohortEvery` kills, so
+   * the field changes character over a run without ever showing all of it.
+   */
+  refreshCohort(world) {
+    const pool = availableTypes(world.kills);
+    if (!pool.length) return;
+    const size = Math.min(CFG.cohort, pool.length);
+    // Anything that unlocked since the last look goes in at once.
+    const fresh = pool.filter((t) => !this.seen.has(t.id));
+    for (const t of fresh) {
+      this.seen.add(t.id);
+      this.cohort = this.cohort.filter((x) => x.id !== t.id);
+      this.cohort.unshift(t);
+    }
+    // Drop anything that is somehow no longer available, then rotate on the
+    // clock: oldest out, and a type not currently carried in.
+    this.cohort = this.cohort.filter((t) => pool.some((p) => p.id === t.id));
+    if (world.kills >= this.rotateAt) {
+      this.rotateAt = world.kills + CFG.cohortEvery;
+      const rest = pool.filter((t) => !this.cohort.some((c) => c.id === t.id));
+      if (rest.length && this.cohort.length >= size) this.cohort.pop();
+      if (rest.length) this.cohort.unshift(pick(rest));
+    }
+    while (this.cohort.length < size) {
+      const rest = pool.filter((t) => !this.cohort.some((c) => c.id === t.id));
+      if (!rest.length) break;
+      this.cohort.push(pick(rest));
+    }
+    while (this.cohort.length > size) this.cohort.pop();
   }
 
   update(world, dt) {
@@ -1251,22 +1455,62 @@ export class Director {
     const hostiles = hostileCount(world);
     if (hostiles >= Math.min(popTarget, CFG.maxEnemies)) return;
 
-    const kinds = availableTypes(world.kills);
+    this.refreshCohort(world);
+    // A SCION is capped on the field rather than in the roll, because two of
+    // them is the whole design and three is noise.
+    const scions = world.enemies.filter((e) => !e.dead && e.type.id === 'scion').length;
+    const kinds = this.cohort.filter((t) => t.id !== 'scion' || scions < CFG.graft.cap);
+    if (!kinds.length) return;
     const room = Math.min(popTarget, CFG.maxEnemies, world.released + quota) - hostiles;
 
-    if (room >= 4 && quota >= 4 && Math.random() < CFG.formationChance) {
-      spawnFormation(world, kinds, randInt(3, Math.min(6, room, quota)));
+    // A formation is three to six of one type at once, so anything with a cap
+    // on the field cannot be in one.
+    const massable = kinds.filter((k) => !k.solo);
+    if (massable.length && room >= 4 && quota >= 4 && Math.random() < CFG.formationChance) {
+      spawnFormation(world, massable, randInt(3, Math.min(6, room, quota)));
     } else {
       // A TOW costs two of the allotment, so it is off the table when only one
       // release is left.
       const affordable = quota >= 2 ? kinds : kinds.filter((k) => !k.tows);
       const t = weightedPick(affordable);
-      release(world, t, rand(t.r + 12, world.width - t.r - 12), -50 - rand(0, 40));
+      let x = rand(t.r + 12, world.width - t.r - 12);
+      if (t.id === 'scion') x = scionLane(world, t, x);
+      release(world, t, x, -50 - rand(0, 40));
     }
   }
 }
 
 /** Area damage + shove, used by blooms, PULSE and the boss. */
+/**
+ * A SEED reaching a host. The host keeps being whatever it was — its shape,
+ * its route, its behaviour — and becomes a larger, tougher version of it that
+ * heals. Nothing is replaced, because "that BLOOM is now a problem" is a much
+ * better read than "a new object appeared".
+ *
+ * Once only per body: a second seed finds something else, which is what keeps
+ * a SCION's three from all landing on the same target.
+ */
+export function graft(world, host) {
+  if (!host || host.dead || host.grafted) return false;
+  const G = CFG.graft;
+  host.grafted = true;
+  host.r *= G.grow;
+  host.mass = massOf(host.type, host.r);
+  host.invMass = 1 / host.mass;
+  host.maxHp = Math.round(host.maxHp * G.tough);
+  host.hp = Math.min(host.maxHp, host.hp * G.tough);
+  host.salvage = (host.salvage || 0) * G.tough;
+  host.flash = 1;
+  ring(host.x, host.y, host.r * 0.5, host.r * 2.6, 0.5, '#c9a7ff', 3);
+  ripple(host.x, host.y, 1.2, host.r * 5);
+  for (let i = 0; i < 12; i++) {
+    const a = rand(0, TAU);
+    spark(host.x, host.y, Math.cos(a) * rand(90, 260), Math.sin(a) * rand(90, 260), '#d9c2ff', rand(0.24, 0.5), 2.2);
+  }
+  audio.reflect();
+  return true;
+}
+
 export function applyBlast(world, blast) {
   const { x, y, r, damage, impulse, source } = blast;
   const r2 = r * r;

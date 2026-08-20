@@ -851,6 +851,79 @@ floor to point at: *"Those pieces are wreckage, not enemies. They drift to you
 on their own."*, then *"Shoot wreckage to cash it in. SALVAGE is the green
 number."*
 
+### What is on the field at once
+
+Eleven types unlock over a run, and until build 63 every one of them was in the
+roll from the moment it unlocked. By a few minutes in the field was a handful
+of objects, each a different thing, none of them on screen long enough to be
+learned. **A wave of six MOTEs teaches you what a MOTE is. Six different
+objects teach you nothing** and read as noise.
+
+Two changes, and they are different changes:
+
+- **The reveal schedule is stretched.** It was 0, 0, 10, 25, 55, 70, 85, 115,
+  145, 175, 210 — everything the run has by kill 210, less than half way. It is
+  now 0, 0, 18, 45, 85, 125, 165, 205, 245, 285, 330, 380, so the last type
+  arrives with a hundred and twenty kills still to go. Measured at four points:
+  4 → 3 types unlocked by kill 25, 7 → 5 by kill 100, 10 → 7 by kill 200.
+- **The director holds a working set rather than the whole pool.** `CFG.cohort`
+  types may be rolled at once; one is swapped out every `cohortEvery` kills,
+  and a type that has just unlocked takes a place immediately, because a reveal
+  that has to wait its turn is not a reveal. Anything with a cap on the field
+  is also kept out of formations — a formation is three to six of one type in
+  one go, which is how five SCIONs reached the screen the first time this was
+  measured against a cap of two.
+
+What reaches the screen is the number that matters, so that is what was
+measured: distinct types alive, three runs, a player clearing at a steady rate.
+At 60s it was 2.0 and is 2.3; at 120s it was 4.0 and is 2.7; **at 180s it was
+6.7 and is 3.3**. The stretch and the working set each do about half of that.
+Later in a run it converges toward the working set plus stragglers — objects
+already on the field when a cohort rotates do not vanish — which is a mean of
+about four rather than the five and a half it was.
+
+### SCION, and what a graft does
+
+A large body worth more to the field dead than alive.
+
+Kill a SCION and it does not simply come apart: it throws three **SEED**s, and
+a seed goes looking for something to join. What it finds is **grafted** — 35%
+bigger, 90% more health, and it closes its own wounds at `graft.regen` a
+second. Nothing else in this game heals, so a graft is the one thing that
+punishes spreading fire around. The host keeps its own shape, colour and
+behaviour and gains a turning violet ring, because *that BLOOM is now a
+problem* is a far better read than *a new object appeared*.
+
+It grafts onto **anything except another SCION**. A SCION is the largest body
+on the field and a seed takes the largest thing in reach, so it would win the
+pick nearly every time — and a SCION whose seeds reinforce the next SCION is a
+loop, not a decision. The object exists to give the ability away.
+
+**The counterplay is the seeds.** They are slow, they have 14 health, and they
+are in the air for several seconds before they land. Shoot them and nothing is
+grafted; ignore them and you fight something you made. One caveat worth knowing:
+a seed is a harmless body, and auto-aim does not target harmless bodies — so
+answering a SCION is something you do with your own hand.
+
+**Two on the field, never three**, and the second is released at least
+`graft.apart` from the first: two arriving together would seed the same host
+twice and read as one event rather than two decisions. The cap is enforced on
+the field rather than in the roll, and `solo: true` keeps it out of formations.
+
+Seeds cost nothing from the run's allotment of five hundred — a SCION costs one
+whatever it does on the way out — and a graft creates no new body, so neither
+one moves the count.
+
+### Large objects
+
+**Fewer, and each one worth more.** Build 63 cut the roll weight of everything
+carrying `large: true` and raised its health to match: LURCHER 98 → 142,
+SPLITTER 84 → 122, BLOOM 132 → 190, BULWARK 360 → 520, a TOW's MASS 150 → 215.
+The small types took the weight the large ones gave up. Large objects are now
+31% of the roll by weight, and the smallest of them out-healths the largest
+thing that is not one. The point is a field with fewer big bodies in it, none
+of which is a pushover.
+
 ### Charges
 
 An ability holds one use and behaves as a plain cooldown, and nothing extra is
