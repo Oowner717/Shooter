@@ -62,7 +62,8 @@ class Mine {
     this.r = k.r;
     this.t = 0; // flight progress, 0..1
     this.settle = 0; // seconds since landing
-    this.life = k.life * world0.up.mineLife;
+    this.armScale = 1; // QUICK ARM, set at the throw
+    this.life = M.life;
     this.dead = false;
     this.spin = rand(0, TAU);
     this.hold = 0; // snare only: seconds of grip left once it has opened
@@ -86,7 +87,7 @@ class Mine {
   }
 
   get armed() {
-    return this.landed && this.settle >= this.cfg.arm && this.hold <= 0;
+    return this.landed && this.settle >= this.cfg.arm * this.armScale && this.hold <= 0;
   }
 
   /** Snare only: currently holding a knot. */
@@ -115,7 +116,18 @@ const LAY_TONE = { blast: 300, snare: 240, wire: 380, knell: 200 };
 export function throwMine(world, kind = 'blast') {
   const s = world.shooter;
   const site = landingSite(world);
+  // The ceiling is enforced here rather than at the clock, because a SEED
+  // offer lays three at once and does not go through the clock at all. The
+  // oldest goes, and it goes the way its kind goes — a blast mine bangs, a
+  // spall throws, a void closes — so nothing simply evaporates.
+  while (laidCount(world) >= M.cap) {
+    const oldest = world.mines.find((x) => !x.dead);
+    if (!oldest) break;
+    retire(world, oldest);
+    if (!oldest.dead) oldest.dead = true;
+  }
   const m = new Mine(kind, s.x, s.y - 20, site.x, site.y, world);
+  m.armScale = world.up.mineArm;
   if (kind === 'wire') {
     // The line is laid across the field, not along it, so it closes a lane
     // rather than sitting parallel to everything coming down. Kept inside the
@@ -211,6 +223,38 @@ function grip(world, m, dt) {
  * shoved off the way it was leaning — so a body crossing takes a slice rather
  * than being parked in the beam and ground to nothing.
  */
+/**
+ * A mine reaching the end of it — because its life ran out, or because a newer
+ * one needed its place. It goes off the way its kind goes off, so being pushed
+ * off the field is not the same as being wasted.
+ */
+function retire(world, m) {
+  if (m.dead) return;
+  if (!m.landed || m.settle < m.cfg.arm * m.armScale) { m.dead = true; return; }
+  if (m.kind === 'blast') { detonate(world, m); return; }
+  if (m.kind === 'spall') { spall(world, m); return; }
+  if (m.kind === 'knell') { while (!m.dead && m.tolls > 0) toll(world, m); return; }
+  if (m.kind === 'snare' && !m.gripping) { snap(world, m); return; }
+  m.dead = true;
+}
+
+/** SALTED. A mine that simply ran out still leaves something behind. */
+function fizzle(world, m) {
+  m.dead = true;
+  if (world.up.mineFizzle) {
+    const f = M.fizzle;
+    applyBlast(world, {
+      x: m.x, y: m.y, r: f.r * world.up.mineBlast,
+      damage: f.damage * world.up.mineDamage, impulse: f.impulse,
+    });
+    ring(m.x, m.y, m.r, f.r * 1.3, 0.32, '#ffb347', 3);
+    for (let k = 0; k < 8; k++) spark(m.x, m.y, spread(180), spread(180), '#ffd9a0', 0.35, 1.8);
+    audio.boom();
+    return;
+  }
+  for (let k = 0; k < 6; k++) spark(m.x, m.y, spread(50), spread(50), '#6d829a', 0.5, 1.4);
+}
+
 /** SPALL. One fan, straight up the field, and the mine is spent. */
 function spall(world, m) {
   m.dead = true;
@@ -354,7 +398,7 @@ export function updateMines(world, dt) {
         world.effects.push(m.patch);
       }
       if (m.life <= 0) {
-        m.dead = true;
+        fizzle(world, m);
         if (m.patch) m.patch.dead = true;
       }
       continue;
@@ -362,24 +406,14 @@ export function updateMines(world, dt) {
 
     if (m.kind === 'lode') {
       if (m.settle >= L.arm) repel(world, m, dt);
-      if (m.life <= 0) {
-        m.dead = true;
-        for (let k = 0; k < 8; k++) spark(m.x, m.y, spread(160), spread(160), '#59e0ff', 0.4, 1.8);
-        audio.pop(1);
-      }
+      if (m.life <= 0) fizzle(world, m);
       continue;
     }
 
     if (m.kind === 'wire') {
       // Nothing triggers it and nothing consumes it; it runs out its life.
       if (m.cutting) cut(world, m, dt);
-      if (m.life <= 0) {
-        m.dead = true;
-        for (let k = 0; k < 8; k++) {
-          spark(m.x, m.y, spread(140), spread(140), '#7cffb2', 0.4, 1.8);
-        }
-        audio.pop(1.1);
-      }
+      if (m.life <= 0) fizzle(world, m);
     } else if (m.kind === 'knell') {
       // It does not need anything to walk into it. Once armed it is a clock,
       // and it ends itself on the last of its tolls — the life is a backstop
@@ -388,10 +422,7 @@ export function updateMines(world, dt) {
         m.tollTimer -= dt;
         if (m.tollTimer <= 0) toll(world, m);
       }
-      if (!m.dead && m.life <= 0) {
-        m.dead = true;
-        for (let k = 0; k < 6; k++) spark(m.x, m.y, spread(50), spread(50), '#6d829a', 0.5, 1.4);
-      }
+      if (!m.dead && m.life <= 0) fizzle(world, m);
     } else if (m.gripping) {
       // Holding. It cannot be re-triggered and it does no damage itself.
       m.hold -= dt;
@@ -403,9 +434,9 @@ export function updateMines(world, dt) {
         audio.pop(0.9);
       }
     } else if (m.life <= 0) {
-      // Expired rather than triggered: fizzles out without a bang.
-      m.dead = true;
-      for (let k = 0; k < 6; k++) spark(m.x, m.y, spread(50), spread(50), '#6d829a', 0.5, 1.4);
+      // Ran out rather than being triggered. Nothing to show for it, unless
+      // SALTED has been taken.
+      fizzle(world, m);
     } else if (m.armed && m.cfg.trigger) {
       const reach = m.r + m.cfg.trigger * world.up.mineTrigger;
       for (const e of world.enemies) {
@@ -704,12 +735,17 @@ export function drawMines(ctx, world) {
  * field, since nothing expires: the cap is field-wide, so laying a new kind
  * pushes the old ones off one at a time rather than all at once.
  */
+/**
+ * One clock for every kind, fixed at CFG.mines.throwEvery, and no upgrade may
+ * move it. What an upgrade may do is put more down per throw: PAIRED CHARGE
+ * widens the salvo, which is the only way the cap is reachable by laying.
+ */
 export function mineCadence(world, timer, dt) {
   const kind = world.mine;
   if (!kind || world.phase === 'ending' || world.phase === 'boot') return timer;
-  const k = KIND[kind];
   const next = timer - dt;
   if (next > 0) return next;
-  if (laidCount(world) < M.cap + world.up.mineMax) throwMine(world, kind);
-  return k.interval * world.up.mineRate * rand(0.85, 1.15);
+  const n = 1 + world.up.mineSalvo;
+  for (let i = 0; i < n; i++) throwMine(world, kind);
+  return M.throwEvery;
 }

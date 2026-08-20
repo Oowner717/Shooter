@@ -160,17 +160,27 @@ seconds, completely inert in flight — passing straight through anything in the
 way — and none does anything until it has settled. Harmless drift never sets
 one off.
 
-**Every kind lasts thirty seconds**, then fizzles out without a bang if nothing
-has set it off. Build 48 removed expiry entirely and the field silted up:
-nothing ever left, so the cap was the only thing deciding how much was down and
-ten permanent WIREs closed most of the field for good.
+**Three numbers govern every kind, and no upgrade may move any of them.** They
+are a contract with the player rather than a balance dial:
 
-There is **one cap of ten across the whole field**, not one per kind, and it
-stays: switching kinds is what makes a per-kind cap gameable. But with
-lifetimes back the cap is a ceiling rather than a resting place. What actually
-decides how much is down is `life / interval` — a BLAST stack settles around
-six and a half of the ten, a WIRE around three and a half — so **reaching the
-cap is what QUICK LAY and LONG FUSE are for**.
+    five on the field · fifteen seconds each · one thrown every fifteen
+
+One clock for all eight kinds, not one each. Note what that arithmetic means: a
+throw every fifteen seconds against a fifteen-second life is a **steady state
+of one mine**, laid as the last one goes — measured at throws on 0.2s, 15.2s,
+30.2s and 45.2s with one on the field at the end. The cap is a backstop, not a
+target.
+
+Reaching it takes something that does not touch the three: a **SEED** offer,
+which lays three at once, or **PAIRED CHARGE**, which lays more per throw.
+Measured peaks: 2 with nothing taken, 4 with one PAIRED CHARGE, 5 with two —
+and 5 with six, because five is five.
+
+**A sixth pushes the oldest off**, and it goes the way its kind goes: a BLAST
+bangs, a SPALL throws its fan, a KNELL rings out what it still owes. Being
+crowded off the field is not the same as being wasted. With the clock and the
+lifetime equal this should never come up by laying alone, which is the point of
+setting them equal.
 
 Switching kinds mid-run leaves what is already down to run out its own life.
 
@@ -408,15 +418,15 @@ button can then say AMENDMENT and mean it.
 
   | AMMO | | FIELD | | TURRET | |
   |---|---|---|---|---|---|
-  | HOLLOWPOINT | +25% damage | DEEP MAGAZINE | +2 mines on the field | RATE | +20% fire rate |
+  | HOLLOWPOINT | +25% damage | PAIRED CHARGE | +1 mine laid per throw | RATE | +20% fire rate |
   | THROUGH AND THROUGH | +2 spine pierces | BLOOM OUT | +35% patch size, +45% burn | | |
   | SLEDGE | +60% slug knockback | BUCKSHOT | +60% spall pellets | | |
   | DEEP FREEZE | +70% rime chill | REPULSOR | +40% lode reach and push | | |
   | LEVY | +50% tithe mark | | | | |
   | PRY BAR | +60% sunder duration | | | | |
-  | HOT LOAD | +15% fire rate | QUICK LAY | +30% lay speed | HANDS OFF | auto fire matches manual |
+  | HOT LOAD | +15% fire rate | QUICK ARM | mines go live twice as fast | HANDS OFF | auto fire matches manual |
   | TRACER | +35% round speed | DEEP CHARGE | +35% mine blast radius | SLEW | +50% auto aim turn speed |
-  | | | LONG FUSE | +60% mine lifetime | | |
+  | | | SALTED | a spent mine goes off | | |
   | | | SHRAPNEL | +45% mine blast damage | | |
   | | | DEAD WEIGHT | +65% snare hold | | |
   | | | HOT WIRE | +50% wire damage | | |

@@ -34,9 +34,12 @@ export function freshUpgrades() {
     bounty: 1, // TITHE's multiplier on a marked body
     sunder: 1, // how long SUNDER keeps a body's plating open
     // field
-    mineMax: 0,
-    mineRate: 1,
-    mineLife: 1, // how long one sits before it fizzles
+    // The cap, the lifetime and the throw clock are fixed in config and no
+    // upgrade may move any of them. What an upgrade may do is put more down
+    // per throw, arm them sooner, or make a spent one worth something.
+    mineSalvo: 0, // extra mines laid per throw
+    mineArm: 1, // multiplier on the settling time before one goes live
+    mineFizzle: false, // a mine that runs out its life goes off instead
     mineBlast: 1, // radius of a blast mine and of a knell's tolls
     mineDamage: 1, // and how hard both of them land
     mineHold: 1, // seconds a snare keeps what it caught
@@ -152,11 +155,11 @@ export const UPGRADES = {
     { id: 'salvo', name: 'SALVO', line: 'Every 8th shot fires 3 rounds.', apply: set('salvo', 8) , icon: MARK.salvo },
   ],
   FIELD: [
-    { id: 'deepmag', name: 'DEEP MAGAZINE', line: '+2 mines on the field at once.', apply: bump('mineMax', 2) , icon: MARK.deepmag },
-    { id: 'quicklay', name: 'QUICK LAY', line: '+30% mine lay speed.', apply: quicken('mineRate', 0.7) , icon: MARK.quicklay },
+    { id: 'paired', name: 'PAIRED CHARGE', line: '+1 mine laid per throw.', apply: bump('mineSalvo', 1) , icon: MARK.deepmag },
+    { id: 'quickarm', name: 'QUICK ARM', line: 'Mines go live in half the time.', apply: scale('mineArm', 0.5) , icon: MARK.quicklay },
     { id: 'deepcharge', name: 'DEEP CHARGE', line: '+35% mine blast radius.', apply: scale('mineBlast', 1.35) , icon: MARK.deepcharge },
     { id: 'widemouth', name: 'WIDE MOUTH', line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) , icon: MARK.widemouth },
-    { id: 'longfuse', name: 'LONG FUSE', line: '+60% mine lifetime.', apply: scale('mineLife', 1.6) , icon: MARK.longfuse },
+    { id: 'salted', name: 'SALTED', line: 'A spent mine goes off instead of fizzling.', apply: set('mineFizzle', true) , icon: MARK.longfuse },
     { id: 'shrapnel', name: 'SHRAPNEL', line: '+45% mine blast damage.', apply: scale('mineDamage', 1.45) , icon: MARK.shrapnel },
     { id: 'deadweight', name: 'DEAD WEIGHT', line: '+65% snare hold time.', apply: scale('mineHold', 1.65) , icon: MARK.deadweight },
     { id: 'hotwire', name: 'HOT WIRE', line: '+50% wire damage.', apply: scale('wireDamage', 1.5) , icon: MARK.hotwire },
@@ -244,7 +247,7 @@ export const ALL_UPGRADES = AXES.flatMap((a) => UPGRADES[a].map((u) => ({ ...u, 
  * repeatable ones can come round again, which is what makes a long run able to
  * lean rather than merely collect.
  */
-const ONCE = new Set(['salvo', 'sweep', 'reflex', 'handsoff']);
+const ONCE = new Set(['salvo', 'sweep', 'reflex', 'handsoff', 'salted', 'quickarm']);
 
 const pick = (pool) => (pool.length ? pool[(Math.random() * pool.length) | 0] : null);
 

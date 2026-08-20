@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '51';
+export const BUILD = '52';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -248,8 +248,6 @@ export const CFG = {
    * on it is being hurt the whole time it stands there.
    */
   thorn: {
-    interval: 8.2,
-    life: 30,
     flight: 0.9,
     arm: 0.5,
     r: 12,
@@ -261,8 +259,6 @@ export const CFG = {
    * for holding a crowd off the turret while something else does the work.
    */
   lode: {
-    interval: 9.0,
-    life: 30,
     flight: 0.9,
     arm: 0.5,
     r: 13,
@@ -275,8 +271,6 @@ export const CFG = {
    * whatever is coming down it.
    */
   spall: {
-    interval: 7.8,
-    life: 30,
     flight: 0.85,
     arm: 0.45,
     r: 12,
@@ -292,8 +286,6 @@ export const CFG = {
    * to the single object a run cannot otherwise get through.
    */
   void: {
-    interval: 12,
-    life: 30,
     flight: 1,
     arm: 0.7,
     r: 12,
@@ -328,30 +320,27 @@ export const CFG = {
 
   // ---- auto mines -----------------------------------------------------
   mines: {
-    interval: 4.6, // seconds between throws while armed
     /*
-     * One cap for the whole field, not one per kind. Mines used to run out on
-     * their own, so the per-kind numbers were a rate limit on top of that and
-     * switching kinds mid-run left the old ones to expire. Nothing expires
-     * now, so without a single ceiling a player could switch round the four
-     * kinds and hold every cap at once. What differentiates the kinds is the
-     * lay interval instead: ten wires is eighty-six seconds of laying, ten
-     * blast mines is forty-six.
+     * Three numbers govern every kind, and no upgrade may move any of them.
+     * They are a contract with the player rather than a balance dial: five on
+     * the field, fifteen seconds each, one thrown every fifteen seconds.
+     *
+     * Note what that arithmetic means. A throw every fifteen seconds and a
+     * fifteen-second life is a steady state of one mine, laid as the last one
+     * goes — so the cap is a backstop rather than a target, and reaching it
+     * takes either a SEED offer, which lays three at once, or PAIRED CHARGE,
+     * which lays more per throw without touching any of the three.
      */
-    cap: 10,
-    // One lifetime for every kind. Build 48 took expiry off entirely and the
-    // field silted up: nothing ever left, so the cap was the only thing
-    // deciding how much was down, and ten permanent wires closed most of the
-    // field for good. Thirty seconds puts the cadence back in charge — the
-    // steady state is life over interval, so a blast stack settles around six
-    // and a half of the ten, and reaching the cap is what the upgrades are for.
-    life: 30,
+    cap: 5,
+    life: 15,
+    throwEvery: 15, // one clock for every kind, not one each
     flight: 0.85, // seconds from turret to landing site
     arm: 0.4, // settling time before it can trigger
     r: 13,
     trigger: 26, // extra reach beyond the mine's own radius
     // Nerfed in build 49 from 140; SHRAPNEL is the way back past it.
     blast: { r: 168, damage: 95, impulse: 760 },
+    fizzle: { r: 96, damage: 44, impulse: 300 }, // SALTED: what a spent one does
   },
 
   // ---- snares ---------------------------------------------------------
@@ -360,8 +349,6 @@ export const CFG = {
   // damage is the objects grinding against each other, and whatever you
   // choose to put into the pile while it cannot move.
   snare: {
-    interval: 7.4, // slower to lay than a blast mine
-    life: 30,
     flight: 0.9,
     arm: 0.6, // takes longer to settle
     r: 14,
@@ -377,8 +364,6 @@ export const CFG = {
   // is cut for as long as it stays on it. Nothing triggers it and nothing
   // consumes it: it is a lane closed for as long as it lasts.
   wire: {
-    interval: 8.6,
-    life: 30,
     flight: 0.95,
     arm: 0.5,
     r: 11,
@@ -394,8 +379,6 @@ export const CFG = {
   // goes off three times where it lies, each wider and weaker than the last.
   // A blast mine punishes what walks into it; this one denies the ground.
   knell: {
-    interval: 9.4,
-    life: 30,
     flight: 0.9,
     arm: 0.8,
     r: 13,
