@@ -47,9 +47,9 @@ and tap with the other.
 
 ### The strip
 
-**Eleven cells sit above the ability bar and never go away.** The four
-**mines** stack at the left edge, the five kinds of **ammunition** stack at the
-right edge, and the two things that **run on their own** sit side by side in
+**Nine cells sit above the ability bar and never go away.** Four **mine**
+slots stack at the left edge, five **ammunition** slots stack at the right
+edge, and the two things that **run on their own** sit side by side in
 the middle. That is the whole of what you choose between, permanently on
 screen, one tap each.
 
@@ -199,6 +199,19 @@ than something it starts with:
   lane closed for good. Measured: a body on the line takes damage, a body 260
   units off it takes none, and the wire is still there afterwards.
 
+- **THORN** is not a charge. It opens into a patch of burning ground and stays
+  open — nothing triggers it and nothing uses it up, and anything standing on
+  it is being hurt the whole time it stands there. It shares its implementation
+  with SPORE's patch, because they are the same object with different numbers.
+- **LODE** does no damage and cannot be triggered. It pushes, constantly, and
+  everything in reach is walking uphill — hardest at the centre and nothing at
+  all at the rim, so the edge is somewhere a body can sit rather than a wall it
+  bounces off. Measured: a body moves outward and loses no health at all.
+- **SPALL** is a claymore. It triggers like a BLAST and throws everything it
+  has in one direction rather than all of them: measured at 14 pellets, every
+  one of them up the field.
+- **VOID** removes one thing, whatever it is, and is then spent. It does not
+  care about armour or health or size — measured against a 99,999-hp body.
 - **KNELL** does not wait to be touched. It counts, and then it goes off three
   times where it lies, each half again as wide as the last and worth 72% of its
   damage. BLAST punishes what walks into it; KNELL denies the ground whether
@@ -219,6 +232,26 @@ it looks.
   measured, a pellet now covers about **474 units against a 1206-unit field**,
   where a BOLT crosses 1267. It reaches a third of the way up, so it is
   devastating up close and useless at anything else.
+- **SPINE** does not stop at the first thing. No chaining and no repeating: it
+  carries straight out the far side, a little weaker each time. Measured
+  through a column of three at 13, 10 and 8.
+- **SLUG** barely hurts anything and moves it a very long way — measured at 14
+  damage and 100-plus units of travel on one shot. The field is a physics
+  problem before it is a shooting one, and this is the round that treats it as
+  one.
+- **RIME** drags whatever it touches to a crawl for a few seconds — measured
+  taking a body from 200 units a second to about 13. It kills nothing by
+  itself; it buys the time for everything else to.
+- **SPORE** bursts into a patch of ground that keeps burning after the shot is
+  over: 14 damage on impact and 75 by the time the patch has finished. The one
+  round you fire where something is going to be rather than where it is.
+- **TITHE** barely hurts. It marks a body, and a marked body pays several times
+  over whenever it comes apart — measured at 70 salvage against 20 for the same
+  body unmarked. The mark rides down onto the fragments, because that is where
+  the salvage actually is.
+- **SUNDER** opens a body's plating: for a while everything lands harder on it,
+  including everything that is not this round. Measured at 132 damage before
+  and 211 after.
 - **ARC** is the weakest round in the rack on impact and the strongest through
   a crowd: the hit jumps to the nearest thing it has not touched yet and on
   again, up to four links, each a little weaker than the last. It works at any
@@ -376,6 +409,11 @@ button can then say AMENDMENT and mean it.
   | AMMO | | FIELD | | TURRET | |
   |---|---|---|---|---|---|
   | HOLLOWPOINT | +25% damage | DEEP MAGAZINE | +2 mines on the field | RATE | +20% fire rate |
+  | THROUGH AND THROUGH | +2 spine pierces | BLOOM OUT | +35% patch size, +45% burn | | |
+  | SLEDGE | +60% slug knockback | BUCKSHOT | +60% spall pellets | | |
+  | DEEP FREEZE | +70% rime chill | REPULSOR | +40% lode reach and push | | |
+  | LEVY | +50% tithe mark | | | | |
+  | PRY BAR | +60% sunder duration | | | | |
   | HOT LOAD | +15% fire rate | QUICK LAY | +30% lay speed | HANDS OFF | auto fire matches manual |
   | TRACER | +35% round speed | DEEP CHARGE | +35% mine blast radius | SLEW | +50% auto aim turn speed |
   | | | LONG FUSE | +60% mine lifetime | | |

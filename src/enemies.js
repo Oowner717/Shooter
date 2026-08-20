@@ -151,6 +151,10 @@ export class Enemy {
     // Set when it is made, from the parent's mass. Banked whichever way it
     // goes: reaching the turret, or being destroyed.
     this.salvage = opts.salvage || 0;
+    // Marks left on a body by the rounds that do not simply hurt it.
+    this.chill = 0; // RIME: seconds of being dragged to a crawl
+    this.sunder = 0; // SUNDER: seconds of taking more from everything
+    this.bounty = 1; // TITHE: what its salvage is worth when it goes
     this.spawnIn = opts.spawnIn ?? 0; // brief materialise animation
 
     if (type.shards) {
@@ -293,6 +297,17 @@ export class Enemy {
   update(world, dt) {
     if (this.spawnIn > 0) this.spawnIn = Math.max(0, this.spawnIn - dt * 2.2);
     this.flash = Math.max(0, this.flash - dt * 4.5);
+
+    // RIME and SUNDER both wear off on their own. The chill is a drag rather
+    // than a speed cap, so a heavy body coasts further out of it than a light
+    // one — which is the same physics everything else here obeys.
+    if (this.chill > 0) {
+      this.chill -= dt;
+      const k = CFG.rounds.rime.drag ** dt;
+      this.vx *= k;
+      this.vy *= k;
+    }
+    if (this.sunder > 0) this.sunder -= dt;
     if (this.wardT > 0) {
       this.wardT -= dt;
       if (this.wardT <= 0) this.ward = 0;
@@ -424,7 +439,10 @@ export class Enemy {
     // beacon stops covering, which is what makes killing the beacon feel like
     // the answer rather than a statistic.
     const ward = this.wardT > 0 ? (this.ward || 0) : 0;
-    const real = Math.max(1, dmg * (1 - this.armor) * (1 - ward));
+    // A sundered body has had its plating opened; everything lands harder,
+    // not just the round that opened it.
+    const open = this.sunder > 0 ? CFG.rounds.sunder.bite : 1;
+    const real = Math.max(1, dmg * (1 - this.armor) * (1 - ward) * open);
     this.hp -= real;
     this.flash = Math.min(1, this.flash + 0.5 + real / 260);
     if (impulse) {
@@ -440,9 +458,9 @@ export class Enemy {
     this.dead = true;
     const t = this.type;
     // Destroying a fragment is a way of collecting it, not a way of losing it.
-    if (this.salvage) bank(world, this.salvage, this.x, this.y);
+    if (this.salvage) bank(world, this.salvage * this.bounty, this.x, this.y);
     // The harmless ones pay too. It is the one income the tally never sees.
-    else if (this.harmless) bank(world, CFG.salvage.drift, this.x, this.y);
+    else if (this.harmless) bank(world, CFG.salvage.drift * this.bounty, this.x, this.y);
     explode(this.x, this.y, this.r, t.color, t.glow, this.isDebris ? 0.55 : 1);
     audio.pop(clamp(this.r / 22, 0.5, 2.4));
 
@@ -500,6 +518,9 @@ export class Enemy {
         speedScale: 1.25,
         salvage: each,
       }));
+      // TITHE marks the body, but the salvage rides on what the body leaves —
+      // so the mark has to come with it or the round pays nothing at all.
+      world.debris[world.debris.length - 1].bounty = this.bounty;
     }
   }
 

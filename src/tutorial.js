@@ -55,11 +55,21 @@ export const FIRST_USE = {
   shotgun: 'SHOT. Five pellets. Close range only.',
   arc: 'ARC. The hit jumps on to the next thing, four times.',
   recur: 'RECUR. The shot happens three more times, further down.',
+  spine: 'SPINE. Goes straight through, and on to the next one.',
+  slug: 'SLUG. Barely hurts. Moves things a very long way.',
+  rime: 'RIME. Drags what it touches down to a crawl.',
+  spore: 'SPORE. Leaves a patch of ground that keeps burning.',
+  tithe: 'TITHE. Marks a body. Marked bodies pay far more.',
+  sunder: 'SUNDER. Opens the plating. Everything lands harder.',
 
   blast: 'BLAST. Mines lay themselves. This one bangs once, hard.',
   snare: 'SNARE. Never goes off. It pins a crowd in place.',
   wire: 'WIRE. A line across the field. It cuts what crosses.',
   knell: 'KNELL. Waits for nothing. Goes off three times.',
+  thorn: 'THORN. Burning ground. Nothing sets it off, nothing uses it up.',
+  lode: 'LODE. No damage. It pushes, and keeps pushing.',
+  spall: 'SPALL. A claymore. Everything it has, straight up the field.',
+  void: 'VOID. The first thing to touch it is simply gone.',
 
   autoAim: 'AUTO AIM. It picks a target and leads the shot.',
   autoFire: 'AUTO FIRE. It keeps shooting where the barrel points.',
@@ -89,8 +99,8 @@ export const STARTING = ['standard', 'pulse', 'fan', 'autoAim', 'autoFire'];
 
 /** Rounds, mines and abilities, in the order the offers hand them out. */
 export const LOCKABLE = {
-  rounds: ['explosive', 'shotgun', 'arc', 'recur'],
-  mines: ['blast', 'snare', 'wire', 'knell'],
+  rounds: ['explosive', 'shotgun', 'arc', 'recur', 'spine', 'slug', 'rime', 'spore', 'tithe', 'sunder'],
+  mines: ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'],
   abilities: ['lance', 'well', 'prism', 'stasis', 'decoy', 'chorus'],
 };
 

@@ -21,15 +21,21 @@ import { CFG, HAIRLINE } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, segClosest } from './util.js';
 import { applyBlast, ENTRY_Y } from './enemies.js';
 import { spark, dot, ring, ripple, shake, flash } from './fx.js';
+import { Patch } from './patch.js';
+import { fire } from './projectiles.js';
 import { audio } from './audio.js';
 
 const M = CFG.mines;
 const S = CFG.snare;
 const W = CFG.wire;
 const K = CFG.knell;
+const T = CFG.thorn;
+const L = CFG.lode;
+const P = CFG.spall;
+const V = CFG.void;
 
 /** Per-kind timings and geometry. Adding a kind is an entry here and a case. */
-const KIND = { blast: M, snare: S, wire: W, knell: K };
+const KIND = { blast: M, snare: S, wire: W, knell: K, thorn: T, lode: L, spall: P, void: V };
 
 /** What each kind shows on the field. */
 const TONE = {
@@ -37,6 +43,10 @@ const TONE = {
   snare: { live: '#c77dff', idle: '#8fa9c4', core: '#e0aaff' },
   wire: { live: '#7cffb2', idle: '#8fa9c4', core: '#c9ffe4' },
   knell: { live: '#ff5d8f', idle: '#9fb3c8', core: '#ffd6e2' },
+  thorn: { live: '#9be89b', idle: '#8fa9c4', core: '#e6ffe6' },
+  lode: { live: '#59e0ff', idle: '#8fa9c4', core: '#d6f6ff' },
+  spall: { live: '#ffd166', idle: '#9fb3c8', core: '#fff0c8' },
+  void: { live: '#b388ff', idle: '#8fa9c4', core: '#1a0f2e' },
 };
 
 class Mine {
@@ -201,6 +211,64 @@ function grip(world, m, dt) {
  * shoved off the way it was leaning — so a body crossing takes a slice rather
  * than being parked in the beam and ground to nothing.
  */
+/** SPALL. One fan, straight up the field, and the mine is spent. */
+function spall(world, m) {
+  m.dead = true;
+  const base = -Math.PI / 2;
+  const n = Math.round(P.pellets * world.up.spallPellets);
+  for (let i = 0; i < n; i++) {
+    const off = ((i / Math.max(1, n - 1)) - 0.5) * P.spread + spread(0.03);
+    fire(world, m.x, m.y - 4, base + off, {
+      speed: rand(P.speed[0], P.speed[1]),
+      r: 3.4,
+      damage: P.damage * world.up.mineDamage,
+      impulse: 60,
+      bounces: 0,
+      life: 0.85,
+      color: '#ffd9a0',
+      trail: 0.03,
+    });
+  }
+  ring(m.x, m.y, m.r, 150, 0.3, '#ffd166', 3);
+  for (let k = 0; k < 10; k++) spark(m.x, m.y, spread(200), spread(200) - 120, '#ffe9c0', 0.3, 2);
+  shake(4);
+  audio.boom();
+}
+
+/** VOID. Whatever walked into it is simply not there any more. */
+function swallow(world, m, e) {
+  m.dead = true;
+  ring(m.x, m.y, e.r * 2.2, 6, 0.42, '#b388ff', 3);
+  for (let k = 0; k < 16; k++) {
+    const a = rand(0, TAU);
+    spark(e.x, e.y, Math.cos(a) * rand(40, 260), Math.sin(a) * rand(40, 260), '#c9a7ff', rand(0.25, 0.5), 2.2);
+  }
+  // Destroyed, not dissolved: it counts, and it pays.
+  e.applyDamage(world, e.hp + 1e6, 0, 0, 0);
+  flash(0.12, '#d9c2ff');
+  shake(6);
+  audio.boom();
+}
+
+/** LODE. Everything in reach is being pushed away, every frame it is up. */
+function repel(world, m, dt) {
+  const reach = L.reach * world.up.lodeReach;
+  const rr = reach * reach;
+  for (const e of world.enemies) {
+    if (e.dead || e.staged) continue;
+    const dx = e.x - m.x;
+    const dy = e.y - m.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > rr || d2 < 1) continue;
+    const d = Math.sqrt(d2);
+    // Hardest at the centre and nothing at all at the rim, so the edge of it
+    // is somewhere a body can sit rather than a wall it bounces off.
+    const f = (1 - d / reach) * L.push * world.up.lodePush * dt * e.invMass;
+    e.vx += (dx / d) * f;
+    e.vy += (dy / d) * f;
+  }
+}
+
 function cut(world, m, dt) {
   const reach = W.width * m.open;
   const take = (list) => {
@@ -270,8 +338,37 @@ export function updateMines(world, dt) {
       continue;
     }
 
-    m.settle += dt;
+      m.settle += dt;
     m.life -= dt;
+
+    if (m.kind === 'thorn') {
+      // It is the patch: one is opened the moment it settles and kept in step
+      // with the mine, so killing the mine takes the ground with it.
+      if (!m.patch && m.settle >= T.arm) {
+        m.patch = new Patch(m.x, m.y, {
+          r: T.patch.r * world.up.patchR,
+          life: m.life,
+          dps: T.patch.dps * world.up.patchDps,
+          tone: '#9be89b',
+        });
+        world.effects.push(m.patch);
+      }
+      if (m.life <= 0) {
+        m.dead = true;
+        if (m.patch) m.patch.dead = true;
+      }
+      continue;
+    }
+
+    if (m.kind === 'lode') {
+      if (m.settle >= L.arm) repel(world, m, dt);
+      if (m.life <= 0) {
+        m.dead = true;
+        for (let k = 0; k < 8; k++) spark(m.x, m.y, spread(160), spread(160), '#59e0ff', 0.4, 1.8);
+        audio.pop(1);
+      }
+      continue;
+    }
 
     if (m.kind === 'wire') {
       // Nothing triggers it and nothing consumes it; it runs out its life.
@@ -316,7 +413,10 @@ export function updateMines(world, dt) {
         if (e.dead || e.harmless || e.staged) continue;
         const rr = reach + e.r;
         if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 <= rr * rr) {
-          if (m.kind === 'snare') snap(world, m); else detonate(world, m);
+          if (m.kind === 'snare') snap(world, m);
+          else if (m.kind === 'spall') spall(world, m);
+          else if (m.kind === 'void') swallow(world, m, e);
+          else detonate(world, m);
           break;
         }
       }
@@ -338,7 +438,15 @@ export function drawMines(ctx, world) {
     const knell = m.kind === 'knell';
     const tone = TONE[m.kind];
     // The snare's violet is WELL's, because it does the same thing to a crowd.
-    const live = snare ? m.gripping || armed : wire ? m.cutting : knell ? m.landed : armed;
+    const thorn = m.kind === 'thorn';
+    const lode = m.kind === 'lode';
+    const spallM = m.kind === 'spall';
+    const voidM = m.kind === 'void';
+    const live = snare ? m.gripping || armed
+      : wire ? m.cutting
+        : knell ? m.landed
+          : thorn || lode ? m.landed && m.settle >= m.cfg.arm
+            : armed;
     const accent = live ? (snare && m.gripping ? tone.core : tone.live) : tone.idle;
 
     // The grip, drawn first so held bodies sit on top of it.
@@ -361,6 +469,34 @@ export function drawMines(ctx, world) {
         if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 > S.reach * S.reach) continue;
         ctx.moveTo(m.x, m.y);
         ctx.lineTo(e.x, e.y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // LODE's reach. It has no trigger ring to borrow, and a push you cannot
+    // see the edge of is a push you cannot use.
+    if (lode && live) {
+      const rr = L.reach * world.up.lodeReach;
+      const pulse = 0.5 + 0.5 * Math.sin(world.time * 2.2 + m.spin);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      drawGlow(ctx, '#59e0ff', m.x, m.y, rr * 0.8, 0.07 + pulse * 0.04);
+      ctx.strokeStyle = rgba('#59e0ff', 0.2 + pulse * 0.16);
+      ctx.lineWidth = HAIRLINE * 1.4;
+      ctx.setLineDash([HAIRLINE * 3, HAIRLINE * 7]);
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, rr, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // a few marks running outward, so the direction is not a guess
+      ctx.strokeStyle = rgba('#d6f6ff', 0.3 + pulse * 0.25);
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * TAU + world.time * 0.5;
+        const d0 = rr * (0.45 + 0.3 * pulse);
+        ctx.moveTo(m.x + Math.cos(a) * d0, m.y + Math.sin(a) * d0);
+        ctx.lineTo(m.x + Math.cos(a) * (d0 + 14), m.y + Math.sin(a) * (d0 + 14));
       }
       ctx.stroke();
       ctx.restore();
@@ -462,6 +598,57 @@ export function drawMines(ctx, world) {
       ctx.beginPath();
       ctx.arc(0, m.r * 0.75, m.r * 0.26, 0, TAU);
       ctx.fill();
+      ctx.stroke();
+    } else if (thorn) {
+      // a burr: a small core with spines out of it in every direction
+      ctx.beginPath();
+      ctx.arc(0, 0, m.r * 0.45, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * TAU;
+        ctx.moveTo(Math.cos(a) * m.r * 0.45, Math.sin(a) * m.r * 0.45);
+        ctx.lineTo(Math.cos(a) * m.r * 1.5, Math.sin(a) * m.r * 1.5);
+      }
+      ctx.stroke();
+    } else if (lode) {
+      // two rings and a gap: something with a field around it
+      ctx.beginPath();
+      ctx.arc(0, 0, m.r * 0.4, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, m.r * 0.85, 0.5, Math.PI - 0.5);
+      ctx.moveTo(Math.cos(Math.PI + 0.5) * m.r * 0.85, Math.sin(Math.PI + 0.5) * m.r * 0.85);
+      ctx.arc(0, 0, m.r * 0.85, Math.PI + 0.5, TAU - 0.5);
+      ctx.stroke();
+    } else if (spallM) {
+      // a wedge, facing the way it will throw
+      ctx.beginPath();
+      ctx.moveTo(-m.r, m.r * 0.5);
+      ctx.lineTo(m.r, m.r * 0.5);
+      ctx.lineTo(m.r * 0.5, -m.r * 0.9);
+      ctx.lineTo(-m.r * 0.5, -m.r * 0.9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      for (let i = -1; i <= 1; i++) {
+        ctx.moveTo(i * m.r * 0.45, -m.r * 0.9);
+        ctx.lineTo(i * m.r * 0.7, -m.r * 1.7);
+      }
+      ctx.stroke();
+    } else if (voidM) {
+      // a hole: filled dark, ringed bright, with nothing inside it
+      ctx.fillStyle = 'rgba(6,4,14,0.98)';
+      ctx.beginPath();
+      ctx.arc(0, 0, m.r, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = rgba(accent, 0.4);
+      ctx.beginPath();
+      ctx.arc(0, 0, m.r * 0.55, 0, TAU);
       ctx.stroke();
     } else if (snare) {
       // four jaws, splayed open once it has hold of something

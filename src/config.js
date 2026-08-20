@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '50';
+export const BUILD = '51';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -111,6 +111,75 @@ export const CFG = {
     // fraction of a second later from the point of impact, still travelling
     // the way it was — so a column coming straight down is hit once by every
     // shot, all the way to the back of it. Useless on anything on its own.
+    /*
+     * SPINE. It does not stop at the first thing. No chaining, no repeating —
+     * it simply carries on out the far side, a little weaker each time, so its
+     * worth is entirely in how much you can line up behind the first target.
+     */
+    spine: {
+      rate: 1.45,
+      speed: 1560,
+      damage: 20,
+      pierce: 3, // bodies it goes through after the first
+      fade: 0.78, // and what it keeps of its damage each time
+    },
+    /*
+     * SLUG. Almost no damage and an enormous shove. The field is a physics
+     * problem before it is a shooting one, and this is the round that says so:
+     * it is for putting things back where they came from, or into each other.
+     */
+    slug: {
+      rate: 2.4,
+      speed: 820,
+      damage: 14,
+      impulse: 1500,
+    },
+    /*
+     * RIME. Drags whatever it touches to a crawl for a few seconds. It kills
+     * nothing on its own; it buys the time for everything else to.
+     */
+    rime: {
+      rate: 1.7,
+      speed: 1180,
+      damage: 16,
+      chill: 3.2, // seconds of drag
+      drag: 0.02, // velocity kept per second while chilled
+    },
+    /*
+     * SPORE. Bursts into a patch of ground that keeps burning. The only round
+     * whose damage arrives after the shot is over, which makes it the one you
+     * fire where something is going to be rather than where it is.
+     */
+    spore: {
+      rate: 2.0,
+      speed: 980,
+      damage: 10,
+      patch: { r: 92, life: 4.5, dps: 46 },
+    },
+    /*
+     * TITHE. It barely hurts. What it does is mark a body, and a marked body
+     * pays several times over when it finally comes apart — by your hand or
+     * anyone's. The round for a run that is being built rather than survived.
+     */
+    tithe: {
+      rate: 1.5,
+      speed: 1300,
+      damage: 8,
+      bounty: 3.5, // salvage multiplier on a marked body
+    },
+    /*
+     * SUNDER. Opens a body's plating: for a while everything lands harder on
+     * it, including everything that is not this round. Aimed at the things
+     * armour makes tedious, and worth nothing at all against the things it
+     * does not.
+     */
+    sunder: {
+      rate: 1.75,
+      speed: 1240,
+      damage: 12,
+      open: 5, // seconds the plating stays open
+      bite: 1.6, // and how much harder everything lands while it is
+    },
     recur: {
       rate: 1.9,
       speed: 1240,
@@ -171,6 +240,64 @@ export const CFG = {
     cap: 62,
     link: 620, // and no echo jumps further than this
     reach: 1400, // effectively the whole field, but not the staged rows above it
+  },
+
+  /*
+   * THORN. Not a charge at all: it opens into a patch of burning ground and
+   * stays open. Nothing sets it off and nothing uses it up — anything standing
+   * on it is being hurt the whole time it stands there.
+   */
+  thorn: {
+    interval: 8.2,
+    life: 30,
+    flight: 0.9,
+    arm: 0.5,
+    r: 12,
+    patch: { r: 104, dps: 34 },
+  },
+  /*
+   * LODE. Does no damage and cannot be triggered. It pushes, constantly, and
+   * everything within reach is walking uphill. The mine for making a lane, or
+   * for holding a crowd off the turret while something else does the work.
+   */
+  lode: {
+    interval: 9.0,
+    life: 30,
+    flight: 0.9,
+    arm: 0.5,
+    r: 13,
+    reach: 235,
+    push: 620, // acceleration outward, per second, at the centre
+  },
+  /*
+   * SPALL. A claymore. It triggers like a BLAST but throws everything it has
+   * in one direction instead of all of them — straight up the field, into
+   * whatever is coming down it.
+   */
+  spall: {
+    interval: 7.8,
+    life: 30,
+    flight: 0.85,
+    arm: 0.45,
+    r: 12,
+    trigger: 30,
+    pellets: 14,
+    spread: 0.9, // radians of the fan
+    speed: [900, 1240],
+    damage: 26,
+  },
+  /*
+   * VOID. One thing, whatever it is, gone. It does not care about armour or
+   * health or how big the thing was, and it only ever does it once. The answer
+   * to the single object a run cannot otherwise get through.
+   */
+  void: {
+    interval: 12,
+    life: 30,
+    flight: 1,
+    arm: 0.7,
+    r: 12,
+    trigger: 18, // it has to be walked into, not merely approached
   },
 
   // ---- offers ----------------------------------------------------------

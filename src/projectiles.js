@@ -29,6 +29,12 @@ class Projectile {
     // and how long it waits at the impact point before it does.
     this.recur = opts.recur ?? 0;
     this.hold = opts.hold ?? 0;
+    // SPINE: bodies it carries on through, and what it keeps of its damage
+    // each time it does.
+    this.pierce = opts.pierce ?? 0;
+    this.pierceFade = opts.pierceFade ?? 1;
+    // Rounds that leave a mark on what they hit rather than only hurting it.
+    this.onHit = opts.onHit || null;
     this.dead = false;
     this.ignore = null; // body we just reflected off
     this.ignoreT = 0;
@@ -320,9 +326,20 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         for (let i = 0; i < 4; i++) spark(hx, hy, spread(220), spread(220), '#e0aaff', 0.22, 2.2);
         return;
       }
+      if (p.onHit) p.onHit(world, e, hx, hy);
       if (p.chain) chainFrom(world, e, hx, hy, p.jumps);
       if (p.recur > 0) recurFrom(world, p, hx, hy, dirx, diry, e);
       audio.hit();
+      // A piercing round carries on out the other side, weaker, ignoring what
+      // it just went through for long enough not to hit it twice.
+      if (p.pierce > 0) {
+        p.pierce--;
+        p.damage *= p.pierceFade;
+        p.ignore = e;
+        p.ignoreT = 0.06;
+        for (let i = 0; i < 3; i++) spark(hx, hy, spread(140), spread(140), p.color, 0.18, 1.8);
+        return;
+      }
       endProjectile(world, p, hx, hy, true);
       return;
     }

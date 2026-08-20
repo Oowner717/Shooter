@@ -45,6 +45,7 @@ const ASSETS = [
   './src/codex.js',
   './src/tutorial.js',
   './src/loadout.js',
+  './src/patch.js',
 ];
 
 self.addEventListener('install', (e) => {

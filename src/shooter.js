@@ -4,6 +4,7 @@
 import { CFG, HAIRLINE } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, angleDelta } from './util.js';
 import { fire, clampAim } from './projectiles.js';
+import { Patch } from './patch.js';
 import { spark, ring, shake } from './fx.js';
 import { applyBlast } from './enemies.js';
 import { audio } from './audio.js';
@@ -208,6 +209,91 @@ export class Shooter {
         core: '#ffffff',
         trail: 0.05,
         recur: g.repeats + up.recur,
+      });
+    } else if (world.round === 'spine') {
+      const g = R.spine;
+      for (const f of fan) shot(a + f, {
+        speed: g.speed * slow,
+        r: 3.4,
+        damage: g.damage,
+        impulse: 30,
+        bounces: 0,
+        color: '#d8f1ff',
+        core: '#ffffff',
+        trail: 0.05,
+        pierce: g.pierce + up.pierce,
+        pierceFade: g.fade,
+      });
+    } else if (world.round === 'slug') {
+      const g = R.slug;
+      for (const f of fan) shot(a + f, {
+        speed: g.speed * slow,
+        r: 7.2,
+        damage: g.damage,
+        impulse: g.impulse * up.slug,
+        bounces: 0,
+        color: '#b8c6d8',
+        core: '#f2f6fb',
+        trail: 0.02,
+      });
+    } else if (world.round === 'rime') {
+      const g = R.rime;
+      for (const f of fan) shot(a + f, {
+        speed: g.speed * slow,
+        r: 4.4,
+        damage: g.damage,
+        impulse: 18,
+        bounces: 0,
+        color: '#8fe3ff',
+        core: '#e8faff',
+        trail: 0.05,
+        onHit: (w, e) => { e.chill = Math.max(e.chill, g.chill * w.up.chill); },
+      });
+    } else if (world.round === 'spore') {
+      const g = R.spore;
+      for (const f of fan) shot(a + f, {
+        speed: g.speed * slow,
+        r: 5,
+        damage: g.damage,
+        impulse: 24,
+        bounces: 0,
+        color: '#9be89b',
+        core: '#e6ffe6',
+        trail: 0.04,
+        burst: (w, x, y) => {
+          w.effects.push(new Patch(x, y, {
+            r: g.patch.r * w.up.patchR,
+            life: g.patch.life * w.up.patchLife,
+            dps: g.patch.dps * w.up.patchDps,
+            tone: '#9be89b',
+          }));
+        },
+      });
+    } else if (world.round === 'tithe') {
+      const g = R.tithe;
+      for (const f of fan) shot(a + f, {
+        speed: g.speed * slow,
+        r: 4.2,
+        damage: g.damage,
+        impulse: 22,
+        bounces: 0,
+        color: '#7cffb2',
+        core: '#dfffe9',
+        trail: 0.05,
+        onHit: (w, e) => { e.bounty = Math.max(e.bounty, g.bounty * w.up.bounty); },
+      });
+    } else if (world.round === 'sunder') {
+      const g = R.sunder;
+      for (const f of fan) shot(a + f, {
+        speed: g.speed * slow,
+        r: 4.8,
+        damage: g.damage,
+        impulse: 34,
+        bounces: 0,
+        color: '#ffb0d8',
+        core: '#ffe6f2',
+        trail: 0.045,
+        onHit: (w, e) => { e.sunder = Math.max(e.sunder, g.open * w.up.sunder); },
       });
     } else {
       for (const f of fan) shot(a + f, { speed: CFG.bolt.speed * slow });

@@ -25,6 +25,14 @@ export function freshUpgrades() {
     arcJumps: 0,
     recur: 0,
     salvo: 0, // every Nth shot fires three
+    pierce: 0, // extra bodies a SPINE carries on through
+    slug: 1, // how hard a SLUG shoves
+    chill: 1, // how long RIME drags something down for
+    patchR: 1, // and how wide, how long and how hard a SPORE patch burns
+    patchLife: 1,
+    patchDps: 1,
+    bounty: 1, // TITHE's multiplier on a marked body
+    sunder: 1, // how long SUNDER keeps a body's plating open
     // field
     mineMax: 0,
     mineRate: 1,
@@ -33,6 +41,9 @@ export function freshUpgrades() {
     mineDamage: 1, // and how hard both of them land
     mineHold: 1, // seconds a snare keeps what it caught
     mineTolls: 0, // extra rings on a knell
+    spallPellets: 1, // how much a spall throws
+    lodeReach: 1, // how far a lode pushes, and how hard
+    lodePush: 1,
     wireDamage: 1, // per second of contact on a wire
     mineTrigger: 1,
     sweep: 0, // seconds between the turret clearing behind itself
@@ -73,6 +84,23 @@ const MARK = {
   // --- field ---
   deepmag: g('<ellipse cx="12" cy="7" rx="7.5" ry="2.8"/><path d="M4.5 7v5c0 1.6 3.4 2.8 7.5 2.8s7.5-1.2 7.5-2.8V7"/><path d="M4.5 12v5c0 1.6 3.4 2.8 7.5 2.8s7.5-1.2 7.5-2.8v-5"/>'),
   quicklay: g('<circle cx="15" cy="14" r="5"/><path d="M2 8h7M2 12h5M2 16h4" opacity=".7"/>'),
+  // --- build 51: the ten new types ---
+  // One more body to go through.
+  throughandthrough: g('<path d="M2.5 12h19"/><circle cx="8" cy="12" r="2.4"/><circle cx="15" cy="12" r="2.4"/><path d="M19 9.6 21.6 12 19 14.4" fill="currentColor" stroke="none"/>'),
+  // A shove with more behind it.
+  sledge: g('<rect x="3" y="9.4" width="7" height="5.2" rx="1"/><path d="M10 12h7"/><path d="M14.6 8.6 18.6 12l-4 3.4"/><path d="M20.6 8.4v7.2" opacity=".6"/>'),
+  // Colder, for longer.
+  deepfreeze: g('<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5 4.2 16.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>'),
+  // The patch, wider and hotter.
+  bloomout: g('<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.6" stroke-dasharray="2.2 2.6"/><circle cx="12" cy="12" r="10" stroke-dasharray="2.2 3.4" opacity=".6"/>'),
+  // A mark worth more.
+  levy: g('<path d="M12 3.4 19.4 8v8L12 20.6 4.6 16V8z"/><path d="M12 7.6v8.8M9.6 9.8h4.8M9.6 14.2h4.8"/><path d="M16.6 4.4h4M18.6 2.4v4" opacity=".8"/>'),
+  // Plating open longer.
+  prybar: g('<path d="M12 2.6 20 6v6.6c0 4.6-3.4 7.2-8 8.8-4.6-1.6-8-4.2-8-8.8V6z" stroke-dasharray="3 2.6"/><path d="M6.4 8.4 17 19"/><path d="M4.4 6.4 8 8l-1.6 2.4z" fill="currentColor" stroke="none"/>'),
+  // More thrown, one way.
+  buckshot: g('<path d="M4.6 20h14.8"/><path d="M12 16V9M8 16 6 9.6M16 16l2-6.4M4.6 15 3 10M19.4 15 21 10" opacity=".95"/><circle cx="12" cy="6.4" r="1.6" fill="currentColor" stroke="none"/>'),
+  // A field that reaches further and shoves harder.
+  repulsor: g('<circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="6" stroke-dasharray="2.4 2.6"/><path d="M12 5.4V2.6M12 18.6v2.8M5.4 12H2.6M18.6 12h2.8"/><path d="M10.4 4.2 12 2.6l1.6 1.6M10.4 19.8 12 21.4l1.6-1.6" fill="currentColor" stroke="none" opacity=".85"/>'),
   // A charge going off wider than it used to: the same centre, one ring further.
   deepcharge: g('<circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="5.6"/><circle cx="12" cy="12" r="9.4" stroke-dasharray="2.6 2.8"/><path d="M12 2.6v1.6M12 19.8v1.6M2.6 12h1.6M19.8 12h1.6" opacity=".7"/>'),
   widemouth: g('<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9" stroke-dasharray="2.4 3"/>'),
@@ -116,6 +144,11 @@ export const UPGRADES = {
     { id: 'overpressure', name: 'OVERPRESSURE', line: '+40% HE blast radius.', apply: scale('blastR', 1.4) , icon: MARK.overpressure },
     { id: 'fifthlink', name: 'FIFTH LINK', line: 'ARC jumps 1 more time.', apply: bump('arcJumps', 1) , icon: MARK.fifthlink },
     { id: 'fourthtime', name: 'FOURTH TIME', line: 'RECUR repeats 1 more time.', apply: bump('recur', 1) , icon: MARK.fourthtime },
+    { id: 'throughandthrough', name: 'THROUGH AND THROUGH', line: '+2 bodies a spine pierces.', apply: bump('pierce', 2) , icon: MARK.throughandthrough },
+    { id: 'sledge', name: 'SLEDGE', line: '+60% slug knockback.', apply: scale('slug', 1.6) , icon: MARK.sledge },
+    { id: 'deepfreeze', name: 'DEEP FREEZE', line: '+70% rime chill time.', apply: scale('chill', 1.7) , icon: MARK.deepfreeze },
+    { id: 'levy', name: 'LEVY', line: '+50% tithe salvage mark.', apply: scale('bounty', 1.5) , icon: MARK.levy },
+    { id: 'prybar', name: 'PRY BAR', line: '+60% sunder duration.', apply: scale('sunder', 1.6) , icon: MARK.prybar },
     { id: 'salvo', name: 'SALVO', line: 'Every 8th shot fires 3 rounds.', apply: set('salvo', 8) , icon: MARK.salvo },
   ],
   FIELD: [
@@ -128,6 +161,9 @@ export const UPGRADES = {
     { id: 'deadweight', name: 'DEAD WEIGHT', line: '+65% snare hold time.', apply: scale('mineHold', 1.65) , icon: MARK.deadweight },
     { id: 'hotwire', name: 'HOT WIRE', line: '+50% wire damage.', apply: scale('wireDamage', 1.5) , icon: MARK.hotwire },
     { id: 'fourthbell', name: 'FOURTH BELL', line: '+1 toll on every knell.', apply: bump('mineTolls', 1) , icon: MARK.fourthbell },
+    { id: 'bloomout', name: 'BLOOM OUT', line: '+35% patch size, +45% burn.', apply: (u) => { u.patchR *= 1.35; u.patchDps *= 1.45; } , icon: MARK.bloomout },
+    { id: 'buckshot', name: 'BUCKSHOT', line: '+60% spall pellets.', apply: scale('spallPellets', 1.6) , icon: MARK.buckshot },
+    { id: 'repulsor', name: 'REPULSOR', line: '+40% lode reach and push.', apply: (u) => { u.lodeReach *= 1.4; u.lodePush *= 1.4; } , icon: MARK.repulsor },
     { id: 'sweep', name: 'SWEEP', line: 'Turret blasts behind itself every 20s.', apply: set('sweep', 20) , icon: MARK.sweep },
     { id: 'reflex', name: 'REFLEX', line: 'PULSE fires itself when 2+ objects grip you.', apply: set('reflex', true) , icon: MARK.reflex },
     { id: 'intake', name: 'INTAKE', line: '+50% salvage pickup range.', apply: scale('intake', 1.5) , icon: MARK.intake },
