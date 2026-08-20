@@ -155,6 +155,7 @@ export class Enemy {
     this.chill = 0; // RIME: seconds of being dragged to a crawl
     this.sunder = 0; // SUNDER: seconds of taking more from everything
     this.bounty = 1; // TITHE: what its salvage is worth when it goes
+    this.marks = 0; // ...and how deep the mark is, which is what TITHE rides on
     this.spawnIn = opts.spawnIn ?? 0; // brief materialise animation
 
     if (type.shards) {

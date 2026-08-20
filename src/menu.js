@@ -9,7 +9,7 @@
 
 import { CODEX, codex } from './codex.js';
 import { CONTROLS } from './narrative.js';
-import { ARSENAL, ARSENAL_GROUPS } from './arsenal.js';
+import { ARSENAL, ARSENAL_GROUPS, specRows } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
 import { BUILD } from './config.js';
 
@@ -119,7 +119,7 @@ export class Menu {
         if (a.tone) row.style.setProperty('--tone', a.tone);
         row.innerHTML = `<div class="codexArt arm">${a.icon}</div>`
           + `<div class="codexBody"><div class="codexName">${a.label}</div>`
-          + `<div class="codexLine">${a.line}</div></div>`;
+          + `<div class="codexSpec">${specRows(a)}</div></div>`;
         grid.appendChild(row);
         this.cells.set(a.key, row);
       }

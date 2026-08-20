@@ -63,7 +63,7 @@ emptiest.
                                                             [  HE  ]
                                                             [ SHOT ]
 [BLAST]                                                     [ ARC  ]
-[SNARE]                                                     [RECUR ]
+[SNARE]                                                     [ HALO ]
 [WIRE ]
 [KNELL]              [AUTO AIM][AUTO FIRE]
 [ PULSE ][  FAN  ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ CHORUS ]
@@ -108,6 +108,20 @@ rest of the interface uses for locked things, so a stack with two things in it
 says what the other two could be. The slots themselves are drawn across the top
 of the sheet in strip order. An empty cell on the strip opens the same screen,
 because an empty cell is a question and that screen is the answer.
+
+**Every round and every mine is described the same way, in the same order.**
+`src/arsenal.js` carries two short fields for each — `dmg`, which is the
+number, and `fx`, which is the one thing it does that nothing else does — and
+the loadout sheet, the ARSENAL tab and the card that hands the thing over all
+render exactly those, from that one table. It used to be a paragraph each:
+considered, quite good, and read by nobody choosing a loadout mid-fight. A
+comparison is only useful if it can be made at a glance, and a glance is what
+this screen gets.
+
+**The slots across the top of the sheet are buttons.** Pressing one takes that
+round or mine back off the strip, because the shortest way to undo a choice is
+to press the choice. The same two rules apply as anywhere else: the last round
+cannot be removed, and a refused press flashes rather than doing nothing.
 
 **A newly bought round or mine takes a free cell by itself** — buying a thing
 and watching nothing happen is not a reward. **If both its cells are full it
@@ -216,7 +230,9 @@ than something it starts with:
 - **LODE** does no damage and cannot be triggered. It pushes, constantly, and
   everything in reach is walking uphill — hardest at the centre and nothing at
   all at the rim, so the edge is somewhere a body can sit rather than a wall it
-  bounces off. Measured: a body moves outward and loses no health at all.
+  bounces off. Measured: a body moves outward and loses no health at all. Its
+  reach was cut 60% in build 53, from 235 to 94: at the old figure one mine
+  closed most of a lane on its own, which made the placement of it uninteresting.
 - **SPALL** is a claymore. It triggers like a BLAST and throws everything it
   has in one direction rather than all of them: measured at 14 pellets, every
   one of them up the field.
@@ -255,10 +271,14 @@ it looks.
 - **SPORE** bursts into a patch of ground that keeps burning after the shot is
   over: 14 damage on impact and 75 by the time the patch has finished. The one
   round you fire where something is going to be rather than where it is.
-- **TITHE** barely hurts. It marks a body, and a marked body pays several times
-  over whenever it comes apart — measured at 70 salvage against 20 for the same
-  body unmarked. The mark rides down onto the fragments, because that is where
-  the salvage actually is.
+- **TITHE** barely hurts on the first hit, and every hit after it hurts more.
+  Each one deepens the mark, up to eight, and the mark is read at the moment of
+  impact rather than at the muzzle: 5.3 damage on the first hit and 19.8 on the
+  sixth, measured on one body. A marked body also pays several times over when
+  it comes apart — 70 salvage against 20 for the same body unmarked — and the
+  mark rides down onto the fragments, because that is where the salvage is. The
+  ramp is what makes it an answer to one large thing without ever changing
+  ammunition, which is what a long fight against a single body needs.
 - **SUNDER** opens a body's plating: for a while everything lands harder on it,
   including everything that is not this round. Measured at 132 damage before
   and 211 after.
@@ -267,12 +287,11 @@ it looks.
   again, up to four links, each a little weaker than the last. It works at any
   range, which is the one thing neither HE nor SHOT does. Poor against anything
   standing on its own.
-- **RECUR** is the shot that happens again. A tenth of a second after it lands
-  it reappears a little further along the same line, still travelling the way it
-  was, three times over and weaker each time — so one shot hits every rank of a
-  column coming straight down. It cannot land on the same body twice, so a lone
-  object cannot farm it, and ORDINAL is immune to the recurrence entirely:
-  there is nothing behind it to reach.
+- **HALO** is the one round that does not leave. It enters a slow orbit around
+  the turret and stays there for seven seconds, cutting anything that comes
+  through the ring, and it does not stop on a hit — up to five can be circling
+  at once. Nothing else in the rack answers the thing already on top of you,
+  and this answers it without being aimed at all.
 
 The five kinds are exclusive: picking one clears whichever was loaded, and
 picking the loaded one again is a no-op rather than a silent unload.
@@ -435,7 +454,7 @@ button can then say AMENDMENT and mean it.
   | HEAVY | 2x knockback | SWEEP | blasts behind you every 20s | HARD CASING | 40 dmg/s to what touches you |
   | OVERPRESSURE | +40% HE radius | REFLEX | PULSE fires itself at 2+ grips | INSULATION | corruption costs half |
   | FIFTH LINK | ARC +1 jump | INTAKE | +50% pickup range | SHRUG | throws objects off every 15s |
-  | FOURTH TIME | RECUR +1 repeat | STANDING ORDER | -20% ability cooldowns | | |
+  | WIDER RING | HALO +2 in orbit | STANDING ORDER | -20% ability cooldowns | | |
   | SALVO | every 8th shot fires 3 | | | | |
 
 Each carries its own mark, and the card shows how many of it you already hold.

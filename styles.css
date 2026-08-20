@@ -870,6 +870,17 @@ body.menuOpen #quickBar { pointer-events: none; }
   background: transparent;
 }
 .loadEmpty { font-size: 6px; letter-spacing: 0.1em; }
+/* A filled slot is pressable: it removes what is in it. The caption only
+   appears on the ones that have something to remove. */
+.loadSlot { -webkit-appearance: none; appearance: none; font: inherit; cursor: pointer; }
+button.loadSlot:active { background: rgba(20, 44, 68, 0.9); }
+.slotOff {
+  font-size: 5.5px !important;
+  letter-spacing: 0.12em;
+  color: rgba(150, 180, 210, 0.42);
+}
+button.loadSlot:active .slotOff { color: var(--tone, var(--accent)); }
+
 
 #loadList {
   overflow-y: auto;
@@ -907,6 +918,31 @@ body.menuOpen #quickBar { pointer-events: none; }
 .loadBody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .loadName { font-size: 10px; letter-spacing: 0.18em; }
 .loadLine { font-size: 8.5px; line-height: 1.45; color: var(--dim); }
+/* Damage, then effect. Two labelled rows in a fixed order rather than a
+   paragraph, so the eye can run down a column of them and compare. */
+.spec {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 8.5px;
+  line-height: 1.45;
+}
+.spec b {
+  flex: 0 0 20px;
+  font-weight: 400;
+  font-size: 6.5px;
+  letter-spacing: 0.12em;
+  color: rgba(150, 180, 210, 0.5);
+  padding-top: 1px;
+}
+.spec i { font-style: normal; color: var(--dim); }
+.spec.dmg i {
+  color: color-mix(in srgb, var(--tone, var(--accent)) 78%, #dfeaf4);
+  letter-spacing: 0.04em;
+}
+.codexSpec { margin-top: 3px; display: flex; flex-direction: column; gap: 1px; }
+.loadBody .spec { margin-top: 1px; }
+
 .loadState {
   flex: 0 0 auto;
   font-size: 7px;

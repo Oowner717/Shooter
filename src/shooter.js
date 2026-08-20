@@ -197,19 +197,32 @@ export class Shooter {
         chain: true,
         jumps: R.arc.jumps + up.arcJumps,
       });
-    } else if (world.round === 'recur') {
-      const g = R.recur;
-      for (const f of fan) shot(a + f, {
-        speed: g.speed * slow,
-        r: 4.4,
-        damage: g.damage,
-        impulse: 26,
-        bounces: 0,
-        color: '#c9b6ff',
-        core: '#ffffff',
-        trail: 0.05,
-        recur: g.repeats + up.recur,
-      });
+    } else if (world.round === 'halo') {
+      const g = R.halo;
+      // A ring rather than a stream: past the ceiling the oldest gives way, so
+      // holding the trigger keeps the halo turning rather than piling up.
+      const inOrbit = world.projectiles.filter((q) => q.orbit && !q.dead);
+      const cap = g.max + up.haloMax;
+      while (inOrbit.length >= cap) { const q = inOrbit.shift(); q.dead = true; }
+      for (const f of fan) {
+        const p = shot(a + f, {
+          r: 4.6,
+          damage: g.damage,
+          impulse: 30,
+          bounces: 0,
+          life: g.life * up.haloLife,
+          color: '#ffd166',
+          core: '#fff3d0',
+          trail: 0.04,
+          // It sweeps the same bodies pass after pass, so it must not be spent
+          // on the first one it touches.
+          pierce: 9999,
+          pierceFade: 1,
+          orbit: { a: a + f, r: g.r, w: g.spin },
+        });
+        p.x = this.x + Math.cos(a + f) * g.r;
+        p.y = this.y + Math.sin(a + f) * g.r;
+      }
     } else if (world.round === 'spine') {
       const g = R.spine;
       for (const f of fan) shot(a + f, {
@@ -280,7 +293,22 @@ export class Shooter {
         color: '#7cffb2',
         core: '#dfffe9',
         trail: 0.05,
-        onHit: (w, e) => { e.bounty = Math.max(e.bounty, g.bounty * w.up.bounty); },
+        onHit: (w, e) => {
+          /*
+           * The ramp lands here, on the body that was actually hit, rather
+           * than being guessed at the muzzle. The base damage has already
+           * gone in by the time this runs; what this adds is what the marks
+           * already on it are worth, and then it deepens the mark by one.
+           *
+           * So TITHE is nearly harmless on the first hit and real damage by
+           * the eighth, which is what lets it be left on one large thing for a
+           * long fight without ever changing ammunition.
+           */
+          const extra = e.marks * g.step * w.up.titheStep;
+          if (extra > 0) e.applyDamage(w, g.damage * w.up.damage * extra, 0, 0, 0);
+          e.marks = Math.min(g.marks, e.marks + 1);
+          e.bounty = Math.max(e.bounty, g.bounty * w.up.bounty);
+        },
       });
     } else if (world.round === 'sunder') {
       const g = R.sunder;

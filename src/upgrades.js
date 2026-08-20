@@ -23,7 +23,9 @@ export function freshUpgrades() {
     impulse: 1,
     blastR: 1,
     arcJumps: 0,
-    recur: 0,
+    haloMax: 0, // extra rounds HALO keeps in orbit
+    haloLife: 1, // and how long they stay up
+    titheStep: 1, // how fast TITHE's mark deepens its own bite
     salvo: 0, // every Nth shot fires three
     pierce: 0, // extra bodies a SPINE carries on through
     slug: 1, // how hard a SLUG shoves
@@ -82,6 +84,10 @@ const MARK = {
   heavy: g('<rect x="13" y="8" width="8" height="8" rx="1"/><path d="M2 12h8"/><path d="M7 8.5 10.5 12 7 15.5"/>'),
   overpressure: g('<circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="6" opacity=".6"/><circle cx="12" cy="12" r="9.6" opacity=".3"/>'),
   fifthlink: g('<circle cx="5" cy="17" r="2.2"/><circle cx="12" cy="8" r="2.2"/><circle cx="19" cy="16" r="2.2"/><path d="M6.4 15.3 10.6 9.8M13.5 9.5l4.2 4.7"/>'),
+  // A ring that stays up longer.
+  longorbit: g('<circle cx="12" cy="12" r="8.4" stroke-dasharray="3 2.4"/><circle cx="20.4" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M12 8.6V12l2.6 1.6" opacity=".8"/>'),
+  // A mark that compounds on itself.
+  compound: g('<path d="M4 19.4 9 13l3.6 3.2L20 5.6"/><path d="M15.6 5.6H20v4.4" fill="none"/><circle cx="9" cy="13" r="1.6" fill="currentColor" stroke="none"/><circle cx="12.6" cy="16.2" r="1.6" fill="currentColor" stroke="none"/>'),
   fourthtime: g('<circle cx="4.5" cy="12" r="2.1" fill="currentColor" stroke="none"/><circle cx="11" cy="12" r="2.1" fill="currentColor" stroke="none" opacity=".7"/><circle cx="17.5" cy="12" r="2.1" fill="currentColor" stroke="none" opacity=".4"/>'),
   salvo: g('<path d="M5 21V7M12 21V4M19 21V7"/><path d="M2.6 9.4 5 7l2.4 2.4M9.6 6.4 12 4l2.4 2.4M16.6 9.4 19 7l2.4 2.4"/>'),
   // --- field ---
@@ -146,7 +152,9 @@ export const UPGRADES = {
     { id: 'heavy', name: 'HEAVY', line: '2x knockback on every hit.', apply: scale('impulse', 2) , icon: MARK.heavy },
     { id: 'overpressure', name: 'OVERPRESSURE', line: '+40% HE blast radius.', apply: scale('blastR', 1.4) , icon: MARK.overpressure },
     { id: 'fifthlink', name: 'FIFTH LINK', line: 'ARC jumps 1 more time.', apply: bump('arcJumps', 1) , icon: MARK.fifthlink },
-    { id: 'fourthtime', name: 'FOURTH TIME', line: 'RECUR repeats 1 more time.', apply: bump('recur', 1) , icon: MARK.fourthtime },
+    { id: 'fourthtime', name: 'WIDER RING', line: '+2 halo rounds in orbit.', apply: bump('haloMax', 2) , icon: MARK.fourthtime },
+    { id: 'longorbit', name: 'LONG ORBIT', line: '+50% halo duration.', apply: scale('haloLife', 1.5) , icon: MARK.longorbit },
+    { id: 'compound', name: 'COMPOUND', line: '+60% tithe mark bite.', apply: scale('titheStep', 1.6) , icon: MARK.compound },
     { id: 'throughandthrough', name: 'THROUGH AND THROUGH', line: '+2 bodies a spine pierces.', apply: bump('pierce', 2) , icon: MARK.throughandthrough },
     { id: 'sledge', name: 'SLEDGE', line: '+60% slug knockback.', apply: scale('slug', 1.6) , icon: MARK.sledge },
     { id: 'deepfreeze', name: 'DEEP FREEZE', line: '+70% rime chill time.', apply: scale('chill', 1.7) , icon: MARK.deepfreeze },
@@ -213,7 +221,8 @@ export const UNLOCKS = Object.values(LOCKABLE).flat().map((key) => ({
   name: armName(key),
   // The caption's own name prefix comes off — the card already has the name in
   // its heading — and its authored line break with it, because a card is one
-  // paragraph and not two lines.
+  // paragraph and not two lines. For a round or a mine that leaves the damage
+  // and the effect exactly as the loadout sheet states them.
   line: (FIRST_USE[key] || '').replace(/^[A-Z ]+\. /, '').replace(/\s+/g, ' '),
   icon: armIcon(key),
   apply: (up, world) => {

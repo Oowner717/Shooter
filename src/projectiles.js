@@ -25,9 +25,9 @@ class Projectile {
     this.burst = opts.burst || null;
     this.chain = !!opts.chain; // ARC: jumps on from whatever it hits
     this.jumps = opts.jumps ?? CFG.rounds.arc.jumps;
-    // RECUR: how many more times this shot happens again after it lands,
-    // and how long it waits at the impact point before it does.
-    this.recur = opts.recur ?? 0;
+    // HALO: a round that circles the turret instead of leaving. `a` is where
+    // it is on the ring, `w` how fast it goes round.
+    this.orbit = opts.orbit || null;
     this.hold = opts.hold ?? 0;
     // SPINE: bodies it carries on through, and what it keeps of its damage
     // each time it does.
@@ -63,9 +63,22 @@ export function updateProjectiles(world, dt) {
     if (p.life <= 0) endProjectile(world, p, p.x, p.y, true);
     if (p.ignoreT > 0) p.ignoreT -= dt; else p.ignore = null;
 
-    // A recurrence sits where the last one landed for a moment before it goes
-    // on. That stutter is the whole read of the round: the line of light stops
-    // dead, then reappears deeper into the column.
+    // HALO does not travel; it is carried round the turret and swept through
+    // whatever is standing in the ring. Handled before the flight code because
+    // none of that applies to it.
+    if (!p.dead && p.orbit) {
+      const o = p.orbit;
+      const s0 = world.shooter;
+      o.a += o.w * dt;
+      const px = p.x;
+      const py = p.y;
+      p.x = s0.x + Math.cos(o.a) * o.r;
+      p.y = s0.y + Math.sin(o.a) * o.r;
+      resolveSegment(world, p, px, py, p.x, p.y);
+      if (p.dead) { list[i] = list[list.length - 1]; list.pop(); }
+      continue;
+    }
+
     if (!p.dead && p.hold > 0) {
       p.hold -= dt;
       dot(p.x, p.y, 0, 0, p.color, 0.06, 5);
@@ -191,33 +204,6 @@ class Arc {
   }
 }
 
-/**
- * RECUR. The shot happens again from where it landed, still travelling the way
- * it was, after a short hold. It cannot hit the same body twice in a row, so a
- * single object cannot farm it — it has to have something behind it.
- */
-function recurFrom(world, p, hx, hy, dirx, diry, hit) {
-  const cfg = CFG.rounds.recur;
-  const a = Math.atan2(diry, dirx);
-  // Clear of the body it just landed on, or the recurrence lands on the same
-  // one again and the round never gets past the first thing it touches.
-  const off = (hit ? hit.r : 0) + p.r + 6;
-  const next = fire(world, hx + dirx * off, hy + diry * off, a, {
-    damage: p.damage * cfg.falloff,
-    speed: cfg.speed,
-    bounces: 0,
-    recur: p.recur - 1,
-    hold: cfg.hold,
-    color: '#c9b6ff',
-    core: '#ffffff',
-  });
-  if (next && hit) {
-    next.ignore = hit;
-    next.ignoreT = cfg.hold + 0.25;
-  }
-  audio.thud();
-}
-
 function ricochetFx(p) {
   for (let i = 0; i < 3; i++) {
     spark(p.x, p.y, spread(180), spread(180), p.color, 0.18, 2);
@@ -328,7 +314,6 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       }
       if (p.onHit) p.onHit(world, e, hx, hy);
       if (p.chain) chainFrom(world, e, hx, hy, p.jumps);
-      if (p.recur > 0) recurFrom(world, p, hx, hy, dirx, diry, e);
       audio.hit();
       // A piercing round carries on out the other side, weaker, ignoring what
       // it just went through for long enough not to hit it twice.
@@ -372,10 +357,6 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         audio.hit();
       }
       // An ARC round still jumps off ORDINAL into whatever it has around it.
-      // A RECUR round does not: the recurrence would land on the same hull a
-      // tenth of a second later and again after that, which farmed ORDINAL for
-      // twice a plain bolt off one shot. There is nothing behind it to reach,
-      // which is exactly the matchup the round is bad at.
       if (p.chain) chainFrom(world, null, hx, hy, p.jumps);
       endProjectile(world, p, hx, hy, true);
       return;

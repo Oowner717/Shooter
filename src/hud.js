@@ -2,7 +2,7 @@
 // be crisp, tappable and safe-area aware.
 
 import { ABILITIES } from './abilities.js';
-import { ARSENAL } from './arsenal.js';
+import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
 import { BUILD } from './config.js';
 import { clamp } from './util.js';
@@ -19,7 +19,7 @@ const CONFIG_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
   + '<circle cx="12" cy="7" r="2.1"/><circle cx="16" cy="17" r="2.1"/></svg>';
 
 /** Rounds that are not the default. Mutually exclusive with each other. */
-export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'recur'];
+export const ROUND_KEYS = ['explosive', 'shotgun', 'arc', 'halo'];
 /** Mines. Also mutually exclusive, but all of them can be off at once. */
 export const MINE_KEYS = ['blast', 'snare', 'wire', 'knell'];
 
@@ -267,15 +267,26 @@ export class Hud {
     const keys = world.loadout[group];
 
     // The slots, in the order they appear on the strip: bottom cell first.
+    // A filled one is a button, and pressing it takes that thing back off the
+    // strip — the shortest way to undo a choice is to press the choice.
     this.el.loadSlots.innerHTML = '';
     for (const key of keys) {
       const a = key && ARSENAL.find((x) => x.key === key);
-      const d = document.createElement('div');
+      const d = document.createElement(a ? 'button' : 'div');
       d.className = `loadSlot${a ? '' : ' empty'}`;
       if (a && a.tone) d.style.setProperty('--tone', a.tone);
       d.innerHTML = a
-        ? `${a.icon}<span>${a.label}</span>`
+        ? `${a.icon}<span>${a.label}</span><span class="slotOff">REMOVE</span>`
         : '<span class="loadEmpty">EMPTY</span>';
+      if (a) {
+        d.type = 'button';
+        d.title = `Remove ${a.label} from the strip`;
+        d.setAttribute('aria-label', `Remove ${a.label} from the strip`);
+        d.id = `sl${a.key[0].toUpperCase()}${a.key.slice(1)}`;
+        d.addEventListener('click', () => {
+          if (!this.game.toggleCarry(a.key)) this.refuse(d);
+        });
+      }
       this.el.loadSlots.appendChild(d);
     }
 
@@ -294,7 +305,8 @@ export class Hud {
       b.disabled = !owned;
       b.innerHTML = `<span class="loadArt">${a.icon}</span>`
         + `<span class="loadBody"><span class="loadName">${a.label}</span>`
-        + `<span class="loadLine">${owned ? a.line : 'Not yet unlocked.'}</span></span>`
+        + (owned ? specRows(a) : '<span class="loadLine">Not yet unlocked.</span>')
+        + '</span>'
         + `<span class="loadState">${on ? 'ON STRIP' : owned ? (full ? 'NO SLOT' : 'ADD') : 'LOCKED'}</span>`;
       if (owned) {
         b.addEventListener('click', () => {

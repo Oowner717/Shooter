@@ -33,9 +33,8 @@ export const ICON = {
   // It does not stop at what it hit. A bolt reads at 13px; three dots and a
   // zigzag did not — it came out as a chevron.
   arc: svg('<path d="M13.6 2 5 13.4h5.6L9.8 22l8.6-11.4h-5.6z" fill="currentColor" stroke="none"/>'),
-  // It stays in.
-  // The same shot, three places down the same line.
-  recur: svg('<circle cx="12" cy="4.5" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="11.5" r="2.2" fill="currentColor" stroke="none" opacity=".72"/><circle cx="12" cy="18.5" r="2.2" fill="currentColor" stroke="none" opacity=".45"/>'),
+  // It does not leave: a ring around the turret, with one on it.
+  halo: svg('<circle cx="12" cy="12" r="7.6" opacity=".55"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="19.6" cy="12" r="2.4" fill="currentColor" stroke="none"/>'),
   // --- build 51: six more rounds ---
   // It does not stop at the first thing.
   spine: svg('<path d="M12 22V3.4"/><path d="M8.6 6.8 12 3.2l3.4 3.6"/><path d="M6.5 11h11M7.5 16h9" opacity=".55"/>'),
@@ -64,93 +63,122 @@ export const ICON = {
  * Strip order, left to right. Mines, then the two that run on their own, then
  * ammunition — so the things a hand reaches for during a fight sit at the two
  * ends and the two that are simply left on sit between them.
+ *
+ * Every round and every mine is described the same way and in the same order:
+ * `dmg`, which is the number, and `fx`, which is the one thing it does that
+ * nothing else does. Both are short on purpose. This table used to carry a
+ * paragraph each — considered, quite good, and read by nobody choosing a
+ * loadout mid-fight. A comparison is only useful if it can be made at a
+ * glance, and a glance is what the loadout sheet gets.
+ *
+ * `dmg` is per hit unless it says otherwise: `/s` is per second of contact,
+ * `x N` is that many pieces, `+ N` is what follows the impact. `none` means
+ * the mine does no damage of its own, which for SNARE and LODE is the point.
  */
 export const ARSENAL = [
   {
     key: 'blast', kind: 'mine', group: 'mines', label: 'BLAST', icon: ICON.blast, tone: '#ffb347',
-    line: 'Lobbed onto a random patch every few seconds. Completely inert in flight and only arms where it settles. Drift never sets one off. One hard bang.',
+    dmg: '95', fx: 'Triggers on contact. One hard bang.',
   },
   {
     key: 'snare', kind: 'mine', group: 'mines', label: 'SNARE', icon: ICON.snare, tone: '#c77dff',
-    line: 'It does not go off. It opens, hauls everything near it into one pinned knot and holds it there. No damage of its own — the damage is what you put into a pile that cannot move.',
+    dmg: 'none', fx: 'Never goes off. Pins a crowd in place for 2.4s.',
   },
   {
     key: 'wire', kind: 'mine', group: 'mines', label: 'WIRE', icon: ICON.wire, tone: '#7cffb2',
-    line: 'The only one that is not a point. It unspools a taut line across the field and cuts whatever crosses it, for as long as that thing stays on it. Nothing triggers it, nothing uses it up and it does not expire: it is a lane closed for good, or until the cap pushes it off for a newer one.',
+    dmg: '72/s', fx: 'A line across the field. It cuts what crosses.',
   },
   {
     key: 'knell', kind: 'mine', group: 'mines', label: 'KNELL', icon: ICON.knell, tone: '#ff5d8f',
-    line: 'It does not wait to be touched. It counts, and then it goes off three times where it lies, each wider and weaker than the last. BLAST punishes what walks into it; this denies the ground whether anything is there or not.',
-  },  {
+    dmg: '74, twice', fx: 'Waits for nothing. Tolls where it lies, wider each time.',
+  },
+  {
     key: 'thorn', kind: 'mine', group: 'mines', label: 'THORN', icon: ICON.thorn, tone: '#9be89b',
-    line: 'Not a charge. It opens into a patch of burning ground and stays open — nothing triggers it and nothing uses it up, and anything standing on it is being hurt the whole time it stands there.',
+    dmg: '34/s', fx: 'Opens into burning ground and stays open.',
   },
   {
     key: 'lode', kind: 'mine', group: 'mines', label: 'LODE', icon: ICON.lode, tone: '#59e0ff',
-    line: 'Does no damage and cannot be triggered. It pushes, constantly, and everything in reach is walking uphill. For making a lane, or for holding a crowd off while something else does the work.',
+    dmg: 'none', fx: 'Cannot be triggered. Pushes everything near it away.',
   },
   {
     key: 'spall', kind: 'mine', group: 'mines', label: 'SPALL', icon: ICON.spall, tone: '#ffd166',
-    line: 'A claymore. It triggers like a blast mine and throws everything it has in one direction instead of all of them: straight up the field, into whatever is coming down it.',
+    dmg: '26 x 14', fx: 'Triggers on contact. Throws it all straight up the field.',
   },
   {
     key: 'void', kind: 'mine', group: 'mines', label: 'VOID', icon: ICON.voidmine, tone: '#b388ff',
-    line: 'One thing, whatever it is, gone. It does not care about armour or health or size, and it only ever does it once. The answer to the single object a run cannot otherwise get through.',
+    dmg: 'total', fx: 'The first thing to touch it is gone. Once only.',
   },
 
   {
     key: 'autoAim', kind: 'auto', group: 'auto', label: 'AUTO AIM', icon: ICON.aim, wide: true, run: true,
-    line: 'Tracks whatever is corrupting the feed, leads the shot for flight time and swings at its own rate. Your hand on the lever outranks it.',
+    fx: 'Picks a target and leads the shot. Your hand outranks it.',
   },
   {
     key: 'autoFire', kind: 'auto', group: 'auto', label: 'AUTO FIRE', icon: ICON.fire, wide: true, run: true,
-    line: 'Keeps shooting wherever the barrel happens to point. A shade slower than working the lever yourself, so playing is still worth it.',
+    fx: 'Keeps firing where the barrel points, a shade slower than you.',
   },
+
   {
     key: 'standard', kind: 'round', group: 'ammo', label: 'BOLT', icon: ICON.std, tone: '#bff4ff',
-    line: 'Nothing done to it, and the fastest cadence there is. Everything else buys its trick with rate of fire.',
+    dmg: '26', fx: 'The fastest cadence there is. Nothing done to it.',
   },
   {
     key: 'explosive', kind: 'round', group: 'ammo', label: 'HE', icon: ICON.he, tone: '#ff9f5c',
-    line: 'Detonates on impact. Costs better than half your rate of fire and travels slower, so single targets are no easier — crowds are.',
+    dmg: '15 + 44 blast', fx: 'Detonates on impact. Half the fire rate.',
   },
   {
     key: 'shotgun', kind: 'round', group: 'ammo', label: 'SHOT', icon: ICON.shot, tone: '#ffd9a0',
-    line: 'Five pellets a shot in a tight cone. They expire well short of the top of the field: devastating up close, useless at range.',
+    dmg: '12 x 5', fx: 'A tight cone that dies short. Close range only.',
   },
   {
     key: 'arc', kind: 'round', group: 'ammo', label: 'ARC', icon: ICON.arc, tone: '#9be7ff',
-    line: 'The weakest thing you can load on impact and the strongest through a crowd. The hit jumps to the nearest thing it has not touched, up to four links, each a little weaker. Poor against anything standing on its own.',
+    dmg: '11, then 25 a jump', fx: 'The hit jumps to 4 more nearby, weaker each time.',
   },
   {
-    key: 'recur', kind: 'round', group: 'ammo', label: 'RECUR', icon: ICON.recur, tone: '#c9b6ff',
-    line: 'The shot happens again. Whatever it lands on, a moment later it is a little further along the same line, still travelling the way it was, three times over and weaker each time. Wasted on anything standing on its own; devastating down the length of a column.',
-  },  {
+    key: 'halo', kind: 'round', group: 'ammo', label: 'HALO', icon: ICON.halo, tone: '#ffd166',
+    dmg: '26 a pass', fx: 'Orbits the turret for 7s, cutting what comes through.',
+  },
+  {
     key: 'spine', kind: 'round', group: 'ammo', label: 'SPINE', icon: ICON.spine, tone: '#d8f1ff',
-    line: 'It does not stop at what it hits. Straight through and on to whatever was standing behind it, a little weaker each time. Worth exactly as much as you can line up.',
+    dmg: '20, fading', fx: 'Punches through 3 more bodies behind the first.',
   },
   {
     key: 'slug', kind: 'round', group: 'ammo', label: 'SLUG', icon: ICON.slug, tone: '#b8c6d8',
-    line: 'Barely hurts anything. It moves things: back up the field, off the turret, into each other. The field is a physics problem first, and this is the round that treats it as one.',
+    dmg: '14', fx: 'Barely hurts. Shoves things a very long way.',
   },
   {
     key: 'rime', kind: 'round', group: 'ammo', label: 'RIME', icon: ICON.rime, tone: '#8fe3ff',
-    line: 'Drags whatever it touches down to a crawl for a few seconds. It kills nothing by itself. It buys the time for everything else to.',
+    dmg: '16', fx: 'Chills for 3.2s. What it touches barely moves.',
   },
   {
     key: 'spore', kind: 'round', group: 'ammo', label: 'SPORE', icon: ICON.spore, tone: '#9be89b',
-    line: 'Bursts into a patch of ground that keeps burning after the shot is over. The only round you fire where something is going to be rather than where it is.',
+    dmg: '10 + 46/s', fx: 'Leaves burning ground where it bursts, for 4.5s.',
   },
   {
     key: 'tithe', kind: 'round', group: 'ammo', label: 'TITHE', icon: ICON.tithe, tone: '#7cffb2',
-    line: 'Almost harmless. It marks a body instead, and a marked body pays several times over whenever it finally comes apart — by your hand or anyone else\u2019s.',
+    dmg: '8, and rising', fx: 'Marks a body: each mark hurts it more and pays more.',
   },
   {
     key: 'sunder', kind: 'round', group: 'ammo', label: 'SUNDER', icon: ICON.sunder, tone: '#ffb0d8',
-    line: 'Opens a body\u2019s plating. For a while everything lands harder on it, including everything that is not this round. For the things armour makes tedious, and worthless against the things it does not.',
+    dmg: '12', fx: 'Opens plating for 5s. Everything lands 60% harder.',
   },
-
 ];
+
+/** Everything in the table, by key, because three surfaces look things up. */
+export const ARM = new Map(ARSENAL.map((a) => [a.key, a]));
+
+/**
+ * The whole of an entry on one line, for the places that only have one: the
+ * caption on first use and the card that hands the thing over. Same words as
+ * the loadout sheet, in the same order, so nothing has to be read twice.
+ */
+export function specLine(key) {
+  const a = ARM.get(key);
+  if (!a) return '';
+  const head = !a.dmg ? '' : a.dmg === 'none' ? 'No damage. ' : `DMG ${a.dmg}. `;
+  return `${head}${a.fx}`;
+}
+
 
 /** Menu order: grouped, with the heading each group is filed under. */
 export const ARSENAL_GROUPS = [
@@ -158,3 +186,16 @@ export const ARSENAL_GROUPS = [
   { id: 'mines', title: 'MINES', note: 'one kind at a time' },
   { id: 'auto', title: 'RUNNING', note: 'left on or left off' },
 ];
+
+/**
+ * The two rows every round and mine is now described by. Labelled, aligned and
+ * in the same order every time, so two entries can be compared by looking down
+ * a column rather than by reading two paragraphs.
+ */
+export function specRows(a) {
+  const rows = [];
+  if (a.dmg) rows.push(`<span class="spec dmg"><b>DMG</b><i>${a.dmg}</i></span>`);
+  if (a.fx) rows.push(`<span class="spec"><b>FX</b><i>${a.fx}</i></span>`);
+  return rows.join('');
+}
+

@@ -11,6 +11,8 @@
 // only if the player actually reaches for it. The teaching is spread across
 // the whole run because the run hands things over across the whole run.
 
+import { ARSENAL, specLine } from './arsenal.js';
+
 /** Seconds a line of n words needs: a beat to notice it, then about 180wpm. */
 export function holdFor(text) {
   const words = String(text).trim().split(/\s+/).length;
@@ -49,31 +51,7 @@ export const SCRIPT = [...OPENING, ...NOTES].map((e) => ({ ...e, hold: holdFor(e
  * also the lines the unlock offers carry, so the card that hands you a round
  * and the caption that greets you using it say the same thing.
  */
-export const FIRST_USE = {
-  standard: 'BOLT. Plain, and the fastest thing you can fire.',
-  explosive: 'HE. Blows up where it lands. Slower to fire.',
-  shotgun: 'SHOT. Five pellets. Close range only.',
-  arc: 'ARC. The hit jumps on to the next thing, four times.',
-  recur: 'RECUR. The shot happens three more times, further down.',
-  spine: 'SPINE. Goes straight through, and on to the next one.',
-  slug: 'SLUG. Barely hurts. Moves things a very long way.',
-  rime: 'RIME. Drags what it touches down to a crawl.',
-  spore: 'SPORE. Leaves a patch of ground that keeps burning.',
-  tithe: 'TITHE. Marks a body. Marked bodies pay far more.',
-  sunder: 'SUNDER. Opens the plating. Everything lands harder.',
-
-  blast: 'BLAST. Mines lay themselves. This one bangs once, hard.',
-  snare: 'SNARE. Never goes off. It pins a crowd in place.',
-  wire: 'WIRE. A line across the field. It cuts what crosses.',
-  knell: 'KNELL. Waits for nothing. Goes off three times.',
-  thorn: 'THORN. Burning ground. Nothing sets it off, nothing uses it up.',
-  lode: 'LODE. No damage. It pushes, and keeps pushing.',
-  spall: 'SPALL. A claymore. Everything it has, straight up the field.',
-  void: 'VOID. The first thing to touch it is simply gone.',
-
-  autoAim: 'AUTO AIM. It picks a target and leads the shot.',
-  autoFire: 'AUTO FIRE. It keeps shooting where the barrel points.',
-
+const ABILITY_USE = {
   pulse: 'PULSE. A shockwave. Shoves everything away from you.',
   fan: 'FAN. Twenty-five pellets in one tight cone.',
   lance: 'LANCE. A beam through the biggest thing out there.',
@@ -82,6 +60,17 @@ export const FIRST_USE = {
   stasis: 'STASIS. Objects stop. Your shots do not.',
   decoy: 'DECOY. A turret that is not yours. They go there.',
   chorus: 'CHORUS. Ties the field together.\nWhatever kills one hurts the rest.',
+};
+
+/**
+ * Rounds, mines and the two that run on their own say exactly what the loadout
+ * sheet says about them, with the name in front — one source for the number
+ * and the one line, so the card that hands it over, the caption that greets
+ * you using it and the sheet you compare it on can never drift apart.
+ */
+export const FIRST_USE = {
+  ...Object.fromEntries(ARSENAL.map((a) => [a.key, `${a.label}. ${specLine(a.key)}`])),
+  ...ABILITY_USE,
 };
 
 /**
@@ -99,7 +88,7 @@ export const STARTING = ['standard', 'pulse', 'fan', 'autoAim', 'autoFire'];
 
 /** Rounds, mines and abilities, in the order the offers hand them out. */
 export const LOCKABLE = {
-  rounds: ['explosive', 'shotgun', 'arc', 'recur', 'spine', 'slug', 'rime', 'spore', 'tithe', 'sunder'],
+  rounds: ['explosive', 'shotgun', 'arc', 'halo', 'spine', 'slug', 'rime', 'spore', 'tithe', 'sunder'],
   mines: ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'],
   abilities: ['lance', 'well', 'prism', 'stasis', 'decoy', 'chorus'],
 };

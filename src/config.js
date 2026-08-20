@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '52';
+export const BUILD = '53';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -161,11 +161,20 @@ export const CFG = {
      * pays several times over when it finally comes apart — by your hand or
      * anyone's. The round for a run that is being built rather than survived.
      */
+    /*
+     * TITHE. It barely hurts on the first hit, and that is the point: every
+     * hit on the same body deepens the mark, and a deeper mark takes more from
+     * this round and pays more when it goes. Left on a single large thing it
+     * ramps into real damage without ever changing ammunition, which is what a
+     * long fight against one body needs.
+     */
     tithe: {
       rate: 1.5,
       speed: 1300,
       damage: 8,
       bounty: 3.5, // salvage multiplier on a marked body
+      step: 0.55, // extra TITHE damage per mark already on it
+      marks: 8, // and it stops deepening here
     },
     /*
      * SUNDER. Opens a body's plating: for a while everything lands harder on
@@ -180,13 +189,19 @@ export const CFG = {
       open: 5, // seconds the plating stays open
       bite: 1.6, // and how much harder everything lands while it is
     },
-    recur: {
-      rate: 1.9,
-      speed: 1240,
-      damage: 18,
-      repeats: 3, // times it happens again after the first hit
-      hold: 0.11, // seconds it waits at the impact point before going on
-      falloff: 0.8, // each recurrence a little weaker
+    /*
+     * HALO. The one round that does not leave. It enters a slow orbit around
+     * the turret and stays there, cutting anything that comes through it, for
+     * as long as it lasts. Nothing else here answers the thing already on top
+     * of you; this does, and it does it without being aimed.
+     */
+    halo: {
+      rate: 2.2,
+      damage: 26,
+      life: 7, // seconds it circles for
+      r: 168, // orbit radius
+      spin: 2.6, // radians a second
+      max: 5, // rounds that can be in orbit at once
     },
   },
 
@@ -262,7 +277,7 @@ export const CFG = {
     flight: 0.9,
     arm: 0.5,
     r: 13,
-    reach: 235,
+    reach: 94, // cut 60% in build 53: it was closing most of a lane on its own
     push: 620, // acceleration outward, per second, at the centre
   },
   /*
