@@ -10,6 +10,7 @@ import { Menu } from './menu.js';
 import { holdFor, STACK } from './tutorial.js';
 import { SLOTS, carried, freeSlot } from './loadout.js';
 import { readRun } from './save.js';
+import { TIMED } from './events.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -46,6 +47,7 @@ export class Hud {
       killGoal: document.querySelector('#counter .dim'),
       salvage: $('salvageNum'),
       salvageChip: $('salvageChip'),
+      effects: $('effects'),
       phaseTagEl: $('phaseTag'),
       pendingBtn: $('pendingBtn'),
       pendingLabel: $('pendingLabel'),
@@ -562,6 +564,57 @@ export class Hud {
    * sat on, because that is the only place the corruption costs anything the
    * player can read.
    */
+  /**
+   * What is running on a clock, and how much of it is left.
+   *
+   * Only two things in the game have a duration — SURGE and HASTE, the two
+   * top-ups that stack in time rather than in effect — and until build 62
+   * neither said so anywhere. You took a card that said "double fire rate for
+   * 30s" and then had no way at all to know whether you were still inside the
+   * thirty, which is most of what the card was worth.
+   *
+   * Rebuilt only when the set of live effects changes; a live one has its
+   * number and its bar written in place every frame, so this costs two text
+   * writes and a width per effect and never touches the DOM tree.
+   */
+  syncEffects(world) {
+    const live = TIMED.filter((t) => world[t.id] > 0);
+    const sig = live.map((t) => t.id).join(',');
+    if (sig !== this.lastEffects) {
+      this.lastEffects = sig;
+      this.effectEls = {};
+      this.el.effects.innerHTML = '';
+      for (const t of live) {
+        const d = document.createElement('div');
+        d.className = `fxChip fx-${t.id}`;
+        d.id = `fx${t.id[0].toUpperCase()}${t.id.slice(1)}`;
+        d.innerHTML = `<span class="fxMark">${t.icon}</span>`
+          + `<span class="fxBody"><span class="fxName">${t.name}</span>`
+          + '<span class="fxBar"><i></i></span></span>'
+          + '<b class="fxTime"></b>';
+        this.el.effects.appendChild(d);
+        this.effectEls[t.id] = { time: d.querySelector('.fxTime'), fill: d.querySelector('.fxBar i') };
+      }
+    }
+    for (const t of live) {
+      const left = world[t.id];
+      const el = this.effectEls[t.id];
+      if (!el) continue;
+      // These stack in time, so a second card can put the clock well past one
+      // card's worth. The bar is against the peak this run of it reached,
+      // which is the only reading of "how full is it" that is true after two.
+      this.effectPeak = this.effectPeak || {};
+      this.effectPeak[t.id] = Math.max(this.effectPeak[t.id] || 0, left);
+      const secs = Math.ceil(left);
+      if (secs !== el.lastSecs) {
+        el.lastSecs = secs;
+        el.time.textContent = `${secs}s`;
+      }
+      el.fill.style.width = `${Math.max(0, Math.min(1, left / this.effectPeak[t.id])) * 100}%`;
+    }
+    for (const t of TIMED) if (world[t.id] <= 0 && this.effectPeak) this.effectPeak[t.id] = 0;
+  }
+
   setSalvage(n, rate = 1) {
     const v = Math.floor(n);
     if (v !== this.lastSalvage) {

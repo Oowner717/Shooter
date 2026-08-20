@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '61';
+  var BUILD = '62';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -83,6 +83,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
     </header>
+
+    <!-- What is running on a clock right now. Empty and out of the layout
+         unless something timed is up; see Hud.syncEffects(). -->
+    <div id="effects"></div>
 
     <div id="bossBar" hidden>
       <div class="bossName"><span id="bossTitle">ORDINAL</span><span id="bossSub">FIRST OF ——</span></div>

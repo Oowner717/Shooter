@@ -11,6 +11,10 @@
 import { CFG } from './config.js';
 import { ABILITIES } from './abilities.js';
 import { rollLarge } from './upgrades.js';
+import { ARSENAL } from './arsenal.js';
+
+/** Every mine there is, so nothing here has to be kept in step by hand. */
+const MINE_IDS = ARSENAL.filter((a) => a.kind === 'mine').map((a) => a.key);
 
 /*
  * A mark per top-up, drawn the same way the permanent ones are. The card is
@@ -60,13 +64,15 @@ const SMALL = [
   },
   {
     id: 'haste', icon: TICK.haste, name: 'HASTE', line: 'Ability cooldowns halved for 45s.',
-    stacks: 'time',
-    run(world) { world.haste += 45; },
+    // `id` is the world field it runs on, and `seconds` is read by both the
+    // card and the readout, so a retune moves all three at once.
+    stacks: 'time', seconds: 45,
+    run(world) { world.haste += this.seconds; },
   },
   {
     id: 'surge', icon: TICK.surge, name: 'SURGE', line: 'Double fire rate for 30s.',
-    stacks: 'time',
-    run(world) { world.surge += 30; },
+    stacks: 'time', seconds: 30,
+    run(world) { world.surge += this.seconds; },
   },
   {
     id: 'yield', icon: TICK.yield, name: 'YIELD', line: '+150 salvage.',
@@ -93,7 +99,9 @@ export function rollSmallFor(world) {
 function rollSmall(world) {
   // A turret with no mine unlocked has nowhere to put three of them, and an
   // option that does nothing is worse than one fewer option.
-  const anyMine = ['blast', 'snare', 'wire', 'knell'].some((k) => world.unlocked.has(k));
+  // Any mine, not the four there used to be: a turret carrying only THORN had
+  // SEED filtered out of every roll it was ever offered.
+  const anyMine = MINE_IDS.some((k) => world.unlocked.has(k));
   const pool = SMALL.filter((o) => o.id !== 'seed' || anyMine);
   const out = [];
   for (let i = 0; i < 3 && pool.length; i++) {
@@ -183,5 +191,12 @@ export class Offers {
     return opt;
   }
 }
+
+/**
+ * The top-ups that run on a clock, for the readout that shows them. Filtered
+ * from the table rather than listed again, so a third timed one is shown the
+ * moment it exists.
+ */
+export const TIMED = SMALL.filter((o) => o.stacks === 'time');
 
 export { SMALL, ABILITIES };

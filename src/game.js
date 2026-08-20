@@ -340,6 +340,7 @@ export class Game {
     this.hud.setKills(w.kills, w.endless ? null : CFG.killGoal);
     this.hud.setSalvage(w.salvage);
     this.hud.setPending(w.offers.pending, w.offers.next);
+    this.hud.syncEffects(w);
     this.hud.syncAbilities(w.abilities);
     this.hud.alert('SESSION RESTORED', 'info', 2.6);
   }
@@ -1270,6 +1271,7 @@ export class Game {
     else this.hud.setKills(w.kills, !w.endless && w.phase === 'staging' ? CFG.killGoal : null);
     this.hud.setSalvage(w.salvage, intakeRate(w));
     this.hud.setPending(w.offers.pending, w.offers.next);
+    this.hud.syncEffects(w);
     this.hud.syncAbilities(w.abilities);
     this.hud.syncLoadout(w);
     this.hud.syncSeals();

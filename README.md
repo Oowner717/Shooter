@@ -479,6 +479,20 @@ The second line went with it: the opening already says what an AMENDMENT is,
 and the sheet it opens says "permanent · select one" across the top. Measured
 clear of the turret at 414, 390, 375 and 320 wide.
 
+**What is running, and how long is left of it.** Two of the top-ups have a
+duration — SURGE and HASTE, the pair that stack in time rather than in effect —
+and until build 62 neither said so anywhere on the screen. You took a card
+reading "double fire rate for 30s" and then had no way at all to know whether
+you were still inside the thirty, which is most of what the card was worth.
+They now show as chips under the counter row: the same mark the card carried,
+the name, the seconds remaining, and a bar. Because they stack in time, a
+second card can put the clock well past one card's worth, so the bar is drawn
+against the peak this run of the effect reached rather than against the card's
+nominal length — the only reading of "how full is it" that is still true after
+two. The rail collapses out of the layout when nothing is timed; an empty rail
+reads as a broken readout rather than as one with nothing to say. Nothing else
+in the game has a duration, so nothing else is on it.
+
 - **ALLOCATION**, every 40 kills — about twelve in a counted run. Free tempo,
   gone in a minute.
 
