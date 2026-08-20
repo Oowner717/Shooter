@@ -1,10 +1,20 @@
 // Wreckage, as distinct from energy.
 //
 // Energy is the currency: small, bright, drawn to the turret, taken in by a
-// PULSE. Debris is none of those things. It is the object's structure coming
-// apart, and it does nothing at all — it cannot be collected, it cannot hurt
-// you, and it is not counted. It bounces off whatever it meets and then it
-// leaves the field.
+// PULSE. Debris is none of those things. It cannot be collected, it cannot
+// hurt you, and it is not counted. It bounces off whatever it meets and then
+// it leaves the field.
+//
+// It can, however, be shot. A chunk of any size comes apart on one hit — into
+// smaller pieces if there is enough of it to break, and into nothing if there
+// is not. That is destructible scenery, not a health pool: the cascade comes
+// from size, so a big plate is worth three volleys and a splinter is worth
+// one. Nothing pays for it, because wreckage is not the currency and paying
+// for it would undo the whole distinction.
+//
+// A round is never stopped by wreckage, and auto-aim never picks it. It breaks
+// what it passes through on the way to whatever it was actually aimed at, so
+// a field of chunks is a light show rather than cover.
 //
 // It exists because a BULWARK breaking into two dozen glowing collectables
 // reads as a payout, and a BULWARK breaking into two dozen tumbling plates
@@ -16,7 +26,9 @@
 // should never be shootable ends up shootable.
 
 import { CFG } from './config.js';
-import { TAU, rand, spread, rgba } from './util.js';
+import { TAU, rand, randInt, spread, rgba } from './util.js';
+import { spark, ring } from './fx.js';
+import { audio } from './audio.js';
 
 export class Chunk {
   constructor(x, y, vx, vy, r, color) {
@@ -36,7 +48,7 @@ export class Chunk {
     this.restitution = 0.62;
     this.friction = 0.2;
     // Read by the contact solver: nothing a chunk touches takes damage, and
-    // nothing it is touched by hurts it either.
+    // no amount of being shoved around breaks it. Only fire does that.
     this.inert = true;
     // The speed ceiling in integrate() is a multiple of a body's cruise, and
     // a chunk is thrown far faster than it would ever travel under its own
@@ -44,6 +56,8 @@ export class Chunk {
     this.cruise = 160;
     this.thrown = 0;
     this.life = D.life;
+    // Not breakable for the first instant of its existence: see CFG.debris.grace.
+    this.grace = D.grace;
     this.dead = false;
     // Four to seven sides, fixed at birth, so a chunk keeps its silhouette
     // as it tumbles.
@@ -52,7 +66,11 @@ export class Chunk {
     for (let i = 0; i < this.sides; i++) this.jag.push(rand(0.62, 1));
   }
 
-  /** The contact solver calls this on everything; a chunk simply shrugs. */
+  /**
+   * The contact solver calls this on everything; a chunk simply shrugs. Being
+   * shoulder-barged is not what breaks wreckage — see `shatter`, which is
+   * called by fire and only by fire.
+   */
   applyDamage() {}
 
   /** Never steers. It was thrown, and that is the whole of its opinion. */
@@ -62,7 +80,66 @@ export class Chunk {
     this.vy *= d;
   }
 
+  /**
+   * Shot, or caught in a blast. One hit is one break, always — there is no
+   * health here, only size: a chunk wider than `split` comes apart into
+   * smaller ones, and anything at or below it has nothing left to break.
+   *
+   * `dirx`,`diry` is the direction the break is travelling, so the burst
+   * throws forward off the shot rather than puffing symmetrically.
+   *
+   * `pieces` is false for a shockwave, which pulverises rather than splits —
+   * a PULSE that turned one plate into three near the turret would be adding
+   * clutter exactly where it was meant to be clearing it.
+   */
+  shatter(world, dirx = 0, diry = 0, pieces = true) {
+    if (this.dead || this.grace > 0) return;
+    this.dead = true;
+    const D = CFG.debris;
+    const breaks = pieces && this.r > D.split;
+    // Wreckage is drawn unlit, so a break has to be the one moment it lights
+    // up — sparks in its own colour would be as dim as the chunk was. Every
+    // third is near-white, which is what makes the burst read at all against
+    // the background.
+    //
+    // Fewer, larger when it splits, because the pieces are the event. More,
+    // smaller, and with a ring when it does not, because that burst is the
+    // whole of what is left of it.
+    const n = breaks ? 7 : 12;
+    for (let i = 0; i < n; i++) {
+      spark(
+        this.x, this.y,
+        spread(230) + dirx * 140, spread(230) + diry * 140,
+        i % 3 === 0 ? '#e8f2ff' : this.color,
+        rand(0.2, 0.38), breaks ? 2.3 : 1.8,
+      );
+    }
+    if (!breaks) ring(this.x, this.y, this.r * 0.4, this.r * 2.6, 0.22, '#cfe0f2', 1.4);
+    // Gated inside audio, so a round cutting through a dozen chunks is one
+    // sound rather than a dozen.
+    audio.crack(this.r / D.cap);
+    if (!breaks) return;
+
+    const count = randInt(D.pieces[0], D.pieces[1]);
+    for (let i = 0; i < count; i++) {
+      if (world.debris.length >= D.max) break;
+      const a = (i / count) * TAU + rand(0, TAU);
+      const sp = rand(D.speed[0], D.speed[1]) * 0.45;
+      const c = new Chunk(
+        this.x + Math.cos(a) * this.r * 0.4,
+        this.y + Math.sin(a) * this.r * 0.4,
+        this.vx * 0.6 + Math.cos(a) * sp + dirx * 70,
+        this.vy * 0.6 + Math.sin(a) * sp + diry * 70,
+        Math.max(D.min, this.r * D.keep),
+        this.color,
+      );
+      c.life = Math.min(c.life, this.life * D.wane);
+      world.debris.push(c);
+    }
+  }
+
   update(world, dt) {
+    if (this.grace > 0) this.grace -= dt;
     this.life -= dt;
     const D = CFG.debris;
     const out = D.out;

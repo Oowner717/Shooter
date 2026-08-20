@@ -908,12 +908,46 @@ then *"PULSE takes in the energy near you. ENERGY is the green number."*
 
 Build 69 gave the largest objects a second thing to leave behind. **Debris** is
 the structure coming apart: jagged unlit plates in the object's own colour that
-tumble outward, bounce off whatever they meet, and drift off the field. It is
-inert in every direction — it cannot be collected, it cannot be shot, it cannot
-hurt you, and nothing it touches takes damage from it. `CFG.debris` holds the
-whole of it, and `Chunk` in `src/debris.js` is deliberately *not* an `Enemy`:
-giving a chunk health and steering in order to reuse the class is exactly how a
-thing that should never be shootable ends up shootable.
+tumble outward, bounce off whatever they meet, and drift off the field. It
+cannot be collected, it cannot hurt you, and nothing it touches takes damage
+from it — being shoulder-barged by a BULWARK does not chip it, and it does not
+chip the BULWARK. `CFG.debris` holds the whole of it, and `Chunk` in
+`src/debris.js` is deliberately *not* an `Enemy`: it has no health, no steering
+and no value, and reusing the class to get them would drag in a dozen
+behaviours nothing about wreckage wants.
+
+**It can be shot, and that is the only thing that breaks it.** `applyDamage` is
+a no-op — the contact solver cannot hurt a chunk — while `shatter` is called by
+fire and only by fire. One hit is one break, always; there is no health pool
+here, only size. A chunk wider than `debris.split` comes apart into two or three
+pieces at `keep` of its radius, and anything at or below it has nothing left to
+break and simply goes, in a ring and a puff. So a full-size plate is worth three
+volleys (15 → 8.4 → 5 → gone) and a splinter is worth one. The ladder terminates
+because a piece is floored at `debris.min` and `min` is under `split` — a floored
+piece can never split again.
+
+Nothing pays for it. Wreckage is not the currency, and paying for it would undo
+build 67's whole distinction.
+
+**A round is never stopped by wreckage.** `shatterAlong` runs *after* the
+contest for the nearest hit and takes no part in it, so a chunk drifting in
+front of a BULWARK cannot eat the round meant for the BULWARK — it comes apart
+as the round goes past, and the BULWARK still takes the full 17. The sweep is
+capped at the impact point, so nothing behind what the round stopped in is
+touched. Auto-aim never picks wreckage either, because `autoTarget` reads
+`world.enemies` and wreckage is not in it. A field of chunks is a light show,
+never cover.
+
+**A blast pulverises rather than splits** (`shatter(..., pieces = false)`). A
+PULSE turning one plate into three next to the turret would be adding clutter
+exactly where it was meant to be clearing it.
+
+**A chunk cannot be broken for `debris.grace` after it appears.** Without it the
+round that made the pieces is still travelling through them and breaks them
+again the next frame, so one bolt pulverised a plate all the way down — and the
+bolt that killed a BULWARK shattered all sixteen chunks before they had cleared
+its body. A bolt covers about 180 units in that window, so by the time it lifts
+the round that caused it is long gone.
 
 **Only four objects shed it, and they shed a lot.** BULWARK 16, a TOW's mass 12,
 SCION 11, BLOOM 9. That is the point — a BULWARK breaking into two dozen glowing
@@ -928,6 +962,12 @@ halo, additive, at full brightness. A chunk is an outline-only polygon of four
 to seven fixed sides, filled with the background colour and stroked at half
 alpha, with no glow at all. One of them lights up and the other does not, and
 that is the whole of telling them apart at a glance.
+
+Which is also why a break has to be loud: sparks in the chunk's own colour are
+as dim as the chunk was, so every third one is near-white. `audio.crack()` is
+drier, higher and quieter than the `pop()` of something dying — a chunk coming
+apart must not sound like a kill — and it is gated at 60ms, so a round cutting
+through a dozen chunks is one crack rather than a dozen.
 
 **It is the one body allowed to leave the arena.** In `physicsStep` the chunks
 are appended past the end of the clamped run, so the edge pass simply stops

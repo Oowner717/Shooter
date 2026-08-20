@@ -1658,6 +1658,23 @@ export function applyBlast(world, blast) {
   hit(world.enemies);
   hit(world.drops);
 
+  // Wreckage is pulverised rather than split by a shockwave: a PULSE turning
+  // one plate into three next to the turret would be adding clutter exactly
+  // where it was meant to be clearing it. Downward from the captured length,
+  // so nothing added mid-loop is walked.
+  if (world.debris) {
+    for (let i = world.debris.length - 1; i >= 0; i--) {
+      const c = world.debris[i];
+      if (c.dead) continue;
+      const dx = c.x - x;
+      const dy = c.y - y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r2) continue;
+      const d = Math.sqrt(d2) || 1;
+      c.shatter(world, dx / d, dy / d, false);
+    }
+  }
+
   if (world.boss && !world.boss.dead) {
     const dx = world.boss.x - x;
     const dy = world.boss.y - y;

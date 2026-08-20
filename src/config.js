@@ -106,6 +106,21 @@ export const CFG = {
     size: [0.16, 0.34], // fraction of the parent's radius
     min: 5,
     cap: 15,
+    // Shooting it. A chunk wider than `split` comes apart into `pieces`
+    // smaller ones at `keep` of its radius; anything at or below simply goes.
+    // `min` is under `split` on purpose — that is what makes the cascade
+    // terminate rather than halving forever.
+    split: 7,
+    pieces: [2, 3],
+    keep: 0.56,
+    // A chunk cannot be broken for this long after it appears. Without it the
+    // round that made the pieces is still travelling through them and breaks
+    // them again the next frame, so one bolt pulverised a plate all the way
+    // down — and the bolt that killed a BULWARK shattered all sixteen chunks
+    // before they had cleared its body. A bolt covers ~180 units in this, so
+    // by the time it lifts the round that caused it is long gone.
+    grace: 0.12,
+    wane: 0.7, // a piece of a piece does not last as long as the original
   },
 
   // ---- scion / graft ---------------------------------------------------

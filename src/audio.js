@@ -163,6 +163,17 @@ class Audio {
     this.tone({ type: 'triangle', f0: 1800, f1: 2600, dur: 0.09, gain: 0.09 });
   }
 
+  /**
+   * Wreckage coming apart. Drier, higher and quieter than pop(), because a
+   * chunk breaking must not sound like an object dying. Gated hard: a round
+   * cutting through a dozen chunks is one crack, not a dozen.
+   */
+  crack(size = 1) {
+    if (!this.ready || !this._gate('crack', 0.06)) return;
+    const s = clamp(size, 0.25, 1);
+    this.noise({ dur: 0.05 + 0.05 * s, gain: 0.045 + 0.03 * s, f0: 5200 - 1800 * s, f1: 900, q: 1.2 });
+  }
+
   pop(size = 1) {
     if (!this.ready || !this._gate('pop', 0.02)) return;
     this.noise({ dur: clamp(0.12 * size, 0.08, 0.5), gain: clamp(0.1 * size, 0.06, 0.3), f0: 2600 / size, f1: 90, q: 0.8 });

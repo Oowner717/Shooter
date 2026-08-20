@@ -203,6 +203,30 @@ function ricochetFx(p) {
   }
 }
 
+/**
+ * Break every chunk of wreckage the segment passes through, up to `limit`
+ * along it. Walks downward from the length captured on entry, so the pieces a
+ * chunk sheds are appended past the end and are never re-broken by the same
+ * round.
+ */
+function shatterAlong(world, p, ax, ay, bx, by, limit) {
+  const list = world.debris;
+  if (!list || !list.length) return;
+  const sp = Math.hypot(p.vx, p.vy) || 1;
+  const dirx = p.vx / sp;
+  const diry = p.vy / sp;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const c = list[i];
+    if (c.dead) continue;
+    const rr = c.r + p.r;
+    if (Math.min(ax, bx) - rr > c.x || Math.max(ax, bx) + rr < c.x) continue;
+    if (Math.min(ay, by) - rr > c.y || Math.max(ay, by) + rr < c.y) continue;
+    const hit = segClosest(ax, ay, bx, by, c.x, c.y);
+    if (hit.d2 > rr * rr || hit.t > limit) continue;
+    c.shatter(world, dirx, diry);
+  }
+}
+
 /** Find and apply the nearest thing hit along ax,ay -> bx,by. */
 function resolveSegment(world, p, ax, ay, bx, by) {
   let bestT = 2;
@@ -275,6 +299,13 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       }
     }
   }
+
+  // Wreckage breaks but never blocks. It is resolved after the contest for
+  // bestT and takes no part in it, so a chunk drifting in front of a BULWARK
+  // can never eat the round meant for the BULWARK — it just comes apart as
+  // the round goes past. Capped at bestT so a round does not shatter what is
+  // behind whatever it stopped in.
+  shatterAlong(world, p, ax, ay, bx, by, Math.min(bestT, 1));
 
   if (!bestKind) return;
 
