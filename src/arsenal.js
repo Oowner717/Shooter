@@ -2,8 +2,9 @@
 //
 // Two surfaces read this: the strip across the bottom of the play screen,
 // which is where it is chosen, and the menu's ARSENAL tab, which is where it
-// is explained. An entry here buys both surfaces and no markup — the round's
-// behaviour still needs CFG.rounds, ROUND_KEYS and the firing code.
+// is explained. An entry here buys both surfaces and no markup, and ROUND_KEYS
+// and MINE_KEYS are read off it rather than written out again — the round's
+// behaviour still needs CFG.rounds and the firing code.
 //
 // `kind` decides which handler a tap calls — 'round' is exclusive, 'auto' is a
 // toggle. `group` decides where it sits: mines to the left of the two that run

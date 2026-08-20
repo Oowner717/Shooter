@@ -105,8 +105,12 @@ export class Shooter {
     // own slower rate, easing off as it arrives, so it sweeps between targets
     // instead of jumping between them.
     const d = angleDelta(this.aim, this.targetAim);
+    // SLEW scales the whole traverse rather than only its ceiling. The ceiling
+    // is not what binds over most of a sweep -- the ease-in term is -- so an
+    // upgrade that lifted the cap alone moved the barrel by nothing at all,
+    // which is what it had been doing since it was written.
     const rate = world.autoSteering && !this.gripHeld
-      ? Math.min(CFG.shooter.autoTurnRate, Math.max(0.9, Math.abs(d) * 3))
+      ? Math.min(CFG.shooter.autoTurnRate, Math.max(0.9, Math.abs(d) * 3)) * world.up.slew
       : CFG.shooter.turnRate;
     this.aim += clamp(d, -rate * dt, rate * dt);
 

@@ -250,7 +250,7 @@ than something it starts with:
 
 ### The ammunition
 
-Five kinds, one loaded at a time. Every one of them buys its trick with rate of
+Nine kinds, one loaded at a time. Every one of them buys its trick with rate of
 fire, so **BOLT** — nothing done to it — stays the right answer more often than
 it looks.
 
