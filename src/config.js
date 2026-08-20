@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '57';
+export const BUILD = '58';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -13,19 +13,28 @@ export const CFG = {
   // The field stays empty this long. The opening's first four entries ask for
   // nothing but the clock, so the grip, the tap, PULSE and BOLT are all in
   // hand — and have been played with — before the first object is released.
-  openingGrace: 27,
+  //
+  // Cut from 27 in build 58. The fourth line is said at 20.6s and reads for
+  // another 5.7 — "something is coming down now" — and at 27 it had finished
+  // and gone before anything did. At 22 the first object arrives while that
+  // sentence is still on the screen, which is the beat it was written for.
+  openingGrace: 22,
   // Harmless drift comes early regardless, so there is something to shoot at
   // while the field is still safe.
   driftStart: 7,
   // And then it arrives gently: the population target and the spawn rate both
   // start well under normal and reach it over this many objects.
-  warmPop: 2,
+  // Raised from 2 in build 58: two objects is not a field, it is a queue, and
+  // a player who wanted to try a mine or an ability had nothing to try it on.
+  // The *rate* is what keeps the opening gentle (see warmRate and teachRate,
+  // both untouched) — this only says how many may stand there at once.
+  warmPop: 5,
   warmKills: 30,
   warmSeconds: 75, // ...or this long after the first release, whichever is sooner
   // And while the opening is still running it stays thinner than that. There
   // are nineteen controls being handed over with a sentence to read on each,
   // and none of that should happen while dodging.
-  teachPop: 5,
+  teachPop: 6,
   teachRate: 0.62, // spawn attempts run this fraction of speed while teaching
   teachKills: 26, // ...and that holds for this many objects, not the whole run
   warmRate: 0.42, // spawn attempts run this fraction of normal speed at first

@@ -565,8 +565,17 @@ export class Hud {
   setSalvage(n, rate = 1) {
     const v = Math.floor(n);
     if (v !== this.lastSalvage) {
+      // The far end of the collection animation. The streaks go into the
+      // turret; this is where they come out, so the two read as one motion.
+      const up = v > this.lastSalvage;
       this.lastSalvage = v;
       this.el.salvage.textContent = v;
+      if (up) {
+        const chip = this.el.salvageChip;
+        chip.classList.remove('took');
+        void chip.offsetWidth;
+        chip.classList.add('took');
+      }
     }
     const choked = rate < 0.999;
     if (choked !== this.lastChoked) {

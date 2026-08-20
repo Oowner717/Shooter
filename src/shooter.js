@@ -34,6 +34,11 @@ export class Shooter {
     this.gripAngle = Math.PI / 2; // straight down = barrel straight up
     this.gripHeld = false;
     this.gripGlow = 0;
+
+    // How hard the intake is glowing. Bumped by every fragment banked and
+    // decayed here, so a floor being swept up reads as a ring pulsing rather
+    // than as a number quietly going up in the corner.
+    this.intake = 0;
   }
 
   reset(x, y) {
@@ -46,6 +51,7 @@ export class Shooter {
     this.gripAngle = Math.PI / 2;
     this.gripHeld = false;
     this.gripGlow = 0;
+    this.intake = 0;
   }
 
   aimAt(x, y, inverted) {
@@ -120,6 +126,7 @@ export class Shooter {
 
     this.recoil = Math.max(0, this.recoil - dt * 6.5);
     this.heat = Math.max(0, this.heat - dt * 1.4);
+    this.intake = Math.max(0, this.intake - dt * 2.2);
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.spin += dt * (0.6 + this.heat * 2.4);
   }
@@ -331,6 +338,31 @@ export class Shooter {
     const bossHit = world.bossContact > 0;
     const t = world.time;
     const accent = bossHit ? '#ff2d55' : breached ? '#ff5d5d' : '#59e0ff';
+
+    // The intake, drawn where it actually is. Everything inside this circle is
+    // being taken in and paid for, and until build 58 the boundary was an
+    // invisible rule with no mark on the field at all -- so wreckage vanished
+    // at a distance the player had no way to learn.
+    const iR = CFG.salvage.intake * world.up.intake;
+    const pulse = Math.min(1, this.intake);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = rgba('#9fe8ff', 0.07 + pulse * 0.2);
+    ctx.lineWidth = HAIRLINE * (1 + pulse * 2.2);
+    ctx.setLineDash([6, 10]);
+    ctx.lineDashOffset = -t * 14;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, iR, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (pulse > 0.01) {
+      ctx.strokeStyle = rgba('#dff6ff', pulse * 0.3);
+      ctx.lineWidth = HAIRLINE * 1.4;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, iR * (1 - pulse * 0.05), 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
 
     // Aim ray. It reaches further while the lever is held, because that is
     // when you are aiming by feel rather than by pointing at a target.

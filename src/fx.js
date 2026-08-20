@@ -7,14 +7,15 @@ import { TAU, clamp, rand, spread, rgba, drawGlow, glowSprite } from './util.js'
 
 const PARTICLE_FIELDS = {
   x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, r: 2, drag: 1.2, grav: 0,
-  color: '#fff', kind: 0, rot: 0, vr: 0, glow: 1, sides: 3,
+  color: '#fff', kind: 0, rot: 0, vr: 0, glow: 1, sides: 3, tx: 0, ty: 0,
 };
 
-// kind: 0 = glow dot, 1 = streak, 2 = shard, 3 = ember
+// kind: 0 = glow dot, 1 = streak, 2 = shard, 3 = ember, 4 = hauled in
 const KIND_DOT = 0;
 const KIND_STREAK = 1;
 const KIND_SHARD = 2;
 const KIND_EMBER = 3;
+const KIND_HAUL = 4;
 
 class Pool {
   constructor(make) {
@@ -110,6 +111,23 @@ function ember(x, y, vx, vy, color, life, r) {
   return p;
 }
 
+/**
+ * Something being drawn into the intake. Unlike everything else here it does
+ * not fly: it homes on a point and speeds up as it closes, because the read
+ * wanted is "this is being taken in", and a particle that decelerates on
+ * arrival reads as one that was thrown and ran out.
+ */
+export function haul(x, y, tx, ty, color = '#9fe8ff', life = 0.5, r = 2.6) {
+  if (fx.budgetLeft <= 0) return null;
+  const p = fx.particles.spawn();
+  p.x = x; p.y = y; p.vx = 0; p.vy = 0;
+  p.tx = tx; p.ty = ty;
+  p.life = p.max = life;
+  p.r = r; p.color = color; p.kind = KIND_HAUL;
+  p.drag = 0; p.grav = 0; p.glow = 1;
+  return p;
+}
+
 export function ring(x, y, r0, r1, life, color, w = 3, fill = 0) {
   const g = fx.rings.spawn();
   g.x = x; g.y = y; g.r = r0;
@@ -196,6 +214,20 @@ export function updateFx(dt) {
     const p = parts[i];
     p.life -= dt;
     if (p.life <= 0) continue;
+    if (p.kind === KIND_HAUL) {
+      const hx = p.tx - p.x;
+      const hy = p.ty - p.y;
+      const hd = Math.hypot(hx, hy) || 1;
+      // Slow off the floor and quick into the intake. The tail is drawn from
+      // the velocity, so accelerating also lengthens the streak as it goes.
+      const sp = 200 + (1 - p.life / p.max) * 1150;
+      p.vx = (hx / hd) * sp;
+      p.vy = (hy / hd) * sp;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      if (hd < 16) p.life = 0;
+      continue;
+    }
     const d = Math.exp(-p.drag * dt);
     p.vx *= d;
     p.vy = p.vy * d + p.grav * dt;
@@ -237,13 +269,17 @@ export function drawFx(ctx) {
     const t = p.life / p.max;
     if (t <= 0) continue;
 
-    if (p.kind === KIND_STREAK) {
-      const a = clamp(t, 0, 1);
+    if (p.kind === KIND_STREAK || p.kind === KIND_HAUL) {
+      // A haul brightens as it arrives rather than fading out, and carries a
+      // longer tail, so a floor being cleared reads as a stream of them going
+      // in rather than as sparks going out.
+      const haulT = p.kind === KIND_HAUL;
+      const a = haulT ? clamp(0.45 + (1 - t) * 0.55, 0, 1) : clamp(t, 0, 1);
       ctx.strokeStyle = rgba(p.color, a);
-      ctx.lineWidth = p.r * a;
+      ctx.lineWidth = Math.max(0.5, p.r * (haulT ? 0.5 + (1 - t) * 0.7 : a));
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.x - p.vx * 0.022, p.y - p.vy * 0.022);
+      ctx.lineTo(p.x - p.vx * (haulT ? 0.05 : 0.022), p.y - p.vy * (haulT ? 0.05 : 0.022));
       ctx.stroke();
     } else if (p.kind === KIND_SHARD) {
       ctx.globalAlpha = clamp(t * 1.3, 0, 1);

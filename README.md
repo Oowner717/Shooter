@@ -772,10 +772,60 @@ while the field is still safe.
 And then it arrives gently. The population target and the spawn rate climb from
 `warmPop` to normal over `warmKills` objects **or** `warmSeconds` — whichever
 comes first, because on kills alone a player who shoots nothing would sit in
-front of two objects indefinitely. It is thinner still for the first
+front of the opening field indefinitely. It is thinner still for the first
 `teachKills` objects, capped at `teachPop`. LURCHER is held back to object 10,
 so the first things down are MOTEs and NEEDLEs and nothing else. Endless runs
 skip the warm-up entirely.
+
+**Build 58 moved the opening earlier and made it wider, not faster.**
+`openingGrace` went 27 → 22, because the fourth opening line is said at 20.6s
+and reads for another 5.7 — "something is coming down now" — and at 27 it had
+finished and gone before anything did. At 22 the first object arrives while
+that sentence is still on the screen, which is the beat it was written for.
+`warmPop` went 2 → 5 and `teachPop` 5 → 6: two objects is not a field, it is a
+queue, and a player who wanted to try a mine or an ability had nothing to try
+it on. **Both rate scalars are untouched** — `warmRate` 0.42 and `teachRate`
+0.62 still hold spawn attempts to roughly one every four seconds through the
+opening. More of them standing there; no faster a stream. Measured from a cold
+start: nothing until 22s, three on the field by 26s, six by 36s, and the cap
+holds at six until the opening finishes.
+
+### Wreckage, and being paid for it
+
+Everything destroyed leaves fragments, and a fragment is worth something from
+the moment it drops until the moment it is collected. Nothing decays. They
+drift turret-ward at `salvage.pull` on their own and bank when they cross
+`salvage.intake`.
+
+That has always been true and, until build 58, was almost entirely invisible:
+the intake was an **unmarked boundary** at which wreckage silently vanished,
+and the whole of the feedback was one faint dot drifting upward. A player had
+no way to learn where the edge was, and no reason to believe the floor was
+worth anything.
+
+Four things now say it, and they are one motion end to end:
+
+- **The intake is drawn.** A slow dashed ring at `salvage.intake * up.intake`,
+  around the turret, at rest barely there. It is the boundary made visible, and
+  it grows when INTAKE is taken.
+- **A fragment on its way in trails.** A sparse spark off its far side, so a
+  floor full of wreckage visibly leans toward the turret rather than merely
+  drifting. Sparse on purpose: there can be 128 fragments down there.
+- **Banking hauls.** Two streaks leave the pickup point and home on the turret,
+  *accelerating* as they close and brightening as they arrive — a new particle
+  kind, `KIND_HAUL` in `src/fx.js`, because everything else in that file flies
+  ballistically and a particle that decelerates on arrival reads as one that
+  was thrown and ran out.
+- **The turret and the chip answer.** The intake ring pulses, and the SALVAGE
+  chip in the HUD gives a 0.26s scale bump, so the streaks going in and the
+  number going up read as the same event.
+
+And the opening now says it in words, gated on the first kill so there is
+wreckage on the floor to point at: *"Those pieces are wreckage, not enemies.
+They drift to you on their own."*, then *"The ring is your INTAKE. Wreckage
+that reaches it becomes SALVAGE — the green number."* Two lines rather than one
+because they answer two different questions a new player has in the same
+second — is that thing dangerous, and why is it moving toward me.
 
 ### Charges
 

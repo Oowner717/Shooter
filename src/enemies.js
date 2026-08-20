@@ -4,7 +4,7 @@
 
 import { CFG, ENEMY_TYPES, TYPE_BY_ID, ROUTES, HAIRLINE, massOf } from './config.js';
 import { TAU, clamp, rand, randInt, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
-import { explode, hitBurst, spark, dot, shard as fxShard, ring, ripple } from './fx.js';
+import { explode, hitBurst, spark, dot, shard as fxShard, ring, ripple, haul } from './fx.js';
 import { audio } from './audio.js';
 
 /**
@@ -1075,7 +1075,18 @@ function bank(world, amount, x, y) {
   const got = amount * intakeRate(world);
   world.salvage += got;
   world.salvageShown = world.salvageShown ?? 0;
-  if (got >= 1) dot(x, y, 0, -60, '#9fe8ff', 0.5, 3);
+  if (got < 1) return;
+  // Where it went, not just that it went. Two streaks home on the turret and
+  // brighten as they arrive; the turret's intake ring answers them. A single
+  // dot drifting upward was the whole of this, and it never once read as
+  // "that wreckage is now your salvage".
+  const s = world.shooter;
+  if (s) {
+    haul(x, y, s.x, s.y, '#9fe8ff', 0.5, 2.8);
+    haul(x + spread(9), y + spread(9), s.x, s.y, '#dff6ff', 0.55, 1.8);
+    s.intake = Math.min(1.1, (s.intake || 0) + 0.45);
+  }
+  ring(x, y, 3, 22, 0.3, '#9fe8ff', 1.6);
 }
 
 /**
@@ -1105,6 +1116,13 @@ export function collectSalvage(world, dt) {
     const d = Math.sqrt(d2) || 1;
     e.vx += (dx / d) * S.pull * dt;
     e.vy += (dy / d) * S.pull * dt;
+    // A sparse trail off the far side, so a floor full of wreckage visibly
+    // leans toward the turret instead of merely drifting. Sparse on purpose:
+    // there can be 128 fragments down there.
+    if (Math.random() < dt * 1.6) {
+      dot(e.x + (dx / d) * -e.r, e.y + (dy / d) * -e.r, (dx / d) * -18, (dy / d) * -18,
+        '#7fd4f0', 0.45, 1.5);
+    }
   }
 }
 
