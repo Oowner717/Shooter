@@ -3,11 +3,11 @@
 import { CFG, BUILD, ENEMY_TYPES } from './config.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
 import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
-import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, shake } from './fx.js';
+import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake } from './fx.js';
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast, solveTethers, collectSalvage, intakeRate, ENTRY_Y } from './enemies.js';
+import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast, solveTethers, collectSalvage, collectOne, intakeRate, ENTRY_Y } from './enemies.js';
 import { Shooter } from './shooter.js';
 import { Boss } from './boss.js';
 import { Abilities } from './abilities.js';
@@ -183,6 +183,10 @@ export class Game {
     w.offers.reset();
     w.surge = 0;
     w.haste = 0;
+    w.corona = 0; // seconds the turret is burning
+    w.overdraw = 0; // shots left that leave as three
+    w.pendingScour = false;
+    w.pendingEbb = false;
     w.pendingMines = 0;
     this.sweepTimer = 0;
     this.shrugTimer = 0;
@@ -851,6 +855,52 @@ export class Game {
     this.runUpgrades(dt);
     if (w.surge > 0) w.surge = Math.max(0, w.surge - dt);
     if (w.haste > 0) w.haste = Math.max(0, w.haste - dt);
+    if (w.corona > 0) w.corona = Math.max(0, w.corona - dt);
+    // SCOUR: the whole floor at once, and paid over the odds for it. The one
+    // card that answers the chore build 59 created, and its worth is however
+    // much wreckage you had let pile up.
+    if (w.pendingScour) {
+      w.pendingScour = false;
+      const s = w.shooter;
+      let took = 0;
+      for (const e of w.debris) {
+        if (e.dead || !e.salvage) continue;
+        collectOne(w, e, CFG.boosts.scour.bonus);
+        took++;
+      }
+      if (took) {
+        ring(s.x, s.y, 30, 520, 0.55, '#9fe8ff', 3);
+        ripple(s.x, s.y, 1.3, 900);
+        audio.chime(880);
+      }
+    }
+
+    // EBB: everything hostile thrown back up the field. The velocity is set
+    // rather than added, so a BULWARK goes as far as a MOTE — the point is
+    // that the field comes off you, not that heavy things shrug it off.
+    if (w.pendingEbb) {
+      w.pendingEbb = false;
+      const E = CFG.boosts.ebb;
+      const s = w.shooter;
+      let n = 0;
+      for (const e of w.enemies) {
+        if (e.dead || e.harmless || e.staged) continue;
+        e.vx = spread(E.spread);
+        e.vy = -E.speed;
+        e.thrown = E.coast;
+        e.attacking = false;
+        w.attackers.delete(e);
+        e.flash = Math.max(e.flash, 0.6);
+        n++;
+      }
+      if (n) {
+        ring(s.x, s.y, 20, 900, 0.5, '#7cffb2', 4);
+        ripple(s.x, s.y, 1.8, 1200);
+        shake(5);
+        audio.chime(520);
+      }
+    }
+
     while (w.pendingMines > 0) {
       w.pendingMines--;
       // With nothing selected SEED used to do nothing at all, which made it a
@@ -952,6 +1002,31 @@ export class Game {
     if (up.casing > 0) {
       for (const e of w.attackers) {
         if (!e.dead) e.applyDamage(w, up.casing * dt);
+      }
+    }
+
+    // CORONA: for half a minute the turret is unpleasant to be near. Reaches
+    // past what is actually attached, which is the whole difference between
+    // this and the card it replaced — it kills the crowd on the way in as
+    // well as the one already holding on.
+    if (w.corona > 0) {
+      const C = CFG.boosts.corona;
+      const r2 = C.r * C.r;
+      const bite = C.dps * dt;
+      for (const e of w.enemies) {
+        if (e.dead || e.staged || e.harmless) continue;
+        if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= r2) e.applyDamage(w, bite);
+      }
+      if (w.boss && !w.boss.dead) {
+        const bd = (w.boss.x - s.x) ** 2 + (w.boss.y - s.y) ** 2;
+        if (bd <= (C.r + w.boss.r) ** 2) w.boss.hurt(w, bite);
+      }
+      // A ring on the beat rather than every frame: sixty of these a second
+      // is a solid disc, not a shell.
+      this.coronaBeat = (this.coronaBeat || 0) - dt;
+      if (this.coronaBeat <= 0) {
+        this.coronaBeat = 0.28;
+        ring(s.x, s.y, C.r * 0.55, C.r, 0.3, '#ff9f5c', 2);
       }
     }
 

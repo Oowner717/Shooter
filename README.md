@@ -494,35 +494,51 @@ reads as a broken readout rather than as one with nothing to say. Nothing else
 in the game has a duration, so nothing else is on it.
 
 - **ALLOCATION**, every 40 kills — about twelve in a counted run. Free tempo,
-  gone in a minute.
+  gone in a minute. **Three of eight**, never the same one twice in one offer.
 
   | | |
   |---|---|
-  | **RESET** | Every ability ready right now. |
-  | **HASTE** | Ability cooldowns halved for 45s. *Time stacks, effect does not.* |
-  | **SURGE** | Double fire rate for 30s. *Time stacks, rate does not.* |
-  | **YIELD** | +150 salvage. |
-  | **SEED** | Lay 3 mines now — a random unlocked kind if none is selected. |
-  | **SHAKE OFF** | Destroy everything gripping the turret. |
+  | **SURGE** | Double fire rate for 30s. |
+  | **HASTE** | Ability cooldowns halved for 45s. |
+  | **CORONA** | The turret burns for 30s. Anything holding on or close by takes damage. |
+  | **OVERDRAW** | The next 12 shots each fire three rounds. |
+  | **SCOUR** | Every fragment on the floor collected at once, at +50%. |
+  | **EBB** | Everything hostile is thrown back up the field. |
+  | **SEED** | Lay 3 mines now, random kind if none set. |
+  | **VOLLEY** | Fill the field to five mines now. |
 
-  **SURGE and HASTE carry a TIME STACKS, NOT EFFECT tag.** Both run on a clock
-  and both effects are a switch the game reads as a boolean — a flat halving
-  while the timer is above zero — so a second one cannot make the turret shoot
-  four times as fast. What it does do is **add to the clock**: two SURGEs are
-  sixty seconds of double rate, not thirty. The card says which of the two it
-  is, because "double fire rate" on its own invites the wrong guess in either
-  direction. Neither is capped, so a player who banks offers can hold one long
-  window rather than several short ones — offers never expire, and that is the
-  point of them.
+  **Build 65 rebuilt this list.** It had been six, of which one did nothing and
+  two were conditional:
 
-  The permanent tier has non-stacking upgrades as well, but those are simply
-  never offered twice, so the question never comes up; these two come round
-  again and again.
+  - **RESET** (every ability ready) went. Its worth was decided by how many
+    abilities you happened to have unlocked — two at the start, eight at the
+    end — which is not a choice the card offered you.
+  - **YIELD** (+150 salvage) went. `world.salvage` is written by `bank()` and
+    read by the HUD and **never spent on anything**: it is a score, not a
+    currency. A card that moves it is a card that does nothing.
+  - **SHAKE OFF** (destroy everything gripping the turret) became **CORONA**.
+    It was the best card in the pool with four things attached and literally
+    nothing with none, and which of those you got was decided before you saw
+    it. CORONA does the same job as an answer and can also be taken as a
+    precaution: for thirty seconds the turret is unpleasant to be near, so the
+    crowd that was about to arrive dies on the way in. It reaches past what is
+    actually attached, which is the whole difference.
 
-  Each carries a mark, drawn the way the permanent ones are. A card is read in
-  the two seconds before a tap and a shape lands before a name does; without
-  them the small tier showed an empty box where the large tier showed a symbol,
-  which read as something missing rather than something simpler.
+  Three of six meant **you saw half the pool every offer**, twelve times a run.
+  Three of eight is a real roll.
+
+  Two of the new four needed something underneath them. **EBB** sets velocity
+  rather than adding impulse, so a BULWARK goes as far as a MOTE — but the
+  physics speed ceiling is *relative to a body's own cruise*, which clamped a
+  BULWARK's throw on the first frame and moved it 95 units to a MOTE's 248. A
+  thrown body is now exempt from that clamp while it coasts (`physics.thrownSpeed`)
+  and does not steer during the coast (`boosts.ebb.coast`), so the throw lands:
+  measured 459/431/445 units across a MOTE, a BULWARK and a LURCHER, a spread
+  of 28. **OVERDRAW** rides the same `fan` that SALVO does — and the shotgun
+  branch built its own cone and ignored `fan` entirely, which means **SALVO had
+  never done anything at all for SHOT, in any build**. Both work on it now: a
+  tripled SHOT is fifteen pellets.
+
 - **AMENDMENT**, every 50 kills — ten in a counted run. Permanent for the run.
   Three cards, and while anything is still locked the first of them **opens
   something**, because that is the spine of a run: the turret arrives with a
@@ -892,13 +908,29 @@ Two changes, and they are different changes:
   one go, which is how five SCIONs reached the screen the first time this was
   measured against a cap of two.
 
-What reaches the screen is the number that matters, so that is what was
-measured: distinct types alive, three runs, a player clearing at a steady rate.
-At 60s it was 2.0 and is 2.3; at 120s it was 4.0 and is 2.7; **at 180s it was
-6.7 and is 3.3**. The stretch and the working set each do about half of that.
-Later in a run it converges toward the working set plus stragglers — objects
-already on the field when a cohort rotates do not vanish — which is a mean of
-about four rather than the five and a half it was.
+What reaches the screen is the number that matters, and it is a noisy one — a
+single run lands anywhere between 0 and 8 distinct types at the three-minute
+mark. **Measured at nine runs a side**, distinct hostile types alive with a
+player clearing at a steady rate:
+
+| | old | new |
+|---|---|---|
+| 60s | 1.33 (0–2) | 1.78 (1–3) |
+| 120s | 3.67 (0–6) | 3.33 (1–5) |
+| 180s | 6.00 (4–8) | 3.78 (0–7) |
+
+So the working set cuts the **late** window by about a third and does nothing
+measurable to the first two minutes, with ranges that overlap heavily either
+way. (Build 63 originally claimed 2.0 → 2.3, 4.0 → 2.7 and 6.7 → 3.3 from a
+three-run sample; that was under-sampled and over-stated the effect. The table
+above replaces it.) The reason the gain is confined to late is that objects
+already on the field when a cohort rotates do not vanish, so what you see
+converges on the working set plus however many stragglers the field is holding.
+
+The invariants — the working set never exceeds its cap, a newly unlocked type
+enters it immediately, nothing capped on the field can appear in a formation —
+hold every run and are what the test suite guards. The table above is a
+measurement, not a guarantee, and is not asserted.
 
 ### SCION, and what a graft does
 

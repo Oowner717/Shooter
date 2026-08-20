@@ -12,6 +12,7 @@ import { CFG } from './config.js';
 import { ABILITIES } from './abilities.js';
 import { rollLarge } from './upgrades.js';
 import { ARSENAL } from './arsenal.js';
+import { laidCount } from './mines.js';
 
 /** Every mine there is, so nothing here has to be kept in step by hand. */
 const MINE_IDS = ARSENAL.filter((a) => a.kind === 'mine').map((a) => a.key);
@@ -28,20 +29,23 @@ const g = (body, w = 1.7) =>
      stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
 const TICK = {
-  // every ability ready: the cycle jumped back to the start
-  reset: g('<path d="M3.5 12a8.5 8.5 0 1 1 2.9 6.4"/><path d="M3 7.5v5h5"/>'),
   // cooldowns halved: a clock with the charge run through it
   haste: g('<circle cx="12" cy="13" r="8"/><path d="M12 8.5V13l3 2" opacity=".6"/><path d="M13.6 3 10 8.2h4L10.4 13"/>'),
   // double cadence: two shots where there was one
   surge: g('<path d="M8 21V9M16 21V9"/><path d="M5 12 8 8.5 11 12M13 12l3-3.5 3 3.5"/><path d="M8 5.5V3M16 5.5V3" opacity=".5"/>'),
-  // salvage: the thing the chip counts
-  yield: g('<path d="M12 2.6 21 9l-9 12.4L3 9z"/><path d="M3 9h18M12 2.6 8 9l4 12.4M12 2.6 16 9l-4 12.4" opacity=".45"/>'),
   // three laid at once
   seed: g('<circle cx="6" cy="17" r="2.4"/><circle cx="12" cy="17" r="2.4"/><circle cx="18" cy="17" r="2.4"/><path d="M6 12.6V4M12 12.6V6.5M18 12.6V4" opacity=".55"/>'),
-  // everything holding on is thrown off
-  shake: g('<circle cx="12" cy="12" r="3.2"/><path d="M12 6.6V2.4M12 17.4v4.2M6.6 12H2.4M17.4 12h4.2"/><path d="m8.2 8.2-3 -3M15.8 8.2l3-3M8.2 15.8l-3 3M15.8 15.8l3 3" opacity=".55"/>'),
+  // a shell around the turret, with teeth on it
+  corona: g('<circle cx="12" cy="12" r="3.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7.6" stroke-dasharray="2.6 2.4"/><path d="M12 1.8v2.4M12 19.8v2.4M1.8 12h2.4M19.8 12h2.4M5.4 5.4 7.1 7.1M16.9 16.9l1.7 1.7M18.6 5.4 16.9 7.1M7.1 16.9l-1.7 1.7"/>'),
+  // the floor, swept up
+  scour: g('<path d="M3 20.4h18"/><path d="M12 3.6v8.8M8.2 8.4 12 12.2l3.8-3.8"/><path d="M6.4 16.6h11.2l1.2 3.8H5.2z"/>'),
+  // everything on the field, sent back the way it came
+  ebb: g('<path d="M12 21V6.4"/><path d="M6.8 11.6 12 6.2l5.2 5.4"/><path d="M3.4 17.4h5M15.6 17.4h5" opacity=".55"/><path d="M3.4 21h17.2" opacity=".35"/>'),
+  // one pull of the trigger, three rounds out
+  overdraw: g('<path d="M5 21V10M12 21V7M19 21V10"/><path d="M2.6 12.4 5 10l2.4 2.4M9.6 9.4 12 7l2.4 2.4M16.6 12.4 19 10l2.4 2.4"/><circle cx="12" cy="3.2" r="1.4" fill="currentColor" stroke="none"/>'),
+  // the field filled with them at once
+  volley: g('<circle cx="4.6" cy="18" r="2.1"/><circle cx="10.2" cy="18" r="2.1"/><circle cx="15.8" cy="18" r="2.1"/><circle cx="21" cy="18" r="2.1" opacity=".5"/><circle cx="12" cy="11" r="2.1"/><path d="M12 8.6V3.4M9.6 5.6 12 3.2l2.4 2.4" opacity=".6"/>'),
 };
-
 /**
  * The small tier. Everything here is tempo, not power: it changes the next
  * minute and nothing after it.
@@ -59,10 +63,6 @@ const TICK = {
  */
 const SMALL = [
   {
-    id: 'reset', icon: TICK.reset, name: 'RESET', line: 'Every ability ready right now.',
-    run(world) { world.abilities.clearCooldowns(); },
-  },
-  {
     id: 'haste', icon: TICK.haste, name: 'HASTE', line: 'Ability cooldowns halved for 45s.',
     // `id` is the world field it runs on, and `seconds` is read by both the
     // card and the readout, so a retune moves all three at once.
@@ -75,22 +75,54 @@ const SMALL = [
     run(world) { world.surge += this.seconds; },
   },
   {
-    id: 'yield', icon: TICK.yield, name: 'YIELD', line: '+150 salvage.',
-    run(world) { world.salvage += 150; },
+    /*
+     * CORONA. Replaced SHAKE OFF in build 65.
+     *
+     * SHAKE OFF destroyed whatever was gripping the turret, which made it the
+     * best card in the pool with four things attached and a card that did
+     * literally nothing with none — and which of those you got was decided
+     * before you saw it. This does the same job as an answer and can also be
+     * taken as a precaution: for thirty seconds the turret is unpleasant to be
+     * near, so the crowd that was about to arrive dies on the way in.
+     */
+    id: 'corona', icon: TICK.corona, name: 'CORONA',
+    line: 'The turret burns for 30s. Anything holding on or close by takes damage.',
+    stacks: 'time', seconds: CFG.boosts.corona.seconds,
+    run(world) { world.corona += this.seconds; },
   },
   {
     id: 'seed', icon: TICK.seed, name: 'SEED', line: 'Lay 3 mines now, random kind if none set.',
     run(world) { world.pendingMines = (world.pendingMines || 0) + 3; },
   },
   {
-    id: 'shake', icon: TICK.shake, name: 'SHAKE OFF', line: 'Destroy everything gripping the turret.',
+    // VOLLEY tops the field up to a full set rather than laying a flat number,
+    // so it never spends throws retiring mines you already had down.
+    id: 'volley', icon: TICK.volley, name: 'VOLLEY',
+    line: 'Fill the field to five mines now.',
     run(world) {
-      for (const e of [...world.attackers]) if (!e.dead) e.destroy(world);
-      world.attackers.clear();
+      const room = Math.max(0, CFG.mines.cap - laidCount(world));
+      world.pendingMines = (world.pendingMines || 0) + room;
     },
   },
+  {
+    id: 'scour', icon: TICK.scour, name: 'SCOUR',
+    line: 'Every fragment on the floor collected at once, at +50%.',
+    run(world) { world.pendingScour = true; },
+  },
+  {
+    id: 'ebb', icon: TICK.ebb, name: 'EBB',
+    line: 'Everything hostile is thrown back up the field.',
+    run(world) { world.pendingEbb = true; },
+  },
+  {
+    id: 'overdraw', icon: TICK.overdraw, name: 'OVERDRAW',
+    line: 'The next 12 shots each fire three rounds.',
+    // Counted in shots rather than seconds, so it reads on the same rail with
+    // its own unit rather than being invisible.
+    stacks: 'time', unit: 'shots', seconds: CFG.boosts.overdraw.shots,
+    run(world) { world.overdraw += this.seconds; },
+  },
 ];
-
 /** Three of the small tier, never the same one twice in one offer. */
 export function rollSmallFor(world) {
   return rollSmall(world);
@@ -102,7 +134,7 @@ function rollSmall(world) {
   // Any mine, not the four there used to be: a turret carrying only THORN had
   // SEED filtered out of every roll it was ever offered.
   const anyMine = MINE_IDS.some((k) => world.unlocked.has(k));
-  const pool = SMALL.filter((o) => o.id !== 'seed' || anyMine);
+  const pool = SMALL.filter((o) => !(o.id === 'seed' || o.id === 'volley') || anyMine);
   const out = [];
   for (let i = 0; i < 3 && pool.length; i++) {
     out.push(...pool.splice((Math.random() * pool.length) | 0, 1));

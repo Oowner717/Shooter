@@ -140,6 +140,8 @@ export class Enemy {
     // GRAFT. A SEED is a harmless body that hunts a host instead of wandering;
     // `grafted` is what it leaves behind, and a grafted body closes its own
     // wounds until something finishes it.
+    // EBB: seconds left of being thrown, during which it does not steer.
+    this.thrown = 0;
     this.seed = type.id === 'seed';
     this.seedT = this.seed ? CFG.graft.life : 0;
     this.host = null;
@@ -275,6 +277,13 @@ export class Enemy {
   }
 
   steer(world, dt) {
+    // Thrown clear and not yet recovered. It coasts: the whole point of EBB is
+    // that the field comes off you, and a body that starts steering back on
+    // the next frame has not been thrown anywhere.
+    if (this.thrown > 0) {
+      this.thrown -= dt;
+      return;
+    }
     if (this.seed) {
       this.hunt(world, dt);
       return;
@@ -1286,6 +1295,15 @@ function bank(world, amount, x, y) {
  * turret is taken in on contact. It is the difference between wreckage being
  * work and wreckage being income, which is worth a card.
  */
+/** One fragment taken in. `bonus` is SCOUR paying over the odds for it. */
+export function collectOne(world, e, bonus = 1) {
+  if (e.dead || !e.salvage) return;
+  bank(world, e.salvage * bonus, e.x, e.y);
+  e.salvage = 0;
+  e.dead = true;
+  e.dissolved = true;
+}
+
 export function collectSalvage(world, dt) {
   const S = CFG.salvage;
   const s = world.shooter;
@@ -1302,10 +1320,7 @@ export function collectSalvage(world, dt) {
       // radii and a little, the same test contact uses for everything else.
       const rr = s.r + e.r + 2;
       if (d2 <= rr * rr) {
-        bank(world, e.salvage, e.x, e.y);
-        e.salvage = 0;
-        e.dead = true;
-        e.dissolved = true;
+        collectOne(world, e);
         continue;
       }
     }

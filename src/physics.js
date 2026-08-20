@@ -92,7 +92,10 @@ export function integrate(b, dt) {
   b.av *= Math.exp(-P.angularDamping * dt);
 
   // Soft speed ceiling so a chain reaction can't fling anything to infinity.
-  const cap = (b.cruise || 60) * P.maxSpeedFactor;
+  // A body that has just been thrown is exempt for as long as it is coasting:
+  // that throw is bounded and deliberate, which is the case the clamp is not
+  // there to catch. See CFG.physics.thrownSpeed.
+  const cap = b.thrown > 0 ? P.thrownSpeed : (b.cruise || 60) * P.maxSpeedFactor;
   const sp2 = b.vx * b.vx + b.vy * b.vy;
   if (sp2 > cap * cap) {
     const s = cap / Math.sqrt(sp2);

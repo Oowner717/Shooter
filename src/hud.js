@@ -482,7 +482,7 @@ export class Hud {
         // card reading "double fire rate" invites the wrong guess in either
         // direction — that a second one is wasted, or that it is quadruple.
         + (opt.stacks === 'time'
-          ? '<span class="offerTag">TIME STACKS, NOT EFFECT</span>'
+          ? `<span class="offerTag">${opt.unit === 'shots' ? 'SHOTS' : 'TIME'} STACKS, NOT EFFECT</span>`
           : opt.stacks === false || opt.levels === 1
             ? '<span class="offerTag">DOES NOT STACK</span>' : '')
         + '</span>'
@@ -605,10 +605,13 @@ export class Hud {
       // which is the only reading of "how full is it" that is true after two.
       this.effectPeak = this.effectPeak || {};
       this.effectPeak[t.id] = Math.max(this.effectPeak[t.id] || 0, left);
+      // Seconds for the ones that run on a clock, shots for OVERDRAW, which
+      // counts trigger pulls -- a slow round should get the same number of
+      // them as a fast one, so it cannot be a duration.
       const secs = Math.ceil(left);
       if (secs !== el.lastSecs) {
         el.lastSecs = secs;
-        el.time.textContent = `${secs}s`;
+        el.time.textContent = t.unit === 'shots' ? String(secs) : `${secs}s`;
       }
       el.fill.style.width = `${Math.max(0, Math.min(1, left / this.effectPeak[t.id])) * 100}%`;
     }

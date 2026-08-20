@@ -152,7 +152,7 @@ export function throwMine(world, kind = 'blast') {
  * has to be field-wide: counting per kind would let a player switch round the
  * four and hold four caps at once.
  */
-function laidCount(world) {
+export function laidCount(world) {
   let n = 0;
   for (const m of world.mines) if (!m.dead) n++;
   return n;

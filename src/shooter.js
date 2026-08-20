@@ -155,9 +155,22 @@ export class Shooter {
       bounces: (opts.bounces ?? CFG.bolt.bounces) + up.bounces,
     });
 
-    // SALVO: every Nth shot leaves as three.
+    /*
+     * SALVO: every Nth shot leaves as three. OVERDRAW: so does every shot,
+     * for the next dozen of them.
+     *
+     * `fan` is a list of angle offsets and every branch below spreads its
+     * round across it — except the shotgun, which built its own cone and
+     * ignored `fan` entirely. That meant SALVO had never done anything at all
+     * for SHOT, in any build. It does now: the branch multiplies its pellets
+     * across the fan, so a tripled SHOT is fifteen pellets and not five.
+     */
     this.salvoCount = (this.salvoCount || 0) + 1;
-    const fan = up.salvo && this.salvoCount % up.salvo === 0 ? [-0.09, 0, 0.09] : [0];
+    const salvo = up.salvo && this.salvoCount % up.salvo === 0;
+    const drawing = world.overdraw > 0;
+    if (drawing) world.overdraw = Math.max(0, world.overdraw - 1);
+    const spreadBy = CFG.boosts.overdraw.fan;
+    const fan = salvo || drawing ? [-spreadBy, 0, spreadBy] : [0];
 
     if (world.round === 'shotgun') {
       const g = R.shotgun;
@@ -165,8 +178,10 @@ export class Shooter {
       // pellets fill it in rather than spreading it out. LONG SHOT moves the
       // cliff further away; it never removes it.
       const pellets = g.pellets + up.shotPellets;
-      for (let i = 0; i < pellets; i++) {
-        const off = ((i / (pellets - 1)) - 0.5) * g.spread + spread(0.02);
+      // Every pellet, once per fan offset — so a tripled SHOT is three cones
+      // and not one. See the note on `fan` above.
+      for (const f of fan) for (let i = 0; i < pellets; i++) {
+        const off = ((i / (pellets - 1)) - 0.5) * g.spread + spread(0.02) + f;
         shot(a + off, {
           speed: rand(g.speed[0], g.speed[1]) * slow,
           r: 3.2,

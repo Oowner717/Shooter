@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '64';
+export const BUILD = '65';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -359,6 +359,28 @@ export const CFG = {
     trigger: 18,
   },
 
+  // ---- allocation boosts ------------------------------------------------
+  // The small tier. Everything here is tempo: it changes the next minute and
+  // nothing after it.
+  boosts: {
+    // CORONA. A burning shell on the turret. Replaced SHAKE OFF, which was a
+    // dead card whenever nothing was attached — this one is worth taking
+    // before the crowd arrives as well as after.
+    corona: { seconds: 30, dps: 70, r: 150 },
+    // SCOUR. The whole floor at once, and paid over the odds for it.
+    scour: { bonus: 1.5 },
+    // EBB. Everything hostile thrown back up the field. Velocity is set rather
+    // than added, so a BULWARK goes as far as a MOTE — the point is that the
+    // field is cleared off you, not that heavy things resist it.
+    // `coast` is the window in which a thrown body does not steer. Without it
+    // the throw was fought on the very next frame and a BULWARK travelled 95
+    // units to a MOTE's 248 — which is the opposite of the point.
+    ebb: { speed: 620, spread: 120, coast: 0.8 },
+    // OVERDRAW. The next N shots leave as three. Counted in shots, not
+    // seconds, so a slow round gets the same number of them as a fast one.
+    overdraw: { shots: 12, fan: 0.09 },
+  },
+
   // ---- offers ----------------------------------------------------------
   // Kills are the clock. Neither tier ever interrupts: they queue behind a
   // button and wait as long as it takes, because the point of this game is
@@ -522,6 +544,12 @@ export const CFG = {
     correction: 0.72, // positional correction factor
     slop: 0.4,
     maxSpeedFactor: 6, // hard clamp relative to a body's own cruise speed
+    // ...and the ceiling for a body that has deliberately been thrown. The
+    // ordinary clamp is relative to a body's own cruise, which is right for
+    // stopping a chain reaction flinging something to infinity and wrong for
+    // EBB: it clamped a BULWARK's throw on the first frame, so the heavy
+    // things barely moved and the card read as doing nothing to them.
+    thrownSpeed: 720,
     collisionDamage: 0.42, // damage per unit of (impact speed * reduced mass)
     collisionThreshold: 62, // impact speed below this is a harmless bump
   },
