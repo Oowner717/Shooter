@@ -42,7 +42,12 @@ export const CODEX = [
   {
     id: 'warden',
     name: 'WARDEN',
-    line: 'Three plates orbit it and eat what you send. Take the plates first.',
+    line: 'Three plates orbit it and eat what you send. Take them first, or take them anyway.',
+  },
+  {
+    id: 'plate',
+    name: 'PLATE',
+    line: 'A piece of a WARDEN with nothing left to guard. Whatever is still on the core when it goes comes at you.',
   },
   {
     id: 'prism',

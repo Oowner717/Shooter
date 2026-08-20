@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '68';
+export const BUILD = '69';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -78,6 +78,35 @@ export const CFG = {
    */
   cohort: 3, // distinct types the roll may draw from at once
   cohortEvery: 80, // kills before one of them is swapped out
+
+  // ---- debris ----------------------------------------------------------
+  /*
+   * Wreckage, as distinct from energy.
+   *
+   * Energy is the currency: small, bright, drawn to the turret, taken in by a
+   * PULSE. Debris is none of those things — it is the object's structure
+   * coming apart, and it does nothing at all. It is inert, it cannot be
+   * collected, it cannot hurt you, it bounces off whatever it meets and it
+   * leaves the field. It exists because a BULWARK breaking into two dozen
+   * glowing collectables reads as a payout, and a BULWARK breaking into two
+   * dozen tumbling plates reads as a BULWARK breaking.
+   *
+   * Only four objects shed it, and they shed a lot: the point is that it is
+   * occasional and unmistakable when it happens, not a constant litter.
+   */
+  debris: {
+    speed: [140, 460], // thrown out at this, then left alone
+    spin: 7, // radians a second, give or take
+    drag: 0.22, // it slows, but it never stops and never settles
+    life: 14, // seconds before one gives up, if it has not left already
+    out: 240, // world units past the edge before it is forgotten
+    max: 90, // on the field at once
+    // Bigger than an energy mote by design: nothing about the two should
+    // invite a second look to tell apart.
+    size: [0.16, 0.34], // fraction of the parent's radius
+    min: 5,
+    cap: 15,
+  },
 
   // ---- scion / graft ---------------------------------------------------
   // What a SCION leaves behind and what it does to whatever it reaches.
@@ -742,6 +771,7 @@ export const ENEMY_TYPES = [
     glow: '#ff2d6f',
     weight: 6,
     drops: 6, // energy it leaves when it comes apart
+    debris: 9, // inert wreckage thrown when it breaks up
     detonate: { radius: 132, damage: 96 },
   },
   {
@@ -762,6 +792,7 @@ export const ENEMY_TYPES = [
     glow: '#5f7fa6',
     weight: 5,
     drops: 14, // energy it leaves when it comes apart
+    debris: 16, // inert wreckage thrown when it breaks up
   },
   {
     id: 'warden',
@@ -777,9 +808,39 @@ export const ENEMY_TYPES = [
     wobble: 1.6,
     color: '#ff9f1c',
     glow: '#ff6b00',
-    weight: 8,
+    // Halved, because one WARDEN is now four objects: itself and the three
+    // plates it releases. The roll should put about as much on the field as
+    // it did, not twice as much.
+    weight: 4,
     drops: 6, // energy it leaves when it comes apart
     shards: 3, // orbiting plates that eat incoming bolts
+    // ...and when it goes, they come off as bodies rather than as scenery.
+    splits: { type: 'plate', count: 3 },
+  },
+  {
+    /*
+     * PLATE. One of a WARDEN's three, off its orbit and on its own.
+     *
+     * While the WARDEN lives these eat your bolts and are shot off it one at a
+     * time; when it dies the survivors do not simply vanish into energy, they
+     * come at you. Small, quick, and worth a tally place each, which is why a
+     * WARDEN is now half as common as it was.
+     */
+    id: 'plate',
+    unlock: 0,
+    name: 'PLATE',
+    shape: 'plate',
+    r: 11,
+    hp: 34,
+    density: 1.3,
+    speed: 62,
+    accel: 190,
+    restitution: 0.7,
+    wobble: 0.8,
+    color: '#ffb84d',
+    glow: '#ff6b00',
+    weight: 0, // never rolled: a WARDEN places these
+    drops: 2, // energy it leaves when it comes apart
   },
   {
     /*
@@ -816,6 +877,7 @@ export const ENEMY_TYPES = [
     // them ended up on the screen at once the first time this was measured.
     solo: true,
     drops: 9, // energy it leaves when it comes apart
+    debris: 11, // inert wreckage thrown when it breaks up
   },
   {
     // What a SCION leaves. Harmless in itself -- it never breaches the turret
@@ -939,6 +1001,7 @@ export const ENEMY_TYPES = [
     glow: '#7f9bb5',
     weight: 0,
     drops: 8, // energy it leaves when it comes apart
+    debris: 12, // inert wreckage thrown when it breaks up
   },
   {
     id: 'prism',

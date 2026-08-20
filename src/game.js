@@ -84,6 +84,7 @@ export class Game {
 
       enemies: [],
       drops: [], // energy on the floor, waiting to be taken in
+      debris: [], // inert wreckage, on its way off the field
       projectiles: [],
       effects: [],
       pendingBlasts: [],
@@ -160,6 +161,7 @@ export class Game {
     const w = this.world;
     w.enemies.length = 0;
     w.drops.length = 0;
+    w.debris.length = 0;
     w.projectiles.length = 0;
     w.effects.length = 0;
     w.mines.length = 0;
@@ -824,6 +826,7 @@ export class Game {
     // ---- per-frame entity bookkeeping ----
     for (const e of w.enemies) e.update(w, dt);
     for (const e of w.drops) e.update(w, dt);
+    for (const c of w.debris) c.update(w, dt);
     for (let i = w.effects.length - 1; i >= 0; i--) {
       w.effects[i].update(w, dt);
       if (w.effects[i].dead) w.effects.splice(i, 1);
@@ -918,6 +921,10 @@ export class Game {
     this.checkContact();
     this.sweep(w.enemies);
     this.sweep(w.drops);
+    // Debris keeps no ledger, so it gets a plain splice rather than sweep().
+    for (let i = w.debris.length - 1; i >= 0; i--) {
+      if (w.debris[i].dead) w.debris.splice(i, 1);
+    }
     updateFx(dt);
 
     this.updatePhase(real);
@@ -937,6 +944,17 @@ export class Game {
       integrate(b, dt);
     }
 
+    // Debris collides like everything else but is never clamped to the arena
+    // — leaving the field is how a chunk ends. It is appended past the end of
+    // the clamped run so the edge pass below can simply stop early.
+    const clamped = bodies.length;
+    for (const c of w.debris) {
+      if (c.dead) continue;
+      c.steer(w, dt);
+      integrate(c, dt);
+      bodies.push(c);
+    }
+
     bodies.push(w.shooter);
     // The decoy is a static body too, so things pile up against it instead of
     // drifting through it — and it takes the collision damage of the pile.
@@ -946,6 +964,10 @@ export class Game {
       if (a.dead || b.dead) return;
       const impact = resolvePair(a, b);
       if (impact <= 0) return;
+      // Wreckage bounces off things and hurts none of them, in either
+      // direction. Skipped here rather than in applyDamage so the object it
+      // struck is spared too.
+      if (a.inert || b.inert) return;
       const dmg = impactDamage(a, b, impact);
       if (dmg <= 0) return;
       const mx = (a.x + b.x) / 2;
@@ -964,10 +986,13 @@ export class Game {
     solveTethers(w);
 
     const boss = w.boss;
-    for (const b of bodies) {
-      let impact = clampToArena(b, w.width, STAGE_HEIGHT, w.floorY);
-      if (impact > 240) {
-        spark(b.x, b.y, spread(impact), spread(impact), b.type.glow, 0.18, 1.8);
+    for (let i = 0; i < bodies.length; i++) {
+      const b = bodies[i];
+      if (i < clamped) {
+        const impact = clampToArena(b, w.width, STAGE_HEIGHT, w.floorY);
+        if (impact > 240) {
+          spark(b.x, b.y, spread(impact), spread(impact), b.type.glow, 0.18, 1.8);
+        }
       }
       if (boss && !boss.dead && boss.intro >= 1) {
         const dx = b.x - boss.x;
@@ -1219,6 +1244,7 @@ export class Game {
         w.timeScale = 1;
         for (const e of w.enemies) { e.dead = true; e.dissolved = true; }
         for (const e of w.drops) { e.dead = true; e.dissolved = true; }
+        w.debris.length = 0;
         w.projectiles.length = 0;
         this.hud.showEnding(ENDING);
         this.hud.setBoss(false);
@@ -1359,7 +1385,7 @@ export class Game {
         `fps    ${this.fps.toFixed(0)}\n`
         + `phase  ${w.phase}\n`
         + `kills  ${w.kills}  released ${w.released}/${CFG.killGoal}\n`
-        + `obj    ${hostileCount(w)} hostile + ${w.enemies.length - hostileCount(w)} drift + ${w.drops.length} frag\n`
+        + `obj    ${hostileCount(w)} hostile + ${w.enemies.length - hostileCount(w)} drift + ${w.drops.length} frag + ${w.debris.length} wreck\n`
         + `shots  ${w.projectiles.length}\n`
         + `parts  ${fx.particles.active.length}\n`
         + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}\n`
@@ -1411,6 +1437,9 @@ export class Game {
       13 / w.scale,
     );
 
+    // Under the energy and the objects both: wreckage is scenery, and it must
+    // never sit on top of something you are meant to be aiming at.
+    for (const c of w.debris) c.draw(ctx);
     for (const e of w.drops) e.draw(ctx, w);
     for (const e of w.enemies) e.draw(ctx, w);
     if (w.boss && !w.boss.dead) w.boss.draw(ctx);
@@ -1685,6 +1714,14 @@ export class Game {
     spawnFormation(w, ENEMY_TYPES, 5);
   }
 
+  /** Place one object of a named type, for probing a single behaviour. */
+  debugSpawn(id, x, y) {
+    const w = this.world;
+    const t = ENEMY_TYPES.find((e) => e.id === id);
+    if (!t) return null;
+    return spawnOne(w, t, x ?? w.width / 2, y ?? ENTRY_Y + 120, { staged: false, spawnIn: 0.2 });
+  }
+
   debugFillField() {
     const w = this.world;
     while (hostileCount(w) < CFG.maxEnemies) {
@@ -1702,6 +1739,7 @@ export class Game {
     // and a live for..of would walk straight into them and kill those too.
     for (const e of [...w.enemies]) if (!e.dead) e.destroy(w);
     for (const e of [...w.drops]) if (!e.dead) e.destroy(w);
+    w.debris.length = 0;
   }
 
   debugThrowMine(kind = 'blast') {

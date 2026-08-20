@@ -6,6 +6,7 @@ import { CFG, ENEMY_TYPES, TYPE_BY_ID, ROUTES, HAIRLINE, massOf } from './config
 import { TAU, clamp, rand, randInt, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
 import { explode, hitBurst, spark, dot, shard as fxShard, ring, ripple, haul } from './fx.js';
 import { audio } from './audio.js';
+import { shed } from './debris.js';
 
 /**
  * The top of the visible field, in world units. Objects are queued above it
@@ -60,6 +61,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'blob': drawBlob(ctx, r, 0.6, 0); break;
     case 'bloom': drawBloom(ctx, r, 0.4, 0, t); break;
     case 'plated': drawPlated(ctx, r, 1); break;
+    case 'plate': drawPlate(ctx, r); break;
     case 'warden': {
       drawWardenCore(ctx, r);
       // the plates are what the entry is about, so they are in the portrait
@@ -609,7 +611,11 @@ export class Enemy {
       const child = TYPE_BY_ID[t.splits.type];
       // Children are glitch-causing objects too, so they come out of the same
       // quota. Near the end of the run a splitter simply sheds fewer.
-      const count = Math.min(t.splits.count, releasesLeft(world));
+      // A body carrying shards releases only the ones still on it: shoot the
+      // plates off a WARDEN and there are fewer left to come at you when the
+      // core finally goes.
+      const alive = this.shards ? this.shards.filter((sh) => sh.alive).length : t.splits.count;
+      const count = Math.min(t.splits.count, alive, releasesLeft(world));
       for (let i = 0; i < count; i++) {
         // a little over the cap: a split should not be silently swallowed
         if (hostileCount(world) >= CFG.maxEnemies + 8) break;
@@ -625,9 +631,14 @@ export class Enemy {
       }
     }
 
-    // Debris chips: destructible, pushable, do not count toward the tally.
-    // They carry the object's salvage between them, so what a thing is worth
-    // is what it was made of.
+    // Wreckage. Only the four largest objects shed it, and they shed a lot of
+    // it — the point is that a BULWARK coming apart looks like a BULWARK
+    // coming apart, and that it happens rarely enough to stay an event.
+    if (t.debris) shed(world, this, t.debris);
+
+    // Energy: destructible, pushable, does not count toward the tally. A body
+    // carries its worth between its pieces, so what a thing pays is what it
+    // was made of.
     const n = t.drops || 0;
     const worth = Math.max(n, Math.round(massOf(t, this.r) * CFG.energy.perMass));
     const each = Math.max(CFG.energy.minValue, Math.round(worth / Math.max(1, n)));
@@ -635,7 +646,7 @@ export class Enemy {
       if (world.drops.length >= CFG.maxDrops) break;
       const a = rand(0, TAU);
       const sp = rand(70, 240);
-      // A fraction of the parent, but never bigger than wreckage is allowed
+      // A fraction of the parent, but never bigger than energy is allowed
       // to draw. The ceiling is drawn rather than fixed: a flat clamp pinned
       // every chip off anything large to exactly the maximum, and a floor of
       // identical pieces reads as tiling rather than as wreckage.
@@ -696,6 +707,7 @@ export class Enemy {
       case 'blob': drawBlob(ctx, this.r, this.phase, world.time); break;
       case 'bloom': drawBloom(ctx, this.r, this.phase, world.time, t); break;
       case 'plated': drawPlated(ctx, this.r, hpFrac); break;
+      case 'plate': drawPlate(ctx, this.r); break;
       case 'warden': drawWardenCore(ctx, this.r); break;
       case 'prism': drawPrism(ctx, this.r); break;
       case 'herald': drawHerald(ctx, this.r, this.wardSpin || 0); break;
@@ -751,20 +763,21 @@ export class Enemy {
     // orbiting plates (unrotated frame)
     if (this.shards) {
       const orbit = this.orbitR;
+      const plate = TYPE_BY_ID.plate;
       ctx.strokeStyle = rgba(t.color, 0.9);
+      ctx.fillStyle = rgba(t.color, 0.16);
       ctx.lineWidth = HAIRLINE * 2.2;
-      ctx.beginPath();
       for (const sh of this.shards) {
         if (!sh.alive) continue;
-        const ca = Math.cos(sh.a);
-        const sa = Math.sin(sh.a);
-        const sx = this.x + ca * orbit;
-        const sy = this.y + sa * orbit;
-        // the plate is a bar tangent to its orbit
-        ctx.moveTo(sx + sa * 9, sy - ca * 9);
-        ctx.lineTo(sx - sa * 9, sy + ca * 9);
+        // Drawn as the PLATE it will become when the core goes, facing out
+        // along its orbit. A bar here and a shell segment loose on the field
+        // hid the fact that they are the same object.
+        ctx.save();
+        ctx.translate(this.x + Math.cos(sh.a) * orbit, this.y + Math.sin(sh.a) * orbit);
+        ctx.rotate(sh.a);
+        drawPlate(ctx, plate.r);
+        ctx.restore();
       }
-      ctx.stroke();
     }
 
     // The cable to the other half of a TOW pair, and the shell/threads of a
@@ -971,6 +984,31 @@ function drawWardenCore(ctx, r) {
   ctx.stroke();
   ctx.beginPath();
   ctx.arc(0, 0, r * 0.3, 0, TAU);
+  ctx.fill();
+}
+
+/**
+ * PLATE: a curved section of shell, which is what it is — one of the three
+ * pieces a WARDEN's armour comes apart into. Drawn as an arc band rather than
+ * a solid so it never gets mistaken for a small whole object.
+ */
+function drawPlate(ctx, r) {
+  const outer = r;
+  const inner = r * 0.52;
+  const half = 1.15; // ~130 degrees of shell
+  ctx.beginPath();
+  ctx.arc(0, 0, outer, -half, half);
+  ctx.arc(0, 0, inner, half, -half, true);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Two rivets, so the curve reads as plating and not as a crescent.
+  ctx.beginPath();
+  const mid = (outer + inner) / 2;
+  for (const a of [-half * 0.55, half * 0.55]) {
+    ctx.moveTo(Math.cos(a) * mid + r * 0.1, Math.sin(a) * mid);
+    ctx.arc(Math.cos(a) * mid, Math.sin(a) * mid, r * 0.1, 0, TAU);
+  }
   ctx.fill();
 }
 

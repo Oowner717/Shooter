@@ -904,6 +904,36 @@ The opening says it, gated on the first kill so there is energy on the floor to
 point at: *"Broken objects leave ENERGY. It is not an enemy. It drifts to you."*,
 then *"PULSE takes in the energy near you. ENERGY is the green number."*
 
+### Wreckage, which is not energy
+
+Build 69 gave the largest objects a second thing to leave behind. **Debris** is
+the structure coming apart: jagged unlit plates in the object's own colour that
+tumble outward, bounce off whatever they meet, and drift off the field. It is
+inert in every direction — it cannot be collected, it cannot be shot, it cannot
+hurt you, and nothing it touches takes damage from it. `CFG.debris` holds the
+whole of it, and `Chunk` in `src/debris.js` is deliberately *not* an `Enemy`:
+giving a chunk health and steering in order to reuse the class is exactly how a
+thing that should never be shootable ends up shootable.
+
+**Only four objects shed it, and they shed a lot.** BULWARK 16, a TOW's mass 12,
+SCION 11, BLOOM 9. That is the point — a BULWARK breaking into two dozen glowing
+collectables reads as a payout, and a BULWARK breaking into two dozen tumbling
+plates reads as a BULWARK breaking. Because the four are uncommon, wreckage is
+an event rather than constant litter. Ninety chunks can be loose at once
+(`debris.max`); a saturated debris field on top of a full enemy field costs
+about four frames a second.
+
+**It is drawn as the opposite of energy.** Energy is a filled core in a pulsing
+halo, additive, at full brightness. A chunk is an outline-only polygon of four
+to seven fixed sides, filled with the background colour and stroked at half
+alpha, with no glow at all. One of them lights up and the other does not, and
+that is the whole of telling them apart at a glance.
+
+**It is the one body allowed to leave the arena.** In `physicsStep` the chunks
+are appended past the end of the clamped run, so the edge pass simply stops
+early — they collide with everything and are clamped by nothing. Off the field,
+or fourteen seconds, whichever comes first.
+
 ### What is on the field at once
 
 Eleven types unlock over a run, and until build 63 every one of them was in the
@@ -1019,7 +1049,10 @@ They unlock progressively as the count climbs.
 - **SPLITTER** — bursts into four motes that inherit its momentum.
 - **BLOOM** — detonates on death and takes its neighbours with it. Chains.
 - **BULWARK** — armoured, enormous mass. Bolts barely move it; PULSE does.
-- **WARDEN** — three orbiting plates that eat bolts. Strip them first.
+- **WARDEN** — three orbiting PLATEs that eat bolts. Strip them first, because
+  the ones still on it when the core dies come off as bodies and come at you.
+  Half as common as it was (weight 8 → 4), since one WARDEN is now up to four
+  objects and each PLATE takes a place in the tally.
 - **PRISM** — reflects glancing shots. Hit it square, or bank the ricochet
   into something else.
 - **HERALD** — a beacon. It hardens the nearest few hostiles around it, and
@@ -1071,7 +1104,9 @@ arcs, and all of them still arrive.
 
 Everything leaves **energy**: small bright bodies that are themselves
 destructible, pushable, and dangerous to each other. Up to 128 can be loose at
-once, and a bulwark alone sheds fourteen.
+once, and a bulwark alone sheds fourteen. The four largest also leave
+**wreckage**, which is inert and is not budgeted at all — see *Wreckage, which
+is not energy*.
 
 Drift and energy are budgeted **separately** from hostiles — `hostileCount()`
 is what the spawn director measures against `popStart`/`popEnd`, so the amount
