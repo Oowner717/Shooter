@@ -109,3 +109,12 @@ export function drawGlow(ctx, color, x, y, r, alpha = 1) {
   ctx.drawImage(s, x - r, y - r, r * 2, r * 2);
   ctx.globalAlpha = 1;
 }
+
+/**
+ * An inline SVG mark, sized by whatever is drawing it and inheriting its
+ * colour. Three files were each carrying their own copy of this — two of them
+ * byte-identical — which is three places for a stroke width to drift.
+ */
+export const svgMark = (body, w = 1.7) =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}"
+     stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;

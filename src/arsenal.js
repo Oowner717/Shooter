@@ -10,9 +10,10 @@
 // toggle. `group` decides where it sits: mines to the left of the two that run
 // on their own, ammunition to the right of them.
 
-const svg = (body, w = 1.8) =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}"
-     stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+import { svgMark } from './util.js';
+
+/** The arsenal's marks are a hair heavier than the upgrade marks. */
+const svg = (body, w = 1.8) => svgMark(body, w);
 
 export const ICON = {
   // A charge that sits where it lands and goes off once, hard.

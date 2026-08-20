@@ -49,10 +49,6 @@ export function readRun() {
   }
 }
 
-export function hasRun() {
-  return !!readRun();
-}
-
 export function forgetRun() {
   try {
     localStorage.removeItem(KEY);

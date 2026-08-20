@@ -9,6 +9,7 @@
 // adding an upgrade is an entry plus one place that reads it.
 
 /** Defaults. Anything not listed is off. */
+import { svgMark } from './util.js';
 import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
 import { LOCKABLE, FIRST_USE } from './tutorial.js';
@@ -82,9 +83,8 @@ export function freshUpgrades() {
  * name is slower to recognise than a shape — especially for the repeatable
  * ones, where what matters is "the one I already have three of".
  */
-const g = (body, w = 1.7) =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}"
-     stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+
+const g = svgMark;
 
 const MARK = {
   // --- ammo ---
@@ -323,7 +323,15 @@ export const BY_ID = new Map(
   [...ALL_UPGRADES, ...UNLOCKS, ...CHARGES].map((u) => [u.id, u]),
 );
 
-/** Everything, flat, for the tests and the record. */
+/*
+ * Everything, flat, for the tests and the record.
+ *
+ * UPGRADES, AXES, UNLOCKS, CHARGES and ALL_UPGRADES are exported and nothing
+ * in src/ imports them: the per-feature suite does, and they are the seam it
+ * reads a run's whole offer table through. Deleting them because a dead-export
+ * scan flags them would take the tests with them. Same for events.rollSmall
+ * and save.captureRun.
+ */
 
 
 /**
@@ -346,7 +354,13 @@ const heldCount = (taken, id) => taken.reduce((n, t) => n + (t === id ? 1 : 0), 
 /** The card as it reads at the level about to be offered. `n` is 0-based. */
 const atLevel = (u, n) => (u.tiers && u.tiers[n] ? { ...u, ...u.tiers[n] } : u);
 
-const pick = (pool) => (pool.length ? pool[(Math.random() * pool.length) | 0] : null);
+/*
+ * util.js exports a `pick` too, and it returns undefined on an empty array
+ * rather than null. Two functions of the same name with different answers to
+ * the same question is a trap, so this one is named for what it is: every
+ * caller here tests the result, and null is what they test for.
+ */
+const pickOrNone = (pool) => (pool.length ? pool[(Math.random() * pool.length) | 0] : null);
 
 /** The stat upgrades, one axis at a time, skipping what is already spent. */
 const statPool = (taken, axis) =>
@@ -373,15 +387,15 @@ export function rollLarge(taken, world) {
   const out = [];
   const add = (u) => { if (u && !out.some((o) => o.id === u.id)) out.push(u); };
 
-  add(pick(UNLOCKS.filter((u) => !unlocked.has(u.key))));
-  add(pick(CHARGES.filter((c) => unlocked.has(c.key) && !held.has(c.id))));
+  add(pickOrNone(UNLOCKS.filter((u) => !unlocked.has(u.key))));
+  add(pickOrNone(CHARGES.filter((c) => unlocked.has(c.key) && !held.has(c.id))));
 
   // Whatever is still missing comes off the stat table, one axis at a time so
   // three stat cards are never three of the same kind.
   const axes = [...AXES].sort(() => Math.random() - 0.5);
   for (const axis of axes) {
     if (out.length >= 3) break;
-    add(pick(statPool(taken, axis).filter((u) => !out.some((o) => o.id === u.id))));
+    add(pickOrNone(statPool(taken, axis).filter((u) => !out.some((o) => o.id === u.id))));
   }
   return out;
 }

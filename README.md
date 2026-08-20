@@ -1203,3 +1203,35 @@ The smoke test drives the game through every phase in an iPhone-sized viewport,
 writes screenshots to `/tmp/sim7749-shots`, and exits non-zero on any console
 error. It needs Playwright available (`NODE_PATH` may need to point at a global
 install).
+
+## House-keeping
+
+A cleanup pass in build 66 fixed six things worth not letting back in:
+
+- **One inline-SVG helper, not three.** `arsenal.js`, `events.js` and
+  `upgrades.js` each carried their own copy; two were byte-identical. It lives
+  in `util.js` as `svgMark` now. The arsenal's marks are drawn a hair heavier
+  and keep that by passing a width, which is the only difference there ever was.
+- **One `pick`, or two clearly different names.** `util.js` exports `pick`,
+  which returns `undefined` on an empty array, and `upgrades.js` had a local
+  `pick` returning `null` — two functions of one name giving different answers
+  to the same question. The local one is `pickOrNone` now, which is what every
+  caller in that file tests for.
+- **`.fx-corona` and `.fx-overdraw` had no tone.** Build 65 added two chips to
+  the timed readout and styled neither, so both fell back to the default green
+  and read as the same thing. Every entry in `events.TIMED` needs a line in
+  `styles.css`, and the suite now checks that no two share a tone.
+- **A stale duplicate doc block.** `CFG.rounds.tithe` carried two comments, the
+  first describing the round as it behaved before build 53 — no ramp, just a
+  salvage mark. Gone.
+- **A dead branch.** `opt.stacks === false` was checked in `showOffer` and set
+  by nothing since the level system landed; `levels === 1` covers it.
+- **Dead exports.** `save.hasRun`, `loadout.ownedOf` and the `rollSmallFor`
+  pass-through wrapper are gone; `enemies.spawnTow` and `loadout.slotOf` are
+  used only inside their own files and are no longer exported.
+
+What a dead-export scan still flags — `UPGRADES`, `AXES`, `UNLOCKS`, `CHARGES`,
+`ALL_UPGRADES`, `events.rollSmall`, `save.captureRun` — is exported for the
+test suite, which lives in the session scratchpad rather than the repo. There
+is a note at each site saying so, because deleting them on the strength of a
+scan would take the tests with them.

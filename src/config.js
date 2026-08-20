@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '65';
+export const BUILD = '66';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -232,11 +232,6 @@ export const CFG = {
       damage: 10,
       patch: { r: 92, life: 4.5, dps: 46 },
     },
-    /*
-     * TITHE. It barely hurts. What it does is mark a body, and a marked body
-     * pays several times over when it finally comes apart — by your hand or
-     * anyone's. The round for a run that is being built rather than survived.
-     */
     /*
      * TITHE. It barely hurts on the first hit, and that is the point: every
      * hit on the same body deepens the mark, and a deeper mark takes more from

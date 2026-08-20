@@ -483,8 +483,7 @@ export class Hud {
         // direction — that a second one is wasted, or that it is quadruple.
         + (opt.stacks === 'time'
           ? `<span class="offerTag">${opt.unit === 'shots' ? 'SHOTS' : 'TIME'} STACKS, NOT EFFECT</span>`
-          : opt.stacks === false || opt.levels === 1
-            ? '<span class="offerTag">DOES NOT STACK</span>' : '')
+          : opt.levels === 1 ? '<span class="offerTag">DOES NOT STACK</span>' : '')
         + '</span>'
         // How far along this one is. An upgrade with a ceiling says which
         // level is on the card and how many there are, because the question

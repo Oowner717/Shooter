@@ -28,7 +28,7 @@ export function freshLoadout() {
   };
 }
 
-export function slotOf(loadout, key) {
+function slotOf(loadout, key) {
   const g = groupOf(key);
   return g ? loadout[g].indexOf(key) : -1;
 }
@@ -66,7 +66,3 @@ export function drop(loadout, key) {
   return true;
 }
 
-/** Everything of one kind the turret owns, in the table's own order. */
-export function ownedOf(world, group) {
-  return ARSENAL.filter((a) => a.group === group && world.unlocked.has(a.key));
-}

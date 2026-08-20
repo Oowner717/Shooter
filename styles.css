@@ -1893,10 +1893,14 @@ body.booting #pendingBtn {
   font-variant-numeric: tabular-nums;
 }
 
-/* Gold for the one that changes the gun, violet for the one that changes the
-   buttons — the same split the ability bar already uses. */
+/* One tone per boost, matching the mark on the card it came from. Every entry
+   in events.js TIMED needs a line here or it falls back to the default green
+   and two boosts read as the same thing — which is what CORONA and OVERDRAW
+   did between builds 65 and 66. */
 .fx-surge { --tone: #ffd166; }
 .fx-haste { --tone: #c77dff; }
+.fx-corona { --tone: #ff9f5c; }
+.fx-overdraw { --tone: #bff4ff; }
 
 @keyframes fxIn {
   from { opacity: 0; transform: translateX(-8px); }

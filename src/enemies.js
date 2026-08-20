@@ -1201,7 +1201,7 @@ export function spawnOne(world, type, x, y, opts = {}) {
  * splitter's children are.
  */
 /** Exported for the test suite, which builds a TOW pair directly. */
-export function spawnTow(world, x, y, opts = {}) {
+function spawnTow(world, x, y, opts = {}) {
   const head = TYPE_BY_ID.tow;
   const massType = TYPE_BY_ID[head.tows.type];
   const len = head.tows.length;

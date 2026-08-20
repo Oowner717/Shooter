@@ -8,6 +8,7 @@
 // indefinitely, because the whole point of this game is that you can put it
 // down. An offer left untaken for eight hours is still there.
 
+import { svgMark } from './util.js';
 import { CFG } from './config.js';
 import { ABILITIES } from './abilities.js';
 import { rollLarge } from './upgrades.js';
@@ -24,9 +25,8 @@ const MINE_IDS = ARSENAL.filter((a) => a.kind === 'mine').map((a) => a.key);
  * showed a symbol, which read as something missing rather than something
  * simpler.
  */
-const g = (body, w = 1.7) =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}"
-     stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+
+const g = svgMark;
 
 const TICK = {
   // cooldowns halved: a clock with the charge run through it
@@ -124,11 +124,7 @@ const SMALL = [
   },
 ];
 /** Three of the small tier, never the same one twice in one offer. */
-export function rollSmallFor(world) {
-  return rollSmall(world);
-}
-
-function rollSmall(world) {
+export function rollSmall(world) {
   // A turret with no mine unlocked has nowhere to put three of them, and an
   // option that does nothing is worse than one fewer option.
   // Any mine, not the four there used to be: a turret carrying only THORN had
