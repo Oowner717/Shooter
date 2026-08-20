@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '56';
+  var BUILD = '57';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -181,7 +181,14 @@
         <!-- Filled from CONTROLS in src/narrative.js, which the menu's SYSTEM
              tab reads too, so the two cannot drift apart. -->
         <ul class="bootKeys"></ul>
-        <button id="startBtn">BEGIN SIMULATION</button>
+        <!-- CONTINUE is shown only when there is a run on disk to pick up;
+             see Hud.offerResume(). The two share one row so that offering a
+             resume costs no vertical space -- on a 568-tall screen the panel
+             already ends level with the fold. BEGIN always starts a clean one. -->
+        <div class="bootGo">
+          <button id="resumeBtn" hidden>CONTINUE</button>
+          <button id="startBtn">NEW RUN</button>
+        </div>
         <div class="bootFoot">Add to Home Screen for fullscreen playback.</div>
       </div>
     </section>

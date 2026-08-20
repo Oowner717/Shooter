@@ -151,6 +151,20 @@ export class Offers {
     return out;
   }
 
+  /**
+   * Put an offer of this tier back on the queue with a fresh roll. Used when a
+   * saved run is picked up: the three cards on an unopened offer were never
+   * seen, so re-rolling them costs the player nothing and saves the store from
+   * having to serialise a card.
+   */
+  requeue(world, tier) {
+    if (tier === 'large') {
+      this.queue.push({ tier, options: rollLarge(this.taken, world), held: this.held() });
+    } else {
+      this.queue.push({ tier, options: rollSmall(world) });
+    }
+  }
+
   /** @returns the option taken, or null. */
   take(world, index) {
     const offer = this.queue[0];

@@ -16,14 +16,18 @@ import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator, ENDING } from './narrative.js';
 import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
 import { codex, cleared, markCleared, forgetCleared, taught, markTaught, forgetTaught } from './codex.js';
+import { readRun, saveRun, forgetRun } from './save.js';
 import { Offers } from './events.js';
-import { freshUpgrades } from './upgrades.js';
+import { freshUpgrades, BY_ID } from './upgrades.js';
 import { SCRIPT, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
+
+/** Seconds between one automatic checkpoint and the next. */
+const SAVE_EVERY = 4;
 
 export class Game {
   constructor(canvas) {
@@ -240,6 +244,7 @@ export class Game {
     w.autoSteering = false;
 
     this.mineTimer = 0;
+    this.saveTimer = SAVE_EVERY;
     this.snapshot = null;
     this.endStage = 0;
     this.endTimer = 0;
@@ -261,12 +266,96 @@ export class Game {
     audio.resume();
     this.hud.hideBoot();
     this.reset();
+    forgetRun();
     this.hud.alert('SIMULATION ONLINE', 'info', 2.6);
+  }
+
+  /**
+   * Pick a saved run back up. reset() builds a whole fresh run first and this
+   * then overwrites the parts that were kept, because a resumed run and a new
+   * one differ in what has happened rather than in how anything works — every
+   * subsystem still wants its own reset before it is told where it is.
+   *
+   * The field itself is not restored, and that is the design: you come back to
+   * your count, your kit and your salvage, standing on clear ground.
+   */
+  resume() {
+    const d = readRun();
+    if (!d) return this.start();
+    audio.init();
+    audio.resume();
+    this.hud.hideBoot();
+    this.reset();
+
+    const w = this.world;
+    // The permanent tier is replayed as decisions rather than restored as
+    // numbers: this rebuilds world.up, the ability charges and the held counts
+    // from the one table that defines them.
+    for (const id of d.taken) {
+      const u = BY_ID.get(id);
+      if (!u) continue;
+      try { u.apply(w.up, w); } catch { /* a card from a table that has moved on */ }
+      w.offers.taken.push(id);
+    }
+    // ...and then what was actually owned and carried wins over whatever the
+    // replay happened to place, because a loadout is a decision too.
+    w.unlocked = new Set(d.unlocked);
+    for (const k of STARTING) w.unlocked.add(k);
+    w.loadout = { mines: [...d.loadout.mines], ammo: [...d.loadout.ammo] };
+
+    w.kills = d.kills;
+    w.released = d.released;
+    w.time = d.time || 0;
+    w.salvage = d.salvage;
+    w.ledger = d.ledger;
+    w.reclaimed = d.reclaimed;
+    w.nextStoryAt = d.nextStoryAt;
+    w.counted = !!d.counted;
+    // A loaded round with no cell on the strip is a broken state — the turret
+    // is meant always to have a round it can actually see. The save cannot
+    // produce one today, but a guard here is a line of code and the state it
+    // prevents is a run you cannot shoot with.
+    w.round = carried(w.loadout, d.round) ? d.round : (w.loadout.ammo.find(Boolean) || 'standard');
+    w.mine = carried(w.loadout, d.mine) ? d.mine : null;
+    w.autoAim = !!d.autoAim;
+    w.autoFire = !!d.autoFire;
+    w.offers.nextSmall = d.nextSmall;
+    w.offers.nextLarge = d.nextLarge;
+    for (const tier of d.queued || []) w.offers.requeue(w, tier);
+    if (w.narrator) w.narrator.index = d.story || 0;
+
+    // The opening is a first-run thing and a resumed run is not a first run.
+    this.teaching = false;
+    this.scriptStep = d.scriptStep || 0;
+    this.autoHinted = {};
+    for (const k of d.hinted || []) this.autoHinted[k] = true;
+
+    this.hud.buildStrip();
+    for (const k of [...MINE_KEYS, ...ROUND_KEYS]) this.hud.setToggle(k, false);
+    this.hud.setToggle('standard', w.round === 'standard');
+    for (const k of ROUND_KEYS) this.hud.setToggle(k, w.round === k);
+    for (const k of MINE_KEYS) this.hud.setToggle(k, w.mine === k);
+    this.hud.setToggle('autoAim', w.autoAim);
+    this.hud.setToggle('autoFire', w.autoFire);
+    this.hud.setKills(w.kills, w.endless ? null : CFG.killGoal);
+    this.hud.setSalvage(w.salvage);
+    this.hud.setPending(w.offers.pending, w.offers.next);
+    this.hud.syncAbilities(w.abilities);
+    this.hud.alert('SESSION RESTORED', 'info', 2.6);
+  }
+
+  /**
+   * Write the run down. Called on a slow timer, and again the moment the page
+   * is hidden — on a phone that is the last thing anything reliably gets.
+   */
+  checkpoint() {
+    saveRun(this.world, this);
   }
 
   restart() {
     this.hud.hideEnding();
     this.reset();
+    forgetRun();
     audio.resume();
     this.hud.alert('SIMULATION ONLINE', 'info', 2.6);
   }
@@ -515,6 +604,9 @@ export class Game {
       if (opt.axis === 'UNLOCK' && opt.key) {
         setTimeout(() => this.hud.flashUnlocked(opt.key), 260);
       }
+      // Not worth waiting four seconds for: this is the decision a player
+      // would be most annoyed to lose.
+      this.checkpoint();
     }
     return opt;
   }
@@ -685,6 +777,15 @@ export class Game {
     }
 
     w.time += dt;
+
+    // The run writes itself down every few seconds. Off the world clock, so a
+    // paused game is not writing, and cheap enough at this cadence that the
+    // frame never notices: the whole record is a few hundred bytes.
+    this.saveTimer -= real;
+    if (this.saveTimer <= 0) {
+      this.saveTimer = SAVE_EVERY;
+      this.checkpoint();
+    }
 
     // The opening script. Runs off the world clock so it holds with the menu.
     // The script waits on the count but is paced by the clock, so an entry
@@ -1111,6 +1212,9 @@ export class Game {
 
   onBossDead() {
     markCleared();
+    // The count is done. There is nothing left to pick up, and a save that
+    // outlived its run would offer to resume a finished one.
+    forgetRun();
     // Hand the world back to the sky. Both eased, so it drains out of the
     // substrate rather than cutting.
     background.setDread(0);

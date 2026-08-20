@@ -4,11 +4,12 @@
 import { ABILITIES } from './abilities.js';
 import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
-import { BUILD } from './config.js';
+import { BUILD, CFG } from './config.js';
 import { clamp } from './util.js';
 import { Menu } from './menu.js';
 import { holdFor, STACK } from './tutorial.js';
 import { SLOTS, carried, freeSlot } from './loadout.js';
+import { readRun } from './save.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -70,6 +71,7 @@ export class Hud {
       dbgStats: $('dbgStats'),
       boot: $('boot'),
       startBtn: $('startBtn'),
+      resumeBtn: $('resumeBtn'),
       endScreen: $('endScreen'),
       endText: $('endText'),
       resetBtn: $('resetBtn'),
@@ -113,6 +115,8 @@ export class Hud {
     this.el.offerScrim.addEventListener('click', () => game.closeOffer());
 
     this.el.startBtn.addEventListener('click', () => game.start());
+    this.el.resumeBtn.addEventListener('click', () => game.resume());
+    this.offerResume();
     this.el.resetBtn.addEventListener('click', () => game.restart());
     $('dbgClose').addEventListener('click', () => this.toggleDebug(false));
   }
@@ -750,6 +754,29 @@ export class Hud {
   }
 
   // ------------------------------------------------------------- screens
+
+  /**
+   * A saved run gets a button of its own on the title screen, with the count
+   * on it. Two buttons rather than one that changes meaning: BEGIN has to keep
+   * meaning "start a clean one", because the alternative is a player tapping
+   * the only button on the screen and silently losing a run.
+   */
+  offerResume() {
+    const d = readRun();
+    const b = this.el.resumeBtn;
+    if (!b) return;
+    if (!d) {
+      b.hidden = true;
+      this.el.startBtn.textContent = 'BEGIN SIMULATION';
+      return;
+    }
+    const goal = d.endless ? '' : ` / ${CFG.killGoal}`;
+    b.textContent = `CONTINUE · ${d.kills}${goal}`;
+    b.hidden = false;
+    // Beside a CONTINUE the long form does not fit, and the short form is the
+    // more honest label anyway: from here, that button is a new run.
+    this.el.startBtn.textContent = 'NEW RUN';
+  }
 
   hideBoot() {
     document.body.classList.remove('booting');

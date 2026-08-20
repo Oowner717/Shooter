@@ -1619,7 +1619,7 @@ body.amendPending #abilityHint:not(.tutorial) {
   margin-right: 8px;
 }
 
-#startBtn, #resetBtn {
+#startBtn, #resetBtn, #resumeBtn {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
@@ -1632,7 +1632,35 @@ body.amendPending #abilityHint:not(.tutorial) {
   color: var(--accent);
   text-shadow: 0 0 12px rgba(89, 224, 255, 0.6);
 }
-#startBtn:active, #resetBtn:active { background: rgba(89, 224, 255, 0.3); }
+#startBtn:active, #resetBtn:active, #resumeBtn:active { background: rgba(89, 224, 255, 0.3); }
+
+/* CONTINUE is the primary when there is something to continue: it carries the
+   count, so it reads as "your run" rather than as a second start button. BEGIN
+   drops back to an outline beside it, because from that screen it is now the
+   destructive one. */
+.bootGo { display: flex; gap: 8px; align-items: stretch; }
+.bootGo button { min-width: 0; white-space: nowrap; }
+#resumeBtn { flex: 1.35 1 0; }
+#resumeBtn:not([hidden]) ~ #startBtn { flex: 1 1 0; }
+#resumeBtn {
+  border-color: #ffcf5c;
+  background: rgba(255, 207, 92, 0.12);
+  color: #ffcf5c;
+  text-shadow: 0 0 12px rgba(255, 207, 92, 0.55);
+  letter-spacing: 0.2em;
+}
+#resumeBtn:active { background: rgba(255, 207, 92, 0.3); }
+/* Beside a CONTINUE, BEGIN is the destructive one: it drops the saved run.
+   It drops to an outline and to the word alone so the pair cannot be tapped
+   the wrong way round in a hurry. */
+#resumeBtn:not([hidden]) ~ #startBtn {
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  background: transparent;
+  border-color: rgba(89, 224, 255, 0.4);
+  color: rgba(191, 244, 255, 0.75);
+  text-shadow: none;
+}
 
 .bootFoot {
   margin-top: 14px;
@@ -1762,7 +1790,13 @@ body.booting #pendingBtn {
   .bootBody { font-size: 10.5px; line-height: 1.6; margin-bottom: 14px; }
   .bootKeys { margin-bottom: 14px; }
   .bootKeys li { font-size: 9.5px; line-height: 1.5; padding: 4px 0; }
+  /* At 320 the panel already ends level with the fold, so the pair has to
+     cost no more height than the single button did. */
+  .bootGo button { padding: 12px 6px; }
   #startBtn { padding: 13px; }
+  #resumeBtn:not([hidden]), #resumeBtn:not([hidden]) ~ #startBtn { padding: 12px 6px; }
+  #resumeBtn { font-size: 10px; letter-spacing: 0.12em; }
+  #resumeBtn:not([hidden]) ~ #startBtn { font-size: 9px; letter-spacing: 0.1em; }
 
   /* The opening lines carry their own break, and at 320 the plate's padding
      was enough to wrap each half again — four rendered lines for a two-line

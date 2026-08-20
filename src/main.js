@@ -29,10 +29,15 @@ document.addEventListener('touchmove', (e) => {
 }, { passive: false });
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) return;
+  // Going away: write the run down now. On iOS this is the last event the page
+  // is guaranteed to get -- a backgrounded PWA can be killed without another
+  // frame, a beforeunload or anything else, so a save on the way out is the
+  // only one that can be relied on.
+  if (document.hidden) { game.checkpoint(); return; }
   last = performance.now();
   audio.resume();
 });
+window.addEventListener('pagehide', () => game.checkpoint());
 
 // -------------------------------------------------------------- frame loop
 

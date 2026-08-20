@@ -308,9 +308,21 @@ export const CHARGES = ABILITIES.map((a) => ({
   icon: a.icon,
   apply: (up, world) => { world.abilities.grantCharge(a.id); },
 }));
+export const ALL_UPGRADES = AXES.flatMap((a) => UPGRADES[a].map((u) => ({ ...u, axis: a })));
+
+/**
+ * Every permanent card an AMENDMENT can hand over, by id. A saved run keeps
+ * the ids it accepted rather than the numbers they produced, and replaying
+ * them through this rebuilds world.up, the ability charges and the held counts
+ * from the table that defines them — so a retuned upgrade is retuned for a
+ * resumed run too, instead of the save carrying a stale figure forever.
+ */
+export const BY_ID = new Map(
+  [...ALL_UPGRADES, ...UNLOCKS, ...CHARGES].map((u) => [u.id, u]),
+);
 
 /** Everything, flat, for the tests and the record. */
-export const ALL_UPGRADES = AXES.flatMap((a) => UPGRADES[a].map((u) => ({ ...u, axis: a })));
+
 
 /**
  * One from each axis. An upgrade that cannot stack is not offered twice; the

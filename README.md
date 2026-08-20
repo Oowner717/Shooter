@@ -89,6 +89,48 @@ reaching into the turret's column.
 The whole thing is built from `ARSENAL` in `src/arsenal.js`. A new round or
 mine is a table entry and no markup.
 
+### Saving a run
+
+**The run writes itself down, and the title screen offers it back.** This is
+played on a phone, in sittings, and a backgrounded PWA can be killed between
+one glance and the next without ever being told. Losing a two-hundred-kill run
+to that is not a difficulty setting.
+
+It is a **checkpoint, not a snapshot**. What is kept is the progress — the
+count, the salvage, what has been unlocked, what is on the strip, which round
+and mine are loaded, the two running toggles, the offer clocks and anything
+queued — and not the field. The objects in the air, the barrel's angle, a mine
+mid-flight: none of it is restored, because restoring a live field is a great
+deal of machinery for a moment nobody is attached to. **You come back to your
+count, your kit and your salvage, standing on clear ground.**
+
+The permanent tier is stored as **decisions rather than numbers**. `taken` is
+the list of AMENDMENT ids accepted, in order, and `resume()` replays them
+through `BY_ID` in `src/upgrades.js` to rebuild `world.up`, the ability charges
+and the held counts from the one table that defines them. A saved figure would
+go stale the moment an upgrade was retuned; a saved decision does not. `resume()`
+runs a full `reset()` first and then overwrites what was kept, because a
+resumed run and a new one differ in what has happened, not in how anything
+works — every subsystem still wants its own reset before it is told where it is.
+
+Written to `sim7749-run`, about 600 bytes. It saves every four seconds off the
+world clock, immediately on taking a permanent card, and again on
+`visibilitychange` and `pagehide` — on iOS that last one is the only event the
+page is guaranteed to get on the way out. It is only ever written from
+`staging` or `lull`: mid-boss and mid-ending are not places to be picked up
+from. It is dropped on BEGIN, on RESET SIMULATION, and when ORDINAL falls.
+
+A save from another build is **discarded rather than migrated**. The tables it
+names — round keys, mine keys, upgrade ids — are exactly what changes between
+builds, and half-restoring a run is worse than starting one. So is a save that
+names a round no longer on the strip: the turret falls back to something it
+actually has a cell for rather than loading a round it cannot see.
+
+On the title screen a saved run gets **its own button**, carrying the count.
+Two buttons rather than one that changes meaning, because the alternative is a
+player tapping the only button on the screen and silently losing a run — and
+they share one row, since at 320x568 the panel already ends level with the fold.
+
 ### The loadout
 
 **The strip shows what you are carrying, not what you own.** Those were the
