@@ -684,40 +684,34 @@ body.menuOpen #quickBar { pointer-events: none; }
 }
 #pendingBtn b[hidden] { display: none; }
 .pendingText { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-/* Only the permanent tier says what it is; a top-up is one word. */
-#pendingSub { display: none; }
 
 /*
- * A permanent one. Bigger plate, gold, and it says out loud what it is —
- * the only thing in a run that is kept, against a queue of things that are
- * not. It also never settles: the reminder pulse runs for as long as it is
- * unclaimed, because an offer that never expires can otherwise be forgotten
- * about ten minutes after the one moment it announced itself.
+ * A permanent one. Gold, and it never settles: the reminder pulse runs for as
+ * long as it is unclaimed, because an offer that never expires can otherwise
+ * be forgotten about ten minutes after the one moment it announced itself.
+ *
+ * It used to be a noticeably bigger plate carrying a second line — "permanent
+ * · choose one" — on the argument that the size was the announcement. It sat
+ * on the field for as long as the offer went unclaimed, which is the whole
+ * point of it and also the reason the size was the wrong lever: an
+ * announcement is a moment and that was a permanent slab across the left of
+ * the play area. The announcement is carried by things that are moments — the
+ * bloom on arrival, the gold frame that runs round the screen — and the plate
+ * that stays behind is now the same size as a top-up, told apart by colour and
+ * by the pulse rather than by size. The second line went with it: the
+ * opening already says what an AMENDMENT is, and the sheet it opens says
+ * "permanent · select one" across the top.
  */
 #pendingBtn.large {
-  /* The plate is taller and wider than the chip, and at 320 its bottom-right
-     corner reached the turret's muzzle. It lifts clear rather than shrinking:
-     the size is the announcement. Measured at 320x568, the tightest. */
-  bottom: calc(var(--safe-b) + var(--bar-h) + 186px);
   border-color: rgba(255, 207, 92, 0.85);
   border-width: 1.5px;
   background: rgba(30, 20, 4, 0.94);
   color: #ffcf5c;
-  font-size: 9.5px;
-  padding: 9px 13px;
-  box-shadow: 0 0 13px rgba(255, 207, 92, 0.18);
+  box-shadow: 0 0 11px rgba(255, 207, 92, 0.16);
   animation: pendingIn 0.3s ease-out, amendRemind 7.5s 0.3s infinite ease-in-out;
 }
 #pendingBtn.large b {
   background: rgba(255, 207, 92, 0.24);
-  font-size: 11px;
-}
-#pendingBtn.large #pendingSub {
-  display: block;
-  font-style: normal;
-  font-size: 6.5px;
-  letter-spacing: 0.14em;
-  color: rgba(255, 207, 92, 0.66);
 }
 
 /* The arrival itself: the plate blooms once and throws a ring off its edge. */
@@ -1446,8 +1440,12 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
  * is a one-line first-use note that is up for nine seconds; nobody will see it
  * shift. Measured at 320x568, where the gap is tightest.
  */
+/* Build 61: the permanent plate is the same height as a top-up now, and sits
+   at the same offset, so there is nothing for the band to clear. Kept as a
+   no-op hook rather than deleted -- setPending still sets the class, and the
+   next thing that needs the band moved will want it. */
 body.amendPending #abilityHint:not(.tutorial) {
-  bottom: calc(var(--safe-b) + var(--bar-h) + 242px);
+  bottom: calc(var(--safe-b) + var(--bar-h) + 190px);
 }
 
 /*

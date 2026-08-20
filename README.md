@@ -466,6 +466,19 @@ minutes after the one moment it announced itself. A permanent one also **jumps
 the queue**: the top-ups it steps in front of lose nothing by waiting, and the
 button can then say AMENDMENT and mean it.
 
+**The announcement is the moments, not the plate.** Until build 61 the
+permanent chip was a noticeably larger slab carrying a second line —
+"permanent · choose one" — on the argument that the size was the announcement.
+The trouble is that everything else in that list is a moment and the plate is
+not: it sits on the field for as long as the offer goes unclaimed, which is the
+whole point of it and also why size was the wrong lever for saying "look at
+this". It is now the same size as a top-up (103x29 against 84x25, the
+difference being the count badge), told apart by gold and by the reminder pulse
+rather than by area — down from 134x40, about a third of the footprint gone.
+The second line went with it: the opening already says what an AMENDMENT is,
+and the sheet it opens says "permanent · select one" across the top. Measured
+clear of the turret at 414, 390, 375 and 320 wide.
+
 - **ALLOCATION**, every 40 kills — about twelve in a counted run. Free tempo,
   gone in a minute.
 

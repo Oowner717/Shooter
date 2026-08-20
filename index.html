@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '60';
+  var BUILD = '61';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -100,7 +100,6 @@
     <button id="pendingBtn" hidden>
       <span class="pendingText">
         <span id="pendingLabel">EVALUATION</span>
-        <i id="pendingSub">permanent · choose one</i>
       </span><b id="pendingCount">1</b>
     </button>
 
