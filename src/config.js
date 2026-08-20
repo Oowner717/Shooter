@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '59';
+export const BUILD = '60';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -63,6 +63,25 @@ export const CFG = {
   popRampKills: 320,
   spawnInterval: [1.05, 0.52], // seconds between spawn attempts, start -> end
   formationChance: 0.42,
+
+  // ---- drift ----------------------------------------------------------
+  // The harmless ones, and where they end up.
+  //
+  // Aimless is not the same as absent. On a pure random walk a body spawned at
+  // the entry line is exactly as likely to wander up out of the field as down
+  // into it, and nothing removes it — so they collected against the top edge,
+  // half off the screen, where no shot could reach and nothing could be
+  // learned from them. They are the first thing a run meets and they were
+  // meeting it from off-camera.
+  //
+  // They still have no destination. They just sink while they have no opinion,
+  // and they stop sinking here.
+  drift: {
+    band: 520, // world units above the turret they settle around
+    reach: 460, // how far above that the sink runs at full strength
+    sink: 0.9, // how much of the wander it overrules there
+    fall: 90, // and how fast they come down while it does
+  },
 
   // ---- shooter --------------------------------------------------------
   shooter: {

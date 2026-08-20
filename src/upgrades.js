@@ -190,7 +190,7 @@ export const UPGRADES = {
       line: 'A TITHE mark runs to 14 instead of 8. Far more on one long body.',
       apply: bump('titheMarks', 6), icon: MARK.lien },
     // --- build 54: the rounds that had nothing of their own ---
-    { id: 'overstuffed', name: 'OVERSTUFFED', levels: 3,
+    { id: 'overstuffed', name: 'OVERSTUFFED', levels: 4,
       line: 'BOLT rebounds off bodies instead of stopping, weaker each time. +1 rebound, +30% life.',
       apply: (u) => { u.boltRebound += 1; u.boltBounce += 1; u.boltLife *= 1.3; }, icon: MARK.overstuffed },
     { id: 'doubletap', name: 'DOUBLE TAP', levels: 2,

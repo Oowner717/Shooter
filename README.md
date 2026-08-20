@@ -297,10 +297,13 @@ fire, so **BOLT** — nothing done to it — stays the right answer more often t
 it looks.
 
 Build 54 gave the five that had nothing of their own something to grow into.
-BOLT gets **OVERSTUFFED**, three levels of it, and stops being a round that
-ends in the first thing it meets: it comes back off a body the way it comes off
-a wall, keeping 70% of its damage each time, so one round crosses up to four
-objects. It also gets **DOUBLE TAP** and, at its second level, **TRIPLE TAP** —
+BOLT gets **OVERSTUFFED** — three levels then, four as of build 60 — and stops
+being a round that ends in the first thing it meets: it comes back off a body
+the way it comes off a wall, keeping 70% of its damage each time, so one round
+crosses up to five objects. Note the geometry it wants: a rebound mirrors about
+the surface normal, so a shot fired dead-centre into a flat row comes straight
+back the way it came and leaves. It pays in a pocket, not against a wall —
+measured, one round through a cluster of six hit three of them for 57. It also gets **DOUBLE TAP** and, at its second level, **TRIPLE TAP** —
 follow-up rounds that wait 0.06s at the muzzle rather than shortening the
 cadence, which reads as one trigger pull with a stutter in it and not as a
 faster gun. HE gets **CLUSTER**, four smaller bursts thrown out around the
@@ -524,7 +527,7 @@ button can then say AMENDMENT and mean it.
   | LIEN | TITHE marks run to 14 | STANDING ORDER | -20% ability cooldowns | | |
   | COMPOUND | +60% tithe mark bite | | | | |
   | SALVO | every 8th shot fires 3 | | | | |
-  | OVERSTUFFED (x3) | BOLT rebounds off bodies | | | | |
+  | OVERSTUFFED (x4) | BOLT rebounds off bodies | | | | |
   | DOUBLE / TRIPLE TAP (x2) | a second and third BOLT behind the first | | | | |
   | CLUSTER | HE throws four smaller bursts | | | | |
   | DOUBLE-O (x2) | +3 SHOT pellets | | | | |
@@ -542,7 +545,7 @@ the one I already have three of".
 **Three kinds of ceiling, and the card says which.** An upgrade with no
 `levels` field repeats without limit and its card counts what you hold: `x3`.
 `levels: 1` is a switch, and a switch cannot be thrown twice. In between is an
-upgrade with a shape to it — OVERSTUFFED runs to three, DOUBLE TAP to two —
+upgrade with a shape to it — OVERSTUFFED runs to four, DOUBLE TAP to two —
 and those cards count what is left instead: `LV 2/3`, because that is the
 question a ceiling raises. A level may also be a **different card**: the second
 DOUBLE TAP is not "DOUBLE TAP again", it is **TRIPLE TAP**, with its own name
@@ -863,9 +866,23 @@ They unlock progressively as the count climbs.
   shoves whatever it catches, and both count — a TOW is **two** of the five
   hundred. Cut either end and the cable goes slack.
 - **DRIFT** — harmless. No goal, no destination, no threat: it wanders on a
-  slow random walk, wanders back up the field as often as down, never
-  breaches the turret, never triggers a mine, is never auto-targeted and does
-  not count toward the tally. It is there to be shot at and shoved around.
+  slow random walk, never breaches the turret, never triggers a mine, is never
+  auto-targeted and does not count toward the tally. It is there to be shot at
+  and shoved around, and it is the first thing a run meets.
+
+  **It sinks, as of build 60.** Aimless is not the same as absent: on a pure
+  random walk a body released at the entry line is exactly as likely to wander
+  up out of the field as down into it, and nothing removes one — so they
+  collected against the top edge, half off the screen, where no shot could
+  reach and nothing could be learned from them. The first thing a run meets was
+  meeting it from off-camera. So while a drift is above its band
+  (`drift.band` above the turret) the walk is overruled toward straight down by
+  `drift.sink` and it descends at `drift.fall` rather than at its wander speed;
+  below the line it is as aimless as it ever was. Measured from the entry line:
+  the first one is in the field in under fourteen seconds — ahead of the first
+  hostile at twenty-two — eight of them settle between 250 and 780 units above
+  the turret, none is left above the top of the field, and one already in the
+  band still spends about as many frames rising as falling.
 
 Every object picks a **route** when it spawns — direct, sweeping, wide,
 serpentine, hooking or loitering — as a lateral offset that folds in as it

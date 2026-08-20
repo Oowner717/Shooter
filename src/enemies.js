@@ -185,10 +185,30 @@ export class Enemy {
       this.wanderAngle += spread(1.9);
     }
     const slow = world.stasis > 0 ? 0.12 : 1;
-    const cruise = this.cruise * slow;
+    let cruise = this.cruise * slow;
     const k = (this.type.accel / 100) * slow * 0.9;
-    const dx = Math.cos(this.wanderAngle);
-    const dy = Math.sin(this.wanderAngle);
+    let dx = Math.cos(this.wanderAngle);
+    let dy = Math.sin(this.wanderAngle);
+
+    // It sinks while it is above its band, and only while it is above it.
+    // Below the line the walk is as aimless as it ever was — this does not
+    // give a drift a destination, it just stops the random half of them
+    // wandering off the top of the world and staying there.
+    const D = CFG.drift;
+    const home = world.shooter.y - D.band;
+    if (this.y < home) {
+      const urge = clamp((home - this.y) / D.reach, 0, 1) * D.sink;
+      dx *= 1 - urge;
+      dy = dy * (1 - urge) + urge;
+      const n = Math.hypot(dx, dy) || 1;
+      dx /= n;
+      dy /= n;
+      // ...and it comes down at a pace worth watching. At wander speed the
+      // first one reached the field a good ten seconds after the first
+      // hostile, which is not what "the safe thing arrives first" means.
+      cruise = (this.cruise + (D.fall - this.cruise) * urge) * slow;
+    }
+
     this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);
     this.vy += (dy * cruise - this.vy) * clamp(k * dt, 0, 1);
     if (world.stasis > 0) {
