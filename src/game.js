@@ -585,9 +585,12 @@ export class Game {
 
   /** Opens whatever is at the front of the queue. Holds the world while it is up. */
   openOffer() {
-    if (!this.world.offers.pending) return false;
+    const w = this.world;
+    if (!w.offers.pending) return false;
     this.offerOpen = true;
-    this.hud.showOffer(this.world.offers.next);
+    // Rolled here rather than when it came due, so the three cards are drawn
+    // against what has actually been taken by now. See Offers.prepare.
+    this.hud.showOffer(w.offers.prepare(w));
     return true;
   }
 

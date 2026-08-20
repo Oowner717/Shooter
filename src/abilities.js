@@ -764,6 +764,10 @@ export class Abilities {
   grantCharge(id) {
     const s = this.slots.find((a) => a.def.id === id);
     if (!s) return false;
+    // A second use, and only a second: the roll already offers each of these
+    // once, and this makes that true of the granting as well rather than only
+    // of the offering.
+    if (s.max >= 2) return false;
     s.max += 1;
     s.charges += 1; // the one just bought is in hand, not owed
     return true;

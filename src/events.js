@@ -163,10 +163,25 @@ export class Offers {
    * in the queue — nothing is ever skipped because something else arrived. The
    * permanent tier jumps ahead of the top-ups; see below.
    */
+  /*
+   * An offer is queued empty and rolled when it is first opened.
+   *
+   * It used to be rolled here, at the moment it came due — which meant two
+   * AMENDMENTs waiting on the button had both been rolled against the same
+   * state, and taking a card from the first did not touch the second. Measured
+   * over 20,000 pairs: 53% shared at least one card, and 4.4% shared an
+   * UNLOCK. Taking that twice unlocked nothing the second time and the pick
+   * was simply gone; a shared CHARGE granted two extra uses where the design
+   * says one; a shared levelled stat went past its own ceiling.
+   *
+   * Rolling on open fixes all three at once, because by then `taken` and
+   * `unlocked` say what actually happened. It is rolled once and kept, so
+   * closing the sheet and opening it again is not a free re-roll.
+   */
   note(world) {
     while (world.kills >= this.nextSmall) {
       this.nextSmall += CFG.events.small;
-      this.queue.push({ tier: 'small', options: rollSmall(world) });
+      this.queue.push({ tier: 'small', options: null });
       if (world.announceOffer) world.announceOffer('small');
     }
     while (world.kills >= this.nextLarge) {
@@ -175,9 +190,25 @@ export class Offers {
       // steps in front of lose nothing by waiting — and the button can then
       // say AMENDMENT and mean it, instead of advertising the top-up that
       // happened to be queued first.
-      this.queue.unshift({ tier: 'large', options: rollLarge(this.taken, world), held: this.held() });
+      this.queue.unshift({ tier: 'large', options: null });
       if (world.announceOffer) world.announceOffer('large');
     }
+  }
+
+  /**
+   * Fill in the offer at the head of the queue, if it has not been looked at
+   * yet. Everything that shows or takes an offer goes through here first.
+   *
+   * @returns the offer, ready to render, or null.
+   */
+  prepare(world) {
+    const offer = this.queue[0];
+    if (!offer) return null;
+    if (!offer.options) {
+      offer.options = offer.tier === 'large' ? rollLarge(this.taken, world) : rollSmall(world);
+      if (offer.tier === 'large') offer.held = this.held();
+    }
+    return offer;
   }
 
   /** How many of each upgrade is already stacked, by id. */
@@ -194,16 +225,14 @@ export class Offers {
    * having to serialise a card.
    */
   requeue(world, tier) {
-    if (tier === 'large') {
-      this.queue.push({ tier, options: rollLarge(this.taken, world), held: this.held() });
-    } else {
-      this.queue.push({ tier, options: rollSmall(world) });
-    }
+    // Empty, like note() leaves them: a restored offer has not been looked at
+    // either, so it is rolled when it is opened.
+    this.queue.push({ tier, options: null });
   }
 
   /** @returns the option taken, or null. */
   take(world, index) {
-    const offer = this.queue[0];
+    const offer = this.prepare(world);
     if (!offer) return null;
     const opt = offer.options[index];
     if (!opt) return null;

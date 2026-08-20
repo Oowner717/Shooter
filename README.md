@@ -456,6 +456,21 @@ button that only exists while something is waiting, and opening it is what
 holds the world — a choice you made, not one made for you. An offer left
 untaken for eight hours is still there.
 
+**An offer is rolled when it is opened, not when it comes due.** It used to be
+rolled the moment it was queued, which meant two AMENDMENTs waiting on the
+button had both been drawn against the same state — and taking a card from the
+first did not touch the second. Measured over 20,000 pairs: **53% shared at
+least one card, and 4.4% shared an UNLOCK.** Taking the same unlock twice
+unlocked nothing the second time and the pick was simply gone; a shared CHARGE
+granted two extra uses of an ability where the design says one; a shared
+levelled upgrade went past its own ceiling. `Offers.prepare` fills the head of
+the queue on first open and keeps it, so closing the sheet and opening it again
+is not a free re-roll, and a restored save's queued offers are unrolled too.
+
+`grantCharge` also refuses a third use now. The roll had always offered each
+charge once; that makes it true of the granting as well, rather than only of
+the offering.
+
 Not interrupting is not the same as being quiet. A **top-up gets a chime** and
 a small green chip, because it is tempo and it will keep. A **permanent one is
 the loudest thing the interface does**: a three-note fanfare, a gold frame
