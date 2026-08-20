@@ -208,7 +208,7 @@ function grip(world, m, dt) {
     }
   };
   take(world.enemies);
-  take(world.debris);
+  take(world.drops);
 
   if (Math.random() < 0.7) {
     const a = rand(0, TAU);
@@ -331,7 +331,7 @@ function cut(world, m, dt) {
     }
   };
   take(world.enemies);
-  take(world.debris);
+  take(world.drops);
 }
 
 /** KNELL. One of three, each wider than the one before and worth less. */

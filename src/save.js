@@ -16,7 +16,7 @@
 import { BUILD } from './config.js';
 
 const KEY = 'sim7749-run';
-const VERSION = 2;
+const VERSION = 3; // 3: salvage became energy, and debris became motes
 
 /** Only these two phases are a coherent place to pick a run up from. */
 const SAVABLE = new Set(['staging', 'lull']);
@@ -70,7 +70,7 @@ export function captureRun(world, game) {
     kills: world.kills,
     released: world.released,
     time: world.time,
-    salvage: world.salvage,
+    energy: world.energy,
     ledger: world.ledger,
     reclaimed: world.reclaimed,
     nextStoryAt: world.nextStoryAt,

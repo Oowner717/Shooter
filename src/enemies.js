@@ -4,7 +4,7 @@
 
 import { CFG, ENEMY_TYPES, TYPE_BY_ID, ROUTES, HAIRLINE, massOf } from './config.js';
 import { TAU, clamp, rand, randInt, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
-import { explode, hitBurst, spark, dot, shard as fxShard, ring, ripple } from './fx.js';
+import { explode, hitBurst, spark, dot, shard as fxShard, ring, ripple, haul } from './fx.js';
 import { audio } from './audio.js';
 
 /**
@@ -104,8 +104,8 @@ export const SHARD_R = 12;
 export class Enemy {
   constructor(type, x, y, opts = {}) {
     this.type = type;
-    this.isDebris = !!opts.debris;
-    this.counts = !this.isDebris;
+    this.isDrop = !!opts.drop;
+    this.counts = !this.isDrop;
 
     const r = opts.r || type.r;
     this.r = r;
@@ -122,7 +122,7 @@ export class Enemy {
     this.friction = 0.3;
     this.cruise = type.speed * (opts.speedScale || rand(0.86, 1.14));
 
-    this.maxHp = Math.round((opts.hp ?? type.hp) * (this.isDebris ? 1 : rand(0.92, 1.1)));
+    this.maxHp = Math.round((opts.hp ?? type.hp) * (this.isDrop ? 1 : rand(0.92, 1.1)));
     this.hp = this.maxHp;
     this.armor = type.armor || 0;
 
@@ -162,10 +162,10 @@ export class Enemy {
     this.ttl = 0;
     // Set when it is made, from the parent's mass. Banked whichever way it
     // goes: reaching the turret, or being destroyed.
-    this.salvage = opts.salvage || 0;
+    this.energy = opts.energy || 0;
     // Marks left on a body by the rounds that do not simply hurt it.
     this.chill = 0; // RIME: seconds of being dragged to a crawl
-    this.bounty = 1; // TITHE: what its salvage is worth when it goes
+    this.bounty = 1; // TITHE: what its energy is worth when it goes
     this.marks = 0; // ...and how deep the mark is, which is what TITHE rides on
     this.spawnIn = opts.spawnIn ?? 0; // brief materialise animation
 
@@ -209,7 +209,7 @@ export class Enemy {
     const D = CFG.drift;
     const home = world.shooter.y - D.band;
     if (this.y < home) {
-      const urge = clamp((home - this.y) / D.reach, 0, 1) * D.sink;
+      const urge = clamp((home - this.y) / D.ease, 0, 1) * D.sink;
       dx *= 1 - urge;
       dy = dy * (1 - urge) + urge;
       const n = Math.hypot(dx, dy) || 1;
@@ -471,7 +471,7 @@ export class Enemy {
     const cfg = this.type.eat;
     if (this.staged || this.spawnIn > 0) return;
     if (this.r >= cfg.maxR) return;
-    for (const d of world.debris) {
+    for (const d of world.drops) {
       if (d.dead) continue;
       const reach = this.r + d.r + cfg.reach;
       const dx = d.x - this.x;
@@ -530,6 +530,19 @@ export class Enemy {
 
   applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0, shred = 0) {
     if (this.dead) return;
+    /*
+     * An energy mote cannot be hurt. It is not wreckage to be broken up a
+     * second time — it is the charge the object was carrying, and the only
+     * thing that can happen to it is being taken in. A blast still shoves it
+     * around, which is why the impulse is applied before the return.
+     */
+    if (this.isDrop) {
+      if (impulse) {
+        this.vx += nx * impulse * this.invMass;
+        this.vy += ny * impulse * this.invMass;
+      }
+      return;
+    }
     // A HERALD's cover, if one is refreshing it. It lapses a frame after the
     // beacon stops covering, which is what makes killing the beacon feel like
     // the answer rather than a statistic.
@@ -553,13 +566,13 @@ export class Enemy {
     this.dead = true;
     const t = this.type;
     // Destroying a fragment is a way of collecting it, not a way of losing it.
-    if (this.salvage) bank(world, this.salvage * this.bounty, this.x, this.y);
+    if (this.energy) bank(world, this.energy * this.bounty, this.x, this.y);
     // The harmless ones pay too. It is the one income the tally never sees.
-    else if (this.harmless) bank(world, CFG.salvage.drift * this.bounty, this.x, this.y);
-    explode(this.x, this.y, this.r, t.color, t.glow, this.isDebris ? 0.55 : 1);
+    else if (this.harmless) bank(world, CFG.energy.drift * this.bounty, this.x, this.y);
+    explode(this.x, this.y, this.r, t.color, t.glow, this.isDrop ? 0.55 : 1);
     audio.pop(clamp(this.r / 22, 0.5, 2.4));
 
-    if (this.isDebris) return;
+    if (this.isDrop) return;
 
     // Bloom: takes the neighbourhood with it.
     if (t.detonate) {
@@ -615,11 +628,11 @@ export class Enemy {
     // Debris chips: destructible, pushable, do not count toward the tally.
     // They carry the object's salvage between them, so what a thing is worth
     // is what it was made of.
-    const n = t.debris || 0;
-    const worth = Math.max(n, Math.round(massOf(t, this.r) * CFG.salvage.perMass));
-    const each = Math.max(CFG.salvage.minValue, Math.round(worth / Math.max(1, n)));
+    const n = t.drops || 0;
+    const worth = Math.max(n, Math.round(massOf(t, this.r) * CFG.energy.perMass));
+    const each = Math.max(CFG.energy.minValue, Math.round(worth / Math.max(1, n)));
     for (let i = 0; i < n; i++) {
-      if (world.debris.length >= CFG.maxDebris) break;
+      if (world.drops.length >= CFG.maxDrops) break;
       const a = rand(0, TAU);
       const sp = rand(70, 240);
       // A fraction of the parent, but never bigger than wreckage is allowed
@@ -628,20 +641,20 @@ export class Enemy {
       // identical pieces reads as tiling rather than as wreckage.
       const dr = Math.min(
         rand(this.r * 0.16, this.r * 0.3),
-        rand(CFG.wreck.min, CFG.wreck.max),
+        rand(CFG.drop.min, CFG.drop.max),
       );
-      world.debris.push(new Enemy(t, this.x + Math.cos(a) * this.r * 0.5, this.y + Math.sin(a) * this.r * 0.5, {
-        debris: true,
+      world.drops.push(new Enemy(t, this.x + Math.cos(a) * this.r * 0.5, this.y + Math.sin(a) * this.r * 0.5, {
+        drop: true,
         r: dr,
         hp: 8 + dr,
         vx: this.vx * 0.4 + Math.cos(a) * sp,
         vy: this.vy * 0.4 + Math.sin(a) * sp,
         speedScale: 1.25,
-        salvage: each,
+        energy: each,
       }));
       // TITHE marks the body, but the salvage rides on what the body leaves —
       // so the mark has to come with it or the round pays nothing at all.
-      world.debris[world.debris.length - 1].bounty = this.bounty;
+      world.drops[world.drops.length - 1].bounty = this.bounty;
     }
   }
 
@@ -663,11 +676,20 @@ export class Enemy {
     ctx.globalCompositeOperation = 'source-over';
 
     const dim = 0.45 + hpFrac * 0.55;
-    ctx.fillStyle = rgba(t.color, 0.16 * dim);
-    ctx.strokeStyle = rgba(t.color, 0.55 + 0.45 * dim);
-    ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.09);
+    if (this.isDrop) {
+      // Energy is not damaged and has no health to read, so it is drawn at
+      // full brightness and additively: a floor of it should glow.
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = rgba(t.color, 0.5);
+      ctx.strokeStyle = rgba(t.color, 0.75);
+      ctx.lineWidth = Math.max(HAIRLINE * 0.8, this.r * 0.22);
+    } else {
+      ctx.fillStyle = rgba(t.color, 0.16 * dim);
+      ctx.strokeStyle = rgba(t.color, 0.55 + 0.45 * dim);
+      ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.09);
+    }
 
-    switch (this.isDebris ? 'chip' : t.shape) {
+    switch (this.isDrop ? 'drop' : t.shape) {
       case 'shard': drawShard(ctx, this.r); break;
       case 'needle': drawNeedle(ctx, this.r); break;
       case 'hex': drawHex(ctx, this.r); break;
@@ -683,6 +705,7 @@ export class Enemy {
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
+      case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
       default: drawChip(ctx, this.r, this.phase);
     }
 
@@ -797,7 +820,7 @@ export class Enemy {
     }
 
     // damage arc — only on objects big enough to be worth tracking
-    if (hpFrac < 0.98 && !this.isDebris && this.r >= 16) {
+    if (hpFrac < 0.98 && !this.isDrop && this.r >= 16) {
       ctx.strokeStyle = rgba(t.color, 0.8);
       ctx.lineWidth = HAIRLINE * 1.5;
       ctx.beginPath();
@@ -1116,6 +1139,25 @@ function drawSeed(ctx, r, phase, time) {
   ctx.fill();
 }
 
+/**
+ * An energy mote. It used to be drawn as `drawChip` — a small angular
+ * pentagon, the same shape family as a body — because it used to be wreckage.
+ * It is the charge the object was carrying, so it is a core with a halo on it
+ * and it pulses: nothing else on the field glows steadily like this, which is
+ * what makes a floor of it read as something to collect rather than something
+ * to shoot.
+ */
+function drawDrop(ctx, r, phase, time) {
+  const t = 0.72 + 0.28 * Math.sin(time * 3.4 + phase);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.5 * t, 0, TAU);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.75, 0, TAU);
+  ctx.fill();
+  ctx.fill();
+}
+
 function drawChip(ctx, r, phase) {
   ctx.beginPath();
   const n = 5;
@@ -1267,7 +1309,7 @@ function releasesLeft(world) {
  * costs seventy per cent, and it never reaches nothing.
  */
 export function intakeRate(world) {
-  const S = CFG.salvage;
+  const S = CFG.energy;
   const n = Math.min(world.attackers.size, S.taxCap);
   const bite = 1 - (1 - S.tax) * world.up.insulation;
   return Math.max(S.taxFloor, bite ** n);
@@ -1275,8 +1317,8 @@ export function intakeRate(world) {
 
 function bank(world, amount, x, y) {
   const got = amount * intakeRate(world);
-  world.salvage += got;
-  world.salvageShown = world.salvageShown ?? 0;
+  world.energy += got;
+  world.energyShown = world.energyShown ?? 0;
   if (got >= 1) dot(x, y, 0, -60, '#9fe8ff', 0.5, 3);
 }
 
@@ -1295,23 +1337,48 @@ function bank(world, amount, x, y) {
  * turret is taken in on contact. It is the difference between wreckage being
  * work and wreckage being income, which is worth a card.
  */
-/** One fragment taken in. `bonus` is SCOUR paying over the odds for it. */
-export function collectOne(world, e, bonus = 1) {
-  if (e.dead || !e.salvage) return;
-  bank(world, e.salvage * bonus, e.x, e.y);
-  e.salvage = 0;
+/**
+ * Every mote within reach, taken in at once. PULSE is the ordinary way this
+ * happens; SCOUR is the same verb with no limit and a bonus on it.
+ *
+ * @returns how many were taken, so the caller can decide whether to say so.
+ */
+export function drawIn(world, radius, bonus = 1) {
+  const s = world.shooter;
+  const r2 = radius * radius;
+  let took = 0;
+  for (const e of world.drops) {
+    if (e.dead || !e.energy) continue;
+    if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 > r2) continue;
+    absorb(world, e, bonus, true);
+    took++;
+  }
+  return took;
+}
+
+/** One mote taken in. `bonus` is SCOUR paying over the odds for it. */
+export function absorb(world, e, bonus = 1, streak = false) {
+  if (e.dead || !e.energy) return;
+  bank(world, e.energy * bonus, e.x, e.y);
+  // Drawn in from a distance rather than walked into: show it arriving, or
+  // a PULSE that empties the floor is a number in the corner going up.
+  if (streak) {
+    const s = world.shooter;
+    haul(e.x, e.y, s.x, s.y, '#9fe8ff', 0.42, 2.6);
+  }
+  e.energy = 0;
   e.dead = true;
   e.dissolved = true;
 }
 
-export function collectSalvage(world, dt) {
-  const S = CFG.salvage;
+export function collectEnergy(world, dt) {
+  const S = CFG.energy;
   const s = world.shooter;
-  const list = world.debris;
+  const list = world.drops;
   const auto = world.up.intake;
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i];
-    if (e.dead || !e.salvage) continue;
+    if (e.dead || !e.energy) continue;
     const dx = s.x - e.x;
     const dy = s.y - e.y;
     const d2 = dx * dx + dy * dy;
@@ -1320,7 +1387,7 @@ export function collectSalvage(world, dt) {
       // radii and a little, the same test contact uses for everything else.
       const rr = s.r + e.r + 2;
       if (d2 <= rr * rr) {
-        collectOne(world, e);
+        absorb(world, e);
         continue;
       }
     }
@@ -1521,7 +1588,7 @@ export function graft(world, host) {
   host.invMass = 1 / host.mass;
   host.maxHp = Math.round(host.maxHp * G.tough);
   host.hp = Math.min(host.maxHp, host.hp * G.tough);
-  host.salvage = (host.salvage || 0) * G.tough;
+  host.energy = (host.energy || 0) * G.tough;
   host.flash = 1;
   ring(host.x, host.y, host.r * 0.5, host.r * 2.6, 0.5, '#c9a7ff', 3);
   ripple(host.x, host.y, 1.2, host.r * 5);
@@ -1551,7 +1618,7 @@ export function applyBlast(world, blast) {
     }
   };
   hit(world.enemies);
-  hit(world.debris);
+  hit(world.drops);
 
   if (world.boss && !world.boss.dead) {
     const dx = world.boss.x - x;

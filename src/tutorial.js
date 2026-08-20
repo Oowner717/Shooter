@@ -37,13 +37,13 @@ const OPENING = [
  * the time the second one is read.
  */
 const NOTES = [
-  // Said the moment there is wreckage on the floor to point at. Two lines
+  // Said the moment there is energy on the floor to point at. Two lines
   // rather than one because they answer three questions a new player has in
   // the same few seconds — is that thing dangerous, why is it moving toward
   // me, and what am I supposed to do about it. No, it is coming to you, and
-  // shoot it. The INTAKE upgrade is what eventually removes the third.
-  { at: 1, text: 'Those pieces are wreckage, not enemies.\nThey drift to you on their own.' },
-  { at: 2, text: 'Shoot wreckage to cash it in.\nSALVAGE is the green number.' },
+  // PULSE takes it in. The INTAKE upgrade is what eventually removes the third.
+  { at: 1, text: 'Broken objects leave ENERGY.\nIt is not an enemy. It drifts to you.' },
+  { at: 2, text: 'PULSE takes in the energy near you.\nENERGY is the green number.' },
   { at: 20, text: 'ALLOCATION is waiting. Three offered, one taken.\nIt keeps. Open it whenever you want it.' },
   { at: 44, text: 'An AMENDMENT is the permanent one.\nNew rounds, new mines, new abilities.' },
   { at: 120, text: 'Everything you are not carrying is still out there.\nThe offers are how you get it.' },
@@ -58,7 +58,7 @@ export const SCRIPT = [...OPENING, ...NOTES].map((e) => ({ ...e, hold: holdFor(e
  * and the caption that greets you using it say the same thing.
  */
 const ABILITY_USE = {
-  pulse: 'PULSE. A shockwave. Shoves everything away from you.',
+  pulse: 'PULSE. Hurts and shoves what is near you,\nand takes in the energy on the floor.',
   fan: 'FAN. Twenty-five pellets in one tight cone.',
   lance: 'LANCE. A beam through the biggest thing out there.',
   well: 'WELL. Drags everything into a knot, then collapses it.',

@@ -45,8 +45,8 @@ export class Hud {
       bossSub: $('bossSub'),
       alerts: $('alerts'),
       killGoal: document.querySelector('#counter .dim'),
-      salvage: $('salvageNum'),
-      salvageChip: $('salvageChip'),
+      energy: $('energyNum'),
+      energyChip: $('energyChip'),
       effects: $('effects'),
       phaseTagEl: $('phaseTag'),
       pendingBtn: $('pendingBtn'),
@@ -617,16 +617,16 @@ export class Hud {
     for (const t of TIMED) if (world[t.id] <= 0 && this.effectPeak) this.effectPeak[t.id] = 0;
   }
 
-  setSalvage(n, rate = 1) {
+  setEnergy(n, rate = 1) {
     const v = Math.floor(n);
-    if (v !== this.lastSalvage) {
+    if (v !== this.lastEnergy) {
       // The far end of the collection animation. The streaks go into the
       // turret; this is where they come out, so the two read as one motion.
-      const up = v > this.lastSalvage;
-      this.lastSalvage = v;
-      this.el.salvage.textContent = v;
+      const up = v > this.lastEnergy;
+      this.lastEnergy = v;
+      this.el.energy.textContent = v;
       if (up) {
-        const chip = this.el.salvageChip;
+        const chip = this.el.energyChip;
         chip.classList.remove('took');
         void chip.offsetWidth;
         chip.classList.add('took');
@@ -635,7 +635,7 @@ export class Hud {
     const choked = rate < 0.999;
     if (choked !== this.lastChoked) {
       this.lastChoked = choked;
-      this.el.salvageChip.classList.toggle('choked', choked);
+      this.el.energyChip.classList.toggle('choked', choked);
     }
   }
 

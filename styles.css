@@ -121,31 +121,31 @@ html, body {
  * they are two halves of the same statement: what the simulation is taking,
  * and what is left over.
  */
-#salvageChip {
+#energyChip {
   display: flex;
   align-items: baseline;
   gap: 5px;
   transition: opacity 0.4s, border-color 0.4s;
 }
-#salvageChip em {
+#energyChip em {
   font-style: normal;
   font-size: 7.5px;
   letter-spacing: 0.18em;
   color: var(--dim);
   margin: 0;
 }
-#salvageNum {
+#energyNum {
   font-size: 13px;
   font-weight: 700;
   color: #7cffb2;
   font-variant-numeric: tabular-nums;
 }
 /* Something is sitting on the intake. The only place corruption costs a number. */
-#salvageChip.choked {
+#energyChip.choked {
   border-color: rgba(255, 77, 109, 0.4);
   opacity: 0.72;
 }
-#salvageChip.choked #salvageNum { color: #9fb3c8; }
+#energyChip.choked #energyNum { color: #9fb3c8; }
 
 #counter #killNum {
   font-size: 14px;
@@ -1768,8 +1768,8 @@ body.booting #pendingBtn {
 @media (max-width: 372px) {
   /* The green number is unmistakable beside the count; the word is not
      carrying anything the colour does not. */
-  #salvageChip em { display: none; }
-  #salvageChip { padding: 5px 8px; }
+  #energyChip em { display: none; }
+  #energyChip { padding: 5px 8px; }
 
   .q_mines, .q_ammo { width: 56px; }
   .qc { height: 28px; gap: 4px; padding: 0 5px; }
@@ -1817,12 +1817,12 @@ body.booting #pendingBtn {
   30% { transform: scale(1.13); }
   100% { transform: scale(1); }
 }
-#salvageChip.took {
+#energyChip.took {
   animation: tookSalvage 0.26s ease-out;
   border-color: rgba(159, 232, 255, 0.55);
 }
 @media (prefers-reduced-motion: reduce) {
-  #salvageChip.took { animation: none; }
+  #energyChip.took { animation: none; }
 }
 
 /*

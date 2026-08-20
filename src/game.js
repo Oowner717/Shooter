@@ -7,7 +7,7 @@ import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, sha
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast, solveTethers, collectSalvage, collectOne, intakeRate, ENTRY_Y } from './enemies.js';
+import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast, solveTethers, collectEnergy, drawIn, intakeRate, ENTRY_Y } from './enemies.js';
 import { Shooter } from './shooter.js';
 import { Boss } from './boss.js';
 import { Abilities } from './abilities.js';
@@ -83,7 +83,7 @@ export class Game {
       phase: 'boot', // boot | staging | lull | boss | ending | frozen
 
       enemies: [],
-      debris: [],
+      drops: [], // energy on the floor, waiting to be taken in
       projectiles: [],
       effects: [],
       pendingBlasts: [],
@@ -113,7 +113,7 @@ export class Game {
       autoFire: false,
       mine: null, // the one kind of mine being laid, or none
 
-      salvage: 0, // banked; nothing carries across a reset
+      energy: 0, // banked; nothing carries across a reset
       up: freshUpgrades(), // what the large offers have granted, this run only
       offers: new Offers(),
       surge: 0, // seconds of doubled cadence, from a SURGE offer
@@ -159,7 +159,7 @@ export class Game {
   reset() {
     const w = this.world;
     w.enemies.length = 0;
-    w.debris.length = 0;
+    w.drops.length = 0;
     w.projectiles.length = 0;
     w.effects.length = 0;
     w.mines.length = 0;
@@ -178,7 +178,7 @@ export class Game {
     this.hud.bossCaption(null);
     w.nextStoryAt = CFG.storyEvery;
     w.counted = false;
-    w.salvage = 0;
+    w.energy = 0;
     w.up = freshUpgrades();
     w.offers.reset();
     w.surge = 0;
@@ -259,7 +259,7 @@ export class Game {
     this.hud.setBoss(false);
     this.hud.setLedgerMode(false);
     this.hud.setKills(0, w.endless ? null : CFG.killGoal);
-    this.hud.setSalvage(0);
+    this.hud.setEnergy(0);
     this.hud.setPhase(w.endless ? 'FIELD' : 'STAGING');
     background.setDread(0);
     this.hud.syncAbilities(w.abilities);
@@ -310,7 +310,7 @@ export class Game {
     w.kills = d.kills;
     w.released = d.released;
     w.time = d.time || 0;
-    w.salvage = d.salvage;
+    w.energy = d.energy;
     w.ledger = d.ledger;
     w.reclaimed = d.reclaimed;
     w.nextStoryAt = d.nextStoryAt;
@@ -342,7 +342,7 @@ export class Game {
     this.hud.setToggle('autoAim', w.autoAim);
     this.hud.setToggle('autoFire', w.autoFire);
     this.hud.setKills(w.kills, w.endless ? null : CFG.killGoal);
-    this.hud.setSalvage(w.salvage);
+    this.hud.setEnergy(w.energy);
     this.hud.setPending(w.offers.pending, w.offers.next);
     this.hud.syncEffects(w);
     this.hud.syncAbilities(w.abilities);
@@ -820,7 +820,7 @@ export class Game {
 
     // ---- per-frame entity bookkeeping ----
     for (const e of w.enemies) e.update(w, dt);
-    for (const e of w.debris) e.update(w, dt);
+    for (const e of w.drops) e.update(w, dt);
     for (let i = w.effects.length - 1; i >= 0; i--) {
       w.effects[i].update(w, dt);
       if (w.effects[i].dead) w.effects.splice(i, 1);
@@ -851,7 +851,7 @@ export class Game {
 
     updateProjectiles(w, dt);
     this.mineTimer = mineCadence(w, this.mineTimer, dt);
-    collectSalvage(w, dt);
+    collectEnergy(w, dt);
     this.runUpgrades(dt);
     if (w.surge > 0) w.surge = Math.max(0, w.surge - dt);
     if (w.haste > 0) w.haste = Math.max(0, w.haste - dt);
@@ -862,12 +862,10 @@ export class Game {
     if (w.pendingScour) {
       w.pendingScour = false;
       const s = w.shooter;
-      let took = 0;
-      for (const e of w.debris) {
-        if (e.dead || !e.salvage) continue;
-        collectOne(w, e, CFG.boosts.scour.bonus);
-        took++;
-      }
+      // The same verb PULSE uses, with no limit on the reach and a bonus on
+      // the take. Infinity rather than a big number, because "the whole floor"
+      // is what the card says.
+      const took = drawIn(w, Infinity, CFG.boosts.scour.bonus);
       if (took) {
         ring(s.x, s.y, 30, 520, 0.55, '#9fe8ff', 3);
         ripple(s.x, s.y, 1.3, 900);
@@ -916,7 +914,7 @@ export class Game {
     this.resolveBlasts();
     this.checkContact();
     this.sweep(w.enemies);
-    this.sweep(w.debris);
+    this.sweep(w.drops);
     updateFx(dt);
 
     this.updatePhase(real);
@@ -929,7 +927,7 @@ export class Game {
     const bodies = this.bodies;
     bodies.length = 0;
     for (const e of w.enemies) if (!e.dead) bodies.push(e);
-    for (const e of w.debris) if (!e.dead) bodies.push(e);
+    for (const e of w.drops) if (!e.dead) bodies.push(e);
 
     for (const b of bodies) {
       b.steer(w, dt);
@@ -1217,7 +1215,7 @@ export class Game {
         this.endStage = 1;
         w.timeScale = 1;
         for (const e of w.enemies) { e.dead = true; e.dissolved = true; }
-        for (const e of w.debris) { e.dead = true; e.dissolved = true; }
+        for (const e of w.drops) { e.dead = true; e.dissolved = true; }
         w.projectiles.length = 0;
         this.hud.showEnding(ENDING);
         this.hud.setBoss(false);
@@ -1344,7 +1342,7 @@ export class Game {
     // reads the ledger, and it falls.
     if (w.boss) this.hud.setLedger(w.ledger, CFG.killGoal);
     else this.hud.setKills(w.kills, !w.endless && w.phase === 'staging' ? CFG.killGoal : null);
-    this.hud.setSalvage(w.salvage, intakeRate(w));
+    this.hud.setEnergy(w.energy, intakeRate(w));
     this.hud.setPending(w.offers.pending, w.offers.next);
     this.hud.syncEffects(w);
     this.hud.syncAbilities(w.abilities);
@@ -1358,7 +1356,7 @@ export class Game {
         `fps    ${this.fps.toFixed(0)}\n`
         + `phase  ${w.phase}\n`
         + `kills  ${w.kills}  released ${w.released}/${CFG.killGoal}\n`
-        + `obj    ${hostileCount(w)} hostile + ${w.enemies.length - hostileCount(w)} drift + ${w.debris.length} frag\n`
+        + `obj    ${hostileCount(w)} hostile + ${w.enemies.length - hostileCount(w)} drift + ${w.drops.length} frag\n`
         + `shots  ${w.projectiles.length}\n`
         + `parts  ${fx.particles.active.length}\n`
         + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}\n`
@@ -1410,7 +1408,7 @@ export class Game {
       13 / w.scale,
     );
 
-    for (const e of w.debris) e.draw(ctx, w);
+    for (const e of w.drops) e.draw(ctx, w);
     for (const e of w.enemies) e.draw(ctx, w);
     if (w.boss && !w.boss.dead) w.boss.draw(ctx);
 
@@ -1562,7 +1560,7 @@ export class Game {
     ctx.strokeStyle = 'rgba(0,255,120,0.55)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (const e of [...w.enemies, ...w.debris]) {
+    for (const e of [...w.enemies, ...w.drops]) {
       ctx.moveTo(e.x + e.r, e.y);
       ctx.arc(e.x, e.y, e.r, 0, TAU);
     }
@@ -1697,10 +1695,10 @@ export class Game {
 
   debugClearField() {
     const w = this.world;
-    // Snapshot first: destroying an object appends its fragments to w.debris,
+    // Snapshot first: destroying an object appends its fragments to w.drops,
     // and a live for..of would walk straight into them and kill those too.
     for (const e of [...w.enemies]) if (!e.dead) e.destroy(w);
-    for (const e of [...w.debris]) if (!e.dead) e.destroy(w);
+    for (const e of [...w.drops]) if (!e.dead) e.destroy(w);
   }
 
   debugThrowMine(kind = 'blast') {

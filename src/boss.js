@@ -459,8 +459,8 @@ export class Boss {
       const pieces = [];
       // Prefer real debris near the assembly point: those are things the
       // player actually broke, and pulling them back is the point.
-      for (let i = world.debris.length - 1; i >= 0 && pieces.length < cfg.perObject; i--) {
-        const d = world.debris[i];
+      for (let i = world.drops.length - 1; i >= 0 && pieces.length < cfg.perObject; i--) {
+        const d = world.drops[i];
         if (d.dead) continue;
         if (Math.hypot(d.x - ax, d.y - ay) > cfg.reach) continue;
         pieces.push({ x: d.x, y: d.y, color: d.type.glow, r: d.r * 0.7 });

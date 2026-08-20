@@ -11,7 +11,7 @@ import { TAU, clamp, rand, spread, smoothstep, rgba, drawGlow, segClosest } from
 import { spark, dot, ring, ripple, shake, flash } from './fx.js';
 import { CFG } from './config.js';
 import { fire } from './projectiles.js';
-import { applyBlast, ENTRY_Y } from './enemies.js';
+import { applyBlast, ENTRY_Y, drawIn } from './enemies.js';
 import { audio } from './audio.js';
 
 /*
@@ -131,7 +131,7 @@ class Well {
       }
     };
     grab(world.enemies);
-    grab(world.debris);
+    grab(world.drops);
 
     // infalling matter
     const streams = this.crush > 0 ? 3 : 1;
@@ -473,7 +473,7 @@ function prismBurst(world, x, y) {
       }
     };
     sweep(world.enemies);
-    sweep(world.debris);
+    sweep(world.drops);
     if (world.boss && !world.boss.dead) {
       const c = segClosest(x, y, x1, y1, world.boss.x, world.boss.y);
       if (c.d2 < (world.boss.r + 18) ** 2) world.boss.hurt(world, P.beamDamage * 2);
@@ -546,10 +546,15 @@ export const ABILITIES = [
     // the turret where the barrel cannot reach, so ORDINAL can never take it.
     essential: true,
     icon: ICON.pulse,
-    hint: 'PULSE — a shockwave. Shoves everything away from you.',
+    hint: 'PULSE — hurts and shoves what is near you, and takes in the energy.',
     run(world) {
       const s = world.shooter;
       applyBlast(world, { x: s.x, y: s.y, r: 340, damage: 58, impulse: 1050 });
+      // ...and it draws the energy in. This is how the currency is collected:
+      // objects drop it when they come apart, it drifts to the turret, and it
+      // sits there until a PULSE takes it. INTAKE is the upgrade that stops
+      // you having to ask.
+      drawIn(world, CFG.energy.pulse);
       ring(s.x, s.y, 20, 360, 0.42, '#59e0ff', 6);
       ring(s.x, s.y, 10, 220, 0.28, '#ffffff', 2.4);
       ripple(s.x, s.y, 1.5, 800);
@@ -618,7 +623,7 @@ export const ABILITIES = [
         }
       };
       hitList(world.enemies);
-      hitList(world.debris);
+      hitList(world.drops);
 
       if (world.boss && !world.boss.dead) {
         const ec2 = world.boss.echo;
@@ -693,7 +698,7 @@ export const ABILITIES = [
     run(world) {
       world.stasis = 4;
       for (const e of world.enemies) { e.vx *= 0.1; e.vy *= 0.1; e.av *= 0.1; }
-      for (const e of world.debris) { e.vx *= 0.1; e.vy *= 0.1; e.av *= 0.1; }
+      for (const e of world.drops) { e.vx *= 0.1; e.vy *= 0.1; e.av *= 0.1; }
       ring(world.shooter.x, world.shooter.y, 20, Math.hypot(world.width, world.height), 0.5, '#9fe8ff', 4);
       flash(0.2, '#d6f4ff');
       for (let i = 0; i < 22; i++) {

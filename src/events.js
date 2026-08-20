@@ -106,7 +106,7 @@ const SMALL = [
   },
   {
     id: 'scour', icon: TICK.scour, name: 'SCOUR',
-    line: 'Every fragment on the floor collected at once, at +50%.',
+    line: 'All the energy on the field taken in at once, at +50%.',
     run(world) { world.pendingScour = true; },
   },
   {

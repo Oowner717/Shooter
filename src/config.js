@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '66';
+export const BUILD = '67';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -55,7 +55,7 @@ export const CFG = {
 
   // ---- population -----------------------------------------------------
   maxEnemies: 44,
-  maxDebris: 128,
+  maxDrops: 128,
   maxDrift: 10, // aimless, harmless bodies alive at once
   maxParticles: 620,
   popStart: 13,
@@ -112,9 +112,15 @@ export const CFG = {
   // and they stop sinking here.
   drift: {
     band: 520, // world units above the turret they settle around
-    reach: 460, // how far above that the sink runs at full strength
-    sink: 0.9, // how much of the wander it overrules there
-    fall: 90, // and how fast they come down while it does
+    // How far above the band the sink *eases off* over. It used to be 460,
+    // which is further than the whole descent — so the sink was strongest at
+    // the top and had faded to almost nothing by the time the body neared the
+    // line it was supposed to cross, and a lone drift dithered above it for
+    // anywhere between 17 and 47 seconds. Small, so the descent is firm and
+    // only the arrival is soft.
+    ease: 130,
+    sink: 0.95, // how much of the wander the descent overrules
+    fall: 260, // and how fast they come down while it does
   },
 
   // ---- shooter --------------------------------------------------------
@@ -243,7 +249,7 @@ export const CFG = {
       rate: 1.5,
       speed: 1300,
       damage: 8,
-      bounty: 3.5, // salvage multiplier on a marked body
+      bounty: 3.5, // energy multiplier on a marked body
       step: 0.55, // extra TITHE damage per mark already on it
       marks: 8, // and it stops deepening here
     },
@@ -481,31 +487,34 @@ export const CFG = {
   // the floor and cash it now, at the cost of the shots that are not going
   // into what is coming down.
   /*
-   * How big a piece of wreckage may draw, whatever it came off.
+   * How big an energy mote may draw, whatever it came off.
    *
-   * A chip's radius, and an explosion shard's, are both a fraction of the
-   * parent's — which meant a BULWARK left wreckage 16.7px across, a grafted
+   * A mote's radius, and an explosion shard's, are both a fraction of the
+   * parent's — which meant a BULWARK dropped motes 16.7px across, a grafted
    * one 22.7px, and its explosion threw spiky shards bigger still. A live
    * NEEDLE is 12.4px. So the floor and the flash were full of things that read
-   * as bodies and were not, in the parent's own colour: WARDEN's wreckage was
-   * the same orange as a WARDEN.
+   * as bodies and were not, in the parent's own colour.
    *
-   * Capped, every piece draws in the band a MOTE's always did, and "small,
-   * dull, angular" means wreckage and nothing else. Explosion shards get a
-   * looser ceiling because they live under a second and a big object should
-   * still burst bigger than a small one.
+   * Capped, every piece draws in the small, bright band that says "this is
+   * energy, come and take it". Explosion shards get a looser ceiling because
+   * they live under a second and a big object should still burst bigger than
+   * a small one.
    *
-   * What a chip is worth is unaffected: value comes from the parent's mass and
-   * is split across the chips, not read off their size.
+   * What a mote is worth is unaffected: value comes from the parent's mass and
+   * is split across the motes it leaves, not read off their size.
    */
-  wreck: {
+  drop: {
     min: 1.8,
     max: 4.4,
     burst: 1.6, // multiplier on the ceiling for explosion shards
   },
 
-  salvage: {
-    // A whole object's worth, from its mass, split across the fragments it
+  energy: {
+    // How far PULSE reaches to take energy in. Its blast is 340; this is a
+    // little wider, because a shockwave that damages a body ought to be able
+    // to pull in the energy sitting just past it.
+    pulse: 400,
+    // A whole object's worth, from its mass, split across the motes it
     // leaves. Taken from the parent rather than the chip: a chip's own mass is
     // small enough that every fragment in the game rounded to the same 1.
     perMass: 3.6,
@@ -659,7 +668,7 @@ export const ENEMY_TYPES = [
     color: '#7ef9ff',
     glow: '#00d4ff',
     weight: 26,
-    debris: 4,
+    drops: 4, // energy it leaves when it comes apart
   },
   {
     id: 'needle',
@@ -676,7 +685,7 @@ export const ENEMY_TYPES = [
     color: '#ffd166',
     glow: '#ff9f1c',
     weight: 18,
-    debris: 2,
+    drops: 2, // energy it leaves when it comes apart
   },
   {
     id: 'lurcher',
@@ -695,7 +704,7 @@ export const ENEMY_TYPES = [
     color: '#b98cff',
     glow: '#8b5cf6',
     weight: 12,
-    debris: 8,
+    drops: 8, // energy it leaves when it comes apart
   },
   {
     id: 'splitter',
@@ -713,7 +722,7 @@ export const ENEMY_TYPES = [
     color: '#7cffb2',
     glow: '#22d37a',
     weight: 8,
-    debris: 4,
+    drops: 4, // energy it leaves when it comes apart
     splits: { type: 'mote', count: 4 },
   },
   {
@@ -732,7 +741,7 @@ export const ENEMY_TYPES = [
     color: '#ff5d8f',
     glow: '#ff2d6f',
     weight: 6,
-    debris: 6,
+    drops: 6, // energy it leaves when it comes apart
     detonate: { radius: 132, damage: 96 },
   },
   {
@@ -752,7 +761,7 @@ export const ENEMY_TYPES = [
     color: '#9fb3c8',
     glow: '#5f7fa6',
     weight: 5,
-    debris: 14,
+    drops: 14, // energy it leaves when it comes apart
   },
   {
     id: 'warden',
@@ -769,7 +778,7 @@ export const ENEMY_TYPES = [
     color: '#ff9f1c',
     glow: '#ff6b00',
     weight: 8,
-    debris: 6,
+    drops: 6, // energy it leaves when it comes apart
     shards: 3, // orbiting plates that eat incoming bolts
   },
   {
@@ -806,7 +815,7 @@ export const ENEMY_TYPES = [
     // releases three to six of one type in one go -- which is how five of
     // them ended up on the screen at once the first time this was measured.
     solo: true,
-    debris: 9,
+    drops: 9, // energy it leaves when it comes apart
   },
   {
     // What a SCION leaves. Harmless in itself -- it never breaches the turret
@@ -826,7 +835,7 @@ export const ENEMY_TYPES = [
     color: '#d9c2ff',
     glow: '#a56bff',
     weight: 0, // never rolled: a SCION places these
-    debris: 0,
+    drops: 0, // energy it leaves when it comes apart
   },
   {
     // Harmless: it has no goal, it never breaches the turret, it does not
@@ -846,7 +855,7 @@ export const ENEMY_TYPES = [
     color: '#8fa9c4',
     glow: '#4f6f92',
     weight: 0, // never chosen by the ordinary spawn roll
-    debris: 2,
+    drops: 2, // energy it leaves when it comes apart
   },
   {
     // Hardens everything near it while it lives, and shows you exactly what it
@@ -866,7 +875,7 @@ export const ENEMY_TYPES = [
     color: '#7cffb2',
     glow: '#22d37a',
     weight: 9,
-    debris: 4,
+    drops: 4, // energy it leaves when it comes apart
     ward: { radius: 240, reduction: 0.62, max: 5 },
   },
   {
@@ -887,7 +896,7 @@ export const ENEMY_TYPES = [
     color: '#ffd166',
     glow: '#e07a00',
     weight: 9,
-    debris: 6,
+    drops: 6, // energy it leaves when it comes apart
     eat: { reach: 26, growth: 3.1, hpPer: 26, maxR: 52 },
   },
   {
@@ -908,7 +917,7 @@ export const ENEMY_TYPES = [
     color: '#9fb3c8',
     glow: '#59e0ff',
     weight: 5,
-    debris: 5,
+    drops: 5, // energy it leaves when it comes apart
     tows: { type: 'towMass', length: 132 },
   },
   {
@@ -929,7 +938,7 @@ export const ENEMY_TYPES = [
     color: '#c8d6e5',
     glow: '#7f9bb5',
     weight: 0,
-    debris: 8,
+    drops: 8, // energy it leaves when it comes apart
   },
   {
     id: 'prism',
@@ -946,7 +955,7 @@ export const ENEMY_TYPES = [
     color: '#e0aaff',
     glow: '#c77dff',
     weight: 6,
-    debris: 4,
+    drops: 4, // energy it leaves when it comes apart
     reflect: 0.55, // glancing bolts bounce off instead of landing
   },
 ];

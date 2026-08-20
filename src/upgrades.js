@@ -65,7 +65,7 @@ export function freshUpgrades() {
     voidReach: 1, // VOID's mouth alone, which nothing else widens
     sweep: 0, // seconds between the turret clearing behind itself
     reflex: false, // PULSE answers a crowd on the turret by itself
-    intake: false, // wreckage that touches the turret is taken in on contact
+    intake: false, // energy that touches the turret is taken in without a PULSE
     cooldown: 1, // multiplier on every ability's cooldown
     // turret
     handsOff: false, // auto-fire at the manual cadence
@@ -185,7 +185,7 @@ export const UPGRADES = {
     { id: 'throughandthrough', name: 'THROUGH AND THROUGH', line: '+2 bodies a spine pierces.', apply: bump('pierce', 2) , icon: MARK.throughandthrough },
     { id: 'sledge', name: 'SLEDGE', line: '+60% slug knockback.', apply: scale('slug', 1.6) , icon: MARK.sledge },
     { id: 'deepfreeze', name: 'DEEP FREEZE', line: '+70% rime chill time.', apply: scale('chill', 1.7) , icon: MARK.deepfreeze },
-    { id: 'levy', name: 'LEVY', line: '+50% tithe salvage mark.', apply: scale('bounty', 1.5) , icon: MARK.levy },
+    { id: 'levy', name: 'LEVY', line: '+50% tithe energy mark.', apply: scale('bounty', 1.5) , icon: MARK.levy },
     { id: 'lien', name: 'LIEN', levels: 1,
       line: 'A TITHE mark runs to 14 instead of 8. Far more on one long body.',
       apply: bump('titheMarks', 6), icon: MARK.lien },
@@ -239,7 +239,7 @@ export const UPGRADES = {
     { id: 'sweep', name: 'SWEEP', line: 'Turret blasts behind itself every 20s.', levels: 1, apply: set('sweep', 20) , icon: MARK.sweep },
     { id: 'reflex', name: 'REFLEX', line: 'PULSE fires itself when 2+ objects grip you.', levels: 1, apply: set('reflex', true) , icon: MARK.reflex },
     { id: 'intake', name: 'INTAKE', levels: 1,
-      line: 'Wreckage that lands on the turret is collected. No need to shoot it.',
+      line: 'Energy is taken in on contact. No PULSE needed.',
       apply: set('intake', true), icon: MARK.intake },
     { id: 'standing', name: 'STANDING ORDER', line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
   ],
@@ -249,7 +249,7 @@ export const UPGRADES = {
     { id: 'slew', name: 'SLEW', line: '+50% auto aim turn speed.', apply: scale('slew', 1.5) , icon: MARK.slew },
     { id: 'overwatch', name: 'OVERWATCH', line: '+25% damage while hands off the lever.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },
     { id: 'casing', name: 'HARD CASING', line: 'Objects touching you take 40 damage a second.', apply: bump('casing', 40) , icon: MARK.casing },
-    { id: 'insulation', name: 'INSULATION', line: 'Corruption costs half as much salvage.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
+    { id: 'insulation', name: 'INSULATION', line: 'Corruption costs half as much energy.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
     { id: 'shrug', name: 'SHRUG', line: 'Throws objects off the turret every 15s.', apply: set('shrug', 15) , icon: MARK.shrug },
   ],
 };

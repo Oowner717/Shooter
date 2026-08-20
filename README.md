@@ -97,12 +97,12 @@ one glance and the next without ever being told. Losing a two-hundred-kill run
 to that is not a difficulty setting.
 
 It is a **checkpoint, not a snapshot**. What is kept is the progress — the
-count, the salvage, what has been unlocked, what is on the strip, which round
+count, the energy, what has been unlocked, what is on the strip, which round
 and mine are loaded, the two running toggles, the offer clocks and anything
 queued — and not the field. The objects in the air, the barrel's angle, a mine
 mid-flight: none of it is restored, because restoring a live field is a great
 deal of machinery for a moment nobody is attached to. **You come back to your
-count, your kit and your salvage, standing on clear ground.**
+count, your kit and your energy, standing on clear ground.**
 
 The permanent tier is stored as **decisions rather than numbers**. `taken` is
 the list of AMENDMENT ids accepted, in order, and `resume()` replays them
@@ -343,8 +343,8 @@ measured at 13.2 to 20 against a BULWARK.
   Each one deepens the mark, up to eight, and the mark is read at the moment of
   impact rather than at the muzzle: 5.3 damage on the first hit and 19.8 on the
   sixth, measured on one body. A marked body also pays several times over when
-  it comes apart — 70 salvage against 20 for the same body unmarked — and the
-  mark rides down onto the fragments, because that is where the salvage is. The
+  it comes apart — 70 energy against 20 for the same body unmarked — and the
+  mark rides down onto the motes, because that is where the energy is. The
   ramp is what makes it an answer to one large thing without ever changing
   ammunition, which is what a long fight against a single body needs. **LIEN**
   raises the ceiling from eight marks to fourteen: measured, a sixteenth hit
@@ -447,7 +447,7 @@ A typical run is about fifteen minutes.
 run after it is endless: no five hundred, no lull, no boss, no ending. The
 counter loses its denominator and just climbs, the phase reads FIELD, and the
 field keeps coming. The counted run is the tutorial for the game underneath it.
-Nothing carries over — salvage starts at zero every time.
+Nothing carries over — energy starts at zero every time.
 
 ### Offers
 
@@ -502,7 +502,7 @@ in the game has a duration, so nothing else is on it.
   | **HASTE** | Ability cooldowns halved for 45s. |
   | **CORONA** | The turret burns for 30s. Anything holding on or close by takes damage. |
   | **OVERDRAW** | The next 12 shots each fire three rounds. |
-  | **SCOUR** | Every fragment on the floor collected at once, at +50%. |
+  | **SCOUR** | All the energy on the field taken in at once, at +50%. |
   | **EBB** | Everything hostile is thrown back up the field. |
   | **SEED** | Lay 3 mines now, random kind if none set. |
   | **VOLLEY** | Fill the field to five mines now. |
@@ -513,7 +513,7 @@ in the game has a duration, so nothing else is on it.
   - **RESET** (every ability ready) went. Its worth was decided by how many
     abilities you happened to have unlocked — two at the start, eight at the
     end — which is not a choice the card offered you.
-  - **YIELD** (+150 salvage) went. `world.salvage` is written by `bank()` and
+  - **YIELD** (+150 energy) went. `world.energy` is written by `bank()` and
     read by the HUD and **never spent on anything**: it is a score, not a
     currency. A card that moves it is a card that does nothing.
   - **SHAKE OFF** (destroy everything gripping the turret) became **CORONA**.
@@ -566,7 +566,7 @@ in the game has a duration, so nothing else is on it.
   | RICOCHET | +1 wall bounce | WIDE MOUTH | +40% trigger range | OVERWATCH | +25% damage hands-off |
   | HEAVY | 2x knockback | SWEEP | blasts behind you every 20s | HARD CASING | 40 dmg/s to what touches you |
   | OVERPRESSURE | +40% HE radius | REFLEX | PULSE fires itself at 2+ grips | INSULATION | corruption costs half |
-  | FIFTH LINK | ARC +1 jump | INTAKE | wreckage that lands on you is collected | SHRUG | throws objects off every 15s |
+  | FIFTH LINK | ARC +1 jump | INTAKE | energy that lands on you is collected | SHRUG | throws objects off every 15s |
   | LIEN | TITHE marks run to 14 | STANDING ORDER | -20% ability cooldowns | | |
   | COMPOUND | +60% tithe mark bite | | | | |
   | SALVO | every 8th shot fires 3 | | | | |
@@ -604,40 +604,27 @@ itself every twenty seconds, which is the one place the barrel cannot reach —
 so the flank problem becomes something you buy your way out of. **REFLEX**
 makes PULSE answer a crowd on the turret without being asked.
 
-### Salvage
+### Energy on the floor
 
-Every object leaves fragments, and a fragment is worth something from the
-moment it drops until the moment it is collected. **Nothing decays.** What is on
-the floor is a backlog, not a clock.
+Every object leaves energy, and a mote is worth something from the moment it
+drops until the moment it is taken in. **Nothing decays.** What is on the floor
+is a backlog, not a clock. An object's worth comes from its mass and is split
+across the motes it leaves, so a BULWARK pays about twenty-eight times what a
+MOTE does. The harmless drift pays a flat six: income the tally never sees.
 
-**Wreckage is drawn small, whatever it came off.** A chip's radius, and an
-explosion shard's, were both a fraction of the parent's — so a BULWARK left
-chips 16.7px across, a grafted one 22.7px, and its burst threw spiky shards
+**Energy is drawn small, whatever it came off.** A mote's radius, and an
+explosion shard's, were both a fraction of the parent's — so a BULWARK dropped
+pieces 16.7px across, a grafted one 22.7px, and its burst threw spiky shards
 bigger still. A live NEEDLE is 12.4px and the smallest body in the game is
-9.9px. The floor and the flash were full of things that read as bodies and were
-not, in the parent's own colour: WARDEN's wreckage was the same orange as a
-WARDEN, sitting still on the floor looking like a threat.
+9.9px, so the floor and the flash were full of things that read as bodies and
+were not.
 
-`CFG.wreck` caps both. Every chip now draws 2.1–5.5px — the band a MOTE's
-always did — and explosion shards get a looser ceiling (`wreck.burst`) because
-they live under a second and a big object should still come apart bigger than a
-small one: 3.8px from a MOTE, 7.9px from a BULWARK, against a 9.9px floor for
-anything alive. The ceiling is a *drawn* value rather than a fixed one, because
-a flat clamp pinned every chip off anything large to exactly the maximum and a
-floor of identical pieces reads as tiling. What a chip is worth is untouched —
-value comes from the parent's mass and is split across the chips, never read
-off their size.
-
-**A fragment is collected by being destroyed** — shot, blasted or crushed. An
-object's worth comes from its mass and is split across the fragments it leaves,
-so a bulwark pays about twenty-eight times what a mote does. The harmless drift
-pays a flat six: income the tally never sees.
-
-Auto-aim never targets debris, so clearing the floor is always a decision you
-make with your own hand — barrel down, at the wreckage, and not up the field at
-what is coming.
-Sit down and play and you can turn the barrel on the floor and cash it now, at
-the cost of the shots that are not going into what is coming down.
+`CFG.drop` caps both. Every mote now draws 2.1–5.5px, and explosion shards get
+a looser ceiling (`drop.burst`) because they live under a second and a big
+object should still come apart bigger than a small one: 3.8px from a MOTE,
+7.9px from a BULWARK. The ceiling is a *drawn* value rather than a fixed one,
+because a flat clamp pinned every piece off anything large to exactly the
+maximum and a floor of identical pieces reads as tiling.
 
 **Corruption taxes the intake.** Whatever is stuck to the turret is sitting on
 the collection point:
@@ -647,8 +634,11 @@ the collection point:
 | intake | 100% | 78% | 61% | 47% | 37% | 30% |
 
 It floors at five and never reaches zero, so an unattended game always earns —
-just at up to a third of the rate. The salvage chip goes red when something is
+just at up to a third of the rate. The energy chip goes red when something is
 on the intake; it is the only place the corruption costs a number.
+
+How energy is actually collected — PULSE, INTAKE and SCOUR — is under
+**Energy, and how it is taken in**, further down.
 
 ### The fight
 
@@ -709,7 +699,7 @@ wider than that would be one it could never push out of.
 
 - **REPRISE** un-kills. Fragments of things you already destroyed lift out of
   the simulation, fly back together along visible seams, and land as whole
-  objects again. It prefers real debris near the assembly point and only makes
+  objects again. It prefers real energy near the assembly point and only makes
   up the shortfall from itself, so on a littered field you watch your own work
   undone.
 - **ECHO** stands a copy of *your* turret across the field and shoots back with
@@ -800,7 +790,7 @@ minutes of looking at its cell.
 Four lines run over the empty field — the grip, the shot, that PULSE can never
 be taken, and that what is coming cannot kill you — and then it stops talking.
 Four more are spread across the count for the three things the run gives back:
-SALVAGE at object 2, ALLOCATION at object 20 with a real one waiting on the
+ENERGY at object 2, ALLOCATION at object 20 with a real one waiting on the
 button, AMENDMENT at object 44, and a reminder at 120 that everything not in
 hand is still out there.
 
@@ -853,37 +843,51 @@ opening. More of them standing there; no faster a stream. Measured from a cold
 start: nothing until 22s, three on the field by 26s, six by 36s, and the cap
 holds at six until the opening finishes.
 
-### Wreckage, and being paid for it
+### Energy, and how it is taken in
 
-Wreckage drifts turret-ward at `salvage.pull` and **lands on you**. It does not
-stop, it does not fade, and — as of build 59 — it is not taken in when it
-arrives. It sits there.
+**The currency is energy.** An object carries it, and when it comes apart the
+energy is left behind as small bright motes in the object's own colour. They
+drift toward the turret at `energy.pull` and land on it. That is as far as they
+get on their own.
 
-There used to be a **collection radius**: an unmarked circle at 190 units where
-a fragment silently stopped existing and its salvage appeared in the corner.
-Build 58 drew that circle and animated the pickup, which made the rule legible
-but did not make it a decision. Build 59 removed the rule instead.
+**PULSE is how you take it in.** The one ability that can never be taken from
+you does three things at once: it hurts what is near you, it shoves it away,
+and it draws in every mote within `energy.pulse` — 400 units, a little wider
+than its own 340 blast, because a shockwave that damages a body ought to reach
+the energy sitting just past it. So the ability you always have is also the
+economy, and the loop is: break things, watch the energy gather on you, pulse.
 
-What is left is simpler and asks something of the player. **The way to bank a
-fragment is to destroy it**, which costs the shots that were going up the field.
-An uncleared floor is not an abstraction any more — it is a heap physically on
-top of the turret, and it eats your own rounds. Measured against a
-twenty-five-piece pile: **14 of 20 shots aimed straight up the field still got
-through**, so it is a tax of roughly a third rather than a lockout, and the six
-that were stopped banked wreckage instead of being wasted. The pile clears
-itself as you fire into it.
+**Energy is not a target.** It cannot be damaged and it cannot be destroyed — a
+round passes straight through it to whatever is behind, and a blast shoves it
+around without consuming it. It is not rubble to be broken up a second time; it
+is the charge the object was carrying, and the only thing that can happen to it
+is being taken in. That also means an uncollected floor no longer eats your own
+rounds, which it did between builds 59 and 66, when the same objects were
+wreckage and destroying each one was how you got paid.
 
-**INTAKE** is the upgrade that ends the chore: with it, anything touching the
-turret is taken in on contact — the same two-radii test contact uses for
-everything else. It used to be "+50% pickup range", a number on a rule that no
-longer exists; it is now the switch between wreckage being work and wreckage
-being income, which is worth a card on its own. One level, and it never comes
-round twice.
+**INTAKE automates it.** One permanent upgrade, one level: energy is taken in
+on contact, no PULSE needed. **SCOUR**, a top-up, is the same verb with no
+limit on the reach and +50% on the take.
 
-The opening says the rule, gated on the first kill so there is wreckage on the
-floor to point at: *"Those pieces are wreckage, not enemies. They drift to you
-on their own."*, then *"Shoot wreckage to cash it in. SALVAGE is the green
-number."*
+It is drawn to look like energy rather than like rubble: a filled core inside a
+pulsing halo, additive, at full brightness — it has no health to read, so
+nothing dims it. Absorbing throws a streak per mote from where it lay into the
+turret, accelerating and brightening as it arrives, so a PULSE that empties the
+floor is visibly a stream going in rather than a number in the corner going up.
+
+Every mote draws between 2.1 and 5.5px whatever it came off (`CFG.drop`), well
+under the 9.9px of the smallest body, so nothing on the floor can be mistaken
+for something alive. What a mote is worth comes from the parent's mass, split
+across the motes it leaves — never read off its size.
+
+**In the code** the currency is `world.energy`, the pieces on the floor are
+`world.drops`, and a piece is `isDrop`. They are deliberately *not* called motes
+in code, though that is the right word for them in prose: there is an enemy type
+called MOTE, and two things of one name is how a reader gets hurt.
+
+The opening says it, gated on the first kill so there is energy on the floor to
+point at: *"Broken objects leave ENERGY. It is not an enemy. It drifts to you."*,
+then *"PULSE takes in the energy near you. ENERGY is the green number."*
 
 ### What is on the field at once
 
@@ -1007,7 +1011,7 @@ They unlock progressively as the count climbs.
   shows you it is doing so: a thread out to each one and a shell on each of
   them. Covered objects take 62% less. Kill the beacon, not the escort — the
   cover lapses a frame after it dies.
-- **GLUT** — eats the mess. Every fragment it touches makes it bigger, heavier
+- **GLUT** — eats the mess. Every mote it touches makes it bigger, heavier
   and tougher, one visible seam per mouthful, from 16 units up to 52 and from
   90 hit points up to 350. A littered field is its food supply, so it is the
   only object whose threat you control.
@@ -1028,22 +1032,33 @@ They unlock progressively as the count climbs.
   meeting it from off-camera. So while a drift is above its band
   (`drift.band` above the turret) the walk is overruled toward straight down by
   `drift.sink` and it descends at `drift.fall` rather than at its wander speed;
-  below the line it is as aimless as it ever was. Measured from the entry line:
-  the first one is in the field in under fourteen seconds — ahead of the first
-  hostile at twenty-two — eight of them settle between 250 and 780 units above
-  the turret, none is left above the top of the field, and one already in the
-  band still spends about as many frames rising as falling.
+  below the line it is as aimless as it ever was.
+
+  **Build 67 fixed the descent, which had never worked as measured.** The sink
+  eased off over `reach: 460` — further than the whole descent — so it was
+  strongest at the entry line and had faded to almost nothing by the time the
+  body neared the line it was meant to cross. A *lone* drift dithered above the
+  band for anywhere between 17 and 47 seconds. Build 60's "under fourteen
+  seconds" was timed on eight released together, where they shove each other
+  down; that is not how the spawner releases them, and the figure was not
+  representative. It eases over `ease: 130` now and falls at 260: measured on
+  sixteen lone drifts, **median 4.3 seconds**, with the occasional straggler
+  that wanders sideways first. Since drift spawns every 3.5–6.5s from
+  `driftStart: 7`, the field reliably has some well before the first hostile at
+  22. Eight of them settle between 250 and 780 units above the turret, none is
+  left above the top of the field, and one already in the band still spends
+  about as many frames rising as falling.
 
 Every object picks a **route** when it spawns — direct, sweeping, wide,
 serpentine, hooking or loitering — as a lateral offset that folds in as it
 closes. Two of the same type released together arrive by visibly different
 arcs, and all of them still arrive.
 
-Everything leaves **fragments**: smaller bodies that are themselves
+Everything leaves **energy**: small bright bodies that are themselves
 destructible, pushable, and dangerous to each other. Up to 128 can be loose at
 once, and a bulwark alone sheds fourteen.
 
-Drift and fragments are budgeted **separately** from hostiles — `hostileCount()`
+Drift and energy are budgeted **separately** from hostiles — `hostileCount()`
 is what the spawn director measures against `popStart`/`popEnd`, so the amount
 of harmless matter floating around can be changed freely without touching the
 pace of the run.
@@ -1223,7 +1238,7 @@ A cleanup pass in build 66 fixed six things worth not letting back in:
   `styles.css`, and the suite now checks that no two share a tone.
 - **A stale duplicate doc block.** `CFG.rounds.tithe` carried two comments, the
   first describing the round as it behaved before build 53 — no ramp, just a
-  salvage mark. Gone.
+  energy mark. Gone.
 - **A dead branch.** `opt.stacks === false` was checked in `showOffer` and set
   by nothing since the level system landed; `levels === 1` covers it.
 - **Dead exports.** `save.hasRun`, `loadout.ownedOf` and the `rollSmallFor`

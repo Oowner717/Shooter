@@ -145,7 +145,6 @@ function chainFrom(world, first, hx, hy, jumps) {
       }
     };
     scan(world.enemies);
-    scan(world.debris);
     if (!best) break;
 
     seen.add(best);
@@ -245,7 +244,8 @@ function resolveSegment(world, p, ax, ay, bx, by) {
     }
   };
   test(world.enemies);
-  test(world.debris);
+  // Energy is not in the way of anything. A round passes straight through it:
+  // it is not a target, it is the thing you were shooting *for*.
 
   // boss body
   const boss = world.boss;
