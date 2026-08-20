@@ -594,6 +594,24 @@ Every object leaves fragments, and a fragment is worth something from the
 moment it drops until the moment it is collected. **Nothing decays.** What is on
 the floor is a backlog, not a clock.
 
+**Wreckage is drawn small, whatever it came off.** A chip's radius, and an
+explosion shard's, were both a fraction of the parent's — so a BULWARK left
+chips 16.7px across, a grafted one 22.7px, and its burst threw spiky shards
+bigger still. A live NEEDLE is 12.4px and the smallest body in the game is
+9.9px. The floor and the flash were full of things that read as bodies and were
+not, in the parent's own colour: WARDEN's wreckage was the same orange as a
+WARDEN, sitting still on the floor looking like a threat.
+
+`CFG.wreck` caps both. Every chip now draws 2.1–5.5px — the band a MOTE's
+always did — and explosion shards get a looser ceiling (`wreck.burst`) because
+they live under a second and a big object should still come apart bigger than a
+small one: 3.8px from a MOTE, 7.9px from a BULWARK, against a 9.9px floor for
+anything alive. The ceiling is a *drawn* value rather than a fixed one, because
+a flat clamp pinned every chip off anything large to exactly the maximum and a
+floor of identical pieces reads as tiling. What a chip is worth is untouched —
+value comes from the parent's mass and is split across the chips, never read
+off their size.
+
 **A fragment is collected by being destroyed** — shot, blasted or crushed. An
 object's worth comes from its mass and is split across the fragments it leaves,
 so a bulwark pays about twenty-eight times what a mote does. The harmless drift

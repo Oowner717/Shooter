@@ -169,7 +169,11 @@ export function explode(x, y, r, color, glow, power = 1) {
   for (let i = 0; i < shards; i++) {
     const a = rand(0, TAU);
     const s = rand(60, 260) * power;
-    shard(x, y, Math.cos(a) * s, Math.sin(a) * s, color, rand(0.5, 1.15), rand(r * 0.12, r * 0.3), 3 + ((Math.random() * 3) | 0));
+    // Capped like a chip is, so a big body's burst does not throw pieces the
+    // size of a small body. Looser than the floor's ceiling because these live
+    // under a second and a BULWARK should still come apart bigger than a MOTE.
+    const sr = Math.min(rand(r * 0.12, r * 0.3), rand(CFG.wreck.min, CFG.wreck.max * CFG.wreck.burst));
+    shard(x, y, Math.cos(a) * s, Math.sin(a) * s, color, rand(0.5, 1.15), sr, 3 + ((Math.random() * 3) | 0));
   }
   const sparks = clamp((r * 0.7 * power * q) | 0, 5, 34);
   for (let i = 0; i < sparks; i++) {

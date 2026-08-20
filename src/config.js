@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '63';
+export const BUILD = '64';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -463,12 +463,37 @@ export const CFG = {
   // intake or by being destroyed, so a present player can turn the barrel on
   // the floor and cash it now, at the cost of the shots that are not going
   // into what is coming down.
+  /*
+   * How big a piece of wreckage may draw, whatever it came off.
+   *
+   * A chip's radius, and an explosion shard's, are both a fraction of the
+   * parent's — which meant a BULWARK left wreckage 16.7px across, a grafted
+   * one 22.7px, and its explosion threw spiky shards bigger still. A live
+   * NEEDLE is 12.4px. So the floor and the flash were full of things that read
+   * as bodies and were not, in the parent's own colour: WARDEN's wreckage was
+   * the same orange as a WARDEN.
+   *
+   * Capped, every piece draws in the band a MOTE's always did, and "small,
+   * dull, angular" means wreckage and nothing else. Explosion shards get a
+   * looser ceiling because they live under a second and a big object should
+   * still burst bigger than a small one.
+   *
+   * What a chip is worth is unaffected: value comes from the parent's mass and
+   * is split across the chips, not read off their size.
+   */
+  wreck: {
+    min: 1.8,
+    max: 4.4,
+    burst: 1.6, // multiplier on the ceiling for explosion shards
+  },
+
   salvage: {
     // A whole object's worth, from its mass, split across the fragments it
     // leaves. Taken from the parent rather than the chip: a chip's own mass is
     // small enough that every fragment in the game rounded to the same 1.
     perMass: 3.6,
     minValue: 1,
+
     drift: 6, // flat, for the harmless ones — income the tally never sees
     // No collection radius. Build 59 took it out: wreckage drifts the whole
     // way in and lands on the turret, and banking it means destroying it --

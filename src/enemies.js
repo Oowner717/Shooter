@@ -613,7 +613,14 @@ export class Enemy {
       if (world.debris.length >= CFG.maxDebris) break;
       const a = rand(0, TAU);
       const sp = rand(70, 240);
-      const dr = rand(this.r * 0.16, this.r * 0.3);
+      // A fraction of the parent, but never bigger than wreckage is allowed
+      // to draw. The ceiling is drawn rather than fixed: a flat clamp pinned
+      // every chip off anything large to exactly the maximum, and a floor of
+      // identical pieces reads as tiling rather than as wreckage.
+      const dr = Math.min(
+        rand(this.r * 0.16, this.r * 0.3),
+        rand(CFG.wreck.min, CFG.wreck.max),
+      );
       world.debris.push(new Enemy(t, this.x + Math.cos(a) * this.r * 0.5, this.y + Math.sin(a) * this.r * 0.5, {
         debris: true,
         r: dr,
