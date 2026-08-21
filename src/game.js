@@ -14,12 +14,12 @@ import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator } from './narrative.js';
 import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
-import { codex, taught, markTaught, forgetTaught } from './codex.js';
+import { codex, lineSeen, markLine, forgetLines, migrateLines } from './codex.js';
 import { readRun, saveRun, forgetRun } from './save.js';
 import { Offers } from './events.js';
 import { freshUpgrades, BY_ID } from './upgrades.js';
 import { NODE_BY_ID, priceOf } from './tree.js';
-import { SCRIPT, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { SCRIPT, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
@@ -181,9 +181,14 @@ export class Game {
     // else in the opening moves until it passes; the first line is due at
     // START, which is what the initial value buys.
     this.lineUntil = START - GAP;
-    // The opening lines run once, ever — unless asked for again from the menu,
-    // which is the only way back to them.
-    this.teaching = this.replayNext || !taught();
+    /*
+     * Nothing is said twice, and anything not yet said still gets said. The
+     * record is per line now, so a line written after this device finished the
+     * opening is simply a line it has not been told — which is how the two
+     * about DRIFT reach anyone who was already playing before they existed.
+     */
+    migrateLines(CONTROL_LINES);
+    this.teaching = this.replayNext || SCRIPT.some((e) => !lineSeen(e.id));
     this.replayNext = false;
     // What the turret is issued with. Everything else — four rounds, four
     // mines, the two that run on their own and seven of the eight abilities —
@@ -305,7 +310,7 @@ export class Game {
     // Setting teaching false outright, which is what this did until build 71,
     // meant quitting during the opening silently cancelled the rest of it.
     this.scriptStep = d.scriptStep || 0;
-    this.teaching = !!d.teaching && this.scriptStep < SCRIPT.length;
+    this.teaching = !!d.teaching && SCRIPT.some((e) => !lineSeen(e.id));
     this.autoHinted = {};
     for (const k of d.hinted || []) this.autoHinted[k] = true;
     // Back to the wave the run was left on, from the top of it.
@@ -1143,20 +1148,23 @@ export class Game {
   teach() {
     if (!this.teaching) return;
     const w = this.world;
+    // Walk past anything this device has already been told. Costs nothing and
+    // no clock: a line it has heard should not hold up the one it has not.
+    while (this.scriptStep < SCRIPT.length && lineSeen(SCRIPT[this.scriptStep].id)) {
+      this.scriptStep++;
+    }
     const step = SCRIPT[this.scriptStep];
-    if (!step) return;
+    if (!step) { this.teaching = false; return; }
     // Paced by the clock so nothing is ever cut off, and gated on the count so
     // a line about salvage is not said before any has been banked.
     if (w.time < this.lineUntil + GAP) return;
     if (step.at !== undefined && w.kills < step.at) return;
 
     this.scriptStep++;
+    markLine(step.id);
     this.hud.showHint(step.text, true);
     this.lineUntil = w.time + step.hold;
-    if (this.scriptStep >= SCRIPT.length) {
-      this.teaching = false;
-      markTaught();
-    }
+    if (this.scriptStep >= SCRIPT.length) this.teaching = false;
   }
 
   /**
@@ -1166,7 +1174,7 @@ export class Game {
    * which made every later change to them invisible to anyone who had played.
    */
   replayOpening() {
-    forgetTaught();
+    forgetLines();
     this.replayNext = true;
     this.restart();
   }
@@ -1177,7 +1185,8 @@ export class Game {
     this.teaching = false;
     this.scriptStep = SCRIPT.length;
     this.hud.clearHint();
-    markTaught();
+    // Stopping it is a decision about all of it, so all of it counts as said.
+    for (const e of SCRIPT) markLine(e.id);
   }
 
   /**
@@ -1554,7 +1563,7 @@ export class Game {
 
   /** Put the opening back, for looking at it again. */
   debugForgetTaught() {
-    forgetTaught();
+    forgetLines();
   }
 
   debugCodexAll() {

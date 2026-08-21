@@ -133,6 +133,11 @@ export class Hud {
     this.el.resumeBtn.addEventListener('click', () => game.resume());
     this.offerResume();
     $('dbgClose').addEventListener('click', () => this.toggleDebug(false));
+
+    // Everything above is what `preboot` was waiting for: the strip, the
+    // abilities, the menu, the controls list, the build stamp and whether
+    // there is a run to continue. The overlay can be looked at now.
+    document.documentElement.classList.remove('preboot');
   }
 
   // ----------------------------------------------------------------- strip

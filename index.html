@@ -1,5 +1,15 @@
 <!doctype html>
-<html lang="en">
+<!--
+  `preboot` is on the root element in the markup rather than added by script,
+  so it is in force from the first byte the parser sees and there is no frame
+  in which it is missing. It hides the interface until the interface is built:
+  the title screen is markup, but its controls list and its build stamp are
+  filled in by Hud, so between the stylesheet loading and the modules running
+  there was a real screen -- correct fonts, correct layout, no controls, no
+  BUILD -- for as long as the modules took to arrive. Hud removes the class as
+  its last act. See the fallback in styles.css for what happens if it cannot.
+-->
+<html lang="en" class="preboot">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -29,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '93';
+  var BUILD = '94';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;

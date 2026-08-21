@@ -190,10 +190,73 @@ export function forgetCleared() {
 }
 
 /**
- * Whether the opening has been walked through once. The first run hands the
- * interface over a piece at a time; every run after it starts with all of it,
- * because being taught the same nineteen things twice is not teaching.
+ * Which lines this device has already been told, one id at a time.
+ *
+ * It used to be a single flag: said, or not said, for the whole script at
+ * once. That was fine until the script grew — the two lines about DRIFT were
+ * written after most devices had already set the flag, so the game had
+ * something to say and no way left to say it, and the only route back was
+ * REPLAY OPENING in the menu, which you would have to already know about.
+ *
+ * Per line, a line added later is simply a line this device has not been told,
+ * and one it has been told is never repeated. Held in memory as well, because
+ * teach() asks this every frame.
  */
+const LINES = 'sim7749-lines';
+let _lines = null;
+
+function loadLines() {
+  if (_lines) return _lines;
+  try {
+    const raw = localStorage.getItem(LINES);
+    _lines = new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    _lines = new Set();
+  }
+  return _lines;
+}
+
+export function lineSeen(id) {
+  return loadLines().has(id);
+}
+
+export function markLine(id) {
+  const set = loadLines();
+  if (set.has(id)) return;
+  set.add(id);
+  try {
+    localStorage.setItem(LINES, JSON.stringify([...set]));
+  } catch { /* private mode: it will offer the line again next launch */ }
+}
+
+export function forgetLines() {
+  _lines = new Set();
+  try {
+    localStorage.removeItem(LINES);
+  } catch { /* nothing to forget */ }
+}
+
+/**
+ * The one-time move off the old flag.
+ *
+ * A device carrying `sim7749-taught` has been through an opening, but not
+ * which one — there is no record of that to read. `ids` is what it is credited
+ * with: the control lines, which have been in the opening since the first
+ * build and are the ones nobody wants to sit through twice. Anything written
+ * since is left unseen, which is the whole point of doing this at all.
+ */
+export function migrateLines(ids) {
+  try {
+    if (localStorage.getItem(LINES) !== null) return;
+    if (localStorage.getItem(TAUGHT) !== '1') return;
+    const set = loadLines();
+    for (const id of ids) set.add(id);
+    localStorage.setItem(LINES, JSON.stringify([...set]));
+    localStorage.removeItem(TAUGHT);
+  } catch { /* private mode: nothing was remembered to migrate */ }
+}
+
+/** The flag the above replaced. Read once, by migrateLines(), then removed. */
 const TAUGHT = 'sim7749-taught';
 
 export function taught() {

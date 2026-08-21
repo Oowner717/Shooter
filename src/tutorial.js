@@ -58,7 +58,30 @@ const NOTES = [
   { at: 120, text: 'Everything you are not carrying is still out there.\nThe offers are how you get it.' },
 ];
 
-export const SCRIPT = [...OPENING, ...NOTES].map((e) => ({ ...e, hold: holdFor(e.text) }));
+/*
+ * A line's id is its text. Two consequences, both wanted: a line added later is
+ * a line this device has not been told, and a line whose wording changes is a
+ * new line too — which is right, because the reason to change it was that the
+ * old one said something else.
+ */
+const idOf = (text) => {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+};
+
+export const SCRIPT = [...OPENING, ...NOTES]
+  .map((e) => ({ ...e, id: idOf(e.text), hold: holdFor(e.text) }));
+
+/*
+ * What a device carrying the old `sim7749-taught` flag is credited with having
+ * heard. The four control lines: they have opened the game since the first
+ * build, they are the ones nobody wants to sit through twice, and they are the
+ * only ones anything can honestly be assumed about. Everything written after
+ * them — the two about DRIFT among them — is left unheard, because for most
+ * devices carrying that flag it genuinely is.
+ */
+export const CONTROL_LINES = SCRIPT.slice(0, 4).map((e) => e.id);
 
 /**
  * What each thing says the first time it is used. One sentence about what it

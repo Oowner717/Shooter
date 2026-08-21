@@ -77,6 +77,25 @@ html, body {
 
 #ui button { pointer-events: auto; font-family: var(--mono); }
 
+/*
+ * Before the interface exists.
+ *
+ * The title screen is in the markup, but the controls list under it and the
+ * build stamp under that are written by Hud — so a phone painted a complete,
+ * wrong title screen for however long the modules took to load, then filled in
+ * two more blocks under it. This holds the whole overlay back until Hud takes
+ * the class off. The canvas underneath is already the right black, so what is
+ * on screen in the meantime is the game's own background and nothing else.
+ *
+ * The animation is the failsafe. If the modules never arrive the class is
+ * never removed, and a title screen nobody can see is worse than an incomplete
+ * one — so it reveals itself after four seconds on its own. When Hud does its
+ * job the class goes long before that and the animation never runs.
+ */
+:root.preboot #ui { animation: preboot 4s step-end both; }
+@keyframes preboot { 0% { opacity: 0; } 100% { opacity: 1; } }
+#ui { transition: opacity 0.28s ease-out; }
+
 /* ---------------- top bar ---------------- */
 
 #topbar {
