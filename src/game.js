@@ -9,11 +9,10 @@ import { glitch } from './glitch.js';
 import { audio } from './audio.js';
 import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast, solveTethers, collectEnergy, drawIn, intakeRate, ENTRY_Y } from './enemies.js';
 import { Shooter } from './shooter.js';
-import { Boss } from './boss.js';
 import { Abilities } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
-import { Narrator, ENDING } from './narrative.js';
+import { Narrator } from './narrative.js';
 import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
 import { codex, taught, markTaught, forgetTaught } from './codex.js';
 import { readRun, saveRun, forgetRun } from './save.js';
@@ -36,7 +35,6 @@ export class Game {
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.buffer = makeCanvas(2, 2);
     this.bctx = this.buffer.getContext('2d', { alpha: false });
-    this.snapshot = null;
 
     this.dpr = 1;
     this.grid = new Grid(96);
@@ -49,7 +47,6 @@ export class Game {
     this.autoHinted = {};
     this.wells = []; // reused every frame; see the collection pass in update()
     this.acc = 0;
-    this.endFade = 1; // turret opacity; falls to 0 under the ending text
     this.frameTimes = [];
     this.fps = 60;
     this.qualityCooldown = 0;
@@ -81,7 +78,7 @@ export class Game {
       timeScale: 1,
       kills: 0,
       released: 0, // hostile objects let out so far; capped at CFG.killGoal
-      phase: 'boot', // boot | staging | lull | boss | ending | frozen
+      phase: 'boot', // boot | staging
 
       enemies: [],
       drops: [], // energy on the floor, waiting to be taken in
@@ -92,7 +89,6 @@ export class Game {
       attackers: new Set(),
 
       shooter: new Shooter(0, 0),
-      boss: null,
       background,
       narrator: new Narrator(),
       abilities: new Abilities(),
@@ -100,16 +96,6 @@ export class Game {
 
       // status effects
       stasis: 0,
-      veil: 0,
-      invert: 0,
-      jam: 0,
-      chrono: 0,
-      lockout: 0,
-      bossContact: 0,
-      // What ORDINAL still holds of the player's tally. Set when it arrives,
-      // drained both by everything it does and by every hit that lands.
-      ledger: 0,
-      reclaimed: 0,
       autoSteering: false, // is auto aim traversing the barrel this frame?
       autoAim: false,
       autoFire: false,
@@ -121,10 +107,10 @@ export class Game {
       surge: 0, // seconds of doubled cadence, from a SURGE offer
       haste: 0, // seconds of halved ability cooldowns, from a HASTE offer
       pendingMines: 0, // laid on the next tick, from a SEED offer
-      // Set once ORDINAL has been beaten. Every run after it is endless: no
-      // five hundred, no lull, no boss, no ending. The counted run is the
-      // tutorial for the game underneath it.
-      endless: false,
+      // Always true from build 81. Kept as a field because the director, the
+      // counter and the save all read it, and a constant threaded through
+      // four modules is worse than a flag that is simply never false.
+      endless: true,
       // What the first run has handed over so far. Every strip cell and every
       // ability button is on screen from the start; only what is in here can
       // actually be pressed. Full on any run after the opening.
@@ -136,10 +122,8 @@ export class Game {
       round: 'standard', // standard | explosive | shotgun
       mines: [],
       decoy: null, // the DECOY ability's stand-in turret, while one is up
-      veilFade: 0, // eased so VEIL closes in rather than snapping
 
       nextStoryAt: CFG.storyEvery,
-      counted: false, // the five hundredth has fallen; the lull is running
 
       debug: {
         noCooldown: false,
@@ -150,11 +134,9 @@ export class Game {
       },
 
       alert: (text, kind, dur) => self.hud.alert(text, kind, dur),
-      bossCaption: (text, hold) => self.hud.bossCaption(text, hold),
       abilityTaken: (i) => self.hud.flashTaken(i),
       announceOffer: (tier) => self.announceOffer(tier),
       carry: (key) => self.carry(key),
-      onBossDead: () => self.onBossDead(),
     };
   }
 
@@ -172,15 +154,9 @@ export class Game {
     w.timeScale = 1;
     w.kills = 0;
     w.released = 0;
-    w.boss = null;
-    w.stasis = w.veil = w.invert = w.jam = w.chrono = w.lockout = w.bossContact = 0;
-    w.veilFade = 0;
-    w.ledger = 0;
-    w.reclaimed = 0;
+    w.stasis = 0;
     w.decoy = null;
-    this.hud.bossCaption(null);
     w.nextStoryAt = CFG.storyEvery;
-    w.counted = false;
     w.energy = 0;
     w.up = freshUpgrades();
     w.offers.reset();
@@ -199,7 +175,6 @@ export class Game {
     // the run is however long you keep playing it. It used to be the state a
     // player earned by beating the boss once; it is the whole game now.
     w.endless = true;
-    this.lullTimer = 0;
     this.scriptStep = 0;
     // World time at which the line now up has had its reading time. Nothing
     // else in the opening moves until it passes; the first line is due at
@@ -254,15 +229,8 @@ export class Game {
 
     this.mineTimer = 0;
     this.saveTimer = SAVE_EVERY;
-    this.snapshot = null;
-    this.endStage = 0;
-    this.endTimer = 0;
-    this.endFade = 1;
     this.resetShown = false;
     this.hud.clearAlerts();
-    this.hud.hideEnding();
-    this.hud.setBoss(false);
-    this.hud.setLedgerMode(false);
     this.hud.setKills(0, w.endless ? null : CFG.killGoal);
     this.hud.setEnergy(0);
     this.hud.setPhase(w.endless ? 'FIELD' : 'STAGING');
@@ -316,10 +284,7 @@ export class Game {
     w.released = d.released;
     w.time = d.time || 0;
     w.energy = d.energy;
-    w.ledger = d.ledger;
-    w.reclaimed = d.reclaimed;
     w.nextStoryAt = d.nextStoryAt;
-    w.counted = !!d.counted;
     // A loaded round with no cell on the strip is a broken state — the turret
     // is meant always to have a round it can actually see. The save cannot
     // produce one today, but a guard here is a line of code and the state it
@@ -369,7 +334,6 @@ export class Game {
   }
 
   restart() {
-    this.hud.hideEnding();
     this.reset();
     forgetRun();
     audio.resume();
@@ -447,9 +411,6 @@ export class Game {
     this.grid.resize(world.width, world.height + STAGE_HEIGHT, 96);
     background.resize(world.width, world.height, world.width / 2, ENTRY_Y);
 
-    // Soft darkness mask for the boss VEIL power, also in world units.
-    this.veilMask = makeCanvas(Math.ceil(world.width / 2), Math.ceil(world.height / 2));
-    this.veilCtx = this.veilMask.getContext('2d');
   }
 
   qualityScale() {
@@ -478,12 +439,12 @@ export class Game {
       // is a direct shot at the point you touched.
       if (this.gripPointer === null && p.y > s.y - s.r) {
         this.gripPointer = ev.pointerId;
-        s.grabGrip(p.x, p.y, w.invert > 0);
+        s.grabGrip(p.x, p.y, false);
         s.shoot(w);
         this.fireTimer = CFG.shooter.gripFireInterval;
       } else {
         this.pointers.set(ev.pointerId, p);
-        s.aimAt(p.x, p.y, w.invert > 0);
+        s.aimAt(p.x, p.y, false);
         s.aim = s.targetAim; // taps are instant, drags slew
         s.shoot(w);
         this.fireTimer = CFG.shooter.holdFireInterval;
@@ -495,14 +456,14 @@ export class Game {
       const w = this.world;
       if (ev.pointerId === this.gripPointer) {
         const p = pos(ev);
-        w.shooter.driveGrip(p.x, p.y, w.invert > 0);
+        w.shooter.driveGrip(p.x, p.y, false);
         ev.preventDefault();
         return;
       }
       if (!this.pointers.has(ev.pointerId)) return;
       const p = pos(ev);
       this.pointers.set(ev.pointerId, p);
-      w.shooter.aimAt(p.x, p.y, w.invert > 0);
+      w.shooter.aimAt(p.x, p.y, false);
       ev.preventDefault();
     }, { passive: false });
 
@@ -688,7 +649,7 @@ export class Game {
     const hint = FIRST_USE[key];
     if (!changed || !on || !hint || this.autoHinted[key] || !this.hintsAllowed) return;
     // Marked only once it has actually been shown. It used to be marked first,
-    // so picking a round during the boss fight — where captions are suppressed
+    // so picking a round while captions are suppressed
     // and where all five are now one tap away — spent that caption on nothing
     // and never gave it back, not even across a reset.
     this.autoHinted[key] = true;
@@ -725,7 +686,6 @@ export class Game {
       const score = Math.hypot(dx, dy) * (e.attacking ? 0.25 : 1);
       if (score < bestScore) { bestScore = score; best = e; }
     }
-    if (!best && w.boss && !w.boss.dead && w.boss.intro >= 1) best = w.boss;
     return best;
   }
 
@@ -733,9 +693,9 @@ export class Game {
   aimLead(target) {
     const w = this.world;
     const s = w.shooter;
-    const speed = CFG.bolt.speed * (w.chrono > 0 ? 0.42 : 1);
+    const speed = CFG.bolt.speed;
     const flight = Math.hypot(target.x - s.x, target.y - s.y) / speed;
-    s.aimAt(target.x + (target.vx || 0) * flight, target.y + (target.vy || 0) * flight, w.invert > 0);
+    s.aimAt(target.x + (target.vx || 0) * flight, target.y + (target.vy || 0) * flight, false);
   }
 
   /**
@@ -777,7 +737,7 @@ export class Game {
     this.fireTimer = interval;
     if (dragging && !s.gripHeld) {
       const last = [...this.pointers.values()].pop();
-      if (last) s.aimAt(last.x, last.y, w.invert > 0);
+      if (last) s.aimAt(last.x, last.y, false);
     }
     s.shoot(w);
   }
@@ -801,16 +761,6 @@ export class Game {
     if (w.debug.slowmo) dt *= 0.25;
     dt *= w.timeScale;
 
-    if (w.phase === 'frozen') {
-      glitch.update(dtRaw, 1, 'frozen');
-      this.endTimer += dtRaw;
-      if (this.endTimer > 2.2 && !this.resetShown) {
-        this.resetShown = true;
-        this.hud.showResetButton();
-      }
-      return;
-    }
-
     w.time += dt;
 
     // The run writes itself down every few seconds. Off the world clock, so a
@@ -833,13 +783,6 @@ export class Game {
 
     // ---- status timers ----
     w.stasis = Math.max(0, w.stasis - dt);
-    w.veil = Math.max(0, w.veil - dt);
-    w.invert = Math.max(0, w.invert - dt);
-    w.jam = Math.max(0, w.jam - dt);
-    w.chrono = Math.max(0, w.chrono - dt);
-    w.lockout = Math.max(0, w.lockout - dt);
-    w.bossContact = Math.max(0, w.bossContact - dt);
-    w.veilFade += ((w.veil > 0 ? 1 : 0) - w.veilFade) * clamp(dt * 3.4, 0, 1);
 
     this.updateFiring(dt);
 
@@ -868,17 +811,6 @@ export class Game {
     background.setWells(this.wells);
 
     w.director.update(w, dt);
-    if (w.boss && !w.boss.dead) {
-      w.boss.update(w, dt);
-      // The world radiates from whatever is holding its attention, and the
-      // sweep runs faster the emptier its ledger gets.
-      background.setFocus(w.boss.x, w.boss.y);
-      background.setDread(1, 1 - clamp(w.ledger / CFG.killGoal, 0, 1));
-      if (!this.bossArmed && w.boss.intro >= 1) {
-        this.bossArmed = true;
-        this.onBossArrived();
-      }
-    }
 
     // ---- physics substeps ----
     let steps = 0;
@@ -962,7 +894,6 @@ export class Game {
     }
     updateFx(dt);
 
-    this.updatePhase(real);
     this.syncHud(dt);
     this.updateGlitch(dtRaw);
   }
@@ -1040,32 +971,13 @@ export class Game {
     // whatever it just shoved.
     solveTethers(w);
 
-    const boss = w.boss;
-    for (let i = 0; i < bodies.length; i++) {
+    // Only the clamped run — debris is appended past it and is the one body
+    // allowed to leave the field.
+    for (let i = 0; i < clamped; i++) {
       const b = bodies[i];
-      if (i < clamped) {
-        const impact = clampToArena(b, w.width, STAGE_HEIGHT, w.floorY);
-        if (impact > 240) {
-          spark(b.x, b.y, spread(impact), spread(impact), b.type.glow, 0.18, 1.8);
-        }
-      }
-      if (boss && !boss.dead && boss.intro >= 1) {
-        const dx = b.x - boss.x;
-        const dy = b.y - boss.y;
-        const rr = b.r + boss.r;
-        const d2 = dx * dx + dy * dy;
-        if (d2 < rr * rr && d2 > 1e-6) {
-          const d = Math.sqrt(d2);
-          const nx = dx / d;
-          const ny = dy / d;
-          b.x = boss.x + nx * rr;
-          b.y = boss.y + ny * rr;
-          const vn = b.vx * nx + b.vy * ny;
-          if (vn < 0) {
-            b.vx -= (1 + b.restitution) * vn * nx;
-            b.vy -= (1 + b.restitution) * vn * ny;
-          }
-        }
+      const impact = clampToArena(b, w.width, STAGE_HEIGHT, w.floorY);
+      if (impact > 240) {
+        spark(b.x, b.y, spread(impact), spread(impact), b.type.glow, 0.18, 1.8);
       }
     }
   }
@@ -1097,10 +1009,6 @@ export class Game {
       for (const e of w.enemies) {
         if (e.dead || e.staged || e.harmless) continue;
         if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= r2) e.applyDamage(w, bite);
-      }
-      if (w.boss && !w.boss.dead) {
-        const bd = (w.boss.x - s.x) ** 2 + (w.boss.y - s.y) ** 2;
-        if (bd <= (C.r + w.boss.r) ** 2) w.boss.hurt(w, bite);
       }
       // A ring on the beat rather than every frame: sixty of these a second
       // is a solid disc, not a shell.
@@ -1258,134 +1166,7 @@ export class Game {
     }
   }
 
-  // --------------------------------------------------------------- phases
 
-  /** @param real unscaled seconds — the outro must not run at slow-mo speed. */
-  updatePhase(real) {
-    const w = this.world;
-    // Fades the turret out across the text, and snaps back on a reset.
-    const wantFade = w.phase === 'ending' && this.endStage >= 1 ? 0 : 1;
-    this.endFade += (wantFade - this.endFade) * clamp(real * 0.7, 0, 1);
-    if (wantFade === 1 && this.endFade > 0.995) this.endFade = 1;
-
-    if (w.phase === 'lull') {
-      this.lullTimer -= real;
-      if (this.lullTimer <= 0) this.beginBoss();
-      return;
-    }
-
-    if (w.phase === 'ending') {
-      this.endTimer += real;
-      if (this.endStage === 0 && this.endTimer > 2.2) {
-        this.endStage = 1;
-        w.timeScale = 1;
-        for (const e of w.enemies) { e.dead = true; e.dissolved = true; }
-        for (const e of w.drops) { e.dead = true; e.dissolved = true; }
-        w.debris.length = 0;
-        w.projectiles.length = 0;
-        this.hud.showEnding(ENDING);
-        this.hud.setBoss(false);
-        background.setMood('ending');
-        audio.setDroneMood(28, 140, 0.03);
-      } else if (this.endStage === 1 && this.endTimer > 2.2 + ENDING.length * 1.5 + 2.6) {
-        this.endStage = 2;
-        this.freeze();
-      }
-    }
-  }
-
-  /**
-   * Five hundred are down and nothing is falling. A few seconds of empty field
-   * is the whole of the transition — the run simply stops, and the light goes
-   * wrong.
-   */
-  onLull() {
-    // Insurance. The opening is two minutes and the count is thirteen, so a
-    // run that reaches five hundred still teaching is not one anyone will
-    // play — but nothing explains itself over ORDINAL, and that rule should
-    // not rest on the arithmetic holding.
-    this.finishTeaching();
-    this.hud.setPhase('—');
-    background.setMood('lull');
-    background.surge(2);
-    audio.setDroneMood(55, 480, 0.07);
-  }
-
-  beginBoss() {
-    const w = this.world;
-    w.phase = 'boss';
-    this.hud.setPhase('BOSS');
-    // The field goes dark for the arrival and only lights up again with it.
-    background.setMood('breach');
-    background.surge(2);
-    audio.setDroneMood(26, 180, 0.05);
-
-    w.boss = new Boss(w.width / 2, ENTRY_Y + CFG.boss.r * 0.4);
-    background.setDread(1);
-
-    // The reveal. Five hundred objects were not a score, they were a deposit,
-    // and the counter the player has been watching all run turns over and
-    // becomes the thing they now have to take back.
-    w.ledger = CFG.killGoal;
-    w.reclaimed = 0;
-    this.hud.setLedgerMode(true);
-    this.hud.clearAlerts();
-    // All ten beats are spent by five hundred kills, but anything still
-    // decaying mid-field would sit under the arrival captions. Clear the line
-    // WITHOUT rewinding the script: reset() also zeroes the index, which
-    // re-armed all ten sentences to replay over the boss as its own emissions
-    // pushed the kill count past 550.
-    w.narrator.clear();
-    this.hud.setBoss(true, 1, 'ORDINAL', 'FIRST OF ——');
-    this.bossArmed = false;
-  }
-
-  /** Called once the arrival sequence finishes and the fight proper starts. */
-  onBossArrived() {
-    // The last caption is still holding when the fight starts; from here on
-    // there are no words at all.
-    this.hud.bossCaption(null);
-    background.setMood('boss');
-    background.surge(2);
-    audio.setDroneMood(33, 260, 0.09);
-  }
-
-  onBossDead() {
-    // Unreachable as of build 81 — there is no boss to be dead. It used to
-    // mark the run cleared, which is what switched a device to endless; every
-    // run is endless now, so there is nothing left to record.
-    // The count is done. There is nothing left to pick up, and a save that
-    // outlived its run would offer to resume a finished one.
-    forgetRun();
-    // Hand the world back to the sky. Both eased, so it drains out of the
-    // substrate rather than cutting.
-    background.setDread(0);
-    background.setFocus(null, null);
-    const w = this.world;
-    if (codex.record('ordinal')) this.hud.noteCodex();
-    w.phase = 'ending';
-    w.timeScale = 0.3;
-    w.lockout = 999;
-    w.veil = w.invert = w.jam = w.chrono = 0;
-    this.endTimer = 0;
-    this.endStage = 0;
-    this.resetShown = false;
-    w.boss.detonate(w);
-    this.hud.setPhase('END');
-    this.hud.clearAlerts();
-  }
-
-  freeze() {
-    const w = this.world;
-    w.phase = 'frozen';
-    this.endTimer = 0;
-    this.snapshot = makeCanvas(this.buffer.width, this.buffer.height);
-    this.snapshot.getContext('2d').drawImage(this.buffer, 0, 0);
-    glitch.mode = 'frozen';
-    glitch.level = 1;
-    audio.setDroneMood(24, 90, 0.05);
-    audio.glitchOn();
-  }
 
   // ------------------------------------------------------------- glitch
 
@@ -1394,22 +1175,14 @@ export class Game {
     let level = 0;
     let mode = 'normal';
     if (!w.debug.noGlitch) {
-      if (w.bossContact > 0) {
-        level = 1;
-        mode = 'boss';
-      } else {
-        level = Math.min(CFG.glitch.max, w.attackers.size * CFG.glitch.perAttacker);
-      }
+      level = Math.min(CFG.glitch.max, w.attackers.size * CFG.glitch.perAttacker);
     }
     glitch.update(dtRaw, level, mode);
   }
 
   syncHud(dt) {
     const w = this.world;
-    // Once ORDINAL is on the field the counter is no longer the player's: it
-    // reads the ledger, and it falls.
-    if (w.boss) this.hud.setLedger(w.ledger, CFG.killGoal);
-    else this.hud.setKills(w.kills, !w.endless && w.phase === 'staging' ? CFG.killGoal : null);
+    this.hud.setKills(w.kills, null);
     this.hud.setEnergy(w.energy, intakeRate(w));
     this.hud.setPending(w.offers.pending, w.offers.next);
     this.hud.syncEffects(w);
@@ -1418,7 +1191,6 @@ export class Game {
     this.hud.syncSeals();
     this.hud.menu.sync(w);
     this.hud.updateAlerts(dt);
-    if (w.boss && !w.boss.dead) this.hud.setBoss(true, w.boss.hpFrac);
     if (w.debug.stats) {
       this.hud.setStats(
         `fps    ${this.fps.toFixed(0)}\n`
@@ -1429,12 +1201,6 @@ export class Game {
         + `parts  ${fx.particles.active.length}\n`
         + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}\n`
         + `mines  ${w.mines.length}  round ${w.round}\n`
-        + (w.boss
-          ? `ledger ${w.ledger}  back ${w.reclaimed}  burnt ${w.boss.spent}${w.boss.spentOut ? ' OUT' : ''}\n`
-            + `armour x${w.boss.damageScale(w).toFixed(2)}  intro ${w.boss.intro.toFixed(2)}${w.boss.looming ? '  LOOMING' : ''}\n`
-            + `rev    ${w.boss.reprises.length} reprise  ${w.boss.echo ? 'echo' : 'no echo'} ${w.boss.echoBolts.length} bolts\n`
-            + `locked ${w.abilities.slots.filter((s) => s.locked > 0).length}/${w.abilities.slots.length}\n`
-          : '')
         + `build  ${BUILD}  rev ${REV}  zoom ${CFG.zoom}`,
       );
     }
@@ -1481,22 +1247,12 @@ export class Game {
     for (const c of w.debris) c.draw(ctx);
     for (const e of w.drops) e.draw(ctx, w);
     for (const e of w.enemies) e.draw(ctx, w);
-    if (w.boss && !w.boss.dead) w.boss.draw(ctx);
 
     drawMines(ctx, w);
     for (const e of w.effects) e.draw(ctx, w);
 
     this.drawAutoLock(ctx);
-    // The turret dissolves as the ending text comes up. It used to sit under
-    // the last line of the closing stamp, which made the stamp unreadable —
-    // and the session being over is a better reason for it to be gone than any
-    // amount of moving text around.
-    if (this.endFade > 0.002) {
-      ctx.save();
-      ctx.globalAlpha = this.endFade;
-      w.shooter.draw(ctx, w);
-      ctx.restore();
-    }
+    w.shooter.draw(ctx, w);
     drawProjectiles(ctx, w);
     drawFx(ctx);
     this.drawTouchAid(ctx);
@@ -1506,7 +1262,6 @@ export class Game {
     ctx.restore();
 
     if (w.stasis > 0) this.drawStasis(ctx, W, H);
-    if (w.veilFade > 0.004) this.drawVeil(ctx, W, H);
     background.drawOverlay(ctx, W, H);
     drawFlash(ctx, W, H);
 
@@ -1558,11 +1313,6 @@ export class Game {
     const e = this.autoLock;
     if (!e || e.dead) return;
     const w = this.world;
-    // Under INVERT the barrel goes to the mirrored bearing, so brackets drawn
-    // on the true target point at somewhere the gun is not aiming — the
-    // reticle would be arguing with the muzzle mark. Drop them while the axis
-    // is flipped and let the barrel be the only claim about where fire goes.
-    if (w.invert > 0) return;
     const converged = clamp(1 - w.shooter.aimError / 0.9, 0, 1);
     const r = (e.r || 40) + 16 + (1 - converged) * 42;
     const a = 0.25 + converged * 0.5;
@@ -1592,39 +1342,6 @@ export class Game {
     ctx.strokeRect(3, 3, W - 6, H - 6);
   }
 
-  drawVeil(ctx, W, H) {
-    const w = this.world;
-    const a = w.veilFade * 0.93;
-    const g = this.veilCtx;
-    const vw = this.veilMask.width;
-    const vh = this.veilMask.height;
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.globalCompositeOperation = 'source-over';
-    g.fillStyle = '#000';
-    g.fillRect(0, 0, vw, vh);
-    g.globalCompositeOperation = 'destination-out';
-
-    const hole = (x, y, r) => {
-      const grad = g.createRadialGradient(x / 2, y / 2, 0, x / 2, y / 2, r / 2);
-      grad.addColorStop(0, 'rgba(255,255,255,1)');
-      grad.addColorStop(0.55, 'rgba(255,255,255,0.92)');
-      grad.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = grad;
-      g.fillRect(x / 2 - r / 2, y / 2 - r / 2, r, r);
-    };
-    hole(w.shooter.x, w.shooter.y, 400);
-    if (w.boss && !w.boss.dead) {
-      hole(w.boss.x, w.boss.y, w.boss.r * 4);
-      // and its copy — hiding the one thing that has to be shot down turns
-      // VEIL from "sight withdrawn" into "target removed"
-      const e = w.boss.echo;
-      if (e) hole(e.x, e.y, e.r * 3.4);
-    }
-
-    ctx.globalAlpha = a;
-    ctx.drawImage(this.veilMask, 0, 0, W, H);
-    ctx.globalAlpha = 1;
-  }
 
   drawHitboxes(ctx) {
     const w = this.world;
@@ -1689,28 +1406,9 @@ export class Game {
 
 
 
-  /** Jump straight to the spent-ledger endgame without waiting it out. */
-  debugDrainLedger() {
-    const w = this.world;
-    if (!w.boss || w.boss.dead) return;
-    w.boss.spend(w, w.ledger);
-  }
 
-  debugTithe() {
-    const w = this.world;
-    if (w.boss && !w.boss.dead) w.boss.tithe(w);
-  }
 
-  debugSubtract() {
-    const w = this.world;
-    if (w.boss && !w.boss.dead) w.boss.subtract(w);
-  }
 
-  /** Skip the arrival sequence when testing the fight itself. */
-  debugSkipIntro() {
-    const w = this.world;
-    if (w.boss && !w.boss.dead) w.boss.intro = 1;
-  }
 
   debugSpawnWave() {
     const w = this.world;
@@ -1755,7 +1453,6 @@ export class Game {
 
   debugGlitch() {
     glitch.kick(1);
-    this.world.bossContact = 1.6;
   }
 
 
@@ -1799,13 +1496,4 @@ export class Game {
     this.hud.menu.syncCodex();
   }
 
-  debugEnding() {
-    const w = this.world;
-    if (!w.boss) {
-      w.boss = new Boss(w.width / 2, ENTRY_Y + 120);
-      w.boss.intro = 1;
-    }
-    w.boss.dead = true;
-    this.onBossDead();
-  }
 }

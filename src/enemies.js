@@ -25,7 +25,6 @@ export function drawSpecimen(ctx, id, r) {
   ctx.save();
   ctx.lineWidth = 1.6;
   if (!t) {
-    // ORDINAL: an iris, in its first aspect's colours.
     ctx.strokeStyle = rgba('#ffd98a', 0.95);
     ctx.fillStyle = 'rgba(6,3,12,0.9)';
     ctx.beginPath();
@@ -348,11 +347,6 @@ export class Enemy {
       if (world.decoy && !world.decoy.dead) {
         tx = world.decoy.x;
         ty = world.decoy.y;
-      }
-      // ORDINAL's RECALL outranks both.
-      if (world.boss && world.boss.recallActive) {
-        tx = world.boss.x;
-        ty = world.boss.y;
       }
     }
 
@@ -1743,7 +1737,7 @@ export class Director {
   }
 }
 
-/** Area damage + shove, used by blooms, PULSE and the boss. */
+/** Area damage + shove, used by blooms, mines and PULSE. */
 /**
  * A SEED reaching a host. The host keeps being whatever it was — its shape,
  * its route, its behaviour — and becomes a larger, tougher version of it that
@@ -1811,21 +1805,4 @@ export function applyBlast(world, blast) {
     }
   }
 
-  if (world.boss && !world.boss.dead) {
-    const dx = world.boss.x - x;
-    const dy = world.boss.y - y;
-    const d = Math.hypot(dx, dy);
-    if (d < r + world.boss.r) {
-      const falloff = clamp(1 - d / (r + world.boss.r), 0, 1);
-      world.boss.hurt(world, damage * falloff * 1.6);
-      world.boss.push(dx / (d || 1), dy / (d || 1), impulse * falloff * 0.06);
-    }
-    // The copy is destructible, so blasts have to reach it as well — without
-    // this, abilities were the one thing on the field that could not touch it.
-    const e = world.boss.echo;
-    if (e && e.born >= 1) {
-      const ed = Math.hypot(e.x - x, e.y - y);
-      if (ed < r + e.r) world.boss.hurtEcho(world, damage * clamp(1 - ed / (r + e.r), 0, 1) * 1.6);
-    }
-  }
 }

@@ -76,10 +76,7 @@ export function captureRun(world, game) {
     released: world.released,
     time: world.time,
     energy: world.energy,
-    ledger: world.ledger,
-    reclaimed: world.reclaimed,
     nextStoryAt: world.nextStoryAt,
-    counted: !!world.counted,
     // Kept for shape only. Every run has been endless since build 81, and
     // restore forces it true rather than trusting a value from a save that
     // predates that.

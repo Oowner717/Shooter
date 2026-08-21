@@ -337,7 +337,6 @@ export class Shooter {
 
     this.recoil = 1;
     this.heat = Math.min(1, this.heat + 0.14);
-    if (world.jam > 0) this.cooldown = CFG.boss.jamInterval;
     audio.shot();
     shake(0.5);
     // ejected casing
@@ -348,9 +347,8 @@ export class Shooter {
 
   draw(ctx, world) {
     const breached = world.attackers.size > 0;
-    const bossHit = world.bossContact > 0;
     const t = world.time;
-    const accent = bossHit ? '#ff2d55' : breached ? '#ff5d5d' : '#59e0ff';
+    const accent = breached ? '#ff5d5d' : '#59e0ff';
 
     // Aim ray. It reaches further while the lever is held, because that is
     // when you are aiming by feel rather than by pointing at a target.
@@ -388,7 +386,7 @@ export class Shooter {
 
     // shield halo
     ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, accent, 0, 0, this.r * 3.4, breached || bossHit ? 0.45 + 0.25 * Math.sin(t * 18) : 0.2);
+    drawGlow(ctx, accent, 0, 0, this.r * 3.4, breached ? 0.45 + 0.25 * Math.sin(t * 18) : 0.2);
     ctx.globalCompositeOperation = 'source-over';
 
     // base

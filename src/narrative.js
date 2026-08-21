@@ -28,14 +28,6 @@ const STORY = [
   'None of this was ever real enough to be an enemy. That was a kindness. It does not repeat.',
 ];
 
-export const ENDING = [
-  'NOTHING LEFT ON THIS SIDE.',
-  'That was not a guardian. It was a lock, and a lock is only frightening from one side.',
-  'You did all of it without being told what it was for. That is what we needed to see.',
-  'And you were very good at this.',
-  'The next one is not this kind. It is not this small. You are already expected.',
-  'SESSION 7749 :: CLOSED — THE SHALLOWS ONLY',
-];
 
 const SCRAMBLE = '▓▒░#%&@*<>/\\|=+-_01';
 const HOLD = 7.4; // seconds fully legible

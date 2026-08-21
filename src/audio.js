@@ -260,12 +260,6 @@ class Audio {
     this.tone({ type: 'square', f0: 70, f1: 55, dur: 0.3, gain: 0.09 });
   }
 
-  bossPower() {
-    if (!this.ready) return;
-    this.tone({ type: 'sawtooth', f0: 110, f1: 96, dur: 1.1, gain: 0.12 });
-    this.tone({ type: 'sawtooth', f0: 155, f1: 148, dur: 1.1, gain: 0.1, detune: -12 });
-    this.tone({ type: 'sine', f0: 880, f1: 440, dur: 0.9, gain: 0.07 });
-  }
 
   /** A dull knock: something sinking in rather than breaking. */
   thud() {

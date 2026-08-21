@@ -3,7 +3,7 @@
 
 import { CFG } from './config.js';
 import { TAU, rand, spread, rgba, drawGlow, segClosest } from './util.js';
-import { spark, dot, hitBurst } from './fx.js';
+import { spark, dot } from './fx.js';
 import { SHARD_R } from './enemies.js';
 import { audio } from './audio.js';
 
@@ -78,18 +78,6 @@ export function updateProjectiles(world, dt) {
     if (!p.dead) {
       let nx = p.x + p.vx * dt;
       let ny = p.y + p.vy * dt;
-
-      // Boss RECALL bends shots toward the boss — helpful, and unnerving.
-      if (world.boss && world.boss.recallActive && !world.boss.dead) {
-        const bdx = world.boss.x - p.x;
-        const bdy = world.boss.y - p.y;
-        const bd = Math.hypot(bdx, bdy) || 1;
-        const pull = 900 * dt;
-        p.vx += (bdx / bd) * pull;
-        p.vy += (bdy / bd) * pull;
-        nx = p.x + p.vx * dt;
-        ny = p.y + p.vy * dt;
-      }
 
       resolveSegment(world, p, p.x, p.y, nx, ny);
       if (!p.dead) {
@@ -271,35 +259,6 @@ function resolveSegment(world, p, ax, ay, bx, by) {
   // Energy is not in the way of anything. A round passes straight through it:
   // it is not a target, it is the thing you were shooting *for*.
 
-  // boss body
-  const boss = world.boss;
-  if (boss && !boss.dead) {
-    const shieldHit = boss.castShields(ax, ay, bx, by, p.r);
-    if (shieldHit && shieldHit.t < bestT) {
-      bestT = shieldHit.t;
-      bestKind = 'bossShield';
-      bestTarget = shieldHit.shield;
-    }
-    const rr = boss.r + p.r;
-    const c = segClosest(ax, ay, bx, by, boss.x, boss.y);
-    if (c.d2 <= rr * rr && c.t < bestT) {
-      bestT = c.t;
-      bestKind = 'boss';
-      bestTarget = boss;
-    }
-    // The copy of your turret is a target like anything else.
-    const e = boss.echo;
-    if (e && e.born >= 1) {
-      const er = e.r + p.r;
-      const ec = segClosest(ax, ay, bx, by, e.x, e.y);
-      if (ec.d2 <= er * er && ec.t < bestT) {
-        bestT = ec.t;
-        bestKind = 'echo';
-        bestTarget = e;
-      }
-    }
-  }
-
   // Wreckage breaks but never blocks. It is resolved after the contest for
   // bestT and takes no part in it, so a chunk drifting in front of a BULWARK
   // can never eat the round meant for the BULWARK — it just comes apart as
@@ -375,41 +334,6 @@ function resolveSegment(world, p, ax, ay, bx, by) {
     }
     case 'shard': {
       bestTarget.enemy.hitShard(bestTarget.shard, p.damage, hx, hy, -dirx, -diry);
-      endProjectile(world, p, hx, hy, true);
-      return;
-    }
-    case 'bossShield': {
-      bestTarget.hp -= p.damage;
-      hitBurst(hx, hy, -dirx, -diry, '#ffe9a8');
-      audio.reflect();
-      endProjectile(world, p, hx, hy, true);
-      return;
-    }
-    case 'boss': {
-      // Its armour is the player's own tally. A hit that mostly gets soaked
-      // has to look different from one that lands, or the ramp is invisible.
-      const boss = world.boss;
-      const soaked = boss.damageScale(world) < 0.55;
-      boss.hurt(world, p.damage);
-      boss.push(dirx, diry, CFG.boss.pushPerBolt);
-      if (soaked) {
-        for (let i = 0; i < 4; i++) {
-          spark(hx, hy, spread(150) - dirx * 130, spread(150) - diry * 130, boss.palette.ring, 0.24, 1.8);
-        }
-        audio.reflect();
-      } else {
-        hitBurst(hx, hy, -dirx, -diry, boss.hitColor);
-        audio.hit();
-      }
-      // An ARC round still jumps off ORDINAL into whatever it has around it.
-      if (p.chain) chainFrom(world, null, hx, hy, p.jumps);
-      endProjectile(world, p, hx, hy, true);
-      return;
-    }
-    case 'echo': {
-      world.boss.hurtEcho(world, p.damage);
-      hitBurst(hx, hy, -dirx, -diry, world.boss.hitColor);
-      audio.hit();
       endProjectile(world, p, hx, hy, true);
       return;
     }

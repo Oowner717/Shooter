@@ -5,7 +5,7 @@ import { ABILITIES } from './abilities.js';
 import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
 import { BUILD, CFG } from './config.js';
-import { clamp } from './util.js';
+import {  } from './util.js';
 import { Menu } from './menu.js';
 import { holdFor, STACK } from './tutorial.js';
 import { SLOTS, carried, freeSlot } from './loadout.js';
@@ -39,16 +39,11 @@ export class Hud {
       killNum: $('killNum'),
       counter: $('counter'),
       phaseTag: $('phaseTag'),
-      bossBar: $('bossBar'),
-      bossFill: $('bossFill'),
-      bossTitle: $('bossTitle'),
-      bossSub: $('bossSub'),
       alerts: $('alerts'),
       killGoal: document.querySelector('#counter .dim'),
       energy: $('energyNum'),
       energyChip: $('energyChip'),
       effects: $('effects'),
-      phaseTagEl: $('phaseTag'),
       pendingBtn: $('pendingBtn'),
       pendingLabel: $('pendingLabel'),
       pendingCount: $('pendingCount'),
@@ -65,7 +60,6 @@ export class Hud {
       offerKicker: $('offerKicker'),
       offerNote: $('offerNote'),
       counterLabel: document.querySelector('#counter em'),
-      bossCaption: $('bossCaption'),
       abilities: $('abilities'),
       hint: $('abilityHint'),
       debug: $('debugPanel'),
@@ -74,9 +68,6 @@ export class Hud {
       boot: $('boot'),
       startBtn: $('startBtn'),
       resumeBtn: $('resumeBtn'),
-      endScreen: $('endScreen'),
-      endText: $('endText'),
-      resetBtn: $('resetBtn'),
       quickBar: $('quickBar'),
     };
 
@@ -119,7 +110,6 @@ export class Hud {
     this.el.startBtn.addEventListener('click', () => game.start());
     this.el.resumeBtn.addEventListener('click', () => game.resume());
     this.offerResume();
-    this.el.resetBtn.addEventListener('click', () => game.restart());
     $('dbgClose').addEventListener('click', () => this.toggleDebug(false));
   }
 
@@ -646,28 +636,7 @@ export class Hud {
     }
   }
 
-  /**
-   * The same chip, repurposed. It is the most-looked-at number on the screen
-   * for thirteen minutes, so taking it over says more than any alert can.
-   */
-  setLedgerMode(on) {
-    this.el.counter.classList.toggle('ledger', on);
-    if (!on) this.el.counter.classList.remove('spent');
-    // WITHHELD, not RECLAIMED: the number is what ORDINAL still has of yours,
-    // and it reads 500/500 at the moment nothing has come back yet.
-    this.el.counterLabel.textContent = on ? 'WITHHELD' : 'OBJECTS';
-    // The memo exists to keep the DOM quiet; a mode change has to break it in
-    // both directions or the chip keeps the previous run's number.
-    this.lastKills = -1;
-    this.lastGoal = -1;
-  }
 
-  setLedger(n, of) {
-    this.setKills(n, of);
-    // Emptied: it stops reading as a quantity and starts reading as a state.
-    this.el.counter.classList.toggle('spent', n <= 0);
-    if (n <= 0) this.el.counterLabel.textContent = 'SPENT';
-  }
 
   setPhase(label) {
     if (label === this.lastPhase) return;
@@ -675,37 +644,7 @@ export class Hud {
     this.el.phaseTag.textContent = label;
   }
 
-  /**
-   * The arrival captions. Large, centred, one at a time — deliberately not an
-   * alert pill, because the point of the entrance is that the interface stops
-   * being busy for a moment. Pass null to clear.
-   */
-  bossCaption(text, hold = 3) {
-    const el = this.el.bossCaption;
-    clearTimeout(this.captionTimer);
-    if (!text) {
-      el.classList.remove('show');
-      el.textContent = '';
-      return;
-    }
-    el.textContent = text;
-    el.classList.remove('show');
-    void el.offsetWidth; // restart the entrance
-    el.classList.add('show');
-    this.captionTimer = setTimeout(() => el.classList.remove('show'), hold * 1000);
-  }
 
-  setBoss(visible, frac = 1, title, sub) {
-    this.el.bossBar.hidden = !visible;
-    // The phase chip reads BOSS directly above a bar that reads ORDINAL. One
-    // of them is redundant, and dropping it is also what keeps the top bar
-    // inside 320px now that salvage has a chip.
-    this.el.phaseTagEl.hidden = visible;
-    if (!visible) return;
-    this.el.bossFill.style.transform = `scaleX(${clamp(frac, 0, 1)})`;
-    if (title) this.el.bossTitle.textContent = title;
-    if (sub) this.el.bossSub.textContent = sub;
-  }
 
 
   // ----------------------------------------------------------------- alerts
@@ -851,30 +790,8 @@ export class Hud {
     setTimeout(() => { this.el.boot.hidden = true; }, 500);
   }
 
-  showEnding(lines) {
-    document.body.classList.add('ending');
-    this.el.endScreen.hidden = false;
-    this.el.endText.innerHTML = '';
-    lines.forEach((line, i) => {
-      const d = document.createElement('div');
-      d.textContent = line;
-      if (i === lines.length - 1) d.className = 'term';
-      d.style.animationDelay = `${i * 1.5}s`;
-      this.el.endText.appendChild(d);
-    });
-    this.el.resetBtn.hidden = true;
-  }
 
-  showResetButton() {
-    this.el.resetBtn.hidden = false;
-  }
 
-  hideEnding() {
-    document.body.classList.remove('ending');
-    this.el.endScreen.hidden = true;
-    this.el.endText.innerHTML = '';
-    this.el.resetBtn.hidden = true;
-  }
 
   /**
    * One place that turns a strip cell into the call it stands for, and the one

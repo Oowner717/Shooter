@@ -137,7 +137,7 @@ export class Menu {
     grid.className = 'codexGrid';
     for (const e of CODEX) {
       const cell = document.createElement('div');
-      cell.className = `codexCell${e.boss ? ' boss' : ''}`;
+      cell.className = 'codexCell';
       cell.innerHTML = `<div class="codexArt"><canvas width="72" height="72"></canvas></div>`
         + `<div class="codexBody"><div class="codexName"></div><div class="codexLine"></div></div>`;
       grid.appendChild(cell);

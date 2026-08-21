@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '81';
+  var BUILD = '82';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -73,11 +73,11 @@
 
     <header id="topbar">
       <div id="counter" class="chip">
-        <span id="killNum">0</span><span class="dim">/500</span>
+        <span id="killNum">0</span><span class="dim"></span>
         <em>OBJECTS</em>
       </div>
       <div id="energyChip" class="chip"><em>ENERGY</em><span id="energyNum">0</span></div>
-      <div id="phaseTag" class="chip ghost">STAGING</div>
+      <div id="phaseTag" class="chip ghost">FIELD</div>
       <div class="spacer"></div>
       <button id="menuBtn" class="chip btn menuBtn" aria-label="Menu">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
@@ -88,14 +88,7 @@
          unless something timed is up; see Hud.syncEffects(). -->
     <div id="effects"></div>
 
-    <div id="bossBar" hidden>
-      <div class="bossName"><span id="bossTitle">ORDINAL</span><span id="bossSub">FIRST OF ——</span></div>
-      <div class="bar"><i id="bossFill"></i></div>
-    </div>
-
-
     <div id="alerts"></div>
-    <div id="bossCaption"></div>
 
     <!-- ============ OFFERS ============ -->
     <!-- Nothing here ever interrupts. The button appears when something is
@@ -194,12 +187,6 @@
         </div>
         <div class="bootFoot">Add to Home Screen for fullscreen playback.</div>
       </div>
-    </section>
-
-    <!-- ============ END SCREEN ============ -->
-    <section id="endScreen" hidden>
-      <div id="endText"></div>
-      <button id="resetBtn" hidden>RESET SIMULATION</button>
     </section>
 
   </div>

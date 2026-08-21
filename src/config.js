@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '81';
+export const BUILD = '82';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '81';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '01cb712';
+export const REV = 'a68d62f';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -62,7 +62,6 @@ export const CFG = {
   // here until build 71. Waves replaced every one of them: a wave is a fixed
   // group with a fixed pace, so how thin the opening is, is a property of
   // which waves come first rather than of a curve applied to a trickle.
-  lull: 4.5, // the pause between the five hundredth kill and the arrival
   storyEvery: 50, // one story line per this many kills (10 lines total)
 
   // ---- camera ---------------------------------------------------------
@@ -708,86 +707,6 @@ export const CFG = {
 
 
   // ---- boss -----------------------------------------------------------
-  boss: {
-    hp: 16000,
-    r: 130,
-    // Only ever used to close a gap the player opened, so it can be brisk
-    // without ever becoming a creep.
-    approach: 22,
-    // A bolt has to be able to shift it. At the old 5.6 three seconds of
-    // sustained fire moved it 28 units against a 110-unit band, which is the
-    // "cannot push it away fast enough" this model exists to fix.
-    pushPerBolt: 14,
-    contactGlitch: 2.6,
-    jamInterval: 0.4, // forced delay between shots while JAM is up
-    powerInterval: [13, 9.5], // seconds between powers, phase 1 -> phase 3
-
-    // It does not advance. It holds a station and returns to it — the only
-    // reason it ever moves toward the turret is to close a gap the player
-    // opened by shooting it. It can never be nearer than `hold`, so the fight
-    // is never about a shape sitting on the barrel, and there is no creep to
-    // out-race.
-    // Centre to centre; ~254 units of open space at its closest, against the
-    // 124 the old creep-to-the-barrel model ended at.
-    //
-    // These three numbers have to fit inside the field. The top edge stops its
-    // centre at about 232 and the turret sits at about 706, so the whole
-    // range it can occupy is roughly 474 units — a station of 360 leaves ~107
-    // units of travel, and a band wider than that would be one it could never
-    // push out of, which is the trap this is here to avoid. At 360 the gap
-    // from its hull to the turret's is about 204 units.
-    hold: 360,
-    // Push it further than this and its presence stops rewriting the feed.
-    // Let it settle back onto station and the corruption resumes on a timer,
-    // so the pressure is "keep it off you", not "it is arriving regardless".
-    pushBand: 30,
-    loomInterval: 7,
-
-    // The flow of objects is held right back at the start of the fight, so
-    // the opening is the player and ORDINAL and nothing else, then thickens.
-    spawnInterval: 7.5,
-    firstSpawn: 24, // seconds after it arrives before the first emission
-    earlySpawnScale: 1.75, // interval multiplier at aspect 1, easing to 1 by aspect 3
-
-    // The ledger. ORDINAL walks in wearing the player's five hundred. While
-    // it holds them they absorb damage for it, so the opening is armoured and
-    // the fight accelerates as the count comes back — no timing, no window,
-    // just a number that is worth attacking. Everything it spends is armour
-    // it no longer has, and every hit takes some back.
-    ledger: {
-      armour: 0.76, // damage reduction at a full ledger; none at an empty one
-      reclaimPerDamage: 0.12, // count returned per point of damage that lands
-      power: 18,
-      emit: 5,
-      reprise: 34,
-      echo: 55,
-      tithe: 46, // taken BACK off the player when it can afford nothing else
-      titheAbove: 0.62, // only below this fraction of the original count
-      spentApproach: 2.4, // it stops conserving once there is nothing left
-      spentPowerScale: 0.5,
-    },
-
-    // Taking a button away. It cannot damage the player, so it removes
-    // options instead — the spec the whole boss is built on.
-    subtract: 11,
-
-    // Kills coming apart backwards: debris on the field flies together and
-    // becomes whole objects again.
-    reprise: { objects: [3, 6], gather: 1.2, reach: 640, perObject: 7 },
-
-    // A copy of your own turret, firing back. Its rounds cannot hurt you —
-    // they corrupt the feed and knock the barrel — and they can be shot down.
-    echo: {
-      hp: 460, // and it can be dealt with: destroy the copy
-      bodyR: 26, // hit radius, matching the player's own turret
-      interval: 1.45,
-      speed: 300,
-      r: 9,
-      intercept: 17,
-      glitch: 1.5,
-      knock: 0.42, // radians the barrel is thrown by a hit
-    },
-  },
 
   // ---- feel -----------------------------------------------------------
   glitch: {

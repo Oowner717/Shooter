@@ -993,6 +993,28 @@ are appended past the end of the clamped run, so the edge pass simply stops
 early — they collide with everything and are clamped by nothing. Off the field,
 or fourteen seconds, whichever comes first.
 
+### ORDINAL is gone
+
+Build 82 deleted it. `src/boss.js` (1,233 lines), the ledger, the ending, the
+four status effects that were only ever boss powers, and the interface that
+served them. **1,920 lines out, 49 in, across 15 files.**
+
+Taken with it, because nothing else ever used them: `veil`, `invert`, `jam` and
+`chrono` and all their consumers, including the half-resolution `veilMask`
+canvas that was allocated on every resize and composited every frame — the one
+place where removing the boss made the running game cheaper rather than just
+smaller. Also `world.ledger`, `world.reclaimed`, `world.counted`, the `lull`,
+`boss`, `ending` and `frozen` phases, the glitch `boss` and `frozen` modes, the
+end screen and its reset button, `CFG.boss` (80 lines), `CFG.lull`, and
+`audio.bossPower`.
+
+`world.stasis` survived, which was the one real trap: it is the player's STASIS
+ability and it sat on the same reset line as five things that all went.
+
+The plan is `docs/boss-removal.md`, written before any of it was cut. It holds
+up: one export, one importer, 89 live references across six files. What it
+called a clean seam was a clean seam.
+
 ### There is no count, and no ORDINAL
 
 Every run is endless as of build 81. There is no five hundred to reach, no
@@ -1021,6 +1043,27 @@ and TOGGLE ENDLESS along with the methods behind them.
 ledger HUD, the boss glitch modes and the `cleared` flag. That is 1,233 lines
 and roughly 322 references across a dozen files — a third of the codebase —
 and pulling it out is its own job rather than a rider on this one.
+
+### The glossary reveals on the kill, and only on the kill
+
+16 entries, 16 object types, no gaps in either direction. An entry is recorded
+in `sweep()` — `if (!e.dead) continue;` then `noteDestroyed(e)` — so it takes a
+body that is actually dead. Anything removed rather than destroyed sets
+`dissolved` (a SEED expiring, a GLUT eating a fragment, a debug clear) and is
+excluded from both the glossary and the tally.
+
+Measured from an empty codex: spawning five types and leaving them alive
+reveals **nothing**; killing one PRISM reveals **`prism` and nothing else**;
+collecting energy reveals nothing on its own.
+
+**Every object type can reach the field.** All twelve rollable types are named
+in the wave table; the four that are not (`plate`, `seed`, `drift`, `towMass`)
+arrive by their own routes — split from a WARDEN, thrown by a SCION, the drift
+trickle, towed by a TOW. No orphans, so the glossary is completable.
+
+The distribution is deliberately uneven, matching the reveal schedule: MOTE and
+NEEDLE appear in 11 waves each, LURCHER 7, SPLITTER 5, BLOOM 4, and the late
+arrivals — WARDEN, SCION, GLUT, TOW — in 2 apiece.
 
 ### FIELD and STAGING were not two versions
 

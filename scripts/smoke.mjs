@@ -159,19 +159,17 @@ const stillPlaying = await page.evaluate(() => {
   return { phase: w.phase, kills: w.kills, endless: w.endless, boss: !!w.boss };
 });
 
-const hasReset = await page.evaluate(() => !document.getElementById('resetBtn').hidden);
-if (hasReset) {
-  await page.click('#resetBtn');
-  await sleep(1500);
-  await page.screenshot({ path: `${SHOTS}/10-restart.png` });
-}
+// The run has no end, so there is no reset button and nothing to restart from.
+// What is checked instead is that a restart from the menu lands back in play.
+await page.evaluate(() => window.__sim.restart());
+await sleep(1800);
+await page.screenshot({ path: `${SHOTS}/10-restart.png` });
 
 const finalPhase = await page.evaluate(() => document.getElementById('phaseTag').textContent);
 
 console.log('--- busy-field stats ---\n' + busyStats);
 console.log('--- deep-field stats ---\n' + deepStats);
 console.log('past the old count:', JSON.stringify(stillPlaying));
-console.log('reset button appeared (should be false):', hasReset);
 console.log('phase after restart:', finalPhase);
 const runningBuild = await page.evaluate(() => document.querySelector('.bootFoot')?.textContent || '');
 console.log('running build:', runningBuild.replace(/^.*BUILD /, '') || '(unknown)');
