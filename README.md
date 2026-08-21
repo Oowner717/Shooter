@@ -1027,6 +1027,27 @@ Purchases are recorded in `world.offers.taken`, the ledger the save already
 keeps and already replays on restore, so the tree persists for free and there
 is one answer to "what has this run got".
 
+**Five row states, because three questions get asked of a row and each needs
+its own answer.** *Is it mine? Is it finished? Can I afford it?*
+
+| state | reads as |
+|---|---|
+| `locked` | behind something unbought — 34% opacity, still legible |
+| `poor` | open and priced, out of reach right now |
+| `afford` | open and buyable — the only state that invites a press |
+| `part` | yours, levels left — lit in the branch tone, rail down the left, and **still priced** |
+| `full` | yours and finished — lit, ticked, no longer asking |
+
+`part` is the one that was missing in build 83: a node bought once out of three
+looked exactly like one never bought at all. Anything owned now takes the
+branch's colour and a 2px rail on its left edge, because the fastest read down
+a long column is the rail rather than the row; a tick closes a node and a price
+does not.
+
+Progress is a row of **filled pips**, not "1/3" — pips read as progress where a
+fraction reads as a label — and a single-level node has no meter at all,
+because there is nothing to be part-way through.
+
 **The layout is an indented outline, not a drawn graph.** Eighty nodes on a
 390px screen is the constraint, and an outline is the shape that survives it: a
 row reads at a glance, the rail down the left says what hangs off what, and a

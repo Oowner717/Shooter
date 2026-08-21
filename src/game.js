@@ -566,16 +566,8 @@ export class Game {
    * the whole screen, a pill that names it, and a button that blooms and then
    * keeps pulsing until it is taken. The world is never interrupted for it.
    */
-  announceOffer(tier) {
-    if (tier !== 'large') {
-      audio.chime(600);
-      return;
-    }
-    audio.amend();
-    background.surge(2.4);
-    shake(1.8);
-    this.hud.alert('PERMANENT UPGRADE', 'power', 5.5);
-    this.hud.announceAmendment();
+  announceOffer() {
+    audio.chime(600);
   }
 
   /**

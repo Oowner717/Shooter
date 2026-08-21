@@ -47,7 +47,6 @@ export class Hud {
       pendingBtn: $('pendingBtn'),
       pendingLabel: $('pendingLabel'),
       pendingCount: $('pendingCount'),
-      amendFlash: $('amendFlash'),
       offer: $('offer'),
       offerScrim: $('offerScrim'),
       offerCards: $('offerCards'),
@@ -424,55 +423,25 @@ export class Hud {
     this.el.pendingBtn.hidden = n <= 0;
     this.el.pendingCount.textContent = n;
     this.el.pendingCount.hidden = n < 2;
-    this.el.pendingLabel.textContent = kind === 'large' ? 'AMENDMENT' : 'ALLOCATION';
-    this.el.pendingBtn.classList.toggle('large', kind === 'large');
+    this.el.pendingLabel.textContent = 'ALLOCATION';
     // The taller plate grows up into the caption band; the band gets out of
     // its way for as long as one is waiting. See styles.css.
-    document.body.classList.toggle('amendPending', kind === 'large');
     // The bloom belongs to the arrival, not to the tier: dropping back to a
     // top-up has to clear it or the next AMENDMENT inherits a spent animation.
-    if (kind !== 'large') this.el.pendingBtn.classList.remove('flare');
+    this.el.pendingBtn.classList.remove('flare');
   }
 
-  /**
-   * A permanent upgrade has come due. The plate blooms and a gold frame runs
-   * round the edge of the screen twice. Neither one takes a tap or holds the
-   * world — this is the interface raising its voice, not stopping the run.
-   */
-  announceAmendment() {
-    const btn = this.el.pendingBtn;
-    // setPending runs on the next frame off world state; the button has to be
-    // up now or the bloom plays against display:none and is never seen.
-    btn.hidden = false;
-    btn.classList.add('large');
-    document.body.classList.add('amendPending');
-    this.el.pendingLabel.textContent = 'AMENDMENT';
-    btn.classList.remove('flare');
-    void btn.offsetWidth;
-    btn.classList.add('flare');
-
-    const f = this.el.amendFlash;
-    clearTimeout(this.amendTimer);
-    f.hidden = true;
-    void f.offsetWidth;
-    f.hidden = false;
-    this.amendTimer = setTimeout(() => { f.hidden = true; }, 2000);
-  }
 
   showOffer(offer) {
     if (!offer) return;
-    const large = offer.tier === 'large';
-    this.el.offerKicker.textContent = large ? 'PERFORMANCE NOTED' : 'ALLOCATION AVAILABLE';
-    this.el.offerNote.textContent = large ? 'permanent · select one' : 'select one';
-    this.el.offer.classList.toggle('large', large);
+    this.el.offerKicker.textContent = 'ALLOCATION AVAILABLE';
+    this.el.offerNote.textContent = 'select one';
     this.el.offerCards.innerHTML = '';
     offer.options.forEach((opt, i) => {
       const b = document.createElement('button');
       b.className = 'offerCard';
-      const held = large ? offer.held[opt.id] || 0 : 0;
       b.innerHTML = `<span class="offerMark">${opt.icon || ''}</span>`
         + '<span class="offerBody">'
-        + (large ? `<span class="offerAxis">${opt.axis}</span>` : '')
         + `<span class="offerName">${opt.name}</span>`
         + `<span class="offerLine">${opt.line}</span>`
         // Said rather than implied: these come round again and again, and a
@@ -482,13 +451,7 @@ export class Hud {
           ? `<span class="offerTag">${opt.unit === 'shots' ? 'SHOTS' : 'TIME'} STACKS, NOT EFFECT</span>`
           : opt.levels === 1 ? '<span class="offerTag">DOES NOT STACK</span>' : '')
         + '</span>'
-        // How far along this one is. An upgrade with a ceiling says which
-        // level is on the card and how many there are, because the question
-        // it raises is how much of it is left; one without a ceiling says how
-        // many you have, because that is the only number there is.
-        + (Number.isFinite(opt.levels) && opt.levels > 1
-          ? `<span class="offerHeld lv">LV ${opt.level}/${opt.levels}</span>`
-          : held ? `<span class="offerHeld">x${held}</span>` : '');
+        + '';
       b.addEventListener('click', () => this.game.takeOffer(i));
       this.el.offerCards.appendChild(b);
     });

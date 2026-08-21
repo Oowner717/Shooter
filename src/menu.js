@@ -139,10 +139,18 @@ export class Menu {
     const row = document.createElement('button');
     row.className = `treeRow k-${n.kind}`;
     row.type = 'button';
+    // A level meter, not a fraction. Three states have to be told apart at a
+    // glance — nothing bought, part bought, full — and "1/3" reads as a label
+    // where a row of filled pips reads as progress. Single-level nodes get no
+    // meter at all: there is nothing to be part-way through.
+    const max = n.levels || 1;
+    const pips = max > 1
+      ? `<span class="treePips">${'<i></i>'.repeat(max)}</span>` : '';
     const cost = document.createElement('b');
     cost.className = 'treeCost';
     row.innerHTML = `<span class="treeIcon">${n.icon || ''}</span>`
-      + `<span class="treeText"><span class="treeName">${n.name}</span>`
+      + `<span class="treeText"><span class="treeTop">`
+      + `<span class="treeName">${n.name}</span>${pips}</span>`
       + `<span class="treeLine">${n.line || ''}</span></span>`;
     row.appendChild(cost);
     row.addEventListener('click', () => {
@@ -185,22 +193,46 @@ export class Menu {
     for (const { n, row, cost, wrap } of this.treeRows) {
       const have = n.id ? g.owned(n.id) : 0;
       const max = n.levels || 1;
-      const done = n.free || (n.id && have >= max);
       const open = g.available(n);
-      const price = n.id && have < max ? priceOf(n, have) : 0;
+      const full = n.free || (n.id && have >= max);
+      const part = !full && have > 0;
+      const price = !full ? priceOf(n, have) : 0;
       const afford = price > 0 && w.energy >= price;
 
-      row.classList.toggle('owned', !!done);
+      /*
+       * Five states, and every one of them says a different thing:
+       *
+       *   locked  behind something unbought. Dim, still readable.
+       *   poor    open, priced, and out of reach right now.
+       *   afford  open and buyable. The only state that invites a press.
+       *   part    yours, with levels left. Lit, and still priced.
+       *   full    yours, and finished. Lit, ticked, and no longer asking.
+       *
+       * `part` is the one that was missing: a node bought once out of three
+       * looked exactly like one never bought at all.
+       */
       row.classList.toggle('locked', !open);
-      row.classList.toggle('afford', open && !done && afford);
-      row.classList.toggle('poor', open && !done && !afford);
-      wrap.classList.toggle('branchOpen', !!done || n.kind === 'root');
-      cost.textContent = done ? '✓' : !open ? '—' : price;
-      // A multi-level node says which level is being bought.
+      row.classList.toggle('poor', open && !full && !part && !afford);
+      row.classList.toggle('afford', open && !full && !part && afford);
+      row.classList.toggle('part', part);
+      row.classList.toggle('full', !!full);
+      row.classList.toggle('partAfford', part && afford);
+      wrap.classList.toggle('branchOpen', !!full || n.kind === 'root');
+
+      cost.textContent = full ? '✓' : !open ? '·' : price;
+      cost.classList.toggle('tick', !!full);
+
+      const meter = row.querySelector('.treePips');
+      if (meter) {
+        for (let i = 0; i < meter.children.length; i++) {
+          meter.children[i].classList.toggle('on', i < have);
+        }
+      }
+      // The name is the tier's name once a tier has been reached.
       const lvl = row.querySelector('.treeName');
       if (lvl) {
-        const tier = n.tiers && n.tiers[have] ? n.tiers[have].name : n.name;
-        lvl.textContent = max > 1 ? `${tier}  ${Math.min(have + 1, max)}/${max}` : tier;
+        const at = Math.min(have, max - 1);
+        lvl.textContent = n.tiers && n.tiers[at] ? n.tiers[at].name : n.name;
       }
     }
   }

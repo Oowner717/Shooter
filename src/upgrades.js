@@ -359,54 +359,6 @@ export const BY_ID = new Map(
  * a third round out of one trigger pull is not "DOUBLE TAP again", it is
  * TRIPLE TAP, and the offer should say so.
  */
-const levelsOf = (u) => u.levels ?? Infinity;
-const heldCount = (taken, id) => taken.reduce((n, t) => n + (t === id ? 1 : 0), 0);
 
-/** The card as it reads at the level about to be offered. `n` is 0-based. */
-const atLevel = (u, n) => (u.tiers && u.tiers[n] ? { ...u, ...u.tiers[n] } : u);
 
-/*
- * util.js exports a `pick` too, and it returns undefined on an empty array
- * rather than null. Two functions of the same name with different answers to
- * the same question is a trap, so this one is named for what it is: every
- * caller here tests the result, and null is what they test for.
- */
-const pickOrNone = (pool) => (pool.length ? pool[(Math.random() * pool.length) | 0] : null);
 
-/** The stat upgrades, one axis at a time, skipping what is already spent. */
-const statPool = (taken, axis) =>
-  UPGRADES[axis].reduce((out, u) => {
-    const n = heldCount(taken, u.id);
-    // `level` and `levels` are for the card, which says LV 2/3 rather than x1
-    // when there is a ceiling: the question a levelled upgrade raises is how
-    // much of it is left, not how much of it you have.
-    if (n < levelsOf(u)) out.push({ ...atLevel(u, n), axis, level: n + 1, levels: levelsOf(u) });
-    return out;
-  }, []);
-
-/**
- * Three cards. While anything is still locked the first of them opens
- * something, because that is the spine of a run: the turret arrives with two
- * things and everything else is a choice made on the way. The second is a
- * second use of an ability once there is an ability worth doubling, and the
- * third is always a stat. Each falls through to a stat when its own pool is
- * empty, and the three are never the same card twice.
- */
-export function rollLarge(taken, world) {
-  const held = new Set(taken);
-  const unlocked = world && world.unlocked ? world.unlocked : new Set();
-  const out = [];
-  const add = (u) => { if (u && !out.some((o) => o.id === u.id)) out.push(u); };
-
-  add(pickOrNone(UNLOCKS.filter((u) => !unlocked.has(u.key))));
-  add(pickOrNone(CHARGES.filter((c) => unlocked.has(c.key) && !held.has(c.id))));
-
-  // Whatever is still missing comes off the stat table, one axis at a time so
-  // three stat cards are never three of the same kind.
-  const axes = [...AXES].sort(() => Math.random() - 0.5);
-  for (const axis of axes) {
-    if (out.length >= 3) break;
-    add(pickOrNone(statPool(taken, axis).filter((u) => !out.some((o) => o.id === u.id))));
-  }
-  return out;
-}

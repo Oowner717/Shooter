@@ -11,7 +11,6 @@
 import { svgMark } from './util.js';
 import { CFG } from './config.js';
 import { ABILITIES } from './abilities.js';
-import { rollLarge } from './upgrades.js';
 import { ARSENAL } from './arsenal.js';
 import { laidCount } from './mines.js';
 
@@ -146,7 +145,6 @@ export class Offers {
   reset() {
     this.queue = []; // { tier, options } — oldest first, and none of them expire
     this.nextSmall = CFG.events.smallFirst;
-    this.nextLarge = CFG.events.large;
     this.taken = []; // upgrade ids, so the one-offs are not offered twice
   }
 
@@ -201,8 +199,7 @@ export class Offers {
     const offer = this.queue[0];
     if (!offer) return null;
     if (!offer.options) {
-      offer.options = offer.tier === 'large' ? rollLarge(this.taken, world) : rollSmall(world);
-      if (offer.tier === 'large') offer.held = this.held();
+      offer.options = rollSmall(world);
     }
     return offer;
   }
@@ -233,14 +230,7 @@ export class Offers {
     const opt = offer.options[index];
     if (!opt) return null;
     this.queue.shift();
-    if (offer.tier === 'large') {
-      // Stat upgrades only ever touch world.up; the unlocks and the charges
-      // need the world itself, so both are handed over.
-      opt.apply(world.up, world);
-      this.taken.push(opt.id);
-    } else {
-      opt.run(world);
-    }
+    opt.run(world);
     return opt;
   }
 }
