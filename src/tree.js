@@ -98,12 +98,26 @@ const BEHIND_BLAST = ['snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'
 const FREE_ARMS = new Set(['bolt', 'pulse', 'fan']);
 
 const UP_BY_ID = new Map(ALL_UPGRADES.map((u) => [u.id, u]));
-const armLabel = (key) => (ARSENAL.find((a) => a.key === key) || {}).label
-  || (ABILITIES.find((a) => a.id === key) || {}).name || key.toUpperCase();
-const armIcon = (key) => (ARSENAL.find((a) => a.key === key) || {}).icon
-  || (ABILITIES.find((a) => a.id === key) || {}).icon || '';
-const armTone = (key) => (ARSENAL.find((a) => a.key === key) || {}).tone
-  || (ABILITIES.find((a) => a.id === key) || {}).color || '#8fb6d8';
+
+/*
+ * The round you start with is `standard` in the arsenal and `bolt` everywhere
+ * else -- the default has never needed a key of its own there. Without the
+ * alias every lookup below missed, and the BOLT row carried no icon, no tone
+ * and no description at all: a blank line at the top of AMMUNITION.
+ */
+const ARM_KEY = { bolt: 'standard' };
+const armOf = (key) => ARSENAL.find((a) => a.key === (ARM_KEY[key] || key));
+const abilityOf = (key) => ABILITIES.find((a) => a.id === key);
+
+const armLabel = (key) => (armOf(key) || {}).label
+  || (abilityOf(key) || {}).name || key.toUpperCase();
+const armIcon = (key) => (armOf(key) || {}).icon
+  || (abilityOf(key) || {}).icon || '';
+const armTone = (key) => (armOf(key) || {}).tone
+  || (abilityOf(key) || {}).color || '#8fb6d8';
+
+/** These are read as sentences on the row, and the sources are not. */
+const sentence = (t) => (t ? t[0].toUpperCase() + t.slice(1) : '');
 
 /**
  * What a round, mine or ability does, said on the row itself. A price with no
@@ -111,12 +125,24 @@ const armTone = (key) => (ARSENAL.find((a) => a.key === key) || {}).tone
  * over a card draw is being able to read it before you commit.
  */
 function armLine(key) {
-  const a = ARSENAL.find((x) => x.key === key);
-  if (a) return `${a.dmg ? `${a.dmg} damage. ` : ''}${a.fx || ''}`.trim();
-  const b = ABILITIES.find((x) => x.id === key);
+  const a = armOf(key);
+  if (a) {
+    /*
+     * `dmg` is free text for the arsenal's spec table: '95', but also 'none',
+     * 'total', '74, twice' and '11, then 25 a jump'. Appending " damage." to
+     * all of them gave SNARE "none damage." and VOID "total damage.".
+     *
+     * A quantity gets labelled instead of suffixed, which reads correctly for
+     * every one of them. Anything that is not a quantity is left out entirely
+     * — SNARE's line already opens "Never goes off."
+     */
+    const dmg = /^\d/.test(a.dmg || '') ? `Damage ${a.dmg}. ` : '';
+    return `${dmg}${sentence(a.fx || '')}`.trim();
+  }
+  const b = abilityOf(key);
   // The ability hints are written as "NAME — what it does"; the name is
-  // already the heading of the row.
-  if (b) return (b.hint || '').replace(/^[A-Z ]+—\s*/, '');
+  // already the heading of the row, and what is left starts mid-sentence.
+  if (b) return sentence((b.hint || '').replace(/^[A-Z ]+—\s*/, ''));
   return '';
 }
 
@@ -177,6 +203,41 @@ function arm(key, kind) {
 const KIND = { ammo: 'round', mines: 'mine', abilities: 'ability', turret: null };
 
 /*
+ * The upgrades that are not about any one thing.
+ *
+ * HOLLOWPOINT applies to whatever is loaded; STANDING ORDER to everything you
+ * hold. Both sat directly under their category heading, in one flat list with
+ * the rounds and abilities they apply to -- so REFLEX read as an ability you
+ * could equip, and the actual abilities were four rows further down. They get
+ * their own branch, and the category is left holding only the things it is a
+ * category of.
+ *
+ * TURRET has no arms, so there is nothing there to separate its leaves from
+ * and it stays flat. MINES has no leaves of its own at all.
+ */
+const GROUP = {
+  ammo: {
+    name: 'ALL ROUNDS',
+    line: 'Applies to whatever is loaded, not to one round.',
+  },
+  abilities: {
+    name: 'ALL ABILITIES',
+    line: 'Applies to everything you hold, not to one ability.',
+  },
+};
+
+/** A category's own leaves, boxed under a heading where there is one. */
+function commons(root) {
+  const kids = (UNDER[root] || []).map(leaf);
+  const g = GROUP[root];
+  if (!g || !kids.length) return kids;
+  return [node({
+    kind: 'group', key: `${root}_all`, free: true,
+    name: g.name, line: g.line, tone: ROOT_TONE[root], children: kids,
+  })];
+}
+
+/*
  * A category is a heading and is never bought. Everything purchasable is an
  * arm or a leaf under one, which is what makes ABILITIES a peer of AMMO rather
  * than a list hanging off PULSE.
@@ -185,7 +246,7 @@ export const TREE = ['turret', 'ammo', 'mines', 'abilities'].map((root) => node(
   kind: 'root', key: root, name: ROOT_NAME[root], free: true,
   tone: ROOT_TONE[root], line: ROOT_LINE[root],
   children: [
-    ...(UNDER[root] || []).map(leaf),
+    ...commons(root),
     ...(BRANCH[root] || []).map((k) => arm(k, KIND[root])),
   ],
 }));

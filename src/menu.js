@@ -157,6 +157,20 @@ export class Menu {
       + `<span class="treeLine">${n.line || ''}</span></span>`;
     row.appendChild(cost);
     /*
+     * The disclosure caret. A row that hides fourteen more rows looked exactly
+     * like a row that hides nothing, so the seven mines behind BLAST read as
+     * "there is one mine" rather than as "there are eight, and this is the
+     * door". It points right when the branch is shut and down when it is open,
+     * which is the one convention nobody has to be taught.
+     */
+    if (n.children.length) {
+      const caret = document.createElement('span');
+      caret.className = 'treeCaret';
+      caret.setAttribute('aria-hidden', 'true');
+      row.appendChild(caret);
+      row.classList.add('hasKids');
+    }
+    /*
      * One tap does one thing. A row used to both open its branch and try to
      * buy itself, which meant looking inside a round was the same gesture as
      * spending nine hundred on it.
@@ -164,11 +178,16 @@ export class Menu {
      * Now: something already yours opens and closes. Something buyable arms,
      * and asks. The second tap is the purchase, and anything else cancels it.
      */
-    row.addEventListener('click', () => {
+    row.addEventListener('click', (e) => {
       const g = this.game;
       const have = n.id ? g.owned(n.id) : 0;
       const full = n.free || (n.id && have >= (n.levels || 1));
-      if (!n.id || full) {
+      // Tapping the caret only ever opens and closes, even on a row that is
+      // still for sale. Without that, a branch could not be looked into until
+      // it was paid for -- which is backwards, since what is inside it is the
+      // reason to pay.
+      const onCaret = !!(e.target.closest && e.target.closest('.treeCaret'));
+      if (onCaret || !n.id || full) {
         if (n.children.length) wrap.classList.toggle('shut');
         this.armRow(null);
         this.syncTree();
@@ -188,9 +207,18 @@ export class Menu {
       kids.className = 'treeKids';
       for (const c of n.children) kids.appendChild(this.treeNode(c, depth + 1));
       wrap.appendChild(kids);
-      // Bought things open; everything else starts closed, or the panel is a
-      // wall of eighty rows before a single decision has been made.
-      if (depth > 0) wrap.classList.add('shut');
+      /*
+       * Closed by default, or the panel is a wall of eighty rows before a
+       * single decision has been made.
+       *
+       * The exception is a branch holding other arms. BLAST is the only door
+       * to seven more mines, and a MINES category showing one row does not
+       * read as "seven more behind this" -- it reads as a category with one
+       * mine in it. Open, they are all there from the first look, greyed until
+       * BLAST is bought.
+       */
+      const holdsArms = n.children.some((c) => c.kind === 'arm');
+      if (depth > 0 && !holdsArms) wrap.classList.add('shut');
     }
     return wrap;
   }
@@ -256,14 +284,18 @@ export class Menu {
       row.classList.toggle('part', part);
       row.classList.toggle('full', !!full);
       row.classList.toggle('partAfford', part && afford);
-      wrap.classList.toggle('branchOpen', !!full || n.kind === 'root');
 
       if (open && !full) {
         if (afford) affordable++;
         else cheapest = Math.min(cheapest, price);
       }
-      cost.textContent = row === this.armed ? 'SURE?' : full ? '✓' : !open ? '·' : price;
-      cost.classList.toggle('tick', !!full);
+      // A category is a heading, not a thing you own, so a ✓ on one said you
+      // had bought something you were never offered. The caret is its whole
+      // right-hand side now.
+      const heading = n.kind === 'root' || n.kind === 'group';
+      cost.textContent = heading ? ''
+        : row === this.armed ? 'SURE?' : full ? '✓' : !open ? '·' : price;
+      cost.classList.toggle('tick', !!full && !heading);
       cost.classList.toggle('ask', row === this.armed);
 
       const meter = row.querySelector('.treePips');
