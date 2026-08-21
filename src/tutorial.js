@@ -28,6 +28,13 @@ const OPENING = [
   { text: 'Or tap ahead of the turret\nand it shoots there.' },
   { text: 'PULSE is under your thumb.\nNothing can ever take it from you.' },
   { text: 'Something is coming down now.\nNone of it can kill you.' },
+  // The first wave is grey and nothing else — CFG.WAVES[0] is drift with no
+  // hostiles at all, and it dwells long enough for both of these to be read
+  // while the only thing on the field is the thing they are about. Said here
+  // rather than in NOTES because NOTES are gated on the count and a DRIFT does
+  // not raise it: a player who only ever shot drift would never reach them.
+  { text: 'The grey ones are DRIFT.\nNot enemies. They cannot hurt you.' },
+  { text: 'AUTO AIM ignores them. Shoot one\nyourself \u2014 they hold extra ENERGY.' },
 ];
 
 /**

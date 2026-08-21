@@ -1650,6 +1650,11 @@ export class Director {
     // Everything is out. The wave ends when the field thins — or when patience
     // runs out, so one object loitering out of reach can never stall the run.
     this.wait += dt;
+    // A wave may hold the field for a minimum time regardless of how fast it
+    // clears. The opening uses it so the lines about DRIFT are read against a
+    // field that has nothing else on it.
+    const wv = this.wave;
+    if (wv && wv.dwell && this.wait < wv.dwell) return;
     // Proportional to what this wave let out, so a big wave is not held to the
     // same empty field as a small one and does not simply time out every time.
     const thinAt = Math.max(CFG.waves.clearTo, Math.round(this.asked * CFG.waves.thinFrac));

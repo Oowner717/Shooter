@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '74';
+export const BUILD = '75';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -91,6 +91,8 @@ export const CFG = {
    */
   waves: {
     clearTo: 2, // hostiles left before the next wave is allowed to start
+    // A wave may also set `dwell`: the least time it is allowed to last, no
+    // matter how fast the field clears. Only the opening uses it.
     patience: 26, // ...and the longest it will ever wait for that
     gap: [0.85, 1.7], // seconds between releases inside a regular wave
     rest: [2.2, 3.8], // quiet between two regular waves
@@ -1108,7 +1110,11 @@ export const ENEMY_TYPES = [
  */
 export const WAVES = [
   // ---- the opening. Grey drift and almost nothing else, to begin with. ----
-  { teach: true, of: [], drift: 4 },
+  // Grey and nothing else, and held there: the two opening lines about DRIFT
+  // are read against a field with no enemies on it, which is the whole of what
+  // makes "not an enemy" land. Without the dwell this wave ends the instant it
+  // starts — it has no hostiles to clear — and the MOTEs arrive mid-sentence.
+  { teach: true, of: [], drift: 4, dwell: 16 },
   { teach: true, of: [['mote', 2]], drift: 2 },
   { teach: true, of: [['needle', 2]], drift: 2 },
   { teach: true, of: [['mote', 3], ['needle', 1]], drift: 1 },

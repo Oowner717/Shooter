@@ -1248,6 +1248,27 @@ before and 4 s after. Kill rate across one run each way was 14.5/min and 11/min,
 which a single run either side cannot separate from noise; an earlier pair ran
 13 and 14.5 the other way up.
 
+**The opening names DRIFT, and says the two things about it that are not
+guessable.** The grey objects were never explained: they look like the harmless
+scenery they are, but nothing told you that AUTO AIM will not touch them or
+that they are the best energy on the field for the damage. Two lines now do,
+and they are in `OPENING` rather than `NOTES` on purpose — NOTES are gated on
+the count and a DRIFT does not raise it, so a player who only ever shot drift
+would never reach them.
+
+They are read against an empty field. `CFG.WAVES[0]` is grey and nothing else,
+and it now carries `dwell: 16` — the least time a wave may last however fast it
+clears. Without it that wave ends the instant it starts, having no hostiles to
+clear, and the first MOTEs arrive mid-sentence. Measured hands-off: the lines
+land at t=27.1 s and t=33.6 s, both at **wave 0 with zero hostiles on the
+field**, which is the whole of what makes "not an enemy" land.
+
+All three claims are checked against the running game rather than asserted:
+auto-aim returns no target with five DRIFT on the field (`autoTarget` filters
+`harmless`); a DRIFT banks **10** energy against a MOTE's 4; and destroying
+five of them leaves the count at zero (`counts` is forced false for anything
+harmless).
+
 **Volume is a level, not a switch.** The menu had SOUND on/off and nothing
 else. It is now a six-segment row under SYSTEM: `audio.VOLUME_STEPS` scaled
 against `FULL_GAIN`, ramped with `setTargetAtTime` so a change never clicks,

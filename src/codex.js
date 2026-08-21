@@ -87,7 +87,7 @@ export const CODEX = [
   {
     id: 'drift',
     name: 'DRIFT',
-    line: 'No heading, no destination, no threat. It is not counted. It is here so the field is not only enemies.',
+    line: 'No heading, no destination, no threat. It is not counted, and AUTO AIM will not take it — a DRIFT is only ever shot on purpose. Worth 10 ENERGY against a MOTE\u2019s 4, which is the reason to bother.',
   },
   {
     id: 'ordinal',
