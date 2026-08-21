@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '77';
+export const BUILD = '78';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '77';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'd235683';
+export const REV = 'e72df02';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -214,16 +214,37 @@ export const CFG = {
   // They still have no destination. They just sink while they have no opinion,
   // and they stop sinking here.
   drift: {
-    band: 520, // world units above the turret they settle around
-    // How far above the band the sink *eases off* over. It used to be 460,
-    // which is further than the whole descent — so the sink was strongest at
-    // the top and had faded to almost nothing by the time the body neared the
-    // line it was supposed to cross, and a lone drift dithered above it for
-    // anywhere between 17 and 47 seconds. Small, so the descent is firm and
-    // only the arrival is soft.
+    /*
+     * Where the grey objects live, as a fraction of the screen height rather
+     * than a distance above the turret. "A quarter of the way down" is a thing
+     * about the screen, and stating it as one makes it hold on any device.
+     *
+     * It used to be 520 units above the turret, which put the line at 0.35 —
+     * and, worse, the pull was one-sided. Above the line they sank; below it
+     * the walk was completely aimless, so nothing ever brought one back up.
+     * Measured over 2300 samples: median 0.39 down, and a tail reaching 0.57
+     * with a fifth of their time spent past halfway. They were wandering into
+     * the field the game is played in.
+     *
+     * The band is two-sided now. They sink to it firmly from above and are
+     * nudged back to it from below, and inside `spread` they wander as freely
+     * as they ever did — a band, not a rail.
+     */
+    band: 0.25, // fraction of the screen height
+    spread: 0.06, // ...and how far either side of it they may wander
+    // How far past the band the pull eases off over. It used to be 460, which
+    // is further than the whole descent — so the sink was strongest at the top
+    // and had faded to almost nothing by the time the body neared the line it
+    // was supposed to cross, and a lone drift dithered above it for anywhere
+    // between 17 and 47 seconds. Small, so the descent is firm and only the
+    // arrival is soft.
     ease: 130,
     sink: 0.95, // how much of the wander the descent overrules
     fall: 260, // and how fast they come down while it does
+    // Coming back up is gentler than coming down. A drift that has wandered
+    // low should ease back into the band, not launch.
+    rise: 0.8,
+    lift: 130,
   },
 
   // ---- shooter --------------------------------------------------------

@@ -208,14 +208,19 @@ export class Enemy {
     let dx = Math.cos(this.wanderAngle);
     let dy = Math.sin(this.wanderAngle);
 
-    // It sinks while it is above its band, and only while it is above it.
-    // Below the line the walk is as aimless as it ever was — this does not
-    // give a drift a destination, it just stops the random half of them
-    // wandering off the top of the world and staying there.
+    // A band a quarter of the way down the screen, held from both sides.
+    // Inside it the walk is as aimless as it ever was — this does not give a
+    // drift a destination, it keeps it in the part of the field it belongs in.
+    //
+    // The pull used to be one-sided: they sank to the line and then wandered
+    // wherever, which is how a fifth of their time ended up below the halfway
+    // mark, out in the field the game is actually played in.
     const D = CFG.drift;
-    const home = world.shooter.y - D.band;
-    if (this.y < home) {
-      const urge = clamp((home - this.y) / D.ease, 0, 1) * D.sink;
+    const home = world.height * D.band;
+    const slack = world.height * D.spread;
+    const off = this.y - home; // positive is below the band
+    if (off < -slack) {
+      const urge = clamp((-off - slack) / D.ease, 0, 1) * D.sink;
       dx *= 1 - urge;
       dy = dy * (1 - urge) + urge;
       const n = Math.hypot(dx, dy) || 1;
@@ -225,6 +230,17 @@ export class Enemy {
       // first one reached the field a good ten seconds after the first
       // hostile, which is not what "the safe thing arrives first" means.
       cruise = (this.cruise + (D.fall - this.cruise) * urge) * slow;
+    } else if (off > slack) {
+      // Wandered low. Eased back rather than yanked: this is the half that
+      // never existed, and a hard pull upward would read as the grey objects
+      // fleeing rather than milling about.
+      const urge = clamp((off - slack) / D.ease, 0, 1) * D.rise;
+      dx *= 1 - urge;
+      dy = dy * (1 - urge) - urge;
+      const n = Math.hypot(dx, dy) || 1;
+      dx /= n;
+      dy /= n;
+      cruise = (this.cruise + (D.lift - this.cruise) * urge) * slow;
     }
 
     this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);

@@ -1036,6 +1036,26 @@ else; the runner in `Director` turns it into releases.
   waves bound the population by construction, which is most of why they work
   and all of why they need this.
 
+**DRIFT lives in a band a quarter of the way down, held from both sides.** It
+used to sit 520 units above the turret — a line at 0.35 of the screen — and the
+pull was one-sided: above the line they sank, below it the walk was completely
+aimless, so nothing ever brought one back up. Measured over 2300 samples they
+wandered to a median of **0.39** with a tail reaching **0.57**, and spent **20%
+of their time past the halfway mark**, out in the field the game is played in.
+
+`drift.band` is now a fraction of the screen height (0.25) rather than a
+distance above the turret — "a quarter of the way down" is a fact about the
+screen, and stating it as one makes it hold on any device. Inside `spread`
+(0.06 either side) they wander exactly as freely as before; outside it they are
+pulled back, firmly from above and gently from below, because a hard upward
+pull reads as the grey objects fleeing rather than milling about.
+
+| | before | after |
+|---|---|---|
+| median depth | 0.391 | **0.229** |
+| p90 depth | 0.571 | **0.334** |
+| time past halfway | 20.1% | **0%** |
+
 **One wave is grey and nothing else.** No hostiles, no risk, nothing taken from
 the five hundred, and about 220 ENERGY on the field if you take it — 22 DRIFT
 at 10 each, against roughly 11 an object for a normal wave.
