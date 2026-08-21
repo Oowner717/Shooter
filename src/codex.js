@@ -89,12 +89,6 @@ export const CODEX = [
     name: 'DRIFT',
     line: 'No heading, no destination, no threat. It is not counted, and AUTO AIM will not take it — a DRIFT is only ever shot on purpose. Worth 10 ENERGY against a MOTE\u2019s 4, which is the reason to bother.',
   },
-  {
-    id: 'ordinal',
-    name: 'ORDINAL',
-    boss: true,
-    line: 'Wore your five hundred and would not hand them back. Not the hardest thing they have — the first one.',
-  },
 ];
 
 const IDS = new Set(CODEX.map((e) => e.id));
@@ -163,6 +157,10 @@ class Codex {
 export const codex = new Codex();
 
 /**
+ * Vestigial since build 81: every run is endless, so there is nothing to have
+ * beaten and nothing this can gate. Left in place because the key is still on
+ * players' devices and removing the reader would strand it.
+ *
  * Whether ORDINAL has been beaten. Kept the same way the glossary is, because
  * it answers the same kind of question: what has this player already seen?
  * Every run after the first clear is endless — no count, no boss, no ending.

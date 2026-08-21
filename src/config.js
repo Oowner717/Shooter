@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '80';
+export const BUILD = '81';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '80';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '1ee2c38';
+export const REV = '01cb712';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -238,7 +238,11 @@ export const CFG = {
   shooter: {
     r: 26,
     standoff: 210, // world units between the turret and the ability strip
-    holdFireInterval: 0.2, // sustained-fire cadence; tapping faster is always allowed
+    // Every cadence below is 30% slower than it was through build 80: 0.2 and
+    // 0.22 became 0.286 and 0.314. The turret is meant to be a thing you
+    // improve, and a base rate that already felt fast left the rate upgrades
+    // with nothing to give. Tapping faster than this is still always allowed.
+    holdFireInterval: 0.286, // sustained-fire cadence
     aimClamp: 1.36, // radians away from straight up that the barrel allows
     turnRate: 26, // rad/s barrel slew under your own hand
     autoTurnRate: 4.2, // rad/s while auto aim traverses between targets
@@ -248,8 +252,8 @@ export const CFG = {
     // the opposite way. Holding the grip fires on its own.
     gripLen: 112, // world units from pivot to grip
     gripR: 24, // grip knob radius
-    gripFireInterval: 0.2,
-    autoFireInterval: 0.22, // hands-off cadence; a shade behind driving it yourself
+    gripFireInterval: 0.286,
+    autoFireInterval: 0.314, // hands-off cadence; a shade behind driving it yourself
   },
 
   // ---- rounds ---------------------------------------------------------

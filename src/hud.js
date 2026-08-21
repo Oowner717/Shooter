@@ -759,15 +759,11 @@ export class Hud {
   buildDebug() {
     const g = this.game;
     const actions = [
-      ['SKIP → COUNT', () => g.debugSkipToCount()],
-      ['TOGGLE ENDLESS', () => g.debugEndless()],
-      ['SKIP → BOSS', () => g.debugSkipToBoss()],
-      ['KILL BOSS', () => g.debugKillBoss()],
+      // The count, the lull, ORDINAL and the ending are gone as of build 81,
+      // and so are the buttons that jumped to them. What is left of boss.js is
+      // unreachable — see the note in the README about clearing it out.
       ['+50 KILLS', () => g.debugAddKills(50)],
       ['NEXT STORY', () => g.debugNextStory()],
-      ['BOSS POWER', () => g.debugBossPower()],
-      ['REPRISE', () => g.debugReprise()],
-      ['ECHO', () => g.debugEcho()],
       ['TITHE', () => g.debugTithe()],
       ['SUBTRACT', () => g.debugSubtract()],
       ['DRAIN LEDGER', () => g.debugDrainLedger()],

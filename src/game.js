@@ -15,7 +15,7 @@ import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator, ENDING } from './narrative.js';
 import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
-import { codex, cleared, markCleared, forgetCleared, taught, markTaught, forgetTaught } from './codex.js';
+import { codex, taught, markTaught, forgetTaught } from './codex.js';
 import { readRun, saveRun, forgetRun } from './save.js';
 import { Offers } from './events.js';
 import { freshUpgrades, BY_ID } from './upgrades.js';
@@ -194,7 +194,11 @@ export class Game {
     this.sweepTimer = 0;
     this.hud.setPending(0, null);
     this.loadoutOpen = null;
-    w.endless = cleared();
+    // Every run is endless as of build 81. There is no five hundred to reach,
+    // no lull, no ORDINAL and no ending — the field simply keeps coming, and
+    // the run is however long you keep playing it. It used to be the state a
+    // player earned by beating the boss once; it is the whole game now.
+    w.endless = true;
     this.lullTimer = 0;
     this.scriptStep = 0;
     // World time at which the line now up has had its reading time. Nothing
@@ -202,9 +206,8 @@ export class Game {
     // START, which is what the initial value buys.
     this.lineUntil = START - GAP;
     // The opening lines run once, ever — unless asked for again from the menu,
-    // which is the only way back to them. A cleared save is past them by
-    // definition, and asking overrides that too.
-    this.teaching = this.replayNext || (!taught() && !cleared());
+    // which is the only way back to them.
+    this.teaching = this.replayNext || !taught();
     this.replayNext = false;
     // What the turret is issued with. Everything else — four rounds, four
     // mines, the two that run on their own and seven of the eight abilities —
@@ -1244,20 +1247,14 @@ export class Game {
     w.kills++;
     w.offers.note(w);
     this.teach();
-    // Story beats belong to the staging run only. ORDINAL's own emissions push
-    // the count well past five hundred, and a sentence in the mid-field band is
-    // exactly the text that has no business being there.
-    while (!w.endless && w.phase === 'staging' && w.kills >= w.nextStoryAt && w.narrator.index < 10) {
+    // The ten lines, one per `storyEvery` kills, and then it stops talking.
+    // They used to be gated on the counted run — the run that no longer
+    // exists — which would have left the game with no voice at all.
+    while (w.phase === 'staging' && w.kills >= w.nextStoryAt && w.narrator.index < 10) {
       w.nextStoryAt += CFG.storyEvery;
       w.narrator.advance();
       audio.chime(520 + w.narrator.index * 30);
       background.surge(0.7);
-    }
-    if (!w.endless && !w.counted && w.kills >= CFG.killGoal) {
-      w.counted = true;
-      w.phase = 'lull';
-      this.lullTimer = CFG.lull;
-      this.onLull();
     }
   }
 
@@ -1354,7 +1351,9 @@ export class Game {
   }
 
   onBossDead() {
-    markCleared();
+    // Unreachable as of build 81 — there is no boss to be dead. It used to
+    // mark the run cleared, which is what switched a device to endless; every
+    // run is endless now, so there is nothing left to record.
     // The count is done. There is nothing left to pick up, and a save that
     // outlived its run would offer to resume a finished one.
     forgetRun();
@@ -1424,7 +1423,7 @@ export class Game {
       this.hud.setStats(
         `fps    ${this.fps.toFixed(0)}\n`
         + `phase  ${w.phase}\n`
-        + `kills  ${w.kills}  released ${w.released}/${CFG.killGoal}\n`
+        + `kills  ${w.kills}  released ${w.released}\n`
         + `obj    ${hostileCount(w)} hostile + ${w.enemies.length - hostileCount(w)} drift + ${w.drops.length} frag + ${w.debris.length} wreck\n`
         + `shots  ${w.projectiles.length}\n`
         + `parts  ${fx.particles.active.length}\n`
@@ -1671,32 +1670,8 @@ export class Game {
 
   // ---------------------------------------------------------------- debug
 
-  debugSkipToCount() {
-    const w = this.world;
-    if (w.phase !== 'staging') return;
-    w.kills = CFG.killGoal - 1;
-    w.narrator.index = 9;
-    w.nextStoryAt = CFG.killGoal;
-    this.registerKill();
-  }
 
-  debugSkipToBoss() {
-    const w = this.world;
-    if (w.phase === 'boss' || w.phase === 'ending') return;
-    if (w.phase === 'staging') this.debugSkipToCount();
-    this.lullTimer = 0;
-    this.beginBoss();
-  }
 
-  debugKillBoss() {
-    const w = this.world;
-    if (w.boss && !w.boss.dead) {
-      w.boss.intro = 1;
-      // Damage is scaled by whatever the armour is worth right now, so a
-      // debug kill has to divide it back out or it merely dents it.
-      w.boss.hurt(w, w.boss.hp / w.boss.damageScale(w) + 1);
-    }
-  }
 
   debugAddKills(n) {
     const w = this.world;
@@ -1711,20 +1686,8 @@ export class Game {
     this.world.narrator.advance();
   }
 
-  debugBossPower() {
-    const w = this.world;
-    if (w.boss && !w.boss.dead) w.boss.castPower(w);
-  }
 
-  debugReprise() {
-    const w = this.world;
-    if (w.boss && !w.boss.dead) w.boss.reprise(w);
-  }
 
-  debugEcho() {
-    const w = this.world;
-    if (w.boss && !w.boss.dead && !w.boss.echo) w.boss.raiseEcho(w);
-  }
 
   /** Jump straight to the spent-ledger endgame without waiting it out. */
   debugDrainLedger() {
@@ -1830,11 +1793,6 @@ export class Game {
     this.hud.menu.syncCodex();
   }
 
-  debugEndless() {
-    const w = this.world;
-    if (w.endless) forgetCleared(); else markCleared();
-    this.restart();
-  }
 
   debugCodexWipe() {
     codex.forget();

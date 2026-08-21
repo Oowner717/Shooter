@@ -242,7 +242,21 @@ export const UPGRADES = {
     { id: 'standing', name: 'STANDING ORDER', line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
   ],
   TURRET: [
-    { id: 'rate', name: 'RATE', line: '+20% fire rate.', apply: quicken('rate', 0.8) , icon: MARK.rate },
+    /*
+     * Two steps now, not one. It used to declare no `levels` at all, which
+     * means Infinity here — it could be taken over and over for the same 20%
+     * every time, which is a stack rather than a ladder.
+     *
+     * The effect is the same at both levels because `apply` is handed
+     * (world.up, world) and never the level: tiers change what the card says,
+     * not what it does. Two takes come to 0.64 of the interval, which is more
+     * than the 30% that came off the base rate in build 81, so a turret that
+     * invests in cadence ends up faster than it ever was.
+     */
+    { id: 'rate', name: 'RATE', levels: 2,
+      line: '+20% fire rate.',
+      tiers: [null, { name: 'RUNAWAY', line: '+20% fire rate again, on top of RATE. The barrel stops waiting.' }],
+      apply: quicken('rate', 0.8), icon: MARK.rate },
     { id: 'handsoff', name: 'HANDS OFF', line: 'Auto fire matches your own fire rate.', levels: 1, apply: set('handsOff', true) , icon: MARK.handsoff },
     { id: 'slew', name: 'SLEW', line: '+50% auto aim turn speed.', apply: scale('slew', 1.5) , icon: MARK.slew },
     { id: 'overwatch', name: 'OVERWATCH', line: '+25% damage while hands off the lever.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },

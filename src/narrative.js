@@ -20,10 +20,10 @@ const STORY = [
   'The shapes are simple here. They are simple on purpose.',
   'You have not asked who is counting. That is being counted too.',
   'Further in, the shapes stop being this polite.',
-  'Halfway, and not once have you looked behind you. We noted that.',
+  'Not once have you looked behind you. We noted that.',
   'Nothing here was built to last. It was built to be counted.',
   'We stopped watching the shapes a while ago.',
-  'Nothing sent down so far has looked at you. The last one will.',
+  'Nothing sent down here has ever looked at you. Nothing here ever will.',
   'You will try to describe this later. You will leave most of it out.',
   'None of this was ever real enough to be an enemy. That was a kindness. It does not repeat.',
 ];

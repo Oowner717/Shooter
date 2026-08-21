@@ -80,7 +80,10 @@ export function captureRun(world, game) {
     reclaimed: world.reclaimed,
     nextStoryAt: world.nextStoryAt,
     counted: !!world.counted,
-    endless: !!world.endless,
+    // Kept for shape only. Every run has been endless since build 81, and
+    // restore forces it true rather than trusting a value from a save that
+    // predates that.
+    endless: true,
     unlocked: [...world.unlocked],
     loadout: { mines: [...world.loadout.mines], ammo: [...world.loadout.ammo] },
     round: world.round,

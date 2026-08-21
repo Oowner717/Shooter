@@ -993,7 +993,36 @@ are appended past the end of the clamped run, so the edge pass simply stops
 early — they collide with everything and are clamped by nothing. Off the field,
 or fourteen seconds, whichever comes first.
 
-### FIELD and STAGING are not two versions
+### There is no count, and no ORDINAL
+
+Every run is endless as of build 81. There is no five hundred to reach, no
+lull, no boss and no ending — the field keeps coming and the run is however
+long you keep playing it. `world.endless` is simply `true` at reset; it used to
+be `cleared()`, the state a player earned by beating the boss once, and that
+path was already written and already exercised, so the switch is one line and
+the behaviour it selects is not new code.
+
+What that turns off, all of it through gates that already existed: the `/500`
+on the counter, the `STAGING` phase tag (it reads `FIELD`), the lull, ORDINAL's
+arrival, the ending sequence, and the release quota — `releasesLeft` returns
+`Infinity`, so the director never runs out of objects. Verified from the first
+frame: `endless: true`, tag `FIELD`, counter `0 OBJECTS`, and `released`
+climbing past the old goal with `boss: false` throughout.
+
+The ten story lines used to be gated on the counted run, which would have left
+the game with no voice at all; they run on the count regardless now. Two of
+them described a shape the game no longer has — "Halfway, and not once have you
+looked behind you" and "Nothing sent down so far has looked at you. The last
+one will" — and are rewritten. ORDINAL is out of the glossary, and the debug
+panel has lost SKIP → COUNT, SKIP → BOSS, KILL BOSS, BOSS POWER, REPRISE, ECHO
+and TOGGLE ENDLESS along with the methods behind them.
+
+**`src/boss.js` is still on disk and is now unreachable.** So are `ENDING`, the
+ledger HUD, the boss glitch modes and the `cleared` flag. That is 1,233 lines
+and roughly 322 references across a dozen files — a third of the codebase —
+and pulling it out is its own job rather than a rider on this one.
+
+### FIELD and STAGING were not two versions
 
 The phase tag reads `STAGING` on a counted run and `FIELD` on an endless one,
 and `world.endless` is set from `cleared()` — a `localStorage` flag written the
@@ -1035,6 +1064,18 @@ else; the runner in `Director` turns it into releases.
   peaked at nine objects and the late run was thinner than the early one —
   waves bound the population by construction, which is most of why they work
   and all of why they need this.
+
+**The base rate of fire is 30% slower.** 0.2 and 0.22 second cadences became
+0.286 and 0.314. The turret is meant to be a thing you improve, and a base rate
+that already felt fast left the rate upgrades with nothing to give.
+
+**RATE has two levels instead of one**, the second called RUNAWAY. It used to
+declare no `levels`, which means `Infinity` here — it could be taken over and
+over for the same 20% every time, which is a stack rather than a ladder. Both
+levels do the same thing, because `apply` is handed `(world.up, world)` and
+never the level: tiers change what the card says, not what it does. Two takes
+come to 0.64 of the interval, more than the 30% that came off the base, so a
+turret that invests in cadence ends up faster than it ever was.
 
 **There is a soft wall inside the hard one.** `clampToArena` is a hard stop
 with a bounce: a body that reaches the side is pinned to it and, if it is still

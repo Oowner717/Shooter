@@ -128,47 +128,50 @@ await page.screenshot({ path: `${SHOTS}/05-full-field.png` });
 const stats = async () => page.evaluate(() => document.getElementById('dbgStats').textContent);
 const busyStats = await stats();
 
-// the five hundredth kill, then the lull: an empty field and nothing else
-await dbg('SKIP → COUNT');
-await sleep(2600);
-await page.screenshot({ path: `${SHOTS}/06-lull.png` });
+/*
+ * There is no count, no lull, no ORDINAL and no ending to walk any more —
+ * build 81 made every run endless. What is left to prove is that a long run
+ * keeps going: the field stays populated, waves keep rotating, and nothing
+ * transitions the game out from under the player.
+ */
+await dbg('+50 KILLS');
+await dbg('+50 KILLS');
+await sleep(1200);
+await page.screenshot({ path: `${SHOTS}/06-deep-field.png` });
 
-await dbg('SKIP → BOSS');
-await sleep(4000);
-await page.screenshot({ path: `${SHOTS}/07-boss.png` });
-
-// let the boss fight breathe so powers fire
-for (let i = 0; i < 6; i++) {
-  await dbg('BOSS POWER');
-  await sleep(900);
-  await page.screenshot({ path: `${SHOTS}/08-power-${i}.png` });
-}
-const bossStats = await stats();
+await dbg('NEXT STORY');
+await sleep(1200);
+await page.screenshot({ path: `${SHOTS}/07-story.png` });
 
 await dbg('GLITCH TEST');
 await sleep(400);
-await page.screenshot({ path: `${SHOTS}/09-glitch.png` });
+await page.screenshot({ path: `${SHOTS}/08-glitch.png` });
 
-await dbg('KILL BOSS');
-await sleep(3000);
-await page.screenshot({ path: `${SHOTS}/10-death.png` });
-await sleep(9000);
-await page.screenshot({ path: `${SHOTS}/11-ending.png` });
+// Long enough for several waves to hand over, and past where the five
+// hundredth kill used to end the run.
+for (let i = 0; i < 6; i++) await dbg('+50 KILLS');
 await sleep(6000);
-await page.screenshot({ path: `${SHOTS}/12-frozen.png` });
+const deepStats = await stats();
+await page.screenshot({ path: `${SHOTS}/09-still-running.png` });
+
+const stillPlaying = await page.evaluate(() => {
+  const w = window.__sim.world;
+  return { phase: w.phase, kills: w.kills, endless: w.endless, boss: !!w.boss };
+});
 
 const hasReset = await page.evaluate(() => !document.getElementById('resetBtn').hidden);
 if (hasReset) {
   await page.click('#resetBtn');
   await sleep(1500);
-  await page.screenshot({ path: `${SHOTS}/13-restart.png` });
+  await page.screenshot({ path: `${SHOTS}/10-restart.png` });
 }
 
 const finalPhase = await page.evaluate(() => document.getElementById('phaseTag').textContent);
 
 console.log('--- busy-field stats ---\n' + busyStats);
-console.log('--- boss stats ---\n' + bossStats);
-console.log('reset button appeared:', hasReset);
+console.log('--- deep-field stats ---\n' + deepStats);
+console.log('past the old count:', JSON.stringify(stillPlaying));
+console.log('reset button appeared (should be false):', hasReset);
 console.log('phase after restart:', finalPhase);
 const runningBuild = await page.evaluate(() => document.querySelector('.bootFoot')?.textContent || '');
 console.log('running build:', runningBuild.replace(/^.*BUILD /, '') || '(unknown)');
