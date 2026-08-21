@@ -702,6 +702,7 @@ export class Hud {
       ['+50 KILLS', () => g.debugAddKills(50)],
       ['NEXT STORY', () => g.debugNextStory()],
       ['UNLOCK ALL', () => g.debugUnlockAll()],
+      ['MAX UPGRADES', () => g.debugBuyAll()],
       ['SPAWN WAVE', () => g.debugSpawnWave()],
       ['FILL FIELD', () => g.debugFillField()],
       ['CLEAR FIELD', () => g.debugClearField()],

@@ -18,7 +18,7 @@ import { codex, lineSeen, markLine, forgetLines, migrateLines } from './codex.js
 import { readRun, saveRun, forgetRun } from './save.js';
 import { Offers } from './events.js';
 import { freshUpgrades, BY_ID } from './upgrades.js';
-import { NODE_BY_ID, priceOf } from './tree.js';
+import { NODES, NODE_BY_ID, priceOf } from './tree.js';
 import { SCRIPT, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
@@ -1537,6 +1537,41 @@ export class Game {
   }
 
 
+
+  /**
+   * The whole tree, every node at every level, paid for by nobody.
+   *
+   * UNLOCK ALL below hands over the kit -- the rounds, the mines, the
+   * abilities -- and stops there, which is half a turret: none of the seventy
+   * upgrades behind them, so a SHOT with no DOUBLE-O and a mine tier with no
+   * doctrine on it. This is the other half, and it includes the kit, since an
+   * arm's unlock is a node in the tree like anything else.
+   *
+   * NODES comes out of flatten() parent-first, which is the order that matters:
+   * a charge applies through world.abilities and would have nothing to grant
+   * it to if the ability it belongs to had not been opened first.
+   */
+  debugBuyAll() {
+    const w = this.world;
+    let bought = 0;
+    for (const n of NODES) {
+      if (!n.id) continue;
+      const def = BY_ID.get(n.id);
+      if (!def) continue;
+      for (let have = this.owned(n.id); have < (n.levels || 1); have++) {
+        def.apply(w.up, w);
+        w.offers.taken.push(n.id);
+        bought++;
+      }
+    }
+    this.hud.setEnergy(w.energy, intakeRate(w));
+    this.hud.buildStrip();
+    this.hud.syncLoadout(w);
+    this.hud.syncAbilities(w.abilities);
+    this.hud.menu.syncTree();
+    this.hud.alert(`+${bought} upgrades`, 'info', 1.6);
+    return bought;
+  }
 
   /**
    * Everything the run could ever hand over, now. The opening lines are
