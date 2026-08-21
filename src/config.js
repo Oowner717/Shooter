@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '76';
+export const BUILD = '77';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '76';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a70e2a3';
+export const REV = 'd235683';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -114,6 +114,11 @@ export const CFG = {
     teachGap: [2.6, 4.2],
     teachRest: [4, 6],
     drift: [4.5, 8], // a grey object every so often, for the whole run
+    // maxDrift caps the *ambient* trickle. A wave placing drift on purpose is
+    // a different thing and gets its own ceiling — the bonus wave is 22 at
+    // once and would otherwise stop at ten. The trickle simply pauses until
+    // the field is back under maxDrift.
+    driftCap: 26,
     // A wave is authored at its opening size and swells over the run, so the
     // same six-MOTE wave that is a gentle problem at kill 20 is fourteen of
     // them by the end. Without this the field peaked at nine objects and the
@@ -1161,6 +1166,25 @@ export const WAVES = [
   { of: [['glut', 2], ['splitter', 2]] },
   { of: [['tow', 2]] },
   { of: [['tow', 1], ['bulwark', 1]] },
+
+  /*
+   * The bonus. Grey and nothing else: no hostiles, no risk, no cost to the
+   * allotment, and about 220 ENERGY lying on the field if you take it.
+   *
+   * It is a wave you have to *play*, which is the point of putting it in the
+   * rotation rather than just handing out energy. AUTO AIM does not target
+   * DRIFT, so auto-fire does nothing here at all — the whole wave is you
+   * aiming by hand, at things that cannot hurt you, for as long as you care
+   * to. It is the one beat in the run where the assists are dead weight.
+   *
+   * Short on purpose. `dwell` is the quiet it buys; the drift itself does not
+   * expire when the wave ends, so anything left is still there to sweep up
+   * while the next wave comes down on top of it.
+   *
+   * Nothing announces it. A screen of grey with nothing hostile on it is the
+   * announcement — see the note on waves never being named.
+   */
+  { of: [], drift: 22, dwell: 8 },
 ];
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

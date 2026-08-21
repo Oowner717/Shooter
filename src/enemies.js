@@ -1586,9 +1586,13 @@ export class Director {
     this.jobs = jobs;
     this.wait = 0;
     // A wave may ask for grey drift alongside it. It is not hostile, costs
-    // nothing from the allotment, and is mostly what the opening is made of.
-    for (let i = 0; i < (wave.drift || 0); i++) {
-      if (driftCount(world) < CFG.maxDrift) spawnDrift(world);
+    // nothing from the allotment, and is the whole of both the opening and the
+    // bonus wave. Stacked upward rather than dropped in one row, so twenty-two
+    // of them arrive as a shower over a few seconds instead of a wall.
+    const want = wave.drift || 0;
+    for (let i = 0; i < want; i++) {
+      if (driftCount(world) >= CFG.waves.driftCap) break;
+      spawnDrift(world, want > 4 ? { y: ENTRY_Y + rand(10, 40) - i * 30 } : {});
     }
   }
 

@@ -1036,6 +1036,27 @@ else; the runner in `Director` turns it into releases.
   waves bound the population by construction, which is most of why they work
   and all of why they need this.
 
+**One wave is grey and nothing else.** No hostiles, no risk, nothing taken from
+the five hundred, and about 220 ENERGY on the field if you take it — 22 DRIFT
+at 10 each, against roughly 11 an object for a normal wave.
+
+It earns its place in the rotation by being a wave you have to *play*. AUTO AIM
+does not target DRIFT, so during this one the assists do nothing at all: the
+whole wave is you aiming by hand at things that cannot hurt you, for as long as
+you care to. It is the only beat in the run where auto-fire is dead weight, and
+it is the payoff for the two opening lines that say so.
+
+`dwell: 8` is the quiet it buys, not a timer on the drift — the objects do not
+expire when the wave ends, so anything left is still there to sweep while the
+next wave comes down on top of it. `waves.driftCap` (26) is the ceiling for
+drift a wave places deliberately; `maxDrift` (10) still caps the ambient
+trickle, which simply pauses until the field is back under it.
+
+Measured: 22 placed at once, **0 hostiles on the field for the whole wave**,
+auto-aim returns no target throughout, the wave hands over in about 9 s, the
+sweep banks 260 (26 objects, including ambient drift already there), and
+`world.released` does not move.
+
 **None of it is ever named on screen.** No wave counter, no "WAVE 4" card, no
 between-wave banner. The pacing is meant to be felt; a number would turn a
 rhythm into a score.
