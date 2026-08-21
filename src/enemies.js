@@ -121,7 +121,12 @@ export class Enemy {
     this.invMass = 1 / this.mass;
     this.restitution = type.restitution ?? 0.6;
     this.friction = 0.3;
-    this.cruise = type.speed * (opts.speedScale || rand(0.86, 1.14));
+    // Energy moves at its own pace and turns at its own rate; a body moves at
+    // its type's. See CFG.drop.speed for why they were ever the same thing.
+    this.cruise = this.isDrop
+      ? CFG.drop.speed * (opts.speedScale || rand(0.9, 1.12))
+      : type.speed * (opts.speedScale || rand(0.86, 1.14));
+    this.accel = this.isDrop ? CFG.drop.accel : type.accel;
 
     this.maxHp = Math.round((opts.hp ?? type.hp) * (this.isDrop ? 1 : rand(0.92, 1.1)));
     this.hp = this.maxHp;
@@ -253,7 +258,7 @@ export class Enemy {
     }
     const slow = world.stasis > 0 ? 0.12 : 1;
     let cruise = this.cruise * slow;
-    const k = (this.type.accel / 100) * slow * 0.9;
+    const k = (this.accel / 100) * slow * 0.9;
     let dx = Math.cos(this.wanderAngle);
     let dy = Math.sin(this.wanderAngle);
 
@@ -360,7 +365,7 @@ export class Enemy {
       this.dissolved = true;
       return;
     }
-    const k = (this.type.accel / 100) * dt;
+    const k = (this.accel / 100) * dt;
     this.vx += ((dx / d) * this.cruise - this.vx) * clamp(k, 0, 1);
     this.vy += ((dy / d) * this.cruise - this.vy) * clamp(k, 0, 1);
   }
@@ -377,7 +382,16 @@ export class Enemy {
       this.hunt(world, dt);
       return;
     }
-    if (this.harmless) {
+    /*
+     * Energy is energy, whatever dropped it.
+     *
+     * A mote is built from the type it fell off, so a mote off a DRIFT
+     * inherited `harmless` and took this branch -- it wandered the band it was
+     * made in and never came to the turret at all. The one object whose
+     * salvage you have to go and fetch was the one object whose salvage was
+     * never coming to you.
+     */
+    if (this.harmless && !this.isDrop) {
       this.wander(world, dt);
       return;
     }
@@ -451,7 +465,7 @@ export class Enemy {
     const speed = Math.hypot(this.vx, this.vy);
     // Steering yields to physics while a body is flying — knockback stays fun.
     const authority = clamp(1 - (speed / Math.max(cruise, 1) - 1) / 3, 0.12, 1);
-    const k = (this.type.accel / 100) * authority * slow;
+    const k = (this.accel / 100) * authority * slow;
 
     this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);
     this.vy += (dy * cruise - this.vy) * clamp(k * dt, 0, 1);
@@ -788,7 +802,6 @@ export class Enemy {
         hp: 8 + dr,
         vx: this.vx * 0.4 + Math.cos(a) * sp,
         vy: this.vy * 0.4 + Math.sin(a) * sp,
-        speedScale: 1.25,
         energy: each,
       }));
       // TITHE marks the body, but the salvage rides on what the body leaves —

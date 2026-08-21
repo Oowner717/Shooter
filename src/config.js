@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '96';
+export const BUILD = '97';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '96';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a5f27dd';
+export const REV = '5fe261f';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -647,6 +647,17 @@ export const CFG = {
     min: 1.8,
     max: 4.4,
     burst: 1.6, // multiplier on the ceiling for explosion shards
+    /*
+     * How energy travels, whatever it fell off.
+     *
+     * It used to inherit the parent type's `speed` and `accel`, which made the
+     * same object on screen behave four different ways: a mote off a NEEDLE
+     * closed at 130 and turned hard, one off a BULWARK closed at 29 and barely
+     * turned at all, and neither number is anything a player can see a reason
+     * for. Energy is energy.
+     */
+    speed: 132,
+    accel: 300,
   },
 
   energy: {
