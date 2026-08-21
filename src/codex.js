@@ -37,7 +37,7 @@ export const CODEX = [
   {
     id: 'bulwark',
     name: 'BULWARK',
-    line: 'Armoured past the point of interest. Shove it off you and deal with it last.',
+    line: 'Armoured past the point of interest. Push it into something instead.',
   },
   {
     id: 'warden',

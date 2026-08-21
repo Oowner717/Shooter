@@ -73,7 +73,6 @@ export function freshUpgrades() {
     overwatch: 1, // damage while no hand is on the lever
     casing: 0, // damage a second to whatever is touching the turret
     insulation: 1, // multiplier on how much corruption costs the intake
-    shrug: 0, // seconds between throwing attackers off
   };
 }
 
@@ -163,7 +162,6 @@ const MARK = {
   overwatch: g('<circle cx="12" cy="12" r="6.6"/><circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none"/><path d="M12 1.6v3.2M12 19.2v3.2M1.6 12h3.2M19.2 12h3.2"/>'),
   casing: g('<path d="M12 2.6 20 6v6.6c0 4.6-3.4 7.2-8 8.8-4.6-1.6-8-4.2-8-8.8V6z"/><path d="M12 8v8M8 12h8"/>'),
   insulation: g('<path d="M12 2.6 20 6v6.6c0 4.6-3.4 7.2-8 8.8-4.6-1.6-8-4.2-8-8.8V6z"/><path d="M7.5 12.5c1.6-2 3.4-2 4.5 0s2.9 2 4.5 0" opacity=".85"/>'),
-  shrug: g('<circle cx="12" cy="12" r="3"/><path d="M12 8V3.6M9.8 5.8 12 3.5l2.2 2.3"/><path d="M12 16v4.4M9.8 18.2 12 20.5l2.2-2.3"/><path d="M8 12H3.6M5.8 9.8 3.5 12l2.3 2.2"/><path d="M16 12h4.4M18.2 9.8 20.5 12l-2.3 2.2"/>'),
 };
 
 const bump = (key, by) => (up) => { up[key] += by; };
@@ -250,7 +248,6 @@ export const UPGRADES = {
     { id: 'overwatch', name: 'OVERWATCH', line: '+25% damage while hands off the lever.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },
     { id: 'casing', name: 'HARD CASING', line: 'Objects touching you take 40 damage a second.', apply: bump('casing', 40) , icon: MARK.casing },
     { id: 'insulation', name: 'INSULATION', line: 'Corruption costs half as much energy.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
-    { id: 'shrug', name: 'SHRUG', line: 'Throws objects off the turret every 15s.', apply: set('shrug', 15) , icon: MARK.shrug },
   ],
 };
 

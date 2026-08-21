@@ -389,13 +389,20 @@ export class Hud {
       if (s.frac !== f) {
         s.frac = f;
         s.fill.style.transform = `scaleY(${1 - f})`;
-        // Ready means there is a use in hand, which with two charges is true
-        // while the bar is still filling the second one back up.
-        const ready = abilities.usable(i);
-        if (s.ready !== ready) {
-          s.ready = ready;
-          s.el.classList.toggle('ready', ready);
-        }
+      }
+      // Ready means there is a use in hand, which with two charges is true
+      // while the bar is still filling the second one back up.
+      //
+      // Checked on its own rather than inside the fraction diff above, which
+      // is where it used to live. readyFraction is 1 whenever the cooldown is
+      // clear, and an ability nobody owns has no cooldown — so buying one left
+      // the fraction sitting at the 1 it had always been, the diff never fired,
+      // and the button never lit. WELL, PRISM and STASIS could be bought and
+      // still look sealed until something else happened to move the bar.
+      const ready = abilities.usable(i);
+      if (s.ready !== ready) {
+        s.ready = ready;
+        s.el.classList.toggle('ready', ready);
       }
       if (s.locked !== locked) {
         s.locked = locked;

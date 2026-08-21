@@ -144,6 +144,10 @@ export class Enemy {
     // wounds until something finishes it.
     // EBB: seconds left of being thrown, during which it does not steer.
     this.thrown = 0;
+    // SLUG: seconds left of being exempt from collision damage, in both
+    // directions. A SLUG shoves as hard as it ever did and pays out nothing
+    // for what it shoves things into — see CFG.rounds.slug.calm.
+    this.slugged = 0;
     this.seed = type.id === 'seed';
     this.seedT = this.seed ? CFG.graft.life : 0;
     this.host = null;
@@ -388,6 +392,7 @@ export class Enemy {
   update(world, dt) {
     if (this.spawnIn > 0) this.spawnIn = Math.max(0, this.spawnIn - dt * 2.2);
     this.flash = Math.max(0, this.flash - dt * 4.5);
+    if (this.slugged > 0) this.slugged = Math.max(0, this.slugged - dt);
 
     // A grafted body closes what you did not finish. Nothing else in the game
     // heals, so this is the one object that punishes spreading fire around.

@@ -2,7 +2,7 @@
 
 import { CFG, BUILD, ENEMY_TYPES } from './config.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
-import { Grid, integrate, resolvePair, clampToArena } from './physics.js';
+import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
 import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake } from './fx.js';
 import { background } from './background.js';
 import { glitch } from './glitch.js';
@@ -192,7 +192,6 @@ export class Game {
     w.pendingEbb = false;
     w.pendingMines = 0;
     this.sweepTimer = 0;
-    this.shrugTimer = 0;
     this.hud.setPending(0, null);
     this.loadoutOpen = null;
     w.endless = cleared();
@@ -974,23 +973,42 @@ export class Game {
 
     bodies.push(w.shooter);
     // The decoy is a static body too, so things pile up against it instead of
-    // drifting through it. The pile no longer wears it down — nothing on the
-    // field damages anything — so it stands for its full life and then goes.
+    // drifting through it — and it takes the collision damage of the pile.
     if (w.decoy && !w.decoy.dead) bodies.push(w.decoy);
     this.grid.build(bodies);
     this.grid.eachPair(bodies, (a, b) => {
       if (a.dead || b.dead) return;
       const impact = resolvePair(a, b);
-      // A collision is a shove and nothing more. Bodies used to hurt each
-      // other here, which meant the field killed things the player never
-      // touched and made SLUG a damage round by proxy; build 70 took it out.
-      // What is left is the spark, so a hard meeting still reads as one.
-      if (impact <= CFG.physics.impactSpark) return;
+      if (impact <= 0) return;
+      // Wreckage bounces off things and hurts none of them, in either
+      // direction. Skipped here rather than in applyDamage so the object it
+      // struck is spared too.
+      if (a.inert || b.inert) return;
+      // ...and so is anything a SLUG has just hit. SLUG is the round that puts
+      // things where you want them, not a damage round dressed as one: it
+      // still shoves as hard as it ever did, but nothing it throws pays out on
+      // impact, in either direction. Every other collision on the field trades
+      // damage exactly as it always has. See CFG.rounds.slug.calm.
+      if (a.slugged > 0 || b.slugged > 0) {
+        // ...and the mark travels with the shove. A slugged BULWARK driven
+        // through a MOTE would otherwise leave that MOTE flying at whatever is
+        // behind it with full damage, which is still the SLUG doing it. The
+        // mark is passed at its *remaining* time, never refreshed, so a chain
+        // runs down instead of propagating for ever.
+        const t = Math.max(a.slugged || 0, b.slugged || 0);
+        if (typeof a.slugged === 'number') a.slugged = t;
+        if (typeof b.slugged === 'number') b.slugged = t;
+        return;
+      }
+      const dmg = impactDamage(a, b, impact);
+      if (dmg <= 0) return;
       const mx = (a.x + b.x) / 2;
       const my = (a.y + b.y) / 2;
       for (let i = 0; i < 3; i++) {
         spark(mx, my, spread(impact * 1.4), spread(impact * 1.4), '#ffffff', 0.16, 1.8);
       }
+      if (a.applyDamage) a.applyDamage(w, dmg);
+      if (b.applyDamage) b.applyDamage(w, dmg);
     });
     if (w.decoy && !w.decoy.dead) bodies.pop();
     bodies.pop(); // shooter is not integrated
@@ -1078,18 +1096,6 @@ export class Game {
         this.sweepTimer = up.sweep;
         applyBlast(w, { x: s.x, y: s.y, r: 260, damage: 90, impulse: 780 });
         ring(s.x, s.y, 20, 300, 0.4, '#7cffb2', 4);
-      }
-    }
-
-    // SHRUG: the same idea, without the damage — it just gets them off.
-    if (up.shrug > 0) {
-      this.shrugTimer -= dt;
-      if (this.shrugTimer <= 0) {
-        this.shrugTimer = up.shrug;
-        if (w.attackers.size) {
-          applyBlast(w, { x: s.x, y: s.y, r: 200, damage: 0, impulse: 1200 });
-          ring(s.x, s.y, 14, 220, 0.3, '#59e0ff', 3);
-        }
       }
     }
 

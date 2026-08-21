@@ -246,6 +246,11 @@ export class Shooter {
         color: '#b8c6d8',
         core: '#f2f6fb',
         trail: 0.02,
+        // Marked as thrown-by-SLUG. While the mark is live the body neither
+        // deals nor takes collision damage — SLUG puts things where you want
+        // them and is not allowed to be a damage round by proxy. Everything
+        // else on the field still trades damage on impact.
+        onHit: (w, e) => { e.slugged = Math.max(e.slugged || 0, R.slug.calm); },
       });
     } else if (world.round === 'rime') {
       const g = R.rime;

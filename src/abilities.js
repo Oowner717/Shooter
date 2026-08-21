@@ -78,11 +78,6 @@ class Beam {
 // one grinding knot, then a short collapse that crushes the knot and blows.
 // Most of the damage comes from the objects hitting each other on the way in.
 const WELL_GATHER = 2.5;
-// Damage a second to anything inside the horizon, before the ramp and the
-// crush multiplier. The knot used to do its damage by grinding bodies into
-// each other; build 70 removed collision damage, so the crush has to be the
-// well's own or WELL is a shove and one blast. See the note in update().
-const WELL_CRUSH = 52;
 const WELL_COLLAPSE = 0.6;
 const WELL_REACH = 430;
 
@@ -109,20 +104,13 @@ class Well {
 
     // A tractor beam rather than a gravity field: velocity is driven toward a
     // fixed inward speed, so bodies converge instead of slingshotting into
-    // escape orbits.
-    //
-    // Most of the damage used to come from them colliding with each other on
-    // the way in. That is gone, so the well does it directly: anything that
-    // has reached the horizon is being crushed by the well, harder the tighter
-    // it draws. Targeted rather than physics-wide, which is the difference
-    // between an ability that crushes and a field where everything hurts
-    // everything.
+    // escape orbits. They still collide with each other the whole way in —
+    // that is where most of the damage comes from.
     const blend = clamp(9 * ramp * dt, 0, 1);
-    const bite = WELL_CRUSH * (0.35 + ramp * 0.65) * (1 + this.crush * 2.2) * dt;
     const inward = 270 * (1 + this.crush * 1.6);
     const swirl = 130 * (1 - this.crush);
 
-    const grab = (list, crushable) => {
+    const grab = (list) => {
       for (const e of list) {
         if (e.dead) continue;
         const dx = this.x - e.x;
@@ -131,15 +119,6 @@ class Well {
         if (d > WELL_REACH || d < 0.5) continue;
         const nx = dx / d;
         const ny = dy / d;
-        // Inside the horizon, and therefore being crushed. Energy is not
-        // crushable — applyDamage ignores it anyway — so only the enemy pass
-        // asks for it, and the sparks say which bodies are taking it.
-        if (crushable && d < this.r) {
-          e.applyDamage(world, bite, 0, 0, 0);
-          if (Math.random() < 9 * dt) {
-            spark(e.x, e.y, spread(150), spread(150), '#e0aaff', 0.22, 1.9);
-          }
-        }
         // ease off inside the knot so they pack together instead of
         // driving straight through the middle and out the far side
         const closing = inward * Math.min(1, d / 70);
@@ -151,8 +130,8 @@ class Well {
         e.av += 1.4 * dt;
       }
     };
-    grab(world.enemies, true);
-    grab(world.drops, false);
+    grab(world.enemies);
+    grab(world.drops);
 
     // infalling matter
     const streams = this.crush > 0 ? 3 : 1;
@@ -239,9 +218,7 @@ class Well {
  * walks at it instead — Enemy.steer picks it over the shooter — so a scattered
  * field becomes one pile somewhere that is not on top of you. It is a static
  * body, so things pile up against it rather than through it, and it takes the
- * pile of everything it catches. Nothing on the field can damage it — build
- * 70 removed collision damage — so it stands for its full life and then goes,
- * loudly, whatever gathered on it.
+ * collision damage of everything it catches. When it goes, it goes loudly.
  */
 class Decoy {
   constructor(x, y) {
@@ -249,6 +226,8 @@ class Decoy {
     this.x = x;
     this.y = y;
     this.r = D.r;
+    this.hp = D.hp;
+    this.maxHp = D.hp;
     this.life = D.life;
     this.dead = false;
     this.flash = 0;
@@ -261,6 +240,14 @@ class Decoy {
     this.mass = Infinity;
     this.restitution = 0.5;
     this.friction = 0.4;
+  }
+
+  /** The solver calls this on anything it damages. */
+  applyDamage(world, dmg) {
+    if (this.dead) return;
+    this.hp -= dmg;
+    this.flash = Math.min(1, this.flash + dmg / 200);
+    if (this.hp <= 0) this.expire(world);
   }
 
   expire(world) {
@@ -291,7 +278,7 @@ class Decoy {
 
   draw(ctx, world) {
     const k = this.born;
-    const left = clamp(this.life / CFG.decoy.life, 0, 1);
+    const hpf = clamp(this.hp / this.maxHp, 0, 1);
     const going = clamp(this.life / 1.6, 0, 1);
     ctx.save();
     ctx.translate(this.x, this.y);
@@ -317,12 +304,11 @@ class Decoy {
     ctx.strokeRect(-4, -this.r * 1.5, 8, this.r * 0.8);
     ctx.restore();
 
-    // how long it has left. It used to be how much health it had left, which
-    // stopped moving the moment collisions stopped doing damage.
+    // what is left of it
     ctx.strokeStyle = rgba('#ffffff', 0.85);
     ctx.lineWidth = 2.6;
     ctx.beginPath();
-    ctx.arc(0, 0, this.r + 7, -Math.PI / 2, -Math.PI / 2 + TAU * left);
+    ctx.arc(0, 0, this.r + 7, -Math.PI / 2, -Math.PI / 2 + TAU * hpf);
     ctx.stroke();
 
     // a lure sweeping outward, so it reads as calling rather than sitting

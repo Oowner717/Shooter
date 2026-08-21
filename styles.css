@@ -1296,7 +1296,16 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   flex: 1 1 0;
   min-width: 0;
   position: relative;
-  border: 1px solid var(--line);
+  /*
+   * Always tinted with the ability's own colour, even cold. Every ability is
+   * owned from the first frame, so a plain grey border on a recharging one was
+   * indistinguishable from a button you had not bought — and since the pips
+   * only draw above one charge, a single-charge ability on cooldown had no
+   * colour, no dots and no glow anywhere on it. Readiness is still the loud
+   * step (.ab.ready below); this is only the difference between "mine, not
+   * yet" and "not mine".
+   */
+  border: 1px solid color-mix(in srgb, currentColor 36%, var(--line));
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(12, 22, 38, 0.86), rgba(5, 9, 16, 0.9));
   color: var(--ink);
@@ -1329,7 +1338,7 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
  * frame, and a label that stays lit whether or not the button is ready.
  */
 .ab.essential {
-  border-color: color-mix(in srgb, currentColor 34%, transparent);
+  border-color: color-mix(in srgb, currentColor 52%, transparent);
   background:
     radial-gradient(120% 90% at 50% 108%, color-mix(in srgb, currentColor 12%, transparent), transparent 70%),
     linear-gradient(180deg, rgba(12, 22, 38, 0.86), rgba(5, 9, 16, 0.9));
@@ -1368,7 +1377,7 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   box-shadow: 0 0 4px currentColor;
 }
 
-.ab.ready { border-color: color-mix(in srgb, currentColor 55%, transparent); }
+.ab.ready { border-color: color-mix(in srgb, currentColor 80%, transparent); }
 .ab.ready .lbl { color: var(--ink); }
 .ab.ready svg { filter: drop-shadow(0 0 6px currentColor); }
 .ab:active { transform: scale(0.94); }

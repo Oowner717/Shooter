@@ -332,10 +332,10 @@ measured at 13.2 to 20 against a BULWARK.
 - **SLUG** hits harder than anything else per shot and moves what it hits a very
   long way — measured at 44 damage and 100-plus units of travel on one shot. It
   used to do 14, on the theory that the damage would come from whatever you
-  shoved it into; build 70 removed collision damage, which left it paying a
-  2.4× rate penalty for a shove and nothing else — the worst round in the rack
-  by a distance. It is now the biggest single hit available and still under BOLT
-  on sustained damage, because it still brings the shove.
+  shoved it into. It is now the one round on the field that *cannot* do that —
+  see the note on the SLUG mark under **The physics** — so the 2.4× rate penalty
+  had to buy something real. It is the biggest single hit available and still
+  under BOLT on sustained damage, because it still brings the shove.
 - **RIME** drags whatever it touches to a crawl for a few seconds — measured
   taking a body from 200 units a second to about 13. It kills nothing by
   itself; it buys the time for everything else to.
@@ -393,13 +393,9 @@ a caption explains it.
 **DECOY** is the one defensive ability. It plants a hollow copy of your turret
 up-field; `Enemy.steer` picks it over you, so a scattered field becomes one pile
 somewhere that is not on top of you. It is a static physics body, so things heap
-up against it rather than drifting through. It used to be worn down by the pile
-it caught, so a big enough crowd popped it early; with collision damage gone
-nothing on the field can touch it, and it simply stands for its nine seconds and
-then leaves a 260-unit blast. Measured under twelve BULWARKs driven into it at
-1600 units a second: 8.9 s, ended by its own timer. The ring around it now
-counts that time down rather than counting health that never moves. Only one at
-a time; casting again detonates the old one.
+up against it rather than drifting through, and it takes the collision damage of
+everything it catches — 900 hit points, nine seconds, and a 260-unit blast when
+it finally goes. Only one at a time; casting again detonates the old one.
 
 **CHORUS** is the only ability that does nothing on its own. It binds every
 hostile on the field for six seconds — no damage, no hold — and from then on,
@@ -604,7 +600,7 @@ in the game has a duration, so nothing else is on it.
   | RICOCHET | +1 wall bounce | WIDE MOUTH | +40% trigger range | OVERWATCH | +25% damage hands-off |
   | HEAVY | 2x knockback | SWEEP | blasts behind you every 20s | HARD CASING | 40 dmg/s to what touches you |
   | OVERPRESSURE | +40% HE radius | REFLEX | PULSE fires itself at 2+ grips | INSULATION | corruption costs half |
-  | FIFTH LINK | ARC +1 jump | INTAKE | energy that lands on you is collected | SHRUG | throws objects off every 15s |
+  | FIFTH LINK | ARC +1 jump | INTAKE | energy that lands on you is collected | | |
   | LIEN | TITHE marks run to 14 | STANDING ORDER | -20% ability cooldowns | | |
   | COMPOUND | +60% tithe mark bite | | | | |
   | SALVO | every 8th shot fires 3 | | | | |
@@ -1204,28 +1200,47 @@ broadphase, and distance constraints for TOW cables, solved after the contact
 pass so a towed pair cannot be pulled apart by whatever it just shoved. Mass is `density × area`, so heavy objects genuinely shrug off
 what light ones can't.
 
-**Collisions are a shove and nothing else.** Until build 70 an impact above a
-threshold hurt *both* bodies in proportion to reduced mass and closing speed, so
-punting a mote into a lurcher hurt the lurcher. That is gone. Bodies still
-bounce — restitution, friction, spin, mass, all of it — they just cannot damage
-each other, and nothing on the field kills anything the player did not. What is
-left of the threshold is `physics.impactSpark`, which now decides only whether
-you see the two bodies meet.
+**Collision damage is live**, and has been since the beginning. An impact above
+a threshold hurts *both* bodies in proportion to reduced mass and closing speed.
+Punting a mote into a lurcher hurts the lurcher. WELL is built on it: it drags
+everything within reach into one spinning knot and most of the kills happen on
+the way in, before the collapse goes off at all.
 
-Removing it changed less than it sounds like. Two BULWARKs closing at 2800 units
-a second now trade no health at all, but across three 60-second hands-off runs
-each way the kill count was 46.7 before and 46.0 after — well inside the
-run-to-run spread, which was 33 to 56 on the old build alone. It was never
-carrying much of the tally; it was carrying two specific things, and both were
-handled rather than left hollow:
+**With exactly one exception: SLUG.** A body a SLUG has hit is marked for
+`rounds.slug.calm` seconds, and while the mark is live it neither deals nor
+takes collision damage. SLUG is the round that puts things where you want them,
+and it is not allowed to be a damage round by proxy — its 44 has to be the
+damage it does. Everything else on the field trades on impact exactly as it
+always has.
 
-- **WELL** dragged everything into a knot and let the grinding do the work.
-  It now crushes directly: anything inside the horizon takes `WELL_CRUSH` a
-  second, ramped and multiplied as the well tightens. Targeted rather than
-  physics-wide, which is the difference between an ability that crushes and a
-  field where everything hurts everything. Measured on a packed dozen SPLITTERs,
-  four runs each way: 1472 damage and 60 kills before, 1482 and 60 after.
-- **SLUG** was a damage round by proxy and is now a damage round. See above.
+The mark travels with the shove and never refreshes: when a marked body meets an
+unmarked one, the unmarked one inherits whatever time is *left*, so a chain runs
+down instead of propagating for ever. Without that, a slugged BULWARK driven
+through a MOTE would leave that MOTE flying into whatever was behind it at full
+damage — still the SLUG doing it, one body further along.
+
+Build 70 removed collision damage from *everything*, which was a misreading:
+WELL had to be given its own crush to replace the grinding, and DECOY became
+unkillable because the pile could no longer wear it down. Build 72 put all of
+that back and scoped the removal to SLUG, which is what it should always have
+been. Measured: two LURCHERs closing at 2800 units a second take 300 each; the
+identical collision with one side marked takes zero on both, and the mark
+spreads to the other body.
+
+**Every ability's border carries its own colour, cold or ready.** It used to be
+plain grey until `usable()` went true. Every ability is owned from the first
+frame and the charge pips only draw above one charge, so a single-charge ability
+on cooldown — WELL, PRISM and STASIS, if nothing had bought them a second charge
+— had no colour, no dots and no glow anywhere on it, and read as a button you
+did not own rather than one recharging. The cold border is now `currentColor` at
+36% and ready is 80%, so readiness is still the loud step and identity never
+goes away.
+
+`syncAbilities` also had the readiness check nested inside its cooldown-fraction
+diff, so `ready` was only ever recomputed when the bar moved. `readyFraction` is
+1 whenever the cooldown is clear, which means anything that changes usability
+*without* moving the bar — ORDINAL locking a button, most obviously — left the
+border showing the old state. It is checked on its own now.
 
 **WELL bends the substrate.** The lattice is the only thing drawn in the same
 space as the field but not *of* it, so a well that visibly drags it is the

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '71';
+export const BUILD = '72';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -269,17 +269,22 @@ export const CFG = {
      * SLUG. One slow, heavy round with an enormous shove behind it.
      *
      * It used to do almost no damage on purpose: the damage was supposed to
-     * come from what you shoved it into. Build 70 removed collision damage,
-     * which left SLUG paying a 2.4x rate penalty for a shove and nothing else
-     * — the worst round in the rack by a distance. It now hits hardest of
-     * anything per shot (44, against SPINE's 20 and BOLT's 26) while staying
-     * under BOLT on sustained damage, because it still brings the shove.
+     * come from what you shoved it into. That is the one thing it is no longer
+     * allowed to do — a body a SLUG has just hit does no collision damage to
+     * anything it is driven through, and takes none from it, for `calm`
+     * seconds. Everything else on the field still trades damage on impact;
+     * only what a SLUG threw is exempt.
+     *
+     * That left it paying a 2.4x rate penalty for a shove and nothing else, so
+     * it now hits hardest of anything per shot — 44, against SPINE's 20 and
+     * BOLT's 26 — while staying under BOLT on sustained damage.
      */
     slug: {
       rate: 2.4,
       speed: 820,
       damage: 44,
       impulse: 1500,
+      calm: 2.4, // seconds a slugged body neither deals nor takes impact damage
     },
     /*
      * RIME. Drags whatever it touches to a crawl for a few seconds. It kills
@@ -325,11 +330,8 @@ export const CFG = {
   // walking at you walks at it instead, which turns a scattered field into one
   // pile somewhere else — and the pile is not on top of you.
   decoy: {
-    // It used to be poppable: the pile that gathered on it did collision
-    // damage and blew it early. With collision damage gone nothing can hurt
-    // it, so it is purely a timer now, and the ring around it counts that
-    // down rather than counting health that never moves.
     life: 9,
+    hp: 900,
     r: 24,
     ahead: 300, // world units up-field from the turret
     blast: { r: 260, damage: 150, impulse: 900 }, // what it leaves behind
@@ -622,10 +624,8 @@ export const CFG = {
     // EBB: it clamped a BULWARK's throw on the first frame, so the heavy
     // things barely moved and the card read as doing nothing to them.
     thrownSpeed: 720,
-    // Impact speed above this is worth a spark. It used to be the point at
-    // which a collision started doing damage; collisions do none now, so all
-    // it decides is whether you see the two bodies meet.
-    impactSpark: 62,
+    collisionDamage: 0.42, // damage per unit of (impact speed * reduced mass)
+    collisionThreshold: 62, // impact speed below this is a harmless bump
   },
 
 
