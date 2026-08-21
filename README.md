@@ -1248,6 +1248,25 @@ before and 4 s after. Kill rate across one run each way was 14.5/min and 11/min,
 which a single run either side cannot separate from noise; an earlier pair ran
 13 and 14.5 the other way up.
 
+**Volume is a level, not a switch.** The menu had SOUND on/off and nothing
+else. It is now a six-segment row under SYSTEM: `audio.VOLUME_STEPS` scaled
+against `FULL_GAIN`, ramped with `setTargetAtTime` so a change never clicks,
+and written to `sim7749-volume` — the run is saved, so a volume that reset on
+every return would be the only setting in the game that did not.
+
+The first segment is off, so mute is a *position on the scale* rather than a
+second control that can disagree with it; `audio.enabled` is derived from
+`volume > 0` rather than stored beside it. Off gets its own colour (red, not an
+unlit segment) so a muted game says so instead of merely failing to say
+anything. `setEnabled` survives for the quick mute and remembers the level to
+come back to.
+
+It is six tap targets rather than an `<input type=range>` on purpose: a thumb
+on a 6px track is a worse control on a phone than five marks you can hit
+without looking, and the rest of the interface already reads in segments. The
+marks rise left to right so the row reads as a level at a glance; the tap area
+is the full 30px row height, not the mark.
+
 **Every ability's border carries its own colour, cold or ready.** It used to be
 plain grey until `usable()` went true. Every ability is owned from the first
 frame and the charge pips only draw above one charge, so a single-charge ability

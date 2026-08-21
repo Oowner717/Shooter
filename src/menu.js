@@ -11,6 +11,7 @@ import { CODEX, codex } from './codex.js';
 import { CONTROLS } from './narrative.js';
 import { ARSENAL, ARSENAL_GROUPS, specRows } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
+import { VOLUME_STEPS } from './audio.js';
 import { BUILD } from './config.js';
 
 const $ = (id) => document.getElementById(id);
@@ -175,18 +176,17 @@ export class Menu {
     const grid = document.createElement('div');
     grid.className = 'menuGrid';
     const g = this.game;
+    p.appendChild(this.volumeRow());
     const rows = [
-      ['SOUND', 'on or off', () => g.toggleSound(), () => g.soundOn],
       ['RESET SIMULATION', 'start the session again', () => { this.setOpen(false); g.restart(); }],
       ['REPLAY OPENING', 'hand the controls over again', () => { this.setOpen(false); g.replayOpening(); }],
       ['DEBUG', 'developer panel', () => { this.setOpen(false); g.hud.toggleDebug(true); }],
     ];
-    for (const [label, sub, run, state] of rows) {
+    for (const [label, sub, run] of rows) {
       const b = document.createElement('button');
       b.className = 'menuCell';
       b.innerHTML = `<span class="cellName">${label}</span><span class="cellSub">${sub}</span>`;
       b.addEventListener('click', () => { run(); this.syncSystem(); });
-      if (state) { b.dataset.stateful = '1'; this.soundCell = b; this.soundState = state; }
       grid.appendChild(b);
     }
     p.appendChild(grid);
@@ -211,10 +211,58 @@ export class Menu {
     this.syncSystem();
   }
 
+  /**
+   * Volume, as a row of levels rather than a slider. A phone thumb on a 6px
+   * track is a worse control than five targets you can hit without looking,
+   * and the rest of the interface already reads in segments. The first segment
+   * is off, so mute is a position on the scale and not a second control that
+   * can disagree with it.
+   */
+  volumeRow() {
+    const wrap = document.createElement('div');
+    wrap.className = 'volRow';
+    const name = document.createElement('span');
+    name.className = 'volName';
+    name.textContent = 'VOLUME';
+    wrap.appendChild(name);
+
+    const bar = document.createElement('div');
+    bar.className = 'volBar';
+    bar.setAttribute('role', 'group');
+    bar.setAttribute('aria-label', 'Volume');
+    this.volCells = VOLUME_STEPS.map((v, i) => {
+      const b = document.createElement('button');
+      b.className = 'volStep';
+      b.type = 'button';
+      b.dataset.level = String(i);
+      b.setAttribute('aria-label', i === 0 ? 'Mute' : `Volume ${i} of ${VOLUME_STEPS.length - 1}`);
+      // Segments grow left to right, so the control reads as a level at a
+      // glance and not as six equal buttons.
+      b.style.setProperty('--h', `${34 + i * 12}%`);
+      b.innerHTML = '<i></i>';
+      b.addEventListener('click', () => { this.game.setVolume(v); this.syncSystem(); });
+      bar.appendChild(b);
+      return b;
+    });
+    wrap.appendChild(bar);
+    return wrap;
+  }
+
   syncSystem() {
-    if (!this.soundCell) return;
-    this.soundCell.classList.toggle('on', !!this.soundState());
-    this.soundCell.setAttribute('aria-pressed', String(!!this.soundState()));
+    if (!this.volCells) return;
+    const v = this.game.volume;
+    // Nearest step, so a value restored from an older build still lights one.
+    let at = 0;
+    let best = Infinity;
+    VOLUME_STEPS.forEach((s, i) => {
+      const d = Math.abs(s - v);
+      if (d < best) { best = d; at = i; }
+    });
+    this.volCells.forEach((b, i) => {
+      b.classList.toggle('on', i <= at && at > 0);
+      b.classList.toggle('muted', at === 0 && i === 0);
+      b.setAttribute('aria-pressed', String(i === at));
+    });
   }
 
   // -------------------------------------------------------------- live sync

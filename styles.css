@@ -541,6 +541,72 @@ html, body {
 .menuCell.on .cellName { color: var(--accent); }
 .menuCell.on .cellSub { color: rgba(89, 224, 255, 0.7); }
 
+/*
+ * Volume, as a level rather than a slider. Six segments rising left to right:
+ * the first is off, so mute is a position on the scale instead of a second
+ * control that can disagree with it. Sized for a thumb — 44px of height in the
+ * row, which is the whole reason this is not an <input type=range>.
+ */
+.volRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  margin-bottom: 6px;
+  border: 1px solid var(--line);
+  background: rgba(6, 12, 22, 0.7);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+}
+.volName {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--ink);
+  flex: 0 0 auto;
+}
+.volBar {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  flex: 1 1 auto;
+  height: 30px;
+}
+.volStep {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+}
+/* The bar inside the target: the tap area is the full 30px, the mark is not. */
+.volStep i {
+  display: block;
+  width: 100%;
+  height: var(--h, 50%);
+  border: 1px solid var(--line);
+  background: rgba(89, 224, 255, 0.05);
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.volStep.on i {
+  border-color: var(--accent);
+  background: rgba(89, 224, 255, 0.34);
+  box-shadow: 0 0 6px rgba(89, 224, 255, 0.35);
+}
+/* Off is its own state, not an unlit segment: the leftmost mark goes red so a
+   muted game says so rather than merely failing to say anything. */
+.volStep.muted i {
+  border-color: #ff5d8f;
+  background: rgba(255, 93, 143, 0.28);
+  box-shadow: 0 0 6px rgba(255, 93, 143, 0.3);
+}
+.volStep:active i { transform: translateY(1px); }
+.volStep:focus-visible i { outline: 1px solid var(--accent); outline-offset: 1px; }
+
 .menuKeys { display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; }
 .menuKey {
   border-left: 2px solid rgba(120, 190, 255, 0.2);

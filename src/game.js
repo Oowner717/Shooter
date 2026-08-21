@@ -379,6 +379,22 @@ export class Game {
     this.hud.setSound(audio.enabled);
   }
 
+  /**
+   * Set the level, 0..1. init() first because the context does not exist until
+   * something asks for it, and a player whose first act is to turn the volume
+   * up should hear the result rather than silently setting a gain on nothing.
+   */
+  setVolume(v) {
+    audio.init();
+    audio.resume();
+    audio.setVolume(v);
+    this.hud.setSound(audio.enabled);
+  }
+
+  get volume() {
+    return audio.volume;
+  }
+
   get soundOn() {
     return audio.enabled;
   }

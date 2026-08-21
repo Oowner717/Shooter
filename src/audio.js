@@ -3,11 +3,37 @@
 
 import { clamp, rand } from './util.js';
 
+// Where the level is written down. It is the one setting a player changes once
+// and expects to stay changed — the run is saved, so a volume that reset every
+// time the tab came back would be the only thing in the game that did not.
+const VOL_KEY = 'sim7749-volume';
+// What full means. Everything below is a fraction of it, so the mix is tuned
+// in one place and the setting only ever scales it.
+export const FULL_GAIN = 0.6;
+// The steps offered. Not a continuous slider: a phone thumb on a 6px track is
+// a worse control than five targets you can hit without looking, and the game
+// already reads in segments everywhere else.
+export const VOLUME_STEPS = [0, 0.15, 0.35, 0.6, 0.8, 1];
+
+function readVolume() {
+  try {
+    const raw = localStorage.getItem(VOL_KEY);
+    if (raw === null) return 1;
+    const v = Number(raw);
+    return Number.isFinite(v) ? clamp(v, 0, 1) : 1;
+  } catch {
+    return 1; // private mode: full, and it simply is not remembered
+  }
+}
+
 class Audio {
   constructor() {
     this.ctx = null;
     this.master = null;
-    this.enabled = true;
+    // 0..1, a scale on FULL_GAIN. `enabled` is derived from it rather than
+    // stored beside it — two sources of truth for "is there sound" is how a
+    // muted game ends up playing and a loud one ends up silent.
+    this.volume = readVolume();
     this.ready = false;
     this.noiseBuf = null;
     this.drone = null;
@@ -26,7 +52,7 @@ class Audio {
       comp.attack.value = 0.003;
       comp.release.value = 0.18;
       this.master = this.ctx.createGain();
-      this.master.gain.value = this.enabled ? 0.6 : 0;
+      this.master.gain.value = FULL_GAIN * this.volume;
       this.master.connect(comp);
       comp.connect(this.ctx.destination);
 
@@ -48,9 +74,25 @@ class Audio {
     if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
   }
 
+  get enabled() {
+    return this.volume > 0;
+  }
+
+  /** @param v 0..1. Ramped rather than set, so a change never clicks. */
+  setVolume(v) {
+    this.volume = clamp(v, 0, 1);
+    if (this.master) {
+      this.master.gain.setTargetAtTime(FULL_GAIN * this.volume, this.ctx.currentTime, 0.05);
+    }
+    try {
+      localStorage.setItem(VOL_KEY, String(this.volume));
+    } catch { /* private mode: it holds for this session and no longer */ }
+  }
+
+  /** The quick mute. Off remembers where it was, so on comes back to it. */
   setEnabled(on) {
-    this.enabled = on;
-    if (this.master) this.master.gain.setTargetAtTime(on ? 0.6 : 0, this.ctx.currentTime, 0.05);
+    if (on) this.setVolume(this.lastVolume || 1);
+    else { this.lastVolume = this.volume || 1; this.setVolume(0); }
   }
 
   /** Simple per-key throttle so 10 taps/second doesn't turn into mud. */
