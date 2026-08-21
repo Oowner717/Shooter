@@ -1399,12 +1399,17 @@ function scionLane(world, type, x) {
 }
 
 /**
- * Put one rolled type on the field. A TOW is the only type that is two bodies,
- * so it is the only one that needs dispatching.
+ * Put one rolled type on the field, and say what that came to.
+ *
+ * A TOW is the only type that is two bodies, so it is the only one that needs
+ * dispatching -- and the only reason this returns a list. It used to return
+ * the head of the pair and nothing else, which was fine for the director,
+ * which ignores the return, and wrong for the spawn screen, which counts it:
+ * three TOWs put six bodies on the field and the panel said three.
  */
 function release(world, type, x, y, opts) {
-  if (type.tows) return spawnTow(world, x, y, opts)[0];
-  return spawnOne(world, type, x, y, opts);
+  if (type.tows) return spawnTow(world, x, y, opts);
+  return [spawnOne(world, type, x, y, opts)];
 }
 
 /**
@@ -1500,7 +1505,6 @@ export function intakeRate(world) {
 function bank(world, amount, x, y) {
   const got = amount * intakeRate(world);
   world.energy += got;
-  world.energyShown = world.energyShown ?? 0;
   if (got >= 1) dot(x, y, 0, -60, '#9fe8ff', 0.5, 3);
 }
 
@@ -1669,12 +1673,11 @@ export function spawnGroup(world, id, count, opts = {}) {
     // Drift is not released, it is let go: it has its own entry velocities and
     // is not counted against anything.
     if (type.harmless) { made.push(spawnDrift(world, { x, y })); continue; }
-    const e = release(world, type, x, y, {
+    made.push(...release(world, type, x, y, {
       staged: !onField,
       spawnIn: onField ? 0.25 : 1,
       speedScale: rand(0.94, 1.06),
-    });
-    if (e) made.push(e);
+    }));
   }
   return made;
 }
@@ -1979,6 +1982,10 @@ export function applyBlast(world, blast) {
        * to a body carrying three of them.
        */
       if (e.graftCount) {
+        // `orbit` is read once, outside the loop, and that is load-bearing:
+        // taking a ball off shrinks the host and moves the ring the rest ride,
+        // so reading it per ball would judge the second and third against an
+        // orbit the blast never saw. One shockwave, one set of positions.
         const orbit = e.graftR;
         for (const g of e.grafts) {
           if (!g.alive) continue;

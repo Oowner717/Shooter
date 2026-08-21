@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '99';
+  var BUILD = '100';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -192,8 +192,9 @@
         <ul class="bootKeys"></ul>
         <!-- CONTINUE is shown only when there is a run on disk to pick up;
              see Hud.offerResume(). The two share one row so that offering a
-             resume costs no vertical space -- on a 568-tall screen the panel
-             already ends level with the fold. BEGIN always starts a clean one. -->
+             resume costs no vertical space: on a 320x568 screen this row ends
+             within a pixel or two of the fold, and a briefing line one wrap
+             longer is enough to push it under. NEW RUN always starts clean. -->
         <div class="bootGo">
           <button id="resumeBtn" hidden>CONTINUE</button>
           <button id="startBtn">NEW RUN</button>

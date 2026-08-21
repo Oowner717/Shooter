@@ -264,7 +264,7 @@ export class Menu {
     // wall and a target.
     let cheapest = Infinity;
     let affordable = 0;
-    for (const { n, row, cost, wrap } of this.treeRows) {
+    for (const { n, row, cost } of this.treeRows) {
       const have = n.id ? g.owned(n.id) : 0;
       const max = n.levels || 1;
       const open = g.available(n);

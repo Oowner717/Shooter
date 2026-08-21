@@ -36,18 +36,40 @@ function write(data) {
 }
 
 /**
- * What is on disk, or null. A save from another build is discarded rather than
- * migrated: the tables it names — rounds, mines, upgrade ids — are exactly the
- * things that change between builds, and half-restoring a run is worse than
- * starting one.
+ * What is on disk, or null.
+ *
+ * This used to throw a run away whenever the build changed -- the reasoning
+ * being that the tables a save names, rounds and mines and upgrade ids, are
+ * exactly what changes between builds. The reasoning outlived its truth. The
+ * restore path already refuses everything it was afraid of, and each of these
+ * was tested against a save doctored to contain it:
+ *
+ *   a round id this build has never had   ->  falls back to what is carried
+ *   a mine id it has never had            ->  falls back to none
+ *   an upgrade id it has never had        ->  skipped by the replay
+ *   an unlocked key it has never had      ->  sits in the set, unused
+ *   a wave index past the end of the table ->  director starts the rotation
+ *
+ * So the gate was buying nothing and costing everything: shipping a build
+ * silently deleted the run of every player who had one open, which is the
+ * opposite of what a save is for. `v` still guards the *shape* of the file --
+ * bump VERSION when this stops being able to read its own past -- and the
+ * checks below guard the fields the restore reaches into without asking.
+ *
+ * `build` is still written. It says which build wrote this, which is worth
+ * knowing when a save does turn out to be strange; it is no longer a reason to
+ * throw one away.
  */
 export function readRun() {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const d = JSON.parse(raw);
-    if (!d || d.v !== VERSION || d.build !== BUILD) return null;
+    if (!d || d.v !== VERSION) return null;
     if (!Number.isFinite(d.kills)) return null;
+    // Shapes the restore indexes into directly rather than reading defensively.
+    if (!d.loadout || !Array.isArray(d.loadout.mines) || !Array.isArray(d.loadout.ammo)) return null;
+    if (!Array.isArray(d.taken) || !Array.isArray(d.unlocked)) return null;
     return d;
   } catch {
     return null;
@@ -77,10 +99,9 @@ export function captureRun(world, game) {
     time: world.time,
     energy: world.energy,
     nextStoryAt: world.nextStoryAt,
-    // Kept for shape only. Every run has been endless since build 81, and
-    // restore forces it true rather than trusting a value from a save that
-    // predates that.
-    endless: true,
+    // `endless: true` used to be written here. Nothing ever read it back —
+    // every run has been endless since build 81, so restore sets it rather
+    // than asking a file about it.
     unlocked: [...world.unlocked],
     loadout: { mines: [...world.loadout.mines], ammo: [...world.loadout.ammo] },
     round: world.round,

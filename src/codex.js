@@ -156,38 +156,22 @@ class Codex {
 
 export const codex = new Codex();
 
-/**
- * Vestigial since build 81: every run is endless, so there is nothing to have
- * beaten and nothing this can gate. Left in place because the key is still on
- * players' devices and removing the reader would strand it.
+/*
+ * Two keys this build has no use for, and no readers left.
  *
- * Whether ORDINAL has been beaten. Kept the same way the glossary is, because
- * it answers the same kind of question: what has this player already seen?
- * Every run after the first clear is endless — no count, no boss, no ending.
+ * `sim7749-cleared` recorded whether ORDINAL had been beaten, and has meant
+ * nothing since build 81 took the boss out: every run is endless, so there is
+ * nothing to have beaten and nothing it could gate. Its three readers were
+ * kept on the grounds that the key was still on players' devices and removing
+ * them would strand it — but a reader nobody calls does not un-strand
+ * anything. They are gone, and migrateLines() deletes the key instead, which
+ * is what not stranding it actually looks like.
+ *
+ * `sim7749-taught` is the flag the per-line record replaced in build 94. Read
+ * once, by migrateLines(), then removed.
  */
 const CLEARED = 'sim7749-cleared';
-
-export function cleared() {
-  try {
-    return localStorage.getItem(CLEARED) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function markCleared() {
-  try {
-    localStorage.setItem(CLEARED, '1');
-  } catch {
-    /* private mode: this run stays counted, which is the safe way to fail */
-  }
-}
-
-export function forgetCleared() {
-  try {
-    localStorage.removeItem(CLEARED);
-  } catch { /* nothing to forget */ }
-}
+const TAUGHT = 'sim7749-taught';
 
 /**
  * Which lines this device has already been told, one id at a time.
@@ -253,30 +237,7 @@ export function migrateLines(ids) {
     for (const id of ids) set.add(id);
     localStorage.setItem(LINES, JSON.stringify([...set]));
     localStorage.removeItem(TAUGHT);
+    localStorage.removeItem(CLEARED); // dead since build 81; see the note above
   } catch { /* private mode: nothing was remembered to migrate */ }
 }
 
-/** The flag the above replaced. Read once, by migrateLines(), then removed. */
-const TAUGHT = 'sim7749-taught';
-
-export function taught() {
-  try {
-    return localStorage.getItem(TAUGHT) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function markTaught() {
-  try {
-    localStorage.setItem(TAUGHT, '1');
-  } catch {
-    /* private mode: the run that is open keeps its unlocks either way */
-  }
-}
-
-export function forgetTaught() {
-  try {
-    localStorage.removeItem(TAUGHT);
-  } catch { /* nothing to forget */ }
-}
