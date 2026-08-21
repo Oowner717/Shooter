@@ -2,7 +2,7 @@
 
 import { CFG, BUILD, ENEMY_TYPES } from './config.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
-import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
+import { Grid, integrate, resolvePair, clampToArena } from './physics.js';
 import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake } from './fx.js';
 import { background } from './background.js';
 import { glitch } from './glitch.js';
@@ -957,26 +957,23 @@ export class Game {
 
     bodies.push(w.shooter);
     // The decoy is a static body too, so things pile up against it instead of
-    // drifting through it — and it takes the collision damage of the pile.
+    // drifting through it. The pile no longer wears it down — nothing on the
+    // field damages anything — so it stands for its full life and then goes.
     if (w.decoy && !w.decoy.dead) bodies.push(w.decoy);
     this.grid.build(bodies);
     this.grid.eachPair(bodies, (a, b) => {
       if (a.dead || b.dead) return;
       const impact = resolvePair(a, b);
-      if (impact <= 0) return;
-      // Wreckage bounces off things and hurts none of them, in either
-      // direction. Skipped here rather than in applyDamage so the object it
-      // struck is spared too.
-      if (a.inert || b.inert) return;
-      const dmg = impactDamage(a, b, impact);
-      if (dmg <= 0) return;
+      // A collision is a shove and nothing more. Bodies used to hurt each
+      // other here, which meant the field killed things the player never
+      // touched and made SLUG a damage round by proxy; build 70 took it out.
+      // What is left is the spark, so a hard meeting still reads as one.
+      if (impact <= CFG.physics.impactSpark) return;
       const mx = (a.x + b.x) / 2;
       const my = (a.y + b.y) / 2;
       for (let i = 0; i < 3; i++) {
         spark(mx, my, spread(impact * 1.4), spread(impact * 1.4), '#ffffff', 0.16, 1.8);
       }
-      if (a.applyDamage) a.applyDamage(w, dmg);
-      if (b.applyDamage) b.applyDamage(w, dmg);
     });
     if (w.decoy && !w.decoy.dead) bodies.pop();
     bodies.pop(); // shooter is not integrated

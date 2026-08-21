@@ -138,7 +138,7 @@ export const ARSENAL = [
   },
   {
     key: 'slug', kind: 'round', group: 'ammo', label: 'SLUG', icon: ICON.slug, tone: '#b8c6d8',
-    dmg: '14', fx: 'Barely hurts. Shoves things a very long way.',
+    dmg: '44', fx: 'Slow and heavy. Shoves things a very long way.',
   },
   {
     key: 'rime', kind: 'round', group: 'ammo', label: 'RIME', icon: ICON.rime, tone: '#8fe3ff',

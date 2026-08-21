@@ -163,14 +163,10 @@ export function resolvePair(a, b) {
   return -vn;
 }
 
-/** Mutual damage produced by an impact, before per-body armour. */
-export function impactDamage(a, b, impact) {
-  if (impact <= P.collisionThreshold) return 0;
-  const invSum = a.invMass + b.invMass;
-  if (invSum <= 0) return 0;
-  const reduced = 1 / invSum;
-  return clamp((impact - P.collisionThreshold) * reduced * P.collisionDamage, 0, 300);
-}
+// Impacts used to hurt both bodies, scaled by closing speed and reduced mass.
+// That is gone as of build 70: bodies shove each other and nothing else. The
+// solver is a solver — what damages a thing is a round, a mine or an ability,
+// and nothing on the field kills anything the player did not.
 
 
 /** Keep a body inside the arena's left/right/bottom edges. */

@@ -329,10 +329,13 @@ measured at 13.2 to 20 against a BULWARK.
 - **SPINE** does not stop at the first thing. No chaining and no repeating: it
   carries straight out the far side, a little weaker each time. Measured
   through a column of three at 13, 10 and 8.
-- **SLUG** barely hurts anything and moves it a very long way — measured at 14
-  damage and 100-plus units of travel on one shot. The field is a physics
-  problem before it is a shooting one, and this is the round that treats it as
-  one.
+- **SLUG** hits harder than anything else per shot and moves what it hits a very
+  long way — measured at 44 damage and 100-plus units of travel on one shot. It
+  used to do 14, on the theory that the damage would come from whatever you
+  shoved it into; build 70 removed collision damage, which left it paying a
+  2.4× rate penalty for a shove and nothing else — the worst round in the rack
+  by a distance. It is now the biggest single hit available and still under BOLT
+  on sustained damage, because it still brings the shove.
 - **RIME** drags whatever it touches to a crawl for a few seconds — measured
   taking a body from 200 units a second to about 13. It kills nothing by
   itself; it buys the time for everything else to.
@@ -390,9 +393,13 @@ a caption explains it.
 **DECOY** is the one defensive ability. It plants a hollow copy of your turret
 up-field; `Enemy.steer` picks it over you, so a scattered field becomes one pile
 somewhere that is not on top of you. It is a static physics body, so things heap
-up against it rather than drifting through, and it takes the collision damage of
-everything it catches — 900 hit points, nine seconds, and a 260-unit blast when
-it finally goes. Only one at a time; casting again detonates the old one.
+up against it rather than drifting through. It used to be worn down by the pile
+it caught, so a big enough crowd popped it early; with collision damage gone
+nothing on the field can touch it, and it simply stands for its nine seconds and
+then leaves a 260-unit blast. Measured under twelve BULWARKs driven into it at
+1600 units a second: 8.9 s, ended by its own timer. The ring around it now
+counts that time down rather than counting health that never moves. Only one at
+a time; casting again detonates the old one.
 
 **CHORUS** is the only ability that does nothing on its own. It binds every
 hostile on the field for six seconds — no damage, no hold — and from then on,
@@ -1098,7 +1105,12 @@ They unlock progressively as the count climbs.
 - **HERALD** — a beacon. It hardens the nearest few hostiles around it, and
   shows you it is doing so: a thread out to each one and a shell on each of
   them. Covered objects take 62% less. Kill the beacon, not the escort — the
-  cover lapses a frame after it dies.
+  cover lapses a frame after it dies. **A beacon never covers another beacon**,
+  as of build 70: five HERALDs drifting together spent eighteen of their
+  twenty-five cover slots on each other, webbing the screen green and making a
+  knot of them near-unkillable — the exact opposite of the line above. The
+  filter is on `type.ward` rather than on the id, so it holds for any beacon
+  added later.
 - **GLUT** — eats the mess. Every mote it touches makes it bigger, heavier
   and tougher, one visible seam per mouthful, from 16 units up to 52 and from
   90 hit points up to 350. A littered field is its food supply, so it is the
@@ -1161,11 +1173,28 @@ broadphase, and distance constraints for TOW cables, solved after the contact
 pass so a towed pair cannot be pulled apart by whatever it just shoved. Mass is `density × area`, so heavy objects genuinely shrug off
 what light ones can't.
 
-**Collision damage is live.** Impacts above a threshold hurt *both* bodies in
-proportion to reduced mass and closing speed. Punting a mote into a lurcher
-hurts the lurcher. WELL is built entirely on this: it drags everything within
-reach into one spinning knot and most of the kills happen on the way in,
-before the collapse goes off at all.
+**Collisions are a shove and nothing else.** Until build 70 an impact above a
+threshold hurt *both* bodies in proportion to reduced mass and closing speed, so
+punting a mote into a lurcher hurt the lurcher. That is gone. Bodies still
+bounce — restitution, friction, spin, mass, all of it — they just cannot damage
+each other, and nothing on the field kills anything the player did not. What is
+left of the threshold is `physics.impactSpark`, which now decides only whether
+you see the two bodies meet.
+
+Removing it changed less than it sounds like. Two BULWARKs closing at 2800 units
+a second now trade no health at all, but across three 60-second hands-off runs
+each way the kill count was 46.7 before and 46.0 after — well inside the
+run-to-run spread, which was 33 to 56 on the old build alone. It was never
+carrying much of the tally; it was carrying two specific things, and both were
+handled rather than left hollow:
+
+- **WELL** dragged everything into a knot and let the grinding do the work.
+  It now crushes directly: anything inside the horizon takes `WELL_CRUSH` a
+  second, ramped and multiplied as the well tightens. Targeted rather than
+  physics-wide, which is the difference between an ability that crushes and a
+  field where everything hurts everything. Measured on a packed dozen SPLITTERs,
+  four runs each way: 1472 damage and 60 kills before, 1482 and 60 after.
+- **SLUG** was a damage round by proxy and is now a damage round. See above.
 
 ### The story
 
@@ -1211,7 +1240,7 @@ src/
   game.js               world state, phase machine, physics stepping, render pipeline
   config.js             every balance number lives here
   util.js               math + canvas helpers
-  physics.js            grid broadphase, impulse solver, impact damage
+  physics.js            grid broadphase, impulse solver, arena clamp
   fx.js                 pooled particles, shockwaves, screen shake, ripples
   background.js         the substrate: nebula, lattice, glyph rain, dust
   glitch.js             full-frame corruption compositor

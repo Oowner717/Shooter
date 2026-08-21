@@ -439,9 +439,10 @@ export class Enemy {
   // ------------------------------------------------------------ behaviours
 
   /**
-   * HERALD. Covers the nearest few hostiles: while covered they take a
-   * fraction of incoming damage, and both the thread and the shell are drawn,
-   * so the beacon reads as the reason nothing else is dying.
+   * HERALD. Covers the nearest few hostiles — never another beacon — so that
+   * while covered they take a fraction of incoming damage. Both the thread and
+   * the shell are drawn, so the beacon reads as the reason nothing else is
+   * dying, and killing it is always a thing you can actually do.
    */
   wardNearby(world, dt) {
     const cfg = this.type.ward;
@@ -451,6 +452,11 @@ export class Enemy {
     const r2 = cfg.radius * cfg.radius;
     for (const e of world.enemies) {
       if (e === this || e.dead || e.harmless || e.staged) continue;
+      // No beacon covers another beacon. Five HERALDs drifting together spent
+      // eighteen of their twenty-five cover slots on each other and webbed the
+      // screen doing it — a knot of them was near-unkillable, which is the
+      // exact opposite of "kill the beacon, not the escort".
+      if (e.type.ward) continue;
       const dx = e.x - this.x;
       const dy = e.y - this.y;
       if (dx * dx + dy * dy > r2) continue;
