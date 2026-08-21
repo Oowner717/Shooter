@@ -12,7 +12,7 @@ import { CONTROLS } from './narrative.js';
 import { ARSENAL, ARSENAL_GROUPS, specRows } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
 import { VOLUME_STEPS } from './audio.js';
-import { BUILD } from './config.js';
+import { BUILD, REV } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -206,7 +206,10 @@ export class Menu {
 
     const foot = document.createElement('div');
     foot.className = 'menuNote dim';
-    foot.textContent = `SESSION 7749 · BUILD ${BUILD}`;
+    // BUILD says which build this claims to be; REV says which bytes it is.
+    // Two devices showing the same pair are running the same code — which is
+    // the thing that could not be checked before, and cost an afternoon.
+    foot.textContent = `SESSION 7749 · BUILD ${BUILD} · REV ${REV}`;
     p.appendChild(foot);
     this.syncSystem();
   }

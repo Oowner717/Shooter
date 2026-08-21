@@ -2,7 +2,19 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '75';
+export const BUILD = '76';
+
+/**
+ * What these bytes actually are, as opposed to what build they claim to be.
+ *
+ * A seven-character hash of every source file, stamped by
+ * `node scripts/check-build.mjs --stamp` and guarded by the same script. Two
+ * installs can both say BUILD 75 and be different code — a stale cache, a
+ * different host, an older deploy — and there was no way to tell from inside
+ * the game. There is now: the menu shows BUILD and REV together, and two
+ * screens showing the same pair are running the same bytes.
+ */
+export const REV = 'a70e2a3';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------

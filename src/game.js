@@ -1,6 +1,6 @@
 // World state, phase machine, physics stepping and the render pipeline.
 
-import { CFG, BUILD, ENEMY_TYPES } from './config.js';
+import { CFG, BUILD, REV, ENEMY_TYPES } from './config.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
 import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
 import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake } from './fx.js';
@@ -1432,7 +1432,7 @@ export class Game {
             + `rev    ${w.boss.reprises.length} reprise  ${w.boss.echo ? 'echo' : 'no echo'} ${w.boss.echoBolts.length} bolts\n`
             + `locked ${w.abilities.slots.filter((s) => s.locked > 0).length}/${w.abilities.slots.length}\n`
           : '')
-        + `build  ${BUILD}  zoom ${CFG.zoom}`,
+        + `build  ${BUILD}  rev ${REV}  zoom ${CFG.zoom}`,
       );
     }
   }

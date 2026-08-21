@@ -25,8 +25,12 @@ phases rather than spending it.
 
 ## The suite, for when it is wanted
 
-`node scripts/check-build.mjs` guards the build literal and the worker's
-precache list. `node scripts/smoke.mjs` walks every phase headlessly. The
+`node scripts/check-build.mjs` guards the build literal, the worker's precache
+list, and `REV` — a content hash of every served file, shown next to BUILD in
+the menu. **Changing any source file makes REV stale**, so the last step of any
+change is `node scripts/check-build.mjs --stamp`; the plain run then passes.
+REV exists because two installs can both say BUILD 75 and be different code,
+and there was no way to tell from inside the game. `node scripts/smoke.mjs` walks every phase headlessly. The
 per-feature tests live in the session scratchpad, not the repo; they need
 `NODE_PATH=/opt/node22/lib/node_modules` and a static server on :8099.
 

@@ -993,6 +993,20 @@ are appended past the end of the clamped run, so the edge pass simply stops
 early — they collide with everything and are clamped by nothing. Off the field,
 or fourteen seconds, whichever comes first.
 
+### FIELD and STAGING are not two versions
+
+The phase tag reads `STAGING` on a counted run and `FIELD` on an endless one,
+and `world.endless` is set from `cleared()` — a `localStorage` flag written the
+first time ORDINAL is beaten. Every run after that first clear is endless: no
+count, no boss, no ending. Because `localStorage` is per-origin, **the same
+build reports different things on two devices**: a phone that has beaten the
+boss shows `FIELD` and a bare object count, while a fresh browser on the same
+build shows `STAGING`, `0 / 500` and a boss at the end.
+
+That looks exactly like a version mismatch and is not one. `TOGGLE ENDLESS` in
+the debug panel calls `forgetCleared()` and restarts, which puts a device back
+onto a counted run. REV above is how to actually tell two versions apart.
+
 ### Waves
 
 The field arrives in waves. Builds 63 to 70 ran a rolling cohort — a working
@@ -1247,6 +1261,19 @@ extra distance costs the run time rather than adding it — measured march is 2 
 before and 4 s after. Kill rate across one run each way was 14.5/min and 11/min,
 which a single run either side cannot separate from noise; an earlier pair ran
 13 and 14.5 the other way up.
+
+**BUILD says what this claims to be; REV says what it actually is.** Two
+installs both reporting BUILD 75 can be different code — a stale cache, a
+different host, an older deploy — and nothing inside the game could tell them
+apart. `REV` is a seven-character hash of every served file (all of `src/`,
+`styles.css`, `index.html`, `sw.js`), stamped into `config.js` by
+`node scripts/check-build.mjs --stamp` and guarded by the plain run of the same
+script. It appears next to BUILD in the menu footer and in the debug stats, so
+two screens showing the same pair are running the same bytes.
+
+config.js's own REV line is blanked before hashing — it is an input to itself
+otherwise and could never be stable. **Any source change makes REV stale**, so
+`--stamp` is the last step of any change.
 
 **The opening names DRIFT, and says the two things about it that are not
 guessable.** The grey objects were never explained: they look like the harmless

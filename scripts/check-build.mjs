@@ -5,8 +5,16 @@
 // only remaining copy is the inline escape hatch in index.html, which runs
 // before any module can load and so cannot import anything.
 //
-// Run: node scripts/check-build.mjs
-import { readFileSync, readdirSync } from 'node:fs';
+// It also stamps and guards REV — a content fingerprint of the whole source
+// tree. BUILD says which build this is *meant* to be; REV says which bytes it
+// actually is. Two installs claiming BUILD 75 can still be different code —
+// that is exactly the confusion that produced this — and comparing a seven
+// character hash on two screens settles it in a glance.
+//
+// Run: node scripts/check-build.mjs        (verify)
+//      node scripts/check-build.mjs --stamp (write the current REV)
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 const grab = (file, re) => {
   const m = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').match(re);
@@ -36,3 +44,37 @@ if (missing.length) {
   process.exit(1);
 }
 console.log(`sw.js precaches all ${src.length} modules`);
+
+// ---- REV: what these bytes actually are ------------------------------------
+//
+// Everything the browser is served, in a fixed order, hashed. config.js's own
+// REV line is blanked before hashing or the value could never be stable — it
+// would be an input to itself.
+const REV_LINE = /export const REV = '[^']*';/;
+const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+const files = [...src.map((f) => `src/${f}`).sort(), 'styles.css', 'index.html', 'sw.js'];
+const h = createHash('sha256');
+for (const f of files) {
+  h.update(f);
+  h.update(f === 'src/config.js' ? read(f).replace(REV_LINE, '') : read(f));
+}
+const rev = h.digest('hex').slice(0, 7);
+
+const cfgPath = new URL('../src/config.js', import.meta.url);
+const cfg = readFileSync(cfgPath, 'utf8');
+if (process.argv.includes('--stamp')) {
+  if (!REV_LINE.test(cfg)) {
+    console.error('no REV literal in src/config.js to stamp');
+    process.exit(1);
+  }
+  writeFileSync(cfgPath, cfg.replace(REV_LINE, `export const REV = '${rev}';`));
+  console.log(`rev stamped ${rev}`);
+} else {
+  const found = (cfg.match(/export const REV = '([^']*)'/) || [])[1];
+  if (found !== rev) {
+    console.error(`rev stale: src/config.js=${found || '(none)'} actual=${rev}`);
+    console.error('run: node scripts/check-build.mjs --stamp');
+    process.exit(1);
+  }
+  console.log(`rev ${rev} matches ${files.length} files`);
+}
