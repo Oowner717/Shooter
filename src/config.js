@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '72';
+export const BUILD = '73';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -22,6 +22,30 @@ export const CFG = {
   // Harmless drift comes early regardless, so there is something to shoot at
   // while the field is still safe.
   driftStart: 7,
+
+  /*
+   * How far below the top edge an object has to come before it is loose in
+   * the arena — before auto-aim will take it, before a HERALD will cover it,
+   * before EBB or an aura will touch it.
+   *
+   * It used to be zero: an object went live the instant its lower edge cleared
+   * the top of the screen, at a measured median of y=14 out of 1361. Auto-aim
+   * picked it there and killed it there, at maximum range, at its smallest,
+   * behind the status chips — the top band is occupied by interface down to
+   * world y=234. So objects arrived and died in the one strip of the field you
+   * cannot actually watch.
+   *
+   * 260 puts the line just clear of all of it. Nothing about *being shot* has
+   * changed: `staged` never gated projectile collision, so a manual shot has
+   * always been able to reach something on its way in, and still can. This
+   * only holds the assists back until the thing they are shooting is somewhere
+   * you can see it.
+   */
+  entryDepth: 260,
+  // ...and the march in runs this much faster than the object's own cruise, so
+  // the extra 260 units cost the run no time. Without it a wave simply took
+  // five seconds longer to become a wave.
+  entrySpeed: 2.6,
   // The population ramp, the warm-up rate and the teaching throttle all lived
   // here until build 71. Waves replaced every one of them: a wave is a fixed
   // group with a fixed pace, so how thin the opening is, is a property of

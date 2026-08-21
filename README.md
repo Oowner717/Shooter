@@ -1227,6 +1227,27 @@ been. Measured: two LURCHERs closing at 2800 units a second take 300 each; the
 identical collision with one side marked takes zero on both, and the mark
 spreads to the other body.
 
+**Objects enter the field 260 units down, not at the top edge.** `CFG.entryDepth`
+is how far below the top an object has to come before it is loose in the arena
+— before auto-aim will take it, before a HERALD will cover it, before EBB or an
+aura touches it.
+
+It used to be zero. An object went live the instant its lower edge cleared the
+top of the screen, at a measured median of **y=13** out of 1361, and auto-fire
+killed it there: median death at **y=65**, with **100%** of kills landing above
+y=234 — the band the status chips occupy. Objects arrived and died in the one
+strip of the field you cannot watch. At 260 they go live at a median **y=275**
+and die at **y=336**, a quarter of the way down, with 18% above the HUD line.
+
+Nothing about being *shot* changed. `staged` never gated projectile collision,
+so a manual round has always been able to reach something on its way in and
+still can; this only holds the assists back until their target is somewhere
+visible. `entrySpeed` runs the march in at 2.6× the object's own cruise so the
+extra distance costs the run time rather than adding it — measured march is 2 s
+before and 4 s after. Kill rate across one run each way was 14.5/min and 11/min,
+which a single run either side cannot separate from noise; an earlier pair ran
+13 and 14.5 the other way up.
+
 **Every ability's border carries its own colour, cold or ready.** It used to be
 plain grey until `usable()` went true. Every ability is owned from the first
 frame and the charge pips only draw above one charge, so a single-charge ability

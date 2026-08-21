@@ -304,10 +304,12 @@ export class Enemy {
     let ty;
 
     if (this.staged) {
-      // Nothing to aim at yet: it is still off the top of the screen, so it
-      // simply comes down, drifting a little as it falls.
+      // Nothing to aim at yet: it is still marching in, so it simply comes
+      // down, drifting a little as it falls. The target sits below the entry
+      // line rather than on it, or a body eases to a halt just short of the
+      // line it is supposed to cross.
       tx = this.x + Math.sin(t * 0.6 + this.phase) * 40;
-      ty = ENTRY_Y + 40;
+      ty = ENTRY_Y + CFG.entryDepth + 60;
     } else {
       tx = world.shooter.x;
       ty = world.shooter.y;
@@ -355,6 +357,11 @@ export class Enemy {
     // Something that has already breached the turret commits to it, so the
     // corruption it causes is always clearable.
     let cruise = this.cruise * slow * (this.attacking ? 1.3 : 1);
+    // The march in is brisk. The entry line is 260 units down the field and an
+    // object crossing it at its own cruise would spend five seconds getting
+    // there — the point of the depth is where things are engaged, not how long
+    // the run takes to hand them over.
+    if (this.staged) cruise *= CFG.entrySpeed;
     // Once nothing more will be released, whatever is left closes in, so the
     // tail of the run is never a hunt across an empty field.
     if (releasesLeft(world) <= 0) cruise *= 1.45;
@@ -432,12 +439,14 @@ export class Enemy {
     if (this.type.eat) this.feed(world);
 
     if (this.staged) {
-      // An object wedged above the screen would stall the run forever, since
-      // the count only completes once every released object is destroyed.
+      // An object wedged on its way in would stall the run forever, since the
+      // count only completes once every released object is destroyed. The
+      // march is longer than it was, so the valve waits longer before shoving.
       this.stagedFor += dt;
-      if (this.stagedFor > 10) this.vy += 130 * dt;
-      // Fully on screen: it is loose in the arena now.
-      if (this.y - this.r > ENTRY_Y) this.staged = false;
+      if (this.stagedFor > 14) this.vy += 130 * dt;
+      // Past the entry line: it is loose in the arena now, and somewhere the
+      // player can actually watch it be dealt with.
+      if (this.y - this.r > ENTRY_Y + CFG.entryDepth) this.staged = false;
     }
   }
 
