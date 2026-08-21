@@ -1062,6 +1062,36 @@ Prices are flat per depth — 900 a round or mine, 1100 an ability, 1400 a secon
 charge, 500 a leaf and 350 more per level after the first. Pacing is not what
 this is for yet; one number to move when it is.
 
+### The bug that made the game unplayable
+
+Build 82 deleted `world.lockout` along with the rest of ORDINAL. It left one
+line behind:
+
+```js
+canFire(world) { return this.cooldown <= 0 && world.lockout <= 0; }
+```
+
+`undefined <= 0` is **false**. So `canFire()` returned false on every frame of
+builds 82, 83 and 84 and the turret could not fire a single round. Everything
+downstream followed: no kills, no energy, and a brand-new upgrade tree in which
+nothing could ever be afforded — which reads, reasonably, as the menu being
+broken too.
+
+Three things about it are worth keeping:
+
+- **Deleting a world field leaves every comparison against it silently
+  answering the wrong way.** `undefined > 0` is false and harmless;
+  `undefined <= 0` is false and lethal. The same sweep found
+  `world.chrono > 0` and `world.jam > 0` in the same file, both benign, both
+  now gone.
+- **The suite stayed green through it.** `smoke.mjs` walks the whole game with
+  debug spawns and debug kills, and nothing in it had ever pulled an actual
+  trigger. It now asserts a trigger pull produces a round, first, before
+  anything else is measured.
+- **A tree with no energy looks broken.** The header names the gap now —
+  `392 more for the next`, or `6 within reach` — so an early panel reads as
+  early rather than as dead.
+
 ### ORDINAL is gone
 
 Build 82 deleted it. `src/boss.js` (1,233 lines), the ledger, the ending, the

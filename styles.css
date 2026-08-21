@@ -2095,3 +2095,15 @@ body.booting #pendingBtn {
   25% { transform: translateX(-3px); border-color: #ff5d8f; }
   75% { transform: translateX(3px); border-color: #ff5d8f; }
 }
+
+/* What the tree is waiting for. A panel where nothing is affordable reads as
+   broken rather than as early; naming the gap makes it a target instead. */
+.treeNext {
+  flex: 1 1 auto;
+  text-align: right;
+  padding-right: 10px;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: #45566a;
+}
+.treeNext.reach { color: color-mix(in srgb, #7cffb2 70%, transparent); }

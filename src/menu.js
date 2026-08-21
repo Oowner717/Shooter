@@ -121,9 +121,12 @@ export class Menu {
     this.treeRows = [];
     const head = document.createElement('div');
     head.className = 'treeHead';
-    head.innerHTML = '<span class="treeHeadName">ENERGY</span><b id="treeBank">0</b>';
+    head.innerHTML = '<span class="treeHeadName">ENERGY</span>'
+      + '<span class="treeNext" id="treeNext"></span>'
+      + '<b id="treeBank">0</b>';
     p.appendChild(head);
     this.el.treeBank = head.querySelector('#treeBank');
+    this.el.treeNext = head.querySelector('#treeNext');
 
     for (const root of TREE) {
       p.appendChild(this.treeNode(root, 0));
@@ -190,6 +193,11 @@ export class Menu {
     const g = this.game;
     const w = g.world;
     if (this.el.treeBank) this.el.treeBank.textContent = Math.floor(w.energy);
+    // What the next thing costs. A tree you cannot afford anything in reads as
+    // broken rather than as early, and "820 more" is the difference between a
+    // wall and a target.
+    let cheapest = Infinity;
+    let affordable = 0;
     for (const { n, row, cost, wrap } of this.treeRows) {
       const have = n.id ? g.owned(n.id) : 0;
       const max = n.levels || 1;
@@ -219,6 +227,10 @@ export class Menu {
       row.classList.toggle('partAfford', part && afford);
       wrap.classList.toggle('branchOpen', !!full || n.kind === 'root');
 
+      if (open && !full) {
+        if (afford) affordable++;
+        else cheapest = Math.min(cheapest, price);
+      }
       cost.textContent = full ? '✓' : !open ? '·' : price;
       cost.classList.toggle('tick', !!full);
 
@@ -234,6 +246,13 @@ export class Menu {
         const at = Math.min(have, max - 1);
         lvl.textContent = n.tiers && n.tiers[at] ? n.tiers[at].name : n.name;
       }
+    }
+    if (this.el.treeNext) {
+      this.el.treeNext.textContent = affordable
+        ? `${affordable} within reach`
+        : Number.isFinite(cheapest) ? `${Math.ceil(cheapest - w.energy)} more for the next`
+          : '';
+      this.el.treeNext.classList.toggle('reach', affordable > 0);
     }
   }
 

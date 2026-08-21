@@ -125,6 +125,28 @@ await dbg('FILL FIELD');
 await sleep(1500);
 await page.screenshot({ path: `${SHOTS}/05-full-field.png` });
 
+/*
+ * The turret can shoot. Trivial, and it went unnoticed for three builds:
+ * removing world.lockout in build 82 left `world.lockout <= 0` in canFire()
+ * comparing against undefined, which is false, so nothing could fire at all.
+ * Nothing here exercised an actual trigger pull — the walk uses debug spawns
+ * and debug kills — so the suite stayed green through a game you could not
+ * play. It is asserted first now, before anything else is measured.
+ */
+const fired = await page.evaluate(async () => {
+  const w = window.__sim.world;
+  const before = w.projectiles.length;
+  w.shooter.cooldown = 0;
+  w.shooter.shoot(w);
+  await new Promise((r) => setTimeout(r, 60));
+  return w.projectiles.length - before;
+});
+if (fired < 1) {
+  console.error('FAIL: the turret did not fire when told to');
+  process.exit(1);
+}
+console.log('turret fires:', fired, 'round(s) on one trigger pull');
+
 const stats = async () => page.evaluate(() => document.getElementById('dbgStats').textContent);
 const busyStats = await stats();
 

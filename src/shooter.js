@@ -132,15 +132,23 @@ export class Shooter {
     return this.y + Math.sin(this.aim) * (this.r * 1.42 - this.recoil * 7);
   }
 
-  canFire(world) {
-    return this.cooldown <= 0 && world.lockout <= 0;
+  /*
+   * It used to also require `world.lockout <= 0`. That field went with ORDINAL
+   * in build 82 and nothing noticed, because `undefined <= 0` is false — so
+   * canFire returned false on every frame of build 82, 83 and 84 and the
+   * turret could not shoot at all. Deleting a world field leaves every
+   * comparison against it silently answering the wrong way, and a `<=` answers
+   * it in the direction that breaks things.
+   */
+  canFire() {
+    return this.cooldown <= 0;
   }
 
   /** One shot of whatever is loaded. Returns true if it actually went out. */
   shoot(world) {
-    if (!this.canFire(world)) return false;
+    if (!this.canFire()) return false;
     const a = this.aim + spread(0.012);
-    const slow = world.chrono > 0 ? 0.42 : 1;
+    const slow = 1;
     const R = CFG.rounds;
     const up = world.up;
 
@@ -446,60 +454,8 @@ export class Shooter {
     ctx.fill();
     ctx.restore();
 
-    this.drawInterference(ctx, world, t);
   }
 
-  /**
-   * What is being done to the gun, drawn on the gun. VEIL, CHRONO and the
-   * corruption are all visible on their own; a throttled feed and a mirrored
-   * aim are the two that would otherwise read as the controls being broken, so
-   * they get a mark at the pivot instead of a caption over the boss.
-   */
-  drawInterference(ctx, world, t) {
-    const jam = world.jam > 0;
-    const inv = world.invert > 0;
-    if (!jam && !inv) return;
-
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    const pulse = 0.55 + 0.45 * Math.sin(t * 9);
-
-    if (jam) {
-      // a bar across the muzzle: the barrel is stopped, not the finger
-      ctx.save();
-      ctx.rotate(this.aim);
-      ctx.strokeStyle = rgba('#ff4d6d', 0.55 + pulse * 0.4);
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(this.r * 1.5, -11);
-      ctx.lineTo(this.r * 1.5, 11);
-      ctx.moveTo(this.r * 1.25, -8);
-      ctx.lineTo(this.r * 1.75, 8);
-      ctx.moveTo(this.r * 1.75, -8);
-      ctx.lineTo(this.r * 1.25, 8);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    if (inv) {
-      // two arrows pointing at each other around the pivot: the axis is flipped
-      ctx.strokeStyle = rgba('#ffcf5c', 0.5 + pulse * 0.4);
-      ctx.lineWidth = 2.2;
-      const rr = this.r * 1.55;
-      for (const dir of [-1, 1]) {
-        const bx = dir * rr;
-        ctx.beginPath();
-        ctx.moveTo(bx, 0);
-        ctx.lineTo(bx - dir * 13, 0);
-        ctx.moveTo(bx - dir * 13, 0);
-        ctx.lineTo(bx - dir * 7, -5);
-        ctx.moveTo(bx - dir * 13, 0);
-        ctx.lineTo(bx - dir * 7, 5);
-        ctx.stroke();
-      }
-    }
-    ctx.restore();
-  }
 
   /**
    * The half of the rod that hangs below the pivot, plus the grip on its end
