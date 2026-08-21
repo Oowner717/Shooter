@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '98';
+export const BUILD = '99';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '98';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '21594cc';
+export const REV = '6eedf3e';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -268,7 +268,15 @@ export const CFG = {
     gripLen: 112, // world units from pivot to grip
     gripR: 24, // grip knob radius
     gripFireInterval: 0.286,
-    autoFireInterval: 0.314, // hands-off cadence; a shade behind driving it yourself
+    /*
+     * There is no third cadence. Auto fire and auto aim used to shoot at
+     * 0.314 -- a tax for not being your hand -- which HANDS OFF then removed
+     * for 500 energy. Two problems with that: the penalty was invisible (a
+     * tenth of a second is not something anyone reads off the screen, it just
+     * makes the turret feel worse for a reason you cannot name), and the
+     * upgrade that lifted it was not an upgrade, it was a refund. Everything
+     * fires at gripFireInterval now.
+     */
   },
 
   // ---- rounds ---------------------------------------------------------

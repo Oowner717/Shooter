@@ -68,7 +68,6 @@ export function freshUpgrades() {
     intake: false, // energy that touches the turret is taken in without a PULSE
     cooldown: 1, // multiplier on every ability's cooldown
     // turret
-    handsOff: false, // auto-fire at the manual cadence
     slew: 1,
     overwatch: 1, // damage while no hand is on the lever
     casing: 0, // damage a second to whatever is touching the turret
@@ -157,7 +156,6 @@ const MARK = {
   standing: g('<circle cx="12" cy="13" r="7.5"/><path d="M12 8.5V13l3 2"/><path d="M8.5 2.5h7" opacity=".6"/><path d="M17.5 20h4"/>'),
   // --- turret ---
   rate: g('<path d="M12 21V8"/><path d="M8.4 11.4 12 7l3.6 4.4"/><path d="M8.4 16.4 12 12l3.6 4.4" opacity=".5"/>'),
-  handsoff: g('<path d="M12 21V8"/><path d="M8.4 11.4 12 7l3.6 4.4"/><circle cx="18" cy="18" r="4"/><path d="M15.2 20.8 20.8 15.2"/>'),
   slew: g('<path d="M4 16a8 8 0 0 1 16 0" stroke-dasharray="2.6 2.6"/><path d="M12 16V6"/><path d="M9 8.5 12 5.5l3 3"/><path d="M17 6.5l3 1.5-3 1.5" opacity=".7"/>'),
   overwatch: g('<circle cx="12" cy="12" r="6.6"/><circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none"/><path d="M12 1.6v3.2M12 19.2v3.2M1.6 12h3.2M19.2 12h3.2"/>'),
   casing: g('<path d="M12 2.6 20 6v6.6c0 4.6-3.4 7.2-8 8.8-4.6-1.6-8-4.2-8-8.8V6z"/><path d="M12 8v8M8 12h8"/>'),
@@ -257,7 +255,6 @@ export const UPGRADES = {
       line: '+20% fire rate.',
       tiers: [null, { name: 'RUNAWAY', line: '+20% fire rate again, on top of RATE. The barrel stops waiting.' }],
       apply: quicken('rate', 0.8), icon: MARK.rate },
-    { id: 'handsoff', name: 'HANDS OFF', line: 'Auto fire matches your own fire rate.', levels: 1, apply: set('handsOff', true) , icon: MARK.handsoff },
     { id: 'slew', name: 'SLEW', line: '+50% auto aim turn speed.', apply: scale('slew', 1.5) , icon: MARK.slew },
     { id: 'overwatch', name: 'OVERWATCH', line: '+25% damage while hands off the lever.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },
     { id: 'casing', name: 'HARD CASING', line: 'Objects touching you take 40 damage a second.', apply: bump('casing', 40) , icon: MARK.casing },

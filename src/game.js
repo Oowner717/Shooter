@@ -769,10 +769,9 @@ export class Game {
     let interval = 0;
     if (s.gripHeld) interval = CFG.shooter.gripFireInterval;
     else if (dragging) interval = CFG.shooter.holdFireInterval;
-    else if (w.autoFire || target) {
-      // HANDS OFF removes the penalty auto fire pays for not being your hand.
-      interval = w.up.handsOff ? CFG.shooter.gripFireInterval : CFG.shooter.autoFireInterval;
-    }
+    // Hands on the lever, a thumb on the field, or neither: the same cadence.
+    // See the note in CFG.shooter about the one that used to be different.
+    else if (w.autoFire || target) interval = CFG.shooter.gripFireInterval;
     if (interval <= 0) return;
     // heavier rounds buy their effect with cadence
     interval *= CFG.rounds[w.round].rate * w.up.rate;

@@ -113,7 +113,7 @@ export const ARSENAL = [
   },
   {
     key: 'autoFire', kind: 'auto', group: 'auto', label: 'AUTO FIRE', icon: ICON.fire, wide: true, run: true,
-    fx: 'Keeps firing where the barrel points, a shade slower than you.',
+    fx: 'Keeps firing where the barrel points, at the rate you fire yourself.',
   },
 
   {
