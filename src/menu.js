@@ -165,14 +165,18 @@ export class Menu {
      * "there is one mine" rather than as "there are eight, and this is the
      * door". It points right when the branch is shut and down when it is open,
      * which is the one convention nobody has to be taught.
+     *
+     * First in the row, not last. It sat beside the price, and those are the
+     * two things this row does -- open, and spend nine hundred -- with a thumb
+     * width between them. They are at opposite ends now.
+     *
+     * A row with nothing under it still gets one, blank and untappable, so the
+     * icons stay in one column instead of stepping in and out down the list.
      */
-    if (n.children.length) {
-      const caret = document.createElement('span');
-      caret.className = 'treeCaret';
-      caret.setAttribute('aria-hidden', 'true');
-      row.appendChild(caret);
-      row.classList.add('hasKids');
-    }
+    const caret = document.createElement('span');
+    caret.className = n.children.length ? 'treeCaret' : 'treeCaret off';
+    caret.setAttribute('aria-hidden', 'true');
+    row.insertBefore(caret, row.firstChild);
     /*
      * One tap does one thing. A row used to both open its branch and try to
      * buy itself, which meant looking inside a round was the same gesture as

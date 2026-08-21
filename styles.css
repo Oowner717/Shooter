@@ -2281,10 +2281,25 @@ body.booting #pendingBtn {
   border-bottom: 1.5px solid currentColor;
   transform: rotate(-45deg);
 }
-.treeCaret::after { content: ''; position: absolute; inset: -14px -10px -14px -6px; }
+/*
+ * The tap target, reaching left to the row's edge and right only as far as the
+ * gap before the icon. It is at the opposite end of the row from the price now
+ * -- those are the row's two actions and they were a thumb-width apart.
+ */
+.treeCaret::after { content: ''; position: absolute; inset: -14px -6px -14px -11px; }
 .treeBranch:not(.shut) > .treeRow .treeCaret { transform: rotate(90deg); }
-.treeRow.hasKids { padding-right: 6px; }
 .treeRow.locked .treeCaret { color: #46566a; }
+
+/*
+ * A row with nothing under it: the space is kept, the caret is not drawn, and
+ * nothing there is tappable. `pointer-events: none` is the part that matters —
+ * without it the 8px slot still answered to the tap and the handler read it as
+ * a caret, so the left edge of every leaf row was a dead zone that swallowed
+ * the press instead of arming the buy.
+ */
+.treeCaret.off { pointer-events: none; }
+.treeCaret.off::before { content: none; }
+.treeCaret.off::after { content: none; }
 
 /*
  * A group: a heading for the upgrades that are not about any one round or
