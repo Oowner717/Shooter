@@ -156,14 +156,28 @@ export class Menu {
       + `<span class="treeName">${n.name}</span>${pips}</span>`
       + `<span class="treeLine">${n.line || ''}</span></span>`;
     row.appendChild(cost);
+    /*
+     * One tap does one thing. A row used to both open its branch and try to
+     * buy itself, which meant looking inside a round was the same gesture as
+     * spending nine hundred on it.
+     *
+     * Now: something already yours opens and closes. Something buyable arms,
+     * and asks. The second tap is the purchase, and anything else cancels it.
+     */
     row.addEventListener('click', () => {
-      if (n.children.length && (n.kind === 'root' || n.kind === 'arm')) {
-        wrap.classList.toggle('shut');
+      const g = this.game;
+      const have = n.id ? g.owned(n.id) : 0;
+      const full = n.free || (n.id && have >= (n.levels || 1));
+      if (!n.id || full) {
+        if (n.children.length) wrap.classList.toggle('shut');
+        this.armRow(null);
+        this.syncTree();
+        return;
       }
-      if (n.id) {
-        const res = this.game.buy(n.id);
-        if (res !== 'ok') this.refuseRow(row);
-      }
+      if (this.armed !== row) { this.armRow(row); this.syncTree(); return; }
+      this.armRow(null);
+      const res = g.buy(n.id);
+      if (res !== 'ok') this.refuseRow(row);
       this.syncTree();
     });
     wrap.appendChild(row);
@@ -179,6 +193,23 @@ export class Menu {
       if (depth > 0) wrap.classList.add('shut');
     }
     return wrap;
+  }
+
+  /**
+   * Arm one row, and only one. Nine hundred energy is most of an early run and
+   * a thumb is not precise, so nothing is spent on a single tap.
+   */
+  armRow(row) {
+    clearTimeout(this.armTimer);
+    if (this.armed && this.armed !== row) this.armed.classList.remove('armed');
+    this.armed = row;
+    if (!row) return;
+    row.classList.add('armed');
+    // It lapses on its own. An armed row left sitting is a trap for the next
+    // tap, which by then is about something else.
+    this.armTimer = setTimeout(() => {
+      if (this.armed === row) { row.classList.remove('armed'); this.armed = null; this.syncTree(); }
+    }, 4000);
   }
 
   refuseRow(row) {
@@ -231,8 +262,9 @@ export class Menu {
         if (afford) affordable++;
         else cheapest = Math.min(cheapest, price);
       }
-      cost.textContent = full ? '✓' : !open ? '·' : price;
+      cost.textContent = row === this.armed ? 'SURE?' : full ? '✓' : !open ? '·' : price;
       cost.classList.toggle('tick', !!full);
+      cost.classList.toggle('ask', row === this.armed);
 
       const meter = row.querySelector('.treePips');
       if (meter) {
@@ -333,15 +365,39 @@ export class Menu {
     const g = this.game;
     p.appendChild(this.volumeRow());
     const rows = [
-      ['RESET SIMULATION', 'start the session again', () => { this.setOpen(false); g.restart(); }],
-      ['REPLAY OPENING', 'hand the controls over again', () => { this.setOpen(false); g.replayOpening(); }],
+      ['RESET SIMULATION', 'start the session again', () => { this.setOpen(false); g.restart(); }, true],
+      ['REPLAY OPENING', 'hand the controls over again', () => { this.setOpen(false); g.replayOpening(); }, true],
       ['DEBUG', 'developer panel', () => { this.setOpen(false); g.hud.toggleDebug(true); }],
     ];
-    for (const [label, sub, run] of rows) {
+    for (const [label, sub, run, ask] of rows) {
       const b = document.createElement('button');
       b.className = 'menuCell';
       b.innerHTML = `<span class="cellName">${label}</span><span class="cellSub">${sub}</span>`;
-      b.addEventListener('click', () => { run(); this.syncSystem(); });
+      b.addEventListener('click', () => {
+        // Anything that throws the run away asks first. There is no undo and
+        // the button sits one tap from the volume control.
+        if (ask && this.armedCell !== b) {
+          if (this.armedCell) this.armedCell.classList.remove('armed');
+          this.armedCell = b;
+          b.classList.add('armed');
+          b.querySelector('.cellSub').textContent = 'tap again — this cannot be undone';
+          clearTimeout(this.cellTimer);
+          this.cellTimer = setTimeout(() => {
+            b.classList.remove('armed');
+            b.querySelector('.cellSub').textContent = sub;
+            this.armedCell = null;
+          }, 4000);
+          return;
+        }
+        if (ask) {
+          clearTimeout(this.cellTimer);
+          b.classList.remove('armed');
+          b.querySelector('.cellSub').textContent = sub;
+          this.armedCell = null;
+        }
+        run();
+        this.syncSystem();
+      });
       grid.appendChild(b);
     }
     p.appendChild(grid);

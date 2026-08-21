@@ -1003,19 +1003,38 @@ first minute, and every energy banked is aimed at something chosen.
 **ALLOCATIONs are untouched.** They are tempo, not progression, and a top-up is
 exactly the kind of thing that should turn up rather than be shopped for.
 
-Four branches, three of them already yours:
+**Four categories, and a category is never bought.** It is a heading.
 
-| root | | holds |
-|---|---|---|
-| **TURRET** | free | the machine — rate, hands off, slew, casing, sweep, intake |
-| **BOLT** | free | the rack — whole-rack upgrades, BOLT's own two, and all 8 other rounds |
-| **PULSE** | free | the hands — FAN, cooldowns, reflex, and all 6 other abilities |
-| **BLAST** | 900 | the field — mine doctrine and all 7 other mines behind it |
+| category | holds |
+|---|---|
+| **TURRET** | the machine — rate, hands off, slew, casing, sweep, intake |
+| **AMMUNITION** | whole-rack upgrades, then BOLT (free) and the 8 bought rounds beside it |
+| **MINES** | BLAST (900), and the mine doctrine and other 7 mines behind it |
+| **ABILITIES** | cooldowns and reflex, then PULSE and FAN (free) and the 6 bought abilities beside them |
+
+PULSE used to *be* the root of the ability branch, which made every other
+ability read as something hanging off PULSE rather than as its equal. Same for
+BOLT and the rack. A category fixes both: everything purchasable is an arm or a
+leaf under a heading, and peers look like peers.
 
 A node is available when its parent is owned, and bought with energy. That is
 the whole rule: nothing rolled, nothing expired, nothing missed. BLAST is the
-only bought root, which is what makes taking the mine tier a decision instead
-of a formality.
+one arm that gates a whole tier, which is what makes taking the mines a
+decision instead of a formality.
+
+**Every arm says what it does.** A round, mine or ability row carries its own
+damage-and-effect line from `ARSENAL`, or its hint from `ABILITIES` — a price
+with no description is a thing you cannot decide about, and being able to read
+the whole machine before committing is the entire advantage of a tree over a
+card draw.
+
+**Nothing is spent on one tap.** A row that is already yours opens and closes;
+a row you could buy *arms* instead, shows `SURE?`, and only the second tap
+spends. It lapses after four seconds, because an armed row left sitting is a
+trap for the next tap. A row used to both open its branch and try to buy
+itself, which meant looking inside a round was the same gesture as spending
+nine hundred on it. RESET SIMULATION and REPLAY OPENING ask the same way —
+there is no undo and they sit one tap from the volume control.
 
 **80 nodes.** `src/tree.js` holds only the shape; what each node *does* still
 lives in `upgrades.js` and is looked up by id, so there is one definition of an
@@ -1061,6 +1080,21 @@ plan).
 Prices are flat per depth — 900 a round or mine, 1100 an ability, 1400 a second
 charge, 500 a leaf and 350 more per level after the first. Pacing is not what
 this is for yet; one number to move when it is.
+
+### The phone kept an old build
+
+An iOS home-screen web app caches the document indefinitely, and a static page
+has no header it can send to stop it — so a republish to the same URL simply
+does not arrive. A phone sat on build 84 while the server had 85.
+
+The single-file build now checks. One same-origin fetch of itself with a
+cache-buster on the query, a look at the `REV` in the reply, and one reload if
+it differs. `sessionStorage` holds the REV already checked, so it runs once per
+launch and cannot loop. Measured against a local server: one load on a normal
+visit, two when a newer build is waiting, and the game boots either way.
+
+That fixes it going forward. A page already stuck needs a fresh URL once,
+because the stale copy is what would be doing the checking.
 
 ### The bug that made the game unplayable
 

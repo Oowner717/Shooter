@@ -6,12 +6,16 @@
  * accidents. A tree makes it a plan — you can see the whole machine from the
  * first minute, and every energy you bank is aimed at something you picked.
  *
- * Four branches, and three of them are already yours:
+ * Four categories, and nothing at the top level is bought:
  *
- *   TURRET   the machine itself. Free.
- *   BOLT     the rack. Free, and every other round hangs off it.
- *   PULSE    the abilities. Free, and every other ability hangs off it.
- *   BLAST    the field. Bought, and every other mine hangs off it.
+ *   TURRET     the machine itself
+ *   AMMO       BOLT, free, and every other round beside it
+ *   MINES      BLAST, bought, and every other mine behind it
+ *   ABILITIES  PULSE and FAN, free, and the other six beside them
+ *
+ * A category is a heading, not a thing you own — PULSE used to be the root of
+ * the ability branch, which made every other ability read as something that
+ * hung off PULSE rather than as its equal.
  *
  * A node is available when its parent is owned, and bought with energy. That
  * is the whole rule. Nothing is rolled, nothing expires, nothing is missed.
@@ -46,10 +50,9 @@ const UNDER = {
   turret: ['rate', 'handsoff', 'slew', 'overwatch', 'casing', 'insulation', 'sweep', 'intake'],
 
   // ---- the rack ----
-  // BOLT is the round you start with, so the whole-rack upgrades hang off it
-  // alongside its own two.
-  bolt: ['hollowpoint', 'hotload', 'tracer', 'ricochet', 'heavy', 'salvo',
-    'overstuffed', 'doubletap'],
+  // Whole-rack upgrades sit on the category; BOLT keeps only its own two.
+  ammo: ['hollowpoint', 'hotload', 'tracer', 'ricochet', 'heavy', 'salvo'],
+  bolt: ['overstuffed', 'doubletap'],
   explosive: ['overpressure', 'cluster'],
   shotgun: ['doubleo', 'longshot'],
   arc: ['fifthlink', 'superconductor', 'longlead'],
@@ -73,19 +76,26 @@ const UNDER = {
   void: ['eventhorizon'],
 
   // ---- the abilities ----
-  pulse: ['standing', 'reflex'],
+  abilities: ['standing', 'reflex'],
+  pulse: [],
   fan: [], lance: [], well: [], prism: [], stasis: [], decoy: [], chorus: [],
 };
 
-/** Which unlock nodes hang off which root. */
+/** Which arms hang off which category, in the order they are shown. */
 const BRANCH = {
-  bolt: ['explosive', 'shotgun', 'arc', 'spine', 'slug', 'rime', 'spore', 'tithe'],
-  blast: ['snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'],
-  // FAN is the other ability the turret starts with, so it is free where the
-  // six below are bought. Its extra use is not.
-  pulse: ['fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'chorus'],
+  ammo: ['bolt', 'explosive', 'shotgun', 'arc', 'spine', 'slug', 'rime', 'spore', 'tithe'],
+  mines: ['blast'],
+  // PULSE and FAN are the two the turret starts with. They are free where the
+  // six below them are bought; their extra uses are not.
+  abilities: ['pulse', 'fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'chorus'],
   turret: [],
 };
+
+/** The mines behind BLAST. Buying the first charge is what opens the tier. */
+const BEHIND_BLAST = ['snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'];
+
+/** Free arms: things the turret already has when the run starts. */
+const FREE_ARMS = new Set(['bolt', 'pulse', 'fan']);
 
 const UP_BY_ID = new Map(ALL_UPGRADES.map((u) => [u.id, u]));
 const armLabel = (key) => (ARSENAL.find((a) => a.key === key) || {}).label
@@ -94,6 +104,21 @@ const armIcon = (key) => (ARSENAL.find((a) => a.key === key) || {}).icon
   || (ABILITIES.find((a) => a.id === key) || {}).icon || '';
 const armTone = (key) => (ARSENAL.find((a) => a.key === key) || {}).tone
   || (ABILITIES.find((a) => a.id === key) || {}).color || '#8fb6d8';
+
+/**
+ * What a round, mine or ability does, said on the row itself. A price with no
+ * description is a thing you cannot decide about — the whole point of a tree
+ * over a card draw is being able to read it before you commit.
+ */
+function armLine(key) {
+  const a = ARSENAL.find((x) => x.key === key);
+  if (a) return `${a.dmg ? `${a.dmg} damage. ` : ''}${a.fx || ''}`.trim();
+  const b = ABILITIES.find((x) => x.id === key);
+  // The ability hints are written as "NAME — what it does"; the name is
+  // already the heading of the row.
+  if (b) return (b.hint || '').replace(/^[A-Z ]+—\s*/, '');
+  return '';
+}
 
 /**
  * A node.
@@ -105,12 +130,13 @@ function node(o) {
   return { levels: 1, cost: 0, children: [], ...o };
 }
 
-const ROOT_TONE = { turret: '#59e0ff', bolt: '#bff4ff', blast: '#ffb347', pulse: '#59e0ff' };
+const ROOT_TONE = { turret: '#59e0ff', ammo: '#bff4ff', mines: '#ffb347', abilities: '#c9a7ff' };
+const ROOT_NAME = { turret: 'TURRET', ammo: 'AMMUNITION', mines: 'MINES', abilities: 'ABILITIES' };
 const ROOT_LINE = {
-  turret: 'The machine. Everything here is yours from the first frame.',
-  bolt: 'The rack. BOLT is loaded before you start; every other round is bought from here.',
-  blast: 'The field. Buy the charge and the rest of the mines open behind it.',
-  pulse: 'The hands. PULSE can never be taken from you; the rest are bought.',
+  turret: 'The machine itself. Everything here is yours from the first frame.',
+  ammo: 'What leaves the barrel. BOLT is loaded before you start; the rest are bought.',
+  mines: 'What you leave behind. BLAST opens the tier — the other seven are behind it.',
+  abilities: 'What you hold. PULSE and FAN can never be taken from you; the other six are bought.',
 };
 
 function leaf(id) {
@@ -133,37 +159,34 @@ function chargeOf(key) {
   });
 }
 
-/** `free` marks something the turret already has: FAN, and the three roots. */
-function arm(key, kind, free = false) {
+/** `free` marks something the turret already has: BOLT, PULSE and FAN. */
+function arm(key, kind) {
+  const free = FREE_ARMS.has(key);
   const kids = (UNDER[key] || []).map(leaf);
   if (kind === 'ability') kids.unshift(chargeOf(key));
+  // BLAST carries the whole mine tier behind it.
+  if (key === 'blast') kids.push(...BEHIND_BLAST.map((k) => arm(k, 'mine')));
   return node({
     kind: 'arm', id: free ? null : `open_${key}`, key, free,
-    name: armLabel(key), icon: armIcon(key), tone: armTone(key),
+    name: armLabel(key), line: armLine(key), icon: armIcon(key), tone: armTone(key),
     cost: free ? 0 : (kind === 'ability' ? COST.ability : COST[kind]),
     children: kids,
   });
 }
 
-const KIND = { bolt: 'round', blast: 'mine', pulse: 'ability', turret: null };
+const KIND = { ammo: 'round', mines: 'mine', abilities: 'ability', turret: null };
 
 /*
- * BLAST is the only root that is bought. It is a mine like any other and the
- * whole of the field tier sits behind it, which is what makes buying it a
- * decision rather than a formality.
+ * A category is a heading and is never bought. Everything purchasable is an
+ * arm or a leaf under one, which is what makes ABILITIES a peer of AMMO rather
+ * than a list hanging off PULSE.
  */
-const BOUGHT_ROOT = { blast: COST.mine };
-
-export const TREE = ['turret', 'bolt', 'pulse', 'blast'].map((root) => node({
-  kind: 'root', key: root, name: armLabel(root), icon: armIcon(root),
-  id: BOUGHT_ROOT[root] ? `open_${root}` : null,
-  cost: BOUGHT_ROOT[root] || 0,
-  free: !BOUGHT_ROOT[root],
+export const TREE = ['turret', 'ammo', 'mines', 'abilities'].map((root) => node({
+  kind: 'root', key: root, name: ROOT_NAME[root], free: true,
   tone: ROOT_TONE[root], line: ROOT_LINE[root],
   children: [
-    ...(root === 'pulse' ? [chargeOf('pulse')] : []),
     ...(UNDER[root] || []).map(leaf),
-    ...(BRANCH[root] || []).map((k) => arm(k, KIND[root], k === 'fan')),
+    ...(BRANCH[root] || []).map((k) => arm(k, KIND[root])),
   ],
 }));
 

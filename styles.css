@@ -2107,3 +2107,17 @@ body.booting #pendingBtn {
   color: #45566a;
 }
 .treeNext.reach { color: color-mix(in srgb, #7cffb2 70%, transparent); }
+
+/* Armed: one tap from spending, or from throwing the run away. Amber, because
+   it is neither a refusal nor a confirmation — it is a question. */
+.treeRow.armed {
+  border-color: #ffcf5c;
+  background: linear-gradient(180deg, rgba(255, 207, 92, 0.14), rgba(6, 12, 22, 0.7));
+}
+.treeCost.ask { color: #ffcf5c; font-size: 9px; letter-spacing: 0.1em; }
+.menuCell.armed {
+  border-color: #ffcf5c;
+  background: rgba(255, 207, 92, 0.12);
+}
+.menuCell.armed .cellName { color: #ffcf5c; }
+.menuCell.armed .cellSub { color: rgba(255, 207, 92, 0.8); }
