@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '78';
+export const BUILD = '79';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '78';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e72df02';
+export const REV = '862ffa3';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -681,6 +681,23 @@ export const CFG = {
     angularDamping: 0.9,
     correction: 0.72, // positional correction factor
     slop: 0.4,
+    /*
+     * A soft wall inside the hard one.
+     *
+     * clampToArena is a hard stop with a bounce: a body that reaches the side
+     * is pinned to it and, if it is still steering inward-and-down, it rolls
+     * along the edge for as long as it takes to get past. That reads as the
+     * simulation running out of room rather than as an object moving.
+     *
+     * So there is a second, invisible boundary `edgeEase` units in from each
+     * side, and anything inside it is nudged back toward the middle. Squared
+     * falloff: nothing at the outer limit, firmest right at the wall, so the
+     * correction is felt as the object choosing to come away rather than as a
+     * force acting on it. The hard clamp stays as the backstop for anything
+     * thrown at the wall faster than the nudge can answer.
+     */
+    edgeEase: 96, // how far in from each side the soft boundary reaches
+    edgePush: 300, // and how hard it pushes at the wall itself
     maxSpeedFactor: 6, // hard clamp relative to a body's own cruise speed
     // ...and the ceiling for a body that has deliberately been thrown. The
     // ordinary clamp is relative to a body's own cruise, which is right for

@@ -253,6 +253,26 @@ export class Enemy {
   }
 
   /**
+   * The soft side boundary. Applied after steering and before integration, to
+   * every body the arena holds, so it covers a hostile making its run, a drift
+   * wandering, and a mote being drawn in — every one of which could otherwise
+   * end up rolling along a wall.
+   *
+   * A nudge on the velocity rather than a change of heading: the object keeps
+   * doing whatever it was doing and simply stops being able to reach the edge.
+   */
+  edgeEase(world, dt) {
+    const E = CFG.physics;
+    const left = this.x - this.r;
+    const right = world.width - (this.x + this.r);
+    const near = Math.min(left, right);
+    if (near >= E.edgeEase) return;
+    // Squared, so it is nothing at the outer limit and firm at the wall.
+    const urge = (1 - Math.max(near, 0) / E.edgeEase) ** 2;
+    this.vx += (left < right ? 1 : -1) * E.edgePush * urge * dt;
+  }
+
+  /**
    * A SEED looking for a host. It takes the largest thing within reach rather
    * than the nearest, so it reads as reinforcing the object that was already
    * the problem — and it re-picks every frame, so shooting its target out from

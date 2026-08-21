@@ -1036,6 +1036,27 @@ else; the runner in `Director` turns it into releases.
   waves bound the population by construction, which is most of why they work
   and all of why they need this.
 
+**There is a soft wall inside the hard one.** `clampToArena` is a hard stop
+with a bounce: a body that reaches the side is pinned to it and, if it is still
+steering inward-and-down, it rolls along the edge until it gets past. That reads
+as the simulation running out of room rather than as an object moving. Measured
+over 5,384 frames, **25.3% of all body-samples were touching a wall** and 34.5%
+were within 8 units of one — a quarter of every object's life spent against an
+edge.
+
+`physics.edgeEase` (96 units) is a second, invisible boundary in from each side,
+and `edgePush` nudges anything inside it back toward the middle. The falloff is
+squared, so it is nothing at the outer limit and firmest at the wall: the
+correction reads as the object choosing to come away rather than as a force
+acting on it. It is applied between steering and integration, to every body the
+arena holds — hostiles, drift and energy alike. Debris is excluded, being the
+one thing that is meant to leave.
+
+After: **0% touching, 0.24% within 8 units, and a minimum gap of 5 units across
+5,379 frames** — nothing reached a wall at all. Throughput is unchanged (162
+kills against 161). The hard clamp stays as the backstop for anything thrown at
+a wall faster than the nudge can answer.
+
 **DRIFT lives in a band a quarter of the way down, held from both sides.** It
 used to sit 520 units above the turret — a line at 0.35 of the screen — and the
 pull was one-sided: above the line they sank, below it the walk was completely

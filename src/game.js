@@ -973,6 +973,10 @@ export class Game {
 
     for (const b of bodies) {
       b.steer(w, dt);
+      // The soft side boundary, between steering and integration so the nudge
+      // lands this frame. Debris is deliberately excluded — it is the one thing
+      // that is supposed to leave the field, and it is integrated below.
+      b.edgeEase(w, dt);
       integrate(b, dt);
     }
 
