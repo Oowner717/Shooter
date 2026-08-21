@@ -246,6 +246,28 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         }
       }
 
+      /*
+       * Balls a SCION left on this body. Same contest as the plates: they are
+       * on the outside, so a round that reaches one stops there, and taking
+       * one off is a shot you can choose to take instead of firing into a
+       * body that is healing faster than you are hurting it.
+       */
+      if (e.graftCount) {
+        const gr = CFG.graft.ball + p.r;
+        const orbit = e.graftR;
+        for (const g of e.grafts) {
+          if (!g.alive) continue;
+          const gx = e.x + Math.cos(g.a) * orbit;
+          const gy = e.y + Math.sin(g.a) * orbit;
+          const cg = segClosest(ax, ay, bx, by, gx, gy);
+          if (cg.d2 <= gr * gr && cg.t < bestT) {
+            bestT = cg.t;
+            bestKind = 'graft';
+            bestTarget = { enemy: e, graft: g };
+          }
+        }
+      }
+
       const rr = e.r + p.r;
       const c = segClosest(ax, ay, bx, by, e.x, e.y);
       if (c.d2 <= rr * rr && c.t < bestT) {
@@ -334,6 +356,11 @@ function resolveSegment(world, p, ax, ay, bx, by) {
     }
     case 'shard': {
       bestTarget.enemy.hitShard(bestTarget.shard, p.damage, hx, hy, -dirx, -diry);
+      endProjectile(world, p, hx, hy, true);
+      return;
+    }
+    case 'graft': {
+      bestTarget.enemy.hitGraft(bestTarget.graft, p.damage, hx, hy);
       endProjectile(world, p, hx, hy, true);
       return;
     }

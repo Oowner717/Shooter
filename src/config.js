@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '91';
+export const BUILD = '92';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '91';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'b00890e';
+export const REV = 'dcf2e55';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -188,16 +188,28 @@ export const CFG = {
   // it forces and three of them at once is not a decision, it is noise. They
   // are also held apart on release: two SCIONs side by side would seed the
   // same host twice and read as one event.
+  //
+  // A seed that reaches a host does not dissolve into it. It rides it, as a
+  // ball you can see and shoot, and everything it gives is given per ball and
+  // taken back when the ball goes -- so `grow`, `tough` and `regen` below are
+  // shares added per ball, not the multipliers they used to be.
   graft: {
-    cap: 2, // on the field at once
+    cap: 2, // SCIONs on the field at once
     apart: 320, // world units the second is kept from the first
     seeds: 3, // thrown when one is destroyed
     spread: 190, // how hard they are thrown clear before they start hunting
     life: 13, // seconds a seed has to find a host
     hunt: 480, // ...and how far it will look
-    grow: 1.35, // what grafting does to the host's radius
-    tough: 1.9, // ...and to its health
-    regen: 11, // health a grafted body closes per second
+
+    // ---- per ball, and all of it comes off with the ball ----
+    stack: 3, // most that can ride one host
+    grow: 0.2, // + this share of the host's own radius
+    tough: 0.6, // + this share of its own health, and of its energy
+    regen: 9, // health it closes per second
+    hp: 26, // what the ball itself takes to shoot off
+    orbit: 1.45, // where it rides, as a multiple of the host's radius
+    ball: 9, // its radius
+    spin: 0.9, // radians per second the ring turns
   },
 
   // ---- drift ----------------------------------------------------------
@@ -891,9 +903,12 @@ export const ENEMY_TYPES = [
      * chose to shoot first decides what the rest of the wave becomes, which is
      * the one decision the field did not previously ask for.
      *
-     * The counterplay is the seeds themselves: they are slow, they are weak,
-     * and they are in the air for several seconds. Shoot them and nothing is
-     * grafted. Ignore them and you fight something you made.
+     * There are two counters, and they are the same target twice. In the air a
+     * SEED is slow, weak and available for several seconds: shoot it and
+     * nothing is grafted at all. Once it lands it is still there — attached to
+     * the host, orbiting it, with its own health — so it can be shot off, and
+     * everything it was giving goes with it. Up to three ride one body; ignore
+     * them and you fight something you made.
      */
     id: 'scion',
     unlock: 245,

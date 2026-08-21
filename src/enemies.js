@@ -150,8 +150,18 @@ export class Enemy {
     this.seed = type.id === 'seed';
     this.seedT = this.seed ? CFG.graft.life : 0;
     this.host = null;
-    this.grafted = false;
-    this.graftGlow = 0;
+    /*
+     * Balls riding this body. A seed that reaches a host used to dissolve into
+     * it: the host silently became bigger and started healing, and there was
+     * nothing to shoot to undo it. Now each one stays, orbiting, as a thing
+     * with its own health -- so the boost is always visible, always stackable
+     * and always removable. null until the first one lands.
+     */
+    this.grafts = null;
+    this.graftSpin = 0;
+    this.graftBaseR = 0; // what the body was before any of them
+    this.graftBaseHp = 0;
+    this.graftBaseEnergy = 0;
     this.tether = null; // the other half of a TOW, if any
     // Every object picks its own way across the field.
     this.route = opts.route || weightedPick(ROUTES);
@@ -188,8 +198,48 @@ export class Enemy {
     return this.r * SHARD_ORBIT;
   }
 
+  /** Live balls riding this body. */
+  get graftCount() {
+    if (!this.grafts) return 0;
+    let n = 0;
+    for (const g of this.grafts) if (g.alive) n++;
+    return n;
+  }
+
+  /** Kept as a read-only name because half the file asks the question. */
+  get grafted() {
+    return this.graftCount > 0;
+  }
+
+  /** Radius the balls ride at. It follows the body, which the balls grow. */
+  get graftR() {
+    return this.r * CFG.graft.orbit;
+  }
+
   get hitReach() {
-    return this.shards ? this.orbitR + SHARD_R : this.r;
+    const core = this.shards ? this.orbitR + SHARD_R : this.r;
+    return this.graftCount ? Math.max(core, this.graftR + CFG.graft.ball) : core;
+  }
+
+  /*
+   * Recompute everything the balls give, from how many are alive.
+   *
+   * Derived rather than accumulated on purpose: a ball being shot off has to
+   * put the body back exactly, and a body whose radius was multiplied on the
+   * way up cannot be divided back down without drift. The wound is carried
+   * across as a fraction, so losing a ball never kills the host outright and
+   * gaining one never heals it.
+   */
+  refreshGrafts() {
+    const G = CFG.graft;
+    const n = this.graftCount;
+    this.r = this.graftBaseR * (1 + G.grow * n);
+    this.mass = massOf(this.type, this.r);
+    this.invMass = 1 / this.mass;
+    const frac = this.maxHp > 0 ? clamp(this.hp / this.maxHp, 0, 1) : 1;
+    this.maxHp = Math.max(1, Math.round(this.graftBaseHp * (1 + G.tough * n)));
+    this.hp = Math.max(1, Math.min(this.maxHp, this.maxHp * frac));
+    this.energy = this.graftBaseEnergy * (1 + G.tough * n);
   }
 
   // ------------------------------------------------------------- behaviour
@@ -284,7 +334,10 @@ export class Enemy {
       // win the pick nearly every time, and a SCION whose seeds reinforce the
       // next SCION is a loop rather than a decision -- the object exists to
       // give the ability away.
-      if (e === this || e.dead || e.seed || e.harmless || e.staged || e.grafted) continue;
+      // Full is full. Below the cap a body can take another, which is what
+      // makes a SCION's three land as one problem rather than three.
+      if (e === this || e.dead || e.seed || e.harmless || e.staged) continue;
+      if (e.graftCount >= G.stack) continue;
       if (e.type.id === 'scion') continue;
       const d2 = (e.x - this.x) ** 2 + (e.y - this.y) ** 2;
       if (d2 > G.hunt * G.hunt) continue;
@@ -426,11 +479,19 @@ export class Enemy {
     this.flash = Math.max(0, this.flash - dt * 4.5);
     if (this.slugged > 0) this.slugged = Math.max(0, this.slugged - dt);
 
-    // A grafted body closes what you did not finish. Nothing else in the game
-    // heals, so this is the one object that punishes spreading fire around.
-    if (this.grafted) {
-      this.graftGlow = (this.graftGlow + dt * 2.2) % TAU;
-      if (this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + CFG.graft.regen * dt);
+    /*
+     * A grafted body closes what you did not finish, once per second per ball.
+     * Nothing else in the game heals, so this is the one object that punishes
+     * spreading fire around -- and the answer to it is on its surface: shoot
+     * the balls off and the healing goes with them.
+     */
+    const balls = this.graftCount;
+    if (balls) {
+      const spin = world.stasis > 0 ? 0.12 : 1;
+      for (const g of this.grafts) g.a += this.graftSpin * dt * spin;
+      if (this.hp < this.maxHp) {
+        this.hp = Math.min(this.maxHp, this.hp + CFG.graft.regen * balls * dt);
+      }
     }
 
     // RIME wears off on its own. The chill is a drag rather
@@ -552,6 +613,28 @@ export class Enemy {
     s.alive = false;
     fxShard(hx, hy, spread(140), spread(140) - 40, this.type.color, 0.7, 7, 4);
     spark(hx, hy, spread(200), spread(200), this.type.glow, 0.3, 2.4);
+    audio.reflect();
+  }
+
+  /**
+   * A ball shot off a host. Everything it was giving comes off with it, which
+   * is the whole point of it being a thing on the outside rather than a state
+   * on the inside.
+   */
+  hitGraft(s, dmg, hx, hy) {
+    if (!s.alive) return;
+    s.hp -= dmg;
+    if (s.hp > 0) {
+      hitBurst(hx, hy, 0, -1, '#d9c2ff');
+      return;
+    }
+    s.alive = false;
+    this.refreshGrafts();
+    ring(hx, hy, 2, CFG.graft.ball * 4, 0.34, '#c9a7ff', 2);
+    for (let i = 0; i < 8; i++) {
+      const a = rand(0, TAU);
+      spark(hx, hy, Math.cos(a) * rand(70, 210), Math.sin(a) * rand(70, 210), '#d9c2ff', rand(0.2, 0.42), 2);
+    }
     audio.reflect();
   }
 
@@ -766,30 +849,6 @@ export class Enemy {
       default: drawChip(ctx, this.r, this.phase);
     }
 
-    // Grafted: a turning ring round whatever it landed on. The body keeps its
-    // own shape and colour — the point is that it is still that object, and
-    // now it is a bigger one that heals.
-    if (this.grafted) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = rgba('#c9a7ff', 0.5);
-      ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.07);
-      ctx.setLineDash([this.r * 0.34, this.r * 0.28]);
-      ctx.lineDashOffset = -this.graftGlow * this.r * 0.5;
-      ctx.beginPath();
-      ctx.arc(0, 0, this.r * 1.16, 0, TAU);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      for (let i = 0; i < 3; i++) {
-        const a = this.graftGlow + (i / 3) * TAU;
-        ctx.beginPath();
-        ctx.arc(Math.cos(a) * this.r * 1.16, Math.sin(a) * this.r * 1.16, this.r * 0.09, 0, TAU);
-        ctx.fillStyle = rgba('#d9c2ff', 0.85);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
     if (this.flash > 0.01) {
       // A disc, not ctx.fill() on whatever sub-path the shape left behind —
       // several of the shapes end on an open stroke path.
@@ -804,6 +863,41 @@ export class Enemy {
     }
 
     ctx.restore();
+
+    /*
+     * The balls a SCION left on this body (unrotated frame, like the plates).
+     *
+     * Drawn as the SEED they arrived as, on a thread back to the body, and
+     * each one dims as it is worn down — so a ball that is nearly off looks
+     * nearly off. They are the same object they were in the air, which is what
+     * makes "shoot them there instead" occur to anyone at all.
+     */
+    if (this.graftCount) {
+      const G = CFG.graft;
+      const orbit = this.graftR;
+      for (const g of this.grafts) {
+        if (!g.alive) continue;
+        const gx = this.x + Math.cos(g.a) * orbit;
+        const gy = this.y + Math.sin(g.a) * orbit;
+        const life = clamp(g.hp / g.maxHp, 0.2, 1);
+        ctx.strokeStyle = rgba('#c9a7ff', 0.3 + 0.25 * life);
+        ctx.lineWidth = HAIRLINE * 1.6;
+        // From the body's edge, not its centre: a line drawn through the
+        // middle of a BULWARK reads as damage to it rather than as a thread.
+        ctx.beginPath();
+        ctx.moveTo(this.x + Math.cos(g.a) * this.r * 0.92, this.y + Math.sin(g.a) * this.r * 0.92);
+        ctx.lineTo(gx, gy);
+        ctx.stroke();
+        ctx.save();
+        ctx.translate(gx, gy);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = rgba('#c9a7ff', 0.2 + 0.3 * life);
+        ctx.strokeStyle = rgba('#d9c2ff', 0.45 + 0.5 * life);
+        ctx.lineWidth = Math.max(HAIRLINE, G.ball * 0.16);
+        drawSeed(ctx, G.ball, g.a * 3, world.time);
+        ctx.restore();
+      }
+    }
 
     // orbiting plates (unrotated frame)
     if (this.shards) {
@@ -1802,24 +1896,44 @@ export class Director {
 
 /** Area damage + shove, used by blooms, mines and PULSE. */
 /**
- * A SEED reaching a host. The host keeps being whatever it was — its shape,
- * its route, its behaviour — and becomes a larger, tougher version of it that
- * heals. Nothing is replaced, because "that BLOOM is now a problem" is a much
- * better read than "a new object appeared".
+ * A SEED reaching a host. It does not dissolve into it: it attaches, and stays
+ * attached as a ball riding the outside of the body.
  *
- * Once only per body: a second seed finds something else, which is what keeps
- * a SCION's three from all landing on the same target.
+ * The host keeps being whatever it was — its shape, its route, its behaviour —
+ * and every ball on it makes it a little larger, a little tougher, and closes
+ * its wounds a little faster. Nothing is replaced, because "that BLOOM is now
+ * a problem" is a much better read than "a new object appeared".
+ *
+ * Up to `CFG.graft.stack` of them, so a SCION's three can all land on the same
+ * body and make one monster of it. Each is a separate target with its own
+ * health, and shooting one off takes its whole share back — which is the way
+ * out of a body that is otherwise healing faster than you can hurt it.
  */
 export function graft(world, host) {
-  if (!host || host.dead || host.grafted) return false;
   const G = CFG.graft;
-  host.grafted = true;
-  host.r *= G.grow;
-  host.mass = massOf(host.type, host.r);
-  host.invMass = 1 / host.mass;
-  host.maxHp = Math.round(host.maxHp * G.tough);
-  host.hp = Math.min(host.maxHp, host.hp * G.tough);
-  host.energy = (host.energy || 0) * G.tough;
+  if (!host || host.dead || host.graftCount >= G.stack) return false;
+
+  // First one: remember what the body was, so every later recount is measured
+  // from the same place rather than from whatever the last one left behind.
+  if (!host.grafts) {
+    host.grafts = [];
+    host.graftBaseR = host.r;
+    host.graftBaseHp = host.maxHp;
+    host.graftBaseEnergy = host.energy || 0;
+    host.graftSpin = rand(0.7, 1.3) * (Math.random() < 0.5 ? -1 : 1) * G.spin;
+  }
+
+  // Spaced around the ring by slot, so a second and a third land opposite what
+  // is already there instead of stacking into one bright dot.
+  const slot = host.grafts.length;
+  host.grafts.push({
+    a: (slot / G.stack) * TAU + rand(-0.3, 0.3),
+    alive: true,
+    hp: G.hp,
+    maxHp: G.hp,
+  });
+  host.refreshGrafts();
+
   host.flash = 1;
   ring(host.x, host.y, host.r * 0.5, host.r * 2.6, 0.5, '#c9a7ff', 3);
   ripple(host.x, host.y, 1.2, host.r * 5);
@@ -1845,6 +1959,24 @@ export function applyBlast(world, blast) {
       const falloff = 1 - d / r;
       const nx = dx / d;
       const ny = dy / d;
+      /*
+       * The balls on a grafted body take the blast too, each judged from where
+       * it actually is. Without this a mine or a PULSE could only ever hurt
+       * the host, and a build with no precise shot in it had no answer at all
+       * to a body carrying three of them.
+       */
+      if (e.graftCount) {
+        const orbit = e.graftR;
+        for (const g of e.grafts) {
+          if (!g.alive) continue;
+          const gx = e.x + Math.cos(g.a) * orbit;
+          const gy = e.y + Math.sin(g.a) * orbit;
+          const gd2 = (gx - x) ** 2 + (gy - y) ** 2;
+          if (gd2 > r2) continue;
+          const gf = 1 - Math.sqrt(gd2) / r;
+          e.hitGraft(g, damage * (0.35 + gf * 0.65), gx, gy);
+        }
+      }
       e.applyDamage(world, damage * (0.35 + falloff * 0.65), nx, ny, impulse * falloff);
     }
   };

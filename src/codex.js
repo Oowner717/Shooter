@@ -82,7 +82,7 @@ export const CODEX = [
   {
     id: 'seed',
     name: 'SEED',
-    line: 'Harmless on its own, and it is not on its own for long. Shoot it in the air or fight what it makes.',
+    line: 'Harmless on its own, and it is not on its own for long. It rides whatever it reaches and closes that body\'s wounds — up to three of them at once. Shoot it in the air, or shoot it off afterwards.',
   },
   {
     id: 'drift',
