@@ -96,10 +96,30 @@ export class Hud {
         .join('');
     }
 
-    // Stamped where it is visible on launch: if this number is not the newest,
-    // the page is running a cached build.
+    /*
+     * The footer says two things at once: which build this is, and what to do
+     * about the browser chrome.
+     *
+     * Add to Home Screen only goes borderless when this page is the document
+     * iOS is looking at -- it reads apple-mobile-web-app-capable out of the
+     * top-level <head>. Inside a frame that head belongs to the host, so the
+     * advice is false there and the line says so instead. Already standalone,
+     * there is nothing to advise and only the build is left.
+     */
     const foot = document.querySelector('.bootFoot');
-    if (foot) foot.textContent = `${foot.textContent}  ·  BUILD ${BUILD}`;
+    if (foot) {
+      const framed = window.top !== window.self;
+      const standalone =
+        navigator.standalone === true ||
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+        (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches);
+      const advice = standalone
+        ? ''
+        : framed
+          ? 'Framed here. Open the page on its own to go borderless.'
+          : 'Add to Home Screen for fullscreen playback.';
+      foot.textContent = advice ? `${advice}  ·  BUILD ${BUILD}` : `BUILD ${BUILD}`;
+    }
 
     this.el.loadScrim.addEventListener('click', () => game.closeLoadout());
     $('loadClose').addEventListener('click', () => game.closeLoadout());

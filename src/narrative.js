@@ -182,6 +182,6 @@ export const CONTROLS = [
   ['LEVER', () => 'hold the grip under the turret and swing. The barrel goes the other way, and fires while you hold it.'],
   ['TAP', () => 'anywhere ahead of the turret to shoot there instead. Hold to keep firing.'],
   ['ABILITIES', (n) => `PULSE and FAN to begin with, ${n - 2} more to open. One tap each; each comes back on its own.`],
-  ['OFFERS', () => 'a choice of three, every so often. Rounds, mines, abilities and upgrades all come from there.'],
+  ['UPGRADES', () => 'energy is the currency. Open the menu and spend it down the tree — rounds, mines, abilities, and everything that hangs off them.'],
   ['CONTACT', () => 'does not kill you. It breaks up the feed you aim through until you destroy what caused it.'],
 ];
