@@ -1587,6 +1587,8 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 .spawnBack {
   -webkit-appearance: none;
   appearance: none;
+  flex: 0 0 auto;
+  white-space: nowrap;
   background: none;
   border: 0;
   padding: 2px 0;
@@ -1595,11 +1597,36 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   color: var(--accent);
 }
 .spawnTally {
+  flex: 1 1 auto;
   font-size: 8px;
   letter-spacing: 0.02em;
   color: var(--dim);
   text-align: right;
 }
+.spawnPeek {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: rgba(14, 26, 42, 0.8);
+  color: var(--dim);
+}
+
+/*
+ * Folded. The picker and its option rows go; the head, the spawn button and
+ * CLEAR FIELD stay, and the panel narrows so most of the arena is visible
+ * beside it. This is the state a spawn leaves it in -- see Hud.miniSpawn().
+ */
+#debugPanel.mini .spawnPick,
+#debugPanel.mini .spawnRow,
+#debugPanel.mini .dbgStats { display: none; }
+#debugPanel.wide.mini { width: min(244px, calc(100vw - 16px)); }
+#debugPanel.mini .spawnGo { margin-top: 2px; }
+#debugPanel.mini .spawnTally { white-space: nowrap; }
 
 .spawnPick {
   display: grid;

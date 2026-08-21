@@ -761,7 +761,10 @@ export class Hud {
   buildSpawn() {
     const g = this.game;
     const el = this.el.dbgSpawn;
-    this.spawn = { id: ENEMY_TYPES[0].id, count: 5, shape: '', where: 'entry' };
+    // ON FIELD by default. The point of the screen is to look at the thing,
+    // and a group queued above the arena spends its first four seconds off the
+    // top of the screen -- which reads as nothing having happened at all.
+    this.spawn = { id: ENEMY_TYPES[0].id, count: 5, shape: '', where: 'field' };
     this.spawnCells = new Map();
     this.spawnRows = [];
     this.spawnTallyText = '';
@@ -774,8 +777,12 @@ export class Hud {
     back.addEventListener('click', () => this.showSpawn(false));
     const tally = document.createElement('span');
     tally.className = 'spawnTally';
-    head.append(back, tally);
+    const peek = document.createElement('button');
+    peek.className = 'spawnPeek';
+    peek.addEventListener('click', () => this.miniSpawn(!this.el.debug.classList.contains('mini')));
+    head.append(back, tally, peek);
     this.el.spawnTally = tally;
+    this.el.spawnPeek = peek;
 
     const pick = document.createElement('div');
     pick.className = 'spawnPick';
@@ -854,6 +861,7 @@ export class Hud {
       // Saying the real number is the difference between a tool and a guess.
       const t = TYPE_BY_ID[this.spawn.id];
       this.alert(`+${made.length} ${t ? t.name : this.spawn.id}`, 'info', 1.4);
+      this.miniSpawn(true);
     });
     this.el.spawnGo = go;
 
@@ -865,8 +873,25 @@ export class Hud {
     el.append(head, pick, howMany, shape, where, go, clear);
   }
 
+  /*
+   * Fold the picker away and leave the button, the tally and the field.
+   *
+   * The panel is 340px of opaque glass over a 390px screen, and a group queued
+   * above the arena marches down into exactly the part of the field it covers.
+   * Spawning five MOTEs and seeing none of them is not a spawner that failed,
+   * it is a spawner you cannot watch -- so a spawn folds it away by itself.
+   * The button keeps its label, so the next one is still a single tap.
+   */
+  miniSpawn(on) {
+    this.el.debug.classList.toggle('mini', !!on);
+    this.el.spawnPeek.textContent = on ? 'PICK' : 'HIDE';
+    this.spawnTallyText = ''; // the folded head has room for a shorter one
+    this.syncSpawn();
+  }
+
   /** Swap the panel between the button grid and the spawn screen. */
   showSpawn(on) {
+    this.miniSpawn(false);
     this.el.dbgSpawn.hidden = !on;
     this.el.dbgGrid.hidden = on;
     // The picker needs three columns to be readable, which the 280px panel
@@ -895,7 +920,9 @@ export class Hud {
       this.el.spawnGo.textContent = `SPAWN ${this.spawn.count} \u00d7 ${t ? t.name : this.spawn.id}`;
     }
     const f = this.game.debugFieldCount();
-    const line = `${f.hostile} live · ${f.drift} drift · ${f.frag} frag · ${f.wreck} wreck`;
+    const line = this.el.debug.classList.contains('mini')
+      ? `${f.hostile} live · ${f.drift} drift`
+      : `${f.hostile} live · ${f.drift} drift · ${f.frag} frag · ${f.wreck} wreck`;
     if (line !== this.spawnTallyText) {
       this.spawnTallyText = line;
       this.el.spawnTally.textContent = line;

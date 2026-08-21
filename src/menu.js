@@ -90,6 +90,9 @@ export class Menu {
     this.tab = tab;
     for (const b of this.el.tabs.children) b.classList.toggle('on', b.dataset.tab === tab);
     for (const p of this.el.panels.children) p.hidden = p.dataset.panel !== tab;
+    // The panels share one scroller. Leaving the tree scrolled halfway and
+    // switching to a short tab landed on its bottom edge, or on nothing.
+    this.el.panels.scrollTop = 0;
     // The found count is about the glossary; on the other tabs it is a number
     // with nothing to belong to.
     this.el.found.classList.toggle('show', tab === 'codex');
