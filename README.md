@@ -993,6 +993,54 @@ are appended past the end of the clamped run, so the edge pass simply stops
 early — they collide with everything and are clamped by nothing. Off the field,
 or fourteen seconds, whichever comes first.
 
+### The tree
+
+Everything permanent is bought from a tree with energy. AMENDMENTs are gone:
+three cards, take one, and the other two never seen again made a run a sequence
+of accidents. A tree makes it a plan — the whole machine is visible from the
+first minute, and every energy banked is aimed at something chosen.
+
+**ALLOCATIONs are untouched.** They are tempo, not progression, and a top-up is
+exactly the kind of thing that should turn up rather than be shopped for.
+
+Four branches, three of them already yours:
+
+| root | | holds |
+|---|---|---|
+| **TURRET** | free | the machine — rate, hands off, slew, casing, sweep, intake |
+| **BOLT** | free | the rack — whole-rack upgrades, BOLT's own two, and all 8 other rounds |
+| **PULSE** | free | the hands — FAN, cooldowns, reflex, and all 6 other abilities |
+| **BLAST** | 900 | the field — mine doctrine and all 7 other mines behind it |
+
+A node is available when its parent is owned, and bought with energy. That is
+the whole rule: nothing rolled, nothing expired, nothing missed. BLAST is the
+only bought root, which is what makes taking the mine tier a decision instead
+of a formality.
+
+**80 nodes.** `src/tree.js` holds only the shape; what each node *does* still
+lives in `upgrades.js` and is looked up by id, so there is one definition of an
+upgrade and one definition of where it sits. `check-build.mjs` asserts every
+buyable id is placed exactly once — 76 of them — which is what stops the two
+drifting. A node left out of the tree would be content nobody could ever buy.
+
+Purchases are recorded in `world.offers.taken`, the ledger the save already
+keeps and already replays on restore, so the tree persists for free and there
+is one answer to "what has this run got".
+
+**The layout is an indented outline, not a drawn graph.** Eighty nodes on a
+390px screen is the constraint, and an outline is the shape that survives it: a
+row reads at a glance, the rail down the left says what hangs off what, and a
+closed branch costs one line instead of fourteen. A bought arm opens to show
+its own upgrades; an unbought one is a single priced line. Four row states —
+owned (lit in the branch's tone, ✓), affordable (green price), open but out of
+reach (dimmed, still priced), and behind something unbought (34% opacity, still
+legible, because a tree you cannot read the far side of is a fog rather than a
+plan).
+
+Prices are flat per depth — 900 a round or mine, 1100 an ability, 1400 a second
+charge, 500 a leaf and 350 more per level after the first. Pacing is not what
+this is for yet; one number to move when it is.
+
 ### ORDINAL is gone
 
 Build 82 deleted it. `src/boss.js` (1,233 lines), the ledger, the ending, the

@@ -13,10 +13,12 @@ import { ARSENAL, ARSENAL_GROUPS, specRows } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
 import { VOLUME_STEPS } from './audio.js';
 import { BUILD, REV } from './config.js';
+import { TREE, priceOf } from './tree.js';
 
 const $ = (id) => document.getElementById(id);
 
 const TABS = [
+  { id: 'tree', label: 'UPGRADES' },
   { id: 'arsenal', label: 'ARSENAL' },
   { id: 'codex', label: 'OBJECTS' },
   { id: 'system', label: 'SYSTEM' },
@@ -35,16 +37,17 @@ export class Menu {
       found: $('codexFound'),
     };
     this.open = false;
-    this.tab = 'arsenal';
+    this.tab = 'tree';
     this.cells = new Map(); // key -> element, for the active-state sync
     this.codexCells = new Map();
     this.lastFound = -1;
 
     this.buildTabs();
+    this.buildTree();
     this.buildArsenal();
     this.buildCodex();
     this.buildSystem();
-    this.show('arsenal');
+    this.show('tree');
 
     this.el.btn.addEventListener('click', () => this.toggle());
     this.el.close.addEventListener('click', () => this.setOpen(false));
@@ -67,7 +70,7 @@ export class Menu {
     this.el.scrim.classList.toggle('on', on);
     this.el.btn.classList.toggle('on', on);
     document.body.classList.toggle('menuOpen', on);
-    if (on) this.syncCodex();
+    if (on) { this.syncCodex(); this.syncTree(); }
   }
 
   buildTabs() {
@@ -91,6 +94,7 @@ export class Menu {
     // with nothing to belong to.
     this.el.found.classList.toggle('show', tab === 'codex');
     if (tab === 'codex') this.syncCodex();
+    if (tab === 'tree') this.syncTree();
   }
 
   panel(id, cls = '') {
@@ -99,6 +103,106 @@ export class Menu {
     p.dataset.panel = id;
     this.el.panels.appendChild(p);
     return p;
+  }
+
+  // ------------------------------------------------------------------- tree
+
+  /*
+   * Everything permanent, laid out as what it is: a tree. Four branches, three
+   * of them already yours, and every node behind the one above it.
+   *
+   * It is an indented outline rather than a drawn 2D graph. Eighty nodes on a
+   * 390px screen is the constraint, and an outline is the shape that survives
+   * it — a row can be read at a glance, the rail down the left says what hangs
+   * off what, and a branch that is closed takes one line instead of fourteen.
+   */
+  buildTree() {
+    const p = this.panel('tree', 'tree');
+    this.treeRows = [];
+    const head = document.createElement('div');
+    head.className = 'treeHead';
+    head.innerHTML = '<span class="treeHeadName">ENERGY</span><b id="treeBank">0</b>';
+    p.appendChild(head);
+    this.el.treeBank = head.querySelector('#treeBank');
+
+    for (const root of TREE) {
+      p.appendChild(this.treeNode(root, 0));
+    }
+  }
+
+  /** One row, plus its children under it. Recursive; depth drives the indent. */
+  treeNode(n, depth) {
+    const wrap = document.createElement('div');
+    wrap.className = `treeBranch d${Math.min(depth, 3)}`;
+    if (n.tone) wrap.style.setProperty('--tone', n.tone);
+
+    const row = document.createElement('button');
+    row.className = `treeRow k-${n.kind}`;
+    row.type = 'button';
+    const cost = document.createElement('b');
+    cost.className = 'treeCost';
+    row.innerHTML = `<span class="treeIcon">${n.icon || ''}</span>`
+      + `<span class="treeText"><span class="treeName">${n.name}</span>`
+      + `<span class="treeLine">${n.line || ''}</span></span>`;
+    row.appendChild(cost);
+    row.addEventListener('click', () => {
+      if (n.children.length && (n.kind === 'root' || n.kind === 'arm')) {
+        wrap.classList.toggle('shut');
+      }
+      if (n.id) {
+        const res = this.game.buy(n.id);
+        if (res !== 'ok') this.refuseRow(row);
+      }
+      this.syncTree();
+    });
+    wrap.appendChild(row);
+    this.treeRows.push({ n, row, cost, wrap });
+
+    if (n.children.length) {
+      const kids = document.createElement('div');
+      kids.className = 'treeKids';
+      for (const c of n.children) kids.appendChild(this.treeNode(c, depth + 1));
+      wrap.appendChild(kids);
+      // Bought things open; everything else starts closed, or the panel is a
+      // wall of eighty rows before a single decision has been made.
+      if (depth > 0) wrap.classList.add('shut');
+    }
+    return wrap;
+  }
+
+  refuseRow(row) {
+    row.classList.remove('refuse');
+    void row.offsetWidth;
+    row.classList.add('refuse');
+  }
+
+  /** Every row's state, diffed. Called on open, on a buy, and on tab change. */
+  syncTree() {
+    if (!this.treeRows) return;
+    const g = this.game;
+    const w = g.world;
+    if (this.el.treeBank) this.el.treeBank.textContent = Math.floor(w.energy);
+    for (const { n, row, cost, wrap } of this.treeRows) {
+      const have = n.id ? g.owned(n.id) : 0;
+      const max = n.levels || 1;
+      const done = n.free || (n.id && have >= max);
+      const open = g.available(n);
+      const price = n.id && have < max ? priceOf(n, have) : 0;
+      const afford = price > 0 && w.energy >= price;
+
+      row.classList.toggle('owned', !!done);
+      row.classList.toggle('locked', !open);
+      row.classList.toggle('afford', open && !done && afford);
+      row.classList.toggle('poor', open && !done && !afford);
+      wrap.classList.toggle('branchOpen', !!done || n.kind === 'root');
+      cost.textContent = done ? '✓' : !open ? '—' : price;
+      // A multi-level node says which level is being bought.
+      const lvl = row.querySelector('.treeName');
+      if (lvl) {
+        const tier = n.tiers && n.tiers[have] ? n.tiers[have].name : n.name;
+        lvl.textContent = max > 1 ? `${tier}  ${Math.min(have + 1, max)}/${max}` : tier;
+      }
+    }
   }
 
   // ---------------------------------------------------------------- arsenal

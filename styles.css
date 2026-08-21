@@ -1984,3 +1984,119 @@ body.booting #pendingBtn {
 @media (prefers-reduced-motion: reduce) {
   .fxChip { animation: none; }
 }
+
+/* ============================================================
+   THE TREE
+   Eighty nodes on a 390px screen. An indented outline rather than a drawn
+   graph: a row reads at a glance, the rail down the left says what hangs off
+   what, and a closed branch costs one line instead of fourteen.
+   ============================================================ */
+
+.menuPanel.tree { display: flex; flex-direction: column; gap: 2px; }
+
+.treeHead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: rgba(4, 10, 18, 0.96);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+.treeHeadName { font-size: 9px; letter-spacing: 0.2em; color: var(--dim); }
+.treeHead b {
+  font-size: 17px;
+  color: #7cffb2;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px rgba(124, 255, 178, 0.4);
+}
+
+/* The rail. Depth 0 has none — a root is not hanging off anything. */
+.treeBranch { --tone: #8fb6d8; }
+.treeBranch.d1, .treeBranch.d2, .treeBranch.d3 {
+  margin-left: 9px;
+  padding-left: 9px;
+  border-left: 1px solid color-mix(in srgb, var(--tone) 26%, transparent);
+}
+.treeBranch.d0 { margin-top: 10px; }
+.treeBranch.shut > .treeKids { display: none; }
+
+.treeKids { display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
+
+.treeRow {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: rgba(6, 12, 22, 0.66);
+  color: var(--ink);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  transition: border-color 0.14s, background 0.14s, opacity 0.14s;
+}
+.treeRow:active { transform: translateY(1px); }
+.treeRow .treeIcon { flex: 0 0 auto; width: 18px; height: 18px; color: var(--tone); opacity: 0.9; }
+.treeRow .treeIcon svg { width: 18px; height: 18px; display: block; }
+.treeText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.treeName { font-size: 10px; letter-spacing: 0.13em; color: var(--ink); }
+.treeLine {
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
+  color: #4d5f74;
+  /* Two lines, then it stops. A tree is scanned, not read. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.treeCost {
+  flex: 0 0 auto;
+  min-width: 34px;
+  text-align: right;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: #45566a;
+}
+
+/* A root is the header of its branch, not a row you press. */
+.treeRow.k-root { background: rgba(10, 20, 34, 0.9); border-color: color-mix(in srgb, var(--tone) 34%, transparent); }
+.treeRow.k-root .treeName { font-size: 11px; letter-spacing: 0.2em; color: var(--tone); }
+.treeRow.k-arm .treeName { letter-spacing: 0.17em; }
+
+/* Owned: it is yours, and it stops asking for anything. */
+.treeRow.owned {
+  border-color: color-mix(in srgb, var(--tone) 52%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 10%, transparent), rgba(6, 12, 22, 0.7));
+}
+.treeRow.owned .treeName { color: var(--tone); }
+.treeRow.owned .treeCost { color: color-mix(in srgb, var(--tone) 70%, transparent); }
+
+/* Affordable: the only state that is actually inviting. */
+.treeRow.afford { border-color: rgba(124, 255, 178, 0.5); }
+.treeRow.afford .treeCost { color: #7cffb2; text-shadow: 0 0 8px rgba(124, 255, 178, 0.35); }
+
+/* Open but out of reach: readable, priced, and plainly not yet. */
+.treeRow.poor { opacity: 0.72; }
+.treeRow.poor .treeCost { color: #6b7a8c; }
+
+/* Behind something unbought. Still legible — a tree you cannot read the far
+   side of is not a plan, it is a fog. */
+.treeRow.locked { opacity: 0.34; }
+.treeRow.locked .treeCost { color: #3a4757; }
+
+.treeRow.refuse { animation: treeRefuse 0.3s ease-out; }
+@keyframes treeRefuse {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); border-color: #ff5d8f; }
+  75% { transform: translateX(3px); border-color: #ff5d8f; }
+}

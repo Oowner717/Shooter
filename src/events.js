@@ -184,15 +184,11 @@ export class Offers {
       this.queue.push({ tier: 'small', options: null });
       if (world.announceOffer) world.announceOffer('small');
     }
-    while (world.kills >= this.nextLarge) {
-      this.nextLarge += CFG.events.large;
-      // A permanent one goes to the front. Nothing expires, so the top-ups it
-      // steps in front of lose nothing by waiting — and the button can then
-      // say AMENDMENT and mean it, instead of advertising the top-up that
-      // happened to be queued first.
-      this.queue.unshift({ tier: 'large', options: null });
-      if (world.announceOffer) world.announceOffer('large');
-    }
+    // AMENDMENTs are gone as of build 83. Everything permanent is bought from
+    // the tree with energy instead of arriving as three cards you had to pick
+    // one of and never see the other two again. ALLOCATIONs above are
+    // untouched: they are tempo, not progression, and a top-up is exactly the
+    // kind of thing that should turn up rather than be shopped for.
   }
 
   /**

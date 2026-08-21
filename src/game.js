@@ -18,6 +18,7 @@ import { codex, taught, markTaught, forgetTaught } from './codex.js';
 import { readRun, saveRun, forgetRun } from './save.js';
 import { Offers } from './events.js';
 import { freshUpgrades, BY_ID } from './upgrades.js';
+import { NODE_BY_ID, priceOf } from './tree.js';
 import { SCRIPT, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
@@ -338,6 +339,59 @@ export class Game {
     forgetRun();
     audio.resume();
     this.hud.alert('SIMULATION ONLINE', 'info', 2.6);
+  }
+
+  /**
+   * How many of `id` the run has bought. The offer ledger is reused rather
+   * than a second list kept beside it: `taken` already survives a save and is
+   * already replayed on restore, so the tree gets persistence for free and
+   * there is one answer to "what has this run got".
+   */
+  owned(id) {
+    let n = 0;
+    for (const t of this.world.offers.taken) if (t === id) n++;
+    return n;
+  }
+
+  /** Is this node's parent bought, or free? */
+  available(n) {
+    for (let p = n.parent; p; p = p.parent) {
+      if (p.free) continue;
+      if (!p.id || !this.owned(p.id)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Buy one level of a tree node. Everything is checked here rather than at
+   * the button, so a stale panel can never spend energy it does not have.
+   * @returns 'ok' | 'locked' | 'maxed' | 'poor'
+   */
+  buy(id) {
+    const w = this.world;
+    const n = NODE_BY_ID.get(id);
+    if (!n) return 'locked';
+    if (!this.available(n)) return 'locked';
+    const have = this.owned(id);
+    if (have >= (n.levels || 1)) return 'maxed';
+    const price = priceOf(n, have);
+    if (w.energy < price) return 'poor';
+
+    const def = BY_ID.get(id);
+    if (!def) return 'locked';
+    w.energy -= price;
+    // Stat upgrades only touch world.up; unlocks and charges need the world.
+    def.apply(w.up, w);
+    w.offers.taken.push(id);
+
+    audio.amend();
+    this.hud.setEnergy(w.energy, intakeRate(w));
+    this.hud.buildStrip();
+    this.hud.syncLoadout(w);
+    this.hud.syncAbilities(w.abilities);
+    this.hud.menu.syncTree();
+    this.checkpoint();
+    return 'ok';
   }
 
   toggleSound() {

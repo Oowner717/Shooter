@@ -24,6 +24,7 @@ const ASSETS = [
   './src/main.js',
   './src/game.js',
   './src/config.js',
+  './src/tree.js',
   './src/util.js',
   './src/physics.js',
   './src/fx.js',

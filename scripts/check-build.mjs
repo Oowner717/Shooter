@@ -45,6 +45,21 @@ if (missing.length) {
 }
 console.log(`sw.js precaches all ${src.length} modules`);
 
+// ---- the tree covers everything --------------------------------------------
+//
+// tree.js says where each permanent thing sits; upgrades.js says what it does.
+// Two files, one subject, so they can drift — and a node left out of the tree
+// is content nobody in the game can ever buy. Checked here rather than trusted.
+const { coverage } = await import(new URL('../src/tree.js', import.meta.url));
+const cov = coverage();
+if (cov.missing.length || cov.extra.length || cov.dupes.length) {
+  if (cov.missing.length) console.error(`tree is missing: ${cov.missing.join(', ')}`);
+  if (cov.extra.length) console.error(`tree has unknown ids: ${cov.extra.join(', ')}`);
+  if (cov.dupes.length) console.error(`tree places twice: ${cov.dupes.join(', ')}`);
+  process.exit(1);
+}
+console.log(`tree places all ${cov.want} buyable things exactly once`);
+
 // ---- REV: what these bytes actually are ------------------------------------
 //
 // Everything the browser is served, in a fixed order, hashed. config.js's own
