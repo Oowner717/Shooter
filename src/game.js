@@ -7,7 +7,7 @@ import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, sha
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, spawnFormation, spawnDrift, hostileCount, applyBlast, solveTethers, collectEnergy, drawIn, intakeRate, ENTRY_Y } from './enemies.js';
+import { Director, spawnOne, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectEnergy, drawIn, intakeRate, ENTRY_Y } from './enemies.js';
 import { Shooter } from './shooter.js';
 import { Abilities } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
@@ -1237,6 +1237,7 @@ export class Game {
     this.hud.syncSeals();
     this.hud.menu.sync(w);
     this.hud.updateAlerts(dt);
+    this.hud.syncSpawn();
     if (w.debug.stats) {
       this.hud.setStats(
         `fps    ${this.fps.toFixed(0)}\n`
@@ -1495,6 +1496,31 @@ export class Game {
 
   debugSpawnDrift() {
     spawnDrift(this.world);
+  }
+
+  /**
+   * A group of one named type, on demand -- the whole job of the spawn screen.
+   * Returns what it made so the panel can say how many actually landed, which
+   * differs from what was asked for whenever a TOW is involved.
+   */
+  debugSpawnGroup(id, count, opts = {}) {
+    return spawnGroup(this.world, id, count, opts);
+  }
+
+  /**
+   * What is on the field right now, for the spawn screen's tally. Counted in a
+   * loop rather than filtered, because this runs every frame the screen is up.
+   */
+  debugFieldCount() {
+    const w = this.world;
+    let frag = 0;
+    for (const e of w.drops) if (!e.dead) frag++;
+    return {
+      hostile: hostileCount(w),
+      drift: driftCount(w),
+      frag,
+      wreck: w.debris.length,
+    };
   }
 
   debugGlitch() {

@@ -133,19 +133,23 @@ await page.screenshot({ path: `${SHOTS}/05-full-field.png` });
  * and debug kills — so the suite stayed green through a game you could not
  * play. It is asserted first now, before anything else is measured.
  */
-const fired = await page.evaluate(async () => {
+const fired = await page.evaluate(() => {
   const w = window.__sim.world;
   const before = w.projectiles.length;
   w.shooter.cooldown = 0;
-  w.shooter.shoot(w);
-  await new Promise((r) => setTimeout(r, 60));
-  return w.projectiles.length - before;
+  const ok = w.shooter.shoot(w);
+  // Counted in the same tick. It used to wait 60ms first, which on the packed
+  // field this runs against measured whether the round survived the flight
+  // rather than whether it left the barrel: FILL FIELD puts bodies close
+  // enough to the muzzle that a hit inside one frame is normal, and the check
+  // failed on roughly a third of runs for a turret that was working fine.
+  return { made: w.projectiles.length - before, ok };
 });
-if (fired < 1) {
-  console.error('FAIL: the turret did not fire when told to');
+if (!fired.ok || fired.made < 1) {
+  console.error('FAIL: the turret did not fire when told to', JSON.stringify(fired));
   process.exit(1);
 }
-console.log('turret fires:', fired, 'round(s) on one trigger pull');
+console.log('turret fires:', fired.made, 'round(s) on one trigger pull');
 
 const stats = async () => page.evaluate(() => document.getElementById('dbgStats').textContent);
 const busyStats = await stats();

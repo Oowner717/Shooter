@@ -29,7 +29,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '87';
+  var BUILD = '88';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -160,6 +160,10 @@
         <button class="x" id="dbgClose" aria-label="Close">✕</button>
       </div>
       <div class="dbgGrid" id="dbgGrid"></div>
+      <!-- The spawn screen replaces the button grid rather than sitting under
+           it: the panel is 280px wide on a phone and two screens fighting for
+           that is worse than one screen at a time. Built by Hud.buildSpawn(). -->
+      <div class="dbgSpawn" id="dbgSpawn" hidden></div>
       <div class="dbgStats" id="dbgStats"></div>
     </section>
 

@@ -4,7 +4,8 @@
 import { ABILITIES } from './abilities.js';
 import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
-import { BUILD, CFG } from './config.js';
+import { BUILD, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
+import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
 import {  } from './util.js';
 import { Menu } from './menu.js';
 import { holdFor, STACK } from './tutorial.js';
@@ -63,6 +64,7 @@ export class Hud {
       hint: $('abilityHint'),
       debug: $('debugPanel'),
       dbgGrid: $('dbgGrid'),
+      dbgSpawn: $('dbgSpawn'),
       dbgStats: $('dbgStats'),
       boot: $('boot'),
       startBtn: $('startBtn'),
@@ -80,6 +82,7 @@ export class Hud {
 
     this.buildAbilities();
     this.buildDebug();
+    this.buildSpawn();
 
     this.menu = new Menu(game);
     this.buildStrip();
@@ -680,17 +683,20 @@ export class Hud {
 
   buildDebug() {
     const g = this.game;
+    /*
+     * Five of these called methods that went with the boss and the ledger in
+     * builds 81-82 -- TITHE, SUBTRACT, DRAIN LEDGER, SKIP INTRO, END SCREEN.
+     * Nothing complained, because a button only throws when it is pressed, and
+     * the panel was not being pressed. They are gone.
+     *
+     * `wide` spans both columns; SPAWN GROUP opens a screen rather than doing
+     * something, so it gets the width and the ellipsis that say so.
+     */
     const actions = [
-      // The count, the lull, ORDINAL and the ending are gone as of build 81,
-      // and so are the buttons that jumped to them. What is left of boss.js is
-      // unreachable — see the note in the README about clearing it out.
+      ['SPAWN GROUP…', () => this.showSpawn(true), 'wide'],
       ['+50 KILLS', () => g.debugAddKills(50)],
       ['NEXT STORY', () => g.debugNextStory()],
-      ['TITHE', () => g.debugTithe()],
-      ['SUBTRACT', () => g.debugSubtract()],
-      ['DRAIN LEDGER', () => g.debugDrainLedger()],
       ['UNLOCK ALL', () => g.debugUnlockAll()],
-      ['SKIP INTRO', () => g.debugSkipIntro()],
       ['SPAWN WAVE', () => g.debugSpawnWave()],
       ['FILL FIELD', () => g.debugFillField()],
       ['CLEAR FIELD', () => g.debugClearField()],
@@ -701,7 +707,6 @@ export class Hud {
       ['THROW KNELL', () => g.debugThrowMine('knell')],
       ['SPAWN DRIFT', () => g.debugSpawnDrift()],
       ['RESTART', () => g.restart()],
-      ['END SCREEN', () => g.debugEnding()],
       ['CODEX ALL', () => g.debugCodexAll()],
       ['CODEX WIPE', () => g.debugCodexWipe()],
     ];
@@ -714,9 +719,10 @@ export class Hud {
     ];
 
     const frag = document.createDocumentFragment();
-    for (const [label, fn] of actions) {
+    for (const [label, fn, cls] of actions) {
       const b = document.createElement('button');
       b.textContent = label;
+      if (cls) b.classList.add(cls);
       b.addEventListener('click', fn);
       frag.appendChild(b);
     }
@@ -731,6 +737,169 @@ export class Hud {
       frag.appendChild(b);
     }
     this.el.dbgGrid.appendChild(frag);
+  }
+
+  // ----------------------------------------------------------- spawn screen
+
+  /*
+   * A group of anything, on demand.
+   *
+   * The rest of the panel is one button per fixed thing, which stops working
+   * the moment the question is "what do sixteen HERALDs do to each other" or
+   * "does a PRISM ring reflect into itself". So this is a screen rather than a
+   * button: pick the object, the count, the shape and how it arrives, then
+   * spawn it as many times as you like.
+   *
+   * ABOVE queues the group off the top of the screen and lets it march in, so
+   * the entry itself is what you are watching. ON FIELD puts it down past the
+   * entry line already loose, which is the only way to see a behaviour that
+   * does not start until an object is in play -- warding, feeding, splitting.
+   *
+   * The portraits are the same drawSpecimen the glossary uses, so a chip can
+   * never show something the field does not.
+   */
+  buildSpawn() {
+    const g = this.game;
+    const el = this.el.dbgSpawn;
+    this.spawn = { id: ENEMY_TYPES[0].id, count: 5, shape: '', where: 'entry' };
+    this.spawnCells = new Map();
+    this.spawnRows = [];
+    this.spawnTallyText = '';
+
+    const head = document.createElement('div');
+    head.className = 'spawnHead';
+    const back = document.createElement('button');
+    back.className = 'spawnBack';
+    back.textContent = '\u2039 BACK';
+    back.addEventListener('click', () => this.showSpawn(false));
+    const tally = document.createElement('span');
+    tally.className = 'spawnTally';
+    head.append(back, tally);
+    this.el.spawnTally = tally;
+
+    const pick = document.createElement('div');
+    pick.className = 'spawnPick';
+    for (const t of ENEMY_TYPES) {
+      const b = document.createElement('button');
+      b.className = 'spawnChip';
+      b.title = t.name;
+      const c = document.createElement('canvas');
+      // Backed at 2x and drawn once: a portrait never changes, and sixteen of
+      // them redrawing every frame would cost more than the panel is worth.
+      c.width = 64;
+      c.height = 64;
+      const ctx = c.getContext('2d');
+      ctx.translate(32, 32);
+      drawSpecimen(ctx, t.id, 20);
+      const name = document.createElement('span');
+      name.textContent = t.name;
+      b.append(c, name);
+      b.addEventListener('click', () => { this.spawn.id = t.id; this.syncSpawn(true); });
+      pick.appendChild(b);
+      this.spawnCells.set(t.id, b);
+    }
+
+    const row = (label, opts, read, write) => {
+      const r = document.createElement('div');
+      r.className = 'spawnRow';
+      const l = document.createElement('span');
+      l.className = 'spawnLabel';
+      l.textContent = label;
+      const box = document.createElement('div');
+      box.className = 'spawnOpts';
+      const cells = [];
+      for (const [text, value] of opts) {
+        const b = document.createElement('button');
+        b.textContent = text;
+        b.addEventListener('click', () => { write(value); this.syncSpawn(true); });
+        box.appendChild(b);
+        cells.push([b, value]);
+      }
+      r.append(l, box);
+      this.spawnRows.push({ cells, read });
+      return r;
+    };
+
+    // Presets rather than a stepper: on a phone, six taps to reach twelve is
+    // six taps too many, and nothing in between 12 and 20 is a different test.
+    const counts = [1, 3, 5, 8, 12, 20].filter((n) => n <= GROUP_MAX);
+    const howMany = row(
+      'HOW MANY',
+      counts.map((n) => [String(n), n]),
+      () => this.spawn.count,
+      (v) => { this.spawn.count = v; },
+    );
+    // '' is ANY, which lets spawnGroup roll one, the way the director does.
+    const shape = row(
+      'SHAPE',
+      [['ANY', ''], ...FORMATION_SHAPES.map((k) => [k.toUpperCase(), k])],
+      () => this.spawn.shape,
+      (v) => { this.spawn.shape = v; },
+    );
+    const where = row(
+      'ARRIVES',
+      [['ABOVE', 'entry'], ['ON FIELD', 'field']],
+      () => this.spawn.where,
+      (v) => { this.spawn.where = v; },
+    );
+
+    const go = document.createElement('button');
+    go.className = 'spawnGo';
+    go.addEventListener('click', () => {
+      const made = this.game.debugSpawnGroup(this.spawn.id, this.spawn.count, {
+        shape: this.spawn.shape || undefined,
+        where: this.spawn.where,
+      });
+      // A TOW is two bodies, so what landed is not always what was asked for.
+      // Saying the real number is the difference between a tool and a guess.
+      const t = TYPE_BY_ID[this.spawn.id];
+      this.alert(`+${made.length} ${t ? t.name : this.spawn.id}`, 'info', 1.4);
+    });
+    this.el.spawnGo = go;
+
+    const clear = document.createElement('button');
+    clear.className = 'spawnClear';
+    clear.textContent = 'CLEAR FIELD';
+    clear.addEventListener('click', () => g.debugClearField());
+
+    el.append(head, pick, howMany, shape, where, go, clear);
+  }
+
+  /** Swap the panel between the button grid and the spawn screen. */
+  showSpawn(on) {
+    this.el.dbgSpawn.hidden = !on;
+    this.el.dbgGrid.hidden = on;
+    // The picker needs three columns to be readable, which the 280px panel
+    // does not have. It widens only while the screen is up.
+    this.el.debug.classList.toggle('wide', !!on);
+    if (on) this.syncSpawn(true);
+  }
+
+  spawnOpen() {
+    return !this.el.dbgSpawn.hidden;
+  }
+
+  /**
+   * `full` redraws the selection marks; without it this is the once-a-frame
+   * tally, which is why it exits early and compares before it writes.
+   */
+  syncSpawn(full) {
+    if (!this.spawn || this.el.debug.hidden || this.el.dbgSpawn.hidden) return;
+    if (full) {
+      for (const [id, cell] of this.spawnCells) cell.classList.toggle('on', id === this.spawn.id);
+      for (const r of this.spawnRows) {
+        const at = r.read();
+        for (const [b, v] of r.cells) b.classList.toggle('on', v === at);
+      }
+      const t = TYPE_BY_ID[this.spawn.id];
+      this.el.spawnGo.textContent = `SPAWN ${this.spawn.count} \u00d7 ${t ? t.name : this.spawn.id}`;
+    }
+    const f = this.game.debugFieldCount();
+    const line = `${f.hostile} live · ${f.drift} drift · ${f.frag} frag · ${f.wreck} wreck`;
+    if (line !== this.spawnTallyText) {
+      this.spawnTallyText = line;
+      this.el.spawnTally.textContent = line;
+    }
   }
 
   toggleDebug(force) {

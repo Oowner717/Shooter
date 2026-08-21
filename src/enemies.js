@@ -1270,7 +1270,7 @@ export function hostileCount(world) {
   return n;
 }
 
-function driftCount(world) {
+export function driftCount(world) {
   let n = 0;
   for (const e of world.enemies) if (!e.dead && e.harmless) n++;
   return n;
@@ -1472,6 +1472,28 @@ export function collectEnergy(world, dt) {
   }
 }
 
+/**
+ * Where the i-th member of a shape sits, relative to the shape's centre.
+ *
+ * Pulled out of spawnFormation when the debug screen grew a shape picker: two
+ * copies of this switch would have let a RING mean one thing to the director
+ * and another to the panel meant for inspecting it.
+ */
+function formationOffset(shape, i, count, gap) {
+  const k = i - (count - 1) / 2;
+  switch (shape) {
+    case 'line': return [k * gap, 0];
+    case 'wedge': return [k * gap, -Math.abs(k) * gap * 0.8];
+    case 'column': return [spread(6), -i * gap];
+    case 'arc': return [k * gap, -(k * k) * gap * 0.16];
+    case 'ring': {
+      const a = (i / count) * TAU;
+      return [Math.cos(a) * gap * 1.1, Math.sin(a) * gap * 1.1];
+    }
+    default: return [spread(gap * 1.4), spread(gap * 1.4)];
+  }
+}
+
 /** A formation queued above the screen, marching down into it. */
 export function spawnFormation(world, kinds, count) {
   const shape = pick(FORMATIONS);
@@ -1486,25 +1508,66 @@ export function spawnFormation(world, kinds, count) {
   const made = [];
 
   for (let i = 0; i < count; i++) {
-    let ox = 0;
-    let oy = 0;
-    const k = i - (count - 1) / 2;
-    switch (shape) {
-      case 'line': ox = k * gap; oy = 0; break;
-      case 'wedge': ox = k * gap; oy = -Math.abs(k) * gap * 0.8; break;
-      case 'column': ox = spread(6); oy = -i * gap; break;
-      case 'arc': ox = k * gap; oy = -(k * k) * gap * 0.16; break;
-      case 'ring': {
-        const a = (i / count) * TAU;
-        ox = Math.cos(a) * gap * 1.1;
-        oy = Math.sin(a) * gap * 1.1;
-        break;
-      }
-      default: ox = spread(gap * 1.4); oy = spread(gap * 1.4);
-    }
+    const [ox, oy] = formationOffset(shape, i, count, gap);
     const x = clamp(cx + ox, type.r + 4, world.width - type.r - 4);
     const y = -60 + oy - rand(0, 30);
     made.push(spawnOne(world, type, x, y, { speedScale: rand(0.94, 1.06) }));
+  }
+  return made;
+}
+
+/** The shapes a group can be asked for by name. */
+export const FORMATION_SHAPES = FORMATIONS;
+
+/** Nobody needs forty BULWARKs, and the frame time says so. */
+export const GROUP_MAX = 24;
+
+/**
+ * One named group, exactly as asked for: this type, this many, this shape,
+ * arriving this way.
+ *
+ * spawnFormation deliberately rolls its own type and drops the towed pair,
+ * because inside a run a formation of TOWs is a traffic jam rather than a
+ * formation. The debug screen wants the opposite of all of that -- the point
+ * there is to get the thing you pointed at, and a wall of TOWs is a legitimate
+ * thing to want to look at once.
+ *
+ *   where: 'entry' queues it above the screen so the march in is part of what
+ *          you see; 'field' puts it down in the arena already loose, which is
+ *          the only way to watch a behaviour that only starts after the entry
+ *          line -- warding, feeding, splitting.
+ */
+export function spawnGroup(world, id, count, opts = {}) {
+  const type = TYPE_BY_ID[id];
+  if (!type) return [];
+  const n = clamp(Math.round(count) || 1, 1, GROUP_MAX);
+  const shape = FORMATIONS.includes(opts.shape) ? opts.shape : pick(FORMATIONS);
+  const onField = opts.where === 'field';
+  const gap = type.r * 2.5 + 8;
+  const half = Math.min(world.width * 0.3, 200);
+  const cx = clamp(opts.x ?? world.width / 2 + spread(world.width * 0.4), half, world.width - half);
+  // On the field, somewhere with room to be watched: below the entry line so
+  // nothing is still marching, and clear of the floor so nothing lands on it.
+  const lo = ENTRY_Y + CFG.entryDepth + 90;
+  const hi = Math.max(lo + 40, world.floorY - 220);
+  const cy = onField ? clamp(opts.y ?? rand(lo, hi), lo, hi) : -60;
+  const made = [];
+
+  for (let i = 0; i < n; i++) {
+    const [ox, oy] = formationOffset(shape, i, n, gap);
+    const x = clamp(cx + ox, type.r + 4, world.width - type.r - 4);
+    const y = onField
+      ? clamp(cy + oy, ENTRY_Y + 40, world.floorY - type.r - 24)
+      : cy + oy - rand(0, 30);
+    // Drift is not released, it is let go: it has its own entry velocities and
+    // is not counted against anything.
+    if (type.harmless) { made.push(spawnDrift(world, { x, y })); continue; }
+    const e = release(world, type, x, y, {
+      staged: !onField,
+      spawnIn: onField ? 0.25 : 1,
+      speedScale: rand(0.94, 1.06),
+    });
+    if (e) made.push(e);
   }
   return made;
 }
