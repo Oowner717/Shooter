@@ -2,8 +2,8 @@
 // and a hand-drawn look. Nothing here knows about the rest of the game beyond
 // the `world` handle it is given.
 
-import { CFG, ENEMY_TYPES, TYPE_BY_ID, ROUTES, HAIRLINE, massOf } from './config.js';
-import { TAU, clamp, rand, randInt, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
+import { CFG, WAVES, TYPE_BY_ID, ROUTES, HAIRLINE, massOf } from './config.js';
+import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
 import { explode, hitBurst, spark, dot, shard as fxShard, ring, ripple, haul } from './fx.js';
 import { audio } from './audio.js';
 import { shed } from './debris.js';
@@ -1237,7 +1237,6 @@ function driftCount(world) {
   return n;
 }
 
-/** Types that have unlocked at the current kill count. */
 /**
  * Where a second SCION comes down. Two of them arriving together would seed
  * the same host twice and read as one event rather than two decisions, so the
@@ -1251,13 +1250,6 @@ function scionLane(world, type, x) {
   if (Math.abs(x - other.x) >= CFG.graft.apart) return x;
   const away = other.x < world.width / 2 ? hi : lo;
   return clamp(away + spread(60), lo, hi);
-}
-
-function availableTypes(kills) {
-  // weight 0 means "never rolled for": drift and a TOW's mass are both placed
-  // by dedicated spawners, and weightedPick's fallback could otherwise return
-  // one of them.
-  return ENEMY_TYPES.filter((t) => t.weight > 0 && kills >= (t.unlock || 0));
 }
 
 /**
@@ -1489,127 +1481,211 @@ export function spawnDrift(world, opts = {}) {
   return e;
 }
 
+/**
+ * The wave runner. Objects arrive in groups with a beginning and an end, and
+ * the quiet between two of them is the point — a trickle never finishes and
+ * so never starts.
+ *
+ * Nothing here is ever named on screen. There is no counter and no banner: a
+ * number would turn a rhythm into a score.
+ */
 export class Director {
   constructor() {
     this.reset();
   }
 
   reset() {
-    // The field starts empty and stays empty. There is an interface to find, a
-    // lever to try and two things already in hand by the time the first object
-    // is released, and none of that should be done while reacting. Harmless
-    // drift comes well before any of it, so there is something to shoot at
-    // while the field is still safe.
-    this.timer = CFG.openingGrace;
+    // The field starts empty and stays empty for a while. There is an
+    // interface to find, a lever to try and two things already in hand before
+    // the first object is released, and none of that should be done while
+    // reacting. Harmless drift comes well before any of it, so there is
+    // something to shoot at while the field is still safe.
     this.driftTimer = CFG.driftStart;
-    // The working set, and the kill count the next rotation is due at.
-    this.cohort = [];
-    this.seen = new Set();
-    this.rotateAt = CFG.cohortEvery;
+    this.order = []; // wave indices, in the order they will be played
+    this.at = -1; // which of `order` is running; -1 is "not started"
+    this.cycle = 0; // full passes finished — the first one carries the opening
+    this.jobs = []; // what is left to release in the running wave
+    this.asked = 0; // how many the running wave asked for, after the swell
+    this.timer = CFG.openingGrace; // until the next release, or the next wave
+    this.wait = 0; // how long this wave has been waiting for the field to thin
+    this.resting = true; // between waves rather than inside one
+  }
+
+  /** Every type in a wave has to have unlocked before the wave is eligible. */
+  eligible(world, wave) {
+    return wave.of.every(([id]) => world.kills >= (TYPE_BY_ID[id].unlock || 0));
   }
 
   /**
-   * Keep the working set to `CFG.cohort` types. A type that has just unlocked
-   * always takes a place, because a reveal that has to wait its turn is not a
-   * reveal; otherwise one is swapped for another every `cohortEvery` kills, so
-   * the field changes character over a run without ever showing all of it.
+   * Build the next rotation. The first one leads with the opening waves in
+   * their authored order; every one after that drops them for good and simply
+   * shuffles whatever has unlocked.
    */
-  refreshCohort(world) {
-    const pool = availableTypes(world.kills);
-    if (!pool.length) return;
-    const size = Math.min(CFG.cohort, pool.length);
-    // Anything that unlocked since the last look goes in at once.
-    const fresh = pool.filter((t) => !this.seen.has(t.id));
-    for (const t of fresh) {
-      this.seen.add(t.id);
-      this.cohort = this.cohort.filter((x) => x.id !== t.id);
-      this.cohort.unshift(t);
+  shuffle(world) {
+    const rest = [];
+    WAVES.forEach((wv, i) => { if (!wv.teach && this.eligible(world, wv)) rest.push(i); });
+    // Fisher-Yates. Order past the opening is meant to be arbitrary.
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      [rest[i], rest[j]] = [rest[j], rest[i]];
     }
-    // Drop anything that is somehow no longer available, then rotate on the
-    // clock: oldest out, and a type not currently carried in.
-    this.cohort = this.cohort.filter((t) => pool.some((p) => p.id === t.id));
-    if (world.kills >= this.rotateAt) {
-      this.rotateAt = world.kills + CFG.cohortEvery;
-      const rest = pool.filter((t) => !this.cohort.some((c) => c.id === t.id));
-      if (rest.length && this.cohort.length >= size) this.cohort.pop();
-      if (rest.length) this.cohort.unshift(pick(rest));
+    const open = this.cycle === 0
+      ? WAVES.map((wv, i) => (wv.teach ? i : -1)).filter((i) => i >= 0)
+      : [];
+    this.order = [...open, ...rest];
+    this.at = -1;
+    this.cycle++;
+  }
+
+  /**
+   * Expand a wave into the list of releases it will make.
+   *
+   * Three or more of one type in a regular wave arrive together in formation,
+   * because six MOTEs in a wedge is a wave and six MOTEs filing in one at a
+   * time is a queue. Tutorial waves never form up — they always file in, one
+   * object at a time, which is the whole of what makes the opening readable.
+   */
+  load(world, wave) {
+    const W = CFG.waves;
+    // How much bigger this wave is than it was authored. Tutorial waves are
+    // authored at exactly the size they should be and never swell.
+    const progress = clamp(world.kills / W.swellKills, 0, 1);
+    const swell = wave.teach ? 1 : W.swell[0] + (W.swell[1] - W.swell[0]) * progress;
+    const jobs = [];
+    let asked = 0;
+    for (const [id, base] of wave.of) {
+      const type = TYPE_BY_ID[id];
+      if (!type) continue;
+      const n = Math.max(1, Math.round(base * swell));
+      asked += n;
+      if (!wave.teach && n >= W.formAt) jobs.push({ type, n });
+      else for (let i = 0; i < n; i++) jobs.push({ type, n: 1 });
     }
-    while (this.cohort.length < size) {
-      const rest = pool.filter((t) => !this.cohort.some((c) => c.id === t.id));
-      if (!rest.length) break;
-      this.cohort.push(pick(rest));
+    this.asked = asked;
+    // Interleaved rather than type by type, so a mixed wave arrives mixed.
+    if (!wave.teach) {
+      for (let i = jobs.length - 1; i > 0; i--) {
+        const j = (Math.random() * (i + 1)) | 0;
+        [jobs[i], jobs[j]] = [jobs[j], jobs[i]];
+      }
     }
-    while (this.cohort.length > size) this.cohort.pop();
+    this.jobs = jobs;
+    this.wait = 0;
+    // A wave may ask for grey drift alongside it. It is not hostile, costs
+    // nothing from the allotment, and is mostly what the opening is made of.
+    for (let i = 0; i < (wave.drift || 0); i++) {
+      if (driftCount(world) < CFG.maxDrift) spawnDrift(world);
+    }
+  }
+
+  /** The wave currently running, or null before the first one starts. */
+  get wave() {
+    const i = this.order[this.at];
+    return i === undefined ? null : WAVES[i];
+  }
+
+  /**
+   * Stand the runner back up from a save. The wave is *restarted*, not
+   * resumed: you come back to the wave you left on, from the top of it. Half
+   * a wave is not a place anyone remembers being.
+   */
+  restore(world, d) {
+    // Nothing to come back to: a run that quit before its first wave started
+    // is left exactly as a fresh one, opening grace and tutorial waves and
+    // all. The tooltips it already saw still do not replay — those are kept
+    // separately, and seen is seen.
+    if (!d || !Array.isArray(d.order) || !d.order.length) return;
+    this.order = d.order.filter((i) => Number.isInteger(i) && i >= 0 && i < WAVES.length);
+    // One *behind* the saved wave, because the first begin() steps forward and
+    // has to land back on it. Setting `at` to the saved index directly is how
+    // "resume on the wave I left" quietly became "resume on the one after".
+    const was = Math.min(d.at ?? 0, this.order.length - 1);
+    this.at = Math.max(-1, was - 1);
+    this.cycle = d.cycle || 1;
+    this.resting = true;
+    this.timer = 1.5; // a beat to look at the field before it starts again
+    this.jobs = [];
+    this.asked = 0;
   }
 
   update(world, dt) {
     if (world.phase !== 'staging') return;
 
-    // A slow trickle of aimless matter, capped so it never crowds the field.
+    // A slow trickle of aimless matter, all run, independent of the waves.
     this.driftTimer -= dt;
     if (this.driftTimer <= 0) {
-      this.driftTimer = rand(3.5, 6.5);
+      this.driftTimer = rand(CFG.waves.drift[0], CFG.waves.drift[1]);
       if (driftCount(world) < CFG.maxDrift) spawnDrift(world);
     }
 
-    const progress = clamp(world.kills / CFG.popRampKills, 0, 1);
-    const target = CFG.popStart + (CFG.popEnd - CFG.popStart) * progress;
-    let interval = CFG.spawnInterval[0] + (CFG.spawnInterval[1] - CFG.spawnInterval[0]) * progress;
+    this.timer -= dt;
 
-    // And then it arrives gently. Thirteen objects the moment the grace ends
-    // is the normal field, not an opening — for the first thirty the target
-    // and the rate both climb from well under it, so the first thing a new
-    // player deals with is one object at a time. Endless runs are past this.
-    // Whichever comes first. On kills alone a player who shoots nothing would
-    // sit in front of two objects indefinitely, which is not gentle, it is
-    // stalled; the clock guarantees the field fills either way.
-    const warm = world.endless ? 1 : Math.max(
-      clamp(world.kills / CFG.warmKills, 0, 1),
-      clamp((world.time - CFG.openingGrace) / CFG.warmSeconds, 0, 1),
-    );
-    let popTarget = Math.round(CFG.warmPop + (target - CFG.warmPop) * warm);
-    interval /= CFG.warmRate + (1 - CFG.warmRate) * warm;
-
-    // And thinner still while the opening is running. Nineteen controls are
-    // being handed over with a sentence to read on each; the field is there to
-    // give the new thing something to do, not to be survived.
-    if (world.teaching && world.kills < CFG.teachKills) {
-      popTarget = Math.min(popTarget, CFG.teachPop);
-      interval /= CFG.teachRate;
+    if (this.resting) {
+      if (this.timer > 0) return;
+      this.begin(world);
+      return;
     }
 
-    this.timer -= dt;
-    if (this.timer > 0) return;
-    this.timer = interval * rand(0.8, 1.25);
+    // Still letting the wave out.
+    if (this.jobs.length) {
+      if (this.timer > 0) return;
+      this.emit(world);
+      return;
+    }
+
+    // Everything is out. The wave ends when the field thins — or when patience
+    // runs out, so one object loitering out of reach can never stall the run.
+    this.wait += dt;
+    // Proportional to what this wave let out, so a big wave is not held to the
+    // same empty field as a small one and does not simply time out every time.
+    const thinAt = Math.max(CFG.waves.clearTo, Math.round(this.asked * CFG.waves.thinFrac));
+    if (hostileCount(world) > thinAt && this.wait < CFG.waves.patience) return;
+    const teach = this.wave && this.wave.teach;
+    const rest = teach ? CFG.waves.teachRest : CFG.waves.rest;
+    this.resting = true;
+    this.timer = rand(rest[0], rest[1]);
+  }
+
+  /** Start the next wave, rebuilding the rotation if this one is spent. */
+  begin(world) {
+    if (releasesLeft(world) <= 0) { this.timer = 1; return; }
+    if (this.at + 1 >= this.order.length) this.shuffle(world);
+    if (!this.order.length) { this.timer = 1; return; }
+    this.at++;
+    this.load(world, this.wave);
+    this.resting = false;
+    this.timer = 0;
+  }
+
+  /** Put the next job on the field. */
+  emit(world) {
+    const wave = this.wave;
+    const gap = wave && wave.teach ? CFG.waves.teachGap : CFG.waves.gap;
+    this.timer = rand(gap[0], gap[1]);
 
     const quota = releasesLeft(world);
-    if (quota <= 0) return; // the whole allotment has been let out
+    if (quota <= 0) { this.jobs.length = 0; return; }
+    // The field cap is a hard ceiling on top of the wave. Hold the job rather
+    // than dropping it: a wave is a group, and losing half of it to a cap the
+    // player is about to clear would make waves quietly inconsistent.
+    if (hostileCount(world) >= CFG.maxEnemies) return;
 
-    const hostiles = hostileCount(world);
-    if (hostiles >= Math.min(popTarget, CFG.maxEnemies)) return;
+    const job = this.jobs.shift();
+    if (!job) return;
+    const t = job.type;
+    // A TOW is two bodies and costs two of the allotment.
+    const cost = t.tows ? 2 : 1;
+    if (quota < cost) { this.jobs.length = 0; return; }
 
-    this.refreshCohort(world);
-    // A SCION is capped on the field rather than in the roll, because two of
-    // them is the whole design and three is noise.
-    const scions = world.enemies.filter((e) => !e.dead && e.type.id === 'scion').length;
-    const kinds = this.cohort.filter((t) => t.id !== 'scion' || scions < CFG.graft.cap);
-    if (!kinds.length) return;
-    const room = Math.min(popTarget, CFG.maxEnemies, world.released + quota) - hostiles;
-
-    // A formation is three to six of one type at once, so anything with a cap
-    // on the field cannot be in one.
-    const massable = kinds.filter((k) => !k.solo);
-    if (massable.length && room >= 4 && quota >= 4 && Math.random() < CFG.formationChance) {
-      spawnFormation(world, massable, randInt(3, Math.min(6, room, quota)));
-    } else {
-      // A TOW costs two of the allotment, so it is off the table when only one
-      // release is left.
-      const affordable = quota >= 2 ? kinds : kinds.filter((k) => !k.tows);
-      const t = weightedPick(affordable);
-      let x = rand(t.r + 12, world.width - t.r - 12);
-      if (t.id === 'scion') x = scionLane(world, t, x);
-      release(world, t, x, -50 - rand(0, 40));
+    if (job.n > 1) {
+      const room = Math.min(job.n, quota, CFG.maxEnemies - hostileCount(world));
+      if (room >= 2) { spawnFormation(world, [t], room); return; }
     }
+    let x = rand(t.r + 12, world.width - t.r - 12);
+    // Two SCIONs arriving on top of each other seed the same host twice and
+    // read as one event rather than two decisions.
+    if (t.id === 'scion') x = scionLane(world, t, x);
+    release(world, t, x, -50 - rand(0, 40));
   }
 }
 

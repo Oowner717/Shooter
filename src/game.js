@@ -47,6 +47,7 @@ export class Game {
     this.mineTimer = 0;
     this.autoLock = null;
     this.autoHinted = {};
+    this.wells = []; // reused every frame; see the collection pass in update()
     this.acc = 0;
     this.endFade = 1; // turret opacity; falls to 0 under the ending text
     this.frameTimes = [];
@@ -330,11 +331,17 @@ export class Game {
     for (const tier of d.queued || []) w.offers.requeue(w, tier);
     if (w.narrator) w.narrator.index = d.story || 0;
 
-    // The opening is a first-run thing and a resumed run is not a first run.
-    this.teaching = false;
+    // Nothing is said twice. The ladder picks up at the step it reached, so a
+    // run that quit four lines in still gets the other fifteen and never
+    // re-reads the four — and every first-use hint already shown stays shown.
+    // Setting teaching false outright, which is what this did until build 71,
+    // meant quitting during the opening silently cancelled the rest of it.
     this.scriptStep = d.scriptStep || 0;
+    this.teaching = !!d.teaching && this.scriptStep < SCRIPT.length;
     this.autoHinted = {};
     for (const k of d.hinted || []) this.autoHinted[k] = true;
+    // Back to the wave the run was left on, from the top of it.
+    w.director.restore(w, d.wave);
 
     this.hud.buildStrip();
     for (const k of [...MINE_KEYS, ...ROUND_KEYS]) this.hud.setToggle(k, false);
@@ -831,6 +838,16 @@ export class Game {
       w.effects[i].update(w, dt);
       if (w.effects[i].dead) w.effects.splice(i, 1);
     }
+
+    // The substrate bends around a WELL. Collected here rather than pushed
+    // from the effect, so the background never holds a reference to something
+    // that has ended — an empty list every frame there is nothing pulling.
+    this.wells.length = 0;
+    for (const e of w.effects) {
+      if (e.dead || !e.wellField) continue;
+      this.wells.push(e.wellField());
+    }
+    background.setWells(this.wells);
 
     w.director.update(w, dt);
     if (w.boss && !w.boss.dead) {

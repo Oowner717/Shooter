@@ -177,6 +177,27 @@ class Well {
     }
   }
 
+  /**
+   * What this is doing to the substrate. The lattice reads it once a frame and
+   * bends its rays and rings around it — the reach is well past the tractor
+   * beam's, because the pull on the sky should be visible before you are in it,
+   * and the strength climbs as the well tightens so the sky collapses with it.
+   */
+  wellField() {
+    const ramp = clamp((this.max - this.life) / 0.6, 0, 1);
+    const out = clamp(this.life / 0.4, 0, 1); // let go as it goes, not after
+    return {
+      x: this.x,
+      y: this.y,
+      // Well past the tractor beam's own reach. The pull on the sky should be
+      // readable before you are anywhere near the hole, and the strongest part
+      // of the bend sits under the well's own glow if it is any tighter than
+      // this — the visible half of the effect is all out here.
+      reach: WELL_REACH * 2.4,
+      strength: (0.6 + this.crush * 1.1) * ramp * out,
+    };
+  }
+
   draw(ctx, world) {
     const fade = clamp(this.life / 0.35, 0, 1);
     const heat = this.crush;

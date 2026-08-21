@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '70';
+export const BUILD = '71';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -22,22 +22,10 @@ export const CFG = {
   // Harmless drift comes early regardless, so there is something to shoot at
   // while the field is still safe.
   driftStart: 7,
-  // And then it arrives gently: the population target and the spawn rate both
-  // start well under normal and reach it over this many objects.
-  // Raised from 2 in build 58: two objects is not a field, it is a queue, and
-  // a player who wanted to try a mine or an ability had nothing to try it on.
-  // The *rate* is what keeps the opening gentle (see warmRate and teachRate,
-  // both untouched) — this only says how many may stand there at once.
-  warmPop: 5,
-  warmKills: 30,
-  warmSeconds: 75, // ...or this long after the first release, whichever is sooner
-  // And while the opening is still running it stays thinner than that. There
-  // are nineteen controls being handed over with a sentence to read on each,
-  // and none of that should happen while dodging.
-  teachPop: 6,
-  teachRate: 0.62, // spawn attempts run this fraction of speed while teaching
-  teachKills: 26, // ...and that holds for this many objects, not the whole run
-  warmRate: 0.42, // spawn attempts run this fraction of normal speed at first
+  // The population ramp, the warm-up rate and the teaching throttle all lived
+  // here until build 71. Waves replaced every one of them: a wave is a fixed
+  // group with a fixed pace, so how thin the opening is, is a property of
+  // which waves come first rather than of a curve applied to a trickle.
   lull: 4.5, // the pause between the five hundredth kill and the arrival
   storyEvery: 50, // one story line per this many kills (10 lines total)
 
@@ -58,26 +46,54 @@ export const CFG = {
   maxDrops: 128,
   maxDrift: 10, // aimless, harmless bodies alive at once
   maxParticles: 620,
-  popStart: 13,
-  popEnd: 30, // population target ramps between these over the run
-  popRampKills: 320,
-  spawnInterval: [1.05, 0.52], // seconds between spawn attempts, start -> end
-  formationChance: 0.42,
 
-  // ---- what is on the field at once ------------------------------------
+  // ---- waves -----------------------------------------------------------
   /*
-   * Eleven types unlock over a run and, until build 63, every one of them was
-   * in the roll from the moment it unlocked — so by the first few minutes the
-   * field was a handful of objects, each a different thing, none of them long
-   * enough on screen to be learned. A wave of six MOTEs teaches you what a
-   * MOTE is; six different objects teach you nothing and read as noise.
+   * The field arrives in waves, not as a trickle.
    *
-   * So the director holds a small working set instead of the whole pool. It
-   * rotates one out every `cohortEvery` kills, and a newly unlocked type takes
-   * a place immediately — a reveal should be a reveal.
+   * Builds 63 to 70 ran a rolling cohort: a working set of three types that a
+   * timer drew from, rotating one out every so often. That got the *variety*
+   * right and the *shape* wrong — objects arrived one at a time forever, so
+   * nothing ever finished and nothing ever started. A wave has a beginning and
+   * an end, which is what makes the quiet between two of them feel earned.
+   *
+   * A wave is done when everything in it has been released *and* the field has
+   * thinned to `clearTo` — or when `patience` runs out, because one object
+   * loitering in a corner must never be able to stall the run.
+   *
+   * None of this is ever named on screen. There is no wave counter, no "WAVE
+   * 4" card and no between-wave banner: the pacing is meant to be felt, and a
+   * number would turn a rhythm into a score.
    */
-  cohort: 3, // distinct types the roll may draw from at once
-  cohortEvery: 80, // kills before one of them is swapped out
+  waves: {
+    clearTo: 2, // hostiles left before the next wave is allowed to start
+    patience: 26, // ...and the longest it will ever wait for that
+    gap: [0.85, 1.7], // seconds between releases inside a regular wave
+    rest: [2.2, 3.8], // quiet between two regular waves
+    // The opening is much slower on both counts. Objects join one at a time
+    // with a long beat between them, because the whole point of the tutorial
+    // waves is that there is time to look at each new thing.
+    teachGap: [2.6, 4.2],
+    teachRest: [4, 6],
+    drift: [4.5, 8], // a grey object every so often, for the whole run
+    // A wave is authored at its opening size and swells over the run, so the
+    // same six-MOTE wave that is a gentle problem at kill 20 is fourteen of
+    // them by the end. Without this the field peaked at nine objects and the
+    // late run was thinner than the early one — waves bound the population by
+    // construction, which is most of why they work and all of why they need
+    // this. Tutorial waves never swell; they are authored at the size they
+    // are meant to be.
+    swell: [1, 2.4],
+    swellKills: 320,
+    // The next wave is allowed in once the field has thinned to a quarter of
+    // what this one let out, floored at `clearTo`. Proportional rather than
+    // fixed, or a fourteen-object wave would sit at the end of its patience
+    // every time while a three-object one cleared instantly.
+    thinFrac: 0.25,
+    // Three or more of one type in a regular wave arrive together in formation
+    // rather than filing in. Tutorial waves never do — they always file in.
+    formAt: 3,
+  },
 
   // ---- debris ----------------------------------------------------------
   /*
@@ -1046,6 +1062,63 @@ export const ENEMY_TYPES = [
     drops: 4, // energy it leaves when it comes apart
     reflect: 0.55, // glancing bolts bounce off instead of landing
   },
+];
+
+/*
+ * The waves.
+ *
+ * `teach: true` marks the opening set. Those run first, in exactly this order,
+ * exactly once — they are the tutorial, and they are hand-paced. Everything
+ * else is shuffled, because past the opening the order genuinely does not
+ * matter: each wave is a self-contained problem and meeting them in a
+ * different sequence every run is the variety.
+ *
+ * A regular wave is eligible only once every type in it has unlocked, so the
+ * reveal ladder built in build 63 still holds — the pool the shuffle draws
+ * from simply grows as the run goes on. When the rotation is exhausted the
+ * tutorial waves are dropped, the (now larger) pool is reshuffled, and it
+ * begins again.
+ *
+ * Counts are what the wave *asks* for. The five-hundred allotment and the
+ * field cap can both cut a wave short; neither is allowed to make one hang.
+ */
+export const WAVES = [
+  // ---- the opening. Grey drift and almost nothing else, to begin with. ----
+  { teach: true, of: [], drift: 4 },
+  { teach: true, of: [['mote', 2]], drift: 2 },
+  { teach: true, of: [['needle', 2]], drift: 2 },
+  { teach: true, of: [['mote', 3], ['needle', 1]], drift: 1 },
+  { teach: true, of: [['lurcher', 1], ['mote', 2]], drift: 2 },
+  { teach: true, of: [['needle', 3], ['mote', 3]], drift: 1 },
+  { teach: true, of: [['lurcher', 2], ['needle', 3]], drift: 1 },
+  { teach: true, of: [['splitter', 1], ['mote', 4], ['needle', 2]], drift: 2 },
+
+  // ---- and then the rest, in whatever order they come out ----
+  { of: [['mote', 6]] },
+  { of: [['needle', 6]] },
+  { of: [['mote', 4], ['needle', 4]] },
+  { of: [['lurcher', 3]] },
+  { of: [['lurcher', 2], ['mote', 4]] },
+  { of: [['splitter', 3]] },
+  { of: [['splitter', 2], ['needle', 4]] },
+  { of: [['bloom', 2], ['mote', 4]] },
+  { of: [['bloom', 3], ['lurcher', 2]] },
+  // A beacon and the escort it exists to cover: the pairing the type was
+  // designed around, and the one that teaches "kill the beacon".
+  { of: [['herald', 1], ['lurcher', 3]] },
+  { of: [['herald', 2], ['splitter', 2]] },
+  { of: [['prism', 3], ['needle', 3]] },
+  { of: [['prism', 2], ['bloom', 2]] },
+  { of: [['warden', 2], ['mote', 3]] },
+  { of: [['warden', 1], ['prism', 2], ['needle', 3]] },
+  { of: [['scion', 1], ['bloom', 2]] },
+  { of: [['scion', 2], ['lurcher', 2]] },
+  { of: [['bulwark', 1], ['needle', 4]] },
+  { of: [['bulwark', 2], ['herald', 1]] },
+  { of: [['glut', 3], ['mote', 4]] },
+  { of: [['glut', 2], ['splitter', 2]] },
+  { of: [['tow', 2]] },
+  { of: [['tow', 1], ['bulwark', 1]] },
 ];
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

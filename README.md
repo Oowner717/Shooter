@@ -456,6 +456,22 @@ counter loses its denominator and just climbs, the phase reads FIELD, and the
 field keeps coming. The counted run is the tutorial for the game underneath it.
 Nothing carries over — energy starts at zero every time.
 
+**The run is saved, and it is saved on a wave.** `save.js` writes a checkpoint
+on a slow timer and again the instant the page is hidden — on a phone that is
+the last event anything reliably gets. What is kept is progress, not the field:
+the count, the loadout, the permanent cards taken, and the wave rotation with
+the position in it. Coming back puts you on **the wave you left, restarted from
+the top of it**; half a wave is not a place anyone remembers being. A run that
+quit before its first wave ever started is left exactly as a fresh one, opening
+grace and tutorial waves and all.
+
+**Nothing is said twice.** A tooltip seen once is seen. The teaching ladder
+resumes at the step it reached rather than replaying from the top, and every
+first-use hint already shown stays shown. Setting `teaching = false` outright,
+which is what resume did until build 71, also silently cancelled the rest of
+the opening for anyone who quit four lines into it — so a run that closed the
+tab during the tutorial never got the other fifteen lines either.
+
 ### Offers
 
 **Nothing in this game ever interrupts you.** Both kinds of offer queue behind a
@@ -981,52 +997,67 @@ are appended past the end of the clamped run, so the edge pass simply stops
 early — they collide with everything and are clamped by nothing. Off the field,
 or fourteen seconds, whichever comes first.
 
-### What is on the field at once
+### Waves
 
-Eleven types unlock over a run, and until build 63 every one of them was in the
-roll from the moment it unlocked. By a few minutes in the field was a handful
-of objects, each a different thing, none of them on screen long enough to be
-learned. **A wave of six MOTEs teaches you what a MOTE is. Six different
-objects teach you nothing** and read as noise.
+The field arrives in waves. Builds 63 to 70 ran a rolling cohort — a working
+set of three types that a timer drew from, rotating one out every so often.
+That got the *variety* right and the *shape* wrong: objects arrived one at a
+time forever, so nothing ever finished and nothing ever started. **A wave has a
+beginning and an end, which is what makes the quiet between two of them feel
+earned.**
 
-Two changes, and they are different changes:
+`CFG.WAVES` is the table. A wave is a list of `[type, count]` pairs and nothing
+else; the runner in `Director` turns it into releases.
 
-- **The reveal schedule is stretched.** It was 0, 0, 10, 25, 55, 70, 85, 115,
-  145, 175, 210 — everything the run has by kill 210, less than half way. It is
-  now 0, 0, 18, 45, 85, 125, 165, 205, 245, 285, 330, 380, so the last type
-  arrives with a hundred and twenty kills still to go. Measured at four points:
-  4 → 3 types unlocked by kill 25, 7 → 5 by kill 100, 10 → 7 by kill 200.
-- **The director holds a working set rather than the whole pool.** `CFG.cohort`
-  types may be rolled at once; one is swapped out every `cohortEvery` kills,
-  and a type that has just unlocked takes a place immediately, because a reveal
-  that has to wait its turn is not a reveal. Anything with a cap on the field
-  is also kept out of formations — a formation is three to six of one type in
-  one go, which is how five SCIONs reached the screen the first time this was
-  measured against a cap of two.
+- **A wave ends when everything in it is out *and* the field has thinned** — to
+  a quarter of what the wave released, floored at `waves.clearTo`. Proportional
+  rather than fixed, or a fourteen-object wave would sit at the end of its
+  patience every time while a three-object one cleared instantly. `patience`
+  caps the wait at 26 s regardless, because one object loitering out of reach
+  must never be able to stall a run.
+- **Three or more of one type in a regular wave arrive in formation.** Six
+  MOTEs in a wedge is a wave; six MOTEs filing in one at a time is a queue.
+  Tutorial waves never form up — they always file in, one object at a time,
+  which is most of what makes the opening readable.
+- **Waves swell.** Each entry is authored at its opening size and scales by
+  `waves.swell` over `swellKills`, so the six-MOTE wave that is a gentle
+  problem at kill 20 is fourteen of them by the end. Without it the field
+  peaked at nine objects and the late run was thinner than the early one —
+  waves bound the population by construction, which is most of why they work
+  and all of why they need this.
 
-What reaches the screen is the number that matters, and it is a noisy one — a
-single run lands anywhere between 0 and 8 distinct types at the three-minute
-mark. **Measured at nine runs a side**, distinct hostile types alive with a
-player clearing at a steady rate:
+**None of it is ever named on screen.** No wave counter, no "WAVE 4" card, no
+between-wave banner. The pacing is meant to be felt; a number would turn a
+rhythm into a score.
 
-| | old | new |
-|---|---|---|
-| 60s | 1.33 (0–2) | 1.78 (1–3) |
-| 120s | 3.67 (0–6) | 3.33 (1–5) |
-| 180s | 6.00 (4–8) | 3.78 (0–7) |
+**The order.** The eight `teach: true` waves run first, in exactly the authored
+order, exactly once. Everything after that is shuffled, because past the
+opening the order genuinely does not matter — each wave is a self-contained
+problem and meeting them in a different sequence every run *is* the variety. A
+regular wave is eligible only once every type in it has unlocked, so the reveal
+schedule below still holds and the pool the shuffle draws from simply grows.
+When the rotation is exhausted the tutorial waves are dropped for good, the
+larger pool is reshuffled, and it begins again.
 
-So the working set cuts the **late** window by about a third and does nothing
-measurable to the first two minutes, with ranges that overlap heavily either
-way. (Build 63 originally claimed 2.0 → 2.3, 4.0 → 2.7 and 6.7 → 3.3 from a
-three-run sample; that was under-sampled and over-stated the effect. The table
-above replaces it.) The reason the gain is confined to late is that objects
-already on the field when a cohort rotates do not vanish, so what you see
-converges on the working set plus however many stragglers the field is holding.
+**The reveal schedule is unchanged** and still gates eligibility: 0, 0, 18, 45,
+85, 125, 165, 205, 245, 285, 330, 380, so the last type arrives with a hundred
+and twenty kills still to go. (It was 0, 0, 10, 25, 55, 70, 85, 115, 145, 175,
+210 before build 63 — everything the run had by kill 210, less than half way.)
 
-The invariants — the working set never exceeds its cap, a newly unlocked type
-enters it immediately, nothing capped on the field can appear in a formation —
-hold every run and are what the test suite guards. The table above is a
-measurement, not a guarantee, and is not asserted.
+**The opening.** Eight tutorial waves, 29 hostiles and 15 grey drift between
+them, at `teachGap` seconds a release and `teachRest` between waves. Measured
+hands-off from a cleared store: **the tutorial ends at 133 s and 33 kills**,
+and throughput returns to normal immediately after — 30 kills at 120 s, 100 by
+200 s. The old opening was a 22-second grace and then a rate-throttled trickle
+that reached 26 kills in roughly 104 s; this is longer, slower per object, and
+made of discrete pieces instead of a curve.
+
+The population ramp, warm-up rate and teaching throttle that used to run all of
+this — `popStart`/`popEnd`/`popRampKills`, `spawnInterval`, `warmPop`/
+`warmKills`/`warmSeconds`/`warmRate`, `teachPop`/`teachRate`/`teachKills`,
+`cohort`/`cohortEvery`, `formationChance` — are all gone. How thin the opening
+is, is now a property of which waves come first rather than of a curve applied
+to a trickle.
 
 ### SCION, and what a graft does
 
@@ -1195,6 +1226,26 @@ handled rather than left hollow:
   field where everything hurts everything. Measured on a packed dozen SPLITTERs,
   four runs each way: 1472 damage and 60 kills before, 1482 and 60 after.
 - **SLUG** was a damage round by proxy and is now a damage round. See above.
+
+**WELL bends the substrate.** The lattice is the only thing drawn in the same
+space as the field but not *of* it, so a well that visibly drags it is the
+difference between an ability that happens on top of the world and one that
+happens to it. `Well.wellField()` publishes `{x, y, reach, strength}` each
+frame; `game.js` collects whatever is live into one list and hands it to
+`background.setWells()`, so the background never holds a reference to an effect
+that has ended.
+
+`Background.warp()` pulls each lattice point toward the well and rotates what
+is left of its radius as it falls — the twist is what makes it read as an
+accretion spiral rather than a dent. Rays are two points each while nothing is
+pulling on them and subdivided into eleven only while something is, since a
+straight line cannot bend and paying for that all run to cover the three
+seconds a WELL lasts would be paying for it all run. Rings go from 26 segments
+to 44 for the same reason. Reach is `WELL_REACH × 2.4` — well past the tractor
+beam's own — because the strongest part of the bend sits under the well's own
+glow at anything tighter, and the visible half of the effect is all out beyond
+it. Measured cost while a well is up: **60 fps to about 51**, back to the cheap
+path the instant it ends.
 
 ### The story
 

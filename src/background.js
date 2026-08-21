@@ -40,6 +40,10 @@ class Background {
     this.deepAge = 99;
     this.overlay = null;
     this.pulse = 0;
+    // Gravity wells bending the lattice, and the scratch point warp() writes
+    // into rather than allocating one a few thousand times a frame.
+    this.wells = null;
+    this._wp = { x: 0, y: 0 };
 
     // --- the boss substrate ---
     // While ORDINAL is on the field the world stops being something emitted
@@ -64,6 +68,59 @@ class Background {
   setDread(on, urgency = 0) {
     this.dreadTarget = clamp(on, 0, 1);
     this.dreadUrgency = clamp(urgency, 0, 1);
+  }
+
+  /**
+   * The gravity wells bending the substrate this frame, in world units:
+   * `{x, y, r, strength}`. The lattice is the only thing in the game drawn in
+   * the same space as the field but not *of* it, so a well that visibly drags
+   * it is the difference between an ability that happens on top of the world
+   * and one that happens to it.
+   *
+   * Set every frame from whatever is live, and cleared by passing nothing —
+   * the background never holds a reference to an effect that has ended.
+   */
+  setWells(list) {
+    this.wells = list && list.length ? list : null;
+  }
+
+  /**
+   * Drag one lattice point toward whatever is pulling on it. Inside the
+   * horizon it goes almost all the way in; outside, the pull falls off with
+   * distance, and a tangential term winds it round so the line spirals rather
+   * than simply sagging.
+   *
+   * Writes into `this._wp` rather than returning an object: this runs a few
+   * thousand times a frame and the lattice is the one hot path in here.
+   */
+  warp(px, py) {
+    const wp = this._wp;
+    wp.x = px;
+    wp.y = py;
+    const wells = this.wells;
+    if (!wells) return wp;
+    for (let i = 0; i < wells.length; i++) {
+      const g = wells[i];
+      const dx = g.x - wp.x;
+      const dy = g.y - wp.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 0.001 || d > g.reach) continue;
+      const nx = dx / d;
+      const ny = dy / d;
+      // 1 at the centre, 0 at the edge of reach. The exponent decides how much
+      // of the sky moves: squared kept it all under the well's own glow, and
+      // this is the flattest curve that still leaves the far corners straight.
+      const f = (1 - d / g.reach) ** 1.7 * g.strength;
+      const pull = Math.min(d * 0.97, d * f * 1.5);
+      const twist = f * 2.8;
+      // Rotate what is left of the radius as it falls in: that is what makes
+      // it read as an accretion spiral and not as a dent.
+      const rest = d - pull;
+      const a = Math.atan2(-ny, -nx) + twist;
+      wp.x = g.x + Math.cos(a) * rest;
+      wp.y = g.y + Math.sin(a) * rest;
+    }
+    return wp;
   }
 
   /** Where the world should radiate from. Null hands it back to the sky. */
@@ -277,21 +334,31 @@ class Background {
 
     ctx.lineWidth = 1;
 
-    // Rays.
+    // Rays. Two points each while nothing is pulling on them, and subdivided
+    // only while something is — a straight line cannot bend, and paying for
+    // sixteen segments a ray every frame to cover the seconds a WELL is up
+    // would be paying for it all run.
     ctx.strokeStyle = rgba(m.line, 0.09 * bright);
     ctx.beginPath();
     const rays = 30;
+    const steps = this.wells ? 11 : 1;
     for (let i = 0; i <= rays; i++) {
       const a = (i / rays) * Math.PI;
-      ctx.moveTo(vpx + Math.cos(a) * 34, vpy + Math.sin(a) * 34);
-      ctx.lineTo(vpx + Math.cos(a) * maxR, vpy + Math.sin(a) * maxR);
+      const ca = Math.cos(a);
+      const sa = Math.sin(a);
+      for (let k = 0; k <= steps; k++) {
+        const rr = 34 + ((maxR - 34) * k) / steps;
+        const p = this.warp(vpx + ca * rr, vpy + sa * rr);
+        if (k === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+      }
     }
     ctx.stroke();
 
     // Rings, displaced by ripples.
     const spacing = 62;
     const offset = this.flow % spacing;
-    const segs = 26;
+    // Denser while something is bending them, for the same reason as the rays.
+    const segs = this.wells ? 44 : 26;
     for (let ringIdx = 0; ; ringIdx++) {
       const base = offset + ringIdx * spacing;
       if (base > maxR) break;
@@ -315,9 +382,8 @@ class Background {
           const decay = (1 - d / rp.radius) * (1 - rp.t / rp.life);
           r += Math.sin(d * 0.05 - rp.t * 13) * 22 * rp.strength * decay * decay;
         }
-        const x = vpx + ca * r;
-        const y = vpy + sa * r;
-        if (s === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        const p = this.warp(vpx + ca * r, vpy + sa * r);
+        if (s === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
     }

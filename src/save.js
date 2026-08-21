@@ -2,11 +2,16 @@
 //
 // This is a checkpoint, not a snapshot. What is kept is the *progress* — how
 // far the count has got, what has been bought, what is on the strip, what the
-// permanent tier has already handed over — and not the field: the objects in
-// the air, where the barrel was pointing, which mine was mid-flight. Restoring
-// a live field is a great deal of machinery for a moment nobody is attached
-// to, and a resumed run that starts on a clear field at your own kill count is
-// the thing a player actually wanted when they closed the tab.
+// permanent tier has already handed over, and which wave the run was on — and
+// not the field: the objects in the air, where the barrel was pointing, which
+// mine was mid-flight. Restoring a live field is a great deal of machinery for
+// a moment nobody is attached to. Coming back to a clear field at your own
+// count, on the wave you left, restarted from the top of it, is the thing a
+// player actually wanted when they closed the tab.
+//
+// What has already been *said* is kept too. A tooltip seen once is seen: the
+// teaching ladder resumes at the step it reached rather than replaying from
+// the top, and every first-use hint already shown stays shown.
 //
 // It is written for the way this is played: a phone, in short sittings, where
 // the app can be killed between one glance and the next and never gets to say
@@ -16,7 +21,7 @@
 import { BUILD } from './config.js';
 
 const KEY = 'sim7749-run';
-const VERSION = 3; // 3: salvage became energy, and debris became motes
+const VERSION = 4; // 4: the run is on a wave, and the wave is part of the run
 
 /** Only these two phases are a coherent place to pick a run up from. */
 const SAVABLE = new Set(['staging', 'lull']);
@@ -92,6 +97,15 @@ export function captureRun(world, game) {
     scriptStep: game.scriptStep,
     hinted: Object.keys(game.autoHinted || {}),
     story: world.narrator ? world.narrator.index : 0,
+    // Where the run is in the rotation. The order is stored rather than
+    // re-rolled, because coming back to "the wave I was on" means the same
+    // wave, not a wave of the same size. It is restarted from the top on
+    // resume — half a wave is not a place anyone remembers being.
+    wave: {
+      order: [...world.director.order],
+      at: world.director.at,
+      cycle: world.director.cycle,
+    },
   };
 }
 
