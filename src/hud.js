@@ -703,6 +703,7 @@ export class Hud {
       ['NEXT STORY', () => g.debugNextStory()],
       ['UNLOCK ALL', () => g.debugUnlockAll()],
       ['MAX UPGRADES', () => g.debugBuyAll()],
+      ['+10000 ENERGY', () => g.debugGiveEnergy(10000)],
       ['SPAWN WAVE', () => g.debugSpawnWave()],
       ['FILL FIELD', () => g.debugFillField()],
       ['CLEAR FIELD', () => g.debugClearField()],

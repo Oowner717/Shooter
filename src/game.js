@@ -1536,6 +1536,21 @@ export class Game {
     glitch.kick(1);
   }
 
+  /**
+   * Energy, without earning it. The tree is the only thing that spends it, so
+   * this and MAX UPGRADES are the two halves of looking at the tree: one buys
+   * everything outright, this one lets you buy it the way a player would and
+   * watch the rows change state as you go.
+   */
+  debugGiveEnergy(n = 10000) {
+    const w = this.world;
+    w.energy += n;
+    this.hud.setEnergy(w.energy, intakeRate(w));
+    this.hud.menu.syncTree();
+    this.hud.alert(`+${n} ENERGY`, 'info', 1.4);
+    return w.energy;
+  }
+
 
 
   /**
