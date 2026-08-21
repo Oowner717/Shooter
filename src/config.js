@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '92';
+export const BUILD = '93';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '92';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'dcf2e55';
+export const REV = '726b7ba';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -153,6 +153,10 @@ export const CFG = {
    * occasional and unmistakable when it happens, not a constant litter.
    */
   debris: {
+    // The one grey on the field. DRIFT wears it, and wreckage fades into it.
+    // Nothing that can hurt you is allowed anywhere near it.
+    grey: '#8fa9c4',
+    fade: 2.4, // seconds a chunk takes to lose the colour it came off
     speed: [140, 460], // thrown out at this, then left alone
     spin: 7, // radians a second, give or take
     drag: 0.22, // it slows, but it never stops and never settles
@@ -730,6 +734,23 @@ export const CFG = {
 // -----------------------------------------------------------------------
 // Objects. Mass is derived from density * area, so the big ones genuinely
 // shrug off bolts while motes get punted across the arena.
+//
+// COLOUR IS A CONTRACT. Grey means harmless: it cannot touch the turret, it
+// cannot corrupt the feed, and nothing is lost by ignoring it. `harmless` on a
+// type is exactly that -- Game.checkContact() skips it, so it can never become
+// an attacker. There is one grey, CFG.debris.grey, and only two things wear
+// it: DRIFT, and wreckage.
+//
+// Everything that can reach you therefore has a hue, and three of them used to
+// not: BULWARK and TOW were #9fb3c8, a TOW's mass #c8d6e5 -- the same
+// grey-blue as DRIFT, on the three heaviest things on the field. They are
+// cobalt and lime now. Energy keeps its own colour: it is not an object and
+// the rule does not reach it.
+//
+// A fragment of a harmful body that comes off harmless -- wreckage -- arrives
+// in the colour of what it came off and fades to the grey over
+// CFG.debris.fade seconds, so the break is legible and what is left of it
+// says plainly that it is over.
 // -----------------------------------------------------------------------
 export const ENEMY_TYPES = [
   {
@@ -838,8 +859,11 @@ export const ENEMY_TYPES = [
     restitution: 0.32,
     wobble: 0.9,
     armor: 0.34, // flat damage reduction
-    color: '#9fb3c8',
-    glow: '#5f7fa6',
+    // Cobalt. It was #9fb3c8 on a #5f7fa6 glow -- grey on the single hardest
+    // body in the game, which is the exact opposite of what grey promises.
+    // This is the saturation of the blue it already had.
+    color: '#5d9cff',
+    glow: '#2f6bd8',
     weight: 5,
     drops: 14, // energy it leaves when it comes apart
     debris: 16, // inert wreckage thrown when it breaks up
@@ -947,7 +971,13 @@ export const ENEMY_TYPES = [
     accel: 200,
     restitution: 0.5,
     wobble: 0,
-    color: '#d9c2ff',
+    // A SEED cannot touch the turret and cannot corrupt the feed, so it is
+    // `harmless` in the sense the code means. It is not harmless in the sense
+    // the colour rule means: it is on its way to making some other body
+    // bigger, tougher and healing. Grey would say "ignore this", about the one
+    // object on the field you least can. Violet, and a shade lighter than the
+    // SCION it came out of.
+    color: '#ceb0ff',
     glow: '#a56bff',
     weight: 0, // never rolled: a SCION places these
     drops: 0, // energy it leaves when it comes apart
@@ -967,7 +997,10 @@ export const ENEMY_TYPES = [
     accel: 95,
     restitution: 0.92,
     wobble: 0,
-    color: '#8fa9c4',
+    // The grey, taken from the one place it is defined rather than typed out
+    // again: DRIFT and wreckage must wear the same one, or "grey is harmless"
+    // is two colours making a promise instead of one.
+    color: CFG.debris.grey,
     glow: '#4f6f92',
     weight: 0, // never chosen by the ordinary spawn roll
     drops: 2, // energy it leaves when it comes apart
@@ -1029,8 +1062,11 @@ export const ENEMY_TYPES = [
     accel: 175,
     restitution: 0.6,
     wobble: 1.1,
-    color: '#9fb3c8',
-    glow: '#59e0ff',
+    // Lime, and the mass on its cable is a paler one: a hauled load reads as
+    // hazard, and lime is the one hue nothing else on the field uses. It was
+    // #9fb3c8 -- DRIFT's grey, on a body that drags a wrecking ball into you.
+    color: '#c9e84a',
+    glow: '#8fb100',
     weight: 5,
     drops: 5, // energy it leaves when it comes apart
     tows: { type: 'towMass', length: 132 },
@@ -1050,8 +1086,8 @@ export const ENEMY_TYPES = [
     restitution: 0.36,
     wobble: 0.5,
     armor: 0.2,
-    color: '#c8d6e5',
-    glow: '#7f9bb5',
+    color: '#e2f28a',
+    glow: '#a8c22e',
     weight: 0,
     drops: 8, // energy it leaves when it comes apart
     debris: 12, // inert wreckage thrown when it breaks up

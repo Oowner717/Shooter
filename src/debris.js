@@ -26,7 +26,7 @@
 // should never be shootable ends up shootable.
 
 import { CFG } from './config.js';
-import { TAU, rand, randInt, spread, rgba } from './util.js';
+import { TAU, clamp, rand, randInt, spread, rgba, mixHex } from './util.js';
 import { spark, ring } from './fx.js';
 import { audio } from './audio.js';
 
@@ -38,7 +38,18 @@ export class Chunk {
     this.vx = vx;
     this.vy = vy;
     this.r = r;
+    /*
+     * Grey means harmless -- see the rule above ENEMY_TYPES in config.js.
+     *
+     * A chunk is harmless from the instant it exists, but it came off
+     * something that was not, and a BULWARK bursting into sixteen grey flecks
+     * would not read as that BULWARK breaking. So it arrives wearing the
+     * colour of the body it came off and loses it over CFG.debris.fade
+     * seconds: the break is legible, and what is left is plainly over.
+     */
+    this.born = color;
     this.color = color;
+    this.age = 0;
     this.angle = rand(0, TAU);
     this.av = spread(D.spin);
     // Heavy for its size, so it shoulders energy aside rather than being
@@ -134,6 +145,10 @@ export class Chunk {
         this.color,
       );
       c.life = Math.min(c.life, this.life * D.wane);
+      // Carries on greying from where its parent had got to. Restarting the
+      // fade would have a splinter off a nearly-grey plate come out bright.
+      c.born = this.born;
+      c.age = this.age;
       world.debris.push(c);
     }
   }
@@ -142,6 +157,8 @@ export class Chunk {
     if (this.grace > 0) this.grace -= dt;
     this.life -= dt;
     const D = CFG.debris;
+    this.age += dt;
+    this.color = mixHex(this.born, D.grey, clamp(this.age / D.fade, 0, 1));
     const out = D.out;
     // Off the field is gone. This is the one body in the game that is allowed
     // to leave, which is why it is not clamped to the arena.

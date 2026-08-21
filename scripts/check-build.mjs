@@ -60,6 +60,38 @@ if (cov.missing.length || cov.extra.length || cov.dupes.length) {
 }
 console.log(`tree places all ${cov.want} buyable things exactly once`);
 
+/*
+ * Colour is a contract: grey means harmless. See the rule above ENEMY_TYPES.
+ *
+ * It is checked rather than trusted because it is the kind of rule a single
+ * new object breaks silently -- and it had already been broken by three,
+ * BULWARK and both halves of a TOW, which wore DRIFT's grey while being the
+ * heaviest things that can reach the turret.
+ *
+ * Chroma, not a hue name: what makes a colour read as grey at a glance is how
+ * little of it there is. The grey itself sits at 0.21, so 0.28 leaves room
+ * either side of the line.
+ */
+const { ENEMY_TYPES, CFG } = await import(new URL('../src/config.js', import.meta.url));
+const chroma = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
+};
+const GREY = CFG.debris.grey;
+const greyFails = ENEMY_TYPES.filter((t) => t.color === GREY && !t.harmless)
+  .map((t) => `${t.id} wears the grey but is not harmless`);
+const dullFails = ENEMY_TYPES.filter((t) => t.color !== GREY && chroma(t.color) < 0.28)
+  .map((t) => `${t.id} ${t.color} reads as grey (chroma ${chroma(t.color).toFixed(2)})`);
+if (greyFails.length || dullFails.length) {
+  for (const line of [...greyFails, ...dullFails]) console.error(`colour rule: ${line}`);
+  process.exit(1);
+}
+console.log(`colour rule holds: ${GREY} is the only grey, on ${
+  ENEMY_TYPES.filter((t) => t.color === GREY).map((t) => t.id).join(', ')}`);
+
 // ---- REV: what these bytes actually are ------------------------------------
 //
 // Everything the browser is served, in a fixed order, hashed. config.js's own

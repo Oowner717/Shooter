@@ -33,7 +33,9 @@ const OPENING = [
   // while the only thing on the field is the thing they are about. Said here
   // rather than in NOTES because NOTES are gated on the count and a DRIFT does
   // not raise it: a player who only ever shot drift would never reach them.
-  { text: 'The grey ones are DRIFT.\nNot enemies. They cannot hurt you.' },
+  // Says the rule, not just this object: grey is a promise the whole field
+  // keeps, and it is worth more to a player as a rule than as one fact.
+  { text: 'The grey ones are DRIFT.\nGrey is always harmless. Nothing grey can hurt you.' },
   { text: 'AUTO AIM ignores them. Shoot one\nyourself \u2014 they hold extra ENERGY.' },
 ];
 
