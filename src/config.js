@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '79';
+export const BUILD = '80';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '79';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '862ffa3';
+export const REV = '1ee2c38';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -215,36 +215,23 @@ export const CFG = {
   // and they stop sinking here.
   drift: {
     /*
-     * Where the grey objects live, as a fraction of the screen height rather
-     * than a distance above the turret. "A quarter of the way down" is a thing
-     * about the screen, and stating it as one makes it hold on any device.
+     * How the grey objects come down.
      *
-     * It used to be 520 units above the turret, which put the line at 0.35 —
-     * and, worse, the pull was one-sided. Above the line they sank; below it
-     * the walk was completely aimless, so nothing ever brought one back up.
-     * Measured over 2300 samples: median 0.39 down, and a tail reaching 0.57
-     * with a fifth of their time spent past halfway. They were wandering into
-     * the field the game is played in.
+     * Not a band. Builds 78 tried holding them in one a quarter of the way
+     * down, pulled back from both sides, and a two-sided pull is a wall
+     * however softly it is written — they could not get past it, and the
+     * bottom two thirds of the field had no grey in it at all.
      *
-     * The band is two-sided now. They sink to it firmly from above and are
-     * nudged back to it from below, and inside `spread` they wander as freely
-     * as they ever did — a band, not a rail.
+     * It is a taper instead. The descent is quick at the top and eases off
+     * with depth, and `crawl` is the fraction of it that never goes away: a
+     * drift is always still coming down, just less and less urgently the
+     * lower it gets. Nothing stops it, nothing sends it back, and it will
+     * reach the turret eventually if it is left alone.
      */
-    band: 0.25, // fraction of the screen height
-    spread: 0.06, // ...and how far either side of it they may wander
-    // How far past the band the pull eases off over. It used to be 460, which
-    // is further than the whole descent — so the sink was strongest at the top
-    // and had faded to almost nothing by the time the body neared the line it
-    // was supposed to cross, and a lone drift dithered above it for anywhere
-    // between 17 and 47 seconds. Small, so the descent is firm and only the
-    // arrival is soft.
-    ease: 130,
-    sink: 0.95, // how much of the wander the descent overrules
-    fall: 260, // and how fast they come down while it does
-    // Coming back up is gentler than coming down. A drift that has wandered
-    // low should ease back into the band, not launch.
-    rise: 0.8,
-    lift: 130,
+    fall: 300, // downward speed at the very top of the screen
+    taper: 420, // world units over which that eases off
+    crawl: 0.05, // ...and what is always left of it, however deep
+    sink: 0.95, // how much of the wander the descent overrules at full urge
   },
 
   // ---- shooter --------------------------------------------------------
@@ -698,6 +685,12 @@ export const CFG = {
      */
     edgeEase: 96, // how far in from each side the soft boundary reaches
     edgePush: 300, // and how hard it pushes at the wall itself
+    // The floor is a wall too, and a shallower one because the turret sits
+    // just above it and nothing should be shoved off its own approach. Without
+    // this a drift that has finished coming down simply rests on the bottom
+    // edge — measured at fifteen unbroken seconds of vy exactly 0, which is
+    // the one thing a thing that never stops is not allowed to do.
+    floorEase: 84,
     maxSpeedFactor: 6, // hard clamp relative to a body's own cruise speed
     // ...and the ceiling for a body that has deliberately been thrown. The
     // ordinary clamp is relative to a body's own cruise, which is right for

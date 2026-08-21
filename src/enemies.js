@@ -208,40 +208,26 @@ export class Enemy {
     let dx = Math.cos(this.wanderAngle);
     let dy = Math.sin(this.wanderAngle);
 
-    // A band a quarter of the way down the screen, held from both sides.
-    // Inside it the walk is as aimless as it ever was — this does not give a
-    // drift a destination, it keeps it in the part of the field it belongs in.
+    // Quick in at the top, easing off with depth, and never stopped. There
+    // is no band and no floor: `crawl` is the fraction of the descent that
+    // always remains, so a drift is forever still coming down — just less and
+    // less urgently — and will reach the turret if it is left alone.
     //
-    // The pull used to be one-sided: they sank to the line and then wandered
-    // wherever, which is how a fifth of their time ended up below the halfway
-    // mark, out in the field the game is actually played in.
+    // Build 78 held them in a band and pulled them back from below, which is a
+    // wall however gently it is written: the bottom two thirds of the field
+    // had no grey in it at all.
     const D = CFG.drift;
-    const home = world.height * D.band;
-    const slack = world.height * D.spread;
-    const off = this.y - home; // positive is below the band
-    if (off < -slack) {
-      const urge = clamp((-off - slack) / D.ease, 0, 1) * D.sink;
-      dx *= 1 - urge;
-      dy = dy * (1 - urge) + urge;
-      const n = Math.hypot(dx, dy) || 1;
-      dx /= n;
-      dy /= n;
-      // ...and it comes down at a pace worth watching. At wander speed the
-      // first one reached the field a good ten seconds after the first
-      // hostile, which is not what "the safe thing arrives first" means.
-      cruise = (this.cruise + (D.fall - this.cruise) * urge) * slow;
-    } else if (off > slack) {
-      // Wandered low. Eased back rather than yanked: this is the half that
-      // never existed, and a hard pull upward would read as the grey objects
-      // fleeing rather than milling about.
-      const urge = clamp((off - slack) / D.ease, 0, 1) * D.rise;
-      dx *= 1 - urge;
-      dy = dy * (1 - urge) - urge;
-      const n = Math.hypot(dx, dy) || 1;
-      dx /= n;
-      dy /= n;
-      cruise = (this.cruise + (D.lift - this.cruise) * urge) * slow;
-    }
+    const ease = D.crawl + (1 - D.crawl) * Math.exp(-Math.max(this.y, 0) / D.taper);
+    const urge = D.sink * ease;
+    dx *= 1 - urge;
+    dy = dy * (1 - urge) + urge;
+    const n = Math.hypot(dx, dy) || 1;
+    dx /= n;
+    dy /= n;
+    // ...and it comes down at a pace worth watching. At wander speed the first
+    // one reached the field a good ten seconds after the first hostile, which
+    // is not what "the safe thing arrives first" means.
+    cruise = (this.cruise + (D.fall - this.cruise) * ease) * slow;
 
     this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);
     this.vy += (dy * cruise - this.vy) * clamp(k * dt, 0, 1);
@@ -266,10 +252,19 @@ export class Enemy {
     const left = this.x - this.r;
     const right = world.width - (this.x + this.r);
     const near = Math.min(left, right);
-    if (near >= E.edgeEase) return;
-    // Squared, so it is nothing at the outer limit and firm at the wall.
-    const urge = (1 - Math.max(near, 0) / E.edgeEase) ** 2;
-    this.vx += (left < right ? 1 : -1) * E.edgePush * urge * dt;
+    if (near < E.edgeEase) {
+      // Squared, so it is nothing at the outer limit and firm at the wall.
+      const urge = (1 - Math.max(near, 0) / E.edgeEase) ** 2;
+      this.vx += (left < right ? 1 : -1) * E.edgePush * urge * dt;
+    }
+    // The floor is a wall too. A drift that has finished coming down would
+    // otherwise settle onto the bottom edge and sit there at a dead stop,
+    // which is exactly what a thing that never stops must not do.
+    const below = world.floorY - (this.y + this.r);
+    if (below < E.floorEase) {
+      const urge = (1 - Math.max(below, 0) / E.floorEase) ** 2;
+      this.vy -= E.edgePush * urge * dt;
+    }
   }
 
   /**

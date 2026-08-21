@@ -1057,25 +1057,31 @@ After: **0% touching, 0.24% within 8 units, and a minimum gap of 5 units across
 kills against 161). The hard clamp stays as the backstop for anything thrown at
 a wall faster than the nudge can answer.
 
-**DRIFT lives in a band a quarter of the way down, held from both sides.** It
-used to sit 520 units above the turret — a line at 0.35 of the screen — and the
-pull was one-sided: above the line they sank, below it the walk was completely
-aimless, so nothing ever brought one back up. Measured over 2300 samples they
-wandered to a median of **0.39** with a tail reaching **0.57**, and spent **20%
-of their time past the halfway mark**, out in the field the game is played in.
+**DRIFT comes down fast, decelerates, and never stops.** Not a band. Build 78
+held them in one a quarter of the way down, pulled back from both sides, and a
+two-sided pull is a wall however softly it is written: measured median depth
+0.229, p90 0.334, and **nothing at all in the bottom two thirds of the field**.
 
-`drift.band` is now a fraction of the screen height (0.25) rather than a
-distance above the turret — "a quarter of the way down" is a fact about the
-screen, and stating it as one makes it hold on any device. Inside `spread`
-(0.06 either side) they wander exactly as freely as before; outside it they are
-pulled back, firmly from above and gently from below, because a hard upward
-pull reads as the grey objects fleeing rather than milling about.
+It is a taper instead. The descent runs at `fall` (300) at the very top and
+eases off over `taper` (420 units) with depth; `crawl` is the fraction of it
+that never goes away, so a drift is forever still coming down — just less and
+less urgently — and will reach the turret if left alone. A single one tracked
+from the top: 111 units/s at 0.01 depth, 65 at 0.25, 35 at 0.77.
 
-| | before | after |
-|---|---|---|
-| median depth | 0.391 | **0.229** |
-| p90 depth | 0.571 | **0.334** |
-| time past halfway | 20.1% | **0%** |
+That exposed a second wall. Once one had finished coming down it settled onto
+the bottom edge and sat there — **fifteen unbroken seconds of `vy` exactly 0**,
+which is the one thing a thing that never stops must not do. So `edgeEase` now
+covers the floor as well as the sides (`physics.floorEase`, 84 — shallower,
+because the turret sits just above it and nothing should be shoved off its own
+approach).
+
+| | build 77 | build 78 | build 80 |
+|---|---|---|---|
+| median depth | 0.391 | 0.229 | **0.649** |
+| p90 depth | 0.571 | 0.334 | **0.837** |
+| touching floor | — | — | **0%** |
+| touching a side | — | — | **0%** |
+| effectively still | — | — | 3.4% (wander turnarounds) |
 
 **One wave is grey and nothing else.** No hostiles, no risk, nothing taken from
 the five hundred, and about 220 ENERGY on the field if you take it — 22 DRIFT
