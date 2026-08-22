@@ -168,7 +168,6 @@ export class Game {
     w.pendingScour = false;
     w.pendingEbb = false;
     w.pendingMines = 0;
-    this.sweepTimer = 0;
     this.hud.setPending(0, null);
     this.loadoutOpen = null;
     // Every run is endless as of build 81. There is no five hundred to reach,
@@ -1066,17 +1065,6 @@ export class Game {
       if (this.coronaBeat <= 0) {
         this.coronaBeat = 0.28;
         ring(s.x, s.y, C.r * 0.55, C.r, 0.3, '#ff9f5c', 2);
-      }
-    }
-
-    // SWEEP: the barrel cannot reach behind the turret, so the turret does it
-    // itself. This is the upgrade that turns a chore into something you bought.
-    if (up.sweep > 0) {
-      this.sweepTimer -= dt;
-      if (this.sweepTimer <= 0) {
-        this.sweepTimer = up.sweep;
-        applyBlast(w, { x: s.x, y: s.y, r: 260, damage: 90, impulse: 780 });
-        ring(s.x, s.y, 20, 300, 0.4, '#7cffb2', 4);
       }
     }
 

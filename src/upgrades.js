@@ -63,7 +63,6 @@ export function freshUpgrades() {
     wireDamage: 1, // per second of contact on a wire
     mineTrigger: 1,
     voidReach: 1, // VOID's mouth alone, which nothing else widens
-    sweep: 0, // seconds between the turret clearing behind itself
     reflex: false, // PULSE answers a crowd on the turret by itself
     intake: false, // energy that touches the turret is taken in without a PULSE
     cooldown: 1, // multiplier on every ability's cooldown
@@ -150,7 +149,6 @@ const MARK = {
   lien: g('<path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z"/><path d="M12 8v8M9.4 10.2h5.2M9.4 13.8h5.2" opacity=".9"/><path d="M12 20.8v-2M12 5.2v-2" opacity=".55"/>'),
   // A mouth that reaches much further than the thing itself.
   eventhorizon: g('<circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="6.4" opacity=".6"/><circle cx="12" cy="12" r="10" stroke-dasharray="2.2 2.6"/><path d="M12 2v1.6M12 20.4V22M2 12h1.6M20.4 12H22" opacity=".7"/>'),
-  sweep: g('<path d="M12 4v7"/><path d="M8 11h8l1.5 5h-11z" fill="currentColor" stroke="none"/><path d="M3.5 15a9 9 0 0 0 17 0" stroke-dasharray="2.6 2.6"/>'),
   reflex: g('<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M6.5 6.5a7.7 7.7 0 0 0 0 11M17.5 6.5a7.7 7.7 0 0 1 0 11" opacity=".6"/><path d="M13.5 2 10 7.5h4L10.5 13" />'),
   intake: g('<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 2.5v4M9.8 4.6 12 6.9l2.2-2.3"/><path d="M12 21.5v-4M9.8 19.4 12 17.1l2.2 2.3"/><path d="M2.5 12h4M4.6 9.8 6.9 12l-2.3 2.2"/><path d="M21.5 12h-4M19.4 9.8 17.1 12l2.3 2.2"/>'),
   standing: g('<circle cx="12" cy="13" r="7.5"/><path d="M12 8.5V13l3 2"/><path d="M8.5 2.5h7" opacity=".6"/><path d="M17.5 20h4"/>'),
@@ -232,7 +230,6 @@ export const UPGRADES = {
     { id: 'bloomout', name: 'BLOOM OUT', line: '+35% patch size, +45% burn.', apply: (u) => { u.patchR *= 1.35; u.patchDps *= 1.45; } , icon: MARK.bloomout },
     { id: 'buckshot', name: 'BUCKSHOT', line: '+60% spall pellets.', apply: scale('spallPellets', 1.6) , icon: MARK.buckshot },
     { id: 'repulsor', name: 'REPULSOR', line: '+40% lode reach and push.', apply: (u) => { u.lodeReach *= 1.4; u.lodePush *= 1.4; } , icon: MARK.repulsor },
-    { id: 'sweep', name: 'SWEEP', line: 'Turret blasts behind itself every 20s.', levels: 1, apply: set('sweep', 20) , icon: MARK.sweep },
     { id: 'reflex', name: 'REFLEX', line: 'PULSE fires itself when 2+ objects grip you.', levels: 1, apply: set('reflex', true) , icon: MARK.reflex },
     { id: 'intake', name: 'INTAKE', levels: 1,
       line: 'Energy is taken in on contact. No PULSE needed.',
