@@ -423,8 +423,12 @@ export class Shooter {
       ctx.stroke();
     }
 
+    // everything the TURRET branch has bolted on, in the unrotated frame
+    this.drawRigBase(ctx, world, accent, t);
+
     // barrel
     ctx.rotate(this.aim);
+    this.drawRigBarrel(ctx, world, accent);
     const recoil = this.recoil * 6;
     ctx.fillStyle = 'rgba(18,34,52,0.98)';
     ctx.strokeStyle = rgba(accent, 0.95);
@@ -456,6 +460,174 @@ export class Shooter {
 
   }
 
+
+  /*
+   * ============================ the rig ==============================
+   *
+   * Every node in the TURRET branch is a part on the machine, and its level is
+   * how much of that part there is. Buying GIMBAL grows a gimbal; buying it
+   * again grows another. The tree is named for the parts, so the row you press
+   * and the thing that appears are the same word.
+   *
+   * Counted straight off the purchase ledger and cached against its length,
+   * because the ledger only ever grows: no hook to forget to call on a buy, a
+   * restore or a reset. `rigFlash` runs down after a purchase and every part
+   * is drawn brighter and a little larger while it does, so the moment a part
+   * goes on is visible without anything having to remember which part it was.
+   */
+  rig(world) {
+    const taken = world.offers.taken;
+    if (world.rig && world.rigAt === taken.length) return world.rig;
+    const rig = { rate: 0, slew: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0 };
+    for (const id of taken) if (id in rig) rig[id]++;
+    world.rig = rig;
+    world.rigAt = taken.length;
+    return rig;
+  }
+
+  /** Parts that sit on the mount, drawn in the turret's own unrotated frame. */
+  drawRigBase(ctx, world, accent, t) {
+    const R = CFG.rig;
+    const g = this.rig(world);
+    const flash = world.rigFlash / R.flash; // 1 -> 0 across the fitting
+    const lift = 1 + flash * 0.12;
+    const glow = 0.55 + flash * 0.45;
+
+    // GIMBAL — a further ring per level, each turning against the last.
+    for (let i = 0; i < g.slew; i++) {
+      const rr = this.r * (1.1 + i * R.ring) * lift;
+      const off = this.spin * (i % 2 ? 1 : -1) * (1 + i * 0.3);
+      ctx.strokeStyle = rgba(accent, (0.3 + 0.12 * i) * glow);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, rr, off, off + Math.PI * (1.1 - i * 0.18));
+      ctx.stroke();
+    }
+
+    // SPINES — spikes out of the housing, more of them each level.
+    if (g.casing) {
+      const n = 4 + g.casing * 3;
+      ctx.strokeStyle = rgba('#ff9f5c', (0.5 + 0.15 * g.casing) * glow);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU + this.spin * 0.2;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        const len = R.spine * (0.7 + 0.3 * g.casing) * lift;
+        ctx.moveTo(c * this.r * 0.94, sn * this.r * 0.94);
+        ctx.lineTo(c * (this.r + len), sn * (this.r + len));
+      }
+      ctx.stroke();
+    }
+
+    // SHROUD — a collar round the base, wider with every level. It sits under
+    // the barrel's arc, which is where the field actually comes from.
+    if (g.insulation) {
+      const sweep = Math.min(TAU, R.shroud * g.insulation);
+      const rr = (this.r + 13) * lift;
+      ctx.strokeStyle = rgba('#7cffb2', 0.42 * glow);
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(0, 0, rr, Math.PI / 2 - sweep / 2, Math.PI / 2 + sweep / 2);
+      ctx.stroke();
+      ctx.strokeStyle = rgba('#7cffb2', 0.7 * glow);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, rr + 3, Math.PI / 2 - sweep / 2, Math.PI / 2 + sweep / 2);
+      ctx.stroke();
+    }
+
+    // INTAKE — scoops under the housing, drawing the floor in.
+    if (g.intake) {
+      ctx.strokeStyle = rgba('#9fe8ff', 0.75 * glow);
+      ctx.fillStyle = rgba('#9fe8ff', 0.12 * glow);
+      ctx.lineWidth = 1.4;
+      for (let i = -1; i <= 1; i++) {
+        const a = Math.PI / 2 + i * 0.42;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        const inR = this.r * 0.92;
+        const outR = (this.r + 8) * lift;
+        const w = 4.5;
+        ctx.beginPath();
+        ctx.moveTo(c * inR - sn * w * 0.5, sn * inR + c * w * 0.5);
+        ctx.lineTo(c * outR - sn * w, sn * outR + c * w);
+        ctx.lineTo(c * outR + sn * w, sn * outR - c * w);
+        ctx.lineTo(c * inR + sn * w * 0.5, sn * inR - c * w * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      // and the pull itself, a slow ring inward
+      const pull = (t * 0.6) % 1;
+      ctx.strokeStyle = rgba('#9fe8ff', 0.3 * (1 - pull) * glow);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.r + 8 + (1 - pull) * 46, 0, TAU);
+      ctx.stroke();
+    }
+  }
+
+  /** Parts that ride the barrel, drawn after the frame is turned to the aim. */
+  drawRigBarrel(ctx, world, accent) {
+    const R = CFG.rig;
+    const g = this.rig(world);
+    const flash = world.rigFlash / R.flash;
+    const glow = 0.6 + flash * 0.4;
+
+    // FEED — a belt housing alongside the barrel, a second one at RUNAWAY.
+    for (let i = 0; i < g.rate; i++) {
+      const side = i ? 1 : -1;
+      const y = side * (6.5 + R.feed * 0.5);
+      ctx.fillStyle = rgba('#0d1a28', 0.95);
+      ctx.strokeStyle = rgba(accent, 0.9 * glow);
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.rect(this.r * 0.34, y - R.feed / 2, this.r * 0.78, R.feed);
+      ctx.fill();
+      ctx.stroke();
+      // a lit rail along the outer edge, or the housing is a dark rectangle
+      // outlined in a hairline and reads as nothing at all
+      ctx.strokeStyle = rgba(accent, 0.55 * glow);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(this.r * 0.34, y + side * R.feed * 0.5);
+      ctx.lineTo(this.r * 1.12, y + side * R.feed * 0.5);
+      ctx.stroke();
+      // rounds in the belt, marching toward the breech
+      ctx.fillStyle = rgba('#ffe9b0', 0.55 * glow);
+      const march = (world.time * 34) % 7;
+      for (let k = 0; k < 5; k++) {
+        const x = this.r * 0.36 + ((k * 7 + march) % (this.r * 0.74));
+        ctx.fillRect(x, y - 1.2, 2.4, 2.4);
+      }
+    }
+
+    // SIGHT — a mast over the barrel with a crossbar per level.
+    if (g.overwatch) {
+      const h = R.sight * g.overwatch;
+      const x = this.r * 0.95;
+      ctx.strokeStyle = rgba('#ffd166', 0.85 * glow);
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(x, -6.5);
+      ctx.lineTo(x, -6.5 - h);
+      ctx.stroke();
+      for (let i = 0; i < g.overwatch; i++) {
+        const y = -6.5 - h + i * (h / g.overwatch) + 2;
+        const w = 5 - i;
+        ctx.beginPath();
+        ctx.moveTo(x - w, y);
+        ctx.lineTo(x + w, y);
+        ctx.stroke();
+      }
+      ctx.fillStyle = rgba('#ffd166', 0.9 * glow);
+      ctx.beginPath();
+      ctx.arc(x, -6.5 - h, 1.6, 0, TAU);
+      ctx.fill();
+    }
+  }
 
   /**
    * The half of the rod that hangs below the pivot, plus the grip on its end

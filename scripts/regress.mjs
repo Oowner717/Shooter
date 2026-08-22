@@ -35,6 +35,9 @@
  *                  game still knowing you.
  *   corruption     build 105: the only copy in the game that states numbers,
  *                  checked against the numbers the code charges.
+ *   the rig        build 106: the TURRET branch is named for the parts it
+ *                  bolts on, so a part that stops drawing makes a liar of the
+ *                  tree.
  *
  * Run: node scripts/regress.mjs            (expects a static server on :8099)
  *      node scripts/regress.mjs --port N
@@ -294,6 +297,46 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   });
   check('the corruption line quotes the rates the code actually charges',
     r.missing.length === 0, `wanted ${JSON.stringify(r.want)}, missing ${JSON.stringify(r.missing)}`);
+}
+
+// --- every turret upgrade puts something on the turret -----------------------
+// The TURRET branch is named for its parts, so a part that quietly stops being
+// drawn makes a liar of the tree. Each one is drawn alone onto a scratch
+// canvas and its lit pixels counted against a bare turret.
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const s = w.shooter;
+    const cvs = document.createElement('canvas');
+    cvs.width = 260; cvs.height = 260;
+    const c = cvs.getContext('2d');
+    const lit = (rig) => {
+      c.clearRect(0, 0, 260, 260);
+      c.save();
+      c.translate(130 - s.x, 130 - s.y);
+      w.rig = rig;
+      w.rigAt = w.offers.taken.length; // make the cache hit, so `rig` is used
+      w.rigFlash = 0;
+      s.draw(c, w);
+      c.restore();
+      const d = c.getImageData(0, 0, 260, 260).data;
+      let n = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 24) n++;
+      return n;
+    };
+    const none = { rate: 0, slew: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0 };
+    const bare = lit(none);
+    const each = {};
+    for (const [k, v] of Object.entries({ rate: 2, slew: 3, overwatch: 3, casing: 3, insulation: 3, intake: 1 })) {
+      each[k] = lit({ ...none, [k]: v }) - bare;
+    }
+    w.rigAt = -1; // let it rebuild honestly again
+    return { bare, each };
+  });
+  const silent = Object.entries(r.each).filter(([, n]) => n <= 0).map(([k]) => k);
+  check('every turret upgrade puts a visible part on the turret', silent.length === 0,
+    `${silent.length ? `nothing drawn for ${silent.join(', ')} — ` : ''}${JSON.stringify(r.each)}`);
 }
 
 // --- the broadphase ---------------------------------------------------------

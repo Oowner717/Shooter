@@ -19,6 +19,9 @@ import { readRun, saveRun, forgetRun } from './save.js';
 import { Offers } from './events.js';
 import { freshUpgrades, BY_ID } from './upgrades.js';
 import { NODES, NODE_BY_ID, priceOf } from './tree.js';
+
+/** The turret branch, for the fitting announcements and the completion one. */
+const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
 import { SCRIPT, ON_CONTACT, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
@@ -125,6 +128,15 @@ export class Game {
       decoy: null, // the DECOY ability's stand-in turret, while one is up
 
       nextStoryAt: CFG.storyEvery,
+
+      // What is bolted to the turret: one count per TURRET node, rebuilt from
+      // `offers.taken` whenever that grows. Declared here rather than sprung
+      // into existence on first use — a field that appears later is the shape
+      // of bug scripts/regress.mjs watches for.
+      rig: null,
+      rigAt: -1, // taken.length the cache was built at
+      rigFlash: 0, // seconds of the fitting animation still to run
+      rigDone: false, // the whole branch bought out, announced once a run
 
       debug: {
         noCooldown: false,
@@ -393,8 +405,36 @@ export class Game {
     this.hud.syncLoadout(w);
     this.hud.syncAbilities(w.abilities);
     this.hud.menu.syncTree();
+    this.noteRig(n);
     this.checkpoint();
     return 'ok';
+  }
+
+  /**
+   * A fitting going on to the turret.
+   *
+   * Every TURRET node is a part you can see — the tree says GIMBAL and a
+   * gimbal ring appears — so buying one is worth a moment: the machine flares
+   * as the part goes on, and the part is named. And when the last of them is
+   * bought out, that is the one thing in the run that is finished, so it is
+   * said as such.
+   */
+  noteRig(n) {
+    const w = this.world;
+    if (!n || !n.parent || n.parent.key !== 'turret') return;
+    w.rigFlash = CFG.rig.flash;
+    const at = this.owned(n.id);
+    const tier = n.tiers && n.tiers[at - 1] ? n.tiers[at - 1].name : n.name;
+    this.hud.alert(`${tier} FITTED`, 'rig', 2.6);
+    audio.chime(680);
+    if (w.rigDone) return;
+    const done = TURRET_NODES.every((t) => this.owned(t.id) >= (t.levels || 1));
+    if (!done) return;
+    w.rigDone = true;
+    this.hud.alert('TURRET COMPLETE — EVERY FITTING INSTALLED', 'rigDone', 5);
+    audio.chime(880);
+    background.surge(1);
+    shake(6);
   }
 
   toggleSound() {
@@ -1238,6 +1278,7 @@ export class Game {
   // ------------------------------------------------------------- glitch
 
   updateGlitch(dtRaw) {
+    if (this.world.rigFlash > 0) this.world.rigFlash = Math.max(0, this.world.rigFlash - dtRaw);
     const w = this.world;
     let level = 0;
     let mode = 'normal';

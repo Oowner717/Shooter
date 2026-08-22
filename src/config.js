@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '105';
+export const BUILD = '106';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '105';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '4a66bb1';
+export const REV = 'd383b95';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -766,6 +766,21 @@ export const CFG = {
     fill: 0.6, // how much of each segment's slice is drawn
     thick: 0.055, // stroke, as a fraction of the shell radius
     spin: 0.9, // radians a second, so it is held rather than painted on
+  },
+
+  /*
+   * What the TURRET branch bolts on. Every node in it is a part you can see,
+   * and its level is how much of that part there is — see Shooter.drawRig().
+   * The names in the tree are the parts: FEED, GIMBAL, SIGHT, SPINES, SHROUD,
+   * INTAKE.
+   */
+  rig: {
+    flash: 0.9, // seconds the machine flares while a part goes on
+    ring: 0.2, // gimbal: each level adds a ring this much further out
+    spine: 9, // spines: length of each spike, in world units
+    shroud: 1.15, // shroud: radians of collar per level
+    sight: 8, // sight: mast height per level
+    feed: 7, // feed: belt housing depth
   },
 
   // ---- feel -----------------------------------------------------------

@@ -232,7 +232,7 @@ export const UPGRADES = {
     { id: 'repulsor', name: 'REPULSOR', line: '+40% lode reach and push.', apply: (u) => { u.lodeReach *= 1.4; u.lodePush *= 1.4; } , icon: MARK.repulsor },
     { id: 'reflex', name: 'REFLEX', line: 'PULSE fires itself when 2+ objects grip you.', levels: 1, apply: set('reflex', true) , icon: MARK.reflex },
     { id: 'intake', name: 'INTAKE', levels: 1,
-      line: 'Energy is taken in on contact. No PULSE needed.',
+      line: 'Energy is taken in on contact, no PULSE needed. Scoops at the base.',
       apply: set('intake', true), icon: MARK.intake },
     { id: 'standing', name: 'STANDING ORDER', line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
   ],
@@ -248,14 +248,21 @@ export const UPGRADES = {
      * than the 30% that came off the base rate in build 81, so a turret that
      * invests in cadence ends up faster than it ever was.
      */
-    { id: 'rate', name: 'RATE', levels: 2,
-      line: '+20% fire rate.',
-      tiers: [null, { name: 'RUNAWAY', line: '+20% fire rate again, on top of RATE. The barrel stops waiting.' }],
+    /*
+     * This branch is named for what it bolts on rather than for the stat it
+     * moves. Every one of them puts a visible fitting on the machine — see
+     * Shooter.drawRig() — and a row that says GIMBAL and then grows a gimbal
+     * ring is a row you can point at. The line still states the effect,
+     * because the effect is what is being paid for.
+     */
+    { id: 'rate', name: 'FEED', levels: 2,
+      line: '+20% fire rate. A belt feed along the barrel.',
+      tiers: [null, { name: 'RUNAWAY FEED', line: '+20% again, on top of FEED. A second belt, and the barrel stops waiting.' }],
       apply: quicken('rate', 0.8), icon: MARK.rate },
-    { id: 'slew', name: 'SLEW', line: '+50% auto aim turn speed.', apply: scale('slew', 1.5) , icon: MARK.slew },
-    { id: 'overwatch', name: 'OVERWATCH', line: '+25% damage while hands off the lever.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },
-    { id: 'casing', name: 'HARD CASING', line: 'Objects touching you take 40 damage a second.', apply: bump('casing', 40) , icon: MARK.casing },
-    { id: 'insulation', name: 'INSULATION', line: 'Corruption costs half as much energy.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
+    { id: 'slew', name: 'GIMBAL', line: '+50% auto aim turn speed. Another ring on the mount.', apply: scale('slew', 1.5) , icon: MARK.slew },
+    { id: 'overwatch', name: 'SIGHT', line: '+25% damage while hands off the lever. A sight mast over the barrel.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },
+    { id: 'casing', name: 'SPINES', line: 'Objects touching you take 40 damage a second. Spikes round the housing.', apply: bump('casing', 40) , icon: MARK.casing },
+    { id: 'insulation', name: 'SHROUD', line: 'Corruption costs half as much energy. A shield collar round the base.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
   ],
 };
 

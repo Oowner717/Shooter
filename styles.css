@@ -261,6 +261,26 @@ html, body {
 .alert.power { color: #ffcf5c; }
 .alert.info { color: var(--accent); }
 /*
+ * A fitting going on to the turret, and the moment the last one does. The
+ * second is the only thing in a run that is ever finished, so it is allowed to
+ * be louder than anything else in the stack.
+ */
+.alert.rig { color: #9fe8ff; letter-spacing: 0.26em; }
+.alert.rigDone {
+  color: #7cffb2;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  padding: 7px 16px;
+  background: rgba(6, 14, 12, 0.9);
+  box-shadow: 0 0 22px -4px currentColor, inset 0 0 16px -8px currentColor;
+  animation: alertIn 0.18s ease-out, rigDone 1.1s ease-out;
+}
+@keyframes rigDone {
+  0% { transform: scale(1.08); filter: brightness(2.2); }
+  100% { transform: none; filter: none; }
+}
+
+/*
  * An object recorded for the first time. Wider letters and a lit edge, and the
  * colour comes inline from the object itself — the one alert that is about a
  * specific thing on the field rather than about the run.
