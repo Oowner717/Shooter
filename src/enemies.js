@@ -1656,7 +1656,15 @@ export function spawnFormation(world, kinds, count) {
     const [ox, oy] = formationOffset(shape, i, count, gap);
     const x = clamp(cx + ox, type.r + 4, world.width - type.r - 4);
     const y = -60 + oy - rand(0, 30);
-    made.push(spawnOne(world, type, x, y, { speedScale: rand(0.94, 1.06) }));
+    /*
+     * release(), not spawnOne(). The line above drops towed types when there
+     * is anything else to pick, but with a single kind there is nothing to
+     * fall back to -- and spawnOne on a TOW makes a head with no MASS and no
+     * cable, which is not a TOW at all. Unreachable until build 110 only
+     * because the TOW waves never actually played; the director refuses to
+     * form them up either, so this is the belt to that pair of braces.
+     */
+    made.push(...release(world, type, x, y, { speedScale: rand(0.94, 1.06) }));
   }
   return made;
 }
@@ -1828,6 +1836,34 @@ export class Director {
     }
   }
 
+  /*
+   * Waves that have unlocked since this rotation was built, spliced into what
+   * is left of it.
+   *
+   * The rotation used to be a snapshot: shuffle() read eligibility once, at
+   * the top of a cycle, and nothing rejoined until the next one. A run is five
+   * cycles and the last is built at around 317 kills, so GLUT (330) and TOW
+   * (380) unlocked into a rotation that had already been decided and then ran
+   * out of allotment before another was built. Measured over 30 driven runs
+   * before this: both played 0% of the time. They were authored, reachable in
+   * the debug screen, in the codex -- and unreachable in an actual run.
+   *
+   * Spliced ahead of the playhead at a random point rather than appended, so
+   * a late unlock is not always the very last thing you see.
+   */
+  admit(world) {
+    const already = new Set(this.order);
+    let added = 0;
+    WAVES.forEach((wv, i) => {
+      if (wv.teach || already.has(i) || !this.eligible(world, wv)) return;
+      const room = this.order.length - this.at;
+      const at = this.at + 1 + ((Math.random() * Math.max(1, room)) | 0);
+      this.order.splice(at, 0, i);
+      added++;
+    });
+    return added;
+  }
+
   /** The wave currently running, or null before the first one starts. */
   get wave() {
     const i = this.order[this.at];
@@ -1904,6 +1940,7 @@ export class Director {
   /** Start the next wave, rebuilding the rotation if this one is spent. */
   begin(world) {
     if (releasesLeft(world) <= 0) { this.timer = 1; return; }
+    if (this.order.length) this.admit(world);
     if (this.at + 1 >= this.order.length) this.shuffle(world);
     if (!this.order.length) { this.timer = 1; return; }
     this.at++;
@@ -1932,7 +1969,9 @@ export class Director {
     const cost = t.tows ? 2 : 1;
     if (quota < cost) { this.jobs.length = 0; return; }
 
-    if (job.n > 1) {
+    // A shape made of towed pairs is a traffic jam rather than a formation,
+    // and costs double the allotment for it. They file in.
+    if (job.n > 1 && !t.tows) {
       const room = Math.min(job.n, quota, CFG.maxEnemies - hostileCount(world));
       if (room >= 2) { spawnFormation(world, [t], room); return; }
     }

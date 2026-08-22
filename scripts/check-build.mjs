@@ -72,7 +72,7 @@ console.log(`tree places all ${cov.want} buyable things exactly once`);
  * little of it there is. The grey itself sits at 0.21, so 0.28 leaves room
  * either side of the line.
  */
-const { ENEMY_TYPES, CFG } = await import(new URL('../src/config.js', import.meta.url));
+const { ENEMY_TYPES, CFG, TYPE_BY_ID } = await import(new URL('../src/config.js', import.meta.url));
 const chroma = (hex) => {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255;
@@ -133,6 +133,47 @@ if (smallestShell < HALO * 3) {
 }
 console.log(`ward shell floor ${smallestShell.toFixed(0)} is ${(smallestShell / HALO).toFixed(1)}x `
   + `the largest energy mote (${HALO.toFixed(1)})`);
+
+/*
+ * Every regular wave is a combination, and every type in the table can be met.
+ *
+ * A wave naming one type is a quantity; two or three is a problem, and the
+ * problem is the point. The bodies-per-wave ceiling is what keeps a
+ * combination from becoming a crowd -- eight before the swell, which the
+ * swell can take to about nineteen late in a run.
+ *
+ * The second half of this is the reachability rule: a type that appears in no
+ * wave at all can only ever be met through the debug screen. Whether the
+ * *rotation* actually reaches a wave is a runtime question and lives in
+ * scripts/regress.mjs; this is the table-level half of it.
+ */
+const { WAVES } = await import(new URL('../src/config.js', import.meta.url));
+const regular = WAVES.filter((w) => !w.teach && w.of.length);
+const soloWaves = regular.filter((w) => w.of.length < 2 || w.of.length > 3);
+if (soloWaves.length) {
+  console.error(`${soloWaves.length} regular wave(s) do not name two or three types: `
+    + soloWaves.map((w) => JSON.stringify(w.of)).join(' '));
+  process.exit(1);
+}
+const WAVE_BODIES = 8;
+const crowded = regular
+  .map((w) => [w.of, w.of.reduce((n, [id, c]) => n + c * (TYPE_BY_ID[id].tows ? 2 : 1), 0)])
+  .filter(([, n]) => n > WAVE_BODIES);
+if (crowded.length) {
+  console.error(`${crowded.length} wave(s) over ${WAVE_BODIES} bodies before the swell: `
+    + crowded.map(([of, n]) => `${JSON.stringify(of)}=${n}`).join(' '));
+  process.exit(1);
+}
+// Types that are only ever produced by another type, never released directly.
+const DERIVED = new Set(['plate', 'seed', 'towMass', 'drift']);
+const placed = new Set(WAVES.flatMap((w) => w.of.map(([id]) => id)));
+const unplaced = ENEMY_TYPES.filter((t) => !placed.has(t.id) && !DERIVED.has(t.id)).map((t) => t.id);
+if (unplaced.length) {
+  console.error(`no wave releases: ${unplaced.join(', ')} — unreachable outside the debug screen`);
+  process.exit(1);
+}
+console.log(`${regular.length} regular waves, all 2-3 types, none over ${WAVE_BODIES} bodies; `
+  + `${placed.size} types released, ${DERIVED.size} produced by others`);
 
 // ---- REV: what these bytes actually are ------------------------------------
 //

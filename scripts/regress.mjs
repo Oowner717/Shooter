@@ -430,6 +430,121 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `base ${r.base}, near/mid/far at x1,x1.45,x2.1 = ${JSON.stringify([r.near, r.mid, r.far])}, abeam ${r.abeam}`);
 }
 
+// --- a wave that unlocks mid-rotation joins that rotation --------------------
+/*
+ * shuffle() read eligibility once, at the top of a cycle, and nothing rejoined
+ * until the next one was built. A run is about five cycles and the last was
+ * built at around 317 kills, so GLUT (unlock 330) and TOW (380) unlocked into
+ * a rotation that had already been decided, and the 500-release allotment ran
+ * out before another was. Driven 30 times on build 109: both played 0% of the
+ * time. Authored, in the codex, in the debug screen, unreachable in a run.
+ *
+ * This half is the mechanism, deterministically: build a rotation at zero
+ * kills, then cross every threshold and step the director once.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { WAVES, TYPE_BY_ID } = await import('../src/config.js');
+    g.restart();
+    const w = g.world;
+    w.phase = 'staging';
+    const d = w.director;
+    w.kills = 0;
+    d.shuffle(w);           // a rotation decided when almost nothing is unlocked
+    const before = d.order.length;
+    const missing = WAVES.map((wv, i) => i).filter((i) => !WAVES[i].teach && !d.order.includes(i));
+    w.kills = 9999;         // everything is unlocked now, mid-rotation
+    d.begin(w);
+    const after = d.order.length;
+    const stillMissing = missing.filter((i) => !d.order.includes(i));
+    // and nothing already played is replayed by the splice
+    const ahead = missing.filter((i) => d.order.indexOf(i) >= 0 && d.order.indexOf(i) <= d.at);
+    return { before, after, wanted: missing.length, stillMissing: stillMissing.length, behindPlayhead: ahead.length,
+             names: stillMissing.map((i) => JSON.stringify(WAVES[i].of)) };
+  });
+  check('a wave that unlocks mid-rotation joins the rotation it unlocked during',
+    r.wanted > 0 && r.stillMissing === 0 && r.behindPlayhead === 0,
+    `rotation ${r.before} -> ${r.after}, ${r.wanted} newly eligible, ${r.stillMissing} still absent`
+    + `${r.names.length ? ` (${r.names.join(' ')})` : ''}, ${r.behindPlayhead} spliced behind the playhead`);
+}
+
+// --- ...and every type is actually met in a run ------------------------------
+// The other half, driven: the real Director on a fast clock with the field
+// cleared each step, so the player is a perfect one and unlocks land on time.
+// A type met in under half of runs is content most players will never see.
+{
+  const RUNS = 12;
+  const FLOOR = 0.5;
+  const r = await page.evaluate(async (RUNS) => {
+    const g = window.__sim;
+    const { CFG, WAVES, TYPE_BY_ID } = await import('../src/config.js');
+    const seen = {};
+    for (let n = 0; n < RUNS; n++) {
+      g.restart();
+      const w = g.world;
+      w.phase = 'staging';
+      const d = w.director;
+      let guard = 0;
+      const played = new Set();
+      const realLoad = d.load.bind(d);
+      d.load = (world, wave) => { played.add(WAVES.indexOf(wave)); return realLoad(world, wave); };
+      while (w.released < CFG.killGoal && guard++ < 40000) {
+        d.update(w, 0.7);
+        for (const e of w.enemies) e.dead = true;
+        w.enemies.length = 0;
+        for (const dr of w.drops) dr.dead = true;
+        w.drops.length = 0;
+        w.kills = w.released;
+      }
+      d.load = realLoad;
+      for (const i of played) for (const [id] of WAVES[i].of) seen[id] = (seen[id] || 0) + 1;
+    }
+    const types = [...new Set(WAVES.flatMap((wv) => wv.of.map(([id]) => id)))];
+    types.sort((a, b) => (TYPE_BY_ID[a].unlock || 0) - (TYPE_BY_ID[b].unlock || 0));
+    return { runs: RUNS, rate: Object.fromEntries(types.map((t) => [t, (seen[t] || 0) / RUNS])) };
+  }, RUNS);
+  const thin = Object.entries(r.rate).filter(([, v]) => v < FLOOR);
+  check(`every type in the wave table is met in over ${FLOOR * 100}% of runs`,
+    thin.length === 0,
+    `${thin.length ? `thin: ${thin.map(([t, v]) => `${t} ${Math.round(v * 100)}%`).join(', ')} — ` : ''}`
+    + Object.entries(r.rate).map(([t, v]) => `${t} ${Math.round(v * 100)}%`).join(', '));
+}
+
+// --- a TOW always brings its MASS --------------------------------------------
+// A TOW is the one type that is two bodies on a cable. spawnFormation went
+// through spawnOne, which makes a head with no mass and no tether -- harmless
+// only while the TOW waves never played, which they now do.
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const en = await import('../src/enemies.js');
+    const { TYPE_BY_ID } = await import('../src/config.js');
+    const clear = () => { for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0; };
+    const bare = (label) => {
+      const heads = w.enemies.filter((e) => !e.dead && e.type.id === 'tow');
+      const loose = heads.filter((e) => !e.tether || !e.tether.other || e.tether.other.dead
+        || e.tether.other.type.id !== 'towMass');
+      return { label, heads: heads.length,
+        masses: w.enemies.filter((e) => !e.dead && e.type.id === 'towMass').length,
+        loose: loose.length };
+    };
+    const out = [];
+    clear();
+    en.spawnFormation(w, [TYPE_BY_ID.tow], 4);
+    out.push(bare('formation'));
+    clear();
+    en.spawnGroup(w, 'tow', 4);
+    out.push(bare('group'));
+    clear();
+    return out;
+  });
+  const broken = r.filter((x) => x.loose > 0 || x.masses !== x.heads);
+  check('a TOW is never put on the field without its MASS',
+    broken.length === 0, JSON.stringify(r));
+}
+
 // --- the broadphase ---------------------------------------------------------
 {
   const r = await page.evaluate(async () => {

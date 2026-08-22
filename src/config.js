@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '109';
+export const BUILD = '110';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '109';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'f7b4315';
+export const REV = 'b1e7f6e';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1247,13 +1247,28 @@ export const WAVES = [
   { teach: true, of: [['lurcher', 2], ['needle', 3]], drift: 1 },
   { teach: true, of: [['splitter', 1], ['mote', 4], ['needle', 2]], drift: 2 },
 
-  // ---- and then the rest, in whatever order they come out ----
-  { of: [['mote', 6]] },
-  { of: [['needle', 6]] },
+  /*
+   * ---- and then the rest, in whatever order they come out ----
+   *
+   * Every one of these names two or three types, never one. A wave of six
+   * MOTEs is a quantity; six MOTEs with two NEEDLEs threading them is a
+   * problem, because the two want different things from you at the same time
+   * and neither on its own is hard. That is the whole brief: a light challenge
+   * out of the combination, not out of the count. Totals stay at six to eight
+   * bodies before the swell, which is what keeps a combination from becoming
+   * a crowd.
+   *
+   * A wave is eligible only once *every* type in it has unlocked, so a
+   * combination is gated by its latest member. That is why the first three are
+   * MOTE and NEEDLE in different proportions -- before kill 18 there is
+   * nothing else to combine them with.
+   */
+  { of: [['mote', 5], ['needle', 3]] },
+  { of: [['needle', 5], ['mote', 3]] },
   { of: [['mote', 4], ['needle', 4]] },
-  { of: [['lurcher', 3]] },
+  { of: [['lurcher', 3], ['needle', 3]] },
   { of: [['lurcher', 2], ['mote', 4]] },
-  { of: [['splitter', 3]] },
+  { of: [['splitter', 2], ['lurcher', 1], ['mote', 3]] },
   { of: [['splitter', 2], ['needle', 4]] },
   { of: [['bloom', 2], ['mote', 4]] },
   { of: [['bloom', 3], ['lurcher', 2]] },
@@ -1267,12 +1282,18 @@ export const WAVES = [
   { of: [['warden', 1], ['prism', 2], ['needle', 3]] },
   { of: [['scion', 1], ['bloom', 2]] },
   { of: [['scion', 2], ['lurcher', 2]] },
+  // Seeds and something worth landing on. A WARDEN already carries plating;
+  // a grafted one is the clearest read there is on what a SEED does.
+  { of: [['scion', 1], ['warden', 2], ['needle', 3]] },
   { of: [['bulwark', 1], ['needle', 4]] },
   { of: [['bulwark', 2], ['herald', 1]] },
   { of: [['glut', 3], ['mote', 4]] },
   { of: [['glut', 2], ['splitter', 2]] },
-  { of: [['tow', 2]] },
-  { of: [['tow', 1], ['bulwark', 1]] },
+  // A TOW is two bodies -- the head and the MASS on its cable -- so these are
+  // heavier than they read. Never more than one pair alongside anything else.
+  { of: [['tow', 2], ['needle', 3]] },
+  { of: [['tow', 1], ['bulwark', 1], ['mote', 4]] },
+  { of: [['tow', 1], ['prism', 2], ['needle', 3]] },
 
   /*
    * The bonus. Grey and nothing else: no hostiles, no risk, no cost to the
