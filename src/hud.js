@@ -6,6 +6,7 @@ import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
 import { BUILD, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
+import { CODEX, codex } from './codex.js';
 import {  } from './util.js';
 import { Menu } from './menu.js';
 import { holdFor, STACK } from './tutorial.js';
@@ -640,7 +641,8 @@ export class Hud {
 
   // ----------------------------------------------------------------- alerts
 
-  alert(text, kind = 'info', duration = 2.4) {
+  /** `tone` overrides the kind's colour: used to say which object this is about. */
+  alert(text, kind = 'info', duration = 2.4, tone = null) {
     const existing = this.alerts.find((a) => a.text === text);
     if (existing) {
       existing.t = duration;
@@ -648,6 +650,7 @@ export class Hud {
     }
     const el = document.createElement('div');
     el.className = `alert ${kind}`;
+    if (tone) el.style.color = tone;
     el.textContent = text;
     this.el.alerts.appendChild(el);
     this.alerts.push({ el, t: duration, text });
@@ -1093,11 +1096,26 @@ export class Hud {
    * one thing the fight is not allowed to do. The menu button pulses and its
    * count goes up, and the entry is waiting when the player looks.
    */
-  noteCodex() {
+  /**
+   * An object destroyed for the first time.
+   *
+   * The menu button flashes, which it always did and which nobody looking at
+   * the field ever saw. So it is said on the field as well, in the colour of
+   * the thing that was just destroyed, with the tally beside it — the count is
+   * what makes the glossary a thing you are filling in rather than a tab you
+   * have not opened.
+   */
+  noteCodex(id) {
     this.menu.syncCodex();
     const b = this.menu.el.btn;
     b.classList.remove('recorded');
     void b.offsetWidth;
     b.classList.add('recorded');
+
+    const entry = CODEX.find((e) => e.id === id);
+    if (!entry) return;
+    const type = TYPE_BY_ID[id];
+    this.alert(`${entry.name} RECORDED  ${codex.found}/${codex.total}`, 'found', 3.6,
+      type ? type.color : null);
   }
 }

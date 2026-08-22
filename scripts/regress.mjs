@@ -28,6 +28,11 @@
  *   broadphase     build 92 grew a body past half the grid cell, so two of
  *                  them could overlap unseen. (Also guarded statically in
  *                  check-build.mjs; this checks the running game agrees.)
+ *   discovery      build 104: a first kill only flashed the menu button, which
+ *                  nobody watching the field ever saw.
+ *   the reset      build 104: RESET SIMULATION kept the glossary and every
+ *                  line already said, so starting again started again with the
+ *                  game still knowing you.
  *
  * Run: node scripts/regress.mjs            (expects a static server on :8099)
  *      node scripts/regress.mjs --port N
@@ -217,6 +222,57 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   });
   check('unmuting after a relaunch returns to the chosen level', Math.abs(back - 0.35) < 1e-6, `came back at ${back}`);
   await page.evaluate(async () => { (await import('../src/audio.js')).audio.setVolume(1); });
+}
+
+// --- a first kill is said on the field --------------------------------------
+// The menu button has always flashed. Nobody watching the field ever saw it.
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { codex } = await import('../src/codex.js');
+    const w = g.world;
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    codex.forget();
+    for (const a of document.querySelectorAll('#alerts .alert')) a.remove();
+    const e = g.debugSpawn('bloom', w.width / 2, 600);
+    e.staged = false; e.spawnIn = 0; e.applyDamage(w, 1e9);
+    await new Promise((res) => setTimeout(res, 400));
+    const notice = [...document.querySelectorAll('#alerts .alert.found')]
+      .map((a) => ({ text: a.textContent, colour: a.style.color }))[0];
+    return { notice, found: codex.found };
+  });
+  check('a first kill is announced on the field', !!r.notice && /BLOOM/.test(r.notice.text) && !!r.notice.colour,
+    JSON.stringify(r));
+}
+
+// --- reset means reset ------------------------------------------------------
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { codex } = await import('../src/codex.js');
+    g.debugTeachAll();
+    g.debugGiveEnergy(4000);
+    g.debugCodexAll();
+    if (g.saveNow) g.saveNow();
+    const before = {
+      found: codex.found, energy: Math.round(g.world.energy), teaching: g.teaching,
+      keys: Object.keys(localStorage).filter((k) => k.startsWith('sim7749')).sort(),
+    };
+    g.resetAll();
+    await new Promise((res) => setTimeout(res, 800));
+    return {
+      before,
+      found: codex.found, energy: Math.round(g.world.energy), teaching: g.teaching,
+      kills: g.world.kills, taken: g.world.offers.taken.length,
+      keys: Object.keys(localStorage).filter((k) => k.startsWith('sim7749')).sort(),
+    };
+  });
+  check('reset puts the device back to a first launch',
+    r.found === 0 && r.energy === 0 && r.kills === 0 && r.taken === 0 && r.teaching === true
+      && !r.keys.includes('sim7749-run') && !r.keys.includes('sim7749-codex')
+      && !r.keys.includes('sim7749-lines'),
+    JSON.stringify(r));
 }
 
 // --- the broadphase ---------------------------------------------------------

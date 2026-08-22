@@ -404,8 +404,10 @@ export class Menu {
     const g = this.game;
     p.appendChild(this.volumeRow());
     const rows = [
-      ['RESET SIMULATION', 'start the session again', () => { this.setOpen(false); g.restart(); }, true],
-      ['REPLAY OPENING', 'hand the controls over again', () => { this.setOpen(false); g.replayOpening(); }, true],
+      // One button, and it means all of it: the run, the glossary, the opening
+      // lines. REPLAY OPENING used to sit here to put the lines back, which was
+      // a second button for half of what this one now does.
+      ['RESET SIMULATION', 'wipe everything and start as if new', () => { this.setOpen(false); g.resetAll(); }, true],
       ['DEBUG', 'developer panel', () => { this.setOpen(false); g.hud.toggleDebug(true); }],
     ];
     for (const [label, sub, run, ask] of rows) {

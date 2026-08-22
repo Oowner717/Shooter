@@ -213,6 +213,28 @@ export function markLine(id) {
   } catch { /* private mode: it will offer the line again next launch */ }
 }
 
+/**
+ * Every trace of this player, gone: the glossary, every line already said, and
+ * the two dead keys the migration would otherwise have to find later. What
+ * RESET SIMULATION means — the next launch is a first launch.
+ *
+ * The volume is deliberately not here. It is a comfort setting rather than
+ * progress, and a reset that unmutes a phone at midnight is a worse thing to
+ * do to someone than a volume that outlives their run.
+ */
+export function forgetPlayer() {
+  codex.forget();
+  forgetLines();
+  try {
+    // forget() leaves an empty record behind; a device that has never been
+    // opened has no record at all, and that is what this is meant to look
+    // like. The next thing destroyed writes it again.
+    localStorage.removeItem(KEY);
+    localStorage.removeItem(TAUGHT);
+    localStorage.removeItem(CLEARED);
+  } catch { /* nothing to forget */ }
+}
+
 export function forgetLines() {
   _lines = new Set();
   try {

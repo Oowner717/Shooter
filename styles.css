@@ -261,6 +261,18 @@ html, body {
 .alert.power { color: #ffcf5c; }
 .alert.info { color: var(--accent); }
 /*
+ * An object recorded for the first time. Wider letters and a lit edge, and the
+ * colour comes inline from the object itself — the one alert that is about a
+ * specific thing on the field rather than about the run.
+ */
+.alert.found {
+  font-size: 10.5px;
+  letter-spacing: 0.28em;
+  padding: 5px 14px;
+  background: rgba(6, 10, 18, 0.82);
+  box-shadow: 0 0 14px -4px currentColor, inset 0 0 12px -8px currentColor;
+}
+/*
  * ORDINAL's arrival captions. Centred over the field, one line at a time,
  * away from the pill stack — the entrance is the one moment the interface is
  * supposed to go quiet.

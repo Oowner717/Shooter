@@ -14,7 +14,7 @@ import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator } from './narrative.js';
 import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
-import { codex, lineSeen, markLine, forgetLines, migrateLines } from './codex.js';
+import { codex, lineSeen, markLine, forgetLines, forgetPlayer, migrateLines } from './codex.js';
 import { readRun, saveRun, forgetRun } from './save.js';
 import { Offers } from './events.js';
 import { freshUpgrades, BY_ID } from './upgrades.js';
@@ -187,8 +187,7 @@ export class Game {
      * about DRIFT reach anyone who was already playing before they existed.
      */
     migrateLines(CONTROL_LINES);
-    this.teaching = this.replayNext || SCRIPT.some((e) => !lineSeen(e.id));
-    this.replayNext = false;
+    this.teaching = SCRIPT.some((e) => !lineSeen(e.id));
     // What the turret is issued with. Everything else — four rounds, four
     // mines, the two that run on their own and seven of the eight abilities —
     // is bought from the permanent tier, and nothing carries over.
@@ -1123,7 +1122,7 @@ export class Game {
   /** Everything destroyed passes through here for the record, counted or not. */
   noteDestroyed(e) {
     const id = e && e.type && e.type.id;
-    if (codex.record(id)) this.hud.noteCodex();
+    if (codex.record(id)) this.hud.noteCodex(id);
   }
 
   /**
@@ -1155,14 +1154,17 @@ export class Game {
   }
 
   /**
-   * Run the opening lines again. They are remembered as said in localStorage
-   * and a reset does not clear that on purpose — being told the same four
-   * things twice is not teaching. But there was no way back to them at all,
-   * which made every later change to them invisible to anyone who had played.
+   * Back to a first launch.
+   *
+   * RESET SIMULATION used to only throw away the run — the glossary and every
+   * line already said survived it, so "start again" started again with the
+   * game still knowing you. REPLAY OPENING sat beside it to put the lines
+   * back, which is two buttons for one idea and neither of them the one
+   * anybody wanted. This is the one: the save, the glossary, the opening, and
+   * the energy with it.
    */
-  replayOpening() {
-    forgetLines();
-    this.replayNext = true;
+  resetAll() {
+    forgetPlayer();
     this.restart();
   }
 
