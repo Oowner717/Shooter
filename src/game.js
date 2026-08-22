@@ -19,7 +19,7 @@ import { readRun, saveRun, forgetRun } from './save.js';
 import { Offers } from './events.js';
 import { freshUpgrades, BY_ID } from './upgrades.js';
 import { NODES, NODE_BY_ID, priceOf } from './tree.js';
-import { SCRIPT, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { SCRIPT, ON_CONTACT, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
@@ -1098,6 +1098,29 @@ export class Game {
         shake(7);
         ring(s.x, s.y, 10, 120, 0.3, '#ff2d55', 3);
       }
+    }
+    // What it is and what it costs, said while something is doing it.
+    if (w.attackers.size) this.sayOnce(ON_CONTACT);
+  }
+
+  /**
+   * A line that waits for a thing to happen rather than for the count.
+   *
+   * One per call, and only when the last one has had its reading time, so a
+   * pair of them comes out paced the way the opening does. Remembered by the
+   * same per-line record as everything else, so each is said once on this
+   * device and never again — including to a player who finished the opening
+   * long before the line existed.
+   */
+  sayOnce(lines) {
+    const w = this.world;
+    for (const l of lines) {
+      if (lineSeen(l.id)) continue;
+      if (w.time < this.lineUntil + GAP) return;
+      markLine(l.id);
+      this.hud.showHint(l.text, true);
+      this.lineUntil = w.time + l.hold;
+      return;
     }
   }
 

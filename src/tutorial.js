@@ -74,6 +74,26 @@ export const SCRIPT = [...OPENING, ...NOTES]
   .map((e) => ({ ...e, id: idOf(e.text), hold: holdFor(e.text) }));
 
 /*
+ * Said the first time corruption actually happens, rather than at a point in
+ * the count.
+ *
+ * Every other line in here is paced by the clock or gated on kills, and
+ * neither works for this one: something can grab the turret in the first ten
+ * seconds or not for two minutes, and a paragraph about what it costs is worth
+ * nothing unless something is holding on while it is read.
+ *
+ * The numbers are the point, and they are the real ones — CFG.energy.tax is
+ * 0.78 per attached object, compounding, floored at CFG.energy.taxFloor with
+ * CFG.energy.taxCap objects counted. So one costs 22% of what you bank, two
+ * 39%, three 53%, five 70%, and past five nothing more. The feed's break-up
+ * tops out at three (CFG.glitch: 0.34 each, capped at 0.92).
+ */
+export const ON_CONTACT = [
+  'CORRUPTION. Something is holding the turret.\nIt cannot kill you. It stops when you destroy it.',
+  'Each one taxes what you bank: one costs 22%,\ntwo 39%, three 53%, five 70% and no worse than that.',
+].map((text) => ({ id: idOf(text), text, hold: holdFor(text) }));
+
+/*
  * What a device carrying the old `sim7749-taught` flag is credited with having
  * heard. The four control lines: they have opened the game since the first
  * build, they are the ones nobody wants to sit through twice, and they are the

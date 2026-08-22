@@ -33,6 +33,8 @@
  *   the reset      build 104: RESET SIMULATION kept the glossary and every
  *                  line already said, so starting again started again with the
  *                  game still knowing you.
+ *   corruption     build 105: the only copy in the game that states numbers,
+ *                  checked against the numbers the code charges.
  *
  * Run: node scripts/regress.mjs            (expects a static server on :8099)
  *      node scripts/regress.mjs --port N
@@ -273,6 +275,25 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       && !r.keys.includes('sim7749-run') && !r.keys.includes('sim7749-codex')
       && !r.keys.includes('sim7749-lines'),
     JSON.stringify(r));
+}
+
+// --- the corruption line quotes the real rates ------------------------------
+// It is the one piece of copy in the game that states numbers, so the numbers
+// have to be the ones the code uses. Change CFG.energy.tax and this fails.
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { ON_CONTACT } = await import('../src/tutorial.js');
+    const S = CFG.energy;
+    // intakeRate() with no INSULATION: bite is CFG.energy.tax, compounding,
+    // floored, with at most taxCap objects counted.
+    const cost = (n) => Math.round((1 - Math.max(S.taxFloor, S.tax ** Math.min(n, S.taxCap))) * 100);
+    const said = ON_CONTACT.map((l) => l.text).join(' ');
+    const want = [1, 2, 3, S.taxCap].map((n) => `${cost(n)}%`);
+    return { want, missing: want.filter((w) => !said.includes(w)), said };
+  });
+  check('the corruption line quotes the rates the code actually charges',
+    r.missing.length === 0, `wanted ${JSON.stringify(r.want)}, missing ${JSON.stringify(r.missing)}`);
 }
 
 // --- the broadphase ---------------------------------------------------------

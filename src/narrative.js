@@ -183,5 +183,5 @@ export const CONTROLS = [
   ['TAP', () => 'anywhere ahead of the turret to shoot there instead. Hold to keep firing.'],
   ['ABILITIES', (n) => `PULSE and FAN to begin with, ${n - 2} more to open. One tap each; each comes back on its own.`],
   ['UPGRADES', () => 'energy buys them. Open the menu and spend it down the tree.'],
-  ['CONTACT', () => 'does not kill you. It breaks up the feed you aim through until you destroy what caused it.'],
+  ['CORRUPTION', () => 'an object holding the turret. It cannot kill you, but each one costs 22% of what you bank and breaks up the feed.'],
 ];
