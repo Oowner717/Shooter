@@ -1,6 +1,6 @@
 // World state, phase machine, physics stepping and the render pipeline.
 
-import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL } from './config.js';
+import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID } from './config.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
 import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
 import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake } from './fx.js';
@@ -137,6 +137,7 @@ export class Game {
       rigAt: -1, // taken.length the cache was built at
       rigFlash: 0, // seconds of the fitting animation still to run
       rigDone: false, // the whole branch bought out, announced once a run
+      shock: 0, // a hurled MASS landing: corruption in its own right, decaying
 
       debug: {
         noCooldown: false,
@@ -163,6 +164,7 @@ export class Game {
     w.mines.length = 0;
     w.pendingBlasts.length = 0;
     w.attackers.clear();
+    w.shock = 0;
     w.time = 0;
     w.timeScale = 1;
     w.kills = 0;
@@ -1152,7 +1154,22 @@ export class Game {
         e.attacking = true;
         w.attackers.add(e);
         audio.glitchOn();
-        shake(7);
+        /*
+         * A MASS that was thrown at you is not the same event as something
+         * walking into you. It lands as a spike of corruption in its own
+         * right -- see CFG's tow.hurl.shock -- which then decays, on top of
+         * the grip it has on you afterwards like anything else.
+         */
+        if (e.hurled) {
+          const H = TYPE_BY_ID.tow.hurl;
+          e.hurled = false; // it only lands once
+          w.shock = Math.max(w.shock, H.shock);
+          audio.boom();
+          shake(18);
+          ring(s.x, s.y, 12, 260, 0.5, e.type.color, 5);
+        } else {
+          shake(7);
+        }
         ring(s.x, s.y, 10, 120, 0.3, '#ff2d55', 3);
       }
     }
@@ -1299,8 +1316,11 @@ export class Game {
     const w = this.world;
     let level = 0;
     let mode = 'normal';
+    if (w.shock > 0) {
+      w.shock = Math.max(0, w.shock - dtRaw / TYPE_BY_ID.tow.hurl.shockFor);
+    }
     if (!w.debug.noGlitch) {
-      level = Math.min(CFG.glitch.max, w.attackers.size * CFG.glitch.perAttacker);
+      level = Math.min(CFG.glitch.max, w.attackers.size * CFG.glitch.perAttacker + w.shock);
     }
     glitch.update(dtRaw, level, mode);
   }

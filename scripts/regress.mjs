@@ -458,8 +458,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     d.begin(w);
     const after = d.order.length;
     const stillMissing = missing.filter((i) => !d.order.includes(i));
-    // and nothing already played is replayed by the splice
-    const ahead = missing.filter((i) => d.order.indexOf(i) >= 0 && d.order.indexOf(i) <= d.at);
+    // ...and nothing already played is replayed by the splice. `<`, not `<=`:
+    // begin() admits and then steps forward, so a wave spliced at the very
+    // next slot lands exactly on the playhead and is played immediately,
+    // which is the point of admitting it.
+    const ahead = missing.filter((i) => { const k = d.order.indexOf(i); return k >= 0 && k < d.at; });
     return { before, after, wanted: missing.length, stillMissing: stillMissing.length, behindPlayhead: ahead.length,
              names: stillMissing.map((i) => JSON.stringify(WAVES[i].of)) };
   });
@@ -543,6 +546,143 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const broken = r.filter((x) => x.loose > 0 || x.masses !== x.heads);
   check('a TOW is never put on the field without its MASS',
     broken.length === 0, JSON.stringify(r));
+}
+
+// --- a body under sustained fire still closes on the turret ------------------
+/*
+ * Knockback stacked without limit along the line of fire. Measured on build
+ * 110, one invulnerable MOTE under auto fire on a direct route: it closed to
+ * 400 units, was blown out to 1306 -- past the top of the field -- and was
+ * still out there twenty seconds later. A LURCHER held station between 330
+ * and 560 for a whole run and never arrived. Repeated hits now give
+ * diminishing shove; the first one after a quiet moment is untouched.
+ *
+ * The measure is against the same object with the turret silent, because that
+ * is the claim: being shot at may slow an object down, it may not park it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const S = w.shooter;
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    const clear = () => { for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+                          for (const d of [...w.drops]) d.dead = true; w.drops.length = 0; };
+    const SECONDS = 26;
+    const trial = (type, fire) => {
+      clear();
+      w.autoAim = fire; w.autoFire = fire;
+      const e = g.debugSpawn(type, S.x + 40, 180);
+      e.staged = false; e.spawnIn = 0;
+      e.route = { id: 'direct', width: 0, weave: 0, commit: 1 };
+      e.hp = 1e9; e.maxHp = 1e9; // it is here to be pushed, not killed
+      const start = Math.hypot(e.x - S.x, e.y - S.y);
+      let far = start;
+      let arrived = null;
+      for (let s = 0; s < SECONDS * 30; s++) {
+        g.update(1 / 30);
+        const d = Math.hypot(e.x - S.x, e.y - S.y);
+        far = Math.max(far, d);
+        if (d < 90) { arrived = +(s / 30).toFixed(1); break; }
+      }
+      const end = arrived === null ? Math.hypot(e.x - S.x, e.y - S.y) : 90;
+      clear();
+      return { arrived, start: Math.round(start), far: Math.round(far), end: Math.round(end),
+        closed: Math.round(start - end) };
+    };
+    const out = {};
+    for (const type of ['lurcher', 'bulwark']) {
+      out[type] = { quiet: trial(type, false), fire: trial(type, true) };
+    }
+    w.autoAim = false; w.autoFire = false;
+    return out;
+  });
+  const share = (o) => o.fire.closed / Math.max(1, o.quiet.closed);
+  const ok = r.lurcher.fire.arrived !== null
+    && share(r.lurcher) >= 0.7 && share(r.bulwark) >= 0.7
+    && r.lurcher.fire.far < r.lurcher.fire.start * 1.2
+    && r.bulwark.fire.far < r.bulwark.fire.start * 1.2;
+  check('a body under sustained fire still closes on the turret', ok,
+    Object.entries(r).map(([k, o]) => `${k} closed ${o.fire.closed}/${o.quiet.closed} of `
+      + `${o.quiet.start} (${Math.round(share(o) * 100)}%), arrived ${o.fire.arrived ?? 'no'}, `
+      + `pushed out to ${o.fire.far}`).join(' | '));
+}
+
+// --- a NEEDLE leads with its point -------------------------------------------
+// It is the fastest thing on the field and used to tumble, which told you
+// nothing about where it was going. The art is drawn along -y, so the angle it
+// wants is the travel bearing plus a quarter turn.
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    const out = [];
+    for (const h of [-Math.PI / 2, 0, Math.PI / 2, 2.4]) {
+      const e = g.debugSpawn('needle', w.shooter.x, 300);
+      e.staged = false; e.spawnIn = 0;
+      e.vx = Math.cos(h) * 140; e.vy = Math.sin(h) * 140;
+      for (let k = 0; k < 90; k++) e.face(1 / 60);
+      const want = h + Math.PI / 2;
+      let d = e.angle - want;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      out.push(+Math.abs(d).toFixed(3));
+      e.dead = true;
+    }
+    w.enemies.length = 0;
+    // ...and something that does not lead with a point is left alone
+    const m = g.debugSpawn('mote', w.shooter.x, 300);
+    m.staged = false; m.spawnIn = 0; m.vx = 140; m.vy = 0;
+    const before = m.angle;
+    for (let k = 0; k < 90; k++) m.face(1 / 60);
+    const moteMoved = Math.abs(m.angle - before) > 1e-9;
+    m.dead = true; w.enemies.length = 0;
+    return { off: out, moteMoved };
+  });
+  check('a NEEDLE turns to lead with its point',
+    r.off.every((d) => d < 0.05) && !r.moteMoved,
+    `radians off heading: ${r.off.join(', ')}${r.moteMoved ? ' — and a MOTE was rotated too' : ''}`);
+}
+
+// --- a TOW throws its MASS, and the hit lands as corruption -------------------
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const S = w.shooter;
+    const en = await import('../src/enemies.js');
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    w.autoAim = false; w.autoFire = false;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.shock = 0;
+    const made = en.spawnGroup(w, 'tow', 1, { where: 'field', x: S.x + 30, y: 700 });
+    const head = made.find((e) => e.type.id === 'tow');
+    const mass = made.find((e) => e.type.id === 'towMass');
+    head.staged = false; head.spawnIn = 0; mass.staged = false; mass.spawnIn = 0;
+    let released = null; let peak = 0; let landed = null;
+    for (let s = 0; s < 1500; s++) {
+      g.update(1 / 60);
+      peak = Math.max(peak, w.shock);
+      if (released === null && !head.tether) {
+        released = { speed: Math.round(Math.hypot(mass.vx, mass.vy)), thrown: mass.thrown > 0, hurled: !!mass.hurled };
+      }
+      if (released && landed === null && mass.attacking) {
+        landed = { shock: +w.shock.toFixed(2), attackers: w.attackers.size };
+        for (let k = 0; k < 60 * 3; k++) g.update(1 / 60); // and it has to clear
+        landed.after = +w.shock.toFixed(2);
+        break;
+      }
+    }
+    const H = TYPE_BY_ID.tow.hurl;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.shock = 0; w.attackers.clear();
+    return { released, landed, peak: +peak.toFixed(2), want: H.shock, speed: H.speed };
+  });
+  check('a TOW throws its MASS at the turret and the hit spikes corruption',
+    !!r.released && r.released.speed >= r.speed * 0.9 && r.released.hurled
+    && !!r.landed && r.peak >= r.want * 0.95 && r.landed.after === 0,
+    JSON.stringify(r));
 }
 
 // --- the broadphase ---------------------------------------------------------

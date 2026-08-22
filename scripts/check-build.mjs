@@ -155,13 +155,24 @@ if (soloWaves.length) {
     + soloWaves.map((w) => JSON.stringify(w.of)).join(' '));
   process.exit(1);
 }
-const WAVE_BODIES = 8;
-const crowded = regular
-  .map((w) => [w.of, w.of.reduce((n, [id, c]) => n + c * (TYPE_BY_ID[id].tows ? 2 : 1), 0)])
-  .filter(([, n]) => n > WAVE_BODIES);
+/*
+ * Bodies per wave as released, which is the authored count times the flat
+ * population multiplier -- the swell is on top of both and is meant to be.
+ * A TOW counts two, because it is two.
+ */
+const WAVE_BODIES = 11;
+const bodiesOf = (w) => Math.round(w.of
+  .reduce((n, [id, c]) => n + Math.max(1, Math.round(c * CFG.waves.population)) * (TYPE_BY_ID[id].tows ? 2 : 1), 0));
+const crowded = regular.map((w) => [w.of, bodiesOf(w)]).filter(([, n]) => n > WAVE_BODIES);
 if (crowded.length) {
-  console.error(`${crowded.length} wave(s) over ${WAVE_BODIES} bodies before the swell: `
-    + crowded.map(([of, n]) => `${JSON.stringify(of)}=${n}`).join(' '));
+  console.error(`${crowded.length} wave(s) over ${WAVE_BODIES} bodies at population `
+    + `${CFG.waves.population}: ` + crowded.map(([of, n]) => `${JSON.stringify(of)}=${n}`).join(' '));
+  process.exit(1);
+}
+const peak = Math.max(...regular.map((w) => Math.round(bodiesOf(w) * CFG.waves.swell[1])));
+if (peak > CFG.maxEnemies) {
+  console.error(`the heaviest wave asks for ${peak} bodies at full swell against a field cap `
+    + `of ${CFG.maxEnemies}; the cap would be doing the balancing`);
   process.exit(1);
 }
 // Types that are only ever produced by another type, never released directly.
@@ -172,7 +183,8 @@ if (unplaced.length) {
   console.error(`no wave releases: ${unplaced.join(', ')} — unreachable outside the debug screen`);
   process.exit(1);
 }
-console.log(`${regular.length} regular waves, all 2-3 types, none over ${WAVE_BODIES} bodies; `
+console.log(`${regular.length} regular waves, all 2-3 types, up to ${Math.max(...regular.map(bodiesOf))} `
+  + `bodies at population ${CFG.waves.population} (${peak} at full swell, cap ${CFG.maxEnemies}); `
   + `${placed.size} types released, ${DERIVED.size} produced by others`);
 
 // ---- REV: what these bytes actually are ------------------------------------

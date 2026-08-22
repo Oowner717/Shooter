@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '110';
+export const BUILD = '111';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '110';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'b1e7f6e';
+export const REV = 'a85f438';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -77,7 +77,10 @@ export const CFG = {
   maxFrameDelta: 0.1, // clamp huge tab-switch deltas
 
   // ---- population -----------------------------------------------------
-  maxEnemies: 44,
+  // Raised with CFG.waves.population in build 111: a 30% bigger wave that
+  // then meets the same ceiling is not a bigger wave, it is the same wave
+  // arriving later.
+  maxEnemies: 57,
   maxDrops: 128,
   maxDrift: 10, // aimless, harmless bodies alive at once
   maxParticles: 620,
@@ -127,6 +130,13 @@ export const CFG = {
     // are meant to be.
     swell: [1, 2.4],
     swellKills: 320,
+    /*
+     * A flat multiplier on every authored count, on top of the swell. The
+     * table stays readable as a set of shapes -- two BLOOMs and four MOTEs is
+     * a legible thing to author -- and how heavy the whole run is stays one
+     * number here. 1.3 as of build 111.
+     */
+    population: 1.3,
     // The next wave is allowed in once the field has thinned to a quarter of
     // what this one let out, floored at `clearTo`. Proportional rather than
     // fixed, or a fourteen-object wave would sit at the end of its patience
@@ -754,6 +764,12 @@ export const CFG = {
     // EBB: it clamped a BULWARK's throw on the first frame, so the heavy
     // things barely moved and the card read as doing nothing to them.
     thrownSpeed: 720,
+    /*
+     * How long an accumulated shove takes to bleed off, in seconds. See
+     * Enemy.shoveFade() for what this is for and what it measured like
+     * without it. Deliberate throws are exempt and use thrownSpeed above.
+     */
+    kickFade: 1.5,
     collisionDamage: 0.42, // damage per unit of (impact speed * reduced mass)
     collisionThreshold: 62, // impact speed below this is a harmless bump
   },
@@ -837,7 +853,7 @@ export const ENEMY_TYPES = [
     name: 'MOTE',
     shape: 'shard',
     r: 12,
-    hp: 24,
+    hp: 31,
     density: 0.85,
     speed: 56,
     accel: 190,
@@ -853,8 +869,11 @@ export const ENEMY_TYPES = [
     unlock: 0,
     name: 'NEEDLE',
     shape: 'needle',
+    // Leads with the point: the heading follows the travel bearing rather
+    // than tumbling. See Enemy.face().
+    point: true,
     r: 10,
-    hp: 20,
+    hp: 26,
     density: 0.7,
     speed: 104, // the quick one
     accel: 330,
@@ -871,7 +890,7 @@ export const ENEMY_TYPES = [
     name: 'LURCHER',
     shape: 'hex',
     r: 24,
-    hp: 142,
+    hp: 185,
     large: true, // released more slowly, and worth more when it lands
     density: 1.35,
     speed: 38,
@@ -890,7 +909,7 @@ export const ENEMY_TYPES = [
     name: 'SPLITTER',
     shape: 'blob',
     r: 29,
-    hp: 122,
+    hp: 159,
     large: true, // released more slowly, and worth more when it lands
     density: 1.0,
     speed: 46,
@@ -909,7 +928,7 @@ export const ENEMY_TYPES = [
     name: 'BLOOM',
     shape: 'bloom',
     r: 33,
-    hp: 190,
+    hp: 247,
     large: true, // released more slowly, and worth more when it lands
     density: 1.05,
     speed: 33,
@@ -929,7 +948,7 @@ export const ENEMY_TYPES = [
     name: 'BULWARK',
     shape: 'plated',
     r: 45,
-    hp: 520,
+    hp: 676,
     large: true, // released more slowly, and worth more when it lands
     density: 2.7,
     speed: 23,
@@ -952,7 +971,7 @@ export const ENEMY_TYPES = [
     name: 'WARDEN',
     shape: 'warden',
     r: 22,
-    hp: 118,
+    hp: 153,
     density: 1.15,
     speed: 41,
     accel: 140,
@@ -983,7 +1002,7 @@ export const ENEMY_TYPES = [
     name: 'PLATE',
     shape: 'plate',
     r: 11,
-    hp: 34,
+    hp: 44,
     density: 1.3,
     speed: 62,
     accel: 190,
@@ -1017,7 +1036,7 @@ export const ENEMY_TYPES = [
     name: 'SCION',
     shape: 'scion',
     r: 34,
-    hp: 300,
+    hp: 390,
     large: true,
     density: 1.15,
     speed: 26,
@@ -1043,7 +1062,7 @@ export const ENEMY_TYPES = [
     shape: 'seed',
     harmless: true,
     r: 8,
-    hp: 14,
+    hp: 18,
     density: 0.5,
     speed: 150,
     accel: 200,
@@ -1069,7 +1088,7 @@ export const ENEMY_TYPES = [
     shape: 'drift',
     harmless: true,
     r: 17,
-    hp: 30,
+    hp: 39,
     density: 0.55,
     speed: 34,
     accel: 95,
@@ -1092,7 +1111,7 @@ export const ENEMY_TYPES = [
     name: 'HERALD',
     shape: 'herald',
     r: 19,
-    hp: 76,
+    hp: 99,
     density: 0.8,
     speed: 44,
     accel: 150,
@@ -1113,7 +1132,7 @@ export const ENEMY_TYPES = [
     name: 'GLUT',
     shape: 'glut',
     r: 16,
-    hp: 90,
+    hp: 117,
     density: 1.1,
     speed: 30,
     accel: 105,
@@ -1134,7 +1153,7 @@ export const ENEMY_TYPES = [
     name: 'TOW',
     shape: 'tow',
     r: 18,
-    hp: 104,
+    hp: 135,
     density: 0.8,
     speed: 52,
     accel: 175,
@@ -1148,6 +1167,21 @@ export const ENEMY_TYPES = [
     weight: 5,
     drops: 5, // energy it leaves when it comes apart
     tows: { type: 'towMass', length: 132 },
+    /*
+     * ...and it does not carry it all the way in. Inside `range` the TOW winds
+     * the load up for `wind` seconds -- the cable shortens and the mass comes
+     * round harder every turn -- and then lets go of it.
+     *
+     * A thrown MASS is 280hp of armoured lump crossing the field at 620, which
+     * is faster than anything else on it. It costs nothing to dodge and a lot
+     * to eat: on the turret it lands as a `shock`, a spike of corruption in
+     * its own right that decays over `shockFor`, on top of the grip it then
+     * has on you like anything else that arrives.
+     *
+     * The head keeps coming, lighter and unencumbered, which is the second
+     * half of the beat.
+     */
+    hurl: { range: 430, wind: 1.15, speed: 620, shock: 0.62, shockFor: 1.8 },
   },
   {
     // The mass on the end of a TOW's cable. Never rolled for on its own.
@@ -1156,7 +1190,7 @@ export const ENEMY_TYPES = [
     name: 'MASS',
     shape: 'mass',
     r: 27,
-    hp: 215,
+    hp: 280,
     large: true, // released more slowly, and worth more when it lands
     density: 2.4,
     speed: 26,
@@ -1176,7 +1210,7 @@ export const ENEMY_TYPES = [
     name: 'PRISM',
     shape: 'prism',
     r: 20,
-    hp: 68,
+    hp: 88,
     density: 0.9,
     speed: 50,
     accel: 170,

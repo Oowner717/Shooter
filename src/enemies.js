@@ -382,7 +382,90 @@ export class Enemy {
     this.vy += ((dy / d) * this.cruise - this.vy) * clamp(k, 0, 1);
   }
 
+  /**
+   * Steering, then the two things that have to happen however it steered.
+   *
+   * drive() has half a dozen early returns -- thrown, seeded, harmless, dead
+   * -- and a NEEDLE that stops pointing where it is going the moment EBB
+   * throws it is a NEEDLE that tumbles for the most visible second of its
+   * life. Same for a TOW's wind-up, which must not stall because the pair got
+   * shoved.
+   */
   steer(world, dt) {
+    this.shoveFade(dt);
+    this.drive(world, dt);
+    if (this.type.hurl && this.tether) this.windUp(world, dt);
+    this.face(dt);
+  }
+
+  /**
+   * Types that lead with a point turn to face where they are going.
+   *
+   * A NEEDLE is drawn as a spike along -y, so the heading it wants is the
+   * travel bearing plus a quarter turn. Eased over about a tenth of a second
+   * rather than snapped, and its tumble is damped out as it comes round, so a
+   * body shoved sideways reads as correcting rather than as a sprite being
+   * rotated. Below walking pace it keeps whatever heading it had -- a needle
+   * sitting still has no "forward" to point at.
+   */
+  face(dt) {
+    if (!this.type.point || this.isDrop) return;
+    const sp = Math.hypot(this.vx, this.vy);
+    if (sp < 10) return;
+    let d = Math.atan2(this.vy, this.vx) + Math.PI / 2 - this.angle;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    const k = clamp(dt * 11, 0, 1);
+    this.angle += d * k;
+    this.av *= 1 - k;
+  }
+
+  /**
+   * A TOW winding its load up, and letting go of it.
+   *
+   * Only the head runs this, and only while it still has a cable. Inside the
+   * hurl range the mass is driven around the head -- a sideways push each
+   * frame, so the pair spins up instead of being teleported into an orbit --
+   * and at the end of the wind it is released at the turret.
+   */
+  windUp(world, dt) {
+    const H = this.type.hurl;
+    const mass = this.tether.other;
+    if (!mass || mass.dead) return;
+    const s = world.shooter;
+    if (Math.hypot(s.x - this.x, s.y - this.y) > H.range) { this.wind = 0; return; }
+
+    this.wind = (this.wind || 0) + dt;
+    const spin = clamp(this.wind / H.wind, 0, 1);
+    // perpendicular to the cable, so the load comes round rather than in
+    let cx = mass.x - this.x;
+    let cy = mass.y - this.y;
+    const cd = Math.hypot(cx, cy) || 1;
+    cx /= cd; cy /= cd;
+    mass.vx += -cy * 900 * spin * dt;
+    mass.vy += cx * 900 * spin * dt;
+    this.tether.len = this.type.tows.length * (1 - spin * 0.45); // and it draws in
+
+    if (this.wind < H.wind) return;
+
+    // Let go. Straight at the turret, at a speed nothing else on the field
+    // has, and coasting -- `thrown` is what stops a released body steering.
+    const dx = s.x - mass.x;
+    const dy = s.y - mass.y;
+    const d = Math.hypot(dx, dy) || 1;
+    mass.vx = (dx / d) * H.speed;
+    mass.vy = (dy / d) * H.speed;
+    mass.av = spread(9);
+    mass.thrown = 2.2;
+    mass.hurled = true;
+    this.tether = null;
+    mass.tether = null;
+    this.wind = 0;
+    this.hurled = true; // spent: it never gets another one
+    ring(this.x, this.y, this.r, this.r * 5, 0.3, this.type.color, 2);
+    audio.thud();
+  }
+
+  drive(world, dt) {
     // Thrown clear and not yet recovered. It coasts: the whole point of EBB is
     // that the field comes off you, and a body that starts steering back on
     // the next frame has not been thrown anywhere.
@@ -439,8 +522,18 @@ export class Enemy {
     // as the object closes, so each one arrives by its own arc.
     if (!this.staged) {
       const r = this.route;
+      /*
+       * `commit` is an exponent, so a low one folds in very slowly: WIDE
+       * (width 480, commit 0.35) still held a 293-unit sideways offset at 130
+       * units out, which is not an approach, it is an orbit.
+       *
+       * So the offset is scaled off entirely across the last stretch,
+       * whatever the route. An arc is how a thing arrives; it is not how it
+       * spends the endgame.
+       */
       const reach = clamp(d / 520, 0, 1) ** r.commit;
-      let lateral = r.width * this.routeScale * this.routeSide * reach;
+      const closing = clamp((d - 170) / 210, 0, 1);
+      let lateral = r.width * this.routeScale * this.routeSide * reach * closing;
       if (r.weave) lateral *= Math.sin(t * r.weave + this.phase);
       tx += -dy * lateral;
       ty += dx * lateral;
@@ -475,8 +568,28 @@ export class Enemy {
       if (dist > 260) cruise *= this.route.dawdle;
     }
     const speed = Math.hypot(this.vx, this.vy);
-    // Steering yields to physics while a body is flying — knockback stays fun.
-    const authority = clamp(1 - (speed / Math.max(cruise, 1) - 1) / 3, 0.12, 1);
+    /*
+     * Steering yields to physics while a body is flying, so knockback stays
+     * fun -- but only while the body is still going roughly where it wanted
+     * to. It used to yield unconditionally, and the shove that mattered was
+     * the one that reversed it: authority collapsed to 0.12 and the object
+     * coasted away without turning round. Measured on build 110, one
+     * invulnerable MOTE under auto fire on a direct route:
+     *
+     *   quiet       791 746 702 ... 344 299 255 209 166 121  78  39
+     *   under fire  791 750 705 ... 445 402 473 672 969 1277 1305 1306
+     *
+     * It closed to 400 units, was blown back across the whole field, and was
+     * still out there twenty seconds later. A LURCHER simply sat between 330
+     * and 560 for the entire run.
+     *
+     * `along` is how much of the current velocity is going the way the object
+     * wants. Negative means it is travelling away from where it is steering,
+     * and that is exactly when it needs its authority back rather than least.
+     */
+    const along = speed > 1 ? (this.vx * dx + this.vy * dy) / speed : 1;
+    const flying = clamp(1 - (speed / Math.max(cruise, 1) - 1) / 3, 0.12, 1);
+    const authority = clamp(flying + Math.max(0, -along) * 0.9, 0.12, 1);
     const k = (this.accel / 100) * authority * slow;
 
     this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);
@@ -665,6 +778,30 @@ export class Enemy {
   }
 
   /**
+   * A shove is a shove. A stream of them is not a conveyor belt.
+   *
+   * Knockback stacked without limit, so anything the turret kept shooting was
+   * pushed back faster than it could steer in. Measured on build 110, one
+   * invulnerable MOTE under auto fire on a direct route: it closed to 400
+   * units, was blown out to 1306 -- past the top of the field -- and was
+   * still out there twenty seconds later at vy -70, because every bolt that
+   * reached it renewed the push. A LURCHER held station between 330 and 560
+   * for a whole run. That is the "enemies stop and never arrive" this fixes.
+   *
+   * So repeated hits give diminishing shove. `kicked` counts effective hits
+   * and bleeds off over CFG.physics.kickFade seconds, and each new hit is
+   * scaled by 1/(1 + kicked). The first hit after a quiet moment lands at
+   * exactly its old strength -- the punt is the fun part and is untouched --
+   * while a sustained stream settles at about a third of it, which is well
+   * inside what the object's own steering can answer.
+   *
+   * Damage is not touched. This is the impulse only.
+   */
+  shoveFade(dt) {
+    if (this.kicked > 0) this.kicked = Math.max(0, this.kicked - dt / CFG.physics.kickFade);
+  }
+
+  /**
    * @returns 'reflect' | 'hit'
    */
   takeHit(world, dmg, hx, hy, nx, ny, impulse, shred = 0) {
@@ -710,9 +847,13 @@ export class Enemy {
     this.hp -= real;
     this.flash = Math.min(1, this.flash + 0.5 + real / 260);
     if (impulse) {
-      this.vx += nx * impulse * this.invMass;
-      this.vy += ny * impulse * this.invMass;
-      this.av += spread(impulse * this.invMass * 0.02);
+      // Diminishing returns on a stream of hits — see shoveFade().
+      const fade = 1 / (1 + (this.kicked || 0));
+      this.kicked = (this.kicked || 0) + fade;
+      const push = impulse * this.invMass * fade;
+      this.vx += nx * push;
+      this.vy += ny * push;
+      this.av += spread(push * 0.02);
     }
     if (this.hp <= 0) this.destroy(world);
   }
@@ -1063,15 +1204,56 @@ function drawShard(ctx, r) {
   ctx.stroke();
 }
 
+/*
+ * A dart, not a diamond.
+ *
+ * It used to be four straight lines -- tip, two shoulders, tail -- which at
+ * ten units across read as a kite with no front and no back, and told you
+ * nothing about which way the fastest thing on the field was going. It leads
+ * with the point now: a long spike, shoulders set well back, a pair of swept
+ * fins behind them and a lit spine running up to a bright tip.
+ *
+ * Drawn along -y, because that is the axis Enemy.face() turns to the heading.
+ */
 function drawNeedle(ctx, r) {
+  const stroke = ctx.strokeStyle;
+  // the body: a narrow spike with the widest point two thirds of the way back
   ctx.beginPath();
-  ctx.moveTo(0, -r * 1.9);
-  ctx.lineTo(r * 0.72, 0);
-  ctx.lineTo(0, r * 1.1);
-  ctx.lineTo(-r * 0.72, 0);
+  ctx.moveTo(0, -r * 2.1);
+  ctx.quadraticCurveTo(r * 0.34, -r * 0.5, r * 0.56, r * 0.62);
+  ctx.lineTo(0, r * 0.24);
+  ctx.lineTo(-r * 0.56, r * 0.62);
+  ctx.quadraticCurveTo(-r * 0.34, -r * 0.5, 0, -r * 2.1);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+
+  // swept fins, off the shoulders and raked back
+  ctx.beginPath();
+  for (const side of [-1, 1]) {
+    ctx.moveTo(side * r * 0.4, -r * 0.1);
+    ctx.lineTo(side * r * 1.05, r * 0.72);
+    ctx.lineTo(side * r * 0.5, r * 0.5);
+  }
+  ctx.stroke();
+
+  // the spine, and a lit tip at the front of it
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = Math.max(HAIRLINE * 0.7, r * 0.07);
+  ctx.beginPath();
+  ctx.moveTo(0, r * 0.3);
+  ctx.lineTo(0, -r * 1.7);
+  ctx.stroke();
+  ctx.fillStyle = stroke;
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 2.1);
+  ctx.lineTo(r * 0.17, -r * 1.35);
+  ctx.lineTo(-r * 0.17, -r * 1.35);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawHex(ctx, r) {
@@ -1804,7 +1986,10 @@ export class Director {
     // How much bigger this wave is than it was authored. Tutorial waves are
     // authored at exactly the size they should be and never swell.
     const progress = clamp(world.kills / W.swellKills, 0, 1);
-    const swell = wave.teach ? 1 : W.swell[0] + (W.swell[1] - W.swell[0]) * progress;
+    // ...and the flat population multiplier on top of it. Tutorial waves are
+    // exempt from both: they are authored at exactly the size they teach at.
+    const swell = wave.teach ? 1
+      : (W.swell[0] + (W.swell[1] - W.swell[0]) * progress) * W.population;
     const jobs = [];
     let asked = 0;
     for (const [id, base] of wave.of) {
