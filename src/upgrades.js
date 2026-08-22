@@ -68,6 +68,7 @@ export function freshUpgrades() {
     cooldown: 1, // multiplier on every ability's cooldown
     // turret
     slew: 1,
+    aimRange: 1, // how far auto aim will reach for a target
     overwatch: 1, // damage while no hand is on the lever
     casing: 0, // damage a second to whatever is touching the turret
     insulation: 1, // multiplier on how much corruption costs the intake
@@ -158,6 +159,8 @@ const MARK = {
   overwatch: g('<circle cx="12" cy="12" r="6.6"/><circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none"/><path d="M12 1.6v3.2M12 19.2v3.2M1.6 12h3.2M19.2 12h3.2"/>'),
   casing: g('<path d="M12 2.6 20 6v6.6c0 4.6-3.4 7.2-8 8.8-4.6-1.6-8-4.2-8-8.8V6z"/><path d="M12 8v8M8 12h8"/>'),
   insulation: g('<path d="M12 2.6 20 6v6.6c0 4.6-3.4 7.2-8 8.8-4.6-1.6-8-4.2-8-8.8V6z"/><path d="M7.5 12.5c1.6-2 3.4-2 4.5 0s2.9 2 4.5 0" opacity=".85"/>'),
+  // A dish on a stem, and the sweep coming back off something further out.
+  aimrange: g('<path d="M4.6 18.4 9.4 13.6"/><path d="M3 20l3.2-3.2" opacity=".6"/><path d="M8 12.8a5.4 5.4 0 0 1 7.6 7.6z" fill="currentColor" stroke="none" opacity=".9"/><path d="M13.4 9.6a8.6 8.6 0 0 1 1 1M15.6 6.8a12 12 0 0 1 1.6 1.6M17.8 4a15.4 15.4 0 0 1 2.2 2.2" opacity=".85"/>'),
 };
 
 const bump = (key, by) => (up) => { up[key] += by; };
@@ -263,6 +266,17 @@ export const UPGRADES = {
     { id: 'overwatch', name: 'SIGHT', line: '+25% damage while hands off the lever. A sight mast over the barrel.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },
     { id: 'casing', name: 'SPINES', line: 'Objects touching you take 40 damage a second. Spikes round the housing.', apply: bump('casing', 40) , icon: MARK.casing },
     { id: 'insulation', name: 'SHROUD', line: 'Corruption costs half as much energy. A shield collar round the base.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
+    /*
+     * Two steps, and the only thing in the branch that changes what auto aim
+     * can see rather than how it behaves once it has seen it. GIMBAL is how
+     * fast the barrel comes round; this is whether there is anything there to
+     * come round to. Base reach is CFG.shooter.aimRange — see the note there
+     * for why 400 and what 841 buys.
+     */
+    { id: 'aimrange', name: 'ARRAY', levels: 2,
+      line: '+45% auto aim range. A scanning dish on the mount.',
+      tiers: [null, { name: 'DEEP ARRAY', line: '+45% again, on top of ARRAY. A second dish, and the sweep reaches the top of the field.' }],
+      apply: scale('aimRange', 1.45), icon: MARK.aimrange },
   ],
 };
 

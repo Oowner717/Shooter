@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '108';
+export const BUILD = '109';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '108';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e3915f9';
+export const REV = 'f7b4315';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -261,6 +261,24 @@ export const CFG = {
     aimClamp: 1.36, // radians away from straight up that the barrel allows
     turnRate: 26, // rad/s barrel slew under your own hand
     autoTurnRate: 4.2, // rad/s while auto aim traverses between targets
+
+    /*
+     * How far auto aim will reach for a target, in world units, before ARRAY.
+     *
+     * It used to have no limit at all: `autoTarget` walked every live object
+     * in the cone and took the nearest, so the assist covered the whole field
+     * corner to corner. At 390x844 the turret sits at y=996 of a 1361-unit
+     * world and objects go live at y=260, which puts the far corner 800 units
+     * away — auto aim held all of it, and the only thing that ever changed
+     * about it was how fast the barrel got there.
+     *
+     * 400 is the near half: a little past the middle of the live field
+     * straight up, and about two thirds of the way out to the top corners.
+     * Anything further in is yours to shoot by hand until ARRAY is bought,
+     * and two levels of it (x1.45 each) come to 841 — the whole field again,
+     * with the corner inside it.
+     */
+    aimRange: 400,
 
     // The lever. A rod runs through the turret's pivot: the grip hangs below
     // it, the barrel sticks out above it, and pushing one swings the other
@@ -781,6 +799,7 @@ export const CFG = {
     shroud: 1.15, // shroud: radians of collar per level
     sight: 8, // sight: mast height per level
     feed: 7, // feed: belt housing depth
+    dish: 20, // array: dish aperture, growing with the level
   },
 
   // ---- feel -----------------------------------------------------------

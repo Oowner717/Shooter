@@ -47,7 +47,7 @@ export const COST = {
 /** Where every leaf hangs. Ids are upgrade ids; the key is the parent node. */
 const UNDER = {
   // ---- the machine ----
-  turret: ['rate', 'slew', 'overwatch', 'casing', 'insulation', 'intake'],
+  turret: ['rate', 'slew', 'aimrange', 'overwatch', 'casing', 'insulation', 'intake'],
 
   // ---- the rack ----
   // Whole-rack upgrades sit on the category; BOLT keeps only its own two.

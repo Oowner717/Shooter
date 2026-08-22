@@ -760,10 +760,25 @@ export class Game {
    * nearest live threat. Only considers bearings the barrel can actually
    * reach, so auto aim never locks onto something behind the turret.
    */
+  /*
+   * The reach of the assist, in world units. Base plus whatever ARRAY has
+   * added, read at the point of use like every other scalar on world.up.
+   */
+  get aimRange() {
+    return CFG.shooter.aimRange * this.world.up.aimRange;
+  }
+
   autoTarget() {
     const w = this.world;
     const s = w.shooter;
     const limit = CFG.shooter.aimClamp + 0.04;
+    /*
+     * Reach, not just bearing. Until build 109 the only test was the cone, so
+     * the assist held the whole field and there was nothing left for ARRAY to
+     * sell. Measured against the body's edge rather than its centre, or a
+     * BULWARK 72 units across would sit half inside the ring and be ignored.
+     */
+    const reach = this.aimRange;
     let best = null;
     let bestScore = Infinity;
     for (const e of w.enemies) {
@@ -771,8 +786,10 @@ export class Game {
       const dx = e.x - s.x;
       const dy = e.y - s.y;
       if (Math.abs(angleDelta(-Math.PI / 2, Math.atan2(dy, dx))) > limit) continue;
+      const dist = Math.hypot(dx, dy);
+      if (dist - (e.r || 0) > reach) continue;
       // a marked breacher outranks anything four times closer
-      const score = Math.hypot(dx, dy) * (e.attacking ? 0.25 : 1);
+      const score = dist * (e.attacking ? 0.25 : 1);
       if (score < bestScore) { bestScore = score; best = e; }
     }
     return best;

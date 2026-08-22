@@ -109,7 +109,7 @@ export const ARSENAL = [
 
   {
     key: 'autoAim', kind: 'auto', group: 'auto', label: 'AUTO AIM', icon: ICON.aim, wide: true, run: true,
-    fx: 'Picks a target and leads the shot. Your hand outranks it.',
+    fx: 'Picks the nearest target inside its reach and leads the shot. ARRAY extends the reach; your hand outranks all of it.',
   },
   {
     key: 'autoFire', kind: 'auto', group: 'auto', label: 'AUTO FIRE', icon: ICON.fire, wide: true, run: true,

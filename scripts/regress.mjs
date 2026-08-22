@@ -328,12 +328,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       for (let i = 3; i < d.length; i += 4) if (d[i] > 24) n++;
       return n;
     };
-    const none = { rate: 0, slew: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0 };
+    // Read off the tree rather than listed here, so a node placed under TURRET
+    // is covered by this case the moment it is placed. It was a hardcoded list
+    // until build 109, which would have let ARRAY in undrawn and unnoticed.
+    const { NODES } = await import('../src/tree.js');
+    const parts = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
+    const none = Object.fromEntries(parts.map((p) => [p.id, 0]));
     const bare = lit(none);
     const each = {};
-    for (const [k, v] of Object.entries({ rate: 2, slew: 3, overwatch: 3, casing: 3, insulation: 3, intake: 1 })) {
-      each[k] = lit({ ...none, [k]: v }) - bare;
-    }
+    for (const p of parts) each[p.id] = lit({ ...none, [p.id]: p.levels || 1 }) - bare;
     w.rigAt = -1; // let it rebuild honestly again
     return { bare, each };
   });
@@ -371,6 +374,60 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   });
   check('no energy mote wears the plating of what dropped it',
     r.bad.length === 0, `${r.motes} motes: ${JSON.stringify(r.bad)}`);
+}
+
+// --- auto aim has a reach, and ARRAY is what extends it ----------------------
+// Through build 108 `autoTarget` tested bearing and nothing else, so the
+// assist held the whole field and no upgrade could sell reach. The base is
+// CFG.shooter.aimRange; ARRAY multiplies it 1.45 a level, two levels deep.
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const s = w.shooter;
+    const { CFG } = await import('../src/config.js');
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    const clear = () => { for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0; };
+    // one hostile straight up the field at `dist`, with ARRAY at `mult`
+    const takes = (dist, mult) => {
+      clear();
+      const e = g.debugSpawn('mote', s.x, s.y - dist);
+      if (!e) return null;
+      e.staged = false; e.spawnIn = 0;
+      w.up.aimRange = mult;
+      const got = g.autoTarget() === e;
+      clear();
+      return got;
+    };
+    const b = CFG.shooter.aimRange;
+    const one = 1.45;
+    const two = 1.45 * 1.45;
+    const out = {
+      base: b,
+      near: [takes(b * 0.5, 1), takes(b * 0.5, one), takes(b * 0.5, two)],
+      mid: [takes(b * 1.2, 1), takes(b * 1.2, one), takes(b * 1.2, two)],
+      far: [takes(b * 1.9, 1), takes(b * 1.9, one), takes(b * 1.9, two)],
+      // and the cone still rules: dead abeam, well inside the reach, is not a
+      // target -- 90 degrees off straight up, against a clamp of 1.36 + 0.04
+      abeam: (() => {
+        clear();
+        const e = g.debugSpawn('mote', s.x + b * 0.5, s.y);
+        if (!e) return null;
+        e.staged = false; e.spawnIn = 0;
+        w.up.aimRange = two;
+        const got = g.autoTarget() === e;
+        clear();
+        return got;
+      })(),
+    };
+    w.up.aimRange = 1;
+    return out;
+  });
+  const want = { near: [true, true, true], mid: [false, true, true], far: [false, false, true] };
+  const wrong = Object.keys(want).filter((k) => JSON.stringify(r[k]) !== JSON.stringify(want[k]));
+  check('auto aim reaches exactly as far as ARRAY has paid for',
+    wrong.length === 0 && r.abeam === false,
+    `base ${r.base}, near/mid/far at x1,x1.45,x2.1 = ${JSON.stringify([r.near, r.mid, r.far])}, abeam ${r.abeam}`);
 }
 
 // --- the broadphase ---------------------------------------------------------

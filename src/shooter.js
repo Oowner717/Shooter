@@ -440,6 +440,23 @@ export class Shooter {
     ctx.arc(0, 0, this.r * 1.1, 0, TAU);
     ctx.stroke();
 
+    // ---- ARRAY's stubs: two masts waiting for a dish ----
+    if (g.aimrange < 2) {
+      ctx.strokeStyle = socket;
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      for (let i = g.aimrange; i < 2; i++) {
+        const a = -Math.PI / 2 + (i ? 1 : -1) * 0.86;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        ctx.moveTo(c * this.r * 0.88, sn * this.r * 0.88);
+        ctx.lineTo(c * (this.r * 0.88 + 9), sn * (this.r * 0.88 + 9));
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
     // ---- INTAKE's ports, under the deck ----
     if (!g.intake) {
       ctx.strokeStyle = socket;
@@ -609,7 +626,7 @@ export class Shooter {
   rig(world) {
     const taken = world.offers.taken;
     if (world.rig && world.rigAt === taken.length) return world.rig;
-    const rig = { rate: 0, slew: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0 };
+    const rig = { rate: 0, slew: 0, aimrange: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0 };
     for (const id of taken) if (id in rig) rig[id]++;
     world.rig = rig;
     world.rigAt = taken.length;
@@ -623,6 +640,95 @@ export class Shooter {
     const flash = world.rigFlash / R.flash; // 1 -> 0 across the fitting
     const lift = 1 + flash * 0.12;
     const glow = 0.55 + flash * 0.45;
+
+    /*
+     * The reach of the assist, drawn only while it is switched on: a hairline
+     * arc across the cone at exactly the distance a target has to be inside.
+     * Without it the base range is invisible — you would only ever meet it as
+     * "auto aim ignored that one" — and ARRAY would be a number on a card
+     * rather than a ring you watch move out.
+     */
+    if (world.autoAim) {
+      const reach = CFG.shooter.aimRange * world.up.aimRange;
+      const cone = CFG.shooter.aimClamp;
+      ctx.strokeStyle = rgba(accent, 0.12 + flash * 0.3);
+      ctx.lineWidth = HAIRLINE;
+      ctx.setLineDash([HAIRLINE * 5, HAIRLINE * 11]);
+      ctx.beginPath();
+      ctx.arc(0, 0, reach, -Math.PI / 2 - cone, -Math.PI / 2 + cone);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    /*
+     * ARRAY — a dish on a mast per level, off the shoulders of the housing.
+     * Everything else in the branch acts on what the turret does; this one is
+     * how far it can see, so it is drawn as the thing that looks: a bowl, a
+     * feed horn at its focus, and a sweep leaving the mouth.
+     */
+    for (let i = 0; i < g.aimrange; i++) {
+      const a = -Math.PI / 2 + (i ? 1 : -1) * 0.86;
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      const ap = (R.dish + i * 5) * lift;
+      const foot = this.r * 0.88;
+      const mast = foot + (10 + i * 4) * lift;
+      const lit = 0.78 + flash * 0.22; // a fitting this small has to be bright
+      ctx.strokeStyle = rgba('#8fd8ff', 0.9 * lit);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(c * foot, sn * foot);
+      ctx.lineTo(c * mast, sn * mast);
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(c * (mast + ap * 0.5), sn * (mast + ap * 0.5));
+      ctx.rotate(a); // +x is now straight out of the mount: the mouth faces it
+      const bowl = ap * 0.5;
+      // the bowl, backed toward the mast and open outward
+      ctx.beginPath();
+      ctx.arc(0, 0, bowl, Math.PI - 1.5, Math.PI + 1.5);
+      ctx.fillStyle = rgba('#8fd8ff', 0.2 * lit);
+      ctx.fill();
+      ctx.strokeStyle = rgba('#9fe4ff', lit);
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+      // a rib inside it, and a lip at each edge, or it reads as a crescent
+      ctx.strokeStyle = rgba('#9fe4ff', 0.45 * lit);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, bowl * 0.6, Math.PI - 1.4, Math.PI + 1.4);
+      ctx.stroke();
+      ctx.strokeStyle = rgba('#9fe4ff', 0.9 * lit);
+      ctx.lineWidth = 1.6;
+      for (const e of [-1.5, 1.5]) {
+        const ex = Math.cos(Math.PI + e) * bowl;
+        const ey = Math.sin(Math.PI + e) * bowl;
+        ctx.beginPath();
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex + bowl * 0.3, ey + Math.sign(e) * bowl * 0.16);
+        ctx.stroke();
+      }
+      // feed horn at the focus, on a strut
+      ctx.strokeStyle = rgba('#9fe4ff', 0.6 * lit);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-bowl * 0.9, 0);
+      ctx.lineTo(bowl * 0.5, 0);
+      ctx.stroke();
+      ctx.fillStyle = rgba('#eaf8ff', lit);
+      ctx.beginPath();
+      ctx.arc(bowl * 0.5, 0, 2, 0, TAU);
+      ctx.fill();
+      // the sweep leaving the mouth
+      const out = (t * 0.75 + i * 0.5) % 1;
+      ctx.strokeStyle = rgba('#8fd8ff', 0.6 * (1 - out) * lit);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, bowl * 1.2 + out * 18, -0.8, 0.8);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // GIMBAL — a further ring per level, each turning against the last.
     for (let i = 0; i < g.slew; i++) {
