@@ -200,7 +200,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const g = window.__sim;
     g.hud.menu.setOpen(true);
     const out = {};
-    for (const tab of ['system', 'arsenal', 'codex', 'tree']) {
+    for (const tab of ['system', 'codex', 'tree']) {
       g.hud.menu.show(tab);
       const shown = [...document.querySelectorAll('#menuPanels .menuPanel')]
         .filter((el) => getComputedStyle(el).display !== 'none')

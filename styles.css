@@ -2334,6 +2334,25 @@ body.booting #pendingBtn {
 .treeCaret.off::after { content: none; }
 
 /*
+ * A round or a mine, wearing what the arsenal tab used to give it: the DMG/FX
+ * pair, labelled and aligned, so two of them compare down a column instead of
+ * by reading two sentences. `.spec` is shared with the arsenal rows still
+ * under the tree, so the two presentations cannot drift apart.
+ */
+.treeSpec { display: flex; flex-direction: column; gap: 1px; }
+.treeSpec .spec { display: flex; gap: 6px; font-size: 8.5px; line-height: 1.45; }
+.treeSpec .spec b {
+  flex: 0 0 20px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--tone) 62%, transparent);
+}
+.treeSpec .spec i { font-style: normal; color: var(--dim); }
+.treeSpec .spec.dmg i { color: color-mix(in srgb, var(--tone) 72%, var(--ink)); }
+.treeRow.armLike .treeIcon,
+.treeRow.armLike .treeIcon svg { width: 20px; height: 20px; }
+
+/*
  * A group: a heading for the upgrades that are not about any one round or
  * ability. Quieter than a category, louder than a leaf.
  */

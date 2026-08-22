@@ -10,6 +10,9 @@
 import { CODEX, codex } from './codex.js';
 import { CONTROLS } from './narrative.js';
 import { ARSENAL, ARSENAL_GROUPS, specRows } from './arsenal.js';
+
+/** Every arm, by the key the tree calls it — BOLT is `standard` in here. */
+const ARM_BY_KEY = new Map(ARSENAL.map((a) => [a.key === 'standard' ? 'bolt' : a.key, a]));
 import { ABILITIES } from './abilities.js';
 import { VOLUME_STEPS } from './audio.js';
 import { BUILD, REV } from './config.js';
@@ -17,9 +20,17 @@ import { TREE, priceOf } from './tree.js';
 
 const $ = (id) => document.getElementById(id);
 
+/*
+ * Three, not four. ARSENAL was a second screen describing the same rounds and
+ * mines the tree sells — you read the specs on one tab and bought them on
+ * another, and the tab you bought on said less about them than the tab you
+ * did not. The tree carries the arsenal's own rows now: its art, its label and
+ * its DMG/FX pair, with the price on the end. What is left of ARSENAL is the
+ * two that run on their own, which are not bought and so belong under the
+ * tree rather than in it.
+ */
 const TABS = [
   { id: 'tree', label: 'UPGRADES' },
-  { id: 'arsenal', label: 'ARSENAL' },
   { id: 'codex', label: 'OBJECTS' },
   { id: 'system', label: 'SYSTEM' },
 ];
@@ -44,7 +55,6 @@ export class Menu {
 
     this.buildTabs();
     this.buildTree();
-    this.buildArsenal();
     this.buildCodex();
     this.buildSystem();
     this.show('tree');
@@ -134,6 +144,24 @@ export class Menu {
     for (const root of TREE) {
       p.appendChild(this.treeNode(root, 0));
     }
+
+    // The two that are never bought. They are the last thing the arsenal tab
+    // held that the tree has no row for, so they sit under it as a reference.
+    const run = ARSENAL_GROUPS.find((x) => x.id === 'auto');
+    p.appendChild(heading(run.title, run.note));
+    const grid = document.createElement('div');
+    grid.className = 'armGrid';
+    for (const a of ARSENAL.filter((x) => x.group === 'auto')) {
+      const row = document.createElement('div');
+      row.className = 'armRow';
+      if (a.tone) row.style.setProperty('--tone', a.tone);
+      row.innerHTML = `<div class="codexArt arm">${a.icon}</div>`
+        + `<div class="codexBody"><div class="codexName">${a.label}</div>`
+        + `<div class="codexSpec">${specRows(a)}</div></div>`;
+      grid.appendChild(row);
+      this.cells.set(a.key, row);
+    }
+    p.appendChild(grid);
   }
 
   /** One row, plus its children under it. Recursive; depth drives the indent. */
@@ -154,10 +182,21 @@ export class Menu {
       ? `<span class="treePips">${'<i></i>'.repeat(max)}</span>` : '';
     const cost = document.createElement('b');
     cost.className = 'treeCost';
+    /*
+     * A round or a mine is described the way the arsenal described it: the
+     * labelled DMG/FX pair, aligned, so two of them can be compared down a
+     * column instead of by reading two sentences. Everything else keeps its
+     * one line, because everything else is one sentence long.
+     */
+    const arm = n.kind === 'arm' ? ARM_BY_KEY.get(n.key) : null;
+    const body = arm && (arm.kind === 'round' || arm.kind === 'mine')
+      ? `<span class="treeSpec">${specRows(arm)}</span>`
+      : `<span class="treeLine">${n.line || ''}</span>`;
+    if (arm) row.classList.add('armLike');
     row.innerHTML = `<span class="treeIcon">${n.icon || ''}</span>`
       + `<span class="treeText"><span class="treeTop">`
       + `<span class="treeName">${n.name}</span>${pips}</span>`
-      + `<span class="treeLine">${n.line || ''}</span></span>`;
+      + `${body}</span>`;
     row.appendChild(cost);
     /*
      * The disclosure caret. A row that hides fourteen more rows looked exactly
@@ -334,26 +373,6 @@ export class Menu {
    * a mine is chosen; this is the only place the one-line reason for choosing
    * it is written down, and it lights to match whatever is loaded right now.
    */
-  buildArsenal() {
-    const p = this.panel('arsenal', 'codex');
-    for (const g of ARSENAL_GROUPS) {
-      p.appendChild(heading(g.title, g.note));
-      const grid = document.createElement('div');
-      grid.className = 'armGrid';
-      for (const a of ARSENAL.filter((x) => x.group === g.id)) {
-        const row = document.createElement('div');
-        row.className = 'armRow';
-        if (a.tone) row.style.setProperty('--tone', a.tone);
-        row.innerHTML = `<div class="codexArt arm">${a.icon}</div>`
-          + `<div class="codexBody"><div class="codexName">${a.label}</div>`
-          + `<div class="codexSpec">${specRows(a)}</div></div>`;
-        grid.appendChild(row);
-        this.cells.set(a.key, row);
-      }
-      p.appendChild(grid);
-    }
-  }
-
   // ------------------------------------------------------------------ codex
 
   buildCodex() {
