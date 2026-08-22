@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '101';
+export const BUILD = '102';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '101';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '436c31d';
+export const REV = '7fe7817';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -742,6 +742,31 @@ export const CFG = {
 
 
   // ---- boss -----------------------------------------------------------
+
+  /*
+   * The cover a HERALD holds over a body.
+   *
+   * It used to be one thin ring at r + 7. On the smallest hostile there is — a
+   * MOTE at r 12, and the thing a SPLITTER breaks into four of — that came out
+   * barely wider than the body, and on a floor of glowing energy it read as a
+   * dot with a halo rather than as something being protected. Energy is drawn
+   * in the colour of whatever dropped it, so a MOTE's energy is a MOTE's cyan
+   * and a SPLITTER's is a SPLITTER's green: the cover is what has to carry the
+   * difference, and a thin ring did not.
+   *
+   * `min` is the floor that fixes it, and it is set against the largest an
+   * energy mote is ever drawn — CFG.drop.max * 1.5, or 6.6 units — so the
+   * smallest shell in the game is still four times the biggest thing it could
+   * be mistaken for. scripts/check-build.mjs holds that ratio.
+   */
+  wardShell: {
+    min: 26, // world units, whatever the body is
+    gap: 8, // ...and at least this far clear of a body bigger than that
+    plates: 5, // drawn as arc segments: plating reads as cover, a circle reads as glow
+    fill: 0.6, // how much of each segment's slice is drawn
+    thick: 0.055, // stroke, as a fraction of the shell radius
+    spin: 0.9, // radians a second, so it is held rather than painted on
+  },
 
   // ---- feel -----------------------------------------------------------
   glitch: {

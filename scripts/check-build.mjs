@@ -112,6 +112,28 @@ if (!readFileSync(new URL('../src/game.js', import.meta.url), 'utf8').includes('
 }
 console.log(`broadphase cell ${GRID_CELL} covers the largest body (${MAX_BODY_R})`);
 
+/*
+ * A covered body must not read as an energy mote.
+ *
+ * Energy is drawn in the colour of whatever dropped it, so a MOTE's energy is
+ * a MOTE's cyan — the HERALD's cover is the only thing distinguishing "small
+ * hostile someone is protecting" from "small thing to collect", and it used to
+ * be a ring seven units clear of a body twelve units wide. The smallest shell
+ * has to stay comfortably larger than the largest energy mote is ever drawn.
+ */
+const HALO = CFG.drop.max * 1.5; // drawDrop's outer radius at full pulse
+const smallestShell = Math.min(
+  ...ENEMY_TYPES.filter((t) => !t.harmless)
+    .map((t) => Math.max(t.r + CFG.wardShell.gap, CFG.wardShell.min)),
+);
+if (smallestShell < HALO * 3) {
+  console.error(`smallest ward shell is ${smallestShell.toFixed(1)} against an energy mote drawn `
+    + `at up to ${HALO.toFixed(1)}; a covered body will read as energy`);
+  process.exit(1);
+}
+console.log(`ward shell floor ${smallestShell.toFixed(0)} is ${(smallestShell / HALO).toFixed(1)}x `
+  + `the largest energy mote (${HALO.toFixed(1)})`);
+
 // ---- REV: what these bytes actually are ------------------------------------
 //
 // Everything the browser is served, in a fixed order, hashed. config.js's own

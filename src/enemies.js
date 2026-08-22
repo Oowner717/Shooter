@@ -973,15 +973,37 @@ export class Enemy {
       ctx.stroke();
     }
 
-    // Covered by a HERALD: a shell, so the reason it is shrugging off hits is
-    // visible on the thing shrugging them off.
+    /*
+     * Covered by a HERALD: a shell, so the reason it is shrugging off hits is
+     * visible on the thing shrugging them off.
+     *
+     * Four things make it a shell rather than a ring, and the point of all
+     * four is that a covered MOTE must not read as an energy mote with a halo
+     * — see CFG.wardShell. A floor on the radius, so the smallest hostile gets
+     * a shell it can be seen inside. Plating with gaps in it, because a solid
+     * circle is what a glow looks like. A turn, because energy does not turn.
+     * And a wash across the volume, so the body is inside something.
+     */
     if (this.wardT > 0 && this.ward > 0) {
+      const W = CFG.wardShell;
+      const rr = Math.max(this.r + W.gap, W.min);
       const pulse = 0.45 + 0.3 * Math.sin(world.time * 5 + this.phase);
-      ctx.strokeStyle = rgba('#7cffb2', pulse);
-      ctx.lineWidth = HAIRLINE * 2;
+      const spin = world.time * W.spin + this.phase;
+
+      ctx.fillStyle = rgba('#7cffb2', 0.05 + 0.035 * pulse);
       ctx.beginPath();
-      ctx.arc(this.x, this.y, this.r + 7, 0, TAU);
-      ctx.stroke();
+      ctx.arc(this.x, this.y, rr, 0, TAU);
+      ctx.fill();
+
+      ctx.strokeStyle = rgba('#7cffb2', pulse + 0.2);
+      ctx.lineWidth = Math.max(HAIRLINE * 2, rr * W.thick);
+      const slice = (TAU / W.plates) * W.fill;
+      for (let i = 0; i < W.plates; i++) {
+        const a0 = spin + (i / W.plates) * TAU;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, rr, a0, a0 + slice);
+        ctx.stroke();
+      }
     }
 
     // damage arc — only on objects big enough to be worth tracking
