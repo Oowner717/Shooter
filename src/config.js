@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '100';
+export const BUILD = '101';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '100';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '2912370';
+export const REV = '436c31d';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1130,6 +1130,30 @@ export const ENEMY_TYPES = [
     reflect: 0.55, // glancing bolts bounce off instead of landing
   },
 ];
+
+/**
+ * The largest a body can ever be: the biggest type in the table, carrying a
+ * full stack of SCION balls.
+ *
+ * The physics broadphase buckets a body by its centre cell and then looks only
+ * at the eight neighbours, which is exact only while a cell is at least twice
+ * this — any two overlapping bodies are then at most one cell apart. Before
+ * build 92 the biggest thing on the field was a BULWARK at 45 and the cell was
+ * 96, which held with six units to spare. Grafts made a BULWARK 72, and two of
+ * those overlap at 143 apart, which is two cells: the broadphase stopped
+ * seeing the contact at all. `scripts/check-build.mjs` now asserts the cell
+ * covers this, so growing an object cannot quietly break it again.
+ */
+export const MAX_BODY_R = Math.max(
+  ...ENEMY_TYPES.map((t) => t.r * (1 + CFG.graft.grow * CFG.graft.stack)),
+);
+
+/**
+ * The broadphase cell, derived rather than chosen — see MAX_BODY_R above. It
+ * lives here rather than in game.js so scripts/check-build.mjs can read the
+ * real value instead of parsing it out of a file it cannot import.
+ */
+export const GRID_CELL = Math.max(96, Math.ceil(2 * MAX_BODY_R));
 
 /*
  * The waves.

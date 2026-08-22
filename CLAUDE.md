@@ -25,14 +25,33 @@ phases rather than spending it.
 
 ## The suite, for when it is wanted
 
-`node scripts/check-build.mjs` guards the build literal, the worker's precache
-list, and `REV` — a content hash of every served file, shown next to BUILD in
-the menu. **Changing any source file makes REV stale**, so the last step of any
-change is `node scripts/check-build.mjs --stamp`; the plain run then passes.
-REV exists because two installs can both say BUILD 75 and be different code,
-and there was no way to tell from inside the game. `node scripts/smoke.mjs` walks every phase headlessly. The
-per-feature tests live in the session scratchpad, not the repo; they need
+Three scripts, all in the repo. The last two need
 `NODE_PATH=/opt/node22/lib/node_modules` and a static server on :8099.
+
+`node scripts/check-build.mjs` is the static one and takes no server. It guards
+the build literal, the worker's precache list, the tree's coverage of every
+buyable id, the colour rule (grey means harmless), the broadphase cell against
+the largest body, and `REV` — a content hash of every served file, shown next
+to BUILD in the menu. **Changing any source file makes REV stale**, so the last
+step of any change is `node scripts/check-build.mjs --stamp`; the plain run
+then passes. REV exists because two installs can both say BUILD 75 and be
+different code, and there was no way to tell from inside the game.
+
+`node scripts/smoke.mjs` walks a long run headlessly and screenshots it.
+
+`node scripts/regress.mjs` asserts the things this game has actually got wrong:
+stale field reads (the class of bug that stopped the turret firing for three
+builds), the trigger itself, every round/mine/ability/object type running once
+without an error, a save surviving an app update while still refusing a
+malformed one, each menu tab showing only its own panel, the volume surviving
+mute-quit-return, and the broadphase seeing every overlap of the biggest body.
+Add a case to it whenever something ships broken — that is the whole rule.
+
+Before build 101 this section pointed at a session scratchpad. There were 243
+probe scripts in it behind a hand-kept runner list; 21 of the 43 the list named
+failed on build 100, every one of them because the probe named something
+deleted in builds 81-99, and the lot died with the container. Nothing about
+that was a suite.
 
 ## Repo facts worth not rediscovering
 

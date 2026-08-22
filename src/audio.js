@@ -7,6 +7,17 @@ import { clamp, rand } from './util.js';
 // and expects to stay changed — the run is saved, so a volume that reset every
 // time the tab came back would be the only thing in the game that did not.
 const VOL_KEY = 'sim7749-volume';
+/*
+ * Where the mute toggle comes back to.
+ *
+ * `lastVolume` used to live only in memory, so muting, closing the app and
+ * unmuting on the next launch came back to full rather than to the level the
+ * player had chosen — the one setting the comment above promises will stay
+ * changed was the one that did not survive being turned off. It is the last
+ * non-zero level, written by setVolume itself, so nothing has to remember to
+ * maintain it.
+ */
+const VOL_LAST_KEY = 'sim7749-volume-last';
 // What full means. Everything below is a fraction of it, so the mix is tuned
 // in one place and the setting only ever scales it.
 export const FULL_GAIN = 0.6;
@@ -15,9 +26,9 @@ export const FULL_GAIN = 0.6;
 // already reads in segments everywhere else.
 export const VOLUME_STEPS = [0, 0.15, 0.35, 0.6, 0.8, 1];
 
-function readVolume() {
+function readLevel(key) {
   try {
-    const raw = localStorage.getItem(VOL_KEY);
+    const raw = localStorage.getItem(key);
     if (raw === null) return 1;
     const v = Number(raw);
     return Number.isFinite(v) ? clamp(v, 0, 1) : 1;
@@ -33,7 +44,10 @@ class Audio {
     // 0..1, a scale on FULL_GAIN. `enabled` is derived from it rather than
     // stored beside it — two sources of truth for "is there sound" is how a
     // muted game ends up playing and a loud one ends up silent.
-    this.volume = readVolume();
+    this.volume = readLevel(VOL_KEY);
+    // The level the quick mute returns to: the last non-zero one, across
+    // launches. Never zero, or unmuting would be a no-op.
+    this.lastVolume = readLevel(VOL_LAST_KEY) || 1;
     this.ready = false;
     this.noiseBuf = null;
     this.drone = null;
@@ -84,15 +98,20 @@ class Audio {
     if (this.master) {
       this.master.gain.setTargetAtTime(FULL_GAIN * this.volume, this.ctx.currentTime, 0.05);
     }
+    // Anything audible is also where unmuting comes back to.
+    if (this.volume > 0) this.lastVolume = this.volume;
     try {
       localStorage.setItem(VOL_KEY, String(this.volume));
+      if (this.volume > 0) localStorage.setItem(VOL_LAST_KEY, String(this.volume));
     } catch { /* private mode: it holds for this session and no longer */ }
   }
 
-  /** The quick mute. Off remembers where it was, so on comes back to it. */
+  /**
+   * The quick mute. Off comes back on at the level it was last audible at,
+   * which setVolume keeps for it — including across a launch.
+   */
   setEnabled(on) {
-    if (on) this.setVolume(this.lastVolume || 1);
-    else { this.lastVolume = this.volume || 1; this.setVolume(0); }
+    this.setVolume(on ? (this.lastVolume || 1) : 0);
   }
 
   /** Simple per-key throttle so 10 taps/second doesn't turn into mud. */

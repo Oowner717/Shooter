@@ -92,6 +92,26 @@ if (greyFails.length || dullFails.length) {
 console.log(`colour rule holds: ${GREY} is the only grey, on ${
   ENEMY_TYPES.filter((t) => t.color === GREY).map((t) => t.id).join(', ')}`);
 
+/*
+ * The broadphase is only exact while a cell is at least twice the largest
+ * body: bodies are bucketed by centre cell and only the eight neighbours are
+ * searched, so anything bigger than that can overlap something two cells away
+ * and never be looked at. The cell is derived from MAX_BODY_R rather than
+ * chosen, and this is what keeps the derivation honest — it went wrong once
+ * already, when grafts made a BULWARK 72 against a cell of 96.
+ */
+const { MAX_BODY_R, GRID_CELL } = await import(new URL('../src/config.js', import.meta.url));
+if (!(GRID_CELL >= 2 * MAX_BODY_R)) {
+  console.error(`broadphase cell ${GRID_CELL} is under 2 x the largest body (${MAX_BODY_R}); `
+    + 'two of those can overlap two cells apart and never be tested');
+  process.exit(1);
+}
+if (!readFileSync(new URL('../src/game.js', import.meta.url), 'utf8').includes('GRID_CELL')) {
+  console.error('src/game.js no longer uses GRID_CELL — the grid is sized by something unguarded');
+  process.exit(1);
+}
+console.log(`broadphase cell ${GRID_CELL} covers the largest body (${MAX_BODY_R})`);
+
 // ---- REV: what these bytes actually are ------------------------------------
 //
 // Everything the browser is served, in a fixed order, hashed. config.js's own

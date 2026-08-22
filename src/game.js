@@ -1,6 +1,6 @@
 // World state, phase machine, physics stepping and the render pipeline.
 
-import { CFG, BUILD, REV, ENEMY_TYPES } from './config.js';
+import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL } from './config.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
 import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
 import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake } from './fx.js';
@@ -38,7 +38,7 @@ export class Game {
     this.bctx = this.buffer.getContext('2d', { alpha: false });
 
     this.dpr = 1;
-    this.grid = new Grid(96);
+    this.grid = new Grid(GRID_CELL);
     this.bodies = [];
     this.pointers = new Map();
     this.gripPointer = null;
@@ -467,7 +467,7 @@ export class Game {
     world.shooter.x = world.width / 2;
     world.shooter.y = this.shooterY;
 
-    this.grid.resize(world.width, world.height + STAGE_HEIGHT, 96);
+    this.grid.resize(world.width, world.height + STAGE_HEIGHT, GRID_CELL);
     background.resize(world.width, world.height, world.width / 2, ENTRY_Y);
 
   }
