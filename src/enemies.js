@@ -189,7 +189,19 @@ export class Enemy {
     this.marks = 0; // ...and how deep the mark is, which is what TITHE rides on
     this.spawnIn = opts.spawnIn ?? 0; // brief materialise animation
 
-    if (type.shards) {
+    /*
+     * Plates, and only on a body.
+     *
+     * `isDrop` was not checked here, so a WARDEN's energy — built from the
+     * WARDEN type like every mote is built from its parent — came out of the
+     * constructor carrying three orbiting plates of its own. A four-unit mote
+     * was drawn as a three-bladed pinwheel the size of the thing that dropped
+     * it, and its hitReach grew to the plates' orbit, so a round aimed past it
+     * could be stopped by the phantom plating on a piece of salvage. The
+     * screen filled with orange rotors that looked like objects, could not be
+     * auto-aimed, and ate shots.
+     */
+    if (type.shards && !this.isDrop) {
       this.shards = [];
       for (let i = 0; i < type.shards; i++) {
         this.shards.push({ a: (i / type.shards) * TAU, alive: true, hp: 22 });

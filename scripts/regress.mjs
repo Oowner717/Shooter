@@ -38,6 +38,9 @@
  *   the rig        build 106: the TURRET branch is named for the parts it
  *                  bolts on, so a part that stops drawing makes a liar of the
  *                  tree.
+ *   salvage        build 108: a WARDEN's energy inherited its orbiting plates,
+ *                  so a 4-unit mote was drawn as a pinwheel and stopped rounds
+ *                  across a 59-unit reach.
  *
  * Run: node scripts/regress.mjs            (expects a static server on :8099)
  *      node scripts/regress.mjs --port N
@@ -337,6 +340,37 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const silent = Object.entries(r.each).filter(([, n]) => n <= 0).map(([k]) => k);
   check('every turret upgrade puts a visible part on the turret', silent.length === 0,
     `${silent.length ? `nothing drawn for ${silent.join(', ')} — ` : ''}${JSON.stringify(r.each)}`);
+}
+
+// --- energy is not a small copy of what dropped it ---------------------------
+// A mote is built from its parent's type, and the constructor did not check
+// isDrop before handing out orbiting plates: a WARDEN's salvage came out as a
+// three-bladed pinwheel with the reach of the thing that dropped it, and it
+// stopped rounds aimed past it.
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    for (const d of [...w.drops]) d.dead = true; w.drops.length = 0;
+    const { ENEMY_TYPES } = await import('../src/config.js');
+    // break one of everything, so every kind of salvage is on the floor at once
+    for (const t of ENEMY_TYPES) {
+      const e = g.debugSpawn(t.id, 80 + Math.random() * 460, 400 + Math.random() * 300);
+      if (!e) continue;
+      e.staged = false; e.spawnIn = 0;
+      e.applyDamage(w, 1e9);
+    }
+    await new Promise((res) => setTimeout(res, 700));
+    const bad = w.drops.filter((d) => !d.dead)
+      .filter((d) => (d.shards && d.shards.length) || d.hitReach > d.r + 0.01)
+      .map((d) => `${d.type.id} r${d.r.toFixed(1)} reach ${d.hitReach.toFixed(1)}`);
+    const wardens = w.enemies.filter((e) => !e.dead && e.type.shards && !e.isDrop);
+    return { motes: w.drops.filter((d) => !d.dead).length, bad, keptPlates: wardens.every((e) => e.shards) };
+  });
+  check('no energy mote wears the plating of what dropped it',
+    r.bad.length === 0, `${r.motes} motes: ${JSON.stringify(r.bad)}`);
 }
 
 // --- the broadphase ---------------------------------------------------------
