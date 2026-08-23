@@ -31,8 +31,15 @@ import { spark, ring } from './fx.js';
 import { audio } from './audio.js';
 
 export class Chunk {
-  constructor(x, y, vx, vy, r, color) {
+  constructor(x, y, vx, vy, r, color, keep = false) {
     const D = CFG.debris;
+    /*
+     * A chunk that stays. Ordinary wreckage is occasional and clears itself,
+     * which is right for a BULWARK breaking mid-wave; what ORDINAL leaves is
+     * supposed to still be lying there afterwards. A keep never times out and
+     * settles harder, so the field it dies on keeps the shape of it.
+     */
+    this.keep = keep;
     this.x = x;
     this.y = y;
     this.vx = vx;
@@ -66,7 +73,7 @@ export class Chunk {
     // power. This is that ceiling, not a speed it aims for.
     this.cruise = 160;
     this.thrown = 0;
-    this.life = D.life;
+    this.life = keep ? Infinity : D.life;
     // Not breakable for the first instant of its existence: see CFG.debris.grace.
     this.grace = D.grace;
     this.dead = false;
@@ -86,7 +93,9 @@ export class Chunk {
 
   /** Never steers. It was thrown, and that is the whole of its opinion. */
   steer(world, dt) {
-    const d = Math.exp(-CFG.debris.drag * dt);
+    // A keep settles: it is scenery, and scenery that is still sliding about
+    // a minute later reads as something the game forgot to finish.
+    const d = Math.exp(-CFG.debris.drag * (this.keep ? 3.2 : 1) * dt);
     this.vx *= d;
     this.vy *= d;
   }
@@ -195,11 +204,15 @@ export class Chunk {
 }
 
 /** Break an object up. `n` chunks, thrown outward, and then left alone. */
-export function shed(world, e, n) {
+export function shed(world, e, n, opts = {}) {
   if (!world.debris) return;
   const D = CFG.debris;
+  // A keep is allowed past the ordinary ceiling: it is a one-off, and being
+  // silently dropped because a wave happened to be shedding at the time is
+  // how a boss leaves no wreck at all.
+  const cap = opts.keep ? D.max + 90 : D.max;
   for (let i = 0; i < n; i++) {
-    if (world.debris.length >= D.max) break;
+    if (world.debris.length >= cap) break;
     const a = (i / n) * TAU + rand(0, TAU);
     const sp = rand(D.speed[0], D.speed[1]);
     const r = Math.min(D.cap, Math.max(D.min, e.r * rand(D.size[0], D.size[1])));
@@ -208,8 +221,9 @@ export function shed(world, e, n) {
       e.y + Math.sin(a) * e.r * 0.45,
       e.vx * 0.35 + Math.cos(a) * sp,
       e.vy * 0.35 + Math.sin(a) * sp,
-      r,
+      r * (opts.size || 1),
       e.type.color,
+      !!opts.keep,
     ));
   }
 }

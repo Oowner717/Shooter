@@ -928,6 +928,69 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `said "${r.said}"`);
 }
 
+// --- what ORDINAL leaves behind ---------------------------------------------
+/*
+ * Two things reported off a real phone, both visible in one screenshot: the
+ * boss's salvage sat frozen in a cloud where the frame had been, and the
+ * wreckage vanished the instant it died.
+ *
+ * The salvage froze because a drop is built from the type it fell off, and
+ * ORDINAL and TALLY are `fixed` — the guard that pins the frame in place was
+ * pinning its energy too, velocity zeroed every frame, no steering, nothing
+ * to collect. The wreckage vanished because ordinary debris times out, which
+ * is right for a BULWARK mid-wave and wrong for the one object the field is
+ * supposed to remember.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { TYPE_BY_ID, CFG } = await import('../src/config.js');
+    const { Enemy } = await import('../src/enemies.js');
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    for (const d of [...w.drops]) d.dead = true; w.drops.length = 0;
+    w.debris.length = 0;
+    const s = w.shooter;
+
+    // ---- salvage off a fixed type has to come to you ----
+    const moved = {};
+    for (const id of ['ordinal', 'tally', 'mote']) {
+      for (const d of [...w.drops]) d.dead = true; w.drops.length = 0;
+      const d = new Enemy(TYPE_BY_ID[id], s.x + 120, s.y - 300, { drop: true, r: 4, energy: 5 });
+      w.drops.push(d);
+      const was = Math.hypot(d.x - s.x, d.y - s.y);
+      for (let k = 0; k < 90; k++) g.update(1 / 60);
+      moved[id] = Math.round(was - Math.hypot(d.x - s.x, d.y - s.y));
+    }
+    for (const d of [...w.drops]) d.dead = true; w.drops.length = 0;
+
+    // ---- and the wreck has to still be there afterwards ----
+    w.aperture = 1;
+    g.openBoss();
+    const bo = w.boss;
+    bo.arriving = 0;
+    bo.core.dead = true;
+    for (let k = 0; k < 60 * 8 && w.boss; k++) g.update(1 / 60);
+    const justAfter = w.debris.filter((c) => !c.dead && c.keep).length;
+    // well past the ordinary lifetime of a chunk
+    const wait = Math.ceil(CFG.debris.life * 2 + 4);
+    for (let k = 0; k < 60 * wait; k++) g.update(1 / 60);
+    const later = w.debris.filter((c) => !c.dead && c.keep).length;
+    const out = { moved, justAfter, later, wait, chunkLife: CFG.debris.life };
+    g.restart();
+    return out;
+  });
+  check("ORDINAL's salvage comes to you and its wreck stays where it fell",
+    r.moved.ordinal > 60 && r.moved.tally > 60 && r.moved.mote > 60
+    && r.justAfter > 20 && r.later >= r.justAfter * 0.9,
+    `closed in 1.5s: ${Object.entries(r.moved).map(([k, v]) => `${k} ${v}`).join(', ')} units; `
+    + `wreck ${r.justAfter} pieces, still ${r.later} after ${r.wait}s `
+    + `(a chunk lives ${r.chunkLife}s)`);
+}
+
 // --- the broadphase ---------------------------------------------------------
 {
   const r = await page.evaluate(async () => {

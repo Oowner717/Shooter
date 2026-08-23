@@ -152,6 +152,7 @@ export class Game {
       boss: null,
       bossStage: 0,
       bossSlow: 0,
+      bossLine: null, // what ORDINAL is saying, if anything
 
       debug: {
         noCooldown: false,
@@ -183,6 +184,7 @@ export class Game {
     w.boss = null;
     w.bossStage = 0;
     w.bossSlow = 0;
+    w.bossLine = null;
     // The ways in and what came back through them are of the run, not of the
     // device. A reset is a fresh session and hands back nothing.
     w.aperture = 0;
@@ -1257,7 +1259,8 @@ export class Game {
     w.bossStage = 0;
     w.timeScale = 1;
     w.director.resting = true;
-    w.director.timer = 3.2; // a beat of empty sky before the field comes back
+    w.director.timer = 4.6; // a long beat of empty sky before the field returns
+    w.bossLine = null;
     this.hud.alert('ORDINAL RECONCILED', 'rigDone', 5);
     background.setMood('staging');
   }
@@ -1438,6 +1441,7 @@ export class Game {
       this.hud.alert(`${w.remainder} HELD · RECAST, IN THE TREE`, 'found', 6, '#ffb8ee');
       this.checkpoint();
     }
+    this.hud.say(w.boss ? w.bossLine : null);
     this.hud.syncBoss(w);
     this.hud.menu.sync(w);
     this.hud.updateAlerts(dt);

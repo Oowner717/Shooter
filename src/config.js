@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '115';
+export const BUILD = '116';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '115';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '423245d';
+export const REV = '3ac1eb8';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -797,7 +797,19 @@ export const CFG = {
   ordinal: {
     cost: 100, // APERTURE, flat, always available
     standoff: 380, // world units above the turret, dead centre
-    arrive: 3.2, // seconds of wormhole before the frame is solid
+    /*
+     * The arrival, as a scene rather than a spawn.
+     *
+     * It was 3.2 seconds of a frame fading up, which is an object appearing.
+     * Nine is long enough to be an event: the sky goes over first and the
+     * field is empty for a beat, then the hole opens and widens, then
+     * something comes through it and unfolds. Four captions across it, one at
+     * a time. Nothing can be hurt until it is over -- the fight starts when
+     * ORDINAL is finished arriving, and not before.
+     */
+    arrive: 9,
+    // Beats within the arrival, as fractions of it: sky, hole, through, unfold.
+    beats: [0.16, 0.38, 0.62, 1],
     coreR: 40,
     // Two frames. `half` is half the side, `per` the segments per side, `turn`
     // the resting rotation -- a quarter turn makes the inner one a diamond.
@@ -826,9 +838,25 @@ export const CFG = {
      */
     stageOuter: 0.5,
     stageCore: 0.6,
+    /*
+     * CONVERGENCE. The beat between the second stage and the third, and the
+     * one thing in the fight that happens *to* you rather than being a
+     * property of the frame.
+     *
+     * ORDINAL stops turning, pulls every segment it has left down onto the
+     * core until the whole thing is a knot the size of the core itself,
+     * holds -- and throws all of them outward at once. They are still solid
+     * while they fly, so for two seconds the field is full of ORDINAL going
+     * past you, and then the frames rebuild out of whatever survived.
+     */
+    convergeRebuild: 0.8, // how much of each frame it puts back first
+    convergePull: 1.9, // seconds of the frame drawing in
+    convergeHold: 0.55, // ...held at the knot
+    convergeThrow: 620, // ...and how hard each segment leaves
+    convergeBack: 2.2, // seconds before the survivors are reeled back in
     spin: [1, 1.8, 2.9], // ...how fast the frames turn
     garrison: [12, 9, 14], // ...how many DIGITs are inside when it starts
-    repair: [0, 7.5, 5.5], // ...seconds between repair pulses, 0 for never
+    repair: [0, 7.5, 7], // ...seconds between repair pulses, 0 for never
     repairHp: 0.5, // and how much of a panel comes back
     /*
      * ...and the most of a frame it may ever put back. Uncapped, ORDINAL
@@ -841,8 +869,17 @@ export const CFG = {
      * between you and the core.
      */
     repairCap: 0.45,
-    burst: [0, 0, 3.4], // ...seconds between the core throwing DIGITs itself
-    burstOf: 3,
+    /*
+     * ...seconds between the core throwing DIGITs itself, 0 for never.
+     *
+     * It was 3.4 for three. Auto aim takes what is nearest and a DIGIT is
+     * always nearer than a core 380 units up the field, so a burst that fast
+     * simply parked the turret's whole output on the garrison: measured,
+     * stage III ran 140 seconds of a 216-second fight with the core creeping
+     * down a percent at a time. The garrison is pressure, not a wall.
+     */
+    burst: [0, 0, 5.5],
+    burstOf: 2,
     /*
      * The death, as a sequence rather than an explosion. Four beats, timed on
      * the real clock so the slow-motion does not stretch them:
@@ -1313,7 +1350,7 @@ export const ENEMY_TYPES = [
     name: 'TALLY',
     shape: 'tally',
     r: 15,
-    hp: 80,
+    hp: 105,
     fixed: true, // the boss places it; physics never moves it
     density: 6,
     speed: 0,
@@ -1335,7 +1372,7 @@ export const ENEMY_TYPES = [
     name: 'ORDINAL',
     shape: 'ordinal',
     r: 40,
-    hp: 1400,
+    hp: 1100,
     large: true,
     fixed: true,
     density: 9,
@@ -1358,7 +1395,7 @@ export const ENEMY_TYPES = [
     name: 'DIGIT',
     shape: 'digit',
     r: 11,
-    hp: 58,
+    hp: 82,
     density: 0.85,
     speed: 92,
     accel: 230,

@@ -36,9 +36,22 @@ import { clamp, rand, rgba, TAU, drawGlow } from './util.js';
 import { Enemy } from './enemies.js';
 import { explode, ring, ripple, spark, shake, haul, flash } from './fx.js';
 import { audio } from './audio.js';
+import { shed } from './debris.js';
 import { background } from './background.js';
 
 const O = () => CFG.ordinal;
+
+/*
+ * What it says on the way in, one line per beat of the arrival. Flat and
+ * observed, the same voice as the story: it is not threatening you, it is
+ * telling you what it has been doing.
+ */
+const ARRIVAL = [
+  'SOMETHING ON THE OTHER SIDE HAS STOPPED COUNTING.',
+  'IT HAS BEEN KEEPING A TALLY SINCE BEFORE YOU ARRIVED.',
+  'IT WOULD LIKE TO SEE THE THING DOING THE SUBTRACTING.',
+  'ORDINAL',
+];
 
 /** Where a segment sits on a square frame, in the frame's own unturned space. */
 function slotAt(half, per, side, i) {
@@ -171,7 +184,13 @@ export class Ordinal {
           const p = this.body('tally', this.x, this.y, ring.half / ring.per);
           p.slot = slotAt(ring.half, ring.per, side, i);
           ring.panels.push(p);
-          world.enemies.push(p);
+          /*
+           * Not on the field yet. The frames assemble on the last beat of the
+           * arrival, segment by segment, and a panel joins the world at the
+           * moment it snaps into its slot — so it is neither drawn nor
+           * shootable before then, which is what makes the unfold read as the
+           * thing being built rather than as forty sprites fading up.
+           */
         }
       }
     }
@@ -259,9 +278,23 @@ export class Ordinal {
       const s = Math.sin(ring.angle);
       for (const p of ring.panels) {
         if (p.dead) continue;
+        // Thrown clear by CONVERGENCE: its own business until it is reeled in.
+        if (p.free && !p.homing) { p.vx = 0; p.vy = 0; p.av = 0; continue; }
         const [ox, oy, bar] = p.slot;
-        p.x = this.x + ox * c - oy * s;
-        p.y = this.y + ox * s + oy * c;
+        // `knot` draws every slot down onto the core; `homing` is a segment
+        // easing back to wherever its slot has turned to while it was away.
+        const grip = 1 - (this.knot || 0) * 0.94;
+        const tx = this.x + (ox * c - oy * s) * grip;
+        const ty = this.y + (ox * s + oy * c) * grip;
+        if (p.homing) {
+          const h = p.homing;
+          p.x += (tx - p.x) * h * 0.3;
+          p.y += (ty - p.y) * h * 0.3;
+          if (h >= 1) { p.free = null; p.homing = 0; }
+        } else {
+          p.x = tx;
+          p.y = ty;
+        }
         p.angle = bar + ring.angle;
         p.vx = 0;
         p.vy = 0;
@@ -391,23 +424,116 @@ export class Ordinal {
     audio.boom();
   }
 
+  /**
+   * The arrival, in four beats.
+   *
+   *   SKY      the substrate turns over and the field is empty for a moment.
+   *            Nothing is drawn where ORDINAL will be; the announcement is
+   *            that the world has changed colour.
+   *   HOLE     a point of light, then a hole, widening.
+   *   THROUGH  the core comes through it, from nothing to full size.
+   *   UNFOLD   the frames assemble out of the dark, segment by segment,
+   *            snapping outward into their slots.
+   *
+   * Nothing can be hurt for any of it, and the health is pinned rather than
+   * merely ignored -- a stray round landing on a boss that has not finished
+   * arriving is a fight that started before the player was looking.
+   */
+  arrive(world, raw) {
+    const C = O();
+    this.arriving -= raw;
+    this.t += raw;
+    const k = clamp(1 - this.arriving / C.arrive, 0, 1);
+    this.entry = k;
+    const [b1, b2, b3] = C.beats;
+
+    // nothing takes damage until it is here
+    for (const ring2 of this.rings) for (const p of ring2.panels) p.hp = p.maxHp;
+    this.core.hp = this.core.maxHp;
+
+    // the frames assemble on the last beat, and are simply not there before it
+    const unfold = k < b3 ? 0 : (k - b3) / (1 - b3);
+    let n = 0;
+    for (const ring2 of this.rings) {
+      for (let i = 0; i < ring2.panels.length; i++) {
+        const p = ring2.panels[i];
+        const due = i / ring2.panels.length;
+        p.spawnIn = unfold > due ? 0 : 1;
+        if (unfold > due && !p.landed) {
+          p.landed = true;
+          world.enemies.push(p);
+          ring(p.x, p.y, p.r * 2.4, p.r * 0.6, 0.22, p.type.glow, 2);
+          if (n++ < 2) audio.pop(0.5);
+        }
+      }
+    }
+    this.core.spawnIn = k < b2 ? 1 : clamp(1 - (k - b2) / (b3 - b2), 0, 1);
+    this.place(raw * 0.5);
+
+    // the sky goes over first, and keeps going over
+    background.setDread(clamp(k / b1, 0, 1), 0);
+    background.setFocus(this.x, this.y);
+    if (!this.moodSet && k >= b1 * 0.5) { this.moodSet = true; background.setMood('boss'); }
+
+    // one shove of light per beat
+    const beat = k < b1 ? 0 : k < b2 ? 1 : k < b3 ? 2 : 3;
+    if (beat !== this.beatAt) {
+      this.beatAt = beat;
+      if (beat >= 1) {
+        ring(this.x, this.y, 4, 120 + beat * 220, 0.4 + beat * 0.12, TYPE_BY_ID.ordinal.glow, 5 - beat);
+        background.surge(1.4);
+        shake(6 + beat * 5);
+        audio.boom();
+      }
+      world.bossLine = ARRIVAL[beat] || null;
+    }
+    if (this.arriving <= 0) {
+      this.entry = 1;
+      world.bossLine = null;
+      ring(this.x, this.y, 20, 640, 0.7, '#ffffff', 5);
+      ripple(this.x, this.y, 2.6, 900);
+      shake(22);
+      audio.boom();
+      background.surge(2);
+    }
+  }
+
   update(world, dt) {
     const C = O();
     this.t += dt;
     this.flare = Math.max(0, this.flare - dt * 2.2);
+    // A stage caption reads for a few seconds and then gets out of the way.
+    if (this.lineFor > 0) {
+      this.lineFor -= world.dtRaw || dt;
+      if (this.lineFor <= 0) world.bossLine = null;
+    }
     for (let i = this.beams.length - 1; i >= 0; i--) {
       this.beams[i].t -= dt;
       if (this.beams[i].t <= 0) this.beams.splice(i, 1);
     }
 
     if (this.arriving > 0) {
-      this.arriving -= dt;
-      // It is not solid yet: nothing can be hurt while it is still coming out.
-      for (const ring of this.rings) for (const p of ring.panels) p.hp = p.maxHp;
-      this.core.hp = this.core.maxHp;
-      this.place(dt * 0.35);
-      background.setDread(1, 0);
+      this.arrive(world, world.dtRaw || dt);
       return;
+    }
+    /*
+     * Belt to the unfold's braces. A segment joins world.enemies at the
+     * moment it snaps into its slot, which is the whole of how the frame
+     * assembles — but anything that shortcuts the arrival (a test setting
+     * `arriving = 0`, a restore, a frame skipped under load) would otherwise
+     * leave ORDINAL standing there with a frame nothing can see or shoot.
+     * Once, on the first frame after the arrival, whatever has not landed
+     * lands.
+     */
+    if (!this.settled) {
+      this.settled = true;
+      for (const ring2 of this.rings) {
+        for (const p of ring2.panels) {
+          p.landed = true;
+          p.spawnIn = 0;
+          if (!p.dead && !world.enemies.includes(p)) world.enemies.push(p);
+        }
+      }
     }
 
     if (this.dying > 0) {
@@ -440,6 +566,38 @@ export class Ordinal {
     let want = 1;
     if (this.shellFrac(0) <= C.stageOuter) want = 2;
     if (frac <= C.stageCore) want = 3;
+    /*
+     * Stage III is not entered, it is arrived at through CONVERGENCE — the
+     * frame collapses onto the core, is thrown back out, and reassembles.
+     * Everything else is held while that runs.
+     */
+    if (want >= 3 && this.stage < 3 && !this.converged) {
+      if (this.conv === undefined) {
+        this.conv = 0;
+        this.threw = false;
+        this.knot = 0;
+        /*
+         * It takes itself back first.
+         *
+         * By the time the core is down to 60% both frames are usually gone,
+         * so a collapse-and-fling had nothing to collapse: measured, the knot
+         * was the bare core and the throw put two segments on the field.
+         * ORDINAL rebuilds most of itself as it draws in — which is what
+         * makes the phase worth watching, and what makes it a third stage
+         * rather than a cutscene.
+         */
+        this.rebuild(world, C.convergeRebuild);
+        world.bossLine = 'CONVERGENCE';
+        flash(0.3, TYPE_BY_ID.ordinal.color);
+        shake(14);
+        audio.boom();
+      }
+      if (this.converge(world, world.dtRaw || dt)) {
+        this.converged = true;
+        this.enterStage(world, 3);
+      }
+      return;
+    }
     if (want > this.stage) this.enterStage(world, want);
 
     const rep = C.repair[this.stage - 1];
@@ -466,6 +624,110 @@ export class Ordinal {
     if (this.core.dead) this.die(world);
   }
 
+  /**
+   * CONVERGENCE: the frame collapsing onto the core and being thrown back out.
+   *
+   * Runs on the way into stage III and is the one beat of the fight that
+   * happens *to* you. Everything else here is a property of the structure —
+   * turn rate, repair, garrison — and can be waited out. This cannot: the
+   * segments are still solid while they fly, so for two seconds the field is
+   * ORDINAL going past you in every direction.
+   *
+   * Whatever survives is reeled back in and the frames rebuild out of it,
+   * which is why it is worth shooting them on the way through.
+   */
+  converge(world, raw) {
+    const C = O();
+    this.conv += raw;
+    const pull = C.convergePull;
+    const hold = pull + C.convergeHold;
+    const live = [];
+    for (const ring2 of this.rings) for (const p of ring2.panels) if (!p.dead) live.push(p);
+
+    if (this.conv < hold) {
+      // in: every segment eased down onto the core, and the sky drawn with it
+      const k = clamp(this.conv / pull, 0, 1);
+      this.knot = k * k * (3 - 2 * k);
+      if (Math.random() < 0.4) {
+        const rr = 420 * (1 - this.knot) + 30;
+        ring(this.x, this.y, rr, rr * 0.3, 0.24, TYPE_BY_ID.ordinal.glow, 2);
+      }
+      shake(2 + this.knot * 8);
+      return false;
+    }
+
+    if (!this.threw) {
+      this.threw = true;
+      // ...and out. Solid the whole way.
+      for (const p of live) {
+        const a = Math.atan2(p.y - this.y, p.x - this.x) + rand(-0.1, 0.1);
+        p.free = { vx: Math.cos(a) * C.convergeThrow, vy: Math.sin(a) * C.convergeThrow, t: 0 };
+      }
+      flash(0.5, TYPE_BY_ID.ordinal.color);
+      for (let i = 0; i < 4; i++) {
+        ring(this.x, this.y, 10 + i * 20, 420 + i * 200, 0.45 + i * 0.14,
+          i % 2 ? '#ffffff' : TYPE_BY_ID.ordinal.glow, 5 - i);
+      }
+      ripple(this.x, this.y, 3, 1100);
+      shake(30);
+      audio.boom();
+      background.surge(2);
+      world.bossLine = 'IT IS NOT A WALL. IT NEVER WAS.';
+      return false;
+    }
+
+    // the survivors coast, then are reeled back into their slots
+    const back = this.conv - hold;
+    for (const p of live) {
+      if (!p.free) continue;
+      p.free.t += raw;
+      if (p.free.t < C.convergeBack * 0.45) {
+        p.x += p.free.vx * raw;
+        p.y += p.free.vy * raw;
+        p.angle += raw * 4;
+      } else {
+        // home, easing back to wherever its slot has turned to by now
+        p.homing = clamp((p.free.t - C.convergeBack * 0.45) / (C.convergeBack * 0.55), 0, 1);
+      }
+    }
+    if (back < C.convergeBack) return false;
+    for (const p of live) { p.free = null; p.homing = 0; }
+    this.knot = 0;
+    world.bossLine = null;
+    ring(this.x, this.y, 400, 20, 0.5, TYPE_BY_ID.ordinal.glow, 3);
+    audio.boom();
+    return true;
+  }
+
+  /**
+   * Put dead segments back, up to `frac` of each frame, at part health. The
+   * same push into world.enemies that repair() needs: sweep() removes a dead
+   * body from the field, and clearing `dead` on one this still holds a
+   * reference to would otherwise revive it where nothing can see or shoot it.
+   */
+  rebuild(world, frac) {
+    let back = 0;
+    this.rings.forEach((ring2, i) => {
+      const want = Math.round(ring2.panels.length * frac);
+      const gone = ring2.panels.filter((p) => p.dead);
+      const need = Math.max(0, want - (ring2.panels.length - gone.length));
+      for (let k = 0; k < need && k < gone.length; k++) {
+        const p = gone[k];
+        p.dead = false;
+        p.maxHp = TYPE_BY_ID.tally.hp;
+        p.hp = Math.round(p.maxHp * 0.6);
+        p.spawnIn = 0.4;
+        p.flash = 1;
+        p.free = null;
+        p.homing = 0;
+        if (!world.enemies.includes(p)) world.enemies.push(p);
+        this.beams.push({ p, t: 0.55 });
+        back++;
+      }
+    });
+    return back;
+  }
+
   enterStage(world, n) {
     const C = O();
     this.stage = n;
@@ -475,6 +737,10 @@ export class Ordinal {
     this.burstT = C.burst[n - 1];
     // Both frames reverse, so whatever alignment was learned is now wrong.
     for (const ring of this.rings) ring.spin *= -1;
+    // The whole sky escalates with it, not just the boss.
+    background.setMood(n >= 3 ? 'boss3' : 'boss2');
+    world.bossLine = n >= 3 ? 'THE COUNT IS SHORT. IT HAS NOTICED.' : 'IT IS MENDING ITSELF.';
+    this.lineFor = 3.4;
     this.garrison(C.garrison[n - 1], true);
     ring(this.x, this.y, 20, 520, 0.7, TYPE_BY_ID.ordinal.glow, 6);
     ring(this.x, this.y, 10, 300, 0.4, '#ffffff', 3);
@@ -580,6 +846,23 @@ export class Ordinal {
         rand(0.5, 1.1), 3);
     }
     explode(this.x, this.y, C.coreR * 2, T.color, T.glow, 4);
+    /*
+     * The husk.
+     *
+     * Ordinary wreckage clears itself, which is right for a BULWARK breaking
+     * mid-wave and wrong here: a boss that leaves an empty field reads as
+     * having been deleted rather than broken. These are keeps — they never
+     * time out — so what is lying on the floor afterwards is the shape of the
+     * thing that was there, and it is still there when the next wave arrives.
+     */
+    for (const ring2 of this.rings) {
+      for (const p of ring2.panels) {
+        shed(world, { x: p.x, y: p.y, r: p.r, vx: 0, vy: 0, type: p.type }, 3,
+          { keep: true, size: 1.35 });
+      }
+    }
+    shed(world, { x: this.x, y: this.y, r: C.coreR, vx: 0, vy: 0, type: T }, 16,
+      { keep: true, size: 1.5 });
     ripple(this.x, this.y, 4, 1500);
     shake(40);
     audio.boom();

@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '115';
+  var BUILD = '116';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -111,6 +111,11 @@
       <div class="bar"><i id="bossFill"></i></div>
       <div class="bossShell"><i id="bossShellA"></i><i id="bossShellB"></i></div>
     </div>
+
+    <!-- ORDINAL's captions. Centred over the field, one line at a time, away
+         from the pill stack: the entrance is the one moment the interface is
+         allowed to talk over the game. -->
+    <div id="bossCaption"></div>
 
     <div id="alerts"></div>
 

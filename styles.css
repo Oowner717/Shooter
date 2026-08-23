@@ -405,7 +405,13 @@ html, body {
   position: absolute;
   left: calc(var(--safe-l) + 22px);
   right: calc(var(--safe-r) + 22px);
-  top: 42%;
+  /*
+   * Above the boss, not on it. ORDINAL sits at about 45% of the field and at
+   * 42% the caption was printed straight through its glow — legible in a
+   * mockup and not on a phone. This clears the frame and still sits well
+   * below the bar.
+   */
+  top: 24%;
   text-align: center;
   font-size: 13px;
   line-height: 1.7;

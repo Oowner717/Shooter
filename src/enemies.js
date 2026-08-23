@@ -318,8 +318,9 @@ export class Enemy {
    */
   edgeEase(world, dt) {
     // Fixed bodies are placed, not steered — see drive(). Nudging one toward
-    // the middle just fights the boss for the same frame.
-    if (this.type.fixed) return;
+    // the middle just fights the boss for the same frame. Their salvage is
+    // not fixed and wants the wall like anything else.
+    if (this.type.fixed && !this.isDrop) return;
     const E = CFG.physics;
     const left = this.x - this.r;
     const right = world.width - (this.x + this.r);
@@ -482,7 +483,14 @@ export class Enemy {
     // ORDINAL's frame and its core. Their position is the boss's business,
     // not physics' — see src/boss.js. They are still solid, still take hits
     // and still come apart; they simply do not go anywhere.
-    if (this.type.fixed) { this.vx = 0; this.vy = 0; return; }
+    /*
+     * ...but only a body. A drop is built from the type it fell off, so
+     * ORDINAL's salvage and every TALLY's carried `fixed` and was pinned by
+     * this line the instant it existed: velocity zeroed every frame, no
+     * steering, no drift to the turret. The whole payout of a boss sat in a
+     * frozen cloud where the frame had been and could not be collected.
+     */
+    if (this.type.fixed && !this.isDrop) { this.vx = 0; this.vy = 0; return; }
     // Thrown clear and not yet recovered. It coasts: the whole point of EBB is
     // that the field comes off you, and a body that starts steering back on
     // the next frame has not been thrown anywhere.

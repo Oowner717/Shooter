@@ -12,11 +12,19 @@ const MOODS = {
   // The arrival: everything drains out of the substrate and the only colour
   // left is coming through the breach.
   breach: { top: '#000000', mid: '#080407', low: '#000000', line: '#6b4a2a', neb: ['#1a0d05', '#120612', '#050308'], accent: '#ffd08a' },
-  // One per aspect, so the whole field turns over as it wakes up rather than
-  // only the boss sprite changing colour.
-  boss: { top: '#0b0703', mid: '#2b1a06', low: '#050301', line: '#c08a3a', neb: ['#6b3d08', '#4a2d10', '#2a1a04'], accent: '#ffd98a' },
-  boss2: { top: '#08040f', mid: '#1b0b2e', low: '#04020a', line: '#9a5fd0', neb: ['#42117a', '#5c1040', '#1c0a4d'], accent: '#cbb8ff' },
-  boss3: { top: '#0f0206', mid: '#320714', low: '#0a0103', line: '#e03a63', neb: ['#7a0c2c', '#5c1040', '#3d0416'], accent: '#ff9fb0' },
+  /*
+   * ORDINAL's sky, one per stage, so the whole field turns over as the fight
+   * escalates rather than only the boss changing colour. Magenta because
+   * ORDINAL is, and nothing else on the field uses that hue -- once the way
+   * is open, everything that is not yours is one colour.
+   *
+   * I  the ground goes out from under the blue and a violet comes up through
+   *    it; II is hotter and closer; III is nearly white at the horizon, which
+   *    is what a thing about to come apart looks like.
+   */
+  boss: { top: '#0a0410', mid: '#2a0a33', low: '#050109', line: '#a03fb0', neb: ['#4d0a5c', '#2e0a4a', '#3d0630'], accent: '#ff8ae0' },
+  boss2: { top: '#12031a', mid: '#48083f', low: '#08010c', line: '#d64ab0', neb: ['#7a0a5c', '#4d0a5c', '#5c0630'], accent: '#ff6ad5' },
+  boss3: { top: '#1c0320', mid: '#6b0a4a', low: '#0d0110', line: '#ff5ec8', neb: ['#a80c66', '#7a0a5c', '#8c0640'], accent: '#ffc2f0' },
   ending: { top: '#000000', mid: '#0a0a0a', low: '#000000', line: '#555555', neb: ['#222222', '#111111', '#191919'], accent: '#cccccc' },
 };
 

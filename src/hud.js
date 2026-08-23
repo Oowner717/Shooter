@@ -67,6 +67,7 @@ export class Hud {
       dbgGrid: $('dbgGrid'),
       dbgSpawn: $('dbgSpawn'),
       dbgStats: $('dbgStats'),
+      bossCaption: $('bossCaption'),
       apertureBar: $('apertureBar'),
       bossBar: $('bossBar'),
       bossTitle: $('bossTitle'),
@@ -1079,6 +1080,23 @@ export class Hud {
    * screen is its bar. The two shell meters under the core's are the frames,
    * because for most of the fight the frames are what is actually moving.
    */
+  /**
+   * ORDINAL talking. One line at a time, centred over the field, faded in and
+   * out on its own — the arrival is the one moment the interface is allowed
+   * to talk over the game, and it is the only thing that uses this.
+   *
+   * Passing null clears it.
+   */
+  say(text) {
+    const el = this.el.bossCaption;
+    if (!el) return;
+    if (this._said === text) return;
+    this._said = text;
+    if (!text) { el.classList.remove('show'); return; }
+    el.textContent = text;
+    el.classList.add('show');
+  }
+
   syncBoss(world) {
     const ap = this.el.apertureBar;
     const bar = this.el.bossBar;
