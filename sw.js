@@ -32,6 +32,7 @@ const ASSETS = [
   './src/glitch.js',
   './src/audio.js',
   './src/debris.js',
+  './src/boss.js',
   './src/enemies.js',
   './src/projectiles.js',
   './src/mines.js',

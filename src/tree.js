@@ -79,6 +79,10 @@ const UNDER = {
   spall: ['buckshot'],
   void: ['eventhorizon'],
 
+  // ---- the way in ----
+  // One leaf under its own heading, always available, never behind anything.
+  anomaly: ['aperture'],
+
   // ---- the abilities ----
   abilities: ['standing', 'reflex'],
   pulse: [],
@@ -96,6 +100,7 @@ const BRANCH = {
   // six below them are bought; their extra uses are not.
   abilities: ['pulse', 'fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'chorus'],
   turret: [],
+  anomaly: [],
 };
 
 /** Free arms: things the turret already has when the run starts. */
@@ -160,13 +165,14 @@ function node(o) {
   return { levels: 1, cost: 0, children: [], ...o };
 }
 
-const ROOT_TONE = { turret: '#59e0ff', ammo: '#bff4ff', mines: '#ffb347', abilities: '#c9a7ff' };
-const ROOT_NAME = { turret: 'TURRET', ammo: 'AMMUNITION', mines: 'MINES', abilities: 'ABILITIES' };
+const ROOT_TONE = { turret: '#59e0ff', ammo: '#bff4ff', mines: '#ffb347', abilities: '#c9a7ff', anomaly: '#ff5ec8' };
+const ROOT_NAME = { turret: 'TURRET', ammo: 'AMMUNITION', mines: 'MINES', abilities: 'ABILITIES', anomaly: 'ANOMALY' };
 const ROOT_LINE = {
   turret: 'The machine itself. Everything here is yours from the first frame.',
   ammo: 'What leaves the barrel. BOLT is loaded before you start; the rest are bought.',
   mines: 'What you leave behind. Eight of them, none behind any other — buy them in any order.',
   abilities: 'What you hold. PULSE and FAN can never be taken from you; the other six are bought.',
+  anomaly: 'Not of the field. Buy one and the way can be opened whenever you choose to open it.',
 };
 
 function leaf(id) {
@@ -175,8 +181,10 @@ function leaf(id) {
   const levels = u.levels ?? 3; // an unlimited stack is offered three deep here
   return node({
     kind: 'upgrade', id, key: id, name: u.name, line: u.line, icon: u.icon,
-    levels, tone: '#9fb3c8',
-    cost: COST.upgrade, step: COST.step, tiers: u.tiers || null,
+    levels, tone: u.tone || '#9fb3c8',
+    // An upgrade may price itself. Only APERTURE does: it is not a step on a
+    // ladder, it is the same purchase every time, and it costs what it costs.
+    cost: u.cost ?? COST.upgrade, step: u.step ?? COST.step, tiers: u.tiers || null,
   });
 }
 
@@ -248,7 +256,7 @@ function commons(root) {
  * arm or a leaf under one, which is what makes ABILITIES a peer of AMMO rather
  * than a list hanging off PULSE.
  */
-export const TREE = ['turret', 'ammo', 'mines', 'abilities'].map((root) => node({
+export const TREE = ['anomaly', 'turret', 'ammo', 'mines', 'abilities'].map((root) => node({
   kind: 'root', key: root, name: ROOT_NAME[root], free: true,
   tone: ROOT_TONE[root], line: ROOT_LINE[root],
   children: [

@@ -70,6 +70,21 @@ export const CODEX = [
     line: 'Drags a weight on a cable. The weight does not steer, and it does not need to.',
   },
   {
+    id: 'ordinal',
+    name: 'ORDINAL',
+    line: 'It has been counting since before you arrived. The frame is the count; the thing in the middle is what has been keeping it.',
+  },
+  {
+    id: 'tally',
+    name: 'TALLY',
+    line: 'One segment of the count. Five strokes, and it goes out on the fifth.',
+  },
+  {
+    id: 'digit',
+    name: 'DIGIT',
+    line: 'Garrisoned, not built in. It was only ever waiting for a door.',
+  },
+  {
     id: 'towMass',
     name: 'MASS',
     line: 'The far end of a cable. It arrives by being swung, and it arrives regardless.',

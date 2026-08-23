@@ -652,9 +652,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const S = w.shooter;
     const en = await import('../src/enemies.js');
     const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    // A clean field, and nothing left running over it: an earlier case in this
+    // file can leave a WELL or a STASIS up, and either of them will drag a
+    // thrown MASS off the turret it was aimed at.
     w.director.timer = 1e9; w.director.driftTimer = 1e9;
     w.autoAim = false; w.autoFire = false;
     for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    for (const e of w.effects) e.dead = true; w.effects.length = 0;
+    w.mines.length = 0;
+    w.stasis = 0;
+    w.timeScale = 1;
+    w.attackers.clear();
     w.shock = 0;
     const made = en.spawnGroup(w, 'tow', 1, { where: 'field', x: S.x + 30, y: 700 });
     const head = made.find((e) => e.type.id === 'tow');
@@ -667,8 +675,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       if (released === null && !head.tether) {
         released = { speed: Math.round(Math.hypot(mass.vx, mass.vy)), thrown: mass.thrown > 0, hurled: !!mass.hurled };
       }
-      if (released && landed === null && mass.attacking) {
-        landed = { shock: +w.shock.toFixed(2), attackers: w.attackers.size };
+      /*
+       * The landing is read off the corruption spike, not off the MASS being
+       * a live attacker afterwards: 280hp of armour arriving at 614 can and
+       * often does break itself on the turret, so it lands, spikes, and is
+       * gone in the same instant. The spike is the event.
+       */
+      if (released && landed === null && w.shock > 0) {
+        landed = { shock: +w.shock.toFixed(2), attackers: w.attackers.size, dead: mass.dead };
         for (let k = 0; k < 60 * 3; k++) g.update(1 / 60); // and it has to clear
         landed.after = +w.shock.toFixed(2);
         break;
@@ -683,6 +697,101 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     !!r.released && r.released.speed >= r.speed * 0.9 && r.released.hurled
     && !!r.landed && r.peak >= r.want * 0.95 && r.landed.after === 0,
     JSON.stringify(r));
+}
+
+// --- ORDINAL --------------------------------------------------------------
+/*
+ * The whole point of the shape: the core is behind two closed frames, and a
+ * frame whose segments do not meet is not a frame. On the first build of this
+ * fight the segments covered 62% of a side and rounds went straight through --
+ * the core was at 99% while the frame was still at 100%.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    w.aperture = 1;
+    g.openBoss();
+    const bo = w.boss;
+    bo.arriving = 0; // straight to solid
+    const coreAt = bo.core.hp;
+    // Everything the turret has, straight up the field, for a good while.
+    w.autoAim = true; w.autoFire = true;
+    for (let k = 0; k < 8 * 60; k++) g.update(1 / 60);
+    const sealedCore = bo.core.hp;
+    const outerAfter = bo.shellFrac(0);
+    /*
+     * ...and with the frames taken out of the way it is reachable. The loose
+     * garrison goes too: auto aim takes what is nearest, and a DIGIT between
+     * the turret and the core is nearer than the core -- which is correct in
+     * the fight and confounding in the measurement.
+     */
+    for (const ring of bo.rings) for (const p of ring.panels) p.dead = true;
+    for (const e of w.enemies) if (e !== bo.core) e.dead = true;
+    for (let k = 0; k < 5 * 60; k++) {
+      g.update(1 / 60);
+      for (const e of w.enemies) if (e !== bo.core && !e.dead) e.dead = true;
+    }
+    const openCore = bo.core.hp;
+    const out = { coreAt, sealedCore, openCore, outerAfter: +outerAfter.toFixed(2),
+      panels: bo.rings.reduce((n, x) => n + x.panels.length, 0) };
+    if (w.boss) w.boss.clear(w);
+    w.boss = null; w.autoAim = false; w.autoFire = false;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    return out;
+  });
+  // Sealed: the core takes little or nothing while the frame is up, and the
+  // frame is visibly being worked on. Open: it takes real damage.
+  const leak = (r.coreAt - r.sealedCore) / r.coreAt;
+  const through = (r.sealedCore - r.openCore) / r.coreAt;
+  check('ORDINAL\'s core is only reachable through a hole in its frame',
+    leak < 0.05 && r.outerAfter < 1 && through > 0.05,
+    `sealed 8s: core lost ${(leak * 100).toFixed(1)}%, outer frame at ${r.outerAfter}; `
+    + `frame removed, 5s: core lost a further ${(through * 100).toFixed(1)}% of ${r.panels} segments`);
+}
+
+// --- ...and the fight progresses on the assists alone ------------------------
+// It has to be finishable with no manual aiming at all -- the assist shoots
+// what is nearest, the frame is what is nearest, and shots through the holes
+// are what reach the core.
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    w.autoAim = true; w.autoFire = true;
+    w.aperture = 1;
+    g.openBoss();
+    const bo = w.boss;
+    const seen = new Set();
+    let released = 0;
+    const parked0 = bo.parked.length;
+    for (let s = 0; s < 70; s++) {
+      for (let k = 0; k < 30; k++) g.update(1 / 30);
+      seen.add(bo.stage);
+      released = Math.max(released, parked0 - bo.parked.length);
+      if (!w.boss) break;
+    }
+    const out = { stages: [...seen], outer: +bo.shellFrac(0).toFixed(2),
+      inner: +bo.shellFrac(1).toFixed(2), core: +bo.coreFrac.toFixed(2),
+      released, parked0, loose: w.enemies.filter((e) => !e.dead && e.type.id === 'digit').length };
+    if (w.boss) w.boss.clear(w);
+    w.boss = null; w.autoAim = false; w.autoFire = false;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.timeScale = 1;
+    return out;
+  });
+  check('ORDINAL can be fought on the assists alone, and its garrison gets out',
+    r.stages.includes(2) && r.core < 0.95 && r.inner < 1 && r.released > 0,
+    `70s on auto: stages ${r.stages.join('+')}, outer ${r.outer}, inner ${r.inner}, `
+    + `core ${r.core}, ${r.released}/${r.parked0} DIGITs released`);
 }
 
 // --- the broadphase ---------------------------------------------------------

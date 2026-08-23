@@ -51,6 +51,7 @@ console.log(`sw.js precaches all ${src.length} modules`);
 // Two files, one subject, so they can drift — and a node left out of the tree
 // is content nobody in the game can ever buy. Checked here rather than trusted.
 const { coverage } = await import(new URL('../src/tree.js', import.meta.url));
+const { ALL_UPGRADES } = await import(new URL('../src/upgrades.js', import.meta.url));
 const cov = coverage();
 if (cov.missing.length || cov.extra.length || cov.dupes.length) {
   if (cov.missing.length) console.error(`tree is missing: ${cov.missing.join(', ')}`);
@@ -176,7 +177,9 @@ if (peak > CFG.maxEnemies) {
   process.exit(1);
 }
 // Types that are only ever produced by another type, never released directly.
-const DERIVED = new Set(['plate', 'seed', 'towMass', 'drift']);
+// ORDINAL's three are not of the field at all: they come through the APERTURE
+// and leave with it, and no wave will ever name them.
+const DERIVED = new Set(['plate', 'seed', 'towMass', 'drift', 'tally', 'ordinal', 'digit']);
 const placed = new Set(WAVES.flatMap((w) => w.of.map(([id]) => id)));
 const unplaced = ENEMY_TYPES.filter((t) => !placed.has(t.id) && !DERIVED.has(t.id)).map((t) => t.id);
 if (unplaced.length) {
@@ -186,6 +189,33 @@ if (unplaced.length) {
 console.log(`${regular.length} regular waves, all 2-3 types, up to ${Math.max(...regular.map(bodiesOf))} `
   + `bodies at population ${CFG.waves.population} (${peak} at full swell, cap ${CFG.maxEnemies}); `
   + `${placed.size} types released, ${DERIVED.size} produced by others`);
+
+/*
+ * ORDINAL's frames are solid, and the way in costs what it says it costs.
+ *
+ * A segment's radius is half a side over the segments on it, so the segments
+ * of a side meet. At r 15 against a 300-unit side they covered 62% of it and
+ * rounds simply flew through: the core was at 99% while the frame was still
+ * at 100%, which is the fight backwards. This is the arithmetic that stops
+ * that returning as a tuning slip.
+ */
+const leaky = CFG.ordinal.rings
+  .map((r, i) => [i, (r.half / r.per) * 2 * r.per, r.half * 2])
+  .filter(([, covered, side]) => covered < side - 0.001);
+if (leaky.length) {
+  console.error(`ORDINAL frame ${leaky.map(([i, c, side]) => `${i} covers ${c.toFixed(0)} of ${side}`).join(', ')}`
+    + ' — rounds go through a frame that does not close');
+  process.exit(1);
+}
+const ap = ALL_UPGRADES.find((u) => u.id === 'aperture');
+if (!ap || ap.cost !== CFG.ordinal.cost) {
+  console.error(`APERTURE is priced at ${ap ? ap.cost : 'nothing'} against CFG.ordinal.cost `
+    + `${CFG.ordinal.cost}`);
+  process.exit(1);
+}
+const panels = CFG.ordinal.rings.reduce((n, r) => n + r.per * 4, 0);
+console.log(`ORDINAL: ${panels} segments in ${CFG.ordinal.rings.length} closed frames, `
+  + `APERTURE ${ap.cost}`);
 
 // ---- REV: what these bytes actually are ------------------------------------
 //

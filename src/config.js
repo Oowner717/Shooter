@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '111';
+export const BUILD = '112';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '111';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a85f438';
+export const REV = 'e0a6f93';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -775,7 +775,81 @@ export const CFG = {
   },
 
 
-  // ---- boss -----------------------------------------------------------
+  /*
+   * ---- ORDINAL ---------------------------------------------------------
+   *
+   * The thing that has been counting, come to look at you.
+   *
+   * A square frame turning slowly around a core that does not move, with a
+   * second frame inside it turning the other way. Both are built out of
+   * TALLY segments and both are solid: a round stops in one. The core can
+   * only be reached through a hole in both, and the two frames turn at
+   * different rates, so the holes you have opened line up and part again.
+   * That alignment is the whole rhythm of the fight, and it is why auto aim
+   * can finish it -- the assist keeps firing at what is nearest, the shots
+   * grind the frame open, and the ones that go through land on the core.
+   *
+   * DIGITs are garrisoned in the frame rather than placed on the field. They
+   * are not part of the structure and they are not spawned by it: they are
+   * sitting inside it, and a hole is a door. Break the panel beside one and
+   * it leaves, and from then on it is an object like any other.
+   */
+  ordinal: {
+    cost: 100, // APERTURE, flat, always available
+    standoff: 380, // world units above the turret, dead centre
+    arrive: 3.2, // seconds of wormhole before the frame is solid
+    coreR: 40,
+    // Two frames. `half` is half the side, `per` the segments per side, `turn`
+    // the resting rotation -- a quarter turn makes the inner one a diamond.
+    /*
+     * A segment's radius is not chosen, it is `half / per` -- half a side
+     * divided by the segments on it -- so the segments of a side meet and the
+     * frame is solid. At r 15 against a 300-unit side they covered 62% of it
+     * and rounds went through the gaps: measured on the first build of this
+     * fight, the core was down to 99% while the frame was still at 100%,
+     * which is the fight backwards.
+     */
+    rings: [
+      { half: 150, per: 6, spin: 0.20, turn: 0 },
+      { half: 94, per: 4, spin: -0.33, turn: Math.PI / 4 },
+    ],
+    /*
+     * Stages are read off progress through the whole thing, not off the core
+     * alone -- the core cannot be touched until both frames are open, so
+     * core-only staging put every stage change in the last third of the
+     * fight and left the first two thirds as one flat grind.
+     *
+     *   I    from the arrival
+     *   II   once half the outer frame is gone: the frames speed up and
+     *        reverse, ORDINAL starts mending itself, a second garrison walks
+     *   III  once the core is under 60%: it stops waiting
+     */
+    stageOuter: 0.5,
+    stageCore: 0.6,
+    spin: [1, 1.8, 2.9], // ...how fast the frames turn
+    garrison: [12, 9, 14], // ...how many DIGITs are inside when it starts
+    repair: [0, 7.5, 5.5], // ...seconds between repair pulses, 0 for never
+    repairHp: 0.5, // and how much of a panel comes back
+    /*
+     * ...and the most of a frame it may ever put back. Uncapped, ORDINAL
+     * simply out-healed a base turret: measured over a driven fight, the
+     * outer frame went from 25% back to 100% between the 70th and 140th
+     * second while the core barely moved. A boss that mends faster than you
+     * break is not a stage, it is a wall.
+     *
+     * The inner frame is mended first, because that is the one standing
+     * between you and the core.
+     */
+    repairCap: 0.45,
+    burst: [0, 0, 3.4], // ...seconds between the core throwing DIGITs itself
+    burstOf: 3,
+    // The death. A long one on purpose: it is the only time the field stops.
+    endSlow: 0.22, // time scale it drops to
+    endFor: 2.8, // ...for this long
+    pay: 900, // energy on the floor when it comes apart
+  },
+
+  // ---- ward shell -----------------------------------------------------
 
   /*
    * The cover a HERALD holds over a body.
@@ -1203,6 +1277,79 @@ export const ENEMY_TYPES = [
     weight: 0,
     drops: 8, // energy it leaves when it comes apart
     debris: 12, // inert wreckage thrown when it breaks up
+  },
+  /*
+   * ---- ORDINAL's three ----
+   *
+   * None of these is ever rolled for, released by a wave or counted against
+   * the five hundred: they arrive through the APERTURE and leave with it.
+   * Magenta, which nothing else on the field uses -- when the sky goes over
+   * to the boss substrate the only things in that hue are the boss and what
+   * came with it.
+   */
+  {
+    // One segment of a frame. Solid: a round stops in it, which is what makes
+    // a hole a hole.
+    id: 'tally',
+    unlock: 0,
+    name: 'TALLY',
+    shape: 'tally',
+    r: 15,
+    hp: 80,
+    fixed: true, // the boss places it; physics never moves it
+    density: 6,
+    speed: 0,
+    accel: 0,
+    restitution: 0.15,
+    wobble: 0,
+    armor: 0.12,
+    color: '#ff8ae0',
+    glow: '#ff3fc0',
+    weight: 0,
+    drops: 2,
+    debris: 5,
+  },
+  {
+    // The core. It does not move, it does not steer, and it cannot be reached
+    // except through the frames.
+    id: 'ordinal',
+    unlock: 0,
+    name: 'ORDINAL',
+    shape: 'ordinal',
+    r: 40,
+    hp: 1600,
+    large: true,
+    fixed: true,
+    density: 9,
+    speed: 0,
+    accel: 0,
+    restitution: 0.2,
+    wobble: 0,
+    armor: 0.2,
+    color: '#ff5ec8',
+    glow: '#ff1f9e',
+    weight: 0,
+    drops: 26,
+    debris: 22,
+  },
+  {
+    // The garrison. A sovereign object: once it is out it wants what every
+    // other object wants, and nothing about the frame governs it any more.
+    id: 'digit',
+    unlock: 0,
+    name: 'DIGIT',
+    shape: 'digit',
+    r: 11,
+    hp: 58,
+    density: 0.85,
+    speed: 92,
+    accel: 230,
+    restitution: 0.72,
+    wobble: 1.8,
+    color: '#ffa8e8',
+    glow: '#ff5fd0',
+    weight: 0,
+    drops: 3,
   },
   {
     id: 'prism',

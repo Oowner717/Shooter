@@ -67,6 +67,13 @@ export class Hud {
       dbgGrid: $('dbgGrid'),
       dbgSpawn: $('dbgSpawn'),
       dbgStats: $('dbgStats'),
+      apertureBar: $('apertureBar'),
+      bossBar: $('bossBar'),
+      bossTitle: $('bossTitle'),
+      bossPhase: $('bossPhase'),
+      bossFill: $('bossFill'),
+      bossShellA: $('bossShellA'),
+      bossShellB: $('bossShellB'),
       boot: $('boot'),
       startBtn: $('startBtn'),
       resumeBtn: $('resumeBtn'),
@@ -134,6 +141,24 @@ export class Hud {
     this.el.resumeBtn.addEventListener('click', () => game.resume());
     this.offerResume();
     $('dbgClose').addEventListener('click', () => this.toggleDebug(false));
+
+    /*
+     * The way in. A play-screen control, so pointerdown like the rest of them
+     * -- a thumb landing on it is the press. Keyboard gets its own path,
+     * because pointerdown alone is right for a thumb and wrong for anything
+     * else.
+     */
+    const open = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.game.openBoss();
+    };
+    this.el.apertureBar.addEventListener('pointerdown', open);
+    this.el.apertureBar.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    this.el.apertureBar.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      open(ev);
+    });
 
     // Everything above is what `preboot` was waiting for: the strip, the
     // abilities, the menu, the controls list, the build stamp and whether
@@ -1046,6 +1071,41 @@ export class Hud {
    * the same as ORDINAL's `locked`: locked is something taken away mid-fight,
    * sealed is something not yet given. Both are visible; only one is a loss.
    */
+  /**
+   * The way in, and the thing that came through it.
+   *
+   * One or the other, never both: while there is no boss the banner is a
+   * control offering the arrival, and while there is one the same strip of
+   * screen is its bar. The two shell meters under the core's are the frames,
+   * because for most of the fight the frames are what is actually moving.
+   */
+  syncBoss(world) {
+    const ap = this.el.apertureBar;
+    const bar = this.el.bossBar;
+    const boss = world.boss;
+    const offer = !boss && world.aperture > 0;
+    if (ap.hidden !== !offer) ap.hidden = !offer;
+    if (offer) {
+      const held = world.aperture > 1 ? ` x${world.aperture}` : '';
+      const want = `APERTURE HELD${held}`;
+      if (this._apLabel !== want) {
+        this._apLabel = want;
+        ap.firstElementChild.textContent = want;
+      }
+    }
+    if (bar.hidden !== !boss) bar.hidden = !boss;
+    if (!boss) { this._bossSeen = null; return; }
+    const frac = boss.arriving > 0 ? 1 : boss.coreFrac;
+    this.el.bossFill.style.transform = `scaleX(${frac.toFixed(3)})`;
+    this.el.bossShellA.style.transform = `scaleX(${boss.shellFrac(0).toFixed(3)})`;
+    this.el.bossShellB.style.transform = `scaleX(${boss.shellFrac(1).toFixed(3)})`;
+    const phase = boss.arriving > 0 ? 'ARRIVING' : ['I', 'II', 'III'][boss.stage - 1];
+    if (this._bossSeen !== phase) {
+      this._bossSeen = phase;
+      this.el.bossPhase.textContent = phase;
+    }
+  }
+
   syncSeals() {
     for (const q of this.strip) {
       const sealed = this.game.isSealed(q.key);
@@ -1087,6 +1147,7 @@ export class Hud {
     this.syncAbilities(world.abilities);
     this.syncLoadout(world);
     this.syncSeals();
+    this.syncBoss(world);
     this.menu.sync(world);
   }
 

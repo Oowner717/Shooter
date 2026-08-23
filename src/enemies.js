@@ -56,6 +56,9 @@ export function drawSpecimen(ctx, id, r) {
   switch (t.shape) {
     case 'shard': drawShard(ctx, r); break;
     case 'needle': drawNeedle(ctx, r); break;
+    case 'tally': drawTally(ctx, r, 1); break;
+    case 'ordinal': drawOrdinal(ctx, r, 0, 0, 1); break;
+    case 'digit': drawDigit(ctx, r, 0, 0); break;
     case 'hex': drawHex(ctx, r); break;
     case 'blob': drawBlob(ctx, r, 0.6, 0); break;
     case 'bloom': drawBloom(ctx, r, 0.4, 0, t); break;
@@ -466,6 +469,10 @@ export class Enemy {
   }
 
   drive(world, dt) {
+    // ORDINAL's frame and its core. Their position is the boss's business,
+    // not physics' — see src/boss.js. They are still solid, still take hits
+    // and still come apart; they simply do not go anywhere.
+    if (this.type.fixed) { this.vx = 0; this.vy = 0; return; }
     // Thrown clear and not yet recovered. It coasts: the whole point of EBB is
     // that the field comes off you, and a body that starts steering back on
     // the next frame has not been thrown anywhere.
@@ -1006,6 +1013,9 @@ export class Enemy {
       case 'prism': drawPrism(ctx, this.r); break;
       case 'herald': drawHerald(ctx, this.r, this.wardSpin || 0); break;
       case 'glut': drawGlut(ctx, this.r, this.fed || 0, this.phase, world.time); break;
+      case 'tally': drawTally(ctx, this.r, hpFrac); break;
+      case 'ordinal': drawOrdinal(ctx, this.r, this.phase, world.time, hpFrac); break;
+      case 'digit': drawDigit(ctx, this.r, this.phase, world.time); break;
       case 'tow': drawTowHead(ctx, this.r); break;
       case 'mass': drawTowMass(ctx, this.r, hpFrac); break;
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
@@ -1253,6 +1263,150 @@ function drawNeedle(ctx, r) {
   ctx.lineTo(-r * 0.17, -r * 1.35);
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
+}
+
+/*
+ * ---- ORDINAL's three ----
+ *
+ * A frame segment. Drawn along its own bar axis, which the boss sets on the
+ * body's angle, so a segment always lies along the edge it is part of. Five
+ * strokes cut across it: it is a tally, and the count is what it is made of.
+ * The strokes go out as it is damaged, so how far into a panel you are is
+ * legible from across the field without a health bar on it.
+ */
+function drawTally(ctx, r, hpFrac) {
+  const L = r * 2.05; // along the edge
+  const T = r * 0.66; // across it
+  ctx.beginPath();
+  ctx.moveTo(-L / 2, -T / 2);
+  ctx.lineTo(L / 2, -T / 2);
+  ctx.lineTo(L / 2 + T * 0.34, 0);
+  ctx.lineTo(L / 2, T / 2);
+  ctx.lineTo(-L / 2, T / 2);
+  ctx.lineTo(-L / 2 - T * 0.34, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  const marks = 5;
+  const lit = Math.ceil(marks * hpFrac);
+  const stroke = ctx.strokeStyle;
+  ctx.save();
+  ctx.lineWidth = Math.max(HAIRLINE * 0.8, r * 0.1);
+  for (let i = 0; i < marks; i++) {
+    const x = -L / 2 + (i + 0.5) * (L / marks);
+    const on = i < lit;
+    ctx.strokeStyle = on ? stroke : rgba('#3a2438', 0.9);
+    if (on) ctx.globalCompositeOperation = 'lighter';
+    ctx.beginPath();
+    // the fifth is struck through the other four, the way a tally is
+    if (i === marks - 1) {
+      ctx.moveTo(-L / 2 + L * 0.08, T * 0.34);
+      ctx.lineTo(x + L * 0.06, -T * 0.34);
+    } else {
+      ctx.moveTo(x, -T * 0.3);
+      ctx.lineTo(x, T * 0.3);
+    }
+    ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  ctx.restore();
+}
+
+/*
+ * The core. It does not move and it does not turn, so everything that reads
+ * as motion on it is drawn: a ring of counters going round the outside, an
+ * iris that opens as it is hurt, and a pupil that watches. The iris opening
+ * is the tell -- at full health it is a closed lens, and by the last stage it
+ * is a hole with something in it.
+ */
+function drawOrdinal(ctx, r, phase, t, hpFrac) {
+  const stroke = ctx.strokeStyle;
+  const hurt = 1 - hpFrac;
+
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+
+  // the counting collar
+  ctx.save();
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.05);
+  const teeth = 24;
+  ctx.beginPath();
+  for (let i = 0; i < teeth; i++) {
+    const a = (i / teeth) * TAU + t * 0.35;
+    const long = i % 4 === 0;
+    ctx.moveTo(Math.cos(a) * r * 0.86, Math.sin(a) * r * 0.86);
+    ctx.lineTo(Math.cos(a) * r * (long ? 0.99 : 0.93), Math.sin(a) * r * (long ? 0.99 : 0.93));
+  }
+  ctx.stroke();
+
+  // three rings, each turning at its own rate, each broken in a different place
+  for (let i = 0; i < 3; i++) {
+    const rr = r * (0.74 - i * 0.14);
+    const off = t * (0.5 + i * 0.55) * (i % 2 ? -1 : 1);
+    ctx.globalAlpha = 0.75 - i * 0.14;
+    ctx.beginPath();
+    ctx.arc(0, 0, rr, off, off + Math.PI * (1.5 - i * 0.22));
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // the iris: shut at full health, wide open at the end
+  const irisR = r * (0.1 + 0.3 * hurt);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = rgba('#ffffff', 0.16 + 0.5 * hurt);
+  ctx.beginPath();
+  ctx.arc(0, 0, irisR, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.06);
+  const blades = 6;
+  ctx.beginPath();
+  for (let i = 0; i < blades; i++) {
+    const a = (i / blades) * TAU - t * 0.8;
+    const in0 = irisR;
+    const out = r * 0.62;
+    ctx.moveTo(Math.cos(a) * in0, Math.sin(a) * in0);
+    ctx.lineTo(Math.cos(a + 0.5) * out, Math.sin(a + 0.5) * out);
+  }
+  ctx.stroke();
+  // and the pupil
+  ctx.fillStyle = rgba('#ffffff', 0.6 + 0.4 * Math.sin(t * 2 + phase) * hurt);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.075, 0, TAU);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+}
+
+/*
+ * One of the garrison. A bracket with a bar through it: small, angular and
+ * obviously of the same make as the frame it came out of, so a loose one
+ * still reads as ORDINAL's rather than as a new object type arriving.
+ */
+function drawDigit(ctx, r, phase, t) {
+  const w = r * 0.72;
+  const h = r * 1.05;
+  ctx.beginPath();
+  ctx.moveTo(-w, -h);
+  ctx.lineTo(w, -h * 0.55);
+  ctx.lineTo(w, h * 0.55);
+  ctx.lineTo(-w, h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.13);
+  const beat = 0.5 + 0.5 * Math.sin(t * 5 + phase);
+  ctx.globalAlpha = 0.4 + 0.6 * beat;
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.45, 0);
+  ctx.lineTo(w * 0.6, 0);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -2081,6 +2235,8 @@ export class Director {
 
   update(world, dt) {
     if (world.phase !== 'staging') return;
+    // The field belongs to ORDINAL while it is up. See Game.endBoss().
+    if (world.boss) return;
 
     // A slow trickle of aimless matter, all run, independent of the waves.
     this.driftTimer -= dt;

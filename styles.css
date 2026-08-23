@@ -190,6 +190,49 @@ html, body {
 .chip.btn:active { background: rgba(89, 224, 255, 0.2); }
 .chip.btn.off { color: #45566a; text-decoration: line-through; }
 
+/* ---------------- the way in ---------------- */
+
+/*
+ * A control, not a status line. It sits where the boss bar will be, so the
+ * banner is replaced in place by the thing it summoned rather than moving
+ * something else around when the fight starts.
+ */
+#apertureBar {
+  position: absolute;
+  top: calc(var(--hud-t) + 40px);
+  left: calc(var(--safe-l) + 10px);
+  right: calc(var(--safe-r) + 10px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  font: inherit;
+  color: #ffd4f2;
+  background: linear-gradient(90deg, rgba(60, 6, 44, 0.92), rgba(24, 4, 22, 0.86));
+  border: 1px solid rgba(255, 94, 200, 0.55);
+  border-radius: 4px;
+  box-shadow: 0 0 22px rgba(255, 47, 158, 0.28), inset 0 0 18px rgba(255, 47, 158, 0.12);
+  animation: apPulse 2.4s ease-in-out infinite;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#apertureBar[hidden] { display: none; }
+#apertureBar:active { transform: translateY(1px); }
+.apName { font-size: 10px; letter-spacing: 0.24em; }
+.apGo {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: #ff9ede;
+  border: 1px solid rgba(255, 94, 200, 0.6);
+  border-radius: 3px;
+  padding: 3px 8px;
+}
+@keyframes apPulse {
+  0%, 100% { box-shadow: 0 0 18px rgba(255, 47, 158, 0.22), inset 0 0 14px rgba(255, 47, 158, 0.10); }
+  50% { box-shadow: 0 0 34px rgba(255, 47, 158, 0.5), inset 0 0 22px rgba(255, 47, 158, 0.2); }
+}
+
 /* ---------------- boss bar ---------------- */
 
 #bossBar {
@@ -227,6 +270,27 @@ html, body {
   background: linear-gradient(90deg, #fff3c4, #ffb347 45%, #ff5d8f);
   box-shadow: 0 0 12px rgba(255, 160, 90, 0.7);
   transition: transform 0.12s linear;
+}
+
+/*
+ * ORDINAL's bar is magenta because ORDINAL is, and the two thin meters under
+ * it are the frames -- outer, then inner. They are the thing you are actually
+ * working on for most of the fight, and a single core bar would have said
+ * nothing was happening while you opened them.
+ */
+#bossBar .bar i {
+  background: linear-gradient(90deg, #fff0fb, #ff8ae0 45%, #ff1f9e);
+  box-shadow: 0 0 14px rgba(255, 47, 158, 0.75);
+}
+.bossShell { display: flex; gap: 4px; margin-top: 3px; }
+.bossShell i {
+  display: block;
+  flex: 1;
+  height: 2px;
+  background: rgba(255, 138, 224, 0.85);
+  transform-origin: left center;
+  box-shadow: 0 0 8px rgba(255, 94, 200, 0.6);
+  transition: transform 0.14s linear;
 }
 
 /* ---------------- alerts (breach / boss powers) ---------------- */

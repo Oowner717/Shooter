@@ -9,6 +9,7 @@
 // adding an upgrade is an entry plus one place that reads it.
 
 /** Defaults. Anything not listed is off. */
+import { CFG } from './config.js';
 import { svgMark } from './util.js';
 import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
@@ -161,6 +162,8 @@ const MARK = {
   insulation: g('<path d="M12 2.6 20 6v6.6c0 4.6-3.4 7.2-8 8.8-4.6-1.6-8-4.2-8-8.8V6z"/><path d="M7.5 12.5c1.6-2 3.4-2 4.5 0s2.9 2 4.5 0" opacity=".85"/>'),
   // A dish on a stem, and the sweep coming back off something further out.
   aimrange: g('<path d="M4.6 18.4 9.4 13.6"/><path d="M3 20l3.2-3.2" opacity=".6"/><path d="M8 12.8a5.4 5.4 0 0 1 7.6 7.6z" fill="currentColor" stroke="none" opacity=".9"/><path d="M13.4 9.6a8.6 8.6 0 0 1 1 1M15.6 6.8a12 12 0 0 1 1.6 1.6M17.8 4a15.4 15.4 0 0 1 2.2 2.2" opacity=".85"/>'),
+  // A hole opened in something, with a way through it.
+  aperture: g('<circle cx="12" cy="12" r="9.2" stroke-dasharray="2.6 2.8"/><circle cx="12" cy="12" r="5.2"/><path d="M12 6.8 15 12l-3 5.2-3-5.2z" fill="currentColor" stroke="none" opacity=".85"/><path d="M12 1.6v2.4M12 20v2.4M1.6 12H4M20 12h2.4" opacity=".7"/>'),
 };
 
 const bump = (key, by) => (up) => { up[key] += by; };
@@ -278,9 +281,28 @@ export const UPGRADES = {
       tiers: [null, { name: 'DEEP ARRAY', line: '+45% again, on top of ARRAY. A second dish, and the sweep reaches the top of the field.' }],
       apply: scale('aimRange', 1.45), icon: MARK.aimrange },
   ],
+  /*
+   * ---- the way in ----
+   *
+   * Not an upgrade of anything. It buys one arrival: the banner lights, and
+   * pressing it opens the hole ORDINAL comes out of. Its own axis so it is
+   * never rolled as an AMENDMENT card, always unlocked because it hangs off
+   * a category rather than behind anything, and flat-priced because the only
+   * gate on it is meant to be energy.
+   *
+   * Repeatable: the levels are how many are held, and each is spent when the
+   * way is opened.
+   */
+  ANOMALY: [
+    { id: 'aperture', name: 'APERTURE', levels: 9,
+      cost: CFG.ordinal.cost, step: 0,
+      line: 'Opens the way. Something on the other side has been counting, and it will come through.',
+      apply: (up, world) => { world.aperture = (world.aperture || 0) + 1; },
+      tone: '#ff5ec8', icon: MARK.aperture },
+  ],
 };
 
-export const AXES = ['AMMO', 'FIELD', 'TURRET'];
+export const AXES = ['AMMO', 'FIELD', 'TURRET', 'ANOMALY'];
 
 /*
  * The other two kinds of permanent thing an AMENDMENT can be. They are not

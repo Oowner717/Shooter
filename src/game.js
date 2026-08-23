@@ -1,6 +1,7 @@
 // World state, phase machine, physics stepping and the render pipeline.
 
 import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID } from './config.js';
+import { Ordinal, openAperture } from './boss.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
 import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
 import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake } from './fx.js';
@@ -138,6 +139,14 @@ export class Game {
       rigFlash: 0, // seconds of the fitting animation still to run
       rigDone: false, // the whole branch bought out, announced once a run
       shock: 0, // a hurled MASS landing: corruption in its own right, decaying
+      // ---- ORDINAL ----
+      // `aperture` is how many ways in are held, bought from the tree. `boss`
+      // is the one on the field, or null. While there is one the director is
+      // stopped: the field belongs to it.
+      aperture: 0,
+      boss: null,
+      bossStage: 0,
+      bossSlow: 0,
 
       debug: {
         noCooldown: false,
@@ -165,6 +174,10 @@ export class Game {
     w.pendingBlasts.length = 0;
     w.attackers.clear();
     w.shock = 0;
+    if (w.boss) w.boss.clear(w);
+    w.boss = null;
+    w.bossStage = 0;
+    w.bossSlow = 0;
     w.time = 0;
     w.timeScale = 1;
     w.kills = 0;
@@ -917,7 +930,18 @@ export class Game {
     }
     background.setWells(this.wells);
 
-    w.director.update(w, dt);
+    /*
+     * ORDINAL, and the field held while it is up. Waves do not resume until
+     * it is gone: the whole point of the arrival is that everything else
+     * stops, and a wave landing behind it would read as the simulation not
+     * having noticed.
+     */
+    if (w.boss) {
+      w.boss.update(w, dt);
+      if (w.boss.done) this.endBoss();
+    } else {
+      w.director.update(w, dt);
+    }
 
     // ---- physics substeps ----
     let steps = 0;
@@ -1178,6 +1202,38 @@ export class Game {
   }
 
   /**
+   * Open the way, from the banner. One APERTURE is spent and the field is
+   * ORDINAL's until it is gone.
+   */
+  openBoss() {
+    const w = this.world;
+    if (!openAperture(w)) return false;
+    // No codex note here: recording it on arrival would name the thing
+    // before it has done anything. It is recorded when it comes apart, by the
+    // same path as everything else.
+    this.hud.alert('THE WAY IS OPEN', 'rigDone', 4);
+    return true;
+  }
+
+  /**
+   * ORDINAL has come apart. The sky lets go, time comes back, and the field
+   * resumes from wherever the director left it -- the wave that was running
+   * when the way opened is restarted, not resumed, which is the same rule a
+   * saved run comes back on.
+   */
+  endBoss() {
+    const w = this.world;
+    w.boss.clear(w);
+    w.boss = null;
+    w.bossStage = 0;
+    w.timeScale = 1;
+    w.director.resting = true;
+    w.director.timer = 3.2; // a beat of empty sky before the field comes back
+    this.hud.alert('ORDINAL RECONCILED', 'rigDone', 5);
+    background.setMood('staging');
+  }
+
+  /**
    * A line that waits for a thing to happen rather than for the count.
    *
    * One per call, and only when the last one has had its reading time, so a
@@ -1313,6 +1369,12 @@ export class Game {
 
   updateGlitch(dtRaw) {
     if (this.world.rigFlash > 0) this.world.rigFlash = Math.max(0, this.world.rigFlash - dtRaw);
+    // Time comes back after ORDINAL's death, eased rather than snapped.
+    if (this.world.bossSlow > 0) {
+      this.world.bossSlow = Math.max(0, this.world.bossSlow - dtRaw);
+      const k = 1 - this.world.bossSlow / Math.max(0.001, CFG.ordinal.endFor);
+      this.world.timeScale = CFG.ordinal.endSlow + (1 - CFG.ordinal.endSlow) * (k * k);
+    }
     const w = this.world;
     let level = 0;
     let mode = 'normal';
@@ -1334,6 +1396,7 @@ export class Game {
     this.hud.syncAbilities(w.abilities);
     this.hud.syncLoadout(w);
     this.hud.syncSeals();
+    this.hud.syncBoss(w);
     this.hud.menu.sync(w);
     this.hud.updateAlerts(dt);
     this.hud.syncSpawn();
@@ -1393,6 +1456,9 @@ export class Game {
     for (const c of w.debris) c.draw(ctx);
     for (const e of w.drops) e.draw(ctx, w);
     for (const e of w.enemies) e.draw(ctx, w);
+    // Over its own bodies: the frame's cables, the repair beams and the halo
+    // belong on top of the segments they run between.
+    if (w.boss) w.boss.draw(ctx, w);
 
     drawMines(ctx, w);
     for (const e of w.effects) e.draw(ctx, w);

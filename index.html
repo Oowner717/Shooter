@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '111';
+  var BUILD = '112';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -97,6 +97,20 @@
     <!-- What is running on a clock right now. Empty and out of the layout
          unless something timed is up; see Hud.syncEffects(). -->
     <div id="effects"></div>
+
+    <!-- The way in, and the thing that comes through it. The banner is a
+         control: it appears the moment an APERTURE is held and pressing it
+         opens the hole. The bar under it is ORDINAL's, and only its. -->
+    <button id="apertureBar" hidden>
+      <span class="apName">APERTURE HELD</span>
+      <span class="apGo">OPEN THE WAY</span>
+    </button>
+
+    <div id="bossBar" hidden>
+      <div class="bossName"><span id="bossTitle">ORDINAL</span><span id="bossPhase">I</span></div>
+      <div class="bar"><i id="bossFill"></i></div>
+      <div class="bossShell"><i id="bossShellA"></i><i id="bossShellB"></i></div>
+    </div>
 
     <div id="alerts"></div>
 
