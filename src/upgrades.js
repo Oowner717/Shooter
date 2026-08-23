@@ -164,6 +164,8 @@ const MARK = {
   aimrange: g('<path d="M4.6 18.4 9.4 13.6"/><path d="M3 20l3.2-3.2" opacity=".6"/><path d="M8 12.8a5.4 5.4 0 0 1 7.6 7.6z" fill="currentColor" stroke="none" opacity=".9"/><path d="M13.4 9.6a8.6 8.6 0 0 1 1 1M15.6 6.8a12 12 0 0 1 1.6 1.6M17.8 4a15.4 15.4 0 0 1 2.2 2.2" opacity=".85"/>'),
   // A hole opened in something, with a way through it.
   aperture: g('<circle cx="12" cy="12" r="9.2" stroke-dasharray="2.6 2.8"/><circle cx="12" cy="12" r="5.2"/><path d="M12 6.8 15 12l-3 5.2-3-5.2z" fill="currentColor" stroke="none" opacity=".85"/><path d="M12 1.6v2.4M12 20v2.4M1.6 12H4M20 12h2.4" opacity=".7"/>'),
+  // Something coming apart and reassembling as something else.
+  recast: g('<path d="M12 2.6 19 6.4v7.2L12 17.4 5 13.6V6.4z"/><path d="M12 9.4l3.2 1.8v3.4L12 16.4l-3.2-1.8v-3.4z" fill="currentColor" stroke="none" opacity=".8"/><path d="M4.4 19.4a9 9 0 0 0 15.2 0" stroke-dasharray="2.4 2.6"/><path d="M2.6 17.2 4.4 20l2.8-1" fill="none"/>'),
 };
 
 const bump = (key, by) => (up) => { up[key] += by; };
@@ -301,6 +303,23 @@ export const UPGRADES = {
       line: 'Opens the way. Something on the other side has been counting, and it will come through.',
       apply: (up, world) => { world.aperture = (world.aperture || 0) + 1; },
       tone: '#ff5ec8', icon: MARK.aperture },
+    /*
+     * ---- what the count leaves behind ----
+     *
+     * Paid for in REMAINDERs, not energy: one ORDINAL, one REMAINDER, one
+     * RECAST. It is the only thing in the game with a currency of its own,
+     * which is the whole reason to have one -- an upgrade that cannot be
+     * ground out is a different kind of decision from one that can.
+     *
+     * It does nothing yet, and says so. What it will do is change what the
+     * turret *is* rather than what it has: every other purchase bolts
+     * something onto the machine, and this one is meant to replace it.
+     */
+    { id: 'recast', name: 'RECAST', repeat: true,
+      currency: 'remainder', cost: CFG.ordinal.recast, step: 0,
+      line: 'A new form for the turret. Not yet built — the REMAINDER is spent and nothing changes.',
+      apply: () => {},
+      tone: '#ffd9f6', icon: MARK.recast },
   ],
 };
 

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '113';
+export const BUILD = '114';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '113';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'ca797e6';
+export const REV = 'ac45411';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -843,10 +843,28 @@ export const CFG = {
     repairCap: 0.45,
     burst: [0, 0, 3.4], // ...seconds between the core throwing DIGITs itself
     burstOf: 3,
-    // The death. A long one on purpose: it is the only time the field stops.
-    endSlow: 0.22, // time scale it drops to
-    endFor: 2.8, // ...for this long
-    pay: 900, // energy on the floor when it comes apart
+    /*
+     * The death, as a sequence rather than an explosion. Four beats, timed on
+     * the real clock so the slow-motion does not stretch them:
+     *
+     *   ARREST      the frames stop dead and come apart segment by segment
+     *   INFALL      the core draws the whole field into itself
+     *   DETONATION  and lets go of all of it at once
+     *   AFTER       the REMAINDER rises out of what is left
+     *
+     * It is the only time the field stops, and it is meant to be the thing
+     * someone points a camera at.
+     */
+    endSlow: 0.12, // time scale it slams to
+    arrest: 0.7, // segments snapping off, staggered
+    infall: 1.1, // ...then the core pulling everything in
+    endFor: 4.3, // the whole sequence, real seconds
+    pull: 900, // how hard the infall drags loose bodies
+    pay: 900, // energy on the floor when it lets go
+    // What it leaves behind. One per ORDINAL, and the only source there is.
+    remainder: 1,
+    riseFor: 2.1, // seconds the REMAINDER takes to reach the turret
+    recast: 1, // REMAINDERs a RECAST costs
   },
 
   // ---- ward shell -----------------------------------------------------

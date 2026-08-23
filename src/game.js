@@ -144,6 +144,11 @@ export class Game {
       // is the one on the field, or null. While there is one the director is
       // stopped: the field belongs to it.
       aperture: 0,
+      // What ORDINAL leaves behind, and the only thing RECAST can be bought
+      // with. `remainderGained` is the announcement queue: the collectible
+      // banks itself and the HUD is the thing that can say so.
+      remainder: 0,
+      remainderGained: 0,
       boss: null,
       bossStage: 0,
       bossSlow: 0,
@@ -178,9 +183,11 @@ export class Game {
     w.boss = null;
     w.bossStage = 0;
     w.bossSlow = 0;
-    // The ways in are of the run, not of the device. A reset is a fresh
-    // session and hands back nothing.
+    // The ways in and what came back through them are of the run, not of the
+    // device. A reset is a fresh session and hands back nothing.
     w.aperture = 0;
+    w.remainder = 0;
+    w.remainderGained = 0;
     w.time = 0;
     w.timeScale = 1;
     w.kills = 0;
@@ -313,6 +320,7 @@ export class Game {
     // the ways in that are still held: the replay hands one out per APERTURE
     // ever bought, and spending them is not in the ledger. See save.js.
     if (Number.isFinite(d.aperture)) w.aperture = Math.max(0, d.aperture | 0);
+    if (Number.isFinite(d.remainder)) w.remainder = Math.max(0, d.remainder | 0);
     w.unlocked = new Set(d.unlocked);
     for (const k of STARTING) w.unlocked.add(k);
     w.loadout = { mines: [...d.loadout.mines], ammo: [...d.loadout.ammo] };
@@ -411,11 +419,19 @@ export class Game {
     const have = this.owned(id);
     if (!n.repeat && have >= (n.levels || 1)) return 'maxed';
     const price = priceOf(n, have);
-    if (w.energy < price) return 'poor';
+    /*
+     * Most of the tree is bought with energy. RECAST is bought with what
+     * ORDINAL leaves behind, and a node says which by naming a currency --
+     * so there is one purchase path and one place a price is checked, rather
+     * than a second buy button that could drift out of step with this one.
+     */
+    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
+    if (purse < price) return 'poor';
 
     const def = BY_ID.get(id);
     if (!def) return 'locked';
-    w.energy -= price;
+    if (n.currency === 'remainder') w.remainder -= price;
+    else w.energy -= price;
     // Stat upgrades only touch world.up; unlocks and charges need the world.
     def.apply(w.up, w);
     w.offers.taken.push(id);
@@ -1409,6 +1425,19 @@ export class Game {
     this.hud.syncAbilities(w.abilities);
     this.hud.syncLoadout(w);
     this.hud.syncSeals();
+    /*
+     * A REMAINDER arriving is the rarest event in the run -- one per ORDINAL,
+     * and the only currency there is a second of. It gets said plainly, held
+     * on screen for six seconds, and the tree grows a purse for it.
+     */
+    while (w.remainderGained > 0) {
+      w.remainderGained--;
+      // Two lines rather than one long one: what happened, then what to do
+      // about it. One line ran off both edges of a 390-wide screen.
+      this.hud.alert('ORDINAL LEFT A REMAINDER', 'remainder', 6);
+      this.hud.alert(`${w.remainder} HELD · RECAST, IN THE TREE`, 'found', 6, '#ffb8ee');
+      this.checkpoint();
+    }
     this.hud.syncBoss(w);
     this.hud.menu.sync(w);
     this.hud.updateAlerts(dt);

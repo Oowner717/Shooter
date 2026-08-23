@@ -81,7 +81,7 @@ const UNDER = {
 
   // ---- the way in ----
   // One leaf under its own heading, always available, never behind anything.
-  anomaly: ['aperture'],
+  anomaly: ['aperture', 'recast'],
 
   // ---- the abilities ----
   abilities: ['standing', 'reflex'],
@@ -183,7 +183,8 @@ function leaf(id) {
   const levels = u.repeat ? Infinity : (u.levels ?? 3);
   return node({
     kind: 'upgrade', id, key: id, name: u.name, line: u.line, icon: u.icon,
-    levels, repeat: !!u.repeat, tone: u.tone || '#9fb3c8',
+    levels, repeat: !!u.repeat, currency: u.currency || null,
+    tone: u.tone || '#9fb3c8',
     // An upgrade may price itself. Only APERTURE does: it is not a step on a
     // ladder, it is the same purchase every time, and it costs what it costs.
     cost: u.cost ?? COST.upgrade, step: u.step ?? COST.step, tiers: u.tiers || null,

@@ -136,9 +136,11 @@ export class Menu {
     head.className = 'treeHead';
     head.innerHTML = '<span class="treeHeadName">ENERGY</span>'
       + '<span class="treeNext" id="treeNext"></span>'
+      + '<span class="treeSouls" id="treeSouls" hidden></span>'
       + '<b id="treeBank">0</b>';
     p.appendChild(head);
     this.el.treeBank = head.querySelector('#treeBank');
+    this.el.treeSouls = head.querySelector('#treeSouls');
     this.el.treeNext = head.querySelector('#treeNext');
 
     for (const root of TREE) {
@@ -301,6 +303,14 @@ export class Menu {
     const g = this.game;
     const w = g.world;
     if (this.el.treeBank) this.el.treeBank.textContent = Math.floor(w.energy);
+    // The other purse, shown only once there is something in it — a currency
+    // reading "0" for the first hour is a promise nobody asked for.
+    const souls = this.el.treeSouls;
+    if (souls) {
+      const n = w.remainder || 0;
+      if (souls.hidden !== !n) souls.hidden = !n;
+      if (n) souls.textContent = `${n}◆ REMAINDER`;
+    }
     // What the next thing costs. A tree you cannot afford anything in reads as
     // broken rather than as early, and "820 more" is the difference between a
     // wall and a target.
@@ -313,7 +323,10 @@ export class Menu {
       const full = n.free || (n.id && have >= max);
       const part = !full && have > 0;
       const price = !full ? priceOf(n, have) : 0;
-      const afford = price > 0 && w.energy >= price;
+      // A node may be priced in something other than energy. RECAST is the
+      // only one, and it is bought with what ORDINAL leaves behind.
+      const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
+      const afford = price > 0 && purse >= price;
 
       /*
        * Five states, and every one of them says a different thing:
@@ -336,14 +349,19 @@ export class Menu {
 
       if (open && !full) {
         if (afford) affordable++;
-        else cheapest = Math.min(cheapest, price);
+        // Only energy prices feed the "820 more" line: a REMAINDER is not
+        // something you are short of, it is something you have not been given.
+        else if (!n.currency) cheapest = Math.min(cheapest, price);
       }
       // A category is a heading, not a thing you own, so a ✓ on one said you
       // had bought something you were never offered. The caret is its whole
       // right-hand side now.
       const heading = n.kind === 'root' || n.kind === 'group';
+      // A price in REMAINDERs is marked, or "1" beside HOLLOWPOINT's 500 reads
+      // as the cheapest thing in the tree rather than as the rarest.
+      const tag = n.currency === 'remainder' ? `${price}◆` : price;
       cost.textContent = heading ? ''
-        : row === this.armed ? 'SURE?' : full ? '✓' : !open ? '·' : price;
+        : row === this.armed ? 'SURE?' : full ? '✓' : !open ? '·' : tag;
       cost.classList.toggle('tick', !!full && !heading);
       cost.classList.toggle('ask', row === this.armed);
 

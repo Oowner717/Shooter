@@ -118,6 +118,9 @@ export function captureRun(world, game) {
      * records what is left, and the restore takes this one.
      */
     aperture: world.aperture | 0,
+    // ...and the same for what ORDINAL left. Both are held counts that go
+    // down again, which the ledger has no way of recording.
+    remainder: world.remainder | 0,
     nextSmall: world.offers.nextSmall,
     nextLarge: world.offers.nextLarge,
     // Only the tiers. The three cards on an unopened offer are a fresh roll

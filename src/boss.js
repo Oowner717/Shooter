@@ -34,7 +34,7 @@
 import { CFG, TYPE_BY_ID } from './config.js';
 import { clamp, rand, rgba, TAU, drawGlow } from './util.js';
 import { Enemy } from './enemies.js';
-import { explode, ring, ripple, spark, shake, haul } from './fx.js';
+import { explode, ring, ripple, spark, shake, haul, flash } from './fx.js';
 import { audio } from './audio.js';
 import { background } from './background.js';
 
@@ -50,6 +50,93 @@ function slotAt(half, per, side, i) {
     case 1: return [half, along, Math.PI / 2]; // right
     case 2: return [-along, half, 0]; // bottom
     default: return [-half, -along, Math.PI / 2]; // left
+  }
+}
+
+/*
+ * The REMAINDER.
+ *
+ * ORDINAL has been counting since before you arrived, and when the count is
+ * broken there is something left over. It is not energy: energy is what
+ * objects are made of and there is a floor of it after every wave. This is
+ * the one thing in the game there is exactly one of per ORDINAL, and the only
+ * thing a RECAST can be paid for with.
+ *
+ * It rises out of the detonation, hangs for a beat where the core was so it
+ * is seen, and then comes to the turret on its own. Nothing has to be done to
+ * collect it -- missing the only drop of its kind because a thumb was
+ * somewhere else would be a cruelty, not a challenge.
+ */
+class Remainder {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.x0 = x;
+    this.y0 = y;
+    this.t = 0;
+    this.dead = false;
+    this.taken = false;
+  }
+
+  update(world, dt) {
+    const C = O();
+    this.t += world.dtRaw || dt; // its own clock: it outlives the slow-motion
+    const hang = 0.9;
+    if (this.t < hang) {
+      this.y = this.y0 - (this.t / hang) * 26;
+      return;
+    }
+    const k = clamp((this.t - hang) / C.riseFor, 0, 1);
+    const e = k * k * (3 - 2 * k); // ease, so it leaves slowly and arrives fast
+    const s = world.shooter;
+    this.x = this.x0 + (s.x - this.x0) * e;
+    this.y = (this.y0 - 26) + (s.y - (this.y0 - 26)) * e;
+    if (k < 1 || this.taken) return;
+    this.taken = true;
+    this.dead = true;
+    world.remainder = (world.remainder || 0) + 1;
+    // Picked up by the HUD, which is the thing that can say so. Counted
+    // rather than flagged, so two arriving in one frame both get said.
+    world.remainderGained = (world.remainderGained || 0) + 1;
+    ring(s.x, s.y, 6, 200, 0.5, '#ffe9ff', 4);
+    ring(s.x, s.y, 2, 90, 0.3, '#ffffff', 2);
+    ripple(s.x, s.y, 1.4, 420);
+    audio.chime(880);
+  }
+
+  draw(ctx) {
+    const T = TYPE_BY_ID.ordinal;
+    const pulse = 0.7 + 0.3 * Math.sin(this.t * 7);
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.globalCompositeOperation = 'lighter';
+    drawGlow(ctx, T.glow, 0, 0, 54 * pulse, 0.55);
+    // a small hard diamond, turning, with a white core
+    ctx.rotate(this.t * 1.6);
+    ctx.strokeStyle = rgba('#ffd9f6', 0.95);
+    ctx.fillStyle = rgba(T.color, 0.5);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -11);
+    ctx.lineTo(7.5, 0);
+    ctx.lineTo(0, 11);
+    ctx.lineTo(-7.5, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = rgba('#ffffff', pulse);
+    ctx.beginPath();
+    ctx.arc(0, 0, 3.2, 0, TAU);
+    ctx.fill();
+    // and a thin cross of light, so it reads at a glance across a busy field
+    ctx.strokeStyle = rgba('#ffffff', 0.35 * pulse);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-22, 0); ctx.lineTo(22, 0);
+    ctx.moveTo(0, -22); ctx.lineTo(0, 22);
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalCompositeOperation = 'source-over';
   }
 }
 
@@ -325,13 +412,22 @@ export class Ordinal {
 
     if (this.dying > 0) {
       /*
-       * On the raw clock. `dt` here is already scaled by world.timeScale, and
-       * the death drops that to 0.22 -- so a 2.8-second sequence counted in
-       * scaled time ran for as long as the ramp back took, which is not a
-       * number anyone chose. Measured at 4.2 real seconds before this.
+       * On the raw clock. `dt` here is already scaled by world.timeScale and
+       * the death slams that to a tenth, so a sequence counted in scaled time
+       * would run for as long as the ramp back took -- which is not a number
+       * anyone chose. Measured at 4.2 seconds against a 2.8 that was asked
+       * for, before this.
        */
-      this.dying -= world.dtRaw || dt;
-      this.place(dt);
+      const raw = world.dtRaw || dt;
+      this.dying -= raw;
+      this.beat += raw;
+      const t = this.beat;
+      if (t < C.arrest) this.arrest(world, t / C.arrest);
+      else if (t < C.arrest + C.infall) {
+        this.arrest(world, 1);
+        this.infall(world, raw, (t - C.arrest) / C.infall);
+      } else if (!this.blew) this.detonate(world);
+      this.place(dt * 0.2);
       if (this.dying <= 0) this.done = true;
       return;
     }
@@ -390,40 +486,117 @@ export class Ordinal {
   }
 
   /**
-   * The end. The frame goes first, one panel at a time over a beat, then the
-   * core folds in and lets go of everything it was holding. Time slows for it
-   * -- the one moment in the run when the field stops.
+   * The end, in four beats. Timed on the real clock -- see the note in
+   * CFG.ordinal -- so the slow-motion does not stretch the sequence it is
+   * there to make readable.
+   *
+   *   ARREST      the frames stop dead and come apart segment by segment,
+   *               in order round the ring rather than all at once
+   *   INFALL      the core takes everything loose on the field into itself
+   *   DETONATION  and lets go of all of it in one frame
+   *   AFTER       the REMAINDER rises out of what is left and comes to you
+   *
+   * Nothing here is on `update`'s scaled clock, and nothing here is a single
+   * explode() call: the whole point is that it takes long enough to watch.
    */
   die(world) {
     const C = O();
     this.dying = C.endFor;
+    this.beat = 0; // how far through the sequence, in real seconds
+    this.snapped = 0; // segments taken so far during ARREST
     world.timeScale = C.endSlow;
     world.bossSlow = C.endFor;
-    for (const ring of this.rings) {
-      for (const p of ring.panels) {
-        if (p.dead) continue;
-        p.dead = true;
-        explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.4);
-      }
-    }
+    // Everything the frames were holding is let go at once.
     for (const d of this.parked) d.dead = true;
     this.parked.length = 0;
-    for (let i = 0; i < 5; i++) {
-      ring(this.x, this.y, 10 + i * 30, 320 + i * 190, 0.5 + i * 0.16, i % 2 ? '#ffffff' : TYPE_BY_ID.ordinal.glow, 6 - i);
-    }
-    ripple(this.x, this.y, 3.4, 1400);
-    shake(34);
+    ring(this.x, this.y, 8, 240, 0.5, '#ffffff', 4);
+    ripple(this.x, this.y, 2.4, 700);
+    shake(20);
     audio.boom();
-    // Everything it was counting, paid out at once.
-    for (let i = 0; i < 26; i++) {
-      const a = (i / 26) * TAU + rand(-0.1, 0.1);
-      const sp = rand(180, 420);
+    background.surge(2);
+  }
+
+  /** ARREST: segments snapping off round the frame, one after another. */
+  arrest(world, k) {
+    const C = O();
+    const all = [];
+    for (const ring2 of this.rings) for (const p of ring2.panels) if (!p.dead) all.push(p);
+    const want = Math.ceil(all.length * clamp(k, 0, 1));
+    while (this.snapped < want && all.length) {
+      const p = all.shift();
+      if (!p || p.dead) { this.snapped++; continue; }
+      p.dead = true;
+      this.snapped++;
+      explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.5);
+      ring(p.x, p.y, 2, p.r * 5, 0.3, p.type.glow, 2);
+      for (let i = 0; i < 4; i++) {
+        const a = rand(0, TAU);
+        spark(p.x, p.y, Math.cos(a) * rand(90, 260), Math.sin(a) * rand(90, 260),
+          p.type.color, rand(0.3, 0.7), 2);
+      }
+    }
+  }
+
+  /** INFALL: the core taking the field into itself. */
+  infall(world, dt, k) {
+    const C = O();
+    const grab = (list) => {
+      for (const e of list) {
+        if (e.dead) continue;
+        const dx = this.x - e.x;
+        const dy = this.y - e.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const f = C.pull * k * dt / d;
+        e.vx += dx * f;
+        e.vy += dy * f;
+      }
+    };
+    grab(world.enemies);
+    grab(world.drops);
+    grab(world.debris);
+    // ...and a ring closing on the centre, one every few frames
+    if (Math.random() < 0.5) {
+      const rr = 520 * (1 - k) + 40;
+      ring(this.x, this.y, rr, rr * 0.2, 0.28, TYPE_BY_ID.ordinal.glow, 2);
+    }
+    shake(3 + k * 6);
+  }
+
+  /** DETONATION: one frame, everything at once. */
+  detonate(world) {
+    const C = O();
+    const T = TYPE_BY_ID.ordinal;
+    this.blew = true;
+    flash(0.85, '#ffffff');
+    for (let i = 0; i < 6; i++) {
+      ring(this.x, this.y, 6 + i * 24, 300 + i * 240, 0.55 + i * 0.15,
+        i % 2 ? '#ffffff' : T.glow, 7 - i);
+    }
+    // radial spokes, thrown out of the centre
+    for (let i = 0; i < 30; i++) {
+      const a = (i / 30) * TAU + rand(-0.05, 0.05);
+      const sp = rand(420, 900);
+      spark(this.x, this.y, Math.cos(a) * sp, Math.sin(a) * sp, i % 3 ? T.color : '#ffffff',
+        rand(0.5, 1.1), 3);
+    }
+    explode(this.x, this.y, C.coreR * 2, T.color, T.glow, 4);
+    ripple(this.x, this.y, 4, 1500);
+    shake(40);
+    audio.boom();
+    background.surge(2);
+    // Everything it was counting, thrown outward.
+    for (let i = 0; i < 30; i++) {
+      const a = (i / 30) * TAU + rand(-0.1, 0.1);
+      const sp = rand(220, 520);
       world.drops.push(new Enemy(TYPE_BY_ID.ordinal, this.x, this.y, {
-        drop: true, r: rand(3.4, 5.6), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-        energy: C.pay / 26,
+        drop: true, r: rand(3.4, 5.8), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        energy: C.pay / 30,
       }));
     }
-    background.surge(2);
+    // ...and the one thing it was keeping.
+    for (let i = 0; i < C.remainder; i++) {
+      world.effects.push(new Remainder(this.x, this.y));
+    }
   }
 
   /** Take everything of ORDINAL's off the field. */

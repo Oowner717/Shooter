@@ -879,6 +879,55 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `ledger still records ${r.ledger}`);
 }
 
+// --- ORDINAL leaves a REMAINDER, and RECAST is what spends it ---------------
+/*
+ * The only currency in the game that is not energy: one per ORDINAL, dropped
+ * on its death, collected on its own so it cannot be missed, and spendable on
+ * exactly one thing. RECAST does nothing yet -- the point of the case is that
+ * the purse, the price and the announcement all agree.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    g.debugGiveEnergy(9000);
+    w.aperture = 1;
+    g.openBoss();
+    const bo = w.boss;
+    bo.arriving = 0;
+    const before = w.remainder;
+    const cantYet = g.buy('recast'); // nothing to pay with
+    bo.core.dead = true;
+    // Run the death and the collection out, on the real clock.
+    for (let k = 0; k < 60 * 12 && w.remainder === before; k++) g.update(1 / 60);
+    const held = w.remainder;
+    // The announcement, off the screen rather than off the queue: syncHud
+    // drains `remainderGained` on the frame it says it, so reading the queue
+    // afterwards always finds it empty.
+    const said = [...document.querySelectorAll('#alerts .alert')]
+      .map((a) => a.textContent).join(' | ');
+    const bought = g.buy('recast');
+    const spent = w.remainder;
+    const again = g.buy('recast');
+    // ...and the price is a REMAINDER, not energy.
+    const energyAfter = Math.round(w.energy);
+    const out = { before, cantYet, held, said, bought, spent, again,
+      energyKept: energyAfter >= 9000, boss: !!w.boss };
+    g.restart();
+    return out;
+  });
+  check('ORDINAL leaves one REMAINDER, and RECAST is the only thing that spends it',
+    r.cantYet === 'poor' && r.held === 1 && /REMAINDER/.test(r.said) && r.bought === 'ok'
+    && r.spent === 0 && r.again === 'poor' && r.energyKept,
+    `before ${r.before} (buy: ${r.cantYet}), after the death ${r.held} held, `
+    + `buy: ${r.bought} -> ${r.spent} held, again: ${r.again}, energy untouched ${r.energyKept}; `
+    + `said "${r.said}"`);
+}
+
 // --- the broadphase ---------------------------------------------------------
 {
   const r = await page.evaluate(async () => {
