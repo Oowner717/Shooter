@@ -285,16 +285,18 @@ export const UPGRADES = {
    * ---- the way in ----
    *
    * Not an upgrade of anything. It buys one arrival: the banner lights, and
-   * pressing it opens the hole ORDINAL comes out of. Its own axis so it is
-   * never rolled as an AMENDMENT card, always unlocked because it hangs off
-   * a category rather than behind anything, and flat-priced because the only
-   * gate on it is meant to be energy.
+   * pressing it opens the hole ORDINAL comes out of. Its own axis because it
+   * belongs to none of the three a run is a shape of, always available
+   * because it hangs off a category rather than behind anything, and
+   * flat-priced because the only gate on it is meant to be energy.
    *
-   * Repeatable: the levels are how many are held, and each is spent when the
-   * way is opened.
+   * Repeatable with no ceiling. It was `levels: 9`, which is a ceiling on how
+   * many have ever been *bought* rather than on how many are held -- so a long
+   * session that opened the way nine times could never buy a tenth, with
+   * nothing held and nothing to show for it.
    */
   ANOMALY: [
-    { id: 'aperture', name: 'APERTURE', levels: 9,
+    { id: 'aperture', name: 'APERTURE', repeat: true,
       cost: CFG.ordinal.cost, step: 0,
       line: 'Opens the way. Something on the other side has been counting, and it will come through.',
       apply: (up, world) => { world.aperture = (world.aperture || 0) + 1; },

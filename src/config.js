@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '112';
+export const BUILD = '113';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '112';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e0a6f93';
+export const REV = 'ca797e6';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1317,7 +1317,7 @@ export const ENEMY_TYPES = [
     name: 'ORDINAL',
     shape: 'ordinal',
     r: 40,
-    hp: 1600,
+    hp: 1400,
     large: true,
     fixed: true,
     density: 9,

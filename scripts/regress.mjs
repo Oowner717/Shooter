@@ -794,6 +794,91 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `core ${r.core}, ${r.released}/${r.parked0} DIGITs released`);
 }
 
+// --- a mended segment is back on the field, not just back alive --------------
+/*
+ * sweep() takes a dead body out of world.enemies with a swap-and-pop, so
+ * clearing `dead` on a segment ORDINAL still holds a reference to resurrected
+ * it *outside* the field: it counted toward the shell meter and could not be
+ * seen, hit or collided with. Measured on build 112 -- the outer frame climbed
+ * from 8% back to 42% through stage III with nothing actually there.
+ *
+ * The same block checks that a SEED cannot graft ORDINAL. A graft grows and
+ * heals its host, and a segment that changes size opens a hole in a frame
+ * built to close exactly.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.aperture = 1;
+    g.openBoss();
+    const bo = w.boss;
+    bo.arriving = 0;
+    const ring = bo.rings[0];
+    // Take it well under the repair cap so ORDINAL will mend.
+    for (const p of ring.panels.slice(0, 20)) p.dead = true;
+    g.update(1 / 60); // let sweep run
+    const splicedOut = ring.panels.filter((p) => p.dead && !w.enemies.includes(p)).length;
+    const mended = bo.repair(w);
+    const phantom = ring.panels.filter((p) => !p.dead && !w.enemies.includes(p)).length;
+
+    // ...and a SEED sitting inside it grafts nothing.
+    const seed = g.debugSpawn('seed', bo.x + 30, bo.y - 20);
+    seed.staged = false; seed.spawnIn = 0;
+    for (let k = 0; k < 120; k++) g.update(1 / 60);
+    const grafted = ring.panels.filter((p) => p.graftCount).length + (bo.core.graftCount || 0);
+    // A loose DIGIT is a legitimate host and often the nearest thing — what
+    // must never be one is anything the boss places.
+    const host = seed.host && seed.host.type.fixed ? seed.host.type.id : null;
+
+    const out = { splicedOut, mended, phantom, grafted, host };
+    w.boss.clear(w); w.boss = null;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.timeScale = 1;
+    return out;
+  });
+  check('a mended segment is back on the field, and ORDINAL cannot be grafted',
+    r.splicedOut > 0 && r.mended && r.phantom === 0 && r.grafted === 0 && r.host === null,
+    `${r.splicedOut} segments swept out, mended ${r.mended}, ${r.phantom} alive but off the field, `
+    + `${r.grafted} grafted${r.host ? `, a SEED took ORDINAL's ${r.host}` : ''}`);
+}
+
+// --- a spent APERTURE is not handed back by a reload -------------------------
+// The ledger records what was bought, and a restore replays every taken id
+// through its `apply` -- APERTURE's hands out one each time. A run that bought
+// two and opened one came back holding two.
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    g.debugGiveEnergy(5000);
+    g.buy('aperture');
+    g.buy('aperture');
+    const held = w.aperture;
+    g.openBoss(); // spends one
+    const spent = w.aperture;
+    g.checkpoint();
+    const { readRun } = await import('../src/save.js');
+    const d = readRun();
+    if (w.boss) { w.boss.clear(w); w.boss = null; }
+    g.resume(); // the real restore path, off the real file
+    const back = { held, spent, saved: d ? d.aperture : null, restored: w.aperture,
+      ledger: w.offers.taken.filter((x) => x === 'aperture').length };
+    g.restart();
+    return back;
+  });
+  check('a spent APERTURE is not handed back by a reload',
+    r.held === 2 && r.spent === 1 && r.saved === 1 && r.restored === 1 && r.ledger === 2,
+    `bought 2, spent 1 -> held ${r.spent}, saved ${r.saved}, restored ${r.restored}, `
+    + `ledger still records ${r.ledger}`);
+}
+
 // --- the broadphase ---------------------------------------------------------
 {
   const r = await page.evaluate(async () => {

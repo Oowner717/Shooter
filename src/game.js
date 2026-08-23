@@ -178,6 +178,9 @@ export class Game {
     w.boss = null;
     w.bossStage = 0;
     w.bossSlow = 0;
+    // The ways in are of the run, not of the device. A reset is a fresh
+    // session and hands back nothing.
+    w.aperture = 0;
     w.time = 0;
     w.timeScale = 1;
     w.kills = 0;
@@ -306,7 +309,10 @@ export class Game {
       w.offers.taken.push(id);
     }
     // ...and then what was actually owned and carried wins over whatever the
-    // replay happened to place, because a loadout is a decision too.
+    // replay happened to place, because a loadout is a decision too. Same for
+    // the ways in that are still held: the replay hands one out per APERTURE
+    // ever bought, and spending them is not in the ledger. See save.js.
+    if (Number.isFinite(d.aperture)) w.aperture = Math.max(0, d.aperture | 0);
     w.unlocked = new Set(d.unlocked);
     for (const k of STARTING) w.unlocked.add(k);
     w.loadout = { mines: [...d.loadout.mines], ammo: [...d.loadout.ammo] };
@@ -403,7 +409,7 @@ export class Game {
     if (!n) return 'locked';
     if (!this.available(n)) return 'locked';
     const have = this.owned(id);
-    if (have >= (n.levels || 1)) return 'maxed';
+    if (!n.repeat && have >= (n.levels || 1)) return 'maxed';
     const price = priceOf(n, have);
     if (w.energy < price) return 'poor';
 
@@ -879,6 +885,10 @@ export class Game {
     const real = Math.min(dtRaw, CFG.maxFrameDelta);
     let dt = real;
     if (w.debug.slowmo) dt *= 0.25;
+    // The unscaled step, for the few things that must not stretch with the
+    // world -- ORDINAL's death sequence is timed against the slow-motion ramp
+    // rather than inside it.
+    w.dtRaw = dt;
     dt *= w.timeScale;
 
     w.time += dt;
@@ -1207,6 +1217,9 @@ export class Game {
    */
   openBoss() {
     const w = this.world;
+    // Only onto a running field. The banner is a play-screen control and the
+    // boot and ending screens are not the field.
+    if (w.phase !== 'staging') return false;
     if (!openAperture(w)) return false;
     // No codex note here: recording it on arrival would name the thing
     // before it has done anything. It is recorded when it comes apart, by the
@@ -1729,6 +1742,11 @@ export class Game {
       if (!n.id) continue;
       const def = BY_ID.get(n.id);
       if (!def) continue;
+      // A repeatable node has no ceiling, so "buy every level of everything"
+      // is not a finite instruction for it — the loop ran until the ledger
+      // array itself refused to grow. It is also not an upgrade: handing out
+      // ways in is not what MAX UPGRADES means.
+      if (n.repeat) continue;
       for (let have = this.owned(n.id); have < (n.levels || 1); have++) {
         def.apply(w.up, w);
         w.offers.taken.push(n.id);

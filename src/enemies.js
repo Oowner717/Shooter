@@ -317,6 +317,9 @@ export class Enemy {
    * doing whatever it was doing and simply stops being able to reach the edge.
    */
   edgeEase(world, dt) {
+    // Fixed bodies are placed, not steered — see drive(). Nudging one toward
+    // the middle just fights the boss for the same frame.
+    if (this.type.fixed) return;
     const E = CFG.physics;
     const left = this.x - this.r;
     const right = world.width - (this.x + this.r);
@@ -357,6 +360,13 @@ export class Enemy {
       // Full is full. Below the cap a body can take another, which is what
       // makes a SCION's three land as one problem rather than three.
       if (e === this || e.dead || e.seed || e.harmless || e.staged) continue;
+      // ...nor onto ORDINAL. A graft grows its host and heals it, and the one
+      // thing a segment of a frame must not do is change size: the frame is
+      // built to close exactly, and a grafted panel would open a hole in it
+      // that no round made. A SCION already on the field when the way opens
+      // is the only way this could ever have come up, which is exactly the
+      // kind of thing that turns up once and is never reproducible.
+      if (e.type.fixed) continue;
       if (e.graftCount >= G.stack) continue;
       if (e.type.id === 'scion') continue;
       const d2 = (e.x - this.x) ** 2 + (e.y - this.y) ** 2;
@@ -982,10 +992,16 @@ export class Enemy {
     ctx.rotate(this.angle);
     if (s !== 1) ctx.scale(s, s);
 
-    // ambient glow
-    ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, t.glow, 0, 0, this.r * 2.1, 0.24 + this.flash * 0.5);
-    ctx.globalCompositeOperation = 'source-over';
+    /*
+     * Ambient glow. Skipped on a fixed body unless it has just been hit:
+     * ORDINAL puts forty segments on the field at once and draws a halo over
+     * all of them itself, so forty more glow blits a frame bought nothing.
+     */
+    if (!t.fixed || this.flash > 0.01) {
+      ctx.globalCompositeOperation = 'lighter';
+      drawGlow(ctx, t.glow, 0, 0, this.r * 2.1, 0.24 + this.flash * 0.5);
+      ctx.globalCompositeOperation = 'source-over';
+    }
 
     const dim = 0.45 + hpFrac * 0.55;
     if (this.isDrop) {

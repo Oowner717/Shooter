@@ -178,10 +178,12 @@ const ROOT_LINE = {
 function leaf(id) {
   const u = UP_BY_ID.get(id);
   if (!u) throw new Error(`tree: no upgrade "${id}"`);
-  const levels = u.levels ?? 3; // an unlimited stack is offered three deep here
+  // `repeat` is a node with no ceiling at all: the count is not what you own,
+  // it is how many you are holding, and it goes down again. Only APERTURE.
+  const levels = u.repeat ? Infinity : (u.levels ?? 3);
   return node({
     kind: 'upgrade', id, key: id, name: u.name, line: u.line, icon: u.icon,
-    levels, tone: u.tone || '#9fb3c8',
+    levels, repeat: !!u.repeat, tone: u.tone || '#9fb3c8',
     // An upgrade may price itself. Only APERTURE does: it is not a step on a
     // ladder, it is the same purchase every time, and it costs what it costs.
     cost: u.cost ?? COST.upgrade, step: u.step ?? COST.step, tiers: u.tiers || null,

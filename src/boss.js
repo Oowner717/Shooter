@@ -34,7 +34,7 @@
 import { CFG, TYPE_BY_ID } from './config.js';
 import { clamp, rand, rgba, TAU, drawGlow } from './util.js';
 import { Enemy } from './enemies.js';
-import { explode, ring, ripple, spark, shake } from './fx.js';
+import { explode, ring, ripple, spark, shake, haul } from './fx.js';
 import { audio } from './audio.js';
 import { background } from './background.js';
 
@@ -117,21 +117,40 @@ export class Ordinal {
     return e;
   }
 
-  /** Fill the empty slots of the frame with DIGITs, parked. */
-  garrison(n) {
-    const C = O();
-    const outer = this.rings[0];
+  /**
+   * Fill the frame with DIGITs, parked behind particular segments.
+   *
+   * Each one is given a segment of its own and sits just inside it, so where
+   * a DIGIT is, is a fact about the frame rather than a decoration: break
+   * *that* panel and *that* DIGIT comes out of *that* hole. Spread across all
+   * four sides in turn, so the garrison is on every side of ORDINAL and not
+   * banked on one.
+   *
+   * A later wave garrisons the inner frame as well, which is what makes
+   * opening the outer one stop being the whole answer.
+   */
+  garrison(n, deep = false) {
+    const rings = deep ? this.rings : [this.rings[0]];
     for (let k = 0; k < n; k++) {
+      const ring = rings[k % rings.length];
+      const live = ring.panels.filter((p) => !p.dead);
+      const pool = live.length ? live : ring.panels;
+      // Round the sides in turn rather than at random: four sides, evenly.
+      const guard = pool[(k * 7 + this.wave * 3) % pool.length];
       const d = new Enemy(TYPE_BY_ID.digit, this.x, this.y, { staged: false, spawnIn: 0 });
       d.counts = false;
-      // Between the two frames, spread round the corridor.
-      const a = (k / n) * TAU + rand(-0.2, 0.2);
-      const rr = (C.rings[0].half + C.rings[1].half) * 0.5 * rand(0.82, 1.02);
-      d.berth = { a, rr };
-      d.guard = outer.panels[(k * 3 + this.wave) % outer.panels.length];
+      d.guard = guard;
+      d.berth = rand(0.55, 0.8); // how far in from its segment it waits
       this.parked.push(d);
     }
     this.wave++;
+  }
+
+  /** Where a parked DIGIT is: just inside the segment it is waiting behind. */
+  berthOf(d) {
+    const g = d.guard;
+    if (!g) return [this.x, this.y];
+    return [this.x + (g.x - this.x) * d.berth, this.y + (g.y - this.y) * d.berth];
   }
 
   get coreFrac() {
@@ -166,30 +185,52 @@ export class Ordinal {
     this.core.y = this.y;
     this.core.vx = 0;
     this.core.vy = 0;
+    // ...and the garrison rides the segment it is waiting behind.
+    for (const d of this.parked) {
+      const [bx, by] = this.berthOf(d);
+      d.x = bx;
+      d.y = by;
+    }
   }
 
   /**
-   * A parked DIGIT leaves when the panel it is sitting behind is gone -- or
-   * when a third of the outer frame is, because a garrison does not wait
-   * politely behind the one door it was assigned.
+   * A parked DIGIT leaves when the segment it is waiting behind is gone. It
+   * leaves *through that hole*, outward along the line from the core through
+   * where the panel was, which is what makes breaking a particular part of
+   * the frame a decision rather than a chore.
+   *
+   * The rest of the garrison does not wait politely behind one door forever:
+   * once two thirds of the outer frame is open, whoever is left files out at
+   * one a second through whatever is nearest.
    */
-  releaseCheck(world) {
-    const open = 1 - this.shellFrac(0);
+  releaseCheck(world, dt) {
+    const wide = this.shellFrac(0) <= 0.34;
+    this.impatient = Math.max(0, (this.impatient || 0) - dt);
     for (let i = this.parked.length - 1; i >= 0; i--) {
       const d = this.parked[i];
-      const doorOpen = !d.guard || d.guard.dead;
-      if (!doorOpen && open < 0.34) continue;
+      const own = !d.guard || d.guard.dead;
+      if (!own) {
+        if (!wide || this.impatient > 0) continue;
+        this.impatient = 1;
+      }
       this.parked.splice(i, 1);
-      // It leaves through its own berth, outward, and then it is on its own.
-      const a = d.berth.a;
-      d.vx = Math.cos(a) * rand(150, 250);
-      d.vy = Math.sin(a) * rand(150, 250);
+      const [bx, by] = this.berthOf(d);
+      d.x = bx;
+      d.y = by;
+      // Outward, along the line the hole is on.
+      let ax = d.x - this.x;
+      let ay = d.y - this.y;
+      const ad = Math.hypot(ax, ay) || 1;
+      ax /= ad; ay /= ad;
+      d.vx = ax * rand(190, 280);
+      d.vy = ay * rand(190, 280);
       d.spawnIn = 0.25;
-      d.thrown = 0.35;
+      d.thrown = 0.4;
+      d.guard = null;
       world.enemies.push(d);
       spark(d.x, d.y, d.vx * 0.4, d.vy * 0.4, TYPE_BY_ID.digit.glow, 0.35, 2);
       audio.pop(0.7);
-      if (open < 0.34) break; // one at a time when the door is not theirs
+      if (!own) break;
     }
   }
 
@@ -198,9 +239,20 @@ export class Ordinal {
    * never past CFG.ordinal.repairCap of a frame. See the note there for what
    * an uncapped version measured like.
    */
-  repair() {
+  repair(world) {
     const cap = O().repairCap;
-    for (let i = this.rings.length - 1; i >= 0; i--) {
+    /*
+     * Which frame it mends, and it is not the same answer in both stages.
+     *
+     * II mends the inner frame first: that is the one between you and the
+     * core, and having to reopen it is the stage. III mends the outer one
+     * first instead, so the core stays exposed and the last stage is about
+     * the core rather than about the frame all over again. Measured before
+     * this: stage III ran 100 seconds of a 150-second fight, nearly all of it
+     * shooting a mended inner frame while the core sat there.
+     */
+    const order = this.stage >= 3 ? [0, 1] : [1, 0];
+    for (const i of order) {
       const ring = this.rings[i];
       if (this.shellFrac(i) >= cap) continue;
       const gone = ring.panels.filter((p) => p.dead);
@@ -211,6 +263,17 @@ export class Ordinal {
       p.hp = Math.round(p.maxHp * O().repairHp);
       p.spawnIn = 0.5;
       p.flash = 1;
+      /*
+       * Back into the world, not just back to alive.
+       *
+       * sweep() removes a dead body from world.enemies with a swap-and-pop,
+       * so clearing `dead` on a segment ORDINAL still holds a reference to
+       * resurrected it *outside* the field: it counted toward the shell
+       * meter and could not be seen, hit or collided with. Measured on the
+       * first build of this fight -- the outer frame climbed from 8% back to
+       * 42% through stage III while nothing was actually there.
+       */
+      if (!world.enemies.includes(p)) world.enemies.push(p);
       this.beams.push({ p, t: 0.55 });
       return true;
     }
@@ -220,8 +283,12 @@ export class Ordinal {
   /** The core throwing its own garrison out, stage III. */
   burst(world) {
     const C = O();
-    this.garrison(C.burstOf);
-    const fresh = this.parked.splice(-C.burstOf, C.burstOf);
+    const fresh = [];
+    for (let k = 0; k < C.burstOf; k++) {
+      const d = new Enemy(TYPE_BY_ID.digit, this.x, this.y, { staged: false, spawnIn: 0 });
+      d.counts = false;
+      fresh.push(d);
+    }
     for (const d of fresh) {
       const a = rand(0, TAU);
       d.x = this.x + Math.cos(a) * (C.coreR + 6);
@@ -257,14 +324,20 @@ export class Ordinal {
     }
 
     if (this.dying > 0) {
-      this.dying -= dt;
+      /*
+       * On the raw clock. `dt` here is already scaled by world.timeScale, and
+       * the death drops that to 0.22 -- so a 2.8-second sequence counted in
+       * scaled time ran for as long as the ramp back took, which is not a
+       * number anyone chose. Measured at 4.2 real seconds before this.
+       */
+      this.dying -= world.dtRaw || dt;
       this.place(dt);
       if (this.dying <= 0) this.done = true;
       return;
     }
 
     this.place(dt);
-    this.releaseCheck(world);
+    this.releaseCheck(world, dt);
 
     // ---- stages, off progress through the whole thing ----
     const frac = this.coreFrac;
@@ -278,7 +351,7 @@ export class Ordinal {
       this.repairT -= dt;
       if (this.repairT <= 0) {
         this.repairT = rep;
-        if (this.repair()) audio.chime(320);
+        if (this.repair(world)) audio.chime(320);
       }
     }
     const bur = C.burst[this.stage - 1];
@@ -306,7 +379,7 @@ export class Ordinal {
     this.burstT = C.burst[n - 1];
     // Both frames reverse, so whatever alignment was learned is now wrong.
     for (const ring of this.rings) ring.spin *= -1;
-    this.garrison(C.garrison[n - 1]);
+    this.garrison(C.garrison[n - 1], true);
     ring(this.x, this.y, 20, 520, 0.7, TYPE_BY_ID.ordinal.glow, 6);
     ring(this.x, this.y, 10, 300, 0.4, '#ffffff', 3);
     ripple(this.x, this.y, 2.2, 620);
@@ -395,10 +468,9 @@ export class Ordinal {
     }
 
     // ---- the parked garrison, seen through the frame ----
+    // Positioned in place(), not here: a draw that moves things is a draw
+    // that behaves differently when the frame is dropped.
     for (const d of this.parked) {
-      const a = d.berth.a + this.rings[0].angle * 0.6;
-      d.x = this.x + Math.cos(a) * d.berth.rr;
-      d.y = this.y + Math.sin(a) * d.berth.rr;
       ctx.save();
       ctx.globalAlpha = 0.5 * open;
       d.draw(ctx, world);
@@ -465,8 +537,37 @@ export class Ordinal {
 export function openAperture(world) {
   if (world.boss || !world.aperture) return false;
   world.aperture--;
-  // The field belongs to ORDINAL now. Anything already on it is left where it
-  // is -- clearing it would rob the arrival of the thing it arrives into.
+
+  /*
+   * The field is ORDINAL's now, and that has to be true the moment the way
+   * opens rather than only for what comes next.
+   *
+   * Everything hostile already on it is taken by the hole: hauled in and
+   * broken, which pays out its salvage exactly as shooting it would have. So
+   * it is not a robbery -- opening the way mid-wave banks the wave. Drift
+   * stays. It is harmless, it is grey, and it is scenery.
+   */
+  const cx = world.shooter.x;
+  const cy = world.shooter.y - CFG.ordinal.standoff;
+  // Four passes, because a SPLITTER coming apart leaves four more behind it
+  // and a BLOOM's blast can shed further bodies. Nothing splits four deep, so
+  // this terminates on the field rather than on the counter.
+  for (let pass = 0; pass < 4; pass++) {
+    let took = 0;
+    for (const e of [...world.enemies]) {
+      if (e.dead || e.harmless || e.type.fixed) continue;
+      haul(e.x, e.y, cx, cy, e.type.glow, 0.5, 3);
+      // It pays out, but it is not a kill: you did not destroy it, the hole
+      // did. Otherwise opening the way onto a full field walks the tally
+      // forward by fifty-odd objects for the price of one APERTURE.
+      e.counts = false;
+      e.destroy(world);
+      took++;
+    }
+    if (!took) break;
+  }
+  world.attackers.clear();
+
   world.boss = new Ordinal(world);
   world.bossStage = 1;
   ripple(world.shooter.x, world.shooter.y - CFG.ordinal.standoff, 2.6, 900);

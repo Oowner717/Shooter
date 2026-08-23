@@ -109,6 +109,15 @@ export function captureRun(world, game) {
     autoAim: !!world.autoAim,
     autoFire: !!world.autoFire,
     taken: [...world.offers.taken],
+    /*
+     * How many ways in are actually held, which is not what the ledger says.
+     *
+     * A restore replays every taken id through its `apply`, and APERTURE's
+     * hands out one each time -- so a run that bought three and opened two
+     * came back holding three. The ledger records what was bought; this
+     * records what is left, and the restore takes this one.
+     */
+    aperture: world.aperture | 0,
     nextSmall: world.offers.nextSmall,
     nextLarge: world.offers.nextLarge,
     // Only the tiers. The three cards on an unopened offer are a fresh roll

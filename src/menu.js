@@ -177,7 +177,10 @@ export class Menu {
     // glance — nothing bought, part bought, full — and "1/3" reads as a label
     // where a row of filled pips reads as progress. Single-level nodes get no
     // meter at all: there is nothing to be part-way through.
-    const max = n.levels || 1;
+    // A repeatable node has no ceiling and so no meter: there is nothing to
+    // be part-way through, and `'<i></i>'.repeat(Infinity)` is not a meter,
+    // it is a hang.
+    const max = n.repeat ? 0 : (n.levels || 1);
     const pips = max > 1
       ? `<span class="treePips">${'<i></i>'.repeat(max)}</span>` : '';
     const cost = document.createElement('b');
