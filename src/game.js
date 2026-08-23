@@ -2,6 +2,7 @@
 
 import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID } from './config.js';
 import { Ordinal, openAperture } from './boss.js';
+import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
 import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
 import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake } from './fx.js';
@@ -1653,13 +1654,22 @@ export class Game {
     this.frameTimes.length = 0;
     this.fps = 1000 / Math.max(avg, 1);
 
+    /*
+     * The governor drops quality when frames get long and lets it back up
+     * when they do not -- but never above the player's own ceiling. Somebody
+     * who set EFFECTS to LOW on a device they know is slow meant it, and
+     * having the governor quietly undo that the moment the field is empty is
+     * the setting not working.
+     */
+    const roof = pref('effects');
+    if (fx.quality > roof) { fx.quality = roof; this.resize(); }
     if (this.qualityCooldown > 0) { this.qualityCooldown--; return; }
     if (avg > 20.5 && fx.quality > 0.45) {
       fx.quality = fx.quality > 0.7 ? 0.7 : 0.45;
       this.qualityCooldown = 3;
       this.resize();
-    } else if (avg < 13.5 && fx.quality < 1) {
-      fx.quality = fx.quality < 0.7 ? 0.7 : 1;
+    } else if (avg < 13.5 && fx.quality < roof) {
+      fx.quality = Math.min(roof, fx.quality < 0.7 ? 0.7 : 1);
       this.qualityCooldown = 6;
       this.resize();
     }

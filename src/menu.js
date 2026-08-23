@@ -14,9 +14,10 @@ import { ARSENAL, ARSENAL_GROUPS, specRows } from './arsenal.js';
 /** Every arm, by the key the tree calls it — BOLT is `standard` in here. */
 const ARM_BY_KEY = new Map(ARSENAL.map((a) => [a.key === 'standard' ? 'bolt' : a.key, a]));
 import { ABILITIES } from './abilities.js';
+import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
 import { BUILD, REV } from './config.js';
-import { TREE, priceOf } from './tree.js';
+import { TREE, NODES, priceOf } from './tree.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -311,6 +312,33 @@ export class Menu {
   }
 
   /** Every row's state, diffed. Called on open, on a buy, and on tab change. */
+  /**
+   * Is this row buyable right now? The one definition of it — the tree paints
+   * `afford` with it and the chip badge counts with it, so the number on the
+   * chip and the rows behind it can never disagree.
+   */
+  buyable(n, w) {
+    if (!n.id || n.dormant || n.free) return false;
+    const g = this.game;
+    const have = g.owned(n.id);
+    const max = n.repeat ? Infinity : (n.levels || 1);
+    if (have >= max) return false;
+    if (!g.available(n)) return false;
+    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
+    return purse >= priceOf(n, have);
+  }
+
+  /**
+   * How many of them, walking the node table rather than the DOM — so it
+   * costs nothing with the menu shut, which is exactly when the badge on the
+   * energy chip needs it.
+   */
+  reachCount(w) {
+    let n = 0;
+    for (const node of NODES) if (this.buyable(node, w)) n++;
+    return n;
+  }
+
   syncTree() {
     if (!this.treeRows) return;
     const g = this.game;
@@ -459,6 +487,29 @@ export class Menu {
     grid.className = 'menuGrid';
     const g = this.game;
     p.appendChild(this.volumeRow());
+    /*
+     * The rest of the options. One row each, tapped to step through their
+     * values, because three of them have three states and a toggle cannot say
+     * "medium". They are preferences rather than progress, so they live in
+     * their own store and RESET SIMULATION does not touch them — see
+     * src/settings.js.
+     */
+    const opts = document.createElement('div');
+    opts.className = 'optRows';
+    this.optRows = Object.keys(PREFS).map((key) => {
+      const b = document.createElement('button');
+      b.className = 'optRow';
+      b.type = 'button';
+      b.innerHTML = `<span class="optName">${PREFS[key].label}</span>`
+        + `<span class="optPips"></span><span class="optWord"></span>`;
+      const pips = b.querySelector('.optPips');
+      for (let i = 0; i < PREFS[key].of.length; i++) pips.appendChild(document.createElement('i'));
+      b.addEventListener('click', () => { cyclePref(key); this.syncSystem(); });
+      opts.appendChild(b);
+      return { key, el: b, pips: [...pips.children], word: b.querySelector('.optWord') };
+    });
+    p.appendChild(opts);
+
     const rows = [
       // One button, and it means all of it: the run, the glossary, the opening
       // lines. REPLAY OPENING used to sit here to put the lines back, which was
@@ -560,6 +611,17 @@ export class Menu {
   }
 
   syncSystem() {
+    if (this.optRows) {
+      for (const r of this.optRows) {
+        const spec = PREFS[r.key];
+        const at = spec.of.indexOf(pref(r.key));
+        r.word.textContent = prefWord(r.key);
+        // Nothing lit at the bottom step: a meter reading "one of three" for
+        // OFF says the opposite of what it is. Same rule as the volume bar.
+        r.pips.forEach((p, i) => p.classList.toggle('on', at > 0 && i <= at));
+        r.el.classList.toggle('off', at === 0 && spec.of[0] === 0);
+      }
+    }
     if (!this.volCells) return;
     const v = this.game.volume;
     // Nearest step, so a value restored from an older build still lights one.
@@ -580,6 +642,13 @@ export class Menu {
 
   /** Called every frame; cheap because every write is diffed. */
   sync(world) {
+    // The badge on the energy chip. Only recomputed when a purse actually
+    // moves — energy ticks up constantly, so this is the diff that matters.
+    const purse = `${world.energy | 0}:${world.remainder | 0}:${world.offers.taken.length}`;
+    if (purse !== this.lastPurse) {
+      this.lastPurse = purse;
+      this.game.hud.setBuys(this.reachCount(world));
+    }
     for (const a of ARSENAL) {
       const on = a.kind === 'round' ? world.round === a.key
         : a.kind === 'mine' ? world.mine === a.key

@@ -207,6 +207,135 @@ html, body {
 }
 .treeSouls[hidden] { display: none; }
 
+/*
+ * The energy chip is a button now — the way into the tree. The badge is how
+ * many rows are within reach, which is the one figure that decides whether
+ * opening it is worth the tap.
+ */
+#energyChip { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+#energyChip:active { transform: translateY(1px); }
+#energyChip.canBuy {
+  border-color: rgba(124, 255, 178, 0.5);
+  box-shadow: 0 0 18px -6px rgba(124, 255, 178, 0.8);
+}
+#energyBuys {
+  display: none;
+  margin-left: 6px;
+  min-width: 15px;
+  padding: 1px 4px;
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: #04140c;
+  background: #7cffb2;
+  border-radius: 2px;
+  box-shadow: 0 0 10px -2px rgba(124, 255, 178, 0.9);
+}
+#energyBuys.on { display: inline-block; }
+
+/*
+ * The record, on the title screen. The glossary is the only thing that
+ * survives a reset — it was never yours, it is kept by whoever has been
+ * counting — so it is the only honest answer a title screen can give to "how
+ * far have I got".
+ */
+#bootRecord {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+#bootRecord[hidden] { display: none; }
+#bootRecord span {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid rgba(120, 190, 255, 0.2);
+  background: rgba(6, 12, 22, 0.5);
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+}
+#bootRecord b {
+  font-size: 13px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px rgba(89, 224, 255, 0.5);
+}
+#bootRecord em {
+  font-style: normal;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: #6d829a;
+}
+
+#resumeNote {
+  margin-top: 6px;
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  color: #56697f;
+}
+#resumeNote[hidden] { display: none; }
+
+/*
+ * Both of these are worth having and neither is worth the fold.
+ *
+ * On a 320x568 screen the briefing plus the five control rows already ends
+ * within a pixel or two of the bottom — the buttons are the one thing on this
+ * screen that has to be reachable without a scroll, and a record row and a
+ * detail line put them 45px under it. Short screens get the buttons.
+ */
+@media (max-height: 660px) {
+  #bootRecord, #resumeNote { display: none !important; }
+}
+
+/* ---------------- options ---------------- */
+
+/*
+ * One row per preference, tapped to step through its values. A pip strip
+ * rather than a switch, because three of these have three states and a switch
+ * cannot say "medium" — the same reason the volume control is a bar of steps
+ * and not a checkbox.
+ */
+.optRows { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 10px; }
+.optRow {
+  -webkit-appearance: none;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  background: rgba(6, 12, 22, 0.66);
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  transition: border-color 0.14s, opacity 0.14s;
+}
+.optRow:active { transform: translateY(1px); }
+.optName { flex: 1 1 auto; font-size: 9px; letter-spacing: 0.18em; color: #8fb6d8; text-align: left; }
+.optPips { flex: 0 0 auto; display: flex; gap: 3px; }
+.optPips i {
+  display: block;
+  width: 12px;
+  height: 4px;
+  background: rgba(120, 190, 255, 0.16);
+  transition: background 0.14s, box-shadow 0.14s;
+}
+.optPips i.on { background: var(--accent); box-shadow: 0 0 8px -1px var(--accent); }
+.optWord {
+  flex: 0 0 auto;
+  min-width: 56px;
+  text-align: right;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+/* Off is a state worth reading as off, not as "the first of three". */
+.optRow.off .optName, .optRow.off .optWord { color: #4d5f74; }
+.optRow.off .optPips i.on { background: rgba(120, 190, 255, 0.22); box-shadow: none; }
+
 /* ---------------- the way in ---------------- */
 
 /*

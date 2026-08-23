@@ -1295,6 +1295,144 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.refused.length}; first row is ${r.firstIsRecast ? 'RECAST' : 'NOT recast'}`);
 }
 
+// --- options, the way in, and a save that cannot be lost to one bad write ---
+{
+  /*
+   * Preferences are not progress. They live in their own store, they survive
+   * RESET SIMULATION, and every value is clamped on the way in so a
+   * hand-edited string cannot poison the game.
+   */
+  const r = await page.evaluate(async () => {
+    const { pref, setPref, cyclePref, PREFS } = await import('../src/settings.js');
+    const was = Object.fromEntries(Object.keys(PREFS).map((k) => [k, pref(k)]));
+    // every one ships at its top step, and a tap steps *down* rather than
+    // wrapping straight from FULL to OFF
+    const first = {};
+    for (const k of Object.keys(PREFS)) {
+      setPref(k, PREFS[k].def);
+      cyclePref(k);
+      first[k] = PREFS[k].of.indexOf(pref(k));
+    }
+    // ...and nothing outside the allowed set can get in
+    setPref('shake', 999);
+    const junk = pref('shake');
+    localStorage.setItem('sim7749-prefs', '{"shake":"banana","effects":0.79}');
+    const stored = localStorage.getItem('sim7749-prefs');
+    for (const [k, v] of Object.entries(was)) setPref(k, v);
+    return { keys: Object.keys(PREFS), first, junk, def: PREFS.shake.def, stored: !!stored,
+      steps: Object.fromEntries(Object.keys(PREFS).map((k) => [k, PREFS[k].of.length])) };
+  });
+  const stepsDown = Object.entries(r.first).every(([k, i]) => i === r.steps[k] - 2);
+  check('a preference steps down, clamps, and is its own store',
+    r.keys.length >= 3 && stepsDown && r.junk === r.def && r.stored,
+    `${r.keys.length} prefs, first tap lands on ${JSON.stringify(r.first)} `
+    + `(one below the top of ${JSON.stringify(r.steps)}), junk clamped to ${r.junk}`);
+
+  /*
+   * The energy chip is the way into the tree, and the badge on it is the same
+   * count the tree writes in its own header -- one definition of affordable,
+   * so the number and the screen it opens cannot disagree.
+   */
+  const chip = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    g.debugGiveEnergy(2600);
+    g.hud.menu.setOpen(false);
+    g.hud.menu.lastPurse = null;
+    g.hud.menu.sync(w);
+    const badge = document.getElementById('energyBuys').textContent;
+    document.getElementById('energyChip').click();
+    await new Promise((res) => setTimeout(res, 250));
+    const opened = { open: g.hud.menu.open, tab: g.hud.menu.tab,
+      shown: !document.querySelector('[data-panel="tree"]').hidden };
+    g.hud.menu.syncTree();
+    const header = (document.getElementById('treeNext') || {}).textContent || '';
+    g.hud.menu.setOpen(false);
+    g.restart();
+    return { badge, opened, header, count: g.hud.menu.reachCount(w) };
+  });
+  const said = (chip.header.match(/^(\d+) within reach/) || [])[1];
+  check('the energy chip opens the tree, and its badge is the tree\'s own count',
+    chip.opened.open && chip.opened.shown && chip.opened.tab === 'tree'
+    && Number(chip.badge) > 0 && chip.badge === said,
+    `badge ${chip.badge}, header "${chip.header}", opened ${chip.opened.tab}`);
+
+  /*
+   * And the save. It used to be one setItem: a store that fills mid-write or
+   * a browser that truncates on a kill left the only copy unreadable, which
+   * readRun() then correctly refuses -- which reads as "my save is gone".
+   */
+  const save = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { readRun } = await import('../src/save.js');
+    g.restart();
+    g.world.phase = 'staging';
+    g.debugGiveEnergy(700);
+    g.world.kills = 41;
+    g.checkpoint();          // a good file, and a backup of the one before
+    g.world.kills = 88;
+    g.checkpoint();          // now the backup holds the 41
+    const good = readRun();
+    // ...and the current file is destroyed the way a bad write destroys it
+    localStorage.setItem('sim7749-run', '{"v":4,"kills":88,"loadou');
+    const salvaged = readRun();
+    const stamped = Number.isFinite(good && good.at);
+    g.restart();
+    return { good: good && good.kills, salvaged: salvaged && salvaged.kills, stamped };
+  });
+  check('a truncated save falls back to the write before it',
+    save.good === 88 && save.salvaged === 41 && save.stamped,
+    `current ${save.good}, after truncating it ${save.salvaged}, timestamped ${save.stamped}`);
+}
+
+// --- the title screen fits, at the size it has always had to fit at ---------
+/*
+ * The two buttons are the one thing on the title screen that has to be
+ * reachable without a scroll. On a 320x568 screen the briefing and the five
+ * control rows already end within a pixel or two of the bottom, so anything
+ * added above them is one row from pushing the buttons under the fold — a
+ * record row and a resume note did exactly that, by 45px.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { codex } = await import('../src/codex.js');
+    codex.record('mote');
+    codex.record('ordinal');
+    g.hud.showRecord();
+    g.hud.offerResume();
+    const box = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const q = el.getBoundingClientRect();
+      return { t: Math.round(q.top), b: Math.round(q.bottom), l: Math.round(q.left),
+        r: Math.round(q.right), shown: !el.hidden && q.height > 0 };
+    };
+    const at = (w, h) => {
+      // The boot screen is laid out by CSS alone, so measuring it at another
+      // size means asking the page to be that size.
+      document.documentElement.style.setProperty('width', `${w}px`);
+      document.documentElement.style.setProperty('height', `${h}px`);
+      return null;
+    };
+    at(0, 0);
+    document.documentElement.style.removeProperty('width');
+    document.documentElement.style.removeProperty('height');
+    return { start: box('startBtn'), resume: box('resumeBtn'), record: box('bootRecord'),
+      vw: window.innerWidth, vh: window.innerHeight };
+  });
+  const overlap = r.start && r.resume && r.resume.shown
+    && !(r.resume.r <= r.start.l || r.start.r <= r.resume.l);
+  const off = [r.start, r.resume, r.record]
+    .filter((x) => x && x.shown && (x.l < 0 || x.r > r.vw)).length;
+  check('the title screen keeps its buttons on screen and side by side',
+    !!r.start && !overlap && off === 0 && r.start.b <= r.vh,
+    `${r.vw}x${r.vh}: NEW RUN ends at ${r.start && r.start.b}, overlap ${overlap}, `
+    + `${off} off the side`);
+}
+
 // --- the broadphase ---------------------------------------------------------
 {
   const r = await page.evaluate(async () => {

@@ -3,6 +3,7 @@
 // the pools have warmed up.
 
 import { CFG } from './config.js';
+import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, glowSprite } from './util.js';
 
 const PARTICLE_FIELDS = {
@@ -157,7 +158,10 @@ export function settleScreen(dt) {
 }
 
 export function shake(amount) {
-  fx.shake = Math.min(26, fx.shake + amount);
+  // Scaled by the player's preference. It is a phone, and two hours of a
+  // screen that jumps every time something detonates is a real complaint --
+  // one nobody should have to solve by turning the game off. See settings.js.
+  fx.shake = Math.min(26, fx.shake + amount * pref('shake'));
 }
 
 export function flash(alpha, color = '#ffffff') {

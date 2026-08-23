@@ -6,6 +6,7 @@ import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
 import { BUILD, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
+import { pref, cyclePref, prefWord, PREFS } from './settings.js';
 import { CODEX, codex } from './codex.js';
 import {  } from './util.js';
 import { Menu } from './menu.js';
@@ -34,6 +35,22 @@ export const ROUND_KEYS = ARSENAL
 /** Mines. Also mutually exclusive, but all of them can be off at once. */
 export const MINE_KEYS = ARSENAL.filter((a) => a.kind === 'mine').map((a) => a.key);
 
+/**
+ * How long ago, in as few characters as will do. Anything older than a week is
+ * simply "a while" -- past that the exact figure is not what anybody is
+ * deciding on, and "13d" reads as a demand to remember what happened 13 days
+ * ago rather than as an invitation to pick the run back up.
+ */
+function ageOf(at) {
+  if (!Number.isFinite(at)) return '';
+  const s = Math.max(0, (Date.now() - at) / 1000);
+  if (s < 90) return 'just now';
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  if (s < 86400 * 7) return `${Math.round(s / 86400)}d ago`;
+  return 'a while ago';
+}
+
 export class Hud {
   constructor(game) {
     this.game = game;
@@ -45,6 +62,7 @@ export class Hud {
       killGoal: document.querySelector('#counter .dim'),
       energy: $('energyNum'),
       energyChip: $('energyChip'),
+      energyBuys: $('energyBuys'),
       effects: $('effects'),
       pendingBtn: $('pendingBtn'),
       pendingLabel: $('pendingLabel'),
@@ -76,6 +94,8 @@ export class Hud {
       bossShellA: $('bossShellA'),
       bossShellB: $('bossShellB'),
       boot: $('boot'),
+      bootRecord: $('bootRecord'),
+      resumeNote: $('resumeNote'),
       startBtn: $('startBtn'),
       resumeBtn: $('resumeBtn'),
       quickBar: $('quickBar'),
@@ -141,6 +161,7 @@ export class Hud {
     this.el.startBtn.addEventListener('click', () => game.start());
     this.el.resumeBtn.addEventListener('click', () => game.resume());
     this.offerResume();
+    this.showRecord();
     $('dbgClose').addEventListener('click', () => this.toggleDebug(false));
 
     /*
@@ -149,6 +170,17 @@ export class Hud {
      * because pointerdown alone is right for a thumb and wrong for anything
      * else.
      */
+    /*
+     * The energy chip is the way into the tree. Energy is what upgrades cost,
+     * so the number is the button, and the badge on it is how many things are
+     * within reach right now — the one figure that decides whether opening it
+     * is worth the tap.
+     */
+    this.el.energyChip.addEventListener('click', () => {
+      this.menu.setOpen(true);
+      this.menu.show('tree');
+    });
+
     const open = (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -533,6 +565,13 @@ export class Hud {
    *   nine seconds gave a four-word line the same time as a fifteen-word one.
    */
   showHint(text, tutorial = false, hold = holdFor(text)) {
+    /*
+     * CAPTIONS off silences the interface's own voice — the story lines, the
+     * first-use notes, the contact explanation. ORDINAL keeps talking either
+     * way: those captions are the event rather than commentary on it, and a
+     * boss arriving in silence would read as a bug.
+     */
+    if (!pref('chatter')) return;
     // Lines are written with their own break, so they wrap where they read.
     if (!tutorial) {
       this.tutLines.length = 0;
@@ -652,6 +691,22 @@ export class Hud {
       this.lastChoked = choked;
       this.el.energyChip.classList.toggle('choked', choked);
     }
+  }
+
+  /**
+   * How many rows in the tree are affordable right now, shown on the chip.
+   *
+   * The count comes from the menu, which already works it out to write "N
+   * within reach" in its own header — so there is one calculation of what
+   * affordable means and the badge cannot disagree with the screen it opens.
+   */
+  setBuys(n) {
+    if (n === this.lastBuys) return;
+    this.lastBuys = n;
+    const el = this.el.energyBuys;
+    el.textContent = n > 0 ? String(n) : '';
+    el.classList.toggle('on', n > 0);
+    this.el.energyChip.classList.toggle('canBuy', n > 0);
   }
 
 
@@ -982,17 +1037,55 @@ export class Hud {
    * meaning "start a clean one", because the alternative is a player tapping
    * the only button on the screen and silently losing a run.
    */
+  /**
+   * The record, on the title screen: what this device has to show for itself
+   * across every run it has ever had.
+   *
+   * The glossary is the only thing in the game that survives a reset — it was
+   * never yours, it is kept by whoever has been counting — so it is the only
+   * honest measure of "how far have I got" that a title screen can offer.
+   * Shown only once there is something in it: a first launch has no record
+   * and a row of zeroes is a worse welcome than no row at all.
+   */
+  showRecord() {
+    const el = this.el.bootRecord;
+    if (!el) return;
+    const found = codex.found;
+    if (!found) { el.hidden = true; return; }
+    const bits = [`<b>${found}</b><em>of ${codex.total} recorded</em>`];
+    // ORDINAL in the glossary means one has been taken apart. There is no
+    // other way for it to get in there.
+    if (codex.has('ordinal')) bits.push('<b>◆</b><em>ORDINAL reconciled</em>');
+    el.innerHTML = bits.map((b) => `<span>${b}</span>`).join('');
+    el.hidden = false;
+  }
+
   offerResume() {
     const d = readRun();
     const b = this.el.resumeBtn;
     if (!b) return;
     if (!d) {
       b.hidden = true;
+      if (this.el.resumeNote) this.el.resumeNote.hidden = true;
       this.el.startBtn.textContent = 'BEGIN SIMULATION';
       return;
     }
-    const goal = d.endless ? '' : ` / ${CFG.killGoal}`;
-    b.textContent = `CONTINUE · ${d.kills}${goal}`;
+    /*
+     * What is actually in the file, not just how far it got. A resume button
+     * that says only a number is asking you to remember what that run was;
+     * the count, the bank and how long ago it was answers it.
+     */
+    b.textContent = `CONTINUE · ${d.kills}${d.endless ? '' : ` / ${CFG.killGoal}`}`;
+    const bits = [];
+    if (Number.isFinite(d.energy) && d.energy >= 1) bits.push(`${Math.floor(d.energy)} ENERGY`);
+    if (d.remainder > 0) bits.push(`${d.remainder}◆ REMAINDER`);
+    const ago = ageOf(d.at);
+    if (ago) bits.push(ago);
+    const note = this.el.resumeNote;
+    if (note) {
+      note.textContent = bits.join('  ·  ');
+      note.hidden = !bits.length;
+    }
     b.hidden = false;
     // Beside a CONTINUE the long form does not fit, and the short form is the
     // more honest label anyway: from here, that button is a new run.

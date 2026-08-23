@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '121';
+  var BUILD = '122';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -86,7 +86,15 @@
         <span id="killNum">0</span><span class="dim"></span>
         <em>OBJECTS</em>
       </div>
-      <div id="energyChip" class="chip"><em>ENERGY</em><span id="energyNum">0</span></div>
+      <!--
+        The way into the tree. Energy is what upgrades cost, so the number is
+        the button: tapping what you have opens what it buys. It used to live
+        one level down behind the hamburger, which put the most-used screen in
+        the game behind two taps and a tab.
+      -->
+      <button id="energyChip" class="chip btn" aria-label="Upgrades">
+        <em>ENERGY</em><span id="energyNum">0</span><i id="energyBuys"></i>
+      </button>
       <div id="phaseTag" class="chip ghost">FIELD</div>
       <div class="spacer"></div>
       <button id="menuBtn" class="chip btn menuBtn" aria-label="Menu">
@@ -221,10 +229,18 @@
              resume costs no vertical space: on a 320x568 screen this row ends
              within a pixel or two of the fold, and a briefing line one wrap
              longer is enough to push it under. NEW RUN always starts clean. -->
+        <!-- What this device has to show for itself, across every run. Only
+             there once there is something to say; see Hud.showRecord(). -->
+        <div id="bootRecord" hidden></div>
+
         <div class="bootGo">
           <button id="resumeBtn" hidden>CONTINUE</button>
           <button id="startBtn">NEW RUN</button>
         </div>
+        <!-- What is in the file, under the row rather than inside the button:
+             the two buttons share one line and a label long enough to say all
+             of it pushed NEW RUN off the side of a 390-wide screen. -->
+        <div id="resumeNote" hidden></div>
         <div class="bootFoot">Add to Home Screen for fullscreen playback.</div>
       </div>
     </section>

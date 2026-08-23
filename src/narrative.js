@@ -182,6 +182,6 @@ export const CONTROLS = [
   ['LEVER', () => 'hold the grip under the turret and swing. The barrel goes the other way, and fires while you hold it.'],
   ['TAP', () => 'anywhere ahead of the turret to shoot there instead. Hold to keep firing.'],
   ['ABILITIES', (n) => `PULSE and FAN to begin with, ${n - 2} more to open. One tap each; each comes back on its own.`],
-  ['UPGRADES', () => 'energy buys them. Open the menu and spend it down the tree.'],
+  ['UPGRADES', () => 'energy buys them. Tap the ENERGY figure to spend it down the tree.'],
   ['CORRUPTION', () => 'an object holding the turret. It cannot kill you, but each one costs 22% of what you bank and breaks up the feed.'],
 ];
