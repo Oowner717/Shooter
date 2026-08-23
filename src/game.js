@@ -418,6 +418,10 @@ export class Game {
     const n = NODE_BY_ID.get(id);
     if (!n) return 'locked';
     if (!this.available(n)) return 'locked';
+    // A slot with nothing behind it yet. It is shown because the shape of
+    // what is coming is worth seeing; it is not sold because a way in that
+    // opens onto nothing is worse than a door that plainly does not open.
+    if (n.dormant) return 'locked';
     const have = this.owned(id);
     if (!n.repeat && have >= (n.levels || 1)) return 'maxed';
     const price = priceOf(n, have);

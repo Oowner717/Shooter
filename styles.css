@@ -2353,6 +2353,44 @@ body.booting #pendingBtn {
 .treeRow.k-arm .treeName { letter-spacing: 0.17em; }
 
 /*
+ * ANOMALY, in every boss colour at once.
+ *
+ * `--tones` is a set of hard-stopped bands, one per boss, built in
+ * Menu.treeNode from BOSS_TONE. The heading wears them twice: a spine of
+ * solid bands down its left edge, and the name itself filled with the same
+ * ramp. It is the only heading in the tree that is not one colour, and that
+ * is the whole message — there are seven of these and one of them is open.
+ */
+.spectrum > .treeRow.k-root {
+  border-color: rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0)),
+    rgba(10, 20, 34, 0.92);
+  overflow: hidden;
+}
+.spectrum > .treeRow.k-root::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: linear-gradient(180deg, var(--tones));
+  box-shadow: 0 0 14px -2px rgba(255, 255, 255, 0.5);
+}
+.spectrum > .treeRow.k-root .treeName {
+  background: linear-gradient(90deg, var(--tones));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* Safari drops the shadow through transparent text; the spine carries the
+     glow instead, so this only has to not fight it. */
+  text-shadow: none;
+}
+.spectrum > .treeRow.k-root .treeIcon,
+.spectrum > .treeRow.k-root .treeCaret { color: #ffffff; opacity: 0.7; }
+
+/*
  * Five states. Each one answers a different question, and the row has to say
  * which without being read:
  *

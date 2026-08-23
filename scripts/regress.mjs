@@ -1237,6 +1237,64 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `with ${a2.jobs} left, rotation ${a2.order === b2.order ? 'intact' : 'CHANGED'}`);
 }
 
+// --- seven ways in, one colour each ------------------------------------------
+/*
+ * ANOMALY holds a slot per boss. One of them has something behind it; the
+ * other six are doors, shown because the shape of what is coming is worth
+ * seeing and sealed because a way in that opens onto nothing is worse than a
+ * door that plainly does not open.
+ *
+ * RECAST is not among them. It is not an upgrade to the machine, the rack or
+ * the field — it is what you do with what the bosses leave — so it sits above
+ * every category rather than inside one.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { TREE, NODES } = await import('../src/tree.js');
+    const { BOSS_TONE } = await import('../src/upgrades.js');
+    g.restart();
+    w.phase = 'staging';
+    g.debugGiveEnergy(9000);
+    w.remainder = 2;
+
+    const first = TREE[0];
+    const anomaly = NODES.find((n) => n.kind === 'root' && n.key === 'anomaly');
+    const slots = NODES.filter((n) => n.id && /^aperture/.test(n.id));
+    const live = slots.filter((n) => !n.dormant);
+    const sealed = slots.filter((n) => n.dormant);
+    // every one of them refuses, and the open one does not
+    const buys = slots.map((n) => ({ id: n.id, r: g.buy(n.id) }));
+    const tones = slots.map((n) => n.tone);
+    const out = {
+      firstIsRecast: first.id === 'recast' && first.kind === 'upgrade',
+      recastInTree: NODES.filter((n) => n.id === 'recast').length,
+      slots: slots.length,
+      live: live.length,
+      sealed: sealed.length,
+      names: slots.map((n) => n.name),
+      tones,
+      uniqueTones: new Set(tones).size,
+      matchesPalette: tones.join(',') === BOSS_TONE.join(','),
+      spectrum: (anomaly.tones || []).length,
+      opened: buys.filter((b) => b.r === 'ok').map((b) => b.id),
+      refused: buys.filter((b) => b.r === 'locked').map((b) => b.id),
+    };
+    g.restart();
+    return out;
+  });
+  check('seven APERTURE slots, one open and six sealed, with RECAST above them all',
+    r.firstIsRecast && r.recastInTree === 1
+    && r.slots === 7 && r.live === 1 && r.sealed === 6
+    && r.uniqueTones === 7 && r.matchesPalette && r.spectrum === 7
+    && r.opened.length === 1 && r.opened[0] === 'aperture' && r.refused.length === 6
+    && r.names[0] === 'ORDINAL APERTURE',
+    `${r.slots} slots (${r.live} open, ${r.sealed} sealed), ${r.uniqueTones} distinct colours, `
+    + `heading carries ${r.spectrum}; bought ${JSON.stringify(r.opened)}, refused `
+    + `${r.refused.length}; first row is ${r.firstIsRecast ? 'RECAST' : 'NOT recast'}`);
+}
+
 // --- the broadphase ---------------------------------------------------------
 {
   const r = await page.evaluate(async () => {

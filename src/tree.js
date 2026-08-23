@@ -27,7 +27,7 @@
  * what stops the two drifting.
  */
 
-import { ALL_UPGRADES, UNLOCKS, CHARGES } from './upgrades.js';
+import { ALL_UPGRADES, UNLOCKS, CHARGES, BOSS_TONE } from './upgrades.js';
 import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
 
@@ -81,7 +81,9 @@ const UNDER = {
 
   // ---- the way in ----
   // One leaf under its own heading, always available, never behind anything.
-  anomaly: ['aperture', 'recast'],
+  // ...one slot per boss, in order. RECAST is not here — it sits above every
+  // category; see TREE at the bottom of this file.
+  anomaly: ['aperture', 'aperture2', 'aperture3', 'aperture4', 'aperture5', 'aperture6', 'aperture7'],
 
   // ---- the abilities ----
   abilities: ['standing', 'reflex'],
@@ -165,14 +167,14 @@ function node(o) {
   return { levels: 1, cost: 0, children: [], ...o };
 }
 
-const ROOT_TONE = { turret: '#59e0ff', ammo: '#bff4ff', mines: '#ffb347', abilities: '#c9a7ff', anomaly: '#ff5ec8' };
+const ROOT_TONE = { turret: '#59e0ff', ammo: '#bff4ff', mines: '#ffb347', abilities: '#c9a7ff', anomaly: BOSS_TONE[0] };
 const ROOT_NAME = { turret: 'TURRET', ammo: 'AMMUNITION', mines: 'MINES', abilities: 'ABILITIES', anomaly: 'ANOMALY' };
 const ROOT_LINE = {
   turret: 'The machine itself. Everything here is yours from the first frame.',
   ammo: 'What leaves the barrel. BOLT is loaded before you start; the rest are bought.',
   mines: 'What you leave behind. Eight of them, none behind any other — buy them in any order.',
   abilities: 'What you hold. PULSE and FAN can never be taken from you; the other six are bought.',
-  anomaly: 'Not of the field. Buy one and the way can be opened whenever you choose to open it.',
+  anomaly: 'Seven ways in, one colour each. One of them has something on the other side of it.',
 };
 
 function leaf(id) {
@@ -184,7 +186,7 @@ function leaf(id) {
   return node({
     kind: 'upgrade', id, key: id, name: u.name, line: u.line, icon: u.icon,
     levels, repeat: !!u.repeat, currency: u.currency || null,
-    tone: u.tone || '#9fb3c8',
+    dormant: !!u.dormant, tone: u.tone || '#9fb3c8',
     // An upgrade may price itself. Only APERTURE does: it is not a step on a
     // ladder, it is the same purchase every time, and it costs what it costs.
     cost: u.cost ?? COST.upgrade, step: u.step ?? COST.step, tiers: u.tiers || null,
@@ -259,14 +261,29 @@ function commons(root) {
  * arm or a leaf under one, which is what makes ABILITIES a peer of AMMO rather
  * than a list hanging off PULSE.
  */
-export const TREE = ['anomaly', 'turret', 'ammo', 'mines', 'abilities'].map((root) => node({
-  kind: 'root', key: root, name: ROOT_NAME[root], free: true,
-  tone: ROOT_TONE[root], line: ROOT_LINE[root],
-  children: [
-    ...commons(root),
-    ...(BRANCH[root] || []).map((k) => arm(k, KIND[root])),
-  ],
-}));
+/*
+ * The whole thing, and RECAST sits above all of it.
+ *
+ * Every other purchasable thing in the game is an upgrade to the machine, the
+ * rack or the field, and belongs under the category it upgrades. RECAST is
+ * not: it is what you do with what the bosses leave behind, it is bought with
+ * a currency nothing else uses, and there is exactly one of it. A category of
+ * one would have been a heading with a single row under it, which says less
+ * than the row on its own.
+ */
+export const TREE = [
+  leaf('recast'),
+  ...['anomaly', 'turret', 'ammo', 'mines', 'abilities'].map((root) => node({
+    kind: 'root', key: root, name: ROOT_NAME[root], free: true,
+    tone: ROOT_TONE[root], line: ROOT_LINE[root],
+    // The ANOMALY heading carries every boss colour at once — see BOSS_TONE.
+    tones: root === 'anomaly' ? BOSS_TONE : null,
+    children: [
+      ...commons(root),
+      ...(BRANCH[root] || []).map((k) => arm(k, KIND[root])),
+    ],
+  })),
+];
 
 /** Every node, flat, parent first. */
 export function flatten(nodes = TREE, parent = null, out = []) {

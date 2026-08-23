@@ -174,6 +174,40 @@ const set = (key, v) => (up) => { up[key] = v; };
 /** Lower is faster, and repeats have to compound rather than run to zero. */
 const quicken = (key, by) => (up) => { up[key] *= by; };
 
+/*
+ * A hue per boss. Seven of them, well apart from each other and from every
+ * colour the field already uses -- the turret's cyan, the mines' orange, the
+ * abilities' violet, TOW's lime, DRIFT's grey. ORDINAL has the first one and
+ * has had it since it arrived; the other six are reserved, and a boss taking
+ * one is how the tree will say which boss it is without being read.
+ */
+export const BOSS_TONE = [
+  '#ff5ec8', // I    ORDINAL — magenta
+  '#ff8a3d', // II   amber
+  '#8bff4d', // III  acid green
+  '#2ee6c0', // IV   teal
+  '#4d8dff', // V    electric blue
+  '#a86bff', // VI   violet
+  '#ff4d6d', // VII  crimson
+];
+
+/** II through VII, as they stand: a door, a colour, and nothing behind it. */
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+const SLEEPING = BOSS_TONE.slice(1).map((tone, i) => ({
+  id: `aperture${i + 2}`,
+  name: `${ROMAN[i + 1]} APERTURE`,
+  repeat: true,
+  // Not for sale. There is nothing on the other side of it yet, and a way in
+  // that opens onto nothing is worse than a door that plainly does not open.
+  dormant: true,
+  cost: CFG.ordinal.cost,
+  step: 0,
+  line: 'Sealed. Nothing has been put on the other side of this one yet.',
+  apply: () => {},
+  tone,
+  icon: MARK.aperture,
+}));
+
 export const UPGRADES = {
   AMMO: [
     { id: 'hollowpoint', name: 'HOLLOWPOINT', line: '+25% damage.', apply: scale('damage', 1.25) , icon: MARK.hollowpoint },
@@ -297,19 +331,37 @@ export const UPGRADES = {
    * session that opened the way nine times could never buy a tenth, with
    * nothing held and nothing to show for it.
    */
+  /*
+   * ---- the ways in ----
+   *
+   * One slot per boss, and a colour each. ORDINAL is the only one behind a
+   * door so far; the other six are the doors, standing there unopened, and
+   * they are named by number until there is something to name them after.
+   *
+   * The colours are the point of showing them at all. Each boss owns a hue
+   * that nothing else on the field uses, so ORDINAL's magenta means ORDINAL
+   * the way DRIFT's grey means harmless — and the ANOMALY heading carries all
+   * seven at once, which is the only place in the game that says how many
+   * there are going to be.
+   */
   ANOMALY: [
-    { id: 'aperture', name: 'APERTURE', repeat: true,
+    { id: 'aperture', name: 'ORDINAL APERTURE', repeat: true,
       cost: CFG.ordinal.cost, step: 0,
       line: 'Opens the way. Something on the other side has been counting, and it will come through.',
       apply: (up, world) => { world.aperture = (world.aperture || 0) + 1; },
-      tone: '#ff5ec8', icon: MARK.aperture },
+      tone: BOSS_TONE[0], icon: MARK.aperture },
+    ...SLEEPING,
     /*
      * ---- what the count leaves behind ----
      *
-     * Paid for in REMAINDERs, not energy: one ORDINAL, one REMAINDER, one
+     * Paid for in REMAINDERs, not energy: one boss, one REMAINDER, one
      * RECAST. It is the only thing in the game with a currency of its own,
      * which is the whole reason to have one -- an upgrade that cannot be
      * ground out is a different kind of decision from one that can.
+     *
+     * It sits above every category in the tree rather than inside one,
+     * because it is not an upgrade to the machine or the rack or the field:
+     * it is what you do with what the bosses leave.
      *
      * It does nothing yet, and says so. What it will do is change what the
      * turret *is* rather than what it has: every other purchase bolts

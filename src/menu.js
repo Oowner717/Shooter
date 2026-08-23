@@ -171,6 +171,19 @@ export class Menu {
     const wrap = document.createElement('div');
     wrap.className = `treeBranch d${Math.min(depth, 3)}`;
     if (n.tone) wrap.style.setProperty('--tone', n.tone);
+    /*
+     * A node may carry more than one colour. Only ANOMALY does: it holds a
+     * slot per boss and each boss owns a hue, so the heading is painted with
+     * all of them in hard bands — the one place in the game that says how
+     * many of these there are going to be.
+     */
+    if (n.tones && n.tones.length) {
+      const step = 100 / n.tones.length;
+      wrap.style.setProperty('--tones', n.tones
+        .map((c, i) => `${c} ${(i * step).toFixed(2)}%, ${c} ${((i + 1) * step).toFixed(2)}%`)
+        .join(', '));
+      wrap.classList.add('spectrum');
+    }
 
     const row = document.createElement('button');
     row.className = `treeRow k-${n.kind}`;
@@ -319,7 +332,10 @@ export class Menu {
     for (const { n, row, cost } of this.treeRows) {
       const have = n.id ? g.owned(n.id) : 0;
       const max = n.levels || 1;
-      const open = g.available(n);
+      // A dormant slot is not open, whatever the tree says about its parent:
+      // its door has nothing behind it. Same rule as Game.buy(), which is the
+      // thing that would refuse the purchase anyway.
+      const open = g.available(n) && !n.dormant;
       const full = n.free || (n.id && have >= max);
       const part = !full && have > 0;
       const price = !full ? priceOf(n, have) : 0;
