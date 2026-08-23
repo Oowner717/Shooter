@@ -1248,9 +1248,19 @@ export class Game {
 
   /**
    * ORDINAL has come apart. The sky lets go, time comes back, and the field
-   * resumes from wherever the director left it -- the wave that was running
-   * when the way opened is restarted, not resumed, which is the same rule a
-   * saved run comes back on.
+   * picks up exactly where it left off.
+   *
+   * The director is *frozen* while a boss is up, not reset — it returns at
+   * the top of its update and nothing touches its state — so whatever it had
+   * left to release is still sitting in `jobs` and `at` still points at the
+   * wave that was running. This used to force `resting = true`, which made
+   * the next begin() step past that wave and load the following one: half a
+   * wave you were in the middle of, thrown away because a boss happened.
+   *
+   * So the only thing done here is to hold it for a beat. A wave with
+   * releases left resumes and lets the rest of them out; a wave that had
+   * already emptied is marked rested, because the hole took the field with it
+   * and there is nothing left of that wave to finish.
    */
   endBoss() {
     const w = this.world;
@@ -1258,8 +1268,9 @@ export class Game {
     w.boss = null;
     w.bossStage = 0;
     w.timeScale = 1;
-    w.director.resting = true;
-    w.director.timer = 4.6; // a long beat of empty sky before the field returns
+    const d = w.director;
+    if (!d.jobs.length) d.resting = true;
+    d.timer = CFG.ordinal.after;
     w.bossLine = null;
     this.hud.alert('ORDINAL RECONCILED', 'rigDone', 5);
     background.setMood('staging');

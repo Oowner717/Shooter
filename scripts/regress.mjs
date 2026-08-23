@@ -1186,6 +1186,57 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.after.hostile} + ${r.after.drift}; ${r.after.keptMine}/6 of your own salvage left alone`);
 }
 
+// --- the field picks up where it left off -----------------------------------
+/*
+ * The director is frozen while a boss is up, not reset — it returns at the
+ * top of its update and nothing touches its state. So the wave that was
+ * running when the way opened still has its remaining releases sitting in
+ * `jobs`, and `at` still points at it.
+ *
+ * endBoss() used to force `resting = true`, which made the next begin() step
+ * past that wave and load the following one: half a wave you were in the
+ * middle of, thrown away because a boss happened. Driven, before and after
+ * the same fight: `at` went 3 -> 4 and the wave with it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { WAVES } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    g.debugTeachAll();
+    g.debugGiveEnergy(9000);
+    const d = w.director;
+    // run on until a wave is genuinely mid-release
+    let guard = 0;
+    while (guard++ < 30000 && !(d.jobs.length >= 3 && !d.resting)) g.update(1 / 60);
+    const before = { at: d.at, wave: WAVES.indexOf(d.wave), jobs: d.jobs.length,
+      order: d.order.join(','), cycle: d.cycle };
+
+    w.aperture = 1;
+    g.openBoss();
+    const bo = w.boss;
+    bo.arriving = 0;
+    g.update(1 / 60);
+    bo.core.dead = true;
+    for (let k = 0; k < 60 * 20 && w.boss; k++) g.update(1 / 60);
+    // ...and past the beat, so it is demonstrably letting things out again
+    for (let k = 0; k < 60 * 9; k++) g.update(1 / 60);
+    const after = { at: d.at, wave: WAVES.indexOf(d.wave), jobs: d.jobs.length,
+      order: d.order.join(','), cycle: d.cycle };
+    g.restart();
+    return { before, after };
+  });
+  const b2 = r.before;
+  const a2 = r.after;
+  check('the wave that was running when the way opened resumes, it is not skipped',
+    b2.jobs >= 3 && a2.at === b2.at && a2.wave === b2.wave
+    && a2.order === b2.order && a2.cycle === b2.cycle && a2.jobs < b2.jobs,
+    `wave ${b2.wave} at ${b2.at} with ${b2.jobs} left -> wave ${a2.wave} at ${a2.at} `
+    + `with ${a2.jobs} left, rotation ${a2.order === b2.order ? 'intact' : 'CHANGED'}`);
+}
+
 // --- the broadphase ---------------------------------------------------------
 {
   const r = await page.evaluate(async () => {

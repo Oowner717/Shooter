@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '119';
+export const BUILD = '120';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '119';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '0087e27';
+export const REV = '4cb4d9d';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -944,6 +944,9 @@ export const CFG = {
     pay: 900, // energy on the floor when it lets go
     // What it leaves behind. One per ORDINAL, and the only source there is.
     remainder: 1,
+    // A beat of empty sky before the field picks up again. The wave that was
+    // running when the way opened resumes — see Game.endBoss().
+    after: 4.6,
     riseFor: 2.1, // seconds the REMAINDER takes to reach the turret
     recast: 1, // REMAINDERs a RECAST costs
   },
