@@ -39,6 +39,15 @@ different code, and there was no way to tell from inside the game.
 
 `node scripts/smoke.mjs` walks a long run headlessly and screenshots it.
 
+`node scripts/bundle.mjs` is the single-file build — the form the Artifact and
+the home-screen install are made of. Not a build step for the game, which has
+none: it exists because two places want the whole thing as one file and neither
+can be handed a directory. It writes both forms to a temp dir (`--out DIR` to
+put them elsewhere) and fails if the rev stamp it embeds lands outside the
+first 2KB, because that stamp is the only thing keeping installed copies up to
+date. It lived in /tmp for twenty builds and was rewritten from memory after
+every container.
+
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three
 builds), the trigger itself, every round/mine/ability/object type running once
@@ -52,6 +61,24 @@ probe scripts in it behind a hand-kept runner list; 21 of the 43 the list named
 failed on build 100, every one of them because the probe named something
 deleted in builds 81-99, and the lot died with the container. Nothing about
 that was a suite.
+
+## How an installed copy updates itself
+
+The single-file build ships no `sw.js`, so `main.js`'s registration is switched
+off in it and no service worker is ever involved — which means nothing pins it
+and nothing updates it either. So the page does it: a rev stamp in the first
+hundred bytes of the head, and a script that range-fetches its own first 2KB,
+compares, and reloads once if it differs.
+
+It asks **on load and on every return to the foreground**. It used to ask once
+per session, guarded on its own rev — which reads as "once per launch" and is
+not: a home-screen app's session survives backgrounding for days, so an install
+that is never evicted checks on its first cold start and never again. That is
+how a phone sat on build 113 while the server had 114, and why the updates that
+*did* land were the ones where iOS had happened to evict the app.
+
+The loop guard is on the incoming rev, not on the check, so it will reload at
+most once for any given target and cannot spin.
 
 ## Repo facts worth not rediscovering
 
