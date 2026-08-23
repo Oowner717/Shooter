@@ -1404,7 +1404,7 @@ export class Game {
     // Time comes back after ORDINAL's death, eased rather than snapped.
     if (this.world.bossSlow > 0) {
       this.world.bossSlow = Math.max(0, this.world.bossSlow - dtRaw);
-      const k = 1 - this.world.bossSlow / Math.max(0.001, CFG.ordinal.endFor);
+      const k = 1 - this.world.bossSlow / Math.max(0.001, CFG.ordinal.slowFor);
       this.world.timeScale = CFG.ordinal.endSlow + (1 - CFG.ordinal.endSlow) * (k * k);
     }
     const w = this.world;

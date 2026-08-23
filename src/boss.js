@@ -42,17 +42,33 @@ import { background } from './background.js';
 const O = () => CFG.ordinal;
 
 /*
- * What it says on the way in, one line per beat of the arrival. Flat and
- * observed, the same voice as the story: it is not threatening you, it is
- * telling you what it has been doing.
+ * What it says on the way in, and what it says once it is over.
+ *
+ * Held on an explicit clock rather than derived from the visual beats: those
+ * are about what the frame is doing and these are about how long a sentence
+ * takes to read, and tying them together is how the first line ended up on
+ * screen for 1.44 seconds. Roughly eleven characters a second, which is a
+ * comfortable pace for widely spaced caps, plus a beat to land on.
+ *
+ * Flat and observed, the same voice as the story: it is not threatening you,
+ * it is telling you what it has been doing.
  */
 const ARRIVAL = [
-  'SOMETHING ON THE OTHER SIDE HAS STOPPED COUNTING.',
-  'IT HAS BEEN KEEPING A TALLY SINCE BEFORE YOU ARRIVED.',
-  'IT WOULD LIKE TO SEE THE THING DOING THE SUBTRACTING.',
-  'ORDINAL',
+  { text: 'SOMETHING HAS STOPPED COUNTING.', hold: 3.4 },
+  { text: 'IT HAS KEPT A TALLY SINCE BEFORE YOU ARRIVED.', hold: 4.2 },
+  { text: 'IT WANTS TO SEE WHAT HAS BEEN SUBTRACTING.', hold: 4 },
+  { text: 'ORDINAL', hold: 2.8 },
 ];
 
+/*
+ * ...and afterwards. Said over the wreck, once the field has stopped moving,
+ * which is the only quiet the run ever gets.
+ */
+const OUTRO = [
+  { text: 'THE COUNT IS BROKEN.', hold: 3.2 },
+  { text: 'WHAT IS LEFT OF IT IS ON THE FLOOR IN FRONT OF YOU.', hold: 4.4 },
+  { text: 'SOMETHING ELSE IS ALREADY COUNTING.', hold: 3.8 },
+];
 /** Where a segment sits on a square frame, in the frame's own unturned space. */
 function slotAt(half, per, side, i) {
   // Along one edge, inset half a step at each end so corners are not doubled.
@@ -475,7 +491,7 @@ export class Ordinal {
     background.setFocus(this.x, this.y);
     if (!this.moodSet && k >= b1 * 0.5) { this.moodSet = true; background.setMood('boss'); }
 
-    // one shove of light per beat
+    // one shove of light per beat of the *staging*...
     const beat = k < b1 ? 0 : k < b2 ? 1 : k < b3 ? 2 : 3;
     if (beat !== this.beatAt) {
       this.beatAt = beat;
@@ -485,8 +501,9 @@ export class Ordinal {
         shake(6 + beat * 5);
         audio.boom();
       }
-      world.bossLine = ARRIVAL[beat] || null;
     }
+    // ...and the captions on their own, at reading speed. See ARRIVAL.
+    this.say(world, ARRIVAL, raw);
     if (this.arriving <= 0) {
       this.entry = 1;
       world.bossLine = null;
@@ -496,6 +513,24 @@ export class Ordinal {
       audio.boom();
       background.surge(2);
     }
+  }
+
+  /**
+   * Step a caption script. One line at a time, each held for as long as it
+   * takes to read, and the whole thing gets out of the way when it is done.
+   */
+  say(world, script, raw) {
+    if (this.line === undefined) { this.line = 0; this.lineT = 0; }
+    if (this.line >= script.length) return true;
+    this.lineT += raw;
+    const cur = script[this.line];
+    world.bossLine = cur.text;
+    if (this.lineT >= cur.hold) {
+      this.lineT = 0;
+      this.line++;
+      if (this.line >= script.length) world.bossLine = null;
+    }
+    return this.line >= script.length;
   }
 
   update(world, dt) {
@@ -537,6 +572,11 @@ export class Ordinal {
     }
 
     if (this.dying > 0) {
+      // ...and what it has to say about it, once it has stopped exploding.
+      if (this.blew) {
+        if (this.outroAt === undefined) { this.outroAt = 0; this.line = 0; this.lineT = 0; }
+        this.say(world, OUTRO, world.dtRaw || dt);
+      }
       /*
        * On the raw clock. `dt` here is already scaled by world.timeScale and
        * the death slams that to a tenth, so a sequence counted in scaled time
@@ -571,6 +611,9 @@ export class Ordinal {
      * frame collapses onto the core, is thrown back out, and reassembles.
      * Everything else is held while that runs.
      */
+    // IV is the last quarter, and it is where ORDINAL stops waiting.
+    if (this.stage === 3 && frac <= C.stageDescend) this.enterStage(world, 4);
+    if (this.stage === 4) this.descend(world, world.dtRaw || dt);
     if (want >= 3 && this.stage < 3 && !this.converged) {
       if (this.conv === undefined) {
         this.conv = 0;
@@ -728,6 +771,58 @@ export class Ordinal {
     return back;
   }
 
+  /**
+   * DESCENT. It comes down.
+   *
+   * Everything else in this fight is a property of a structure sitting at the
+   * top of the field: turn rate, repair, garrison, all of it waited out from
+   * where you are standing. This is the one stage that changes the geometry —
+   * ORDINAL leaves its station and closes on the turret, frames spun to a
+   * blur, and turns four beams out of its core.
+   *
+   * A beam across the turret is corruption. It cannot kill you — nothing in
+   * this game can — but for as long as it is on you it costs the intake,
+   * which is the only thing this fight has ever been able to take.
+   */
+  descend(world, raw) {
+    const C = O();
+    const s = world.shooter;
+    this.fall = Math.min(1, (this.fall || 0) + raw / C.descendFor);
+    const e = this.fall * this.fall * (3 - 2 * this.fall);
+    this.y = this.y0 + (s.y - C.close - this.y0) * e;
+    background.setFocus(this.x, this.y);
+
+    // the eye tracks you
+    this.gaze = Math.atan2(s.y - this.y, s.x - this.x);
+
+    // ...and the beams turn, in sweeps rather than continuously
+    this.lashA = (this.lashA || 0) + C.lashSpin * raw;
+    this.lashT = (this.lashT || 0) - raw;
+    if (this.lashT <= 0) {
+      this.lashT = C.lashEvery + C.lashFor;
+      this.lashing = C.lashFor;
+      audio.glitchOn();
+      shake(9);
+    }
+    if (this.lashing > 0) {
+      this.lashing -= raw;
+      // Anything the sweep is across takes it. The turret is what matters.
+      const to = Math.atan2(s.y - this.y, s.x - this.x);
+      let on = false;
+      for (let i = 0; i < C.lash; i++) {
+        const a = this.lashA + (i / C.lash) * TAU;
+        let d = to - a;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        if (Math.abs(d) < C.lashWidth) on = true;
+      }
+      if (on) {
+        world.shock = Math.max(world.shock, C.lashShock);
+        if (Math.random() < 0.3) spark(s.x + rand(-20, 20), s.y + rand(-20, 20),
+          rand(-60, 60), rand(-60, 60), TYPE_BY_ID.ordinal.glow, 0.3, 2);
+      }
+    }
+  }
+
   enterStage(world, n) {
     const C = O();
     this.stage = n;
@@ -738,10 +833,22 @@ export class Ordinal {
     // Both frames reverse, so whatever alignment was learned is now wrong.
     for (const ring of this.rings) ring.spin *= -1;
     // The whole sky escalates with it, not just the boss.
-    background.setMood(n >= 3 ? 'boss3' : 'boss2');
-    world.bossLine = n >= 3 ? 'THE COUNT IS SHORT. IT HAS NOTICED.' : 'IT IS MENDING ITSELF.';
-    this.lineFor = 3.4;
-    this.garrison(C.garrison[n - 1], true);
+    background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
+    world.bossLine = n >= 4 ? 'IT IS COMING DOWN TO LOOK AT YOU.'
+      : n >= 3 ? 'THE COUNT IS SHORT. IT HAS NOTICED.'
+        : 'IT IS MENDING ITSELF.';
+    this.lineFor = n >= 4 ? 4.4 : 3.4;
+    if (n >= 4) {
+      // Where it falls from, and it never goes back up.
+      this.y0 = this.y;
+      this.fall = 0;
+      this.lashT = 1.2;
+      flash(0.6, '#ffffff');
+      for (const ring of this.rings) ring.spin *= 2.1;
+      ripple(this.x, this.y, 3.4, 1300);
+      shake(34);
+    }
+    this.garrison(C.garrison[Math.min(n, C.garrison.length) - 1], true);
     ring(this.x, this.y, 20, 520, 0.7, TYPE_BY_ID.ordinal.glow, 6);
     ring(this.x, this.y, 10, 300, 0.4, '#ffffff', 3);
     ripple(this.x, this.y, 2.2, 620);
@@ -771,7 +878,7 @@ export class Ordinal {
     this.beat = 0; // how far through the sequence, in real seconds
     this.snapped = 0; // segments taken so far during ARREST
     world.timeScale = C.endSlow;
-    world.bossSlow = C.endFor;
+    world.bossSlow = C.slowFor;
     // Everything the frames were holding is let go at once.
     for (const d of this.parked) d.dead = true;
     this.parked.length = 0;
@@ -981,6 +1088,42 @@ export class Ordinal {
       }
       ctx.stroke();
     }
+    /*
+     * DESCENT's beams. Four of them, turning out of the core, and they only
+     * exist while a sweep is running — a beam that is always on is a hazard
+     * you route around once and then ignore, and one that arrives on a clock
+     * is a thing you have to keep answering.
+     */
+    if (this.stage >= 4 && this.lashing > 0 && this.dying <= 0) {
+      const k = clamp(this.lashing / C.lashFor, 0, 1);
+      const reach = 1500;
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < C.lash; i++) {
+        const a = this.lashA + (i / C.lash) * TAU;
+        const w = C.lashWidth;
+        const g2 = ctx.createLinearGradient(this.x, this.y,
+          this.x + Math.cos(a) * reach, this.y + Math.sin(a) * reach);
+        g2.addColorStop(0, rgba('#ffffff', 0.55 * k));
+        g2.addColorStop(0.25, rgba(T.color, 0.4 * k));
+        g2.addColorStop(1, rgba(T.glow, 0));
+        ctx.fillStyle = g2;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.arc(this.x, this.y, reach, a - w, a + w);
+        ctx.closePath();
+        ctx.fill();
+        // a hard line down the middle of it
+        ctx.strokeStyle = rgba('#ffffff', 0.8 * k);
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + Math.cos(a) * reach, this.y + Math.sin(a) * reach);
+        ctx.stroke();
+      }
+      drawGlow(ctx, '#ffffff', this.x, this.y, C.coreR * 3, 0.5 * k);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
     ctx.globalCompositeOperation = 'source-over';
     ctx.restore();
   }

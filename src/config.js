@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '116';
+export const BUILD = '117';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '116';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '3ac1eb8';
+export const REV = '6d92707';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -807,9 +807,18 @@ export const CFG = {
      * a time. Nothing can be hurt until it is over -- the fight starts when
      * ORDINAL is finished arriving, and not before.
      */
-    arrive: 9,
+    /*
+     * Fourteen and a half seconds, and the length is set by the reading
+     * rather than the other way round. At nine it ran the first caption for
+     * 1.44s — 34 characters a second, of which the first 0.9 was the fade-in,
+     * so the line people were meant to read was fully visible for about half
+     * a second. The holds below are authored at roughly eleven characters a
+     * second, which is a comfortable pace for widely spaced caps, and the
+     * fade was cut to 0.4s so a line is legible almost as soon as it is up.
+     */
+    arrive: 14.4,
     // Beats within the arrival, as fractions of it: sky, hole, through, unfold.
-    beats: [0.16, 0.38, 0.62, 1],
+    beats: [0.14, 0.36, 0.6, 1],
     coreR: 40,
     // Two frames. `half` is half the side, `per` the segments per side, `turn`
     // the resting rotation -- a quarter turn makes the inner one a diamond.
@@ -854,9 +863,32 @@ export const CFG = {
     convergeHold: 0.55, // ...held at the knot
     convergeThrow: 620, // ...and how hard each segment leaves
     convergeBack: 2.2, // seconds before the survivors are reeled back in
-    spin: [1, 1.8, 2.9], // ...how fast the frames turn
-    garrison: [12, 9, 14], // ...how many DIGITs are inside when it starts
-    repair: [0, 7.5, 7], // ...seconds between repair pulses, 0 for never
+
+    /*
+     * ---- IV: DESCENT ----
+     *
+     * The angry one, and the only stage that changes where ORDINAL *is*.
+     *
+     * It has been a fixed installation for the whole fight — a thing at the
+     * top of the field you work at. At the last quarter it stops waiting and
+     * comes down, slowly, to `close`, with both frames spun to a blur and the
+     * core's eye tracking the turret. Four beams turn out of it, and a beam
+     * crossing the turret is corruption in its own right: it cannot kill you,
+     * but it costs you the intake for as long as it is on you, which is the
+     * one currency this fight has ever been able to take.
+     */
+    stageDescend: 0.28, // core fraction it comes down at
+    close: 235, // ...how near it gets
+    descendFor: 13, // ...and how long it takes to get there
+    lash: 4, // beams out of the core
+    lashSpin: 0.42, // rad/s they turn at
+    lashWidth: 0.1, // half-angle of the beam, in radians
+    lashShock: 0.34, // corruption while one is across the turret
+    lashEvery: 2.6, // seconds between sweeps
+    lashFor: 1.5, // ...and how long a sweep lasts
+    spin: [1, 1.8, 2.9, 4.4], // ...how fast the frames turn
+    garrison: [12, 9, 14, 18], // ...how many DIGITs are inside when it starts
+    repair: [0, 7.5, 7, 6], // ...seconds between repair pulses, 0 for never
     repairHp: 0.5, // and how much of a panel comes back
     /*
      * ...and the most of a frame it may ever put back. Uncapped, ORDINAL
@@ -878,7 +910,7 @@ export const CFG = {
      * stage III ran 140 seconds of a 216-second fight with the core creeping
      * down a percent at a time. The garrison is pressure, not a wall.
      */
-    burst: [0, 0, 5.5],
+    burst: [0, 0, 5.5, 3.8],
     burstOf: 2,
     /*
      * The death, as a sequence rather than an explosion. Four beats, timed on
@@ -895,7 +927,15 @@ export const CFG = {
     endSlow: 0.12, // time scale it slams to
     arrest: 0.7, // segments snapping off, staggered
     infall: 1.1, // ...then the core pulling everything in
-    endFor: 4.3, // the whole sequence, real seconds
+    /*
+     * Two clocks, on purpose. `endFor` is how long the sequence lasts, which
+     * is set by how long three outro captions take to read; `slowFor` is how
+     * long time itself is slowed, which is set by how long slow motion is
+     * interesting. Tying them together left the field at half speed for six
+     * seconds of reading.
+     */
+    endFor: 13.4,
+    slowFor: 3.6,
     pull: 900, // how hard the infall drags loose bodies
     pay: 900, // energy on the floor when it lets go
     // What it leaves behind. One per ORDINAL, and the only source there is.
@@ -1350,7 +1390,7 @@ export const ENEMY_TYPES = [
     name: 'TALLY',
     shape: 'tally',
     r: 15,
-    hp: 105,
+    hp: 135,
     fixed: true, // the boss places it; physics never moves it
     density: 6,
     speed: 0,
@@ -1372,7 +1412,7 @@ export const ENEMY_TYPES = [
     name: 'ORDINAL',
     shape: 'ordinal',
     r: 40,
-    hp: 1100,
+    hp: 1900,
     large: true,
     fixed: true,
     density: 9,

@@ -773,7 +773,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const seen = new Set();
     let released = 0;
     const parked0 = bo.parked.length;
-    for (let s = 0; s < 70; s++) {
+    for (let s = 0; s < 85; s++) {
       for (let k = 0; k < 30; k++) g.update(1 / 30);
       seen.add(bo.stage);
       released = Math.max(released, parked0 - bo.parked.length);
@@ -788,9 +788,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.timeScale = 1;
     return out;
   });
+  /*
+   * What this is about is that the assists make progress with nobody aiming,
+   * and the evidence for that is the frame coming apart -- not the core.
+   *
+   * It used to assert the core was under 95% by then, which held while the
+   * whole fight was 100 seconds. It is 200 now, with a 14-second arrival in
+   * front of it and a fourth stage behind it, so at this point the core is
+   * still sealed *and should be*: it cannot be touched until the frames are
+   * open, and opening them is the first two stages. Asserting on the core
+   * here was asserting on the length of the fight by accident.
+   */
   check('ORDINAL can be fought on the assists alone, and its garrison gets out',
-    r.stages.includes(2) && r.core < 0.95 && r.inner < 1 && r.released > 0,
-    `70s on auto: stages ${r.stages.join('+')}, outer ${r.outer}, inner ${r.inner}, `
+    r.stages.includes(2) && r.outer < 0.4 && r.inner < 1 && r.released > 0,
+    `85s on auto: stages ${r.stages.join('+')}, outer ${r.outer}, inner ${r.inner}, `
     + `core ${r.core}, ${r.released}/${r.parked0} DIGITs released`);
 }
 
@@ -989,6 +1000,73 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `closed in 1.5s: ${Object.entries(r.moved).map(([k, v]) => `${k} ${v}`).join(', ')} units; `
     + `wreck ${r.justAfter} pieces, still ${r.later} after ${r.wait}s `
     + `(a chunk lives ${r.chunkLife}s)`);
+}
+
+// --- DESCENT, and the captions that read at reading speed --------------------
+/*
+ * The fourth stage is the only one that changes where ORDINAL is: it leaves
+ * its station and closes on the turret, and the beams it turns out of its
+ * core are corruption while they are across you.
+ *
+ * The captions are here too because they were measurably wrong: the first
+ * arrival line held for 1.44 seconds at 34 characters a second, of which the
+ * first 0.9 was the fade-in. Anything over about fifteen a second is not a
+ * line anyone read, it is a line that was on screen.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.aperture = 1;
+    g.openBoss();
+    const bo = w.boss;
+    const station = bo.y;
+    bo.arriving = 0;
+    g.update(1 / 60);
+    bo.core.hp = bo.core.maxHp * 0.2; // straight into IV
+    let peak = 0;
+    let sweeps = 0;
+    let was = 0;
+    for (let k = 0; k < 60 * 40; k++) {
+      g.update(1 / 60);
+      peak = Math.max(peak, w.shock);
+      if ((bo.lashing || 0) > 0 && was <= 0) sweeps++;
+      was = bo.lashing || 0;
+    }
+    const out = { stage: bo.stage, station: Math.round(station), now: Math.round(bo.y),
+      want: Math.round(w.shooter.y - CFG.ordinal.close), fall: +(bo.fall || 0).toFixed(2),
+      peak: +peak.toFixed(2), lashShock: CFG.ordinal.lashShock, sweeps };
+    if (w.boss) { w.boss.clear(w); w.boss = null; }
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.timeScale = 1; w.shock = 0;
+    return out;
+  });
+  check('ORDINAL comes down in its fourth stage, and its beams cost you',
+    r.stage === 4 && r.fall === 1 && Math.abs(r.now - r.want) < 4 && r.now > r.station
+    && r.sweeps > 4 && r.peak >= r.lashShock * 0.9,
+    `stage ${r.stage}, fell ${r.station} -> ${r.now} (wanted ${r.want}), `
+    + `${r.sweeps} sweeps in 40s, corruption peaked at ${r.peak} of ${r.lashShock}`);
+
+  // ...and no caption anywhere is faster than a person can read it.
+  const cap = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const src = await (await fetch('../src/boss.js')).text();
+    const out = [];
+    for (const m of src.matchAll(/\{ text: '([^']+)', hold: ([\d.]+) \}/g)) {
+      out.push({ text: m[1], hold: +m[2], rate: +(m[1].length / +m[2]).toFixed(1) });
+    }
+    return { lines: out, arrive: CFG.ordinal.arrive };
+  });
+  const fast = cap.lines.filter((l) => l.rate > 15);
+  check('no ORDINAL caption goes by faster than it can be read',
+    cap.lines.length >= 6 && fast.length === 0,
+    `${cap.lines.length} lines, fastest ${Math.max(...cap.lines.map((l) => l.rate))} chars/sec`
+    + `${fast.length ? ` — too fast: ${fast.map((l) => `"${l.text}" ${l.rate}`).join(', ')}` : ''}`);
 }
 
 // --- the broadphase ---------------------------------------------------------

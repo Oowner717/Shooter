@@ -420,7 +420,9 @@ html, body {
   text-shadow: 0 0 22px rgba(0, 0, 0, 0.95), 0 0 40px rgba(230, 179, 255, 0.5);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.9s ease;
+  /* Fast enough that a short line is readable almost as soon as it is up: at
+     0.9s a 3.4-second caption spent a quarter of its life arriving. */
+  transition: opacity 0.4s ease;
 }
 #bossCaption.show {
   opacity: 1;

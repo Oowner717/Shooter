@@ -25,6 +25,9 @@ const MOODS = {
   boss: { top: '#0a0410', mid: '#2a0a33', low: '#050109', line: '#a03fb0', neb: ['#4d0a5c', '#2e0a4a', '#3d0630'], accent: '#ff8ae0' },
   boss2: { top: '#12031a', mid: '#48083f', low: '#08010c', line: '#d64ab0', neb: ['#7a0a5c', '#4d0a5c', '#5c0630'], accent: '#ff6ad5' },
   boss3: { top: '#1c0320', mid: '#6b0a4a', low: '#0d0110', line: '#ff5ec8', neb: ['#a80c66', '#7a0a5c', '#8c0640'], accent: '#ffc2f0' },
+  // IV. It has come down off the top of the field and the sky has come with
+  // it: no ground left, the horizon lit from underneath, nearly white.
+  boss4: { top: '#2e0526', mid: '#9c0f55', low: '#1a0214', line: '#ff9ee0', neb: ['#d41a72', '#a80c66', '#c0106a'], accent: '#ffffff' },
   ending: { top: '#000000', mid: '#0a0a0a', low: '#000000', line: '#555555', neb: ['#222222', '#111111', '#191919'], accent: '#cccccc' },
 };
 
