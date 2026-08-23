@@ -876,6 +876,10 @@ export class Ordinal {
     const C = O();
     this.dying = C.endFor;
     this.beat = 0; // how far through the sequence, in real seconds
+    // A stage caption still counting down would clobber the outro's first
+    // line the moment it expired.
+    this.lineFor = 0;
+    world.bossLine = null;
     this.snapped = 0; // segments taken so far during ARREST
     world.timeScale = C.endSlow;
     world.bossSlow = C.slowFor;
@@ -962,14 +966,21 @@ export class Ordinal {
      * time out — so what is lying on the floor afterwards is the shape of the
      * thing that was there, and it is still there when the next wave arrives.
      */
+    /*
+     * One piece per segment and a dozen off the core, at nearly twice the
+     * size. Three each came to a hundred and thirty-odd chunks and the field
+     * afterwards read as gravel rather than as the wreck of a structure —
+     * and the next wave then arrived into it. Fewer and larger is the same
+     * idea and a legible one.
+     */
     for (const ring2 of this.rings) {
       for (const p of ring2.panels) {
-        shed(world, { x: p.x, y: p.y, r: p.r, vx: 0, vy: 0, type: p.type }, 3,
-          { keep: true, size: 1.35 });
+        shed(world, { x: p.x, y: p.y, r: p.r, vx: 0, vy: 0, type: p.type }, 2,
+          { keep: true, size: 2 });
       }
     }
-    shed(world, { x: this.x, y: this.y, r: C.coreR, vx: 0, vy: 0, type: T }, 16,
-      { keep: true, size: 1.5 });
+    shed(world, { x: this.x, y: this.y, r: C.coreR, vx: 0, vy: 0, type: T }, 14,
+      { keep: true, size: 1.9 });
     ripple(this.x, this.y, 4, 1500);
     shake(40);
     audio.boom();

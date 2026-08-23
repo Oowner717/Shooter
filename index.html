@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '117';
+  var BUILD = '118';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -112,12 +112,19 @@
       <div class="bossShell"><i id="bossShellA"></i><i id="bossShellB"></i></div>
     </div>
 
-    <!-- ORDINAL's captions. Centred over the field, one line at a time, away
-         from the pill stack: the entrance is the one moment the interface is
-         allowed to talk over the game. -->
-    <div id="bossCaption"></div>
+    <!--
+      ORDINAL's captions, and the transient pills, in one column.
 
-    <div id="alerts"></div>
+      They were two absolutely positioned blocks at two fixed offsets, which
+      is a promise that they will collide the moment three pills are up and a
+      caption is reading — and they did, on a real phone, mid-outro. Sharing a
+      flex column makes not overlapping a property of the layout rather than
+      of two numbers agreeing. The caption is the first child, so pills stack
+      underneath it and the big line keeps the top of the band.
+    -->
+    <div id="alerts">
+      <div id="bossCaption"></div>
+    </div>
 
     <!-- ============ OFFERS ============ -->
     <!-- Nothing here ever interrupts. The button appears when something is

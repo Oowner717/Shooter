@@ -916,17 +916,29 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // Run the death and the collection out, on the real clock.
     for (let k = 0; k < 60 * 12 && w.remainder === before; k++) g.update(1 / 60);
     const held = w.remainder;
-    // The announcement, off the screen rather than off the queue: syncHud
-    // drains `remainderGained` on the frame it says it, so reading the queue
-    // afterwards always finds it empty.
-    const said = [...document.querySelectorAll('#alerts .alert')]
+    /*
+     * The announcement, off the screen rather than off the queue: syncHud
+     * drains `remainderGained` on the frame it says it, so reading the queue
+     * afterwards always finds it empty.
+     *
+     * And it waits for ORDINAL to stop talking — the REMAINDER lands about
+     * four seconds into a death whose outro reads for eleven — so this runs
+     * on until the pill is actually up rather than sampling once and hoping.
+     */
+    const pills = () => [...document.querySelectorAll('#alerts .alert')]
       .map((a) => a.textContent).join(' | ');
+    let said = pills();
+    for (let k = 0; k < 60 * 20 && !/REMAINDER/.test(said); k++) {
+      g.update(1 / 60);
+      said = pills();
+    }
+    const waited = !!w.bossLine;
     const bought = g.buy('recast');
     const spent = w.remainder;
     const again = g.buy('recast');
     // ...and the price is a REMAINDER, not energy.
     const energyAfter = Math.round(w.energy);
-    const out = { before, cantYet, held, said, bought, spent, again,
+    const out = { before, cantYet, held, said, waited, bought, spent, again,
       energyKept: energyAfter >= 9000, boss: !!w.boss };
     g.restart();
     return out;
@@ -1067,6 +1079,50 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     cap.lines.length >= 6 && fast.length === 0,
     `${cap.lines.length} lines, fastest ${Math.max(...cap.lines.map((l) => l.rate))} chars/sec`
     + `${fast.length ? ` — too fast: ${fast.map((l) => `"${l.text}" ${l.rate}`).join(', ')}` : ''}`);
+}
+
+// --- the caption and the pills never overlap ---------------------------------
+/*
+ * They were two absolutely positioned blocks at two fixed offsets — a caption
+ * at 24% of the field and a pill stack at hud-t + 104 — which is a promise
+ * that they will collide as soon as three pills are up and a caption is
+ * reading. They did, on a phone, mid-outro: ORDINAL's last line printed
+ * straight through REMAINDER RECOVERED.
+ *
+ * They share a flex column now, so not overlapping is a property of the
+ * layout. This is the arithmetic that says so, against the worst case the
+ * outro can actually produce.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    g.hud.say('WHAT IS LEFT OF IT IS ON THE FLOOR IN FRONT OF YOU.');
+    const realSay = g.hud.say.bind(g.hud);
+    g.hud.say = () => {}; // the frame loop clears it while no boss is up
+    g.hud.alert('ORDINAL LEFT A REMAINDER', 'remainder', 9);
+    g.hud.alert('2 HELD · RECAST, IN THE TREE', 'found', 9, '#ffb8ee');
+    g.hud.alert('ORDINAL RECORDED 3/19', 'found', 9, '#ff5ec8');
+    await new Promise((res) => setTimeout(res, 1400)); // let captionIn finish
+    const box = (el) => {
+      const q = el.getBoundingClientRect();
+      return { t: Math.round(q.top), b: Math.round(q.bottom), l: Math.round(q.left), r: Math.round(q.right) };
+    };
+    const cap = box(document.getElementById('bossCaption'));
+    const pills = [...document.querySelectorAll('#alerts .alert')].map(box);
+    g.hud.say = realSay;
+    g.hud.say(null);
+    for (const a of [...g.hud.alerts]) a.t = 0;
+    return { cap, pills, w: window.innerWidth, h: window.innerHeight };
+  });
+  const hits = (a, c) => !(a.b <= c.t || c.b <= a.t);
+  const over = r.pills.filter((p) => hits(r.cap, p)).length;
+  const boxes = [r.cap, ...r.pills];
+  const off = boxes.filter((x) => x.l < 0 || x.r > r.w || x.t < 0 || x.b > r.h).length;
+  const tall = r.cap.b > r.cap.t; // it has to actually be up, or this proves nothing
+  check('ORDINAL\'s caption and the alert pills never overlap',
+    tall && r.pills.length >= 3 && over === 0 && off === 0,
+    `caption ${r.cap.t}-${r.cap.b}, ${r.pills.length} pills `
+    + `${r.pills.map((p) => `${p.t}-${p.b}`).join(' ')}; ${over} overlapping, ${off} off-screen`);
 }
 
 // --- the broadphase ---------------------------------------------------------

@@ -1433,7 +1433,14 @@ export class Game {
      * and the only currency there is a second of. It gets said plainly, held
      * on screen for six seconds, and the tree grows a purse for it.
      */
-    while (w.remainderGained > 0) {
+    /*
+     * ...and it waits for ORDINAL to stop talking. The REMAINDER lands about
+     * four seconds into a death whose outro reads for eleven, so the two
+     * announcements were always going to arrive together. They cannot
+     * overlap on screen any more — they share a column — but one at a time
+     * is still the better beat, and this is the whole of what that costs.
+     */
+    while (w.remainderGained > 0 && !w.bossLine) {
       w.remainderGained--;
       // Two lines rather than one long one: what happened, then what to do
       // about it. One line ran off both edges of a 390-wide screen.

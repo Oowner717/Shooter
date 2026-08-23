@@ -402,16 +402,13 @@ html, body {
  * supposed to go quiet.
  */
 #bossCaption {
-  position: absolute;
-  left: calc(var(--safe-l) + 22px);
-  right: calc(var(--safe-r) + 22px);
   /*
-   * Above the boss, not on it. ORDINAL sits at about 45% of the field and at
-   * 42% the caption was printed straight through its glow — legible in a
-   * mockup and not on a phone. This clears the frame and still sits well
-   * below the bar.
+   * In the alert column, not floating over it — see the note in index.html.
+   * Nothing here positions it; the column does that, and the column cannot
+   * overlap itself.
    */
-  top: 24%;
+  align-self: stretch;
+  padding: 0 22px;
   text-align: center;
   font-size: 13px;
   line-height: 1.7;
@@ -424,8 +421,18 @@ html, body {
      0.9s a 3.4-second caption spent a quarter of its life arriving. */
   transition: opacity 0.4s ease;
 }
+/* Out of the flow entirely when it is not talking, or an empty caption holds
+   a gap in the column and the pills sit lower than they should. */
+#bossCaption:not(.show) {
+  height: 0;
+  overflow: hidden;
+  margin: 0;
+}
 #bossCaption.show {
   opacity: 1;
+  /* Clear of the pill under it even while captionIn is still running: at
+     6px the two boxes touched by a pixel mid-animation. */
+  margin-bottom: 12px;
   animation: captionIn 1s ease-out;
 }
 @keyframes captionIn {

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '117';
+export const BUILD = '118';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '117';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '6d92707';
+export const REV = 'beccd67';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -886,7 +886,11 @@ export const CFG = {
     lashShock: 0.34, // corruption while one is across the turret
     lashEvery: 2.6, // seconds between sweeps
     lashFor: 1.5, // ...and how long a sweep lasts
-    spin: [1, 1.8, 2.9, 4.4], // ...how fast the frames turn
+    // ...how fast the frames turn. IV also multiplies the stored spin by 2.1
+    // once, on entry, so the last figure here is not the whole of it: 2.6 x
+    // 2.1 is about five and a half times the first stage, which is a blur
+    // without being a strobe.
+    spin: [1, 1.8, 2.9, 2.6],
     garrison: [12, 9, 14, 18], // ...how many DIGITs are inside when it starts
     repair: [0, 7.5, 7, 6], // ...seconds between repair pulses, 0 for never
     repairHp: 0.5, // and how much of a panel comes back
