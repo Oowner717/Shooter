@@ -1427,6 +1427,26 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     && !(r.resume.r <= r.start.l || r.start.r <= r.resume.l);
   const off = [r.start, r.resume, r.record]
     .filter((x) => x && x.shown && (x.l < 0 || x.r > r.vw)).length;
+  /*
+   * ...and CONTINUE says CONTINUE. It read "CONTINUE · 137 / 500" and that
+   * goal had been meaningless since build 81 — every run is endless — but it
+   * survived on an accident: `endless` stopped being written to the save in
+   * build 100 because nothing read it back, and this was the one thing still
+   * reading it. Absent field, falsy, goal printed.
+   */
+  const label = await page.evaluate(() => {
+    const g = window.__sim;
+    g.debugGiveEnergy(50);
+    g.world.kills = 137;
+    g.checkpoint();
+    g.hud.offerResume();
+    return { btn: document.getElementById('resumeBtn').textContent,
+      note: document.getElementById('resumeNote').textContent };
+  });
+  check('CONTINUE says CONTINUE, and the goal is nowhere on it',
+    label.btn.trim() === 'CONTINUE' && !/\/\s*\d/.test(label.btn) && /137/.test(label.note),
+    `button "${label.btn}", note "${label.note}"`);
+
   check('the title screen keeps its buttons on screen and side by side',
     !!r.start && !overlap && off === 0 && r.start.b <= r.vh,
     `${r.vw}x${r.vh}: NEW RUN ends at ${r.start && r.start.b}, overlap ${overlap}, `

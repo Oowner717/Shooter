@@ -1085,8 +1085,22 @@ export class Hud {
      * that says only a number is asking you to remember what that run was;
      * the count, the bank and how long ago it was answers it.
      */
-    b.textContent = `CONTINUE · ${d.kills}${d.endless ? '' : ` / ${CFG.killGoal}`}`;
+    /*
+     * Just CONTINUE.
+     *
+     * It used to read "CONTINUE · 137 / 500", and the goal in that had been
+     * meaningless since build 81 -- every run is endless, there is no five
+     * hundred to reach, and the in-game counter has shown no goal for forty
+     * builds. It survived here on an accident: `endless` stopped being written
+     * to the save in build 100 because nothing read it back, and this was the
+     * one thing still reading it. Absent field, falsy, goal printed.
+     *
+     * The count itself is not meaningless and moves to the line below, where
+     * the rest of what is in the file already lives.
+     */
+    b.textContent = 'CONTINUE';
     const bits = [];
+    if (Number.isFinite(d.kills)) bits.push(`${d.kills} OBJECTS`);
     if (Number.isFinite(d.energy) && d.energy >= 1) bits.push(`${Math.floor(d.energy)} ENERGY`);
     if (d.remainder > 0) bits.push(`${d.remainder}◆ REMAINDER`);
     const ago = ageOf(d.at);
