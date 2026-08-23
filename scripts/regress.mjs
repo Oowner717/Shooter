@@ -1125,6 +1125,67 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.pills.map((p) => `${p.t}-${p.b}`).join(' ')}; ${over} overlapping, ${off} off-screen`);
 }
 
+// --- the way opening takes the whole field ----------------------------------
+/*
+ * "All waves stop, no more enemies except boss and his minions" has to be
+ * true on the frame the way opens, not just afterwards — so everything on the
+ * field is hauled into the hole and broken, paying out exactly as shooting it
+ * would have.
+ *
+ * Including DRIFT, which was exempt on the grounds that it is grey and it is
+ * scenery. True, and not the point: a dozen grey shapes still wandering
+ * through the arrival say the field is not ORDINAL's when it is.
+ *
+ * Energy already on the floor is untouched. That is yours, not the field's,
+ * and taking it would make opening the way a punishment for having just
+ * cleared a wave.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const en = await import('../src/enemies.js');
+    const { TYPE_BY_ID } = await import('../src/config.js');
+    const { Enemy } = await import('../src/enemies.js');
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    for (const d of [...w.drops]) d.dead = true; w.drops.length = 0;
+    g.debugGiveEnergy(9000);
+    g.debugFillField();
+    for (let i = 0; i < 12; i++) en.spawnDrift(w, { x: 60 + i * 40, y: 320 + (i % 4) * 130 });
+    for (const e of w.enemies) { e.staged = false; e.spawnIn = 0; }
+    // salvage already on the floor, which has to survive the arrival
+    const mine = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Enemy(TYPE_BY_ID.mote, w.shooter.x + 40 + i * 12, w.shooter.y - 120,
+        { drop: true, r: 4, energy: 3 });
+      w.drops.push(d);
+      mine.push(d);
+    }
+    const before = {
+      hostile: w.enemies.filter((e) => !e.dead && !e.harmless).length,
+      drift: w.enemies.filter((e) => !e.dead && e.harmless).length,
+    };
+    w.aperture = 1;
+    g.openBoss();
+    const after = {
+      hostile: w.enemies.filter((e) => !e.dead && !e.harmless && !e.type.fixed).length,
+      drift: w.enemies.filter((e) => !e.dead && e.harmless).length,
+      keptMine: mine.filter((d) => !d.dead).length,
+    };
+    if (w.boss) { w.boss.clear(w); w.boss = null; }
+    g.restart();
+    return { before, after };
+  });
+  check('opening the way takes the whole field, DRIFT included, and leaves your salvage',
+    r.before.hostile > 10 && r.before.drift >= 10
+    && r.after.hostile === 0 && r.after.drift === 0 && r.after.keptMine === 6,
+    `${r.before.hostile} hostile + ${r.before.drift} drift -> `
+    + `${r.after.hostile} + ${r.after.drift}; ${r.after.keptMine}/6 of your own salvage left alone`);
+}
+
 // --- the broadphase ---------------------------------------------------------
 {
   const r = await page.evaluate(async () => {

@@ -1152,10 +1152,17 @@ export function openAperture(world) {
    * The field is ORDINAL's now, and that has to be true the moment the way
    * opens rather than only for what comes next.
    *
-   * Everything hostile already on it is taken by the hole: hauled in and
-   * broken, which pays out its salvage exactly as shooting it would have. So
-   * it is not a robbery -- opening the way mid-wave banks the wave. Drift
-   * stays. It is harmless, it is grey, and it is scenery.
+   * Everything already on it is taken by the hole: hauled in and broken,
+   * which pays out its salvage exactly as shooting it would have. So it is
+   * not a robbery -- opening the way mid-wave banks the wave.
+   *
+   * Including the harmless ones. DRIFT used to be left where it was on the
+   * grounds that it is grey and it is scenery, which is true and is not the
+   * point: the field belongs to ORDINAL from the frame the way opens, and a
+   * dozen grey shapes still wandering through the arrival say that it does
+   * not. Drift pays too -- it always has, at CFG.energy.drift -- so taking it
+   * costs nobody anything. Energy already on the floor is untouched: that is
+   * yours, not the field's.
    */
   const cx = world.shooter.x;
   const cy = world.shooter.y - CFG.ordinal.standoff;
@@ -1165,7 +1172,7 @@ export function openAperture(world) {
   for (let pass = 0; pass < 4; pass++) {
     let took = 0;
     for (const e of [...world.enemies]) {
-      if (e.dead || e.harmless || e.type.fixed) continue;
+      if (e.dead || e.type.fixed) continue;
       haul(e.x, e.y, cx, cy, e.type.glow, 0.5, 3);
       // It pays out, but it is not a kill: you did not destroy it, the hole
       // did. Otherwise opening the way onto a full field walks the tally
