@@ -29,12 +29,6 @@ const SPEC = {
    * the governor can still go lower.
    */
   effects: { def: 1, of: [0.55, 0.8, 1], label: 'EFFECTS', words: ['LOW', 'MEDIUM', 'FULL'] },
-  /*
-   * Whether the interface says things unprompted — the story lines, the
-   * first-use captions, the codex announcements. The boss keeps its captions
-   * either way: those are the event, not commentary on it.
-   */
-  chatter: { def: 1, of: [0, 1], label: 'CAPTIONS', words: ['OFF', 'ON'] },
 };
 
 const state = { ...Object.fromEntries(Object.entries(SPEC).map(([k, s]) => [k, s.def])) };

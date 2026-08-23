@@ -6,7 +6,7 @@ import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
 import { BUILD, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
-import { pref, cyclePref, prefWord, PREFS } from './settings.js';
+
 import { CODEX, codex } from './codex.js';
 import {  } from './util.js';
 import { Menu } from './menu.js';
@@ -51,6 +51,19 @@ function ageOf(at) {
   return 'a while ago';
 }
 
+/*
+ * The gauge's colour per stage: arriving, then I to IV. It follows the sky —
+ * see the boss moods in background.js — so the bar is hotter by the end
+ * rather than one pink for two hundred seconds.
+ */
+const BOSS_BAR = [
+  ['#a03fb0', '#e6a8ff'], // arriving
+  ['#ff5ec8', '#ffb8ee'], // I
+  ['#ff3fb0', '#ffc2f0'], // II
+  ['#ff2f8f', '#ffd0e6'], // III
+  ['#ff5470', '#ffe0e6'], // IV — it is coming down
+];
+
 export class Hud {
   constructor(game) {
     this.game = game;
@@ -91,6 +104,10 @@ export class Hud {
       bossTitle: $('bossTitle'),
       bossPhase: $('bossPhase'),
       bossFill: $('bossFill'),
+      bossGhost: $('bossGhost'),
+      bossCore: document.querySelector('.bossCore'),
+      bossMark3: $('bossMark3'),
+      bossMark4: $('bossMark4'),
       bossShellA: $('bossShellA'),
       bossShellB: $('bossShellB'),
       boot: $('boot'),
@@ -565,13 +582,6 @@ export class Hud {
    *   nine seconds gave a four-word line the same time as a fifteen-word one.
    */
   showHint(text, tutorial = false, hold = holdFor(text)) {
-    /*
-     * CAPTIONS off silences the interface's own voice — the story lines, the
-     * first-use notes, the contact explanation. ORDINAL keeps talking either
-     * way: those captions are the event rather than commentary on it, and a
-     * boss arriving in silence would read as a bug.
-     */
-    if (!pref('chatter')) return;
     // Lines are written with their own break, so they wrap where they read.
     if (!tutorial) {
       this.tutLines.length = 0;
@@ -1205,12 +1215,47 @@ export class Hud {
       }
     }
     if (bar.hidden !== !boss) bar.hidden = !boss;
-    if (!boss) { this._bossSeen = null; return; }
-    const frac = boss.arriving > 0 ? 1 : boss.coreFrac;
-    this.el.bossFill.style.transform = `scaleX(${frac.toFixed(3)})`;
+    if (!boss) { this._bossSeen = null; this._bossGhost = null; return; }
+
+    const arriving = boss.arriving > 0;
+    const core = arriving ? 1 : boss.coreFrac;
+    this.el.bossCore.classList.toggle('arriving', arriving);
+    this.el.bossFill.style.transform = `scaleX(${core.toFixed(3)})`;
+    /*
+     * The ghost only ever falls, and it falls late. It holds where the health
+     * was until the transition catches it up, so a big hit reads as a hit
+     * rather than as a bar that is slightly shorter than it was.
+     */
+    if (this._bossGhost == null || core > this._bossGhost) this._bossGhost = core;
+    if (core < this._bossGhost) {
+      this._bossGhost = core;
+      this.el.bossGhost.style.transform = `scaleX(${core.toFixed(3)})`;
+    }
+
     this.el.bossShellA.style.transform = `scaleX(${boss.shellFrac(0).toFixed(3)})`;
     this.el.bossShellB.style.transform = `scaleX(${boss.shellFrac(1).toFixed(3)})`;
-    const phase = boss.arriving > 0 ? 'ARRIVING' : ['I', 'II', 'III'][boss.stage - 1];
+
+    // Where the next two stages begin, on the track they begin at. Set once.
+    if (!this._bossMarks) {
+      this._bossMarks = true;
+      const C = CFG.ordinal;
+      this.el.bossMark3.style.left = `${(C.stageCore * 100).toFixed(1)}%`;
+      this.el.bossMark4.style.left = `${(C.stageDescend * 100).toFixed(1)}%`;
+    }
+    this.el.bossMark3.classList.toggle('past', core <= CFG.ordinal.stageCore);
+    this.el.bossMark4.classList.toggle('past', core <= CFG.ordinal.stageDescend);
+
+    // The gauge wears the stage's own colour, so the bar escalates with the
+    // sky rather than staying one pink for the whole fight.
+    const tone = arriving ? 0 : boss.stage;
+    if (tone !== this._bossTone) {
+      this._bossTone = tone;
+      const [c, lit] = BOSS_BAR[Math.min(tone, BOSS_BAR.length - 1)];
+      bar.style.setProperty('--boss', c);
+      bar.style.setProperty('--bossLit', lit);
+    }
+
+    const phase = arriving ? 'ARRIVING' : ['I', 'II', 'III', 'IV'][boss.stage - 1] || 'IV';
     if (this._bossSeen !== phase) {
       this._bossSeen = phase;
       this.el.bossPhase.textContent = phase;

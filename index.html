@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '122';
+  var BUILD = '123';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -114,10 +114,41 @@
       <span class="apGo">OPEN THE WAY</span>
     </button>
 
+    <!--
+      ORDINAL's gauge. Three readings, not one:
+
+        the core     the thing you are actually killing, with a ghost layer
+                     that drains behind every hit so a big one is visible as
+                     a hit and not only as a slightly shorter bar
+        the frames   outer and inner, notched at their real segment counts,
+                     because for most of the fight the frames are the work
+        the stage    named, and marked on the core's own track at the health
+                     the next one begins at
+
+      Everything here is driven by Hud.syncBoss().
+    -->
     <div id="bossBar" hidden>
-      <div class="bossName"><span id="bossTitle">ORDINAL</span><span id="bossPhase">I</span></div>
-      <div class="bar"><i id="bossFill"></i></div>
-      <div class="bossShell"><i id="bossShellA"></i><i id="bossShellB"></i></div>
+      <div class="bossName">
+        <span id="bossTitle">ORDINAL</span>
+        <span id="bossPhase">I</span>
+      </div>
+      <div class="bossCore">
+        <i class="bossGhost" id="bossGhost"></i>
+        <i class="bossFill" id="bossFill"></i>
+        <u class="bossNotch"></u>
+        <b class="bossMark" id="bossMark3"></b>
+        <b class="bossMark" id="bossMark4"></b>
+      </div>
+      <div class="bossShell">
+        <span class="bossShellRow">
+          <em>OUTER</em>
+          <span class="bossShellTrack" style="--seg:24"><i id="bossShellA"></i></span>
+        </span>
+        <span class="bossShellRow">
+          <em>INNER</em>
+          <span class="bossShellTrack" style="--seg:16"><i id="bossShellB"></i></span>
+        </span>
+      </div>
     </div>
 
     <!--

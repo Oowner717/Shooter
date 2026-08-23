@@ -1324,7 +1324,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   });
   const stepsDown = Object.entries(r.first).every(([k, i]) => i === r.steps[k] - 2);
   check('a preference steps down, clamps, and is its own store',
-    r.keys.length >= 3 && stepsDown && r.junk === r.def && r.stored,
+    r.keys.length >= 2 && stepsDown && r.junk === r.def && r.stored,
     `${r.keys.length} prefs, first tap lands on ${JSON.stringify(r.first)} `
     + `(one below the top of ${JSON.stringify(r.steps)}), junk clamped to ${r.junk}`);
 
@@ -1431,6 +1431,84 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     !!r.start && !overlap && off === 0 && r.start.b <= r.vh,
     `${r.vw}x${r.vh}: NEW RUN ends at ${r.start && r.start.b}, overlap ${overlap}, `
     + `${off} off the side`);
+}
+
+// --- the boss gauge reads what is actually happening ------------------------
+/*
+ * It was a 6px track with a gradient in it, which says "something has health"
+ * and nothing else. Three things are worth reading off it and none of them
+ * were legible: how hard the last hit landed, how much of each frame is still
+ * standing, and how far it is to the stage that changes the problem.
+ *
+ * The frame meters are notched at the *real* segment counts, so a tick going
+ * out is a panel going out — which is only true while the notch count and the
+ * ring table agree, and that is what this checks.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.aperture = 1;
+    g.openBoss();
+    const bo = w.boss;
+    const read = () => {
+      g.syncHud(0.016);
+      const el = (id) => document.getElementById(id);
+      const num = (t) => Number((String(t).match(/scaleX\(([\d.]+)\)/) || [])[1]);
+      return {
+        phase: el('bossPhase').textContent,
+        arriving: el('bossFill').closest('.bossCore').classList.contains('arriving'),
+        fill: num(el('bossFill').style.transform),
+        ghost: num(el('bossGhost').style.transform),
+        m3: el('bossMark3').classList.contains('past'),
+        m4: el('bossMark4').classList.contains('past'),
+      };
+    };
+    const coming = read();
+    bo.arriving = 0;
+    g.update(1 / 60);
+    const full = read();
+    // a big bite, then a moment: the ghost must not have caught up instantly
+    bo.core.hp = bo.core.maxHp * 0.5;
+    const hit = read();
+    bo.core.hp = bo.core.maxHp * 0.2;
+    const late = read();
+    // ...and the ghost never rises, however the health moves
+    bo.core.hp = bo.core.maxHp * 0.9;
+    const healed = read();
+
+    // the notches are the frame, not a decoration of it
+    const seg = [...document.querySelectorAll('.bossShellTrack')]
+      .map((t) => Number(t.style.getPropertyValue('--seg')));
+    const want = CFG.ordinal.rings.map((x) => x.per * 4);
+
+    const box = document.getElementById('bossBar').getBoundingClientRect();
+    const out = { coming, full, hit, late, healed, seg, want,
+      onScreen: box.left >= 0 && box.right <= window.innerWidth,
+      marks: [CFG.ordinal.stageCore, CFG.ordinal.stageDescend] };
+    if (w.boss) { w.boss.clear(w); w.boss = null; }
+    g.restart();
+    return out;
+  });
+  const ok = r.coming.arriving && r.coming.phase === 'ARRIVING'
+    && !r.full.arriving && r.full.fill === 1
+    && r.hit.fill === 0.5 && r.late.fill === 0.2
+    && r.healed.ghost <= r.late.ghost                 // the ghost only falls
+    && r.full.m3 === false && r.late.m3 === true      // marks flip as they pass
+    && r.full.m4 === false && r.late.m4 === true
+    && JSON.stringify(r.seg) === JSON.stringify(r.want)
+    && r.onScreen;
+  check('the boss gauge reads arrival, damage, the frames and the next stage',
+    ok,
+    `arriving ${r.coming.phase}/${r.coming.arriving}; fill 1 -> ${r.hit.fill} -> ${r.late.fill}; `
+    + `ghost held at ${r.healed.ghost} through a heal; stage marks ${JSON.stringify(r.marks)} `
+    + `past ${r.full.m3}/${r.full.m4} -> ${r.late.m3}/${r.late.m4}; `
+    + `notches ${JSON.stringify(r.seg)} against ${JSON.stringify(r.want)}`);
 }
 
 // --- the broadphase ---------------------------------------------------------
