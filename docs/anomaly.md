@@ -6,7 +6,49 @@ repo so it survives the container; each phase below is one build-sized
 request, and a future session should be able to pick any phase up from this
 file alone.
 
-Status: **Phase 0 shipped in build 127; Phase 1 (GNOMON) in build 128.**
+Status: **Phases 0–2 shipped (builds 127, 128, 129).** Three of seven bosses
+are built: ORDINAL, GNOMON, FRACTAL. Phases 3–7 not started.
+
+### Changed by request (build 129)
+
+**No boss is gated behind another.** The plan had slot N unlock on breaking
+boss N−1; the user asked for every boss fight to be unlocked in the upgrade
+screen. Chaining them was a queue rather than a choice. Slots that are still
+sealed are sealed because nothing is behind them, and say so. The `needs`
+mechanism remains in the tree, unused — TERMINUS may still want it.
+
+### Phase 2 as built (FRACTAL, build 129)
+
+- Nine smalls, not twelve: the plan said both "three smalls orbit each mid"
+  and "the same twelve smalls". Three-fold is what Sierpinski means, so 3×3.
+- Stage IV reads off **health**, not "one piece remaining". Piece-count first
+  measured at 0.8s — auto-aim spreads damage evenly across the three pieces,
+  so the last two die within a breath of each other. A stage shorter than one
+  of its own captions is not a stage.
+- Its skies are authored, not generated: acid green in the sky hides salvage
+  and every affordance in the tree. Sky stays near-black; the boss carries
+  the colour. (The plan predicted this override would be needed.)
+- **Measured**: 201.6s over two runs, stages 17/30/21/19%, captions
+  11.4 chars/sec, everything inside 215 units, one REMAINDER.
+
+### A global bug the hash tool caught
+
+`MAX_BODY_R` applied a full SCION graft-stack multiplier to **every** type,
+including `fixed` ones — which `enemies.js` has refused as graft hosts since
+ORDINAL shipped. FRACTAL's r-64 core inflated to 102, taking the broadphase
+cell from 144 to 205: a coarser grid and more pairs tested per body for
+every object in the game, and it silently retuned every existing fight.
+
+Nothing else would have surfaced it. It was found because ORDINAL's seeded
+9000-frame hash moved. Fixed by counting a fixed body at its own size (it
+still must fit the cell); guarded in both directions by a case. **This is
+law 8's real teeth** — the law said "no boss body over r 72"; the actual
+rule is "no boss body over half the cell", and the multiplier was lying
+about which bodies were which.
+
+Original Phase 0/1 notes follow.
+
+Status (Phases 0–1): **shipped in builds 127 and 128.**
 Two of seven bosses are built. Phases 2–7 are not started.
 
 ### Phase 1 as built (GNOMON, build 128)
