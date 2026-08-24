@@ -231,10 +231,24 @@ export class Menu {
      * A row with nothing under it still gets one, blank and untappable, so the
      * icons stay in one column instead of stepping in and out down the list.
      */
+    const gut = document.createElement('span');
+    gut.className = n.children.length ? 'treeGut' : 'treeGut off';
+    gut.setAttribute('aria-hidden', 'true');
+    /*
+     * The word above it. An arrow says "something happens here" and nothing
+     * about what -- OPEN when the branch is shut, CLOSE when it is not, so
+     * the door is labelled with what pressing it does rather than with a
+     * shape the reader has to already know.
+     *
+     * Only on a branch. A leaf keeps the empty gutter so the icons stay in
+     * one column, but there is nothing there to name.
+     */
+    const word = n.children.length ? document.createElement('i') : null;
+    if (word) { word.className = 'treeGutWord'; gut.appendChild(word); }
     const caret = document.createElement('span');
     caret.className = n.children.length ? 'treeCaret' : 'treeCaret off';
-    caret.setAttribute('aria-hidden', 'true');
-    row.insertBefore(caret, row.firstChild);
+    gut.appendChild(caret);
+    row.insertBefore(gut, row.firstChild);
     /*
      * One tap does one thing. A row used to both open its branch and try to
      * buy itself, which meant looking inside a round was the same gesture as
@@ -251,7 +265,7 @@ export class Menu {
       // still for sale. Without that, a branch could not be looked into until
       // it was paid for -- which is backwards, since what is inside it is the
       // reason to pay.
-      const onCaret = !!(e.target.closest && e.target.closest('.treeCaret'));
+      const onCaret = !!(e.target.closest && e.target.closest('.treeGut'));
       if (onCaret || !n.id || full) {
         if (n.children.length) wrap.classList.toggle('shut');
         this.armRow(null);
@@ -265,7 +279,7 @@ export class Menu {
       this.syncTree();
     });
     wrap.appendChild(row);
-    this.treeRows.push({ n, row, cost, wrap });
+    this.treeRows.push({ n, row, cost, wrap, word });
 
     if (n.children.length) {
       const kids = document.createElement('div');
@@ -357,7 +371,7 @@ export class Menu {
     // wall and a target.
     let cheapest = Infinity;
     let affordable = 0;
-    for (const { n, row, cost } of this.treeRows) {
+    for (const { n, row, cost, wrap, word } of this.treeRows) {
       const have = n.id ? g.owned(n.id) : 0;
       const max = n.levels || 1;
       // A dormant slot is not open, whatever the tree says about its parent:
@@ -408,6 +422,22 @@ export class Menu {
         : row === this.armed ? 'SURE?' : full ? '✓' : !open ? '·' : tag;
       cost.classList.toggle('tick', !!full && !heading);
       cost.classList.toggle('ask', row === this.armed);
+      /*
+       * The price wears a box only when the price is a thing you can press.
+       * A ✓, a locked row's ·, and a heading's blank are all readouts, and a
+       * button drawn round a readout is a lie about what a tap will do.
+       */
+      cost.classList.toggle('box', !heading && open && !full);
+      /*
+       * The gutter word, named for what the press does next. Every open and
+       * close in the tree comes back through here, so it cannot drift out of
+       * step with the branch it labels.
+       */
+      if (word) {
+        const shut = wrap.classList.contains('shut');
+        const say = shut ? 'OPEN' : 'CLOSE';
+        if (word.textContent !== say) word.textContent = say;
+      }
 
       const meter = row.querySelector('.treePips');
       if (meter) {

@@ -2555,6 +2555,16 @@ body.booting #pendingBtn {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/*
+ * The price.
+ *
+ * It used to be bare text hard against the right edge, which is how a
+ * readout is drawn, not a control -- and a row's whole purchase is that
+ * number. It wears a box now (`.box`, set in Menu.syncTree) whenever the
+ * press would actually do something: priced, open, unfinished. A ✓, a
+ * locked ·, and a heading's blank stay bare, because a button drawn round
+ * a readout is a lie about what a tap does.
+ */
 .treeCost {
   flex: 0 0 auto;
   min-width: 34px;
@@ -2564,6 +2574,22 @@ body.booting #pendingBtn {
   letter-spacing: 0.04em;
   color: #45566a;
 }
+.treeCost.box {
+  /* Wide enough for the longest thing it ever says -- SURE? -- so arming a
+     row does not shunt the whole line sideways. */
+  min-width: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
+  border-radius: 3px;
+  background: rgba(3, 8, 16, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color 0.14s, background 0.14s, box-shadow 0.14s;
+}
+/* Pressed, on the element the thumb is actually over. */
+.treeRow:active .treeCost.box { background: rgba(124, 255, 178, 0.08); }
 
 /* A root is the header of its branch, not a row you press. */
 .treeRow.k-root { background: rgba(10, 20, 34, 0.9); border-color: color-mix(in srgb, var(--tone) 34%, transparent); }
@@ -2606,6 +2632,7 @@ body.booting #pendingBtn {
   text-shadow: none;
 }
 .spectrum > .treeRow.k-root .treeIcon,
+.spectrum > .treeRow.k-root .treeGutWord,
 .spectrum > .treeRow.k-root .treeCaret { color: #ffffff; opacity: 0.7; }
 
 /*
@@ -2650,6 +2677,12 @@ body.booting #pendingBtn {
 /* Open and buyable. */
 .treeRow.afford { border-color: rgba(124, 255, 178, 0.5); }
 .treeRow.afford .treeCost { color: #7cffb2; text-shadow: 0 0 8px rgba(124, 255, 178, 0.35); }
+.treeRow.afford .treeCost.box,
+.treeRow.partAfford .treeCost.box {
+  border-color: rgba(124, 255, 178, 0.55);
+  background: rgba(124, 255, 178, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 10px -2px rgba(124, 255, 178, 0.4);
+}
 
 /* Open but out of reach: readable, priced, plainly not yet. */
 .treeRow.poor { opacity: 0.72; }
@@ -2669,6 +2702,37 @@ body.booting #pendingBtn {
  * invisible tap target about twice its size, reaching left only into the gap
  * before it — any further and it would swallow taps meant for the price.
  */
+/*
+ * The gutter the caret lives in: a fixed column, its own width, with the
+ * arrow centred in it and the word above. Centred rather than hard against
+ * the row's padding because a 8px arrow pinned to the left edge reads as
+ * part of the border; given a column of its own it reads as a control.
+ *
+ * The width is fixed so the caret column does not step left and right as
+ * OPEN becomes CLOSE, and it is kept on leaf rows too -- empty and
+ * untappable -- so the icons stay in one line down the panel.
+ */
+.treeGut {
+  position: relative;
+  flex: 0 0 30px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+/* Reaching left into the row's padding and right into the gap before the
+   icon, so the door is a thumb-sized target and not an 8px one. */
+.treeGut::after { content: ''; position: absolute; inset: 0 -5px 0 -9px; }
+.treeGutWord {
+  font-style: normal;
+  font-size: 5.5px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--tone) 52%, transparent);
+  white-space: nowrap;
+}
 .treeCaret {
   position: relative;
   flex: 0 0 auto;
@@ -2688,14 +2752,10 @@ body.booting #pendingBtn {
   border-bottom: 1.5px solid currentColor;
   transform: rotate(-45deg);
 }
-/*
- * The tap target, reaching left to the row's edge and right only as far as the
- * gap before the icon. It is at the opposite end of the row from the price now
- * -- those are the row's two actions and they were a thumb-width apart.
- */
-.treeCaret::after { content: ''; position: absolute; inset: -14px -6px -14px -11px; }
+/* The tap target is the gutter's, not the arrow's -- see .treeGut::after. */
 .treeBranch:not(.shut) > .treeRow .treeCaret { transform: rotate(90deg); }
-.treeRow.locked .treeCaret { color: #46566a; }
+.treeRow.locked .treeCaret,
+.treeRow.locked .treeGutWord { color: #46566a; }
 
 /*
  * A row with nothing under it: the space is kept, the caret is not drawn, and
@@ -2704,9 +2764,9 @@ body.booting #pendingBtn {
  * a caret, so the left edge of every leaf row was a dead zone that swallowed
  * the press instead of arming the buy.
  */
-.treeCaret.off { pointer-events: none; }
+.treeGut.off { pointer-events: none; }
+.treeGut.off::after { content: none; }
 .treeCaret.off::before { content: none; }
-.treeCaret.off::after { content: none; }
 
 /*
  * A round or a mine, wearing what the arsenal tab used to give it: the DMG/FX
@@ -2777,6 +2837,14 @@ body.booting #pendingBtn {
   background: linear-gradient(180deg, rgba(255, 207, 92, 0.14), rgba(6, 12, 22, 0.7));
 }
 .treeCost.ask { color: #ffcf5c; font-size: 9px; letter-spacing: 0.1em; }
+/* Specific enough to beat `.treeRow.afford .treeCost.box`, which is four
+   classes deep: an armed row is still an affordable one, and the question
+   has to be louder than the invitation it interrupts. */
+.treeRow.armed .treeCost.box {
+  border-color: rgba(255, 207, 92, 0.7);
+  background: rgba(255, 207, 92, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 10px -2px rgba(255, 207, 92, 0.5);
+}
 .menuCell.armed {
   border-color: #ffcf5c;
   background: rgba(255, 207, 92, 0.12);

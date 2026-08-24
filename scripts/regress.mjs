@@ -1559,6 +1559,76 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('the broadphase sees every overlap of the largest body', !r.missedAt, JSON.stringify(r));
 }
 
+// --- the tree row says what a press will do ---------------------------------
+/*
+ * Two affordances that were not there. The disclosure arrow was an 8px chevron
+ * hard against the row's left border, unlabelled — it read as part of the
+ * frame rather than as a door — and the price was bare text, which is how a
+ * readout is drawn, not a control.
+ *
+ * Now: a fixed gutter with the arrow centred in it and OPEN/CLOSE named above
+ * it, and a box round the price whenever the press would actually spend
+ * something. What is checked is that the word tracks the branch, that the box
+ * appears on exactly the pressable states and on none of the readouts (a ✓, a
+ * locked ·, a heading's blank), and that a tap in the gutter still opens
+ * rather than arms while a tap on a leaf's dead gutter still reaches the row.
+ */
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    g.debugGiveEnergy(2600);
+    g.hud.menu.setOpen(true);
+    g.hud.menu.show('tree');
+    const vis = (el) => el.getBoundingClientRect().width > 0;
+    const rows = [...document.querySelectorAll('.treeRow')];
+    // Every price is either a box or a readout, never the wrong one.
+    const wrong = [];
+    for (const row of rows) {
+      const c = row.querySelector('.treeCost');
+      const box = c.classList.contains('box');
+      const t = c.textContent;
+      const readout = t === '' || t === '\u2713' || t === '\u00b7';
+      if (box === readout) wrong.push(`${row.querySelector('.treeName').textContent}:"${t}":${box}`);
+    }
+    // The word names what the next press does, and follows the branch.
+    const head = rows.find((x) => x.querySelector('.treeGutWord'));
+    const branch = head.parentElement;
+    const said = [];
+    for (let i = 0; i < 2; i++) {
+      said.push({ shut: branch.classList.contains('shut'),
+        word: head.querySelector('.treeGutWord').textContent });
+      head.querySelector('.treeCaret').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    }
+    const armedByCaret = !!document.querySelector('.treeRow.armed');
+    // The arrow sits in the middle of its own gutter, and that gutter is the
+    // space between the row's edge and the first thing in it.
+    const rb = head.getBoundingClientRect();
+    const cb = head.querySelector('.treeCaret').getBoundingClientRect();
+    const ib = head.querySelector('.treeIcon').getBoundingClientRect();
+    const arrow = cb.left + cb.width / 2 - rb.left;
+    const middle = (ib.left - rb.left) / 2;
+    // A leaf's gutter is dead, so the row underneath it takes the press —
+    // the left edge of a leaf used to be a zone that swallowed the buy.
+    const leaf = rows.find((x) => vis(x) && !x.querySelector('.treeGutWord'));
+    const lg = leaf.querySelector('.treeGut').getBoundingClientRect();
+    const hit = document.elementFromPoint(lg.left + lg.width / 2, lg.top + lg.height / 2) === leaf;
+    g.hud.menu.setOpen(false);
+    return { rows: rows.length, wrong, said, armedByCaret, arrow: +arrow.toFixed(1),
+      middle: +middle.toFixed(1), hit, boxes: rows.filter((x) =>
+        x.querySelector('.treeCost').classList.contains('box')).length };
+  });
+  const words = r.said.length === 2
+    && r.said.every((s) => s.word === (s.shut ? 'OPEN' : 'CLOSE'))
+    && r.said[0].shut !== r.said[1].shut;
+  check('a tree price is boxed when it is pressable and bare when it is not',
+    r.wrong.length === 0 && r.boxes > 0, `${r.boxes}/${r.rows} boxed; wrong: ${r.wrong.slice(0, 4)}`);
+  check('the gutter names what the press does, and only opens',
+    words && !r.armedByCaret, JSON.stringify(r.said) + ` armed:${r.armedByCaret}`);
+  check('the arrow is centred between the row edge and its text',
+    Math.abs(r.arrow - r.middle) <= 2 && r.hit,
+    `arrow at ${r.arrow}, middle at ${r.middle}, leaf gutter reaches the row: ${r.hit}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;
