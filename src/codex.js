@@ -100,6 +100,21 @@ export const CODEX = [
     line: 'It waited behind an hour for the hour to break. Nothing about the dial governs it now.',
   },
   {
+    id: 'fractal',
+    name: 'FRACTAL',
+    line: 'It does not have parts, it has generations. Break one and you have not removed anything — you have let it go.',
+  },
+  {
+    id: 'fraction',
+    name: 'FRACTION',
+    line: 'The middle of three. Armour on one side, and on the other, three things that were only ever waiting to be loose.',
+  },
+  {
+    id: 'mite',
+    name: 'MITE',
+    line: 'The smallest part it believes in, which is not the same as the smallest part there is.',
+  },
+  {
     id: 'towMass',
     name: 'MASS',
     line: 'The far end of a cable. It arrives by being swung, and it arrives regardless.',

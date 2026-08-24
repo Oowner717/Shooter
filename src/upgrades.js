@@ -200,10 +200,15 @@ import { BOSS_TONE as TONES, ANOMALIES } from './anomaly.js';
  * list too. A slot that is not built stays dormant: a way in that opens onto
  * nothing is worse than a door that plainly does not open.
  *
- * `needs` is the gate. A slot opens once the boss before it has been broken
- * at least once -- which is what `world.reconciled` records -- and the line
- * says so plainly. Teasing what is behind a door while hiding what opens it
- * reads as a bug rather than as a secret.
+ * No slot is gated behind another. A way in that exists is for sale, and the
+ * price is the whole of what it costs -- gating them in a chain meant a
+ * player who wanted the amber one had to go and break the magenta one first,
+ * which is a queue rather than a choice. The `needs` mechanism is still in
+ * the tree for anything that genuinely has to wait on progress; nothing uses
+ * it today.
+ *
+ * A slot that is not built stays sealed, and says so honestly rather than
+ * pretending something would open it.
  */
 const HINT = {
   2: 'Something in here keeps the hours.',
@@ -215,7 +220,6 @@ const HINT = {
 };
 
 const SLEEPING = ANOMALIES.slice(1).map((a) => {
-  const prev = ANOMALIES[a.n - 2];
   const common = {
     id: a.key,
     name: `${a.name} APERTURE`,
@@ -229,15 +233,13 @@ const SLEEPING = ANOMALIES.slice(1).map((a) => {
       ...common,
       dormant: true,
       cost: CFG.ordinal.cost,
-      line: `Sealed behind ${prev.name}. ${HINT[a.n]}`,
+      line: `Not cut yet. ${HINT[a.n]}`,
       apply: () => {},
     };
   }
   return {
     ...common,
-    // Gated on the one before it, and priced by its own config -- which
-    // scripts/check-build.mjs holds it to.
-    needs: prev.n,
+    // Priced by its own config, which scripts/check-build.mjs holds it to.
     cost: CFG[a.cfg].cost,
     line: `A way in to ${a.name}. ${HINT[a.n]}`,
     apply: (up, world) => { world.apertures[a.n] = (world.apertures[a.n] | 0) + 1; },

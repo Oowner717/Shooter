@@ -5,6 +5,7 @@ import { Ordinal, openAperture } from './boss.js';
 // Imported for the side effect: a boss module registers its constructor
 // with anomaly.js on load, and nothing else references it by name.
 import './gnomon.js';
+import './fractal.js';
 import { nameOf, dressOf, heldList } from './anomaly.js';
 import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';

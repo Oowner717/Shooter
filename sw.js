@@ -28,6 +28,7 @@ const ASSETS = [
   './src/tree.js',
   './src/util.js',
   './src/physics.js',
+  './src/fractal.js',
   './src/fx.js',
   './src/background.js',
   './src/glitch.js',

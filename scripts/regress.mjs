@@ -1254,6 +1254,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const w = g.world;
     const { TREE, NODES } = await import('../src/tree.js');
     const { BOSS_TONE } = await import('../src/upgrades.js');
+    const { ANOMALIES } = await import('../src/anomaly.js');
     g.restart();
     w.phase = 'staging';
     g.debugGiveEnergy(9000);
@@ -1265,15 +1266,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const live = slots.filter((n) => !n.dormant);
     const sealed = slots.filter((n) => n.dormant);
     /*
-     * Nothing is reconciled yet, so the only slot that sells is ORDINAL's:
-     * five are sealed behind bosses that do not exist, and GNOMON's is built
-     * but gated behind having broken ORDINAL at least once.
+     * Every way in that exists is for sale, and nothing is behind anything
+     * else: the built ones all take the money on a cold run, and the ones
+     * that are not built refuse whatever has been broken.
      */
     w.reconciled.length = 0;
     const buys = slots.map((n) => ({ id: n.id, r: g.buy(n.id) }));
-    // ...and once ORDINAL has been broken, exactly one more door opens.
-    w.reconciled.push(1);
-    const after = slots.map((n) => ({ id: n.id, r: g.buy(n.id) }));
     const tones = slots.map((n) => n.tone);
     const out = {
       firstIsRecast: first.id === 'recast' && first.kind === 'upgrade',
@@ -1288,33 +1286,46 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       spectrum: (anomaly.tones || []).length,
       opened: buys.filter((b) => b.r === 'ok').map((b) => b.id),
       refused: buys.filter((b) => b.r === 'locked').map((b) => b.id),
-      afterOpened: after.filter((b) => b.r === 'ok').map((b) => b.id),
-      afterRefused: after.filter((b) => b.r === 'locked').length,
-      gnomonHeld: w.apertures[2],
+      held: [1, 2, 3, 4, 5, 6, 7].map((n) => w.apertures[n] | 0).join(','),
+      builtIds: slots.filter((n) => !n.dormant).map((n) => n.id),
+      anomalies: ANOMALIES.length,
+      builtCount: ANOMALIES.filter((a) => a.built).length,
+      wantNames: ANOMALIES.map((a) => `${a.name} APERTURE`),
     };
     w.reconciled.length = 0;
     g.restart();
     return out;
   });
-  check('seven APERTURE slots, two built and five sealed, with RECAST above them all',
-    r.firstIsRecast && r.recastInTree === 1
-    && r.slots === 7 && r.live === 2 && r.sealed === 5
-    && r.uniqueTones === 7 && r.matchesPalette && r.spectrum === 7
-    && r.names[0] === 'ORDINAL APERTURE' && r.names[1] === 'GNOMON APERTURE',
-    `${r.slots} slots (${r.live} built, ${r.sealed} sealed), ${r.uniqueTones} distinct colours, `
-    + `heading carries ${r.spectrum}; first row is ${r.firstIsRecast ? 'RECAST' : 'NOT recast'}`);
   /*
-   * The gate. A way in to the second boss is not sold until the first has
-   * been broken -- and a slot that teases what is behind it while hiding what
-   * opens it reads as a bug, so the line says so.
+   * The counts are derived, not written down. Every phase builds another boss
+   * and a hardcoded "two built, five sealed" is a test that has to be edited
+   * to stay true -- which is a test that eventually gets edited without being
+   * read. What is actually invariant is that the tree agrees with the table:
+   * a slot per anomaly, one live slot per built anomaly, and the names in the
+   * table's own order.
    */
-  check('a way in is sold only once the boss before it has been broken',
-    r.opened.join() === 'aperture' && r.refused.length === 6
-    && r.afterOpened.join() === 'aperture,aperture2' && r.afterRefused === 5
-    && r.gnomonHeld === 1,
-    `before: bought ${JSON.stringify(r.opened)}, refused ${r.refused.length}; `
-    + `after ORDINAL: bought ${JSON.stringify(r.afterOpened)}, refused ${r.afterRefused}, `
-    + `GNOMON ways in held ${r.gnomonHeld}`);
+  check('a tree slot per anomaly, live exactly where one is built',
+    r.firstIsRecast && r.recastInTree === 1
+    && r.slots === r.anomalies && r.live === r.builtCount
+    && r.sealed === r.anomalies - r.builtCount
+    && r.uniqueTones === r.anomalies && r.matchesPalette && r.spectrum === r.anomalies
+    && r.names.join() === r.wantNames.join(),
+    `${r.slots} slots (${r.live} live against ${r.builtCount} built, ${r.sealed} sealed), `
+    + `${r.uniqueTones} distinct colours, heading carries ${r.spectrum}; `
+    + `names ${JSON.stringify(r.names)}; first row is ${r.firstIsRecast ? 'RECAST' : 'NOT recast'}`);
+  /*
+   * Nothing is behind anything else. Every boss that exists is for sale on a
+   * cold run -- gating them in a chain made a player who wanted the amber one
+   * go and break the magenta one first, which is a queue rather than a
+   * choice. The ones that are not built still refuse, because there is
+   * genuinely nothing on the other side of them.
+   */
+  check('every boss that exists is for sale, and nothing is behind anything else',
+    r.opened.join() === r.builtIds.join()
+    && r.opened.length === r.live && r.refused.length === r.sealed
+    && r.held.split(',').slice(0, r.live).every((x) => x === '1'),
+    `bought ${JSON.stringify(r.opened)} against built ${JSON.stringify(r.builtIds)}, `
+    + `refused ${r.refused.length}; ways in held ${r.held}`);
 }
 
 // --- options, the way in, and a save that cannot be lost to one bad write ---
@@ -1579,6 +1590,40 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return { cell, maxR: r0, missedAt: null, worst };
   });
   check('the broadphase sees every overlap of the largest body', !r.missedAt, JSON.stringify(r));
+
+  /*
+   * ...and the cell is not being sized for grafts that can never happen.
+   *
+   * MAX_BODY_R carried a full SCION stack's growth on *every* type, including
+   * the ones SCION refuses outright. FRACTAL's r-64 core was multiplied to
+   * 102 by it and took the cell from 144 to 205 -- a coarser grid and more
+   * pairs tested for every object in the game, and it silently changed every
+   * fight that had already been tuned. A fixed body still has to fit the
+   * guarantee, so it counts at its own size; it just does not count as if it
+   * were carrying something it cannot be given.
+   */
+  const graftable = await page.evaluate(async () => {
+    const { ENEMY_TYPES, CFG, MAX_BODY_R, GRID_CELL } = await import('../src/config.js');
+    const grown = 1 + CFG.graft.grow * CFG.graft.stack;
+    const fixed = ENEMY_TYPES.filter((t) => t.fixed);
+    return {
+      cell: GRID_CELL,
+      max: MAX_BODY_R,
+      // No fixed type may be counted as if it had grown.
+      inflated: fixed.filter((t) => MAX_BODY_R < t.r * grown && MAX_BODY_R >= t.r).length,
+      // ...but every fixed body still has to fit inside the guarantee.
+      tooBig: fixed.filter((t) => t.r * 2 > GRID_CELL).map((t) => t.id),
+      biggestFixed: Math.max(...fixed.map((t) => t.r)),
+      biggestLoose: Math.max(...ENEMY_TYPES.filter((t) => !t.fixed).map((t) => t.r * grown)),
+    };
+  });
+  check('the broadphase cell is not sized for grafts a boss can never carry',
+    graftable.tooBig.length === 0
+    && graftable.max === Math.max(graftable.biggestFixed, graftable.biggestLoose)
+    && graftable.cell >= 2 * graftable.biggestFixed,
+    `cell ${graftable.cell}, max body ${graftable.max} `
+    + `(biggest fixed ${graftable.biggestFixed}, biggest graftable ${graftable.biggestLoose})`
+    + `${graftable.tooBig.length ? `; TOO BIG: ${graftable.tooBig}` : ''}`);
 }
 
 // --- the tree row says what a press will do ---------------------------------
@@ -1805,6 +1850,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.named = A.ANOMALIES.every((a) => a.name && /^#[0-9a-f]{6}$/i.test(a.tone));
     out.tones = A.BOSS_TONE.join(',');
     out.built = A.ANOMALIES.filter((a) => a.built).map((a) => a.n);
+    out.makeable = A.ANOMALIES.filter((a) => A.makerOf(a.n)).map((a) => a.n);
 
     // ORDINAL's gauge ramp is the table that was authored for it, not a
     // generated approximation of it.
@@ -1831,10 +1877,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('one integer holds boss I\'s ways in, under both its names',
     r.readsThrough === 3 && r.writesThrough === 5 && r.clamps === 0,
     JSON.stringify({ read: r.readsThrough, write: r.writesThrough, clamp: r.clamps }));
-  check('seven anomalies, each named and coloured, two of them built',
-    r.seven === 7 && r.named && r.built.join() === '1,2'
+  /*
+   * `built` is a claim the table makes; a registered constructor is the fact.
+   * Checking them against each other is what catches a boss that was written
+   * and never wired up, or flagged and never written -- either of which ships
+   * a slot that takes the money and opens onto nothing.
+   */
+  check('every anomaly is named and coloured, and built exactly when it can be made',
+    r.seven === 7 && r.named && r.built.join() === r.makeable.join()
     && r.tones.split(',').length === 7 && new Set(r.tones.split(',')).size === 7,
-    `${r.seven} anomalies, built ${r.built}, tones ${r.tones}`);
+    `${r.seven} anomalies, flagged built ${r.built}, actually makeable ${r.makeable}, `
+    + `tones ${r.tones}`);
   check('a boss dresses its own gauge and sky, and ORDINAL keeps the authored one',
     r.ramp === '#a03fb0/#e6a8ff #ff5ec8/#ffb8ee #ff3fb0/#ffc2f0 #ff2f8f/#ffd0e6 #ff5470/#ffe0e6'
     && r.genOk && r.moodOk,
@@ -2145,6 +2198,108 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.noonBefore === false && r.noonAfter === true && r.noonRebuilt > 0 && r.noonOnce,
     JSON.stringify({ before: r.noonBefore, after: r.noonAfter,
       arcsBack: r.noonRebuilt, onlyOnce: r.noonOnce }));
+}
+
+// --- FRACTAL: freeing, not deleting -----------------------------------------
+/*
+ * FRACTAL's one rule is that breaking a middle does not remove the three
+ * smalls it was carrying -- it frees them. Armour becomes pressure, and the
+ * order you break things in is the whole decision.
+ *
+ * If that silently stopped working the fight would still look right: the
+ * triangles would still orbit, the bar would still fall, and it would simply
+ * be a stack of health with nothing at stake. So it is checked directly, and
+ * so is the conservation rule that keeps it legible -- it may never put more
+ * bodies on the field than it arrived with, which is the same law that stops
+ * a boss out-healing a turret.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[3] = 1;
+    g.openBoss(3);
+    const boss = w.boss;
+    const out = { built: boss.constructor.name };
+    boss.arriving = 0;
+    boss.settle(w);
+    g.update(1 / 60);
+
+    const C = CFG.fractal;
+    out.mids = boss.mids.length;
+    out.mites = boss.mids.reduce((n, m) => n + m.mites.length, 0);
+    out.onField = boss.parts().filter((p) => w.enemies.includes(p)).length;
+
+    // Break one middle. Its smalls must survive it, and stop being its.
+    const victim = boss.mids[0];
+    const theirs = victim.mites;
+    victim.dead = true;
+    g.update(1 / 60);
+    out.freedAlive = theirs.filter((t) => !t.dead).length;
+    out.freedLoose = theirs.filter((t) => !t.host).length;
+    /*
+     * ...and being loose has to mean something. A body the boss still places
+     * every frame is armour whatever it is called; one that steers has a
+     * finite mass and a cruise speed, which is the whole difference.
+     */
+    out.freedSteers = theirs.every((t) => t.dead
+      || (Number.isFinite(t.mass) && t.cruise === TYPE_BY_ID.mite.speed));
+
+    // Breaking the first middle starts RECURSION, and it is the only heal.
+    out.recursing = boss.recursed;
+    let guard = 0;
+    while (!boss.sprangDone && guard++ < 1200) g.update(1 / 60);
+    out.recursed = boss.sprangDone;
+    // Everything it ever had is back -- and nothing more than it arrived with.
+    out.afterMids = boss.mids.filter((m) => !m.dead).length;
+    out.afterHeld = boss.mids.reduce((n, m) => n + m.mites.filter((t) => !t.dead && t.host).length, 0);
+    out.bodyCount = boss.parts().length;
+
+    /*
+     * The conservation rule, pressed hard: kill everything it has and let it
+     * replace for a while. It may put back what it lost and not one body more.
+     */
+    for (const m of boss.mids) { m.dead = true; for (const t of m.mites) t.dead = true; }
+    for (let i = 0; i < 3000; i++) g.update(1 / 60);
+    out.rebuiltMids = boss.mids.length;
+    out.rebuiltMites = boss.mids.reduce((n, m) => n + m.mites.length, 0);
+    out.heldNow = boss.mids.reduce((n, m) => n + m.mites.filter((t) => !t.dead && t.host).length, 0);
+
+    // The bar is the sum of whatever the core currently is, against a total
+    // that does not move -- so dividing into thirds is not a sudden loss.
+    const before = boss.coreFrac;
+    boss.core.hp = Math.round(boss.core.maxHp * 0.5);
+    const half = boss.coreFrac;
+    boss.divide(w);
+    const after = boss.coreFrac;
+    out.pieces = boss.pieces.length;
+    out.frac = [+half.toFixed(3), +after.toFixed(3)];
+    out.sameTotal = Math.abs(half - after) < 0.02;
+    out.shells = boss.gauge().shells.map((x) => `${x.label}:${x.seg}`).join(',');
+    g.restart();
+    return out;
+  });
+  check('FRACTAL stands up as three generations of one shape',
+    r.built === 'Fractal' && r.mids === 3 && r.mites === 9 && r.onField === 12
+    && r.shells === 'ORBIT:12',
+    JSON.stringify({ mids: r.mids, mites: r.mites, onField: r.onField, shells: r.shells }));
+  check('breaking a middle frees its smalls rather than deleting them',
+    r.freedAlive === 3 && r.freedLoose === 3 && r.freedSteers,
+    `${r.freedAlive} of 3 survived, ${r.freedLoose} came loose, `
+    + `and they steer: ${r.freedSteers}`);
+  check('RECURSION puts the whole figure back, once',
+    r.recursing && r.recursed && r.afterMids === 3 && r.afterHeld === 9,
+    JSON.stringify({ started: r.recursing, finished: r.recursed,
+      mids: r.afterMids, held: r.afterHeld }));
+  check('it never puts more on the field than it arrived with',
+    r.rebuiltMids === 3 && r.rebuiltMites === 9 && r.heldNow <= 9,
+    `${r.rebuiltMids} middles and ${r.rebuiltMites} smalls exist, ${r.heldNow} held`);
+  check('dividing the core is not the bar suddenly falling',
+    r.pieces === 3 && r.sameTotal,
+    `${r.pieces} pieces; bar went ${r.frac[0]} -> ${r.frac[1]}`);
 }
 
 // --- report -----------------------------------------------------------------

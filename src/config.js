@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '128';
+export const BUILD = '129';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '128';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a5b9e95';
+export const REV = 'd8c70f9';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1047,6 +1047,81 @@ export const CFG = {
   },
 
   /*
+   * ---- FRACTAL, anomaly III ----
+   *
+   * ORDINAL was a wall you opened. GNOMON was a light you waited on. This is
+   * neither: it is depth. Three generations of the same triangle, each
+   * orbiting the one above it, and your rounds meet the smallest first.
+   *
+   * The rule that makes it a fight rather than a stack: breaking a middle
+   * piece does not remove three small ones, it *frees* them. They stop being
+   * armour and become sovereign objects with ordinary appetites. So the
+   * fight's pressure and the fight's armour are the same bodies, and you
+   * choose which they are by what you break -- and it never gains a body it
+   * did not arrive with, which is what keeps it legible.
+   */
+  fractal: {
+    cost: 190,
+    standoff: 380,
+    arrive: 14.4,
+    beats: [0.14, 0.36, 0.6, 1],
+    coreR: 64,
+    // Three middles, three smalls each. Sierpinski is three-fold; so is this.
+    mids: 3,
+    mites: 3,
+    midR: 150, // how far the middles orbit from the core
+    miteR: 44, // ...and the smalls from their middle
+    midSpin: 0.24,
+    miteSpin: -0.62,
+    // II makes the orbits eccentric and counter-rotates the generations, so
+    // the shape you learned in I stops being the shape.
+    eccentric: 0.34,
+    /*
+     * RECURSION. The setpiece, on the first middle broken: everything left
+     * collapses onto the core and reassembles into the whole figure once, at
+     * part health. It is the only heal in the fight and it is a scene rather
+     * than a drip -- which is the difference between "it is mending" and "it
+     * remembers what it was".
+     */
+    recurseIn: 1.5,
+    recurseHold: 0.5,
+    recurseOut: 1.2,
+    recurseHp: 0.6,
+    /*
+     * ...and the cap that stops it being a wall. It may only ever put back
+     * what it arrived with, so a fight it is losing cannot be turned into a
+     * fight it is winning -- see law 7, and see what an uncapped ORDINAL
+     * measured like.
+     */
+    replaceEvery: 9, // seconds between replacing a lost small, 0 for never
+    // III: the core divides. Three pieces, a third of the size and a third of
+    // what is left of its health each, orbiting wide.
+    splitAt: 0.55,
+    pieces: 3,
+    pieceR: 34,
+    pieceOrbit: 168,
+    pieceSpin: 0.38,
+    /*
+     * IV: whatever is left comes for you.
+     *
+     * Read off the health rather than off "one piece remaining", which is how
+     * it was first written and measured at eight tenths of a second: auto aim
+     * takes what is nearest and so spreads its damage evenly across the three
+     * pieces, which means the second-to-last and the last die within a breath
+     * of each other. A stage that lasts less than one of its own captions is
+     * not a stage.
+     */
+    huntAt: 0.18,
+    closeOrbit: 180,
+    closeFor: 9,
+    shedEvery: 4.2,
+    spin: [1, 1.5, 2.0, 2.3],
+    endFor: 13.4,
+    pull: 900,
+    pay: 900,
+  },
+
+  /*
    * ---- what every boss shares ----
    *
    * Five numbers that are about *a* boss ending rather than about ORDINAL.
@@ -1647,6 +1722,81 @@ export const ENEMY_TYPES = [
     weight: 0,
     drops: 3,
   },
+  /*
+   * ---- FRACTAL's three ----
+   *
+   * Acid green, and the same body three times at three sizes: that is the
+   * whole idea of it, so the cast is one shape scaled rather than three
+   * designs.
+   */
+  {
+    // The smallest generation. Not solid -- it steers, it wants what every
+    // other object wants -- but while it is in orbit it is in the way.
+    id: 'mite',
+    unlock: 0,
+    name: 'MITE',
+    shape: 'mite',
+    r: 13,
+    hp: 100,
+    density: 0.8,
+    speed: 108,
+    accel: 250,
+    restitution: 0.72,
+    wobble: 1.9,
+    color: '#b6ff8f',
+    glow: '#8bff4d',
+    weight: 0,
+    drops: 2,
+  },
+  {
+    // The middle generation, and the one the fight is really about: break it
+    // and the three it was carrying stop being armour and start being loose.
+    id: 'fraction',
+    unlock: 0,
+    name: 'FRACTION',
+    shape: 'fraction',
+    r: 30,
+    hp: 540,
+    fixed: true, // the boss places it; it orbits rather than steers
+    density: 5,
+    speed: 0,
+    accel: 0,
+    restitution: 0.2,
+    wobble: 0,
+    armor: 0.1,
+    color: '#8bff4d',
+    glow: '#6ee02a',
+    weight: 0,
+    drops: 6,
+    debris: 8,
+  },
+  {
+    // The whole of it. In the last stages there are three of these and they
+    // are each a third of the size, which is the point being made.
+    id: 'fractal',
+    unlock: 0,
+    name: 'FRACTAL',
+    // The bulk of the fight. Three generations of shield sit between this
+    // and the turret, but auto aim takes what is *nearest* rather than what
+    // is outermost -- so a core at standoff is a legitimate target half the
+    // time, and measured, it absorbed 52% of everything at 1450.
+    shape: 'fractal',
+    r: 64,
+    hp: 7400,
+    large: true,
+    fixed: true,
+    density: 9,
+    speed: 0,
+    accel: 0,
+    restitution: 0.2,
+    wobble: 0,
+    armor: 0.18,
+    color: '#8bff4d',
+    glow: '#5ce015',
+    weight: 0,
+    drops: 24,
+    debris: 20,
+  },
   {
     id: 'prism',
     unlock: 165,
@@ -1681,7 +1831,23 @@ export const ENEMY_TYPES = [
  * covers this, so growing an object cannot quietly break it again.
  */
 export const MAX_BODY_R = Math.max(
-  ...ENEMY_TYPES.map((t) => t.r * (1 + CFG.graft.grow * CFG.graft.stack)),
+  /*
+   * The graft allowance is only for bodies that can actually carry one.
+   *
+   * A `fixed` type is placed by a boss every frame and SCION's hunt refuses
+   * it outright -- see the `e.type.fixed` guard in enemies.js -- so a boss
+   * core was inflating the broadphase cell by sixty percent for a stack of
+   * grafts it can never be given. FRACTAL's core is r 64 and, multiplied,
+   * took MAX_BODY_R from 72 to 102 and the cell from 144 to 205: a coarser
+   * grid, more pairs tested per body, for every object in the game, on a
+   * phone. It also silently changed every fight that was already tuned,
+   * which is how it was caught.
+   *
+   * A fixed body still has to fit the guarantee, so it counts at its own
+   * size -- the cell must be at least twice the largest thing on the field
+   * whether or not that thing can grow.
+   */
+  ...ENEMY_TYPES.map((t) => (t.fixed ? t.r : t.r * (1 + CFG.graft.grow * CFG.graft.stack))),
 );
 
 /**

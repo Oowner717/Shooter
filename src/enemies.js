@@ -62,6 +62,9 @@ export function drawSpecimen(ctx, id, r) {
     case 'dial': drawDial(ctx, r, 1); break;
     case 'gnomon': drawGnomon(ctx, r, 0, 0, 1); break;
     case 'second': drawSecond(ctx, r, 0, 0); break;
+    case 'mite': drawTri(ctx, r, 1, 0); break;
+    case 'fraction': drawTri(ctx, r, 1, 1); break;
+    case 'fractal': drawTri(ctx, r, 1, 2); break;
     case 'hex': drawHex(ctx, r); break;
     case 'blob': drawBlob(ctx, r, 0.6, 0); break;
     case 'bloom': drawBloom(ctx, r, 0.4, 0, t); break;
@@ -1046,6 +1049,9 @@ export class Enemy {
       case 'dial': drawDial(ctx, this.r, hpFrac); break;
       case 'gnomon': drawGnomon(ctx, this.r, this.phase, world.time, hpFrac); break;
       case 'second': drawSecond(ctx, this.r, this.phase, world.time); break;
+      case 'mite': drawTri(ctx, this.r, hpFrac, 0); break;
+      case 'fraction': drawTri(ctx, this.r, hpFrac, 1); break;
+      case 'fractal': drawTri(ctx, this.r, hpFrac, 2); break;
       case 'tow': drawTowHead(ctx, this.r); break;
       case 'mass': drawTowMass(ctx, this.r, hpFrac); break;
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
@@ -1417,6 +1423,53 @@ function drawOrdinal(ctx, r, phase, t, hpFrac) {
  * obviously of the same make as the frame it came out of, so a loose one
  * still reads as ORDINAL's rather than as a new object type arriving.
  */
+/*
+ * ---- FRACTAL's three ----
+ *
+ * One function for all of them, because they are one shape. `depth` is which
+ * generation this is, and it draws that many levels of subdivision inside
+ * itself -- so a MITE is a bare triangle, a FRACTION has three inside it, and
+ * the core has three inside each of those. The armour you have to chew
+ * through is visible in the body before you shoot it.
+ */
+function drawTri(ctx, r, hpFrac, depth) {
+  const pts = (rad) => [
+    [0, -rad],
+    [rad * 0.866, rad * 0.5],
+    [-rad * 0.866, rad * 0.5],
+  ];
+  const path = (rad, cx = 0, cy = 0) => {
+    const p = pts(rad);
+    ctx.beginPath();
+    ctx.moveTo(cx + p[0][0], cy + p[0][1]);
+    ctx.lineTo(cx + p[1][0], cy + p[1][1]);
+    ctx.lineTo(cx + p[2][0], cy + p[2][1]);
+    ctx.closePath();
+  };
+  path(r);
+  ctx.fill();
+  ctx.stroke();
+
+  // The subdivisions, drawn inward. Sierpinski proper removes the middle;
+  // this draws the three that are kept, which is the same picture and reads
+  // at fifteen pixels where a cut-out does not.
+  const stroke = ctx.strokeStyle;
+  ctx.save();
+  ctx.lineWidth = Math.max(HAIRLINE * 0.8, r * 0.045);
+  const sub = (rad, cx, cy, left) => {
+    if (left <= 0) return;
+    const half = rad * 0.5;
+    for (const [px, py] of pts(rad * 0.5)) {
+      path(half, cx + px, cy + py);
+      ctx.stroke();
+      sub(half, cx + px, cy + py, left - 1);
+    }
+  };
+  ctx.strokeStyle = rgba(stroke, 0.22 + 0.5 * hpFrac);
+  sub(r, 0, 0, depth);
+  ctx.restore();
+}
+
 /*
  * ---- GNOMON's three ----
  */
