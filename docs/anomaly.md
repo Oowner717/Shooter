@@ -6,7 +6,38 @@ repo so it survives the container; each phase below is one build-sized
 request, and a future session should be able to pick any phase up from this
 file alone.
 
-Status: **Phase 0 shipped in build 127.** The engine holds seven bosses;
+Status: **Phase 0 shipped in build 127; Phase 1 (GNOMON) in build 128.**
+Two of seven bosses are built. Phases 2–7 are not started.
+
+### Phase 1 as built (GNOMON, build 128)
+
+Landed close to the design. Changes worth knowing:
+
+- **A `Boss` base class was extracted** in this phase rather than Phase 0 —
+  bodies, captions, arrival, the four-beat death, the husk, the REMAINDER.
+  ORDINAL takes only the three provably identical members and keeps its own
+  tuned arrival and death; the seeded hash proves it is unchanged.
+- **The generated gauge ramp was wrong and is fixed.** It escalated by
+  turning the hue (ORDINAL's authored table does: magenta → red), which
+  walked every generated boss into the *next* boss's colour at stage IV —
+  amber→crimson, teal→green, violet→blue, and DYNAMO's blue onto the
+  interface's own cyan. It escalates by saturation and lightness now;
+  `check-build` fails any generated ramp drifting more than 1/60 turn.
+  ORDINAL's authored table is exempt and still ends near TERMINUS's crimson
+  — acceptable while it is boss I, worth revisiting in Phase 7.
+- **Stage III had to be retuned.** First measured at 130s of treadmill: the
+  single dial mended itself straight back between the turret and the core.
+  Mending belongs to stage II alone now, and GNOMON's core carries *less*
+  health than ORDINAL's despite being the later fight, because the shadow
+  already removes about a third of the turret's output.
+- **Measured**: 231.8s over two runs, stages 14/27/31/16%, captions 9.9
+  chars/sec, everything mandatory within 148 units, one REMAINDER. 60/60.
+- Tree slots are now generated from the anomaly table; a boss becomes
+  buyable by being `built`, gated on the previous one being reconciled.
+
+Original Phase 0 note follows.
+
+Status (Phase 0): **shipped in build 127.** The engine holds seven bosses;
 one of them (ORDINAL, boss I, magenta) is built, and it is the reference for
 everything here. Phases 1–7 below are not started.
 
