@@ -84,6 +84,7 @@ export class Hud {
       offerScrim: $('offerScrim'),
       offerCards: $('offerCards'),
       loadout: $('loadout'),
+      loadMore: $('loadMore'),
       loadScrim: $('loadScrim'),
       loadTitle: $('loadTitle'),
       loadNote: $('loadNote'),
@@ -172,6 +173,19 @@ export class Hud {
 
     this.el.loadScrim.addEventListener('click', () => game.closeLoadout());
     $('loadClose').addEventListener('click', () => game.closeLoadout());
+    /*
+     * The bar at the foot of the sheet. Everything reading LOCKED on that list
+     * is bought in the tree and nowhere else, so the screen that shows you
+     * what you have not got now has a door to the place that sells it -- and
+     * it lands on this group's own branch rather than on the top of eighty
+     * rows. The sheet closes on the way out: two stacked modals over the field
+     * is one more than anybody asked for.
+     */
+    this.el.loadMore.addEventListener('click', () => {
+      const group = this.loadGroup;
+      game.closeLoadout();
+      this.menu.openTo(group === 'mines' ? 'mines' : 'ammo');
+    });
     this.el.pendingBtn.addEventListener('click', () => game.openOffer());
     this.el.offerScrim.addEventListener('click', () => game.closeOffer());
 
@@ -400,8 +414,10 @@ export class Hud {
     const full = freeSlot(world.loadout, group) < 0;
     const lastAmmo = group === 'ammo' && keys.filter(Boolean).length <= 1;
     this.el.loadList.innerHTML = '';
+    let sealed = 0;
     for (const a of ARSENAL.filter((x) => x.group === group)) {
       const owned = world.unlocked.has(a.key);
+      if (!owned) sealed++;
       const on = carried(world.loadout, a.key);
       const stuck = on ? (lastAmmo && group === 'ammo') : full;
       const b = document.createElement('button');
@@ -420,6 +436,27 @@ export class Hud {
         });
       }
       this.el.loadList.appendChild(b);
+    }
+
+    /*
+     * And the bar under the list, which is the answer to the question the
+     * list just raised. Three things it can say, in the order they are worth
+     * saying: what you can afford in this branch right now, then what is
+     * still sealed in it, then nothing -- because "0 within reach" beside a
+     * button is a reason not to press it, and there is always a reason.
+     */
+    const bar = this.el.loadMore;
+    if (bar) {
+      const branch = group === 'mines' ? 'mines' : 'ammo';
+      const reach = this.menu ? this.menu.reachCount(world, branch) : 0;
+      bar.querySelector('.loadMoreName').textContent =
+        group === 'mines' ? 'MINE UPGRADES' : 'AMMUNITION UPGRADES';
+      bar.querySelector('.loadMoreLine').textContent = reach
+        ? `${reach} within reach`
+        : sealed ? `${sealed} still sealed` : 'nothing within reach yet';
+      bar.classList.toggle('reach', reach > 0);
+      bar.setAttribute('aria-label',
+        `Open the ${group === 'mines' ? 'mines' : 'ammunition'} branch of the upgrade tree`);
     }
   }
 

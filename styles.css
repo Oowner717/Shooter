@@ -1404,6 +1404,59 @@ button.loadSlot:active .slotOff { color: var(--tone, var(--accent)); }
     transparent 2px 6px);
 }
 
+/*
+ * The bar at the foot of the sheet: the door to the tree.
+ *
+ * Outside the scroller on purpose. It is the answer to the question the list
+ * raises -- half of what is on it reads LOCKED, and locked things are bought
+ * in one place -- so it has to be there at the moment the question is asked
+ * rather than at the bottom of a scroll. Full width, because a bar reads as a
+ * destination where a chip in a corner reads as a detail.
+ */
+#loadMore {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  color: var(--ink);
+  border: 0;
+  border-top: 1px solid rgba(89, 224, 255, 0.16);
+  background: linear-gradient(180deg, rgba(11, 26, 42, 0.7), rgba(6, 14, 24, 0.9));
+  transition: background 0.14s, border-color 0.14s;
+}
+#loadMore:active { background: rgba(20, 44, 68, 0.92); }
+.loadMoreIcon {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  color: var(--accent);
+}
+.loadMoreIcon svg { width: 15px; height: 15px; display: block; }
+.loadMoreBody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.loadMoreName { font-size: 9.5px; letter-spacing: 0.2em; color: var(--accent); }
+.loadMoreLine { font-size: 8px; letter-spacing: 0.1em; color: var(--dim); }
+/* Something is affordable in this branch right now. Same green the tree and
+   the energy chip use for the same fact, so it is one language. */
+#loadMore.reach { border-top-color: rgba(124, 255, 178, 0.4); }
+#loadMore.reach .loadMoreLine { color: #7cffb2; text-shadow: 0 0 8px rgba(124, 255, 178, 0.35); }
+.loadMoreGo {
+  flex: 0 0 auto;
+  font-size: 15px;
+  line-height: 1;
+  color: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+#loadMore.reach .loadMoreGo { color: #7cffb2; }
+
 /* Nothing on the field is live while it is up. */
 body.loadoutOpen #abilities,
 body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
@@ -2810,6 +2863,17 @@ body.booting #pendingBtn {
   border-radius: 1px;
 }
 .treePips i.on { background: var(--tone); box-shadow: 0 0 4px var(--tone); }
+
+/*
+ * Where you landed, when something else sent you here. Arriving in the middle
+ * of an eighty-row list with no mark on it reads as having arrived nowhere,
+ * so the row that was asked for says so for a second and then stops.
+ */
+.treeRow.landed { animation: treeLanded 1.5s ease-out; }
+@keyframes treeLanded {
+  0%, 55% { border-color: var(--tone); box-shadow: 0 0 18px -4px var(--tone); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
 
 .treeRow.refuse { animation: treeRefuse 0.3s ease-out; }
 @keyframes treeRefuse {

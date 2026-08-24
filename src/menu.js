@@ -19,6 +19,16 @@ import { VOLUME_STEPS } from './audio.js';
 import { BUILD, REV } from './config.js';
 import { TREE, NODES, priceOf } from './tree.js';
 
+/**
+ * Is this node somewhere under the branch with that key? `parent` is set on
+ * every node by tree.js's flatten(), so this is a walk up rather than a
+ * search down, and a node is counted as being under itself.
+ */
+function inBranch(n, key) {
+  for (let at = n; at; at = at.parent) if (at.key === key) return true;
+  return false;
+}
+
 const $ = (id) => document.getElementById(id);
 
 /*
@@ -347,10 +357,76 @@ export class Menu {
    * costs nothing with the menu shut, which is exactly when the badge on the
    * energy chip needs it.
    */
-  reachCount(w) {
+  reachCount(w, under = null) {
     let n = 0;
-    for (const node of NODES) if (this.buyable(node, w)) n++;
+    for (const node of NODES) {
+      if (!this.buyable(node, w)) continue;
+      if (under && !inBranch(node, under)) continue;
+      n++;
+    }
     return n;
+  }
+
+  /**
+   * Open the tree standing on one branch, with everything above it opened on
+   * the way. What the loadout sheet's bar does: the sheet is where you find
+   * out a round is sealed, and this is the shortest line from that to the row
+   * that unseals it. Landing on the top of an eighty-row tree instead would
+   * make the reader find it again.
+   *
+   * Returns whether the branch was found, so a caller wiring a key that no
+   * longer exists finds out rather than silently opening the top.
+   */
+  openTo(key) {
+    this.setOpen(true);
+    this.show('tree');
+    const hit = this.treeRows && this.treeRows.find((r) => r.n.key === key);
+    if (!hit) return false;
+    // Its own branch and every branch it hangs from: a row inside a shut
+    // parent is a row with no height, and scrolling to it lands on nothing.
+    for (let w = hit.wrap; w; w = w.parentElement && w.parentElement.closest('.treeBranch')) {
+      w.classList.remove('shut');
+    }
+    this.syncTree();
+    /*
+     * Put it at the top of the scroller. Measured as a difference between two
+     * rects, which is why the sheet sliding up underneath does not spoil it:
+     * #menu's entrance is a translate, and a translate moves both rects by
+     * the same amount.
+     */
+    const box = this.el.panels.getBoundingClientRect();
+    const row = hit.row.getBoundingClientRect();
+    /*
+     * Clear of the ENERGY strip, which is sticky at the top of this same
+     * scroller -- scrolling to the scroller's own top edge parks the row you
+     * were sent to underneath it, which looks exactly like being sent
+     * nowhere. Measured rather than written down, so restyling the strip
+     * cannot quietly break the landing.
+     */
+    const head = this.el.panels.querySelector('.menuPanel.tree .treeHead');
+    const clear = (head ? head.getBoundingClientRect().height : 0) + 10;
+    this.el.panels.scrollTop += row.top - box.top - clear;
+    /*
+     * And say where you landed. Arriving somewhere in the middle of a long
+     * list with no mark on it reads as having arrived nowhere.
+     *
+     * It is a mark on the way in and not a state, so it is cleared off
+     * whatever wore it last and taken off this row when its animation ends.
+     * Left on, two trips through here leave two rows claiming to be where
+     * you are.
+     */
+    for (const el of this.el.panels.querySelectorAll('.treeRow.landed')) el.classList.remove('landed');
+    void hit.row.offsetWidth;
+    hit.row.classList.add('landed');
+    const done = (e) => {
+      // The row has another animation on it -- the refusal shake -- and that
+      // one must not count as this one ending.
+      if (e.animationName !== 'treeLanded') return;
+      hit.row.classList.remove('landed');
+      hit.row.removeEventListener('animationend', done);
+    };
+    hit.row.addEventListener('animationend', done);
+    return true;
   }
 
   syncTree() {

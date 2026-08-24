@@ -1574,11 +1574,22 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  * rather than arms while a tap on a leaf's dead gutter still reaches the row.
  */
 {
-  const r = await page.evaluate(() => {
+  /*
+   * Measured at rest, not on the way in. #menu enters on a translate, so a
+   * difference between two rects inside it survives being measured mid-slide
+   * -- but elementFromPoint takes viewport coordinates and does not, and a
+   * row still hundreds of pixels below the fold answers "nothing" rather than
+   * "the wrong thing". The first version of this case measured during the
+   * entrance and passed only because the menu happened to be open already.
+   */
+  await page.evaluate(() => {
     const g = window.__sim;
     g.debugGiveEnergy(2600);
     g.hud.menu.setOpen(true);
     g.hud.menu.show('tree');
+  });
+  await page.waitForTimeout(400);
+  const r = await page.evaluate(() => {
     const vis = (el) => el.getBoundingClientRect().width > 0;
     const rows = [...document.querySelectorAll('.treeRow')];
     // Every price is either a box or a readout, never the wrong one.
@@ -1607,14 +1618,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const ib = head.querySelector('.treeIcon').getBoundingClientRect();
     const arrow = cb.left + cb.width / 2 - rb.left;
     const middle = (ib.left - rb.left) / 2;
-    // A leaf's gutter is dead, so the row underneath it takes the press —
+    // A leaf's gutter is dead, so the row underneath it takes the press --
     // the left edge of a leaf used to be a zone that swallowed the buy.
     const leaf = rows.find((x) => vis(x) && !x.querySelector('.treeGutWord'));
+    leaf.scrollIntoView({ block: 'center' });
     const lg = leaf.querySelector('.treeGut').getBoundingClientRect();
-    const hit = document.elementFromPoint(lg.left + lg.width / 2, lg.top + lg.height / 2) === leaf;
-    g.hud.menu.setOpen(false);
+    const top = document.elementFromPoint(lg.left + lg.width / 2, lg.top + lg.height / 2);
+    const hit = top === leaf;
+    const hitWas = top ? `${top.tagName}.${top.className}` : 'nothing';
+    window.__sim.hud.menu.setOpen(false);
     return { rows: rows.length, wrong, said, armedByCaret, arrow: +arrow.toFixed(1),
-      middle: +middle.toFixed(1), hit, boxes: rows.filter((x) =>
+      middle: +middle.toFixed(1), hit, hitWas,
+      leafName: leaf.querySelector('.treeName').textContent,
+      leafBox: [Math.round(lg.left), Math.round(lg.top)],
+      boxes: rows.filter((x) =>
         x.querySelector('.treeCost').classList.contains('box')).length };
   });
   const words = r.said.length === 2
@@ -1626,7 +1643,109 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     words && !r.armedByCaret, JSON.stringify(r.said) + ` armed:${r.armedByCaret}`);
   check('the arrow is centred between the row edge and its text',
     Math.abs(r.arrow - r.middle) <= 2 && r.hit,
-    `arrow at ${r.arrow}, middle at ${r.middle}, leaf gutter reaches the row: ${r.hit}`);
+    `arrow at ${r.arrow}, middle at ${r.middle}; leaf ${r.leafName} at ${r.leafBox} `
+    + `reaches the row: ${r.hit} (hit ${r.hitWas})`);
+}
+
+// --- the loadout sheet has a door to the tree --------------------------------
+/*
+ * Half of what the loadout sheet lists reads LOCKED, and a locked round is
+ * unsealed in the upgrade tree and nowhere else -- so the screen that raises
+ * the question had no way to the screen that answers it. There is a bar at
+ * its foot now, outside the scroller so it is there when the question is
+ * asked, and it lands on this group's own branch rather than on the top of
+ * eighty rows.
+ *
+ * Two things this checks that broke while it was being built: the branch
+ * counts have to partition the tree's own total (a wrong `inBranch` would
+ * still produce plausible numbers), and the landing has to clear the ENERGY
+ * strip, which is sticky at the top of the same scroller and parked the row
+ * you were sent to underneath itself.
+ */
+{
+  /*
+   * Same rule as the tree case above: the sheet enters on a translate, so it
+   * is opened, left to settle, and only then measured. Measured on the way in
+   * it sits 14px lower than it ever will and reads as hanging off the bottom
+   * of the screen.
+   */
+  const read = async (group) => {
+    await page.evaluate((g) => {
+      window.__sim.debugGiveEnergy(4000);
+      window.__sim.hud.menu.setOpen(false);
+      window.__sim.openLoadout(g);
+    }, group);
+    await page.waitForTimeout(320);
+    return page.evaluate(() => {
+      const bar = document.getElementById('loadMore');
+      const list = document.getElementById('loadList');
+      const sheet = document.getElementById('loadout').getBoundingClientRect();
+      const bb = bar.getBoundingClientRect();
+      return {
+        name: bar.querySelector('.loadMoreName').textContent,
+        line: bar.querySelector('.loadMoreLine').textContent,
+        // Outside the scroller and at the foot of the sheet: a door that
+        // scrolls away is a door most people never find.
+        belowList: bb.top >= list.getBoundingClientRect().bottom - 1,
+        atFoot: Math.abs(sheet.bottom - bb.bottom) <= 2,
+        wide: bb.width >= sheet.width - 4,
+        onScreen: bb.bottom <= window.innerHeight + 1 && bb.top >= 0,
+        box: [Math.round(bb.top), Math.round(bb.bottom), Math.round(window.innerHeight)],
+      };
+    });
+  };
+  const ammo = await read('ammo');
+  // Press it: the sheet goes, the tree comes up standing on AMMUNITION. Every
+  // figure here is a difference between two rects, so the menu still sliding
+  // in cannot spoil it.
+  const jump = await page.evaluate(() => {
+    const g = window.__sim;
+    document.getElementById('loadMore').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const landed = document.querySelector('.treeRow.landed');
+    const head = document.querySelector('.menuPanel.tree .treeHead');
+    return {
+      sheetShut: document.getElementById('loadout').hidden,
+      stillOpen: g.loadoutOpen,
+      menu: g.hud.menu.open && g.hud.menu.tab,
+      on: landed && landed.querySelector('.treeName').textContent,
+      branchOpen: !!landed && !landed.parentElement.classList.contains('shut'),
+      // Clear of the ENERGY strip, which is sticky at the top of the same
+      // scroller and used to park the row you were sent to underneath it.
+      clearOfHead: landed
+        ? Math.round(landed.getBoundingClientRect().top - head.getBoundingClientRect().bottom) : null,
+    };
+  });
+  const mines = await read('mines');
+  const rest = await page.evaluate(() => {
+    const g = window.__sim;
+    const w = g.world;
+    document.getElementById('loadMore').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const second = document.querySelector('.treeRow.landed');
+    const jump2 = { on: second && second.querySelector('.treeName').textContent,
+      marks: document.querySelectorAll('.treeRow.landed').length };
+    // The branch counts have to add up to the tree's own, or one of them is
+    // counting rows that belong to somebody else.
+    const m = g.hud.menu;
+    const roots = ['turret', 'ammo', 'mines', 'abilities', 'anomaly'];
+    const parts = Object.fromEntries(roots.map((k) => [k, m.reachCount(w, k)]));
+    const missing = m.openTo('no-such-branch-key');
+    m.setOpen(false);
+    g.closeLoadout();
+    return { jump2, parts, total: m.reachCount(w),
+      sum: roots.reduce((a, k) => a + parts[k], 0), missing };
+  });
+  check('the loadout sheet carries a bar to its own branch of the tree',
+    ammo.name === 'AMMUNITION UPGRADES' && mines.name === 'MINE UPGRADES'
+    && [ammo, mines].every((x) => x.belowList && x.atFoot && x.wide && x.onScreen),
+    JSON.stringify({ ammo, mines }));
+  check('pressing it closes the sheet and stands the tree on that branch',
+    jump.sheetShut && jump.stillOpen === null && jump.menu === 'tree'
+    && jump.on === 'AMMUNITION' && jump.branchOpen && jump.clearOfHead >= 0
+    && rest.jump2.on === 'MINES' && rest.jump2.marks === 1 && rest.missing === false,
+    JSON.stringify({ jump, jump2: rest.jump2, unknownKey: rest.missing }));
+  check('a branch count is a part of the tree count, and the parts are the whole',
+    rest.sum === rest.total && rest.total > 0,
+    `${JSON.stringify(rest.parts)} sums to ${rest.sum}, tree says ${rest.total}`);
 }
 
 // --- report -----------------------------------------------------------------
