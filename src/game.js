@@ -2,6 +2,9 @@
 
 import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID } from './config.js';
 import { Ordinal, openAperture } from './boss.js';
+// Imported for the side effect: a boss module registers its constructor
+// with anomaly.js on load, and nothing else references it by name.
+import './gnomon.js';
 import { nameOf, dressOf, heldList } from './anomaly.js';
 import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
@@ -457,8 +460,15 @@ export class Game {
     return n;
   }
 
-  /** Is this node's parent bought, or free? */
+  /**
+   * Is this node's parent bought, or free -- and is whatever it waits on done?
+   *
+   * `needs` is an anomaly number: a way in to the second boss does not open
+   * until the first has been broken at least once, which is progression
+   * rather than a purchase and so is not something a parent node can say.
+   */
   available(n) {
+    if (n.needs && !this.world.reconciled.includes(n.needs)) return false;
     for (let p = n.parent; p; p = p.parent) {
       if (p.free) continue;
       if (!p.id || !this.owned(p.id)) return false;

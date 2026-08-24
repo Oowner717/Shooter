@@ -85,6 +85,21 @@ export const CODEX = [
     line: 'Garrisoned, not built in. It was only ever waiting for a door.',
   },
   {
+    id: 'gnomon',
+    name: 'GNOMON',
+    line: 'It does not count you, it times you. The dial is the hour; the needle throws the shadow; the shadow is the only wall it ever really had.',
+  },
+  {
+    id: 'dial',
+    name: 'DIAL',
+    line: 'One arc of the face. The hours cut into it go out as it does.',
+  },
+  {
+    id: 'second',
+    name: 'SECOND',
+    line: 'It waited behind an hour for the hour to break. Nothing about the dial governs it now.',
+  },
+  {
     id: 'towMass',
     name: 'MASS',
     line: 'The far end of a cable. It arrives by being swung, and it arrives regardless.',

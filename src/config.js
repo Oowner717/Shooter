@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '127';
+export const BUILD = '128';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '127';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'b7d7e3e';
+export const REV = 'a5b9e95';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -944,6 +944,109 @@ export const CFG = {
   },
 
   /*
+   * ---- GNOMON, anomaly II ----
+   *
+   * ORDINAL's problem was alignment: two frames turning at different rates,
+   * and you waited for your holes to line up. GNOMON is that inverted. The
+   * holes you make in the dial stay exactly where you put them -- and what
+   * moves is the *shadow*, thrown by a needle sweeping out of the middle.
+   *
+   * A round that crosses the shadow decays and dies. So the dial is not the
+   * only thing between you and the core: the light is, and the light is on a
+   * clock. Everything else here is a consequence of that one idea.
+   */
+  gnomon: {
+    cost: 140,
+    standoff: 380,
+    arrive: 14.6,
+    // sky, hole, through, unfold -- the same staging as ORDINAL, because it
+    // is the staging of an arrival rather than anything about ORDINAL.
+    beats: [0.14, 0.36, 0.6, 1],
+    coreR: 40,
+    /*
+     * The dial: one ring of arcs.
+     *
+     * `r` on the type is 30, and 16 arcs at radius 150 need to be at least
+     * that to meet: the circumference is 2*pi*150, a shade over 942, and 16
+     * segments across it want a diameter of 58.9. Under that and rounds go
+     * through the gaps, which is the same bug ORDINAL shipped once and the
+     * same arithmetic guards it -- see scripts/check-build.mjs.
+     */
+    dialR: 150,
+    arcs: 16,
+    dialSpin: -0.16, // the dial turns one way...
+    /*
+     * ...and the needle the other, which is what makes the shadow sweep
+     * across holes that are themselves moving. Signed, and multiplied by the
+     * stage, like ORDINAL's frames.
+     */
+    needleSpin: 0.30,
+    needleLen: 232, // reaches well past the dial, so the shadow is thrown wide
+    needleSeg: 6, // collinear bodies making it up: the physics has only circles
+    needleR: 11,
+    /*
+     * The shadow. `half` is half its angle, so 0.52 is a wedge of about 60
+     * degrees. A round inside it decays; the turret inside it is corrupted,
+     * which is the one currency a boss is allowed to take.
+     */
+    shadowHalf: 0.52,
+    shadowShock: 0.3,
+    shadowFrom: 46, // no shadow inside this radius: the core is not in its own
+    /*
+     * NOON. The setpiece, when half the dial is gone: the needle spins up and
+     * throws its shadow once round the whole field. Everything in flight
+     * dies, every SECOND still waiting leaves at once, and the dial puts part
+     * of itself back -- so the answer to NOON is to have been ahead of it.
+     */
+    noonAt: 0.5, // dial fraction it fires at
+    noonSpin: 7.5, // rad/s while it runs
+    noonFor: 3.4,
+    noonRebuild: 0.55, // how much of the dial it puts back
+    // Stages, read the same way ORDINAL's are: off the dial, then the core.
+    stageCore: 0.55,
+    stageDescend: 0.25,
+    close: 235, // how near it comes in IV
+    descendFor: 12,
+    // ...how fast the needle turns per stage, and how many needles there are.
+    spin: [1, 1.5, 2.1, 2.4],
+    needles: [1, 2, 2, 1], // II grows a second one; IV plants the survivor
+    garrison: [11, 8, 13, 16],
+    /*
+     * Seconds between mends, 0 for never -- and III is 0 on purpose.
+     *
+     * GNOMON has one dial where ORDINAL has two frames, so mending it in the
+     * late stages puts the wall straight back between you and the core.
+     * Measured with III mending on a 7-second clock: the core went from 53%
+     * to 39% over a hundred and thirty seconds while the dial oscillated
+     * between an eighth and a third of itself, which is not a stage, it is a
+     * treadmill. Mending belongs to II, where re-opening the dial *is* the
+     * stage.
+     */
+    repair: [0, 8, 0, 0],
+    repairHp: 0.5,
+    repairCap: 0.45,
+    /*
+     * ...and how often the core throws SECONDs itself. Auto aim takes what is
+     * nearest and a SECOND is always nearer than a core, so a fast burst
+     * simply parks the turret's whole output on the garrison. Pressure, not a
+     * wall -- the same lesson ORDINAL's stage III taught at 3.4 seconds.
+     */
+    burst: [0, 0, 7.5, 5.5],
+    burstOf: 2,
+    /*
+     * IV. The needle comes down: it stops being a sweep and becomes a wall,
+     * planted beside the turret, pulsing rings of shadow out of where it fell.
+     * It is the one thing in this fight that does not move again.
+     */
+    plantFor: 1.4, // seconds of it falling
+    plantAt: 150, // how far to the side of the turret it lands
+    plantPulse: 2.8, // seconds between the rings it throws
+    endFor: 13.6,
+    pull: 900,
+    pay: 900,
+  },
+
+  /*
    * ---- what every boss shares ----
    *
    * Five numbers that are about *a* boss ending rather than about ORDINAL.
@@ -1467,6 +1570,80 @@ export const ENEMY_TYPES = [
     wobble: 1.8,
     color: '#ffa8e8',
     glow: '#ff5fd0',
+    weight: 0,
+    drops: 3,
+  },
+  /*
+   * ---- GNOMON's three ----
+   *
+   * Amber, and the whole cast is: a boss's colour is its identity, and every
+   * body that comes through its way in wears it.
+   */
+  {
+    // One arc of the dial. Solid, like a TALLY: a round stops in it, which is
+    // what makes a hole a hole. Sized in CFG.gnomon so the arcs of the ring
+    // meet -- a dial with gaps in it is not a dial.
+    id: 'dial',
+    unlock: 0,
+    name: 'DIAL',
+    shape: 'dial',
+    r: 30,
+    hp: 150,
+    fixed: true,
+    density: 6,
+    speed: 0,
+    accel: 0,
+    restitution: 0.15,
+    wobble: 0,
+    armor: 0.12,
+    color: '#ffb066',
+    glow: '#ff8a3d',
+    weight: 0,
+    drops: 2,
+    debris: 5,
+  },
+  {
+    // The disc at the middle of the dial, and the thing the needle turns on.
+    // It does not move until the last quarter, when it comes down.
+    id: 'gnomon',
+    unlock: 0,
+    name: 'GNOMON',
+    shape: 'gnomon',
+    r: 40,
+    // Lower than ORDINAL's 1900 despite being the later fight, because the
+    // shadow already takes a third of the turret's output off the table:
+    // measured, the core absorbed under 6 damage a second through stage III.
+    hp: 1500,
+    large: true,
+    fixed: true,
+    density: 9,
+    speed: 0,
+    accel: 0,
+    restitution: 0.2,
+    wobble: 0,
+    armor: 0.2,
+    color: '#ff8a3d',
+    glow: '#ff6a1a',
+    weight: 0,
+    drops: 26,
+    debris: 22,
+  },
+  {
+    // A second, in the hours sense. Parked behind an arc until that arc is
+    // gone, and a sovereign object from the moment it is out.
+    id: 'second',
+    unlock: 0,
+    name: 'SECOND',
+    shape: 'second',
+    r: 10,
+    hp: 76,
+    density: 0.8,
+    speed: 104,
+    accel: 250,
+    restitution: 0.72,
+    wobble: 1.8,
+    color: '#ffc98a',
+    glow: '#ffa04d',
     weight: 0,
     drops: 3,
   },

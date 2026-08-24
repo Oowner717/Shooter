@@ -59,6 +59,9 @@ export function drawSpecimen(ctx, id, r) {
     case 'tally': drawTally(ctx, r, 1); break;
     case 'ordinal': drawOrdinal(ctx, r, 0, 0, 1); break;
     case 'digit': drawDigit(ctx, r, 0, 0); break;
+    case 'dial': drawDial(ctx, r, 1); break;
+    case 'gnomon': drawGnomon(ctx, r, 0, 0, 1); break;
+    case 'second': drawSecond(ctx, r, 0, 0); break;
     case 'hex': drawHex(ctx, r); break;
     case 'blob': drawBlob(ctx, r, 0.6, 0); break;
     case 'bloom': drawBloom(ctx, r, 0.4, 0, t); break;
@@ -1040,6 +1043,9 @@ export class Enemy {
       case 'tally': drawTally(ctx, this.r, hpFrac); break;
       case 'ordinal': drawOrdinal(ctx, this.r, this.phase, world.time, hpFrac); break;
       case 'digit': drawDigit(ctx, this.r, this.phase, world.time); break;
+      case 'dial': drawDial(ctx, this.r, hpFrac); break;
+      case 'gnomon': drawGnomon(ctx, this.r, this.phase, world.time, hpFrac); break;
+      case 'second': drawSecond(ctx, this.r, this.phase, world.time); break;
       case 'tow': drawTowHead(ctx, this.r); break;
       case 'mass': drawTowMass(ctx, this.r, hpFrac); break;
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
@@ -1411,6 +1417,102 @@ function drawOrdinal(ctx, r, phase, t, hpFrac) {
  * obviously of the same make as the frame it came out of, so a loose one
  * still reads as ORDINAL's rather than as a new object type arriving.
  */
+/*
+ * ---- GNOMON's three ----
+ */
+
+/**
+ * One arc of the dial: a slab curved the long way, with hour ticks cut into
+ * its outer edge that go out as it is broken. Drawn along its own axis, the
+ * way a TALLY is, so the boss only has to hand it an angle.
+ */
+function drawDial(ctx, r, hpFrac) {
+  const L = r * 2.0; // along the ring
+  const T = r * 0.6; // across it
+  const bow = r * 0.22; // how much the outer edge bellies out
+  ctx.beginPath();
+  ctx.moveTo(-L / 2, -T / 2);
+  ctx.quadraticCurveTo(0, -T / 2 - bow, L / 2, -T / 2);
+  ctx.lineTo(L / 2, T / 2);
+  ctx.quadraticCurveTo(0, T / 2 - bow * 0.4, -L / 2, T / 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Hours, going out as the arc goes. Four is enough to read at this size.
+  const marks = 4;
+  const lit = Math.ceil(marks * hpFrac);
+  const stroke = ctx.strokeStyle;
+  ctx.save();
+  ctx.lineWidth = Math.max(HAIRLINE * 0.8, r * 0.08);
+  for (let i = 0; i < marks; i++) {
+    const x = -L / 2 + (i + 0.5) * (L / marks);
+    ctx.strokeStyle = i < lit ? stroke : rgba('#3a2a18', 0.9);
+    ctx.beginPath();
+    ctx.moveTo(x, -T / 2 - bow * 0.5);
+    ctx.lineTo(x, -T / 6);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * The core: a disc with a graduated rim, and a bright pinhole at the middle
+ * that the needle turns on. The rim is a face, so the thing at the centre of
+ * a sundial reads as the instrument it is.
+ */
+function drawGnomon(ctx, r, phase, t, hpFrac) {
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+
+  const stroke = ctx.strokeStyle;
+  ctx.save();
+  // The face: twelve graduations, dimming as it is worn down.
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.05);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * TAU;
+    const long = i % 3 === 0;
+    ctx.strokeStyle = rgba(long ? '#ffd9a8' : '#ffa860', 0.28 + 0.5 * hpFrac);
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * (long ? 0.62 : 0.74), Math.sin(a) * r * (long ? 0.62 : 0.74));
+    ctx.lineTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9);
+    ctx.stroke();
+  }
+  // ...and the pinhole, which is the only part of it that is ever bright.
+  const beat = 0.62 + 0.38 * Math.sin(t * 2.2 + phase);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = rgba('#fff0d0', 0.5 + 0.5 * beat);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.19 * (0.85 + 0.15 * beat), 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = rgba(stroke, 0.6);
+  ctx.restore();
+}
+
+/** A SECOND: a small hard tick, leaning the way it is going. */
+function drawSecond(ctx, r, phase, t) {
+  const w = r * 0.5;
+  const h = r * 1.15;
+  ctx.beginPath();
+  ctx.moveTo(0, -h);
+  ctx.lineTo(w, 0);
+  ctx.lineTo(0, h * 0.62);
+  ctx.lineTo(-w, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.14);
+  ctx.globalAlpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 6 + phase));
+  ctx.beginPath();
+  ctx.moveTo(0, -h * 0.5);
+  ctx.lineTo(0, h * 0.3);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawDigit(ctx, r, phase, t) {
   const w = r * 0.72;
   const h = r * 1.05;

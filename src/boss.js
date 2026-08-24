@@ -171,22 +171,380 @@ class Remainder {
   }
 }
 
-export class Ordinal {
-  constructor(world) {
-    const C = O();
-    this.x = world.shooter.x;
-    this.y = world.shooter.y - C.standoff;
+/**
+ * What every boss is, underneath.
+ *
+ * ORDINAL was written before there was a second one, so the parts of it that
+ * are about *a* boss got tangled with the parts that are about counting.
+ * This is the untangled half: the bodies, the captions, the arrival and the
+ * death, in the shape all seven need them.
+ *
+ * ORDINAL takes the small mechanical parts from here and keeps its own
+ * arrival and death, which are tuned to the second and measured. That is
+ * deliberate: rewriting a fight that works, in order to share code with a
+ * fight that does not exist yet, is how you break the one that works. A boss
+ * written against this class gets the whole of it.
+ */
+export class Boss {
+  constructor(world, n) {
+    this.n = n; // which of the seven. See anomaly.js.
     this.t = 0;
-    this.arriving = C.arrive;
     this.stage = 1;
     this.stageT = 0;
     this.dying = 0;
     this.done = false;
-    this.n = 1; // which of the seven. See anomaly.js.
+    this.flare = 0; // white bloom on a stage change or a mend
+    this.beams = []; // mend beams, drawn from the core to what it is mending
     this.repairT = 0;
     this.burstT = 0;
-    this.flare = 0; // white bloom on a stage change or a repair
-    this.beams = []; // repair beams, drawn from the core to what it is mending
+    this.parked = [];
+    this.arriving = 0;
+    this.entry = 0;
+  }
+
+  /** One of this boss's bodies: fixed in place, off the ledger, off the tally. */
+  body(id, x, y, r) {
+    const e = new Enemy(TYPE_BY_ID[id], x, y, { staged: false, spawnIn: 0.9, r });
+    e.counts = false; // it is not one of the five hundred
+    e.mass = Infinity;
+    e.invMass = 0;
+    e.cruise = 0;
+    e.accel = 0;
+    return e;
+  }
+
+  get coreFrac() {
+    return this.core.dead ? 0 : clamp(this.core.hp / this.core.maxHp, 0, 1);
+  }
+
+  /**
+   * Step a caption script. One line at a time, each held for as long as it
+   * takes to read, and the whole thing gets out of the way when it is done.
+   */
+  say(world, script, raw) {
+    if (this.line === undefined) { this.line = 0; this.lineT = 0; }
+    if (this.line >= script.length) return true;
+    this.lineT += raw;
+    const cur = script[this.line];
+    world.bossLine = cur.text;
+    if (this.lineT >= cur.hold) {
+      this.lineT = 0;
+      this.line++;
+      if (this.line >= script.length) world.bossLine = null;
+    }
+    return this.line >= script.length;
+  }
+
+  /** Everything of this boss's that is a placed body. Overridden per boss. */
+  parts() {
+    return [];
+  }
+
+  /** The per-frame housekeeping every boss does before anything else. */
+  tickCommon(world, dt) {
+    this.flare = Math.max(0, this.flare - dt * 2.2);
+    if (this.lineFor > 0) {
+      this.lineFor -= world.dtRaw || dt;
+      if (this.lineFor <= 0) world.bossLine = null;
+    }
+    for (let i = this.beams.length - 1; i >= 0; i--) {
+      this.beams[i].t -= dt;
+      if (this.beams[i].t <= 0) this.beams.splice(i, 1);
+    }
+  }
+
+  /**
+   * Belt to the arrival's braces. A part joins world.enemies as it lands, but
+   * anything that shortcuts the arrival -- a test setting `arriving = 0`, a
+   * frame dropped under load -- would otherwise leave a boss standing there
+   * with a structure nothing can see or shoot.
+   */
+  settle(world) {
+    if (this.settled) return;
+    this.settled = true;
+    for (const p of this.parts()) {
+      p.landed = true;
+      if (p.hidden) continue;
+      p.spawnIn = 0;
+      if (!p.dead && !world.enemies.includes(p)) world.enemies.push(p);
+    }
+  }
+
+  /**
+   * A dead part, put back at part health -- and put back into the world.
+   *
+   * sweep() removes a dead body from world.enemies with a swap-and-pop, so
+   * clearing `dead` on one the boss still holds a reference to revives it
+   * *outside* the field: counted by the gauge, impossible to see or hit.
+   * ORDINAL shipped that once; it is a law now.
+   */
+  revive(world, p, hpFrac) {
+    p.dead = false;
+    p.maxHp = p.type.hp;
+    p.hp = Math.round(p.maxHp * hpFrac);
+    p.spawnIn = 0.4;
+    p.flash = 1;
+    p.free = null;
+    p.homing = 0;
+    if (!world.enemies.includes(p)) world.enemies.push(p);
+  }
+
+  /**
+   * The arrival, in four beats: the sky turns over, a hole opens, the thing
+   * comes through it, and its structure assembles out of the dark.
+   *
+   * Nothing can be hurt for any of it, and the health is pinned rather than
+   * merely ignored -- a stray round landing on a boss that has not finished
+   * arriving is a fight that started before the player was looking.
+   */
+  arriveStep(world, raw, C, script, moods) {
+    this.arriving -= raw;
+    this.t += raw;
+    const k = clamp(1 - this.arriving / C.arrive, 0, 1);
+    this.entry = k;
+    const [b1, b2, b3] = C.beats;
+
+    for (const p of this.parts()) p.hp = p.maxHp;
+    this.core.hp = this.core.maxHp;
+
+    const unfold = k < b3 ? 0 : (k - b3) / (1 - b3);
+    const all = this.parts();
+    let popped = 0;
+    for (let i = 0; i < all.length; i++) {
+      const p = all[i];
+      if (p.hidden) continue;
+      const due = i / all.length;
+      p.spawnIn = unfold > due ? 0 : 1;
+      if (unfold > due && !p.landed) {
+        p.landed = true;
+        world.enemies.push(p);
+        ring(p.x, p.y, p.r * 2.4, p.r * 0.6, 0.22, p.type.glow, 2);
+        if (popped++ < 2) audio.pop(0.5);
+      }
+    }
+    this.core.spawnIn = k < b2 ? 1 : clamp(1 - (k - b2) / (b3 - b2), 0, 1);
+    this.place(raw * 0.5);
+
+    background.setDread(clamp(k / b1, 0, 1), 0);
+    background.setFocus(this.x, this.y);
+    if (!this.moodSet && k >= b1 * 0.5) {
+      this.moodSet = true;
+      if (moods) background.setBossMoods(moods);
+      background.setMood('boss');
+    }
+
+    const T = this.core.type;
+    const beat = k < b1 ? 0 : k < b2 ? 1 : k < b3 ? 2 : 3;
+    if (beat !== this.beatAt) {
+      this.beatAt = beat;
+      if (beat >= 1) {
+        ring(this.x, this.y, 4, 120 + beat * 220, 0.4 + beat * 0.12, T.glow, 5 - beat);
+        background.surge(1.4);
+        shake(6 + beat * 5);
+        audio.boom();
+      }
+    }
+    this.say(world, script, raw);
+    if (this.arriving <= 0) {
+      this.entry = 1;
+      world.bossLine = null;
+      ring(this.x, this.y, 20, 640, 0.7, '#ffffff', 5);
+      ripple(this.x, this.y, 2.6, 900);
+      shake(22);
+      audio.boom();
+      background.surge(2);
+    }
+  }
+
+  /**
+   * The end, in four beats, on the real clock -- so the slow motion does not
+   * stretch the sequence it is there to make readable.
+   *
+   *   ARREST      the structure stops dead and comes apart, piece by piece
+   *   INFALL      the core takes everything loose on the field into itself
+   *   DETONATION  and lets go of all of it in one frame
+   *   AFTER       the REMAINDER rises out of what is left and comes to you
+   */
+  die(world, C) {
+    this.dying = C.endFor;
+    this.beat = 0;
+    this.lineFor = 0;
+    world.bossLine = null;
+    this.snapped = 0;
+    world.timeScale = B().endSlow;
+    world.bossSlow = B().slowFor;
+    for (const d of this.parked) d.dead = true;
+    this.parked.length = 0;
+    ring(this.x, this.y, 8, 240, 0.5, '#ffffff', 4);
+    ripple(this.x, this.y, 2.4, 700);
+    shake(20);
+    audio.boom();
+    background.surge(2);
+  }
+
+  dieStep(world, dt, C, outro) {
+    if (this.blew) {
+      if (this.outroAt === undefined) { this.outroAt = 0; this.line = 0; this.lineT = 0; }
+      this.say(world, outro, world.dtRaw || dt);
+    }
+    const raw = world.dtRaw || dt;
+    this.dying -= raw;
+    this.beat += raw;
+    const t = this.beat;
+    const A = C.arrest !== undefined ? C.arrest : 0.7;
+    const I = C.infall !== undefined ? C.infall : 1.1;
+    if (t < A) { this.dieExtra(world, t / A); this.arrest(world, t / A); }
+    else if (t < A + I) {
+      this.arrest(world, 1);
+      this.infall(world, raw, (t - A) / I, C);
+    } else if (!this.blew) this.detonate(world, C);
+    this.place(dt * 0.2);
+    if (this.dying <= 0) this.done = true;
+  }
+
+  /** A hook for whatever a particular ending does on the way down. */
+  dieExtra() {}
+
+  /** ARREST: pieces snapping off, one after another rather than all at once. */
+  arrest(world, k) {
+    const all = this.parts().filter((p) => !p.dead && !p.hidden);
+    const want = Math.ceil(all.length * clamp(k, 0, 1));
+    while (this.snapped < want && all.length) {
+      const p = all.shift();
+      if (!p || p.dead) { this.snapped++; continue; }
+      p.dead = true;
+      this.snapped++;
+      explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.5);
+      ring(p.x, p.y, 2, p.r * 5, 0.3, p.type.glow, 2);
+      for (let i = 0; i < 4; i++) {
+        const a = rand(0, TAU);
+        spark(p.x, p.y, Math.cos(a) * rand(90, 260), Math.sin(a) * rand(90, 260),
+          p.type.color, rand(0.3, 0.7), 2);
+      }
+    }
+  }
+
+  /** INFALL: the core taking the field into itself. */
+  infall(world, dt, k, C) {
+    const grab = (list) => {
+      for (const e of list) {
+        if (e.dead) continue;
+        const dx = this.x - e.x;
+        const dy = this.y - e.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const f = C.pull * k * dt / d;
+        e.vx += dx * f;
+        e.vy += dy * f;
+      }
+    };
+    grab(world.enemies);
+    grab(world.drops);
+    grab(world.debris);
+    if (Math.random() < 0.5) {
+      const rr = 520 * (1 - k) + 40;
+      ring(this.x, this.y, rr, rr * 0.2, 0.28, this.core.type.glow, 2);
+    }
+    shake(3 + k * 6);
+  }
+
+  /** DETONATION: one frame, everything at once, and a wreck that stays. */
+  detonate(world, C) {
+    const T = this.core.type;
+    this.blew = true;
+    flash(0.85, '#ffffff');
+    for (let i = 0; i < 6; i++) {
+      ring(this.x, this.y, 6 + i * 24, 300 + i * 240, 0.55 + i * 0.15,
+        i % 2 ? '#ffffff' : T.glow, 7 - i);
+    }
+    for (let i = 0; i < 30; i++) {
+      const a = (i / 30) * TAU + rand(-0.05, 0.05);
+      const sp = rand(420, 900);
+      spark(this.x, this.y, Math.cos(a) * sp, Math.sin(a) * sp, i % 3 ? T.color : '#ffffff',
+        rand(0.5, 1.1), 3);
+    }
+    explode(this.x, this.y, C.coreR * 2, T.color, T.glow, 4);
+    /*
+     * The husk. Ordinary wreckage clears itself, which is right for a BULWARK
+     * breaking mid-wave and wrong here: a boss that leaves an empty field
+     * reads as having been deleted rather than broken. These are keeps.
+     */
+    for (const p of this.parts()) {
+      shed(world, { x: p.x, y: p.y, r: p.r, vx: 0, vy: 0, type: p.type }, 2,
+        { keep: true, size: 2 });
+    }
+    shed(world, { x: this.x, y: this.y, r: C.coreR, vx: 0, vy: 0, type: T }, 14,
+      { keep: true, size: 1.9 });
+    ripple(this.x, this.y, 4, 1500);
+    shake(40);
+    audio.boom();
+    background.surge(2);
+    for (let i = 0; i < 30; i++) {
+      const a = (i / 30) * TAU + rand(-0.1, 0.1);
+      const sp = rand(220, 520);
+      world.drops.push(new Enemy(T, this.x, this.y, {
+        drop: true, r: rand(3.4, 5.8), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        energy: C.pay / 30,
+      }));
+    }
+    world.remainderFrom = this.n;
+    for (let i = 0; i < B().remainder; i++) {
+      world.effects.push(new Remainder(this.x, this.y));
+    }
+  }
+
+  /** Take everything of this boss's off the field. */
+  clear(world) {
+    for (const p of this.parts()) p.dead = true;
+    this.core.dead = true;
+    for (const d of this.parked) d.dead = true;
+    this.parked.length = 0;
+    background.setDread(0, 0);
+    background.setFocus(null, null);
+  }
+
+  // --------------------------------------------------------------- draw
+
+  /** The hole it comes out of, and falls back into. */
+  drawHole(ctx, C, T, arriving) {
+    if (!arriving && this.dying <= 0) return;
+    const g = arriving
+      ? 1 - clamp(this.arriving / C.arrive, 0, 1)
+      : clamp(this.dying / C.endFor, 0, 1);
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 4; i++) {
+      const rr = (60 + i * 90) * g;
+      ctx.strokeStyle = rgba(T.glow, 0.5 * g * (1 - i * 0.18));
+      ctx.lineWidth = 3 - i * 0.5;
+      ctx.beginPath();
+      ctx.ellipse(this.x, this.y, rr, rr * (0.42 + 0.5 * g), this.t * (0.6 + i * 0.2), 0, TAU);
+      ctx.stroke();
+    }
+    drawGlow(ctx, T.glow, this.x, this.y, 300 * g, 0.5 * g);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /** The beams from the core to whatever it is mending. */
+  drawBeams(ctx) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (const b of this.beams) {
+      const k = clamp(b.t / 0.55, 0, 1);
+      ctx.strokeStyle = rgba('#ffffff', 0.7 * k);
+      ctx.lineWidth = 1 + k * 3;
+      ctx.beginPath();
+      ctx.moveTo(this.x, this.y);
+      ctx.lineTo(b.p.x, b.p.y);
+      ctx.stroke();
+    }
+  }
+}
+
+export class Ordinal extends Boss {
+  constructor(world) {
+    super(world, 1);
+    const C = O();
+    this.x = world.shooter.x;
+    this.y = world.shooter.y - C.standoff;
+    this.arriving = C.arrive;
 
     // The two frames. `spin` is signed and multiplied by the stage.
     this.rings = C.rings.map((r) => ({ ...r, angle: r.turn, panels: [] }));
@@ -231,17 +589,6 @@ export class Ordinal {
     background.surge(2);
   }
 
-  /** One of ORDINAL's bodies: fixed in place, off the ledger, off the tally. */
-  body(id, x, y, r) {
-    const e = new Enemy(TYPE_BY_ID[id], x, y, { staged: false, spawnIn: 0.9, r });
-    e.counts = false; // it is not one of the five hundred
-    e.mass = Infinity;
-    e.invMass = 0;
-    e.cruise = 0;
-    e.accel = 0;
-    return e;
-  }
-
   /**
    * Fill the frame with DIGITs, parked behind particular segments.
    *
@@ -278,8 +625,9 @@ export class Ordinal {
     return [this.x + (g.x - this.x) * d.berth, this.y + (g.y - this.y) * d.berth];
   }
 
-  get coreFrac() {
-    return this.core.dead ? 0 : clamp(this.core.hp / this.core.maxHp, 0, 1);
+  /** Every segment of both frames: what settle(), arrest() and clear() walk. */
+  parts() {
+    return this.rings.flatMap((r) => r.panels);
   }
 
   /** Alive segments over the total, per frame — what the bar's ticks show. */
@@ -552,24 +900,6 @@ export class Ordinal {
       audio.boom();
       background.surge(2);
     }
-  }
-
-  /**
-   * Step a caption script. One line at a time, each held for as long as it
-   * takes to read, and the whole thing gets out of the way when it is done.
-   */
-  say(world, script, raw) {
-    if (this.line === undefined) { this.line = 0; this.lineT = 0; }
-    if (this.line >= script.length) return true;
-    this.lineT += raw;
-    const cur = script[this.line];
-    world.bossLine = cur.text;
-    if (this.lineT >= cur.hold) {
-      this.lineT = 0;
-      this.line++;
-      if (this.line >= script.length) world.bossLine = null;
-    }
-    return this.line >= script.length;
   }
 
   update(world, dt) {

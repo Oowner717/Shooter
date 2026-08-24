@@ -23,6 +23,7 @@ const ASSETS = [
   './icons/icon-512.png',
   './src/main.js',
   './src/game.js',
+  './src/gnomon.js',
   './src/config.js',
   './src/tree.js',
   './src/util.js',

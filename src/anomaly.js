@@ -39,7 +39,8 @@
 export const ANOMALIES = [
   { n: 1, key: 'aperture', name: 'ORDINAL', tone: '#ff5ec8', cfg: 'ordinal', built: true,
     types: ['ordinal', 'tally', 'digit'] },
-  { n: 2, key: 'aperture2', name: 'GNOMON', tone: '#ff8a3d', cfg: 'gnomon', built: false, types: [] },
+  { n: 2, key: 'aperture2', name: 'GNOMON', tone: '#ff8a3d', cfg: 'gnomon', built: true,
+    types: ['gnomon', 'dial', 'second'] },
   { n: 3, key: 'aperture3', name: 'FRACTAL', tone: '#8bff4d', cfg: 'fractal', built: false, types: [] },
   { n: 4, key: 'aperture4', name: 'AMPLITUDE', tone: '#2ee6c0', cfg: 'amplitude', built: false, types: [] },
   { n: 5, key: 'aperture5', name: 'DYNAMO', tone: '#4d8dff', cfg: 'dynamo', built: false, types: [] },
@@ -156,16 +157,28 @@ function rotate(hex, turn) {
  */
 export function barRamp(tone) {
   const [h, s, l] = toHsl(tone);
+  /*
+   * Hotter is brighter and more saturated, and stays where it is on the
+   * wheel. The first version of this escalated by turning the hue -- which
+   * is what ORDINAL's hand table does, magenta walking toward red -- and
+   * that is only safe when nothing else owns red.
+   *
+   * Something else does. Generated with a hue walk, every boss ended its
+   * fight wearing the next one's identity: amber finished on crimson,
+   * teal on green, violet on blue, crimson on magenta, and DYNAMO's blue
+   * finished on the cyan the whole interface is drawn in. The colour is the
+   * identity, so the colour is the one thing a stage may not change.
+   */
   const step = [
-    [-0.03, 0.62, l * 0.72], // arriving: back off the wheel, and darker
-    [0, s, l],
-    [-0.02, Math.min(1, s * 1.06), l * 0.98],
-    [-0.04, Math.min(1, s * 1.12), l * 0.95],
-    [-0.08, Math.min(1, s * 1.02), l * 1.04], // IV: it is coming down
+    [s * 0.58, l * 0.7], // arriving: drained, and darker
+    [s, l],
+    [Math.min(1, s * 1.08), Math.min(0.78, l * 1.06)],
+    [Math.min(1, s * 1.16), Math.min(0.82, l * 1.12)],
+    [Math.min(1, s * 1.22), Math.min(0.86, l * 1.2)], // IV: nearly white-hot
   ];
-  return step.map(([dh, ss, ll]) => [
-    toHex(h + dh, ss, ll),
-    toHex(h + dh, Math.min(1, ss * 0.72), Math.min(0.94, ll + 0.3)),
+  return step.map(([ss, ll]) => [
+    toHex(h, ss, ll),
+    toHex(h, Math.min(1, ss * 0.72), Math.min(0.94, ll + 0.3)),
   ]);
 }
 

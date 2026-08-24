@@ -189,24 +189,60 @@ const quicken = (key, by) => (up) => { up[key] *= by; };
  * anomaly.js owns the identity of a boss now; this is the tree's view of it.
  */
 export { BOSS_TONE } from './anomaly.js';
-import { BOSS_TONE as TONES } from './anomaly.js';
+import { BOSS_TONE as TONES, ANOMALIES } from './anomaly.js';
 
-/** II through VII, as they stand: a door, a colour, and nothing behind it. */
-const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-const SLEEPING = TONES.slice(1).map((tone, i) => ({
-  id: `aperture${i + 2}`,
-  name: `${ROMAN[i + 1]} APERTURE`,
-  repeat: true,
-  // Not for sale. There is nothing on the other side of it yet, and a way in
-  // that opens onto nothing is worse than a door that plainly does not open.
-  dormant: true,
-  cost: CFG.ordinal.cost,
-  step: 0,
-  line: 'Sealed. Nothing has been put on the other side of this one yet.',
-  apply: () => {},
-  tone,
-  icon: MARK.aperture,
-}));
+/*
+ * II through VII: a door, a colour, and -- for one of them now -- something
+ * behind it.
+ *
+ * Built from the anomaly table rather than written out, so a boss becomes
+ * buyable by being built rather than by somebody remembering to edit this
+ * list too. A slot that is not built stays dormant: a way in that opens onto
+ * nothing is worse than a door that plainly does not open.
+ *
+ * `needs` is the gate. A slot opens once the boss before it has been broken
+ * at least once -- which is what `world.reconciled` records -- and the line
+ * says so plainly. Teasing what is behind a door while hiding what opens it
+ * reads as a bug rather than as a secret.
+ */
+const HINT = {
+  2: 'Something in here keeps the hours.',
+  3: 'Something in here repeats itself.',
+  4: 'Something in here is oscillating.',
+  5: 'Something in here draws current.',
+  6: 'Something in here has a twin.',
+  7: 'Something in here is the edge of the field.',
+};
+
+const SLEEPING = ANOMALIES.slice(1).map((a) => {
+  const prev = ANOMALIES[a.n - 2];
+  const common = {
+    id: a.key,
+    name: `${a.name} APERTURE`,
+    repeat: true,
+    step: 0,
+    tone: a.tone,
+    icon: MARK.aperture,
+  };
+  if (!a.built) {
+    return {
+      ...common,
+      dormant: true,
+      cost: CFG.ordinal.cost,
+      line: `Sealed behind ${prev.name}. ${HINT[a.n]}`,
+      apply: () => {},
+    };
+  }
+  return {
+    ...common,
+    // Gated on the one before it, and priced by its own config -- which
+    // scripts/check-build.mjs holds it to.
+    needs: prev.n,
+    cost: CFG[a.cfg].cost,
+    line: `A way in to ${a.name}. ${HINT[a.n]}`,
+    apply: (up, world) => { world.apertures[a.n] = (world.apertures[a.n] | 0) + 1; },
+  };
+});
 
 export const UPGRADES = {
   AMMO: [

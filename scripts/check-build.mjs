@@ -52,7 +52,7 @@ console.log(`sw.js precaches all ${src.length} modules`);
 // is content nobody in the game can ever buy. Checked here rather than trusted.
 const { coverage } = await import(new URL('../src/tree.js', import.meta.url));
 const { ALL_UPGRADES } = await import(new URL('../src/upgrades.js', import.meta.url));
-const { ANOMALIES } = await import(new URL('../src/anomaly.js', import.meta.url));
+const { ANOMALIES, barRamp } = await import(new URL('../src/anomaly.js', import.meta.url));
 const cov = coverage();
 if (cov.missing.length || cov.extra.length || cov.dupes.length) {
   if (cov.missing.length) console.error(`tree is missing: ${cov.missing.join(', ')}`);
@@ -247,6 +247,72 @@ if (misprice.length) {
     + `CFG.${a.cfg}.cost ${cfg ? cfg.cost : '(no config)'}`).join('; '));
   process.exit(1);
 }
+/*
+ * GNOMON's dial closes too.
+ *
+ * Same arithmetic as ORDINAL's frames and the same bug it guards against: 16
+ * arcs round a ring of radius 150 have 942 units of circumference to cover,
+ * so each needs a diameter of at least 58.9. Under that and rounds fly
+ * between them, and the fight is about a wall that is not one.
+ */
+{
+  const C = CFG.gnomon;
+  const need = (Math.PI * C.dialR) / C.arcs;
+  const have = TYPE_BY_ID.dial.r;
+  if (have < need - 0.001) {
+    console.error(`GNOMON's dial: ${C.arcs} arcs at radius ${C.dialR} need r ${need.toFixed(2)}, `
+      + `DIAL is r ${have} — rounds go through a dial that does not close`);
+    process.exit(1);
+  }
+  console.log(`GNOMON: ${C.arcs} arcs close a dial of ${C.dialR} (r ${have} >= ${need.toFixed(1)}), `
+    + `${C.needleSeg} segments a needle`);
+}
+
+/*
+ * A stage may not change whose colour it is.
+ *
+ * The gauge escalates through a fight, and the first generated ramp did that
+ * by walking the hue -- which is what ORDINAL's hand-authored table does,
+ * magenta drifting toward red. That is only safe while nothing else owns red.
+ * Generated for the other six it was a disaster: amber finished its fight on
+ * crimson, teal on green, violet on blue, crimson on magenta, and DYNAMO's
+ * blue finished on the cyan the entire interface is drawn in. Every boss
+ * ended up wearing the next one's identity at exactly the moment the fight
+ * was most worth looking at.
+ *
+ * So: a generated ramp stays within a sixtieth of a turn of its own tone.
+ * ORDINAL is exempt because its table is authored rather than generated, and
+ * it was shipped that way.
+ */
+{
+  const hueOf = (hex) => {
+    const v = parseInt(hex.slice(1), 16);
+    const r = ((v >> 16) & 255) / 255;
+    const g = ((v >> 8) & 255) / 255;
+    const b = (v & 255) / 255;
+    const mx = Math.max(r, g, b);
+    const mn = Math.min(r, g, b);
+    if (mx === mn) return 0;
+    const d = mx - mn;
+    if (mx === r) return ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    if (mx === g) return ((b - r) / d + 2) / 6;
+    return ((r - g) / d + 4) / 6;
+  };
+  const apart = (a, b) => { const d = Math.abs(a - b) % 1; return Math.min(d, 1 - d); };
+  const drifted = [];
+  for (const a of ANOMALIES) {
+    if (a.bar) continue; // authored, not generated
+    const own = hueOf(a.tone);
+    for (const [c] of barRamp(a.tone)) {
+      if (apart(hueOf(c), own) > 1 / 60) drifted.push(`${a.name} -> ${c}`);
+    }
+  }
+  if (drifted.length) {
+    console.error(`a gauge ramp leaves its own colour: ${drifted.join(', ')}`);
+    process.exit(1);
+  }
+}
+
 const built = ANOMALIES.filter((a) => a.built);
 const panels = CFG.ordinal.rings.reduce((n, r) => n + r.per * 4, 0);
 console.log(`${built.length} of ${ANOMALIES.length} anomalies built (`

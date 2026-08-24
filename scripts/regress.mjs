@@ -1264,8 +1264,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const slots = NODES.filter((n) => n.id && /^aperture/.test(n.id));
     const live = slots.filter((n) => !n.dormant);
     const sealed = slots.filter((n) => n.dormant);
-    // every one of them refuses, and the open one does not
+    /*
+     * Nothing is reconciled yet, so the only slot that sells is ORDINAL's:
+     * five are sealed behind bosses that do not exist, and GNOMON's is built
+     * but gated behind having broken ORDINAL at least once.
+     */
+    w.reconciled.length = 0;
     const buys = slots.map((n) => ({ id: n.id, r: g.buy(n.id) }));
+    // ...and once ORDINAL has been broken, exactly one more door opens.
+    w.reconciled.push(1);
+    const after = slots.map((n) => ({ id: n.id, r: g.buy(n.id) }));
     const tones = slots.map((n) => n.tone);
     const out = {
       firstIsRecast: first.id === 'recast' && first.kind === 'upgrade',
@@ -1280,19 +1288,33 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       spectrum: (anomaly.tones || []).length,
       opened: buys.filter((b) => b.r === 'ok').map((b) => b.id),
       refused: buys.filter((b) => b.r === 'locked').map((b) => b.id),
+      afterOpened: after.filter((b) => b.r === 'ok').map((b) => b.id),
+      afterRefused: after.filter((b) => b.r === 'locked').length,
+      gnomonHeld: w.apertures[2],
     };
+    w.reconciled.length = 0;
     g.restart();
     return out;
   });
-  check('seven APERTURE slots, one open and six sealed, with RECAST above them all',
+  check('seven APERTURE slots, two built and five sealed, with RECAST above them all',
     r.firstIsRecast && r.recastInTree === 1
-    && r.slots === 7 && r.live === 1 && r.sealed === 6
+    && r.slots === 7 && r.live === 2 && r.sealed === 5
     && r.uniqueTones === 7 && r.matchesPalette && r.spectrum === 7
-    && r.opened.length === 1 && r.opened[0] === 'aperture' && r.refused.length === 6
-    && r.names[0] === 'ORDINAL APERTURE',
-    `${r.slots} slots (${r.live} open, ${r.sealed} sealed), ${r.uniqueTones} distinct colours, `
-    + `heading carries ${r.spectrum}; bought ${JSON.stringify(r.opened)}, refused `
-    + `${r.refused.length}; first row is ${r.firstIsRecast ? 'RECAST' : 'NOT recast'}`);
+    && r.names[0] === 'ORDINAL APERTURE' && r.names[1] === 'GNOMON APERTURE',
+    `${r.slots} slots (${r.live} built, ${r.sealed} sealed), ${r.uniqueTones} distinct colours, `
+    + `heading carries ${r.spectrum}; first row is ${r.firstIsRecast ? 'RECAST' : 'NOT recast'}`);
+  /*
+   * The gate. A way in to the second boss is not sold until the first has
+   * been broken -- and a slot that teases what is behind it while hiding what
+   * opens it reads as a bug, so the line says so.
+   */
+  check('a way in is sold only once the boss before it has been broken',
+    r.opened.join() === 'aperture' && r.refused.length === 6
+    && r.afterOpened.join() === 'aperture,aperture2' && r.afterRefused === 5
+    && r.gnomonHeld === 1,
+    `before: bought ${JSON.stringify(r.opened)}, refused ${r.refused.length}; `
+    + `after ORDINAL: bought ${JSON.stringify(r.afterOpened)}, refused ${r.afterRefused}, `
+    + `GNOMON ways in held ${r.gnomonHeld}`);
 }
 
 // --- options, the way in, and a save that cannot be lost to one bad write ---
@@ -1809,8 +1831,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('one integer holds boss I\'s ways in, under both its names',
     r.readsThrough === 3 && r.writesThrough === 5 && r.clamps === 0,
     JSON.stringify({ read: r.readsThrough, write: r.writesThrough, clamp: r.clamps }));
-  check('seven anomalies, each named and coloured, one of them built',
-    r.seven === 7 && r.named && r.built.join() === '1'
+  check('seven anomalies, each named and coloured, two of them built',
+    r.seven === 7 && r.named && r.built.join() === '1,2'
     && r.tones.split(',').length === 7 && new Set(r.tones.split(',')).size === 7,
     `${r.seven} anomalies, built ${r.built}, tones ${r.tones}`);
   check('a boss dresses its own gauge and sky, and ORDINAL keeps the authored one',
@@ -2013,6 +2035,116 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.reconciled === '1' && r.said.length === 2
     && r.said.every((x) => x === 'ORDINAL RECONCILED'),
     JSON.stringify(r));
+}
+
+// --- GNOMON: the shadow is the fight ----------------------------------------
+/*
+ * ORDINAL's problem was alignment. GNOMON's is occlusion, and the whole fight
+ * rests on one rule: a round inside the shadow dies. If that stops being true
+ * the fight is a dial with holes in it and nothing else, and it would still
+ * look right on screen -- which is exactly the kind of thing that ships.
+ *
+ * Also checked: the dial closes (a wall with gaps is not a wall), the needle
+ * is real bodies rather than a drawing, NOON fires once and only once, and
+ * the shadow costs the intake rather than anything that could kill you.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[2] = 1;
+    g.openBoss(2);
+    const boss = w.boss;
+    const out = { built: boss.constructor.name };
+    boss.arriving = 0;
+    boss.settle(w);
+    g.update(1 / 60);
+
+    // The dial is a closed ring of real, shootable bodies.
+    out.arcs = boss.arcs.length;
+    out.onField = boss.arcs.filter((p) => w.enemies.includes(p)).length;
+    // ...and the needle is bodies too, not a line drawn on the field: stage
+    // IV plants it beside the turret as a wall, which a drawing cannot be.
+    out.needleOnField = boss.needleSegs
+      .filter((p) => !p.hidden && w.enemies.includes(p)).length;
+
+    /*
+     * The rule. A round put inside the wedge dies within a frame; one put
+     * outside it does not. Placed by angle off the boss rather than by
+     * guessing at coordinates, so this keeps meaning what it says if the
+     * needle's rest angle ever changes.
+     */
+    const C = CFG.gnomon;
+    boss.needleA = 0; // pointing +x
+    const at = (ang, rad) => ({ x: boss.x + Math.cos(ang) * rad, y: boss.y + Math.sin(ang) * rad });
+    const put = (p) => {
+      const q = { x: p.x, y: p.y, dead: false, hold: 0, r: 2, vx: 0, vy: 0 };
+      w.projectiles.push(q);
+      return q;
+    };
+    const inside = put(at(0, 300));
+    const outside = put(at(Math.PI / 2, 300));
+    // ...and one deep in the middle, which is nobody's shadow.
+    const middle = put(at(0, C.shadowFrom * 0.5));
+    boss.sweep(w, 1 / 60);
+    out.killedInside = inside.dead;
+    out.sparedOutside = outside.dead;
+    out.sparedMiddle = middle.dead;
+    w.projectiles.length = 0;
+
+    // The turret in shadow is corrupted, and corruption is all it costs.
+    const s = w.shooter;
+    const keep = { x: s.x, y: s.y };
+    w.shock = 0;
+    const spot = at(0, 300);
+    s.x = spot.x; s.y = spot.y;
+    boss.sweep(w, 1 / 60);
+    out.shockInShadow = +w.shock.toFixed(2);
+    w.shock = 0;
+    const clear2 = at(Math.PI / 2, 300);
+    s.x = clear2.x; s.y = clear2.y;
+    boss.sweep(w, 1 / 60);
+    out.shockClear = +w.shock.toFixed(2);
+    s.x = keep.x; s.y = keep.y;
+
+    // NOON fires once, at half a dial, and does not fire again.
+    out.noonBefore = boss.noonDone;
+    for (let i = 0; i < Math.ceil(boss.arcs.length * 0.55); i++) boss.arcs[i].dead = true;
+    g.update(1 / 60);
+    out.noonAfter = boss.noonDone;
+    out.noonRebuilt = boss.arcs.filter((p) => !p.dead).length;
+    const wasNoon = boss.noon;
+    boss.noonDone = boss.noonDone; // fire again? it must not
+    for (const p of boss.arcs) p.dead = true;
+    g.update(1 / 60);
+    out.noonOnce = boss.noon <= wasNoon + 0.001;
+
+    // ...and one gauge, because there is one dial.
+    const gg = boss.gauge();
+    out.shells = gg.shells.map((x) => `${x.label}:${x.seg}`).join(',');
+    out.title = gg.title;
+    g.restart();
+    return out;
+  });
+  check('GNOMON stands up as a dial, a needle and a garrison',
+    r.built === 'Gnomon' && r.arcs === 16 && r.onField === 16 && r.needleOnField === 6
+    && r.shells === 'DIAL:16' && r.title === 'GNOMON',
+    JSON.stringify({ arcs: r.arcs, onField: r.onField, needle: r.needleOnField,
+      shells: r.shells, title: r.title }));
+  check('a round inside the shadow dies and one outside it does not',
+    r.killedInside === true && r.sparedOutside === false && r.sparedMiddle === false,
+    `inside killed ${r.killedInside}, outside killed ${r.sparedOutside}, `
+    + `inside the core's own radius killed ${r.sparedMiddle}`);
+  check('the shadow costs the intake and nothing else',
+    r.shockInShadow > 0 && r.shockClear === 0,
+    `in shadow ${r.shockInShadow} corruption, clear of it ${r.shockClear}`);
+  check('NOON strikes once, at half a dial, and mends part of it',
+    r.noonBefore === false && r.noonAfter === true && r.noonRebuilt > 0 && r.noonOnce,
+    JSON.stringify({ before: r.noonBefore, after: r.noonAfter,
+      arcsBack: r.noonRebuilt, onlyOnce: r.noonOnce }));
 }
 
 // --- report -----------------------------------------------------------------
