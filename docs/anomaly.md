@@ -6,8 +6,29 @@ repo so it survives the container; each phase below is one build-sized
 request, and a future session should be able to pick any phase up from this
 file alone.
 
-Status: **planned, nothing implemented.** ORDINAL (boss I, magenta) shipped
-in builds 112–120 and is the reference for everything here.
+Status: **Phase 0 shipped in build 127.** The engine holds seven bosses;
+one of them (ORDINAL, boss I, magenta) is built, and it is the reference for
+everything here. Phases 1–7 below are not started.
+
+Phase 0 landed as planned, with two changes worth knowing:
+
+- The gate became exact rather than statistical. `scripts/fight.mjs --seed
+  --hash` is bit-reproducible once rAF is stubbed, the service worker is
+  blocked and audio is absent (audio's white-noise buffer pulls ~50,000
+  `Math.random()` draws at an unpredictable moment, which is what defeated a
+  seeded run). 9000 frames of ORDINAL hashed identically before and after.
+- `reconciled` is cleared by `reset()` and handed back by the restore, the
+  same lifecycle as the ways in. RESET SIMULATION therefore clears it,
+  because it throws the save away.
+
+Two defects found by the new tooling and deliberately left, both out of
+Phase 0's no-behaviour-change scope:
+
+- ORDINAL's CONVERGENCE caption `IT IS NOT A WALL. IT NEVER WAS.` reads at
+  **14.1 chars/sec** against law 4's ceiling of 13. One-line fix; it belongs
+  with the balance pass or with Phase 1.
+- Three banner rows at once sit under the alert stack. Unreachable until a
+  second slot is buyable, so Phase 1 owns it.
 
 ## The seven
 
