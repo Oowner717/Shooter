@@ -2,6 +2,7 @@
 
 import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID } from './config.js';
 import { Ordinal, openAperture } from './boss.js';
+import { nameOf, dressOf, heldList } from './anomaly.js';
 import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
 import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
@@ -60,7 +61,7 @@ export class Game {
     // The glossary draws its specimens with the field's own shape routines.
     registerCodexShape(drawSpecimen);
 
-    this.world = this.makeWorld();
+    this.world = Game.bindAperture(this.makeWorld());
     this.hud = new Hud(this);
     this.hud.setSound(audio.enabled);
 
@@ -140,20 +141,36 @@ export class Game {
       rigFlash: 0, // seconds of the fitting animation still to run
       rigDone: false, // the whole branch bought out, announced once a run
       shock: 0, // a hurled MASS landing: corruption in its own right, decaying
-      // ---- ORDINAL ----
-      // `aperture` is how many ways in are held, bought from the tree. `boss`
-      // is the one on the field, or null. While there is one the director is
-      // stopped: the field belongs to it.
-      aperture: 0,
-      // What ORDINAL leaves behind, and the only thing RECAST can be bought
+      // ---- the anomalies ----
+      /*
+       * How many ways in are held, per boss, indexed by anomaly number --
+       * see anomaly.js. Bought from the tree, spent by opening the way.
+       * Index 0 is unused so the number in the table is the index.
+       *
+       * `world.aperture` is an accessor onto slot 1, defined below. It is
+       * boss I's count under the name it has had since there was only one
+       * boss, and it is the *same integer*, not a copy: the save format, the
+       * APERTURE upgrade's apply and every test still read and write it.
+       */
+      apertures: [0, 0, 0, 0, 0, 0, 0, 0],
+      /*
+       * Which bosses have ever been broken. Progression rather than run
+       * state -- it is what unseals the next slot in the tree -- so it
+       * survives a reset and rides the save.
+       */
+      reconciled: [],
+      // What a boss leaves behind, and the only thing RECAST can be bought
       // with. `remainderGained` is the announcement queue: the collectible
       // banks itself and the HUD is the thing that can say so.
       remainder: 0,
       remainderGained: 0,
+      // The one on the field, or null, and which of the seven it is. While
+      // there is one the director is stopped: the field belongs to it.
       boss: null,
+      bossN: 0,
       bossStage: 0,
       bossSlow: 0,
-      bossLine: null, // what ORDINAL is saying, if anything
+      bossLine: null, // what the boss is saying, if anything
 
       debug: {
         noCooldown: false,
@@ -168,6 +185,27 @@ export class Game {
       announceOffer: (tier) => self.announceOffer(tier),
       carry: (key) => self.carry(key),
     };
+  }
+
+  /**
+   * `world.aperture`, which is slot 1 of `world.apertures` under its old
+   * name.
+   *
+   * Boss I's count is read and written in six places -- the upgrade that
+   * sells it, the save that records it, the restore that hands it back, the
+   * reset that clears it, the open that spends it, and a dozen tests that
+   * set it to 1. Making it an accessor rather than renaming those keeps one
+   * integer where there would otherwise be two that have to be kept in step,
+   * and two that have to be kept in step is how they end up not being.
+   */
+  static bindAperture(w) {
+    Object.defineProperty(w, 'aperture', {
+      enumerable: true,
+      configurable: true,
+      get() { return this.apertures[1] | 0; },
+      set(v) { this.apertures[1] = Math.max(0, v | 0); },
+    });
+    return w;
   }
 
   reset() {
@@ -185,10 +223,15 @@ export class Game {
     w.boss = null;
     w.bossStage = 0;
     w.bossSlow = 0;
+    w.bossN = 0;
     w.bossLine = null;
     // The ways in and what came back through them are of the run, not of the
     // device. A reset is a fresh session and hands back nothing.
-    w.aperture = 0;
+    w.apertures.fill(0);
+    // Same lifecycle as the ways in: cleared here, handed back by the
+    // restore. A run that is genuinely new -- RESET SIMULATION throws the
+    // save away -- starts with nothing broken.
+    w.reconciled.length = 0;
     w.remainder = 0;
     w.remainderGained = 0;
     w.time = 0;
@@ -322,7 +365,21 @@ export class Game {
     // replay happened to place, because a loadout is a decision too. Same for
     // the ways in that are still held: the replay hands one out per APERTURE
     // ever bought, and spending them is not in the ledger. See save.js.
-    if (Number.isFinite(d.aperture)) w.aperture = Math.max(0, d.aperture | 0);
+    /*
+     * The ways in. `apertures` is the store; `aperture` is the same slot
+     * under the name saves have used since there was one boss, and older
+     * files carry only that. Read the array when it is there, fall back to
+     * the integer when it is not -- which is every save written before this
+     * build, and they still load.
+     */
+    if (Array.isArray(d.apertures)) {
+      for (let n = 1; n < w.apertures.length; n++) {
+        w.apertures[n] = Math.max(0, d.apertures[n] | 0);
+      }
+    } else if (Number.isFinite(d.aperture)) w.aperture = Math.max(0, d.aperture | 0);
+    if (Array.isArray(d.reconciled)) {
+      w.reconciled = d.reconciled.filter((n) => Number.isFinite(n)).map((n) => n | 0);
+    }
     if (Number.isFinite(d.remainder)) w.remainder = Math.max(0, d.remainder | 0);
     w.unlocked = new Set(d.unlocked);
     for (const k of STARTING) w.unlocked.add(k);
@@ -1238,12 +1295,12 @@ export class Game {
    * Open the way, from the banner. One APERTURE is spent and the field is
    * ORDINAL's until it is gone.
    */
-  openBoss() {
+  openBoss(n = 1) {
     const w = this.world;
     // Only onto a running field. The banner is a play-screen control and the
     // boot and ending screens are not the field.
     if (w.phase !== 'staging') return false;
-    if (!openAperture(w)) return false;
+    if (!openAperture(w, n)) return false;
     // No codex note here: recording it on arrival would name the thing
     // before it has done anything. It is recorded when it comes apart, by the
     // same path as everything else.
@@ -1269,15 +1326,20 @@ export class Game {
    */
   endBoss() {
     const w = this.world;
+    const n = w.bossN || 1;
     w.boss.clear(w);
     w.boss = null;
     w.bossStage = 0;
     w.timeScale = 1;
+    // It has been broken at least once now, which is what unseals what comes
+    // after it. Recorded once; breaking the same one again changes nothing.
+    if (!w.reconciled.includes(n)) w.reconciled.push(n);
+    w.bossN = 0;
     const d = w.director;
     if (!d.jobs.length) d.resting = true;
-    d.timer = CFG.ordinal.after;
+    d.timer = CFG.boss.after;
     w.bossLine = null;
-    this.hud.alert('ORDINAL RECONCILED', 'rigDone', 5);
+    this.hud.alert(`${nameOf(n)} RECONCILED`, 'rigDone', 5);
     background.setMood('staging');
   }
 
@@ -1420,8 +1482,8 @@ export class Game {
     // Time comes back after ORDINAL's death, eased rather than snapped.
     if (this.world.bossSlow > 0) {
       this.world.bossSlow = Math.max(0, this.world.bossSlow - dtRaw);
-      const k = 1 - this.world.bossSlow / Math.max(0.001, CFG.ordinal.slowFor);
-      this.world.timeScale = CFG.ordinal.endSlow + (1 - CFG.ordinal.endSlow) * (k * k);
+      const k = 1 - this.world.bossSlow / Math.max(0.001, CFG.boss.slowFor);
+      this.world.timeScale = CFG.boss.endSlow + (1 - CFG.boss.endSlow) * (k * k);
     }
     const w = this.world;
     let level = 0;
@@ -1460,8 +1522,10 @@ export class Game {
       w.remainderGained--;
       // Two lines rather than one long one: what happened, then what to do
       // about it. One line ran off both edges of a 390-wide screen.
-      this.hud.alert('ORDINAL LEFT A REMAINDER', 'remainder', 6);
-      this.hud.alert(`${w.remainder} HELD · RECAST, IN THE TREE`, 'found', 6, '#ffb8ee');
+      const from = w.remainderFrom || 1;
+      this.hud.alert(`${nameOf(from)} LEFT A REMAINDER`, 'remainder', 6);
+      this.hud.alert(`${w.remainder} HELD · RECAST, IN THE TREE`, 'found', 6,
+        dressOf(from).bar[1][1]);
       this.checkpoint();
     }
     this.hud.say(w.boss ? w.bossLine : null);

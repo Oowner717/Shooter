@@ -168,7 +168,20 @@ export function captureRun(world, game) {
      * records what is left, and the restore takes this one.
      */
     aperture: world.aperture | 0,
-    // ...and the same for what ORDINAL left. Both are held counts that go
+    /*
+     * ...and the same for the other six, once there are other six.
+     *
+     * Additive, and the VERSION is deliberately not bumped for it: readSlot
+     * refuses a file whose version it does not know, so bumping would throw
+     * away the run of every install that updates. `aperture` above is slot 1
+     * of this same array and is still written, so a file this build produces
+     * is still readable as one of the old shape.
+     */
+    apertures: [...world.apertures],
+    // Which bosses have ever been broken. Progression -- it is what unseals
+    // the next slot -- so it is recorded rather than recomputed.
+    reconciled: [...world.reconciled],
+    // ...and the same for what a boss left. Both are held counts that go
     // down again, which the ledger has no way of recording.
     remainder: world.remainder | 0,
     // When, so CONTINUE can say how long ago rather than just how far. Not

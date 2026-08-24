@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '126';
+  var BUILD = '127';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -109,10 +109,10 @@
     <!-- The way in, and the thing that comes through it. The banner is a
          control: it appears the moment an APERTURE is held and pressing it
          opens the hole. The bar under it is ORDINAL's, and only its. -->
-    <button id="apertureBar" hidden>
-      <span class="apName">APERTURE HELD</span>
-      <span class="apGo">OPEN THE WAY</span>
-    </button>
+    <!-- One row per boss whose way in is held, each in that boss's colour;
+         built by Hud.syncBoss() from the anomaly table. It was a single
+         button because there was a single boss. -->
+    <div id="apertureBar" hidden></div>
 
     <!--
       ORDINAL's gauge. Three readings, not one:
@@ -139,16 +139,11 @@
         <b class="bossMark" id="bossMark3"></b>
         <b class="bossMark" id="bossMark4"></b>
       </div>
-      <div class="bossShell">
-        <span class="bossShellRow">
-          <em>OUTER</em>
-          <span class="bossShellTrack" style="--seg:24"><i id="bossShellA"></i></span>
-        </span>
-        <span class="bossShellRow">
-          <em>INNER</em>
-          <span class="bossShellTrack" style="--seg:16"><i id="bossShellB"></i></span>
-        </span>
-      </div>
+      <!-- One row per shell the boss says it has. ORDINAL has two frames;
+           GNOMON has one dial and DYNAMO's shell is three pylons, so the
+           rows are built from the boss's own gauge() rather than written
+           down here. -->
+      <div class="bossShell" id="bossShell"></div>
     </div>
 
     <!--

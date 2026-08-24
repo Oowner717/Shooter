@@ -52,6 +52,7 @@ console.log(`sw.js precaches all ${src.length} modules`);
 // is content nobody in the game can ever buy. Checked here rather than trusted.
 const { coverage } = await import(new URL('../src/tree.js', import.meta.url));
 const { ALL_UPGRADES } = await import(new URL('../src/upgrades.js', import.meta.url));
+const { ANOMALIES } = await import(new URL('../src/anomaly.js', import.meta.url));
 const cov = coverage();
 if (cov.missing.length || cov.extra.length || cov.dupes.length) {
   if (cov.missing.length) console.error(`tree is missing: ${cov.missing.join(', ')}`);
@@ -176,10 +177,19 @@ if (peak > CFG.maxEnemies) {
     + `of ${CFG.maxEnemies}; the cap would be doing the balancing`);
   process.exit(1);
 }
-// Types that are only ever produced by another type, never released directly.
-// ORDINAL's three are not of the field at all: they come through the APERTURE
-// and leave with it, and no wave will ever name them.
-const DERIVED = new Set(['plate', 'seed', 'towMass', 'drift', 'tally', 'ordinal', 'digit']);
+/*
+ * Types that are only ever produced by another type, never released directly.
+ *
+ * A boss's bodies are not of the field at all: they come through an APERTURE
+ * and leave with it, and no wave will ever name them. Which ones those are is
+ * the anomaly table's business rather than a list kept here -- a seventh boss
+ * adding three types should not also have to remember to edit this file, and
+ * before this it would have failed the build with "no wave releases: crest".
+ */
+const DERIVED = new Set([
+  'plate', 'seed', 'towMass', 'drift',
+  ...ANOMALIES.flatMap((a) => a.types),
+]);
 const placed = new Set(WAVES.flatMap((w) => w.of.map(([id]) => id)));
 const unplaced = ENEMY_TYPES.filter((t) => !placed.has(t.id) && !DERIVED.has(t.id)).map((t) => t.id);
 if (unplaced.length) {
@@ -207,15 +217,41 @@ if (leaky.length) {
     + ' — rounds go through a frame that does not close');
   process.exit(1);
 }
-const ap = ALL_UPGRADES.find((u) => u.id === 'aperture');
-if (!ap || ap.cost !== CFG.ordinal.cost) {
-  console.error(`APERTURE is priced at ${ap ? ap.cost : 'nothing'} against CFG.ordinal.cost `
-    + `${CFG.ordinal.cost}`);
+/*
+ * Every anomaly has a slot in the tree, its own colour, and -- once it is
+ * built -- a price that agrees with its own config.
+ *
+ * The price was checked for ORDINAL alone, against CFG.ordinal.cost. Six more
+ * slots exist now and each will grow a cost; this checks whichever of them
+ * claim to be built, and checks the parts that are true of all seven whether
+ * they are built or not.
+ */
+const dupTone = ANOMALIES.map((a) => a.tone)
+  .filter((t, i, all) => all.indexOf(t) !== i);
+if (dupTone.length) {
+  console.error(`two anomalies share a colour: ${dupTone.join(', ')} — the tone is the identity`);
   process.exit(1);
 }
+const slotless = ANOMALIES.filter((a) => !ALL_UPGRADES.some((u) => u.id === a.key));
+if (slotless.length) {
+  console.error(`no upgrade sells the way in to: ${slotless.map((a) => a.name).join(', ')}`);
+  process.exit(1);
+}
+const misprice = ANOMALIES.filter((a) => a.built).map((a) => {
+  const up = ALL_UPGRADES.find((u) => u.id === a.key);
+  const cfg = CFG[a.cfg];
+  return [a, up, cfg];
+}).filter(([, up, cfg]) => !cfg || up.cost !== cfg.cost);
+if (misprice.length) {
+  console.error(misprice.map(([a, up, cfg]) => `${a.name} is priced at ${up.cost} against `
+    + `CFG.${a.cfg}.cost ${cfg ? cfg.cost : '(no config)'}`).join('; '));
+  process.exit(1);
+}
+const built = ANOMALIES.filter((a) => a.built);
 const panels = CFG.ordinal.rings.reduce((n, r) => n + r.per * 4, 0);
-console.log(`ORDINAL: ${panels} segments in ${CFG.ordinal.rings.length} closed frames, `
-  + `APERTURE ${ap.cost}`);
+console.log(`${built.length} of ${ANOMALIES.length} anomalies built (`
+  + `${built.map((a) => `${a.name} ${ALL_UPGRADES.find((u) => u.id === a.key).cost}`).join(', ')})`);
+console.log(`ORDINAL: ${panels} segments in ${CFG.ordinal.rings.length} closed frames`);
 
 // ---- REV: what these bytes actually are ------------------------------------
 //

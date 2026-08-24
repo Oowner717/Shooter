@@ -343,40 +343,70 @@ html, body {
  * banner is replaced in place by the thing it summoned rather than moving
  * something else around when the fight starts.
  */
+/*
+ * The container is a list -- one row per boss whose way in is held -- and
+ * every colour in a row comes off `--tone` and `--glow`, which Hud
+ * .syncApertures() sets per row from the anomaly table. It was one button in
+ * one magenta because there was one boss.
+ */
 #apertureBar {
   position: absolute;
   top: calc(var(--hud-t) + 40px);
   left: calc(var(--safe-l) + 10px);
   right: calc(var(--safe-r) + 10px);
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#apertureBar[hidden] { display: none; }
+.apRow {
+  --tone: #ff5ec8;
+  --glow: #ff2f9e;
+  -webkit-appearance: none;
+  appearance: none;
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  width: 100%;
   padding: 8px 12px;
   font: inherit;
-  color: #ffd4f2;
-  background: linear-gradient(90deg, rgba(60, 6, 44, 0.92), rgba(24, 4, 22, 0.86));
-  border: 1px solid rgba(255, 94, 200, 0.55);
+  color: color-mix(in srgb, var(--tone) 26%, #ffffff);
+  /* Both stops off the boss's own glow. The right one was a fixed dark
+     magenta, which left every other boss's row fading into ORDINAL's colour;
+     the mixes below land within a few units of the authored magenta when the
+     glow *is* ORDINAL's. */
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--glow) 22%, rgba(2, 2, 6, 0.95)),
+      color-mix(in srgb, var(--glow) 9%, rgba(2, 2, 6, 0.9)));
+  border: 1px solid color-mix(in srgb, var(--tone) 55%, transparent);
   border-radius: 4px;
-  box-shadow: 0 0 22px rgba(255, 47, 158, 0.28), inset 0 0 18px rgba(255, 47, 158, 0.12);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--glow) 28%, transparent),
+    inset 0 0 18px color-mix(in srgb, var(--glow) 12%, transparent);
   animation: apPulse 2.4s ease-in-out infinite;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-#apertureBar[hidden] { display: none; }
-#apertureBar:active { transform: translateY(1px); }
+.apRow:active { transform: translateY(1px); }
 .apName { font-size: 10px; letter-spacing: 0.24em; }
 .apGo {
   font-size: 9px;
   letter-spacing: 0.2em;
-  color: #ff9ede;
-  border: 1px solid rgba(255, 94, 200, 0.6);
+  color: color-mix(in srgb, var(--tone) 62%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--tone) 60%, transparent);
   border-radius: 3px;
   padding: 3px 8px;
 }
 @keyframes apPulse {
-  0%, 100% { box-shadow: 0 0 18px rgba(255, 47, 158, 0.22), inset 0 0 14px rgba(255, 47, 158, 0.10); }
-  50% { box-shadow: 0 0 34px rgba(255, 47, 158, 0.5), inset 0 0 22px rgba(255, 47, 158, 0.2); }
+  0%, 100% {
+    box-shadow: 0 0 18px color-mix(in srgb, var(--glow) 22%, transparent),
+      inset 0 0 14px color-mix(in srgb, var(--glow) 10%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 34px color-mix(in srgb, var(--glow) 50%, transparent),
+      inset 0 0 22px color-mix(in srgb, var(--glow) 20%, transparent);
+  }
 }
 
 /* ---------------- boss bar ---------------- */

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '126';
+export const BUILD = '127';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '126';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '102ffd4';
+export const REV = 'b7d7e3e';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -928,7 +928,6 @@ export const CFG = {
      * It is the only time the field stops, and it is meant to be the thing
      * someone points a camera at.
      */
-    endSlow: 0.12, // time scale it slams to
     arrest: 0.7, // segments snapping off, staggered
     infall: 1.1, // ...then the core pulling everything in
     /*
@@ -939,16 +938,34 @@ export const CFG = {
      * seconds of reading.
      */
     endFor: 13.4,
-    slowFor: 3.6,
     pull: 900, // how hard the infall drags loose bodies
     pay: 900, // energy on the floor when it lets go
-    // What it leaves behind. One per ORDINAL, and the only source there is.
-    remainder: 1,
+    recast: 1, // REMAINDERs a RECAST costs
+  },
+
+  /*
+   * ---- what every boss shares ----
+   *
+   * Five numbers that are about *a* boss ending rather than about ORDINAL.
+   * They sat in CFG.ordinal because ORDINAL was the only boss there was, and
+   * six more are planned; a second boss copying them is how two of them end
+   * up different by accident.
+   *
+   * The two clocks are separate on purpose. A boss's own `endFor` is how long
+   * its death sequence lasts, which is set by how long its outro takes to
+   * read; `slowFor` is how long time itself is slowed, which is set by how
+   * long slow motion stays interesting. Tying them together left the field at
+   * half speed for six seconds of reading.
+   */
+  boss: {
+    endSlow: 0.12, // time scale a death slams to
+    slowFor: 3.6, // ...and how long before it ramps back
     // A beat of empty sky before the field picks up again. The wave that was
     // running when the way opened resumes — see Game.endBoss().
     after: 4.6,
-    riseFor: 2.1, // seconds the REMAINDER takes to reach the turret
-    recast: 1, // REMAINDERs a RECAST costs
+    riseFor: 2.1, // seconds a REMAINDER takes to reach the turret
+    // What one leaves behind. One each, and the only source there is.
+    remainder: 1,
   },
 
   // ---- ward shell -----------------------------------------------------

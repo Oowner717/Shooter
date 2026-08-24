@@ -1748,6 +1748,273 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `${JSON.stringify(rest.parts)} sums to ${rest.sum}, tree says ${rest.total}`);
 }
 
+// --- the boss engine holds seven, not one -----------------------------------
+/*
+ * Phase 0: ORDINAL stopped being *the* boss and became boss I of seven.
+ *
+ * The risk in that is entirely in the seams, and this covers the ones that
+ * would fail quietly. The purse is the sharpest: `world.aperture` is now an
+ * accessor onto slot 1 of `world.apertures`, and if those ever became two
+ * integers instead of one view of the same integer, a run would hold ways in
+ * that could not be spent. The save is next: per-boss counts were added
+ * *without* bumping the version, because readSlot refuses a file whose
+ * version it does not know and a bump would have thrown away the run of
+ * every install that updated.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const A = await import('../src/anomaly.js');
+    const out = {};
+
+    // One integer, two names.
+    w.aperture = 0;
+    w.apertures[1] = 3;
+    out.readsThrough = w.aperture;
+    w.aperture = 5;
+    out.writesThrough = w.apertures[1];
+    w.aperture = -2;
+    out.clamps = w.apertures[1];
+
+    // Every anomaly has a name, a colour and a slot in the tree, and the
+    // tree's seven-colour heading is the same list rather than a copy of it.
+    out.seven = A.ANOMALIES.length;
+    out.named = A.ANOMALIES.every((a) => a.name && /^#[0-9a-f]{6}$/i.test(a.tone));
+    out.tones = A.BOSS_TONE.join(',');
+    out.built = A.ANOMALIES.filter((a) => a.built).map((a) => a.n);
+
+    // ORDINAL's gauge ramp is the table that was authored for it, not a
+    // generated approximation of it.
+    out.ramp = A.dressOf(1).bar.map((x) => x.join('/')).join(' ');
+    // ...and a boss that has none of its own still gets five usable pairs.
+    const gen = A.dressOf(5).bar;
+    out.genOk = gen.length === 5
+      && gen.every((pr) => pr.length === 2 && pr.every((c) => /^#[0-9a-f]{6}$/i.test(c)));
+    const moods = A.dressOf(5).moods;
+    out.moodOk = moods.length === 4
+      && moods.every((m) => /^#[0-9a-f]{6}$/i.test(m.top) && m.neb.length === 3)
+      // ...and it is not just ORDINAL's magenta handed back.
+      && moods[0].mid !== A.dressOf(1).moods[0].mid;
+
+    // A boss that is planned and not written refuses to be opened, and does
+    // not eat the way in on its way to refusing.
+    w.apertures[5] = 1;
+    out.unbuilt = g.openBoss(5);
+    out.unbuiltKept = w.apertures[5];
+    w.apertures[5] = 0;
+    w.aperture = 0;
+    return out;
+  });
+  check('one integer holds boss I\'s ways in, under both its names',
+    r.readsThrough === 3 && r.writesThrough === 5 && r.clamps === 0,
+    JSON.stringify({ read: r.readsThrough, write: r.writesThrough, clamp: r.clamps }));
+  check('seven anomalies, each named and coloured, one of them built',
+    r.seven === 7 && r.named && r.built.join() === '1'
+    && r.tones.split(',').length === 7 && new Set(r.tones.split(',')).size === 7,
+    `${r.seven} anomalies, built ${r.built}, tones ${r.tones}`);
+  check('a boss dresses its own gauge and sky, and ORDINAL keeps the authored one',
+    r.ramp === '#a03fb0/#e6a8ff #ff5ec8/#ffb8ee #ff3fb0/#ffc2f0 #ff2f8f/#ffd0e6 #ff5470/#ffe0e6'
+    && r.genOk && r.moodOk,
+    `ORDINAL ramp "${r.ramp}"; generated ok ${r.genOk}; moods ok ${r.moodOk}`);
+  check('a boss that is planned and not written cannot be opened, and costs nothing',
+    r.unbuilt === false && r.unbuiltKept === 1,
+    `opened ${r.unbuilt}, way in ${r.unbuiltKept === 1 ? 'kept' : 'EATEN'}`);
+}
+
+// --- the save carries seven purses and does not throw the run away ----------
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { captureRun } = await import('../src/save.js');
+    const out = {};
+
+    w.apertures[1] = 2;
+    w.apertures[3] = 4;
+    w.reconciled = [1];
+    const d = captureRun(w, g);
+    out.version = d.v;
+    out.wroteBoth = d.aperture === 2 && Array.isArray(d.apertures) && d.apertures[3] === 4;
+    out.wroteReconciled = (d.reconciled || []).join() === '1';
+
+    // Round trip, through the real path: written to the slot, read back by
+    // resume(), which is the only thing that ever restores a run.
+    localStorage.setItem('sim7749-run', JSON.stringify(d));
+    g.resume();
+    out.back = `${w.apertures[1]}/${w.apertures[3]}/${w.reconciled.join()}`;
+
+    /*
+     * ...and the shape every existing install has on disk: an old file with
+     * `aperture` and neither of the new fields. It has to load, and boss I's
+     * count has to survive it.
+     */
+    const old = JSON.parse(JSON.stringify(d));
+    delete old.apertures;
+    delete old.reconciled;
+    old.aperture = 7;
+    localStorage.setItem('sim7749-run', JSON.stringify(old));
+    g.resume();
+    out.oldLoads = `${w.aperture}/${w.apertures[1]}/${w.apertures[3]}/${w.reconciled.length}`;
+
+    w.apertures.fill(0);
+    w.reconciled.length = 0;
+    localStorage.removeItem('sim7749-run');
+    return out;
+  });
+  check('the save records every purse without bumping the version',
+    r.version === 4 && r.wroteBoth && r.wroteReconciled && r.back === '2/4/1',
+    JSON.stringify(r));
+  check('a save written before there were seven still loads',
+    r.oldLoads === '7/7/0/0', `aperture/slot1/slot3/reconciled = ${r.oldLoads}`);
+}
+
+// --- the banner names whose way it is ---------------------------------------
+/*
+ * It was one button in one magenta, because there was one boss. It is a list
+ * now -- a row per boss whose way in is held, each in that boss's colour --
+ * and the press has to carry which. Delegated, because the rows are rebuilt
+ * whenever what is held changes.
+ */
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    const w = g.world;
+    const read = () => {
+      g.hud.syncBoss(w);
+      const bar = document.getElementById('apertureBar');
+      return {
+        hidden: bar.hidden,
+        rows: [...bar.querySelectorAll('.apRow')].map((b) => ({
+          n: b.dataset.n,
+          text: b.querySelector('.apName').textContent,
+          tone: b.style.getPropertyValue('--tone'),
+        })),
+      };
+    };
+    const out = {};
+    w.apertures.fill(0);
+    out.none = read();
+    // The case every player has today: one boss, and the row says what it has
+    // always said rather than naming a thing there is only one of.
+    w.apertures[1] = 1;
+    out.one = read();
+    w.apertures[1] = 2;
+    out.two = read();
+    // ...and once there is more than one kind, each is named and coloured.
+    w.apertures[4] = 1;
+    out.mixed = read();
+    // Pressing a row opens *that* way. Boss IV is not built, so this proves
+    // the number reached openBoss rather than that a boss appeared.
+    const opened = [];
+    const was = g.openBoss.bind(g);
+    g.openBoss = (n) => { opened.push(n); return false; };
+    for (const b of document.querySelectorAll('#apertureBar .apRow')) {
+      b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    }
+    g.openBoss = was;
+    out.pressed = opened.join(',');
+    w.apertures.fill(0);
+    g.hud.syncBoss(w);
+    return out;
+  });
+  check('the banner is hidden with nothing held and says the old thing with one',
+    r.none.hidden && r.none.rows.length === 0
+    && !r.one.hidden && r.one.rows.length === 1
+    && r.one.rows[0].text === 'APERTURE HELD'
+    && r.two.rows[0].text === 'APERTURE HELD x2',
+    JSON.stringify({ none: r.none.rows.length, one: r.one.rows, two: r.two.rows }));
+  check('two kinds held are two rows, each named, coloured and pressable',
+    r.mixed.rows.length === 2
+    && r.mixed.rows[0].text === 'ORDINAL APERTURE HELD x2'
+    && r.mixed.rows[1].text === 'AMPLITUDE APERTURE HELD'
+    && r.mixed.rows[0].tone === '#ff5ec8' && r.mixed.rows[1].tone === '#2ee6c0'
+    && r.pressed === '1,4',
+    `${JSON.stringify(r.mixed.rows)} pressed ${r.pressed}`);
+}
+
+// --- the gauge is the boss's, not ORDINAL's ---------------------------------
+/*
+ * The bar read CFG.ordinal directly and assumed two shells whose segment
+ * counts were written into the markup. GNOMON has one dial and DYNAMO's shell
+ * is three pylons, so the boss describes its gauge and the HUD builds what it
+ * is handed -- including rebuilding when the shape is not what it drew last.
+ */
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    const w = g.world;
+    w.aperture = 1;
+    g.openBoss(1);
+    const boss = w.boss;
+    boss.arriving = 0;
+    boss.settled = false;
+    g.hud.syncBoss(w);
+    const rows = () => [...document.querySelectorAll('#bossShell .bossShellRow')]
+      .map((x) => `${x.querySelector('em').textContent}:`
+        + `${x.querySelector('.bossShellTrack').style.getPropertyValue('--seg')}`);
+    const gauge = boss.gauge();
+    const out = {
+      title: document.getElementById('bossTitle').textContent,
+      shells: rows().join(' '),
+      seg: gauge.shells.map((sh) => sh.seg).join(','),
+      real: boss.rings.map((x) => x.panels.length).join(','),
+      marks: gauge.marks.map((m) => m.at).join(','),
+      phase: document.getElementById('bossPhase').textContent,
+      barVar: document.getElementById('bossBar').style.getPropertyValue('--boss'),
+    };
+    /*
+     * A boss with a different number of shells gets a different number of
+     * rows. Faked by overriding this one's gauge for a frame -- the point is
+     * that the HUD builds what it is handed, and there is no second boss to
+     * hand it anything yet.
+     */
+    const three = boss.gauge();
+    boss.gauge = () => ({ ...three, shells: [...three.shells, { label: 'THIRD', seg: 9, frac: 0.5 }] });
+    g.hud.syncBoss(w);
+    out.rebuilt = rows().join(' ');
+    delete boss.gauge; // back to the prototype's
+    g.hud.syncBoss(w);
+    return out;
+  });
+  check('the gauge is built from what the boss says it has',
+    !!r && r.title === 'ORDINAL' && r.shells === 'OUTER:24 INNER:16'
+    && r.seg === '24,16' && r.seg === r.real && r.marks === '0.6,0.28'
+    && r.phase === 'I' && r.barVar === '#ff5ec8',
+    JSON.stringify(r));
+  check('a boss with another number of shells gets another number of rows',
+    !!r && r.rebuilt === 'OUTER:24 INNER:16 THIRD:9', r && r.rebuilt);
+}
+
+// --- breaking one is recorded, and named --------------------------------------
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    const w = g.world;
+    const said = [];
+    const was = g.hud.alert.bind(g.hud);
+    g.hud.alert = (text, ...rest) => { said.push(text); return was(text, ...rest); };
+    if (!w.boss) { w.aperture = 1; g.openBoss(1); }
+    w.bossN = 1;
+    w.reconciled.length = 0;
+    g.endBoss();
+    // Twice is once: it is a fact about the device, not a tally.
+    w.aperture = 1;
+    g.openBoss(1);
+    w.bossN = 1;
+    g.endBoss();
+    g.hud.alert = was;
+    const out = { reconciled: w.reconciled.join(','), said: said.filter((x) => /RECONCILED/.test(x)) };
+    w.reconciled.length = 0;
+    w.apertures.fill(0);
+    return out;
+  });
+  check('breaking a boss is recorded once, under its own name',
+    r.reconciled === '1' && r.said.length === 2
+    && r.said.every((x) => x === 'ORDINAL RECONCILED'),
+    JSON.stringify(r));
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

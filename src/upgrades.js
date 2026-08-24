@@ -181,19 +181,19 @@ const quicken = (key, by) => (up) => { up[key] *= by; };
  * has had it since it arrived; the other six are reserved, and a boss taking
  * one is how the tree will say which boss it is without being read.
  */
-export const BOSS_TONE = [
-  '#ff5ec8', // I    ORDINAL — magenta
-  '#ff8a3d', // II   amber
-  '#8bff4d', // III  acid green
-  '#2ee6c0', // IV   teal
-  '#4d8dff', // V    electric blue
-  '#a86bff', // VI   violet
-  '#ff4d6d', // VII  crimson
-];
+/*
+ * The seven colours, re-exported from the one table that holds them.
+ *
+ * They were written down twice -- once here for the tree and once in the
+ * HUD's bar -- which is exactly the sort of pair that ends up disagreeing.
+ * anomaly.js owns the identity of a boss now; this is the tree's view of it.
+ */
+export { BOSS_TONE } from './anomaly.js';
+import { BOSS_TONE as TONES } from './anomaly.js';
 
 /** II through VII, as they stand: a door, a colour, and nothing behind it. */
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-const SLEEPING = BOSS_TONE.slice(1).map((tone, i) => ({
+const SLEEPING = TONES.slice(1).map((tone, i) => ({
   id: `aperture${i + 2}`,
   name: `${ROMAN[i + 1]} APERTURE`,
   repeat: true,
@@ -349,7 +349,7 @@ export const UPGRADES = {
       cost: CFG.ordinal.cost, step: 0,
       line: 'Opens the way. Something on the other side has been counting, and it will come through.',
       apply: (up, world) => { world.aperture = (world.aperture || 0) + 1; },
-      tone: BOSS_TONE[0], icon: MARK.aperture },
+      tone: TONES[0], icon: MARK.aperture },
     ...SLEEPING,
     /*
      * ---- what the count leaves behind ----

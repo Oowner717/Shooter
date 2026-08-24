@@ -12,6 +12,7 @@ import {  } from './util.js';
 import { Menu } from './menu.js';
 import { holdFor, STACK } from './tutorial.js';
 import { SLOTS, carried, freeSlot } from './loadout.js';
+import { heldList } from './anomaly.js';
 import { readRun } from './save.js';
 import { TIMED } from './events.js';
 
@@ -50,19 +51,6 @@ function ageOf(at) {
   if (s < 86400 * 7) return `${Math.round(s / 86400)}d ago`;
   return 'a while ago';
 }
-
-/*
- * The gauge's colour per stage: arriving, then I to IV. It follows the sky —
- * see the boss moods in background.js — so the bar is hotter by the end
- * rather than one pink for two hundred seconds.
- */
-const BOSS_BAR = [
-  ['#a03fb0', '#e6a8ff'], // arriving
-  ['#ff5ec8', '#ffb8ee'], // I
-  ['#ff3fb0', '#ffc2f0'], // II
-  ['#ff2f8f', '#ffd0e6'], // III
-  ['#ff5470', '#ffe0e6'], // IV — it is coming down
-];
 
 export class Hud {
   constructor(game) {
@@ -109,8 +97,7 @@ export class Hud {
       bossCore: document.querySelector('.bossCore'),
       bossMark3: $('bossMark3'),
       bossMark4: $('bossMark4'),
-      bossShellA: $('bossShellA'),
-      bossShellB: $('bossShellB'),
+      bossShell: $('bossShell'),
       boot: $('boot'),
       bootRecord: $('bootRecord'),
       resumeNote: $('resumeNote'),
@@ -212,10 +199,18 @@ export class Hud {
       this.menu.show('tree');
     });
 
+    /*
+     * The banner is a list now, one row per boss whose way in is held, so
+     * the press has to say *which* way. Delegated rather than bound per row:
+     * the rows are rebuilt whenever what is held changes, and a listener per
+     * row would be rebound with them.
+     */
     const open = (ev) => {
+      const row = ev.target.closest && ev.target.closest('.apRow');
+      if (!row) return;
       ev.preventDefault();
       ev.stopPropagation();
-      this.game.openBoss();
+      this.game.openBoss(Number(row.dataset.n) || 1);
     };
     this.el.apertureBar.addEventListener('pointerdown', open);
     this.el.apertureBar.addEventListener('contextmenu', (ev) => ev.preventDefault());
@@ -1252,64 +1247,118 @@ export class Hud {
   }
 
   syncBoss(world) {
-    const ap = this.el.apertureBar;
     const bar = this.el.bossBar;
     const boss = world.boss;
-    const offer = !boss && world.aperture > 0;
-    if (ap.hidden !== !offer) ap.hidden = !offer;
-    if (offer) {
-      const held = world.aperture > 1 ? ` x${world.aperture}` : '';
-      const want = `APERTURE HELD${held}`;
-      if (this._apLabel !== want) {
-        this._apLabel = want;
-        ap.firstElementChild.textContent = want;
-      }
-    }
-    if (bar.hidden !== !boss) bar.hidden = !boss;
-    if (!boss) { this._bossSeen = null; this._bossGhost = null; return; }
+    this.syncApertures(world);
 
-    const arriving = boss.arriving > 0;
-    const core = arriving ? 1 : boss.coreFrac;
-    this.el.bossCore.classList.toggle('arriving', arriving);
-    this.el.bossFill.style.transform = `scaleX(${core.toFixed(3)})`;
+    if (bar.hidden !== !boss) bar.hidden = !boss;
+    if (!boss) { this._bossSeen = null; this._bossGhost = null; this._bossShells = 0; return; }
+
+    /*
+     * Everything below comes off the boss's own gauge() and nothing off
+     * CFG.ordinal. The bar used to read ORDINAL's config directly and assume
+     * two shells with their segment counts written into the markup, which is
+     * a bar that can only ever draw one boss.
+     */
+    const g = boss.gauge();
+
+    if (this._bossTitle !== g.title) {
+      this._bossTitle = g.title;
+      this.el.bossTitle.textContent = g.title;
+    }
+
+    this.el.bossCore.classList.toggle('arriving', g.arriving);
+    this.el.bossFill.style.transform = `scaleX(${g.core.toFixed(3)})`;
     /*
      * The ghost only ever falls, and it falls late. It holds where the health
      * was until the transition catches it up, so a big hit reads as a hit
      * rather than as a bar that is slightly shorter than it was.
      */
-    if (this._bossGhost == null || core > this._bossGhost) this._bossGhost = core;
-    if (core < this._bossGhost) {
-      this._bossGhost = core;
-      this.el.bossGhost.style.transform = `scaleX(${core.toFixed(3)})`;
+    if (this._bossGhost == null || g.core > this._bossGhost) this._bossGhost = g.core;
+    if (g.core < this._bossGhost) {
+      this._bossGhost = g.core;
+      this.el.bossGhost.style.transform = `scaleX(${g.core.toFixed(3)})`;
     }
 
-    this.el.bossShellA.style.transform = `scaleX(${boss.shellFrac(0).toFixed(3)})`;
-    this.el.bossShellB.style.transform = `scaleX(${boss.shellFrac(1).toFixed(3)})`;
-
-    // Where the next two stages begin, on the track they begin at. Set once.
-    if (!this._bossMarks) {
-      this._bossMarks = true;
-      const C = CFG.ordinal;
-      this.el.bossMark3.style.left = `${(C.stageCore * 100).toFixed(1)}%`;
-      this.el.bossMark4.style.left = `${(C.stageDescend * 100).toFixed(1)}%`;
+    // The shell rows, built to whatever the boss says it has and then only
+    // written to. Rebuilt when the shape changes, which is once per fight.
+    if (this._bossShells !== g.shells.length) {
+      this._bossShells = g.shells.length;
+      this.el.bossShell.innerHTML = '';
+      this._shellBars = g.shells.map((sh) => {
+        const row = document.createElement('span');
+        row.className = 'bossShellRow';
+        row.innerHTML = `<em>${sh.label}</em>`
+          + `<span class="bossShellTrack" style="--seg:${sh.seg}"><i></i></span>`;
+        this.el.bossShell.appendChild(row);
+        return row.querySelector('i');
+      });
     }
-    this.el.bossMark3.classList.toggle('past', core <= CFG.ordinal.stageCore);
-    this.el.bossMark4.classList.toggle('past', core <= CFG.ordinal.stageDescend);
+    for (let i = 0; i < g.shells.length; i++) {
+      this._shellBars[i].style.transform = `scaleX(${g.shells[i].frac.toFixed(3)})`;
+    }
+
+    // Where the stages still ahead of you begin, on the track they begin at.
+    // Placed once per fight; lit as they are passed.
+    if (this._bossMarkAt !== g.marks.length) {
+      this._bossMarkAt = g.marks.length;
+      this._markEls = [this.el.bossMark3, this.el.bossMark4];
+      for (let i = 0; i < this._markEls.length; i++) {
+        const m = g.marks[i];
+        this._markEls[i].hidden = !m;
+        if (m) this._markEls[i].style.left = `${(m.at * 100).toFixed(1)}%`;
+      }
+    }
+    for (let i = 0; i < this._markEls.length; i++) {
+      if (g.marks[i]) this._markEls[i].classList.toggle('past', g.marks[i].past);
+    }
 
     // The gauge wears the stage's own colour, so the bar escalates with the
-    // sky rather than staying one pink for the whole fight.
-    const tone = arriving ? 0 : boss.stage;
-    if (tone !== this._bossTone) {
-      this._bossTone = tone;
-      const [c, lit] = BOSS_BAR[Math.min(tone, BOSS_BAR.length - 1)];
+    // sky rather than staying one colour for the whole fight.
+    const [c, lit] = g.bar;
+    if (this._bossTone !== c) {
+      this._bossTone = c;
       bar.style.setProperty('--boss', c);
       bar.style.setProperty('--bossLit', lit);
     }
 
-    const phase = arriving ? 'ARRIVING' : ['I', 'II', 'III', 'IV'][boss.stage - 1] || 'IV';
-    if (this._bossSeen !== phase) {
-      this._bossSeen = phase;
-      this.el.bossPhase.textContent = phase;
+    if (this._bossSeen !== g.phase) {
+      this._bossSeen = g.phase;
+      this.el.bossPhase.textContent = g.phase;
+    }
+  }
+
+  /**
+   * The banner: one row per boss whose way in is held, in that boss's colour.
+   *
+   * It was a single button, because there was a single boss. Rebuilt only
+   * when what is held actually changes -- this runs every frame.
+   */
+  syncApertures(world) {
+    const ap = this.el.apertureBar;
+    const held = world.boss ? [] : heldList(world);
+    const key = held.map((h) => `${h.n}:${h.held}`).join(',');
+    if (this._apKey === key) return;
+    this._apKey = key;
+    if (ap.hidden !== !held.length) ap.hidden = !held.length;
+    ap.innerHTML = '';
+    for (const h of held) {
+      const b = document.createElement('button');
+      b.className = 'apRow';
+      b.type = 'button';
+      b.dataset.n = String(h.n);
+      b.style.setProperty('--tone', h.tone);
+      // ...and the hotter companion the glow and the row's fill are mixed
+      // from. Without it every row wore ORDINAL's magenta behind its own
+      // border, which is worse than not colouring them at all.
+      b.style.setProperty('--glow', h.glow);
+      // The name only once there is more than one to tell apart: "APERTURE
+      // HELD" is what this has always said, and saying "ORDINAL APERTURE
+      // HELD" to somebody who has only ever seen one is noise.
+      const name = held.length > 1 ? `${h.name} APERTURE HELD` : 'APERTURE HELD';
+      b.innerHTML = `<span class="apName">${name}${h.held > 1 ? ` x${h.held}` : ''}</span>`
+        + '<span class="apGo">OPEN THE WAY</span>';
+      ap.appendChild(b);
     }
   }
 

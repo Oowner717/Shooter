@@ -38,8 +38,11 @@ import { explode, ring, ripple, spark, shake, haul, flash } from './fx.js';
 import { audio } from './audio.js';
 import { shed } from './debris.js';
 import { background } from './background.js';
+import { registerAnomaly, makerOf, dressOf, anomalyOf } from './anomaly.js';
 
 const O = () => CFG.ordinal;
+/** The five numbers every boss's ending shares. See CFG.boss. */
+const B = () => CFG.boss;
 
 /*
  * What it says on the way in, and what it says once it is over.
@@ -108,14 +111,13 @@ class Remainder {
   }
 
   update(world, dt) {
-    const C = O();
     this.t += world.dtRaw || dt; // its own clock: it outlives the slow-motion
     const hang = 0.9;
     if (this.t < hang) {
       this.y = this.y0 - (this.t / hang) * 26;
       return;
     }
-    const k = clamp((this.t - hang) / C.riseFor, 0, 1);
+    const k = clamp((this.t - hang) / B().riseFor, 0, 1);
     const e = k * k * (3 - 2 * k); // ease, so it leaves slowly and arrives fast
     const s = world.shooter;
     this.x = this.x0 + (s.x - this.x0) * e;
@@ -180,6 +182,7 @@ export class Ordinal {
     this.stageT = 0;
     this.dying = 0;
     this.done = false;
+    this.n = 1; // which of the seven. See anomaly.js.
     this.repairT = 0;
     this.burstT = 0;
     this.flare = 0; // white bloom on a stage change or a repair
@@ -283,6 +286,42 @@ export class Ordinal {
   shellFrac(i) {
     const ps = this.rings[i].panels;
     return ps.filter((p) => !p.dead).length / ps.length;
+  }
+
+  /**
+   * Everything the gauge needs to draw itself, and nothing about ORDINAL.
+   *
+   * The bar used to read CFG.ordinal directly and assume exactly two frames
+   * with the segment counts written into the markup. GNOMON has one dial,
+   * DYNAMO's shell is three pylons and TERMINUS has two rings, so the boss
+   * describes its own gauge and the HUD builds whatever it is handed.
+   *
+   * `marks` are where the stages that are still ahead of you begin, on the
+   * track they begin on -- the two ticks in the core bar. `seg` is the real
+   * segment count of a shell, so a tick going out on that track is a panel
+   * going out.
+   */
+  gauge() {
+    const C = O();
+    const arriving = this.arriving > 0;
+    const d = dressOf(this.n);
+    const stage = arriving ? 0 : this.stage;
+    return {
+      title: d.name,
+      phase: arriving ? 'ARRIVING' : ['I', 'II', 'III', 'IV'][this.stage - 1] || 'IV',
+      arriving,
+      core: arriving ? 1 : this.coreFrac,
+      shells: this.rings.map((r, i) => ({
+        label: i === 0 ? 'OUTER' : 'INNER',
+        seg: r.panels.length,
+        frac: this.shellFrac(i),
+      })),
+      marks: [
+        { at: C.stageCore, past: !arriving && this.coreFrac <= C.stageCore },
+        { at: C.stageDescend, past: !arriving && this.coreFrac <= C.stageDescend },
+      ],
+      bar: d.bar[Math.min(stage, d.bar.length - 1)],
+    };
   }
 
   /** Put every panel where its frame says it is, this frame. */
@@ -881,8 +920,8 @@ export class Ordinal {
     this.lineFor = 0;
     world.bossLine = null;
     this.snapped = 0; // segments taken so far during ARREST
-    world.timeScale = C.endSlow;
-    world.bossSlow = C.slowFor;
+    world.timeScale = B().endSlow;
+    world.bossSlow = B().slowFor;
     // Everything the frames were holding is let go at once.
     for (const d of this.parked) d.dead = true;
     this.parked.length = 0;
@@ -994,8 +1033,14 @@ export class Ordinal {
         energy: C.pay / 30,
       }));
     }
-    // ...and the one thing it was keeping.
-    for (let i = 0; i < C.remainder; i++) {
+    /*
+     * ...and the one thing it was keeping. Whose it was is recorded here
+     * rather than read off the boss when it lands: a REMAINDER is still on
+     * its way to the turret after the fight has been cleaned up, so by the
+     * time anything announces it there is no boss left to ask.
+     */
+    world.remainderFrom = this.n;
+    for (let i = 0; i < B().remainder; i++) {
       world.effects.push(new Remainder(this.x, this.y));
     }
   }
@@ -1141,12 +1186,19 @@ export class Ordinal {
 }
 
 /**
- * Open the way. Spends one APERTURE, stops the field, and puts ORDINAL on it.
- * Returns false if there is nothing to spend or one is already up.
+ * Open the way to anomaly `n`. Spends one of its APERTUREs, stops the field,
+ * and puts the boss on it.
+ *
+ * Returns false if there is nothing to spend, one is already up, or `n` names
+ * a boss that is planned and not written -- which is the honest answer for
+ * six of the seven, and the reason the tree keeps their slots dormant.
  */
-export function openAperture(world) {
-  if (world.boss || !world.aperture) return false;
-  world.aperture--;
+export function openAperture(world, n = 1) {
+  if (world.boss) return false;
+  const make = makerOf(n);
+  if (!make || !anomalyOf(n)) return false;
+  if (!world.apertures || !(world.apertures[n] > 0)) return false;
+  world.apertures[n]--;
 
   /*
    * The field is ORDINAL's now, and that has to be true the moment the way
@@ -1185,10 +1237,20 @@ export function openAperture(world) {
   }
   world.attackers.clear();
 
-  world.boss = new Ordinal(world);
+  // Whose sky this is, before the arrival starts turning it over.
+  background.setBossMoods(dressOf(n).moods);
+  world.boss = make(world);
+  world.bossN = n;
   world.bossStage = 1;
   ripple(world.shooter.x, world.shooter.y - CFG.ordinal.standoff, 2.6, 900);
   shake(20);
   audio.boom();
   return true;
 }
+
+/*
+ * ORDINAL is anomaly I. Registered here, at the bottom of the module that
+ * defines it, so nothing has to import a boss in order to build one -- see
+ * the note at the top of anomaly.js.
+ */
+registerAnomaly(1, (world) => new Ordinal(world));

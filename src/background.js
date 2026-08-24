@@ -4,6 +4,7 @@
 // lattice, a few pre-rendered glyph columns and a dust field.
 
 import { clamp, rand, rgba, mixHex, makeCanvas, glowSprite } from './util.js';
+import { ORDINAL_MOODS } from './anomaly.js';
 import { fx } from './fx.js';
 
 const MOODS = {
@@ -13,21 +14,19 @@ const MOODS = {
   // left is coming through the breach.
   breach: { top: '#000000', mid: '#080407', low: '#000000', line: '#6b4a2a', neb: ['#1a0d05', '#120612', '#050308'], accent: '#ffd08a' },
   /*
-   * ORDINAL's sky, one per stage, so the whole field turns over as the fight
-   * escalates rather than only the boss changing colour. Magenta because
-   * ORDINAL is, and nothing else on the field uses that hue -- once the way
-   * is open, everything that is not yours is one colour.
+   * The boss sky, one per stage, so the whole field turns over as the fight
+   * escalates rather than only the boss changing colour. Once the way is
+   * open, everything that is not yours is one colour.
    *
-   * I  the ground goes out from under the blue and a violet comes up through
-   *    it; II is hotter and closer; III is nearly white at the horizon, which
-   *    is what a thing about to come apart looks like.
+   * These four are *slots*, not colours. They hold ORDINAL's magenta until
+   * something says otherwise, and setBossMoods() drops another boss's four
+   * in before it arrives -- see anomaly.js, which is where the escalation
+   * was authored and where the other six get it rotated onto their own hue.
    */
-  boss: { top: '#0a0410', mid: '#2a0a33', low: '#050109', line: '#a03fb0', neb: ['#4d0a5c', '#2e0a4a', '#3d0630'], accent: '#ff8ae0' },
-  boss2: { top: '#12031a', mid: '#48083f', low: '#08010c', line: '#d64ab0', neb: ['#7a0a5c', '#4d0a5c', '#5c0630'], accent: '#ff6ad5' },
-  boss3: { top: '#1c0320', mid: '#6b0a4a', low: '#0d0110', line: '#ff5ec8', neb: ['#a80c66', '#7a0a5c', '#8c0640'], accent: '#ffc2f0' },
-  // IV. It has come down off the top of the field and the sky has come with
-  // it: no ground left, the horizon lit from underneath, nearly white.
-  boss4: { top: '#2e0526', mid: '#9c0f55', low: '#1a0214', line: '#ff9ee0', neb: ['#d41a72', '#a80c66', '#c0106a'], accent: '#ffffff' },
+  boss: { ...ORDINAL_MOODS[0] },
+  boss2: { ...ORDINAL_MOODS[1] },
+  boss3: { ...ORDINAL_MOODS[2] },
+  boss4: { ...ORDINAL_MOODS[3] },
   ending: { top: '#000000', mid: '#0a0a0a', low: '#000000', line: '#555555', neb: ['#222222', '#111111', '#191919'], accent: '#cccccc' },
 };
 
@@ -142,6 +141,21 @@ class Background {
 
   setMood(name) {
     if (MOODS[name]) this.target = MOODS[name];
+  }
+
+  /**
+   * Whose sky the next fight is under. Four moods, stage I to IV, dropped
+   * into the boss slots before the arrival starts.
+   *
+   * Copied in rather than pointed at: the mood the field is *currently*
+   * showing is eased toward its target key by key every frame, and a target
+   * that is somebody else's live object would be edited underneath it.
+   */
+  setBossMoods(list) {
+    if (!Array.isArray(list) || list.length < 4) return;
+    ['boss', 'boss2', 'boss3', 'boss4'].forEach((k, i) => {
+      Object.assign(MOODS[k], list[i], { neb: [...list[i].neb] });
+    });
   }
 
   /** A short bright bloom of the lattice — used on the lull and boss beats. */
