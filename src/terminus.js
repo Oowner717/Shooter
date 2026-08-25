@@ -788,11 +788,7 @@ export class Terminus extends Boss {
      * saying since its first caption. It is the edge. It does not stop being
      * the edge because you took some of it away.
      */
-    for (const p of [...this.outer, ...this.inner]) {
-      p.hidden = false;
-      if (!p.dead) continue;
-      this.revive(world, p, C.recloseHp);
-    }
+    this.reform(world, C.recloseHp, { sweep: C.recloseFor * 0.6 });
     this.syncReach(world);
     flash(0.55, '#ffffff');
     for (let i = 0; i < 4; i++) {
@@ -862,6 +858,7 @@ export class Terminus extends Boss {
     if (n === 3) this.takeFrame(world);
     if (n >= 3) this.limitT = C.limitEvery[n - 1];
     if (n >= 4) this.lastClose(world);
+    this.hold(world, 0.45);
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
     world.bossLine = n >= 4 ? 'IT HAS LET GO OF EVERYTHING BUT YOU.'
       : n >= 3 ? 'IT HAS LET GO OF THE EDGE.'
@@ -1029,6 +1026,13 @@ export class Terminus extends Boss {
      * phone the segments alone are thirty-two small marks that do not join
      * up. Faint, so it never competes with the bodies.
      */
+    // The boundary you have opened, outlined where it was. Not only during
+    // ECLIPSE now -- a ring with holes in it should read as a ring for the
+    // whole fight, and the gaps are the record of what you have done.
+    if (this.frameK <= 0 && !arriving && this.eclipse <= 0) {
+      this.drawGhosts(ctx, T.color, 0.16);
+    }
+
     if (this.frameK < 1 && !arriving) {
       ctx.globalCompositeOperation = 'lighter';
       for (const rr of this.twoRings ? [this.radius, this.radius * C.innerAt] : [this.radius]) {

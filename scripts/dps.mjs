@@ -110,6 +110,10 @@ for (let r = 0; r < RUNS; r++) {
       candSum: 0,
       inCone: 0, // frames the boss's own nearest body was inside the cone
       bossFrames: 0,
+      // ...and law 2 asked as an angle rather than a distance: per type, how
+      // much of the time was a body of that type legally targetable at all.
+      typeSeen: {},
+      typeLegal: {},
     });
     rec.at = () => {
       const k = w.boss ? (w.boss.arriving > 0 ? 0 : w.boss.stage) : -1;
@@ -160,7 +164,13 @@ for (let r = 0; r < RUNS; r++) {
           const d = Math.hypot(dx, dy);
           const inCone = Math.abs(angleDelta(-Math.PI / 2, Math.atan2(dy, dx))) <= limit;
           if (d < near) { near = d; nearIn = inCone; }
-          if (inCone && d - (e.r || 0) <= g.aimRange) cands++;
+          const legal = inCone && d - (e.r || 0) <= g.aimRange;
+          if (legal) cands++;
+          const id = e.type && e.type.id;
+          if (id) {
+            b.typeSeen[id] = (b.typeSeen[id] || 0) + 1;
+            if (legal) b.typeLegal[id] = (b.typeLegal[id] || 0) + 1;
+          }
         }
         b.candSum += cands;
         if (!cands) b.blind++;
@@ -210,6 +220,8 @@ for (let r = 0; r < RUNS; r++) {
         cand: b.candSum / Math.max(1, b.secs * 60),
         inCone: b.inCone / Math.max(1, b.bossFrames),
         byType: b.byType,
+        typeSeen: b.typeSeen,
+        typeLegal: b.typeLegal,
       };
     }
     return o;
@@ -255,6 +267,30 @@ for (const k of keys) {
     + `${pad(`${Math.round((100 * blind) / Math.max(1, secs * 60))}%`, 8)}`
     + `${pad(`${Math.round(100 * cone)}%`, 9)}`,
   );
+}
+
+/*
+ * Law 2, asked as an angle. `fight.mjs` checks that every mandatory body comes
+ * inside aim RANGE; it cannot see that a body can be well inside 400 and still
+ * be untargetable because it is past the shoulder. Per type, over the whole
+ * fight: what fraction of the frames it was on the field was it legal to shoot.
+ */
+const seen = {};
+const legal = {};
+for (const r of runs) {
+  for (const k of Object.keys(r.stages)) {
+    for (const [id, n] of Object.entries(r.stages[k].typeSeen)) seen[id] = (seen[id] || 0) + n;
+    for (const [id, n] of Object.entries(r.stages[k].typeLegal)) legal[id] = (legal[id] || 0) + n;
+  }
+}
+const ids = Object.keys(seen).sort((a, b) => (legal[a] || 0) / seen[a] - (legal[b] || 0) / seen[b]);
+if (ids.length) {
+  console.log('\n  targetable, by type (frames legal / frames on the field)');
+  for (const id of ids) {
+    const f = (legal[id] || 0) / seen[id];
+    console.log(`    ${id.padEnd(10)} ${String(Math.round(f * 100)).padStart(4)}%`
+      + `   ${f < 0.5 ? 'PAST THE SHOULDER' : ''}`);
+  }
 }
 
 console.log('\n  wide     shots fired while the barrel was still coming round -- these');

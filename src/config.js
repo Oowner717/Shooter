@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '136';
+export const BUILD = '137';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '136';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'd7cfc60';
+export const REV = '1034393';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -271,6 +271,18 @@ export const CFG = {
     aimClamp: 1.36, // radians away from straight up that the barrel allows
     turnRate: 26, // rad/s barrel slew under your own hand
     autoTurnRate: 4.2, // rad/s while auto aim traverses between targets
+    /*
+     * How much better a challenger has to be before the assist lets go of what
+     * it is already shooting. 1.0 is no memory at all, which is what this was.
+     *
+     * The barrel traverses at `autoTurnRate` and, with auto fire on, the
+     * cadence does not wait for it -- so a target change costs a slew and
+     * every round fired during it. Measured on build 136, TERMINUS changed
+     * target forty-five times a second for the whole of stage I because
+     * thirty-two ring segments sat at exactly the same distance; seventy-four
+     * percent of its shots were fired mid-sweep. See Game.autoTarget.
+     */
+    aimStick: 1.15,
 
     /*
      * How far auto aim will reach for a target, in world units, before ARRAY.

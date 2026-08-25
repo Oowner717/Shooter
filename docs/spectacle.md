@@ -24,7 +24,55 @@ Measured with `scripts/fight.mjs`, assists only, nothing bought.
 | VII | TERMINUS | 419s | 22 / 17 / 15 / 37 |
 
 I–VI span 198–249s, a 25% spread. **Target: I–VI at 290 ± 15s, VII at
-430 ± 20s.** That is +70 to +90 seconds each, all of it from new content.
+430 ± 20s.**
+
+### Where they are after build 137
+
+The assist gained memory in Phase A, which raised effective damage and moved
+every one of these. Re-measured, one run each:
+
+| boss | 136 | 137 | |
+|---|---|---|---|
+| I ORDINAL | 220s | **174s** | −21% |
+| II GNOMON | 198s | **215s** | +8% |
+| III FRACTAL | 207s | **189s** | −9% |
+| IV AMPLITUDE | 203s | **219s** | +8% |
+| V DYNAMO | 249s | **222s** | −11% |
+| VI PARITY | 237s | **226s** | −5% |
+| VII TERMINUS | 419s | **377s** | −10% |
+
+The spread tightened (174–226 against 198–249) and the mean fell about 8%, so
+the length job is bigger than it was and the consistency job is smaller.
+
+### How length actually works — the first draft of this plan had it wrong
+
+That draft costed every proposal as "+40s for a new phase, +10s for a
+setpiece, +25s for a re-form" and totted them up. **The first of those is
+zero.** Length here is
+
+> destructible health ÷ effective damage, plus whatever holds the fight
+
+and a new stage does not add health — it re-partitions the health that was
+already there. Measured across five threshold experiments on TERMINUS during
+build 136, the stage split moved from 25/15/34/17 to 21/15/31/24 while the
+total stayed between 407 and 430 seconds every time. Thresholds move time
+between stages; they never create it.
+
+The honest arithmetic:
+
+- **A new phase: +0s.** It buys interest, not length. Worth doing for its own
+  sake, never counted toward the target.
+- **A setpiece: + its own duration.** A held beat is dead time and dead time
+  is real time. 7–10s each.
+- **A re-form at 40%: + 0.4 × structure health ÷ measured damage per second.**
+  The only large lever. Worked example, measured: TERMINUS resurrects 44
+  segments at 0.35 of a 260 bar — 4004 health — against about 65 damage a
+  second, and its stage IV went from roughly 70 seconds to 132.
+- **Raising effective damage: −5 to −21%,** as the table above shows. Every
+  aim fix pays for itself in feel and charges for it in length.
+
+So the target is reached by **re-forms and setpieces**, and every per-boss
+number below is derived from that rather than asserted.
 
 ## What the probe found — the aim cone, and what it costs
 
@@ -133,43 +181,78 @@ index order, four captions. TERMINUS has six captions and the same shape.
 remainder. PARITY restores its panes first and TERMINUS changes the sky;
 otherwise they are interchangeable.
 
-## Phase A — the shared machinery (one build)
+## Phase A — the shared machinery · **shipped, build 137**
 
-Everything in Phase B is cheaper if these exist first. Nothing here changes a
-fight on its own, so it ships with the ORDINAL work rather than alone.
+Everything in Phase B is cheaper because these exist. Two of them change every
+fight on their own, which is why this shipped as its own build rather than
+riding along with ORDINAL.
 
-- **`Boss.reform(world, frac, opts)`** — resurrect this boss's dead parts at
-  `frac` of a bar with a staged sweep, in ring or index order, with the flash
-  and shake. TERMINUS's `lastClose` becomes three lines. This is the fix for
-  finding 1 and the single biggest change in the plan. *Adds 20–30s per
-  fight on its own*, because it puts structure back that has to be broken
-  again.
+- ✅ **`Boss.reform(world, frac, opts)`** — resurrects this boss's dead parts
+  at `frac` of a bar, in list order, staggered across a `sweep` so they come
+  back as a wave rather than all at once. TERMINUS's `lastClose` is three
+  lines now. The fix for finding 1, and the only lever in the plan that
+  reliably makes a fight longer.
 - **`Boss.beat(world, name, seconds, step)`** — the setpiece harness: holds
   the stage ladder, owns the caption, runs `step(k)` from 0 to 1, returns
   true on the last frame. Every existing setpiece is hand-rolled; with this
   a second one per boss is ~20 lines instead of ~60.
-- **Structure ghosts** — a shared draw helper that outlines a boss's *dead*
-  parts where they would be. Proven in TERMINUS's ECLIPSE, where it turned
-  six lonely survivors into a whole boundary. Applies to all seven and makes
-  every late stage legible.
-- **Camera verbs on `background`** — `roll(rad)`, `zoom(k)`, `invert(t)`.
-  Three functions, and they unlock most of the cinema below.
-- **A held breath on `enterStage`** — 0.5s of time dilation and silence.
-  The engine already has `world.timeScale` and `world.bossSlow`; this is one
-  call. *Adds ~2s per fight* and makes every stage land.
-- **Per-boss arrival verbs** — replace the shared unfold with an
-  `arriveShape(k)` hook the boss may override.
-- **Target hysteresis in `autoTarget`** — the current target keeps its lock
-  unless something beats it by a margin. Five lines, and the largest single
-  quality change available: TERMINUS's forty-five switches a second go to
-  nearly none and damage per shot rises across every fight. Gated on
-  `dps.mjs`, `fight.mjs` and a wave-clearing run, because it changes how the
-  whole game aims.
+- ✅ **`Boss.drawGhosts(ctx, colour, alpha)`** — outlines a boss's *dead*
+  parts where they would be, so a structure with holes in it still reads as a
+  structure. TERMINUS draws them for the whole fight now, not only during
+  ECLIPSE. One caveat for Phase B: it only works for a boss that keeps
+  *placing* its dead parts. TERMINUS does that deliberately; the others will
+  each need a line in `place()`.
+- ⏸ **Camera verbs on `background`** — `roll(rad)`, `zoom(k)`, `invert(t)`.
+  Deferred to the builds that need them: GNOMON wants `roll`, FRACTAL wants
+  `zoom`. Writing them now would be three functions against no caller.
+- ✅ **`Boss.hold(world, secs)`** — a held breath: dilation and quiet so a
+  beat lands. The engine already had the mechanism and nothing but the death
+  sequence had ever used it. TERMINUS holds 0.45s on every stage change.
+- ⏸ **Per-boss arrival verbs** — deferred for the same reason. The hook is
+  trivial; everything it is worth is in the seven overrides.
+- ✅ **Target hysteresis in `autoTarget`** (`CFG.shooter.aimStick` 1.15) — the
+  current target keeps its lock unless something beats it by 15%. Measured:
+  **TERMINUS's stage I went from 45.5 target changes a second to 0.3, and from
+  74% of its shots fired mid-sweep to 12%.**
+
+  It shipped with a bug worth remembering. `!held.dead` is not the test for
+  "still shootable": ORDINAL's garrison, DYNAMO's core, PARITY's phased
+  crescent and TERMINUS's second ring are all hidden by splicing them out of
+  `world.enemies` and leaving them alive, so a target that had just phased kept
+  the lock. Measured with it wrong, PARITY ran 19% longer with the assist
+  holding a reflection. Two regress cases cover it now.
 
 ## Phase B — one build per boss
 
-Each is: **one new phase** (the length), **one second setpiece** (the back
-half), **one re-form** (the finale), **one draw upgrade** (the screenshot).
+Each is: **one new phase** (the interest), **one second setpiece** (the back
+half), **one re-form** (the length), **one draw upgrade** (the screenshot).
+
+**Order: III, II, IV, I, VI, V, VII** — biggest visual win per unit of work
+first. FRACTAL leads because its whole idea is invisible and the fix is one
+drawing function; DYNAMO is late because it is the one with a known length
+risk; TERMINUS is last because it has had two builds already.
+
+### What "done" means, per boss
+
+Three gates, all of them measurable, checked before the build is called
+finished:
+
+1. **A stage IV screenshot that could not be any other boss.** The structure
+   is on screen, in its own colour, doing its own thing. This is the whole
+   point and it is the one the eye checks in a second.
+2. **`dps.mjs` shows no type past the shoulder** — nothing mandatory legal to
+   shoot less than half the time it is on the field — and no stage above 20%
+   blind or above 2 target switches a second.
+3. **`fight.mjs` inside 290 ± 15s** (430 ± 20 for TERMINUS), three runs, with
+   no stage below 15% or above 35%.
+
+### What must not break
+
+The standing gate for every build in this plan: the regress suite green,
+ORDINAL's seeded hash reproducible within the build (it may *change*, but it
+must be recorded when it does), `check-build --stamp` run last, and a
+`smoke.mjs` walk with zero console errors. Every one of those has caught
+something at least once.
 
 ---
 

@@ -405,6 +405,98 @@ export class Boss {
   /** A hook for whatever a particular ending does on the way down. */
   dieExtra() {}
 
+  // ------------------------------------------------------- shared beats
+
+  /**
+   * Put this boss's structure back.
+   *
+   * Every fight's last stage is its emptiest, and all seven get there the same
+   * way: the structure IS the boss -- the frames, the dial, the wave, the
+   * mirror, the boundary -- and it is consumed exactly when the fight is
+   * supposed to peak. Screenshotted at stage IV, ORDINAL had two of forty
+   * panels standing, GNOMON none of sixteen arcs, AMPLITUDE four of fourteen
+   * segments. Every finale was one glowing object over an empty field.
+   *
+   * TERMINUS answered it in build 136 by throwing its boundary back up for the
+   * last stage, and the answer generalises. This is a scripted resurrection
+   * rather than a heal -- law 7 caps what a boss may mend for itself; a
+   * setpiece that puts the whole thing back at a fraction of a bar is a beat,
+   * and PARITY's death has done exactly that since build 132.
+   *
+   * It is also the only thing in the plan that reliably makes a fight LONGER,
+   * because length is destructible health over effective damage and a new
+   * stage only re-partitions the health that was already there.
+   *
+   * They come back in a sweep rather than all at once: `spawnIn` staggered
+   * across `sweep` seconds in list order, which for a ring or a frame is the
+   * order they are arranged in.
+   */
+  reform(world, frac, opts = {}) {
+    const back = this.parts().filter((p) => p.dead || p.hidden);
+    if (!back.length) return 0;
+    const sweep = opts.sweep !== undefined ? opts.sweep : 0.9;
+    const cap = opts.cap || back.length;
+    let n = 0;
+    for (const p of back) {
+      if (n >= cap) break;
+      const was = p.hidden;
+      p.hidden = false;
+      if (p.dead) this.revive(world, p, frac);
+      else if (was && !world.enemies.includes(p)) world.enemies.push(p);
+      p.spawnIn = 0.12 + (n / back.length) * sweep;
+      p.flash = 1;
+      n++;
+    }
+    const T = this.core.type;
+    flash(0.4, T.color);
+    ring(this.x, this.y, 12, 520, 0.5, T.glow, 4);
+    ripple(this.x, this.y, 2.6, 900);
+    shake(24);
+    audio.boom();
+    background.surge(2);
+    return n;
+  }
+
+  /**
+   * A held breath: a moment of dilation and quiet so a beat lands.
+   *
+   * The engine already had the mechanism -- it is what the death sequence
+   * runs on -- and nothing but the death ever used it. A stage change that
+   * arrives at full speed is a caption and a colour swap; the same change with
+   * half a second of drag in front of it is an event.
+   */
+  hold(world, secs = 0.5) {
+    world.timeScale = Math.min(world.timeScale, B().endSlow);
+    world.bossSlow = Math.max(world.bossSlow || 0, Math.min(secs, B().slowFor));
+  }
+
+  /**
+   * Outline this boss's dead parts where they would be.
+   *
+   * A structure with holes in it should still read as a structure: the gap
+   * where a part was is the only record of what the player has done to it, and
+   * on a phone the survivors alone are a handful of unrelated marks. Proven in
+   * TERMINUS's ECLIPSE, where it turned six lonely segments into a boundary.
+   *
+   * Only useful for a boss that keeps placing its dead parts -- TERMINUS does
+   * so deliberately, because its core has to be able to fly to the gap it is
+   * going to mend. A boss that stops updating a dead part will draw its ghost
+   * wherever the part happened to die.
+   */
+  drawGhosts(ctx, color, alpha = 0.28) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = rgba(color, alpha);
+    ctx.lineWidth = 1.3;
+    for (const p of this.parts()) {
+      if (!p.dead || p.hidden) continue;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 0.86, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   /** ARREST: pieces snapping off, one after another rather than all at once. */
   arrest(world, k) {
     const all = this.parts().filter((p) => !p.dead && !p.hidden);

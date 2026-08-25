@@ -3106,6 +3106,98 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `it came round onto the turret ${r.seamPasses} times in a minute`);
 }
 
+// --- the assist's memory ----------------------------------------------------
+/*
+ * `autoTarget` used to pick strictly by score, sixty times a second, with no
+ * memory of what it was already shooting. The barrel does not move that fast --
+ * it traverses at `autoTurnRate` -- and with auto fire on the cadence does not
+ * wait for it, so every shot taken during a slew goes where the last target
+ * was. Measured on build 136, TERMINUS changed target FORTY-FIVE times a
+ * second through the whole of stage I, because thirty-two ring segments sat at
+ * exactly the same distance and the winner flipped on floating-point noise.
+ * Seventy-four percent of that stage's shots were fired mid-sweep.
+ *
+ * The second case here is the bug the first one shipped with. Half this game's
+ * bosses hide a body by splicing it out of world.enemies and leaving it alive
+ * -- ORDINAL's garrison, DYNAMO's core, PARITY's phased crescent, TERMINUS's
+ * second ring -- so a held target that has just phased passes every liveness
+ * test there is. With `!held.dead` as the check instead of "still on the
+ * field", PARITY ran nineteen percent longer with the assist locked onto a
+ * reflection.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { TYPE_BY_ID } = await import('../src/config.js');
+    const { Enemy } = await import('../src/enemies.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    g.restart();
+    w.phase = 'staging';
+    w.autoAim = true;
+    const s = w.shooter;
+    w.enemies.length = 0;
+
+    // Two bodies at exactly the same distance, straight up and either side.
+    const put = (dx, dy) => {
+      // A real hostile body: DRIFT is flagged `harmless` and `autoTarget`
+      // skips it entirely, which made the first draft of this block pass by
+      // comparing null to null sixty times.
+      const e = new Enemy(TYPE_BY_ID.prism, s.x + dx, s.y + dy, { staged: false, spawnIn: 0 });
+      e.counts = false;
+      w.enemies.push(e);
+      return e;
+    };
+    const a = put(-60, -300);
+    const b = put(60, -300);
+    out.tie = Math.abs(Math.hypot(-60, -300) - Math.hypot(60, -300)) < 0.001;
+
+    // Sixty frames of picking. Without memory this alternates; with it, it
+    // holds whatever it locked first.
+    let switches = 0;
+    let last = null;
+    for (let i = 0; i < 60; i++) {
+      const t = g.autoTarget();
+      g.autoLock = t;
+      if (last && t && t !== last) switches++;
+      last = t;
+    }
+    out.tieSwitches = switches;
+    out.tieLocked = !!last; // ...and it locked onto something at all
+
+    // ...and something genuinely nearer still takes the lock at once.
+    const near = put(0, -140);
+    g.autoLock = last;
+    out.tookNearer = g.autoTarget() === near;
+    near.dead = true;
+
+    /*
+     * The parked case: the held target leaves world.enemies without dying.
+     * The lock has to go with it on the very next pick.
+     */
+    g.autoLock = a;
+    out.holdsWhileOn = g.autoTarget() === a;
+    w.enemies.splice(w.enemies.indexOf(a), 1);
+    out.dropsWhenParked = g.autoTarget() !== a;
+    out.parkedStillAlive = !a.dead;
+
+    out.stick = CFG.shooter.aimStick;
+    g.restart();
+    return out;
+  });
+  check('the assist keeps its lock on a tie rather than picking again every frame',
+    r.tie && r.tieLocked && r.tieSwitches === 0 && r.stick > 1,
+    `two bodies at the same distance, 60 frames: ${r.tieSwitches} switches `
+    + `(margin ${r.stick})`);
+  check('...and lets go the moment something is genuinely nearer',
+    r.tookNearer, `took the nearer body: ${r.tookNearer}`);
+  check('a target parked out of the world releases the lock, alive or not',
+    r.holdsWhileOn && r.dropsWhenParked && r.parkedStillAlive,
+    `held while on the field: ${r.holdsWhileOn}; dropped once parked: `
+    + `${r.dropsWhenParked}; and it was never dead: ${r.parkedStillAlive}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

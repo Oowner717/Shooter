@@ -902,7 +902,13 @@ export class Game {
     const reach = this.aimRange;
     let best = null;
     let bestScore = Infinity;
+    // Whether the thing it is already shooting is still ON the field. See the
+    // note below: `dead` is not the test, because half this game's bosses hide
+    // a body by taking it out of world.enemies without killing it.
+    let heldLive = false;
+    const held = this.autoLock;
     for (const e of w.enemies) {
+      if (e === held) heldLive = true;
       if (e.dead || e.staged || e.harmless) continue;
       const dx = e.x - s.x;
       const dy = e.y - s.y;
@@ -912,6 +918,47 @@ export class Game {
       // a marked breacher outranks anything four times closer
       const score = dist * (e.attacking ? 0.25 : 1);
       if (score < bestScore) { bestScore = score; best = e; }
+    }
+    /*
+     * ...and the thing it is already shooting keeps the lock unless something
+     * beats it by a margin.
+     *
+     * Picking strictly by score is picking again from scratch sixty times a
+     * second, and the barrel does not move that fast: it traverses at
+     * `autoTurnRate`, and with auto fire on the cadence does not wait for it,
+     * so every shot taken during a slew is fired at where the last target was.
+     * Two bodies at the same distance therefore cost a slew and a handful of
+     * wasted rounds every time they trade places.
+     *
+     * Measured on build 136, before this existed: TERMINUS changed target
+     * forty-five times a second through the whole of stage I -- thirty-two
+     * ring segments at exactly the same distance, so the winner flipped on
+     * floating-point noise every frame -- and fired seventy-four percent of
+     * its shots mid-sweep. FRACTAL's three divided core pieces did 4.7/s and
+     * AMPLITUDE's wave 5.3/s. See scripts/dps.mjs, which is what found it.
+     *
+     * A quarter better is the bar. A minion closing on the turret still takes
+     * the lock instantly -- it is nearer by much more than a quarter, and it
+     * carries the `attacking` weight besides -- while a tie does not.
+     */
+    /*
+     * `heldLive` rather than `!held.dead`, and that distinction is the whole
+     * of a bug this shipped with for about twenty minutes. ORDINAL's garrison,
+     * DYNAMO's core, PARITY's phased crescent and TERMINUS's second ring are
+     * all hidden the same way -- spliced out of world.enemies and left alive --
+     * so a held target that has just phased passes every liveness test there
+     * is. Measured with it wrong, PARITY ran 19% longer: the assist kept its
+     * lock on a reflection.
+     */
+    if (heldLive && held !== best && !held.dead && !held.staged && !held.harmless) {
+      const hx = held.x - s.x;
+      const hy = held.y - s.y;
+      const hd = Math.hypot(hx, hy);
+      if (Math.abs(angleDelta(-Math.PI / 2, Math.atan2(hy, hx))) <= limit
+        && hd - (held.r || 0) <= reach
+        && hd * (held.attacking ? 0.25 : 1) <= bestScore * CFG.shooter.aimStick) {
+        return held;
+      }
     }
     return best;
   }
