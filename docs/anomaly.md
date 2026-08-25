@@ -6,7 +6,49 @@ repo so it survives the container; each phase below is one build-sized
 request, and a future session should be able to pick any phase up from this
 file alone.
 
-Status: **Phases 0–2 shipped (builds 127, 128, 129).** Three of seven bosses
+Status: **Phases 0–3 shipped (builds 127–130).** Four of seven bosses built:
+ORDINAL, GNOMON, FRACTAL, AMPLITUDE. Phases 4–7 (DYNAMO, PARITY, TERMINUS,
+polish) not started.
+
+### Phase 3 as built (AMPLITUDE, build 130)
+
+Landed as designed, after four measured corrections:
+
+1. **Droplets were a wall.** One fling per 6.5s → they absorbed 63% of the
+   turret's whole output over a 505s fight. Slowed to 11s. This is now the
+   third boss to teach the same lesson; treat minion cadence as suspect
+   until measured.
+2. **The plan's law-2 story for this boss was wrong.** It claimed the far
+   segments start out of range and are rescued by the growing swing. They
+   don't: at `span: 460` the far end reaches 355 of 400 at full length. The
+   span buys legality; the swing is escalation, not rescue. Both the comment
+   and the test now say so, measured at three body lengths.
+3. **The coil was empty.** The body is reliably gone by mid-fight, so stage
+   IV had nothing to ring. A slow capped mend failed twice — from II it made
+   II 43% of a 413s fight; in III it achieved nothing, because a segment
+   restored into a trough that dips to 80 units is deleted on arrival. Fixed
+   with a one-time **gather** of six segments on entering IV: a beat, like
+   NOON and RECURSION, not a drip.
+4. **The head was behind its own ring.** Orbiting outside the coil put the
+   whole wave between the turret and the only body whose death ends the
+   fight; auto-aim chewed the ring and IV became 42% of a 324s fight. The
+   head orbits *inside* now — faster, and truer to "it is closing its period
+   around you".
+
+**Measured**: 223.9s over two runs, stages 25/28/20/15%, damage split
+40/35/25 across body/head/spray (the most even of the four), captions
+10.6 chars/sec, everything inside 100 units, one REMAINDER.
+
+### A pattern worth naming for phases 4–7
+
+Three of the four bosses shipped a minion cadence that turned the fight into
+a spray-shooting exercise, and two shipped a late-stage heal that turned a
+stage into a treadmill. Both are invisible without `fight.mjs`'s
+damage-absorbed table. **Check that table before tuning anything else.**
+
+Original Phase 0–2 notes follow.
+
+Status (Phases 0–2): **shipped in builds 127, 128, 129.** Three of seven bosses
 are built: ORDINAL, GNOMON, FRACTAL. Phases 3–7 not started.
 
 ### Changed by request (build 129)
