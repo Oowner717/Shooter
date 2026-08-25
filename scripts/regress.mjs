@@ -2521,8 +2521,60 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.stages = seen.join(',');
     out.ladder = seen.every((v, i) => i === 0 || v === seen[i - 1] + 1);
     // ...and the last leg goes out when it collapses into the core, rather
-    // than riding the blades still standing and still armouring it.
+    // than riding the blades still standing and still armouring it. Read
+    // here, before the block below puts the circuit back to test the blink.
     out.legsAtIV = boss.pylons.filter((p) => !p.dead).length;
+
+    /*
+     * The blink has to run in the stages where the core can actually be
+     * touched, which is the whole of what was wrong with this fight for a
+     * build. It ran only while two legs stood -- exactly when the core is
+     * sheltered and unshootable -- so its signature happened entirely while
+     * the player was shooting something else, and then stopped for the
+     * remaining three quarters of the fight.
+     */
+    // Everything above killed the circuit; these need one back.
+    for (const p of boss.pylons) { p.dead = false; p.hp = p.maxHp; p.retired = false; }
+    boss.triad = false;
+    boss.hunt = { x: w.shooter.x, y: w.shooter.y };
+    out.stopsByStage = [1, 2, 3, 4].map((n) => { boss.stage = n; return boss.stops(); });
+    boss.stage = 3;
+    boss.at = 0;
+    boss.next = -1;
+    boss.tele = 0;
+    boss.blinkT = 0;
+    boss.lance = null;
+    const where = [];
+    for (let i = 0; i < 900; i++) {
+      boss.stepBlink(w, 1 / 60);
+      boss.place(1 / 60);
+      where.push(`${Math.round(boss.x)},${Math.round(boss.y)}`);
+      // A few frames past the blink, so the move it caused is recorded --
+      // breaking on the lance alone stops on the very frame it happens.
+      if (boss.lance && boss.lance.t < 1) break;
+    }
+    out.blinkedLate = new Set(where).size > 1;
+    out.lanced = !!boss.lance;
+    // ...and the lance is a hazard, not a decoration.
+    if (boss.lance) {
+      const s = w.shooter;
+      const keep = { x: s.x, y: s.y };
+      w.shock = 0;
+      s.x = (boss.lance.ax + boss.lance.bx) / 2;
+      s.y = (boss.lance.ay + boss.lance.by) / 2;
+      boss.stepLance(w, 1 / 60);
+      out.lanceShock = +w.shock.toFixed(2);
+      w.shock = 0;
+      s.x = keep.x - 4000;
+      boss.stepLance(w, 1 / 60);
+      out.lanceClear = +w.shock.toFixed(2);
+      s.x = keep.x; s.y = keep.y;
+    }
+    // The circuit turns rather than standing still.
+    boss.stage = 1;
+    const spun = boss.pylons.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join('|');
+    for (let i = 0; i < 240; i++) boss.place(1 / 60);
+    out.turned = boss.pylons.map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join('|') !== spun;
     g.restart();
     return out;
   });
@@ -2540,6 +2592,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('it climbs the stages one at a time and cannot skip one',
     r.ladder && r.stages.endsWith('4') && r.legsAtIV === 0,
     `stages seen: ${r.stages}; legs still standing at IV: ${r.legsAtIV}`);
+  check('it keeps blinking once the core is something you can shoot',
+    r.stopsByStage.every((n) => n >= 2) && r.blinkedLate && r.lanced,
+    `places it can be, by stage: ${r.stopsByStage.join('/')}; `
+    + `moved in III: ${r.blinkedLate}; left a discharge: ${r.lanced}`);
+  check('every blink leaves a discharge, and crossing it costs the intake',
+    r.lanceShock > 0 && r.lanceClear === 0,
+    `on the lance ${r.lanceShock} corruption, clear of it ${r.lanceClear}`);
+  check('the circuit turns rather than standing still',
+    r.turned, `pylons moved over four seconds: ${r.turned}`);
 }
 
 // --- PARITY: two of everything, one of them real ----------------------------

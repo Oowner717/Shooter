@@ -93,12 +93,15 @@ export class Dynamo extends Boss {
      * between you and the rest of it -- which makes the obvious first target
      * also the one that opens the shortest path to the core.
      */
+    this.circuitA = 0;
     this.pylons = [];
     for (let i = 0; i < 3; i++) {
+      // Its place on the ring, not its place on the field: the whole circuit
+      // turns, so where a pylon *is* is worked out every frame.
       const a = -Math.PI / 2 + (i / 3) * TAU + Math.PI;
       const p = this.body('pylon', this.hub.x + Math.cos(a) * C.inset,
         this.hub.y + Math.sin(a) * C.inset);
-      p.home = { x: p.x, y: p.y };
+      p.at = a;
       this.pylons.push(p);
     }
 
@@ -161,10 +164,16 @@ export class Dynamo extends Boss {
 
   place(dt) {
     const C = D();
+    /*
+     * The circuit turns, and that is most of what stops this fight being a
+     * still image. Three towers that never move were a quarter of it.
+     */
+    this.circuitA += C.circuitSpin[this.stage - 1] * dt;
     for (const p of this.pylons) {
       if (p.dead) continue;
-      p.x = p.home.x;
-      p.y = p.home.y;
+      const a = p.at + this.circuitA;
+      p.x = this.hub.x + Math.cos(a) * C.inset;
+      p.y = this.hub.y + Math.sin(a) * C.inset;
       p.angle = 0;
       p.vx = 0; p.vy = 0; p.av = 0;
     }
@@ -174,11 +183,15 @@ export class Dynamo extends Boss {
       // still be shot would be a second health bar on a boss that has one.
       this.bladeA = (this.bladeA || 0) + C.bladeSpin * dt;
     } else if (this.stage >= 3 && !this.arriving) {
-      // III: off the ground, going round you.
-      this.orbitA += C.orbitSpin * dt;
-      const s = this.hunt;
-      this.x = s.x + Math.cos(this.orbitA) * C.orbitAt;
-      this.y = s.y + Math.sin(this.orbitA) * C.orbitAt;
+      /*
+       * III: off the ground, and still blinking -- station to station round
+       * you rather than sliding smoothly between them. A boss that glides is
+       * a chase; one that is somewhere else every few seconds is the thing
+       * this boss was supposed to be all along.
+       */
+      const [sx, sy] = this.stopAt(this.at);
+      this.x = sx;
+      this.y = sy;
     } else {
       const p = this.live()[this.at] || this.live()[0] || this.pylons[0];
       this.x = p.x;
@@ -227,31 +240,85 @@ export class Dynamo extends Boss {
    * Without the tell a teleport is a discontinuity, and a discontinuity is
    * not a mechanic, it is a bug you have to be told is deliberate.
    */
+  /** How many places it can be right now: pylons, or stations on its orbit. */
+  stops() {
+    return this.stage >= 3 ? D().orbitStops : this.live().length;
+  }
+
+  /** ...and where a given one of them is. */
+  stopAt(i) {
+    const C = D();
+    if (this.stage >= 3) {
+      const a = -Math.PI / 2 + (i / C.orbitStops) * TAU;
+      const s = this.hunt || this.hub;
+      return [s.x + Math.cos(a) * C.orbitAt, s.y + Math.sin(a) * C.orbitAt];
+    }
+    const live = this.live();
+    const p = live[Math.min(i, live.length - 1)] || this.pylons[0];
+    return [p.x, p.y];
+  }
+
   stepBlink(world, dt) {
     const C = D();
-    const live = this.live();
-    if (live.length < 2 || this.stage >= 3) { this.next = -1; return; }
+    if (this.stops() < 2) { this.next = -1; return; }
     if (this.tele > 0) {
       this.tele -= dt;
       if (this.tele <= 0) {
+        // Where it left from, so the discharge has somewhere to come from.
+        const [fx, fy] = this.stopAt(this.at);
         this.at = this.next;
         this.next = -1;
-        ring(live[this.at].x, live[this.at].y, 8, 180, 0.4, TYPE_BY_ID.dynamo.glow, 3);
-        spark(this.x, this.y, rand(-90, 90), rand(-90, 90), '#ffffff', 0.3, 3);
+        const [tx, ty] = this.stopAt(this.at);
+        this.lance = { ax: fx, ay: fy, bx: tx, by: ty, t: C.lanceFor };
+        ring(tx, ty, 8, 180, 0.4, TYPE_BY_ID.dynamo.glow, 3);
+        spark(fx, fy, rand(-90, 90), rand(-90, 90), '#ffffff', 0.3, 3);
         audio.pop(0.85);
-        shake(5);
+        shake(6);
       }
       return;
     }
     this.blinkT -= dt;
     if (this.blinkT > 0) return;
     this.blinkT = C.blinkEvery * (this.stage >= 2 ? C.blinkFast : 1);
-    this.at = Math.min(this.at, live.length - 1);
-    let n = this.at;
-    while (n === this.at && live.length > 1) n = (Math.random() * live.length) | 0;
-    this.next = n;
+    const n = this.stops();
+    this.at = Math.min(this.at, n - 1);
+    let go = this.at;
+    while (go === this.at && n > 1) go = (Math.random() * n) | 0;
+    this.next = go;
     this.tele = C.telegraph;
     audio.chime(320);
+  }
+
+  /**
+   * The discharge.
+   *
+   * Every blink leaves a lance burning down the arc it travelled, for a
+   * second or so. Crossing one is corruption -- so the telegraph is a warning
+   * about two things at once: where it is going, and where the field is about
+   * to be dangerous. It is also the only pressure this boss makes that is not
+   * a minion, which matters: a fight whose only threat arrives on a spawn
+   * clock has one rhythm, and this one now has two.
+   */
+  stepLance(world, dt) {
+    const C = D();
+    const L = this.lance;
+    if (!L || L.t <= 0) return;
+    L.t -= dt;
+    const s = world.shooter;
+    const vx = L.bx - L.ax;
+    const vy = L.by - L.ay;
+    const len2 = vx * vx + vy * vy || 1;
+    const k = clamp(((s.x - L.ax) * vx + (s.y - L.ay) * vy) / len2, 0, 1);
+    const dx = s.x - (L.ax + vx * k);
+    const dy = s.y - (L.ay + vy * k);
+    if (dx * dx + dy * dy < C.lanceWidth * C.lanceWidth) {
+      world.shock = Math.max(world.shock, C.lanceShock);
+      if (Math.random() < 0.3) {
+        spark(s.x + rand(-18, 18), s.y + rand(-18, 18), rand(-70, 70), rand(-70, 70),
+          '#dceaff', 0.28, 2);
+      }
+    }
+    if (L.t <= 0) this.lance = null;
   }
 
   /** The links, as pairs of live pylons. */
@@ -461,6 +528,7 @@ export class Dynamo extends Boss {
     this.syncReach(world);
     this.stepRiders(world, dt);
     this.sweepArcs(world);
+    this.stepLance(world, dt);
 
     if (this.surge > 0) {
       this.surge -= world.dtRaw || dt;
@@ -504,7 +572,16 @@ export class Dynamo extends Boss {
     let want = this.stage;
     if (gone >= 1 && want < 2) want = 2;
     if (gone >= 2 && !this.surged) { this.startSurge(world); return; }
-    if (gone >= 2 && want < 3) want = 3;
+    /*
+     * III waits for the whole circuit, not two thirds of it.
+     *
+     * At two the gap between the first pylon falling and the second was four
+     * percent of the fight -- the turret takes them at a steady rate, so the
+     * stage between them was never going to be a stage. II is the middle of
+     * this fight now: arcs live, blinks quick, SURGE landing inside it, and
+     * the core coming out of shelter partway through.
+     */
+    if (gone >= 3 && want < 3) want = 3;
     if (this.coreFrac <= C.stageTriad && want < 4) want = 4;
     /*
      * One stage at a time. This boss's triggers are independent -- pylons for
@@ -603,6 +680,40 @@ export class Dynamo extends Boss {
             || (b === live[this.at] && a === live[this.next]));
         this.arc(ctx, a.x, a.y, b.x, b.y, going, seed += 3.7);
       }
+    }
+
+    /*
+     * ...and in III there are no links to light, so the telegraph is drawn
+     * straight from where it is to where it is going. Without this the blink
+     * loses its tell exactly when the core is finally something you can shoot.
+     */
+    if (this.stage >= 3 && this.next >= 0 && !this.triad) {
+      const [tx, ty] = this.stopAt(this.next);
+      this.arc(ctx, this.x, this.y, tx, ty, true, 23);
+    }
+
+    // The discharge burning down the arc it just travelled.
+    if (this.lance && this.lance.t > 0) {
+      const k = clamp(this.lance.t / C.lanceFor, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = 0.35 + 0.65 * k;
+      this.arc(ctx, this.lance.ax, this.lance.ay, this.lance.bx, this.lance.by, true, 31);
+      // A wide soft core to the beam, so its width is something you can see
+      // rather than something you learn by being corrupted by it.
+      const g3 = ctx.createLinearGradient(this.lance.ax, this.lance.ay,
+        this.lance.bx, this.lance.by);
+      g3.addColorStop(0, rgba('#ffffff', 0.3 * k));
+      g3.addColorStop(0.5, rgba(T.glow, 0.22 * k));
+      g3.addColorStop(1, rgba('#ffffff', 0.3 * k));
+      ctx.strokeStyle = g3;
+      ctx.lineWidth = C.lanceWidth * 1.2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(this.lance.ax, this.lance.ay);
+      ctx.lineTo(this.lance.bx, this.lance.by);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      ctx.restore();
     }
 
     // III: the leash back to whatever is left of the ground.

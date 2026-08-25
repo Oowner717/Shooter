@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '132';
+export const BUILD = '133';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '132';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '934a002';
+export const REV = 'f44e9ff';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1262,9 +1262,36 @@ export const CFG = {
      * before the core is there -- it is the whole of the tell, and without it
      * a teleport is just a discontinuity.
      */
-    blinkEvery: 6.0,
+    blinkEvery: 5.2,
     telegraph: 0.8,
     blinkFast: 0.68, // the multiplier on it once the circuit is broken
+    /*
+     * ...and it keeps blinking after the circuit is gone.
+     *
+     * It did not, and that was the whole of what was wrong with this fight.
+     * The blink -- the telegraph, the arc lighting up, the thing that makes
+     * this boss this boss -- ran only in stages I and II, which are exactly
+     * the stages where the core is sheltered and cannot be touched. So its
+     * signature happened entirely while the player was shooting something
+     * else, and then stopped for the remaining three quarters of the fight.
+     * In III and IV it blinks between stations on its own orbit instead.
+     */
+    orbitStops: 6,
+    /*
+     * The circuit turns. Three towers standing still for a quarter of the
+     * fight is a still image; turning, the arcs sweep the field and the
+     * geometry is different every few seconds.
+     */
+    circuitSpin: [0.11, 0.24, 0.4, 0.55],
+    /*
+     * ...and every blink discharges. The pylon it left fires a lance down
+     * the arc it travelled, and crossing that lance is corruption -- so the
+     * telegraph is a warning about two things at once: where it is going,
+     * and where the field is about to be dangerous.
+     */
+    lanceFor: 1.2,
+    lanceWidth: 32,
+    lanceShock: 0.32,
     /*
      * How much damage the core ignores, indexed by pylons *gone*: none yet,
      * one, two, all three. So it starts armoured and opens as you take the
@@ -1309,9 +1336,9 @@ export const CFG = {
      */
     surgeFor: 3.2,
     surgeSpin: 6.5,
-    // III: the core lets go of the ground and orbits *you*, trailing a leash
-    // back to whatever pylon is left. The radius keeps it inside aim range
-    // by construction rather than by luck.
+    // III: the core lets go of the ground and works its way round *you*,
+    // station to station, trailing a leash back to whatever pylon is left.
+    // The radius keeps it inside aim range by construction rather than luck.
     orbitAt: 300,
     orbitSpin: 0.42,
     // IV: the last pylon collapses into it and the pair becomes a propeller.
