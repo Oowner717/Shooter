@@ -437,7 +437,40 @@ empty field. This is the least watchable fight in the game.
 
 ---
 
-### IV — AMPLITUDE · teal · the wave
+### IV — AMPLITUDE · teal · the wave · **shipped, build 140**
+
+**As built: 241s (from 219), stages 21/22/28/17.** Every stage inside the
+band, blindness gone, and the head always in reach.
+
+- ✅ **The swing grows downward.** This was the real defect and it took the
+  probe to see it. The amplitude is bought with the body — a broken wave
+  whips harder — and for eleven builds it whipped *both* ways, which put the
+  crests further away every time the player made progress. The far end at a
+  crest sat **541 from the turret against an aim range of 400**, and stage III
+  ran with **nothing legal to shoot on 47% of its frames**. The fight was not
+  quiet; it was out of reach. Holding the crest and dropping the trough keeps
+  the escalation and inverts what it costs: a whipping wave comes at you.
+- ✅ **The head never leaves reach.** A wide sine cannot have all of itself
+  inside 400 — the ends are 200 across, so anything above 346 out there is
+  unreachable, and segments cycling in and out *is* the fight. The thing whose
+  death ends it is not allowed to. It is pulled down its own vertical until it
+  is inside `reach`. Legality 45% → **99%**, and blindness 47% → **0%**.
+- ✅ **OCTAVE** (into III): the body comes back and the wave folds into **four
+  strands** a quarter period apart across the same span. Two strands was a
+  pair of lines; four is interference. `at()` takes any number of strands now.
+  This is where the back half gets its length.
+- ✅ **The coil is a real ring, and an arc.** It was capped at six of fourteen
+  segments and read as four leaves; it takes the whole body back now. And it
+  spans 1.2 rad either side of straight up rather than closing a full circle,
+  because a closed ring puts a third of itself behind the shoulder.
+- ⚠️ **DROPLETs are still past the shoulder** — legal 39% of the time, up from
+  21%. They are flung from the far crest by design and they latch beside the
+  turret. Not mandatory to kill, so the gate is met on the letter; recorded
+  because it is the same shape of problem as the rest.
+- ⏸ **STANDING WAVE** (the nodes-lock phase) not built. A phase adds no
+  length and OCTAVE took the visual budget for this build.
+
+### IV — AMPLITUDE · teal · the wave — original plan
 
 *Now:* 14 segments on a travelling sine, the swing grows as the body shrinks,
 RESONANCE comes down over the turret, two strands in III, a coil in IV.

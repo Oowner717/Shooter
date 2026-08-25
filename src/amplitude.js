@@ -78,6 +78,9 @@ export class Amplitude extends Boss {
     const C = A();
     this.cx = world.shooter.x;
     this.cy = world.shooter.y - C.standoff;
+    // Where the turret is, so place() can keep the head inside its reach
+    // without being handed the world every frame.
+    this.hub = { x: world.shooter.x, y: world.shooter.y };
     this.x = this.cx;
     this.y = this.cy;
     this.arriving = C.arrive;
@@ -169,10 +172,33 @@ export class Amplitude extends Boss {
   at(u, strand) {
     const C = A();
     const slide = Math.sin(this.slideT) * C.slide;
-    const gap = this.strands > 1 ? (strand ? 1 : -1) * C.strandGap * 0.5 : 0;
-    const ph = this.strands > 1 && strand ? C.strandPhase : 0;
+    /*
+     * Any number of strands, not two.
+     *
+     * OCTAVE takes it to four, and four sines a quarter period apart over the
+     * same span is a moiré rather than a pair of lines -- which is the one
+     * picture a wave can make that this fight did not already have.
+     */
+    const n = this.strands;
+    const gap = n > 1 ? (strand / (n - 1) - 0.5) * C.strandGap : 0;
+    const ph = n > 1 ? (strand / n) * TAU * (C.strandPhase / Math.PI) : 0;
     const x = this.cx + slide + u * C.span;
-    const y = this.cy + this.drop + gap
+    /*
+     * The growth in the swing is spent DOWNWARD, not both ways.
+     *
+     * The amplitude is bought with the body -- a broken wave whips harder --
+     * and for eleven builds it whipped in both directions, which put the
+     * crests further away every time the player made progress. Measured: the
+     * far end of the wave at a crest sat 541 from the turret against an aim
+     * range of 400, and stage III ran with **nothing legal to shoot on 47% of
+     * its frames**. The fight was not quiet; it was out of reach.
+     *
+     * Holding the crest and dropping the trough keeps the escalation and
+     * inverts what it costs: a whipping wave comes at you rather than
+     * retreating from you, which is what it always claimed to do.
+     */
+    const grown = this.swing() - C.swing;
+    const y = this.cy + this.drop + gap + grown
       + Math.sin(u * C.waves * TAU + this.phase + ph) * this.swing();
     return [x, y];
   }
@@ -203,7 +229,31 @@ export class Amplitude extends Boss {
       p.angle = this.tangent(p.u, p.strand);
       p.vx = 0; p.vy = 0; p.av = 0;
     }
-    const [hx, hy] = this.at(-0.5, 0);
+    /*
+     * The head rides the leading end of its own wave -- and never out of
+     * reach of the thing that has to kill it.
+     *
+     * A wide sine cannot have all of itself inside a 400 aim range: the ends
+     * are 200 across, so anything more than 346 above the turret at the ends
+     * is unreachable, and the crests are further than that by design. The
+     * segments cycling in and out of reach IS the fight -- you shoot the wave
+     * when it comes to you. The head is not: it is the thing whose death ends
+     * this, and stage III measured with **nothing legal to shoot on 47% of
+     * its frames** because the survivors and the head were all high at once.
+     *
+     * So the head is pulled down its own vertical until it is inside `reach`.
+     * It stays on the curve horizontally, it still rides the leading end, and
+     * a wave whose head dips when it climbs too far is a better picture than
+     * one that swims out of the world.
+     */
+    const [hx, hy0] = this.at(-0.5, 0);
+    let hy = hy0;
+    if (this.hub) {
+      const dx = hx - this.hub.x;
+      const room = Math.sqrt(Math.max(0, C.reach * C.reach - dx * dx));
+      const top = this.hub.y - room;
+      if (hy < top) hy = top;
+    }
     this.core.x = hx;
     this.core.y = hy;
     this.core.vx = 0;
@@ -226,9 +276,20 @@ export class Amplitude extends Boss {
     const rr = C.coilFrom + (C.coilTo - C.coilFrom) * e;
     this.ringA = (this.ringA || 0) + C.coilSpin * dt;
     const live = this.segs.filter((p) => !p.dead);
+    /*
+     * An ARC over the turret rather than a closed ring around it.
+     *
+     * A ring puts a third of itself behind the turret's shoulder, where the
+     * assist's cone ends and a body is not a target at any distance -- so a
+     * third of the coil was scenery. It spans `coilArc` either side of
+     * straight up now, inside the 1.36 the assist allows, and rocks rather
+     * than revolving: still a period closing around you, still every segment
+     * reachable.
+     */
     for (let i = 0; i < live.length; i++) {
       const p = live[i];
-      const a = this.ringA + (i / Math.max(1, live.length)) * TAU;
+      const u = live.length > 1 ? i / (live.length - 1) - 0.5 : 0;
+      const a = -Math.PI / 2 + u * 2 * C.coilArc + Math.sin(this.ringA) * C.coilRock;
       p.x = s.x + Math.cos(a) * rr;
       p.y = s.y + Math.sin(a) * rr;
       p.angle = a + Math.PI / 2;
@@ -246,7 +307,8 @@ export class Amplitude extends Boss {
      * wall, and "it is closing its period around you" is more true rather than
      * less: it has come inside with you.
      */
-    const ha = -this.ringA * 1.4;
+    // ...and the head inside it, tracking the same arc so it stays in reach.
+    const ha = -Math.PI / 2 + Math.sin(-this.ringA * 1.4) * C.coilArc * 0.7;
     this.core.x = s.x + Math.cos(ha) * rr * 0.52;
     this.core.y = s.y + Math.sin(ha) * rr * 0.52;
     this.core.vx = 0;
@@ -353,7 +415,7 @@ export class Amplitude extends Boss {
     this.stage = n;
     this.flare = 1;
     this.flingT = C.fling[n - 1];
-    if (n >= 3) this.strands = 2;
+    if (n >= 3) this.strike(world);
     if (n >= 4) {
       this.gather(world);
       this.coil = 0.0001;
@@ -376,6 +438,37 @@ export class Amplitude extends Boss {
   }
 
   /**
+   * OCTAVE. The second setpiece, on the way into III.
+   *
+   * The body comes back whole and the wave folds into FOUR strands, a quarter
+   * period apart across the same span. Two strands was a pair of lines; four
+   * is interference -- the lane between them opens and closes four times
+   * where it used to twice, and the shape is different every second.
+   *
+   * It is also where the back half of this fight gets its length. A stage
+   * re-partitions health it already had; putting the body back is the only
+   * thing that adds any, and this fight's body is the only structure it has.
+   */
+  strike(world) {
+    const C = A();
+    if (this.struck) { this.strands = C.strands; return; }
+    this.struck = true;
+    this.strands = C.strands;
+    this.reform(world, C.octaveHp, { sweep: 0.8 });
+    // Re-seated across the strands it now has, or three quarters of them are
+    // empty and the moiré is one line with company.
+    const live = this.segs.filter((p) => !p.dead);
+    live.forEach((p, i) => { p.strand = i % this.strands; });
+    world.bossLine = 'OCTAVE';
+    this.lineFor = 3.0;
+    this.hold(world, 0.5);
+    flash(0.5, TYPE_BY_ID.crest.color);
+    ripple(this.cx, this.cy, 3, 1100);
+    shake(24);
+    audio.boom();
+  }
+
+  /**
    * The wave gathers itself, once, on the way into the coil.
    *
    * By stage IV the body is reliably gone -- which left the ring with nothing
@@ -387,12 +480,15 @@ export class Amplitude extends Boss {
    */
   gather(world) {
     const C = A();
-    const gone = this.segs.filter((p) => p.dead);
-    const want = Math.min(C.gather, gone.length);
-    for (let i = 0; i < want; i++) {
-      this.revive(world, gone[i], C.gatherHp);
-      this.beams.push({ p: gone[i], t: 0.55 });
-    }
+    /*
+     * All of it, not six of fourteen. The cap was there because a segment
+     * restored into a trough that dips to eighty units from the turret is
+     * deleted before it finishes arriving -- but the trough is where the
+     * growth goes now, not the crest, and what closes on you should be a ring
+     * rather than four leaves. Measured before this, stage IV's coil was four
+     * segments and read as nothing at all.
+     */
+    const want = this.reform(world, C.gatherHp, { sweep: 0.7 });
     if (want) {
       for (let i = 0; i < 3; i++) {
         ring(world.shooter.x, world.shooter.y, 340 - i * 60, 90, 0.4 + i * 0.1,

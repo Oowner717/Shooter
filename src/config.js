@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '139';
+export const BUILD = '140';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '139';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '66aad2e';
+export const REV = 'e898e66';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1242,7 +1242,7 @@ export const CFG = {
     // Stages.
     stageBody: 0.5, // body fraction that triggers RESONANCE and II
     stageCore: 0.62,
-    stageCoil: 0.30,
+    stageCoil: 0.45,
     freqMul: [1, 2, 1.7, 1.4],
     /*
      * III: two waves, out of phase, one high and one low. The segments split
@@ -1257,6 +1257,21 @@ export const CFG = {
      */
     coilFrom: 240,
     coilTo: 150,
+    /*
+     * ...and it is an ARC over the turret rather than a ring around it. A
+     * closed ring puts a third of itself behind the shoulder, where the
+     * assist's cone ends and a body is not a target at any distance. 1.2 rad
+     * either side of straight up is inside the 1.36 it allows.
+     */
+    /*
+     * How near the head is kept, whatever the wave is doing. A wide sine
+     * cannot have all of itself inside a 400 aim range and the segments
+     * cycling in and out of reach is the fight -- but the thing whose death
+     * ends this is not allowed to swim out of the world. See place().
+     */
+    reach: 370,
+    coilArc: 1.2,
+    coilRock: 0.34, // ...and it rocks about that rather than revolving
     coilFor: 11,
     coilSpin: 0.5,
     /*
@@ -1276,8 +1291,16 @@ export const CFG = {
      * Once, like NOON and RECURSION, and nothing after it -- what closes on
      * you is what you left it.
      */
-    gather: 6,
-    gatherHp: 0.45,
+    gather: 6, // (unused: the coil takes the whole body back now)
+    gatherHp: 1,
+    /*
+     * OCTAVE, on the way into III: the body comes back whole and the wave
+     * folds into four strands a quarter period apart. Two strands was a pair
+     * of lines; four is interference. It is also where the back half of this
+     * fight gets its length -- a stage re-partitions health it already had.
+     */
+    strands: 4,
+    octaveHp: 0.55,
     /*
      * ...and what it throws off the top of itself, on a clock.
      *

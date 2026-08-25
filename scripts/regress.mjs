@@ -3122,6 +3122,121 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `it came round onto the turret ${r.seamPasses} times in a minute`);
 }
 
+// --- AMPLITUDE has to stay inside the world ---------------------------------
+/*
+ * A wide sine cannot have all of itself inside a 400 aim range: the ends are
+ * two hundred across, so anything more than 346 above the turret out there is
+ * unreachable. Segments cycling in and out of reach IS this fight -- you shoot
+ * the wave when it comes to you.
+ *
+ * Two things are not allowed to. The growth in the swing used to go BOTH ways,
+ * so every crest got further away as the player made progress: measured, the
+ * far end at a crest sat 541 from the turret and stage III ran with nothing
+ * legal to shoot on 47% of its frames. And the head -- the thing whose death
+ * ends this -- swam out with it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { angleDelta } = await import('../src/util.js');
+    const g = window.__sim;
+    const w = g.world;
+    const C = CFG.amplitude;
+    const out = {};
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[4] = 1;
+    g.openBoss(4);
+    const boss = w.boss;
+    boss.arriving = 0;
+    boss.settle(w);
+    g.update(1 / 60);
+    const s = w.shooter;
+
+    /*
+     * The growth is spent downward. Take the wave's highest and lowest points
+     * whole, then break most of the body so the swing grows, and take them
+     * again: the top must not have moved up, and the bottom must have come
+     * down.
+     */
+    const span = () => {
+      let top = Infinity;
+      let low = -Infinity;
+      for (let i = 0; i <= 40; i++) {
+        const [, y] = boss.at(-0.5 + i / 40, 0);
+        top = Math.min(top, y);
+        low = Math.max(low, y);
+      }
+      return [top, low];
+    };
+    boss.phase = 0;
+    const [top0, low0] = span();
+    out.swing0 = Math.round(boss.swing());
+    boss.segs.forEach((p, i) => { if (i > 2) p.dead = true; });
+    boss.phase = 0;
+    const [top1, low1] = span();
+    out.swing1 = Math.round(boss.swing());
+    out.grew = out.swing1 > out.swing0;
+    out.crestHeld = top1 >= top0 - 1; // no further away (smaller y is higher)
+    out.troughCame = low1 > low0 + 1; // and the bottom is nearer the turret
+
+    /*
+     * The head stays inside reach, whatever the wave is doing.
+     */
+    let worst = 0;
+    for (let i = 0; i < 60 * 20; i++) {
+      boss.place(1 / 60);
+      worst = Math.max(worst, Math.hypot(boss.core.x - s.x, boss.core.y - s.y));
+    }
+    out.headFurthest = Math.round(worst);
+    out.headInReach = worst <= C.reach + 2;
+
+    /*
+     * OCTAVE: four strands, and the body back.
+     */
+    boss.segs.forEach((p) => { p.dead = true; });
+    boss.strike(w);
+    out.strands = boss.strands;
+    out.bodyBack = boss.segs.filter((p) => !p.dead).length;
+    const used = new Set(boss.segs.filter((p) => !p.dead).map((p) => p.strand));
+    out.allStrandsUsed = used.size === boss.strands;
+    // ...and four sines a quarter period apart are actually apart.
+    const ys = [0, 1, 2, 3].map((k) => boss.at(0, k)[1]);
+    out.strandsApart = new Set(ys.map((y) => Math.round(y / 8))).size >= 3;
+
+    /*
+     * The coil is an ARC over the turret, not a ring around it: every segment
+     * inside the assist's cone, which a closed ring cannot be.
+     */
+    boss.coil = 1;
+    boss.hunt = { x: s.x, y: s.y };
+    boss.place(1 / 60);
+    const limit = CFG.shooter.aimClamp;
+    const live = boss.segs.filter((p) => !p.dead);
+    out.coilOf = live.length;
+    out.coilInCone = live.every((p) => Math.abs(angleDelta(-Math.PI / 2,
+      Math.atan2(p.y - s.y, p.x - s.x))) <= limit);
+    // ...and it still does not crush: law 3.
+    out.coilFloor = live.every((p) => Math.hypot(p.x - s.x, p.y - s.y) >= C.coilTo - 2);
+    g.restart();
+    return out;
+  });
+  check('the swing grows downward: the crest holds and the trough comes to you',
+    r.grew && r.crestHeld && r.troughCame,
+    `swing ${r.swing0} -> ${r.swing1}; crest held: ${r.crestHeld}; `
+    + `trough came in: ${r.troughCame}`);
+  check('the head never swims out of reach of the turret',
+    r.headInReach, `furthest the head got over twenty seconds: ${r.headFurthest}`);
+  check('OCTAVE folds the wave into four strands and puts the body back',
+    r.strands === 4 && r.bodyBack > 0 && r.allStrandsUsed && r.strandsApart,
+    `${r.strands} strands, ${r.bodyBack} segments back, all strands seated: `
+    + `${r.allStrandsUsed}`);
+  check('the coil is an arc over the turret rather than a ring around it',
+    r.coilInCone && r.coilFloor && r.coilOf > 6,
+    `${r.coilOf} segments, all inside the cone: ${r.coilInCone}; `
+    + `none inside the floor: ${r.coilFloor}`);
+}
+
 // --- GNOMON's clock keeps running -------------------------------------------
 /*
  * The shadow is the best pressure mechanic in this game -- 30-34% of stages II
