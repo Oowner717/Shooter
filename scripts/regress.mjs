@@ -2776,14 +2776,27 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * back out, and the corruption is how near it has got.
      */
     boss.radius = C.ring;
+    boss.pulse = 0;
+    boss.lurchT = C.lurchEvery[0];
     w.shock = 0;
     boss.stepSqueeze(w, 1 / 60);
     out.wideClear = +w.shock.toFixed(2); // at full radius it costs nothing
-    for (let i = 0; i < 60 * 40; i++) boss.stepSqueeze(w, 1 / 60);
+    /*
+     * ...and between lurches it costs nothing either. The boundary corrupts
+     * for the half second its shockwave is crossing you and not otherwise:
+     * before build 136 it corrupted every frame it was near, which measured
+     * at 76% of stage I and 95% of stage II spent glitching.
+     */
+    let bit = 0;
+    let hi = 0;
+    for (let i = 0; i < 60 * 60; i++) {
+      w.shock = 0;
+      boss.stepSqueeze(w, 1 / 60);
+      if (w.shock > 0.001) { bit++; hi = Math.max(hi, w.shock); }
+    }
+    out.duty = +(bit / (60 * 60)).toFixed(2);
     out.closed = Math.round(boss.radius);
-    w.shock = 0;
-    boss.stepSqueeze(w, 1 / 60);
-    out.tightShock = +w.shock.toFixed(2);
+    out.tightShock = +hi.toFixed(2);
     // Break most of it and the boundary has to give ground.
     boss.outer.forEach((p, i) => { if (i % 4) p.dead = true; });
     boss.inner.forEach((p, i) => { if (i % 4) p.dead = true; });
@@ -2891,10 +2904,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.outFar && r.inNear && r.armourOpens,
     `outside the ring it is furthest: ${r.outFar}; inside, nearest: ${r.inNear}; `
     + `armour ${r.armour[0]} -> ${r.armour[1]}`);
-  check('the squeeze is what is left of the boundary, and it never crushes',
+  check('the boundary lurches rather than hums, and it never crushes',
     r.wideClear === 0 && r.closed < 250 && r.tightShock > 0 && r.sprang > r.closed
-    && r.neverCrushes,
-    `at full radius ${r.wideClear}; closes to ${r.closed} costing ${r.tightShock}; `
+    && r.neverCrushes && r.duty > 0.02 && r.duty < 0.3,
+    `at full radius ${r.wideClear}; closes to ${r.closed}, corrupting on `
+    + `${Math.round(r.duty * 100)}% of frames at up to ${r.tightShock}; `
     + `opened, springs back to ${r.sprang}`);
   check('a mend puts a segment back on the field, and the budget runs out',
     r.mendPut && r.mendPartial && r.mendCapped && r.mends >= 1,

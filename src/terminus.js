@@ -93,6 +93,35 @@ const MOODS = [
 ];
 
 /**
+ * Move between two places THE WAY ROUND, not the way across.
+ *
+ * Everything in this fight is arranged about one centre, and a straight line
+ * between two points arranged about a centre goes through the centre -- which
+ * is where the turret is. Measured: during LAST CLOSE the segments flying
+ * from their frame seats back to the ring passed within 6 units of the
+ * turret, and the core swapping between hanging over you and riding the wall
+ * came within 13. Bodies sliding through the player read as a bug however
+ * deliberate they are.
+ *
+ * So both ends are put into polar coordinates about the centre and the angle
+ * and the radius are interpolated separately. The radius never passes through
+ * zero, so nothing crosses the middle, and the motion is an arc -- which is
+ * also what a thing made of a circle should look like when it moves.
+ */
+function arcLerp(cx, cy, ax, ay, bx, by, k) {
+  const a1 = Math.atan2(ay - cy, ax - cx);
+  const r1 = Math.hypot(ax - cx, ay - cy);
+  const a2 = Math.atan2(by - cy, bx - cx);
+  const r2 = Math.hypot(bx - cx, by - cy);
+  let turn = (a2 - a1) % TAU;
+  if (turn > Math.PI) turn -= TAU;
+  if (turn < -Math.PI) turn += TAU;
+  const a = a1 + turn * k;
+  const r = r1 + (r2 - r1) * k;
+  return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+}
+
+/**
  * A point on the perimeter of a square of half-width `h`, for `t` in 0..1 --
  * and which way that side runs, so a body placed there can lie along it.
  *
@@ -139,6 +168,8 @@ export class Terminus extends Boss {
     this.beamA = 0;
     this.spiral = 0;
     this.limitT = 0;
+    this.lurchT = C.lurchEvery[0];
+    this.pulse = 0;
     this.fc = { x: this.hub.x, y: this.hub.y - C.frameAt };
 
     /*
@@ -268,9 +299,13 @@ export class Terminus extends Boss {
     const seat = toInner ? (i - 2) / 3 : i - Math.floor((i + 1) / 3);
     const count = toInner ? inCount : Math.max(1, n - inCount);
     const [ox, oy, ang] = onSquare(h, seat / count);
-    const c = Math.cos(this.frameA);
-    const s = Math.sin(this.frameA);
-    return [this.fc.x + ox * c - oy * s, this.fc.y + ox * s + oy * c, this.frameA + ang];
+    // The inner square turns the other way, the same trick the second ring
+    // plays at field scale: two frames whose corners cross rather than one
+    // shape with a smaller copy of itself inside it.
+    const turn = toInner ? -this.frameA * 1.6 : this.frameA;
+    const c = Math.cos(turn);
+    const s = Math.sin(turn);
+    return [this.fc.x + ox * c - oy * s, this.fc.y + ox * s + oy * c, turn + ang];
   }
 
   place(dt) {
@@ -306,8 +341,8 @@ export class Terminus extends Boss {
       } else {
         const [fx, fy, fa] = this.frameAtOf(p, i, live.length);
         const k = this.frameK * this.frameK * (3 - 2 * this.frameK);
-        p.x = rx + (fx - rx) * k;
-        p.y = ry + (fy - ry) * k;
+        const [px, py] = arcLerp(this.hub.x, this.hub.y, rx, ry, fx, fy, k);
+        p.x = px; p.y = py;
         const from = ra + Math.PI / 2;
         // The short way round, or a segment a hair past the wrap takes the
         // long way and visibly spins on its way to its seat.
@@ -326,8 +361,12 @@ export class Terminus extends Boss {
       p.x = rx; p.y = ry;
     }
 
-    if (this.frameK > 0) {
-      // III and IV: it is the middle of the frame, and the frame is the boss.
+    if (this.stage >= 3) {
+      /*
+       * III and IV: it is wherever `fc` is -- the middle of its own frame,
+       * and then, once the frame has gone back to being a ring, a point
+       * coming down the field inside it.
+       */
       this.x = this.fc.x;
       this.y = this.fc.y;
     } else {
@@ -378,14 +417,22 @@ export class Terminus extends Boss {
   // -------------------------------------------------------------- beats
 
   /**
-   * The squeeze.
+   * The squeeze, which arrives in LURCHES rather than as a hum.
    *
    * The whole of this fight's pressure, and its clock. A ring that is still
-   * whole closes at `contract`; one you have opened pushes back out at
-   * `relax` in proportion to what you opened. So the radius is the running
-   * total of the fight so far, and the corruption is how near the boundary
-   * has got -- nothing thrown, nothing to dodge, and nothing that is not a
-   * consequence of how fast you are working.
+   * whole closes; one you have opened pushes back out at `relax` in
+   * proportion to what you opened. So the radius is the running total of the
+   * fight so far -- nothing thrown, nothing to dodge, and nothing that is not
+   * a consequence of how fast you are working.
+   *
+   * What changed in build 136 is when it costs you. It used to corrupt every
+   * frame the boundary was near, which measured at seventy-six percent of
+   * stage I and ninety-five percent of stage II: a constant screen-wide
+   * glitch for two hundred seconds, which is not a mechanic anyone can read.
+   * Now the boundary lurches inward on a clock -- a step, a shockwave you can
+   * see coming down the field, and corruption for the half second the wave is
+   * crossing you -- and between lurches the field is clean. Same pressure,
+   * one tenth of the glitch, and a beat instead of weather.
    */
   stepSqueeze(world, dt) {
     const C = X();
@@ -406,20 +453,67 @@ export class Terminus extends Boss {
        * stage IV got two builds ago.
        */
       const target = C.ring - (C.ring - C.floor) * C.tight[this.stage - 1] * frac;
-      const rate = (this.radius > target ? C.contract[this.stage - 1] : C.relax) * dt;
-      this.radius = clamp(this.radius + clamp(target - this.radius, -rate, rate),
-        C.floor, C.ring);
+      /*
+       * Out is smooth and in is a step. Opening the boundary lets it go at
+       * once -- that is the reward, and it has to be legible in the frame you
+       * earn it -- but closing waits for the lurch clock, so the ring only
+       * ever comes at you in front of a shockwave you were given warning of.
+       */
+      if (this.radius < target) {
+        this.radius = Math.min(target, this.radius + C.relax * dt);
+        this.lurchT = Math.max(this.lurchT, C.lurchEvery[this.stage - 1] * 0.4);
+      } else {
+        this.lurchT -= dt;
+        if (this.lurchT <= 0) {
+          this.lurchT = C.lurchEvery[this.stage - 1];
+          this.lurch(world, target);
+        }
+      }
     }
     if (this.frameK > 0) return;
+    if (this.pulse > 0) this.pulse -= dt;
+    if (this.pulse <= 0) return;
+    // How hard a lurch bites is how near the boundary already was.
     const k = (C.ring - this.radius) / (C.ring - C.floor);
-    if (k <= C.squeezeFrom) return;
-    const bite = (k - C.squeezeFrom) / (1 - C.squeezeFrom);
+    const bite = clamp((k - C.squeezeFrom) / (1 - C.squeezeFrom), 0, 1);
+    if (bite <= 0) return;
     world.shock = Math.max(world.shock, C.squeezeShock * bite);
-    if (Math.random() < 0.25 * bite) {
+    if (Math.random() < 0.4 * bite) {
       const s = world.shooter;
       spark(s.x + rand(-22, 22), s.y + rand(-22, 22), rand(-60, 60), rand(-60, 60),
         TYPE_BY_ID.bound.glow, 0.3, 2);
     }
+  }
+
+  /**
+   * One step inward, and the wave it sends ahead of itself.
+   *
+   * The step is small -- `lurchBy` units -- so what you watch is a boundary
+   * ratcheting closed, not a boundary sliding closed. The shockwave is drawn
+   * from the ring inward and the corruption lasts exactly as long as it takes
+   * to reach you, so the glitch is something arriving rather than something
+   * that is on.
+   */
+  lurch(world, target) {
+    const C = X();
+    /*
+     * It pulses whether or not it can move. A boundary already as tight as
+     * this stage allows still strains against the limit on the clock -- and
+     * dropping the beat there meant the pressure switched itself off for
+     * whole stretches, which is the same defect in reverse.
+     */
+    this.radius = Math.max(target, this.radius - C.lurchBy);
+    this.pulse = C.pulseFor;
+    const T = TYPE_BY_ID.bound;
+    ring(this.hub.x, this.hub.y, this.radius, -(this.radius - 20), C.pulseFor, T.glow, 3);
+    for (let i = 0; i < 3; i++) {
+      const a = rand(0, TAU);
+      spark(this.hub.x + Math.cos(a) * this.radius, this.hub.y + Math.sin(a) * this.radius,
+        -Math.cos(a) * 220, -Math.sin(a) * 220, T.color, 0.4, 2);
+    }
+    shake(7);
+    audio.pop(0.5);
+    this.flare = Math.max(this.flare, 0.5);
   }
 
   /**
@@ -611,15 +705,25 @@ export class Terminus extends Boss {
    * apart repeat every quarter turn, which is what doubling the angle inside
    * the sine is doing.
    */
+  beamCount() {
+    const C = X();
+    // Six for the last stage. The angle test below is written for any count,
+    // so this is the one number that has to change.
+    return this.stage >= 4 ? C.beamsLate : C.beams;
+  }
+
   stepBeams(world, dt) {
     const C = X();
-    if (this.frameK < 1) return;
+    if (this.stage < 3 || (this.stage === 3 && this.frameK < 1)) return;
     this.beamA += C.beamSpin * (1 + this.spiral * 0.8) * dt;
     const s = world.shooter;
     const d = Math.hypot(s.x - this.x, s.y - this.y);
     if (d > C.beamLen) return;
     const toward = Math.atan2(s.y - this.y, s.x - this.x);
-    const across = Math.abs(Math.sin(2 * (toward - this.beamA))) < Math.sin(2 * C.beamArc);
+    // n beams a turn apart repeat every turn/n, which is what the half-count
+    // inside the sine is doing: one test covers all of them.
+    const h = this.beamCount() / 2;
+    const across = Math.abs(Math.sin(h * (toward - this.beamA))) < Math.sin(h * C.beamArc);
     if (!across) return;
     world.shock = Math.max(world.shock, C.beamShock);
     if (Math.random() < 0.3) {
@@ -648,6 +752,108 @@ export class Terminus extends Boss {
     audio.pop(0.7);
   }
 
+  /**
+   * IV -- LAST CLOSE. It puts the edge back up, one more time, around you.
+   *
+   * The plan had the frame simply drifting nearer for the last stage, and
+   * that is what the second half of this fight was: III with a shorter
+   * distance. It is the last stage of the last boss and it was the least
+   * interesting thing on screen.
+   *
+   * So it throws the frame back out into a ring -- the fight's own best image
+   * returning, and the one thing this boss has said from its first caption --
+   * and ratchets it shut to the floor while the core comes down INSIDE it,
+   * to a hundred and thirty above the turret. Nearer than the boundary, which
+   * is the point: for the whole fight the edge has been the thing between you
+   * and it, and for the last stage there is nothing between you at all.
+   */
+  lastClose(world) {
+    const C = X();
+    this.radius = C.ring;
+    this.reclose = C.recloseFor;
+    this.beamA += 0.4;
+    this.bare = true;
+    this.bareT = C.bareFor;
+    /*
+     * ...and it puts the boundary back. All of it.
+     *
+     * Without this the last stage had no ring in it: the trigger is the
+     * core's bar, and by the time the core is down to two fifths the turret
+     * has long since eaten every segment there was, so LAST CLOSE closed
+     * around an empty circle. Measured on the first build of this beat, both
+     * shell bars read zero for the whole of IV.
+     *
+     * A scripted resurrection rather than a heal -- PARITY's death does the
+     * same thing for the same reason -- and it is what this boss has been
+     * saying since its first caption. It is the edge. It does not stop being
+     * the edge because you took some of it away.
+     */
+    for (const p of [...this.outer, ...this.inner]) {
+      p.hidden = false;
+      if (!p.dead) continue;
+      this.revive(world, p, C.recloseHp);
+    }
+    this.syncReach(world);
+    flash(0.55, '#ffffff');
+    for (let i = 0; i < 4; i++) {
+      ring(this.hub.x, this.hub.y, 30 + i * 60, 420 + i * 200, 0.5 + i * 0.12,
+        i % 2 ? '#ffffff' : TYPE_BY_ID.terminus.glow, 5 - i);
+    }
+    ripple(this.hub.x, this.hub.y, 3.4, 1300);
+    shake(32);
+    audio.boom();
+    background.surge(2);
+  }
+
+  /**
+   * IV's loop: it comes down onto you, and then it goes back into the wall.
+   *
+   * Two targets, alternating, which is the whole reason the last stage is
+   * worth its length. Bare, it hangs a hundred and thirty above the turret --
+   * nearer than the boundary, so the assist takes it and nothing else. Back
+   * on the wall it is outside the ring again and out of reach, and what the
+   * turret finds instead is the boundary it just put back up.
+   *
+   * Without this IV was one long look at a core with beams on it: the frame
+   * evaporates in about twenty seconds because a compact double square is a
+   * splash magnet, and everything after that was a single target and a timer.
+   */
+  stepBare(world, dt) {
+    const C = X();
+    const s = world.shooter;
+    const raw = world.dtRaw || dt;
+    this.bareT -= raw;
+    if (this.bareT <= 0) {
+      this.bare = !this.bare;
+      this.bareT = this.bare ? C.bareFor : C.hideFor;
+      const T = TYPE_BY_ID.terminus;
+      ring(this.fc.x, this.fc.y, 16, 300, 0.45, T.glow, 3);
+      flash(this.bare ? 0.3 : 0.16, T.color);
+      shake(this.bare ? 14 : 8);
+      audio.boom();
+      // Once, on the first dive. Said on every one it was a caption every
+      // twelve seconds cutting the last one off half-read -- measured at
+      // twenty-eight characters a second against a ceiling of thirteen.
+      if (this.bare && !this.said) {
+        this.said = true;
+        world.bossLine = 'IT IS INSIDE ITS OWN EDGE WITH YOU.';
+        this.lineFor = 3.4;
+      }
+    }
+    this.dip = this.bare ? 1 : 0;
+    this.patrolA += C.patrolSpin * 1.5 * dt;
+    // Where it wants to be: over the turret, or back out on the wall.
+    const tx = this.bare ? s.x : this.hub.x + Math.cos(this.patrolA) * this.radius * C.patrolOut;
+    const ty = this.bare ? s.y - C.spiralTo
+      : this.hub.y + Math.sin(this.patrolA) * this.radius * C.patrolOut;
+    // Round, not across: the two places it swings between are on opposite
+    // sides of the turret and the chord between them runs straight over it.
+    const k = Math.min(1, dt * C.bareRate);
+    const [fx, fy] = arcLerp(this.hub.x, this.hub.y, this.fc.x, this.fc.y, tx, ty, k);
+    this.fc.x = fx;
+    this.fc.y = fy;
+  }
+
   enterStage(world, n) {
     const C = X();
     this.stage = n;
@@ -655,12 +861,7 @@ export class Terminus extends Boss {
     if (n === 2) this.openInner(world);
     if (n === 3) this.takeFrame(world);
     if (n >= 3) this.limitT = C.limitEvery[n - 1];
-    if (n >= 4) {
-      this.spiralT = 0;
-      flash(0.5, '#ffffff');
-      ripple(this.fc.x, this.fc.y, 3.2, 1200);
-      shake(30);
-    }
+    if (n >= 4) this.lastClose(world);
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
     world.bossLine = n >= 4 ? 'IT HAS LET GO OF EVERYTHING BUT YOU.'
       : n >= 3 ? 'IT HAS LET GO OF THE EDGE.'
@@ -708,19 +909,34 @@ export class Terminus extends Boss {
       return;
     }
 
-    if (this.frameK > 0 && this.frameK < 1) {
+    if (this.stage < 4 && this.frameK > 0 && this.frameK < 1) {
       this.frameK = Math.min(1, this.frameK + (world.dtRaw || dt) / C.frameFor);
     }
     if (this.stage >= 4) {
-      this.spiral = Math.min(1, this.spiral + (world.dtRaw || dt) / C.spiralFor);
-      const e = this.spiral * this.spiral * (3 - 2 * this.spiral);
-      this.fc.x += (s.x - this.fc.x) * Math.min(1, dt * 0.5);
-      this.fc.y = (s.y - C.frameAt) + (C.frameAt - C.spiralTo) * e;
+      // The frame unmakes itself back into a ring, and the core comes down
+      // inside it. Both on the raw clock, so the slow motion of a big hit
+      // does not stretch a beat that is meant to be read at speed.
+      if (this.reclose > 0) {
+        /*
+         * The edge goes back up first, and the core only starts its loop once
+         * it is up. Run together, `fc` was already easing down to a hundred
+         * and thirty above the turret while the frame's seats were still being
+         * measured from it -- so the segments on their way out were computed
+         * around a point next to the player and passed within 25 of it.
+         */
+        this.reclose -= world.dtRaw || dt;
+        this.frameK = Math.max(0, this.reclose / C.recloseFor);
+      } else {
+        this.spiral = Math.min(1, this.spiral + (world.dtRaw || dt) / C.spiralFor);
+        this.stepBare(world, dt);
+      }
     }
 
     this.place(dt);
     this.stepSqueeze(world, dt);
-    if (this.frameK <= 0) this.stepPatrol(world, dt);
+    // The patrol belongs to the boundary stages. In III it is in the middle
+    // of its own frame and in IV it is coming down on you; neither is a lap.
+    if (this.stage < 3) this.stepPatrol(world, dt);
     this.stepBeams(world, dt);
 
     if (this.stage >= 3) {
@@ -872,7 +1088,31 @@ export class Terminus extends Boss {
      * silhouette is a shape rather than a scatter -- and the four beams,
      * which are the only thing in this fight that is thrown at all.
      */
-    if (this.frameK >= 1) {
+    /*
+     * III: the frame's own lines, drawn between its segments.
+     *
+     * Twenty bodies arranged on two squares are twenty bodies until something
+     * joins them up. ORDINAL's silhouette is the point of this stage and the
+     * silhouette is the line, not the marks on it -- so the outer ring of
+     * seats is stroked as one closed path and the inner ring as another.
+     */
+    if (this.stage === 3 && this.frameK >= 1) {
+      const live = this.parts().filter((p) => !p.dead);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = rgba(T.color, 0.3 + 0.3 * this.flare);
+      ctx.lineWidth = 1.6;
+      for (const band of [0, 1]) {
+        const on = live.filter((p, i) => (i % 3 === 2) === !!band);
+        if (on.length < 3) continue;
+        ctx.beginPath();
+        on.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+        ctx.closePath();
+        ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    if (this.stage >= 3 && (this.stage > 3 || this.frameK >= 1)) {
       ctx.globalCompositeOperation = 'lighter';
       const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, C.beamLen);
       g.addColorStop(0, rgba('#ffd6dd', 0.34));
@@ -880,8 +1120,9 @@ export class Terminus extends Boss {
       g.addColorStop(1, rgba(T.glow, 0));
       ctx.strokeStyle = g;
       ctx.lineWidth = 10;
-      for (let i = 0; i < C.beams; i++) {
-        const a = this.beamA + (i / C.beams) * TAU;
+      const beams = this.beamCount();
+      for (let i = 0; i < beams; i++) {
+        const a = this.beamA + (i / beams) * TAU;
         ctx.beginPath();
         ctx.moveTo(this.x, this.y);
         ctx.lineTo(this.x + Math.cos(a) * C.beamLen, this.y + Math.sin(a) * C.beamLen);

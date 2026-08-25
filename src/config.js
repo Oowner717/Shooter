@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '135';
+export const BUILD = '136';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '135';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '7daae08';
+export const REV = 'd7cfc60';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1545,8 +1545,22 @@ export const CFG = {
     // This is the escalation, and ECLIPSE is where it is finally allowed all
     // of it. See stepSqueeze for the build where it was not permissioned.
     tight: [0.55, 0.75, 1, 1],
-    squeezeFrom: 0.3, // fraction of the way to the floor before it bites
-    squeezeShock: 0.3,
+    /*
+     * ...and it closes in STEPS, not as a slide.
+     *
+     * `lurchEvery` is the clock, `lurchBy` the size of one step, and
+     * `pulseFor` how long the shockwave it sends ahead of itself takes to
+     * cross you -- which is the only window in which the boundary corrupts
+     * anything. Before this the squeeze corrupted every frame it was near:
+     * seventy-six percent of stage I and ninety-five percent of stage II
+     * spent glitching, which is a screen effect rather than a mechanic. Same
+     * pressure, a tenth of the duty, and something to watch coming.
+     */
+    lurchEvery: [5.4, 4.0, 3.2, 3.4],
+    lurchBy: 13,
+    pulseFor: 0.5,
+    squeezeFrom: 0.22, // fraction of the way to the floor before it bites
+    squeezeShock: 0.4,
     /*
      * The patrol. The core rides the ring rather than sitting at its centre,
      * and while it patrols it rides *outside* it -- which is what makes it
@@ -1600,7 +1614,14 @@ export const CFG = {
      */
     eclipseAt: 0.6, // core fraction that triggers ECLIPSE, once...
     eclipseRing: 0.5, // ...or what is left of the boundary, whichever first
-    stageBare: 0.42, // ...and the one that starts the last stage
+    /*
+     * ...and the one that starts the last stage, set high on purpose. III is
+     * over once its frame is gone -- about twenty seconds, because a compact
+     * double square is a splash magnet -- and everything after that was a
+     * lone core. IV is where the interesting half of this fight lives now, so
+     * IV gets most of the bar.
+     */
+    stageBare: 0.72,
     /*
      * ECLIPSE. Both rings slam to the floor and hold, and each segment in
      * turn flashes one of the six prior tones, magenta round to violet,
@@ -1644,6 +1665,7 @@ export const CFG = {
      */
     frameKeep: 20,
     beams: 4,
+    beamsLate: 6, // ...and six for the last stage
     beamSpin: 0.46,
     beamArc: 0.16, // radians either side of a beam that count as across it
     beamShock: 0.3,
@@ -1655,9 +1677,32 @@ export const CFG = {
      */
     limitEvery: [0, 0, 14, 11],
     limitOf: 1,
-    // IV: the frame breaks orbit and the whole of what is left spirals in.
-    spiralFor: 16,
-    spiralTo: 210, // how near the frame's centre gets, and no nearer
+    /*
+     * IV -- LAST CLOSE. The frame is thrown back out into a ring and shut one
+     * more time, and the core comes down INSIDE it.
+     *
+     * The plan had the frame simply drifting nearer, which made the second
+     * half of this fight III at a shorter distance -- the least interesting
+     * thing on screen during the last stage of the last boss. `spiralTo` is
+     * inside the boundary's floor of 180 on purpose: nearer than the edge, so
+     * for the last stage there is nothing between you and it at all.
+     */
+    recloseFor: 2.4,
+    // ...and what the boundary comes back at. Not a heal it chooses -- a
+    // scripted resurrection, the way PARITY's death puts its panes back.
+    recloseHp: 0.35,
+    /*
+     * ...and the loop that makes the last stage worth its length: it hangs
+     * over the turret for `bareFor`, then goes back out onto the wall for
+     * `hideFor` where it is out of reach and the boundary is what the turret
+     * finds instead. Two targets, alternating. Without it IV was one long
+     * look at a core with beams on it.
+     */
+    bareFor: 7.5,
+    hideFor: 5.0,
+    bareRate: 2.4, // how fast it moves between the two
+    spiralFor: 14,
+    spiralTo: 130, // how near the core gets, and no nearer
     close: 230,
     // The death: the longest in the game, and the only one that leaves the
     // sky changed behind it.
