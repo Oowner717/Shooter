@@ -6,7 +6,50 @@ repo so it survives the container; each phase below is one build-sized
 request, and a future session should be able to pick any phase up from this
 file alone.
 
-Status: **Phases 0–4 shipped (builds 127–131).** Five of seven bosses built:
+Status: **Phases 0–5 shipped (builds 127–132).** Six of seven bosses built.
+Remaining: **TERMINUS (VII)** and the polish phase.
+
+### Phase 5 as built (PARITY, build 132)
+
+Landed as designed. Four measured corrections, two of them geometry:
+
+1. **Panes were on the crescent's inner face**, behind it from the turret's
+   point of view. The mirror sat at 100% a hundred seconds in — the pairing
+   rule, stage II and the MERGE heal had *never been exercised in any run*.
+2. **Then they were buried in it** — radius 30 against a crescent of radius
+   38. One pair broke and then nothing. At 52 they stand proud (158 out
+   against the crescent's 210).
+3. **The shared pool never emptied.** Two bodies, one bar; a hit big enough
+   to kill a crescent between frames had its killing blow skipped, so the
+   pool stopped just short of zero and the fight ran to the 900s cap with
+   health still showing. A half that dies now spends what it had left.
+4. **It could MERGE over its own corpse** — the death check ran last and a
+   pool-emptying blow fell through into the setpiece trigger. Death is
+   checked first now.
+
+**Measured**: 223.3s over two runs, stages 21/33/19/15%, captions 11.0
+chars/sec, everything inside 150 units, one REMAINDER.
+
+### Two patterns now confirmed across six bosses
+
+**Minion cadence.** Every single boss has shipped a first draft where the
+spray absorbed 40–65% of the turret's whole output. ORDINAL, GNOMON,
+FRACTAL, AMPLITUDE, DYNAMO, PARITY — six for six. Start TERMINUS's LIMITs
+at roughly **one release per 12–16 seconds** and tune down only if the
+damage table says there is room.
+
+**Geometry decides targeting, not intent.** Auto-aim picks the nearest body
+and cannot be told what anything *is*. Anything meant to be armour must be
+physically nearer than what it protects (PARITY's panes, twice); anything
+meant to be unreachable must be off the field entirely (ORDINAL's garrison,
+DYNAMO's core, PARITY's reflection). For TERMINUS this means the ring
+segments must sit inside the core's patrol radius, and the core must dip
+*inward* when it repairs, exactly as planned — otherwise the fight becomes
+"shoot the core through the ring" and the patrol means nothing.
+
+Original Phase 0–4 notes follow.
+
+Status (Phases 0–4): **shipped in builds 127–131.** Five of seven bosses built:
 ORDINAL, GNOMON, FRACTAL, AMPLITUDE, DYNAMO. Remaining: PARITY (VI),
 TERMINUS (VII), then the polish phase.
 
