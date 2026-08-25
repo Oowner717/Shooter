@@ -2302,6 +2302,139 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `${r.pieces} pieces; bar went ${r.frac[0]} -> ${r.frac[1]}`);
 }
 
+// --- AMPLITUDE: the wave leans in as it loses --------------------------------
+/*
+ * This boss has no middle. Its body is a waveform, and the one rule holding
+ * the fight together is that breaking segments makes what is left swing
+ * HIGHER: it leans in as it loses.
+ *
+ * Both halves of law 2 are checked here. The span was chosen so the far end
+ * of the wave passes inside the base aim range even at full length -- 355 of
+ * 400 at the bottom of its swing, which is the whole reason the span is 460
+ * and not the field's own 629 -- and the growing amplitude then brings it
+ * further in rather than rescuing it. Measured at three body lengths, because
+ * a boss that is legal at the start and drifts out of reach in the middle
+ * looks identical while being unwinnable.
+ *
+ * The coil's floor is the other one: a ring that closed to nothing would be
+ * the first thing in this game that could kill you.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[4] = 1;
+    g.openBoss(4);
+    const boss = w.boss;
+    const out = { built: boss.constructor.name };
+    boss.arriving = 0;
+    boss.settle(w);
+    g.update(1 / 60);
+
+    const C = CFG.amplitude;
+    out.segs = boss.segs.length;
+    out.onField = boss.segs.filter((p) => w.enemies.includes(p)).length;
+    out.shells = boss.gauge().shells.map((x) => `${x.label}:${x.seg}`).join(',');
+
+    // The rule: a shorter body swings higher.
+    out.whole = Math.round(boss.swing());
+    for (let i = 0; i < 7; i++) boss.segs[i].dead = true;
+    out.half = Math.round(boss.swing());
+    for (let i = 7; i < 13; i++) boss.segs[i].dead = true;
+    out.bare = Math.round(boss.swing());
+
+    /*
+     * ...and it is the swing that makes the far end reachable. Walked over a
+     * whole period at each length: with the body whole the far segment never
+     * comes inside the base aim range, and by the time it is broken it does.
+     */
+    const s = w.shooter;
+    const reachAt = (frac) => {
+      for (const p of boss.segs) p.dead = false;
+      const kill = Math.round(boss.segs.length * (1 - frac));
+      for (let i = 0; i < kill; i++) boss.segs[i].dead = true;
+      let best = 1e9;
+      const keep = boss.phase;
+      for (let i = 0; i < 120; i++) {
+        boss.phase = (i / 120) * Math.PI * 2;
+        // The far end of the wave, which is the hardest place to be.
+        const [x, y] = boss.at(0.5, 0);
+        best = Math.min(best, Math.hypot(x - s.x, y - s.y));
+      }
+      boss.phase = keep;
+      return Math.round(best);
+    };
+    out.reachWhole = reachAt(1);
+    out.reachHalf = reachAt(0.5);
+    out.reachBare = reachAt(0.15);
+    for (const p of boss.segs) p.dead = false;
+
+    /*
+     * The coil has a floor. Driven all the way in and then some, the ring
+     * must never draw closer than the config says -- it presses, it does not
+     * crush.
+     */
+    /*
+     * ...and the ring has something to be made of.
+     *
+     * The body is reliably gone by stage IV, which left the coil empty twice
+     * over -- once with no answer at all, and once with a slow mend that
+     * restored segments into a trough deep enough to delete them on arrival.
+     * The gather is a beat rather than a drip, and this is the thing it
+     * exists to guarantee.
+     */
+    for (const p of boss.segs) p.dead = true;
+    boss.stage = 3;
+    const got = boss.gather(w);
+    out.gathered = got;
+    out.ringHas = boss.segs.filter((p) => !p.dead).length;
+    out.ringOnField = boss.segs.filter((p) => !p.dead && w.enemies.includes(p)).length;
+
+    boss.stage = 4;
+    boss.coil = 1;
+    boss.hunt = { x: s.x, y: s.y };
+    let closest = 1e9;
+    for (let i = 0; i < 400; i++) {
+      boss.coil = Math.min(1, boss.coil + 0.02);
+      boss.placeCoil(1 / 60);
+      for (const p of boss.segs) {
+        if (!p.dead) closest = Math.min(closest, Math.hypot(p.x - s.x, p.y - s.y));
+      }
+    }
+    out.coilFloor = Math.round(closest);
+    out.wantFloor = C.coilTo;
+    // The head comes inside its own ring: outside it, the whole coil sits
+    // between the turret and the only body whose death ends the fight, and
+    // auto aim spends the stage chewing through it.
+    out.headIn = Math.round(Math.hypot(boss.core.x - s.x, boss.core.y - s.y));
+    g.restart();
+    return out;
+  });
+  check('AMPLITUDE stands up as a waveform with a head on it',
+    r.built === 'Amplitude' && r.segs === 14 && r.onField === 14
+    && r.shells === 'BODY:14',
+    JSON.stringify({ segs: r.segs, onField: r.onField, shells: r.shells }));
+  check('a shorter wave swings higher',
+    r.whole < r.half && r.half < r.bare,
+    `whole ${r.whole}, half-broken ${r.half}, nearly gone ${r.bare}`);
+  check('the far end of the wave is reachable at every length, and gets nearer',
+    r.reachWhole <= 390 && r.reachHalf <= 390 && r.reachBare <= 390
+    && r.reachBare < r.reachHalf && r.reachHalf < r.reachWhole,
+    `far end comes within ${r.reachWhole} whole, ${r.reachHalf} half-broken, `
+    + `${r.reachBare} nearly gone — against a base aim range of 400`);
+  check('the coil presses and does not crush',
+    r.coilFloor >= r.wantFloor - 2,
+    `closest the ring ever came: ${r.coilFloor}, floor ${r.wantFloor}`);
+  check('the wave gathers a ring to close with, and comes inside it',
+    r.gathered > 0 && r.ringHas === r.gathered && r.ringOnField === r.gathered
+    && r.headIn < r.coilFloor,
+    `gathered ${r.gathered} segments, ${r.ringOnField} of them on the field; `
+    + `head orbits at ${r.headIn} inside a ring at ${r.coilFloor}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

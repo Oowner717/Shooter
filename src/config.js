@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '129';
+export const BUILD = '130';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '129';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'd8c70f9';
+export const REV = 'd40e2d8';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1122,6 +1122,110 @@ export const CFG = {
   },
 
   /*
+   * ---- AMPLITUDE, anomaly IV ----
+   *
+   * Every boss so far has been a structure around a centre: a frame, a dial,
+   * a set of orbits. This one is a *waveform*. Fourteen segments strung along
+   * a travelling sine, head at the leading end, and where any one of them is
+   * depends on when you look rather than on where it started.
+   *
+   * The rule that makes it a fight: breaking segments SHORTENS the wave, and
+   * a shorter wave swings HIGHER. Its amplitude grows as its body shrinks, so
+   * the troughs dip nearer the turret the better you are doing. It leans in
+   * as it loses, which is the opposite of every other fight in the game.
+   */
+  amplitude: {
+    cost: 250,
+    standoff: 380,
+    arrive: 14.4,
+    beats: [0.14, 0.36, 0.6, 1],
+    coreR: 34,
+    segs: 14,
+    /*
+     * How wide the wave is drawn and how tall it swings.
+     *
+     * `span` is deliberately narrower than the field, and that is law 2 being
+     * paid for rather than hoped for. Across the field's full 629 a segment
+     * parked at the edge sits 493 from the turret against a base aim range of
+     * 400 and could never be shot at all. At 460 the far end is 230 across,
+     * and a trough of 110 brings it to 355 -- in range at full length, before
+     * the swing has grown at all. The growing swing then takes it to 300,
+     * which is escalation rather than rescue. Measured at three body lengths
+     * by the suite, and per body class by scripts/fight.mjs.
+     */
+    span: 460,
+    swing: 110, // amplitude at full length...
+    swingGrow: 90, // ...and how much of it is bought by breaking the body
+    waves: 1.6, // how many periods fit across the span
+    freq: 0.62, // rad/s the wave travels at
+    slide: 84, // how far the whole serpent drifts side to side
+    slideRate: 0.24,
+    /*
+     * RESONANCE. On the way into II the whole serpent comes down the field,
+     * passes over the turret and goes back up. It is the one beat of this
+     * fight that happens *to* you: the segments are still solid, so for three
+     * seconds the field is a wave going past, and touching one is corruption.
+     */
+    resonanceFor: 4.2,
+    resonanceShock: 0.32,
+    // Stages.
+    stageBody: 0.5, // body fraction that triggers RESONANCE and II
+    stageCore: 0.62,
+    stageCoil: 0.30,
+    freqMul: [1, 2, 1.7, 1.4],
+    /*
+     * III: two waves, out of phase, one high and one low. The segments split
+     * between two strands and the lane between them breathes.
+     */
+    strandGap: 128,
+    strandPhase: Math.PI,
+    /*
+     * IV: the coil. What is left wraps a ring round the turret and contracts
+     * to a floor -- pressure, never a crush. Nothing in this game kills you,
+     * and a ring that closed to nothing would be the first thing that did.
+     */
+    coilFrom: 240,
+    coilTo: 150,
+    coilFor: 11,
+    coilSpin: 0.5,
+    /*
+     * ...and what the wave gathers back to make the ring out of.
+     *
+     * The body is reliably gone by the middle of the fight, which left the
+     * coil -- the whole point of stage IV -- with nothing to be a ring of.
+     * The first answer was a slow capped mend through the late stages, and it
+     * did not work twice over: mending from II made stage II forty-three
+     * percent of a four-hundred-second fight, and mending in III achieved
+     * nothing at all, because a segment restored into a trough that now dips
+     * to eighty units from the turret is deleted before it has finished
+     * arriving.
+     *
+     * So it is not a drip, it is a beat: on the way into IV the wave gathers
+     * this many segments back at once, at part health, and that is the ring.
+     * Once, like NOON and RECURSION, and nothing after it -- what closes on
+     * you is what you left it.
+     */
+    gather: 6,
+    gatherHp: 0.45,
+    /*
+     * ...and what it throws off the top of itself, on a clock.
+     *
+     * Slow, because auto aim takes what is nearest and a DROPLET falling
+     * toward the turret is always nearer than a wave at standoff. At 6.5
+     * seconds the droplets absorbed 63% of everything the turret produced
+     * across a five-hundred-second fight -- the whole of it was spent
+     * shooting the spray rather than the thing making it. The same lesson
+     * ORDINAL's garrison and GNOMON's SECONDs each taught once: pressure,
+     * not a wall.
+     */
+    fling: [11, 9.5, 8.5, 7.5],
+    flingOf: 2,
+    endFor: 13.6,
+    pull: 900,
+    pay: 900,
+  },
+
+  /*
    * ---- what every boss shares ----
    *
    * Five numbers that are about *a* boss ending rather than about ORDINAL.
@@ -1796,6 +1900,77 @@ export const ENEMY_TYPES = [
     weight: 0,
     drops: 24,
     debris: 20,
+  },
+  /*
+   * ---- AMPLITUDE's three ----
+   *
+   * Teal. The first boss whose body is laid out in *time* rather than around
+   * a centre: the segments are a waveform, and where one is depends on when
+   * you look.
+   */
+  {
+    // One segment of the wave. Solid, like every other boss's structure --
+    // and unlike every other boss's structure, it is somewhere different
+    // every second without ever having moved of its own accord.
+    id: 'crest',
+    unlock: 0,
+    name: 'CREST',
+    shape: 'crest',
+    r: 16,
+    hp: 300,
+    fixed: true,
+    density: 6,
+    speed: 0,
+    accel: 0,
+    restitution: 0.15,
+    wobble: 0,
+    armor: 0.1,
+    color: '#5cf0d0',
+    glow: '#2ee6c0',
+    weight: 0,
+    drops: 2,
+    debris: 4,
+  },
+  {
+    // The head. It rides its own wave, so the fight's one fixed installation
+    // is not fixed at all -- it is periodic.
+    id: 'amplitude',
+    unlock: 0,
+    name: 'AMPLITUDE',
+    shape: 'amplitude',
+    r: 34,
+    hp: 3400,
+    large: true,
+    fixed: true,
+    density: 9,
+    speed: 0,
+    accel: 0,
+    restitution: 0.2,
+    wobble: 0,
+    armor: 0.18,
+    color: '#2ee6c0',
+    glow: '#12d4a8',
+    weight: 0,
+    drops: 24,
+    debris: 20,
+  },
+  {
+    // Thrown off the top of the wave. Sovereign from the moment it leaves.
+    id: 'droplet',
+    unlock: 0,
+    name: 'DROPLET',
+    shape: 'droplet',
+    r: 10,
+    hp: 88,
+    density: 0.8,
+    speed: 112,
+    accel: 260,
+    restitution: 0.78,
+    wobble: 2.0,
+    color: '#8ff5e0',
+    glow: '#41ecc4',
+    weight: 0,
+    drops: 3,
   },
   {
     id: 'prism',

@@ -65,6 +65,9 @@ export function drawSpecimen(ctx, id, r) {
     case 'mite': drawTri(ctx, r, 1, 0); break;
     case 'fraction': drawTri(ctx, r, 1, 1); break;
     case 'fractal': drawTri(ctx, r, 1, 2); break;
+    case 'crest': drawCrest(ctx, r, 1); break;
+    case 'amplitude': drawAmplitude(ctx, r, 0, 0, 1); break;
+    case 'droplet': drawDroplet(ctx, r, 0, 0); break;
     case 'hex': drawHex(ctx, r); break;
     case 'blob': drawBlob(ctx, r, 0.6, 0); break;
     case 'bloom': drawBloom(ctx, r, 0.4, 0, t); break;
@@ -1052,6 +1055,9 @@ export class Enemy {
       case 'mite': drawTri(ctx, this.r, hpFrac, 0); break;
       case 'fraction': drawTri(ctx, this.r, hpFrac, 1); break;
       case 'fractal': drawTri(ctx, this.r, hpFrac, 2); break;
+      case 'crest': drawCrest(ctx, this.r, hpFrac); break;
+      case 'amplitude': drawAmplitude(ctx, this.r, this.phase, world.time, hpFrac); break;
+      case 'droplet': drawDroplet(ctx, this.r, this.phase, world.time); break;
       case 'tow': drawTowHead(ctx, this.r); break;
       case 'mass': drawTowMass(ctx, this.r, hpFrac); break;
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
@@ -1423,6 +1429,87 @@ function drawOrdinal(ctx, r, phase, t, hpFrac) {
  * obviously of the same make as the frame it came out of, so a loose one
  * still reads as ORDINAL's rather than as a new object type arriving.
  */
+/*
+ * ---- AMPLITUDE's three ----
+ */
+
+/**
+ * One segment of the wave: a lens, wider than it is tall, with a bar through
+ * it that shortens as it is broken. Drawn along its own axis, so the boss can
+ * lie it flat along the tangent of the curve and it reads as part of a line
+ * rather than as a bead on one.
+ */
+function drawCrest(ctx, r, hpFrac) {
+  const L = r * 1.9;
+  const T = r * 0.78;
+  ctx.beginPath();
+  ctx.moveTo(-L / 2, 0);
+  ctx.quadraticCurveTo(0, -T, L / 2, 0);
+  ctx.quadraticCurveTo(0, T, -L / 2, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.16);
+  ctx.strokeStyle = rgba('#d6fff2', 0.35 + 0.55 * hpFrac);
+  ctx.beginPath();
+  ctx.moveTo(-L * 0.34 * hpFrac, 0);
+  ctx.lineTo(L * 0.34 * hpFrac, 0);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * The head: a disc with a waveform running through it, and the waveform runs
+ * faster as the thing is worn down. It is the only body in the game whose
+ * decoration is a readout.
+ */
+function drawAmplitude(ctx, r, phase, t, hpFrac) {
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.94, 0, TAU);
+  ctx.clip();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.09);
+  // Two traces, the second a beat behind, so the head reads as oscillating
+  // rather than as a circle with a squiggle in it.
+  for (let k = 0; k < 2; k++) {
+    ctx.strokeStyle = rgba(k ? '#8ff5e0' : '#ffffff', k ? 0.35 : 0.75);
+    ctx.beginPath();
+    for (let i = -10; i <= 10; i++) {
+      const x = (i / 10) * r;
+      const y = Math.sin(i * 0.6 + t * (2 + (1 - hpFrac) * 5) + phase + k * 1.1)
+        * r * 0.42 * (0.4 + 0.6 * hpFrac);
+      if (i === -10) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** A DROPLET: a teardrop, point leading. */
+function drawDroplet(ctx, r, phase, t) {
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 1.2);
+  ctx.quadraticCurveTo(r * 0.92, r * 0.2, 0, r * 0.95);
+  ctx.quadraticCurveTo(-r * 0.92, r * 0.2, 0, -r * 1.2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = rgba('#ffffff', 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(t * 5 + phase)));
+  ctx.beginPath();
+  ctx.arc(0, r * 0.05, r * 0.26, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
 /*
  * ---- FRACTAL's three ----
  *

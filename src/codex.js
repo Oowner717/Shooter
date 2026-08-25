@@ -115,6 +115,21 @@ export const CODEX = [
     line: 'The smallest part it believes in, which is not the same as the smallest part there is.',
   },
   {
+    id: 'amplitude',
+    name: 'AMPLITUDE',
+    line: 'It has no middle. It is a period, and the head is only the part of it that arrives first.',
+  },
+  {
+    id: 'crest',
+    name: 'CREST',
+    line: 'One segment of the wave. Break enough of them and what is left swings higher — it leans in as it loses.',
+  },
+  {
+    id: 'droplet',
+    name: 'DROPLET',
+    line: 'Thrown off the top of the wave, from the part of it furthest from you.',
+  },
+  {
     id: 'towMass',
     name: 'MASS',
     line: 'The far end of a cable. It arrives by being swung, and it arrives regardless.',
