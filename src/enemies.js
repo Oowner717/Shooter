@@ -71,6 +71,9 @@ export function drawSpecimen(ctx, id, r) {
     case 'pylon': drawPylon(ctx, r, 1); break;
     case 'dynamo': drawDynamo(ctx, r, 0, 0, 1); break;
     case 'ion': drawIon(ctx, r, 0, 0); break;
+    case 'pane': drawPane(ctx, r, 1); break;
+    case 'parity': drawParity(ctx, r, 0, 0, 1); break;
+    case 'echo': drawEcho(ctx, r, 0, 0); break;
     case 'hex': drawHex(ctx, r); break;
     case 'blob': drawBlob(ctx, r, 0.6, 0); break;
     case 'bloom': drawBloom(ctx, r, 0.4, 0, t); break;
@@ -1064,6 +1067,9 @@ export class Enemy {
       case 'pylon': drawPylon(ctx, this.r, hpFrac); break;
       case 'dynamo': drawDynamo(ctx, this.r, this.phase, world.time, hpFrac); break;
       case 'ion': drawIon(ctx, this.r, this.phase, world.time); break;
+      case 'pane': drawPane(ctx, this.r, hpFrac); break;
+      case 'parity': drawParity(ctx, this.r, this.phase, world.time, hpFrac); break;
+      case 'echo': drawEcho(ctx, this.r, this.phase, world.time); break;
       case 'tow': drawTowHead(ctx, this.r); break;
       case 'mass': drawTowMass(ctx, this.r, hpFrac); break;
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
@@ -1435,6 +1441,106 @@ function drawOrdinal(ctx, r, phase, t, hpFrac) {
  * obviously of the same make as the frame it came out of, so a loose one
  * still reads as ORDINAL's rather than as a new object type arriving.
  */
+/*
+ * ---- PARITY's three ----
+ */
+
+/**
+ * A mirror pane: a hard-edged shard with a bright face and a crack that opens
+ * across it as it is broken. Flat rather than solid-looking, because the whole
+ * point of it is that it is a *surface*.
+ */
+function drawPane(ctx, r, hpFrac) {
+  const w = r * 0.55;
+  const h = r * 1.15;
+  ctx.beginPath();
+  ctx.moveTo(0, -h);
+  ctx.lineTo(w, -h * 0.35);
+  ctx.lineTo(w * 0.72, h);
+  ctx.lineTo(-w * 0.72, h);
+  ctx.lineTo(-w, -h * 0.35);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  // The face: a bright sliver down one side, which is what makes it read as
+  // reflective rather than as a plate.
+  ctx.fillStyle = rgba('#ffffff', 0.16 + 0.24 * hpFrac);
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.5, -h * 0.75);
+  ctx.lineTo(w * 0.1, -h * 0.5);
+  ctx.lineTo(-w * 0.1, h * 0.7);
+  ctx.lineTo(-w * 0.62, h * 0.4);
+  ctx.closePath();
+  ctx.fill();
+  // ...and the crack, which only exists once it has been hit.
+  if (hpFrac < 0.99) {
+    ctx.strokeStyle = rgba('#1a0d2e', 0.75);
+    ctx.lineWidth = Math.max(HAIRLINE, r * 0.09 * (1 - hpFrac));
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.8, -h * 0.2);
+    ctx.lineTo(w * 0.1, h * 0.1 * (1 - hpFrac) - h * 0.05);
+    ctx.lineTo(w * 0.7, h * 0.55);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * A half: a crescent, its open side facing its twin. Drawn as an arc with
+ * thickness rather than a disc, so the pair reads as two halves of one thing
+ * with a gap between them where the mirror-line runs.
+ */
+function drawParity(ctx, r, phase, t, hpFrac) {
+  const inner = r * 0.46;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, -1.15, 1.15);
+  ctx.arc(0, 0, inner, 1.15, -1.15, true);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  // A bright rib down the middle of the crescent, breathing.
+  ctx.strokeStyle = rgba('#e6d6ff', 0.35 + 0.45 * hpFrac);
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.1);
+  ctx.beginPath();
+  ctx.arc(0, 0, (r + inner) * 0.5, -1.0, 1.0);
+  ctx.stroke();
+  // ...and the eye at its inner face, which is what looks across the gap.
+  const beat = 0.6 + 0.4 * Math.sin(t * 2.4 + phase);
+  ctx.fillStyle = rgba('#ffffff', 0.4 + 0.5 * beat * hpFrac);
+  ctx.beginPath();
+  ctx.arc(inner * 1.12, 0, r * 0.11 * (0.8 + 0.2 * beat), 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** An ECHO: a small paired chevron. There is always another one of these. */
+function drawEcho(ctx, r, phase, t) {
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.8, -r * 0.55);
+  ctx.lineTo(0, r * 0.1);
+  ctx.lineTo(r * 0.8, -r * 0.55);
+  ctx.lineTo(r * 0.8, r * 0.2);
+  ctx.lineTo(0, r * 0.85);
+  ctx.lineTo(-r * 0.8, r * 0.2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = rgba('#ffffff', 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(t * 6 + phase)));
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.13);
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.45, -r * 0.1);
+  ctx.lineTo(0, r * 0.4);
+  ctx.lineTo(r * 0.45, -r * 0.1);
+  ctx.stroke();
+  ctx.restore();
+}
+
 /*
  * ---- DYNAMO's three ----
  */

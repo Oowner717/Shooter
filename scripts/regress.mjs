@@ -2542,6 +2542,104 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `stages seen: ${r.stages}; legs still standing at IV: ${r.legsAtIV}`);
 }
 
+// --- PARITY: two of everything, one of them real ----------------------------
+/*
+ * The whole fight is a bargain between two rules that pull against each other:
+ * panes break in PAIRS, which doubles your damage on the structure, and only
+ * the REAL half takes damage to the bar, which halves what you can shoot at.
+ * If either one quietly stopped working the fight would look identical.
+ *
+ * Also checked: the shared pool, which is the one thing here with no visible
+ * tell at all. Two bodies, one bar -- and the first version never emptied it,
+ * because a hit big enough to take a crescent below zero killed the body
+ * between frames and the killing blow was skipped. That fight ran to the
+ * nine-hundred-second cap with health still on the gauge.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[6] = 1;
+    g.openBoss(6);
+    const boss = w.boss;
+    const out = { built: boss.constructor.name };
+    boss.arriving = 0;
+    boss.settle(w);
+    g.update(1 / 60);
+
+    const C = CFG.parity;
+    out.halves = boss.halves.length;
+    out.panes = boss.parts().length;
+    out.shells = boss.gauge().shells.map((x) => `${x.label}:${x.seg}`).join(',');
+
+    /*
+     * Only one half is on the field. Its panes go with it -- a solid pane
+     * hanging off a reflection would be a piece of a picture you can shoot.
+     */
+    const onField = () => boss.halves.map((h) => (w.enemies.includes(h) ? 1 : 0)
+      + h.panes.filter((q) => !q.dead && w.enemies.includes(q)).length);
+    out.reach = onField().join('/');
+    // ...and it is the other one after a swap.
+    boss.real = 1 - boss.real;
+    boss.syncReach(w);
+    out.reachAfter = onField().join('/');
+
+    /*
+     * Panes break in pairs. Kill one and its twin on the other crescent must
+     * go with it -- including a twin that is currently phased, which is the
+     * case that would be easiest to miss.
+     */
+    const a = boss.halves[0].panes[2];
+    const twin = boss.halves[1].panes[2];
+    a.dead = true;
+    g.update(1 / 60);
+    out.pairedTwin = twin.dead === true;
+    out.pairedCount = boss.parts().filter((p) => p.dead).length;
+
+    /*
+     * The shared pool: hurting whichever half is real spends the one bar, and
+     * a blow big enough to kill a crescent outright still comes off it rather
+     * than being lost. The half comes back while the pool has anything in it.
+     */
+    const was = boss.coreFrac;
+    const real = boss.realHalves()[0];
+    real.hp -= boss.poolMax * 0.25;
+    g.update(1 / 60);
+    out.spent = +(was - boss.coreFrac).toFixed(2);
+    out.mirrored = boss.halves.every((h) => h.retired || h.dead
+      || Math.abs(h.hp - boss.pool) < 2);
+    // The overkill case: dead between frames, and the pool still empties.
+    const live = boss.realHalves()[0];
+    live.hp = -99999;
+    live.dead = true;
+    g.update(1 / 60);
+    out.emptied = boss.pool <= 0;
+    out.ended = boss.dying > 0;
+    g.restart();
+    return out;
+  });
+  check('PARITY stands up as two halves of one mirror',
+    r.built === 'Parity' && r.halves === 2 && r.panes === 14
+    && r.shells === 'MIRROR:14',
+    JSON.stringify({ halves: r.halves, panes: r.panes, shells: r.shells }));
+  check('only one half is on the field, and its panes go with it',
+    /^(0\/\d+|\d+\/0)$/.test(r.reach.replace(/(\d+)/g, (m) => m))
+    && r.reach !== r.reachAfter
+    && r.reach.split('/').some((x) => x === '0')
+    && r.reachAfter.split('/').some((x) => x === '0'),
+    `bodies on the field per half: ${r.reach}, and after a swap: ${r.reachAfter}`);
+  check('a pane takes its twin with it, phased or not',
+    r.pairedTwin && r.pairedCount === 2,
+    `twin went too: ${r.pairedTwin}; ${r.pairedCount} panes gone from one kill`);
+  check('two bodies share one bar, and an overkill still empties it',
+    r.spent >= 0.2 && r.mirrored && r.emptied && r.ended,
+    `a quarter-bar hit spent ${r.spent}; halves agree: ${r.mirrored}; `
+    + `overkill emptied the pool: ${r.emptied}; it ended: ${r.ended}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

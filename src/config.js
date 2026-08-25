@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '131';
+export const BUILD = '132';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '131';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a7f6a14';
+export const REV = '934a002';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1331,6 +1331,101 @@ export const CFG = {
   },
 
   /*
+   * ---- PARITY, anomaly VI ----
+   *
+   * Two mirrored crescents orbiting a point, a hundred and eighty degrees
+   * apart, sharing one bar -- and only one of them is real at a time. They
+   * trade places on a clock, and the one that is not real is a wireframe
+   * standing exactly where it would be if it were.
+   *
+   * Two rules, and they pull against each other on purpose:
+   *
+   *   Panes break in pairs. Shatter one and its twin on the other crescent
+   *   goes with it, so damage on the structure is doubled and the mirror
+   *   stays a mirror. That feels generous.
+   *
+   *   Only the real half takes damage to the bar. The phased one is out of
+   *   the world entirely -- the parked mechanism, the same one DYNAMO's core
+   *   uses inside its circuit -- so half of what you might shoot is a
+   *   picture. That is what the generosity is paying for.
+   */
+  parity: {
+    cost: 400,
+    /*
+     * Nearer than most, because the crescents orbit: the far one sits at
+     * standoff + orbit, and it is the orbit that carries every part of it
+     * through aim range rather than any one position doing so. At 300 and 90
+     * the near half is 210 out and the far one 390, and they trade every few
+     * seconds.
+     */
+    standoff: 300,
+    orbit: 90,
+    orbitSpin: 0.34,
+    arrive: 14.4,
+    beats: [0.14, 0.36, 0.6, 1],
+    coreR: 38,
+    panes: 7, // per crescent, so fourteen and every one has a twin
+    paneArc: 1.5, // radians of the crescent's edge they are spread across
+    /*
+     * ...and how far off the crescent's centre they sit.
+     *
+     * Must clear the crescent's own radius of 38, or they are buried in it:
+     * at 30 the first pair broke and then nothing, because everything behind
+     * the first row was further from the turret than the crescent itself and
+     * auto aim went back to the body. At 52 they stand proud, and the near
+     * half's panes are 158 out against its own 210 -- which is what makes
+     * them armour rather than decoration.
+     */
+    paneR: 52,
+    /*
+     * The swap. `tell` is how long the pair spends visibly trading -- both
+     * ghosting -- before the change lands. Without it a phase flip is a
+     * discontinuity, which is the same thing DYNAMO's telegraph exists for.
+     */
+    swapEvery: [5.4, 3.2, 2.6, 0],
+    tell: 0.5,
+    // II makes the mirror-line precess and the orbit breathe.
+    eccentric: 0.3,
+    lineSpin: [0.12, 0.22, 0.7, 1.4],
+    /*
+     * MERGE. On the way into III the halves rush together and try to fuse:
+     * both fully real for a few seconds, which is the fight's one window of
+     * genuinely double damage. It is dressed as a threat and it is an
+     * opportunity, and it is the only heal it ever gets -- capped, and only
+     * if you waste it.
+     */
+    /*
+     * MERGE has to come after the mirror is visibly going, or it lands while
+     * the fight is still in its first stage and II gets a single frame on the
+     * way past. Measured with the merge at 0.6 and II at half the panes: the
+     * pool crossed 60% well before the panes crossed 50%.
+     */
+    mergeAt: 0.52,
+    // ...so II is read off the panes going, rather than half of them gone.
+    crackAt: 0.7,
+    mergeFor: 3.6,
+    mergeHeal: 0.06, // of the bar, if the window closes with both halves whole
+    // IV: one crescent shatters for good and the survivor is permanently
+    // real. The fight's premise breaking is the last stage.
+    loneAt: 0.22,
+    flailSpin: 2.4,
+    close: 240,
+    descendFor: 11,
+    /*
+     * ...and what it throws, always two at once, mirrored.
+     *
+     * Slow, for the reason every boss before it has had to learn once: auto
+     * aim takes what is nearest and an ECHO on its way in is always nearer
+     * than a crescent at standoff. At 9.5 seconds they absorbed sixty-four
+     * percent of everything the turret produced.
+     */
+    echoEvery: [16, 14, 12, 10],
+    endFor: 13.6,
+    pull: 900,
+    pay: 900,
+  },
+
+  /*
    * ---- what every boss shares ----
    *
    * Five numbers that are about *a* boss ending rather than about ORDINAL.
@@ -2162,6 +2257,76 @@ export const ENEMY_TYPES = [
     wobble: 2.1,
     color: '#a8c8ff',
     glow: '#61a0ff',
+    weight: 0,
+    drops: 3,
+  },
+  /*
+   * ---- PARITY's three ----
+   *
+   * Violet, and everything comes in twos.
+   */
+  {
+    // One mirror pane off a crescent's edge. It has a twin on the other half
+    // and they break together -- see CFG.parity.
+    id: 'pane',
+    unlock: 0,
+    name: 'PANE',
+    shape: 'pane',
+    r: 17,
+    hp: 330,
+    fixed: true,
+    density: 6,
+    speed: 0,
+    accel: 0,
+    restitution: 0.18,
+    wobble: 0,
+    armor: 0.1,
+    color: '#c396ff',
+    glow: '#a86bff',
+    weight: 0,
+    drops: 3,
+    debris: 5,
+  },
+  {
+    /*
+     * A half. There are two, they share one bar, and only one of them is
+     * real at a time -- the other is a wireframe standing where it would be.
+     */
+    id: 'parity',
+    unlock: 0,
+    name: 'PARITY',
+    shape: 'parity',
+    r: 38,
+    hp: 7600,
+    large: true,
+    fixed: true,
+    density: 9,
+    speed: 0,
+    accel: 0,
+    restitution: 0.2,
+    wobble: 0,
+    armor: 0.16,
+    color: '#a86bff',
+    glow: '#8b45ff',
+    weight: 0,
+    drops: 24,
+    debris: 20,
+  },
+  {
+    // Always two of these, mirrored across the line. Never one.
+    id: 'echo',
+    unlock: 0,
+    name: 'ECHO',
+    shape: 'echo',
+    r: 11,
+    hp: 90,
+    density: 0.8,
+    speed: 110,
+    accel: 258,
+    restitution: 0.76,
+    wobble: 2.0,
+    color: '#d3b3ff',
+    glow: '#b581ff',
     weight: 0,
     drops: 3,
   },

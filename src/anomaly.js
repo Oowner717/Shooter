@@ -47,7 +47,8 @@ export const ANOMALIES = [
     types: ['amplitude', 'crest', 'droplet'] },
   { n: 5, key: 'aperture5', name: 'DYNAMO', tone: '#4d8dff', cfg: 'dynamo', built: true,
     types: ['dynamo', 'pylon', 'ion'] },
-  { n: 6, key: 'aperture6', name: 'PARITY', tone: '#a86bff', cfg: 'parity', built: false, types: [] },
+  { n: 6, key: 'aperture6', name: 'PARITY', tone: '#a86bff', cfg: 'parity', built: true,
+    types: ['parity', 'pane', 'echo'] },
   { n: 7, key: 'aperture7', name: 'TERMINUS', tone: '#ff4d6d', cfg: 'terminus', built: false, types: [] },
 ];
 

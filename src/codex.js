@@ -145,6 +145,21 @@ export const CODEX = [
     line: 'It travels the wire before it travels the field. You can see where it will be long before it is there.',
   },
   {
+    id: 'parity',
+    name: 'PARITY',
+    line: 'Two halves of one account, and only ever one of them is real. Which one is a question it answers on a clock.',
+  },
+  {
+    id: 'pane',
+    name: 'PANE',
+    line: 'A face of the mirror. It has a twin, and they go together — which is generous, and is paying for something.',
+  },
+  {
+    id: 'echo',
+    name: 'ECHO',
+    line: 'There is always another one of these. Looking for it is how you find out which side of the line you are on.',
+  },
+  {
     id: 'towMass',
     name: 'MASS',
     line: 'The far end of a cable. It arrives by being swung, and it arrives regardless.',
