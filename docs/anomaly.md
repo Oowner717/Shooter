@@ -835,6 +835,93 @@ kept here so the reasoning survives:
     boss and hid the unlock rule, which reads as a bug ("why can't I buy
     this?"). → Every sealed line now opens with `Sealed behind <NAME>.`
 
+## Build 134 — the pressure audit
+
+"Dynamo is boring" turned out to be one instance of a class, so the same
+question was asked of every fight that has shipped: **in which stages is the
+signature mechanic both running and actionable?** Extended to the other half
+of the same question — *what does this fight actually cost the player?* — by
+driving a whole fight per boss and counting the frames on which any
+corruption was applied, per stage, alongside mean attackers and mean intake.
+
+Build 133, measured:
+
+| Anomaly | corrupted frames | by stage (I/II/III/IV) |
+|---------|-----------------|------------------------|
+| I ORDINAL   | 1.6%  | 0 / 0 / 0 / 4.3 |
+| II GNOMON   | 18.2% | 8.7 / 32.1 / 34.1 / 0.4 |
+| III FRACTAL | 0%    | — |
+| IV AMPLITUDE| 0%    | — |
+| V DYNAMO    | 24.7% | 0 / 0 / 4.0 / **77.1** |
+| VI PARITY   | 0%    | — |
+
+Three of the six cost the player nothing at all, and the one that cost the
+most did it by sitting on top of them. Three defects, all of them a geometry
+that misses, and none visible by reading the code:
+
+1. **AMPLITUDE's RESONANCE never landed.** The wave comes down the field,
+   over you, and back up, and the segments are solid while they pass — that
+   is the whole beat. Measured closest approach **85** against a contact of
+   50. Two causes, both structural: the reach was measured to the wave's
+   centre line, so anything riding a crest passed overhead; and RESONANCE
+   fires with half the body gone, where the missing half is *always* the part
+   nearest the turret, because auto aim takes the nearest thing. The wave came
+   down through the hole the turret had shot in it. Fixed by reaching a full
+   swing further, and by respacing the survivors across the span as the beat
+   starts — which is also the beat visibly re-forming.
+2. **DYNAMO's `sweepArcs` had never once fired.** It asked whether the turret
+   was across a link between two surviving pylons; the circuit stands at
+   standoff 320, and from II there are two pylons and so exactly one link,
+   three hundred away. Zero hits in every stage of every fight for six builds,
+   while the header comment and the config both said the surviving links
+   electrify. Replaced with the thing the fiction actually implies: from II
+   the discharge stops running back along the arc and **earths**, down the
+   field past the turret, which reaches because it is thrown at the ground
+   rather than strung between two distant things.
+3. **DYNAMO's stage IV was weather, not a threat.** The propeller corrupted on
+   plain proximity, and once descended it is permanently inside `close` — 77%
+   of the stage. Gated on the blade angle instead: two sweeps per turn, ~22%.
+4. **PARITY applied no pressure whatsoever.** Zero corrupted frames, mean
+   attackers 0.00, mean intake 0.999. It had no corruption channel at all.
+   Given the one its own premise was already drawing: the **mirror-line** is
+   live. The turret sits directly below the hub, so the seam comes round onto
+   it exactly twice per precession — slow in I, four times faster by IV, on
+   the one part of the boss that was drawn and doing nothing.
+
+Build 134, after: AMPLITUDE's beat peaks at 0.31 corruption with a closest
+approach of 26; DYNAMO 6.6% overall with IV at 22%; PARITY 7% spread evenly
+across all four stages (7.4 / 7.0 / 7.2 / 6.2). Fight lengths held: DYNAMO
+238.9s against 233.5s before, stage split 28/13/24/24.
+
+### One that was tried and rolled back
+
+DYNAMO's blink shuts off between SURGE and III: `stops()` needs two places to
+be, SURGE lands on the second pylon and III waits for the third, so the back
+half of stage II has one leg, one place to stand, and no blinks — measured,
+thirty-one seconds of II produced one. The fix was to let it pace stations
+*around* the last pylon. It worked, and it cost 30% of the fight: III went
+from 57s to 136s and the whole fight from 233s to 307s, with the run-to-run
+spread widening from ±1s to ±40s. Isolating it did not find the mechanism —
+turning off the pacing, the earthing bolt and the blade gate one at a time
+all still measured 280–315s, and only a full revert of the module came back to
+222s — so it was dropped rather than shipped on a guess. The gap is real and
+still there. Recorded here as the next thing to look at, not as done.
+
+### Also measured, not changed
+
+- **GNOMON's stage IV is 0.4%** where II and III are 32–34%: the sweeping
+  shadow is what corrupts, and once the needle plants it stops sweeping. That
+  reads as a deliberate release before the ending rather than a defect.
+- **FRACTAL and AMPLITUDE apply almost no pressure by any channel** (intake
+  0.96–0.99, mean attackers under 0.2). Both are fights about a structure
+  rather than about surviving, which is defensible, but it means only three of
+  six bosses tax the player at all. That is a balance question for phase 7,
+  where it can be settled across all seven at once.
+- Two config keys nothing read (`gnomon.plantFor`, `dynamo.chainFor`) are
+  gone, as is `dynamo.arcWidth` with the mechanic it belonged to.
+
+Four regress cases added, one per fix, in the block named for them.
+
 ## Open questions, deliberately deferred
 
 - Final prices and HP (user: rebalance later). The `fight.mjs` numbers per

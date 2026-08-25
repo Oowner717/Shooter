@@ -16,8 +16,9 @@
  * so you can see where it is going, not so you can react in time.
  *
  *   I      three pylons, lazy blinks, IONs riding the rails.
- *   II     first pylon down -- the surviving links electrify and sweep, and
- *          the blinks quicken.
+ *   II     first pylon down. The blinks quicken, and the circuit can no
+ *          longer hold what it is carrying: the discharge stops running back
+ *          along the arc and earths itself down the field instead.
  *   SURGE  second pylon down: the grid overloads, every arc whips a full turn
  *          round its pylon, and everything riding drops at once.
  *   III    one pylon left. The core lets go of the ground and orbits *you*,
@@ -269,7 +270,8 @@ export class Dynamo extends Boss {
         this.at = this.next;
         this.next = -1;
         const [tx, ty] = this.stopAt(this.at);
-        this.lance = { ax: fx, ay: fy, bx: tx, by: ty, t: C.lanceFor };
+        const [dx2, dy2] = this.discharge(world, tx, ty);
+        this.lance = { ax: fx, ay: fy, bx: dx2, by: dy2, t: C.lanceFor };
         ring(tx, ty, 8, 180, 0.4, TYPE_BY_ID.dynamo.glow, 3);
         spark(fx, fy, rand(-90, 90), rand(-90, 90), '#ffffff', 0.3, 3);
         audio.pop(0.85);
@@ -405,32 +407,30 @@ export class Dynamo extends Boss {
   }
 
   /**
-   * The electrified links, from II. An arc sweeps its own length once per
-   * blink and crossing one is corruption -- the same currency every other
-   * boss takes, and the only one any of them is allowed to.
+   * Where the discharge goes, which from II is the ground.
+   *
+   * While the circuit is whole the charge has somewhere to be: it runs back
+   * along the arc the core just travelled, between two things that are both a
+   * long way from you. Break a leg and it has nowhere, so it earths -- down
+   * the field, somewhere along the bottom, and crossing it is corruption.
+   *
+   * This is where `sweepArcs` was, which walked the links between surviving
+   * pylons asking whether the turret was across one. It could never have
+   * been: the circuit stands at standoff, and by II there are two pylons left
+   * and so exactly one link, three hundred away. Measured over whole fights
+   * it fired zero times in every stage, for six builds, while the header and
+   * the config both said the surviving links electrify.
    */
-  sweepArcs(world) {
+  discharge(world, tx, ty) {
     const C = D();
-    if (this.stage < 2) return;
+    if (this.stage < 2) return [tx, ty];
     const s = world.shooter;
-    for (const [a, b] of this.links()) {
-      // Distance from the turret to the segment, which is what "crossing an
-      // arc" actually means.
-      const vx = b.x - a.x;
-      const vy = b.y - a.y;
-      const len2 = vx * vx + vy * vy || 1;
-      let t = ((s.x - a.x) * vx + (s.y - a.y) * vy) / len2;
-      t = clamp(t, 0, 1);
-      const dx = s.x - (a.x + vx * t);
-      const dy = s.y - (a.y + vy * t);
-      if (dx * dx + dy * dy < C.arcWidth * C.arcWidth) {
-        world.shock = Math.max(world.shock, C.arcShock);
-        if (Math.random() < 0.25) {
-          spark(s.x + rand(-16, 16), s.y + rand(-16, 16), rand(-70, 70), rand(-70, 70),
-            TYPE_BY_ID.dynamo.glow, 0.28, 2);
-        }
-      }
-    }
+    // Somewhere along the bottom, not at you: it is being got rid of rather
+    // than aimed, so whether it lands across the turret is the roll.
+    const gx = s.x + rand(-C.earthSpread, C.earthSpread);
+    const gy = s.y + rand(40, 140);
+    ring(gx, gy, 6, 150, 0.34, TYPE_BY_ID.dynamo.glow, 2);
+    return [gx, gy];
   }
 
   /**
@@ -527,7 +527,6 @@ export class Dynamo extends Boss {
     this.place(dt);
     this.syncReach(world);
     this.stepRiders(world, dt);
-    this.sweepArcs(world);
     this.stepLance(world, dt);
 
     if (this.surge > 0) {
@@ -555,7 +554,18 @@ export class Dynamo extends Boss {
       this.x = this.hunt.x + Math.cos(this.orbitA) * C.orbitAt * (1 - e * 0.55);
       this.y = this.hunt.y + Math.sin(this.orbitA) * C.orbitAt * (1 - e * 0.55);
       this.orbitA += C.orbitSpin * 1.6 * dt;
-      if (Math.hypot(this.x - s.x, this.y - s.y) < C.close) {
+      /*
+       * ...and it corrupts when a blade is across you, not merely while it is
+       * near. Descended, this thing sits inside `close` permanently: measured
+       * on build 133 stage IV ran at seventy-seven percent corrupted frames,
+       * which is not a threat, it is weather. Gated on the blade angle it is
+       * the two-per-turn strobe the propeller looks like it is. |sin| of the
+       * difference is symmetric about a half turn, which is what makes one
+       * test cover both blades of a two-bladed thing.
+       */
+      const toward = Math.atan2(s.y - this.y, s.x - this.x);
+      const across = Math.abs(Math.sin(toward - this.bladeA)) < Math.sin(C.bladeArc);
+      if (across && Math.hypot(this.x - s.x, this.y - s.y) < C.close) {
         world.shock = Math.max(world.shock, C.arcShock);
       }
       this.core.x = this.x;

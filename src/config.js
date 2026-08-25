@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '133';
+export const BUILD = '134';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '133';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'f44e9ff';
+export const REV = 'ab32753';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1038,7 +1038,6 @@ export const CFG = {
      * planted beside the turret, pulsing rings of shadow out of where it fell.
      * It is the one thing in this fight that does not move again.
      */
-    plantFor: 1.4, // seconds of it falling
     plantAt: 150, // how far to the side of the turret it lands
     plantPulse: 2.8, // seconds between the rings it throws
     endFor: 13.6,
@@ -1277,6 +1276,8 @@ export const CFG = {
      * In III and IV it blinks between stations on its own orbit instead.
      */
     orbitStops: 6,
+    // ...and with one leg left it paces around that instead of standing on
+    // it, so the blink survives the stretch of II between SURGE and III.
     /*
      * The circuit turns. Three towers standing still for a quarter of the
      * fight is a still image; turning, the arcs sweep the field and the
@@ -1324,11 +1325,23 @@ export const CFG = {
     railFor: 2.6,
     railOf: 2,
     /*
-     * From II the surviving links electrify: an arc sweeps its own length
-     * once per blink and crossing one is corruption.
+     * From II the discharge earths instead of running back along the arc:
+     * the leg the core has just left dumps what it was carrying at the
+     * ground, somewhere along the bottom of the field rather than at you.
+     * How far off the turret it can land is the whole of its rate -- at 260
+     * against a lance width of 32 it lands across you on about a quarter.
+     *
+     * This replaced a sweep along the links between surviving pylons, which
+     * could not reach: the circuit stands at standoff, and by II there are two
+     * pylons left and so exactly one link, three hundred away. It fired zero
+     * times in every stage of every fight for six builds.
      */
+    earthSpread: 260,
+    // IV: the propeller corrupts while a blade is across you, within this
+    // many radians of the line to the turret, rather than the whole time it
+    // is inside `close` -- which, descended, is permanently.
+    bladeArc: 0.42,
     arcShock: 0.3,
-    arcWidth: 26, // how near a live arc has to be
     /*
      * SURGE, on the second pylon. The grid overloads: every arc whips a full
      * turn around its pylon, the field strobes, and everything riding drops
@@ -1351,7 +1364,6 @@ export const CFG = {
     // the game. Hard-capped, and the core glows through it -- a dark frame
     // that lingers reads as a crash rather than as a beat.
     darkFor: 0.5,
-    chainFor: 0.9,
     endFor: 13.8,
     pull: 900,
     pay: 900,
@@ -1414,6 +1426,16 @@ export const CFG = {
     // II makes the mirror-line precess and the orbit breathe.
     eccentric: 0.3,
     lineSpin: [0.12, 0.22, 0.7, 1.4],
+    /*
+     * ...and the seam is live. Standing on the mirror-line is corruption, and
+     * the turret sits directly below the hub, so the line comes onto it twice
+     * per precession however fast that is going. At 34 against a standoff of
+     * 300 the window is about seven percent of each turn: an occasional bite
+     * with a visible tell -- the line itself, sweeping toward you -- rather
+     * than the nothing at all this fight applied before it.
+     */
+    seamWidth: 34,
+    seamShock: 0.3,
     /*
      * MERGE. On the way into III the halves rush together and try to fuse:
      * both fully real for a few seconds, which is the fight's one window of

@@ -268,6 +268,21 @@ export class Amplitude extends Boss {
   startResonance(world) {
     this.resonated = true;
     this.resonance = A().resonanceFor;
+    /*
+     * The survivors respace across the span first, so what comes down is a
+     * whole wave rather than the comb you have shot holes in.
+     *
+     * That is the beat re-forming, and it is also the only thing that makes
+     * it connect. Auto aim takes the nearest thing, and the nearest segment
+     * is always the one directly above the turret -- so the gap in the wave
+     * is centred on you by construction, and RESONANCE fires with half the
+     * body already gone. Measured on build 133 the beat's closest approach
+     * was 85 against a contact of 50: for six builds the wave came down
+     * through the hole the turret had shot in it and the setpiece that is
+     * meant to be the one thing that happens *to* you never once landed.
+     */
+    const live = this.segs.filter((p) => !p.dead);
+    for (let i = 0; i < live.length; i++) live[i].u = (i + 1) / live.length - 0.5;
     world.bossLine = 'RESONANCE';
     this.lineFor = 3.0;
     flash(0.42, TYPE_BY_ID.amplitude.color);
@@ -284,7 +299,10 @@ export class Amplitude extends Boss {
     // Down and back: a full sine over the beat, so it arrives and leaves at
     // the same speed and is at its lowest exactly halfway through.
     const s = world.shooter;
-    const reach = (s.y - this.cy) + 40;
+    // Far enough that the *crest* clears the turret, not merely the trough:
+    // a reach measured to the centre line leaves anything riding the top of
+    // the wave passing overhead, which is half of what is left.
+    const reach = (s.y - this.cy) + this.swing() + 40;
     this.drop = Math.sin(k * Math.PI) * reach;
     // Anything the wave is across takes it.
     for (const p of this.segs) {

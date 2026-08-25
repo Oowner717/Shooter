@@ -2701,6 +2701,144 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `overkill emptied the pool: ${r.emptied}; it ended: ${r.ended}`);
 }
 
+// --- the three that measured as doing nothing at all ------------------------
+/*
+ * Every one of these shipped as a mechanic the code described and the fight
+ * never performed, and none of them could be seen by looking: they are all a
+ * geometry that misses.
+ *
+ * AMPLITUDE's RESONANCE came down through the hole the turret had shot in the
+ * wave -- auto aim takes the nearest thing, the nearest segment is the one
+ * directly above you, so the gap is centred on the turret by construction.
+ * Closest approach 85 against a contact of 50, for six builds.
+ *
+ * DYNAMO's discharge ran back along the arc the core travelled, between two
+ * pylons that both stand at standoff. And its propeller corrupted on plain
+ * proximity, so once descended it never stopped: 77% of stage IV, which is
+ * weather rather than a threat.
+ *
+ * PARITY had no corruption channel of any kind. Whole fight, zero.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const open = (n) => {
+      g.restart();
+      w.phase = 'staging';
+      w.apertures[n] = 1;
+      g.openBoss(n);
+      const b = w.boss;
+      b.arriving = 0;
+      b.settle(w);
+      g.update(1 / 60);
+      return b;
+    };
+
+    // AMPLITUDE: the beat has to reach, with the body half gone -- which is
+    // the state it fires in, not a whole wave.
+    {
+      const b = open(4);
+      b.segs.forEach((p, i) => { if (i % 2 === 0) p.dead = true; });
+      b.startResonance(w);
+      let peak = 0;
+      let near = 1e9;
+      for (let i = 0; i < 400 && b.resonance > 0; i++) {
+        w.shock = 0;
+        b.place(1 / 60);
+        b.stepResonance(w, 1 / 60);
+        peak = Math.max(peak, w.shock);
+        for (const p of b.segs) {
+          if (p.dead) continue;
+          near = Math.min(near, Math.hypot(p.x - w.shooter.x, p.y - w.shooter.y));
+        }
+      }
+      out.resShock = +peak.toFixed(2);
+      out.resNear = Math.round(near);
+    }
+
+    // DYNAMO: the discharge earths from II, and the propeller strobes.
+    {
+      const b = open(5);
+      const arc = [b.hub.x + 40, b.hub.y - 20];
+      b.stage = 1;
+      out.holds = b.discharge(w, arc[0], arc[1]).join(',') === arc.join(',');
+      b.stage = 2;
+      const to = b.discharge(w, arc[0], arc[1]);
+      out.earths = to[1] > w.shooter.y;
+      out.earthNear = Math.abs(to[0] - w.shooter.x) <= CFG.dynamo.earthSpread;
+
+      b.stage = 4;
+      b.triad = true;
+      b.hunt = { x: w.shooter.x, y: w.shooter.y };
+      b.fall = 1;
+      b.bladeA = 0;
+      b.x = w.shooter.x;
+      b.y = w.shooter.y - 60; // inside `close`, so only the angle can gate it
+      let on = 0;
+      const frames = 240;
+      for (let i = 0; i < frames; i++) {
+        w.shock = 0;
+        b.bladeA += CFG.dynamo.bladeSpin / 60;
+        const toward = Math.atan2(w.shooter.y - b.y, w.shooter.x - b.x);
+        const across = Math.abs(Math.sin(toward - b.bladeA)) < Math.sin(CFG.dynamo.bladeArc);
+        if (across) on++;
+      }
+      out.bladeDuty = +(on / frames).toFixed(2);
+    }
+
+    // PARITY: standing on the mirror-line costs the intake, and standing off
+    // it does not.
+    {
+      const b = open(6);
+      const s = w.shooter;
+      // Straight through the turret: the hub is directly above it, so the
+      // seam is on the turret exactly when the line is vertical.
+      b.lineA = Math.PI / 2;
+      w.shock = 0;
+      b.stepSeam(w);
+      out.seamOn = +w.shock.toFixed(2);
+      b.lineA = 0;
+      w.shock = 0;
+      b.stepSeam(w);
+      out.seamOff = +w.shock.toFixed(2);
+      // ...and it comes round onto the turret on its own, twice a turn.
+      b.lineA = 0;
+      let hits = 0;
+      let was = false;
+      for (let i = 0; i < 60 * 60; i++) {
+        b.lineA += CFG.parity.lineSpin[0] / 60;
+        w.shock = 0;
+        b.stepSeam(w);
+        const now = w.shock > 0;
+        if (now && !was) hits++;
+        was = now;
+      }
+      out.seamPasses = hits;
+    }
+
+    w.shock = 0;
+    g.restart();
+    return out;
+  });
+  check('RESONANCE comes down onto the turret rather than past it',
+    r.resShock > 0 && r.resNear < 50,
+    `peak corruption ${r.resShock}; closest the wave came: ${r.resNear}`);
+  check('from II the discharge earths down the field instead of back up the arc',
+    r.holds && r.earths && r.earthNear,
+    `I leaves it on the arc: ${r.holds}; II throws it past the turret: ${r.earths}`);
+  check('the propeller strobes across you rather than humming on top of you',
+    r.bladeDuty > 0.1 && r.bladeDuty < 0.6,
+    `a blade is across the turret on ${Math.round(r.bladeDuty * 100)}% of frames`);
+  check('standing on the mirror-line costs the intake, and standing off it does not',
+    r.seamOn > 0 && r.seamOff === 0 && r.seamPasses >= 2,
+    `on the seam ${r.seamOn}, clear of it ${r.seamOff}; `
+    + `it came round onto the turret ${r.seamPasses} times in a minute`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

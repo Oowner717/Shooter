@@ -24,6 +24,14 @@
  * reflection. Auto aim picks by distance and cannot be told that a thing is
  * not really there -- so the thing is not really there.
  *
+ * And the mirror-line is not scenery. It is the seam the two of them are
+ * reflected across, it precesses, and when it comes round onto the turret you
+ * are briefly on both sides of it -- which is corruption, and the only
+ * pressure this fight makes that is not a thrown ECHO. Without it this boss
+ * cost the player nothing at all: measured on build 133, zero corrupted
+ * frames, a mean of zero things stuck to the turret, and an intake it never
+ * once taxed.
+ *
  *   I      slow orbit, slow swaps.
  *   II     panes half gone: the swaps quicken and the mirror-line precesses.
  *   MERGE  the halves rush together and try to fuse. Both real for a few
@@ -298,6 +306,30 @@ export class Parity extends Boss {
    * same reason DYNAMO telegraphs its blink: an instantaneous change of which
    * things are real is indistinguishable from a bug.
    */
+  /**
+   * The seam, across the turret.
+   *
+   * The mirror-line runs through the hub at `lineA`, so how near it comes to
+   * the turret is a pure function of its angle: the turret sits directly
+   * below the hub, which puts it on the line exactly twice per precession.
+   * Slow in I, four times as fast by IV -- the same escalation the swaps get,
+   * on the one part of this boss that was already drawn and doing nothing.
+   */
+  stepSeam(world) {
+    const C = P();
+    const s = world.shooter;
+    const dx = s.x - this.hub.x;
+    const dy = s.y - this.hub.y;
+    // Perpendicular distance to an infinite line through the hub.
+    const off = Math.abs(dx * Math.sin(this.lineA) - dy * Math.cos(this.lineA));
+    if (off > C.seamWidth) return;
+    world.shock = Math.max(world.shock, C.seamShock);
+    if (Math.random() < 0.3) {
+      spark(s.x + rand(-20, 20), s.y + rand(-20, 20), rand(-70, 70), rand(-70, 70),
+        TYPE_BY_ID.parity.glow, 0.3, 2);
+    }
+  }
+
   stepSwap(world, dt) {
     const C = P();
     if (this.lone || this.merge > 0) return;
@@ -503,6 +535,7 @@ export class Parity extends Boss {
     }
 
     this.stepSwap(world, dt);
+    this.stepSeam(world);
 
     // IV brings the survivor down on you.
     if (this.lone) {
