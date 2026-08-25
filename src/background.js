@@ -27,6 +27,15 @@ const MOODS = {
   boss2: { ...ORDINAL_MOODS[1] },
   boss3: { ...ORDINAL_MOODS[2] },
   boss4: { ...ORDINAL_MOODS[3] },
+  /*
+   * What is left after TERMINUS. The only mood in the game that is a
+   * consequence rather than a setting: the edge broke, and the darkness has
+   * gone slightly grey-gold for the rest of the run. Staging's own geometry,
+   * lifted a couple of stops and warmed -- it has to still read as the
+   * between-waves sky or the change is a different game rather than the same
+   * one after something happened to it.
+   */
+  dawn: { top: '#0d0b0a', mid: '#241f18', low: '#070606', line: '#7a6a4e', neb: ['#3d3320', '#2c2a24', '#1f2430'], accent: '#ffd9a3' },
   ending: { top: '#000000', mid: '#0a0a0a', low: '#000000', line: '#555555', neb: ['#222222', '#111111', '#191919'], accent: '#cccccc' },
 };
 

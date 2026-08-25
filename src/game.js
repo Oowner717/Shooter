@@ -9,6 +9,7 @@ import './fractal.js';
 import './amplitude.js';
 import './dynamo.js';
 import './parity.js';
+import './terminus.js';
 import { nameOf, dressOf, heldList } from './anomaly.js';
 import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
@@ -148,6 +149,9 @@ export class Game {
       rigFlash: 0, // seconds of the fitting animation still to run
       rigDone: false, // the whole branch bought out, announced once a run
       shock: 0, // a hurled MASS landing: corruption in its own right, decaying
+      // The edge has been broken this run, so the sky between waves is the
+      // `dawn` one rather than `staging`. See endBoss and background.js.
+      dawn: false,
       // ---- the anomalies ----
       /*
        * How many ways in are held, per boss, indexed by anomaly number --
@@ -314,6 +318,8 @@ export class Game {
     w.shooter.reset(w.width / 2, this.shooterY);
     fx.reset();
     glitch.reset();
+    // A new game is a new field, and the edge is back up. See endBoss.
+    w.dawn = false;
     background.setMood('staging');
     audio.setDroneMood(41, 320, 0.05);
 
@@ -1210,6 +1216,18 @@ export class Game {
     // allowed to leave the field.
     for (let i = 0; i < clamped; i++) {
       const b = bodies[i];
+      /*
+       * ...except a body its boss puts somewhere every frame.
+       *
+       * The clamp exists to stop a free body leaving the field. A pinned one
+       * is not free: TERMINUS's ring is a circle centred on the turret, and
+       * the floor sits only 210 below it, so the arena quietly pushed the
+       * bottom seven segments inward and the boundary was a circle with a
+       * flat bottom -- 180 from the turret where the rest were at 250. Caught
+       * by a regress case asserting that every segment is the same distance
+       * away, which is the whole geometric premise of that fight.
+       */
+      if (b.pinned) continue;
       const impact = clampToArena(b, w.width, STAGE_HEIGHT, w.floorY);
       if (impact > 240) {
         spark(b.x, b.y, spread(impact), spread(impact), b.type.glow, 0.18, 1.8);
@@ -1354,7 +1372,17 @@ export class Game {
     d.timer = CFG.boss.after;
     w.bossLine = null;
     this.hud.alert(`${nameOf(n)} RECONCILED`, 'rigDone', 5);
-    background.setMood('staging');
+    /*
+     * ...and the sky does not always come back the same.
+     *
+     * Every other fight hands `staging` back and the field looks exactly as
+     * it did before. TERMINUS is the edge of the simulation, and breaking it
+     * is the one thing in this game that leaves a mark on the world rather
+     * than on the ledger: from here on the darkness is grey-gold. Per run --
+     * a new game is a new field, and the edge is back up.
+     */
+    if (n === 7) w.dawn = true;
+    background.setMood(w.dawn ? 'dawn' : 'staging');
   }
 
   /**

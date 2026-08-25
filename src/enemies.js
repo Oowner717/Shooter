@@ -74,6 +74,9 @@ export function drawSpecimen(ctx, id, r) {
     case 'pane': drawPane(ctx, r, 1); break;
     case 'parity': drawParity(ctx, r, 0, 0, 1); break;
     case 'echo': drawEcho(ctx, r, 0, 0); break;
+    case 'bound': drawBound(ctx, r, 1); break;
+    case 'terminus': drawTerminus(ctx, r, 0, 0, 1); break;
+    case 'limit': drawLimit(ctx, r, 0, 0); break;
     case 'hex': drawHex(ctx, r); break;
     case 'blob': drawBlob(ctx, r, 0.6, 0); break;
     case 'bloom': drawBloom(ctx, r, 0.4, 0, t); break;
@@ -1070,6 +1073,9 @@ export class Enemy {
       case 'pane': drawPane(ctx, this.r, hpFrac); break;
       case 'parity': drawParity(ctx, this.r, this.phase, world.time, hpFrac); break;
       case 'echo': drawEcho(ctx, this.r, this.phase, world.time); break;
+      case 'bound': drawBound(ctx, this.r, hpFrac); break;
+      case 'terminus': drawTerminus(ctx, this.r, this.phase, world.time, hpFrac); break;
+      case 'limit': drawLimit(ctx, this.r, this.phase, world.time); break;
       case 'tow': drawTowHead(ctx, this.r); break;
       case 'mass': drawTowMass(ctx, this.r, hpFrac); break;
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
@@ -1537,6 +1543,109 @@ function drawEcho(ctx, r, phase, t) {
   ctx.moveTo(-r * 0.45, -r * 0.1);
   ctx.lineTo(0, r * 0.4);
   ctx.lineTo(r * 0.45, -r * 0.1);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/*
+ * ---- TERMINUS's three ----
+ */
+
+/**
+ * A BOUND: one tile of the skin of the world.
+ *
+ * Drawn as a bar lying ACROSS its own radius rather than a blob, because
+ * thirty-two of them have to read as one continuous edge and not as beads on
+ * a string. The bright line is on the outward face -- the side away from you
+ * -- so a ring of them looks like something seen from the inside.
+ */
+function drawBound(ctx, r, hpFrac) {
+  const w = r * 1.02; // along the ring
+  const h = r * 0.6; // across it
+  ctx.beginPath();
+  ctx.moveTo(-w, -h * 0.72);
+  ctx.lineTo(w, -h * 0.72);
+  ctx.lineTo(w * 0.86, h);
+  ctx.lineTo(-w * 0.86, h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = rgba('#ffd6dd', 0.3 + 0.5 * hpFrac);
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.17);
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.92, -h * 0.72);
+  ctx.lineTo(w * 0.92, -h * 0.72);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * TERMINUS: an eye with the pupil of a hole, and four stubs at the quarters
+ * where the beams come out in stage III. The iris turns the other way to the
+ * shell, which is the same trick the two rings play at field scale.
+ */
+function drawTerminus(ctx, r, phase, t, hpFrac) {
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  // The four stubs.
+  ctx.strokeStyle = rgba('#ff9aab', 0.3 + 0.4 * hpFrac);
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.16);
+  for (let i = 0; i < 4; i++) {
+    const a = t * 0.5 + phase + (i / 4) * TAU;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 0.72, Math.sin(a) * r * 0.72);
+    ctx.lineTo(Math.cos(a) * r * 1.16, Math.sin(a) * r * 1.16);
+    ctx.stroke();
+  }
+  // The iris: a broken annulus turning against the body.
+  ctx.strokeStyle = rgba('#ffd6dd', 0.28 + 0.44 * hpFrac);
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.11);
+  for (let i = 0; i < 5; i++) {
+    const a = -t * 0.8 + phase + (i / 5) * TAU;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.62, a, a + 0.86);
+    ctx.stroke();
+  }
+  // ...and the hole at the middle of it, which is the only part that is not
+  // crimson: what the boundary is holding shut.
+  const beat = 0.6 + 0.4 * Math.sin(t * 1.8 + phase);
+  ctx.restore();
+  ctx.save();
+  ctx.fillStyle = rgba('#12000a', 0.9);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.3 * (0.9 + 0.1 * beat), 0, TAU);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = rgba('#ffffff', 0.3 + 0.45 * beat * hpFrac);
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.06);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A LIMIT: a caret pointing the way it is going, which is inward. */
+function drawLimit(ctx, r, phase, t) {
+  ctx.beginPath();
+  ctx.moveTo(0, r);
+  ctx.lineTo(r * 0.82, -r * 0.3);
+  ctx.lineTo(0, -r * 0.02);
+  ctx.lineTo(-r * 0.82, -r * 0.3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = rgba('#ffffff', 0.28 + 0.5 * (0.5 + 0.5 * Math.sin(t * 7 + phase)));
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.15);
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.44, -r * 0.16);
+  ctx.lineTo(0, r * 0.5);
+  ctx.lineTo(r * 0.44, -r * 0.16);
   ctx.stroke();
   ctx.restore();
 }

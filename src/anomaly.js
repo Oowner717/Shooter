@@ -49,7 +49,8 @@ export const ANOMALIES = [
     types: ['dynamo', 'pylon', 'ion'] },
   { n: 6, key: 'aperture6', name: 'PARITY', tone: '#a86bff', cfg: 'parity', built: true,
     types: ['parity', 'pane', 'echo'] },
-  { n: 7, key: 'aperture7', name: 'TERMINUS', tone: '#ff4d6d', cfg: 'terminus', built: false, types: [] },
+  { n: 7, key: 'aperture7', name: 'TERMINUS', tone: '#ff4d6d', cfg: 'terminus', built: true,
+    types: ['terminus', 'bound', 'limit'] },
 ];
 
 export const ANOMALY_BY_N = new Map(ANOMALIES.map((a) => [a.n, a]));

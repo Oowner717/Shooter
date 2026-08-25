@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '134';
+export const BUILD = '135';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '134';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'ab32753';
+export const REV = '7daae08';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1473,6 +1473,207 @@ export const CFG = {
     pull: 900,
     pay: 900,
   },
+  /*
+   * ---- TERMINUS. Anomaly VII, crimson. The capstone. ----
+   *
+   * The one boss that does not stand in front of the turret. It is a ring
+   * centred *on* you, and the fight is about how much of it is left.
+   *
+   * Every number here is bounded by the field rather than chosen. The world is
+   * 629 x 1361 and the turret sits at (315, 996), so the largest circle
+   * centred on the turret that stays on the field has radius 314 -- the sides
+   * bind, not the top and bottom. That is the only reason `ring` is 250 and
+   * not the plan's 360: the core rides just outside the ring at 1.1x, and 250
+   * is what puts its far edge exactly on the margin instead of sliding off
+   * the side of the world twice a lap.
+   *
+   * The happy consequence is that law 2 is free here for the first time: a
+   * ring centred on the turret puts EVERY segment at exactly `ring` from it,
+   * so at 250 against a base aim range of 400 there is no far side to worry
+   * about. It is the only boss in the game with that property, and it is the
+   * one whose whole subject is distance.
+   */
+  terminus: {
+    cost: 500,
+    /*
+     * It materialises out past aim range and comes in during the arrival --
+     * the threat legible before the fight is, law 2 restored the moment
+     * damage becomes possible. 420 is deliberately just outside 400.
+     */
+    edge: 420,
+    ring: 250, // where it settles, and the widest it ever is once live
+    floor: 180, // ...and the tightest. Law 3: it presses, it never crushes.
+    arrive: 21.6, // the longest arrival in the game, and its six beats need it
+    beats: [0.12, 0.3, 0.52, 1],
+    coreR: 40,
+    /*
+     * 32 segments, because the ring has to CLOSE.
+     *
+     * Same arithmetic as ORDINAL's frames and GNOMON's dial, and the same bug
+     * it guards against: 32 bodies round a circle of radius 250 each need a
+     * radius of at least pi*250/32 = 24.5, or rounds fly between them and the
+     * boundary is not one. BOUND is r 30. The plan said 28 segments of r 15,
+     * which is a ring with a third of its circumference missing -- caught by
+     * scripts/check-build.mjs on the first run, which is what that check is
+     * for.
+     */
+    segs: 32,
+    /*
+     * The second ring, from II. Sparser ON PURPOSE -- 12 bodies where a
+     * closed ring at that radius would need 24 -- because two closed rings is
+     * a wall and the stage is meant to be two lattices of moving gaps that
+     * occasionally line up. It is the only structure in the game that is
+     * deliberately permeable, and check-build asserts that it stays that way.
+     */
+    innerSegs: 12,
+    innerAt: 0.62, // as a fraction of the outer radius, so they close together
+    spin: [0.1, 0.15, 0.2, 0.26],
+    innerSpin: -0.34, // counter-rotating
+    /*
+     * The squeeze, which is this fight's pressure and its clock at once.
+     *
+     * The ring contracts at a rate proportional to how much of it is standing
+     * and pushes back out in proportion to how much you have opened, so
+     * "break gaps faster than it closes them" is not a figure of speech: it
+     * is the sign of one subtraction. Nothing is thrown at you here. The
+     * corruption is the boundary being near, and it is entirely yours to
+     * govern.
+     */
+    contract: [3.2, 4.6, 0, 0], // units/sec toward the tightest it may be
+    relax: 30, // ...and how fast an opened ring springs back out
+    // How far toward the floor the boundary is permitted to close, per stage.
+    // This is the escalation, and ECLIPSE is where it is finally allowed all
+    // of it. See stepSqueeze for the build where it was not permissioned.
+    tight: [0.55, 0.75, 1, 1],
+    squeezeFrom: 0.3, // fraction of the way to the floor before it bites
+    squeezeShock: 0.3,
+    /*
+     * The patrol. The core rides the ring rather than sitting at its centre,
+     * and while it patrols it rides *outside* it -- which is what makes it
+     * unshootable without a single point of armour doing the work.
+     *
+     * Auto aim takes the nearest thing. A core at the ring's own radius is
+     * exactly as near as thirty-two segments and ties with all of them; a
+     * core outside the ring is strictly further than every one of them, and
+     * the assist cannot pick it while any segment lives. This is the fifth
+     * boss to need that lesson and the first to get it from geometry alone.
+     */
+    patrolOut: 1.1, // radius multiplier while patrolling
+    patrolSpin: 0.52,
+    /*
+     * ...and the mend, which is the only time it is anywhere near you.
+     *
+     * To put a segment back it has to dip INSIDE the ring, where it is nearer
+     * than everything else and the assist takes it instantly. So the fight is
+     * a trade it makes with itself: every piece of ring it restores costs it
+     * a window. Capped, like every heal in this game -- once the budget is
+     * spent it stops trading and there is nothing left to do but finish the
+     * ring.
+     */
+    /*
+     * ...and it has to dip inside the INNER ring, not merely inside the outer
+     * one. At 0.7 the mending core sat at 175 while the second ring stood at
+     * 150, so from stage II onward the one window this fight gives you was
+     * not a window at all: the assist went on taking the nearer thing, which
+     * was the boundary. Kept a clear step under `innerAt`.
+     */
+    mendIn: 0.5, // radius multiplier while mending
+    mendFor: 2.8,
+    mendEvery: 1.6, // rest between mends
+    mendHeal: 0.45, // of a segment's bar, per mend
+    mendCap: 6, // ...and how many it will ever do
+    armorPatrol: 0.55,
+    armorMend: 0.05,
+    // Stages.
+    stageInner: 0.78, // outer-ring fraction that brings the second ring
+    /*
+     * What opens ECLIPSE, and there are two doors into it because the fight
+     * has two clocks.
+     *
+     * The core is by construction hard to reach early -- it is outside its
+     * own ring except while mending -- so a core-only trigger meant stage II
+     * ran until the entire boundary was gone AND the core had been ground to
+     * 60% with nothing left to shoot: measured, II was forty-four percent of
+     * a five-hundred-and-forty-second fight. The boundary being spent is the
+     * other way in, and dramatically the better one: the edge is nearly gone,
+     * so it slams shut for one beat and shows you what it was made of.
+     */
+    eclipseAt: 0.6, // core fraction that triggers ECLIPSE, once...
+    eclipseRing: 0.5, // ...or what is left of the boundary, whichever first
+    stageBare: 0.42, // ...and the one that starts the last stage
+    /*
+     * ECLIPSE. Both rings slam to the floor and hold, and each segment in
+     * turn flashes one of the six prior tones, magenta round to violet,
+     * before the whole thing is thrown back out. The one explicit echo of the
+     * other six, and it is a scene rather than a stage.
+     */
+    eclipseFor: 7.2,
+    eclipseHold: 0.55, // of it spent at the floor before the throw
+    /*
+     * III: it lets go of the ring and takes what is left of it to the middle
+     * of the field, as a double square frame -- ORDINAL's silhouette, in
+     * crimson, the first boss quoted by the last. And it turns four beams out
+     * of itself.
+     */
+    /*
+     * How far above the turret the frame's centre sits -- which is to say how
+     * far away the core is for the whole of stage III, and so a law 2 number
+     * rather than a composition one. At the plan's 470 the core sat outside a
+     * base aim range of 400 and could not be shot at all: measured, stage III
+     * was sixty percent of a fight that then ran into the nine-hundred-second
+     * cap without ever reaching IV. At 360 the core is in reach and the
+     * frame's near side is at 204, which is what makes the frame armour.
+     */
+    frameAt: 360,
+    /*
+     * Outer and inner half-widths. Wider than the plan's sketch because a
+     * compact frame is a splash magnet: at 156 and 96 the segments sit close
+     * enough together that one area weapon takes several, and sixteen of them
+     * went in about twenty seconds. Spread out they are a silhouette you get
+     * to look at.
+     */
+    frameR: [190, 118],
+    frameFor: 2.6, // seconds of the segments flying to their places
+    /*
+     * ...and how much of the boundary it can carry. What it cannot, it drops.
+     *
+     * The frame is made of whatever survived the ring, so how much survived
+     * is how big stage III is -- and unbounded that is the whole of the rest
+     * of the fight. Sixteen is a double square with a readable outline and
+     * about eighty seconds of work in it.
+     */
+    frameKeep: 20,
+    beams: 4,
+    beamSpin: 0.46,
+    beamArc: 0.16, // radians either side of a beam that count as across it
+    beamShock: 0.3,
+    beamLen: 900,
+    /*
+     * LIMITs, from III. They walk the frame's own lines inward. Slow, for the
+     * reason all six before it had to learn once: auto aim takes what is
+     * nearest, and a minion on its way in is always nearer than a boss.
+     */
+    limitEvery: [0, 0, 14, 11],
+    limitOf: 1,
+    // IV: the frame breaks orbit and the whole of what is left spirals in.
+    spiralFor: 16,
+    spiralTo: 210, // how near the frame's centre gets, and no nearer
+    close: 230,
+    // The death: the longest in the game, and the only one that leaves the
+    // sky changed behind it.
+    /*
+    * The longest death in the game, and the length is arithmetic rather than
+    * taste: the outro only starts once the detonation has landed, which is
+    * arrest + infall = 3.4s in, and its four lines want 14.8s of reading.
+    * Under 18.2 the last line -- the one the whole game has been walking
+    * toward -- is cut off mid-sentence.
+    */
+    endFor: 19.4,
+    arrest: 1.6,
+    infall: 1.8,
+    pull: 1100,
+    pay: 1400,
+  },
 
   /*
    * ---- what every boss shares ----
@@ -2376,6 +2577,81 @@ export const ENEMY_TYPES = [
     wobble: 2.0,
     color: '#d3b3ff',
     glow: '#b581ff',
+    weight: 0,
+    drops: 3,
+  },
+  /*
+   * ---- TERMINUS's three ----
+   *
+   * Crimson, and all three of them are about a line you are inside of.
+   */
+  {
+    /*
+     * One segment of the boundary. Thirty-two of these close a ring around
+     * the turret; the fight is how many are left.
+     *
+     * r 30 is a floor rather than a taste: it is what closes a circle of
+     * radius 250 with 32 bodies on it, and check-build holds it.
+     */
+    id: 'bound',
+    unlock: 0,
+    name: 'BOUND',
+    shape: 'bound',
+    r: 30,
+    hp: 260,
+    fixed: true,
+    density: 6,
+    speed: 0,
+    accel: 0,
+    restitution: 0.16,
+    wobble: 0,
+    armor: 0.08,
+    color: '#ff8095',
+    glow: '#ff4d6d',
+    weight: 0,
+    drops: 3,
+    debris: 5,
+  },
+  {
+    /*
+     * The edge itself. It rides its own ring rather than sitting at the
+     * middle of it, and it is only ever near you while it is mending.
+     */
+    id: 'terminus',
+    unlock: 0,
+    name: 'TERMINUS',
+    shape: 'terminus',
+    r: 40,
+    hp: 8000,
+    large: true,
+    fixed: true,
+    density: 10,
+    speed: 0,
+    accel: 0,
+    restitution: 0.2,
+    wobble: 0,
+    armor: 0.16,
+    color: '#ff4d6d',
+    glow: '#e01f45',
+    weight: 0,
+    drops: 28,
+    debris: 22,
+  },
+  {
+    // A LIMIT: it walks the frame's lines inward and does not stop.
+    id: 'limit',
+    unlock: 0,
+    name: 'LIMIT',
+    shape: 'limit',
+    r: 12,
+    hp: 105,
+    density: 0.85,
+    speed: 96,
+    accel: 240,
+    restitution: 0.7,
+    wobble: 1.6,
+    color: '#ffa8b6',
+    glow: '#ff5f7d',
     weight: 0,
     drops: 3,
   },

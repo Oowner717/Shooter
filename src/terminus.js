@@ -1,0 +1,903 @@
+/*
+ * TERMINUS. Anomaly VII, crimson. The last one.
+ *
+ * Every other boss in this game stands in front of the turret. This one does
+ * not stand anywhere: it is a ring of thirty-two boundary segments closed
+ * around *you*, and the fight is how much of it is left.
+ *
+ * That single decision pays for three things at once.
+ *
+ * LAW 2 IS FREE, for the first and only time. Every other fight has had to be
+ * argued into aim range -- DYNAMO's pylons pulled in from 430, AMPLITUDE's
+ * span narrowed from the field's full width, PARITY's crescents given an
+ * orbit so that both of them pass through reach. A ring centred on the turret
+ * puts every one of its segments at exactly the same distance from it. At 250
+ * against a base aim range of 400 there is no far side to worry about, which
+ * is a pleasant thing to be true of the boss whose entire subject is
+ * distance.
+ *
+ * THE PRESSURE IS THE BOUNDARY BEING NEAR. Nothing is thrown at you here. The
+ * ring contracts at a rate proportional to how much of it is standing and
+ * pushes back out in proportion to how much you have opened, so the squeeze
+ * is the sign of one subtraction and it is entirely yours to govern. It is
+ * the only corruption in the game the player is in charge of.
+ *
+ * AND THE CORE CANNOT BE ARMOURED, SO IT ISN'T. It rides the ring instead of
+ * sitting at the middle of it, and while it patrols it rides *outside* --
+ * strictly further from the turret than every segment, so the assist cannot
+ * pick it while any segment lives. To mend a gap it has to dip *inside*,
+ * where it is nearer than everything else and the assist takes it instantly.
+ * Five bosses learned by measurement that armour cannot express priority and
+ * geometry can. This one is built out of that.
+ *
+ *   I       one ring, turning slowly, closing slowly.
+ *   II      a second sparser ring inside it, turning the other way: two
+ *           lattices of moving gaps.
+ *   ECLIPSE both rings slam to the floor and hold, and each segment flashes
+ *           one of the six prior tones before the whole thing is thrown back
+ *           out. The one explicit echo of the other six.
+ *   III     it lets go of the ring and takes what is left of it to the middle
+ *           of the field as a double square frame -- ORDINAL's silhouette, in
+ *           crimson -- and turns four beams out of itself.
+ *   IV      the frame breaks orbit and the whole of what is left comes down
+ *           together. All-out, both sides.
+ */
+
+import { CFG, TYPE_BY_ID } from './config.js';
+import { clamp, rand, rgba, TAU, drawGlow } from './util.js';
+import { Enemy } from './enemies.js';
+import { ring, ripple, spark, shake, flash, explode } from './fx.js';
+import { audio } from './audio.js';
+import { background } from './background.js';
+import { registerAnomaly, dressOf, BOSS_TONE } from './anomaly.js';
+import { Boss } from './boss.js';
+
+const X = () => CFG.terminus;
+
+/*
+ * Six beats, the longest arrival in the game. The sky does not darken for
+ * this one -- it closes, and the ring comes in from beyond the edge of the
+ * world while it is saying so.
+ */
+const ARRIVAL = [
+  { text: 'THE COUNT WAS NEVER THE POINT.', hold: 3.4 },
+  { text: 'EVERYTHING YOU BROKE WAS MEASURING YOU FOR THIS.', hold: 4.6 },
+  { text: 'IT IS NOT COMING TO YOU.', hold: 3.0 },
+  { text: 'IT IS THE EDGE.', hold: 3.0 },
+  { text: 'THE SIMULATION ENDS AT ITS SKIN.', hold: 3.6 },
+  { text: 'TERMINUS', hold: 2.8 },
+];
+
+const OUTRO = [
+  { text: 'THE EDGE IS BROKEN.', hold: 3.0 },
+  { text: 'THE FIELD DOES NOT END WHERE ANYTHING SAYS IT DOES.', hold: 4.6 },
+  { text: 'NOTHING ELSE IS COUNTING.', hold: 3.2 },
+  { text: 'SIMULATION 7749 IS YOURS.', hold: 4.0 },
+];
+
+/*
+ * Crimson skies, rotated from ORDINAL's and then pulled *away* from the
+ * generator's answer at the hot end.
+ *
+ * Generated, stage IV came out a bright scarlet at the horizon -- which is
+ * the colour of the damage flash, so every hit the turret took during the
+ * last stage of the last fight vanished into the sky it was taken against.
+ * These keep the ramp and end on a bloodless white-pink instead: the edge
+ * going, rather than the field on fire.
+ */
+const MOODS = [
+  { top: '#12040a', mid: '#3a0a1c', low: '#080104', line: '#a83f56', neb: ['#5c0a22', '#3d0a20', '#4a0618'], accent: '#ff8a9e' },
+  { top: '#1a0410', mid: '#560a26', low: '#0c0106', line: '#d64a6a', neb: ['#820a30', '#5c0a22', '#6b0620'], accent: '#ff6a85' },
+  { top: '#240418', mid: '#780a34', low: '#12010a', line: '#ff4d6d', neb: ['#b00c44', '#820a30', '#96063a', ], accent: '#ffc2cd' },
+  { top: '#36061f', mid: '#a01a4e', low: '#1e0212', line: '#ffb0c0', neb: ['#d42a68', '#b00c44', '#c01458'], accent: '#ffffff' },
+];
+
+/**
+ * A point on the perimeter of a square of half-width `h`, for `t` in 0..1 --
+ * and which way that side runs, so a body placed there can lie along it.
+ *
+ * The angle is not decoration. Every segment placed with one shared rotation
+ * gave twenty parallel bars scattered over a square area, which reads as a
+ * spill rather than as ORDINAL's silhouette; lying along their own side they
+ * are an outline.
+ */
+function onSquare(h, t) {
+  const u = (((t % 1) + 1) % 1) * 4;
+  const side = Math.floor(u);
+  const f = u - side;
+  const a = -h + 2 * h * f;
+  const ang = (side * Math.PI) / 2;
+  if (side === 0) return [a, -h, ang];
+  if (side === 1) return [h, a, ang];
+  if (side === 2) return [-a, h, ang];
+  return [-h, -a, ang];
+}
+
+export class Terminus extends Boss {
+  constructor(world) {
+    super(world, 7);
+    const C = X();
+    // The centre of everything is the turret. Not a standoff, not a hub above
+    // it: this boss is drawn around the player, which is the whole of it.
+    this.hub = { x: world.shooter.x, y: world.shooter.y };
+    this.x = this.hub.x;
+    this.y = this.hub.y;
+    this.arriving = C.arrive;
+
+    this.radius = C.edge; // it comes in from beyond the world
+    this.ringA = 0;
+    this.innerA = 0;
+    this.patrolA = -Math.PI / 2; // it starts at the top, where you can see it
+    this.dip = 0; // 0 patrolling outside the ring, 1 mending inside it
+    this.mend = null;
+    this.mends = 0;
+    this.mendT = C.mendEvery;
+    this.eclipse = 0;
+    this.eclipsed = false;
+    this.frameK = 0; // 0 on the ring, 1 in the frame
+    this.frameA = 0;
+    this.beamA = 0;
+    this.spiral = 0;
+    this.limitT = 0;
+    this.fc = { x: this.hub.x, y: this.hub.y - C.frameAt };
+
+    /*
+     * The boundary. The outer ring closes -- 32 bodies of r 30 round a circle
+     * of radius 250 -- and the inner one deliberately does not: 12 where 24
+     * would be needed, so stage II is two lattices of moving gaps rather than
+     * two walls. See CFG.terminus, and both closure checks in check-build.
+     */
+    this.outer = [];
+    for (let i = 0; i < C.segs; i++) {
+      const p = this.body('bound', this.hub.x, this.hub.y);
+      p.at = (i / C.segs) * TAU;
+      p.band = 0;
+      /*
+       * Out of the arena's hands. The floor sits 210 below the turret and this
+       * ring is 250 round it, so the clamp pushed the bottom of the boundary
+       * inward every frame and the circle had a flat bottom -- see the note in
+       * Game.physicsStep. This boss places its own bodies; nothing else may.
+       */
+      p.pinned = true;
+      this.outer.push(p);
+    }
+    this.inner = [];
+    for (let i = 0; i < C.innerSegs; i++) {
+      const p = this.body('bound', this.hub.x, this.hub.y);
+      p.at = (i / C.innerSegs) * TAU;
+      p.band = 1;
+      // Not there yet, and `hidden` is what the arrival and the arrest read
+      // to leave it alone. Keeping it out of world.enemies is syncReach's job
+      // -- the same parked mechanism every boss since ORDINAL has used.
+      p.hidden = true;
+      p.pinned = true;
+      this.inner.push(p);
+    }
+
+    this.core = this.body('terminus', this.hub.x, this.hub.y - C.edge);
+    this.core.pinned = true;
+    world.enemies.push(this.core);
+
+    this.place(0);
+    background.setFocus(this.x, this.y);
+    background.setDread(1, 0);
+    background.surge(2);
+  }
+
+  // -------------------------------------------------------------- shape
+
+  /*
+   * Everything of this boss's that is a placed body -- and the second ring is
+   * not one of those until it exists. The base class walks this to settle the
+   * arrival, to arrest the death and to shed the wreck, and the last of those
+   * does not check `hidden`: a ring that never arrived would have left a
+   * circle of debris where it would have been.
+   */
+  parts() {
+    return this.inner[0].hidden ? [...this.outer] : [...this.outer, ...this.inner];
+  }
+
+  /** Everything of the boundary still standing, over everything it had. */
+  shellFrac() {
+    const all = this.parts();
+    if (!all.length) return 0;
+    return all.filter((p) => !p.dead).length / all.length;
+  }
+
+  /** ...and the outer ring alone, which is what the squeeze is driven by. */
+  outerFrac() {
+    return this.outer.filter((p) => !p.dead).length / this.outer.length;
+  }
+
+  innerFrac() {
+    return this.inner.filter((p) => !p.dead).length / this.inner.length;
+  }
+
+  /** Whether the second ring is on the field yet. */
+  get twoRings() {
+    return !this.inner[0].hidden;
+  }
+
+  gauge() {
+    const C = X();
+    const arriving = this.arriving > 0;
+    const d = dressOf(7);
+    const shells = [{ label: 'BOUND', seg: this.outer.length, frac: this.outerFrac() }];
+    // The second row appears when the second ring does, and the bar rebuilds
+    // itself around it -- see hud.syncBoss, which reads the shape rather than
+    // assuming one.
+    if (this.twoRings) {
+      shells.push({ label: 'INNER', seg: this.inner.length, frac: this.innerFrac() });
+    }
+    return {
+      title: d.name,
+      phase: arriving ? 'ARRIVING' : ['I', 'II', 'III', 'IV'][this.stage - 1] || 'IV',
+      arriving,
+      core: arriving ? 1 : this.coreFrac,
+      shells,
+      marks: [
+        { at: C.eclipseAt, past: !arriving && this.eclipsed },
+        { at: C.stageBare, past: !arriving && this.coreFrac <= C.stageBare },
+      ],
+      bar: d.bar[Math.min(arriving ? 0 : this.stage, d.bar.length - 1)],
+    };
+  }
+
+  /** Where a segment of a given band sits on the ring, right now. */
+  ringAt(p) {
+    const C = X();
+    const rr = this.radius * (p.band ? C.innerAt : 1);
+    const a = p.at + (p.band ? this.innerA : this.ringA);
+    return [this.hub.x + Math.cos(a) * rr, this.hub.y + Math.sin(a) * rr, a];
+  }
+
+  /** ...and where it sits in the frame, once it has let go of the ring. */
+  frameAtOf(p, i, n) {
+    const C = X();
+    /*
+     * Every third one makes the inner square and the rest the outer, so the
+     * frame keeps ORDINAL's proportion however much of the ring survived to
+     * be dragged into it. Interleaved rather than split down the middle of
+     * the list, or one whole side of the outer square would be whichever
+     * segments happened to be at three o'clock.
+     */
+    const toInner = i % 3 === 2;
+    const shrink = 1 - this.spiral * 0.32;
+    const h = (toInner ? C.frameR[1] : C.frameR[0]) * shrink;
+    const inCount = Math.max(1, Math.floor((n + 1) / 3));
+    const seat = toInner ? (i - 2) / 3 : i - Math.floor((i + 1) / 3);
+    const count = toInner ? inCount : Math.max(1, n - inCount);
+    const [ox, oy, ang] = onSquare(h, seat / count);
+    const c = Math.cos(this.frameA);
+    const s = Math.sin(this.frameA);
+    return [this.fc.x + ox * c - oy * s, this.fc.y + ox * s + oy * c, this.frameA + ang];
+  }
+
+  place(dt) {
+    const C = X();
+    const arriving = this.arriving > 0;
+
+    if (arriving) {
+      // In from beyond the edge of the world, easing to where damage becomes
+      // possible exactly as the arrival ends.
+      const k = clamp(this.entry, 0, 1);
+      const e = k * k * (3 - 2 * k);
+      this.radius = C.edge + (C.ring - C.edge) * e;
+    }
+
+    this.ringA += C.spin[this.stage - 1] * dt;
+    this.innerA += C.innerSpin * dt;
+    if (this.frameK > 0) this.frameA += (C.beamSpin * 0.4 + this.spiral * 0.5) * dt;
+
+    const live = this.parts().filter((p) => !p.dead);
+    for (let i = 0; i < live.length; i++) {
+      const p = live[i];
+      const [rx, ry, ra] = this.ringAt(p);
+      if (this.frameK <= 0) {
+        p.x = rx; p.y = ry;
+        /*
+         * Lying ALONG the ring rather than across it, which is a quarter turn
+         * off the radius -- and the shape's bright face is on its local -y,
+         * so this also puts the lit edge on the outward side. Thirty-two of
+         * them then read as one continuous skin seen from the inside, which
+         * is the entire visual premise of the fight.
+         */
+        p.angle = ra + Math.PI / 2;
+      } else {
+        const [fx, fy, fa] = this.frameAtOf(p, i, live.length);
+        const k = this.frameK * this.frameK * (3 - 2 * this.frameK);
+        p.x = rx + (fx - rx) * k;
+        p.y = ry + (fy - ry) * k;
+        const from = ra + Math.PI / 2;
+        // The short way round, or a segment a hair past the wrap takes the
+        // long way and visibly spins on its way to its seat.
+        let turn = (fa - from) % TAU;
+        if (turn > Math.PI) turn -= TAU;
+        if (turn < -Math.PI) turn += TAU;
+        p.angle = from + turn * k;
+      }
+      p.vx = 0; p.vy = 0; p.av = 0;
+    }
+    // A dead segment still has a place: the core has to be able to fly to the
+    // gap it is going to mend, and the gap is where the segment would be.
+    for (const p of [...this.outer, ...this.inner]) {
+      if (!p.dead && !p.hidden) continue;
+      const [rx, ry] = this.ringAt(p);
+      p.x = rx; p.y = ry;
+    }
+
+    if (this.frameK > 0) {
+      // III and IV: it is the middle of the frame, and the frame is the boss.
+      this.x = this.fc.x;
+      this.y = this.fc.y;
+    } else {
+      const mul = C.patrolOut + (C.mendIn - C.patrolOut) * this.dip;
+      this.x = this.hub.x + Math.cos(this.patrolA) * this.radius * mul;
+      this.y = this.hub.y + Math.sin(this.patrolA) * this.radius * mul;
+    }
+    this.core.x = this.x;
+    this.core.y = this.y;
+    this.core.vx = 0;
+    this.core.vy = 0;
+    this.core.armor = C.armorPatrol + (C.armorMend - C.armorPatrol) * this.dip;
+  }
+
+  /**
+   * Belt to the arrival's braces, for the one thing this boss keeps outside
+   * its bodies: the radius.
+   *
+   * The ring comes in from `edge` during the arrival and nothing else ever
+   * moves it inward. Anything that shortcuts the arrival -- a test setting
+   * `arriving = 0`, a frame dropped under load -- would otherwise leave the
+   * boundary parked at 420, which is outside aim range: a fight that cannot
+   * be started, the same failure the base class's settle() exists to prevent
+   * for bodies.
+   */
+  settle(world) {
+    if (!this.settled) this.radius = Math.min(this.radius, X().ring);
+    super.settle(world);
+  }
+
+  /**
+   * Which parts of the boundary are on the field.
+   *
+   * Only the second ring needs this, and only before it exists: a body that
+   * is drawn but not yet arrived has to be out of world.enemies, or the
+   * assist will shoot a thing the player cannot see. The parked mechanism,
+   * for the fifth boss in a row.
+   */
+  syncReach(world) {
+    for (const p of this.inner) {
+      if (p.dead) continue;
+      const at = world.enemies.indexOf(p);
+      if (p.hidden && at >= 0) world.enemies.splice(at, 1);
+      else if (!p.hidden && at < 0) world.enemies.push(p);
+    }
+  }
+
+  // -------------------------------------------------------------- beats
+
+  /**
+   * The squeeze.
+   *
+   * The whole of this fight's pressure, and its clock. A ring that is still
+   * whole closes at `contract`; one you have opened pushes back out at
+   * `relax` in proportion to what you opened. So the radius is the running
+   * total of the fight so far, and the corruption is how near the boundary
+   * has got -- nothing thrown, nothing to dodge, and nothing that is not a
+   * consequence of how fast you are working.
+   */
+  stepSqueeze(world, dt) {
+    const C = X();
+    const frac = this.shellFrac();
+    if (this.eclipse <= 0 && this.frameK <= 0) {
+      /*
+       * How tight it can get is how much of it is left. A whole ring closes
+       * all the way to the floor; one you have opened cannot, and the radius
+       * springs back out at `relax` -- much faster than it closes -- the
+       * moment you take a segment out of it.
+       *
+       * ...and `tight` is how far in it is ALLOWED to close this stage, which
+       * is the escalation. Without it a whole ring was entitled to the floor
+       * from the opening frame: measured, stage I ran at eighty percent
+       * corrupted frames with a mean of 0.19, so the fight was at its most
+       * oppressive before the player had done anything to it. Pressure that
+       * starts at maximum is weather, not pressure -- the same note DYNAMO's
+       * stage IV got two builds ago.
+       */
+      const target = C.ring - (C.ring - C.floor) * C.tight[this.stage - 1] * frac;
+      const rate = (this.radius > target ? C.contract[this.stage - 1] : C.relax) * dt;
+      this.radius = clamp(this.radius + clamp(target - this.radius, -rate, rate),
+        C.floor, C.ring);
+    }
+    if (this.frameK > 0) return;
+    const k = (C.ring - this.radius) / (C.ring - C.floor);
+    if (k <= C.squeezeFrom) return;
+    const bite = (k - C.squeezeFrom) / (1 - C.squeezeFrom);
+    world.shock = Math.max(world.shock, C.squeezeShock * bite);
+    if (Math.random() < 0.25 * bite) {
+      const s = world.shooter;
+      spark(s.x + rand(-22, 22), s.y + rand(-22, 22), rand(-60, 60), rand(-60, 60),
+        TYPE_BY_ID.bound.glow, 0.3, 2);
+    }
+  }
+
+  /**
+   * The patrol, and the trade it makes with itself.
+   *
+   * It walks its own ring. When it passes a gap and has any of its budget
+   * left it stops and mends -- which means dipping inside the ring, where it
+   * is nearer to the turret than every segment and the assist takes it at
+   * once. Every piece of boundary it puts back costs it a window, and when
+   * the budget is spent it stops trading and there is nothing left to do but
+   * finish the ring.
+   */
+  stepPatrol(world, dt) {
+    const C = X();
+    if (this.mend) {
+      this.dip = Math.min(1, this.dip + dt / 0.5);
+      this.mend.t -= dt;
+      if (this.beams.length < 1 && Math.random() < 0.25) {
+        this.beams.push({ p: this.mend.seg, t: 0.5 });
+      }
+      if (this.mend.t <= 0) {
+        const seg = this.mend.seg;
+        this.mend = null;
+        this.mends++;
+        this.mendT = C.mendEvery;
+        // Law 7: a heal is capped, and this one is capped twice -- at a
+        // fraction of one segment's bar and at a count for the whole fight.
+        this.revive(world, seg, C.mendHeal);
+        ring(seg.x, seg.y, 4, seg.r * 7, 0.35, TYPE_BY_ID.bound.glow, 3);
+        audio.chime(300);
+        flash(0.16, TYPE_BY_ID.terminus.color);
+      }
+      return;
+    }
+    this.dip = Math.max(0, this.dip - dt / 0.5);
+    this.patrolA += C.patrolSpin * dt;
+    if (this.mendT > 0) { this.mendT -= dt; return; }
+    if (this.mends >= C.mendCap) return;
+    // Is it passing a gap right now? The gap is where the dead segment would
+    // have been, which is why place() keeps putting dead ones somewhere.
+    const twoPi = TAU;
+    for (const p of this.parts()) {
+      if (!p.dead) continue;
+      const a = p.at + (p.band ? this.innerA : this.ringA);
+      let d = (this.patrolA - a) % twoPi;
+      d = Math.abs(((d + Math.PI * 3) % twoPi) - Math.PI);
+      if (d < 0.14) {
+        this.mend = { seg: p, t: C.mendFor };
+        // Said once, on the first one. Repeated per mend it was six captions
+        // in a row over a fight that also has stage lines to get through, and
+        // the reading-rate check counted one of them at twenty-two characters
+        // a second against a ceiling of thirteen -- because a line replaced
+        // before it has been read is a line that was never said.
+        if (!this.mends) {
+          world.bossLine = 'IT IS MENDING THE EDGE.';
+          this.lineFor = 3.2;
+        }
+        return;
+      }
+    }
+  }
+
+  /** The second ring, arriving inside the first. */
+  openInner(world) {
+    for (const p of this.inner) {
+      p.hidden = false;
+      p.spawnIn = 0.5;
+      p.flash = 1;
+    }
+    this.syncReach(world);
+    for (let i = 0; i < 3; i++) {
+      ring(this.hub.x, this.hub.y, this.radius * X().innerAt - i * 20, 60, 0.4 + i * 0.1,
+        TYPE_BY_ID.bound.glow, 3);
+    }
+    flash(0.34, TYPE_BY_ID.terminus.color);
+    shake(18);
+    audio.boom();
+  }
+
+  /**
+   * ECLIPSE. Both rings slam to the floor and hold there, and every segment
+   * in turn wears one of the six colours that came before it.
+   *
+   * The only explicit quotation of the other six in the whole fight -- the
+   * draft had TERMINUS re-running all of them as stages, and that was six
+   * bosses of code and a fight made of reruns. One beat, six colours, and
+   * then it throws the whole boundary back out to full radius.
+   */
+  startEclipse(world) {
+    const C = X();
+    this.eclipsed = true;
+    this.eclipse = C.eclipseFor;
+    world.bossLine = 'EVERYTHING YOU BROKE WAS MEASURING YOU FOR THIS.';
+    this.lineFor = 5.0;
+    flash(0.5, TYPE_BY_ID.terminus.color);
+    ripple(this.hub.x, this.hub.y, 3.4, 1300);
+    shake(30);
+    audio.boom();
+    background.surge(2);
+  }
+
+  stepEclipse(world, raw) {
+    const C = X();
+    this.eclipse -= raw;
+    const k = 1 - clamp(this.eclipse / C.eclipseFor, 0, 1);
+    if (k < C.eclipseHold) {
+      // Down onto the floor, and held there. This is the tightest the field
+      // ever gets, and the squeeze is at its maximum for all of it.
+      const e = clamp(k / C.eclipseHold, 0, 1);
+      this.radius = C.ring + (C.floor - C.ring) * (e * e * (3 - 2 * e));
+      if (Math.random() < 0.3) shake(4);
+    } else {
+      if (!this.threw) {
+        this.threw = true;
+        flash(0.62, '#ffffff');
+        for (let i = 0; i < 5; i++) {
+          ring(this.hub.x, this.hub.y, C.floor + i * 30, 420 + i * 200, 0.5 + i * 0.12,
+            i % 2 ? '#ffffff' : TYPE_BY_ID.terminus.glow, 5 - i);
+        }
+        ripple(this.hub.x, this.hub.y, 3.8, 1500);
+        shake(34);
+        audio.boom();
+        background.surge(2);
+      }
+      const e = clamp((k - C.eclipseHold) / (1 - C.eclipseHold), 0, 1);
+      this.radius = C.floor + (C.ring - C.floor) * (e * e * (3 - 2 * e));
+    }
+    if (this.eclipse <= 0) {
+      world.bossLine = null;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * III. It lets go of the ring.
+   *
+   * What is left of the boundary is dragged to the middle of the field as a
+   * double square frame -- ORDINAL's silhouette, worn in crimson, the first
+   * boss quoted by the last -- and the core sits at the middle of it and
+   * turns four beams out of itself.
+   *
+   * The frame's near side is nearer to the turret than the core is, so it is
+   * armour by construction and the fight is the same shape it has always
+   * been: get through the edge to reach the thing that is holding it.
+   */
+  takeFrame(world) {
+    const C = X();
+    this.fc = { x: world.shooter.x, y: world.shooter.y - C.frameAt };
+    this.frameK = 0.0001;
+    this.limitT = C.limitEvery[2];
+    /*
+     * It can only carry so much of itself, and what it cannot it drops.
+     *
+     * Unbounded, stage III is however much boundary happened to survive --
+     * which is the whole of the rest of the fight if ECLIPSE came early. And
+     * the drop is the better image anyway: half the edge falling away as the
+     * rest of it is gathered up.
+     */
+    const alive = this.parts().filter((p) => !p.dead);
+    const keep = C.frameKeep;
+    if (alive.length > keep) {
+      for (let i = 0; i < alive.length; i++) {
+        // Evenly spread, so what it keeps is a frame rather than an arc.
+        if (Math.floor((i * keep) / alive.length) !== Math.floor(((i + 1) * keep) / alive.length)) {
+          continue;
+        }
+        const p = alive[i];
+        p.dead = true;
+        explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.3);
+        ring(p.x, p.y, 2, p.r * 4, 0.28, p.type.glow, 2);
+      }
+    }
+    for (let i = 0; i < 4; i++) {
+      ring(this.fc.x, this.fc.y, 20 + i * 40, 300 + i * 160, 0.45 + i * 0.1,
+        i % 2 ? '#ffffff' : TYPE_BY_ID.terminus.glow, 4 - i * 0.5);
+    }
+    shake(24);
+    audio.boom();
+  }
+
+  /**
+   * The beams, from III.
+   *
+   * Four of them, turning. Being across one is corruption -- gated on the
+   * ANGLE rather than on being near, which is DYNAMO's stage IV lesson taken
+   * before it had to be learned twice: a hazard that is simply on top of you
+   * for the whole stage is weather, not a threat. Four beams a quarter turn
+   * apart repeat every quarter turn, which is what doubling the angle inside
+   * the sine is doing.
+   */
+  stepBeams(world, dt) {
+    const C = X();
+    if (this.frameK < 1) return;
+    this.beamA += C.beamSpin * (1 + this.spiral * 0.8) * dt;
+    const s = world.shooter;
+    const d = Math.hypot(s.x - this.x, s.y - this.y);
+    if (d > C.beamLen) return;
+    const toward = Math.atan2(s.y - this.y, s.x - this.x);
+    const across = Math.abs(Math.sin(2 * (toward - this.beamA))) < Math.sin(2 * C.beamArc);
+    if (!across) return;
+    world.shock = Math.max(world.shock, C.beamShock);
+    if (Math.random() < 0.3) {
+      spark(s.x + rand(-18, 18), s.y + rand(-18, 18), rand(-70, 70), rand(-70, 70),
+        '#ffd6dd', 0.28, 2);
+    }
+  }
+
+  /** LIMITs: off the frame's corners, and they walk in. */
+  throwLimits(world) {
+    const C = X();
+    for (let k = 0; k < C.limitOf; k++) {
+      const a = this.frameA + (k / C.limitOf) * TAU + Math.PI / 4;
+      const h = C.frameR[0] * 1.2;
+      const x = this.fc.x + Math.cos(a) * h;
+      const y = this.fc.y + Math.sin(a) * h;
+      const e = new Enemy(TYPE_BY_ID.limit, x, y, { staged: false, spawnIn: 0.25 });
+      e.counts = false;
+      const toward = Math.atan2(world.shooter.y - y, world.shooter.x - x);
+      e.vx = Math.cos(toward) * rand(140, 190);
+      e.vy = Math.sin(toward) * rand(140, 190);
+      e.thrown = 0.4;
+      world.enemies.push(e);
+      spark(x, y, e.vx * 0.4, e.vy * 0.4, TYPE_BY_ID.limit.glow, 0.3, 2);
+    }
+    audio.pop(0.7);
+  }
+
+  enterStage(world, n) {
+    const C = X();
+    this.stage = n;
+    this.flare = 1;
+    if (n === 2) this.openInner(world);
+    if (n === 3) this.takeFrame(world);
+    if (n >= 3) this.limitT = C.limitEvery[n - 1];
+    if (n >= 4) {
+      this.spiralT = 0;
+      flash(0.5, '#ffffff');
+      ripple(this.fc.x, this.fc.y, 3.2, 1200);
+      shake(30);
+    }
+    background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
+    world.bossLine = n >= 4 ? 'IT HAS LET GO OF EVERYTHING BUT YOU.'
+      : n >= 3 ? 'IT HAS LET GO OF THE EDGE.'
+        : 'THERE IS A SECOND EDGE INSIDE THE FIRST.';
+    this.lineFor = n >= 4 ? 4.4 : 3.6;
+    ring(this.x, this.y, 20, 520, 0.7, TYPE_BY_ID.terminus.glow, 6);
+    ripple(this.x, this.y, 2.2, 640);
+    shake(16);
+    background.surge(2);
+    audio.boom();
+    world.bossStage = n;
+  }
+
+  // -------------------------------------------------------------- frame
+
+  update(world, dt) {
+    const C = X();
+    this.t += dt;
+    this.tickCommon(world, dt);
+
+    if (this.arriving > 0) {
+      this.arriveStep(world, world.dtRaw || dt, C, ARRIVAL, MOODS);
+      return;
+    }
+    this.settle(world);
+
+    if (this.dying > 0) {
+      this.dieStep(world, dt, C, OUTRO);
+      return;
+    }
+
+    // The ring is centred on the turret and stays centred on it.
+    const s = world.shooter;
+    this.hub.x += (s.x - this.hub.x) * Math.min(1, dt * 1.4);
+    this.hub.y += (s.y - this.hub.y) * Math.min(1, dt * 1.4);
+
+    this.syncReach(world);
+
+    // ECLIPSE holds everything while it runs -- it *is* the way into III.
+    if (this.eclipse > 0) {
+      this.place(dt);
+      if (this.stepEclipse(world, world.dtRaw || dt)) this.enterStage(world, 3);
+      this.stepSqueeze(world, dt);
+      background.setFocus(this.x, this.y);
+      return;
+    }
+
+    if (this.frameK > 0 && this.frameK < 1) {
+      this.frameK = Math.min(1, this.frameK + (world.dtRaw || dt) / C.frameFor);
+    }
+    if (this.stage >= 4) {
+      this.spiral = Math.min(1, this.spiral + (world.dtRaw || dt) / C.spiralFor);
+      const e = this.spiral * this.spiral * (3 - 2 * this.spiral);
+      this.fc.x += (s.x - this.fc.x) * Math.min(1, dt * 0.5);
+      this.fc.y = (s.y - C.frameAt) + (C.frameAt - C.spiralTo) * e;
+    }
+
+    this.place(dt);
+    this.stepSqueeze(world, dt);
+    if (this.frameK <= 0) this.stepPatrol(world, dt);
+    this.stepBeams(world, dt);
+
+    if (this.stage >= 3) {
+      this.limitT -= dt;
+      if (this.limitT <= 0) {
+        this.limitT = C.limitEvery[this.stage - 1];
+        this.throwLimits(world);
+      }
+    }
+
+    const frac = this.coreFrac;
+    let want = this.stage;
+    if (this.outerFrac() <= C.stageInner && want < 2) want = 2;
+    // ECLIPSE is the door into III and holds the ladder while it runs. Two
+    // ways in -- see CFG.terminus: the core worn down, or the boundary spent.
+    if (!this.eclipsed && this.stage >= 2
+      && (frac <= C.eclipseAt || this.shellFrac() <= C.eclipseRing)) {
+      this.startEclipse(world);
+      return;
+    }
+    if (this.eclipsed && want < 3) want = 3;
+    if (frac <= C.stageBare && want < 4) want = 4;
+    // One stage at a time. The triggers are independent -- the ring for II,
+    // the bar for ECLIPSE and IV -- so two can come true on the same frame,
+    // and jumping to the furthest along skips whatever is between.
+    if (want > this.stage) this.enterStage(world, this.stage + 1);
+
+    const through = 1 - (this.shellFrac() * 0.3 + frac * 0.7);
+    background.setDread(1, through);
+    background.setFocus(this.x, this.y);
+
+    if (this.core.dead) this.die(world, C);
+  }
+
+  /** Everything has to be back on the field for the wreck to be shed. */
+  clear(world) {
+    for (const p of this.inner) p.hidden = false;
+    super.clear(world);
+  }
+
+  /**
+   * The death: the edge lets go, and the field is bigger afterwards.
+   *
+   * The core falls to the middle of the world rather than staying where it
+   * was standing -- it has spent the whole fight being the outside of things
+   * and it ends at the centre -- and the sky drains after it. What no other
+   * ending does is leave anything behind: see Game.endBoss, which lands on
+   * the `dawn` sky instead of putting `staging` back.
+   */
+  dieExtra(world, k) {
+    if (this.fell === undefined) {
+      this.fell = { x: this.x, y: this.y };
+      flash(0.4, '#ffd6dd');
+      audio.chime(220);
+    }
+    const e = k * k * (3 - 2 * k);
+    const cx = world.width / 2;
+    const cy = world.shooter.y - X().frameAt * 0.8;
+    this.fc.x = this.fell.x + (cx - this.fell.x) * e;
+    this.fc.y = this.fell.y + (cy - this.fell.y) * e;
+    this.hub.x = this.fc.x;
+    this.hub.y = this.fc.y;
+    this.frameK = 1;
+    this.x = this.fc.x;
+    this.y = this.fc.y;
+    this.core.x = this.x;
+    this.core.y = this.y;
+    // The sky comes with it: dread easing off as the edge that caused it goes.
+    background.setDread(1 - e, 1);
+    background.setFocus(this.x, this.y);
+  }
+
+  // --------------------------------------------------------------- draw
+
+  draw(ctx, world) {
+    const C = X();
+    const T = TYPE_BY_ID.terminus;
+    const arriving = this.arriving > 0;
+    const open = arriving ? 1 - clamp(this.arriving / C.arrive, 0, 1) : 1;
+
+    ctx.save();
+    this.drawHole(ctx, C, T, arriving);
+
+    /*
+     * The boundary itself, drawn as a circle through where the segments are
+     * rather than only as the segments.
+     *
+     * A ring with holes in it should still read as a ring -- the gap where a
+     * segment was is the only record of what you have done to it, and on a
+     * phone the segments alone are thirty-two small marks that do not join
+     * up. Faint, so it never competes with the bodies.
+     */
+    if (this.frameK < 1 && !arriving) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (const rr of this.twoRings ? [this.radius, this.radius * C.innerAt] : [this.radius]) {
+        ctx.strokeStyle = rgba(T.color, (0.1 + 0.16 * this.flare) * open);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(this.hub.x, this.hub.y, rr, 0, TAU);
+        ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    /*
+     * ECLIPSE: each segment wearing one of the six that came before it, the
+     * colour walking round the ring rather than all of them at once. It is
+     * the only place in the game where six anomalies are on screen together.
+     */
+    if (this.eclipse > 0) {
+      const k = 1 - clamp(this.eclipse / C.eclipseFor, 0, 1);
+      ctx.globalCompositeOperation = 'lighter';
+      /*
+       * EVERY segment, including the ones you broke -- the dead as outlines,
+       * the living ringed. For one beat the whole boundary is back and it is
+       * wearing the six colours that came before it.
+       *
+       * Drawn from the survivors alone this was six lonely pieces: the beat
+       * fires when the boundary is nearly spent, by construction, so the
+       * scene the plan asked for -- a tight double circle of six colours
+       * closed around the turret -- could only ever have been a handful of
+       * marks. The ghosts cost nothing and are the whole image.
+       */
+      const all = [...this.outer, ...(this.twoRings ? this.inner : [])];
+      for (let i = 0; i < all.length; i++) {
+        const p = all[i];
+        const u = (i / all.length + k * 1.6) % 1;
+        const tone = BOSS_TONE[Math.floor(u * 6) % 6];
+        if (p.dead) {
+          ctx.strokeStyle = rgba(tone, 0.34);
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * 0.92, 0, TAU);
+          ctx.stroke();
+          continue;
+        }
+        ctx.strokeStyle = rgba(tone, 0.85);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 1.5, 0, TAU);
+        ctx.stroke();
+        drawGlow(ctx, tone, p.x, p.y, p.r * 5, 0.4);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    /*
+     * III and IV: the frame's own lines, drawn between its segments so the
+     * silhouette is a shape rather than a scatter -- and the four beams,
+     * which are the only thing in this fight that is thrown at all.
+     */
+    if (this.frameK >= 1) {
+      ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, C.beamLen);
+      g.addColorStop(0, rgba('#ffd6dd', 0.34));
+      g.addColorStop(0.4, rgba(T.glow, 0.16));
+      g.addColorStop(1, rgba(T.glow, 0));
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 10;
+      for (let i = 0; i < C.beams; i++) {
+        const a = this.beamA + (i / C.beams) * TAU;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + Math.cos(a) * C.beamLen, this.y + Math.sin(a) * C.beamLen);
+        ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    this.drawBeams(ctx);
+
+    ctx.globalCompositeOperation = 'lighter';
+    const pulse = 0.2 + 0.1 * Math.sin(this.t * (1.4 + this.stage)) + this.flare * 0.6;
+    drawGlow(ctx, T.glow, this.x, this.y, C.coreR * 5, pulse * open);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+  }
+}
+
+registerAnomaly(7, (world) => new Terminus(world));

@@ -1,13 +1,87 @@
-# The six other apertures — plan
+# The seven apertures — plan, and what was built
 
-Not built yet. This is the plan for the six remaining bosses, one per
-ANOMALY colour, created, reviewed and revised before any code. It is in the
-repo so it survives the container; each phase below is one build-sized
-request, and a future session should be able to pick any phase up from this
-file alone.
+Originally the plan for the six bosses after ORDINAL, one per ANOMALY
+colour, created, reviewed and revised before any code. It is in the repo so
+it survives the container; each phase below was one build-sized request, and
+the "as built" notes under each are what actually happened.
 
-Status: **Phases 0–5 shipped (builds 127–132); DYNAMO reworked in 133.**
-Six of seven bosses built. Remaining: **TERMINUS (VII)** and polish.
+Status: **all seven built.** Phases 0–5 shipped in builds 127–132, DYNAMO
+reworked in 133, the pressure audit in 134, and **TERMINUS (VII) in 135**.
+Remaining: the polish phase — narrative lines between fights, and a balance
+pass across all seven at once.
+
+### Phase 6 as built (TERMINUS, build 135)
+
+The capstone. 426s assists-only against a ~420s target, stages 21/15/31/24,
+one REMAINDER, everything inside aim range, 95/95 regress green and
+ORDINAL's hash unmoved.
+
+**What it is.** A ring of 32 boundary segments closed around the *turret* —
+the only boss that does not stand in front of you. The core rides the ring
+rather than sitting at the middle of it, and rides **outside** it, which is
+what makes it unreachable without a single point of armour doing the work:
+auto aim takes the nearest thing, and a core outside the ring is strictly
+further away than every segment. To mend a gap it has to dip **inside**,
+where it is nearer than everything else and the assist takes it instantly.
+Every piece of boundary it puts back costs it a window, and the budget is
+capped at six. That trade is the fight.
+
+The pressure is the boundary being near. Nothing is thrown at you until
+stage III: the ring contracts toward a per-stage limit scaled by how much of
+it is standing, and springs back out at `relax` — five times faster than it
+closes — the moment you open it. It is the only corruption in the game the
+player governs.
+
+**Five things measurement caught, none visible by reading:**
+
+1. **The arena was deforming the ring.** The play floor sits 210 below the
+   turret and the ring is 250 around it, so `clampToArena` pushed the bottom
+   seven segments inward every frame: a circle with a flat bottom, 180 from
+   the turret where the rest were at 250. The whole geometric premise, gone,
+   and invisible because the deformed arc is exactly the part behind the
+   control deck. Bodies a boss places every frame are `pinned` now and the
+   arena leaves them alone. Only TERMINUS sets it, so no other fight moved —
+   confirmed by ORDINAL's hash.
+2. **The core was out of aim range for the whole of stage III.** The plan put
+   the frame's centre 470 above the turret against a base range of 400.
+   Measured: stage III was 60% of a fight that ran into the 900-second cap
+   without ever reaching IV. 360 now, with the frame's near side at 204 —
+   which is also what makes the frame armour.
+3. **The mend window was not a window from stage II onward.** The core dipped
+   to 0.7 of the ring radius while the second ring stood at 0.6 of it, so the
+   assist went on taking the boundary. A clear step under `innerAt` now.
+4. **ECLIPSE had nothing to slam.** The beat fires when the boundary is
+   nearly spent — by construction — so the plan's tight double circle of six
+   colours was six lonely pieces. Every segment is drawn during it now,
+   including the ones you broke: the dead as outlines, the living ringed. For
+   one beat the whole boundary is back, wearing the six colours that came
+   before it. It is the best image in the game.
+5. **Stage III had no frame.** Same cause: nothing survived to be dragged
+   into ORDINAL's silhouette. ECLIPSE opens on the boundary at 50% now
+   rather than 14%, and III carries at most 16 of what is left and drops the
+   rest — which is the better image anyway, half the edge falling away as the
+   rest is gathered up. And the frame's segments lie **along** their own side
+   of the square: placed with one shared rotation, twenty parallel bars over
+   a square area read as a spill rather than as an outline.
+
+**Also:** the ring's segments lie along the ring rather than across it, with
+their lit face outward, so 32 of them read as one skin seen from the inside;
+the boundary's radius is snapped on `settle()` as well as during the arrival,
+or a shortcut arrival leaves it parked at 420 and the fight cannot be
+started; and the outro is 19.4s because four lines of 14.8s cannot be read
+inside the 3.4s of arrest and infall that precede them.
+
+**The dawn sky.** The one thing in this game that leaves a mark on the world
+rather than on the ledger: `endBoss` lands on a new `dawn` mood instead of
+handing `staging` back, and the darkness is grey-gold for the rest of the
+run. Per run — a restart puts the edge back up.
+
+**Known trade, stated rather than hidden:** the ring's lower arc and the
+core's pass behind the bottom of it are partly behind the control deck. A
+ring centred on the turret cannot avoid that on a field whose floor is 210
+below the turret, and every alternative — lifting the centre, shrinking the
+radius — costs the distance invariant the whole fight is built on. The
+occlusion is cosmetic and about 25 CSS pixels deep; the mechanic is exact.
 
 ### DYNAMO reworked (build 133) — the boring-boss post-mortem
 
@@ -753,8 +827,13 @@ acknowledges progress between fights.
 | 3 | AMPLITUDE (IV) | same |
 | 4 | DYNAMO (V) | same |
 | 5 | PARITY (VI) | same |
-| 6 | TERMINUS (VII), mechanics | ring/patrol/ECLIPSE working, ~420s |
-| 7 | TERMINUS cinematics + dawn, narrative lines, balance pass over all seven, full regression | everything |
+| 6 | TERMINUS (VII), mechanics **— shipped, build 135** | ring/patrol/ECLIPSE working, ~420s — 426s measured |
+| 7 | Narrative lines between fights, balance pass over all seven, full regression | everything |
+
+Phase 6 shipped its cinematics and the dawn sky with the mechanics rather
+than after them: the arrival, the outro and the mood switch are all beat
+tables and one line in `endBoss`, and holding them back would have meant
+shipping the last boss in the game without an ending.
 
 One phase per request, in order, each ending: `check-build --stamp`,
 regress, commit, push, bundle, artifact. Phases 1–5 are independent of each

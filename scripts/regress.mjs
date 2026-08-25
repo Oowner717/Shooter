@@ -2701,6 +2701,259 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `overkill emptied the pool: ${r.emptied}; it ended: ${r.ended}`);
 }
 
+// --- TERMINUS: the one that is a distance -----------------------------------
+/*
+ * This boss is a geometry argument, so these are geometry assertions.
+ *
+ * The ring is centred on the turret, which makes law 2 free -- every segment
+ * is at exactly the same distance -- and makes the core's reachability a
+ * question of radius rather than of armour: outside the ring it is strictly
+ * further away than every segment and the assist cannot pick it; inside, it
+ * is nearer than all of them and the assist takes it at once. Five bosses
+ * before it proved armour cannot express priority. If either of those two
+ * inequalities ever stops holding, this fight quietly becomes a different one
+ * and nothing on screen says so.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[7] = 1;
+    g.openBoss(7);
+    const boss = w.boss;
+    const C = CFG.terminus;
+    const out = { built: boss.constructor.name };
+    boss.arriving = 0;
+    boss.settle(w);
+    g.update(1 / 60);
+    const s = w.shooter;
+    const far = (p) => Math.hypot(p.x - s.x, p.y - s.y);
+
+    out.outer = boss.outer.length;
+    out.inner = boss.inner.length;
+    out.shells = boss.gauge().shells.map((x) => `${x.label}:${x.seg}`).join(',');
+    // The arrival can be shortcut; the ring must still have come in. Parked at
+    // `edge` it sits outside aim range and the fight cannot be started at all.
+    out.radius = Math.round(boss.radius);
+
+    // Law 2, for free: one distance, and it is inside reach.
+    const d = boss.outer.map(far);
+    out.spread = Math.round(Math.max(...d) - Math.min(...d));
+    out.reach = Math.round(Math.max(...d));
+
+    // The second ring is out of the world until it is in it.
+    out.innerOff = boss.inner.every((p) => !w.enemies.includes(p));
+    out.innerDrawnOnly = boss.inner.every((p) => p.hidden);
+    boss.enterStage(w, 2);
+    g.update(1 / 60);
+    out.innerOn = boss.inner.every((p) => w.enemies.includes(p));
+    out.shellsII = boss.gauge().shells.map((x) => `${x.label}:${x.seg}`).join(',');
+
+    // Patrolling: further than every segment. Mending: nearer than all of them.
+    boss.mend = null;
+    boss.dip = 0;
+    boss.place(1 / 60);
+    const live = boss.parts().filter((p) => !p.dead);
+    out.outFar = far(boss.core) > Math.max(...live.map(far)) - 0.001;
+    boss.dip = 1;
+    boss.place(1 / 60);
+    out.inNear = far(boss.core) < Math.min(...live.map(far)) - 0.001;
+    // ...and the armour follows the same dip, so the exposure is not only
+    // positional. Never total in either direction.
+    boss.dip = 0; boss.place(1 / 60);
+    const armOut = boss.core.armor;
+    boss.dip = 1; boss.place(1 / 60);
+    out.armour = [+armOut.toFixed(2), +boss.core.armor.toFixed(2)];
+    out.armourOpens = armOut > boss.core.armor && armOut < 1;
+    boss.dip = 0;
+
+    /*
+     * The squeeze. It is the only pressure in this fight and the only one in
+     * the game the player governs: a whole ring closes, an opened one springs
+     * back out, and the corruption is how near it has got.
+     */
+    boss.radius = C.ring;
+    w.shock = 0;
+    boss.stepSqueeze(w, 1 / 60);
+    out.wideClear = +w.shock.toFixed(2); // at full radius it costs nothing
+    for (let i = 0; i < 60 * 40; i++) boss.stepSqueeze(w, 1 / 60);
+    out.closed = Math.round(boss.radius);
+    w.shock = 0;
+    boss.stepSqueeze(w, 1 / 60);
+    out.tightShock = +w.shock.toFixed(2);
+    // Break most of it and the boundary has to give ground.
+    boss.outer.forEach((p, i) => { if (i % 4) p.dead = true; });
+    boss.inner.forEach((p, i) => { if (i % 4) p.dead = true; });
+    for (let i = 0; i < 60 * 6; i++) boss.stepSqueeze(w, 1 / 60);
+    out.sprang = Math.round(boss.radius);
+    // ...and it never goes past the floor, whatever happens. Law 3.
+    out.neverCrushes = boss.radius >= C.floor - 0.001;
+
+    /*
+     * The mend, which is the trade this boss makes with itself: every piece of
+     * boundary it puts back costs it a window inside its own ring. Capped, and
+     * a revived body has to be back ON the field -- ORDINAL shipped a repair
+     * that healed things outside world.enemies once, and it is a law now.
+     */
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[7] = 1;
+    g.openBoss(7);
+    const b2 = w.boss;
+    b2.arriving = 0;
+    b2.settle(w);
+    g.update(1 / 60);
+    b2.outer[3].dead = true;
+    b2.mendT = 0;
+    let mends = 0;
+    let target = null;
+    for (let i = 0; i < 60 * 600 && mends < CFG.terminus.mendCap + 2; i++) {
+      b2.place(1 / 60);
+      b2.stepPatrol(w, 1 / 60);
+      // Whatever it actually chose, which is not necessarily the one killed
+      // last: it mends the gap it is passing.
+      if (b2.mend) target = b2.mend.seg;
+      if (b2.mends > mends) {
+        mends = b2.mends;
+        if (out.mendPut === undefined && target) {
+          out.mendPut = w.enemies.includes(target) && !target.dead;
+          out.mendPartial = target.hp < target.maxHp && target.hp > 0;
+        }
+      }
+      // Keep giving it something to do, so the cap is what stops it.
+      if (!b2.mend) {
+        const alive = b2.outer.filter((p) => !p.dead);
+        if (alive.length > 1) alive[0].dead = true;
+      }
+    }
+    out.mends = b2.mends;
+    out.mendCapped = b2.mends <= CFG.terminus.mendCap;
+
+    /*
+     * III: it drags what it can carry into a double square frame, and drops
+     * the rest. Unbounded, stage III is however much boundary happened to
+     * survive -- and the core has to be in reach once it is there, which the
+     * plan's 470 was not.
+     */
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[7] = 1;
+    g.openBoss(7);
+    const b3 = w.boss;
+    b3.arriving = 0;
+    b3.settle(w);
+    b3.enterStage(w, 2);
+    g.update(1 / 60);
+    const before = b3.parts().filter((p) => !p.dead).length;
+    b3.enterStage(w, 3);
+    for (let i = 0; i < 60 * 4; i++) g.update(1 / 60);
+    const kept = b3.parts().filter((p) => !p.dead);
+    out.dropped = before - kept.length;
+    out.carried = kept.length;
+    out.keptCap = kept.length <= CFG.terminus.frameKeep;
+    out.coreInReach = Math.round(Math.hypot(b3.core.x - s.x, b3.core.y - s.y));
+    // Two squares, not one: the distances from the frame's centre fall into
+    // two bands, and the near side of the outer one is nearer than the core.
+    const off = kept.map((p) => Math.max(Math.abs(p.x - b3.fc.x), Math.abs(p.y - b3.fc.y)));
+    out.bands = new Set(off.map((v) => Math.round(v / 40))).size;
+    out.frameShields = Math.min(...kept.map((p) => Math.hypot(p.x - s.x, p.y - s.y)))
+      < Math.hypot(b3.core.x - s.x, b3.core.y - s.y);
+
+    // The beams strobe across the turret rather than sitting on it.
+    let on = 0;
+    const frames = 600;
+    b3.frameK = 1;
+    for (let i = 0; i < frames; i++) {
+      w.shock = 0;
+      b3.stepBeams(w, 1 / 60);
+      if (w.shock > 0.001) on++;
+    }
+    out.beamDuty = +(on / frames).toFixed(2);
+
+    w.shock = 0;
+    g.restart();
+    return out;
+  });
+  check('TERMINUS stands up as a boundary closed around the turret',
+    r.built === 'Terminus' && r.outer === 32 && r.inner === 12
+    && r.shells === 'BOUND:32' && r.shellsII === 'BOUND:32,INNER:12',
+    JSON.stringify({ outer: r.outer, inner: r.inner, shells: r.shells, andThen: r.shellsII }));
+  check('every segment is the same distance away, and all of it is in reach',
+    r.spread <= 1 && r.reach <= 390 && r.radius <= 260,
+    `spread ${r.spread}, furthest ${r.reach}, radius after a shortcut arrival ${r.radius}`);
+  check('the second ring is out of the world until it is in it',
+    r.innerOff && r.innerDrawnOnly && r.innerOn,
+    `off the field first: ${r.innerOff}; on it after II: ${r.innerOn}`);
+  check('the core is out of reach on patrol and in reach while it mends',
+    r.outFar && r.inNear && r.armourOpens,
+    `outside the ring it is furthest: ${r.outFar}; inside, nearest: ${r.inNear}; `
+    + `armour ${r.armour[0]} -> ${r.armour[1]}`);
+  check('the squeeze is what is left of the boundary, and it never crushes',
+    r.wideClear === 0 && r.closed < 250 && r.tightShock > 0 && r.sprang > r.closed
+    && r.neverCrushes,
+    `at full radius ${r.wideClear}; closes to ${r.closed} costing ${r.tightShock}; `
+    + `opened, springs back to ${r.sprang}`);
+  check('a mend puts a segment back on the field, and the budget runs out',
+    r.mendPut && r.mendPartial && r.mendCapped && r.mends >= 1,
+    `revived onto the field: ${r.mendPut}; part-healed: ${r.mendPartial}; `
+    + `${r.mends} mends against a cap`);
+  check('III carries what it can into a double frame and drops the rest',
+    r.keptCap && r.dropped > 0 && r.bands >= 2 && r.frameShields && r.coreInReach <= 390,
+    `carried ${r.carried}, dropped ${r.dropped}, ${r.bands} bands of frame; `
+    + `core at ${r.coreInReach}; frame nearer than the core: ${r.frameShields}`);
+  check('the beams strobe across the turret rather than sitting on it',
+    r.beamDuty > 0.08 && r.beamDuty < 0.6,
+    `a beam is across the turret on ${Math.round(r.beamDuty * 100)}% of frames`);
+}
+
+/*
+ * ...and the one thing in this game that leaves a mark on the world.
+ *
+ * Every other fight hands `staging` back and the field looks exactly as it
+ * did. Breaking the edge does not: the between-waves sky is grey-gold for the
+ * rest of the run. Per run, and only for the seventh -- a mood that leaked
+ * into any other reconciliation, or survived a restart, would read as the
+ * background having broken rather than as a consequence.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { background } = await import('../src/background.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    const land = (n) => {
+      g.restart();
+      w.phase = 'staging';
+      w.apertures[n] = 1;
+      g.openBoss(n);
+      w.boss.clear(w);
+      g.endBoss();
+      return background.target.accent;
+    };
+    const staging = (() => { g.restart(); return background.target.accent; })();
+    out.afterSix = land(6);
+    out.afterSeven = land(7);
+    out.dawnFlag = !!w.dawn;
+    // ...and it holds through the waves that follow rather than being one
+    // frame of colour on the way past.
+    background.setMood(w.dawn ? 'dawn' : 'staging');
+    out.holds = background.target.accent === out.afterSeven;
+    g.restart();
+    out.afterRestart = background.target.accent;
+    out.staging = staging;
+    out.cleared = !w.dawn;
+    return out;
+  });
+  check('breaking the edge leaves the sky changed, and only that one does',
+    r.afterSix === r.staging && r.afterSeven !== r.staging && r.dawnFlag && r.holds
+    && r.afterRestart === r.staging && r.cleared,
+    `staging ${r.staging}; after VI ${r.afterSix}; after VII ${r.afterSeven}; `
+    + `after a restart ${r.afterRestart}`);
+}
+
 // --- the three that measured as doing nothing at all ------------------------
 /*
  * Every one of these shipped as a mechanic the code described and the fight

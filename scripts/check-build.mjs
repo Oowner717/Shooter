@@ -269,6 +269,41 @@ if (misprice.length) {
 }
 
 /*
+ * TERMINUS's outer ring closes too -- and its inner one deliberately does not.
+ *
+ * Same arithmetic a third time. The outer ring is the boundary and a boundary
+ * with rounds going through it is not one, so 32 bodies round a circle of
+ * radius 300 need a diameter of at least 58.9. Checked at `ring`, the widest
+ * it ever is once damage is possible: it only ever contracts from there, and
+ * contracting makes it tighter.
+ *
+ * The inner ring is the opposite claim and is checked as such. Stage II is
+ * meant to be two lattices of moving gaps, so 18 segments where 32 would be
+ * needed is the design; if someone ever "fixes" it into a second wall the
+ * stage stops being a stage.
+ */
+{
+  const C = CFG.terminus;
+  const need = (Math.PI * C.ring) / C.segs;
+  const have = TYPE_BY_ID.bound.r;
+  if (have < need - 0.001) {
+    console.error(`TERMINUS's ring: ${C.segs} segments at radius ${C.ring} need r `
+      + `${need.toFixed(2)}, BOUND is r ${have} — the edge of the world has holes in it`);
+    process.exit(1);
+  }
+  const innerNeed = (Math.PI * C.ring * C.innerAt) / C.innerSegs;
+  if (have >= innerNeed) {
+    console.error(`TERMINUS's inner ring closes (${C.innerSegs} segments at radius `
+      + `${(C.ring * C.innerAt).toFixed(0)} need r ${innerNeed.toFixed(2)}, BOUND is r ${have}) `
+      + '— stage II is supposed to be a lattice of gaps, not a second wall');
+    process.exit(1);
+  }
+  console.log(`TERMINUS: ${C.segs} segments close a ring of ${C.ring} `
+    + `(r ${have} >= ${need.toFixed(1)}), ${C.innerSegs} inside it that deliberately do not `
+    + `(need ${innerNeed.toFixed(1)})`);
+}
+
+/*
  * A stage may not change whose colour it is.
  *
  * The gauge escalates through a fight, and the first generated ramp did that
