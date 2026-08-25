@@ -68,6 +68,9 @@ export function drawSpecimen(ctx, id, r) {
     case 'crest': drawCrest(ctx, r, 1); break;
     case 'amplitude': drawAmplitude(ctx, r, 0, 0, 1); break;
     case 'droplet': drawDroplet(ctx, r, 0, 0); break;
+    case 'pylon': drawPylon(ctx, r, 1); break;
+    case 'dynamo': drawDynamo(ctx, r, 0, 0, 1); break;
+    case 'ion': drawIon(ctx, r, 0, 0); break;
     case 'hex': drawHex(ctx, r); break;
     case 'blob': drawBlob(ctx, r, 0.6, 0); break;
     case 'bloom': drawBloom(ctx, r, 0.4, 0, t); break;
@@ -1058,6 +1061,9 @@ export class Enemy {
       case 'crest': drawCrest(ctx, this.r, hpFrac); break;
       case 'amplitude': drawAmplitude(ctx, this.r, this.phase, world.time, hpFrac); break;
       case 'droplet': drawDroplet(ctx, this.r, this.phase, world.time); break;
+      case 'pylon': drawPylon(ctx, this.r, hpFrac); break;
+      case 'dynamo': drawDynamo(ctx, this.r, this.phase, world.time, hpFrac); break;
+      case 'ion': drawIon(ctx, this.r, this.phase, world.time); break;
       case 'tow': drawTowHead(ctx, this.r); break;
       case 'mass': drawTowMass(ctx, this.r, hpFrac); break;
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
@@ -1429,6 +1435,104 @@ function drawOrdinal(ctx, r, phase, t, hpFrac) {
  * obviously of the same make as the frame it came out of, so a loose one
  * still reads as ORDINAL's rather than as a new object type arriving.
  */
+/*
+ * ---- DYNAMO's three ----
+ */
+
+/**
+ * A pylon: a squat tower with a cap and three insulator rings that go dark as
+ * it is broken. It has to read as *standing on something* even though nothing
+ * in this game has a ground, which is what the flared base is for.
+ */
+function drawPylon(ctx, r, hpFrac) {
+  const w = r * 0.62;
+  const h = r * 1.05;
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.55, -h);
+  ctx.lineTo(w * 0.55, -h);
+  ctx.lineTo(w, h);
+  ctx.lineTo(-w, h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  const stroke = ctx.strokeStyle;
+  ctx.save();
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.07);
+  const rings = 3;
+  const lit = Math.ceil(rings * hpFrac);
+  for (let i = 0; i < rings; i++) {
+    const y = -h * 0.6 + (i / (rings - 1)) * h * 1.3;
+    const ww = w * (0.62 + i * 0.22);
+    ctx.strokeStyle = i < lit ? rgba('#a8c8ff', 0.85) : rgba('#20304c', 0.9);
+    ctx.beginPath();
+    ctx.moveTo(-ww, y);
+    ctx.lineTo(ww, y);
+    ctx.stroke();
+  }
+  // The terminal on top: where an arc leaves from.
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = rgba('#dceaff', 0.5 + 0.5 * hpFrac);
+  ctx.beginPath();
+  ctx.arc(0, -h, r * 0.2, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = stroke;
+  ctx.restore();
+}
+
+/**
+ * The core: a ring with a lightning glyph in it, spinning up as it is worn
+ * down. It is drawn as something *carrying* a charge rather than being one --
+ * the ring is the vessel, the bolt inside is the contents.
+ */
+function drawDynamo(ctx, r, phase, t, hpFrac) {
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  const stroke = ctx.strokeStyle;
+  ctx.save();
+  // A second ring, turning, so the thing reads as live even standing still.
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.07);
+  ctx.strokeStyle = rgba('#a8c8ff', 0.5);
+  ctx.setLineDash([r * 0.5, r * 0.34]);
+  ctx.lineDashOffset = -t * r * (1 + (1 - hpFrac) * 3);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.76, 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // ...and the bolt.
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineWidth = Math.max(HAIRLINE, r * 0.13);
+  ctx.strokeStyle = rgba('#ffffff', 0.6 + 0.4 * Math.sin(t * 6 + phase));
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.2, -r * 0.5);
+  ctx.lineTo(r * 0.12, -r * 0.08);
+  ctx.lineTo(-r * 0.08, r * 0.04);
+  ctx.lineTo(r * 0.22, r * 0.5);
+  ctx.stroke();
+  ctx.strokeStyle = stroke;
+  ctx.restore();
+}
+
+/** An ION: a small hard diamond with a spark in it. */
+function drawIon(ctx, r, phase, t) {
+  ctx.beginPath();
+  ctx.moveTo(0, -r);
+  ctx.lineTo(r * 0.7, 0);
+  ctx.lineTo(0, r);
+  ctx.lineTo(-r * 0.7, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = rgba('#ffffff', 0.35 + 0.5 * (0.5 + 0.5 * Math.sin(t * 8 + phase)));
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.3, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
 /*
  * ---- AMPLITUDE's three ----
  */

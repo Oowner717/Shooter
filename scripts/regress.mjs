@@ -1867,10 +1867,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     // A boss that is planned and not written refuses to be opened, and does
     // not eat the way in on its way to refusing.
-    w.apertures[5] = 1;
-    out.unbuilt = g.openBoss(5);
-    out.unbuiltKept = w.apertures[5];
-    w.apertures[5] = 0;
+    /*
+     * Whichever of the seven is still unwritten -- picked from the table
+     * rather than named, because naming one meant this case quietly started
+     * testing a boss that had since been built, and passed by accident.
+     */
+    const idle = A.ANOMALIES.find((a) => !A.makerOf(a.n));
+    out.idleName = idle ? idle.name : null;
+    if (idle) {
+      w.apertures[idle.n] = 1;
+      out.unbuilt = g.openBoss(idle.n);
+      out.unbuiltKept = w.apertures[idle.n];
+      w.apertures[idle.n] = 0;
+    } else { out.unbuilt = false; out.unbuiltKept = 1; }
     w.aperture = 0;
     return out;
   });
@@ -1894,7 +1903,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `ORDINAL ramp "${r.ramp}"; generated ok ${r.genOk}; moods ok ${r.moodOk}`);
   check('a boss that is planned and not written cannot be opened, and costs nothing',
     r.unbuilt === false && r.unbuiltKept === 1,
-    `opened ${r.unbuilt}, way in ${r.unbuiltKept === 1 ? 'kept' : 'EATEN'}`);
+    `${r.idleName || 'nothing'} is unwritten: opened ${r.unbuilt}, `
+    + `way in ${r.unbuiltKept === 1 ? 'kept' : 'EATEN'}`);
 }
 
 // --- the save carries seven purses and does not throw the run away ----------
@@ -2433,6 +2443,103 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     && r.headIn < r.coilFloor,
     `gathered ${r.gathered} segments, ${r.ringOnField} of them on the field; `
     + `head orbits at ${r.headIn} inside a ring at ${r.coilFloor}`);
+}
+
+// --- DYNAMO: the circuit is the way in --------------------------------------
+/*
+ * This boss took four goes to get right and every one of them failed the same
+ * way: the core was reachable, so auto aim -- which picks by distance, and the
+ * core blinks between pylons so it is always exactly as far as one -- put
+ * about half the turret's output into it regardless of how heavily it was
+ * armoured. Armour at 0.6 let the core die during stage II and stage III
+ * lasted a single frame; armour at 0.88 merely wasted the fire instead and
+ * stage II became sixty-two percent of the fight.
+ *
+ * So the core is *out of the world* while two legs stand, using the parked
+ * mechanism ORDINAL's garrison proved. These check the three things that
+ * makes true, plus the two ordering bugs found on the way: the shield table
+ * being indexed backwards, and independent stage triggers letting the fight
+ * skip a stage entirely.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[5] = 1;
+    g.openBoss(5);
+    const boss = w.boss;
+    const out = { built: boss.constructor.name };
+    boss.arriving = 0;
+    boss.settle(w);
+    g.update(1 / 60);
+
+    const C = CFG.dynamo;
+    out.pylons = boss.pylons.length;
+    out.onField = boss.pylons.filter((p) => w.enemies.includes(p)).length;
+    out.shells = boss.gauge().shells.map((x) => `${x.label}:${x.seg}`).join(',');
+
+    /*
+     * The shelter. Three legs and two legs: unreachable. One leg: out in the
+     * open. Checked by membership of world.enemies, which is the only thing
+     * "unreachable" means -- nothing can shoot, blast or collide with a body
+     * that is not on the field.
+     */
+    const reach = () => { boss.syncReach(w); return w.enemies.includes(boss.core); };
+    out.reach3 = reach();
+    boss.pylons[0].dead = true;
+    out.reach2 = reach();
+    boss.pylons[1].dead = true;
+    out.reach1 = reach();
+    boss.pylons[2].dead = true;
+    out.reach0 = reach();
+
+    // The shield opens as the circuit comes apart, rather than closing.
+    const armorAt = (dead) => {
+      boss.pylons.forEach((p, i) => { p.dead = i < dead; });
+      return boss.shield();
+    };
+    out.armour = [0, 1, 2, 3].map(armorAt);
+    // ...and it is never total: the damage floor means a whole circuit is the
+    // slow way in, not no way in.
+    out.neverWall = out.armour.every((a) => a < 1);
+
+    /*
+     * No stage may be skipped. Its triggers are independent -- pylons for II
+     * and III, core health for IV -- so both can come true on one frame, and
+     * jumping to the furthest along skipped III entirely.
+     */
+    boss.pylons.forEach((p) => { p.dead = true; });
+    boss.core.hp = Math.round(boss.core.maxHp * 0.05);
+    const seen = [boss.stage];
+    for (let i = 0; i < 400 && boss.stage < 4; i++) {
+      g.update(1 / 60);
+      if (boss.stage !== seen[seen.length - 1]) seen.push(boss.stage);
+    }
+    out.stages = seen.join(',');
+    out.ladder = seen.every((v, i) => i === 0 || v === seen[i - 1] + 1);
+    // ...and the last leg goes out when it collapses into the core, rather
+    // than riding the blades still standing and still armouring it.
+    out.legsAtIV = boss.pylons.filter((p) => !p.dead).length;
+    g.restart();
+    return out;
+  });
+  check('DYNAMO stands up as a circuit with a core inside it',
+    r.built === 'Dynamo' && r.pylons === 3 && r.onField === 3
+    && r.shells === 'CIRCUIT:3',
+    JSON.stringify({ pylons: r.pylons, onField: r.onField, shells: r.shells }));
+  check('the core cannot be reached until the circuit is down to one leg',
+    r.reach3 === false && r.reach2 === false && r.reach1 === true && r.reach0 === true,
+    `reachable with 3/2/1/0 legs standing: ${r.reach3}/${r.reach2}/${r.reach1}/${r.reach0}`);
+  check('its shield opens as the circuit comes apart, and is never total',
+    r.armour[0] > r.armour[1] && r.armour[1] > r.armour[2] && r.armour[2] > r.armour[3]
+    && r.neverWall,
+    `armour by legs gone: ${r.armour.join(' -> ')}`);
+  check('it climbs the stages one at a time and cannot skip one',
+    r.ladder && r.stages.endsWith('4') && r.legsAtIV === 0,
+    `stages seen: ${r.stages}; legs still standing at IV: ${r.legsAtIV}`);
 }
 
 // --- report -----------------------------------------------------------------

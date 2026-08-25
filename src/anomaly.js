@@ -45,7 +45,8 @@ export const ANOMALIES = [
     types: ['fractal', 'fraction', 'mite'] },
   { n: 4, key: 'aperture4', name: 'AMPLITUDE', tone: '#2ee6c0', cfg: 'amplitude', built: true,
     types: ['amplitude', 'crest', 'droplet'] },
-  { n: 5, key: 'aperture5', name: 'DYNAMO', tone: '#4d8dff', cfg: 'dynamo', built: false, types: [] },
+  { n: 5, key: 'aperture5', name: 'DYNAMO', tone: '#4d8dff', cfg: 'dynamo', built: true,
+    types: ['dynamo', 'pylon', 'ion'] },
   { n: 6, key: 'aperture6', name: 'PARITY', tone: '#a86bff', cfg: 'parity', built: false, types: [] },
   { n: 7, key: 'aperture7', name: 'TERMINUS', tone: '#ff4d6d', cfg: 'terminus', built: false, types: [] },
 ];

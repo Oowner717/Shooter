@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '130';
+export const BUILD = '131';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '130';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'd40e2d8';
+export const REV = 'a7f6a14';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1226,6 +1226,111 @@ export const CFG = {
   },
 
   /*
+   * ---- DYNAMO, anomaly V ----
+   *
+   * A closed circuit. Three pylons in a compact triangle, arcs between them,
+   * and a core that is not anywhere in particular: it sits AT a pylon, and
+   * every few seconds it is at a different one.
+   *
+   * While the circuit is closed the core is armoured, and every pylon you
+   * take out opens it further -- so the fight is about the legs rather than
+   * about the thing standing on them, right up until there are no legs left.
+   *
+   * A teleporting boss is the one archetype that is *more* comfortable on
+   * auto aim than under a thumb: the assist retargets on the blink for free,
+   * where a person would be chasing it. Everything else here is built on
+   * that -- the telegraph exists so you can see it coming, not so you can
+   * react to it.
+   */
+  dynamo: {
+    cost: 320,
+    /*
+     * Nearer than the others, and that is law 2 being paid for.
+     *
+     * The pylons are a triangle around this point, so the far two sit at
+     * standoff + inset/2 vertically. At 320 and 96 that is 368 up and 83
+     * across, which is 377 against a base aim range of 400. At the plan's
+     * original spread they were 430 out and the fight could not be started.
+     */
+    standoff: 320,
+    inset: 96, // how far each pylon is from the middle of the triangle
+    arrive: 14.4,
+    beats: [0.14, 0.36, 0.6, 1],
+    coreR: 36,
+    /*
+     * The blink. `telegraph` is how long the arc to the next pylon brightens
+     * before the core is there -- it is the whole of the tell, and without it
+     * a teleport is just a discontinuity.
+     */
+    blinkEvery: 6.0,
+    telegraph: 0.8,
+    blinkFast: 0.68, // the multiplier on it once the circuit is broken
+    /*
+     * How much damage the core ignores, indexed by pylons *gone*: none yet,
+     * one, two, all three. So it starts armoured and opens as you take the
+     * circuit apart, which is the fight.
+     *
+     * Written the other way round first -- the array read as "by pylons still
+     * standing" while being indexed by pylons destroyed -- so the core was
+     * softest with its circuit whole and became a wall once you had broken
+     * it. Measured, stage IV was 47% of the fight and the core absorbed 38%
+     * of everything while all three legs were up.
+     *
+     * Never a wall in either direction: the damage formula floors every hit
+     * at 1, so a whole circuit is the slow way in rather than no way in.
+     *
+     * The first two figures are high because they have to make the legs the
+     * obvious answer. At 0.82 and 0.6 the core simply died during stage II --
+     * it blinks between pylons and so is often the nearest thing, and auto
+     * aim takes the nearest thing -- which meant the circuit came down after
+     * the fight was already decided and stage III lasted a single frame.
+     */
+    shield: [0.88, 0.72, 0.45, 0.15],
+    /*
+     * IONs ride the arcs. `railFor` is how long one takes to travel a link
+     * before it drops off onto the field, which is the pressure this boss
+     * makes -- slowly, because a boss whose spray is nearer than its core is
+     * a boss you never get to shoot. Three of the four before this one
+     * shipped that mistake once each.
+     */
+    railEvery: [13, 11, 10, 9],
+    railFor: 2.6,
+    railOf: 2,
+    /*
+     * From II the surviving links electrify: an arc sweeps its own length
+     * once per blink and crossing one is corruption.
+     */
+    arcShock: 0.3,
+    arcWidth: 26, // how near a live arc has to be
+    /*
+     * SURGE, on the second pylon. The grid overloads: every arc whips a full
+     * turn around its pylon, the field strobes, and everything riding drops
+     * at once. Once, like NOON and RECURSION.
+     */
+    surgeFor: 3.2,
+    surgeSpin: 6.5,
+    // III: the core lets go of the ground and orbits *you*, trailing a leash
+    // back to whatever pylon is left. The radius keeps it inside aim range
+    // by construction rather than by luck.
+    orbitAt: 300,
+    orbitSpin: 0.42,
+    // IV: the last pylon collapses into it and the pair becomes a propeller.
+    stageTriad: 0.25,
+    bladeR: 92,
+    bladeSpin: 2.2,
+    close: 250,
+    descendFor: 11,
+    // The death: chained lightning walking outward, then the one blackout in
+    // the game. Hard-capped, and the core glows through it -- a dark frame
+    // that lingers reads as a crash rather than as a beat.
+    darkFor: 0.5,
+    chainFor: 0.9,
+    endFor: 13.8,
+    pull: 900,
+    pay: 900,
+  },
+
+  /*
    * ---- what every boss shares ----
    *
    * Five numbers that are about *a* boss ending rather than about ORDINAL.
@@ -1969,6 +2074,94 @@ export const ENEMY_TYPES = [
     wobble: 2.0,
     color: '#8ff5e0',
     glow: '#41ecc4',
+    weight: 0,
+    drops: 3,
+  },
+  /*
+   * ---- DYNAMO's three ----
+   *
+   * Electric blue -- and deliberately not the cyan the interface is drawn in;
+   * see the note on the gauge ramp in anomaly.js for how nearly that went
+   * wrong.
+   */
+  {
+    // A leg of the circuit. Solid, and while it stands it is carrying part of
+    // what keeps the core armoured.
+    id: 'pylon',
+    unlock: 0,
+    name: 'PYLON',
+    shape: 'pylon',
+    r: 24,
+    /*
+     * Cheaper than it looks like it should be, on purpose. A pylon is a gate
+     * rather than a wall: the fight's shape is I, II, III as the circuit
+     * comes apart, and at 900 the second one took a hundred and twelve
+     * seconds to fall -- by which time the core was already low enough for
+     * stage IV, so stage III lasted a single frame. The legs have to come
+     * down faster than the thing standing on them.
+     *
+     * Raised again once the core became unreachable inside the circuit: with
+     * the pylons the only target there is, everything the turret produces
+     * goes into them, and at 700 the whole circuit fell in twenty seconds.
+     */
+    hp: 1700,
+    fixed: true,
+    density: 7,
+    speed: 0,
+    accel: 0,
+    restitution: 0.15,
+    wobble: 0,
+    armor: 0.12,
+    color: '#7fb0ff',
+    glow: '#4d8dff',
+    weight: 0,
+    drops: 8,
+    debris: 10,
+  },
+  {
+    /*
+     * The core. It does not sit anywhere: it is *at* a pylon, and every few
+     * seconds it is at a different one.
+     *
+     * `armor` here is only its floor, with nothing left standing. The boss
+     * raises it while the circuit is closed -- see Dynamo.shield().
+     */
+    id: 'dynamo',
+    unlock: 0,
+    name: 'DYNAMO',
+    shape: 'dynamo',
+    r: 36,
+    hp: 4200,
+    large: true,
+    fixed: true,
+    density: 9,
+    speed: 0,
+    accel: 0,
+    restitution: 0.2,
+    wobble: 0,
+    armor: 0.15,
+    color: '#4d8dff',
+    glow: '#2f6fff',
+    weight: 0,
+    drops: 24,
+    debris: 20,
+  },
+  {
+    // Rides the arc between two pylons and drops off it onto the field. The
+    // circuit is visibly inhabited, which is the whole of why it is here.
+    id: 'ion',
+    unlock: 0,
+    name: 'ION',
+    shape: 'ion',
+    r: 10,
+    hp: 92,
+    density: 0.8,
+    speed: 118,
+    accel: 270,
+    restitution: 0.8,
+    wobble: 2.1,
+    color: '#a8c8ff',
+    glow: '#61a0ff',
     weight: 0,
     drops: 3,
   },

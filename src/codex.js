@@ -130,6 +130,21 @@ export const CODEX = [
     line: 'Thrown off the top of the wave, from the part of it furthest from you.',
   },
   {
+    id: 'dynamo',
+    name: 'DYNAMO',
+    line: 'It is never anywhere for long. While the circuit is closed it is armoured by its own legs; take those away and it stops needing the ground.',
+  },
+  {
+    id: 'pylon',
+    name: 'PYLON',
+    line: 'One leg of the circuit. What it carries is not power, it is cover.',
+  },
+  {
+    id: 'ion',
+    name: 'ION',
+    line: 'It travels the wire before it travels the field. You can see where it will be long before it is there.',
+  },
+  {
     id: 'towMass',
     name: 'MASS',
     line: 'The far end of a cable. It arrives by being swung, and it arrives regardless.',

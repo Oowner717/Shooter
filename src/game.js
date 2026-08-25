@@ -7,6 +7,7 @@ import { Ordinal, openAperture } from './boss.js';
 import './gnomon.js';
 import './fractal.js';
 import './amplitude.js';
+import './dynamo.js';
 import { nameOf, dressOf, heldList } from './anomaly.js';
 import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
