@@ -26,6 +26,78 @@ Measured with `scripts/fight.mjs`, assists only, nothing bought.
 I–VI span 198–249s, a 25% spread. **Target: I–VI at 290 ± 15s, VII at
 430 ± 20s.** That is +70 to +90 seconds each, all of it from new content.
 
+## What the probe found — the aim cone, and what it costs
+
+`scripts/dps.mjs` was built to answer the DYNAMO question below and answered a
+much larger one. It measures what happens *between* the turret deciding to
+shoot and a body losing health, which is where three things live that no
+damage table can see:
+
+- **The cone.** `Game.autoTarget` only considers bodies within
+  `CFG.shooter.aimClamp` — 1.36 radians, **78° either side of straight up**.
+  Anything further round than that is not a target however near it is.
+- **The slew.** Auto aim traverses at `autoTurnRate` 4.2 rad/s. A quarter turn
+  takes most of a second.
+- **The mid-sweep shot.** With auto fire on, the cadence does *not* wait for
+  the barrel — `updateFiring` only holds fire on `aimError` when auto fire is
+  **off**. Every shot taken during a slew is fired at where the last target
+  was.
+
+Measured, one run each. `shots/s` is a flat 3.3 in every stage of every
+fight — so every difference below is *where the shots went*, not how many
+there were.
+
+| | stage IV: dmg/shot | mid-sweep shots | target switches/s | nearest body in cone |
+|---|---|---|---|---|
+| I ORDINAL | 17.2 | 54% | 1.5 | 21% |
+| II GNOMON | 14.6 | 58% | 1.3 | 3% |
+| III FRACTAL | 10.7 | 36% | **4.7** | 13% |
+| IV AMPLITUDE | 14.0 | 44% | **5.3** | 0% |
+| V DYNAMO | 8.2 | 21% | 0.3 | 5% |
+| VI PARITY | 22.4 | 19% | 0.4 | 78% |
+| VII TERMINUS | 18.9 | 37% | **15.4** | 8% |
+
+Against 20–33 damage per shot in the early stages of every fight. Three things
+fall out of it:
+
+**Every fight goes half-blind in its last stage.** Stage IV is where bosses
+come close and orbit, which puts them at high angular velocity and often past
+the turret's shoulder. DYNAMO's propeller spends **52% of stage IV with no
+legal target on the field at all** — the finale is unshootable for half its
+length. GNOMON's stage IV has its nearest body inside the cone 3% of the time.
+This is the same finding as "the last stage is the emptiest" seen from the
+other side, and it is worse: the finale is not merely sparse, it is often not
+aimable.
+
+**TERMINUS changes target forty-five times a second in stage I.** Thirty-two
+segments at *exactly* the same distance means the nearest one flips on
+floating-point noise every frame, so the barrel never settles and **74% of its
+shots are fired mid-sweep**. The "every segment is the same distance" property
+the whole fight is built on is actively pathological for the assist. FRACTAL's
+divided core and AMPLITUDE's wave do a smaller version of the same thing.
+
+**AMPLITUDE's nearest body is inside the cone 0% of the time** in stages II,
+III and IV, with 24–44% of frames having nothing legal to shoot. A wide wave
+puts its ends past the shoulder. This is why that fight feels like nothing is
+happening: often nothing is.
+
+### The fix this implies, and its gate
+
+`autoTarget` picks strictly by score with no memory. **Give it hysteresis** —
+the current target keeps its lock unless something beats it by a margin — and
+TERMINUS's forty-five switches a second become nearly none. Five lines in one
+function.
+
+It is also a change to how the whole game aims rather than to a boss, so it
+does not ship on a hunch: `dps.mjs` and `fight.mjs` across all seven before and
+after, plus a wave-clearing run. It goes in Phase A and gets measured like a
+fight.
+
+The cone itself should probably stay — it is what the reach upgrades sell
+against, and widening it is a balance change to the whole game. What can change
+is the *bosses*. A fight that ends up behind your shoulder is a fight that made
+a geometry mistake, and there is now a number for it.
+
 ## Six things wrong with all of them
 
 These came out of screenshotting every fight at stage II and stage IV. They
@@ -87,6 +159,12 @@ fight on its own, so it ships with the ORDINAL work rather than alone.
   call. *Adds ~2s per fight* and makes every stage land.
 - **Per-boss arrival verbs** — replace the shared unfold with an
   `arriveShape(k)` hook the boss may override.
+- **Target hysteresis in `autoTarget`** — the current target keeps its lock
+  unless something beats it by a margin. Five lines, and the largest single
+  quality change available: TERMINUS's forty-five switches a second go to
+  nearly none and damage per shot rises across every fight. Gated on
+  `dps.mjs`, `fight.mjs` and a wave-clearing run, because it changes how the
+  whole game aims.
 
 ## Phase B — one build per boss
 
@@ -117,6 +195,9 @@ core over a field with two panels left in it.
   reading your receipt to you.
 - **Death:** the frames should come apart *in counting order*, one panel per
   tick, rather than the generic arrest.
+- **Probe:** stage IV fires **54% of its shots mid-sweep** with the nearest
+  body inside the cone 21% of the time. The descending core orbits the turret;
+  hold it above the shoulder.
 
 *Length: 220 → 220 + 40 + 10 + 25 = ~295s.*
 
@@ -147,6 +228,11 @@ a clock face never shows a time.
   camera moves, and it is the fight about rotation.
 - **Minion:** SECONDs flung off the needle's tip by its own sweep, tangential,
   so their speed is the needle's speed.
+- **Probe:** the worst cone numbers in the game — the nearest body is inside
+  it **21%** of stage III and **3%** of stage IV, with 58% of IV's shots fired
+  mid-sweep. The needle sweeps a full circle and half of that circle is behind
+  the turret's shoulder. Clamp the sweep, or accept that half of it is scenery
+  and say so.
 
 *Length: 198 → 198 + 40 + 10 + 25 = ~275s. Add ~15s of hour-holds.*
 
@@ -177,6 +263,10 @@ empty field. This is the least watchable fight in the game.
   triangles made of triangles. The screenshot this fight has never had.
 - **Death:** collapse inward by generation — every mite, then every mid, then
   the core — rather than the generic arrest.
+- **Probe:** stage IV thrashes at **4.7 target switches a second** — three
+  divided core pieces at near-identical distances, so the assist cannot
+  choose — and damage per shot falls to 10.7 against 33.4 in stage II.
+  Separate the three pieces' radii, or let the hysteresis fix carry it.
 
 *Length: 207 → 207 + 40 + 10 + 25 = ~282s.*
 
@@ -207,6 +297,10 @@ The fight is also the quietest in the game (mean intake 0.99, mean attackers
   sitting.
 - **Minion:** DROPLETs shed off the crests at the moment each crest passes its
   peak — thrown by the motion rather than spawned on a clock.
+- **Probe:** the nearest body is inside the cone **0% of the time** in stages
+  II, III and IV, and 24–44% of frames have nothing legal to shoot at all.
+  `span` 460 puts the wave's ends past the shoulder. Narrow it, or bring the
+  wave's centre up the field.
 
 *Length: 203 → 203 + 40 + 10 + 25 = ~278s.*
 
@@ -225,10 +319,19 @@ stations around the last pylon) was built in build 134 and rolled back
 because it cost 30% of the fight length for reasons three isolation runs
 never identified. Stage IV is a propeller hovering at a fixed distance.
 
-- **Re-attempt the blink gap, with a harness first.** Build a per-stage DPS
-  probe before touching the module — the previous attempt failed because
-  "the fight got 30% longer" was the only signal available and it could not
-  be attributed. This is the one item in the plan with known risk.
+- **The blink gap is affordable now — the harness has run.** The build-134
+  rollback does not reproduce. Re-applied to build 136's module the pacing fix
+  takes stage II from **2 blinks to 7** and costs +12% of fight length
+  (224.6s → 251.5s), not the +32% that got it reverted; the earlier blowup
+  belonged to the lances-array version of the module that was replaced in
+  build 135 and no longer exists. What it does add is **variance** — two
+  patched runs at 273s and 230s against a baseline of 225.1 and 224.2 — so it
+  ships with a threshold retune rather than on its own.
+- **The bigger defect is stage IV, and it is new.** The propeller orbits the
+  turret, which takes it past the shoulder: **52% of stage IV has no legal
+  target on the field**, the nearest body is inside the cone 5% of the time,
+  and damage per shot collapses from ~20 to 8.2. Keep the orbit inside 78° of
+  vertical, or bias the descent toward the top of the field.
 - **New phase — LATTICE (between II and III, +40s).** The links between
   surviving pylons carry visible current, and the IONs *are* that current: a
   continuous stream riding every link, dropping off where the lattice is
@@ -292,7 +395,14 @@ core with beams on it until IV starts.
   fades to crimson across stage IV — a slow echo of ECLIPSE rather than a
   second flash of it.
 - **Beams widen** as the core loses health, so the last thirty seconds are
-  four (then six) crimson wedges rather than lines.
+  crimson wedges rather than lines.
+- **Probe — the worst number in the game.** Stage I changes target **45 times
+  a second** and fires **74% of its shots mid-sweep**, because thirty-two
+  segments at exactly the same distance flip the "nearest" on floating-point
+  noise every frame. The fight's central elegance is what breaks the assist.
+  Phase A's hysteresis is aimed squarely at this; failing that, give the
+  segments a deliberate radius jitter of a few units so the ordering is
+  stable.
 - **New phase — HORIZON (between II and ECLIPSE, +40s).** The ring stops
   being a circle: it deforms into an ellipse and precesses, so the boundary
   is nearer on one side and the nearest segment changes as it turns. The one
@@ -316,17 +426,26 @@ build when it was broken:
    thing and cannot be told what a thing *is*. Anything meant as armour must
    be physically nearer; anything meant to be unreachable must be further
    away or off the field entirely.
-2. **Measure before and after every change**, with `fight.mjs` and the
-   corruption audit. Six of seven bosses shipped a first draft where the
+2. **And nearest only counts inside 78° of straight up.** A body behind the
+   turret's shoulder is not a target at any distance — which is how DYNAMO's
+   finale ended up unaimable for half its length without anything saying so.
+   Anything arranged *around* the turret rather than in front of it has to
+   answer this.
+3. **Ties are expensive.** Two bodies at the same distance make the assist
+   switch every frame, and with auto fire on every shot taken during the slew
+   goes where the last target was. Equal distances look elegant and measure
+   terribly.
+4. **Measure before and after every change**, with `fight.mjs`, `dps.mjs` and
+   the corruption audit. Six of seven bosses shipped a first draft where the
    minions absorbed 40–65% of the turret's output, and every one of those was
    found by the damage table rather than by looking.
-3. **A mechanic must run in a stage where its target is reachable.** Ask of
+5. **A mechanic must run in a stage where its target is reachable.** Ask of
    every new phase: *in which stages is this both running and actionable?*
-4. **Corruption is a beat, not weather.** Anything above ~25% of frames in a
+6. **Corruption is a beat, not weather.** Anything above ~25% of frames in a
    stage is a screen effect rather than a mechanic. TERMINUS's squeeze was at
    95% and is now at 10%.
-5. **Nothing crosses the middle.** In any fight arranged about a centre,
+7. **Nothing crosses the middle.** In any fight arranged about a centre,
    interpolate in polar — a straight line between two points around a centre
    passes through where the player is.
-6. **Add a regress case for anything that ships broken.** That is the whole
+8. **Add a regress case for anything that ships broken.** That is the whole
    rule and it is why the suite is 95 cases.

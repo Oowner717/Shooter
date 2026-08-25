@@ -48,6 +48,16 @@ first 2KB, because that stamp is the only thing keeping installed copies up to
 date. It lived in /tmp for twenty builds and was rewritten from memory after
 every container.
 
+`node scripts/dps.mjs [n]` is the other half of `fight.mjs`: not what absorbed
+the damage but what happened between the turret deciding to shoot and a body
+losing health. Per stage it reports shots, damage per shot, target switches per
+second, shots fired while the barrel was still slewing, frames with no legal
+target, and how often the nearest body was inside the assist's ±78° cone. It
+exists because build 134 made a fight 30% longer and three isolation runs could
+not say why; the damage table only ever describes the symptom. It found that
+every boss goes half-blind in stage IV and that TERMINUS changes target
+forty-five times a second.
+
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three
 builds), the trigger itself, every round/mine/ability/object type running once
