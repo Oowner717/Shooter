@@ -2258,7 +2258,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.freedSteers = theirs.every((t) => t.dead
       || (Number.isFinite(t.mass) && t.cruise === TYPE_BY_ID.mite.speed));
 
-    // Breaking the first middle starts RECURSION, and it is the only heal.
+    /*
+     * RECURSION comes on the LAST middle, not the first -- changed in build
+     * 138, because at one middle it fired about thirty seconds into the fight
+     * and stage I was thirteen percent of it. The scene is better for it too:
+     * everything the boss had is loose and the figure is a bare core, and then
+     * all of it comes back at once.
+     */
+    out.notYet = !boss.recursed;
+    for (const m of boss.mids) { if (!m.dead) { m.dead = true; } }
+    g.update(1 / 60);
     out.recursing = boss.recursed;
     let guard = 0;
     while (!boss.sprangDone && guard++ < 1200) g.update(1 / 60);
@@ -2300,9 +2309,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.freedAlive === 3 && r.freedLoose === 3 && r.freedSteers,
     `${r.freedAlive} of 3 survived, ${r.freedLoose} came loose, `
     + `and they steer: ${r.freedSteers}`);
-  check('RECURSION puts the whole figure back, once',
-    r.recursing && r.recursed && r.afterMids === 3 && r.afterHeld === 9,
-    JSON.stringify({ started: r.recursing, finished: r.recursed,
+  check('RECURSION waits for the whole generation, then puts it all back',
+    r.notYet && r.recursing && r.recursed && r.afterMids === 3 && r.afterHeld === 9,
+    JSON.stringify({ heldOff: r.notYet, started: r.recursing, finished: r.recursed,
       mids: r.afterMids, held: r.afterHeld }));
   check('it never puts more on the field than it arrived with',
     r.rebuiltMids === 3 && r.rebuiltMites === 9 && r.heldNow <= 9,
@@ -3104,6 +3113,124 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.seamOn > 0 && r.seamOff === 0 && r.seamPasses >= 2,
     `on the seam ${r.seamOn}, clear of it ${r.seamOff}; `
     + `it came round onto the turret ${r.seamPasses} times in a minute`);
+}
+
+// --- FRACTAL is a shape containing itself -----------------------------------
+/*
+ * This fight's one idea is self-similarity, and for ten builds nothing on
+ * screen showed it: the core drew a proper Sierpinski subdivision inside
+ * itself while the bodies around it orbited at 150 with their own rotations,
+ * so the figure read as a solar system. These hold the arrangement that fixed
+ * it -- children on the parent's CORNERS, at half the distance, wearing the
+ * parent's rotation -- because it is geometry, and geometry is exactly what
+ * drifts when someone tunes an orbit radius later.
+ *
+ * Plus the stage ladder, which could skip III entirely: `divide()` is gated on
+ * entering stage three, and the ladder jumped straight to whatever was
+ * furthest along. A fight that crossed both thresholds on one frame never
+ * divided its core at all.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const C = CFG.fractal;
+    const out = {};
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[3] = 1;
+    g.openBoss(3);
+    const boss = w.boss;
+    boss.arriving = 0;
+    boss.settle(w);
+    boss.spinA = 0;
+    boss.spinB = 0;
+    boss.place(0);
+
+    const ang = (ax, ay, bx, by) => Math.atan2(by - ay, bx - ax);
+    const near = (a, b) => Math.abs(((a - b + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < 0.02;
+
+    /*
+     * A triangle drawn by drawTri has vertices at -90, 30 and 150 degrees.
+     * Every middle has to sit on one of those bearings from the core, and
+     * every small on one of them from its middle.
+     */
+    const corners = [-Math.PI / 2, Math.PI / 6, (5 * Math.PI) / 6];
+    const onCorner = (a) => corners.some((c) => near(a, c));
+    out.midsOnCorners = boss.mids.every((m) => onCorner(ang(boss.x, boss.y, m.x, m.y)));
+    out.mitesOnCorners = boss.mids.every((m) => m.mites
+      .every((t) => onCorner(ang(m.x, m.y, t.x, t.y))));
+
+    // ...and every generation wears one rotation, or they do not nest.
+    const faces = [boss.core.angle, ...boss.mids.map((m) => m.angle),
+      ...boss.mids.flatMap((m) => m.mites.map((t) => t.angle))];
+    out.oneFace = faces.every((a) => near(a, faces[0]));
+
+    // Half the distance, near enough: a child on a corner has its inner edge
+    // touching, which is `parent vertex + child radius`.
+    const midD = Math.hypot(boss.mids[0].x - boss.x, boss.mids[0].y - boss.y);
+    out.midSits = Math.abs(midD - (C.coreR + boss.mids[0].r)) < 12;
+    out.ratio = +(C.midR / C.miteR).toFixed(2);
+
+    /*
+     * DESCENT: the figure comes back one level lower, three copies of it, and
+     * not one body more than it arrived with.
+     */
+    boss.mids.forEach((m) => { m.dead = true; m.mites.forEach((t) => { t.dead = true; }); });
+    boss.divide(w);
+    // After the divide, not before: dividing the core is where the two extra
+    // pieces come from, and they are the core rather than new structure.
+    const bodies = boss.parts().length;
+    boss.startDescent(w);
+    for (let i = 0; i < 60 * 12 && boss.descent !== null; i++) {
+      boss.place(1 / 60);
+      boss.stepDescent(w, 1 / 60);
+    }
+    out.descended = boss.descended && boss.descent === null;
+    out.cameBack = boss.mids.filter((m) => !m.dead).length;
+    out.noNewBodies = boss.parts().length === bodies;
+    boss.place(0);
+    // Each middle now hangs off a piece rather than off the middle of nothing.
+    out.reparented = boss.mids.filter((m) => !m.dead).every((m) => boss.pieces
+      .some((p) => !p.dead && Math.abs(Math.hypot(m.x - p.x, m.y - p.y) - C.subR) < 14));
+
+    /*
+     * The ladder: both thresholds true on one frame must still visit III.
+     */
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[3] = 1;
+    g.openBoss(3);
+    const b2 = w.boss;
+    b2.arriving = 0;
+    b2.settle(w);
+    b2.sprangDone = true;
+    b2.recursed = true;
+    b2.core.hp = Math.round(b2.core.maxHp * 0.02);
+    const seen = [b2.stage];
+    for (let i = 0; i < 60 * 40 && b2.stage < 4; i++) {
+      g.update(1 / 60);
+      if (!w.boss) break;
+      if (b2.stage !== seen[seen.length - 1]) seen.push(b2.stage);
+    }
+    out.stages = seen.join(',');
+    out.ladder = seen.every((v, i) => i === 0 || v === seen[i - 1] + 1);
+    out.divided = b2.split;
+    g.restart();
+    return out;
+  });
+  check('the generations sit on their parent’s corners, wearing its rotation',
+    r.midsOnCorners && r.mitesOnCorners && r.oneFace && r.midSits,
+    `middles on corners: ${r.midsOnCorners}; smalls on corners: ${r.mitesOnCorners}; `
+    + `one rotation: ${r.oneFace}; a middle sits on the corner: ${r.midSits}`);
+  check('DESCENT puts the figure back one level down, and adds no bodies',
+    r.descended && r.cameBack === 3 && r.noNewBodies && r.reparented,
+    `${r.cameBack} middles back, hanging off pieces: ${r.reparented}; `
+    + `body count unchanged: ${r.noNewBodies}`);
+  check('it cannot skip the stage where the core divides',
+    r.ladder && r.divided && r.stages.endsWith('4'),
+    `stages seen: ${r.stages}; the core divided: ${r.divided}`);
 }
 
 // --- the assist's memory ----------------------------------------------------

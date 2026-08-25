@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '137';
+export const BUILD = '138';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '137';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '1034393';
+export const REV = '1805b09';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1080,8 +1080,26 @@ export const CFG = {
     // Three middles, three smalls each. Sierpinski is three-fold; so is this.
     mids: 3,
     mites: 3,
-    midR: 150, // how far the middles orbit from the core
-    miteR: 44, // ...and the smalls from their middle
+    /*
+     * How far each generation sits from its parent -- and these are the two
+     * numbers that decide whether this boss looks like what it is.
+     *
+     * A Sierpinski triangle's three children sit ON the parent's corners:
+     * half the size, half the distance, same orientation. At the old 150 the
+     * middles floated eighty-six units past the core's corner and the whole
+     * figure read as a solar system rather than as a shape containing itself
+     * -- which is the one idea this fight has. The core's own drawing has
+     * been a proper subdivision since it was written; nothing outside it
+     * matched.
+     *
+     * The core's vertex is at its radius, 64. A middle of radius 30 centred
+     * at 96 has its inner edge at 66, so it sits on that corner. Same
+     * arithmetic one level down: a middle's vertex is at 30, a small of
+     * radius 13 centred at 44 has its inner edge at 31. `miteR` was already
+     * right; only the generation above it was wrong.
+     */
+    midR: 96, // how far the middles sit from the core -- ON its corners
+    miteR: 44, // ...and the smalls from their middle, by the same arithmetic
     midSpin: 0.24,
     miteSpin: -0.62,
     // II makes the orbits eccentric and counter-rotates the generations, so
@@ -1097,7 +1115,7 @@ export const CFG = {
     recurseIn: 1.5,
     recurseHold: 0.5,
     recurseOut: 1.2,
-    recurseHp: 0.6,
+    recurseHp: 1,
     /*
      * ...and the cap that stops it being a wall. It may only ever put back
      * what it arrived with, so a fight it is losing cannot be turned into a
@@ -1107,10 +1125,17 @@ export const CFG = {
     replaceEvery: 9, // seconds between replacing a lost small, 0 for never
     // III: the core divides. Three pieces, a third of the size and a third of
     // what is left of its health each, orbiting wide.
-    splitAt: 0.55,
+    splitAt: 0.68,
     pieces: 3,
     pieceR: 34,
     pieceOrbit: 168,
+    /*
+     * How far either side of straight up the pieces sweep in IV. Inside the
+     * assist's own cone of 1.36 rad on purpose -- see the note in place().
+     * A full orbit round the turret looks like a siege and measures like a
+     * blindfold.
+     */
+    pieceArc: 1.2,
     pieceSpin: 0.38,
     /*
      * IV: whatever is left comes for you.
@@ -1122,6 +1147,21 @@ export const CFG = {
      * of each other. A stage that lasts less than one of its own captions is
      * not a stage.
      */
+    /*
+     * DESCENT. The second setpiece, and the one the back half of this fight
+     * did not have: on the way into IV the whole figure knots down onto the
+     * three pieces and comes back one level LOWER -- each piece carrying its
+     * own middle and that middle its own three smalls, so the field holds
+     * three complete copies of the shape instead of one.
+     *
+     * It is also where this fight gets its length. A new stage adds no time;
+     * it re-partitions health that was already there. Putting the structure
+     * back at `descentHp` is the only thing that does, and it is the same
+     * bodies it arrived with -- the conservation rule is not bent for it.
+     */
+    descentAt: 0.2, // core fraction that opens it, once
+    descentHp: 1, // ...and what the figure comes back at
+    subR: 64, // a middle's distance from its piece: on the piece's corner
     huntAt: 0.18,
     closeOrbit: 180,
     closeFor: 9,

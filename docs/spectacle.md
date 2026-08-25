@@ -321,7 +321,58 @@ a clock face never shows a time.
 
 ---
 
-### III — FRACTAL · green · self-similarity
+### III — FRACTAL · green · self-similarity · **shipped, build 138**
+
+**As built: 249s (from 189), stages 17/24/23/26.** Every stage inside the
+15–35% band, no type past the shoulder, and a stage I screenshot that is
+unmistakably this boss and nothing else.
+
+- ✅ **The figure is now the Sierpinski it always drew.** The diagnosis in the
+  first draft was half wrong and worth correcting: `drawTri` has drawn a
+  proper subdivision inside every body since the fight was written. What did
+  not match was everything outside it. The middles orbited at 150 — eighty-six
+  units past the core's own corner — each turned to face along its own orbit,
+  with the smalls counter-spinning from the first frame. Three generations of
+  triangle arranged as a solar system.
+
+  Three changes, all geometry: middles at 96 so they sit **on** the core's
+  corners, every generation wearing the **same rotation**, and the children
+  placed at −90/30/150 so they land on the parent's drawn vertices rather than
+  the middles of its sides. The bodies are now the same figure the core has
+  inside it. From II they come apart, which the header always claimed and
+  nothing ever showed.
+- ✅ **DESCENT** (III→IV): the figure knots down and comes back one level
+  *lower* — each core piece carrying its own middle and that middle its own
+  three smalls, so the field holds three complete copies of the shape.
+  Same verb as RECURSION, different sentence. Not one body more than it
+  arrived with; the conservation rule is not bent for a setpiece.
+- ✅ **RECURSION now waits for the whole middle generation** rather than the
+  first one broken. At one middle it fired thirty seconds in and stage I was
+  13% of the fight, under this plan's own floor.
+- ✅ **Stage IV sweeps rather than orbits.** The pieces used to circle the
+  turret, which took them behind the shoulder: 5% in-cone, 47% of shots
+  mid-sweep, 16% of frames with nothing legal to shoot. They now swing ±1.2
+  rad either side of straight up — inside the assist's 1.36 — and per-type
+  reachability went from 46/56/62% to 68/78/84%.
+- ✅ **The stage ladder could skip III.** `divide()` is gated on entering
+  stage three and the ladder jumped to whatever was furthest along, so a fight
+  crossing both thresholds on one frame never divided its core. One stage at a
+  time now, with a case.
+- ⏸ **SCALE** (the zoom phase) not built. It needs `background.zoom`, and a
+  phase adds no length; it is worth doing for its own sake in a later pass.
+
+**What this taught the model.** FRACTAL went 189 → 249s, and the model
+predicted it almost exactly: two re-forms of a 2520-health structure at ~90
+damage a second is 2 × 28 = 56 seconds, and the fight gained 60. It also
+showed where the lever **stops**: raising the re-form fraction from 0.85 to
+1.0 changed the length by nothing measurable. A re-form is worth
+`frac × structure health ÷ damage`, and once `frac` is near 1 the only
+remaining lever is the structure's own health — which is a balance pass, not
+content, and belongs in Phase C across all seven at once rather than boss by
+boss. **On that evidence the 290s target is likely to land nearer 260 for the
+whole set; Phase C decides it with all seven measured, not this build.**
+
+### III — FRACTAL · green · self-similarity — original plan
 
 *Now:* three generations of one triangle, breaking a mid frees its mites,
 RECURSION puts the figure back once, the core divides into three pieces

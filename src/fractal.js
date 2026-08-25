@@ -87,6 +87,8 @@ export class Fractal extends Boss {
     this.recursed = false;
     this.recurse = 0; // seconds of RECURSION still to run
     this.knot = 0; // 0..1, how far everything is drawn onto the core
+    this.descent = null; // the second beat's clock, on the way into IV
+    this.descended = false;
     this.split = false;
     this.replaceT = C.replaceEvery;
     this.closeT = 0;
@@ -111,11 +113,19 @@ export class Fractal extends Boss {
     this.mids = [];
     for (let i = 0; i < C.mids; i++) {
       const m = this.body('fraction', this.x, this.y);
-      m.at = (i / C.mids) * TAU;
+      /*
+       * On the parent's CORNERS, not merely round it.
+       *
+       * `drawTri` puts a triangle's vertices at -90, 30 and 150 degrees, so a
+       * child placed at a multiple of 120 from zero lands on the middles of
+       * the parent's sides instead -- a quarter turn out, which is exactly
+       * enough to stop the figure reading as a subdivision of itself.
+       */
+      m.at = -Math.PI / 2 + (i / C.mids) * TAU;
       m.mites = [];
       for (let k = 0; k < C.mites; k++) {
         const t = this.body('mite', this.x, this.y);
-        t.at = (k / C.mites) * TAU;
+        t.at = -Math.PI / 2 + (k / C.mites) * TAU;
         t.host = m;
         m.mites.push(t);
       }
@@ -200,26 +210,53 @@ export class Fractal extends Boss {
     const grip = 1 - this.knot * 0.94;
     const ecc = this.stage >= 2 ? C.eccentric : 0;
 
+    /*
+     * Every generation wears the same rotation, and in stage I every
+     * generation sits at the same three angles.
+     *
+     * That is what makes the arrangement of the bodies the same figure the
+     * core has drawn inside itself since this boss was written. Turned to
+     * face along their own orbits and spun independently -- which is what
+     * this did -- three middles and nine smalls are a scatter that happens to
+     * contain triangles. Locked, they are one triangle of triangles of
+     * triangles, and every screenshot of stage I says so.
+     *
+     * From II they come apart, which is a thing the header has always claimed
+     * and nothing ever showed: `spinB` diverges from `spinA` and the shape
+     * you learned stops being the shape.
+     */
+    const lock = this.stage >= 2 ? this.spinB : this.spinA;
+    const face = this.spinA;
     for (let i = 0; i < this.mids.length; i++) {
       const m = this.mids[i];
       const a = m.at + this.spinA;
       // Eccentric from II: the orbit breathes rather than being a circle.
       const rr = C.midR * (1 + ecc * Math.sin(a * 2 + i)) * grip;
       if (!m.dead) {
-        m.x = this.x + Math.cos(a) * rr;
-        m.y = this.y + Math.sin(a) * rr;
-        m.angle = a + Math.PI / 2;
+        /*
+         * After DESCENT a middle belongs to a piece rather than to the middle
+         * of the field: the figure has gone one level down and there are
+         * three of it. Same relationship, one scale smaller -- on the corner
+         * of whatever is carrying it.
+         */
+        const host = this.descended ? this.pieceFor(i) : null;
+        const hx = host ? host.x : this.x;
+        const hy = host ? host.y : this.y;
+        const hr = host ? C.subR * grip : rr;
+        m.x = hx + Math.cos(a) * hr;
+        m.y = hy + Math.sin(a) * hr;
+        m.angle = face;
         m.vx = 0; m.vy = 0; m.av = 0;
       }
       for (const t of m.mites) {
         // A freed small is nobody's any more: it steers, and this leaves it
         // alone. That is the whole of what being freed means.
         if (t.dead || !t.host) continue;
-        const b = t.at + this.spinB;
+        const b = t.at + lock;
         const tr = C.miteR * grip;
         t.x = m.x + Math.cos(b) * tr;
         t.y = m.y + Math.sin(b) * tr;
-        t.angle = b;
+        t.angle = face;
         t.vx = 0; t.vy = 0; t.av = 0;
       }
     }
@@ -231,8 +268,31 @@ export class Fractal extends Boss {
       if (!this.split) {
         p.x = this.x;
         p.y = this.y;
+        // The core wears the same rotation as everything hanging off it, or
+        // its drawn corners turn away from the bodies sitting on them.
+        p.angle = face;
       } else {
-        const a = (i / this.pieces.length) * TAU + this.spinA * C.pieceSpin * 4;
+        /*
+         * In IV they orbit YOU -- and an orbit is a full turn, which takes
+         * them behind the turret's shoulder where the assist cannot reach
+         * them at any distance. Measured before this: stage IV had the
+         * nearest body inside the cone 5% of the time, 47% of its shots fired
+         * mid-sweep and 16% of its frames with nothing legal to shoot at all.
+         *
+         * So it is a SWEEP rather than an orbit: each piece swings back and
+         * forth across the top of the field, out to `pieceArc` either side of
+         * straight up, which is inside the assist's 1.36. Three of them a
+         * third of a cycle apart still cross and pass each other; what they
+         * no longer do is spend a third of every lap unshootable.
+         */
+        const phase = (i / this.pieces.length) * TAU + this.spinA * C.pieceSpin * 4;
+        // Half rate for the sweep: a swing crosses its own arc twice a cycle,
+        // where an orbit crosses it once, so the same number turns the barrel
+        // twice as often. Measured at full rate, 61% of stage IV's shots were
+        // fired while the barrel was still coming round.
+        const a = this.stage >= 4
+          ? -Math.PI / 2 + Math.sin(phase * 0.5) * C.pieceArc
+          : phase;
         const rr = C.pieceOrbit * grip * (this.stage >= 4 ? this.closeIn() : 1);
         const cx = this.stage >= 4 ? this.hunt.x : this.x;
         const cy = this.stage >= 4 ? this.hunt.y : this.y;
@@ -364,6 +424,85 @@ export class Fractal extends Boss {
     return true;
   }
 
+  /** Which piece a middle belongs to once the figure has gone a level down. */
+  pieceFor(i) {
+    const live = this.pieces.filter((p) => !p.dead);
+    if (!live.length) return null;
+    return live[i % live.length];
+  }
+
+  /**
+   * DESCENT. The second setpiece, and the beat the back half never had.
+   *
+   * Same verb as RECURSION -- knot everything down, put it back, spring it
+   * out -- and a different sentence. RECURSION restores the figure it was.
+   * This one restores it one level LOWER: the core has divided by now, so
+   * what springs back is three complete copies of the shape, each hanging off
+   * a piece. "It is not smaller, there is more of it", finally shown rather
+   * than captioned.
+   */
+  startDescent(world) {
+    const C = F();
+    this.descended = true;
+    this.descent = 0;
+    this.sprungDeep = false;
+    world.bossLine = 'IT IS GOING DOWN A LEVEL.';
+    this.lineFor = 3.4;
+    this.hold(world, 0.5);
+    flash(0.45, TYPE_BY_ID.fractal.color);
+    ripple(this.x, this.y, 3, 1100);
+    shake(20);
+    audio.boom();
+    background.surge(2);
+  }
+
+  stepDescent(world, raw) {
+    const C = F();
+    this.descent += raw;
+    const inFor = C.recurseIn;
+    const hold = inFor + C.recurseHold;
+    if (this.descent < inFor) {
+      const k = clamp(this.descent / inFor, 0, 1);
+      this.knot = k * k * (3 - 2 * k);
+      if (Math.random() < 0.35) {
+        const rr = 360 * (1 - this.knot) + 24;
+        ring(this.x, this.y, rr, rr * 0.3, 0.24, TYPE_BY_ID.fractal.glow, 2);
+      }
+      shake(2 + this.knot * 7);
+      return false;
+    }
+    if (this.descent < hold) { this.knot = 1; return false; }
+    if (!this.sprungDeep) {
+      this.sprungDeep = true;
+      // The same bodies it arrived with, put back and recalled -- the
+      // conservation rule is not bent for a setpiece.
+      this.reform(world, C.descentHp);
+      this.recall();
+      return false;
+    }
+    const out = this.descent - hold;
+    const k = clamp(out / C.recurseOut, 0, 1);
+    this.knot = 1 - k * k * (3 - 2 * k);
+    if (k < 1) return false;
+    this.knot = 0;
+    this.descent = null;
+    return true;
+  }
+
+  /** Loose smalls come home. What "freed" meant, unmade for one beat. */
+  recall() {
+    for (const m of this.mids) {
+      for (const t of m.mites) {
+        if (t.dead || t.host) continue;
+        t.host = m;
+        t.mass = Infinity;
+        t.invMass = 0;
+        t.cruise = 0;
+        t.accel = 0;
+      }
+    }
+  }
+
   /**
    * III: the core divides.
    *
@@ -426,6 +565,7 @@ export class Fractal extends Boss {
       this.closeT = 0;
       this.hunt = { x: world.shooter.x, y: world.shooter.y };
     }
+    this.hold(world, 0.45);
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
     world.bossLine = n >= 4 ? 'EVERY PIECE IS STILL THE WHOLE.'
       : n >= 3 ? 'IT IS NOT SMALLER. THERE IS MORE OF IT.'
@@ -462,7 +602,19 @@ export class Fractal extends Boss {
       if (m.dead && !m.freed) {
         m.freed = true;
         this.free(world, m);
-        if (!this.recursed) this.startRecursion(world);
+        /*
+         * On the LAST middle, not the first.
+         *
+         * The figure is compact enough now that one area weapon takes a
+         * middle in a few seconds, so on the first it fired about thirty
+         * seconds into the fight and stage I was thirteen percent of it --
+         * under the floor the plan sets for a stage. Waiting for the whole
+         * generation makes the opening a stage rather than a doorway, and it
+         * is the better scene besides: everything it had is loose and the
+         * figure is a bare core, and THEN it puts all of it back at once.
+         */
+        this.broke = (this.broke || 0) + 1;
+        if (!this.recursed && this.broke >= this.mids.length) this.startRecursion(world);
       }
     }
 
@@ -476,6 +628,14 @@ export class Fractal extends Boss {
         background.setFocus(this.x, this.y);
         return;
       }
+    }
+
+    // DESCENT holds everything while it runs.
+    if (this.descent !== null) {
+      this.place(dt);
+      if (this.stepDescent(world, world.dtRaw || dt)) this.enterStage(world, 4);
+      background.setFocus(this.x, this.y);
+      return;
     }
 
     this.place(dt);
@@ -497,8 +657,22 @@ export class Fractal extends Boss {
     let want = this.stage;
     if (this.sprangDone && this.stage < 2) want = 2;
     if (frac <= C.splitAt && want < 3) want = 3;
+    // DESCENT is the door into IV and holds the ladder while it runs.
+    if (this.split && !this.descended && frac <= C.descentAt) {
+      this.startDescent(world);
+      return;
+    }
+    if (this.descended && want < 4) want = 4;
     if (frac <= C.huntAt && want < 4) want = 4;
-    if (want > this.stage) this.enterStage(world, want);
+    /*
+     * One stage at a time. The triggers are independent -- the beat for II,
+     * the bar for III and IV -- so two can come true on the same frame, and
+     * jumping to the furthest along skips whatever is between. Written as a
+     * jump, a fight that crossed `splitAt` and `huntAt` together went straight
+     * to IV and the core never divided at all, because divide() is gated on
+     * entering exactly stage three.
+     */
+    if (want > this.stage) this.enterStage(world, this.stage + 1);
 
     if (C.replaceEvery > 0 && this.stage >= 2 && this.stage < 4) {
       this.replaceT -= dt;
