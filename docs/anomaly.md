@@ -6,7 +6,37 @@ repo so it survives the container; each phase below is one build-sized
 request, and a future session should be able to pick any phase up from this
 file alone.
 
-Status: **Phases 0–5 shipped (builds 127–132).** Six of seven bosses built.
+Status: **Phases 0–5 shipped (builds 127–132); DYNAMO reworked in 133.**
+Six of seven bosses built. Remaining: **TERMINUS (VII)** and polish.
+
+### DYNAMO reworked (build 133) — the boring-boss post-mortem
+
+The user called it boring and was right. **Its signature never reached the
+player.** The blink — teleport, telegraph, arc lighting up, the whole
+identity — ran only while ≥2 pylons stood, which is exactly the stages
+where the core is sheltered and untouchable. The mechanic happened entirely
+while the player was shooting something else, then switched off for the
+remaining three quarters. Stage III was 40% of the fight: one ball gliding
+on a leash. Three towers that never moved were the first quarter.
+
+Fixed by: the circuit **turns** (biggest single difference — static geometry
+was the root of it); it **blinks in every stage**, station to station round
+the turret once the ground is gone, with the telegraph drawn there too;
+every blink leaves a **discharge lance** that costs the intake, giving the
+fight a second rhythm beside the minion clock; and III now waits for the
+whole circuit rather than two thirds of it.
+
+Stages went 11/14/40/23 → **30/11/24/23**; length 243 → 227s.
+
+**The generalisable check, for TERMINUS and any future rework:** for each
+boss, ask *in which stages is the signature mechanic both running and
+visible to a player who can act on it?* If the answer is "the stages where
+its target is unreachable", the fight is decoration. Worth auditing the
+other five against this — none is known to fail it, but none was checked.
+
+Original Phase 0–5 notes follow.
+
+Status (Phases 0–5): **shipped in builds 127–132.** Six of seven bosses built.
 Remaining: **TERMINUS (VII)** and the polish phase.
 
 ### Phase 5 as built (PARITY, build 132)
