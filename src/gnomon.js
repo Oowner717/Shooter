@@ -114,7 +114,10 @@ export class Gnomon extends Boss {
     this.needles = C.needles[0];
     this.noon = 0; // seconds of NOON still to run
     this.noonDone = false;
-    this.planted = null; // where the needle fell, once it has
+    this.planted = null;
+    this.midnight = null;
+    this.midnightDone = false;
+    this.plantA = 0; // where the needle fell, once it has
 
     this.core = this.body('gnomon', this.x, this.y);
     world.enemies.push(this.core);
@@ -206,6 +209,9 @@ export class Gnomon extends Boss {
     const fast = this.noon > 0 ? C.noonSpin : C.needleSpin * spin;
     this.dialAngle += C.dialSpin * spin * dt;
     this.needleA += fast * dt;
+    // The planted needle's shadow keeps going round. Slower than the sweep it
+    // had in the air -- it is dragging the whole field behind it now.
+    if (this.planted) this.plantA = (this.plantA || 0) + C.plantSweep * dt;
 
     const c = Math.cos(this.dialAngle);
     const s = Math.sin(this.dialAngle);
@@ -270,10 +276,36 @@ export class Gnomon extends Boss {
 
   // ------------------------------------------------------------- shadow
 
+  /**
+   * Where the shadow falls from, which is not always the core.
+   *
+   * Once the needle is down it is the gnomon -- the thing a sundial is named
+   * for -- so the shadow swings out of where it landed rather than out of the
+   * middle of the field.
+   */
+  shadowFrom() {
+    return this.planted || this;
+  }
+
   /** Where the shadows are pointing right now, as angles. */
   shadowAngles() {
     const out = [];
-    if (this.planted) return out; // a planted needle throws rings, not a wedge
+    if (this.planted) {
+      /*
+       * A planted needle used to throw no wedge at all, and stage IV measured
+       * at 0.4% corrupted frames against 32-34% for stages II and III. The
+       * best pressure mechanic in the game switched itself off for the finale
+       * -- the exact defect DYNAMO was reworked for two builds earlier, in a
+       * fight that had it first.
+       *
+       * It sweeps from the plant now. One shadow, out of a point beside the
+       * turret, going round the whole field: the last stage is the only one
+       * where the dark comes from somewhere other than the middle, and it is
+       * the only one where the axis is next to you.
+       */
+      out.push(this.plantA || 0);
+      return out;
+    }
     for (let i = 0; i < this.needles; i++) out.push(this.needleA + i * Math.PI);
     return out;
   }
@@ -281,8 +313,9 @@ export class Gnomon extends Boss {
   /** Is this point in shadow? Anything that asks is about to be punished. */
   inShadow(x, y) {
     const C = G();
-    const dx = x - this.x;
-    const dy = y - this.y;
+    const o = this.shadowFrom();
+    const dx = x - o.x;
+    const dy = y - o.y;
     // Nothing is in the core's own shadow: the wedge starts outside it.
     if (dx * dx + dy * dy < C.shadowFrom * C.shadowFrom) return false;
     const to = Math.atan2(dy, dx);
@@ -495,6 +528,65 @@ export class Gnomon extends Boss {
   }
 
   /**
+   * MIDNIGHT. The second setpiece, and the counterpart to NOON.
+   *
+   * NOON is the sun at its highest and the shadow at its shortest: a blur, a
+   * sweep, and the dial partly restored. This is the other end of the day.
+   * Both needles come to twelve, the dial is put back whole, and then the
+   * sweep runs one revolution at speed -- and every arc it passes goes dark
+   * for the rest of the fight. Still solid, still in the way, and no longer
+   * lit. The clock running down rather than round.
+   *
+   * It is also where this fight gets its length: a stage adds no time, and
+   * putting the dial back is the only thing that does.
+   */
+  strikeMidnight(world) {
+    const C = G();
+    this.midnight = 0;
+    this.midnightDone = true;
+    this.needleA = -Math.PI / 2;
+    world.bossLine = 'MIDNIGHT';
+    this.lineFor = 3.2;
+    this.hold(world, 0.6);
+    this.reform(world, C.midnightHp, { sweep: 1.1 });
+    flash(0.55, '#1a0d00');
+    ripple(this.x, this.y, 3.4, 1300);
+    shake(30);
+    audio.boom();
+    background.surge(2);
+  }
+
+  stepMidnight(world, raw) {
+    const C = G();
+    const was = this.midnight;
+    this.midnight += raw;
+    const k = clamp(this.midnight / C.midnightFor, 0, 1);
+    // One turn, from twelve, at speed -- and it darkens what it passes.
+    const from = -Math.PI / 2 + (was / C.midnightFor) * TAU;
+    this.needleA = -Math.PI / 2 + k * TAU;
+    for (const p of this.arcs) {
+      if (p.dead || p.dark) continue;
+      const a = Math.atan2(p.y - this.y, p.x - this.x);
+      let d = a - this.needleA;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      let e = a - from;
+      e = Math.atan2(Math.sin(e), Math.cos(e));
+      // Passed between the last frame's bearing and this one's.
+      if (d <= 0 && e > 0) {
+        p.dark = true;
+        spark(p.x, p.y, rand(-40, 40), rand(-40, 40), '#3a2400', 0.4, 2);
+      }
+    }
+    if (Math.random() < 0.4) shake(4);
+    if (k >= 1) {
+      this.midnight = null;
+      world.bossLine = null;
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * IV: the needle comes down.
    *
    * It stops sweeping and plants itself beside the turret -- a wall in a
@@ -510,6 +602,7 @@ export class Gnomon extends Boss {
       y: s.y - 40,
       a: -Math.PI / 2 + side * 0.5,
     };
+    this.plantA = this.needleA;
     this.plantT = C.plantPulse;
     for (const p of this.needleSegs) if (p.needle === 1) p.hidden = true;
     this.y0 = this.y;
@@ -561,12 +654,27 @@ export class Gnomon extends Boss {
       if (this.core.dead) this.die(world, C);
       return;
     }
+    if (this.midnight !== null && this.midnight !== undefined) {
+      if (this.stepMidnight(world, world.dtRaw || dt)) this.enterStage(world, 4);
+      background.setFocus(this.x, this.y);
+      if (this.core.dead) this.die(world, C);
+      return;
+    }
 
     let want = this.stage;
     if (this.noonDone && this.stage < 2) want = 2;
     if (frac <= C.stageCore && want < 3) want = 3;
+    // MIDNIGHT is the door into IV and holds the ladder while it runs.
+    if (this.stage >= 3 && !this.midnightDone && frac <= C.midnightAt) {
+      this.strikeMidnight(world);
+      return;
+    }
+    if (this.midnightDone && want < 4) want = 4;
     if (frac <= C.stageDescend && want < 4) want = 4;
-    if (want > this.stage) this.enterStage(world, want);
+    // One stage at a time: the triggers are independent, so two can come true
+    // on the same frame and jumping to the furthest along skips what is
+    // between -- and stage IV is where the needle plants.
+    if (want > this.stage) this.enterStage(world, this.stage + 1);
     if (this.stage >= 4) this.descend(world, world.dtRaw || dt);
 
     const rep = C.repair[this.stage - 1];
@@ -689,6 +797,38 @@ export class Gnomon extends Boss {
         ctx.lineTo(ox + Math.cos(a) * len, oy + Math.sin(a) * len);
         ctx.stroke();
       }
+    }
+
+    /*
+     * The hour marks, and the fact that this is a clock.
+     *
+     * The fight is named for a sundial, its whole mechanic is a shadow on a
+     * clock, and for ten builds its face carried no hours -- so a screenshot
+     * of it was a ring of amber slabs with a stick through them and nothing
+     * said what it was. Twelve ticks, four of them long, and the arcs that
+     * MIDNIGHT has darkened drawn as such.
+     */
+    if (!arriving && this.dying <= 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (let h = 0; h < 12; h++) {
+        const a = -Math.PI / 2 + (h / 12) * TAU + this.dialAngle;
+        const quarter = h % 3 === 0;
+        const inR = C.dialR * (quarter ? 0.58 : 0.70);
+        const outR = C.dialR * 0.80;
+        ctx.strokeStyle = rgba(quarter ? '#ffd9a8' : T.color, (quarter ? 0.5 : 0.26) * open);
+        ctx.lineWidth = quarter ? 2 : 1.1;
+        ctx.beginPath();
+        ctx.moveTo(this.x + Math.cos(a) * inR, this.y + Math.sin(a) * inR);
+        ctx.lineTo(this.x + Math.cos(a) * outR, this.y + Math.sin(a) * outR);
+        ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // ...and the gaps in the ring, outlined where they were. A dial with
+    // holes in it should still read as a dial.
+    if (!arriving && this.dying <= 0 && !this.planted) {
+      this.drawGhosts(ctx, T.color, 0.14);
     }
 
     this.drawBeams(ctx);

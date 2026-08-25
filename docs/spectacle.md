@@ -286,7 +286,38 @@ core over a field with two panels left in it.
 
 ---
 
-### II — GNOMON · amber · the clock
+### II — GNOMON · amber · the clock · **shipped, build 139**
+
+**As built: 246s (from 215), stages 16/27/21/29.** Every stage inside the
+band, no type past the shoulder, and **stage IV's corruption went from 0.4%
+to 14.5%.**
+
+- ✅ **The planted needle still throws a shadow.** This was the real defect.
+  The wedge is the best pressure mechanic in the game — 30–34% of stages II
+  and III — and it stopped dead the moment the needle came down, so the
+  finale of the fight whose entire subject is a moving shadow had no moving
+  shadow in it. It sweeps out of the *plant* now rather than out of the core,
+  which is what a gnomon is: the shadow's origin moves next to you for the
+  last stage.
+- ✅ **MIDNIGHT** (III→IV): the counterpart to NOON. Both needles to twelve,
+  the dial put back whole, then one revolution at speed — and every arc the
+  sweep passes goes dark for the rest of the fight. Still solid, still in the
+  way, no longer lit. The clock running down rather than round. This is where
+  the fight's added length comes from.
+- ✅ **The face has hours.** Twelve ticks, four of them long, and the gaps in
+  the ring outlined where they were. The fight is named for a sundial, its
+  mechanic is a shadow on a clock, and for ten builds a screenshot of it was
+  a ring of amber slabs with a stick through them.
+- ✅ **NOON moved from half a dial to a third**, because stage I measured at
+  11% of the fight — under the floor. Its regress case now reads the
+  threshold from config rather than repeating the number.
+- ✅ **The ladder could skip stage IV**, where the needle plants. One stage at
+  a time now, with a case.
+- ⏸ **The background roll** in IV — still wants `background.roll`, still
+  deferred. The planted shadow sweeping the whole field turned out to deliver
+  most of what the roll was for.
+
+### II — GNOMON · amber · the clock — original plan
 
 *Now:* a dial of 16 arcs, a needle of 6 segments sweeping, a shadow wedge
 that kills projectiles and corrupts, NOON at the midpoint, the needle plants

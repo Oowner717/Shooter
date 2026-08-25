@@ -2173,9 +2173,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.shockClear = +w.shock.toFixed(2);
     s.x = keep.x; s.y = keep.y;
 
-    // NOON fires once, at half a dial, and does not fire again.
+    /*
+     * NOON fires once, on its own threshold, and does not fire again. Read
+     * off `noonAt` rather than written down: it moved from half a dial to a
+     * third in build 139 when stage I measured at eleven percent of the
+     * fight, and a case with the old number in it fails for the wrong reason.
+     */
     out.noonBefore = boss.noonDone;
-    for (let i = 0; i < Math.ceil(boss.arcs.length * 0.55); i++) boss.arcs[i].dead = true;
+    out.noonNeeds = CFG.gnomon.noonAt;
+    const kill = Math.ceil(boss.arcs.length * (1 - CFG.gnomon.noonAt) + 1);
+    for (let i = 0; i < kill && i < boss.arcs.length; i++) boss.arcs[i].dead = true;
     g.update(1 / 60);
     out.noonAfter = boss.noonDone;
     out.noonRebuilt = boss.arcs.filter((p) => !p.dead).length;
@@ -2204,9 +2211,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('the shadow costs the intake and nothing else',
     r.shockInShadow > 0 && r.shockClear === 0,
     `in shadow ${r.shockInShadow} corruption, clear of it ${r.shockClear}`);
-  check('NOON strikes once, at half a dial, and mends part of it',
+  check('NOON strikes once, on its own threshold, and mends part of it',
     r.noonBefore === false && r.noonAfter === true && r.noonRebuilt > 0 && r.noonOnce,
-    JSON.stringify({ before: r.noonBefore, after: r.noonAfter,
+    JSON.stringify({ before: r.noonBefore, after: r.noonAfter, needs: r.noonNeeds,
       arcsBack: r.noonRebuilt, onlyOnce: r.noonOnce }));
 }
 
@@ -3113,6 +3120,115 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.seamOn > 0 && r.seamOff === 0 && r.seamPasses >= 2,
     `on the seam ${r.seamOn}, clear of it ${r.seamOff}; `
     + `it came round onto the turret ${r.seamPasses} times in a minute`);
+}
+
+// --- GNOMON's clock keeps running -------------------------------------------
+/*
+ * The shadow is the best pressure mechanic in this game -- 30-34% of stages II
+ * and III -- and it used to stop dead the moment the needle planted. Stage IV
+ * measured 0.4% corrupted frames: the finale of the fight whose whole subject
+ * is a moving shadow had no moving shadow in it. It sweeps out of the planted
+ * needle now, which is what a gnomon is.
+ *
+ * And MIDNIGHT, the beat the back half did not have: the dial comes back, one
+ * revolution runs at speed, and every arc it passes goes dark for good.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const C = CFG.gnomon;
+    const out = {};
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[2] = 1;
+    g.openBoss(2);
+    const boss = w.boss;
+    boss.arriving = 0;
+    boss.settle(w);
+    g.update(1 / 60);
+
+    /*
+     * MIDNIGHT: half the dial gone, then the beat, then the dial back and the
+     * arcs it swept marked dark.
+     */
+    boss.arcs.forEach((p, i) => { if (i % 2 === 0) p.dead = true; });
+    out.brokeTo = boss.arcs.filter((p) => !p.dead).length;
+    boss.stage = 3;
+    boss.strikeMidnight(w);
+    out.opened = boss.midnight === 0;
+    let guard = 0;
+    while (boss.midnight !== null && guard++ < 60 * 30) {
+      boss.place(1 / 60);
+      boss.stepMidnight(w, 1 / 60);
+    }
+    out.ran = boss.midnight === null && boss.midnightDone;
+    out.dialBack = boss.arcs.filter((p) => !p.dead).length;
+    out.darkened = boss.arcs.filter((p) => p.dark).length;
+    // ...once. A second pass would be a second heal.
+    out.onlyOnce = boss.midnightDone;
+
+    /*
+     * The planted needle still throws a wedge, and it sweeps. Origin is the
+     * plant rather than the core -- that is the whole point of a sundial.
+     */
+    boss.plant(w);
+    out.planted = !!boss.planted;
+    out.throwsShadow = boss.shadowAngles().length > 0;
+    const from = boss.shadowFrom();
+    out.fromPlant = from === boss.planted;
+    const a0 = boss.plantA;
+    for (let i = 0; i < 120; i++) boss.place(1 / 60);
+    out.sweeps = Math.abs(boss.plantA - a0) > 0.2;
+    // ...and something standing in it is corrupted, which is what "the finale
+    // has pressure" means in a number.
+    const s = w.shooter;
+    const keep = { x: s.x, y: s.y };
+    const a = boss.plantA;
+    s.x = boss.planted.x + Math.cos(a) * (C.shadowFrom + 80);
+    s.y = boss.planted.y + Math.sin(a) * (C.shadowFrom + 80);
+    out.inIt = boss.inShadow(s.x, s.y);
+    s.x = boss.planted.x + Math.cos(a + Math.PI / 2) * (C.shadowFrom + 80);
+    s.y = boss.planted.y + Math.sin(a + Math.PI / 2) * (C.shadowFrom + 80);
+    out.clearOfIt = !boss.inShadow(s.x, s.y);
+    s.x = keep.x; s.y = keep.y;
+
+    /*
+     * The ladder: both core thresholds true on one frame must still visit the
+     * stage where the needle comes down.
+     */
+    g.restart();
+    w.phase = 'staging';
+    w.apertures[2] = 1;
+    g.openBoss(2);
+    const b2 = w.boss;
+    b2.arriving = 0;
+    b2.settle(w);
+    b2.noonDone = true;
+    b2.core.hp = Math.round(b2.core.maxHp * 0.02);
+    const seen = [b2.stage];
+    for (let i = 0; i < 60 * 60 && b2.stage < 4; i++) {
+      g.update(1 / 60);
+      if (!w.boss) break;
+      if (b2.stage !== seen[seen.length - 1]) seen.push(b2.stage);
+    }
+    out.stages = seen.join(',');
+    out.ladder = seen.every((v, i) => i === 0 || v === seen[i - 1] + 1);
+    out.came = !!b2.planted;
+    g.restart();
+    return out;
+  });
+  check('MIDNIGHT puts the dial back and darkens what its sweep passes',
+    r.opened && r.ran && r.dialBack > r.brokeTo && r.darkened > 0 && r.onlyOnce,
+    `${r.brokeTo} arcs standing, ${r.dialBack} after; ${r.darkened} went dark`);
+  check('a planted needle still throws a shadow, and it sweeps',
+    r.planted && r.throwsShadow && r.fromPlant && r.sweeps && r.inIt && r.clearOfIt,
+    `throws: ${r.throwsShadow}; out of the plant: ${r.fromPlant}; `
+    + `turns: ${r.sweeps}; dark where it points: ${r.inIt}`);
+  check('it cannot skip the stage where the needle comes down',
+    r.ladder && r.came && r.stages.endsWith('4'),
+    `stages seen: ${r.stages}; the needle planted: ${r.came}`);
 }
 
 // --- FRACTAL is a shape containing itself -----------------------------------

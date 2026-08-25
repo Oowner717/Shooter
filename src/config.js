@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '138';
+export const BUILD = '139';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '138';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '1805b09';
+export const REV = '66aad2e';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1010,12 +1010,12 @@ export const CFG = {
      * dies, every SECOND still waiting leaves at once, and the dial puts part
      * of itself back -- so the answer to NOON is to have been ahead of it.
      */
-    noonAt: 0.5, // dial fraction it fires at
+    noonAt: 0.34, // dial fraction it fires at
     noonSpin: 7.5, // rad/s while it runs
     noonFor: 3.4,
-    noonRebuild: 0.55, // how much of the dial it puts back
+    noonRebuild: 0.9, // how much of the dial it puts back
     // Stages, read the same way ORDINAL's are: off the dial, then the core.
-    stageCore: 0.55,
+    stageCore: 0.5,
     stageDescend: 0.25,
     close: 235, // how near it comes in IV
     descendFor: 12,
@@ -1050,6 +1050,26 @@ export const CFG = {
      * planted beside the turret, pulsing rings of shadow out of where it fell.
      * It is the one thing in this fight that does not move again.
      */
+    /*
+     * MIDNIGHT. The second setpiece, on the way into IV, and the counterpart
+     * to NOON: both needles to twelve, the dial put back whole, and then one
+     * revolution at speed that darkens every arc it passes -- still solid,
+     * still in the way, no longer lit.
+     *
+     * It is also this fight's length. A stage re-partitions health it already
+     * had; putting the dial back is the only thing that adds any.
+     */
+    midnightAt: 0.26, // core fraction that opens it, once
+    midnightHp: 1, // ...and what the dial comes back at
+    midnightFor: 4.2, // one full revolution
+    /*
+     * ...and once the needle is down the shadow swings out of IT rather than
+     * out of the core. A planted needle used to throw no wedge at all and
+     * stage IV measured 0.4% corrupted frames against 32-34% for II and III:
+     * the best pressure mechanic in the game switching itself off for the
+     * finale, in the fight that has it.
+     */
+    plantSweep: 0.5, // rad/s the planted shadow goes round
     plantAt: 150, // how far to the side of the turret it lands
     plantPulse: 2.8, // seconds between the rings it throws
     endFor: 13.6,
