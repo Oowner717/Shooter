@@ -6,7 +6,53 @@ repo so it survives the container; each phase below is one build-sized
 request, and a future session should be able to pick any phase up from this
 file alone.
 
-Status: **Phases 0–3 shipped (builds 127–130).** Four of seven bosses built:
+Status: **Phases 0–4 shipped (builds 127–131).** Five of seven bosses built:
+ORDINAL, GNOMON, FRACTAL, AMPLITUDE, DYNAMO. Remaining: PARITY (VI),
+TERMINUS (VII), then the polish phase.
+
+### Phase 4 as built (DYNAMO, build 131)
+
+Landed as designed but took four attempts, and the failures are worth more
+than the design was.
+
+**Armour cannot express priority to a distance-based assist.** DYNAMO's core
+blinks between pylons, so it is always exactly as far from the turret as a
+pylon is — and auto-aim picks by distance, not by what a thing *is*. Roughly
+half the turret's output went into the core no matter how it was armoured:
+
+| attempt | result |
+|---|---|
+| shield 0.6 | core died during stage II; stage III lasted one frame |
+| shield 0.88 | fire wasted rather than redirected; stage II = 62% of a 264s fight |
+| pylons at 480 hp | circuit fell in 20s; fight had no shape |
+| **core out of the world while ≥2 legs stand** | works |
+
+The fix is the **parked mechanism** — ORDINAL's garrison, PARITY's planned
+phased half: unreachable means *not in `world.enemies`*, not a flag every
+system has to honour. Drawn dimmer behind a shell so it reads as "not yet"
+rather than as rounds doing nothing.
+
+**Generalisable rule for VI and VII:** if a design says "deal with X before
+Y", and Y is not further away than X, only removing Y from the field will
+achieve it. PARITY's phased crescent already plans to work this way; TERMINUS's
+patrolling core must dip *inward* off the ring when it repairs, as planned,
+or the same failure returns.
+
+Two ordinary bugs also: the shield table was indexed by pylons **gone** while
+its comment described pylons **standing** (so the core hardened as you broke
+the circuit), and independent stage triggers let the fight skip stage III
+entirely — it steps one stage at a time now, and a case asserts the ladder.
+
+**Measured**: 243.2s over two runs, stages 11/14/40/23%, damage split
+41/33/26, captions 10.6 chars/sec, everything in range, one REMAINDER.
+
+Also fixed a test that named DYNAMO as its "not yet written" example and so
+started passing by accident the moment DYNAMO was written; it picks whichever
+anomaly has no registered constructor now.
+
+Original Phase 0–3 notes follow.
+
+Status (Phases 0–3): **shipped in builds 127–130.** Four of seven bosses built:
 ORDINAL, GNOMON, FRACTAL, AMPLITUDE. Phases 4–7 (DYNAMO, PARITY, TERMINUS,
 polish) not started.
 
