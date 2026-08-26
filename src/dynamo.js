@@ -28,7 +28,7 @@
  */
 
 import { CFG, TYPE_BY_ID } from './config.js';
-import { clamp, rand, rgba, TAU, drawGlow } from './util.js';
+import { clamp, rand, rgba, TAU, drawGlow, drawBolt } from './util.js';
 import { Enemy } from './enemies.js';
 import { ring, ripple, spark, shake, flash, explode } from './fx.js';
 import { audio } from './audio.js';
@@ -833,123 +833,17 @@ export class Dynamo extends Boss {
 
   /** One arc, drawn as a jagged line rather than a straight one. */
   /**
-   * Deterministic noise for the bolts, in -1..1.
-   *
-   * Not `Math.random`. The draw runs off the same stream the simulation does,
-   * so a bolt that rerolls from it also rerolls the fight -- the seeded hash
-   * in `fight.mjs --hash` would stop reproducing the moment anything was
-   * drawn. Hashed off the point index, a per-bolt seed and a STEPPED clock:
-   * stepped because lightning crackles rather than undulates, and a smooth
-   * function of `t` is a wobble.
+   * One bolt. The routine lives in util.js -- the ARC round's chain lightning
+   * is the same picture and was carrying its own worse copy of it -- and this
+   * supplies only what is particular to this boss: its colours, and a clock
+   * stepped at eighteen a second so the circuit crackles.
    */
-  jag(i, seed, tick) {
-    const x = Math.sin(i * 127.1 + seed * 311.7 + tick * 74.7) * 43758.5453;
-    return (x - Math.floor(x)) * 2 - 1;
-  }
-
-  /**
-   * The points of one bolt, jagged in proportion to how far it has to go.
-   *
-   * Both numbers used to be constants -- seven segments and nine units of
-   * offset, whatever the span. That is fine over a link between two pylons at
-   * a hundred and ninety units and is a straight line over EARTH's curtain at
-   * nine hundred: seven segments of a hundred and twenty-eight units each,
-   * deviating by four degrees. Screenshotted, it was a pale stick.
-   *
-   * So the segment count and the amplitude both scale with the span, and the
-   * offset is two octaves rather than one: a long swing down the length of the
-   * bolt with a per-point jag on top of it. One octave of a smooth sine is a
-   * rope; the second octave is what makes it lightning.
-   */
-  boltPath(ax, ay, bx, by, seed, amp = 1) {
-    const dx = bx - ax;
-    const dy = by - ay;
-    const len = Math.hypot(dx, dy) || 1;
-    const px = -dy / len;
-    const py = dx / len;
-    const n = clamp(Math.round(len / 26), 6, 30);
-    const wide = clamp(len * 0.075, 7, 40) * amp;
-    const tick = Math.floor(this.t * 18);
-    const pts = [ax, ay];
-    for (let i = 1; i < n; i++) {
-      const k = i / n;
-      const swing = this.jag(i, seed, tick) * 0.7 + this.jag(i * 4.3, seed + 9, tick) * 0.3;
-      /*
-       * Pinned at both ends, widest in the middle: a bolt starts and finishes
-       * where it was aimed and does what it likes in between. The taper is
-       * flattened off `sin` so it stays wide down most of its length and
-       * pinches only near the ends.
-       */
-      const j = swing * wide * Math.sin(k * Math.PI) ** 0.55;
-      /*
-       * ...and it is displaced ALONG the run as well, which is the difference
-       * between lightning and a zigzag. Evenly spaced points with only a
-       * sideways offset give every segment the same length and the same
-       * cadence -- a stylised bolt, drawn. Kept under half a segment so the
-       * points cannot cross and double back.
-       */
-      const along = this.jag(i * 2.9, seed + 4, tick) * 0.42 / n;
-      pts.push(ax + dx * (k + along) + px * j, ay + dy * (k + along) + py * j);
-    }
-    pts.push(bx, by);
-    return pts;
-  }
-
-  /** ...and one bolt, drawn. */
   arc(ctx, ax, ay, bx, by, bright, seed, opts = {}) {
     const T = TYPE_BY_ID.dynamo;
-    const w = opts.width || 1;
-    const pts = this.boltPath(ax, ay, bx, by, seed, opts.amp);
-    const trace = () => {
-      ctx.beginPath();
-      ctx.moveTo(pts[0], pts[1]);
-      for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
-      ctx.stroke();
-    };
-    /*
-     * Three passes down the same path: a wide haze, a body, and a thin white
-     * core. Additively, that is what makes a stroke look hot rather than
-     * drawn -- and it is why the lance and the curtain no longer lay a
-     * straight gradient over the top of the jagged line. That straight band
-     * was most of what the eye was reading.
-     */
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = rgba(T.glow, (bright ? 0.2 : 0.15) * (opts.alpha ?? 1));
-    ctx.lineWidth = (bright ? 11 : 6) * w;
-    trace();
-    ctx.strokeStyle = rgba(bright ? '#dceaff' : T.glow, (bright ? 0.55 : 0.42) * (opts.alpha ?? 1));
-    ctx.lineWidth = (bright ? 4 : 2.2) * w;
-    trace();
-    // The dim pass still gets a white core. A link this boss is not currently
-    // jumping along is a live wire, not a pencil line -- drawn at the old
-    // 0.34 of one colour it read as the diagram of a circuit rather than one.
-    ctx.strokeStyle = rgba('#ffffff', (bright ? 0.9 : 0.5) * (opts.alpha ?? 1));
-    ctx.lineWidth = (bright ? 1.6 : 1) * w;
-    trace();
-
-    /*
-     * ...and it branches. A bolt that runs from one point to another and
-     * nowhere else reads as a wire however jagged it is; the forks are what
-     * say electricity. They come off the middle of the run, go a fraction of
-     * the way, and end in the air.
-     */
-    if (!bright || opts.forks === 0) { ctx.lineCap = 'butt'; return; }
-    const tick = Math.floor(this.t * 18);
-    const forks = opts.forks ?? 2;
-    for (let f = 0; f < forks; f++) {
-      const at = 0.3 + this.jag(f * 17 + 3, seed, tick) * 0.12 + f * 0.22;
-      const i = Math.max(2, Math.min(pts.length - 4, Math.round((pts.length / 2) * at) * 2));
-      const fx = pts[i];
-      const fy = pts[i + 1];
-      const a = Math.atan2(by - ay, bx - ax)
-        + (this.jag(f * 5 + 1, seed + 3, tick) > 0 ? 1 : -1)
-        * (0.5 + Math.abs(this.jag(f * 11, seed + 7, tick)) * 0.5);
-      const run = Math.hypot(bx - ax, by - ay) * (0.16 + Math.abs(this.jag(f, seed + 2, tick)) * 0.2);
-      this.arc(ctx, fx, fy, fx + Math.cos(a) * run, fy + Math.sin(a) * run, false,
-        seed + 31 + f * 13, { width: w * 0.7, alpha: (opts.alpha ?? 1) * 0.8, forks: 0 });
-    }
-    ctx.lineCap = 'butt';
+    drawBolt(ctx, ax, ay, bx, by, {
+      glow: T.glow, hot: '#dceaff', bright, seed, tick: Math.floor(this.t * 18),
+      width: opts.width, alpha: opts.alpha, forks: opts.forks, amp: opts.amp,
+    });
   }
 
   draw(ctx, world) {

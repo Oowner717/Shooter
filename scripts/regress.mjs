@@ -1014,6 +1014,83 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `(a chunk lives ${r.chunkLife}s)`);
 }
 
+// --- every part the TURRET branch sells is visible on the turret -------------
+/*
+ * The branch is named for the parts -- GIMBAL, SPINES, SHROUD, ARRAY, FEED,
+ * SIGHT, INTAKE -- so the row you press and the thing that appears are the
+ * same word, and a level of one of them that drew nothing would be a purchase
+ * with no evidence. There is no way to eyeball seven parts across three levels
+ * each on a machine forty units wide, so it is asked of the pixels: render the
+ * turret with the part and without it, and require the frames to differ.
+ *
+ * Rendered to an offscreen canvas at the turret's own scale rather than
+ * screenshotting the game, so the test sees the machine and not the sky.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.autoAim = true;
+    const s = w.shooter;
+
+    const cv = document.createElement('canvas');
+    cv.width = 260;
+    cv.height = 260;
+    const c2 = cv.getContext('2d', { willReadFrequently: true });
+
+    const shot = (rig) => {
+      // Force the cache rather than buying: `rig()` keys off the ledger's
+      // length, so a stub with a matching count is honoured.
+      w.rig = { rate: 0, slew: 0, aimrange: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0, ...rig };
+      w.rig.filled = ['rate', 'slew', 'aimrange', 'overwatch', 'casing', 'insulation', 'intake']
+        .reduce((a, k) => a + w.rig[k], 0) / 17;
+      w.rigAt = w.offers.taken.length;
+      w.rigFlash = 0;
+      c2.setTransform(1, 0, 0, 1, 0, 0);
+      c2.clearRect(0, 0, 260, 260);
+      c2.translate(130 - s.x, 130 - s.y);
+      s.draw(c2, w);
+      const d = c2.getImageData(0, 0, 260, 260).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2] + d[i + 3];
+      return sum;
+    };
+
+    const bare = shot({});
+    const parts = ['rate', 'slew', 'aimrange', 'overwatch', 'casing', 'insulation', 'intake'];
+    const out = { bare, shows: [], quiet: [] };
+    for (const id of parts) {
+      const one = shot({ [id]: 1 });
+      (Math.abs(one - bare) > 500 ? out.shows : out.quiet).push(id);
+    }
+    // ...and a second level of the same part has to add something too, or the
+    // levels above the first are numbers on a card.
+    out.deeper = [];
+    for (const id of ['slew', 'casing', 'insulation', 'overwatch']) {
+      const a = shot({ [id]: 1 });
+      const b = shot({ [id]: 3 });
+      if (Math.abs(b - a) > 500) out.deeper.push(id);
+    }
+    // ...and the whole branch together is not the same picture as any of it.
+    out.full = shot({ rate: 2, slew: 3, aimrange: 2, overwatch: 3, casing: 3, insulation: 3, intake: 1 });
+    w.rig = null;
+    g.restart();
+    return out;
+  });
+  check('every part the TURRET branch sells shows up on the turret',
+    r.quiet.length === 0 && r.shows.length === 7,
+    `drew something: ${r.shows.join(', ') || 'none'}`
+    + `${r.quiet.length ? `; drew NOTHING: ${r.quiet.join(', ')}` : ''}`);
+  check('...and so does every level of it above the first',
+    r.deeper.length === 4 && Math.abs(r.full - r.bare) > 5000,
+    `levels 1 -> 3 changed the machine for ${r.deeper.join(', ') || 'nothing'}; `
+    + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
+}
+
 // --- nothing a boss made outlives it -----------------------------------------
 /*
  * The outro is the payout, and it used to have a fight going on in it.

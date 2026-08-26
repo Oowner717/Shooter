@@ -6,6 +6,13 @@ import { TAU, clamp, rand, spread, rgba, drawGlow, angleDelta } from './util.js'
 import { fire, clampAim } from './projectiles.js';
 import { Patch } from './patch.js';
 import { spark, ring, shake } from './fx.js';
+
+/*
+ * Every level of every part in the TURRET branch, added up: 2 FEED, 3 GIMBAL,
+ * 2 ARRAY, 3 SIGHT, 3 SPINES, 3 SHROUD, 1 INTAKE. What `rig().filled` is a
+ * fraction of, and the one number that tells the machine it is finished.
+ */
+const RIG_MAX = 17;
 import { applyBlast } from './enemies.js';
 import { audio } from './audio.js';
 
@@ -483,16 +490,38 @@ export class Shooter {
       }
       ctx.closePath();
     };
+    const filled = g.filled || 0;
     ctx.fillStyle = 'rgba(8,16,26,0.96)';
     ctx.strokeStyle = rgba(accent, 0.9);
-    ctx.lineWidth = HAIRLINE * 2;
+    ctx.lineWidth = HAIRLINE * (2 + filled * 1.6);
     hex(this.r, Math.PI / 8);
     ctx.fill();
     ctx.stroke();
-    ctx.strokeStyle = rgba(accent, 0.3);
+    ctx.strokeStyle = rgba(accent, 0.3 + filled * 0.35);
     ctx.lineWidth = HAIRLINE;
     hex(this.r * 0.82, Math.PI / 8);
     ctx.stroke();
+    /*
+     * A bolt at every corner, and a deck plate between the two bevels that
+     * fills in as the branch does. Eight small marks are what turn a drawn
+     * octagon into a machined one, and they cost nothing at this size.
+     */
+    ctx.fillStyle = rgba(accent, 0.25 + filled * 0.45);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * TAU + Math.PI / 8;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * this.r * 0.91, Math.sin(a) * this.r * 0.91, 1.5, 0, TAU);
+      ctx.fill();
+    }
+    if (filled > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = rgba(accent, 0.1 + filled * 0.3);
+      ctx.lineWidth = HAIRLINE * 5 * filled;
+      hex(this.r * 0.91, Math.PI / 8);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // ---- SPINES' sockets: notches cut into the rim ----
     if (!g.casing) {
@@ -509,14 +538,38 @@ export class Shooter {
       ctx.stroke();
     }
 
-    // ---- the two rings that were always there ----
-    ctx.strokeStyle = rgba(accent, 0.55);
-    ctx.lineWidth = 1.5;
+    /*
+     * ---- the two rings that were always there ----
+     *
+     * They CLOSE. Each is an arc of a turn and a third at nothing bought and a
+     * whole turn when the branch is full, so a finished machine has a
+     * continuous ring where an unfinished one has two broken ones -- and the
+     * index marks that ride the outer one only appear once it has closed,
+     * because a scale on a broken ring is not a scale.
+     */
+    ctx.strokeStyle = rgba(accent, 0.55 + filled * 0.3);
+    ctx.lineWidth = 1.5 + filled * 0.8;
+    const sweep = Math.PI * 1.35 + filled * (TAU - Math.PI * 1.35);
     for (let i = 0; i < 2; i++) {
       const rr = this.r * (0.62 + i * 0.24);
       const off = this.spin * (i ? -1 : 1);
       ctx.beginPath();
-      ctx.arc(0, 0, rr, off, off + Math.PI * 1.35);
+      ctx.arc(0, 0, rr, off, off + sweep);
+      ctx.stroke();
+    }
+    if (filled > 0.55) {
+      const lit = (filled - 0.55) / 0.45;
+      ctx.strokeStyle = rgba(accent, 0.5 * lit);
+      ctx.lineWidth = HAIRLINE * 1.6;
+      ctx.beginPath();
+      for (let i = 0; i < 12; i++) {
+        const a = this.spin * -1 + (i / 12) * TAU;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        const long = i % 3 === 0 ? 5 : 2.6;
+        ctx.moveTo(c * this.r * 0.86, sn * this.r * 0.86);
+        ctx.lineTo(c * (this.r * 0.86 + long), sn * (this.r * 0.86 + long));
+      }
       ctx.stroke();
     }
 
@@ -555,9 +608,38 @@ export class Shooter {
     roundRectPath(ctx, this.r * 0.2 - recoil, -6.5, this.r * 1.3, 13, 4);
     ctx.fill();
     ctx.stroke();
-    // bore, hot with use
-    ctx.fillStyle = rgba('#ffffff', 0.14 + this.heat * 0.5);
-    ctx.fillRect(this.r * 0.3 - recoil, -3, this.r * 1.05, 6);
+    /*
+     * The bore, hot with use -- as a LINE down the middle rather than a bar
+     * filling most of the barrel. At full heat the bar was a six-unit block of
+     * white the width of the whole barrel, which is what made the turret's one
+     * long straight edge the brightest thing on the machine and flattened
+     * everything bolted to it.
+     */
+    ctx.fillStyle = rgba('#ffffff', 0.1 + this.heat * 0.34);
+    ctx.fillRect(this.r * 0.3 - recoil, -1.6, this.r * 1.05, 3.2);
+    // ...and the heat is at the muzzle end, where it would be.
+    if (this.heat > 0.02) {
+      const gh = ctx.createLinearGradient(this.r * 0.4 - recoil, 0, this.r * 1.4 - recoil, 0);
+      gh.addColorStop(0, rgba('#ff9f5c', 0));
+      gh.addColorStop(1, rgba('#ffd6a0', 0.5 * this.heat));
+      ctx.fillStyle = gh;
+      ctx.fillRect(this.r * 0.4 - recoil, -5, this.r * 1.0, 10);
+    }
+    /*
+     * Cooling fins across the top of the jacket. Three marks, and the barrel
+     * stops being a rounded rectangle with a line in it.
+     */
+    ctx.strokeStyle = rgba(accent, 0.4);
+    ctx.lineWidth = HAIRLINE * 1.6;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const x = this.r * (0.52 + i * 0.2) - recoil;
+      ctx.moveTo(x, -6);
+      ctx.lineTo(x, -2.6);
+      ctx.moveTo(x, 2.6);
+      ctx.lineTo(x, 6);
+    }
+    ctx.stroke();
     // muzzle brake: two ports near the tip
     ctx.strokeStyle = rgba(accent, 0.8);
     ctx.lineWidth = 1.4;
@@ -598,8 +680,15 @@ export class Shooter {
       ctx.arc(0, 0, 6, a, a + 0.7);
     }
     ctx.stroke();
+    /*
+     * The core glow is drawn last and over everything, so at 0.6 plus heat it
+     * was a white disc across the middle of the machine and the iris, the
+     * rings and the inner bevel were all underneath it. Held to a ceiling, and
+     * with the heat going into its COLOUR rather than its brightness.
+     */
     ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, accent, 0, 0, this.r * 0.8, 0.6 + 0.2 * Math.sin(t * 4) + this.heat * 0.5);
+    const lit = Math.min(0.72, 0.34 + 0.1 * Math.sin(t * 4) + this.heat * 0.28);
+    drawGlow(ctx, this.heat > 0.35 ? '#ffd6a0' : accent, 0, 0, this.r * 0.66, lit);
     ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
@@ -628,6 +717,16 @@ export class Shooter {
     if (world.rig && world.rigAt === taken.length) return world.rig;
     const rig = { rate: 0, slew: 0, aimrange: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0 };
     for (const id of taken) if (id in rig) rig[id]++;
+    /*
+     * ...and how much of the branch is on, as one number.
+     *
+     * Every part could be seen individually and there was nothing that said
+     * FINISHED -- a fully rigged turret was a turret with a lot on it, which
+     * at this scale reads as clutter rather than as an achievement. The
+     * housing, the rings and the mount all lean on this: the machine closes
+     * up and lights as the last sockets fill.
+     */
+    rig.filled = Object.values(rig).reduce((a, b) => a + b, 0) / RIG_MAX;
     world.rig = rig;
     world.rigAt = taken.length;
     return rig;
@@ -875,100 +974,177 @@ export class Shooter {
     const len = CFG.shooter.gripLen;
     const gx = this.gripX;
     const gy = this.gripY;
-    const glow = this.gripGlow;
+    const held = this.gripGlow;
     const gr = CFG.shooter.gripR;
     const clamp2 = CFG.shooter.aimClamp;
-    const held = glow;
+    const down = Math.PI / 2;
+    const now = this.gripAngle;
+    const swing = (now - down) / clamp2; // -1 .. 1 across the travel
 
     /*
      * The control column. It is the one thing on screen a thumb is actually
-     * on, so it is built like a control: a detented travel arc that says where
-     * the ends are, a shaft with a collar at the pivot, and a grip with finger
-     * ridges rather than a disc with spokes. Everything on it answers to
-     * `gripGlow`, which is how hard it is being held.
+     * on, so it is built like a control rather than like a line with a knob:
+     * a rail with hard stops at the ends, an ARTICULATED arm with a hinge in
+     * the middle of it, and a grip that is also a gauge.
+     *
+     * The arm is the change that does the work. A straight rod from the mount
+     * to the grip is the same picture at every angle -- it slides, it does not
+     * operate. A two-segment arm with a knee bows as it swings, so pulling the
+     * handle over visibly works a linkage, and the machine reads as something
+     * that is being driven rather than dragged.
      */
 
-    // travel arc, with detents at the ends and the middle
-    ctx.strokeStyle = rgba(accent, 0.14 + held * 0.26);
-    ctx.lineWidth = HAIRLINE * 1.4;
-    ctx.setLineDash([HAIRLINE * 6, HAIRLINE * 8]);
+    // ---- the rail: a solid track, hard stops, and the stretch travelled ----
+    ctx.strokeStyle = rgba(accent, 0.1 + held * 0.14);
+    ctx.lineWidth = HAIRLINE * 3.4;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, len, Math.PI / 2 - clamp2, Math.PI / 2 + clamp2);
+    ctx.arc(this.x, this.y, len, down - clamp2, down + clamp2);
     ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.strokeStyle = rgba(accent, 0.3 + held * 0.4);
-    ctx.lineWidth = HAIRLINE * 1.6;
-    ctx.beginPath();
-    for (let i = -2; i <= 2; i++) {
-      const a = Math.PI / 2 + (i / 2) * clamp2;
+    for (const e of [-1, 1]) {
+      const a = down + e * clamp2;
       const c = Math.cos(a);
       const sn = Math.sin(a);
-      const tick = i === 0 ? 7 : 5;
-      ctx.moveTo(this.x + c * (len - tick), this.y + sn * (len - tick));
-      ctx.lineTo(this.x + c * (len + tick), this.y + sn * (len + tick));
+      ctx.strokeStyle = rgba(accent, 0.34 + held * 0.4);
+      ctx.lineWidth = HAIRLINE * 2.2;
+      ctx.beginPath();
+      ctx.moveTo(this.x + c * (len - 9), this.y + sn * (len - 9));
+      ctx.lineTo(this.x + c * (len + 9), this.y + sn * (len + 9));
+      ctx.stroke();
     }
-    ctx.stroke();
-
-    // the stretch of arc already travelled, lit, so the swing has a readout
-    const now = Math.atan2(gy - this.y, gx - this.x);
-    ctx.strokeStyle = rgba(accent, 0.28 + held * 0.5);
-    ctx.lineWidth = HAIRLINE * 2.6;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, len, Math.min(Math.PI / 2, now), Math.max(Math.PI / 2, now));
-    ctx.stroke();
-
-    // shaft: a dark rod with a lit spine down it, and a collar at the pivot
-    ctx.strokeStyle = rgba('#22384e', 0.95);
-    ctx.lineWidth = HAIRLINE * 7;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(this.x, this.y);
-    ctx.lineTo(gx, gy);
-    ctx.stroke();
-    ctx.strokeStyle = rgba(accent, 0.45 + held * 0.55);
-    ctx.lineWidth = HAIRLINE * 1.8;
-    ctx.stroke();
-    ctx.lineCap = 'butt';
-
-    // pivot collar
-    const ca = Math.atan2(gy - this.y, gx - this.x);
-    ctx.save();
-    ctx.translate(this.x + Math.cos(ca) * 16, this.y + Math.sin(ca) * 16);
-    ctx.rotate(ca);
-    ctx.fillStyle = 'rgba(12,24,38,0.98)';
-    ctx.strokeStyle = rgba(accent, 0.6);
+    // centre detent, drawn as a notch rather than another tick
+    ctx.strokeStyle = rgba(accent, 0.24 + held * 0.3);
     ctx.lineWidth = HAIRLINE * 1.6;
-    roundRectPath(ctx, -5, -7, 10, 14, 2.5);
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y + len - 6);
+    ctx.lineTo(this.x, this.y + len + 6);
+    ctx.stroke();
+    ctx.strokeStyle = rgba(accent, 0.3 + held * 0.55);
+    ctx.lineWidth = HAIRLINE * 3;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, len, Math.min(down, now), Math.max(down, now));
+    ctx.stroke();
+
+    /*
+     * ---- the arm ----
+     *
+     * The knee always bows the same way, so the linkage has a handedness and
+     * the two segments never straighten into the rod this replaced. It opens
+     * a little as the handle is pulled off centre, which is the geometry a
+     * real bell crank has and reads as effort.
+     */
+    const ex = (this.x + gx) / 2;
+    const ey = (this.y + gy) / 2;
+    const bow = 11 + Math.abs(swing) * 7;
+    const px = -(gy - this.y) / len;
+    const py = (gx - this.x) / len;
+    const kx = ex + px * bow;
+    const ky = ey + py * bow;
+
+    const limb = (ax, ay, bx, by) => {
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(10,20,33,0.97)';
+      ctx.lineWidth = HAIRLINE * 8;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+      ctx.strokeStyle = rgba(accent, 0.28 + held * 0.3);
+      ctx.lineWidth = HAIRLINE * 5.4;
+      ctx.stroke();
+      ctx.strokeStyle = rgba(accent, 0.5 + held * 0.5);
+      ctx.lineWidth = HAIRLINE * 1.6;
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+    };
+    limb(this.x, this.y, kx, ky);
+    limb(kx, ky, gx, gy);
+
+    // the knee: a hinge pin, so the join is a joint and not a kink
+    ctx.fillStyle = 'rgba(7,15,25,0.98)';
+    ctx.strokeStyle = rgba(accent, 0.6 + held * 0.4);
+    ctx.lineWidth = HAIRLINE * 1.8;
+    ctx.beginPath();
+    ctx.arc(kx, ky, 5.2, 0, TAU);
     ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = rgba(accent, 0.45 + held * 0.5);
+    ctx.beginPath();
+    ctx.arc(kx, ky, 1.7, 0, TAU);
+    ctx.fill();
+
+    // the yoke at the mount: a fork the first segment is pinned into
+    const ya = Math.atan2(ky - this.y, kx - this.x);
+    ctx.save();
+    ctx.translate(this.x + Math.cos(ya) * 15, this.y + Math.sin(ya) * 15);
+    ctx.rotate(ya);
+    ctx.fillStyle = 'rgba(12,24,38,0.98)';
+    ctx.strokeStyle = rgba(accent, 0.55 + held * 0.35);
+    ctx.lineWidth = HAIRLINE * 1.6;
+    roundRectPath(ctx, -6, -8.5, 12, 17, 3);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = rgba(accent, 0.3 + held * 0.4);
+    ctx.lineWidth = HAIRLINE * 1.4;
+    ctx.beginPath();
+    ctx.moveTo(-2.5, -8.5); ctx.lineTo(-2.5, 8.5);
+    ctx.moveTo(2.5, -8.5); ctx.lineTo(2.5, 8.5);
     ctx.stroke();
     ctx.restore();
 
-    // grip
+    // ---- the grip ----
     ctx.save();
     ctx.translate(gx, gy);
     ctx.rotate(this.gripAngle);
     ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, accent, 0, 0, gr * 2.4 + held * 30, 0.2 + held * 0.45);
+    drawGlow(ctx, accent, 0, 0, gr * 2.4 + held * 30, 0.18 + held * 0.42);
     ctx.globalCompositeOperation = 'source-over';
 
-    // body
     ctx.fillStyle = 'rgba(9,18,29,0.96)';
     ctx.strokeStyle = rgba(accent, 0.8 + held * 0.2);
-    ctx.lineWidth = HAIRLINE * 2.2;
+    ctx.lineWidth = HAIRLINE * 2.4;
     ctx.beginPath();
     ctx.arc(0, 0, gr, 0, TAU);
     ctx.fill();
     ctx.stroke();
 
-    // finger ridges: four arcs round the rim, offset, not spokes
-    ctx.strokeStyle = rgba(accent, 0.3 + held * 0.45);
-    ctx.lineWidth = HAIRLINE * 2;
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * TAU + t * 0.35;
-      ctx.beginPath();
-      ctx.arc(0, 0, gr * 0.78, a, a + 0.85);
-      ctx.stroke();
+    /*
+     * Knurling, not spokes. Short radial marks round the rim are what a thing
+     * meant to be gripped has; the four sliding arcs that were here instead
+     * turned with the clock, which made the grip look like it was spinning
+     * under the thumb holding it.
+     */
+    ctx.strokeStyle = rgba(accent, 0.22 + held * 0.4);
+    ctx.lineWidth = HAIRLINE * 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * TAU;
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      ctx.moveTo(c * (gr - 5.5), sn * (gr - 5.5));
+      ctx.lineTo(c * (gr - 1.5), sn * (gr - 1.5));
     }
+    ctx.stroke();
+
+    /*
+     * ...and the rim is a gauge. The turret's cadence is a timer the player
+     * has no other sight of -- the only way to know where in it you are is to
+     * watch a round leave -- so it sweeps here, under the thumb, on the one
+     * part of the machine that is being looked at while it fires.
+     */
+    const cyc = (t % CFG.shooter.gripFireInterval) / CFG.shooter.gripFireInterval;
+    ctx.strokeStyle = rgba('#ffffff', (0.25 + held * 0.55) * (1 - cyc * 0.5));
+    ctx.lineWidth = HAIRLINE * 2.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, gr - 3.2, -Math.PI / 2, -Math.PI / 2 + cyc * TAU);
+    ctx.stroke();
+
+    // thumb pad: a flat across the top of the rim, so the grip has an up
+    ctx.fillStyle = rgba(accent, 0.14 + held * 0.22);
+    ctx.beginPath();
+    ctx.arc(0, 0, gr * 0.82, -2.5, -0.64);
+    ctx.arc(0, 0, gr * 0.46, -0.64, -2.5, true);
+    ctx.closePath();
+    ctx.fill();
 
     // hub, and the trigger state in the middle of it
     ctx.fillStyle = 'rgba(5,11,18,0.98)';
@@ -990,11 +1166,10 @@ export class Shooter {
 
     // a ring off the grip on every round it sends
     if (held > 0.02) {
-      const pulse = (t % CFG.shooter.gripFireInterval) / CFG.shooter.gripFireInterval;
-      ctx.strokeStyle = rgba(accent, (1 - pulse) * held * 0.75);
+      ctx.strokeStyle = rgba(accent, (1 - cyc) * held * 0.75);
       ctx.lineWidth = HAIRLINE * 1.6;
       ctx.beginPath();
-      ctx.arc(gx, gy, gr + pulse * 20, 0, TAU);
+      ctx.arc(gx, gy, gr + cyc * 20, 0, TAU);
       ctx.stroke();
     }
   }

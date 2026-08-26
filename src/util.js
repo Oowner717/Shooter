@@ -118,3 +118,118 @@ export function drawGlow(ctx, color, x, y, r, alpha = 1) {
 export const svgMark = (body, w = 1.7) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}"
      stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+
+/**
+ * Deterministic noise for lightning, in -1..1.
+ *
+ * Not `Math.random`. The draw runs off the same stream the simulation does, so
+ * a bolt that rerolled from it would also reroll the fight -- the seeded run in
+ * `fight.mjs --hash` stops reproducing the moment anything is drawn. Hashed off
+ * the point index, a per-bolt seed and a STEPPED clock: stepped because
+ * lightning crackles rather than undulates, and a smooth function of time is a
+ * wobble.
+ */
+export function jag(i, seed, tick) {
+  const x = Math.sin(i * 127.1 + seed * 311.7 + tick * 74.7) * 43758.5453;
+  return (x - Math.floor(x)) * 2 - 1;
+}
+
+/**
+ * The points of one bolt, jagged in proportion to how far it has to go.
+ *
+ * Both numbers were constants in the two places this used to live -- seven
+ * segments and nine units of offset in DYNAMO's, one quadratic kink in the ARC
+ * round's. Fixed, they are fine over a link between two pylons at a hundred and
+ * ninety units and are a straight line over a nine-hundred-unit curtain: seven
+ * segments of a hundred and twenty-eight units each, deviating by four degrees.
+ *
+ * So the segment count and the amplitude both scale with the span, and the
+ * offset is two octaves rather than one: a long swing down the length with a
+ * per-point jag on top of it. One octave of anything smooth is a rope; the
+ * second octave is what makes it lightning. Points are displaced ALONG the run
+ * as well as across it, which is the difference between lightning and a zigzag
+ * -- evenly spaced points with only a sideways offset give every segment the
+ * same length and the same cadence.
+ */
+export function boltPath(ax, ay, bx, by, seed, tick, amp = 1) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len = Math.hypot(dx, dy) || 1;
+  const px = -dy / len;
+  const py = dx / len;
+  const n = clamp(Math.round(len / 26), 5, 30);
+  const wide = clamp(len * 0.075, 6, 40) * amp;
+  const pts = [ax, ay];
+  for (let i = 1; i < n; i++) {
+    const k = i / n;
+    const swing = jag(i, seed, tick) * 0.7 + jag(i * 4.3, seed + 9, tick) * 0.3;
+    // Pinned at both ends, widest in the middle: a bolt starts and finishes
+    // where it was aimed and does what it likes in between.
+    const j = swing * wide * Math.sin(k * Math.PI) ** 0.55;
+    const along = jag(i * 2.9, seed + 4, tick) * 0.42 / n;
+    pts.push(ax + dx * (k + along) + px * j, ay + dy * (k + along) + py * j);
+  }
+  pts.push(bx, by);
+  return pts;
+}
+
+/**
+ * ...and one bolt, drawn: three passes down the same path, and forks.
+ *
+ * The three passes -- a wide haze, a body, a thin white core -- are what make a
+ * stroke look hot rather than drawn, and they are why nothing needs to lay a
+ * straight gradient over the top of its own jagged line. That straight band was
+ * most of what the eye read.
+ *
+ * The forks are what say electricity. A line from one point to another and
+ * nowhere else reads as a wire however jagged it is; these come off the middle
+ * of the run, go a fraction of the way, and end in the air.
+ */
+export function drawBolt(ctx, ax, ay, bx, by, opts = {}) {
+  const glow = opts.glow || '#7fb0ff';
+  const hot = opts.hot || '#dceaff';
+  const bright = opts.bright !== false;
+  const alpha = opts.alpha ?? 1;
+  const w = opts.width || 1;
+  const seed = opts.seed || 0;
+  const tick = opts.tick || 0;
+  const pts = boltPath(ax, ay, bx, by, seed, tick, opts.amp);
+  const trace = () => {
+    ctx.beginPath();
+    ctx.moveTo(pts[0], pts[1]);
+    for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+    ctx.stroke();
+  };
+  const cap = ctx.lineCap;
+  const join = ctx.lineJoin;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = rgba(glow, (bright ? 0.2 : 0.15) * alpha);
+  ctx.lineWidth = (bright ? 11 : 6) * w;
+  trace();
+  ctx.strokeStyle = rgba(bright ? hot : glow, (bright ? 0.55 : 0.42) * alpha);
+  ctx.lineWidth = (bright ? 4 : 2.2) * w;
+  trace();
+  ctx.strokeStyle = rgba('#ffffff', (bright ? 0.9 : 0.5) * alpha);
+  ctx.lineWidth = (bright ? 1.6 : 1) * w;
+  trace();
+
+  const forks = opts.forks ?? (bright ? 2 : 0);
+  for (let f = 0; f < forks; f++) {
+    const at = 0.3 + jag(f * 17 + 3, seed, tick) * 0.12 + f * 0.22;
+    const i = Math.max(2, Math.min(pts.length - 4, Math.round((pts.length / 2) * at) * 2));
+    const fx = pts[i];
+    const fy = pts[i + 1];
+    const a = Math.atan2(by - ay, bx - ax)
+      + (jag(f * 5 + 1, seed + 3, tick) > 0 ? 1 : -1)
+      * (0.5 + Math.abs(jag(f * 11, seed + 7, tick)) * 0.5);
+    const run = Math.hypot(bx - ax, by - ay)
+      * (0.16 + Math.abs(jag(f, seed + 2, tick)) * 0.2);
+    drawBolt(ctx, fx, fy, fx + Math.cos(a) * run, fy + Math.sin(a) * run, {
+      glow, hot, bright: false, alpha: alpha * 0.8, width: w * 0.7,
+      seed: seed + 31 + f * 13, tick, forks: 0,
+    });
+  }
+  ctx.lineCap = cap;
+  ctx.lineJoin = join;
+}

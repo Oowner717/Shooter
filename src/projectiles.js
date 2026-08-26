@@ -2,7 +2,7 @@
 // 1500 px/s, earliest-hit resolution so the nearest object always takes it.
 
 import { CFG } from './config.js';
-import { TAU, rand, spread, rgba, drawGlow, segClosest } from './util.js';
+import { TAU, rand, spread, rgba, drawGlow, segClosest, drawBolt } from './util.js';
 import { spark, dot } from './fx.js';
 import { SHARD_R } from './enemies.js';
 import { audio } from './audio.js';
@@ -149,38 +149,40 @@ function chainFrom(world, first, hx, hy, jumps) {
 }
 
 /** A drawn link in an ARC chain. Pure decoration; the damage already landed. */
+/**
+ * One hop of an ARC round, as lightning rather than as a bent laser.
+ *
+ * It was a quadratic curve with a single fixed kink in it, which is a shape
+ * that reads as a whip or a tracer -- one smooth bow, no matter how far it had
+ * to reach. The bolt routine in util.js is the one DYNAMO's circuit uses:
+ * segments and amplitude scaled to the span, two octaves of offset, and forks.
+ *
+ * The seed is fixed per hop and the clock is stepped, so a hop crackles for the
+ * fifth of a second it lives rather than sitting still or smearing.
+ */
 class Arc {
   constructor(x0, y0, x1, y1) {
     this.x0 = x0; this.y0 = y0; this.x1 = x1; this.y1 = y1;
     this.life = 0.22;
     this.max = 0.22;
     this.dead = false;
-    // one fixed kink so the bolt reads as electrical, not as a laser
-    this.kink = rand(-0.3, 0.3);
+    this.seed = rand(0, 500);
+    this.t = 0;
   }
 
   update(_world, dt) {
     this.life -= dt;
+    this.t += dt;
     if (this.life <= 0) this.dead = true;
   }
 
   draw(ctx) {
-    const t = Math.max(0, this.life / this.max);
-    const mx = (this.x0 + this.x1) / 2;
-    const my = (this.y0 + this.y1) / 2;
-    const dx = this.x1 - this.x0;
-    const dy = this.y1 - this.y0;
+    const k = Math.max(0, this.life / this.max);
     ctx.globalCompositeOperation = 'lighter';
-    ctx.lineCap = 'round';
-    for (const [w, c, a] of [[7, '#59e0ff', 0.3], [2.2, '#ffffff', 0.95]]) {
-      ctx.strokeStyle = rgba(c, a * t);
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      ctx.moveTo(this.x0, this.y0);
-      ctx.quadraticCurveTo(mx - dy * this.kink, my + dx * this.kink, this.x1, this.y1);
-      ctx.stroke();
-    }
-    ctx.lineCap = 'butt';
+    drawBolt(ctx, this.x0, this.y0, this.x1, this.y1, {
+      glow: '#59e0ff', hot: '#bff0ff', alpha: k, width: 0.7,
+      seed: this.seed, tick: Math.floor(this.t * 26), forks: 2, amp: 0.8,
+    });
     ctx.globalCompositeOperation = 'source-over';
   }
 }
