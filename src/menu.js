@@ -32,6 +32,15 @@ function inBranch(n, key) {
 const $ = (id) => document.getElementById(id);
 
 /*
+ * Every level the TURRET branch sells, added up. Off the tree rather than off
+ * shooter.js's RIG_MAX, because this is the denominator of what the panel is
+ * counting and the panel counts tree nodes.
+ */
+const RIG_LEVELS = NODES
+  .filter((n) => n.id && !n.repeat && n.parent && n.parent.key === 'turret')
+  .reduce((a2, n) => a2 + (n.levels || 1), 0);
+
+/*
  * Three, not four. ARSENAL was a second screen describing the same rounds and
  * mines the tree sells — you read the specs on one tab and bought them on
  * another, and the tab you bought on said less about them than the tab you
@@ -92,6 +101,8 @@ export class Menu {
     this.el.btn.classList.toggle('on', on);
     document.body.classList.toggle('menuOpen', on);
     if (on) { this.syncCodex(); this.syncTree(); }
+    // The machine only draws while it is being looked at.
+    if (on && this.tab === 'tree') this.runHero(); else this.stopHero();
   }
 
   buildTabs() {
@@ -119,6 +130,7 @@ export class Menu {
     this.el.found.classList.toggle('show', tab === 'codex');
     if (tab === 'codex') this.syncCodex();
     if (tab === 'tree') this.syncTree();
+    if (this.open && tab === 'tree') this.runHero(); else this.stopHero();
   }
 
   panel(id, cls = '') {
@@ -157,6 +169,13 @@ export class Menu {
     for (const root of TREE) {
       p.appendChild(this.treeNode(root, 0));
     }
+    // ...and the room goes in front of all of it. Built last so the rows it
+    // reads from exist; inserted first so it is what opens.
+    // The strip is the TREE's header -- the wallet and what is within reach of
+    // it -- so it belongs against the tree rather than between the machine and
+    // the shelf, where it cost the cards forty-five pixels of screen.
+    p.insertBefore(this.buildHero(), p.firstChild);
+    p.insertBefore(this.buildShelf(), head);
 
     // The two that are never bought. They are the last thing the arsenal tab
     // held that the tree has no row for, so they sit under it as a reference.
@@ -175,6 +194,347 @@ export class Menu {
       this.cells.set(a.key, row);
     }
     p.appendChild(grid);
+  }
+
+  /*
+   * ======================= the room =========================
+   *
+   * The machine, what you have built of it, and the two cheapest things you
+   * can afford. Above the tree, because the tree could say none of it.
+   *
+   * The measurement that put it here: screenshot the panel owning nothing,
+   * buy all one hundred and thirty-six levels, screenshot again, diff below
+   * the energy strip -- zero differing pixels. The menu that upgrades the
+   * turret could not tell an empty machine from a finished one.
+   */
+
+  buildHero() {
+    const wrap = document.createElement('div');
+    wrap.className = 'rigHero';
+    const cv = document.createElement('canvas');
+    const flare = document.createElement('span');
+    flare.className = 'rigFlare';
+    const count = document.createElement('div');
+    count.className = 'rigCount';
+    wrap.appendChild(cv);
+    wrap.appendChild(flare);
+    wrap.appendChild(count);
+    this.el.rigCanvas = cv;
+    this.el.rigFlare = flare;
+    this.el.rigCount = count;
+    return wrap;
+  }
+
+  buildShelf() {
+    const wrap = document.createElement('div');
+    const lab = document.createElement('div');
+    lab.className = 'shopLab';
+    lab.innerHTML = '<span>NEXT</span><em id="shopMore"></em>';
+    wrap.appendChild(lab);
+    const shelf = document.createElement('div');
+    shelf.className = 'shelf';
+    wrap.appendChild(shelf);
+    this.el.shelf = shelf;
+    this.el.shopMore = lab.querySelector('#shopMore');
+    this.shelfAt = ['', ''];
+    return wrap;
+  }
+
+  /**
+   * One card. The whole thing is the button — the first press turns it over,
+   * the second spends. Three targets on one row is the bug menu.js already
+   * fixed once and it is not being reintroduced at a larger size.
+   */
+  shopCard(slot) {
+    const c = document.createElement('button');
+    c.type = 'button';
+    c.className = 'shopCard';
+    c.innerHTML = '<span class="shopIcon"></span>'
+      + '<span class="shopName"></span>'
+      + '<span class="shopStat"></span>'
+      + '<span class="shopMeter"></span>'
+      + '<b class="shopPrice"></b>';
+    c.addEventListener('click', () => {
+      const n = this.shelfNode && this.shelfNode[slot];
+      if (!n) return;
+      if (this.armed !== c) { this.armRow(c); this.syncTree(); return; }
+      this.armRow(null);
+      const res = this.game.buy(n.id);
+      if (res !== 'ok') this.refuseRow(c);
+      this.syncTree();
+    });
+    return c;
+  }
+
+  /**
+   * What a card says about itself, in one line.
+   *
+   * `line` is written as a stat followed by a description -- "+20% fire rate.
+   * A belt feed along the barrel." The first sentence is the number you are
+   * deciding with and the rest is flavour that was being set at 8px on all
+   * sixty-three rows. The card keeps the number.
+   */
+  /**
+   * The colour a card wears: its branch's, not its own.
+   *
+   * Most leaves carry no tone and fall back to a slate grey, so every card on
+   * the shelf came out the same colour whatever it was upgrading. The tone
+   * that means something is the nearest one up the tree -- the arm's if it
+   * hangs off one, the category's otherwise.
+   */
+  toneOf(n) {
+    const SLATE = '#9fb3c8';
+    for (let at = n; at; at = at.parent) {
+      if (at.tone && at.tone !== SLATE) return at.tone;
+    }
+    return SLATE;
+  }
+
+  statOf(n) {
+    const line = (n.line || '').trim();
+    if (!line) return '';
+    const stop = line.indexOf('. ');
+    return (stop > 0 ? line.slice(0, stop) : line.replace(/\.$/, '')).toUpperCase();
+  }
+
+  /** Everything the room shows. Driven from syncTree, so it cannot drift. */
+  syncRoom(rows) {
+    const g = this.game;
+    const w = g.world;
+
+    /*
+     * A part landed. Detected here rather than announced from Game.buy so
+     * there is one path -- anything that adds to the ledger flares, including
+     * the debug hooks, and nothing has to remember to call this.
+     */
+    const taken = w.offers.taken;
+    if (this.tookAt === undefined) this.tookAt = taken.length;
+    if (taken.length > this.tookAt) {
+      const last = NODES.find((n) => n.id === taken[taken.length - 1]);
+      this.flare(last && last.tone);
+    }
+    this.tookAt = taken.length;
+
+    // What you have built. No denominator: there are 136 levels in the tree
+    // and a run does not reach that, so a fraction of it is a failure state
+    // rather than a trophy. The turret has one because it can be finished.
+    let built = 0;
+    let rigHave = 0;
+    for (const { n } of rows) {
+      if (!n.id || n.repeat) continue;
+      const have = g.owned(n.id);
+      built += have;
+      if (n.parent && n.parent.key === 'turret') rigHave += have;
+    }
+    const say = `<b>${built}</b> BUILT<i>·</i>TURRET <b>${rigHave}</b>/${RIG_LEVELS}`;
+    if (this.el.rigCount && this.el.rigCount.innerHTML !== say) {
+      this.el.rigCount.innerHTML = say;
+    }
+
+    /*
+     * The shelf: the two cheapest things within reach. Not a catalogue -- the
+     * tree below is the catalogue, and the whole complaint about it was that
+     * it opened on one.
+     */
+    const buyable = [];
+    let cheapest = null;
+    for (const { n } of rows) {
+      if (!n.id || n.dormant || !g.available(n)) continue;
+      /*
+       * A way in is not an upgrade. APERTUREs are the cheapest things in the
+       * tree and they repeat, so cheapest-first put two of them on the shelf
+       * and left them there -- which is the fault this panel was rebuilt to
+       * fix, reproduced at a larger size. They live under ANOMALY.
+       */
+      if (n.repeat) continue;
+      const have = g.owned(n.id);
+      if (have >= (n.levels || 1)) continue;
+      const price = priceOf(n, have);
+      const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
+      if (purse >= price) buyable.push({ n, price, have });
+      else if (!n.currency && (!cheapest || price < cheapest.price)) cheapest = { n, price };
+    }
+    buyable.sort((a, b) => a.price - b.price);
+    this.shelfNode = [null, null];
+
+    const shelf = this.el.shelf;
+    if (!shelf) return;
+    if (this.el.shopMore) {
+      const more = buyable.length - 2;
+      this.el.shopMore.textContent = more > 0 ? `${more} MORE BELOW` : '';
+    }
+
+    if (!buyable.length) {
+      // Honest about being empty rather than blank. A shelf with nothing on
+      // it and no reason given reads as broken; a target reads as early.
+      const short = cheapest ? Math.ceil(cheapest.price - w.energy) : 0;
+      const say2 = cheapest
+        ? `<span>${cheapest.n.name}</span><b>${short}</b><span>MORE ENERGY</span>`
+        : '<span>NOTHING LEFT TO BUY</span>';
+      if (shelf.dataset.empty !== say2) {
+        shelf.dataset.empty = say2;
+        shelf.innerHTML = `<div class="shopNone">${say2}</div>`;
+        this.shelfAt = ['', ''];
+      }
+      return;
+    }
+    if (shelf.dataset.empty) { shelf.innerHTML = ''; delete shelf.dataset.empty; }
+
+    for (let i = 0; i < 2; i++) {
+      const pick = buyable[i];
+      let card = shelf.children[i];
+      if (pick && !(card instanceof HTMLButtonElement)) {
+        card = this.shopCard(i);
+        if (shelf.children[i]) shelf.replaceChild(card, shelf.children[i]);
+        else shelf.appendChild(card);
+        this.shelfAt[i] = '';
+      }
+      if (!pick) {
+        if (card) card.remove();
+        this.shelfAt[i] = '';
+        continue;
+      }
+      this.shelfNode[i] = pick.n;
+      const { n, price, have } = pick;
+      const max = n.repeat ? 0 : (n.levels || 1);
+      card.style.setProperty('--tone', this.toneOf(n));
+      card.querySelector('.shopIcon').innerHTML = n.icon || '';
+      const nm = card.querySelector('.shopName');
+      const at = Math.min(have, Math.max(max - 1, 0));
+      nm.textContent = n.tiers && n.tiers[at] ? n.tiers[at].name : n.name;
+      card.querySelector('.shopStat').textContent = this.statOf(n);
+      const tag = n.currency === 'remainder' ? `${price}\u25c6` : price;
+      nm.dataset.price = tag;
+      card.querySelector('.shopPrice').textContent = card === this.armed ? 'BUY' : tag;
+      card.classList.toggle('armed', card === this.armed);
+      card.classList.remove('poor');
+      // The meter, one segment per level. Three 6px hollow squares is what
+      // this replaces, which is a progress bar drawn at the size of a full
+      // stop.
+      const meter = card.querySelector('.shopMeter');
+      if (meter.children.length !== max) {
+        meter.innerHTML = '<i></i>'.repeat(max);
+      }
+      for (let k = 0; k < meter.children.length; k++) {
+        meter.children[k].classList.toggle('on', k < have);
+      }
+      // Beat four: a card that is not the one that was here slides in, so the
+      // shelf visibly re-deals instead of silently swapping.
+      const key = `${n.id}:${have}`;
+      if (this.shelfAt[i] !== key) {
+        this.shelfAt[i] = key;
+        card.classList.remove('dealt');
+        void card.offsetWidth;
+        card.classList.add('dealt');
+      }
+    }
+  }
+
+  /** Beat one: the part lands. Over the canvas, not into it — see below. */
+  flare(tone) {
+    const f = this.el.rigFlare;
+    if (!f) return;
+    f.style.setProperty('--flare', tone || '#59e0ff');
+    f.classList.remove('go');
+    void f.offsetWidth;
+    f.classList.add('go');
+  }
+
+  /**
+   * The machine, drawn from the same code the field uses.
+   *
+   * The simulation is held while the menu is open — `Game.paused` — so the
+   * world clock is stopped and anything the drawing reads off it is frozen.
+   * That is what the local clock is for: a slow sweep of the barrel so the
+   * thing is alive without the field running behind it.
+   *
+   * Capped at fifteen frames a second. A sixty-frame loop over a paused game
+   * on a phone is how the best idea in the plan becomes a frame-rate bug.
+   */
+  drawHero(now) {
+    const cv = this.el.rigCanvas;
+    const g = this.game;
+    if (!cv || !g.world || !g.world.shooter) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const box = cv.getBoundingClientRect();
+    if (!box.width) return;
+    const w = Math.round(box.width * dpr);
+    const h = Math.round(box.height * dpr);
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+
+    const s = g.world.shooter;
+    const t = now / 1000;
+    // Big enough to read the parts on. The machine grows with the rig, so the
+    // scale is against the finished radius rather than the current one.
+    const k = (h / dpr / 190) * dpr;
+    ctx.save();
+    ctx.translate(w / 2, h * 0.62);
+    ctx.scale(k, k);
+    ctx.translate(-s.x, -s.y);
+    // Borrowed, drawn, put back. The field owns these; the menu is only
+    // looking at them, and a paused turret that came back pointing somewhere
+    // else would be this panel reaching into the game.
+    const aim0 = s.aim;
+    const spin0 = s.spin;
+    s.aim = -Math.PI / 2 + Math.sin(t * 0.55) * 0.26;
+    s.spin = spin0 + t * 0.5;
+    try {
+      s.drawMachine(ctx, g.world, '#59e0ff', t, false);
+    } finally {
+      s.aim = aim0;
+      s.spin = spin0;
+      ctx.restore();
+    }
+  }
+
+  /**
+   * The idle. Runs only while the sheet is open on this tab, and stops dead
+   * otherwise — there is nothing to animate on the other two.
+   */
+  runHero() {
+    if (this.heroRaf) return;
+    const tick = (now) => {
+      if (!this.open || this.tab !== 'tree') { this.heroRaf = 0; return; }
+      this.heroRaf = requestAnimationFrame(tick);
+      if (now - (this.heroAt || 0) < 66) return;
+      this.heroAt = now;
+      this.drawHero(now);
+    };
+    this.heroRaf = requestAnimationFrame(tick);
+  }
+
+  stopHero() {
+    if (this.heroRaf) cancelAnimationFrame(this.heroRaf);
+    this.heroRaf = 0;
+  }
+
+  /**
+   * Beat two: the wallet counts down rather than jumping.
+   *
+   * A quarter of a second of ticking is most of the sensation of spending;
+   * the number arriving already changed is the sensation of a form being
+   * submitted.
+   */
+  rollBank(to) {
+    const el = this.el.treeBank;
+    if (!el) return;
+    const from = this.bankShown === undefined ? to : this.bankShown;
+    this.bankShown = to;
+    if (from === to) { el.textContent = to; return; }
+    // Only a spend rolls. Energy arriving is the field's business and it has
+    // its own animation on the chip outside.
+    if (to > from || from - to > 100000) { el.textContent = to; return; }
+    cancelAnimationFrame(this.bankRaf || 0);
+    const t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min((now - t0) / 260, 1);
+      const e = 1 - (1 - p) * (1 - p);
+      el.textContent = Math.round(from + (to - from) * e);
+      if (p < 1) this.bankRaf = requestAnimationFrame(step);
+    };
+    this.bankRaf = requestAnimationFrame(step);
   }
 
   /** One row, plus its children under it. Recursive; depth drives the indent. */
@@ -433,7 +793,7 @@ export class Menu {
     if (!this.treeRows) return;
     const g = this.game;
     const w = g.world;
-    if (this.el.treeBank) this.el.treeBank.textContent = Math.floor(w.energy);
+    this.rollBank(Math.floor(w.energy));
     // The other purse, shown only once there is something in it — a currency
     // reading "0" for the first hour is a promise nobody asked for.
     const souls = this.el.treeSouls;
@@ -535,6 +895,7 @@ export class Menu {
           : '';
       this.el.treeNext.classList.toggle('reach', affordable > 0);
     }
+    this.syncRoom(this.treeRows);
   }
 
   // ---------------------------------------------------------------- arsenal

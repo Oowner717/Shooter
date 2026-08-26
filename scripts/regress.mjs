@@ -217,6 +217,61 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('each menu tab shows its own panel and only its own', oneEach, JSON.stringify(r));
 }
 
+// --- the room ---------------------------------------------------------------
+/*
+ * The panel that upgrades the turret could not tell an empty machine from a
+ * finished one: screenshot it owning nothing, buy all 136 levels, screenshot
+ * again, diff below the energy strip -- zero differing pixels. This is that
+ * gate, kept as an assertion rather than as a screenshot: the count and the
+ * shelf both have to move, and the machine has to be drawn at all.
+ */
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    const m = g.hud.menu;
+    m.setOpen(true);
+    m.show('tree');
+    const read = () => {
+      m.syncTree();
+      const cv = document.querySelector('.rigHero canvas');
+      return {
+        count: document.querySelector('.rigCount').textContent,
+        cards: [...document.querySelectorAll('.shopCard')]
+          .map((c) => c.querySelector('.shopName').textContent),
+        tones: [...document.querySelectorAll('.shopCard')]
+          .map((c) => c.style.getPropertyValue('--tone')),
+        drawn: cv ? cv.width > 0 && cv.height > 0 : false,
+      };
+    };
+    g.debugGiveEnergy(9000);
+    m.drawHero(1000);
+    const bare = read();
+    // The shelf sells upgrades. A way in to a boss is the cheapest thing in
+    // the tree and it repeats, so cheapest-first would park two APERTUREs on
+    // it and never clear them.
+    const noWays = bare.cards.every((n) => !/APERTURE/.test(n));
+    g.debugBuyAll();
+    g.debugGiveEnergy(90000);
+    m.drawHero(2000);
+    const full = read();
+    m.setOpen(false);
+    return { bare, full, noWays };
+  });
+  // Not "0 BUILT": the cases above this one have already spent energy on the
+  // same page. What is asserted is that the two states are told apart at all,
+  // and that the finished one reads as finished.
+  const num = (t) => parseInt(t, 10);
+  check('the room tells an empty machine from a finished one',
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 136
+    && /TURRET 17\/17/.test(r.full.count) && !/TURRET 17\/17/.test(r.bare.count),
+    `${r.bare.count} -> ${r.full.count}`);
+  check('the shelf re-deals, and it never sells a way in',
+    r.noWays && r.bare.cards.length === 2 && r.full.cards.length === 0
+    && r.bare.tones.every((t) => t && t !== '#9fb3c8'),
+    JSON.stringify({ bare: r.bare.cards, tones: r.bare.tones, full: r.full.cards }));
+  check('the machine is drawn in the menu that upgrades it', r.bare.drawn, JSON.stringify(r.bare.drawn));
+}
+
 // --- the volume -------------------------------------------------------------
 {
   await page.evaluate(async () => { (await import('../src/audio.js')).audio.setVolume(0.35); });

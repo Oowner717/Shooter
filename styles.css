@@ -826,7 +826,14 @@ html, body {
   left: calc(var(--safe-l) + 8px);
   right: calc(var(--safe-r) + 8px);
   bottom: calc(var(--safe-b) + 8px);
-  max-height: 74%;
+  /*
+   * The whole screen, not three quarters of it. It was `max-height: 74%`, so
+   * a quarter of the phone sat above the sheet showing a dimmed field that
+   * nothing could be done with -- and the first row you could buy started 305
+   * pixels down a 664 pixel screen, with six rows under it. The field behind
+   * is paused and scrimmed; there is nothing up there to look at.
+   */
+  top: calc(var(--safe-t) + 8px);
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, rgba(8, 15, 26, 0.97), rgba(3, 6, 12, 0.98));
@@ -901,7 +908,13 @@ html, body {
 }
 .menuTab.on { color: var(--accent); border-bottom-color: var(--accent); background: rgba(89, 224, 255, 0.06); }
 
-#menuPanels { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+#menuPanels {
+  /* The sheet has a definite height now, so the scroller has to claim what
+     is left of it rather than growing to fit its content. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+}
 .menuPanel { padding: 10px 12px 16px; }
 .menuPanel[hidden] { display: none; }
 
@@ -2583,7 +2596,9 @@ body.booting #pendingBtn {
   padding: 8px 10px;
   margin-bottom: 6px;
   border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  background: rgba(4, 10, 18, 0.96);
+  /* Opaque. At 0.96 the rows scrolled visibly through it, which does not read
+     as translucency -- it reads as a rendering fault. */
+  background: #040a12;
   clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
 }
 .treeHeadName { font-size: 9px; letter-spacing: 0.2em; color: var(--dim); }
@@ -2905,7 +2920,8 @@ body.booting #pendingBtn {
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
-.treeRow.refuse { animation: treeRefuse 0.3s ease-out; }
+.treeRow.refuse,
+.shopCard.refuse { animation: treeRefuse 0.3s ease-out; }
 @keyframes treeRefuse {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-3px); border-color: #ff5d8f; }
@@ -2945,3 +2961,245 @@ body.booting #pendingBtn {
 }
 .menuCell.armed .cellName { color: #ffcf5c; }
 .menuCell.armed .cellSub { color: rgba(255, 207, 92, 0.8); }
+
+
+/* ======================================================================
+ * THE ROOM
+ *
+ * What opens above the tree: the machine you are building, how much of it
+ * you have built, and the two cheapest things you can afford right now.
+ *
+ * The tree could say neither of the first two. Screenshot the panel owning
+ * nothing, buy all of it, screenshot again, diff below the energy strip:
+ * zero differing pixels. The only figure that moved was the wallet, which
+ * measures what you have NOT spent. So the machine goes at the top and the
+ * count goes under it, and both of them only ever grow.
+ * ====================================================================== */
+
+.rigHero {
+  position: relative;
+  margin: 0 0 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.rigHero canvas {
+  display: block;
+  width: 100%;
+  height: 150px;
+  /* The same substrate as the field, so the machine is standing somewhere. */
+  background:
+    radial-gradient(ellipse at 50% 64%, rgba(89, 224, 255, 0.09), transparent 62%),
+    repeating-linear-gradient(180deg, rgba(120, 190, 255, 0.035) 0 1px, transparent 1px 14px);
+}
+
+/*
+ * What you have built, as one line that never goes down.
+ *
+ * The total is every level of every finite node bought, and it has no
+ * denominator on purpose: there are 136 of them and a run does not reach
+ * that, so "17 OF 136" is a permanent failure state rather than a trophy.
+ * The branch beside it does have one, because the turret can actually be
+ * finished -- and it is the branch the drawing above is made of.
+ */
+.rigCount {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: #7f93a8;
+  padding: 3px 0 9px;
+  text-align: center;
+}
+.rigCount b {
+  color: #59e0ff;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.rigCount i { font-style: normal; color: #4d6076; margin: 0 6px; }
+
+/* The flare a new part lands with. Drawn over the canvas rather than into
+   it: the simulation is held while the menu is open, so the machine's own
+   clock is stopped and anything driven off it would never decay. */
+.rigFlare {
+  position: absolute;
+  left: 50%;
+  /* On the machine, which drawHero centres at 0.62 of the canvas height. */
+  top: 93px;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  border: 2px solid var(--flare, #59e0ff);
+  opacity: 0;
+  pointer-events: none;
+}
+.rigFlare.go { animation: rigFlare 0.42s cubic-bezier(0.15, 0.8, 0.3, 1) 1; }
+@keyframes rigFlare {
+  0% { opacity: 0.95; transform: scale(0.4); }
+  100% { opacity: 0; transform: scale(6.2); }
+}
+
+/* ---------------------------------------------------------------- the shelf */
+
+.shopLab {
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: #56687e;
+  padding: 8px 2px 7px;
+  border-top: 1px solid rgba(120, 190, 255, 0.12);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.shopLab em { font-style: normal; color: #3f5165; letter-spacing: 0.1em; }
+
+.shelf { display: flex; gap: 8px; margin-bottom: 12px; }
+
+/*
+ * One object, one target.
+ *
+ * The tree row has three: the gutter opens it, the body arms it, the price
+ * buys it. That is the thing menu.js already fixed once and it is not being
+ * reintroduced at a larger size -- the whole card is the button, the first
+ * press turns it over, the second spends.
+ */
+.shopCard {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 168px;
+  padding: 12px 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: var(--ink);
+  border: 1px solid var(--tone, #59e0ff);
+  background: rgba(6, 12, 22, 0.86);
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+  box-shadow: 0 0 16px -4px color-mix(in srgb, var(--tone, #59e0ff) 42%, transparent);
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.14s, box-shadow 0.14s, transform 0.1s;
+}
+.shopCard:active { transform: translateY(1px); }
+
+/* The art at the size it was drawn for. It was rendering at 18. */
+.shopIcon { width: 44px; height: 44px; color: var(--tone, #59e0ff); }
+.shopIcon svg { width: 44px; height: 44px; display: block; }
+
+.shopName {
+  display: block;
+  font-size: 16px;
+  letter-spacing: 0.1em;
+  color: #e6f1fb;
+  margin-top: 9px;
+  line-height: 1.15;
+}
+.shopStat {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.35;
+  /* 8.4:1 on this ground. The row it replaces was 8px at 2.99:1. */
+  color: #9fb8d2;
+  margin-top: 5px;
+}
+.shopMeter {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 4px;
+  margin-top: auto;
+  margin-bottom: 9px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.shopMeter i {
+  flex: 1 1 0;
+  background: transparent;
+  transition: background 0.18s ease;
+}
+.shopMeter i.on { background: var(--tone, #59e0ff); }
+.shopPrice {
+  display: block;
+  width: calc(100% + 16px);
+  margin: 0 -8px;
+  padding: 8px 0;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: #05080f;
+  background: var(--tone, #59e0ff);
+}
+
+/* Too dear: the same size, dimmed. Legible is a state; gone is not. */
+.shopCard.poor {
+  border-color: color-mix(in srgb, var(--tone, #59e0ff) 30%, transparent);
+  box-shadow: none;
+}
+.shopCard.poor .shopIcon { opacity: 0.45; }
+.shopCard.poor .shopName { color: #7d8ea1; }
+.shopCard.poor .shopPrice { background: transparent; color: #6a7e93; }
+
+/*
+ * Armed. The card turns over instead of a border changing hue: the price
+ * fills the face and the whole thing says what the next press does.
+ */
+.shopCard.armed { border-color: #ffffff; }
+/*
+ * `display`, not `visibility`. Hidden-but-laid-out, the icon and the stat
+ * still held their 60-odd pixels, the name and the big price were added on
+ * top, and the BUY bar was pushed past the bottom edge -- where the card's
+ * own clip-path cut it off. The button said nothing at all.
+ */
+.shopCard.armed .shopIcon,
+.shopCard.armed .shopStat,
+.shopCard.armed .shopMeter { display: none; }
+.shopCard.armed .shopName {
+  /* Two auto margins: the free space splits above the name and above the
+     bar, so the price centres and BUY stays welded to the bottom edge. */
+  margin-top: auto;
+  font-size: 15px;
+  color: var(--tone, #59e0ff);
+}
+.shopCard.armed .shopName::after {
+  content: attr(data-price);
+  display: block;
+  margin-top: 8px;
+  font-size: 30px;
+  letter-spacing: 0;
+  color: #e6f1fb;
+  font-variant-numeric: tabular-nums;
+}
+.shopCard.armed .shopPrice { margin-top: auto; background: #e6f1fb; color: #05080f; }
+
+/* Beat four: the bought card leaves and the next-cheapest arrives. */
+.shopCard.dealt { animation: shopDeal 0.2s ease-out 1; }
+@keyframes shopDeal {
+  0% { opacity: 0; transform: translateY(9px); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* Nothing affordable. Honest about it rather than empty. */
+.shopNone {
+  flex: 1 1 0;
+  height: 168px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px dashed rgba(120, 190, 255, 0.2);
+  color: #56687e;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-align: center;
+  padding: 0 10px;
+}
+.shopNone b { color: #7cffb2; font-size: 20px; font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rigFlare.go, .shopCard.dealt { animation: none; }
+}

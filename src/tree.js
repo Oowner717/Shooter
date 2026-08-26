@@ -167,7 +167,15 @@ function node(o) {
   return { levels: 1, cost: 0, children: [], ...o };
 }
 
-const ROOT_TONE = { turret: '#59e0ff', ammo: '#bff4ff', mines: '#ffb347', abilities: '#c9a7ff', anomaly: BOSS_TONE[0] };
+/*
+ * Four categories, four hues. AMMUNITION was '#bff4ff' -- twenty degrees of
+ * hue from TURRET's cyan and almost white, so the two branches that carry the
+ * most rows were the same colour. Rose is what is free: green belongs to
+ * energy and the spectrum belongs to ANOMALY. It is KNELL's tone as well, but
+ * KNELL is one mine deep inside another branch; two categories sharing a hue
+ * is the collision that matters.
+ */
+const ROOT_TONE = { turret: '#59e0ff', ammo: '#ff5d8f', mines: '#ffb347', abilities: '#c9a7ff', anomaly: BOSS_TONE[0] };
 const ROOT_NAME = { turret: 'TURRET', ammo: 'AMMUNITION', mines: 'MINES', abilities: 'ABILITIES', anomaly: 'ANOMALY' };
 const ROOT_LINE = {
   turret: 'The machine itself. Everything here is yours from the first frame.',
