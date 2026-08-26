@@ -928,65 +928,74 @@ Two things worth keeping from the attempt:
 
 ### The variance probe · `scripts/variance.mjs`
 
-Built, and it closed the question in two runs of itself.
+Built. And its first answer was wrong, which is the more useful half of the
+story.
 
-The turret's cadence is a timer rather than a decision — **3.31 shots a second
-in every run of every fight ever measured here** — so the whole thing collapses
-to `length = shots / 3.31 + held`. A run that took longer needed more shots.
-And every shot ends in one of five places: on the boss, on a minion, into
-armour, past zero as overkill, or nowhere at all. Partition each run's shots
-across those five by the round size measured from that run, and the terms sum
-to its total by construction; difference two runs and the gap comes out in
-seconds, term by term, with nothing left over but rounding.
+The reduction: the turret's cadence is a timer, so
+`length = rounds / roundRate + held`. A run that took longer needed more
+rounds. Every round ends in one of five places — on the boss, on a minion,
+into armour, past zero as overkill, or nowhere at all — so partition each
+run's rounds across those five by the round size measured from that run, add
+the rate term, and the difference between two runs comes out in seconds, term
+by term, with nothing left over but rounding.
 
-(The first version of the decomposition converted damage to seconds using the
-mean round and the mean cadence across runs, and left 20 seconds of a 53-second
-gap unattributed. That is what a decomposition looks like when it is a model of
-the fight rather than the fight's own arithmetic.)
+**What it got wrong.** The first version counted `shooter.shoot()` calls and
+credited a shot with a hit if any damage landed before the next one. A bolt
+crosses 380 units in a quarter of a second against a shot every three tenths,
+so hits fell in the wrong window — and the probe reported GNOMON missing 28–37%
+of everything it fired, and 41 of its 64-second gap being misses. A defect that
+did not exist, stated with a number. (`shoot()` also returns false when it
+cannot fire, so a call is not a round either.)
 
-**ORDINAL and GNOMON turn out to have nothing in common.**
+Measured properly — distinct projectiles, each watched until it leaves the
+field, times out, or is marked by the impact site it caused — **every fight
+misses between 1% and 10%, and GNOMON is the most accurate of them:**
 
-| | I ORDINAL | II GNOMON |
+| | rounds/s | missed |
 |---|---|---|
-| spread | 227–297s (26%) | 203–267s (27%) |
-| gap | 71s | 64s |
-| on the boss | **+26.6s** | +7.6s |
-| on minions | **+21.0s** | +13.3s |
-| overkill | +10.6s | — |
-| into armour | +4.6s | +1.4s |
-| shots that missed | +8.5s | **+41.5s** |
-| rounding | −0.5s | −0.6s |
+| I ORDINAL | 2.86 | 2–6% |
+| II GNOMON | 2.14 | **1–5%** |
+| III FRACTAL | 3.24 | 5–10% |
 
-**ORDINAL's variance is work the boss generated.** It put back 10.7k of health
-on the short run and 13.1k on the long one, and spawned 7.4k of DIGITs against
-10.1k. Its shot budget is otherwise identical run to run — 54/23/9/10/4 across
-the five destinations, ±2 points. The fight is self-similar; some runs just have
-more of it. Both moving terms are re-forms and spawns, and they compound: more
-work means a longer fight means more spawns.
+### What it found once it was right
 
-**GNOMON's variance is the turret missing.** 41 of its 64 seconds are shots
-that reached nothing at all, and the boss's own work barely moves — 9.4k to
-9.6k landed, 4.7k to 4.9k put back. Its baseline miss rate is **28–37% of every
-shot**, against ORDINAL's 4% and FRACTAL's 8–11%. A third of everything the
-turret produces on this fight never arrives.
+**Both loose fights vary for the same reason, and it is not shooting.** The
+boss generates a different amount of work.
 
-That is the answer the audit's three hypotheses could not have found, because
-all three were about the boss's work — the term that, on GNOMON, barely moves.
+- **ORDINAL**: on a 27-second gap, `+13.4s` of extra damage into the boss and
+  `+7.8s` into minions. It put back 11.9k of health on the short run against
+  13.1k on the long one, and spawned 8.3k of DIGITs against 9.3k.
+- **GNOMON**: on a 44-second gap, `+19.7s` into minions and `+14.9s` into the
+  boss. Misses went the *other* way — the long run missed fewer.
+
+The round budget is otherwise the same shape run to run, within a couple of
+points. The fight is self-similar; some runs simply have more of it. And the
+two terms compound: more work means a longer fight means more spawns.
+
+So the audit's three hypotheses were the right *family* after all — they were
+about the boss's work, and the boss's work is the answer. They failed because
+each fixed one mechanism while the total kept moving, not because they were
+aimed at the wrong term.
+
+**One thing nobody was looking for: the turret's output rate differs by half
+between fights.** 3.24 rounds a second on FRACTAL against 2.14 on GNOMON, on
+the same turret with nothing bought. It is stable within a boss and it is not
+`held` time, which is four or five seconds everywhere. The likely cause is
+hit-stop — a fight that kills many small bodies dilates more often than one
+that kills a few large ones — and if that is right, the fights with the most
+minions are being slowed by their own minions twice over.
 
 ### What comes next
 
-**GNOMON's miss rate is the next build.** A third of the output reaching
-nothing is a defect on its own terms before it is a variance problem, and it is
-almost certainly geometry again: the dial turns, the needle sweeps, and a shot
-fired at where an arc was arrives where it is not. `dps.mjs`'s `wide` column
-measures the half of that which is the barrel still slewing; the rest is lead.
-
-**ORDINAL's is a design question rather than a bug.** Its length is dominated
-by what it puts back — restored health runs to twice its starting structure —
-so anything that makes the re-forms bigger or smaller moves the fight bodily.
-That is the fight working as designed; if the spread matters more than the
-design, the lever is to bound what TALLY and the repair pulses restore, the way
-DYNAMO's EARTH is bounded by construction.
+- **ORDINAL and GNOMON's spread is what their re-forms and spawns do**, and
+  that is the fight working as designed. If the spread matters more than the
+  design, the lever is to bound what they restore and how many they spawn, the
+  way DYNAMO's EARTH is bounded by construction — which is exactly why DYNAMO
+  is the steadiest of the seven.
+- **The rate finding is worth one probe of its own** before anything is done
+  about it: a fifty percent difference in the turret's own output between two
+  fights is either a real design fact about hit-stop or a bug, and nothing in
+  the suite currently measures it.
 
 ## Rules this plan holds itself to
 

@@ -83,14 +83,23 @@ itself, so the terms sum to the total by construction, and then it converts the
 difference between the longest and shortest run into seconds, term by term.
 Nothing is left over but rounding.
 
-It found that ORDINAL's spread and GNOMON's have nothing in common. ORDINAL's
-26% is work the boss generated -- it put back 10.7k of health on the short run
-and 13.1k on the long one, and spawned 7.4k of DIGITs against 10.1k. GNOMON's
-27% is **the turret missing**: 41 of its 64-second gap is shots that reached
-nothing, and its baseline miss rate is 28-37% against ORDINAL's 4% and
-FRACTAL's 8-11%. Three hypotheses had been built against GNOMON's variance in
-the Phase C audit and all three were about the boss's work, which is the term
-that barely moves.
+It found that both loose fights vary for the same reason, and it is not
+shooting: **the boss generates a different amount of work.** ORDINAL puts back
+11.9k of health on a short run and 13.1k on a long one and spawns 8.3k of
+DIGITs against 9.3k; GNOMON's minions swing 5.1k to 6.3k. Nothing else moves --
+the round budget is the same shape run to run, to within a couple of points.
+
+**It got that wrong first, and the wrong answer is instructive.** The first
+version counted `shooter.shoot()` calls and credited a shot with a hit if any
+damage landed before the next one. A bolt crosses 380 units in a quarter second
+against a shot every three tenths, so hits fell in the wrong window and it
+reported GNOMON missing a third of everything -- a defect that did not exist,
+stated with a number. `shoot()` also returns false when it cannot fire, so a
+call is not a round. Measured properly -- distinct projectiles, and each one
+watched until it leaves the field, times out, or is marked by the impact site
+it caused -- every boss misses between 1% and 6%, and GNOMON is the best of
+them. The rule this suite already had, that a measurement is only as good as
+its instrument, cost a published finding to learn again.
 
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three

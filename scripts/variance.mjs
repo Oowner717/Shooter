@@ -9,15 +9,14 @@
  * came back negative, because each was a guess at one term of a sum nobody
  * had written down.
  *
- * So write the sum down. The turret fires at a near-constant rate -- 3.2 to
- * 3.3 shots a second in every measurement ever taken here, because the cadence
- * is a timer and not a decision -- which collapses the whole question to:
+ * So write the sum down. The turret's cadence is a timer rather than a
+ * decision, which collapses the whole question to:
  *
- *     length  ~=  shots / shotRate  +  held
+ *     length  ~=  rounds / roundRate  +  held
  *
- * A run is longer because it needed more shots, or because more of it was
+ * A run is longer because it needed more rounds, or because more of it was
  * spent in a beat where nothing could be shot. Nothing else is available. And
- * "needed more shots" decomposes exactly, because every shot ends up in one
+ * "needed more rounds" decomposes exactly, because every round ends up in one
  * of four places:
  *
  *   ON THE BOSS      damage that actually came off a boss body's health. The
@@ -28,10 +27,19 @@
  *                    the damage the body took. Paid, never landed.
  *   OVERKILL         the part of a killing blow past zero. A body on 5hp
  *                    taking a 40 hit wastes 35 of it.
- *   MISSED           a shot that never reached anything at all -- which is
- *                    mostly the mid-sweep problem `dps.mjs` measures as
- *                    `wide`: with auto fire on, the cadence does not wait for
- *                    the barrel.
+ *   MISSED           a round that never reached anything at all -- mostly the
+ *                    mid-sweep problem `dps.mjs` measures as `wide`: with auto
+ *                    fire on, the cadence does not wait for the barrel.
+ *
+ * ROUNDS, NOT SHOTS, and impacts counted at the projectile rather than
+ * inferred. The first version of this counted `shooter.shoot()` calls and
+ * credited a shot with a hit if any damage was applied before the next one --
+ * and a bolt crosses 380 units in a quarter second against a shot every three
+ * tenths, so hits landed in the wrong window and the probe reported GNOMON
+ * missing a third of everything. Measured properly -- distinct projectiles
+ * that ever appeared on the field, against calls to the one function a
+ * projectile impact goes through -- it misses 4%. `shoot()` also returns false
+ * when it cannot fire, so a call is not a round either.
  *
  * ...and the work itself is not fixed either, which is the part the audit
  * kept guessing at. A boss that mends, repairs or re-forms ADDS health to the
@@ -101,8 +109,10 @@ for (let r = 0; r < RUNS; r++) {
 
     const v = {
       t: 0,
-      shots: 0,
-      hitShots: 0, // shots that reached something
+      rounds: 0, // distinct projectiles that ever reached the field
+      impacts: 0, // ...and how many impacts they made
+      lost: 0, // ...and how many left the field or timed out having hit nothing
+      live: new Map(), // projectile -> where it was last seen
       onBoss: 0,
       onOther: 0,
       armour: 0,
@@ -116,7 +126,7 @@ for (let r = 0; r < RUNS; r++) {
       own: new WeakSet(), // the boss's own bodies, refreshed every frame
       hp: new WeakMap(),
       seen: new WeakSet(),
-      touched: false, // did the shot in flight reach anything this call
+      shells: new WeakSet(), // projectiles already counted
     };
 
     /*
@@ -134,7 +144,6 @@ for (let r = 0; r < RUNS; r++) {
       // and the part below zero is the overkill.
       const real = before - this.hp;
       const landed = before - Math.max(0, this.hp);
-      v.touched = true;
       v.armour += Math.max(0, dmg - real);
       v.over += Math.max(0, real - landed);
       const id = (this.type && this.type.id) || '?';
@@ -144,14 +153,27 @@ for (let r = 0; r < RUNS; r++) {
       return undefined;
     };
 
-    // Every shot, and whether it reached anything. A shot is credited with a
-    // hit if any damage was applied between it leaving and the next one.
-    const shoot = w.shooter.shoot.bind(w.shooter);
-    w.shooter.shoot = (world) => {
-      if (v.touched) v.hitShots++;
-      v.touched = false;
-      v.shots++;
-      return shoot(world);
+    /*
+     * Impacts, at the one function a projectile hit goes through. Splash and
+     * contact damage reach `applyDamage` directly and are deliberately not
+     * counted here: this is asking how many ROUNDS arrived, not how many
+     * bodies were hurt.
+     */
+    const land = Enemy.prototype.takeHit;
+    Enemy.prototype.takeHit = function landed(world, dmg, ...rest) {
+      v.impacts++;
+      // The round that did it is the one nearest the hit and still alive; the
+      // hit site is passed in, so this is exact rather than a guess.
+      const [hx, hy] = rest;
+      let near = null;
+      let best = 1e9;
+      for (const p of world.projectiles) {
+        if (p.dead) continue;
+        const d = (p.x - hx) ** 2 + (p.y - hy) ** 2;
+        if (d < best) { best = d; near = p; }
+      }
+      if (near) near.__hit = true;
+      return land.call(this, world, dmg, ...rest);
     };
     window.__v = v;
   }, N);
@@ -171,6 +193,31 @@ for (let r = 0; r < RUNS; r++) {
       for (let i = 0; i < 600; i++) {
         if (!w.boss || v.t > cap) return true;
         const b = w.boss;
+
+        /*
+         * Rounds, counted as they appear. `shoot()` returns false when it
+         * cannot fire, so counting calls to it counts intentions.
+         *
+         * ...and a round is LOST if it went off the end of the field or ran
+         * out of life without ever arriving. Counted by watching each one
+         * disappear rather than by differencing rounds against impacts,
+         * because a round can impact more than once -- it ricochets off the
+         * arena sides, and a PRISM reflects it -- so the difference goes
+         * negative and a run reads 0% missed when it did not.
+         */
+        const now = new Set();
+        for (const p of w.projectiles) {
+          now.add(p);
+          if (!v.shells.has(p)) { v.shells.add(p); v.rounds++; }
+          v.live.set(p, { x: p.x, y: p.y, life: p.life, hit: p.__hit });
+        }
+        for (const [p, last] of v.live) {
+          if (now.has(p)) continue;
+          v.live.delete(p);
+          if (p.__hit) continue; // it arrived at least once
+          const out = last.x < 0 || last.x > w.width || last.y < 0 || last.y > w.height;
+          if (out || last.life <= 2 / 60) v.lost++;
+        }
 
         /*
          * Whose body is whose, refreshed every frame because a boss's parts
@@ -246,8 +293,9 @@ for (let r = 0; r < RUNS; r++) {
     const v = window.__v;
     return {
       secs: v.t,
-      shots: v.shots,
-      hitShots: v.hitShots,
+      rounds: v.rounds,
+      impacts: v.impacts,
+      lost: v.lost,
       onBoss: v.onBoss,
       onOther: v.onOther,
       armour: v.armour,
@@ -272,14 +320,14 @@ const pad = (s, n) => String(s).padStart(n);
 const k = (x) => (Math.abs(x) >= 1000 ? `${(x / 1000).toFixed(1)}k` : String(Math.round(x)));
 
 console.log(`\nANOMALY ${N} — ${RUNS} runs, why they differ\n`);
-console.log('  run    secs   shots   sh/s   miss     boss   minion   armour     over'
+console.log('  run    secs  rounds    r/s   miss     boss   minion   armour     over'
   + '  restored   held  blind');
 for (let i = 0; i < runs.length; i++) {
   const r = runs[i];
   console.log(
-    `  ${pad(i + 1, 3)}  ${pad(r.secs.toFixed(0), 6)}${pad(r.shots, 8)}`
-    + `${pad((r.shots / r.secs).toFixed(2), 7)}`
-    + `${pad(`${Math.round((100 * (r.shots - r.hitShots)) / Math.max(1, r.shots))}%`, 7)}`
+    `  ${pad(i + 1, 3)}  ${pad(r.secs.toFixed(0), 6)}${pad(r.rounds, 8)}`
+    + `${pad((r.rounds / r.secs).toFixed(2), 7)}`
+    + `${pad(`${Math.round((100 * r.lost) / Math.max(1, r.rounds))}%`, 7)}`
     + `${pad(k(r.onBoss), 9)}${pad(k(r.onOther), 9)}${pad(k(r.armour), 9)}${pad(k(r.over), 9)}`
     + `${pad(k(r.restored), 10)}${pad(r.held.toFixed(0), 7)}${pad(r.blind.toFixed(0), 7)}`,
   );
@@ -301,18 +349,17 @@ console.log(`\n  spread ${Math.round(Math.min(...secs))}-${Math.round(Math.max(.
 /*
  * The decomposition, and it is exact rather than a model.
  *
- * A shot delivers a fixed round, and that round ends up split between health
- * it took off a body, armour that refused it, and the part of a killing blow
- * past zero -- so the damage a run asked for divided by the shots that reached
- * anything IS the round, measured. Allocating each run's hit-shots across its
- * own four destinations by that ratio therefore partitions the run's shots
- * exactly: the five terms below sum to the run's total, by construction.
+ * A round's damage ends up split between health it took off a body, armour
+ * that refused it, and the part of a killing blow past zero -- so the damage a
+ * run asked for divided by the rounds that arrived IS the round, measured.
+ * Allocating each run's impacts across its own four destinations by that ratio
+ * therefore partitions the run's rounds exactly: the five terms below sum to
+ * the run's total, by construction.
  *
- * Which makes the difference between two runs a difference in shots, and a
- * difference in shots a difference in seconds at a cadence that has measured
- * 3.31/s in every run of every fight ever taken here. The only term that is
- * not shots is time the fight spent dilated, when there was nothing to fire
- * at. Nothing is left over except rounding.
+ * Which makes the difference between two runs a difference in rounds, and a
+ * difference in rounds a difference in seconds at a cadence that is a timer.
+ * The only term that is not rounds is time the fight spent dilated, when there
+ * was nothing to fire at. Nothing is left over except rounding.
  *
  * The first version of this converted damage to seconds using the MEAN
  * round-size and the MEAN cadence across runs, and left twenty seconds of a
@@ -321,15 +368,15 @@ console.log(`\n  spread ${Math.round(Math.min(...secs))}-${Math.round(Math.max(.
  */
 const budget = (r) => {
   const raw = r.onBoss + r.onOther + r.armour + r.over;
-  const per = raw / Math.max(1, r.hitShots); // the round, measured
+  const per = raw / Math.max(1, r.rounds - r.lost); // the round, measured
   const sh = (d) => d / Math.max(0.0001, per);
   return {
     boss: sh(r.onBoss),
     minion: sh(r.onOther),
     armour: sh(r.armour),
     over: sh(r.over),
-    miss: r.shots - r.hitShots,
-    rate: r.shots / r.secs,
+    miss: r.lost,
+    rate: r.rounds / r.secs,
   };
 };
 
@@ -342,7 +389,17 @@ if (RUNS > 1 && gap > 1) {
     ['on minions', (b.minion - a.minion) / rate, `${k(lo.onOther)} -> ${k(hi.onOther)}`],
     ['into armour', (b.armour - a.armour) / rate, `${k(lo.armour)} -> ${k(hi.armour)}`],
     ['overkill', (b.over - a.over) / rate, `${k(lo.over)} -> ${k(hi.over)}`],
-    ['shots that missed', (b.miss - a.miss) / rate, `${a.miss} -> ${b.miss} shots`],
+    ['rounds that missed', (b.miss - a.miss) / rate, `${a.miss} -> ${b.miss} rounds`],
+    /*
+     * ...and the cadence itself, which is not quite a constant. The turret
+     * fires on a timer, but the timer runs on scaled time and a fight spends a
+     * different amount of itself dilated, so the same number of rounds can
+     * take a different number of seconds. On ORDINAL this is a quarter of the
+     * gap; left out, it appears as "rounding" and makes the decomposition look
+     * approximate when it is not.
+     */
+    ['fire rate', hi.rounds * (1 / b.rate - 1 / a.rate),
+      `${a.rate.toFixed(2)} -> ${b.rate.toFixed(2)} rounds/s`],
     ['held, unshootable', hi.held - lo.held, `${lo.held.toFixed(0)}s -> ${hi.held.toFixed(0)}s`],
   ];
   console.log(`\n  what separates the longest run from the shortest: ${gap.toFixed(0)}s`);
@@ -367,11 +424,11 @@ if (RUNS > 1 && gap > 1) {
   }
 }
 
-console.log('\n  the shot budget, as a share of each run');
+console.log('\n  the round budget, as a share of each run');
 console.log('  run     boss  minion  armour    over    miss');
 for (let i = 0; i < runs.length; i++) {
   const bud = budget(runs[i]);
-  const tot = runs[i].shots || 1;
+  const tot = runs[i].rounds || 1;
   const pc = (x) => pad(`${Math.round((100 * x) / tot)}%`, 8);
   console.log(`  ${pad(i + 1, 3)}  ${pc(bud.boss)}${pc(bud.minion)}${pc(bud.armour)}`
     + `${pc(bud.over)}${pc(bud.miss)}`);
@@ -385,7 +442,7 @@ if (ids.length) {
   }
 }
 
-console.log('\n  miss      shots that reached nothing at all -- mostly mid-sweep');
+console.log('\n  miss      rounds that reached nothing at all -- mostly mid-sweep');
 console.log('  armour    asked-for damage a body never took');
 console.log('  overkill  the part of a killing blow past zero');
 console.log('  restored  health the boss put back: mends, repairs, re-forms');
