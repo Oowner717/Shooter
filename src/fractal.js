@@ -710,8 +710,7 @@ export class Fractal extends Boss {
     const a = rand(0, TAU);
     const p = this.pieces.find((q) => !q.dead);
     if (!p) return;
-    const t = new Enemy(TYPE_BY_ID.mite, p.x, p.y, { staged: false, spawnIn: 0.2 });
-    t.counts = false;
+    const t = this.claim(new Enemy(TYPE_BY_ID.mite, p.x, p.y, { staged: false, spawnIn: 0.2 }));
     t.vx = Math.cos(a) * rand(260, 360);
     t.vy = Math.sin(a) * rand(260, 360);
     t.thrown = 0.5;

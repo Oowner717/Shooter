@@ -399,8 +399,7 @@ export class Amplitude extends Boss {
     const from = top || this.core;
     for (let k = 0; k < C.flingOf; k++) {
       const a = Math.PI / 2 + rand(-0.5, 0.5);
-      const d = new Enemy(TYPE_BY_ID.droplet, from.x, from.y, { staged: false, spawnIn: 0.2 });
-      d.counts = false;
+      const d = this.claim(new Enemy(TYPE_BY_ID.droplet, from.x, from.y, { staged: false, spawnIn: 0.2 }));
       d.vx = Math.cos(a) * rand(120, 200);
       d.vy = Math.sin(a) * rand(160, 260);
       d.thrown = 0.45;

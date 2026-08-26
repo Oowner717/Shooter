@@ -420,8 +420,7 @@ export class Dynamo extends Boss {
     if (!ls.length) { this.shed(world); return; }
     for (let k = 0; k < C.railOf; k++) {
       const [a, b] = ls[(Math.random() * ls.length) | 0];
-      const d = new Enemy(TYPE_BY_ID.ion, a.x, a.y, { staged: false, spawnIn: 0.2 });
-      d.counts = false;
+      const d = this.claim(new Enemy(TYPE_BY_ID.ion, a.x, a.y, { staged: false, spawnIn: 0.2 }));
       // Off the ledger and off the field until it drops: while it is riding
       // it is scenery, the same way ORDINAL's garrison is scenery until a
       // panel goes. Nothing can shoot a thing that is inside a wire.
@@ -435,9 +434,8 @@ export class Dynamo extends Boss {
     const C = D();
     for (let k = 0; k < C.railOf; k++) {
       const a = rand(0, TAU);
-      const d = new Enemy(TYPE_BY_ID.ion, this.x + Math.cos(a) * (C.coreR + 8),
-        this.y + Math.sin(a) * (C.coreR + 8), { staged: false, spawnIn: 0.2 });
-      d.counts = false;
+      const d = this.claim(new Enemy(TYPE_BY_ID.ion, this.x + Math.cos(a) * (C.coreR + 8),
+        this.y + Math.sin(a) * (C.coreR + 8), { staged: false, spawnIn: 0.2 }));
       d.vx = Math.cos(a) * rand(180, 260);
       d.vy = Math.sin(a) * rand(180, 260);
       d.thrown = 0.45;

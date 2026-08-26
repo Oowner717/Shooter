@@ -1014,6 +1014,85 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `(a chunk lives ${r.chunkLife}s)`);
 }
 
+// --- nothing a boss made outlives it -----------------------------------------
+/*
+ * The outro is the payout, and it used to have a fight going on in it.
+ *
+ * A boss's death runs for eleven to nineteen seconds: the arrest, the infall,
+ * the detonation, three lines of outro read at reading speed, and the salvage
+ * walking home. Through all of it, whatever the boss last threw was still
+ * flying at the turret, still bumping it, still being shot at by an assist
+ * that had nothing else to aim at. Measured on AMPLITUDE's fourth stage, three
+ * hundred objects were on the field when the bar emptied.
+ *
+ * So every minion a boss makes is marked as its own, and the ending takes them
+ * with it -- paying out, because the energy is the player's either way, but
+ * never as kills. `counts = false` could not be the mark on its own: it is set
+ * on drift and on everything an APERTURE clears off the field as well.
+ *
+ * This walks all seven, because the mark has to be applied at every spawn site
+ * in seven files and a missed one is invisible until someone watches an outro.
+ * ORDINAL had exactly that: it keeps its own copy of the death sequence, so
+ * the fix to the base class did nothing for it and its garrison flew on.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    const { dressOf } = await import('../src/anomaly.js');
+    const out = [];
+    for (let n = 1; n <= 7; n++) {
+      g.restart();
+      w.phase = 'staging';
+      w.director.timer = 1e9; w.director.driftTimer = 1e9;
+      for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+      for (const d of [...w.drops]) d.dead = true; w.drops.length = 0;
+      w.apertures[n] = 1;
+      g.openBoss(n);
+      const b = w.boss;
+      b.arriving = 0;
+      b.settle(w);
+      g.update(1 / 60);
+
+      // Far enough in that the minion clocks have fired. Every boss releases
+      // on a timer from its later stages, so the fight has to actually run.
+      b.enterStage(w, 3);
+      const mine = () => w.enemies.filter((e) => !e.dead && e.ofBoss === n).length;
+      let held = 0;
+      for (let i = 0; i < 60 * 40 && w.boss && b.dying <= 0; i++) {
+        g.update(1 / 60);
+        held = Math.max(held, mine());
+      }
+      const before = mine();
+
+      // ...and then it dies, through its own death and not a shortcut: three
+      // of the seven trigger on something other than the core's body.
+      const key = dressOf(n).name.toLowerCase();
+      b.die(w, CFG[key]);
+      const after = mine();
+      let peak = 0;
+      for (let i = 0; i < 60 * 30 && w.boss; i++) {
+        g.update(1 / 60);
+        peak = Math.max(peak, mine());
+      }
+      out.push({ n, key, held, before, after, peak, ended: !w.boss });
+    }
+    g.restart();
+    return out;
+  });
+  const made = r.filter((x) => x.held > 0);
+  const clean = r.filter((x) => x.after === 0 && x.peak === 0);
+  check('nothing a boss made is still flying during its own outro',
+    clean.length === 7 && made.length >= 5,
+    `${made.length} of 7 had minions out during the fight (most at once: `
+    + `${r.map((x) => x.held).join('/')}); left on the field once it died: `
+    + `${r.map((x) => x.after).join('/')}; arriving during the outro: `
+    + `${r.map((x) => x.peak).join('/')}`);
+  check('...and every one of the seven reaches the end of its ending',
+    r.every((x) => x.ended), `ran out: ${r.filter((x) => x.ended).length} of 7`);
+}
+
 // --- TALLY, the one heal in the back half ------------------------------------
 /*
  * ORDINAL was the shortest of the seven at 174 seconds, and the reason is

@@ -74,14 +74,14 @@ is there to catch.
 `node scripts/variance.mjs [n] [--runs 7]` is the third of the trio and
 answers the one thing the other two cannot: **why the same fight takes a third
 longer on one run than another.** The turret's cadence is a timer rather than a
-decision -- 3.31 shots a second in every run of every fight ever measured here
--- so `length = shots / 3.31 + held`, and a run that took longer simply needed
-more shots. Every shot lands in one of five places: on the boss, on a minion,
-into armour, past zero as overkill, or nowhere at all. The probe partitions
-each run's shots across those five by the round size it measures from the run
-itself, so the terms sum to the total by construction, and then it converts the
-difference between the longest and shortest run into seconds, term by term.
-Nothing is left over but rounding.
+decision, so `length = rounds / roundRate + held`, and a run that took longer
+simply needed more rounds. Every round lands in one of five places: on the
+boss, on a minion, into armour, past zero as overkill, or nowhere at all. The
+probe partitions each run's rounds across those five by the round size it
+measures from the run itself, so the terms sum to the total by construction,
+adds a term for the cadence itself, and converts the difference between the
+longest and shortest run into seconds term by term. Nothing is left over but
+rounding.
 
 It found that both loose fights vary for the same reason, and it is not
 shooting: **the boss generates a different amount of work.** ORDINAL puts back
@@ -106,7 +106,11 @@ stale field reads (the class of bug that stopped the turret firing for three
 builds), the trigger itself, every round/mine/ability/object type running once
 without an error, a save surviving an app update while still refusing a
 malformed one, each menu tab showing only its own panel, the volume surviving
-mute-quit-return, and the broadphase seeing every overlap of the biggest body.
+mute-quit-return, the broadphase seeing every overlap of the biggest body, and
+nothing a boss made still flying during its own outro -- which walks all seven
+through their own deaths, because the mark that makes that work has to be
+applied at a spawn site in seven files and a missed one is invisible until
+somebody watches an ending.
 Add a case to it whenever something ships broken — that is the whole rule.
 
 Before build 101 this section pointed at a session scratchpad. There were 243

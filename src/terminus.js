@@ -784,8 +784,7 @@ export class Terminus extends Boss {
       const h = C.frameR[0] * 1.2;
       const x = this.fc.x + Math.cos(a) * h;
       const y = this.fc.y + Math.sin(a) * h;
-      const e = new Enemy(TYPE_BY_ID.limit, x, y, { staged: false, spawnIn: 0.25 });
-      e.counts = false;
+      const e = this.claim(new Enemy(TYPE_BY_ID.limit, x, y, { staged: false, spawnIn: 0.25 }));
       const toward = Math.atan2(world.shooter.y - y, world.shooter.x - x);
       e.vx = Math.cos(toward) * rand(140, 190);
       e.vy = Math.sin(toward) * rand(140, 190);

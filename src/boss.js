@@ -202,6 +202,47 @@ export class Boss {
     this.entry = 0;
   }
 
+  /**
+   * Mark a body as this boss's own, so the ending can take it with it.
+   *
+   * A boss's minions used to outlive it. The fight ends, the arrest holds the
+   * field, the outro reads for eleven seconds and the salvage walks home --
+   * and through all of it whatever the boss last threw is still flying at the
+   * turret, still bumping it, still being shot at. That is action during the
+   * one stretch of this game that is meant to be neither: it is the payout.
+   * Measured on AMPLITUDE's fourth stage, three hundred objects were on the
+   * field when the bar emptied.
+   *
+   * `counts = false` alone could not be the mark. It is set on drift and on
+   * every body an APERTURE clears off the field as well, so a sweep keyed to
+   * it would take things this boss never made.
+   */
+  claim(e) {
+    e.counts = false; // it is not one of the five hundred
+    e.ofBoss = this.n;
+    return e;
+  }
+
+  /**
+   * ...and the ending taking them.
+   *
+   * They pay out on the way -- this is the reward, and a minion's energy is
+   * the player's whether it was shot or not -- but none of it is a kill: you
+   * did not destroy them, the ending did. `counts` is already false on every
+   * one of them, which is what keeps the tally honest without a second flag.
+   */
+  takeMinions(world) {
+    let n = 0;
+    for (const e of [...world.enemies]) {
+      if (e.dead || e.ofBoss !== this.n) continue;
+      e.destroy(world);
+      n++;
+    }
+    for (const d of this.parked) d.dead = true;
+    this.parked.length = 0;
+    return n;
+  }
+
   /** One of this boss's bodies: fixed in place, off the ledger, off the tally. */
   body(id, x, y, r) {
     const e = new Enemy(TYPE_BY_ID[id], x, y, { staged: false, spawnIn: 0.9, r });
@@ -373,8 +414,10 @@ export class Boss {
     this.snapped = 0;
     world.timeScale = B().endSlow;
     world.bossSlow = B().slowFor;
-    for (const d of this.parked) d.dead = true;
-    this.parked.length = 0;
+    // Everything it made goes with it, on the frame it dies. The outro reads
+    // for eleven seconds and the salvage walks home through all of it; nothing
+    // this boss threw should still be arriving while that happens.
+    this.takeMinions(world);
     ring(this.x, this.y, 8, 240, 0.5, '#ffffff', 4);
     ripple(this.x, this.y, 2.4, 700);
     shake(20);
@@ -701,8 +744,7 @@ export class Ordinal extends Boss {
       const pool = live.length ? live : ring.panels;
       // Round the sides in turn rather than at random: four sides, evenly.
       const guard = pool[(k * 7 + this.wave * 3) % pool.length];
-      const d = new Enemy(TYPE_BY_ID.digit, this.x, this.y, { staged: false, spawnIn: 0 });
-      d.counts = false;
+      const d = this.claim(new Enemy(TYPE_BY_ID.digit, this.x, this.y, { staged: false, spawnIn: 0 }));
       d.guard = guard;
       d.berth = rand(0.55, 0.8); // how far in from its segment it waits
       this.parked.push(d);
@@ -900,9 +942,7 @@ export class Ordinal extends Boss {
     const C = O();
     const fresh = [];
     for (let k = 0; k < C.burstOf; k++) {
-      const d = new Enemy(TYPE_BY_ID.digit, this.x, this.y, { staged: false, spawnIn: 0 });
-      d.counts = false;
-      fresh.push(d);
+      fresh.push(this.claim(new Enemy(TYPE_BY_ID.digit, this.x, this.y, { staged: false, spawnIn: 0 })));
     }
     for (const d of fresh) {
       const a = rand(0, TAU);
@@ -1430,9 +1470,11 @@ export class Ordinal extends Boss {
     this.snapped = 0; // segments taken so far during ARREST
     world.timeScale = B().endSlow;
     world.bossSlow = B().slowFor;
-    // Everything the frames were holding is let go at once.
-    for (const d of this.parked) d.dead = true;
-    this.parked.length = 0;
+    // Everything the frames were holding is let go at once -- and everything
+    // already out on the field goes with it. ORDINAL keeps its own copy of
+    // this sequence, which is exactly how it kept its garrison flying through
+    // its own outro when the base class stopped letting the others.
+    this.takeMinions(world);
     ring(this.x, this.y, 8, 240, 0.5, '#ffffff', 4);
     ripple(this.x, this.y, 2.4, 700);
     shake(20);

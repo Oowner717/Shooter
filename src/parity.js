@@ -454,8 +454,7 @@ export class Parity extends Boss {
     if (!from) return;
     for (const s of [1, -1]) {
       const a = Math.atan2(world.shooter.y - from.y, world.shooter.x - from.x) + s * 0.42;
-      const d = new Enemy(TYPE_BY_ID.echo, from.x, from.y, { staged: false, spawnIn: 0.2 });
-      d.counts = false;
+      const d = this.claim(new Enemy(TYPE_BY_ID.echo, from.x, from.y, { staged: false, spawnIn: 0.2 }));
       d.vx = Math.cos(a) * rand(200, 280);
       d.vy = Math.sin(a) * rand(200, 280);
       d.thrown = 0.45;

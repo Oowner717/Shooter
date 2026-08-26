@@ -193,8 +193,7 @@ export class Gnomon extends Boss {
       const live = this.arcs.filter((p) => !p.dead);
       const pool = live.length ? live : this.arcs;
       const guard = pool[(k * 5 + this.wave * 3) % pool.length];
-      const d = new Enemy(TYPE_BY_ID.second, this.x, this.y, { staged: false, spawnIn: 0 });
-      d.counts = false;
+      const d = this.claim(new Enemy(TYPE_BY_ID.second, this.x, this.y, { staged: false, spawnIn: 0 }));
       d.guard = guard;
       d.berth = rand(0.58, 0.82);
       this.parked.push(d);
@@ -463,8 +462,7 @@ export class Gnomon extends Boss {
     const C = G();
     for (let k = 0; k < C.burstOf; k++) {
       const a = rand(0, TAU);
-      const d = new Enemy(TYPE_BY_ID.second, this.x, this.y, { staged: false, spawnIn: 0.2 });
-      d.counts = false;
+      const d = this.claim(new Enemy(TYPE_BY_ID.second, this.x, this.y, { staged: false, spawnIn: 0.2 }));
       d.x = this.x + Math.cos(a) * (C.coreR + 6);
       d.y = this.y + Math.sin(a) * (C.coreR + 6);
       d.vx = Math.cos(a) * rand(320, 430);
