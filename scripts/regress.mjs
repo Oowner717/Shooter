@@ -217,6 +217,105 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('each menu tab shows its own panel and only its own', oneEach, JSON.stringify(r));
 }
 
+// --- the shop's own floor ---------------------------------------------------
+/*
+ * Every word in the panel that sells things has to be readable.
+ *
+ * It was not: 434 of 460 pieces of text at 10px or under, the smallest 5.5,
+ * and the line on all sixty-three rows was 8px at 2.99:1 against a 4.5:1
+ * floor. This walks what is actually on screen, composites each element's
+ * ground through its ancestors, and measures -- so a colour that passes in
+ * isolation and fails over the surface it is actually on is still caught.
+ */
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    g.debugGiveEnergy(3000);
+    g.hud.menu.setOpen(true);
+    g.hud.menu.show('tree');
+    document.querySelectorAll('.branchRow')[1].click();
+    const px = (s) => {
+      const m = s.match(/rgba?\(([^)]+)\)/);
+      if (!m) return null;
+      const a = m[1].split(',').map(Number);
+      return { r: a[0], g: a[1], b: a[2], a: a.length > 3 ? a[3] : 1 };
+    };
+    const over = (f, b) => ({ r: f.r * f.a + b.r * (1 - f.a), g: f.g * f.a + b.g * (1 - f.a),
+      b: f.b * f.a + b.b * (1 - f.a), a: 1 });
+    const lin = (v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+    const L = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+    const cr = (x, y) => { const a = L(x); const b = L(y);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+    const bad = [];
+    const wk = document.createTreeWalker(document.querySelector('.menuPanel.tree'), NodeFilter.SHOW_TEXT);
+    let t;
+    let seen = 0;
+    while ((t = wk.nextNode())) {
+      const txt = t.nodeValue.trim();
+      if (!txt) continue;
+      const el = t.parentElement;
+      if (!el.offsetParent) continue;
+      const cs = getComputedStyle(el);
+      const fg = px(cs.color);
+      // Text painted through a gradient with background-clip reports a
+      // transparent colour; there is nothing there to measure.
+      if (!fg || fg.a === 0) continue;
+      seen++;
+      let bg = { r: 5, g: 8, b: 15, a: 1 };
+      const chain = [];
+      for (let e = el; e; e = e.parentElement) {
+        const c = px(getComputedStyle(e).backgroundColor);
+        if (c && c.a > 0) chain.unshift(c);
+      }
+      for (const c of chain) bg = over(c, bg);
+      const size = parseFloat(cs.fontSize);
+      const large = size >= 24 || (size >= 18.66 && parseInt(cs.fontWeight, 10) >= 700);
+      const ratio = cr(over(fg, bg), bg);
+      if (size < 11 || ratio < (large ? 3 : 4.5)) {
+        bad.push(`${txt.slice(0, 14)}@${size}px:${ratio.toFixed(2)}`);
+      }
+    }
+    g.hud.menu.setOpen(false);
+    return { seen, bad };
+  });
+  check('every word in the shop clears 11px and 4.5:1',
+    r.bad.length === 0 && r.seen > 20, `${r.seen} read; failing: ${r.bad.slice(0, 6)}`);
+}
+
+// --- what a purchase sounds like --------------------------------------------
+/*
+ * It was a rising arpeggio over two and a bit seconds -- five times longer
+ * than the longest thing that happens on screen when you buy something. What
+ * is asserted is the length, because that is the part that was wrong: a
+ * fitting seats, it does not get announced.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { audio } = await import('../src/audio.js');
+    // Scheduled, not rendered: the suite stubs the audio context, so what can
+    // be checked is what amend() asks for rather than what comes out.
+    const voices = [];
+    const t0 = Date.now();
+    const tone = audio.tone.bind(audio);
+    const noise = audio.noise.bind(audio);
+    audio.tone = (o) => { voices.push({ at: Date.now() - t0, dur: o.dur || 0.12, gain: o.gain }); };
+    audio.noise = (o) => { voices.push({ at: Date.now() - t0, dur: o.dur || 0.2, gain: o.gain }); };
+    const wasReady = audio.ready;
+    Object.defineProperty(audio, 'ready', { value: true, configurable: true });
+    audio.amend();
+    await new Promise((res) => setTimeout(res, 140));
+    audio.tone = tone;
+    audio.noise = noise;
+    Object.defineProperty(audio, 'ready', { value: wasReady, configurable: true });
+    const end = Math.max(...voices.map((v) => v.at / 1000 + v.dur));
+    return { voices: voices.length, endMs: Math.round(end * 1000),
+      peak: Math.max(...voices.map((v) => v.gain)) };
+  });
+  check('a purchase seats rather than chimes',
+    r.voices === 5 && r.endMs < 400 && r.peak >= 0.2,
+    `${r.voices} voices, last ends at ${r.endMs}ms, loudest ${r.peak}`);
+}
+
 // --- the room ---------------------------------------------------------------
 /*
  * The panel that upgrades the turret could not tell an empty machine from a

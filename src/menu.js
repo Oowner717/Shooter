@@ -188,8 +188,18 @@ export class Menu {
     this.el.treeSouls = head.querySelector('#treeSouls');
     this.el.treeNext = head.querySelector('#treeNext');
 
-    // The two that are never bought. They are the last thing the arsenal tab
-    // held that the tree had no row for, so they sit under it as a reference.
+  }
+
+  /*
+   * AUTO AIM and AUTO FIRE. They are not bought, so they are not for sale,
+   * so they do not belong in a shop -- they sat at the bottom of it because
+   * they were the last thing the old ARSENAL tab held that the tree had no
+   * row for. Eight pieces of text between 6.5 and 10 pixels, describing two
+   * things nobody can buy, under eighty-three things they can.
+   *
+   * They are a reference, and OBJECTS is where the references are.
+   */
+  buildAuto(p) {
     const run = ARSENAL_GROUPS.find((x) => x.id === 'auto');
     p.appendChild(heading(run.title, run.note));
     const grid = document.createElement('div');
@@ -911,6 +921,7 @@ export class Menu {
 
   buildCodex() {
     const p = this.panel('codex', 'codex');
+    this.buildAuto(p);
     p.appendChild(heading('OBJECTS', 'recorded on first kill'));
     const grid = document.createElement('div');
     grid.className = 'codexGrid';

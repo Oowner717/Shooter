@@ -292,18 +292,39 @@ class Audio {
    * the interface ever plays: three ascending fifths with a bloom under them,
    * so it is not mistaken for the top-up chime even with the phone in a pocket.
    */
+  /*
+   * A part going on to the machine.
+   *
+   * It was a rising major arpeggio -- C, G, C -- over two and a bit seconds,
+   * with a noise sweep under it. A chime: the sound of a reward being
+   * announced, and five times longer than the longest of the four things
+   * that happen on screen when you buy something (the flare is 220ms, the
+   * wallet rolls for 260, the shelf re-deals in 200). The ear was still being
+   * told about the purchase long after the eye had finished with it.
+   *
+   * A fitting seats. Three sounds inside 270ms and no melody at all:
+   *
+   *   the meet   a 35ms crack of highpassed noise, metal touching metal
+   *   the seat   a sine dropping 165Hz to 72 in 160ms, with a lowpassed
+   *              thump under it -- the weight of the thing arriving
+   *   the ring   the housing answering, two triangles a fifth apart
+   *
+   * The ring was at 45ms and a tenth of the seat's amplitude, and rendering
+   * the three offline says why that does not work: the seat is still at 0.06
+   * RMS at 45ms and the ring peaks at 0.047, so it was entirely masked -- a
+   * voice that costs two oscillators and is never heard. It lands at 70ms
+   * now, by which point the seat is down to 0.004, and it is loud enough to
+   * be the thing on top.
+   */
   amend() {
     if (!this.ready) return;
-    const root = 523.25;
-    [0, 0.11, 0.24].forEach((t, i) => {
-      const f = root * [1, 1.5, 2][i];
-      setTimeout(() => {
-        this.tone({ type: 'sine', f0: f, f1: f, dur: 1.5, gain: 0.13, attack: 0.008 });
-        this.tone({ type: 'triangle', f0: f * 2, f1: f * 2, dur: 0.5, gain: 0.05, attack: 0.006 });
-      }, t * 1000);
-    });
-    this.tone({ type: 'sine', f0: root / 2, f1: root / 2, dur: 2.2, gain: 0.09, attack: 0.05 });
-    this.noise({ dur: 0.6, gain: 0.05, f0: 900, f1: 5200, type: 'bandpass', q: 1.2 });
+    this.noise({ dur: 0.035, gain: 0.16, f0: 5400, f1: 2300, type: 'highpass', q: 0.7 });
+    this.tone({ type: 'sine', f0: 165, f1: 72, dur: 0.16, gain: 0.3, attack: 0.002 });
+    this.noise({ dur: 0.13, gain: 0.12, f0: 1400, f1: 180, type: 'lowpass', q: 0.9 });
+    setTimeout(() => {
+      this.tone({ type: 'triangle', f0: 1290, f1: 1240, dur: 0.26, gain: 0.1, attack: 0.004 });
+      this.tone({ type: 'triangle', f0: 1935, f1: 1900, dur: 0.17, gain: 0.045, attack: 0.004 });
+    }, 70);
   }
 
   chime(f = 660) {

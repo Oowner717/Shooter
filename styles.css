@@ -2693,7 +2693,7 @@ body.booting #pendingBtn {
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
 }
-.rigCount i { font-style: normal; color: #4d6076; margin: 0 6px; }
+.rigCount i { font-style: normal; color: #6d8096; margin: 0 6px; }
 
 /* The flare a new part lands with. Drawn over the canvas rather than into
    it: the simulation is held while the menu is open, so the machine's own
@@ -2722,14 +2722,18 @@ body.booting #pendingBtn {
 .shopLab {
   font-size: 11px;
   letter-spacing: 0.24em;
-  color: #56687e;
+  /* 5.8:1. It was #56687e -- 3.57:1, under the floor. A section label is
+     allowed to be quiet and is not allowed to be unreadable. */
+  color: #7d90a6;
   padding: 8px 2px 7px;
   border-top: 1px solid rgba(120, 190, 255, 0.12);
   display: flex;
   justify-content: space-between;
   align-items: baseline;
 }
-.shopLab em { font-style: normal; color: #3f5165; letter-spacing: 0.1em; }
+/* "44 MORE BELOW" is the one line that says whether opening a branch is
+   worth the tap, and it was #3f5165 at 2.5:1. */
+.shopLab em { font-style: normal; color: #72859a; letter-spacing: 0.1em; }
 
 .shelf { display: flex; gap: 8px; margin-bottom: 12px; }
 
