@@ -3256,8 +3256,175 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `carried ${r.carried}, dropped ${r.dropped}, ${r.bands} bands of frame; `
     + `core at ${r.coreInReach}; frame nearer than the core: ${r.frameShields}`);
   check('the beams strobe across the turret rather than sitting on it',
-    r.beamDuty > 0.08 && r.beamDuty < 0.6,
+    r.beamDuty > 0.05 && r.beamDuty < 0.3,
     `a beam is across the turret on ${Math.round(r.beamDuty * 100)}% of frames`);
+}
+
+// --- the last stage: wider beams, fewer of them, and less of the turn -------
+/*
+ * "A hazard that is simply on top of you for the whole stage is weather, not
+ * a threat" is this file's own line, written when DYNAMO's propeller ran
+ * stage IV at 77% corrupted frames. TERMINUS was doing the same thing and
+ * calling it a strobe: six beams at 0.46 rad/s come round every 2.3 seconds,
+ * world shock decays over about a second, and the decay never finished --
+ * measured, 58% of the last stage.
+ *
+ * The plan wanted the beams to WIDEN as the core goes, so the end of the
+ * fight is crimson wedges rather than lines. Widening alone took it to 74%.
+ * So fewer of them turn as they widen, and the test is the arithmetic that
+ * makes that work: the total share of a turn covered must not rise, while a
+ * single beam must get substantially fatter.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.apertures[7] = 1;
+    g.openBoss(7);
+    const b = w.boss;
+    b.arriving = 0;
+    b.settle(w);
+    b.stage = 4;
+    b.frameK = 0;
+    const C = CFG.terminus;
+
+    // The share of a full turn a beam is across you for, at both ends of IV.
+    const share = () => (2 * b.beamCount() * b.beamArc()) / (Math.PI * 2);
+    b.core.hp = b.core.maxHp * C.stageBare;
+    const open = { n: b.beamCount(), arc: +b.beamArc().toFixed(3), share: +share().toFixed(3) };
+    b.core.hp = 1;
+    const shut = { n: b.beamCount(), arc: +b.beamArc().toFixed(3), share: +share().toFixed(3) };
+
+    /*
+     * ...and the resurrected boundary wears the six tones. LAST CLOSE puts
+     * every segment back up -- it is the edge, and it does not stop being the
+     * edge because you took some of it away -- and the six colours bleed back
+     * to crimson over the stage rather than flashing once.
+     */
+    b.stage = 3;
+    b.openInner(w); // the second ring has to be on the field to come back up
+    for (const p of b.parts()) p.dead = true;
+    b.enterStage(w, 4);
+    const all = b.parts();
+    const tones = new Set(all.map((p) => p.tone).filter(Boolean));
+    const out = {
+      open, shut,
+      backUp: all.filter((p) => !p.dead).length,
+      total: all.length,
+      tones: tones.size,
+      fadeStart: +(b.toneFade || 0).toFixed(2),
+      toneFor: C.toneFor,
+    };
+    // ...and it fades, once the edge is back up: `reclose` runs first and
+    // nothing else in IV advances until it has.
+    for (let i = 0; i < 60 * 30; i++) g.update(1 / 60);
+    out.fadeLater = +(b.toneFade || 0).toFixed(2);
+    g.restart();
+    return out;
+  });
+  check('the beams widen as the core goes, and cover less of the turn for it',
+    r.shut.arc > r.open.arc * 1.5 && r.shut.n < r.open.n
+    && r.shut.share <= r.open.share && r.open.share < 0.25,
+    `${r.open.n} beams at ${r.open.arc} rad covering ${Math.round(r.open.share * 100)}% `
+    + `of the turn, then ${r.shut.n} at ${r.shut.arc} covering `
+    + `${Math.round(r.shut.share * 100)}%`);
+  check('the last stage puts the whole edge back, wearing the six before it',
+    r.backUp === r.total && r.total > 40 && r.tones === 6
+    && r.fadeStart === 0 && r.fadeLater > 0.1 && r.fadeLater < 1,
+    `${r.backUp} of ${r.total} segments back up in ${r.tones} tones, `
+    + `fading ${r.fadeStart} -> ${r.fadeLater} over ${r.toneFor}s`);
+}
+
+// --- III closes too, and does not crush anything ----------------------------
+/*
+ * Stage III was the weakest fifth of this fight: the frame is a compact
+ * double square, a compact double square is a splash magnet, and what was
+ * left was a core with beams on it until IV started. Two things changed.
+ *
+ * It GATHERS. `frameKeep` was only a ceiling, and ECLIPSE fires on the
+ * boundary being half spent, so the frame was usually built from fewer bodies
+ * than it wanted and the drop never ran at all -- stage III was however
+ * little happened to survive. The fallen edge is taken up into the frame now.
+ *
+ * And it CLOSES. A square boundary shrinking on the turret, which is the
+ * ring's own move in the shape the ring turned into, rather than a distant
+ * object that happens to be square. Law 3 still holds: it presses, it never
+ * crushes, and that is the number this case exists to pin.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.apertures[7] = 1;
+    g.openBoss(7);
+    const b = w.boss;
+    const s = w.shooter;
+    b.arriving = 0;
+    b.settle(w);
+    b.enterStage(w, 2);
+    g.update(1 / 60);
+    const C = CFG.terminus;
+
+    // Spend the boundary the way ECLIPSE guarantees it will be spent.
+    const all = b.parts();
+    for (let i = 0; i < all.length; i++) if (i % 4) all[i].dead = true;
+    const left = b.parts().filter((p) => !p.dead).length;
+    b.enterStage(w, 3);
+    for (let i = 0; i < 60 * 4; i++) g.update(1 / 60);
+    const out = { left, gathered: b.parts().filter((p) => !p.dead).length, keep: C.frameKeep };
+
+    // Now close it, and watch what the nearest body ever does.
+    out.high = Math.round(s.y - b.fc.y);
+    let near = Infinity;
+    // How far the frame reaches from its own middle, read at both ends of the
+    // close: the shrink IS the closing here, so it is the thing to measure.
+    const span = () => Math.round(Math.max(...b.parts().filter((p) => !p.dead && !p.hidden)
+      .map((p) => Math.max(Math.abs(p.x - b.fc.x), Math.abs(p.y - b.fc.y)))));
+    out.wide0 = span();
+    for (let i = 0; i < 60 * (C.shutFor + 6); i++) {
+      g.update(1 / 60);
+      if (!w.boss || b.stage !== 3) break;
+      for (const p of b.parts()) {
+        if (p.dead || p.hidden) continue;
+        near = Math.min(near, Math.hypot(p.x - s.x, p.y - s.y) - (p.r || 0));
+      }
+    }
+    out.wide1 = span();
+    out.shut = +(b.shut || 0).toFixed(2);
+    out.low = Math.round(s.y - b.fc.y);
+    out.near = Math.round(near);
+    out.want = C.frameClose;
+    g.restart();
+    return out;
+  });
+  check('III gathers the fallen edge instead of only dropping the surplus',
+    r.gathered === r.keep && r.gathered > r.left,
+    `${r.left} segments survived to III, and the frame carries ${r.gathered} `
+    + `of a wanted ${r.keep}`);
+  /*
+   * It closes by drawing in -- the ring's own move, in the shape the ring
+   * turned into -- and it comes down a little as well. The corner is what
+   * law 3 binds: a square that turns puts a corner sqrt(2) out directly under
+   * its centre twice a turn, which is why closing by descent alone drove it
+   * to within fourteen units of the turret, and why `frameR` had to come down
+   * from 190 to fix a violation that predates any of this.
+   */
+  check('III closes on the turret, and law 3 holds while it does',
+    r.shut >= 0.99 && r.low < r.high && Math.abs(r.low - r.want) < 6
+    && r.wide1 < r.wide0 * 0.8 && r.near > 80,
+    `the frame drew in from ${r.wide0} to ${r.wide1} and came from ${r.high} `
+    + `above the turret to ${r.low} (wanted ${r.want}); nothing of it ever got `
+    + `nearer than ${r.near}`);
 }
 
 /*

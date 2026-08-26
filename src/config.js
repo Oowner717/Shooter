@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '143';
+export const BUILD = '144';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '143';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '56db987';
+export const REV = '04c733c';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1778,7 +1778,7 @@ export const CFG = {
     armorPatrol: 0.55,
     armorMend: 0.05,
     // Stages.
-    stageInner: 0.78, // outer-ring fraction that brings the second ring
+    stageInner: 0.88, // outer-ring fraction that brings the second ring
     /*
      * What opens ECLIPSE, and there are two doors into it because the fight
      * has two clocks.
@@ -1800,7 +1800,7 @@ export const CFG = {
      * lone core. IV is where the interesting half of this fight lives now, so
      * IV gets most of the bar.
      */
-    stageBare: 0.72,
+    stageBare: 0.62,
     /*
      * ECLIPSE. Both rings slam to the floor and hold, and each segment in
      * turn flashes one of the six prior tones, magenta round to violet,
@@ -1832,7 +1832,7 @@ export const CFG = {
      * went in about twenty seconds. Spread out they are a silhouette you get
      * to look at.
      */
-    frameR: [190, 118],
+    frameR: [170, 106],
     frameFor: 2.6, // seconds of the segments flying to their places
     /*
      * ...and how much of the boundary it can carry. What it cannot, it drops.
@@ -1842,11 +1842,79 @@ export const CFG = {
      * of the fight. Sixteen is a double square with a readable outline and
      * about eighty seconds of work in it.
      */
-    frameKeep: 20,
+    frameKeep: 30,
+    /*
+     * ...and what it is short of, it takes back.
+     *
+     * `frameKeep` was only ever a ceiling, and by III the boundary is spent
+     * by construction -- ECLIPSE fires on the ring being half gone -- so the
+     * frame was usually built from fewer bodies than it wanted and the drop
+     * never ran. It is a floor as well now: the fallen edge is gathered into
+     * the frame rather than left on the circle. Stage III was the weakest
+     * fifth of this fight and this is where its length comes from.
+     */
+    frameHp: 0.7,
+    /*
+     * III closes too.
+     *
+     * The plan's own words: a square boundary shrinking on the turret, the
+     * same idea as the ring in a different shape, rather than a distant
+     * object that happens to be square. It comes from `frameAt` down to
+     * `frameClose` and draws in by `shutBy` over `shutFor` seconds.
+     *
+     * It closes by DRAWING IN, which is the ring's own move rather than a
+     * different one: the ring contracts, it does not descend, and a square
+     * boundary contracting around its centre is the same picture. The descent
+     * is a garnish on top of it.
+     *
+     * That is not the shape the first attempt took, and the reason is law 3.
+     * The frame turns, so a corner of the outer square passes directly under
+     * `fc` twice a turn -- and a corner is `sqrt(2)` further out than a side.
+     * Closing by coming DOWN therefore drives the corner into the turret: at
+     * 270 and a 16% draw-in it passed within fourteen units. Chasing it with
+     * more draw-in does not help either, because past a point the shrinking
+     * corner recedes faster than the frame descends and the thing stops
+     * closing at all.
+     *
+     * The corner is also why `frameR` came down from [190, 118]. At 190 the
+     * outer corner was 269 out and the frame sits 360 above the turret, so it
+     * passed within 61 units -- a law 3 violation that predates all of this
+     * and had no case watching it. At 170 the worst it ever gets is 90.
+     */
+    frameClose: 320,
+    shutBy: 0.44,
+    shutFor: 34,
     beams: 4,
-    beamsLate: 6, // ...and six for the last stage
+    /*
+     * ...and the last stage does not get MORE beams, it gets bigger ones.
+     *
+     * What decides how much of a stage is corrupted is not how wide a beam is
+     * but how often one comes round: world shock decays over about a second,
+     * so each crossing smears. Six beams at 0.46 rad/s cross every 2.3
+     * seconds and the decay never finishes -- which is how stage IV measured
+     * 58% of its frames corrupted while the code called it a strobe.
+     */
+    beamsLate: 5,
     beamSpin: 0.46,
-    beamArc: 0.16, // radians either side of a beam that count as across it
+    beamArc: 0.09, // radians either side of a beam that count as across it
+    /*
+     * ...and they widen as the core goes, while FEWER of them turn.
+     *
+     * The widening is the plan's: the last of this fight should be crimson
+     * wedges rather than lines, and it is the only escalation here that is
+     * not a change of shape. The merging is the measurement's. Six beams at
+     * the old 0.16 covered 31% of every turn, and corruption smears -- world
+     * shock decays over about half a second -- so stage IV was measured at
+     * 58% of its frames corrupted BEFORE any of this was touched, which is
+     * the definition this file already uses for weather rather than threat.
+     * Widening alone would have taken it to 74%.
+     *
+     * Six narrow beams becoming three wide ones is more dramatic and less
+     * constant at the same time: 19% of the turn at the start of IV and 21%
+     * at the end, against 31% flat before.
+     */
+    beamsLast: 2,
+    beamWiden: 1.6,
     beamShock: 0.3,
     beamLen: 900,
     /*
@@ -1869,7 +1937,14 @@ export const CFG = {
     recloseFor: 2.4,
     // ...and what the boundary comes back at. Not a heal it chooses -- a
     // scripted resurrection, the way PARITY's death puts its panes back.
-    recloseHp: 0.35,
+    recloseHp: 0.7,
+    /*
+     * ...and it comes back wearing the six tones, fading to crimson over the
+     * stage. ECLIPSE flashes them in a beat; this is the same idea taken
+     * slowly, so the last thing the last boss does is stop being six things
+     * and become one.
+     */
+    toneFor: 46,
     /*
      * ...and the loop that makes the last stage worth its length: it hangs
      * over the turret for `bareFor`, then goes back out onto the wall for

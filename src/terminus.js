@@ -293,7 +293,9 @@ export class Terminus extends Boss {
      * segments happened to be at three o'clock.
      */
     const toInner = i % 3 === 2;
-    const shrink = 1 - this.spiral * 0.32;
+    // ...and III draws in as it comes down, so the frame is a boundary
+    // closing rather than a distant object that happens to be square.
+    const shrink = 1 - this.spiral * 0.32 - (this.shut || 0) * C.shutBy;
     const h = (toInner ? C.frameR[1] : C.frameR[0]) * shrink;
     const inCount = Math.max(1, Math.floor((n + 1) / 3));
     const seat = toInner ? (i - 2) / 3 : i - Math.floor((i + 1) / 3);
@@ -673,6 +675,20 @@ export class Terminus extends Boss {
      * the drop is the better image anyway: half the edge falling away as the
      * rest of it is gathered up.
      */
+    /*
+     * ...and what it is short of, it takes back.
+     *
+     * The cap was only ever a ceiling, and ECLIPSE fires on the boundary
+     * being half spent -- so by III there are usually fewer bodies left than
+     * the frame wants and the drop below never ran at all. Stage III was the
+     * weakest fifth of this fight for exactly that reason: it was however
+     * little happened to survive. It is a floor now. The fallen edge is
+     * gathered up into the frame instead of being left lying on the circle,
+     * which is both the better image and the whole of this stage's length.
+     */
+    const short = C.frameKeep - this.parts().filter((p) => !p.dead).length;
+    if (short > 0) this.reform(world, C.frameHp, { cap: short, sweep: C.frameFor * 0.8 });
+
     const alive = this.parts().filter((p) => !p.dead);
     const keep = C.frameKeep;
     if (alive.length > keep) {
@@ -707,15 +723,43 @@ export class Terminus extends Boss {
    */
   beamCount() {
     const C = X();
-    // Six for the last stage. The angle test below is written for any count,
-    // so this is the one number that has to change.
-    return this.stage >= 4 ? C.beamsLate : C.beams;
+    if (this.stage < 4) return C.beams;
+    /*
+     * Six for the last stage, merging to three as the core goes.
+     *
+     * The angle test is written for any count, including an odd one, so this
+     * is the one number that has to change -- and it is what keeps the
+     * widening from turning the stage into weather. Fewer, wider beams cover
+     * less of the turn than more, narrower ones did.
+     */
+    const k = 1 - this.coreFrac / Math.max(0.0001, X().stageBare);
+    return Math.round(C.beamsLate + (C.beamsLast - C.beamsLate) * clamp(k, 0, 1));
+  }
+
+  /**
+   * ...and how wide one is, which grows as the core goes. The last of this
+   * fight is crimson wedges rather than lines: the only escalation it has
+   * that is not a change of shape.
+   */
+  beamArc() {
+    const C = X();
+    return C.beamArc * (1 + (1 - this.coreFrac) * C.beamWiden);
   }
 
   stepBeams(world, dt) {
     const C = X();
     if (this.stage < 3 || (this.stage === 3 && this.frameK < 1)) return;
     this.beamA += C.beamSpin * (1 + this.spiral * 0.8) * dt;
+    // ...and when two of them become one, it is an event rather than a body
+    // quietly vanishing from the turn.
+    const n = this.beamCount();
+    if (this.beamsWere !== undefined && n !== this.beamsWere) {
+      flash(0.3, TYPE_BY_ID.terminus.color);
+      ring(this.x, this.y, 20, 460, 0.45, TYPE_BY_ID.terminus.glow, 4);
+      shake(12);
+      audio.boom();
+    }
+    this.beamsWere = n;
     const s = world.shooter;
     const d = Math.hypot(s.x - this.x, s.y - this.y);
     if (d > C.beamLen) return;
@@ -723,7 +767,7 @@ export class Terminus extends Boss {
     // n beams a turn apart repeat every turn/n, which is what the half-count
     // inside the sine is doing: one test covers all of them.
     const h = this.beamCount() / 2;
-    const across = Math.abs(Math.sin(h * (toward - this.beamA))) < Math.sin(h * C.beamArc);
+    const across = Math.abs(Math.sin(h * (toward - this.beamA))) < Math.sin(h * this.beamArc());
     if (!across) return;
     world.shock = Math.max(world.shock, C.beamShock);
     if (Math.random() < 0.3) {
@@ -790,6 +834,18 @@ export class Terminus extends Boss {
      */
     this.reform(world, C.recloseHp, { sweep: C.recloseFor * 0.6 });
     this.syncReach(world);
+    /*
+     * ...and it comes back wearing the six tones.
+     *
+     * ECLIPSE flashes them in a beat, three quarters of the way through the
+     * fight, and then they are gone. This is the same idea taken slowly: the
+     * boundary this stage puts back up is coloured by where each segment sits
+     * on the circle, and it bleeds back to crimson over the stage. The last
+     * thing the last boss does is stop being six things and become one.
+     */
+    this.toneFade = 0;
+    const all = [...this.outer, ...this.inner];
+    for (let i = 0; i < all.length; i++) all[i].tone = BOSS_TONE[i % 6];
     flash(0.55, '#ffffff');
     for (let i = 0; i < 4; i++) {
       ring(this.hub.x, this.hub.y, 30 + i * 60, 420 + i * 200, 0.5 + i * 0.12,
@@ -909,6 +965,18 @@ export class Terminus extends Boss {
     if (this.stage < 4 && this.frameK > 0 && this.frameK < 1) {
       this.frameK = Math.min(1, this.frameK + (world.dtRaw || dt) / C.frameFor);
     }
+    /*
+     * III closes. The frame comes down the field and draws in at the same
+     * time -- the ring's own move, in the shape the ring turned into. Held
+     * until the segments have reached their seats, or it would be closing on
+     * a point they are still flying toward.
+     */
+    if (this.stage === 3 && this.frameK >= 1) {
+      this.shut = Math.min(1, (this.shut || 0) + (world.dtRaw || dt) / C.shutFor);
+      const e = this.shut * this.shut * (3 - 2 * this.shut);
+      this.fc.x += (s.x - this.fc.x) * Math.min(1, dt * 0.6);
+      this.fc.y = s.y - (C.frameAt + (C.frameClose - C.frameAt) * e);
+    }
     if (this.stage >= 4) {
       // The frame unmakes itself back into a ring, and the core comes down
       // inside it. Both on the raw clock, so the slow motion of a big hit
@@ -925,6 +993,7 @@ export class Terminus extends Boss {
         this.frameK = Math.max(0, this.reclose / C.recloseFor);
       } else {
         this.spiral = Math.min(1, this.spiral + (world.dtRaw || dt) / C.spiralFor);
+        this.toneFade = Math.min(1, (this.toneFade || 0) + (world.dtRaw || dt) / C.toneFor);
         this.stepBare(world, dt);
       }
     }
@@ -1088,6 +1157,28 @@ export class Terminus extends Boss {
     }
 
     /*
+     * The resurrected boundary, still wearing the six.
+     *
+     * The segments are ordinary bodies drawn by the field in this boss's own
+     * crimson, so the tone goes on over the top of them and fades out --
+     * which leaves crimson, rather than needing a second colour to fade TO.
+     */
+    if (this.toneFade !== undefined && this.toneFade < 1) {
+      const fade = 1 - this.toneFade;
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of this.parts()) {
+        if (p.dead || p.hidden || !p.tone) continue;
+        ctx.strokeStyle = rgba(p.tone, 0.62 * fade);
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 1.3, 0, TAU);
+        ctx.stroke();
+        drawGlow(ctx, p.tone, p.x, p.y, p.r * 3.4, 0.26 * fade);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    /*
      * III and IV: the frame's own lines, drawn between its segments so the
      * silhouette is a shape rather than a scatter -- and the four beams,
      * which are the only thing in this fight that is thrown at all.
@@ -1123,7 +1214,9 @@ export class Terminus extends Boss {
       g.addColorStop(0.4, rgba(T.glow, 0.16));
       g.addColorStop(1, rgba(T.glow, 0));
       ctx.strokeStyle = g;
-      ctx.lineWidth = 10;
+      // Drawn at the width it actually corrupts at, so a beam that has grown
+      // teeth looks like one. 10px at the base arc, in proportion after.
+      ctx.lineWidth = 10 * (this.beamArc() / C.beamArc);
       const beams = this.beamCount();
       for (let i = 0; i < beams; i++) {
         const a = this.beamA + (i / beams) * TAU;

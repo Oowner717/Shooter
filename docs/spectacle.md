@@ -232,9 +232,10 @@ first. FRACTAL leads because its whole idea is invisible and the fix is one
 drawing function; DYNAMO is late because it is the one with a known length
 risk; TERMINUS is last because it has had two builds already.
 
-**Shipped: III (138), II (139), IV (140), I (141), VI (142), V (143). Left:
-VII.** Six of six have landed between 221 and 258 against a 290s target — not
-six misses, the target being wrong. See Phase C.
+**Phase B is done: III (138), II (139), IV (140), I (141), VI (142), V (143),
+VII (144).** The six of I–VI landed between 221 and 258 against a 290s target
+— not six misses, the target being wrong. See Phase C, which is all that is
+left of this plan.
 
 ### What "done" means, per boss
 
@@ -722,7 +723,67 @@ swap is a cross-fade rather than an event.
 
 ---
 
-### VII — TERMINUS · crimson · the edge
+### VII — TERMINUS · crimson · the edge · **shipped, build 144**
+
+**As built: 434s (from 382), stages 15/15/29/31** — it had two outside the
+band, II at 14% and IV at 35%. Runs land within 25 seconds of each other.
+**Corruption came down rather than up**: stage IV from 58% of frames to 45%,
+stage III from 34% to 29%.
+
+- **III gathers, and III closes.** `frameKeep` was only ever a ceiling, and
+  ECLIPSE fires on the boundary being half spent — so the frame was built from
+  whatever happened to survive and the drop never ran. It is a floor now (30),
+  and the fallen edge is taken up into the frame at 70%. Then it **draws in by
+  44% and comes down 40 units** over 34 seconds: the ring's own move in the
+  shape the ring turned into. Stage III was the weakest fifth of this fight
+  and is now its longest stage.
+- **The beams widen, and fewer of them turn.** The plan asked for the last of
+  the fight to be crimson wedges rather than lines. Widening alone took stage
+  IV from 58% corrupted frames to **74%** — what decides that number is not
+  how wide a beam is but how often one comes round, because world shock decays
+  over about a second and six beams at 0.46 rad/s cross every 2.3s, so the
+  decay never finishes. So they **merge as they widen**: five beams at 0.09 rad
+  become two at 0.23. More dramatic and less constant at once, and each merge
+  is an event rather than a beam quietly leaving the turn.
+- **The resurrected boundary wears the six.** LAST CLOSE puts the whole edge
+  back up — it is the edge, and it does not stop being the edge because you
+  took some of it away — and now it comes back coloured by where each segment
+  sits on the circle, bleeding to crimson over 46 seconds. ECLIPSE flashes the
+  six in a beat three quarters of the way through; this is the same idea taken
+  slowly, so the last thing the last boss does is stop being six things and
+  become one.
+- **Not shipped: HORIZON.** An ellipse that precesses, so the boundary has a
+  near side — still the most interesting unbuilt idea in this document. A
+  phase adds 0s under the corrected model, and the length came from the
+  gather. Deferred whole.
+
+**The plan's worst number is gone, and Phase A did it.** Stage I was measured
+at **45 target switches a second** with 74% of its shots fired mid-sweep,
+because thirty-two segments at exactly the same distance flip the "nearest" on
+floating-point noise every frame. It is **0.28/s and 11%** now. The hysteresis
+shipped in build 137 and nothing re-measured this fight until now.
+
+Two things this build found that were nobody's plan:
+
+- **A law 3 violation that predates all of it.** The frame turns, so a corner
+  of the outer square passes directly under its centre twice a turn — and a
+  corner is √2 further out than a side. At `frameR[0]` 190 and 360 above the
+  turret that put a body within **61 units** of it, and no case was watching.
+  Fixed at 170, worst case 95, and the case now pins it. It is also why the
+  frame closes by *drawing in* rather than by coming down: descent drives the
+  corner straight into the turret (the first attempt reached fourteen units),
+  and past a point a shrinking corner recedes faster than the frame descends,
+  so it stops closing at all.
+- **`bound` is legal to shoot 49% of the time, and that is the design.** A
+  ring centred on the turret has only the part above the ±78° shoulder
+  available at any instant — 49% is very nearly exactly the cone's share of a
+  circle. It is the one place in the seven where the shoulder rule is the
+  premise rather than a defect, and `blind` is 0% in every ring stage because
+  the ring turns and every segment comes round.
+
+---
+
+### VII — TERMINUS · crimson · the edge — original plan
 
 *Now (build 136):* a ring of 32 boundary segments closed around the turret, a
 core that rides outside it and dips inside to mend, ECLIPSE, a double square
@@ -767,6 +828,7 @@ seven times rather than seven defects.
 | IV AMPLITUDE | DROPLET | 39% |
 | V DYNAMO | ION | 35% |
 | VI PARITY | ECHO | 33% |
+| VII TERMINUS | LIMIT | 8% |
 
 A minion thrown *at* the turret flies past it, and everything past the turret
 is behind the ±78° shoulder. It is not a per-boss balance problem and it does
@@ -792,7 +854,12 @@ below 15% or above 35%.
 246, 241, 221, 244 and 258 — a 37-second span, and only the last of them was
 tuned toward a number at all. That is the honest length of a fight built this
 way; 290 was picked before the length model was corrected. So Phase C's job is
-**I up to 250 and the rest held there**, VII at 450 ± 20.
+**I up to 250 and the rest held there**, VII at 450 ± 20 — where it already
+sits, at 434.
+
+Phase B is finished, so Phase C is the whole of what remains: re-measure all
+seven together, move I from 221 up to the others, and confirm nothing drifted
+while the other six were being built.
 
 ## Rules this plan holds itself to
 
