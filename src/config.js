@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '142';
+export const BUILD = '143';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '142';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '1d68f7f';
+export const REV = '56db987';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1381,14 +1381,44 @@ export const CFG = {
      * In III and IV it blinks between stations on its own orbit instead.
      */
     orbitStops: 6,
-    // ...and with one leg left it paces around that instead of standing on
-    // it, so the blink survives the stretch of II between SURGE and III.
+    /*
+     * ...and with one leg left it paces around that instead of standing on
+     * it, so the blink survives the stretch of II between SURGE and III.
+     *
+     * That comment sat over nothing for six builds. The fix it describes was
+     * built in 134, cost thirty percent of the fight length for reasons three
+     * isolation runs could not name, and was rolled back -- leaving the
+     * config asserting a behaviour the module did not have. Measured, thirty
+     * one seconds of stage II produced a single blink: the mechanic this boss
+     * is named for, switched off for the stage in the middle of it.
+     *
+     * It comes back as a slide ACROSS the leg -- stations on the line
+     * perpendicular to the turret, so the distance barely changes. The two
+     * other geometries were both measured and both cost the fight: a full lap
+     * (the 134 version) hides the core behind its own leg for half of every
+     * turn, and an arc across the near face makes the core nearer than the
+     * pylon, so auto aim spends the whole stretch on it and the bar is under
+     * the stage IV threshold before the last leg falls.
+     */
+    pylonStops: 4,
+    pylonOrbit: 74,
     /*
      * The circuit turns. Three towers standing still for a quarter of the
      * fight is a still image; turning, the arcs sweep the field and the
      * geometry is different every few seconds.
      */
     circuitSpin: [0.11, 0.24, 0.4, 0.55],
+    /*
+     * ...and II is read off how chewed the circuit is, not off a leg falling.
+     *
+     * A turning circuit does not deliver legs one at a time: three pylons
+     * sweep past each other, auto aim takes whatever is nearest, and the
+     * damage lands on all three. The first one dies at about a third of the
+     * circuit's health left and the other two go almost together, so "a leg
+     * has fallen" put 70% of the leg phase in stage I -- 67 seconds against
+     * 21. At 0.55 the two halves of it are about the same size.
+     */
+    crackAt: 0.5,
     /*
      * ...and every blink discharges. The pylon it left fires a lance down
      * the arc it travelled, and crossing that lance is corruption -- so the
@@ -1459,6 +1489,33 @@ export const CFG = {
     // The radius keeps it inside aim range by construction rather than luck.
     orbitAt: 300,
     orbitSpin: 0.42,
+    /*
+     * EARTH, on the way from III to IV. The circuit comes back at 40% and the
+     * whole of it dumps at the ground on one frame -- a curtain down the
+     * field, and the core taken back into shelter behind it.
+     *
+     * It is also this fight's only length. A stage boundary re-partitions
+     * health the boss already had; three pylons at 40% is about thirty
+     * seconds of shooting that did not exist, and it lands in the half of the
+     * fight that had one beat in it.
+     */
+    earthFor: 4.6,
+    curtainFor: 1.6, // how long the bolts burn, on the frame clock
+    earthHp: 0.4,
+    earthShock: 0.5, // one jolt, on the frame the curtain lands
+    /*
+     * IV: the propeller works an arc over the turret rather than a full
+     * circle around it.
+     *
+     * A full circle is half a stage spent behind the ±78° shoulder, and the
+     * probe measured exactly that: 43% of stage IV with no legal target on
+     * the field at all, the nearest body inside the cone 1% of the time, and
+     * damage per shot collapsing from 20 to 9.5. The worst stage in the game,
+     * and it was geometry rather than balance. 1.15 keeps it inside 66°.
+     */
+    orbitArc: 1.15,
+    orbitRock: 0.8,
+    trailFor: 0.5, // ...and the blades leave half a turn of afterimage
     // IV: the last pylon collapses into it and the pair becomes a propeller.
     stageTriad: 0.25,
     bladeR: 92,

@@ -2611,16 +2611,31 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     boss.pylons.forEach((p) => { p.dead = true; });
     boss.core.hp = Math.round(boss.core.maxHp * 0.05);
     const seen = [boss.stage];
-    for (let i = 0; i < 400 && boss.stage < 4; i++) {
+    let earthRan = 0;
+    for (let i = 0; i < 1200 && boss.stage < 4; i++) {
       g.update(1 / 60);
+      if (boss.earthing !== undefined) earthRan++;
       if (boss.stage !== seen[seen.length - 1]) seen.push(boss.stage);
     }
     out.stages = seen.join(',');
     out.ladder = seen.every((v, i) => i === 0 || v === seen[i - 1] + 1);
-    // ...and the last leg goes out when it collapses into the core, rather
-    // than riding the blades still standing and still armouring it. Read
-    // here, before the block below puts the circuit back to test the blink.
+    out.earthRan = +(earthRan / 60).toFixed(1);
+    /*
+     * IV opens with the circuit STANDING. EARTH is the way into it and EARTH
+     * gives the ground back, so the last stage has two movements: the circuit
+     * one last time, and then the propeller. The old assertion here was that
+     * no leg survived the stage change, which was right when IV had one
+     * shape in it and is now exactly backwards.
+     */
     out.legsAtIV = boss.pylons.filter((p) => !p.dead).length;
+    out.bladesAtIV = !!boss.triad;
+    // ...and the last leg still has to actually go when it goes: left alive
+    // it keeps the core at a leg's worth of armour and the turret goes on
+    // splitting its fire.
+    for (const p of boss.pylons) p.dead = true;
+    g.update(1 / 60);
+    out.bladesAfter = !!boss.triad;
+    out.legsAfter = boss.pylons.filter((p) => !p.dead).length;
 
     /*
      * The blink has to run in the stages where the core can actually be
@@ -2635,6 +2650,35 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     boss.triad = false;
     boss.hunt = { x: w.shooter.x, y: w.shooter.y };
     out.stopsByStage = [1, 2, 3, 4].map((n) => { boss.stage = n; return boss.stops(); });
+    /*
+     * ...including the stretch of II with one leg left, which is the case it
+     * was actually broken in: `stops()` returned the number of live pylons,
+     * so with one left there was one place to stand and the blink switched
+     * off. Measured, thirty one seconds of stage II produced a single blink.
+     */
+    boss.stage = 2;
+    boss.pylons.forEach((p, i) => { p.dead = i > 0; });
+    out.stopsOneLeg = boss.stops();
+    const leg = boss.pylons[0];
+    const seenAt = new Set();
+    for (let i = 0; i < boss.stops(); i++) {
+      const [sx, sy] = boss.stopAt(i);
+      seenAt.add(`${Math.round(sx)},${Math.round(sy)}`);
+    }
+    out.pacedPlaces = seenAt.size;
+    /*
+     * And it paces ACROSS the leg rather than around it: every station is
+     * about as far from the turret as the leg itself. Nearer and auto aim
+     * spends the stretch on the core instead of the pylon; further and the
+     * core hides behind its own leg. Both were measured and both cost the
+     * fight -- see the note in stopAt.
+     */
+    const dLeg = Math.hypot(leg.x - w.shooter.x, leg.y - w.shooter.y);
+    out.paceDrift = Math.round(Math.max(...[...Array(boss.stops())].map((_, i) => {
+      const [sx, sy] = boss.stopAt(i);
+      return Math.abs(Math.hypot(sx - w.shooter.x, sy - w.shooter.y) - dLeg);
+    })));
+    for (const p of boss.pylons) { p.dead = false; p.hp = p.maxHp; }
     boss.stage = 3;
     boss.at = 0;
     boss.next = -1;
@@ -2686,18 +2730,108 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.armour[0] > r.armour[1] && r.armour[1] > r.armour[2] && r.armour[2] > r.armour[3]
     && r.neverWall,
     `armour by legs gone: ${r.armour.join(' -> ')}`);
-  check('it climbs the stages one at a time and cannot skip one',
-    r.ladder && r.stages.endsWith('4') && r.legsAtIV === 0,
-    `stages seen: ${r.stages}; legs still standing at IV: ${r.legsAtIV}`);
+  check('it climbs the stages one at a time, and only EARTH opens the last',
+    r.ladder && r.stages.endsWith('4') && r.earthRan >= 1,
+    `stages seen: ${r.stages}; EARTH ran ${r.earthRan}s on the way into IV`);
+  check('IV opens with the ground EARTH gave back, and ends without it',
+    r.legsAtIV > 0 && !r.bladesAtIV && r.bladesAfter && r.legsAfter === 0,
+    `legs standing at IV: ${r.legsAtIV}, propeller then: ${r.bladesAtIV}; `
+    + `once the circuit falls: propeller ${r.bladesAfter}, legs ${r.legsAfter}`);
   check('it keeps blinking once the core is something you can shoot',
     r.stopsByStage.every((n) => n >= 2) && r.blinkedLate && r.lanced,
     `places it can be, by stage: ${r.stopsByStage.join('/')}; `
     + `moved in III: ${r.blinkedLate}; left a discharge: ${r.lanced}`);
+  check('...and through the stretch of II where only one leg is left',
+    r.stopsOneLeg >= 2 && r.pacedPlaces === r.stopsOneLeg && r.paceDrift <= 12,
+    `${r.stopsOneLeg} places on one leg, ${r.pacedPlaces} of them distinct, `
+    + `and none more than ${r.paceDrift} units off the leg's own range`);
   check('every blink leaves a discharge, and crossing it costs the intake',
     r.lanceShock > 0 && r.lanceClear === 0,
     `on the lance ${r.lanceShock} corruption, clear of it ${r.lanceClear}`);
   check('the circuit turns rather than standing still',
     r.turned, `pylons moved over four seconds: ${r.turned}`);
+}
+
+// --- and everywhere DYNAMO can stand is somewhere the turret can point ------
+/*
+ * The one law this fight kept breaking, in two places, for four builds.
+ *
+ * `Game.autoTarget` will not pick a body more than `CFG.shooter.aimClamp`
+ * off vertical -- 78 degrees either side of straight up -- however near it
+ * is. So a boss that puts itself in a ring AROUND the turret is unshootable
+ * for as much of that ring as falls behind the shoulder, and if it is the
+ * only thing on the field the turret has nothing to do at all.
+ *
+ * DYNAMO did it twice. III blinks between six stations on a circle centred
+ * on the turret; IV orbits it. Measured: stage III ran 31% blind at 41 dmg/s
+ * against 70 everywhere else, and stage IV ran 43% blind with the nearest
+ * body inside the cone 1% of the time and damage per shot at 9.5 against 20.
+ * Between them they were 46% of a 324-second fight.
+ *
+ * Both are arcs across the top now. This walks every station III can blink
+ * to and a full sweep of IV's orbit, and asks the geometry question directly.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    const { angleDelta } = await import('../src/util.js');
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.apertures[5] = 1;
+    g.openBoss(5);
+    const bo = w.boss;
+    bo.arriving = 0;
+    bo.settle(w);
+    g.update(1 / 60);
+    const C = CFG.dynamo;
+    const s = w.shooter;
+    const limit = CFG.shooter.aimClamp;
+
+    const off = (x, y) => Math.abs(angleDelta(-Math.PI / 2, Math.atan2(y - s.y, x - s.x)));
+    const reach = (x, y) => Math.hypot(x - s.x, y - s.y);
+
+    // III: every station it can blink to.
+    bo.stage = 3;
+    bo.hunt = { x: s.x, y: s.y };
+    const st = [];
+    for (let i = 0; i < bo.stops(); i++) {
+      const [x, y] = bo.stopAt(i);
+      st.push({ off: off(x, y), d: reach(x, y) });
+    }
+    // IV: a full sweep of the propeller's rock, at both ends of the descent.
+    bo.stage = 4;
+    bo.triad = true;
+    bo.orbitPhase = 0;
+    const pr = [];
+    for (let k = 0; k < 400; k++) {
+      bo.orbitPhase += C.orbitRock / 60;
+      const a = -Math.PI / 2 + Math.sin(bo.orbitPhase) * C.orbitArc;
+      for (const e of [0, 1]) {
+        const rr = C.orbitAt * (1 - e * 0.55);
+        pr.push({ off: off(s.x + Math.cos(a) * rr, s.y + Math.sin(a) * rr),
+          d: reach(s.x + Math.cos(a) * rr, s.y + Math.sin(a) * rr) });
+      }
+    }
+    const worst = (xs) => +(Math.max(...xs.map((p) => p.off))).toFixed(2);
+    const far = (xs) => Math.round(Math.max(...xs.map((p) => p.d)));
+    const out = {
+      limit: +limit.toFixed(2), range: g.aimRange,
+      stations: st.length, stationOff: worst(st), stationFar: far(st),
+      bladeOff: worst(pr), bladeFar: far(pr),
+    };
+    g.restart();
+    return out;
+  });
+  check('everywhere it can stand is somewhere the turret can point',
+    r.stations >= 2 && r.stationOff < r.limit && r.bladeOff < r.limit
+    && r.stationFar <= r.range && r.bladeFar <= r.range,
+    `${r.stations} stations in III, worst ${r.stationOff} rad off vertical `
+    + `(cone ${r.limit}), furthest ${r.stationFar} of ${r.range}; `
+    + `the propeller's sweep in IV: worst ${r.bladeOff}, furthest ${r.bladeFar}`);
 }
 
 // --- PARITY: two of everything, one of them real ----------------------------

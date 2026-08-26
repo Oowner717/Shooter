@@ -131,6 +131,28 @@ export class Dynamo extends Boss {
   }
 
   /**
+   * How chewed the circuit is, by health rather than by count.
+   *
+   * The stage ladder used to read "a leg has fallen", and a turning circuit
+   * does not deliver legs one at a time: auto aim takes whatever is nearest,
+   * three pylons sweep past each other every few seconds, and the damage is
+   * spread across all three. So the first pylon dies at about a third of the
+   * circuit's health remaining and the other two fall almost together --
+   * measured, stage I was 70% of the leg phase and stage II was the 30%
+   * afterwards, 67 seconds against 21. Read as health it splits evenly, which
+   * is what a stage boundary is for.
+   */
+  circuitFrac() {
+    let hp = 0;
+    let max = 0;
+    for (const p of this.pylons) {
+      max += p.maxHp;
+      if (!p.dead) hp += Math.max(0, p.hp);
+    }
+    return max ? hp / max : 0;
+  }
+
+  /**
    * What the core ignores, by how much of the circuit is left.
    *
    * Never a wall: the damage formula floors every hit at 1, so a whole
@@ -194,9 +216,11 @@ export class Dynamo extends Boss {
       this.x = sx;
       this.y = sy;
     } else {
-      const p = this.live()[this.at] || this.live()[0] || this.pylons[0];
-      this.x = p.x;
-      this.y = p.y;
+      // Through stopAt rather than off the pylon directly: with one leg left
+      // the stops are stations around it, not the leg itself.
+      const [sx, sy] = this.stopAt(this.at);
+      this.x = sx;
+      this.y = sy;
     }
     this.core.x = this.x;
     this.core.y = this.y;
@@ -243,18 +267,61 @@ export class Dynamo extends Boss {
    */
   /** How many places it can be right now: pylons, or stations on its orbit. */
   stops() {
-    return this.stage >= 3 ? D().orbitStops : this.live().length;
+    const C = D();
+    if (this.stage >= 3) return C.orbitStops;
+    const n = this.live().length;
+    // One leg left is not one place to stand: it paces the near face of it.
+    // Without this the blink -- the mechanic this boss is named for -- went
+    // out for the whole stretch of II between SURGE and III, measured as one
+    // blink in thirty one seconds.
+    return n === 1 ? C.pylonStops : n;
   }
 
   /** ...and where a given one of them is. */
   stopAt(i) {
     const C = D();
     if (this.stage >= 3) {
-      const a = -Math.PI / 2 + (i / C.orbitStops) * TAU;
+      /*
+       * Across the top of the turret, not all the way round it.
+       *
+       * A full ring of six stations puts two of them behind the ±78°
+       * shoulder, and when the core blinks to one of those there is nothing
+       * else on the field to shoot: measured, stage III ran 31% blind at 41
+       * dmg/s against 70 everywhere else, which is most of why it was 46% of
+       * a 324-second fight. The same geometry, and the same fix, as the
+       * propeller in IV.
+       */
+      const a = -Math.PI / 2 + ((i / Math.max(1, C.orbitStops - 1)) - 0.5) * 2 * C.orbitArc;
       const s = this.hunt || this.hub;
       return [s.x + Math.cos(a) * C.orbitAt, s.y + Math.sin(a) * C.orbitAt];
     }
     const live = this.live();
+    if (live.length === 1) {
+      /*
+       * ...ACROSS the leg, not around it. The stations sit on the line
+       * perpendicular to the turret, so the core slides side to side over its
+       * last pylon at the distance it was already standing at.
+       *
+       * Both other geometries were measured and both cost the fight. A full
+       * lap -- the version built in 134 and rolled back for costing thirty
+       * percent of the length -- puts the core behind its own leg for half of
+       * every turn: further off, past the shoulder, and unshootable. An arc
+       * across the NEAR face is worse in the opposite direction: it makes the
+       * core nearer than the pylon, auto aim takes the nearest, and the whole
+       * one-leg stretch is spent on the thing the stretch is not about. That
+       * one drained the bar under the stage IV threshold before the last leg
+       * fell -- III lasted zero seconds and II ran to a hundred and thirty.
+       *
+       * Sideways changes the distance by about seven units out of three
+       * hundred. Nothing about who is nearest moves, and the blink comes
+       * back on.
+       */
+      const p = live[0];
+      const toward = Math.atan2(this.hub.y + C.standoff - p.y, this.hub.x - p.x);
+      const side = ((i / Math.max(1, C.pylonStops - 1)) - 0.5) * 2;
+      const a = toward + Math.PI / 2;
+      return [p.x + Math.cos(a) * side * C.pylonOrbit, p.y + Math.sin(a) * side * C.pylonOrbit];
+    }
     const p = live[Math.min(i, live.length - 1)] || this.pylons[0];
     return [p.x, p.y];
   }
@@ -459,6 +526,70 @@ export class Dynamo extends Boss {
     background.surge(2);
   }
 
+  /**
+   * EARTH. The circuit comes back, and dumps itself at the ground.
+   *
+   * The beat this fight's back half never had. Everything after SURGE was one
+   * long descent: the core lets go of the ground in III and comes down as a
+   * propeller in IV, and nothing in between asks you to change what you are
+   * shooting. So the ground reaches back up -- all three pylons return at
+   * 40%, the whole circuit discharges downward on a single frame, and the
+   * core is taken back into shelter behind it.
+   *
+   * It is also the only thing in this build that adds any length. A stage
+   * boundary re-partitions health the boss already had; three pylons at 40%
+   * is thirty seconds of shooting that was not there.
+   */
+  startEarth(world) {
+    const C = D();
+    this.earthing = 0;
+    this.earthed = true; // set here, not on completion: the gate is one-shot
+    this.struck = false;
+    this.curtain = [];
+    world.bossLine = 'EARTH';
+    this.lineFor = 3.6;
+    this.hold(world, 0.7);
+    this.reform(world, C.earthHp, { sweep: 1 });
+    flash(0.5, '#dceaff');
+    ripple(this.hub.x, this.hub.y, 3.2, 1200);
+    shake(26);
+    audio.boom();
+    background.surge(2);
+  }
+
+  stepEarth(world, raw) {
+    const C = D();
+    this.earthing += raw;
+    const k = clamp(this.earthing / C.earthFor, 0, 1);
+
+    // ...and then, on one frame, all of it at once.
+    if (!this.struck && k >= 0.62) {
+      this.struck = true;
+      const floor = world.floorY || (world.shooter.y + 210);
+      for (const p of this.live()) {
+        this.curtain.push({ x: p.x, y: p.y, gx: p.x + rand(-40, 40), gy: floor, t: C.curtainFor });
+        spark(p.x, p.y, rand(-60, 60), rand(80, 200), '#dceaff', 0.4, 4);
+      }
+      // One jolt, on the frame it lands. A curtain that corrupted for as long
+      // as it was drawn would be weather; this boss already learned that once,
+      // when its propeller ran stage IV at 77% corrupted frames.
+      world.shock = Math.max(world.shock, C.earthShock);
+      flash(0.75, '#ffffff');
+      for (let i = 0; i < 4; i++) {
+        ring(this.hub.x, this.hub.y, 14 + i * 30, 560 + i * 240, 0.5 + i * 0.12,
+          i % 2 ? '#ffffff' : TYPE_BY_ID.dynamo.glow, 5 - i);
+      }
+      ripple(this.hub.x, this.hub.y, 3.6, 1400);
+      shake(34);
+      audio.boom();
+      background.surge(2);
+    }
+    if (k < 1) return false;
+    this.earthing = undefined;
+    world.bossLine = null;
+    return true;
+  }
+
   enterStage(world, n) {
     const C = D();
     this.stage = n;
@@ -471,30 +602,8 @@ export class Dynamo extends Boss {
       this.tele = 0;
       this.next = -1;
     }
-    if (n >= 4) {
-      /*
-       * "The last pylon collapses into the core" -- and it has to actually
-       * collapse, not ride along still standing. Left alive it kept a leg on
-       * the board, which meant the core stayed at a leg's worth of armour and
-       * the turret went on splitting its fire: measured, stage IV was
-       * forty-three percent of the fight for the last quarter of the bar.
-       * It goes out here, and what turns on the blades afterwards is a husk.
-       */
-      for (const p of this.live()) {
-        p.dead = true;
-        explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.6);
-        ring(p.x, p.y, 4, p.r * 6, 0.35, p.type.glow, 3);
-      }
-      this.triad = true;
-      this.bladeA = 0;
-      this.y0 = this.y;
-      this.fall = 0;
-      flash(0.6, '#ffffff');
-      ripple(this.x, this.y, 3.4, 1300);
-      shake(34);
-    }
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
-    world.bossLine = n >= 4 ? 'IT NO LONGER NEEDS THE GROUND.'
+    world.bossLine = n >= 4 ? 'IT HAS TAKEN THE GROUND BACK.'
       : n >= 3 ? 'IT HAS LET GO OF THE GROUND.'
         : 'IT HAS CLOSED THE CIRCUIT.';
     this.lineFor = n >= 4 ? 4.2 : 3.4;
@@ -504,6 +613,41 @@ export class Dynamo extends Boss {
     background.surge(2);
     audio.boom();
     world.bossStage = n;
+  }
+
+  /**
+   * ...and the second movement of IV: the circuit falls for the last time and
+   * collapses into the core.
+   *
+   * This used to happen at the stage boundary, which was right when IV had
+   * one movement. EARTH gives the ground back, so IV opens with the circuit
+   * standing and the core behind it, and the propeller is what is left when
+   * you have taken it apart a second time. The last stage is the only one in
+   * this fight with two shapes in it, which is the right place for that.
+   *
+   * The legs have to actually go. Left alive one kept the core at a leg's
+   * worth of armour and the turret went on splitting its fire: measured, IV
+   * was forty three percent of the fight for the last quarter of the bar.
+   */
+  collapse(world) {
+    for (const p of this.live()) {
+      p.dead = true;
+      explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.6);
+      ring(p.x, p.y, 4, p.r * 6, 0.35, p.type.glow, 3);
+    }
+    this.triad = true;
+    this.bladeA = 0;
+    this.y0 = this.y;
+    this.fall = 0;
+    this.hunt = { x: world.shooter.x, y: world.shooter.y };
+    this.orbitPhase = 0;
+    world.bossLine = 'IT NO LONGER NEEDS THE GROUND.';
+    this.lineFor = 4.2;
+    flash(0.6, '#ffffff');
+    ripple(this.x, this.y, 3.4, 1300);
+    shake(34);
+    audio.boom();
+    background.surge(2);
   }
 
   // -------------------------------------------------------------- frame
@@ -528,12 +672,36 @@ export class Dynamo extends Boss {
     this.syncReach(world);
     this.stepRiders(world, dt);
     this.stepLance(world, dt);
+    /*
+     * The curtain burns out on the frame clock, not on EARTH's -- it used to
+     * be stepped inside stepEarth, which stops running the moment the
+     * setpiece ends, so three bolts the height of the field hung over the
+     * whole of stage IV.
+     */
+    if (this.curtain) {
+      for (let i = this.curtain.length - 1; i >= 0; i--) {
+        this.curtain[i].t -= world.dtRaw || dt;
+        if (this.curtain[i].t <= 0) this.curtain.splice(i, 1);
+      }
+    }
 
     if (this.surge > 0) {
       this.surge -= world.dtRaw || dt;
       this.surgeA = (this.surgeA || 0) + C.surgeSpin * dt;
       if (Math.random() < 0.4) shake(5);
       if (this.surge <= 0) world.bossLine = null;
+      background.setFocus(this.x, this.y);
+      return;
+    }
+
+    /*
+     * EARTH is held above the rest of the frame for the reason SURGE is: it
+     * drives the circuit itself, and a blink or an ION launch landing inside
+     * it would be a second thing happening during the one beat this fight
+     * asks you to watch.
+     */
+    if (this.earthing !== undefined) {
+      if (this.stepEarth(world, world.dtRaw || dt)) this.enterStage(world, 4);
       background.setFocus(this.x, this.y);
       return;
     }
@@ -546,14 +714,24 @@ export class Dynamo extends Boss {
       this.hunt.x += (s.x - this.hunt.x) * Math.min(1, dt * 1.1);
       this.hunt.y += (s.y - this.hunt.y) * Math.min(1, dt * 1.1);
     }
-    if (this.stage >= 4) {
+    // IV, first movement: the circuit EARTH gave back, one last time.
+    if (this.stage >= 4 && !this.triad && !this.live().length) this.collapse(world);
+    if (this.triad) {
       this.fall = Math.min(1, (this.fall || 0) + (world.dtRaw || dt) / C.descendFor);
       const e = this.fall * this.fall * (3 - 2 * this.fall);
       const s = world.shooter;
       // The propeller comes down the line between where it was and you.
+      /*
+       * An arc over the turret rather than a lap around it. A full circle put
+       * the propeller behind the shoulder for half of every turn, which the
+       * probe read as 43% of stage IV with nothing legal on the field and
+       * damage per shot at 9.5 against 20 everywhere else -- the worst stage
+       * in the game, and geometry rather than balance.
+       */
+      this.orbitPhase = (this.orbitPhase || 0) + C.orbitRock * dt;
+      this.orbitA = -Math.PI / 2 + Math.sin(this.orbitPhase) * C.orbitArc;
       this.x = this.hunt.x + Math.cos(this.orbitA) * C.orbitAt * (1 - e * 0.55);
       this.y = this.hunt.y + Math.sin(this.orbitA) * C.orbitAt * (1 - e * 0.55);
-      this.orbitA += C.orbitSpin * 1.6 * dt;
       /*
        * ...and it corrupts when a blade is across you, not merely while it is
        * near. Descended, this thing sits inside `close` permanently: measured
@@ -580,7 +758,7 @@ export class Dynamo extends Boss {
 
     const gone = this.pylons.length - this.live().length;
     let want = this.stage;
-    if (gone >= 1 && want < 2) want = 2;
+    if ((gone >= 1 || this.circuitFrac() <= C.crackAt) && want < 2) want = 2;
     if (gone >= 2 && !this.surged) { this.startSurge(world); return; }
     /*
      * III waits for the whole circuit, not two thirds of it.
@@ -592,7 +770,16 @@ export class Dynamo extends Boss {
      * the core coming out of shelter partway through.
      */
     if (gone >= 3 && want < 3) want = 3;
-    if (this.coreFrac <= C.stageTriad && want < 4) want = 4;
+    /*
+     * IV is not entered, it is arrived at through EARTH -- and only from III.
+     * After it the circuit is standing again, so the last stage waits for the
+     * legs to come down a second time as well as for the bar.
+     */
+    if (this.stage === 3 && !this.earthed && this.coreFrac <= C.stageTriad) {
+      this.startEarth(world);
+      return;
+    }
+    if (this.earthed && this.coreFrac <= C.stageTriad && want < 4) want = 4;
     /*
      * One stage at a time. This boss's triggers are independent -- pylons for
      * II and III, core health for IV -- so both can come true on the same
@@ -733,10 +920,59 @@ export class Dynamo extends Boss {
     // IV: the propeller, core to husk.
     if (this.triad) {
       const a = this.bladeA || 0;
+      /*
+       * ...over half a turn of its own afterimage. A two-bladed thing turning
+       * at 2.2 rad/s is, in any one frame, two straight lines -- the shape
+       * the eye is being sold is the sweep, and a still frame of it was not
+       * showing that at all. Drawn as flat wedges behind the live blades so
+       * the arc reads as swept rather than as more lightning.
+       */
+      const trail = C.trailFor * C.bladeSpin;
+      ctx.save();
+      for (const s of [0, Math.PI]) {
+        const g = ctx.createLinearGradient(this.x, this.y,
+          this.x + Math.cos(a + s) * C.bladeR, this.y + Math.sin(a + s) * C.bladeR);
+        g.addColorStop(0, rgba(T.glow, 0.3));
+        g.addColorStop(1, rgba('#ffffff', 0.06));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.arc(this.x, this.y, C.bladeR, a + s - trail, a + s);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
       for (const s of [1, -1]) {
         this.arc(ctx, this.x, this.y, this.x + Math.cos(a + (s < 0 ? Math.PI : 0)) * C.bladeR,
           this.y + Math.sin(a + (s < 0 ? Math.PI : 0)) * C.bladeR, true, s * 5);
       }
+    }
+
+    /*
+     * EARTH: the whole circuit dumping at the ground on one frame. Every
+     * standing pylon to the floor at once, which is the only time this fight
+     * draws anything below the turret at all.
+     */
+    if (this.curtain && this.curtain.length) {
+      ctx.save();
+      let seed = 41;
+      for (const b of this.curtain) {
+        const k = clamp(b.t / C.curtainFor, 0, 1);
+        ctx.globalAlpha = 0.25 + 0.75 * k;
+        this.arc(ctx, b.x, b.y, b.gx, b.gy, true, seed += 5.3);
+        const g4 = ctx.createLinearGradient(b.x, b.y, b.gx, b.gy);
+        g4.addColorStop(0, rgba('#ffffff', 0.34 * k));
+        g4.addColorStop(1, rgba(T.glow, 0));
+        ctx.strokeStyle = g4;
+        ctx.lineWidth = 26;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.gx, b.gy);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+      }
+      ctx.restore();
     }
 
     // SURGE: every arc whipping a full turn round its pylon.

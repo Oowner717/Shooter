@@ -270,6 +270,31 @@ for (const k of keys) {
 }
 
 /*
+ * ...and where that damage went, per stage.
+ *
+ * `fight.mjs` totals this over the whole fight, which cannot tell a stage
+ * that is long because the boss is tough from one that is long because the
+ * turret spent it on minions. DYNAMO's third stage was 46% of a 324-second
+ * fight and the whole-fight table said the core absorbed 27%; the per-stage
+ * split said the stage was two thirds IONs.
+ */
+console.log('\n  where it went, by stage');
+for (const k of keys) {
+  if (!runs.some((r) => r.stages[k])) continue;
+  const secs = med(runs.filter((r) => r.stages[k]).map((r) => r.stages[k].secs));
+  if (secs < 1) continue;
+  const by = {};
+  for (const r of runs) {
+    if (!r.stages[k]) continue;
+    for (const [id, n] of Object.entries(r.stages[k].byType)) by[id] = (by[id] || 0) + n;
+  }
+  const tot = Object.values(by).reduce((a, b) => a + b, 0) || 1;
+  const parts = Object.entries(by).sort((a, b) => b[1] - a[1])
+    .map(([id, n]) => `${id} ${Math.round((100 * n) / tot)}%`).join('  ');
+  console.log(`    ${name(k).padEnd(9)} ${parts}`);
+}
+
+/*
  * Law 2, asked as an angle. `fight.mjs` checks that every mandatory body comes
  * inside aim RANGE; it cannot see that a body can be well inside 400 and still
  * be untargetable because it is past the shoulder. Per type, over the whole

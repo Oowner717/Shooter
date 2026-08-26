@@ -52,11 +52,16 @@ every container.
 the damage but what happened between the turret deciding to shoot and a body
 losing health. Per stage it reports shots, damage per shot, target switches per
 second, shots fired while the barrel was still slewing, frames with no legal
-target, and how often the nearest body was inside the assist's ±78° cone. It
+target, how often the nearest body was inside the assist's ±78° cone, and
+where each stage's damage actually went. It
 exists because build 134 made a fight 30% longer and three isolation runs could
 not say why; the damage table only ever describes the symptom. It found that
 every boss goes half-blind in stage IV and that TERMINUS changed target
 forty-five times a second, which is what `CFG.shooter.aimStick` exists to stop.
+The per-stage damage split went in at build 143, because the whole-fight table
+cannot tell a stage that is long because the boss is tough from one that is
+long because the turret spent it on minions -- DYNAMO's third stage was 46% of
+a 324-second fight and two thirds of it was IONs.
 
 **ORDINAL's canonical hash is `917805618`** (seed 20260824, 9000 frames),
 re-baselined at build 141 when TALLY went in. Before that it was

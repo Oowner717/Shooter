@@ -232,9 +232,9 @@ first. FRACTAL leads because its whole idea is invisible and the fix is one
 drawing function; DYNAMO is late because it is the one with a known length
 risk; TERMINUS is last because it has had two builds already.
 
-**Shipped: III (138), II (139), IV (140), I (141), VI (142). Left: V, VII.**
-Five of five have come in short of the 290s target — 249, 246, 241, 221, 244 —
-which is not five misses, it is the target being wrong. See Phase C.
+**Shipped: III (138), II (139), IV (140), I (141), VI (142), V (143). Left:
+VII.** Six of six have landed between 221 and 258 against a 290s target — not
+six misses, the target being wrong. See Phase C.
 
 ### What "done" means, per boss
 
@@ -547,7 +547,71 @@ The fight is also the quietest in the game (mean intake 0.99, mean attackers
 
 ---
 
-### V — DYNAMO · blue · the circuit
+### V — DYNAMO · blue · the circuit · **shipped, build 143**
+
+**As built: 258s (from 235), stages 16/18/32/22** — and the run-to-run spread
+went from 210–312s to 251–273s, which matters more here than the number. This
+was the variance boss.
+
+Two of its three stages were losing time to the same law, and neither was a
+balance problem:
+
+- **III and IV both put the boss in a ring around the turret.** III blinks
+  between six stations on a circle centred on you; IV orbited you. The probe:
+  stage III **31% blind at 41 dmg/s** against 70 everywhere else, stage IV
+  **43% blind, nearest body in the cone 1% of the time, damage per shot 9.5
+  against 20**. Between them, 46% of a 324-second fight spent unable to shoot
+  the only thing on the field. Both are arcs across the top now, and a regress
+  case walks every station and a full sweep of the propeller against the cone.
+  Stage IV's corruption **halved as a side effect** — 38% of frames to 18% —
+  because a blade is across you far less often when the thing is not orbiting
+  you.
+- **The stage ladder read "a leg has fallen", and a turning circuit does not
+  deliver legs one at a time.** Three pylons sweep past each other, auto aim
+  takes whatever is nearest, and the damage lands on all three — so the first
+  one dies at about a third of the circuit's health left and the other two go
+  almost together. Stage I was 70% of the leg phase and stage II the 30%
+  afterwards, 67 seconds against 21. II is read off `circuitFrac` now, which
+  is the same partition by health instead of by count.
+
+- **EARTH (III→IV).** The circuit comes back at 40% and the whole of it dumps
+  at the ground on one frame: a curtain the height of the field, one jolt of
+  corruption, and the core taken back into shelter behind it. It is the only
+  length in this build.
+- **IV in two movements.** EARTH gives the ground back, so the last stage opens
+  with the circuit standing and the core behind it, and the propeller is what
+  is left once you have taken it apart a second time. The only stage in this
+  fight with two shapes in it, which is the right place for that.
+- **The blink gap, finally closed.** With one leg left `stops()` returned 1 and
+  the mechanic this boss is named for switched off — one blink in thirty-one
+  seconds. It now paces **across** the leg: stations on the line perpendicular
+  to the turret, so the distance changes by about seven units out of three
+  hundred. Both other geometries were built and both cost the fight. A full lap
+  (the build-134 version, rolled back for costing 30%) hides the core behind
+  its own leg for half of every turn. An arc across the near face makes the
+  core *nearer* than the pylon, so auto aim spends the whole stretch on it —
+  measured, the bar was under the stage IV threshold before the last leg fell,
+  III lasted zero seconds and II ran to 130.
+- **Draw: the blades keep half a turn of afterimage.** A two-bladed thing
+  turning at 2.2 rad/s is, in any one frame, two straight lines; the shape
+  being sold is the sweep, and a still frame was not showing it.
+- **Not shipped: LATTICE.** +40s of current riding the links, and a phase adds
+  0s under the corrected model. Deferred whole.
+
+One bug worth remembering: the EARTH curtain was stepped inside `stepEarth`,
+which stops running when the setpiece ends — so three bolts the height of the
+field hung over the whole of stage IV. Effects that outlive the beat that made
+them have to burn on the frame clock.
+
+`dps.mjs` gained a **per-stage damage split** during this build. The
+whole-fight table said the core absorbed 27%; the question that needed
+answering was whether stage III was long because the boss was tough or because
+the turret spent it on minions, and only the per-stage split can say (it was
+two thirds IONs and 31% blind).
+
+---
+
+### V — DYNAMO · blue · the circuit — original plan
 
 *Now:* three pylons on a turning circuit, a core that shelters inside it and
 blinks between them, an earthing discharge from II, SURGE on the second
@@ -701,6 +765,7 @@ seven times rather than seven defects.
 |---|---|---|
 | I ORDINAL | DIGIT | 69% |
 | IV AMPLITUDE | DROPLET | 39% |
+| V DYNAMO | ION | 35% |
 | VI PARITY | ECHO | 33% |
 
 A minion thrown *at* the turret flies past it, and everything past the turret
@@ -723,12 +788,11 @@ and VII to about 1.8× it by moving stage thresholds only — no new content, no
 HP changes beyond what a threshold implies. The stage split target is nothing
 below 15% or above 35%.
 
-**The target is 250s, not 290.** Five builds of Phase B have landed at 249,
-246, 241, 221 and 244 without any of them being tuned toward a number: each
-was "add the setpiece, add the re-form, measure". Five independent arrivals
-inside a 28-second span is the honest length of a fight built this way, and
-290 was a figure picked before the length model was corrected. So Phase C's
-job is **I up to 250 and the rest held there**, VII at 450 ± 20.
+**The target is 250s, not 290.** Six builds of Phase B have landed at 249,
+246, 241, 221, 244 and 258 — a 37-second span, and only the last of them was
+tuned toward a number at all. That is the honest length of a fight built this
+way; 290 was picked before the length model was corrected. So Phase C's job is
+**I up to 250 and the rest held there**, VII at 450 ± 20.
 
 ## Rules this plan holds itself to
 
