@@ -13,6 +13,9 @@ longer, and longer has to come from content rather than from health bars.
 
 Measured with `scripts/fight.mjs`, assists only, nothing bought.
 
+*As this plan was written, at build 136. For where they ended up, see the
+Phase C audit at the bottom.*
+
 | | boss | length | stages I/II/III/IV |
 |---|---|---|---|
 | I | ORDINAL | 220s | 16 / 22 / 24 / 25 |
@@ -860,6 +863,80 @@ sits, at 434.
 Phase B is finished, so Phase C is the whole of what remains: re-measure all
 seven together, move I from 221 up to the others, and confirm nothing drifted
 while the other six were being built.
+
+## Phase C — the audit, as run · **build 145**
+
+All seven, `fight.mjs --runs 3` (ORDINAL five, for the reason below).
+
+| | boss | median | spread | stages |
+|---|---|---|---|---|
+| I | ORDINAL | 224 → **249** | 202–287 | 16/25/20/28 |
+| II | GNOMON | 248 | 207–288 | 15/31/21/19 |
+| III | FRACTAL | 253 | 251–257 | 16/24/22/26 |
+| IV | AMPLITUDE | 247 | 241–251 | 21/22/27/16 |
+| V | DYNAMO | 252 | 250–253 | 16/18/32/24 |
+| VI | PARITY | 238 | 233–240 | 17/30/17/24 |
+| VII | TERMINUS | 445 | 426–467 | 14/15/31/32 |
+
+**Six of seven were already there.** Every stage of every fight is inside the
+15–35% band, and six of seven sit inside 250 ± 15 (450 ± 20 for VII) without
+being touched. Phase B's recipe — add the setpiece, add the re-form, measure —
+produced a consistent set without anyone steering toward a number, which is
+the strongest evidence the corrected length model was right.
+
+**ORDINAL was 26 seconds low, and had no threshold left to move.** Every
+re-form it has is already at maximum: TALLY puts all forty panels back at full
+health, CONVERGENCE rebuilds both frames whole, and a stage boundary only
+re-partitions health the boss already had. So the rule this phase set itself —
+thresholds only — bent rather than the measurement: the panel's health went
+from 135 to 165. The panel and not the core, because the frame is the fight;
+the core is only reachable through a hole in it, so health added to the frame
+is health added to what the player is working on.
+
+### What the audit actually found: the spread, not the mean
+
+**ORDINAL swings 202–287 and GNOMON 207–288 — a third of their own length —
+while FRACTAL, AMPLITUDE, DYNAMO and PARITY all sit inside ten seconds.** That
+is the outstanding defect in this game's fights, and it is worth more than any
+remaining question about the mean. Three hypotheses were built, measured and
+**all three came back negative**:
+
+- **The ladder reads a bar most of the damage never touches.** GNOMON's stages
+  are gated on the core, which absorbs 18% of what the turret produces; the
+  dial takes 51% and the SECONDs 31%. Rebuilt on total progress (dial and core
+  together, the weighting the fight already hands its own sky) it moved time
+  between stages and left the spread where it was.
+- **The timed minion clock feeding back.** A long run spawns more SECONDs,
+  which absorb more damage, which lengthens the run. Silencing every burst
+  clock took minions from 78 to 48 per fight and the spread stayed: 188–259.
+- **MIDNIGHT's rebuild being a dice roll.** What it puts back is however much
+  of the dial happened to be gone when it fired. Gated on the dial instead —
+  so the amount is constant by construction, which is why DYNAMO, whose EARTH
+  cannot fire until all three pylons are down, is the steadiest at a
+  three-second spread — the spread stayed: 202–267.
+
+Two things worth keeping from the attempt:
+
+- **A re-form that puts back "whatever is missing" inverts any change to the
+  mend rate.** Making ORDINAL repair *faster* made the fight *shorter*: more
+  panels were standing when TALLY fired, so TALLY had less to put back. Any
+  boss with both a mend and a full re-form has this, and it means the two
+  numbers cannot be tuned independently.
+- **`fight.mjs --runs 3` is too coarse for the loose bosses.** Three-run
+  medians of the same ORDINAL build read 224, 262 and 226. Every number tuned
+  against a three-run median on I or II has been tuned against noise.
+
+### What comes next
+
+A variance instrument. This plan built `dps.mjs` when `fight.mjs` could say
+how long a fight was but not where the output went; the same move is needed
+now for *why does this fight's length vary by a third*. It should run one boss
+many times and report, per run, what the total work actually was — bodies
+destroyed by type, how much every re-form put back, how many minions were
+spawned against how many were killed — so the difference between a 202-second
+ORDINAL and a 287-second one is a line in a table rather than a hypothesis.
+
+Until that exists, no further length tuning on I or II is worth doing.
 
 ## Rules this plan holds itself to
 

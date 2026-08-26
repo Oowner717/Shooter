@@ -63,10 +63,11 @@ cannot tell a stage that is long because the boss is tough from one that is
 long because the turret spent it on minions -- DYNAMO's third stage was 46% of
 a 324-second fight and two thirds of it was IONs.
 
-**ORDINAL's canonical hash is `917805618`** (seed 20260824, 9000 frames),
-re-baselined at build 141 when TALLY went in. Before that it was
-`-1210682079` from build 137, when the assist gained its target memory, and
-`1109808491` from build 127 to 136. Each move was a change to ORDINAL or to
+**ORDINAL's canonical hash is `117409503`** (seed 20260824, 9000 frames),
+re-baselined at build 145 when the Phase C audit raised the panel's health.
+Before that it was `917805618` from build 141, when TALLY went in;
+`-1210682079` from 137, when the assist gained its target memory; and
+`1109808491` from 127 to 136. Each move was a change to ORDINAL or to
 targeting, which is the hash doing its job; a move without one is the bug it
 is there to catch.
 

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '144';
+export const BUILD = '145';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '144';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '04c733c';
+export const REV = 'c691078';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -2445,7 +2445,23 @@ export const ENEMY_TYPES = [
     name: 'TALLY',
     shape: 'tally',
     r: 15,
-    hp: 135,
+    /*
+     * 135 in Phase B, 165 after the Phase C audit.
+     *
+     * ORDINAL came out of Phase B at 224s against the other five's 238-253,
+     * and it is the one fight with nowhere else for length to come from. Every
+     * re-form it has is already at maximum -- TALLY puts all forty panels back
+     * at full health, CONVERGENCE rebuilds both frames whole -- and a stage
+     * boundary only re-partitions health the boss already had. The audit was
+     * supposed to move thresholds and nothing else; on this boss there was no
+     * threshold left to move, so the rule bent rather than the measurement.
+     *
+     * Raising the panel rather than the core because the frame is the fight:
+     * the core is only reachable through a hole in it, so health added here is
+     * health added to the thing the player is actually working on, and health
+     * added to the core would only have lengthened the last stage.
+     */
+    hp: 165,
     fixed: true, // the boss places it; physics never moves it
     density: 6,
     speed: 0,
