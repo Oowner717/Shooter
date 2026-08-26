@@ -1035,21 +1035,70 @@ export class Menu {
    */
   // ------------------------------------------------------------------ codex
 
+  /*
+   * ====================== the record =============================
+   *
+   * A collection, laid out as one.
+   *
+   * It was thirty-four identical rows. Each one was 115px of dashed art box,
+   * a name redacted into block glyphs, and the sentence "No record. Destroy
+   * one." -- thirty-four times, over 2166px, which is 3.8 screens of the same
+   * line. The tab whose entire subject is what you have collected opened on
+   * a wall of what you have not, and said how many you had at 8.5px in the
+   * title bar.
+   *
+   * So: the count is the first thing and it is a meter, what you have found
+   * is a list that grows, and what you have not is a block of blank tiles
+   * that shrinks. The sentence is said once, over the block, instead of
+   * thirty-four times inside it.
+   */
   buildCodex() {
     const p = this.panel('codex', 'codex');
+
+    const head = document.createElement('div');
+    head.className = 'codexHead';
+    head.innerHTML = '<span class="codexCount"></span>'
+      + '<span class="codexBar"><i></i></span>';
+    p.appendChild(head);
+    this.el.codexCount = head.querySelector('.codexCount');
+    this.el.codexBar = head.querySelector('.codexBar > i');
+
+    this.el.codexKnownLab = heading('RECORDED', '');
+    p.appendChild(this.el.codexKnownLab);
+    const known = document.createElement('div');
+    known.className = 'codexGrid';
+    p.appendChild(known);
+    const none = document.createElement('div');
+    none.className = 'codexNone';
+    none.textContent = 'Nothing yet. An object is recorded the first time you destroy one.';
+    p.appendChild(none);
+    this.el.codexNone = none;
+
+    this.el.codexUnseenLab = heading('NOT YET SEEN', 'destroy one to record it');
+    p.appendChild(this.el.codexUnseenLab);
+    const unseen = document.createElement('div');
+    unseen.className = 'codexUnseen';
+    p.appendChild(unseen);
+
+    /*
+     * AUTO AIM and AUTO FIRE last. They came here in 154 because they are a
+     * reference and this is where the references are -- but put at the top
+     * they pushed the count, which is the entire subject of this tab, below
+     * the fold. A reference for two systems you never buy does not open the
+     * page about what you have collected.
+     */
     this.buildAuto(p);
-    p.appendChild(heading('OBJECTS', 'recorded on first kill'));
-    const grid = document.createElement('div');
-    grid.className = 'codexGrid';
+
+    this.el.codexKnown = known;
+    this.el.codexUnseenBox = unseen;
     for (const e of CODEX) {
       const cell = document.createElement('div');
       cell.className = 'codexCell';
-      cell.innerHTML = `<div class="codexArt"><canvas width="72" height="72"></canvas></div>`
-        + `<div class="codexBody"><div class="codexName"></div><div class="codexLine"></div></div>`;
-      grid.appendChild(cell);
+      cell.innerHTML = '<div class="codexArt"><canvas width="72" height="72"></canvas></div>'
+        + '<div class="codexBody"><div class="codexName"></div><div class="codexLine"></div></div>';
+      unseen.appendChild(cell);
       this.codexCells.set(e.id, cell);
     }
-    p.appendChild(grid);
   }
 
   /** Redacted until it has been destroyed once. */
@@ -1057,12 +1106,31 @@ export class Menu {
     if (this.lastFound === codex.found) return;
     this.lastFound = codex.found;
     this.el.found.textContent = `${codex.found}/${codex.total}`;
+    if (this.el.codexCount) {
+      this.el.codexCount.innerHTML = `<b>${codex.found}</b> OF ${codex.total} RECORDED`;
+      this.el.codexBar.style.width = `${(codex.found / codex.total) * 100}%`;
+      // The two headings and the empty note only belong on screen when the
+      // section under them has something in it.
+      this.el.codexKnownLab.hidden = !codex.found;
+      this.el.codexNone.hidden = !!codex.found;
+      const left = codex.total - codex.found;
+      this.el.codexUnseenLab.hidden = !left;
+      this.el.codexUnseenLab.querySelector('em').textContent = left === codex.total
+        ? 'destroy one to record it' : `${left} left`;
+    }
     for (const e of CODEX) {
       const cell = this.codexCells.get(e.id);
       const known = codex.has(e.id);
       cell.classList.toggle('locked', !known);
-      cell.querySelector('.codexName').textContent = known ? e.name : redact(e.name);
-      cell.querySelector('.codexLine').textContent = known ? e.line : 'No record. Destroy one.';
+      // Into the section it now belongs to. Cells are moved rather than
+      // rebuilt so a drawn specimen is drawn once and stays drawn.
+      const home = known ? this.el.codexKnown : this.el.codexUnseenBox;
+      if (cell.parentElement !== home) home.appendChild(cell);
+      // A blank tile says "not seen" on its own. The name used to be redacted
+      // into block glyphs -- thirty-four strings of ▚▞▜▙ at 10px and 1.93 to
+      // one, which reads as text that has gone wrong rather than as a secret.
+      cell.querySelector('.codexName').textContent = known ? e.name : '';
+      cell.querySelector('.codexLine').textContent = known ? e.line : '';
       const c = cell.querySelector('canvas');
       if (known && !c.dataset.drawn) {
         c.dataset.drawn = '1';
@@ -1106,11 +1174,14 @@ export class Menu {
     });
     p.appendChild(opts);
 
+    /*
+     * DEBUG here; RESET at the very bottom, on its own, under its own
+     * heading. They were a pair of equal tiles side by side -- one opens a
+     * developer panel and the other wipes the run, the glossary and the
+     * opening lines with no undo, and nothing about the layout said which was
+     * which. A destructive action is not a peer of a convenience.
+     */
     const rows = [
-      // One button, and it means all of it: the run, the glossary, the opening
-      // lines. REPLAY OPENING used to sit here to put the lines back, which was
-      // a second button for half of what this one now does.
-      ['RESET SIMULATION', 'wipe everything and start as if new', () => { this.setOpen(false); g.resetAll(); }, true],
       ['DEBUG', 'developer panel', () => { this.setOpen(false); g.hud.toggleDebug(true); }],
     ];
     for (const [label, sub, run, ask] of rows) {
@@ -1159,13 +1230,53 @@ export class Menu {
     }
     p.appendChild(keys);
 
+    /*
+     * BUILD says which build this claims to be; REV says which bytes it is.
+     * Two devices showing the same pair are running the same code -- which is
+     * the thing that could not be checked before, and cost an afternoon.
+     *
+     * It was 8.5px at 1.84 to one, which is a stamp you cannot read off a
+     * phone held at arm's length. A version stamp that exists to be compared
+     * between two devices has exactly one requirement.
+     */
     const foot = document.createElement('div');
-    foot.className = 'menuNote dim';
-    // BUILD says which build this claims to be; REV says which bytes it is.
-    // Two devices showing the same pair are running the same code — which is
-    // the thing that could not be checked before, and cost an afternoon.
-    foot.textContent = `SESSION 7749 · BUILD ${BUILD} · REV ${REV}`;
+    foot.className = 'menuStamp';
+    foot.innerHTML = `<span>SESSION 7749</span><span>BUILD <b>${BUILD}</b></span>`
+      + `<span>REV <b>${REV}</b></span>`;
     p.appendChild(foot);
+
+    /*
+     * And the one thing on this panel that cannot be undone, at the bottom,
+     * alone, wearing its own colour. It used to be a tile beside DEBUG.
+     */
+    p.appendChild(heading('DANGER', ''));
+    const wipe = document.createElement('button');
+    wipe.className = 'menuCell wipe';
+    wipe.type = 'button';
+    const sub = 'wipes the run, the record and the opening lines';
+    wipe.innerHTML = `<span class="cellName">RESET SIMULATION</span><span class="cellSub">${sub}</span>`;
+    wipe.addEventListener('click', () => {
+      if (this.armedCell !== wipe) {
+        if (this.armedCell) this.armedCell.classList.remove('armed');
+        this.armedCell = wipe;
+        wipe.classList.add('armed');
+        wipe.querySelector('.cellSub').textContent = 'tap again — this cannot be undone';
+        clearTimeout(this.cellTimer);
+        this.cellTimer = setTimeout(() => {
+          wipe.classList.remove('armed');
+          wipe.querySelector('.cellSub').textContent = sub;
+          this.armedCell = null;
+        }, 4000);
+        return;
+      }
+      clearTimeout(this.cellTimer);
+      wipe.classList.remove('armed');
+      wipe.querySelector('.cellSub').textContent = sub;
+      this.armedCell = null;
+      this.setOpen(false);
+      g.resetAll();
+    });
+    p.appendChild(wipe);
     this.syncSystem();
   }
 
@@ -1183,6 +1294,15 @@ export class Menu {
     name.className = 'volName';
     name.textContent = 'VOLUME';
     wrap.appendChild(name);
+    /*
+     * ...and what it is set to. SCREEN SHAKE and EFFECTS both end in a word --
+     * FULL, HALF, OFF -- and the volume, the one control on this panel with
+     * six positions instead of three, ended in nothing at all. Six lit boxes
+     * is a picture of a level; it is not a reading of one.
+     */
+    const word = document.createElement('span');
+    word.className = 'volWord';
+    this.el.volWord = word;
 
     const bar = document.createElement('div');
     bar.className = 'volBar';
@@ -1203,6 +1323,10 @@ export class Menu {
       return b;
     });
     wrap.appendChild(bar);
+    // ...after the bar, because SCREEN SHAKE and EFFECTS both read
+    // name / pips / word and a third row reading name / word / pips is one
+    // row disagreeing with the two under it.
+    wrap.appendChild(word);
     return wrap;
   }
 
@@ -1232,6 +1356,11 @@ export class Menu {
       b.classList.toggle('muted', at === 0 && i === 0);
       b.setAttribute('aria-pressed', String(i === at));
     });
+    if (this.el.volWord) {
+      const say = at === 0 ? 'MUTE' : `${Math.round(VOLUME_STEPS[at] * 100)}%`;
+      if (this.el.volWord.textContent !== say) this.el.volWord.textContent = say;
+      this.el.volWord.classList.toggle('off', at === 0);
+    }
   }
 
   // -------------------------------------------------------------- live sync
@@ -1267,13 +1396,6 @@ function heading(title, note) {
   h.className = 'menuHead';
   h.innerHTML = `<span>${title}</span>${note ? `<em>${note}</em>` : ''}`;
   return h;
-}
-
-const BLOCKS = '▚▞▜▙▟▛';
-function redact(name) {
-  let out = '';
-  for (let i = 0; i < name.length; i++) out += BLOCKS[i % BLOCKS.length];
-  return out;
 }
 
 /**

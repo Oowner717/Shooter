@@ -961,8 +961,17 @@ html, body {
   clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
   transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
-.menuCell .cellName { font-size: 10px; letter-spacing: 0.16em; color: var(--ink); }
-.menuCell .cellSub { font-size: 8px; letter-spacing: 0.06em; color: #45566a; }
+/* Changed at the source rather than overridden below: these two selectors
+   are more specific than a bare class, so a later `.cellSub { font-size }`
+   loses to them silently -- which is how the sub-line stayed at 8px and
+   2.64:1 through a pass that was meant to raise it. */
+.menuCell .cellName { font-size: 14px; letter-spacing: 0.12em; color: var(--ink); }
+.menuCell .cellSub {
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  color: #8fa6bd;
+}
 .menuCell:active { transform: translateY(1px); }
 .menuCell.on {
   border-color: var(--accent);
@@ -3133,4 +3142,173 @@ body.booting #pendingBtn {
 @media (prefers-reduced-motion: reduce) {
   .branchBar > i { transition: none; }
   .branchRow.landed { animation: none; }
+}
+
+
+/* ======================================================================
+ * THE REST OF THE MENU
+ *
+ * OBJECTS and SYSTEM never had the pass UPGRADES had. Measured on the same
+ * 390x664 phone: every one of OBJECTS' 78 pieces of text was under 11px, 72
+ * of them failed 4.5:1, and the worst was 1.82. SYSTEM's 23 were all under
+ * 11px too. The shop had a floor and the other two tabs did not, which is
+ * one interface with two standards in it.
+ * ====================================================================== */
+
+/* -------------------------------------------------------- shared headings */
+
+.menuHead { font-size: 12px; letter-spacing: 0.2em; }
+.menuHead em { font-size: 11px; color: #7d90a6; }
+.menuHead[hidden] { display: none; }
+
+/* ------------------------------------------------------- OBJECTS: the head */
+
+/*
+ * The count, first and as a meter. It was "0/34" at 8.5px in the title bar --
+ * the one number this whole tab is about, set smaller than anything else on
+ * the screen and parked beside the close button.
+ */
+.codexHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 11px;
+  margin-bottom: 4px;
+  border: 1px solid rgba(120, 190, 255, 0.22);
+  background: rgba(10, 20, 34, 0.86);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+.codexCount {
+  flex: 0 0 auto;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: #8fa6bd;
+  font-variant-numeric: tabular-nums;
+}
+.codexCount b { color: #59e0ff; font-size: 17px; letter-spacing: 0.04em; }
+.codexBar {
+  flex: 1 1 auto;
+  height: 5px;
+  min-width: 24px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.codexBar > i {
+  display: block;
+  height: 5px;
+  width: 0;
+  background: #59e0ff;
+  transition: width 0.35s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.codexNone {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #8fa6bd;
+  padding: 14px 12px 18px;
+}
+.codexNone[hidden] { display: none; }
+
+/* --------------------------------------------------- OBJECTS: what is known */
+
+.codexName { font-size: 14px; letter-spacing: 0.1em; }
+.codexLine { font-size: 12px; line-height: 1.4; color: #9fb8d2; }
+.codexSpec { font-size: 11px; }
+.codexSpec b { font-size: 11px; color: #9fb8d2; }
+.codexSpec i { font-size: 11px; color: #9fb8d2; }
+
+/* ------------------------------------------------- OBJECTS: what is not yet */
+
+/*
+ * A block of blanks, not a list of them. Thirty-four full rows each saying
+ * "No record. Destroy one." was 2166px -- 3.8 screens of the same sentence.
+ * The sentence is on the heading now and these are tiles: the block shrinks
+ * as the list above it grows, which is the shape of a collection.
+ */
+.codexUnseen {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 7px;
+  padding: 4px 2px 16px;
+}
+.codexUnseen .codexCell {
+  display: block;
+  padding: 0;
+  border: 1px dashed rgba(120, 190, 255, 0.2);
+  background: rgba(6, 12, 22, 0.5);
+  aspect-ratio: 1;
+  min-height: 0;
+}
+.codexUnseen .codexCell .codexArt {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.codexUnseen .codexCell .codexArt::after {
+  content: '?';
+  font-size: 17px;
+  color: rgba(120, 190, 255, 0.26);
+}
+.codexUnseen .codexCell canvas,
+.codexUnseen .codexCell .codexBody { display: none; }
+
+/* ------------------------------------------------------- SYSTEM: the volume */
+
+.volWord {
+  flex: 0 0 auto;
+  min-width: 52px;
+  text-align: right;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+  color: #7cffb2;
+}
+.volWord.off { color: #8fa6bd; }
+.volName { font-size: 13px; letter-spacing: 0.16em; }
+
+/* --------------------------------------------------------- SYSTEM: the rows */
+
+.optName { font-size: 13px; letter-spacing: 0.16em; }
+.optWord { font-size: 13px; letter-spacing: 0.1em; }
+.menuKey > span { font-size: 13px; letter-spacing: 0.14em; }
+.menuKey p { font-size: 12px; line-height: 1.5; color: #9fb8d2; }
+
+/* The one that cannot be undone: on its own, full width, and red enough that
+   nothing about it reads as a convenience. */
+.menuCell.wipe {
+  --tone: #ff5f6d;
+  border-color: color-mix(in srgb, var(--tone) 45%, transparent);
+  background: linear-gradient(100deg, color-mix(in srgb, var(--tone) 10%, transparent), rgba(6, 12, 22, 0.9) 60%);
+}
+.menuCell.wipe .cellName { color: var(--tone); }
+.menuCell.wipe.armed {
+  border-color: var(--tone);
+  box-shadow: 0 0 18px -5px var(--tone);
+}
+.menuCell.wipe.armed .cellSub { color: var(--tone); }
+
+/* ------------------------------------------------------- SYSTEM: the stamp */
+
+/*
+ * Readable. It was 8.5px at 1.84 to one, and its whole job is being compared
+ * against the same line on another device.
+ */
+.menuStamp {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 16px 12px 6px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: #7d90a6;
+}
+.menuStamp b {
+  color: #9fb8d2;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
 }

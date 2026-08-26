@@ -247,15 +247,44 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const cr = (x, y) => { const a = L(x); const b = L(y);
       return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
     const bad = [];
-    const wk = document.createTreeWalker(document.querySelector('.menuPanel.tree'), NodeFilter.SHOW_TEXT);
-    let t;
     let seen = 0;
-    while ((t = wk.nextNode())) {
+    /*
+     * All three panels, not just the shop.
+     *
+     * UPGRADES got a floor in 154 and OBJECTS and SYSTEM did not, so the
+     * menu carried two standards for two builds: measured the same way,
+     * every one of OBJECTS' 78 pieces of text was under 11px and 72 of them
+     * failed 4.5:1, the worst at 1.82. A floor that applies to one tab is
+     * not a floor.
+     */
+    const panels = [];
+    for (const tab of ['tree', 'codex', 'system']) {
+      g.hud.menu.show(tab);
+      panels.push(document.querySelector(`[data-panel="${tab}"]`));
+    }
+    g.hud.menu.show('tree');
+    const nodes = [];
+    for (const panel of panels) {
+      const wk = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
+      let n;
+      // A panel that is not the open one is `hidden`, so offsetParent is null
+      // for everything inside it. It is un-hidden for the measurement and put
+      // back afterwards.
+      const was = panel.hidden;
+      panel.hidden = false;
+      while ((n = wk.nextNode())) nodes.push(n);
+      panel.hidden = was;
+    }
+    for (const panel of panels) panel.hidden = panel.dataset.panel !== 'tree';
+    let t;
+    let at = -1;
+    while ((t = nodes[++at])) {
       const txt = t.nodeValue.trim();
       if (!txt) continue;
       const el = t.parentElement;
-      if (!el.offsetParent) continue;
+      if (!el.isConnected || el.hidden || el.closest('[hidden]')) continue;
       const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
       const fg = px(cs.color);
       // Text painted through a gradient with background-clip reports a
       // transparent colour; there is nothing there to measure.
@@ -278,8 +307,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.hud.menu.setOpen(false);
     return { seen, bad };
   });
-  check('every word in the shop clears 11px and 4.5:1',
-    r.bad.length === 0 && r.seen > 20, `${r.seen} read; failing: ${r.bad.slice(0, 6)}`);
+  check('every word in the menu clears 11px and 4.5:1',
+    r.bad.length === 0 && r.seen > 60, `${r.seen} read; failing: ${r.bad.slice(0, 6)}`);
 }
 
 // --- what a purchase sounds like --------------------------------------------
@@ -664,6 +693,85 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.order[0] === 'TURRET' && r.order[r.order.length - 1] === 'ANOMALY'
     && r.spill.length === 0 && r.dead === 0,
     JSON.stringify({ order: r.order, spill: r.spill, deadTracks: r.dead }));
+}
+
+// --- the record, and the one button that cannot be undone -------------------
+/*
+ * OBJECTS is a tab about what you have collected, and it opened on what you
+ * have not: thirty-four rows, each 115px of dashed box and the sentence "No
+ * record. Destroy one.", over 2166px -- 3.8 screens of the same line -- with
+ * the count itself at 8.5px beside the close button. The sentence is said
+ * once now, over a block of tiles that shrinks as the list above it grows.
+ *
+ * And SYSTEM had RESET SIMULATION as an equal tile beside DEBUG: one opens a
+ * developer panel, the other wipes the run, the record and the opening lines
+ * with no undo.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { codex, CODEX } = await import('../src/codex.js');
+    const m = g.hud.menu;
+    m.setOpen(true);
+    m.show('codex');
+    // Relative, not absolute: the cases above this one destroy things, so the
+    // record is not empty by the time it gets here.
+    const before = codex.found;
+    let added = 0;
+    for (const e of CODEX) { if (added < 5 && codex.record(e.id)) added++; }
+    m.lastFound = -1;
+    m.syncCodex();
+    const panel = document.querySelector('[data-panel="codex"]');
+    const kids = [...panel.children];
+    const head = panel.querySelector('.codexHead');
+    const known = [...panel.querySelectorAll('.codexGrid .codexCell')];
+    const unseen = [...panel.querySelectorAll('.codexUnseen .codexCell')];
+    const out = {
+      // The count is the first thing in the panel, and it is a meter.
+      countFirst: kids.indexOf(head) === 0,
+      countSays: head.querySelector('.codexCount').textContent,
+      meter: head.querySelector('.codexBar > i').style.width,
+      before,
+      added,
+      found: codex.found,
+      total: codex.total,
+      known: known.length,
+      unseen: unseen.length,
+      // A tile carries no name and no sentence: the block used to repeat one.
+      quiet: unseen.every((c) => !c.querySelector('.codexName').textContent
+        && !c.querySelector('.codexLine').textContent),
+      named: known.every((c) => !!c.querySelector('.codexName').textContent),
+      // ...and a tile is a tile, not a row.
+      tall: unseen.length ? Math.round(unseen[0].getBoundingClientRect().height) : 0,
+      rowTall: known.length ? Math.round(known[0].getBoundingClientRect().height) : 0,
+    };
+    m.show('system');
+    const sys = document.querySelector('[data-panel="system"]');
+    const wipe = sys.querySelector('.menuCell.wipe');
+    out.wipeAlone = !!wipe && !wipe.closest('.menuGrid');
+    out.wipeArms = (() => {
+      wipe.click();
+      const armed = wipe.classList.contains('armed');
+      m.armedCell = null;
+      wipe.classList.remove('armed');
+      return armed;
+    })();
+    out.volWord = (sys.querySelector('.volWord') || {}).textContent || '';
+    m.setOpen(false);
+    return out;
+  });
+  check('the record leads with the count, and counts up',
+    r.countFirst && r.countSays === `${r.found} OF ${r.total} RECORDED`
+    && r.found === r.before + r.added && parseFloat(r.meter) > 0
+    && r.known === r.found && r.known + r.unseen === r.total,
+    JSON.stringify({ first: r.countFirst, says: r.countSays, meter: r.meter,
+      known: r.known, unseen: r.unseen, total: r.total }));
+  check('an object not yet seen is a quiet tile, not a row repeating a sentence',
+    r.quiet && r.named && r.tall > 0 && r.tall < r.rowTall,
+    `tile ${r.tall}px vs row ${r.rowTall}px; quiet ${r.quiet}`);
+  check('the one button that cannot be undone stands alone, and arms first',
+    r.wipeAlone && r.wipeArms && !!r.volWord,
+    `alone ${r.wipeAlone}, arms ${r.wipeArms}, volume reads "${r.volWord}"`);
 }
 
 // --- the volume -------------------------------------------------------------
