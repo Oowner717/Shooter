@@ -373,6 +373,86 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('the machine is drawn in the menu that upgrades it', r.bare.drawn, JSON.stringify(r.bare.drawn));
 }
 
+// --- an arm does not survive the sheet --------------------------------------
+/*
+ * A press arms a card and a second press spends, because nine hundred energy
+ * is most of an early run and a thumb is not precise. It lapses after four
+ * seconds for the same reason: an armed card left sitting is a trap for the
+ * next tap, which by then is about something else.
+ *
+ * Closing the sheet and opening it again was exactly that gap with the four
+ * seconds still running -- so was changing tab and coming back. Both shipped
+ * in 152, and both meant one tap spent.
+ */
+{
+  const r = await page.evaluate(() => {
+    const m = window.__sim.hud.menu;
+    window.__sim.debugGiveEnergy(9000);
+    m.setOpen(true);
+    m.show('tree');
+    /*
+     * A card from a branch, not from the shelf: the cases above this one have
+     * already bought the tree out, so the shelf is legitimately empty by the
+     * time this runs and querying it returns null.
+     */
+    const rows = [...document.querySelectorAll('.branchRow')];
+    if (rows[1].parentElement.classList.contains('shut')) rows[1].click();
+    const card = [...document.querySelectorAll('.branchGrid .shopCard')]
+      .find((c) => c.offsetParent && !c.classList.contains('locked'));
+    const arm = () => { m.armRow(null); card.click(); };
+    arm();
+    const armed = !!document.querySelector('.shopCard.armed');
+    m.setOpen(false);
+    m.setOpen(true);
+    const afterClose = !!m.armed;
+    arm();
+    m.show('system');
+    m.show('tree');
+    const afterTab = !!m.armed;
+    m.setOpen(false);
+    return { armed, afterClose, afterTab };
+  });
+  check('an arm lapses when the sheet closes or the tab changes',
+    r.armed && !r.afterClose && !r.afterTab, JSON.stringify(r));
+}
+
+// --- what belongs on the shelf ----------------------------------------------
+/*
+ * The shelf sells upgrades. The seven APERTUREs are the cheapest things in
+ * the tree, so cheapest-first parked two of them on it and -- because they
+ * repeat and so are never finished -- left them there.
+ *
+ * The first rule for that was "not repeatable", and it was wrong: RECAST
+ * repeats too, and it is the one thing the plan explicitly wanted here. With
+ * three REMAINDER in hand and RECAST costing one, the shelf offered two
+ * five-hundred-energy upgrades instead. The test is where a node lives.
+ */
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    const m = g.hud.menu;
+    const w = g.world;
+    m.setOpen(true);
+    m.show('tree');
+    g.debugGiveEnergy(9000);
+    const held = w.remainder || 0;
+    w.remainder = 0;
+    m.syncTree();
+    const without = [...document.querySelectorAll('.shelf .shopCard')].map((c) => c.dataset.id);
+    w.remainder = 3;
+    m.syncTree();
+    const withIt = [...document.querySelectorAll('.shelf .shopCard')].map((c) => c.dataset.id);
+    w.remainder = held;
+    m.syncTree();
+    m.setOpen(false);
+    return { without, withIt };
+  });
+  const noWays = [...r.without, ...r.withIt].every((id) => !/^aperture/.test(id));
+  check('the shelf offers RECAST once there is a REMAINDER, and never a way in',
+    noWays && !r.without.includes('recast') && r.withIt[0] === 'recast',
+    JSON.stringify(r));
+}
+
 // --- the volume -------------------------------------------------------------
 {
   await page.evaluate(async () => { (await import('../src/audio.js')).audio.setVolume(0.35); });

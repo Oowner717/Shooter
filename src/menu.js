@@ -115,6 +115,11 @@ export class Menu {
     this.el.scrim.classList.toggle('on', on);
     this.el.btn.classList.toggle('on', on);
     document.body.classList.toggle('menuOpen', on);
+    // An arm does not survive the sheet. It lapses after four seconds because
+    // an armed card left sitting is a trap for the next tap -- and closing the
+    // sheet and opening it again is exactly that gap, with the four seconds
+    // still running. Measured: arm a card, close, reopen, and one tap spent.
+    this.armRow(null);
     if (on) { this.syncCodex(); this.syncTree(); }
     // The machine only draws while it is being looked at.
     if (on && this.tab === 'tree') this.runHero(); else this.stopHero();
@@ -135,6 +140,8 @@ export class Menu {
 
   show(tab) {
     this.tab = tab;
+    // Same rule as the sheet: leaving this tab abandons whatever was armed.
+    this.armRow(null);
     for (const b of this.el.tabs.children) b.classList.toggle('on', b.dataset.tab === tab);
     for (const p of this.el.panels.children) p.hidden = p.dataset.panel !== tab;
     // The panels share one scroller. Leaving the tree scrolled halfway and
@@ -447,20 +454,9 @@ export class Menu {
     for (let k = 0; k < meter.children.length; k++) {
       meter.children[k].classList.toggle('on', k < have);
     }
-    // A repeatable node has no ceiling, so it has no meter and no ✓ -- what
-    // you hold is a count that goes down again, not a level.
-    if (n.repeat && have) pr.textContent = armed ? 'BUY' : `${tag}`;
     return { open, full, afford, price, have, max };
   }
 
-  /**
-   * What a card says about itself, in one line.
-   *
-   * `line` is written as a stat followed by a description -- "+20% fire rate.
-   * A belt feed along the barrel." The first sentence is the number you are
-   * deciding with and the rest is flavour that was being set at 8px on all
-   * sixty-three rows. The card keeps the number.
-   */
   /**
    * The colour a card wears: its branch's, not its own.
    *
@@ -477,6 +473,14 @@ export class Menu {
     return SLATE;
   }
 
+  /**
+   * What a card says about itself, in one line.
+   *
+   * `line` is written as a stat followed by a description -- "+20% fire rate.
+   * A belt feed along the barrel." The first sentence is the number you are
+   * deciding with and the rest is flavour that was being set at 8px on all
+   * sixty-three rows. The card keeps the number.
+   */
   statOf(n) {
     const line = (n.line || '').trim();
     if (!line) return '';
@@ -529,20 +533,25 @@ export class Menu {
       if (!n.id || n.dormant || !g.available(n)) continue;
       /*
        * A way in is not an upgrade. APERTUREs are the cheapest things in the
-       * tree and they repeat, so cheapest-first put two of them on the shelf
-       * and left them there -- which is the fault this panel was rebuilt to
-       * fix, reproduced at a larger size. They live under ANOMALY.
+       * tree, so cheapest-first put two of them on the shelf and left them
+       * there -- which is the fault this panel was rebuilt to fix, reproduced
+       * at a larger size.
+       *
+       * The test is where they live, not that they repeat. Repeatability was
+       * the first rule and it was wrong: RECAST repeats too, and it swept the
+       * one thing the plan explicitly wanted on this shelf off it -- so with
+       * three REMAINDER in hand and RECAST costing one, the shelf offered two
+       * five-hundred-energy upgrades instead.
        */
-      if (n.repeat) continue;
+      if (inBranch(n, 'anomaly')) continue;
       const have = g.owned(n.id);
-      if (have >= (n.levels || 1)) continue;
+      if (!n.repeat && have >= (n.levels || 1)) continue;
       const price = priceOf(n, have);
       const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
       if (purse >= price) buyable.push({ n, price, have });
       else if (!n.currency && (!cheapest || price < cheapest.price)) cheapest = { n, price };
     }
     buyable.sort((a, b) => a.price - b.price);
-    this.shelfNode = [null, null];
 
     const shelf = this.el.shelf;
     if (!shelf) return;
@@ -583,7 +592,6 @@ export class Menu {
         card = this.makeCard(n);
         if (at) shelf.replaceChild(card, at); else shelf.appendChild(card);
       }
-      this.shelfNode[i] = n;
       this.syncCard(card, n);
       // Beat four: a card that is not the one that was here slides in, so the
       // shelf visibly re-deals instead of silently swapping.
@@ -632,7 +640,11 @@ export class Menu {
     ctx.clearRect(0, 0, w, h);
 
     const s = g.world.shooter;
-    const t = now / 1000;
+    // Wrapped. `now` is milliseconds since the page loaded, and the sweep
+    // below is a sine of it -- left unbounded the borrowed spin reaches
+    // thousands of radians on a long session, where a float has fewer bits
+    // left for the fraction than the drawing needs.
+    const t = (now % 600000) / 1000;
     // Big enough to read the parts on. The machine grows with the rig, so the
     // scale is against the finished radius rather than the current one.
     const k = (h / dpr / 190) * dpr;
