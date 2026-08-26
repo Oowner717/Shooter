@@ -1,6 +1,38 @@
 # The upgrade menu
 
-*A plan. Nothing here is built yet.*
+*Shipped, builds 152-154. What follows is the plan as written; the table
+below is what it measured against afterwards.*
+
+| | before | gate | **after** |
+|---|---|---|---|
+| screen above the first buyable thing | 305 of 664 | < 200 | 93 (the machine) |
+| whole cards on screen, no scrolling | 0 | 2 + the turret | **2 + the turret** |
+| text nodes in the default view | 460 | < 60 | **28** |
+| type below 11px | 150 nodes | 0 | **0** |
+| body-text contrast | 2.99:1 | >= 4.5:1 | **>= 4.5:1, swept** |
+| icon size | 18px | 44px | 40px |
+| first screen: 0 owned vs 63 owned | 0 differing pixels | must differ | **the machine, the count, five meters** |
+| scroll to see everything owned | 3069px | one screen | **788px** (viewport 572) |
+| taps to a purchase | up to 4 | 2, one target | **2, one target** |
+| branch hues >= 60 deg apart | 2 of 4 | 4 of 4 | **4 of 4** |
+
+Two gates were written wrong and are recorded as written. *Screen above the
+first buyable thing* was set at 200px before the plan put a 150px machine at
+the top of the panel; the machine IS the thing above it, and 93px of that is
+the top of the machine itself. *Icon size* landed at 40 rather than 44 because
+the card is a fixed height and 44 cost the stat its third line.
+
+`17 OF 63` was wrong twice over: there are **136** levels in the tree, and a
+run does not reach that, so the count shipped without a denominator. Risk 3
+below called it and it was right.
+
+Phase B shipped with phase D, because B is D's replacement and shipping the
+branch grids on top of the tree would have left the panel with two
+catalogues -- which is the complaint.
+
+---
+
+*The plan, as written before any of it was built:*
 
 The brief was: it is not satisfying, it is too busy, it is too small, it makes
 you focus too hard, and you do not want to be in there. Upgrading is a major
