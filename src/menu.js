@@ -18,6 +18,7 @@ import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
 import { BUILD, REV } from './config.js';
 import { TREE, NODES, priceOf } from './tree.js';
+import { svgMark } from './util.js';
 
 /**
  * Is this node somewhere under the branch with that key? `parent` is set on
@@ -30,6 +31,20 @@ function inBranch(n, key) {
 }
 
 const $ = (id) => document.getElementById(id);
+
+/*
+ * One mark per category. The categories are headings in tree.js and never had
+ * icons, because a row of text does not need one -- a 44-pixel row that has to
+ * be told apart at a glance does.
+ */
+const bm = (body) => svgMark(body, 1.8);
+const BRANCH_MARK = {
+  turret: bm('<path d="M12 21V9"/><path d="M9 12 12 8.6 15 12"/><path d="M4.6 18.6 12 21l7.4-2.4"/>'),
+  ammo: bm('<circle cx="12" cy="7" r="2.8" fill="currentColor" stroke="none"/><path d="M12 21V12"/><path d="M8.6 15.5h6.8" opacity=".6"/>'),
+  mines: bm('<path d="M3.5 19h17"/><path d="M8 19a4 4 0 0 1 8 0"/><path d="M12 12.5V7"/>'),
+  abilities: bm('<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>'),
+  anomaly: bm('<circle cx="12" cy="12" r="6.4"/><path d="M12 2.4v3.2M12 18.4v3.2M2.4 12h3.2M18.4 12h3.2"/>'),
+};
 
 /*
  * Every level the TURRET branch sells, added up. Off the tree rather than off
@@ -154,31 +169,27 @@ export class Menu {
    */
   buildTree() {
     const p = this.panel('tree', 'tree');
-    this.treeRows = [];
+    this.items = [];
+    this.branches = [];
+
     const head = document.createElement('div');
     head.className = 'treeHead';
     head.innerHTML = '<span class="treeHeadName">ENERGY</span>'
       + '<span class="treeNext" id="treeNext"></span>'
       + '<span class="treeSouls" id="treeSouls" hidden></span>'
       + '<b id="treeBank">0</b>';
+
+    p.appendChild(this.buildHero());
+    p.appendChild(this.buildShelf());
     p.appendChild(head);
+    p.appendChild(this.buildBranches());
+
     this.el.treeBank = head.querySelector('#treeBank');
     this.el.treeSouls = head.querySelector('#treeSouls');
     this.el.treeNext = head.querySelector('#treeNext');
 
-    for (const root of TREE) {
-      p.appendChild(this.treeNode(root, 0));
-    }
-    // ...and the room goes in front of all of it. Built last so the rows it
-    // reads from exist; inserted first so it is what opens.
-    // The strip is the TREE's header -- the wallet and what is within reach of
-    // it -- so it belongs against the tree rather than between the machine and
-    // the shelf, where it cost the cards forty-five pixels of screen.
-    p.insertBefore(this.buildHero(), p.firstChild);
-    p.insertBefore(this.buildShelf(), head);
-
     // The two that are never bought. They are the last thing the arsenal tab
-    // held that the tree has no row for, so they sit under it as a reference.
+    // held that the tree had no row for, so they sit under it as a reference.
     const run = ARSENAL_GROUPS.find((x) => x.id === 'auto');
     p.appendChild(heading(run.title, run.note));
     const grid = document.createElement('div');
@@ -194,6 +205,114 @@ export class Menu {
       this.cells.set(a.key, row);
     }
     p.appendChild(grid);
+  }
+
+  /*
+   * ====================== YOUR MACHINE ==========================
+   *
+   * What the tree was. Five rows, one per category, each with a meter in its
+   * own colour and its own fraction -- the whole shape of eighty-three
+   * purchases in five lines, readable across a room.
+   *
+   * It was an indented outline three levels deep, closed by default, with
+   * OPEN and CLOSE on every branch and a rail down the left. That is the
+   * shape of a file browser and it is the wrong shape for a shop: 460 pieces
+   * of text, 434 of them at ten pixels or under, and up to four taps between
+   * opening the panel and spending anything.
+   *
+   * Flat, one category open at a time, and the thing nesting used to say --
+   * that OVERSTUFFED belongs to BOLT -- is said by order and colour instead.
+   * A mod sits directly under its round, wearing its round's tone.
+   */
+  buildBranches() {
+    const frag = document.createDocumentFragment();
+    const lab = document.createElement('div');
+    lab.className = 'shopLab';
+    lab.innerHTML = '<span>YOUR MACHINE</span>';
+    frag.appendChild(lab);
+
+    for (const root of TREE) {
+      // RECAST is a leaf at the top of the tree because it is bought with a
+      // currency nothing else uses. It is still a new form for the turret, so
+      // it is shown with the turret rather than as a category of one.
+      if (root.kind !== 'root') continue;
+      frag.appendChild(this.buildBranch(root));
+    }
+    return frag;
+  }
+
+  buildBranch(root) {
+    const wrap = document.createElement('div');
+    wrap.className = 'branch shut';
+    wrap.style.setProperty('--tone', root.tone || '#8fb6d8');
+
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'branchRow';
+    row.innerHTML = `<span class="branchIcon">${BRANCH_MARK[root.key] || ''}</span>`
+      + `<span class="branchName">${root.name}</span>`
+      + '<span class="branchBar"><i></i></span>'
+      + '<span class="branchFrac"></span>'
+      + '<span class="branchCaret"></span>';
+    // ANOMALY holds a slot per boss and each boss owns a hue, so its meter
+    // wears all seven at once -- the one row that says how many there are.
+    if (root.tones && root.tones.length) {
+      const step = 100 / root.tones.length;
+      wrap.style.setProperty('--tones', root.tones
+        .map((c, i) => `${c} ${(i * step).toFixed(2)}%, ${c} ${((i + 1) * step).toFixed(2)}%`)
+        .join(', '));
+      wrap.classList.add('spectrum');
+    }
+    wrap.appendChild(row);
+
+    const grid = document.createElement('div');
+    grid.className = 'branchGrid';
+
+    const own = [];
+    const walk = (nodes) => {
+      for (const n of nodes) {
+        if (n.id) {
+          const card = this.makeCard(n);
+          grid.appendChild(card);
+          this.items.push({ n, card });
+          own.push(n);
+        } else if (n.name && (n.kind === 'group' || n.kind === 'arm')) {
+          // A heading, not a purchase: ALL ROUNDS, and the three arms the
+          // turret starts with. It names the cards under it and nothing else.
+          const g = document.createElement('div');
+          g.className = 'grpLab';
+          g.style.setProperty('--tone', this.toneOf(n));
+          g.textContent = n.name;
+          grid.appendChild(g);
+        }
+        if (n.children && n.children.length) walk(n.children);
+      }
+    };
+    walk(root.children || []);
+    // ...and RECAST, on the end of the turret.
+    if (root.key === 'turret') {
+      for (const n of TREE) {
+        if (n.kind === 'root' || !n.id) continue;
+        const card = this.makeCard(n);
+        grid.appendChild(card);
+        this.items.push({ n, card });
+        own.push(n);
+      }
+    }
+    wrap.appendChild(grid);
+
+    row.addEventListener('click', () => {
+      const shut = wrap.classList.contains('shut');
+      // One at a time. Two open branches is two screens of cards and no way
+      // back to the top, which is the thing this replaced.
+      for (const b of this.branches) b.wrap.classList.add('shut');
+      this.armRow(null);
+      if (shut) wrap.classList.remove('shut');
+      this.syncTree();
+    });
+
+    this.branches.push({ root, wrap, row, grid, nodes: own });
+    return wrap;
   }
 
   /*
@@ -245,18 +364,20 @@ export class Menu {
    * the second spends. Three targets on one row is the bug menu.js already
    * fixed once and it is not being reintroduced at a larger size.
    */
-  shopCard(slot) {
+  makeCard(n) {
     const c = document.createElement('button');
     c.type = 'button';
     c.className = 'shopCard';
-    c.innerHTML = '<span class="shopIcon"></span>'
+    c.dataset.id = n.id;
+    c.style.setProperty('--tone', this.toneOf(n));
+    const max = n.repeat ? 0 : (n.levels || 1);
+    c.innerHTML = `<span class="shopIcon">${n.icon || ''}</span>`
       + '<span class="shopName"></span>'
       + '<span class="shopStat"></span>'
-      + '<span class="shopMeter"></span>'
+      + `<span class="shopMeter">${'<i></i>'.repeat(max)}</span>`
       + '<b class="shopPrice"></b>';
     c.addEventListener('click', () => {
-      const n = this.shelfNode && this.shelfNode[slot];
-      if (!n) return;
+      if (c.classList.contains('locked')) { this.refuseRow(c); return; }
       if (this.armed !== c) { this.armRow(c); this.syncTree(); return; }
       this.armRow(null);
       const res = this.game.buy(n.id);
@@ -264,6 +385,62 @@ export class Menu {
       this.syncTree();
     });
     return c;
+  }
+
+  /**
+   * One card's five states. The same function paints the shelf and the
+   * grids, so a card cannot say one thing in one place and another in the
+   * other -- which is how the tree's price box and its pips drifted apart.
+   *
+   *   locked  behind something unbought. Dim, still readable, still priced.
+   *   poor    open and out of reach right now.
+   *   afford  the only state that invites a press.
+   *   part    yours, with levels left. Lit, and still priced.
+   *   own     yours, and finished. Brightest, and the price is a full meter.
+   *
+   * `own` is the inversion. A bought row used to grey out and get a tick,
+   * which made colour mean FOR SALE and grey mean YOURS -- so finishing the
+   * tree made it go dim. A tick is a receipt; a lit part is a trophy.
+   */
+  syncCard(card, n) {
+    const g = this.game;
+    const w = g.world;
+    const have = g.owned(n.id);
+    const max = n.repeat ? 0 : (n.levels || 1);
+    const full = !n.repeat && have >= max;
+    const open = g.available(n) && !n.dormant;
+    const price = full ? 0 : priceOf(n, have);
+    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
+    const afford = !full && purse >= price;
+    const armed = card === this.armed;
+
+    card.classList.toggle('locked', !open);
+    card.classList.toggle('poor', open && !full && !afford);
+    card.classList.toggle('own', !!full);
+    card.classList.toggle('armed', armed);
+
+    const at = Math.min(have, Math.max(max - 1, 0));
+    const nm = card.querySelector('.shopName');
+    const name = n.tiers && n.tiers[at] ? n.tiers[at].name : n.name;
+    if (nm.textContent !== name) nm.textContent = name;
+    const stat = this.statOf(n);
+    const st = card.querySelector('.shopStat');
+    if (st.textContent !== stat) st.textContent = stat;
+
+    const tag = n.currency === 'remainder' ? `${price}\u25c6` : String(price);
+    nm.dataset.price = tag;
+    const say = armed ? 'BUY' : full ? '\u2713' : !open ? '\u00b7' : tag;
+    const pr = card.querySelector('.shopPrice');
+    if (pr.textContent !== say) pr.textContent = say;
+
+    const meter = card.querySelector('.shopMeter');
+    for (let k = 0; k < meter.children.length; k++) {
+      meter.children[k].classList.toggle('on', k < have);
+    }
+    // A repeatable node has no ceiling, so it has no meter and no ✓ -- what
+    // you hold is a count that goes down again, not a level.
+    if (n.repeat && have) pr.textContent = armed ? 'BUY' : `${tag}`;
+    return { open, full, afford, price, have, max };
   }
 
   /**
@@ -382,42 +559,22 @@ export class Menu {
 
     for (let i = 0; i < 2; i++) {
       const pick = buyable[i];
-      let card = shelf.children[i];
-      if (pick && !(card instanceof HTMLButtonElement)) {
-        card = this.shopCard(i);
-        if (shelf.children[i]) shelf.replaceChild(card, shelf.children[i]);
-        else shelf.appendChild(card);
-        this.shelfAt[i] = '';
-      }
+      const at = shelf.children[i];
       if (!pick) {
-        if (card) card.remove();
+        if (at) at.remove();
         this.shelfAt[i] = '';
         continue;
       }
-      this.shelfNode[i] = pick.n;
-      const { n, price, have } = pick;
-      const max = n.repeat ? 0 : (n.levels || 1);
-      card.style.setProperty('--tone', this.toneOf(n));
-      card.querySelector('.shopIcon').innerHTML = n.icon || '';
-      const nm = card.querySelector('.shopName');
-      const at = Math.min(have, Math.max(max - 1, 0));
-      nm.textContent = n.tiers && n.tiers[at] ? n.tiers[at].name : n.name;
-      card.querySelector('.shopStat').textContent = this.statOf(n);
-      const tag = n.currency === 'remainder' ? `${price}\u25c6` : price;
-      nm.dataset.price = tag;
-      card.querySelector('.shopPrice').textContent = card === this.armed ? 'BUY' : tag;
-      card.classList.toggle('armed', card === this.armed);
-      card.classList.remove('poor');
-      // The meter, one segment per level. Three 6px hollow squares is what
-      // this replaces, which is a progress bar drawn at the size of a full
-      // stop.
-      const meter = card.querySelector('.shopMeter');
-      if (meter.children.length !== max) {
-        meter.innerHTML = '<i></i>'.repeat(max);
+      const { n, have } = pick;
+      // A card is rebuilt only when the thing on it changes; the rest of the
+      // time it is repainted in place, so the meter and the price can animate.
+      let card = at;
+      if (!card || card.dataset.id !== n.id) {
+        card = this.makeCard(n);
+        if (at) shelf.replaceChild(card, at); else shelf.appendChild(card);
       }
-      for (let k = 0; k < meter.children.length; k++) {
-        meter.children[k].classList.toggle('on', k < have);
-      }
+      this.shelfNode[i] = n;
+      this.syncCard(card, n);
       // Beat four: a card that is not the one that was here slides in, so the
       // shelf visibly re-deals instead of silently swapping.
       const key = `${n.id}:${have}`;
@@ -537,141 +694,6 @@ export class Menu {
     this.bankRaf = requestAnimationFrame(step);
   }
 
-  /** One row, plus its children under it. Recursive; depth drives the indent. */
-  treeNode(n, depth) {
-    const wrap = document.createElement('div');
-    wrap.className = `treeBranch d${Math.min(depth, 3)}`;
-    if (n.tone) wrap.style.setProperty('--tone', n.tone);
-    /*
-     * A node may carry more than one colour. Only ANOMALY does: it holds a
-     * slot per boss and each boss owns a hue, so the heading is painted with
-     * all of them in hard bands — the one place in the game that says how
-     * many of these there are going to be.
-     */
-    if (n.tones && n.tones.length) {
-      const step = 100 / n.tones.length;
-      wrap.style.setProperty('--tones', n.tones
-        .map((c, i) => `${c} ${(i * step).toFixed(2)}%, ${c} ${((i + 1) * step).toFixed(2)}%`)
-        .join(', '));
-      wrap.classList.add('spectrum');
-    }
-
-    const row = document.createElement('button');
-    row.className = `treeRow k-${n.kind}`;
-    row.type = 'button';
-    // A level meter, not a fraction. Three states have to be told apart at a
-    // glance — nothing bought, part bought, full — and "1/3" reads as a label
-    // where a row of filled pips reads as progress. Single-level nodes get no
-    // meter at all: there is nothing to be part-way through.
-    // A repeatable node has no ceiling and so no meter: there is nothing to
-    // be part-way through, and `'<i></i>'.repeat(Infinity)` is not a meter,
-    // it is a hang.
-    const max = n.repeat ? 0 : (n.levels || 1);
-    const pips = max > 1
-      ? `<span class="treePips">${'<i></i>'.repeat(max)}</span>` : '';
-    const cost = document.createElement('b');
-    cost.className = 'treeCost';
-    /*
-     * A round or a mine is described the way the arsenal described it: the
-     * labelled DMG/FX pair, aligned, so two of them can be compared down a
-     * column instead of by reading two sentences. Everything else keeps its
-     * one line, because everything else is one sentence long.
-     */
-    const arm = n.kind === 'arm' ? ARM_BY_KEY.get(n.key) : null;
-    const body = arm && (arm.kind === 'round' || arm.kind === 'mine')
-      ? `<span class="treeSpec">${specRows(arm)}</span>`
-      : `<span class="treeLine">${n.line || ''}</span>`;
-    if (arm) row.classList.add('armLike');
-    row.innerHTML = `<span class="treeIcon">${n.icon || ''}</span>`
-      + `<span class="treeText"><span class="treeTop">`
-      + `<span class="treeName">${n.name}</span>${pips}</span>`
-      + `${body}</span>`;
-    row.appendChild(cost);
-    /*
-     * The disclosure caret. A row that hides fourteen more rows looked exactly
-     * like a row that hides nothing, so the seven mines behind BLAST read as
-     * "there is one mine" rather than as "there are eight, and this is the
-     * door". It points right when the branch is shut and down when it is open,
-     * which is the one convention nobody has to be taught.
-     *
-     * First in the row, not last. It sat beside the price, and those are the
-     * two things this row does -- open, and spend nine hundred -- with a thumb
-     * width between them. They are at opposite ends now.
-     *
-     * A row with nothing under it still gets one, blank and untappable, so the
-     * icons stay in one column instead of stepping in and out down the list.
-     */
-    const gut = document.createElement('span');
-    gut.className = n.children.length ? 'treeGut' : 'treeGut off';
-    gut.setAttribute('aria-hidden', 'true');
-    /*
-     * The word above it. An arrow says "something happens here" and nothing
-     * about what -- OPEN when the branch is shut, CLOSE when it is not, so
-     * the door is labelled with what pressing it does rather than with a
-     * shape the reader has to already know.
-     *
-     * Only on a branch. A leaf keeps the empty gutter so the icons stay in
-     * one column, but there is nothing there to name.
-     */
-    const word = n.children.length ? document.createElement('i') : null;
-    if (word) { word.className = 'treeGutWord'; gut.appendChild(word); }
-    const caret = document.createElement('span');
-    caret.className = n.children.length ? 'treeCaret' : 'treeCaret off';
-    gut.appendChild(caret);
-    row.insertBefore(gut, row.firstChild);
-    /*
-     * One tap does one thing. A row used to both open its branch and try to
-     * buy itself, which meant looking inside a round was the same gesture as
-     * spending nine hundred on it.
-     *
-     * Now: something already yours opens and closes. Something buyable arms,
-     * and asks. The second tap is the purchase, and anything else cancels it.
-     */
-    row.addEventListener('click', (e) => {
-      const g = this.game;
-      const have = n.id ? g.owned(n.id) : 0;
-      const full = n.free || (n.id && have >= (n.levels || 1));
-      // Tapping the caret only ever opens and closes, even on a row that is
-      // still for sale. Without that, a branch could not be looked into until
-      // it was paid for -- which is backwards, since what is inside it is the
-      // reason to pay.
-      const onCaret = !!(e.target.closest && e.target.closest('.treeGut'));
-      if (onCaret || !n.id || full) {
-        if (n.children.length) wrap.classList.toggle('shut');
-        this.armRow(null);
-        this.syncTree();
-        return;
-      }
-      if (this.armed !== row) { this.armRow(row); this.syncTree(); return; }
-      this.armRow(null);
-      const res = g.buy(n.id);
-      if (res !== 'ok') this.refuseRow(row);
-      this.syncTree();
-    });
-    wrap.appendChild(row);
-    this.treeRows.push({ n, row, cost, wrap, word });
-
-    if (n.children.length) {
-      const kids = document.createElement('div');
-      kids.className = 'treeKids';
-      for (const c of n.children) kids.appendChild(this.treeNode(c, depth + 1));
-      wrap.appendChild(kids);
-      /*
-       * Closed by default, or the panel is a wall of eighty rows before a
-       * single decision has been made.
-       *
-       * The exception is a branch holding other arms. BLAST is the only door
-       * to seven more mines, and a MINES category showing one row does not
-       * read as "seven more behind this" -- it reads as a category with one
-       * mine in it. Open, they are all there from the first look, greyed until
-       * BLAST is bought.
-       */
-      const holdsArms = n.children.some((c) => c.kind === 'arm');
-      if (depth > 0 && !holdsArms) wrap.classList.add('shut');
-    }
-    return wrap;
-  }
-
   /**
    * Arm one row, and only one. Nine hundred energy is most of an early run and
    * a thumb is not precise, so nothing is spent on a single tap.
@@ -740,13 +762,19 @@ export class Menu {
   openTo(key) {
     this.setOpen(true);
     this.show('tree');
-    const hit = this.treeRows && this.treeRows.find((r) => r.n.key === key);
+    /*
+     * A branch, not a row. The callers ask for 'ammo' or 'mines' -- the
+     * loadout sheet is where you find out a round is sealed and this is the
+     * shortest line from that to the cards that unseal it.
+     *
+     * It used to walk a row's ancestors open one at a time, because a row
+     * inside a shut parent has no height and scrolling to it lands on
+     * nothing. There is one level now, so there is one thing to open.
+     */
+    const hit = this.branches && this.branches.find((b) => b.root.key === key);
     if (!hit) return false;
-    // Its own branch and every branch it hangs from: a row inside a shut
-    // parent is a row with no height, and scrolling to it lands on nothing.
-    for (let w = hit.wrap; w; w = w.parentElement && w.parentElement.closest('.treeBranch')) {
-      w.classList.remove('shut');
-    }
+    for (const b of this.branches) b.wrap.classList.toggle('shut', b !== hit);
+    this.armRow(null);
     this.syncTree();
     /*
      * Put it at the top of the scroller. Measured as a difference between two
@@ -764,23 +792,14 @@ export class Menu {
      * cannot quietly break the landing.
      */
     const head = this.el.panels.querySelector('.menuPanel.tree .treeHead');
-    const clear = (head ? head.getBoundingClientRect().height : 0) + 10;
+    const clear = (head ? head.getBoundingClientRect().height : 0) + 8;
     this.el.panels.scrollTop += row.top - box.top - clear;
-    /*
-     * And say where you landed. Arriving somewhere in the middle of a long
-     * list with no mark on it reads as having arrived nowhere.
-     *
-     * It is a mark on the way in and not a state, so it is cleared off
-     * whatever wore it last and taken off this row when its animation ends.
-     * Left on, two trips through here leave two rows claiming to be where
-     * you are.
-     */
-    for (const el of this.el.panels.querySelectorAll('.treeRow.landed')) el.classList.remove('landed');
+    for (const el of this.el.panels.querySelectorAll('.branchRow.landed')) {
+      el.classList.remove('landed');
+    }
     void hit.row.offsetWidth;
     hit.row.classList.add('landed');
     const done = (e) => {
-      // The row has another animation on it -- the refusal shake -- and that
-      // one must not count as this one ending.
       if (e.animationName !== 'treeLanded') return;
       hit.row.classList.remove('landed');
       hit.row.removeEventListener('animationend', done);
@@ -789,8 +808,9 @@ export class Menu {
     return true;
   }
 
+  /** Every card's state, plus the room and the branch meters. Diffed. */
   syncTree() {
-    if (!this.treeRows) return;
+    if (!this.items) return;
     const g = this.game;
     const w = g.world;
     this.rollBank(Math.floor(w.energy));
@@ -800,94 +820,23 @@ export class Menu {
     if (souls) {
       const n = w.remainder || 0;
       if (souls.hidden !== !n) souls.hidden = !n;
-      if (n) souls.textContent = `${n}◆ REMAINDER`;
+      if (n) souls.textContent = `${n}\u25c6 REMAINDER`;
     }
-    // What the next thing costs. A tree you cannot afford anything in reads as
-    // broken rather than as early, and "820 more" is the difference between a
-    // wall and a target.
+
     let cheapest = Infinity;
     let affordable = 0;
-    for (const { n, row, cost, wrap, word } of this.treeRows) {
-      const have = n.id ? g.owned(n.id) : 0;
-      const max = n.levels || 1;
-      // A dormant slot is not open, whatever the tree says about its parent:
-      // its door has nothing behind it. Same rule as Game.buy(), which is the
-      // thing that would refuse the purchase anyway.
-      const open = g.available(n) && !n.dormant;
-      const full = n.free || (n.id && have >= max);
-      const part = !full && have > 0;
-      const price = !full ? priceOf(n, have) : 0;
-      // A node may be priced in something other than energy. RECAST is the
-      // only one, and it is bought with what ORDINAL leaves behind.
-      const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
-      const afford = price > 0 && purse >= price;
-
-      /*
-       * Five states, and every one of them says a different thing:
-       *
-       *   locked  behind something unbought. Dim, still readable.
-       *   poor    open, priced, and out of reach right now.
-       *   afford  open and buyable. The only state that invites a press.
-       *   part    yours, with levels left. Lit, and still priced.
-       *   full    yours, and finished. Lit, ticked, and no longer asking.
-       *
-       * `part` is the one that was missing: a node bought once out of three
-       * looked exactly like one never bought at all.
-       */
-      row.classList.toggle('locked', !open);
-      row.classList.toggle('poor', open && !full && !part && !afford);
-      row.classList.toggle('afford', open && !full && !part && afford);
-      row.classList.toggle('part', part);
-      row.classList.toggle('full', !!full);
-      row.classList.toggle('partAfford', part && afford);
-
-      if (open && !full) {
-        if (afford) affordable++;
-        // Only energy prices feed the "820 more" line: a REMAINDER is not
-        // something you are short of, it is something you have not been given.
-        else if (!n.currency) cheapest = Math.min(cheapest, price);
-      }
-      // A category is a heading, not a thing you own, so a ✓ on one said you
-      // had bought something you were never offered. The caret is its whole
-      // right-hand side now.
-      const heading = n.kind === 'root' || n.kind === 'group';
-      // A price in REMAINDERs is marked, or "1" beside HOLLOWPOINT's 500 reads
-      // as the cheapest thing in the tree rather than as the rarest.
-      const tag = n.currency === 'remainder' ? `${price}◆` : price;
-      cost.textContent = heading ? ''
-        : row === this.armed ? 'SURE?' : full ? '✓' : !open ? '·' : tag;
-      cost.classList.toggle('tick', !!full && !heading);
-      cost.classList.toggle('ask', row === this.armed);
-      /*
-       * The price wears a box only when the price is a thing you can press.
-       * A ✓, a locked row's ·, and a heading's blank are all readouts, and a
-       * button drawn round a readout is a lie about what a tap will do.
-       */
-      cost.classList.toggle('box', !heading && open && !full);
-      /*
-       * The gutter word, named for what the press does next. Every open and
-       * close in the tree comes back through here, so it cannot drift out of
-       * step with the branch it labels.
-       */
-      if (word) {
-        const shut = wrap.classList.contains('shut');
-        const say = shut ? 'OPEN' : 'CLOSE';
-        if (word.textContent !== say) word.textContent = say;
-      }
-
-      const meter = row.querySelector('.treePips');
-      if (meter) {
-        for (let i = 0; i < meter.children.length; i++) {
-          meter.children[i].classList.toggle('on', i < have);
-        }
-      }
-      // The name is the tier's name once a tier has been reached.
-      const lvl = row.querySelector('.treeName');
-      if (lvl) {
-        const at = Math.min(have, max - 1);
-        lvl.textContent = n.tiers && n.tiers[at] ? n.tiers[at].name : n.name;
+    for (const { n, card } of this.items) {
+      // A card inside a shut branch is a card with no height. Painting it is
+      // work nobody can see, and there are eighty-three of them.
+      const shown = card.offsetParent !== null;
+      const st = shown ? this.syncCard(card, n)
+        : this.cardState(n);
+      if (st.open && !st.full) {
+        if (st.afford) affordable++;
+        else if (!n.currency) cheapest = Math.min(cheapest, st.price);
       }
     }
+
     if (this.el.treeNext) {
       this.el.treeNext.textContent = affordable
         ? `${affordable} within reach`
@@ -895,7 +844,60 @@ export class Menu {
           : '';
       this.el.treeNext.classList.toggle('reach', affordable > 0);
     }
-    this.syncRoom(this.treeRows);
+
+    this.syncBranches();
+    this.syncRoom(this.items);
+  }
+
+  /** What syncCard works out, without touching the DOM. */
+  cardState(n) {
+    const g = this.game;
+    const w = g.world;
+    const have = g.owned(n.id);
+    const max = n.repeat ? 0 : (n.levels || 1);
+    const full = !n.repeat && have >= max;
+    const open = g.available(n) && !n.dormant;
+    const price = full ? 0 : priceOf(n, have);
+    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
+    return { open, full, price, have, max, afford: !full && purse >= price };
+  }
+
+  /**
+   * The five meters. Each one is every level its category sells, and how
+   * many of them are yours.
+   *
+   * ANOMALY counts differently on purpose: its seven slots repeat, so what
+   * you hold is a stock rather than a level. Opened-at-least-once is the
+   * thing that goes up and stays up, which is what a meter is for.
+   */
+  syncBranches() {
+    if (!this.branches) return;
+    const g = this.game;
+    for (const b of this.branches) {
+      let have = 0;
+      let max = 0;
+      let reach = 0;
+      for (const n of b.nodes) {
+        // RECAST is shown with the turret because it is a new form for the
+        // turret, but it is bought with REMAINDER -- so it is not a level of
+        // this branch and counting it made the row say 10/18 beside a hero
+        // saying 10/17.
+        if (n.currency) continue;
+        const st = this.cardState(n);
+        if (n.repeat) { have += Math.min(st.have, 1); max += 1; }
+        else { have += st.have; max += st.max; }
+        if (st.open && !st.full && st.afford) reach++;
+      }
+      const frac = b.row.querySelector('.branchFrac');
+      const say = `${have}/${max}`;
+      if (frac.textContent !== say) frac.textContent = say;
+      const bar = b.row.querySelector('.branchBar > i');
+      bar.style.width = `${max ? (have / max) * 100 : 0}%`;
+      b.wrap.classList.toggle('done', max > 0 && have >= max);
+      // A dot on a shut branch holding something you can afford: the reason
+      // to open it, without opening it.
+      b.wrap.classList.toggle('reach', reach > 0);
+    }
   }
 
   // ---------------------------------------------------------------- arsenal

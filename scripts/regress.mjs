@@ -236,9 +236,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       const cv = document.querySelector('.rigHero canvas');
       return {
         count: document.querySelector('.rigCount').textContent,
-        cards: [...document.querySelectorAll('.shopCard')]
+        // The shelf's two, not all eighty-five: the branch grids are made of
+        // the same card and querying for the class alone catches the lot.
+        cards: [...document.querySelectorAll('.shelf .shopCard')]
           .map((c) => c.querySelector('.shopName').textContent),
-        tones: [...document.querySelectorAll('.shopCard')]
+        tones: [...document.querySelectorAll('.shelf .shopCard')]
           .map((c) => c.style.getPropertyValue('--tone')),
         drawn: cv ? cv.width > 0 && cv.height > 0 : false,
       };
@@ -2054,92 +2056,100 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${graftable.tooBig.length ? `; TOO BIG: ${graftable.tooBig}` : ''}`);
 }
 
-// --- the tree row says what a press will do ---------------------------------
 /*
- * Two affordances that were not there. The disclosure arrow was an 8px chevron
- * hard against the row's left border, unlabelled — it read as part of the
- * frame rather than as a door — and the price was bare text, which is how a
- * readout is drawn, not a control.
+ * One card, one target.
  *
- * Now: a fixed gutter with the arrow centred in it and OPEN/CLOSE named above
- * it, and a box round the price whenever the press would actually spend
- * something. What is checked is that the word tracks the branch, that the box
- * appears on exactly the pressable states and on none of the readouts (a ✓, a
- * locked ·, a heading's blank), and that a tap in the gutter still opens
- * rather than arms while a tap on a leaf's dead gutter still reaches the row.
+ * The tree row had three: a gutter that opened it, a body that armed it, and
+ * a price that bought it -- so looking inside a round was the same gesture as
+ * spending nine hundred on it, and the left edge of a leaf was a dead zone
+ * that swallowed the buy. It was fixed once, and the first draft of the plan
+ * that replaced the tree proposed it again at a larger size.
+ *
+ * What is checked is that the price says a price on exactly the states where
+ * a press would spend and a readout on every state where it would not, that
+ * the branch row only ever opens, and that a press anywhere on a card -- its
+ * art, its text, its price -- lands on the same button.
  */
 {
   /*
    * Measured at rest, not on the way in. #menu enters on a translate, so a
    * difference between two rects inside it survives being measured mid-slide
    * -- but elementFromPoint takes viewport coordinates and does not, and a
-   * row still hundreds of pixels below the fold answers "nothing" rather than
-   * "the wrong thing". The first version of this case measured during the
-   * entrance and passed only because the menu happened to be open already.
+   * card still hundreds of pixels below the fold answers "nothing" rather
+   * than "the wrong thing".
    */
   await page.evaluate(() => {
     const g = window.__sim;
     g.debugGiveEnergy(2600);
     g.hud.menu.setOpen(true);
     g.hud.menu.show('tree');
+    // Open one, so there are cards in every state to look at.
+    document.querySelectorAll('.branchRow')[1].click();
   });
   await page.waitForTimeout(400);
   const r = await page.evaluate(() => {
-    const vis = (el) => el.getBoundingClientRect().width > 0;
-    const rows = [...document.querySelectorAll('.treeRow')];
-    // Every price is either a box or a readout, never the wrong one.
+    const cards = [...document.querySelectorAll('.branchGrid .shopCard')]
+      .filter((c) => c.offsetParent);
     const wrong = [];
-    for (const row of rows) {
-      const c = row.querySelector('.treeCost');
-      const box = c.classList.contains('box');
-      const t = c.textContent;
-      const readout = t === '' || t === '\u2713' || t === '\u00b7';
-      if (box === readout) wrong.push(`${row.querySelector('.treeName').textContent}:"${t}":${box}`);
+    let priced = 0;
+    for (const c of cards) {
+      const t = c.querySelector('.shopPrice').textContent;
+      const readout = t === '\u2713' || t === '\u00b7';
+      const locked = c.classList.contains('locked');
+      const own = c.classList.contains('own');
+      // A ✓ means finished, a · means behind something unbought, and anything
+      // else is a number you can be charged. Nothing else is legal.
+      const should = own ? '\u2713' : locked ? '\u00b7' : 'price';
+      const says = t === '\u2713' ? '\u2713' : t === '\u00b7' ? '\u00b7' : 'price';
+      if (should !== says) wrong.push(`${c.querySelector('.shopName').textContent}:"${t}"`);
+      if (!readout) priced++;
     }
-    // The word names what the next press does, and follows the branch.
-    const head = rows.find((x) => x.querySelector('.treeGutWord'));
-    const branch = head.parentElement;
-    const said = [];
+    // The caret tracks the branch, and opening never arms a purchase.
+    const rows = [...document.querySelectorAll('.branchRow')];
+    const shutness = [];
     for (let i = 0; i < 2; i++) {
-      said.push({ shut: branch.classList.contains('shut'),
-        word: head.querySelector('.treeGutWord').textContent });
-      head.querySelector('.treeCaret').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      shutness.push(rows[1].parentElement.classList.contains('shut'));
+      rows[1].click();
     }
-    const armedByCaret = !!document.querySelector('.treeRow.armed');
-    // The arrow sits in the middle of its own gutter, and that gutter is the
-    // space between the row's edge and the first thing in it.
-    const rb = head.getBoundingClientRect();
-    const cb = head.querySelector('.treeCaret').getBoundingClientRect();
-    const ib = head.querySelector('.treeIcon').getBoundingClientRect();
-    const arrow = cb.left + cb.width / 2 - rb.left;
-    const middle = (ib.left - rb.left) / 2;
-    // A leaf's gutter is dead, so the row underneath it takes the press --
-    // the left edge of a leaf used to be a zone that swallowed the buy.
-    const leaf = rows.find((x) => vis(x) && !x.querySelector('.treeGutWord'));
-    leaf.scrollIntoView({ block: 'center' });
-    const lg = leaf.querySelector('.treeGut').getBoundingClientRect();
-    const top = document.elementFromPoint(lg.left + lg.width / 2, lg.top + lg.height / 2);
-    const hit = top === leaf;
-    const hitWas = top ? `${top.tagName}.${top.className}` : 'nothing';
+    /*
+     * The two carets are read at the same moment, off two different branches
+     * -- one open and one shut -- rather than off one branch before and after
+     * a press. The rotation is a 0.16s transition, so measured immediately
+     * after a click it is still halfway there and both reads come back the
+     * same number.
+     */
+    const open = rows.find((x) => !x.parentElement.classList.contains('shut'))
+      || rows[1];
+    const shut = rows.find((x) => x.parentElement.classList.contains('shut'));
+    const sin = (x) => Math.round(parseFloat(
+      getComputedStyle(x.querySelector('.branchCaret')).transform.split(',')[1]) * 100);
+    const said = { shutness, openTurn: sin(open), shutTurn: sin(shut) };
+    const armedByBranch = !!document.querySelector('.shopCard.armed');
+
+    // Three presses on one card -- the art, the words and the price -- and
+    // all three have to land on the same button.
+    const card = cards.find((c) => !c.classList.contains('locked'));
+    card.scrollIntoView({ block: 'center' });
+    const at = (el) => {
+      const b = el.getBoundingClientRect();
+      const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+      return top && top.closest('.shopCard') === card;
+    };
+    const oneTarget = ['.shopIcon', '.shopName', '.shopPrice'].every((q) => at(card.querySelector(q)));
     window.__sim.hud.menu.setOpen(false);
-    return { rows: rows.length, wrong, said, armedByCaret, arrow: +arrow.toFixed(1),
-      middle: +middle.toFixed(1), hit, hitWas,
-      leafName: leaf.querySelector('.treeName').textContent,
-      leafBox: [Math.round(lg.left), Math.round(lg.top)],
-      boxes: rows.filter((x) =>
-        x.querySelector('.treeCost').classList.contains('box')).length };
+    return { cards: cards.length, wrong, priced, said, armedByBranch, oneTarget,
+      name: card.querySelector('.shopName').textContent };
   });
-  const words = r.said.length === 2
-    && r.said.every((s) => s.word === (s.shut ? 'OPEN' : 'CLOSE'))
-    && r.said[0].shut !== r.said[1].shut;
-  check('a tree price is boxed when it is pressable and bare when it is not',
-    r.wrong.length === 0 && r.boxes > 0, `${r.boxes}/${r.rows} boxed; wrong: ${r.wrong.slice(0, 4)}`);
-  check('the gutter names what the press does, and only opens',
-    words && !r.armedByCaret, JSON.stringify(r.said) + ` armed:${r.armedByCaret}`);
-  check('the arrow is centred between the row edge and its text',
-    Math.abs(r.arrow - r.middle) <= 2 && r.hit,
-    `arrow at ${r.arrow}, middle at ${r.middle}; leaf ${r.leafName} at ${r.leafBox} `
-    + `reaches the row: ${r.hit} (hit ${r.hitWas})`);
+  // sin of the rotation: -45deg shut, +45deg open. Opposite signs.
+  const turns = r.said.shutness[0] !== r.said.shutness[1]
+    && r.said.openTurn * r.said.shutTurn < 0;
+  check('a card asks for a price only when the press would spend',
+    r.wrong.length === 0 && r.priced > 0 && r.cards > 0,
+    `${r.priced}/${r.cards} priced; wrong: ${r.wrong.slice(0, 4)}`);
+  check('a branch row only ever opens, and its caret says which way',
+    turns && !r.armedByBranch, JSON.stringify(r.said) + ` armed:${r.armedByBranch}`);
+  check('the whole card is one target: art, words and price all reach it',
+    r.oneTarget, `${r.name}: ${r.oneTarget}`);
 }
 
 // --- the loadout sheet has a door to the tree --------------------------------
@@ -2196,13 +2206,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const jump = await page.evaluate(() => {
     const g = window.__sim;
     document.getElementById('loadMore').dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    const landed = document.querySelector('.treeRow.landed');
+    const landed = document.querySelector('.branchRow.landed');
     const head = document.querySelector('.menuPanel.tree .treeHead');
     return {
       sheetShut: document.getElementById('loadout').hidden,
       stillOpen: g.loadoutOpen,
       menu: g.hud.menu.open && g.hud.menu.tab,
-      on: landed && landed.querySelector('.treeName').textContent,
+      on: landed && landed.querySelector('.branchName').textContent,
       branchOpen: !!landed && !landed.parentElement.classList.contains('shut'),
       // Clear of the ENERGY strip, which is sticky at the top of the same
       // scroller and used to park the row you were sent to underneath it.
@@ -2215,9 +2225,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const g = window.__sim;
     const w = g.world;
     document.getElementById('loadMore').dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    const second = document.querySelector('.treeRow.landed');
-    const jump2 = { on: second && second.querySelector('.treeName').textContent,
-      marks: document.querySelectorAll('.treeRow.landed').length };
+    const second = document.querySelector('.branchRow.landed');
+    const jump2 = { on: second && second.querySelector('.branchName').textContent,
+      marks: document.querySelectorAll('.branchRow.landed').length };
     // The branch counts have to add up to the tree's own, or one of them is
     // counting rows that belong to somebody else.
     const m = g.hud.menu;

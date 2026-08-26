@@ -2601,326 +2601,18 @@ body.booting #pendingBtn {
   background: #040a12;
   clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
 }
-.treeHeadName { font-size: 9px; letter-spacing: 0.2em; color: var(--dim); }
+.treeHeadName { font-size: 11px; letter-spacing: 0.2em; color: var(--dim); }
 .treeHead b {
   font-size: 17px;
   color: #7cffb2;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 10px rgba(124, 255, 178, 0.4);
 }
-
-/* The rail. Depth 0 has none — a root is not hanging off anything. */
-.treeBranch { --tone: #8fb6d8; }
-.treeBranch.d1, .treeBranch.d2, .treeBranch.d3 {
-  margin-left: 9px;
-  padding-left: 9px;
-  border-left: 1px solid color-mix(in srgb, var(--tone) 26%, transparent);
-}
-.treeBranch.d0 { margin-top: 10px; }
-.treeBranch.shut > .treeKids { display: none; }
-
-.treeKids { display: flex; flex-direction: column; gap: 2px; padding-top: 2px; }
-
-.treeRow {
-  position: relative;
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 9px;
-  text-align: left;
-  border: 1px solid var(--line);
-  background: rgba(6, 12, 22, 0.66);
-  color: var(--ink);
-  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
-  transition: border-color 0.14s, background 0.14s, opacity 0.14s;
-}
-.treeRow:active { transform: translateY(1px); }
-.treeRow .treeIcon { flex: 0 0 auto; width: 18px; height: 18px; color: var(--tone); opacity: 0.9; }
-.treeRow .treeIcon svg { width: 18px; height: 18px; display: block; }
-.treeText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.treeName { font-size: 10px; letter-spacing: 0.13em; color: var(--ink); }
-.treeLine {
-  font-size: 8px;
-  letter-spacing: 0.03em;
-  line-height: 1.35;
-  color: #4d5f74;
-  /* Two lines, then it stops. A tree is scanned, not read. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-/*
- * The price.
- *
- * It used to be bare text hard against the right edge, which is how a
- * readout is drawn, not a control -- and a row's whole purchase is that
- * number. It wears a box now (`.box`, set in Menu.syncTree) whenever the
- * press would actually do something: priced, open, unfinished. A ✓, a
- * locked ·, and a heading's blank stay bare, because a button drawn round
- * a readout is a lie about what a tap does.
- */
-.treeCost {
-  flex: 0 0 auto;
-  min-width: 34px;
-  text-align: right;
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  color: #45566a;
-}
-.treeCost.box {
-  /* Wide enough for the longest thing it ever says -- SURE? -- so arming a
-     row does not shunt the whole line sideways. */
-  min-width: 52px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 5px 8px;
-  border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
-  border-radius: 3px;
-  background: rgba(3, 8, 16, 0.7);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  transition: border-color 0.14s, background 0.14s, box-shadow 0.14s;
-}
-/* Pressed, on the element the thumb is actually over. */
-.treeRow:active .treeCost.box { background: rgba(124, 255, 178, 0.08); }
-
-/* A root is the header of its branch, not a row you press. */
-.treeRow.k-root { background: rgba(10, 20, 34, 0.9); border-color: color-mix(in srgb, var(--tone) 34%, transparent); }
-.treeRow.k-root .treeName { font-size: 11px; letter-spacing: 0.2em; color: var(--tone); }
-.treeRow.k-arm .treeName { letter-spacing: 0.17em; }
-
-/*
- * ANOMALY, in every boss colour at once.
- *
- * `--tones` is a set of hard-stopped bands, one per boss, built in
- * Menu.treeNode from BOSS_TONE. The heading wears them twice: a spine of
- * solid bands down its left edge, and the name itself filled with the same
- * ramp. It is the only heading in the tree that is not one colour, and that
- * is the whole message — there are seven of these and one of them is open.
- */
-.spectrum > .treeRow.k-root {
-  border-color: rgba(255, 255, 255, 0.16);
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0)),
-    rgba(10, 20, 34, 0.92);
-  overflow: hidden;
-}
-.spectrum > .treeRow.k-root::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 5px;
-  background: linear-gradient(180deg, var(--tones));
-  box-shadow: 0 0 14px -2px rgba(255, 255, 255, 0.5);
-}
-.spectrum > .treeRow.k-root .treeName {
-  background: linear-gradient(90deg, var(--tones));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  /* Safari drops the shadow through transparent text; the spine carries the
-     glow instead, so this only has to not fight it. */
-  text-shadow: none;
-}
-.spectrum > .treeRow.k-root .treeIcon,
-.spectrum > .treeRow.k-root .treeGutWord,
-.spectrum > .treeRow.k-root .treeCaret { color: #ffffff; opacity: 0.7; }
-
-/*
- * Five states. Each one answers a different question, and the row has to say
- * which without being read:
- *
- *   locked   behind something unbought — dim, but still legible
- *   poor     open and priced, out of reach right now
- *   afford   open and buyable — the only state that invites a press
- *   part     yours, levels left — lit, and still priced
- *   full     yours and finished — lit, ticked, no longer asking
- */
-
-/* Yours. Both `part` and `full` take the branch's colour, because the first
-   question a row answers is "is this mine". */
-.treeRow.part,
-.treeRow.full {
-  border-color: color-mix(in srgb, var(--tone) 52%, transparent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 10%, transparent), rgba(6, 12, 22, 0.7));
-}
-.treeRow.part .treeName,
-.treeRow.full .treeName { color: var(--tone); }
-
-/* ...and the second is "is it finished". A tick closes it; a price does not. */
-.treeRow.full .treeCost { color: color-mix(in srgb, var(--tone) 75%, transparent); }
-.treeCost.tick { font-size: 12px; }
-.treeRow.part .treeCost { color: #6b7a8c; }
-.treeRow.part.partAfford .treeCost { color: #7cffb2; text-shadow: 0 0 8px rgba(124, 255, 178, 0.35); }
-
-/* A left edge on anything owned: the fastest read down a long column is the
-   rail, not the row. */
-.treeRow.part::before,
-.treeRow.full::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 2px;
-  background: var(--tone);
-}
-.treeRow.part::before { opacity: 0.55; }
-
-/* Open and buyable. */
-.treeRow.afford { border-color: rgba(124, 255, 178, 0.5); }
-.treeRow.afford .treeCost { color: #7cffb2; text-shadow: 0 0 8px rgba(124, 255, 178, 0.35); }
-.treeRow.afford .treeCost.box,
-.treeRow.partAfford .treeCost.box {
-  border-color: rgba(124, 255, 178, 0.55);
-  background: rgba(124, 255, 178, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 10px -2px rgba(124, 255, 178, 0.4);
-}
-
-/* Open but out of reach: readable, priced, plainly not yet. */
-.treeRow.poor { opacity: 0.72; }
-.treeRow.poor .treeCost { color: #6b7a8c; }
-
-/* Behind something unbought. Still legible — a tree you cannot read the far
-   side of is not a plan, it is a fog. 0.34 was fog: the seven mines behind
-   BLAST are meant to be read and wanted, not squinted at. */
-.treeRow.locked { opacity: 0.5; }
-.treeRow.locked .treeCost { color: #46566a; }
-
-/*
- * The disclosure caret.
- *
- * A row hiding fourteen more rows looked exactly like a row hiding nothing.
- * Right when the branch is shut, down when it is open. Its ::after is an
- * invisible tap target about twice its size, reaching left only into the gap
- * before it — any further and it would swallow taps meant for the price.
- */
-/*
- * The gutter the caret lives in: a fixed column, its own width, with the
- * arrow centred in it and the word above. Centred rather than hard against
- * the row's padding because a 8px arrow pinned to the left edge reads as
- * part of the border; given a column of its own it reads as a control.
- *
- * The width is fixed so the caret column does not step left and right as
- * OPEN becomes CLOSE, and it is kept on leaf rows too -- empty and
- * untappable -- so the icons stay in one line down the panel.
- */
-.treeGut {
-  position: relative;
-  flex: 0 0 30px;
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-}
-/* Reaching left into the row's padding and right into the gap before the
-   icon, so the door is a thumb-sized target and not an 8px one. */
-.treeGut::after { content: ''; position: absolute; inset: 0 -5px 0 -9px; }
-.treeGutWord {
-  font-style: normal;
-  font-size: 5.5px;
-  line-height: 1;
-  letter-spacing: 0.06em;
-  color: color-mix(in srgb, var(--tone) 52%, transparent);
-  white-space: nowrap;
-}
-.treeCaret {
-  position: relative;
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  color: color-mix(in srgb, var(--tone) 62%, transparent);
-  transition: transform 0.16s ease;
-}
-.treeCaret::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(-45deg);
-}
-/* The tap target is the gutter's, not the arrow's -- see .treeGut::after. */
-.treeBranch:not(.shut) > .treeRow .treeCaret { transform: rotate(90deg); }
-.treeRow.locked .treeCaret,
-.treeRow.locked .treeGutWord { color: #46566a; }
-
-/*
- * A row with nothing under it: the space is kept, the caret is not drawn, and
- * nothing there is tappable. `pointer-events: none` is the part that matters —
- * without it the 8px slot still answered to the tap and the handler read it as
- * a caret, so the left edge of every leaf row was a dead zone that swallowed
- * the press instead of arming the buy.
- */
-.treeGut.off { pointer-events: none; }
-.treeGut.off::after { content: none; }
-.treeCaret.off::before { content: none; }
-
-/*
- * A round or a mine, wearing what the arsenal tab used to give it: the DMG/FX
- * pair, labelled and aligned, so two of them compare down a column instead of
- * by reading two sentences. `.spec` is shared with the arsenal rows still
- * under the tree, so the two presentations cannot drift apart.
- */
-.treeSpec { display: flex; flex-direction: column; gap: 1px; }
-.treeSpec .spec { display: flex; gap: 6px; font-size: 8.5px; line-height: 1.45; }
-.treeSpec .spec b {
-  flex: 0 0 20px;
-  font-weight: 400;
-  letter-spacing: 0.1em;
-  color: color-mix(in srgb, var(--tone) 62%, transparent);
-}
-.treeSpec .spec i { font-style: normal; color: var(--dim); }
-.treeSpec .spec.dmg i { color: color-mix(in srgb, var(--tone) 72%, var(--ink)); }
-.treeRow.armLike .treeIcon,
-.treeRow.armLike .treeIcon svg { width: 20px; height: 20px; }
-
-/*
- * A group: a heading for the upgrades that are not about any one round or
- * ability. Quieter than a category, louder than a leaf.
- */
-.treeRow.k-group { background: rgba(8, 16, 28, 0.82); }
-.treeRow.k-group .treeName {
-  font-size: 9.5px;
-  letter-spacing: 0.18em;
-  color: color-mix(in srgb, var(--tone) 78%, var(--ink));
-}
-
-/* The level meter. Filled pips read as progress where "1/3" reads as a label,
-   and a single-level node has no meter at all — there is nothing to be
-   part-way through. */
-.treeTop { display: flex; align-items: center; gap: 6px; }
-.treePips { display: inline-flex; gap: 2px; flex: 0 0 auto; }
-.treePips i {
-  width: 5px;
-  height: 5px;
-  border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent);
-  border-radius: 1px;
-}
-.treePips i.on { background: var(--tone); box-shadow: 0 0 4px var(--tone); }
-
-/*
- * Where you landed, when something else sent you here. Arriving in the middle
- * of an eighty-row list with no mark on it reads as having arrived nowhere,
- * so the row that was asked for says so for a second and then stops.
- */
-.treeRow.landed { animation: treeLanded 1.5s ease-out; }
 @keyframes treeLanded {
   0%, 55% { border-color: var(--tone); box-shadow: 0 0 18px -4px var(--tone); }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
-.treeRow.refuse,
 .shopCard.refuse { animation: treeRefuse 0.3s ease-out; }
 @keyframes treeRefuse {
   0%, 100% { transform: translateX(0); }
@@ -2934,27 +2626,13 @@ body.booting #pendingBtn {
   flex: 1 1 auto;
   text-align: right;
   padding-right: 10px;
-  font-size: 8px;
+  /* 8px was below Apple's floor and below this panel's own. It is the one
+     line that says whether opening a branch is worth the tap. */
+  font-size: 11px;
   letter-spacing: 0.1em;
   color: #45566a;
 }
 .treeNext.reach { color: color-mix(in srgb, #7cffb2 70%, transparent); }
-
-/* Armed: one tap from spending, or from throwing the run away. Amber, because
-   it is neither a refusal nor a confirmation — it is a question. */
-.treeRow.armed {
-  border-color: #ffcf5c;
-  background: linear-gradient(180deg, rgba(255, 207, 92, 0.14), rgba(6, 12, 22, 0.7));
-}
-.treeCost.ask { color: #ffcf5c; font-size: 9px; letter-spacing: 0.1em; }
-/* Specific enough to beat `.treeRow.afford .treeCost.box`, which is four
-   classes deep: an armed row is still an affordable one, and the question
-   has to be louder than the invitation it interrupts. */
-.treeRow.armed .treeCost.box {
-  border-color: rgba(255, 207, 92, 0.7);
-  background: rgba(255, 207, 92, 0.14);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 10px -2px rgba(255, 207, 92, 0.5);
-}
 .menuCell.armed {
   border-color: #ffcf5c;
   background: rgba(255, 207, 92, 0.12);
@@ -3068,7 +2746,7 @@ body.booting #pendingBtn {
   appearance: none;
   flex: 1 1 0;
   min-width: 0;
-  height: 168px;
+  height: 184px;
   padding: 12px 8px 0;
   display: flex;
   flex-direction: column;
@@ -3085,11 +2763,16 @@ body.booting #pendingBtn {
 .shopCard:active { transform: translateY(1px); }
 
 /* The art at the size it was drawn for. It was rendering at 18. */
-.shopIcon { width: 44px; height: 44px; color: var(--tone, #59e0ff); }
-.shopIcon svg { width: 44px; height: 44px; display: block; }
+.shopIcon { flex: 0 0 auto; width: 40px; height: 40px; color: var(--tone, #59e0ff); }
+.shopIcon svg { width: 40px; height: 40px; display: block; }
 
 .shopName {
   display: block;
+  /* Fixed, not shrinkable. The card is a fixed height and these are flex
+     items, so without this the name and the stat give up lines to fit --
+     which is a clamp nobody wrote, silently cutting SPINES off at "40
+     DAMAGE A". */
+  flex: 0 0 auto;
   font-size: 16px;
   letter-spacing: 0.1em;
   color: #e6f1fb;
@@ -3098,11 +2781,15 @@ body.booting #pendingBtn {
 }
 .shopStat {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  /* Three, not two. SPINES' stat is "Objects touching you take 40 damage a
+     second" and at two lines it ended on "40 DAMAGE A…" — a number cut off
+     before its unit says less than no number at all. */
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  flex: 0 0 auto;
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
   /* 8.4:1 on this ground. The row it replaces was 8px at 2.99:1. */
   color: #9fb8d2;
   margin-top: 5px;
@@ -3185,7 +2872,7 @@ body.booting #pendingBtn {
 /* Nothing affordable. Honest about it rather than empty. */
 .shopNone {
   flex: 1 1 0;
-  height: 168px;
+  height: 184px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3202,4 +2889,165 @@ body.booting #pendingBtn {
 
 @media (prefers-reduced-motion: reduce) {
   .rigFlare.go, .shopCard.dealt { animation: none; }
+}
+
+
+/* ======================================================================
+ * YOUR MACHINE
+ *
+ * What the tree was. Five rows, one per category, each with a meter in its
+ * own colour and its own fraction: the shape of eighty-three purchases in
+ * five lines. Tap one and it opens in place, and opening one shuts the last,
+ * so the top of the panel is never more than a screen away.
+ * ====================================================================== */
+
+.branch { --tone: #8fb6d8; margin-bottom: 2px; }
+.branch.shut > .branchGrid { display: none; }
+
+.branchRow {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 11px;
+  text-align: left;
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--tone) 34%, transparent);
+  background: rgba(10, 20, 34, 0.86);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.14s, background 0.14s;
+}
+.branchRow:active { transform: translateY(1px); }
+
+.branchIcon { flex: 0 0 auto; width: 22px; height: 22px; color: var(--tone); }
+.branchIcon svg { width: 22px; height: 22px; display: block; }
+
+.branchName {
+  flex: 0 0 auto;
+  width: 92px;
+  font-size: 14px;
+  letter-spacing: 0.15em;
+  color: var(--tone);
+}
+
+/* The meter. Three 6px hollow squares is what this replaces, which is a
+   progress bar drawn at the size of a full stop. */
+.branchBar {
+  flex: 1 1 auto;
+  height: 5px;
+  min-width: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.branchBar > i {
+  display: block;
+  height: 5px;
+  width: 0;
+  background: var(--tone);
+  transition: width 0.3s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.branchFrac {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: #8fa6bd;
+  min-width: 44px;
+  text-align: right;
+}
+/* Points right when the branch is shut and down when it is open: the one
+   convention nobody has to be taught. */
+.branchCaret {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-right: 1.6px solid var(--tone);
+  border-bottom: 1.6px solid var(--tone);
+  transform: rotate(-45deg);
+  opacity: 0.8;
+  transition: transform 0.16s ease;
+}
+.branch:not(.shut) > .branchRow .branchCaret { transform: rotate(45deg); }
+
+/* Something in there is affordable right now. The reason to open it, without
+   opening it. */
+.branch.reach > .branchRow {
+  border-color: color-mix(in srgb, var(--tone) 80%, transparent);
+  box-shadow: 0 0 14px -5px var(--tone);
+}
+.branch.done > .branchRow { background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 13%, transparent), rgba(10, 20, 34, 0.9)); }
+.branch.done .branchFrac { color: var(--tone); }
+
+/* ANOMALY wears every boss colour at once — the one row that says how many
+   of these there are going to be. */
+.branch.spectrum > .branchRow .branchIcon { color: #e6f1fb; }
+.branch.spectrum .branchBar > i { background: linear-gradient(90deg, var(--tones)); }
+.branch.spectrum > .branchRow .branchName {
+  background: linear-gradient(90deg, var(--tones));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ------------------------------------------------------------- the grid */
+
+.branchGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px 0 14px;
+}
+/*
+ * A heading, not a purchase: ALL ROUNDS, and the three arms the turret starts
+ * with. It is what the indent used to say -- the cards under it belong to it
+ * -- said by adjacency and a rule in its colour instead.
+ */
+.grpLab {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: var(--tone);
+  padding: 10px 2px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
+}
+
+/* ------------------------------------------------- the card's other states */
+
+/*
+ * Yours, and finished. The brightest thing on the screen.
+ *
+ * A bought row used to grey out and get a tick, so colour meant FOR SALE and
+ * grey meant YOURS -- and finishing the tree made the tree go dim. A tick is
+ * a receipt; a lit part is a trophy.
+ */
+.shopCard.own {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--tone) 14%, transparent), rgba(6, 12, 22, 0.9));
+  box-shadow: inset 0 0 22px -10px var(--tone);
+}
+.shopCard.own .shopName { color: var(--tone); }
+.shopCard.own .shopPrice { font-size: 16px; letter-spacing: 0.3em; }
+
+/* Behind something unbought. Dim, still readable, still priced — the reason
+   to buy the thing in front of it is what is behind it. */
+.shopCard.locked {
+  border-style: dashed;
+  border-color: rgba(120, 190, 255, 0.16);
+  box-shadow: none;
+}
+.shopCard.locked .shopIcon { opacity: 0.3; }
+.shopCard.locked .shopName { color: #5d6d80; }
+.shopCard.locked .shopStat { color: #4d5f74; }
+.shopCard.locked .shopPrice { background: transparent; color: #45566a; }
+
+/* A row you were sent to, so arriving reads as arriving. */
+.branchRow.landed { animation: treeLanded 1.1s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .branchBar > i { transition: none; }
+  .branchRow.landed { animation: none; }
 }
