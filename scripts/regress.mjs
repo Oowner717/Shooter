@@ -71,6 +71,61 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.
 
 await page.goto(BASE, { waitUntil: 'load' });
 await page.waitForTimeout(900);
+
+// --- the title screen, before anything presses it ----------------------------
+/*
+ * The same floor the menu has: 11px and 4.5:1, on the one screen every run
+ * begins at. The footer gets its own check because it once ended seven pixels
+ * past a 664px viewport -- half of "BUILD N" simply off the screen -- and a
+ * clipped element still passes a font-size sweep.
+ */
+{
+  const r = await page.evaluate(() => {
+    const px = (v) => { const m = v.match(/rgba?\(([^)]+)\)/); if (!m) return null;
+      const a2 = m[1].split(',').map(Number);
+      return { r: a2[0], g: a2[1], b: a2[2], a: a2.length > 3 ? a2[3] : 1 }; };
+    const over = (f, b2) => ({ r: f.r * f.a + b2.r * (1 - f.a), g: f.g * f.a + b2.g * (1 - f.a),
+      b: f.b * f.a + b2.b * (1 - f.a), a: 1 });
+    const lin = (v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+    const L = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+    const cr = (x, y) => { const a2 = L(x); const b2 = L(y);
+      return (Math.max(a2, b2) + 0.05) / (Math.min(a2, b2) + 0.05); };
+    const bad = [];
+    let seen = 0;
+    const wk = document.createTreeWalker(document.getElementById('boot'), NodeFilter.SHOW_TEXT);
+    let t;
+    while ((t = wk.nextNode())) {
+      const txt = t.nodeValue.trim();
+      if (!txt) continue;
+      const el = t.parentElement;
+      if (!el.offsetParent) continue;
+      const cs = getComputedStyle(el);
+      const fg = px(cs.color);
+      if (!fg || fg.a === 0) continue;
+      seen++;
+      let bg = { r: 4, g: 8, b: 14, a: 1 };
+      const chain = [];
+      for (let e = el; e; e = e.parentElement) {
+        const q = px(getComputedStyle(e).backgroundColor);
+        if (q && q.a > 0) chain.unshift(q);
+      }
+      for (const q of chain) bg = over(q, bg);
+      const size = parseFloat(cs.fontSize);
+      const large = size >= 24 || (size >= 18.66 && parseInt(cs.fontWeight, 10) >= 700);
+      const ratio = cr(over(fg, bg), bg);
+      if (size < 11 || ratio < (large ? 3 : 4.5)) bad.push(`${txt.slice(0, 14)}@${size}px:${ratio.toFixed(2)}`);
+    }
+    const foot = document.querySelector('.bootFoot').getBoundingClientRect();
+    const keys = document.querySelectorAll('.bootKeys li').length;
+    return { seen, bad, footBottom: Math.round(foot.bottom), vh: innerHeight, keys };
+  });
+  check('the title clears the menu\'s floor, and nothing hangs off the screen',
+    r.bad.length === 0 && r.seen > 6 && r.footBottom <= r.vh,
+    `${r.seen} read; failing: ${r.bad.slice(0, 5)}; foot ${r.footBottom}/${r.vh}`);
+  check('the title teaches the two ways to shoot and leaves the rest to the run',
+    r.keys === 2, `${r.keys} control rows on the title`);
+}
+
 await page.evaluate(() => document.getElementById('startBtn').click());
 await page.waitForTimeout(1200);
 
@@ -727,6 +782,46 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.order[0] === 'TURRET' && r.order[r.order.length - 1] === 'ANOMALY'
     && r.spill.length === 0 && r.dead === 0,
     JSON.stringify({ order: r.order, spill: r.spill, deadTracks: r.dead }));
+}
+
+// --- the play screen's own floor ---------------------------------------------
+/*
+ * The chrome over the field: the chips, the weapon cells, the ability cards
+ * and the alerts. Measured the way the menu is measured, because this was the
+ * last surface still under the old scale -- the ENERGY label was 7.5px (an
+ * id-specific rule beating the class the pass raised, the same cascade trap
+ * as .cellSub in 159), the ammo cell labels were 6.5px, and the way into the
+ * menu was a 31x25 target on a screen whose own guideline is 44.
+ */
+{
+  const r = await page.evaluate(() => {
+    window.__sim.hud.menu.setOpen(false);
+    const px = (v) => { const m = v.match(/rgba?\(([^)]+)\)/); if (!m) return null;
+      const a2 = v.match(/rgba?\(([^)]+)\)/)[1].split(',').map(Number);
+      return { r: a2[0], g: a2[1], b: a2[2], a: a2.length > 3 ? a2[3] : 1 }; };
+    const bad = [];
+    let seen = 0;
+    for (const root of ['#topbar', '#quickBar', '#abilities', '#alerts']) {
+      const el0 = document.querySelector(root);
+      if (!el0) continue;
+      const wk = document.createTreeWalker(el0, NodeFilter.SHOW_TEXT);
+      let t;
+      while ((t = wk.nextNode())) {
+        const txt = t.nodeValue.trim();
+        if (!txt) continue;
+        const el = t.parentElement;
+        if (!el.offsetParent) continue;
+        seen++;
+        const size = parseFloat(getComputedStyle(el).fontSize);
+        if (size < 11) bad.push(`${txt.slice(0, 12)}@${size}px`);
+      }
+    }
+    const mb = document.getElementById('menuBtn').getBoundingClientRect();
+    return { seen, bad, menuBtn: [Math.round(mb.width), Math.round(mb.height)] };
+  });
+  check('the play screen clears the menu\'s floor, and its door is a real target',
+    r.bad.length === 0 && r.seen > 8 && r.menuBtn[0] >= 42 && r.menuBtn[1] >= 42,
+    `${r.seen} read; small: ${r.bad.slice(0, 5)}; menu button ${r.menuBtn.join('x')}`);
 }
 
 // --- the record, and the one button that cannot be undone -------------------

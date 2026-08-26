@@ -128,7 +128,15 @@ export class Hud {
 
     const keys = document.querySelector('.bootKeys');
     if (keys) {
-      keys.innerHTML = CONTROLS
+      /*
+       * The two ways to shoot, and nothing else. All five entries used to be
+       * here, and together they took more of the screen than the title did
+       * -- while ABILITIES, UPGRADES and CORRUPTION are concepts the opening
+       * script hands over one at a time in play, where they mean something.
+       * LEVER and TAP are the two things a thumb needs before first contact.
+       * SYSTEM > CONTROLS still carries the whole list, as its note says.
+       */
+      keys.innerHTML = CONTROLS.slice(0, 2)
         .map(([k, body]) => `<li><span>${k}</span> ${body(ABILITIES.length)}</li>`)
         .join('');
     }
@@ -290,7 +298,7 @@ export class Hud {
     b.setAttribute('aria-pressed', 'false');
     b.setAttribute('aria-label', a.label);
     b.dataset.key = a.key;
-    b.innerHTML = `${a.icon}<span class="qLbl">${a.label}</span>`;
+    b.innerHTML = `${a.icon}<span class="qLbl">${a.short || a.label}</span>`;
     b.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();

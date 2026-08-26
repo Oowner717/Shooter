@@ -101,20 +101,20 @@ html, body {
 #topbar {
   position: absolute;
   top: calc(var(--hud-t) + 8px);
-  left: calc(var(--safe-l) + 10px);
-  right: calc(var(--safe-r) + 10px);
+  left: calc(var(--safe-l) + 8px);
+  right: calc(var(--safe-r) + 8px);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .spacer { flex: 1; }
 
 .chip {
   position: relative;
-  font-size: 11px;
-  letter-spacing: 0.09em;
-  padding: 5px 9px;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  padding: 8px 9px;
   border: 1px solid var(--line);
   border-radius: 4px;
   background: var(--panel);
@@ -128,7 +128,7 @@ html, body {
 .chip em {
   font-style: normal;
   color: var(--dim);
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 0.18em;
   margin-left: 6px;
 }
@@ -148,7 +148,7 @@ html, body {
 }
 #energyChip em {
   font-style: normal;
-  font-size: 7.5px;
+  font-size: 11px;
   letter-spacing: 0.18em;
   color: var(--dim);
   margin: 0;
@@ -221,11 +221,12 @@ html, body {
 #energyBuys {
   display: none;
   margin-left: 6px;
-  min-width: 15px;
+  min-width: 16px;
   padding: 1px 4px;
-  font-size: 8px;
+  /* A number the player reads before every trip to the shop. It was 8px. */
+  font-size: 11px;
   font-style: normal;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-align: center;
   color: #04140c;
   background: #7cffb2;
@@ -270,10 +271,13 @@ html, body {
 }
 
 #resumeNote {
-  margin-top: 6px;
-  font-size: 8px;
-  letter-spacing: 0.16em;
-  color: #56697f;
+  /* What is in the file is the whole basis of the CONTINUE / NEW RUN choice,
+     and it was the smallest thing on the screen: 8px at three to one. */
+  margin-top: 8px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: #8fa6bd;
+  font-variant-numeric: tabular-nums;
 }
 #resumeNote[hidden] { display: none; }
 
@@ -585,9 +589,9 @@ html, body {
    */
   max-width: calc(100vw - var(--safe-l) - var(--safe-r) - 28px);
   text-align: center;
-  font-size: 10px;
-  letter-spacing: 0.24em;
-  padding: 4px 12px;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  padding: 6px 13px;
   border-radius: 3px;
   border: 1px solid currentColor;
   background: rgba(6, 10, 18, 0.66);
@@ -792,8 +796,9 @@ html, body {
  */
 
 
-.chip.menuBtn { padding: 4px 7px; }
-.chip.menuBtn svg { width: 15px; height: 15px; display: block; }
+/* The main way into the menu was a 31x25 target on a screen full of 44s. */
+.chip.menuBtn { padding: 11px 12px; }
+.chip.menuBtn svg { width: 20px; height: 20px; display: block; }
 .chip.menuBtn.on { border-color: var(--accent); color: var(--accent); }
 
 /* A new object went into the record. Said without a word. */
@@ -864,7 +869,7 @@ html, body {
   padding: 11px 12px 9px;
   border-bottom: 1px solid rgba(120, 190, 255, 0.14);
 }
-.menuTitle { font-size: 10px; letter-spacing: 0.3em; color: var(--dim); }
+.menuTitle { font-size: 11px; letter-spacing: 0.3em; color: var(--dim); }
 .menuTitle b { color: var(--accent); font-weight: 700; letter-spacing: 0.16em; }
 .menuX {
   /* The push to the right edge lived on the count that used to sit between
@@ -896,7 +901,7 @@ html, body {
   border: 0;
   border-bottom: 2px solid transparent;
   color: var(--dim);
-  font-size: 9.5px;
+  font-size: 11px;
   letter-spacing: 0.22em;
   padding: 10px 4px 8px;
 }
@@ -1152,7 +1157,9 @@ body.menuOpen #quickBar { pointer-events: none; }
    * for. This sits at the left edge, just above the mine stack, which is the
    * only place down here that is both free and reachable.
    */
-  bottom: calc(var(--safe-b) + var(--bar-h) + 158px);
+  /* Above a mine stack of four 36px cells; it was tuned for 30px cells and
+     the taller stack rose up behind it. */
+  bottom: calc(var(--safe-b) + var(--bar-h) + 184px);
   left: calc(var(--safe-l) + 8px);
   display: flex;
   align-items: center;
@@ -1700,7 +1707,7 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-.qc.empty .qLbl { font-size: 9px; opacity: 0.7; letter-spacing: 0; }
+.qc.empty .qLbl { font-size: 11px; opacity: 0.7; letter-spacing: 0; }
 
 .qc {
   -webkit-appearance: none;
@@ -1709,8 +1716,10 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   align-items: center;
   justify-content: center;
   gap: 5px;
-  height: 30px;
-  padding: 0 6px;
+  /* A weapon switch is pressed mid-fight, with things falling. 30px was the
+     shortest control on the screen. */
+  height: 36px;
+  padding: 0 7px;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(10, 18, 32, 0.86), rgba(4, 8, 15, 0.92));
   color: var(--dim);
@@ -1752,7 +1761,8 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 
 .qc svg { width: 14px; height: 14px; display: block; flex: 0 0 auto; }
 .qc .qLbl {
-  font-size: 6.5px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
   letter-spacing: 0.08em;
   white-space: nowrap;
   color: inherit;
@@ -1825,7 +1835,7 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 }
 
 .ab svg { width: 24px; height: 24px; display: block; }
-.ab .lbl { font-size: 8.5px; letter-spacing: 0.13em; color: var(--dim); white-space: nowrap; }
+.ab .lbl { font-size: 11px; letter-spacing: 0.02em; color: #9fb8d2; white-space: nowrap; }
 
 .ab .fill {
   position: absolute;
@@ -1902,7 +1912,7 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   position: absolute;
   left: 10px;
   right: 10px;
-  bottom: calc(var(--safe-b) + var(--bar-h) + 190px);
+  bottom: calc(var(--safe-b) + var(--bar-h) + 214px);
   text-align: center;
   white-space: pre-line;
   font-size: 10px;
@@ -1924,7 +1934,7 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   /* Measured off the same bottom as the hint band rather than as a percentage
      of the viewport: the turret's height above the ability bar is fixed in
      pixels, so a percentage put this on top of the turret on a short screen. */
-  bottom: calc(var(--safe-b) + var(--bar-h) + 230px);
+  bottom: calc(var(--safe-b) + var(--bar-h) + 252px);
   font-size: 12px;
   line-height: 1.85;
   letter-spacing: 0.14em;
@@ -2221,6 +2231,11 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 #boot {
   flex-direction: column;
   justify-content: flex-start;
+  /* Taller content scrolls instead of running off the bottom edge: the
+     footer used to end seven pixels below a 664px screen, half a line of
+     "BUILD 160" simply missing. */
+  overflow-y: auto;
+  padding-bottom: calc(var(--safe-b) + 12px);
 }
 .bootInner { margin-block: auto; }
 #boot[hidden], #endScreen[hidden] { display: none; }
@@ -2231,7 +2246,7 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 .bootInner { max-width: 420px; width: 100%; }
 
 .bootKicker {
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.42em;
   color: var(--dim);
   margin-bottom: 14px;
@@ -2260,7 +2275,7 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 }
 
 .bootBody {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.78;
   color: #a9c2da;
   margin-bottom: 16px;
@@ -2268,10 +2283,10 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 
 .bootKeys { list-style: none; margin-bottom: 22px; }
 .bootKeys li {
-  font-size: 10.5px;
-  line-height: 1.6;
-  color: var(--dim);
-  padding: 5px 0 5px 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #a3b8ce;
+  padding: 7px 0;
   border-top: 1px solid rgba(120, 190, 255, 0.09);
 }
 .bootKeys li span {
@@ -2315,8 +2330,8 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
    It drops to an outline and to the word alone so the pair cannot be tapped
    the wrong way round in a hurry. */
 #resumeBtn:not([hidden]) ~ #startBtn {
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
+  font-size: 11px;
+  letter-spacing: 0.14em;
   background: transparent;
   border-color: rgba(89, 224, 255, 0.4);
   color: rgba(191, 244, 255, 0.75);
@@ -2324,11 +2339,13 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 }
 
 .bootFoot {
-  margin-top: 14px;
+  margin-top: 16px;
   text-align: center;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.14em;
-  color: #3d4d5e;
+  /* 5.8:1. It was #3d4d5e at 2.35:1 -- and the build number in it is the
+     line two devices get compared by. */
+  color: #7d90a6;
 }
 
 /* ---------------- end ---------------- */
@@ -2438,10 +2455,10 @@ body.booting #pendingBtn {
   .qc { height: 28px; gap: 4px; padding: 0 5px; }
   .qc.wide { height: 38px; width: 48px; }
   .qc svg { width: 13px; height: 13px; }
-  .qc .qLbl { font-size: 6px; letter-spacing: 0.02em; }
+  .qc .qLbl { font-size: 9px; letter-spacing: 0.02em; }
 
   .ab svg { width: 20px; height: 20px; }
-  .ab .lbl { font-size: 7px; letter-spacing: 0.04em; }
+  .ab .lbl { font-size: 9px; letter-spacing: 0.03em; }
 
   /* The title screen scrolls rather than clipping, but a BEGIN button below
      the fold on the smallest phone is a start button nobody finds. The copy
@@ -2450,14 +2467,14 @@ body.booting #pendingBtn {
   .bootKicker { margin-bottom: 10px; }
   .bootBody { font-size: 10.5px; line-height: 1.6; margin-bottom: 14px; }
   .bootKeys { margin-bottom: 14px; }
-  .bootKeys li { font-size: 9.5px; line-height: 1.5; padding: 4px 0; }
+  .bootKeys li { font-size: 11px; line-height: 1.5; padding: 4px 0; }
   /* At 320 the panel already ends level with the fold, so the pair has to
      cost no more height than the single button did. */
   .bootGo button { padding: 12px 6px; }
   #startBtn { padding: 13px; }
   #resumeBtn:not([hidden]), #resumeBtn:not([hidden]) ~ #startBtn { padding: 12px 6px; }
   #resumeBtn { font-size: 10px; letter-spacing: 0.12em; }
-  #resumeBtn:not([hidden]) ~ #startBtn { font-size: 9px; letter-spacing: 0.1em; }
+  #resumeBtn:not([hidden]) ~ #startBtn { font-size: 10px; letter-spacing: 0.08em; }
 
   /* The opening lines carry their own break, and at 320 the plate's padding
      was enough to wrap each half again — four rendered lines for a two-line
@@ -2629,13 +2646,14 @@ body.booting #pendingBtn {
   flex: 1 1 auto;
   text-align: right;
   padding-right: 10px;
-  /* 8px was below Apple's floor and below this panel's own. It is the one
-     line that says whether opening a branch is worth the tap. */
+  /* Readable in BOTH states. The reach state is green and passed the sweep;
+     the broke state ("100 more for the next") wore --dim at 2.64:1, and the
+     sweep only ever measured the panel with money in hand. */
   font-size: 11px;
   letter-spacing: 0.1em;
-  color: #45566a;
+  color: #7d90a6;
 }
-.treeNext.reach { color: color-mix(in srgb, #7cffb2 70%, transparent); }
+.treeNext.reach { color: #7cffb2; }
 .menuCell.armed {
   border-color: #ffcf5c;
   background: rgba(255, 207, 92, 0.12);
@@ -2955,7 +2973,7 @@ body.booting #pendingBtn {
   justify-content: center;
   gap: 7px;
   border: 1px dashed rgba(120, 190, 255, 0.2);
-  color: #56687e;
+  color: #8fa6bd;
   font-size: 12px;
   letter-spacing: 0.12em;
   text-align: center;

@@ -122,11 +122,14 @@ export const ARSENAL = [
   },
 
   {
-    key: 'autoAim', kind: 'auto', group: 'auto', label: 'AUTO AIM', icon: ICON.aim, wide: true, run: true,
+    // `short` is what the strip cell says. The cell is 52px wide and the
+    // full name at a readable size is 64: on the strip the icon carries the
+    // AUTO half. Everywhere else -- OBJECTS, aria -- the full name stands.
+    key: 'autoAim', kind: 'auto', group: 'auto', label: 'AUTO AIM', short: 'AIM', icon: ICON.aim, wide: true, run: true,
     fx: 'Picks the nearest target inside its reach and leads the shot. ARRAY extends the reach; your hand outranks all of it.',
   },
   {
-    key: 'autoFire', kind: 'auto', group: 'auto', label: 'AUTO FIRE', icon: ICON.fire, wide: true, run: true,
+    key: 'autoFire', kind: 'auto', group: 'auto', label: 'AUTO FIRE', short: 'FIRE', icon: ICON.fire, wide: true, run: true,
     fx: 'Keeps firing where the barrel points, at the rate you fire yourself.',
   },
 
