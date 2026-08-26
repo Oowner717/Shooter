@@ -365,8 +365,8 @@ export class Shooter {
     const t = world.time;
     const accent = breached ? '#ff5d5d' : '#59e0ff';
 
-    // Aim ray. It reaches further while the lever is held, because that is
-    // when you are aiming by feel rather than by pointing at a target.
+    // Aim ray. It reaches further while the ball is held, because that is when
+    // you are aiming by feel rather than by pointing at a target.
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const rayLen = 300 + this.gripGlow * 320;
@@ -384,334 +384,434 @@ export class Shooter {
     ctx.restore();
 
     this.drawLever(ctx, accent, t);
+    this.drawMachine(ctx, world, accent, t, breached);
+  }
 
-    ctx.save();
-    ctx.translate(this.x, this.y);
-
-    /*
-     * ======================== the machine =========================
-     *
-     * Drawn as a mount with sockets in it rather than as a shape. Every
-     * fitting the TURRET branch sells has a place waiting for it here — a
-     * collar lip for the SHROUD, notches in the rim for the SPINES, a track
-     * for the GIMBAL rings, ports under the deck for the INTAKE, and rails on
-     * the barrel for the FEED and the SIGHT. Empty, each is drawn as a faint
-     * outline; filled, drawRigBase() and drawRigBarrel() put the part in it.
-     *
-     * So a bare turret does not look plain, it looks unfinished, and buying a
-     * part is watching a socket get occupied. The two halves are designed
-     * against each other on purpose: neither is the whole picture.
-     */
+  /*
+   * ========================== the machine ============================
+   *
+   * ONE MACHINE, and the upgrades are made of it rather than hung off it.
+   *
+   * The version this replaces drew a mount full of empty sockets and then put
+   * a gadget in each one: a dish on a mast, a spike in a notch, a ring on a
+   * track. Every part was a separate little object at a separate little
+   * radius, most of them translucent, and a fully rigged turret was not a
+   * better machine -- it was the same machine with seven things floating
+   * around it. At forty units across on a phone that reads as clutter, and
+   * clutter is not a reward.
+   *
+   * So every part is now STRUCTURE. It changes the body's outline, it is drawn
+   * opaque with hard edges, and it is drawn in the same pass as the thing it
+   * belongs to:
+   *
+   *   SPINES   the hull. Armour plates round the deck, growing it outward --
+   *            the machine is physically bigger by the end.
+   *   SHROUD   the mantlet. A gun shield that closes round the breech and
+   *            turns with the barrel. The biggest change to the silhouette.
+   *   GIMBAL   the bearing. A toothed race under the deck and legs that go
+   *            from a wire tripod to braced struts on footplates.
+   *   ARRAY    the fin. A flat panel blade off the back, not a dish.
+   *   FEED     the drum. A belt box on the breech's flank with rounds in it.
+   *   SIGHT    the block. A boxed sight along the barrel with a lit lens.
+   *   INTAKE   the vents. Louvres cut through the skirt.
+   *
+   * Bare, it is a plain dark hexagon with a stub barrel and one lit line --
+   * basic on purpose, so that there is somewhere to go.
+   */
+  drawMachine(ctx, world, accent, t, breached) {
     const g = this.rig(world);
-    const socket = rgba('#3d5871', 0.55); // an empty mount, waiting
+    const filled = g.filled || 0;
+    const flash = clamp(world.rigFlash / CFG.rig.flash, 0, 1);
+    // The whole thing grows. Nothing else says "look what I built" as
+    // immediately as the machine taking up more room than it used to.
+    const R = this.r * (1 + filled * 0.34) * (1 + flash * 0.06);
+    const lit = 0.55 + filled * 0.45;
 
-    // ---- legs: a tripod with feet, behind everything ----
-    ctx.strokeStyle = rgba('#3d5871', 0.75);
-    ctx.lineWidth = HAIRLINE * 2.6;
-    ctx.lineCap = 'round';
-    for (let i = 0; i < 3; i++) {
-      const a = Math.PI * 0.25 + (i / 2) * Math.PI * 0.5;
-      const c = Math.cos(a);
-      const sn = Math.sin(a);
+    const DARK = 'rgba(7,14,23,0.98)';
+    const BODY = 'rgba(20,34,52,0.99)';
+    const FACE = 'rgba(30,50,74,0.99)';
+
+    const poly = (n, rr, turn, cx = 0, cy = 0) => {
       ctx.beginPath();
-      ctx.moveTo(c * this.r * 0.66, sn * this.r * 0.66);
-      ctx.lineTo(c * this.r * 1.9, sn * this.r * 1.9);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(c * this.r * 1.9 - sn * 5, sn * this.r * 1.9 + c * 5);
-      ctx.lineTo(c * this.r * 1.9 + sn * 5, sn * this.r * 1.9 - c * 5);
-      ctx.stroke();
-    }
-    ctx.lineCap = 'butt';
-
-    // ---- shield halo ----
-    ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, accent, 0, 0, this.r * 3.4, breached ? 0.45 + 0.25 * Math.sin(t * 18) : 0.2);
-    ctx.globalCompositeOperation = 'source-over';
-
-    // ---- SHROUD's lip: a collar rail round the base ----
-    if (!g.insulation) {
-      ctx.strokeStyle = socket;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([3, 5]);
-      ctx.beginPath();
-      ctx.arc(0, 0, this.r + 13, 0, TAU);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    // ---- GIMBAL's track ----
-    ctx.strokeStyle = rgba('#3d5871', g.slew ? 0.5 : 0.34);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(0, 0, this.r * 1.1, 0, TAU);
-    ctx.stroke();
-
-    // ---- ARRAY's stubs: two masts waiting for a dish ----
-    if (g.aimrange < 2) {
-      ctx.strokeStyle = socket;
-      ctx.lineWidth = 1.2;
-      ctx.setLineDash([2, 3]);
-      ctx.beginPath();
-      for (let i = g.aimrange; i < 2; i++) {
-        const a = -Math.PI / 2 + (i ? 1 : -1) * 0.86;
-        const c = Math.cos(a);
-        const sn = Math.sin(a);
-        ctx.moveTo(c * this.r * 0.88, sn * this.r * 0.88);
-        ctx.lineTo(c * (this.r * 0.88 + 9), sn * (this.r * 0.88 + 9));
-      }
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    // ---- INTAKE's ports, under the deck ----
-    if (!g.intake) {
-      ctx.strokeStyle = socket;
-      ctx.lineWidth = 1.2;
-      for (let i = -1; i <= 1; i++) {
-        const a = Math.PI / 2 + i * 0.42;
-        const c = Math.cos(a);
-        const sn = Math.sin(a);
-        ctx.beginPath();
-        ctx.moveTo(c * this.r * 0.96 - sn * 3, sn * this.r * 0.96 + c * 3);
-        ctx.lineTo(c * this.r * 0.96 + sn * 3, sn * this.r * 0.96 - c * 3);
-        ctx.stroke();
-      }
-    }
-
-    // ---- housing: an outer bevel and an inner deck ----
-    const hex = (rr, turn) => {
-      ctx.beginPath();
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * TAU + turn;
-        const x = Math.cos(a) * rr;
-        const y = Math.sin(a) * rr;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU + turn;
+        const x = cx + Math.cos(a) * rr;
+        const y = cy + Math.sin(a) * rr;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.closePath();
     };
-    const filled = g.filled || 0;
-    ctx.fillStyle = 'rgba(8,16,26,0.96)';
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
+    // ---- GIMBAL: the bearing race and the legs it stands on ----------------
+    /*
+     * Three legs, always. A brace per level was six thick struts with
+     * footplates fanned across the bottom of the machine by the last one --
+     * a grey skirt that read as the largest thing on screen, and the gun
+     * disappeared behind its own stand. The bearing above them is where
+     * GIMBAL is legible; the legs only have to hold it up.
+     */
+    const legs = 3;
+    const legR = R * (1.5 + g.slew * 0.06);
+    ctx.strokeStyle = rgba(g.slew ? '#5b7f9e' : '#3d5871', 0.62);
+    ctx.lineWidth = HAIRLINE * (2.2 + g.slew * 0.5);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < legs; i++) {
+      const a = Math.PI * 0.22 + (i / (legs - 1)) * Math.PI * 0.56;
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      ctx.beginPath();
+      ctx.moveTo(c * R * 0.7, sn * R * 0.7);
+      ctx.lineTo(c * legR, sn * legR);
+      ctx.stroke();
+      // a footplate, and it gets wider with the bearing
+      const fw = 4.5 + g.slew * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(c * legR - sn * fw, sn * legR + c * fw);
+      ctx.lineTo(c * legR + sn * fw, sn * legR - c * fw);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+    if (g.slew) {
+      // the race: a machined ring with teeth cut in it, one row per level
+      for (let i = 0; i < g.slew; i++) {
+        const rr = R * (1.06 + i * 0.13);
+        ctx.strokeStyle = rgba('#7fa8c8', (0.5 + 0.14 * i) * lit);
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.arc(0, 0, rr, 0, TAU);
+        ctx.stroke();
+        const teeth = 18 + i * 6;
+        ctx.lineWidth = HAIRLINE * 2;
+        ctx.beginPath();
+        for (let k = 0; k < teeth; k++) {
+          const a = this.spin * (i % 2 ? -0.5 : 0.5) + (k / teeth) * TAU;
+          const c = Math.cos(a);
+          const sn = Math.sin(a);
+          ctx.moveTo(c * rr, sn * rr);
+          ctx.lineTo(c * (rr + 3.4), sn * (rr + 3.4));
+        }
+        ctx.stroke();
+      }
+    }
+
+    // ---- SPINES: the hull. Armour that makes the machine bigger -----------
+    if (g.casing) {
+      for (let i = 0; i < g.casing; i++) {
+        const rr = R * (1.0 + i * 0.16);
+        const last = i === g.casing - 1;
+        ctx.fillStyle = i ? BODY : FACE;
+        // The outermost plate carries the bright edge: the silhouette is what
+        // the eye reads first and it should be the lit line, not an inner one.
+        ctx.strokeStyle = rgba(last ? '#bfe6ff' : accent, (last ? 0.7 : 0.3) * lit);
+        ctx.lineWidth = HAIRLINE * (last ? 2.6 : 2);
+        poly(6, rr, Math.PI / 6 + i * 0.26);
+        ctx.fill();
+        ctx.stroke();
+      }
+      // chamfers: a bright short stroke on each plate's outer corner, which is
+      // what makes a stack of hexagons read as bevelled metal
+      const rr = R * (1.0 + (g.casing - 1) * 0.16);
+      ctx.strokeStyle = rgba('#bfe6ff', 0.5 * lit);
+      ctx.lineWidth = HAIRLINE * 1.8;
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * TAU + Math.PI / 6 + (g.casing - 1) * 0.26;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        ctx.moveTo(c * rr * 0.86 - sn * 4, sn * rr * 0.86 + c * 4);
+        ctx.lineTo(c * rr - sn * 1, sn * rr + c * 1);
+      }
+      ctx.stroke();
+    }
+
+    // ---- the deck: the one part that is always there ----------------------
+    ctx.fillStyle = BODY;
     ctx.strokeStyle = rgba(accent, 0.9);
-    ctx.lineWidth = HAIRLINE * (2 + filled * 1.6);
-    hex(this.r, Math.PI / 8);
+    ctx.lineWidth = HAIRLINE * (2 + filled * 1.4);
+    poly(6, R * 0.92, Math.PI / 6);
     ctx.fill();
     ctx.stroke();
-    ctx.strokeStyle = rgba(accent, 0.3 + filled * 0.35);
+    ctx.strokeStyle = rgba(accent, 0.26 + filled * 0.24);
     ctx.lineWidth = HAIRLINE;
-    hex(this.r * 0.82, Math.PI / 8);
+    poly(6, R * 0.74, Math.PI / 6);
     ctx.stroke();
-    /*
-     * A bolt at every corner, and a deck plate between the two bevels that
-     * fills in as the branch does. Eight small marks are what turn a drawn
-     * octagon into a machined one, and they cost nothing at this size.
-     */
-    ctx.fillStyle = rgba(accent, 0.25 + filled * 0.45);
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * TAU + Math.PI / 8;
+    // bolts at the corners: six small marks, and a drawn hexagon becomes a
+    // machined one
+    ctx.fillStyle = rgba(accent, 0.3 + filled * 0.4);
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * TAU + Math.PI / 6;
       ctx.beginPath();
-      ctx.arc(Math.cos(a) * this.r * 0.91, Math.sin(a) * this.r * 0.91, 1.5, 0, TAU);
+      ctx.arc(Math.cos(a) * R * 0.83, Math.sin(a) * R * 0.83, 1.5, 0, TAU);
       ctx.fill();
     }
-    if (filled > 0) {
+
+    // ---- INTAKE: louvres cut through the skirt ----------------------------
+    if (g.intake) {
+      for (let i = -1; i <= 1; i++) {
+        const a = Math.PI / 2 + i * 0.44;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        const x = c * R * 0.84;
+        const y = sn * R * 0.84;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(a);
+        ctx.fillStyle = 'rgba(4,9,15,0.99)';
+        roundRectPath(ctx, -6, -5.5, 12, 11, 2);
+        ctx.fill();
+        ctx.strokeStyle = rgba('#7fe6c0', 0.75);
+        ctx.lineWidth = HAIRLINE * 1.6;
+        ctx.beginPath();
+        for (let k = -1; k <= 1; k++) {
+          ctx.moveTo(-4.5, k * 3);
+          ctx.lineTo(4.5, k * 3);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // ---- ARRAY: a panel fin off the back, not a dish ----------------------
+    for (let i = 0; i < g.aimrange; i++) {
+      // Off the shoulders, not off the back: the back of the mount is where
+      // the legs fan out from, and a fin down there is a fin behind a tripod.
+      const a = -Math.PI / 2 + (i ? 1 : -1) * 1.78;
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      const h = 18 + i * 8;
       ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = rgba(accent, 0.1 + filled * 0.3);
-      ctx.lineWidth = HAIRLINE * 5 * filled;
-      hex(this.r * 0.91, Math.PI / 8);
+      ctx.translate(c * R * 0.8, sn * R * 0.8);
+      ctx.rotate(a);
+      ctx.fillStyle = 'rgba(12,26,40,0.99)';
+      ctx.strokeStyle = rgba('#8fd8ff', 0.85 * lit);
+      ctx.lineWidth = HAIRLINE * 1.8;
+      // a blade: narrow at the mount, square at the tip
+      ctx.beginPath();
+      ctx.moveTo(0, -3.5);
+      ctx.lineTo(h, -6.5);
+      ctx.lineTo(h, 6.5);
+      ctx.lineTo(0, 3.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // the elements on its face
+      ctx.strokeStyle = rgba('#8fd8ff', 0.55 * lit);
+      ctx.lineWidth = HAIRLINE * 1.2;
+      ctx.beginPath();
+      for (let k = 1; k < 4; k++) {
+        ctx.moveTo(h * (k / 4), -5);
+        ctx.lineTo(h * (k / 4), 5);
+      }
       ctx.stroke();
       ctx.restore();
     }
 
-    // ---- SPINES' sockets: notches cut into the rim ----
-    if (!g.casing) {
-      ctx.strokeStyle = socket;
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * TAU;
-        const c = Math.cos(a);
-        const sn = Math.sin(a);
-        ctx.moveTo(c * this.r * 0.9, sn * this.r * 0.9);
-        ctx.lineTo(c * this.r * 1.0, sn * this.r * 1.0);
-      }
-      ctx.stroke();
-    }
-
-    /*
-     * ---- the two rings that were always there ----
-     *
-     * They CLOSE. Each is an arc of a turn and a third at nothing bought and a
-     * whole turn when the branch is full, so a finished machine has a
-     * continuous ring where an unfinished one has two broken ones -- and the
-     * index marks that ride the outer one only appear once it has closed,
-     * because a scale on a broken ring is not a scale.
-     */
-    ctx.strokeStyle = rgba(accent, 0.55 + filled * 0.3);
-    ctx.lineWidth = 1.5 + filled * 0.8;
-    const sweep = Math.PI * 1.35 + filled * (TAU - Math.PI * 1.35);
-    for (let i = 0; i < 2; i++) {
-      const rr = this.r * (0.62 + i * 0.24);
-      const off = this.spin * (i ? -1 : 1);
-      ctx.beginPath();
-      ctx.arc(0, 0, rr, off, off + sweep);
-      ctx.stroke();
-    }
-    if (filled > 0.55) {
-      const lit = (filled - 0.55) / 0.45;
-      ctx.strokeStyle = rgba(accent, 0.5 * lit);
-      ctx.lineWidth = HAIRLINE * 1.6;
-      ctx.beginPath();
-      for (let i = 0; i < 12; i++) {
-        const a = this.spin * -1 + (i / 12) * TAU;
-        const c = Math.cos(a);
-        const sn = Math.sin(a);
-        const long = i % 3 === 0 ? 5 : 2.6;
-        ctx.moveTo(c * this.r * 0.86, sn * this.r * 0.86);
-        ctx.lineTo(c * (this.r * 0.86 + long), sn * (this.r * 0.86 + long));
-      }
-      ctx.stroke();
-    }
-
-    // everything the TURRET branch has bolted on, in the unrotated frame
-    this.drawRigBase(ctx, world, accent, t);
-
-    // ---- the barrel and what rides it ----
+    // ======================= everything that turns =======================
+    ctx.save();
     ctx.rotate(this.aim);
     const recoil = this.recoil * 6;
 
-    // breech block at the pivot end
-    ctx.fillStyle = 'rgba(14,26,40,0.98)';
-    ctx.strokeStyle = rgba(accent, 0.7);
-    ctx.lineWidth = HAIRLINE * 1.6;
-    roundRectPath(ctx, this.r * 0.02 - recoil * 0.4, -9, this.r * 0.42, 18, 3);
+    // ---- FEED: the belt drum on the breech's flank ------------------------
+    for (let i = 0; i < g.rate; i++) {
+      const sy = i ? 1 : -1;
+      const dx = R * 0.28 - recoil * 0.4;
+      const dy = sy * (11 + i * 1.5);
+      ctx.save();
+      ctx.translate(dx, dy);
+      ctx.fillStyle = BODY;
+      ctx.strokeStyle = rgba('#ffc07a', 0.85);
+      ctx.lineWidth = HAIRLINE * 1.8;
+      roundRectPath(ctx, -9, -7, 20, 14, 3);
+      ctx.fill();
+      ctx.stroke();
+      // rounds in the belt, marching
+      ctx.fillStyle = rgba('#ffc07a', 0.9);
+      for (let k = 0; k < 4; k++) {
+        const u = ((t * 1.6 + k * 0.25) % 1);
+        ctx.fillRect(-7 + u * 15, -2.2, 2.4, 4.4);
+      }
+      ctx.restore();
+      // the belt itself, curving into the breech
+      ctx.strokeStyle = rgba('#ffc07a', 0.55);
+      ctx.lineWidth = HAIRLINE * 2.2;
+      ctx.beginPath();
+      ctx.moveTo(dx + 10, dy);
+      ctx.quadraticCurveTo(R * 0.5, dy * 0.5, R * 0.42 - recoil, 0);
+      ctx.stroke();
+    }
+
+    // ---- the breech block -------------------------------------------------
+    ctx.fillStyle = FACE;
+    ctx.strokeStyle = rgba(accent, 0.8);
+    ctx.lineWidth = HAIRLINE * 1.8;
+    roundRectPath(ctx, -R * 0.1 - recoil * 0.4, -10, R * 0.62, 20, 3);
     ctx.fill();
     ctx.stroke();
 
-    // rails the FEED and the SIGHT clamp to, drawn empty when nothing is on
-    if (!g.rate || !g.overwatch) {
-      ctx.strokeStyle = socket;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([2.5, 3.5]);
+    // ---- SHROUD: the mantlet. The biggest change to the outline -----------
+    if (g.insulation) {
+      const half = 0.5 + g.insulation * 0.26; // radians of shield either side
+      const mr = R * (0.62 + g.insulation * 0.1);
+      ctx.fillStyle = FACE;
+      ctx.strokeStyle = rgba('#7fe6c0', 0.95 * lit);
+      ctx.lineWidth = HAIRLINE * 2.6;
       ctx.beginPath();
-      if (!g.overwatch) { ctx.moveTo(this.r * 0.5, -7.5); ctx.lineTo(this.r * 1.3, -7.5); }
-      if (!g.rate) { ctx.moveTo(this.r * 0.5, 7.5); ctx.lineTo(this.r * 1.3, 7.5); }
+      ctx.arc(0, 0, mr, -half, half);
+      ctx.arc(0, 0, mr - 8 - g.insulation * 1.5, half, -half, true);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
-      ctx.setLineDash([]);
+      // a lit lip along its outer edge, so the shield has a front
+      ctx.strokeStyle = rgba('#c8fff0', 0.55 * lit);
+      ctx.lineWidth = HAIRLINE * 1.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, mr - 1.5, -half * 0.94, half * 0.94);
+      ctx.stroke();
+      // ribs across the face of it
+      ctx.strokeStyle = rgba('#7fe6c0', 0.4 * lit);
+      ctx.lineWidth = HAIRLINE * 1.4;
+      ctx.beginPath();
+      for (let k = -1; k <= 1; k++) {
+        const a = (k / 2) * half * 0.9;
+        ctx.moveTo(Math.cos(a) * (mr - 6), Math.sin(a) * (mr - 6));
+        ctx.lineTo(Math.cos(a) * (mr - 1), Math.sin(a) * (mr - 1));
+      }
+      ctx.stroke();
     }
-    this.drawRigBarrel(ctx, world, accent);
 
-    // the barrel itself
-    ctx.fillStyle = 'rgba(18,34,52,0.98)';
+    // ---- the barrel -------------------------------------------------------
+    // Longer with a heavier feed, and longer again once it is armoured: the
+    // gun has to stay the biggest thing on the machine or the machine stops
+    // reading as a gun.
+    const bl = R * (1.24 + g.rate * 0.11 + g.casing * 0.08);
+    ctx.fillStyle = 'rgba(18,34,52,0.99)';
     ctx.strokeStyle = rgba(accent, 0.95);
     ctx.lineWidth = 2;
-    roundRectPath(ctx, this.r * 0.2 - recoil, -6.5, this.r * 1.3, 13, 4);
+    const bw = 6.5 + g.casing * 0.9;
+    roundRectPath(ctx, R * 0.16 - recoil, -bw, bl, bw * 2, 4);
     ctx.fill();
     ctx.stroke();
-    /*
-     * The bore, hot with use -- as a LINE down the middle rather than a bar
-     * filling most of the barrel. At full heat the bar was a six-unit block of
-     * white the width of the whole barrel, which is what made the turret's one
-     * long straight edge the brightest thing on the machine and flattened
-     * everything bolted to it.
-     */
-    ctx.fillStyle = rgba('#ffffff', 0.1 + this.heat * 0.34);
-    ctx.fillRect(this.r * 0.3 - recoil, -1.6, this.r * 1.05, 3.2);
-    // ...and the heat is at the muzzle end, where it would be.
+    // the bore, as a line, and the heat at the muzzle end where it would be
+    ctx.fillStyle = rgba('#ffffff', 0.1 + this.heat * 0.3);
+    ctx.fillRect(R * 0.26 - recoil, -1.6, bl - R * 0.16, 3.2);
     if (this.heat > 0.02) {
-      const gh = ctx.createLinearGradient(this.r * 0.4 - recoil, 0, this.r * 1.4 - recoil, 0);
+      const gh = ctx.createLinearGradient(R * 0.3 - recoil, 0, R * 0.16 + bl - recoil, 0);
       gh.addColorStop(0, rgba('#ff9f5c', 0));
-      gh.addColorStop(1, rgba('#ffd6a0', 0.5 * this.heat));
+      gh.addColorStop(1, rgba('#ffd6a0', 0.45 * this.heat));
       ctx.fillStyle = gh;
-      ctx.fillRect(this.r * 0.4 - recoil, -5, this.r * 1.0, 10);
+      ctx.fillRect(R * 0.3 - recoil, -5, bl - R * 0.2, 10);
     }
-    /*
-     * Cooling fins across the top of the jacket. Three marks, and the barrel
-     * stops being a rounded rectangle with a line in it.
-     */
-    ctx.strokeStyle = rgba(accent, 0.4);
+    // cooling fins across the jacket
+    ctx.strokeStyle = rgba(accent, 0.42);
     ctx.lineWidth = HAIRLINE * 1.6;
     ctx.beginPath();
-    for (let i = 0; i < 3; i++) {
-      const x = this.r * (0.52 + i * 0.2) - recoil;
-      ctx.moveTo(x, -6);
+    for (let k = 0; k < 3; k++) {
+      const x = R * 0.44 + (bl * 0.16) * k - recoil;
+      ctx.moveTo(x, -bw + 0.5);
       ctx.lineTo(x, -2.6);
       ctx.moveTo(x, 2.6);
-      ctx.lineTo(x, 6);
+      ctx.lineTo(x, bw - 0.5);
     }
     ctx.stroke();
-    // muzzle brake: two ports near the tip
-    ctx.strokeStyle = rgba(accent, 0.8);
-    ctx.lineWidth = 1.4;
+    // muzzle brake: ports at the tip, and a second pair once it is armoured
+    ctx.strokeStyle = rgba(accent, 0.85);
+    ctx.lineWidth = 1.5;
     for (const sy of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(this.r * 1.16 - recoil, sy * 6.5);
-      ctx.lineTo(this.r * 1.16 - recoil, sy * 10);
-      ctx.lineTo(this.r * 1.36 - recoil, sy * 10);
-      ctx.lineTo(this.r * 1.36 - recoil, sy * 6.5);
+      for (let k = 0; k < 1 + Math.min(1, g.casing); k++) {
+        const x0 = R * 0.16 + bl - 12 - k * 9 - recoil;
+        ctx.beginPath();
+        ctx.moveTo(x0, sy * bw);
+        ctx.lineTo(x0, sy * (bw + 3.5));
+        ctx.lineTo(x0 + 6, sy * (bw + 3.5));
+        ctx.lineTo(x0 + 6, sy * bw);
+        ctx.stroke();
+      }
+    }
+
+    // ---- SIGHT: a boxed sight along the top of the barrel ------------------
+    if (g.overwatch) {
+      // Short, and seated on the jacket. At five units a level it grew longer
+      // than the barrel it was clamped to and read as a second stick lying
+      // across the machine.
+      const sl = 9 + g.overwatch * 3.2;
+      const sx = R * 0.5 - recoil;
+      ctx.fillStyle = BODY;
+      ctx.strokeStyle = rgba('#ffe08a', 0.9);
+      ctx.lineWidth = HAIRLINE * 1.8;
+      roundRectPath(ctx, sx, -bw - 7.5, sl, 7.5, 2);
+      ctx.fill();
       ctx.stroke();
+      // the lens at the front of it, and a mount foot at the back
+      ctx.fillStyle = rgba('#ffe08a', 0.75);
+      ctx.beginPath();
+      ctx.arc(sx + sl - 3, -bw - 3.8, 2.4, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = rgba('#ffe08a', 0.5);
+      ctx.lineWidth = HAIRLINE * 1.6;
+      ctx.beginPath();
+      ctx.moveTo(sx + 2.5, -bw);
+      ctx.lineTo(sx + 2.5, -bw + 3);
+      ctx.moveTo(sx + sl - 3, -bw);
+      ctx.lineTo(sx + sl - 3, -bw + 3);
+      ctx.stroke();
+      // ...and at the last level it puts a designator on the target
+      if (g.overwatch >= 3 && world.autoAim) {
+        ctx.strokeStyle = rgba('#ffe08a', 0.18 + 0.1 * Math.sin(t * 9));
+        ctx.lineWidth = HAIRLINE;
+        ctx.beginPath();
+        ctx.moveTo(sx + sl, -bw - 3.8);
+        ctx.lineTo(CFG.shooter.aimRange * world.up.aimRange, -bw - 3.8);
+        ctx.stroke();
+      }
     }
 
     if (this.recoil > 0.02) {
       ctx.globalCompositeOperation = 'lighter';
-      drawGlow(ctx, '#ffe9b0', this.r * 1.5 - recoil, 0, 26 * this.recoil, this.recoil);
+      drawGlow(ctx, '#ffe9b0', R * 0.16 + bl + 6 - recoil, 0, 24 * this.recoil, this.recoil);
       ctx.globalCompositeOperation = 'source-over';
     }
     ctx.restore();
 
-    // ---- the core, recessed, with an iris over it ----
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.fillStyle = 'rgba(4,9,15,0.95)';
+    // ---- the core port, recessed in the deck ------------------------------
+    ctx.fillStyle = 'rgba(4,9,15,0.98)';
     ctx.beginPath();
-    ctx.arc(0, 0, 8.5, 0, TAU);
+    ctx.arc(0, 0, 9, 0, TAU);
     ctx.fill();
-    ctx.strokeStyle = rgba(accent, 0.5);
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = rgba(accent, 0.55);
+    ctx.lineWidth = HAIRLINE * 1.6;
     ctx.beginPath();
-    ctx.arc(0, 0, 8.5, 0, TAU);
+    ctx.arc(0, 0, 9, 0, TAU);
     ctx.stroke();
-    // three iris blades, turning slowly against the rings
+    // three iris blades, turning against the bearing
     ctx.strokeStyle = rgba(accent, 0.6);
     ctx.lineWidth = 1.3;
     ctx.beginPath();
     for (let i = 0; i < 3; i++) {
       const a = -this.spin * 0.7 + (i / 3) * TAU;
-      ctx.arc(0, 0, 6, a, a + 0.7);
+      ctx.arc(0, 0, 6.2, a, a + 0.7);
     }
     ctx.stroke();
-    /*
-     * The core glow is drawn last and over everything, so at 0.6 plus heat it
-     * was a white disc across the middle of the machine and the iris, the
-     * rings and the inner bevel were all underneath it. Held to a ceiling, and
-     * with the heat going into its COLOUR rather than its brightness.
-     */
-    ctx.globalCompositeOperation = 'lighter';
-    const lit = Math.min(0.72, 0.34 + 0.1 * Math.sin(t * 4) + this.heat * 0.28);
-    drawGlow(ctx, this.heat > 0.35 ? '#ffd6a0' : accent, 0, 0, this.r * 0.66, lit);
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = rgba(this.heat > 0.35 ? '#ffd6a0' : accent, 0.55 + this.heat * 0.4);
     ctx.beginPath();
-    ctx.arc(0, 0, 3.2 + this.recoil * 1.6, 0, TAU);
+    ctx.arc(0, 0, 3 + this.recoil * 1.6, 0, TAU);
     ctx.fill();
+
+    /*
+     * Breached, and only then, the machine is lit from outside. It is the one
+     * piece of light this drawing has, because it is the one thing that is not
+     * part of the machine: something has hold of it.
+     */
+    if (breached) {
+      ctx.globalCompositeOperation = 'lighter';
+      drawGlow(ctx, accent, 0, 0, R * 3, 0.3 + 0.22 * Math.sin(t * 18));
+      ctx.globalCompositeOperation = 'source-over';
+    }
     ctx.restore();
   }
 
-
-  /*
-   * ============================ the rig ==============================
-   *
-   * Every node in the TURRET branch is a part on the machine, and its level is
-   * how much of that part there is. Buying GIMBAL grows a gimbal; buying it
-   * again grows another. The tree is named for the parts, so the row you press
-   * and the thing that appears are the same word.
-   *
-   * Counted straight off the purchase ledger and cached against its length,
-   * because the ledger only ever grows: no hook to forget to call on a buy, a
-   * restore or a reset. `rigFlash` runs down after a purchase and every part
-   * is drawn brighter and a little larger while it does, so the moment a part
-   * goes on is visible without anything having to remember which part it was.
-   */
   rig(world) {
     const taken = world.offers.taken;
     if (world.rig && world.rigAt === taken.length) return world.rig;
@@ -732,243 +832,15 @@ export class Shooter {
     return rig;
   }
 
-  /** Parts that sit on the mount, drawn in the turret's own unrotated frame. */
-  drawRigBase(ctx, world, accent, t) {
-    const R = CFG.rig;
-    const g = this.rig(world);
-    const flash = world.rigFlash / R.flash; // 1 -> 0 across the fitting
-    const lift = 1 + flash * 0.12;
-    const glow = 0.55 + flash * 0.45;
-
-    /*
-     * The reach of the assist, drawn only while it is switched on: a hairline
-     * arc across the cone at exactly the distance a target has to be inside.
-     * Without it the base range is invisible — you would only ever meet it as
-     * "auto aim ignored that one" — and ARRAY would be a number on a card
-     * rather than a ring you watch move out.
-     */
-    if (world.autoAim) {
-      const reach = CFG.shooter.aimRange * world.up.aimRange;
-      const cone = CFG.shooter.aimClamp;
-      ctx.strokeStyle = rgba(accent, 0.12 + flash * 0.3);
-      ctx.lineWidth = HAIRLINE;
-      ctx.setLineDash([HAIRLINE * 5, HAIRLINE * 11]);
-      ctx.beginPath();
-      ctx.arc(0, 0, reach, -Math.PI / 2 - cone, -Math.PI / 2 + cone);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    /*
-     * ARRAY — a dish on a mast per level, off the shoulders of the housing.
-     * Everything else in the branch acts on what the turret does; this one is
-     * how far it can see, so it is drawn as the thing that looks: a bowl, a
-     * feed horn at its focus, and a sweep leaving the mouth.
-     */
-    for (let i = 0; i < g.aimrange; i++) {
-      const a = -Math.PI / 2 + (i ? 1 : -1) * 0.86;
-      const c = Math.cos(a);
-      const sn = Math.sin(a);
-      const ap = (R.dish + i * 5) * lift;
-      const foot = this.r * 0.88;
-      const mast = foot + (10 + i * 4) * lift;
-      const lit = 0.78 + flash * 0.22; // a fitting this small has to be bright
-      ctx.strokeStyle = rgba('#8fd8ff', 0.9 * lit);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(c * foot, sn * foot);
-      ctx.lineTo(c * mast, sn * mast);
-      ctx.stroke();
-
-      ctx.save();
-      ctx.translate(c * (mast + ap * 0.5), sn * (mast + ap * 0.5));
-      ctx.rotate(a); // +x is now straight out of the mount: the mouth faces it
-      const bowl = ap * 0.5;
-      // the bowl, backed toward the mast and open outward
-      ctx.beginPath();
-      ctx.arc(0, 0, bowl, Math.PI - 1.5, Math.PI + 1.5);
-      ctx.fillStyle = rgba('#8fd8ff', 0.2 * lit);
-      ctx.fill();
-      ctx.strokeStyle = rgba('#9fe4ff', lit);
-      ctx.lineWidth = 2.4;
-      ctx.stroke();
-      // a rib inside it, and a lip at each edge, or it reads as a crescent
-      ctx.strokeStyle = rgba('#9fe4ff', 0.45 * lit);
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(0, 0, bowl * 0.6, Math.PI - 1.4, Math.PI + 1.4);
-      ctx.stroke();
-      ctx.strokeStyle = rgba('#9fe4ff', 0.9 * lit);
-      ctx.lineWidth = 1.6;
-      for (const e of [-1.5, 1.5]) {
-        const ex = Math.cos(Math.PI + e) * bowl;
-        const ey = Math.sin(Math.PI + e) * bowl;
-        ctx.beginPath();
-        ctx.moveTo(ex, ey);
-        ctx.lineTo(ex + bowl * 0.3, ey + Math.sign(e) * bowl * 0.16);
-        ctx.stroke();
-      }
-      // feed horn at the focus, on a strut
-      ctx.strokeStyle = rgba('#9fe4ff', 0.6 * lit);
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(-bowl * 0.9, 0);
-      ctx.lineTo(bowl * 0.5, 0);
-      ctx.stroke();
-      ctx.fillStyle = rgba('#eaf8ff', lit);
-      ctx.beginPath();
-      ctx.arc(bowl * 0.5, 0, 2, 0, TAU);
-      ctx.fill();
-      // the sweep leaving the mouth
-      const out = (t * 0.75 + i * 0.5) % 1;
-      ctx.strokeStyle = rgba('#8fd8ff', 0.6 * (1 - out) * lit);
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.arc(0, 0, bowl * 1.2 + out * 18, -0.8, 0.8);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // GIMBAL — a further ring per level, each turning against the last.
-    for (let i = 0; i < g.slew; i++) {
-      const rr = this.r * (1.1 + i * R.ring) * lift;
-      const off = this.spin * (i % 2 ? 1 : -1) * (1 + i * 0.3);
-      ctx.strokeStyle = rgba(accent, (0.3 + 0.12 * i) * glow);
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.arc(0, 0, rr, off, off + Math.PI * (1.1 - i * 0.18));
-      ctx.stroke();
-    }
-
-    // SPINES — spikes out of the housing, more of them each level.
-    if (g.casing) {
-      const n = 4 + g.casing * 3;
-      ctx.strokeStyle = rgba('#ff9f5c', (0.5 + 0.15 * g.casing) * glow);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * TAU + this.spin * 0.2;
-        const c = Math.cos(a);
-        const sn = Math.sin(a);
-        const len = R.spine * (0.7 + 0.3 * g.casing) * lift;
-        ctx.moveTo(c * this.r * 0.94, sn * this.r * 0.94);
-        ctx.lineTo(c * (this.r + len), sn * (this.r + len));
-      }
-      ctx.stroke();
-    }
-
-    // SHROUD — a collar round the base, wider with every level. It sits under
-    // the barrel's arc, which is where the field actually comes from.
-    if (g.insulation) {
-      const sweep = Math.min(TAU, R.shroud * g.insulation);
-      const rr = (this.r + 13) * lift;
-      ctx.strokeStyle = rgba('#7cffb2', 0.42 * glow);
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(0, 0, rr, Math.PI / 2 - sweep / 2, Math.PI / 2 + sweep / 2);
-      ctx.stroke();
-      ctx.strokeStyle = rgba('#7cffb2', 0.7 * glow);
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.arc(0, 0, rr + 3, Math.PI / 2 - sweep / 2, Math.PI / 2 + sweep / 2);
-      ctx.stroke();
-    }
-
-    // INTAKE — scoops under the housing, drawing the floor in.
-    if (g.intake) {
-      ctx.strokeStyle = rgba('#9fe8ff', 0.75 * glow);
-      ctx.fillStyle = rgba('#9fe8ff', 0.12 * glow);
-      ctx.lineWidth = 1.4;
-      for (let i = -1; i <= 1; i++) {
-        const a = Math.PI / 2 + i * 0.42;
-        const c = Math.cos(a);
-        const sn = Math.sin(a);
-        const inR = this.r * 0.92;
-        const outR = (this.r + 8) * lift;
-        const w = 4.5;
-        ctx.beginPath();
-        ctx.moveTo(c * inR - sn * w * 0.5, sn * inR + c * w * 0.5);
-        ctx.lineTo(c * outR - sn * w, sn * outR + c * w);
-        ctx.lineTo(c * outR + sn * w, sn * outR - c * w);
-        ctx.lineTo(c * inR + sn * w * 0.5, sn * inR - c * w * 0.5);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-      }
-      // and the pull itself, a slow ring inward
-      const pull = (t * 0.6) % 1;
-      ctx.strokeStyle = rgba('#9fe8ff', 0.3 * (1 - pull) * glow);
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(0, 0, this.r + 8 + (1 - pull) * 46, 0, TAU);
-      ctx.stroke();
-    }
-  }
-
-  /** Parts that ride the barrel, drawn after the frame is turned to the aim. */
-  drawRigBarrel(ctx, world, accent) {
-    const R = CFG.rig;
-    const g = this.rig(world);
-    const flash = world.rigFlash / R.flash;
-    const glow = 0.6 + flash * 0.4;
-
-    // FEED — a belt housing alongside the barrel, a second one at RUNAWAY.
-    for (let i = 0; i < g.rate; i++) {
-      const side = i ? 1 : -1;
-      const y = side * (6.5 + R.feed * 0.5);
-      ctx.fillStyle = rgba('#0d1a28', 0.95);
-      ctx.strokeStyle = rgba(accent, 0.9 * glow);
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.rect(this.r * 0.34, y - R.feed / 2, this.r * 0.78, R.feed);
-      ctx.fill();
-      ctx.stroke();
-      // a lit rail along the outer edge, or the housing is a dark rectangle
-      // outlined in a hairline and reads as nothing at all
-      ctx.strokeStyle = rgba(accent, 0.55 * glow);
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(this.r * 0.34, y + side * R.feed * 0.5);
-      ctx.lineTo(this.r * 1.12, y + side * R.feed * 0.5);
-      ctx.stroke();
-      // rounds in the belt, marching toward the breech
-      ctx.fillStyle = rgba('#ffe9b0', 0.55 * glow);
-      const march = (world.time * 34) % 7;
-      for (let k = 0; k < 5; k++) {
-        const x = this.r * 0.36 + ((k * 7 + march) % (this.r * 0.74));
-        ctx.fillRect(x, y - 1.2, 2.4, 2.4);
-      }
-    }
-
-    // SIGHT — a mast over the barrel with a crossbar per level.
-    if (g.overwatch) {
-      const h = R.sight * g.overwatch;
-      const x = this.r * 0.95;
-      ctx.strokeStyle = rgba('#ffd166', 0.85 * glow);
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.moveTo(x, -6.5);
-      ctx.lineTo(x, -6.5 - h);
-      ctx.stroke();
-      for (let i = 0; i < g.overwatch; i++) {
-        const y = -6.5 - h + i * (h / g.overwatch) + 2;
-        const w = 5 - i;
-        ctx.beginPath();
-        ctx.moveTo(x - w, y);
-        ctx.lineTo(x + w, y);
-        ctx.stroke();
-      }
-      ctx.fillStyle = rgba('#ffd166', 0.9 * glow);
-      ctx.beginPath();
-      ctx.arc(x, -6.5 - h, 1.6, 0, TAU);
-      ctx.fill();
-    }
-  }
-
   /**
-   * The half of the rod that hangs below the pivot, plus the grip on its end
-   * and the arc it travels. Drawn under the turret body so the rod reads as
-   * passing through it.
+   * The control: a rail, and a ball on it.
+   *
+   * There was a stem -- a shaft from the mount out to the grip, latterly an
+   * articulated arm with a hinge in it. It was always the weakest thing on
+   * screen: a long diagonal across the middle of the play area, drawn over
+   * whatever was behind it, and it made the turret and the control look like
+   * one bent object rather than a machine and the hand on it. Gone. The ball
+   * runs the rail, the rail is the linkage, and the turret is left alone.
    */
   drawLever(ctx, accent, t) {
     const len = CFG.shooter.gripLen;
@@ -979,24 +851,10 @@ export class Shooter {
     const clamp2 = CFG.shooter.aimClamp;
     const down = Math.PI / 2;
     const now = this.gripAngle;
-    const swing = (now - down) / clamp2; // -1 .. 1 across the travel
 
-    /*
-     * The control column. It is the one thing on screen a thumb is actually
-     * on, so it is built like a control rather than like a line with a knob:
-     * a rail with hard stops at the ends, an ARTICULATED arm with a hinge in
-     * the middle of it, and a grip that is also a gauge.
-     *
-     * The arm is the change that does the work. A straight rod from the mount
-     * to the grip is the same picture at every angle -- it slides, it does not
-     * operate. A two-segment arm with a knee bows as it swings, so pulling the
-     * handle over visibly works a linkage, and the machine reads as something
-     * that is being driven rather than dragged.
-     */
-
-    // ---- the rail: a solid track, hard stops, and the stretch travelled ----
-    ctx.strokeStyle = rgba(accent, 0.1 + held * 0.14);
-    ctx.lineWidth = HAIRLINE * 3.4;
+    // ---- the rail: a track, hard stops, a centre notch, and the travel ----
+    ctx.strokeStyle = rgba(accent, 0.09 + held * 0.12);
+    ctx.lineWidth = HAIRLINE * 3.2;
     ctx.beginPath();
     ctx.arc(this.x, this.y, len, down - clamp2, down + clamp2);
     ctx.stroke();
@@ -1004,115 +862,63 @@ export class Shooter {
       const a = down + e * clamp2;
       const c = Math.cos(a);
       const sn = Math.sin(a);
-      ctx.strokeStyle = rgba(accent, 0.34 + held * 0.4);
+      ctx.strokeStyle = rgba(accent, 0.3 + held * 0.4);
       ctx.lineWidth = HAIRLINE * 2.2;
       ctx.beginPath();
       ctx.moveTo(this.x + c * (len - 9), this.y + sn * (len - 9));
       ctx.lineTo(this.x + c * (len + 9), this.y + sn * (len + 9));
       ctx.stroke();
     }
-    // centre detent, drawn as a notch rather than another tick
-    ctx.strokeStyle = rgba(accent, 0.24 + held * 0.3);
+    ctx.strokeStyle = rgba(accent, 0.2 + held * 0.28);
     ctx.lineWidth = HAIRLINE * 1.6;
     ctx.beginPath();
     ctx.moveTo(this.x, this.y + len - 6);
     ctx.lineTo(this.x, this.y + len + 6);
     ctx.stroke();
-    ctx.strokeStyle = rgba(accent, 0.3 + held * 0.55);
+    ctx.strokeStyle = rgba(accent, 0.3 + held * 0.5);
     ctx.lineWidth = HAIRLINE * 3;
     ctx.beginPath();
     ctx.arc(this.x, this.y, len, Math.min(down, now), Math.max(down, now));
     ctx.stroke();
 
-    /*
-     * ---- the arm ----
-     *
-     * The knee always bows the same way, so the linkage has a handedness and
-     * the two segments never straighten into the rod this replaced. It opens
-     * a little as the handle is pulled off centre, which is the geometry a
-     * real bell crank has and reads as effort.
-     */
-    const ex = (this.x + gx) / 2;
-    const ey = (this.y + gy) / 2;
-    const bow = 11 + Math.abs(swing) * 7;
-    const px = -(gy - this.y) / len;
-    const py = (gx - this.x) / len;
-    const kx = ex + px * bow;
-    const ky = ey + py * bow;
-
-    const limb = (ax, ay, bx, by) => {
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = 'rgba(10,20,33,0.97)';
-      ctx.lineWidth = HAIRLINE * 8;
-      ctx.beginPath();
-      ctx.moveTo(ax, ay);
-      ctx.lineTo(bx, by);
-      ctx.stroke();
-      ctx.strokeStyle = rgba(accent, 0.28 + held * 0.3);
-      ctx.lineWidth = HAIRLINE * 5.4;
-      ctx.stroke();
-      ctx.strokeStyle = rgba(accent, 0.5 + held * 0.5);
-      ctx.lineWidth = HAIRLINE * 1.6;
-      ctx.stroke();
-      ctx.lineCap = 'butt';
-    };
-    limb(this.x, this.y, kx, ky);
-    limb(kx, ky, gx, gy);
-
-    // the knee: a hinge pin, so the join is a joint and not a kink
-    ctx.fillStyle = 'rgba(7,15,25,0.98)';
-    ctx.strokeStyle = rgba(accent, 0.6 + held * 0.4);
-    ctx.lineWidth = HAIRLINE * 1.8;
-    ctx.beginPath();
-    ctx.arc(kx, ky, 5.2, 0, TAU);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = rgba(accent, 0.45 + held * 0.5);
-    ctx.beginPath();
-    ctx.arc(kx, ky, 1.7, 0, TAU);
-    ctx.fill();
-
-    // the yoke at the mount: a fork the first segment is pinned into
-    const ya = Math.atan2(ky - this.y, kx - this.x);
-    ctx.save();
-    ctx.translate(this.x + Math.cos(ya) * 15, this.y + Math.sin(ya) * 15);
-    ctx.rotate(ya);
-    ctx.fillStyle = 'rgba(12,24,38,0.98)';
-    ctx.strokeStyle = rgba(accent, 0.55 + held * 0.35);
-    ctx.lineWidth = HAIRLINE * 1.6;
-    roundRectPath(ctx, -6, -8.5, 12, 17, 3);
-    ctx.fill();
-    ctx.stroke();
-    ctx.strokeStyle = rgba(accent, 0.3 + held * 0.4);
-    ctx.lineWidth = HAIRLINE * 1.4;
-    ctx.beginPath();
-    ctx.moveTo(-2.5, -8.5); ctx.lineTo(-2.5, 8.5);
-    ctx.moveTo(2.5, -8.5); ctx.lineTo(2.5, 8.5);
-    ctx.stroke();
-    ctx.restore();
-
-    // ---- the grip ----
+    // ---- the ball ----------------------------------------------------------
     ctx.save();
     ctx.translate(gx, gy);
     ctx.rotate(this.gripAngle);
     ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, accent, 0, 0, gr * 2.4 + held * 30, 0.18 + held * 0.42);
+    drawGlow(ctx, accent, 0, 0, gr * 2.2 + held * 28, 0.16 + held * 0.4);
     ctx.globalCompositeOperation = 'source-over';
 
-    ctx.fillStyle = 'rgba(9,18,29,0.96)';
+    /*
+     * A sphere rather than a disc: the body is dark, and a crescent of
+     * lighter face is laid across the upper left of it. That single offset
+     * arc is the whole difference between a ball and a circle.
+     */
+    ctx.fillStyle = 'rgba(9,18,29,0.97)';
+    ctx.beginPath();
+    ctx.arc(0, 0, gr, 0, TAU);
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = rgba(accent, 0.09 + held * 0.08);
+    ctx.beginPath();
+    ctx.arc(-gr * 0.28, -gr * 0.3, gr * 0.92, 0, TAU);
+    ctx.fill();
+    ctx.restore();
     ctx.strokeStyle = rgba(accent, 0.8 + held * 0.2);
     ctx.lineWidth = HAIRLINE * 2.4;
     ctx.beginPath();
     ctx.arc(0, 0, gr, 0, TAU);
-    ctx.fill();
+    ctx.stroke();
+    // the limb: a bright short arc on the lit side, which is what makes it
+    // read as round rather than flat
+    ctx.strokeStyle = rgba('#ffffff', 0.35 + held * 0.3);
+    ctx.lineWidth = HAIRLINE * 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, gr - 2.5, Math.PI * 1.05, Math.PI * 1.55);
     ctx.stroke();
 
-    /*
-     * Knurling, not spokes. Short radial marks round the rim are what a thing
-     * meant to be gripped has; the four sliding arcs that were here instead
-     * turned with the clock, which made the grip look like it was spinning
-     * under the thumb holding it.
-     */
+    // knurling round the equator: what a thing meant to be gripped has
     ctx.strokeStyle = rgba(accent, 0.22 + held * 0.4);
     ctx.lineWidth = HAIRLINE * 1.5;
     ctx.beginPath();
@@ -1138,33 +944,25 @@ export class Shooter {
     ctx.arc(0, 0, gr - 3.2, -Math.PI / 2, -Math.PI / 2 + cyc * TAU);
     ctx.stroke();
 
-    // thumb pad: a flat across the top of the rim, so the grip has an up
-    ctx.fillStyle = rgba(accent, 0.14 + held * 0.22);
-    ctx.beginPath();
-    ctx.arc(0, 0, gr * 0.82, -2.5, -0.64);
-    ctx.arc(0, 0, gr * 0.46, -0.64, -2.5, true);
-    ctx.closePath();
-    ctx.fill();
-
     // hub, and the trigger state in the middle of it
     ctx.fillStyle = 'rgba(5,11,18,0.98)';
     ctx.beginPath();
-    ctx.arc(0, 0, gr * 0.44, 0, TAU);
+    ctx.arc(0, 0, gr * 0.42, 0, TAU);
     ctx.fill();
     ctx.strokeStyle = rgba(accent, 0.5 + held * 0.4);
     ctx.lineWidth = HAIRLINE * 1.4;
     ctx.beginPath();
-    ctx.arc(0, 0, gr * 0.44, 0, TAU);
+    ctx.arc(0, 0, gr * 0.42, 0, TAU);
     ctx.stroke();
     ctx.globalCompositeOperation = 'lighter';
     ctx.fillStyle = rgba(accent, 0.25 + held * 0.75);
     ctx.beginPath();
-    ctx.arc(0, 0, gr * 0.26 + held * 2.5, 0, TAU);
+    ctx.arc(0, 0, gr * 0.24 + held * 2.5, 0, TAU);
     ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
     ctx.restore();
 
-    // a ring off the grip on every round it sends
+    // a ring off the ball on every round it sends
     if (held > 0.02) {
       ctx.strokeStyle = rgba(accent, (1 - cyc) * held * 0.75);
       ctx.lineWidth = HAIRLINE * 1.6;
