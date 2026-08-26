@@ -2735,7 +2735,7 @@ body.booting #pendingBtn {
    worth the tap, and it was #3f5165 at 2.5:1. */
 .shopLab em { font-style: normal; color: #72859a; letter-spacing: 0.1em; }
 
-.shelf { display: flex; gap: 8px; margin-bottom: 12px; }
+.shelf { display: flex; align-items: stretch; gap: 8px; margin-bottom: 12px; }
 
 /*
  * One object, one target.
@@ -2750,7 +2750,7 @@ body.booting #pendingBtn {
   appearance: none;
   flex: 1 1 0;
   min-width: 0;
-  height: 184px;
+  min-height: 184px;
   padding: 12px 8px 0;
   display: flex;
   flex-direction: column;
@@ -2786,14 +2786,22 @@ body.booting #pendingBtn {
   margin-top: 9px;
   line-height: 1.15;
 }
+/*
+ * No clamp. A card grows to hold what it says.
+ *
+ * It was `-webkit-line-clamp`, first at two lines and then at three, and both
+ * times the answer to a card that overflowed was to shorten the sentence
+ * until it fit. That is a guarantee held up by hand: the ellipsis comes back
+ * the moment anyone writes a longer line, and it comes back on the half of
+ * the sentence that says what the thing does. SPINES ended on "40 DAMAGE A…"
+ * and SNARE on "It never…".
+ *
+ * The clamp was only ever there to keep two cards in a row the same height,
+ * and grid does that on its own: the row is as tall as its tallest card and
+ * both stretch to it. So the height is a floor now, not a ceiling.
+ */
 .shopStat {
-  display: -webkit-box;
-  /* Three, not two. SPINES' stat is "Objects touching you take 40 damage a
-     second" and at two lines it ended on "40 DAMAGE A…" — a number cut off
-     before its unit says less than no number at all. */
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  display: block;
   flex: 0 0 auto;
   font-size: 12px;
   line-height: 1.3;
@@ -2862,10 +2870,7 @@ body.booting #pendingBtn {
 .shopCard.arm .shopIcon svg { width: 52px; height: 52px; }
 .shopCard.arm .shopBody { grid-area: body; min-width: 0; }
 .shopCard.arm .shopName { font-size: 20px; margin-top: 0; }
-/* Three: the card is height:auto, so the lines are free, and two of them
-   cut SNARE off at "It never…" -- which is the exact half of the sentence
-   this rewrite existed to remove. */
-.shopCard.arm .shopStat { -webkit-line-clamp: 3; margin-top: 4px; }
+.shopCard.arm .shopStat { margin-top: 4px; }
 /* A single empty segment floating beside the text is not a meter, it is a
    grey dash. Nothing with one level has anything to be part-way through. */
 .shopCard.arm .shopMeter { grid-area: meter; width: 46px; margin: 0; align-self: center; }
@@ -3066,6 +3071,9 @@ body.booting #pendingBtn {
 .branchGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  /* Both cards in a row take the height of the taller one, which is the job
+     the clamp used to do by cutting the taller one's text off. */
+  align-items: stretch;
   gap: 8px;
   padding: 8px 0 14px;
 }

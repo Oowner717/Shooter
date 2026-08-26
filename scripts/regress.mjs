@@ -294,26 +294,47 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const { audio } = await import('../src/audio.js');
     // Scheduled, not rendered: the suite stubs the audio context, so what can
     // be checked is what amend() asks for rather than what comes out.
+    /*
+     * The five amend() asks for, found by their own shape.
+     *
+     * The first version of this counted every voice inside a 140ms window and
+     * asserted there were five. The suite runs a live game underneath it, so
+     * anything else that made a sound in that window was counted too -- it
+     * came back seven about one run in ten. What is being tested is what a
+     * purchase schedules, not what the field happened to be doing.
+     */
     const voices = [];
     const t0 = Date.now();
     const tone = audio.tone.bind(audio);
     const noise = audio.noise.bind(audio);
-    audio.tone = (o) => { voices.push({ at: Date.now() - t0, dur: o.dur || 0.12, gain: o.gain }); };
-    audio.noise = (o) => { voices.push({ at: Date.now() - t0, dur: o.dur || 0.2, gain: o.gain }); };
+    const grab = (kind, dflt) => (o) => voices.push({
+      kind, at: Date.now() - t0, dur: o.dur || dflt, gain: o.gain, f0: o.f0 || 0,
+    });
+    audio.tone = grab('tone', 0.12);
+    audio.noise = grab('noise', 0.2);
     const wasReady = audio.ready;
     Object.defineProperty(audio, 'ready', { value: true, configurable: true });
     audio.amend();
-    await new Promise((res) => setTimeout(res, 140));
+    await new Promise((res) => setTimeout(res, 160));
     audio.tone = tone;
     audio.noise = noise;
     Object.defineProperty(audio, 'ready', { value: wasReady, configurable: true });
-    const end = Math.max(...voices.map((v) => v.at / 1000 + v.dur));
-    return { voices: voices.length, endMs: Math.round(end * 1000),
-      peak: Math.max(...voices.map((v) => v.gain)) };
+    const find = (f) => voices.find(f);
+    const mine = [
+      find((v) => v.kind === 'noise' && Math.abs(v.dur - 0.035) < 0.001),   // the meet
+      find((v) => v.kind === 'tone' && Math.abs(v.f0 - 165) < 1),           // the seat
+      find((v) => v.kind === 'noise' && Math.abs(v.dur - 0.13) < 0.001),    // its weight
+      find((v) => v.kind === 'tone' && Math.abs(v.f0 - 1290) < 1),          // the ring
+      find((v) => v.kind === 'tone' && Math.abs(v.f0 - 1935) < 1),
+    ];
+    const got = mine.filter(Boolean);
+    const end = got.length ? Math.max(...got.map((v) => v.at / 1000 + v.dur)) : 99;
+    return { found: got.length, heard: voices.length, endMs: Math.round(end * 1000),
+      peak: got.length ? Math.max(...got.map((v) => v.gain)) : 0 };
   });
   check('a purchase seats rather than chimes',
-    r.voices === 5 && r.endMs < 400 && r.peak >= 0.2,
-    `${r.voices} voices, last ends at ${r.endMs}ms, loudest ${r.peak}`);
+    r.found === 5 && r.endMs < 400 && r.peak >= 0.2,
+    `${r.found}/5 of its own voices (${r.heard} heard), last ends at ${r.endMs}ms, loudest ${r.peak}`);
 }
 
 // --- the room ---------------------------------------------------------------
@@ -418,18 +439,25 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         }
         out.mods++;
         if (head) out.headed++;
-        const st = c.querySelector('.shopStat');
-        const lh = parseFloat(getComputedStyle(st).lineHeight);
-        if (Math.round(st.scrollHeight / lh) > Math.round(st.clientHeight / lh)) {
-          out.clipped.push(c.querySelector('.shopName').textContent);
-        }
       }
-      // ...and the arms themselves
-      for (const c of grid.querySelectorAll('.shopCard.arm')) {
-        const st = c.querySelector('.shopStat');
-        const lh = parseFloat(getComputedStyle(st).lineHeight);
-        if (Math.round(st.scrollHeight / lh) > Math.round(st.clientHeight / lh)) {
-          out.clipped.push(c.querySelector('.shopName').textContent);
+      /*
+       * Nothing in the shop is allowed to end in an ellipsis.
+       *
+       * Every element that owns text, not just the stat: a clamp on the
+       * description was only half of it, and a name or a spec that overflowed
+       * would elide just as quietly. Checked as "is anything cut off",
+       * because that is the thing being forbidden -- an assertion about the
+       * clamp value would pass the day someone adds a different one.
+       */
+      for (const el of document.querySelectorAll('.menuPanel.tree *')) {
+        if (!el.offsetParent) continue;
+        if (![...el.childNodes].some((x) => x.nodeType === 3 && x.nodeValue.trim())) continue;
+        const t = el.textContent.trim();
+        if (t.includes('\u2026')) { out.clipped.push(`literal: ${t.slice(-24)}`); continue; }
+        if (el.scrollHeight <= el.clientHeight + 1 && el.scrollWidth <= el.clientWidth + 1) continue;
+        const cs = getComputedStyle(el);
+        if (cs.overflow !== 'visible' || cs.textOverflow === 'ellipsis' || cs.webkitLineClamp !== 'none') {
+          out.clipped.push(`${el.className || el.tagName}: ${t.slice(0, 24)}`);
         }
       }
     }
@@ -445,8 +473,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.arms.every((a) => a.wide)
     && r.arms.filter((a) => a.spec).length >= 17,
     JSON.stringify(r.arms.slice(0, 3)));
-  check('no card is cut off mid-sentence',
-    r.clipped.length === 0, `clipped: ${r.clipped.slice(0, 6)}`);
+  check('nothing in the shop ends in an ellipsis',
+    r.clipped.length === 0, `cut off: ${r.clipped.slice(0, 6)}`);
 }
 
 // --- no two things in a branch wear the same colour --------------------------
