@@ -2770,6 +2770,9 @@ body.booting #pendingBtn {
 .shopIcon { flex: 0 0 auto; width: 40px; height: 40px; color: var(--tone, #59e0ff); }
 .shopIcon svg { width: 40px; height: 40px; display: block; }
 
+.shopBody { display: contents; }
+.shopCard.arm .shopBody { display: block; }
+
 .shopName {
   display: block;
   /* Fixed, not shrinkable. The card is a fixed height and these are flex
@@ -2824,6 +2827,67 @@ body.booting #pendingBtn {
   color: #05080f;
   background: var(--tone, #59e0ff);
 }
+
+/*
+ * A ROUND, A MINE, AN ABILITY -- the thing itself.
+ *
+ * Full width, so it heads the mods that follow it, and laid out sideways so
+ * the numbers and the effect both fit. What it replaces: a card identical to
+ * its own mods, in the same colour at the same size, so HE and OVERPRESSURE
+ * read as two upgrades to the same thing.
+ */
+.shopCard.arm {
+  grid-column: 1 / -1;
+  height: auto;
+  min-height: 104px;
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  grid-template-areas: 'kind kind kind' 'icon body meter' 'price price price';
+  align-items: center;
+  column-gap: 12px;
+  padding: 0 12px;
+  text-align: left;
+  background:
+    linear-gradient(100deg, color-mix(in srgb, var(--tone) 13%, transparent), rgba(6, 12, 22, 0.9) 62%);
+}
+.shopCard.arm .shopKind {
+  grid-area: kind;
+  align-self: start;
+  font-size: 11px;
+  letter-spacing: 0.26em;
+  color: var(--tone);
+  padding: 9px 0 7px;
+}
+.shopCard.arm .shopIcon { grid-area: icon; width: 52px; height: 52px; }
+.shopCard.arm .shopIcon svg { width: 52px; height: 52px; }
+.shopCard.arm .shopBody { grid-area: body; min-width: 0; }
+.shopCard.arm .shopName { font-size: 20px; margin-top: 0; }
+/* Three: the card is height:auto, so the lines are free, and two of them
+   cut SNARE off at "It never…" -- which is the exact half of the sentence
+   this rewrite existed to remove. */
+.shopCard.arm .shopStat { -webkit-line-clamp: 3; margin-top: 4px; }
+/* A single empty segment floating beside the text is not a meter, it is a
+   grey dash. Nothing with one level has anything to be part-way through. */
+.shopCard.arm .shopMeter { grid-area: meter; width: 46px; margin: 0; align-self: center; }
+.shopCard.arm .shopMeter:not(:has(> i + i)) { display: none; }
+.shopCard.arm .shopPrice { grid-area: price; width: calc(100% + 24px); margin: 10px -12px 0; text-align: center; }
+
+/* The numbers, on a line of their own. An arm's own text leads with its
+   damage -- "Damage 11, then 25 a jump" -- and putting that where the effect
+   goes is how ARC came to say nothing about jumping to four more bodies. */
+.shopSpec {
+  display: block;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  color: var(--tone);
+  margin-top: 3px;
+}
+.shopSpec[hidden] { display: none; }
+
+/* Issued, not bought: BOLT, PULSE and FAN. */
+.shopCard.issued .shopPrice { letter-spacing: 0.26em; font-size: 13px; }
 
 /* Too dear: the same size, dimmed. Legible is a state; gone is not. */
 .shopCard.poor {

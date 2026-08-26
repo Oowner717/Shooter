@@ -373,6 +373,129 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('the machine is drawn in the menu that upgrades it', r.bare.drawn, JSON.stringify(r.bare.drawn));
 }
 
+// --- what a card has to say for itself --------------------------------------
+/*
+ * Three complaints, one place.
+ *
+ * A ROUND IS NOT AN UPGRADE TO ONE. HE sat beside OVERPRESSURE in the same
+ * colour at the same size, and nothing said one was a new round and the other
+ * was forty percent more blast radius. An arm takes the full width and heads
+ * everything under it.
+ *
+ * SUBTITLES. Only BOLT and ALL ROUNDS had a heading, because the label was
+ * keyed off having no id rather than off being an arm -- so the three arms
+ * the turret is issued with got one and the six you buy did not.
+ *
+ * NOTHING IS CUT OFF. The card clamps its text, and a stat that runs past the
+ * clamp is a sentence that stops mid-word: SNARE read "It never…", which is
+ * the exact half the rewrite existed to remove.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const m = g.hud.menu;
+    g.debugGiveEnergy(90000);
+    m.setOpen(true);
+    m.show('tree');
+    const out = { arms: [], clipped: [], mods: 0, headed: 0 };
+    for (const name of ['AMMUNITION', 'MINES', 'ABILITIES']) {
+      [...document.querySelectorAll('.branchRow')]
+        .find((x) => x.querySelector('.branchName').textContent === name).click();
+      const grid = [...document.querySelectorAll('.branchGrid')].find((x) => x.offsetParent);
+      let head = null;
+      for (const c of grid.children) {
+        if (c.classList.contains('grpLab')) { head = 'group'; continue; }
+        if (c.classList.contains('arm')) {
+          head = c;
+          out.arms.push({
+            name: c.querySelector('.shopName').textContent,
+            kind: (c.querySelector('.shopKind') || {}).textContent || '',
+            spec: (c.querySelector('.shopSpec') || {}).textContent || '',
+            wide: getComputedStyle(c).gridColumnStart === '1'
+              && getComputedStyle(c).gridColumnEnd.includes('-1'),
+          });
+          continue;
+        }
+        out.mods++;
+        if (head) out.headed++;
+        const st = c.querySelector('.shopStat');
+        const lh = parseFloat(getComputedStyle(st).lineHeight);
+        if (Math.round(st.scrollHeight / lh) > Math.round(st.clientHeight / lh)) {
+          out.clipped.push(c.querySelector('.shopName').textContent);
+        }
+      }
+      // ...and the arms themselves
+      for (const c of grid.querySelectorAll('.shopCard.arm')) {
+        const st = c.querySelector('.shopStat');
+        const lh = parseFloat(getComputedStyle(st).lineHeight);
+        if (Math.round(st.scrollHeight / lh) > Math.round(st.clientHeight / lh)) {
+          out.clipped.push(c.querySelector('.shopName').textContent);
+        }
+      }
+    }
+    m.setOpen(false);
+    return out;
+  });
+  // Nine rounds, eight mines, eight abilities.
+  check('every round, mine and ability heads its own group of upgrades',
+    r.arms.length === 25 && r.mods > 0 && r.headed === r.mods
+    && r.arms.every((a) => /^(NEW )?(ROUND|MINE|ABILITY)$/.test(a.kind)),
+    `${r.arms.length} arms, ${r.headed}/${r.mods} mods under one`);
+  check('an unlock does not read as an upgrade: full width, and its own numbers',
+    r.arms.every((a) => a.wide)
+    && r.arms.filter((a) => a.spec).length >= 17,
+    JSON.stringify(r.arms.slice(0, 3)));
+  check('no card is cut off mid-sentence',
+    r.clipped.length === 0, `clipped: ${r.clipped.slice(0, 6)}`);
+}
+
+// --- no two things in a branch wear the same colour --------------------------
+/*
+ * `tone` is read by hud.js and nothing else, so it is an interface colour --
+ * and it was chosen per entry with nothing checking the set. Measured as CIE
+ * dE against a dark ground, ARC and RIME were 3.2 apart, BOLT and SPINE 9.1,
+ * and STASIS and DECOY 1.0: literally the same colour on two abilities. On a
+ * 1px rail at 26% opacity nobody could tell; on a card with a 40px icon they
+ * read as the same thing twice.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { ARSENAL } = await import('../src/arsenal.js');
+    const { ABILITIES } = await import('../src/abilities.js');
+    const lab = (hx) => {
+      const [r0, g0, b0] = [1, 3, 5].map((i) => parseInt(hx.slice(i, i + 2), 16) / 255)
+        .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+      let X = (r0 * 0.4124 + g0 * 0.3576 + b0 * 0.1805) / 0.95047;
+      let Y = r0 * 0.2126 + g0 * 0.7152 + b0 * 0.0722;
+      let Z = (r0 * 0.0193 + g0 * 0.1192 + b0 * 0.9505) / 1.08883;
+      const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+      X = f(X); Y = f(Y); Z = f(Z);
+      return [116 * Y - 16, 500 * (X - Y), 200 * (Y - Z)];
+    };
+    const dE = (a, b) => { const A = lab(a); const B = lab(b);
+      return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]); };
+    const sets = {
+      rounds: ARSENAL.filter((a) => a.kind === 'round').map((a) => [a.label, a.tone]),
+      mines: ARSENAL.filter((a) => a.kind === 'mine').map((a) => [a.label, a.tone]),
+      abilities: ABILITIES.map((a) => [a.id, a.color]),
+    };
+    const out = {};
+    for (const [k, list] of Object.entries(sets)) {
+      let worst = [1e9, '', ''];
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const d = dE(list[i][1], list[j][1]);
+          if (d < worst[0]) worst = [+d.toFixed(1), list[i][0], list[j][0]];
+        }
+      }
+      out[k] = worst;
+    }
+    return out;
+  });
+  check('no two rounds, mines or abilities wear the same colour',
+    Object.values(r).every((w) => w[0] >= 25), JSON.stringify(r));
+}
+
 // --- an arm does not survive the sheet --------------------------------------
 /*
  * A press arms a card and a second press spends, because nine hundred energy

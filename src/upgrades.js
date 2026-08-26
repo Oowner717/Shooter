@@ -265,7 +265,7 @@ export const UPGRADES = {
       apply: bump('titheMarks', 6), icon: MARK.lien },
     // --- build 54: the rounds that had nothing of their own ---
     { id: 'overstuffed', name: 'OVERSTUFFED', levels: 4,
-      line: 'BOLT rebounds off bodies instead of stopping, weaker each time. +1 rebound, +30% life.',
+      line: 'BOLT bounces off bodies instead of stopping. +1 rebound, +30% life.',
       apply: (u) => { u.boltRebound += 1; u.boltBounce += 1; u.boltLife *= 1.3; }, icon: MARK.overstuffed },
     { id: 'doubletap', name: 'DOUBLE TAP', levels: 2,
       line: 'A second BOLT follows every shot, a beat behind and 40% weaker.',
@@ -296,11 +296,18 @@ export const UPGRADES = {
   ],
   FIELD: [
     { id: 'paired', name: 'PAIRED CHARGE', line: '+1 mine laid per throw.', apply: bump('mineSalvo', 1) , icon: MARK.deepmag },
-    { id: 'quickarm', name: 'QUICK ARM', line: 'Mines go live in half the time.', levels: 1, apply: scale('mineArm', 0.5) , icon: MARK.quicklay },
+    /*
+ * `mineArm` scales CFG's per-mine `arm`: the settling time between a mine
+ * landing and it being able to trigger, 0.4s to 0.8s depending on the kind.
+ * It is not the wait between throws -- that is the mine timer, and nothing
+ * here touches it. "Mines go live in half the time" was read as the throw
+ * cooldown, which is the wrong half of the sentence to leave implicit.
+ */
+{ id: 'quickarm', name: 'QUICK ARM', line: 'A mine arms twice as fast after it lands.', levels: 1, apply: scale('mineArm', 0.5) , icon: MARK.quicklay },
     { id: 'deepcharge', name: 'DEEP CHARGE', line: '+35% mine blast radius.', apply: scale('mineBlast', 1.35) , icon: MARK.deepcharge },
     { id: 'widemouth', name: 'WIDE MOUTH', line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) , icon: MARK.widemouth },
     { id: 'eventhorizon', name: 'EVENT HORIZON', levels: 1,
-      line: 'A VOID takes what comes near it, not only what walks into it.',
+      line: 'A VOID reaches for what comes near, not just what touches it.',
       apply: scale('voidReach', 2.2), icon: MARK.eventhorizon },
     { id: 'salted', name: 'SALTED', line: 'A spent mine goes off instead of fizzling.', levels: 1, apply: set('mineFizzle', true) , icon: MARK.longfuse },
     { id: 'shrapnel', name: 'SHRAPNEL', line: '+45% mine blast damage.', apply: scale('mineDamage', 1.45) , icon: MARK.shrapnel },

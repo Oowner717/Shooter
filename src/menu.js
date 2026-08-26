@@ -38,6 +38,9 @@ const $ = (id) => document.getElementById(id);
  * be told apart at a glance does.
  */
 const bm = (body) => svgMark(body, 1.8);
+/** What an arm card says across its top. A round is not an upgrade to one. */
+const NEW_WORD = { ammo: 'ROUND', mines: 'MINE', abilities: 'ABILITY' };
+
 const BRANCH_MARK = {
   turret: bm('<path d="M12 21V9"/><path d="M9 12 12 8.6 15 12"/><path d="M4.6 18.6 12 21l7.4-2.4"/>'),
   ammo: bm('<circle cx="12" cy="7" r="2.8" fill="currentColor" stroke="none"/><path d="M12 21V12"/><path d="M8.6 15.5h6.8" opacity=".6"/>'),
@@ -288,14 +291,29 @@ export class Menu {
     const own = [];
     const walk = (nodes) => {
       for (const n of nodes) {
-        if (n.id) {
-          const card = this.makeCard(n);
+        if (n.kind === 'arm') {
+          /*
+           * A round, a mine or an ability: the thing itself, not a tweak to
+           * it. It takes the full width and says NEW ROUND across the top,
+           * and everything under it until the next one belongs to it.
+           *
+           * It used to be a card exactly like its own mods -- HE sat beside
+           * OVERPRESSURE, same colour, same size, with nothing on screen to
+           * say that one was a new round and the other was forty percent more
+           * blast radius. Only BOLT, PULSE and FAN got a heading, and that
+           * was by accident: they are the arms with no id, and the label was
+           * keyed off the id rather than off the kind.
+           */
+          const card = this.makeCard(n, root);
+          grid.appendChild(card);
+          if (n.id) { this.items.push({ n, card }); own.push(n); }
+        } else if (n.id) {
+          const card = this.makeCard(n, root);
           grid.appendChild(card);
           this.items.push({ n, card });
           own.push(n);
-        } else if (n.name && (n.kind === 'group' || n.kind === 'arm')) {
-          // A heading, not a purchase: ALL ROUNDS, and the three arms the
-          // turret starts with. It names the cards under it and nothing else.
+        } else if (n.name && n.kind === 'group') {
+          // A heading over a set that belongs to no one arm: ALL ROUNDS.
           const g = document.createElement('div');
           g.className = 'grpLab';
           g.style.setProperty('--tone', this.toneOf(n));
@@ -310,7 +328,7 @@ export class Menu {
     if (root.key === 'turret') {
       for (const n of TREE) {
         if (n.kind === 'root' || !n.id) continue;
-        const card = this.makeCard(n);
+        const card = this.makeCard(n, root);
         grid.appendChild(card);
         this.items.push({ n, card });
         own.push(n);
@@ -381,18 +399,33 @@ export class Menu {
    * the second spends. Three targets on one row is the bug menu.js already
    * fixed once and it is not being reintroduced at a larger size.
    */
-  makeCard(n) {
+  makeCard(n, root) {
     const c = document.createElement('button');
     c.type = 'button';
-    c.className = 'shopCard';
-    c.dataset.id = n.id;
+    c.className = `shopCard${n.kind === 'arm' ? ' arm' : ''}`;
+    if (n.id) c.dataset.id = n.id;
     c.style.setProperty('--tone', this.toneOf(n));
     const max = n.repeat ? 0 : (n.levels || 1);
-    c.innerHTML = `<span class="shopIcon">${n.icon || ''}</span>`
-      + '<span class="shopName"></span>'
-      + '<span class="shopStat"></span>'
+    const kind = n.kind === 'arm' ? (NEW_WORD[root && root.key] || 'THING') : '';
+    c.innerHTML = (kind ? `<span class="shopKind" data-noun="${kind}">${kind}</span>` : '')
+      + `<span class="shopIcon">${n.icon || ''}</span>`
+      + '<span class="shopBody"><span class="shopName"></span>'
+      + '<span class="shopSpec"></span>'
+      + '<span class="shopStat"></span></span>'
       + `<span class="shopMeter">${'<i></i>'.repeat(max)}</span>`
       + '<b class="shopPrice"></b>';
+    /*
+     * BOLT, PULSE and FAN are issued rather than bought, so they have no id
+     * and nothing to buy. They still get a card: a round you already own
+     * reading the same way as one you do not is the point of the heading.
+     */
+    if (!n.id) {
+      c.disabled = true;
+      c.classList.add('issued', 'own');
+      this.fillCard(c, n, n.name);
+      c.querySelector('.shopPrice').textContent = 'ISSUED';
+      return c;
+    }
     c.addEventListener('click', () => {
       if (c.classList.contains('locked')) { this.refuseRow(c); return; }
       if (this.armed !== c) { this.armRow(c); this.syncTree(); return; }
@@ -435,14 +468,20 @@ export class Menu {
     card.classList.toggle('poor', open && !full && !afford);
     card.classList.toggle('own', !!full);
     card.classList.toggle('armed', armed);
+    /*
+     * NEW ROUND while it is one. Once it is yours it is just a round, and the
+     * mods under it are still its mods -- the eyebrow has a second job as the
+     * heading for everything below it, so it does not go away.
+     */
+    const eyebrow = card.querySelector('.shopKind');
+    if (eyebrow) {
+      const word = full ? eyebrow.dataset.noun : `NEW ${eyebrow.dataset.noun}`;
+      if (eyebrow.textContent !== word) eyebrow.textContent = word;
+    }
 
     const at = Math.min(have, Math.max(max - 1, 0));
     const nm = card.querySelector('.shopName');
-    const name = n.tiers && n.tiers[at] ? n.tiers[at].name : n.name;
-    if (nm.textContent !== name) nm.textContent = name;
-    const stat = this.statOf(n);
-    const st = card.querySelector('.shopStat');
-    if (st.textContent !== stat) st.textContent = stat;
+    this.fillCard(card, n, n.tiers && n.tiers[at] ? n.tiers[at].name : n.name);
 
     const tag = n.currency === 'remainder' ? `${price}\u25c6` : String(price);
     nm.dataset.price = tag;
@@ -474,18 +513,59 @@ export class Menu {
   }
 
   /**
-   * What a card says about itself, in one line.
+   * What a card says about itself.
    *
-   * `line` is written as a stat followed by a description -- "+20% fire rate.
-   * A belt feed along the barrel." The first sentence is the number you are
-   * deciding with and the rest is flavour that was being set at 8px on all
-   * sixty-three rows. The card keeps the number.
+   * An UPGRADE's line is written as a stat and then flavour -- "+20% fire
+   * rate. A belt feed along the barrel." The first sentence is the number you
+   * are deciding with, and the rest was being set at 8px on sixty-three rows.
+   * The card keeps the number.
+   *
+   * An ARM's is written the other way round: the damage first, then what the
+   * thing actually does. Taking the first sentence there gave SNARE "NEVER
+   * GOES OFF" and LODE "CANNOT BE TRIGGERED" -- both true, both a description
+   * of what the mine does not do, and both dropping the half that is the
+   * reason to buy it (SNARE pins a crowd for 2.4s; LODE shoves everything
+   * near it away). ARC read "DAMAGE 11, THEN 25 A JUMP" and never mentioned
+   * that the hit jumps to four more bodies.
+   *
+   * So an arm splits: the numbers go on a spec line of their own and the card
+   * says what it does.
    */
-  statOf(n) {
+  textOf(n) {
+    const say = (t) => (t ? t[0].toUpperCase() + t.slice(1) : '');
+    if (n.kind === 'arm') {
+      const a = ARM_BY_KEY.get(n.key);
+      if (a) return { spec: String(a.dmg || '').toUpperCase(), stat: say(a.fx || '') };
+      const b = ABILITIES.find((x) => x.id === n.key);
+      // The ability hints read "NAME — what it does"; the name is already the
+      // heading of the card and what is left starts mid-sentence.
+      if (b) return { spec: '', stat: say((b.hint || '').replace(/^[A-Z ]+—\s*/, '')) };
+    }
     const line = (n.line || '').trim();
-    if (!line) return '';
+    if (!line) return { spec: '', stat: '' };
     const stop = line.indexOf('. ');
-    return (stop > 0 ? line.slice(0, stop) : line.replace(/\.$/, '')).toUpperCase();
+    const first = stop > 0 ? line.slice(0, stop) : line.replace(/\.$/, '');
+    /*
+     * Caps for a quantity, sentence case for a sentence. "+25% DAMAGE" is a
+     * readout and reads as one; "BOLT REBOUNDS OFF BODIES INSTEAD OF
+     * STOPPING, WEAKER EACH TIME" is forty-eight characters of shouting at
+     * 12px, and letterforms with no ascenders or descenders are the hardest
+     * thing to read at that size.
+     */
+    const quantity = /^[+\u00d7\u2013-]?\d|^[+\u00d7]/.test(first) && first.length <= 30;
+    return { spec: '', stat: quantity ? first.toUpperCase() : say(first) };
+  }
+
+  /** Name, numbers and effect. Shared, so an issued arm reads like a sold one. */
+  fillCard(card, n, name) {
+    const nm = card.querySelector('.shopName');
+    if (nm.textContent !== name) nm.textContent = name;
+    const { spec, stat } = this.textOf(n);
+    const sp = card.querySelector('.shopSpec');
+    if (sp.textContent !== spec) sp.textContent = spec;
+    sp.hidden = !spec;
+    const st = card.querySelector('.shopStat');
+    if (st.textContent !== stat) st.textContent = stat;
   }
 
   /** Everything the room shows. Driven from syncTree, so it cannot drift. */

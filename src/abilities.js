@@ -660,7 +660,7 @@ export const ABILITIES = [
   {
     id: 'prism',
     name: 'PRISM',
-    color: '#ff9ff3',
+    color: '#ff6beb',
     cooldown: 16,
     icon: ICON.prism,
     hint: 'PRISM — a shell that refracts. Wide blast, then beams every way.',
@@ -688,7 +688,7 @@ export const ABILITIES = [
   {
     id: 'stasis',
     name: 'STASIS',
-    color: '#9fe8ff',
+    color: '#8fabff',
     cooldown: 21,
     icon: ICON.stasis,
     hint: 'STASIS — objects freeze. Your shots do not.',
@@ -707,7 +707,7 @@ export const ABILITIES = [
   {
     id: 'decoy',
     name: 'DECOY',
-    color: '#9be7ff',
+    color: '#ff616e',
     cooldown: 24,
     icon: ICON.decoy,
     hint: 'DECOY — a turret that is not yours. They go for it instead.',
@@ -728,7 +728,7 @@ export const ABILITIES = [
   {
     id: 'chorus',
     name: 'CHORUS',
-    color: '#c9a7ff',
+    color: '#92f24e',
     cooldown: 15,
     icon: ICON.chorus,
     hint: 'CHORUS — ties the field together. Whatever kills one hurts the rest.',

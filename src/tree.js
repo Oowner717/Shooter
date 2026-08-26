@@ -205,7 +205,9 @@ function leaf(id) {
 function chargeOf(key) {
   return node({
     kind: 'charge', id: `charge_${key}`, key, name: `${armLabel(key)} ×2`,
-    line: 'Hold a second use of it, ready before the wait.',
+    // Named rather than "it": eight of these sit in one branch and the line
+    // was word-for-word identical on all eight.
+    line: `A second ${armLabel(key)}, ready before the wait is over.`,
     icon: armIcon(key), tone: armTone(key), cost: COST.charge,
   });
 }

@@ -1,5 +1,16 @@
 // What the turret shoots with, in one table.
 //
+// A note on `tone`. It is read by hud.js and nothing else -- the strip, the
+// loadout sheet and the upgrade cards -- so it is an interface colour, not a
+// gameplay one. Rounds and mines are drawn from CFG.
+//
+// It used to be chosen per entry with nothing checking the set. Measured as
+// CIE dE against a dark ground, ARC and RIME were 3.2 apart, BOLT and SPINE
+// 9.1, STASIS and DECOY 1.0 -- five of the nine rounds sat inside a
+// twenty-four degree band of pale blue. On a 1px rail at 26% opacity nobody
+// could tell, and nobody had to; on a 170px card with a 40px icon they read
+// as the same round twice. Every pair inside a branch now clears dE 25.
+//
 // Two surfaces read this: the strip across the bottom of the play screen,
 // which is where it is chosen, and the menu's ARSENAL tab, which is where it
 // is explained. An entry here buys both surfaces and no markup, and ROUND_KEYS
@@ -75,36 +86,39 @@ export const ICON = {
  */
 export const ARSENAL = [
   {
-    key: 'blast', kind: 'mine', group: 'mines', label: 'BLAST', icon: ICON.blast, tone: '#ffb347',
+    key: 'blast', kind: 'mine', group: 'mines', label: 'BLAST', icon: ICON.blast, tone: '#ffb247',
     dmg: '95', fx: 'Triggers on contact. One hard bang.',
   },
   {
     key: 'snare', kind: 'mine', group: 'mines', label: 'SNARE', icon: ICON.snare, tone: '#c77dff',
-    dmg: 'none', fx: 'Never goes off. Pins a crowd in place for 2.4s.',
+    dmg: 'no damage',
+    fx: 'Pins a whole crowd where it stands, for 2.4s.',
   },
   {
-    key: 'wire', kind: 'mine', group: 'mines', label: 'WIRE', icon: ICON.wire, tone: '#7cffb2',
+    key: 'wire', kind: 'mine', group: 'mines', label: 'WIRE', icon: ICON.wire, tone: '#73ffad',
     dmg: '72/s', fx: 'A line across the field. It cuts what crosses.',
   },
   {
-    key: 'knell', kind: 'mine', group: 'mines', label: 'KNELL', icon: ICON.knell, tone: '#ff5d8f',
-    dmg: '74, twice', fx: 'Waits for nothing. Tolls where it lies, wider each time.',
+    key: 'knell', kind: 'mine', group: 'mines', label: 'KNELL', icon: ICON.knell, tone: '#ff61f2',
+    dmg: '74, twice', fx: 'Tolls where it lies, untouched, each one reaching further.',
   },
   {
-    key: 'thorn', kind: 'mine', group: 'mines', label: 'THORN', icon: ICON.thorn, tone: '#9be89b',
+    key: 'thorn', kind: 'mine', group: 'mines', label: 'THORN', icon: ICON.thorn, tone: '#c3eb4b',
     dmg: '34/s', fx: 'Opens into burning ground and stays open.',
   },
   {
-    key: 'lode', kind: 'mine', group: 'mines', label: 'LODE', icon: ICON.lode, tone: '#59e0ff',
-    dmg: 'none', fx: 'Cannot be triggered. Pushes everything near it away.',
+    key: 'lode', kind: 'mine', group: 'mines', label: 'LODE', icon: ICON.lode, tone: '#59e1ff',
+    dmg: 'no damage',
+    fx: 'Shoves everything near it away, and keeps on shoving.',
   },
   {
-    key: 'spall', kind: 'mine', group: 'mines', label: 'SPALL', icon: ICON.spall, tone: '#ffd166',
-    dmg: '26 x 14', fx: 'Triggers on contact. Throws it all straight up the field.',
+    key: 'spall', kind: 'mine', group: 'mines', label: 'SPALL', icon: ICON.spall, tone: '#ff4d4d',
+    dmg: '26 x 14', fx: 'Throws a wall of shot straight up the field on contact.',
   },
   {
-    key: 'void', kind: 'mine', group: 'mines', label: 'VOID', icon: ICON.voidmine, tone: '#b388ff',
-    dmg: 'total', fx: 'The first thing to touch it is gone. Once only.',
+    key: 'void', kind: 'mine', group: 'mines', label: 'VOID', icon: ICON.voidmine, tone: '#7383ff',
+    dmg: 'one kill',
+    fx: 'The first thing to touch it is gone, whatever its health.',
   },
 
   {
@@ -117,39 +131,39 @@ export const ARSENAL = [
   },
 
   {
-    key: 'standard', kind: 'round', group: 'ammo', label: 'BOLT', icon: ICON.std, tone: '#bff4ff',
+    key: 'standard', kind: 'round', group: 'ammo', label: 'BOLT', icon: ICON.std, tone: '#7aa2ff',
     dmg: '26', fx: 'The fastest cadence there is. Nothing done to it.',
   },
   {
-    key: 'explosive', kind: 'round', group: 'ammo', label: 'HE', icon: ICON.he, tone: '#ff9f5c',
+    key: 'explosive', kind: 'round', group: 'ammo', label: 'HE', icon: ICON.he, tone: '#ff5638',
     dmg: '15 + 44 blast', fx: 'Detonates on impact. Half the fire rate.',
   },
   {
-    key: 'shotgun', kind: 'round', group: 'ammo', label: 'SHOT', icon: ICON.shot, tone: '#ffd9a0',
+    key: 'shotgun', kind: 'round', group: 'ammo', label: 'SHOT', icon: ICON.shot, tone: '#ffc533',
     dmg: '12 x 5', fx: 'A tight cone that dies short. Close range only.',
   },
   {
-    key: 'arc', kind: 'round', group: 'ammo', label: 'ARC', icon: ICON.arc, tone: '#9be7ff',
+    key: 'arc', kind: 'round', group: 'ammo', label: 'ARC', icon: ICON.arc, tone: '#ad73ff',
     dmg: '11, then 25 a jump', fx: 'The hit jumps to 4 more nearby, weaker each time.',
   },
   {
-    key: 'spine', kind: 'round', group: 'ammo', label: 'SPINE', icon: ICON.spine, tone: '#d8f1ff',
+    key: 'spine', kind: 'round', group: 'ammo', label: 'SPINE', icon: ICON.spine, tone: '#ff6bce',
     dmg: '20, fading', fx: 'Punches through 3 more bodies behind the first.',
   },
   {
-    key: 'slug', kind: 'round', group: 'ammo', label: 'SLUG', icon: ICON.slug, tone: '#b8c6d8',
+    key: 'slug', kind: 'round', group: 'ammo', label: 'SLUG', icon: ICON.slug, tone: '#c1cee0',
     dmg: '44', fx: 'Slow and heavy. Shoves things a very long way.',
   },
   {
-    key: 'rime', kind: 'round', group: 'ammo', label: 'RIME', icon: ICON.rime, tone: '#8fe3ff',
+    key: 'rime', kind: 'round', group: 'ammo', label: 'RIME', icon: ICON.rime, tone: '#4de1ff',
     dmg: '16', fx: 'Chills for 3.2s. What it touches barely moves.',
   },
   {
-    key: 'spore', kind: 'round', group: 'ammo', label: 'SPORE', icon: ICON.spore, tone: '#9be89b',
+    key: 'spore', kind: 'round', group: 'ammo', label: 'SPORE', icon: ICON.spore, tone: '#8eeb4b',
     dmg: '10 + 46/s', fx: 'Leaves burning ground where it bursts, for 4.5s.',
   },
   {
-    key: 'tithe', kind: 'round', group: 'ammo', label: 'TITHE', icon: ICON.tithe, tone: '#7cffb2',
+    key: 'tithe', kind: 'round', group: 'ammo', label: 'TITHE', icon: ICON.tithe, tone: '#40e693',
     dmg: '8, and rising', fx: 'Marks a body: each mark hurts it more and pays more.',
   },
 ];
