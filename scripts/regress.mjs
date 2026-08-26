@@ -397,9 +397,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.debugGiveEnergy(9000);
     m.drawHero(1000);
     const bare = read();
-    // The shelf sells upgrades. A way in to a boss is the cheapest thing in
-    // the tree and it repeats, so cheapest-first would park two APERTUREs on
-    // it and never clear them.
+    // Upgrades take the shelf's slots; a way in stands in only where a slot
+    // would otherwise sit empty. With upgrades affordable, no APERTURE shows.
     const noWays = bare.cards.every((n) => !/APERTURE/.test(n));
     g.debugBuyAll();
     g.debugGiveEnergy(90000);
@@ -416,8 +415,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     num(r.bare.count) < num(r.full.count) && num(r.full.count) === 136
     && /TURRET 17\/17/.test(r.full.count) && !/TURRET 17\/17/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
-  check('the shelf re-deals, and it never sells a way in',
-    r.noWays && r.bare.cards.length === 2 && r.full.cards.length === 0
+  // ...and with the tree bought out, the ways in are the only things left to
+  // buy, so they are exactly what the shelf should hold.
+  check('the shelf re-deals: upgrades first, ways in only into empty slots',
+    r.noWays && r.bare.cards.length === 2
+    && r.full.cards.length === 2 && r.full.cards.every((n) => /APERTURE/.test(n))
     && r.bare.tones.every((t) => t && t !== '#9fb3c8'),
     JSON.stringify({ bare: r.bare.cards, tones: r.bare.tones, full: r.full.cards }));
   check('the machine is drawn in the menu that upgrades it', r.bare.drawn, JSON.stringify(r.bare.drawn));
@@ -630,9 +632,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     m.setOpen(false);
     return { without, withIt };
   });
-  const noWays = [...r.without, ...r.withIt].every((id) => !/^aperture/.test(id));
-  check('the shelf offers RECAST once there is a REMAINDER, and never a way in',
-    noWays && !r.without.includes('recast') && r.withIt[0] === 'recast',
+  /*
+   * By this point in the suite the tree is bought out, so the ways in are the
+   * only things left and the shelf rightly holds them. What must never happen
+   * is a way in standing AHEAD of an affordable upgrade -- RECAST here -- so
+   * the assertion is about order, not presence.
+   */
+  const upgradesFirst = (list) => {
+    const i = list.findIndex((id) => /^aperture/.test(id));
+    return i === -1 || list.slice(i).every((id) => /^aperture/.test(id));
+  };
+  check('the shelf offers RECAST once there is a REMAINDER, never a way in over an upgrade',
+    upgradesFirst(r.without) && upgradesFirst(r.withIt)
+    && !r.without.includes('recast') && r.withIt[0] === 'recast',
     JSON.stringify(r));
 }
 
@@ -669,6 +681,26 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const strip = parseInt(document.getElementById('treeNext').textContent, 10);
     const label = parseInt(document.getElementById('shopMore').textContent, 10) || 0;
     const shown = document.querySelectorAll('.shelf .shopCard').length;
+    /*
+     * Broke: drain the purse and the strip's "X more for the next" and the
+     * empty shelf's target must name the same shortfall. They computed
+     * "next" from two different lists once -- the strip counted the ways in
+     * and the shelf did not, so at zero energy one said 100 and the other
+     * said 500.
+     */
+    const held = g.world.energy;
+    g.world.energy = 0;
+    m.syncTree();
+    const stripSays = document.getElementById('treeNext').textContent;
+    const noneCard = document.querySelector('.shelf .shopNone');
+    const cardShort = noneCard ? (noneCard.querySelector('b') || {}).textContent : null;
+    const broke = {
+      strip: stripSays,
+      card: cardShort,
+      agree: !!cardShort && parseInt(stripSays, 10) === parseInt(cardShort, 10),
+    };
+    g.world.energy = held;
+    m.syncTree();
     const order = [...document.querySelectorAll('.branchRow .branchName')].map((x) => x.textContent);
     const spill = order.filter((_, i) => {
       const el = document.querySelectorAll('.branchRow .branchName')[i];
@@ -684,11 +716,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       return mt && !mt.children.length && getComputedStyle(mt).visibility !== 'hidden';
     }).length;
     m.setOpen(false);
-    return { strip, label, shown, order, spill, dead };
+    return { strip, label, shown, order, spill, dead, broke };
   });
   check('the strip, the shelf label and the cards shown are one count',
     r.strip === r.label + r.shown && r.shown > 0,
     `${r.strip} within reach = ${r.label} below + ${r.shown} shown`);
+  check('broke, the strip and the shelf point at the same next thing',
+    r.broke.agree, JSON.stringify(r.broke));
   check('the machine leads and the doors come last, with no name overflowing',
     r.order[0] === 'TURRET' && r.order[r.order.length - 1] === 'ANOMALY'
     && r.spill.length === 0 && r.dead === 0,

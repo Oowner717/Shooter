@@ -83,7 +83,6 @@ export class Menu {
       btn: $('menuBtn'),
       scrim: $('menuScrim'),
       close: $('menuClose'),
-      found: $('codexFound'),
     };
     this.open = false;
     this.tab = 'tree';
@@ -150,9 +149,6 @@ export class Menu {
     // The panels share one scroller. Leaving the tree scrolled halfway and
     // switching to a short tab landed on its bottom edge, or on nothing.
     this.el.panels.scrollTop = 0;
-    // The found count is about the glossary; on the other tabs it is a number
-    // with nothing to belong to.
-    this.el.found.classList.toggle('show', tab === 'codex');
     if (tab === 'codex') this.syncCodex();
     if (tab === 'tree') this.syncTree();
     if (this.open && tab === 'tree') this.runHero(); else this.stopHero();
@@ -623,30 +619,35 @@ export class Menu {
      * it opened on one.
      */
     const buyable = [];
+    const ways = [];
     let cheapest = null;
     for (const { n } of rows) {
       if (!n.id || n.dormant || !g.available(n)) continue;
-      /*
-       * A way in is not an upgrade. APERTUREs are the cheapest things in the
-       * tree, so cheapest-first put two of them on the shelf and left them
-       * there -- which is the fault this panel was rebuilt to fix, reproduced
-       * at a larger size.
-       *
-       * The test is where they live, not that they repeat. Repeatability was
-       * the first rule and it was wrong: RECAST repeats too, and it swept the
-       * one thing the plan explicitly wanted on this shelf off it -- so with
-       * three REMAINDER in hand and RECAST costing one, the shelf offered two
-       * five-hundred-energy upgrades instead.
-       */
-      if (inBranch(n, 'anomaly')) continue;
       const have = g.owned(n.id);
       if (!n.repeat && have >= (n.levels || 1)) continue;
       const price = priceOf(n, have);
       const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
-      if (purse >= price) buyable.push({ n, price, have });
+      /*
+       * Upgrades first; a way in fills only a slot no upgrade wants.
+       *
+       * The APERTUREs are the cheapest things in the tree and they repeat, so
+       * plain cheapest-first parked two of them on the shelf permanently --
+       * which is the fault this panel was rebuilt to fix, reproduced at a
+       * larger size. Excluding them outright was the second wrong rule: with
+       * only a way in within reach, the strip said "100 more for the next"
+       * while the empty shelf pointed at a five-hundred-energy upgrade,
+       * because the two were computing "next" from different lists. One list
+       * now. Upgrades take the slots; an affordable way in stands in only
+       * where a slot would otherwise sit empty; and the empty shelf's target
+       * is the cheapest thing under the strip's own definition.
+       */
+      const way = inBranch(n, 'anomaly');
+      if (purse >= price) (way ? ways : buyable).push({ n, price, have });
       else if (!n.currency && (!cheapest || price < cheapest.price)) cheapest = { n, price };
     }
     buyable.sort((a, b) => a.price - b.price);
+    ways.sort((a, b) => a.price - b.price);
+    const offer = buyable.concat(ways);
 
     const shelf = this.el.shelf;
     if (!shelf) return;
@@ -660,11 +661,11 @@ export class Menu {
        * them being wrong. Now the label is always the strip minus what the
        * shelf is showing.
        */
-      const more = affordable - Math.min(buyable.length, 2);
+      const more = affordable - Math.min(offer.length, 2);
       this.el.shopMore.textContent = more > 0 ? `${more} MORE BELOW` : '';
     }
 
-    if (!buyable.length) {
+    if (!offer.length) {
       // Honest about being empty rather than blank. A shelf with nothing on
       // it and no reason given reads as broken; a target reads as early.
       const short = cheapest ? Math.ceil(cheapest.price - w.energy) : 0;
@@ -681,7 +682,7 @@ export class Menu {
     if (shelf.dataset.empty) { shelf.innerHTML = ''; delete shelf.dataset.empty; }
 
     for (let i = 0; i < 2; i++) {
-      const pick = buyable[i];
+      const pick = offer[i];
       const at = shelf.children[i];
       if (!pick) {
         if (at) at.remove();
@@ -1105,7 +1106,6 @@ export class Menu {
   syncCodex() {
     if (this.lastFound === codex.found) return;
     this.lastFound = codex.found;
-    this.el.found.textContent = `${codex.found}/${codex.total}`;
     if (this.el.codexCount) {
       this.el.codexCount.innerHTML = `<b>${codex.found}</b> OF ${codex.total} RECORDED`;
       this.el.codexBar.style.width = `${(codex.found / codex.total) * 100}%`;
@@ -1146,7 +1146,9 @@ export class Menu {
 
   buildSystem() {
     const p = this.panel('system');
-    p.appendChild(heading('SYSTEM', ''));
+    // No heading. The tab above this panel already says SYSTEM, and the other
+    // two tabs open on their subject -- the machine, the count -- not on
+    // their own name repeated.
     const grid = document.createElement('div');
     grid.className = 'menuGrid';
     const g = this.game;
