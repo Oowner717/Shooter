@@ -713,8 +713,14 @@ export class Game {
     this.hud.flashAbility(i);
     // An ability says what it is the first time it is used, which is minutes
     // after it was bought and only if the player actually reaches for it.
+    // ...and once on this device: `res.first` is per-run, so without this an
+    // ability re-explains itself at the start of every run for ever.
     const line = FIRST_USE[res.slot.def.id];
-    if (res.first && line && this.hintsAllowed) this.hud.showHint(line, true);
+    const said = `use:${res.slot.def.id}`;
+    if (res.first && line && this.hintsAllowed && !lineSeen(said)) {
+      markLine(said);
+      this.hud.showHint(line, true);
+    }
   }
 
   // The opening lines live in tutorial.js with the rest of the script. The
@@ -858,6 +864,19 @@ export class Game {
     audio.chime(on ? 760 : 430);
     const hint = FIRST_USE[key];
     if (!changed || !on || !hint || this.autoHinted[key] || !this.hintsAllowed) return;
+    /*
+     * ...and once on this DEVICE, not once in this run.
+     *
+     * `autoHinted` is per-run: it is reset by restart() and carried in the
+     * save, so a caption already read comes back the next time a run starts.
+     * A player who has been told what BOLT is does not need telling again
+     * because they died. The per-line record is the same one the opening and
+     * the corruption lines use, and its whole promise is that a line is said
+     * once and never again.
+     */
+    const said = `use:${key}`;
+    if (lineSeen(said)) { this.autoHinted[key] = true; return; }
+    markLine(said);
     // Marked only once it has actually been shown. It used to be marked first,
     // so picking a round while captions are suppressed
     // and where all five are now one tap away — spent that caption on nothing

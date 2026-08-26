@@ -408,8 +408,8 @@ export class Shooter {
    *            the machine is physically bigger by the end.
    *   SHROUD   the mantlet. A gun shield that closes round the breech and
    *            turns with the barrel. The biggest change to the silhouette.
-   *   GIMBAL   the bearing. A toothed race under the deck and legs that go
-   *            from a wire tripod to braced struts on footplates.
+   *   GIMBAL   the bearing. A toothed race under the deck, a row of teeth
+   *            per level.
    *   ARRAY    the fin. A flat panel blade off the back, not a dish.
    *   FEED     the drum. A belt box on the breech's flank with rounds in it.
    *   SIGHT    the block. A boxed sight along the barrel with a lit lens.
@@ -445,35 +445,16 @@ export class Shooter {
     ctx.save();
     ctx.translate(this.x, this.y);
 
-    // ---- GIMBAL: the bearing race and the legs it stands on ----------------
     /*
-     * Three legs, always. A brace per level was six thick struts with
-     * footplates fanned across the bottom of the machine by the last one --
-     * a grey skirt that read as the largest thing on screen, and the gun
-     * disappeared behind its own stand. The bearing above them is where
-     * GIMBAL is legible; the legs only have to hold it up.
+     * ---- GIMBAL: the bearing race ----
+     *
+     * There were legs: three struts out from under the deck, each with a
+     * crossbar at the foot, drawn in translucent grey. Three upside-down Ts
+     * hanging under the machine. They were meant to say "mounted" and they
+     * said nothing -- the turret does not stand anywhere, it is the middle of
+     * the field, and a tripod under it only ever answered a question nobody
+     * had asked. Gone. The race is where this part is legible anyway.
      */
-    const legs = 3;
-    const legR = R * (1.5 + g.slew * 0.06);
-    ctx.strokeStyle = rgba(g.slew ? '#5b7f9e' : '#3d5871', 0.62);
-    ctx.lineWidth = HAIRLINE * (2.2 + g.slew * 0.5);
-    ctx.lineCap = 'round';
-    for (let i = 0; i < legs; i++) {
-      const a = Math.PI * 0.22 + (i / (legs - 1)) * Math.PI * 0.56;
-      const c = Math.cos(a);
-      const sn = Math.sin(a);
-      ctx.beginPath();
-      ctx.moveTo(c * R * 0.7, sn * R * 0.7);
-      ctx.lineTo(c * legR, sn * legR);
-      ctx.stroke();
-      // a footplate, and it gets wider with the bearing
-      const fw = 4.5 + g.slew * 0.9;
-      ctx.beginPath();
-      ctx.moveTo(c * legR - sn * fw, sn * legR + c * fw);
-      ctx.lineTo(c * legR + sn * fw, sn * legR - c * fw);
-      ctx.stroke();
-    }
-    ctx.lineCap = 'butt';
     if (g.slew) {
       // the race: a machined ring with teeth cut in it, one row per level
       for (let i = 0; i < g.slew; i++) {
@@ -576,8 +557,8 @@ export class Shooter {
 
     // ---- ARRAY: a panel fin off the back, not a dish ----------------------
     for (let i = 0; i < g.aimrange; i++) {
-      // Off the shoulders, not off the back: the back of the mount is where
-      // the legs fan out from, and a fin down there is a fin behind a tripod.
+      // Off the shoulders. Down is the back of the mount, and a fin drawn
+      // there points straight at the control the thumb is on.
       const a = -Math.PI / 2 + (i ? 1 : -1) * 1.78;
       const c = Math.cos(a);
       const sn = Math.sin(a);
