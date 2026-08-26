@@ -2798,6 +2798,112 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `overkill emptied the pool: ${r.emptied}; it ended: ${r.ended}`);
 }
 
+// --- INVERSION, and the mirror that survives to the end ----------------------
+/*
+ * Stage IV used to shatter one crescent, which threw the fight's premise
+ * away: one crescent is not a mirror, so the last stage of the mirror fight
+ * had no mirror in it. Now the twin is retired from *reality* rather than
+ * from the field. Four things have to hold or it is a corpse left lying:
+ *
+ *   - the ladder cannot skip INVERSION on the way to IV (the bug this game
+ *     has shipped four times, once in this very boss);
+ *   - the twin is still there, still drawn, and still NOT in world.enemies,
+ *     which is the only thing "cannot be touched" has ever meant here;
+ *   - it never comes back round to being real, however long the fight runs;
+ *   - it loses every pane the survivor loses, because a reflection that
+ *     keeps panes the original has lost is not a reflection.
+ *
+ * And the panes come back, which is the whole of where this build's length
+ * came from.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.apertures[6] = 1;
+    g.openBoss(6);
+    const bo = w.boss;
+    bo.arriving = 0;
+    bo.settle(w);
+    g.update(1 / 60);
+    const C = CFG.parity;
+
+    const seen = [];
+    let ran = 0;
+    let gone = 0;   // panes down when INVERSION started
+    let stood = 0;  // ...and standing at that moment
+    let back = 0;   // ...and standing when it finished
+    let flips = 0;  // times `real` changed during it
+    let lastReal = bo.real;
+    // Walk it down the honest way so the ladder is under test: bleed the
+    // shared bar and break panes, and let the boss decide its own stages.
+    for (let k = 0; k < 60 * 300 && w.boss; k++) {
+      if (seen[seen.length - 1] !== bo.stage) seen.push(bo.stage);
+      if (bo.inverting === undefined) {
+        const live = bo.parts().filter((q) => !q.dead && w.enemies.includes(q));
+        if (k % 8 === 0 && live.length) live[0].dead = true;
+        bo.pool = Math.max(bo.poolMax * 0.12, bo.pool - 30);
+      } else {
+        ran++;
+        if (!gone) {
+          gone = bo.parts().filter((q) => q.dead).length;
+          stood = bo.parts().filter((q) => !q.dead).length;
+        }
+        if (bo.real !== lastReal) { flips++; lastReal = bo.real; }
+      }
+      g.update(1 / 60);
+      if (bo.stage === 4) { back = bo.parts().filter((q) => !q.dead).length; break; }
+    }
+    if (w.boss && seen[seen.length - 1] !== bo.stage) seen.push(bo.stage);
+
+    /*
+     * Now IV proper. Run it on for a while and watch the twin: it must stay
+     * on the field as a picture, never become real, and stay in step.
+     */
+    let everReal = false;
+    let everReachable = false;
+    let drifted = 0;
+    const twin = bo.halves.find((h) => h.retired);
+    const alive = bo.halves.find((h) => !h.retired);
+    for (let k = 0; k < 60 * 30 && w.boss && bo.stage === 4; k++) {
+      const live = alive.panes.filter((q) => !q.dead);
+      if (k % 40 === 0 && live.length) live[0].dead = true;
+      g.update(1 / 60);
+      if (!twin) break;
+      if (bo.realHalves().includes(twin)) everReal = true;
+      if (w.enemies.includes(twin)) everReachable = true;
+      if (twin.panes.some((q, i) => q.dead !== alive.panes[i].dead)) drifted++;
+      if (twin.spawnIn > 0.001) drifted++;
+    }
+    const out = {
+      seen, ran: +(ran / 60).toFixed(1), gone, stood, back, flips,
+      invertFor: C.invertFor, inverted: !!bo.inverted, lone: !!bo.lone,
+      twinThere: !!twin && !twin.dead, twinDrawn: !!twin && !!twin.phased,
+      everReal, everReachable, drifted,
+      standing: twin ? twin.panes.filter((q) => !q.dead).length : -1,
+    };
+    g.restart();
+    return out;
+  });
+  check('it cannot reach its last stage without inverting first',
+    r.seen.join() === '1,2,3,4' && r.inverted && r.ran >= r.invertFor
+    && r.flips === 1 && r.gone > 3 && r.back > r.stood,
+    `stages ${r.seen.join(' -> ')}, INVERSION ran ${r.ran}s (over ${r.invertFor}s), `
+    + `reality flipped ${r.flips}x, ${r.gone} panes down and ${r.stood} standing `
+    + `-> ${r.back} standing after`);
+  check('the last stage keeps its mirror, and the mirror is provably empty',
+    r.lone && r.twinThere && r.twinDrawn && !r.everReal && !r.everReachable
+    && r.drifted === 0 && r.standing >= 0,
+    `twin on the field: ${r.twinThere}, drawn as a picture: ${r.twinDrawn}, `
+    + `ever real: ${r.everReal}, ever shootable: ${r.everReachable}, `
+    + `frames out of step with the survivor: ${r.drifted}`);
+}
+
 // --- TERMINUS: the one that is a distance -----------------------------------
 /*
  * This boss is a geometry argument, so these are geometry assertions.

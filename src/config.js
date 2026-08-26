@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '141';
+export const BUILD = '142';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '141';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '1cb25da';
+export const REV = '1d68f7f';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1554,14 +1554,31 @@ export const CFG = {
      * way past. Measured with the merge at 0.6 and II at half the panes: the
      * pool crossed 60% well before the panes crossed 50%.
      */
-    mergeAt: 0.52,
+    mergeAt: 0.58,
     // ...so II is read off the panes going, rather than half of them gone.
     crackAt: 0.7,
     mergeFor: 3.6,
     mergeHeal: 0.06, // of the bar, if the window closes with both halves whole
-    // IV: one crescent shatters for good and the survivor is permanently
-    // real. The fight's premise breaking is the last stage.
-    loneAt: 0.22,
+    /*
+     * INVERSION, and then IV.
+     *
+     * The old IV shattered one crescent, which threw the premise away: one
+     * crescent is not a mirror, and the last stage of the mirror fight had no
+     * mirror in it. Now the twin is retired from reality rather than from the
+     * field -- it stays, wireframe, mimicking the survivor exactly, and every
+     * pane you take is taken from it too. What changes at IV is not that the
+     * mirror ends but that it is provably empty.
+     *
+     * INVERSION is the beat that turns it. The halves trade *places* while
+     * the seam sweeps a full turn, reality flips at the midpoint -- the
+     * picture becomes the thing, standing where the thing was -- and the
+     * panes come back. It is the only thing in this fight that adds length:
+     * fourteen panes at 55% is about thirty seconds of shooting, and a stage
+     * boundary moved is only a re-partition of health already there.
+     */
+    loneAt: 0.3,
+    invertFor: 4.2, // the sweep, before the panes come back
+    invertHp: 0.55, // ...and what they come back at
     flailSpin: 2.4,
     close: 240,
     descendFor: 11,

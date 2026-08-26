@@ -232,9 +232,9 @@ first. FRACTAL leads because its whole idea is invisible and the fix is one
 drawing function; DYNAMO is late because it is the one with a known length
 risk; TERMINUS is last because it has had two builds already.
 
-**Shipped: III (138), II (139), IV (140), I (141). Left: VI, V, VII.** Four
-of four have come in short of the 290s target — 249, 246, 241, 221 — which is
-not four misses, it is the target being wrong. See Phase C.
+**Shipped: III (138), II (139), IV (140), I (141), VI (142). Left: V, VII.**
+Five of five have come in short of the 290s target — 249, 246, 241, 221, 244 —
+which is not five misses, it is the target being wrong. See Phase C.
 
 ### What "done" means, per boss
 
@@ -589,7 +589,48 @@ never identified. Stage IV is a propeller hovering at a fixed distance.
 
 ---
 
-### VI — PARITY · violet · the mirror
+### VI — PARITY · violet · the mirror · **shipped, build 142**
+
+**As built: 244s (from 214), stages 16/31/18/23.** Every stage inside the
+band — it had two outside it, II at 37% and IV at 14%. No new corruption:
+stage IV measured 24% of frames against 21% before, mean shock 0.045 against
+0.039, so the glitch this fight makes is the one it already made.
+
+- **INVERSION (III→IV).** The halves trade *places* while the seam sweeps a
+  full turn, and at the midpoint reality flips: what you were shooting is now
+  the reflection, standing exactly where the reflection stood, and the thing
+  you could not touch is in front of you. Then the panes come back at 55%.
+  That re-form is the entire length gain — 30 of the 30 seconds — and it lands
+  in stage IV, which is precisely where the fight was thinnest.
+- **IV keeps its mirror.** The old IV shattered one crescent, which threw the
+  premise away: one crescent is not a mirror. Now the twin is retired from
+  *reality*, not from the field. It holds its place opposite the survivor,
+  mimics it, and loses every pane the survivor loses — it simply never comes
+  round to being the real one again. What changes at IV is not that the mirror
+  ends but that it is **provably empty**.
+- **Draw: the field, reflected.** The marquee idea of this whole plan, and it
+  is one transform. The turret and everything it has in the air, mirrored
+  through the seam, drawn as a ghost on the far side of the boss: your own gun
+  firing your own shots at the boss from behind it. It also gives the seam a
+  tell it never had — the reflection's distance from you is exactly twice the
+  seam's, so the two turrets walk toward each other as the line comes round,
+  and the frame they touch is the frame it corrupts you on.
+- **Not shipped: FOUR.** +40s of two crossing mirror-lines, and under the
+  corrected length model a new phase adds 0s. Deferred whole; it is still the
+  best unbuilt idea in this document after ORDINAL's ALIGNMENT.
+
+One bug came out of it, and it is general rather than PARITY's. A parked body
+— off `world.enemies`, which is the only thing "cannot be touched" has ever
+meant here — is not stepped by anything, and `spawnIn` is stepped by that
+step. So the seven panes INVERSION gave back to the *reflection* stayed
+permanently mid-materialise, drawn at a third of their size, for the rest of
+the fight. Any boss that parks a body and then revives it has this. PARITY now
+ticks it itself; the regress case asserts the twin never drifts out of step
+with the survivor by so much as a frame.
+
+---
+
+### VI — PARITY · violet · the mirror — original plan
 
 *Now:* two crescents orbiting a point 180° apart sharing one bar, only one
 real at a time, panes break in pairs, MERGE, one crescent shatters in IV.
@@ -651,6 +692,30 @@ core with beams on it until IV starts.
 
 *Length: 419 → ~445s. Already at target.*
 
+## The one defect Phase B keeps finding and not fixing
+
+Every boss's thrown minion is past the shoulder, and it is the same defect
+seven times rather than seven defects.
+
+| boss | minion | legal |
+|---|---|---|
+| I ORDINAL | DIGIT | 69% |
+| IV AMPLITUDE | DROPLET | 39% |
+| VI PARITY | ECHO | 33% |
+
+A minion thrown *at* the turret flies past it, and everything past the turret
+is behind the ±78° shoulder. It is not a per-boss balance problem and it does
+not have a per-boss fix: it is what "spawn and fly at the player" means when
+the gun cannot turn round. It shows up in the probe as `in-cone` collapsing —
+PARITY's stage III sits at 0%, meaning the nearest body on the field is
+essentially never one the assist may pick, while `blind` stays at 0% because
+there is always something further away that it may.
+
+Worth one build of its own, after Phase B: give thrown minions a standoff so
+they hold station in front of the turret instead of swarming round it. Not
+worth a quarter of each remaining boss build, which is what fixing it in place
+would cost.
+
 ## Phase C — the length audit (one build)
 
 Re-measure all seven with `fight.mjs --runs 3`, and bring I–VI to one length
@@ -658,12 +723,12 @@ and VII to about 1.8× it by moving stage thresholds only — no new content, no
 HP changes beyond what a threshold implies. The stage split target is nothing
 below 15% or above 35%.
 
-**The target is 250s, not 290.** Four builds of Phase B have landed at 249,
-246, 241 and 221 without any of them being tuned toward a number: each was
-"add the setpiece, add the re-form, measure". Four independent arrivals at
-the same place is the honest length of a fight built this way, and 290 was a
-figure picked before the length model was corrected. So Phase C's job is
-**I to 250 and the other five held there**, VII at 450 ± 20.
+**The target is 250s, not 290.** Five builds of Phase B have landed at 249,
+246, 241, 221 and 244 without any of them being tuned toward a number: each
+was "add the setpiece, add the re-form, measure". Five independent arrivals
+inside a 28-second span is the honest length of a fight built this way, and
+290 was a figure picked before the length model was corrected. So Phase C's
+job is **I up to 250 and the rest held there**, VII at 450 ± 20.
 
 ## Rules this plan holds itself to
 

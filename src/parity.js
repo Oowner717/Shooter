@@ -151,11 +151,18 @@ export class Parity extends Boss {
     return clamp(this.pool / this.poolMax, 0, 1);
   }
 
-  /** Whichever half is currently real; both, during MERGE. */
+  /**
+   * Whichever half is currently real; both, during MERGE.
+   *
+   * `lone` used to mean "both", because there only ever was one left. Now IV
+   * keeps its twin -- retired from reality, not from the field -- so the rule
+   * is the same in the last stage as in the first: one of the two is a
+   * picture, and the picture is not in world.enemies.
+   */
   realHalves() {
-    if (this.lone) return this.halves.filter((h) => !h.dead);
-    if (this.merge > 0) return this.halves.filter((h) => !h.dead);
-    return [this.halves[this.real]].filter((h) => h && !h.dead);
+    if (this.merge > 0) return this.halves.filter((h) => !h.dead && !h.retired);
+    const h = this.halves[this.real];
+    return h && !h.dead && !h.retired ? [h] : [];
   }
 
   gauge() {
@@ -178,8 +185,13 @@ export class Parity extends Boss {
 
   place(dt) {
     const C = P();
-    this.orbitA += C.orbitSpin * dt * (this.stage >= 3 ? 1.5 : 1);
-    this.lineA += C.lineSpin[this.stage - 1] * dt;
+    // INVERSION drives both angles itself -- it is the one beat where where
+    // the halves are and which way the seam lies are the subject rather than
+    // the background, so nothing else may advance them under it.
+    if (this.inverting === undefined) {
+      this.orbitA += C.orbitSpin * dt * (this.stage >= 3 ? 1.5 : 1);
+      this.lineA += C.lineSpin[this.stage - 1] * dt;
+    }
     const ecc = this.stage >= 2 ? C.eccentric : 0;
     // MERGE draws the two together; IV has only one left to place.
     const pull = this.merge > 0 ? 1 - clamp(this.merge / C.mergeFor, 0, 1) : 0;
@@ -189,7 +201,9 @@ export class Parity extends Boss {
       const h = this.halves[i];
       if (h.dead) continue;
       const a = this.orbitA + i * Math.PI;
-      const rr = C.orbit * (1 + ecc * Math.sin(a * 2)) * (this.lone ? 0 : near);
+      // ...and it stays a pair to the end: the survivor no longer collapses
+      // onto the hub in IV, because there is still something opposite it.
+      const rr = C.orbit * (1 + ecc * Math.sin(a * 2)) * near;
       h.x = this.hub.x + Math.cos(a) * rr;
       h.y = this.hub.y + Math.sin(a) * rr;
       // Each crescent's open side faces the middle, so the pair reads as one
@@ -282,15 +296,26 @@ export class Parity extends Boss {
    * reflection is not there to pick. Its panes go with it: a pane hanging off
    * a half that is not real would be a solid piece of a picture.
    */
-  syncReach(world) {
+  syncReach(world, dt = 0) {
+    const live = this.realHalves();
     for (let i = 0; i < this.halves.length; i++) {
       const h = this.halves[i];
-      const real = !h.dead && this.realHalves().includes(h);
+      const real = !h.dead && live.includes(h);
       for (const body of [h, ...h.panes]) {
         if (body.dead) continue;
         const at = world.enemies.indexOf(body);
         if (real && at < 0) world.enemies.push(body);
         else if (!real && at >= 0) world.enemies.splice(at, 1);
+        /*
+         * A parked body is off world.enemies, so nothing steps it -- and its
+         * own materialise timer is stepped by that update. Left alone it
+         * never runs out, and the body stays at a third of its size for the
+         * rest of the fight. Found on INVERSION: the panes it puts back come
+         * back on both halves, and the reflection's seven were still
+         * arriving, permanently, small. Ticked here at the same rate the
+         * enemy would have ticked it.
+         */
+        if (!real && body.spawnIn > 0) body.spawnIn = Math.max(0, body.spawnIn - dt * 2.2);
       }
       h.phased = !real;
     }
@@ -446,7 +471,7 @@ export class Parity extends Boss {
     this.flare = 1;
     this.swapT = C.swapEvery[n - 1] || 0;
     this.echoT = C.echoEvery[n - 1];
-    if (n >= 4) this.shatterOne(world);
+    if (n >= 4) this.retireTwin(world);
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
     world.bossLine = n >= 4 ? 'IT HAS GIVEN UP ON SYMMETRY.'
       : n >= 3 ? 'THE HALVES NO LONGER AGREE.'
@@ -461,30 +486,96 @@ export class Parity extends Boss {
   }
 
   /**
-   * IV: one crescent shatters for good, and what is left is permanently real.
+   * INVERSION. The halves trade places, and the picture becomes the thing.
    *
-   * The fight's premise breaking is the last stage. Everything up to here has
-   * been about which of two things is the true one; from here there is only
-   * one thing, and it is coming.
+   * The setpiece the back half never had, and the beat that turns III into
+   * IV. The seam sweeps a full turn while the two crescents walk half a
+   * circle -- so each ends where the other began -- and at the midpoint,
+   * reality flips. What you were shooting is now the reflection, standing
+   * exactly where the reflection was standing, and the thing you could not
+   * touch is the thing in front of you.
+   *
+   * Then the panes come back. That is where this fight's length is: a stage
+   * boundary only re-partitions health the boss already had, and fourteen
+   * panes at 55% is the only number in this build that adds any.
    */
-  shatterOne(world) {
-    const gone = this.halves[1 - this.real] || this.halves[1];
-    if (gone && !gone.dead) {
-      gone.dead = true;
-      // Retired, not merely dead: syncPool brings a dead half back while the
-      // shared pool has anything left in it, and this one is not coming back.
-      gone.retired = true;
-      for (const q of gone.panes) {
-        if (q.dead) continue;
-        q.dead = true;
-        q.paired = true; // its twin does not go with it: the pairing is over
-        explode(q.x, q.y, q.r, q.type.color, q.type.glow, 1.4);
+  startInversion(world) {
+    const C = P();
+    this.inverting = 0;
+    this.invA0 = this.orbitA;
+    this.invL0 = this.lineA;
+    this.flipped = false;
+    this.invBack = false;
+    world.bossLine = 'INVERSION';
+    this.lineFor = 3.6;
+    this.hold(world, 0.7);
+    flash(0.45, TYPE_BY_ID.parity.color);
+    ripple(this.hub.x, this.hub.y, 2.8, 1000);
+    shake(22);
+    audio.boom();
+    background.surge(2);
+  }
+
+  stepInversion(world, raw) {
+    const C = P();
+    this.inverting += raw;
+    const k = clamp(this.inverting / C.invertFor, 0, 1);
+    const e = k * k * (3 - 2 * k);
+    // Half a circle for the pair, a whole one for the seam: the crescents
+    // change ends while the mirror-line turns all the way round them.
+    this.orbitA = this.invA0 + Math.PI * e;
+    this.lineA = this.invL0 + TAU * e;
+
+    if (!this.flipped && k >= 0.5) {
+      this.flipped = true;
+      this.real = 1 - this.real;
+      flash(0.5, '#ffffff');
+      for (const h of this.halves) {
+        if (!h.dead) ring(h.x, h.y, 12, 260, 0.45, TYPE_BY_ID.parity.glow, 4);
       }
-      explode(gone.x, gone.y, gone.r, gone.type.color, gone.type.glow, 2.4);
-      ripple(gone.x, gone.y, 3, 1100);
+      shake(18);
+      audio.boom();
+    }
+    if (k < 1) return false;
+    if (!this.invBack) {
+      this.invBack = true;
+      this.reform(world, C.invertHp, { sweep: 1.1 });
+      /*
+       * A pane that came back is a pane that can pair again. `paired` is what
+       * stops pairPanes taking a twin twice for the same break, and leaving
+       * it set on a revived pane retires the rule that makes this a mirror.
+       */
+      for (const h of this.halves) for (const q of h.panes) if (!q.dead) q.paired = false;
+      return false;
+    }
+    if (this.inverting < C.invertFor + 1.1) return false;
+    this.inverting = undefined;
+    world.bossLine = null;
+    return true;
+  }
+
+  /**
+   * IV: the twin is retired from reality, and stays.
+   *
+   * This used to shatter one crescent, and that threw the premise away -- one
+   * crescent is not a mirror, so the last stage of the mirror fight had no
+   * mirror in it. Now the twin keeps its place opposite the survivor, keeps
+   * mimicking it, and loses every pane the survivor loses; it simply never
+   * comes back round to being the real one. The premise survives to the end.
+   * What changes is that the reflection is now provably empty.
+   */
+  retireTwin(world) {
+    const twin = this.halves[1 - this.real] || this.halves[1];
+    if (twin) {
+      // Retired, not dead: syncPool brings a *dead* half back while the pool
+      // has anything in it, and the drawing code needs a body to outline.
+      twin.retired = true;
+      twin.mirror = true;
+      twin.dead = false;
+      ring(twin.x, twin.y, 14, 420, 0.6, TYPE_BY_ID.parity.glow, 4);
+      ripple(twin.x, twin.y, 2.4, 800);
     }
     this.lone = true;
-    this.real = this.halves.findIndex((h) => !h.dead);
     this.y0 = this.y;
     this.fall = 0;
     flash(0.6, '#ffffff');
@@ -511,7 +602,7 @@ export class Parity extends Boss {
 
     this.place(dt);
     this.pairPanes(world);
-    this.syncReach(world);
+    this.syncReach(world, dt);
     this.syncPool();
 
     /*
@@ -534,6 +625,23 @@ export class Parity extends Boss {
       return;
     }
 
+    /*
+     * INVERSION, held above everything else for the same reason MERGE is: it
+     * drives the orbit and the seam itself, and a swap or an ECHO landing
+     * inside it would be a second thing happening during the one beat this
+     * fight asks you to watch.
+     */
+    if (this.inverting !== undefined) {
+      const done = this.stepInversion(world, world.dtRaw || dt);
+      this.place(0); // ...on this frame's angles, not last frame's
+      if (done) {
+        this.inverted = true;
+        this.enterStage(world, 4);
+      }
+      background.setFocus(this.x, this.y);
+      return;
+    }
+
     this.stepSwap(world, dt);
     this.stepSeam(world);
 
@@ -551,7 +659,18 @@ export class Parity extends Boss {
     if (this.shellFrac() <= C.crackAt && want < 2) want = 2;
     if (frac <= C.mergeAt && !this.merged) { this.startMerge(world); return; }
     if (this.merged && want < 3) want = 3;
-    if (frac <= C.loneAt && want < 4) want = 4;
+    /*
+     * IV is not entered, it is arrived at through INVERSION -- and only from
+     * III. A bar that falls past both gates on one frame still climbs the
+     * ladder a rung at a time, which is the bug this game has shipped four
+     * times: FRACTAL never divided, GNOMON never planted its needle, DYNAMO
+     * and PARITY both skipped a stage whole.
+     */
+    if (frac <= C.loneAt && this.stage === 3 && !this.inverted) {
+      this.startInversion(world);
+      return;
+    }
+    if (frac <= C.loneAt && this.inverted && want < 4) want = 4;
     // One stage at a time: the triggers are independent -- panes for II, the
     // bar for III and IV -- so two can come true on the same frame.
     if (want > this.stage) this.enterStage(world, this.stage + 1);
@@ -611,6 +730,100 @@ export class Parity extends Boss {
     }
   }
 
+  /**
+   * The field, reflected across the seam.
+   *
+   * The most striking thing available in any of these seven fights, and it is
+   * one transform: the turret and everything it has in the air, mirrored
+   * through the line, drawn as a ghost on the far side. Your own gun, firing
+   * your own shots, at the boss, from the other side of it.
+   *
+   * It also makes the seam mean something before it costs you anything. The
+   * reflection's distance from you is exactly twice the seam's, so the two
+   * turrets close on each other as the line comes round -- and the frame they
+   * touch is the frame `stepSeam` corrupts you on. The one pressure this
+   * fight makes had no tell but the line itself; now the tell is your own
+   * reflection walking toward you.
+   */
+  drawMirror(ctx, world, open) {
+    const C = P();
+    const s = world.shooter;
+    const hx = this.hub.x;
+    const hy = this.hub.y;
+    // Reflection through a line at `lineA` through the hub.
+    const c2 = Math.cos(2 * this.lineA);
+    const s2 = Math.sin(2 * this.lineA);
+    const mx = (x, y) => hx + (x - hx) * c2 + (y - hy) * s2;
+    const my = (x, y) => hy + (x - hx) * s2 - (y - hy) * c2;
+
+    // How close the seam is to the turret, which is how close the reflection
+    // is to standing in the same place as the thing it reflects.
+    const off = Math.abs((s.x - hx) * Math.sin(this.lineA) - (s.y - hy) * Math.cos(this.lineA));
+    const near = clamp(1 - off / (C.seamWidth * 5), 0, 1);
+    const a = (0.2 + near * 0.55) * open;
+    if (a <= 0.01) return;
+
+    const gx = mx(s.x, s.y);
+    const gy = my(s.x, s.y);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Its shots, first, so the ghost turret sits on top of its own muzzle.
+    ctx.lineCap = 'round';
+    for (const p of world.projectiles) {
+      const px = mx(p.x, p.y);
+      const py = my(p.x, p.y);
+      // The velocity reflects too, or the tracers trail the wrong way.
+      const vx = p.vx * c2 + p.vy * s2;
+      const vy = p.vx * s2 - p.vy * c2;
+      ctx.strokeStyle = rgba('#e6d6ff', a * 0.6);
+      ctx.lineWidth = p.r * 1.1;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px - vx * p.trail, py - vy * p.trail);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+
+    /*
+     * The turret itself, as an outline rather than a copy. Reflecting the
+     * real drawing means a mount, six sockets and whatever is bolted into
+     * them, at a fifth of the alpha -- measured as a smear. Three circles and
+     * a barrel is the thing it is a reflection *of*, which is what reads.
+     */
+    const ga = this.lineA * 2 - s.aim;
+    ctx.strokeStyle = rgba('#e6d6ff', a);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(gx, gy);
+    ctx.lineTo(gx + Math.cos(ga) * 34, gy + Math.sin(ga) * 34);
+    ctx.stroke();
+    for (const r of [20, 12, 5]) {
+      ctx.beginPath();
+      ctx.arc(gx, gy, r, 0, TAU);
+      ctx.stroke();
+    }
+    /*
+     * ...and the base, which is the part that says "turret" at a glance --
+     * carried round with the reflection rather than left level. A direction
+     * reflects to `2 * lineA - itself`, so the ghost's own up is
+     * `2 * lineA + PI/2`, and its deck lies across that.
+     */
+    const up = 2 * this.lineA + Math.PI / 2;
+    const ux = Math.cos(up);
+    const uy = Math.sin(up);
+    const bx = gx - ux * 16;
+    const by = gy - uy * 16;
+    ctx.beginPath();
+    ctx.moveTo(bx + uy * 26, by - ux * 26);
+    ctx.lineTo(bx - uy * 26, by + ux * 26);
+    ctx.stroke();
+
+    if (near > 0.35) drawGlow(ctx, TYPE_BY_ID.parity.glow, gx, gy, 70, near * 0.5 * open);
+    ctx.restore();
+  }
+
   // --------------------------------------------------------------- draw
 
   draw(ctx, world) {
@@ -622,13 +835,19 @@ export class Parity extends Boss {
     ctx.save();
     this.drawHole(ctx, C, T, arriving);
 
+    if (!arriving) this.drawMirror(ctx, world, open);
+
     /*
      * The mirror-line: a thin bright axis through the middle of the pair.
      * Nothing enforces it in the simulation -- the crescents are simply
      * placed opposite each other -- but it is the thing that makes the two of
      * them read as reflections rather than as a pair of objects.
+     *
+     * Drawn in IV as well now. It used to stop the moment one crescent went,
+     * which was correct when the mirror ended there and is wrong now that it
+     * does not.
      */
-    if (!this.lone && !arriving) {
+    if (!arriving) {
       const len = 520;
       const g2 = ctx.createLinearGradient(
         this.hub.x - Math.cos(this.lineA) * len, this.hub.y - Math.sin(this.lineA) * len,
