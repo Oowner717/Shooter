@@ -1072,8 +1072,43 @@ export class Ordinal extends Boss {
      * frame collapses onto the core, is thrown back out, and reassembles.
      * Everything else is held while that runs.
      */
+    /*
+     * TALLY. The second setpiece, and the beat the back half never had.
+     *
+     * CONVERGENCE is at the midpoint and everything after it was one long
+     * descent. This is the counterpart: the count stops, and it reads back
+     * what you have taken. Every panel you broke is redrawn as a ghost in
+     * order, one per tick, accelerating -- and then the frames come back.
+     *
+     * It is also where this fight's length comes from. ORDINAL is the
+     * shortest of the seven at 174 seconds; a stage re-partitions health it
+     * already had, and putting forty panels back is the only thing that adds
+     * any.
+     */
+    /*
+     * ...but not over a corpse. A core that goes down mid-count takes the
+     * count with it: the branch below returns, so a TALLY left running would
+     * sit between ORDINAL and its own death for as long as the receipt took.
+     * Measured as the REMAINDER never landing inside the twelve seconds the
+     * suite gives it.
+     */
+    if (this.tally !== undefined && this.core.dead) {
+      this.tally = undefined;
+      this.tallied = true;
+      world.bossLine = null;
+    }
+    if (this.stage === 3 && !this.tallied && !this.core.dead && frac <= C.tallyAt) {
+      if (this.tally === undefined) this.startTally(world);
+      if (this.stepTally(world, world.dtRaw || dt)) {
+        this.tallied = true;
+        this.enterStage(world, 4);
+      }
+      return;
+    }
     // IV is the last quarter, and it is where ORDINAL stops waiting.
-    if (this.stage === 3 && frac <= C.stageDescend) this.enterStage(world, 4);
+    if (this.stage === 3 && this.tallied && frac <= C.stageDescend) {
+      this.enterStage(world, 4);
+    }
     if (this.stage === 4) this.descend(world, world.dtRaw || dt);
     if (want >= 3 && this.stage < 3 && !this.converged) {
       if (this.conv === undefined) {
@@ -1140,6 +1175,57 @@ export class Ordinal extends Boss {
    * Whatever survives is reeled back in and the frames rebuild out of it,
    * which is why it is worth shooting them on the way through.
    */
+  /**
+   * TALLY: it counts back what you took, then takes it back.
+   *
+   * The ghosts walk in slot order at an accelerating tick -- a till printing
+   * a receipt -- and when the count reaches the end the frames re-form. The
+   * one heal in the back half of this fight, and it is a scene.
+   */
+  startTally(world) {
+    this.tally = 0;
+    this.tallyAt = 0;
+    this.tallyGone = this.panels().filter((p) => p.dead).length;
+    world.bossLine = 'TALLY';
+    this.lineFor = 3.2;
+    this.hold(world, 0.6);
+    flash(0.4, TYPE_BY_ID.ordinal.color);
+    ripple(this.x, this.y, 2.8, 1000);
+    shake(20);
+    audio.boom();
+    background.surge(2);
+  }
+
+  stepTally(world, raw) {
+    const C = O();
+    this.tally += raw;
+    const k = clamp(this.tally / C.tallyFor, 0, 1);
+    // Accelerating: the count starts as a beat and ends as a rattle.
+    const want = Math.floor(this.tallyGone * (k * k));
+    while (this.tallyAt < want) {
+      this.tallyAt++;
+      audio.chime(300 + this.tallyAt * 12);
+      if (this.tallyAt % 3 === 0) shake(3);
+    }
+    if (k < 1) return false;
+    if (!this.tallyBack) {
+      this.tallyBack = true;
+      this.reform(world, C.tallyHp, { sweep: 1.2 });
+      return false;
+    }
+    if (this.tally < C.tallyFor + 0.9) return false;
+    this.tally = undefined;
+    world.bossLine = null;
+    return true;
+  }
+
+  /** Every panel of both frames, which is what TALLY counts. */
+  panels() {
+    const out = [];
+    for (const ring of this.rings) for (const p of ring.panels) out.push(p);
+    return out;
+  }
+
   converge(world, raw) {
     const C = O();
     this.conv += raw;
@@ -1600,6 +1686,60 @@ export class Ordinal extends Boss {
       }
       drawGlow(ctx, '#ffffff', this.x, this.y, C.coreR * 3, 0.5 * k);
       ctx.globalCompositeOperation = 'source-over';
+    }
+
+    /*
+     * The numbers.
+     *
+     * This fight is called ORDINAL, its premise is a thing that counts, its
+     * gauge counts and its captions are about a count coming up short -- and
+     * for twelve builds the field held forty identical magenta slabs with no
+     * number anywhere on it. Every panel carries its own now, and the ones
+     * you have broken are still counted: the number stays where the panel
+     * was, dimmed. The gap in the frame is the receipt.
+     */
+    if (!arriving && this.dying <= 0) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const reading = this.tally !== undefined;
+
+      /*
+       * The number, at the middle of the thing that is counting.
+       *
+       * A first pass put every panel's index on the panel, and forty small
+       * numerals over forty slabs that already carry tick marks is clutter
+       * rather than information -- at phone scale none of it was legible.
+       * One large figure at the core is: it is the count, it moves every time
+       * you take a panel, and during TALLY it climbs back as the ghosts light.
+       */
+      const standing = this.panels().filter((q) => !q.dead && !q.hidden).length;
+      const shown = reading ? standing + this.tallyAt : standing;
+      // The core is a dial, and a numeral laid straight over its ticks reads
+      // as neither. A disc of the arena's own dark under it separates them.
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, 21, 0, TAU);
+      ctx.fillStyle = rgba('#12040f', 0.82 * open);
+      ctx.fill();
+      ctx.font = '700 26px ui-monospace, Menlo, monospace';
+      ctx.fillStyle = rgba(reading ? '#ffffff' : '#ffd6f4', (reading ? 0.95 : 0.7) * open);
+      ctx.fillText(String(shown), this.x, this.y);
+
+      /*
+       * ...and the gaps carry their own. A live panel stays a clean slab; a
+       * hole in the frame shows the number that used to be there, which is
+       * what makes the frame a receipt rather than a wall with bites out of
+       * it. Lit one at a time while TALLY reads them back.
+       */
+      ctx.font = '600 11px ui-monospace, Menlo, monospace';
+      for (const ring of this.rings) {
+        for (const p of ring.panels) {
+          if (p.hidden || !p.tag || !p.dead) continue;
+          const lit = reading && p.tag <= this.tallyAt;
+          ctx.fillStyle = rgba(lit ? '#ffffff' : T.color, (lit ? 0.95 : 0.3) * open);
+          ctx.fillText(String(p.tag), p.x, p.y);
+        }
+      }
     }
 
     ctx.globalCompositeOperation = 'source-over';

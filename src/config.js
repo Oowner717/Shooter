@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '140';
+export const BUILD = '141';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '140';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e898e66';
+export const REV = '1cb25da';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -870,7 +870,7 @@ export const CFG = {
      * while they fly, so for two seconds the field is full of ORDINAL going
      * past you, and then the frames rebuild out of whatever survived.
      */
-    convergeRebuild: 0.8, // how much of each frame it puts back first
+    convergeRebuild: 1, // how much of each frame it puts back first
     convergePull: 1.9, // seconds of the frame drawing in
     convergeHold: 0.55, // ...held at the knot
     convergeThrow: 620, // ...and how hard each segment leaves
@@ -889,6 +889,16 @@ export const CFG = {
      * but it costs you the intake for as long as it is on you, which is the
      * one currency this fight has ever been able to take.
      */
+    /*
+     * TALLY, the second setpiece: the count stops and reads back what you
+     * took, one ghost per tick, accelerating -- and then the frames come
+     * back. ORDINAL is the shortest of the seven and a stage re-partitions
+     * health it already had; putting forty panels back is the only thing
+     * that adds any.
+     */
+    tallyAt: 0.34, // core fraction that opens it, once
+    tallyFor: 3.6, // how long the reading takes
+    tallyHp: 1, // ...and what the frames come back at
     stageDescend: 0.28, // core fraction it comes down at
     close: 235, // ...how near it gets
     descendFor: 13, // ...and how long it takes to get there
@@ -916,7 +926,7 @@ export const CFG = {
      * The inner frame is mended first, because that is the one standing
      * between you and the core.
      */
-    repairCap: 0.45,
+    repairCap: 0.75,
     /*
      * ...seconds between the core throwing DIGITs itself, 0 for never.
      *
@@ -1036,7 +1046,7 @@ export const CFG = {
      */
     repair: [0, 8, 0, 0],
     repairHp: 0.5,
-    repairCap: 0.45,
+    repairCap: 0.75,
     /*
      * ...and how often the core throws SECONDs itself. Auto aim takes what is
      * nearest and a SECOND is always nearer than a core, so a fast burst

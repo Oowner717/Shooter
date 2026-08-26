@@ -1014,6 +1014,87 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `(a chunk lives ${r.chunkLife}s)`);
 }
 
+// --- TALLY, the one heal in the back half ------------------------------------
+/*
+ * ORDINAL was the shortest of the seven at 174 seconds, and the reason is
+ * arithmetic: a new stage re-partitions health the boss already had, so it
+ * adds nothing. Only putting destroyed bodies back adds time. TALLY does
+ * both jobs at once -- it counts the panels you took, in slot order, at an
+ * accelerating tick, and then it re-forms them.
+ *
+ * Three things have to hold or the setpiece is decoration:
+ *   - it fires once, on the way from III to IV, and the ladder does not skip
+ *     the stage it gates (the bug class that has bitten FRACTAL, GNOMON,
+ *     DYNAMO and PARITY, every time by jumping `this.stage = n` past the
+ *     enter hook);
+ *   - the count it reads back matches the number of panels actually gone,
+ *     because the figure at the core IS that count and a wrong one is a lie
+ *     told in 26px type;
+ *   - the frames come back, which is the part that costs the player time.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.aperture = 1;
+    g.openBoss();
+    const bo = w.boss;
+    bo.arriving = 0;
+    g.update(1 / 60);
+
+    // Walk it to the gate the honest way, so the stage ladder is under test
+    // too: bleed the boss down and let its own step decide when TALLY runs.
+    const seen = [];
+    let gone = 0;          // panels down at the moment TALLY started
+    let peak = 0;          // highest count it read out
+    let ran = 0;
+    let back = 0;          // panels standing once it finished
+    const panels = () => bo.panels().filter((p) => !p.hidden);
+    for (let k = 0; k < 60 * 240 && w.boss; k++) {
+      if (seen[seen.length - 1] !== bo.stage) seen.push(bo.stage);
+      const live = panels().filter((p) => !p.dead);
+      // Stop breaking things once the count starts: a panel lost mid-receipt
+      // moves the number the receipt is being read against.
+      if (k % 6 === 0 && live.length && bo.tally === undefined) live[0].dead = true;
+      /*
+       * ...and the core is bled to a floor rather than to nothing. Forty
+       * panels going up beside it splash, and a core parked on 1hp died to
+       * that about one run in four -- which abandons the count, correctly,
+       * and made this case flaky for the wrong reason. A fifth of full is
+       * under both gates (TALLY 0.34, DESCENT 0.28) with room to spare.
+       */
+      bo.core.hp = Math.max(bo.core.maxHp * 0.2, bo.core.hp - 8);
+      g.update(1 / 60);
+      if (bo.tally !== undefined) {
+        ran++;
+        if (!gone) gone = panels().filter((p) => p.dead).length;
+        peak = Math.max(peak, bo.tallyAt || 0);
+      }
+      if (bo.stage === 4) { back = panels().filter((p) => !p.dead).length; break; }
+    }
+    // The ladder is read after the loop as well as inside it: the stage that
+    // ends the walk changes on the update that breaks out of it.
+    if (w.boss && seen[seen.length - 1] !== bo.stage) seen.push(bo.stage);
+    const out = { seen, gone, peak, ran: +(ran / 60).toFixed(1), back,
+      tallyFor: CFG.ordinal.tallyFor, tallied: !!bo.tallied, coreDead: !!bo.core.dead };
+    if (w.boss) { w.boss.clear(w); w.boss = null; }
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.timeScale = 1; w.shock = 0; w.bossLine = null;
+    return out;
+  });
+  check('ORDINAL counts back what you took, and then takes it back',
+    r.seen.join() === '1,2,3,4' && r.tallied && r.gone > 4 && r.peak === r.gone
+    && r.ran >= r.tallyFor && r.back > 4,
+    `stages ${r.seen.join(' -> ')}, TALLY ran ${r.ran}s (over ${r.tallyFor}s), `
+    + `read ${r.peak} of ${r.gone} gone, ${r.back} panels standing after`
+    + `${r.coreDead ? ' (the core died on the way)' : ''}`);
+}
+
 // --- DESCENT, and the captions that read at reading speed --------------------
 /*
  * The fourth stage is the only one that changes where ORDINAL is: it leaves

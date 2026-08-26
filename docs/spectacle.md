@@ -232,6 +232,10 @@ first. FRACTAL leads because its whole idea is invisible and the fix is one
 drawing function; DYNAMO is late because it is the one with a known length
 risk; TERMINUS is last because it has had two builds already.
 
+**Shipped: III (138), II (139), IV (140), I (141). Left: VI, V, VII.** Four
+of four have come in short of the 290s target — 249, 246, 241, 221 — which is
+not four misses, it is the target being wrong. See Phase C.
+
 ### What "done" means, per boss
 
 Three gates, all of them measurable, checked before the build is called
@@ -256,7 +260,46 @@ something at least once.
 
 ---
 
-### I — ORDINAL · magenta · the counter
+### I — ORDINAL · magenta · the counter · **shipped, build 141**
+
+**As built: 221s (from 174), stages 14/27/21/27.** No type past the shoulder,
+and **stage IV's blind frames went from 20% to 5%** — the gate boundary to
+clear of it. Canonical hash re-baselined to `917805618`.
+
+What shipped, and what it cost:
+
+- **TALLY (III→IV).** The setpiece the back half did not have. The count
+  stops, the ghosts of every panel you broke light in slot order at an
+  accelerating tick — a till printing a receipt — and then the frames re-form
+  at full health. It is the only thing in this build that adds time, and it
+  adds most of the 47 seconds: a stage re-partitions health the boss already
+  had, so `repairCap` 0.45 → 0.75 and `convergeRebuild` 0.8 → 1 did the rest.
+  Gated on `frac <= tallyAt` (0.34), fires once, and is abandoned outright if
+  the core dies mid-count — that guard is not cosmetic, it is what stops the
+  receipt sitting between ORDINAL and its own death.
+- **The number, but one of them.** The plan said "number the panels", and a
+  first pass did exactly that: forty small numerals over forty slabs that
+  already carry tick marks. At phone scale it was clutter, not information,
+  and none of it was legible in a screenshot. What shipped is **one large
+  count at the core** — the thing that is doing the counting — over a disc of
+  the arena's own dark so it reads against the dial's ticks, plus **the index
+  of each panel you have taken, drawn in the gap it left**. The frame becomes
+  a receipt rather than a wall with bites out of it, and the figure moves
+  every time you take a panel and climbs back during TALLY.
+- **Not shipped: ALIGNMENT.** +40s of counter-rotating frames, still the best
+  idea in this section, and no longer needed for length. Deferred whole.
+- **Not shipped: death in counting order.** Cosmetic, and the arrest is
+  already the strongest death of the seven.
+
+Three regress cases came out of it: the ladder cannot skip TALLY, the count
+it reads back equals the number of panels actually gone, and the frames come
+back. The second failed twice before it held — once because the harness kept
+breaking panels *during* the count, and once because forty panels going up
+beside a core parked on 1hp splashed it to death about one run in four.
+
+---
+
+### I — ORDINAL · magenta · the counter — original plan
 
 *Now:* two concentric square frames of panels around a core, a garrison of
 DIGITs parked behind the panels, a burst in III, the core descends in IV.
@@ -610,10 +653,17 @@ core with beams on it until IV starts.
 
 ## Phase C — the length audit (one build)
 
-Re-measure all seven with `fight.mjs --runs 3`, and bring I–VI to 290 ± 15s
-and VII to 430 ± 20s by moving stage thresholds only — no new content, no HP
-changes beyond what a threshold implies. The stage split target is nothing
+Re-measure all seven with `fight.mjs --runs 3`, and bring I–VI to one length
+and VII to about 1.8× it by moving stage thresholds only — no new content, no
+HP changes beyond what a threshold implies. The stage split target is nothing
 below 15% or above 35%.
+
+**The target is 250s, not 290.** Four builds of Phase B have landed at 249,
+246, 241 and 221 without any of them being tuned toward a number: each was
+"add the setpiece, add the re-form, measure". Four independent arrivals at
+the same place is the honest length of a fight built this way, and 290 was a
+figure picked before the length model was corrected. So Phase C's job is
+**I to 250 and the other five held there**, VII at 450 ± 20.
 
 ## Rules this plan holds itself to
 

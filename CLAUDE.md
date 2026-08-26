@@ -58,10 +58,12 @@ not say why; the damage table only ever describes the symptom. It found that
 every boss goes half-blind in stage IV and that TERMINUS changed target
 forty-five times a second, which is what `CFG.shooter.aimStick` exists to stop.
 
-**ORDINAL's canonical hash is `-1210682079`** (seed 20260824, 9000 frames),
-re-baselined at build 137 when the assist gained that memory. It changed
-because targeting changed, which is the hash doing its job; before that it was
-`1109808491`, unmoved from build 127 to 136.
+**ORDINAL's canonical hash is `917805618`** (seed 20260824, 9000 frames),
+re-baselined at build 141 when TALLY went in. Before that it was
+`-1210682079` from build 137, when the assist gained its target memory, and
+`1109808491` from build 127 to 136. Each move was a change to ORDINAL or to
+targeting, which is the hash doing its job; a move without one is the bug it
+is there to catch.
 
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three
