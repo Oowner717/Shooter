@@ -926,17 +926,67 @@ Two things worth keeping from the attempt:
   medians of the same ORDINAL build read 224, 262 and 226. Every number tuned
   against a three-run median on I or II has been tuned against noise.
 
+### The variance probe · `scripts/variance.mjs`
+
+Built, and it closed the question in two runs of itself.
+
+The turret's cadence is a timer rather than a decision — **3.31 shots a second
+in every run of every fight ever measured here** — so the whole thing collapses
+to `length = shots / 3.31 + held`. A run that took longer needed more shots.
+And every shot ends in one of five places: on the boss, on a minion, into
+armour, past zero as overkill, or nowhere at all. Partition each run's shots
+across those five by the round size measured from that run, and the terms sum
+to its total by construction; difference two runs and the gap comes out in
+seconds, term by term, with nothing left over but rounding.
+
+(The first version of the decomposition converted damage to seconds using the
+mean round and the mean cadence across runs, and left 20 seconds of a 53-second
+gap unattributed. That is what a decomposition looks like when it is a model of
+the fight rather than the fight's own arithmetic.)
+
+**ORDINAL and GNOMON turn out to have nothing in common.**
+
+| | I ORDINAL | II GNOMON |
+|---|---|---|
+| spread | 227–297s (26%) | 203–267s (27%) |
+| gap | 71s | 64s |
+| on the boss | **+26.6s** | +7.6s |
+| on minions | **+21.0s** | +13.3s |
+| overkill | +10.6s | — |
+| into armour | +4.6s | +1.4s |
+| shots that missed | +8.5s | **+41.5s** |
+| rounding | −0.5s | −0.6s |
+
+**ORDINAL's variance is work the boss generated.** It put back 10.7k of health
+on the short run and 13.1k on the long one, and spawned 7.4k of DIGITs against
+10.1k. Its shot budget is otherwise identical run to run — 54/23/9/10/4 across
+the five destinations, ±2 points. The fight is self-similar; some runs just have
+more of it. Both moving terms are re-forms and spawns, and they compound: more
+work means a longer fight means more spawns.
+
+**GNOMON's variance is the turret missing.** 41 of its 64 seconds are shots
+that reached nothing at all, and the boss's own work barely moves — 9.4k to
+9.6k landed, 4.7k to 4.9k put back. Its baseline miss rate is **28–37% of every
+shot**, against ORDINAL's 4% and FRACTAL's 8–11%. A third of everything the
+turret produces on this fight never arrives.
+
+That is the answer the audit's three hypotheses could not have found, because
+all three were about the boss's work — the term that, on GNOMON, barely moves.
+
 ### What comes next
 
-A variance instrument. This plan built `dps.mjs` when `fight.mjs` could say
-how long a fight was but not where the output went; the same move is needed
-now for *why does this fight's length vary by a third*. It should run one boss
-many times and report, per run, what the total work actually was — bodies
-destroyed by type, how much every re-form put back, how many minions were
-spawned against how many were killed — so the difference between a 202-second
-ORDINAL and a 287-second one is a line in a table rather than a hypothesis.
+**GNOMON's miss rate is the next build.** A third of the output reaching
+nothing is a defect on its own terms before it is a variance problem, and it is
+almost certainly geometry again: the dial turns, the needle sweeps, and a shot
+fired at where an arc was arrives where it is not. `dps.mjs`'s `wide` column
+measures the half of that which is the barrel still slewing; the rest is lead.
 
-Until that exists, no further length tuning on I or II is worth doing.
+**ORDINAL's is a design question rather than a bug.** Its length is dominated
+by what it puts back — restored health runs to twice its starting structure —
+so anything that makes the re-forms bigger or smaller moves the fight bodily.
+That is the fight working as designed; if the spread matters more than the
+design, the lever is to bound what TALLY and the repair pulses restore, the way
+DYNAMO's EARTH is bounded by construction.
 
 ## Rules this plan holds itself to
 

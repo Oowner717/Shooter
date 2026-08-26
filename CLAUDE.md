@@ -71,6 +71,27 @@ Before that it was `917805618` from build 141, when TALLY went in;
 targeting, which is the hash doing its job; a move without one is the bug it
 is there to catch.
 
+`node scripts/variance.mjs [n] [--runs 7]` is the third of the trio and
+answers the one thing the other two cannot: **why the same fight takes a third
+longer on one run than another.** The turret's cadence is a timer rather than a
+decision -- 3.31 shots a second in every run of every fight ever measured here
+-- so `length = shots / 3.31 + held`, and a run that took longer simply needed
+more shots. Every shot lands in one of five places: on the boss, on a minion,
+into armour, past zero as overkill, or nowhere at all. The probe partitions
+each run's shots across those five by the round size it measures from the run
+itself, so the terms sum to the total by construction, and then it converts the
+difference between the longest and shortest run into seconds, term by term.
+Nothing is left over but rounding.
+
+It found that ORDINAL's spread and GNOMON's have nothing in common. ORDINAL's
+26% is work the boss generated -- it put back 10.7k of health on the short run
+and 13.1k on the long one, and spawned 7.4k of DIGITs against 10.1k. GNOMON's
+27% is **the turret missing**: 41 of its 64-second gap is shots that reached
+nothing, and its baseline miss rate is 28-37% against ORDINAL's 4% and
+FRACTAL's 8-11%. Three hypotheses had been built against GNOMON's variance in
+the Phase C audit and all three were about the boss's work, which is the term
+that barely moves.
+
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three
 builds), the trigger itself, every round/mine/ability/object type running once
