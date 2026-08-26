@@ -251,13 +251,20 @@ export class Menu {
     lab.innerHTML = '<span>YOUR MACHINE</span>';
     frag.appendChild(lab);
 
-    for (const root of TREE) {
-      // RECAST is a leaf at the top of the tree because it is bought with a
-      // currency nothing else uses. It is still a new form for the turret, so
-      // it is shown with the turret rather than as a category of one.
-      if (root.kind !== 'root') continue;
-      frag.appendChild(this.buildBranch(root));
-    }
+    /*
+     * Display order, not tree order. TREE leads with ANOMALY because the old
+     * outline put "the way in" first -- but this section's heading is YOUR
+     * MACHINE, and a boss door is not the machine. The turret leads, its
+     * ammunition and field follow, and the doors are the last row: the thing
+     * you go down to when you are ready, not the first thing under the shelf.
+     */
+    const order = ['turret', 'ammo', 'mines', 'abilities', 'anomaly'];
+    const roots = TREE.filter((n) => n.kind === 'root');
+    roots.sort((x, y) => order.indexOf(x.key) - order.indexOf(y.key));
+    // RECAST is a leaf at the top of the tree because it is bought with a
+    // currency nothing else uses. It is still a new form for the turret, so
+    // it is shown with the turret rather than as a category of one.
+    for (const root of roots) frag.appendChild(this.buildBranch(root));
     return frag;
   }
 
@@ -407,12 +414,20 @@ export class Menu {
     c.style.setProperty('--tone', this.toneOf(n));
     const max = n.repeat ? 0 : (n.levels || 1);
     const kind = n.kind === 'arm' ? (NEW_WORD[root && root.key] || 'THING') : '';
+    /*
+     * A meter only where there are levels to be part-way through -- the same
+     * rule the old tree wrote down for its pips. Below two segments the track
+     * is kept for layout and hidden: on a single-level card the owned state
+     * already reads through the tone wash and the tick, and on a repeatable
+     * one (the APERTUREs, RECAST) an empty track can never fill, which reads
+     * as something stuck rather than as something to do.
+     */
     c.innerHTML = (kind ? `<span class="shopKind" data-noun="${kind}">${kind}</span>` : '')
       + `<span class="shopIcon">${n.icon || ''}</span>`
       + '<span class="shopBody"><span class="shopName"></span>'
       + '<span class="shopSpec"></span>'
       + '<span class="shopStat"></span></span>'
-      + `<span class="shopMeter">${'<i></i>'.repeat(max)}</span>`
+      + `<span class="shopMeter${max < 2 ? ' none' : ''}">${'<i></i>'.repeat(max)}</span>`
       + '<b class="shopPrice"></b>';
     /*
      * BOLT, PULSE and FAN are issued rather than bought, so they have no id
@@ -569,7 +584,7 @@ export class Menu {
   }
 
   /** Everything the room shows. Driven from syncTree, so it cannot drift. */
-  syncRoom(rows) {
+  syncRoom(rows, affordable = 0) {
     const g = this.game;
     const w = g.world;
 
@@ -636,7 +651,16 @@ export class Menu {
     const shelf = this.el.shelf;
     if (!shelf) return;
     if (this.el.shopMore) {
-      const more = buyable.length - 2;
+      /*
+       * Counted against the strip's own total, not against this list. The
+       * shelf sells upgrades and skips the seven ways in, but the ways in
+       * are still below, in the ANOMALY grid -- and the strip, the energy
+       * chip's badge and this label all describe the same purse, so "55
+       * within reach" sitting an inch from "46 MORE BELOW" read as one of
+       * them being wrong. Now the label is always the strip minus what the
+       * shelf is showing.
+       */
+      const more = affordable - Math.min(buyable.length, 2);
       this.el.shopMore.textContent = more > 0 ? `${more} MORE BELOW` : '';
     }
 
@@ -948,7 +972,7 @@ export class Menu {
     }
 
     this.syncBranches();
-    this.syncRoom(this.items);
+    this.syncRoom(this.items, affordable);
   }
 
   /** What syncCard works out, without touching the DOM. */

@@ -420,8 +420,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     m.show('tree');
     const out = { arms: [], clipped: [], mods: 0, headed: 0 };
     for (const name of ['AMMUNITION', 'MINES', 'ABILITIES']) {
-      [...document.querySelectorAll('.branchRow')]
-        .find((x) => x.querySelector('.branchName').textContent === name).click();
+      // Open, not toggle: an earlier case may have left this branch open,
+      // and a click on an open branch shuts it.
+      const row = [...document.querySelectorAll('.branchRow')]
+        .find((x) => x.querySelector('.branchName').textContent === name);
+      if (row.parentElement.classList.contains('shut')) row.click();
       const grid = [...document.querySelectorAll('.branchGrid')].find((x) => x.offsetParent);
       let head = null;
       for (const c of grid.children) {
@@ -602,6 +605,65 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('the shelf offers RECAST once there is a REMAINDER, and never a way in',
     noWays && !r.without.includes('recast') && r.withIt[0] === 'recast',
     JSON.stringify(r));
+}
+
+// --- one count, and the shop's own furniture ---------------------------------
+/*
+ * Three small things a screenshot caught after the shop shipped, kept here so
+ * they stay fixed:
+ *
+ * ONE COUNT. The strip's "N within reach", the energy chip's badge and the
+ * shelf's "N MORE BELOW" all describe the same purse, and the shelf label was
+ * counting by a different rule -- it skipped the seven ways in, which are
+ * affordable and are below. Two numbers an inch apart disagreed, and the
+ * reader's arithmetic is the check: strip = shelf label + cards shown.
+ *
+ * ORDER. The section is headed YOUR MACHINE and it opened on ANOMALY, which
+ * is a boss door, not the machine. The turret leads; the doors are last.
+ *
+ * NO DEAD TRACKS. A repeatable card has no levels, so it gets no meter -- an
+ * empty track that can never fill reads as something stuck. And no branch
+ * name overflows into its own meter, which is what AMMUNITION did at 92px.
+ */
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    const m = g.hud.menu;
+    // A fresh run, not whatever the cases above left bought: with the tree
+    // bought out the shelf is legitimately empty and the arithmetic is 0=0.
+    g.restart();
+    g.world.phase = 'staging';
+    g.debugGiveEnergy(9000);
+    m.setOpen(true);
+    m.show('tree');
+    m.syncTree();
+    const strip = parseInt(document.getElementById('treeNext').textContent, 10);
+    const label = parseInt(document.getElementById('shopMore').textContent, 10) || 0;
+    const shown = document.querySelectorAll('.shelf .shopCard').length;
+    const order = [...document.querySelectorAll('.branchRow .branchName')].map((x) => x.textContent);
+    const spill = order.filter((_, i) => {
+      const el = document.querySelectorAll('.branchRow .branchName')[i];
+      return el.scrollWidth > el.clientWidth;
+    });
+    const rows = [...document.querySelectorAll('.branchRow')];
+    for (const name of ['ANOMALY', 'TURRET']) {
+      rows.find((x) => x.querySelector('.branchName').textContent === name).click();
+    }
+    const dead = [...document.querySelectorAll('.shopCard')].filter((c) => {
+      if (!c.offsetParent) return false;
+      const mt = c.querySelector('.shopMeter');
+      return mt && !mt.children.length && getComputedStyle(mt).visibility !== 'hidden';
+    }).length;
+    m.setOpen(false);
+    return { strip, label, shown, order, spill, dead };
+  });
+  check('the strip, the shelf label and the cards shown are one count',
+    r.strip === r.label + r.shown && r.shown > 0,
+    `${r.strip} within reach = ${r.label} below + ${r.shown} shown`);
+  check('the machine leads and the doors come last, with no name overflowing',
+    r.order[0] === 'TURRET' && r.order[r.order.length - 1] === 'ANOMALY'
+    && r.spill.length === 0 && r.dead === 0,
+    JSON.stringify({ order: r.order, spill: r.spill, deadTracks: r.dead }));
 }
 
 // --- the volume -------------------------------------------------------------
@@ -2424,13 +2486,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     let priced = 0;
     for (const c of cards) {
       const t = c.querySelector('.shopPrice').textContent;
-      const readout = t === '\u2713' || t === '\u00b7';
+      const readout = t === '\u2713' || t === '\u00b7' || t === 'ISSUED';
       const locked = c.classList.contains('locked');
       const own = c.classList.contains('own');
-      // A ✓ means finished, a · means behind something unbought, and anything
-      // else is a number you can be charged. Nothing else is legal.
-      const should = own ? '\u2713' : locked ? '\u00b7' : 'price';
-      const says = t === '\u2713' ? '\u2713' : t === '\u00b7' ? '\u00b7' : 'price';
+      // A ✓ means finished, a · means behind something unbought, ISSUED means
+      // the turret came with it, and anything else is a number you can be
+      // charged. Nothing else is legal.
+      const should = c.classList.contains('issued') ? 'ISSUED'
+        : own ? '\u2713' : locked ? '\u00b7' : 'price';
+      const says = t === '\u2713' ? '\u2713' : t === '\u00b7' ? '\u00b7'
+        : t === 'ISSUED' ? 'ISSUED' : 'price';
       if (should !== says) wrong.push(`${c.querySelector('.shopName').textContent}:"${t}"`);
       if (!readout) priced++;
     }
