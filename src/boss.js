@@ -243,6 +243,33 @@ export class Boss {
     return n;
   }
 
+  /**
+   * Everything of this boss's, finished with.
+   *
+   * The ending is the payout, and it used to have a fight in it. Build 146
+   * took the minions; this takes the structure. It cannot simply kill it --
+   * the arrest snaps the frame off one piece at a time and the infall pulls
+   * what is left into the core, which is the whole choreography of a death
+   * and needs the bodies still there to be drawn. So they are marked `spent`
+   * instead: still drawn, no longer a target, and a round passes straight
+   * through them.
+   *
+   * Re-applied every frame of the sequence rather than once, because two of
+   * the endings put bodies BACK. PARITY reassembles every pane it ever lost so
+   * that the last thing you see is what it was, and TERMINUS stands its
+   * boundary up again; marked once at the top, both would have handed the
+   * assist a fresh set of targets halfway through their own outro.
+   */
+  hush(world) {
+    const all = [this.core, ...this.parts(), ...this.parked];
+    if (this.halves) all.push(...this.halves);
+    for (const p of all) if (p) p.spent = true;
+    // ...and the field stops costing anything. A beam or a squeeze still on
+    // the turret when the bar empties is the fight carrying on past its end.
+    world.shock = 0;
+    world.attackers.clear();
+  }
+
   /** One of this boss's bodies: fixed in place, off the ledger, off the tally. */
   body(id, x, y, r) {
     const e = new Enemy(TYPE_BY_ID[id], x, y, { staged: false, spawnIn: 0.9, r });
@@ -418,6 +445,7 @@ export class Boss {
     // for eleven seconds and the salvage walks home through all of it; nothing
     // this boss threw should still be arriving while that happens.
     this.takeMinions(world);
+    this.hush(world);
     ring(this.x, this.y, 8, 240, 0.5, '#ffffff', 4);
     ripple(this.x, this.y, 2.4, 700);
     shake(20);
@@ -426,6 +454,7 @@ export class Boss {
   }
 
   dieStep(world, dt, C, outro) {
+    this.hush(world);
     if (this.blew) {
       if (this.outroAt === undefined) { this.outroAt = 0; this.line = 0; this.lineT = 0; }
       this.say(world, outro, world.dtRaw || dt);
@@ -1073,6 +1102,7 @@ export class Ordinal extends Boss {
     }
 
     if (this.dying > 0) {
+      this.hush(world);
       // ...and what it has to say about it, once it has stopped exploding.
       if (this.blew) {
         if (this.outroAt === undefined) { this.outroAt = 0; this.line = 0; this.lineT = 0; }
@@ -1475,6 +1505,7 @@ export class Ordinal extends Boss {
     // this sequence, which is exactly how it kept its garrison flying through
     // its own outro when the base class stopped letting the others.
     this.takeMinions(world);
+    this.hush(world);
     ring(this.x, this.y, 8, 240, 0.5, '#ffffff', 4);
     ripple(this.x, this.y, 2.4, 700);
     shake(20);

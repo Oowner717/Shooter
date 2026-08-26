@@ -1093,6 +1093,71 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.every((x) => x.ended), `ran out: ${r.filter((x) => x.ended).length} of 7`);
 }
 
+// --- ...and nothing is left to shoot at while it happens ---------------------
+/*
+ * The structure is the other half of it, and it cannot be solved the same way.
+ * A boss's minions can simply be destroyed when it dies; its own bodies cannot,
+ * because the ending is made OF them -- the arrest snaps the frame off one
+ * piece at a time and the infall pulls what is left into the core. They have to
+ * still be there to be drawn.
+ *
+ * So they are marked `spent`: still drawn, no longer a target, and a round
+ * passes straight through. Measured before it existed, AMPLITUDE had something
+ * legal to shoot on 85% of the frames of its own payout, TERMINUS on 50% and
+ * PARITY on 57% -- and PARITY and TERMINUS are the two that put bodies BACK
+ * during the sequence, which is why the mark is re-applied every frame rather
+ * than once.
+ *
+ * The corruption goes too. A beam or a squeeze still on the turret when the bar
+ * empties is the fight carrying on past its own end.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    const { dressOf } = await import('../src/anomaly.js');
+    const out = [];
+    for (let n = 1; n <= 7; n++) {
+      g.restart();
+      w.phase = 'staging';
+      w.director.timer = 1e9; w.director.driftTimer = 1e9;
+      for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+      w.apertures[n] = 1;
+      g.openBoss(n);
+      const b = w.boss;
+      b.arriving = 0;
+      b.settle(w);
+      g.update(1 / 60);
+      b.enterStage(w, 3);
+      for (let i = 0; i < 60 * 20 && w.boss && b.dying <= 0; i++) g.update(1 / 60);
+
+      b.die(w, CFG[dressOf(n).name.toLowerCase()]);
+      let targeted = 0;
+      let frames = 0;
+      let shock = 0;
+      let drawn = 0;
+      for (let i = 0; i < 60 * 30 && w.boss; i++) {
+        g.update(1 / 60);
+        frames++;
+        if (g.autoTarget(w)) targeted++;
+        shock = Math.max(shock, w.shock);
+        drawn = Math.max(drawn, w.enemies.filter((e) => !e.dead && e.spent).length);
+      }
+      out.push({ n, targeted, frames, shock: +shock.toFixed(2), drawn });
+    }
+    g.restart();
+    return out;
+  });
+  check('and nothing of it is left to shoot at while that happens',
+    r.every((x) => x.targeted === 0) && r.every((x) => x.shock === 0)
+    && r.some((x) => x.drawn > 0),
+    `frames of the outro with a legal target: ${r.map((x) => x.targeted).join('/')} `
+    + `of ${r.map((x) => x.frames).join('/')}; peak corruption `
+    + `${r.map((x) => x.shock).join('/')}; bodies still drawn through it `
+    + `${r.map((x) => x.drawn).join('/')}`);
+}
+
 // --- TALLY, the one heal in the back half ------------------------------------
 /*
  * ORDINAL was the shortest of the seven at 174 seconds, and the reason is

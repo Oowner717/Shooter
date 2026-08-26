@@ -107,10 +107,20 @@ builds), the trigger itself, every round/mine/ability/object type running once
 without an error, a save surviving an app update while still refusing a
 malformed one, each menu tab showing only its own panel, the volume surviving
 mute-quit-return, the broadphase seeing every overlap of the biggest body, and
-nothing a boss made still flying during its own outro -- which walks all seven
-through their own deaths, because the mark that makes that work has to be
-applied at a spawn site in seven files and a missed one is invisible until
-somebody watches an ending.
+nothing a boss made still flying during its own outro, and nothing of the boss
+left to shoot at either -- which walks all seven through their own deaths,
+because the marks that make those work are applied at a spawn site in seven
+files and in a death sequence two bosses keep private copies of, and a missed
+one is invisible until somebody watches an ending.
+
+The two marks are different on purpose. A minion can be destroyed when the boss
+dies; the boss's own structure cannot, because the ending is made of it -- the
+arrest snaps the frame off a piece at a time and the infall pulls the rest into
+the core. So structure is marked `spent` instead: still drawn, skipped by
+`autoTarget`, and rounds pass through it. Anything that decides what may be
+shot has to honour it, including the assist's hysteresis, which kept a lock on
+a spent body for eighteen percent of TERMINUS's outro because it tested `dead`,
+`staged` and `harmless` and nothing else.
 Add a case to it whenever something ships broken — that is the whole rule.
 
 Before build 101 this section pointed at a session scratchpad. There were 243

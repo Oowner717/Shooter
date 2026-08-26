@@ -1206,7 +1206,9 @@ export class Terminus extends Boss {
       ctx.globalCompositeOperation = 'source-over';
     }
 
-    if (this.stage >= 3 && (this.stage > 3 || this.frameK >= 1)) {
+    // ...and not through the ending: an inert beam still sweeping the turret
+    // after the bar empties is the fight carrying on past its own end.
+    if (this.stage >= 3 && (this.stage > 3 || this.frameK >= 1) && this.dying <= 0) {
       ctx.globalCompositeOperation = 'lighter';
       const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, C.beamLen);
       g.addColorStop(0, rgba('#ffd6dd', 0.34));

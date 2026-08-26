@@ -224,7 +224,9 @@ function resolveSegment(world, p, ax, ay, bx, by) {
   const test = (list) => {
     for (let i = 0; i < list.length; i++) {
       const e = list[i];
-      if (e.dead || e === p.ignore) continue;
+      // `spent`: finished with, and drawn only so its ending can be watched.
+      // A round passes through it the way it passes through energy.
+      if (e.dead || e.spent || e === p.ignore) continue;
       // Reach covers orbiting plates, which live outside the core radius.
       const reach = e.hitReach + p.r;
       if (Math.min(ax, bx) - reach > e.x || Math.max(ax, bx) + reach < e.x) continue;

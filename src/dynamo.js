@@ -987,7 +987,7 @@ export class Dynamo extends Boss {
     }
 
     // The discharge burning down the arc it just travelled.
-    if (this.lance && this.lance.t > 0) {
+    if (this.lance && this.lance.t > 0 && this.dying <= 0) {
       const k = clamp(this.lance.t / C.lanceFor, 0, 1);
       ctx.save();
       /*

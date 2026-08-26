@@ -834,7 +834,11 @@ export class Parity extends Boss {
     ctx.save();
     this.drawHole(ctx, C, T, arriving);
 
-    if (!arriving) this.drawMirror(ctx, world, open);
+    // Not through the ending. The mirror-line and the field reflected across
+    // it are what this boss DOES; a hazard still drawn after the bar empties
+    // is the fight carrying on through its own payout, and GNOMON's shadow has
+    // been gated this way since it was written.
+    if (!arriving && this.dying <= 0) this.drawMirror(ctx, world, open);
 
     /*
      * The mirror-line: a thin bright axis through the middle of the pair.
@@ -846,7 +850,7 @@ export class Parity extends Boss {
      * which was correct when the mirror ended there and is wrong now that it
      * does not.
      */
-    if (!arriving) {
+    if (!arriving && this.dying <= 0) {
       const len = 520;
       const g2 = ctx.createLinearGradient(
         this.hub.x - Math.cos(this.lineA) * len, this.hub.y - Math.sin(this.lineA) * len,

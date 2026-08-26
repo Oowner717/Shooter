@@ -909,7 +909,16 @@ export class Game {
     const held = this.autoLock;
     for (const e of w.enemies) {
       if (e === held) heldLive = true;
-      if (e.dead || e.staged || e.harmless) continue;
+      /*
+       * ...and `spent`, which is a body that is part of an ending rather than
+       * part of a fight. A boss's structure is still drawn all the way through
+       * its death -- the arrest snaps it off one piece at a time and that is
+       * the whole beat -- so it cannot simply be killed or parked at the
+       * moment the bar empties. It can stop being a target. Measured over the
+       * seven outros, AMPLITUDE had thirteen bodies still on the field and
+       * something legal to shoot on 85% of the frames of its own payout.
+       */
+      if (e.dead || e.staged || e.harmless || e.spent) continue;
       const dx = e.x - s.x;
       const dy = e.y - s.y;
       if (Math.abs(angleDelta(-Math.PI / 2, Math.atan2(dy, dx))) > limit) continue;
@@ -950,7 +959,16 @@ export class Game {
      * is. Measured with it wrong, PARITY ran 19% longer: the assist kept its
      * lock on a reflection.
      */
-    if (heldLive && held !== best && !held.dead && !held.staged && !held.harmless) {
+    /*
+     * ...and the lock it is holding has to pass the same tests the challengers
+     * did. It did not test `spent`, so a boss body marked finished at the
+     * moment its bar emptied kept the lock for the whole of the outro --
+     * TERMINUS held one for 18% of its nineteen seconds. The hysteresis
+     * decides which of two legal targets to keep, not whether a target is
+     * legal at all.
+     */
+    if (heldLive && held !== best && !held.dead && !held.staged && !held.harmless
+      && !held.spent) {
       const hx = held.x - s.x;
       const hy = held.y - s.y;
       const hd = Math.hypot(hx, hy);
