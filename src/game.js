@@ -1592,7 +1592,18 @@ export class Game {
     this.hud.menu.sync(w);
     this.hud.updateAlerts(dt);
     this.hud.syncSpawn();
-    if (w.debug.stats) {
+    /*
+     * ...and cleared when the toggle goes off, which it never was. The box
+     * only ever had text written INTO it, so switching STATS off left the
+     * last frame's readout frozen in the panel -- a live-looking fps, phase
+     * and object count that had stopped being true the moment it stopped
+     * updating. The worst kind of debug output: still there, still plausible,
+     * no longer measuring anything.
+     */
+    if (!w.debug.stats) {
+      if (this.statsShown) { this.statsShown = false; this.hud.setStats(''); }
+    } else {
+      this.statsShown = true;
       this.hud.setStats(
         `fps    ${this.fps.toFixed(0)}\n`
         + `phase  ${w.phase}\n`

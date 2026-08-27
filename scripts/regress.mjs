@@ -1538,6 +1538,179 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- every control in the debug panel does something, and nothing throws ----
+/*
+ * This panel has been wrong before and in a way nothing could catch: five of
+ * its buttons called methods that went with the boss and the ledger in builds
+ * 81-82, and they sat there dead for twenty builds because a button only
+ * throws when it is pressed and nobody was pressing them. Its own comment
+ * says so.
+ *
+ * So they are all pressed here -- twenty-three in the panel and every control
+ * on the spawn screen behind it -- with an error trap around each press,
+ * because an exception inside a click handler is an uncaught error and not a
+ * throw at the call site: a try/catch around `.click()` catches nothing.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const caught = [];
+    const onErr = (ev) => caught.push(String(ev.message || ev.reason || ev));
+    window.addEventListener('error', onErr);
+    window.addEventListener('unhandledrejection', onErr);
+
+    g.debugTeachAll();
+    g.hud.toggleDebug(true);
+    const label = (b) => (b.textContent || '').trim() || b.className;
+
+    const pressAll = (sel) => {
+      const out = [];
+      const n = document.querySelectorAll(sel).length;
+      for (let i = 0; i < n; i++) {
+        const b = document.querySelectorAll(sel)[i];
+        if (!b) continue;
+        const name = label(b);
+        const was = caught.length;
+        b.click();
+        // The spawn screen can be left by its own BACK; put it back so the
+        // remaining controls are still reachable.
+        if (sel === '#dbgSpawn button' && document.getElementById('dbgSpawn').hidden) {
+          g.hud.showSpawn(true);
+        }
+        out.push({ name, threw: caught.length > was ? caught[caught.length - 1] : null });
+      }
+      return out;
+    };
+
+    const panel = pressAll('#dbgGrid button');
+    g.hud.showSpawn(true);
+    const spawn = pressAll('#dbgSpawn button');
+    g.hud.showSpawn(false);
+
+    window.removeEventListener('error', onErr);
+    window.removeEventListener('unhandledrejection', onErr);
+    g.hud.toggleDebug(false);
+    // Toggles are left wherever the presses put them.
+    for (const k of Object.keys(g.world.debug)) g.world.debug[k] = false;
+    g.restart();
+    return { panel, spawn };
+  });
+
+  const broke = [...r.panel, ...r.spawn].filter((x) => x.threw);
+  check('every control in the debug panel can be pressed without throwing',
+    broke.length === 0 && r.panel.length >= 20 && r.spawn.length >= 40,
+    `${r.panel.length} panel + ${r.spawn.length} spawn-screen controls; `
+    + `${broke.length} threw${broke.length ? `: ${broke.slice(0, 3).map((b) => `${b.name} (${b.threw})`).join('; ')}` : ''}`);
+}
+
+// --- the panel's two live readouts say what is true now --------------------
+/*
+ * STATS wrote into its box and never cleared it, so switching the toggle off
+ * left the last frame's readout sitting there: a plausible fps, phase and
+ * object count that had stopped being true the moment it stopped updating.
+ * The worst kind of debug output -- still there, still believable, no longer
+ * measuring anything.
+ *
+ * HITBOXES is checked on the one thing it draws that nothing else does: a
+ * full-width line across the floor. Whole-frame luminance cannot see it --
+ * measured, two frames with the update loop stubbed still differ by 289k
+ * while the hitboxes are worth 32k, so the frame's own noise is nine times
+ * the signal and any before/after on it is reading weather.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.debugTeachAll();
+    g.hud.toggleDebug(true);
+    g.debugClearField();
+    g.debugFillField();
+    for (let i = 0; i < 60; i++) g.update(1 / 60);
+
+    const box = () => document.getElementById('dbgStats').textContent.trim();
+    const press = (t) => [...document.querySelectorAll('#dbgGrid button')]
+      .find((b) => b.textContent.trim() === t).click();
+
+    // --- STATS ---
+    w.debug.stats = false; g.update(1 / 60);
+    const before = box().length;
+    press('STATS');
+    g.update(1 / 60);
+    const on = box();
+    // ...and it is live, not a one-off write.
+    w.kills += 7;
+    g.update(1 / 60);
+    const moved = box() !== on;
+    press('STATS');
+    g.update(1 / 60);
+    const after = box().length;
+
+    /*
+     * --- HITBOXES: the floor line, which nothing else draws ---
+     *
+     * Counted by COLOUR, not by brightness, and against a control row.
+     *
+     * Summing the strip's luminance gave a case that failed twice and passed
+     * once on the same code -- the strip is a few pixel rows, so one body
+     * drifting across it moves the total by a third, and the corruption feed
+     * randomises the frame inside draw() itself.
+     *
+     * The line is rgba(255,220,0,.5) at one world unit, which lands as about
+     * (54,50,16) after scaling and antialiasing -- so it is not bright, and a
+     * threshold picked for "yellow" at 110 found nothing at all. What marks it
+     * is blue sitting well BELOW red, which nothing on a blue-black field
+     * does across a full width. Read against a control row sixty pixels up,
+     * it is 0 / 1560 / 0 and identical on three consecutive runs.
+     */
+    const { glitch } = await import('../src/glitch.js');
+    glitch.level = 0;
+    glitch.burst = 0;
+    const cv = document.getElementById('stage');
+    const c2 = cv.getContext('2d');
+    const k = cv.width / w.width;
+    const row = Math.round(w.floorY * k);
+    const yellow = (y) => {
+      const d = c2.getImageData(0, Math.max(0, y - 2), cv.width, 5).data;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i] > 35 && d[i + 1] > 30 && d[i + 2] < d[i] * 0.55) n++;
+      }
+      return n;
+    };
+    const ctrl = Math.max(0, row - 60);
+    const strip = () => yellow(row) - yellow(ctrl);
+    w.debug.hitboxes = false; g.draw();
+    const floorOff = strip();
+    press('HITBOXES'); g.draw();
+    const floorOn = strip();
+    press('HITBOXES'); g.draw();
+    const floorBack = strip();
+
+    for (const key of Object.keys(w.debug)) w.debug[key] = false;
+    g.hud.toggleDebug(false);
+    g.restart();
+    return { before, onLen: on.length, moved, after,
+      lines: on.split('\n').length, floorOff, floorOn, floorBack };
+  });
+
+  check('STATS writes a live readout, and clears it rather than freezing it',
+    r.before === 0 && r.onLen > 60 && r.lines >= 8 && r.moved && r.after === 0,
+    `off ${r.before} chars -> on ${r.onLen} chars over ${r.lines} lines `
+    + `(updates: ${r.moved}) -> off again ${r.after} chars`);
+
+  /*
+   * Absolute, not relative: off is zero, so a ratio against it says nothing.
+   * The gap is the whole point -- the line reads 273 to 1560 depending on how
+   * much of the floor row the field is sitting on, and nothing at all reads
+   * between 0 and 273. The threshold goes in that gap rather than near either
+   * end of it.
+   */
+  check('...and HITBOXES draws its floor line and takes it away again',
+    r.floorOn > 150 && r.floorOff < 40 && r.floorBack < 40,
+    `floor row against a control row: off ${r.floorOff}, on ${r.floorOn}, `
+    + `off again ${r.floorBack}`);
+}
+
 // --- the corruption feed is not the brightest thing in the game -------------
 /*
  * The feed's inverted bands were `difference` against #ffffff. On a normal
