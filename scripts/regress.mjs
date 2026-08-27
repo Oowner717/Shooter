@@ -1538,6 +1538,99 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- nine rounds, nine shapes in the air ------------------------------------
+/*
+ * Every projectile used to be drawn by one recipe -- two strokes, a glow and
+ * a dot -- so the only thing separating HE in flight from RIME was a colour,
+ * which is the same disease the bodies had before build 166. Each round now
+ * flies as its mechanic: a shell, pellets, a crackling zigzag, a finned dart,
+ * a slab with a bow wave, a turning flake, a pod shedding motes, the TITHE
+ * ring, and BOLT's needle.
+ *
+ * Asked of the pixels, pairwise: each round's projectile is rendered alone at
+ * a fixed spot and heading through the REAL branch in shooter.js -- no
+ * duplicated opts to drift out of date -- and every pair of rounds has to
+ * differ. A future round added to the arsenal that never names a form falls
+ * back to the tracer and immediately collides with BOLT here, which is the
+ * point: the case is the reminder that a round is a shape, not a hue.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { drawProjectiles } = await import('../src/projectiles.js');
+    g.debugTeachAll();
+    g.debugClearField();
+    const s = w.shooter;
+
+    const cv = document.createElement('canvas');
+    cv.width = 160; cv.height = 160;
+    const c2 = cv.getContext('2d', { willReadFrequently: true });
+
+    const rounds = ['standard', 'shotgun', 'explosive', 'arc', 'spine',
+      'slug', 'rime', 'spore', 'tithe'];
+    const shots = {};
+    const forms = {};
+    for (const key of rounds) {
+      w.projectiles.length = 0;
+      w.round = key;
+      s.cooldown = 0;
+      s.aim = 0;
+      s.shoot(w);
+      const p = w.projectiles[0];
+      forms[key] = p.form;
+      // One projectile, parked at the same spot with the same heading, so
+      // the comparison is the form and nothing else.
+      p.x = 80; p.y = 80;
+      const sp = Math.hypot(p.vx, p.vy) || 1;
+      p.vx = (p.vx / sp) * 900; p.vy = (p.vy / sp) * 900;
+      c2.setTransform(1, 0, 0, 1, 0, 0);
+      c2.clearRect(0, 0, 160, 160);
+      drawProjectiles(c2, { time: 2.0, projectiles: [p] });
+      const d = c2.getImageData(0, 0, 160, 160).data;
+      // Downsampled RGB signature: 20x20 cells of summed channels.
+      const sig = new Float64Array(20 * 20 * 3);
+      let ink = 0;
+      for (let y = 0; y < 160; y++) {
+        for (let x = 0; x < 160; x++) {
+          const i = (y * 160 + x) * 4;
+          const cell = ((y >> 3) * 20 + (x >> 3)) * 3;
+          sig[cell] += d[i] * (d[i + 3] / 255);
+          sig[cell + 1] += d[i + 1] * (d[i + 3] / 255);
+          sig[cell + 2] += d[i + 2] * (d[i + 3] / 255);
+          ink += d[i + 3];
+        }
+      }
+      shots[key] = { sig: [...sig], ink: Math.round(ink / 1000) };
+    }
+    w.projectiles.length = 0;
+    g.restart();
+    return { rounds, shots, forms };
+  });
+
+  const diff = (a, b) => {
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
+    return Math.round(sum / 1000);
+  };
+  const pairs = [];
+  for (let i = 0; i < r.rounds.length; i++) {
+    for (let j = i + 1; j < r.rounds.length; j++) {
+      pairs.push({ a: r.rounds[i], b: r.rounds[j],
+        d: diff(r.shots[r.rounds[i]].sig, r.shots[r.rounds[j]].sig) });
+    }
+  }
+  pairs.sort((x, y) => x.d - y.d);
+  const empty = r.rounds.filter((k) => r.shots[k].ink < 20);
+  const formSet = new Set(Object.values(r.forms));
+  check('all nine rounds fly as nine different shapes',
+    empty.length === 0 && pairs[0].d > 8 && formSet.size === 9,
+    `${formSet.size} distinct forms; closest pair ${pairs[0].a}/${pairs[0].b} at ${pairs[0].d} `
+    + `(next ${pairs[1].a}/${pairs[1].b} at ${pairs[1].d}); `
+    + `ink ${r.rounds.map((k) => `${k}:${r.shots[k].ink}`).join(' ')}`
+    + `${empty.length ? `; EMPTY: ${empty.join(',')}` : ''}`);
+}
+
 // --- every control in the debug panel does something, and nothing throws ----
 /*
  * This panel has been wrong before and in a way nothing could catch: five of

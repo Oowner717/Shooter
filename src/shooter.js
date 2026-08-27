@@ -220,6 +220,7 @@ export class Shooter {
           bounces: 0,
           color: '#ffd9a0',
           trail: 0.03,
+          form: 'pellet',
         });
       }
     } else if (world.round === 'explosive') {
@@ -233,6 +234,7 @@ export class Shooter {
         color: '#ff9f5c',
         core: '#fff0d8',
         trail: 0.03,
+        form: 'shell',
         burst: heBurst,
       });
     } else if (world.round === 'arc') {
@@ -243,9 +245,17 @@ export class Shooter {
         damage: g.damage,
         impulse: 40,
         bounces: 0,
-        color: '#9be7ff',
+        /*
+         * The card is violet (#ad73ff) and the round flew pale BLUE -- so
+         * the chip you press and the thing that leaves the barrel did not
+         * match, on the one round whose whole identity is its colour of
+         * electricity. SPINE and BOLT had the same drift and get the same
+         * correction: flight colours come from the card's family now.
+         */
+        color: '#c79bff',
         core: '#ffffff',
         trail: 0.038,
+        form: 'arc',
         chain: true,
         jumps: R.arc.jumps + up.arcJumps,
       });
@@ -257,9 +267,10 @@ export class Shooter {
         damage: g.damage,
         impulse: 30,
         bounces: 0,
-        color: '#d8f1ff',
+        color: '#ff9ade',
         core: '#ffffff',
         trail: 0.05,
+        form: 'dart',
         pierce: g.pierce + up.pierce,
         pierceFade: up.spineFade || g.fade,
         shred: up.spineShred,
@@ -275,6 +286,7 @@ export class Shooter {
         color: '#b8c6d8',
         core: '#f2f6fb',
         trail: 0.02,
+        form: 'slab',
         // Marked as thrown-by-SLUG. While the mark is live the body neither
         // deals nor takes collision damage — SLUG puts things where you want
         // them and is not allowed to be a damage round by proxy. Everything
@@ -292,6 +304,7 @@ export class Shooter {
         color: '#8fe3ff',
         core: '#e8faff',
         trail: 0.05,
+        form: 'flake',
         onHit: (w, e) => { e.chill = Math.max(e.chill, g.chill * w.up.chill); },
       });
     } else if (world.round === 'spore') {
@@ -305,6 +318,7 @@ export class Shooter {
         color: '#8eeb4b',
         core: '#e6ffe6',
         trail: 0.04,
+        form: 'pod',
         burst: (w, x, y) => {
           w.effects.push(new Patch(x, y, {
             r: g.patch.r * w.up.patchR,
@@ -325,6 +339,7 @@ export class Shooter {
         color: '#7cffb2',
         core: '#dfffe9',
         trail: 0.05,
+        form: 'tithe',
         onHit: (w, e) => {
           /*
            * The ramp lands here, on the body that was actually hit, rather
@@ -353,6 +368,8 @@ export class Shooter {
         for (let t = 0; t < taps; t++) {
           shot(a + f + (t ? spread(0.02) : 0), {
             speed: CFG.bolt.speed * slow,
+            color: '#a8c4ff',
+            core: '#eef4ff',
             damage: CFG.bolt.damage * g.tapFade ** t,
             life: CFG.bolt.life * up.boltLife,
             bounces: CFG.bolt.bounces + up.boltBounce,
@@ -365,6 +382,12 @@ export class Shooter {
     }
 
     this.recoil = 1;
+    // What just left, for the muzzle flash: the flash on the machine wears
+    // the round's colour, so switching ammunition is visible at the barrel
+    // and not only on the strip.
+    this.shotTint = ({ shotgun: '#ffd9a0', explosive: '#ff9f5c', arc: '#c79bff',
+      spine: '#ff9ade', slug: '#b8c6d8', rime: '#8fe3ff', spore: '#8eeb4b',
+      tithe: '#7cffb2' })[world.round] || '#a8c4ff';
     this.heat = Math.min(1, this.heat + 0.14);
     audio.shot();
     shake(0.5);
@@ -396,6 +419,17 @@ export class Shooter {
     ctx.lineTo(rx, ry);
     ctx.stroke();
     ctx.restore();
+
+    // The muzzle flash, in the round's own colour. Off the recoil rather
+    // than a timer of its own: recoil spikes to 1 on the shot and decays,
+    // which is exactly the envelope a flash wants.
+    if (this.recoil > 0.06 && this.shotTint) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      drawGlow(ctx, this.shotTint, this.muzzleX, this.muzzleY,
+        14 + this.recoil * 20, 0.55 * this.recoil);
+      ctx.restore();
+    }
 
     this.drawLever(ctx, accent, t);
     this.drawMachine(ctx, world, accent, t, breached);

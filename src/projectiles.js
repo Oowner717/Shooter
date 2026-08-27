@@ -3,7 +3,7 @@
 
 import { CFG } from './config.js';
 import { TAU, rand, spread, rgba, drawGlow, segClosest, drawBolt } from './util.js';
-import { spark, dot } from './fx.js';
+import { spark, dot, ring } from './fx.js';
 import { SHARD_R } from './enemies.js';
 import { audio } from './audio.js';
 
@@ -28,6 +28,14 @@ class Projectile {
      * shots that happen to have started at the same place.
      */
     this.spun = !!opts.spun;
+    /*
+     * Which flight form drawProjectiles gives it. Every round used to be the
+     * same two-stroke tracer at a different hue, which is the disease the
+     * bodies had before build 166: nine rounds, one recipe, and the only
+     * thing separating HE in flight from RIME was a colour. The form is the
+     * round's mechanic made visible -- a shell, a dart, a flake, a pod.
+     */
+    this.form = opts.form || 'tracer';
     /*
      * The marker's phase, off the launch bearing rather than off Math.random.
      *
@@ -397,34 +405,232 @@ function resolveSegment(world, p, ax, ay, bx, by) {
 export function drawProjectiles(ctx, world) {
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
+  const t = world.time || 0;
   for (const p of world.projectiles) {
-    // Two flat strokes read as a tapered tracer for a fraction of the cost of
-    // a per-projectile gradient.
     const tx = p.x - p.vx * p.trail;
     const ty = p.y - p.vy * p.trail;
-    ctx.strokeStyle = rgba(p.color, 0.28);
-    ctx.lineWidth = p.r * 1.7;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    ctx.lineTo(tx, ty);
-    ctx.stroke();
-    ctx.strokeStyle = rgba(p.color, 0.9);
-    ctx.lineWidth = p.r * 0.9;
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    ctx.lineTo(p.x - p.vx * p.trail * 0.45, p.y - p.vy * p.trail * 0.45);
-    ctx.stroke();
+    // Unit vector along travel, for the forms that have a body. The phase of
+    // anything that turns is world.time plus p.spin -- which is derived from
+    // the launch bearing, never Math.random; see the note on `spin`.
+    const sp = Math.hypot(p.vx, p.vy) || 1;
+    const ux = p.vx / sp;
+    const uy = p.vy / sp;
+    const nx = -uy;
+    const ny = ux;
+    const seg = (x0, y0, x1, y1, color, w2) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = w2;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+    };
 
-    drawGlow(ctx, p.color, p.x, p.y, p.r * 4.2, 0.75);
+    switch (p.form) {
+      /*
+       * SHOT. Up to forty-five of these can be in the air at once (DOUBLE-O
+       * pellets across a SALVO fan), so this is the one form that had to get
+       * CHEAPER: one stroke and a half-size glow, against the old recipe's
+       * two strokes, a glow and a filled arc. A pellet is hot metal, not a
+       * little tracer.
+       */
+      case 'pellet':
+        seg(p.x, p.y, tx, ty, rgba(p.color, 0.7), p.r);
+        drawGlow(ctx, p.color, p.x, p.y, p.r * 3, 0.55);
+        break;
+
+      /*
+       * HE. A fat shell that reads as ordnance: a wide heat-wake, a blunt
+       * capsule body, an ember glow that breathes, and the fuse bright at
+       * the nose. The pulse is the promise that it goes off.
+       */
+      case 'shell': {
+        const pulse = 0.7 + 0.3 * Math.sin(t * 22 + p.spin * 7);
+        seg(p.x, p.y, tx, ty, rgba('#ff5638', 0.18), p.r * 2.5);
+        seg(p.x + ux * p.r * 0.6, p.y + uy * p.r * 0.6,
+          p.x - ux * p.r * 1.2, p.y - uy * p.r * 1.2, rgba(p.color, 0.95), p.r * 1.5);
+        drawGlow(ctx, p.color, p.x, p.y, p.r * 5, 0.35 + 0.35 * pulse);
+        ctx.fillStyle = p.core;
+        ctx.beginPath();
+        ctx.arc(p.x + ux * p.r * 0.9, p.y + uy * p.r * 0.9, p.r * 0.5, 0, TAU);
+        ctx.fill();
+        break;
+      }
+
+      /*
+       * ARC. The tail crackles: three segments kinked off the line of travel
+       * by out-of-phase sines, so it never repeats and never sits straight.
+       * It is the only round whose tail is not where it has been.
+       */
+      case 'arc': {
+        ctx.strokeStyle = rgba(p.color, 0.8);
+        ctx.lineWidth = p.r * 0.8;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        for (let i = 1; i <= 3; i++) {
+          const f = i / 3;
+          const kink = Math.sin(t * 46 + p.spin * 9 + i * 2.4)
+            * p.r * 1.9 * (i === 3 ? 0.4 : 1);
+          ctx.lineTo(p.x - p.vx * p.trail * f + nx * kink,
+            p.y - p.vy * p.trail * f + ny * kink);
+        }
+        ctx.stroke();
+        drawGlow(ctx, p.color, p.x, p.y, p.r * 4.6, 0.8);
+        ctx.fillStyle = p.core;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 0.55, 0, TAU);
+        ctx.fill();
+        break;
+      }
+
+      /*
+       * SPINE. A flechette: a long thin shaft, a hard bright tip, two fins
+       * at the tail, and almost no glow -- it is the one round that is a
+       * piece of metal rather than a piece of light, and it pierces, so it
+       * should look like the only thing here that would leave a hole.
+       */
+      case 'dart': {
+        const bx = p.x - ux * p.r * 3.2;
+        const by = p.y - uy * p.r * 3.2;
+        seg(p.x, p.y, p.x - p.vx * p.trail * 1.7, p.y - p.vy * p.trail * 1.7,
+          rgba(p.color, 0.4), p.r * 0.7);
+        seg(p.x + ux * p.r * 2.6, p.y + uy * p.r * 2.6, bx, by, rgba(p.color, 0.95), p.r * 0.8);
+        seg(p.x + ux * p.r * 2.6, p.y + uy * p.r * 2.6,
+          p.x + ux * p.r * 0.8, p.y + uy * p.r * 0.8, p.core, p.r * 1.05);
+        // fins
+        seg(bx, by, bx - ux * p.r * 1.4 + nx * p.r * 1.3,
+          by - uy * p.r * 1.4 + ny * p.r * 1.3, rgba(p.color, 0.8), p.r * 0.5);
+        seg(bx, by, bx - ux * p.r * 1.4 - nx * p.r * 1.3,
+          by - uy * p.r * 1.4 - ny * p.r * 1.3, rgba(p.color, 0.8), p.r * 0.5);
+        drawGlow(ctx, p.color, p.x, p.y, p.r * 2.6, 0.4);
+        break;
+      }
+
+      /*
+       * SLUG. Mass. A thick capsule with a blunt white nose, and a bow wave
+       * standing ahead of it -- two arcs compressed in front of the nose,
+       * which is what "this thing shoves" looks like before it lands.
+       */
+      case 'slab': {
+        const ang = Math.atan2(uy, ux);
+        seg(p.x, p.y, tx, ty, rgba(p.color, 0.25), p.r * 1.9);
+        seg(p.x + ux * p.r * 0.7, p.y + uy * p.r * 0.7,
+          p.x - ux * p.r * 1.5, p.y - uy * p.r * 1.5, rgba(p.color, 0.95), p.r * 1.5);
+        ctx.fillStyle = p.core;
+        ctx.beginPath();
+        ctx.arc(p.x + ux * p.r * 0.95, p.y + uy * p.r * 0.95, p.r * 0.62, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = rgba(p.core, 0.5);
+        ctx.lineWidth = 1.4;
+        for (let i = 0; i < 2; i++) {
+          ctx.beginPath();
+          ctx.arc(p.x + ux * p.r * (2.1 + i * 0.9), p.y + uy * p.r * (2.1 + i * 0.9),
+            p.r * (1.15 + i * 0.55), ang - 1.05 + i * 0.15, ang + 1.05 - i * 0.15);
+          ctx.stroke();
+        }
+        drawGlow(ctx, p.color, p.x, p.y, p.r * 4, 0.7);
+        break;
+      }
+
+      /*
+       * RIME. A crystal: six spokes turning slowly, and two glints trailing
+       * on alternating sides. Cold reads as structure, not as fire.
+       */
+      case 'flake': {
+        const rot = t * 2.4 + p.spin;
+        seg(p.x, p.y, tx, ty, rgba(p.color, 0.22), p.r * 1.4);
+        ctx.strokeStyle = rgba(p.color, 0.9);
+        ctx.lineWidth = p.r * 0.42;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a2 = rot + (i * Math.PI) / 3;
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x + Math.cos(a2) * p.r * 1.7, p.y + Math.sin(a2) * p.r * 1.7);
+        }
+        ctx.stroke();
+        for (let i = 1; i <= 2; i++) {
+          const f = i * 0.5;
+          const side = (i % 2 ? 1 : -1) * Math.sin(t * 7 + p.spin * 3);
+          ctx.fillStyle = rgba(p.core, 0.6 - i * 0.2);
+          ctx.beginPath();
+          ctx.arc(p.x - p.vx * p.trail * f + nx * side * p.r,
+            p.y - p.vy * p.trail * f + ny * side * p.r, p.r * 0.4, 0, TAU);
+          ctx.fill();
+        }
+        drawGlow(ctx, p.color, p.x, p.y, p.r * 3.8, 0.6);
+        break;
+      }
+
+      /*
+       * SPORE. A pod, shedding: three motes sway behind it on out-of-phase
+       * sines, smaller and fainter with distance, so the round is visibly
+       * the thing the patch will be made of.
+       */
+      case 'pod': {
+        for (let i = 1; i <= 3; i++) {
+          const f = i / 3;
+          const sway = Math.sin(t * 9 + p.spin * 5 + i * 2.1) * p.r * 1.5;
+          ctx.fillStyle = rgba(p.color, 0.55 - i * 0.13);
+          ctx.beginPath();
+          ctx.arc(p.x - p.vx * p.trail * f * 1.5 + nx * sway,
+            p.y - p.vy * p.trail * f * 1.5 + ny * sway, p.r * (0.62 - i * 0.12), 0, TAU);
+          ctx.fill();
+        }
+        ctx.fillStyle = rgba(p.color, 0.85);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 0.9, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = p.core;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 0.4, 0, TAU);
+        ctx.fill();
+        drawGlow(ctx, p.color, p.x, p.y, p.r * 4, 0.55);
+        break;
+      }
+
+      /*
+       * TITHE. It flies wearing the mark it leaves: an open ring turning
+       * around the core, the same language as the ticks it cuts into a
+       * body. The round and its ledger entry are one image.
+       */
+      case 'tithe': {
+        const rot = t * 6 + p.spin;
+        seg(p.x, p.y, tx, ty, rgba(p.color, 0.3), p.r * 0.9);
+        ctx.strokeStyle = rgba(p.color, 0.9);
+        ctx.lineWidth = p.r * 0.5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 1.5, rot, rot + Math.PI * 1.2);
+        ctx.stroke();
+        ctx.fillStyle = p.core;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 0.55, 0, TAU);
+        ctx.fill();
+        drawGlow(ctx, p.color, p.x, p.y, p.r * 4, 0.7);
+        break;
+      }
+
+      /*
+       * BOLT, and everything that never named a form. The tapered tracer,
+       * with one change: the head is a needle along the line of travel
+       * rather than a ball, because a bolt is a bolt.
+       */
+      default:
+        seg(p.x, p.y, tx, ty, rgba(p.color, 0.28), p.r * 1.7);
+        seg(p.x, p.y, p.x - p.vx * p.trail * 0.45, p.y - p.vy * p.trail * 0.45,
+          rgba(p.color, 0.9), p.r * 0.9);
+        drawGlow(ctx, p.color, p.x, p.y, p.r * 4.2, 0.75);
+        seg(p.x + ux * p.r * 1.5, p.y + uy * p.r * 1.5,
+          p.x - ux * p.r * 1.5, p.y - uy * p.r * 1.5, p.core, p.r * 0.75);
+        break;
+    }
+
     /*
      * A spun round carries the sweep's own colour as a husk around whatever
      * it actually is: the core stays the round's, so BOLT is still blue and
-     * RIME still ice, and the orange says where it came from. Two short
-     * cross-strokes turning with the round, rather than a ring, because a
-     * ring at this size is a dot and reads as nothing.
+     * RIME still ice, and the orange says where it came from.
      */
     if (p.spun) {
-      const a = p.spin + world.time * 9;
+      const a = p.spin + t * 9;
       drawGlow(ctx, '#ff7a1a', p.x, p.y, p.r * 5.6, 0.4);
       ctx.strokeStyle = rgba('#ffb066', 0.75);
       ctx.lineWidth = p.r * 0.42;
@@ -438,10 +644,6 @@ export function drawProjectiles(ctx, world) {
       }
       ctx.stroke();
     }
-    ctx.fillStyle = p.core;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r * 0.62, 0, TAU);
-    ctx.fill();
   }
   ctx.lineCap = 'butt';
   ctx.globalCompositeOperation = 'source-over';
@@ -452,10 +654,56 @@ export function fire(world, x, y, angle, opts = {}) {
   const speed = opts.speed ?? CFG.bolt.speed;
   const p = new Projectile(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, opts);
   world.projectiles.push(p);
-  for (let i = 0; i < 2; i++) {
-    spark(x, y, Math.cos(angle) * rand(60, 200) + spread(70), Math.sin(angle) * rand(60, 200) + spread(70), p.color, 0.14, 2);
+  /*
+   * The muzzle, per form. Two rules hold this block together:
+   *
+   *  - the default path is byte-for-byte what it always was, including its
+   *    two rand() draws -- ORDINAL's canonical hash is taken with BOLT and
+   *    PULSE and nothing else, so the default's draw count is load-bearing.
+   *  - everything ADDED for the other forms uses computed velocities only.
+   *    spark(), dot() and ring() take explicit numbers and roll nothing
+   *    internally (hitBurst and shard do -- they are not used here), so a
+   *    fancier muzzle provably cannot move the seeded stream.
+   */
+  switch (p.form) {
+    // A pellet is one of up to forty-five in the same trigger pull; the old
+    // two-sparks-and-a-dot per PROJECTILE made the muzzle the brightest
+    // thing in the salvo. One spark, straight out.
+    case 'pellet':
+      spark(x, y, Math.cos(angle) * 150, Math.sin(angle) * 150, p.color, 0.12, 1.8);
+      break;
+    // Ordnance leaves with a report: a small concussion ring on top of the
+    // usual flash.
+    case 'shell':
+      spark(x, y, Math.cos(angle) * 170, Math.sin(angle) * 170, p.color, 0.16, 2.4);
+      dot(x, y, 0, 0, p.color, 0.1, 11);
+      ring(x, y, 2, 30, 0.22, p.color, 2);
+      break;
+    // Mass. The heaviest leave in the game: a wider ring and no sparks at
+    // all -- nothing about SLUG is spray.
+    case 'slab':
+      dot(x, y, 0, 0, p.color, 0.12, 14);
+      ring(x, y, 2, 44, 0.3, p.color, 2.6);
+      break;
+    // The charge crackles off the rails sideways as it leaves.
+    case 'arc':
+      spark(x, y, -Math.sin(angle) * 130 + Math.cos(angle) * 60,
+        Math.cos(angle) * 130 + Math.sin(angle) * 60, p.color, 0.14, 1.8);
+      spark(x, y, Math.sin(angle) * 130 + Math.cos(angle) * 60,
+        -Math.cos(angle) * 130 + Math.sin(angle) * 60, p.color, 0.14, 1.8);
+      dot(x, y, 0, 0, p.color, 0.09, 9);
+      break;
+    // A dart leaves clean: one fast glint straight down the line.
+    case 'dart':
+      spark(x, y, Math.cos(angle) * 320, Math.sin(angle) * 320, p.core, 0.1, 1.6);
+      break;
+    default:
+      for (let i = 0; i < 2; i++) {
+        spark(x, y, Math.cos(angle) * rand(60, 200) + spread(70), Math.sin(angle) * rand(60, 200) + spread(70), p.color, 0.14, 2);
+      }
+      dot(x, y, 0, 0, p.color, 0.09, 9);
+      break;
   }
-  dot(x, y, 0, 0, p.color, 0.09, 9);
   return p;
 }
 
