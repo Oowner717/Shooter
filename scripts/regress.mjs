@@ -1538,6 +1538,90 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- the corruption feed is not the brightest thing in the game -------------
+/*
+ * The feed's inverted bands were `difference` against #ffffff. On a normal
+ * image that is an invert; on this one it is a white fill, because the field
+ * is 97% near-black -- so every band took a strip of the screen from luminance
+ * 5 to luminance 250.
+ *
+ * Measured on a full field, one object attached to the turret took the screen
+ * from 0.65% near-white pixels to 11.4%, and two to 14.4%. The entire game --
+ * fifty-seven bodies of neon on black -- is 0.5%. The corruption feed was
+ * twenty times brighter than the thing it was drawn over, and it read as
+ * broken rendering rather than as something having hold of you.
+ *
+ * The bands difference against a dark slate now, the block noise is cold and
+ * dim, the tear line is the turret's own breached red instead of white, and
+ * the light that came out is paid back in displacement -- slices tear
+ * vertically as well as sideways, which moves the game's own image a long way
+ * for no light at all. Brightness fell to 0.57%/0.64% and the fraction of the
+ * lit image the feed disturbs held at 39.6%/62.1% against 35.6%/62.4%.
+ *
+ * The ceiling is what is asserted. The disturbance is not, because the
+ * instrument for it is poor -- see the note in the probe -- and a test that
+ * cannot tell violent from bright is the test that let this ship.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { glitch } = await import('../src/glitch.js');
+    g.debugTeachAll();
+    g.debugClearField();
+    g.debugFillField();
+    g.hud.clearHint();
+    g.hud.clearAlerts();
+    // Let the field settle into place without the feed on it.
+    w.shock = 0;
+    for (let i = 0; i < 90; i++) g.update(1 / 60);
+
+    const cv = document.getElementById('stage');
+    const c2 = cv.getContext('2d');
+    /* Every 5th pixel; near-white is what a plate makes and a neon outline
+     * does not. */
+    const read = () => {
+      const d = c2.getImageData(0, 0, cv.width, cv.height).data;
+      let n = 0; let bright = 0; let sum = 0;
+      for (let i = 0; i < d.length; i += 20) {
+        const L = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+        sum += L; n++;
+        if (L > 200) bright++;
+      }
+      return { brightPct: +(bright / n * 100).toFixed(2), mean: +(sum / n).toFixed(1) };
+    };
+
+    const at = (level) => {
+      glitch.level = level;
+      glitch.roll += 90;
+      g.draw();
+      return read();
+    };
+    const clean = at(0);
+    // CFG.glitch: 0.34 an attachment, capped at 0.92.
+    const one = at(0.34);
+    const two = at(0.68);
+    const capped = at(0.92);
+    glitch.level = 0;
+    g.draw();
+    g.restart();
+    return { clean, one, two, capped };
+  });
+
+  const worst = Math.max(r.one.brightPct, r.two.brightPct, r.capped.brightPct);
+  check('the corruption feed is not brighter than the game it is drawn over',
+    worst < 2.5 && r.capped.mean < r.clean.mean * 2,
+    `clean ${r.clean.brightPct}% near-white at mean ${r.clean.mean}; `
+    + `one ${r.one.brightPct}%, two ${r.two.brightPct}%, `
+    + `capped ${r.capped.brightPct}% at mean ${r.capped.mean}`);
+
+  // ...and it is still doing something. A feed that lit nothing and moved
+  // nothing would pass the check above.
+  check('...and it is still doing something to the frame',
+    r.capped.mean > r.clean.mean * 1.05 || r.capped.brightPct > r.clean.brightPct,
+    `clean mean ${r.clean.mean} -> capped mean ${r.capped.mean}`);
+}
+
 // --- SPIRAL is the one ability that is about the gun -------------------------
 /*
  * It replaced CHORUS, and the reason was a gap rather than a complaint. Every
