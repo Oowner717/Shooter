@@ -328,7 +328,12 @@ function resolveSegment(world, p, ax, ay, bx, by) {
   switch (bestKind) {
     case 'enemy': {
       const e = bestTarget;
-      const res = e.takeHit(world, p.damage, hx, hy, dirx, diry, p.impulse, p.shred);
+      // 'tracer' is the explicit default form; takeHit treats null and
+      // 'tracer' the same way (the classic burst), so only NAMED forms take
+      // the per-form path. Passed as null for tracer to keep that path's
+      // guard trivially cheap.
+      const res = e.takeHit(world, p.damage, hx, hy, dirx, diry, p.impulse, p.shred,
+        p.form === 'tracer' ? null : p.form);
       if (res === 'reflect') {
         // mirror the velocity about the prism's surface normal
         let nx = (hx - e.x) / (e.r || 1);

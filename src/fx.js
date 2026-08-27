@@ -174,6 +174,143 @@ export function flash(alpha, color = '#ffffff') {
 // ------------------------------------------------------------ composites
 
 /** Bolt impact against a body. */
+/**
+ * A round landing, per form.
+ *
+ * Every projectile in the game landed as the same hitBurst in a different
+ * colour -- the rounds were given nine identities in flight in build 172 and
+ * all nine still ARRIVED identically, which is the one-recipe disease at the
+ * exact moment the player is being paid for a hit. Each form lands as what it
+ * is now: ice chips, a crackle, a puncture, a concussion, a puff, a ledger
+ * tick.
+ *
+ * The default -- BOLT, FAN, anything unnamed -- still goes through hitBurst
+ * with its exact randomness, because ORDINAL's canonical hash is taken with
+ * BOLT and the default path's draw count is load-bearing. Everything here
+ * only ever runs for a named form, which the canonical fight never fires.
+ */
+export function impactFx(form, x, y, nx, ny, color) {
+  switch (form) {
+    // Up to forty-five of these land per salvo: one spark and out, which is
+    // also a quarter of what the generic burst cost.
+    case 'pellet':
+      spark(x, y, nx * 160 + spread(60), ny * 160 + spread(60), color, 0.14, 1.8);
+      break;
+    // The blast is the show; the contact itself is one ember so the two
+    // never compete.
+    case 'shell':
+      ember(x, y, spread(40), spread(40) - 30, color, 0.5, 2.6);
+      break;
+    // Discharge: jagged, perpendicular, brief.
+    case 'arc': {
+      const px = -ny;
+      const py = nx;
+      for (const side of [-1, 1]) {
+        spark(x, y, px * side * rand(180, 320) + nx * 60,
+          py * side * rand(180, 320) + ny * 60, color, 0.14, 1.7);
+      }
+      dot(x, y, 0, 0, '#ffffff', 0.1, 8);
+      break;
+    }
+    // A puncture: one bright through-spark carrying on, no spray.
+    case 'dart':
+      spark(x, y, -nx * rand(260, 380), -ny * rand(260, 380), '#ffffff', 0.16, 2);
+      dot(x, y, 0, 0, color, 0.08, 6);
+      break;
+    // Concussion: a ring and slow dust, nothing bright. Mass, arriving.
+    case 'slab':
+      ring(x, y, 3, 40, 0.28, color, 2.6);
+      for (let i = 0; i < 3; i++) dot(x, y, spread(60), spread(60) - 20, color, rand(0.4, 0.7), rand(3, 5));
+      break;
+    // Ice: faceted chips with gravity, and a cold glint.
+    case 'flake':
+      for (let i = 0; i < 4; i++) {
+        shard(x, y, nx * rand(40, 120) + spread(140), ny * rand(40, 120) + spread(140) - 60,
+          '#bfefff', rand(0.4, 0.8), rand(2, 3.6), 6);
+      }
+      dot(x, y, 0, 0, '#ffffff', 0.09, 7);
+      break;
+    // A puff that rises: what the patch will be made of.
+    case 'pod':
+      for (let i = 0; i < 3; i++) {
+        ember(x, y, spread(50), -rand(20, 70), color, rand(0.5, 0.9), rand(2, 3.4));
+      }
+      break;
+    // The ledger tick: a small ring in the mark's own green.
+    case 'tithe':
+      ring(x, y, 2, 26, 0.24, color, 2);
+      dot(x, y, 0, 0, color, 0.1, 6);
+      break;
+    default:
+      hitBurst(x, y, nx, ny, color);
+  }
+}
+
+/**
+ * A death, flavoured by what caused it. The base explode() always runs --
+ * this is the garnish on top, and only for a fresh, named killer: a body
+ * that dies to BOLT, to an ability, or half a second after its last hit gets
+ * the classic death it always had, which also keeps every kill in ORDINAL's
+ * canonical fight off this path entirely.
+ */
+export function deathFx(form, x, y, r) {
+  switch (form) {
+    // Frozen through: the body comes apart as ice, not as fire.
+    case 'flake':
+      for (let i = 0; i < 6; i++) {
+        const a = rand(0, TAU);
+        shard(x, y, Math.cos(a) * rand(80, 220), Math.sin(a) * rand(80, 220) - 40,
+          '#bfefff', rand(0.5, 1), rand(2.4, Math.max(3, r * 0.22)), 6);
+      }
+      ring(x, y, 4, r * 2.2, 0.3, '#8fe3ff', 2);
+      break;
+    // Burned out: embers rise off the wreck.
+    case 'shell':
+      for (let i = 0; i < 5; i++) {
+        ember(x, y, spread(80), -rand(20, 90), '#ff9f5c', rand(0.7, 1.4), rand(2, 4));
+      }
+      break;
+    // Earthed: the charge leaves the body the way it arrived.
+    case 'arc': {
+      for (let i = 0; i < 3; i++) {
+        const a = rand(0, TAU);
+        spark(x, y, Math.cos(a) * rand(240, 420), Math.sin(a) * rand(240, 420),
+          '#c79bff', 0.18, 2);
+      }
+      dot(x, y, 0, 0, '#ffffff', 0.12, r);
+      break;
+    }
+    // Bisected: two big halves, perpendicular to nothing in particular --
+    // the read is "cut", not "burst".
+    case 'dart':
+      for (const side of [-1, 1]) {
+        shard(x, y, spread(60), side * rand(120, 200), '#ff9ade', rand(0.6, 1),
+          Math.max(3, r * 0.3), 3);
+      }
+      break;
+    // Crushed: slow, heavy, and the ground answers.
+    case 'slab':
+      for (let i = 0; i < 4; i++) {
+        dot(x, y, spread(70), spread(70), '#b8c6d8', rand(0.5, 0.9), rand(3, 6));
+      }
+      ripple(x, y, 1.2, r * 6);
+      break;
+    // Gone to spores.
+    case 'pod':
+      for (let i = 0; i < 5; i++) {
+        ember(x, y, spread(60), -rand(20, 80), '#8eeb4b', rand(0.7, 1.3), rand(2, 3.6));
+      }
+      break;
+    // Paid in full: the double ring is the receipt.
+    case 'tithe':
+      ring(x, y, 4, r * 2.6, 0.34, '#40e693', 2.6);
+      ring(x, y, 2, r * 1.6, 0.26, '#dfffe9', 1.6);
+      break;
+    default:
+      break;
+  }
+}
+
 export function hitBurst(x, y, nx, ny, color) {
   const n = (5 * fx.quality) | 0;
   for (let i = 0; i < n; i++) {

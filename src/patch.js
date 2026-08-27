@@ -83,6 +83,9 @@ export class Patch {
       if (e.dead || e.staged || e.harmless) continue;
       const reach = rr + e.r;
       if ((e.x - this.x) ** 2 + (e.y - this.y) ** 2 > reach * reach) continue;
+      // A body the ground finishes died of spores, and its death says so.
+      e.lastHit = 'pod';
+      e.lastHitT = world.time;
       e.applyDamage(world, bite, 0, 0, 0);
       spark(e.x, e.y, spread(60), spread(60) - 30, this.tone, 0.3, 1.6);
     }

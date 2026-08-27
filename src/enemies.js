@@ -4,7 +4,7 @@
 
 import { CFG, WAVES, TYPE_BY_ID, ROUTES, HAIRLINE, massOf } from './config.js';
 import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
-import { explode, hitBurst, spark, dot, shard as fxShard, ring, ripple, haul } from './fx.js';
+import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul } from './fx.js';
 import { audio } from './audio.js';
 import { shed } from './debris.js';
 
@@ -227,6 +227,11 @@ export class Enemy {
     this.graftBaseHp = 0;
     this.graftBaseEnergy = 0;
     this.tether = null; // the other half of a TOW, if any
+    // What last hit this body and when -- the death wears it if it is fresh.
+    // A name from the round's flight form ('flake', 'shell'...), never from
+    // an ability, so every kill in the canonical fight stays off the path.
+    this.lastHit = null;
+    this.lastHitT = -1;
     // Every object picks its own way across the field.
     this.route = opts.route || weightedPick(ROUTES);
     this.routeSide = Math.random() < 0.5 ? -1 : 1;
@@ -885,7 +890,7 @@ export class Enemy {
   /**
    * @returns 'reflect' | 'hit'
    */
-  takeHit(world, dmg, hx, hy, nx, ny, impulse, shred = 0) {
+  takeHit(world, dmg, hx, hy, nx, ny, impulse, shred = 0, form = null) {
     // Prisms bounce glancing bolts; only a square-on hit lands.
     if (this.type.reflect) {
       const ndx = (hx - this.x) / this.r;
@@ -897,8 +902,18 @@ export class Enemy {
       }
     }
 
+    if (form) {
+      this.lastHit = form;
+      this.lastHitT = world.time;
+    }
     this.applyDamage(world, dmg, nx, ny, impulse, shred);
-    hitBurst(hx, hy, -nx, -ny, this.type.glow);
+    /*
+     * The landing, per form. The null path is byte-for-byte the old one --
+     * hitBurst with its own randomness -- because it is the path every hit
+     * in ORDINAL's canonical fight takes, and its draw count is load-bearing.
+     */
+    if (form) impactFx(form, hx, hy, -nx, -ny, this.type.glow);
+    else hitBurst(hx, hy, -nx, -ny, this.type.glow);
     return 'hit';
   }
 
@@ -948,6 +963,15 @@ export class Enemy {
     // The harmless ones pay too. It is the one income the tally never sees.
     else if (this.harmless) bank(world, CFG.energy.drift * this.bounty, this.x, this.y);
     explode(this.x, this.y, this.r, t.color, t.glow, this.isDrop ? 0.55 : 1);
+    /*
+     * ...and the death wears what killed it, if the kill is fresh: frozen
+     * through, burned out, earthed, bisected, crushed, gone to spores, or
+     * paid in full. Half a second of freshness, because a body tagged by
+     * RIME a while ago and finished by a PULSE did not die of ice.
+     */
+    if (this.lastHit && world.time - this.lastHitT < 0.5 && !this.isDrop) {
+      deathFx(this.lastHit, this.x, this.y, this.r);
+    }
     audio.pop(clamp(this.r / 22, 0.5, 2.4));
 
     if (this.isDrop) return;

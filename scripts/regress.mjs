@@ -1538,6 +1538,124 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- a hit lands as the round, and a death wears its killer ------------------
+/*
+ * The rounds were given nine identities in flight in build 172 and all nine
+ * still ARRIVED identically -- every projectile landed as the same hitBurst
+ * in a different colour, and every body died as the same explode(). The
+ * one-recipe disease, at the exact moments the player is being paid.
+ *
+ * Named forms land as what they are now (ice chips, a crackle, a puncture, a
+ * concussion, a puff, a ledger tick) and a death within half a second of a
+ * named hit wears it. The default path -- BOLT, FAN, anything unnamed -- is
+ * byte-for-byte the old hitBurst and the plain explode, because it is the
+ * path every hit in ORDINAL's canonical fight takes, and the hash held at
+ * 117409503 through this change on exactly that guarantee.
+ *
+ * Counted structurally: what each impact SPAWNS (streaks, dots, shards,
+ * embers, rings), not what it paints -- the mix is the identity and it is
+ * exact where pixels are weather.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { fx, impactFx, deathFx } = await import('../src/fx.js');
+    g.debugTeachAll();
+    g.debugClearField();
+    w.spawnLock = 1e9;
+    if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
+
+    const census = () => {
+      const c = { streak: 0, dot: 0, shard: 0, ember: 0 };
+      for (const q of fx.particles.active) {
+        c[['dot', 'streak', 'shard', 'ember', 'haul'][q.kind] || 'dot']++;
+      }
+      c.rings = fx.rings.active.length;
+      return c;
+    };
+    const clear = () => { fx.particles.clear(); fx.rings.clear(); };
+    const delta = (a, b) => Object.fromEntries(
+      Object.keys(b).map((k) => [k, b[k] - (a[k] || 0)]));
+
+    const forms = ['pellet', 'shell', 'arc', 'dart', 'slab', 'flake', 'pod', 'tithe'];
+    const impacts = {};
+    for (const f of forms) {
+      clear();
+      const before = census();
+      impactFx(f, 400, 400, 0, -1, '#ffffff');
+      impacts[f] = delta(before, census());
+    }
+    clear();
+    const before = census();
+    impactFx(null, 400, 400, 0, -1, '#ffffff'); // the default: classic burst
+    impacts.default = delta(before, census());
+
+    const deaths = {};
+    for (const f of ['flake', 'shell', 'arc', 'dart', 'slab', 'pod', 'tithe']) {
+      clear();
+      const b2 = census();
+      deathFx(f, 400, 400, 20);
+      deaths[f] = delta(b2, census());
+    }
+
+    /*
+     * ...and the wiring, end to end: a body killed by a RIME round dies with
+     * ice shards on top of its own explode, and one killed by a BOLT does
+     * not. Driven through the real projectile path, not the dispatchers.
+     */
+    const kill = (round) => {
+      g.debugClearField();
+      // ...and the air with it. The first draft left the previous round's
+      // projectiles in flight, and a leftover RIME bolt tagged the "BOLT"
+      // kill's fresh mote before the first BOLT arrived.
+      w.projectiles.length = 0;
+      const s = w.shooter;
+      const e = g.debugSpawn('mote', s.x, s.y - 160);
+      e.spawnIn = 0; e.vx = 0; e.vy = 0; e.hp = 1;
+      w.round = round;
+      s.aim = -Math.PI / 2; s.targetAim = s.aim;
+      clear();
+      for (let i = 0; i < 90 && !e.dead; i++) {
+        s.cooldown = 0;
+        s.shoot(w);
+        g.update(1 / 60);
+      }
+      return { dead: e.dead, tagged: e.lastHit, shards: census().shard };
+    };
+    const rimeKill = kill('rime');
+    const boltKill = kill('standard');
+
+    clear();
+    g.debugClearField();
+    g.restart();
+    return { impacts, deaths, rimeKill, boltKill };
+  });
+
+  const sig = (d) => Object.entries(d).filter(([, v]) => v > 0)
+    .map(([k, v]) => `${k}:${v}`).join(',') || 'nothing';
+  const sigs = Object.entries(r.impacts).map(([f, d]) => `${f}=${sig(d)}`);
+  const distinct = new Set(Object.values(r.impacts).map(sig));
+  const empty = Object.entries(r.impacts).filter(([, d]) => sig(d) === 'nothing');
+  check('every named round lands as its own mix, and none lands as nothing',
+    empty.length === 0 && distinct.size >= 7,
+    `${distinct.size} distinct impact signatures of ${Object.keys(r.impacts).length}: `
+    + sigs.join('  '));
+
+  const deadSigs = new Set(Object.values(r.deaths).map(sig));
+  check('...and every named death is a different garnish',
+    Object.values(r.deaths).every((d) => sig(d) !== 'nothing') && deadSigs.size >= 6,
+    `${deadSigs.size} distinct of ${Object.keys(r.deaths).length}: `
+    + Object.entries(r.deaths).map(([f, d]) => `${f}=${sig(d)}`).join('  '));
+
+  check('...and a RIME kill dies of ice through the real path, a BOLT kill does not',
+    r.rimeKill.dead && r.rimeKill.tagged === 'flake' && r.rimeKill.shards > 0
+    && r.boltKill.dead && r.boltKill.tagged === null,
+    `RIME: dead ${r.rimeKill.dead}, tagged ${r.rimeKill.tagged}, `
+    + `${r.rimeKill.shards} shards; BOLT: dead ${r.boltKill.dead}, `
+    + `tagged ${r.boltKill.tagged}`);
+}
+
 // --- ground is under the field, and one band holds one voice ----------------
 /*
  * Two defects from the first full-chaos review -- every system staged on one
