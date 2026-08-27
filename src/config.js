@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '177';
+export const BUILD = '178';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '177';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '683b8a3';
+export const REV = '9ec11bd';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -375,7 +375,18 @@ export const CFG = {
       // and wait at the muzzle, so they read as one trigger pull with a
       // stutter in it rather than as a faster cadence.
       tapGap: 0.06,
-      tapFade: 0.6,
+      /*
+       * 0.5 from build 178, down from 0.6.
+       *
+       * This is the other half of the cadence nerf, and the larger half.
+       * scripts/tiers.mjs measured the ladder on 177: FEED's two levels were
+       * worth 1.56x on rounds a second and the two taps 3x on top, so a
+       * trigger pull with TRIPLE TAP behind it was 1 + 0.6 + 0.36 = 1.96
+       * rounds' worth of damage. At 0.5 it is 1 + 0.5 + 0.25 = 1.75, which is
+       * 11% off the top end and nothing at all off a turret that has not
+       * bought the taps -- which is the shape a nerf here should have.
+       */
+      tapFade: 0.5,
     },
     explosive: {
       rate: 2.1, // less than half the cadence

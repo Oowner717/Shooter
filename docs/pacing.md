@@ -153,3 +153,68 @@ thresholds used, so nothing a run has met ever re-locks.)*
 - Implementation order: **A first** (ladder + chip + fail score, swell still
   in place behind it), then tiers.mjs, then B and C tuned against its table,
   then the swell/killGoal demolition last — each step shippable.
+
+---
+
+## What was actually built, and what it measured
+
+### Build 177 — plan A, the ladder
+
+Shipped as specified: bands on all 25 regular waves, tiers with the three
+slopes, the fail score off `director.wait` and contact-seconds, two-strike
+step-back announced as `THE FIELD RELENTS`, the TIER chip and its row, four
+save fields with migration from kills, six regress cases.
+
+One thing the plan got wrong and the screen found: the chip was put inside
+`#barChips`, the group that deliberately shrinks to absorb a growing purse, so
+a six-figure ENERGY reading pushed the tier control behind the menu button. A
+control is fixed furniture. Fixed the same build.
+
+### Build 178 — plan B's B1 and B3
+
+FEED went from two levels to one; `tapFade` from 0.6 to 0.5. `scripts/tiers.mjs`
+was written first, so both are measured rather than asserted.
+
+| | build 177 | build 178 |
+|---|---|---|
+| peak rounds/s | 32.9 | **25.4** (−23%) |
+| peak dps | 2,050 | **1,438** (−30%) |
+| worst TTK, tiers 9–20 | ~1.0s | **~1.4s** (+40%) |
+| tiers 1–5 | unchanged | unchanged |
+
+The last row is the shape a nerf here should have: a turret that has not bought
+the taps pays nothing at all.
+
+### ...and the thing the plan had wrong
+
+**The wall plan B is written around does not exist, and cannot be built out of
+the health slope as it stands.** Plan B wants a tier's band held at 2–4s
+through about tier 10 and past 6s by about 14. Measured across tiers 1–20, both
+before and after the nerf, the slowest member of a band peaks at 3.0s (SPLITTER,
+tier 3) and then *falls*, settling at 1.2–1.6s from tier 9 all the way to 20.
+
+Two measurements say why:
+
+1. **The tree plateaus at about tier 8.** dps is 1,430 for 15k spent and still
+   1,438 for 116k. Everything past the damage line — every round, mine and
+   ability — buys nothing a single body can feel. A partly-spent turret is as
+   dangerous as a bought-out one.
+2. **`hp: 0.06` is linear and cannot catch it.** At tier 20 it is ×2.2. The
+   damage line is ×13 by tier 8 and then flat. Health never closes that.
+
+To put the worst body at 6s by tier 14 the multiplier there has to be about
+7.4× rather than today's 1.84×. Linear, that is `hp: 0.457`, which makes tier 2
+nearly twice as tough as tier 1 — a slope that is all early and no late.
+Compounding is the right shape for it: `hp` read as `1.155ⁿ` gives ×1.33 at
+tier 2, ×2.05 at 5, ×4.2 at 10, ×7.5 at 14 and ×18 at 20 — gentle where the
+player is learning the ladder and steep where the wall is wanted.
+
+That is a change to the ladder's character and not a tuning pass, so it is
+written down here rather than shipped. It is the next decision, and it is the
+only one left between plan B and its own target.
+
+### Still outstanding
+
+- The hp-slope decision above.
+- Plan C in full: `world.earned`, energy-gated unlocks, bounty tuning.
+- The demolition: `killGoal`, `releasesLeft`.

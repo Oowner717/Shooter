@@ -63,6 +63,30 @@ if (cov.missing.length || cov.extra.length || cov.dupes.length) {
 console.log(`tree places all ${cov.want} buyable things exactly once`);
 
 /*
+ * ...and the machine knows how many parts it has.
+ *
+ * `RIG_MAX` in shooter.js is every level of every TURRET node added up, and it
+ * is a hand-written copy because the gun has no business importing the shop.
+ * It is read out of the source rather than imported, because importing
+ * shooter.js here would drag in audio and the canvas.
+ *
+ * A stale copy is silent: the turret's housing, rings and mount all light as a
+ * fraction of it, so a machine that has bought everything simply never
+ * finishes filling. Build 178 took a level off FEED and left this at 17.
+ */
+const { NODES } = await import(new URL('../src/tree.js', import.meta.url));
+const turretLevels = NODES
+  .filter((n) => n.id && n.parent && n.parent.key === 'turret')
+  .reduce((a, n) => a + (n.levels || 1), 0);
+const rigMax = Number(grab('src/shooter.js', /RIG_MAX = (\d+)/));
+if (rigMax !== turretLevels) {
+  console.error(`RIG_MAX is ${rigMax} but the TURRET branch sells ${turretLevels} levels; `
+    + 'the machine would never finish filling');
+  process.exit(1);
+}
+console.log(`the turret's ${turretLevels} sockets match what the TURRET branch sells`);
+
+/*
  * Colour is a contract: grey means harmless. See the rule above ENEMY_TYPES.
  *
  * It is checked rather than trusted because it is the kind of rule a single

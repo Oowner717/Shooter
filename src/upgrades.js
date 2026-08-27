@@ -345,15 +345,22 @@ export const UPGRADES = {
   ],
   TURRET: [
     /*
-     * Two steps now, not one. It used to declare no `levels` at all, which
-     * means Infinity here — it could be taken over and over for the same 20%
-     * every time, which is a stack rather than a ladder.
+     * One step, from build 178. It had two -- FEED and RUNAWAY FEED, 0.64 of
+     * the interval between them -- and before that no `levels` at all, which
+     * means Infinity here: it could be taken over and over for the same 20%,
+     * a stack rather than a ladder.
      *
-     * The effect is the same at both levels because `apply` is handed
-     * (world.up, world) and never the level: tiers change what the card says,
-     * not what it does. Two takes come to 0.64 of the interval, which is more
-     * than the 30% that came off the base rate in build 81, so a turret that
-     * invests in cadence ends up faster than it ever was.
+     * The second step went because the cadence at the top was too high and
+     * this is the honest place to take it off: a level of an upgrade, priced
+     * and named, rather than a slope quietly retuned underneath one. What it
+     * is worth is 20% of the interval instead of 36%.
+     *
+     * It is worth knowing what this does NOT fix. scripts/tiers.mjs measured
+     * the whole cadence ladder on build 177: FEED's two levels together came
+     * to 1.56x on rounds a second, and DOUBLE TAP into TRIPLE TAP came to 3x
+     * on top of it -- the cliff is the taps, and this is the smaller half of
+     * it. See CFG.rounds.standard.tapFade for the other half, and
+     * docs/pacing.md for why both were still not enough on their own.
      */
     /*
      * This branch is named for what it bolts on rather than for the stat it
@@ -362,9 +369,8 @@ export const UPGRADES = {
      * ring is a row you can point at. The line still states the effect,
      * because the effect is what is being paid for.
      */
-    { id: 'rate', name: 'FEED', levels: 2,
+    { id: 'rate', name: 'FEED', levels: 1,
       line: '+20% fire rate. A belt feed along the barrel.',
-      tiers: [null, { name: 'RUNAWAY FEED', line: '+20% again, on top of FEED. A second belt, and the barrel stops waiting.' }],
       apply: quicken('rate', 0.8), icon: MARK.rate },
     { id: 'slew', name: 'GIMBAL', line: '+50% auto aim turn speed. Another ring on the mount.', apply: scale('slew', 1.5) , icon: MARK.slew },
     { id: 'overwatch', name: 'SIGHT', line: '+25% damage while hands off the lever. A sight mast over the barrel.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },

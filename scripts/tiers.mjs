@@ -265,8 +265,17 @@ for (let r = 0; r < RUNS; r++) {
        * comparable down its whole length.
        */
       for (const id of line) {
-        if (g.buy(id) !== 'ok') break;
-        bought.push(id);
+        const got = g.buy(id);
+        /*
+         * Only "cannot afford" stops the line. "maxed" means the line asks for
+         * a level the tree no longer sells and is skipped -- build 178 took
+         * FEED from two levels to one, and breaking on maxed abandoned the
+         * damage line at its fourth entry and measured tree order instead. The
+         * table looked like the nerf had moved the taps six tiers later; it had
+         * moved nothing.
+         */
+        if (got === 'poor') break;
+        if (got === 'ok') bought.push(id);
       }
       // Whatever the damage line could not absorb goes on the rest of the
       // tree, in tree order -- parents first, so an arm is open before its

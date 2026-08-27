@@ -8,11 +8,18 @@ import { Patch } from './patch.js';
 import { spark, ring, shake } from './fx.js';
 
 /*
- * Every level of every part in the TURRET branch, added up: 2 FEED, 3 GIMBAL,
+ * Every level of every part in the TURRET branch, added up: 1 FEED, 3 GIMBAL,
  * 2 ARRAY, 3 SIGHT, 3 SPINES, 3 SHROUD, 1 INTAKE. What `rig().filled` is a
  * fraction of, and the one number that tells the machine it is finished.
+ *
+ * It is written out here rather than derived, because shooter.js reaching into
+ * the tree to ask would be the gun importing the shop. So it is a copy, and a
+ * copy of a number that moves is a number that goes stale: it said 17 for the
+ * whole of build 178, when FEED went from two levels to one, and a machine
+ * that can never fill its last socket never lights. scripts/check-build.mjs
+ * holds this to the tree now.
  */
-const RIG_MAX = 17;
+export const RIG_MAX = 16;
 
 /** How wide SALVO throws its three. */
 const SALVO_FAN = 0.09;

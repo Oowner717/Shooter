@@ -464,10 +464,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 137 since build 169, when SPIRAL gained COUNTERSPIN -- the first
-    // shaping upgrade any ability has ever had under it.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 137
-    && /TURRET 17\/17/.test(r.full.count) && !/TURRET 17\/17/.test(r.bare.count),
+    // 136 since build 178, when FEED lost its second level -- plan B's nerf.
+    // It was 137 from 169, when SPIRAL gained COUNTERSPIN, the first shaping
+    // upgrade any ability has ever had under it.
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 136
+    && /TURRET 16\/16/.test(r.full.count) && !/TURRET 16\/16/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
     r.bare.tones.length > 10 && r.bare.tones.every((t) => t && t !== '#9fb3c8'),
@@ -1536,6 +1537,85 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.deeper.length === 4 && Math.abs(r.full - r.bare) > 5000,
     `levels 1 -> 3 changed the machine for ${r.deeper.join(', ') || 'nothing'}; `
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
+}
+
+// --- the cadence ceiling is where plan B put it ------------------------------
+/*
+ * Two numbers hold the top of the turret's rate of fire down, and both were
+ * moved in build 178: FEED has one level instead of two, and a tap fades to
+ * half instead of three fifths.
+ *
+ * They are asserted together and against the gun rather than against the
+ * table, because that is where they could come apart. Either could be put back
+ * by a hand that only read the other -- the tree could grow a second FEED
+ * without anyone touching tapFade, or tapFade could drift back to 0.6 and
+ * leave the tree alone -- and neither shows up anywhere on screen. What is
+ * checked is the thing plan B is actually about: how many rounds a fully fed
+ * turret puts out a second, and what the tail of one trigger pull is worth.
+ *
+ * Rounds are counted at the muzzle. `shoot()` returns false when it cannot
+ * fire, so a call is not a round -- the same mistake scripts/variance.mjs made
+ * and published a finding on.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { NODE_BY_ID } = await import('../src/tree.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    /*
+     * The director is silenced so nothing arrives mid-count, and put back
+     * before this case returns. `reset()` clears the world's arrays but keeps
+     * the same Director object, so a patch left on it outlives every restart
+     * after it -- which is how this case, on its first run, quietly stopped
+     * the four ladder cases below from ever seeing a wave.
+     */
+    const ran = w.director.update;
+    w.director.update = () => {};
+    for (const e of [...w.enemies]) e.dead = true;
+    w.enemies.length = 0;
+    w.projectiles.length = 0;
+
+    const feed = NODE_BY_ID.get('rate').levels;
+    const fade = CFG.rounds.standard.tapFade;
+
+    // Everything, then fire at nothing for four seconds and count the muzzle.
+    g.debugGiveEnergy(200000);
+    g.debugBuyAll();
+    w.autoAim = false;
+    w.autoFire = true;
+    w.shooter.cooldown = 0;
+    g.fireTimer = 0;
+    let rounds = 0;
+    const push = w.projectiles.push.bind(w.projectiles);
+    w.projectiles.push = (...ps) => { rounds += ps.length; return push(...ps); };
+    for (let i = 0; i < 4 * 60; i++) g.update(1 / 60);
+    w.projectiles.push = push;
+    w.director.update = ran;
+
+    // What the interval is, straight off the same arithmetic updateFiring does.
+    const interval = CFG.shooter.gripFireInterval * CFG.rounds.standard.rate * w.up.rate;
+    return {
+      feed, fade, taps: w.up.boltTap, rps: rounds / 4, pulls: 1 / interval,
+      // 1 + fade + fade^2: what one trigger pull is worth with TRIPLE TAP in.
+      pull: 1 + fade + fade * fade,
+    };
+  });
+  check('FEED sells one level, and a tap fades to half',
+    r.feed === 1 && Math.abs(r.fade - 0.5) < 1e-9,
+    `FEED x${r.feed}, tapFade ${r.fade}`);
+  /*
+   * 7.1 pulls a second: 0.286 base, one FEED (x0.8) and three HOT LOAD
+   * (x0.85^3). It was 8.9 with the second FEED in. The rounds figure is that
+   * times three taps times SALVO's every-eighth, so it sits near 26.
+   */
+  check('a fully fed turret tops out where plan B put it',
+    r.pulls > 6.8 && r.pulls < 7.4 && r.rps > 22 && r.rps < 30,
+    `${r.pulls.toFixed(1)} pulls/s, ${r.rps.toFixed(1)} rounds/s, ${r.taps} taps`);
+  check('...and the tail of a trigger pull is worth 1.75, not 1.96',
+    Math.abs(r.pull - 1.75) < 1e-9, `one pull = ${r.pull.toFixed(2)} rounds of damage`);
 }
 
 // --- the ladder climbs, catches, and remembers ------------------------------
