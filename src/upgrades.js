@@ -35,6 +35,7 @@ export function freshUpgrades() {
     boltTap: 0, // follow-up rounds behind every BOLT
     shotPellets: 0, // extra pellets in a SHOT
     shotRange: 1, // and how far they get before they expire
+    spiralArms: 1, // barrels SPIRAL sweeps with, and which way they turn
     titheStep: 1, // how fast TITHE's mark deepens its own bite
     titheMarks: 0, // and how deep it may go past the eight it starts with
     salvo: 0, // every Nth shot fires three
@@ -96,6 +97,8 @@ const MARK = {
   fifthlink: g('<circle cx="5" cy="17" r="2.2"/><circle cx="12" cy="8" r="2.2"/><circle cx="19" cy="16" r="2.2"/><path d="M6.4 15.3 10.6 9.8M13.5 9.5l4.2 4.7"/>'),
   // A mark that compounds on itself.
   compound: g('<path d="M4 19.4 9 13l3.6 3.2L20 5.6"/><path d="M15.6 5.6H20v4.4" fill="none"/><circle cx="9" cy="13" r="1.6" fill="currentColor" stroke="none"/><circle cx="12.6" cy="16.2" r="1.6" fill="currentColor" stroke="none"/>'),
+  counterspin: g('<path d="M12 4.6a7.4 7.4 0 1 1-7.2 5.7"/><path d="M4.4 5.6 4.8 10.3l4.6-.9" />'
+    + '<path d="M12 9.2a2.9 2.9 0 1 0 2.8 3.6" opacity=".75"/>'),
   salvo: g('<path d="M5 21V7M12 21V4M19 21V7"/><path d="M2.6 9.4 5 7l2.4 2.4M9.6 6.4 12 4l2.4 2.4M16.6 9.4 19 7l2.4 2.4"/>'),
   // --- build 54: BOLT, HE, SHOT, ARC and SPINE each get their own ---
   // A round coming off a body at an angle rather than stopping in it.
@@ -266,6 +269,12 @@ export const UPGRADES = {
     { id: 'heavy', name: 'HEAVY', line: '2x knockback on every hit.', apply: scale('impulse', 2) , icon: MARK.heavy },
     { id: 'overpressure', name: 'OVERPRESSURE', line: '+40% HE blast radius.', apply: scale('blastR', 1.4) , icon: MARK.overpressure },
     { id: 'fifthlink', name: 'FIFTH LINK', line: 'ARC jumps 1 more time.', apply: bump('arcJumps', 1) , icon: MARK.fifthlink },
+    // One level, because it is a second arm and not a dial. Left on the
+    // default three it would have sold four arms, which is not what the line
+    // says and not what the name means.
+    { id: 'counterspin', name: 'COUNTERSPIN', levels: 1,
+      line: 'SPIRAL sweeps with a second arm, turning the other way.',
+      apply: bump('spiralArms', 1), icon: MARK.counterspin },
     { id: 'compound', name: 'COMPOUND', line: '+60% tithe mark bite.', apply: scale('titheStep', 1.6) , icon: MARK.compound },
     { id: 'throughandthrough', name: 'THROUGH AND THROUGH', line: '+2 bodies a spine pierces.', apply: bump('pierce', 2) , icon: MARK.throughandthrough },
     { id: 'sledge', name: 'SLEDGE', line: '+60% slug knockback.', apply: scale('slug', 1.6) , icon: MARK.sledge },

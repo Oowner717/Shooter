@@ -349,88 +349,172 @@ class Spiral {
     const P = CFG.spiral;
     this.t = 0;
     this.life = P.life;
+    this.settle = P.settle;
     this.dead = false;
     this.from = world.shooter.aim;
+    this.grip = world.shooter.gripAngle;
     this.next = 0;
     this.rounds = 0;
+    /*
+     * COUNTERSPIN adds a second arm turning the other way. Each arm carries
+     * its own angle and its own sign, so the upgrade is one more entry here
+     * rather than a special case in three places. The barrel is arm 0 and is
+     * the one the gun actually points along; the rest are traced.
+     */
+    this.arms = Array.from({ length: Math.max(1, world.up.spiralArms) }, (_, i) => ({
+      dir: i % 2 ? -1 : 1,
+      at: this.from + (i / Math.max(1, world.up.spiralArms)) * TAU,
+      a: this.from,
+    }));
     world.spiral = P.life;
+  }
+
+  /** Where an arm is, and how far out, at sweep fraction k. */
+  reach(k) {
+    const P = CFG.spiral;
+    return P.rIn + (P.rOut - P.rIn) * k;
   }
 
   update(world, dt) {
     const P = CFG.spiral;
     const s = world.shooter;
     this.t += dt;
-    this.life -= dt;
-    if (this.life <= 0) {
-      this.dead = true;
-      world.spiral = 0;
+
+    if (this.life > 0) {
+      this.life -= dt;
+      world.spiral = Math.max(0, this.life);
+      const k = clamp(this.t / P.life, 0, 1);
+      for (const arm of this.arms) {
+        arm.a = arm.at + arm.dir * k * P.turns * TAU;
+      }
+      /*
+       * The sweep owns the barrel. This runs in the effects pass, after
+       * shooter.update(), so whatever the assist did to the aim this frame is
+       * overwritten rather than fought with. `targetAim` goes with it, because
+       * `aimError` is a getter off the two and the slew would otherwise spend
+       * the whole sweep correcting back to a target.
+       */
+      s.aim = this.arms[0].a + spread(P.wobble);
+      s.targetAim = s.aim;
+      s.sweepFade = 1;
+
+      this.next -= dt;
+      // `while` rather than `if`: a long frame owes more than one round, and
+      // dropping them would make the sweep quietly weaker on a slow phone.
+      let guard = 12;
+      while (this.next <= 0 && guard-- > 0) {
+        /*
+         * One tick, one round per arm -- so COUNTERSPIN doubles the output
+         * and does not square it. The first version also divided the
+         * interval by the arm count, which is the same multiplier applied
+         * twice: two arms fired 118 rounds against one arm's 33.
+         */
+        this.next += P.interval;
+        for (const arm of this.arms) {
+          s.cooldown = 0;
+          const was = s.aim;
+          s.aim = arm.a + spread(P.wobble);
+          if (s.shoot(world, P.damage)) this.rounds++;
+          s.aim = was;
+        }
+      }
       return;
     }
-    world.spiral = this.life;
 
     /*
-     * The sweep owns the barrel. This runs in the effects pass, which is
-     * after shooter.update(), so whatever the assist did to the aim this
-     * frame is overwritten rather than fought with. `targetAim` goes with it,
-     * because `aimError` is a getter off the two and the slew would otherwise
-     * spend the whole sweep trying to correct back to a target -- and it is
-     * the field the assist reads to decide whether the barrel has arrived.
+     * Done firing. The gun goes back before anything else does -- the aim is
+     * wound back to where the sweep began rather than left at `from + 2.6
+     * turns`, because gripAngle is derived from it and an unwound aim leaves
+     * the gimbal's travel arc spanning six radians for the rest of the run.
+     * That is exactly what it did: the ring stayed shut after every use.
+     *
+     * Guarded on a flag rather than on `world.spiral !== 0`, which is what
+     * the first fix used and which never fired once: the running branch
+     * writes `Math.max(0, this.life)`, so by the frame the sweep ends the
+     * field it was testing had already reached zero on its own.
      */
-    const k = this.t / P.life;
-    s.aim = this.from + k * P.turns * TAU + spread(P.wobble);
-    s.targetAim = s.aim;
-
-    this.next -= dt;
-    // `while` rather than `if`: a long frame owes more than one round, and
-    // dropping them would make the sweep quietly weaker on a slow phone.
-    let guard = 8;
-    while (this.next <= 0 && guard-- > 0) {
-      this.next += P.interval;
-      s.cooldown = 0;
-      if (s.shoot(world, P.damage)) this.rounds++;
+    if (!this.restored) {
+      this.restored = true;
+      world.spiral = 0;
+      s.aim = this.from;
+      s.targetAim = this.from;
+      s.gripAngle = this.grip;
+    }
+    // ...and the closed circle fades rather than vanishing on the frame.
+    this.settle -= dt;
+    s.sweepFade = clamp(this.settle / CFG.spiral.settle, 0, 1);
+    if (this.settle <= 0) {
+      s.sweepFade = 0;
+      this.dead = true;
     }
   }
 
   draw(ctx, world) {
     const P = CFG.spiral;
     const s = world.shooter;
-    const k = clamp(this.life / P.life, 0, 1);
-    // Fades in over the first fifth and out over the last, so it never
-    // appears or vanishes on a frame.
-    const fade = Math.min(1, this.t / 0.18) * Math.min(1, this.life / 0.5);
+    const running = this.life > 0;
+    const k = clamp(this.t / P.life, 0, 1);
+    const fade = running
+      ? Math.min(1, this.t / 0.16)
+      : clamp(this.settle / P.settle, 0, 1);
+    if (fade <= 0) return;
     const TONE = '#ff7a1a';
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, TONE, s.x, s.y, 120 + (1 - k) * 50, 0.22 * fade);
+    drawGlow(ctx, TONE, s.x, s.y, 90 + k * 70, 0.2 * fade);
+
     /*
-     * A tail behind the barrel rather than a ring around the turret.
+     * The trail is the swept path itself, wound outward.
      *
-     * The first draft drew two thin arcs at a fixed radius and they were
-     * invisible against the turret's own furniture -- the aim ray, the lever,
-     * the corruption ring all live in the same sixty pixels. This is the
-     * swept arc itself: a wedge trailing the barrel, brightest at the muzzle
-     * and falling off behind, so what is drawn is the ground the gun has just
-     * covered. It also spirals outward with the sweep, which is the name.
+     * The first draft drew two thin arcs at a fixed radius and they were lost
+     * against the turret's own furniture -- the aim ray, the lever and the
+     * corruption ring all live in the same sixty pixels. The second drew a
+     * ring, which is not what the ability is called. This walks back along
+     * each arm's own history: every step is a shorter, dimmer, tighter piece
+     * of the same curve, so what is on the screen is where the gun has been.
      */
-    const head = s.aim;
-    const tail = 2.4; // radians of sweep still shown behind the barrel
-    const STEPS = 22;
-    for (let i = 0; i < STEPS; i++) {
-      const f = i / STEPS;
-      const a0 = head - f * tail;
-      const rr = 54 + f * 26 + (1 - k) * 30;
-      const w = (1 - f) ** 1.4;
-      ctx.strokeStyle = rgba(TONE, 0.5 * w * fade);
-      ctx.lineWidth = 1 + 5 * w;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, rr, a0 - tail / STEPS * 1.6, a0);
-      ctx.stroke();
+    const STEPS = 26;
+    const back = 2.9; // radians of sweep still shown behind each arm
+    for (const arm of this.arms) {
+      let px = 0;
+      let py = 0;
+      for (let i = 0; i <= STEPS; i++) {
+        const f = i / STEPS;
+        const a = arm.a - arm.dir * f * back;
+        // How far through the sweep the arm was when it was there, so the
+        // trail winds in behind it instead of tracking a fixed radius.
+        const kk = Math.max(0, k - (f * back) / (P.turns * TAU));
+        const rr = this.reach(kk);
+        const x = s.x + Math.cos(a) * rr;
+        const y = s.y + Math.sin(a) * rr;
+        if (i > 0) {
+          const w = (1 - f) ** 1.5;
+          ctx.strokeStyle = rgba(TONE, (0.12 + 0.5 * w) * fade);
+          ctx.lineWidth = 1 + 5.5 * w;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+        }
+        px = x;
+        py = y;
+      }
+      // The leading edge, where the rounds are actually leaving.
+      const hx = s.x + Math.cos(arm.a) * this.reach(k);
+      const hy = s.y + Math.sin(arm.a) * this.reach(k);
+      drawGlow(ctx, '#ffd9a0', hx, hy, 34, 0.55 * fade);
+      if (running) {
+        // ...and the line from the muzzle out to it, so the two read as one
+        // machine rather than as a turret and a separate spinning thing.
+        ctx.strokeStyle = rgba(TONE, 0.3 * fade);
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y);
+        ctx.lineTo(hx, hy);
+        ctx.stroke();
+      }
     }
-    // The leading edge, where the rounds are actually leaving.
-    const lx = s.x + Math.cos(head) * 62;
-    const ly = s.y + Math.sin(head) * 62;
-    drawGlow(ctx, '#ffd9a0', lx, ly, 30, 0.5 * fade);
-    drawGlow(ctx, '#ffd9a0', s.muzzleX, s.muzzleY, 26, 0.45 * fade);
+    if (running) drawGlow(ctx, '#ffd9a0', s.muzzleX, s.muzzleY, 28, 0.5 * fade);
     ctx.restore();
   }
 }

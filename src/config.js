@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '168';
+export const BUILD = '169';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '168';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e2947ab';
+export const REV = 'dd4797a';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -490,6 +490,21 @@ export const CFG = {
     // of three at a fifth of PRISM's cooldown.
     damage: 0.7,
     wobble: 0.05, // the sweep is a machine turning, not a laser
+    /*
+     * It is called SPIRAL and the first version drew a circle. The trail now
+     * winds outward from `rIn` to `rOut` across the sweep, so the shape on
+     * the screen is the shape in the name -- and it reads as one continuous
+     * opening turn rather than as a ring that happens to be rotating.
+     */
+    rIn: 40,
+    rOut: 118,
+    /*
+     * The barrel goes all the way round, which closes the gimbal's travel
+     * arc into a full circle -- the one time in the game that ring is ever
+     * whole. That is worth seeing, so it is not snapped back: the upper half
+     * holds for a moment after the last round and fades over this.
+     */
+    settle: 0.6,
   },
 
   /*

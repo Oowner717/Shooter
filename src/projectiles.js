@@ -21,6 +21,23 @@ class Projectile {
     this.color = opts.color || '#bff4ff';
     this.core = opts.core || '#ffffff';
     this.trail = opts.trail ?? 0.024;
+    /*
+     * Thrown by SPIRAL's sweep rather than aimed. It is the same round with
+     * the same upgrades -- this only changes how it is drawn, so a field full
+     * of them reads as one sweep going out rather than as fifty unrelated
+     * shots that happen to have started at the same place.
+     */
+    this.spun = !!opts.spun;
+    /*
+     * The marker's phase, off the launch bearing rather than off Math.random.
+     *
+     * A decorative `rand(0, TAU)` here draws once per projectile, and a
+     * projectile is the most common thing this game makes -- it moved
+     * ORDINAL's canonical hash from 117409503 to -701545965 the moment it
+     * went in. This is deterministic, free, and better besides: the strokes
+     * line up with the way the round is travelling.
+     */
+    this.spin = Math.atan2(vy, vx);
     // Called at the point of impact (or on timeout) for rounds that go off.
     this.burst = opts.burst || null;
     this.chain = !!opts.chain; // ARC: jumps on from whatever it hits
@@ -399,6 +416,28 @@ export function drawProjectiles(ctx, world) {
     ctx.stroke();
 
     drawGlow(ctx, p.color, p.x, p.y, p.r * 4.2, 0.75);
+    /*
+     * A spun round carries the sweep's own colour as a husk around whatever
+     * it actually is: the core stays the round's, so BOLT is still blue and
+     * RIME still ice, and the orange says where it came from. Two short
+     * cross-strokes turning with the round, rather than a ring, because a
+     * ring at this size is a dot and reads as nothing.
+     */
+    if (p.spun) {
+      const a = p.spin + world.time * 9;
+      drawGlow(ctx, '#ff7a1a', p.x, p.y, p.r * 5.6, 0.4);
+      ctx.strokeStyle = rgba('#ffb066', 0.75);
+      ctx.lineWidth = p.r * 0.42;
+      ctx.beginPath();
+      for (let i = 0; i < 2; i++) {
+        const t2 = a + (i * Math.PI) / 2;
+        const c = Math.cos(t2) * p.r * 1.5;
+        const sn = Math.sin(t2) * p.r * 1.5;
+        ctx.moveTo(p.x - c, p.y - sn);
+        ctx.lineTo(p.x + c, p.y + sn);
+      }
+      ctx.stroke();
+    }
     ctx.fillStyle = p.core;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r * 0.62, 0, TAU);

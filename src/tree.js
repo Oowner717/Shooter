@@ -88,7 +88,12 @@ const UNDER = {
   // ---- the abilities ----
   abilities: ['standing', 'reflex'],
   pulse: [],
-  fan: [], lance: [], well: [], prism: [], stasis: [], decoy: [], spiral: [],
+  fan: [], lance: [], well: [], prism: [], stasis: [], decoy: [],
+  // The only ability in the tree with a shaping upgrade of its own. The other
+  // seven are bought and then have nothing but a second charge to sell; this
+  // one has a knob on it, which is part of why it is the one that replaced
+  // CHORUS -- the tree is about the gun, and so is this.
+  spiral: ['counterspin'],
 };
 
 /** Which arms hang off which category, in the order they are shown. */

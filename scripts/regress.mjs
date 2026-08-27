@@ -464,7 +464,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 136
+    // 137 since build 169, when SPIRAL gained COUNTERSPIN -- the first
+    // shaping upgrade any ability has ever had under it.
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 137
     && /TURRET 17\/17/.test(r.full.count) && !/TURRET 17\/17/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -1642,6 +1644,77 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    */
   const differs = r.boltColours.length > 0 && r.rimeColours.length > 0
     && r.rimeColours.some((c) => !r.boltColours.includes(c));
+  /*
+   * COUNTERSPIN, and the gimbal going home.
+   *
+   * Two things that both went wrong the first time and in the same way -- a
+   * multiplier applied twice, and a guard on a value that had already moved.
+   * COUNTERSPIN fired 118 rounds against one arm's 33, because the interval
+   * was divided by the arm count AND a round went out per arm, which is the
+   * doubling squared. And the aim was never wound back, because the restore
+   * was guarded on `world.spiral !== 0` while the running branch had already
+   * written zero to it -- so the gimbal's travel arc stayed spanning six
+   * radians and the ring sat closed for the rest of the run.
+   */
+  const extra = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { NODES } = await import('../src/tree.js');
+    g.debugTeachAll();
+    g.debugClearField();
+    w.debug.noCooldown = true;
+    for (let i = 0; i < 24; i++) g.debugSpawn('mote', 160 + i * 16, 240);
+    const s = w.shooter;
+    const slot = w.abilities.slots.findIndex((sl) => sl && sl.def.id === 'spiral');
+    const sweep = (arms) => {
+      w.up.spiralArms = arms;
+      w.round = 'standard';
+      const sl = w.abilities.slots[slot];
+      sl.charges = Math.max(1, sl.charges); sl.cd = 0; sl.locked = 0;
+      s.aim = -Math.PI / 2;
+      const aim0 = s.aim;
+      const grip0 = s.gripAngle;
+      g.useAbility(slot);
+      const eff = w.effects.find((e) => e.arms);
+      const n = eff ? eff.arms.length : 0;
+      for (let i = 0; i < 300; i++) g.update(1 / 60);
+      return { n, rounds: eff ? eff.rounds : 0,
+        // Where the barrel and the grip ended up against where they began.
+        aimBack: Math.abs(s.aim - aim0) < 0.5,
+        gripSpan: +Math.abs(s.gripAngle - grip0).toFixed(2),
+        fade: s.sweepFade };
+    };
+    const one = sweep(1);
+    const two = sweep(2);
+    w.up.spiralArms = 1;
+    w.debug.noCooldown = false;
+    const inTree = JSON.stringify(NODES.map((n) => [n.id, n.name]));
+    g.restart();
+    return { one, two, hasNode: /counterspin/.test(inTree) && /COUNTERSPIN/.test(inTree) };
+  });
+
+  check('COUNTERSPIN adds an arm and doubles the sweep, rather than squaring it',
+    extra.hasNode && extra.one.n === 1 && extra.two.n === 2
+    && extra.two.rounds > extra.one.rounds * 1.6
+    && extra.two.rounds < extra.one.rounds * 2.6,
+    `in the tree ${extra.hasNode}; one arm ${extra.one.rounds} rounds, `
+    + `two arms ${extra.two.rounds} `
+    + `(${(extra.two.rounds / Math.max(1, extra.one.rounds)).toFixed(2)}x)`);
+
+  /*
+   * ...and the gimbal goes home. The travel arc is drawn from straight-down
+   * to wherever the grip is, so an aim left at `start + 2.6 turns` leaves it
+   * spanning the whole circle -- which is what a player saw for the rest of
+   * the run, every run, after every use.
+   */
+  check('...and the barrel and the gimbal are back where they started',
+    extra.one.aimBack && extra.two.aimBack
+    && extra.one.gripSpan < 0.5 && extra.two.gripSpan < 0.5
+    && extra.one.fade === 0,
+    `aim returned ${extra.one.aimBack}/${extra.two.aimBack}, `
+    + `grip off by ${extra.one.gripSpan}/${extra.two.gripSpan} rad, `
+    + `sweep overlay faded to ${extra.one.fade}`);
+
   check('...and it fires whatever round is loaded, not a round of its own',
     differs,
     `BOLT sweep (went ${r.fired.standard && r.fired.standard.went}) left `
