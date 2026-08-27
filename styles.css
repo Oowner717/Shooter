@@ -1668,7 +1668,12 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
      between two cells used to reach the canvas and take a shot. */
   pointer-events: auto;
 }
-.q_mines, .q_ammo { width: 62px; }
+/* Wide enough that a five-letter round -- TITHE, SPORE, SNARE -- has real
+   air on both sides. At 62px the label sat 3px off each edge, against a
+   corner that is itself cut 6px, so the text touched the notch. The centre
+   row gives up 2px per cell to pay for it; the whole band still clears a
+   390 screen with slack. */
+.q_mines, .q_ammo { width: 70px; }
 .q_auto { flex-direction: row; gap: 4px; }
 /* The two that open the loadout sheet, one beside each stack. */
 .q_cfg { justify-content: flex-end; }
@@ -1719,7 +1724,7 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   /* A weapon switch is pressed mid-fight, with things falling. 30px was the
      shortest control on the screen. */
   height: 36px;
-  padding: 0 7px;
+  padding: 0 8px;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(10, 18, 32, 0.86), rgba(4, 8, 15, 0.92));
   color: var(--dim);
@@ -1738,7 +1743,7 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
   flex-direction: column;
   gap: 2px;
   height: 40px;
-  width: 52px;
+  width: 50px;
   padding: 0 4px;
 }
 /*
@@ -1762,7 +1767,7 @@ body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 .qc svg { width: 14px; height: 14px; display: block; flex: 0 0 auto; }
 .qc .qLbl {
   font-size: 11px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   letter-spacing: 0.08em;
   white-space: nowrap;
   color: inherit;
@@ -2451,11 +2456,15 @@ body.booting #pendingBtn {
   #energyChip em { display: none; }
   #energyChip { padding: 5px 8px; }
 
-  .q_mines, .q_ammo { width: 56px; }
-  .qc { height: 28px; gap: 4px; padding: 0 5px; }
-  .qc.wide { height: 38px; width: 48px; }
+  /* Budgeted, not inherited: 2 stacks + 4 wide cells + the gaps have to
+     close inside 320. At the widths above the band ran 14px off the right
+     edge -- measured, not noticed, because nothing this narrow was being
+     screenshotted. */
+  .q_mines, .q_ammo { width: 54px; }
+  .qc { height: 28px; gap: 3px; padding: 0 4px; }
+  .qc.wide { height: 38px; width: 44px; }
   .qc svg { width: 13px; height: 13px; }
-  .qc .qLbl { font-size: 9px; letter-spacing: 0.02em; }
+  .qc .qLbl { font-size: 9px; letter-spacing: 0; }
 
   .ab svg { width: 20px; height: 20px; }
   .ab .lbl { font-size: 9px; letter-spacing: 0.03em; }

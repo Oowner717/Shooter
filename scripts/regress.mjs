@@ -817,11 +817,35 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       }
     }
     const mb = document.getElementById('menuBtn').getBoundingClientRect();
-    return { seen, bad, menuBtn: [Math.round(mb.width), Math.round(mb.height)] };
+    /*
+     * The strip's cells give their contents air. TITHE and SPORE sat 3px off
+     * their cell edges -- against a corner that is itself cut 6px, so the
+     * text touched the notch. The floor is 5px, met by the tightest label on
+     * the smallest supported screen.
+     */
+    let tightest = 99;
+    let tightName = '';
+    for (const lbl of document.querySelectorAll('.qc .qLbl')) {
+      if (!lbl.offsetParent || !lbl.textContent.trim()) continue;
+      const cell = lbl.closest('.qc').getBoundingClientRect();
+      const lr = lbl.getBoundingClientRect();
+      const gap = Math.min(lr.left - cell.left, cell.right - lr.right);
+      if (gap < tightest) { tightest = gap; tightName = lbl.textContent; }
+    }
+    // ...and the whole band stays on the screen. At 320 it once ran 14px off
+    // the right edge, found only when something finally measured that width.
+    const qb = document.getElementById('quickBar');
+    const bandEnd = Math.max(...[...qb.querySelectorAll('.qGroup')]
+      .map((g) => g.getBoundingClientRect().right));
+    return { seen, bad, menuBtn: [Math.round(mb.width), Math.round(mb.height)],
+      tightest: Math.round(tightest), tightName, bandEnd: Math.round(bandEnd), vw: innerWidth };
   });
   check('the play screen clears the menu\'s floor, and its door is a real target',
     r.bad.length === 0 && r.seen > 8 && r.menuBtn[0] >= 42 && r.menuBtn[1] >= 42,
     `${r.seen} read; small: ${r.bad.slice(0, 5)}; menu button ${r.menuBtn.join('x')}`);
+  check('every strip label has air, and the band ends on the screen',
+    r.tightest >= 5 && r.bandEnd <= r.vw,
+    `tightest ${r.tightest}px on ${r.tightName}; band ends ${r.bandEnd} of ${r.vw}`);
 }
 
 // --- the record, and the one button that cannot be undone -------------------
