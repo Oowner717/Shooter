@@ -707,6 +707,10 @@ export class Game {
     this.buffer.width = this.canvas.width;
     this.buffer.height = this.canvas.height;
 
+    // ...and the top bar's chips are sized against the numbers in them, which
+    // a rotation changes the room for. See Hud.fitBar.
+    if (this.hud) this.hud.fitBar();
+
     // Safe-area insets come from the probe's resolved padding; a custom
     // property holding max()/env() is not guaranteed to parse as a number.
     const probe = getComputedStyle(this.safeProbe);

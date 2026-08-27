@@ -1762,6 +1762,65 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `wrote ${r.wrote}; a pre-clock save at 240 kills came back at ${r.migrated} earned`);
 }
 
+// --- the top bar fits the numbers in it -------------------------------------
+/*
+ * `#barChips` is the shrinkable group and its comment has always said so, but
+ * nothing inside it could shrink: every chip is `white-space: nowrap`, so the
+ * group never absorbed anything, it clipped. Measured across the widths this
+ * is played at, with a five-figure purse and the affordable-rows badge up --
+ * ordinary mid-run play -- the badge ran 17px past the edge at 390 and 32px at
+ * 375, the two commonest iPhone widths. The badge saying how many upgrades you
+ * can afford, cut off exactly when you can afford plenty.
+ *
+ * A media query cannot see the length of a number, so the bar measures itself
+ * and drops labels in order of what they are worth. Asserted at every width
+ * and every purse size rather than at the one that was noticed, and asserted
+ * BOTH ways: a label that never comes back when the purse is spent down is the
+ * same bug pointing the other way.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const bar = g.hud.el.barChips;
+    const held = { w: window.innerWidth, energy: w.energy };
+    const over = [];
+    const labels = [];
+    // The real widths cannot be changed from in here, so the group is squeezed
+    // directly -- which is the same thing as far as the fit is concerned.
+    for (const width of [200, 220, 250, 300, 340]) {
+      bar.style.maxWidth = `${width}px`;
+      for (const [energy, buys] of [[0, 0], [12345, 12], [148000, 85]]) {
+        g.hud.setEnergy(energy, 1);
+        g.hud.setBuys(buys);
+        g.hud.barSig = ''; // the guard is keyed on digits; the width moved too
+        g.hud.fitBar();
+        if (bar.scrollWidth > bar.clientWidth + 1) {
+          over.push(`${width}px/E${energy}: ${bar.scrollWidth - bar.clientWidth}px`);
+        }
+      }
+      // ...and with room again, the words have to come back.
+      g.hud.setEnergy(0, 1);
+      g.hud.setBuys(0);
+      g.hud.barSig = '';
+      g.hud.fitBar();
+      labels.push(width >= 300 ? bar.className.trim() : 'x');
+    }
+    bar.style.maxWidth = '';
+    g.hud.setEnergy(held.energy, 1);
+    g.hud.barSig = '';
+    g.hud.fitBar();
+    return { over, restored: labels.filter((c) => c === '').length, checked: labels.length };
+  });
+
+  check('nothing in the top bar is ever clipped, at any width or purse',
+    r.over.length === 0, r.over.length ? r.over.join(', ') : 'clear at every width tried');
+
+  check('...and the labels come back once the purse is spent down',
+    r.restored >= 2,
+    `${r.restored} of the roomy widths dropped no label with an empty purse`);
+}
+
 // --- the assist says where it stops, and what it will take ------------------
 /*
  * Three things that are all one idea: the player can see what the assist is

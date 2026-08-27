@@ -78,6 +78,7 @@ export class Hud {
       counterLabel: document.querySelector('#counter em'),
       abilities: $('abilities'),
       hint: $('abilityHint'),
+      barChips: $('barChips'),
       debug: $('debugPanel'),
       dbgGrid: $('dbgGrid'),
       dbgSpawn: $('dbgSpawn'),
@@ -105,6 +106,8 @@ export class Hud {
     this.alerts = [];
     this.hintTimer = 0;
     this.hintShown = 0; // ...and how long the line now up has been up for
+    this.barSig = ''; // what the top bar was last measured against
+
     this.recedeT = 0; // seconds the strip and the ability bar stay out of the way
     this.voiceHeld = []; // lines waiting for the screen to be quiet -- see speaking()
     this.pillHeld = []; // ...and pills waiting for room beside the band
@@ -763,6 +766,56 @@ export class Hud {
    * player can read.
    */
 
+  /**
+   * Make the top bar's chips fit the numbers in them.
+   *
+   * `#barChips` is the shrinkable group and its comment has always said so,
+   * but nothing inside it could actually shrink: every chip is `white-space:
+   * nowrap`, so the group did not absorb anything, it clipped. Measured across
+   * the widths this is played at, with a five-figure purse and the
+   * affordable-rows badge up -- which is ordinary mid-run play, not an edge
+   * case -- the badge was cut off by 17px at 390 and 32px at 375, the two
+   * commonest iPhone widths. The badge that says how many upgrades you can
+   * afford, gone exactly when you can afford plenty.
+   *
+   * A media query cannot fix it, because the trigger is not the screen width:
+   * it is how many digits are in the purse and whether the badge is up. There
+   * is already a 372px rule hiding the ENERGY word, and it is below both
+   * widths that break. So the bar measures itself instead and drops labels in
+   * order of what they are worth -- OBJECTS first, which is ambient, then
+   * ENERGY, which the green number says anyway.
+   */
+  fitBar() {
+    const bar = this.el.barChips;
+    if (!bar) return;
+    /*
+     * Guarded on what is actually in the chips, because the measuring is not
+     * free: reading scrollWidth after a class change forces a synchronous
+     * layout, and setEnergy runs on every frame that energy lands -- which is
+     * every frame of a PULSE. Three forced reflows a frame on a phone that
+     * already has a quality governor is not a fix, it is a different bug.
+     *
+     * The signature is how many DIGITS are in each number, not the numbers
+     * themselves. What decides whether a label still fits is the width of the
+     * chips, and a purse going from 1,204 to 1,207 does not change that --
+     * keyed on the values it re-measured on every frame energy landed, which
+     * is every frame of a PULSE and 874 forced layouts in ten seconds. Keyed
+     * on digits it fires a handful of times in a whole run.
+     */
+    const digits = (v) => String(Math.max(0, Math.floor(v || 0))).length;
+    const sig = `${digits(this.lastEnergy)}|${digits(this.lastBuys)}`
+      + `|${digits(this.lastKills)}|${window.innerWidth}`;
+    if (sig === this.barSig) return;
+    this.barSig = sig;
+    // Widest first: measuring with the labels back on is the only way to know
+    // whether they still need to be off.
+    bar.classList.remove('tight', 'tighter');
+    if (bar.scrollWidth <= bar.clientWidth + 1) return;
+    bar.classList.add('tight');
+    if (bar.scrollWidth <= bar.clientWidth + 1) return;
+    bar.classList.add('tighter');
+  }
+
   setEnergy(n, rate = 1) {
     const v = Math.floor(n);
     if (v !== this.lastEnergy) {
@@ -783,6 +836,7 @@ export class Hud {
       this.lastChoked = choked;
       this.el.energyChip.classList.toggle('choked', choked);
     }
+    this.fitBar();
   }
 
   /**
@@ -799,6 +853,8 @@ export class Hud {
     el.textContent = n > 0 ? String(n) : '';
     el.classList.toggle('on', n > 0);
     this.el.energyChip.classList.toggle('canBuy', n > 0);
+    // The badge is what pushed the chip past the edge in the first place.
+    this.fitBar();
   }
 
 

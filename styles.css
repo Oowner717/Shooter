@@ -2451,6 +2451,18 @@ body.booting #quickBar {
  * six-letter names (STASIS, SIPHON) run past a 34px button at the default
  * tracking and get clipped by .ab's overflow.
  */
+/*
+ * The bar dropping labels because the numbers got long.
+ *
+ * Set by Hud.fitBar, which measures rather than guessing at a width -- what
+ * overflows the group is a five-figure purse and the affordable-rows badge,
+ * and no media query can see either. OBJECTS goes first: it is ambient, and
+ * the number beside it is still there. ENERGY goes second and only if that was
+ * not enough, because the green number already says what it is.
+ */
+#barChips.tight #counter em { display: none; }
+#barChips.tighter #energyChip em { display: none; }
+
 @media (max-width: 372px) {
   /* The green number is unmistakable beside the count; the word is not
      carrying anything the colour does not. */
