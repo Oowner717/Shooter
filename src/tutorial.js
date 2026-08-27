@@ -13,11 +13,34 @@
 
 import { ARSENAL, specLine } from './arsenal.js';
 
-/** Seconds a line of n words needs: a beat to notice it, then about 180wpm. */
+/**
+ * Seconds a line of n words needs: a beat to notice it, then reading pace.
+ *
+ * It was `2 + words / 3` -- a beat and 180wpm -- and that is the pace you read
+ * prose you have never seen at. These are not prose: they are one sentence
+ * about a button, most of them naming the button in their first word, and the
+ * player is looking at the thing while they read about it. 1.5 + words / 3.6
+ * is about 215wpm after a slightly shorter beat, which takes a twelve-word
+ * line from six seconds to under five.
+ *
+ * The length was never the whole complaint though. See MIN_READ and the
+ * queue in Hud.showHint: the real cost of these was four of them arriving in
+ * three seconds and shoving each other off the band unread.
+ */
 export function holdFor(text) {
   const words = String(text).trim().split(/\s+/).length;
-  return 2 + words / 3;
+  return 1.5 + words / 3.6;
 }
+
+/**
+ * How long a line has to have been up before a tap may take it away.
+ *
+ * Acting on a line is the best evidence there is that it has been read, so
+ * playing dismisses it -- but a tap in the same instant it appears is a tap
+ * that was already on its way, and would take the line away before it was
+ * seen.
+ */
+export const MIN_READ = 1.1;
 
 /**
  * The opening, over an empty field. Four lines and then it stops talking: the
@@ -142,6 +165,9 @@ export const CONTROL_LINES = SCRIPT.slice(0, 4).map((e) => e.id);
  * the caption that greets you using it say the same thing.
  */
 const ABILITY_USE = {
+  // Not an ability: AUTO AIM's third position, which needs its own sentence
+  // because it is the one assist that stops defending you.
+  aimDrift: 'AUTO AIM: DRIFT. It takes grey and nothing else.\nIt is not watching the field while it does.',
   pulse: 'PULSE. Hurts and shoves what is near you,\nand takes in the energy on the floor.',
   fan: 'FAN. Twenty-five pellets in one tight cone.',
   lance: 'LANCE. A beam through the biggest thing out there.',
@@ -192,8 +218,18 @@ export const ALL_KEYS = [...STARTING, ...Object.values(LOCKABLE).flat()];
  */
 export const GAP = 0.7;
 
-/** How many lines the band keeps. The newest is at the bottom. */
-export const STACK = 2;
+/**
+ * How many lines the band keeps. The newest is at the bottom.
+ *
+ * One, from build 182. Two was written for the opening, where a line you have
+ * just acted on is worth still having in view -- but every line is two rows of
+ * text, so two of them is four rows of the field covered, and the band is over
+ * the play area. It is also what made a burst of presses unreadable: the
+ * second line pushed the first up and the third pushed it off, at whatever
+ * speed the player happened to be tapping. The queue holds them now instead,
+ * so nothing is lost by only showing one.
+ */
+export const STACK = 1;
 
 /** When the first line is said, in seconds from the start of the run. */
 export const START = 1.2;

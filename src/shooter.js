@@ -9,7 +9,7 @@ import { spark, ring, shake } from './fx.js';
 
 /*
  * Every level of every part in the TURRET branch, added up: 1 FEED, 3 GIMBAL,
- * 2 ARRAY, 3 SIGHT, 3 SPINES, 3 SHROUD, 1 INTAKE. What `rig().filled` is a
+ * 2 ARRAY, 1 SIEVE, 3 SIGHT, 3 SPINES, 3 SHROUD, 1 INTAKE. What `rig().filled` is a
  * fraction of, and the one number that tells the machine it is finished.
  *
  * It is written out here rather than derived, because shooter.js reaching into
@@ -19,7 +19,7 @@ import { spark, ring, shake } from './fx.js';
  * that can never fill its last socket never lights. scripts/check-build.mjs
  * holds this to the tree now.
  */
-export const RIG_MAX = 16;
+export const RIG_MAX = 17;
 
 /** How wide SALVO throws its three. */
 const SALVO_FAN = 0.09;
@@ -501,6 +501,50 @@ export class Shooter {
     ctx.translate(this.x, this.y);
 
     /*
+     * ---- the reach of the assist ----
+     *
+     * A hairline arc across the cone at exactly the distance a target has to
+     * be inside, drawn only while auto aim is switched on. Without it the base
+     * range is invisible -- you only ever meet it as "auto aim ignored that
+     * one" -- and ARRAY is a number on a card rather than a line you watch
+     * move out.
+     *
+     * It went in at build 109 with the reach itself and was lost at 150, in
+     * the pass that turned every floating gadget into structure. It was not a
+     * gadget: it is the one part of the machine that is about the field rather
+     * than about the machine, and it is the only thing that says where the
+     * assist stops.
+     *
+     * Drawn first, under everything, so it never competes with the turret.
+     */
+    if (world.autoAim) {
+      const reach = CFG.shooter.aimRange * world.up.aimRange;
+      const cone = CFG.shooter.aimClamp;
+      ctx.strokeStyle = rgba(accent, 0.12 + flash * 0.3);
+      ctx.lineWidth = HAIRLINE;
+      ctx.setLineDash([HAIRLINE * 5, HAIRLINE * 11]);
+      ctx.beginPath();
+      ctx.arc(0, 0, reach, -Math.PI / 2 - cone, -Math.PI / 2 + cone);
+      ctx.stroke();
+      /*
+       * ...and the two edges of the cone, as short ticks at the arc. The arc
+       * alone says how far and says nothing about how wide, and "past the
+       * shoulder" is the other half of why the assist ignores something --
+       * see the note on aimClamp in config.js.
+       */
+      ctx.beginPath();
+      for (const side of [-1, 1]) {
+        const a = -Math.PI / 2 + side * cone;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        ctx.moveTo(c * (reach - 14), sn * (reach - 14));
+        ctx.lineTo(c * (reach + 14), sn * (reach + 14));
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    /*
      * ---- GIMBAL: the bearing race ----
      *
      * There were legs: three struts out from under the deck, each with a
@@ -643,6 +687,44 @@ export class Shooter {
       }
       ctx.stroke();
       ctx.restore();
+    }
+
+    /*
+     * ---- SIEVE: a screen across the array's mouth ----
+     *
+     * Seated on the fins rather than beside them, because what it does is done
+     * to the array: it is the thing that decides what the sweep is allowed to
+     * come back with. Drawn on both fins when both are there and on the mount
+     * shoulder when neither is, so buying it before ARRAY still shows.
+     */
+    if (g.driftaim) {
+      const seats = g.aimrange > 0 ? g.aimrange : 1;
+      for (let i = 0; i < seats; i++) {
+        const a = -Math.PI / 2 + (i ? 1 : -1) * 1.78;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        const h = g.aimrange > i ? 18 + i * 8 : 10;
+        ctx.save();
+        ctx.translate(c * R * 0.8, sn * R * 0.8);
+        ctx.rotate(a);
+        ctx.strokeStyle = rgba('#b8f0a0', 0.9 * lit);
+        ctx.lineWidth = HAIRLINE * 1.6;
+        // the frame, standing off the fin's tip
+        ctx.beginPath();
+        ctx.moveTo(h + 2.5, -7.5);
+        ctx.lineTo(h + 2.5, 7.5);
+        ctx.stroke();
+        // ...and the mesh in it
+        ctx.lineWidth = HAIRLINE;
+        ctx.strokeStyle = rgba('#b8f0a0', 0.6 * lit);
+        ctx.beginPath();
+        for (let k = -2; k <= 2; k++) {
+          ctx.moveTo(h - 0.5, k * 3);
+          ctx.lineTo(h + 2.5, k * 3);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     // ======================= everything that turns =======================
@@ -851,7 +933,7 @@ export class Shooter {
   rig(world) {
     const taken = world.ledger;
     if (world.rig && world.rigAt === taken.length) return world.rig;
-    const rig = { rate: 0, slew: 0, aimrange: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0 };
+    const rig = { rate: 0, slew: 0, aimrange: 0, driftaim: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0 };
     for (const id of taken) if (id in rig) rig[id]++;
     /*
      * ...and how much of the branch is on, as one number.

@@ -71,6 +71,7 @@ export function freshUpgrades() {
     // turret
     slew: 1,
     aimRange: 1, // how far auto aim will reach for a target
+    driftAim: false, // ...and whether it will accept DRIFT as a target at all
     overwatch: 1, // damage while no hand is on the lever
     casing: 0, // damage a second to whatever is touching the turret
     insulation: 1, // multiplier on how much corruption costs the intake
@@ -167,6 +168,12 @@ const MARK = {
   aimrange: g('<path d="M4.6 18.4 9.4 13.6"/><path d="M3 20l3.2-3.2" opacity=".6"/><path d="M8 12.8a5.4 5.4 0 0 1 7.6 7.6z" fill="currentColor" stroke="none" opacity=".9"/><path d="M13.4 9.6a8.6 8.6 0 0 1 1 1M15.6 6.8a12 12 0 0 1 1.6 1.6M17.8 4a15.4 15.4 0 0 1 2.2 2.2" opacity=".85"/>'),
   // A hole opened in something, with a way through it.
   aperture: g('<circle cx="12" cy="12" r="9.2" stroke-dasharray="2.6 2.8"/><circle cx="12" cy="12" r="5.2"/><path d="M12 6.8 15 12l-3 5.2-3-5.2z" fill="currentColor" stroke="none" opacity=".85"/><path d="M12 1.6v2.4M12 20v2.4M1.6 12H4M20 12h2.4" opacity=".7"/>'),
+  // A screen with the small stuff passing through it and the rest held back.
+  driftaim: g('<path d="M3.4 8.6h17.2M3.4 12h17.2M3.4 15.4h17.2" opacity=".75"/>'
+    + '<path d="M7.4 5.2v13.6M12 5.2v13.6M16.6 5.2v13.6" opacity=".75"/>'
+    + '<circle cx="9.7" cy="10.3" r="1.5" fill="currentColor" stroke="none"/>'
+    + '<circle cx="14.3" cy="13.7" r="1.5" fill="currentColor" stroke="none"/>'
+    + '<path d="M2 21.4 22 2.6" opacity=".45"/>'),
   // Something coming apart and reassembling as something else.
   recast: g('<path d="M12 2.6 19 6.4v7.2L12 17.4 5 13.6V6.4z"/><path d="M12 9.4l3.2 1.8v3.4L12 16.4l-3.2-1.8v-3.4z" fill="currentColor" stroke="none" opacity=".8"/><path d="M4.4 19.4a9 9 0 0 0 15.2 0" stroke-dasharray="2.4 2.6"/><path d="M2.6 17.2 4.4 20l2.8-1" fill="none"/>'),
 };
@@ -383,6 +390,24 @@ export const UPGRADES = {
      * come round to. Base reach is CFG.shooter.aimRange — see the note there
      * for why 400 and what 841 buys.
      */
+    /*
+     * The one part in the branch that changes what the assist is willing to
+     * shoot rather than how well it shoots it.
+     *
+     * DRIFT is the only thing on the field auto aim has ever refused. That is
+     * deliberate -- grey is harmless, the bonus wave is grey and nothing else,
+     * and "the assists are dead weight here, aim it yourself" is the whole
+     * beat of that wave. This sells the other option: a screen across the
+     * array's mouth that lets the grey through as a target, and a third
+     * position on the AUTO AIM button that hunts it and nothing else.
+     *
+     * Nothing else in the branch is a mode. This one has to be, because
+     * sweeping grey and answering a wave are not the same job and a player
+     * doing one is not doing the other -- see Game.cycleAim.
+     */
+    { id: 'driftaim', name: 'SIEVE', levels: 1,
+      line: 'A third position on AUTO AIM: hunt DRIFT and nothing else. A sorting screen over the array.',
+      apply: set('driftAim', true), icon: MARK.driftaim },
     { id: 'aimrange', name: 'ARRAY', levels: 2,
       line: '+45% auto aim range. A scanning dish on the mount.',
       tiers: [null, { name: 'DEEP ARRAY', line: '+45% again, on top of ARRAY. A second dish, and the sweep reaches the top of the field.' }],

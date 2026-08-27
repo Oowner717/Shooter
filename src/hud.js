@@ -8,10 +8,10 @@ import { pref, setPref } from './settings.js';
 import { BUILD, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
 
-import { CODEX, codex } from './codex.js';
+import { CODEX, codex, markLine } from './codex.js';
 import {  } from './util.js';
 import { Menu } from './menu.js';
-import { holdFor, STACK } from './tutorial.js';
+import { holdFor, STACK, MIN_READ } from './tutorial.js';
 import { SLOTS, carried, freeSlot } from './loadout.js';
 import { heldList } from './anomaly.js';
 import { readRun } from './save.js';
@@ -104,6 +104,7 @@ export class Hud {
     this.slots = [];
     this.alerts = [];
     this.hintTimer = 0;
+    this.hintShown = 0; // ...and how long the line now up has been up for
     this.recedeT = 0; // seconds the strip and the ability bar stay out of the way
     this.voiceHeld = []; // lines waiting for the screen to be quiet -- see speaking()
     this.pillHeld = []; // ...and pills waiting for room beside the band
@@ -633,7 +634,7 @@ export class Hud {
    * @param hold seconds on screen. Sized to the sentence by default: a flat
    *   nine seconds gave a four-word line the same time as a fifteen-word one.
    */
-  showHint(text, tutorial = false, hold = holdFor(text)) {
+  showHint(text, tutorial = false, hold = holdFor(text), id = null) {
     /*
      * One long-form voice at a time.
      *
@@ -654,9 +655,26 @@ export class Hud {
      * device by the time it gets here, so a line thrown away here is a line
      * the player never gets -- it is held and said when the screen is clear.
      */
-    if (tutorial && this.speaking()) {
-      this.voiceHeld.push({ text, hold });
-      while (this.voiceHeld.length > 3) this.voiceHeld.shift();
+    /*
+     * ...and one teaching line at a time, which is the same rule turned
+     * inward.
+     *
+     * The band used to take whatever arrived and push what was there out of
+     * the way. Measured on a fresh device: AUTO AIM, AUTO FIRE, PULSE and FAN
+     * pressed as fast as they can be reached put four lines through a
+     * two-line band in under three seconds, and every one was marked
+     * said-on-this-device the moment it was pushed -- so three of the four
+     * were spent without being read, and this device will never offer them
+     * again. That is the actual complaint behind "I only saw the first two".
+     *
+     * So a line arriving while one is still up waits for it, and the queue
+     * drains in update(). `id` is what makes the marking honest: the caller
+     * no longer records the line as said, this does, when it is painted.
+     */
+    if (tutorial && (this.speaking() || this.hintTimer > 0)) {
+      this.voiceHeld.push({ text, hold, id });
+      // Deep enough to hold every control a thumb can reach in one burst.
+      while (this.voiceHeld.length > 8) this.voiceHeld.shift();
       return;
     }
     // Lines are written with their own break, so they wrap where they read.
@@ -680,6 +698,31 @@ export class Hud {
     this.el.hint.classList.toggle('tutorial', tutorial);
     this.el.hint.classList.add('show');
     this.hintTimer = hold;
+    this.hintShown = 0;
+    // Said, now that it has actually been said.
+    if (id) markLine(id);
+  }
+
+  /**
+   * Take the current line away because the player is playing.
+   *
+   * Acting on a line is the strongest evidence there is that it has been read,
+   * and a band that stays over the field after that is in the way. Held for
+   * MIN_READ first, or a tap already travelling when the line appeared would
+   * take it away before it was seen. The queue is not dropped -- the next line
+   * comes up on the following frame.
+   */
+  dismissHint() {
+    if (this.hintTimer <= 0 || this.hintShown < MIN_READ) return false;
+    this.hintTimer = 0;
+    this.el.hint.classList.remove('show');
+    this.tutLines.length = 0;
+    return true;
+  }
+
+  /** Is the band busy, either talking or holding something to say? */
+  pending() {
+    return this.hintTimer > 0 || this.voiceHeld.length > 0;
   }
 
   /** Take it down now — the run has moved on, or the opening was cut short. */
@@ -896,6 +939,7 @@ export class Hud {
     }
     if (this.hintTimer > 0) {
       this.hintTimer -= dt;
+      this.hintShown += dt;
       // The band going dark ends the stack: the next line after a silence
       // starts on its own rather than under something said a minute ago.
       if (this.hintTimer <= 0) {
@@ -909,7 +953,7 @@ export class Hud {
       // The screen is clear and something has been waiting. One at a time,
       // oldest first, with the gap the opening already uses between lines.
       const next = this.voiceHeld.shift();
-      this.showHint(next.text, true, next.hold);
+      this.showHint(next.text, true, next.hold, next.id);
     }
   }
 
@@ -1382,6 +1426,25 @@ export class Hud {
     el.setAttribute('aria-pressed', String(on));
     const q = this.strip.find((e) => e.key === key);
     if (q) q.on = on;
+  }
+
+  /**
+   * AUTO AIM's three positions, on the one cell.
+   *
+   * `on` is the lit state either way -- the assist is running in both -- and
+   * `drift` re-tones it and renames it, because a control whose third position
+   * looks like its second is a control nobody can read at a glance. The label
+   * is the shortest true word for what it is hunting.
+   */
+  setAim(world) {
+    this.setToggle('autoAim', world.autoAim);
+    const el = this.el.toggles.autoAim;
+    if (!el) return;
+    const drift = !!world.aimDrift && !!world.autoAim;
+    el.classList.toggle('drift', drift);
+    const lbl = el.querySelector('.qLbl');
+    if (lbl) lbl.textContent = drift ? 'DRIFT' : 'AIM';
+    el.setAttribute('aria-label', drift ? 'AUTO AIM: DRIFT' : 'AUTO AIM');
   }
 
   setSound() {

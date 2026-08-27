@@ -169,6 +169,7 @@ export function captureRun(world, game) {
     round: world.round,
     mine: world.mine,
     autoAim: !!world.autoAim,
+    aimDrift: !!world.aimDrift,
     autoFire: !!world.autoFire,
     taken: [...world.ledger],
     /*

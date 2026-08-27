@@ -1614,6 +1614,33 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
 /* A round is a choice; the middle two are a thing left running. Filled, not lit. */
 .qc.run.on { box-shadow: inset 0 0 0 40px color-mix(in srgb, var(--accent) 13%, transparent); }
 
+/*
+ * AUTO AIM's third position: hunting DRIFT, and nothing else.
+ *
+ * DRIFT's own grey would be the honest tone and is the one colour the game
+ * will not spend here -- grey means harmless, and the rule is that nothing
+ * else may wear it (see CFG.debris.grey and check-build's colour test). So it
+ * takes the pale green the SIEVE itself is drawn in, which is the part that
+ * bought the position.
+ *
+ * Below .qc.on and .qc.run.on, both of which it has to beat: a later rule of
+ * the same specificity wins, and this file has already lost a border to a
+ * block written above the one it meant to override.
+ *
+ * These cells transition their colour, so a probe that reads getComputedStyle
+ * on the frame the class lands gets the colour being LEFT and concludes the
+ * rule never applied. It cost a specificity bump that fixed nothing before the
+ * transition was remembered. Read it a frame later.
+ */
+.qc.on.drift {
+  --tone: #b8f0a0;
+  color: #b8f0a0;
+  border-color: color-mix(in srgb, #b8f0a0 62%, transparent);
+}
+.qc.run.on.drift {
+  box-shadow: inset 0 0 0 40px color-mix(in srgb, #b8f0a0 15%, transparent);
+}
+
 /* ---------------- abilities ---------------- */
 
 #abilities {

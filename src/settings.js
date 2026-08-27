@@ -38,6 +38,18 @@ const SPEC = {
    * They are two values rather than one because the reasons differ -- a run
    * that lays no mines wants that column gone and its ammunition kept.
    */
+  /*
+   * The teaching lines: the opening, and the one sentence each control says
+   * the first time it is used.
+   *
+   * A preference rather than a one-way "seen it" flag, because the complaint
+   * is not that the lines are wrong -- somebody who has played games like this
+   * knows what an auto-aim toggle does before they press it, and a sentence
+   * telling them is in the way of the field. Off suppresses both, and the
+   * per-device record of what has been said is untouched either way, so
+   * turning it back on does not replay a line already read.
+   */
+  hints: { def: 1, of: [0, 1], label: 'TEACHING LINES', words: ['OFF', 'ON'] },
   showMines: { def: 1, of: [0, 1], label: 'MINE STACK', words: ['HIDDEN', 'SHOWN'] },
   showAmmo: { def: 1, of: [0, 1], label: 'AMMO STACK', words: ['HIDDEN', 'SHOWN'] },
 };

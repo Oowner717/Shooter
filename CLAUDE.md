@@ -228,6 +228,11 @@ most once for any given target and cannot spin.
   offline. `check-build.mjs` fails if one is missing.
 - Play-screen controls bind on `pointerdown`, not `click`, so a tap registers
   when the thumb lands. Tests must dispatch `pointerdown` to press them.
+- Teaching lines queue. A first-use caption arriving while one is up waits its
+  turn, and is marked said-on-this-device by the band when it *paints*, not by
+  the caller. It used to be marked when asked for and the band clobbered
+  whatever was up, so four controls pressed in a burst spent four captions and
+  showed one. `PREFS.hints` turns the lot off, opening included.
 - Object types are gated on `world.earned` — lifetime energy banked, fed from
   `bank()`, which is the only place energy enters a run. Not on kills, and not
   on the purse, which falls every time the tree is bought from. The thresholds

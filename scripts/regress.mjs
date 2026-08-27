@@ -464,11 +464,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 136 since build 178, when FEED lost its second level -- plan B's nerf.
-    // It was 137 from 169, when SPIRAL gained COUNTERSPIN, the first shaping
-    // upgrade any ability has ever had under it.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 136
-    && /TURRET 16\/16/.test(r.full.count) && !/TURRET 16\/16/.test(r.bare.count),
+    // 137 again since build 182, when SIEVE went into the TURRET branch. It was
+    // 136 from 178, when FEED lost its second level, and 137 before that from
+    // 169, when SPIRAL gained COUNTERSPIN.
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 137
+    && /TURRET 17\/17/.test(r.full.count) && !/TURRET 17\/17/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
     r.bare.tones.length > 10 && r.bare.tones.every((t) => t && t !== '#9fb3c8'),
@@ -1760,6 +1760,191 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('a save from before the clock is migrated rather than reset',
     r.wrote === 4321 && r.migrated === 2880,
     `wrote ${r.wrote}; a pre-clock save at 240 kills came back at ${r.migrated} earned`);
+}
+
+// --- the assist says where it stops, and what it will take ------------------
+/*
+ * Three things that are all one idea: the player can see what the assist is
+ * doing without being told.
+ *
+ * The reach arc says where auto aim stops. It went in with the reach itself at
+ * build 109 and was lost at 150, in the pass that turned every floating gadget
+ * on the turret into structure -- it is not a gadget, it is the only thing on
+ * screen that says why a body two thirds up the field was ignored, and without
+ * it ARRAY is a number on a card.
+ *
+ * SIEVE puts a third position on AUTO AIM: DRIFT and nothing else. Asserted at
+ * both ends, because the interesting half is what it REFUSES -- an assist that
+ * took grey as well as hostiles would just shoot whatever was nearest and make
+ * the choice for the player.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    // Put back before this returns. reset() keeps the same Director object, so
+    // a patch left on it outlives every restart after it -- which is how this
+    // case, on its first run, stopped four ladder cases below from ever seeing
+    // a wave.
+    const ranD = w.director.update;
+    w.director.update = () => {};
+    for (const e of [...w.enemies]) e.dead = true;
+    w.enemies.length = 0;
+    w.drops.length = 0;
+    w.debris.length = 0;
+    w.effects.length = 0;
+
+    /*
+     * ---- the reach arc, by diffing frames ----
+     *
+     * A colour test is no good here: the arc is a hairline at 0.12 alpha over
+     * a lattice that is already blue, so counting blue pixels counts the
+     * lattice. Two frames with it off must be identical -- that control is the
+     * instrument checking itself -- and the frame with it on must differ.
+     */
+    const cv = document.getElementById('stage');
+    const c2 = cv.getContext('2d', { willReadFrequently: true });
+    const k = cv.width / w.width;
+    const reach = CFG_aimRange(w);
+    function CFG_aimRange(world) { return 400 * world.up.aimRange; }
+    const row = Math.round((w.shooter.y - reach) * k);
+    const grab = () => c2.getImageData(0, Math.max(0, row - 4), cv.width, 9).data;
+    const diff = (x, y) => {
+      let n = 0;
+      for (let i = 0; i < x.length; i += 4) {
+        if (Math.abs(x[i] - y[i]) + Math.abs(x[i + 1] - y[i + 1])
+          + Math.abs(x[i + 2] - y[i + 2]) > 6) n++;
+      }
+      return n;
+    };
+    w.autoAim = false; w.aimDrift = false;
+    g.draw(); const off1 = grab();
+    g.draw(); const off2 = grab();
+    w.autoAim = true;
+    g.draw(); const on = grab();
+    const noise = diff(off1, off2);
+    const moved = diff(off1, on);
+
+    // ---- the third position ----
+    w.up.driftAim = false;
+    w.autoAim = false; w.aimDrift = false;
+    const bare = [];
+    for (let i = 0; i < 4; i++) { g.cycleAim(); bare.push(`${w.autoAim ? 1 : 0}${w.aimDrift ? 'd' : ''}`); }
+    w.up.driftAim = true;
+    w.autoAim = false; w.aimDrift = false;
+    const sieved = [];
+    for (let i = 0; i < 4; i++) { g.cycleAim(); sieved.push(`${w.autoAim ? 1 : 0}${w.aimDrift ? 'd' : ''}`); }
+
+    // ---- ...and what each position will actually pick ----
+    w.enemies.length = 0;
+    const mote = g.debugSpawn('mote', w.width / 2 - 40, w.shooter.y - 200);
+    mote.staged = false; mote.spawnIn = 0;
+    g.debugSpawnDrift();
+    const drift = w.enemies.find((e) => e.harmless);
+    drift.x = w.width / 2 + 40; drift.y = w.shooter.y - 200;
+    drift.staged = false; drift.spawnIn = 0;
+    w.autoAim = true; w.aimDrift = false;
+    const plain = g.autoTarget();
+    w.aimDrift = true;
+    const grey = g.autoTarget();
+
+    w.director.update = ranD;
+    g.restart();
+    return {
+      noise, moved, row, cvW: cv.width,
+      bare: bare.join(' '), sieved: sieved.join(' '),
+      plain: plain && plain.type.id, grey: grey && grey.type.id,
+    };
+  });
+
+  check('auto aim draws where it stops, and only while it is on',
+    r.noise === 0 && r.moved > 40,
+    `two frames with it off differ by ${r.noise}px; with it on, ${r.moved}px on row ${r.row} of ${r.cvW}`);
+
+  check('AUTO AIM has two positions, and three once SIEVE is bought',
+    r.bare === '1 0 1 0' && r.sieved === '1 1d 0 1',
+    `without SIEVE: ${r.bare} | with: ${r.sieved}`);
+
+  check('...and the third takes DRIFT and nothing else',
+    r.plain === 'mote' && r.grey === 'drift',
+    `plain picks ${r.plain}, DRIFT picks ${r.grey}`);
+}
+
+// --- a burst of presses loses nothing, and marks nothing it did not say -----
+/*
+ * Four controls reached as fast as a thumb can reach them.
+ *
+ * The band used to take whatever arrived and push what was there out of the
+ * way, and every line was marked said-on-this-device the moment it was pushed
+ * -- so pressing AUTO AIM, AUTO FIRE, PULSE and FAN in three seconds spent
+ * four captions and showed one, and this device would never offer the other
+ * three again. That is the whole of "I only saw the tooltips for the first
+ * two". They queue now, and the marking moved to the moment of painting.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { lineSeen } = await import('../src/codex.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    const ranD = w.director.update;
+    w.director.update = () => {};
+    g.hud.clearHint();
+    /*
+     * A fresh device as far as these four lines are concerned -- and only
+     * these four. forgetLines() wipes the record for the whole device, which
+     * every case after this one reads, so the file is put back byte for byte
+     * afterwards.
+     */
+    const keys = ['use:autoAim', 'use:autoFire', 'use:pulse', 'use:fan'];
+    const { forgetLines } = await import('../src/codex.js');
+    const heldLines = localStorage.getItem('sim7749-lines');
+    forgetLines();
+    const heldHinted = g.autoHinted;
+    const heldTeaching = g.teaching;
+    g.autoHinted = {};
+    g.teaching = false; // the opening is a separate queue and not what this is about
+
+    const seen = [];
+    const markedEarly = [];
+    for (const fn of [() => g.toggleAuto('autoAim'), () => g.toggleAuto('autoFire'),
+      () => g.useAbility(0), () => g.useAbility(1)]) {
+      fn();
+      g.update(1 / 60);
+      markedEarly.push(keys.filter((k) => lineSeen(k)).length);
+    }
+    const queued = g.hud.voiceHeld.length;
+    // ...and then let the band work through them.
+    const texts = new Set();
+    for (let i = 0; i < 60 * 90; i++) {
+      g.update(1 / 60);
+      if (g.hud.hintTimer > 0) texts.add(g.hud.el.hint.textContent.trim());
+    }
+    const marked = keys.filter((k) => lineSeen(k)).length;
+    w.director.update = ranD;
+    g.autoHinted = heldHinted;
+    g.teaching = heldTeaching;
+    if (heldLines === null) localStorage.removeItem('sim7749-lines');
+    else localStorage.setItem('sim7749-lines', heldLines);
+    g.restart();
+    return { queued, marked, shown: texts.size, markedEarly };
+  });
+
+  check('four controls pressed in a burst all get their line, in turn',
+    r.queued >= 3 && r.shown >= 4 && r.marked === 4,
+    `${r.queued} queued behind the first, ${r.shown} distinct lines shown, ${r.marked}/4 marked said`);
+
+  /*
+   * ...and nothing was marked before it was shown. After the first press
+   * exactly one line has been painted and so exactly one is marked; if the
+   * old behaviour came back this would read 1 2 3 4.
+   */
+  check('...and a line is marked said only once it has actually been said',
+    JSON.stringify(r.markedEarly) === JSON.stringify([1, 1, 1, 1]),
+    `lines marked after each of the four presses: ${r.markedEarly.join(' ')}`);
 }
 
 // --- the ladder climbs, catches, and remembers ------------------------------

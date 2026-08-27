@@ -178,6 +178,14 @@ export class Game {
       spiral: 0,
       autoSteering: false, // is auto aim traversing the barrel this frame?
       autoAim: false,
+      /*
+       * ...and whether the assist is hunting DRIFT instead of the field.
+       *
+       * A third position on the same button rather than a button of its own --
+       * the strip is full and a control that is a mode of another control
+       * belongs on it. Only reachable once SIEVE is bought; see Game.cycleAim.
+       */
+      aimDrift: false,
       autoFire: false,
       mine: null, // the one kind of mine being laid, or none
 
@@ -381,6 +389,7 @@ export class Game {
     // nothing running on its own, matching what a first-time player is handed
     // — including the first-use captions, which a fresh session should get.
     w.autoAim = false;
+    w.aimDrift = false;
     w.autoFire = false;
     w.mine = null;
     w.round = 'standard';
@@ -501,6 +510,9 @@ export class Game {
     w.round = carried(w.loadout, d.round) ? d.round : (w.loadout.ammo.find(Boolean) || 'standard');
     w.mine = carried(w.loadout, d.mine) ? d.mine : null;
     w.autoAim = !!d.autoAim;
+    // A save from before SIEVE has no aimDrift, and one written while it was
+    // held cannot restore into a run that has not bought it back.
+    w.aimDrift = !!d.aimDrift && !!w.up.driftAim;
     w.autoFire = !!d.autoFire;
     if (w.narrator) w.narrator.index = d.story || 0;
 
@@ -521,7 +533,7 @@ export class Game {
     this.hud.setToggle('standard', w.round === 'standard');
     for (const k of ROUND_KEYS) this.hud.setToggle(k, w.round === k);
     for (const k of MINE_KEYS) this.hud.setToggle(k, w.mine === k);
-    this.hud.setToggle('autoAim', w.autoAim);
+    this.hud.setAim(w);
     this.hud.setToggle('autoFire', w.autoFire);
     this.hud.setKills(w.kills, w.endless ? null : CFG.killGoal);
     this.hud.setEnergy(w.energy);
@@ -741,6 +753,9 @@ export class Game {
 
       // Anything at or behind the turret grabs the lever; anything ahead of it
       // is a direct shot at the point you touched.
+      // Acting on a line is the best evidence it has been read.
+      this.hud.dismissHint();
+
       if (this.gripPointer === null && p.y > s.y - s.r) {
         this.gripPointer = ev.pointerId;
         s.grabGrip(p.x, p.y, false);
@@ -818,9 +833,10 @@ export class Game {
     }
     const line = FIRST_USE[res.slot.def.id];
     const said = `use:${res.slot.def.id}`;
+    // Marked by the band when it paints, not here -- a line that goes into the
+    // queue and is dropped must not count as read. See Hud.showHint.
     if (res.first && line && this.hintsAllowed && !lineSeen(said)) {
-      markLine(said);
-      this.hud.showHint(line, true);
+      this.hud.showHint(line, true, undefined, said);
     }
   }
 
@@ -879,9 +895,36 @@ export class Game {
 
   toggleAuto(key) {
     const w = this.world;
+    if (key === 'autoAim') return this.cycleAim();
     w[key] = !w[key];
     this.hud.setToggle(key, w[key]);
     this.announceToggle(key, w[key]);
+  }
+
+  /**
+   * AUTO AIM, round its positions: off, the field, and -- once SIEVE is bought
+   * -- DRIFT and nothing else.
+   *
+   * Three positions on one button rather than a second button, because the
+   * third is a mode of the first and the strip has no room for a control that
+   * is only ever meaningful when its neighbour is on.
+   *
+   * DRIFT-only rather than drift-as-well on purpose. Sweeping grey and
+   * answering a wave are different jobs: grey is harmless and worth energy,
+   * hostiles are neither, and an assist doing both would simply shoot whatever
+   * was nearest and make the choice for you. Made to be a decision -- during a
+   * wave this position means the assist has stopped defending you.
+   */
+  cycleAim() {
+    const w = this.world;
+    const sieve = !!w.up.driftAim;
+    if (!w.autoAim) { w.autoAim = true; w.aimDrift = false; }
+    else if (!w.aimDrift && sieve) { w.aimDrift = true; }
+    else { w.autoAim = false; w.aimDrift = false; }
+    this.hud.setAim(w);
+    // The DRIFT position says its own thing the first time it is reached; the
+    // plain one keeps the line it has always had.
+    this.announceToggle(w.aimDrift ? 'aimDrift' : 'autoAim', w.autoAim);
   }
 
   /**
@@ -930,13 +973,14 @@ export class Game {
      */
     const said = `use:${key}`;
     if (lineSeen(said)) { this.autoHinted[key] = true; return; }
-    markLine(said);
-    // Marked only once it has actually been shown. It used to be marked first,
-    // so picking a round while captions are suppressed
-    // and where all five are now one tap away — spent that caption on nothing
-    // and never gave it back, not even across a reset.
+    /*
+     * Marked when it is painted, not when it is asked for -- the band does it,
+     * off the id passed here. It used to be marked on this line, which meant a
+     * line pushed straight off the band by the next press was spent without
+     * ever being read and never came back, not even across a reset.
+     */
     this.autoHinted[key] = true;
-    this.hud.showHint(hint, true);
+    this.hud.showHint(hint, true, undefined, said);
   }
 
   /**
@@ -946,6 +990,11 @@ export class Game {
    * the fight.
    */
   get hintsAllowed() {
+    // ...and the player's own answer, which outranks everything else here.
+    // Somebody who has played games like this knows what an auto-aim toggle
+    // does before they press it, and a sentence saying so is in front of the
+    // field. See PREFS.hints in settings.js.
+    if (!pref('hints')) return false;
     return this.world.phase === 'staging' || this.world.phase === 'lull';
   }
 
@@ -991,7 +1040,14 @@ export class Game {
        * seven outros, AMPLITUDE had thirteen bodies still on the field and
        * something legal to shoot on 85% of the frames of its own payout.
        */
-      if (e.dead || e.staged || e.harmless || e.spent) continue;
+      /*
+       * `harmless` is the DRIFT rule, and SIEVE is the one thing that lifts
+       * it -- and lifts it the other way round: in the DRIFT position the
+       * assist takes grey and NOTHING else, so a player sweeping salvage is
+       * not also being defended. See Game.cycleAim.
+       */
+      if (e.dead || e.staged || e.spent) continue;
+      if (w.aimDrift ? !e.harmless : e.harmless) continue;
       const dx = e.x - s.x;
       const dy = e.y - s.y;
       if (Math.abs(angleDelta(-Math.PI / 2, Math.atan2(dy, dx))) > limit) continue;
@@ -1532,6 +1588,10 @@ export class Game {
    */
   teach() {
     if (!this.teaching) return;
+    // The opening is a teaching line like any other and answers to the same
+    // preference. Nothing is marked said while it is off, so turning it back
+    // on resumes the script rather than skipping it.
+    if (!pref('hints')) return;
     const w = this.world;
     // Walk past anything this device has already been told. Costs nothing and
     // no clock: a line it has heard should not hold up the one it has not.
@@ -1540,14 +1600,24 @@ export class Game {
     }
     const step = SCRIPT[this.scriptStep];
     if (!step) { this.teaching = false; return; }
-    // Paced by the clock so nothing is ever cut off, and gated on the count so
-    // a line about salvage is not said before any has been banked.
+    /*
+     * Paced by what has actually been said, not by what has been asked for.
+     *
+     * The clock below is set when a line is handed to the band, and since
+     * build 182 the band may queue it rather than paint it -- so a player who
+     * presses four controls in the first ten seconds put four first-use lines
+     * in front of the opening, and the opening carried on producing on its own
+     * clock regardless, stacking five deep behind them. The script waits for
+     * the band to be clear instead, which is what its own pacing always meant.
+     */
+    if (this.hud.pending()) return;
+    // ...and gated on the count, so a line about salvage is not said before
+    // any has been banked.
     if (w.time < this.lineUntil + GAP) return;
     if (step.at !== undefined && w.kills < step.at) return;
 
     this.scriptStep++;
-    markLine(step.id);
-    this.hud.showHint(step.text, true);
+    this.hud.showHint(step.text, true, step.hold, step.id);
     this.lineUntil = w.time + step.hold;
     if (this.scriptStep >= SCRIPT.length) this.teaching = false;
   }
