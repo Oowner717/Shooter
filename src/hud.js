@@ -528,7 +528,8 @@ export class Hud {
       b.appendChild(pips);
       frag.appendChild(b);
       this.slots.push({
-        el: b, fill: b.querySelector('.fill'), pips, ready: null, frac: -1, locked: null, held: -1, cap: -1,
+        el: b, def, fill: b.querySelector('.fill'), pips, ready: null, frac: -1,
+        locked: null, held: -1, cap: -1, urgent: null, now: null,
       });
     });
     this.el.abilities.appendChild(frag);
@@ -552,9 +553,33 @@ export class Hud {
     s.el.classList.add('flash');
   }
 
+  /**
+   * PULSE is the only thing that answers something sitting on the turret --
+   * the barrel cannot point at its own mount -- and nothing on the screen
+   * said so, so its button pulses for as long as anything is attached.
+   *
+   * The attacker count is READ here rather than passed in. It was a second
+   * parameter for one draft and there are six call sites; the five that had
+   * not been told about it passed nothing, defaulted to zero, and quietly
+   * cleared the class the sixth had just set. A caller that has to remember
+   * a new argument is a caller that will forget it.
+   */
   syncAbilities(abilities) {
+    const held = this.game.world.attackers.size;
     for (let i = 0; i < this.slots.length; i++) {
       const s = this.slots[i];
+      /*
+       * Two states, not one. A button that pulses "press me" while it is on
+       * cooldown is a lie the player only has to be told once to stop
+       * trusting it -- so `urgent` says "this is the one" and `now` is added
+       * only when there is actually a use in hand. The cooldown fill goes on
+       * saying how long, as it always has.
+       */
+      const urgent = held > 0 && !!s.def.essential;
+      if (s.urgent !== urgent) {
+        s.urgent = urgent;
+        s.el.classList.toggle('urgent', urgent);
+      }
       // Quantised so an idle bar isn't restyled sixty times a second.
       const f = Math.round(abilities.readyFraction(i) * 100) / 100;
       const locked = abilities.isLocked(i);
@@ -575,6 +600,11 @@ export class Hud {
       if (s.ready !== ready) {
         s.ready = ready;
         s.el.classList.toggle('ready', ready);
+      }
+      const now = urgent && ready;
+      if (s.now !== now) {
+        s.now = now;
+        s.el.classList.toggle('now', now);
       }
       if (s.locked !== locked) {
         s.locked = locked;

@@ -1538,6 +1538,159 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- when something is on the turret, the answer says so --------------------
+/*
+ * The barrel cannot point at a thing sitting on its own mount. That is the
+ * entire reason PULSE exists and the reason ORDINAL can never take it away,
+ * and nothing on the screen ever said it: the caption read "it stops when you
+ * destroy it", which is true and useless, and a player who never worked out
+ * which of eight buttons was the answer got no second chance -- every line in
+ * this game is said once per device.
+ *
+ * Three things now. The button wears it for as long as anything is attached;
+ * it distinguishes "this is the one" from "and you can press it right now";
+ * and a player who is still held after a while is told, in words, once, with
+ * a long leash, until they use it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { STILL_HELD } = await import('../src/tutorial.js');
+    g.debugTeachAll();
+    g.debugClearField();
+    g.hud.clearHint();
+
+    const btn = (name) => [...document.querySelectorAll('#abilities .ab')]
+      .find((b) => new RegExp(name).test(b.textContent));
+    /*
+     * `.ab` transitions border-color over 200ms and `.ab.flash` runs a
+     * 340ms animation that outranks the urgent one while it lasts, so a
+     * computed style read on the frame the class changes is reading the
+     * value it is leaving, not the one it is going to. Both are waited out.
+     */
+    const settle = () => new Promise((res) => setTimeout(res, 420));
+    const look = async () => {
+      const b = btn('PULSE');
+      b.classList.remove('flash');
+      await settle();
+      const cs = getComputedStyle(b);
+      return { cls: b.className, border: cs.borderTopColor, anim: cs.animationName,
+        lbl: getComputedStyle(b.querySelector('.lbl')).color };
+    };
+    const others = () => [...document.querySelectorAll('#abilities .ab')]
+      .filter((b) => !/PULSE/.test(b.textContent) && b.classList.contains('urgent')).length;
+
+    const sync = () => g.hud.syncAbilities(w.abilities);
+    w.attackers.clear(); sync();
+    const clean = await look();
+
+    // Something walks onto the mount.
+    const s = w.shooter;
+    const e = g.debugSpawn('lurcher', s.x + 4, s.y - 6);
+    e.spawnIn = 0; e.vx = 0; e.vy = 0;
+    for (let i = 0; i < 30; i++) g.update(1 / 60);
+    const held = await look();
+    const spread = others();
+
+    // ...and with no charge in hand it must still mark itself, but must not
+    // claim to be pressable.
+    const slot = w.abilities.slots.find((x) => x.def.essential);
+    const keep = { charges: slot.charges, cd: slot.cd };
+    slot.charges = 0; slot.cd = 9;
+    sync();
+    const cooling = await look();
+    slot.charges = keep.charges; slot.cd = keep.cd;
+    sync();
+
+    // The words, for someone who has still not pressed it.
+    g.hud.clearHint();
+    g.hud.say(null);
+    w.heldFor = 0; w.heldSaid = 1e9;
+    /*
+     * Gated on `.show`, not on the text. clearHint() drops the class and
+     * leaves the words in the DOM, so a plain textContent read finds the
+     * last thing said for the rest of the run -- which reported the nudge
+     * as firing again when what it had found was its own leftovers.
+     */
+    const band = () => {
+      const el = document.getElementById('abilityHint');
+      return el.classList.contains('show')
+        ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+    };
+    let saidAt = null;
+    for (let i = 0; i < 60 * 20 && saidAt === null; i++) {
+      g.update(1 / 60);
+      if (band().includes('PULSE shoves off')) saidAt = +(w.heldFor).toFixed(1);
+    }
+
+    // ...and it stops for good once they use it.
+    const idx = w.abilities.slots.indexOf(slot);
+    slot.charges = Math.max(1, slot.charges); slot.cd = 0; slot.locked = 0;
+    g.useAbility(idx);
+    g.hud.clearHint();
+    const e2 = g.debugSpawn('lurcher', s.x + 4, s.y - 6);
+    e2.spawnIn = 0; e2.vx = 0; e2.vy = 0;
+    let again = false;
+    for (let i = 0; i < 60 * 120; i++) {
+      g.update(1 / 60);
+      if (band().includes('PULSE shoves off')) { again = true; break; }
+    }
+    const stillHeld = w.attackers.size;
+
+    // Off the mount, off the button.
+    for (const a of [...w.attackers]) a.dead = true;
+    w.attackers.clear();
+    sync();
+    const after = await look();
+
+    g.debugClearField();
+    g.restart();
+    return { clean, held, cooling, after, spread, saidAt, again, stillHeld,
+      window: STILL_HELD.after };
+  });
+
+  check('something on the turret lights PULSE, and only PULSE',
+    !/urgent/.test(r.clean.cls) && /urgent/.test(r.held.cls)
+    && r.spread === 0 && !/urgent/.test(r.after.cls),
+    `clean "${r.clean.cls}" -> held "${r.held.cls}" -> released "${r.after.cls}"; `
+    + `${r.spread} other buttons lit`);
+
+  /*
+   * `now` is the difference between "this is the one" and "and you can press
+   * it". A button that shouts press-me on cooldown is a lie a player only has
+   * to be told once to stop believing it.
+   *
+   * The computed colours are asserted, not just the class, because that is
+   * the half that failed silently: this block sat ABOVE `.ab.ready` in the
+   * stylesheet, both are two-class selectors, and the later one won -- so the
+   * border and the label went back to PULSE's cyan on the exact button being
+   * made unmistakable, with the declarations present in the source and simply
+   * not applying.
+   */
+  const red = (c) => {
+    const m = String(c).match(/[\d.]+/g);
+    if (!m) return false;
+    const [rr, gg, bb] = m.map(Number);
+    return rr > 150 && rr > gg * 1.6 && rr > bb * 1.6;
+  };
+  check('...and it says "press me" only when there is a use in hand',
+    /\bnow\b/.test(r.held.cls) && !/\bnow\b/.test(r.cooling.cls)
+    && /urgent/.test(r.cooling.cls)
+    && r.held.anim !== r.cooling.anim && r.held.anim !== 'none'
+    && red(r.held.border) && red(r.cooling.border) && !red(r.clean.border),
+    `ready "${r.held.cls}" (${r.held.anim}, border ${r.held.border}); `
+    + `cooling "${r.cooling.cls}" (${r.cooling.anim}, border ${r.cooling.border}); `
+    + `clean border ${r.clean.border}`);
+
+  check('...and a player still held after a while is told what to press, once',
+    r.saidAt !== null && r.saidAt >= r.window && r.saidAt < r.window + 3
+    && !r.again && r.stillHeld > 0,
+    `said at ${r.saidAt}s of being held (window ${r.window}s); `
+    + `said again in the two minutes after a PULSE: ${r.again} `
+    + `(with ${r.stillHeld} still attached)`);
+}
+
 // --- nine rounds, nine shapes in the air ------------------------------------
 /*
  * Every projectile used to be drawn by one recipe -- two strokes, a glow and

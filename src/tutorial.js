@@ -93,9 +93,37 @@ export const SCRIPT = [...OPENING, ...NOTES]
  * tops out at three (CFG.glitch: 0.34 each, capped at 0.92).
  */
 export const ON_CONTACT = [
-  'CORRUPTION. Something is holding the turret.\nIt cannot kill you. It stops when you destroy it.',
-  'Each one taxes what you bank: one costs 22%,\ntwo 39%, three 53%, five 70% and no worse than that.',
+  /*
+   * The first line used to end "It stops when you destroy it", which is true
+   * and useless: the barrel cannot point at something sitting on its own
+   * mount, which is the entire reason PULSE exists and the reason ORDINAL
+   * can never take it away. So the player was told to destroy a thing and
+   * not told the one tool in the game that can. It names PULSE now, and the
+   * button itself pulses for as long as anything is attached -- see the
+   * `.ab.urgent` block in styles.css, which is the half of this that keeps
+   * working on a device that heard these lines a year ago.
+   */
+  'CORRUPTION. Something is holding the turret.\nThe barrel cannot reach it. PULSE can.',
+  'It cannot kill you. Each one taxes what you bank:\none costs 22%, two 39%, three 53%, five 70%.',
 ].map((text) => ({ id: idOf(text), text, hold: holdFor(text) }));
+
+/*
+ * ...and if it is still there a while later, said again.
+ *
+ * Everything else in this file is once per device and that is right for it:
+ * a line about a control you have already used is a line nobody wants twice.
+ * This one is different, because being stuck is a state and not an event. A
+ * player who never worked out what PULSE was for gets the opening lines once,
+ * months ago, and then nothing at all -- so the game watches for the shape of
+ * being stuck (something attached, for a while, and PULSE not pressed) and
+ * says the one sentence that ends it. Repeatable, on a long leash, and it
+ * stops for good the moment they use it.
+ */
+export const STILL_HELD = {
+  after: 9, // seconds of being held before it says anything
+  again: 45, // ...and the shortest gap between two of them
+  text: 'PULSE shoves off whatever is holding you.\nIt is the flashing button. It is always yours.',
+};
 
 /*
  * What a device carrying the old `sim7749-taught` flag is credited with having

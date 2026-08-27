@@ -1718,6 +1718,77 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
 .ab.ready .lbl { color: var(--ink); }
 .ab.ready svg { filter: drop-shadow(0 0 6px currentColor); }
 .ab:active { transform: scale(0.94); }
+
+/*
+ * Placed AFTER .ab.ready deliberately. Both are two-class selectors, so the
+ * later one wins -- and with this block above it, `.ab.ready` was quietly
+ * putting the border and the label back to PULSE's cyan on the exact button
+ * this is trying to make unmistakable. The declarations were in the source
+ * and simply did not apply. Same trap the menu hit three times.
+ */
+/*
+ * SOMETHING IS ON THE TURRET, AND THIS IS THE BUTTON.
+ *
+ * The barrel cannot point at a thing sitting on its own mount -- that is the
+ * whole reason PULSE exists and the reason ORDINAL can never take it away --
+ * and nothing on the screen ever said so. A player who has not worked it out
+ * watches the feed break up, keeps shooting at the field, and has no idea
+ * which of eight buttons is the answer.
+ *
+ * Two states rather than one, because a button that shouts "press me" while
+ * it is on cooldown is a lie a player only has to be told once to stop
+ * believing:
+ *
+ *   .urgent  something is attached. A slow breath on the frame, in the
+ *            corruption's own red rather than PULSE's cyan, so it belongs to
+ *            the thing that is happening and not to the button.
+ *   .now     ...and there is a use in hand. The ring lands, faster and
+ *            brighter, and the label comes up to full.
+ *
+ * The cooldown fill goes on saying how long, exactly as it always has.
+ */
+.ab.urgent {
+  border-color: rgba(255, 93, 93, 0.55);
+  animation: abHeld 1.5s ease-in-out infinite;
+}
+.ab.urgent.now {
+  animation: abNow 0.9s ease-in-out infinite;
+}
+.ab.urgent .lbl { color: #ffc9c9; }
+.ab.urgent.now .lbl { color: #fff0f0; }
+/* A second frame inside the border, so the pulse reads on the button's own
+   shape rather than as a glow floating behind it. */
+.ab.urgent::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 93, 93, 0.45);
+  pointer-events: none;
+  animation: abHeldRing 1.5s ease-in-out infinite;
+}
+.ab.urgent.now::after { animation: abHeldRing 0.9s ease-in-out infinite; }
+
+@keyframes abHeld {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 93, 93, 0); }
+  50% { box-shadow: 0 0 12px 1px rgba(255, 93, 93, 0.3); }
+}
+@keyframes abNow {
+  0%, 100% { box-shadow: 0 0 4px 0 rgba(255, 93, 93, 0.35); }
+  50% { box-shadow: 0 0 22px 4px rgba(255, 120, 120, 0.75); }
+}
+@keyframes abHeldRing {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.03); }
+}
+/* Still legible, still obviously the one, without the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .ab.urgent, .ab.urgent.now, .ab.urgent::after { animation: none; }
+  .ab.urgent { box-shadow: 0 0 10px 1px rgba(255, 93, 93, 0.35); }
+  .ab.urgent.now { box-shadow: 0 0 18px 3px rgba(255, 120, 120, 0.6); }
+  .ab.urgent::after { opacity: 0.7; }
+}
+
 .ab.flash { animation: abFlash 0.34s ease-out; }
 
 @keyframes abFlash {

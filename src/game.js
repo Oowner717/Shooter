@@ -32,7 +32,7 @@ import { NODES, NODE_BY_ID, priceOf } from './tree.js';
 
 /** The turret branch, for the fitting announcements and the completion one. */
 const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
-import { SCRIPT, ON_CONTACT, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { SCRIPT, ON_CONTACT, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
@@ -159,6 +159,10 @@ export class Game {
       effects: [],
       pendingBlasts: [],
       attackers: new Set(),
+      // How long something has been on the turret, and when we last said what
+      // to do about it. Both reset the moment PULSE goes off. See STILL_HELD.
+      heldFor: 0,
+      heldSaid: 1e9, // high, so the first prompt is not made to wait out a gap
 
       shooter: new Shooter(0, 0),
       background,
@@ -293,6 +297,9 @@ export class Game {
     w.mines.length = 0;
     w.pendingBlasts.length = 0;
     w.attackers.clear();
+    // A new run has not been told anything yet, and nothing is holding it.
+    w.heldFor = 0;
+    w.heldSaid = 1e9;
     w.shock = 0;
     if (w.boss) w.boss.clear(w);
     w.boss = null;
@@ -771,6 +778,16 @@ export class Game {
     // after it was bought and only if the player actually reaches for it.
     // ...and once on this device: `res.first` is per-run, so without this an
     // ability re-explains itself at the start of every run for ever.
+    /*
+     * They have used it. The nudge about what PULSE is for has done its job
+     * and never runs again this run -- `again` is a ceiling the counter can
+     * now never reach, because nothing else raises it while nothing is
+     * attached.
+     */
+    if (res.slot.def.essential) {
+      w.heldSaid = -Infinity;
+      w.heldFor = 0;
+    }
     const line = FIRST_USE[res.slot.def.id];
     const said = `use:${res.slot.def.id}`;
     if (res.first && line && this.hintsAllowed && !lineSeen(said)) {
@@ -1296,6 +1313,35 @@ export class Game {
     if (up.reflex && w.attackers.size >= 2) {
       const i = w.abilities.slots.findIndex((x) => x.def.essential);
       if (i >= 0 && w.abilities.usable(i)) this.useAbility(i);
+    }
+
+    /*
+     * Somebody who has not worked out what PULSE is for.
+     *
+     * Being stuck is a state, not an event, and every other line in this game
+     * is said once per device -- which is right for a control you have used
+     * and wrong for one you never understood. So this watches for the shape
+     * of it: something has been holding the turret for a while and PULSE has
+     * not been pressed. It says one sentence, waits a long time before it
+     * would say it again, and stops for good the moment they use it.
+     *
+     * `heldSaid` is time since it was last said and ticks whether or not
+     * anything is attached -- it starts high so the FIRST one lands the
+     * moment `after` is reached rather than waiting out a gap that has not
+     * happened yet. Ticking it only while held was the first draft, and it
+     * meant the first prompt needed forty-five seconds of being stuck rather
+     * than nine.
+     */
+    w.heldSaid += dt;
+    if (w.attackers.size > 0) {
+      w.heldFor += dt;
+      if (w.heldFor >= STILL_HELD.after && w.heldSaid >= STILL_HELD.again
+          && this.hintsAllowed) {
+        w.heldSaid = 0;
+        this.hud.showHint(STILL_HELD.text, true);
+      }
+    } else {
+      w.heldFor = 0;
     }
   }
 
