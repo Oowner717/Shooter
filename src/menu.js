@@ -317,7 +317,7 @@ export class Menu {
            * It used to be a card exactly like its own mods -- HE sat beside
            * OVERPRESSURE, same colour, same size, with nothing on screen to
            * say that one was a new round and the other was forty percent more
-           * blast radius. Only BOLT, PULSE and FAN got a heading, and that
+           * blast radius. Only BOLT, PULSE and HAIL got a heading, and that
            * was by accident: they are the arms with no id, and the label was
            * keyed off the id rather than off the kind.
            */
@@ -426,7 +426,7 @@ export class Menu {
       + `<span class="shopMeter${max < 2 ? ' none' : ''}">${'<i></i>'.repeat(max)}</span>`
       + '<b class="shopPrice"></b>';
     /*
-     * BOLT, PULSE and FAN are issued rather than bought, so they have no id
+     * BOLT, PULSE and HAIL are issued rather than bought, so they have no id
      * and nothing to buy. They still get a card: a round you already own
      * reading the same way as one you do not is the point of the heading.
      */

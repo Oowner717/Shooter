@@ -184,7 +184,7 @@ export function flash(alpha, color = '#ffffff') {
  * is now: ice chips, a crackle, a puncture, a concussion, a puff, a ledger
  * tick.
  *
- * The default -- BOLT, FAN, anything unnamed -- still goes through hitBurst
+ * The default -- BOLT, HAIL, anything unnamed -- still goes through hitBurst
  * with its exact randomness, because ORDINAL's canonical hash is taken with
  * BOLT and the default path's draw count is load-bearing. Everything here
  * only ever runs for a named form, which the canonical fight never fires.

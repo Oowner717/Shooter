@@ -1,7 +1,7 @@
 // Eight abilities. Each one is legible from its first use, and each one says
 // what it is the first time it is used rather than in a manual.
 //
-// The turret is issued with PULSE and FAN — one that shoves a crowd off and
+// The turret is issued with PULSE and HAIL — one that shoves a crowd off and
 // one that kills it. The other six are locked and handed over by the permanent
 // tier of the offer system, along with the rounds and the mines. A second use of any one
 // of them is bought the same way; until it is, an ability holds exactly one
@@ -212,7 +212,7 @@ const WELL_REACH = 430;
 
 /*
  * `show` on each ability below is how long its effect is worth looking at,
- * which is not its cooldown and not its damage window: FAN is over before the
+ * which is not its cooldown and not its damage window: HAIL is over before the
  * pellets land and WELL drags for a couple of seconds. Hud.recede() takes the
  * strip and the ability bar down for exactly that long, because measured
  * across three handsets a turret-centred effect is 25-54% behind a control.
@@ -811,11 +811,11 @@ export const ABILITIES = [
   {
     id: 'fan',
     show: 0.7, // seconds this is worth watching -- see Hud.recede()
-    name: 'FAN',
+    name: 'HAIL',
     color: '#7cffb2',
     cooldown: 5,
     icon: ICON.fan,
-    hint: 'FAN — 25 pellets in a tight cone.',
+    hint: 'HAIL — 25 pellets in a tight cone.',
     run(world) {
       const s = world.shooter;
       const count = 25;

@@ -170,7 +170,7 @@ const ABILITY_USE = {
   aimDrift: 'AUTO AIM: DRIFT. It takes grey and nothing else.\nIt is not watching the field while it does.',
   aimAll: 'AUTO AIM: ALL. Grey and hostile together.\nThere is nothing left to tell it.',
   pulse: 'PULSE. Hurts and shoves what is near you,\nand takes in the energy on the floor.',
-  fan: 'FAN. Twenty-five pellets in one tight cone.',
+  fan: 'HAIL. Twenty-five pellets in one tight cone.',
   lance: 'LANCE. A beam through the biggest thing out there.',
   well: 'WELL. Drags everything into a knot, then collapses it.',
   prism: 'PRISM. A shell that bursts, then beams every way.',
@@ -193,7 +193,7 @@ export const FIRST_USE = {
 /**
  * What the turret is issued with. Everything else is bought.
  *
- * PULSE shoves and FAN kills, so the pair is a way to answer a crowd and a way
+ * PULSE shoves and HAIL kills, so the pair is a way to answer a crowd and a way
  * to remove one — a turret that opens with only PULSE has nothing it can point
  * at anything. The two that run on their own come with it because they are not
  * power: they are the difference between playing this with a thumb on the

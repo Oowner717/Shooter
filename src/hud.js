@@ -743,7 +743,7 @@ export class Hud {
      * inward.
      *
      * The band used to take whatever arrived and push what was there out of
-     * the way. Measured on a fresh device: AUTO AIM, AUTO FIRE, PULSE and FAN
+     * the way. Measured on a fresh device: AUTO AIM, AUTO FIRE, PULSE and HAIL
      * pressed as fast as they can be reached put four lines through a
      * two-line band in under three seconds, and every one was marked
      * said-on-this-device the moment it was pushed -- so three of the four

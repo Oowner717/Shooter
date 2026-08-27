@@ -1582,7 +1582,6 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
 .qc svg { width: 14px; height: 14px; display: block; flex: 0 0 auto; }
 .qc .qLbl {
   font-size: 11px;
-  letter-spacing: 0.03em;
   letter-spacing: 0.08em;
   white-space: nowrap;
   color: inherit;

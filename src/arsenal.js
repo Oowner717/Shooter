@@ -141,8 +141,18 @@ export const ARSENAL = [
     key: 'explosive', kind: 'round', group: 'ammo', label: 'HE', icon: ICON.he, tone: '#ff5638',
     dmg: '15 + 44 blast', fx: 'Detonates on impact. Half the fire rate.',
   },
+  /*
+   * SHOT until build 184, and renamed because it was the same word as what the
+   * FAN ability did and one letter from SLUG, which is a round of its own --
+   * three names out of one family, two of them describing the same cone.
+   *
+   * `short` carries it on the strip. The stacks are budgeted at a fixed width
+   * so the whole bar closes inside 320, and seven characters ran past the cell
+   * border above 372px; every other surface with room -- the tree, the loadout
+   * sheet, the codex, the first-use line -- says SCATTER.
+   */
   {
-    key: 'shotgun', kind: 'round', group: 'ammo', label: 'SHOT', icon: ICON.shot, tone: '#ffc533',
+    key: 'shotgun', kind: 'round', group: 'ammo', label: 'SCATTER', short: 'SPRAY', icon: ICON.shot, tone: '#ffc533',
     dmg: '12 x 5', fx: 'A tight cone that dies short. Close range only.',
   },
   {

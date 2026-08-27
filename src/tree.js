@@ -11,7 +11,7 @@
  *   TURRET     the machine itself
  *   AMMO       BOLT, free, and every other round beside it
  *   MINES      all eight, none behind any other
- *   ABILITIES  PULSE and FAN, free, and the other six beside them
+ *   ABILITIES  PULSE and HAIL, free, and the other six beside them
  *
  * A category is a heading, not a thing you own — PULSE used to be the root of
  * the ability branch, which made every other ability read as something that
@@ -103,7 +103,7 @@ const BRANCH = {
   // behind, which made the first 900 a toll rather than a choice — you paid it
   // to reach the mine you actually wanted. They are peers now, in any order.
   mines: ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'],
-  // PULSE and FAN are the two the turret starts with. They are free where the
+  // PULSE and HAIL are the two the turret starts with. They are free where the
   // six below them are bought; their extra uses are not.
   abilities: ['pulse', 'fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'spiral'],
   turret: [],
@@ -186,7 +186,7 @@ const ROOT_LINE = {
   turret: 'The machine itself. Everything here is yours from the first frame.',
   ammo: 'What leaves the barrel. BOLT is loaded before you start; the rest are bought.',
   mines: 'What you leave behind. Eight of them, none behind any other — buy them in any order.',
-  abilities: 'What you hold. PULSE and FAN can never be taken from you; the other six are bought.',
+  abilities: 'What you hold. PULSE and HAIL can never be taken from you; the other six are bought.',
   anomaly: 'Seven ways in, one colour each. One of them has something on the other side of it.',
 };
 
@@ -217,7 +217,7 @@ function chargeOf(key) {
   });
 }
 
-/** `free` marks something the turret already has: BOLT, PULSE and FAN. */
+/** `free` marks something the turret already has: BOLT, PULSE and HAIL. */
 function arm(key, kind) {
   const free = FREE_ARMS.has(key);
   const kids = (UNDER[key] || []).map(leaf);

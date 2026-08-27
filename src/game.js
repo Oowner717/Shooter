@@ -2196,7 +2196,7 @@ export class Game {
    *
    * UNLOCK ALL below hands over the kit -- the rounds, the mines, the
    * abilities -- and stops there, which is half a turret: none of the seventy
-   * upgrades behind them, so a SHOT with no DOUBLE-O and a mine tier with no
+   * upgrades behind them, so a SCATTER with no DOUBLE-O and a mine tier with no
    * doctrine on it. This is the other half, and it includes the kit, since an
    * arm's unlock is a node in the tree like anything else.
    *

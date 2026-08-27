@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '183';
+export const BUILD = '184';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '183';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'b1c4e4f';
+export const REV = 'd8c068a';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -428,7 +428,7 @@ export const CFG = {
     },
     // Jumps from whatever it hits to the next thing near it, and on again.
     // Poor against anything on its own; devastating through a cluster, at any
-    // range, which is the one thing neither HE nor SHOT does.
+    // range, which is the one thing neither HE nor SCATTER does.
     arc: {
       rate: 1.35,
       speed: 1180,
@@ -534,7 +534,7 @@ export const CFG = {
    * It replaced CHORUS, and the reason was a gap rather than a complaint.
    * Every ability in the bar acted on the field and away from the turret --
    * PULSE shoves, LANCE pierces, WELL gathers, PRISM bursts, STASIS holds,
-   * DECOY redirects, FAN throws a cone somewhere else -- and not one of them
+   * DECOY redirects, HAIL throws a cone somewhere else -- and not one of them
    * touched the turret's own gun, which is what the whole UPGRADES tree is
    * about. Nine rounds and twenty fittings, and nothing in the bar cared
    * which of them you were carrying.

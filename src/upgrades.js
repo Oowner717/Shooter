@@ -106,7 +106,7 @@ const MARK = {
   counterspin: g('<path d="M12 4.6a7.4 7.4 0 1 1-7.2 5.7"/><path d="M4.4 5.6 4.8 10.3l4.6-.9" />'
     + '<path d="M12 9.2a2.9 2.9 0 1 0 2.8 3.6" opacity=".75"/>'),
   salvo: g('<path d="M5 21V7M12 21V4M19 21V7"/><path d="M2.6 9.4 5 7l2.4 2.4M9.6 6.4 12 4l2.4 2.4M16.6 9.4 19 7l2.4 2.4"/>'),
-  // --- build 54: BOLT, HE, SHOT, ARC and SPINE each get their own ---
+  // --- build 54: BOLT, HE, SCATTER, ARC and SPINE each get their own ---
   // A round coming off a body at an angle rather than stopping in it.
   overstuffed: g('<circle cx="17" cy="7.6" r="2.6"/><path d="M2.6 4.4 14.6 9.4"/><path d="M14.8 10.4 4.6 19.6"/><path d="M5.4 15.6 4 20.6l5-1.4" fill="currentColor" stroke="none"/>'),
   // One trigger pull, two rounds out of it.
@@ -307,10 +307,15 @@ export const UPGRADES = {
       line: 'An HE burst throws four smaller ones outward.',
       apply: set('cluster', true), icon: MARK.cluster },
     { id: 'doubleo', name: 'DOUBLE-O', levels: 2,
-      line: '+3 pellets in every SHOT.',
+      line: '+3 pellets in every SCATTER.',
       apply: bump('shotPellets', 3), icon: MARK.doubleo },
-    { id: 'longshot', name: 'LONG SHOT', levels: 1,
-      line: '+55% SHOT range. The cone still ends, but further out.',
+    /*
+     * LONG SHOT until build 184. The round it belongs to is SCATTER now, and
+     * an upgrade named after a round that no longer exists is a row nobody can
+     * connect to anything -- the pun was the only thing holding the name on.
+     */
+    { id: 'longshot', name: 'LONG THROW', levels: 1,
+      line: '+55% SCATTER range. The cone still ends, but further out.',
       apply: scale('shotRange', 1.55), icon: MARK.longshot },
     { id: 'superconductor', name: 'SUPERCONDUCTOR', levels: 1,
       line: 'An ARC link keeps 95% of its damage instead of 86%.',

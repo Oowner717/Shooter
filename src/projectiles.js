@@ -433,7 +433,7 @@ export function drawProjectiles(ctx, world) {
 
     switch (p.form) {
       /*
-       * SHOT. Up to forty-five of these can be in the air at once (DOUBLE-O
+       * SCATTER. Up to forty-five of these can be in the air at once (DOUBLE-O
        * pellets across a SALVO fan), so this is the one form that had to get
        * CHEAPER: one stroke and a half-size glow, against the old recipe's
        * two strokes, a glow and a filled arc. A pellet is hot metal, not a

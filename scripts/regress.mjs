@@ -1971,7 +1971,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  *
  * The band used to take whatever arrived and push what was there out of the
  * way, and every line was marked said-on-this-device the moment it was pushed
- * -- so pressing AUTO AIM, AUTO FIRE, PULSE and FAN in three seconds spent
+ * -- so pressing AUTO AIM, AUTO FIRE, PULSE and HAIL in three seconds spent
  * four captions and showed one, and this device would never offer the other
  * three again. That is the whole of "I only saw the tooltips for the first
  * two". They queue now, and the marking moved to the moment of painting.
@@ -2312,7 +2312,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  *
  * Named forms land as what they are now (ice chips, a crackle, a puncture, a
  * concussion, a puff, a ledger tick) and a death within half a second of a
- * named hit wears it. The default path -- BOLT, FAN, anything unnamed -- is
+ * named hit wears it. The default path -- BOLT, HAIL, anything unnamed -- is
  * byte-for-byte the old hitBurst and the plain explode, because it is the
  * path every hit in ORDINAL's canonical fight takes, and the hash held at
  * 117409503 through this change on exactly that guarantee.
@@ -3189,7 +3189,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  * It replaced CHORUS, and the reason was a gap rather than a complaint. Every
  * ability in the bar acted on the field and away from the turret -- PULSE
  * shoves, LANCE pierces, WELL gathers, PRISM bursts, STASIS holds, DECOY
- * redirects, FAN throws a cone somewhere else -- and not one of them touched
+ * redirects, HAIL throws a cone somewhere else -- and not one of them touched
  * the turret's own gun, which is what the whole UPGRADES tree is about. Nine
  * rounds and twenty fittings, and nothing in the bar cared which you carried.
  *
@@ -3842,7 +3842,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.hud.unrecede();
     const before = opacity();
     // An ability going off is a beat, and it is the ability's own `show`,
-    // not its cooldown: FAN is over before the pellets land, WELL drags.
+    // not its cooldown: HAIL is over before the pellets land, WELL drags.
     g.useAbility(0);
     const held = g.hud.recedeT;
     const cls = document.body.classList.contains('recedeStrip');
