@@ -123,6 +123,44 @@ export function drawSpecimen(ctx, id, r) {
 const SHARD_ORBIT = 2.15; // multiples of the core radius
 export const SHARD_R = 12;
 
+/**
+ * What a body is made of.
+ *
+ * Every hostile in the game was drawn by one recipe -- a 16% fill, a stroke
+ * between 55% and 100%, and a line 9% of the radius -- for all thirty-seven
+ * shapes, with no exceptions. So the only two things separating a body from
+ * any other body on the screen were its hue and its silhouette, and at a full
+ * field both saturate: seven hues at the same value and the same optical
+ * weight, nothing in front of anything, and no way to pick out the thing that
+ * is about to hurt you.
+ *
+ * Nothing new had to be invented to fix that. The table already knows what
+ * each of these weighs -- `density` runs from 0.5 on a SEED to 7 on a PYLON,
+ * a fourteen-fold range -- and it already knows which of them are armoured.
+ * The draw simply never read either. So weight is where the material comes
+ * from: a light thing is nearly hollow with a fine line, a heavy thing is
+ * dense with a thick one, and an armoured thing carries a second line inside
+ * the first because it is plated.
+ *
+ * The curve saturates at 2.7, which is BULWARK -- the heaviest thing on an
+ * ordinary field. Everything above it is boss structure at 5 to 7, which is
+ * a wall and should read as one.
+ *
+ * Memoised on the type, because this is per-body per-frame and a full field
+ * is fifty-seven of them.
+ */
+export function materialOf(t) {
+  if (t._mat) return t._mat;
+  const heavy = clamp(((t.density ?? 1) - 0.5) / 2.2, 0, 1);
+  t._mat = {
+    heavy,
+    fill: 0.07 + heavy * 0.3, // 0.07 wisp, 0.37 solid
+    line: 0.062 + heavy * 0.072, // x radius
+    plate: !!t.armor,
+  };
+  return t._mat;
+}
+
 export class Enemy {
   constructor(type, x, y, opts = {}) {
     this.type = type;
@@ -1038,9 +1076,14 @@ export class Enemy {
       ctx.strokeStyle = rgba(t.color, 0.75);
       ctx.lineWidth = Math.max(HAIRLINE * 0.8, this.r * 0.22);
     } else {
-      ctx.fillStyle = rgba(t.color, 0.16 * dim);
+      // Weight, read off the density the table has always carried. See
+      // materialOf(): 0.16/0.09r for everything became 0.07-0.37 fill on a
+      // line of 0.062-0.134r, so a BULWARK arrives as something solid and a
+      // SEED as something you could put a hand through.
+      const m = materialOf(t);
+      ctx.fillStyle = rgba(t.color, m.fill * dim);
       ctx.strokeStyle = rgba(t.color, 0.55 + 0.45 * dim);
-      ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.09);
+      ctx.lineWidth = Math.max(HAIRLINE, this.r * m.line);
     }
 
     /*
@@ -1111,6 +1154,27 @@ export class Enemy {
       if (this.marks >= full) {
         drawGlow(ctx, TONE, 0, 0, this.r * 1.9, 0.16 + 0.07 * Math.sin(world.time * 5 + this.phase));
       }
+      ctx.restore();
+    }
+
+    /*
+     * PLATED. A second line inside the first, on anything the table marks
+     * `armor`.
+     *
+     * Armour is the one property that changes how you fight a body -- a
+     * BULWARK at 676 health behind plate wants a different round from a
+     * SCION at 390 without it -- and it was invisible. Drawn before the
+     * shape and inside it, so it reads as a liner rather than as a halo, and
+     * it fades with health like everything else: a plated thing coming apart
+     * loses its plate first.
+     */
+    if (materialOf(t).plate && !this.isDrop) {
+      ctx.save();
+      ctx.strokeStyle = rgba(t.color, 0.3 + 0.34 * dim);
+      ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.05);
+      ctx.beginPath();
+      ctx.arc(0, 0, this.r * 0.7, 0, TAU);
+      ctx.stroke();
       ctx.restore();
     }
 

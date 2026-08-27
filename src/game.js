@@ -42,6 +42,35 @@ const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 /** Seconds between one automatic checkpoint and the next. */
 const SAVE_EVERY = 4;
 
+/*
+ * Decoration must not move the simulation.
+ *
+ * The title screen's DRIFT is scenery -- it exists so the title is a running
+ * simulation rather than a still page -- but it is spawned through the same
+ * spawnDrift() as everything else, which rolls a position and two velocities
+ * off Math.random. That is four draws per body against a PRNG that
+ * scripts/fight.mjs seeds before the game is constructed, so seven bodies of
+ * scenery shifted the whole stream and ORDINAL's canonical hash moved from
+ * 117409503 to 539018592 the moment the title got something to look at.
+ *
+ * The hash was right to move and the change behind it was not the material
+ * pass it appeared to indict: disabling this one call put the hash back on
+ * the canonical value with everything else still in place. So the scenery
+ * runs on its own stream and hands Math.random back, and the run's own
+ * randomness never learns the title screen happened.
+ */
+let titleSeed = 0x7749;
+function titleRandom(fn) {
+  const real = Math.random;
+  Math.random = () => {
+    titleSeed ^= titleSeed << 13;
+    titleSeed ^= titleSeed >>> 17;
+    titleSeed ^= titleSeed << 5;
+    return (titleSeed >>> 0) / 4294967296;
+  };
+  try { return fn(); } finally { Math.random = real; }
+}
+
 export class Game {
   constructor(canvas) {
     this.canvas = canvas;
@@ -97,12 +126,14 @@ export class Game {
    */
   seedTitleField(n = 7) {
     const w = this.world;
-    for (let i = 0; i < n; i++) {
-      const e = spawnDrift(w);
-      // Spread up the field and a little past the top, so the first frame is
-      // the middle of something rather than the start of it.
-      if (e) e.y = ENTRY_Y - 120 + (i / n) * (w.floorY - ENTRY_Y) * 0.92;
-    }
+    titleRandom(() => {
+      for (let i = 0; i < n; i++) {
+        const e = spawnDrift(w);
+        // Spread up the field and a little past the top, so the first frame
+        // is the middle of something rather than the start of it.
+        if (e) e.y = ENTRY_Y - 120 + (i / n) * (w.floorY - ENTRY_Y) * 0.92;
+      }
+    });
   }
 
   // --------------------------------------------------------------- world
@@ -1069,7 +1100,7 @@ export class Game {
 
     // The title's field, topped up as it falls off the bottom. Only while the
     // title is up: from `staging` on, the director owns what is on the field.
-    if (w.phase === 'boot' && driftCount(w) < 7) spawnDrift(w);
+    if (w.phase === 'boot' && driftCount(w) < 7) titleRandom(() => spawnDrift(w));
 
     // ---- status timers ----
     w.stasis = Math.max(0, w.stasis - dt);

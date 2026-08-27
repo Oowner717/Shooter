@@ -1536,6 +1536,96 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- a body is made of something --------------------------------------------
+/*
+ * Every hostile in the game was drawn by one recipe: a 16% fill, a stroke
+ * between 55% and 100%, and a line 9% of the radius -- thirty-seven shapes,
+ * no exceptions. So the only two things separating any body from any other
+ * were hue and silhouette, and at a full field both saturate.
+ *
+ * Nothing new had to be invented. `density` has been in the table since the
+ * physics went in, running 0.5 on a SEED to 7 on a PYLON, and `armor` has
+ * been there as long; the draw read neither. Weight now comes off density and
+ * plate off armour, so the table's own physics is what the field looks like.
+ *
+ * Asked of the pixels, like the turret's parts above, because there is no
+ * eyeballing thirty shapes at three weights on a phone: render one body,
+ * count how much ink is inside it, and require the light end and the heavy
+ * end to be different pictures. Counting ink rather than summing the whole
+ * frame, because a heavier line and a denser fill both add and a sum would
+ * pass on either alone.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { materialOf } = await import('../src/enemies.js');
+    const { TYPE_BY_ID } = await import('../src/config.js');
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+
+    const cv = document.createElement('canvas');
+    cv.width = 160; cv.height = 160;
+    const c2 = cv.getContext('2d', { willReadFrequently: true });
+
+    /*
+     * One body per type, rendered at a fixed radius so this measures the
+     * material and not the size. Ink is alpha-weighted coverage inside the
+     * frame: a fill that got denser and a line that got thicker both raise
+     * it, and a body that vanished drops it to nothing.
+     */
+    const ink = (id) => {
+      const t = TYPE_BY_ID[id];
+      if (!t) return null;
+      const e = g.debugSpawn(id, 400, 400);
+      if (!e) return null;
+      e.spawnIn = 0; e.angle = 0; e.flash = 0; e.hp = e.maxHp; e.r = 22;
+      c2.setTransform(1, 0, 0, 1, 0, 0);
+      c2.clearRect(0, 0, 160, 160);
+      c2.translate(80 - e.x, 80 - e.y);
+      e.draw(c2, w);
+      const d = c2.getImageData(0, 0, 160, 160).data;
+      let sum = 0;
+      for (let i = 3; i < d.length; i += 4) sum += d[i];
+      e.dead = true;
+      return Math.round(sum / 1000);
+    };
+
+    // Light to heavy, by the density the table already carried.
+    const order = ['seed', 'drift', 'needle', 'mote', 'splitter', 'warden', 'lurcher', 'towMass', 'bulwark'];
+    const got = {};
+    for (const id of order) got[id] = ink(id);
+    const mats = Object.fromEntries(order.map((id) => [id,
+      { d: TYPE_BY_ID[id].density, ...materialOf(TYPE_BY_ID[id]) }]));
+    g.restart();
+    return { order, got, mats,
+      plated: order.filter((id) => mats[id].plate),
+      bare: order.filter((id) => !mats[id].plate) };
+  });
+
+  const light = r.got.seed;
+  const heavy = r.got.bulwark;
+  // Monotone is too strong -- the shapes differ, and a NEEDLE is a chevron
+  // where a WARDEN is a disc. What has to hold is that the ends separate and
+  // that nothing collapsed to the single recipe this replaced.
+  const spread = heavy / Math.max(1, light);
+  check('a body is made of something: the light end and the heavy end differ',
+    spread > 1.35 && light > 0 && r.order.every((id) => r.got[id] > 0),
+    `ink at r22: ${r.order.map((id) => `${id}:${r.got[id]}`).join(' ')} (heavy/light ${spread.toFixed(2)}x)`);
+
+  const fills = r.order.map((id) => r.mats[id].fill);
+  const lines = r.order.map((id) => r.mats[id].line);
+  const rising = (v) => v.every((x, i) => i === 0 || x >= v[i - 1]);
+  check('...and weight comes off the density the table already knew',
+    rising(fills) && rising(lines)
+    && fills[0] < 0.1 && fills[fills.length - 1] > 0.3
+    && r.plated.length === 2 ,
+    `fill ${fills.map((v) => v.toFixed(2)).join('/')}, `
+    + `line ${lines.map((v) => v.toFixed(3)).join('/')}, plated ${r.plated.join(',')}`);
+}
+
 // --- nothing live is on screen behind a full-screen screen ------------------
 /*
  * `body.booting` and `body.ending` each carried a list of the live HUD and
@@ -1624,6 +1714,53 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.drift >= 5 && r.hostile === 0 && r.afterStart === 0,
     `${r.drift} drift, ${r.hostile} hostile on the title; `
     + `${r.afterStart} seeded after the run starts`);
+
+  /*
+   * ...and none of it costs the run a single random number.
+   *
+   * spawnDrift() rolls a position and two velocities off Math.random, so
+   * seven bodies of scenery is twenty-odd draws against a stream that
+   * scripts/fight.mjs seeds before the game is built -- and ORDINAL's
+   * canonical hash moved from 117409503 to 539018592 the moment the title
+   * got something to look at. The scenery runs on its own PRNG now. This
+   * counts the draws rather than re-running the fight, because the fight is
+   * four hundred seconds and this is the property that actually matters.
+   */
+  const draws = await page.evaluate(() => {
+    const g = window.__sim;
+    const w = g.world;
+    const real = Math.random;
+    let n = 0;
+    const count = (fn) => {
+      n = 0;
+      Math.random = () => { n++; return real(); };
+      try { fn(); } finally { Math.random = real; }
+      return n;
+    };
+    const clear = () => { for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0; };
+
+    w.phase = 'boot';
+    clear();
+    const seeding = count(() => g.seedTitleField(7));
+    const seeded = w.enemies.filter((e) => !e.dead).length;
+
+    /*
+     * ...and the per-frame top-up too, which is the part a boot frame runs
+     * over and over. Measured as a difference rather than absolutely: a boot
+     * frame draws for its own reasons -- dust, the substrate, the narrator --
+     * and the first draft of this counted all of that and called it scenery.
+     * What has to be zero is what the top-up ADDS.
+     */
+    clear();
+    const empty = count(() => g.update(1 / 60)); // must top up: no drift at all
+    const full = count(() => g.update(1 / 60)); // nothing to do: one was just made
+    g.restart();
+    return { seeding, seeded, empty, full };
+  });
+  check('...and the scenery does not spend the run\'s randomness',
+    draws.seeding === 0 && draws.seeded > 0 && draws.empty === draws.full,
+    `seeding ${draws.seeded} title bodies cost ${draws.seeding} draws; `
+    + `a boot frame that must top up costs ${draws.empty} against ${draws.full} for one that need not`);
 }
 
 // --- the strip and the ability bar are glass, and still legible -------------
