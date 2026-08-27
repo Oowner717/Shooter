@@ -2900,7 +2900,10 @@ export class Director {
     const T = CFG.waves.tier;
     return {
       pop: Math.min(1 + T.pop * tier, T.popCap),
-      hp: 1 + T.hp * tier,
+      // Compounding, and off tier 1 rather than off zero -- so tier 1 is the
+      // table exactly as authored and every step after it is a ratio on the
+      // one before. See CFG.waves.tier.hpStep for why it is not a slope.
+      hp: T.hpStep ** (tier - 1),
       bounty: 1 + T.bounty * tier,
     };
   }

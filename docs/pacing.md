@@ -187,34 +187,75 @@ the taps pays nothing at all.
 
 ### ...and the thing the plan had wrong
 
-**The wall plan B is written around does not exist, and cannot be built out of
-the health slope as it stands.** Plan B wants a tier's band held at 2–4s
-through about tier 10 and past 6s by about 14. Measured across tiers 1–20, both
-before and after the nerf, the slowest member of a band peaks at 3.0s (SPLITTER,
-tier 3) and then *falls*, settling at 1.2–1.6s from tier 9 all the way to 20.
+**The wall plan B is written around did not exist, and could not be built out
+of the health slope as it stood.** Measured across tiers 1–20, before and after
+the nerf, the slowest member of a band peaked at 3.0s (SPLITTER, tier 3) and
+then *fell*, settling at 1.2–1.6s from tier 9 all the way to 20.
 
-Two measurements say why:
+Two measurements said why:
 
 1. **The tree plateaus at about tier 8.** dps is 1,430 for 15k spent and still
    1,438 for 116k. Everything past the damage line — every round, mine and
-   ability — buys nothing a single body can feel. A partly-spent turret is as
-   dangerous as a bought-out one.
-2. **`hp: 0.06` is linear and cannot catch it.** At tier 20 it is ×2.2. The
-   damage line is ×13 by tier 8 and then flat. Health never closes that.
+   ability — buys nothing a single body can feel.
+2. **`hp: 0.06` was linear and could not catch it.** ×2.2 at tier 20, against a
+   damage line worth ×13 by tier 8 and flat after.
 
-To put the worst body at 6s by tier 14 the multiplier there has to be about
-7.4× rather than today's 1.84×. Linear, that is `hp: 0.457`, which makes tier 2
-nearly twice as tough as tier 1 — a slope that is all early and no late.
-Compounding is the right shape for it: `hp` read as `1.155ⁿ` gives ×1.33 at
-tier 2, ×2.05 at 5, ×4.2 at 10, ×7.5 at 14 and ×18 at 20 — gentle where the
-player is learning the ladder and steep where the wall is wanted.
+### Build 179 — the health slope compounds
 
-That is a change to the ladder's character and not a tuning pass, so it is
-written down here rather than shipped. It is the next decision, and it is the
-only one left between plan B and its own target.
+`hp` becomes `hpStep ** (n - 1)` with **hpStep 1.17**. Two changes in one: it
+compounds, and it is read off tier 1 rather than off zero, so **tier 1 is the
+table exactly as authored** and every rung is 17% on the one below.
+
+A linear slope steep enough to matter at fourteen would have needed 0.457,
+which makes tier 2 nearly twice tier 1 — all early and no late. Compounding
+puts the growth where the wall is wanted: ×1.17 at tier 2, ×1.87 at 5, ×4.1 at
+10, ×7.7 at 14, ×19.7 at 20.
+
+Measured, tiers 1–20, three runs:
+
+| crossing | plan B wanted | measured |
+|---|---|---|
+| slowest band member past 2s | — | tier 3 |
+| ...past 4s | — | tier 12 |
+| ...past 6s | ~tier 14 | **tier 15** |
+| ...past 10s | — | tier 19 |
+| the band's heaviest wave uncleared in 120s | — | **tier 19** |
+
+The wall is real and it is where it was asked for, within a rung. Tiers 9–11
+sit at 3.0–3.4s, inside plan B's 2–4s band; the climb runs 4.4s at 12, 5.5s at
+14, 6.3s at 15, 8.3s at 17, and by 19 a full wave cannot be cleared at all.
+ORDINAL's hash is unmoved at `117409503` — the boss builds its DIGITs outside
+`spawnOne`, so no tier multiplier has ever reached them, which this is the
+first change to have actually checked.
+
+**Where it does not hold: tiers 5–8 fall out of the band**, at 1.1–2.7s. That
+is not the slope, it is the bands: a new band arrives every two tiers, and a
+turret that has just grown meets it before the health has caught up. Levelling
+that means re-banding waves or moving `perBand`, not touching this number.
+
+### The interlock this opened, for plan C
+
+Health now compounds and bounty does not, so they pull apart as the ladder
+climbs. `tiers.mjs` reports it directly — energy a wave offers per 1,000 health
+it makes you chew through:
+
+| tier | 1 | 5 | 10 | 15 | 20 |
+|---|---|---|---|---|---|
+| pay per 1k health | 40 | 4 | 1 | 1 | 0 |
+
+Most of the fall from 40 to 4 is band composition rather than the slopes — band
+2's types carry far more health per unit of bounty than band 1's. Inside band 5,
+which is tiers 9 through 20, it is the slopes alone: bounty ×(1 + 0.15n) reaches
+×4 while health reaches ×19.7, so a rung pays about a fifth of what it did per
+unit of work.
+
+That makes the wall a hard stop rather than a grind — you cannot earn your way
+through it — which may well be the right answer for "progress until you cannot
+any further". But it is now plan C's decision and it has a number on it: to hold
+the ratio flat through band 5, bounty has to compound too, at roughly the same
+1.17.
 
 ### Still outstanding
 
-- The hp-slope decision above.
 - Plan C in full: `world.earned`, energy-gated unlocks, bounty tuning.
 - The demolition: `killGoal`, `releasesLeft`.

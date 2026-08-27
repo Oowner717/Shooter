@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '178';
+export const BUILD = '179';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '178';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '9ec11bd';
+export const REV = '8e583ab';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -150,7 +150,25 @@ export const CFG = {
       // before anything new arrives.
       perBand: 2,
       pop: 0.1, // authored count x (1 + pop*n)
-      hp: 0.06, // type health x (1 + hp*n)
+      /*
+       * Health is the one slope that compounds: type health x hpStep^(n-1),
+       * so tier 1 is the table as authored and each rung is 17% on the one
+       * below it.
+       *
+       * It was linear, +6% a tier, and scripts/tiers.mjs measured what that
+       * came to: x2.2 at tier 20, against a damage line worth x13 by tier 8
+       * and flat after it. The slowest body in a band peaked at 3.0s at tier
+       * 3 and then *fell*, settling near 1.4s from tier 9 to 20 -- the ladder
+       * got busier and never got harder, which is the whole thing it exists
+       * to do. A linear slope steep enough to matter at fourteen (x0.457)
+       * would have made tier 2 nearly twice tier 1: all early and no late.
+       *
+       * Compounding puts the growth where the wall is wanted. x1.17 at tier
+       * 2, x1.87 at 5, x4.1 at 10, x7.7 at 14, x19.7 at 20. There is no
+       * ceiling on it and there should not be: the brief is to climb until
+       * you cannot, and the fail score is what catches you.
+       */
+      hpStep: 1.17,
       bounty: 0.15, // energy x (1 + bounty*n)
       /*
        * The ceiling on population growth. The field caps at CFG.maxEnemies

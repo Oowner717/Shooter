@@ -387,6 +387,23 @@ for (let r = 0; r < RUNS; r++) {
         for (let i = 0; i < 60 * 20 && w.enemies.some((e) => e.staged || e.spawnIn > 0); i++) {
           g.update(S);
         }
+        /*
+         * What the wave is worth against what it costs to get through.
+         *
+         * Health compounds with the tier and bounty does not, so the two
+         * slopes pull apart as the ladder climbs -- and a rung that pays a
+         * fifth of what it used to per unit of work is plan C's problem
+         * arriving through plan B's door. Taken as totals rather than per
+         * second, because the clear column is noisy and this does not have to
+         * be: it is a property of the two slopes, not of the fight.
+         */
+        let pay = 0;
+        let hp = 0;
+        for (const e of w.enemies) {
+          if (e.harmless) continue;
+          pay += e.bounty || 0;
+          hp += e.maxHp || 0;
+        }
 
         w.autoAim = true;
         w.autoFire = true;
@@ -400,7 +417,7 @@ for (let r = 0; r < RUNS; r++) {
         let t = 0;
         while (t < cap2 && live() > 0) { g.update(S); t += S; }
         return {
-          asked, secs: t, cleared: live() === 0, left: live(),
+          asked, pay, hp, secs: t, cleared: live() === 0, left: live(),
           // If anything is still marching when the clock starts, part of what
           // this timed was the walk in and the number is not comparable.
           marching: w.enemies.some((e) => e.staged),
@@ -510,15 +527,16 @@ console.log(`\nTHE LADDER — tiers ${FROM}-${TO}, ${RUNS} run${RUNS > 1 ? 's' :
 console.log(`  spend: ${FIXED !== null ? `${num(FIXED)} flat` : "docs/pacing.md's earned-by-tier targets"}`
   + `, capped at the whole tree (${num(TREE_TOTAL)})`);
 console.log(`  slopes: pop +${CFG.waves.tier.pop * 100}%/tier (cap x${CFG.waves.tier.popCap})`
-  + ` · hp +${CFG.waves.tier.hp * 100}%/tier · bounty +${CFG.waves.tier.bounty * 100}%/tier`);
+  + ` · hp x${CFG.waves.tier.hpStep}^(n-1) · bounty +${CFG.waves.tier.bounty * 100}%/tier`);
 const atRange = [...results.values()].flat()
   .flatMap((r) => r.marks.map((m) => m.at)).filter(Number.isFinite);
 console.log(`  one body, ${RANGE} units straight up (measured ${med(atRange) || RANGE}),`
   + ` cap ${CAP}s\n`);
 
-console.log('  tier band    spend  buys  rnd/s     dps  worst   wave  clear  |  time to kill');
+console.log('  tier band    spend  buys  rnd/s     dps  worst   wave  clear  pay/k  |  time to kill');
 const worst = new Map();
 const clears = new Map();
+const pays = new Map();
 const loose = [];
 for (const tier of tiers) {
   const runs = results.get(tier);
@@ -558,13 +576,16 @@ for (const tier of tiers) {
    */
   const spread = Math.max(...secsEach) / Math.max(0.1, Math.min(...secsEach));
   if (runs.some((r) => r.wave.marching)) loose.push(tier);
+  // Energy the wave offers per thousand health it makes you chew through.
+  const perK = med(runs.map((r) => (1000 * r.wave.pay) / Math.max(1, r.wave.hp)));
+  pays.set(tier, perK);
 
   console.log(`  ${pad(tier, 4)}${pad(band, 5)}${pad(num(spend), 9)}${pad(Math.round(buys), 6)}`
     + `${pad(rps.toFixed(1), 7)}${pad(dps.toFixed(0), 8)}`
     + `${pad(Number.isFinite(top) ? `${top.toFixed(1)}s` : `>${CAP}s`, 7)}`
     + `${pad(Math.round(asked), 7)}`
     + `${pad(stuck ? `>${WAVECAP}s` : `${clear.toFixed(0)}s${spread > 2 ? '~' : ''}`, 7)}`
-    + `  |  ${cells.join('   ')}`);
+    + `${pad(perK.toFixed(1), 7)}  |  ${cells.join('   ')}`);
 }
 
 /*
@@ -601,6 +622,7 @@ console.log(`\n  rnd/s    projectiles a second, counted at the muzzle, against a
 console.log('  dps      ...and what landed on it, a second — armour already paid for');
 console.log('  worst    the slowest member of the band: what the tier is bounded by');
 console.log('  wave     bodies in the band\'s heaviest authored wave, at this tier\'s size');
+console.log('  pay/k    energy the wave offers per 1,000 health it makes you chew through');
 console.log(`  clear    ...and how long the whole of it took to put down (cap ${WAVECAP}s).`);
 console.log('           ~ means the runs disagreed by more than double: read the tier,');
 console.log('           not the second. Raise --runs before tuning against this column.');

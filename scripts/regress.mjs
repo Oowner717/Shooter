@@ -1645,6 +1645,22 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     }
     const badBands = bandRows.filter((b) => !b.ok);
 
+    /*
+     * ---- the health slope compounds, and tier 1 is the table as written ----
+     *
+     * It was linear, +6% a tier, and reached x2.2 by tier 20 against a damage
+     * line worth x13 by tier 8 -- so the ladder got busier and never got
+     * harder, and scripts/tiers.mjs measured the slowest body in a band
+     * *falling* from 3.0s at tier 3 to 1.4s at tier 20. Asserted as a shape
+     * rather than as three numbers: tier 1 unscaled, every rung a fixed ratio
+     * on the one below, and no ceiling on it.
+     */
+    const hp1 = d().scaleAt(1).hp;
+    const ratios = [];
+    for (let t = 2; t <= 30; t++) ratios.push(d().scaleAt(t).hp / d().scaleAt(t - 1).hp);
+    const step = CFG.waves.tier.hpStep;
+    const compounds = ratios.every((x) => Math.abs(x - step) < 1e-9);
+
     // ---- the climb: a fully-bought turret on the assists ----
     g.restart();
     g.debugTeachAll();
@@ -1710,6 +1726,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     g.restart();
     return { badBands, bandAt: { t1: bandRows[0], t9: bandRows[8], t80: bandRows[79] },
+      hp1, compounds, step, hpAt: [10, 14, 20].map((t) => d().scaleAt(t).hp),
       climbFrom, climbed, climbFails,
       caughtFrom, caughtTo, downs,
       heldBefore, heldAfterClean, heldAfterFail, holdCleared,
@@ -1721,6 +1738,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `${r.badBands.length} bad of 80; tier 1 -> ${r.bandAt.t1.lo}..${r.bandAt.t1.hi}, `
     + `tier 9 -> ${r.bandAt.t9.lo}..${r.bandAt.t9.hi}, `
     + `tier 80 -> ${r.bandAt.t80.lo}..${r.bandAt.t80.hi}`);
+
+  check('the ladder\'s health compounds, and tier 1 is the table as written',
+    Math.abs(r.hp1 - 1) < 1e-9 && r.compounds && r.hpAt[2] > 12,
+    `tier 1 x${r.hp1}, every rung x${r.step}; tier 10/14/20 = `
+    + r.hpAt.map((x) => `x${x.toFixed(1)}`).join(' / '));
 
   check('a turret that can cope climbs the ladder',
     r.climbed > r.climbFrom + 8 && r.climbFails === 0,
