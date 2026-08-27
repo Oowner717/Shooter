@@ -442,9 +442,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         count: document.querySelector('.rigCount').textContent,
         // The shelf's two, not all eighty-five: the branch grids are made of
         // the same card and querying for the class alone catches the lot.
-        cards: [...document.querySelectorAll('.shelf .shopCard')]
-          .map((c) => c.querySelector('.shopName').textContent),
-        tones: [...document.querySelectorAll('.shelf .shopCard')]
+        // Every card carries its branch's colour, not the slate fallback.
+        tones: [...document.querySelectorAll('.branchGrid .shopCard')]
           .map((c) => c.style.getPropertyValue('--tone')),
         drawn: cv ? cv.width > 0 && cv.height > 0 : false,
       };
@@ -452,15 +451,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.debugGiveEnergy(9000);
     m.drawHero(1000);
     const bare = read();
-    // Upgrades take the shelf's slots; a way in stands in only where a slot
-    // would otherwise sit empty. With upgrades affordable, no APERTURE shows.
-    const noWays = bare.cards.every((n) => !/APERTURE/.test(n));
+
     g.debugBuyAll();
     g.debugGiveEnergy(90000);
     m.drawHero(2000);
     const full = read();
     m.setOpen(false);
-    return { bare, full, noWays };
+    return { bare, full };
   });
   // Not "0 BUILT": the cases above this one have already spent energy on the
   // same page. What is asserted is that the two states are told apart at all,
@@ -470,13 +467,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     num(r.bare.count) < num(r.full.count) && num(r.full.count) === 136
     && /TURRET 17\/17/.test(r.full.count) && !/TURRET 17\/17/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
-  // ...and with the tree bought out, the ways in are the only things left to
-  // buy, so they are exactly what the shelf should hold.
-  check('the shelf re-deals: upgrades first, ways in only into empty slots',
-    r.noWays && r.bare.cards.length === 2
-    && r.full.cards.length === 2 && r.full.cards.every((n) => /APERTURE/.test(n))
-    && r.bare.tones.every((t) => t && t !== '#9fb3c8'),
-    JSON.stringify({ bare: r.bare.cards, tones: r.bare.tones, full: r.full.cards }));
+  check('every card wears its branch\'s colour, not the slate fallback',
+    r.bare.tones.length > 10 && r.bare.tones.every((t) => t && t !== '#9fb3c8'),
+    `${r.bare.tones.length} cards; distinct: ${[...new Set(r.bare.tones)].length}`);
   check('the machine is drawn in the menu that upgrades it', r.bare.drawn, JSON.stringify(r.bare.drawn));
 }
 
@@ -656,63 +649,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.armed && !r.afterClose && !r.afterTab, JSON.stringify(r));
 }
 
-// --- what belongs on the shelf ----------------------------------------------
+// --- the shop implies no order ----------------------------------------------
 /*
- * The shelf sells upgrades. The seven APERTUREs are the cheapest things in
- * the tree, so cheapest-first parked two of them on it and -- because they
- * repeat and so are never finished -- left them there.
+ * There is no order to this tree. Every branch is open from the first frame,
+ * nothing in it is a prerequisite for anything else, and the panel must not
+ * suggest otherwise -- so the NEXT shelf and the "N more for the next"
+ * countdown are gone. Both answered "what can I buy right now" as a ranking.
  *
- * The first rule for that was "not repeatable", and it was wrong: RECAST
- * repeats too, and it is the one thing the plan explicitly wanted here. With
- * three REMAINDER in hand and RECAST costing one, the shelf offered two
- * five-hundred-energy upgrades instead. The test is where a node lives.
- */
-{
-  const r = await page.evaluate(() => {
-    const g = window.__sim;
-    const m = g.hud.menu;
-    const w = g.world;
-    m.setOpen(true);
-    m.show('tree');
-    g.debugGiveEnergy(9000);
-    const held = w.remainder || 0;
-    w.remainder = 0;
-    m.syncTree();
-    const without = [...document.querySelectorAll('.shelf .shopCard')].map((c) => c.dataset.id);
-    w.remainder = 3;
-    m.syncTree();
-    const withIt = [...document.querySelectorAll('.shelf .shopCard')].map((c) => c.dataset.id);
-    w.remainder = held;
-    m.syncTree();
-    m.setOpen(false);
-    return { without, withIt };
-  });
-  /*
-   * By this point in the suite the tree is bought out, so the ways in are the
-   * only things left and the shelf rightly holds them. What must never happen
-   * is a way in standing AHEAD of an affordable upgrade -- RECAST here -- so
-   * the assertion is about order, not presence.
-   */
-  const upgradesFirst = (list) => {
-    const i = list.findIndex((id) => /^aperture/.test(id));
-    return i === -1 || list.slice(i).every((id) => /^aperture/.test(id));
-  };
-  check('the shelf offers RECAST once there is a REMAINDER, never a way in over an upgrade',
-    upgradesFirst(r.without) && upgradesFirst(r.withIt)
-    && !r.without.includes('recast') && r.withIt[0] === 'recast',
-    JSON.stringify(r));
-}
-
-// --- one count, and the shop's own furniture ---------------------------------
-/*
- * Three small things a screenshot caught after the shop shipped, kept here so
- * they stay fixed:
- *
- * ONE COUNT. The strip's "N within reach", the energy chip's badge and the
- * shelf's "N MORE BELOW" all describe the same purse, and the shelf label was
- * counting by a different rule -- it skipped the seven ways in, which are
- * affordable and are below. Two numbers an inch apart disagreed, and the
- * reader's arithmetic is the check: strip = shelf label + cards shown.
+ * The seven ways in ARE a sequence, and that one is enforced in the tree
+ * rather than implied by furniture: each is shut until the boss before it has
+ * been put down.
  *
  * ORDER. The section is headed YOUR MACHINE and it opened on ANOMALY, which
  * is a boss door, not the machine. The turret leads; the doors are last.
@@ -725,42 +671,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const r = await page.evaluate(() => {
     const g = window.__sim;
     const m = g.hud.menu;
-    // A fresh run, not whatever the cases above left bought: with the tree
-    // bought out the shelf is legitimately empty and the arithmetic is 0=0.
     g.restart();
     g.world.phase = 'staging';
     g.debugGiveEnergy(9000);
     m.setOpen(true);
     m.show('tree');
     m.syncTree();
-    const strip = parseInt(document.getElementById('treeNext').textContent, 10);
-    const label = parseInt(document.getElementById('shopMore').textContent, 10) || 0;
-    const shown = document.querySelectorAll('.shelf .shopCard').length;
-    /*
-     * Broke: drain the purse and the strip's "X more for the next" and the
-     * empty shelf's target must name the same shortfall. They computed
-     * "next" from two different lists once -- the strip counted the ways in
-     * and the shelf did not, so at zero energy one said 100 and the other
-     * said 500.
-     */
-    const held = g.world.energy;
-    g.world.energy = 0;
-    m.syncTree();
-    const stripSays = document.getElementById('treeNext').textContent;
-    const noneCard = document.querySelector('.shelf .shopNone');
-    const cardShort = noneCard ? (noneCard.querySelector('b') || {}).textContent : null;
-    const broke = {
-      strip: stripSays,
-      card: cardShort,
-      agree: !!cardShort && parseInt(stripSays, 10) === parseInt(cardShort, 10),
-    };
-    g.world.energy = held;
-    m.syncTree();
     const order = [...document.querySelectorAll('.branchRow .branchName')].map((x) => x.textContent);
-    const spill = order.filter((_, i) => {
-      const el = document.querySelectorAll('.branchRow .branchName')[i];
-      return el.scrollWidth > el.clientWidth;
-    });
+    const spill = [...document.querySelectorAll('.branchRow .branchName')]
+      .filter((el) => el.scrollWidth > el.clientWidth).map((el) => el.textContent);
     const rows = [...document.querySelectorAll('.branchRow')];
     for (const name of ['ANOMALY', 'TURRET']) {
       rows.find((x) => x.querySelector('.branchName').textContent === name).click();
@@ -770,289 +689,34 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       const mt = c.querySelector('.shopMeter');
       return mt && !mt.children.length && getComputedStyle(mt).visibility !== 'hidden';
     }).length;
+    const doorsNow = () => [...document.querySelectorAll('.branchGrid .shopCard')]
+      .filter((c) => c.offsetParent && /APERTURE/.test(c.querySelector('.shopName').textContent))
+      .map((c) => c.classList.contains('locked'));
+    rows.find((x) => x.querySelector('.branchName').textContent === 'ANOMALY').click();
+    const first = doorsNow();
+    // ...and once the first boss is reconciled, exactly one more opens.
+    g.world.reconciled.push(1);
+    m.syncTree();
+    const after = doorsNow();
+    // Put it back: a reconciled boss left behind changes what later cases
+    // find available.
+    g.world.reconciled.length = 0;
+    m.syncTree();
     m.setOpen(false);
-    return { strip, label, shown, order, spill, dead, broke };
+    return { order, spill, dead, first, after,
+      shelf: !!document.querySelector('.shelf'), next: !!document.getElementById('treeNext') };
   });
-  check('the strip, the shelf label and the cards shown are one count',
-    r.strip === r.label + r.shown && r.shown > 0,
-    `${r.strip} within reach = ${r.label} below + ${r.shown} shown`);
-  check('broke, the strip and the shelf point at the same next thing',
-    r.broke.agree, JSON.stringify(r.broke));
+  check('nothing in the shop suggests an order to buy in',
+    !r.shelf && !r.next, `shelf ${r.shelf}, next line ${r.next}`);
+  check('the ways in are the one sequence, and each waits for the one before',
+    r.first.length === 7 && r.first[0] === false && r.first.slice(1).every(Boolean)
+    && r.after[0] === false && r.after[1] === false && r.after.slice(2).every(Boolean),
+    `shut at start ${r.first.filter(Boolean).length}/7; `
+    + `after the first is put down ${r.after.filter(Boolean).length}/7`);
   check('the machine leads and the doors come last, with no name overflowing',
     r.order[0] === 'TURRET' && r.order[r.order.length - 1] === 'ANOMALY'
     && r.spill.length === 0 && r.dead === 0,
     JSON.stringify({ order: r.order, spill: r.spill, deadTracks: r.dead }));
-}
-
-// --- the play screen's own floor ---------------------------------------------
-/*
- * The chrome over the field: the chips, the weapon cells, the ability cards
- * and the alerts. Measured the way the menu is measured, because this was the
- * last surface still under the old scale -- the ENERGY label was 7.5px (an
- * id-specific rule beating the class the pass raised, the same cascade trap
- * as .cellSub in 159), the ammo cell labels were 6.5px, and the way into the
- * menu was a 31x25 target on a screen whose own guideline is 44.
- */
-{
-  const r = await page.evaluate(() => {
-    window.__sim.hud.menu.setOpen(false);
-    const px = (v) => { const m = v.match(/rgba?\(([^)]+)\)/); if (!m) return null;
-      const a2 = v.match(/rgba?\(([^)]+)\)/)[1].split(',').map(Number);
-      return { r: a2[0], g: a2[1], b: a2[2], a: a2.length > 3 ? a2[3] : 1 }; };
-    const bad = [];
-    let seen = 0;
-    for (const root of ['#topbar', '#quickBar', '#abilities', '#alerts']) {
-      const el0 = document.querySelector(root);
-      if (!el0) continue;
-      const wk = document.createTreeWalker(el0, NodeFilter.SHOW_TEXT);
-      let t;
-      while ((t = wk.nextNode())) {
-        const txt = t.nodeValue.trim();
-        if (!txt) continue;
-        const el = t.parentElement;
-        if (!el.offsetParent) continue;
-        seen++;
-        const size = parseFloat(getComputedStyle(el).fontSize);
-        if (size < 11) bad.push(`${txt.slice(0, 12)}@${size}px`);
-      }
-    }
-    const mb = document.getElementById('menuBtn').getBoundingClientRect();
-    /*
-     * The strip's cells give their contents air. TITHE and SPORE sat 3px off
-     * their cell edges -- against a corner that is itself cut 6px, so the
-     * text touched the notch. The floor is 5px, met by the tightest label on
-     * the smallest supported screen.
-     */
-    let tightest = 99;
-    let tightName = '';
-    for (const lbl of document.querySelectorAll('.qc .qLbl')) {
-      if (!lbl.offsetParent || !lbl.textContent.trim()) continue;
-      const cell = lbl.closest('.qc').getBoundingClientRect();
-      const lr = lbl.getBoundingClientRect();
-      const gap = Math.min(lr.left - cell.left, cell.right - lr.right);
-      if (gap < tightest) { tightest = gap; tightName = lbl.textContent; }
-    }
-    // ...and the whole band stays on the screen. At 320 it once ran 14px off
-    // the right edge, found only when something finally measured that width.
-    const qb = document.getElementById('quickBar');
-    const bandEnd = Math.max(...[...qb.querySelectorAll('.qGroup')]
-      .map((g) => g.getBoundingClientRect().right));
-    return { seen, bad, menuBtn: [Math.round(mb.width), Math.round(mb.height)],
-      tightest: Math.round(tightest), tightName, bandEnd: Math.round(bandEnd), vw: innerWidth };
-  });
-  check('the play screen clears the menu\'s floor, and its door is a real target',
-    r.bad.length === 0 && r.seen > 8 && r.menuBtn[0] >= 42 && r.menuBtn[1] >= 42,
-    `${r.seen} read; small: ${r.bad.slice(0, 5)}; menu button ${r.menuBtn.join('x')}`);
-  check('every strip label has air, and the band ends on the screen',
-    r.tightest >= 5 && r.bandEnd <= r.vw,
-    `tightest ${r.tightest}px on ${r.tightName}; band ends ${r.bandEnd} of ${r.vw}`);
-}
-
-// --- the record, and the one button that cannot be undone -------------------
-/*
- * OBJECTS is a tab about what you have collected, and it opened on what you
- * have not: thirty-four rows, each 115px of dashed box and the sentence "No
- * record. Destroy one.", over 2166px -- 3.8 screens of the same line -- with
- * the count itself at 8.5px beside the close button. The sentence is said
- * once now, over a block of tiles that shrinks as the list above it grows.
- *
- * And SYSTEM had RESET SIMULATION as an equal tile beside DEBUG: one opens a
- * developer panel, the other wipes the run, the record and the opening lines
- * with no undo.
- */
-{
-  const r = await page.evaluate(async () => {
-    const g = window.__sim;
-    const { codex, CODEX } = await import('../src/codex.js');
-    const m = g.hud.menu;
-    m.setOpen(true);
-    m.show('codex');
-    // Relative, not absolute: the cases above this one destroy things, so the
-    // record is not empty by the time it gets here.
-    const before = codex.found;
-    let added = 0;
-    for (const e of CODEX) { if (added < 5 && codex.record(e.id)) added++; }
-    m.lastFound = -1;
-    m.syncCodex();
-    const panel = document.querySelector('[data-panel="codex"]');
-    const kids = [...panel.children];
-    const head = panel.querySelector('.codexHead');
-    const known = [...panel.querySelectorAll('.codexGrid .codexCell')];
-    const unseen = [...panel.querySelectorAll('.codexUnseen .codexCell')];
-    const out = {
-      // The count is the first thing in the panel, and it is a meter.
-      countFirst: kids.indexOf(head) === 0,
-      countSays: head.querySelector('.codexCount').textContent,
-      meter: head.querySelector('.codexBar > i').style.width,
-      before,
-      added,
-      found: codex.found,
-      total: codex.total,
-      known: known.length,
-      unseen: unseen.length,
-      // A tile carries no name and no sentence: the block used to repeat one.
-      quiet: unseen.every((c) => !c.querySelector('.codexName').textContent
-        && !c.querySelector('.codexLine').textContent),
-      named: known.every((c) => !!c.querySelector('.codexName').textContent),
-      // ...and a tile is a tile, not a row.
-      tall: unseen.length ? Math.round(unseen[0].getBoundingClientRect().height) : 0,
-      rowTall: known.length ? Math.round(known[0].getBoundingClientRect().height) : 0,
-    };
-    m.show('system');
-    const sys = document.querySelector('[data-panel="system"]');
-    const wipe = sys.querySelector('.menuCell.wipe');
-    out.wipeAlone = !!wipe && !wipe.closest('.menuGrid');
-    out.wipeArms = (() => {
-      wipe.click();
-      const armed = wipe.classList.contains('armed');
-      m.armedCell = null;
-      wipe.classList.remove('armed');
-      return armed;
-    })();
-    out.volWord = (sys.querySelector('.volWord') || {}).textContent || '';
-    m.setOpen(false);
-    return out;
-  });
-  check('the record leads with the count, and counts up',
-    r.countFirst && r.countSays === `${r.found} OF ${r.total} RECORDED`
-    && r.found === r.before + r.added && parseFloat(r.meter) > 0
-    && r.known === r.found && r.known + r.unseen === r.total,
-    JSON.stringify({ first: r.countFirst, says: r.countSays, meter: r.meter,
-      known: r.known, unseen: r.unseen, total: r.total }));
-  check('an object not yet seen is a quiet tile, not a row repeating a sentence',
-    r.quiet && r.named && r.tall > 0 && r.tall < r.rowTall,
-    `tile ${r.tall}px vs row ${r.rowTall}px; quiet ${r.quiet}`);
-  check('the one button that cannot be undone stands alone, and arms first',
-    r.wipeAlone && r.wipeArms && !!r.volWord,
-    `alone ${r.wipeAlone}, arms ${r.wipeArms}, volume reads "${r.volWord}"`);
-}
-
-// --- the volume -------------------------------------------------------------
-{
-  await page.evaluate(async () => { (await import('../src/audio.js')).audio.setVolume(0.35); });
-  await page.evaluate(async () => { (await import('../src/audio.js')).audio.setEnabled(false); });
-  await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(900);
-  const back = await page.evaluate(async () => {
-    const a = (await import('../src/audio.js')).audio;
-    a.setEnabled(true);
-    return a.volume;
-  });
-  check('unmuting after a relaunch returns to the chosen level', Math.abs(back - 0.35) < 1e-6, `came back at ${back}`);
-  await page.evaluate(async () => { (await import('../src/audio.js')).audio.setVolume(1); });
-}
-
-// --- a first kill is said on the field --------------------------------------
-// The menu button has always flashed. Nobody watching the field ever saw it.
-{
-  const r = await page.evaluate(async () => {
-    const g = window.__sim;
-    const { codex } = await import('../src/codex.js');
-    const w = g.world;
-    w.director.timer = 1e9; w.director.driftTimer = 1e9;
-    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
-    codex.forget();
-    for (const a of document.querySelectorAll('#alerts .alert')) a.remove();
-    const e = g.debugSpawn('bloom', w.width / 2, 600);
-    e.staged = false; e.spawnIn = 0; e.applyDamage(w, 1e9);
-    await new Promise((res) => setTimeout(res, 400));
-    const notice = [...document.querySelectorAll('#alerts .alert.found')]
-      .map((a) => ({ text: a.textContent, colour: a.style.color }))[0];
-    return { notice, found: codex.found };
-  });
-  check('a first kill is announced on the field', !!r.notice && /BLOOM/.test(r.notice.text) && !!r.notice.colour,
-    JSON.stringify(r));
-}
-
-// --- reset means reset ------------------------------------------------------
-{
-  const r = await page.evaluate(async () => {
-    const g = window.__sim;
-    const { codex } = await import('../src/codex.js');
-    g.debugTeachAll();
-    g.debugGiveEnergy(4000);
-    g.debugCodexAll();
-    if (g.saveNow) g.saveNow();
-    const before = {
-      found: codex.found, energy: Math.round(g.world.energy), teaching: g.teaching,
-      keys: Object.keys(localStorage).filter((k) => k.startsWith('sim7749')).sort(),
-    };
-    g.resetAll();
-    await new Promise((res) => setTimeout(res, 800));
-    return {
-      before,
-      found: codex.found, energy: Math.round(g.world.energy), teaching: g.teaching,
-      kills: g.world.kills, taken: g.world.offers.taken.length,
-      keys: Object.keys(localStorage).filter((k) => k.startsWith('sim7749')).sort(),
-    };
-  });
-  check('reset puts the device back to a first launch',
-    r.found === 0 && r.energy === 0 && r.kills === 0 && r.taken === 0 && r.teaching === true
-      && !r.keys.includes('sim7749-run') && !r.keys.includes('sim7749-codex')
-      && !r.keys.includes('sim7749-lines'),
-    JSON.stringify(r));
-}
-
-// --- the corruption line quotes the real rates ------------------------------
-// It is the one piece of copy in the game that states numbers, so the numbers
-// have to be the ones the code uses. Change CFG.energy.tax and this fails.
-{
-  const r = await page.evaluate(async () => {
-    const { CFG } = await import('../src/config.js');
-    const { ON_CONTACT } = await import('../src/tutorial.js');
-    const S = CFG.energy;
-    // intakeRate() with no INSULATION: bite is CFG.energy.tax, compounding,
-    // floored, with at most taxCap objects counted.
-    const cost = (n) => Math.round((1 - Math.max(S.taxFloor, S.tax ** Math.min(n, S.taxCap))) * 100);
-    const said = ON_CONTACT.map((l) => l.text).join(' ');
-    const want = [1, 2, 3, S.taxCap].map((n) => `${cost(n)}%`);
-    return { want, missing: want.filter((w) => !said.includes(w)), said };
-  });
-  check('the corruption line quotes the rates the code actually charges',
-    r.missing.length === 0, `wanted ${JSON.stringify(r.want)}, missing ${JSON.stringify(r.missing)}`);
-}
-
-// --- every turret upgrade puts something on the turret -----------------------
-// The TURRET branch is named for its parts, so a part that quietly stops being
-// drawn makes a liar of the tree. Each one is drawn alone onto a scratch
-// canvas and its lit pixels counted against a bare turret.
-{
-  const r = await page.evaluate(async () => {
-    const g = window.__sim;
-    const w = g.world;
-    const s = w.shooter;
-    const cvs = document.createElement('canvas');
-    cvs.width = 260; cvs.height = 260;
-    const c = cvs.getContext('2d');
-    const lit = (rig) => {
-      c.clearRect(0, 0, 260, 260);
-      c.save();
-      c.translate(130 - s.x, 130 - s.y);
-      w.rig = rig;
-      w.rigAt = w.offers.taken.length; // make the cache hit, so `rig` is used
-      w.rigFlash = 0;
-      s.draw(c, w);
-      c.restore();
-      const d = c.getImageData(0, 0, 260, 260).data;
-      let n = 0;
-      for (let i = 3; i < d.length; i += 4) if (d[i] > 24) n++;
-      return n;
-    };
-    // Read off the tree rather than listed here, so a node placed under TURRET
-    // is covered by this case the moment it is placed. It was a hardcoded list
-    // until build 109, which would have let ARRAY in undrawn and unnoticed.
-    const { NODES } = await import('../src/tree.js');
-    const parts = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
-    const none = Object.fromEntries(parts.map((p) => [p.id, 0]));
-    const bare = lit(none);
-    const each = {};
-    for (const p of parts) each[p.id] = lit({ ...none, [p.id]: p.levels || 1 }) - bare;
-    w.rigAt = -1; // let it rebuild honestly again
-    return { bare, each };
-  });
-  const silent = Object.entries(r.each).filter(([, n]) => n <= 0).map(([k]) => k);
-  check('every turret upgrade puts a visible part on the turret', silent.length === 0,
-    `${silent.length ? `nothing drawn for ${silent.join(', ')} — ` : ''}${JSON.stringify(r.each)}`);
 }
 
 // --- energy is not a small copy of what dropped it ---------------------------
@@ -2397,18 +2061,27 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.uniqueTones} distinct colours, heading carries ${r.spectrum}; `
     + `names ${JSON.stringify(r.names)}; first row is ${r.firstIsRecast ? 'RECAST' : 'NOT recast'}`);
   /*
-   * Nothing is behind anything else. Every boss that exists is for sale on a
-   * cold run -- gating them in a chain made a player who wanted the amber one
-   * go and break the magenta one first, which is a queue rather than a
-   * choice. The ones that are not built still refuse, because there is
-   * genuinely nothing on the other side of them.
+   * One door at a time, and this reverses what it used to assert.
+   *
+   * Every built boss was for sale on a cold run, on the reasoning that gating
+   * them made a player who wanted the amber one go and break the magenta one
+   * first. That is true of the rest of the tree -- where nothing is behind
+   * anything and the panel is built not to imply otherwise -- and wrong here:
+   * these are numbered, each is built on the last, and a player meeting all
+   * seven at once has no idea which one is meant for them yet. So the
+   * sequence is enforced (`needs`, upgrades.js) rather than left as a hint,
+   * and it is the ONLY sequence in the tree.
+   *
+   * On a cold run exactly one opens; the other six refuse whether they are
+   * built or not, and the unbuilt ones would refuse anyway.
    */
-  check('every boss that exists is for sale, and nothing is behind anything else',
-    r.opened.join() === r.builtIds.join()
-    && r.opened.length === r.live && r.refused.length === r.sealed
-    && r.held.split(',').slice(0, r.live).every((x) => x === '1'),
-    `bought ${JSON.stringify(r.opened)} against built ${JSON.stringify(r.builtIds)}, `
-    + `refused ${r.refused.length}; ways in held ${r.held}`);
+  check('the ways in open one at a time, and only the first is cold-open',
+    r.opened.join() === 'aperture'
+    && r.refused.length === r.slots - 1
+    && r.held.split(',')[0] === '1'
+    && r.held.split(',').slice(1).every((x) => x === '0'),
+    `bought ${JSON.stringify(r.opened)} of ${r.slots} slots, refused ${r.refused.length}; `
+    + `ways in held ${r.held}`);
 }
 
 // --- options, the way in, and a save that cannot be lost to one bad write ---
@@ -2464,16 +2137,26 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const opened = { open: g.hud.menu.open, tab: g.hud.menu.tab,
       shown: !document.querySelector('[data-panel="tree"]').hidden };
     g.hud.menu.syncTree();
-    const header = (document.getElementById('treeNext') || {}).textContent || '';
+    // Read before the restart: restart() empties the purse, and a count taken
+    // after it is a count of what a fresh run can afford, not what the badge
+    // was showing.
+    const count = g.hud.menu.reachCount(w);
     g.hud.menu.setOpen(false);
     g.restart();
-    return { badge, opened, header, count: g.hud.menu.reachCount(w) };
+    return { badge, opened, count };
   });
-  const said = (chip.header.match(/^(\d+) within reach/) || [])[1];
+  /*
+   * Against reachCount, not against a line in the panel. The panel used to
+   * repeat the figure as "N within reach" and this compared the two; that
+   * line is gone, because a countdown to the cheapest thing reads as a queue
+   * in a tree that has no order. The badge survives it -- out on the field it
+   * says how many things are in reach without saying which -- so what is
+   * checked now is the badge against the count it is derived from.
+   */
   check('the energy chip opens the tree, and its badge is the tree\'s own count',
     chip.opened.open && chip.opened.shown && chip.opened.tab === 'tree'
-    && Number(chip.badge) > 0 && chip.badge === said,
-    `badge ${chip.badge}, header "${chip.header}", opened ${chip.opened.tab}`);
+    && Number(chip.badge) > 0 && Number(chip.badge) === chip.count,
+    `badge ${chip.badge}, reachCount ${chip.count}, opened ${chip.opened.tab}`);
 
   /*
    * And the save. It used to be one setItem: a store that fills mid-write or

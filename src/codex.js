@@ -5,8 +5,18 @@
 // has been counting. Descriptions are field notes in the same voice as the
 // story: flat, observed, second person where it helps, never a tutorial.
 
+import { ANOMALIES } from './anomaly.js';
+
 const KEY = 'sim7749-codex';
 
+/*
+ * Two categories, and the split is derived rather than written down.
+ *
+ * ANOMALIES.types is each boss's own roster -- the boss first, then what it
+ * makes -- so `ANOMALY_IDS` is the authority on which entries belong to a
+ * boss and the glossary cannot drift from the fights. Everything else is the
+ * field: what comes down on its own, and what those break into.
+ */
 /** Every entry, in the order they are shown. `id` matches the object type. */
 export const CODEX = [
   {
@@ -159,6 +169,28 @@ export const CODEX = [
     name: 'ECHO',
     line: 'There is always another one of these. Looking for it is how you find out which side of the line you are on.',
   },
+  /*
+   * TERMINUS and its two. They were missing entirely -- the seventh boss and
+   * the only two things it puts on the field had no entries at all, which
+   * nothing noticed while the glossary was one undivided list of thirty-four.
+   * Splitting it into the field and the anomalies made a boss-shaped hole
+   * obvious at once.
+   */
+  {
+    id: 'terminus',
+    name: 'TERMINUS',
+    line: 'The last of them, and the only one that never throws anything. It closes instead: the room gets smaller until there is no room.',
+  },
+  {
+    id: 'bound',
+    name: 'BOUND',
+    line: 'One segment of the boundary. The ring it belongs to is closed, so the only way through it is out.',
+  },
+  {
+    id: 'limit',
+    name: 'LIMIT',
+    line: 'It comes in off a corner of the frame and walks. Nothing sent it; it was always going to arrive.',
+  },
   {
     id: 'towMass',
     name: 'MASS',
@@ -245,6 +277,13 @@ class Codex {
 }
 
 export const codex = new Codex();
+
+/** Every id any anomaly puts on the field, boss included. */
+export const ANOMALY_IDS = new Set(ANOMALIES.flatMap((a) => a.types));
+
+/** The glossary in two halves: what the field sends, and what a boss makes. */
+export const FIELD_ENTRIES = CODEX.filter((e) => !ANOMALY_IDS.has(e.id));
+export const ANOMALY_ENTRIES = CODEX.filter((e) => ANOMALY_IDS.has(e.id));
 
 /*
  * Two keys this build has no use for, and no readers left.

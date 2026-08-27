@@ -7,7 +7,7 @@
 // shot. Both are built from data, so a new round or a new object is a table
 // entry and no markup.
 
-import { CODEX, codex } from './codex.js';
+import { CODEX, FIELD_ENTRIES, ANOMALY_ENTRIES, codex } from './codex.js';
 import { CONTROLS } from './narrative.js';
 import { ARSENAL, ARSENAL_GROUPS, specRows } from './arsenal.js';
 
@@ -178,21 +178,35 @@ export class Menu {
     this.items = [];
     this.branches = [];
 
+    /*
+     * No NEXT shelf, and no "N more for the next".
+     *
+     * Both were built to answer "what can I buy right now", and both answered
+     * it as an ordering: two cards under a heading that says NEXT read as the
+     * two you are supposed to buy next, and a countdown to the cheapest thing
+     * reads as a queue. There is no order to this tree -- every branch is open
+     * from the first frame and nothing in it is a prerequisite for anything
+     * else -- so the panel should not imply one. The exception is the seven
+     * ways in, and those are gated in the tree itself rather than hinted at
+     * here; see `needs` in upgrades.js.
+     *
+     * What is left is the machine, what you have built of it, and the
+     * branches. The affordable count still exists where it is a fact rather
+     * than a suggestion: on the energy chip out on the field, which says how
+     * many things are in reach without saying which.
+     */
     const head = document.createElement('div');
     head.className = 'treeHead';
     head.innerHTML = '<span class="treeHeadName">ENERGY</span>'
-      + '<span class="treeNext" id="treeNext"></span>'
       + '<span class="treeSouls" id="treeSouls" hidden></span>'
       + '<b id="treeBank">0</b>';
 
     p.appendChild(this.buildHero());
-    p.appendChild(this.buildShelf());
     p.appendChild(head);
     p.appendChild(this.buildBranches());
 
     this.el.treeBank = head.querySelector('#treeBank');
     this.el.treeSouls = head.querySelector('#treeSouls');
-    this.el.treeNext = head.querySelector('#treeNext');
 
   }
 
@@ -252,7 +266,7 @@ export class Menu {
      * outline put "the way in" first -- but this section's heading is YOUR
      * MACHINE, and a boss door is not the machine. The turret leads, its
      * ammunition and field follow, and the doors are the last row: the thing
-     * you go down to when you are ready, not the first thing under the shelf.
+     * you go down to when you are ready, not the first thing you meet.
      */
     const order = ['turret', 'ammo', 'mines', 'abilities', 'anomaly'];
     const roots = TREE.filter((n) => n.kind === 'root');
@@ -356,8 +370,8 @@ export class Menu {
   /*
    * ======================= the room =========================
    *
-   * The machine, what you have built of it, and the two cheapest things you
-   * can afford. Above the tree, because the tree could say none of it.
+   * The machine, and what you have built of it. Above the branches, because
+   * the tree could say neither.
    *
    * The measurement that put it here: screenshot the panel owning nothing,
    * buy all one hundred and thirty-six levels, screenshot again, diff below
@@ -382,20 +396,6 @@ export class Menu {
     return wrap;
   }
 
-  buildShelf() {
-    const wrap = document.createElement('div');
-    const lab = document.createElement('div');
-    lab.className = 'shopLab';
-    lab.innerHTML = '<span>NEXT</span><em id="shopMore"></em>';
-    wrap.appendChild(lab);
-    const shelf = document.createElement('div');
-    shelf.className = 'shelf';
-    wrap.appendChild(shelf);
-    this.el.shelf = shelf;
-    this.el.shopMore = lab.querySelector('#shopMore');
-    this.shelfAt = ['', ''];
-    return wrap;
-  }
 
   /**
    * One card. The whole thing is the button — the first press turns it over,
@@ -449,9 +449,9 @@ export class Menu {
   }
 
   /**
-   * One card's five states. The same function paints the shelf and the
-   * grids, so a card cannot say one thing in one place and another in the
-   * other -- which is how the tree's price box and its pips drifted apart.
+   * One card's five states. Every card in every branch is painted by this
+   * one function, so a card cannot say one thing in one place and another
+   * elsewhere -- which is how the tree's price box and its pips drifted.
    *
    *   locked  behind something unbought. Dim, still readable, still priced.
    *   poor    open and out of reach right now.
@@ -511,7 +511,7 @@ export class Menu {
    * The colour a card wears: its branch's, not its own.
    *
    * Most leaves carry no tone and fall back to a slate grey, so every card on
-   * the shelf came out the same colour whatever it was upgrading. The tone
+   * every card came out the same colour whatever it was upgrading. The tone
    * that means something is the nearest one up the tree -- the arm's if it
    * hangs off one, the category's otherwise.
    */
@@ -580,7 +580,7 @@ export class Menu {
   }
 
   /** Everything the room shows. Driven from syncTree, so it cannot drift. */
-  syncRoom(rows, affordable = 0) {
+  syncRoom(rows) {
     const g = this.game;
     const w = g.world;
 
@@ -613,101 +613,6 @@ export class Menu {
       this.el.rigCount.innerHTML = say;
     }
 
-    /*
-     * The shelf: the two cheapest things within reach. Not a catalogue -- the
-     * tree below is the catalogue, and the whole complaint about it was that
-     * it opened on one.
-     */
-    const buyable = [];
-    const ways = [];
-    let cheapest = null;
-    for (const { n } of rows) {
-      if (!n.id || n.dormant || !g.available(n)) continue;
-      const have = g.owned(n.id);
-      if (!n.repeat && have >= (n.levels || 1)) continue;
-      const price = priceOf(n, have);
-      const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
-      /*
-       * Upgrades first; a way in fills only a slot no upgrade wants.
-       *
-       * The APERTUREs are the cheapest things in the tree and they repeat, so
-       * plain cheapest-first parked two of them on the shelf permanently --
-       * which is the fault this panel was rebuilt to fix, reproduced at a
-       * larger size. Excluding them outright was the second wrong rule: with
-       * only a way in within reach, the strip said "100 more for the next"
-       * while the empty shelf pointed at a five-hundred-energy upgrade,
-       * because the two were computing "next" from different lists. One list
-       * now. Upgrades take the slots; an affordable way in stands in only
-       * where a slot would otherwise sit empty; and the empty shelf's target
-       * is the cheapest thing under the strip's own definition.
-       */
-      const way = inBranch(n, 'anomaly');
-      if (purse >= price) (way ? ways : buyable).push({ n, price, have });
-      else if (!n.currency && (!cheapest || price < cheapest.price)) cheapest = { n, price };
-    }
-    buyable.sort((a, b) => a.price - b.price);
-    ways.sort((a, b) => a.price - b.price);
-    const offer = buyable.concat(ways);
-
-    const shelf = this.el.shelf;
-    if (!shelf) return;
-    if (this.el.shopMore) {
-      /*
-       * Counted against the strip's own total, not against this list. The
-       * shelf sells upgrades and skips the seven ways in, but the ways in
-       * are still below, in the ANOMALY grid -- and the strip, the energy
-       * chip's badge and this label all describe the same purse, so "55
-       * within reach" sitting an inch from "46 MORE BELOW" read as one of
-       * them being wrong. Now the label is always the strip minus what the
-       * shelf is showing.
-       */
-      const more = affordable - Math.min(offer.length, 2);
-      this.el.shopMore.textContent = more > 0 ? `${more} MORE BELOW` : '';
-    }
-
-    if (!offer.length) {
-      // Honest about being empty rather than blank. A shelf with nothing on
-      // it and no reason given reads as broken; a target reads as early.
-      const short = cheapest ? Math.ceil(cheapest.price - w.energy) : 0;
-      const say2 = cheapest
-        ? `<span>${cheapest.n.name}</span><b>${short}</b><span>MORE ENERGY</span>`
-        : '<span>NOTHING LEFT TO BUY</span>';
-      if (shelf.dataset.empty !== say2) {
-        shelf.dataset.empty = say2;
-        shelf.innerHTML = `<div class="shopNone">${say2}</div>`;
-        this.shelfAt = ['', ''];
-      }
-      return;
-    }
-    if (shelf.dataset.empty) { shelf.innerHTML = ''; delete shelf.dataset.empty; }
-
-    for (let i = 0; i < 2; i++) {
-      const pick = offer[i];
-      const at = shelf.children[i];
-      if (!pick) {
-        if (at) at.remove();
-        this.shelfAt[i] = '';
-        continue;
-      }
-      const { n, have } = pick;
-      // A card is rebuilt only when the thing on it changes; the rest of the
-      // time it is repainted in place, so the meter and the price can animate.
-      let card = at;
-      if (!card || card.dataset.id !== n.id) {
-        card = this.makeCard(n);
-        if (at) shelf.replaceChild(card, at); else shelf.appendChild(card);
-      }
-      this.syncCard(card, n);
-      // Beat four: a card that is not the one that was here slides in, so the
-      // shelf visibly re-deals instead of silently swapping.
-      const key = `${n.id}:${have}`;
-      if (this.shelfAt[i] !== key) {
-        this.shelfAt[i] = key;
-        card.classList.remove('dealt');
-        void card.offsetWidth;
-        card.classList.add('dealt');
-      }
-    }
   }
 
   /** Beat one: the part lands. Over the canvas, not into it — see below. */
@@ -964,16 +869,8 @@ export class Menu {
       }
     }
 
-    if (this.el.treeNext) {
-      this.el.treeNext.textContent = affordable
-        ? `${affordable} within reach`
-        : Number.isFinite(cheapest) ? `${Math.ceil(cheapest - w.energy)} more for the next`
-          : '';
-      this.el.treeNext.classList.toggle('reach', affordable > 0);
-    }
-
     this.syncBranches();
-    this.syncRoom(this.items, affordable);
+    this.syncRoom(this.items);
   }
 
   /** What syncCard works out, without touching the DOM. */
@@ -1064,22 +961,20 @@ export class Menu {
     this.el.codexCount = head.querySelector('.codexCount');
     this.el.codexBar = head.querySelector('.codexBar > i');
 
-    this.el.codexKnownLab = heading('RECORDED', '');
-    p.appendChild(this.el.codexKnownLab);
-    const known = document.createElement('div');
-    known.className = 'codexGrid';
-    p.appendChild(known);
-    const none = document.createElement('div');
-    none.className = 'codexNone';
-    none.textContent = 'Nothing yet. An object is recorded the first time you destroy one.';
-    p.appendChild(none);
-    this.el.codexNone = none;
-
-    this.el.codexUnseenLab = heading('NOT YET SEEN', 'destroy one to record it');
-    p.appendChild(this.el.codexUnseenLab);
-    const unseen = document.createElement('div');
-    unseen.className = 'codexUnseen';
-    p.appendChild(unseen);
+    /*
+     * Two sections, because a boss is not a field object.
+     *
+     * It was one list of thirty-four in spawn order, so ORDINAL sat between
+     * TOW and TALLY with nothing saying it was a boss, and the twelve things
+     * the bosses make were scattered among ordinary objects they have nothing
+     * to do with. The split is derived from ANOMALIES.types -- see codex.js
+     * -- so the glossary cannot drift from the fights. It also found a hole:
+     * TERMINUS and its two had no entries at all.
+     */
+    this.codexSections = [
+      this.buildCodexSection(p, 'THE FIELD', 'what comes down on its own', FIELD_ENTRIES),
+      this.buildCodexSection(p, 'THE ANOMALIES', 'the seven, and what they make', ANOMALY_ENTRIES),
+    ];
 
     /*
      * AUTO AIM and AUTO FIRE last. They came here in 154 because they are a
@@ -1089,10 +984,26 @@ export class Menu {
      * page about what you have collected.
      */
     this.buildAuto(p);
+  }
 
-    this.el.codexKnown = known;
-    this.el.codexUnseenBox = unseen;
-    for (const e of CODEX) {
+  /**
+   * One half of the glossary: a heading carrying its own count, the entries
+   * recorded in it, and a block of tiles for the ones that are not.
+   */
+  buildCodexSection(p, title, note, entries) {
+    const lab = heading(title, note);
+    p.appendChild(lab);
+    const known = document.createElement('div');
+    known.className = 'codexGrid';
+    p.appendChild(known);
+    const none = document.createElement('div');
+    none.className = 'codexNone';
+    none.textContent = 'Nothing here yet.';
+    p.appendChild(none);
+    const unseen = document.createElement('div');
+    unseen.className = 'codexUnseen';
+    p.appendChild(unseen);
+    for (const e of entries) {
       const cell = document.createElement('div');
       cell.className = 'codexCell';
       cell.innerHTML = '<div class="codexArt"><canvas width="72" height="72"></canvas></div>'
@@ -1100,6 +1011,7 @@ export class Menu {
       unseen.appendChild(cell);
       this.codexCells.set(e.id, cell);
     }
+    return { entries, lab, note, known, none, unseen };
   }
 
   /** Redacted until it has been destroyed once. */
@@ -1109,23 +1021,24 @@ export class Menu {
     if (this.el.codexCount) {
       this.el.codexCount.innerHTML = `<b>${codex.found}</b> OF ${codex.total} RECORDED`;
       this.el.codexBar.style.width = `${(codex.found / codex.total) * 100}%`;
-      // The two headings and the empty note only belong on screen when the
-      // section under them has something in it.
-      this.el.codexKnownLab.hidden = !codex.found;
-      this.el.codexNone.hidden = !!codex.found;
-      const left = codex.total - codex.found;
-      this.el.codexUnseenLab.hidden = !left;
-      this.el.codexUnseenLab.querySelector('em').textContent = left === codex.total
-        ? 'destroy one to record it' : `${left} left`;
+    }
+    for (const sec of this.codexSections || []) {
+      const have = sec.entries.filter((e) => codex.has(e.id)).length;
+      // Each half carries its own fraction: 12/16 of the field is a different
+      // thing from 3/21 of the anomalies, and one total said neither.
+      sec.lab.querySelector('em').textContent = `${have}/${sec.entries.length}`;
+      sec.none.hidden = have > 0;
+      sec.unseen.hidden = have >= sec.entries.length;
     }
     for (const e of CODEX) {
       const cell = this.codexCells.get(e.id);
       const known = codex.has(e.id);
       cell.classList.toggle('locked', !known);
-      // Into the section it now belongs to. Cells are moved rather than
+      // Into the right list of its OWN section. Cells are moved rather than
       // rebuilt so a drawn specimen is drawn once and stays drawn.
-      const home = known ? this.el.codexKnown : this.el.codexUnseenBox;
-      if (cell.parentElement !== home) home.appendChild(cell);
+      const sec = (this.codexSections || []).find((x) => x.entries.includes(e));
+      const home = !sec ? null : known ? sec.known : sec.unseen;
+      if (home && cell.parentElement !== home) home.appendChild(cell);
       // A blank tile says "not seen" on its own. The name used to be redacted
       // into block glyphs -- thirty-four strings of ▚▞▜▙ at 10px and 1.93 to
       // one, which reads as text that has gone wrong rather than as a secret.

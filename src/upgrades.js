@@ -239,6 +239,17 @@ const SLEEPING = ANOMALIES.slice(1).map((a) => {
   }
   return {
     ...common,
+    /*
+     * One door at a time. `needs` is an anomaly number that has to be in
+     * world.reconciled before Game.available() will open this node, so the
+     * way in to the second boss is shut until the first has been put down.
+     *
+     * The rest of the tree has no order and is not meant to look as though
+     * it has one. These are the exception: they are a sequence, they are
+     * numbered, and each is built on the last -- so the sequence is enforced
+     * rather than merely implied by price.
+     */
+    needs: a.n - 1,
     // Priced by its own config, which scripts/check-build.mjs holds it to.
     cost: CFG[a.cfg].cost,
     line: `A way in to ${a.name}. ${HINT[a.n]}`,

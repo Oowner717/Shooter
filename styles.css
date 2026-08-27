@@ -108,6 +108,21 @@ html, body {
   gap: 5px;
 }
 
+/*
+ * The readouts give, and the door does not. Anything that will not fit is
+ * clipped off the right of this box -- which is the phase tag, the last and
+ * least of the three -- instead of being pushed onto the menu button.
+ */
+#barChips {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+}
+#menuBtn { flex: 0 0 auto; margin-left: auto; }
+
 .spacer { flex: 1; }
 
 .chip {
@@ -2456,6 +2471,11 @@ body.booting #pendingBtn {
   #energyChip em { display: none; }
   #energyChip { padding: 5px 8px; }
 
+  /* The phase tag steps aside rather than being clipped. A boss announces
+     itself with a named bar across the top of the field, so this chip is
+     only ever repeating FIELD while there is nothing else to say. */
+  #phaseTag { display: none; }
+
   /* Budgeted, not inherited: 2 stacks + 4 wide cells + the gaps have to
      close inside 320. At the widths above the band ran 14px off the right
      edge -- measured, not noticed, because nothing this narrow was being
@@ -2649,20 +2669,6 @@ body.booting #pendingBtn {
   75% { transform: translateX(3px); border-color: #ff5d8f; }
 }
 
-/* What the tree is waiting for. A panel where nothing is affordable reads as
-   broken rather than as early; naming the gap makes it a target instead. */
-.treeNext {
-  flex: 1 1 auto;
-  text-align: right;
-  padding-right: 10px;
-  /* Readable in BOTH states. The reach state is green and passed the sweep;
-     the broke state ("100 more for the next") wore --dim at 2.64:1, and the
-     sweep only ever measured the panel with money in hand. */
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: #7d90a6;
-}
-.treeNext.reach { color: #7cffb2; }
 .menuCell.armed {
   border-color: #ffcf5c;
   background: rgba(255, 207, 92, 0.12);
@@ -2747,7 +2753,7 @@ body.booting #pendingBtn {
   100% { opacity: 0; transform: scale(6.2); }
 }
 
-/* ---------------------------------------------------------------- the shelf */
+/* --------------------------------------------------------- section labels */
 
 .shopLab {
   font-size: 11px;
@@ -2764,8 +2770,6 @@ body.booting #pendingBtn {
 /* "44 MORE BELOW" is the one line that says whether opening a branch is
    worth the tap, and it was #3f5165 at 2.5:1. */
 .shopLab em { font-style: normal; color: #72859a; letter-spacing: 0.1em; }
-
-.shelf { display: flex; align-items: stretch; gap: 8px; margin-bottom: 12px; }
 
 /*
  * One object, one target.
@@ -2965,33 +2969,9 @@ body.booting #pendingBtn {
 }
 .shopCard.armed .shopPrice { margin-top: auto; background: #e6f1fb; color: #05080f; }
 
-/* Beat four: the bought card leaves and the next-cheapest arrives. */
-.shopCard.dealt { animation: shopDeal 0.2s ease-out 1; }
-@keyframes shopDeal {
-  0% { opacity: 0; transform: translateY(9px); }
-  100% { opacity: 1; transform: none; }
-}
-
-/* Nothing affordable. Honest about it rather than empty. */
-.shopNone {
-  flex: 1 1 0;
-  height: 184px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  border: 1px dashed rgba(120, 190, 255, 0.2);
-  color: #8fa6bd;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-align: center;
-  padding: 0 10px;
-}
-.shopNone b { color: #7cffb2; font-size: 20px; font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: reduce) {
-  .rigFlare.go, .shopCard.dealt { animation: none; }
+  .rigFlare.go { animation: none; }
 }
 
 
@@ -3246,6 +3226,7 @@ body.booting #pendingBtn {
  * The sentence is on the heading now and these are tiles: the block shrinks
  * as the list above it grows, which is the shape of a collection.
  */
+.codexUnseen[hidden] { display: none; }
 .codexUnseen {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
