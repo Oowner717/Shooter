@@ -280,16 +280,20 @@ export class Hud {
     /*
      * The two that run on their own, and the row AUTO AIM opens above them.
      *
-     * The row is stacked over the cells rather than beside them -- the band
-     * sits in the middle of the quick bar between the two stacks and has no
-     * width to give, and everything else on this bar already grows upward off
-     * the floor line. Four positions laid out sideways here would push the
-     * cells under the thumb that is reaching for them.
+     * The row lives in this group in the DOM and nowhere near it on screen:
+     * the stylesheet lifts it out of the flow and spans it across the whole
+     * bar. This group is the middle of five and has no width to give, and four
+     * positions crammed into what it has came out 33px tall -- see #aimModes.
      */
     const modes = document.createElement('div');
     modes.id = 'aimModes';
     modes.hidden = true;
     auto.appendChild(modes);
+    // A rebuilt strip has a closed row, so the dim the open one puts on the
+    // rest of the bar has to come off with it -- buildStrip runs on every
+    // purchase, and one left on would grey out both stacks for the rest of
+    // the run.
+    document.body.classList.remove('aimOpen');
     const cells = document.createElement('div');
     cells.className = 'autoCells';
     auto.appendChild(cells);
@@ -364,6 +368,9 @@ export class Hud {
       }
     }
     row.hidden = !open;
+    // What says which control the row belongs to, and what stops a miss
+    // landing on the cell underneath it. See body.aimOpen in styles.css.
+    document.body.classList.toggle('aimOpen', !!open);
     return true;
   }
 

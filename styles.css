@@ -1601,25 +1601,72 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
 /*
  * The row AUTO AIM opens: one button per position the assist can be put in.
  *
- * Stacked above the two cells rather than beside them. The band sits in the
- * middle of the quick bar with a stack either side of it and has no width to
- * give, and every other group on this bar already grows upward off the floor
- * line -- so this reads as the same furniture rather than as a popup.
+ * It spans the whole bar, and it is out of the flow to do it.
+ *
+ * It used to be a column inside .q_auto, stacked over the two cells. That
+ * group sits in the middle of the quick bar with a stack either side of it and
+ * has no width to give: measured on a 414 screen the column came out 104px
+ * wide and each button 33px tall, four of them adjacent, laid over the turret
+ * and the whole arc of the lever. 33px is below every touch target on this
+ * screen and well below the 44 a thumb needs -- so the control was three
+ * near-misses stacked on the one part of the field the hand is already
+ * covering, which is what "unusable" meant, three times.
+ *
+ * `position: absolute` against #quickBar takes it out of that group entirely.
+ * It gets the bar's full width, one equal column per position, and a height a
+ * thumb can land on. It also stops the group resizing when the row opens,
+ * which used to shift the AIM cell sideways under the finger reaching for it.
  */
 .q_auto { flex-direction: column; align-items: stretch; gap: 4px; }
 .autoCells { display: flex; flex-direction: row; gap: 4px; }
 #aimModes {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-bottom: 2px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Directly over the row it belongs to: one .qc.wide (40px) and the group's
+     own 4px gap. */
+  bottom: calc(40px + 4px);
+  /* One column per position offered, all equal -- a hidden button is display:
+     none and takes no track, so two, three and four all fill the bar. */
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  /* It spans the bar, so its end columns lie over the two stacks -- which come
+     later in the DOM and would otherwise paint over it. Measured before this
+     line: ALL was under the second ammunition cell at every width tested, and
+     `elementFromPoint` on the middle of the button returned the cell. */
+  z-index: 2;
 }
+/*
+ * ...and what puts it away. This is the whole of the bug that was reported
+ * three times as "the menu will not collapse".
+ *
+ * `openAimRow(false)` sets `row.hidden = true`, `aimRowOpen()` reads it back
+ * as closed, and every case in the suite that asks whether the row is shut
+ * passes. The band stays on the screen. `[hidden] { display: none }` lives in
+ * the user-agent sheet at one class of specificity, and both rules above it
+ * here are written on an id and a class -- so the display they set has beaten
+ * the attribute since the row was built, and `hidden` has never once hidden
+ * anything. A shut row went on painting over the field and went on taking the
+ * taps aimed at the field behind it.
+ *
+ * Anything that sets `display` on an element it also hides by attribute owes
+ * that element one of these. Asserted on the rendered box now, not on the
+ * property -- see regress.mjs; the property was always right.
+ */
+#aimModes[hidden] { display: none; }
+.aimMode[hidden] { display: none; }
 .aimMode {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  padding: 5px 8px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  /* The floor for a thumb. Everything else on this screen clears it; this is
+     the one control that did not. */
+  min-height: 46px;
+  padding: 5px 4px;
   border: 1px solid var(--line);
   border-radius: 4px;
   background: rgba(8, 18, 30, 0.94);
@@ -1627,16 +1674,52 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
   -webkit-backdrop-filter: blur(6px);
   color: var(--ink);
   font: inherit;
-  line-height: 1;
-  text-align: left;
+  line-height: 1.15;
+  text-align: center;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .aimMode:active { transform: translateY(1px); }
 .aimName { font-size: 11px; letter-spacing: 0.08em; }
-/* nowrap so every button in the row is the same height: one that wraps is
-   taller than the rest and reads as the important one. */
-.aimNote { font-size: 9px; letter-spacing: 0.04em; color: var(--dim); white-space: nowrap; }
+/* Allowed to wrap. It used to be nowrap so that no one button came out taller
+   than the rest -- in a grid they are all one row and all the same height by
+   construction, so the only thing nowrap can still do here is push "grey +
+   hostile" out of a 73px column on a 320 screen. */
+.aimNote { font-size: 9px; letter-spacing: 0.04em; color: var(--dim); }
+
+/*
+ * While the row is up, the rest of the strip is not what you are doing.
+ *
+ * Two reasons, and the second is the one that matters: it says which control
+ * the row belongs to, and it stops a miss landing on the mine or the round
+ * directly under it. The band covers the second cell of both stacks, and a
+ * thumb going for ALL that catches BLAST instead has changed the loadout
+ * mid-fight to choose an aim mode.
+ */
+body.aimOpen .q_mines,
+body.aimOpen .q_ammo,
+body.aimOpen .q_cfg { opacity: 0.22; }
+
+/*
+ * ...and what actually turns them off.
+ *
+ * `#ui button { pointer-events: auto }` is declared at the top of this file so
+ * that controls work inside an overlay that does not take input. It carries an
+ * id, so nothing built out of classes can beat it -- and every rule in this
+ * file that means "this part of the strip is out of play" is built out of
+ * classes. `body.menuOpen #quickBar { pointer-events: none }` and its loadout
+ * twin have therefore never disabled a single button: the strip went to 25%
+ * and stayed fully pressable underneath the sheet covering it. Measured, not
+ * assumed -- `elementFromPoint` over a strip cell with the sheet open returns
+ * the cell.
+ *
+ * A deliberate disable has to name an id of its own to land. These do.
+ */
+body.menuOpen #quickBar button,
+body.loadoutOpen #quickBar button,
+body.aimOpen #quickBar .q_mines button,
+body.aimOpen #quickBar .q_ammo button,
+body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
 /* Where it is now, so the row says the current position rather than only
    offering four. */
 .aimMode.at {

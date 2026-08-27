@@ -280,4 +280,23 @@ most once for any given target and cannot spin.
   and four loose rules. Two false-positive shapes to know: hex colours read as
   ids (`#a3b8ce`), and classes built by template -- `m_${mode}` in hud.js is
   why `.m_all` and `.m_drift` look dead and are not.
+- **`el.hidden = true` does nothing to an element the stylesheet gives a
+  `display` to.** `[hidden] { display: none }` is the user agent's, at one
+  class of specificity, and loses to any author rule written on an id or a
+  class -- so the property flips, every test that reads it back agrees, and
+  the element stays on the screen taking taps. That is the whole of build
+  185-186's "the AUTO AIM menu will not collapse", reported three times and
+  green every time. Twenty selectors in styles.css already carry a
+  `#thing[hidden] { display: none }` guard; `#aimModes` and `.aimMode` were
+  the two that did not. Anything that sets `display` on an element it also
+  hides by attribute owes that element a guard, and the assertion has to be
+  on the rendered box -- `getBoundingClientRect().height > 0` -- never on the
+  property.
+- `#ui button { pointer-events: auto }` carries an id, so nothing built out of
+  classes can turn a control back off. `body.menuOpen #quickBar` and
+  `body.loadoutOpen #quickBar` both say `pointer-events: none` and neither had
+  ever disabled a button: the strip went to 25% and stayed live under the
+  sheet covering it. A deliberate disable has to name an id of its own.
+  `getComputedStyle(el).pointerEvents` is how you find out; `elementFromPoint`
+  will not tell you, because it skips whatever is already off.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

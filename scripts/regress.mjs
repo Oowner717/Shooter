@@ -2117,6 +2117,149 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `field ${r.plain} · drift ${r.grey} · all ${r.bothA} then ${r.bothB} when grey is nearer`);
 }
 
+// --- the mode row is on the screen, or it is not, and a thumb can hit it ----
+/*
+ * What every case above this one could not see.
+ *
+ * They press the row's buttons by selector and read `hidden` back off the
+ * element, and on all of that the control was perfect: the property flipped,
+ * `aimRowOpen()` agreed, the right mode landed. The band stayed on the screen
+ * the whole time. `#aimModes { display: grid }` and `.aimMode { display:
+ * flex }` are written on an id and a class; `[hidden] { display: none }` is
+ * the user agent's, at one class and losing to both -- so closing the row set
+ * a property that changed nothing anyone could see, and the four buttons went
+ * on painting over the field and taking the taps meant for it. Reported three
+ * times as "the menu will not collapse"; passed every time.
+ *
+ * And what it could not see either: the row was a 104px column wedged between
+ * the two stacks with each button 33px tall, which is under every other
+ * control on this screen and under what a thumb can reliably land on.
+ *
+ * So this case asks the three questions a property cannot answer: is it
+ * painted, is it big enough, and is it what `elementFromPoint` finds. At this
+ * suite's 390, which is the middle of the three the change was measured at --
+ * 320 gives the band 73px columns and 414 gives it 97, and every position
+ * clears 44px tall and hit-tests to itself at all three.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    const ranD = w.director.update;
+    w.director.update = () => {};
+    g.debugGiveEnergy(9000);
+    g.buy('driftaim');
+    g.buy('driftaim');
+    await new Promise((res) => setTimeout(res, 120));
+
+    const row = document.getElementById('aimModes');
+    // Pressed on the element, through the handler, with the event the play
+    // screen binds -- and then measured, which is the part that was missing.
+    const tap = (el) => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    const painted = () => row.getBoundingClientRect().height > 0;
+
+    g.hud.openAimRow(false);
+    const shutAtStart = !painted();
+    tap(document.getElementById('tgAutoAim'));
+    const openPaints = painted();
+
+    /*
+     * Where the finger lands. A button can be the right size, in the right
+     * place, and still be under something: the band spans the whole bar, so
+     * its end columns lie over the two stacks, which come later in the DOM.
+     * Measured before any of this went in, ALL returned an ammunition cell.
+     */
+    const seats = [];
+    for (const btn of row.querySelectorAll('.aimMode')) {
+      if (btn.getBoundingClientRect().height === 0) continue;
+      const b = btn.getBoundingClientRect();
+      const top = document.elementFromPoint(Math.round((b.left + b.right) / 2),
+        Math.round((b.top + b.bottom) / 2));
+      seats.push({ mode: btn.dataset.mode, h: Math.round(b.height), w: Math.round(b.width),
+        mine: top === btn || btn.contains(top),
+        on: b.left >= 0 && b.right <= window.innerWidth
+          && b.top >= 0 && b.bottom <= window.innerHeight });
+    }
+    // 44 is the floor a thumb needs; everything else on this screen clears it.
+    const small = seats.filter((s) => s.h < 44).map((s) => `${s.mode} ${s.h}px`);
+    const buried = seats.filter((s) => !s.mine || !s.on).map((s) => s.mode);
+
+    /*
+     * ...and it is painted over them, not merely hit-tested first.
+     *
+     * elementFromPoint cannot answer this: it skips anything at
+     * `pointer-events: none`, so once the dim disables the stacks the aim
+     * button wins the hit test whether it is drawn on top or underneath. The
+     * band's stacking order is what keeps the ammunition cell from being
+     * drawn over the end of it, and it is a property of the band alone --
+     * the two stacks set none, so later-in-the-DOM is all they have.
+     */
+    const lift = getComputedStyle(row).zIndex;
+    const stacks = ['q_mines', 'q_ammo']
+      .map((c) => getComputedStyle(document.querySelector(`.${c}`)).zIndex).join(',');
+
+    // ...and pressing the cell again takes it off the screen, not just out of
+    // a property.
+    tap(document.getElementById('tgAutoAim'));
+    const shutAgain = !painted() && !document.body.classList.contains('aimOpen');
+
+    /*
+     * A position that has not been paid for is not on the screen either --
+     * the same trap one level down, since `.aimMode` sets display too.
+     */
+    const held = w.up.driftAim;
+    w.up.driftAim = 0;
+    g.hud.openAimRow(true);
+    const bare = [...row.querySelectorAll('.aimMode')]
+      .filter((b) => b.getBoundingClientRect().height > 0)
+      .map((b) => b.dataset.mode).join(',');
+    w.up.driftAim = held;
+    g.hud.openAimRow(false);
+
+    /*
+     * ...and the two sheets that cover the strip actually stop it being
+     * pressed. `#ui button { pointer-events: auto }` carries an id, so the
+     * class-built rules that declare the strip out of play could never reach
+     * a button: it went to 25% opacity and stayed fully live underneath.
+     */
+    const pe = () => getComputedStyle(document.getElementById('tgAutoFire')).pointerEvents;
+    g.hud.showLoadout(w, 'mines');
+    const underSheet = pe();
+    g.hud.hideLoadout();
+    g.hud.menu.setOpen(true);
+    const underMenu = pe();
+    g.hud.menu.setOpen(false);
+    const afterwards = pe();
+
+    w.director.update = ranD;
+    g.restart();
+    return { shutAtStart, openPaints, seats, small, buried, shutAgain, bare,
+      lift, stacks, underSheet, underMenu, afterwards };
+  });
+
+  check('the mode row leaves the screen when it closes, not just the property',
+    r.shutAtStart && r.openPaints && r.shutAgain,
+    `shut at start=${r.shutAtStart}, open paints=${r.openPaints}, shut again=${r.shutAgain}`);
+
+  check('every position it offers is thumb-sized and nothing is on top of it',
+    r.seats.length === 4 && !r.small.length && !r.buried.length
+    && Number(r.lift) > 0 && r.stacks === 'auto,auto',
+    `${r.seats.length} offered, ${r.seats.map((s) => `${s.mode} ${s.w}x${s.h}`).join(' · ')}`
+    + `${r.small.length ? ` | under 44px: ${r.small.join(', ')}` : ''}`
+    + `${r.buried.length ? ` | buried: ${r.buried.join(', ')}` : ''}`
+    + ` | band z-index ${r.lift} over stacks at ${r.stacks}`);
+
+  check('a position that has not been bought is not on the screen',
+    r.bare === 'off,field',
+    `with no SIEVE the row shows [${r.bare}]`);
+
+  check('a sheet over the strip actually stops the strip being pressed',
+    r.underSheet === 'none' && r.underMenu === 'none' && r.afterwards === 'auto',
+    `loadout ${r.underSheet} · menu ${r.underMenu} · neither ${r.afterwards}`);
+}
+
 // --- a burst of presses loses nothing, and marks nothing it did not say -----
 /*
  * Four controls reached as fast as a thumb can reach them.
