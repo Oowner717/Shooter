@@ -1,173 +1,155 @@
-# The three clocks
+# The three clocks — v3
 
-Wave pacing, damage pacing, energy pacing — one plan each, written to lock
-together. Nothing here is implemented; this is the document to argue with.
+Wave pacing, damage pacing, energy pacing. v1 was the proposal; the six open
+questions came back answered; v2 folded them in; this is v3, after a review
+pass over v2 found five holes. Still a plan — nothing implemented.
+
+## Decisions now locked
+
+| # | question | decision |
+|---|---|---|
+| 1 | tier control | the FIELD chip becomes the tier chip, in the top bar |
+| 2 | step-back | announced: `THE FIELD RELENTS · TIER n` |
+| 3 | fail thresholds | chosen below; tiers.mjs calibrates them |
+| 4 | RoF nerf | **B1 + B3**: FEED 2 levels → 1, tapFade 0.6 → 0.5 |
+| 5 | progression clock | **energy earned** gates unlocks; apertures stay energy purchases; the 500-release arc dies; the ladder is unbounded |
+| 6 | save shape | four new fields, chosen below |
 
 ## What is true today (measured, build 176)
 
-| fact | number | instrument |
-|---|---|---|
-| BOLT, stock | 3.4 rounds/s | 10 driven seconds against a dummy |
-| BOLT, FEED×2 + TRIPLE TAP | 16.2 rounds/s | same |
-| ...plus HOT LOAD | **18.2 rounds/s (5.4× stock)** | same |
-| tree, bought out | 119,451 energy, 84 buyables | tree walk |
-| prices | arms 900 · abilities 1100 · charges 1400 · leaves 500 + 350/level | COST table |
-| income, assist floor | ~30–60 energy/min early | 300s driven stock run |
-| wave order | **shuffled** — no difficulty direction after the opening 8 | Director.shuffle |
-| wave growth | authored size × swell(1→2.4 over 320 kills) × 1.3 | CFG.waves |
-| run arc | 500 releases, then endless = unbounded quota | releasesLeft |
-| pressure signal A | director.wait — hit its 26s patience cap even in a stock run | the 300s run |
-| pressure signal B | contact-seconds — attackers on the turret, already tracked per frame | same |
-
-Two design facts fall out. First, the game currently has **no ladder**: past
-the opening, waves arrive in arbitrary order and difficulty only moves via the
-swell, which is a slow global volume knob, not a step anyone can stand on.
-Second, the game **already measures being overwhelmed** — a player who is
-keeping up clears the field before the director's patience runs out and keeps
-things off the mount; a player who is drowning trips both instruments. Turret
-health is not needed. The failure signal exists; nothing reads it.
+| fact | number |
+|---|---|
+| BOLT stock / fully fed | 3.4 → **18.2 rounds/s (5.4×)** |
+| tree, bought out | 119,451 energy · 84 buyables |
+| income, assist floor | ~30–60 energy/min early |
+| wave order | shuffled; only the swell (1→2.4 over 320 kills) moves difficulty |
+| type unlocks today | kill counts: 18, 45, 85, 125, 205, 245, 285, 330, 380 |
+| apertures today | already pure energy purchases — no kill gate exists |
+| overwhelm signals | director.wait (patience 26s) and contact-seconds, both already tracked per frame |
+| lifetime earnings | **not tracked** — bank() feeds the spendable purse only |
 
 ---
 
 ## Plan A — waves: the ladder
 
-**Replace the shuffled rotation with numbered TIERS.** A tier is a recipe, not
-a list: a *band* of authored wave shapes it may draw from, plus multipliers.
+A tier is a recipe: a band of the 25 authored wave shapes, plus multipliers.
 
 ```
 tier n:
-  shapes      band(n) — the 25 authored waves, banded 1..5 by menace
-              (1: mote/needle/drift · 2: +lurcher/splitter · 3: +bloom/warden/
-               plate · 4: +herald/glut/scion · 5: +tow/bulwark), tier draws
-              from its band and one band below
-  population  authored × (1 + 0.10·n)      — replaces the kills-driven swell
-  health      type hp × (1 + 0.06·n)       — the damage-pacing knob, see B
-  bounty      energy × (1 + 0.15·n)        — the energy-pacing knob, see C
+  shapes      band(n) ∩ unlocked, falling down-band when the economy
+              has not met a band's types yet (see the unlock clock, C)
+              band 1: mote/needle/drift    band 2: +lurcher/splitter
+              band 3: +bloom/plate/glut    band 4: +warden/herald/scion
+              band 5: +tow/bulwark
+  population  authored × (1 + 0.10·n)   — replaces the swell entirely
+  health      type hp × (1 + 0.06·n)
+  bounty      energy × (1 + 0.15·n)
 ```
 
-Unbounded n. Every run finds its wall — that is the point.
+Unbounded n; the field cap (57) naturally stops population growing past
+roughly authored×3, after which health and bounty carry the climb alone —
+which is the wall forming exactly where plan B wants it.
 
-**The player's hand.** The FIELD chip in the top bar becomes the tier chip:
-`TIER 7` with a small hold toggle. Auto-advance is the default — clear a
-tier's wave cleanly and the next wave is tier n+1. HOLD pins the tier; two
-taps on the chip open a one-row control: `‹ back · HOLD · auto ›`. No new
-screen, no pause.
+**The chip.** `TIER 7 ▸` where FIELD sits today. One tap opens a one-row
+control: `‹ back · HOLD · auto ›`. Auto-advance on a cleanly cleared wave is
+the default. *(Review fix: `#phaseTag` is hidden under 431px today — the tier
+chip is a control, not a readout, and must survive every width. That CSS rule
+dies with the phase tag.)*
 
-**Auto step-back — the part with no health bar.** A wave is scored when it
-ends, from the two instruments that already run:
+**Fail score** — chosen (question 3), calibration owned by tiers.mjs:
 
 ```
 failed(wave) =
-     contact-seconds during it ≥ 6        (things reached you and sat there)
-  or director.wait hit patience           (the field never thinned)
-  or alive-at-end ≥ 60% of asked          (the wave out-lived its welcome)
+     contact-seconds during it ≥ 6
+  or director.wait reached patience (26s)
+  or alive-at-end ≥ 60% of what it asked
+clean(wave) = none of the three
 ```
 
-One failed wave: nothing — a bad wave is allowed. **Two consecutive: step back
-one tier**, announced in the alert language the game already has (`THE FIELD
-RELENTS · TIER 6`). Hysteresis on the way back up: one *clean* wave at the
-lower tier re-opens auto-advance. This is the same shape as the aim assist's
-target memory — commit, don't flap.
+Two consecutive fails → step back one tier, announced. One clean wave at the
+lower tier re-arms auto-advance. **Step-back fires under HOLD too** — the pin
+holds the climb, not the relief; a player who wants to drown can climb right
+back, but the game never leaves someone pinned above their head. (Flagged
+reviewable — say the word if HOLD should mean "let me drown".)
 
-**What survives.** Kill-gated unlocks, boss apertures and the codex are
-untouched — the ladder replaces the released-500 arc and the swell, nothing
-else. The opening 8 teach-waves stay exactly as authored, as tier 0.
+**Untouched:** the opening eight teach-waves (tier 0), boss behaviour, codex.
+*(Review fix: the story beats stay on kills — they are narrative cadence, not
+difficulty, and moving them to energy would make the opening lines arrive at
+the pace of the player's purse.)*
 
 ## Plan B — damage pacing
 
-**The nerf first.** Max cadence is 5.4× stock, and it is three multipliers
-stacking: FEED×2 (0.64), HOT LOAD (0.85), TAPs (×3 rounds). Options, with the
-measured result of each:
+**The nerf (locked):** FEED loses its second level (max cadence −20%, every
+round, tree drops to 83 buyables) and tapFade 0.6 → 0.5 (BOLT's echoes fade
+harder). Max BOLT lands at **~14.6 rounds/s, ~3.3× stock in damage** from
+5.4× in rounds today.
 
-| option | change | max BOLT rps | notes |
-|---|---|---|---|
-| B1 (recommended) | FEED 2 levels → 1 | 18.2 → **14.6** | your "remove one level"; trims every round's cadence, not just BOLT |
-| B2 | FEED per-level 0.8 → 0.88 | 18.2 → 15.1 | gentler, keeps two purchases |
-| B3 | + tapFade 0.6 → 0.5 | damage −8% on taps | BOLT-specific, stacks with B1 or B2 |
+**The bands:** TTK for a body from tier n's own band, at tier n's expected
+spend (plan C's table), held in **2–4s through ~tier 10**, passing 6s by
+~tier 14 — the wall. The 0.06 hp slope is the tuning knob;
+`scripts/tiers.mjs` (fourth sibling of fight/dps/variance) drives a scripted
+loadout per tier and prints the TTK table. It is the ladder's regression
+instrument afterwards, the way ORDINAL's hash is the engine's.
 
-B1 + B3: max BOLT lands at ~3.9× stock in rounds and ~3.3× in damage. The
-tree loses one 850-energy purchase (prices in C absorb it).
+## Plan C — energy: income, and now the unlock clock too
 
-**Then the actual pacing.** Damage pacing = **time-to-kill bands per tier**.
-The target: a body from tier n's own band, under focused fire from a turret
-that has spent what tier n expects (see C), dies in **2–4 seconds**; the wall
-is where that band breaks upward by design.
+**Income:** prices stay; the tier bounty multiplier ×(1+0.15n) is the single
+knob. Pushing pays, holding pays steadily, stepping back costs income.
 
-```
-P(n) = expected player DPS at tier n   — from expected spend, measured by probe
-D(n) = band hp × (1 + 0.06·n)          — the tier health multiplier
-TTK(n) = D(n) / P(n)                   — hold in [2, 4] through ~tier 10,
-                                          let it pass 6 by ~tier 14: the wall
-```
+**The unlock clock (decision 5).** A new counter, `world.earned` — lifetime
+energy banked this run, only ever up, unaffected by spending. Type unlocks
+move from kill counts to earned thresholds:
 
-The 0.06 hp slope is the tuned number, not a guess to keep: a new probe
-(`scripts/tiers.mjs`, the fourth sibling of fight/dps/variance) drives a
-scripted loadout against each tier band and prints the TTK table. We tune the
-slope until the table reads 2–4–wall. That probe is also the regression
-instrument afterwards — the ladder's ORDINAL hash.
-
-## Plan C — energy pacing
-
-**Keep the price table. Move the income.** Repricing 84 items invites a month
-of debate; one income knob does the same work. Prices stay (arms 900, leaves
-500+350), and the tier bounty multiplier `×(1 + 0.15·n)` becomes the way a
-run funds itself: pushing the ladder pays, holding pays steadily, stepping
-back visibly costs income rather than progress.
-
-**The targets** (what "an expected spend at tier n" means in plan B):
-
-| by end of | expected bank earned | buys roughly |
+| type | kills today | earned threshold (opening bid: ×12, rounded) |
 |---|---|---|
-| tier 2 | ~1,000 | first arm, or two turret leaves |
-| tier 5 | ~5,000 | a loadout: 2–3 arms, first FEED, a damage leaf |
-| tier 8 | ~15,000 | an ability + charge, half the turret rig |
-| tier 12 | ~40,000 | most of one full branch — the wall region |
-| full tree | 119k | aspirational; many runs, by design |
+| lurcher | 18 | 220 |
+| splitter | 45 | 550 |
+| bloom | 85 | 1,000 |
+| plate | 125 | 1,500 |
+| warden | 205 | 2,500 |
+| scion | 245 | 3,000 |
+| herald | 285 | 3,400 |
+| glut | 330 | 4,000 |
+| tow | 380 | 4,600 |
 
-The 0.15 bounty slope is tuned against those rows with the same tiers.mjs
-probe (it already counts income while it measures TTK). One probe, both dials.
+The ×12 bid comes from measured floor income per kill (~4) tripled for real
+play; tiers.mjs calibrates the column against plan C's earned-by-tier table
+so band n's types unlock during tiers n−1..n. Apertures need no change — they
+are already energy purchases behind nothing but their price and chain.
 
-**One price change worth making anyway:** the three-step ways-in (APERTURE
-chain) and arms are priced flat regardless of when they become reachable.
-Leave them — but FEED's removed level (B1) refunds 850 of expected spend, so
-the tier-5 row assumes it.
+**Earned-by-tier targets** (unchanged from v1, now doing double duty as the
+unlock calibration axis): ~1k by tier 2 · ~5k by tier 5 · ~15k by tier 8 ·
+~40k by tier 12 · full tree 119k across many runs.
 
----
+## The save (decision 6)
 
-## How the three lock
+Four fields: `tier`, `hold` (0/1), `failStreak`, `earned`. *(Review fix —
+the migration matters more than the fields: an old save has no `earned`, and
+seeding it at 0 would re-lock TOW for a veteran with 380 kills. On restore,
+`earned = max(d.earned ?? 0, kills × 12)` — the same conversion the
+thresholds used, so nothing a run has met ever re-locks.)*
 
-```
-tier n ──population──▶ wave pressure ──contact-s / patience──▶ step-back
-   │                                                              ▲
-   ├───hp ×(1+0.06n)──▶ TTK band [2..4] ◀── P(n) = DPS(spend) ────┤ the wall:
-   └───bounty ×(1+0.15n)──▶ income ──▶ spend ──▶ P(n)             │ D outruns P
-                                                                  ▶ by design
-```
+## Review findings folded into this version
 
-Income buys damage; damage holds TTK against the tier's health; the tier's
-population sets pressure; pressure trips the step-back when damage has fallen
-behind — which is exactly when income has fallen behind too, so the ladder
-self-corrects at the same point all three clocks agree on.
+1. **`earned` did not exist** — v2 assumed a lifetime counter; bank() feeds
+   the purse only. New field, saved, migrated from kills.
+2. **Old-save re-lock** — the migration seed above.
+3. **The tier chip was hidden on small screens** — `#phaseTag{display:none}`
+   under 431px dies; a control outranks a readout.
+4. **Story beats stayed ambiguous in v2** — resolved: they keep kills.
+5. **Band ∩ unlocked can be empty** when a player climbs tiers faster than
+   the economy unlocks the band — resolved: fall down-band, never stall the
+   director.
 
-## Open questions before implementation
+## Ripples priced in (implementation notes, not scope creep)
 
-1. **Tier chip vs menu control** — plan says the FIELD chip becomes the tier
-   control. Acceptable, or should hold/back live in the menu?
-2. **Announced step-back** — `THE FIELD RELENTS` alert, or silent?
-3. **Fail thresholds** — 6 contact-seconds / patience / 60% alive are opening
-   bids for the tiers.mjs probe to calibrate, not convictions.
-4. **Nerf choice** — B1+B3 recommended; B2+B3 if removing a purchase feels
-   worse than weakening one.
-5. **Does the 500-release arc die?** The ladder replaces it as the run's
-   spine. Kills still gate unlocks and apertures. Confirm.
-6. **Save shape** — tier, hold state, and fail streak all have to survive an
-   app update; the save gains three fields.
-
-## Probe caveats
-
-Income was measured on the assist floor (no PULSE pressed, no aiming), and
-that run spent 170 of its 300 seconds with a body parked on the turret taxing
-the intake — real-player income is meaningfully higher. The 18.2 rps figure
-is rounds, not damage: taps fade 40% per echo, so damage scales ~4.4× where
-rounds scale 5.4×. Both numbers are good enough to rank options, not to be
-quoted as balance truth.
+- swell/swellKills, killGoal and releasesLeft die; `endless` becomes the only
+  mode; smoke's "past the old count" case and check-build's wave-stats line
+  get rewritten.
+- Tree count 84 → 83 (B1): the menu-room case's `137` literal and
+  check-build's buyable count both move.
+- The 26s patience and 57 field cap are now load-bearing pacing constants —
+  they get names in CFG rather than staying incidental.
+- Implementation order: **A first** (ladder + chip + fail score, swell still
+  in place behind it), then tiers.mjs, then B and C tuned against its table,
+  then the swell/killGoal demolition last — each step shippable.
