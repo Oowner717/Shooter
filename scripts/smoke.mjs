@@ -191,12 +191,18 @@ await page.evaluate(() => window.__sim.restart());
 await sleep(1800);
 await page.screenshot({ path: `${SHOTS}/10-restart.png` });
 
-const finalPhase = await page.evaluate(() => document.getElementById('phaseTag').textContent);
+/*
+ * Read off the world rather than off a chip. The FIELD readout this used to
+ * scrape became the ladder's control in build 177 -- and a phase check that
+ * depends on a particular element existing was only ever testing the markup.
+ */
+const finalPhase = await page.evaluate(() => window.__sim.world.phase);
 
 console.log('--- busy-field stats ---\n' + busyStats);
 console.log('--- deep-field stats ---\n' + deepStats);
 console.log('past the old count:', JSON.stringify(stillPlaying));
-console.log('phase after restart:', finalPhase);
+console.log('phase after restart:', finalPhase,
+  '| tier:', await page.evaluate(() => window.__sim.world.director.tier));
 const runningBuild = await page.evaluate(() => document.querySelector('.bootFoot')?.textContent || '');
 console.log('running build:', runningBuild.replace(/^.*BUILD /, '') || '(unknown)');
 console.log('console errors:', errors.length);

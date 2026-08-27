@@ -260,6 +260,17 @@ export class Game {
         stats: false,
       },
 
+      /*
+       * The ladder moved. Announced rather than silent, in the game's own
+       * alert language: a step you did not ask for needs to be a thing that
+       * happened, not a number that quietly changed.
+       */
+      onTier: ({ verdict, moved, tier }) => {
+        void verdict;
+        if (!moved) return;
+        self.hud.syncTier(self.world);
+        if (moved < 0) self.hud.alert(`THE FIELD RELENTS · TIER ${tier}`, 'remainder', 4.5);
+      },
       alert: (text, kind, dur) => self.hud.alert(text, kind, dur),
       abilityTaken: (i) => self.hud.flashTaken(i),
       carry: (key) => self.carry(key),

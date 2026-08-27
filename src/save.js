@@ -201,6 +201,16 @@ export function captureRun(world, game) {
       order: [...world.director.order],
       at: world.director.at,
       cycle: world.director.cycle,
+      /*
+       * The ladder. `tier` is where the run had climbed to, `hold` whether
+       * the player had pinned it, `fails` how close it was to stepping back
+       * -- all three, because coming back one failure from a step-back and
+       * coming back fresh are different situations and the run should
+       * remember which it was in.
+       */
+      tier: world.director.tier,
+      hold: world.director.hold ? 1 : 0,
+      fails: world.director.fails,
     },
   };
 }

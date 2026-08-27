@@ -1538,6 +1538,236 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- the ladder climbs, catches, and remembers ------------------------------
+/*
+ * Difficulty had no direction before this: past the opening eight, waves were
+ * shuffled and the only thing that grew was a global volume knob driven off
+ * the kill count. You could not stand on a step, could not go back to one,
+ * and the game could not tell whether you were coping -- though it had been
+ * measuring exactly that, every frame, in two places nothing read.
+ *
+ * Driven rather than asserted in the abstract, because the whole claim is
+ * behavioural: a turret that can cope climbs, a turret that cannot is caught
+ * and set down a rung, and neither happens by accident.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    const d = () => w.director;
+
+    // ---- bands: sane at every tier anyone can reach, and never empty ----
+    const bandRows = [];
+    for (let t = 1; t <= 80; t++) {
+      const [lo, hi] = d().bandsFor(t);
+      bandRows.push({ t, lo, hi, ok: lo >= 1 && hi <= 5 && lo <= hi });
+    }
+    const badBands = bandRows.filter((b) => !b.ok);
+
+    // ---- the climb: a fully-bought turret on the assists ----
+    g.restart();
+    g.debugTeachAll();
+    g.debugGiveEnergy(200000);
+    g.debugBuyAll();
+    w.autoAim = true; w.autoFire = true;
+    const climbFrom = d().tier;
+    for (let i = 0; i < 300 * 60; i++) g.update(1 / 60);
+    const climbed = d().tier;
+    const climbFails = d().fails;
+
+    /*
+     * ---- the catch: a turret that cannot answer, parked high ----
+     *
+     * Assists off and nothing bought, dropped in at tier 9. The wave scoring
+     * has three ways to notice and this trips at least one of them within a
+     * couple of waves.
+     */
+    g.restart();
+    g.debugTeachAll();
+    w.autoAim = false; w.autoFire = false;
+    d().setTier(9);
+    d().hold = false;
+    const caughtFrom = d().tier;
+    let downs = 0;
+    let last = d().tier;
+    for (let i = 0; i < 500 * 60; i++) {
+      g.update(1 / 60);
+      if (d().tier < last) downs++;
+      last = d().tier;
+    }
+    const caughtTo = d().tier;
+
+    // ---- HOLD pins the climb but never the relief ----
+    g.restart();
+    g.debugTeachAll();
+    d().setTier(4);
+    d().hold = true;
+    // A clean wave under HOLD must not climb...
+    d().contact = 0; d().hitPatience = false; d().asked = 4;
+    d().at = 0; d().order = [8]; // a real, non-teach wave
+    w.enemies.length = 0;
+    const heldBefore = d().tier;
+    d().score(w);
+    const heldAfterClean = d().tier;
+    // ...and two failures must still step it back, and un-pin it.
+    d().hold = true;
+    d().fails = 0;
+    for (let k = 0; k < CFG.waves.tier.failStreak; k++) {
+      d().contact = CFG.waves.tier.failContact + 1;
+      d().score(w);
+    }
+    const heldAfterFail = d().tier;
+    const holdCleared = d().hold;
+
+    // ---- teach waves never move the ladder ----
+    g.restart();
+    d().setTier(3);
+    d().order = [0]; d().at = 0; // wave 0 is a teach wave
+    d().contact = 0; d().hitPatience = false; d().asked = 0;
+    const teachVerdict = d().score(w);
+    const teachTier = d().tier;
+
+    g.restart();
+    return { badBands, bandAt: { t1: bandRows[0], t9: bandRows[8], t80: bandRows[79] },
+      climbFrom, climbed, climbFails,
+      caughtFrom, caughtTo, downs,
+      heldBefore, heldAfterClean, heldAfterFail, holdCleared,
+      teachVerdict, teachTier };
+  });
+
+  check('every tier maps to a real band, at both ends of the ladder',
+    r.badBands.length === 0,
+    `${r.badBands.length} bad of 80; tier 1 -> ${r.bandAt.t1.lo}..${r.bandAt.t1.hi}, `
+    + `tier 9 -> ${r.bandAt.t9.lo}..${r.bandAt.t9.hi}, `
+    + `tier 80 -> ${r.bandAt.t80.lo}..${r.bandAt.t80.hi}`);
+
+  check('a turret that can cope climbs the ladder',
+    r.climbed > r.climbFrom + 8 && r.climbFails === 0,
+    `tier ${r.climbFrom} -> ${r.climbed} over 300 driven seconds, ${r.climbFails} failures standing`);
+
+  check('...and a turret that cannot is caught and set down',
+    r.caughtTo < r.caughtFrom && r.downs >= 1,
+    `tier ${r.caughtFrom} -> ${r.caughtTo}, ${r.downs} step-back(s)`);
+
+  /*
+   * HOLD is the one asymmetric control in the game: it pins the climb and not
+   * the relief. Somebody who pins a tier they cannot hold would otherwise be
+   * left there by their own earlier decision, which is the one outcome an
+   * auto-step-back exists to prevent.
+   */
+  check('HOLD pins the climb, and never pins the fall',
+    r.heldAfterClean === r.heldBefore
+    && r.heldAfterFail === r.heldBefore - 1
+    && r.holdCleared === false,
+    `held at ${r.heldBefore}: clean wave -> ${r.heldAfterClean}, `
+    + `two failures -> ${r.heldAfterFail}, hold still on: ${r.holdCleared}`);
+
+  check('...and the opening teaches without ever moving the ladder',
+    r.teachVerdict === null && r.teachTier === 3,
+    `teach wave scored ${JSON.stringify(r.teachVerdict)}, tier ${r.teachTier}`);
+}
+
+// --- the ladder survives being put down and picked up -----------------------
+/*
+ * Three new fields in the save, and one migration that matters more than the
+ * three: a run saved before the ladder existed has no tier, and defaulting it
+ * to 1 would drop a long run back to the opening on the update that shipped
+ * this. Seeded from the kill count instead.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { captureRun } = await import('../src/save.js');
+    g.restart();
+    g.debugTeachAll();
+    g.debugAddKills(200);
+    /*
+     * Let the director actually start. restore() deliberately does nothing
+     * for a run saved before its first wave -- an empty rotation means there
+     * is nothing to come back to -- so a case that never runs a wave is
+     * testing that early-out rather than the ladder.
+     */
+    w.autoAim = true; w.autoFire = true;
+    for (let i = 0; i < 40 * 60; i++) g.update(1 / 60);
+    const d = w.director;
+    d.setTier(11);
+    d.hold = true;
+    d.fails = 1;
+    const blob = captureRun(w, g);
+    const wrote = { tier: blob.wave.tier, hold: blob.wave.hold, fails: blob.wave.fails };
+
+    // Round trip.
+    d.reset();
+    d.restore(w, blob.wave);
+    const back = { tier: d.tier, hold: d.hold, fails: d.fails };
+
+    // ...and a pre-ladder save, which has the wave block but no tier at all.
+    const old = { ...blob.wave };
+    delete old.tier; delete old.hold; delete old.fails;
+    w.kills = 240;
+    d.reset();
+    d.restore(w, old);
+    const migrated = d.tier;
+
+    g.restart();
+    return { wrote, back, migrated, fromKills: 240 };
+  });
+  check('the ladder is saved, restored, and migrated rather than reset',
+    r.wrote.tier === 11 && r.wrote.hold === 1 && r.wrote.fails === 1
+    && r.back.tier === 11 && r.back.hold === true && r.back.fails === 1
+    && r.migrated > 1,
+    `wrote ${JSON.stringify(r.wrote)}, read back ${JSON.stringify(r.back)}; `
+    + `a pre-ladder save at ${r.fromKills} kills came back at tier ${r.migrated}`);
+}
+
+// --- the tier chip is a control, so it is never the thing that gets cut -----
+/*
+ * It replaced the FIELD readout, which carried `display:none` under 431px --
+ * the first thing sacrificed when the bar got tight. A readout can be cut; the
+ * only way to hold or step down a tier cannot, or the feature does not exist
+ * on the phone most likely to need it.
+ */
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    const box = () => {
+      const c = document.getElementById('tierChip');
+      const q = c.getBoundingClientRect();
+      return { w: Math.round(q.width), shown: q.height > 0 && getComputedStyle(c).display !== 'none' };
+    };
+    const wide = box();
+    document.documentElement.style.setProperty('width', '320px');
+    const narrow = box();
+    document.documentElement.style.removeProperty('width');
+
+    // The row's three controls do what they say.
+    const d = g.world.director;
+    d.setTier(6); d.hold = false;
+    g.hud.syncTier(g.world);
+    document.getElementById('tierChip').click();
+    const opened = !document.getElementById('tierRow').hidden;
+    document.getElementById('tierUp').click();
+    const up = { tier: d.tier, hold: d.hold, shut: document.getElementById('tierRow').hidden };
+    document.getElementById('tierChip').click();
+    document.getElementById('tierDown').click();
+    const down = d.tier;
+    // ...and the floor holds.
+    d.setTier(1);
+    g.hud.syncTier(g.world);
+    const floored = document.getElementById('tierDown').disabled;
+    g.restart();
+    return { wide, narrow, opened, up, down, floored };
+  });
+  check('the tier chip survives the narrowest screen and its row works',
+    r.wide.shown && r.narrow.shown && r.narrow.w > 20
+    && r.opened && r.up.tier === 7 && r.up.hold === true && r.up.shut
+    && r.down === 6 && r.floored,
+    `chip ${r.wide.w}px wide, ${r.narrow.w}px at 320 (shown: ${r.narrow.shown}); `
+    + `up -> ${r.up.tier} pinned ${r.up.hold}, down -> ${r.down}, floor disabled ${r.floored}`);
+}
+
 // --- a hit lands as the round, and a death wears its killer ------------------
 /*
  * The rounds were given nine identities in flight in build 172 and all nine

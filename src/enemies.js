@@ -2542,6 +2542,21 @@ function release(world, type, x, y, opts) {
  */
 export function spawnOne(world, type, x, y, opts = {}) {
   const e = new Enemy(type, x, y, { staged: true, spawnIn: 1, ...opts });
+  /*
+   * The tier's health and bounty, applied at the one place every hostile
+   * enters the world.
+   *
+   * Deliberately not applied to the harmless: DRIFT is a promise the field
+   * keeps, and a tier-8 DRIFT with eight times the health is a grey object
+   * that does not die like a grey object. The bonus wave stays a bonus.
+   */
+  const d = world.director;
+  if (d && !e.harmless && !type.fixed) {
+    const k = d.scaleAt(d.tier);
+    e.maxHp *= k.hp;
+    e.hp = e.maxHp;
+    e.bounty *= k.bounty;
+  }
   world.enemies.push(e);
   if (!e.harmless) world.released++;
   return e;
@@ -2852,6 +2867,91 @@ export class Director {
     this.timer = CFG.openingGrace; // until the next release, or the next wave
     this.wait = 0; // how long this wave has been waiting for the field to thin
     this.resting = true; // between waves rather than inside one
+    /*
+     * ---- the ladder ----
+     * `tier` is the run's difficulty step. It climbs on a clean wave, is
+     * pinned by `hold`, and steps back on its own after two failures. The
+     * three scoring fields below are gathered while a wave runs and read when
+     * it ends -- see score().
+     */
+    this.tier = 1;
+    this.hold = false;
+    this.fails = 0; // consecutive failed waves
+    this.contact = 0; // seconds anything spent on the turret this wave
+    this.hitPatience = false; // ...and whether the field ever thinned
+    this.lastVerdict = null; // 'clean' | 'failed', for the HUD and the tests
+  }
+
+  /** Which authored band a tier draws from, and the one below it. */
+  bandsFor(tier) {
+    // Clamped at BOTH ends. Unclamped, tier 64 asked for bands 31..5 -- a
+    // range matching nothing, which only worked because the empty-band
+    // fallback caught it. Past band 5 every tier is band 4-5 and the climb is
+    // carried by population, health and bounty, which is the intent.
+    const hi = Math.min(5, Math.max(1, Math.ceil(tier / CFG.waves.tier.perBand)));
+    return [Math.max(1, hi - 1), hi];
+  }
+
+  /**
+   * The multipliers this tier applies. One place, so the three plans have one
+   * surface to tune and the probe has one thing to read.
+   */
+  scaleAt(tier) {
+    const T = CFG.waves.tier;
+    return {
+      pop: Math.min(1 + T.pop * tier, T.popCap),
+      hp: 1 + T.hp * tier,
+      bounty: 1 + T.bounty * tier,
+    };
+  }
+
+  /**
+   * Score the wave that just ended, and move the tier.
+   *
+   * Nothing here is new instrumentation: how long something sat on the turret,
+   * whether the director ever got its field back, and how much of the wave
+   * outlived it were all already known. They were simply never read.
+   */
+  score(world) {
+    const T = CFG.waves.tier;
+    const wave = this.wave;
+    // The opening teaches; it is not scored and cannot move the tier.
+    if (!wave || wave.teach) return null;
+    const alive = world.enemies.filter((e) => !e.dead && !e.harmless).length;
+    const failed = this.contact >= T.failContact
+      || this.hitPatience
+      || (this.asked > 0 && alive >= this.asked * T.failAlive);
+
+    this.lastVerdict = failed ? 'failed' : 'clean';
+    let moved = 0;
+    if (failed) {
+      this.fails++;
+      if (this.fails >= T.failStreak && this.tier > 1) {
+        this.tier--;
+        this.fails = 0;
+        moved = -1;
+        /*
+         * A step back re-arms the climb even under HOLD. The pin holds the
+         * climb, not the relief: nobody gets left pinned above their head,
+         * and anyone who wants to drown can climb straight back.
+         */
+        this.hold = false;
+      }
+    } else {
+      this.fails = 0;
+      // A clean wave climbs, unless the player has pinned the tier.
+      if (!this.hold) { this.tier++; moved = 1; }
+    }
+    this.contact = 0;
+    this.hitPatience = false;
+    return { verdict: this.lastVerdict, moved, tier: this.tier };
+  }
+
+  /** Set the tier by hand, from the chip. Pins it either way. */
+  setTier(n) {
+    this.tier = Math.max(1, Math.round(n));
+    this.fails = 0;
+    return this.tier;
   }
 
   /** Every type in a wave has to have unlocked before the wave is eligible. */
@@ -2866,7 +2966,23 @@ export class Director {
    */
   shuffle(world) {
     const rest = [];
-    WAVES.forEach((wv, i) => { if (!wv.teach && this.eligible(world, wv)) rest.push(i); });
+    const [lo, hi] = this.bandsFor(this.tier);
+    const inBand = [];
+    WAVES.forEach((wv, i) => {
+      if (wv.teach || !this.eligible(world, wv)) return;
+      const b = wv.band || 1;
+      if (b >= lo && b <= hi) inBand.push(i);
+      rest.push(i);
+    });
+    /*
+     * The tier's own bands, or everything eligible if that comes out empty.
+     *
+     * It can: a player climbing faster than the economy unlocks types reaches
+     * a band whose waves are all still locked, and a director with nothing to
+     * play stalls the run dead. Falling back down-band is not a compromise --
+     * it is what the ladder should do when it has outrun its own material.
+     */
+    if (inBand.length) { rest.length = 0; rest.push(...inBand); }
     // Fisher-Yates. Order past the opening is meant to be arbitrary.
     for (let i = rest.length - 1; i > 0; i--) {
       const j = (Math.random() * (i + 1)) | 0;
@@ -2892,11 +3008,14 @@ export class Director {
     const W = CFG.waves;
     // How much bigger this wave is than it was authored. Tutorial waves are
     // authored at exactly the size they should be and never swell.
-    const progress = clamp(world.kills / W.swellKills, 0, 1);
-    // ...and the flat population multiplier on top of it. Tutorial waves are
-    // exempt from both: they are authored at exactly the size they teach at.
-    const swell = wave.teach ? 1
-      : (W.swell[0] + (W.swell[1] - W.swell[0]) * progress) * W.population;
+    /*
+     * Size comes off the TIER now, not the kill count. It was
+     * `kills / swellKills` ramping one global knob from 1 to 2.4 across a
+     * run -- which meant difficulty was a function of how long you had
+     * played rather than of where you had chosen to stand, and could only
+     * ever go one way.
+     */
+    const swell = wave.teach ? 1 : this.scaleAt(this.tier).pop * W.population;
     const jobs = [];
     let asked = 0;
     for (const [id, base] of wave.of) {
@@ -2980,6 +3099,17 @@ export class Director {
     const was = Math.min(d.at ?? 0, this.order.length - 1);
     this.at = Math.max(-1, was - 1);
     this.cycle = d.cycle || 1;
+    /*
+     * A save written before the ladder existed has no tier at all, and
+     * defaulting it to 1 would drop a long run back to the opening. Seeded
+     * from the kill count instead, on the same shape the old swell used --
+     * so a returning run resumes at about the difficulty it left.
+     */
+    this.tier = Math.max(1, Math.round(d.tier ?? (1 + (world.kills || 0) / 40)));
+    this.hold = !!d.hold;
+    this.fails = d.fails || 0;
+    this.contact = 0;
+    this.hitPatience = false;
     this.resting = true;
     this.timer = 1.5; // a beat to look at the field before it starts again
     this.jobs = [];
@@ -2997,6 +3127,13 @@ export class Director {
       this.driftTimer = rand(CFG.waves.drift[0], CFG.waves.drift[1]);
       if (driftCount(world) < CFG.maxDrift) spawnDrift(world);
     }
+
+    /*
+     * The two live signals the ladder scores on, gathered while the wave runs
+     * rather than reconstructed after it. Both were already computed every
+     * frame for other reasons; this is the first thing that reads them.
+     */
+    if (!this.resting && world.attackers.size > 0) this.contact += dt;
 
     this.timer -= dt;
 
@@ -3025,10 +3162,16 @@ export class Director {
     // same empty field as a small one and does not simply time out every time.
     const thinAt = Math.max(CFG.waves.clearTo, Math.round(this.asked * CFG.waves.thinFrac));
     if (hostileCount(world) > thinAt && this.wait < CFG.waves.patience) return;
+    // Reaching patience means the field never came back. That is the wave
+    // telling you it was too much, in the one number that already knew.
+    if (this.wait >= CFG.waves.patience) this.hitPatience = true;
     const teach = this.wave && this.wave.teach;
     const rest = teach ? CFG.waves.teachRest : CFG.waves.rest;
     this.resting = true;
     this.timer = rand(rest[0], rest[1]);
+    // The wave is over: score it, and let the world announce any move.
+    const moved = this.score(world);
+    if (moved && world.onTier) world.onTier(moved);
   }
 
   /** Start the next wave, rebuilding the rotation if this one is spent. */

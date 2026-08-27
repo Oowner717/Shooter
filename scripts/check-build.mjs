@@ -171,12 +171,42 @@ if (crowded.length) {
     + `${CFG.waves.population}: ` + crowded.map(([of, n]) => `${JSON.stringify(of)}=${n}`).join(' '));
   process.exit(1);
 }
-const peak = Math.max(...regular.map((w) => Math.round(bodiesOf(w) * CFG.waves.swell[1])));
+/*
+ * The heaviest wave at the ladder's population ceiling. It was checked
+ * against `swell[1]`, the old kill-driven ramp; the ladder's growth is capped
+ * by `tier.popCap` instead, and past that the climb is carried by health and
+ * bounty. Same guarantee either way: the field cap must never be the thing
+ * doing the balancing.
+ */
+const peak = Math.max(...regular.map((w) => Math.round(bodiesOf(w) * CFG.waves.tier.popCap)));
 if (peak > CFG.maxEnemies) {
-  console.error(`the heaviest wave asks for ${peak} bodies at full swell against a field cap `
-    + `of ${CFG.maxEnemies}; the cap would be doing the balancing`);
+  console.error(`the heaviest wave asks for ${peak} bodies at the ladder's population `
+    + `ceiling (x${CFG.waves.tier.popCap}) against a field cap of ${CFG.maxEnemies}; `
+    + 'the cap would be doing the balancing');
   process.exit(1);
 }
+/*
+ * Every regular wave carries a band, and every band has waves in it.
+ *
+ * A wave with no band is unreachable -- the director draws by band -- and an
+ * empty band is a rung with nothing on it, which is a run that stalls on a
+ * tier nobody can play. Both are silent at runtime and obvious here.
+ */
+const unbanded = regular.filter((w) => !w.band);
+if (unbanded.length) {
+  console.error(`${unbanded.length} wave(s) carry no band and can never be drawn: `
+    + unbanded.map((w) => JSON.stringify(w.of)).join(' '));
+  process.exit(1);
+}
+const byBand = {};
+for (const w of regular) byBand[w.band] = (byBand[w.band] || 0) + 1;
+const emptyBands = [1, 2, 3, 4, 5].filter((b) => !byBand[b]);
+if (emptyBands.length) {
+  console.error(`band(s) ${emptyBands.join(', ')} have no waves; the ladder would stall there`);
+  process.exit(1);
+}
+console.log(`ladder: ${regular.length} waves across 5 bands `
+  + `(${[1, 2, 3, 4, 5].map((b) => byBand[b]).join('/')}), heaviest ${peak} of ${CFG.maxEnemies}`);
 /*
  * Types that are only ever produced by another type, never released directly.
  *

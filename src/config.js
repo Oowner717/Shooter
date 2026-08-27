@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '176';
+export const BUILD = '177';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '176';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '93aaaf6';
+export const REV = '2592653';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -121,15 +121,57 @@ export const CFG = {
     // once and would otherwise stop at ten. The trickle simply pauses until
     // the field is back under maxDrift.
     driftCap: 26,
-    // A wave is authored at its opening size and swells over the run, so the
-    // same six-MOTE wave that is a gentle problem at kill 20 is fourteen of
-    // them by the end. Without this the field peaked at nine objects and the
+    // A wave is authored at its opening size and grows with the tier, so the
+    // same six-MOTE wave that is a gentle problem at tier 1 is fourteen of
+    // them high up the ladder. Without this the field peaked at nine and the
     // late run was thinner than the early one — waves bound the population by
     // construction, which is most of why they work and all of why they need
     // this. Tutorial waves never swell; they are authored at the size they
     // are meant to be.
-    swell: [1, 2.4],
-    swellKills: 320,
+    /*
+     * ---- THE LADDER ----
+     *
+     * Difficulty used to have no direction. Past the opening eight, waves
+     * were shuffled and the only thing that grew was `swell`, a global volume
+     * knob driven off the kill count -- so a run got busier but never got
+     * *harder in a way anyone could stand on*, and nothing could be gone back
+     * to. Tiers replace it: a numbered step, climbed automatically, held or
+     * dropped by hand, and dropped for you when the field proves it is over
+     * your head.
+     *
+     * A tier draws its shapes from a band of the authored table and one band
+     * below it, and scales three things. All three slopes are the tuning
+     * surface for the damage and energy plans -- see docs/pacing.md -- and
+     * scripts/tiers.mjs is what calibrates them.
+     */
+    tier: {
+      // Which band a tier draws from. Tier 1-2 is band 1, 3-4 band 2, and so
+      // on: two tiers per band, so a band is met and then met again heavier
+      // before anything new arrives.
+      perBand: 2,
+      pop: 0.1, // authored count x (1 + pop*n)
+      hp: 0.06, // type health x (1 + hp*n)
+      bounty: 0.15, // energy x (1 + bounty*n)
+      /*
+       * The ceiling on population growth. The field caps at CFG.maxEnemies
+       * anyway, so past this the climb is carried by health and bounty alone
+       * -- which is where plan B wants the wall to form.
+       */
+      popCap: 3,
+      /*
+       * What counts as a wave going badly. All three are read off
+       * instruments that already ran every frame before the ladder existed:
+       * how long something sat on the turret, whether the director ever got
+       * its field back, and how much of the wave was still alive at the end.
+       *
+       * Two consecutive failures step the tier back. One is allowed -- a bad
+       * wave is a bad wave, and a ladder that flinches at one is a ladder
+       * nobody can climb.
+       */
+      failContact: 6, // seconds with anything attached, during one wave
+      failAlive: 0.6, // ...or this much of what it asked for still up at the end
+      failStreak: 2, // consecutive failures before it steps back
+    },
     /*
      * A flat multiplier on every authored count, on top of the swell. The
      * table stays readable as a set of shapes -- two BLOOMs and four MOTEs is
@@ -3053,37 +3095,37 @@ export const WAVES = [
    * MOTE and NEEDLE in different proportions -- before kill 18 there is
    * nothing else to combine them with.
    */
-  { of: [['mote', 5], ['needle', 3]] },
-  { of: [['needle', 5], ['mote', 3]] },
-  { of: [['mote', 4], ['needle', 4]] },
-  { of: [['lurcher', 3], ['needle', 3]] },
-  { of: [['lurcher', 2], ['mote', 4]] },
-  { of: [['splitter', 2], ['lurcher', 1], ['mote', 3]] },
-  { of: [['splitter', 2], ['needle', 4]] },
-  { of: [['bloom', 2], ['mote', 4]] },
-  { of: [['bloom', 3], ['lurcher', 2]] },
+  { of: [['mote', 5], ['needle', 3]], band: 1 },
+  { of: [['needle', 5], ['mote', 3]], band: 1 },
+  { of: [['mote', 4], ['needle', 4]], band: 1 },
+  { of: [['lurcher', 3], ['needle', 3]], band: 2 },
+  { of: [['lurcher', 2], ['mote', 4]], band: 2 },
+  { of: [['splitter', 2], ['lurcher', 1], ['mote', 3]], band: 2 },
+  { of: [['splitter', 2], ['needle', 4]], band: 2 },
+  { of: [['bloom', 2], ['mote', 4]], band: 3 },
+  { of: [['bloom', 3], ['lurcher', 2]], band: 3 },
   // A beacon and the escort it exists to cover: the pairing the type was
   // designed around, and the one that teaches "kill the beacon".
-  { of: [['herald', 1], ['lurcher', 3]] },
-  { of: [['herald', 2], ['splitter', 2]] },
-  { of: [['prism', 3], ['needle', 3]] },
-  { of: [['prism', 2], ['bloom', 2]] },
-  { of: [['warden', 2], ['mote', 3]] },
-  { of: [['warden', 1], ['prism', 2], ['needle', 3]] },
-  { of: [['scion', 1], ['bloom', 2]] },
-  { of: [['scion', 2], ['lurcher', 2]] },
+  { of: [['herald', 1], ['lurcher', 3]], band: 4 },
+  { of: [['herald', 2], ['splitter', 2]], band: 4 },
+  { of: [['prism', 3], ['needle', 3]], band: 3 },
+  { of: [['prism', 2], ['bloom', 2]], band: 3 },
+  { of: [['warden', 2], ['mote', 3]], band: 4 },
+  { of: [['warden', 1], ['prism', 2], ['needle', 3]], band: 4 },
+  { of: [['scion', 1], ['bloom', 2]], band: 4 },
+  { of: [['scion', 2], ['lurcher', 2]], band: 4 },
   // Seeds and something worth landing on. A WARDEN already carries plating;
   // a grafted one is the clearest read there is on what a SEED does.
-  { of: [['scion', 1], ['warden', 2], ['needle', 3]] },
-  { of: [['bulwark', 1], ['needle', 4]] },
-  { of: [['bulwark', 2], ['herald', 1]] },
-  { of: [['glut', 3], ['mote', 4]] },
-  { of: [['glut', 2], ['splitter', 2]] },
+  { of: [['scion', 1], ['warden', 2], ['needle', 3]], band: 4 },
+  { of: [['bulwark', 1], ['needle', 4]], band: 5 },
+  { of: [['bulwark', 2], ['herald', 1]], band: 5 },
+  { of: [['glut', 3], ['mote', 4]], band: 3 },
+  { of: [['glut', 2], ['splitter', 2]], band: 3 },
   // A TOW is two bodies -- the head and the MASS on its cable -- so these are
   // heavier than they read. Never more than one pair alongside anything else.
-  { of: [['tow', 2], ['needle', 3]] },
-  { of: [['tow', 1], ['bulwark', 1], ['mote', 4]] },
-  { of: [['tow', 1], ['prism', 2], ['needle', 3]] },
+  { of: [['tow', 2], ['needle', 3]], band: 5 },
+  { of: [['tow', 1], ['bulwark', 1], ['mote', 4]], band: 5 },
+  { of: [['tow', 1], ['prism', 2], ['needle', 3]], band: 5 },
 
   /*
    * The bonus. Grey and nothing else: no hostiles, no risk, no cost to the
@@ -3102,7 +3144,7 @@ export const WAVES = [
    * Nothing announces it. A screen of grey with nothing hostile on it is the
    * announcement — see the note on waves never being named.
    */
-  { of: [], drift: 22, dwell: 8 },
+  { of: [], drift: 22, dwell: 8, band: 1 },
 ];
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

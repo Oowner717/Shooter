@@ -58,7 +58,10 @@ export class Hud {
     this.el = {
       killNum: $('killNum'),
       counter: $('counter'),
-      phaseTag: $('phaseTag'),
+      tierChip: $('tierChip'),
+      tierNum: $('tierNum'),
+      tierHold: $('tierHold'),
+      tierRow: $('tierRow'),
       alerts: $('alerts'),
       killGoal: document.querySelector('#counter .dim'),
       energy: $('energyNum'),
@@ -112,6 +115,7 @@ export class Hud {
     this.buildAbilities();
     this.buildDebug();
     this.buildSpawn();
+    this.buildTier();
 
     this.menu = new Menu(game);
     this.buildStrip();
@@ -757,9 +761,70 @@ export class Hud {
 
 
   setPhase(label) {
-    if (label === this.lastPhase) return;
+    // The chip that used to carry this is the ladder's control now. The phase
+    // is still tracked -- the boss bar and the menu both read it -- it simply
+    // has nowhere to be written, because "FIELD" for a whole run was a word,
+    // not a readout.
     this.lastPhase = label;
-    this.el.phaseTag.textContent = label;
+  }
+
+  // -------------------------------------------------------------- the ladder
+
+  /**
+   * Where the run is standing, and the only way to move it by hand.
+   *
+   * Auto-advance is the default and the chip is mostly a readout; one tap
+   * opens the row that pins or steps it. The row closes on any choice, so it
+   * is never something left open on top of the field.
+   */
+  buildTier() {
+    const g = this.game;
+    const d = () => g.world.director;
+    this.el.tierChip.addEventListener('click', () => {
+      const open = this.el.tierRow.hidden;
+      this.el.tierRow.hidden = !open;
+      this.syncTier(g.world);
+    });
+    const step = (by) => {
+      const dir = d();
+      if (!dir) return;
+      /*
+       * Moving by hand pins the tier. Anything else is a control that fights
+       * the auto-advance: step down, clear one wave, and the ladder puts you
+       * straight back where you could not stand.
+       */
+      dir.setTier(dir.tier + by);
+      dir.hold = true;
+      this.el.tierRow.hidden = true;
+      this.syncTier(g.world);
+    };
+    $('tierDown').addEventListener('click', () => step(-1));
+    $('tierUp').addEventListener('click', () => step(1));
+    $('tierPin').addEventListener('click', () => {
+      const dir = d();
+      if (!dir) return;
+      dir.hold = !dir.hold;
+      this.el.tierRow.hidden = true;
+      this.syncTier(g.world);
+    });
+  }
+
+  syncTier(world) {
+    const dir = world && world.director;
+    if (!dir || !this.el.tierChip) return;
+    const n = dir.tier;
+    if (this._tierAt !== n) {
+      this._tierAt = n;
+      this.el.tierNum.textContent = n;
+    }
+    if (this._tierHold !== dir.hold) {
+      this._tierHold = dir.hold;
+      this.el.tierHold.hidden = !dir.hold;
+      this.el.tierChip.classList.toggle('held', dir.hold);
+      $('tierPin').textContent = dir.hold ? 'AUTO' : 'HOLD';
+    }
+    // Nothing below tier 1 to step down to.
+    $('tierDown').disabled = n <= 1;
   }
 
 
@@ -1547,6 +1612,7 @@ export class Hud {
    */
   syncHudLight(world) {
     this.syncAbilities(world.abilities);
+    this.syncTier(world);
     this.syncLoadout(world);
     this.syncSeals();
     this.syncBoss(world);
