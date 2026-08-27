@@ -168,6 +168,10 @@ export class Game {
 
       // status effects
       stasis: 0,
+      // Seconds SPIRAL still owns the barrel. Zero the rest of the time;
+      // updateFiring stands down while it is up so the two are never both
+      // driving the gun.
+      spiral: 0,
       autoSteering: false, // is auto aim traversing the barrel this frame?
       autoAim: false,
       autoFire: false,
@@ -758,10 +762,11 @@ export class Game {
     const res = w.abilities.trigger(w, i);
     if (!res) return;
     this.hud.flashAbility(i);
-    // ...and the furniture gets out of the way while it happens. Everything
-    // an ability draws is a circle on the turret and the turret sits behind
-    // the controls; see Hud.recede().
-    this.hud.recede(res.slot.def.show ?? 0.9);
+    // ...and the strip gets out of the way while it happens. Everything an
+    // ability draws is a circle on the turret and the turret sits behind the
+    // controls. The ability bar itself stays: this is the one moment it is
+    // the thing being read. See Hud.recede().
+    this.hud.recede(res.slot.def.show ?? 0.9, true);
     // An ability says what it is the first time it is used, which is minutes
     // after it was bought and only if the player actually reaches for it.
     // ...and once on this device: `res.first` is per-run, so without this an
@@ -1021,6 +1026,8 @@ export class Game {
     const w = this.world;
     const s = w.shooter;
     if (w.phase === 'ending' || w.phase === 'boot') return;
+    // SPIRAL owns the gun while it runs, and fires it on its own cadence.
+    if (w.spiral > 0) return;
 
     const dragging = this.pointers.size > 0;
     const manual = s.gripHeld || dragging;

@@ -781,7 +781,10 @@ export class Hud {
     }
     if (this.recedeT > 0) {
       this.recedeT -= dt;
-      if (this.recedeT <= 0) document.body.classList.remove('recede');
+      if (this.recedeT <= 0) {
+        document.body.classList.remove('recede');
+        document.body.classList.remove('recedeStrip');
+      }
     }
     if (this.hintTimer > 0) {
       this.hintTimer -= dt;
@@ -866,15 +869,27 @@ export class Hud {
    * whole time -- a panic PULSE during a recede still fires, because the
    * button is faint rather than gone.
    */
-  recede(seconds = 0.9) {
+  recede(seconds = 0.9, stripOnly = false) {
     this.recedeT = Math.max(this.recedeT || 0, seconds);
-    document.body.classList.add('recede');
+    /*
+     * `stripOnly` leaves the ability bar alone.
+     *
+     * Pressing an ability is the one moment the ability bar is the thing you
+     * are looking at -- which one went, what it cost, when it is back -- and
+     * fading it on the press hides exactly that. So an ability takes the
+     * fifteen-cell strip out of the way and nothing else. A boss arriving or
+     * a stage turning over is not a press, nobody is reading a cooldown, and
+     * both go.
+     */
+    if (!stripOnly) document.body.classList.add('recede');
+    document.body.classList.add('recedeStrip');
   }
 
   /** Put it back now, whatever is left on the clock. */
   unrecede() {
     this.recedeT = 0;
     document.body.classList.remove('recede');
+    document.body.classList.remove('recedeStrip');
   }
 
   // ------------------------------------------------------------------ debug

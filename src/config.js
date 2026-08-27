@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '167';
+export const BUILD = '168';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '167';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'fc97a1a';
+export const REV = 'e2947ab';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -455,44 +455,41 @@ export const CFG = {
     blast: { r: 260, damage: 150, impulse: 900 }, // what it leaves behind
   },
 
-  // ---- chorus ---------------------------------------------------------
-  // Your own wreckage, thrown back. Everything loose on the floor is dragged
-  // in and fired out as a volley, so the more mess there is the harder it
-  // hits — and a field you have just cleared has nothing to give.
-  // CHORUS. Everything on the field is tied to everything else for a while,
-  // and whatever kills one of them is felt by all the rest. On a thin field it
-  // is a modest tick of damage; on a crowded one, one good shot takes the
-  // whole thing apart in a cascade that runs on its own.
-  chorus: {
-    life: 6, // seconds the binding holds
-    maxBound: 40,
-    // The echo is self-amplifying: every death it causes echoes in turn, so
-    // this number has a cliff in it. A third of full health took a maximum
-    // field from 44 down to 4 — a bigger clear than anything else in the bar.
-    // A fifth killed one thing, because the echo off a 20hp NEEDLE cannot kill
-    // another NEEDLE and the chain never starts.
-    //
-    // The real fix was not a number. An echo that reaches every bound body at
-    // once scales as the square of the crowd, so it is all or nothing: either
-    // the first echo is too small to kill anything and the chain never starts,
-    // or it kills the weakest and the field ends. So an echo only reaches the
-    // few nearest instead, and CHORUS became a chain that travels — it runs as
-    // far as the crowd is packed and stalls where it thins out, which is a
-    // thing the player can arrange with WELL, with SNARE, or with the shot.
-    //
-    // Even as a chain it needed bounding: three seeds per death is a branching
-    // process above one, so a packed field either fizzled at two kills or ran
-    // the whole crowd. The echo now weakens by `falloff` at every hop and the
-    // whole binding pays out at most `hops` of them, which makes it reliably a
-    // handful and occasionally a lot, rather than two or forty.
-    spread: 3, // survivors each death reaches, nearest first
-    falloff: 0.62, // and each hop out from the first death lands softer
-    hops: 10, // total echoes one binding will ever pay
-    floor: 26, // always at least this, which is a MOTE and change
-    share: 0.22, // ...plus this much of the dead one's full health
-    cap: 62,
-    link: 620, // and no echo jumps further than this
-    reach: 1400, // effectively the whole field, but not the staged rows above it
+  // ---- spiral ---------------------------------------------------------
+  /*
+   * SPIRAL. The barrel comes off its target and turns, firing the loaded
+   * round the whole way round.
+   *
+   * It replaced CHORUS, and the reason was a gap rather than a complaint.
+   * Every ability in the bar acted on the field and away from the turret --
+   * PULSE shoves, LANCE pierces, WELL gathers, PRISM bursts, STASIS holds,
+   * DECOY redirects, FAN throws a cone somewhere else -- and not one of them
+   * touched the turret's own gun, which is what the whole UPGRADES tree is
+   * about. Nine rounds and twenty fittings, and nothing in the bar cared
+   * which of them you were carrying.
+   *
+   * So this one does, and only that. It fires whatever is loaded, through
+   * every upgrade that round has, which makes it nine abilities rather than
+   * one: RIME chills the whole field, SPORE carpets it, TITHE marks
+   * everything within reach, HE turns a circle into a ring of clusters. It is
+   * also the only answer in the bar to being surrounded, which is the
+   * situation the game actually produces -- measured over a run, two thirds
+   * of all bodies are in the bottom half of the field, piling around you.
+   *
+   * `interval` is the whole balance. The turret's ordinary cadence is
+   * CFG.shooter.gripFireInterval times the round's own `rate`, so a heavy
+   * round fires slower here exactly as it does everywhere else; this only
+   * removes the ceiling, it does not flatten the arsenal.
+   */
+  spiral: {
+    life: 3.2, // seconds the barrel is off its target
+    turns: 2.6, // full revolutions in that time
+    interval: 0.06, // seconds between rounds while it runs
+    // A round fired mid-sweep is not an aimed round, and a full sweep is
+    // fifty of them. Without this it out-damages the whole bar by a factor
+    // of three at a fifth of PRISM's cooldown.
+    damage: 0.7,
+    wobble: 0.05, // the sweep is a machine turning, not a laser
   },
 
   /*

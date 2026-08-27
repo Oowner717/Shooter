@@ -88,7 +88,7 @@ const UNDER = {
   // ---- the abilities ----
   abilities: ['standing', 'reflex'],
   pulse: [],
-  fan: [], lance: [], well: [], prism: [], stasis: [], decoy: [], chorus: [],
+  fan: [], lance: [], well: [], prism: [], stasis: [], decoy: [], spiral: [],
 };
 
 /** Which arms hang off which category, in the order they are shown. */
@@ -100,7 +100,7 @@ const BRANCH = {
   mines: ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'],
   // PULSE and FAN are the two the turret starts with. They are free where the
   // six below them are bought; their extra uses are not.
-  abilities: ['pulse', 'fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'chorus'],
+  abilities: ['pulse', 'fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'spiral'],
   turret: [],
   anomaly: [],
 };

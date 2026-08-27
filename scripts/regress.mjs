@@ -1536,6 +1536,120 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- SPIRAL is the one ability that is about the gun -------------------------
+/*
+ * It replaced CHORUS, and the reason was a gap rather than a complaint. Every
+ * ability in the bar acted on the field and away from the turret -- PULSE
+ * shoves, LANCE pierces, WELL gathers, PRISM bursts, STASIS holds, DECOY
+ * redirects, FAN throws a cone somewhere else -- and not one of them touched
+ * the turret's own gun, which is what the whole UPGRADES tree is about. Nine
+ * rounds and twenty fittings, and nothing in the bar cared which you carried.
+ *
+ * So the thing to assert is not that it does damage, it is that it is the
+ * gun: it fires the loaded round through that round's own upgrades, it takes
+ * the barrel off whatever the assist had chosen, and it gives the barrel back
+ * when it is done. A version that quietly fired BOLTs would pass a damage
+ * check and be the wrong ability.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { ABILITIES } = await import('../src/abilities.js');
+    const { FIRST_USE, LOCKABLE } = await import('../src/tutorial.js');
+    const { NODES } = await import('../src/tree.js');
+
+    const ids = ABILITIES.map((a) => a.id);
+    const treeText = JSON.stringify(NODES.map((n) => [n.id, n.name, n.line]));
+    const gone = !/chorus/i.test(treeText) && !ids.includes('chorus')
+      && !FIRST_USE.chorus && !LOCKABLE.abilities.includes('chorus');
+    const placed = ids.includes('spiral') && /open_spiral/.test(treeText)
+      && /charge_spiral/.test(treeText) && !!FIRST_USE.spiral
+      && LOCKABLE.abilities.includes('spiral');
+
+    g.debugTeachAll();
+    g.debugClearField();
+    w.debug.noCooldown = true;
+    for (let i = 0; i < 20; i++) g.debugSpawn('mote', 200 + i * 18, 260);
+
+    const slot = w.abilities.slots.findIndex((sl) => sl && sl.def.id === 'spiral');
+    const s = w.shooter;
+
+    // Point the barrel somewhere deliberate, so "came off its target" is a
+    // fact about this run rather than about wherever it happened to be.
+    s.aim = 0;
+    const aimBefore = s.aim;
+
+    const fired = {};
+    const seen = new Set();
+    /*
+     * The charge is put back and the field is cleared before each sweep.
+     * Without the first, the second sweep never happens -- `noCooldown` zeroes
+     * the wait but not the charge count, so trigger() refuses and the case
+     * reads the FIRST sweep's rounds still in flight and reports both sweeps
+     * as identical. Which is exactly the failure the check is looking for, so
+     * it was a green-looking red for the wrong reason.
+     */
+    const round = (name) => {
+      w.round = name;
+      w.projectiles.length = 0;
+      const sl = w.abilities.slots[slot];
+      sl.charges = Math.max(1, sl.charges);
+      sl.cd = 0;
+      sl.locked = 0;
+      const went = !!g.useAbility(slot) || w.spiral > 0;
+      let turned = 0;
+      for (let i = 0; i < 200; i++) {
+        g.update(1 / 60);
+        turned = Math.max(turned, Math.abs(s.aim - aimBefore));
+        for (const p of w.projectiles) if (p.color) seen.add(p.color);
+      }
+      fired[name] = { turned: +turned.toFixed(2), spiral: +w.spiral.toFixed(2), went };
+    };
+    round('standard');
+    const coloursAfterBolt = new Set(seen);
+    seen.clear();
+    round('rime');
+    const rimeColours = new Set(seen);
+
+    // ...and the gun is handed back: spiral clears and firing resumes.
+    const handedBack = w.spiral === 0;
+    w.debug.noCooldown = false;
+    g.restart();
+    return { gone, placed, fired, handedBack,
+      boltColours: [...coloursAfterBolt], rimeColours: [...rimeColours],
+      tone: ABILITIES.find((a) => a.id === 'spiral')?.color };
+  });
+
+  check('CHORUS is gone from the bar, the tree and the script, and SPIRAL is in all three',
+    r.gone && r.placed,
+    `chorus gone ${r.gone}, spiral placed ${r.placed}, tone ${r.tone}`);
+
+  // A full sweep is CFG.spiral.turns revolutions; anything under one turn
+  // means the barrel never actually came off its target.
+  const swept = r.fired.standard && r.fired.standard.turned > Math.PI * 2;
+  check('...and it takes the barrel off its target and hands it back',
+    swept && r.handedBack,
+    `turned ${r.fired.standard && r.fired.standard.turned} radians, `
+    + `handed back ${r.handedBack}`);
+
+  /*
+   * The one that matters: it fires what is LOADED. A BOLT is #7aa2ff and a
+   * RIME round is #8fe3ff, so a sweep with RIME on the strip has to put
+   * different projectiles on the field than a sweep with BOLT. An
+   * implementation that always fired the default round would pass every
+   * other check here.
+   */
+  const differs = r.boltColours.length > 0 && r.rimeColours.length > 0
+    && r.rimeColours.some((c) => !r.boltColours.includes(c));
+  check('...and it fires whatever round is loaded, not a round of its own',
+    differs,
+    `BOLT sweep (went ${r.fired.standard && r.fired.standard.went}) left `
+    + `${r.boltColours.join(',') || 'nothing'}; RIME sweep `
+    + `(went ${r.fired.rime && r.fired.rime.went}) left `
+    + `${r.rimeColours.join(',') || 'nothing'}`);
+}
+
 // --- one voice at a time ----------------------------------------------------
 /*
  * The teaching band and the boss caption are the two things in this game that
@@ -2012,23 +2126,39 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // not its cooldown: FAN is over before the pellets land, WELL drags.
     g.useAbility(0);
     const held = g.hud.recedeT;
-    const cls = document.body.classList.contains('recede');
+    const cls = document.body.classList.contains('recedeStrip');
+    /*
+     * ...and the ability bar is NOT in it. Pressing an ability is the one
+     * moment that bar is what you are reading -- which one went, what it
+     * cost, when it is back -- and fading it on the press hides exactly
+     * that. A boss beat still takes both, because nobody is reading a
+     * cooldown through an arrival.
+     */
+    const sparedAbilities = !document.body.classList.contains('recede');
+    g.hud.unrecede();
+    g.hud.recede(1, false);
+    const bossBeatTakesBoth = document.body.classList.contains('recede')
+      && document.body.classList.contains('recedeStrip');
+    g.hud.unrecede();
+    g.useAbility(0);
     // ...and it is still pressable while it is faint. A recede that took the
     // controls away would be worse than the occlusion it is fixing.
     const ab = document.querySelector('#abilities .ab');
     const hittable = getComputedStyle(ab).pointerEvents !== 'none';
     // The clock runs it out on its own.
     g.hud.updateAlerts(99);
-    const after = { cls: document.body.classList.contains('recede'), t: g.hud.recedeT };
+    const after = { cls: document.body.classList.contains('recedeStrip'), t: g.hud.recedeT };
     g.hud.unrecede();
-    return { before, held, cls, hittable, after,
+    return { before, held, cls, hittable, after, sparedAbilities, bossBeatTakesBoth,
       shows: (await import('../src/abilities.js')).ABILITIES.map((a) => a.show) };
   });
-  check('a beat takes the strip and the ability bar down, and they come back',
+  check('an ability takes the strip down and leaves the ability bar alone',
     r.cls && r.held > 0 && r.hittable && !r.after.cls
+    && r.sparedAbilities && r.bossBeatTakesBoth
     && r.before.strip === 1 && r.shows.every((v) => v > 0 && v < 4),
-    `held ${r.held}s, still pressable ${r.hittable}, back afterwards ${!r.after.cls}, `
-    + `durations ${r.shows.join('/')}`);
+    `held ${r.held}s, ability bar spared ${r.sparedAbilities}, `
+    + `a boss beat takes both ${r.bossBeatTakesBoth}, still pressable ${r.hittable}, `
+    + `back afterwards ${!r.after.cls}, durations ${r.shows.join('/')}`);
 }
 
 // --- the TITHE mark is on the screen, and it deepens ------------------------

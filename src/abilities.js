@@ -37,7 +37,7 @@ const ICON = {
   // Two turrets. One of them is not there.
   decoy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.8 4.6v4.2"/><path d="M2.9 12.4 6.8 8.9l3.9 3.5v5.9H2.9z"/><circle cx="6.8" cy="14.6" r="1.3" fill="currentColor" stroke="none"/><path d="M17.2 4.6v4.2" stroke-dasharray="2.2 1.9"/><path d="M13.3 12.4l3.9-3.5 3.9 3.5v5.9h-7.8z" stroke-dasharray="2.2 1.9" opacity=".85"/></svg>',
   // Wreckage hauled up off the floor and thrown back out the top.
-  chorus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.4" r="2.1"/><circle cx="4.6" cy="16" r="2.1"/><circle cx="19.4" cy="16" r="2.1"/><circle cx="12" cy="20.4" r="2.1" fill="currentColor" stroke="none"/><path d="M10.6 6.2 6 14M13.4 6.2 18 14M6.4 17.4l3.5 2.2M17.6 17.4l-3.5 2.2M12 6.5v11.8" opacity=".7"/></svg>',
+  spiral: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12.2a2.6 2.6 0 1 1 2.4-3.6 5.2 5.2 0 1 1-8.1 6.1 8.4 8.4 0 1 1 14.4-2.3"/><circle cx="12" cy="12.2" r="1" fill="currentColor" stroke="none"/><path d="M20.7 12.4 22 9.6M20.7 12.4l-2.9-.6" opacity=".8"/></svg>',
 };
 
 
@@ -331,147 +331,106 @@ class Decoy {
 }
 
 /**
- * SIPHON. Hauls every loose fragment on the field into the muzzle and throws
- * it back out as a volley, so the more wreckage there is the harder it hits.
- * A field you have just cleared has almost nothing to give, which is the
- * trade — and it is the one ability that competes with a GLUT for food.
- */
-/*
- * CHORUS. Every hostile on the field is tied to every other one for a few
- * seconds. Nothing happens on its own — the binding does no damage and holds
- * nothing in place. But the moment one of them comes apart, the rest feel it,
- * and on a crowded field one good shot walks all the way through the crowd
- * without another round being fired.
+ * SPIRAL. The barrel comes off its target and turns, firing all the way round.
  *
- * It is the only ability whose payoff is entirely in what the player does next.
+ * The one ability that is about the turret rather than the field. Every other
+ * entry in the bar does something somewhere else; this one takes the gun the
+ * player has spent the whole tree building and removes the single constraint
+ * on it, which is that it can only point one way at a time.
+ *
+ * It fires the loaded round through every upgrade that round carries, so it is
+ * nine different abilities depending on what is on the strip. It owns the aim
+ * while it runs -- Game.updateFiring stands down on `world.spiral` -- and
+ * hands it straight back, because a barrel left pointing wherever the sweep
+ * ended would be a worse gift than the sweep.
  */
-class Chorus {
+class Spiral {
   constructor(world) {
-    const P = CFG.chorus;
+    const P = CFG.spiral;
     this.t = 0;
+    this.life = P.life;
     this.dead = false;
-    this.bound = [];
-    const s = world.shooter;
-    const r2 = P.reach * P.reach;
-    for (const e of world.enemies) {
-      if (e.dead || e.staged || e.harmless) continue;
-      if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 > r2) continue;
-      this.bound.push(e);
-      if (this.bound.length >= P.maxBound) break;
-    }
-    // Remembered rather than read at the time: an echo is the size of what was
-    // lost, and by the time it is paid out the thing is already gone.
-    this.worth = new Map(this.bound.map((e) => [e, Math.min(P.cap, P.floor + (e.maxHp || e.hp) * P.share)]));
-    this.gen = new Map(); // how far out from the first death each one is
-    this.hops = 0;
-    this.arcs = []; // one short-lived line per echo, so the chain is watchable
-    this.linkT = 0;
-    this.links = [];
-    audio.ability('stasis');
+    this.from = world.shooter.aim;
+    this.next = 0;
+    this.rounds = 0;
+    world.spiral = P.life;
   }
 
   update(world, dt) {
-    const P = CFG.chorus;
+    const P = CFG.spiral;
+    const s = world.shooter;
     this.t += dt;
-    for (let i = this.arcs.length - 1; i >= 0; i--) {
-      this.arcs[i].t += dt;
-      if (this.arcs[i].t > 0.3) this.arcs.splice(i, 1);
+    this.life -= dt;
+    if (this.life <= 0) {
+      this.dead = true;
+      world.spiral = 0;
+      return;
     }
-    if (this.t >= P.life) { this.dead = true; return; }
+    world.spiral = this.life;
 
-    for (let i = this.bound.length - 1; i >= 0; i--) {
-      const e = this.bound[i];
-      if (!e.dead) continue;
-      this.bound.splice(i, 1);
-      // Taken by something else entirely — dissolved bodies were never killed,
-      // so they are not a death the rest of the choir should answer.
-      if (e.dissolved) { this.worth.delete(e); continue; }
-      const g = this.gen.get(e) || 0;
-      const echo = (this.worth.get(e) || 0) * P.falloff ** g;
-      this.worth.delete(e);
-      this.gen.delete(e);
-      if (echo <= 1 || !this.bound.length || this.hops >= P.hops) continue;
-      this.hops++;
+    /*
+     * The sweep owns the barrel. This runs in the effects pass, which is
+     * after shooter.update(), so whatever the assist did to the aim this
+     * frame is overwritten rather than fought with. `targetAim` goes with it,
+     * because `aimError` is a getter off the two and the slew would otherwise
+     * spend the whole sweep trying to correct back to a target -- and it is
+     * the field the assist reads to decide whether the barrel has arrived.
+     */
+    const k = this.t / P.life;
+    s.aim = this.from + k * P.turns * TAU + spread(P.wobble);
+    s.targetAim = s.aim;
 
-      // The few nearest, not everything. This is what makes it a chain rather
-      // than a field-wide detonation: it travels through whatever is packed
-      // together and stops where the crowd thins out.
-      const near = this.bound
-        .filter((o) => !o.dead && (o.x - e.x) ** 2 + (o.y - e.y) ** 2 <= P.link * P.link)
-        .sort((a, b) => ((a.x - e.x) ** 2 + (a.y - e.y) ** 2) - ((b.x - e.x) ** 2 + (b.y - e.y) ** 2))
-        .slice(0, P.spread);
-      for (const o of near) {
-        o.hp -= echo;
-        o.flash = 1;
-        this.gen.set(o, g + 1);
-        this.arcs.push({ x1: e.x, y1: e.y, x2: o.x, y2: o.y, t: 0 });
-        spark(o.x, o.y, rand(-90, 90), rand(-90, 90), '#c9a7ff', 0.3, 2);
-        if (o.hp <= 0) o.dead = true; // and its own echo lands next frame
-      }
-      if (!near.length) continue;
-      ring(e.x, e.y, 8, 120, 0.28, '#c9a7ff', 2.2);
-      shake(1.6);
-      audio.pop(1.2);
+    this.next -= dt;
+    // `while` rather than `if`: a long frame owes more than one round, and
+    // dropping them would make the sweep quietly weaker on a slow phone.
+    let guard = 8;
+    while (this.next <= 0 && guard-- > 0) {
+      this.next += P.interval;
+      s.cooldown = 0;
+      if (s.shoot(world, P.damage)) this.rounds++;
     }
   }
 
-  /**
-   * Who an echo would reach from where. Recomputed a few times a second rather
-   * than every frame — forty bodies is sixteen hundred distance checks, and
-   * the shape does not change fast enough to be worth that at 60fps.
-   */
-  relink() {
-    const P = CFG.chorus;
-    const live = this.bound.filter((e) => !e.dead);
-    this.links = [];
-    for (const a of live) {
-      let best = null;
-      let bd = P.link * P.link;
-      for (const b of live) {
-        if (b === a) continue;
-        const d = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
-        if (d < bd) { bd = d; best = b; }
-      }
-      if (best) this.links.push([a, best]);
-    }
-  }
-
-  draw(ctx) {
-    const P = CFG.chorus;
-    this.linkT -= 1 / 60;
-    if (this.linkT <= 0) { this.linkT = 0.25; this.relink(); }
-    // Fades in over the first beat and out over the last, so the field is not
-    // suddenly webbed and suddenly bare.
-    const k = Math.min(1, this.t / 0.35) * Math.min(1, (P.life - this.t) / 0.9);
-    const pulse = 0.5 + 0.5 * Math.sin(this.t * 5);
+  draw(ctx, world) {
+    const P = CFG.spiral;
+    const s = world.shooter;
+    const k = clamp(this.life / P.life, 0, 1);
+    // Fades in over the first fifth and out over the last, so it never
+    // appears or vanishes on a frame.
+    const fade = Math.min(1, this.t / 0.18) * Math.min(1, this.life / 0.5);
+    const TONE = '#ff7a1a';
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-
-    // What is tied to what: each bound body to its nearest, so the picture is
-    // the shape of the crowd and you can see where a chain would stop.
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = rgba('#c9a7ff', 0.26 * k * (0.55 + 0.45 * pulse));
-    ctx.beginPath();
-    for (const [a, b] of this.links) {
-      if (a.dead || b.dead) continue;
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-    }
-    ctx.stroke();
-    for (const e of this.bound) {
-      if (!e.dead) drawGlow(ctx, '#c9a7ff', e.x, e.y, e.r * 1.5, 0.2 * k);
-    }
-
-    // And the chain actually travelling, one bright line per echo paid.
-    for (const a of this.arcs) {
-      const f = 1 - a.t / 0.3;
-      ctx.lineWidth = 1 + 2.2 * f;
-      ctx.strokeStyle = rgba('#e6d6ff', 0.9 * f);
+    drawGlow(ctx, TONE, s.x, s.y, 120 + (1 - k) * 50, 0.22 * fade);
+    /*
+     * A tail behind the barrel rather than a ring around the turret.
+     *
+     * The first draft drew two thin arcs at a fixed radius and they were
+     * invisible against the turret's own furniture -- the aim ray, the lever,
+     * the corruption ring all live in the same sixty pixels. This is the
+     * swept arc itself: a wedge trailing the barrel, brightest at the muzzle
+     * and falling off behind, so what is drawn is the ground the gun has just
+     * covered. It also spirals outward with the sweep, which is the name.
+     */
+    const head = s.aim;
+    const tail = 2.4; // radians of sweep still shown behind the barrel
+    const STEPS = 22;
+    for (let i = 0; i < STEPS; i++) {
+      const f = i / STEPS;
+      const a0 = head - f * tail;
+      const rr = 54 + f * 26 + (1 - k) * 30;
+      const w = (1 - f) ** 1.4;
+      ctx.strokeStyle = rgba(TONE, 0.5 * w * fade);
+      ctx.lineWidth = 1 + 5 * w;
       ctx.beginPath();
-      ctx.moveTo(a.x1, a.y1);
-      ctx.lineTo(a.x2, a.y2);
+      ctx.arc(s.x, s.y, rr, a0 - tail / STEPS * 1.6, a0);
       ctx.stroke();
     }
+    // The leading edge, where the rounds are actually leaving.
+    const lx = s.x + Math.cos(head) * 62;
+    const ly = s.y + Math.sin(head) * 62;
+    drawGlow(ctx, '#ffd9a0', lx, ly, 30, 0.5 * fade);
+    drawGlow(ctx, '#ffd9a0', s.muzzleX, s.muzzleY, 26, 0.45 * fade);
     ctx.restore();
   }
 }
@@ -741,17 +700,18 @@ export const ABILITIES = [
     },
   },
   {
-    id: 'chorus',
-    show: 1.0, // seconds this is worth watching -- see Hud.recede()
-    name: 'CHORUS',
-    color: '#92f24e',
-    cooldown: 15,
-    icon: ICON.chorus,
-    hint: 'CHORUS — ties the field together. Whatever kills one hurts the rest.',
+    id: 'spiral',
+    show: 3.5, // the whole sweep -- see Hud.recede()
+    name: 'SPIRAL',
+    color: '#ff7a1a',
+    cooldown: 20,
+    icon: ICON.spiral,
+    hint: 'SPIRAL — the barrel comes off its target and turns, firing all the way round.',
     run(world) {
-      world.effects.push(new Chorus(world));
-      ring(world.shooter.x, world.shooter.y, 20, 520, 0.55, '#c9a7ff', 3);
-      shake(4);
+      world.effects.push(new Spiral(world));
+      ring(world.shooter.x, world.shooter.y, 16, 220, 0.4, '#ff7a1a', 3);
+      shake(3);
+      audio.ability('lance');
     },
   },
 ];

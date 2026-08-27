@@ -154,8 +154,13 @@ export class Shooter {
     return this.cooldown <= 0;
   }
 
-  /** One shot of whatever is loaded. Returns true if it actually went out. */
-  shoot(world) {
+  /**
+   * One shot of whatever is loaded. Returns true if it actually went out.
+   *
+   * @param scale a multiplier on the round's damage. SPIRAL fires mid-sweep
+   *   at less than a placed shot is worth; everything else leaves it at 1.
+   */
+  shoot(world, scale = 1) {
     if (!this.canFire()) return false;
     const a = this.aim + spread(0.012);
     const slow = 1;
@@ -167,7 +172,7 @@ export class Shooter {
     const shot = (angle, opts) => fire(world, this.muzzleX, this.muzzleY, angle, {
       ...opts,
       speed: (opts.speed || CFG.bolt.speed) * up.speed,
-      damage: (opts.damage ?? CFG.bolt.damage) * up.damage
+      damage: (opts.damage ?? CFG.bolt.damage) * up.damage * scale
         * (world.autoSteering || world.autoFire ? up.overwatch : 1),
       impulse: (opts.impulse ?? CFG.bolt.impulse) * up.impulse,
       bounces: (opts.bounces ?? CFG.bolt.bounces) + up.bounces,

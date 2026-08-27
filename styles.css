@@ -2184,7 +2184,11 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
 #abilities {
   transition: opacity 0.34s ease;
 }
-body.recede #quickBar,
+/* `recedeStrip` is the strip alone -- what an ability press asks for, because
+   the ability bar is the thing being read at that moment. `recede` adds the
+   ability bar and is for the beats nobody is pressing through: an arrival, a
+   stage turning over. */
+body.recedeStrip #quickBar,
 body.recede #abilities {
   opacity: 0.14;
   /* Out fast, back slowly: the effect it is clearing for has already
@@ -2192,7 +2196,7 @@ body.recede #abilities {
   transition: opacity 0.11s ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
-  body.recede #quickBar,
+  body.recedeStrip #quickBar,
   body.recede #abilities { opacity: 0.45; transition: none; }
 }
 
