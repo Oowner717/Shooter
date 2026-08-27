@@ -76,6 +76,33 @@ export class Game {
     this.resize();
     this.reset();
     this.world.phase = 'boot'; // the title screen runs over a live arena
+    this.seedTitleField();
+  }
+
+  /**
+   * What falls behind the title.
+   *
+   * `phase = 'boot'` has said "the title screen runs over a live arena" since
+   * the first build and the arena was empty: a substrate, a parallax dust
+   * field and nothing else, so a game whose whole identity is a simulation
+   * running opened on a still page. Measured, 2.6% of the sampled pixels
+   * changed over a second and a fifth of that was the dust.
+   *
+   * DRIFT and only DRIFT. It is the one harmless type -- grey, worth energy,
+   * ignored by the assist -- so nothing here is a fight going on without a
+   * player, and the two opening lines about grey being a promise are being
+   * demonstrated before either is said. They are staggered up the field at
+   * birth rather than released together, or the title opens on a curtain
+   * coming down in one piece.
+   */
+  seedTitleField(n = 7) {
+    const w = this.world;
+    for (let i = 0; i < n; i++) {
+      const e = spawnDrift(w);
+      // Spread up the field and a little past the top, so the first frame is
+      // the middle of something rather than the start of it.
+      if (e) e.y = ENTRY_Y - 120 + (i / n) * (w.floorY - ENTRY_Y) * 0.92;
+    }
   }
 
   // --------------------------------------------------------------- world
@@ -700,6 +727,10 @@ export class Game {
     const res = w.abilities.trigger(w, i);
     if (!res) return;
     this.hud.flashAbility(i);
+    // ...and the furniture gets out of the way while it happens. Everything
+    // an ability draws is a circle on the turret and the turret sits behind
+    // the controls; see Hud.recede().
+    this.hud.recede(res.slot.def.show ?? 0.9);
     // An ability says what it is the first time it is used, which is minutes
     // after it was bought and only if the player actually reaches for it.
     // ...and once on this device: `res.first` is per-run, so without this an
@@ -1035,6 +1066,10 @@ export class Game {
     // teaching changes, so the two can never drift apart.
     w.teaching = this.teaching;
     if (this.teaching && w.phase === 'staging') this.teach();
+
+    // The title's field, topped up as it falls off the bottom. Only while the
+    // title is up: from `staging` on, the director owns what is on the field.
+    if (w.phase === 'boot' && driftCount(w) < 7) spawnDrift(w);
 
     // ---- status timers ----
     w.stasis = Math.max(0, w.stasis - dt);

@@ -101,6 +101,7 @@ export class Hud {
     this.slots = [];
     this.alerts = [];
     this.hintTimer = 0;
+    this.recedeT = 0; // seconds the strip and the ability bar stay out of the way
     this.tutLines = []; // the opening's band keeps the line before
     this.lastKills = -1;
     this.lastGoal = -1;
@@ -724,6 +725,10 @@ export class Hud {
         a.el.classList.add('fade');
       }
     }
+    if (this.recedeT > 0) {
+      this.recedeT -= dt;
+      if (this.recedeT <= 0) document.body.classList.remove('recede');
+    }
     if (this.hintTimer > 0) {
       this.hintTimer -= dt;
       // The band going dark ends the stack: the next line after a silence
@@ -738,6 +743,37 @@ export class Hud {
   clearAlerts() {
     for (const a of this.alerts) a.el.remove();
     this.alerts.length = 0;
+  }
+
+  // ----------------------------------------------------------------- recede
+
+  /**
+   * Take the strip and the ability bar down to a whisper for a moment.
+   *
+   * The controls are fixed furniture across the bottom third of the screen,
+   * and everything the turret emits is a circle centred on the turret, which
+   * sits at 60-70% of the way down. The two overlap badly and it is worse on
+   * a bigger phone, because the furniture is a fixed height while the field
+   * grows: measured across three handsets, PRISM's burst is 25/54/54% behind
+   * a control, SNARE's pull the same, DECOY's blast 34/52/49%, and TERMINUS's
+   * boundary -- a ring closed around the turret for the whole fight -- is
+   * 40/51/47%. Half of the last boss in the game was behind four buttons.
+   *
+   * So the furniture gets out of the way on the beats where something big is
+   * being drawn and nothing is being pressed: an ability going off, a boss
+   * arriving, a stage turning over, a boss dying. It stays touchable the
+   * whole time -- a panic PULSE during a recede still fires, because the
+   * button is faint rather than gone.
+   */
+  recede(seconds = 0.9) {
+    this.recedeT = Math.max(this.recedeT || 0, seconds);
+    document.body.classList.add('recede');
+  }
+
+  /** Put it back now, whatever is left on the clock. */
+  unrecede() {
+    this.recedeT = 0;
+    document.body.classList.remove('recede');
   }
 
   // ------------------------------------------------------------------ debug
@@ -1182,7 +1218,11 @@ export class Hud {
     this.syncApertures(world);
 
     if (bar.hidden !== !boss) bar.hidden = !boss;
-    if (!boss) { this._bossSeen = null; this._bossGhost = null; this._bossShells = 0; return; }
+    if (!boss) {
+      this._bossSeen = null; this._bossGhost = null; this._bossShells = 0;
+      this._bossArriving = false;
+      return;
+    }
 
     /*
      * Everything below comes off the boss's own gauge() and nothing off
@@ -1198,6 +1238,14 @@ export class Hud {
     }
 
     this.el.bossCore.classList.toggle('arriving', g.arriving);
+    /*
+     * The two beats of a fight where the screen is the point and nothing is
+     * being pressed: the arrival, and each stage turning over. Both hold the
+     * recede open a beat at a time rather than setting it once, because an
+     * arrival runs for several seconds and the timer counts down through it.
+     */
+    if (g.arriving) this.recede(0.5);
+    this._bossArriving = g.arriving;
     this.el.bossFill.style.transform = `scaleX(${g.core.toFixed(3)})`;
     /*
      * The ghost only ever falls, and it falls late. It holds where the health
@@ -1253,6 +1301,9 @@ export class Hud {
     }
 
     if (this._bossSeen !== g.phase) {
+      // A stage turning over changes the sky, the gauge and usually the shape
+      // of the thing you are shooting at. Worth a second of clear screen.
+      if (this._bossSeen !== null) this.recede(1.4);
       this._bossSeen = g.phase;
       this.el.bossPhase.textContent = g.phase;
     }

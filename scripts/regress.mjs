@@ -1536,6 +1536,253 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- nothing live is on screen behind a full-screen screen ------------------
+/*
+ * `body.booting` and `body.ending` each carried a list of the live HUD and
+ * `{ opacity: 0; pointer-events: none }`. The last selector in both lists was
+ * `#toggleRack`, and the build that replaced the toggle rack with a menu
+ * deleted the element and the declaration block with it, leaving a bare
+ * `body.booting` dangling before a comment. The parser then ran the two lists
+ * together and fed them the NEXT rule's block, so:
+ *
+ * the whole live HUD then painted at full strength behind the title screen --
+ * MINES, FIRE and AMMO are legible through the briefing copy, which reads as
+ * a rendering fault on the first thing anybody sees. Invisible for as long as
+ * nobody screenshotted it.
+ *
+ * Only `booting` is asserted. The `ending` half of the rule is inert: there
+ * is no #endScreen element in the game any more and nothing sets the class,
+ * so a green check on it would be measuring nothing -- the same trap the
+ * colour parser below fell into.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const o = (id) => {
+      const el = document.getElementById(id);
+      return el ? +getComputedStyle(el).opacity : null;
+    };
+    const live = ['topbar', 'abilities', 'quickBar'];
+    const was = document.body.className;
+    document.body.className = 'booting';
+    const hit = getComputedStyle(document.getElementById('abilities')).pointerEvents;
+    /*
+     * Waited out, not sampled on the spot. The recede added a 0.34s opacity
+     * transition to #quickBar and #abilities, so getComputedStyle right after
+     * the class change returns the value the transition started from -- 1 --
+     * and the first draft of this read two of the three as still painting
+     * when the rule was applying correctly the whole time.
+     */
+    await new Promise((res) => setTimeout(res, 500));
+    const booting = Object.fromEntries(live.map((id) => [id, o(id)]));
+    document.body.className = was;
+    await new Promise((res) => setTimeout(res, 500));
+    const after = Object.fromEntries(live.map((id) => [id, o(id)]));
+    return { booting, after, hit };
+  });
+  check('the live HUD is not painting behind the title screen',
+    Object.values(r.booting).every((v) => v === 0) && r.hit === 'none'
+    && Object.values(r.after).every((v) => v === 1),
+    `booting ${JSON.stringify(r.booting)} (pointer-events ${r.hit}), `
+    + `in play ${JSON.stringify(r.after)}`);
+}
+
+// --- the title screen is a running simulation, not a page -------------------
+/*
+ * `phase = 'boot'` has been commented "the title screen runs over a live
+ * arena" since the first build, and the arena was empty: substrate, parallax
+ * dust, nothing else. Sampled a ninth of the canvas twice 1.2s apart, 2.6% of
+ * it changed. DRIFT and only DRIFT falls through it now -- the one harmless
+ * type, so nothing on the title is a fight happening without a player, and
+ * the two opening lines about grey being a promise are demonstrated before
+ * either is said.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { driftCount, hostileCount } = await import('../src/enemies.js');
+    const w = g.world;
+    g.restart();
+    w.phase = 'boot';
+    for (const e of [...w.enemies]) e.dead = true;
+    w.enemies.length = 0;
+    // The top-up rides in update(), so a boot frame has to actually be run.
+    for (let i = 0; i < 60; i++) g.update(1 / 60);
+    const drift = driftCount(w);
+    const hostile = hostileCount(w);
+    // ...and it stops the moment the run starts: from staging the director
+    // owns what is on the field.
+    w.phase = 'staging';
+    for (const e of [...w.enemies]) e.dead = true;
+    w.enemies.length = 0;
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (let i = 0; i < 30; i++) g.update(1 / 60);
+    const afterStart = w.enemies.filter((e) => !e.dead).length;
+    g.restart();
+    return { drift, hostile, afterStart };
+  });
+  check('the title screen has something falling through it, and only DRIFT',
+    r.drift >= 5 && r.hostile === 0 && r.afterStart === 0,
+    `${r.drift} drift, ${r.hostile} hostile on the title; `
+    + `${r.afterStart} seeded after the run starts`);
+}
+
+// --- the strip and the ability bar are glass, and still legible -------------
+/*
+ * The controls own the bottom third of the screen and everything the turret
+ * emits is a circle centred on the turret, which sits 60-70% of the way down
+ * it -- and worse on a bigger phone, because the furniture is a fixed height
+ * while the field grows. Measured on SE / 13 / Pro Max: PRISM's burst is
+ * 25/54/54% behind a control, SNARE's pull the same, DECOY's blast 34/52/49%
+ * and TERMINUS's boundary -- a ring around the turret for a whole fight --
+ * 40/51/47%. Half of the last boss in the game was behind four buttons.
+ *
+ * Two things answer it and both are asserted here. The panels went from
+ * 86-92% opaque to 72-80%, so the field reads through them at all times; and
+ * a beat where something big is drawn takes them down to a whisper. The
+ * transparency is the part that can silently regress into unreadable, so the
+ * labels are measured composited over the brightest sky the game ever paints
+ * rather than over the menu's dark ground.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { ANOMALIES, ORDINAL_MOODS } = await import('../src/anomaly.js');
+    /*
+     * Three notations, because the first draft parsed one and silently
+     * measured almost nothing.
+     *
+     *  - hex, because the boss skies are authored as hex. Parsing only
+     *    rgba() found zero skies and let the dark default stand in as "the
+     *    worst ground" -- a passing test over a measurement that had not
+     *    happened.
+     *  - color(srgb r g b), because every label on the strip takes its
+     *    colour from `color-mix(in srgb, var(--tone) 58%, var(--dim))` and
+     *    Chromium serialises that as color(srgb ...) with 0..1 floats, not
+     *    as rgb(). Fifteen of the twenty-three cells were being skipped, so
+     *    the case read the eight ability labels and called that the strip.
+     *    (The menu's own floor above is unaffected -- checked: all 105 of
+     *    its nodes serialise as rgb().)
+     *  - rgb()/rgba(), which is everything else.
+     */
+    const px = (str) => {
+      const t = String(str).trim();
+      const h = t.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+      if (h) {
+        const v = h[1].length === 3 ? h[1].split('').map((c) => c + c).join('') : h[1];
+        return { r: parseInt(v.slice(0, 2), 16), g: parseInt(v.slice(2, 4), 16),
+          b: parseInt(v.slice(4, 6), 16), a: 1 };
+      }
+      const c = t.match(/^color\(srgb\s+([^)]+)\)/i);
+      if (c) {
+        const [r2, g2, b2, a] = c[1].split(/[\s/]+/).filter(Boolean).map(Number);
+        return { r: r2 * 255, g: g2 * 255, b: b2 * 255, a: a === undefined ? 1 : a };
+      }
+      const m = t.match(/rgba?\(([^)]+)\)/);
+      if (!m) return null;
+      const [r2, g2, b2, a] = m[1].split(',').map(Number);
+      return { r: r2, g: g2, b: b2, a: a === undefined ? 1 : a };
+    };
+    const over = (fg, bg) => ({
+      r: fg.r * fg.a + bg.r * (1 - fg.a),
+      g: fg.g * fg.a + bg.g * (1 - fg.a),
+      b: fg.b * fg.a + bg.b * (1 - fg.a), a: 1 });
+    const lin = (v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+    const L = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+    const cr = (x, y) => { const a = L(x); const b = L(y);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+
+    /*
+     * The worst ground a control ever sits on. Every boss rotates the sky
+     * onto its own hue across four stages, so the brightest `mid` of the lot
+     * is the case to measure -- not the dark staging sky the controls were
+     * designed against.
+     */
+    const skies = [...ORDINAL_MOODS, ...ANOMALIES.flatMap((a) => a.moods || [])]
+      .filter(Boolean).map((m) => px(m.mid) || px(m.top)).filter(Boolean);
+    let ground = { r: 5, g: 8, b: 15, a: 1 };
+    for (const c of skies) if (L(c) > L(ground)) ground = { ...c, a: 1 };
+
+    const bad = [];
+    let seen = 0;
+    /*
+     * The case sets its own state up. Run on whatever an earlier case left
+     * behind it read nine cells out of twenty-three -- a restart empties the
+     * loadout and a folded stack hides its own -- and nine cells passing is
+     * not the strip passing.
+     */
+    const { setPref } = await import('../src/settings.js');
+    window.__sim.debugTeachAll();
+    setPref('showMines', 1); setPref('showAmmo', 1);
+    window.__sim.hud.syncFolds();
+    const cells = [...document.querySelectorAll('.qc, #abilities .ab')];
+    for (const el of cells) {
+      const q = el.getBoundingClientRect();
+      if (!(q.height > 0)) continue;
+      // The button's own painted panel, composited onto that sky.
+      let bg = ground;
+      for (const e of [el]) {
+        const cs = getComputedStyle(e);
+        // The panel is a gradient; take its darkest declared stop, which is
+        // the end a label most often sits over.
+        const stops = [...cs.backgroundImage.matchAll(/rgba?\([^)]+\)/g)].map((m) => px(m[0]));
+        const c = stops.length ? stops.reduce((a, b) => (L(a) < L(b) ? a : b)) : px(cs.backgroundColor);
+        if (c && c.a > 0) bg = over(c, bg);
+      }
+      const wk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = wk.nextNode())) {
+        const txt = n.nodeValue.trim();
+        if (!txt) continue;
+        const cs = getComputedStyle(n.parentElement);
+        const fg = px(cs.color);
+        if (!fg || fg.a === 0) continue;
+        seen++;
+        const size = parseFloat(cs.fontSize);
+        const ratio = cr(over(fg, bg), bg);
+        if (size < 11 || ratio < 4.5) bad.push(`${txt.slice(0, 10)}@${size}px:${ratio.toFixed(2)}`);
+      }
+    }
+    return { seen, bad, ground: `rgb(${Math.round(ground.r)},${Math.round(ground.g)},${Math.round(ground.b)})`,
+      skies: skies.length, cells: cells.length };
+  });
+  check('every word on the strip and the ability bar clears 11px and 4.5:1 on the worst sky',
+    r.bad.length === 0 && r.seen >= 20,
+    `${r.seen} read over ${r.ground} (brightest of ${r.skies} boss skies); failing: ${r.bad.slice(0, 6)}`
+    + ` | ${r.seen} words across ${r.cells} cells`);
+}
+
+// --- ...and the furniture gets out of the way on the beats ------------------
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const opacity = () => ({
+      strip: +getComputedStyle(document.getElementById('quickBar')).opacity,
+      abs: +getComputedStyle(document.getElementById('abilities')).opacity,
+    });
+    g.hud.unrecede();
+    const before = opacity();
+    // An ability going off is a beat, and it is the ability's own `show`,
+    // not its cooldown: FAN is over before the pellets land, WELL drags.
+    g.useAbility(0);
+    const held = g.hud.recedeT;
+    const cls = document.body.classList.contains('recede');
+    // ...and it is still pressable while it is faint. A recede that took the
+    // controls away would be worse than the occlusion it is fixing.
+    const ab = document.querySelector('#abilities .ab');
+    const hittable = getComputedStyle(ab).pointerEvents !== 'none';
+    // The clock runs it out on its own.
+    g.hud.updateAlerts(99);
+    const after = { cls: document.body.classList.contains('recede'), t: g.hud.recedeT };
+    g.hud.unrecede();
+    return { before, held, cls, hittable, after,
+      shows: (await import('../src/abilities.js')).ABILITIES.map((a) => a.show) };
+  });
+  check('a beat takes the strip and the ability bar down, and they come back',
+    r.cls && r.held > 0 && r.hittable && !r.after.cls
+    && r.before.strip === 1 && r.shows.every((v) => v > 0 && v < 4),
+    `held ${r.held}s, still pressable ${r.hittable}, back afterwards ${!r.after.cls}, `
+    + `durations ${r.shows.join('/')}`);
+}
+
 // --- the TITHE mark is on the screen, and it deepens ------------------------
 /*
  * `marks` drove this round's whole ramp from the day it shipped -- the damage

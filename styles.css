@@ -1534,7 +1534,15 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
   height: 36px;
   padding: 0 8px;
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(10, 18, 32, 0.86), rgba(4, 8, 15, 0.92));
+  /*
+   * Glass, not a panel. These were 86-92% opaque, which is a wall: TERMINUS's
+   * boundary is a ring around the turret for the whole fight and half of it
+   * was simply not on the screen. At 72-80% over a 6px backdrop blur the ring
+   * arrives as a soft band through the control rather than as nothing, and
+   * the labels still clear 4.5:1 over the brightest boss sky in the game --
+   * which is asserted, not assumed, in scripts/regress.mjs.
+   */
+  background: linear-gradient(180deg, rgba(10, 18, 32, 0.72), rgba(4, 8, 15, 0.8));
   color: var(--dim);
   overflow: hidden;
   position: relative;
@@ -1565,7 +1573,7 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
 .qc:not(.sealed) {
   color: color-mix(in srgb, var(--tone, var(--accent)) 58%, var(--dim));
   border-color: color-mix(in srgb, var(--tone, var(--accent)) 34%, transparent);
-  background: linear-gradient(180deg, rgba(13, 24, 42, 0.88), rgba(5, 10, 19, 0.92));
+  background: linear-gradient(180deg, rgba(13, 24, 42, 0.74), rgba(5, 10, 19, 0.8));
 }
 .qc:not(.sealed) .qLbl { opacity: 1; }
 
@@ -1636,7 +1644,7 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
    */
   border: 1px solid color-mix(in srgb, currentColor 36%, var(--line));
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(12, 22, 38, 0.86), rgba(5, 9, 16, 0.9));
+  background: linear-gradient(180deg, rgba(12, 22, 38, 0.72), rgba(5, 9, 16, 0.78));
   color: var(--ink);
   display: flex;
   flex-direction: column;
@@ -2161,20 +2169,66 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
   color: #7d90a6;
 }
 
+/* ---------------- the furniture gets out of the way ---------------- */
+/*
+ * See Hud.recede(). The strip and the ability bar own the bottom third of the
+ * screen and everything the turret emits is a circle centred on the turret,
+ * which sits at 60-70% of the way down it. On a beat where something big is
+ * being drawn, both go to a whisper and come back over a third of a second.
+ *
+ * `pointer-events` is deliberately NOT dropped. A recede runs for under a
+ * second and the player may want PULSE inside it; the button is faint, not
+ * gone, and it is in the place their thumb already knows.
+ */
+#quickBar,
+#abilities {
+  transition: opacity 0.34s ease;
+}
+body.recede #quickBar,
+body.recede #abilities {
+  opacity: 0.14;
+  /* Out fast, back slowly: the effect it is clearing for has already
+     started, and the way back should not pull the eye off it. */
+  transition: opacity 0.11s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.recede #quickBar,
+  body.recede #abilities { opacity: 0.45; transition: none; }
+}
+
 /* ---------------- end ---------------- */
 
+/*
+ * The live HUD, while a full-screen screen is up.
+ *
+ * Both of these lists used to end in a fourth selector, `#toggleRack`, and
+ * that element was removed in the build that replaced it with the menu. The
+ * removal took `{ opacity: 0; pointer-events: none }` with it and left the
+ * bare `body.ending` / `body.booting` dangling, so the parser ran the two
+ * lists together and fed them the NEXT rule's block -- #endScreen's. The
+ * whole live HUD then painted at full strength behind the title screen: the
+ * strip, the ability bar and the top chips are all legible through the
+ * briefing copy, which reads as a rendering fault on the first thing anybody
+ * sees.
+ *
+ * The `body.ending` half is kept but is currently inert -- there is no
+ * #endScreen element anywhere in the game any more and nothing sets the
+ * class, though `world.phase === 'ending'` is still a real phase. Everything
+ * below tagged #endScreen / #endText / #resetBtn is orphaned with it.
+ */
 body.ending #topbar,
 body.ending #abilities,
 body.ending #alerts,
 body.ending #bossBar,
 body.ending #abilityHint,
 body.ending #quickBar,
-body.ending 
 /* Same treatment while the title screen is up: none of it is live yet. */
 body.booting #topbar,
 body.booting #abilities,
-body.booting #quickBar,
-body.booting 
+body.booting #quickBar {
+  opacity: 0;
+  pointer-events: none;
+}
 
 /*
  * Same clipping trap as the boot screen: a column flex centred with
