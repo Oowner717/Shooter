@@ -4841,7 +4841,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * goal had been meaningless since build 81 — every run is endless — but it
    * survived on an accident: `endless` stopped being written to the save in
    * build 100 because nothing read it back, and this was the one thing still
-   * reading it. Absent field, falsy, goal printed.
+   * reading it. Absent field, falsy, goal printed. The flag and CFG.killGoal
+   * both went in build 186; this case is what stops the label coming back.
    */
   const label = await page.evaluate(() => {
     const g = window.__sim;

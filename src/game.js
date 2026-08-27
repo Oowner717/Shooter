@@ -149,7 +149,7 @@ export class Game {
       time: 0,
       timeScale: 1,
       kills: 0,
-      released: 0, // hostile objects let out so far; capped at CFG.killGoal
+      released: 0, // hostile objects let out so far; counted, not capped
       phase: 'boot', // boot | staging
 
       enemies: [],
@@ -212,10 +212,6 @@ export class Game {
        * the cards are gone and the record is not.
        */
       ledger: [],
-      // Always true from build 81. Kept as a field because the director, the
-      // counter and the save all read it, and a constant threaded through
-      // four modules is worse than a flag that is simply never false.
-      endless: true,
       // What the first run has handed over so far. Every strip cell and every
       // ability button is on screen from the start; only what is in here can
       // actually be pressed. Full on any run after the opening.
@@ -374,11 +370,17 @@ export class Game {
     w.up = freshUpgrades();
     w.ledger.length = 0;
     this.loadoutOpen = null;
-    // Every run is endless as of build 81. There is no five hundred to reach,
-    // no lull, no ORDINAL and no ending — the field simply keeps coming, and
-    // the run is however long you keep playing it. It used to be the state a
-    // player earned by beating the boss once; it is the whole game now.
-    w.endless = true;
+    /*
+     * There is no five hundred to reach, no lull and no ending: the field keeps
+     * coming and the run is however long you keep playing it.
+     *
+     * `w.endless` was the flag that said so, and it was written true here and
+     * never anywhere else. Every reader was a ternary that could only pick one
+     * branch -- the release quota, the counter's goal, the phase label -- so
+     * the flag, `CFG.killGoal` and `releasesLeft()` all went in build 186. A
+     * constant threaded through four modules is worse than a flag that is
+     * never false, and a flag that is never false is worse than neither.
+     */
     this.scriptStep = 0;
     // World time at which the line now up has had its reading time. Nothing
     // else in the opening moves until it passes; the first line is due at
@@ -442,9 +444,8 @@ export class Game {
     this.saveTimer = SAVE_EVERY;
     this.resetShown = false;
     this.hud.clearAlerts();
-    this.hud.setKills(0, w.endless ? null : CFG.killGoal);
+    this.hud.setKills(0);
     this.hud.setEnergy(0);
-    this.hud.setPhase(w.endless ? 'FIELD' : 'STAGING');
     background.setDread(0);
     this.hud.syncAbilities(w.abilities);
   }
@@ -558,7 +559,7 @@ export class Game {
     for (const k of MINE_KEYS) this.hud.setToggle(k, w.mine === k);
     this.hud.setAim(w);
     this.hud.setToggle('autoFire', w.autoFire);
-    this.hud.setKills(w.kills, w.endless ? null : CFG.killGoal);
+    this.hud.setKills(w.kills);
     this.hud.setEnergy(w.energy);
     this.hud.syncAbilities(w.abilities);
     this.hud.alert('SESSION RESTORED', 'info', 2.6);
@@ -2099,8 +2100,9 @@ export class Game {
   debugAddKills(n) {
     const w = this.world;
     for (let i = 0; i < n && w.phase === 'staging'; i++) {
-      // keep the release quota in step, or the director would keep spawning
-      w.released = Math.min(CFG.killGoal, w.released + 1);
+      // A debug kill is a body that was released, so the count the debug
+      // readout and the save both show moves with it.
+      w.released += 1;
       this.registerKill();
     }
   }

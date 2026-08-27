@@ -54,7 +54,6 @@ export const ANOMALIES = [
 ];
 
 export const ANOMALY_BY_N = new Map(ANOMALIES.map((a) => [a.n, a]));
-export const ANOMALY_BY_KEY = new Map(ANOMALIES.map((a) => [a.key, a]));
 
 /**
  * Just the colours, in order. The tree paints ANOMALY's heading with all

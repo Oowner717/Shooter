@@ -123,8 +123,6 @@ html, body {
 }
 #menuBtn { flex: 0 0 auto; margin-left: auto; }
 
-.spacer { flex: 1; }
-
 .chip {
   position: relative;
   font-size: 12px;
@@ -147,8 +145,6 @@ html, body {
   letter-spacing: 0.18em;
   margin-left: 6px;
 }
-
-.chip .dim { color: var(--dim); }
 
 /*
  * Banked salvage. It sits beside the count because for the whole first run
@@ -1075,14 +1071,6 @@ html, body {
 }
 .menuKey p { font-size: 8.5px; line-height: 1.55; color: var(--dim); }
 
-.menuNote {
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
-  color: #45566a;
-  margin-top: 8px;
-}
-.menuNote.dim { color: #2f3d4c; }
-
 /* ---------------- object glossary ---------------- */
 
 .codexGrid,
@@ -1156,8 +1144,6 @@ body.menuOpen #alerts,
 body.menuOpen #bossCaption { opacity: 0.25; transition: opacity 0.2s ease; }
 body.menuOpen #abilities,
 body.menuOpen #quickBar { pointer-events: none; }
-
-.pendingText { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 
 
 /*
@@ -2189,7 +2175,7 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
 
 /* ---------------- boot ---------------- */
 
-#boot, #endScreen {
+#boot {
   position: absolute;
   inset: 0;
   display: flex;
@@ -2220,7 +2206,7 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
   padding-bottom: calc(var(--safe-b) + 12px);
 }
 .bootInner { margin-block: auto; }
-#boot[hidden], #endScreen[hidden] { display: none; }
+#boot[hidden] { display: none; }
 
 #boot.out { animation: bootOut 0.5s ease-in forwards; }
 @keyframes bootOut { to { opacity: 0; transform: scale(1.06); filter: blur(6px); } }
@@ -2277,7 +2263,7 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
   margin-right: 8px;
 }
 
-#startBtn, #resetBtn, #resumeBtn {
+#startBtn, #resumeBtn {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
@@ -2290,7 +2276,7 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
   color: var(--accent);
   text-shadow: 0 0 12px rgba(89, 224, 255, 0.6);
 }
-#startBtn:active, #resetBtn:active, #resumeBtn:active { background: rgba(89, 224, 255, 0.3); }
+#startBtn:active, #resumeBtn:active { background: rgba(89, 224, 255, 0.3); }
 
 /* CONTINUE is the primary when there is something to continue: it carries the
    count, so it reads as "your run" rather than as a second start button. BEGIN
@@ -2408,103 +2394,29 @@ body.recede #abilities {
   body.recede #abilities { opacity: 0.45; transition: none; }
 }
 
-/* ---------------- end ---------------- */
-
 /*
- * The live HUD, while a full-screen screen is up.
+ * The live HUD, while the title screen is up.
  *
- * Both of these lists used to end in a fourth selector, `#toggleRack`, and
- * that element was removed in the build that replaced it with the menu. The
- * removal took `{ opacity: 0; pointer-events: none }` with it and left the
- * bare `body.ending` / `body.booting` dangling, so the parser ran the two
- * lists together and fed them the NEXT rule's block -- #endScreen's. The
- * whole live HUD then painted at full strength behind the title screen: the
- * strip, the ability bar and the top chips are all legible through the
- * briefing copy, which reads as a rendering fault on the first thing anybody
- * sees.
+ * This list used to end in a fourth selector, `#toggleRack`, and that element
+ * was removed in the build that replaced it with the menu. The removal took
+ * `{ opacity: 0; pointer-events: none }` with it and left the bare
+ * `body.booting` dangling, so the parser ran it together with the list that
+ * followed and fed the pair the NEXT rule's block. The whole live HUD then
+ * painted at full strength behind the title screen: the strip, the ability
+ * bar and the top chips all legible through the briefing copy, which reads as
+ * a rendering fault on the first thing anybody sees. Asserted in regress.mjs.
  *
- * The `body.ending` half is kept but is currently inert -- there is no
- * #endScreen element anywhere in the game any more and nothing sets the
- * class, though `world.phase === 'ending'` is still a real phase. Everything
- * below tagged #endScreen / #endText / #resetBtn is orphaned with it.
+ * A matching `body.ending` list sat above this one, along with #endScreen,
+ * #endText and #resetBtn. All of it went in build 186: there has been no
+ * #endScreen element since the run stopped having an end, and nothing has set
+ * the class since either.
  */
-body.ending #topbar,
-body.ending #abilities,
-body.ending #alerts,
-body.ending #bossBar,
-body.ending #abilityHint,
-body.ending #quickBar,
-/* Same treatment while the title screen is up: none of it is live yet. */
 body.booting #topbar,
 body.booting #abilities,
 body.booting #quickBar {
   opacity: 0;
   pointer-events: none;
 }
-
-/*
- * Same clipping trap as the boot screen: a column flex centred with
- * `justify-content` cuts off the overflowing end instead of scrolling to it,
- * and on a 320x568 screen that put the plate's top edge off screen and the
- * RESET button below the fold. Auto margins collapse to zero when there is no
- * free space, so the pair centres while it fits and scrolls when it does not.
- */
-#endScreen {
-  background: none;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 26px;
-}
-#endText { margin-top: auto; }
-#resetBtn { margin-bottom: auto; }
-
-/*
- * The closing text used to be drawn straight over the field, which put the
- * final stamp on top of the turret and made it unreadable. It now sits on its
- * own plate — and the turret fades out underneath it as the lines arrive, so
- * there is nothing behind it to compete with either way.
- */
-#endText {
-  font-size: 12px;
-  line-height: 1.7;
-  text-align: center;
-  max-width: 420px;
-  letter-spacing: 0.06em;
-  padding: 16px 16px;
-  border-radius: 6px;
-  /* Opaque enough that a backdrop blur would be invisible, and a blur here
-     costs a full-screen readback every frame while the field is still live. */
-  background: rgba(2, 4, 9, 0.93);
-  border: 1px solid rgba(120, 190, 255, 0.12);
-  text-shadow: 0 0 18px rgba(0, 0, 0, 0.95);
-}
-#endText div { opacity: 0; animation: lineIn 0.9s ease-out forwards; }
-#endText div + div { margin-top: 6px; }
-/* The closing stamp. Loose tracking wrapped it onto a second row, which is
-   what collided with the turret. It fits one row at 375 and up; on a 320
-   screen it still takes two, which is fine now there is a plate under it and
-   nothing behind it. */
-#endText div.term {
-  color: var(--accent-2);
-  letter-spacing: 0.08em;
-  font-size: 9.5px;
-  margin-top: 12px;
-}
-
-/* Short screens: the six lines wrap more, so tighten again rather than scroll. */
-@media (max-height: 640px) {
-  #endText { font-size: 11px; line-height: 1.6; padding: 13px 13px; }
-  #endText div + div { margin-top: 4px; }
-  #endText div.term { margin-top: 9px; }
-  #endScreen { gap: 16px; }
-}
-@keyframes lineIn {
-  from { opacity: 0; transform: translateY(6px); filter: blur(4px); }
-  to { opacity: 1; transform: none; filter: none; }
-}
-
-#resetBtn { max-width: 320px; animation: lineIn 0.6s ease-out; }
-#resetBtn[hidden] { display: none; }
 
 /* ---------------- narrow phones ---------------- */
 
@@ -2604,42 +2516,6 @@ body.booting #quickBar {
   #energyChip.took { animation: none; }
 }
 
-
-.fxMark { flex: 0 0 auto; opacity: 0.9; }
-.fxBody { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
-.fxName { font-size: 6.5px; letter-spacing: 0.18em; opacity: 0.85; }
-.fxBar {
-  display: block;
-  height: 2px;
-  background: color-mix(in srgb, var(--tone) 18%, transparent);
-}
-.fxBar i {
-  display: block;
-  height: 100%;
-  width: 100%;
-  background: var(--tone);
-  /* Not animated: it is written every frame and a transition would make it
-     lag the number beside it. */
-}
-.fxTime {
-  flex: 0 0 auto;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  font-variant-numeric: tabular-nums;
-}
-
-/* One tone per boost, matching the mark on the card it came from. Every entry
-   in events.js TIMED needs a line here or it falls back to the default green
-   and two boosts read as the same thing — which is what CORONA and OVERDRAW
-   did between builds 65 and 66. */
-.fx-surge { --tone: #ffd166; }
-.fx-haste { --tone: #c77dff; }
-.fx-corona { --tone: #ff9f5c; }
-.fx-overdraw { --tone: #bff4ff; }
-
-@media (prefers-reduced-motion: reduce) {
-  }
 
 /* ============================================================
    THE TREE

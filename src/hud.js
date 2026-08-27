@@ -63,7 +63,6 @@ export class Hud {
       tierHold: $('tierHold'),
       tierRow: $('tierRow'),
       alerts: $('alerts'),
-      killGoal: document.querySelector('#counter .dim'),
       energy: $('energyNum'),
       energyChip: $('energyChip'),
       energyBuys: $('energyBuys'),
@@ -113,8 +112,6 @@ export class Hud {
     this.pillHeld = []; // ...and pills waiting for room beside the band
     this.tutLines = []; // the opening's band keeps the line before
     this.lastKills = -1;
-    this.lastGoal = -1;
-    this.lastPhase = '';
 
     this.buildAbilities();
     this.buildDebug();
@@ -838,12 +835,10 @@ export class Hud {
 
   // ----------------------------------------------------------------- meters
 
-  setKills(n, goal) {
-    if (n === this.lastKills && goal === this.lastGoal) return;
+  setKills(n) {
+    if (n === this.lastKills) return;
     this.lastKills = n;
-    this.lastGoal = goal;
     this.el.killNum.textContent = n;
-    this.el.killGoal.textContent = goal ? `/${goal}` : '';
   }
 
   /**
@@ -944,14 +939,6 @@ export class Hud {
   }
 
 
-
-  setPhase(label) {
-    // The chip that used to carry this is the ladder's control now. The phase
-    // is still tracked -- the boss bar and the menu both read it -- it simply
-    // has nowhere to be written, because "FIELD" for a whole run was a word,
-    // not a readout.
-    this.lastPhase = label;
-  }
 
   // -------------------------------------------------------------- the ladder
 

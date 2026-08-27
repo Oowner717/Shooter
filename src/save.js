@@ -161,9 +161,9 @@ export function captureRun(world, game) {
     // Lifetime, not the purse: what the object types are gated behind.
     earned: world.earned,
     nextStoryAt: world.nextStoryAt,
-    // `endless: true` used to be written here. Nothing ever read it back —
-    // every run has been endless since build 81, so restore sets it rather
-    // than asking a file about it.
+    // `endless: true` used to be written here. Nothing ever read it back, and
+    // the flag itself went in build 186 -- every run has been endless since 81
+    // and nothing was left that could ask.
     unlocked: [...world.unlocked],
     loadout: { mines: [...world.loadout.mines], ammo: [...world.loadout.ammo] },
     round: world.round,

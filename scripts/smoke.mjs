@@ -161,9 +161,10 @@ const busyStats = await stats();
 
 /*
  * There is no count, no lull, no ORDINAL and no ending to walk any more —
- * build 81 made every run endless. What is left to prove is that a long run
- * keeps going: the field stays populated, waves keep rotating, and nothing
- * transitions the game out from under the player.
+ * build 81 made every run endless, and build 186 finally took out the last
+ * of the machinery that had been left standing for it. What is left to prove
+ * is that a long run keeps going: the field stays populated, waves keep
+ * rotating, and nothing transitions the game out from under the player.
  */
 await dbg('+50 KILLS');
 await dbg('+50 KILLS');
@@ -187,7 +188,7 @@ await page.screenshot({ path: `${SHOTS}/09-still-running.png` });
 
 const stillPlaying = await page.evaluate(() => {
   const w = window.__sim.world;
-  return { phase: w.phase, kills: w.kills, endless: w.endless, boss: !!w.boss };
+  return { phase: w.phase, kills: w.kills, tier: w.director.tier, boss: !!w.boss };
 });
 
 // The run has no end, so there is no reset button and nothing to restart from.

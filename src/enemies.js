@@ -645,9 +645,6 @@ export class Enemy {
     // there — the point of the depth is where things are engaged, not how long
     // the run takes to hand them over.
     if (this.staged) cruise *= CFG.entrySpeed;
-    // Once nothing more will be released, whatever is left closes in, so the
-    // tail of the run is never a hunt across an empty field.
-    if (releasesLeft(world) <= 0) cruise *= 1.45;
     // loiterers hang back at mid range before making their run
     if (this.route.dawdle && !this.staged) {
       const dist = Math.hypot(world.shooter.x - this.x, world.shooter.y - this.y);
@@ -988,8 +985,7 @@ export class Enemy {
     }
 
     // SCION: it throws seeds rather than simply coming apart. They are
-    // harmless bodies and come out of nobody's quota — a SCION costs one of
-    // the five hundred whatever it does on the way out.
+    // harmless bodies, so nothing about them is owed to the field cap.
     if (t.id === 'scion') {
       const G = CFG.graft;
       for (let i = 0; i < G.seeds; i++) {
@@ -1009,13 +1005,11 @@ export class Enemy {
     // Splitter: children keep the parent's momentum.
     if (t.splits) {
       const child = TYPE_BY_ID[t.splits.type];
-      // Children are glitch-causing objects too, so they come out of the same
-      // quota. Near the end of the run a splitter simply sheds fewer.
       // A body carrying shards releases only the ones still on it: shoot the
       // plates off a WARDEN and there are fewer left to come at you when the
       // core finally goes.
       const alive = this.shards ? this.shards.filter((sh) => sh.alive).length : t.splits.count;
-      const count = Math.min(t.splits.count, alive, releasesLeft(world));
+      const count = Math.min(t.splits.count, alive);
       for (let i = 0; i < count; i++) {
         // a little over the cap: a split should not be silently swallowed
         if (hostileCount(world) >= CFG.maxEnemies + 8) break;
@@ -2536,9 +2530,11 @@ function release(world, type, x, y, opts) {
 }
 
 /**
- * Release one object into the run. Exactly `CFG.killGoal` glitch-causing
- * objects exist across a whole run, so every hostile creation is counted here
- * and the director stops once the quota is spent.
+ * Release one object into the run. `world.released` is counted here, at the
+ * one place a hostile enters the world. Nothing gates on it: the 500-object
+ * quota it was kept for went with `releasesLeft` in build 186, having returned
+ * Infinity on every call since runs became endless in build 81. It is still
+ * counted because the debug readout and the save both show it.
  */
 export function spawnOne(world, type, x, y, opts = {}) {
   const e = new Enemy(type, x, y, { staged: true, spawnIn: 1, ...opts });
@@ -2616,16 +2612,6 @@ export function solveTethers(world) {
       o.vy -= dy * j * o.invMass;
     }
   }
-}
-
-/**
- * Hostiles still owed. Endless runs are never owed a last one, so the quota is
- * unbounded — without this the director stops dead and every object keeps the
- * closing-speed bonus meant for the final stragglers.
- */
-function releasesLeft(world) {
-  if (world.endless) return Infinity;
-  return Math.max(0, CFG.killGoal - world.released);
 }
 
 /**
@@ -3192,7 +3178,6 @@ export class Director {
 
   /** Start the next wave, rebuilding the rotation if this one is spent. */
   begin(world) {
-    if (releasesLeft(world) <= 0) { this.timer = 1; return; }
     if (this.order.length) this.admit(world);
     if (this.at + 1 >= this.order.length) this.shuffle(world);
     if (!this.order.length) { this.timer = 1; return; }
@@ -3208,8 +3193,6 @@ export class Director {
     const gap = wave && wave.teach ? CFG.waves.teachGap : CFG.waves.gap;
     this.timer = rand(gap[0], gap[1]);
 
-    const quota = releasesLeft(world);
-    if (quota <= 0) { this.jobs.length = 0; return; }
     // The field cap is a hard ceiling on top of the wave. Hold the job rather
     // than dropping it: a wave is a group, and losing half of it to a cap the
     // player is about to clear would make waves quietly inconsistent.
@@ -3218,14 +3201,11 @@ export class Director {
     const job = this.jobs.shift();
     if (!job) return;
     const t = job.type;
-    // A TOW is two bodies and costs two of the allotment.
-    const cost = t.tows ? 2 : 1;
-    if (quota < cost) { this.jobs.length = 0; return; }
 
-    // A shape made of towed pairs is a traffic jam rather than a formation,
-    // and costs double the allotment for it. They file in.
+    // A shape made of towed pairs is a traffic jam rather than a formation.
+    // They file in.
     if (job.n > 1 && !t.tows) {
-      const room = Math.min(job.n, quota, CFG.maxEnemies - hostileCount(world));
+      const room = Math.min(job.n, CFG.maxEnemies - hostileCount(world));
       if (room >= 2) { spawnFormation(world, [t], room); return; }
     }
     let x = rand(t.r + 12, world.width - t.r - 12);

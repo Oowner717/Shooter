@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '185';
+export const BUILD = '186';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,11 +14,10 @@ export const BUILD = '185';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'b1d4a06';
+export const REV = 'b492d2f';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
-  killGoal: 500, // objects destroyed before the last one arrives
   // Seconds of empty field at the start of a run, and again after the last
   // object falls, before the next thing happens. The field starts with nothing
   // in it: the first beat is the interface, not a reaction.
@@ -1756,15 +1755,18 @@ export const CFG = {
     /*
      * The squeeze, which is this fight's pressure and its clock at once.
      *
-     * The ring contracts at a rate proportional to how much of it is standing
-     * and pushes back out in proportion to how much you have opened, so
-     * "break gaps faster than it closes them" is not a figure of speech: it
-     * is the sign of one subtraction. Nothing is thrown at you here. The
-     * corruption is the boundary being near, and it is entirely yours to
+     * Where the ring WANTS to be is set by how much of it is still standing,
+     * so "break gaps faster than it closes them" is not a figure of speech:
+     * it is the sign of one subtraction. Out is smooth and in is a step --
+     * opening lets it spring back at `relax` in the frame you earn it, while
+     * closing waits on the lurch clock below. Nothing is thrown at you here.
+     * The corruption is the boundary being near, and it is entirely yours to
      * govern.
+     *
+     * A `contract` rate in units/sec sat here until build 186, left behind
+     * when the close became a step; nothing had read it since.
      */
-    contract: [3.2, 4.6, 0, 0], // units/sec toward the tightest it may be
-    relax: 30, // ...and how fast an opened ring springs back out
+    relax: 30, // how fast an opened ring springs back out
     // How far toward the floor the boundary is permitted to close, per stage.
     // This is the escalation, and ECLIPSE is where it is finally allowed all
     // of it. See stepSqueeze for the build where it was not permissioned.
@@ -2081,7 +2083,6 @@ export const CFG = {
     flash: 0.9, // seconds the machine flares while a part goes on
     ring: 0.2, // gimbal: each level adds a ring this much further out
     spine: 9, // spines: length of each spike, in world units
-    shroud: 1.15, // shroud: radians of collar per level
     sight: 8, // sight: mast height per level
     feed: 7, // feed: belt housing depth
     dish: 20, // array: dish aperture, growing with the level

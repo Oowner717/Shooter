@@ -125,9 +125,3 @@ export function prefWord(key) {
   const i = s.of.indexOf(state[key]);
   return s.words[i < 0 ? s.of.indexOf(s.def) : i];
 }
-
-/** Back to the shipped defaults. RESET SIMULATION does not do this. */
-export function forgetPrefs() {
-  for (const [k, s] of Object.entries(SPEC)) state[k] = s.def;
-  try { localStorage.removeItem(KEY); } catch { /* nothing to do */ }
-}

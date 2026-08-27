@@ -263,4 +263,21 @@ most once for any given target and cannot spin.
   currently open — including the ones a migration was written to rescue, since
   the file is thrown away before the restore sees it. Only move it when the
   restore genuinely cannot read its own past.
+- A flag that is never false grows readers that can never take their other
+  branch. `world.endless` was written `true` in two places and nowhere else
+  from build 81; by 185 it had four readers, and every one of them was a
+  ternary or a guard with one dead arm -- `releasesLeft()` returned `Infinity`
+  on every call it ever made, so `CFG.killGoal`, the director's release quota,
+  the closing-speed bonus, `setKills`'s goal, `setPhase` and a `<span
+  class="dim">` in the counter were all inert and all still being maintained.
+  The lot went in build 186. The tell is a constant that is threaded rather
+  than a branch that is taken: if nothing can set it false, delete the flag,
+  not the branch.
+- Dead CSS does not announce itself, so sweep for it: pull every `.class` and
+  `#id` out of styles.css and grep each against `src/*.js` + `index.html`.
+  Build 186's sweep found an entire orphaned widget (the `.fx*` timed-boost
+  rail), the whole `#endScreen`/`#endText`/`#resetBtn`/`body.ending` family,
+  and four loose rules. Two false-positive shapes to know: hex colours read as
+  ids (`#a3b8ce`), and classes built by template -- `m_${mode}` in hud.js is
+  why `.m_all` and `.m_drift` look dead and are not.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
