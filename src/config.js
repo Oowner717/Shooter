@@ -14,7 +14,7 @@ export const BUILD = '177';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '2592653';
+export const REV = '683b8a3';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------

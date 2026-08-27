@@ -780,11 +780,24 @@ export class Hud {
   buildTier() {
     const g = this.game;
     const d = () => g.world.director;
-    this.el.tierChip.addEventListener('click', () => {
-      const open = this.el.tierRow.hidden;
+    const openRow = (open) => {
+      // Same slot: the row takes the chip's place rather than its own width.
       this.el.tierRow.hidden = !open;
+      this.el.tierChip.hidden = open;
+      /*
+       * ...and the count steps aside while it is up. The row is wider than
+       * the chip it replaces, and #barChips absorbs the difference by
+       * shrinking -- which clipped ENERGY mid-number. OBJECTS is the one
+       * readout on the bar nothing is ever decided from, and the row is gone
+       * on the next tap.
+       */
+      document.body.classList.toggle('tiering', open);
+    };
+    this.el.tierChip.addEventListener('click', () => {
+      openRow(this.el.tierRow.hidden);
       this.syncTier(g.world);
     });
+    this.closeTierRow = () => openRow(false);
     const step = (by) => {
       const dir = d();
       if (!dir) return;
@@ -795,7 +808,7 @@ export class Hud {
        */
       dir.setTier(dir.tier + by);
       dir.hold = true;
-      this.el.tierRow.hidden = true;
+      this.closeTierRow();
       this.syncTier(g.world);
     };
     $('tierDown').addEventListener('click', () => step(-1));
@@ -804,7 +817,7 @@ export class Hud {
       const dir = d();
       if (!dir) return;
       dir.hold = !dir.hold;
-      this.el.tierRow.hidden = true;
+      this.closeTierRow();
       this.syncTier(g.world);
     });
   }

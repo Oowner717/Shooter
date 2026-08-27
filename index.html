@@ -104,11 +104,20 @@
       <button id="energyChip" class="chip btn" aria-label="Upgrades">
         <em>ENERGY</em><span id="energyNum">0</span><i id="energyBuys"></i>
       </button>
+      </div>
       <!--
-        The tier chip. It was FIELD, a readout that said the same word for a
-        whole run; it is the ladder's control now -- where you are, and the
-        only place you can hold or step down. A control, so unlike the readout
-        it never hides on a narrow screen.
+        The tier chip, and the row it opens into the same slot.
+
+        Deliberately OUTSIDE #barChips. That group is the shrinkable one --
+        its whole job is to absorb a growing purse so the menu button can
+        never be pushed off the edge -- and the overflow lands on whatever is
+        last in it. The tier control went in there first and a mid-run purse
+        clipped it behind the menu button, which is the exact failure the
+        group exists to prevent, visited on a control instead of a number.
+        It sits with the menu button now: fixed furniture, never squeezed.
+
+        The row REPLACES the chip rather than sitting beside it, so opening it
+        costs no width and nothing lands on the field.
       -->
       <button id="tierChip" class="chip btn" aria-label="Difficulty tier">
         <em>TIER</em><span id="tierNum">1</span><i id="tierHold" hidden>HOLD</i>
@@ -117,7 +126,6 @@
         <button id="tierDown" aria-label="Step back a tier">&#8249;</button>
         <button id="tierPin" aria-label="Hold this tier">HOLD</button>
         <button id="tierUp" aria-label="Step up a tier">&#8250;</button>
-      </div>
       </div>
       <button id="menuBtn" class="chip btn menuBtn" aria-label="Menu">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>

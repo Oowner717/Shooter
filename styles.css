@@ -2258,10 +2258,17 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
   margin-left: 5px;
   opacity: 0.9;
 }
+/* Fixed furniture beside the menu button: never the thing that gets squeezed
+   when the purse grows. #barChips absorbs that, which is its whole job. */
+#tierChip { flex: 0 0 auto; margin-left: 6px; }
+body.tiering #counter { display: none; }
+#tierChip[hidden] { display: none; }
 #tierRow {
   display: flex;
   gap: 3px;
   align-items: stretch;
+  flex: 0 0 auto;
+  margin-left: 6px;
 }
 #tierRow[hidden] { display: none; }
 #tierRow button {
