@@ -2736,103 +2736,71 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     /*
      * --- HITBOXES: the floor line, which nothing else draws ---
      *
-     * Counted by COLOUR, not by brightness, and against a control row.
+     * Measured on an offscreen canvas at a scale this case chooses, the same
+     * way the TURRET-parts case renders the machine rather than screenshotting
+     * the game.
      *
-     * Summing the strip's luminance gave a case that failed twice and passed
-     * once on the same code -- the strip is a few pixel rows, so one body
-     * drifting across it moves the total by a third, and the corruption feed
-     * randomises the frame inside draw() itself.
+     * It used to read the live canvas, and could not be made to work there.
+     * The line is ONE WORLD UNIT wide, so on screen it is `dpr * world scale`
+     * -- and this context has no deviceScaleFactor, so that is 1 x 0.62. Six
+     * tenths of a pixel over a floor band that is not black does not survive
+     * the colour test at all, and the perf governor made it worse: a hundred
+     * and eighty cases in it had taken the canvas to 273x591, where the line is
+     * 0.43 of a pixel. So the case passed or failed on how slow the cases
+     * before it had run, which is not a property of HITBOXES. Pinning
+     * fx.quality does nothing on its own (the backing store is only sized
+     * inside resize()); pinning it and resizing gets the canvas back but not
+     * the line; overriding devicePixelRatio and resizing leaves getImageData
+     * reading zeros on every row.
      *
-     * The line is rgba(255,220,0,.5) at one world unit, which lands as about
-     * (54,50,16) after scaling and antialiasing -- so it is not bright, and a
-     * threshold picked for "yellow" at 110 found nothing at all. What marks it
-     * is blue sitting well BELOW red, which nothing on a blue-black field
-     * does across a full width. Read against a control row sixty pixels up,
-     * it is 0 / 1560 / 0 and identical on three consecutive runs.
+     * At 1.43 units to the pixel the line is unambiguous, and the reading no
+     * longer depends on anything the suite did beforehand. What is lost is
+     * "drawn through draw()", so the button's own wiring is asserted directly
+     * instead: pressing HITBOXES has to move w.debug.hitboxes, both ways.
      */
-    const { glitch } = await import('../src/glitch.js');
-    glitch.level = 0;
-    glitch.burst = 0;
-    const cv = document.getElementById('stage');
-    let c2 = cv.getContext('2d');
-    let k = cv.width / w.width;
-    let row = Math.round(w.floorY * k);
-    const yellow = (y) => {
-      const d = c2.getImageData(0, Math.max(0, y - 2), cv.width, 5).data;
+    const press2 = (t) => [...document.querySelectorAll('#dbgGrid button')]
+      .find((b) => b.textContent.trim() === t).click();
+    w.debug.hitboxes = false;
+    press2('HITBOXES');
+    const flagOn = w.debug.hitboxes;
+    press2('HITBOXES');
+    const flagBack = w.debug.hitboxes;
+
+    const off = document.createElement('canvas');
+    off.width = 900;
+    off.height = 400;
+    const oc = off.getContext('2d', { willReadFrequently: true });
+    const sc = off.width / w.width;
+    const band = 200; // where floorY is put in the offscreen frame
+    const lineAt = (drawIt) => {
+      oc.setTransform(1, 0, 0, 1, 0, 0);
+      oc.clearRect(0, 0, off.width, off.height);
+      oc.save();
+      oc.translate(0, band - w.floorY * sc);
+      oc.scale(sc, sc);
+      if (drawIt) g.drawHitboxes(oc);
+      oc.restore();
+      const d = oc.getImageData(0, band - 4, off.width, 9).data;
       let n = 0;
       for (let i = 0; i < d.length; i += 4) {
         if (d[i] > 35 && d[i + 1] > 30 && d[i + 2] < d[i] * 0.55) n++;
       }
       return n;
     };
-    let ctrl = Math.max(0, row - 60);
-    const strip = () => yellow(row) - yellow(ctrl);
-    /*
-     * The field is emptied first. STATS above needs a populated one; the floor
-     * line does not, and a full field is exactly the contamination the note
-     * above worries about -- a body sitting on either row shifts the count by
-     * tens either way, which is how this read `off -54, on -45, off -54` on a
-     * build that draws the line perfectly well. Wreckage and drops go too:
-     * clearing the field is what creates them.
-     */
-    g.debugClearField();
-    w.enemies.length = 0;
-    w.drops.length = 0;
-    w.debris.length = 0;
-    w.effects.length = 0;
-    for (let i = 0; i < 6; i++) g.update(1 / 60);
-    /*
-     * ...and the canvas is put back to full resolution first.
-     *
-     * The line is ONE WORLD UNIT wide. The perf governor drops fx.quality when
-     * frames run long, which shrinks the backing store -- and a hundred and
-     * eighty cases into the suite it had taken this canvas to 273x591, where
-     * one world unit is 0.43 of a pixel and the line antialiases down below
-     * the colour test entirely. So the case passed or failed on how slow the
-     * cases before it had been, which is not a property of HITBOXES. It read
-     * `off -9, on -3` with the flag correctly true, on a build drawing the
-     * line perfectly well at full size.
-     */
-    /*
-     * The perf governor is stood down for the measurement. It drops fx.quality
-     * when frames run long, which shrinks the backing store -- a hundred and
-     * eighty cases into the suite it had taken this canvas to 273x591, where
-     * one world unit is 0.43 of a pixel and the line antialiases below the
-     * colour test entirely. So the case passed or failed on how slow the cases
-     * before it had been, which is not a property of HITBOXES.
-     *
-     * `resize()` is deliberately NOT called to enlarge it further. Raising
-     * devicePixelRatio and resizing does make the line 1.24px, and it also
-     * leaves getImageData reading zeros on every row -- floor and control
-     * alike -- whether the context handle is taken again afterwards or not.
-     * Whatever resize() does to the backing store mid-suite is not something
-     * this case can read through, and a bigger line nobody can measure is
-     * worse than a small one they can.
-     */
-    const { fx } = await import('../src/fx.js');
-    const heldQuality = fx.quality;
-    fx.quality = 1;
-    w.debug.hitboxes = false; g.draw();
-    const floorOff = strip();
-    press('HITBOXES'); g.draw();
-    const flagOn = w.debug.hitboxes;
-    const floorOn = strip();
-    press('HITBOXES'); g.draw();
-    const flagBack = w.debug.hitboxes;
-    const floorBack = strip();
-    // What the reading depended on, carried into the failure message: whether
-    // the button actually moved the flag, and whether the row the strip is
-    // read at is the row the line is drawn on.
-    const geom = { row, ctrl, cvW: cv.width, cvH: cv.height, k: +k.toFixed(3),
-      floorY: Math.round(w.floorY), paused: !!g.paused, phase: w.phase };
+    const floorOff = lineAt(false);
+    const floorOn = lineAt(true);
+    const floorBack = lineAt(false);
+    const geom = { scale: +sc.toFixed(3), px: +(sc).toFixed(2), width: off.width };
+    // The line spans the whole width, so what it is worth scales with the
+    // canvas -- asserted against that rather than a number copied off one run.
+    const want = off.width * 0.5;
 
-    fx.quality = heldQuality;
     for (const key of Object.keys(w.debug)) w.debug[key] = false;
     g.hud.toggleDebug(false);
     g.restart();
     return { before, onLen: on.length, moved, after,
       lines: on.split('\n').length, floorOff, floorOn, floorBack,
-      flagOn, flagBack, geom };
+      flagOn, flagBack, geom, want };
   });
 
   check('STATS writes a live readout, and clears it rather than freezing it',
@@ -2848,10 +2816,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * end of it.
    */
   check('...and HITBOXES draws its floor line and takes it away again',
-    r.floorOn > 150 && r.floorOff < 40 && r.floorBack < 40,
+    r.floorOn > r.want && r.floorOff < 40 && r.floorBack < 40,
     `floor row against a control row: off ${r.floorOff}, on ${r.floorOn}, `
-    + `off again ${r.floorBack} | flag ${r.flagOn}/${r.flagBack} `
-    + `| ${JSON.stringify(r.geom)}`);
+    + `off again ${r.floorBack} (wanted over ${Math.round(r.want)}) `
+    + `| flag ${r.flagOn}/${r.flagBack} | ${JSON.stringify(r.geom)}`);
 }
 
 // --- the corruption feed is not the brightest thing in the game -------------

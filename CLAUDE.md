@@ -147,6 +147,19 @@ outlives the sweep. And a wave put down loose on the field can land level with
 the turret, which is outside `autoTarget`'s 78° cone forever; waves march in
 from the top here, the way the game sends them.
 
+One case in it is worth knowing about because it wasted an afternoon: **the
+HITBOXES floor line cannot be measured off the live canvas.** It is one world
+unit wide, and on screen that is `dpr * world scale` — in the headless context,
+1 x 0.62. Six tenths of a pixel over a floor band that is not black does not
+survive a colour test, and the perf governor makes it worse, having taken the
+canvas to 273x591 by the time the suite reaches it. So the case passed or failed
+on how slow the cases before it had run. Pinning `fx.quality` does nothing on
+its own (the backing store is only sized inside `resize()`); pinning and
+resizing recovers the canvas but not the line; overriding `devicePixelRatio` and
+resizing leaves `getImageData` reading zeros on every row. It renders to an
+offscreen canvas at a scale it picks now, and asserts the button's wiring
+separately — the same shape as the TURRET-parts case above it.
+
 The clear column is genuinely noisy — the same wave swings five times on where
 its bodies happen to arrive — so runs that disagree by more than double are
 marked `~`. Read the tier, not the second.
