@@ -835,8 +835,10 @@ export class Abilities {
     const s = this.slots[index];
     if (!s || !this.usable(index)) return null;
     s.def.run(world);
-    // STANDING ORDER shortens every cooldown; HASTE halves them for a while.
-    const scale = world.up.cooldown * (world.haste > 0 ? 0.5 : 1);
+    // STANDING ORDER shortens every cooldown. HASTE used to halve them for a
+    // while; it was an ALLOCATION boost and went with that system, but the
+    // read on `world.haste` stayed behind on a field nothing writes.
+    const scale = world.up.cooldown;
     s.cost = s.def.cooldown * scale * (world.debug.noCooldown ? 0 : 1);
     s.charges -= 1;
     // The clock is already running if this was a held charge; starting it over

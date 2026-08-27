@@ -4,6 +4,7 @@
 import { ABILITIES } from './abilities.js';
 import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
+import { pref, setPref } from './settings.js';
 import { BUILD, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
 
@@ -14,7 +15,6 @@ import { holdFor, STACK } from './tutorial.js';
 import { SLOTS, carried, freeSlot } from './loadout.js';
 import { heldList } from './anomaly.js';
 import { readRun } from './save.js';
-import { TIMED } from './events.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -64,13 +64,7 @@ export class Hud {
       energy: $('energyNum'),
       energyChip: $('energyChip'),
       energyBuys: $('energyBuys'),
-      effects: $('effects'),
-      pendingBtn: $('pendingBtn'),
-      pendingLabel: $('pendingLabel'),
-      pendingCount: $('pendingCount'),
       offer: $('offer'),
-      offerScrim: $('offerScrim'),
-      offerCards: $('offerCards'),
       loadout: $('loadout'),
       loadMore: $('loadMore'),
       loadScrim: $('loadScrim'),
@@ -78,8 +72,6 @@ export class Hud {
       loadNote: $('loadNote'),
       loadSlots: $('loadSlots'),
       loadList: $('loadList'),
-      offerKicker: $('offerKicker'),
-      offerNote: $('offerNote'),
       counterLabel: document.querySelector('#counter em'),
       abilities: $('abilities'),
       hint: $('abilityHint'),
@@ -181,8 +173,6 @@ export class Hud {
       game.closeLoadout();
       this.menu.openTo(group === 'mines' ? 'mines' : 'ammo');
     });
-    this.el.pendingBtn.addEventListener('click', () => game.openOffer());
-    this.el.offerScrim.addEventListener('click', () => game.closeOffer());
 
     this.el.startBtn.addEventListener('click', () => game.start());
     this.el.resumeBtn.addEventListener('click', () => game.resume());
@@ -264,13 +254,59 @@ export class Hud {
     const cfgAmmo = band('qGroup q_cfg');
     const ammo = band('qGroup q_ammo');
 
+    /*
+     * A fold at the head of each stack. Four mine slots and four ammunition
+     * slots is a lot of column on a phone, and a run that lays no mines is
+     * looking past that whole side of the screen at the field behind it. The
+     * button stays when the stack is folded -- a control that hides itself is
+     * a control nobody finds again.
+     */
+    mines.appendChild(this.stackFold('mines'));
+    ammo.appendChild(this.stackFold('ammo'));
     // Stacks read bottom-up on screen, so slot 0 is the bottom cell.
     this.fillStack(mines, w, 'mines');
     this.fillStack(ammo, w, 'ammo');
+    this.syncFolds();
     cfgMines.appendChild(this.configButton('mines'));
     cfgAmmo.appendChild(this.configButton('ammo'));
     for (const a of ARSENAL.filter((x) => x.group === 'auto')) {
       auto.appendChild(this.cell(a));
+    }
+  }
+
+  /** The show/hide at the head of a stack. */
+  stackFold(group) {
+    const b = document.createElement('button');
+    b.className = `qc fold q_fold_${group}`;
+    b.id = group === 'mines' ? 'foldMines' : 'foldAmmo';
+    b.innerHTML = '<span class="foldArrow" aria-hidden="true"></span>'
+      + '<span class="qLbl"></span>';
+    b.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const key = group === 'mines' ? 'showMines' : 'showAmmo';
+      setPref(key, pref(key) ? 0 : 1);
+      this.syncFolds();
+    });
+    b.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    return b;
+  }
+
+  /** Both stacks, against the preference. Cheap enough to call on any change. */
+  syncFolds() {
+    for (const [group, key] of [['mines', 'showMines'], ['ammo', 'showAmmo']]) {
+      const on = !!pref(key);
+      const band = this.el.quickBar.querySelector(`.q_${group}`);
+      if (band) band.classList.toggle('folded', !on);
+      const btn = this.el.quickBar.querySelector(`.q_fold_${group}`);
+      if (!btn) continue;
+      btn.classList.toggle('off', !on);
+      btn.setAttribute('aria-pressed', String(on));
+      btn.setAttribute('aria-label',
+        `${on ? 'Hide' : 'Show'} ${group === 'mines' ? 'mines' : 'ammunition'}`);
+      // Named while it is folded, because a lone arrow beside an empty column
+      // does not say what pressing it brings back.
+      btn.querySelector('.qLbl').textContent = on ? '' : (group === 'mines' ? 'MINES' : 'AMMO');
     }
   }
 
@@ -554,67 +590,6 @@ export class Hud {
     }
   }
 
-  /**
-   * The waiting button. It is only ever there when something is actually
-   * waiting, so it never competes with the field, and it says which tier is at
-   * the front of the queue because a permanent one deserves to be noticed.
-   */
-  setPending(n, next) {
-    const kind = next ? next.tier : '';
-    if (n === this.lastPending && kind === this.lastPendingKind) return;
-    this.lastPending = n;
-    this.lastPendingKind = kind;
-    this.el.pendingBtn.hidden = n <= 0;
-    this.el.pendingCount.textContent = n;
-    this.el.pendingCount.hidden = n < 2;
-    this.el.pendingLabel.textContent = 'ALLOCATION';
-    // The taller plate grows up into the caption band; the band gets out of
-    // its way for as long as one is waiting. See styles.css.
-    // The bloom belongs to the arrival, not to the tier: dropping back to a
-    // top-up has to clear it or the next AMENDMENT inherits a spent animation.
-    this.el.pendingBtn.classList.remove('flare');
-  }
-
-
-  showOffer(offer) {
-    if (!offer) return;
-    this.el.offerKicker.textContent = 'ALLOCATION AVAILABLE';
-    this.el.offerNote.textContent = 'select one';
-    this.el.offerCards.innerHTML = '';
-    offer.options.forEach((opt, i) => {
-      const b = document.createElement('button');
-      b.className = 'offerCard';
-      b.innerHTML = `<span class="offerMark">${opt.icon || ''}</span>`
-        + '<span class="offerBody">'
-        + `<span class="offerName">${opt.name}</span>`
-        + `<span class="offerLine">${opt.line}</span>`
-        // Said rather than implied: these come round again and again, and a
-        // card reading "double fire rate" invites the wrong guess in either
-        // direction — that a second one is wasted, or that it is quadruple.
-        + (opt.stacks === 'time'
-          ? `<span class="offerTag">${opt.unit === 'shots' ? 'SHOTS' : 'TIME'} STACKS, NOT EFFECT</span>`
-          : opt.levels === 1 ? '<span class="offerTag">DOES NOT STACK</span>' : '')
-        + '</span>'
-        + '';
-      b.addEventListener('click', () => this.game.takeOffer(i));
-      this.el.offerCards.appendChild(b);
-    });
-    this.el.offer.hidden = false;
-    this.el.offerScrim.hidden = false;
-    // one frame, so the transition has something to run from
-    void this.el.offer.offsetWidth;
-    this.el.offer.classList.add('open');
-    this.el.offerScrim.classList.add('on');
-    document.body.classList.add('offerOpen');
-  }
-
-  hideOffer() {
-    this.el.offer.classList.remove('open');
-    this.el.offerScrim.classList.remove('on');
-    this.el.offer.hidden = true;
-    this.el.offerScrim.hidden = true;
-    document.body.classList.remove('offerOpen');
-  }
 
   /**
    * @param tutorial the opening script, which sits lower and reads larger.
@@ -667,59 +642,6 @@ export class Hud {
    * sat on, because that is the only place the corruption costs anything the
    * player can read.
    */
-  /**
-   * What is running on a clock, and how much of it is left.
-   *
-   * Only two things in the game have a duration — SURGE and HASTE, the two
-   * top-ups that stack in time rather than in effect — and until build 62
-   * neither said so anywhere. You took a card that said "double fire rate for
-   * 30s" and then had no way at all to know whether you were still inside the
-   * thirty, which is most of what the card was worth.
-   *
-   * Rebuilt only when the set of live effects changes; a live one has its
-   * number and its bar written in place every frame, so this costs two text
-   * writes and a width per effect and never touches the DOM tree.
-   */
-  syncEffects(world) {
-    const live = TIMED.filter((t) => world[t.id] > 0);
-    const sig = live.map((t) => t.id).join(',');
-    if (sig !== this.lastEffects) {
-      this.lastEffects = sig;
-      this.effectEls = {};
-      this.el.effects.innerHTML = '';
-      for (const t of live) {
-        const d = document.createElement('div');
-        d.className = `fxChip fx-${t.id}`;
-        d.id = `fx${t.id[0].toUpperCase()}${t.id.slice(1)}`;
-        d.innerHTML = `<span class="fxMark">${t.icon}</span>`
-          + `<span class="fxBody"><span class="fxName">${t.name}</span>`
-          + '<span class="fxBar"><i></i></span></span>'
-          + '<b class="fxTime"></b>';
-        this.el.effects.appendChild(d);
-        this.effectEls[t.id] = { time: d.querySelector('.fxTime'), fill: d.querySelector('.fxBar i') };
-      }
-    }
-    for (const t of live) {
-      const left = world[t.id];
-      const el = this.effectEls[t.id];
-      if (!el) continue;
-      // These stack in time, so a second card can put the clock well past one
-      // card's worth. The bar is against the peak this run of it reached,
-      // which is the only reading of "how full is it" that is true after two.
-      this.effectPeak = this.effectPeak || {};
-      this.effectPeak[t.id] = Math.max(this.effectPeak[t.id] || 0, left);
-      // Seconds for the ones that run on a clock, shots for OVERDRAW, which
-      // counts trigger pulls -- a slow round should get the same number of
-      // them as a fast one, so it cannot be a duration.
-      const secs = Math.ceil(left);
-      if (secs !== el.lastSecs) {
-        el.lastSecs = secs;
-        el.time.textContent = t.unit === 'shots' ? String(secs) : `${secs}s`;
-      }
-      el.fill.style.width = `${Math.max(0, Math.min(1, left / this.effectPeak[t.id])) * 100}%`;
-    }
-    for (const t of TIMED) if (world[t.id] <= 0 && this.effectPeak) this.effectPeak[t.id] = 0;
-  }
 
   setEnergy(n, rate = 1) {
     const v = Math.floor(n);

@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '163';
+  var BUILD = '164';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -113,7 +113,6 @@
 
     <!-- What is running on a clock right now. Empty and out of the layout
          unless something timed is up; see Hud.syncEffects(). -->
-    <div id="effects"></div>
 
     <!-- The way in, and the thing that comes through it. The banner is a
          control: it appears the moment an APERTURE is held and pressing it
@@ -173,11 +172,6 @@
     <!-- Nothing here ever interrupts. The button appears when something is
          waiting and waits as long as it takes; opening it is what holds the
          world, and that is a choice the player made. -->
-    <button id="pendingBtn" hidden>
-      <span class="pendingText">
-        <span id="pendingLabel">EVALUATION</span>
-      </span><b id="pendingCount">1</b>
-    </button>
 
     <!-- The gold frame. Only a permanent upgrade ever lights it, it is drawn
          at the edge of the screen so it collides with nothing, and it is inert
@@ -214,15 +208,6 @@
         </span>
         <span class="loadMoreGo" aria-hidden="true">&#8250;</span>
       </button>
-    </section>
-
-    <div id="offerScrim" hidden></div>
-    <section id="offer" hidden aria-label="Offer">
-      <header class="offerHead">
-        <span id="offerKicker">PERFORMANCE NOTED</span>
-        <em id="offerNote">select one</em>
-      </header>
-      <div id="offerCards"></div>
     </section>
 
     <!-- ============ THE STRIP ============ -->

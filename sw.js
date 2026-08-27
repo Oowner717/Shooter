@@ -48,7 +48,6 @@ const ASSETS = [
   './src/amplitude.js',
   './src/anomaly.js',
   './src/arsenal.js',
-  './src/events.js',
   './src/upgrades.js',
   './src/narrative.js',
   './src/hud.js',

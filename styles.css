@@ -1157,100 +1157,8 @@ body.menuOpen #bossCaption { opacity: 0.25; transition: opacity 0.2s ease; }
 body.menuOpen #abilities,
 body.menuOpen #quickBar { pointer-events: none; }
 
-/* ---------------- offers ---------------- */
-
-/*
- * The waiting button. Centred under the top bar, and only ever present when
- * something is actually waiting — so it never competes with the field, and an
- * unattended game is never blocked by it.
- */
-#pendingBtn {
-  position: absolute;
-  /*
-   * Down where the thumb already is. Not centred: the turret owns the middle
-   * of the lower half, and the two text bands directly above it are spoken
-   * for. This sits at the left edge, just above the mine stack, which is the
-   * only place down here that is both free and reachable.
-   */
-  /* Above a mine stack of four 36px cells; it was tuned for 30px cells and
-     the taller stack rose up behind it. */
-  bottom: calc(var(--safe-b) + var(--bar-h) + 184px);
-  left: calc(var(--safe-l) + 8px);
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  -webkit-appearance: none;
-  appearance: none;
-  font-size: 8px;
-  letter-spacing: 0.18em;
-  padding: 7px 10px;
-  border: 1px solid rgba(124, 255, 178, 0.5);
-  background: rgba(6, 20, 14, 0.9);
-  color: #7cffb2;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
-  animation: pendingIn 0.3s ease-out, pendingPulse 2.4s 0.3s infinite ease-in-out;
-  /* The plate is anchored to the left edge, so it has to bloom out of that
-     edge. Growing from the centre put the arrival flare off-screen at 320. */
-  transform-origin: left center;
-  transition: bottom 0.3s ease;
-  z-index: 18;
-}
-#pendingBtn[hidden] { display: none; }
-#pendingBtn b {
-  font-size: 10px;
-  padding: 1px 5px;
-  background: rgba(124, 255, 178, 0.2);
-  border-radius: 2px;
-}
-#pendingBtn b[hidden] { display: none; }
 .pendingText { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 
-/*
- * A permanent one. Gold, and it never settles: the reminder pulse runs for as
- * long as it is unclaimed, because an offer that never expires can otherwise
- * be forgotten about ten minutes after the one moment it announced itself.
- *
- * It used to be a noticeably bigger plate carrying a second line — "permanent
- * · choose one" — on the argument that the size was the announcement. It sat
- * on the field for as long as the offer went unclaimed, which is the whole
- * point of it and also the reason the size was the wrong lever: an
- * announcement is a moment and that was a permanent slab across the left of
- * the play area. The announcement is carried by things that are moments — the
- * bloom on arrival, the gold frame that runs round the screen — and the plate
- * that stays behind is now the same size as a top-up, told apart by colour and
- * by the pulse rather than by size. The second line went with it: the
- * opening already says what an AMENDMENT is, and the sheet it opens says
- * "permanent · select one" across the top.
- */
-
-/* The arrival itself: the plate blooms once and throws a ring off its edge. */
-#pendingBtn.flare { animation: amendFlare 1.5s ease-out, amendRemind 7.5s 1.5s infinite ease-in-out; }
-@keyframes amendFlare {
-  0% { opacity: 0; transform: scale(0.7); box-shadow: 0 0 0 0 rgba(255, 207, 92, 0.85); }
-  22% { opacity: 1; transform: scale(1.22); box-shadow: 0 0 0 10px rgba(255, 207, 92, 0.4); }
-  46% { transform: scale(1); box-shadow: 0 0 0 26px rgba(255, 207, 92, 0); }
-  60% { transform: scale(1.1); box-shadow: 0 0 0 0 rgba(255, 207, 92, 0.6); }
-  100% { transform: scale(1); box-shadow: 0 0 0 22px rgba(255, 207, 92, 0); }
-}
-/* And every few seconds after, until it is taken. */
-/*
- * A breath rather than a ping. The arrival is already loud — fanfare, gold
- * frame, blooming plate — and this only has to stop the plate being forgotten
- * about ten minutes later. Two hard rings every five seconds was reading as an
- * alarm on a thing that is optional and never expires.
- */
-@keyframes amendRemind {
-  0%, 100% { box-shadow: 0 0 13px rgba(255, 207, 92, 0.18); }
-  50% { box-shadow: 0 0 20px rgba(255, 207, 92, 0.34); }
-}
-
-@keyframes pendingIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes pendingPulse { 50% { box-shadow: 0 0 0 4px rgba(124, 255, 178, 0.08); } }
 
 /*
  * The frame. Drawn at the edge of the screen, so it is impossible to miss and
@@ -1529,124 +1437,9 @@ button.loadSlot:active .slotOff { color: var(--tone, var(--accent)); }
 body.loadoutOpen #abilities,
 body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
 
-#offerScrim {
-  position: absolute;
-  inset: 0;
-  background: rgba(2, 4, 9, 0.72);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.22s ease;
-  z-index: 26;
-}
-#offerScrim.on { opacity: 1; pointer-events: auto; }
-#offerScrim[hidden] { display: none; }
-
-#offer {
-  position: absolute;
-  left: calc(var(--safe-l) + 12px);
-  right: calc(var(--safe-r) + 12px);
-  top: 50%;
-  transform: translateY(-46%);
-  max-height: 78%;
-  display: flex;
-  flex-direction: column;
-  background: linear-gradient(180deg, rgba(8, 15, 26, 0.98), rgba(3, 6, 12, 0.99));
-  border: 1px solid rgba(120, 190, 255, 0.28);
-  clip-path: polygon(0 14px, 14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
-  opacity: 0;
-  pointer-events: none;
-  transition: transform 0.26s cubic-bezier(0.2, 0.9, 0.2, 1), opacity 0.2s ease;
-  z-index: 27;
-  overflow: hidden;
-}
-#offer.open { transform: translateY(-50%); opacity: 1; pointer-events: auto; }
-#offer[hidden] { display: none; }
-
-.offerHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 13px 14px 10px;
-  border-bottom: 1px solid var(--line);
-}
-#offerKicker { font-size: 10px; letter-spacing: 0.26em; color: var(--accent); }
-#offerNote { font-style: normal; font-size: 8px; letter-spacing: 0.2em; color: var(--dim); }
-
-#offerCards {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 12px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.offerCard {
-  -webkit-appearance: none;
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  text-align: left;
-  padding: 11px 12px;
-  border: 1px solid var(--line);
-  background: rgba(6, 12, 22, 0.7);
-  color: var(--ink);
-  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
-  transition: border-color 0.15s, background 0.15s, transform 0.07s ease;
-}
-.offerCard:active { transform: translateY(1px); background: rgba(89, 224, 255, 0.12); }
-/* The mark. Bigger than the type on purpose: it is what gets recognised. */
-.offerMark {
-  flex: 0 0 38px;
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(120, 190, 255, 0.14);
-  background: rgba(2, 6, 12, 0.75);
-  color: var(--accent);
-}
-.offerMark svg { width: 22px; height: 22px; display: block; }
-
-.offerBody {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
 
 /* Already stacked. The number is the point of the marks. */
-/* LV 2/3 is longer than x2 and says something different: how much of this
-   upgrade there is left rather than how much of it you hold. Quieter, because
-   it is a fact about the card and not a score. */
 
-.offerName { font-size: 12px; letter-spacing: 0.2em; }
-/* On a card whose effect is a switch, not a quantity. */
-.offerTag {
-  align-self: flex-start;
-  margin-top: 3px;
-  font-size: 6.5px;
-  letter-spacing: 0.16em;
-  color: var(--dim);
-  border: 1px solid var(--line);
-  padding: 2px 5px;
-}
-
-.offerLine {
-  font-size: 8.5px;
-  line-height: 1.5;
-  letter-spacing: 0.04em;
-  color: var(--dim);
-}
-
-/* Nothing on the field is live while an offer is up. */
-body.offerOpen #abilities,
-body.offerOpen #quickBar { pointer-events: none; opacity: 0.25; }
 
 /* ---------------- the strip ---------------- */
 
@@ -2376,22 +2169,12 @@ body.ending #alerts,
 body.ending #bossBar,
 body.ending #abilityHint,
 body.ending #quickBar,
-body.ending #pendingBtn,
-body.ending #bossCaption {
-  opacity: 0;
-  transition: opacity 1.2s ease;
-  pointer-events: none;
-}
-
+body.ending 
 /* Same treatment while the title screen is up: none of it is live yet. */
 body.booting #topbar,
 body.booting #abilities,
 body.booting #quickBar,
-body.booting #pendingBtn {
-  opacity: 0;
-  pointer-events: none;
-}
-
+body.booting 
 
 /*
  * Same clipping trap as the boot screen: a column flex centred with
@@ -2534,50 +2317,7 @@ body.booting #pendingBtn {
   #energyChip.took { animation: none; }
 }
 
-/*
- * Timed top-ups, under the chip row.
- *
- * SURGE and HASTE are the only two things in the game with a duration, and
- * they stack in time rather than in effect — so what the player needs is not
- * "is it on" but "how much of it is left", which is a number and a bar and
- * cannot be a glow on something else. It lives under the counters because that
- * is the corner already given over to what the run currently is, and because
- * it is the one part of the lower screen that is not spoken for.
- *
- * Empty it collapses out of the layout entirely: an empty rail is a readout
- * that is broken rather than one that has nothing to say.
- */
-#effects {
-  position: absolute;
-  /* The chip row runs to 54px below the safe-area top; this clears it with a
-     gap rather than sitting on its bottom edge. Measured at 414, 390 and 320. */
-  top: calc(var(--safe-t) + 66px);
-  left: calc(var(--safe-l) + 10px);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  pointer-events: none;
-  z-index: 14;
-}
-#effects:empty { display: none; }
 
-.fxChip {
-  --tone: #7cffb2;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 7px 4px 5px;
-  min-width: 104px;
-  border: 1px solid color-mix(in srgb, var(--tone) 42%, transparent);
-  background: rgba(6, 16, 26, 0.82);
-  color: var(--tone);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
-  animation: fxIn 0.24s ease-out;
-}
-.fxChip svg { width: 13px; height: 13px; display: block; }
 .fxMark { flex: 0 0 auto; opacity: 0.9; }
 .fxBody { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
 .fxName { font-size: 6.5px; letter-spacing: 0.18em; opacity: 0.85; }
@@ -2611,13 +2351,8 @@ body.booting #pendingBtn {
 .fx-corona { --tone: #ff9f5c; }
 .fx-overdraw { --tone: #bff4ff; }
 
-@keyframes fxIn {
-  from { opacity: 0; transform: translateX(-8px); }
-  to { opacity: 1; transform: none; }
-}
 @media (prefers-reduced-motion: reduce) {
-  .fxChip { animation: none; }
-}
+  }
 
 /* ============================================================
    THE TREE
@@ -3313,4 +3048,40 @@ body.booting #pendingBtn {
   font-weight: 400;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
+}
+
+
+/* ---------------------------------------------------------- the stack fold */
+
+/*
+ * Show/hide at the head of each stack. Four mine slots and four ammunition
+ * slots is a lot of column on a phone, and a run that lays no mines is
+ * looking straight past that side of the screen. The button never folds
+ * away with the stack -- a control that hides itself is one nobody finds.
+ */
+.qc.fold {
+  height: 22px;
+  min-height: 22px;
+  gap: 6px;
+  padding: 0 8px;
+  border-color: rgba(120, 190, 255, 0.16);
+  background: rgba(6, 12, 22, 0.7);
+}
+.qc.fold .qLbl { color: #8fa6bd; }
+.foldArrow {
+  width: 8px;
+  height: 8px;
+  border-left: 1.6px solid #8fa6bd;
+  border-bottom: 1.6px solid #8fa6bd;
+  transform: rotate(-45deg) translate(1px, -1px);
+  transition: transform 0.16s ease;
+}
+.qc.fold.off .foldArrow { transform: rotate(135deg) translate(1px, -1px); }
+.qc.fold:active { border-color: rgba(120, 190, 255, 0.4); }
+
+/* Folded: the slots go, the fold stays. */
+.qGroup.folded > .qc:not(.fold) { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .foldArrow { transition: none; }
 }

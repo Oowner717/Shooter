@@ -1,8 +1,8 @@
-// What the large events hand out. Permanent for the run, gone on reset.
+// What energy buys. Permanent for the run, gone on reset.
 //
 // Three axes, so a pick is an identity rather than a number: AMMO sharpens
 // what you shoot, FIELD is what happens without you, TURRET is the machine.
-// Every large event offers exactly one of each, so a run reads as a shape.
+// A run picks its way across the three, so it reads as a shape.
 //
 // Every effect here is a scalar on `world.up`, read at the point of use. That
 // is the whole contract: nothing in this file reaches into a subsystem, and

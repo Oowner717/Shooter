@@ -29,6 +29,17 @@ const SPEC = {
    * the governor can still go lower.
    */
   effects: { def: 1, of: [0.55, 0.8, 1], label: 'EFFECTS', words: ['LOW', 'MEDIUM', 'FULL'] },
+  /*
+   * The two stacks on the strip, shown or hidden. A preference rather than
+   * run state: somebody who folded the mines away to see more field did not
+   * mean "until I close the tab", and this is the same store that already
+   * holds the other two decisions of that kind.
+   *
+   * They are two values rather than one because the reasons differ -- a run
+   * that lays no mines wants that column gone and its ammunition kept.
+   */
+  showMines: { def: 1, of: [0, 1], label: 'MINE STACK', words: ['HIDDEN', 'SHOWN'] },
+  showAmmo: { def: 1, of: [0, 1], label: 'AMMO STACK', words: ['HIDDEN', 'SHOWN'] },
 };
 
 const state = { ...Object.fromEntries(Object.entries(SPEC).map(([k, s]) => [k, s.def])) };

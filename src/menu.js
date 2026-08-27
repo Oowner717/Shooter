@@ -589,7 +589,7 @@ export class Menu {
      * there is one path -- anything that adds to the ledger flares, including
      * the debug hooks, and nothing has to remember to call this.
      */
-    const taken = w.offers.taken;
+    const taken = w.ledger;
     if (this.tookAt === undefined) this.tookAt = taken.length;
     if (taken.length > this.tookAt) {
       const last = NODES.find((n) => n.id === taken[taken.length - 1]);
@@ -1284,7 +1284,7 @@ export class Menu {
   sync(world) {
     // The badge on the energy chip. Only recomputed when a purse actually
     // moves — energy ticks up constantly, so this is the diff that matters.
-    const purse = `${world.energy | 0}:${world.remainder | 0}:${world.offers.taken.length}`;
+    const purse = `${world.energy | 0}:${world.remainder | 0}:${world.ledger.length}`;
     if (purse !== this.lastPurse) {
       this.lastPurse = purse;
       this.game.hud.setBuys(this.reachCount(world));

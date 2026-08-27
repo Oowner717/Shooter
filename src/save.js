@@ -158,7 +158,7 @@ export function captureRun(world, game) {
     mine: world.mine,
     autoAim: !!world.autoAim,
     autoFire: !!world.autoFire,
-    taken: [...world.offers.taken],
+    taken: [...world.ledger],
     /*
      * How many ways in are actually held, which is not what the ledger says.
      *
@@ -187,11 +187,8 @@ export function captureRun(world, game) {
     // When, so CONTINUE can say how long ago rather than just how far. Not
     // read by the restore; nothing about the run depends on the clock.
     at: Date.now(),
-    nextSmall: world.offers.nextSmall,
-    nextLarge: world.offers.nextLarge,
     // Only the tiers. The three cards on an unopened offer are a fresh roll
     // either way, and rolling them again on resume costs nothing.
-    queued: world.offers.queue.map((q) => q.tier),
     teaching: !!game.teaching,
     scriptStep: game.scriptStep,
     hinted: Object.keys(game.autoHinted || {}),

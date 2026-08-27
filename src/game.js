@@ -27,7 +27,6 @@ import { Narrator } from './narrative.js';
 import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
 import { codex, lineSeen, markLine, forgetLines, forgetPlayer, migrateLines } from './codex.js';
 import { readRun, saveRun, forgetRun } from './save.js';
-import { Offers } from './events.js';
 import { freshUpgrades, BY_ID } from './upgrades.js';
 import { NODES, NODE_BY_ID, priceOf } from './tree.js';
 
@@ -117,11 +116,15 @@ export class Game {
       mine: null, // the one kind of mine being laid, or none
 
       energy: 0, // banked; nothing carries across a reset
-      up: freshUpgrades(), // what the large offers have granted, this run only
-      offers: new Offers(),
-      surge: 0, // seconds of doubled cadence, from a SURGE offer
-      haste: 0, // seconds of halved ability cooldowns, from a HASTE offer
-      pendingMines: 0, // laid on the next tick, from a SEED offer
+      up: freshUpgrades(), // every permanent effect this run has bought
+      /*
+       * Every id bought, in the order it was bought. This is the run's whole
+       * record of itself: owned() counts it, the turret's rig is derived from
+       * it, and the save is it. It used to live on an Offers object beside a
+       * queue of cards waiting to be picked, which is why it was called that;
+       * the cards are gone and the record is not.
+       */
+      ledger: [],
       // Always true from build 81. Kept as a field because the director, the
       // counter and the save all read it, and a constant threaded through
       // four modules is worse than a flag that is simply never false.
@@ -141,7 +144,7 @@ export class Game {
       nextStoryAt: CFG.storyEvery,
 
       // What is bolted to the turret: one count per TURRET node, rebuilt from
-      // `offers.taken` whenever that grows. Declared here rather than sprung
+      // the ledger whenever that grows. Declared here rather than sprung
       // into existence on first use — a field that appears later is the shape
       // of bug scripts/regress.mjs watches for.
       rig: null,
@@ -193,7 +196,6 @@ export class Game {
 
       alert: (text, kind, dur) => self.hud.alert(text, kind, dur),
       abilityTaken: (i) => self.hud.flashTaken(i),
-      announceOffer: (tier) => self.announceOffer(tier),
       carry: (key) => self.carry(key),
     };
   }
@@ -254,15 +256,7 @@ export class Game {
     w.nextStoryAt = CFG.storyEvery;
     w.energy = 0;
     w.up = freshUpgrades();
-    w.offers.reset();
-    w.surge = 0;
-    w.haste = 0;
-    w.corona = 0; // seconds the turret is burning
-    w.overdraw = 0; // shots left that leave as three
-    w.pendingScour = false;
-    w.pendingEbb = false;
-    w.pendingMines = 0;
-    this.hud.setPending(0, null);
+    w.ledger.length = 0;
     this.loadoutOpen = null;
     // Every run is endless as of build 81. There is no five hundred to reach,
     // no lull, no ORDINAL and no ending — the field simply keeps coming, and
@@ -372,7 +366,7 @@ export class Game {
       const u = BY_ID.get(id);
       if (!u) continue;
       try { u.apply(w.up, w); } catch { /* a card from a table that has moved on */ }
-      w.offers.taken.push(id);
+      w.ledger.push(id);
     }
     // ...and then what was actually owned and carried wins over whatever the
     // replay happened to place, because a loadout is a decision too. Same for
@@ -411,9 +405,6 @@ export class Game {
     w.mine = carried(w.loadout, d.mine) ? d.mine : null;
     w.autoAim = !!d.autoAim;
     w.autoFire = !!d.autoFire;
-    w.offers.nextSmall = d.nextSmall;
-    w.offers.nextLarge = d.nextLarge;
-    for (const tier of d.queued || []) w.offers.requeue(w, tier);
     if (w.narrator) w.narrator.index = d.story || 0;
 
     // Nothing is said twice. The ladder picks up at the step it reached, so a
@@ -437,8 +428,6 @@ export class Game {
     this.hud.setToggle('autoFire', w.autoFire);
     this.hud.setKills(w.kills, w.endless ? null : CFG.killGoal);
     this.hud.setEnergy(w.energy);
-    this.hud.setPending(w.offers.pending, w.offers.next);
-    this.hud.syncEffects(w);
     this.hud.syncAbilities(w.abilities);
     this.hud.alert('SESSION RESTORED', 'info', 2.6);
   }
@@ -466,7 +455,7 @@ export class Game {
    */
   owned(id) {
     let n = 0;
-    for (const t of this.world.offers.taken) if (t === id) n++;
+    for (const t of this.world.ledger) if (t === id) n++;
     return n;
   }
 
@@ -518,7 +507,7 @@ export class Game {
     else w.energy -= price;
     // Stat upgrades only touch world.up; unlocks and charges need the world.
     def.apply(w.up, w);
-    w.offers.taken.push(id);
+    w.ledger.push(id);
 
     audio.amend();
     this.hud.setEnergy(w.energy, intakeRate(w));
@@ -586,7 +575,7 @@ export class Game {
 
   /** The simulation holds while the menu is open, so a change costs nothing. */
   get paused() {
-    return !!this.offerOpen || !!this.loadoutOpen
+    return !!this.loadoutOpen
       || !!(this.hud && this.hud.menu && this.hud.menu.open);
   }
 
@@ -730,17 +719,6 @@ export class Game {
 
 
   /**
-   * Something has come due. A top-up gets a chime and nothing else — it is
-   * tempo, it will keep. A permanent one is the only thing in the run that is
-   * yours for good, and it gets said properly: a fanfare, a gold frame across
-   * the whole screen, a pill that names it, and a button that blooms and then
-   * keeps pulsing until it is taken. The world is never interrupted for it.
-   */
-  announceOffer() {
-    audio.chime(600);
-  }
-
-  /**
    * A round or a mine that has just been bought goes straight onto the strip
    * if there is a free cell for it, because the alternative is buying a thing
    * and watching nothing happen. If both its cells are full it stays owned and
@@ -785,42 +763,6 @@ export class Game {
   closeLoadout() {
     this.loadoutOpen = null;
     this.hud.hideLoadout();
-  }
-
-  /** Opens whatever is at the front of the queue. Holds the world while it is up. */
-  openOffer() {
-    const w = this.world;
-    if (!w.offers.pending) return false;
-    this.offerOpen = true;
-    // Rolled here rather than when it came due, so the three cards are drawn
-    // against what has actually been taken by now. See Offers.prepare.
-    this.hud.showOffer(w.offers.prepare(w));
-    return true;
-  }
-
-  closeOffer() {
-    this.offerOpen = false;
-    this.hud.hideOffer();
-  }
-
-  takeOffer(index) {
-    const w = this.world;
-    const opt = w.offers.take(w, index);
-    this.closeOffer();
-    if (opt) {
-      audio.chime(920);
-      background.surge(1.2);
-      this.hud.syncAbilities(w.abilities);
-      // Point at the thing that just opened. After the scrim, so the bloom is
-      // not spent behind it.
-      if (opt.axis === 'UNLOCK' && opt.key) {
-        setTimeout(() => this.hud.flashUnlocked(opt.key), 260);
-      }
-      // Not worth waiting four seconds for: this is the decision a player
-      // would be most annoyed to lose.
-      this.checkpoint();
-    }
-    return opt;
   }
 
   toggleAuto(key) {
@@ -1035,7 +977,6 @@ export class Game {
     if (interval <= 0) return;
     // heavier rounds buy their effect with cadence
     interval *= CFG.rounds[w.round].rate * w.up.rate;
-    if (w.surge > 0) interval *= 0.5;
 
     // Auto aim waits until the barrel has actually come round. Auto fire does
     // not — that toggle means "shoot wherever this is pointed", including
@@ -1151,63 +1092,6 @@ export class Game {
     this.mineTimer = mineCadence(w, this.mineTimer, dt);
     collectEnergy(w, dt);
     this.runUpgrades(dt);
-    if (w.surge > 0) w.surge = Math.max(0, w.surge - dt);
-    if (w.haste > 0) w.haste = Math.max(0, w.haste - dt);
-    if (w.corona > 0) w.corona = Math.max(0, w.corona - dt);
-    // SCOUR: the whole floor at once, and paid over the odds for it. The one
-    // card that answers the chore build 59 created, and its worth is however
-    // much wreckage you had let pile up.
-    if (w.pendingScour) {
-      w.pendingScour = false;
-      const s = w.shooter;
-      // The same verb PULSE uses, with no limit on the reach and a bonus on
-      // the take. Infinity rather than a big number, because "the whole floor"
-      // is what the card says.
-      const took = drawIn(w, Infinity, CFG.boosts.scour.bonus);
-      if (took) {
-        ring(s.x, s.y, 30, 520, 0.55, '#9fe8ff', 3);
-        ripple(s.x, s.y, 1.3, 900);
-        audio.chime(880);
-      }
-    }
-
-    // EBB: everything hostile thrown back up the field. The velocity is set
-    // rather than added, so a BULWARK goes as far as a MOTE — the point is
-    // that the field comes off you, not that heavy things shrug it off.
-    if (w.pendingEbb) {
-      w.pendingEbb = false;
-      const E = CFG.boosts.ebb;
-      const s = w.shooter;
-      let n = 0;
-      for (const e of w.enemies) {
-        if (e.dead || e.harmless || e.staged) continue;
-        e.vx = spread(E.spread);
-        e.vy = -E.speed;
-        e.thrown = E.coast;
-        e.attacking = false;
-        w.attackers.delete(e);
-        e.flash = Math.max(e.flash, 0.6);
-        n++;
-      }
-      if (n) {
-        ring(s.x, s.y, 20, 900, 0.5, '#7cffb2', 4);
-        ripple(s.x, s.y, 1.8, 1200);
-        shake(5);
-        audio.chime(520);
-      }
-    }
-
-    while (w.pendingMines > 0) {
-      w.pendingMines--;
-      // With nothing selected SEED used to do nothing at all, which made it a
-      // dead option on any run that had not picked a mine yet. It lays a
-      // random kind instead — but only one that has actually been unlocked,
-      // or it hands out a mine the turret has not bought. The offer is not
-      // rolled at all when nothing is open, so the fallback is belt and braces.
-      const own = MINE_KEYS.filter((k) => w.unlocked.has(k));
-      if (w.mine) throwMine(w, w.mine);
-      else if (own.length) throwMine(w, own[(Math.random() * own.length) | 0]);
-    }
     updateMines(w, dt);
     this.resolveBlasts();
     this.checkContact();
@@ -1332,27 +1216,6 @@ export class Game {
     if (up.casing > 0) {
       for (const e of w.attackers) {
         if (!e.dead) e.applyDamage(w, up.casing * dt);
-      }
-    }
-
-    // CORONA: for half a minute the turret is unpleasant to be near. Reaches
-    // past what is actually attached, which is the whole difference between
-    // this and the card it replaced — it kills the crowd on the way in as
-    // well as the one already holding on.
-    if (w.corona > 0) {
-      const C = CFG.boosts.corona;
-      const r2 = C.r * C.r;
-      const bite = C.dps * dt;
-      for (const e of w.enemies) {
-        if (e.dead || e.staged || e.harmless) continue;
-        if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= r2) e.applyDamage(w, bite);
-      }
-      // A ring on the beat rather than every frame: sixty of these a second
-      // is a solid disc, not a shell.
-      this.coronaBeat = (this.coronaBeat || 0) - dt;
-      if (this.coronaBeat <= 0) {
-        this.coronaBeat = 0.28;
-        ring(s.x, s.y, C.r * 0.55, C.r, 0.3, '#ff9f5c', 2);
       }
     }
 
@@ -1569,9 +1432,9 @@ export class Game {
 
   /**
    * On screen and not yet bought. Every locked thing is drawn from the first
-   * frame — the shape of what a turret can become is part of what the offers
-   * are for, and a card that hands you WIRE means more when you have been
-   * looking at its cell for ten minutes.
+   * frame — the shape of what a turret can become is worth seeing before it
+   * is yours, and unsealing WIRE means more when you have been looking at its
+   * cell for ten minutes.
    */
   isSealed(key) {
     return !this.world.unlocked.has(key);
@@ -1586,7 +1449,6 @@ export class Game {
   registerKill() {
     const w = this.world;
     w.kills++;
-    w.offers.note(w);
     this.teach();
     // The ten lines, one per `storyEvery` kills, and then it stops talking.
     // They used to be gated on the counted run — the run that no longer
@@ -1627,8 +1489,6 @@ export class Game {
     const w = this.world;
     this.hud.setKills(w.kills, null);
     this.hud.setEnergy(w.energy, intakeRate(w));
-    this.hud.setPending(w.offers.pending, w.offers.next);
-    this.hud.syncEffects(w);
     this.hud.syncAbilities(w.abilities);
     this.hud.syncLoadout(w);
     this.hud.syncSeals();
@@ -2004,7 +1864,7 @@ export class Game {
       if (n.repeat) continue;
       for (let have = this.owned(n.id); have < (n.levels || 1); have++) {
         def.apply(w.up, w);
-        w.offers.taken.push(n.id);
+        w.ledger.push(n.id);
         bought++;
       }
     }
@@ -2026,7 +1886,7 @@ export class Game {
     const w = this.world;
     for (const k of ALL_KEYS) w.unlocked.add(k);
     // Owning is not carrying. Granting the arsenal without putting any of it
-    // on the strip left every cell empty, which is a state the offers can
+    // on the strip left every cell empty, which is a state the tree can
     // reach too but is never what this button means.
     for (const k of ALL_KEYS) place(w.loadout, k);
     this.hud.buildStrip();

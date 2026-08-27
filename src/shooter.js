@@ -13,6 +13,9 @@ import { spark, ring, shake } from './fx.js';
  * fraction of, and the one number that tells the machine it is finished.
  */
 const RIG_MAX = 17;
+
+/** How wide SALVO throws its three. */
+const SALVO_FAN = 0.09;
 import { applyBlast } from './enemies.js';
 import { audio } from './audio.js';
 
@@ -182,10 +185,8 @@ export class Shooter {
      */
     this.salvoCount = (this.salvoCount || 0) + 1;
     const salvo = up.salvo && this.salvoCount % up.salvo === 0;
-    const drawing = world.overdraw > 0;
-    if (drawing) world.overdraw = Math.max(0, world.overdraw - 1);
-    const spreadBy = CFG.boosts.overdraw.fan;
-    const fan = salvo || drawing ? [-spreadBy, 0, spreadBy] : [0];
+    // SALVO's three, at the spread the fan is drawn to.
+    const fan = salvo ? [-SALVO_FAN, 0, SALVO_FAN] : [0];
 
     if (world.round === 'shotgun') {
       const g = R.shotgun;
@@ -288,7 +289,7 @@ export class Shooter {
         damage: g.damage,
         impulse: 24,
         bounces: 0,
-        color: '#9be89b',
+        color: '#8eeb4b',
         core: '#e6ffe6',
         trail: 0.04,
         burst: (w, x, y) => {
@@ -296,7 +297,7 @@ export class Shooter {
             r: g.patch.r * w.up.patchR,
             life: g.patch.life * w.up.patchLife,
             dps: g.patch.dps * w.up.patchDps,
-            tone: '#9be89b',
+            tone: '#8eeb4b',
           }));
         },
       });
@@ -794,7 +795,7 @@ export class Shooter {
   }
 
   rig(world) {
-    const taken = world.offers.taken;
+    const taken = world.ledger;
     if (world.rig && world.rigAt === taken.length) return world.rig;
     const rig = { rate: 0, slew: 0, aimrange: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0 };
     for (const id of taken) if (id in rig) rig[id]++;

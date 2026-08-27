@@ -1,10 +1,10 @@
 /*
  * The tree.
  *
- * Everything permanent used to arrive as an AMENDMENT: three cards, take one,
- * and the rest of that roll was gone forever. That made a run a sequence of
- * accidents. A tree makes it a plan — you can see the whole machine from the
- * first minute, and every energy you bank is aimed at something you picked.
+ * Everything permanent used to arrive as a card: three offered, take one, and
+ * the rest of that roll gone forever. That made a run a sequence of accidents.
+ * A tree makes it a plan — you can see the whole machine from the first
+ * minute, and every energy you bank is aimed at something you picked.
  *
  * Four categories, and nothing at the top level is bought:
  *

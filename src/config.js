@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '163';
+export const BUILD = '164';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '163';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a2b9570';
+export const REV = 'ca92732';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -546,44 +546,6 @@ export const CFG = {
     // small enough that a VOID often expires unused, which is what EVENT
     // HORIZON is for — it more than doubles this and nothing else.
     trigger: 18,
-  },
-
-  // ---- allocation boosts ------------------------------------------------
-  // The small tier. Everything here is tempo: it changes the next minute and
-  // nothing after it.
-  boosts: {
-    // CORONA. A burning shell on the turret. Replaced SHAKE OFF, which was a
-    // dead card whenever nothing was attached — this one is worth taking
-    // before the crowd arrives as well as after.
-    corona: { seconds: 30, dps: 70, r: 150 },
-    // SCOUR. The whole floor at once, and paid over the odds for it.
-    scour: { bonus: 1.5 },
-    // EBB. Everything hostile thrown back up the field. Velocity is set rather
-    // than added, so a BULWARK goes as far as a MOTE — the point is that the
-    // field is cleared off you, not that heavy things resist it.
-    // `coast` is the window in which a thrown body does not steer. Without it
-    // the throw was fought on the very next frame and a BULWARK travelled 95
-    // units to a MOTE's 248 — which is the opposite of the point.
-    ebb: { speed: 620, spread: 120, coast: 0.8 },
-    // OVERDRAW. The next N shots leave as three. Counted in shots, not
-    // seconds, so a slow round gets the same number of them as a fast one.
-    overdraw: { shots: 12, fan: 0.09 },
-  },
-
-  // ---- offers ----------------------------------------------------------
-  // Kills are the clock. Neither tier ever interrupts: they queue behind a
-  // button and wait as long as it takes, because the point of this game is
-  // that you can put it down.
-  events: {
-    small: 40, // kills between tempo offers — about twelve in a counted run
-    // The first one comes early, so the opening has a real ALLOCATION waiting
-    // on the button at the moment it explains what one is.
-    smallFirst: 22,
-    // Permanent ones. Fourteen things start locked and each AMENDMENT opens at
-    // most one, so this is what decides how much of the turret a single run
-    // can assemble: at fifty, about ten of the fourteen, and the rest is what
-    // the next run is for.
-    large: 50,
   },
 
   // ---- prism shell ----------------------------------------------------

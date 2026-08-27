@@ -1043,6 +1043,77 @@ export class Enemy {
       ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.09);
     }
 
+    /*
+     * THE TITHE MARK.
+     *
+     * `marks` has driven this round's whole ramp since it shipped -- the
+     * damage a hit adds and the salvage the body pays are both read off it --
+     * and it was never drawn. A round whose entire point is that it gets
+     * stronger the longer you stay on one body gave the player no way to see
+     * whether they were on the right body, how far in they were, or that
+     * anything was happening at all. The number was in the simulation and
+     * nowhere on the screen.
+     *
+     * Drawn as strokes cut into the body's own outline, one per mark, closing
+     * into a ring as it deepens -- so a marked thing reads at a glance and a
+     * nearly-spent one reads as nearly closed. Under the shape, so it looks
+     * cut in rather than stuck on.
+     */
+    if (this.marks > 0 && !this.isDrop) {
+      const TONE = '#40e693';
+      // Eight seats, because CFG.rounds.tithe.marks is 8 -- the depth the
+      // round reaches on its own. LIEN raises the cap to fourteen, and those
+      // last six are drawn on a second ring inside the first, offset half a
+      // seat so they interleave. The first draft ran the seat angle off
+      // `i / full` for every mark, so mark 9 landed exactly on mark 1 and a
+      // body worth 14 was indistinguishable from one worth 8.
+      const full = 8;
+      const rr = this.r * 1.24;
+      const deep = Math.min(1, this.marks / full);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      // The ring itself tightens and brightens with the mark.
+      ctx.strokeStyle = rgba(TONE, 0.13 + deep * 0.3);
+      ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.07);
+      ctx.beginPath();
+      ctx.arc(0, 0, rr, 0, TAU);
+      ctx.stroke();
+      // A stroke per mark, cut inward. They accumulate clockwise from the top
+      // so the count is readable without being a number.
+      ctx.lineWidth = Math.max(HAIRLINE * 1.4, this.r * 0.1);
+      ctx.strokeStyle = rgba(TONE, 0.55 + deep * 0.45);
+      const len = this.r * (0.2 + deep * 0.12);
+      const tick = (i, radius, reach) => {
+        const ang = -Math.PI / 2 + ((i % full) / full) * TAU + (i >= full ? Math.PI / full : 0);
+        const cx = Math.cos(ang);
+        const cy = Math.sin(ang);
+        ctx.beginPath();
+        ctx.moveTo(cx * (radius - reach), cy * (radius - reach));
+        ctx.lineTo(cx * (radius + reach * 0.25), cy * (radius + reach * 0.25));
+        ctx.stroke();
+      };
+      const outer = Math.min(this.marks, full);
+      for (let i = 0; i < outer; i++) tick(i, rr, len);
+      /*
+       * Past eight, the marks go outward: shorter strokes in the gaps between
+       * the seats, outside the ring. Outward rather than inward because the
+       * first attempt put them at 0.98r, on top of the body's own outline,
+       * where six of them were worth twenty-seven pixels and read as nothing.
+       */
+      const over = Math.min(this.marks - full, full);
+      if (over > 0) {
+        ctx.strokeStyle = rgba(TONE, 0.5 + deep * 0.35);
+        ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.085);
+        for (let i = full; i < full + over; i++) tick(i, rr + len * 0.95, len * 0.62);
+      }
+      // Full: the ring closes and the body carries a steady bloom, so "this
+      // one is paying out" is visible across the field.
+      if (this.marks >= full) {
+        drawGlow(ctx, TONE, 0, 0, this.r * 1.9, 0.16 + 0.07 * Math.sin(world.time * 5 + this.phase));
+      }
+      ctx.restore();
+    }
+
     switch (this.isDrop ? 'drop' : t.shape) {
       case 'shard': drawShard(ctx, this.r); break;
       case 'needle': drawNeedle(ctx, this.r); break;

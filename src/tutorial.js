@@ -40,10 +40,8 @@ const OPENING = [
 ];
 
 /**
- * And these, spread across the count, about the three things the run gives
- * back. Each is said where it can be pointed at rather than described:
- * CFG.events.smallFirst exists so there is a real ALLOCATION on the button by
- * the time the second one is read.
+ * And these, spread across the count, about what the run gives back. Each is
+ * said where it can be pointed at rather than described.
  */
 const NOTES = [
   // Said the moment there is energy on the floor to point at. Two lines
@@ -53,9 +51,15 @@ const NOTES = [
   // PULSE takes it in. The INTAKE upgrade is what eventually removes the third.
   { at: 1, text: 'Broken objects leave ENERGY.\nIt is not an enemy. It drifts to you.' },
   { at: 2, text: 'PULSE takes in the energy near you.\nENERGY is the green number.' },
-  { at: 20, text: 'ALLOCATION is waiting. Three offered, one taken.\nIt keeps. Open it whenever you want it.' },
-  { at: 44, text: 'An AMENDMENT is the permanent one.\nNew rounds, new mines, new abilities.' },
-  { at: 120, text: 'Everything you are not carrying is still out there.\nThe offers are how you get it.' },
+  /*
+   * The three lines that were here described ALLOCATION and AMENDMENT -- three
+   * cards, one taken -- and neither exists. AMENDMENT went in build 83 and its
+   * line outlived it by eighty builds, telling every new player about a thing
+   * the game had not had for a year. What is left points at the one place
+   * everything is actually bought.
+   */
+  { at: 20, text: 'ENERGY buys everything.\nTap the green number to spend it.' },
+  { at: 120, text: 'Everything you are not carrying is still out there.\nIt is all in UPGRADES, and none of it expires.' },
 ];
 
 /*
@@ -106,8 +110,8 @@ export const CONTROL_LINES = SCRIPT.slice(0, 4).map((e) => e.id);
 /**
  * What each thing says the first time it is used. One sentence about what it
  * does — no story, and nothing that leans on a mechanic not yet met. These are
- * also the lines the unlock offers carry, so the card that hands you a round
- * and the caption that greets you using it say the same thing.
+ * also the lines the tree carries, so the card that sells you a round and
+ * the caption that greets you using it say the same thing.
  */
 const ABILITY_USE = {
   pulse: 'PULSE. Hurts and shoves what is near you,\nand takes in the energy on the floor.',
@@ -139,12 +143,12 @@ export const FIRST_USE = {
  * at anything. The two that run on their own come with it because they are not
  * power: they are the difference between playing this with a thumb on the
  * lever and leaving it running, and which of those a session is should be the
- * player's to choose from the first minute rather than something the offers
- * eventually get round to. Both start switched off.
+ * player's to choose from the first minute rather than something bought
+ * later. Both start switched off.
  */
 export const STARTING = ['standard', 'pulse', 'fan', 'autoAim', 'autoFire'];
 
-/** Rounds, mines and abilities, in the order the offers hand them out. */
+/** Rounds, mines and abilities, in the order the tree lists them. */
 export const LOCKABLE = {
   rounds: ['explosive', 'shotgun', 'arc', 'spine', 'slug', 'rime', 'spore', 'tithe'],
   mines: ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'],

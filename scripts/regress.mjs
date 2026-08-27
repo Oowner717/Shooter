@@ -1254,7 +1254,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     if (w.boss) { w.boss.clear(w); w.boss = null; }
     g.resume(); // the real restore path, off the real file
     const back = { held, spent, saved: d ? d.aperture : null, restored: w.aperture,
-      ledger: w.offers.taken.filter((x) => x === 'aperture').length };
+      ledger: w.ledger.filter((x) => x === 'aperture').length };
     g.restart();
     return back;
   });
@@ -1493,7 +1493,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.rig = { rate: 0, slew: 0, aimrange: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0, ...rig };
       w.rig.filled = ['rate', 'slew', 'aimrange', 'overwatch', 'casing', 'insulation', 'intake']
         .reduce((a, k) => a + w.rig[k], 0) / 17;
-      w.rigAt = w.offers.taken.length;
+      w.rigAt = w.ledger.length;
       w.rigFlash = 0;
       c2.setTransform(1, 0, 0, 1, 0, 0);
       c2.clearRect(0, 0, 260, 260);
@@ -1534,6 +1534,120 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.deeper.length === 4 && Math.abs(r.full - r.bare) > 5000,
     `levels 1 -> 3 changed the machine for ${r.deeper.join(', ') || 'nothing'}; `
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
+}
+
+// --- the TITHE mark is on the screen, and it deepens ------------------------
+/*
+ * `marks` drove this round's whole ramp from the day it shipped -- the damage
+ * a hit adds and the salvage the body pays are both read off it -- and for
+ * every build until 164 it was drawn nowhere. A round whose entire point is
+ * that it gets stronger the longer you stay on one body told the player
+ * nothing about which body they were on or how far in they were.
+ *
+ * Two things are asked, because the first draft passed the first and failed
+ * the second. The mark has to be visible at all; and it has to keep saying
+ * something past the eight that CFG.rounds.tithe.marks stops at, because LIEN
+ * raises that cap to fourteen. The first draft placed every tick at
+ * `i / 8` of a turn, so mark 9 landed exactly on mark 1 and a body worth
+ * fourteen was pixel-identical to one worth eight.
+ *
+ * Counted rather than eyeballed: the mark is the only green thing on a
+ * violet body, so green-dominant pixels are the mark and nothing else.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+
+    const cv = document.createElement('canvas');
+    cv.width = 200; cv.height = 200;
+    const c2 = cv.getContext('2d', { willReadFrequently: true });
+    const e = g.debugSpawn('lurcher', 400, 400);
+    e.spawnIn = 0; e.angle = 0; e.flash = 0; e.hp = e.maxHp;
+
+    const green = (marks) => {
+      e.marks = marks;
+      c2.setTransform(1, 0, 0, 1, 0, 0);
+      c2.clearRect(0, 0, 200, 200);
+      c2.translate(100 - e.x, 100 - e.y);
+      e.draw(c2, w);
+      const d = c2.getImageData(0, 0, 200, 200).data;
+      let n = 0;
+      // #40e693 against a violet body: green well clear of both others.
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 1] > d[i] + 26 && d[i + 1] > d[i + 2] + 26 && d[i + 1] > 60) n++;
+      }
+      return n;
+    };
+
+    const at = {};
+    for (const m of [0, 1, 4, 8, 11, 14]) at[m] = green(m);
+    e.dead = true;
+    g.restart();
+    return at;
+  });
+  const rising = [0, 1, 4, 8, 11, 14].slice(1)
+    .every((m, i) => r[m] > r[[0, 1, 4, 8, 11, 14][i]]);
+  check('a marked body wears its mark, and a deeper mark reads deeper',
+    r[0] < 40 && r[1] > r[0] + 40 && rising,
+    `green pixels by mark: ${[0, 1, 4, 8, 11, 14].map((m) => `${m}:${r[m]}`).join(' ')}`);
+  check('...and it keeps saying something past the eight it stops deepening at',
+    r[14] > r[8] + 60 && r[11] > r[8],
+    `8 -> ${r[8]}, 11 -> ${r[11]}, 14 -> ${r[14]}`);
+}
+
+// --- the two stacks can be put away, and stay away --------------------------
+/*
+ * Nine mines and nine rounds is eighteen buttons down the sides of a phone,
+ * and a player who has settled on two of each is carrying sixteen they never
+ * press. The fold is the answer, and it has one rule that is easy to get
+ * wrong: the button that folds a stack cannot be inside the part that folds,
+ * or putting the stack away takes the way back with it.
+ */
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    const shown = (sel) => [...document.querySelectorAll(sel)]
+      .filter((el) => el.getBoundingClientRect().height > 0).length;
+    const press = (id) => document.getElementById(id)
+      .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    const out = { open: {}, shut: {}, back: {} };
+    const read = (into) => {
+      into.mines = shown('.q_mines .qc');
+      into.ammo = shown('.q_ammo .qc');
+      into.foldMines = shown('#foldMines');
+      into.label = document.querySelector('#foldMines .qLbl').textContent;
+    };
+    g.hud.syncFolds();
+    read(out.open);
+    press('foldMines'); press('foldAmmo');
+    read(out.shut);
+    press('foldMines'); press('foldAmmo');
+    read(out.back);
+    return out;
+  });
+  check('folding a stack puts it away and leaves the way back',
+    r.shut.mines === 1 && r.shut.ammo === 1 && r.shut.foldMines === 1
+    && r.open.mines > 1 && r.back.mines === r.open.mines
+    && r.shut.label === 'MINES' && r.open.label === '',
+    `open ${r.open.mines}/${r.open.ammo}, folded ${r.shut.mines}/${r.shut.ammo} `
+    + `(button still there: ${r.shut.foldMines}, says "${r.shut.label}"), `
+    + `unfolded ${r.back.mines}/${r.back.ammo}`);
+
+  // ...and the choice is a setting, so it survives the app being closed.
+  const kept = await page.evaluate(async () => {
+    const { pref, setPref } = await import('../src/settings.js');
+    setPref('showMines', 0);
+    const raw = localStorage.getItem('sim7749-prefs');
+    setPref('showMines', 1);
+    return { written: /showMines/.test(raw || ''), reads: pref('showMines') };
+  });
+  check('...and which way it was left is remembered', kept.written && kept.reads === 1,
+    `written to the prefs blob: ${kept.written}`);
 }
 
 // --- nothing a boss made outlives it -----------------------------------------

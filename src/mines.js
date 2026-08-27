@@ -43,7 +43,7 @@ const TONE = {
   snare: { live: '#c77dff', idle: '#8fa9c4', core: '#e0aaff' },
   wire: { live: '#7cffb2', idle: '#8fa9c4', core: '#c9ffe4' },
   knell: { live: '#ff5d8f', idle: '#9fb3c8', core: '#ffd6e2' },
-  thorn: { live: '#9be89b', idle: '#8fa9c4', core: '#e6ffe6' },
+  thorn: { live: '#c3eb4b', idle: '#8fa9c4', core: '#e6ffe6' },
   lode: { live: '#59e0ff', idle: '#8fa9c4', core: '#d6f6ff' },
   spall: { live: '#ffd166', idle: '#9fb3c8', core: '#fff0c8' },
   void: { live: '#b388ff', idle: '#8fa9c4', core: '#1a0f2e' },
@@ -393,7 +393,7 @@ export function updateMines(world, dt) {
           r: T.patch.r * world.up.patchR,
           life: m.life,
           dps: T.patch.dps * world.up.patchDps,
-          tone: '#9be89b',
+          tone: '#c3eb4b',
         });
         world.effects.push(m.patch);
       }
