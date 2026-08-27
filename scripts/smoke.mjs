@@ -101,10 +101,15 @@ await dbg('STATS');
 await dbg('NO COOLDOWN');
 
 // --- soak: unlock every object type, then churn the field with abilities ---
+// Energy, not kills: the types have been gated on what a run has banked since
+// build 180, and debugFillField spawns straight from the table regardless --
+// so a soak driven on kills was churning a field the director could not have
+// produced. The kills still go in; they are what the tally and the story read.
 for (let round = 0; round < 6; round++) {
   await page.evaluate(() => {
     const g = window.__sim;
     g.debugAddKills(30);
+    g.debugGiveEnergy(4000);
     g.debugFillField();
   });
   for (let a = 0; a < 5; a++) {

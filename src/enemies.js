@@ -2643,6 +2643,10 @@ export function intakeRate(world) {
 function bank(world, amount, x, y) {
   const got = amount * intakeRate(world);
   world.energy += got;
+  // The one place energy enters a run, so the one place the lifetime counter
+  // can be kept honest. Net of the corruption tax on purpose: what was taken
+  // off you at the intake was never earned.
+  world.earned += got;
   if (got >= 1) dot(x, y, 0, -60, '#9fe8ff', 0.5, 3);
 }
 
@@ -2957,9 +2961,18 @@ export class Director {
     return this.tier;
   }
 
-  /** Every type in a wave has to have unlocked before the wave is eligible. */
+  /**
+   * Every type in a wave has to have opened before the wave is eligible.
+   *
+   * On lifetime energy, not on kills. A kill count says how much you have
+   * shot; what gates a new object ought to be how far the run has actually
+   * got, and the tree, the tiers and the unlocks then all run off one clock
+   * instead of three. The thresholds are grouped by band -- see the note on
+   * `opens` in config.js -- so a band's types are open before the band is
+   * drawn from, rather than in the order they happened to be authored.
+   */
   eligible(world, wave) {
-    return wave.of.every(([id]) => world.kills >= (TYPE_BY_ID[id].unlock || 0));
+    return wave.of.every(([id]) => (world.earned || 0) >= (TYPE_BY_ID[id].opens || 0));
   }
 
   /**

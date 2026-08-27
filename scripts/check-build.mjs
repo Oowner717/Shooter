@@ -229,6 +229,35 @@ if (emptyBands.length) {
   console.error(`band(s) ${emptyBands.join(', ')} have no waves; the ladder would stall there`);
   process.exit(1);
 }
+/*
+ * ...and every type opens before the band that wants it.
+ *
+ * `opens` is lifetime energy, and the thresholds are grouped by band so a
+ * band's types are all in hand before the ladder draws from it. Grouped is not
+ * something the numbers say about themselves -- they are ten integers in ten
+ * scattered type entries -- so it is asserted: no type may open later than any
+ * type of a band above it. The kill counts this replaced failed exactly here,
+ * with HERALD (band 4) opening before PRISM (band 3).
+ */
+const bandOfType = {};
+for (const w of regular) {
+  for (const [id] of w.of || []) {
+    bandOfType[id] = Math.min(bandOfType[id] ?? 9, w.band);
+  }
+}
+const gates = ENEMY_TYPES
+  .filter((t) => (t.opens || 0) > 0)
+  .map((t) => ({ id: t.id, opens: t.opens, band: bandOfType[t.id] ?? 9 }))
+  .sort((a, b) => a.opens - b.opens);
+const ungrouped = gates.filter((g, i) => gates.slice(i + 1).some((h) => h.band < g.band));
+if (ungrouped.length) {
+  console.error('these types open after a type of a lower band, so a band can be '
+    + `drawn before its own types are in hand: ${ungrouped.map((g) => `${g.id} (band ${g.band})`).join(', ')}`);
+  process.exit(1);
+}
+console.log(`gates: ${gates.length} types on lifetime energy, band-ordered — `
+  + gates.map((g) => `${g.id} ${g.opens}`).join(', '));
+
 console.log(`ladder: ${regular.length} waves across 5 bands `
   + `(${[1, 2, 3, 4, 5].map((b) => byBand[b]).join('/')}), heaviest ${peak} of ${CFG.maxEnemies}`);
 /*

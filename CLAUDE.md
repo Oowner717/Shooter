@@ -132,6 +132,15 @@ The clear column is genuinely noisy — the same wave swings five times on where
 its bodies happen to arrive — so runs that disagree by more than double are
 marked `~`. Read the tier, not the second.
 
+The `pay` columns cost a published finding, again. `e.bounty` is a *multiplier*
+on what a body's wreckage is worth, not the worth itself — the worth comes off
+the body's mass through `CFG.energy.perMass` — so the first version summed
+multipliers and reported a fortyfold collapse in income that did not exist.
+Measured properly, off the purse and the floor: income *rises* from 4.3/s at
+tier 1 to 54/s at tier 12, then falls away as the wall makes clears longer.
+Which is the behaviour wanted, and it meant the bounty change build 179's notes
+recommended was never needed.
+
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three
 builds), the trigger itself, every round/mine/ability/object type running once
@@ -187,4 +196,15 @@ most once for any given target and cannot spin.
   offline. `check-build.mjs` fails if one is missing.
 - Play-screen controls bind on `pointerdown`, not `click`, so a tap registers
   when the thumb lands. Tests must dispatch `pointerdown` to press them.
+- Object types are gated on `world.earned` — lifetime energy banked, fed from
+  `bank()`, which is the only place energy enters a run. Not on kills, and not
+  on the purse, which falls every time the tree is bought from. The thresholds
+  live on each type as `opens` and are grouped by band; `check-build.mjs`
+  asserts the grouping. The eight teach waves play from the authored order and
+  never consult the gate, which is why LURCHER and SPLITTER are met before
+  their thresholds.
+- `save.js`'s `VERSION` is checked with `!==`, so bumping it deletes every run
+  currently open — including the ones a migration was written to rescue, since
+  the file is thrown away before the restore sees it. Only move it when the
+  restore genuinely cannot read its own past.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

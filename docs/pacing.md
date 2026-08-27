@@ -233,29 +233,71 @@ is not the slope, it is the bands: a new band arrives every two tiers, and a
 turret that has just grown meets it before the health has caught up. Levelling
 that means re-banding waves or moving `perBand`, not touching this number.
 
-### The interlock this opened, for plan C
+### A correction: the interlock was not what it looked like
 
-Health now compounds and bounty does not, so they pull apart as the ladder
-climbs. `tiers.mjs` reports it directly — energy a wave offers per 1,000 health
-it makes you chew through:
+Build 179 reported a column called "pay per 1,000 health" falling from 40 to 0
+across the ladder, and concluded that bounty had to compound at 1.17 alongside
+health. **Both the number and the conclusion were wrong.** `e.bounty` is a
+*multiplier* on what a body's wreckage is worth, not the worth itself — the
+worth comes from the body's mass through `CFG.energy.perMass`. Summing bounty
+produced a column with no units in it.
 
-| tier | 1 | 5 | 10 | 15 | 20 |
-|---|---|---|---|---|---|
-| pay per 1k health | 40 | 4 | 1 | 1 | 0 |
+Measured properly — energy banked plus everything still on the floor, over the
+seconds the wave took:
 
-Most of the fall from 40 to 4 is band composition rather than the slopes — band
-2's types carry far more health per unit of bounty than band 1's. Inside band 5,
-which is tiers 9 through 20, it is the slopes alone: bounty ×(1 + 0.15n) reaches
-×4 while health reaches ×19.7, so a rung pays about a fifth of what it did per
-unit of work.
+| tier | 1 | 2 | 5 | 8 | 10 | 12 | 15 | 20 |
+|---|---|---|---|---|---|---|---|---|
+| energy the wave offers | 41 | 55 | 364 | 539 | 944 | 1,330 | 1,060 | 704 |
+| ...per second | 4.3 | 5.7 | 15.9 | 38.7 | 51.5 | **54.0** | 19.6 | 5.9 |
 
-That makes the wall a hard stop rather than a grind — you cannot earn your way
-through it — which may well be the right answer for "progress until you cannot
-any further". But it is now plan C's decision and it has a number on it: to hold
-the ratio flat through band 5, bounty has to compound too, at roughly the same
-1.17.
+Income *rises twelvefold* to tier 12 and then falls away, and the fall is the
+wall rather than the bounty slope: clears take longer and longer, so the same
+wave pays the same energy over more seconds. Which is the behaviour you want —
+you cannot grind your way through the wall — and it arrives just as the tree
+finishes (116,700 is reached at about tier 17).
+
+So **bounty needs no change at all.** Plan C's income half was already true:
+pushing pays (4.3/s to 54/s), holding pays steadily, stepping back costs income.
+
+### Build 180 — the unlock clock
+
+`world.earned`: every energy ever banked this run, fed from `bank()`, which is
+the single place energy enters a run. It only goes up, and spending never
+touches it.
+
+Object types move off kill counts onto it, **and are regrouped by band**, which
+the kill counts never were:
+
+| band | wanted at tier | gates |
+|---|---|---|
+| 2 | 3 | lurcher 400, splitter 800 |
+| 3 | 5 | bloom 1,800, prism 2,600, glut 3,400 |
+| 4 | 7 | herald 5,500, warden 6,800, scion 8,000 |
+| 5 | 9 | bulwark 11,000, tow 14,000 |
+
+HERALD used to open fourth of ten and GLUT ninth — a band-4 type in hand two
+bands early, and a band-3 type held back until well past its band.
+`check-build.mjs` asserts the band ordering now.
+
+The thresholds are pitched against the earned-by-tier targets, which the income
+table above supports: 15,000 by tier 8 puts BULWARK and TOW in hand just as
+band 5 is first drawn from. A player who climbs faster than they earn falls
+down-band, which was already built in build 177.
+
+**The save is migrated, and `VERSION` is deliberately not bumped.** `readSlot`
+refuses any file whose `v` does not match exactly, so a bump would delete every
+run currently open — and the migration written to rescue those runs would never
+execute, because the file is discarded before the restore sees it. On restore,
+`earned = max(d.earned ?? 0, kills × 12)`. The ×12 is not arbitrary: a driven
+run banks 12.8 energy a release over its first hundred.
+
+`debugGiveEnergy` credits `earned` too. Without it a tester with 100,000 in the
+purse would have opened the whole tree and still be fighting MOTEs.
 
 ### Still outstanding
 
-- Plan C in full: `world.earned`, energy-gated unlocks, bounty tuning.
-- The demolition: `killGoal`, `releasesLeft`.
+- The demolition: `killGoal`, `releasesLeft`, and the `swell` remnants.
+- Tiers 5–8 fall out of plan B's 2–4s band. That is band composition rather
+  than the health slope — a new band lands every two tiers and a turret that
+  has just grown meets it before the health has caught up. Re-banding waves or
+  moving `perBand` is the lever, and neither is a tuning pass.

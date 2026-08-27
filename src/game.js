@@ -182,6 +182,15 @@ export class Game {
       mine: null, // the one kind of mine being laid, or none
 
       energy: 0, // banked; nothing carries across a reset
+      /*
+       * ...and every energy ever banked this run, which only ever goes up.
+       *
+       * `energy` is a purse: it falls every time the tree is bought from, so
+       * it cannot say how far a run has got. This can, and it is what the
+       * object types are gated behind -- a run that has banked four thousand
+       * has met four thousand's worth of field whether it spent it or not.
+       */
+      earned: 0,
       up: freshUpgrades(), // every permanent effect this run has bought
       /*
        * Every id bought, in the order it was bought. This is the run's whole
@@ -335,6 +344,7 @@ export class Game {
     w.decoy = null;
     w.nextStoryAt = CFG.storyEvery;
     w.energy = 0;
+    w.earned = 0;
     w.up = freshUpgrades();
     w.ledger.length = 0;
     this.loadoutOpen = null;
@@ -476,6 +486,13 @@ export class Game {
     w.released = d.released;
     w.time = d.time || 0;
     w.energy = d.energy;
+    /*
+     * A save from before the unlock clock has no `earned` at all, and seeding
+     * it at zero would take TOW back off a run that had already been fighting
+     * them. The kill counts the gates used to be are converted at the rate the
+     * new thresholds were pitched from, so nothing a run has met re-locks.
+     */
+    w.earned = Math.max(d.earned || 0, (d.kills || 0) * 12);
     w.nextStoryAt = d.nextStoryAt;
     // A loaded round with no cell on the strip is a broken state — the turret
     // is meant always to have a round it can actually see. The save cannot
@@ -2051,6 +2068,14 @@ export class Game {
   debugGiveEnergy(n = 10000) {
     const w = this.world;
     w.energy += n;
+    /*
+     * ...and the lifetime counter with it. The object types are gated on
+     * `earned` since build 180, so energy handed over without it opens the
+     * tree and nothing else: a tester with a hundred thousand in the purse
+     * would still be fighting MOTEs and NEEDLEs. What this button means is
+     * "as though the run had earned it", which is both halves.
+     */
+    w.earned += n;
     this.hud.setEnergy(w.energy, intakeRate(w));
     this.hud.menu.syncTree();
     this.hud.alert(`+${n} ENERGY`, 'info', 1.4);

@@ -388,22 +388,22 @@ for (let r = 0; r < RUNS; r++) {
           g.update(S);
         }
         /*
-         * What the wave is worth against what it costs to get through.
+         * What the wave is worth, in energy.
          *
-         * Health compounds with the tier and bounty does not, so the two
-         * slopes pull apart as the ladder climbs -- and a rung that pays a
-         * fifth of what it used to per unit of work is plan C's problem
-         * arriving through plan B's door. Taken as totals rather than per
-         * second, because the clear column is noisy and this does not have to
-         * be: it is a property of the two slopes, not of the fight.
+         * Measured off the purse and the floor, not off the table. `e.bounty`
+         * is a MULTIPLIER on what a body's wreckage is worth, not the worth
+         * itself -- the worth comes from the body's mass through
+         * CFG.energy.perMass and is split across the motes it leaves. Summing
+         * bounty gave a column with no units in it, which read as a 40x
+         * collapse in income and was nothing of the kind.
+         *
+         * Offered rather than banked: what lands in the purse has already had
+         * the corruption tax taken off it, and the tax is a property of how
+         * the fight went rather than of the tier.
          */
-        let pay = 0;
         let hp = 0;
-        for (const e of w.enemies) {
-          if (e.harmless) continue;
-          pay += e.bounty || 0;
-          hp += e.maxHp || 0;
-        }
+        for (const e of w.enemies) if (!e.harmless) hp += e.maxHp || 0;
+        const purse0 = w.energy;
 
         w.autoAim = true;
         w.autoFire = true;
@@ -416,6 +416,9 @@ for (let r = 0; r < RUNS; r++) {
         };
         let t = 0;
         while (t < cap2 && live() > 0) { g.update(S); t += S; }
+        // Banked, plus everything still lying on the floor unpaid for.
+        let pay = w.energy - purse0;
+        for (const e of w.drops) if (!e.dead && e.energy) pay += e.energy * (e.bounty || 1);
         return {
           asked, pay, hp, secs: t, cleared: live() === 0, left: live(),
           // If anything is still marching when the clock starts, part of what
@@ -533,7 +536,7 @@ const atRange = [...results.values()].flat()
 console.log(`  one body, ${RANGE} units straight up (measured ${med(atRange) || RANGE}),`
   + ` cap ${CAP}s\n`);
 
-console.log('  tier band    spend  buys  rnd/s     dps  worst   wave  clear  pay/k  |  time to kill');
+console.log('  tier band    spend  buys  rnd/s     dps  worst   wave  clear   pay  pay/s  |  time to kill');
 const worst = new Map();
 const clears = new Map();
 const pays = new Map();
@@ -576,16 +579,19 @@ for (const tier of tiers) {
    */
   const spread = Math.max(...secsEach) / Math.max(0.1, Math.min(...secsEach));
   if (runs.some((r) => r.wave.marching)) loose.push(tier);
-  // Energy the wave offers per thousand health it makes you chew through.
-  const perK = med(runs.map((r) => (1000 * r.wave.pay) / Math.max(1, r.wave.hp)));
-  pays.set(tier, perK);
+  // What the wave is worth, and what that comes to a second at the pace it
+  // was actually put down: the two numbers plan C's earned-by-tier curve is
+  // either supported by or is not.
+  const perWave = med(runs.map((r) => r.wave.pay));
+  const perSec = med(runs.map((r) => r.wave.pay / Math.max(0.1, r.wave.secs)));
+  pays.set(tier, perSec);
 
   console.log(`  ${pad(tier, 4)}${pad(band, 5)}${pad(num(spend), 9)}${pad(Math.round(buys), 6)}`
     + `${pad(rps.toFixed(1), 7)}${pad(dps.toFixed(0), 8)}`
     + `${pad(Number.isFinite(top) ? `${top.toFixed(1)}s` : `>${CAP}s`, 7)}`
     + `${pad(Math.round(asked), 7)}`
     + `${pad(stuck ? `>${WAVECAP}s` : `${clear.toFixed(0)}s${spread > 2 ? '~' : ''}`, 7)}`
-    + `${pad(perK.toFixed(1), 7)}  |  ${cells.join('   ')}`);
+    + `${pad(Math.round(perWave), 6)}${pad(perSec.toFixed(1), 7)}  |  ${cells.join('   ')}`);
 }
 
 /*
@@ -622,7 +628,8 @@ console.log(`\n  rnd/s    projectiles a second, counted at the muzzle, against a
 console.log('  dps      ...and what landed on it, a second — armour already paid for');
 console.log('  worst    the slowest member of the band: what the tier is bounded by');
 console.log('  wave     bodies in the band\'s heaviest authored wave, at this tier\'s size');
-console.log('  pay/k    energy the wave offers per 1,000 health it makes you chew through');
+console.log('  pay      energy the wave offers, banked plus still on the floor');
+console.log('  pay/s    ...over the seconds it took: the income plan C is built on');
 console.log(`  clear    ...and how long the whole of it took to put down (cap ${WAVECAP}s).`);
 console.log('           ~ means the runs disagreed by more than double: read the tier,');
 console.log('           not the second. Raise --runs before tuning against this column.');

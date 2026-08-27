@@ -23,7 +23,17 @@ import { BUILD } from './config.js';
 const KEY = 'sim7749-run';
 // The last file that was known good. See write() for what this is for.
 const BACKUP = 'sim7749-run-prev';
-const VERSION = 4; // 4: the run is on a wave, and the wave is part of the run
+/*
+ * 4: the run is on a wave, and the wave is part of the run.
+ *
+ * NOT bumped for `earned` in build 180, and the reason is the note below:
+ * readSlot refuses a file whose `v` does not match exactly, so a bump throws
+ * away every run currently open -- and the migration written to rescue those
+ * runs would never get to execute, because the file is discarded before the
+ * restore ever sees it. This only moves when the restore genuinely cannot read
+ * its own past, and an absent field it has a default for is not that.
+ */
+const VERSION = 4;
 
 /** Only these two phases are a coherent place to pick a run up from. */
 const SAVABLE = new Set(['staging', 'lull']);
@@ -148,6 +158,8 @@ export function captureRun(world, game) {
     released: world.released,
     time: world.time,
     energy: world.energy,
+    // Lifetime, not the purse: what the object types are gated behind.
+    earned: world.earned,
     nextStoryAt: world.nextStoryAt,
     // `endless: true` used to be written here. Nothing ever read it back —
     // every run has been endless since build 81, so restore sets it rather

@@ -827,11 +827,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const w = g.world;
     w.phase = 'staging';
     const d = w.director;
-    w.kills = 0;
+    w.earned = 0;
     d.shuffle(w);           // a rotation decided when almost nothing is unlocked
     const before = d.order.length;
     const missing = WAVES.map((wv, i) => i).filter((i) => !WAVES[i].teach && !d.order.includes(i));
-    w.kills = 9999;         // everything is unlocked now, mid-rotation
+    w.earned = 999999;      // everything is open now, mid-rotation
     d.begin(w);
     const after = d.order.length;
     const stillMissing = missing.filter((i) => !d.order.includes(i));
@@ -850,9 +850,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 }
 
 // --- ...and every type is actually met in a run ------------------------------
-// The other half, driven: the real Director on a fast clock with the field
-// cleared each step, so the player is a perfect one and unlocks land on time.
-// A type met in under half of runs is content most players will never see.
+/*
+ * The other half, driven: the real Director on a fast clock with the field
+ * cleared each step, so the player is a perfect one and the gates land on
+ * time. A type met in under half of runs is content most players will never
+ * see.
+ *
+ * Run until the last gate is comfortably passed, rather than to 500 releases.
+ * 500 was CFG.killGoal, from when a run ended there; runs have been endless
+ * since build 81 and the gates are on banked energy since 180, so a release
+ * count is now a bound on the wrong axis entirely. Measured: a perfect player
+ * banks 8,827 by 500 releases and 29,270 by 800, so BULWARK (11,000) and TOW
+ * (14,000) both sat outside a bound that had nothing to do with them and this
+ * case called two live types unreachable.
+ */
 {
   const RUNS = 12;
   const FLOOR = 0.5;
@@ -869,11 +880,25 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       const played = new Set();
       const realLoad = d.load.bind(d);
       d.load = (world, wave) => { played.add(WAVES.indexOf(wave)); return realLoad(world, wave); };
-      while (w.released < CFG.killGoal && guard++ < 40000) {
+      /*
+       * Destroyed rather than marked dead. The gates are on banked energy now,
+       * and `bank()` only runs inside destroy() -- a perfect player who flips
+       * `dead` earns nothing at all and never opens a single type, which is
+       * how this case first failed. Bodies first, so what they shed is on the
+       * floor to be collected in the same step.
+       */
+      /*
+       * Twice the last gate, so the last type to open gets as much run after it
+       * as before it. At 1.2x it had 2,800 of earnings to be drawn in, TOW is
+       * three of twenty-five waves, and the case reported a live type met a
+       * third of the time -- a statement about the bound, not about TOW.
+       */
+      const NEED = Math.max(...Object.values(TYPE_BY_ID).map((t) => t.opens || 0)) * 2;
+      while (w.earned < NEED && guard++ < 120000) {
         d.update(w, 0.7);
-        for (const e of w.enemies) e.dead = true;
+        for (const e of [...w.enemies]) if (!e.dead) e.destroy(w);
         w.enemies.length = 0;
-        for (const dr of w.drops) dr.dead = true;
+        for (const dr of [...w.drops]) if (!dr.dead) dr.destroy(w);
         w.drops.length = 0;
         w.kills = w.released;
       }
@@ -881,7 +906,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       for (const i of played) for (const [id] of WAVES[i].of) seen[id] = (seen[id] || 0) + 1;
     }
     const types = [...new Set(WAVES.flatMap((wv) => wv.of.map(([id]) => id)))];
-    types.sort((a, b) => (TYPE_BY_ID[a].unlock || 0) - (TYPE_BY_ID[b].unlock || 0));
+    types.sort((a, b) => (TYPE_BY_ID[a].opens || 0) - (TYPE_BY_ID[b].opens || 0));
     return { runs: RUNS, rate: Object.fromEntries(types.map((t) => [t, (seen[t] || 0) / RUNS])) };
   }, RUNS);
   const thin = Object.entries(r.rate).filter(([, v]) => v < FLOOR);
@@ -1618,6 +1643,117 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     Math.abs(r.pull - 1.75) < 1e-9, `one pull = ${r.pull.toFixed(2)} rounds of damage`);
 }
 
+// --- the unlock clock runs on what a run has earned, not on what it killed --
+/*
+ * Object types used to be gated on the kill count, which measures how much you
+ * have shot rather than how far you have got: ten minutes of farming MOTEs
+ * opened a BULWARK there was no turret for. They are on `world.earned` now --
+ * lifetime energy banked, which only ever goes up and is unaffected by
+ * spending, so the tree, the tiers and the types all read one clock.
+ *
+ * Three things could each break it silently. The counter could stop being fed,
+ * because `bank()` is the only place energy enters and nothing on screen shows
+ * a lifetime total. Spending could take it back down, which would re-lock types
+ * a player already has. And a save from before it existed could come back with
+ * nothing, taking TOW off a run that had been fighting them all evening.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { captureRun } = await import('../src/save.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    const d = () => w.director;
+
+    // ---- it is fed, and spending does not take it back ----
+    const from = w.earned;
+    const wave = { of: [['mote', 3]] };
+    // Kill something rather than crediting the field: bank() is the seam, and
+    // a test that writes w.earned itself would pass with the seam cut.
+    w.enemies.length = 0;
+    const e = g.debugSpawn('bloom');
+    e.spawnIn = 0; e.staged = false;
+    for (let i = 0; i < 40; i++) g.update(1 / 60);
+    e.destroy(w);
+    // Destroying a fragment is how it is collected -- see bank(). Done
+    // directly rather than through PULSE, because an ability's index in the
+    // bar is not a handle this case should depend on.
+    for (const dr of [...w.drops]) if (!dr.dead) dr.destroy(w);
+    const banked = w.earned - from;
+    /*
+     * The grant credits `earned` as well as the purse -- see debugGiveEnergy --
+     * so the lifetime figure is re-read AFTER it. Comparing against the total
+     * from before the grant is what this case did first, and it failed on a
+     * counter that was working: 28 banked, 2,000 granted, 2,028 lifetime, and
+     * an assertion that had not been told about the second number.
+     */
+    g.debugGiveEnergy(2000);
+    const afterGrant = w.earned;
+    const purseBefore = w.energy;
+    g.buy('hollowpoint');
+    const spent = purseBefore - w.energy;
+    const afterSpend = w.earned;
+
+    // ---- the gate reads it ----
+    w.earned = 0;
+    const towWave = { of: [['tow', 1]] };
+    const lockedAtZero = d().eligible(w, towWave);
+    w.earned = TYPE_BY_ID.tow.opens;
+    const openAtThreshold = d().eligible(w, towWave);
+    // ...and it is the earned clock, not the purse.
+    w.earned = 0;
+    w.energy = 999999;
+    const purseDoesNotOpen = d().eligible(w, towWave);
+    w.energy = 0;
+
+    // ---- a save that predates the clock ----
+    w.earned = 4321;
+    w.phase = 'staging';
+    const file = captureRun(w, g);
+    const wrote = file && file.earned;
+    /*
+     * The same file with the field stripped, as an old one arrives -- put
+     * through localStorage and `resume()`, which is the only path a save ever
+     * actually takes. Writing it straight into the world would test a line
+     * that no player's save ever reaches.
+     */
+    const old = { ...file, kills: 240 };
+    delete old.earned;
+    localStorage.setItem('sim7749-run', JSON.stringify(old));
+    localStorage.removeItem('sim7749-run-prev');
+    g.resume();
+    const migrated = w.earned;
+    localStorage.removeItem('sim7749-run');
+
+    g.restart();
+    return {
+      banked, spent, afterSpend, afterGrant, from,
+      lockedAtZero, openAtThreshold, purseDoesNotOpen,
+      wrote, migrated, towOpens: TYPE_BY_ID.tow.opens,
+    };
+  });
+
+  check('killing something feeds the lifetime counter, and buying never drains it',
+    r.banked > 0 && r.spent > 0 && r.afterSpend === r.afterGrant,
+    `banked ${r.banked.toFixed(0)}, spent ${r.spent}, lifetime still ${r.afterSpend.toFixed(0)}`);
+
+  check('a type is gated on what was earned, not on what is in the purse',
+    r.lockedAtZero === false && r.openAtThreshold === true && r.purseDoesNotOpen === false,
+    `TOW at 0 earned: ${r.lockedAtZero}, at ${r.towOpens}: ${r.openAtThreshold}, `
+    + `with a full purse and nothing earned: ${r.purseDoesNotOpen}`);
+
+  /*
+   * 240 kills x 12 is the rate the thresholds were pitched from, so a veteran
+   * comes back holding everything they had. Seeding at 0 would have re-locked
+   * nine of the ten types on every run open when this shipped.
+   */
+  check('a save from before the clock is migrated rather than reset',
+    r.wrote === 4321 && r.migrated === 2880,
+    `wrote ${r.wrote}; a pre-clock save at 240 kills came back at ${r.migrated} earned`);
+}
+
 // --- the ladder climbs, catches, and remembers ------------------------------
 /*
  * Difficulty had no direction before this: past the opening eight, waves were
@@ -1744,8 +1880,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `tier 1 x${r.hp1}, every rung x${r.step}; tier 10/14/20 = `
     + r.hpAt.map((x) => `x${x.toFixed(1)}`).join(' / '));
 
+  /*
+   * How far it gets, not whether it ever stumbles.
+   *
+   * It used to also require zero failures standing, which was true while the
+   * health slope was linear and a bought-out turret could climb forever. It
+   * compounds since build 179: this run reaches tier 15, where the slowest
+   * body in the band takes six and a half seconds, and a turret that far up
+   * dropping one wave is the wall working rather than the ladder misfiring.
+   * Requiring none of that made the case a coin flip on where the 300 seconds
+   * happened to end.
+   */
   check('a turret that can cope climbs the ladder',
-    r.climbed > r.climbFrom + 8 && r.climbFails === 0,
+    r.climbed > r.climbFrom + 8,
     `tier ${r.climbFrom} -> ${r.climbed} over 300 driven seconds, ${r.climbFails} failures standing`);
 
   check('...and a turret that cannot is caught and set down',
@@ -2600,8 +2747,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     glitch.burst = 0;
     const cv = document.getElementById('stage');
     const c2 = cv.getContext('2d');
-    const k = cv.width / w.width;
-    const row = Math.round(w.floorY * k);
+    let k = cv.width / w.width;
+    let row = Math.round(w.floorY * k);
     const yellow = (y) => {
       const d = c2.getImageData(0, Math.max(0, y - 2), cv.width, 5).data;
       let n = 0;
@@ -2610,20 +2757,63 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       }
       return n;
     };
-    const ctrl = Math.max(0, row - 60);
+    let ctrl = Math.max(0, row - 60);
     const strip = () => yellow(row) - yellow(ctrl);
+    /*
+     * The field is emptied first. STATS above needs a populated one; the floor
+     * line does not, and a full field is exactly the contamination the note
+     * above worries about -- a body sitting on either row shifts the count by
+     * tens either way, which is how this read `off -54, on -45, off -54` on a
+     * build that draws the line perfectly well. Wreckage and drops go too:
+     * clearing the field is what creates them.
+     */
+    g.debugClearField();
+    w.enemies.length = 0;
+    w.drops.length = 0;
+    w.debris.length = 0;
+    w.effects.length = 0;
+    for (let i = 0; i < 6; i++) g.update(1 / 60);
+    /*
+     * ...and the canvas is put back to full resolution first.
+     *
+     * The line is ONE WORLD UNIT wide. The perf governor drops fx.quality when
+     * frames run long, which shrinks the backing store -- and a hundred and
+     * eighty cases into the suite it had taken this canvas to 273x591, where
+     * one world unit is 0.43 of a pixel and the line antialiases down below
+     * the colour test entirely. So the case passed or failed on how slow the
+     * cases before it had been, which is not a property of HITBOXES. It read
+     * `off -9, on -3` with the flag correctly true, on a build drawing the
+     * line perfectly well at full size.
+     */
+    const { fx } = await import('../src/fx.js');
+    const heldQuality = fx.quality;
+    fx.quality = 1;
+    g.resize();
+    k = cv.width / w.width;
+    row = Math.round(w.floorY * k);
+    ctrl = Math.max(0, row - 60);
     w.debug.hitboxes = false; g.draw();
     const floorOff = strip();
     press('HITBOXES'); g.draw();
+    const flagOn = w.debug.hitboxes;
     const floorOn = strip();
     press('HITBOXES'); g.draw();
+    const flagBack = w.debug.hitboxes;
     const floorBack = strip();
+    // What the reading depended on, carried into the failure message: whether
+    // the button actually moved the flag, and whether the row the strip is
+    // read at is the row the line is drawn on.
+    const geom = { row, ctrl, cvW: cv.width, cvH: cv.height, k: +k.toFixed(3),
+      floorY: Math.round(w.floorY), paused: !!g.paused, phase: w.phase };
 
+    fx.quality = heldQuality;
+    g.resize();
     for (const key of Object.keys(w.debug)) w.debug[key] = false;
     g.hud.toggleDebug(false);
     g.restart();
     return { before, onLen: on.length, moved, after,
-      lines: on.split('\n').length, floorOff, floorOn, floorBack };
+      lines: on.split('\n').length, floorOff, floorOn, floorBack,
+      flagOn, flagBack, geom };
   });
 
   check('STATS writes a live readout, and clears it rather than freezing it',
@@ -2641,7 +2831,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('...and HITBOXES draws its floor line and takes it away again',
     r.floorOn > 150 && r.floorOff < 40 && r.floorBack < 40,
     `floor row against a control row: off ${r.floorOff}, on ${r.floorOn}, `
-    + `off again ${r.floorBack}`);
+    + `off again ${r.floorBack} | flag ${r.flagOn}/${r.flagBack} `
+    + `| ${JSON.stringify(r.geom)}`);
 }
 
 // --- the corruption feed is not the brightest thing in the game -------------

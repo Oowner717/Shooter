@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '179';
+export const BUILD = '180';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '179';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '8e583ab';
+export const REV = '58de9f3';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -2115,10 +2115,37 @@ export const CFG = {
 // CFG.debris.fade seconds, so the break is legible and what is left of it
 // says plainly that it is over.
 // -----------------------------------------------------------------------
+/*
+ * ---- `opens`: what a type is gated behind ----
+ *
+ * Lifetime energy banked this run (world.earned), not kills. It was kills --
+ * 18, 45, 85, 125, 165, 205, 245, 285, 330, 380 -- and a kill count measures
+ * how much you have shot rather than how far you have got: a run that spends
+ * ten minutes farming MOTEs unlocks a BULWARK it has no turret for, and a run
+ * that kills efficiently is punished for it. Energy is the clock everything
+ * else already runs on, so the tree, the tiers and the types now share one.
+ *
+ * Grouped by band, which the kill counts were not. A tier draws from band
+ * ceil(n/2), so the thresholds are pitched to be met before that band is
+ * wanted:
+ *
+ *   band 2, wanted at tier 3    lurcher 400     splitter 800
+ *   band 3, wanted at tier 5    bloom 1,800     prism 2,600    glut 3,400
+ *   band 4, wanted at tier 7    herald 5,500    warden 6,800   scion 8,000
+ *   band 5, wanted at tier 9    bulwark 11,000  tow 14,000
+ *
+ * HERALD used to open fourth of ten and GLUT ninth, which put a band-4 type in
+ * a player's hands two bands early and held a band-3 type back until well past
+ * it. scripts/check-build.mjs holds the grouping now.
+ *
+ * 0 means always available. The director falls down-band if a band is reached
+ * before its types are -- see Director.shuffle -- so a fast climb never stalls
+ * on a locked band; it just fights the band below until the money catches up.
+ */
 export const ENEMY_TYPES = [
   {
     id: 'mote',
-    unlock: 0,
+    opens: 0,
     name: 'MOTE',
     shape: 'shard',
     r: 12,
@@ -2135,7 +2162,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'needle',
-    unlock: 0,
+    opens: 0,
     name: 'NEEDLE',
     shape: 'needle',
     // Leads with the point: the heading follows the travel bearing rather
@@ -2155,7 +2182,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'lurcher',
-    unlock: 18,
+    opens: 400,
     name: 'LURCHER',
     shape: 'hex',
     r: 24,
@@ -2174,7 +2201,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'splitter',
-    unlock: 45,
+    opens: 800,
     name: 'SPLITTER',
     shape: 'blob',
     r: 29,
@@ -2193,7 +2220,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'bloom',
-    unlock: 85,
+    opens: 1800,
     name: 'BLOOM',
     shape: 'bloom',
     r: 33,
@@ -2213,7 +2240,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'bulwark',
-    unlock: 285,
+    opens: 11000,
     name: 'BULWARK',
     shape: 'plated',
     r: 45,
@@ -2236,7 +2263,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'warden',
-    unlock: 205,
+    opens: 6800,
     name: 'WARDEN',
     shape: 'warden',
     r: 22,
@@ -2267,7 +2294,7 @@ export const ENEMY_TYPES = [
      * WARDEN is now half as common as it was.
      */
     id: 'plate',
-    unlock: 0,
+    opens: 0,
     name: 'PLATE',
     shape: 'plate',
     r: 11,
@@ -2301,7 +2328,7 @@ export const ENEMY_TYPES = [
      * them and you fight something you made.
      */
     id: 'scion',
-    unlock: 245,
+    opens: 8000,
     name: 'SCION',
     shape: 'scion',
     r: 34,
@@ -2326,7 +2353,7 @@ export const ENEMY_TYPES = [
     // What a SCION leaves. Harmless in itself -- it never breaches the turret
     // and it is not counted -- but it is not inert: it is looking for a host.
     id: 'seed',
-    unlock: 0,
+    opens: 0,
     name: 'SEED',
     shape: 'seed',
     harmless: true,
@@ -2352,7 +2379,7 @@ export const ENEMY_TYPES = [
     // Harmless: it has no goal, it never breaches the turret, it does not
     // count, and it triggers nothing. It is here to be pushed around.
     id: 'drift',
-    unlock: 0,
+    opens: 0,
     name: 'DRIFT',
     shape: 'drift',
     harmless: true,
@@ -2376,7 +2403,7 @@ export const ENEMY_TYPES = [
     // is doing: threads out to whatever it is covering, and a shell on each of
     // them. Shoot the beacon, not the escort.
     id: 'herald',
-    unlock: 125,
+    opens: 5500,
     name: 'HERALD',
     shape: 'herald',
     r: 19,
@@ -2397,7 +2424,7 @@ export const ENEMY_TYPES = [
     // harder, so a littered field is its food supply — kill it early or clear
     // the floor. It is the only object whose threat you control.
     id: 'glut',
-    unlock: 330,
+    opens: 3400,
     name: 'GLUT',
     shape: 'glut',
     r: 16,
@@ -2418,7 +2445,7 @@ export const ENEMY_TYPES = [
     // and shoves everything it catches; both halves are real bodies and both
     // count, so a TOW is two of the five hundred.
     id: 'tow',
-    unlock: 380,
+    opens: 14000,
     name: 'TOW',
     shape: 'tow',
     r: 18,
@@ -2455,7 +2482,7 @@ export const ENEMY_TYPES = [
   {
     // The mass on the end of a TOW's cable. Never rolled for on its own.
     id: 'towMass',
-    unlock: 0,
+    opens: 0,
     name: 'MASS',
     shape: 'mass',
     r: 27,
@@ -2486,7 +2513,7 @@ export const ENEMY_TYPES = [
     // One segment of a frame. Solid: a round stops in it, which is what makes
     // a hole a hole.
     id: 'tally',
-    unlock: 0,
+    opens: 0,
     name: 'TALLY',
     shape: 'tally',
     r: 15,
@@ -2524,7 +2551,7 @@ export const ENEMY_TYPES = [
     // The core. It does not move, it does not steer, and it cannot be reached
     // except through the frames.
     id: 'ordinal',
-    unlock: 0,
+    opens: 0,
     name: 'ORDINAL',
     shape: 'ordinal',
     r: 40,
@@ -2547,7 +2574,7 @@ export const ENEMY_TYPES = [
     // The garrison. A sovereign object: once it is out it wants what every
     // other object wants, and nothing about the frame governs it any more.
     id: 'digit',
-    unlock: 0,
+    opens: 0,
     name: 'DIGIT',
     shape: 'digit',
     r: 11,
@@ -2573,7 +2600,7 @@ export const ENEMY_TYPES = [
     // what makes a hole a hole. Sized in CFG.gnomon so the arcs of the ring
     // meet -- a dial with gaps in it is not a dial.
     id: 'dial',
-    unlock: 0,
+    opens: 0,
     name: 'DIAL',
     shape: 'dial',
     r: 30,
@@ -2595,7 +2622,7 @@ export const ENEMY_TYPES = [
     // The disc at the middle of the dial, and the thing the needle turns on.
     // It does not move until the last quarter, when it comes down.
     id: 'gnomon',
-    unlock: 0,
+    opens: 0,
     name: 'GNOMON',
     shape: 'gnomon',
     r: 40,
@@ -2621,7 +2648,7 @@ export const ENEMY_TYPES = [
     // A second, in the hours sense. Parked behind an arc until that arc is
     // gone, and a sovereign object from the moment it is out.
     id: 'second',
-    unlock: 0,
+    opens: 0,
     name: 'SECOND',
     shape: 'second',
     r: 10,
@@ -2647,7 +2674,7 @@ export const ENEMY_TYPES = [
     // The smallest generation. Not solid -- it steers, it wants what every
     // other object wants -- but while it is in orbit it is in the way.
     id: 'mite',
-    unlock: 0,
+    opens: 0,
     name: 'MITE',
     shape: 'mite',
     r: 13,
@@ -2666,7 +2693,7 @@ export const ENEMY_TYPES = [
     // The middle generation, and the one the fight is really about: break it
     // and the three it was carrying stop being armour and start being loose.
     id: 'fraction',
-    unlock: 0,
+    opens: 0,
     name: 'FRACTION',
     shape: 'fraction',
     r: 30,
@@ -2688,7 +2715,7 @@ export const ENEMY_TYPES = [
     // The whole of it. In the last stages there are three of these and they
     // are each a third of the size, which is the point being made.
     id: 'fractal',
-    unlock: 0,
+    opens: 0,
     name: 'FRACTAL',
     // The bulk of the fight. Three generations of shield sit between this
     // and the turret, but auto aim takes what is *nearest* rather than what
@@ -2723,7 +2750,7 @@ export const ENEMY_TYPES = [
     // and unlike every other boss's structure, it is somewhere different
     // every second without ever having moved of its own accord.
     id: 'crest',
-    unlock: 0,
+    opens: 0,
     name: 'CREST',
     shape: 'crest',
     r: 16,
@@ -2745,7 +2772,7 @@ export const ENEMY_TYPES = [
     // The head. It rides its own wave, so the fight's one fixed installation
     // is not fixed at all -- it is periodic.
     id: 'amplitude',
-    unlock: 0,
+    opens: 0,
     name: 'AMPLITUDE',
     shape: 'amplitude',
     r: 34,
@@ -2767,7 +2794,7 @@ export const ENEMY_TYPES = [
   {
     // Thrown off the top of the wave. Sovereign from the moment it leaves.
     id: 'droplet',
-    unlock: 0,
+    opens: 0,
     name: 'DROPLET',
     shape: 'droplet',
     r: 10,
@@ -2793,7 +2820,7 @@ export const ENEMY_TYPES = [
     // A leg of the circuit. Solid, and while it stands it is carrying part of
     // what keeps the core armoured.
     id: 'pylon',
-    unlock: 0,
+    opens: 0,
     name: 'PYLON',
     shape: 'pylon',
     r: 24,
@@ -2832,7 +2859,7 @@ export const ENEMY_TYPES = [
      * raises it while the circuit is closed -- see Dynamo.shield().
      */
     id: 'dynamo',
-    unlock: 0,
+    opens: 0,
     name: 'DYNAMO',
     shape: 'dynamo',
     r: 36,
@@ -2855,7 +2882,7 @@ export const ENEMY_TYPES = [
     // Rides the arc between two pylons and drops off it onto the field. The
     // circuit is visibly inhabited, which is the whole of why it is here.
     id: 'ion',
-    unlock: 0,
+    opens: 0,
     name: 'ION',
     shape: 'ion',
     r: 10,
@@ -2879,7 +2906,7 @@ export const ENEMY_TYPES = [
     // One mirror pane off a crescent's edge. It has a twin on the other half
     // and they break together -- see CFG.parity.
     id: 'pane',
-    unlock: 0,
+    opens: 0,
     name: 'PANE',
     shape: 'pane',
     r: 17,
@@ -2903,7 +2930,7 @@ export const ENEMY_TYPES = [
      * real at a time -- the other is a wireframe standing where it would be.
      */
     id: 'parity',
-    unlock: 0,
+    opens: 0,
     name: 'PARITY',
     shape: 'parity',
     r: 38,
@@ -2925,7 +2952,7 @@ export const ENEMY_TYPES = [
   {
     // Always two of these, mirrored across the line. Never one.
     id: 'echo',
-    unlock: 0,
+    opens: 0,
     name: 'ECHO',
     shape: 'echo',
     r: 11,
@@ -2954,7 +2981,7 @@ export const ENEMY_TYPES = [
      * radius 250 with 32 bodies on it, and check-build holds it.
      */
     id: 'bound',
-    unlock: 0,
+    opens: 0,
     name: 'BOUND',
     shape: 'bound',
     r: 30,
@@ -2978,7 +3005,7 @@ export const ENEMY_TYPES = [
      * middle of it, and it is only ever near you while it is mending.
      */
     id: 'terminus',
-    unlock: 0,
+    opens: 0,
     name: 'TERMINUS',
     shape: 'terminus',
     r: 40,
@@ -3000,7 +3027,7 @@ export const ENEMY_TYPES = [
   {
     // A LIMIT: it walks the frame's lines inward and does not stop.
     id: 'limit',
-    unlock: 0,
+    opens: 0,
     name: 'LIMIT',
     shape: 'limit',
     r: 12,
@@ -3017,7 +3044,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'prism',
-    unlock: 165,
+    opens: 2600,
     name: 'PRISM',
     shape: 'prism',
     r: 20,
