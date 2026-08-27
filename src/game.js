@@ -354,6 +354,20 @@ export class Game {
     w.released = 0;
     w.stasis = 0;
     w.decoy = null;
+    /*
+     * ...and SPIRAL, which was the one ability effect this did not clear.
+     *
+     * `updateFiring` stands down while `world.spiral > 0` -- the sweep owns
+     * the barrel -- and the only thing that counts it back down is the effect
+     * itself, which lives in `world.effects` and is emptied four lines above.
+     * So a run reset during the sweep started with a gun that could not fire
+     * and nothing left alive to ever re-enable it: not a stutter, a permanent
+     * dead turret, reachable by pressing RESET SIMULATION within a second of
+     * using SPIRAL. The same class of bug as build 82's, found the same way --
+     * by pressing every control and watching what stopped working.
+     */
+    w.spiral = 0;
+    w.shooter.sweepFade = 0;
     w.nextStoryAt = CFG.storyEvery;
     w.energy = 0;
     w.earned = 0;
@@ -943,7 +957,13 @@ export class Game {
    * because the ladder does.
    */
   aimPressed() {
-    if (this.aimModes().length > 2) return this.hud.openAimRow(true);
+    /*
+     * Toggles. It only ever opened -- pressing the cell again re-opened the
+     * row it was already showing, so the one gesture everybody tries to close
+     * a menu with did nothing at all, twice, and the control read as dead.
+     * The tier chip has always toggled; this is the same control and had to.
+     */
+    if (this.aimModes().length > 2) return this.hud.openAimRow(!this.hud.aimRowOpen());
     const w = this.world;
     return this.setAim(w.autoAim ? 'off' : 'field');
   }

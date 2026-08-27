@@ -228,6 +228,14 @@ most once for any given target and cannot spin.
   offline. `check-build.mjs` fails if one is missing.
 - Play-screen controls bind on `pointerdown`, not `click`, so a tap registers
   when the thumb lands. Tests must dispatch `pointerdown` to press them.
+- A regress case that stubs `world.director.update` MUST put it back. `reset()`
+  keeps the same Director object, so a stub outlives every restart after it and
+  silently starves every later case of waves — three cases were written this
+  way in one session, each one failing four unrelated cases downstream.
+- Press controls through their handler, on the element, with `pointerdown`.
+  A case that calls the method the handler calls tests the logic and not the
+  control: the AUTO AIM row shipped unable to close because its case called
+  `aimPressed()` once instead of pressing the cell twice.
 - `buildStrip()` runs on every purchase and recreates every cell from the
   arsenal's defaults, so anything the interface has written onto a cell —
   AUTO AIM's mode label and tone — has to be re-asserted at the end of it, or

@@ -1762,6 +1762,158 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `wrote ${r.wrote}; a pre-clock save at 240 kills came back at ${r.migrated} earned`);
 }
 
+// --- a reset during SPIRAL does not leave the gun switched off --------------
+/*
+ * `updateFiring` stands down while `world.spiral > 0`, because the sweep owns
+ * the barrel. The only thing that counts it back down is the SPIRAL effect
+ * itself, and that lives in `world.effects`, which reset() empties.
+ *
+ * So resetting inside the sweep -- a second's window, reachable from the menu
+ * -- started the next run with a turret that could not fire and nothing left
+ * alive to switch it back on. Permanent, silent, and the same shape as the
+ * bug that cost builds 82 to 84.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    // Restored below. reset() keeps the same Director object, so a stub left
+    // on it silences every case after this one.
+    const ranD = w.director.update;
+    w.director.update = () => {};
+
+    const spiralAt = [...document.querySelectorAll('#abilities .ab')]
+      .findIndex((el) => /SPIRAL/i.test(el.textContent));
+    g.useAbility(spiralAt);
+    for (let i = 0; i < 6; i++) g.update(1 / 60); // mid-sweep
+    const during = w.spiral;
+
+    // ...and out from under it.
+    g.restart();
+    const after = w.spiral;
+
+    // The only test that matters: can it shoot.
+    w.enemies.length = 0;
+    w.projectiles.length = 0;
+    const e = g.debugSpawn('mote', w.width / 2, w.shooter.y - 220);
+    e.staged = false; e.spawnIn = 0;
+    w.autoAim = true; w.autoFire = true;
+    g.fireTimer = 0; w.shooter.cooldown = 0;
+    let rounds = 0;
+    const push = w.projectiles.push.bind(w.projectiles);
+    w.projectiles.push = (...ps) => { rounds += ps.length; return push(...ps); };
+    for (let i = 0; i < 120; i++) g.update(1 / 60);
+    w.projectiles.push = push;
+
+    w.director.update = ranD;
+    g.restart();
+    return { during: +during.toFixed(2), after, fade: w.shooter.sweepFade, rounds };
+  });
+
+  check('a reset during SPIRAL leaves a turret that can still fire',
+    r.during > 0 && r.after === 0 && r.fade === 0 && r.rounds > 0,
+    `spiral ${r.during} mid-sweep -> ${r.after} after the reset,`
+    + ` sweepFade ${r.fade}, ${r.rounds} rounds in two seconds`);
+}
+
+// --- every control on the play screen answers a real press ------------------
+/*
+ * Pressed, not called.
+ *
+ * The AUTO AIM row shipped in build 183 unable to close: the cell only ever
+ * opened it, so the one gesture everybody uses to dismiss a menu did nothing,
+ * and the whole control read as dead. The case that was supposed to cover it
+ * called `setAim()` and `aimPressed()` once each and asserted the state they
+ * returned -- which is the logic, not the control. Nothing ever pressed the
+ * same button twice, and nothing ever pressed the row's own buttons at all.
+ *
+ * So this goes through the handlers, on the elements, with the event they are
+ * actually bound to. `pointerdown`, because that is what the play screen
+ * binds -- a `click` here would test nothing.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    const ranD = w.director.update;
+    w.director.update = () => {};
+    g.debugGiveEnergy(9000);
+    g.buy('driftaim');
+    g.buy('driftaim');
+
+    const tap = (el) => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    const cell = () => document.getElementById('tgAutoAim');
+    const open = () => g.hud.aimRowOpen();
+
+    // ---- the cell is a toggle ----
+    g.hud.openAimRow(false);
+    const seq = [];
+    for (let i = 0; i < 4; i++) { tap(cell()); seq.push(open() ? 1 : 0); }
+
+    // ---- and every button in the row applies its own mode and closes ----
+    const picked = [];
+    for (const mode of ['off', 'field', 'drift', 'all']) {
+      tap(cell());
+      const btn = document.querySelector(`#aimModes .m_${mode}`);
+      tap(btn);
+      picked.push(`${mode}->${w.autoAim ? w.aimMode : 'off'}${open() ? '!OPEN' : ''}`);
+    }
+
+    // ---- reaching past it for another control puts it away ----
+    tap(cell());
+    tap(document.getElementById('tgAutoFire'));
+    const otherCloses = !open();
+    tap(cell());
+    g.hud.menu.setOpen(true);
+    const menuCloses = !open();
+    g.hud.menu.setOpen(false);
+
+    /*
+     * ...and nothing on the strip or the ability bar throws when pressed. A
+     * control that raises is a control that stops the frame it was pressed on.
+     */
+    const threw = [];
+    const onErr = (ev) => threw.push(String(ev.message || ev.reason));
+    window.addEventListener('error', onErr);
+    for (const el of document.querySelectorAll('#quickBar .qc, #abilities .ab')) {
+      try { tap(el); } catch (e) { threw.push(`${el.id || el.className}: ${e.message}`); }
+      /*
+       * Two of those cells are the config buttons and they open the loadout
+       * sheet, which sets `body.loadoutOpen` -- that drops the strip and the
+       * ability bar to a quarter opacity and holds the run. Left standing it
+       * failed three later cases, one of them the title-screen paint check,
+       * which is a fair report of a sheet nobody closed.
+       */
+      g.closeLoadout();
+    }
+    window.removeEventListener('error', onErr);
+    g.hud.openAimRow(false);
+    g.hud.menu.setOpen(false);
+
+    w.director.update = ranD;
+    g.restart();
+    return { seq: seq.join(''), picked, otherCloses, menuCloses, threw };
+  });
+
+  check('the AUTO AIM cell opens the row and closes it again',
+    r.seq === '1010', `four presses gave ${r.seq} (1 = open); it shipped as 1111`);
+
+  check('...and every position in the row applies from a press on it',
+    JSON.stringify(r.picked) === JSON.stringify(['off->off', 'field->field', 'drift->drift', 'all->all']),
+    r.picked.join('  '));
+
+  check('...and reaching past the row for anything else puts it away',
+    r.otherCloses && r.menuCloses,
+    `another strip control: ${r.otherCloses} · opening the menu: ${r.menuCloses}`);
+
+  check('every control on the strip and the ability bar survives being pressed',
+    r.threw.length === 0, r.threw.slice(0, 4).join(' | ') || 'none threw');
+}
+
 // --- the top bar fits the numbers in it -------------------------------------
 /*
  * `#barChips` is the shrinkable group and its comment has always said so, but

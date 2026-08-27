@@ -350,6 +350,11 @@ export class Hud {
    * a row left open can never be in the way of playing -- see the pointerdown
    * handler on the canvas.
    */
+  /** Is the mode row showing? */
+  aimRowOpen() {
+    return !!this.el.aimModes && !this.el.aimModes.hidden;
+  }
+
   openAimRow(open) {
     const row = this.el.aimModes;
     if (!row) return false;
@@ -489,6 +494,7 @@ export class Hud {
    * other two could be.
    */
   showLoadout(world, group) {
+    this.openAimRow(false);
     this.loadGroup = group;
     this.el.loadTitle.textContent = group === 'mines' ? 'MINES' : 'AMMUNITION';
     this.el.loadNote.textContent = `choose what sits on the strip · ${SLOTS[group]} slots`;
@@ -1534,6 +1540,13 @@ export class Hud {
    * still set the loadout while the opening is running.
    */
   pick(a) {
+    /*
+     * ...and anything else on the strip puts the mode row away. Reaching past
+     * an open menu for another control is a decision not to use it, and a row
+     * that stays up over the field after that is in the way. AUTO AIM itself
+     * is excluded: that press is the toggle.
+     */
+    if (a.key !== 'autoAim') this.openAimRow(false);
     if (this.game.isSealed(a.key)) return this.refuse(this.el.toggles[a.key]);
     if (a.kind === 'round') this.game.toggleRound(a.key);
     else if (a.kind === 'mine') this.game.toggleMine(a.key);
