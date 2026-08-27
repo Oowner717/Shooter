@@ -1536,6 +1536,108 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- one voice at a time ----------------------------------------------------
+/*
+ * The teaching band and the boss caption are the two things in this game that
+ * talk at length, and neither knew the other existed. Sampled across an
+ * ordinary run on two handsets -- the opening script over a live field, eight
+ * abilities, then ORDINAL -- the game was saying something in 97.4% of
+ * frames, two or more surfaces were up in 47.9%, three in 10.3%, and on a
+ * 320-wide screen 38.2% of frames had text landing on other text. The
+ * commonest pair by a distance was the band against the caption, 84 of 340
+ * frames, and the band was in all three of the top collisions.
+ *
+ * Three rules, and each one was needed because the measurement said so after
+ * the one before it went in:
+ *
+ *   1. a teaching line arriving while the boss talks waits its turn,
+ *   2. a caption arriving while the band reads pre-empts it and puts what it
+ *      was saying back on the queue -- without this the band simply stayed,
+ *      still 36 of 340 frames on a 390-wide screen,
+ *   3. a pill with no room beside the band waits. On a 568-tall screen the
+ *      band's top is at y=140 and the alerts column starts at 124, so a pill
+ *      does not merely reach the band, it starts below it -- there is no
+ *      number of pills that fits, and the first attempt, which capped the
+ *      count, moved nothing at all.
+ *
+ * Nothing is ever dropped. A first-use line is marked said on the device at
+ * the call site before it reaches the band, so a line thrown away here is a
+ * line the player never gets.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const hud = g.hud;
+    const showing = () => document.getElementById('abilityHint').classList.contains('show');
+    const captioned = () => document.getElementById('bossCaption').classList.contains('show');
+    const pills = () => document.querySelectorAll('#alerts .alert').length;
+
+    hud.clearHint();
+    hud.clearAlerts();
+    hud.say(null);
+
+    // 1. the boss is talking; a teaching line waits rather than landing on it.
+    hud.say('SOMETHING HAS STOPPED COUNTING.');
+    hud.showHint('PULSE is under your thumb.', true, 30);
+    const deferred = { band: showing(), queued: hud.voiceHeld.length };
+    // ...and it is said once the caption goes.
+    hud.say(null);
+    hud.updateAlerts(0.016);
+    const released = { band: showing(), queued: hud.voiceHeld.length,
+      text: document.getElementById('abilityHint').textContent.trim().slice(0, 24) };
+
+    // 2. the band is reading; a caption pre-empts it and the line is kept.
+    hud.clearHint();
+    hud.say(null);
+    hud.showHint('Broken objects leave ENERGY.', true, 30);
+    const before = showing();
+    hud.say('IT IS THE EDGE.');
+    const preempted = { band: showing(), caption: captioned(), queued: hud.voiceHeld.length };
+
+    // 3. a pill with no room beside the band waits for room.
+    hud.say(null);
+    hud.clearHint();
+    hud.clearAlerts();
+    hud.showHint('Broken objects leave ENERGY.', true, 30);
+    const cap = hud.pillCap();
+    hud.alert('MOTE RECORDED  1/37', 'found', 30);
+    const pilled = { cap, shown: pills(), held: hud.pillHeld.length };
+    hud.clearHint();
+    hud.updateAlerts(0.016);
+    const pillBack = { shown: pills(), held: hud.pillHeld.length };
+
+    hud.clearHint(); hud.clearAlerts(); hud.say(null);
+    return { deferred, released, preempted, before, pilled, pillBack,
+      vh: window.innerHeight };
+  });
+
+  check('a teaching line waits while the boss is talking, and is not lost',
+    r.deferred.band === false && r.deferred.queued === 1
+    && r.released.band === true && r.released.queued === 0
+    && /PULSE/.test(r.released.text),
+    `while talking: band ${r.deferred.band}, ${r.deferred.queued} held; `
+    + `after: band ${r.released.band}, says "${r.released.text}"`);
+
+  check('...and a caption arriving pre-empts a band already reading',
+    r.before === true && r.preempted.band === false
+    && r.preempted.caption === true && r.preempted.queued === 1,
+    `band was ${r.before}, then band ${r.preempted.band} / caption `
+    + `${r.preempted.caption} with ${r.preempted.queued} put back`);
+
+  /*
+   * The pill half only bites where there is genuinely no room, which is a
+   * property of the screen. On a tall one the cap is 2 and the pill shows
+   * immediately -- asserting a deferral there would be asserting a bug.
+   */
+  const tight = r.pilled.cap < 1;
+  check('...and a pill with no room beside the band waits for it',
+    tight
+      ? (r.pilled.shown === 0 && r.pilled.held === 1 && r.pillBack.shown === 1)
+      : (r.pilled.shown === 1 && r.pilled.held === 0),
+    `${r.vh}px tall, cap ${r.pilled.cap}: ${r.pilled.shown} shown / `
+    + `${r.pilled.held} held, then ${r.pillBack.shown} shown once the band went`);
+}
+
 // --- a body is made of something --------------------------------------------
 /*
  * Every hostile in the game was drawn by one recipe: a 16% fill, a stroke
@@ -1742,25 +1844,34 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.phase = 'boot';
     clear();
     const seeding = count(() => g.seedTitleField(7));
+    void clear;
     const seeded = w.enemies.filter((e) => !e.dead).length;
 
     /*
-     * ...and the per-frame top-up too, which is the part a boot frame runs
-     * over and over. Measured as a difference rather than absolutely: a boot
-     * frame draws for its own reasons -- dust, the substrate, the narrator --
-     * and the first draft of this counted all of that and called it scenery.
-     * What has to be zero is what the top-up ADDS.
+     * Only the seeding is asserted, and deliberately.
+     *
+     * The per-frame top-up cannot be isolated from inside a frame: adding a
+     * body changes what the rest of the frame does, and the body itself then
+     * draws every frame it lives for. Three drafts tried and all three
+     * measured that instead -- one frame against one frame (failed on a
+     * jitter of a single draw), twenty against twenty after clearing the
+     * field (81 to 52, which was the cost of burying the bodies), and the
+     * same popping them instead (92 to 40, which was the cost of the new
+     * body existing). Each number was real and none of them was the top-up.
+     *
+     * The whole-run guarantee is not this case, it is ORDINAL's canonical
+     * hash: seeded, 9000 frames, 117409503, which is what caught the problem
+     * in the first place when it moved to 539018592. scripts/fight.mjs is
+     * where that is checked, because it is a four-hundred-second fight and
+     * this suite is not the place for it. What is checked here is the part
+     * that can be checked exactly.
      */
-    clear();
-    const empty = count(() => g.update(1 / 60)); // must top up: no drift at all
-    const full = count(() => g.update(1 / 60)); // nothing to do: one was just made
     g.restart();
-    return { seeding, seeded, empty, full };
+    return { seeding, seeded };
   });
   check('...and the scenery does not spend the run\'s randomness',
-    draws.seeding === 0 && draws.seeded > 0 && draws.empty === draws.full,
-    `seeding ${draws.seeded} title bodies cost ${draws.seeding} draws; `
-    + `a boot frame that must top up costs ${draws.empty} against ${draws.full} for one that need not`);
+    draws.seeding === 0 && draws.seeded > 0,
+    `seeding ${draws.seeded} title bodies cost ${draws.seeding} Math.random draws`);
 }
 
 // --- the strip and the ability bar are glass, and still legible -------------

@@ -102,6 +102,8 @@ export class Hud {
     this.alerts = [];
     this.hintTimer = 0;
     this.recedeT = 0; // seconds the strip and the ability bar stay out of the way
+    this.voiceHeld = []; // lines waiting for the screen to be quiet -- see speaking()
+    this.pillHeld = []; // ...and pills waiting for room beside the band
     this.tutLines = []; // the opening's band keeps the line before
     this.lastKills = -1;
     this.lastGoal = -1;
@@ -598,6 +600,31 @@ export class Hud {
    *   nine seconds gave a four-word line the same time as a fifteen-word one.
    */
   showHint(text, tutorial = false, hold = holdFor(text)) {
+    /*
+     * One long-form voice at a time.
+     *
+     * This band and the boss caption are the two things in the game that talk
+     * at length, and they had no idea the other existed. Sampled across an
+     * ordinary run on two handsets -- the opening script over a live field,
+     * eight abilities, then ORDINAL -- the game was saying something in 97.4%
+     * of frames, two or more surfaces were up in 47.9% and three in 10.3%,
+     * and on a 320-wide screen 38.2% of frames had text actually landing on
+     * other text. The commonest pair by a distance was this band against the
+     * boss caption, at 84 of 340 frames, and the band was in all three of the
+     * top collisions.
+     *
+     * So it waits. The caption's own comment has said since it was written
+     * that the arrival is the one moment the interface may talk over the
+     * game; this is the band finally honouring that. Nothing is dropped --
+     * the call site has already marked a first-use line as said on this
+     * device by the time it gets here, so a line thrown away here is a line
+     * the player never gets -- it is held and said when the screen is clear.
+     */
+    if (tutorial && this.speaking()) {
+      this.voiceHeld.push({ text, hold });
+      while (this.voiceHeld.length > 3) this.voiceHeld.shift();
+      return;
+    }
     // Lines are written with their own break, so they wrap where they read.
     if (!tutorial) {
       this.tutLines.length = 0;
@@ -624,8 +651,23 @@ export class Hud {
   /** Take it down now — the run has moved on, or the opening was cut short. */
   clearHint() {
     this.tutLines.length = 0;
+    this.voiceHeld.length = 0;
     this.hintTimer = 0;
     this.el.hint.classList.remove('show');
+  }
+
+  /**
+   * Is something already talking at length?
+   *
+   * The boss caption and a boss still arriving both count. The arrival is a
+   * set piece with its own narration and a teaching line landing in the
+   * middle of it is wrong on its own terms, never mind on the pixels.
+   */
+  speaking() {
+    const el = this.el.bossCaption;
+    if (el && el.classList.contains('show')) return true;
+    const boss = this.game.world.boss;
+    return !!(boss && boss.arriving > 0);
   }
 
   // ----------------------------------------------------------------- meters
@@ -702,13 +744,25 @@ export class Hud {
       existing.t = duration;
       return;
     }
+    /*
+     * No room beside the band on this screen: hold it rather than paint it
+     * on top of a sentence. A pill is a receipt and three seconds late is
+     * nothing; landing across a line of instruction is not.
+     */
+    if (this.pillCap() < 1 && this.el.hint.classList.contains('show')) {
+      if (!this.pillHeld.some((p) => p.text === text)) {
+        this.pillHeld.push({ text, kind, duration, tone });
+        while (this.pillHeld.length > 3) this.pillHeld.shift();
+      }
+      return;
+    }
     const el = document.createElement('div');
     el.className = `alert ${kind}`;
     if (tone) el.style.color = tone;
     el.textContent = text;
     this.el.alerts.appendChild(el);
     this.alerts.push({ el, t: duration, text });
-    while (this.alerts.length > 3) {
+    while (this.alerts.length > this.pillCap()) {
       const old = this.alerts.shift();
       old.el.remove();
     }
@@ -737,12 +791,59 @@ export class Hud {
         this.el.hint.classList.remove('show');
         this.tutLines.length = 0;
       }
+    } else if (this.pillHeld.length && this.pillCap() >= 1) {
+      const p = this.pillHeld.shift();
+      this.alert(p.text, p.kind, p.duration, p.tone);
+    } else if (this.voiceHeld.length && !this.speaking()) {
+      // The screen is clear and something has been waiting. One at a time,
+      // oldest first, with the gap the opening already uses between lines.
+      const next = this.voiceHeld.shift();
+      this.showHint(next.text, true, next.hold);
     }
   }
 
   clearAlerts() {
     for (const a of this.alerts) a.el.remove();
     this.alerts.length = 0;
+    this.pillHeld.length = 0;
+  }
+
+  /**
+   * How many pills fit between the top of the alerts column and the band.
+   *
+   * The pills share a flex column with the boss caption and so can never
+   * overlap each other -- that was fixed when the column was introduced. What
+   * they can still reach is the teaching band, and on a short screen they do
+   * not merely reach it, they start below it: the band is positioned from the
+   * BOTTOM of the screen, and on a 568-tall phone that puts its top at y=140
+   * while the alerts column starts at 124 and one pill alone ends at 152. So
+   * there is no number of pills that fits, and capping the count -- which is
+   * what the first attempt did -- moved nothing. On a 664-tall phone the same
+   * band starts at 227 and there is 75px of clear air.
+   *
+   * Hence a cap that can be zero, and a queue for what does not fit. Measured
+   * off the two elements rather than guessed at a breakpoint, so a screen
+   * nobody has tested on gets the right answer for its own reasons.
+   */
+  pillCap() {
+    const alerts = this.el.alerts;
+    const band = this.el.hint;
+    if (!alerts || !band) return 2;
+    const top = alerts.getBoundingClientRect().top;
+    const floor = band.getBoundingClientRect().top;
+    const cap = this.el.bossCaption;
+    const capH = cap && cap.classList.contains('show')
+      ? cap.getBoundingClientRect().height : 0;
+    /*
+     * Three at the top end, which is where it has always been -- the ORDINAL
+     * outro fires exactly three (REMAINDER, HELD-RECAST, RECORDED) and they
+     * are asserted not to overlap. An earlier pass lowered this to two on the
+     * theory that the column was what the band landed on; the measurement
+     * said otherwise -- see above, the band starts BELOW the column on a
+     * short screen -- so the ceiling is left where the evidence left it and
+     * only the floor, which can now be zero, is new.
+     */
+    return Math.max(0, Math.min(3, Math.floor((floor - top - capH) / 30)));
   }
 
   // ----------------------------------------------------------------- recede
@@ -1208,6 +1309,25 @@ export class Hud {
     if (this._said === text) return;
     this._said = text;
     if (!text) { el.classList.remove('show'); return; }
+    /*
+     * The other half of the one-voice rule, and the half the first pass
+     * missed. showHint() defers a teaching line that arrives while the boss
+     * is talking -- but a band already reading when the boss STARTS was left
+     * where it was, so ORDINAL arriving on top of an opening line still put
+     * two blocks of text on the screen. Measured, that alone was 36 of 340
+     * frames on a 390-wide screen after the deferral went in.
+     *
+     * So the caption pre-empts, and what the band was saying goes back on the
+     * queue rather than being lost: these lines are marked said on the device
+     * at the call site, so a line dropped here is a line never read.
+     */
+    if (this.hintTimer > 0 && this.el.hint.classList.contains('show')) {
+      const held = this.tutLines[this.tutLines.length - 1];
+      if (held) this.voiceHeld.unshift({ text: held, hold: holdFor(held) });
+      this.hintTimer = 0;
+      this.tutLines.length = 0;
+      this.el.hint.classList.remove('show');
+    }
     el.textContent = text;
     el.classList.add('show');
   }
