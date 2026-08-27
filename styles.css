@@ -1482,7 +1482,6 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
    row gives up 2px per cell to pay for it; the whole band still clears a
    390 screen with slack. */
 .q_mines, .q_ammo { width: 70px; }
-.q_auto { flex-direction: row; gap: 4px; }
 /* The two that open the loadout sheet, one beside each stack. */
 .q_cfg { justify-content: flex-end; }
 
@@ -1615,6 +1614,54 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
 .qc.run.on { box-shadow: inset 0 0 0 40px color-mix(in srgb, var(--accent) 13%, transparent); }
 
 /*
+ * The row AUTO AIM opens: one button per position the assist can be put in.
+ *
+ * Stacked above the two cells rather than beside them. The band sits in the
+ * middle of the quick bar with a stack either side of it and has no width to
+ * give, and every other group on this bar already grows upward off the floor
+ * line -- so this reads as the same furniture rather than as a popup.
+ */
+.q_auto { flex-direction: column; align-items: stretch; gap: 4px; }
+.autoCells { display: flex; flex-direction: row; gap: 4px; }
+#aimModes {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 2px;
+}
+.aimMode {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: rgba(8, 18, 30, 0.94);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.aimMode:active { transform: translateY(1px); }
+.aimName { font-size: 11px; letter-spacing: 0.08em; }
+/* nowrap so every button in the row is the same height: one that wraps is
+   taller than the rest and reads as the important one. */
+.aimNote { font-size: 9px; letter-spacing: 0.04em; color: var(--dim); white-space: nowrap; }
+/* Where it is now, so the row says the current position rather than only
+   offering four. */
+.aimMode.at {
+  border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+  color: var(--accent);
+}
+.aimMode.m_drift.at { border-color: color-mix(in srgb, #b8f0a0 62%, transparent); color: #b8f0a0; }
+.aimMode.m_all.at { border-color: color-mix(in srgb, #ffd166 62%, transparent); color: #ffd166; }
+
+/*
  * AUTO AIM's third position: hunting DRIFT, and nothing else.
  *
  * DRIFT's own grey would be the honest tone and is the one colour the game
@@ -1639,6 +1686,23 @@ body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
 }
 .qc.run.on.drift {
   box-shadow: inset 0 0 0 40px color-mix(in srgb, #b8f0a0 15%, transparent);
+}
+
+/*
+ * ...and the fourth: everything at once.
+ *
+ * Amber rather than a third green. The two SIEVE positions are one part's
+ * doing and could have shared a tone, but they are opposites in play -- one
+ * stops defending you and one stops asking you anything -- so they are told
+ * apart at a glance rather than by reading the word.
+ */
+.qc.on.everything {
+  --tone: #ffd166;
+  color: #ffd166;
+  border-color: color-mix(in srgb, #ffd166 62%, transparent);
+}
+.qc.run.on.everything {
+  box-shadow: inset 0 0 0 40px color-mix(in srgb, #ffd166 15%, transparent);
 }
 
 /* ---------------- abilities ---------------- */

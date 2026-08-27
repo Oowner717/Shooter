@@ -9,7 +9,7 @@ import { spark, ring, shake } from './fx.js';
 
 /*
  * Every level of every part in the TURRET branch, added up: 1 FEED, 3 GIMBAL,
- * 2 ARRAY, 1 SIEVE, 3 SIGHT, 3 SPINES, 3 SHROUD, 1 INTAKE. What `rig().filled` is a
+ * 2 ARRAY, 2 SIEVE, 3 SIGHT, 3 SPINES, 3 SHROUD, 1 INTAKE. What `rig().filled` is a
  * fraction of, and the one number that tells the machine it is finished.
  *
  * It is written out here rather than derived, because shooter.js reaching into
@@ -19,7 +19,7 @@ import { spark, ring, shake } from './fx.js';
  * that can never fill its last socket never lights. scripts/check-build.mjs
  * holds this to the tree now.
  */
-export const RIG_MAX = 17;
+export const RIG_MAX = 18;
 
 /** How wide SALVO throws its three. */
 const SALVO_FAN = 0.09;
@@ -698,6 +698,10 @@ export class Shooter {
      * shoulder when neither is, so buying it before ARRAY still shows.
      */
     if (g.driftaim) {
+      // A second screen behind the first at OPEN SIEVE: the mouth is wider,
+      // not narrower, so the pair reads as something opening rather than
+      // closing.
+      const layers = g.driftaim;
       const seats = g.aimrange > 0 ? g.aimrange : 1;
       for (let i = 0; i < seats; i++) {
         const a = -Math.PI / 2 + (i ? 1 : -1) * 1.78;
@@ -707,22 +711,24 @@ export class Shooter {
         ctx.save();
         ctx.translate(c * R * 0.8, sn * R * 0.8);
         ctx.rotate(a);
-        ctx.strokeStyle = rgba('#b8f0a0', 0.9 * lit);
-        ctx.lineWidth = HAIRLINE * 1.6;
-        // the frame, standing off the fin's tip
-        ctx.beginPath();
-        ctx.moveTo(h + 2.5, -7.5);
-        ctx.lineTo(h + 2.5, 7.5);
-        ctx.stroke();
-        // ...and the mesh in it
-        ctx.lineWidth = HAIRLINE;
-        ctx.strokeStyle = rgba('#b8f0a0', 0.6 * lit);
-        ctx.beginPath();
-        for (let k = -2; k <= 2; k++) {
-          ctx.moveTo(h - 0.5, k * 3);
-          ctx.lineTo(h + 2.5, k * 3);
+        for (let L = 0; L < layers; L++) {
+          const x = h + 2.5 + L * 3.2;
+          const span = 7.5 + L * 2.4;
+          ctx.strokeStyle = rgba('#b8f0a0', (0.9 - L * 0.2) * lit);
+          ctx.lineWidth = HAIRLINE * 1.6;
+          ctx.beginPath();
+          ctx.moveTo(x, -span);
+          ctx.lineTo(x, span);
+          ctx.stroke();
+          ctx.lineWidth = HAIRLINE;
+          ctx.strokeStyle = rgba('#b8f0a0', (0.6 - L * 0.15) * lit);
+          ctx.beginPath();
+          for (let k = -2; k <= 2; k++) {
+            ctx.moveTo(x - 3, k * 3);
+            ctx.lineTo(x, k * 3);
+          }
+          ctx.stroke();
         }
-        ctx.stroke();
         ctx.restore();
       }
     }

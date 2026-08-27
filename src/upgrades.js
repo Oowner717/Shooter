@@ -71,7 +71,12 @@ export function freshUpgrades() {
     // turret
     slew: 1,
     aimRange: 1, // how far auto aim will reach for a target
-    driftAim: false, // ...and whether it will accept DRIFT as a target at all
+    /*
+     * How far the assist's screen has been opened, as a count rather than a
+     * flag: 0 refuses DRIFT, 1 adds a position that takes grey alone, 2 adds
+     * one that takes everything. See Game.aimModes.
+     */
+    driftAim: 0,
     overwatch: 1, // damage while no hand is on the lever
     casing: 0, // damage a second to whatever is touching the turret
     insulation: 1, // multiplier on how much corruption costs the intake
@@ -401,13 +406,23 @@ export const UPGRADES = {
      * array's mouth that lets the grey through as a target, and a third
      * position on the AUTO AIM button that hunts it and nothing else.
      *
-     * Nothing else in the branch is a mode. This one has to be, because
-     * sweeping grey and answering a wave are not the same job and a player
-     * doing one is not doing the other -- see Game.cycleAim.
+     * Two levels, and the second is the automation. The first sells the
+     * CHOICE -- grey instead of the field, which is a trade, because sweeping
+     * salvage and answering a wave are not the same job. The second sells the
+     * end of the choice: both at once, no decision to make, the least manual
+     * the turret ever gets. That is worth paying for twice and worth being
+     * two rungs apart, which is why it is not one level that does both.
+     *
+     * Nothing else in the branch is a mode. This one has to be -- see
+     * Game.aimModes and the row the AUTO AIM cell opens.
      */
-    { id: 'driftaim', name: 'SIEVE', levels: 1,
+    { id: 'driftaim', name: 'SIEVE', levels: 2,
       line: 'A third position on AUTO AIM: hunt DRIFT and nothing else. A sorting screen over the array.',
-      apply: set('driftAim', true), icon: MARK.driftaim },
+      tiers: [null, {
+        name: 'OPEN SIEVE',
+        line: 'A fourth position: grey and hostile together. The turret stops needing to be told which.',
+      }],
+      apply: bump('driftAim', 1), icon: MARK.driftaim },
     { id: 'aimrange', name: 'ARRAY', levels: 2,
       line: '+45% auto aim range. A scanning dish on the mount.',
       tiers: [null, { name: 'DEEP ARRAY', line: '+45% again, on top of ARRAY. A second dish, and the sweep reaches the top of the field.' }],

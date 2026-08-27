@@ -168,6 +168,7 @@ const ABILITY_USE = {
   // Not an ability: AUTO AIM's third position, which needs its own sentence
   // because it is the one assist that stops defending you.
   aimDrift: 'AUTO AIM: DRIFT. It takes grey and nothing else.\nIt is not watching the field while it does.',
+  aimAll: 'AUTO AIM: ALL. Grey and hostile together.\nThere is nothing left to tell it.',
   pulse: 'PULSE. Hurts and shoves what is near you,\nand takes in the energy on the floor.',
   fan: 'FAN. Twenty-five pellets in one tight cone.',
   lance: 'LANCE. A beam through the biggest thing out there.',

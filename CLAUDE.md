@@ -228,6 +228,11 @@ most once for any given target and cannot spin.
   offline. `check-build.mjs` fails if one is missing.
 - Play-screen controls bind on `pointerdown`, not `click`, so a tap registers
   when the thumb lands. Tests must dispatch `pointerdown` to press them.
+- `buildStrip()` runs on every purchase and recreates every cell from the
+  arsenal's defaults, so anything the interface has written onto a cell —
+  AUTO AIM's mode label and tone — has to be re-asserted at the end of it, or
+  buying anything silently resets the control while the world keeps doing what
+  it was doing.
 - `#barChips` is the shrinkable group but its chips are `white-space: nowrap`,
   so it never absorbed anything — it clipped. `Hud.fitBar` measures and drops
   labels (OBJECTS, then ENERGY) because the trigger is how many digits are in

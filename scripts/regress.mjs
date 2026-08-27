@@ -464,11 +464,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 137 again since build 182, when SIEVE went into the TURRET branch. It was
-    // 136 from 178, when FEED lost its second level, and 137 before that from
-    // 169, when SPIRAL gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 137
-    && /TURRET 17\/17/.test(r.full.count) && !/TURRET 17\/17/.test(r.bare.count),
+    // 138 since build 183, when SIEVE gained its second level. It was 137 from
+    // 182 when SIEVE went in, 136 from 178 when FEED lost a level, and 137
+    // before that from 169, when SPIRAL gained COUNTERSPIN.
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 138
+    && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
     r.bare.tones.length > 10 && r.bare.tones.every((t) => t && t !== '#9fb3c8'),
@@ -1886,15 +1886,35 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const noise = diff(off1, off2);
     const moved = diff(off1, on);
 
-    // ---- the third position ----
-    w.up.driftAim = false;
-    w.autoAim = false; w.aimDrift = false;
-    const bare = [];
-    for (let i = 0; i < 4; i++) { g.cycleAim(); bare.push(`${w.autoAim ? 1 : 0}${w.aimDrift ? 'd' : ''}`); }
-    w.up.driftAim = true;
-    w.autoAim = false; w.aimDrift = false;
-    const sieved = [];
-    for (let i = 0; i < 4; i++) { g.cycleAim(); sieved.push(`${w.autoAim ? 1 : 0}${w.aimDrift ? 'd' : ''}`); }
+    // ---- what positions exist, at each level of SIEVE ----
+    const offered = [];
+    for (const lvl of [0, 1, 2]) {
+      w.up.driftAim = lvl;
+      offered.push(g.aimModes().join(','));
+    }
+
+    /*
+     * ---- the control is a toggle until there is something to choose ----
+     *
+     * Two positions is a toggle and four is a menu. A list of two costs a tap
+     * to say what one tap already said; a blind cycle through four is a
+     * control you have to count your way round.
+     */
+    w.up.driftAim = 0;
+    g.setAim('off');
+    g.hud.openAimRow(false);
+    g.aimPressed();
+    const bareOpens = !g.hud.el.aimModes.hidden;
+    const bareOn = w.autoAim;
+    g.aimPressed();
+    const bareOff = !w.autoAim;
+    w.up.driftAim = 2;
+    g.aimPressed();
+    const richOpens = !g.hud.el.aimModes.hidden;
+    const listed = [...g.hud.el.aimModes.querySelectorAll('.aimMode')]
+      .filter((b) => !b.hidden).map((b) => b.dataset.mode).join(',');
+    g.setAim('all');
+    const closesOnPick = g.hud.el.aimModes.hidden;
 
     // ---- ...and what each position will actually pick ----
     w.enemies.length = 0;
@@ -1904,17 +1924,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const drift = w.enemies.find((e) => e.harmless);
     drift.x = w.width / 2 + 40; drift.y = w.shooter.y - 200;
     drift.staged = false; drift.spawnIn = 0;
-    w.autoAim = true; w.aimDrift = false;
-    const plain = g.autoTarget();
-    w.aimDrift = true;
-    const grey = g.autoTarget();
+    const pick = (mode) => { g.setAim(mode); const t = g.autoTarget(); return t && t.type.id; };
+    const plain = pick('field');
+    const grey = pick('drift');
+    // ALL has to be able to reach either, so the nearer one is moved under it.
+    const bothA = pick('all');
+    drift.x = w.width / 2 + 4;
+    const bothB = g.autoTarget() && g.autoTarget().type.id;
 
     w.director.update = ranD;
     g.restart();
     return {
       noise, moved, row, cvW: cv.width,
-      bare: bare.join(' '), sieved: sieved.join(' '),
-      plain: plain && plain.type.id, grey: grey && grey.type.id,
+      offered, bareOpens, bareOn, bareOff, richOpens, listed, closesOnPick,
+      plain, grey, bothA, bothB,
     };
   });
 
@@ -1922,13 +1945,24 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.noise === 0 && r.moved > 40,
     `two frames with it off differ by ${r.noise}px; with it on, ${r.moved}px on row ${r.row} of ${r.cvW}`);
 
-  check('AUTO AIM has two positions, and three once SIEVE is bought',
-    r.bare === '1 0 1 0' && r.sieved === '1 1d 0 1',
-    `without SIEVE: ${r.bare} | with: ${r.sieved}`);
+  check('each level of SIEVE adds a position, and neither is free',
+    JSON.stringify(r.offered) === JSON.stringify(['off,field', 'off,field,drift', 'off,field,drift,all']),
+    r.offered.join('  |  '));
 
-  check('...and the third takes DRIFT and nothing else',
-    r.plain === 'mote' && r.grey === 'drift',
-    `plain picks ${r.plain}, DRIFT picks ${r.grey}`);
+  check('AUTO AIM is a toggle until there is something to choose, then a row',
+    r.bareOpens === false && r.bareOn && r.bareOff
+    && r.richOpens && r.listed === 'off,field,drift,all' && r.closesOnPick,
+    `bare: opens=${r.bareOpens} on=${r.bareOn} off=${r.bareOff}`
+    + ` | bought: opens=${r.richOpens} lists=[${r.listed}] closes=${r.closesOnPick}`);
+
+  /*
+   * The three positions, at the only place it matters -- what comes back from
+   * autoTarget. DRIFT is asserted by what it REFUSES as much as what it takes:
+   * an assist that quietly took hostiles too would make the trade for you.
+   */
+  check('FIELD takes hostiles, DRIFT takes grey, ALL takes whichever is nearer',
+    r.plain === 'mote' && r.grey === 'drift' && r.bothA === 'mote' && r.bothB === 'drift',
+    `field ${r.plain} · drift ${r.grey} · all ${r.bothA} then ${r.bothB} when grey is nearer`);
 }
 
 // --- a burst of presses loses nothing, and marks nothing it did not say -----

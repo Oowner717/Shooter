@@ -179,13 +179,17 @@ export class Game {
       autoSteering: false, // is auto aim traversing the barrel this frame?
       autoAim: false,
       /*
-       * ...and whether the assist is hunting DRIFT instead of the field.
+       * ...and WHAT it is hunting: 'field', 'drift' or 'all'.
        *
-       * A third position on the same button rather than a button of its own --
-       * the strip is full and a control that is a mode of another control
-       * belongs on it. Only reachable once SIEVE is bought; see Game.cycleAim.
+       * Positions on the same button rather than buttons of their own -- the
+       * strip is full, and a control that is a mode of another control belongs
+       * on it. 'field' is free; the other two are the two levels of SIEVE. See
+       * Game.aimModes and the row the AUTO AIM cell opens.
+       *
+       * Held even while autoAim is off, so switching the assist back on
+       * returns it to what it was doing rather than to the default.
        */
-      aimDrift: false,
+      aimMode: 'field',
       autoFire: false,
       mine: null, // the one kind of mine being laid, or none
 
@@ -389,7 +393,7 @@ export class Game {
     // nothing running on its own, matching what a first-time player is handed
     // — including the first-use captions, which a fresh session should get.
     w.autoAim = false;
-    w.aimDrift = false;
+    w.aimMode = 'field';
     w.autoFire = false;
     w.mine = null;
     w.round = 'standard';
@@ -510,9 +514,14 @@ export class Game {
     w.round = carried(w.loadout, d.round) ? d.round : (w.loadout.ammo.find(Boolean) || 'standard');
     w.mine = carried(w.loadout, d.mine) ? d.mine : null;
     w.autoAim = !!d.autoAim;
-    // A save from before SIEVE has no aimDrift, and one written while it was
-    // held cannot restore into a run that has not bought it back.
-    w.aimDrift = !!d.aimDrift && !!w.up.driftAim;
+    /*
+     * A save from before SIEVE has neither field; one from build 182 has the
+     * boolean `aimDrift`. Either way the mode is clamped to what this run has
+     * actually bought, so a file cannot restore into a position the turret
+     * cannot reach.
+     */
+    const wanted = d.aimMode || (d.aimDrift ? 'drift' : 'field');
+    w.aimMode = this.aimModes().includes(wanted) && wanted !== 'off' ? wanted : 'field';
     w.autoFire = !!d.autoFire;
     if (w.narrator) w.narrator.index = d.story || 0;
 
@@ -759,6 +768,8 @@ export class Game {
       // is a direct shot at the point you touched.
       // Acting on a line is the best evidence it has been read.
       this.hud.dismissHint();
+      // ...and a row left open is never in the way of playing.
+      this.hud.openAimRow(false);
 
       if (this.gripPointer === null && p.y > s.y - s.r) {
         this.gripPointer = ev.pointerId;
@@ -899,36 +910,56 @@ export class Game {
 
   toggleAuto(key) {
     const w = this.world;
-    if (key === 'autoAim') return this.cycleAim();
+    if (key === 'autoAim') return this.aimPressed();
     w[key] = !w[key];
     this.hud.setToggle(key, w[key]);
     this.announceToggle(key, w[key]);
   }
 
   /**
-   * AUTO AIM, round its positions: off, the field, and -- once SIEVE is bought
-   * -- DRIFT and nothing else.
+   * Every position the assist can be put in, in the order the row offers them.
    *
-   * Three positions on one button rather than a second button, because the
-   * third is a mode of the first and the strip has no room for a control that
-   * is only ever meaningful when its neighbour is on.
-   *
-   * DRIFT-only rather than drift-as-well on purpose. Sweeping grey and
-   * answering a wave are different jobs: grey is harmless and worth energy,
-   * hostiles are neither, and an assist doing both would simply shoot whatever
-   * was nearest and make the choice for you. Made to be a decision -- during a
-   * wave this position means the assist has stopped defending you.
+   * 'field' is what auto aim has always been and is free. SIEVE's first level
+   * adds 'drift' -- grey alone, which is a trade rather than a gift, because
+   * an assist sweeping salvage is not defending you. Its second adds 'all',
+   * which is the automation: both at once, no decision left to make.
    */
-  cycleAim() {
+  aimModes() {
+    const n = this.world.up.driftAim | 0;
+    const modes = ['off', 'field'];
+    if (n >= 1) modes.push('drift');
+    if (n >= 2) modes.push('all');
+    return modes;
+  }
+
+  /**
+   * The AUTO AIM cell, pressed.
+   *
+   * Two positions is a toggle and four is a menu, and the control is whichever
+   * the turret has paid for: a list of two costs a tap to say what one tap
+   * already said, and a blind cycle through four is a control you have to
+   * count your way around. So it toggles until SIEVE is bought and opens the
+   * row after that -- the same shape as the tier chip, which exists only
+   * because the ladder does.
+   */
+  aimPressed() {
+    if (this.aimModes().length > 2) return this.hud.openAimRow(true);
     const w = this.world;
-    const sieve = !!w.up.driftAim;
-    if (!w.autoAim) { w.autoAim = true; w.aimDrift = false; }
-    else if (!w.aimDrift && sieve) { w.aimDrift = true; }
-    else { w.autoAim = false; w.aimDrift = false; }
+    return this.setAim(w.autoAim ? 'off' : 'field');
+  }
+
+  /** Put the assist in one named position. */
+  setAim(mode) {
+    const w = this.world;
+    if (!this.aimModes().includes(mode)) return false;
+    if (mode !== 'off') w.aimMode = mode;
+    w.autoAim = mode !== 'off';
     this.hud.setAim(w);
-    // The DRIFT position says its own thing the first time it is reached; the
-    // plain one keeps the line it has always had.
-    this.announceToggle(w.aimDrift ? 'aimDrift' : 'autoAim', w.autoAim);
+    this.hud.openAimRow(false);
+    // Each position says its own thing the first time it is reached.
+    const key = !w.autoAim ? 'autoAim' : { drift: 'aimDrift', all: 'aimAll' }[mode] || 'autoAim';
+    this.announceToggle(key, w.autoAim);
+    return true;
   }
 
   /**
@@ -1018,6 +1049,7 @@ export class Game {
   autoTarget() {
     const w = this.world;
     const s = w.shooter;
+    const mode = w.aimMode || 'field';
     const limit = CFG.shooter.aimClamp + 0.04;
     /*
      * Reach, not just bearing. Until build 109 the only test was the cone, so
@@ -1046,12 +1078,13 @@ export class Game {
        */
       /*
        * `harmless` is the DRIFT rule, and SIEVE is the one thing that lifts
-       * it -- and lifts it the other way round: in the DRIFT position the
-       * assist takes grey and NOTHING else, so a player sweeping salvage is
-       * not also being defended. See Game.cycleAim.
+       * it. DRIFT lifts it the other way round -- grey and NOTHING else, so a
+       * player sweeping salvage is not also being defended -- and ALL lifts it
+       * in both directions at once. See Game.aimModes.
        */
       if (e.dead || e.staged || e.spent) continue;
-      if (w.aimDrift ? !e.harmless : e.harmless) continue;
+      if (mode === 'field' && e.harmless) continue;
+      if (mode === 'drift' && !e.harmless) continue;
       const dx = e.x - s.x;
       const dy = e.y - s.y;
       if (Math.abs(angleDelta(-Math.PI / 2, Math.atan2(dy, dx))) > limit) continue;

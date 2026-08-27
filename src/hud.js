@@ -280,9 +280,89 @@ export class Hud {
     this.syncFolds();
     cfgMines.appendChild(this.configButton('mines'));
     cfgAmmo.appendChild(this.configButton('ammo'));
+    /*
+     * The two that run on their own, and the row AUTO AIM opens above them.
+     *
+     * The row is stacked over the cells rather than beside them -- the band
+     * sits in the middle of the quick bar between the two stacks and has no
+     * width to give, and everything else on this bar already grows upward off
+     * the floor line. Four positions laid out sideways here would push the
+     * cells under the thumb that is reaching for them.
+     */
+    const modes = document.createElement('div');
+    modes.id = 'aimModes';
+    modes.hidden = true;
+    auto.appendChild(modes);
+    const cells = document.createElement('div');
+    cells.className = 'autoCells';
+    auto.appendChild(cells);
     for (const a of ARSENAL.filter((x) => x.group === 'auto')) {
-      auto.appendChild(this.cell(a));
+      cells.appendChild(this.cell(a));
     }
+    this.el.aimModes = modes;
+    this.buildAimRow();
+    /*
+     * ...and the cell is put back into the position the world is in.
+     *
+     * buildStrip is called on every purchase, and it recreates the cell from
+     * the arsenal's own defaults -- label AIM, no tone. So buying anything at
+     * all silently reset a turret that was in DRIFT or ALL back to looking
+     * like plain AUTO AIM while it went on doing something else, which is the
+     * one thing a mode control must never do.
+     */
+    this.setAim(w);
+  }
+
+  /**
+   * One button per position the assist can be put in.
+   *
+   * Built once and shown or hidden per mode, rather than rebuilt on every
+   * open: which positions exist is a property of what has been bought, and
+   * that changes at a purchase, not at a tap.
+   */
+  buildAimRow() {
+    const LABEL = { off: 'OFF', field: 'FIELD', drift: 'DRIFT', all: 'ALL' };
+    const NOTE = {
+      off: 'aim by hand',
+      field: 'hostiles only',
+      drift: 'grey only',
+      all: 'grey + hostile',
+    };
+    this.aimButtons = ['off', 'field', 'drift', 'all'].map((mode) => {
+      const b = document.createElement('button');
+      b.className = `aimMode m_${mode}`;
+      b.dataset.mode = mode;
+      b.innerHTML = `<span class="aimName">${LABEL[mode]}</span>`
+        + `<span class="aimNote">${NOTE[mode]}</span>`;
+      b.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.game.setAim(mode);
+      });
+      b.addEventListener('contextmenu', (ev) => ev.preventDefault());
+      this.el.aimModes.appendChild(b);
+      return { mode, el: b };
+    });
+  }
+
+  /**
+   * Open or close it. Closing is what every other press on the field does, so
+   * a row left open can never be in the way of playing -- see the pointerdown
+   * handler on the canvas.
+   */
+  openAimRow(open) {
+    const row = this.el.aimModes;
+    if (!row) return false;
+    if (open) {
+      const modes = this.game.aimModes();
+      const at = this.game.world.autoAim ? this.game.world.aimMode : 'off';
+      for (const b of this.aimButtons) {
+        b.el.hidden = !modes.includes(b.mode);
+        b.el.classList.toggle('at', b.mode === at);
+      }
+    }
+    row.hidden = !open;
+    return true;
   }
 
   /** The show/hide at the head of a stack. */
@@ -1496,11 +1576,16 @@ export class Hud {
     this.setToggle('autoAim', world.autoAim);
     const el = this.el.toggles.autoAim;
     if (!el) return;
-    const drift = !!world.aimDrift && !!world.autoAim;
-    el.classList.toggle('drift', drift);
+    const mode = world.autoAim ? (world.aimMode || 'field') : 'off';
+    // Re-toned and renamed per position: a control whose fourth position looks
+    // like its second is a control nobody can read at a glance.
+    el.classList.toggle('drift', mode === 'drift');
+    el.classList.toggle('everything', mode === 'all');
     const lbl = el.querySelector('.qLbl');
-    if (lbl) lbl.textContent = drift ? 'DRIFT' : 'AIM';
-    el.setAttribute('aria-label', drift ? 'AUTO AIM: DRIFT' : 'AUTO AIM');
+    const word = { drift: 'DRIFT', all: 'ALL' }[mode] || 'AIM';
+    if (lbl) lbl.textContent = word;
+    el.setAttribute('aria-label', mode === 'field' || mode === 'off'
+      ? 'AUTO AIM' : `AUTO AIM: ${word}`);
   }
 
   setSound() {
