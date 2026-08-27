@@ -46,11 +46,21 @@ const mods = new Map();
 for (const f of files) mods.set(`./${f}`, readFileSync(path.join(SRC, f), 'utf8'));
 
 const IMPORT = /^[ \t]*import\s*\{([^}]*)\}\s*from\s*'([^']+)'\s*;?[ \t]*$/gm;
+/*
+ * `import './terminus.js';` -- imported for its side effects alone. The seven
+ * boss modules arrive this way: nothing is bound, they simply have to run.
+ *
+ * It was not in the dependency graph either, so the modules that exist only to
+ * register themselves were ordered by luck as well as being left as bare
+ * `import` statements in a classic script. See the guard at the bottom.
+ */
+const SIDE_IMPORT = /^[ \t]*import\s*'([^']+)'\s*;?[ \t]*$/gm;
 
 const deps = new Map();
 for (const [k, src] of mods) {
   const d = new Set();
   for (const m of src.matchAll(IMPORT)) if (mods.has(m[2])) d.add(m[2]);
+  for (const m of src.matchAll(SIDE_IMPORT)) if (mods.has(m[1])) d.add(m[1]);
   deps.set(k, [...d]);
 }
 const order = [];
@@ -62,6 +72,9 @@ const visit = (k) => {
   order.push(k);
 };
 for (const k of mods.keys()) visit(k);
+
+/** Counter for generated re-export bindings; see the rule inside wrap(). */
+let reexports = 0;
 
 /** One module -> one function body with its own scope and an exports object. */
 function wrap(key, src) {
@@ -82,6 +95,39 @@ function wrap(key, src) {
     }).filter(Boolean).join(', ');
     return `const {${bound}} = __req(${JSON.stringify(from)});`;
   });
+
+  // `import './m.js';` -- run it, bind nothing. The seven boss modules are
+  // pulled in this way and were being left verbatim.
+  out = out.replace(SIDE_IMPORT, (m, from) => `__req(${JSON.stringify(from)});`);
+
+  /*
+   * `export { a, b as c } from './m.js';` -- a re-export.
+   *
+   * MUST come before the plain `export { ... }` rule below, whose pattern
+   * requires the line to end at the brace and so leaves this one untouched --
+   * a bare `export` in a script that is no longer a module, which is a syntax
+   * error that takes the whole bundle with it. upgrades.js has re-exported
+   * BOSS_TONE since build 127 and every single-file build from 127 to 180
+   * booted to a dead page because of this one line. The guard at the bottom of
+   * this file exists so that can never be true again.
+   *
+   * The module is pulled in under a generated name rather than destructured,
+   * because the same file frequently imports the same binding under another
+   * name a line later -- upgrades.js takes BOSS_TONE as TONES -- and two const
+   * declarations of one name is the next syntax error along.
+   */
+  out = out.replace(
+    /^[ \t]*export\s*\{([^}]*)\}\s*from\s*(['"])([^'"]+)\2\s*;?[ \t]*$/gm,
+    (m, names, q, from) => {
+      const tmp = `__rx${reexports++}`;
+      for (const n of names.split(',')) {
+        const t = n.trim().split(/\s+as\s+/);
+        if (!t[0]) continue;
+        exported.push([(t[1] || t[0]).trim(), `${tmp}.${t[0].trim()}`]);
+      }
+      return `const ${tmp} = __req(${JSON.stringify(from)});`;
+    },
+  );
 
   // `export { a, b };`
   out = out.replace(/^[ \t]*export\s*\{([^}]*)\}\s*;?[ \t]*$/gm, (m, names) => {
@@ -338,3 +384,37 @@ if (late.length) {
 }
 console.log(`  rev stamp at byte ${at.map(([n, i]) => `${i} (${n})`).join(', ')}, `
   + `inside the ${RANGE}-byte check`);
+
+/*
+ * ---- nothing module-shaped survives into a script ----
+ *
+ * The whole job of wrap() is turning modules into plain script, and it does it
+ * with a handful of regexes -- one per export form it has been taught. A form
+ * it has NOT been taught passes through verbatim, and a bare `export` or
+ * `import` in a classic script is a SyntaxError that kills the entire bundle
+ * on load. There is no partial failure: the page boots to its title screen and
+ * nothing else ever runs.
+ *
+ * That is not hypothetical. `export { BOSS_TONE } from './anomaly.js';` went
+ * into upgrades.js in build 127 and every single-file build from 127 to 180
+ * shipped dead -- the artifact and every home-screen install -- because
+ * nothing here ever read its own output. Fifty-three builds.
+ *
+ * So the output is parsed rather than trusted. Cheap, total, and it fails the
+ * build instead of the player's page.
+ */
+const leftovers = [];
+for (const [name, text] of [['artifact', framed], ['standalone', whole]]) {
+  const lines = text.split('\n');
+  lines.forEach((line, i) => {
+    if (/^[ \t]*(export|import)[\s{*]/.test(line)) leftovers.push(`${name}:${i + 1}  ${line.trim().slice(0, 90)}`);
+  });
+}
+if (leftovers.length) {
+  console.error(`${leftovers.length} module statement(s) survived into the bundle. `
+    + 'A bare export or import in a classic script is a SyntaxError and the whole '
+    + 'page dies on load — teach wrap() the form rather than shipping this:');
+  for (const l of leftovers.slice(0, 8)) console.error(`  ${l}`);
+  process.exit(1);
+}
+console.log('  no module statements left in either form');

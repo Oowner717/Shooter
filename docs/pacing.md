@@ -279,10 +279,8 @@ HERALD used to open fourth of ten and GLUT ninth — a band-4 type in hand two
 bands early, and a band-3 type held back until well past its band.
 `check-build.mjs` asserts the band ordering now.
 
-The thresholds are pitched against the earned-by-tier targets, which the income
-table above supports: 15,000 by tier 8 puts BULWARK and TOW in hand just as
-band 5 is first drawn from. A player who climbs faster than they earn falls
-down-band, which was already built in build 177.
+A player who climbs faster than they earn falls down-band, which was already
+built in build 177.
 
 **The save is migrated, and `VERSION` is deliberately not bumped.** `readSlot`
 refuses any file whose `v` does not match exactly, so a bump would delete every
@@ -293,6 +291,71 @@ run banks 12.8 energy a release over its first hundred.
 
 `debugGiveEnergy` credits `earned` too. Without it a tester with 100,000 in the
 purse would have opened the whole tree and still be fighting MOTEs.
+
+### Build 181 — the thresholds, re-pitched against play
+
+The first set of thresholds was three times higher, and wrong. They were
+calibrated against the earned-by-tier targets above, and those targets were
+blessed by `tiers.mjs`'s `pay/s` column — **which is not a run's income.** It
+measures a band's heaviest wave, alone, cleared as fast as the turret can, with
+energy still lying on the floor counted as collected. It reads 38.7/s at tier 8.
+
+Fifteen minutes of actual play — assists on, PULSE when ready, no debug spawns,
+no instant kills — reads about an eighth of that:
+
+| minute | 0.5 | 1 | 2 | 4 | 6 | 10 | 14 |
+|---|---|---|---|---|---|---|---|
+| earned | 36 | 118 | 326 | 866 | 1,741 | 3,037 | 4,128 |
+
+**4,417 in fifteen minutes, against a curve that assumed 15,000 by tier 8.**
+So HERALD landed at nineteen minutes and TOW at forty-seven, and a ladder
+sitting at tier 7–8 spent the entire run falling down-band because band 4 was
+not open yet. Every gated type past GLUT was unreachable in a quarter of an
+hour of play.
+
+Re-pitched against that run:
+
+| band | gates |
+|---|---|
+| 2 | lurcher 200, splitter 500 |
+| 3 | bloom 700, prism 900, glut 1,100 |
+| 4 | herald 1,400, warden 1,700, scion 2,000 |
+| 5 | bulwark 2,800, tow 3,400 |
+
+Measured again on a fresh run, all ten now arrive inside 12.7 minutes, in band
+order: lurcher 79s, splitter 147s, bloom 217s, prism 281s, glut 312s, herald
+365s, warden 520s, scion 599s, bulwark 728s, tow 760s. BULWARK and TOW land
+within seconds of where the kill counts they replaced used to put them, which
+is the check that says the re-pitch is right rather than merely lower.
+
+Every threshold also sits below its own old kill gate × 12, the rate the save
+migration converts at, so no run that had a type can lose it. `check-build.mjs`
+asserts that now, against a frozen copy of the old kill gates — the only place
+they still exist.
+
+**The lesson, again: a measurement is only as good as its instrument.** `pay/s`
+answers "which tier pays more", not "what does a run earn", and using it for the
+second is what produced a spend curve four times too rich. `tiers.mjs` now says
+so at the top of the file and under the column. The TTK table it prints is
+priced off that same curve, so every loadout in it is richer than a real run
+affords and every TTK is optimistic — **the wall is nearer than build 179's
+table says, not further.**
+
+### Not pacing, but found by rechecking this work
+
+**The single-file build had been producing a dead page since build 127.**
+`bundle.mjs` turns modules into plain script with one regex per export form it
+knows, and it did not know `export { X } from './m.js'` (added to upgrades.js
+in build 127) or bare side-effect `import './m.js'` (how the seven boss modules
+are pulled in). Either one leaves a module statement in a classic script, which
+is a SyntaxError that kills the whole page on load — it boots to the title
+screen and nothing else runs. The side-effect imports were missing from the
+dependency graph too, so the entry module resolved to `./terminus.js` rather
+than `./main.js`.
+
+Nothing caught it because nothing had ever loaded the bundle's output. It does
+now: the build parses both forms it writes and fails on any surviving `export`
+or `import`. Every artifact published between 127 and 180 was a broken page.
 
 ### Still outstanding
 

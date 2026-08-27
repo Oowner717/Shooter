@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '180';
+export const BUILD = '181';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '180';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '58de9f3';
+export const REV = 'd0fb5f4';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -2129,14 +2129,34 @@ export const CFG = {
  * ceil(n/2), so the thresholds are pitched to be met before that band is
  * wanted:
  *
- *   band 2, wanted at tier 3    lurcher 400     splitter 800
- *   band 3, wanted at tier 5    bloom 1,800     prism 2,600    glut 3,400
- *   band 4, wanted at tier 7    herald 5,500    warden 6,800   scion 8,000
- *   band 5, wanted at tier 9    bulwark 11,000  tow 14,000
+ *   band 2, wanted at tier 3    lurcher 200     splitter 500
+ *   band 3, wanted at tier 5    bloom 700       prism 900      glut 1,100
+ *   band 4, wanted at tier 7    herald 1,400    warden 1,700   scion 2,000
+ *   band 5, wanted at tier 9    bulwark 2,800   tow 3,400
  *
  * HERALD used to open fourth of ten and GLUT ninth, which put a band-4 type in
  * a player's hands two bands early and held a band-3 type back until well past
  * it. scripts/check-build.mjs holds the grouping now.
+ *
+ * ---- these numbers came from play, and the first set did not ----
+ *
+ * They were pitched three times higher, against the earned-by-tier targets in
+ * docs/pacing.md -- and those targets were blessed by tiers.mjs's pay/s column,
+ * which measures a band's HEAVIEST wave, alone, cleared as fast as possible,
+ * counting energy still lying on the floor as collected. Real play earns about
+ * an eighth of that: a stock turret on the assists banks 4,417 in fifteen
+ * minutes, not the 15,000 the curve assumed by tier 8.
+ *
+ * So the first set put HERALD at nineteen minutes and TOW at forty-seven, and
+ * a ladder sitting at tier 7-8 spent the whole run falling down-band because
+ * band 4 was not open yet. Measured against a real fifteen-minute run instead,
+ * these land every type within about twelve minutes -- and land BULWARK and
+ * TOW within seconds of where the kill counts they replaced used to put them,
+ * which is the check that says the re-pitch is right rather than merely lower.
+ *
+ * Every one of them also sits below its old kill gate times twelve, which is
+ * what the save migration converts at, so no run that had a type loses it.
+ * check-build.mjs asserts that.
  *
  * 0 means always available. The director falls down-band if a band is reached
  * before its types are -- see Director.shuffle -- so a fast climb never stalls
@@ -2182,7 +2202,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'lurcher',
-    opens: 400,
+    opens: 200,
     name: 'LURCHER',
     shape: 'hex',
     r: 24,
@@ -2201,7 +2221,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'splitter',
-    opens: 800,
+    opens: 500,
     name: 'SPLITTER',
     shape: 'blob',
     r: 29,
@@ -2220,7 +2240,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'bloom',
-    opens: 1800,
+    opens: 700,
     name: 'BLOOM',
     shape: 'bloom',
     r: 33,
@@ -2240,7 +2260,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'bulwark',
-    opens: 11000,
+    opens: 2800,
     name: 'BULWARK',
     shape: 'plated',
     r: 45,
@@ -2263,7 +2283,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'warden',
-    opens: 6800,
+    opens: 1700,
     name: 'WARDEN',
     shape: 'warden',
     r: 22,
@@ -2328,7 +2348,7 @@ export const ENEMY_TYPES = [
      * them and you fight something you made.
      */
     id: 'scion',
-    opens: 8000,
+    opens: 2000,
     name: 'SCION',
     shape: 'scion',
     r: 34,
@@ -2403,7 +2423,7 @@ export const ENEMY_TYPES = [
     // is doing: threads out to whatever it is covering, and a shell on each of
     // them. Shoot the beacon, not the escort.
     id: 'herald',
-    opens: 5500,
+    opens: 1400,
     name: 'HERALD',
     shape: 'herald',
     r: 19,
@@ -2424,7 +2444,7 @@ export const ENEMY_TYPES = [
     // harder, so a littered field is its food supply — kill it early or clear
     // the floor. It is the only object whose threat you control.
     id: 'glut',
-    opens: 3400,
+    opens: 1100,
     name: 'GLUT',
     shape: 'glut',
     r: 16,
@@ -2445,7 +2465,7 @@ export const ENEMY_TYPES = [
     // and shoves everything it catches; both halves are real bodies and both
     // count, so a TOW is two of the five hundred.
     id: 'tow',
-    opens: 14000,
+    opens: 3400,
     name: 'TOW',
     shape: 'tow',
     r: 18,
@@ -3044,7 +3064,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'prism',
-    opens: 2600,
+    opens: 900,
     name: 'PRISM',
     shape: 'prism',
     r: 20,

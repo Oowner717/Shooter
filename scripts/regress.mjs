@@ -879,7 +879,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       let guard = 0;
       const played = new Set();
       const realLoad = d.load.bind(d);
-      d.load = (world, wave) => { played.add(WAVES.indexOf(wave)); return realLoad(world, wave); };
+      let loads = 0;
+      d.load = (world, wave) => { loads++; played.add(WAVES.indexOf(wave)); return realLoad(world, wave); };
       /*
        * Destroyed rather than marked dead. The gates are on banked energy now,
        * and `bank()` only runs inside destroy() -- a perfect player who flips
@@ -888,13 +889,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
        * floor to be collected in the same step.
        */
       /*
-       * Twice the last gate, so the last type to open gets as much run after it
-       * as before it. At 1.2x it had 2,800 of earnings to be drawn in, TOW is
-       * three of twenty-five waves, and the case reported a live type met a
-       * third of the time -- a statement about the bound, not about TOW.
+       * Long enough that the LAST gate to open has had a full rotation of
+       * waves to be drawn in.
+       *
+       * Bounded on earnings alone it was a guess, and both guesses were wrong:
+       * 1.2x the last gate reported TOW met a third of the time and 2x reported
+       * 42%, neither of which is a statement about TOW. TOW is three of
+       * twenty-five waves, so what it needs is not more money but more draws --
+       * so the money opens the gate and then a rotation's worth of loads has to
+       * go by before the run is called finished.
        */
-      const NEED = Math.max(...Object.values(TYPE_BY_ID).map((t) => t.opens || 0)) * 2;
-      while (w.earned < NEED && guard++ < 120000) {
+      const NEED = Math.max(...Object.values(TYPE_BY_ID).map((t) => t.opens || 0));
+      let gateAt = -1;
+      while ((gateAt < 0 || loads - gateAt < 30) && guard++ < 200000) {
+        if (gateAt < 0 && w.earned >= NEED) gateAt = loads;
         d.update(w, 0.7);
         for (const e of [...w.enemies]) if (!e.dead) e.destroy(w);
         w.enemies.length = 0;
@@ -2746,7 +2754,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     glitch.level = 0;
     glitch.burst = 0;
     const cv = document.getElementById('stage');
-    const c2 = cv.getContext('2d');
+    let c2 = cv.getContext('2d');
     let k = cv.width / w.width;
     let row = Math.round(w.floorY * k);
     const yellow = (y) => {
@@ -2785,13 +2793,25 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * `off -9, on -3` with the flag correctly true, on a build drawing the
      * line perfectly well at full size.
      */
+    /*
+     * The perf governor is stood down for the measurement. It drops fx.quality
+     * when frames run long, which shrinks the backing store -- a hundred and
+     * eighty cases into the suite it had taken this canvas to 273x591, where
+     * one world unit is 0.43 of a pixel and the line antialiases below the
+     * colour test entirely. So the case passed or failed on how slow the cases
+     * before it had been, which is not a property of HITBOXES.
+     *
+     * `resize()` is deliberately NOT called to enlarge it further. Raising
+     * devicePixelRatio and resizing does make the line 1.24px, and it also
+     * leaves getImageData reading zeros on every row -- floor and control
+     * alike -- whether the context handle is taken again afterwards or not.
+     * Whatever resize() does to the backing store mid-suite is not something
+     * this case can read through, and a bigger line nobody can measure is
+     * worse than a small one they can.
+     */
     const { fx } = await import('../src/fx.js');
     const heldQuality = fx.quality;
     fx.quality = 1;
-    g.resize();
-    k = cv.width / w.width;
-    row = Math.round(w.floorY * k);
-    ctrl = Math.max(0, row - 60);
     w.debug.hitboxes = false; g.draw();
     const floorOff = strip();
     press('HITBOXES'); g.draw();
@@ -2807,7 +2827,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       floorY: Math.round(w.floorY), paused: !!g.paused, phase: w.phase };
 
     fx.quality = heldQuality;
-    g.resize();
     for (const key of Object.keys(w.debug)) w.debug[key] = false;
     g.hud.toggleDebug(false);
     g.restart();

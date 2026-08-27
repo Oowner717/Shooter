@@ -22,8 +22,17 @@
  * capped at what the whole tree costs, because nobody can spend more than
  * that. So this prices the loadout at what the economy is *meant* to hand
  * over, not at what it does -- which is the point: B and C are being tuned
- * against each other and one of them has to be the fixed end. When plan C
- * lands, drive the measured curve in through `--spend`.
+ * against each other and one of them has to be the fixed end.
+ *
+ * **Those targets are known to be about four times too rich.** A stock turret
+ * on the assists banks 4,417 in fifteen minutes and settles at tier 7-8; the
+ * curve assumes 15,000 by tier 8. So every loadout in the table below is
+ * richer than a real run affords, and every TTK is correspondingly optimistic
+ * -- the wall is nearer than this says, not further. The `pay/s` column does
+ * not rescue it: that measures one heavy wave in isolation with the floor
+ * counted as collected, which is roughly eight times a run's real income, and
+ * using it to bless the curve is exactly the mistake build 180 made and had to
+ * unpick. Fix the curve by driving a measured one in through `--spend`.
  *
  * THE LOADOUT is the damage line and nothing else: the purchases a player
  * makes if all they want is to kill the thing in front of them, in a fixed
@@ -629,7 +638,12 @@ console.log('  dps      ...and what landed on it, a second — armour already pa
 console.log('  worst    the slowest member of the band: what the tier is bounded by');
 console.log('  wave     bodies in the band\'s heaviest authored wave, at this tier\'s size');
 console.log('  pay      energy the wave offers, banked plus still on the floor');
-console.log('  pay/s    ...over the seconds it took: the income plan C is built on');
+console.log('  pay/s    ...over the seconds it took.');
+console.log('           NOT a run\'s income. This is the band\'s HEAVIEST wave, alone, with');
+console.log('           no rest between waves and the floor counted as collected — about');
+console.log('           eight times what a real run banks. A stock turret on the assists');
+console.log('           banks 4,417 in fifteen minutes. Use it to compare tiers with each');
+console.log('           other, never to price anything.');
 console.log(`  clear    ...and how long the whole of it took to put down (cap ${WAVECAP}s).`);
 console.log('           ~ means the runs disagreed by more than double: read the tier,');
 console.log('           not the second. Raise --runs before tuning against this column.');

@@ -40,7 +40,26 @@ different code, and there was no way to tell from inside the game.
 `node scripts/smoke.mjs` walks a long run headlessly and screenshots it.
 
 `node scripts/bundle.mjs` is the single-file build — the form the Artifact and
-the home-screen install are made of. Not a build step for the game, which has
+the home-screen install are made of.
+
+**It shipped a dead page from build 127 to build 180 and nothing noticed**,
+because nothing ever loaded its own output. `wrap()` turns modules into plain
+script with one regex per form it has been taught, and a form it has not been
+taught passes through verbatim — a bare `export` or `import` in a classic
+script is a SyntaxError that kills the entire bundle on load. There is no
+partial failure: the page boots to its title screen and nothing else ever runs.
+Three forms were missing. `export { BOSS_TONE } from './anomaly.js';` went into
+upgrades.js in build 127. `import './terminus.js';` — the seven boss modules are
+pulled in for their side effects alone — was neither transformed nor counted as
+a dependency, so the entry module was resolved as `./terminus.js` instead of
+`./main.js`. Fifty-three builds of artifacts and installs, all of them dead.
+
+It parses its own output now and fails the build on any surviving module
+statement. That guard is the load-bearing part: the transform will always be
+one syntax away from incomplete, and the only defence is reading what came out.
+Booting the bundle is worth doing by hand after touching it — serve it over
+http (not `file://`, which blocks the module loads and the updater's own range
+fetch) and check `window.__sim` exists. Not a build step for the game, which has
 none: it exists because two places want the whole thing as one file and neither
 can be handed a directory. It writes both forms to a temp dir (`--out DIR` to
 put them elsewhere) and fails if the rev stamp it embeds lands outside the

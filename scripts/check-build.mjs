@@ -258,6 +258,33 @@ if (ungrouped.length) {
 console.log(`gates: ${gates.length} types on lifetime energy, band-ordered — `
   + gates.map((g) => `${g.id} ${g.opens}`).join(', '));
 
+/*
+ * ...and no run that already had a type can lose it.
+ *
+ * A save from before build 180 carries no `earned`, so the restore converts
+ * the kill count it does carry at twelve -- the rate a run actually banks per
+ * object. That only works while every threshold sits at or below its own old
+ * kill gate times twelve; raise one past that and a player who was fighting
+ * TOWs comes back to a run that has never heard of them.
+ *
+ * The kill gates are frozen here because they no longer exist anywhere else.
+ * They are history, not configuration: this is the only thing that reads them,
+ * and it reads them to prove the migration is still honest.
+ */
+const KILL_GATES = {
+  lurcher: 18, splitter: 45, bloom: 85, herald: 125, prism: 165,
+  warden: 205, scion: 245, bulwark: 285, glut: 330, tow: 380,
+};
+const RATE = 12; // must match the conversion in Game.restore
+const relock = gates.filter((g) => (KILL_GATES[g.id] || 0) * RATE < g.opens);
+if (relock.length) {
+  console.error('these gates sit above their old kill gate x'
+    + `${RATE}, so the save migration re-locks them: `
+    + relock.map((g) => `${g.id} ${g.opens} > ${KILL_GATES[g.id] * RATE}`).join(', '));
+  process.exit(1);
+}
+console.log(`  ...and none re-locks on a pre-180 save (all under kills x${RATE})`);
+
 console.log(`ladder: ${regular.length} waves across 5 bands `
   + `(${[1, 2, 3, 4, 5].map((b) => byBand[b]).join('/')}), heaviest ${peak} of ${CFG.maxEnemies}`);
 /*
