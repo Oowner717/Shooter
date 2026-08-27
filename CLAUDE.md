@@ -101,6 +101,37 @@ it caused -- every boss misses between 1% and 6%, and GNOMON is the best of
 them. The rule this suite already had, that a measurement is only as good as
 its instrument, cost a published finding to learn again.
 
+`node scripts/tiers.mjs [--from 1] [--to 20] [--runs 3]` is the fourth, and the
+only one pointed at the ordinary field rather than at a boss. Per tier it buys
+what plan C says that tier's earnings can afford, in a fixed damage-line order,
+then measures three things: the gun against a pinned wall (rounds and damage a
+second), the time to kill each type the tier's band newly brings, and the time
+to clear the band's heaviest authored wave at that tier's size. It exists
+because the ladder shipped with three slopes in it and nothing watching what
+they do.
+
+What it found on build 177, before any of plan B: **single-body TTK is the
+wrong wall.** The worst body in a band peaks at 2.8s (SPLITTER, tier 3) and
+settles at about 1.0s from tier 9 to tier 20 — because health climbs 6% a tier
+while the damage line climbs nineteenfold by tier 8 and then stops dead. The
+tree plateaus: dps is 2,050 at tier 8 with 15k spent and still 2,050 at tier 20
+with 117k spent. And **the cadence cliff is DOUBLE TAP, not FEED** — rounds a
+second go 7.6 to 25.9 across one tier of income when TRIPLE TAP lands, where
+FEED's two levels together are worth 1.56x.
+
+Two instrument bugs cost a table each and are worth not repeating: a body
+spawned 240 units above the *floor* is 30 units off the muzzle, dies inside one
+frame, and takes its round and its damage with it — both counters watched state
+*between* frames and saw neither, so it reported a NEEDLE dying to nothing in no
+time. Rounds are counted at `projectiles.push` now and damage off a roster that
+outlives the sweep. And a wave put down loose on the field can land level with
+the turret, which is outside `autoTarget`'s 78° cone forever; waves march in
+from the top here, the way the game sends them.
+
+The clear column is genuinely noisy — the same wave swings five times on where
+its bodies happen to arrive — so runs that disagree by more than double are
+marked `~`. Read the tier, not the second.
+
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three
 builds), the trigger itself, every round/mine/ability/object type running once
