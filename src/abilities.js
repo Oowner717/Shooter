@@ -43,34 +43,163 @@ const ICON = {
 
 // ------------------------------------------------------------------ effects
 
+/**
+ * PULSE's reach, after the punch has landed.
+ *
+ * fx's ring() fades linearly on BOTH width and alpha -- `lineWidth = w * t`
+ * and `alpha = t * 0.95` -- so a ring asked to live a whole second spends
+ * most of it at sub-pixel width and 0.1 alpha, which is to say invisible. Two
+ * extra ring() calls were the first attempt at making PULSE persist and they
+ * could not be seen at all four hundred milliseconds in.
+ *
+ * So this owns its envelope instead: it opens fast to the blast's real edge,
+ * HOLDS there thin and steady, and only then goes. The point is that the
+ * shove is over in a quarter second while the question the player has -- how
+ * far did that actually reach -- is answered for a second afterwards.
+ */
+class Shock {
+  constructor(x, y, r, color) {
+    this.x = x;
+    this.y = y;
+    this.r = r;
+    this.color = color;
+    this.t = 0;
+    this.open = 0.3; // seconds to reach full radius
+    this.life = 1.15;
+    this.dead = false;
+  }
+
+  update(_world, dt) {
+    this.t += dt;
+    if (this.t >= this.life) this.dead = true;
+  }
+
+  draw(ctx) {
+    const k = clamp(this.t / this.open, 0, 1);
+    // Ease out: fast at the front, settling onto the edge.
+    const e = 1 - (1 - k) ** 3;
+    const rr = this.r * e;
+    // Full while opening, then a long steady hold, then away.
+    const left = clamp((this.life - this.t) / 0.45, 0, 1);
+    const a = Math.min(1, k * 3) * left;
+    if (a <= 0.01) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    /*
+     * Dashed, and turning.
+     *
+     * The first version was a thin solid cyan circle, and it was drawing
+     * correctly the whole time and could not be seen: the substrate is a
+     * polar lattice of solid cyan arcs, so a solid cyan arc at radius 340 is
+     * indistinguishable from the sky it is drawn on. A traced ring reads as
+     * background; a measured one does not. The slow rotation is what stops it
+     * looking like a dotted line somebody left there.
+     */
+    ctx.strokeStyle = rgba(this.color, 0.75 * a);
+    ctx.lineWidth = 2.4 + (1 - k) * 5;
+    ctx.setLineDash([16, 11]);
+    ctx.lineDashOffset = -this.t * 40;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, rr, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Four marks on the axes, which no polar lattice has.
+    ctx.strokeStyle = rgba('#d8f6ff', 0.6 * a);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const ang = (i / 4) * TAU;
+      const cx = Math.cos(ang);
+      const cy = Math.sin(ang);
+      ctx.moveTo(this.x + cx * (rr - 7), this.y + cy * (rr - 7));
+      ctx.lineTo(this.x + cx * (rr + 7), this.y + cy * (rr + 7));
+    }
+    ctx.stroke();
+    // A leading edge while it is still travelling, so the opening reads as
+    // something moving outward rather than a circle being resized.
+    if (k < 1) {
+      ctx.strokeStyle = rgba('#ffffff', 0.5 * (1 - k) * a);
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, rr, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+/**
+ * LANCE's beam, in three parts on two clocks.
+ *
+ * It was one stroke pair on a 0.42s fade, and at four hundred milliseconds
+ * there was nothing left on the screen at all -- twelve seconds of cooldown
+ * for a flash you could blink through, drawn as a thin stick rather than as
+ * the heaviest single hit in the bar.
+ *
+ * The strike is still fast, because a beam that lingers at full strength
+ * stops reading as instantaneous. What is new is the SCAR: the line it went
+ * through stays, thin and dim, for four times as long, so the shot leaves
+ * evidence and the player can see what it passed through after the fact. The
+ * two clocks are the whole idea -- a hard, brief hit and a slow, quiet mark.
+ */
 class Beam {
   constructor(x0, y0, x1, y1, color) {
     this.x0 = x0; this.y0 = y0; this.x1 = x1; this.y1 = y1;
     this.life = 0.42;
     this.max = 0.42;
+    this.scar = 1.6; // the mark it leaves, on its own clock
     this.color = color;
     this.dead = false;
   }
   update(_world, dt) {
     this.life -= dt;
-    if (this.life <= 0) this.dead = true;
+    this.scar -= dt;
+    if (this.scar <= 0) this.dead = true;
   }
   draw(ctx) {
     const t = clamp(this.life / this.max, 0, 1);
-    const w = 3 + t * 26;
+    ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = rgba(this.color, t * 0.35);
-    ctx.lineWidth = w;
     ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(this.x0, this.y0);
-    ctx.lineTo(this.x1, this.y1);
-    ctx.stroke();
-    ctx.strokeStyle = rgba('#ffffff', t);
-    ctx.lineWidth = Math.max(0.6, t * 5);
-    ctx.stroke();
+
+    if (t > 0) {
+      // The bloom, the body, and the filament, widest to narrowest.
+      const dx = this.x1 - this.x0;
+      const dy = this.y1 - this.y0;
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      for (const [mul, alpha] of [[46, 0.16], [22, 0.3], [9, 0.55]]) {
+        ctx.strokeStyle = rgba(this.color, t * alpha);
+        ctx.lineWidth = 2 + t * mul;
+        ctx.beginPath();
+        ctx.moveTo(this.x0, this.y0);
+        ctx.lineTo(this.x1, this.y1);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = rgba('#ffffff', t);
+      ctx.lineWidth = Math.max(0.8, t * 6);
+      ctx.beginPath();
+      ctx.moveTo(this.x0, this.y0);
+      ctx.lineTo(this.x1, this.y1);
+      ctx.stroke();
+      // ...and the muzzle it left from, which is where the weight is.
+      drawGlow(ctx, '#fff0c0', this.x0, this.y0, 30 + t * 70, t * 0.85);
+      drawGlow(ctx, this.color, this.x0 + ux * 40, this.y0 + uy * 40, 20 + t * 40, t * 0.5);
+    }
+
+    // The scar. Thin, dim, and much slower -- what the shot went through.
+    const sc = clamp(this.scar / 1.6, 0, 1) ** 1.6;
+    if (sc > 0) {
+      ctx.strokeStyle = rgba(this.color, sc * 0.3);
+      ctx.lineWidth = 1 + sc * 2.2;
+      ctx.beginPath();
+      ctx.moveTo(this.x0, this.y0);
+      ctx.lineTo(this.x1, this.y1);
+      ctx.stroke();
+    }
     ctx.lineCap = 'butt';
-    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
   }
 }
 
@@ -296,20 +425,41 @@ class Decoy {
     drawGlow(ctx, '#59e0ff', 0, 0, this.r * 3.4, 0.28 + this.flash * 0.5);
     ctx.globalCompositeOperation = 'source-over';
 
-    // the same silhouette as the real one, drawn hollow so it reads as a copy
+    /*
+     * The turret's own silhouette, not a circle.
+     *
+     * It was two dashed rings and a stub, which reads as a marker on the
+     * ground -- and the whole idea is "a turret that is not yours", so
+     * anything walking at it should be walking at something that looks like
+     * the thing they were walking at before. It wears the real machine's
+     * hexagonal mount and barrel, hollow and dashed, and the barrel sweeps:
+     * a decoy that stands perfectly still is obviously not a gun.
+     */
     ctx.strokeStyle = rgba('#9be7ff', 0.9);
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 4]);
     ctx.beginPath();
-    ctx.arc(0, 0, this.r, 0, TAU);
+    for (let i = 0; i <= 6; i++) {
+      const a2 = -Math.PI / 2 + (i / 6) * TAU;
+      const px = Math.cos(a2) * this.r;
+      const py = Math.sin(a2) * this.r;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.arc(0, 0, this.r * 0.42, 0, TAU);
     ctx.stroke();
+    // The barrel, swinging as if it were looking for something. Off
+    // world.time so every decoy on the field is not in lockstep.
     ctx.save();
-    ctx.rotate(-Math.PI / 2);
-    ctx.strokeRect(-4, -this.r * 1.5, 8, this.r * 0.8);
+    ctx.rotate(-Math.PI / 2 + Math.sin(world.time * 1.3 + this.born) * 0.5);
+    ctx.strokeRect(-4, -this.r * 1.62, 8, this.r * 0.9);
+    ctx.strokeStyle = rgba('#d8f4ff', 0.8);
+    ctx.beginPath();
+    ctx.moveTo(0, -this.r * 1.62);
+    ctx.lineTo(0, -this.r * 1.86);
+    ctx.stroke();
     ctx.restore();
 
     // what is left of it
@@ -617,14 +767,43 @@ export const ABILITIES = [
       // sits there until a PULSE takes it. INTAKE is the upgrade that stops
       // you having to ask.
       drawIn(world, CFG.energy.pulse);
+      /*
+       * Three rings on three clocks, not two on one.
+       *
+       * PULSE is the most-pressed thing in the game -- seven seconds, always
+       * owned, and the only answer to something on the mount -- and it was
+       * over in under three tenths of a second. Measured on a still field,
+       * four hundred milliseconds after a PULSE there was no evidence on the
+       * screen that anything had happened.
+       *
+       * The fast pair stay, because the punch is the point. What is added is
+       * a slow ring that walks out to the blast's real edge over a second, so
+       * the reach it actually has is visible after the shove has landed -- and
+       * a held bloom on the turret itself, which is the thing that just did
+       * it.
+       */
       ring(s.x, s.y, 20, 360, 0.42, '#59e0ff', 6);
       ring(s.x, s.y, 10, 220, 0.28, '#ffffff', 2.4);
+      // ...and the reach, held. 340 is the blast radius above, so the ring
+      // that stays is exactly the line the shove reached.
+      world.effects.push(new Shock(s.x, s.y, 340, '#59e0ff'));
       ripple(s.x, s.y, 1.5, 800);
       shake(10);
       flash(0.18, '#bdf0ff');
       for (let i = 0; i < 26; i++) {
         const a = rand(0, TAU);
         spark(s.x + Math.cos(a) * 30, s.y + Math.sin(a) * 30, Math.cos(a) * rand(300, 700), Math.sin(a) * rand(300, 700), '#9fe8ff', 0.4, 2.6);
+      }
+      /*
+       * ...and a second, slower shell of embers behind the first, thrown at
+       * a third of the speed. The original set all cleared the screen
+       * together at the same moment, which is what made the whole thing read
+       * as a single frame rather than as a blast with a wake.
+       */
+      for (let i = 0; i < 14; i++) {
+        const a = rand(0, TAU);
+        spark(s.x + Math.cos(a) * 46, s.y + Math.sin(a) * 46,
+          Math.cos(a) * rand(90, 240), Math.sin(a) * rand(90, 240), '#bdf0ff', 1.1, 2);
       }
       audio.ability('pulse');
     },
@@ -654,6 +833,18 @@ export const ABILITIES = [
           trail: 0.03,
         });
       }
+      /*
+       * The cast, at the barrel. Twenty-five pellets leaving at once was
+       * twenty-five muzzle flashes on top of each other and no single event
+       * -- so the cone itself is drawn once: a wedge of embers thrown along
+       * the spread, and a bloom where they all came from.
+       */
+      for (let i = 0; i < 10; i++) {
+        const a = s.aim + ((i / 9) - 0.5) * arc;
+        spark(s.muzzleX, s.muzzleY, Math.cos(a) * 420, Math.sin(a) * 420, '#c8ffe2', 0.22, 2.4);
+      }
+      dot(s.muzzleX, s.muzzleY, 0, 0, '#e6fff2', 0.16, 20);
+      ring(s.muzzleX, s.muzzleY, 6, 70, 0.24, '#7cffb2', 2.4);
       s.recoil = 1;
       shake(4);
       audio.ability('fan');

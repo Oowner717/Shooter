@@ -1538,6 +1538,128 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- an ability is on the screen for as long as it is on the world ----------
+/*
+ * Three abilities were drawing for a fraction of the time they were running,
+ * and STASIS was the worst of them by far: `world.stasis` is set to 4 and its
+ * draw faded out over `stasis / 0.8`, so it painted for four fifths of a
+ * second and then NOTHING for the remaining three and a bit while it was
+ * still holding the entire field. Twenty-one seconds of cooldown buying an
+ * effect that is invisible for eighty percent of its life, and the only way
+ * to know it was still on was that things were not moving.
+ *
+ * PULSE and LANCE were the same disease in a milder form -- both over inside
+ * half a second, on seven and twelve second cooldowns -- so both now run on
+ * two clocks: a hard brief hit, and a slow quiet mark that says where it
+ * reached (PULSE's dashed ring at the blast's real edge) or what it went
+ * through (LANCE's scar).
+ *
+ * Measured on a frozen frame, so nothing but the effect can differ between
+ * the two reads. The alternative -- diffing live frames -- measures the
+ * world moving and cannot tell an effect that is drawing from a body that
+ * drifted, which is exactly the trap that made the first attempt at this
+ * report all eight abilities as visible for a flat 2.5 seconds.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { glitch } = await import('../src/glitch.js');
+    g.debugTeachAll();
+    g.debugClearField();
+    w.debug.noCooldown = true;
+    w.spawnLock = 1e9;
+    if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
+    g.hud.clearHint(); g.hud.clearAlerts(); g.hud.unrecede();
+    glitch.level = 0; glitch.burst = 0;
+
+    const s = w.shooter;
+    for (let i = 0; i < 12; i++) {
+      const a = -Math.PI / 2 + (i / 11 - 0.5) * 1.6;
+      const e = g.debugSpawn(i % 3 ? 'mote' : 'lurcher',
+        s.x + Math.cos(a) * 190, s.y + Math.sin(a) * 190);
+      if (e) { e.spawnIn = 0; e.vx = 0; e.vy = 0; }
+    }
+    for (let i = 0; i < 20; i++) g.update(1 / 60);
+
+    const cv = document.getElementById('stage');
+    const c2 = cv.getContext('2d');
+    const snap = () => {
+      const d = c2.getImageData(0, 0, cv.width, cv.height).data;
+      const out = new Uint8Array(Math.floor(d.length / 4 / 4));
+      for (let i = 0, j = 0; j < out.length; i += 16, j++) {
+        out[j] = Math.min(255, 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]);
+      }
+      return out;
+    };
+    const diff = (a, b) => {
+      let n = 0;
+      for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 10) n++;
+      return n;
+    };
+
+    // The reference frame: everything exactly where it is, nothing running.
+    w.stasis = 0;
+    w.effects.length = 0;
+    g.draw();
+    const base = snap();
+
+    // STASIS, three seconds into its four. Set directly rather than cast, so
+    // the bodies do not move and the only difference is the drawing.
+    w.stasis = 1.0; g.draw();
+    const stasisLate = diff(snap(), base);
+    w.stasis = 3.5; g.draw();
+    const stasisEarly = diff(snap(), base);
+    w.stasis = 0;
+
+    // PULSE's reach ring, after the punch is over. Its fast rings live 0.42s;
+    // this is read at 0.8, where the old effect had nothing left at all.
+    const fire = (id) => {
+      const i = w.abilities.slots.findIndex((x) => x && x.def.id === id);
+      const sl = w.abilities.slots[i];
+      sl.charges = Math.max(1, sl.charges); sl.cd = 0; sl.locked = 0;
+      g.useAbility(i);
+    };
+    const hold = (secs) => {
+      // Only the effects are ticked, so bodies cannot drift and pollute the
+      // comparison.
+      for (let f = 0; f < Math.round(secs * 60); f++) {
+        for (const e of [...w.effects]) e.update(w, 1 / 60);
+        for (let k = w.effects.length - 1; k >= 0; k--) if (w.effects[k].dead) w.effects.splice(k, 1);
+      }
+    };
+    w.effects.length = 0;
+    fire('pulse');
+    hold(0.8);
+    g.draw();
+    const pulseLate = diff(snap(), base);
+    const pulseEffects = w.effects.length;
+
+    w.effects.length = 0;
+    fire('lance');
+    hold(0.8); // its beam lives 0.42s; only the scar should remain
+    g.draw();
+    const lanceLate = diff(snap(), base);
+    const lanceEffects = w.effects.length;
+
+    w.effects.length = 0;
+    w.stasis = 0;
+    w.debug.noCooldown = false;
+    g.restart();
+    return { stasisEarly, stasisLate, pulseLate, pulseEffects, lanceLate, lanceEffects };
+  });
+
+  check('STASIS is drawn for as long as STASIS is holding the field',
+    r.stasisEarly > 400 && r.stasisLate > 400,
+    `pixels changed at 3.5s left: ${r.stasisEarly}, at 1.0s left: ${r.stasisLate}`);
+
+  check('...and PULSE and LANCE both outlive their own first frame',
+    r.pulseLate > 150 && r.pulseEffects > 0
+    && r.lanceLate > 100 && r.lanceEffects > 0,
+    `0.8s after firing -- PULSE ${r.pulseLate} pixels (${r.pulseEffects} effects alive), `
+    + `LANCE ${r.lanceLate} pixels (${r.lanceEffects} alive)`);
+}
+
 // --- when something is on the turret, the answer says so --------------------
 /*
  * The barrel cannot point at a thing sitting on its own mount. That is the
@@ -1638,7 +1760,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     }
     const stillHeld = w.attackers.size;
 
-    // Off the mount, off the button.
+    /*
+     * Off the mount, off the button.
+     *
+     * The field is emptied and locked first, because `look()` waits out a
+     * 420ms transition and the game keeps running through it -- a body
+     * walking onto the turret during that wait puts the class back on for
+     * perfectly correct reasons and fails the check for none.
+     */
+    g.debugClearField();
+    w.spawnLock = 1e9;
+    if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
     for (const a of [...w.attackers]) a.dead = true;
     w.attackers.clear();
     sync();

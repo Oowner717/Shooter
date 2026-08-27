@@ -1792,15 +1792,84 @@ export class Game {
     ctx.restore();
   }
 
+  /**
+   * STASIS, for as long as STASIS lasts.
+   *
+   * `world.stasis` is set to 4 and this faded out over `stasis / 0.8` -- so
+   * the ability drew for the first four fifths of a second and then nothing
+   * at all for the remaining three and a bit, while it was still holding the
+   * entire field. Twenty-one seconds of cooldown buying an effect that is
+   * invisible for eighty percent of its life, and the only way to know it was
+   * still on was that things were not moving.
+   *
+   * It holds now, and it says what it is doing to each thing rather than only
+   * to the screen: the frame is clamped at four corners, a scan crawls down
+   * the field the way a held picture is read out line by line, and every body
+   * caught in it wears brackets. The last half second is the only part that
+   * fades, which is the warning that it is about to let go.
+   */
   drawStasis(ctx, W, H) {
-    const a = clamp(this.world.stasis / 0.8, 0, 1);
+    const w = this.world;
+    // Full strength while held; only the last half-second lets go.
+    const a = clamp(w.stasis / 0.5, 0, 1);
+    const t = w.time;
+
+    ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = `rgba(120,200,255,${0.05 * a})`;
+    ctx.fillStyle = `rgba(120,200,255,${0.045 * a})`;
     ctx.fillRect(0, 0, W, H);
+
+    /*
+     * The read-out. A bright line crawling down the field: a frame that is
+     * being held still is a frame being scanned, and it is the one moving
+     * thing on a screen where nothing else may move.
+     */
+    const sy = ((t * 0.42) % 1) * H;
+    const g = ctx.createLinearGradient(0, sy - 60, 0, sy + 60);
+    g.addColorStop(0, 'rgba(143,171,255,0)');
+    g.addColorStop(0.5, `rgba(190,225,255,${0.16 * a})`);
+    g.addColorStop(1, 'rgba(143,171,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, sy - 60, W, 120);
     ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = `rgba(200,240,255,${0.3 * a})`;
+
+    /*
+     * Brackets on what is held. The ability's promise is "objects stop, your
+     * shots do not", and nothing on the screen ever separated the two -- so
+     * the things it has hold of are marked and the things it has not are not.
+     */
+    ctx.strokeStyle = `rgba(190,225,255,${0.5 * a})`;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (const e of w.enemies) {
+      if (e.dead || e.staged) continue;
+      const r = e.r * 1.5;
+      for (const [sx2, sy2] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const cx = e.x + sx2 * r;
+        const cy = e.y + sy2 * r;
+        ctx.moveTo(cx - sx2 * r * 0.42, cy);
+        ctx.lineTo(cx, cy);
+        ctx.lineTo(cx, cy - sy2 * r * 0.42);
+      }
+    }
+    ctx.stroke();
+
+    // The frame, clamped at the corners rather than outlined all the way
+    // round -- it reads as held rather than as a border.
+    ctx.strokeStyle = `rgba(200,240,255,${0.34 * a})`;
     ctx.lineWidth = 2;
-    ctx.strokeRect(3, 3, W - 6, H - 6);
+    const m = 4;
+    const L = Math.min(W, H) * 0.12;
+    ctx.beginPath();
+    for (const [cx, cy, dx, dy] of [
+      [m, m, 1, 1], [W - m, m, -1, 1], [m, H - m, 1, -1], [W - m, H - m, -1, -1],
+    ]) {
+      ctx.moveTo(cx + dx * L, cy);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx, cy + dy * L);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
 
 
