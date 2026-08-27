@@ -1538,6 +1538,111 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `bare against fully rigged: ${Math.round(Math.abs(r.full - r.bare) / 1000)}k`);
 }
 
+// --- ground is under the field, and one band holds one voice ----------------
+/*
+ * Two defects from the first full-chaos review -- every system staged on one
+ * screen at once, which no probe had ever done. Both were invisible in
+ * isolation and obvious in composition:
+ *
+ * Patches lived in world.effects, and effects draw AFTER the bodies -- so
+ * burning ground was painted over the things standing on it. On a crowded
+ * frame the two SPORE patches were the visually heaviest objects on the
+ * screen, heavier than the boss, because they were not ground at all: they
+ * were slabs laid on top of the field. Patch declares `ground` now and the
+ * draw makes two passes over effects.
+ *
+ * And the canvas narrator was never in the one-voice rule -- build 167 only
+ * arbitrated the DOM surfaces -- so a story line still fading when a boss
+ * arrived sat exactly under the arrival caption, text through text, in the
+ * same upper band both call home.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { Patch } = await import('../src/patch.js');
+    const { glitch } = await import('../src/glitch.js');
+    g.debugTeachAll();
+    g.debugClearField();
+    w.spawnLock = 1e9;
+    if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
+    g.hud.clearHint(); g.hud.clearAlerts(); g.hud.unrecede();
+    glitch.level = 0; glitch.burst = 0;
+
+    // A body standing on a patch. BULWARK, because it is the biggest and its
+    // stroke is the strongest -- if anything survives being drawn under a
+    // slab it is this, so a wash on IT is proof of the general case.
+    const s = w.shooter;
+    const e = g.debugSpawn('bulwark', s.x, s.y - 260);
+    e.spawnIn = 0; e.vx = 0; e.vy = 0; e.hp = e.maxHp;
+    for (let i = 0; i < 10; i++) g.update(1 / 60);
+
+    const cv = document.getElementById('stage');
+    const c2 = cv.getContext('2d');
+    const k = cv.width / w.width;
+    /*
+     * Read the green channel's EXCESS over red across the body's own disc.
+     * The patch tone is #8eeb4b -- green almost double red -- while nothing
+     * in BULWARK's own draw is green-dominant, so ground drawn over the body
+     * pushes G past R inside the disc and ground drawn under it cannot.
+     */
+    const wash = () => {
+      const r0 = Math.round(e.r * 0.8 * k);
+      const cx = Math.round(e.x * k);
+      const cy = Math.round(e.y * k);
+      const d = c2.getImageData(cx - r0, cy - r0, r0 * 2, r0 * 2).data;
+      let excess = 0;
+      for (let i = 0; i < d.length; i += 4) excess += Math.max(0, d[i + 1] - d[i]);
+      return Math.round(excess / 1000);
+    };
+    w.effects.length = 0;
+    g.draw();
+    const bare = wash();
+    const patch = new Patch(e.x, e.y, { r: 120, life: 6, dps: 0, tone: '#8eeb4b' });
+    // Past its own quarter-second fade-in, or it is invisible everywhere and
+    // the whole case reads a patch that is not being drawn at all.
+    patch.t = 1;
+    w.effects.push(patch);
+    g.draw();
+    const onGround = wash();
+    // ...and the patch is genuinely there: just outside the body it is green.
+    const px = Math.round((e.x + e.r + 18) * k);
+    const py = Math.round(e.y * k);
+    const edge = c2.getImageData(px, py, 2, 2).data;
+    const patchThere = edge[1] > edge[0] + 12;
+    w.effects.length = 0;
+
+    // The narrator, standing down. Spied rather than pixel-read: text on a
+    // canvas has no reliable pixel signature, but whether draw() was invoked
+    // is exact.
+    let drew = 0;
+    const real = w.narrator.draw;
+    w.narrator.draw = (...args) => { drew++; return real.apply(w.narrator, args); };
+    w.bossLine = null;
+    g.draw();
+    const without = drew;
+    w.bossLine = 'IT IS THE EDGE.';
+    g.draw();
+    const withCaption = drew - without;
+    w.narrator.draw = real;
+    w.bossLine = null;
+
+    g.debugClearField();
+    g.restart();
+    return { bare, onGround, patchThere, ground: patch.ground === true,
+      without, withCaption };
+  });
+
+  check('a patch is ground: under the body standing on it, not over it',
+    r.ground && r.patchThere && r.onGround < r.bare * 1.3 + 40,
+    `green excess across the body's disc: bare ${r.bare}, on a patch ${r.onGround} `
+    + `(patch visible beside it: ${r.patchThere})`);
+
+  check('...and the narrator stands down while a boss is talking',
+    r.without === 1 && r.withCaption === 0,
+    `narrator.draw ran ${r.without}x with no caption, ${r.withCaption}x under one`);
+}
+
 // --- an ability is on the screen for as long as it is on the world ----------
 /*
  * Three abilities were drawing for a fraction of the time they were running,

@@ -1689,9 +1689,21 @@ export class Game {
 
     background.draw(ctx, W, H);
 
+    /*
+     * Ground first: anything in effects that declares itself ground (the
+     * SPORE and THORN patches) is part of the floor and draws under every
+     * body, not over them. The rest of the effects stay where they were,
+     * after the bodies, because a blast or a beam IS over the field.
+     */
+    for (const e of w.effects) if (e.ground) e.draw(ctx, w);
+
     // Story sits in the quiet upper band, behind every entity, so it can never
     // hide a target — and never competes with the lever for space.
-    w.narrator.draw(
+    // ...and it stands down while a boss is talking: both live in the same
+    // upper band, and an arrival caption landing across a story line still
+    // fading was the one text-on-text collision the one-voice rule missed --
+    // it only ever arbitrated the DOM surfaces, and the narrator is canvas.
+    if (!w.bossLine) w.narrator.draw(
       ctx,
       W / 2,
       ENTRY_Y + (w.shooter.y - ENTRY_Y) * 0.46,
@@ -1710,7 +1722,7 @@ export class Game {
     if (w.boss) w.boss.draw(ctx, w);
 
     drawMines(ctx, w);
-    for (const e of w.effects) e.draw(ctx, w);
+    for (const e of w.effects) if (!e.ground) e.draw(ctx, w);
 
     this.drawAutoLock(ctx);
     w.shooter.draw(ctx, w);

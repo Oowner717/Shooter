@@ -26,6 +26,16 @@ export class Patch {
     this.next = 0;
     this.dead = false;
     /*
+     * Drawn in the ground pass, under the bodies. Patches lived in
+     * world.effects and effects draw AFTER enemies -- so burning ground was
+     * painted over the things standing on it, washing every body on a patch
+     * with the fill and reading as a slab laid on top of the field instead
+     * of ground under it. The full-chaos review is what caught it: on a
+     * crowded frame the two patches were the visually heaviest objects on
+     * the screen, heavier than the boss.
+     */
+    this.ground = true;
+    /*
      * Spores, not orbiting dots.
      *
      * They used to be ten motes on fixed circular orbits, all the same size,

@@ -1320,7 +1320,16 @@ export class Enemy {
     }
 
     if (this.warded && this.warded.length) {
-      ctx.strokeStyle = rgba(t.glow, 0.34);
+      /*
+       * Dimmer the more it wards. The alpha was a flat 0.34 per line, so the
+       * web's total brightness scaled linearly with the flock -- a HERALD
+       * warding two bodies drew two quiet lines and a crowded field drew a
+       * net that out-shouted every body in it. The information is "these are
+       * shielded and this is why", and that survives at a third the light:
+       * the count is carried by how many lines there are, not by each line
+       * being loud.
+       */
+      ctx.strokeStyle = rgba(t.glow, 0.34 / Math.sqrt(this.warded.length));
       ctx.lineWidth = HAIRLINE * 1.4;
       ctx.beginPath();
       for (const e of this.warded) {
