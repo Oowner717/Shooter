@@ -368,8 +368,16 @@ most once for any given target and cannot spin.
   `tiers.mjs` put one down at 300 units and let it walk, so a TOW pair — which
   climbs away — crossed the turret's 841-unit reach at about 6.6s, and every
   `>45s` in that column was the probe waiting out its cap for something the
-  gun could no longer point at. Not a time: a target that left. It pins now,
-  the way the gun bench always pinned its wall. The same disease as the loose
-  wave spawn above, on distance instead of angle — if a probe lets the thing
-  it is measuring move, find out where it went before believing the number.
+  gun could no longer point at. Not a time: a target that left. The same
+  disease as the loose wave spawn above, on distance instead of angle — if a
+  probe lets the thing it is measuring move, find out where it went before
+  believing the number.
+- **...and the fix for that is a ball of slack, not a nail.** Holding a body
+  at a fixed point breaks PRISM — `reflect: 0.55` means whether a bolt lands
+  depends on how it meets the surface, and a body that cannot move presents
+  the same face for ever, so tier 5 went 1.5s to >45s. Holding only its
+  distance lets a TOW swing out of the 78° cone instead. `tiers.mjs` holds
+  each body within `--slack` (80 units) of where it was put and never touches
+  its velocity. A probe that immobilises what it measures has changed the
+  thing it is measuring.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

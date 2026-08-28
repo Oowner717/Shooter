@@ -83,6 +83,13 @@ const CAP = Number(flag('cap', 45));
  * cannot see is measuring ARRAY.
  */
 const RANGE = Number(flag('range', 300));
+/*
+ * How far a body being timed may wander from where the bench put it. Two
+ * body-lengths of the biggest thing in the table: enough that nothing is
+ * frozen, little enough that nothing leaves the turret's reach or its cone.
+ * See the mark loop for what happens at 0 and at infinity -- both were tried.
+ */
+const SLACK = Number(flag('slack', 80));
 /** Seconds the gun fires at the wall, per tier, for the rate and damage columns. */
 const BENCH = Number(flag('bench', 6));
 /** ...and the longest a whole wave is given to clear before it is called uncleared. */
@@ -244,7 +251,7 @@ for (let r = 0; r < RUNS; r++) {
 
   for (const tier of tiers) {
     const out = await page.evaluate(async ({
-      tier, spend, line, cap, range, benchFor, waveCap, ids, waveOf,
+      tier, spend, line, cap, range, slack, benchFor, waveCap, ids, waveOf,
     }) => {
       const { CFG } = await import('../src/config.js');
       const g = window.__sim;
@@ -481,17 +488,45 @@ for (let r = 0; r < RUNS; r++) {
          * was: not a time, a target that left. The health slope moved it only
          * because a lighter pair dies before it gets far enough away, which
          * is why build 194 appeared to "fix" it.
-         *
-         * So the bench pins them, the same way the gun bench pins its wall.
-         * It measures the gun against a body's health at a known distance,
-         * which is the only thing this column was ever wanted for.
          */
-        const pinned = made.map((e) => ({ e, x: e.x, y: e.y }));
+        /*
+         * A LEASH, not a nail, and the difference cost a table.
+         *
+         * The first version wrote the spawn position back every frame and
+         * zeroed the velocity with it. That stops the drift, and it also
+         * stops the body: a PRISM carries `reflect: 0.55`, so whether a bolt
+         * lands depends on how it meets the surface, and one held perfectly
+         * still at dead centre presents the same face to the muzzle for ever.
+         * Measured, tier 5 PRISM went from 1.5s to >45s -- the probe had
+         * built a body the gun could not hurt and reported it as a wall.
+         *
+         * So each body is held near where it was put, with `SLACK` to move in
+         * and its velocity never touched. Inside that ball it wobbles, spins
+         * and takes recoil exactly as it would; outside it is put back on the
+         * edge and carries on trying. That answers the defect this is for --
+         * a target walking out of the turret's 841-unit reach -- without
+         * answering anything it is not.
+         *
+         * Both of the simpler versions were tried and both were wrong, in
+         * opposite directions. A hard nail on the spawn point breaks PRISM
+         * (>45s against 1.5s, either with the velocity zeroed or not: a fixed
+         * point presents a fixed face). A leash on distance alone leaves the
+         * TOW free to swing out of `autoTarget`'s 78-degree cone, and tier 20
+         * went on reading >45s. The ball is what holds both.
+         */
+        const leashed = made.map((e) => ({ e, x: e.x, y: e.y }));
         const pin = () => {
-          for (const p of pinned) {
+          for (const p of leashed) {
             if (p.e.dead) continue;
-            p.e.x = p.x; p.e.y = p.y;
-            p.e.vx = 0; p.e.vy = 0;
+            const dx = p.e.x - p.x;
+            const dy = p.e.y - p.y;
+            const d = Math.hypot(dx, dy);
+            if (d <= slack || d < 1e-6) continue;
+            // Back onto the edge of its own ball, along its own bearing, and
+            // its velocity is left alone so it carries on trying.
+            const k = slack / d;
+            p.e.x = p.x + dx * k;
+            p.e.y = p.y + dy * k;
           }
         };
 
@@ -551,7 +586,7 @@ for (let r = 0; r < RUNS; r++) {
       const wave = waveClear(waveOf, waveCap);
       return { tier, spend, bought, gun, marks, wave };
     }, {
-      tier, spend: spendAt(tier), line: LINE, cap: CAP, range: RANGE,
+      tier, spend: spendAt(tier), line: LINE, cap: CAP, range: RANGE, slack: SLACK,
       benchFor: BENCH, waveCap: WAVECAP, ids: BANDS.get(bandOf(tier)) || [],
       waveOf: HEAVIEST.get(bandOf(tier)) || [],
     });

@@ -542,19 +542,31 @@ from then on, and the probe sits out its 45-second cap waiting for a body the
 gun cannot point at. Every `>45s` in the TOW column was that: not a time, a
 target that left.
 
-The bench pins the body now, exactly as the gun bench already pinned its
-wall. Same slope, same everything, only the pin:
+The bench holds the body now — near where it was put, with 80 units of slack
+to move in and its velocity never touched. Same slope, same everything, only
+the hold, measured at the old 1.17 where the artefact lived:
 
-| tier | unpinned | pinned |
+| tier | loose | held |
 |---|---|---|
-| 16 | tow 8.3s | tow 8.4s |
-| 17 | tow 17.1s | tow 9.2s |
-| 18 | tow **>45s** | tow 11.8s |
-| 19 | tow **43.0s** | tow 14.0s |
-| 20 | tow **>45s** | tow 15.0s |
+| 16 | tow 8.3s | tow 7.6s |
+| 17 | tow 17.1s | tow 9.5s |
+| 18 | tow **>45s** | tow 10.6s |
+| 19 | tow **43.0s** | tow 13.5s |
+| 20 | tow **>45s** | tow 15.4s |
 
-BULWARK is unchanged throughout, which is what says the pin fixed the
-artefact rather than moving every number.
+BULWARK is unchanged throughout (15.3/18.2/20.6/24.8/27.3 against
+16.2/18.5/22.2/23.1/27.3), which is what says the hold fixed the artefact
+rather than moving every number.
+
+**The slack is the whole of it, and both extremes were tried and are wrong.**
+A hard nail on the spawn point fixes TOW and breaks PRISM: tier 5 goes from
+1.5s to **>45s**, with or without the velocity zeroed, because `reflect: 0.55`
+makes whether a bolt lands depend on how it meets the surface and a body at a
+fixed point presents a fixed face to the muzzle for ever. The probe had built
+a body the gun could not hurt and reported it as a wall — the same class of
+mistake it was written to fix, one build later. A leash on distance alone has
+the opposite fault: it leaves the pair free to swing out of `autoTarget`'s
+78-degree cone, and tier 20 went on reading >45s. A ball of slack holds both.
 
 **Two earlier notes were wrong and are corrected above.** Build 192 claimed a
 direct measurement disagreed with the table — a lone TOW dying in 3.7s. That
@@ -565,8 +577,33 @@ health slope as evidence of a real threshold; it was a lighter pair dying
 before it had drifted far enough to trigger the artefact.
 
 Build 194's `hpStep` of 1.12 stands. It was chosen against BULWARK, which the
-artefact never touched, and the pinned bench puts tier 16 at 8.1s and tier 20
-at 12.6s — the same numbers the choice was made on.
+artefact never touched, and the corrected bench puts tier 16 at 8.1s and tier
+20 at 11.9s — the numbers the choice was made on.
+
+### The ladder as it now stands
+
+Tiers 1–20, five runs each, corrected bench:
+
+| tier | band | spend | rnd/s | dps | worst | clear | pay/s |
+|---|---|---|---|---|---|---|---|
+| 1 | 1 | 500 | 3.5 | 108 | 0.2s | 10s | 4.0 |
+| 3 | 2 | 2,333 | 3.8 | 155 | 3.3s | 11s | 11.5 |
+| 5 | 3 | 5,000 | 7.6 | 287 | 1.5s | 42s | 8.6 |
+| 8 | 4 | 15,000 | 9.6 | 659 | 1.5s | 47s | 11.7 |
+| 10 | 5 | 27,500 | 9.6 | 717 | 4.1s | 30s | 29.1 |
+| 14 | 5 | 65,320 | 9.6 | 717 | 6.0s | 56s | 16.6 |
+| 17 | 5 | 114,150 | 9.6 | 717 | 8.4s | 67s | 17.8 |
+| 20 | 5 | 114,150 | 9.6 | 717 | 11.9s | >120s | 13.1 |
+
+No caps anywhere but the tier-20 clear, and `worst` climbs monotonically from
+0.2s to 11.9s. The 2s / 4s / 6s / 10s crossings land at tiers 3 / 10 / 14 /
+19 — build 179 wanted the 6s crossing at about 14 and it is at 14.
+
+Two things the corrected instrument does *not* fix, because they were never
+instrument problems. The dps plateau is still flat at 717 from tier 7 with
+15,000 spent and still 717 at tier 20 with 114,150. And tiers 5–8 still fall
+to 1.5s where band 2 peaked at 3.3s, which is the band-composition item
+below rather than the health slope.
 
 ### Still outstanding
 
