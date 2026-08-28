@@ -1053,6 +1053,110 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       .join(' | '));
 }
 
+// --- the late wall is answerable by the arsenal, if not by BOLT --------------
+/*
+ * The plateau is intentional, and this is what makes that safe to say.
+ *
+ * Past tier 8 the tree stops selling BOLT damage. scripts/tiers.mjs measures
+ * BOLT, so its dps column is flat at 717 from tier 7 with 15,000 spent and
+ * still 717 at tier 20 with 114,150 -- and its `clear` column goes over the
+ * cap at the top of the ladder. Read as "the ladder has an unanswerable
+ * wall", that would be a reason to cap the health slope.
+ *
+ * It is not what it means. What the tree sells after tier 8 is the arsenal:
+ * eight more rounds, eight mines, six abilities. Measured at tier 20 with the
+ * whole tree bought, against the same band-5 wave, one round at a time:
+ *
+ *   SPORE 64s · HE 109s · SCATTER 159s · BOLT 160s · TITHE 166s
+ *   ARC, SPINE, SLUG and RIME did not clear inside 180s
+ *
+ * SPORE answers in a quarter of the time BOLT needs. The wall is a BOLT wall,
+ * which is the design working rather than failing -- so nothing is capped,
+ * and this case is what stops that decision rotting. It does not name a
+ * round: it asserts that SOMETHING in the rack still answers the top of the
+ * ladder, so a balance pass that flattened the whole arsenal would be caught
+ * even if it left BOLT exactly where it is.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const A = await import('../src/arsenal.js');
+    const g = window.__sim;
+    const w = g.world;
+    const S = 1 / 60;
+    /*
+     * Representative of band 5 rather than derived from the authored table:
+     * the point is a great deal of late health on the field at once, and a
+     * case that recomputed "the heaviest wave" would be re-implementing
+     * tiers.mjs to assert something coarser than either.
+     */
+    const WAVE = [['bulwark', 3], ['tow', 2], ['warden', 3], ['scion', 2]];
+    const CAP = 120;
+    // Best first, measured: the case stops at the first round that answers,
+    // so an intact arsenal costs one trial and a broken one costs nine.
+    const ORDER = ['spore', 'explosive', 'shotgun', 'standard', 'tithe',
+      'arc', 'spine', 'slug', 'rime'];
+    const known = new Set(A.ARSENAL.filter((x) => x.kind === 'round').map((x) => x.key));
+    /*
+     * Captured once and put back at the end. `reset()` keeps the same
+     * Director object, so a stub left on it outlives every restart after it
+     * and starves every later case of waves -- which is exactly what the
+     * first version of this case did to the four ladder cases below it.
+     */
+    const ranD = w.director.update;
+
+    const trial = (round) => {
+      g.restart();
+      g.debugTeachAll();
+      w.director.update = () => {};
+      w.director.timer = 1e9; w.director.driftTimer = 1e9;
+      g.debugGiveEnergy(400000);
+      g.debugBuyAll();
+      w.director.setTier(20);
+      for (const e of [...w.enemies]) e.dead = true;
+      w.enemies.length = 0;
+      w.round = round;
+      w.autoAim = false; w.autoFire = false;
+      const swell = w.director.scaleAt(w.director.tier).pop * CFG.waves.population;
+      for (const [id, base] of WAVE) {
+        g.debugSpawnGroup(id, Math.max(1, Math.round(base * swell)), {});
+      }
+      for (let i = 0; i < 60 * 20 && w.enemies.some((e) => e.staged || e.spawnIn > 0); i++) g.update(S);
+      let hp = 0;
+      for (const e of w.enemies) if (!e.harmless) hp += e.maxHp || 0;
+      w.autoAim = true; w.autoFire = true;
+      g.fireTimer = 0; w.shooter.cooldown = 0;
+      const live = () => w.enemies.filter((e) => !e.dead && !e.harmless).length;
+      let t = 0;
+      while (t < CAP && live() > 0) { g.update(S); t += S; }
+      return { round, secs: +t.toFixed(1), left: live(), hp: Math.round(hp) };
+    };
+
+    const tried = [];
+    let answered = null;
+    for (const round of ORDER) {
+      if (!known.has(round)) continue;
+      const one = trial(round);
+      tried.push(one);
+      if (one.left === 0) { answered = one; break; }
+    }
+    // ...and BOLT's own number, for the record, if the sweep stopped early.
+    const bolt = tried.find((x) => x.round === 'standard') || null;
+    w.director.update = ranD;
+    g.restart();
+    return { answered, tried, bolt, rounds: known.size };
+  });
+
+  check('something in the rack still answers the top of the ladder',
+    !!r.answered && r.answered.left === 0,
+    r.answered
+      ? `${r.answered.round.toUpperCase()} clears ${r.answered.hp.toLocaleString()} of `
+        + `band-5 health at tier 20 in ${r.answered.secs}s`
+        + `${r.tried.length > 1 ? ` (after ${r.tried.length - 1} that did not)` : ''}`
+      : `none of ${r.rounds} rounds cleared it: `
+        + r.tried.map((x) => `${x.round} left ${x.left}`).join(', '));
+}
+
 // --- a NEEDLE leads with its point -------------------------------------------
 // It is the fastest thing on the field and used to tumble, which told you
 // nothing about where it was going. The art is drawn along -y, so the angle it

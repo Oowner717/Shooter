@@ -605,6 +605,50 @@ instrument problems. The dps plateau is still flat at 717 from tier 7 with
 to 1.5s where band 2 peaked at 3.3s, which is the band-composition item
 below rather than the health slope.
 
+## The plateau is intentional — decided, and asserted
+
+Past tier 8 the tree stops selling BOLT damage. `tiers.mjs` measures BOLT, so
+its dps column is flat at 717 from tier 7 on 15,000 spent and still 717 at
+tier 20 on 114,150, and its `clear` column runs over the cap at the top of the
+ladder. Three answers were on the table: late damage nodes for the gun, a
+ceiling on the health slope, or accept it. **Accepted.**
+
+What makes that safe to say rather than a shrug is that the wall is answerable
+— just not with BOLT. Measured at tier 20 with the whole tree bought, against
+the same band-5 wave (~142,000 health on the field), one round at a time:
+
+| round | clears in | left standing |
+|---|---|---|
+| SPORE | **64.2s** | 0 |
+| HE | 109.2s | 0 |
+| SCATTER | 158.7s | 0 |
+| BOLT | 159.7s | 0 |
+| TITHE | 166.3s | 0 |
+| ARC | >180s | 1 |
+| SPINE | >180s | 1 |
+| RIME | >180s | 12 |
+| SLUG | >180s | 24 |
+
+SPORE answers in a bit over a third of the time BOLT needs. What the tree
+sells after tier 8 is the arsenal — eight more rounds, eight mines, six
+abilities — and at the top of the ladder that is the thing that works. The
+late wall is a BOLT wall, which is the design doing its job rather than
+failing at it, so nothing is capped.
+
+Two consequences worth writing down.
+
+**`tiers.mjs`'s `clear` column is a BOLT number**, and its header always said
+so ("BOLT and the damage line"). It is a calibration surface for the damage
+line, not a statement about whether a tier is playable.
+
+**The decision is now an assertion.** `regress.mjs` holds "something in the
+rack still answers the top of the ladder": the same wave at tier 20, tried one
+round at a time until one clears inside 120s. It deliberately does not name a
+round, so a balance pass that flattened the whole arsenal is caught even if it
+left BOLT exactly where it is. Shown to fail — with the trigger interval taken
+out twelvefold it reads "none of 9 rounds cleared it: spore left 7, explosive
+left 13, shotgun left 27, standard left 30…".
+
 ### Still outstanding
 
 - The `swell` remnants.
@@ -612,6 +656,3 @@ below rather than the health slope.
   than the health slope — a new band lands every two tiers and a turret that
   has just grown meets it before the health has caught up. Re-banding waves or
   moving `perBand` is the lever, and neither is a tuning pass.
-- The tree plateaus from tier 8. Removing TRIPLE TAP and capping HOT LOAD
-  both lowered the plateau; neither made the last 100k of the tree buy
-  anything.

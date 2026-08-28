@@ -720,6 +720,11 @@ console.log('           other, never to price anything.');
 console.log(`  clear    ...and how long the whole of it took to put down (cap ${WAVECAP}s).`);
 console.log('           ~ means the runs disagreed by more than double: read the tier,');
 console.log('           not the second. Raise --runs before tuning against this column.');
+console.log('           A BOLT number, like every column here. Past tier 8 the tree');
+console.log('           sells the arsenal rather than BOLT damage, and the late wall is');
+console.log('           answerable with another round: at tier 20 SPORE clears the');
+console.log('           band-5 wave in 64s against BOLT\'s 160. The plateau is');
+console.log('           intentional -- see docs/pacing.md.');
 if (loose.length) {
   console.log(`\n  NOT COMPARABLE: still marching in when the clock started at tier ${loose.join(', ')}`);
 }
