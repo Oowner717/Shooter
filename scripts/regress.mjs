@@ -970,19 +970,46 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  * and 560 for a whole run and never arrived. Repeated hits now give
  * diminishing shove; the first one after a quiet moment is untouched.
  *
- * The measure is against the same object with the turret silent, because that
- * is the claim: being shot at may slow an object down, it may not park it.
+ * The claim is about TIME, so this is measured in time: being shot at may
+ * make a body take longer to arrive, it may not stop it arriving.
+ *
+ * It used to be measured in distance -- how far the body closed under fire as
+ * a share of how far it closed in silence -- plus one absolute window of 26
+ * seconds it had to arrive inside. Both were wrong in the same way. The share
+ * says nothing once the body arrives in both trials, and the window was set
+ * near the truth rather than clear of it: measured, a LURCHER crosses in
+ * 16.0-17.2s with the turret silent and 17.3-22.1s under fire, so 26 gave the
+ * worst honest run 1.2x of margin, and the case failed about one run in ten
+ * for no reason but the weather. It was reported twice as intermittent before
+ * anyone measured what it was actually asking for.
+ *
+ * Each body sets its own budget from its own quiet crossing now, which is
+ * both generous and immune to the next balance pass: a BULWARK takes 46-58s
+ * to cross with nobody shooting at it, and no one fixed number was ever going
+ * to suit it and a LURCHER at once.
  */
 {
   const r = await page.evaluate(async () => {
     const g = window.__sim;
     const w = g.world;
     const S = w.shooter;
+    /*
+     * From a known machine. The fire trial's knockback is whatever the turret
+     * has been bought, and this case never set it -- so an upgrade left on by
+     * an earlier case (HEAVY doubles knockback) would land on the fire run and
+     * not on the quiet one it is compared against.
+     */
+    g.restart();
     w.director.timer = 1e9; w.director.driftTimer = 1e9;
     const clear = () => { for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
                           for (const d of [...w.drops]) d.dead = true; w.drops.length = 0; };
-    const SECONDS = 26;
-    const trial = (type, fire) => {
+    // Generous enough that a body which is merely slow is not recorded as one
+    // that never came. A BULWARK needs about fifty.
+    const CAP = 90;
+    // ...and how much longer than its own quiet crossing being shot at may
+    // cost it. Measured, fire costs a LURCHER 15% and a BULWARK 12%.
+    const SLOW = 3;
+    const trial = (type, fire, secs) => {
       clear();
       w.autoAim = fire; w.autoFire = fire;
       const e = g.debugSpawn(type, S.x + 40, 180);
@@ -992,7 +1019,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       const start = Math.hypot(e.x - S.x, e.y - S.y);
       let far = start;
       let arrived = null;
-      for (let s = 0; s < SECONDS * 30; s++) {
+      for (let s = 0; s < secs * 30; s++) {
         g.update(1 / 30);
         const d = Math.hypot(e.x - S.x, e.y - S.y);
         far = Math.max(far, d);
@@ -1000,25 +1027,30 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       }
       const end = arrived === null ? Math.hypot(e.x - S.x, e.y - S.y) : 90;
       clear();
-      return { arrived, start: Math.round(start), far: Math.round(far), end: Math.round(end),
-        closed: Math.round(start - end) };
+      return { arrived, start: Math.round(start), far: Math.round(far), end: Math.round(end) };
     };
     const out = {};
     for (const type of ['lurcher', 'bulwark']) {
-      out[type] = { quiet: trial(type, false), fire: trial(type, true) };
+      const quiet = trial(type, false, CAP);
+      // Its own crossing, times what fire is allowed to cost it.
+      const budget = quiet.arrived === null ? CAP : Math.min(CAP, quiet.arrived * SLOW + 5);
+      const fire = trial(type, true, budget);
+      out[type] = { quiet, fire, budget: +budget.toFixed(1) };
     }
     w.autoAim = false; w.autoFire = false;
+    g.restart();
     return out;
   });
-  const share = (o) => o.fire.closed / Math.max(1, o.quiet.closed);
-  const ok = r.lurcher.fire.arrived !== null
-    && share(r.lurcher) >= 0.7 && share(r.bulwark) >= 0.7
-    && r.lurcher.fire.far < r.lurcher.fire.start * 1.2
-    && r.bulwark.fire.far < r.bulwark.fire.start * 1.2;
+  const ok = Object.values(r).every((o) => o.quiet.arrived !== null
+    // It arrives, inside a budget set by its own unhindered crossing...
+    && o.fire.arrived !== null
+    // ...and it is never shoved further out than it started.
+    && o.fire.far < o.quiet.start * 1.2);
   check('a body under sustained fire still closes on the turret', ok,
-    Object.entries(r).map(([k, o]) => `${k} closed ${o.fire.closed}/${o.quiet.closed} of `
-      + `${o.quiet.start} (${Math.round(share(o) * 100)}%), arrived ${o.fire.arrived ?? 'no'}, `
-      + `pushed out to ${o.fire.far}`).join(' | '));
+    Object.entries(r).map(([k, o]) => `${k} crosses in ${o.quiet.arrived}s quiet, `
+      + `${o.fire.arrived ?? `NEVER (${o.fire.end} out)`} under fire against a `
+      + `${o.budget}s budget, pushed out to ${o.fire.far} of ${o.quiet.start}`)
+      .join(' | '));
 }
 
 // --- a NEEDLE leads with its point -------------------------------------------
@@ -1990,6 +2022,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     let unasked = 0;
     let held = 0;
     let gripped = 0;
+    /*
+     * The light is sampled INSIDE the loop, on frames where something is
+     * actually on the mount, because that is when the claim applies.
+     *
+     * It was read once at the end, and HARD CASING -- one of the upgrades
+     * this case deliberately buys -- kills whatever has hold of the turret,
+     * so a run where the mount happened to clear on the last frame reported
+     * the button dark and failed. Same disease as the counter below it:
+     * looking after the moment instead of during it.
+     */
+    let litWhenHeld = 0;
+    let sampledHeld = 0;
     let seen = w.abilities.slots.map((x) => x.charges);
     const who = [];
     const tick = () => {
@@ -2007,6 +2051,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       tick();
       if (w.attackers.size >= 2) held++;
       gripped = Math.max(gripped, w.attackers.size);
+      if (i % 30 === 0 && w.attackers.size > 0) {
+        sampledHeld++;
+        g.hud.syncAbilities(w.abilities);
+        const p = w.abilities.slots.findIndex((x) => x.def.essential);
+        if (g.hud.slots[p].el.classList.contains('urgent')) litWhenHeld++;
+      }
     }
     /*
      * Closed off before the press below, and this is the fourth version of
@@ -2019,9 +2069,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const auto = unasked;
     const whoAuto = who.slice();
 
-    g.hud.syncAbilities(w.abilities);
     const pulse = w.abilities.slots.findIndex((x) => x.def.essential);
-    const lit = g.hud.slots[pulse].el.classList.contains('urgent');
+    const lit = sampledHeld > 0 && litWhenHeld === sampledHeld;
 
     /*
      * ...and neither the ability nor the counter watching it is asleep. PULSE
@@ -2038,7 +2087,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     w.director.update = ranD;
     g.restart();
-    return { gripped, held, auto, who: whoAuto, lit, pressed, slots: w.abilities.slots.length };
+    return { gripped, held, auto, who: whoAuto, lit, litWhenHeld, sampledHeld,
+      pressed, slots: w.abilities.slots.length };
   });
 
   check('nothing on the bar goes off by itself, and the button says so instead',
@@ -2046,7 +2096,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `${r.gripped} on the mount and two held for ${r.held} of 420 frames, `
     + `every one of ${r.slots} abilities owned: ${r.auto} charges spent `
     + `unasked over seven seconds${r.who.length ? ` (${r.who.join(', ')})` : ''}; `
-    + `PULSE lit ${r.lit}, and the same counter sees a press ${r.pressed}`);
+    + `PULSE lit on ${r.litWhenHeld}/${r.sampledHeld} of the frames sampled with `
+    + `something on the mount, and the same counter sees a press ${r.pressed}`);
 }
 
 // --- every control on the play screen answers a real press ------------------

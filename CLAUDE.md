@@ -380,4 +380,15 @@ most once for any given target and cannot spin.
   each body within `--slack` (80 units) of where it was put and never touches
   its velocity. A probe that immobilises what it measures has changed the
   thing it is measuring.
+- **A flaky case is a case measured at the wrong moment or against the wrong
+  margin, and both showed up in one sitting.** "A body under sustained fire
+  still closes" gave a LURCHER 26s to arrive when it takes 16-17s quiet and
+  17-22s under fire -- a window set near the truth rather than clear of it,
+  failing about one run in ten; each body sizes its own budget off its own
+  quiet crossing now. And "nothing on the bar goes off by itself" read
+  `.ab.urgent` once at the end of its window, where HARD CASING -- which the
+  case itself buys -- had sometimes just killed the last gripper; it samples
+  the light on frames where something is actually attached now. If a case
+  fails intermittently, measure what it is really asking for before touching
+  its number.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
