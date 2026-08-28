@@ -432,13 +432,13 @@ TAP removal had, because HOT LOAD is affordable from the very first band.
 
 **One thing is unresolved and should not be read as a result.** The table's
 `worst` column puts TOW at >45s from tier 19, against 8.4s before — a 5×
-move where BULWARK's is 1.4×. A direct measurement disagrees: a TOW spawned
-alone at tier 19 against the capped loadout dies in **3.7s**, against 3.0s
-uncapped, which is the 23% the cadence change predicts. So the table's
-high-tier TOW cells are measuring something other than the gun — most likely
-the thrown MASS ending up outside `autoTarget`'s cone, the trap the probe's
-own notes already warn about for loose spawns. Neither measurement has been
-reconciled with the other. Read BULWARK, which is consistent across both.
+move where BULWARK's is 1.4×. Read BULWARK, which is consistent.
+
+> **Resolved in build 195, and both of the guesses below were wrong.** The
+> ">45s" was never a time: the TOW pair drifts out of the turret's reach and
+> the probe waits out its cap. And the "direct measurement" this note
+> originally leaned on — a lone TOW dying in 3.7s — was measuring half a
+> body, because `debugSpawn` returns the head without its MASS. See build 195.
 
 ## Build 193 — HOT LOAD out, FEED halved
 
@@ -517,14 +517,56 @@ than of the slope:
 - **Top-end income.** `pay/s` at tier 20 was 1.1 against a mid-ladder 20-40,
   because income is measured over the time a clear takes. It is 12.4 now.
 
-**And the TOW cliff moved with it**, which is new information about the
-question left open in build 192. At 1.17 the `worst` column read >45s at
-tiers 18 and 20 and 43.0s at 19; at 1.12 those are 9.7s, 11.9s and 12.4s. So
-it is a threshold in health-against-damage rather than a pure instrument
-artefact — the TOW is being killed before it throws again. That still does
-not reconcile with the 3.7s a lone TOW takes when measured directly at tier
-19, so the column is measuring something more than one body's health, and the
-outstanding item stands.
+**And the TOW cliff moved with it.** At 1.17 the `worst` column read >45s at
+tiers 18 and 20 and 43.0s at 19; at 1.12 those are 9.7s, 11.9s and 12.4s.
+
+> **Read in build 195 with the instrument fixed, this is not what it looked
+> like.** It is not a threshold in health-against-damage. A lighter pair
+> simply dies before it has drifted out of the turret's reach, so the
+> artefact stops firing. The slope change did not fix a TOW problem; it hid
+> an instrument one. Build 194's choice of 1.12 stands on its own — it was
+> made against BULWARK, which the artefact never touched, and it holds under
+> the corrected bench.
+
+## Build 195 — the TTK bench measures the gun again
+
+The `worst` column claimed to be time-to-kill at 300 units. It was not. The
+body was put down at 300 and then allowed to walk, so what it measured was as
+much the pathing as the gun.
+
+A TOW is where that showed, because a TOW is two bodies and the pair climbs
+away. Measured over nine seconds at tier 18: head 307 → 682 → 754 → 1092, and
+the MASS 431 → 636 → 840 → 996. The turret's reach with the whole tree bought
+is **841**. At about 6.6s the MASS crosses it, `autoTarget` returns nothing
+from then on, and the probe sits out its 45-second cap waiting for a body the
+gun cannot point at. Every `>45s` in the TOW column was that: not a time, a
+target that left.
+
+The bench pins the body now, exactly as the gun bench already pinned its
+wall. Same slope, same everything, only the pin:
+
+| tier | unpinned | pinned |
+|---|---|---|
+| 16 | tow 8.3s | tow 8.4s |
+| 17 | tow 17.1s | tow 9.2s |
+| 18 | tow **>45s** | tow 11.8s |
+| 19 | tow **43.0s** | tow 14.0s |
+| 20 | tow **>45s** | tow 15.0s |
+
+BULWARK is unchanged throughout, which is what says the pin fixed the
+artefact rather than moving every number.
+
+**Two earlier notes were wrong and are corrected above.** Build 192 claimed a
+direct measurement disagreed with the table — a lone TOW dying in 3.7s. That
+probe used `debugSpawn`, which returns the head *without* its MASS;
+`debugSpawnGroup`, which the bench uses, returns the pair. It was comparing
+half a body against a whole one. And build 194 read the cliff moving with the
+health slope as evidence of a real threshold; it was a lighter pair dying
+before it had drifted far enough to trigger the artefact.
+
+Build 194's `hpStep` of 1.12 stands. It was chosen against BULWARK, which the
+artefact never touched, and the pinned bench puts tier 16 at 8.1s and tier 20
+at 12.6s — the same numbers the choice was made on.
 
 ### Still outstanding
 
@@ -536,6 +578,3 @@ outstanding item stands.
 - The tree plateaus from tier 8. Removing TRIPLE TAP and capping HOT LOAD
   both lowered the plateau; neither made the last 100k of the tree buy
   anything.
-- Why `tiers.mjs` reports TOW at >45s at high tiers when a direct kill takes
-  3.7s. Until that is settled, the `worst` column cannot be trusted on any
-  band containing a TOW.

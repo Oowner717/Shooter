@@ -358,4 +358,18 @@ most once for any given target and cannot spin.
   3.5 pulls a second stock against 3.9 bought. It was 2.54× before 178.
   `regress.mjs` asserts the product rather than the nodes, which is what
   catches a new rate upgrade arriving as much as an old one coming back.
+- **`debugSpawn` gives you half a TOW.** It calls `spawnOne`, which makes the
+  head alone; the pair — head plus the MASS it drags, tethered — comes from
+  `release()`, which is what `debugSpawnGroup` goes through. A probe that
+  builds a TOW the first way is measuring 135hp against the 415 the game
+  actually sends, and a build-192 note published exactly that mistake as a
+  finding.
+- **A time-to-kill bench has to HOLD the body at the range it claims.**
+  `tiers.mjs` put one down at 300 units and let it walk, so a TOW pair — which
+  climbs away — crossed the turret's 841-unit reach at about 6.6s, and every
+  `>45s` in that column was the probe waiting out its cap for something the
+  gun could no longer point at. Not a time: a target that left. It pins now,
+  the way the gun bench always pinned its wall. The same disease as the loose
+  wave spawn above, on distance instead of angle — if a probe lets the thing
+  it is measuring move, find out where it went before believing the number.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

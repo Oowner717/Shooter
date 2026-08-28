@@ -464,6 +464,37 @@ for (let r = 0; r < RUNS; r++) {
         const hp0 = made.reduce((a, e) => a + e.maxHp, 0);
         const at = Math.round(Math.hypot(made[0].x - w.shooter.x, made[0].y - w.shooter.y));
 
+        /*
+         * ---- and it is HELD there ----
+         *
+         * This column claims to be time-to-kill at `range`. It was not: the
+         * body was put down at 300 and then allowed to walk, and what it
+         * measured was as much the pathing as the gun.
+         *
+         * A TOW is where that showed. The pair spawns at 300 and 431 and
+         * climbs away -- measured, head 307 -> 682 -> 754 -> 1092 and mass
+         * 431 -> 636 -> 840 -> 996 over nine seconds -- and the turret's
+         * reach with the whole tree bought is 841. At about 6.6s the mass
+         * crosses it, `autoTarget` returns nothing from then on, and the
+         * probe sits out its 45-second cap waiting for a body the gun can no
+         * longer point at. That is what every `>45s` in the old TOW column
+         * was: not a time, a target that left. The health slope moved it only
+         * because a lighter pair dies before it gets far enough away, which
+         * is why build 194 appeared to "fix" it.
+         *
+         * So the bench pins them, the same way the gun bench pins its wall.
+         * It measures the gun against a body's health at a known distance,
+         * which is the only thing this column was ever wanted for.
+         */
+        const pinned = made.map((e) => ({ e, x: e.x, y: e.y }));
+        const pin = () => {
+          for (const p of pinned) {
+            if (p.e.dead) continue;
+            p.e.x = p.x; p.e.y = p.y;
+            p.e.vx = 0; p.e.vy = 0;
+          }
+        };
+
         w.autoAim = true;
         w.autoFire = true;
         g.fireTimer = 0;
@@ -507,6 +538,7 @@ for (let r = 0; r < RUNS; r++) {
 
         let t = 0;
         while (t < cap) {
+          pin();
           g.update(S);
           t += S;
           note();
@@ -548,7 +580,7 @@ console.log(`  slopes: pop +${CFG.waves.tier.pop * 100}%/tier (cap x${CFG.waves.
   + ` · hp x${CFG.waves.tier.hpStep}^(n-1) · bounty +${CFG.waves.tier.bounty * 100}%/tier`);
 const atRange = [...results.values()].flat()
   .flatMap((r) => r.marks.map((m) => m.at)).filter(Number.isFinite);
-console.log(`  one body, ${RANGE} units straight up (measured ${med(atRange) || RANGE}),`
+console.log(`  one body HELD at ${RANGE} units straight up (measured ${med(atRange) || RANGE}),`
   + ` cap ${CAP}s\n`);
 
 console.log('  tier band    spend  buys  rnd/s     dps  worst   wave  clear   pay  pay/s  |  time to kill');
