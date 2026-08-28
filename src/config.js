@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '193';
+export const BUILD = '194';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '193';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '3b9a8fa';
+export const REV = 'b851782';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -151,7 +151,7 @@ export const CFG = {
       pop: 0.1, // authored count x (1 + pop*n)
       /*
        * Health is the one slope that compounds: type health x hpStep^(n-1),
-       * so tier 1 is the table as authored and each rung is 17% on the one
+       * so tier 1 is the table as authored and each rung is 12% on the one
        * below it.
        *
        * It was linear, +6% a tier, and scripts/tiers.mjs measured what that
@@ -162,12 +162,24 @@ export const CFG = {
        * to do. A linear slope steep enough to matter at fourteen (x0.457)
        * would have made tier 2 nearly twice tier 1: all early and no late.
        *
-       * Compounding puts the growth where the wall is wanted. x1.17 at tier
-       * 2, x1.87 at 5, x4.1 at 10, x7.7 at 14, x19.7 at 20. There is no
-       * ceiling on it and there should not be: the brief is to climb until
+       * Compounding puts the growth where the wall is wanted: x1.12 at tier
+       * 2, x1.57 at 5, x2.77 at 10, x4.36 at 14, x8.6 at 20. There is no
+       * ceiling on it and there should not be -- the brief is to climb until
        * you cannot, and the fail score is what catches you.
+       *
+       * 1.12 from build 194, down from 1.17, and it is less a retune of the
+       * ladder than the other half of one. Builds 189-193 took the whole
+       * cadence tree apart -- TRIPLE TAP, then HOT LOAD, then FEED halved --
+       * and the plateau went from 1,438 dps to 717, which is exactly half. A
+       * compounding slope is the right instrument to answer that with,
+       * because the damage cut is flat and the health it was outrunning is
+       * not: at 1.17 the slowest body in band 5 went 13.9s to 27.3s at tier
+       * 20 while tier 3 did not move at all. Chosen by sweeping 1.11, 1.12
+       * and 1.13 against the wall the game had before any of it -- 1.12 puts
+       * tier 16 at 8.1s against 8.0 and tier 20 at 12.4 against 13.9, where
+       * 1.11 undershoots and 1.13 leaves half the gap. See docs/pacing.md.
        */
-      hpStep: 1.17,
+      hpStep: 1.12,
       bounty: 0.15, // energy x (1 + bounty*n)
       /*
        * The ceiling on population growth. The field caps at CFG.maxEnemies

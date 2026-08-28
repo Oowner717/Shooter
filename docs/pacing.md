@@ -202,9 +202,10 @@ Two measurements said why:
 
 ### Build 179 — the health slope compounds
 
-`hp` becomes `hpStep ** (n - 1)` with **hpStep 1.17**. Two changes in one: it
+`hp` becomes `hpStep ** (n - 1)` with **hpStep 1.17** — 1.12 from build 194,
+where the cadence nerfs are paid for; see below. Two changes in one: it
 compounds, and it is read off tier 1 rather than off zero, so **tier 1 is the
-table exactly as authored** and every rung is 17% on the one below.
+table exactly as authored** and every rung is a fixed ratio on the one below.
 
 A linear slope steep enough to matter at fourteen would have needed 0.457,
 which makes tier 2 nearly twice tier 1 — all early and no late. Compounding
@@ -481,6 +482,49 @@ did.
 
 TOW still reads >45s at high tiers in both columns, before and after, so it
 is not this change — see build 192's note, and the outstanding item below.
+
+## Build 194 — the health slope comes down to meet it
+
+Builds 189–193 took the whole cadence tree apart: TRIPLE TAP, then HOT LOAD,
+then FEED halved. The plateau went 1,438 dps → 717 — exactly half — and the
+wall the ladder forms grew to match. `hpStep` goes 1.17 → **1.12**.
+
+A compounding slope is the right instrument for this, because the damage cut
+is flat and the health it was outrunning is not: at 1.17 the slowest body in
+band 5 went from 13.9s at tier 20 to 27.3s, while tier 3 did not move at all.
+The fix has to do nothing at the bottom and a great deal at the top, which is
+what changing the base of an exponent does.
+
+Chosen by sweeping, not by arithmetic, against the wall the game had before
+any of the cadence work (build 188):
+
+| tier | before the nerfs | at 1.17 | 1.13 | **1.12** | 1.11 |
+|---|---|---|---|---|---|
+| 12 | 4.1s | 8.9s | 5.9s | **5.1s** | 4.6s |
+| 16 | 8.0s | 15.3s | 9.2s | **8.1s** | 7.5s |
+| 17 | 8.7s | 18.2s | 9.7s | **9.2s** | 8.1s |
+| 20 | 13.9s | 27.3s | 15.6s | **12.4s** | 11.3s |
+
+1.11 undershoots — it leaves the top easier than it was before any of this.
+1.13 leaves half the gap. 1.12 lands on the old wall to within the column's
+own noise, and health at tier 20 is ×8.6 rather than ×19.7.
+
+Two things recovered with it, and both were consequences of the nerfs rather
+than of the slope:
+
+- **The clear cap.** Band 5's heaviest wave was over 120s from tier 17; it is
+  102s at tier 20 now, so the whole ladder clears again.
+- **Top-end income.** `pay/s` at tier 20 was 1.1 against a mid-ladder 20-40,
+  because income is measured over the time a clear takes. It is 12.4 now.
+
+**And the TOW cliff moved with it**, which is new information about the
+question left open in build 192. At 1.17 the `worst` column read >45s at
+tiers 18 and 20 and 43.0s at 19; at 1.12 those are 9.7s, 11.9s and 12.4s. So
+it is a threshold in health-against-damage rather than a pure instrument
+artefact — the TOW is being killed before it throws again. That still does
+not reconcile with the 3.7s a lone TOW takes when measured directly at tier
+19, so the column is measuring something more than one body's health, and the
+outstanding item stands.
 
 ### Still outstanding
 

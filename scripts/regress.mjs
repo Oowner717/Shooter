@@ -2688,9 +2688,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `tier 80 -> ${r.bandAt.t80.lo}..${r.bandAt.t80.hi}`);
 
   check('the ladder\'s health compounds, and tier 1 is the table as written',
-    Math.abs(r.hp1 - 1) < 1e-9 && r.compounds && r.hpAt[2] > 12,
+    Math.abs(r.hp1 - 1) < 1e-9 && r.compounds
+    // No ceiling: tier 20 is still exactly the exponent, not a clamp. This
+    // was `> 12` and that was the slope of the day rather than the rule --
+    // build 194 took hpStep from 1.17 to 1.12 to pay for the cadence nerfs,
+    // tier 20 went x19.7 to x8.6, and a case about the SHAPE of the slope
+    // failed on its size.
+    && Math.abs(r.hpAt[2] - r.step ** 19) < 1e-9 && r.hpAt[2] > r.hpAt[0] * 2,
     `tier 1 x${r.hp1}, every rung x${r.step}; tier 10/14/20 = `
-    + r.hpAt.map((x) => `x${x.toFixed(1)}`).join(' / '));
+    + r.hpAt.map((x) => `x${x.toFixed(1)}`).join(' / ')
+    + `, and tier 20 is x${(r.step ** 19).toFixed(1)} by the formula`);
 
   /*
    * How far it gets, not whether it ever stumbles.
