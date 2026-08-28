@@ -86,7 +86,9 @@ const UNDER = {
   anomaly: ['aperture', 'aperture2', 'aperture3', 'aperture4', 'aperture5', 'aperture6', 'aperture7'],
 
   // ---- the abilities ----
-  abilities: ['standing', 'reflex'],
+  // REFLEX sat here until build 190, when it went: it fired PULSE for you,
+  // and nothing in this game casts an ability for you.
+  abilities: ['standing'],
   pulse: [],
   fan: [], lance: [], well: [], prism: [], stasis: [], decoy: [],
   // The only ability in the tree with a shaping upgrade of its own. The other

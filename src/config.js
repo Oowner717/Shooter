@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '189';
+export const BUILD = '190';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '189';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '8795ffb';
+export const REV = '743923c';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -555,7 +555,26 @@ export const CFG = {
    */
   spiral: {
     life: 3.2, // seconds the barrel is off its target
-    turns: 2.6, // full revolutions in that time
+    /*
+     * A WHOLE number of revolutions, and that is the whole of why the barrel
+     * no longer snaps.
+     *
+     * It was 2.6, so the sweep ended 216 degrees from where it started and
+     * the only way back was to write the old angle in on one frame. That
+     * teleport was the most conspicuous thing about the ability. Three turns
+     * end where they began, so the restore below is a wrap of the number and
+     * not a move of the gun -- nothing on screen changes on that frame.
+     */
+    turns: 3,
+    /*
+     * ...and it gets there like a machine rather than like a tween. This much
+     * of the sweep at each end is spent spinning up and spinning down, with
+     * the middle at a constant rate: the barrel leans into the turn, holds,
+     * and comes to rest on its own mark. At 0.2 the peak rate is 7.4 rad/s
+     * against the 5.1 the old constant sweep ran at, and the round count does
+     * not move -- rounds are on `interval`, not on the angle.
+     */
+    ramp: 0.2,
     interval: 0.06, // seconds between rounds while it runs
     // A round fired mid-sweep is not an aimed round, and a full sweep is
     // fifty of them. Without this it out-damages the whole bar by a factor
@@ -573,8 +592,8 @@ export const CFG = {
     /*
      * The barrel goes all the way round, which closes the gimbal's travel
      * arc into a full circle -- the one time in the game that ring is ever
-     * whole. That is worth seeing, so it is not snapped back: the upper half
-     * holds for a moment after the last round and fades over this.
+     * whole. That is worth seeing, so it is not cleared on the frame: the
+     * upper half holds for a moment after the last round and fades over this.
      */
     settle: 0.6,
   },

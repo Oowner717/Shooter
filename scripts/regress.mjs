@@ -464,11 +464,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 137 since build 189, when DOUBLE TAP lost TRIPLE TAP. It was 138 from
-    // 183, when SIEVE gained its second level; 137 from 182 when SIEVE went
-    // in; 136 from 178 when FEED lost a level; and 137 before that from 169,
-    // when SPIRAL gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 137
+    // 136 since build 190, when REFLEX went. It was 137 from 189, when DOUBLE
+    // TAP lost TRIPLE TAP; 138 from 183, when SIEVE gained its second level;
+    // 137 from 182 when SIEVE went in; 136 from 178 when FEED lost a level;
+    // and 137 before that from 169, when SPIRAL gained COUNTERSPIN.
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 136
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -1820,6 +1820,211 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.during > 0 && r.after === 0 && r.fade === 0 && r.rounds > 0,
     `spiral ${r.during} mid-sweep -> ${r.after} after the reset,`
     + ` sweepFade ${r.fade}, ${r.rounds} rounds in two seconds`);
+}
+
+// --- the sweep comes to rest where it began ---------------------------------
+/*
+ * SPIRAL used to teleport its own barrel.
+ *
+ * `turns` was 2.6, so the sweep ended 216 degrees from where it started, and
+ * the ability put it back by writing the old angle in on one frame -- measured
+ * here before the change, 3.12 radians of travel in a sixtieth of a second.
+ * That snap was the most conspicuous thing about the whole ability, and no
+ * case looked at it because every case looked at what the sweep DID rather
+ * than at how the gun moved.
+ *
+ * Three things are asserted and none of them is a position. The gun moves
+ * nothing on the frame the sweep hands it back; it finishes pointing where it
+ * started; and it is slow at both ends and fast in the middle, which is the
+ * difference between a machine turning and a number being interpolated.
+ */
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    const ranD = w.director.update;
+    w.director.update = () => {};
+    w.enemies.length = 0;
+    // Nothing else may touch the aim while this is measured.
+    w.autoAim = false;
+    w.autoFire = false;
+
+    const at = [...document.querySelectorAll('#abilities .ab')]
+      .findIndex((el) => /SPIRAL/i.test(el.textContent));
+    const from = w.shooter.aim;
+    g.useAbility(at);
+
+    // Headings, so a wrap at pi does not read as half a turn of travel.
+    const wrap = (d) => Math.atan2(Math.sin(d), Math.cos(d));
+    const steps = [];
+    let prev = w.shooter.aim;
+    let wasUp = true;
+    let handBack = null;
+    for (let i = 0; i < 400; i++) {
+      g.update(1 / 60);
+      const now = w.shooter.aim;
+      const up = w.spiral > 0;
+      steps.push({ d: Math.abs(wrap(now - prev)), up });
+      // The frame the barrel was given back, which is where a snap lives.
+      if (wasUp && !up && handBack === null) handBack = Math.abs(wrap(now - prev)) * 60;
+      wasUp = up;
+      prev = now;
+      if (!w.effects.some((e) => e.constructor.name === 'Spiral')) break;
+    }
+    const during = steps.filter((x) => x.up);
+    const n = during.length;
+    const rate = (a, b) => {
+      const seg = during.slice(a, b);
+      return seg.length ? (seg.reduce((t, x) => t + x.d, 0) / seg.length) * 60 : 0;
+    };
+    const home = Math.abs(wrap(w.shooter.aim - from));
+    w.director.update = ranD;
+    g.restart();
+    return {
+      frames: n,
+      opening: rate(0, Math.round(n * 0.1)),
+      middle: rate(Math.round(n * 0.45), Math.round(n * 0.55)),
+      closing: rate(Math.round(n * 0.9), n),
+      handBack, home,
+    };
+  });
+
+  check('SPIRAL hands the barrel back without moving it',
+    r.frames > 60 && r.handBack !== null && r.handBack < 0.5 && r.home < 0.08,
+    `${r.frames} frames of sweep; ${r.handBack === null ? 'never handed back' : r.handBack.toFixed(2) + ' rad/s on the frame it let go'}`
+    + `, ${r.home.toFixed(3)} rad from where it started`);
+
+  /*
+   * ...and it gets there like a mass on a gimbal. The ends are asserted
+   * against the middle rather than against a number, so the shape survives
+   * CFG.spiral being retuned -- what must not come back is the straight line,
+   * where the first frame and the last both ran at the cruising rate.
+   */
+  check('...and it spins up and spins down rather than running flat',
+    r.opening < r.middle * 0.5 && r.closing < r.middle * 0.5 && r.middle > 3,
+    `${r.opening.toFixed(1)} rad/s opening · ${r.middle.toFixed(1)} cruising · `
+    + `${r.closing.toFixed(1)} closing`);
+}
+
+// --- nothing casts an ability for you ---------------------------------------
+/*
+ * REFLEX fired PULSE the moment two things had hold of the turret. It was a
+ * bought upgrade and it read as a bug: a charge spent without being asked is a
+ * charge you do not have when you need it, and the ability whose whole job is
+ * answering a crowd is the worst one to take that decision away on. It went in
+ * build 190 and this is the rule left behind it.
+ *
+ * Asserted with the whole tree bought, because an automation nobody has paid
+ * for is an automation that cannot be caught: the turret here owns every
+ * upgrade in the game and two bodies are sitting on its mount, which is every
+ * condition anything of that shape would have keyed on.
+ *
+ * The telling is not the automation and never was, so the button is checked
+ * too -- `.ab.urgent` breathes for as long as anything is attached.
+ */
+{
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    const ranD = w.director.update;
+    w.director.update = () => {};
+    w.enemies.length = 0;
+    g.debugGiveEnergy(200000);
+    g.debugBuyAll();
+
+    // Two of them, on the mount, which is what REFLEX keyed on.
+    const s = w.shooter;
+    for (const dx of [4, -6]) {
+      const e = g.debugSpawn('lurcher', s.x + dx, s.y - 6);
+      e.spawnIn = 0; e.vx = 0; e.vy = 0;
+    }
+    const mount = () => {
+      for (let n = w.attackers.size; n < 2; n++) {
+        const e = g.debugSpawn('lurcher', s.x + (n ? -6 : 4), s.y - 6);
+        e.spawnIn = 0; e.vx = 0; e.vy = 0;
+      }
+    };
+
+    /*
+     * Counted per frame, from the frame the first body lands, and this took
+     * three goes to get right -- each wrong version reported a clean bar
+     * through a turret that was firing itself.
+     *
+     * Hooking Game.useAbility caught nothing and was never shown to catch
+     * anything. Diffing charges either side of the window caught nothing
+     * either, because a cooldown puts a charge back inside it. And counting
+     * per frame but only AFTER letting the bodies settle caught nothing,
+     * because the automation fires on the frame they arrive and the window
+     * opened onto a PULSE that was already spent -- which is the same class
+     * of mistake as the last two: measuring after the event.
+     *
+     * So the counter starts before anything is on the mount and runs the
+     * whole way, and it is proved against a press of its own below.
+     */
+    let unasked = 0;
+    let held = 0;
+    let gripped = 0;
+    let seen = w.abilities.slots.map((x) => x.charges);
+    const who = [];
+    const tick = () => {
+      w.abilities.slots.forEach((x, k) => {
+        if (x.charges < seen[k]) { unasked += seen[k] - x.charges; who.push(x.def.id); }
+        seen[k] = x.charges;
+      });
+    };
+    // Every cooldown in the game clear, so anything of that shape has a use
+    // in hand the moment its condition is met.
+    for (const x of w.abilities.slots) { x.cd = 0; x.locked = 0; }
+    for (let i = 0; i < 60 * 7; i++) {
+      mount();
+      g.update(1 / 60);
+      tick();
+      if (w.attackers.size >= 2) held++;
+      gripped = Math.max(gripped, w.attackers.size);
+    }
+    /*
+     * Closed off before the press below, and this is the fourth version of
+     * this counter. The third shared it with the vacuity check and reported
+     * one unasked cast on a clean build -- the case catching its own press,
+     * traced back to its own line. Every wrong version of this reported
+     * something plausible, which is the whole hazard: the instrument has to
+     * be shown to be reading what it claims before its zero means anything.
+     */
+    const auto = unasked;
+    const whoAuto = who.slice();
+
+    g.hud.syncAbilities(w.abilities);
+    const pulse = w.abilities.slots.findIndex((x) => x.def.essential);
+    const lit = g.hud.slots[pulse].el.classList.contains('urgent');
+
+    /*
+     * ...and neither the ability nor the counter watching it is asleep. PULSE
+     * is pressed on the same counter, so a zero above means "nothing fired"
+     * and not "nothing could have been seen firing".
+     */
+    for (const x of w.abilities.slots) { x.cd = 0; x.locked = 0; }
+    g.update(1 / 60);
+    seen = w.abilities.slots.map((x) => x.charges);
+    const from = unasked;
+    g.useAbility(pulse);
+    tick();
+    const pressed = unasked - from === 1;
+
+    w.director.update = ranD;
+    g.restart();
+    return { gripped, held, auto, who: whoAuto, lit, pressed, slots: w.abilities.slots.length };
+  });
+
+  check('nothing on the bar goes off by itself, and the button says so instead',
+    r.gripped >= 2 && r.held > 350 && r.auto === 0 && r.lit && r.pressed,
+    `${r.gripped} on the mount and two held for ${r.held} of 420 frames, `
+    + `every one of ${r.slots} abilities owned: ${r.auto} charges spent `
+    + `unasked over seven seconds${r.who.length ? ` (${r.who.join(', ')})` : ''}; `
+    + `PULSE lit ${r.lit}, and the same counter sees a press ${r.pressed}`);
 }
 
 // --- every control on the play screen answers a real press ------------------

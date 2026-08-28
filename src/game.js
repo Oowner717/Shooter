@@ -1451,11 +1451,18 @@ export class Game {
       }
     }
 
-    // REFLEX: PULSE answers a crowd on the turret without being asked.
-    if (up.reflex && w.attackers.size >= 2) {
-      const i = w.abilities.slots.findIndex((x) => x.def.essential);
-      if (i >= 0 && w.abilities.usable(i)) this.useAbility(i);
-    }
+    /*
+     * REFLEX used to sit here: PULSE fired itself once two things had hold of
+     * the turret. It went in build 190, and the rule it broke is the one the
+     * rest of the bar has always kept -- nothing in this game casts an ability
+     * for you. A charge spent without being asked is a charge you did not have
+     * when you needed it, and the ability whose whole job is answering a
+     * crowd is the worst one to take that decision away on.
+     *
+     * The telling was never the automation's anyway. `.ab.urgent` breathes on
+     * the PULSE button for as long as anything is attached, with or without
+     * the upgrade -- see Hud.syncAbilities. That is what stays.
+     */
 
     /*
      * Somebody who has not worked out what PULSE is for.

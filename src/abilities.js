@@ -494,6 +494,43 @@ class Decoy {
  * hands it straight back, because a barrel left pointing wherever the sweep
  * ended would be a worse gift than the sweep.
  */
+/*
+ * The sweep's motion, as a rate rather than as a position.
+ *
+ * `windAt` is what fraction of the total turn has been made at time fraction
+ * k, and `rateAt` is how fast it is turning there as a fraction of the peak.
+ * They are the same trapezoid: the rate ramps up over the first `r` of the
+ * sweep, holds, and ramps back down over the last `r`, so the angle is that
+ * integrated and normalised to finish at exactly 1.
+ *
+ * A turret is a mass on a gimbal. It was a straight line before -- full rate
+ * on the first frame, full rate on the last, and then the angle written back
+ * to the start on the frame after that -- and both ends of that read as a
+ * mistake rather than as a machine. This is the same sweep with the two ends
+ * given somewhere to come from and somewhere to go.
+ *
+ * The area under the trapezoid is (1 - r), which is what everything below is
+ * divided by; at r = 0 both collapse to the straight line they replaced.
+ */
+function windAt(k, r) {
+  if (r <= 0) return k;
+  const span = 1 - r;
+  if (k < r) return (k * k) / (2 * r * span);
+  if (k > 1 - r) {
+    const d = 1 - k;
+    return (span - (d * d) / (2 * r)) / span;
+  }
+  return (k - r / 2) / span;
+}
+
+/** ...and the rate it is turning at, 0 at both ends and 1 across the middle. */
+function rateAt(k, r) {
+  if (r <= 0) return 1;
+  if (k < r) return k / r;
+  if (k > 1 - r) return (1 - k) / r;
+  return 1;
+}
+
 class Spiral {
   constructor(world) {
     const P = CFG.spiral;
@@ -505,6 +542,13 @@ class Spiral {
     this.grip = world.shooter.gripAngle;
     this.next = 0;
     this.rounds = 0;
+    /*
+     * How much of the total turn has been made, 0 to 1. Not the same as how
+     * much of the TIME has passed -- see windAt -- and it is this one that
+     * everything geometric reads, because the trail winds outward with the
+     * angle and not with the clock.
+     */
+    this.wound = 0;
     /*
      * COUNTERSPIN adds a second arm turning the other way. Each arm carries
      * its own angle and its own sign, so the upgrade is one more entry here
@@ -534,8 +578,9 @@ class Spiral {
       this.life -= dt;
       world.spiral = Math.max(0, this.life);
       const k = clamp(this.t / P.life, 0, 1);
+      this.wound = windAt(k, P.ramp);
       for (const arm of this.arms) {
-        arm.a = arm.at + arm.dir * k * P.turns * TAU;
+        arm.a = arm.at + arm.dir * this.wound * P.turns * TAU;
       }
       /*
        * The sweep owns the barrel. This runs in the effects pass, after
@@ -544,7 +589,13 @@ class Spiral {
        * `aimError` is a getter off the two and the slew would otherwise spend
        * the whole sweep correcting back to a target.
        */
-      s.aim = this.arms[0].a + spread(P.wobble);
+      /*
+       * The shake goes with the speed. A machine at rest does not shiver, and
+       * with the ramp in place the last tenth of a second is slow enough that
+       * a fixed wobble was the only thing still moving -- the barrel came to
+       * a stop and then twitched on the spot.
+       */
+      s.aim = this.arms[0].a + spread(P.wobble * rateAt(k, P.ramp));
       s.targetAim = s.aim;
       s.sweepFade = 1;
 
@@ -572,11 +623,18 @@ class Spiral {
     }
 
     /*
-     * Done firing. The gun goes back before anything else does -- the aim is
-     * wound back to where the sweep began rather than left at `from + 2.6
-     * turns`, because gripAngle is derived from it and an unwound aim leaves
-     * the gimbal's travel arc spanning six radians for the rest of the run.
-     * That is exactly what it did: the ring stayed shut after every use.
+     * Done firing, and the gun is already home.
+     *
+     * This unwraps the number rather than moving the barrel. `turns` is a
+     * whole number, so the last frame of the sweep leaves arm 0 at `from +
+     * turns * TAU`, which is the same DIRECTION as `from` and a different
+     * value -- and the value matters, because gripAngle is derived from it
+     * and an unwound aim leaves the gimbal's travel arc spanning nineteen
+     * radians for the rest of the run. That is what this is for; nothing on
+     * screen moves on this frame, which is the point.
+     *
+     * It used to be a genuine teleport: `turns` was 2.6, so the sweep ended
+     * 216 degrees out and the barrel was snapped back across it in one frame.
      *
      * Guarded on a flag rather than on `world.spiral !== 0`, which is what
      * the first fix used and which never fired once: the running branch
@@ -585,6 +643,7 @@ class Spiral {
      */
     if (!this.restored) {
       this.restored = true;
+      this.wound = 1;
       world.spiral = 0;
       s.aim = this.from;
       s.targetAim = this.from;
@@ -603,7 +662,9 @@ class Spiral {
     const P = CFG.spiral;
     const s = world.shooter;
     const running = this.life > 0;
-    const k = clamp(this.t / P.life, 0, 1);
+    // How far round it has got, which is what the shape is drawn from. The
+    // clock only decides the fade.
+    const k = this.wound;
     const fade = running
       ? Math.min(1, this.t / 0.16)
       : clamp(this.settle / P.settle, 0, 1);

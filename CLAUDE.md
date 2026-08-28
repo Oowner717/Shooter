@@ -325,4 +325,25 @@ most once for any given target and cannot spin.
   two rows (69px) and cost that slot; one row (44px) plus a boss-bar
   reservation only made during a fight keeps it. Measure `pillCap()` at
   320x568 before adding anything to the top of the screen.
+- **Nothing in this game casts an ability.** REFLEX fired PULSE for you once
+  two things had hold of the turret; it went in build 190 along with the node,
+  because an upgrade that spends a charge unasked is a charge you do not have
+  when you need it. The telling was never the automation's: `.ab.urgent`
+  breathes on the PULSE button for as long as anything is attached, bought or
+  not. `regress.mjs` holds the rule with the whole tree owned.
+- The counter behind that rule took **four** versions and every wrong one
+  reported a clean bar through a turret firing itself twice a second. Hooking
+  `Game.useAbility` caught nothing and was never shown to catch anything.
+  Diffing `charges` either side of the window caught nothing, because a
+  cooldown puts a charge back inside it. Counting per frame but only after
+  letting the bodies settle caught nothing, because the automation fires on
+  the frame they land. And sharing the counter with the case's own vacuity
+  press reported one unasked cast on a clean build — the case catching itself.
+  A zero means nothing until the instrument has been shown to read a one.
+- SPIRAL's `turns` must stay a WHOLE number. The sweep ends where the barrel
+  is left, and the ability then writes the starting angle back so `gripAngle`
+  is not carrying three revolutions of travel. At 2.6 turns that write was a
+  teleport — measured, 3.12 radians in one frame. At 3 it is the same
+  direction and nothing moves. `CFG.spiral.ramp` is the spin-up and spin-down
+  either side of it; at 0 both collapse to the flat sweep they replaced.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
