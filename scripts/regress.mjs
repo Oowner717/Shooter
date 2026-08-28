@@ -4469,7 +4469,23 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + ` | ${r.seen} words across ${r.cells} cells`);
 }
 
-// --- ...and the furniture gets out of the way on the beats ------------------
+// --- ...and the furniture gets out of the way on the beats, not on a press --
+/*
+ * The recede is for the beats where the screen is the point and nothing is
+ * being pressed: a boss arriving, a stage turning over.
+ *
+ * Using an ability was on that list until build 191. Everything an ability
+ * draws is a circle on the turret and the turret sits behind the controls --
+ * measured across three handsets, a turret-centred effect is 25-54% behind
+ * one -- so the strip dimmed itself for the length of whatever had just been
+ * cast. The trouble is which frame that is: the frame you press an ability is
+ * the frame you are most likely to press another, and a control that fades
+ * under the thumb already on it reads as the press having failed.
+ *
+ * So the assertion inverted. What is checked now is that a press changes
+ * nothing at all, and that the beats still do -- and both halves matter,
+ * because deleting the whole mechanism would pass the first on its own.
+ */
 {
   const r = await page.evaluate(async () => {
     const g = window.__sim;
@@ -4477,45 +4493,55 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       strip: +getComputedStyle(document.getElementById('quickBar')).opacity,
       abs: +getComputedStyle(document.getElementById('abilities')).opacity,
     });
+    const settle = () => new Promise((res) => setTimeout(res, 420));
     g.hud.unrecede();
+    await settle();
     const before = opacity();
-    // An ability going off is a beat, and it is the ability's own `show`,
-    // not its cooldown: HAIL is over before the pellets land, WELL drags.
+
+    /* ---- a press leaves both bands alone ---- */
     g.useAbility(0);
-    const held = g.hud.recedeT;
-    const cls = document.body.classList.contains('recedeStrip');
+    const onPress = {
+      cls: document.body.classList.contains('recede'),
+      t: g.hud.recedeT,
+    };
     /*
-     * ...and the ability bar is NOT in it. Pressing an ability is the one
-     * moment that bar is what you are reading -- which one went, what it
-     * cost, when it is back -- and fading it on the press hides exactly
-     * that. A boss beat still takes both, because nobody is reading a
-     * cooldown through an arrival.
+     * Waited out, not sampled on the spot. Both bands carry a 0.34s opacity
+     * transition, so getComputedStyle on the frame of the press returns the
+     * value it would have been leaving -- 1 -- and a fade would read as no
+     * fade at all. Long enough for one to have finished if there were one.
      */
-    const sparedAbilities = !document.body.classList.contains('recede');
-    g.hud.unrecede();
-    g.hud.recede(1, false);
-    const bossBeatTakesBoth = document.body.classList.contains('recede')
-      && document.body.classList.contains('recedeStrip');
-    g.hud.unrecede();
-    g.useAbility(0);
+    await settle();
+    const after = opacity();
+
+    /* ---- and a beat still takes both ---- */
+    g.hud.recede(1);
+    await settle();
+    const beat = opacity();
+    const beatCls = document.body.classList.contains('recede');
     // ...and it is still pressable while it is faint. A recede that took the
     // controls away would be worse than the occlusion it is fixing.
     const ab = document.querySelector('#abilities .ab');
     const hittable = getComputedStyle(ab).pointerEvents !== 'none';
     // The clock runs it out on its own.
     g.hud.updateAlerts(99);
-    const after = { cls: document.body.classList.contains('recedeStrip'), t: g.hud.recedeT };
+    await settle();
+    const back = opacity();
     g.hud.unrecede();
-    return { before, held, cls, hittable, after, sparedAbilities, bossBeatTakesBoth,
-      shows: (await import('../src/abilities.js')).ABILITIES.map((a) => a.show) };
+    return { before, onPress, after, beat, beatCls, hittable, back };
   });
-  check('an ability takes the strip down and leaves the ability bar alone',
-    r.cls && r.held > 0 && r.hittable && !r.after.cls
-    && r.sparedAbilities && r.bossBeatTakesBoth
-    && r.before.strip === 1 && r.shows.every((v) => v > 0 && v < 4),
-    `held ${r.held}s, ability bar spared ${r.sparedAbilities}, `
-    + `a boss beat takes both ${r.bossBeatTakesBoth}, still pressable ${r.hittable}, `
-    + `back afterwards ${!r.after.cls}, durations ${r.shows.join('/')}`);
+
+  check('using an ability does not fade anything',
+    r.before.strip === 1 && r.before.abs === 1
+    && !r.onPress.cls && r.onPress.t === 0
+    && r.after.strip === 1 && r.after.abs === 1,
+    `before ${r.before.strip}/${r.before.abs}, on the press class=${r.onPress.cls} `
+    + `clock=${r.onPress.t}, a third of a second later ${r.after.strip}/${r.after.abs}`);
+
+  check('...and a boss beat still takes both bands down, and gives them back',
+    r.beatCls && r.beat.strip < 0.6 && r.beat.abs < 0.6 && r.hittable
+    && r.back.strip === 1 && r.back.abs === 1,
+    `beat ${r.beat.strip}/${r.beat.abs} (pressable ${r.hittable}), `
+    + `back to ${r.back.strip}/${r.back.abs}`);
 }
 
 // --- the TITHE mark is on the screen, and it deepens ------------------------

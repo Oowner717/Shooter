@@ -2613,7 +2613,9 @@ body.bossUp #waveRail { display: none; }
  * See Hud.recede(). The strip and the ability bar own the bottom third of the
  * screen and everything the turret emits is a circle centred on the turret,
  * which sits at 60-70% of the way down it. On a beat where something big is
- * being drawn, both go to a whisper and come back over a third of a second.
+ * being drawn AND NOTHING IS BEING PRESSED -- an arrival, a stage turning
+ * over -- both go to a whisper and come back over a third of a second. Using
+ * an ability is not one of those beats and has not been since build 191.
  *
  * `pointer-events` is deliberately NOT dropped. A recede runs for under a
  * second and the player may want PULSE inside it; the button is faint, not
@@ -2623,11 +2625,10 @@ body.bossUp #waveRail { display: none; }
 #abilities {
   transition: opacity 0.34s ease;
 }
-/* `recedeStrip` is the strip alone -- what an ability press asks for, because
-   the ability bar is the thing being read at that moment. `recede` adds the
-   ability bar and is for the beats nobody is pressing through: an arrival, a
-   stage turning over. */
-body.recedeStrip #quickBar,
+/* One class, both bands. There were two -- `recedeStrip` for the strip alone,
+   which is what an ability press asked for, and `recede` for both -- and the
+   press stopped asking in build 191, so every caller left wants both. */
+body.recede #quickBar,
 body.recede #abilities {
   opacity: 0.14;
   /* Out fast, back slowly: the effect it is clearing for has already
@@ -2635,7 +2636,7 @@ body.recede #abilities {
   transition: opacity 0.11s ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
-  body.recedeStrip #quickBar,
+  body.recede #quickBar,
   body.recede #abilities { opacity: 0.45; transition: none; }
 }
 

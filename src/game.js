@@ -842,11 +842,20 @@ export class Game {
     const res = w.abilities.trigger(w, i);
     if (!res) return;
     this.hud.flashAbility(i);
-    // ...and the strip gets out of the way while it happens. Everything an
-    // ability draws is a circle on the turret and the turret sits behind the
-    // controls. The ability bar itself stays: this is the one moment it is
-    // the thing being read. See Hud.recede().
-    this.hud.recede(res.slot.def.show ?? 0.9, true);
+    /*
+     * The strip used to fade to a whisper here for the length of whatever was
+     * drawn -- each ability carried its own `show` for it. It went in build
+     * 191. The reasoning was that everything an ability draws is a circle on
+     * the turret and the turret sits behind the controls, which is true and
+     * is not worth what it costs: the frame you press an ability is the frame
+     * you are most likely to press another, and a bar that dims itself under
+     * the thumb already on it reads as the press having gone wrong. The
+     * occlusion is a fair complaint about where the furniture sits; dimming
+     * the furniture at the moment of use is not the answer to it.
+     *
+     * The boss beats still recede -- an arrival and a stage turning over are
+     * not presses, and nobody is reading a cooldown through either.
+     */
     // An ability says what it is the first time it is used, which is minutes
     // after it was bought and only if the player actually reaches for it.
     // ...and once on this device: `res.first` is per-run, so without this an

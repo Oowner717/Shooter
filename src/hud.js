@@ -1114,10 +1114,7 @@ export class Hud {
     }
     if (this.recedeT > 0) {
       this.recedeT -= dt;
-      if (this.recedeT <= 0) {
-        document.body.classList.remove('recede');
-        document.body.classList.remove('recedeStrip');
-      }
+      if (this.recedeT <= 0) document.body.classList.remove('recede');
     }
     if (this.hintTimer > 0) {
       this.hintTimer -= dt;
@@ -1198,32 +1195,27 @@ export class Hud {
    * 40/51/47%. Half of the last boss in the game was behind four buttons.
    *
    * So the furniture gets out of the way on the beats where something big is
-   * being drawn and nothing is being pressed: an ability going off, a boss
-   * arriving, a stage turning over, a boss dying. It stays touchable the
-   * whole time -- a panic PULSE during a recede still fires, because the
+   * being drawn and NOBODY IS PRESSING ANYTHING: a boss arriving, a stage
+   * turning over, a boss dying. It stays touchable the whole time -- the
    * button is faint rather than gone.
+   *
+   * Using an ability was on that list until build 191, with a `stripOnly`
+   * argument that took the fifteen-cell strip and spared the ability bar. It
+   * is not on it any more, and the argument went with it: the frame you press
+   * an ability is the frame you are most likely to press another, and a
+   * control that dims under the thumb already on it reads as the press having
+   * failed. Every caller left is a beat, so there is nothing to spare and one
+   * class covers both.
    */
-  recede(seconds = 0.9, stripOnly = false) {
+  recede(seconds = 0.9) {
     this.recedeT = Math.max(this.recedeT || 0, seconds);
-    /*
-     * `stripOnly` leaves the ability bar alone.
-     *
-     * Pressing an ability is the one moment the ability bar is the thing you
-     * are looking at -- which one went, what it cost, when it is back -- and
-     * fading it on the press hides exactly that. So an ability takes the
-     * fifteen-cell strip out of the way and nothing else. A boss arriving or
-     * a stage turning over is not a press, nobody is reading a cooldown, and
-     * both go.
-     */
-    if (!stripOnly) document.body.classList.add('recede');
-    document.body.classList.add('recedeStrip');
+    document.body.classList.add('recede');
   }
 
   /** Put it back now, whatever is left on the clock. */
   unrecede() {
     this.recedeT = 0;
     document.body.classList.remove('recede');
-    document.body.classList.remove('recedeStrip');
   }
 
   // ------------------------------------------------------------------ debug

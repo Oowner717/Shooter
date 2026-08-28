@@ -210,14 +210,6 @@ const WELL_GATHER = 2.5;
 const WELL_COLLAPSE = 0.6;
 const WELL_REACH = 430;
 
-/*
- * `show` on each ability below is how long its effect is worth looking at,
- * which is not its cooldown and not its damage window: HAIL is over before the
- * pellets land and WELL drags for a couple of seconds. Hud.recede() takes the
- * strip and the ability bar down for exactly that long, because measured
- * across three handsets a turret-centred effect is 25-54% behind a control.
- */
-
 class Well {
   constructor(x, y) {
     this.x = x;
@@ -811,7 +803,6 @@ function densestPoint(world) {
 export const ABILITIES = [
   {
     id: 'pulse',
-    show: 0.85, // seconds this is worth watching -- see Hud.recede()
     name: 'PULSE',
     color: '#59e0ff',
     cooldown: 7,
@@ -871,7 +862,6 @@ export const ABILITIES = [
   },
   {
     id: 'fan',
-    show: 0.7, // seconds this is worth watching -- see Hud.recede()
     name: 'HAIL',
     color: '#7cffb2',
     cooldown: 5,
@@ -913,7 +903,6 @@ export const ABILITIES = [
   },
   {
     id: 'lance',
-    show: 1.0, // seconds this is worth watching -- see Hud.recede()
     name: 'LANCE',
     color: '#ffd166',
     cooldown: 12,
@@ -951,7 +940,6 @@ export const ABILITIES = [
   },
   {
     id: 'well',
-    show: 2.2, // seconds this is worth watching -- see Hud.recede()
     name: 'WELL',
     color: '#c77dff',
     cooldown: 38,
@@ -966,7 +954,6 @@ export const ABILITIES = [
   },
   {
     id: 'prism',
-    show: 1.25, // seconds this is worth watching -- see Hud.recede()
     name: 'PRISM',
     color: '#ff6beb',
     cooldown: 16,
@@ -995,7 +982,6 @@ export const ABILITIES = [
   },
   {
     id: 'stasis',
-    show: 1.1, // seconds this is worth watching -- see Hud.recede()
     name: 'STASIS',
     color: '#8fabff',
     cooldown: 21,
@@ -1015,7 +1001,6 @@ export const ABILITIES = [
   },
   {
     id: 'decoy',
-    show: 1.0, // seconds this is worth watching -- see Hud.recede()
     name: 'DECOY',
     color: '#ff616e',
     cooldown: 24,
@@ -1037,7 +1022,6 @@ export const ABILITIES = [
   },
   {
     id: 'spiral',
-    show: 3.5, // the whole sweep -- see Hud.recede()
     name: 'SPIRAL',
     color: '#ff7a1a',
     cooldown: 20,
