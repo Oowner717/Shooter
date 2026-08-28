@@ -9,7 +9,6 @@ import { BUILD, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
 
 import { CODEX, codex, markLine } from './codex.js';
-import {  } from './util.js';
 import { Menu } from './menu.js';
 import { holdFor, STACK, MIN_READ } from './tutorial.js';
 import { SLOTS, carried, freeSlot } from './loadout.js';
@@ -17,6 +16,14 @@ import { heldList } from './anomaly.js';
 import { readRun } from './save.js';
 
 const $ = (id) => document.getElementById(id);
+
+/*
+ * How many tiers the rail shows at once. Odd, so the run's own position is
+ * the middle one and there is as much behind it as ahead; five, because four
+ * of them across a 320 screen still leaves the two arrows their 44px and a
+ * seventh node would be 24px of column for a two-digit number.
+ */
+const RAIL_SEEN = 5;
 
 /** Sliders. The one shape that reads as "choose what goes here" at 14px. */
 const CONFIG_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
@@ -58,10 +65,9 @@ export class Hud {
     this.el = {
       killNum: $('killNum'),
       counter: $('counter'),
-      tierChip: $('tierChip'),
-      tierNum: $('tierNum'),
-      tierHold: $('tierHold'),
-      tierRow: $('tierRow'),
+      rail: $('waveRail'),
+      railNodes: $('railNodes'),
+      railAuto: $('railAuto'),
       alerts: $('alerts'),
       energy: $('energyNum'),
       energyChip: $('energyChip'),
@@ -116,7 +122,7 @@ export class Hud {
     this.buildAbilities();
     this.buildDebug();
     this.buildSpawn();
-    this.buildTier();
+    this.buildRail();
 
     this.menu = new Menu(game);
     this.buildStrip();
@@ -950,33 +956,28 @@ export class Hud {
   // -------------------------------------------------------------- the ladder
 
   /**
-   * Where the run is standing, and the only way to move it by hand.
+   * The rail, and the two arrows that move it.
    *
-   * Auto-advance is the default and the chip is mostly a readout; one tap
-   * opens the row that pins or steps it. The row closes on any choice, so it
-   * is never something left open on top of the field.
+   * A window of five tiers rather than one number: what is behind carries a
+   * tick, what the run is on is lit, what is ahead is an outline. The chip
+   * this replaces said "TIER 6" and opened a row on a second tap, which is
+   * two taps to find out something the player should never have to ask for.
+   *
+   * The nodes are built once and rewritten in place. Rebuilding five elements
+   * every time a wave scores would throw away the transition the lit one is
+   * in the middle of, and the ladder moves on every clear.
    */
-  buildTier() {
+  buildRail() {
     const g = this.game;
     const d = () => g.world.director;
-    const openRow = (open) => {
-      // Same slot: the row takes the chip's place rather than its own width.
-      this.el.tierRow.hidden = !open;
-      this.el.tierChip.hidden = open;
-      /*
-       * ...and the count steps aside while it is up. The row is wider than
-       * the chip it replaces, and #barChips absorbs the difference by
-       * shrinking -- which clipped ENERGY mid-number. OBJECTS is the one
-       * readout on the bar nothing is ever decided from, and the row is gone
-       * on the next tap.
-       */
-      document.body.classList.toggle('tiering', open);
-    };
-    this.el.tierChip.addEventListener('click', () => {
-      openRow(this.el.tierRow.hidden);
-      this.syncTier(g.world);
-    });
-    this.closeTierRow = () => openRow(false);
+    this.railCells = [];
+    for (let i = 0; i < RAIL_SEEN; i++) {
+      const el = document.createElement('div');
+      el.className = 'railNode';
+      el.innerHTML = '<b></b><i></i>';
+      this.el.railNodes.appendChild(el);
+      this.railCells.push({ el, n: el.querySelector('b'), tick: el.querySelector('i'), at: -1 });
+    }
     const step = (by) => {
       const dir = d();
       if (!dir) return;
@@ -987,36 +988,81 @@ export class Hud {
        */
       dir.setTier(dir.tier + by);
       dir.hold = true;
-      this.closeTierRow();
-      this.syncTier(g.world);
+      this.syncRail(g.world);
     };
-    $('tierDown').addEventListener('click', () => step(-1));
-    $('tierUp').addEventListener('click', () => step(1));
-    $('tierPin').addEventListener('click', () => {
+    $('railDown').addEventListener('click', () => step(-1));
+    $('railUp').addEventListener('click', () => step(1));
+    this.el.railAuto.addEventListener('click', () => {
       const dir = d();
       if (!dir) return;
       dir.hold = !dir.hold;
-      this.closeTierRow();
-      this.syncTier(g.world);
+      this.syncRail(g.world);
     });
   }
 
-  syncTier(world) {
+  /**
+   * The switch's two labels. Present tense, so it reads as the state it is in
+   * rather than as the thing pressing it would do -- and both forms are
+   * written every time, because the stylesheet picks between them by width
+   * and a form left stale is a form that appears on the next rotation.
+   */
+  writeAuto(hold, n) {
+    const el = this.el.railAuto;
+    el.querySelector('.rLong').textContent = hold ? `HELD AT ${n}` : 'AUTO PROGRESS ON';
+    el.querySelector('.rShort').textContent = hold ? `HELD ${n}` : 'AUTO';
+  }
+
+  /**
+   * Redraw the window. Called every frame, so everything here is guarded on
+   * a value having actually moved -- the ladder changes once a wave and the
+   * DOM should not be written to sixty times a second to say so.
+   */
+  syncRail(world) {
     const dir = world && world.director;
-    if (!dir || !this.el.tierChip) return;
+    if (!dir || !this.railCells) return;
     const n = dir.tier;
-    if (this._tierAt !== n) {
-      this._tierAt = n;
-      this.el.tierNum.textContent = n;
+    const peak = Math.max(dir.peak || 0, n);
+    if (this._railAt !== n || this._railPeak !== peak) {
+      this._railAt = n;
+      this._railPeak = peak;
+      /*
+       * Where the window sits. Centred on the run's own position, and pushed
+       * off the floor rather than showing tiers that do not exist: at tier 1
+       * the window is 1..5, not -1..3.
+       */
+      const first = Math.max(1, n - Math.floor(RAIL_SEEN / 2));
+      for (let i = 0; i < this.railCells.length; i++) {
+        const c = this.railCells[i];
+        const t = first + i;
+        if (c.at !== t) {
+          c.at = t;
+          c.n.textContent = t;
+        }
+        c.el.classList.toggle('at', t === n);
+        // Behind you: cleared, and ticked.
+        c.el.classList.toggle('done', t < n);
+        /*
+         * ...and ahead of you but already stood on, which a run that was
+         * pushed back down has above it. Not ticked -- a tick on a tier you
+         * are about to climb back into reads as "cleared, nothing to do" --
+         * but not a stranger either, so it wears the lighter outline. That
+         * is the whole of what `peak` is for.
+         */
+        c.el.classList.toggle('seen', t > n && t <= peak);
+        c.tick.textContent = t < n ? '\u2713' : '';
+      }
     }
-    if (this._tierHold !== dir.hold) {
-      this._tierHold = dir.hold;
-      this.el.tierHold.hidden = !dir.hold;
-      this.el.tierChip.classList.toggle('held', dir.hold);
-      $('tierPin').textContent = dir.hold ? 'AUTO' : 'HOLD';
+    if (this._railHold !== dir.hold) {
+      this._railHold = dir.hold;
+      this.el.rail.classList.toggle('held', dir.hold);
+      this.el.railAuto.classList.toggle('on', !dir.hold);
+      this.writeAuto(dir.hold, n);
+    } else if (dir.hold && this._railHeldAt !== n) {
+      this.writeAuto(true, n);
     }
-    // Nothing below tier 1 to step down to.
-    $('tierDown').disabled = n <= 1;
+    this._railHeldAt = n;
+    // Nothing below tier 1 to step back to.
+    $('railDown').disabled = n <= 1;
   }
 
 
@@ -1671,7 +1717,16 @@ export class Hud {
     const boss = world.boss;
     this.syncApertures(world);
 
-    if (bar.hidden !== !boss) bar.hidden = !boss;
+    if (bar.hidden !== !boss) {
+      bar.hidden = !boss;
+      /*
+       * ...and the top of the screen changes hands. The rail steps aside and
+       * the space it was taking goes to the boss bar, which is the whole of
+       * what body.bossUp does -- see --rail-h in styles.css for why the two
+       * cannot both be standing on a short phone.
+       */
+      document.body.classList.toggle('bossUp', !!boss);
+    }
     if (!boss) {
       this._bossSeen = null; this._bossGhost = null; this._bossShells = 0;
       this._bossArriving = false;
@@ -1836,7 +1891,7 @@ export class Hud {
    */
   syncHudLight(world) {
     this.syncAbilities(world.abilities);
-    this.syncTier(world);
+    this.syncRail(world);
     this.syncLoadout(world);
     this.syncSeals();
     this.syncBoss(world);

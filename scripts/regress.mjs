@@ -2552,50 +2552,184 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `a pre-ladder save at ${r.fromKills} kills came back at tier ${r.migrated}`);
 }
 
-// --- the tier chip is a control, so it is never the thing that gets cut -----
+// --- the ladder is a rail, and it is legible and reachable on every phone ---
 /*
- * It replaced the FIELD readout, which carried `display:none` under 431px --
- * the first thing sacrificed when the bar got tight. A readout can be cut; the
- * only way to hold or step down a tier cannot, or the feature does not exist
- * on the phone most likely to need it.
+ * What replaced the tier chip, and what the chip could never say.
+ *
+ * The chip read "TIER 6" and opened a three-button row on a second tap: two
+ * taps to find out what the run was doing, and a number with no context
+ * around it. Six of what, going which way, and had it ever been higher. The
+ * rail answers all three without being asked, so the things worth asserting
+ * are the ones a number did not have: that the window is centred and clamped,
+ * that the ticks mean passed rather than smaller, and that the three controls
+ * are still reachable once five nodes are sharing the row with them.
+ *
+ * The band is measured against what is above and below it, because that is
+ * where the two real mistakes were. Written against the 32px the top-bar
+ * chips used to be, it landed 12px inside the menu button; and at the two
+ * rows it was drawn from it pushed the alerts column past the teaching band
+ * on a 568 screen, where pillCap() went to zero and every receipt in the game
+ * queued for good.
  */
 {
-  const r = await page.evaluate(() => {
+  const r = await page.evaluate(async () => {
     const g = window.__sim;
-    const box = () => {
-      const c = document.getElementById('tierChip');
-      const q = c.getBoundingClientRect();
-      return { w: Math.round(q.width), shown: q.height > 0 && getComputedStyle(c).display !== 'none' };
-    };
-    const wide = box();
-    document.documentElement.style.setProperty('width', '320px');
-    const narrow = box();
-    document.documentElement.style.removeProperty('width');
-
-    // The row's three controls do what they say.
-    const d = g.world.director;
-    d.setTier(6); d.hold = false;
-    g.hud.syncTier(g.world);
-    document.getElementById('tierChip').click();
-    const opened = !document.getElementById('tierRow').hidden;
-    document.getElementById('tierUp').click();
-    const up = { tier: d.tier, hold: d.hold, shut: document.getElementById('tierRow').hidden };
-    document.getElementById('tierChip').click();
-    document.getElementById('tierDown').click();
-    const down = d.tier;
-    // ...and the floor holds.
-    d.setTier(1);
-    g.hud.syncTier(g.world);
-    const floored = document.getElementById('tierDown').disabled;
+    const w = g.world;
     g.restart();
-    return { wide, narrow, opened, up, down, floored };
+    g.debugTeachAll();
+    const ranD = w.director.update;
+    w.director.update = () => {};
+    const d = w.director;
+
+    const box = (id) => {
+      const q = document.getElementById(id).getBoundingClientRect();
+      return { t: Math.round(q.top), b: Math.round(q.bottom), h: Math.round(q.height),
+        w: Math.round(q.width) };
+    };
+    // Where the finger lands, not just where the element says it is.
+    const seat = (id) => {
+      const el = document.getElementById(id);
+      const q = el.getBoundingClientRect();
+      const top = document.elementFromPoint(Math.round((q.left + q.right) / 2),
+        Math.round((q.top + q.bottom) / 2));
+      return { h: Math.round(q.height), mine: top === el || el.contains(top) };
+    };
+    const window5 = () => [...document.querySelectorAll('.railNode')].map((n) => ({
+      n: Number(n.querySelector('b').textContent),
+      tick: n.querySelector('i').textContent === '\u2713',
+      at: n.classList.contains('at'),
+      seen: n.classList.contains('seen'),
+    }));
+
+    /* ---- the band clears the bar above it ---- */
+    d.setTier(7); d.hold = false;
+    g.hud.syncRail(w);
+    const bar = box('topbar');
+    const rail = box('waveRail');
+    const clearsBar = rail.t >= bar.b;
+
+    /* ---- and the three controls are reachable ---- */
+    const seats = { down: seat('railDown'), up: seat('railUp'), auto: seat('railAuto') };
+
+    /* ---- the window is centred, and clamped at the floor ---- */
+    d.setTier(9); d.setTier(7); d.hold = false; // been to 9, standing on 7
+    g.hud.syncRail(w);
+    const mid = window5();
+    d.setTier(1); d.hold = false;
+    g.hud.syncRail(w);
+    const floor = window5();
+    const floorLocked = document.getElementById('railDown').disabled;
+
+    /* ---- the arrows move it and pin it; the switch says which ---- */
+    d.setTier(6); d.hold = false;
+    g.hud.syncRail(w);
+    const autoWord = () => document.getElementById('railAuto')
+      .querySelector('.rLong').textContent;
+    const runningLabel = autoWord();
+    document.getElementById('railUp').click();
+    const up = { tier: d.tier, hold: d.hold, label: autoWord() };
+    document.getElementById('railDown').click();
+    const down = d.tier;
+    document.getElementById('railAuto').click();
+    const released = { hold: d.hold, label: autoWord() };
+
+    /*
+     * ---- peak survives being written down ----
+     *
+     * Through captureRun and the director's own restore rather than through
+     * resume(), which tears down and rebuilds every subsystem in the game and
+     * would leave the twelve cases after this one standing in the wreckage.
+     */
+    const { captureRun } = await import('../src/save.js');
+    d.setTier(12); d.setTier(4);
+    const peakBefore = d.peak;
+    const file = captureRun(w, g);
+    const wrote = file && file.wave ? file.wave.peak : null;
+    // restore() refuses a file with no rotation in it, and the rotation is
+    // empty between runs, so one is supplied rather than borrowed.
+    const asFile = (extra) => ({ ...file.wave, order: [0], at: 0, cycle: 1, ...extra });
+    d.peak = 1;
+    d.restore(w, asFile());
+    const peakBack = d.peak;
+    // ...and a file written before build 188 has none, which must not read as
+    // "never been anywhere" -- standing on a tier is proof of having reached it.
+    d.peak = 1;
+    d.restore(w, asFile({ peak: undefined, tier: 9 }));
+    const peakOld = d.peak;
+
+    /* ---- and a fight takes the slot back ---- */
+    d.setTier(7); d.hold = false;
+    const quiet = () => { g.hud.clearAlerts();
+      document.getElementById('bossCaption').classList.remove('show'); };
+    quiet();
+    const beforeFight = { rail: box('waveRail').h, alerts: box('alerts').t, cap: g.hud.pillCap() };
+    w.apertures[1] = 1;
+    g.openBoss(1);
+    await new Promise((res) => setTimeout(res, 700));
+    quiet();
+    const inFight = { rail: box('waveRail').h, alerts: box('alerts').t, cap: g.hud.pillCap(),
+      boss: box('bossBar').t, cls: document.body.classList.contains('bossUp') };
+
+    w.director.update = ranD;
+    g.restart();
+    await new Promise((res) => setTimeout(res, 200));
+    const afterFight = document.body.classList.contains('bossUp');
+    return { bar, rail, clearsBar, seats, mid, floor, floorLocked, runningLabel,
+      up, down, released, peakBefore, peakBack, peakOld, wrote,
+      beforeFight, inFight, afterFight, vh: window.innerHeight };
   });
-  check('the tier chip survives the narrowest screen and its row works',
-    r.wide.shown && r.narrow.shown && r.narrow.w > 20
-    && r.opened && r.up.tier === 7 && r.up.hold === true && r.up.shut
-    && r.down === 6 && r.floored,
-    `chip ${r.wide.w}px wide, ${r.narrow.w}px at 320 (shown: ${r.narrow.shown}); `
-    + `up -> ${r.up.tier} pinned ${r.up.hold}, down -> ${r.down}, floor disabled ${r.floored}`);
+
+  check('the rail sits clear of the bar above it and every control is thumb-sized',
+    r.clearsBar && r.rail.h > 0
+    && Object.values(r.seats).every((s) => s.h >= 44 && s.mine),
+    `bar ends ${r.bar.b}, rail ${r.rail.t}..${r.rail.b}; `
+    + Object.entries(r.seats).map(([k, s]) => `${k} ${s.h}px hit=${s.mine}`).join(' · '));
+
+  check('the window centres on the run and stops at the floor',
+    r.mid.map((c) => c.n).join(',') === '5,6,7,8,9'
+    && r.mid.find((c) => c.at).n === 7
+    && r.floor.map((c) => c.n).join(',') === '1,2,3,4,5'
+    && r.floor.find((c) => c.at).n === 1 && r.floorLocked,
+    `at 7: [${r.mid.map((c) => c.n).join(',')}] · at 1: `
+    + `[${r.floor.map((c) => c.n).join(',')}], step-back disabled ${r.floorLocked}`);
+
+  /*
+   * The ticks are the whole reason for drawing this instead of counting. A
+   * run that reached 9 and was pushed back to 7 has stood on 8 -- so 8 is not
+   * a stranger, but it is not cleared-and-done either, and a tick on it would
+   * read as "nothing to do here" over a tier about to be climbed again.
+   */
+  check('a tick means passed, and a tier above you that you have stood on is neither',
+    r.mid.filter((c) => c.tick).map((c) => c.n).join(',') === '5,6'
+    && r.mid.filter((c) => c.seen).map((c) => c.n).join(',') === '8,9',
+    `ticked [${r.mid.filter((c) => c.tick).map((c) => c.n).join(',')}] · `
+    + `stood on above [${r.mid.filter((c) => c.seen).map((c) => c.n).join(',')}]`);
+
+  check('the arrows move the ladder and pin it, and the switch says so',
+    r.runningLabel === 'AUTO PROGRESS ON'
+    && r.up.tier === 7 && r.up.hold === true && r.up.label === 'HELD AT 7'
+    && r.down === 6
+    && r.released.hold === false && r.released.label === 'AUTO PROGRESS ON',
+    `running "${r.runningLabel}" · up -> ${r.up.tier} "${r.up.label}" · `
+    + `down -> ${r.down} · released "${r.released.label}"`);
+
+  check('the highest tier the run has stood on survives being written down',
+    r.peakBefore === 12 && r.wrote === 12 && r.peakBack === 12 && r.peakOld === 9,
+    `peak ${r.peakBefore} in memory, ${r.wrote} in the file, ${r.peakBack} back; `
+    + `a file without one restores at its own tier (${r.peakOld})`);
+
+  /*
+   * The measurement the design was changed by. Two rows here cost the 568
+   * screen its only pill slot; one row and a reservation that is only made
+   * during a fight keep it, in both states.
+   */
+  check('a fight takes the slot back, and the column below keeps its room',
+    r.beforeFight.rail > 0 && r.inFight.rail === 0 && r.inFight.cls
+    && r.inFight.boss === r.rail.t
+    && r.beforeFight.cap >= 1 && r.inFight.cap >= 1 && !r.afterFight,
+    `${r.vh}px tall · quiet: rail ${r.beforeFight.rail}px, alerts ${r.beforeFight.alerts}, `
+    + `cap ${r.beforeFight.cap} | fight: rail ${r.inFight.rail}px, boss at ${r.inFight.boss}, `
+    + `alerts ${r.inFight.alerts}, cap ${r.inFight.cap} | class clears after: ${!r.afterFight}`);
 }
 
 // --- a hit lands as the round, and a death wears its killer ------------------

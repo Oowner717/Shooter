@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '187';
+  var BUILD = '188';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -105,32 +105,47 @@
         <em>ENERGY</em><span id="energyNum">0</span><i id="energyBuys"></i>
       </button>
       </div>
-      <!--
-        The tier chip, and the row it opens into the same slot.
-
-        Deliberately OUTSIDE #barChips. That group is the shrinkable one --
-        its whole job is to absorb a growing purse so the menu button can
-        never be pushed off the edge -- and the overflow lands on whatever is
-        last in it. The tier control went in there first and a mid-run purse
-        clipped it behind the menu button, which is the exact failure the
-        group exists to prevent, visited on a control instead of a number.
-        It sits with the menu button now: fixed furniture, never squeezed.
-
-        The row REPLACES the chip rather than sitting beside it, so opening it
-        costs no width and nothing lands on the field.
-      -->
-      <button id="tierChip" class="chip btn" aria-label="Difficulty tier">
-        <em>TIER</em><span id="tierNum">1</span><i id="tierHold" hidden>HOLD</i>
-      </button>
-      <div id="tierRow" hidden>
-        <button id="tierDown" aria-label="Step back a tier">&#8249;</button>
-        <button id="tierPin" aria-label="Hold this tier">HOLD</button>
-        <button id="tierUp" aria-label="Step up a tier">&#8250;</button>
-      </div>
       <button id="menuBtn" class="chip btn menuBtn" aria-label="Menu">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
     </header>
+
+    <!--
+      ============ THE LADDER ============
+
+      Where the run is standing, as a rail rather than as a number.
+
+      This used to be a chip in the bar reading "TIER 6" and a three-button
+      row it opened into its own slot: two taps to see what the run was doing,
+      and a number with no context around it. Six of what, out of how many,
+      and going which way. The rail answers all three at a glance -- what is
+      behind you carries a tick, what you are on is lit, what is ahead is an
+      outline -- which is the whole reason for drawing it instead of counting.
+
+      The nodes are a readout and not a control. Five of them across a 320
+      screen is 33px each, which is under what a thumb can land on, and a rail
+      you can mis-tap is a rail that drops you two tiers mid-wave. The three
+      buttons are the control surface and they are sized for the hand.
+
+      One row, and the row it was pictured from had two. Measured: a 69px band
+      here puts the alerts column below the teaching band on a 568 screen and
+      pillCap() goes to zero, so every receipt in the game queues and none of
+      them is ever shown. The switch moves onto the end of the rail instead of
+      under it, and the band costs 44.
+
+      Everything here is driven by Hud.syncRail().
+    -->
+    <div id="waveRail">
+      <button id="railDown" class="railStep" aria-label="Step back a tier">&#8249;</button>
+      <div id="railNodes"></div>
+      <button id="railUp" class="railStep" aria-label="Step up a tier">&#8250;</button>
+      <!-- Two labels, because "AUTO PROGRESS ON" does not fit beside five
+           nodes and two arrows on a 320 screen and the state still has to be
+           readable there. The stylesheet picks; both are written. -->
+      <button id="railAuto" aria-label="Automatic progression">
+        <span class="rLong"></span><span class="rShort"></span>
+      </button>
+    </div>
 
     <!-- What is running on a clock right now. Empty and out of the layout
          unless something timed is up; see Hud.syncEffects(). -->

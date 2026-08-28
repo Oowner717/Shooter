@@ -285,7 +285,7 @@ export class Game {
       onTier: ({ verdict, moved, tier }) => {
         void verdict;
         if (!moved) return;
-        self.hud.syncTier(self.world);
+        self.hud.syncRail(self.world);
         if (moved < 0) self.hud.alert(`THE FIELD RELENTS · TIER ${tier}`, 'remainder', 4.5);
       },
       alert: (text, kind, dur) => self.hud.alert(text, kind, dur),

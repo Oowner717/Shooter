@@ -2865,6 +2865,13 @@ export class Director {
      * it ends -- see score().
      */
     this.tier = 1;
+    /*
+     * The highest tier this run has stood on, which is not the same as the
+     * highest below it. A run that reached 8 and stepped back to 5 has been
+     * through 6 and 7, and the rail's ticks mean "passed" rather than
+     * "smaller than where you are" -- so it is recorded rather than inferred.
+     */
+    this.peak = 1;
     this.hold = false;
     this.fails = 0; // consecutive failed waves
     this.contact = 0; // seconds anything spent on the turret this wave
@@ -2935,14 +2942,16 @@ export class Director {
       // A clean wave climbs, unless the player has pinned the tier.
       if (!this.hold) { this.tier++; moved = 1; }
     }
+    this.peak = Math.max(this.peak, this.tier);
     this.contact = 0;
     this.hitPatience = false;
     return { verdict: this.lastVerdict, moved, tier: this.tier };
   }
 
-  /** Set the tier by hand, from the chip. Pins it either way. */
+  /** Set the tier by hand, from the rail's arrows. Pins it either way. */
   setTier(n) {
     this.tier = Math.max(1, Math.round(n));
+    this.peak = Math.max(this.peak, this.tier);
     this.fails = 0;
     return this.tier;
   }
@@ -3108,6 +3117,9 @@ export class Director {
      * so a returning run resumes at about the difficulty it left.
      */
     this.tier = Math.max(1, Math.round(d.tier ?? (1 + (world.kills || 0) / 40)));
+    // Absent in files written before build 188: where the run is standing is
+    // the least it can have stood on, so the ticks are right either way.
+    this.peak = Math.max(this.tier, Math.round(d.peak || 0));
     this.hold = !!d.hold;
     this.fails = d.fails || 0;
     this.contact = 0;

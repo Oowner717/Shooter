@@ -19,6 +19,25 @@
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
   --bar-h: 74px;
+  /*
+   * The ladder's band. `--rail-t` is the top bar's own top plus its 44 of
+   * height and 6 of air -- the bar is as tall as the menu button in it, and
+   * the rail was written against the 32 the chips used to be, which put it
+   * 12px inside the button. `--rail-h` is 44 of row and 8 of air under it.
+   * Everything that used to be measured from the top bar is measured from
+   * the bottom of this.
+   *
+   * `--boss-h` is the space kept for the boss bar. It used to be kept always
+   * -- the alerts column sat 64px below a slot that is empty for most of
+   * every run -- and with the rail above it as well there was no room left
+   * on a 568 screen for even one pill. Both are conditional now: the rail is
+   * not up during a fight and the reservation is not made outside one, so
+   * the column below has the same room it always had, either way.
+   */
+  --rail-t: calc(var(--hud-t) + 58px);
+  --rail-h: 52px;
+  --boss-h: 0px;
+  --under-rail: calc(var(--rail-t) + var(--rail-h));
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 
@@ -366,7 +385,8 @@ html, body {
  */
 #apertureBar {
   position: absolute;
-  top: calc(var(--hud-t) + 40px);
+  /* Below the rail -- see --rail-t for what the offset is made of. */
+  top: var(--under-rail);
   left: calc(var(--safe-l) + 10px);
   right: calc(var(--safe-r) + 10px);
   display: flex;
@@ -438,7 +458,8 @@ html, body {
 
 #bossBar {
   position: absolute;
-  top: calc(var(--hud-t) + 40px);
+  /* Below the rail, alongside #apertureBar -- the two never show at once. */
+  top: var(--under-rail);
   left: calc(var(--safe-l) + 10px);
   right: calc(var(--safe-r) + 10px);
   --boss: #ff5ec8;
@@ -585,7 +606,8 @@ html, body {
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(var(--hud-t) + 104px);
+  /* ...and below the boss bar, when there is one. */
+  top: calc(var(--under-rail) + var(--boss-h));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2401,50 +2423,190 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
 
 /* ---------------- the ladder ---------------- */
 /*
- * The tier chip and the row it opens. Both live in the top bar beside the
- * energy chip, and the row replaces the chip's own width rather than floating
- * over the field: a control on top of the play area is a control that eats a
- * tap meant for something else.
+ * The rail. A window of five tiers with the run's own position lit, the two
+ * arrows that move it, and one line saying whether it is climbing by itself.
+ *
+ * Sits under the top bar rather than in it. The chip this replaces was fixed
+ * furniture in a bar whose whole job is to give ground when the purse grows,
+ * and a rail is far too wide to be a passenger there -- so it takes its own
+ * band, and #apertureBar, #bossBar and #alerts each start below it.
  */
-#tierChip.held {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-}
-#tierChip i {
-  font-style: normal;
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  color: var(--accent);
-  margin-left: 5px;
-  opacity: 0.9;
-}
-/* Fixed furniture beside the menu button: never the thing that gets squeezed
-   when the purse grows. #barChips absorbs that, which is its whole job. */
-#tierChip { flex: 0 0 auto; margin-left: 6px; }
-body.tiering #counter { display: none; }
-#tierChip[hidden] { display: none; }
-#tierRow {
+#waveRail {
+  position: absolute;
+  top: var(--rail-t);
+  left: calc(var(--safe-l) + 10px);
+  right: calc(var(--safe-r) + 10px);
   display: flex;
-  gap: 3px;
   align-items: stretch;
-  flex: 0 0 auto;
-  margin-left: 6px;
+  gap: 4px;
+  /* The band is furniture; only the three controls in it take input. */
+  pointer-events: none;
 }
-#tierRow[hidden] { display: none; }
-#tierRow button {
+#waveRail[hidden] { display: none; }
+
+/*
+ * A fight owns the top of the screen: the boss bar takes this slot, the
+ * ladder is not what anyone is reading, and the alerts column needs the room
+ * back. See --rail-h for the measurement that made this necessary.
+ */
+body.bossUp {
+  /*
+   * `--under-rail` is set outright rather than by moving `--rail-h`. A custom
+   * property's value is substituted where it is DEFINED, not where it is
+   * used: `--under-rail` is computed on :root against :root's `--rail-h`, and
+   * a fresh `--rail-h` down here changes nothing it already resolved. That
+   * cost a measurement -- the boss bar moved and the alerts column did not.
+   */
+  --under-rail: var(--rail-t);
+  --boss-h: 64px;
+}
+body.bossUp #waveRail { display: none; }
+
+/*
+ * The two that move it. Everything else in this band is a readout, so these
+ * are the whole control surface and they are sized for a thumb: 44 tall, and
+ * wide enough that the arrow is not the target -- the plate is.
+ */
+.railStep {
   -webkit-appearance: none;
   appearance: none;
-  min-width: 34px;
-  padding: 0 8px;
-  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line));
+  pointer-events: auto;
+  flex: 0 0 auto;
+  width: 40px;
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border-radius: 5px;
   background: linear-gradient(180deg, rgba(12, 22, 38, 0.86), rgba(5, 9, 16, 0.9));
   color: var(--ink);
   font: inherit;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  border-radius: 5px;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-#tierRow button:disabled { opacity: 0.35; }
-#tierRow button:active { transform: translateY(1px); }
+.railStep:disabled { opacity: 0.3; }
+.railStep:active:not(:disabled) { transform: translateY(1px); }
+
+/*
+ * The window itself. Equal columns, so the rail is the same shape at 320 as
+ * at 414 and only the nodes narrow -- five fixed-width nodes would either
+ * overflow the small screen or leave a gap on the large one.
+ */
+#railNodes {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/*
+ * One node per tier in the window. Three states and they are meant to be
+ * told apart at arm's length, so each one changes more than a shade: passed
+ * is a tick over a filled plate, standing is lit and outlined in the accent,
+ * ahead is an outline with nothing in it.
+ */
+.railNode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: 44px;
+  padding: 3px 2px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: rgba(6, 12, 22, 0.7);
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  overflow: hidden;
+}
+.railNode b { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
+/* The tick, and the space it keeps when there is nothing to say. Held at a
+   fixed height so a node does not change size as the run passes it. */
+.railNode i {
+  font-style: normal;
+  font-size: 10px;
+  line-height: 9px;
+  height: 9px;
+  opacity: 0.95;
+}
+
+.railNode.done {
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, rgba(6, 12, 22, 0.7));
+  color: color-mix(in srgb, var(--accent) 62%, var(--dim));
+}
+/* Ahead, but stood on before -- see syncRail. Lighter than passed and heavier
+   than never-reached, which is exactly where it sits. */
+.railNode.seen {
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  color: color-mix(in srgb, var(--accent) 40%, var(--dim));
+}
+.railNode.at {
+  border-color: color-mix(in srgb, var(--accent) 72%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, rgba(6, 12, 22, 0.8));
+  color: var(--accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.railNode.at b { font-size: 15px; }
+
+/*
+ * Pinned. The rail stops being a climb and becomes a place you are standing,
+ * so it stops wearing the colour the climb is drawn in -- otherwise HELD and
+ * AUTO differ by one word on one line and nothing else on the screen.
+ */
+#waveRail.held .railNode.at {
+  border-color: color-mix(in srgb, var(--accent-2) 66%, transparent);
+  background: color-mix(in srgb, var(--accent-2) 15%, rgba(6, 12, 22, 0.8));
+  color: var(--accent-2);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-2) 16%, transparent);
+}
+
+/*
+ * ...and the line that says which it is, which is also the switch. One
+ * control, one sentence, present tense: it reads as the state and it changes
+ * the state, and there is nothing else it could be mistaken for.
+ */
+#railAuto {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: rgba(6, 12, 22, 0.72);
+  color: var(--dim);
+  font: inherit;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#railAuto.on {
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  color: color-mix(in srgb, var(--accent) 78%, var(--ink));
+}
+#waveRail.held #railAuto {
+  border-color: color-mix(in srgb, var(--accent-2) 40%, transparent);
+  color: var(--accent-2);
+}
+#railAuto:active { transform: translateY(1px); }
+/* The long form where it fits and the short one where it does not -- both are
+   written every time, so neither can go stale behind the other. */
+.rShort { display: none; }
+@media (max-width: 392px) {
+  .rLong { display: none; }
+  .rShort { display: inline; }
+}
 
 /* ---------------- the furniture gets out of the way ---------------- */
 /*
@@ -2537,9 +2699,11 @@ body.booting #quickBar {
    * vanishes on a narrow phone is a feature that does not exist there. It
    * shrinks instead.
    */
-  #tierChip { padding: 0 7px; }
-  #tierChip em { display: none; }
-  #tierRow button { min-width: 30px; }
+  /* The arrows keep their 44 of height; the nodes are a readout and narrow. */
+  .railStep { width: 32px; font-size: 15px; }
+  .railNode { padding: 3px 1px; }
+  .railNode b { font-size: 12px; }
+  #railAuto { padding: 4px 6px; }
 
   /* Budgeted, not inherited: 2 stacks + 4 wide cells + the gaps have to
      close inside 320. At the widths above the band ran 14px off the right

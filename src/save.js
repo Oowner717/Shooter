@@ -222,6 +222,13 @@ export function captureRun(world, game) {
        * remember which it was in.
        */
       tier: world.director.tier,
+      /*
+       * ...and the highest it has stood on, which the rail's ticks are drawn
+       * from. Additive, so the VERSION does not move: a file without it comes
+       * back with peak = tier, which is the truth for every run that never
+       * stepped back and an understatement for the rest.
+       */
+      peak: world.director.peak,
       hold: world.director.hold ? 1 : 0,
       fails: world.director.fails,
     },

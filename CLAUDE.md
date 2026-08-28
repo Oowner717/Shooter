@@ -299,4 +299,19 @@ most once for any given target and cannot spin.
   sheet covering it. A deliberate disable has to name an id of its own.
   `getComputedStyle(el).pointerEvents` is how you find out; `elementFromPoint`
   will not tell you, because it skips whatever is already off.
+- **A custom property is substituted where it is DEFINED, not where it is
+  used.** `--under-rail: calc(var(--rail-t) + var(--rail-h))` on `:root`
+  resolves against `:root`'s `--rail-h` and inherits down already computed, so
+  redefining `--rail-h` on `body.bossUp` moved nothing. The boss bar shifted
+  and the alerts column did not. A state class has to redefine the *derived*
+  property, not the term inside it.
+- The top furniture is three absolutely-positioned bands sharing one column
+  (`--rail-t`, then `--under-rail`, then `#alerts` at `+ --boss-h`), and the
+  thing that decides whether a design fits is `Hud.pillCap()`: it measures the
+  gap between the alerts column and the teaching band and can legitimately
+  return 0, at which point every pill queues and none is ever shown. On a
+  568-tall screen there is room for exactly one. The wave rail was drawn as
+  two rows (69px) and cost that slot; one row (44px) plus a boss-bar
+  reservation only made during a fight keeps it. Measure `pillCap()` at
+  320x568 before adding anything to the top of the screen.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
