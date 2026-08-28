@@ -3098,18 +3098,34 @@ export class Director {
    * a wave is not a place anyone remembers being.
    */
   restore(world, d) {
-    // Nothing to come back to: a run that quit before its first wave started
-    // is left exactly as a fresh one, opening grace and tutorial waves and
-    // all. The tooltips it already saw still do not replay — those are kept
-    // separately, and seen is seen.
-    if (!d || !Array.isArray(d.order) || !d.order.length) return;
-    this.order = d.order.filter((i) => Number.isInteger(i) && i >= 0 && i < WAVES.length);
-    // One *behind* the saved wave, because the first begin() steps forward and
-    // has to land back on it. Setting `at` to the saved index directly is how
-    // "resume on the wave I left" quietly became "resume on the one after".
-    const was = Math.min(d.at ?? 0, this.order.length - 1);
-    this.at = Math.max(-1, was - 1);
-    this.cycle = d.cycle || 1;
+    if (!d) return;
+    /*
+     * The rotation and the ladder are restored SEPARATELY, and running them
+     * off one guard cost every early save its tier.
+     *
+     * `order` is empty for the whole of the opening grace -- it is not built
+     * until the first begin() -- so a run saved in its first few seconds, or
+     * by the page being hidden in them, writes `order: []`. That is a
+     * perfectly good file. The old guard read it as a malformed one and
+     * returned, which silently threw away `tier`, `peak`, `hold` and `fails`
+     * with it: a player who had climbed to tier 12 and quit early in a wave
+     * came back to tier 1 and nothing said so.
+     *
+     * So an absent rotation now means only that there is no rotation to come
+     * back to -- the run is left with the fresh one, opening grace and
+     * tutorial waves and all, which is what it had -- and the ladder below is
+     * restored either way.
+     */
+    if (Array.isArray(d.order) && d.order.length) {
+      this.order = d.order.filter((i) => Number.isInteger(i) && i >= 0 && i < WAVES.length);
+      // One *behind* the saved wave, because the first begin() steps forward
+      // and has to land back on it. Setting `at` to the saved index directly
+      // is how "resume on the wave I left" quietly became "resume on the one
+      // after".
+      const was = Math.min(d.at ?? 0, this.order.length - 1);
+      this.at = Math.max(-1, was - 1);
+      this.cycle = d.cycle || 1;
+    }
     /*
      * A save written before the ladder existed has no tier at all, and
      * defaulting it to 1 would drop a long run back to the opening. Seeded

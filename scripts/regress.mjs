@@ -3049,6 +3049,38 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     d.peak = 1;
     d.restore(w, asFile({ peak: undefined, tier: 9 }));
     const peakOld = d.peak;
+    /*
+     * ...and a file with no ROTATION in it still restores the ladder.
+     *
+     * `order` is empty for the whole of the opening grace, so a run saved in
+     * its first few seconds -- or by the page being hidden in them, which is
+     * the last event iOS reliably gives -- writes `order: []`. restore() used
+     * to read that as a malformed file and return, throwing tier, peak, hold
+     * and fails away with it. A player who had climbed to 12 and quit early
+     * in a wave came back to tier 1, and nothing said so.
+     */
+    d.setTier(1); d.peak = 1; d.hold = false;
+    d.restore(w, { ...file.wave, order: [], tier: 12, peak: 14, hold: 1, fails: 1 });
+    const noOrder = { tier: d.tier, peak: d.peak, hold: d.hold, fails: d.fails };
+
+    /*
+     * ---- the frame loop paints it ----
+     * Blanked by hand, the tier moved behind the HUD's back, and one frame of
+     * ordinary play run. Nothing here presses anything or changes phase.
+     */
+    for (const c of g.hud.railCells) { c.n.textContent = ''; c.tick.textContent = ''; c.at = -1; }
+    g.hud.el.railAuto.querySelector('.rLong').textContent = '';
+    g.hud._railAt = null; g.hud._railPeak = null; g.hud._railHold = null;
+    const paintedBefore = [...document.querySelectorAll('.railNode')]
+      .map((n) => n.querySelector('b').textContent).join(',').replace(/^,+$/, '');
+    d.setTier(11); d.hold = false;
+    g.update(1 / 60);
+    const painted = {
+      before: paintedBefore.replace(/,/g, '') === '' ? '' : paintedBefore,
+      after: [...document.querySelectorAll('.railNode')]
+        .map((n) => n.querySelector('b').textContent).join(','),
+      label: g.hud.el.railAuto.querySelector('.rLong').textContent,
+    };
 
     /* ---- and a fight takes the slot back ---- */
     d.setTier(7); d.hold = false;
@@ -3068,8 +3100,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     await new Promise((res) => setTimeout(res, 200));
     const afterFight = document.body.classList.contains('bossUp');
     return { bar, rail, clearsBar, seats, mid, floor, floorLocked, runningLabel,
-      up, down, released, peakBefore, peakBack, peakOld, wrote,
-      beforeFight, inFight, afterFight, vh: window.innerHeight };
+      up, down, released, peakBefore, peakBack, peakOld, wrote, noOrder,
+      painted, beforeFight, inFight, afterFight, vh: window.innerHeight };
   });
 
   check('the rail sits clear of the bar above it and every control is thumb-sized',
@@ -3110,6 +3142,32 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.peakBefore === 12 && r.wrote === 12 && r.peakBack === 12 && r.peakOld === 9,
     `peak ${r.peakBefore} in memory, ${r.wrote} in the file, ${r.peakBack} back; `
     + `a file without one restores at its own tier (${r.peakOld})`);
+
+  check('...and a save taken before the first wave still keeps its ladder',
+    r.noOrder.tier === 12 && r.noOrder.peak === 14
+    && r.noOrder.hold === true && r.noOrder.fails === 1,
+    `a file with an empty rotation restores tier ${r.noOrder.tier}, peak `
+    + `${r.noOrder.peak}, held ${r.noOrder.hold}, ${r.noOrder.fails} fail(s)`);
+
+  /*
+   * ...and the band is painted by the frame loop, not by luck.
+   *
+   * syncRail was called from syncHudLight -- the path that runs while the
+   * world is HELD -- and not from syncHud, which runs every frame of play. So
+   * the rail was drawn on a tier change, on a press of its own arrows, or the
+   * next time the game was paused, and never otherwise. A fresh run got away
+   * with it because the first clean wave moves the tier and paints it; a
+   * resumed one came back with five empty boxes and no switch label.
+   *
+   * Moved here rather than asserted through resume(), which rebuilds every
+   * subsystem in the game: the tier is set behind the HUD's back and one
+   * frame is run, which is exactly the situation a restore leaves.
+   */
+  check('the rail is painted by the frame loop, not by something moving it',
+    r.painted.before === '' && r.painted.after === '9,10,11,12,13'
+    && r.painted.label !== '',
+    `cells blanked to "${r.painted.before}", one frame later "${r.painted.after}", `
+    + `switch reads "${r.painted.label}"`);
 
   /*
    * The measurement the design was changed by. Two rows here cost the 568

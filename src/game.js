@@ -1778,7 +1778,18 @@ export class Game {
 
   syncHud(dt) {
     const w = this.world;
-    this.hud.setKills(w.kills, null);
+    this.hud.setKills(w.kills);
+    /*
+     * The ladder's rail. It was missing from here and present only in
+     * syncHudLight -- the path that runs while the world is HELD -- so the
+     * rail was drawn by accident and not by design: on a tier change, on a
+     * press of its own arrows, or the next time the game was paused. A fresh
+     * run got away with it because the first clean wave moves the tier and
+     * paints it. A resumed one did not: nothing moves the ladder on the way
+     * in, so the band came back with five empty boxes and no switch label,
+     * which is what "waves do not show on continuing" was.
+     */
+    this.hud.syncRail(w);
     this.hud.setEnergy(w.energy, intakeRate(w));
     this.hud.syncAbilities(w.abilities);
     this.hud.syncLoadout(w);
