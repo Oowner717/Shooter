@@ -396,6 +396,49 @@ tier 20 on 15k of spend and then 117k of it — so this made the existing
 problem shorter-tempered rather than causing a new one. `tapFade` back toward
 0.6 is the cheap lever if it wants softening; the hp slope is the honest one.
 
+## Build 192 — HOT LOAD
+
+Capped at one level. It never had a `levels` of its own, so it was taking the
+tree's default of three (`u.levels ?? 3`, tree.js:200) — 0.85³ = 0.614 on the
+interval, or **1.63× on rounds a second**. That is larger than the FEED nerf
+build 178 made for exactly this reason: FEED's two levels came to 1.56× and
+were cut to one. The cadence pass capped the smaller multiplier and left the
+bigger one sitting on a default nobody had chosen.
+
+Measured A/B with `scripts/tiers.mjs --from 1 --to 20 --runs 3`, the same
+build and the **same buy line** either side of the one change — the extra
+HOT LOAD asks are skipped as `maxed`, which is what a real player's budget
+does with them:
+
+| | HOT LOAD ×3 | ×1 |
+|---|---|---|
+| rnd/s, plateau (8–20) | 17.0 | 13.0 |
+| dps, plateau (8–20) | 1,236 | 940 |
+| BULWARK at tier 20 | 16.5s | 22.7s |
+| whole tree | 116,700 / 136 levels | 114,650 / 134 |
+
+**It costs less than the arithmetic says, and the reason is the point.**
+Removing two ×0.85 steps should multiply the interval by 1.384 and take
+rounds a second to 12.3 and dps to 893. Measured: 13.0 and 940. The two
+purchases that no longer exist free their budget, and the damage line spends
+it on HOLLOWPOINT and SALVO instead — so part of what HOT LOAD was worth was
+crowding out damage that pays better.
+
+**The early ladder is reshuffled rather than lowered**, for the same reason.
+Tier 5 goes 6.1 → 10.3 rnd/s and 304 → 380 dps; tier 7 goes 785 → 923 dps.
+Tiers 4, 6 and 8 fall. This is not the flat-below, cut-above shape the TRIPLE
+TAP removal had, because HOT LOAD is affordable from the very first band.
+
+**One thing is unresolved and should not be read as a result.** The table's
+`worst` column puts TOW at >45s from tier 19, against 8.4s before — a 5×
+move where BULWARK's is 1.4×. A direct measurement disagrees: a TOW spawned
+alone at tier 19 against the capped loadout dies in **3.7s**, against 3.0s
+uncapped, which is the 23% the cadence change predicts. So the table's
+high-tier TOW cells are measuring something other than the gun — most likely
+the thrown MASS ending up outside `autoTarget`'s cone, the trap the probe's
+own notes already warn about for loose spawns. Neither measurement has been
+reconciled with the other. Read BULWARK, which is consistent across both.
+
 ### Still outstanding
 
 - The `swell` remnants.
@@ -403,5 +446,9 @@ problem shorter-tempered rather than causing a new one. `tapFade` back toward
   than the health slope — a new band lands every two tiers and a turret that
   has just grown meets it before the health has caught up. Re-banding waves or
   moving `perBand` is the lever, and neither is a tuning pass.
-- The tree plateaus from tier 8. Removing TRIPLE TAP lowered the plateau; it
-  did not make the last 100k of the tree buy anything.
+- The tree plateaus from tier 8. Removing TRIPLE TAP and capping HOT LOAD
+  both lowered the plateau; neither made the last 100k of the tree buy
+  anything.
+- Why `tiers.mjs` reports TOW at >45s at high tiers when a direct kill takes
+  3.7s. Until that is settled, the `worst` column cannot be trusted on any
+  band containing a TOW.

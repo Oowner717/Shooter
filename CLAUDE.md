@@ -346,4 +346,11 @@ most once for any given target and cannot spin.
   teleport — measured, 3.12 radians in one frame. At 3 it is the same
   direction and nothing moves. `CFG.spiral.ramp` is the spin-up and spin-down
   either side of it; at 0 both collapse to the flat sweep they replaced.
+- **An upgrade with no `levels` silently gets three.** `tree.js` reads
+  `u.levels ?? 3`, so a node the author never capped is sold three times.
+  HOT LOAD was 0.85³ on the fire interval — 1.63× on rounds a second, larger
+  than the FEED nerf of build 178, which capped FEED for exactly that reason
+  and stopped one node short. Capped in 192 and asserted in `regress.mjs`, so
+  the default cannot take it back. Check the tree's number, not the
+  upgrade's, when asking how much of something is for sale.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

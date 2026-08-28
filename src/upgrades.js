@@ -273,7 +273,18 @@ const SLEEPING = ANOMALIES.slice(1).map((a) => {
 export const UPGRADES = {
   AMMO: [
     { id: 'hollowpoint', name: 'HOLLOWPOINT', line: '+25% damage.', apply: scale('damage', 1.25) , icon: MARK.hollowpoint },
-    { id: 'hotload', name: 'HOT LOAD', line: '+15% fire rate.', apply: quicken('rate', 0.85) , icon: MARK.hotload },
+    /*
+     * One step, from build 192, and it never had a `levels` of its own -- it
+     * was taking the tree's default of three (see tree.js), which made it
+     * worth 0.85^3 = 0.614 on the interval, or 1.63x on rounds a second.
+     *
+     * That is larger than the FEED nerf build 178 thought worth making --
+     * FEED's two levels came to 1.56x and were cut to one for exactly this
+     * reason -- so the cadence pass capped the smaller multiplier and left
+     * the bigger one sitting on a default nobody had chosen. It is chosen
+     * now.
+     */
+    { id: 'hotload', name: 'HOT LOAD', levels: 1, line: '+15% fire rate.', apply: quicken('rate', 0.85) , icon: MARK.hotload },
     { id: 'tracer', name: 'TRACER', line: '+35% round speed.', apply: scale('speed', 1.35) , icon: MARK.tracer },
     { id: 'ricochet', name: 'RICOCHET', line: '+1 bounce off the arena edges.', apply: bump('bounces', 1) , icon: MARK.ricochet },
     { id: 'heavy', name: 'HEAVY', line: '2x knockback on every hit.', apply: scale('impulse', 2) , icon: MARK.heavy },
