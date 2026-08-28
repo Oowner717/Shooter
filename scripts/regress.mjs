@@ -424,7 +424,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 // --- the room ---------------------------------------------------------------
 /*
  * The panel that upgrades the turret could not tell an empty machine from a
- * finished one: screenshot it owning nothing, buy all 136 levels, screenshot
+ * finished one: screenshot it owning nothing, buy every level, screenshot
  * again, diff below the energy strip -- zero differing pixels. This is that
  * gate, kept as an assertion rather than as a screenshot: the count and the
  * shelf both have to move, and the machine has to be drawn at all.
@@ -464,10 +464,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 138 since build 183, when SIEVE gained its second level. It was 137 from
-    // 182 when SIEVE went in, 136 from 178 when FEED lost a level, and 137
-    // before that from 169, when SPIRAL gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 138
+    // 137 since build 189, when DOUBLE TAP lost TRIPLE TAP. It was 138 from
+    // 183, when SIEVE gained its second level; 137 from 182 when SIEVE went
+    // in; 136 from 178 when FEED lost a level; and 137 before that from 169,
+    // when SPIRAL gained COUNTERSPIN.
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 137
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -1612,6 +1613,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.projectiles.length = 0;
 
     const feed = NODE_BY_ID.get('rate').levels;
+    const taps = NODE_BY_ID.get('doubletap').levels;
     const fade = CFG.rounds.standard.tapFade;
 
     // Everything, then fire at nothing for four seconds and count the muzzle.
@@ -1631,24 +1633,26 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // What the interval is, straight off the same arithmetic updateFiring does.
     const interval = CFG.shooter.gripFireInterval * CFG.rounds.standard.rate * w.up.rate;
     return {
-      feed, fade, taps: w.up.boltTap, rps: rounds / 4, pulls: 1 / interval,
-      // 1 + fade + fade^2: what one trigger pull is worth with TRIPLE TAP in.
-      pull: 1 + fade + fade * fade,
+      feed, taps, held: w.up.boltTap, fade, rps: rounds / 4, pulls: 1 / interval,
+      // 1 + fade: what one trigger pull is worth with DOUBLE TAP behind it.
+      // It was 1 + fade + fade^2 while TRIPLE TAP existed.
+      pull: 1 + fade,
     };
   });
-  check('FEED sells one level, and a tap fades to half',
-    r.feed === 1 && Math.abs(r.fade - 0.5) < 1e-9,
-    `FEED x${r.feed}, tapFade ${r.fade}`);
+  check('FEED and DOUBLE TAP each sell one level, and a tap fades to half',
+    r.feed === 1 && r.taps === 1 && r.held === 1 && Math.abs(r.fade - 0.5) < 1e-9,
+    `FEED x${r.feed}, DOUBLE TAP x${r.taps} (turret holds ${r.held}), tapFade ${r.fade}`);
   /*
    * 7.1 pulls a second: 0.286 base, one FEED (x0.8) and three HOT LOAD
    * (x0.85^3). It was 8.9 with the second FEED in. The rounds figure is that
-   * times three taps times SALVO's every-eighth, so it sits near 26.
+   * times two taps times SALVO's every-eighth -- it sat near 26 on three taps
+   * and lands near 17 on two, which is the whole of what build 189 did.
    */
   check('a fully fed turret tops out where plan B put it',
-    r.pulls > 6.8 && r.pulls < 7.4 && r.rps > 22 && r.rps < 30,
-    `${r.pulls.toFixed(1)} pulls/s, ${r.rps.toFixed(1)} rounds/s, ${r.taps} taps`);
-  check('...and the tail of a trigger pull is worth 1.75, not 1.96',
-    Math.abs(r.pull - 1.75) < 1e-9, `one pull = ${r.pull.toFixed(2)} rounds of damage`);
+    r.pulls > 6.8 && r.pulls < 7.4 && r.rps > 14 && r.rps < 20,
+    `${r.pulls.toFixed(1)} pulls/s, ${r.rps.toFixed(1)} rounds/s, ${r.held + 1} rounds a pull`);
+  check('...and the tail of a trigger pull is worth 1.5, not 1.75',
+    Math.abs(r.pull - 1.5) < 1e-9, `one pull = ${r.pull.toFixed(2)} rounds of damage`);
 }
 
 // --- the unlock clock runs on what a run has earned, not on what it killed --

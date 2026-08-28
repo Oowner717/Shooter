@@ -50,8 +50,8 @@ class Projectile {
     this.burst = opts.burst || null;
     this.chain = !!opts.chain; // ARC: jumps on from whatever it hits
     this.jumps = opts.jumps ?? CFG.rounds.arc.jumps;
-    // DOUBLE TAP / TRIPLE TAP: a follow-up round waits this long at the
-    // muzzle before it sets off.
+    // DOUBLE TAP: the follow-up round waits this long at the muzzle before
+    // it sets off.
     this.hold = opts.hold ?? 0;
     // SPINE: bodies it carries on through, and what it keeps of its damage
     // each time it does.

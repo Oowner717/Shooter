@@ -600,7 +600,7 @@ export class Menu {
     }
     this.tookAt = taken.length;
 
-    // What you have built. No denominator: there are 136 levels in the tree
+    // What you have built. No denominator: there are 137 levels in the tree
     // and a run does not reach that, so a fraction of it is a failure state
     // rather than a trophy. The turret has one because it can be finished.
     let built = 0;

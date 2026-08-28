@@ -367,9 +367,9 @@ export class Shooter {
     } else {
       const g = R.standard;
       // OVERSTUFFED rides on the bounce budget, so an extra ricochet is worth
-      // the same whether it comes off a wall or off a body. DOUBLE TAP and
-      // TRIPLE TAP hold their rounds at the muzzle rather than shortening the
-      // cadence: one trigger pull with a stutter in it, not a faster gun.
+      // the same whether it comes off a wall or off a body. DOUBLE TAP holds
+      // its second round at the muzzle rather than shortening the cadence:
+      // one trigger pull with a stutter in it, not a faster gun.
       const taps = 1 + up.boltTap;
       for (const f of fan) {
         for (let t = 0; t < taps; t++) {

@@ -138,6 +138,17 @@ with 117k spent. And **the cadence cliff is DOUBLE TAP, not FEED** — rounds a
 second go 7.6 to 25.9 across one tier of income when TRIPLE TAP lands, where
 FEED's two levels together are worth 1.56x.
 
+TRIPLE TAP was removed in build 189 and the same probe measured it, A/B over
+tiers 1-20 at three runs each. The cliff is what went: rounds a second step
+6.1 to 13.6 at tier 6 instead of 6.1 to 20.4, and the top-end plateau falls
+25.4 to 17.0. dps falls only 14% (1,438 to 1,236) because the third round
+carried `tapFade²`, a quarter of one — a trigger pull went from 1.75 rounds'
+worth to 1.5, and the measurement matched that to a tenth of a percent, which
+is the instrument agreeing with the arithmetic rather than with itself.
+Tiers 1-5 are untouched to the digit: DOUBLE TAP is not affordable until 6.
+What it costs is the late wall — a BULWARK at tier 20 goes 13.9s to 15.6s,
+and the heaviest wave of band 5 stops clearing inside the 120s cap.
+
 Two instrument bugs cost a table each and are worth not repeating: a body
 spawned 240 units above the *floor* is 30 units off the muzzle, dies inside one
 frame, and takes its round and its damage with it — both counters watched state

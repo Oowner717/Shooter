@@ -357,10 +357,51 @@ Nothing caught it because nothing had ever loaded the bundle's output. It does
 now: the build parses both forms it writes and fails on any surviving `export`
 or `import`. Every artifact published between 127 and 180 was a broken page.
 
+## Build 189 — TRIPLE TAP
+
+Removed. It was DOUBLE TAP's second level and the single largest step in the
+damage line: build 177's table had rounds a second going 7.6 to 25.9 across one
+tier of income when it landed, which is not a rung, it is a cliff with the rest
+of the tree at the bottom.
+
+Measured A/B with `scripts/tiers.mjs --from 1 --to 20 --runs 3`, the same
+build either side of the one change:
+
+| | with TRIPLE TAP | without |
+|---|---|---|
+| rnd/s, tier 5 → 6 | 6.1 → 20.4 | 6.1 → 13.6 |
+| rnd/s, plateau (8–20) | 25.4 | 17.0 |
+| dps, plateau (8–20) | 1,438 | 1,236 |
+| tiers 1–5 dps | 108 · 140 · 162 · 243 · 304 | identical |
+| BULWARK at tier 20 | 13.9s | 15.6s |
+| whole tree | 118,050 / 138 levels | 117,200 / 137 |
+
+Three things worth keeping from that.
+
+**dps falls a third less than cadence does**, and it should: the third round
+carried `tapFade²` — a quarter of one — so a trigger pull went from 1 + 0.5 +
+0.25 to 1 + 0.5, which is 14.3% off. The table says 14.0%. The instrument is
+agreeing with the arithmetic and not with itself, which is the only kind of
+agreement worth having.
+
+**The early game did not move at all.** Tiers 1–5 come back digit for digit,
+because the damage line does not reach DOUBLE TAP until tier 6 spends 8,333.
+A nerf that lands only where the cliff was is the shape a nerf here should
+have, and it is the same shape `tapFade` was chosen for in build 178.
+
+**The late wall came in, and that is the cost.** A BULWARK at tier 20 takes
+15.6s instead of 13.9s, and band 5's heaviest wave stops clearing inside the
+probe's 120s cap. The plateau is still a plateau — 1,236 flat from tier 8 to
+tier 20 on 15k of spend and then 117k of it — so this made the existing
+problem shorter-tempered rather than causing a new one. `tapFade` back toward
+0.6 is the cheap lever if it wants softening; the hp slope is the honest one.
+
 ### Still outstanding
 
-- The demolition: `killGoal`, `releasesLeft`, and the `swell` remnants.
+- The `swell` remnants.
 - Tiers 5–8 fall out of plan B's 2–4s band. That is band composition rather
   than the health slope — a new band lands every two tiers and a turret that
   has just grown meets it before the health has caught up. Re-banding waves or
   moving `perBand` is the lever, and neither is a tuning pass.
+- The tree plateaus from tier 8. Removing TRIPLE TAP lowered the plateau; it
+  did not make the last 100k of the tree buy anything.

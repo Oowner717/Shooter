@@ -299,9 +299,17 @@ export const UPGRADES = {
     { id: 'overstuffed', name: 'OVERSTUFFED', levels: 4,
       line: 'BOLT bounces off bodies instead of stopping. +1 rebound, +30% life.',
       apply: (u) => { u.boltRebound += 1; u.boltBounce += 1; u.boltLife *= 1.3; }, icon: MARK.overstuffed },
-    { id: 'doubletap', name: 'DOUBLE TAP', levels: 2,
+    /*
+     * One step, from build 189. It had two: TRIPLE TAP put a third BOLT
+     * behind the second and was the single largest jump in the whole damage
+     * line -- scripts/tiers.mjs measured rounds a second going 7.6 to 25.9
+     * across one tier of income when it landed, which is not a step in a
+     * ladder, it is a cliff with the rest of the tree at the bottom of it.
+     * The second level is gone rather than retuned: a trigger pull is two
+     * rounds now and the tail of it is worth 1.5 rather than 1.75.
+     */
+    { id: 'doubletap', name: 'DOUBLE TAP', levels: 1,
       line: 'A second BOLT follows every shot, a beat behind and 40% weaker.',
-      tiers: [null, { name: 'TRIPLE TAP', line: 'A third BOLT behind the second, weaker again. One trigger pull, three rounds.' }],
       apply: bump('boltTap', 1), icon: MARK.doubletap },
     { id: 'cluster', name: 'CLUSTER', levels: 1,
       line: 'An HE burst throws four smaller ones outward.',
@@ -372,12 +380,12 @@ export const UPGRADES = {
      * and named, rather than a slope quietly retuned underneath one. What it
      * is worth is 20% of the interval instead of 36%.
      *
-     * It is worth knowing what this does NOT fix. scripts/tiers.mjs measured
+     * It was worth knowing what this did NOT fix. scripts/tiers.mjs measured
      * the whole cadence ladder on build 177: FEED's two levels together came
      * to 1.56x on rounds a second, and DOUBLE TAP into TRIPLE TAP came to 3x
-     * on top of it -- the cliff is the taps, and this is the smaller half of
-     * it. See CFG.rounds.standard.tapFade for the other half, and
-     * docs/pacing.md for why both were still not enough on their own.
+     * on top of it -- the cliff was the taps, not this. TRIPLE TAP itself
+     * went in build 189, which is the last of that ladder. See
+     * CFG.rounds.standard.tapFade and docs/pacing.md.
      */
     /*
      * This branch is named for what it bolts on rather than for the stat it
@@ -582,8 +590,8 @@ export const BY_ID = new Map(
  * for a plain scalar — HOLLOWPOINT has no natural ceiling. `levels: 1` is the
  * old one-shot: a switch cannot be thrown twice. Anything in between is an
  * upgrade with a shape to it, and `tiers` lets a level be a different card:
- * a third round out of one trigger pull is not "DOUBLE TAP again", it is
- * TRIPLE TAP, and the offer should say so.
+ * a second level of SIEVE is not "SIEVE again", it is OPEN SIEVE and it hands
+ * over a position the first one did not, and the offer should say so.
  */
 
 

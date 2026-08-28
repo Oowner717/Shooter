@@ -190,7 +190,11 @@ const LINE = [
   'hollowpoint', 'rate', 'hotload',
   'hollowpoint', 'rate', 'hotload',
   'hollowpoint', 'hotload',
-  'doubletap', 'overstuffed', 'doubletap',
+  // One DOUBLE TAP, because there is only one to buy: TRIPLE TAP was its
+  // second level and went in build 189. The line asked for it twice and the
+  // second ask was skipped as `maxed` rather than breaking, but a calibration
+  // list should say what it means to buy.
+  'doubletap', 'overstuffed',
   'overstuffed', 'overstuffed', 'overstuffed',
   'overwatch', 'overwatch', 'overwatch',
   'salvo',
