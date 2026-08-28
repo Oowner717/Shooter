@@ -2485,6 +2485,10 @@ body.bossUp #waveRail { display: none; }
   -webkit-tap-highlight-color: transparent;
 }
 .railStep:disabled { opacity: 0.3; }
+#railSkip[hidden] { display: none; }
+/* The skip is the same plate as the arrows and reads a shade quieter: it is
+   the convenience, not the control. */
+#railSkip { border-color: color-mix(in srgb, var(--accent) 20%, var(--line)); }
 .railStep:active:not(:disabled) { transform: translateY(1px); }
 
 /*
@@ -2539,11 +2543,22 @@ body.bossUp #waveRail { display: none; }
   background: color-mix(in srgb, var(--accent) 14%, rgba(6, 12, 22, 0.7));
   color: color-mix(in srgb, var(--accent) 62%, var(--dim));
 }
-/* Ahead, but stood on before -- see syncRail. Lighter than passed and heavier
+/* Ahead, but already climbed -- see syncRail. Lighter than passed and heavier
    than never-reached, which is exactly where it sits. */
 .railNode.seen {
   border-color: color-mix(in srgb, var(--accent) 34%, transparent);
   color: color-mix(in srgb, var(--accent) 40%, var(--dim));
+}
+/*
+ * Never reached, and not reachable: the arrow stops at the rung below it.
+ * Dashed, because that is already what this interface means by "a place for
+ * something that is not there yet" -- see .qc.empty on the strip.
+ */
+.railNode.locked {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--line) 70%, transparent);
+  background: rgba(6, 12, 22, 0.4);
+  color: color-mix(in srgb, var(--dim) 55%, transparent);
 }
 .railNode.at {
   border-color: color-mix(in srgb, var(--accent) 72%, transparent);
@@ -2603,7 +2618,10 @@ body.bossUp #waveRail { display: none; }
 /* The long form where it fits and the short one where it does not -- both are
    written every time, so neither can go stale behind the other. */
 .rShort { display: none; }
-@media (max-width: 392px) {
+/* Short on anything phone-shaped. It was 392 -- wide enough that a 414 screen
+   still read "AUTO PROGRESS ON" -- and that was before the rail carried a
+   fourth control. At 414 the long form left the five nodes 24px each. */
+@media (max-width: 520px) {
   .rLong { display: none; }
   .rShort { display: inline; }
 }

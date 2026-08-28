@@ -978,20 +978,25 @@ export class Hud {
       this.el.railNodes.appendChild(el);
       this.railCells.push({ el, n: el.querySelector('b'), tick: el.querySelector('i'), at: -1 });
     }
-    const step = (by) => {
+    /*
+     * Moving by hand pins the tier. Anything else is a control that fights
+     * the auto-advance: step down, clear one wave, and the ladder puts you
+     * straight back where you could not stand.
+     *
+     * `reach` and not `setTier`: the arrows may not go anywhere the run has
+     * not already climbed to. setTier is the machinery's, and it unlocks.
+     */
+    const go = (to) => {
       const dir = d();
       if (!dir) return;
-      /*
-       * Moving by hand pins the tier. Anything else is a control that fights
-       * the auto-advance: step down, clear one wave, and the ladder puts you
-       * straight back where you could not stand.
-       */
-      dir.setTier(dir.tier + by);
+      dir.reach(to(dir));
       dir.hold = true;
       this.syncRail(g.world);
     };
-    $('railDown').addEventListener('click', () => step(-1));
-    $('railUp').addEventListener('click', () => step(1));
+    $('railDown').addEventListener('click', () => go((dir) => dir.tier - 1));
+    $('railUp').addEventListener('click', () => go((dir) => dir.tier + 1));
+    $('railSkip').addEventListener('click', () => go((dir) => dir.peak));
+    this.el.railSkip = $('railSkip');
     this.el.railAuto.addEventListener('click', () => {
       const dir = d();
       if (!dir) return;
@@ -1042,13 +1047,14 @@ export class Hud {
         // Behind you: cleared, and ticked.
         c.el.classList.toggle('done', t < n);
         /*
-         * ...and ahead of you but already stood on, which a run that was
-         * pushed back down has above it. Not ticked -- a tick on a tier you
-         * are about to climb back into reads as "cleared, nothing to do" --
-         * but not a stranger either, so it wears the lighter outline. That
-         * is the whole of what `peak` is for.
+         * ...ahead of you but already climbed, which a run that was pushed
+         * back down has above it. Not ticked -- a tick on a tier you are
+         * about to go back up into reads as "cleared, nothing to do" -- but
+         * not a stranger either: it is somewhere you may go.
          */
         c.el.classList.toggle('seen', t > n && t <= peak);
+        // ...and never reached. Drawn shut, and the arrow will not go there.
+        c.el.classList.toggle('locked', t > peak);
         c.tick.textContent = t < n ? '\u2713' : '';
       }
     }
@@ -1061,8 +1067,20 @@ export class Hud {
       this.writeAuto(true, n);
     }
     this._railHeldAt = n;
-    // Nothing below tier 1 to step back to.
+    // Nothing below tier 1 to step back to, and nothing above the highest
+    // rung the run has climbed: forward is earned, back is free.
     $('railDown').disabled = n <= 1;
+    $('railUp').disabled = n >= peak;
+    /*
+     * ...and the skip is there only when it has somewhere to go. A control
+     * that is present and inert on most of a run is a control that reads as
+     * broken; one that appears exactly when it is useful explains itself.
+     */
+    const canSkip = n < peak - 1;
+    if (this._railSkip !== canSkip) {
+      this._railSkip = canSkip;
+      this.el.railSkip.hidden = !canSkip;
+    }
   }
 
 

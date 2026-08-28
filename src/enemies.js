@@ -2948,10 +2948,32 @@ export class Director {
     return { verdict: this.lastVerdict, moved, tier: this.tier };
   }
 
-  /** Set the tier by hand, from the rail's arrows. Pins it either way. */
+  /**
+   * Put the ladder somewhere, and count it as reached.
+   *
+   * The machinery's setter: the restore, the probes and the debug panel. It
+   * does not gate, because every one of those already knows where it wants
+   * the run to be -- and it raises `peak`, because being put on a rung is
+   * having stood on it.
+   */
   setTier(n) {
     this.tier = Math.max(1, Math.round(n));
     this.peak = Math.max(this.peak, this.tier);
+    this.fails = 0;
+    return this.tier;
+  }
+
+  /**
+   * ...and the player's, from the rail.
+   *
+   * A rung has to have been climbed before it can be gone back to, so this
+   * clamps to `peak` and never raises it. The only thing that unlocks a tier
+   * is the ladder climbing it in score() -- which is the whole point of a
+   * ladder you can step back down: going back is free, going forward is
+   * earned, and the two are different verbs.
+   */
+  reach(n) {
+    this.tier = Math.min(Math.max(1, Math.round(n)), Math.max(1, this.peak));
     this.fails = 0;
     return this.tier;
   }

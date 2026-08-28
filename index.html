@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '195';
+  var BUILD = '196';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -139,6 +139,12 @@
       <button id="railDown" class="railStep" aria-label="Step back a tier">&#8249;</button>
       <div id="railNodes"></div>
       <button id="railUp" class="railStep" aria-label="Step up a tier">&#8250;</button>
+      <!-- Straight to the highest rung the run has climbed. Present only when
+           there is somewhere to skip to, so the rail is exactly as it was
+           whenever the player is already at the top of what they have earned.
+           A tier that has never been reached cannot be gone to at all: the
+           arrow stops at the ceiling and the nodes past it are drawn shut. -->
+      <button id="railSkip" class="railStep" aria-label="Jump to the highest tier reached" hidden>&#187;</button>
       <!-- Two labels, because "AUTO PROGRESS ON" does not fit beside five
            nodes and two arrows on a 320 screen and the state still has to be
            readable there. The stylesheet picks; both are written. -->

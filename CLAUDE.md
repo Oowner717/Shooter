@@ -391,4 +391,11 @@ most once for any given target and cannot spin.
   the light on frames where something is actually attached now. If a case
   fails intermittently, measure what it is really asking for before touching
   its number.
+- **A control that refuses is not the same as a rule that holds.** The wave
+  rail's tiers are gated on `peak` from build 196: `Director.reach()` is the
+  player's setter and clamps, `setTier()` is the machinery's (restore, probes,
+  debug) and unlocks as it goes. The first case for it pressed the arrow and
+  passed with the gate missing entirely, because `railUp.disabled` swallowed
+  the presses. Assert the model as well as the button, or the next caller
+  walks straight through.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

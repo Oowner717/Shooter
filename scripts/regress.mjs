@@ -3001,8 +3001,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const rail = box('waveRail');
     const clearsBar = rail.t >= bar.b;
 
-    /* ---- and the three controls are reachable ---- */
-    const seats = { down: seat('railDown'), up: seat('railUp'), auto: seat('railAuto') };
+    /* ---- and every control is reachable ---- */
+    d.setTier(9); d.reach(6); // so the skip is on the bar to be measured
+    g.hud.syncRail(w);
+    const seats = { down: seat('railDown'), up: seat('railUp'),
+      skip: seat('railSkip'), auto: seat('railAuto') };
+    // ...and the band still fits, with four controls on it now.
+    const overflow = Math.round(document.getElementById('railAuto').getBoundingClientRect().right)
+      > Math.round(document.getElementById('waveRail').getBoundingClientRect().right) + 1;
 
     /* ---- the window is centred, and clamped at the floor ---- */
     d.setTier(9); d.setTier(7); d.hold = false; // been to 9, standing on 7
@@ -3012,6 +3018,50 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.hud.syncRail(w);
     const floor = window5();
     const floorLocked = document.getElementById('railDown').disabled;
+
+    /*
+     * ---- a rung has to be climbed before it can be gone back to ----
+     *
+     * `peak` is the ceiling and only score() raises it. The arrows use
+     * `reach`, which clamps; `setTier` is the machinery's and does unlock,
+     * which is why the probes and the restore can still put a run anywhere.
+     */
+    d.setTier(9);      // the run has climbed to 9...
+    d.reach(6);        // ...and been pushed back to 6
+    d.hold = false;
+    g.hud.syncRail(w);
+    const shut = [...document.querySelectorAll('.railNode')].map((el) => ({
+      n: Number(el.querySelector('b').textContent),
+      locked: el.classList.contains('locked'),
+      seen: el.classList.contains('seen'),
+    }));
+    const midUp = { off: document.getElementById('railUp').disabled,
+      skip: !document.getElementById('railSkip').hidden };
+    // Straight to the top of what has been earned.
+    document.getElementById('railSkip').click();
+    const skipped = { tier: d.tier, peak: d.peak,
+      off: document.getElementById('railUp').disabled,
+      skip: !document.getElementById('railSkip').hidden,
+      shut: [...document.querySelectorAll('.railNode')]
+        .filter((el) => el.classList.contains('locked'))
+        .map((el) => Number(el.querySelector('b').textContent)) };
+    // ...and the arrow will not go past it, however many times it is pressed.
+    for (let i = 0; i < 4; i++) document.getElementById('railUp').click();
+    const held = { tier: d.tier, peak: d.peak };
+    /*
+     * ...and the MODEL holds it, not the button.
+     *
+     * Asserted separately because the first version of this case was not: the
+     * disabled attribute on the arrow swallowed the presses, so the case
+     * passed with the arrows still calling setTier -- which unlocks as it
+     * goes and would have left no gate at all. A control that refuses is not
+     * the same as a rule that holds, and only one of them survives the next
+     * caller.
+     */
+    const forced = { asked: d.peak + 5, got: d.reach(d.peak + 5), peak: d.peak };
+    // Down is always free -- going back is not something that is earned.
+    document.getElementById('railDown').click();
+    const back = d.tier;
 
     /* ---- the arrows move it and pin it; the switch says which ---- */
     d.setTier(6); d.hold = false;
@@ -3099,15 +3149,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.restart();
     await new Promise((res) => setTimeout(res, 200));
     const afterFight = document.body.classList.contains('bossUp');
-    return { bar, rail, clearsBar, seats, mid, floor, floorLocked, runningLabel,
+    return { bar, rail, clearsBar, seats, overflow, shut, midUp, skipped, held, back, forced,
+      mid, floor, floorLocked, runningLabel,
       up, down, released, peakBefore, peakBack, peakOld, wrote, noOrder,
       painted, beforeFight, inFight, afterFight, vh: window.innerHeight };
   });
 
   check('the rail sits clear of the bar above it and every control is thumb-sized',
-    r.clearsBar && r.rail.h > 0
+    r.clearsBar && r.rail.h > 0 && !r.overflow
     && Object.values(r.seats).every((s) => s.h >= 44 && s.mine),
-    `bar ends ${r.bar.b}, rail ${r.rail.t}..${r.rail.b}; `
+    `bar ends ${r.bar.b}, rail ${r.rail.t}..${r.rail.b}, overflows ${r.overflow}; `
     + Object.entries(r.seats).map(([k, s]) => `${k} ${s.h}px hit=${s.mine}`).join(' · '));
 
   check('the window centres on the run and stops at the floor',
@@ -3129,6 +3180,31 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     && r.mid.filter((c) => c.seen).map((c) => c.n).join(',') === '8,9',
     `ticked [${r.mid.filter((c) => c.tick).map((c) => c.n).join(',')}] · `
     + `stood on above [${r.mid.filter((c) => c.seen).map((c) => c.n).join(',')}]`);
+
+  /*
+   * The gate. Forward is earned and back is free, which is the whole of what
+   * `peak` is for -- before build 196 the arrows called setTier, which raised
+   * peak on the way, so there was no ceiling and nothing to unlock.
+   */
+  check('a tier that has never been climbed cannot be stepped into',
+    r.midUp.off === false && r.midUp.skip === true
+    && r.skipped.tier === 9 && r.skipped.peak === 9
+    && r.held.tier === 9 && r.held.peak === 9
+    && r.forced.got === 9 && r.forced.peak === 9
+    && r.back === 8,
+    `at 6 of 9: up ${r.midUp.off ? 'shut' : 'open'}, skip ${r.midUp.skip ? 'offered' : 'hidden'} `
+    + `-> skip lands on ${r.skipped.tier}, four more presses of up leave it at `
+    + `${r.held.tier} (peak ${r.held.peak}); asked for ${r.forced.asked} it gives `
+    + `${r.forced.got} and peak stays ${r.forced.peak}; down still goes to ${r.back}`);
+
+  check('...and the rungs above it are drawn shut, with nothing to skip to',
+    r.shut.filter((c) => c.locked).length === 0
+    && r.shut.filter((c) => c.seen).map((c) => c.n).join(',') === '7,8'
+    && r.skipped.shut.join(',') === '10,11'
+    && r.skipped.off === true && r.skipped.skip === false,
+    `at 6 of 9 nothing is shut and [${r.shut.filter((c) => c.seen).map((c) => c.n)}] are open ahead; `
+    + `at the ceiling [${r.skipped.shut}] are shut, up is ${r.skipped.off ? 'shut' : 'open'} `
+    + `and the skip is ${r.skipped.skip ? 'still offered' : 'gone'}`);
 
   check('the arrows move the ladder and pin it, and the switch says so',
     r.runningLabel === 'AUTO PROGRESS ON'
