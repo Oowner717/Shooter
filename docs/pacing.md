@@ -439,6 +439,49 @@ the thrown MASS ending up outside `autoTarget`'s cone, the trap the probe's
 own notes already warn about for loose spawns. Neither measurement has been
 reconciled with the other. Read BULWARK, which is consistent across both.
 
+## Build 193 — HOT LOAD out, FEED halved
+
+Both by request. HOT LOAD is gone from the tree; FEED goes from ×0.8 on the
+interval to ×0.9, which is half the buff it was — its card said "+20% fire
+rate" and now says +10%, in the same interval-reduction framing the rest of
+the tree's cards use.
+
+Measured A/B with `scripts/tiers.mjs --from 1 --to 20 --runs 3`, build 192 as
+shipped against this:
+
+| | 192 | 193 |
+|---|---|---|
+| rnd/s, plateau (8–20) | 13.0 | 9.6 |
+| dps, plateau (8–20) | 940 | 717 |
+| BULWARK at tier 17 | 13.2s | 18.2s |
+| BULWARK at tier 20 | 22.4s | 27.3s |
+| pay/s at tier 20 | 5.4 | **1.1** |
+| whole tree | 114,650 / 134 levels | 114,150 / 133 |
+
+**The cadence ladder is now worth 1.11× across the whole tree.** A stock
+turret pulls 3.5 a second and a fully bought one pulls 3.9. It was 1.47× on
+192, and 2.54× before build 178 when FEED had two levels and HOT LOAD three.
+Fire rate has effectively stopped being something the tree sells; what it
+sells is what a round is worth.
+
+**The early ladder moves this time**, which the TRIPLE TAP removal did not.
+FEED is in the damage line from tier 2, so tiers 2–3 lose about 10% of their
+dps outright, and 4–6 get reshuffled by what the freed budget reaches first
+(tier 4 rises 253 → 287, tier 5 falls 380 → 287).
+
+**Two things at the top of the ladder are worth a decision.** A single
+BULWARK at tier 20 is 27.3s, and band 5's heaviest wave stops clearing inside
+the 120s cap from tier 17 rather than 19. And because income is measured over
+the time a clear takes, `pay/s` at tier 20 falls from 5.4 to 1.1 — a fivefold
+collapse at the top, on top of a ladder that already plateaus at tier 8. The
+tier ladder will find its own level (it steps back after two failed waves),
+so this is not a soft-lock; it does mean the reachable ceiling is now
+materially lower, and that the last 100k of the tree buys even less than it
+did.
+
+TOW still reads >45s at high tiers in both columns, before and after, so it
+is not this change — see build 192's note, and the outstanding item below.
+
 ### Still outstanding
 
 - The `swell` remnants.

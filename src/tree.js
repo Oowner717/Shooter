@@ -51,7 +51,9 @@ const UNDER = {
 
   // ---- the rack ----
   // Whole-rack upgrades sit on the category; BOLT keeps only its own two.
-  ammo: ['hollowpoint', 'hotload', 'tracer', 'ricochet', 'heavy', 'salvo'],
+  // HOT LOAD sat here until build 193. It was the whole cadence ladder on its
+  // own -- see docs/pacing.md -- and what is left of the ladder is FEED.
+  ammo: ['hollowpoint', 'tracer', 'ricochet', 'heavy', 'salvo'],
   bolt: ['overstuffed', 'doubletap'],
   explosive: ['overpressure', 'cluster'],
   shotgun: ['doubleo', 'longshot'],

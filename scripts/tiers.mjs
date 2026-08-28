@@ -187,10 +187,10 @@ for (const [b, v] of HEAVIEST) HEAVIEST.set(b, v.of);
  * soak below still buys them once the line is exhausted.
  */
 const LINE = [
-  // One FEED and one HOT LOAD, because there is one of each to buy: FEED was
-  // capped in 178 and HOT LOAD in 192. The extra asks were skipped as `maxed`
-  // rather than breaking, but a calibration list should say what it means.
-  'hollowpoint', 'rate', 'hotload',
+  // One FEED, and that is the whole cadence line: it was capped in 178 and
+  // halved in 193, and HOT LOAD -- three levels of it, on the tree's default
+  // -- went in 193 too. Everything else here buys what a round is worth.
+  'hollowpoint', 'rate',
   'hollowpoint', 'hollowpoint',
   // One DOUBLE TAP, because there is only one to buy: TRIPLE TAP was its
   // second level and went in build 189. The line asked for it twice and the

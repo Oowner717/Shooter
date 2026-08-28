@@ -350,7 +350,12 @@ most once for any given target and cannot spin.
   `u.levels ?? 3`, so a node the author never capped is sold three times.
   HOT LOAD was 0.85³ on the fire interval — 1.63× on rounds a second, larger
   than the FEED nerf of build 178, which capped FEED for exactly that reason
-  and stopped one node short. Capped in 192 and asserted in `regress.mjs`, so
-  the default cannot take it back. Check the tree's number, not the
-  upgrade's, when asking how much of something is for sale.
+  and stopped one node short. Check the tree's number, not the upgrade's,
+  when asking how much of something is for sale.
+- **Fire rate is not something the tree sells any more.** HOT LOAD went in
+  build 193 and FEED was halved to ×0.9 in the same build, so `up.rate` on a
+  fully bought turret is 0.9 and the whole cadence ladder is worth 1.11× —
+  3.5 pulls a second stock against 3.9 bought. It was 2.54× before 178.
+  `regress.mjs` asserts the product rather than the nodes, which is what
+  catches a new rate upgrade arriving as much as an old one coming back.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

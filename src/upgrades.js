@@ -94,7 +94,6 @@ const g = svgMark;
 const MARK = {
   // --- ammo ---
   hollowpoint: g('<path d="M12 21V9"/><path d="M12 3 7.5 9.5h9z" fill="currentColor" stroke="none"/><path d="M18 18h4M20 16v4"/>'),
-  hotload: g('<path d="M6 19.5 12 14l6 5.5M6 13 12 7.5 18 13M6 6.5 12 1.5 18 6.5" opacity=".55"/><path d="M6 19.5 12 14l6 5.5M6 13 12 7.5 18 13"/>'),
   tracer: g('<path d="M3 12h9"/><path d="M12.5 7.5 20 12l-7.5 4.5z" fill="currentColor" stroke="none"/><path d="M4 7.5h5M4 16.5h5" opacity=".5"/>'),
   ricochet: g('<path d="M3 3v18M21 3v18" opacity=".45"/><path d="M4 7l16 6-16 5"/>'),
   heavy: g('<rect x="13" y="8" width="8" height="8" rx="1"/><path d="M2 12h8"/><path d="M7 8.5 10.5 12 7 15.5"/>'),
@@ -273,18 +272,6 @@ const SLEEPING = ANOMALIES.slice(1).map((a) => {
 export const UPGRADES = {
   AMMO: [
     { id: 'hollowpoint', name: 'HOLLOWPOINT', line: '+25% damage.', apply: scale('damage', 1.25) , icon: MARK.hollowpoint },
-    /*
-     * One step, from build 192, and it never had a `levels` of its own -- it
-     * was taking the tree's default of three (see tree.js), which made it
-     * worth 0.85^3 = 0.614 on the interval, or 1.63x on rounds a second.
-     *
-     * That is larger than the FEED nerf build 178 thought worth making --
-     * FEED's two levels came to 1.56x and were cut to one for exactly this
-     * reason -- so the cadence pass capped the smaller multiplier and left
-     * the bigger one sitting on a default nobody had chosen. It is chosen
-     * now.
-     */
-    { id: 'hotload', name: 'HOT LOAD', levels: 1, line: '+15% fire rate.', apply: quicken('rate', 0.85) , icon: MARK.hotload },
     { id: 'tracer', name: 'TRACER', line: '+35% round speed.', apply: scale('speed', 1.35) , icon: MARK.tracer },
     { id: 'ricochet', name: 'RICOCHET', line: '+1 bounce off the arena edges.', apply: bump('bounces', 1) , icon: MARK.ricochet },
     { id: 'heavy', name: 'HEAVY', line: '2x knockback on every hit.', apply: scale('impulse', 2) , icon: MARK.heavy },
@@ -403,8 +390,8 @@ export const UPGRADES = {
      * because the effect is what is being paid for.
      */
     { id: 'rate', name: 'FEED', levels: 1,
-      line: '+20% fire rate. A belt feed along the barrel.',
-      apply: quicken('rate', 0.8), icon: MARK.rate },
+      line: '+10% fire rate. A belt feed along the barrel.',
+      apply: quicken('rate', 0.9), icon: MARK.rate },
     { id: 'slew', name: 'GIMBAL', line: '+50% auto aim turn speed. Another ring on the mount.', apply: scale('slew', 1.5) , icon: MARK.slew },
     { id: 'overwatch', name: 'SIGHT', line: '+25% damage while hands off the lever. A sight mast over the barrel.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },
     { id: 'casing', name: 'SPINES', line: 'Objects touching you take 40 damage a second. Spikes round the housing.', apply: bump('casing', 40) , icon: MARK.casing },
