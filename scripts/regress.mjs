@@ -3039,7 +3039,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       skip: !document.getElementById('railSkip').hidden };
     // Straight to the top of what has been earned.
     document.getElementById('railSkip').click();
-    const skipped = { tier: d.tier, peak: d.peak,
+    const skipped = { tier: d.tier, peak: d.peak, hold: d.hold,
       off: document.getElementById('railUp').disabled,
       skip: !document.getElementById('railSkip').hidden,
       shut: [...document.querySelectorAll('.railNode')]
@@ -3186,14 +3186,22 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * `peak` is for -- before build 196 the arrows called setTier, which raised
    * peak on the way, so there was no ceiling and nothing to unlock.
    */
+  /*
+   * ...and the skip puts the climb back ON, where the arrows pin it. A step
+   * is "I want to be here"; the skip is "put me back where I was", and the
+   * state you were in when you got there was climbing. Pinning on it left the
+   * player at their ceiling reading HELD and never advancing again -- a trap
+   * made of two controls that each behaved sensibly on their own.
+   */
   check('a tier that has never been climbed cannot be stepped into',
     r.midUp.off === false && r.midUp.skip === true
-    && r.skipped.tier === 9 && r.skipped.peak === 9
+    && r.skipped.tier === 9 && r.skipped.peak === 9 && r.skipped.hold === false
     && r.held.tier === 9 && r.held.peak === 9
     && r.forced.got === 9 && r.forced.peak === 9
     && r.back === 8,
     `at 6 of 9: up ${r.midUp.off ? 'shut' : 'open'}, skip ${r.midUp.skip ? 'offered' : 'hidden'} `
-    + `-> skip lands on ${r.skipped.tier}, four more presses of up leave it at `
+    + `-> skip lands on ${r.skipped.tier} still climbing (held ${r.skipped.hold}), `
+    + `four more presses of up leave it at `
     + `${r.held.tier} (peak ${r.held.peak}); asked for ${r.forced.asked} it gives `
     + `${r.forced.got} and peak stays ${r.forced.peak}; down still goes to ${r.back}`);
 

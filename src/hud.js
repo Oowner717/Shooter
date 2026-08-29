@@ -986,16 +986,26 @@ export class Hud {
      * `reach` and not `setTier`: the arrows may not go anywhere the run has
      * not already climbed to. setTier is the machinery's, and it unlocks.
      */
-    const go = (to) => {
+    const go = (to, pin) => {
       const dir = d();
       if (!dir) return;
       dir.reach(to(dir));
-      dir.hold = true;
+      dir.hold = pin;
       this.syncRail(g.world);
     };
-    $('railDown').addEventListener('click', () => go((dir) => dir.tier - 1));
-    $('railUp').addEventListener('click', () => go((dir) => dir.tier + 1));
-    $('railSkip').addEventListener('click', () => go((dir) => dir.peak));
+    $('railDown').addEventListener('click', () => go((dir) => dir.tier - 1, true));
+    $('railUp').addEventListener('click', () => go((dir) => dir.tier + 1, true));
+    /*
+     * ...and the skip does the opposite: it puts the climb back on.
+     *
+     * A step is "I want to be here", which is a decision the ladder should
+     * not overrule a wave later. The skip is "put me back where I was", and
+     * the state you were in when you got there was climbing -- so pinning on
+     * it left the player at the top of what they had earned, reading HELD,
+     * never advancing again until they noticed a switch they had not touched.
+     * That is a trap made out of two controls that each behaved sensibly.
+     */
+    $('railSkip').addEventListener('click', () => go((dir) => dir.peak, false));
     this.el.railSkip = $('railSkip');
     this.el.railAuto.addEventListener('click', () => {
       const dir = d();

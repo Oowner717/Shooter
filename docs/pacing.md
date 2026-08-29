@@ -651,7 +651,6 @@ left 13, shotgun left 27, standard left 30…".
 
 ### Still outstanding
 
-- The `swell` remnants.
 - Tiers 5–8 fall out of plan B's 2–4s band. That is band composition rather
   than the health slope — a new band lands every two tiers and a turret that
   has just grown meets it before the health has caught up. Re-banding waves or
