@@ -262,3 +262,80 @@ BULWARK at 6.03 -- far above the floor at any scale, so it could not move
 whatever the binding did. It read "frozen" on the live module build. The floor
 only shows on a body whose own `r * m.line` lands under it; the number to
 watch is the THINNEST line on the field.
+
+## Phases 3 and 5, tested before being built on
+
+Two of the five recommendations had already failed measurement (1 and 2). So
+the remaining premises were tested rather than trusted.
+
+### Phase 5 is wrong: the boss bar is not untested
+
+Three cases already cover it, and between them they assert the layout (it
+clears the wave rail, and its box stays inside the viewport), that the shell
+notches are built from the boss's real ring structure rather than decoration,
+that the fill and the `--boss` variable track damage AND healing, the title and
+phase text, and the `bossUp` class lifecycle through a restart. Nothing here
+needed doing.
+
+### Phase 3 is right, and its stated cause is wrong
+
+The recommendation said the field is "uniform ambient texture" and wants peaks
+from events instead. Half of that survives.
+
+**The first instrument could not see an event and gave a confident answer
+anyway.** Mean canvas luminance: three hundred particles a few pixels each is
+under a tenth of a percent of a 1.48-megapixel canvas, so at pure white they
+move the mean by 0.2 of a level. It reported a fight with 122 kills adding
+nothing — the instrument's answer, not the game's. It also compared a fight
+against a field the fight had already half cleared: 21 bodies under fire
+against 57 quiet, so combat came out *dimmer* than quiet. The population is
+held now, and the measures are local: `hot` is the share of pixels over 128,
+and the 99.9th percentile is roughly the top 1,500 pixels — the size of the
+event material being asked about.
+
+What a fight adds over the same field standing quiet:
+
+| measure | quiet | combat | ratio |
+|---|---|---|---|
+| bright material (% of canvas over 128) | 2.683% | 3.870% | **1.44x** |
+| the brightest tenth (of 255) | 228 | 242 | **1.06x** |
+
+And inside the fight, against its own median: bright *area* spikes 1.47x,
+bright *intensity* spikes 1.02x.
+
+So events are not invisible — they add real area. **They cannot peak.** And
+the reason is not ambient texture:
+
+| state | hot near turret | hot in field | brightest pixel |
+|---|---|---|---|
+| substrate alone, turret removed | 0.000% | 0.000% | **54** |
+| empty field, turret present | 0.044% | 0.022% | 180 (turret) |
+| 57 bodies, quiet | 0.032% | **1.275%** | **253** (field) |
+
+The substrate is dim and flat — its brightest pixel is 54 of 255, and its mean
+does not vary at all across 180 frames (14.15, p95 14.16, max 14.16). It is not
+competing with anything. **The bodies saturate the highlight range on their
+own**: 98% of the hot pixels on a quiet field are theirs, and the brightest is
+already 253 of 255. An impact has nowhere brighter to go, so it can only be
+bigger, never hotter.
+
+That reframes the work. It is not "add event texture"; it is that the body
+layer occupies the top of the range and leaves no headroom above it. The lever
+is `materialOf`'s fill and the stroke alphas — bringing the body layer's
+ceiling down so events have somewhere to peak into — and that is a rebalance of
+every type's appearance, not a tuning pass. Worth doing deliberately, with the
+A/B discipline Phase 1 had to learn, rather than folded into another build.
+
+### Where the five recommendations ended up
+
+| phase | verdict |
+|---|---|
+| 1. field is unevenly lit | **wrong** — evenly lit; the real defect was the quality governor's ratchet (build 198) |
+| 2. rounds read as one streak | **wrong** — build 166's forms already separate them, measured at real scale and in flight |
+| 3. event density | **right, wrong cause** — bodies saturate the top of the range, the substrate is innocent |
+| 4. silhouette and line weight | **right** — the stroke floor was eating three quarters of the authored ladder (build 199) |
+| 5. the boss bar | **wrong** — already covered by three cases |
+
+Two of five held up, and one of those only after its cause was corrected. The
+assessment they came from was made by looking rather than measuring, and it
+shows: every one of the three that failed sounded plausible and specific.
