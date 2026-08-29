@@ -418,3 +418,44 @@ if (leftovers.length) {
   process.exit(1);
 }
 console.log('  no module statements left in either form');
+
+/*
+ * ---- and no export whose VALUE is expected to change ----
+ *
+ * The guard above catches a form wrap() cannot parse. This one catches a form
+ * it parses perfectly and still gets wrong, which is worse, because the bundle
+ * builds clean and boots clean and is simply a different game.
+ *
+ * Each module gets its own scope and an exports object filled ONCE, at the end
+ * of the module body (`__ex.NAME = NAME`), and each importer DESTRUCTURES that
+ * object. Both halves are snapshots. In a real ES module `export let X` is a
+ * live binding -- reassign it in the exporter and every importer sees the new
+ * value -- and here nobody ever sees anything but the value it had at load.
+ *
+ * Build 199 tried exactly that: a stroke floor recomputed per device on every
+ * resize. Measured, the module build halved it from dpr 1 to dpr 2 and the
+ * bundle did not move it at all -- so the fix worked when served and was inert
+ * in the artifact and in every home-screen install, with a green suite either
+ * way, because the suite runs against the modules.
+ *
+ * `export const` and `export function` are fine: nothing reassigns them. A
+ * value that has to change belongs on an object that does not -- CFG.hairline
+ * is the one this rule was written for. Reads through a snapshotted object
+ * reference are live in both builds.
+ */
+const mutable = [];
+for (const [name, src] of mods) {
+  src.split('\n').forEach((line, i) => {
+    const m = line.match(/^[ \t]*export\s+(let|var)\s+([A-Za-z_$][\w$]*)/);
+    if (m) mutable.push(`${name}:${i + 1}  export ${m[1]} ${m[2]}`);
+  });
+}
+if (mutable.length) {
+  console.error(`${mutable.length} reassignable export(s). wrap() snapshots exports at `
+    + 'module end and importers destructure them, so a value that changes after load '
+    + 'changes only in the served build — the bundle keeps the value it started with. '
+    + 'Put it on an object (CFG) and read through that instead:');
+  for (const l of mutable.slice(0, 8)) console.error(`  ${l}`);
+  process.exit(1);
+}
+console.log('  no reassignable exports (a bundled `export let` is a snapshot)');

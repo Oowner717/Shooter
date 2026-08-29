@@ -1,7 +1,7 @@
 // The turret. Stationary, immortal, and the only thing in the arena with
 // infinite mass — everything else bounces off it.
 
-import { CFG, HAIRLINE } from './config.js';
+import { CFG } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, angleDelta } from './util.js';
 import { fire, clampAim } from './projectiles.js';
 import { Patch } from './patch.js';
@@ -521,8 +521,8 @@ export class Shooter {
       const reach = CFG.shooter.aimRange * world.up.aimRange;
       const cone = CFG.shooter.aimClamp;
       ctx.strokeStyle = rgba(accent, 0.12 + flash * 0.3);
-      ctx.lineWidth = HAIRLINE;
-      ctx.setLineDash([HAIRLINE * 5, HAIRLINE * 11]);
+      ctx.lineWidth = CFG.hairline;
+      ctx.setLineDash([CFG.hairline * 5, CFG.hairline * 11]);
       ctx.beginPath();
       ctx.arc(0, 0, reach, -Math.PI / 2 - cone, -Math.PI / 2 + cone);
       ctx.stroke();
@@ -564,7 +564,7 @@ export class Shooter {
         ctx.arc(0, 0, rr, 0, TAU);
         ctx.stroke();
         const teeth = 18 + i * 6;
-        ctx.lineWidth = HAIRLINE * 2;
+        ctx.lineWidth = CFG.hairline * 2;
         ctx.beginPath();
         for (let k = 0; k < teeth; k++) {
           const a = this.spin * (i % 2 ? -0.5 : 0.5) + (k / teeth) * TAU;
@@ -586,7 +586,7 @@ export class Shooter {
         // The outermost plate carries the bright edge: the silhouette is what
         // the eye reads first and it should be the lit line, not an inner one.
         ctx.strokeStyle = rgba(last ? '#bfe6ff' : accent, (last ? 0.7 : 0.3) * lit);
-        ctx.lineWidth = HAIRLINE * (last ? 2.6 : 2);
+        ctx.lineWidth = CFG.hairline * (last ? 2.6 : 2);
         poly(6, rr, Math.PI / 6 + i * 0.26);
         ctx.fill();
         ctx.stroke();
@@ -595,7 +595,7 @@ export class Shooter {
       // what makes a stack of hexagons read as bevelled metal
       const rr = R * (1.0 + (g.casing - 1) * 0.16);
       ctx.strokeStyle = rgba('#bfe6ff', 0.5 * lit);
-      ctx.lineWidth = HAIRLINE * 1.8;
+      ctx.lineWidth = CFG.hairline * 1.8;
       ctx.beginPath();
       for (let k = 0; k < 6; k++) {
         const a = (k / 6) * TAU + Math.PI / 6 + (g.casing - 1) * 0.26;
@@ -610,12 +610,12 @@ export class Shooter {
     // ---- the deck: the one part that is always there ----------------------
     ctx.fillStyle = BODY;
     ctx.strokeStyle = rgba(accent, 0.9);
-    ctx.lineWidth = HAIRLINE * (2 + filled * 1.4);
+    ctx.lineWidth = CFG.hairline * (2 + filled * 1.4);
     poly(6, R * 0.92, Math.PI / 6);
     ctx.fill();
     ctx.stroke();
     ctx.strokeStyle = rgba(accent, 0.26 + filled * 0.24);
-    ctx.lineWidth = HAIRLINE;
+    ctx.lineWidth = CFG.hairline;
     poly(6, R * 0.74, Math.PI / 6);
     ctx.stroke();
     // bolts at the corners: six small marks, and a drawn hexagon becomes a
@@ -643,7 +643,7 @@ export class Shooter {
         roundRectPath(ctx, -6, -5.5, 12, 11, 2);
         ctx.fill();
         ctx.strokeStyle = rgba('#7fe6c0', 0.75);
-        ctx.lineWidth = HAIRLINE * 1.6;
+        ctx.lineWidth = CFG.hairline * 1.6;
         ctx.beginPath();
         for (let k = -1; k <= 1; k++) {
           ctx.moveTo(-4.5, k * 3);
@@ -667,7 +667,7 @@ export class Shooter {
       ctx.rotate(a);
       ctx.fillStyle = 'rgba(12,26,40,0.99)';
       ctx.strokeStyle = rgba('#8fd8ff', 0.85 * lit);
-      ctx.lineWidth = HAIRLINE * 1.8;
+      ctx.lineWidth = CFG.hairline * 1.8;
       // a blade: narrow at the mount, square at the tip
       ctx.beginPath();
       ctx.moveTo(0, -3.5);
@@ -679,7 +679,7 @@ export class Shooter {
       ctx.stroke();
       // the elements on its face
       ctx.strokeStyle = rgba('#8fd8ff', 0.55 * lit);
-      ctx.lineWidth = HAIRLINE * 1.2;
+      ctx.lineWidth = CFG.hairline * 1.2;
       ctx.beginPath();
       for (let k = 1; k < 4; k++) {
         ctx.moveTo(h * (k / 4), -5);
@@ -715,12 +715,12 @@ export class Shooter {
           const x = h + 2.5 + L * 3.2;
           const span = 7.5 + L * 2.4;
           ctx.strokeStyle = rgba('#b8f0a0', (0.9 - L * 0.2) * lit);
-          ctx.lineWidth = HAIRLINE * 1.6;
+          ctx.lineWidth = CFG.hairline * 1.6;
           ctx.beginPath();
           ctx.moveTo(x, -span);
           ctx.lineTo(x, span);
           ctx.stroke();
-          ctx.lineWidth = HAIRLINE;
+          ctx.lineWidth = CFG.hairline;
           ctx.strokeStyle = rgba('#b8f0a0', (0.6 - L * 0.15) * lit);
           ctx.beginPath();
           for (let k = -2; k <= 2; k++) {
@@ -747,7 +747,7 @@ export class Shooter {
       ctx.translate(dx, dy);
       ctx.fillStyle = BODY;
       ctx.strokeStyle = rgba('#ffc07a', 0.85);
-      ctx.lineWidth = HAIRLINE * 1.8;
+      ctx.lineWidth = CFG.hairline * 1.8;
       roundRectPath(ctx, -9, -7, 20, 14, 3);
       ctx.fill();
       ctx.stroke();
@@ -760,7 +760,7 @@ export class Shooter {
       ctx.restore();
       // the belt itself, curving into the breech
       ctx.strokeStyle = rgba('#ffc07a', 0.55);
-      ctx.lineWidth = HAIRLINE * 2.2;
+      ctx.lineWidth = CFG.hairline * 2.2;
       ctx.beginPath();
       ctx.moveTo(dx + 10, dy);
       ctx.quadraticCurveTo(R * 0.5, dy * 0.5, R * 0.42 - recoil, 0);
@@ -770,7 +770,7 @@ export class Shooter {
     // ---- the breech block -------------------------------------------------
     ctx.fillStyle = FACE;
     ctx.strokeStyle = rgba(accent, 0.8);
-    ctx.lineWidth = HAIRLINE * 1.8;
+    ctx.lineWidth = CFG.hairline * 1.8;
     roundRectPath(ctx, -R * 0.1 - recoil * 0.4, -10, R * 0.62, 20, 3);
     ctx.fill();
     ctx.stroke();
@@ -781,7 +781,7 @@ export class Shooter {
       const mr = R * (0.62 + g.insulation * 0.1);
       ctx.fillStyle = FACE;
       ctx.strokeStyle = rgba('#7fe6c0', 0.95 * lit);
-      ctx.lineWidth = HAIRLINE * 2.6;
+      ctx.lineWidth = CFG.hairline * 2.6;
       ctx.beginPath();
       ctx.arc(0, 0, mr, -half, half);
       ctx.arc(0, 0, mr - 8 - g.insulation * 1.5, half, -half, true);
@@ -790,13 +790,13 @@ export class Shooter {
       ctx.stroke();
       // a lit lip along its outer edge, so the shield has a front
       ctx.strokeStyle = rgba('#c8fff0', 0.55 * lit);
-      ctx.lineWidth = HAIRLINE * 1.6;
+      ctx.lineWidth = CFG.hairline * 1.6;
       ctx.beginPath();
       ctx.arc(0, 0, mr - 1.5, -half * 0.94, half * 0.94);
       ctx.stroke();
       // ribs across the face of it
       ctx.strokeStyle = rgba('#7fe6c0', 0.4 * lit);
-      ctx.lineWidth = HAIRLINE * 1.4;
+      ctx.lineWidth = CFG.hairline * 1.4;
       ctx.beginPath();
       for (let k = -1; k <= 1; k++) {
         const a = (k / 2) * half * 0.9;
@@ -830,7 +830,7 @@ export class Shooter {
     }
     // cooling fins across the jacket
     ctx.strokeStyle = rgba(accent, 0.42);
-    ctx.lineWidth = HAIRLINE * 1.6;
+    ctx.lineWidth = CFG.hairline * 1.6;
     ctx.beginPath();
     for (let k = 0; k < 3; k++) {
       const x = R * 0.44 + (bl * 0.16) * k - recoil;
@@ -864,7 +864,7 @@ export class Shooter {
       const sx = R * 0.5 - recoil;
       ctx.fillStyle = BODY;
       ctx.strokeStyle = rgba('#ffe08a', 0.9);
-      ctx.lineWidth = HAIRLINE * 1.8;
+      ctx.lineWidth = CFG.hairline * 1.8;
       roundRectPath(ctx, sx, -bw - 7.5, sl, 7.5, 2);
       ctx.fill();
       ctx.stroke();
@@ -874,7 +874,7 @@ export class Shooter {
       ctx.arc(sx + sl - 3, -bw - 3.8, 2.4, 0, TAU);
       ctx.fill();
       ctx.strokeStyle = rgba('#ffe08a', 0.5);
-      ctx.lineWidth = HAIRLINE * 1.6;
+      ctx.lineWidth = CFG.hairline * 1.6;
       ctx.beginPath();
       ctx.moveTo(sx + 2.5, -bw);
       ctx.lineTo(sx + 2.5, -bw + 3);
@@ -884,7 +884,7 @@ export class Shooter {
       // ...and at the last level it puts a designator on the target
       if (g.overwatch >= 3 && world.autoAim) {
         ctx.strokeStyle = rgba('#ffe08a', 0.18 + 0.1 * Math.sin(t * 9));
-        ctx.lineWidth = HAIRLINE;
+        ctx.lineWidth = CFG.hairline;
         ctx.beginPath();
         ctx.moveTo(sx + sl, -bw - 3.8);
         ctx.lineTo(CFG.shooter.aimRange * world.up.aimRange, -bw - 3.8);
@@ -905,7 +905,7 @@ export class Shooter {
     ctx.arc(0, 0, 9, 0, TAU);
     ctx.fill();
     ctx.strokeStyle = rgba(accent, 0.55);
-    ctx.lineWidth = HAIRLINE * 1.6;
+    ctx.lineWidth = CFG.hairline * 1.6;
     ctx.beginPath();
     ctx.arc(0, 0, 9, 0, TAU);
     ctx.stroke();
@@ -978,7 +978,7 @@ export class Shooter {
 
     // ---- the rail: a track, hard stops, a centre notch, and the travel ----
     ctx.strokeStyle = rgba(accent, 0.09 + held * 0.12);
-    ctx.lineWidth = HAIRLINE * 3.2;
+    ctx.lineWidth = CFG.hairline * 3.2;
     ctx.beginPath();
     ctx.arc(this.x, this.y, len, down - clamp2, down + clamp2);
     ctx.stroke();
@@ -987,20 +987,20 @@ export class Shooter {
       const c = Math.cos(a);
       const sn = Math.sin(a);
       ctx.strokeStyle = rgba(accent, 0.3 + held * 0.4);
-      ctx.lineWidth = HAIRLINE * 2.2;
+      ctx.lineWidth = CFG.hairline * 2.2;
       ctx.beginPath();
       ctx.moveTo(this.x + c * (len - 9), this.y + sn * (len - 9));
       ctx.lineTo(this.x + c * (len + 9), this.y + sn * (len + 9));
       ctx.stroke();
     }
     ctx.strokeStyle = rgba(accent, 0.2 + held * 0.28);
-    ctx.lineWidth = HAIRLINE * 1.6;
+    ctx.lineWidth = CFG.hairline * 1.6;
     ctx.beginPath();
     ctx.moveTo(this.x, this.y + len - 6);
     ctx.lineTo(this.x, this.y + len + 6);
     ctx.stroke();
     ctx.strokeStyle = rgba(accent, 0.3 + held * 0.5);
-    ctx.lineWidth = HAIRLINE * 3;
+    ctx.lineWidth = CFG.hairline * 3;
     ctx.beginPath();
     ctx.arc(this.x, this.y, len, Math.min(down, now), Math.max(down, now));
     ctx.stroke();
@@ -1020,7 +1020,7 @@ export class Shooter {
     if (this.sweepFade > 0) {
       const f = this.sweepFade;
       ctx.strokeStyle = rgba('#ff7a1a', 0.42 * f);
-      ctx.lineWidth = HAIRLINE * 3.4;
+      ctx.lineWidth = CFG.hairline * 3.4;
       ctx.beginPath();
       ctx.arc(this.x, this.y, len, down + clamp2, down - clamp2 + TAU);
       ctx.stroke();
@@ -1029,7 +1029,7 @@ export class Shooter {
       for (const e of [-1, 1]) {
         const a2 = down + e * clamp2;
         ctx.strokeStyle = rgba('#ffd9a0', 0.5 * f);
-        ctx.lineWidth = HAIRLINE * 2.4;
+        ctx.lineWidth = CFG.hairline * 2.4;
         ctx.beginPath();
         ctx.moveTo(this.x + Math.cos(a2) * (len - 7), this.y + Math.sin(a2) * (len - 7));
         ctx.lineTo(this.x + Math.cos(a2) * (len + 7), this.y + Math.sin(a2) * (len + 7));
@@ -1062,21 +1062,21 @@ export class Shooter {
     ctx.fill();
     ctx.restore();
     ctx.strokeStyle = rgba(accent, 0.8 + held * 0.2);
-    ctx.lineWidth = HAIRLINE * 2.4;
+    ctx.lineWidth = CFG.hairline * 2.4;
     ctx.beginPath();
     ctx.arc(0, 0, gr, 0, TAU);
     ctx.stroke();
     // the limb: a bright short arc on the lit side, which is what makes it
     // read as round rather than flat
     ctx.strokeStyle = rgba('#ffffff', 0.35 + held * 0.3);
-    ctx.lineWidth = HAIRLINE * 2;
+    ctx.lineWidth = CFG.hairline * 2;
     ctx.beginPath();
     ctx.arc(0, 0, gr - 2.5, Math.PI * 1.05, Math.PI * 1.55);
     ctx.stroke();
 
     // knurling round the equator: what a thing meant to be gripped has
     ctx.strokeStyle = rgba(accent, 0.22 + held * 0.4);
-    ctx.lineWidth = HAIRLINE * 1.5;
+    ctx.lineWidth = CFG.hairline * 1.5;
     ctx.beginPath();
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * TAU;
@@ -1095,7 +1095,7 @@ export class Shooter {
      */
     const cyc = (t % CFG.shooter.gripFireInterval) / CFG.shooter.gripFireInterval;
     ctx.strokeStyle = rgba('#ffffff', (0.25 + held * 0.55) * (1 - cyc * 0.5));
-    ctx.lineWidth = HAIRLINE * 2.6;
+    ctx.lineWidth = CFG.hairline * 2.6;
     ctx.beginPath();
     ctx.arc(0, 0, gr - 3.2, -Math.PI / 2, -Math.PI / 2 + cyc * TAU);
     ctx.stroke();
@@ -1106,7 +1106,7 @@ export class Shooter {
     ctx.arc(0, 0, gr * 0.42, 0, TAU);
     ctx.fill();
     ctx.strokeStyle = rgba(accent, 0.5 + held * 0.4);
-    ctx.lineWidth = HAIRLINE * 1.4;
+    ctx.lineWidth = CFG.hairline * 1.4;
     ctx.beginPath();
     ctx.arc(0, 0, gr * 0.42, 0, TAU);
     ctx.stroke();
@@ -1121,7 +1121,7 @@ export class Shooter {
     // a ring off the ball on every round it sends
     if (held > 0.02) {
       ctx.strokeStyle = rgba(accent, (1 - cyc) * held * 0.75);
-      ctx.lineWidth = HAIRLINE * 1.6;
+      ctx.lineWidth = CFG.hairline * 1.6;
       ctx.beginPath();
       ctx.arc(gx, gy, gr + cyc * 20, 0, TAU);
       ctx.stroke();

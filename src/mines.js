@@ -17,7 +17,7 @@
 //   what walks into it; this denies the ground whether anything is there or
 //   not.
 
-import { CFG, HAIRLINE } from './config.js';
+import { CFG } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, segClosest } from './util.js';
 import { applyBlast, ENTRY_Y } from './enemies.js';
 import { spark, dot, ring, ripple, shake, flash } from './fx.js';
@@ -490,13 +490,13 @@ export function drawMines(ctx, world) {
       const rr = S.reach * m.open;
       drawGlow(ctx, '#8b5cf6', m.x, m.y, rr * 0.9, 0.16 * m.open);
       ctx.strokeStyle = rgba('#c77dff', 0.5 * m.open);
-      ctx.lineWidth = HAIRLINE * 1.6;
+      ctx.lineWidth = CFG.hairline * 1.6;
       ctx.beginPath();
       ctx.arc(m.x, m.y, rr, 0, TAU);
       ctx.stroke();
       // wires to whatever it has hold of
       ctx.strokeStyle = rgba('#e0aaff', 0.4 * m.open);
-      ctx.lineWidth = HAIRLINE;
+      ctx.lineWidth = CFG.hairline;
       ctx.beginPath();
       for (const e of world.enemies) {
         if (e.dead || e.staged) continue;
@@ -517,8 +517,8 @@ export function drawMines(ctx, world) {
       ctx.globalCompositeOperation = 'lighter';
       drawGlow(ctx, '#59e0ff', m.x, m.y, rr * 0.8, 0.07 + pulse * 0.04);
       ctx.strokeStyle = rgba('#59e0ff', 0.2 + pulse * 0.16);
-      ctx.lineWidth = HAIRLINE * 1.4;
-      ctx.setLineDash([HAIRLINE * 3, HAIRLINE * 7]);
+      ctx.lineWidth = CFG.hairline * 1.4;
+      ctx.setLineDash([CFG.hairline * 3, CFG.hairline * 7]);
       ctx.beginPath();
       ctx.arc(m.x, m.y, rr, 0, TAU);
       ctx.stroke();
@@ -546,7 +546,7 @@ export function drawMines(ctx, world) {
       ctx.globalCompositeOperation = 'lighter';
       ctx.lineCap = 'round';
       // A wide soft pass and a hard core, so it reads as taut rather than drawn
-      for (const [w2, alpha] of [[W.width * 2, 0.1 * t], [W.width * 0.8, 0.32 * t], [HAIRLINE * 1.4, 0.95 * t]]) {
+      for (const [w2, alpha] of [[W.width * 2, 0.1 * t], [W.width * 0.8, 0.32 * t], [CFG.hairline * 1.4, 0.95 * t]]) {
         ctx.strokeStyle = rgba('#7cffb2', alpha);
         ctx.lineWidth = w2;
         ctx.beginPath();
@@ -558,7 +558,7 @@ export function drawMines(ctx, world) {
       for (const ex of [ax, bx]) {
         drawGlow(ctx, '#7cffb2', ex, m.ay, 14, 0.4 * t);
         ctx.strokeStyle = rgba('#c9ffe4', 0.9 * t);
-        ctx.lineWidth = HAIRLINE * 1.6;
+        ctx.lineWidth = CFG.hairline * 1.6;
         ctx.beginPath();
         ctx.moveTo(ex, m.ay - 9);
         ctx.lineTo(ex, m.ay + 9);
@@ -576,7 +576,7 @@ export function drawMines(ctx, world) {
         ? clamp(m.settle / K.arm, 0, 1)
         : 1 - clamp(m.tollTimer / K.gap, 0, 1);
       ctx.strokeStyle = rgba('#ff5d8f', 0.75);
-      ctx.lineWidth = HAIRLINE * 2.2;
+      ctx.lineWidth = CFG.hairline * 2.2;
       ctx.beginPath();
       ctx.arc(0, 0, m.r * 1.9, -Math.PI / 2, -Math.PI / 2 + frac * TAU);
       ctx.stroke();
@@ -593,8 +593,8 @@ export function drawMines(ctx, world) {
       // trigger radius, so you can read where it will catch something
       const pulse = 0.5 + 0.5 * Math.sin(world.time * 4 + m.spin);
       ctx.strokeStyle = rgba(accent, 0.14 + pulse * 0.16);
-      ctx.lineWidth = HAIRLINE;
-      ctx.setLineDash([HAIRLINE * 4, HAIRLINE * 6]);
+      ctx.lineWidth = CFG.hairline;
+      ctx.setLineDash([CFG.hairline * 4, CFG.hairline * 6]);
       ctx.beginPath();
       ctx.arc(0, 0, m.r + m.cfg.trigger, 0, TAU);
       ctx.stroke();
@@ -608,7 +608,7 @@ export function drawMines(ctx, world) {
     ctx.rotate(m.spin);
     ctx.fillStyle = 'rgba(10,16,26,0.94)';
     ctx.strokeStyle = rgba(accent, 0.9);
-    ctx.lineWidth = HAIRLINE * 1.6;
+    ctx.lineWidth = CFG.hairline * 1.6;
 
     if (wire) {
       // a spool: a ring with the line running out of both sides of it

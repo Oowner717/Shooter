@@ -8286,6 +8286,95 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.restored, `found quality at ${r.foundAt} and did not restore it`);
 }
 
+// --- the stroke floor is a device-pixel measure ------------------------------
+/*
+ * HAIRLINE's own docstring said "not below roughly one device pixel". The
+ * arithmetic said otherwise: a world unit is `dpr * CFG.zoom` device pixels,
+ * so a fixed `1.25 / zoom` draws at 1.25 * dpr -- 2.5 device pixels on a dpr-2
+ * iPhone and 3.75 on a Pro Max.
+ *
+ * A floor is only meant to stop a line vanishing. This one was setting the
+ * weight: measured on build 198, EIGHTEEN of thirty-seven types had
+ * `r * m.line` land under it, so a line ladder authored across 17.3x was drawn
+ * across 4.2x, and the body with density 6.0 got the same outline as the one
+ * at 0.55. Phase 1 measured that a body reads almost entirely as its outline
+ * -- the fill is 7-9% of its brightness -- so that is the type's weight
+ * deleted from the channel carrying the image.
+ *
+ * The floor is live from build 199, set off the canvas's own scale. The
+ * assertions are on what it EVALUATES TO on each device, which is the question
+ * the constant was never asked, plus the dpr-1 case as a regression guard:
+ * low-dpr displays must be unchanged, because 1.25 device pixels is what they
+ * were already getting.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const cfg = await import('../src/config.js');
+    const { CFG, ENEMY_TYPES } = cfg;
+    const { materialOf } = await import('../src/enemies.js');
+    const g = window.__sim;
+    const was = g.dpr;
+
+    const at = (dpr) => {
+      cfg.setHairline(dpr);
+      const H = CFG.hairline;
+      const drawn = Object.values(ENEMY_TYPES).map((t) => {
+        const want = t.r * materialOf(t).line;
+        return { want, drawn: Math.max(H, want), heavy: materialOf(t).heavy };
+      });
+      const w = drawn.map((d) => d.drawn);
+      const solid = drawn.filter((d) => d.heavy >= 0.99).sort((a, b) => a.want - b.want)[0];
+      const wisp = drawn.slice().sort((a, b) => a.heavy - b.heavy)[0];
+      return {
+        floorPx: H * dpr * CFG.zoom,
+        clamped: drawn.filter((d) => d.want < H).length,
+        total: drawn.length,
+        spread: Math.max(...w) / Math.min(...w),
+        solidOverWisp: solid.drawn / wisp.drawn,
+      };
+    };
+
+    const out = { one: at(1), two: at(2), three: at(3) };
+    out.authored = (() => {
+      const w = Object.values(ENEMY_TYPES).map((t) => t.r * materialOf(t).line);
+      return Math.max(...w) / Math.min(...w);
+    })();
+    // Put it back where the running game had it. A case that leaves the stroke
+    // floor set for a phantom device charges every later case for it.
+    g.resize();
+    out.restored = Math.abs(CFG.hairline - 1.25 / (Math.max(g.dpr, 0.1) * CFG.zoom)) < 1e-9;
+    out.dprKept = Math.abs(g.dpr - was) < 1e-9;
+    return out;
+  });
+
+  const px = (v) => Math.abs(v - 1.25) < 0.01;
+  // dpr 3 is a unit test of setHairline, not a claim about a device: the game
+  // clamps to CFG.maxDpr, so a Pro Max runs the canvas at 2 like every other.
+  check('the stroke floor is one device pixel at every scale, not one CSS pixel',
+    px(r.one.floorPx) && px(r.two.floorPx) && px(r.three.floorPx),
+    `floor in device px — dpr 1: ${r.one.floorPx.toFixed(2)}, `
+    + `dpr 2: ${r.two.floorPx.toFixed(2)}, dpr 3: ${r.three.floorPx.toFixed(2)} `
+    + '(build 198 gave 1.25 / 2.50 / 3.75)');
+  check('a retina display stops having half the roster clamped to the floor',
+    r.two.clamped <= 12 && r.three.clamped <= 3,
+    `clamped of ${r.two.total} — dpr 2: ${r.two.clamped}, dpr 3: ${r.three.clamped} `
+    + '(build 198 clamped 18 at every scale)');
+  check('...so the line ladder the roster is authored with survives to the screen',
+    r.two.spread > 7 && r.three.spread > 11 && r.authored > 17,
+    `authored ${r.authored.toFixed(1)}x, drawn — dpr 2: ${r.two.spread.toFixed(1)}x, `
+    + `dpr 3: ${r.three.spread.toFixed(1)}x (build 198 drew 4.2x)`);
+  check('a body of density 6 is no longer given the same outline as one of 0.5',
+    r.two.solidOverWisp > 1.5,
+    `solid over wisp as drawn at dpr 2: ${r.two.solidOverWisp.toFixed(2)}x `
+    + '(build 198: 1.00x — identical)');
+  check('a low-dpr display is left exactly where it was',
+    r.one.clamped === 18 && Math.abs(r.one.spread - 4.25) < 0.01,
+    `dpr 1 — clamped ${r.one.clamped}/37, spread ${r.one.spread.toFixed(2)}x `
+    + '(build 198: 18/37 and 4.25x)');
+  check('the stroke-floor case puts the floor back where the game had it',
+    r.restored && r.dprKept, `restored: ${r.restored}, dpr kept: ${r.dprKept}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

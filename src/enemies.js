@@ -2,7 +2,7 @@
 // and a hand-drawn look. Nothing here knows about the rest of the game beyond
 // the `world` handle it is given.
 
-import { CFG, WAVES, TYPE_BY_ID, ROUTES, HAIRLINE, massOf } from './config.js';
+import { CFG, WAVES, TYPE_BY_ID, ROUTES, massOf } from './config.js';
 import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
 import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul } from './fx.js';
 import { audio } from './audio.js';
@@ -1092,7 +1092,7 @@ export class Enemy {
       ctx.globalCompositeOperation = 'lighter';
       ctx.fillStyle = rgba(t.color, 0.5);
       ctx.strokeStyle = rgba(t.color, 0.75);
-      ctx.lineWidth = Math.max(HAIRLINE * 0.8, this.r * 0.22);
+      ctx.lineWidth = Math.max(CFG.hairline * 0.8, this.r * 0.22);
     } else {
       // Weight, read off the density the table has always carried. See
       // materialOf(): 0.16/0.09r for everything became 0.07-0.37 fill on a
@@ -1101,7 +1101,7 @@ export class Enemy {
       const m = materialOf(t);
       ctx.fillStyle = rgba(t.color, m.fill * dim);
       ctx.strokeStyle = rgba(t.color, 0.55 + 0.45 * dim);
-      ctx.lineWidth = Math.max(HAIRLINE, this.r * m.line);
+      ctx.lineWidth = Math.max(CFG.hairline, this.r * m.line);
     }
 
     /*
@@ -1135,13 +1135,13 @@ export class Enemy {
       ctx.globalCompositeOperation = 'lighter';
       // The ring itself tightens and brightens with the mark.
       ctx.strokeStyle = rgba(TONE, 0.13 + deep * 0.3);
-      ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.07);
+      ctx.lineWidth = Math.max(CFG.hairline, this.r * 0.07);
       ctx.beginPath();
       ctx.arc(0, 0, rr, 0, TAU);
       ctx.stroke();
       // A stroke per mark, cut inward. They accumulate clockwise from the top
       // so the count is readable without being a number.
-      ctx.lineWidth = Math.max(HAIRLINE * 1.4, this.r * 0.1);
+      ctx.lineWidth = Math.max(CFG.hairline * 1.4, this.r * 0.1);
       ctx.strokeStyle = rgba(TONE, 0.55 + deep * 0.45);
       const len = this.r * (0.2 + deep * 0.12);
       const tick = (i, radius, reach) => {
@@ -1164,7 +1164,7 @@ export class Enemy {
       const over = Math.min(this.marks - full, full);
       if (over > 0) {
         ctx.strokeStyle = rgba(TONE, 0.5 + deep * 0.35);
-        ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.085);
+        ctx.lineWidth = Math.max(CFG.hairline, this.r * 0.085);
         for (let i = full; i < full + over; i++) tick(i, rr + len * 0.95, len * 0.62);
       }
       // Full: the ring closes and the body carries a steady bloom, so "this
@@ -1189,7 +1189,7 @@ export class Enemy {
     if (materialOf(t).plate && !this.isDrop) {
       ctx.save();
       ctx.strokeStyle = rgba(t.color, 0.3 + 0.34 * dim);
-      ctx.lineWidth = Math.max(HAIRLINE, this.r * 0.05);
+      ctx.lineWidth = Math.max(CFG.hairline, this.r * 0.05);
       ctx.beginPath();
       ctx.arc(0, 0, this.r * 0.7, 0, TAU);
       ctx.stroke();
@@ -1270,7 +1270,7 @@ export class Enemy {
         const gy = this.y + Math.sin(g.a) * orbit;
         const life = clamp(g.hp / g.maxHp, 0.2, 1);
         ctx.strokeStyle = rgba('#c9a7ff', 0.3 + 0.25 * life);
-        ctx.lineWidth = HAIRLINE * 1.6;
+        ctx.lineWidth = CFG.hairline * 1.6;
         // From the body's edge, not its centre: a line drawn through the
         // middle of a BULWARK reads as damage to it rather than as a thread.
         ctx.beginPath();
@@ -1282,7 +1282,7 @@ export class Enemy {
         ctx.globalCompositeOperation = 'lighter';
         ctx.fillStyle = rgba('#c9a7ff', 0.2 + 0.3 * life);
         ctx.strokeStyle = rgba('#d9c2ff', 0.45 + 0.5 * life);
-        ctx.lineWidth = Math.max(HAIRLINE, G.ball * 0.16);
+        ctx.lineWidth = Math.max(CFG.hairline, G.ball * 0.16);
         drawSeed(ctx, G.ball, g.a * 3, world.time);
         ctx.restore();
       }
@@ -1294,7 +1294,7 @@ export class Enemy {
       const plate = TYPE_BY_ID.plate;
       ctx.strokeStyle = rgba(t.color, 0.9);
       ctx.fillStyle = rgba(t.color, 0.16);
-      ctx.lineWidth = HAIRLINE * 2.2;
+      ctx.lineWidth = CFG.hairline * 2.2;
       for (const sh of this.shards) {
         if (!sh.alive) continue;
         // Drawn as the PLATE it will become when the core goes, facing out
@@ -1314,7 +1314,7 @@ export class Enemy {
     if (this.tether && !this.tether.other.dead) {
       const o = this.tether.other;
       ctx.strokeStyle = rgba('#8fa9c4', 0.75);
-      ctx.lineWidth = HAIRLINE * 2;
+      ctx.lineWidth = CFG.hairline * 2;
       ctx.beginPath();
       ctx.moveTo(this.x, this.y);
       ctx.lineTo(o.x, o.y);
@@ -1325,7 +1325,7 @@ export class Enemy {
       const d = Math.hypot(dx, dy) || 1;
       const n = Math.min(9, Math.max(3, Math.round(d / 22)));
       ctx.strokeStyle = rgba(t.glow, 0.5);
-      ctx.lineWidth = HAIRLINE * 3.2;
+      ctx.lineWidth = CFG.hairline * 3.2;
       ctx.beginPath();
       for (let i = 1; i < n; i++) {
         const k = i / n;
@@ -1348,7 +1348,7 @@ export class Enemy {
        * being loud.
        */
       ctx.strokeStyle = rgba(t.glow, 0.34 / Math.sqrt(this.warded.length));
-      ctx.lineWidth = HAIRLINE * 1.4;
+      ctx.lineWidth = CFG.hairline * 1.4;
       ctx.beginPath();
       for (const e of this.warded) {
         if (e.dead) continue;
@@ -1381,7 +1381,7 @@ export class Enemy {
       ctx.fill();
 
       ctx.strokeStyle = rgba('#7cffb2', pulse + 0.2);
-      ctx.lineWidth = Math.max(HAIRLINE * 2, rr * W.thick);
+      ctx.lineWidth = Math.max(CFG.hairline * 2, rr * W.thick);
       const slice = (TAU / W.plates) * W.fill;
       for (let i = 0; i < W.plates; i++) {
         const a0 = spin + (i / W.plates) * TAU;
@@ -1394,7 +1394,7 @@ export class Enemy {
     // damage arc — only on objects big enough to be worth tracking
     if (hpFrac < 0.98 && !this.isDrop && this.r >= 16) {
       ctx.strokeStyle = rgba(t.color, 0.8);
-      ctx.lineWidth = HAIRLINE * 1.5;
+      ctx.lineWidth = CFG.hairline * 1.5;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.r + 4, -Math.PI / 2, -Math.PI / 2 + TAU * hpFrac);
       ctx.stroke();
@@ -1404,7 +1404,7 @@ export class Enemy {
     if (this.attacking) {
       const p = 0.5 + 0.5 * Math.sin(world.time * 11);
       ctx.strokeStyle = rgba('#ff2d55', 0.5 + p * 0.5);
-      ctx.lineWidth = HAIRLINE * 1.6;
+      ctx.lineWidth = CFG.hairline * 1.6;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.r + 10 + p * 4, 0, TAU);
       ctx.stroke();
@@ -1473,7 +1473,7 @@ function drawNeedle(ctx, r) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.strokeStyle = stroke;
-  ctx.lineWidth = Math.max(HAIRLINE * 0.7, r * 0.07);
+  ctx.lineWidth = Math.max(CFG.hairline * 0.7, r * 0.07);
   ctx.beginPath();
   ctx.moveTo(0, r * 0.3);
   ctx.lineTo(0, -r * 1.7);
@@ -1515,7 +1515,7 @@ function drawTally(ctx, r, hpFrac) {
   const lit = Math.ceil(marks * hpFrac);
   const stroke = ctx.strokeStyle;
   ctx.save();
-  ctx.lineWidth = Math.max(HAIRLINE * 0.8, r * 0.1);
+  ctx.lineWidth = Math.max(CFG.hairline * 0.8, r * 0.1);
   for (let i = 0; i < marks; i++) {
     const x = -L / 2 + (i + 0.5) * (L / marks);
     const on = i < lit;
@@ -1554,7 +1554,7 @@ function drawOrdinal(ctx, r, phase, t, hpFrac) {
 
   // the counting collar
   ctx.save();
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.05);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.05);
   const teeth = 24;
   ctx.beginPath();
   for (let i = 0; i < teeth; i++) {
@@ -1584,7 +1584,7 @@ function drawOrdinal(ctx, r, phase, t, hpFrac) {
   ctx.arc(0, 0, irisR, 0, TAU);
   ctx.fill();
   ctx.strokeStyle = stroke;
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.06);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.06);
   const blades = 6;
   ctx.beginPath();
   for (let i = 0; i < blades; i++) {
@@ -1645,7 +1645,7 @@ function drawPane(ctx, r, hpFrac) {
   // ...and the crack, which only exists once it has been hit.
   if (hpFrac < 0.99) {
     ctx.strokeStyle = rgba('#1a0d2e', 0.75);
-    ctx.lineWidth = Math.max(HAIRLINE, r * 0.09 * (1 - hpFrac));
+    ctx.lineWidth = Math.max(CFG.hairline, r * 0.09 * (1 - hpFrac));
     ctx.beginPath();
     ctx.moveTo(-w * 0.8, -h * 0.2);
     ctx.lineTo(w * 0.1, h * 0.1 * (1 - hpFrac) - h * 0.05);
@@ -1672,7 +1672,7 @@ function drawParity(ctx, r, phase, t, hpFrac) {
   ctx.globalCompositeOperation = 'lighter';
   // A bright rib down the middle of the crescent, breathing.
   ctx.strokeStyle = rgba('#e6d6ff', 0.35 + 0.45 * hpFrac);
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.1);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.1);
   ctx.beginPath();
   ctx.arc(0, 0, (r + inner) * 0.5, -1.0, 1.0);
   ctx.stroke();
@@ -1700,7 +1700,7 @@ function drawEcho(ctx, r, phase, t) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.strokeStyle = rgba('#ffffff', 0.3 + 0.5 * (0.5 + 0.5 * Math.sin(t * 6 + phase)));
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.13);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.13);
   ctx.beginPath();
   ctx.moveTo(-r * 0.45, -r * 0.1);
   ctx.lineTo(0, r * 0.4);
@@ -1735,7 +1735,7 @@ function drawBound(ctx, r, hpFrac) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.strokeStyle = rgba('#ffd6dd', 0.3 + 0.5 * hpFrac);
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.17);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.17);
   ctx.beginPath();
   ctx.moveTo(-w * 0.92, -h * 0.72);
   ctx.lineTo(w * 0.92, -h * 0.72);
@@ -1757,7 +1757,7 @@ function drawTerminus(ctx, r, phase, t, hpFrac) {
   ctx.globalCompositeOperation = 'lighter';
   // The four stubs.
   ctx.strokeStyle = rgba('#ff9aab', 0.3 + 0.4 * hpFrac);
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.16);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.16);
   for (let i = 0; i < 4; i++) {
     const a = t * 0.5 + phase + (i / 4) * TAU;
     ctx.beginPath();
@@ -1767,7 +1767,7 @@ function drawTerminus(ctx, r, phase, t, hpFrac) {
   }
   // The iris: a broken annulus turning against the body.
   ctx.strokeStyle = rgba('#ffd6dd', 0.28 + 0.44 * hpFrac);
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.11);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.11);
   for (let i = 0; i < 5; i++) {
     const a = -t * 0.8 + phase + (i / 5) * TAU;
     ctx.beginPath();
@@ -1785,7 +1785,7 @@ function drawTerminus(ctx, r, phase, t, hpFrac) {
   ctx.fill();
   ctx.globalCompositeOperation = 'lighter';
   ctx.strokeStyle = rgba('#ffffff', 0.3 + 0.45 * beat * hpFrac);
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.06);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.06);
   ctx.stroke();
   ctx.restore();
 }
@@ -1803,7 +1803,7 @@ function drawLimit(ctx, r, phase, t) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.strokeStyle = rgba('#ffffff', 0.28 + 0.5 * (0.5 + 0.5 * Math.sin(t * 7 + phase)));
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.15);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.15);
   ctx.beginPath();
   ctx.moveTo(-r * 0.44, -r * 0.16);
   ctx.lineTo(0, r * 0.5);
@@ -1834,7 +1834,7 @@ function drawPylon(ctx, r, hpFrac) {
   ctx.stroke();
   const stroke = ctx.strokeStyle;
   ctx.save();
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.07);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.07);
   const rings = 3;
   const lit = Math.ceil(rings * hpFrac);
   for (let i = 0; i < rings; i++) {
@@ -1869,7 +1869,7 @@ function drawDynamo(ctx, r, phase, t, hpFrac) {
   const stroke = ctx.strokeStyle;
   ctx.save();
   // A second ring, turning, so the thing reads as live even standing still.
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.07);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.07);
   ctx.strokeStyle = rgba('#a8c8ff', 0.5);
   ctx.setLineDash([r * 0.5, r * 0.34]);
   ctx.lineDashOffset = -t * r * (1 + (1 - hpFrac) * 3);
@@ -1879,7 +1879,7 @@ function drawDynamo(ctx, r, phase, t, hpFrac) {
   ctx.setLineDash([]);
   // ...and the bolt.
   ctx.globalCompositeOperation = 'lighter';
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.13);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.13);
   ctx.strokeStyle = rgba('#ffffff', 0.6 + 0.4 * Math.sin(t * 6 + phase));
   ctx.beginPath();
   ctx.moveTo(-r * 0.2, -r * 0.5);
@@ -1932,7 +1932,7 @@ function drawCrest(ctx, r, hpFrac) {
   ctx.stroke();
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.16);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.16);
   ctx.strokeStyle = rgba('#d6fff2', 0.35 + 0.55 * hpFrac);
   ctx.beginPath();
   ctx.moveTo(-L * 0.34 * hpFrac, 0);
@@ -1956,7 +1956,7 @@ function drawAmplitude(ctx, r, phase, t, hpFrac) {
   ctx.arc(0, 0, r * 0.94, 0, TAU);
   ctx.clip();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.09);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.09);
   // Two traces, the second a beat behind, so the head reads as oscillating
   // rather than as a circle with a squiggle in it.
   for (let k = 0; k < 2; k++) {
@@ -2023,7 +2023,7 @@ function drawTri(ctx, r, hpFrac, depth) {
   // at fifteen pixels where a cut-out does not.
   const stroke = ctx.strokeStyle;
   ctx.save();
-  ctx.lineWidth = Math.max(HAIRLINE * 0.8, r * 0.045);
+  ctx.lineWidth = Math.max(CFG.hairline * 0.8, r * 0.045);
   const sub = (rad, cx, cy, left) => {
     if (left <= 0) return;
     const half = rad * 0.5;
@@ -2064,7 +2064,7 @@ function drawDial(ctx, r, hpFrac) {
   const lit = Math.ceil(marks * hpFrac);
   const stroke = ctx.strokeStyle;
   ctx.save();
-  ctx.lineWidth = Math.max(HAIRLINE * 0.8, r * 0.08);
+  ctx.lineWidth = Math.max(CFG.hairline * 0.8, r * 0.08);
   for (let i = 0; i < marks; i++) {
     const x = -L / 2 + (i + 0.5) * (L / marks);
     ctx.strokeStyle = i < lit ? stroke : rgba('#3a2a18', 0.9);
@@ -2090,7 +2090,7 @@ function drawGnomon(ctx, r, phase, t, hpFrac) {
   const stroke = ctx.strokeStyle;
   ctx.save();
   // The face: twelve graduations, dimming as it is worn down.
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.05);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.05);
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * TAU;
     const long = i % 3 === 0;
@@ -2125,7 +2125,7 @@ function drawSecond(ctx, r, phase, t) {
   ctx.stroke();
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.14);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.14);
   ctx.globalAlpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 6 + phase));
   ctx.beginPath();
   ctx.moveTo(0, -h * 0.5);
@@ -2147,7 +2147,7 @@ function drawDigit(ctx, r, phase, t) {
   ctx.stroke();
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.lineWidth = Math.max(HAIRLINE, r * 0.13);
+  ctx.lineWidth = Math.max(CFG.hairline, r * 0.13);
   const beat = 0.5 + 0.5 * Math.sin(t * 5 + phase);
   ctx.globalAlpha = 0.4 + 0.6 * beat;
   ctx.beginPath();

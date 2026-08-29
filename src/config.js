@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '198';
+export const BUILD = '199';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '198';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'b388394';
+export const REV = '52b6846';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -71,6 +71,13 @@ export const CFG = {
 
   // ---- frame / quality ------------------------------------------------
   maxDpr: 2,
+  /*
+   * The stroke floor, in world units. Live: Game.resize rewrites it through
+   * setHairline off the scale the canvas is actually drawn at. The default is
+   * the dpr-1 value, which is what a fixed floor used to give everybody, so a
+   * frame drawn before the first resize is thicker rather than thinner.
+   */
+  hairline: 1.25 / 0.62,
   fixedStep: 1 / 120, // physics substep
   maxSubsteps: 4,
   maxFrameDelta: 0.1, // clamp huge tab-switch deltas
@@ -3263,8 +3270,38 @@ export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));
  * Minimum stroke width in world units that still resolves to a clean line on
  * screen once the camera scale is applied. Outlines should thin out as the
  * camera pulls back, but not below roughly one device pixel.
+ *
+ * That last sentence was the intent and not the arithmetic. A world unit is
+ * `dpr * CFG.zoom` device pixels, so a fixed `1.25 / zoom` draws at 1.25 * dpr
+ * -- 2.5 device pixels on a dpr-2 iPhone, two and a half times what it claims.
+ * A floor is only supposed to stop a line vanishing; this one was setting the
+ * weight for half the roster. Measured on build 198, EIGHTEEN of thirty-seven
+ * types had `r * m.line` land under it, so a line ladder authored across 17.3x
+ * was drawn across 4.2x, and the body with density 6.0 got the same outline as
+ * the one at 0.55. A body reads almost entirely as its outline -- the fill is
+ * 7-9% of its brightness -- so that is the type's weight deleted from the
+ * channel carrying the image.
+ *
+ * It lives on CFG, and NOT as an `export let` that setHairline reassigns.
+ * bundle.mjs gives each module its own scope and copies its exports into a
+ * registry object once, at the end of the module body -- so a reassigned
+ * export is a snapshot, and every importer keeps the value it had at load.
+ * Measured: the module build halved the floor from dpr 1 to dpr 2 and the
+ * bundle did not move it at all, which would have shipped this fix dead in the
+ * Artifact and the home-screen install while working in the served build. A
+ * property on an object that is itself never reassigned is live in both.
  */
-export const HAIRLINE = 1.25 / CFG.zoom;
+/**
+ * Called from Game.resize with the scale the canvas is actually drawn at --
+ * device pixel ratio times the quality governor's own factor, since a governor
+ * that shrinks the backing store makes every world unit fewer device pixels
+ * and the floor has to rise to meet it. 1.25 DEVICE pixels rather than 1.25
+ * CSS pixels: a shade over one, so a line does not fall between pixel centres
+ * and disappear into the antialiasing.
+ */
+export function setHairline(dpr) {
+  CFG.hairline = 1.25 / (Math.max(dpr, 0.1) * CFG.zoom);
+}
 
 /**
  * How an object crosses the field. Every one picks a route at spawn, so two

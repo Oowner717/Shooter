@@ -1,6 +1,6 @@
 // World state, phase machine, physics stepping and the render pipeline.
 
-import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID } from './config.js';
+import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID, setHairline } from './config.js';
 import { Ordinal, openAperture } from './boss.js';
 // Imported for the side effect: a boss module registers its constructor
 // with anomaly.js on load, and nothing else references it by name.
@@ -726,6 +726,9 @@ export class Game {
     const dpr = clamp(window.devicePixelRatio || 1, 1, CFG.maxDpr) * this.qualityScale();
 
     this.dpr = dpr;
+    // The stroke floor is a device-pixel measure, so it follows the scale the
+    // canvas is actually drawn at -- including the governor's own factor.
+    setHairline(dpr);
     this.canvas.width = Math.round(sw * dpr);
     this.canvas.height = Math.round(sh * dpr);
     this.canvas.style.width = `${sw}px`;

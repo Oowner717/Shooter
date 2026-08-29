@@ -154,3 +154,111 @@ own cadence needs no device measurement, which is why it is the design.
 `smoke.mjs` now prints `work` beside `q` in the debug stats, and the deep
 field reads `q 0.45  work 24.2ms` here — the work clause firing correctly,
 because this environment genuinely cannot render that field in a 60Hz budget.
+
+## Phase 2 withdrawn: the rounds were already fixed, in build 166
+
+The claim was "nine rounds read as one white streak". Two measurements, and
+neither supports it.
+
+**Each of the nine is distinct at the size it actually flies.** Rendered
+offscreen at `dpr 2 x zoom 0.62` = 1.24, over the field's own ground, with the
+same additive compositing `draw()` uses:
+
+| round | ink | white% | sat | hue | declares | along/across |
+|---|---|---|---|---|---|---|
+| BOLT | 945 | 8 | 0.34 | 204 | 190 | 2.17 |
+| SCATTER | 498 | 0 | 0.23 | 31 | 36 | 3.78 |
+| HE | 2521 | 2 | 0.34 | 348 | 25 | 1.82 |
+| ARC | 1773 | 2 | 0.39 | 247 | 266 | 2.21 |
+| SPINE | 640 | 10 | 0.28 | 293 | 320 | 10.00 |
+| SLUG | 2873 | 14 | 0.28 | 216 | 214 | 1.56 |
+| RIME | 1541 | 1 | 0.48 | 203 | 195 | 3.45 |
+| SPORE | 917 | 2 | 0.41 | 133 | 95 | 3.94 |
+| TITHE | 1222 | 2 | 0.47 | 170 | 145 | 3.39 |
+
+No pair is within 25 degrees of hue AND 25% of shape. The additive `lighter`
+compositing does not wash them out either -- the most blown-out is SLUG at 14%,
+and SLUG declares a near-white core on purpose. The shape signature spans
+1.56 (SLUG, blunt) to 10.0 (SPINE, a flechette). Build 166's forms hold.
+
+**And they do not smear together in flight.** With the whole tree bought,
+firing on a held target, sampling every frame with two or more rounds actually
+in the air (the muzzle excluded -- a DOUBLE TAP pair still sitting on it has
+not left yet):
+
+| round | frames sampled | median gap | overlapping |
+|---|---|---|---|
+| standard | 807 | 317u | 18% |
+| explosive | 30 | 23u | 100% |
+| shotgun | 434 | 9u | 91% |
+| spine | 105 | 63u | 100% |
+
+Read the frame counts, not the percentages. BOLT is the only round whose
+cadence puts two in the air for any length of time, and its median gap is 317
+units against a drawn length of 98 -- three times clear. Every other round
+manages 30-105 frames out of 900, because at their cadence there is normally
+one in the air; the only time two coexist is the DOUBLE TAP pair just off the
+muzzle, which `config.js` designs to "read as one trigger pull with a stutter
+in it rather than as a faster cadence". SCATTER's 91% is thirty-four pellets
+from a shotgun.
+
+**Two instrument mistakes on the way**, both the same shape as ever. The first
+counted connected components at a threshold that admitted the faint outer glow
+halo, so it reported 3 rounds making 1 blob -- touching halos are not one
+streak. The second picked the frame with the MOST rounds in it, which is always
+the launch instant, and reported a closest pair of 0 units: rounds stacked at
+the muzzle by design. Measure the thing you are claiming, at the moment the
+claim is about.
+
+## Phase 4 landed early: the stroke floor was setting the weight (build 199)
+
+Phase 1 measured that a body reads almost entirely as its outline -- the
+brightest tenth runs 4-5:1 against the fill, which contributes 7-9%. So
+whatever the outline carries is what the body says. `enemies.js` authors that:
+
+    lineWidth = max(HAIRLINE, r * (0.062 + heavy * 0.072))
+
+`heavy` comes off density, so the roster is authored with a line ladder across
+**17.29x**. The floor deleted most of it. HAIRLINE was `1.25 / CFG.zoom` and a
+world unit is `dpr * CFG.zoom` device pixels, so it drew at **1.25 * dpr** --
+2.5 device pixels on a dpr-2 iPhone. Its own docstring said "not below roughly
+one device pixel"; nobody had asked it what it evaluates to.
+
+| device | floor, device px | clamped | drawn spread | distinct weights |
+|---|---|---|---|---|
+| dpr 1 | 1.25 | 18/37 | 4.25x | 16 |
+| dpr 2 (198) | **2.50** | **18/37** | **4.25x** | **16** |
+| dpr 2 (199) | 1.25 | 11/37 | 8.51x | 23 |
+
+Eighteen of thirty-seven types were drawn at the floor. The pair that makes it
+concrete: type 15 has density 6.00 and lands at `r * m.line` = 2.01, a
+hundredth under the floor, so it was drawn at **exactly the same width** as
+type 9 at density 0.50 -- 1.00x, identical outlines on the two ends of the
+material scale. It is 1.99x now.
+
+dpr 1 is unchanged to the digit (18/37, 4.25x, 16 weights), which is the point:
+1.25 device pixels is what a low-dpr display was already getting. Only the
+retina scales were over-clamped, and those are the ones the game is for.
+
+**The fix nearly shipped dead in the artifact.** It began as `export let
+HAIRLINE` reassigned by `setHairline`. `bundle.mjs` gives each module its own
+scope, copies its exports into a registry object ONCE at the end of the module
+body, and has each importer destructure that object -- two snapshots. In a real
+ES module `export let` is a live binding; in the bundle it is the value it had
+at load. Measured side by side: the module build halved the floor from dpr 1 to
+dpr 2 (1.411 -> 0.706) and the bundle did not move it at all (1.411 -> 1.411).
+Green suite either way, because the suite runs against the modules.
+
+So the floor lives on `CFG` -- a property of an object nobody reassigns, which
+is live through a snapshotted reference in both builds. Both now read
+1.411 -> 0.706. And `bundle.mjs` fails the build on any `export let` or
+`export var`, because that is a form it parses perfectly and still gets wrong,
+which is worse than one it cannot parse: the bundle builds clean, boots clean,
+and is quietly a different game.
+
+**One instrument mistake here too**, and it reported the opposite of the truth
+in both directions. The first version recorded the WIDEST line drawn, which is
+BULWARK at 6.03 -- far above the floor at any scale, so it could not move
+whatever the binding did. It read "frozen" on the live module build. The floor
+only shows on a body whose own `r * m.line` lands under it; the number to
+watch is the THINNEST line on the field.

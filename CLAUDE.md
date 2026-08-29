@@ -422,4 +422,36 @@ most once for any given target and cannot spin.
   that matter. Drive `trackFrame` directly -- and put `fx.quality` back where
   it was found, because the backing store is sized inside `resize()` and a
   case that leaves it on the floor charges every later case for it.
+- **A floor is meant to stop a line vanishing, not to set its weight.**
+  `HAIRLINE` was `1.25 / CFG.zoom` and a world unit is `dpr * CFG.zoom` device
+  pixels, so it drew at `1.25 * dpr` -- 2.5 device pixels on a dpr-2 iPhone,
+  against a docstring that said "roughly one". Eighteen of thirty-seven types
+  had `r * m.line` land under it, so a line ladder authored across 17.3x was
+  drawn across 4.2x and a body of density 6.0 got the same outline as one at
+  0.55 -- and a body reads almost entirely as its outline, the fill being 7-9%
+  of its brightness. It is `CFG.hairline` from build 199, set on every resize
+  off the scale the canvas is actually drawn at (the governor's factor
+  included). dpr 1 is unchanged to the digit; only the retina scales were
+  over-clamped. Note `CFG.maxDpr` caps the canvas at 2, so dpr 3 is a unit test
+  of `setHairline` and not a device the game runs at.
+- **`export let` is a live binding in a module and a SNAPSHOT in the bundle.**
+  `wrap()` gives each module its own scope, copies its exports into the
+  registry once at the end of the module body, and has importers destructure
+  that object -- so a reassigned export changes only in the served build.
+  Measured on build 199's first attempt: the modules halved the stroke floor
+  from dpr 1 to dpr 2 and the bundle did not move it at all. Green suite both
+  ways, because the suite runs against the modules. This is worse than a form
+  `wrap()` cannot parse -- that one dies loudly on load; this one builds clean,
+  boots clean, and is quietly a different game. A value that has to change
+  belongs on an object nobody reassigns (`CFG`), read through that reference.
+  `bundle.mjs` now fails the build on `export let` / `export var`.
+- **Measure the thing you are claiming, at the moment the claim is about.**
+  Three probes in one session reported the opposite of the truth by watching
+  the wrong quantity: connected components at a threshold that admitted the
+  faint glow HALO said three rounds were one streak (touching halos are not);
+  picking the frame with the MOST rounds in it always picks the launch instant,
+  where a DOUBLE TAP pair is stacked at the muzzle by design; and recording the
+  WIDEST line on the field to test a stroke FLOOR watched BULWARK's 6.03, which
+  is far above the floor at any scale and could not move whatever the code did
+  -- it reported "frozen" on a demonstrably live build.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
