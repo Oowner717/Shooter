@@ -1401,6 +1401,71 @@ teach wave is never scaled — asserted as a ratio against the same type under a
 regular wave, because the `Enemy` constructor rolls every body through
 `rand(0.92, 1.1)` and one body against one body reads that roll as a defect.
 
+### Four verdicts, and a rung you can ask for (build 201)
+
+There were two verdicts, and both ways of failing were *slow* rather than *in
+danger*. A maxed run parked where waves took 28-37 s with about 2.6 s of
+contact, climbing +1 a wave and falling -1 per two — so a fall cost six times a
+climb. The wave now reports three numbers and the table reads them:
+
+- **`t`** — seconds from the **last release** to the field thinning. Infinite
+  if `patience` ended the wave. Measured from the last release rather than from
+  the top of the wave on purpose: a wave is not slow because it was big, it is
+  slow because it would not die, and only the second is the player's business.
+- **`k`** — seconds anything spent on the turret.
+- **`c`** — the fraction of what was asked for that did not survive.
+
+| verdict | when | move |
+|---|---|---|
+| `surge` | `t ≤ 3` and `k < 2` | **+2** |
+| `clean` | `t ≤ 12` and `k < 6` | +1 |
+| `stall` | otherwise, `c ≥ 0.4` and `k < 12` | 0, two in a row → −1 |
+| `rout` | `c < 0.4` or `k ≥ 12` | −1 at once |
+
+Any step back arms one wave of **grace** that cannot climb. Without it the
+ladder ping-pongs: the rung below a wall is by construction one you can clear,
+so a drop was always followed by an immediate climb back into what caused it.
+`HOLD` still pins the climb and not the relief.
+
+**The arrow at the ceiling arms a trial.** It used to be simply disabled there
+— the rule working, and reading as a dead control. Now it stands the run three
+rungs up on a rung it has *not* earned, for one wave: cleared, that becomes the
+ceiling; anything else and the run drops straight back having lost the wave and
+nothing else. A button still never raises `peak` — the wave does. The rung is
+drawn dashed and lit: stood on, not yours yet.
+
+Measured with `scripts/ladder-probe.mjs`, 180 s a run, two browsers at a time
+on four cores:
+
+| profile | rung | scored | verdicts | median wave | median contact |
+|---|---|---|---|---|---|
+| max | 10 | 11 | S2 C5 T4 R0 | 8.5 s | 0 s |
+| max | 20 | 9 | S1 C2 T6 R0 | **15.7 s** | 0 s |
+| mid | 10 | 8 | S0 C6 T2 R0 | 13.1 s | 0 s |
+| bare | 1 | 3 | S2 C1 T0 R0 | 5.3 s | 0 s |
+
+Against 28-37 s before. Three things the table says that the brief's targets
+did not expect:
+
+**At equilibrium a maxed run is stall-limited, not contact-limited.** Median
+contact is 0 s in every `max` run — the turret is simply never touched — and
+the ladder holds the run at rung 20 through *stalls*: six of nine waves, no
+routs. That is the `t` term doing the work, and the old contact-only scheme
+could not have seen it, because there is no contact to see. The brief's 1-4 s
+contact band is met only where a profile is being overrun.
+
+**A run dropped above its ceiling is falling, not settled.** `bare` at 20 and
+30, and `mid` at 20 and 30, are every-wave routs — the ladder shoving them back
+down, which is the machine working. Their 27 s medians are the duration of a
+wave that is beating them, not an equilibrium.
+
+**A fall still costs 4.2x a climb**, against a target of 2x and about 6x
+before. The cause is visible in the numbers: falling runs at 19-27 s a rung,
+which is the wave duration itself, and a losing wave runs to `patience` (26 s).
+A fall is bounded below by how long a bad wave is allowed to last, so closing
+the rest of that gap means either `patience` or a rout worth more than one
+rung — a decision, not a tuning pass.
+
 ### SCION, and what a graft does
 
 A large body worth more to the field dead than alive.

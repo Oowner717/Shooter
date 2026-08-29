@@ -2567,6 +2567,19 @@ body.bossUp #waveRail { display: none; }
   box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .railNode.at b { font-size: 15px; }
+/*
+ * The rung under trial: stood on, and not yet earned. It takes `.at` as well,
+ * so this only has to say the second half -- dashed like a locked rung,
+ * because that is what this interface means by "not yours yet", but lit like
+ * the one you are on, because you are on it. It comes after `.at` so the
+ * dashed border wins on the element that carries both.
+ */
+.railNode.trial {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--warn, var(--accent)) 78%, transparent);
+  color: color-mix(in srgb, var(--warn, var(--accent)) 88%, var(--dim));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--warn, var(--accent)) 20%, transparent);
+}
 
 /*
  * Pinned. The rail stops being a climb and becomes a place you are standing,

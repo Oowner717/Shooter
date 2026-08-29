@@ -2989,6 +2989,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 {
   const r = await page.evaluate(async () => {
     const g = window.__sim;
+    const { WAVES } = await import('../src/config.js');
     const w = g.world;
     g.restart();
     g.debugTeachAll();
@@ -3067,9 +3068,34 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       shut: [...document.querySelectorAll('.railNode')]
         .filter((el) => el.classList.contains('locked'))
         .map((el) => Number(el.querySelector('b').textContent)) };
-    // ...and the arrow will not go past it, however many times it is pressed.
+    /*
+     * ...and at the ceiling the arrow ARMS A TRIAL rather than climbing.
+     *
+     * Build 201. It used to be simply disabled there, which is the rule
+     * working and reading as a dead control. What must still hold is that a
+     * button never raises `peak`: the run stands three rungs up, on a rung it
+     * has not earned, and the ceiling does not move until a wave says so.
+     * Pressed repeatedly it must not stack trials either.
+     */
     for (let i = 0; i < 4; i++) document.getElementById('railUp').click();
-    const held = { tier: d.tier, peak: d.peak };
+    const held = { tier: d.tier, peak: d.peak, probe: d.probe ? { ...d.probe } : null };
+    g.hud.syncRail(w);
+    const onTrial = [...document.querySelectorAll('.railNode')].map((el) => ({
+      n: Number(el.querySelector('b').textContent),
+      trial: el.classList.contains('trial'),
+      locked: el.classList.contains('locked'),
+      seen: el.classList.contains('seen'),
+    }));
+    // A trial that is not cleared costs the rung and nothing else.
+    // A real wave, not whatever sat at order[0]: score() returns null for a
+    // teach wave and for one that asked for nothing, and a null here would
+    // read as "the trial did not resolve" when the case never posed it one.
+    const realWave = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
+    d.order = [realWave]; d.at = 0;
+    // Slow, untouched, and most of it still standing: a rout by any reading.
+    w.time = 999; d.lastRelease = 0; d.asked = 10; d.contact = 0; d.hitPatience = true;
+    const lost = d.score(w);
+    const afterLost = { tier: d.tier, peak: d.peak, probe: d.probe };
     /*
      * ...and the MODEL holds it, not the button.
      *
@@ -3174,7 +3200,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return { bar, rail, clearsBar, seats, overflow, shut, midUp, skipped, held, back, forced,
       mid, floor, floorLocked, runningLabel,
       up, down, released, peakBefore, peakBack, peakOld, wrote, noOrder,
-      painted, beforeFight, inFight, afterFight, vh: window.innerHeight };
+      painted, beforeFight, inFight, afterFight, onTrial, lost, afterLost,
+      vh: window.innerHeight };
   });
 
   check('the rail sits clear of the bar above it and every control is thumb-sized',
@@ -3218,20 +3245,41 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('a tier that has never been climbed cannot be stepped into',
     r.midUp.off === false && r.midUp.skip === true
     && r.skipped.tier === 9 && r.skipped.peak === 9 && r.skipped.hold === false
-    && r.held.tier === 9 && r.held.peak === 9
+    && r.held.peak === 9
     && r.forced.got === 9 && r.forced.peak === 9
     && r.back === 8,
     `at 6 of 9: up ${r.midUp.off ? 'shut' : 'open'}, skip ${r.midUp.skip ? 'offered' : 'hidden'} `
     + `-> skip lands on ${r.skipped.tier} still climbing (held ${r.skipped.hold}), `
-    + `four more presses of up leave it at `
-    + `${r.held.tier} (peak ${r.held.peak}); asked for ${r.forced.asked} it gives `
+    + `four more presses of up leave the ceiling at ${r.held.peak}; `
+    + `asked for ${r.forced.asked} it gives `
     + `${r.forced.got} and peak stays ${r.forced.peak}; down still goes to ${r.back}`);
+
+  /*
+   * The trial is the one way past the ceiling, and it is still not a button
+   * raising `peak` -- the button only puts the run there to be judged.
+   */
+  check('at the ceiling the arrow arms one trial, three rungs up, and no more',
+    r.held.probe && r.held.probe.from === 9 && r.held.probe.to === 12
+    && r.held.tier === 12 && r.held.peak === 9,
+    `four presses at 9: probe ${JSON.stringify(r.held.probe)}, standing on `
+    + `${r.held.tier}, ceiling still ${r.held.peak}`);
+  check('...drawn as stood-on but not earned, with the rungs beside it still shut',
+    r.onTrial.some((c) => c.n === 12 && c.trial && !c.locked)
+    && r.onTrial.filter((c) => c.locked).length > 0
+    && !r.onTrial.some((c) => c.seen),
+    `nodes ${r.onTrial.map((c) => `${c.n}${c.trial ? '*' : ''}${c.locked ? 'x' : ''}`).join(' ')} `
+    + '(* trial, x shut)');
+  check('...and a trial that is not cleared costs the rung and nothing else',
+    r.lost && r.lost.trial === 'failed' && r.afterLost.tier === 9
+    && r.afterLost.peak === 9 && r.afterLost.probe === null,
+    `verdict ${r.lost && r.lost.verdict}, back to ${r.afterLost.tier} `
+    + `(ceiling ${r.afterLost.peak}), probe ${JSON.stringify(r.afterLost.probe)}`);
 
   check('...and the rungs above it are drawn shut, with nothing to skip to',
     r.shut.filter((c) => c.locked).length === 0
     && r.shut.filter((c) => c.seen).map((c) => c.n).join(',') === '7,8'
     && r.skipped.shut.join(',') === '10,11'
-    && r.skipped.off === true && r.skipped.skip === false,
+    && r.skipped.off === false && r.skipped.skip === false,
     `at 6 of 9 nothing is shut and [${r.shut.filter((c) => c.seen).map((c) => c.n)}] are open ahead; `
     + `at the ceiling [${r.skipped.shut}] are shut, up is ${r.skipped.off ? 'shut' : 'open'} `
     + `and the skip is ${r.skipped.skip ? 'still offered' : 'gone'}`);
@@ -8551,6 +8599,111 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.teachAt30 === 0 && r.teachAt1 > 0 && r.teachSecondCycle === 0,
     `teach waves in the rotation — starting at tier 30: ${r.teachAt30}, `
     + `at tier 1: ${r.teachAt1}, second cycle: ${r.teachSecondCycle}`);
+}
+
+// --- four verdicts, not two -------------------------------------------------
+/*
+ * There were two, and both ways of failing were "slow" rather than "in
+ * danger": the ladder parked a maxed run where waves ran 28-37 s with about
+ * 2.6 s of contact, climbing +1 per wave and falling -1 per two, so a fall
+ * cost six times a climb. The table reads three numbers now -- `t`, seconds
+ * from the LAST RELEASE to the field thinning; `k`, seconds anything spent on
+ * the turret; `c`, the fraction of the wave that did not survive -- and
+ * `patience` makes `t` infinite rather than being the verdict itself.
+ *
+ * Measuring `t` from the last release rather than from the top of the wave is
+ * the point: a wave is not slow because it was big, it is slow because it
+ * would not die, and only the second is the player's business.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { WAVES, CFG } = await import('../src/config.js');
+    const T = CFG.waves.tier;
+    const w = g.world;
+    const d = w.director;
+    const real = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
+
+    /*
+     * One wave, posed exactly. `left` bodies are put on the field so `c` is
+     * (asked - left) / asked; everything else is written straight onto the
+     * director, which is what score() reads.
+     */
+    const pose = ({ t, k, left, asked = 10, tier = 20, hold = false, grace = 0, fails = 0 }) => {
+      g.debugClearField();
+      for (let i = 0; i < left; i++) g.debugSpawn('mote', 60 + i * 12, 120);
+      d.probe = null;
+      d.setTier(tier);
+      d.peak = tier;
+      d.hold = hold;
+      d.grace = grace;
+      d.fails = fails;
+      d.order = [real]; d.at = 0;
+      d.asked = asked;
+      d.contact = k;
+      d.hitPatience = t === Infinity;
+      w.time = 1000;
+      d.lastRelease = t === Infinity ? 1000 : 1000 - t;
+      const out = d.score(w);
+      g.debugClearField();
+      return out;
+    };
+
+    const res = {
+      surge: pose({ t: 1, k: 0, left: 0 }),
+      clean: pose({ t: 8, k: 1, left: 0 }),
+      // slow, but most of it died and nothing sat on the turret
+      stall: pose({ t: 20, k: 1, left: 2 }),
+      // ...and the same wave again is the second stall
+      stall2: pose({ t: 20, k: 1, left: 2, fails: 1 }),
+      // most of it outlived the wave
+      routByRemains: pose({ t: 20, k: 1, left: 8 }),
+      // ...or it was on the turret for a quarter of a minute
+      routByContact: pose({ t: 8, k: 15, left: 0 }),
+      // patience ending the wave makes t infinite, which the table reads
+      patience: pose({ t: Infinity, k: 0, left: 0 }),
+      // grace: the wave after a drop cannot climb
+      graced: pose({ t: 1, k: 0, left: 0, grace: 1 }),
+      // HOLD pins the climb...
+      pinned: pose({ t: 1, k: 0, left: 0, hold: true }),
+      // ...and not the relief
+      dropUnderHold: pose({ t: 20, k: 15, left: 8, hold: true }),
+      floor: pose({ t: 20, k: 15, left: 8, tier: 1 }),
+    };
+    res.cfg = { surgeWithin: T.surgeWithin, cleanWithin: T.cleanWithin,
+      failContact: T.failContact, routBelow: T.routBelow, routContact: T.routContact };
+    g.restart();
+    return res;
+  });
+
+  const v = (x) => (x ? `${x.verdict}${x.moved >= 0 ? '+' : ''}${x.moved}` : 'null');
+  check('a wave cleared before the last one landed is a surge, and climbs two',
+    r.surge.verdict === 'surge' && r.surge.moved === 2,
+    `${v(r.surge)} (t 1s, no contact, nothing left)`);
+  check('the ordinary clear climbs one',
+    r.clean.verdict === 'clean' && r.clean.moved === 1, v(r.clean));
+  check('slow but survived is a stall: it holds, and the second one steps back',
+    r.stall.verdict === 'stall' && r.stall.moved === 0
+    && r.stall2.verdict === 'stall' && r.stall2.moved === -1,
+    `first ${v(r.stall)}, second ${v(r.stall2)}`);
+  check('a wave that mostly outlived you is a rout, and steps back at once',
+    r.routByRemains.verdict === 'rout' && r.routByRemains.moved === -1,
+    `${v(r.routByRemains)} (8 of 10 still standing)`);
+  check('...as is one that spent a quarter of a minute on the turret',
+    r.routByContact.verdict === 'rout' && r.routByContact.moved === -1,
+    `${v(r.routByContact)} (15 s of contact, field cleared)`);
+  check('patience ending a wave is read as a wave that never thinned',
+    r.patience.verdict !== 'surge' && r.patience.verdict !== 'clean'
+    && r.patience.reason === 'THE FIELD NEVER THINNED',
+    `${v(r.patience)} — ${r.patience.reason}`);
+  check('the wave after a step back cannot climb back into what did it',
+    r.graced.verdict === 'surge' && r.graced.moved === 0,
+    `${v(r.graced)} with grace armed (build 200 would have climbed straight back)`);
+  check('HOLD pins the climb and not the relief',
+    r.pinned.moved === 0 && r.dropUnderHold.moved === -1,
+    `pinned ${v(r.pinned)}, drop under hold ${v(r.dropUnderHold)}`);
+  check('...and nothing steps back off the bottom rung',
+    r.floor.moved === 0, `at tier 1: ${v(r.floor)}`);
 }
 
 // --- report -----------------------------------------------------------------

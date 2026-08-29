@@ -2881,7 +2881,22 @@ export class Director {
     this.fails = 0; // consecutive failed waves
     this.contact = 0; // seconds anything spent on the turret this wave
     this.hitPatience = false; // ...and whether the field ever thinned
-    this.lastVerdict = null; // 'clean' | 'failed', for the HUD and the tests
+    this.lastRelease = 0; // world.time of the last object let out
+    this.lastVerdict = null; // surge | clean | stall | rout, for the HUD and the tests
+    /*
+     * One wave that cannot climb, set by any step back. Without it the ladder
+     * ping-pongs at the ceiling: the rung below the wall is by construction
+     * one you can clear, so a drop was always followed by an immediate climb
+     * back into the wall that caused it.
+     */
+    this.grace = 0;
+    /*
+     * A trial: standing on a rung this run has NOT earned, for one wave, to
+     * find out. `{ from, to }` while it runs. Proven, it becomes the peak;
+     * failed, the run goes back to `from` and loses nothing.
+     */
+    this.probe = null;
+    this.probeLock = 0; // seconds before another may be armed
   }
 
   /** Which authored band a tier draws from, and the one below it. */
@@ -2929,17 +2944,57 @@ export class Director {
      */
     if (!wave || wave.teach || this.asked === 0) return null;
     const alive = world.enemies.filter((e) => !e.dead && !e.harmless).length;
-    const failed = this.contact >= T.failContact
-      || this.hitPatience
-      || (this.asked > 0 && alive >= this.asked * T.failAlive);
+    /*
+     * The three numbers the table reads. `t` is how long the field took to
+     * thin after the last object was let out -- infinite if patience ended the
+     * wave, which is that wave saying it was never coming back. Measuring from
+     * the LAST RELEASE rather than from the top of the wave is the whole point:
+     * a wave is not slow because it was big, it is slow because it would not
+     * die, and only the second of those is the player's business.
+     */
+    const t = this.hitPatience ? Infinity : Math.max(0, (world.time || 0) - this.lastRelease);
+    const k = this.contact;
+    const c = (this.asked - alive) / this.asked;
 
-    this.lastVerdict = failed ? 'failed' : 'clean';
+    let verdict;
+    if (t <= T.surgeWithin && k < T.surgeContact) verdict = 'surge';
+    else if (t <= T.cleanWithin && k < T.failContact) verdict = 'clean';
+    else if (c >= T.routBelow && k < T.routContact) verdict = 'stall';
+    else verdict = 'rout';
+    this.lastVerdict = verdict;
+
+    // Why it went the way it did, in the alert's own register. The dominant
+    // cause, not a list: a step you did not ask for needs one reason.
+    const reason = this.hitPatience ? 'THE FIELD NEVER THINNED'
+      : k >= T.failContact ? `${Math.round(k)} S ON THE TURRET`
+        : c < T.routBelow ? 'MOST OF IT WAS STILL STANDING'
+          : verdict === 'surge' ? 'CLEARED BEFORE THE LAST ONE LANDED'
+            : verdict === 'clean' ? 'THE FIELD CAME BACK'
+              : 'IT TOOK TOO LONG';
+
+    const from = this.tier;
+    this.contact = 0;
+    this.hitPatience = false;
+
+    // A trial answers only for itself: it is not a rung of the ladder until it
+    // is proven, so it neither climbs nor drops the run that armed it.
+    if (this.probe) {
+      const won = verdict === 'surge' || verdict === 'clean';
+      const { from: back, to } = this.probe;
+      this.probe = null;
+      this.probeLock = T.probeLock;
+      this.tier = won ? to : back;
+      if (won) this.peak = Math.max(this.peak, to);
+      this.fails = 0;
+      this.grace = 0;
+      return { verdict, moved: this.tier - from, tier: this.tier, from, reason,
+        trial: won ? 'proven' : 'failed' };
+    }
+
     let moved = 0;
-    if (failed) {
-      this.fails++;
-      if (this.fails >= T.failStreak && this.tier > 1) {
+    if (verdict === 'rout' || (verdict === 'stall' && ++this.fails >= T.failStreak)) {
+      if (this.tier > 1) {
         this.tier--;
-        this.fails = 0;
         moved = -1;
         /*
          * A step back re-arms the climb even under HOLD. The pin holds the
@@ -2948,15 +3003,38 @@ export class Director {
          */
         this.hold = false;
       }
-    } else {
       this.fails = 0;
-      // A clean wave climbs, unless the player has pinned the tier.
-      if (!this.hold) { this.tier++; moved = 1; }
+      // ...and the next wave cannot climb back into whatever did that.
+      this.grace = 1;
+    } else if (verdict === 'surge' || verdict === 'clean') {
+      this.fails = 0;
+      const step = verdict === 'surge' ? 2 : 1;
+      // HOLD pins the climb, and grace defers it by one wave. Both are spent
+      // whether or not there was anything to hold back.
+      if (this.grace > 0) this.grace--;
+      else if (!this.hold) { this.tier += step; moved = step; }
     }
     this.peak = Math.max(this.peak, this.tier);
-    this.contact = 0;
-    this.hitPatience = false;
-    return { verdict: this.lastVerdict, moved, tier: this.tier };
+    return { verdict, moved, tier: this.tier, from, reason };
+  }
+
+  /**
+   * Stand the run on a rung it has not earned, for one wave.
+   *
+   * `setTier()` unlocks as it goes and `reach()` will not go above `peak`, so
+   * neither can do this: the whole point is a rung that is not yet yours. If
+   * the wave comes back surge or clean the rung becomes the peak; anything
+   * else and the run is put back where it was, having lost nothing but the
+   * wave. A lockout after either, so it is a question and not a strategy.
+   */
+  trial(n) {
+    if (this.probe || this.probeLock > 0) return null;
+    const to = Math.max(1, Math.round(n));
+    if (to <= this.peak) return null;
+    this.probe = { from: this.tier, to };
+    this.tier = to;
+    this.fails = 0;
+    return this.probe;
   }
 
   /**
@@ -2984,6 +3062,13 @@ export class Director {
    * earned, and the two are different verbs.
    */
   reach(n) {
+    /*
+     * Stepping away from a trial withdraws it. Otherwise the probe outlives
+     * the rung it was asking about and the next scored wave answers a question
+     * nobody is standing on any more -- putting the run somewhere it did not
+     * ask to be, which is the one thing the rail must never do.
+     */
+    this.probe = null;
     this.tier = Math.min(Math.max(1, Math.round(n)), Math.max(1, this.peak));
     this.fails = 0;
     return this.tier;
@@ -3097,6 +3182,7 @@ export class Director {
     this.contact = 0;
     this.hitPatience = false;
     this.wait = 0;
+    this.lastRelease = world.time || 0;
     // A wave may ask for grey drift alongside it. It is not hostile, costs
     // nothing from the allotment, and is the whole of both the opening and the
     // bonus wave. Stacked upward rather than dropped in one row, so twenty-two
@@ -3247,8 +3333,22 @@ export class Director {
     this.peak = Math.max(this.tier, Math.round(d.peak || 0));
     this.hold = !!d.hold;
     this.fails = d.fails || 0;
+    /*
+     * Both absent before build 201, and both default to "nothing in flight".
+     * A trial is restored only if it is coherent -- two integers, and a rung
+     * above the peak -- because a half-written probe would strand the run on
+     * a rung it never earned with nothing to put it back.
+     */
+    const pr = d.probe;
+    this.probe = pr && Number.isFinite(pr.from) && Number.isFinite(pr.to) && pr.to > this.peak
+      ? { from: Math.max(1, Math.round(pr.from)), to: Math.round(pr.to) }
+      : null;
+    if (this.probe) this.tier = this.probe.to;
+    this.grace = d.grace | 0;
+    this.probeLock = 0;
     this.contact = 0;
     this.hitPatience = false;
+    this.lastRelease = world.time || 0;
     this.resting = true;
     this.timer = 1.5; // a beat to look at the field before it starts again
     this.jobs = [];
@@ -3259,6 +3359,8 @@ export class Director {
     if (world.phase !== 'staging') return;
     // The field belongs to ORDINAL while it is up. See Game.endBoss().
     if (world.boss) return;
+
+    if (this.probeLock > 0) this.probeLock = Math.max(0, this.probeLock - dt);
 
     // A slow trickle of aimless matter, all run, independent of the waves.
     this.driftTimer -= dt;
@@ -3344,13 +3446,14 @@ export class Director {
     // They file in.
     if (job.n > 1 && !t.tows) {
       const room = Math.min(job.n, CFG.maxEnemies - hostileCount(world));
-      if (room >= 2) { spawnFormation(world, [t], room); return; }
+      if (room >= 2) { spawnFormation(world, [t], room); this.lastRelease = world.time || 0; return; }
     }
     let x = rand(t.r + 12, world.width - t.r - 12);
     // Two SCIONs arriving on top of each other seed the same host twice and
     // read as one event rather than two decisions.
     if (t.id === 'scion') x = scionLane(world, t, x);
     release(world, t, x, -50 - rand(0, 40));
+    this.lastRelease = world.time || 0;
   }
 }
 

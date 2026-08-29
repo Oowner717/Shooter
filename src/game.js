@@ -284,11 +284,21 @@ export class Game {
        * alert language: a step you did not ask for needs to be a thing that
        * happened, not a number that quietly changed.
        */
-      onTier: ({ verdict, moved, tier }) => {
-        void verdict;
-        if (!moved) return;
+      onTier: ({ verdict, moved, tier, from, reason, trial }) => {
+        void verdict; void from;
         self.hud.syncRail(self.world);
-        if (moved < 0) self.hud.alert(`THE FIELD RELENTS · TIER ${tier}`, 'remainder', 4.5);
+        /*
+         * A trial answers out loud whichever way it goes: it is a question the
+         * player asked, and a question that gets no answer is a bug report.
+         */
+        if (trial) {
+          self.hud.alert(trial === 'proven' ? `PROVEN ${tier}` : `NOT YET · ${reason}`,
+            trial === 'proven' ? 'good' : 'remainder', 4.5);
+          return;
+        }
+        if (!moved) return;
+        if (moved < 0) self.hud.alert(`THE FIELD RELENTS · ${reason} · TIER ${tier}`, 'remainder', 4.5);
+        else if (moved > 1) self.hud.alert(`SURGE · ${reason} · TIER ${tier}`, 'good', 4);
       },
       alert: (text, kind, dur) => self.hud.alert(text, kind, dur),
       abilityTaken: (i) => self.hud.flashTaken(i),

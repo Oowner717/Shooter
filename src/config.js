@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '200';
+export const BUILD = '201';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '200';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'fa1a3ff';
+export const REV = '61bc87e';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -204,9 +204,33 @@ export const CFG = {
        * wave is a bad wave, and a ladder that flinches at one is a ladder
        * nobody can climb.
        */
+      /*
+       * ---- the four verdicts (build 201) ----
+       *
+       * There were two, and both of the ways to fail were "slow" rather than
+       * "in danger": the ladder parked a maxed run where waves ran 28-37 s
+       * with about 2.6 s of contact, climbing +1 per wave and falling -1 per
+       * two, so a fall took six times a climb. Three numbers are read at the
+       * end of a wave -- `t`, seconds from the last release to the field
+       * thinning; `k`, seconds anything spent on the turret; and `c`, the
+       * fraction of what was asked for that did not survive.
+       *
+       *   surge  t <= surgeWithin and k < surgeContact      +2
+       *   clean  t <= cleanWithin and k < failContact       +1
+       *   stall  otherwise, if c >= routBelow, k < routContact   0, two -> -1
+       *   rout   c < routBelow or k >= routContact          -1 at once
+       *
+       * `patience` still ends a wave; it is no longer itself the verdict --
+       * it makes `t` infinite, which the table then reads.
+       */
+      surgeWithin: 3, // cleared this fast after the last release: a surge
+      surgeContact: 2, // ...and with less than this on the turret
+      cleanWithin: 12, // the ordinary clear
       failContact: 6, // seconds with anything attached, during one wave
-      failAlive: 0.6, // ...or this much of what it asked for still up at the end
-      failStreak: 2, // consecutive failures before it steps back
+      routBelow: 0.4, // less of the wave than this killed is a rout, not a stall
+      routContact: 12, // ...as is this long with something attached
+      failStreak: 2, // consecutive stalls before it steps back
+      probeLock: 60, // seconds before another trial rung may be armed
     },
     /*
      * A flat multiplier on every authored count, on top of the swell. The

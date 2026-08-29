@@ -229,6 +229,11 @@ export function captureRun(world, game) {
        * stepped back and an understatement for the rest.
        */
       peak: world.director.peak,
+      // A trial in flight, and the wave that may not climb. Both additive: a
+      // save without them restores to no trial and no grace, which is what
+      // every save before build 201 means.
+      probe: world.director.probe ? { ...world.director.probe } : null,
+      grace: world.director.grace | 0,
       hold: world.director.hold ? 1 : 0,
       fails: world.director.fails,
     },

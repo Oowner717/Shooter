@@ -994,7 +994,26 @@ export class Hud {
       this.syncRail(g.world);
     };
     $('railDown').addEventListener('click', () => go((dir) => dir.tier - 1, true));
-    $('railUp').addEventListener('click', () => go((dir) => dir.tier + 1, true));
+    /*
+     * Up, and at the ceiling it asks instead.
+     *
+     * The arrow was simply disabled at `peak`, which is the rule working and
+     * reading as a dead control -- the run is standing on the highest rung it
+     * has earned and the only way on is to wait for a wave to climb it. So at
+     * the top the same button arms a TRIAL: one scored wave three rungs up,
+     * on a rung the run has not earned. Cleared, it becomes the ceiling;
+     * anything else and the run is put straight back, having lost the wave and
+     * nothing else. Forward is still earned -- this is a way of earning it in
+     * one wave instead of three, at the risk of wasting one.
+     */
+    $('railUp').addEventListener('click', () => {
+      const dir = d();
+      if (!dir) return;
+      if (dir.tier < dir.peak) { go((x) => x.tier + 1, true); return; }
+      if (!dir.trial(dir.peak + 3)) return;
+      dir.hold = false;                 // a trial is a climb, not a pin
+      this.syncRail(g.world);
+    });
     /*
      * ...and the skip does the opposite: it puts the climb back on.
      *
@@ -1036,10 +1055,17 @@ export class Hud {
     const dir = world && world.director;
     if (!dir || !this.railCells) return;
     const n = dir.tier;
-    const peak = Math.max(dir.peak || 0, n);
-    if (this._railAt !== n || this._railPeak !== peak) {
+    /*
+     * The run's own ceiling, NOT `max(peak, tier)`. During a trial the run
+     * stands three rungs above its peak without having earned any of them, and
+     * folding the trial into the ceiling would draw those three as climbed.
+     */
+    const peak = dir.peak || 0;
+    const trial = dir.probe ? dir.probe.to : 0;
+    if (this._railAt !== n || this._railPeak !== peak || this._railTrial !== trial) {
       this._railAt = n;
       this._railPeak = peak;
+      this._railTrial = trial;
       /*
        * Where the window sits. Centred on the run's own position, and pushed
        * off the floor rather than showing tiers that do not exist: at tier 1
@@ -1064,7 +1090,9 @@ export class Hud {
          */
         c.el.classList.toggle('seen', t > n && t <= peak);
         // ...and never reached. Drawn shut, and the arrow will not go there.
-        c.el.classList.toggle('locked', t > peak);
+        c.el.classList.toggle('locked', t > peak && t !== trial);
+        // The rung being tried: standing on it, not having earned it.
+        c.el.classList.toggle('trial', t === trial);
         c.tick.textContent = t < n ? '\u2713' : '';
       }
     }
@@ -1080,13 +1108,18 @@ export class Hud {
     // Nothing below tier 1 to step back to, and nothing above the highest
     // rung the run has climbed: forward is earned, back is free.
     $('railDown').disabled = n <= 1;
-    $('railUp').disabled = n >= peak;
+    /*
+     * Up is live at the ceiling now -- it arms a trial there. It goes dead
+     * only while one is already running or the lockout after one has not run
+     * down, which is the difference between "nothing to do" and "not yet".
+     */
+    $('railUp').disabled = !!dir.probe || (n >= peak && dir.probeLock > 0);
     /*
      * ...and the skip is there only when it has somewhere to go. A control
      * that is present and inert on most of a run is a control that reads as
      * broken; one that appears exactly when it is useful explains itself.
      */
-    const canSkip = n < peak - 1;
+    const canSkip = n < peak - 1 && !dir.probe;
     if (this._railSkip !== canSkip) {
       this._railSkip = canSkip;
       this.el.railSkip.hidden = !canSkip;
