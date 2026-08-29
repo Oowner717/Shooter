@@ -91,7 +91,9 @@ export class Game {
     this.wells = []; // reused every frame; see the collection pass in update()
     this.acc = 0;
     this.frameTimes = [];
+    this.workTimes = [];
     this.fps = 60;
+    this.frameWork = 0;
     this.qualityCooldown = 0;
 
     // The glossary draws its specimens with the field's own shape routines.
@@ -1840,7 +1842,7 @@ export class Game {
         + `obj    ${hostileCount(w)} hostile + ${w.enemies.length - hostileCount(w)} drift + ${w.drops.length} frag + ${w.debris.length} wreck\n`
         + `shots  ${w.projectiles.length}\n`
         + `parts  ${fx.particles.active.length}\n`
-        + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}\n`
+        + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}  work ${this.frameWork.toFixed(1)}ms\n`
         + `mines  ${w.mines.length}  round ${w.round}\n`
         + `build  ${BUILD}  rev ${REV}  zoom ${CFG.zoom}`,
       );
@@ -2089,30 +2091,76 @@ export class Game {
 
   // -------------------------------------------------------- perf governor
 
-  trackFrame(ms) {
+  /*
+   * `ms` is the interval between frames; `workMs` is how long update() and
+   * draw() actually took inside it. Both are needed, because each is blind to
+   * a kind of slowness the other sees:
+   *
+   *   The INTERVAL sees GPU-bound frames. Canvas calls are queued rather than
+   *   executed, so draw() can return in a millisecond and still have handed
+   *   the compositor more than it can finish before the next vsync. Nothing
+   *   but the interval knows that happened.
+   *
+   *   The WORK sees a game that is uniformly half-rate. A 60Hz phone locked
+   *   to 33ms because we spend 30ms in here is, from timing alone,
+   *   indistinguishable from a 30Hz display -- the intervals are identical.
+   *   Only the work tells the two apart.
+   *
+   * The interval is judged against the display's OWN cadence rather than an
+   * absolute number, which is the whole of build 198. It used to drop above
+   * 20.5ms and recover below 13.5ms, and a vsync-locked 60Hz display cannot
+   * produce an interval under 16.67ms -- so the recovery door was one that
+   * never opened. One transient stall pinned the game at reduced quality for
+   * the rest of the session. The same absolute test also read iOS low-power
+   * mode, which throttles rAF to 30Hz while the game does no more work at
+   * all, as a device that could not cope, and cut quality to the floor.
+   */
+  trackFrame(ms, workMs = 0) {
     this.frameTimes.push(ms);
+    this.workTimes.push(Math.min(workMs, 60));
     if (this.frameTimes.length < 60) return;
     let sum = 0;
     for (const t of this.frameTimes) sum += t;
     const avg = sum / this.frameTimes.length;
-    this.frameTimes.length = 0;
-    this.fps = 1000 / Math.max(avg, 1);
+    let wsum = 0;
+    for (const t of this.workTimes) wsum += t;
+    const work = wsum / this.workTimes.length;
 
     /*
-     * The governor drops quality when frames get long and lets it back up
-     * when they do not -- but never above the player's own ceiling. Somebody
-     * who set EFFECTS to LOW on a device they know is slow meant it, and
-     * having the governor quietly undo that the moment the field is empty is
-     * the setting not working.
+     * The display's cadence is the tenth percentile of the window, not the
+     * mean and not the minimum: the fastest frames are the ones that landed
+     * on a vsync, so they read the refresh rate even when most of the window
+     * missed it, and taking a percentile rather than the outright minimum
+     * keeps one spurious gap -- two callbacks fired back to back after a tab
+     * restore -- from declaring a 500Hz display and dropping quality forever.
+     */
+    const sorted = [...this.frameTimes].sort((a, b) => a - b);
+    const cadence = clamp(sorted[(sorted.length * 0.1) | 0], 6, 34);
+    this.frameTimes.length = 0;
+    this.workTimes.length = 0;
+    this.fps = 1000 / Math.max(avg, 1);
+    this.frameWork = work;
+
+    const late = avg / cadence;      // 1 means every frame landed on time
+    const budget = 1000 / 60;        // the game targets 60; work is judged against that
+
+    /*
+     * Quality drops when frames get long and comes back up when they do not
+     * -- but never above the player's own ceiling. Somebody who set EFFECTS
+     * to LOW on a device they know is slow meant it, and having the governor
+     * quietly undo that the moment the field is empty is the setting not
+     * working.
      */
     const roof = pref('effects');
     if (fx.quality > roof) { fx.quality = roof; this.resize(); }
     if (this.qualityCooldown > 0) { this.qualityCooldown--; return; }
-    if (avg > 20.5 && fx.quality > 0.45) {
+    const struggling = late > 1.25 || work > budget * 0.9;
+    const comfortable = late < 1.06 && work < budget * 0.5;
+    if (struggling && fx.quality > 0.45) {
       fx.quality = fx.quality > 0.7 ? 0.7 : 0.45;
       this.qualityCooldown = 3;
       this.resize();
-    } else if (avg < 13.5 && fx.quality < roof) {
+    } else if (comfortable && fx.quality < roof) {
       fx.quality = Math.min(roof, fx.quality < 0.7 ? 0.7 : 1);
       this.qualityCooldown = 6;
       this.resize();

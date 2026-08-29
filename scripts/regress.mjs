@@ -8189,6 +8189,103 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.dropsWhenParked}; and it was never dead: ${r.parkedStillAlive}`);
 }
 
+// --- the quality governor is not a one-way ratchet ---------------------------
+/*
+ * The governor was fed the frame INTERVAL and judged it against absolute
+ * milliseconds: drop above 20.5, come back below 13.5. A vsync-locked 60Hz
+ * display cannot produce an interval under 16.67ms, so on the phone this game
+ * is for, the recovery door was one that never opened -- one transient stall
+ * and the canvas stayed at reduced resolution until the app was killed. A
+ * 120Hz iPhone recovered and a 60Hz one did not, which is the threshold
+ *testing the refresh rate rather than the game.
+ *
+ * The same absolute test could not tell a THROTTLED DISPLAY from a SLOW GAME.
+ * iOS low-power mode drops rAF to 30Hz while the game does no more work at
+ * all; a 60Hz phone that spends 30ms of every frame in update() and draw()
+ * produces the identical 33ms interval. Build 197 answered both with 0.45 --
+ * punishing the first for a setting the player chose.
+ *
+ * So the interval is judged against the display's OWN cadence now, and work
+ * is measured alongside it. Both are needed and the last two models here are
+ * why: canvas calls are queued rather than executed, so a GPU-bound frame can
+ * return from draw() in a millisecond and still miss its vsync -- only the
+ * interval sees that -- while a uniformly half-rate game is invisible to the
+ * interval and only the work tells it apart from a 30Hz display.
+ *
+ * The models are driven through trackFrame directly. This has to be synthetic:
+ * a headless software rasteriser has no vsync and no GPU, so a live run cannot
+ * produce any of the six timings that matter.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { fx } = await import('../src/fx.js');
+    const wasQuality = fx.quality;
+
+    const run = (frames) => {
+      fx.quality = 1;
+      g.qualityCooldown = 0;
+      g.frameTimes.length = 0;
+      if (g.workTimes) g.workTimes.length = 0;
+      let floor = 1;
+      for (const [ms, work] of frames) {
+        g.trackFrame(Math.min(ms, 60), work);
+        floor = Math.min(floor, fx.quality);
+      }
+      return { floor, end: fx.quality };
+    };
+
+    const V60 = 1000 / 60, V120 = 1000 / 120, V30 = 1000 / 30;
+    const rep = (n, ms, work) => Array(n).fill(0).map(() => [ms, work]);
+    const CALM = 4;    // ms of update+draw on a phone that is coping
+    const HEAVY = 30;  // ms of update+draw on one that is not
+    const STALL = [...rep(40, V60, CALM), ...rep(20, 40, CALM)];
+
+    const out = {
+      // 2400 frames is forty windows -- about forty seconds of play.
+      healthy: run(rep(2400, V60, CALM)),
+      recovers: run([...STALL, ...rep(2400, V60, CALM)]),
+      lowPower: run(rep(2400, V30, CALM)),
+      gpuBound: run([...rep(1200, V60, CALM),
+        ...Array(1200).fill(0).map((_, i) => (i % 2 ? [V60, CALM] : [V60 * 2, CALM]))]),
+      cpuBound: run(rep(2400, V30, HEAVY)),
+      fedWork: Array.isArray(g.workTimes),
+    };
+
+    // Put the canvas back. A case that leaves quality on the floor charges
+    // every later case for it -- the backing store is sized inside resize().
+    fx.quality = wasQuality;
+    g.qualityCooldown = 0;
+    g.frameTimes.length = 0;
+    if (g.workTimes) g.workTimes.length = 0;
+    g.resize();
+    out.restored = fx.quality === wasQuality;
+    out.foundAt = wasQuality;
+    return out;
+  });
+
+  check('a healthy 60Hz frame budget is left alone',
+    r.healthy.floor === 1 && r.healthy.end === 1,
+    `forty windows at 16.67ms: floor ${r.healthy.floor}, ends at ${r.healthy.end}`);
+  check('quality dropped by a stall comes back on a vsync-locked 60Hz display',
+    r.recovers.floor < 1 && r.recovers.end === 1,
+    `one stall then forty clean windows: floor ${r.recovers.floor}, `
+    + `ends at ${r.recovers.end} (build 197 ended at 0.70 and stayed there)`);
+  check('a display throttled to 30Hz is not mistaken for a game that cannot cope',
+    r.lowPower.end === 1,
+    `low-power 30Hz with ${4}ms of work: ends at ${r.lowPower.end} `
+    + '(build 197 ended at 0.45)');
+  check('a GPU-bound frame that misses its vsync still drops quality',
+    r.gpuBound.end <= 0.45,
+    `misses every other vsync at low work: ends at ${r.gpuBound.end}`);
+  check('...and so does a game that is uniformly half-rate on its own work',
+    r.cpuBound.end <= 0.45 && r.fedWork,
+    `33ms interval with 30ms of work: ends at ${r.cpuBound.end}; `
+    + `governor is fed work: ${r.fedWork}`);
+  check('the governor case puts the canvas back where it found it',
+    r.restored, `found quality at ${r.foundAt} and did not restore it`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

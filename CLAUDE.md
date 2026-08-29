@@ -398,4 +398,28 @@ most once for any given target and cannot spin.
   passed with the gate missing entirely, because `railUp.disabled` swallowed
   the presses. Assert the model as well as the button, or the next caller
   walks straight through.
+- **A threshold that a device cannot physically reach is a door that never
+  opens.** The quality governor was fed the frame INTERVAL and judged it
+  against absolute milliseconds -- drop above 20.5, recover below 13.5 -- and
+  a vsync-locked 60Hz display cannot produce an interval under 16.67ms. One
+  transient stall pinned the game at reduced resolution for the rest of the
+  session; a 120Hz iPhone recovered from the same stall and a 60Hz one never
+  did, which is the threshold testing the refresh rate rather than the game.
+  The same test could not tell iOS low-power mode (rAF throttled to 30Hz, no
+  extra work) from a game spending 30ms a frame -- identical intervals -- and
+  answered both by halving quality. Build 198 judges the interval against the
+  display's OWN cadence (the tenth percentile of the window: the fastest
+  frames are the ones that landed on a vsync, and a percentile rather than the
+  minimum survives one spurious back-to-back callback) and measures work
+  alongside it. Both are needed: canvas calls are queued, so a GPU-bound frame
+  returns from `draw()` in a millisecond and still misses its vsync -- only
+  the interval sees that -- while a uniformly half-rate game is invisible to
+  the interval and only the work tells it from a 30Hz display. Anything
+  comparing a measurement against a constant owes an answer to "can this
+  device produce that number at all".
+- A governor case has to be **synthetic**: a headless software rasteriser has
+  no vsync and no GPU, so a live run cannot produce any of the six timings
+  that matter. Drive `trackFrame` directly -- and put `fx.quality` back where
+  it was found, because the backing store is sized inside `resize()` and a
+  case that leaves it on the floor charges every later case for it.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

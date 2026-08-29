@@ -90,3 +90,67 @@ busy field, and since `game.js` multiplies the device pixel ratio by it, the
 whole game renders at 45% resolution and is upscaled. That, rather than any
 effect, is the largest thing standing between this game and how it could
 look.
+
+## Phase 1: the governor was a one-way ratchet (build 198)
+
+The note above was half right. `q 0.45` on a busy field is real and the whole
+game does render at reduced resolution because of it — but the reason was not
+that the device is slow. **The governor was fed the frame INTERVAL and judged
+it against absolute milliseconds: drop above 20.5, recover below 13.5.** A
+vsync-locked 60Hz display cannot produce an interval under 16.67ms, so on the
+phone this game is for, the recovery door was one that never opened.
+
+Six timing models, each a device state the game actually meets, driven through
+`trackFrame` directly — synthetic because a headless software rasteriser has
+no vsync and no GPU and cannot produce any of them:
+
+| timing model | build 197 | build 198 | should be |
+|---|---|---|---|
+| 60Hz, healthy | 1.00 | 1.00 | 1.00 |
+| 60Hz, one stall, then healthy | **0.70** | 1.00 | 1.00 |
+| 120Hz, one stall, then healthy | 1.00 | 1.00 | 1.00 |
+| 30Hz low-power, no stall | **0.45** | 1.00 | 1.00 |
+| 60Hz, GPU-bound (misses every other vsync) | 0.45 | 0.45 | 0.45 |
+| 60Hz, CPU-bound (uniformly 33ms of work) | 0.45 | 0.45 | 0.45 |
+
+Two findings the table makes plain and nothing else could:
+
+**A 120Hz iPhone recovered and a 60Hz one did not.** Same stall, same game,
+opposite outcome — which is the threshold testing the refresh rate rather
+than the performance. One transient stall pinned a 60Hz phone at reduced
+resolution until iOS evicted the app.
+
+**Rows 4 and 6 have IDENTICAL interval sequences** — 33.3ms throughout — and
+differ only in what the game spent inside them. Build 197 answers both with
+0.45 because from the interval alone they cannot be told apart, and one of
+them is a player who turned on low-power mode and got their game quietly
+halved for it. Build 198 answers 1.00 and 0.45.
+
+So the interval is judged against the display's own cadence now — the tenth
+percentile of the window, because the fastest frames are the ones that landed
+on a vsync, and a percentile rather than the outright minimum keeps one
+spurious back-to-back callback from declaring a 500Hz display — and work is
+measured alongside it. Both are needed, and the last two rows are why:
+canvas calls are queued rather than executed, so a GPU-bound frame returns
+from `draw()` in a millisecond and still misses its vsync, which only the
+interval sees; while a uniformly half-rate game is invisible to the interval
+and only the work separates it from a 30Hz display.
+
+**The residual hole, stated rather than papered over.** A game that is
+uniformly GPU-bound at exactly half rate is still indistinguishable from a
+30Hz display: identical intervals, low work in both. Closing it needs a
+baseline cadence latched from startup, and a latched baseline that ever
+latches wrong is a false degradation with no way back — the exact bug class
+being removed here. The work clause catches the CPU-bound form, which for a
+game drawn in hairlines and a few hundred particles is the likelier one.
+
+**What was not calibrated, and why.** The first plan was to feed the governor
+work alone and set thresholds from measured work. That was dropped: headless
+software raster reports ~10ms of `draw()` for an *empty* field, which is the
+rasteriser and not any phone's GPU. Thresholds picked from that number would
+have been picked from the wrong instrument. The ratio against the device's
+own cadence needs no device measurement, which is why it is the design.
+
+`smoke.mjs` now prints `work` beside `q` in the debug stats, and the deep
+field reads `q 0.45  work 24.2ms` here — the work clause firing correctly,
+because this environment genuinely cannot render that field in a 60Hz budget.

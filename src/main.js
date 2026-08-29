@@ -46,9 +46,13 @@ let last = performance.now();
 function frame(now) {
   const dt = (now - last) / 1000;
   last = now;
+  // Two numbers, not one: the interval says whether the frame landed on time,
+  // the work says how much of it we spent. The governor needs both -- see
+  // Game.trackFrame for why either alone is blind to a real kind of slowness.
+  const started = performance.now();
   game.update(dt > 0 ? dt : 1 / 60);
   game.draw();
-  game.trackFrame(Math.min(dt * 1000, 60));
+  game.trackFrame(Math.min(dt * 1000, 60), performance.now() - started);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
