@@ -1354,6 +1354,53 @@ this — `popStart`/`popEnd`/`popRampKills`, `spawnInterval`, `warmPop`/
 is, is now a property of which waves come first rather than of a curve applied
 to a trickle.
 
+### The ladder played a band it had already left (build 200)
+
+Four defects, all of them invisible from inside a run and all of them measured
+by `scripts/ladder-probe.mjs`, which is new: it plays the game with real taps
+at a fixed skill and writes one record per wave.
+
+**The band window lasted exactly one wave.** `shuffle()` builds a rotation from
+the tier's own two bands, and then `admit()` spliced in every eligible wave
+that was not already in it — which is precisely the out-of-band ones — and
+`admit()` runs from `begin()`. Logged at tier 40, straight after a shuffle:
+
+    T T T T T T T T 4 5 4 5 5 4 4 4 4 5 5 4
+
+and one wave later:
+
+    T T T 2 T T T 1 2 T 3 T 4 3 5 2 4 5 5 3
+
+Tier 40 played five MOTEs and three NEEDLEs as often as a TOW and a BULWARK.
+`admit()` honours the window now, and `begin()` drops un-played entries the
+tier has since climbed away from — a cycle is twenty-odd waves long, so a run
+climbing through one was still playing band 1 several rungs after leaving it.
+Neither ever empties the rotation: out-of-band unlocks are what the next
+`shuffle()` is for, and the regress case that guards late unlocks now asserts
+reachability rather than immediate splicing.
+
+Measured after, 180 s at the max profile: every scored wave at rung ≥ 9 came
+from bands 4–5 — 7 of 7 starting at rung 20, 10 of 10 starting at rung 12,
+against 0 of 7 before.
+
+**The verdict leaked between waves.** `score()` returns early for a teach wave
+*before* clearing `contact` and `hitPatience`, and `load()` never cleared them,
+so an unscored wave's seconds on the turret were charged to whichever wave was
+scored next. `load()` clears all three now — it is the guarantee, and `score()`
+still clears them too.
+
+**The drift-only bonus wave was scored.** `{ of: [], drift: 22 }` is not marked
+`teach`, and with `asked === 0` there is nothing that could fail it, so it was
+a free rung every cycle — observed climbing 15 to 16 for shooting nothing.
+
+**The opening replayed, tier-scaled.** It led every cycle-0 rotation whatever
+the tier, and `spawnOne` gave it the tier's health multiplier, so a run
+starting at rung 40 was taught what DRIFT is by a 29-second "needle ×2" that
+could not move the ladder either way. It plays once now, at rung 1, and a
+teach wave is never scaled — asserted as a ratio against the same type under a
+regular wave, because the `Enemy` constructor rolls every body through
+`rand(0.92, 1.1)` and one body against one body reads that roll as a defect.
+
 ### SCION, and what a graft does
 
 A large body worth more to the field dead than alive.

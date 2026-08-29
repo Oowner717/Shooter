@@ -2546,8 +2546,13 @@ export function spawnOne(world, type, x, y, opts = {}) {
    * keeps, and a tier-8 DRIFT with eight times the health is a grey object
    * that does not die like a grey object. The bonus wave stays a bonus.
    */
+  /*
+   * ...and not to a teach wave either. The opening is authored at exactly the
+   * size and difficulty it should be; a tier-40 multiplier on it turns the
+   * sentence "this is a NEEDLE" into a 29-second wall that teaches nothing.
+   */
   const d = world.director;
-  if (d && !e.harmless && !type.fixed) {
+  if (d && !e.harmless && !type.fixed && !d.wave?.teach) {
     const k = d.scaleAt(d.tier);
     e.maxHp *= k.hp;
     e.hp = e.maxHp;
@@ -2915,8 +2920,14 @@ export class Director {
   score(world) {
     const T = CFG.waves.tier;
     const wave = this.wave;
-    // The opening teaches; it is not scored and cannot move the tier.
-    if (!wave || wave.teach) return null;
+    /*
+     * The opening teaches; it is not scored and cannot move the tier. Nor is
+     * the drift-only bonus wave (`{ of: [], drift: 22 }`), which asks for no
+     * hostiles at all: with `asked === 0` there is nothing that could fail it,
+     * so it was a free rung every cycle -- observed climbing 15 to 16 for
+     * shooting nothing.
+     */
+    if (!wave || wave.teach || this.asked === 0) return null;
     const alive = world.enemies.filter((e) => !e.dead && !e.harmless).length;
     const failed = this.contact >= T.failContact
       || this.hitPatience
@@ -3021,7 +3032,13 @@ export class Director {
       const j = (Math.random() * (i + 1)) | 0;
       [rest[i], rest[j]] = [rest[j], rest[i]];
     }
-    const open = this.cycle === 0
+    /*
+     * The opening plays once, at the bottom, and never again. It used to lead
+     * every cycle-0 rotation whatever the tier, so a run started at 40 was
+     * taught DRIFT by "needle x2" -- a 29-second wave, authored for the first
+     * minute of a run, that could not move the ladder either way.
+     */
+    const open = this.cycle === 0 && this.tier === 1
       ? WAVES.map((wv, i) => (wv.teach ? i : -1)).filter((i) => i >= 0)
       : [];
     this.order = [...open, ...rest];
@@ -3068,6 +3085,17 @@ export class Director {
       }
     }
     this.jobs = jobs;
+    /*
+     * ---- every wave starts clean ----
+     *
+     * score() returns early for a teach wave, and used to do so BEFORE
+     * clearing these -- and load() never cleared them at all. So an unscored
+     * wave's contact was charged to whichever wave was scored next: the
+     * opening's seconds on the turret arrived as a failure on the first real
+     * wave. score() may still clear them; this is the guarantee.
+     */
+    this.contact = 0;
+    this.hitPatience = false;
     this.wait = 0;
     // A wave may ask for grey drift alongside it. It is not hostile, costs
     // nothing from the allotment, and is the whole of both the opening and the
@@ -3096,16 +3124,75 @@ export class Director {
    * a late unlock is not always the very last thing you see.
    */
   admit(world) {
+    /*
+     * ---- and it honours the band window ----
+     *
+     * It did not, and that quietly undid bandsFor() entirely. shuffle() builds
+     * a rotation from the tier's own two bands; admit() then spliced in EVERY
+     * eligible wave that was not already in it -- which is precisely the
+     * out-of-band ones -- and it runs from begin(), so the window survived
+     * exactly one wave. Logged at tier 40: after a shuffle the order read
+     * `T T T T T T T T 4 5 4 5 5 4 4 4 4 5 5 4`, and one wave later
+     * `T T T 2 T T T 1 2 T 3 T 4 3 5 2 4 5 5 3`. Tier 40 played five motes and
+     * three needles as often as a tow and a bulwark.
+     *
+     * Nothing is admitted during the opening either: a teach wave is a script,
+     * and splicing the rotation into the middle of it makes it not one.
+     */
+    if (this.wave && this.wave.teach) return 0;
     const already = new Set(this.order);
-    let added = 0;
+    const [lo, hi] = this.bandsFor(this.tier);
+    const inBand = [];
+    const rest = [];
     WAVES.forEach((wv, i) => {
       if (wv.teach || already.has(i) || !this.eligible(world, wv)) return;
+      const b = wv.band || 1;
+      (b >= lo && b <= hi ? inBand : rest).push(i);
+    });
+    /*
+     * Out-of-band waves are not admitted -- they are what the next shuffle()
+     * is for. The one exception is starvation: if the window has nothing to
+     * offer AND there is nothing left to play, take anything rather than stand
+     * the run in front of an empty field. begin() calls shuffle() when the
+     * order is spent, so this should be unreachable; it is here because a
+     * director with nothing to play stalls the run dead.
+     */
+    const take = inBand.length || this.at + 1 < this.order.length ? inBand : rest;
+    let added = 0;
+    for (const i of take) {
       const room = this.order.length - this.at;
       const at = this.at + 1 + ((Math.random() * Math.max(1, room)) | 0);
       this.order.splice(at, 0, i);
       added++;
-    });
+    }
     return added;
+  }
+
+  /*
+   * Un-played entries that the tier has since climbed away from.
+   *
+   * A rotation is built for the band the tier was on when shuffle() ran, and a
+   * cycle is twenty-odd waves long -- so a run climbing through it is still
+   * playing band 1 material several rungs after leaving band 1. admit() is
+   * about what should come IN; this is about what should no longer be waiting.
+   *
+   * Never empties the cycle: if everything ahead is out of band the rotation
+   * is left alone and the next shuffle() rebuilds it. Entries at or before the
+   * playhead are history and are not touched, so `at` never moves.
+   */
+  prune() {
+    if (this.at + 1 >= this.order.length) return 0;
+    if (this.wave && this.wave.teach) return 0;
+    const [lo, hi] = this.bandsFor(this.tier);
+    const head = this.order.slice(0, this.at + 1);
+    const tail = this.order.slice(this.at + 1);
+    const keep = tail.filter((i) => {
+      const b = WAVES[i].band || 1;
+      return b >= lo && b <= hi;
+    });
+    if (!keep.length || keep.length === tail.length) return 0;
+    this.order = [...head, ...keep];
+    return tail.length - keep.length;
   }
 
   /** The wave currently running, or null before the first one starts. */
@@ -3229,6 +3316,7 @@ export class Director {
   /** Start the next wave, rebuilding the rotation if this one is spent. */
   begin(world) {
     if (this.order.length) this.admit(world);
+    this.prune();
     if (this.at + 1 >= this.order.length) this.shuffle(world);
     if (!this.order.length) { this.timer = 1; return; }
     this.at++;

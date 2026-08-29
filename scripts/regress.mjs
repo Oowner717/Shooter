@@ -837,19 +837,41 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.earned = 999999;      // everything is open now, mid-rotation
     d.begin(w);
     const after = d.order.length;
-    const stillMissing = missing.filter((i) => !d.order.includes(i));
+    /*
+     * Build 200 taught admit() the band window, so a wave that unlocks
+     * mid-rotation joins THIS rotation only if the tier is on its band -- at
+     * tier 1 a band-5 wave has no business being played, which is the whole
+     * of the fix. What must survive is reachability: it is in the next
+     * rotation, not lost for the run. So the two halves are asserted apart.
+     */
+    const [lo, hi] = d.bandsFor(d.tier);
+    const inBand = missing.filter((i) => { const b = WAVES[i].band || 1; return b >= lo && b <= hi; });
+    const stillMissing = inBand.filter((i) => !d.order.includes(i));
+    // Measured HERE, before the rebuild below moves the playhead: the claim is
+    // about what the splice did, not about what a fresh rotation looks like.
+    const aheadNow = missing.filter((i) => { const k = d.order.indexOf(i); return k >= 0 && k < d.at; });
+    d.at = d.order.length;  // spend the rotation
+    d.begin(w);             // ...which rebuilds it
+    const unreachable = missing.filter((i) => {
+      const b = WAVES[i].band || 1;
+      return b >= lo && b <= hi && !d.order.includes(i);
+    });
     // ...and nothing already played is replayed by the splice. `<`, not `<=`:
     // begin() admits and then steps forward, so a wave spliced at the very
     // next slot lands exactly on the playhead and is played immediately,
     // which is the point of admitting it.
-    const ahead = missing.filter((i) => { const k = d.order.indexOf(i); return k >= 0 && k < d.at; });
-    return { before, after, wanted: missing.length, stillMissing: stillMissing.length, behindPlayhead: ahead.length,
+    return { before, after, wanted: missing.length, inBand: inBand.length,
+             stillMissing: stillMissing.length, behindPlayhead: aheadNow.length,
+             unreachable: unreachable.length, window: [lo, hi],
              names: stillMissing.map((i) => JSON.stringify(WAVES[i].of)) };
   });
   check('a wave that unlocks mid-rotation joins the rotation it unlocked during',
     r.wanted > 0 && r.stillMissing === 0 && r.behindPlayhead === 0,
-    `rotation ${r.before} -> ${r.after}, ${r.wanted} newly eligible, ${r.stillMissing} still absent`
+    `rotation ${r.before} -> ${r.after}, ${r.wanted} newly eligible and ${r.inBand} of them `
+    + `in band ${r.window[0]}-${r.window[1]}, ${r.stillMissing} still absent`
     + `${r.names.length ? ` (${r.names.join(' ')})` : ''}, ${r.behindPlayhead} spliced behind the playhead`);
+  check('...and one that unlocks out of band is in the next rotation, not lost',
+    r.unreachable === 0, `${r.unreachable} newly eligible waves absent after the rebuild too`);
 }
 
 // --- ...and every type is actually met in a run ------------------------------
@@ -8373,6 +8395,162 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + '(build 198: 18/37 and 4.25x)');
   check('the stroke-floor case puts the floor back where the game had it',
     r.restored && r.dprKept, `restored: ${r.restored}, dpr kept: ${r.dprKept}`);
+}
+
+// --- the ladder plays the band it says it is on -----------------------------
+/*
+ * Four things the ladder got wrong, all of them invisible from inside a run.
+ *
+ * THE BAND WINDOW LASTED ONE WAVE. shuffle() builds a rotation from the tier's
+ * own two bands; admit() then spliced in every eligible wave NOT already in it
+ * -- which is exactly the out-of-band ones -- and admit() runs from begin().
+ * Logged at tier 40: after a shuffle `T T T T T T T T 4 5 4 5 5 4 4 4 4 5 5 4`,
+ * one wave later `T T T 2 T T T 1 2 T 3 T 4 3 5 2 4 5 5 3`. Tier 40 played
+ * five motes and three needles as often as a tow and a bulwark.
+ *
+ * THE VERDICT LEAKED. score() returns early for a teach wave BEFORE clearing
+ * `contact` and `hitPatience`, and load() never cleared them, so an unscored
+ * wave's seconds on the turret were charged to the next scored wave.
+ *
+ * THE BONUS WAVE WAS SCORED. `{ of: [], drift: 22 }` is not marked teach, and
+ * with `asked === 0` nothing could fail it -- a free rung every cycle.
+ *
+ * THE OPENING REPLAYED, TIER-SCALED. It led every cycle-0 rotation whatever
+ * the tier, and spawnOne gave it the tier multiplier, so a run starting at 40
+ * was taught DRIFT by a 29-second "needle x2" that could not move the ladder.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { WAVES, CFG } = await import('../src/config.js');
+    const w = g.world;
+    const d = w.director;
+
+    const out = {};
+
+    // ---- the band window survives more than one wave ----
+    // `earned` first: eligibility gates on it, and shuffle() legitimately
+    // falls back to every eligible wave when the tier's own bands are all
+    // still locked. A run that has not opened band 4 cannot play band 4.
+    g.restart();
+    w.phase = 'staging';
+    w.earned = 999999;
+    d.setTier(20);
+    d.shuffle(w);
+    const [lo, hi] = d.bandsFor(20);
+    out.window = [lo, hi];
+    // Run the rotation the way begin() does, admit() included, and look at
+    // what is left to play after each wave rather than only after the shuffle.
+    let outOfBand = 0, checked = 0;
+    for (let i = 0; i < 12; i++) {
+      d.begin(w);
+      for (let k = d.at + 1; k < d.order.length; k++) {
+        checked++;
+        const b = WAVES[d.order[k]].band || 1;
+        if (b < lo || b > hi) outOfBand++;
+      }
+    }
+    out.aheadChecked = checked;
+    out.aheadOutOfBand = outOfBand;
+
+    // ---- load() leaves no verdict behind ----
+    d.contact = 99;
+    d.hitPatience = true;
+    d.wait = 42;
+    d.load(w, WAVES.find((x) => !x.teach && x.of.length));
+    out.afterLoad = { contact: d.contact, patience: d.hitPatience, wait: d.wait };
+
+    // ---- the drift-only bonus wave cannot move the ladder ----
+    const bonus = WAVES.findIndex((x) => !x.teach && (!x.of || !x.of.length));
+    out.hasBonus = bonus >= 0;
+    if (bonus >= 0) {
+      d.order = [bonus]; d.at = 0;
+      d.load(w, WAVES[bonus]);
+      const before = d.tier;
+      out.bonusScored = d.score(w);
+      out.bonusMoved = d.tier - before;
+    }
+
+    // ---- the opening plays once, at the bottom ----
+    d.reset();
+    d.setTier(30);
+    d.shuffle(w);
+    out.teachAt30 = d.order.filter((i) => WAVES[i].teach).length;
+    d.reset();
+    d.shuffle(w);                       // cycle 0, tier 1
+    out.teachAt1 = d.order.filter((i) => WAVES[i].teach).length;
+    out.teachSecondCycle = (() => { d.shuffle(w); return d.order.filter((i) => WAVES[i].teach).length; })();
+
+    /*
+     * ---- and a teach wave is never tier-scaled ----
+     *
+     * Measured as a RATIO between the same type spawned under a teach wave and
+     * under a regular one at the same tier, rather than against an authored
+     * number: it is spawnOne's multiplier that is being tested, and nothing
+     * else in the constructor has to be modelled for the ratio to mean what it
+     * says. At tier 30 the multiplier is hpStep^29, about 25x.
+     */
+    d.reset();
+    w.earned = 999999;
+    d.setTier(30);
+    const teach = WAVES.find((x) => x.teach && x.of.length);
+    const plain = WAVES.find((x) => !x.teach && x.of.length);
+    /*
+     * Averaged over many spawns: the Enemy constructor rolls every body's
+     * health through `rand(0.92, 1.1)`, so two single bodies can differ by 1.2x
+     * on their own. A first version compared one against one and read 30.4x
+     * where the multiplier is 26.7x -- the roll, reported as a defect.
+     */
+    const hpUnder = (wave) => {
+      const sum = {}, n = {};
+      for (let pass = 0; pass < 14; pass++) {
+        g.debugClearField();
+        d.order = [WAVES.indexOf(wave)]; d.at = 0;
+        d.load(w, wave);
+        for (let i = 0; i < 300 && d.jobs.length; i++) d.emit(w);
+        for (const e of w.enemies.filter((x) => !x.harmless && !x.dead)) {
+          sum[e.type.id] = (sum[e.type.id] || 0) + e.maxHp;
+          n[e.type.id] = (n[e.type.id] || 0) + 1;
+        }
+      }
+      const byType = {};
+      for (const k of Object.keys(sum)) byType[k] = sum[k] / n[k];
+      return byType;
+    };
+    const teachHp = hpUnder(teach);
+    const plainHp = hpUnder(plain);
+    const shared = Object.keys(teachHp).filter((k) => plainHp[k]);
+    out.sharedType = shared[0] || null;
+    out.teachHp = shared.length ? teachHp[shared[0]] : null;
+    out.plainHp = shared.length ? plainHp[shared[0]] : null;
+    out.hpStepAt30 = CFG.waves.tier.hpStep ** 29;
+
+    g.debugClearField();
+    g.restart();
+    return out;
+  });
+
+  check('the tier plays its own band for a whole cycle, not for one wave',
+    r.aheadChecked > 0 && r.aheadOutOfBand === 0,
+    `band window ${r.window[0]}-${r.window[1]}: ${r.aheadOutOfBand} of ${r.aheadChecked} `
+    + 'waves still to play were out of band (build 199: admit() spliced them back every wave)');
+  check('load() leaves no previous wave’s verdict behind',
+    r.afterLoad.contact === 0 && r.afterLoad.patience === false && r.afterLoad.wait === 0,
+    `after load(): contact ${r.afterLoad.contact}, hitPatience ${r.afterLoad.patience}, `
+    + `wait ${r.afterLoad.wait}`);
+  check('the drift-only bonus wave is not a free rung',
+    r.hasBonus && r.bonusScored === null && r.bonusMoved === 0,
+    `bonus wave scored ${JSON.stringify(r.bonusScored)}, moved ${r.bonusMoved}`);
+  check('a teach wave is authored size, not tier size',
+    r.sharedType !== null && r.teachHp !== null
+      && Math.abs(r.plainHp / r.teachHp - r.hpStepAt30) < r.hpStepAt30 * 0.02,
+    `${r.sharedType} at tier 30 — under the opening ${r.teachHp}, under a regular wave `
+    + `${r.plainHp} (ratio ${r.teachHp ? (r.plainHp / r.teachHp).toFixed(1) : '?'}x, `
+    + `hpStep^29 is ${r.hpStepAt30.toFixed(1)}x)`);
+  check('the opening plays once, at the bottom, and never again',
+    r.teachAt30 === 0 && r.teachAt1 > 0 && r.teachSecondCycle === 0,
+    `teach waves in the rotation — starting at tier 30: ${r.teachAt30}, `
+    + `at tier 1: ${r.teachAt1}, second cycle: ${r.teachSecondCycle}`);
 }
 
 // --- report -----------------------------------------------------------------
