@@ -1331,6 +1331,7 @@ export class Game {
     if (w.boss) {
       w.boss.update(w, dt);
       if (w.boss.done) this.endBoss();
+      else this.watchBoss(dt);
     } else {
       w.director.update(w, dt);
     }
@@ -1596,6 +1597,80 @@ export class Game {
    * already emptied is marked rested, because the hole took the field with it
    * and there is nothing left of that wave to finish.
    */
+  /**
+   * A gate rung lights its own banner, free.
+   *
+   * Idempotent and run every frame: the run may arrive on a gate by climbing,
+   * by stepping back down to it, by a restore or by the debug panel, and one
+   * check that simply keeps the invariant true beats four call sites that
+   * each have to remember. Topping up to one rather than adding one, so
+   * standing on a gate cannot be farmed -- and so the banner comes back on
+   * its own after a withdrawal, which is what "the gate stays lit" means.
+   */
+  syncGate() {
+    const w = this.world;
+    const d = w.director;
+    if (!d || w.boss || w.phase !== 'staging') return;
+    const n = d.heldBy(w);
+    if (!n || (w.apertures[n] | 0) > 0) return;
+    w.apertures[n] = 1;
+    if (this.gateLit !== n) {
+      this.gateLit = n;
+      this.hud.alert(`APERTURE · ${nameOf(n)} · OPEN THE WAY`, 'rigDone', 5);
+    }
+  }
+
+  /**
+   * The anomaly stops counting.
+   *
+   * A gate that cannot be passed is a run that cannot continue, so a boss that
+   * has stood for `CFG.boss.patience` without losing a stage withdraws. The
+   * gate stays lit, nothing is reconciled, and the field comes back.
+   *
+   * Watched from here, on `world.bossStage`, rather than from the boss's own
+   * `stageT` -- which the brief named and which turned out to be dead state:
+   * `Boss` sets it to 0 at construction and again in `enterStage`, and nothing
+   * has ever incremented it. All seven bosses write `world.bossStage` on a
+   * stage change, so one watcher here covers them uniformly and does not
+   * depend on which of them call super.
+   */
+  watchBoss(dt) {
+    const w = this.world;
+    if (w.boss.arriving > 0 || w.boss.dying > 0) { this.bossStageT = 0; return; }
+    if (w.bossStage !== this.bossStageWas) {
+      this.bossStageWas = w.bossStage;
+      this.bossStageT = 0;
+      return;
+    }
+    this.bossStageT = (this.bossStageT || 0) + (w.dtRaw || dt);
+    if (this.bossStageT > CFG.boss.patience) this.withdrawBoss();
+  }
+
+  /**
+   * ...and goes, leaving the way open behind it.
+   *
+   * Beside endBoss and deliberately not sharing with it: the two differ in
+   * the one thing that matters, which is that nothing is reconciled here. A
+   * boss that withdrew was not beaten.
+   */
+  withdrawBoss() {
+    const w = this.world;
+    if (!w.boss) return;
+    w.boss.clear(w);
+    w.boss = null;
+    w.bossStage = 0;
+    w.bossN = 0;
+    w.timeScale = 1;
+    w.bossLine = null;
+    this.bossStageT = 0;
+    this.bossStageWas = 0;
+    const d = w.director;
+    if (!d.jobs.length) d.resting = true;
+    d.timer = CFG.boss.after;
+    background.setMood(w.dawn ? 'dawn' : 'staging');
+    this.hud.alert('IT HAS STOPPED COUNTING · FOR NOW', 'remainder', 5);
+  }
+
   endBoss() {
     const w = this.world;
     const n = w.bossN || 1;
@@ -1623,6 +1698,19 @@ export class Game {
      */
     if (n === 7) w.dawn = true;
     background.setMood(w.dawn ? 'dawn' : 'staging');
+    /*
+     * ...and the gate it was standing on is open now. The rung past it is the
+     * fight's own reward: the ladder was held there and nothing else was going
+     * to move it, so handing it over here is the climb the anomaly was in the
+     * way of rather than a bonus on top.
+     */
+    this.bossStageT = 0;
+    this.bossStageWas = 0;
+    this.gateLit = 0;
+    if (d.gateAt(d.tier) === n) {
+      d.setTier(d.tier + 1);
+      this.hud.syncRail(w);
+    }
   }
 
   /**
@@ -1793,6 +1881,9 @@ export class Game {
   }
 
   syncHud(dt) {
+    // The gate keeps its own banner lit. Idempotent, so it does not matter
+    // which of the six ways onto a gate rung the run took to get here.
+    this.syncGate();
     const w = this.world;
     this.hud.setKills(w.kills);
     /*

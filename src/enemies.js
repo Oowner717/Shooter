@@ -2922,6 +2922,48 @@ export class Director {
     this.probeLock = 0; // seconds before another may be armed
   }
 
+  /**
+   * The anomaly standing on this rung, if any. 0 for an ordinary rung.
+   *
+   * `gates` is authored as rungs in order, so the index is the anomaly's own
+   * number minus one -- see ANOMALIES in anomaly.js.
+   */
+  gateAt(tier) {
+    const i = CFG.waves.tier.gates.indexOf(tier);
+    return i < 0 ? 0 : i + 1;
+  }
+
+  /**
+   * The anomaly holding this run where it is, if one is.
+   *
+   * Only ever the gate the run is STANDING on: a gate further up is not
+   * holding anything yet, and one below has already been answered or stepped
+   * back through.
+   */
+  heldBy(world) {
+    const n = this.gateAt(this.tier);
+    if (!n) return 0;
+    return (world.reconciled || []).includes(n) ? 0 : n;
+  }
+
+  /**
+   * The highest rung a climb from here may actually reach.
+   *
+   * Walks up one rung at a time and stops at the first gate whose anomaly is
+   * still standing. Walking rather than comparing, because a surge climbs two
+   * and must not step OVER a gate -- landing past one without answering it is
+   * the only way the ladder could hand out a rung it did not mean to.
+   */
+  climbTo(world, want) {
+    let at = this.tier;
+    while (at < want) {
+      const n = this.gateAt(at);
+      if (n && !(world.reconciled || []).includes(n)) return at;
+      at++;
+    }
+    return want;
+  }
+
   /** Which authored band a tier draws from, and the one below it. */
   bandsFor(tier) {
     // Clamped at BOTH ends. Unclamped, tier 64 asked for bands 31..5 -- a
@@ -3048,7 +3090,12 @@ export class Director {
       // HOLD pins the climb, and grace defers it by one wave. Both are spent
       // whether or not there was anything to hold back.
       if (this.grace > 0) this.grace--;
-      else if (!this.hold) { this.tier += step; moved = step; }
+      else if (!this.hold) {
+        // ...and a gate stops it dead, however good the wave was.
+        const to = this.climbTo(world, this.tier + step);
+        moved = to - this.tier;
+        this.tier = to;
+      }
     }
     this.peak = Math.max(this.peak, this.tier);
     return { verdict, moved, tier: this.tier, from, reason, margin };
@@ -3063,10 +3110,12 @@ export class Director {
    * else and the run is put back where it was, having lost nothing but the
    * wave. A lockout after either, so it is a question and not a strategy.
    */
-  trial(n) {
+  trial(n, world) {
     if (this.probe || this.probeLock > 0) return null;
     const to = Math.max(1, Math.round(n));
     if (to <= this.peak) return null;
+    // A trial is still a climb: it may not be used to step over a gate.
+    if (world && this.climbTo(world, to) < to) return null;
     this.probe = { from: this.tier, to };
     this.tier = to;
     this.fails = 0;

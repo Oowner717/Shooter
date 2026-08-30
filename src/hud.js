@@ -1027,7 +1027,7 @@ export class Hud {
       const dir = d();
       if (!dir) return;
       if (dir.tier < dir.peak) { go((x) => x.tier + 1, true); return; }
-      if (!dir.trial(dir.peak + 3)) return;
+      if (!dir.trial(dir.peak + 3, g.world)) return;
       dir.hold = false;                 // a trial is a climb, not a pin
       this.syncRail(g.world);
     });

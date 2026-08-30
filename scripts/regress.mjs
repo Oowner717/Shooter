@@ -2787,15 +2787,24 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const compounds = ratios.every((x) => Math.abs(x - step) < 1e-9);
 
     // ---- the climb: a fully-bought turret on the assists ----
+    /*
+     * With the anomalies answered, so this measures the LADDER. Build 203 put
+     * seven gates on it and the first is rung 6: without this the run climbs
+     * to 6, is held there by ORDINAL exactly as intended, and a case about
+     * how fast a good turret climbs fails on the gate doing its job. That the
+     * gate holds is asserted on its own, further down.
+     */
     g.restart();
     g.debugTeachAll();
     g.debugGiveEnergy(200000);
     g.debugBuyAll();
+    for (let n = 1; n <= 7; n++) if (!w.reconciled.includes(n)) w.reconciled.push(n);
     w.autoAim = true; w.autoFire = true;
     const climbFrom = d().tier;
     for (let i = 0; i < 300 * 60; i++) g.update(1 / 60);
     const climbed = d().tier;
     const climbFails = d().fails;
+    w.reconciled.length = 0;
 
     /*
      * ---- the catch: a turret that cannot answer, parked high ----
@@ -8828,6 +8837,154 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     Math.abs(r.surge.paid - r.wantMargin) < Math.max(1, r.wantMargin * 0.01),
     `on a wave worth 1000 raw at peak 20: paid ${r.surge.paid.toFixed(0)}, `
     + `want ${r.wantMargin.toFixed(0)} (half again, through one dividend and one intake)`);
+}
+
+// --- the anomalies are on the ladder ----------------------------------------
+/*
+ * All seven were built and none of them was on the ladder. Past band 5 nothing
+ * new was ever introduced, and the only way to meet an anomaly was to buy an
+ * APERTURE out of the tree -- so a run could climb to rung 40 having never
+ * seen one. A gate rung is an ordinary rung for waves; the ladder simply will
+ * not CLIMB past it until its anomaly is reconciled.
+ *
+ * The withdrawal was specified against `Boss.stageT`, which turned out to be
+ * dead state: it is set to 0 in the constructor and again in enterStage, and
+ * nothing in the codebase has ever incremented it. All seven bosses do write
+ * `world.bossStage` on a stage change, so the watcher is in Game and works
+ * the same for every one of them.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { CFG, WAVES } = await import('../src/config.js');
+    const w = g.world;
+    const d = w.director;
+    const gates = CFG.waves.tier.gates;
+    const out = { gates };
+    const real = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
+
+    // ---- a gate stops a climb, and a surge does not step over one ----
+    const climbFrom = (tier, verdict) => {
+      g.debugClearField();
+      g.restart();
+      w.reconciled.length = 0;
+      d.setTier(tier); d.hold = false; d.grace = 0; d.probe = null;
+      d.order = [real]; d.at = 0;
+      d.asked = 10; d.contact = 0; d.hitPatience = false; d.take = 0;
+      w.time = 1000;
+      d.lastRelease = 1000 - (verdict === 'surge' ? 1 : 8);
+      const res = d.score(w);
+      return { from: tier, to: d.tier, verdict: res.verdict };
+    };
+    const gate = gates[0];                       // 6, ORDINAL
+    out.intoGate = climbFrom(gate - 1, 'clean'); // 5 -> 6, allowed
+    out.atGate = climbFrom(gate, 'clean');       // 6 -> 6, held
+    out.surgeOver = climbFrom(gate - 1, 'surge');// 5 -> 6, NOT 7
+    out.surgeBelow = climbFrom(gate - 3, 'surge');// 3 -> 5, nothing in the way
+
+    // ...and once it is reconciled the same wave climbs straight through
+    g.restart(); w.reconciled.length = 0; w.reconciled.push(1);
+    d.setTier(gate); d.hold = false; d.grace = 0; d.probe = null;
+    d.order = [real]; d.at = 0; d.asked = 10; d.contact = 0; d.hitPatience = false;
+    w.time = 1000; d.lastRelease = 992;
+    d.score(w);
+    out.past = d.tier;
+
+    // ---- a drop is never gated: going back was not what had to be earned ----
+    g.restart(); w.reconciled.length = 0;
+    d.setTier(gate); d.hold = false; d.grace = 0; d.probe = null;
+    d.order = [real]; d.at = 0; d.asked = 10; d.contact = 20; d.hitPatience = true;
+    w.time = 1000; d.lastRelease = 1000;
+    out.routed = d.score(w).moved;
+
+    // ---- a trial may not vault a gate ----
+    g.restart(); w.reconciled.length = 0;
+    d.setTier(gate); d.peak = gate; d.probe = null; d.probeLock = 0;
+    out.trialOverGate = d.trial(gate + 3, w);
+    w.reconciled.push(1);
+    d.probe = null; d.probeLock = 0;
+    out.trialOnceOpen = !!d.trial(gate + 3, w);
+
+    // ---- standing on a gate lights the banner, free ----
+    g.restart();
+    w.reconciled.length = 0;
+    for (let i = 1; i <= 7; i++) w.apertures[i] = 0;
+    const spent = w.energy;
+    d.setTier(gate);
+    g.syncGate();
+    out.lit = w.apertures[1] | 0;
+    out.costNothing = w.energy === spent;
+    out.heldRows = (await import('../src/anomaly.js')).heldList(w).length;
+    // ...and it cannot be farmed by standing there
+    for (let i = 0; i < 5; i++) g.syncGate();
+    out.stillOne = w.apertures[1] | 0;
+    // ...and an ordinary rung lights nothing
+    d.setTier(gate + 1); w.apertures[1] = 0; g.syncGate();
+    out.offGate = w.apertures[1] | 0;
+
+    // ---- the withdrawal ----
+    g.restart();
+    w.reconciled.length = 0;
+    d.setTier(gate);
+    g.syncGate();
+    g.openBoss(1);
+    for (let i = 0; i < 240; i++) g.update(1 / 60);   // through the arrival
+    out.stood = !!w.boss;
+    out.stageWas = w.bossStage;
+    // Hold the stage still and run past patience. dtRaw is what watchBoss
+    // counts, so the wall clock is not what this is waiting on.
+    let ticks = 0;
+    while (w.boss && ticks < 60 * 200) { g.update(1 / 60); ticks++; }
+    out.withdrewAfter = +(ticks / 60).toFixed(1);
+    out.patience = CFG.boss.patience;
+    out.gone = !w.boss;
+    out.notReconciled = !w.reconciled.includes(1);
+    out.stillLit = (w.apertures[1] | 0) > 0 || (g.syncGate(), (w.apertures[1] | 0) > 0);
+    out.tierKept = d.tier;
+
+    // ---- and beating one is worth the rung it was standing in front of ----
+    g.restart();
+    w.reconciled.length = 0;
+    d.setTier(gate);
+    g.syncGate();
+    g.openBoss(1);
+    for (let i = 0; i < 120; i++) g.update(1 / 60);
+    if (w.boss) { w.boss.done = true; g.update(1 / 60); }
+    out.afterWin = { tier: d.tier, reconciled: [...w.reconciled] };
+
+    g.restart();
+    return out;
+  });
+
+  check('the seven anomalies stand on rungs of the ladder',
+    r.gates.length === 7 && r.gates.every((x, i) => i === 0 || x > r.gates[i - 1]),
+    `gates at ${r.gates.join(', ')}`);
+  check('a gate rung can be climbed to, and not past',
+    r.intoGate.to === 6 && r.atGate.to === 6,
+    `5 -> ${r.intoGate.to}, then 6 -> ${r.atGate.to} on a clean wave`);
+  check('...and a surge steps ON to a gate rather than over it',
+    r.surgeOver.to === 6 && r.surgeOver.verdict === 'surge' && r.surgeBelow.to === 5,
+    `surge from 5 lands on ${r.surgeOver.to}; the same surge from 3 lands on ${r.surgeBelow.to}`);
+  check('...and once the anomaly is reconciled the rung opens',
+    r.past === 7, `at 6 with ORDINAL reconciled, a clean wave goes to ${r.past}`);
+  check('a gate holds the climb and never the fall',
+    r.routed === -1, `a rout at the gate moved ${r.routed}`);
+  check('a trial cannot be used to vault a gate',
+    r.trialOverGate === null && r.trialOnceOpen === true,
+    `armed over a standing gate: ${JSON.stringify(r.trialOverGate)}; once open: ${r.trialOnceOpen}`);
+  check('standing on a gate lights its banner, and costs nothing',
+    r.lit === 1 && r.costNothing && r.heldRows === 1 && r.stillOne === 1 && r.offGate === 0,
+    `apertures held ${r.lit}, banner rows ${r.heldRows}, energy unchanged ${r.costNothing}, `
+    + `after five more frames ${r.stillOne}, on an ordinary rung ${r.offGate}`);
+  check('an anomaly that stands too long without losing a stage withdraws',
+    r.stood && r.gone && r.withdrewAfter >= r.patience && r.withdrewAfter < r.patience * 1.5,
+    `stood up ${r.stood}, went after ${r.withdrewAfter}s against a patience of ${r.patience}s`);
+  check('...leaving nothing reconciled, the gate lit and the rung where it was',
+    r.notReconciled && r.stillLit && r.tierKept === 6,
+    `reconciled ${!r.notReconciled}, still lit ${r.stillLit}, standing on ${r.tierKept}`);
+  check('and beating one hands over the rung it was standing in front of',
+    r.afterWin.reconciled.includes(1) && r.afterWin.tier === 7,
+    `reconciled ${JSON.stringify(r.afterWin.reconciled)}, now on rung ${r.afterWin.tier}`);
 }
 
 // --- report -----------------------------------------------------------------

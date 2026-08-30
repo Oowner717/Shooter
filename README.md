@@ -1510,6 +1510,57 @@ damage* a deep rung still pays a little less, because bounty is deliberately
 under health. *Per second* it pays far more, because the wave grows as well.
 The second is the one a player experiences.
 
+### The anomalies go on the ladder (build 203)
+
+All seven were built and none of them was on it. Past band 5 nothing new was
+ever introduced, and the only way to meet an anomaly was to buy an APERTURE out
+of the tree — so a run could climb to rung 40 having never seen one.
+
+Seven rungs are **gates**: 6 ORDINAL, 12 GNOMON, 18 FRACTAL, 24 AMPLITUDE,
+30 DYNAMO, 36 PARITY, 42 TERMINUS. A gate rung is an ordinary rung for waves;
+the ladder simply **will not climb past it** until its anomaly is in
+`world.reconciled`. Standing on one lights the banner at no energy cost —
+topped up to one rather than added to, so it cannot be farmed and so it comes
+back on its own after a withdrawal. Nothing holds the world: the way is opened
+when the player opens it. A surge steps **on** to a gate rather than over it,
+and stalls and routs still push down past one, because going back was never the
+thing that had to be earned. Beating a gate hands over the rung it was standing
+in front of.
+
+**Withdrawal.** A gate that cannot be passed is a run that cannot continue, and
+the ladder has no other way round. An anomaly that stands for `CFG.boss.patience`
+(90 s) without losing a stage stops counting and goes: the field comes back, the
+gate stays lit, nothing is reconciled.
+
+The brief specified this against `Boss.stageT` — **which is dead state.** It is
+set to 0 in the constructor and again in `enterStage`, and nothing in the
+codebase has ever incremented it. All seven bosses do write `world.bossStage` on
+a stage change, so the watcher is in `Game` instead and works identically for
+every one of them, without depending on which subclasses call `super.update`.
+
+Measured. A bare turret parked on rung 6 with the way opened, three runs:
+
+| run | lit | stood for | longest stage | arrival | withdrew | reconciled | still lit | rung |
+|---|---|---|---|---|---|---|---|---|
+| 1–3 | yes | 104.4 s | **90.0 s** | 14.4 s | yes | no | yes | 6 |
+
+Exactly patience, every time. The first version of that probe read 104.4 s and
+called it a failure: it counted the arrival, which `watchBoss` deliberately does
+not, because a boss that is still arriving is not a boss that is standing.
+
+And a max profile answering gates as it reaches them:
+
+| from | ORDINAL | GNOMON | FRACTAL | ended on | energy/s |
+|---|---|---|---|---|---|
+| rung 6 | 35.8 s → 7 | 108.7 s → 13 | **209.9 s → 19** | rung 20 | 74.1 |
+| rung 1 | 217.7 s → 7 | 296.6 s → 13 | — | rung 13 | 41.1 |
+
+Three gates in 210 s from rung 6, inside the five-minute target. From rung 1 it
+is two, and the cause is not the gates: **the first scored wave is at 162.6 s**,
+because build 200 confined the opening to rung 1 and a fresh run spends over
+half of a five-minute session being taught. That is the tutorial working as
+specified, and it is worth knowing before reading any from-rung-1 timing.
+
 ### SCION, and what a graft does
 
 A large body worth more to the field dead than alive.

@@ -109,6 +109,8 @@ const read = () => page.evaluate(() => {
     hostile: w.enemies.filter((e) => !e.dead && !e.harmless).length,
     kills: w.kills, energy: Math.round(w.energy), earned: Math.round(w.earned), phase: w.phase, boss: !!w.boss,
     dividend: +(g.__dividend ? g.__dividend(w) : 1),
+    gated: d.heldBy ? d.heldBy(w) : 0,
+    reconciled: [...(w.reconciled || [])],
     dir: { at: d.at, resting: d.resting, tier: d.tier, peak: d.peak, fails: d.fails, verdict: d.lastVerdict, trait: d.trait?.id || d.trait || null,
       of: d.wave ? d.wave.of.map(([id, n]) => `${id}x${n}`).join('+') : '', teach: !!(d.wave && d.wave.teach), band: d.wave ? (d.wave.band || null) : null,
       asked: d.asked, contact: +d.contact.toFixed(1), hitPatience: d.hitPatience },
@@ -120,6 +122,7 @@ const read = () => page.evaluate(() => {
 
 const waves = []; const orderLog = []; const types = {};
 let cur = null; let lastAt = -2; let lastResting = null; let taps = 0; let lastAb = 0; let lastOrder = 0;
+let gatesOpened = 0; const gateLog = [];
 const t0 = Date.now(); const T = () => +((Date.now() - t0) / 1000).toFixed(1);
 const energy0 = (await read()).energy;
 
@@ -133,8 +136,28 @@ while (T() < SECONDS) {
     waves.push(cur); cur = null;
   }
   lastResting = d.resting;
+  if (st.reconciled.length > gateLog.length) {
+    for (const n of st.reconciled.slice(gateLog.length)) gateLog.push({ n, at: T(), tier: d.tier });
+  }
   if (Date.now() - lastOrder > 15000) { lastOrder = Date.now(); orderLog.push(`t=${T()}s tier=${d.tier} ${st.order}`); }
   if (st.phase === 'boot' || st.phase === 'frozen') { await sleep(100); continue; }
+  /*
+   * A gate is answered when the bot reaches one.
+   *
+   * Only when the ladder is actually HELD by a gate -- a held aperture the run
+   * bought for itself is a decision the bot has no business making, but a rung
+   * the ladder will not climb past has exactly one thing to do about it, and a
+   * probe that walks up to a gate and stands there is measuring nothing.
+   */
+  if (st.gated && !st.boss) {
+    const opened = await page.evaluate(() => {
+      const row = document.querySelector('#apertureBar .apRow');
+      if (!row) return false;
+      row.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      return true;
+    });
+    if (opened) { gatesOpened++; await sleep(250); continue; }
+  }
   if (st.panel) { await page.evaluate((p) => { const g = window.__sim; if (p === 'loadout') g.closeLoadout(); else g.hud.menu.toggle(); }, st.panel); continue; }
 
   const s = st.shooter;
@@ -156,7 +179,7 @@ const count = (v) => scored.filter((w) => w.verdict === v).length;
 const median = (a) => (a.length ? a.slice().sort((x, y) => x - y)[a.length >> 1] : null);
 const out = {
   profile: PROFILE, tier: TIER, seconds: SECONDS, taps, hold: HOLD,
-  dividend: fin.dividend,
+  dividend: fin.dividend, gatesOpened, gateLog, reconciled: fin.reconciled,
   final: { kills: fin.kills, tier: fin.dir.tier, peak: fin.dir.peak, energyPerSec: +((fin.energy - energy0) / SECONDS).toFixed(2) },
   summary: { scored: scored.length, surge: count('surge'), clean: count('clean'), stall: count('stall'), rout: count('rout'), failed: count('failed'),
     medianDur: median(scored.map((w) => w.dur)), medianContact: median(scored.map((w) => w.contact)), maxHostile: Math.max(0, ...waves.map((w) => w.maxHostile)) },

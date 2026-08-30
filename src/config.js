@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '202';
+export const BUILD = '203';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '202';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '6185e74';
+export const REV = '8452af8';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -260,6 +260,21 @@ export const CFG = {
       routContact: 12, // ...as is this long with something attached
       failStreak: 2, // consecutive stalls before it steps back
       probeLock: 60, // seconds before another trial rung may be armed
+      /*
+       * ---- the gates (build 203) ----
+       *
+       * The seven anomalies were all built and none of them was on the
+       * ladder: past band 5 nothing new was ever introduced, and the only way
+       * to meet one was to buy an APERTURE from the tree. A gate rung is an
+       * ordinary rung for waves -- the ladder simply will not CLIMB past it
+       * until its anomaly is in `world.reconciled`. Standing on one lights the
+       * banner at no energy cost. Nothing holds the world: the way is opened
+       * when the player opens it, and stalls and routs still push down past a
+       * gate, because going back was never the thing that had to be earned.
+       *
+       * Index i is anomaly n = i + 1; see ANOMALIES in anomaly.js.
+       */
+      gates: [6, 12, 18, 24, 30, 36, 42],
     },
     /*
      * A flat multiplier on every authored count, on top of the swell. The
@@ -2134,6 +2149,17 @@ export const CFG = {
     // A beat of empty sky before the field picks up again. The wave that was
     // running when the way opened resumes — see Game.endBoss().
     after: 4.6,
+    /*
+     * How long a boss may stand without losing a stage before it withdraws.
+     *
+     * A gate that cannot be passed is a run that cannot continue, and the
+     * ladder has no other way past. Rather than let an under-gunned run sit in
+     * front of one for ever, the anomaly stops counting and goes: the field
+     * comes back, the gate stays lit, and nothing is reconciled. Measured off
+     * a stage CHANGE rather than the whole fight, so a long fight that is
+     * visibly progressing is never interrupted.
+     */
+    patience: 90,
     riseFor: 2.1, // seconds a REMAINDER takes to reach the turret
     // What one leaves behind. One each, and the only source there is.
     remainder: 1,
