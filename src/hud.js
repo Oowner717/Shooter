@@ -1003,10 +1003,19 @@ export class Hud {
        * two of them side by side, which is the same row asking a question
        * instead of reporting one.
        */
-      el.innerHTML = '<b></b><i></i><u class="rTraits"></u>';
+      /*
+       * Four things a node can say, in the order they matter: which rung it is,
+       * whether it is passed, what rules are in play, and how the running wave
+       * is going. The meters are only ever painted on the rung the run is
+       * standing on -- everywhere else they would be a claim about a wave that
+       * has not been chosen.
+       */
+      el.innerHTML = '<b></b><i></i><u class="rTraits"></u>'
+        + '<s class="rBars"><em></em><em></em><em></em></s>';
       this.el.railNodes.appendChild(el);
       this.railCells.push({ el, n: el.querySelector('b'), tick: el.querySelector('i'),
-        traits: el.querySelector('.rTraits'), at: -1, glyphs: '' });
+        traits: el.querySelector('.rTraits'),
+        bars: [...el.querySelectorAll('.rBars em')], at: -1, glyphs: '', meters: '' });
     }
     /*
      * Moving by hand pins the tier. Anything else is a control that fights
@@ -1058,6 +1067,15 @@ export class Hud {
     });
     this.el.sheetClose = $('sheetClose');
     this.el.sheetClose.addEventListener('pointerdown', () => g.openSheet(false));
+    /*
+     * ...and it closes the way the other two held things do: a key for a
+     * keyboard, and it never survives a restart or a boss arriving. Opening
+     * the menu over it closes it rather than stacking two held states, which
+     * would leave the world paused by something with no visible way out.
+     */
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && g.sheetOpen) g.openSheet(false);
+    });
     this.el.sheetRecall.addEventListener('pointerdown', () => {
       const dir = d();
       if (!dir) return;
@@ -1142,7 +1160,18 @@ export class Hud {
      */
     const peak = dir.peak || 0;
     const trial = dir.probe ? dir.probe.to : 0;
-    if (this._railAt !== n || this._railPeak !== peak || this._railTrial !== trial) {
+    /*
+     * ...and how many anomalies are down, because a gate that has just been
+     * answered has to stop being drawn shut. Without it the repaint is keyed
+     * only on where the run is standing, and reconciling one without moving
+     * leaves the rung marked closed. The live path happens to move the tier a
+     * line later, which is exactly the kind of accident that holds until it
+     * does not.
+     */
+    const done = (world.reconciled || []).length;
+    if (this._railAt !== n || this._railPeak !== peak || this._railTrial !== trial
+        || this._railDone !== done) {
+      this._railDone = done;
       this._railAt = n;
       this._railPeak = peak;
       this._railTrial = trial;
@@ -1182,12 +1211,17 @@ export class Hud {
          * that has not been chosen yet. What the rail can honestly say is
          * what is in play now, and what the gate is offering.
          */
-        const want = t === n ? this.railGlyphs(dir) : '';
+        const want = t === n ? this.railGlyphs(dir) : this.railAhead(dir, t);
         if (c.glyphs !== want) {
           c.glyphs = want;
           c.traits.textContent = want;
           c.el.classList.toggle('offering', t === n && !!(dir.laneOffer && dir.laneOffer.length));
         }
+        // A gate is a property of the RUNG, so it is honest at any distance --
+        // unlike a trait, which belongs to a wave that may not exist yet.
+        const gate = dir.gateAt(t);
+        c.el.classList.toggle('gate', !!gate);
+        c.el.classList.toggle('shut', !!gate && !(world.reconciled || []).includes(gate));
       }
     }
     if (this._railHold !== dir.hold) {
@@ -1199,6 +1233,7 @@ export class Hud {
       this.writeAuto(true, n);
     }
     this._railHeldAt = n;
+    this.syncRailBars(world, dir);
     // Nothing below tier 1 to step back to, and nothing above the highest
     // rung the run has climbed: forward is earned, back is free.
     $('railDown').disabled = n <= 1;
@@ -2003,6 +2038,43 @@ export class Hud {
    * What the rung the run is standing on has to say: the lane a gate is
    * offering, or failing that the rules the running wave is carrying.
    */
+  /**
+   * The three meters, on the rung the run is standing on: contact toward the
+   * failing six seconds, time since the last release toward the clean twelve,
+   * and how much of the wave is down. The same three AUDIT shows -- so the
+   * verdict is legible on the rail before it is announced, and the sheet is
+   * where you go for the detail rather than for the news.
+   */
+  syncRailBars(world, dir) {
+    const T = CFG.waves.tier;
+    const at = this.railCells.find((c) => c.at === dir.tier);
+    for (const c of this.railCells) c.el.classList.toggle('live', c === at && !dir.resting);
+    if (!at) return;
+    if (dir.resting) { at.meters = ''; return; }
+    const alive = world.enemies.filter((e) => !e.dead && !e.harmless).length;
+    const since = Math.max(0, (world.time || 0) - dir.lastRelease);
+    const cleared = dir.asked > 0 ? Math.max(0, (dir.asked - alive) / dir.asked) : 0;
+    const f = [
+      Math.min(1, dir.contact / T.failContact),
+      Math.min(1, since / T.cleanWithin),
+      Math.min(1, cleared),
+    ];
+    // Keyed on tenths: this runs every frame, and a width in per cent that
+    // changes on the third decimal is a layout a frame.
+    const key = f.map((x) => Math.round(x * 10)).join(',');
+    if (at.meters === key) return;
+    at.meters = key;
+    for (let i = 0; i < 3; i++) at.bars[i].style.width = `${(f[i] * 100).toFixed(0)}%`;
+    at.bars[0].classList.toggle('hot', f[0] > 0.7);
+    at.bars[1].classList.toggle('hot', f[1] > 0.7);
+    at.bars[2].classList.toggle('hot', f[2] < 0.4);
+  }
+
+  /** What a rung AHEAD may honestly show: the gate on it, if there is one. */
+  railAhead(dir, t) {
+    return dir.gateAt(t) ? '\u25c8' : '';
+  }
+
   railGlyphs(dir) {
     const offer = dir.laneOffer;
     if (offer && offer.length) return offer.map((t) => t.glyph).join(' ');

@@ -1455,6 +1455,22 @@ button.loadSlot:active .slotOff { color: var(--tone, var(--accent)); }
 /* Nothing on the field is live while it is up. */
 body.loadoutOpen #abilities,
 body.loadoutOpen #quickBar { pointer-events: none; opacity: 0.25; }
+/*
+ * The wave sheet, held open the way the menu and the loadout are.
+ *
+ * The rail goes out of play with the strip, which the other two do not need to
+ * say: the sheet is opened FROM the rail and sits directly under it, so a
+ * thumb coming off the node it just pressed lands on an arrow. The disables
+ * that actually land are the id-carrying ones further down this file -- see
+ * the note there; these three lines only dim.
+ */
+body.sheetOpen #abilities,
+body.sheetOpen #quickBar,
+body.sheetOpen #waveRail { pointer-events: none; opacity: 0.25; }
+body.sheetOpen #alerts { opacity: 0.25; transition: opacity 0.2s ease; }
+/* ...and the sheet itself is the one thing that still takes input. */
+body.sheetOpen #waveSheet,
+body.sheetOpen #waveSheet button { pointer-events: auto; opacity: 1; }
 
 
 /* Already stacked. The number is the point of the marks. */
@@ -1750,6 +1766,9 @@ body.aimOpen .q_cfg { opacity: 0.22; }
  */
 body.menuOpen #quickBar button,
 body.loadoutOpen #quickBar button,
+body.sheetOpen #quickBar button,
+body.sheetOpen #abilities button,
+body.sheetOpen #waveRail button,
 body.aimOpen #quickBar .q_mines button,
 body.aimOpen #quickBar .q_ammo button,
 body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
@@ -2698,6 +2717,36 @@ body.bossUp #waveRail { display: none; }
   opacity: 0.65;
   pointer-events: none;
 }
+
+/*
+ * The three meters, under the rung the run is standing on: contact, time since
+ * the last release, and how much of the wave is down. The same three AUDIT
+ * shows -- the rail says how it is going, the sheet says why.
+ */
+.rBars {
+  display: none;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 2px;
+  text-decoration: none;
+  margin-top: 2px;
+}
+.railNode.live .rBars { display: grid; }
+.rBars em {
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+  width: 0;
+  /* Stepped in tenths by syncRailBars, so a transition reads as motion rather
+     than as a stutter. */
+  transition: width 0.18s linear;
+}
+.rBars em.hot { background: var(--warn); }
+@media (prefers-reduced-motion: reduce) { .rBars em { transition: none; } }
+/* A gate stands on a rung, so it is honest at any distance -- unlike a trait,
+   which belongs to a wave that may not have been chosen yet. */
+.railNode.gate { border-color: color-mix(in srgb, var(--accent-2) 45%, transparent); }
+.railNode.gate.shut .rTraits { color: var(--accent-2); }
 
 .railNode.trial {
   border-style: dashed;

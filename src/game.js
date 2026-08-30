@@ -304,9 +304,25 @@ export class Game {
           return;
         }
         if (margin > 0) self.hud.alert(`MARGIN +${margin}`, 'good', 3);
-        if (!moved) return;
-        if (moved < 0) self.hud.alert(`THE FIELD RELENTS · ${reason} · TIER ${tier}`, 'remainder', 4.5);
+        /*
+         * ---- every move says why ----
+         *
+         * A step you did not ask for is a thing that happened, not a number
+         * that quietly changed -- and the reason is what makes it a thing
+         * rather than a mood. Held at a gate is announced even though the
+         * ladder did not move, because a run standing still with a wave it
+         * just cleared is the one case where nothing changing IS the news.
+         */
+        const held = self.world.director.heldBy(self.world);
+        if (!moved) {
+          if (held && (verdict === 'surge' || verdict === 'clean')) {
+            self.hud.alert(`HELD AT THE GATE · ${nameOf(held)}`, 'remainder', 4);
+          }
+          return;
+        }
+        if (moved < 0) self.hud.alert(`STEPPED BACK · ${reason} · TIER ${tier}`, 'remainder', 4.5);
         else if (moved > 1) self.hud.alert(`SURGE · ${reason} · TIER ${tier}`, 'good', 4);
+        else self.hud.alert(`TIER ${tier} · ${reason}`, 'info', 3);
       },
       alert: (text, kind, dur) => self.hud.alert(text, kind, dur),
       abilityTaken: (i) => self.hud.flashTaken(i),
@@ -391,7 +407,10 @@ export class Game {
     w.up = freshUpgrades();
     w.ledger.length = 0;
     this.loadoutOpen = null;
+    // Never survives a restart: a held state whose opener is gone is a paused
+    // world with no visible way out.
     this.sheetOpen = false;
+    document.body.classList.remove('sheetOpen');
     /*
      * There is no five hundred to reach, no lull and no ending: the field keeps
      * coming and the run is however long you keep playing it.
@@ -756,7 +775,7 @@ export class Game {
    * that.
    */
   openSheet(on = true) {
-    if (on && this.world.phase !== 'staging') return false;
+    if (on && (this.world.phase !== 'staging' || this.world.boss)) return false;
     this.sheetOpen = !!on;
     document.body.classList.toggle('sheetOpen', this.sheetOpen);
     this.hud.syncSheet(this.world);
@@ -1615,6 +1634,7 @@ export class Game {
     // No codex note here: recording it on arrival would name the thing
     // before it has done anything. It is recorded when it comes apart, by the
     // same path as everything else.
+    this.openSheet(false);
     this.hud.alert('THE WAY IS OPEN', 'rigDone', 4);
     return true;
   }

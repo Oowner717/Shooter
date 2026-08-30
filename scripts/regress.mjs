@@ -9416,6 +9416,150 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `(${r.gap.n} samples each)`);
 }
 
+// --- the rail says how it is going, and the sheet is really held ------------
+/*
+ * Two halves of the same phase.
+ *
+ * THE SHEET IS HELD THE WAY THE MENU AND THE LOADOUT ARE. `#ui button
+ * { pointer-events: auto }` carries an id, so nothing built out of classes can
+ * turn a control back off -- `body.menuOpen #quickBar { pointer-events: none }`
+ * never disabled a single button, and the strip stayed fully pressable under
+ * the sheet covering it for however many builds. A deliberate disable has to
+ * name an id of its own. Asserted on the RENDERED style rather than on the
+ * class, because the class is what was already there and wrong.
+ *
+ * THE RAIL SAYS HOW IT IS GOING. The three meters AUDIT shows are on the rung
+ * the run is standing on, so the verdict is legible before it is announced --
+ * and asserted as rendered boxes, never as a property, for the same reason the
+ * AUTO AIM row had to be: `el.hidden` does nothing to an element the sheet
+ * gives a display to.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { CFG, WAVES } = await import('../src/config.js');
+    const T = CFG.waves.tier;
+    const w = g.world;
+    const d = w.director;
+    const out = {};
+    const real = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
+    const pe = (sel) => {
+      const el = document.querySelector(sel);
+      return el ? getComputedStyle(el).pointerEvents : 'missing';
+    };
+
+    g.restart();
+    w.phase = 'staging';
+    d.setTier(12); d.peak = 12;
+    g.hud.syncRail(w);
+    out.closed = {
+      strip: pe('#quickBar button'), abil: pe('#abilities button'),
+      rail: pe('#railUp'), body: document.body.classList.contains('sheetOpen'),
+    };
+    g.openSheet(true);
+    out.open = {
+      strip: pe('#quickBar button'), abil: pe('#abilities button'),
+      // sheetClose, not sheetRecall: RECALL is legitimately `disabled` until the
+      // tree has sold it, and `#waveSheet .sheetAct[disabled]` rightly beats
+      // the rule that turns the sheet back on. Measuring it asked whether an
+      // unbought control is pressable, which is not the question.
+      rail: pe('#railUp'), sheet: pe('#sheetClose'),
+      body: document.body.classList.contains('sheetOpen'),
+      // ...and it is actually on screen, not merely un-hidden.
+      box: document.getElementById('waveSheet').getBoundingClientRect().height,
+    };
+    // ...and it does not outlive its opener
+    g.restart();
+    out.afterRestart = { open: g.sheetOpen, cls: document.body.classList.contains('sheetOpen') };
+    w.phase = 'staging';
+    d.setTier(6); d.peak = 6;
+    w.reconciled.length = 0;
+    g.syncGate();
+    g.openSheet(true);
+    g.openBoss(1);
+    out.afterBoss = g.sheetOpen;
+    if (w.boss) { w.boss.clear(w); w.boss = null; w.bossN = 0; w.bossStage = 0; }
+
+    // ---- the meters, on the rung the run is standing on ----
+    g.restart();
+    w.phase = 'staging';
+    g.debugClearField();
+    d.setTier(12); d.peak = 12; d.hold = true;
+    d.order = [real]; d.at = 0; d.resting = false;
+    d.asked = 10; d.contact = 0; d.hitPatience = false;
+    w.time = 1000; d.lastRelease = 1000;
+    for (let i = 0; i < 4; i++) {
+      const e = g.debugSpawn('mote', 40 + i * 20, 150);
+      if (e) { e.staged = false; e.spawnIn = 0; }
+    }
+    g.hud.syncRail(w);
+    const cellAt = () => [...document.querySelectorAll('.railNode')]
+      .find((el) => Number(el.querySelector('b').textContent) === d.tier);
+    const widths = () => [...cellAt().querySelectorAll('.rBars em')]
+      .map((el) => parseFloat(el.style.width) || 0);
+    out.barsShown = cellAt().querySelector('.rBars').getBoundingClientRect().height > 0;
+    const w0 = widths();
+    // Six seconds on the turret, and half the wave gone.
+    d.contact = T.failContact * 0.5;
+    w.time = 1000 + T.cleanWithin * 0.5;
+    g.hud.syncRail(w);
+    const w1 = widths();
+    out.moved = w1.some((x, i) => Math.abs(x - w0[i]) > 1);
+    out.contactBar = w1[0];
+    out.sinceBar = w1[1];
+    out.clearedBar = w1[2];
+    // ...and between waves there is nothing to report
+    d.resting = true;
+    g.hud.syncRail(w);
+    out.hiddenBetween = cellAt().querySelector('.rBars').getBoundingClientRect().height === 0;
+
+    // ---- a gate is honest at a distance ----
+    d.resting = false;
+    d.setTier(4); d.peak = 12;
+    w.reconciled.length = 0;
+    g.hud.syncRail(w);
+    const nodes = [...document.querySelectorAll('.railNode')].map((el) => ({
+      n: Number(el.querySelector('b').textContent),
+      gate: el.classList.contains('gate'), shut: el.classList.contains('shut'),
+    }));
+    out.gateAhead = nodes.find((x) => x.n === 6) || null;
+    out.plainRung = nodes.find((x) => x.n === 5) || null;
+    w.reconciled.push(1);
+    g.hud.syncRail(w);
+    out.gateOpened = [...document.querySelectorAll('.railNode')]
+      .some((el) => Number(el.querySelector('b').textContent) === 6
+        && el.classList.contains('gate') && !el.classList.contains('shut'));
+
+    g.debugClearField();
+    g.restart();
+    return out;
+  });
+
+  check('the sheet takes the strip, the abilities and the rail out of play',
+    r.closed.strip === 'auto' && r.open.strip === 'none'
+    && r.open.abil === 'none' && r.open.rail === 'none' && r.open.sheet === 'auto'
+    && r.open.box > 0,
+    `strip pointer-events ${r.closed.strip} -> ${r.open.strip}, abilities ${r.open.abil}, `
+    + `rail ${r.open.rail}, the sheet itself ${r.open.sheet}; sheet ${r.open.box}px tall`);
+  check('...and it never outlives its opener',
+    !r.afterRestart.open && !r.afterRestart.cls && !r.afterBoss,
+    `after a restart ${r.afterRestart.open} (class ${r.afterRestart.cls}); `
+    + `with an anomaly up ${r.afterBoss}`);
+  check('the rung the run is on carries the three meters, and they move',
+    r.barsShown && r.moved && r.contactBar > 40 && r.contactBar < 60
+    && r.sinceBar > 40 && r.sinceBar < 60 && r.clearedBar > 50,
+    `drawn ${r.barsShown}; contact ${r.contactBar}%, since ${r.sinceBar}%, `
+    + `cleared ${r.clearedBar}% (half, half, and six of ten down)`);
+  check('...and says nothing between waves',
+    r.hiddenBetween, `bars still drawn while resting: ${!r.hiddenBetween}`);
+  check('a gate is marked on the rung it stands on, from any distance',
+    r.gateAhead && r.gateAhead.gate && r.gateAhead.shut
+    && r.plainRung && !r.plainRung.gate && r.gateOpened,
+    `standing on 4: rung 6 gate ${r.gateAhead && r.gateAhead.gate} shut `
+    + `${r.gateAhead && r.gateAhead.shut}, rung 5 gate ${r.plainRung && r.plainRung.gate}; `
+    + `once reconciled it is marked and open: ${r.gateOpened}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

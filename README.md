@@ -1684,6 +1684,51 @@ is banked when its wreckage is *collected*, which lags the wave and does not
 respect its boundaries — measuring it properly needs a probe that follows the
 motes rather than the clock.
 
+### The readout, and the sheet held properly (build 206)
+
+**The sheet is held the way the menu and the loadout are**, which is what it
+should have been designed from in the first place — `Game.paused` alone stops
+the world but leaves everything under the sheet pressable.
+
+`#ui button { pointer-events: auto }` carries an id, so nothing built out of
+classes can turn a control back off. This file already records that
+`body.menuOpen #quickBar { pointer-events: none }` and its loadout twin have
+**never disabled a single button**. `body.sheetOpen` therefore does both halves:
+the class rules dim the strip, the abilities and the rail to 25%, and the
+id-carrying rule beside the menu's own is what actually lands. Measured on the
+rendered style, never on the class — the class is what was already there and
+wrong. It closes on Escape like the other two, and never outlives its opener: a
+restart or an anomaly arriving takes it down, because a held state whose opener
+is gone is a paused world with no visible way out.
+
+**The rail says how it is going.** The rung the run is standing on carries the
+same three meters AUDIT shows — contact toward 6 s, time since the last release
+toward 12 s, cleared fraction — as three hairline bars, so the verdict is
+legible before it is announced and the sheet is where you go for the detail
+rather than for the news. They are stepped in tenths, because a width in per
+cent that changes on the third decimal is a layout every frame. Nothing is drawn
+between waves.
+
+**A gate is marked on the rung it stands on, at any distance** — unlike a trait,
+which belongs to a wave that may not have been chosen yet, and so is only ever
+shown on the rung in play. That distinction is the whole of what the rail may
+honestly say about a rung ahead.
+
+**Every move says why.** `STEPPED BACK · 9 S ON THE TURRET · TIER 13`,
+`SURGE · CLEARED BEFORE THE LAST ONE LANDED · TIER 15`, `TIER 12 · THE FIELD
+CAME BACK`, `PROVEN 17`, `HELD AT THE GATE · ORDINAL`. The last is announced
+even though the ladder did not move: a run standing still with a wave it just
+cleared is the one case where nothing changing *is* the news.
+
+**One real bug came out of writing the case for it.** `syncRail` repaints only
+when the tier, the ceiling or the trial changes — so reconciling an anomaly
+without moving left its rung drawn shut. The live path happens to call
+`setTier(tier + 1)` a line earlier, so it never showed; that is the kind of
+accident that holds until it does not. The cache key counts `reconciled` now.
+
+At 320×568 with the meter row the rail is 48px, still clears the top bar, and
+`pillCap()` is 3 — so the readout costs no teaching-line slot.
+
 ### SCION, and what a graft does
 
 A large body worth more to the field dead than alive.
