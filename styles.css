@@ -2585,6 +2585,34 @@ body.bossUp #waveRail { display: none; }
  * the one you are on, because you are on it. It comes after `.at` so the
  * dashed border wins on the element that carries both.
  */
+/*
+ * The rules the running wave is carrying, under its number. Monochrome and in
+ * the rail's own palette: a trait never recolours anything, because the
+ * roster's colours already mean something and two meanings on one channel is
+ * one too many.
+ */
+.rTraits {
+  display: block;
+  font-style: normal;
+  font-size: 9px;
+  line-height: 9px;
+  height: 9px;
+  letter-spacing: 1px;
+  color: color-mix(in srgb, var(--accent) 55%, var(--dim));
+}
+.railNode.at .rTraits { color: var(--accent); }
+/* ...and the same row asking rather than reporting: a gate's two lanes. */
+.railNode.offering .rTraits {
+  color: var(--accent);
+  font-size: 11px;
+  line-height: 11px;
+  animation: laneBreathe 1.8s ease-in-out infinite;
+}
+@keyframes laneBreathe { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .railNode.offering .rTraits { animation: none; opacity: 0.9; }
+}
+
 .railNode.trial {
   border-style: dashed;
   border-color: color-mix(in srgb, var(--warn, var(--accent)) 78%, transparent);

@@ -1561,6 +1561,70 @@ because build 200 confined the opening to rung 1 and a fresh run spends over
 half of a five-minute session being taught. That is the tutorial working as
 specified, and it is worth knowing before reading any from-rung-1 timing.
 
+### The waves start asking a different question (build 204)
+
+Past band 5 the ladder introduced nothing new: the climb was carried by
+population, health and bounty, which are three ways of saying *more of the
+same*. A **trait** is the fourth thing — the same wave, answered differently.
+`src/traits.js` holds five:
+
+| trait | rule |
+|---|---|
+| **ARMORED** | the first hit an object takes each second does nothing |
+| **SWARM** | twice as many, half the health |
+| **MENDING** | it closes 4%/s unless hit twice inside a second |
+| **TETHERED** | pairs share one pool of health |
+| **EBB** | wreckage goes the other way |
+
+Three rules hold the file together. **Grey is harmless** — DRIFT and energy are
+never traited, which is why the stamp sits inside the same guard as the tier
+multiplier. **A trait never recolours a type** — the roster's colours already
+mean something, and two meanings on one channel is one too many; the rail says
+it instead. **Seeded, not stored** — the trait is a pure function of
+`world.runSeed`, the cycle and the wave's index, so the rail can say what is in
+play, a save carries one integer instead of a list, and two runs of one seed are
+the same run. No `Math.random` on the per-wave path: a decorative roll there
+moved ORDINAL's canonical hash once already.
+
+None below rung 10, one from there, two from 25. Never the opening, never the
+drift-only bonus wave. Passing a gate leaves **two traits offered on the rail**;
+tapping one fixes it for six rungs. Nothing is held and nothing is asked — the
+default is to leave it and let the seed keep deciding.
+
+Measured, max profile pinned at rung 12 for 240 s — **20 scored waves, none
+untraited**:
+
+| trait | verdicts | median wave |
+|---|---|---|
+| tethered | 3 surge, 3 clean, 1 stall | 5.0 s |
+| mending | 1 surge, 3 clean | 6.7 s |
+| armored | 1 clean | 7.9 s |
+| swarm | 4 clean, 1 stall | 7.9 s |
+| ebb | 3 clean | 9.2 s |
+
+The distribution genuinely differs, and **neither SWARM nor ARMORED produced a
+single surge**, which is the acceptance. TETHERED is the soft one for a maxed
+turret — a shared pool is half the health of two bodies — and is worth a look
+before it goes near a balance pass.
+
+**Two names in the brief were already taken and one field was dead.** EBB is
+documented in this README as an Offer, and the Offers reward pool
+(SURGE/HASTE/CORONA/OVERDRAW/SCOUR/EBB/SEED/VOLLEY) **no longer exists in the
+code** — there is no pool, no implementation, and `hud.offerResume` is the
+title screen's *resume your run*. The name was free, so the trait keeps it, but
+that README section and three `EBB:` comments in `enemies.js`/`config.js` are
+stale. Worth knowing before Phase 5, which specifies a sheet that "holds the
+world the way Offers do": there is nothing there to copy.
+
+**Three of my own cases needed the traits to exist before they were correct**,
+which is the phase's own hazard showing up in its tests. The teach-wave health
+ratio read 13.3x against 26.7x whenever the seed rolled SWARM at rung 30. The
+TETHERED case read "the other one did not drop" on a working build, because
+rung 30 carries *two* traits and ARMORED turned the test hit away entirely —
+`applyDamage` returns before the mirroring. And the climb case's margin sat on
+exactly rung 10, the trait threshold, making it a coin flip by construction.
+A case about one rule has to survive the other.
+
 ### SCION, and what a graft does
 
 A large body worth more to the field dead than alive.

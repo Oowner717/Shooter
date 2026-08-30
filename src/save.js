@@ -193,6 +193,7 @@ export function captureRun(world, game) {
     apertures: [...world.apertures],
     // Which bosses have ever been broken. Progression -- it is what unseals
     // the next slot -- so it is recorded rather than recomputed.
+    runSeed: world.runSeed | 0,
     reconciled: [...world.reconciled],
     // ...and the same for what a boss left. Both are held counts that go
     // down again, which the ledger has no way of recording.
@@ -233,6 +234,9 @@ export function captureRun(world, game) {
       // save without them restores to no trial and no grace, which is what
       // every save before build 201 means.
       probe: world.director.probe ? { ...world.director.probe } : null,
+      // The lane, if one was taken at a gate. Additive: a save without it
+      // restores to no lane, which is what every save before 204 means.
+      lane: world.director.lane ? { ...world.director.lane } : null,
       grace: world.director.grace | 0,
       hold: world.director.hold ? 1 : 0,
       fails: world.director.fails,

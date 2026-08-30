@@ -3,6 +3,7 @@
 // the `world` handle it is given.
 
 import { CFG, WAVES, TYPE_BY_ID, ROUTES, massOf } from './config.js';
+import { traitsFor, traitAt, has as hasTrait, TRAIT_BY_ID } from './traits.js';
 import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
 import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul } from './fx.js';
 import { audio } from './audio.js';
@@ -227,6 +228,10 @@ export class Enemy {
     this.graftBaseHp = 0;
     this.graftBaseEnergy = 0;
     this.tether = null; // the other half of a TOW, if any
+    this.traits = null; // the wave's rules, if it was released by a traited one
+    this.plateT = 0; // ARMORED: until the plate turns another hit away
+    this.hitAt = 0; // MENDING: when this body was last hurt
+    this.hitAt2 = 0; // ...and the time before that, so "twice within" is real
     // What last hit this body and when -- the death wears it if it is fresh.
     // A name from the round's flight form ('flake', 'shell'...), never from
     // an ability, so every kill in the canonical fight stays off the path.
@@ -596,6 +601,20 @@ export class Enemy {
         tx = world.decoy.x;
         ty = world.decoy.y;
       }
+      /*
+       * EBB: wreckage goes the other way.
+       *
+       * Only the wreckage -- the bodies still close as they always did, or
+       * the trait would be a rest rather than a rule. The mote steers at a
+       * point reflected through itself, so it uses the same steering it
+       * already had and simply wants the opposite thing; PULSE and INTAKE
+       * still overrule it, because taking energy in by hand is the answer to
+       * this and it should keep working.
+       */
+      if (this.isDrop && this.traits && hasTrait(this.traits, 'ebb')) {
+        tx = this.x * 2 - tx;
+        ty = this.y * 2 - ty;
+      }
     }
 
     let dx = tx - this.x;
@@ -700,6 +719,23 @@ export class Enemy {
     if (this.spawnIn > 0) this.spawnIn = Math.max(0, this.spawnIn - dt * 2.2);
     this.flash = Math.max(0, this.flash - dt * 4.5);
     if (this.slugged > 0) this.slugged = Math.max(0, this.slugged - dt);
+    if (this.plateT > 0) this.plateT = Math.max(0, this.plateT - dt);
+    /*
+     * MENDING: it closes unless you keep hitting it.
+     *
+     * Stopped by TWO hits inside the window rather than one, so a stray round
+     * cannot switch the rule off -- with one, MENDING would be a rule about
+     * the opening seconds of a wave and nothing after. It is deliberately the
+     * same verb as a graft's regen and a different reason: a graft is
+     * something stuck to the body and shot off, this is the body itself.
+     */
+    if (this.traits && !this.isDrop && this.hp < this.maxHp
+        && hasTrait(this.traits, 'mending')) {
+      const T = CFG.waves.tier;
+      const now = world.time || 0;
+      const pressed = now - this.hitAt2 < T.mendWindow;
+      if (!pressed) this.hp = Math.min(this.maxHp, this.hp + this.maxHp * T.mendRate * dt);
+    }
 
     /*
      * A grafted body closes what you did not finish, once per second per ball.
@@ -929,6 +965,23 @@ export class Enemy {
       }
       return;
     }
+    /*
+     * ARMORED: the first hit each second does nothing.
+     *
+     * Before the plate and before the ward, because it is not a reduction --
+     * the hit did not happen. A rate rather than a percentage on purpose: it
+     * costs a fast turret almost nothing and a slow one a great deal, which
+     * is the one axis the roster's own armour does not already cover.
+     */
+    if (this.traits && hasTrait(this.traits, 'armored') && this.plateT <= 0) {
+      this.plateT = CFG.waves.tier.plateEvery;
+      this.flash = Math.min(1, this.flash + 0.35);
+      return;
+    }
+    // MENDING counts hits, and needs the one before last: two inside the
+    // window stop it closing. One stray round must never switch a rule off.
+    this.hitAt2 = this.hitAt;
+    this.hitAt = world.time || 0;
     // A HERALD's cover, if one is refreshing it. It lapses a frame after the
     // beacon stops covering, which is what makes killing the beacon feel like
     // the answer rather than a statistic.
@@ -947,6 +1000,22 @@ export class Enemy {
       this.vx += nx * push;
       this.vy += ny * push;
       this.av += spread(push * 0.02);
+    }
+    /*
+     * TETHERED: the pair is one body with two shapes.
+     *
+     * Written across rather than halved, so shooting either half is shooting
+     * the same health -- which is the point, and is what makes a tethered
+     * pair different from two bodies that happen to be joined. Guarded on the
+     * other half being alive and traited, so a TOW's own tether (which shares
+     * nothing) is untouched.
+     */
+    const o = this.tether && this.tether.other;
+    if (o && !o.dead && o.traits && hasTrait(o.traits, 'tethered')
+        && hasTrait(this.traits, 'tethered')) {
+      o.hp = this.hp;
+      o.flash = this.flash;
+      if (o.hp <= 0) o.destroy(world);
     }
     if (this.hp <= 0) this.destroy(world);
   }
@@ -1058,7 +1127,11 @@ export class Enemy {
       }));
       // TITHE marks the body, but the salvage rides on what the body leaves —
       // so the mark has to come with it or the round pays nothing at all.
-      world.drops[world.drops.length - 1].bounty = this.bounty;
+      const mote = world.drops[world.drops.length - 1];
+      mote.bounty = this.bounty;
+      // ...and so does the wave's rule, for the same reason: EBB is a rule
+      // about wreckage, and wreckage is made here rather than released.
+      mote.traits = this.traits;
     }
   }
 
@@ -2526,7 +2599,34 @@ function scionLane(world, type, x) {
  */
 function release(world, type, x, y, opts) {
   if (type.tows) return spawnTow(world, x, y, opts);
-  return [spawnOne(world, type, x, y, opts)];
+  const made = [spawnOne(world, type, x, y, opts)];
+  /*
+   * TETHERED: the wave arrives in pairs sharing one pool of health.
+   *
+   * Joined HERE rather than in load(), because a job is not a body until it
+   * is released and the cap may hold one back -- pairing a plan would leave
+   * half of the pairs joined to something that never arrived. A body waits
+   * for the next one out of the same wave; the odd one at the end of a wave
+   * simply stays single, which is the honest answer to an odd count.
+   *
+   * A TOW is left alone: it has a tether of its own that means something
+   * else entirely, and two meanings on one field would be one too many.
+   */
+  const d = world.director;
+  if (d && d.traits && d.traits.length && hasTrait(d.traits, 'tethered')) {
+    const e = made[0];
+    if (e && !e.harmless && !type.tows) {
+      const waiting = d.pairing;
+      if (waiting && !waiting.dead && !waiting.tether) {
+        e.tether = { other: waiting, len: 96 };
+        waiting.tether = { other: e, len: 96 };
+        e.hp = Math.min(e.hp, waiting.hp);
+        waiting.hp = e.hp;
+        d.pairing = null;
+      } else d.pairing = e;
+    }
+  }
+  return made;
 }
 
 /**
@@ -2557,6 +2657,20 @@ export function spawnOne(world, type, x, y, opts = {}) {
     e.maxHp *= k.hp;
     e.hp = e.maxHp;
     e.bounty *= k.bounty;
+    /*
+     * ...and the wave's rules, on the hostiles only.
+     *
+     * Grey is harmless: DRIFT and energy are never traited, which is why this
+     * sits inside the same guard as the tier multiplier rather than beside it.
+     * An ARMORED mote would break the one promise the colour rule makes.
+     */
+    if (d.traits && d.traits.length) {
+      e.traits = d.traits;
+      if (hasTrait(d.traits, 'swarm')) {
+        e.maxHp = Math.max(1, Math.round(e.maxHp * CFG.waves.tier.swarmHp));
+        e.hp = e.maxHp;
+      }
+    }
   }
   world.enemies.push(e);
   if (!e.harmless) world.released++;
@@ -2905,6 +3019,22 @@ export class Director {
     this.hitPatience = false; // ...and whether the field ever thinned
     this.lastRelease = 0; // world.time of the last object let out
     this.take = 0; // raw energy this wave has been worth, for the margin
+    this.traits = []; // the rules this wave is carrying; see traits.js
+    this.pairing = null; // TETHERED: the body waiting for a partner
+    /*
+     * A trait fixed by the player for a stretch of rungs, taken at a gate.
+     * `{ id, until }` or null. It replaces the FIRST seeded trait and leaves
+     * any second one alone, so choosing a lane narrows the question without
+     * also making a two-trait rung a one-trait rung.
+     */
+    this.lane = null;
+    /*
+     * Two traits, offered on the rail after a gate is passed and standing
+     * until one is taken or a wave is scored. Optional by construction: there
+     * is no prompt and nothing is held, and leaving it lets the seed keep
+     * deciding, which is the default the whole ladder already runs on.
+     */
+    this.laneOffer = null;
     this.lastVerdict = null; // surge | clean | stall | rout, for the HUD and the tests
     /*
      * One wave that cannot climb, set by any step back. Without it the ladder
@@ -3039,6 +3169,9 @@ export class Director {
               : 'IT TOOK TOO LONG';
 
     const from = this.tier;
+    // An offer not taken by the time a wave has been answered has lapsed. It
+    // is a choice at the gate, not a decision hanging over the rest of the run.
+    this.laneOffer = null;
     /*
      * The margin: a surge pays half again on what the wave was worth, in one
      * lump at the turret. Banked through bank() so the intake tax and the
@@ -3236,12 +3369,30 @@ export class Director {
      * ever go one way.
      */
     const swell = wave.teach ? 1 : this.scaleAt(this.tier).pop * W.population;
+    /*
+     * What this wave is carrying, decided before a single body is made so
+     * that SWARM can double the count on the way past. Seeded rather than
+     * rolled: see traits.js.
+     */
+    this.traits = traitsFor(world, wave, this.tier, this.cycle, this.at);
+    this.pairing = null;
+    if (this.lane && this.traits.length) {
+      if (this.lane.until > this.tier) {
+        const laned = this.traits.find((t) => t.id === this.lane.id)
+          || TRAIT_BY_ID[this.lane.id];
+        if (laned) this.traits = [laned, ...this.traits.filter((t) => t !== laned)]
+          .slice(0, this.traits.length);
+      } else this.lane = null;   // the stretch is spent
+    }
+    const swarm = hasTrait(this.traits, 'swarm');
     const jobs = [];
     let asked = 0;
     for (const [id, base] of wave.of) {
       const type = TYPE_BY_ID[id];
       if (!type) continue;
-      const n = Math.max(1, Math.round(base * swell));
+      // SWARM: twice as many, half the health. The halving is stamped on the
+      // body in spawnOne, where the tier's own multiplier is applied.
+      const n = Math.max(1, Math.round(base * swell)) * (swarm ? 2 : 1);
       asked += n;
       if (!wave.teach && n >= W.formAt) jobs.push({ type, n });
       else for (let i = 0; i < n; i++) jobs.push({ type, n: 1 });
@@ -3367,6 +3518,29 @@ export class Director {
     return tail.length - keep.length;
   }
 
+  /**
+   * Offer a lane: two traits, drawn from the same seed as everything else so
+   * that the pair a given gate offers is a property of the run rather than of
+   * when it happened to be reached.
+   */
+  offerLane(world) {
+    const a = traitAt(world.runSeed | 0, this.cycle, this.tier, 11);
+    let b = a;
+    for (let slot = 12; b === a && slot < 24; slot++) {
+      b = traitAt(world.runSeed | 0, this.cycle, this.tier, slot);
+    }
+    this.laneOffer = [a, b];
+    return this.laneOffer;
+  }
+
+  /** Take one of them, fixing it for `laneFor` rungs. */
+  takeLane(id) {
+    if (!this.laneOffer || !this.laneOffer.some((t) => t.id === id)) return null;
+    this.lane = { id, until: this.tier + CFG.waves.tier.laneFor };
+    this.laneOffer = null;
+    return this.lane;
+  }
+
   /** The wave currently running, or null before the first one starts. */
   get wave() {
     const i = this.order[this.at];
@@ -3425,6 +3599,10 @@ export class Director {
      * above the peak -- because a half-written probe would strand the run on
      * a rung it never earned with nothing to put it back.
      */
+    // The lane, if one was taken. Additive, and dropped once its stretch is
+    // past -- a restore onto a rung beyond it should not resurrect it.
+    this.lane = d.lane && d.lane.id && Number.isFinite(d.lane.until)
+      && d.lane.until > this.tier ? { id: d.lane.id, until: d.lane.until | 0 } : null;
     const pr = d.probe;
     this.probe = pr && Number.isFinite(pr.from) && Number.isFinite(pr.to) && pr.to > this.peak
       ? { from: Math.max(1, Math.round(pr.from)), to: Math.round(pr.to) }

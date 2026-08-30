@@ -258,6 +258,13 @@ export class Game {
        * survives a reset and rides the save.
        */
       reconciled: [],
+      /*
+       * The run's own seed. Every wave's trait is a pure function of it, the
+       * cycle and the wave's place in the rotation -- so the rail can show
+       * what is coming before the wave exists, the save carries one integer
+       * instead of a list, and two runs of the same seed are the same run.
+       */
+      runSeed: (Math.random() * 0x7fffffff) | 0,
       // What a boss leaves behind, and the only thing RECAST can be bought
       // with. `remainderGained` is the announcement queue: the collectible
       // banks itself and the HUD is the thing that can say so.
@@ -355,6 +362,7 @@ export class Game {
     // restore. A run that is genuinely new -- RESET SIMULATION throws the
     // save away -- starts with nothing broken.
     w.reconciled.length = 0;
+    w.runSeed = (Math.random() * 0x7fffffff) | 0;
     w.remainder = 0;
     w.remainderGained = 0;
     w.time = 0;
@@ -515,6 +523,9 @@ export class Game {
         w.apertures[n] = Math.max(0, d.apertures[n] | 0);
       }
     } else if (Number.isFinite(d.aperture)) w.aperture = Math.max(0, d.aperture | 0);
+    // Absent before build 204. Zero is a legal seed and gives an old save a
+    // stable set of traits rather than a different one every load.
+    w.runSeed = Number.isFinite(d.runSeed) ? d.runSeed | 0 : 0;
     if (Array.isArray(d.reconciled)) {
       w.reconciled = d.reconciled.filter((n) => Number.isFinite(n)).map((n) => n | 0);
     }
@@ -1709,6 +1720,9 @@ export class Game {
     this.gateLit = 0;
     if (d.gateAt(d.tier) === n) {
       d.setTier(d.tier + 1);
+      // ...and the anomaly leaves a choice behind it. Two rules, on the rail,
+      // taken by tapping one. Nothing is held and nothing is asked.
+      d.offerLane(w);
       this.hud.syncRail(w);
     }
   }

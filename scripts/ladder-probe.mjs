@@ -111,7 +111,7 @@ const read = () => page.evaluate(() => {
     dividend: +(g.__dividend ? g.__dividend(w) : 1),
     gated: d.heldBy ? d.heldBy(w) : 0,
     reconciled: [...(w.reconciled || [])],
-    dir: { at: d.at, resting: d.resting, tier: d.tier, peak: d.peak, fails: d.fails, verdict: d.lastVerdict, trait: d.trait?.id || d.trait || null,
+    dir: { at: d.at, resting: d.resting, tier: d.tier, peak: d.peak, fails: d.fails, verdict: d.lastVerdict, trait: (d.traits || []).map((t) => t.id).join('+') || null,
       of: d.wave ? d.wave.of.map(([id, n]) => `${id}x${n}`).join('+') : '', teach: !!(d.wave && d.wave.teach), band: d.wave ? (d.wave.band || null) : null,
       asked: d.asked, contact: +d.contact.toFixed(1), hitPatience: d.hitPatience },
     order: d.order.map((i, k) => (k <= d.at ? '[' : '') + (W[i].teach ? 'T' : (W[i].band || 1)) + (k <= d.at ? ']' : '')).join(' '),

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '203';
+export const BUILD = '204';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '203';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '8452af8';
+export const REV = 'c9c44ee';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -275,6 +275,27 @@ export const CFG = {
        * Index i is anomaly n = i + 1; see ANOMALIES in anomaly.js.
        */
       gates: [6, 12, 18, 24, 30, 36, 42],
+      /*
+       * ---- traits (build 204) ----
+       *
+       * Where the ladder starts asking a different question rather than a
+       * bigger one. Below `traitFrom` a wave is exactly what it says it is,
+       * which is what the first ten rungs are for; from `traitPair` two rules
+       * arrive together and the pair is its own problem.
+       */
+      traitFrom: 10,
+      traitPair: 25,
+      // ARMORED: how often the plate turns a hit away.
+      plateEvery: 1,
+      // MENDING: fraction of max health a second, and the window in which two
+      // hits stop it. Two, not one -- a single stray round should not switch
+      // off a rule, or MENDING is only ever a rule about the first wave.
+      mendRate: 0.04,
+      mendWindow: 1,
+      // SWARM: twice the bodies at this fraction of the health.
+      swarmHp: 0.5,
+      // A lane fixes one trait for this many rungs past the gate that offered it.
+      laneFor: 6,
     },
     /*
      * A flat multiplier on every authored count, on top of the swell. The

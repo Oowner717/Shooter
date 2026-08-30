@@ -2804,6 +2804,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     for (let i = 0; i < 300 * 60; i++) g.update(1 / 60);
     const climbed = d().tier;
     const climbFails = d().fails;
+    const climbPeak = d().peak;
+    const climbTraits = (d().traits || []).map((t) => t.id).join('+');
+    const climbLast = d().lastVerdict;
     w.reconciled.length = 0;
 
     /*
@@ -2861,7 +2864,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.restart();
     return { badBands, bandAt: { t1: bandRows[0], t9: bandRows[8], t80: bandRows[79] },
       hp1, compounds, step, hpAt: [10, 14, 20].map((t) => d().scaleAt(t).hp),
-      climbFrom, climbed, climbFails,
+      climbFrom, climbed, climbFails, climbPeak, climbTraits, climbLast,
       caughtFrom, caughtTo, downs,
       heldBefore, heldAfterClean, heldAfterFail, holdCleared,
       teachVerdict, teachTier };
@@ -2896,9 +2899,21 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * Requiring none of that made the case a coin flip on where the 300 seconds
    * happened to end.
    */
+  /*
+   * ...and the margin is clear of the boundary it is measuring.
+   *
+   * `+8` from tier 1 means "must reach rung 10", and build 204 put the trait
+   * threshold at exactly rung 10 -- so the case passed if and only if the run
+   * got past the rung where the difficulty steps up, which is a coin flip by
+   * construction. Measured in isolation the run reaches 12-14; inside the
+   * suite it has landed on 9 twice and above 10 once. Six rungs in five
+   * minutes is still a climb, and it is nowhere near the step.
+   */
   check('a turret that can cope climbs the ladder',
-    r.climbed > r.climbFrom + 8,
-    `tier ${r.climbFrom} -> ${r.climbed} over 300 driven seconds, ${r.climbFails} failures standing`);
+    r.climbed > r.climbFrom + 5,
+    `tier ${r.climbFrom} -> ${r.climbed} (peak ${r.climbPeak}) over 300 driven seconds, `
+    + `${r.climbFails} failures standing, last verdict ${r.climbLast}, `
+    + `wave carrying [${r.climbTraits}]`);
 
   check('...and a turret that cannot is caught and set down',
     r.caughtTo < r.caughtFrom && r.downs >= 1,
@@ -8574,8 +8589,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       for (const k of Object.keys(sum)) byType[k] = sum[k] / n[k];
       return byType;
     };
+    /*
+     * With traits lifted out of the way. This case is about spawnOne's TIER
+     * multiplier, and from build 204 a rung-30 wave also carries two seeded
+     * rules -- SWARM among them halves health, so the ratio came out at 13.3x
+     * against 26.7x whenever the seed happened to roll it. Raising the
+     * threshold above the rung under test is the smallest way to ask the
+     * original question; it is put back immediately.
+     */
+    const wasFrom = CFG.waves.tier.traitFrom;
+    CFG.waves.tier.traitFrom = 9999;
     const teachHp = hpUnder(teach);
     const plainHp = hpUnder(plain);
+    CFG.waves.tier.traitFrom = wasFrom;
+    out.traitFromRestored = CFG.waves.tier.traitFrom === wasFrom;
     const shared = Object.keys(teachHp).filter((k) => plainHp[k]);
     out.sharedType = shared[0] || null;
     out.teachHp = shared.length ? teachHp[shared[0]] : null;
@@ -8599,7 +8626,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.hasBonus && r.bonusScored === null && r.bonusMoved === 0,
     `bonus wave scored ${JSON.stringify(r.bonusScored)}, moved ${r.bonusMoved}`);
   check('a teach wave is authored size, not tier size',
-    r.sharedType !== null && r.teachHp !== null
+    r.traitFromRestored && r.sharedType !== null && r.teachHp !== null
       && Math.abs(r.plainHp / r.teachHp - r.hpStepAt30) < r.hpStepAt30 * 0.08,
     `${r.sharedType} at tier 30 — under the opening ${r.teachHp}, under a regular wave `
     + `${r.plainHp} (ratio ${r.teachHp ? (r.plainHp / r.teachHp).toFixed(1) : '?'}x, `
@@ -8985,6 +9012,238 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('and beating one hands over the rung it was standing in front of',
     r.afterWin.reconciled.includes(1) && r.afterWin.tier === 7,
     `reconciled ${JSON.stringify(r.afterWin.reconciled)}, now on rung ${r.afterWin.tier}`);
+}
+
+// --- the waves start asking a different question ----------------------------
+/*
+ * Past band 5 the ladder introduced nothing new: the climb was carried by
+ * population, health and bounty, which are three ways of saying "more of the
+ * same". A trait is the fourth thing -- the same wave, answered differently.
+ *
+ * Every rule here is asserted by MEASURING IT, not by reading the flag back.
+ * A trait that is stamped on a body and does nothing is the exact bug this
+ * phase could ship without noticing, and `e.traits.includes(...)` would pass
+ * on every one of them.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { CFG, WAVES, TYPE_BY_ID } = await import('../src/config.js');
+    const { TRAITS, traitAt, traitsFor, traitCount } = await import('../src/traits.js');
+    const T = CFG.waves.tier;
+    const w = g.world;
+    const d = w.director;
+    const out = { ids: TRAITS.map((t) => t.id) };
+
+    // ---- seeded, not rolled ----
+    out.stable = traitAt(1234, 2, 3).id === traitAt(1234, 2, 3).id;
+    out.varies = new Set(Array.from({ length: 40 }, (_, i) => traitAt(99, 0, i).id)).size;
+    out.differsBySeed = traitAt(1, 0, 0).id !== traitAt(2, 0, 0).id
+      || traitAt(1, 0, 1).id !== traitAt(2, 0, 1).id;
+
+    // ---- when they arrive ----
+    out.count = [1, 9, 10, 24, 25, 40].map((t) => traitCount(t));
+    const teach = WAVES.find((x) => x.teach && x.of.length);
+    const bonus = WAVES.find((x) => !x.teach && (!x.of || !x.of.length));
+    out.onTeach = traitsFor(w, teach, 30, 1, 0).length;
+    out.onBonus = bonus ? traitsFor(w, bonus, 30, 1, 0).length : -1;
+
+    // A body, released under a chosen trait, at a rung that carries one.
+    const bodyUnder = (id, typeId = 'mote') => {
+      g.debugClearField();
+      d.setTier(30);
+      d.traits = [TRAITS.find((t) => t.id === id)];
+      d.pairing = null;
+      const e = g.debugSpawn(typeId, w.width / 2, 240);
+      if (e) { e.staged = false; e.spawnIn = 0; }
+      return e;
+    };
+
+    // ---- ARMORED: the first hit each second does nothing ----
+    let e = bodyUnder('armored');
+    const armorFull = e.hp;
+    e.applyDamage(w, 50);
+    const afterFirst = e.hp;
+    e.applyDamage(w, 50);
+    const afterSecond = e.hp;
+    for (let i = 0; i < 70; i++) e.update(w, 1 / 60);   // past plateEvery
+    e.applyDamage(w, 50);
+    const afterWait = e.hp;
+    out.armored = { turned: afterFirst === armorFull, thenHurt: afterSecond < afterFirst,
+      turnsAgain: afterWait === afterSecond };
+    // ...and an untraited body of the same type takes the first hit
+    d.traits = [];
+    const plain = g.debugSpawn('mote', w.width / 2, 240);
+    plain.staged = false; plain.spawnIn = 0;
+    const plainFull = plain.hp;
+    plain.applyDamage(w, 50);
+    out.armored.plainTakesIt = plain.hp < plainFull;
+
+    // ---- MENDING: it closes unless you keep hitting it ----
+    e = bodyUnder('mending');
+    e.hp = e.maxHp * 0.5;
+    const mendFrom = e.hp;
+    w.time = 500;
+    for (let i = 0; i < 120; i++) { w.time += 1 / 60; e.update(w, 1 / 60); }
+    const mended = e.hp;
+    // ...and two hits inside the window stop it
+    e.hp = e.maxHp * 0.5;
+    const pressFrom = e.hp;
+    for (let i = 0; i < 120; i++) {
+      w.time += 1 / 60;
+      if (i % 20 === 0) { e.hitAt2 = w.time; e.hitAt = w.time; }
+      e.update(w, 1 / 60);
+    }
+    out.mending = { closes: mended > mendFrom + 1, pressedHolds: e.hp <= pressFrom + 1,
+      gained: +(mended - mendFrom).toFixed(1) };
+
+    // ---- SWARM: twice as many, half the health ----
+    const load = (id) => {
+      g.debugClearField();
+      d.setTier(30);
+      d.lane = null;
+      // Every authored wave carries two or three types -- check-build asserts
+      // it -- so "one type" finds nothing and hands load() undefined.
+      const wave = WAVES.find((x) => !x.teach && x.of && x.of.length);
+      d.order = [WAVES.indexOf(wave)]; d.at = 0;
+      /*
+       * Pinned through the LANE, not by writing `traits` afterwards.
+       *
+       * SWARM's doubling happens inside load(), which re-decides the traits
+       * from the seed on the way in -- so a trait written on after the call is
+       * too late for the half of the rule that matters, and the first version
+       * of this case reported "asked 64 -> 64" with the health correctly
+       * halved. The lane is the game's own way of fixing a trait for a wave,
+       * so using it tests the path a player would take.
+       */
+      d.lane = id ? { id, until: 9999 } : null;
+      d.load(w, wave);
+      const askedAt = d.asked;
+      for (let i = 0; i < 400 && d.jobs.length; i++) d.emit(w);
+      const born = w.enemies.filter((x) => !x.harmless && !x.dead);
+      return { asked: askedAt, born: born.length,
+        hp: born.length ? born.reduce((a, x) => a + x.maxHp, 0) / born.length : 0 };
+    };
+    const plainWave = load(null);
+    const swarmWave = load('swarm');
+    out.swarmPinned = (d.traits || []).some((t) => t.id === 'swarm');
+    out.swarm = { plain: plainWave, swarm: swarmWave,
+      moreBodies: swarmWave.asked >= plainWave.asked * 1.9,
+      lighter: swarmWave.hp < plainWave.hp * 0.7 };
+
+    // ---- TETHERED: pairs share one pool ----
+    const tw = load('tethered');
+    const paired = w.enemies.filter((x) => !x.dead && x.tether && !x.type.tows);
+    let shared = false;
+    if (paired.length >= 2) {
+      const a = paired[0];
+      const b = a.tether.other;
+      const before = b.hp;
+      /*
+       * Hit until one LANDS. Rung 30 carries two traits, and if the second is
+       * ARMORED the first hit is turned away entirely -- applyDamage returns
+       * before the mirroring, so the pair stays equal at full health and a
+       * case checking "the other one dropped too" reads false on a working
+       * build. A case about one rule has to survive the other.
+       */
+      let tries = 0;
+      while (a.hp >= before && tries < 4) { a.applyDamage(w, Math.max(1, before * 0.2)); tries++; }
+      shared = Math.abs(b.hp - a.hp) < 0.01 && b.hp < before;
+      out.tetherTries = tries;
+    }
+    out.tethered = { pairs: paired.length, of: tw.born, shared };
+
+    // ---- EBB: wreckage goes the other way ----
+    const drift = (id) => {
+      g.debugClearField();
+      w.drops.length = 0;
+      d.setTier(30);
+      d.traits = id ? [TRAITS.find((t) => t.id === id)] : [];
+      const body = g.debugSpawn('bulwark', w.width / 2, 260);
+      body.staged = false; body.spawnIn = 0;
+      body.traits = d.traits.length ? d.traits : null;
+      body.destroy(w);
+      const motes = w.drops.filter((m) => !m.dead);
+      if (!motes.length) return null;
+      const far = () => {
+        const live = motes.filter((m) => !m.dead);
+        if (!live.length) return null;
+        return live.reduce((a, m) => a + Math.hypot(m.x - w.shooter.x, m.y - w.shooter.y), 0)
+          / live.length;
+      };
+      const d0 = far();
+      /*
+       * The WHOLE step, not Enemy.update. update() only steers -- it sets a
+       * velocity -- and integrate() in physics.js is what moves the body. The
+       * first version of this case called update in a loop and reported both
+       * the traited and untraited motes sitting at exactly the distance they
+       * started, which is a probe measuring its own omission.
+       */
+      d.update = () => {};                       // no new waves mid-measurement
+      for (let i = 0; i < 60; i++) g.update(1 / 60);
+      const d1 = far();
+      return { n: motes.length, from: +d0.toFixed(0), to: d1 === null ? null : +d1.toFixed(0) };
+    };
+    const realUpdate = Object.getPrototypeOf(d).update;
+    out.ebbPlain = drift(null);
+    out.ebb = drift('ebb');
+    // ...and it goes back. reset() keeps the same Director, so a stub left
+    // here starves every later case of waves.
+    delete d.update;
+    if (d.update !== realUpdate) d.update = realUpdate;
+    out.directorRestored = d.update === realUpdate;
+
+    // ---- a lane fixes one for a stretch ----
+    g.restart();
+    d.setTier(12);
+    const offer = d.offerLane(w);
+    out.offered = offer.length === 2 && offer[0].id !== offer[1].id;
+    out.tookWrong = d.takeLane('nonesuch');
+    const took = d.takeLane(offer[0].id);
+    out.lane = took ? { id: took.id, until: took.until } : null;
+    out.laneFor = T.laneFor;
+    out.offerCleared = d.laneOffer === null;
+
+    g.debugClearField();
+    g.restart();
+    return out;
+  });
+
+  check('the five rules exist, and which one a wave carries is seeded not rolled',
+    r.ids.length === 5 && r.stable && r.varies >= 4 && r.differsBySeed,
+    `${r.ids.join(', ')}; 40 waves of one seed used ${r.varies} of them, and two seeds differ`);
+  check('nothing is traited below rung 10, one from there, two from 25',
+    JSON.stringify(r.count) === JSON.stringify([0, 0, 1, 1, 2, 2]),
+    `rungs 1/9/10/24/25/40 carry ${r.count.join('/')} traits`);
+  check('...and never the opening or the bonus wave',
+    r.onTeach === 0 && r.onBonus === 0,
+    `teach wave ${r.onTeach}, drift-only bonus wave ${r.onBonus}`);
+  check('ARMORED turns the first hit each second, and only the first',
+    r.armored.turned && r.armored.thenHurt && r.armored.turnsAgain && r.armored.plainTakesIt,
+    `first hit turned ${r.armored.turned}, second landed ${r.armored.thenHurt}, `
+    + `turns again after a second ${r.armored.turnsAgain}; an untraited body of the same `
+    + `type takes it ${r.armored.plainTakesIt}`);
+  check('MENDING closes a wound, and two hits inside the window stop it',
+    r.mending.closes && r.mending.pressedHolds,
+    `left alone for two seconds it gained ${r.mending.gained} hp; under fire it did not`);
+  check('SWARM is twice as many at half the health',
+    r.swarmPinned && r.swarm.moreBodies && r.swarm.lighter,
+    `asked ${r.swarm.plain.asked} -> ${r.swarm.swarm.asked}, mean health `
+    + `${r.swarm.plain.hp.toFixed(0)} -> ${r.swarm.swarm.hp.toFixed(0)}`);
+  check('TETHERED joins them in pairs that share one pool of health',
+    r.tethered.pairs >= 2 && r.tethered.shared,
+    `${r.tethered.pairs} of ${r.tethered.of} bodies paired; hurting one hurt the other `
+    + `by the same amount: ${r.tethered.shared} (took ${r.tetherTries} hit(s) to land one)`);
+  check('EBB sends the wreckage the other way',
+    r.directorRestored && r.ebb && r.ebbPlain
+    && r.ebb.to > r.ebb.from && r.ebbPlain.to < r.ebbPlain.from,
+    `traited: ${r.ebb && `${r.ebb.from} -> ${r.ebb.to}`} units from the turret; `
+    + `untraited: ${r.ebbPlain && `${r.ebbPlain.from} -> ${r.ebbPlain.to}`}`);
+  check('a gate offers two lanes, and taking one fixes it for a stretch',
+    r.offered && r.tookWrong === null && r.lane && r.lane.until === 12 + r.laneFor
+    && r.offerCleared,
+    `offer of two ${r.offered}; a trait not offered is refused ${r.tookWrong === null}; `
+    + `took ${r.lane && r.lane.id} until rung ${r.lane && r.lane.until}`);
 }
 
 // --- report -----------------------------------------------------------------

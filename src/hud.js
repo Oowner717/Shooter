@@ -991,9 +991,16 @@ export class Hud {
     for (let i = 0; i < RAIL_SEEN; i++) {
       const el = document.createElement('div');
       el.className = 'railNode';
-      el.innerHTML = '<b></b><i></i>';
+      /*
+       * The glyph row carries the wave's rules. Two slots, because two traits
+       * arrive together from `traitPair` -- and because a gate's lane offer is
+       * two of them side by side, which is the same row asking a question
+       * instead of reporting one.
+       */
+      el.innerHTML = '<b></b><i></i><u class="rTraits"></u>';
       this.el.railNodes.appendChild(el);
-      this.railCells.push({ el, n: el.querySelector('b'), tick: el.querySelector('i'), at: -1 });
+      this.railCells.push({ el, n: el.querySelector('b'), tick: el.querySelector('i'),
+        traits: el.querySelector('.rTraits'), at: -1, glyphs: '' });
     }
     /*
      * Moving by hand pins the tier. Anything else is a control that fights
@@ -1010,6 +1017,24 @@ export class Hud {
       dir.hold = pin;
       this.syncRail(g.world);
     };
+    /*
+     * Taking a lane: the node the run is standing on, while a gate is
+     * offering. Two glyphs side by side, and the half of the node a thumb
+     * lands on picks that one. Pointerdown, like every other play-screen
+     * control -- a thumb landing on it is the press.
+     */
+    this.el.railNodes.addEventListener('pointerdown', (ev) => {
+      const dir = d();
+      if (!dir || !dir.laneOffer || !dir.laneOffer.length) return;
+      const cell = this.railCells.find((c) => c.el === ev.target.closest('.railNode'));
+      if (!cell || cell.at !== dir.tier) return;
+      const box = cell.el.getBoundingClientRect();
+      const pick = ev.clientX < box.left + box.width / 2 ? 0 : 1;
+      const t = dir.laneOffer[Math.min(pick, dir.laneOffer.length - 1)];
+      if (!dir.takeLane(t.id)) return;
+      this.alert(`${t.name} · ${t.line}`, 'rigDone', 4.5);
+      this.syncRail(g.world);
+    });
     $('railDown').addEventListener('click', () => go((dir) => dir.tier - 1, true));
     /*
      * Up, and at the ceiling it asks instead.
@@ -1111,6 +1136,20 @@ export class Hud {
         // The rung being tried: standing on it, not having earned it.
         c.el.classList.toggle('trial', t === trial);
         c.tick.textContent = t < n ? '\u2713' : '';
+        /*
+         * The rules, on the rung the run is standing on.
+         *
+         * Only there: a trait belongs to a WAVE, not to a rung, so painting a
+         * glyph on rung 14 would be claiming to know something about a wave
+         * that has not been chosen yet. What the rail can honestly say is
+         * what is in play now, and what the gate is offering.
+         */
+        const want = t === n ? this.railGlyphs(dir) : '';
+        if (c.glyphs !== want) {
+          c.glyphs = want;
+          c.traits.textContent = want;
+          c.el.classList.toggle('offering', t === n && !!(dir.laneOffer && dir.laneOffer.length));
+        }
       }
     }
     if (this._railHold !== dir.hold) {
@@ -1920,6 +1959,16 @@ export class Hud {
         + '<span class="apGo">OPEN THE WAY</span>';
       ap.appendChild(b);
     }
+  }
+
+  /**
+   * What the rung the run is standing on has to say: the lane a gate is
+   * offering, or failing that the rules the running wave is carrying.
+   */
+  railGlyphs(dir) {
+    const offer = dir.laneOffer;
+    if (offer && offer.length) return offer.map((t) => t.glyph).join(' ');
+    return (dir.traits || []).map((t) => t.glyph).join(' ');
   }
 
   syncSeals() {
