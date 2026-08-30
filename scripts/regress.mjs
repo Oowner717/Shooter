@@ -9560,6 +9560,163 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `once reconciled it is marked and open: ${r.gateOpened}`);
 }
 
+// --- everything builds 200-207 added survives a save, and none of it leaks ---
+/*
+ * The wave-system work put nine new pieces of state on the Director and one on
+ * the world, across seven builds. Each was saved and restored on its own and
+ * none of it had ever been round-tripped together.
+ *
+ * Two failure modes, and only a round trip catches either. A field that is
+ * WRITTEN but not READ comes back as its default -- a spent RECALL returns full,
+ * a lane the player chose is gone. A field that is neither written nor cleared
+ * LEAKS -- reset() keeps the same Director object, so whatever the last run
+ * left in it is what the next run starts with. This repo has been bitten by the
+ * second one before: a stubbed `director.update` outlived three restarts and
+ * starved every later case of waves.
+ *
+ * Ordering matters and is asserted by consequence rather than by reading the
+ * code: the ledger replays the tree BEFORE director.restore, so a bought RECALL
+ * sets max=1 and held=1, and the saved `held` has to win over that. If the two
+ * ran the other way round, a spent charge would come back in hand.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { captureRun } = await import('../src/save.js');
+    const { TRAITS } = await import('../src/traits.js');
+    const w = g.world;
+    const d = w.director;
+    const out = {};
+
+    // ---- dirty every new field with a value nothing defaults to ----
+    g.restart();
+    g.debugGiveEnergy(500000);
+    d.setTier(14); d.peak = 19;
+    g.buy('recall'); g.buy('overclock');   // sealed until rung 10; peak is 19
+    out.bought = { recall: d.recall.max, overclock: d.overclock.max };
+    w.runSeed = 123456;
+    w.reconciled.length = 0; w.reconciled.push(1, 2);
+    d.hold = true;
+    d.fails = 1;
+    d.grace = 1;
+    /*
+     * Through trial(), not by writing `probe` beside a tier it disagrees with.
+     * A real trial always stands the run ON probe.to, and restore() repairs an
+     * incoherent pair by trusting the probe -- so a hand-built {from:14,to:22}
+     * with tier 14 comes back as 22 and reads as a round-trip failure when it
+     * is the safety net working. The gates have to be answered first: a trial
+     * may not vault one, which is asserted elsewhere.
+     */
+    w.reconciled.push(3);
+    d.setTier(19); d.peak = 19;
+    d.trial(22, w);
+    d.lane = { id: TRAITS[2].id, until: 20 };
+    d.recall.held = 0; d.recall.cd = 41;
+    d.overclock.held = 0; d.overclock.cd = 77; d.overclock.armed = true;
+    const before = {
+      runSeed: w.runSeed, reconciled: [...w.reconciled],
+      tier: d.tier, peak: d.peak, hold: d.hold, fails: d.fails, grace: d.grace,
+      probe: { ...d.probe }, lane: { ...d.lane },
+      recall: { held: d.recall.held, cd: d.recall.cd, max: d.recall.max },
+      overclock: { held: d.overclock.held, cd: d.overclock.cd,
+        armed: d.overclock.armed, max: d.overclock.max },
+    };
+    // Through storage, the way a returning player does it -- resume() reads
+    // localStorage rather than taking a snapshot, and the point of this case
+    // is the whole path and not the two ends of it.
+    g.checkpoint();
+    const snap = captureRun(w, g);
+    const stored = localStorage.getItem('sim7749-run');
+
+    // ---- a different run in between, so a leak cannot masquerade as a restore --
+    g.restart();
+    d.setTier(2); d.peak = 2;
+    const fresh = {
+      runSeed: w.runSeed, reconciled: [...w.reconciled],
+      grace: d.grace, probe: d.probe, lane: d.lane, laneOffer: d.laneOffer,
+      traits: (d.traits || []).length, pairing: d.pairing, probeLock: d.probeLock,
+      take: d.take,
+      recall: { held: d.recall.held, cd: d.recall.cd, max: d.recall.max },
+      overclock: { held: d.overclock.held, cd: d.overclock.cd,
+        armed: d.overclock.armed, max: d.overclock.max },
+    };
+    out.clean = fresh;
+    out.seedRerolled = fresh.runSeed !== before.runSeed;
+
+    // ---- ...and back ----
+    localStorage.setItem('sim7749-run', stored);
+    g.resume();
+    out.after = {
+      runSeed: w.runSeed, reconciled: [...w.reconciled],
+      tier: d.tier, peak: d.peak, hold: d.hold, fails: d.fails, grace: d.grace,
+      probe: d.probe ? { ...d.probe } : null, lane: d.lane ? { ...d.lane } : null,
+      recall: { held: d.recall.held, cd: d.recall.cd, max: d.recall.max },
+      overclock: { held: d.overclock.held, cd: d.overclock.cd,
+        armed: d.overclock.armed, max: d.overclock.max },
+    };
+    out.before = before;
+
+    // ---- a save from before any of this restores to defaults, not to junk ----
+    /*
+     * Genuinely legacy: the fields are absent AND the ledger has no post-205
+     * node in it. Deleting only the fields leaves a save that bought RECALL,
+     * and the ledger replay then rightly hands the charge over -- which is the
+     * code working and looks like a leak.
+     */
+    const old = JSON.parse(JSON.stringify(snap));
+    delete old.runSeed;
+    delete old.wave.lane; delete old.wave.probe; delete old.wave.grace;
+    delete old.wave.recall; delete old.wave.overclock;
+    old.taken = (old.taken || []).filter((id) => id !== 'recall' && id !== 'overclock');
+    g.restart();
+    localStorage.setItem('sim7749-run', JSON.stringify(old));
+    g.resume();
+    out.legacy = {
+      runSeed: w.runSeed, lane: d.lane, probe: d.probe, grace: d.grace,
+      recallHeld: d.recall.held, recallMax: d.recall.max,
+      overArmed: d.overclock.armed, tier: d.tier,
+    };
+
+    g.restart();
+    return out;
+  });
+
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  check('the tree sells RECALL and OVERCLOCK once the run has stood on rung 10',
+    r.bought.recall === 1 && r.bought.overclock === 1,
+    `after buying: recall max ${r.bought.recall}, overclock max ${r.bought.overclock}`);
+  check('a fresh run starts with none of the wave system’s state left over',
+    r.clean.grace === 0 && r.clean.probe === null && r.clean.lane === null
+    && r.clean.laneOffer === null && r.clean.traits === 0 && r.clean.pairing === null
+    && r.clean.probeLock === 0 && r.clean.take === 0
+    && r.clean.recall.max === 0 && r.clean.recall.held === 0 && r.clean.recall.cd === 0
+    && r.clean.overclock.max === 0 && r.clean.overclock.armed === false
+    && r.clean.reconciled.length === 0 && r.seedRerolled,
+    `grace ${r.clean.grace}, probe ${JSON.stringify(r.clean.probe)}, lane `
+    + `${JSON.stringify(r.clean.lane)}, traits ${r.clean.traits}, take ${r.clean.take}, `
+    + `recall ${JSON.stringify(r.clean.recall)}, overclock ${JSON.stringify(r.clean.overclock)}, `
+    + `reconciled ${r.clean.reconciled.length}, a new seed ${r.seedRerolled}`);
+  check('...and a saved run comes back with every one of them',
+    same(r.before, r.after),
+    `saved ${JSON.stringify(r.before)}\n         got   ${JSON.stringify(r.after)}`);
+  check('a spent charge stays spent: the ledger replay does not refill it',
+    r.after.recall.max === 1 && r.after.recall.held === 0 && r.after.recall.cd === 41
+    && r.after.overclock.max === 1 && r.after.overclock.held === 0,
+    `recall ${JSON.stringify(r.after.recall)}, overclock ${JSON.stringify(r.after.overclock)}`);
+  check('a save written before any of this restores to defaults, not to junk',
+    r.legacy.runSeed === 0 && r.legacy.lane === null && r.legacy.probe === null
+    && r.legacy.grace === 0 && r.legacy.recallHeld === 0 && r.legacy.recallMax === 0
+    && r.legacy.overArmed === false
+    // 22, not 19: the file says the run is standing on 22 and carries no
+    // probe, and standing on a rung is all a save without trials could mean.
+    // A pre-205 file cannot have tier above peak, so nothing needs repairing.
+    && r.legacy.tier === 22,
+    `seed ${r.legacy.runSeed}, lane ${JSON.stringify(r.legacy.lane)}, probe `
+    + `${JSON.stringify(r.legacy.probe)}, grace ${r.legacy.grace}, `
+    + `recall ${r.legacy.recallHeld} in hand of ${r.legacy.recallMax}, overclock armed `
+    + `${r.legacy.overArmed}; and the rung it was on survived: ${r.legacy.tier}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

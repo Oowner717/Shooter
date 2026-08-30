@@ -191,9 +191,11 @@ export function captureRun(world, game) {
      * is still readable as one of the old shape.
      */
     apertures: [...world.apertures],
+    // The run's own seed: every wave's trait is a pure function of it, so one
+    // integer carries what would otherwise be a list. See src/traits.js.
+    runSeed: world.runSeed | 0,
     // Which bosses have ever been broken. Progression -- it is what unseals
     // the next slot -- so it is recorded rather than recomputed.
-    runSeed: world.runSeed | 0,
     reconciled: [...world.reconciled],
     // ...and the same for what a boss left. Both are held counts that go
     // down again, which the ledger has no way of recording.

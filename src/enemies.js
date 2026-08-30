@@ -3659,20 +3659,37 @@ export class Director {
      * from the kill count instead, on the same shape the old swell used --
      * so a returning run resumes at about the difficulty it left.
      */
-    this.tier = Math.max(1, Math.round(d.tier ?? (1 + (world.kills || 0) / 40)));
-    // Absent in files written before build 188: where the run is standing is
-    // the least it can have stood on, so the ticks are right either way.
-    this.peak = Math.max(this.tier, Math.round(d.peak || 0));
+    /*
+     * ---- the ceiling comes back before the rung, not after it ----
+     *
+     * It used to be `peak = max(tier, d.peak)`, and a save taken DURING A TRIAL
+     * is standing three rungs above its ceiling by construction -- so reloading
+     * one banked the unproven rung as earned, and then dropped the trial,
+     * because the probe is only restored when `to` is above the peak the
+     * restore had just inflated. The run came back owning a rung it had not
+     * proved, with nothing left to prove it. Measured on build 207: saved
+     * peak 19 with a trial to 22, restored peak 22 and no probe.
+     *
+     * So the ceiling is read on its own first. A trial then stands the run on
+     * its rung without raising anything; only a run that is NOT mid-trial
+     * floors the ceiling at where it is standing, which is the original rule
+     * for saves written before build 188 that carry no peak at all.
+     */
+    this.peak = Math.max(1, Math.round(d.peak || 0));
+    const pr = d.probe;
+    this.probe = pr && Number.isFinite(pr.from) && Number.isFinite(pr.to) && pr.to > this.peak
+      ? { from: Math.max(1, Math.round(pr.from)), to: Math.round(pr.to) }
+      : null;
+    if (this.probe) {
+      this.tier = this.probe.to;
+    } else {
+      this.tier = Math.max(1, Math.round(d.tier ?? (1 + (world.kills || 0) / 40)));
+      // Where the run is standing is the least it can have stood on, so the
+      // ticks are right even for a save that predates `peak`.
+      this.peak = Math.max(this.peak, this.tier);
+    }
     this.hold = !!d.hold;
     this.fails = d.fails || 0;
-    /*
-     * Both absent before build 201, and both default to "nothing in flight".
-     * A trial is restored only if it is coherent -- two integers, and a rung
-     * above the peak -- because a half-written probe would strand the run on
-     * a rung it never earned with nothing to put it back.
-     */
-    // The lane, if one was taken. Additive, and dropped once its stretch is
-    // past -- a restore onto a rung beyond it should not resurrect it.
     /*
      * The sheet's charges. `max` is replayed from the ledger like every other
      * upgrade, so only what is in hand and the clock have to be carried --
@@ -3687,13 +3704,15 @@ export class Director {
       this.overclock.cd = Math.max(0, +d.overclock.cd || 0);
       this.overclock.armed = !!d.overclock.armed;
     }
+    /*
+     * The lane, if one was taken. Additive, and dropped once its stretch is
+     * past -- but measured against the rung the run OWNS rather than the one it
+     * is standing on, or a trial three rungs up would spend a lane that is
+     * still live at the rung the trial falls back to.
+     */
+    const owned = this.probe ? this.probe.from : this.tier;
     this.lane = d.lane && d.lane.id && Number.isFinite(d.lane.until)
-      && d.lane.until > this.tier ? { id: d.lane.id, until: d.lane.until | 0 } : null;
-    const pr = d.probe;
-    this.probe = pr && Number.isFinite(pr.from) && Number.isFinite(pr.to) && pr.to > this.peak
-      ? { from: Math.max(1, Math.round(pr.from)), to: Math.round(pr.to) }
-      : null;
-    if (this.probe) this.tier = this.probe.to;
+      && d.lane.until > owned ? { id: d.lane.id, until: d.lane.until | 0 } : null;
     this.grace = d.grace | 0;
     this.probeLock = 0;
     this.contact = 0;
