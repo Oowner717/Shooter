@@ -203,7 +203,8 @@ function leaf(id) {
   return node({
     kind: 'upgrade', id, key: id, name: u.name, line: u.line, icon: u.icon,
     levels, repeat: !!u.repeat, currency: u.currency || null,
-    dormant: !!u.dormant, needs: u.needs || 0, tone: u.tone || '#9fb3c8',
+    dormant: !!u.dormant, needs: u.needs || 0, rung: u.rung || 0,
+    tone: u.tone || '#9fb3c8',
     // An upgrade may price itself. Only APERTURE does: it is not a step on a
     // ladder, it is the same purchase every time, and it costs what it costs.
     cost: u.cost ?? COST.upgrade, step: u.step ?? COST.step, tiers: u.tiers || null,
@@ -292,6 +293,25 @@ function commons(root) {
  */
 export const TREE = [
   leaf('recast'),
+  /*
+   * ...and the wave's own two, for the same reason RECAST is up here.
+   *
+   * Neither upgrades the machine, the rack or the field -- they are decisions
+   * about the wave that is running, taken from the rail's sheet rather than
+   * from the strip, which is full at eight. TURRET would have been the natural
+   * home and is the wrong one twice over: every node there fills a socket on
+   * the drawn turret (check-build catches it -- RIG_MAX is 18 and the branch
+   * would have sold 20), and neither of these is a part you bolt on.
+   *
+   * Two rows, so unlike RECAST they get a heading: on its own a row explains
+   * itself, and a pair needs saying what they have in common.
+   */
+  node({
+    kind: 'group', key: 'wave_all', free: true,
+    name: 'THE WAVE', tone: ROOT_TONE.turret,
+    line: 'Two decisions about the wave that is running, taken from the rail.',
+    children: [leaf('recall'), leaf('overclock')],
+  }),
   ...['anomaly', 'turret', 'ammo', 'mines', 'abilities'].map((root) => node({
     kind: 'root', key: root, name: ROOT_NAME[root], free: true,
     tone: ROOT_TONE[root], line: ROOT_LINE[root],

@@ -3035,6 +3035,15 @@ export class Director {
      * deciding, which is the default the whole ladder already runs on.
      */
     this.laneOffer = null;
+    /*
+     * The two sheet actions, as charges. Not abilities: the strip is full at
+     * eight and these are not things the turret does -- they are things done
+     * to a wave. Same shape as a charge all the same, so `held` is what may be
+     * spent now, `max` is what the tree paid for, and the cooldown is what
+     * puts one back.
+     */
+    this.recall = { held: 0, max: 0, cd: 0 };
+    this.overclock = { held: 0, max: 0, cd: 0, armed: false };
     this.lastVerdict = null; // surge | clean | stall | rout, for the HUD and the tests
     /*
      * One wave that cannot climb, set by any step back. Without it the ladder
@@ -3117,7 +3126,9 @@ export class Director {
       // one before. See CFG.waves.tier.hpStep for why it is not a slope.
       hp: T.hpStep ** (tier - 1),
       // Compounding, like health and a little slower than it. See bountyStep.
-      bounty: T.bountyStep ** (tier - 1),
+      // ...and OVERCLOCK pays double for the wave it is armed on.
+      bounty: T.bountyStep ** (tier - 1)
+        * (this.overclock && this.overclock.armed ? T.overclockBounty : 1),
     };
   }
 
@@ -3128,7 +3139,7 @@ export class Director {
    * whether the director ever got its field back, and how much of the wave
    * outlived it were all already known. They were simply never read.
    */
-  score(world) {
+  score(world, forced = null) {
     const T = CFG.waves.tier;
     const wave = this.wave;
     /*
@@ -3152,11 +3163,26 @@ export class Director {
     const k = this.contact;
     const c = (this.asked - alive) / this.asked;
 
+    // OVERCLOCK widens the surge window: a wave arriving twice as fast is over
+    // sooner, and three seconds from the last release would be a surge handed
+    // out for the arming rather than for the answering.
+    const surgeWithin = this.overclock.armed ? T.overclockSurge : T.surgeWithin;
     let verdict;
-    if (t <= T.surgeWithin && k < T.surgeContact) verdict = 'surge';
+    if (t <= surgeWithin && k < T.surgeContact) verdict = 'surge';
     else if (t <= T.cleanWithin && k < T.failContact) verdict = 'clean';
     else if (c >= T.routBelow && k < T.routContact) verdict = 'stall';
     else verdict = 'rout';
+    /*
+     * RECALL names its own verdict, and only its verdict.
+     *
+     * It is a bail-out: a wave three quarters cleared counts as the clean it
+     * was going to be, and anything less is a stall rather than the rout the
+     * table would have given it. That is what the charge buys, and it is why
+     * it is a charge. Everything a verdict then MEANS -- the move, the grace,
+     * the peak, the margin, the streak -- stays here, so there is still one
+     * place that decides what a wave was worth.
+     */
+    if (forced) verdict = forced;
     this.lastVerdict = verdict;
 
     // Why it went the way it did, in the alert's own register. The dominant
@@ -3169,6 +3195,7 @@ export class Director {
               : 'IT TOOK TOO LONG';
 
     const from = this.tier;
+    this.overclock.armed = false;   // spent by the wave it was armed on
     // An offer not taken by the time a wave has been answered has lapsed. It
     // is a choice at the gate, not a decision hanging over the rest of the run.
     this.laneOffer = null;
@@ -3541,6 +3568,44 @@ export class Director {
     return this.lane;
   }
 
+  /**
+   * RECALL: end the running wave now, and score it on what is cleared.
+   *
+   * Not a free clean -- it scores what actually happened. A wave three
+   * quarters cleared is one you were going to clear; below that it is a
+   * stall, which is the honest verdict for a wave walked away from, and a
+   * stall still counts toward the streak that steps the ladder back.
+   *
+   * Posed so that score() reads the verdict rather than scored separately:
+   * one place decides what a wave was worth, and a second copy of that table
+   * is a second thing to keep in step.
+   */
+  recallWave(world) {
+    if (!this.recall.held || this.resting || !this.wave || this.wave.teach) return null;
+    const T = CFG.waves.tier;
+    this.recall.held--;
+    this.recall.cd = T.recallCd;
+    const alive = world.enemies.filter((e) => !e.dead && !e.harmless).length;
+    const cleared = this.asked > 0 ? (this.asked - alive) / this.asked : 1;
+    const clean = cleared >= T.recallClean;
+    this.jobs.length = 0;
+    this.hitPatience = false;
+    this.resting = true;
+    this.timer = rand(CFG.waves.rest[0], CFG.waves.rest[1]);
+    const moved = this.score(world, clean ? 'clean' : 'stall');
+    if (moved && world.onTier) world.onTier(moved);
+    return { cleared, verdict: moved ? moved.verdict : null, moved: moved ? moved.moved : 0 };
+  }
+
+  /** OVERCLOCK: the next wave arrives twice as fast and pays double. */
+  armOverclock() {
+    if (!this.overclock.held || this.overclock.armed) return false;
+    this.overclock.held--;
+    this.overclock.cd = CFG.waves.tier.overclockCd;
+    this.overclock.armed = true;
+    return true;
+  }
+
   /** The wave currently running, or null before the first one starts. */
   get wave() {
     const i = this.order[this.at];
@@ -3601,6 +3666,20 @@ export class Director {
      */
     // The lane, if one was taken. Additive, and dropped once its stretch is
     // past -- a restore onto a rung beyond it should not resurrect it.
+    /*
+     * The sheet's charges. `max` is replayed from the ledger like every other
+     * upgrade, so only what is in hand and the clock have to be carried --
+     * both additive, both defaulting to "nothing spent".
+     */
+    if (d.recall) {
+      this.recall.held = Math.max(0, d.recall.held | 0);
+      this.recall.cd = Math.max(0, +d.recall.cd || 0);
+    }
+    if (d.overclock) {
+      this.overclock.held = Math.max(0, d.overclock.held | 0);
+      this.overclock.cd = Math.max(0, +d.overclock.cd || 0);
+      this.overclock.armed = !!d.overclock.armed;
+    }
     this.lane = d.lane && d.lane.id && Number.isFinite(d.lane.until)
       && d.lane.until > this.tier ? { id: d.lane.id, until: d.lane.until | 0 } : null;
     const pr = d.probe;
@@ -3625,6 +3704,13 @@ export class Director {
     if (world.boss) return;
 
     if (this.probeLock > 0) this.probeLock = Math.max(0, this.probeLock - dt);
+    // The sheet's two clocks. One charge back per cooldown, and never above
+    // what the tree paid for.
+    for (const c of [this.recall, this.overclock]) {
+      if (c.cd <= 0) continue;
+      c.cd = Math.max(0, c.cd - dt);
+      if (c.cd === 0) c.held = Math.min(c.max, c.held + 1);
+    }
 
     // A slow trickle of aimless matter, all run, independent of the waves.
     this.driftTimer -= dt;
@@ -3695,7 +3781,9 @@ export class Director {
   emit(world) {
     const wave = this.wave;
     const gap = wave && wave.teach ? CFG.waves.teachGap : CFG.waves.gap;
-    this.timer = rand(gap[0], gap[1]);
+    // OVERCLOCK halves the gap: the same wave, arriving at twice the rate.
+    const squeeze = this.overclock.armed ? CFG.waves.tier.overclockGap : 1;
+    this.timer = rand(gap[0], gap[1]) * squeeze;
 
     // The field cap is a hard ceiling on top of the wave. Hold the job rather
     // than dropping it: a wave is a group, and losing half of it to a cap the

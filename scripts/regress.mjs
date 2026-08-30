@@ -9116,8 +9116,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
        * halved. The lane is the game's own way of fixing a trait for a wave,
        * so using it tests the path a player would take.
        */
+      /*
+       * The baseline has to be genuinely UNTRAITED, which "no lane" is not: a
+       * rung-30 wave still draws two seeded traits, and when the seed rolls
+       * SWARM into the baseline the comparison reads 393 against 396 and the
+       * rule looks broken on a working build. The threshold is lifted for the
+       * baseline only, and put straight back.
+       */
+      const was = CFG.waves.tier.traitFrom;
+      if (!id) CFG.waves.tier.traitFrom = 9999;
       d.lane = id ? { id, until: 9999 } : null;
       d.load(w, wave);
+      CFG.waves.tier.traitFrom = was;
       const askedAt = d.asked;
       for (let i = 0; i < 400 && d.jobs.length; i++) d.emit(w);
       const born = w.enemies.filter((x) => !x.harmless && !x.dead);
@@ -9127,6 +9137,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const plainWave = load(null);
     const swarmWave = load('swarm');
     out.swarmPinned = (d.traits || []).some((t) => t.id === 'swarm');
+    out.traitFromKept = CFG.waves.tier.traitFrom === T.traitFrom;
     out.swarm = { plain: plainWave, swarm: swarmWave,
       moreBodies: swarmWave.asked >= plainWave.asked * 1.9,
       lighter: swarmWave.hp < plainWave.hp * 0.7 };
@@ -9227,7 +9238,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.mending.closes && r.mending.pressedHolds,
     `left alone for two seconds it gained ${r.mending.gained} hp; under fire it did not`);
   check('SWARM is twice as many at half the health',
-    r.swarmPinned && r.swarm.moreBodies && r.swarm.lighter,
+    r.swarmPinned && r.traitFromKept && r.swarm.moreBodies && r.swarm.lighter,
     `asked ${r.swarm.plain.asked} -> ${r.swarm.swarm.asked}, mean health `
     + `${r.swarm.plain.hp.toFixed(0)} -> ${r.swarm.swarm.hp.toFixed(0)}`);
   check('TETHERED joins them in pairs that share one pool of health',
@@ -9244,6 +9255,165 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     && r.offerCleared,
     `offer of two ${r.offered}; a trait not offered is refused ${r.tookWrong === null}; `
     + `took ${r.lane && r.lane.id} until rung ${r.lane && r.lane.until}`);
+}
+
+// --- the wave sheet ---------------------------------------------------------
+/*
+ * Two decisions about the wave that is running, taken from the rail rather
+ * than from the strip -- which is full at eight, and neither of these is
+ * something the turret does.
+ *
+ * The brief specified a sheet that "holds the world the way Offers do". The
+ * Offers reward pool is documented in the README and does not exist in this
+ * codebase: no pool, no implementation, and `hud.offerResume` is the title
+ * screen's "resume your run". `Game.paused` is what actually holds a run, so
+ * the sheet joins the menu and the loadout there -- and that is asserted, not
+ * assumed, because a modal that does not stop the field is a modal you get
+ * killed behind.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { CFG, WAVES } = await import('../src/config.js');
+    const { NODES } = await import('../src/tree.js');
+    const T = CFG.waves.tier;
+    const w = g.world;
+    const d = w.director;
+    const out = {};
+    const real = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
+
+    // ---- both are in the tree, and sealed until the run has stood on 10 ----
+    const nodes = NODES.filter((n) => n.id === 'recall' || n.id === 'overclock');
+    out.inTree = nodes.length;
+    out.rungs = nodes.map((n) => n.rung);
+    g.restart();
+    g.debugGiveEnergy(500000);
+    d.setTier(1); d.peak = 1;
+    out.sealedLow = nodes.every((n) => !g.available(n));
+    d.setTier(T.sheetRung); d.peak = T.sheetRung;
+    out.openAt10 = nodes.every((n) => g.available(n));
+    // ...and stepping back down does not re-seal what has been earned
+    d.reach(3);
+    out.staysOpen = nodes.every((n) => g.available(n));
+
+    // ---- the sheet holds the world ----
+    g.restart();
+    w.phase = 'staging';
+    const before = { pausedWas: g.paused };
+    g.openSheet(true);
+    out.holds = { open: g.sheetOpen, paused: g.paused, wasPaused: before.pausedWas };
+    // ...and nothing moves while it is up
+    g.debugClearField();
+    const body = g.debugSpawn('mote', w.width / 2, 200);
+    body.staged = false; body.spawnIn = 0;
+    const at = { x: body.x, y: body.y };
+    const at0 = d.at;
+    for (let i = 0; i < 60; i++) g.update(1 / 60);
+    out.frozen = Math.abs(body.x - at.x) < 0.01 && Math.abs(body.y - at.y) < 0.01
+      && d.at === at0;
+    g.openSheet(false);
+    for (let i = 0; i < 30; i++) g.update(1 / 60);
+    out.movesAgain = Math.abs(body.x - at.x) > 0.01 || Math.abs(body.y - at.y) > 0.01;
+
+    // ---- a wave posed at a chosen cleared fraction ----
+    const pose = (cleared) => {
+      g.debugClearField();
+      g.restart();
+      w.phase = 'staging';
+      d.setTier(20); d.peak = 20; d.hold = false; d.grace = 0; d.probe = null;
+      d.order = [real]; d.at = 0;
+      d.resting = false;
+      d.asked = 10; d.contact = 0; d.hitPatience = false; d.take = 0;
+      d.jobs.length = 0;
+      w.time = 1000; d.lastRelease = 1000;
+      const left = Math.round(10 * (1 - cleared));
+      for (let i = 0; i < left; i++) {
+        const e = g.debugSpawn('mote', 40 + i * 14, 140);
+        if (e) { e.staged = false; e.spawnIn = 0; }
+      }
+      d.recall = { held: 1, max: 1, cd: 0 };
+      return d.recallWave(w);
+    };
+    out.recallClean = pose(0.9);
+    out.recallStall = pose(0.3);
+    // ...and it is spent, with a clock on it
+    out.spent = { held: d.recall.held, cd: Math.round(d.recall.cd) };
+    out.cdWanted = T.recallCd;
+    // ...and a spent RECALL refuses
+    out.refuses = d.recallWave(w);
+
+    // ---- OVERCLOCK ----
+    g.restart();
+    d.setTier(20);
+    d.overclock = { held: 1, max: 1, cd: 0, armed: false };
+    out.armed = d.armOverclock();
+    out.armedTwice = d.armOverclock();
+    out.overSpent = { held: d.overclock.held, cd: Math.round(d.overclock.cd) };
+    const plainBounty = (() => { d.overclock.armed = false; return d.scaleAt(20).bounty; })();
+    d.overclock.armed = true;
+    const hotBounty = d.scaleAt(20).bounty;
+    out.paysDouble = Math.abs(hotBounty / plainBounty - T.overclockBounty) < 1e-9;
+    // ...and the gap it releases at
+    /*
+     * Reloaded between the two, because the first twelve emits empty the jobs
+     * and the second loop then never runs -- the first version of this read
+     * "0.541s armed against 0s plain" and the zero was the loop not happening.
+     */
+    /*
+     * Pooled over many loads. `formAt` groups three or more of a type into ONE
+     * job, so an authored wave is about two jobs and a single load yields two
+     * samples -- the first version averaged those two and read 0.873s against
+     * an expected 1.275s, which is two unlucky draws from a range of
+     * [0.85, 1.7] and not a defect. Twenty-odd samples settles it.
+     */
+    const gapsUnder = (armed) => {
+      const out2 = [];
+      for (let pass = 0; pass < 12; pass++) {
+        g.debugClearField();
+        d.order = [real]; d.at = 0; d.resting = false;
+        d.load(w, WAVES[real]);
+        d.overclock.armed = armed;
+        for (let i = 0; i < 12 && d.jobs.length; i++) { d.emit(w); out2.push(d.timer); }
+      }
+      d.overclock.armed = false;
+      return out2;
+    };
+    const gaps = gapsUnder(true);
+    const slow = gapsUnder(false);
+    const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+    out.gap = { hot: +mean(gaps).toFixed(3), plain: +mean(slow).toFixed(3),
+      n: Math.min(gaps.length, slow.length) };
+
+    g.debugClearField();
+    g.restart();
+    return out;
+  });
+
+  check('RECALL and OVERCLOCK are in the tree, sealed until the run has stood on 10',
+    r.inTree === 2 && r.rungs.every((x) => x === 10) && r.sealedLow && r.openAt10,
+    `${r.inTree} nodes at rung ${r.rungs.join('/')}; sealed at rung 1 ${r.sealedLow}, `
+    + `open at 10 ${r.openAt10}`);
+  check('...and stepping back down does not re-seal what has been earned',
+    r.staysOpen, `available after stepping back to rung 3: ${r.staysOpen}`);
+  check('the sheet holds the world, the way the menu and the loadout do',
+    !r.holds.wasPaused && r.holds.open && r.holds.paused && r.frozen && r.movesAgain,
+    `paused ${r.holds.paused}; the field froze ${r.frozen} and moved again on close `
+    + `${r.movesAgain}`);
+  check('RECALL takes what is cleared: three quarters is a clean, less is a stall',
+    r.recallClean && r.recallClean.verdict === 'clean' && r.recallClean.moved === 1
+    && r.recallStall && r.recallStall.verdict === 'stall' && r.recallStall.moved === 0,
+    `90% cleared -> ${r.recallClean && r.recallClean.verdict} (${r.recallClean && r.recallClean.moved}); `
+    + `30% -> ${r.recallStall && r.recallStall.verdict} (${r.recallStall && r.recallStall.moved})`);
+  check('...and it is spent, and refuses until the clock runs out',
+    r.spent.held === 0 && r.spent.cd === r.cdWanted && r.refuses === null,
+    `after use: ${r.spent.held} in hand, ${r.spent.cd}s to wait; a second call gave `
+    + `${JSON.stringify(r.refuses)}`);
+  check('OVERCLOCK arms once, pays double, and halves the gap',
+    r.armed && !r.armedTwice && r.overSpent.held === 0 && r.paysDouble
+    && r.gap.hot < r.gap.plain * 0.62 && r.gap.n >= 20,
+    `armed ${r.armed}, again ${r.armedTwice}; bounty x${2} ${r.paysDouble}; `
+    + `mean release gap ${r.gap.hot}s armed against ${r.gap.plain}s plain `
+    + `(${r.gap.n} samples each)`);
 }
 
 // --- report -----------------------------------------------------------------

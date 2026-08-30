@@ -463,6 +463,34 @@ export const UPGRADES = {
    * seven at once, which is the only place in the game that says how many
    * there are going to be.
    */
+  /*
+   * Not upgrades to the machine, the rack or the field: two decisions about
+   * the WAVE that is running. They sit at the top of the tree beside RECAST
+   * for the same reason it does -- there is no category they are a member of.
+   */
+  WAVE: [
+    /*
+     * ---- the wave sheet's two decisions (build 205) ----
+     *
+     * Not abilities: the strip is full at eight, and neither of these is
+     * something the turret DOES -- they are things done to a wave. They live
+     * on the rail's own sheet, and `rung` seals them until a run has stood on
+     * rung 10, which is where the ladder starts asking questions worth
+     * answering.
+     */
+    { id: 'recall', name: 'RECALL', levels: 1, rung: 10,
+      line: 'End the running wave and take what is cleared. One, then a minute.',
+      apply: (up, world) => {
+        world.director.recall.max = 1;
+        world.director.recall.held = 1;
+      }, icon: MARK.standing },
+    { id: 'overclock', name: 'OVERCLOCK', levels: 1, rung: 10,
+      line: 'The next wave arrives twice as fast and pays double.',
+      apply: (up, world) => {
+        world.director.overclock.max = 1;
+        world.director.overclock.held = 1;
+      }, icon: MARK.standing },
+  ],
   ANOMALY: [
     { id: 'aperture', name: 'ORDINAL APERTURE', repeat: true,
       cost: CFG.ordinal.cost, step: 0,
@@ -494,7 +522,7 @@ export const UPGRADES = {
   ],
 };
 
-export const AXES = ['AMMO', 'FIELD', 'TURRET', 'ANOMALY'];
+export const AXES = ['AMMO', 'FIELD', 'TURRET', 'WAVE', 'ANOMALY'];
 
 /*
  * The other two kinds of permanent thing an AMENDMENT can be. They are not

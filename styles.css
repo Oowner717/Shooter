@@ -2613,6 +2613,92 @@ body.bossUp #waveRail { display: none; }
   .railNode.offering .rTraits { animation: none; opacity: 0.9; }
 }
 
+/*
+ * The wave sheet: opened from the rung the run is standing on, and it holds
+ * the world while it is up. Sits under the rail rather than over the field's
+ * middle, so the thing it is describing is still visible behind it.
+ */
+#waveSheet {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: var(--under-rail);
+  width: min(94vw, 420px);
+  z-index: 6;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+#waveSheet[hidden] { display: none; }
+.sheetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+.sheetX {
+  background: none;
+  border: 0;
+  color: var(--dim);
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 8px;
+  min-height: 44px;
+  min-width: 44px;
+}
+.sheetRow {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--dim);
+  line-height: 1.5;
+}
+#sheetMeters { display: grid; gap: 5px; }
+.sheetMeter { display: grid; grid-template-columns: 92px 1fr 40px; gap: 8px; align-items: center; }
+.sheetMeter span { font-size: 9px; letter-spacing: 1px; color: var(--dim); }
+.sheetMeter u { display: block; height: 4px; border-radius: 2px; background: rgba(120, 190, 255, 0.14); }
+.sheetMeter u i { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+.sheetMeter b { font-size: 10px; color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; }
+.sheetMeter.hot u i { background: var(--warn); }
+.sheetActs { display: grid; gap: 6px; }
+.sheetAct {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'name clock' 'line clock';
+  gap: 0 8px;
+  text-align: left;
+  min-height: 48px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(6, 12, 22, 0.6);
+  color: var(--accent);
+}
+.sheetAct b { grid-area: name; font-size: 12px; letter-spacing: 2px; }
+.sheetAct span { grid-area: line; font-size: 9px; letter-spacing: 1px; color: var(--dim); }
+.sheetAct i {
+  grid-area: clock;
+  align-self: center;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+/* Sealed, spent, or nothing to use it on. Dashed like every other place this
+   interface means "not yours yet" -- see .railNode.locked and .qc.empty. */
+#waveSheet .sheetAct[disabled] {
+  border-style: dashed;
+  color: color-mix(in srgb, var(--dim) 70%, transparent);
+  opacity: 0.65;
+  pointer-events: none;
+}
+
 .railNode.trial {
   border-style: dashed;
   border-color: color-mix(in srgb, var(--warn, var(--accent)) 78%, transparent);

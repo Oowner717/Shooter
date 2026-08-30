@@ -1625,6 +1625,65 @@ rung 30 carries *two* traits and ARMORED turned the test hit away entirely —
 exactly rung 10, the trait threshold, making it a coin flip by construction.
 A case about one rule has to survive the other.
 
+### The wave sheet (build 205)
+
+Tapping the rung the run is standing on opens a sheet: what the wave is, how it
+is going, and the two things that may be done about it. It **holds the world**
+while it is up, the way the menu and the loadout do — nothing in this game opens
+a modal by itself.
+
+- **AUDIT** — free, always. The roster, what is still up, its health, the wave's
+  traits, and the three meters the verdict is read from: contact toward 6 s,
+  time since the last release toward 12 s, and cleared fraction. The verdict is
+  legible before it is announced rather than arriving as a surprise.
+- **RECALL** — end the wave now and take what is cleared. Three quarters counts
+  as the clean it was going to be; less is a **stall**, not the rout the table
+  would have given it. That is what the charge buys.
+- **OVERCLOCK** — the next wave arrives twice as fast, pays double, and gets a
+  six-second surge window instead of three (a wave arriving twice as fast is
+  over sooner, and three seconds would be a surge handed out for the arming
+  rather than for the answering).
+
+Both are tree nodes, sealed until the run has stood on rung 10 — on `peak`, so
+stepping back down to breathe does not re-seal what has been earned.
+
+**Where they sit took three tries and check-build caught two of them.** TURRET
+is the natural home and is wrong twice over: every node there fills a socket on
+the drawn turret (`RIG_MAX` is 18 and the branch would have sold 20 — the build
+refused), and neither of these is a part you bolt on. ABILITIES is wrong too:
+`UNDER.abilities` is the *ALL ABILITIES* group, "applies to everything you
+hold", which these do not. They ended up at the top of the tree beside RECAST,
+under a **THE WAVE** heading, for exactly the reason the comment above RECAST
+already gives: there is no category they are a member of.
+
+**`score()` gained one parameter and no second copy of the table.** RECALL names
+its own verdict — that is the whole of what the charge buys — and everything a
+verdict *means* (the move, the grace, the peak, the margin, the streak) stays in
+`score()`. Delegating entirely was the first attempt and it cannot work: the
+table says `c < 0.4` is a rout, so a 30%-cleared RECALL scored −1 instead of the
+promised stall.
+
+**The brief's reference does not exist.** It specifies a sheet that "holds the
+world the way Offers do". The Offers reward pool
+(SURGE/HASTE/CORONA/OVERDRAW/SCOUR/EBB/SEED/VOLLEY) is documented in this README
+and is **not in the codebase** — no pool, no implementation; `hud.offerResume`
+is the title screen's *resume your run*. `Game.paused` is what actually holds a
+run, so the sheet joins the menu and the loadout there, and a case asserts the
+field freezes and moves again, because a modal that does not stop the field is
+one you get killed behind.
+
+**What is measured and what is not.** The bounty multiplier is exactly ×2 and
+the release gap is halved — 0.63 s armed against 1.27 s plain over 24 samples,
+against an authored range of [0.85, 1.7]. The brief also asks for OVERCLOCK to
+raise a wave's energy by roughly ×2 end to end, and **that is not confirmed**:
+measured on a maxed turret pinned at rung 20, plain waves alone paid 51, 93 and
+189 for the same nominal wave, so the between-wave spread is larger than the
+effect being looked for and the instrument cannot resolve it. Two earlier
+versions of it reported ×1.54 and ×0.55; neither is a finding. A wave's energy
+is banked when its wreckage is *collected*, which lags the wave and does not
+respect its boundaries — measuring it properly needs a probe that follows the
+motes rather than the clock.
+
 ### SCION, and what a graft does
 
 A large body worth more to the field dead than alive.

@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '204';
+  var BUILD = '205';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -135,6 +135,28 @@
 
       Everything here is driven by Hud.syncRail().
     -->
+    <!--
+      The wave sheet. Player-opened, so it holds the world the way the menu and
+      the loadout do -- nothing in this game opens a modal by itself. The brief
+      said "the way Offers do"; the Offers reward pool does not exist in this
+      codebase, so it follows Game.paused, which is what actually holds a run.
+    -->
+    <section id="waveSheet" hidden>
+      <div class="sheetHead">
+        <span id="sheetTitle">WAVE</span>
+        <button id="sheetClose" class="sheetX" aria-label="Close">&#215;</button>
+      </div>
+      <div id="sheetRoster" class="sheetRow"></div>
+      <div id="sheetMeters"></div>
+      <div class="sheetActs">
+        <button id="sheetRecall" class="sheetAct" type="button">
+          <b>RECALL</b><span>END IT AND TAKE WHAT IS CLEARED</span><i></i>
+        </button>
+        <button id="sheetOver" class="sheetAct" type="button">
+          <b>OVERCLOCK</b><span>THE NEXT ONE, TWICE AS FAST, PAID DOUBLE</span><i></i>
+        </button>
+      </div>
+    </section>
     <div id="waveRail">
       <button id="railDown" class="railStep" aria-label="Step back a tier">&#8249;</button>
       <div id="railNodes"></div>

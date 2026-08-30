@@ -90,6 +90,12 @@ export class Hud {
       dbgStats: $('dbgStats'),
       bossCaption: $('bossCaption'),
       apertureBar: $('apertureBar'),
+      sheet: $('waveSheet'),
+      sheetTitle: $('sheetTitle'),
+      sheetRoster: $('sheetRoster'),
+      sheetMeters: $('sheetMeters'),
+      sheetRecall: $('sheetRecall'),
+      sheetOver: $('sheetOver'),
       bossBar: $('bossBar'),
       bossTitle: $('bossTitle'),
       bossPhase: $('bossPhase'),
@@ -1035,6 +1041,38 @@ export class Hud {
       this.alert(`${t.name} · ${t.line}`, 'rigDone', 4.5);
       this.syncRail(g.world);
     });
+    /*
+     * ...and with nothing being offered, the same tap opens the sheet.
+     *
+     * Layered rather than given a control of its own: a lane offer stands for
+     * one wave and the sheet is always there, so the transient meaning takes
+     * the tap while it lasts. The listener above runs first and returns
+     * without opening when it has taken a lane.
+     */
+    this.el.railNodes.addEventListener('pointerdown', (ev) => {
+      const dir = d();
+      if (!dir || (dir.laneOffer && dir.laneOffer.length)) return;
+      const cell = this.railCells.find((c) => c.el === ev.target.closest('.railNode'));
+      if (!cell || cell.at !== dir.tier) return;
+      g.openSheet(true);
+    });
+    this.el.sheetClose = $('sheetClose');
+    this.el.sheetClose.addEventListener('pointerdown', () => g.openSheet(false));
+    this.el.sheetRecall.addEventListener('pointerdown', () => {
+      const dir = d();
+      if (!dir) return;
+      const r = dir.recallWave(g.world);
+      if (!r) return;
+      this.alert(`RECALL · ${Math.round(r.cleared * 100)}% CLEARED · ${(r.verdict || '').toUpperCase()}`,
+        r.verdict === 'clean' ? 'good' : 'remainder', 4);
+      g.openSheet(false);
+    });
+    this.el.sheetOver.addEventListener('pointerdown', () => {
+      const dir = d();
+      if (!dir || !dir.armOverclock()) return;
+      this.alert('OVERCLOCK · THE NEXT ONE COMES FAST', 'good', 4);
+      g.openSheet(false);
+    });
     $('railDown').addEventListener('click', () => go((dir) => dir.tier - 1, true));
     /*
      * Up, and at the ceiling it asks instead.
@@ -1971,6 +2009,55 @@ export class Hud {
     return (dir.traits || []).map((t) => t.glyph).join(' ');
   }
 
+  /**
+   * AUDIT: what the running wave is, and how it is going.
+   *
+   * The three meters are the three numbers the verdict is read from, shown
+   * as the thing they are measured against -- so the verdict is legible
+   * before it is announced rather than arriving as a surprise.
+   */
+  syncSheet(world) {
+    const el = this.el.sheet;
+    const open = !!this.game.sheetOpen;
+    if (el.hidden === !open) { /* already right */ } else el.hidden = !open;
+    if (!open) return;
+    const d = world.director;
+    const T = CFG.waves.tier;
+    const wave = d.wave;
+    const alive = world.enemies.filter((e) => !e.dead && !e.harmless).length;
+    const hp = world.enemies.filter((e) => !e.dead && !e.harmless)
+      .reduce((a, e) => a + e.hp, 0);
+    const traits = (d.traits || []).map((t) => t.name).join(' + ');
+    this.el.sheetTitle.textContent = `WAVE · TIER ${d.tier}${traits ? ` · ${traits}` : ''}`;
+    this.el.sheetRoster.textContent = d.resting || !wave
+      ? 'BETWEEN WAVES'
+      : `${wave.of.map(([id, n]) => `${id.toUpperCase()} x${n}`).join('  ')}`
+        + `  ·  ${alive} OF ${d.asked} UP  ·  ${Math.round(hp)} HP`;
+
+    const since = d.resting ? 0 : Math.max(0, (world.time || 0) - d.lastRelease);
+    const cleared = d.asked > 0 ? Math.max(0, (d.asked - alive) / d.asked) : 0;
+    const meters = [
+      ['ON THE TURRET', d.contact, T.failContact, `${d.contact.toFixed(1)}s`],
+      ['SINCE THE LAST', since, T.cleanWithin, `${since.toFixed(1)}s`],
+      ['CLEARED', cleared, 1, `${Math.round(cleared * 100)}%`],
+    ];
+    this.el.sheetMeters.innerHTML = meters.map(([name, v, of, label]) => {
+      const f = Math.max(0, Math.min(1, v / of));
+      // The first two are meters you do NOT want to fill; the third is.
+      const hot = name === 'CLEARED' ? f < 0.4 : f > 0.7;
+      return `<div class="sheetMeter${hot ? ' hot' : ''}"><span>${name}</span>`
+        + `<u><i style="width:${(f * 100).toFixed(0)}%"></i></u><b>${label}</b></div>`;
+    }).join('');
+
+    const act = (btn, c, ready) => {
+      btn.disabled = !c.max || !c.held || !ready;
+      btn.querySelector('i').textContent = !c.max ? 'SEALED'
+        : c.held ? 'READY' : `${Math.ceil(c.cd)}s`;
+    };
+    act(this.el.sheetRecall, d.recall, !d.resting && !!wave && !wave.teach);
+    act(this.el.sheetOver, d.overclock, !d.overclock.armed);
+  }
+
   syncSeals() {
     for (const q of this.strip) {
       const sealed = this.game.isSealed(q.key);
@@ -2009,6 +2096,9 @@ export class Hud {
    * so a cell lights the instant it is tapped and the readout keeps up.
    */
   syncHudLight(world) {
+    // The sheet is live while the world is held: the meters are what the
+    // verdict will be read from, and a frozen readout would be a lie.
+    if (this.game.sheetOpen) this.syncSheet(world);
     this.syncAbilities(world.abilities);
     this.syncRail(world);
     this.syncLoadout(world);

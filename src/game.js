@@ -391,6 +391,7 @@ export class Game {
     w.up = freshUpgrades();
     w.ledger.length = 0;
     this.loadoutOpen = null;
+    this.sheetOpen = false;
     /*
      * There is no five hundred to reach, no lull and no ending: the field keeps
      * coming and the run is however long you keep playing it.
@@ -625,6 +626,12 @@ export class Game {
    */
   available(n) {
     if (n.needs && !this.world.reconciled.includes(n.needs)) return false;
+    /*
+     * ...and `rung` is the same idea on the ladder rather than on the bosses:
+     * sealed until the run has STOOD on that rung. Peak, not the current tier,
+     * so stepping back down to breathe does not seal something already earned.
+     */
+    if (n.rung && (this.world.director.peak | 0) < n.rung) return false;
     for (let p = n.parent; p; p = p.parent) {
       if (p.free) continue;
       if (!p.id || !this.owned(p.id)) return false;
@@ -733,7 +740,27 @@ export class Game {
   /** The simulation holds while the menu is open, so a change costs nothing. */
   get paused() {
     return !!this.loadoutOpen
+      || !!this.sheetOpen
       || !!(this.hud && this.hud.menu && this.hud.menu.open);
+  }
+
+  /**
+   * The wave sheet: what is running, and the two things that may be done about
+   * it. Player-opened, so it holds the world the way the menu and the loadout
+   * do -- nothing in this game opens a modal by itself.
+   *
+   * The brief said "holds the world the way Offers do". The Offers reward pool
+   * is documented in the README and does not exist in this codebase -- there is
+   * no pool and no implementation, and hud.offerResume is the title screen's
+   * "resume your run". Game.paused is what actually holds a run, so it uses
+   * that.
+   */
+  openSheet(on = true) {
+    if (on && this.world.phase !== 'staging') return false;
+    this.sheetOpen = !!on;
+    document.body.classList.toggle('sheetOpen', this.sheetOpen);
+    this.hud.syncSheet(this.world);
+    return this.sheetOpen;
   }
 
   // -------------------------------------------------------------- layout

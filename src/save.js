@@ -237,6 +237,11 @@ export function captureRun(world, game) {
       // The lane, if one was taken at a gate. Additive: a save without it
       // restores to no lane, which is what every save before 204 means.
       lane: world.director.lane ? { ...world.director.lane } : null,
+      // What is in hand and how long until the next one. `max` is replayed
+      // from the ledger with the rest of the tree, so it is not written here.
+      recall: { held: world.director.recall.held | 0, cd: +world.director.recall.cd || 0 },
+      overclock: { held: world.director.overclock.held | 0,
+        cd: +world.director.overclock.cd || 0, armed: !!world.director.overclock.armed },
       grace: world.director.grace | 0,
       hold: world.director.hold ? 1 : 0,
       fails: world.director.fails,

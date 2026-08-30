@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '204';
+export const BUILD = '205';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '204';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'c9c44ee';
+export const REV = 'fd3c8fe';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -294,6 +294,22 @@ export const CFG = {
       mendWindow: 1,
       // SWARM: twice the bodies at this fraction of the health.
       swarmHp: 0.5,
+      /*
+       * ---- the wave sheet (build 205) ----
+       *
+       * Two decisions about the wave that is running, rather than about the
+       * turret. Neither goes on the ability strip: it is full at eight, and
+       * these are not things the turret does -- they are things done to a
+       * wave. Sealed until the run has stood on `sheetRung`, because that is
+       * where the ladder starts asking questions worth answering.
+       */
+      sheetRung: 10,
+      recallCd: 60, // seconds
+      recallClean: 0.75, // cleared at least this much and RECALL scores a clean
+      overclockCd: 90,
+      overclockGap: 0.5, // the release gap, halved
+      overclockBounty: 2, // ...and the wave pays double
+      overclockSurge: 6, // ...and a surge is six seconds rather than three
       // A lane fixes one trait for this many rungs past the gate that offered it.
       laneFor: 6,
     },
