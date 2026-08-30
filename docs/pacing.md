@@ -15,7 +15,7 @@ pass over v2 found five holes. Still a plan — nothing implemented.
 | 5 | progression clock | **energy earned** gates unlocks; apertures stay energy purchases; the 500-release arc dies; the ladder is unbounded |
 | 6 | save shape | four new fields, chosen below |
 
-## What is true today (measured, build 176)
+## What was true at build 176 (measured)
 
 | fact | number |
 |---|---|
@@ -580,42 +580,78 @@ Build 194's `hpStep` of 1.12 stands. It was chosen against BULWARK, which the
 artefact never touched, and the corrected bench puts tier 16 at 8.1s and tier
 20 at 11.9s — the numbers the choice was made on.
 
-### The ladder as it now stands
+### The ladder as it stands (re-measured, build 207)
 
-Tiers 1–20, five runs each, corrected bench:
+Builds 200-207 changed the ladder and the whole payment model, so this was
+re-run. Tiers 1-20, two runs each; the build-195 numbers are kept beside it
+because what did **not** move is as much the point as what did.
 
-| tier | band | spend | rnd/s | dps | worst | clear | pay/s |
-|---|---|---|---|---|---|---|---|
-| 1 | 1 | 500 | 3.5 | 108 | 0.2s | 10s | 4.0 |
-| 3 | 2 | 2,333 | 3.8 | 155 | 3.3s | 11s | 11.5 |
-| 5 | 3 | 5,000 | 7.6 | 287 | 1.5s | 42s | 8.6 |
-| 8 | 4 | 15,000 | 9.6 | 659 | 1.5s | 47s | 11.7 |
-| 10 | 5 | 27,500 | 9.6 | 717 | 4.1s | 30s | 29.1 |
-| 14 | 5 | 65,320 | 9.6 | 717 | 6.0s | 56s | 16.6 |
-| 17 | 5 | 114,150 | 9.6 | 717 | 8.4s | 67s | 17.8 |
-| 20 | 5 | 114,150 | 9.6 | 717 | 11.9s | >120s | 13.1 |
+| tier | band | spend | rnd/s | dps | worst | clear | pay/s (195) | pay/s (207) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 1 | 500 | 3.5 | 108 | 0.2s | 12s | 4.0 | **3.1** |
+| 3 | 2 | 2,333 | 3.8 | 155 | 3.0s | 13s | 11.5 | **8.3** |
+| 5 | 3 | 5,000 | 7.6 | 287 | 2.4s | 29s | 8.6 | **10.6** |
+| 8 | 4 | 15,000 | 9.6 | 709 | 1.4s | 36s | 11.7 | **13.6** |
+| 10 | 5 | 27,500 | 9.6 | 717 | 4.2s | 26s | 29.1 | **36.5** |
+| 14 | 5 | 65,320 | 9.6 | 717 | 6.6s | 42s | 16.6 | **27.1** |
+| 17 | 5 | 115,150 | 9.3 | 692 | 8.9s | 81s | 17.8 | **18.2** |
+| 20 | 5 | 115,150 | 9.3 | 692 | 11.7s | **101s** | 13.1 | **21.8** |
 
-No caps anywhere but the tier-20 clear, and `worst` climbs monotonically from
-0.2s to 11.9s. The 2s / 4s / 6s / 10s crossings land at tiers 3 / 10 / 14 /
-19 — build 179 wanted the 6s crossing at about 14 and it is at 14.
+**The gun did not move, and should not have.** `rnd/s` and `dps` are the same
+to the digit at every sampled tier — nothing since build 195 touched cadence or
+damage. The 692s against 717 are two runs of noise on 9.3 vs 9.6 rounds a
+second, not a change. The plateau is still flat from tier 7.
 
-Two things the corrected instrument does *not* fix, because they were never
-instrument problems. The dps plateau is still flat at 717 from tier 7 with
-15,000 spent and still 717 at tier 20 with 114,150. And tiers 5–8 still fall
-to 1.5s where band 2 peaked at 3.3s, which is the band-composition item
-below rather than the health slope.
+**`worst` still climbs monotonically**, 0.2s to 11.7s, and the 2s / 4s / 6s /
+10s crossings land at tiers 3 / 10 / 14 / 18 against 3 / 10 / 14 / 19 before.
+
+**The tier-20 clear came inside the cap: 101s, where it used to run past 120.**
+Not a damage change — the wave is the same and so is the gun. It is the ladder
+fixes of build 200: the band window is honoured now, so tier 20 draws its
+heaviest wave from bands 4-5 instead of from whatever `admit()` had spliced
+back in.
+
+**`pay/s` is the column that moved, and it moved the way build 202 intended.**
+Low tiers pay *less* (4.0 → 3.1 at tier 1, 11.5 → 8.3 at tier 3) and high tiers
+pay *more* (13.1 → 21.8 at tier 20, 16.6 → 27.1 at tier 14). Bounty compounds
+at `bountyStep` 1.10 now instead of running linearly at 0.15/tier, and every
+`bank()` carries the depth dividend. The old shape peaked at tier 10 and fell
+away to 13.1 at the top; the new one holds 18-28 across the whole of band 5.
+Holding low is no longer the best-paying place on the ladder, which is the
+whole of what plan C wanted and never had.
+
+**`spend` at the top is 115,150 against 114,150** because the tree sells two
+more things — RECALL and OVERCLOCK, at 1,000 together.
+
+Two things this bench still does *not* see, and both are by construction.
+It buys the damage line in tree order and measures BOLT, so it cannot see the
+arsenal answering the late wall (below). And it spawns its wave directly rather
+than through `Director.load`, so **no wave it measures carries a trait** — the
+rules that arrive from rung 10 are absent from every column here. That is the
+right call for a calibration surface, and it means this table is the ladder
+*without* build 204 rather than the ladder as played.
 
 ## The plateau is intentional — decided, and asserted
 
 Past tier 8 the tree stops selling BOLT damage. `tiers.mjs` measures BOLT, so
 its dps column is flat at 717 from tier 7 on 15,000 spent and still 717 at
-tier 20 on 114,150, and its `clear` column runs over the cap at the top of the
-ladder. Three answers were on the table: late damage nodes for the gun, a
-ceiling on the health slope, or accept it. **Accepted.**
+tier 20 on 115,150. Three answers were on the table: late damage nodes for the
+gun, a ceiling on the health slope, or accept it. **Accepted.**
+
+This section used to add that the `clear` column ran over the 120s cap at the
+top of the ladder. **It does not any more** — re-measured at build 207 it is
+101s, and nothing about the gun or the wave changed to do it. Build 200 made
+`admit()` honour the band window, so tier 20 now draws its heaviest wave from
+bands 4-5 rather than from whatever had been spliced back in. The plateau is
+unchanged and the decision below stands; only the symptom that used to
+illustrate it has gone.
 
 What makes that safe to say rather than a shrug is that the wall is answerable
-— just not with BOLT. Measured at tier 20 with the whole tree bought, against
-the same band-5 wave (~142,000 health on the field), one round at a time:
+— just not with BOLT. Measured at build 195, at tier 20 with the whole tree
+bought, against the same band-5 wave (~142,000 health on the field), one round
+at a time. **These nine numbers are inherited rather than re-measured at 207**
+— nothing since has touched health or damage, and the claim they support is
+held by an assertion rather than by the table (see below):
 
 | round | clears in | left standing |
 |---|---|---|
@@ -651,7 +687,35 @@ left 13, shotgun left 27, standard left 30…".
 
 ### Still outstanding
 
-- Tiers 5–8 fall out of plan B's 2–4s band. That is band composition rather
-  than the health slope — a new band lands every two tiers and a turret that
-  has just grown meets it before the health has caught up. Re-banding waves or
-  moving `perBand` is the lever, and neither is a tuning pass.
+- Tiers 5–8 fall out of plan B's 2–4s band — re-measured at 207 and still true:
+  2.4s / 1.8s / 1.8s / 1.4s where band 2 peaked at 3.0s. That is band
+  composition rather than the health slope — a new band lands every two tiers
+  and a turret that has just grown meets it before the health has caught up.
+  Re-banding waves or moving `perBand` is the lever, and neither is a tuning
+  pass.
+- **Nothing here measures a traited wave.** `tiers.mjs` spawns its wave
+  directly, so the five rules that arrive from rung 10 (build 204) are absent
+  from every column above. What a trait costs a tier in seconds is unmeasured;
+  `ladder-probe.mjs` records the trait per wave and its verdict, which is the
+  nearest thing, and it is a distribution rather than a bench.
+- **OVERCLOCK's end-to-end pay is unmeasured.** The bounty multiplier is
+  asserted at exactly ×2 and the release gap at half, but a wave's energy is
+  banked when its wreckage is *collected*, which lags the wave and ignores its
+  boundaries. Three attempts read ×1.54, ×0.55 and a plain-wave spread of
+  51/93/189 for the same nominal wave — the between-wave variance is larger
+  than the effect, so none of them is a finding. It needs a probe that follows
+  the motes rather than the clock.
+
+### On keeping this document honest
+
+Everything above a build heading is history and stays as written. Everything
+in the present tense is a claim about the game as it is, and by build 206 the
+two present-tense sections here were describing the ladder and the economy as
+they had been at build 195 — eleven builds and a whole payment model earlier.
+The same thing had happened to the README's upgrade tables, which by 206 still
+advertised three upgrades that had been removed.
+
+A measured number nobody re-measures is not a measurement any more, it is a
+claim. When a build moves the ladder, the economy or the damage line, either
+re-run the bench and date the table, or move the section under its build
+heading where the past tense makes it safe.
