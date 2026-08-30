@@ -194,8 +194,9 @@ export class Shooter {
     });
 
     /*
-     * SALVO: every Nth shot leaves as three. OVERDRAW: so does every shot,
-     * for the next dozen of them.
+     * SALVO: every Nth shot leaves as three. An offer called OVERDRAW made
+     * every shot do it for the next dozen; that system is gone -- see "There
+     * are no Offers" in the README.
      *
      * `fan` is a list of angle offsets and every branch below spreads its
      * round across it — except the shotgun, which built its own cone and

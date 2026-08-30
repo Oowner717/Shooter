@@ -303,10 +303,12 @@ the way it comes off a wall, keeping 70% of its damage each time, so one round
 crosses up to five objects. Note the geometry it wants: a rebound mirrors about
 the surface normal, so a shot fired dead-centre into a flat row comes straight
 back the way it came and leaves. It pays in a pocket, not against a wall —
-measured, one round through a cluster of six hit three of them for 57. It also gets **DOUBLE TAP** and, at its second level, **TRIPLE TAP** —
-follow-up rounds that wait 0.06s at the muzzle rather than shortening the
+measured, one round through a cluster of six hit three of them for 57. It also gets **DOUBLE TAP** — a
+follow-up round that waits 0.06s at the muzzle rather than shortening the
 cadence, which reads as one trigger pull with a stutter in it and not as a
-faster gun. HE gets **CLUSTER**, four smaller bursts thrown out around the
+faster gun. It had a second level, TRIPLE TAP, until build 189: it was the
+cadence cliff on its own, taking rounds a second from 7.6 to 25.9 across one
+tier of income. HE gets **CLUSTER**, four smaller bursts thrown out around the
 first, which turns a circle into a patch of overlapping circles: measured, four
 bodies at 118 units that the plain burst does not reach at all. SHOT gets
 **DOUBLE-O** twice over — 5 pellets to 8 to 11, filling the cone in rather than
@@ -468,175 +470,51 @@ which is what resume did until build 71, also silently cancelled the rest of
 the opening for anyone who quit four lines into it — so a run that closed the
 tab during the tutorial never got the other fifteen lines either.
 
-### Offers
+### There are no Offers, and no AMENDMENT
 
-**Nothing in this game ever interrupts you.** Both kinds of offer queue behind a
-button that only exists while something is waiting, and opening it is what
-holds the world — a choice you made, not one made for you. An offer left
-untaken for eight hours is still there.
+This section used to describe a card system: **ALLOCATION** every 40 kills for
+free tempo, **AMENDMENT** every 50 for something permanent, both queued behind a
+button that held the world when you opened it. **None of it exists.** AMENDMENT
+went in build 83, the offer pool went with it, and everything permanent is
+bought from the tree with energy now — one currency, one screen, and no roll.
+The `.fx*` rail that showed SURGE and HASTE counting down was deleted as dead
+CSS in build 186, twenty-odd builds after the last thing that could set it.
 
-**An offer is rolled when it is opened, not when it comes due.** It used to be
-rolled the moment it was queued, which meant two AMENDMENTs waiting on the
-button had both been drawn against the same state — and taking a card from the
-first did not touch the second. Measured over 20,000 pairs: **53% shared at
-least one card, and 4.4% shared an UNLOCK.** Taking the same unlock twice
-unlocked nothing the second time and the pick was simply gone; a shared CHARGE
-granted two extra uses of an ability where the design says one; a shared
-levelled upgrade went past its own ceiling. `Offers.prepare` fills the head of
-the queue on first open and keeps it, so closing the sheet and opening it again
-is not a free re-roll, and a restored save's queued offers are unrolled too.
+It is recorded rather than quietly cut because the reasoning underneath it is
+still the game's, and two of the rules it arrived with outlived it:
 
-`grantCharge` also refuses a third use now. The roll had always offered each
-charge once; that makes it true of the granting as well, rather than only of
-the offering.
+**Nothing in this game ever interrupts you.** Whatever holds the world is
+opened by the player — the menu, the loadout, the aperture banner, the wave
+sheet. That rule is older than the tree and survived the system that produced
+it.
 
-Not interrupting is not the same as being quiet. A **top-up gets a chime** and
-a small green chip, because it is tempo and it will keep. A **permanent one is
-the loudest thing the interface does**: a three-note fanfare, a gold frame
-around the whole screen, a pill that says PERMANENT UPGRADE, and a plate that
-blooms out of the corner and then keeps pulsing for as long as it is unclaimed
-— an offer that never expires is otherwise very easy to forget about ten
-minutes after the one moment it announced itself. A permanent one also **jumps
-the queue**: the top-ups it steps in front of lose nothing by waiting, and the
-button can then say AMENDMENT and mean it.
+**`grantCharge` refuses a third use.** The roll had always offered each charge
+once; that made it true of the granting as well rather than only of the
+offering. The tree sells the second charge now and the guard still holds.
 
-**The announcement is the moments, not the plate.** Until build 61 the
-permanent chip was a noticeably larger slab carrying a second line —
-"permanent · choose one" — on the argument that the size was the announcement.
-The trouble is that everything else in that list is a moment and the plate is
-not: it sits on the field for as long as the offer goes unclaimed, which is the
-whole point of it and also why size was the wrong lever for saying "look at
-this". It is now the same size as a top-up (103x29 against 84x25, the
-difference being the count badge), told apart by gold and by the reminder pulse
-rather than by area — down from 134x40, about a third of the footprint gone.
-The second line went with it: the opening already says what an AMENDMENT is,
-and the sheet it opens says "permanent · select one" across the top. Measured
-clear of the turret at 414, 390, 375 and 320 wide.
+**Three kinds of ceiling, and the card says which.** An upgrade with no `levels`
+field repeats without limit and counts what you hold: `x3`. `levels: 1` is a
+switch, and a switch cannot be thrown twice. In between is one with a shape to
+it, and those count what is left — `LV 2/3` — because that is the question a
+ceiling raises. Note the default is **three**, not one: `tree.js` reads
+`u.levels ?? 3`, so a node the author never capped is sold three times. Check
+the tree's number, not the upgrade's.
 
-**What is running, and how long is left of it.** Two of the top-ups have a
-duration — SURGE and HASTE, the pair that stack in time rather than in effect —
-and until build 62 neither said so anywhere on the screen. You took a card
-reading "double fire rate for 30s" and then had no way at all to know whether
-you were still inside the thirty, which is most of what the card was worth.
-They now show as chips under the counter row: the same mark the card carried,
-the name, the seconds remaining, and a bar. Because they stack in time, a
-second card can put the clock well past one card's worth, so the bar is drawn
-against the peak this run of the effect reached rather than against the card's
-nominal length — the only reading of "how full is it" that is still true after
-two. The rail collapses out of the layout when nothing is timed; an empty rail
-reads as a broken readout rather than as one with nothing to say. Nothing else
-in the game has a duration, so nothing else is on it.
+**Every effect is a scalar on `world.up`, read at the point of use.** Nothing in
+`src/upgrades.js` reaches into a subsystem, so adding an upgrade is a table
+entry and one place that reads it.
 
-- **ALLOCATION**, every 40 kills — about twelve in a counted run. Free tempo,
-  gone in a minute. **Three of eight**, never the same one twice in one offer.
+**Each carries its own mark.** A shape is quicker to recognise than a name,
+especially for the repeatable ones where the question is "which is the one I
+already have three of".
 
-  | | |
-  |---|---|
-  | **SURGE** | Double fire rate for 30s. |
-  | **HASTE** | Ability cooldowns halved for 45s. |
-  | **CORONA** | The turret burns for 30s. Anything holding on or close by takes damage. |
-  | **OVERDRAW** | The next 12 shots each fire three rounds. |
-  | **SCOUR** | All the energy on the field taken in at once, at +50%. |
-  | **EBB** | Everything hostile is thrown back up the field. |
-  | **SEED** | Lay 3 mines now, random kind if none set. |
-  | **VOLLEY** | Fill the field to five mines now. |
-
-  **Build 65 rebuilt this list.** It had been six, of which one did nothing and
-  two were conditional:
-
-  - **RESET** (every ability ready) went. Its worth was decided by how many
-    abilities you happened to have unlocked — two at the start, eight at the
-    end — which is not a choice the card offered you.
-  - **YIELD** (+150 energy) went. `world.energy` is written by `bank()` and
-    read by the HUD and **never spent on anything**: it is a score, not a
-    currency. A card that moves it is a card that does nothing.
-  - **SHAKE OFF** (destroy everything gripping the turret) became **CORONA**.
-    It was the best card in the pool with four things attached and literally
-    nothing with none, and which of those you got was decided before you saw
-    it. CORONA does the same job as an answer and can also be taken as a
-    precaution: for thirty seconds the turret is unpleasant to be near, so the
-    crowd that was about to arrive dies on the way in. It reaches past what is
-    actually attached, which is the whole difference.
-
-  Three of six meant **you saw half the pool every offer**, twelve times a run.
-  Three of eight is a real roll.
-
-  Two of the new four needed something underneath them. **EBB** sets velocity
-  rather than adding impulse, so a BULWARK goes as far as a MOTE — but the
-  physics speed ceiling is *relative to a body's own cruise*, which clamped a
-  BULWARK's throw on the first frame and moved it 95 units to a MOTE's 248. A
-  thrown body is now exempt from that clamp while it coasts (`physics.thrownSpeed`)
-  and does not steer during the coast (`boosts.ebb.coast`), so the throw lands:
-  measured 459/431/445 units across a MOTE, a BULWARK and a LURCHER, a spread
-  of 28. **OVERDRAW** rides the same `fan` that SALVO does — and the shotgun
-  branch built its own cone and ignored `fan` entirely, which means **SALVO had
-  never done anything at all for SHOT, in any build**. Both work on it now: a
-  tripled SHOT is fifteen pellets.
-
-- **AMENDMENT**, every 50 kills — ten in a counted run. Permanent for the run.
-  Three cards, and while anything is still locked the first of them **opens
-  something**, because that is the spine of a run: the turret arrives with a
-  handful of things and everything else is a choice made on the way. The second is a
-  **second charge** for an ability once there is an unlocked one worth
-  doubling. The third is a stat, from one of three axes, so a pick is an
-  identity rather than a number:
-  **AMMO** sharpens what you shoot, **FIELD** is what happens without you, and
-  **TURRET** is the machine itself.
-
-  | AMMO | | FIELD | | TURRET | |
-  |---|---|---|---|---|---|
-  | HOLLOWPOINT | +25% damage | PAIRED CHARGE | +1 mine laid per throw | RATE | +20% fire rate |
-  | THROUGH AND THROUGH | +2 spine pierces | BLOOM OUT | +35% patch size, +45% burn | | |
-  | SLEDGE | +60% slug knockback | BUCKSHOT | +60% spall pellets | | |
-  | DEEP FREEZE | +70% rime chill | REPULSOR | +40% lode reach and push | | |
-  | LEVY | +50% tithe mark | | | | |
-  | HOT LOAD | +15% fire rate | QUICK ARM | mines go live twice as fast | HANDS OFF | auto fire matches manual |
-  | TRACER | +35% round speed | DEEP CHARGE | +35% mine blast radius | SLEW | +50% auto aim turn speed |
-  | | | SALTED | a spent mine goes off | | |
-  | | | SHRAPNEL | +45% mine blast damage | | |
-  | | | DEAD WEIGHT | +65% snare hold | | |
-  | | | HOT WIRE | +50% wire damage | | |
-  | | | FOURTH BELL | +1 toll per knell | | |
-  | RICOCHET | +1 wall bounce | WIDE MOUTH | +40% trigger range | OVERWATCH | +25% damage hands-off |
-  | HEAVY | 2x knockback | SWEEP | blasts behind you every 20s | HARD CASING | 40 dmg/s to what touches you |
-  | OVERPRESSURE | +40% HE radius | REFLEX | PULSE fires itself at 2+ grips | INSULATION | corruption costs half |
-  | FIFTH LINK | ARC +1 jump | INTAKE | energy that lands on you is collected | | |
-  | LIEN | TITHE marks run to 14 | STANDING ORDER | -20% ability cooldowns | | |
-  | COMPOUND | +60% tithe mark bite | | | | |
-  | SALVO | every 8th shot fires 3 | | | | |
-  | OVERSTUFFED (x4) | BOLT rebounds off bodies | | | | |
-  | DOUBLE / TRIPLE TAP (x2) | a second and third BOLT behind the first | | | | |
-  | CLUSTER | HE throws four smaller bursts | | | | |
-  | DOUBLE-O (x2) | +3 SHOT pellets | | | | |
-  | LONG SHOT | +55% SHOT range | | | | |
-  | SUPERCONDUCTOR | ARC links keep 95% | | | | |
-  | LONG LEAD | +60% ARC jump range | | | | |
-  | ANNEALED | SPINE keeps 92% per body | | | | |
-  | RAILED | SPINE ignores armour | EVENT HORIZON | VOID takes what comes near | | |
-
-Each carries its own mark, and the card says how far along it is. An offer is
-read in the two seconds before a tap, and a shape is quicker to recognise than
-a name — especially for the repeatable ones, where the question is "which is
-the one I already have three of".
-
-**Three kinds of ceiling, and the card says which.** An upgrade with no
-`levels` field repeats without limit and its card counts what you hold: `x3`.
-`levels: 1` is a switch, and a switch cannot be thrown twice. In between is an
-upgrade with a shape to it — OVERSTUFFED runs to four, DOUBLE TAP to two —
-and those cards count what is left instead: `LV 2/3`, because that is the
-question a ceiling raises. A level may also be a **different card**: the second
-DOUBLE TAP is not "DOUBLE TAP again", it is **TRIPLE TAP**, with its own name
-and its own line, declared as a `tiers` entry on the same upgrade so the level
-history stays one id.
-
-Every one of them is a scalar on `world.up` read at the point of use — nothing
-in `src/upgrades.js` reaches into a subsystem — so adding one is a table entry
-and one place that reads it.
-
-Two of them are worth calling out. **SWEEP** makes the turret clear behind
-itself every twenty seconds, which is the one place the barrel cannot reach —
-so the flank problem becomes something you buy your way out of. **REFLEX**
-makes PULSE answer a crowd on the turret without being asked.
+**There is deliberately no list of the upgrades here.** There was one — three
+tables, sixty-odd rows, kept by hand — and by build 206 it still advertised
+HOT LOAD (removed in 193), TRIPLE TAP (189) and REFLEX (190). A mirror of the
+tree drifts from the tree, and a stale list is worse than no list because it
+reads as authority. `src/upgrades.js` is the table; `src/tree.js` places it;
+`scripts/check-build.mjs` fails the build if a single buyable thing is missing
+or placed twice.
 
 ### Energy on the floor
 

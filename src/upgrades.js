@@ -525,7 +525,7 @@ export const UPGRADES = {
 export const AXES = ['AMMO', 'FIELD', 'TURRET', 'WAVE', 'ANOMALY'];
 
 /*
- * The other two kinds of permanent thing an AMENDMENT can be. They are not
+ * The other two kinds of permanent thing the tree sells. They are not
  * axes — a card is one of these or one of the three above — but they are what
  * the tier is mostly for now: the turret starts with BOLT and PULSE, and every
  * other round, mine and ability is bought here.
@@ -581,7 +581,7 @@ export const CHARGES = ABILITIES.map((a) => ({
 export const ALL_UPGRADES = AXES.flatMap((a) => UPGRADES[a].map((u) => ({ ...u, axis: a })));
 
 /**
- * Every permanent card an AMENDMENT can hand over, by id. A saved run keeps
+ * Every permanent thing the tree can hand over, by id. A saved run keeps
  * the ids it accepted rather than the numbers they produced, and replaying
  * them through this rebuilds world.up, the ability charges and the held counts
  * from the table that defines them — so a retuned upgrade is retuned for a

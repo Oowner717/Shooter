@@ -82,13 +82,25 @@ cannot tell a stage that is long because the boss is tough from one that is
 long because the turret spent it on minions -- DYNAMO's third stage was 46% of
 a 324-second fight and two thirds of it was IONs.
 
-**ORDINAL's canonical hash is `117409503`** (seed 20260824, 9000 frames),
-re-baselined at build 145 when the Phase C audit raised the panel's health.
-Before that it was `917805618` from build 141, when TALLY went in;
-`-1210682079` from 137, when the assist gained its target memory; and
-`1109808491` from 127 to 136. Each move was a change to ORDINAL or to
-targeting, which is the hash doing its job; a move without one is the bug it
-is there to catch.
+**ORDINAL's canonical hash is `-960623607`** (seed 20260824, 9000 frames),
+re-baselined at build 207 when the wave economy changed what a body pays.
+Before that it was `117409503` from build 145, when the Phase C audit raised
+the panel's health; `917805618` from 141, when TALLY went in; `-1210682079`
+from 137, when the assist gained its target memory; and `1109808491` from 127
+to 136. Each move was a change to ORDINAL or to targeting, which is the hash
+doing its job; a move without one is the bug it is there to catch.
+
+**The 207 move widens that rule, and it was found five builds late.** The hash
+mixes `w.energy`, so ANY change to what a body pays moves it -- and build 202
+made bounty compound and put the depth dividend on every `bank()`. Proved
+rather than argued: restoring build 201's payment (linear bounty, no dividend)
+and re-running the same frames gives a different hash again, so the payment is
+the channel and not something in the fight. The failure was process, not code:
+the hash was run at 199 and then not again until 207, across six builds of
+ladder and economy work. **Run it on any build that touches energy, not only
+ones that touch ORDINAL or targeting**, and re-baseline in the same commit with
+the reason. A canonical number nobody checks is a number that re-baselines
+itself.
 
 `node scripts/variance.mjs [n] [--runs 7]` is the third of the trio and
 answers the one thing the other two cannot: **why the same fight takes a third

@@ -206,7 +206,10 @@ export class Enemy {
     // GRAFT. A SEED is a harmless body that hunts a host instead of wandering;
     // `grafted` is what it leaves behind, and a grafted body closes its own
     // wounds until something finishes it.
-    // EBB: seconds left of being thrown, during which it does not steer.
+    // Seconds left of being thrown clear, during which it does not steer. The
+    // anomalies do the throwing; an offer called EBB used to as well, and that
+    // system is gone. Not the build-204 TRAIT of the same name, which is about
+    // which way wreckage drifts and never touches this.
     this.thrown = 0;
     // SLUG: seconds left of being exempt from collision damage, in both
     // directions. A SLUG shoves as hard as it ever did and pays out nothing
@@ -466,7 +469,7 @@ export class Enemy {
    * Steering, then the two things that have to happen however it steered.
    *
    * drive() has half a dozen early returns -- thrown, seeded, harmless, dead
-   * -- and a NEEDLE that stops pointing where it is going the moment EBB
+   * -- and a NEEDLE that stops pointing where it is going the moment something
    * throws it is a NEEDLE that tumbles for the most visible second of its
    * life. Same for a TOW's wind-up, which must not stall because the pair got
    * shoved.
@@ -557,8 +560,8 @@ export class Enemy {
      * frozen cloud where the frame had been and could not be collected.
      */
     if (this.type.fixed && !this.isDrop) { this.vx = 0; this.vy = 0; return; }
-    // Thrown clear and not yet recovered. It coasts: the whole point of EBB is
-    // that the field comes off you, and a body that starts steering back on
+    // Thrown clear and not yet recovered. It coasts: the whole point of a shove
+    // is that the field comes off you, and a body that starts steering back on
     // the next frame has not been thrown anywhere.
     if (this.thrown > 0) {
       this.thrown -= dt;
@@ -2793,28 +2796,32 @@ function bank(world, amount, x, y) {
  * work and wreckage being income, which is worth a card.
  */
 /**
- * Every mote within reach, taken in at once. PULSE is the ordinary way this
- * happens; SCOUR is the same verb with no limit and a bonus on it.
+ * Every mote within reach, taken in at once. PULSE is the only thing that does
+ * this; an offer called SCOUR did it with no limit and a bonus on the pay, and
+ * that system is gone -- so the `bonus` both of these carried went with it. It
+ * was a parameter nothing could set: PULSE is the sole caller and passes
+ * nothing, so it was 1 on every call it ever made. A multiplier that cannot be
+ * anything but one is a branch that cannot be taken.
  *
  * @returns how many were taken, so the caller can decide whether to say so.
  */
-export function drawIn(world, radius, bonus = 1) {
+export function drawIn(world, radius) {
   const s = world.shooter;
   const r2 = radius * radius;
   let took = 0;
   for (const e of world.drops) {
     if (e.dead || !e.energy) continue;
     if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 > r2) continue;
-    absorb(world, e, bonus, true);
+    absorb(world, e, true);
     took++;
   }
   return took;
 }
 
-/** One mote taken in. `bonus` is SCOUR paying over the odds for it. */
-export function absorb(world, e, bonus = 1, streak = false) {
+/** One mote taken in. */
+export function absorb(world, e, streak = false) {
   if (e.dead || !e.energy) return;
-  bank(world, e.energy * bonus, e.x, e.y);
+  bank(world, e.energy, e.x, e.y);
   // Drawn in from a distance rather than walked into: show it arriving, or
   // a PULSE that empties the floor is a number in the corner going up.
   if (streak) {

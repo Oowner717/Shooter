@@ -2062,18 +2062,6 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
   clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
 }
 /*
- * The AMENDMENT plate is 15px taller than the ALLOCATION chip and grows up
- * into this band. The plate stays where it is — it is the thing being pointed
- * at, and it is placed where the thumb is — so the caption is what moves. It
- * is a one-line first-use note that is up for nine seconds; nobody will see it
- * shift. Measured at 320x568, where the gap is tightest.
- */
-/* Build 61: the permanent plate is the same height as a top-up now, and sits
-   at the same offset, so there is nothing for the band to clear. Kept as a
-   no-op hook rather than deleted -- setPending still sets the class, and the
-   next thing that needs the band moved will want it. */
-
-/*
  * The opening's band keeps the line before. The new one arrives at the bottom
  * and the old one is pushed up and dimmed rather than taken away — a sentence
  * you have just acted on should still be there while you look at what it gave

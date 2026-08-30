@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '206';
+export const BUILD = '207';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '206';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'be020f7';
+export const REV = 'af71e3d';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -37,7 +37,7 @@ export const CFG = {
   /*
    * How far below the top edge an object has to come before it is loose in
    * the arena — before auto-aim will take it, before a HERALD will cover it,
-   * before EBB or an aura will touch it.
+   * before a shove or an aura will touch it.
    *
    * It used to be zero: an object went live the instant its lower edge cleared
    * the top of the screen, at a measured median of y=14 out of 1361. Auto-aim
@@ -959,11 +959,18 @@ export const CFG = {
     // the one thing a thing that never stops is not allowed to do.
     floorEase: 84,
     maxSpeedFactor: 6, // hard clamp relative to a body's own cruise speed
-    // ...and the ceiling for a body that has deliberately been thrown. The
-    // ordinary clamp is relative to a body's own cruise, which is right for
-    // stopping a chain reaction flinging something to infinity and wrong for
-    // EBB: it clamped a BULWARK's throw on the first frame, so the heavy
-    // things barely moved and the card read as doing nothing to them.
+    /*
+     * ...and the ceiling for a body that has deliberately been thrown. The
+     * ordinary clamp is relative to a body's own cruise, which is right for
+     * stopping a chain reaction flinging something to infinity and wrong for a
+     * deliberate shove: it clamped a BULWARK's throw on the first frame, so the
+     * heavy things barely moved and the throw read as doing nothing to them.
+     *
+     * The throw was an offer called EBB when this was written; that system went
+     * and the anomalies do the shoving now (see `thrown` in enemies.js). The
+     * name is reused for a wave TRAIT from build 204 and means something else
+     * entirely, which is why it is not used here.
+     */
     thrownSpeed: 720,
     /*
      * How long an accumulated shove takes to bleed off, in seconds. See
