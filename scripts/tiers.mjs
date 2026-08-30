@@ -723,8 +723,14 @@ console.log('           not the second. Raise --runs before tuning against this 
 console.log('           A BOLT number, like every column here. Past tier 8 the tree');
 console.log('           sells the arsenal rather than BOLT damage, and the late wall is');
 console.log('           answerable with another round: at tier 20 SPORE clears the');
-console.log('           band-5 wave in 64s against BOLT\'s 160. The plateau is');
-console.log('           intentional -- see docs/pacing.md.');
+console.log('           band-5 wave in 64s against BOLT\'s 160 -- measured at build');
+console.log('           195, on the round-by-round bench and not this column.');
+console.log('           The plateau is intentional -- see docs/pacing.md.');
+console.log('  NOTHING HERE CARRIES A TRAIT. This bench spawns its wave directly');
+console.log('           rather than through Director.load, so the five rules that');
+console.log('           arrive from rung 10 are absent from every column above.');
+console.log('           Right for a calibration surface, wrong as a statement');
+console.log('           about the ladder as it is played.');
 if (loose.length) {
   console.log(`\n  NOT COMPARABLE: still marching in when the clock started at tier ${loose.join(', ')}`);
 }
