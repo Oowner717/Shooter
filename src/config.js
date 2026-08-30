@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '201';
+export const BUILD = '202';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '201';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '61bc87e';
+export const REV = '6185e74';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -187,7 +187,36 @@ export const CFG = {
        * 1.11 undershoots and 1.13 leaves half the gap. See docs/pacing.md.
        */
       hpStep: 1.12,
-      bounty: 0.15, // energy x (1 + bounty*n)
+      /*
+       * ---- what a rung pays (build 202) ----
+       *
+       * Bounty was linear, `1 + 0.15 * tier`, against health compounding at
+       * `hpStep`. Exponential cost and linear pay is a shape with only one
+       * outcome: energy per point of damage at rung 40 was 0.08 of rung 1, so
+       * the best-paying place on the whole ladder was near the bottom of it
+       * and every hour spent climbing was an hour spent earning less.
+       * Compounding too, and a little slower than health, so a rung is still
+       * harder than the one below it -- just no longer poorer.
+       */
+      bountyStep: 1.10, // energy x bountyStep^(tier-1), against hpStep 1.12
+      /*
+       * A surge pays half again on what that wave was worth, banked in one
+       * lump at the turret. The ladder's own reward for the thing it most
+       * wants to see: a wave cleared before the last of it landed.
+       */
+      margin: 1.5,
+      /*
+       * ---- the depth dividend ----
+       *
+       * A multiplier on everything banked, off how far the run has BEEN (the
+       * peak, not where it is standing) and how many anomalies it has put
+       * down. Deliberately fed into `earned` as well as the purse: `earned`
+       * is the one clock, and depth ought to move it. Capped, because this
+       * is a nudge toward the deep end and not a second economy.
+       */
+      dividendCap: 1.6,
+      dividendPeak: 0.01, // per rung ever stood on
+      dividendAnomaly: 0.05, // per anomaly reconciled
       /*
        * The ceiling on population growth. The field caps at CFG.maxEnemies
        * anyway, so past this the climb is carried by health and bounty alone

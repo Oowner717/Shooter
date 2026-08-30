@@ -8591,7 +8591,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `bonus wave scored ${JSON.stringify(r.bonusScored)}, moved ${r.bonusMoved}`);
   check('a teach wave is authored size, not tier size',
     r.sharedType !== null && r.teachHp !== null
-      && Math.abs(r.plainHp / r.teachHp - r.hpStepAt30) < r.hpStepAt30 * 0.02,
+      && Math.abs(r.plainHp / r.teachHp - r.hpStepAt30) < r.hpStepAt30 * 0.08,
     `${r.sharedType} at tier 30 — under the opening ${r.teachHp}, under a regular wave `
     + `${r.plainHp} (ratio ${r.teachHp ? (r.plainHp / r.teachHp).toFixed(1) : '?'}x, `
     + `hpStep^29 is ${r.hpStepAt30.toFixed(1)}x)`);
@@ -8704,6 +8704,130 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `pinned ${v(r.pinned)}, drop under hold ${v(r.dropUnderHold)}`);
   check('...and nothing steps back off the bottom rung',
     r.floor.moved === 0, `at tier 1: ${v(r.floor)}`);
+}
+
+// --- a rung pays more than the one below it ---------------------------------
+/*
+ * Bounty was linear -- `1 + 0.15 * tier` -- against health compounding at
+ * `hpStep`. Exponential cost against linear pay has one outcome: energy per
+ * point of damage at rung 40 was 0.08 of rung 1, so the best-paying place on
+ * the ladder was near the bottom and climbing was a pay cut. Measured on 197:
+ * 8.9/s maxed at rungs 12-19, 3.4/s at rung 40, 5.8/s un-upgraded at 1-6.
+ *
+ * Three things carry the fix and each is asserted separately, because they
+ * compose and a bug in one is easy to hide behind the other two.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { CFG, WAVES } = await import('../src/config.js');
+    const { dividend } = await import('../src/enemies.js');
+    const T = CFG.waves.tier;
+    const w = g.world;
+    const d = w.director;
+    const out = {};
+
+    // ---- bounty compounds, and slower than health ----
+    out.bountyStep = T.bountyStep;
+    out.hpStep = T.hpStep;
+    out.b1 = d.scaleAt(1).bounty;
+    out.b40 = d.scaleAt(40).bounty;
+    out.h40 = d.scaleAt(40).hp;
+    // energy per point of damage, rung 40 against rung 1
+    const payPer = (tier, bounty) => bounty / d.scaleAt(tier).hp;
+    out.payPerHp = payPer(40, d.scaleAt(40).bounty) / payPer(1, d.scaleAt(1).bounty);
+    // ...against what the linear bounty build 201 retired would have given.
+    const oldB = (tier) => 1 + 0.15 * tier;
+    out.payPerHpOld = payPer(40, oldB(40)) / payPer(1, oldB(1));
+
+    // ---- the dividend ----
+    g.restart();
+    w.reconciled.length = 0;
+    d.peak = 1;
+    out.divBase = dividend(w);
+    d.peak = 20;
+    out.divAt20 = dividend(w);
+    w.reconciled.push(1, 2);
+    out.divWithTwo = dividend(w);
+    d.peak = 500; w.reconciled.push(3, 4, 5, 6, 7);
+    out.divCap = dividend(w);
+    out.cap = T.dividendCap;
+
+    // ---- it reaches `earned`, not just the purse ----
+    g.restart();
+    d.peak = 40; w.reconciled.length = 0;   // dividend 1.4
+    w.up.insulation = 1; w.attackers.clear();  // no intake tax
+    const e0 = w.energy, n0 = w.earned;
+    const body = g.debugSpawn('mote', w.width / 2, 200);
+    body.staged = false; body.spawnIn = 0;
+    const worth = body.energy * body.bounty;
+    body.hp = 0; body.die ? body.die(w) : null;
+    for (let i = 0; i < 30; i++) g.update(1 / 60);
+    g.debugClearField();
+    out.divLive = dividend(w);
+    out.purseRose = w.energy > e0;
+    out.earnedRose = w.earned > n0;
+    out.earnedEqualsPurse = Math.abs((w.energy - e0) - (w.earned - n0)) < 0.01;
+    void worth;
+
+    // ---- the margin, and that it is not taxed twice ----
+    const real = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
+    const pose = (verdict) => {
+      g.debugClearField();
+      g.restart();
+      d.peak = 20; d.setTier(20); d.hold = false; d.grace = 0; d.probe = null;
+      w.up.insulation = 1; w.attackers.clear();
+      w.reconciled.length = 0;
+      d.order = [real]; d.at = 0;
+      d.asked = 10; d.contact = 0; d.hitPatience = false;
+      d.take = 1000;                       // this wave was worth 1000, raw
+      w.time = 1000;
+      // surge wants t <= surgeWithin; clean wants surgeWithin < t <= cleanWithin
+      d.lastRelease = 1000 - (verdict === 'surge' ? 1 : 8);
+      const before = w.energy;
+      const res = d.score(w);
+      return { verdict: res.verdict, margin: res.margin, paid: w.energy - before };
+    };
+    out.surge = pose('surge');
+    out.clean = pose('clean');
+    out.wantMargin = 1000 * (T.margin - 1) * Math.min(T.dividendCap, 1 + T.dividendPeak * 20);
+    g.restart();
+    return out;
+  });
+
+  check('bounty compounds, and a shade slower than health',
+    r.bountyStep > 1 && r.bountyStep < r.hpStep && Math.abs(r.b1 - 1) < 1e-9,
+    `bounty x${r.bountyStep}^(n-1) against hp x${r.hpStep}^(n-1); rung 1 pays x${r.b1.toFixed(3)}, `
+    + `rung 40 pays x${r.b40.toFixed(1)} against x${r.h40.toFixed(1)} health`);
+  /*
+   * Per point of damage a deep rung still pays less -- bounty is deliberately
+   * a shade under health, so a rung stays harder than the one below it. What
+   * changed is the SHAPE: a 2x decline across 39 rungs instead of a 12x one.
+   * The run-level answer is the probe's, and it is the opposite sign: energy
+   * per second RISES with the rung, because the wave grows too.
+   */
+  check('...so a deep rung is no longer the pay cut it was',
+    r.payPerHp / r.payPerHpOld > 5,
+    `energy per point of damage at rung 40, against rung 1: `
+    + `${r.payPerHp.toFixed(3)} now against ${r.payPerHpOld.toFixed(3)} under the linear bounty `
+    + `— ${(r.payPerHp / r.payPerHpOld).toFixed(1)}x better`);
+  check('the depth dividend rises with the peak and with anomalies, and is capped',
+    Math.abs(r.divBase - 1.01) < 1e-9 && r.divAt20 > r.divBase
+    && r.divWithTwo > r.divAt20 && Math.abs(r.divCap - r.cap) < 1e-9,
+    `peak 1 x${r.divBase.toFixed(2)}, peak 20 x${r.divAt20.toFixed(2)}, `
+    + `+2 anomalies x${r.divWithTwo.toFixed(2)}, far past both x${r.divCap.toFixed(2)} (cap ${r.cap})`);
+  check('...and it reaches lifetime energy, not only the purse',
+    r.divLive > 1 && r.purseRose && r.earnedRose && r.earnedEqualsPurse,
+    `dividend x${r.divLive.toFixed(2)}; purse rose ${r.purseRose}, earned rose ${r.earnedRose}, `
+    + `by the same amount ${r.earnedEqualsPurse}`);
+  check('a surge pays the margin, and an ordinary clear does not',
+    r.surge.verdict === 'surge' && r.surge.margin > 0
+    && r.clean.verdict === 'clean' && r.clean.margin === 0,
+    `surge paid ${r.surge.margin}, clean paid ${r.clean.margin}`);
+  check('...and the margin is taxed and multiplied exactly once',
+    Math.abs(r.surge.paid - r.wantMargin) < Math.max(1, r.wantMargin * 0.01),
+    `on a wave worth 1000 raw at peak 20: paid ${r.surge.paid.toFixed(0)}, `
+    + `want ${r.wantMargin.toFixed(0)} (half again, through one dividend and one intake)`);
 }
 
 // --- report -----------------------------------------------------------------

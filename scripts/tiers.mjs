@@ -612,7 +612,7 @@ console.log(`\nTHE LADDER — tiers ${FROM}-${TO}, ${RUNS} run${RUNS > 1 ? 's' :
 console.log(`  spend: ${FIXED !== null ? `${num(FIXED)} flat` : "docs/pacing.md's earned-by-tier targets"}`
   + `, capped at the whole tree (${num(TREE_TOTAL)})`);
 console.log(`  slopes: pop +${CFG.waves.tier.pop * 100}%/tier (cap x${CFG.waves.tier.popCap})`
-  + ` · hp x${CFG.waves.tier.hpStep}^(n-1) · bounty +${CFG.waves.tier.bounty * 100}%/tier`);
+  + ` · hp x${CFG.waves.tier.hpStep}^(n-1) · bounty x${CFG.waves.tier.bountyStep}^(n-1)`);
 const atRange = [...results.values()].flat()
   .flatMap((r) => r.marks.map((m) => m.at)).filter(Number.isFinite);
 console.log(`  one body HELD at ${RANGE} units straight up (measured ${med(atRange) || RANGE}),`

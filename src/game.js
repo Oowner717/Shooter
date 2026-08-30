@@ -18,7 +18,7 @@ import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, sha
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectEnergy, drawIn, intakeRate, ENTRY_Y } from './enemies.js';
+import { Director, spawnOne, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectEnergy, drawIn, intakeRate, ENTRY_Y, dividend } from './enemies.js';
 import { Shooter } from './shooter.js';
 import { Abilities } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
@@ -284,7 +284,7 @@ export class Game {
        * alert language: a step you did not ask for needs to be a thing that
        * happened, not a number that quietly changed.
        */
-      onTier: ({ verdict, moved, tier, from, reason, trial }) => {
+      onTier: ({ verdict, moved, tier, from, reason, trial, margin = 0 }) => {
         void verdict; void from;
         self.hud.syncRail(self.world);
         /*
@@ -296,6 +296,7 @@ export class Game {
             trial === 'proven' ? 'good' : 'remainder', 4.5);
           return;
         }
+        if (margin > 0) self.hud.alert(`MARGIN +${margin}`, 'good', 3);
         if (!moved) return;
         if (moved < 0) self.hud.alert(`THE FIELD RELENTS · ${reason} · TIER ${tier}`, 'remainder', 4.5);
         else if (moved > 1) self.hud.alert(`SURGE · ${reason} · TIER ${tier}`, 'good', 4);
@@ -655,7 +656,7 @@ export class Game {
     w.ledger.push(id);
 
     audio.amend();
-    this.hud.setEnergy(w.energy, intakeRate(w));
+    this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
     this.hud.buildStrip();
     this.hud.syncLoadout(w);
     this.hud.syncAbilities(w.abilities);
@@ -1805,7 +1806,7 @@ export class Game {
      * which is what "waves do not show on continuing" was.
      */
     this.hud.syncRail(w);
-    this.hud.setEnergy(w.energy, intakeRate(w));
+    this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
     this.hud.syncAbilities(w.abilities);
     this.hud.syncLoadout(w);
     this.hud.syncSeals();
@@ -2293,7 +2294,7 @@ export class Game {
      * "as though the run had earned it", which is both halves.
      */
     w.earned += n;
-    this.hud.setEnergy(w.energy, intakeRate(w));
+    this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
     this.hud.menu.syncTree();
     this.hud.alert(`+${n} ENERGY`, 'info', 1.4);
     return w.energy;
@@ -2332,7 +2333,7 @@ export class Game {
         bought++;
       }
     }
-    this.hud.setEnergy(w.energy, intakeRate(w));
+    this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
     this.hud.buildStrip();
     this.hud.syncLoadout(w);
     this.hud.syncAbilities(w.abilities);

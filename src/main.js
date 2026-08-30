@@ -1,12 +1,17 @@
 // Bootstrap: sizing, the frame loop, iOS gesture suppression, service worker.
 
 import { Game } from './game.js';
+import { dividend } from './enemies.js';
 import { BUILD } from './config.js';
 import { audio } from './audio.js';
 
 const canvas = document.getElementById('stage');
 const game = new Game(canvas);
 window.__sim = game; // handy for the smoke test and for poking at a live run
+// The yield probe reads the depth dividend the same way it reads everything
+// else -- off the live game rather than by recomputing the formula, so the
+// two cannot drift apart and quietly disagree about what was measured.
+game.__dividend = dividend;
 
 // ------------------------------------------------------------------ layout
 

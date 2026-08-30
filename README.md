@@ -1466,6 +1466,50 @@ A fall is bounded below by how long a bad wave is allowed to last, so closing
 the rest of that gap means either `patience` or a rout worth more than one
 rung — a decision, not a tuning pass.
 
+### A rung that pays for itself (build 202)
+
+Bounty was linear — `1 + 0.15 * tier` — against health compounding at
+`hpStep`. Exponential cost and linear pay has one outcome: **energy per point
+of damage at rung 40 was 0.08 of rung 1**, so the best-paying place on the
+whole ladder was near the bottom of it, and every hour spent climbing was an
+hour spent earning less. Three changes, and each is asserted on its own because
+they compose:
+
+- **Bounty compounds too**, at `bountyStep` 1.10 against health's 1.12. Still a
+  shade under, so a rung stays harder than the one below it — but the decline
+  per point of damage is 2x across 39 rungs instead of 12x, **six times better**.
+- **A surge pays the margin**: half again on what that wave was worth, in one
+  lump at the turret. Accumulated *raw* — before the intake tax and before the
+  dividend — because it is banked back through the same function, and banking
+  the netted figure would tax and multiply it a second time.
+- **The depth dividend**, `min(1.6, 1 + 0.01·peak + 0.05·anomalies)`, on
+  everything banked. Off the **peak** rather than the current rung, so stepping
+  back to breathe does not also cost you the rate you climbed for. It feeds
+  `earned` as well as the purse on purpose: `earned` is the one clock, and
+  depth ought to move it.
+
+Measured with `scripts/ladder-probe.mjs --hold`, which pins the ladder at the
+rung it was jumped to — without it a run dropped above its ceiling spends the
+window falling, and what gets reported as "energy per second at rung 30" is the
+energy of a run being shoved back to 26.
+
+| profile | rung 1 | rung 10 | rung 20 | rung 30 | rung 40 |
+|---|---|---|---|---|---|
+| bare | **4.85** | 11.33 † | 6.16 † | 1.83 † | 2.58 † |
+| mid | **4.71** | **15.03** | 12.72 † | 2.99 † | 1.72 † |
+| max | **5.01** | **20.05** | **23.37** | 20.48 † | 12.29 † |
+
+Bold is a rung the profile held; † fell off it. On every held rung, energy per
+second is **strictly increasing** — max goes 5.01 → 20.05 → 23.37 — which is
+the acceptance. Against build 197's 8.9/s maxed at rungs 12-19, 3.4/s at rung
+40 and 5.8/s un-upgraded at the bottom, **holding low is now the worse choice
+at every profile**.
+
+Note the two answers point opposite ways and both are right: *per point of
+damage* a deep rung still pays a little less, because bounty is deliberately
+under health. *Per second* it pays far more, because the wave grows as well.
+The second is the one a player experiences.
+
 ### SCION, and what a graft does
 
 A large body worth more to the field dead than alive.

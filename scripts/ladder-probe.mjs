@@ -28,7 +28,17 @@ const { chromium, devices } = require(process.env.PLAYWRIGHT_MODULE || 'playwrig
 const SECONDS = parseInt(process.argv[2] || '180', 10);
 const TIER = parseInt(process.argv[3] || '1', 10);
 const PROFILE = process.argv[4] || 'bare';
-const BASE = process.argv[5] || 'http://127.0.0.1:8099/index.html';
+const BASE = (process.argv[5] && !process.argv[5].startsWith('--')) ? process.argv[5] : 'http://127.0.0.1:8099/index.html';
+/*
+ * `--hold` pins the ladder at the rung it was jumped to.
+ *
+ * For anything measured PER RUNG -- yield above all -- the rung has to stay
+ * put. Without it a run dropped above its ceiling spends the window falling,
+ * and what gets reported as "energy per second at rung 30" is the energy of a
+ * run being shoved back to 26. HOLD pins climbs only, so a rung the profile
+ * genuinely cannot hold still falls, which is the honest answer there.
+ */
+const HOLD = process.argv.includes('--hold');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const errors = [];
@@ -82,7 +92,12 @@ if (PROFILE === 'mid') {
   });
 }
 // The rail only walks rungs already climbed, so the jump uses the director's setter.
-await page.evaluate((n) => { const g = window.__sim; g.world.director.setTier(n); g.hud.syncRail(g.world); }, TIER);
+await page.evaluate(({ n, hold }) => {
+  const g = window.__sim;
+  g.world.director.setTier(n);
+  g.world.director.hold = hold;
+  g.hud.syncRail(g.world);
+}, { n: TIER, hold: HOLD });
 
 const read = () => page.evaluate(() => {
   const g = window.__sim; const w = g.world; const d = w.director;
@@ -93,6 +108,7 @@ const read = () => page.evaluate(() => {
     enemies: w.enemies.filter((e) => !e.dead).map((e) => ({ x: e.x, y: e.y, harmless: !!e.harmless, id: e.type?.id || '?' })),
     hostile: w.enemies.filter((e) => !e.dead && !e.harmless).length,
     kills: w.kills, energy: Math.round(w.energy), earned: Math.round(w.earned), phase: w.phase, boss: !!w.boss,
+    dividend: +(g.__dividend ? g.__dividend(w) : 1),
     dir: { at: d.at, resting: d.resting, tier: d.tier, peak: d.peak, fails: d.fails, verdict: d.lastVerdict, trait: d.trait?.id || d.trait || null,
       of: d.wave ? d.wave.of.map(([id, n]) => `${id}x${n}`).join('+') : '', teach: !!(d.wave && d.wave.teach), band: d.wave ? (d.wave.band || null) : null,
       asked: d.asked, contact: +d.contact.toFixed(1), hitPatience: d.hitPatience },
@@ -139,7 +155,8 @@ const scored = waves.filter((w) => w.verdict && w.verdict !== 'unscored');
 const count = (v) => scored.filter((w) => w.verdict === v).length;
 const median = (a) => (a.length ? a.slice().sort((x, y) => x - y)[a.length >> 1] : null);
 const out = {
-  profile: PROFILE, tier: TIER, seconds: SECONDS, taps,
+  profile: PROFILE, tier: TIER, seconds: SECONDS, taps, hold: HOLD,
+  dividend: fin.dividend,
   final: { kills: fin.kills, tier: fin.dir.tier, peak: fin.dir.peak, energyPerSec: +((fin.energy - energy0) / SECONDS).toFixed(2) },
   summary: { scored: scored.length, surge: count('surge'), clean: count('clean'), stall: count('stall'), rout: count('rout'), failed: count('failed'),
     medianDur: median(scored.map((w) => w.dur)), medianContact: median(scored.map((w) => w.contact)), maxHostile: Math.max(0, ...waves.map((w) => w.maxHostile)) },

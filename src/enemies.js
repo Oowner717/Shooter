@@ -2631,13 +2631,35 @@ export function intakeRate(world) {
   return Math.max(S.taxFloor, bite ** n);
 }
 
+/**
+ * The depth dividend: what everything banked is multiplied by.
+ *
+ * Off the PEAK rather than the current tier, so stepping back to breathe does
+ * not cost you the rate you climbed for -- the ladder is already a difficulty
+ * decision and it should not also be a pay cut. Anomalies count for five times
+ * a rung because they are the only thing on the ladder that is put down once.
+ */
+export function dividend(world) {
+  const T = CFG.waves.tier;
+  const peak = world.director ? world.director.peak : 1;
+  const done = world.reconciled ? world.reconciled.length : 0;
+  return Math.min(T.dividendCap, 1 + T.dividendPeak * peak + T.dividendAnomaly * done);
+}
+
 function bank(world, amount, x, y) {
-  const got = amount * intakeRate(world);
+  const got = amount * intakeRate(world) * dividend(world);
   world.energy += got;
   // The one place energy enters a run, so the one place the lifetime counter
   // can be kept honest. Net of the corruption tax on purpose: what was taken
   // off you at the intake was never earned.
   world.earned += got;
+  /*
+   * What this wave has been worth, RAW -- before the intake tax and before the
+   * dividend. The margin is paid back through this same function, so banking
+   * the netted figure would tax and multiply it a second time.
+   */
+  const d = world.director;
+  if (d && !d.resting) d.take += amount;
   if (got >= 1) dot(x, y, 0, -60, '#9fe8ff', 0.5, 3);
 }
 
@@ -2882,6 +2904,7 @@ export class Director {
     this.contact = 0; // seconds anything spent on the turret this wave
     this.hitPatience = false; // ...and whether the field ever thinned
     this.lastRelease = 0; // world.time of the last object let out
+    this.take = 0; // raw energy this wave has been worth, for the margin
     this.lastVerdict = null; // surge | clean | stall | rout, for the HUD and the tests
     /*
      * One wave that cannot climb, set by any step back. Without it the ladder
@@ -2921,7 +2944,8 @@ export class Director {
       // table exactly as authored and every step after it is a ratio on the
       // one before. See CFG.waves.tier.hpStep for why it is not a slope.
       hp: T.hpStep ** (tier - 1),
-      bounty: 1 + T.bounty * tier,
+      // Compounding, like health and a little slower than it. See bountyStep.
+      bounty: T.bountyStep ** (tier - 1),
     };
   }
 
@@ -2973,8 +2997,20 @@ export class Director {
               : 'IT TOOK TOO LONG';
 
     const from = this.tier;
+    /*
+     * The margin: a surge pays half again on what the wave was worth, in one
+     * lump at the turret. Banked through bank() so the intake tax and the
+     * dividend apply to it exactly once, like anything else the field pays.
+     */
+    let margin = 0;
+    if (verdict === 'surge' && this.take > 0) {
+      const before = world.energy;
+      bank(world, this.take * (T.margin - 1), world.shooter.x, world.shooter.y);
+      margin = Math.round(world.energy - before);
+    }
     this.contact = 0;
     this.hitPatience = false;
+    this.take = 0;
 
     // A trial answers only for itself: it is not a rung of the ladder until it
     // is proven, so it neither climbs nor drops the run that armed it.
@@ -2987,7 +3023,7 @@ export class Director {
       if (won) this.peak = Math.max(this.peak, to);
       this.fails = 0;
       this.grace = 0;
-      return { verdict, moved: this.tier - from, tier: this.tier, from, reason,
+      return { verdict, moved: this.tier - from, tier: this.tier, from, reason, margin,
         trial: won ? 'proven' : 'failed' };
     }
 
@@ -3015,7 +3051,7 @@ export class Director {
       else if (!this.hold) { this.tier += step; moved = step; }
     }
     this.peak = Math.max(this.peak, this.tier);
-    return { verdict, moved, tier: this.tier, from, reason };
+    return { verdict, moved, tier: this.tier, from, reason, margin };
   }
 
   /**
@@ -3183,6 +3219,7 @@ export class Director {
     this.hitPatience = false;
     this.wait = 0;
     this.lastRelease = world.time || 0;
+    this.take = 0;
     // A wave may ask for grey drift alongside it. It is not hostile, costs
     // nothing from the allotment, and is the whole of both the opening and the
     // bonus wave. Stacked upward rather than dropped in one row, so twenty-two

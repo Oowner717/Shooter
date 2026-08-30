@@ -195,6 +195,17 @@ html, body {
   opacity: 0.72;
 }
 #energyChip.choked #energyNum { color: #9fb3c8; }
+/*
+ * ...and the other direction: the depth dividend is live, so the label slot is
+ * carrying a multiplier instead of the word ENERGY. Deliberately quieter than
+ * `choked` -- corruption on the intake is a thing to look at, and this is a
+ * standing fact about how deep the run is, which should not blink for hours.
+ */
+#energyChip.rich em {
+  color: var(--accent);
+  opacity: 0.95;
+  font-variant-numeric: tabular-nums;
+}
 
 #counter #killNum {
   font-size: 14px;

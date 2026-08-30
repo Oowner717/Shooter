@@ -910,7 +910,7 @@ export class Hud {
     bar.classList.add('tighter');
   }
 
-  setEnergy(n, rate = 1) {
+  setEnergy(n, rate = 1, div = 1) {
     const v = Math.floor(n);
     if (v !== this.lastEnergy) {
       // The far end of the collection animation. The streaks go into the
@@ -929,6 +929,23 @@ export class Hud {
     if (choked !== this.lastChoked) {
       this.lastChoked = choked;
       this.el.energyChip.classList.toggle('choked', choked);
+    }
+    /*
+     * The depth dividend, in the label's own slot.
+     *
+     * The word ENERGY is the one thing on this chip that says nothing the
+     * green number does not -- which is why fitBar drops it first when the
+     * purse grows a digit. So when there IS something to say there, it says
+     * that instead, and goes back to the word when the dividend is spent.
+     * Kept off the number itself: the purse is a quantity and this is a rate,
+     * and running them together makes a third thing that is neither.
+     */
+    const rich = div > 1.001;
+    const word = rich ? `\u00d7${div.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}` : 'ENERGY';
+    if (word !== this.lastEnergyWord) {
+      this.lastEnergyWord = word;
+      this.el.energyChip.querySelector('em').textContent = word;
+      this.el.energyChip.classList.toggle('rich', rich);
     }
     this.fitBar();
   }
