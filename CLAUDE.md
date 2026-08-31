@@ -535,4 +535,47 @@ most once for any given target and cannot spin.
   reach, so it was the flex item that gave ground: measured 8px down to 3px at
   320 the moment the label beside it had text, clipped rather than scrolled,
   `scrollWidth === clientWidth`, nothing to read back.
+- **Canvas alpha must be MULTIPLIED IN AND PUT BACK, never assigned and reset
+  to 1.** `drawGlow` did the latter, and so did the hit-flash disc inside
+  `Enemy.draw` and two of the shape helpers it calls, which threw away any
+  alpha the caller had set for itself. Build 210's fizzle set the
+  alpha one line before the ambient glow was drawn and every body dissolved at
+  full opacity: measured off an offscreen canvas, peak 255 at fizzle 0.9 and
+  255 at 0.02. The scale shrank, the fade did not exist, and nothing read wrong
+  at the call site -- and four separate places had to be fixed before the fade
+  came out, because each of them individually forced the alpha back to 1 for
+  everything drawn after it. Same shape as the `[hidden]` trap: a property set,
+  and silently overwritten one layer down. Anything inside a `save()/restore()`
+  is fine; it is the bare `= 1` on the way out that is the bug.
+- **`Game.update` is `if (w.boss) {...} else { director.update() }`**, so
+  ANY guard written inside `Director.update` for the boss case is dead code.
+  Build 210 put the glitch timer's douse there and it never ran: the fuse froze
+  for a 224-second fight and came back nine tenths closed. The case was green,
+  because it called `d.update` directly with a stub boss -- the one call the
+  game never makes. Anything the director must do while a boss is up belongs on
+  the boss side of that if/else, and its case has to go through `g.update` and
+  a real `openBoss`.
+- **Steering runs from `physicsStep`, not from `Enemy.update`.** A state that
+  should stop a body moving has to be honoured in both: build 210's fizzle
+  early-returned from `update` and the body went on driving at the turret
+  through its own dissolve -- 1 to 20 u/s, eleven units closer.
+- **A `Set` of bodies cleared without clearing the per-body flag locks them
+  out for good.** `world.attackers.clear()` in the two boss sites left
+  `e.attacking` true, and the grab loop skips anything already flagged, so a
+  live body cleared mid-fight could never be re-grabbed. 472 frames of
+  disagreement over one ORDINAL fight. Membership and flag come off together.
+- **A pulse that multiplies ALPHA cannot be made to pass a contrast floor.**
+  The glitch readout's red spent half its cycle under 3:1 and never reached 4.5
+  against any ground the game uses, because `rgba(tone, 0.92 * beat)` composites
+  it further into the field the dimmer it gets. Text that has to be read over
+  arbitrary content needs a plate, not a brighter colour.
+- **A canvas readout drawn INSIDE the glitch shader is torn.** `drawGlitch`
+  paints into the buffer `glitch.present` corrupts, which is the point -- but
+  it means thin glyphs over a busy ground vanish exactly when the number
+  matters. Plate them, and tune the shader's contribution against the WORST
+  case (several attackers plus a full fuse), not against one attacker.
+- **A "spy" test that records call NAMES proves almost nothing.** Build 210's
+  ring case counted two arcs and regexp'd the digits, and passed against four
+  substitute implementations -- including a ring that never closed and a clock
+  that counted up. Record the ARGUMENTS and assert they move the right way.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

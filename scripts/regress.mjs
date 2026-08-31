@@ -10290,6 +10290,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     stage();
     g.debugSpawn('mote', s.x - 90, 260).spawnIn = 0;
     g.debugSpawn('mote', s.x + 90, 260).spawnIn = 0;
+    // A SEED: harmless, and absolutely part of the wave. The first version of
+    // glitchOut skipped every `harmless` body, which spared a SCION's live
+    // seeds and handed the replacement wave a set of grafts it never asked for.
+    g.debugSpawn('seed', s.x + 40, 240).spawnIn = 0;
     g.debugSpawnDrift();
     // A mote of energy on the floor, made the way the game makes them.
     const payer = g.debugSpawn('mote', s.x, 300);
@@ -10303,28 +10307,55 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const dropsBefore = w.drops.filter((x) => !x.dead).length;
     const energyBefore = Math.round(w.energy);
     const killsBefore = w.kills;
-    const hostiles = w.enemies.filter((e) => !e.dead && !e.harmless).length;
-    const greyBefore = w.enemies.filter((e) => !e.dead && e.harmless).length;
+    // Everything the wave put out -- the grey trickle is DRIFT by name, and it
+    // is the only thing on the field that is not the wave's.
+    /*
+     * ...and the assist is shown to READ A ONE first.
+     *
+     * `autoTarget` refuses anything past `CFG.shooter.aimRange` (400 on a
+     * stock run) and the bodies above sit 742 units out, so it returned null
+     * whether or not the fizzle marked anything: a zero the instrument had
+     * never been shown to read a one for. One body goes inside the cone and
+     * the reach, and the lock is taken before the withdrawal and looked for
+     * again after it.
+     *
+     * Spawned BEFORE the field is counted. Put after, it was fizzled and not
+     * counted, and the case reported "4 of 3 marked".
+     */
     w.autoAim = true;
+    w.aimMode = 'field';
+    const near = g.debugSpawn('mote', s.x + 30, s.y - 260);
+    near.spawnIn = 0; near.staged = false;
+    out.targetsBefore = g.autoTarget() !== null;
+
+    const hostiles = w.enemies.filter((e) => !e.dead && e.type.id !== 'drift').length;
+    const greyBefore = w.enemies.filter((e) => !e.dead && e.type.id === 'drift').length;
+    const seedsBefore = w.enemies.filter((e) => !e.dead && e.type.id === 'seed').length;
     const move = d.glitchOut(w);
     out.fizzled = move.fizzled;
     out.hostiles = hostiles;
     out.marks = w.enemies.filter((e) => e.fizzle > 0)
       .every((e) => e.spent === true && e.dissolved === true && !e.attacking);
-    out.greyKept = w.enemies.filter((e) => !e.dead && e.harmless && !e.fizzle).length === greyBefore;
+    out.greyKept = w.enemies.filter((e) => !e.dead && e.type.id === 'drift' && !e.fizzle)
+      .length === greyBefore;
+    out.seeds = seedsBefore;
+    out.seedsTaken = w.enemies.filter((e) => e.type.id === 'seed' && e.fizzle > 0).length;
     out.targetsNone = g.autoTarget() === null;
     // A blast landing on one of them during its second must not cash it in.
     const victim = w.enemies.find((e) => e.fizzle > 0);
     if (victim) victim.destroy(w);
     // ...and a second later there is nothing of them left.
     for (let i = 0; i < Math.round((G.fizzle + 0.4) * 60); i++) g.update(1 / 60);
-    out.gone = w.enemies.filter((e) => !e.dead && !e.harmless).length;
+    out.gone = w.enemies.filter((e) => !e.dead && e.type.id !== 'drift').length;
     out.paid = Math.round(w.energy) - energyBefore;
     out.counted = w.kills - killsBefore;
     out.dropsKept = w.drops.filter((x) => !x.dead).length >= dropsBefore;
 
     // ---- what firing does to the ladder and the wave ----
     stage(9);
+    // A wave RUNNING, because an armed OVERCLOCK is only spent by a glitch
+    // that interrupts one -- see the pair of charge cases below.
+    d.resting = false;
     d.hold = true;
     d.overclock.armed = true;
     d.laneOffer = { id: 'x', until: 99 };
@@ -10355,13 +10386,33 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       probe: d.probe, locked: d.probeLock > 0 };
 
     // ---- it does not run during an anomaly, nor while the game is teaching --
+    /*
+     * Driven through `g.update`, the real frame, and NOT through
+     * `d.update`.
+     *
+     * The first version of this case called the director directly and passed
+     * on a build where the guard was unreachable: `Game.update` is an if/else
+     * and the director is the else, so nothing calls `Director.update` at all
+     * while an anomaly is up. The fuse froze at whatever it held when the way
+     * opened, sat there for the whole fight, and came back still lit over a
+     * turret that had been clear for four minutes -- with a green case above
+     * it asserting the opposite. A control that refuses is not the same as a
+     * rule that holds; press the real path.
+     */
     stage();
     d.glitch = 0.5;
-    const boss = w.boss;
-    w.boss = { arriving: 0, dying: 0 };
-    d.update(w, 1 / 60);
+    w.apertures[1] = 1;
+    g.openBoss(1);
+    out.bossUp = !!w.boss;
+    for (let i = 0; i < 30; i++) g.update(1 / 60);
     out.underBoss = d.glitch;
-    w.boss = boss;
+    // ...and it is still out when the anomaly is gone, rather than resuming
+    // from where it froze.
+    g.withdrawBoss();
+    for (let i = 0; i < 10; i++) g.update(1 / 60);
+    out.afterBoss = d.glitch;
+
+    stage();
     d.glitch = 0.5;
     d.order = [0]; d.at = 0; // wave 0 is a teach wave
     d.update(w, 1 / 60);
@@ -10379,6 +10430,88 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.alert = [...document.querySelectorAll('#alerts .alert')]
       .map((el) => el.textContent).join(' | ');
 
+    // ---- the review's own findings, each with a case of its own -----------
+    /*
+     * The fade RENDERS. `drawGlow` used to assign globalAlpha and reset it to
+     * 1, throwing away the alpha the fizzle had set one line earlier -- so
+     * every body dissolved at full opacity and only the scale moved. Measured
+     * on an offscreen canvas, not the live one, at a scale this case picks.
+     */
+    stage();
+    const fader = g.debugSpawn('mote', 300, 300);
+    fader.spawnIn = 0; fader.staged = false; fader.flash = 0;
+    const alphaAt = (fz) => {
+      fader.fizzle = fz;
+      const c = document.createElement('canvas');
+      c.width = 200; c.height = 200;
+      const cx = c.getContext('2d', { willReadFrequently: true });
+      /*
+       * An OPAQUE ground first.
+       *
+       * `getImageData` hands back unpremultiplied RGBA, so a white pixel drawn
+       * at alpha 0.16 onto a transparent canvas reads back as (255,255,255)
+       * with a = 41: the colour channels do not move at all and only the alpha
+       * does. The first version of this read the colour channels and reported
+       * 210 -> 210 across most of a dissolve that was working. Composited over
+       * black, the colour channels are the fade.
+       */
+      cx.fillStyle = '#000';
+      cx.fillRect(0, 0, 200, 200);
+      cx.setTransform(2, 0, 0, 2, 100 - fader.x * 2, 100 - fader.y * 2);
+      fader.draw(cx, w);
+      cx.setTransform(1, 0, 0, 1, 0, 0);
+      const px = cx.getImageData(0, 0, 200, 200).data;
+      let lit = 0;
+      let peak = 0;
+      let ink = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        const v = (px[i] + px[i + 1] + px[i + 2]) / 3;
+        if (v > 8) lit++;
+        ink += v;
+        peak = Math.max(peak, v);
+      }
+      return { lit, peak: Math.round(peak), ink: Math.round(ink / 1000) };
+    };
+    out.fadeFull = alphaAt(G.fizzle);
+    out.fadeHalf = alphaAt(G.fizzle * 0.4);
+    out.fadeEnd = alphaAt(G.fizzle * 0.05);
+    fader.fizzle = 0;
+    fader.dead = true;
+
+    // A dissolving body drives at nothing.
+    stage();
+    const drifter = g.debugSpawn('lurcher', s.x + 200, s.y - 500);
+    drifter.spawnIn = 0; drifter.staged = false; drifter.vx = 0; drifter.vy = 0;
+    d.glitchOut(w);
+    const d0 = Math.hypot(drifter.x - s.x, drifter.y - s.y);
+    for (let i = 0; i < 30; i++) g.update(1 / 60);
+    out.drove = +(d0 - Math.hypot(drifter.x - s.x, drifter.y - s.y)).toFixed(2);
+    out.droveSpeed = +Math.hypot(drifter.vx, drifter.vy).toFixed(2);
+
+    // An OVERCLOCK armed for a wave that never ran is not spent.
+    stage(9);
+    d.resting = true;
+    d.overclock.armed = true;
+    d.glitchOut(w);
+    out.armedKeptAtRest = d.overclock.armed;
+    stage(9);
+    d.resting = false;
+    d.overclock.armed = true;
+    d.glitchOut(w);
+    out.armedSpentInWave = d.overclock.armed;
+
+    // A body cleared out of the set by a boss can be taken back by the turret.
+    stage();
+    const grabbed = g.debugSpawn('lurcher', s.x + 4, s.y - 6);
+    grabbed.spawnIn = 0;
+    g.update(1 / 60);
+    out.grabbedOn = w.attackers.has(grabbed);
+    for (const e of w.attackers) e.attacking = false;
+    w.attackers.clear();                 // what a boss's hush() does
+    grabbed.x = s.x + 4; grabbed.y = s.y - 6; grabbed.vx = 0; grabbed.vy = 0;
+    g.update(1 / 60);
+    out.grabbedBack = w.attackers.has(grabbed);
+
     // ---- and it is drawn, as a ring that closes with a number in it --------
     /*
      * On a recording stand-in rather than off the live canvas. The ring is one
@@ -10394,26 +10527,49 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       const ctx = new Proxy({ calls }, {
         get(t, k) {
           if (k === 'calls') return calls;
-          return (...a) => { calls.push({ k, a }); return noop(); };
+          return (...a) => {
+            calls.push({ k, a });
+            // Faithful enough to be measured through: the readout measures its
+            // own label to size the plate behind it, and a stand-in that hands
+            // back a function for `measureText` makes the code under test throw
+            // rather than run. Six units a character is close enough for a
+            // monospace face at the sizes this draws at.
+            if (k === 'measureText') return { width: String(a[0]).length * 6 };
+            return noop();
+          };
         },
         set(t, k, v) { calls.push({ k, a: [v], set: true }); return true; },
       });
       return ctx;
     };
+    /*
+     * The ARGUMENTS, not just the call names.
+     *
+     * The first version counted arcs and matched the digits against a regexp,
+     * and would have passed a ring that never closed and a clock that counted
+     * UP -- both drawn with two arcs and a plausible-looking number. It reads
+     * the arc's sweep and the label at four points on the fuse now, and asserts
+     * both are monotonic in the right direction.
+     */
+    const sample = (at) => {
+      d.glitch = at;
+      const c = rec();
+      g.drawGlitch(c);
+      const arcs = c.calls.filter((x) => x.k === 'arc');
+      const text = c.calls.find((x) => x.k === 'fillText');
+      return {
+        calls: c.calls.length,
+        arcs: arcs.length,
+        // The track is the full circle; the fuse is the one that grows.
+        sweep: arcs.length > 1 ? +Math.abs(arcs[1].a[4] - arcs[1].a[3]).toFixed(4) : null,
+        track: arcs.length ? +Math.abs(arcs[0].a[4] - arcs[0].a[3]).toFixed(4) : null,
+        label: text ? String(text.a[0]) : '',
+      };
+    };
     stage();
-    d.glitch = 0;
-    const cold = rec();
-    g.drawGlitch(cold);
-    out.drawCold = cold.calls.length;
-    d.glitch = 0.5;
-    const warm = rec();
-    g.drawGlitch(warm);
-    out.drawArcs = warm.calls.filter((c) => c.k === 'arc').length;
-    out.drawText = (warm.calls.find((c) => c.k === 'fillText') || { a: [''] }).a[0];
-    d.glitch = 1 - 1.4 / G.fuse; // inside the warning window
-    const hot = rec();
-    g.drawGlitch(hot);
-    out.drawHot = (hot.calls.find((c) => c.k === 'fillText') || { a: [''] }).a[0];
+    out.drawCold = sample(0).calls;
+    out.draw = [0.25, 0.5, 0.75, 1 - 1.4 / G.fuse].map(sample);
+    out.tau = Math.PI * 2;
 
     g.debugClearField();
     w.spawnLock = 0;
@@ -10455,10 +10611,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('the field fizzles out, pays nothing, and counts for nothing',
     r.fizzled === r.hostiles && r.hostiles > 0 && r.marks && r.targetsNone
     && r.gone === 0 && r.paid === 0 && r.counted === 0
-    && r.dropsKept && r.greyKept,
-    `${r.fizzled} of ${r.hostiles} marked (flags ok ${r.marks}, assist sees none `
-    + `${r.targetsNone}); after ${r.cfg.fizzle}s ${r.gone} left, paid ${r.paid}, `
-    + `counted ${r.counted}, energy on the floor kept ${r.dropsKept}, grey kept ${r.greyKept}`);
+    && r.dropsKept && r.greyKept && r.seeds > 0 && r.seedsTaken === r.seeds
+    && r.targetsBefore,
+    `${r.fizzled} of ${r.hostiles} marked (flags ok ${r.marks}, assist had a lock `
+    + `${r.targetsBefore} and now sees none ${r.targetsNone}); `
+    + `${r.seedsTaken}/${r.seeds} SEEDs taken; after `
+    + `${r.cfg.fizzle}s ${r.gone} left, paid ${r.paid}, counted ${r.counted}, `
+    + `energy on the floor kept ${r.dropsKept}, grey kept ${r.greyKept}`);
 
   /*
    * Everything score() owes the next wave, paid by hand -- because this path
@@ -10506,8 +10665,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * closed over a turret that has been clear for four minutes.
    */
   check('nothing burns during an anomaly, and nothing burns while the game is teaching',
-    r.underBoss === 0 && r.underTeach === 0,
-    `half a fuse under a boss -> ${r.underBoss}, on a teach wave -> ${r.underTeach}`);
+    r.bossUp && r.underBoss === 0 && r.afterBoss === 0 && r.underTeach === 0,
+    `anomaly on the field ${r.bossUp}; half a fuse through half a second of it `
+    + `-> ${r.underBoss}, and after it withdrew -> ${r.afterBoss}; `
+    + `on a teach wave -> ${r.underTeach}`);
 
   /*
    * `show()` writes text and nothing else; `advance()` moves `index`, which is
@@ -10520,12 +10681,71 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     && /STEPPED BACK/.test(r.alert),
     `narrator: "${r.said}" (story beats spent ${r.storySpent}); alert: "${r.alert}"`);
 
-  check('...and it is drawn as a ring that closes, with the seconds inside it',
-    r.drawCold === 0 && r.drawArcs === 2
-    && /^\d+$/.test(String(r.drawText))
-    && /^\d+\.\d$/.test(String(r.drawHot)),
-    `out: ${r.drawCold} calls; half burnt: ${r.drawArcs} arcs reading `
-    + `"${r.drawText}"; inside the warning: "${r.drawHot}"`);
+  /*
+   * Three findings from the review of this build, each with the case that
+   * would have caught it.
+   *
+   * THE FADE never rendered: `drawGlow` assigned `globalAlpha` and reset it to
+   * 1, throwing away the alpha the fizzle set one line earlier, so every body
+   * dissolved at full opacity with only the scale moving. Read off an
+   * offscreen canvas at a scale this case picks, never the live one -- the
+   * governor has had that down to 273x591 by the time the suite reaches here.
+   *
+   * A DISSOLVING BODY STEERS: `Enemy.update` refuses a fizzling body but
+   * steering is driven from `physicsStep`, not from update, so a fizzled
+   * LURCHER went on driving at the turret through its own dissolve.
+   *
+   * AN OVERCLOCK armed for a wave that then never ran was being spent by the
+   * glitch, because `score()` clears it and this path copied that without
+   * asking whether a wave had actually started.
+   */
+  check('a dissolving body fades out, drives at nothing, and takes no charge with it',
+    r.fadeFull.ink > r.fadeHalf.ink && r.fadeHalf.ink > r.fadeEnd.ink
+    && r.fadeEnd.ink < r.fadeFull.ink * 0.35
+    && r.fadeFull.lit > 0 && r.drove <= 1 && r.droveSpeed <= 1
+    && r.armedKeptAtRest === true && r.armedSpentInWave === false,
+    `ink over black ${r.fadeFull.ink} -> ${r.fadeHalf.ink} -> ${r.fadeEnd.ink} `
+    + `across the dissolve (peaks ${r.fadeFull.peak}/${r.fadeHalf.peak}/`
+    + `${r.fadeEnd.peak}); closed ${r.drove} units at ${r.droveSpeed} u/s while `
+    + `dissolving; OVERCLOCK kept when it fired between waves ${r.armedKeptAtRest}, `
+    + `spent when a wave was running ${r.armedSpentInWave}`);
+
+  /*
+   * A set cleared without clearing the flag locks a live body out for good:
+   * the grab loop skips anything already `attacking`, and `hush()` and
+   * `open()` both empty the set mid-fight with bodies still on the mount.
+   * Measured before the fix, over one ORDINAL fight: 472 frames where the set
+   * and what was actually touching the turret disagreed.
+   */
+  check('a body cleared off the mount by an anomaly can be taken back afterwards',
+    r.grabbedOn && r.grabbedBack,
+    `grabbed ${r.grabbedOn}, and after the set was emptied under it, re-grabbed `
+    + `${r.grabbedBack}`);
+
+  /*
+   * Read the arguments, not the call names. A ring that never closes and a
+   * clock that counts up both draw two arcs and a plausible number, and the
+   * first version of this case passed all four substitute implementations it
+   * was later tried against.
+   */
+  {
+    const d4 = r.draw;
+    const sweeps = d4.map((x) => x.sweep);
+    const secs = d4.map((x) => parseFloat(x.label));
+    const closes = sweeps.every((v, i) => v !== null && (i === 0 || v > sweeps[i - 1]));
+    const counts = secs.every((v, i) => Number.isFinite(v) && (i === 0 || v < secs[i - 1]));
+    // 1e-3, not 1e-9: `sweep` and `track` are both rounded to four places on
+    // the way out of the page, so a tolerance tighter than that rounding can
+    // never be met and the case failed on a ring that was drawing perfectly.
+    const track = d4.every((x) => Math.abs(x.track - r.tau) < 1e-3);
+    check('...and it is drawn as a ring that closes, with the seconds counting down',
+      r.drawCold === 0 && d4.every((x) => x.arcs === 2) && closes && counts && track
+      && Math.abs(sweeps[1] - r.tau * 0.5) < 1e-3
+      && /^\d+$/.test(d4[0].label) && /^\d+\.\d$/.test(d4[3].label),
+      `out: ${r.drawCold} calls; sweep ${sweeps.map((v) => (v / r.tau).toFixed(2)).join(' -> ')} `
+      + `of a full turn (track always ${(d4[0].track / r.tau).toFixed(2)}); `
+      + `reading ${d4.map((x) => `"${x.label}"`).join(' -> ')}`);
+  }
 }
 
 // --- report -----------------------------------------------------------------

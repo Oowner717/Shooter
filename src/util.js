@@ -105,9 +105,23 @@ export function glowSprite(color) {
 /** Draw a centred glow of the given radius. */
 export function drawGlow(ctx, color, x, y, r, alpha = 1) {
   const s = glowSprite(color);
-  ctx.globalAlpha = alpha;
+  /*
+   * Multiplied into whatever the caller had, and PUT BACK -- not assigned and
+   * reset to 1.
+   *
+   * It used to do the latter, which silently threw away any alpha the caller
+   * had set for itself. Build 210's fizzle set `globalAlpha` on a dissolving
+   * body one line before the ambient glow was drawn, and every body faded out
+   * at full opacity: measured on an offscreen canvas, peak alpha 255 at fizzle
+   * 0.9 and 255 at fizzle 0.02. The scale shrank, the fade did not exist, and
+   * nothing about the code read wrong at the call site. Same shape as the
+   * `[hidden]` trap in styles.css -- a property set and quietly overwritten by
+   * something one layer down.
+   */
+  const was = ctx.globalAlpha;
+  ctx.globalAlpha = was * alpha;
   ctx.drawImage(s, x - r, y - r, r * 2, r * 2);
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = was;
 }
 
 /**

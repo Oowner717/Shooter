@@ -1327,6 +1327,11 @@ on four cores:
 Against 28-37 s before. Three things the table says that the brief's targets
 did not expect:
 
+*(Everything below this line is a measurement of build 201's table, which had a
+`rout` in it. Build 210 removed the last way down from the table entirely and
+put it on the glitch timer instead — see
+[the glitch timer](#the-glitch-timer-build-210). Kept as it was measured.)*
+
 **At equilibrium a maxed run is stall-limited, not contact-limited.** Median
 contact is 0 s in every `max` run — the turret is simply never touched — and
 the ladder holds the run at rung 20 through *stalls*: six of nine waves, no
@@ -1403,8 +1408,8 @@ the ladder simply **will not climb past it** until its anomaly is in
 topped up to one rather than added to, so it cannot be farmed and so it comes
 back on its own after a withdrawal. Nothing holds the world: the way is opened
 when the player opens it. A surge steps **on** to a gate rather than over it,
-and stalls and routs still push down past one, because going back was never the
-thing that had to be earned. Beating a gate hands over the rung it was standing
+and the glitch timer still pushes down past one, because going back was never
+the thing that had to be earned. Beating a gate hands over the rung it was standing
 in front of.
 
 **Withdrawal.** A gate that cannot be passed is a run that cannot continue, and
@@ -1517,8 +1522,9 @@ a modal by itself.
   time since the last release toward 12 s, and cleared fraction. The verdict is
   legible before it is announced rather than arriving as a surprise.
 - **RECALL** — end the wave now and take what is cleared. Three quarters counts
-  as the clean it was going to be; less is a **stall**, not the rout the table
-  would have given it. That is what the charge buys.
+  as the clean it was going to be; less is a **stall**. Since build 210 the
+  table has no way down at all, so what the charge buys is the clean rather
+  than an escape from a drop.
 - **OVERCLOCK** — the next wave arrives twice as fast, pays double, and gets a
   six-second surge window instead of three (a wave arriving twice as fast is
   over sooner, and three seconds would be a surge handed out for the arming
@@ -1812,6 +1818,66 @@ The verdict table's inability to go down is asserted by sweeping it — six
 values of `t` either side of both windows, seven of `k` up to twice the old
 rout threshold, four fields from cleared to untouched, and not one of the 168
 poses may come back below 0.
+
+### What the review of 210 found (build 210, same day)
+
+Nineteen findings across six lenses, each put to three independent skeptics
+told to refute it; twelve survived two votes or more. Seven were dropped — PULSE
+being unable to lift a BULWARK off the mount was refuted 3–0, and so was the
+suggestion that `paid` and `dropsKept` prove nothing. What survived:
+
+**The boss guard was unreachable, and four lenses found it independently.**
+`Director.update` opens with `if (world.phase !== 'staging' || world.boss)`,
+written specifically to put the fuse out during a fight. `Game.update` never
+calls it while a boss is up — it is an `if (w.boss) { … } else {
+w.director.update(…) }` and the director is the *else*. So the fuse froze at
+whatever it held when the way opened, sat there for a 224-second fight, and
+came back nine tenths closed over a turret nothing had touched: measured, 0.863
+in, 0.862 out, with the shader billing a constant +0.22 the whole time and
+`drawGlitch` — which *is* gated on the boss — hiding the ring that would have
+explained it. Then the ladder stepped back 3.5s after the fight instead of
+15.5s. **And the case for it was green**, because it drove `Director.update`
+directly with a stub boss: the one call the game never makes. It presses
+`g.update` through a real `openBoss(1)` now, and the fix douses the fuse on the
+boss side of that if/else. Proved by putting the defect back: without the douse
+call the fuse reads 0.500 through the fight and 0.493 after it.
+
+**The fizzle never faded.** `drawGlow` assigned `globalAlpha` and reset it to
+1, throwing away the alpha the fizzle set one line earlier — so every body
+dissolved at full opacity and only the scale moved. Measured on an offscreen
+canvas: peak alpha 255 at fizzle 0.9 and 255 at fizzle 0.02. It multiplies into
+whatever the caller had and puts it back now, which is the same shape as the
+`[hidden]` trap: a property set, and quietly overwritten one layer down. **And
+it was in four places, not one** — the hit-flash disc inside `Enemy.draw` and
+two shape helpers do the same `= 1` on their way out, so fixing only the one
+the review named would have left the fade broken for any body that had recently
+been hit, and for the two shapes that use those helpers. Anything wrapped in
+`save()/restore()` was already fine; the bare reset is the bug.
+
+The rest, each with a case: a dissolving body still *steered* (steering runs
+from `physicsStep`, not from the `update` that refuses it — measured, 1 → 20
+u/s and 11 units closer before it went); a glitch between waves spent an
+OVERCLOCK charge on a wave that never ran; `world.attackers.clear()` in the
+boss files left `e.attacking` set, and the grab loop skips anything already
+flagged, so a body cleared that way was locked out of the set for life (472
+frames of disagreement over one fight); the red countdown never cleared 4.5:1
+and spent half its pulse under 3:1, because the pulse multiplies the *alpha*
+(it has a plate and a shallower pulse now); the ring at a fixed `r * 2.2` sat
+*inside* a fully rigged machine, which paints to 62.4 against the ring's 57.2
+(it scales with the rig now); and the new ON_CONTACT sentence about the ring
+fired during the eight teach waves — the one stretch of the game where the fuse
+is pinned at zero — spending the only explanation the mechanic gets, once per
+device, where there is nothing to look at. It is keyed off the fuse itself now.
+
+**Two of the new cases were passing vacuously**, which is the finding that
+matters most. `it is drawn as a ring that closes` counted arcs and regexp'd the
+digits, and passed against four substitute implementations including a ring
+that never closed and a clock that counted *up*; it reads the arc's sweep and
+the label at four points on the fuse and asserts both are monotonic now.
+`assist sees none` was a zero the instrument had never read a one for — the
+case's bodies sat 742 units out against a 400-unit reach, so `autoTarget()`
+returned null whether the fizzle marked anything or not; it takes a real lock
+first and looks for it again after.
 
 ### The collapse button stops moving (build 210)
 

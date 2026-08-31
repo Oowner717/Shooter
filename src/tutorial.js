@@ -129,14 +129,26 @@ export const ON_CONTACT = [
    */
   'CORRUPTION. Something is holding the turret.\nThe barrel cannot reach it. PULSE can.',
   'Each one taxes what you bank: one costs 22%,\ntwo 39%, three 53%, five 70%.',
-  /*
-   * Added in build 210 with the glitch timer, and the line it replaces said
-   * "It cannot kill you" -- which was true when contact only cost energy and
-   * is not true now that it costs a rung. A player told once that a thing is
-   * harmless does not re-examine it later.
-   */
-  'And it runs the GLITCH down. Let the ring round the\nturret close and the simulation steps back a wave.',
 ].map((text) => ({ id: idOf(text), text, hold: holdFor(text) }));
+
+/*
+ * The glitch timer, said the first time a fuse actually lights.
+ *
+ * NOT part of ON_CONTACT, which was the first attempt and was wrong for a
+ * reason worth writing down: ON_CONTACT fires the first time anything touches
+ * the turret, and the first time anything touches the turret is during the
+ * eight teach waves -- where `Director.burn` is deliberately guarded off and
+ * `glitch` is pinned at zero. Measured: all three lines played at 39s, 45s and
+ * 50s of the opening. So the one sentence explaining a ring round the turret
+ * was spent, once per device and for ever, at the only moment in the run when
+ * there is no ring to look at.
+ *
+ * It is keyed off the fuse instead. See Game.watchGlitch.
+ */
+export const ON_GLITCH = (() => {
+  const text = 'GLITCH. The ring is the simulation losing its grip.\nClear the turret before it closes, or it steps back.';
+  return { id: idOf(text), text, hold: holdFor(text) };
+})();
 
 /*
  * ...and if it is still there a while later, said again.

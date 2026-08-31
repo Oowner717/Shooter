@@ -1359,13 +1359,21 @@ export class Enemy {
     if (this.flash > 0.01) {
       // A disc, not ctx.fill() on whatever sub-path the shape left behind —
       // several of the shapes end on an open stroke path.
+      //
+      // Multiplied into whatever is already set and put BACK, not reset to 1.
+      // The fizzle sets the body's alpha at the top of this method and
+      // `flash` freezes where it was (update refuses a dissolving body), so
+      // a body hit just before the simulation stepped back drew its hit
+      // flash at full strength and handed full opacity to everything after
+      // it. Same trap as drawGlow, one method further in.
+      const was = ctx.globalAlpha;
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = clamp(this.flash, 0, 1) * 0.7;
+      ctx.globalAlpha = was * clamp(this.flash, 0, 1) * 0.7;
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
       ctx.arc(0, 0, this.r * 0.92, 0, TAU);
       ctx.fill();
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = was;
       ctx.globalCompositeOperation = 'source-over';
     }
 
@@ -1684,15 +1692,21 @@ function drawOrdinal(ctx, r, phase, t, hpFrac) {
   ctx.stroke();
 
   // three rings, each turning at its own rate, each broken in a different place
+  //
+  // Alpha multiplied in and put back, not assigned and reset to 1: a shape
+  // helper that forces the alpha to 1 on its way out hands full opacity to
+  // everything drawn after it, which is how build 210's dissolve came out
+  // fully opaque on the shapes that use this pattern.
+  const was = ctx.globalAlpha;
   for (let i = 0; i < 3; i++) {
     const rr = r * (0.74 - i * 0.14);
     const off = t * (0.5 + i * 0.55) * (i % 2 ? -1 : 1);
-    ctx.globalAlpha = 0.75 - i * 0.14;
+    ctx.globalAlpha = was * (0.75 - i * 0.14);
     ctx.beginPath();
     ctx.arc(0, 0, rr, off, off + Math.PI * (1.5 - i * 0.22));
     ctx.stroke();
   }
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = was;
 
   // the iris: shut at full health, wide open at the end
   const irisR = r * (0.1 + 0.3 * hurt);
@@ -2480,9 +2494,11 @@ function drawTowMass(ctx, r, hpFrac) {
     ctx.moveTo(-half, y);
     ctx.lineTo(half, y);
   }
-  ctx.globalAlpha = 0.35 + hpFrac * 0.4;
+  // Multiplied in and put back; see the note in drawEye.
+  const was2 = ctx.globalAlpha;
+  ctx.globalAlpha = was2 * (0.35 + hpFrac * 0.4);
   ctx.stroke();
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = was2;
 }
 
 function drawPrism(ctx, r) {
@@ -3265,6 +3281,14 @@ export class Director {
     const T = CFG.waves.tier;
     const G = CFG.waves.glitch;
     const from = this.tier;
+    /*
+     * Was a wave actually running? `score()` clears `overclock.armed` because
+     * the wave it was armed on has been answered -- but a fuse that blows in
+     * the rest BETWEEN two waves has answered nothing, and clearing it there
+     * charges the player a whole charge for a wave that never started. Read
+     * before `resting` is written below, because this method sets it.
+     */
+    const ran = !this.resting;
 
     /*
      * The field dissolves. Marked rather than destroyed: `destroy()` is what
@@ -3275,12 +3299,19 @@ export class Director {
      * so a mine or a blast landing on one during its second cannot cash it in.
      *
      * Energy already on the floor is left alone -- that was earned before the
-     * fuse blew and is not the simulation's to take back -- and so is the
-     * grey, which was never part of the wave.
+     * fuse blew and is not the simulation's to take back -- and so is DRIFT,
+     * the ambient grey trickle, which runs all run independently of the waves
+     * and was never part of this one.
+     *
+     * DRIFT by name and not by `harmless`, which was the first version and let
+     * a SCION's live SEEDs through: they are harmless -- they cannot touch the
+     * turret and nothing is lost by ignoring them -- and they are absolutely
+     * part of the wave, so a withdrawal that spared them handed the
+     * replacement wave a set of grafts it never asked for.
      */
     let fizzled = 0;
     for (const e of world.enemies) {
-      if (e.dead || e.isDrop || e.harmless || e.fizzle > 0) continue;
+      if (e.dead || e.isDrop || e.type.id === 'drift' || e.fizzle > 0) continue;
       e.fizzle = G.fizzle;
       e.spent = true;
       e.dissolved = true;
@@ -3298,7 +3329,7 @@ export class Director {
     this.contact = 0;
     this.hitPatience = false;
     this.take = 0;
-    this.overclock.armed = false;
+    if (ran) this.overclock.armed = false;
     this.laneOffer = null;
     this.held = 0;
     this.glitch = 0;
@@ -3908,19 +3939,30 @@ export class Director {
     this.asked = 0;
   }
 
+  /**
+   * Put the fuse out.
+   *
+   * Separate from `update` because `Game.update` does not CALL `update` while
+   * an anomaly is up -- it is an if/else, and the director is the else. So the
+   * `world.boss` arm of the guard below was unreachable, and the fuse did
+   * exactly what its own comment said it must not: froze at whatever it held
+   * when the way opened, sat there for the whole fight, and came back still
+   * lit over a turret that had been clear for four minutes. The case for it
+   * passed because it drove `Director.update` directly and never went through
+   * the branch that skips it -- a rule asserted on a control that is never
+   * reached. Game.update calls this on the boss side of that if/else.
+   */
+  douse() {
+    this.held = 0;
+    this.glitch = 0;
+  }
+
   update(world, dt) {
-    /*
-     * The two guards are merged so the fuse can be put OUT by them rather than
-     * frozen behind them. A boss opening on a burning fuse used to leave it
-     * burning for the whole fight -- the director stops running, the clock
-     * stops with it, and the first frame after the anomaly is gone the ring is
-     * still nine tenths closed over a turret that has been clear for four
-     * minutes. The field belongs to the anomaly while it is up; so does the
-     * turret, and so does this.
-     */
+    // Belt and braces: `Game.update` douses on the boss side of its if/else,
+    // and this is the same rule stated where the clock lives, for any caller
+    // that reaches here with either condition true.
     if (world.phase !== 'staging' || world.boss) {
-      this.held = 0;
-      this.glitch = 0;
+      this.douse();
       return;
     }
     const glitched = this.burn(world, dt);

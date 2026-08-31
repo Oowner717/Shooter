@@ -267,6 +267,12 @@ export class Boss {
     // ...and the field stops costing anything. A beam or a squeeze still on
     // the turret when the bar empties is the fight carrying on past its end.
     world.shock = 0;
+    // ...and the flag with it: the grab loop skips anything already
+    // `attacking`, so a live body cleared from the set without it is locked
+    // out of the set for the rest of its life. Measured over an ORDINAL fight
+    // before build 210's release pass went in: 472 frames of disagreement
+    // between the set and what was actually touching the turret.
+    for (const e of world.attackers) e.attacking = false;
     world.attackers.clear();
   }
 
@@ -1883,6 +1889,12 @@ export function openAperture(world, n = 1) {
     }
     if (!took) break;
   }
+  // ...and the flag with it: the grab loop skips anything already
+  // `attacking`, so a live body cleared from the set without it is locked
+  // out of the set for the rest of its life. Measured over an ORDINAL fight
+  // before build 210's release pass went in: 472 frames of disagreement
+  // between the set and what was actually touching the turret.
+  for (const e of world.attackers) e.attacking = false;
   world.attackers.clear();
 
   // Whose sky this is, before the arrival starts turning it over.

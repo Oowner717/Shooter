@@ -32,7 +32,7 @@ import { NODES, NODE_BY_ID, priceOf } from './tree.js';
 
 /** The turret branch, for the fitting announcements and the completion one. */
 const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
-import { SCRIPT, ON_CONTACT, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { SCRIPT, ON_CONTACT, ON_GLITCH, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
@@ -389,6 +389,10 @@ export class Game {
     w.effects.length = 0;
     w.mines.length = 0;
     w.pendingBlasts.length = 0;
+    // The flag comes off with the membership, or the grab loop -- which skips
+    // anything already `attacking` -- can never take the body back. See the
+    // note on the release pass in checkContact.
+    for (const e of w.attackers) e.attacking = false;
     w.attackers.clear();
     // A new run has not been told anything yet, and nothing is holding it.
     w.heldFor = 0;
@@ -1450,6 +1454,13 @@ export class Game {
       w.boss.update(w, dt);
       if (w.boss.done) this.endBoss();
       else this.watchBoss(dt);
+      // The glitch timer is doused HERE and not inside Director.update, which
+      // this branch is the reason nobody calls while an anomaly is up. The
+      // guard at the top of that method reads as if it covered this and does
+      // not: the fuse froze at whatever it held when the way opened and came
+      // back still lit four minutes later. The field belongs to the anomaly
+      // while it is up; so does the turret, and so does this.
+      w.director.douse();
     } else {
       w.director.update(w, dt);
     }
@@ -1491,6 +1502,14 @@ export class Game {
     for (const e of w.drops) if (!e.dead) bodies.push(e);
 
     for (const b of bodies) {
+      /*
+       * A dissolving body steers nothing. `Enemy.update` already refuses it,
+       * but steering is driven from HERE and not from update -- so without
+       * this a fizzled LURCHER kept driving at the turret through its own
+       * dissolve: measured, 1 -> 20 u/s and 11 units closer before it went,
+       * and a TOW went on winding its load.
+       */
+      if (b.fizzle > 0) { integrate(b, dt); continue; }
       b.steer(w, dt);
       // The soft side boundary, between steering and integration so the nudge
       // lands this frame. Debris is deliberately excluded — it is the one thing
@@ -1716,6 +1735,15 @@ export class Game {
     }
     // What it is and what it costs, said while something is doing it.
     if (w.attackers.size) this.sayOnce(ON_CONTACT);
+    /*
+     * ...and the glitch timer explains itself the first time a fuse is
+     * actually burning, which is the first moment there is a ring to point at.
+     * Deliberately not folded into ON_CONTACT above: that fires during the
+     * eight teach waves, where the fuse is guarded off and pinned at zero, so
+     * the one sentence about the ring was being spent, once per device and for
+     * ever, at the only point in a run where there is nothing to see.
+     */
+    if (w.director && w.director.glitch > 0 && this.hintsAllowed) this.sayOnce([ON_GLITCH]);
   }
 
   /**
@@ -2273,9 +2301,29 @@ export class Game {
     const urgent = left <= G.warn;
     // Cyan while there is room, red once there is not. One hue change rather
     // than a ramp: a gradient reads as decoration, a switch reads as a state.
-    const tone = urgent ? '#ff2d55' : '#59e0ff';
-    const beat = urgent ? 0.72 + 0.28 * Math.sin((w.time || 0) * 11) : 1;
-    const R = s.r * 2.2;
+    /*
+     * Cyan while there is room, red once there is not, and #ff5d5d rather than
+     * #ff2d55: measured against every ground the game uses, the brighter red
+     * peaks at 4.13:1 and spends most of its pulse under 3:1, because the
+     * pulse multiplies the ALPHA. So the pulse now moves between 0.82 and 1.0
+     * instead of 0.72 and 1.0, and the number is drawn on a plate of its own
+     * -- which is the half that actually fixes it, since no colour survives
+     * being composited at 0.72 over an arbitrary field.
+     */
+    const tone = urgent ? '#ff5d5d' : '#59e0ff';
+    const beat = urgent ? 0.82 + 0.18 * Math.sin((w.time || 0) * 11) : 1;
+    /*
+     * Outside the MACHINE, not outside `this.r`.
+     *
+     * `drawMachine` computes its own radius -- `this.r * (1 + filled * 0.34)`
+     * plus the mantlet and the plates on top of that -- so a ring pinned to
+     * `s.r * 2.2` is 57.2 units at every level of the tree while the machine
+     * itself paints out to 62.4 fully rigged. Measured: 11% of the ring's
+     * circumference landed on the turret's own structure. It scales with the
+     * rig now, the way everything else drawn on this machine does.
+     */
+    const rig = s.rig ? s.rig(w) : null;
+    const R = s.r * (2.35 + (rig ? rig.filled || 0 : 0) * 0.55);
 
     ctx.save();
     ctx.translate(s.x, s.y);
@@ -2299,12 +2347,30 @@ export class Game {
     // and the rail. One decimal under the warning mark, none above it: a
     // tenths place that ticks for thirteen seconds is noise, and for the last
     // five it is the difference between panicking and not.
-    const px = Math.max(11, 13 / (w.scale || 1));
+    const px = Math.max(12, 15 / (w.scale || 1));
+    const label = urgent ? left.toFixed(1) : String(Math.ceil(left));
     ctx.font = `${px}px ui-monospace, "SF Mono", Menlo, monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = rgba(tone, 0.92 * beat);
-    ctx.fillText(urgent ? left.toFixed(1) : String(Math.ceil(left)), 0, -(R + px * 0.7));
+    const ty = -(R + px * 0.7);
+    /*
+     * A plate under the digits. Without one the number is composited straight
+     * onto whatever the field happens to be -- measured against the brightest
+     * anomaly ground it never cleared 4.5:1 and spent half its pulse under
+     * 3:1 -- and the glitch shader, which this readout is deliberately drawn
+     * INSIDE, tears thin glyphs over a busy background into nothing. An opaque
+     * ground is the only thing that survives both.
+     */
+    const half = ctx.measureText(label).width / 2 + px * 0.42;
+    ctx.fillStyle = 'rgba(6,11,19,0.92)';
+    ctx.beginPath();
+    ctx.rect(-half, ty - px * 0.92, half * 2, px * 1.28);
+    ctx.fill();
+    ctx.strokeStyle = rgba(tone, 0.5 * beat);
+    ctx.lineWidth = CFG.hairline;
+    ctx.stroke();
+    ctx.fillStyle = rgba(tone, beat);
+    ctx.fillText(label, 0, ty);
     ctx.restore();
   }
 
