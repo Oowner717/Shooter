@@ -14,7 +14,7 @@ import { nameOf, dressOf, heldList } from './anomaly.js';
 import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
 import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
-import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake } from './fx.js';
+import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake, flash } from './fx.js';
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
@@ -292,8 +292,37 @@ export class Game {
        * happened, not a number that quietly changed.
        */
       onTier: ({ verdict, moved, tier, from, reason, trial, margin = 0 }) => {
-        void verdict; void from;
+        void from;
         self.hud.syncRail(self.world);
+        /*
+         * ---- the glitch, first, because it is the one that is not a score ----
+         *
+         * It is handled ahead of everything below because it can arrive with
+         * `moved === 0` and still be the loudest thing that has happened all
+         * run: on rung 1 there is no rung to lose, the wave resets anyway, and
+         * a field that vanished with nothing said about it is a bug report.
+         *
+         * The line goes on the canvas narrator rather than through the band or
+         * the alert column. `show()` writes text alone and never touches the
+         * narrator's `index`, so an ad-hoc line cannot spend one of the ten
+         * numbered story beats -- `advance()` would, and `index` is saved to
+         * disk. It stands down for a beat already reading, because that beat's
+         * index is already spent and cannot be shown twice, where this line
+         * can be shown again the next time the fuse blows.
+         */
+        if (verdict === 'glitch') {
+          const w = self.world;
+          if (!w.bossLine && !w.narrator.active) {
+            w.narrator.show("You weren't ready. Simulation has stepped back.");
+          }
+          audio.glitchOn();
+          shake(22);
+          flash(0.34, '#ff2d55');
+          self.hud.alert(moved < 0 ? `STEPPED BACK · ${reason} · TIER ${tier}`
+            : `WAVE RESET · ${reason}`, 'breach', 5);
+          return;
+        }
+        void verdict;
         /*
          * A trial answers out loud whichever way it goes: it is a question the
          * player asked, and a question that gets no answer is a bug report.
@@ -1487,7 +1516,10 @@ export class Game {
     if (w.decoy && !w.decoy.dead) bodies.push(w.decoy);
     this.grid.build(bodies);
     this.grid.eachPair(bodies, (a, b) => {
-      if (a.dead || b.dead) return;
+      // A dissolving body is scenery for the second it takes to go: it must
+      // not shove the turret it is no longer attached to, and it must not
+      // knock the wave that replaces it off its line.
+      if (a.dead || b.dead || a.fizzle > 0 || b.fizzle > 0) return;
       const impact = resolvePair(a, b);
       if (impact <= 0) return;
       // Wreckage bounces off things and hurts none of them, in either
@@ -1618,13 +1650,46 @@ export class Game {
     }
   }
 
-  /** Objects touching the turret corrupt the feed until they are destroyed. */
+  /**
+   * What is on the turret, this frame.
+   *
+   * ---- and it is THIS FRAME as of build 210 ----
+   *
+   * A body used to enter `world.attackers` on contact and leave it exactly one
+   * way: by dying. Nothing ever re-tested the distance, and `e.attacking` was
+   * never written false anywhere outside the constructor -- so a LURCHER
+   * shoved clear by a PULSE and left alive stayed "attached" for the rest of
+   * its life, from across the field. Everything that reads the set was reading
+   * "has ever touched you and is not dead yet": the intake tax, the screen
+   * effect, the turret's breached accent, and the ladder's contact clock.
+   *
+   * That was survivable while the set only tinted things. It is not survivable
+   * under the glitch timer, which is a countdown to losing a rung and has to
+   * be answerable -- and the answer to it is shoving the thing off, which is
+   * precisely the case that never used to register. So the set is now released
+   * as well as filled, and it means what its name says.
+   *
+   * Released over the SET rather than over `world.enemies`, because three
+   * bosses splice live bodies out of that list while they are still on the
+   * field; a body released only by walking `enemies` would leak forever and
+   * hold the fuse lit for the rest of the run.
+   *
+   * The release radius is four units wider than the grab. A body resting
+   * exactly on the rim would otherwise flip in and out every frame, and each
+   * entry fires `audio.glitchOn()`.
+   */
   checkContact() {
     const w = this.world;
     if (w.phase === 'boot' || w.phase === 'ending') return;
     const s = w.shooter;
+    for (const e of [...w.attackers]) {
+      const off = e.r + s.r + 6;
+      if (!e.dead && !e.fizzle && (e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= off * off) continue;
+      e.attacking = false;
+      w.attackers.delete(e);
+    }
     for (const e of w.enemies) {
-      if (e.dead || e.attacking || e.harmless) continue;
+      if (e.dead || e.attacking || e.harmless || e.fizzle > 0) continue;
       const rr = e.r + s.r + 2;
       if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= rr * rr) {
         e.attacking = true;
@@ -1968,7 +2033,12 @@ export class Game {
       w.shock = Math.max(0, w.shock - dtRaw / TYPE_BY_ID.tow.hurl.shockFor);
     }
     if (!w.debug.noGlitch) {
-      level = Math.min(CFG.glitch.max, w.attackers.size * CFG.glitch.perAttacker + w.shock);
+      // ...and the timer the effect is named after. A fuse near the end takes
+      // the picture apart on its own, so the countdown is visible even to a
+      // player who has not worked out what the ring round the turret is.
+      const fuse = w.director ? w.director.glitch || 0 : 0;
+      level = Math.min(CFG.glitch.max,
+        w.attackers.size * CFG.glitch.perAttacker + w.shock + fuse * fuse * CFG.glitch.perFuse);
     }
     glitch.update(dtRaw, level, mode);
   }
@@ -2110,6 +2180,7 @@ export class Game {
 
     this.drawAutoLock(ctx);
     w.shooter.draw(ctx, w);
+    this.drawGlitch(ctx);
     drawProjectiles(ctx, w);
     drawFx(ctx);
     this.drawTouchAid(ctx);
@@ -2179,6 +2250,64 @@ export class Game {
   }
 
   /** Brackets that tighten as the barrel comes round onto the auto-aim target. */
+  /**
+   * The glitch timer, drawn on the machine it is counting down for.
+   *
+   * A ring round the turret that CLOSES as the fuse burns, with the seconds
+   * left in figures above it. On the canvas rather than in the interface for
+   * two reasons: it is a thing happening to the turret and belongs on the
+   * turret, and the top of the screen is already three absolutely-positioned
+   * bands deep -- `Hud.pillCap()` returns 0 on a 568-tall phone as it stands,
+   * and anything else up there takes the last slot the alerts have.
+   *
+   * Sits between the machine (which reaches about r*1.5 fully rigged) and the
+   * lever's rail at `gripLen` 112, so it can collide with neither.
+   */
+  drawGlitch(ctx) {
+    const w = this.world;
+    const d = w.director;
+    if (!d || !(d.glitch > 0) || w.boss) return;
+    const G = CFG.waves.glitch;
+    const s = w.shooter;
+    const left = (1 - d.glitch) * G.fuse;
+    const urgent = left <= G.warn;
+    // Cyan while there is room, red once there is not. One hue change rather
+    // than a ramp: a gradient reads as decoration, a switch reads as a state.
+    const tone = urgent ? '#ff2d55' : '#59e0ff';
+    const beat = urgent ? 0.72 + 0.28 * Math.sin((w.time || 0) * 11) : 1;
+    const R = s.r * 2.2;
+
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    // The track it closes along, so the empty part of the ring is still a ring
+    // and the fuse reads as a fraction of something rather than as a stray arc.
+    ctx.strokeStyle = rgba(tone, 0.13);
+    ctx.lineWidth = CFG.hairline * 2.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, TAU);
+    ctx.stroke();
+    // ...and the fuse itself, from straight up, clockwise, closing as it burns.
+    ctx.strokeStyle = rgba(tone, (0.5 + 0.4 * d.glitch) * beat);
+    ctx.lineWidth = CFG.hairline * 3.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(0, 0, R, -Math.PI / 2, -Math.PI / 2 + TAU * d.glitch);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // The number, above the ring, on the one line of screen between the ring
+    // and the rail. One decimal under the warning mark, none above it: a
+    // tenths place that ticks for thirteen seconds is noise, and for the last
+    // five it is the difference between panicking and not.
+    const px = Math.max(11, 13 / (w.scale || 1));
+    ctx.font = `${px}px ui-monospace, "SF Mono", Menlo, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = rgba(tone, 0.92 * beat);
+    ctx.fillText(urgent ? left.toFixed(1) : String(Math.ceil(left)), 0, -(R + px * 0.7));
+    ctx.restore();
+  }
+
   drawAutoLock(ctx) {
     const e = this.autoLock;
     if (!e || e.dead) return;

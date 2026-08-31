@@ -193,6 +193,15 @@ export class Enemy {
     this.armor = type.armor || 0;
 
     this.staged = opts.staged || false; // still above the top of the screen
+    /*
+     * Seconds left of dissolving out of a simulation that has been stepped
+     * back. Declared here rather than sprung into existence at the site that
+     * sets it, because `spent` and `dissolved` were both written that way and
+     * both are `undefined` on every body that never met the one thing that
+     * writes them -- which is how you end up grepping the repo to find out
+     * whether a field exists.
+     */
+    this.fizzle = 0;
     this.attacking = false;
     this.flash = 0;
     this.dead = false;
@@ -719,6 +728,18 @@ export class Enemy {
   }
 
   update(world, dt) {
+    /*
+     * Dissolving. It steers nothing, heals nothing and answers to nothing --
+     * the run it belonged to is being taken back, and the only thing left for
+     * it to do is stop being on the screen. `dead` at the end of it, which is
+     * what the sweep is watching for; `dissolved` was set with the fizzle, so
+     * the sweep pays nothing and counts nothing for it.
+     */
+    if (this.fizzle > 0) {
+      this.fizzle -= dt;
+      if (this.fizzle <= 0) this.dead = true;
+      return;
+    }
     if (this.spawnIn > 0) this.spawnIn = Math.max(0, this.spawnIn - dt * 2.2);
     this.flash = Math.max(0, this.flash - dt * 4.5);
     if (this.slugged > 0) this.slugged = Math.max(0, this.slugged - dt);
@@ -1025,6 +1046,18 @@ export class Enemy {
 
   destroy(world) {
     if (this.dead) return;
+    /*
+     * A body finished off while it is dissolving is not a kill and pays
+     * nothing, whatever finished it.
+     *
+     * The fizzle marks `spent`, so rounds pass straight through and the
+     * assist will not look at it -- but `spent` has only ever had three
+     * readers (autoTarget, its hysteresis, and the projectile sweep) and
+     * blasts, mines, patches and every ability still test `dead` alone. So
+     * the guard belongs here, at the one door all of them come through,
+     * rather than on each of them.
+     */
+    if (this.fizzle > 0) { this.dead = true; return; }
     this.dead = true;
     const t = this.type;
     // Destroying a fragment is a way of collecting it, not a way of losing it.
@@ -1143,12 +1176,21 @@ export class Enemy {
   draw(ctx, world) {
     const t = this.type;
     const hpFrac = clamp(this.hp / this.maxHp, 0, 1);
-    const s = this.spawnIn > 0 ? 1 - this.spawnIn * 0.6 : 1;
+    /*
+     * Two scales, one variable. Arriving grows in from 0.4; dissolving shrinks
+     * away and takes the whole body's opacity with it, so a fizzled field
+     * reads as the picture being withdrawn rather than as forty things dying
+     * at once -- there is no explosion anywhere in it, which is the point.
+     */
+    const gone = this.fizzle > 0
+      ? clamp(this.fizzle / (CFG.waves.glitch.fizzle || 1), 0, 1) : 1;
+    const s = (this.spawnIn > 0 ? 1 - this.spawnIn * 0.6 : 1) * (0.72 + gone * 0.28);
 
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
     if (s !== 1) ctx.scale(s, s);
+    if (gone !== 1) ctx.globalAlpha *= gone * gone;
 
     /*
      * Ambient glow. Skipped on a fixed body unless it has just been hit:
@@ -2566,7 +2608,10 @@ const FORMATIONS = ['line', 'wedge', 'column', 'arc', 'cluster', 'ring'];
  */
 export function hostileCount(world) {
   let n = 0;
-  for (const e of world.enemies) if (!e.dead && !e.harmless) n++;
+  // A body on its way out is not something the next wave has to wait for --
+  // without this, `thinAt` counts the whole of a fizzled field for the second
+  // it takes to go and the wave after a reset opens against a full board.
+  for (const e of world.enemies) if (!e.dead && !e.harmless && !e.fizzle) n++;
   return n;
 }
 
@@ -3023,6 +3068,19 @@ export class Director {
     this.hold = false;
     this.contact = 0; // seconds anything spent on the turret this wave
     this.hitPatience = false; // ...and whether the field ever thinned
+    /*
+     * ---- the glitch timer ----
+     *
+     * `held` is seconds of UNBROKEN contact and exists only to arm the thing;
+     * `glitch` is the fuse itself, 0 to 1, and is what everything else reads:
+     * the ring round the turret, the seconds inside it, and the screen effect
+     * the mechanic is named after. Neither is per-wave and neither is saved --
+     * a run picked up from a file starts with a clear turret by construction,
+     * because `restore()` puts the wave back to the top and nothing is on the
+     * field yet.
+     */
+    this.held = 0;
+    this.glitch = 0;
     this.lastRelease = 0; // world.time of the last object let out
     this.take = 0; // raw energy this wave has been worth, for the margin
     this.traits = []; // the rules this wave is carrying; see traits.js
@@ -3050,7 +3108,7 @@ export class Director {
      */
     this.recall = { held: 0, max: 0, cd: 0 };
     this.overclock = { held: 0, max: 0, cd: 0, armed: false };
-    this.lastVerdict = null; // surge | clean | stall | rout, for the HUD and the tests
+    this.lastVerdict = null; // surge | clean | stall | glitch, for the probes
     /*
      * One wave that cannot climb, set by any step back. Without it the ladder
      * ping-pongs at the ceiling: the rung below the wall is by construction
@@ -3145,6 +3203,137 @@ export class Director {
    * whether the director ever got its field back, and how much of the wave
    * outlived it were all already known. They were simply never read.
    */
+  /*
+   * ================== the glitch timer ==================
+   *
+   * The only thing in this game that takes a rung away without being asked.
+   *
+   * It reads one signal -- is anything on the turret right now -- and it is a
+   * clock rather than a tally, which is the whole difference between it and
+   * the wave-end rout it replaced. Twelve seconds of contact totted up across
+   * a wave arrived as a verdict a minute later, could not be seen coming, and
+   * could not be answered once it was owed. Fourteen unbroken seconds is in
+   * front of you the entire time it is running: `glitch` is drawn as a ring
+   * closing round the machine with the seconds left inside it, it drives the
+   * screen effect it is named after, and shooting the thing off the mount
+   * winds it back at `recover`. Nothing is owed until it lands.
+   *
+   * Returns the move when it fires and null every other frame. The caller
+   * announces it directly rather than through the `if (moved)` the two scored
+   * paths use, because at tier 1 there is no rung to lose and the wave still
+   * resets -- and a reset nobody is told about is a field that vanished.
+   */
+  burn(world, dt) {
+    const G = CFG.waves.glitch;
+    const wv = this.wave;
+    /*
+     * The opening is taught rather than scored, and it walks a LURCHER onto
+     * the mount on purpose so the contact line has something to be about.
+     * Nothing may be taken away during it -- and `score()` refuses a teach
+     * wave at the same door, for the same reason.
+     */
+    if (wv && wv.teach) {
+      this.held = 0;
+      this.glitch = 0;
+      return null;
+    }
+    if (world.attackers.size > 0) {
+      this.held += dt;
+      // Armed only after `arm` seconds, so a body that clips the mount on its
+      // way past never lights it. `held` is unbroken time and resets below.
+      if (this.held >= G.arm) this.glitch = Math.min(1, this.glitch + dt / G.fuse);
+    } else {
+      this.held = 0;
+      this.glitch = Math.max(0, this.glitch - (dt * G.recover) / G.fuse);
+    }
+    return this.glitch >= 1 ? this.glitchOut(world) : null;
+  }
+
+  /**
+   * The fuse ran out: fizzle the field, abandon the wave, drop a rung.
+   *
+   * Deliberately NOT a call into `score()` with a forced verdict, the way
+   * RECALL goes. A forced verdict still runs the whole scoring path -- the
+   * margin, the climb table, the probe resolution -- and this wave is not
+   * being scored at all, it is being withdrawn. So everything `score()` owes
+   * the next wave is paid here by hand, and the list is exact: `overclock.
+   * armed` and `laneOffer` are cleared in score() and NOWHERE else, so a path
+   * that skips it silently carries a spent OVERCLOCK charge and a lapsed lane
+   * offer into the wave after.
+   */
+  glitchOut(world) {
+    const T = CFG.waves.tier;
+    const G = CFG.waves.glitch;
+    const from = this.tier;
+
+    /*
+     * The field dissolves. Marked rather than destroyed: `destroy()` is what
+     * banks a body's energy, sheds its debris and counts it, and none of that
+     * is owed for a wave that is being taken back. `spent` keeps the assist
+     * off them and lets rounds through, `dissolved` keeps the sweep from
+     * paying or counting, and `Enemy.destroy` refuses a fizzling body outright
+     * so a mine or a blast landing on one during its second cannot cash it in.
+     *
+     * Energy already on the floor is left alone -- that was earned before the
+     * fuse blew and is not the simulation's to take back -- and so is the
+     * grey, which was never part of the wave.
+     */
+    let fizzled = 0;
+    for (const e of world.enemies) {
+      if (e.dead || e.isDrop || e.harmless || e.fizzle > 0) continue;
+      e.fizzle = G.fizzle;
+      e.spent = true;
+      e.dissolved = true;
+      e.attacking = false;
+      world.attackers.delete(e);
+      fizzled++;
+    }
+
+    // The wave is abandoned, not scored. `resting` first and before anything
+    // else, because update() falls straight into the end-of-wave block on the
+    // next frame without it and scores the wave a second time.
+    this.jobs.length = 0;
+    this.resting = true;
+    this.timer = rand(CFG.waves.rest[0], CFG.waves.rest[1]);
+    this.contact = 0;
+    this.hitPatience = false;
+    this.take = 0;
+    this.overclock.armed = false;
+    this.laneOffer = null;
+    this.held = 0;
+    this.glitch = 0;
+
+    let moved = 0;
+    if (this.probe) {
+      /*
+       * A trial that ends in a glitch has been answered, and the answer is no.
+       * Its own fall back to the rung it was armed from IS the step back --
+       * dropping a further rung on top of it would charge the run twice for
+       * one wave, and the trial was a question the player asked.
+       */
+      const back = this.probe.from;
+      this.probe = null;
+      this.probeLock = T.probeLock;
+      this.tier = back;
+      moved = this.tier - from;
+    } else if (this.tier > 1) {
+      this.tier--;
+      moved = -1;
+      // A step back re-arms the climb even under HOLD. The pin holds the
+      // climb, not the relief.
+      this.hold = false;
+    }
+    // ...and the next wave cannot climb straight back into whatever did it.
+    // `grace` has no other writer, so a path that forgets this line turns it
+    // into a flag that can never be non-zero.
+    this.grace = 1;
+    this.lastVerdict = 'glitch';
+    return {
+      verdict: 'glitch', moved, tier: this.tier, from, fizzled,
+      reason: 'THE FEED GAVE OUT', margin: 0,
+    };
+  }
+
   score(world, forced = null) {
     const T = CFG.waves.tier;
     const wave = this.wave;
@@ -3174,15 +3363,16 @@ export class Director {
     // out for the arming rather than for the answering.
     const surgeWithin = this.overclock.armed ? T.overclockSurge : T.surgeWithin;
     /*
-     * Only CONTACT steps the ladder back. A wave that was merely slow, or that
-     * mostly outlived its own wave without ever reaching the turret, holds --
-     * see the note on the table in config.js. `c` is still measured, because
-     * the alert and AUDIT both read it, but it no longer decides.
+     * Three verdicts, and none of them goes down. A wave either earns a climb
+     * or it holds; the only thing in the game that takes a rung away is the
+     * glitch timer, which is a live clock and not a verdict -- see the note on
+     * the table in config.js and `glitchOut` below. `k` and `c` are both still
+     * measured, because the surge and clean windows read `k` and the alert and
+     * AUDIT both read `c`, but neither can subtract any more.
      */
     let verdict;
     if (t <= surgeWithin && k < T.surgeContact) verdict = 'surge';
     else if (t <= T.cleanWithin && k < T.failContact) verdict = 'clean';
-    else if (k >= T.routContact) verdict = 'rout';
     else verdict = 'stall';
     /*
      * RECALL names its own verdict, and only its verdict.
@@ -3200,19 +3390,18 @@ export class Director {
     // Why it went the way it did, in the alert's own register. The dominant
     // cause, not a list: a step you did not ask for needs one reason.
     /*
-     * A step back names the thing that caused it, and from build 208 that is
-     * always the contact -- so the contact is read FIRST for a rout. It used
-     * to lead with "THE FIELD NEVER THINNED" whenever patience ended the wave,
-     * which after this change would explain a drop with the one thing that can
-     * no longer cause one.
+     * Nothing here explains a drop any more -- the glitch timer names its own,
+     * in `glitchOut` -- so the contact no longer has to be read first to keep
+     * "THE FIELD NEVER THINNED" off the front of a step back. It is still read
+     * ahead of the two shapes below it, because a wave that held you for six
+     * seconds and then came back was about the turret whatever else was true.
      */
-    const reason = verdict === 'rout' ? `${Math.round(k)} S ON THE TURRET`
-      : this.hitPatience ? 'THE FIELD NEVER THINNED'
-        : k >= T.failContact ? `${Math.round(k)} S ON THE TURRET`
-          : c < T.routBelow ? 'MOST OF IT WAS STILL STANDING'
-            : verdict === 'surge' ? 'CLEARED BEFORE THE LAST ONE LANDED'
-              : verdict === 'clean' ? 'THE FIELD CAME BACK'
-                : 'IT TOOK TOO LONG';
+    const reason = this.hitPatience ? 'THE FIELD NEVER THINNED'
+      : k >= T.failContact ? `${Math.round(k)} S ON THE TURRET`
+        : c < T.routBelow ? 'MOST OF IT WAS STILL STANDING'
+          : verdict === 'surge' ? 'CLEARED BEFORE THE LAST ONE LANDED'
+            : verdict === 'clean' ? 'THE FIELD CAME BACK'
+              : 'IT TOOK TOO LONG';
 
     const from = this.tier;
     this.overclock.armed = false;   // spent by the wave it was armed on
@@ -3249,20 +3438,7 @@ export class Director {
     }
 
     let moved = 0;
-    if (verdict === 'rout') {
-      if (this.tier > 1) {
-        this.tier--;
-        moved = -1;
-        /*
-         * A step back re-arms the climb even under HOLD. The pin holds the
-         * climb, not the relief: nobody gets left pinned above their head,
-         * and anyone who wants to drown can climb straight back.
-         */
-        this.hold = false;
-      }
-      // ...and the next wave cannot climb back into whatever did that.
-      this.grace = 1;
-    } else if (verdict === 'surge' || verdict === 'clean') {
+    if (verdict === 'surge' || verdict === 'clean') {
       const step = verdict === 'surge' ? 2 : 1;
       // HOLD pins the climb, and grace defers it by one wave. Both are spent
       // whether or not there was anything to hold back.
@@ -3723,6 +3899,8 @@ export class Director {
     this.probeLock = 0;
     this.contact = 0;
     this.hitPatience = false;
+    this.held = 0;
+    this.glitch = 0;
     this.lastRelease = world.time || 0;
     this.resting = true;
     this.timer = 1.5; // a beat to look at the field before it starts again
@@ -3731,9 +3909,25 @@ export class Director {
   }
 
   update(world, dt) {
-    if (world.phase !== 'staging') return;
-    // The field belongs to ORDINAL while it is up. See Game.endBoss().
-    if (world.boss) return;
+    /*
+     * The two guards are merged so the fuse can be put OUT by them rather than
+     * frozen behind them. A boss opening on a burning fuse used to leave it
+     * burning for the whole fight -- the director stops running, the clock
+     * stops with it, and the first frame after the anomaly is gone the ring is
+     * still nine tenths closed over a turret that has been clear for four
+     * minutes. The field belongs to the anomaly while it is up; so does the
+     * turret, and so does this.
+     */
+    if (world.phase !== 'staging' || world.boss) {
+      this.held = 0;
+      this.glitch = 0;
+      return;
+    }
+    const glitched = this.burn(world, dt);
+    if (glitched) {
+      if (world.onTier) world.onTier(glitched);
+      return;
+    }
 
     if (this.probeLock > 0) this.probeLock = Math.max(0, this.probeLock - dt);
     // The sheet's two clocks. One charge back per cooldown, and never above

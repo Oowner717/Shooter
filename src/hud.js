@@ -285,17 +285,31 @@ export class Hud {
     const ammo = band('qGroup q_ammo');
 
     /*
-     * A fold at the head of each stack. Four mine slots and four ammunition
+     * A fold at the FOOT of each stack. Four mine slots and four ammunition
      * slots is a lot of column on a phone, and a run that lays no mines is
      * looking past that whole side of the screen at the field behind it. The
      * button stays when the stack is folded -- a control that hides itself is
      * a control nobody finds again.
+     *
+     * At the head of the column it stayed but it MOVED: measured at 390x844
+     * it sat at y 570 with the stack open and y 726 with it shut, 156px of
+     * travel on the one control whose whole job is to be in the same place
+     * twice. The stack grows upward off a floor line that never moves, so the
+     * foot is the only seat in the column that does not. It also lands level
+     * with the MINES and AMMO buttons in the bands beside it, which are
+     * bottom-aligned for the same reason.
+     *
+     * Appended AFTER fillStack and nowhere else. `.qGroup.folded > .qc:not(
+     * .fold)` is a direct-child selector, so the fold and the slots have to
+     * stay flat siblings: wrapping the slots in a div to reorder them makes
+     * them grandchildren, folding silently stops hiding anything, and nothing
+     * flips a property a test could read back.
      */
-    mines.appendChild(this.stackFold('mines'));
-    ammo.appendChild(this.stackFold('ammo'));
     // Stacks read bottom-up on screen, so slot 0 is the bottom cell.
     this.fillStack(mines, w, 'mines');
     this.fillStack(ammo, w, 'ammo');
+    mines.appendChild(this.stackFold('mines'));
+    ammo.appendChild(this.stackFold('ammo'));
     this.syncFolds();
     cfgMines.appendChild(this.configButton('mines'));
     cfgAmmo.appendChild(this.configButton('ammo'));
@@ -407,7 +421,7 @@ export class Hud {
     return true;
   }
 
-  /** The show/hide at the head of a stack. */
+  /** The show/hide at the foot of a stack. */
   stackFold(group) {
     const b = document.createElement('button');
     b.className = `qc fold q_fold_${group}`;

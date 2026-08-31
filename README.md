@@ -1624,6 +1624,10 @@ pushed down a ladder it was holding fine. The table is now:
 | `rout` | **`k ≥ 12`** | −1 |
 | `stall` | anything else | 0 |
 
+*(`rout` went in build 210 and the table has no way down at all now — see
+[the glitch timer](#the-glitch-timer-build-210). The rest of this section is
+what it was when it was true.)*
+
 The one thing that steps the ladder back is something spending real time
 attached to the turret. Nothing about that is a trap: bodies march at the
 turret, so a wave genuinely beyond a run produces contact and is caught by the
@@ -1728,6 +1732,111 @@ armour plates round the deck, SHROUD's "shield collar round the base" is a
 mantlet that closes round the breech and turns with the barrel. Nothing in the
 game shows a part on its own, so nothing had ever put the sentence next to the
 drawing.
+
+### The glitch timer (build 210)
+
+The rout above was right about *what* it read and wrong about *when*. It added
+up seconds of contact across a whole wave and cashed them in once the wave was
+over, which makes it a bad instrument for "you were in trouble" in three
+separate ways: the punishment lands up to a minute after the thing that earned
+it, it cannot be seen coming, and there is nothing to be done about it once it
+is owed. Ten bad seconds at the top of a wave condemned a wave that was then
+cleared perfectly.
+
+**So the ladder no longer steps back on a verdict at all.** It steps back on a
+clock that is on the screen the whole time it runs.
+
+Something reaches the turret and holds on. After `arm` (1.5s) a fuse lights:
+`Director.glitch` climbs from 0 to 1 over `fuse` (14s) of unbroken contact,
+drawn as a ring closing round the machine with the seconds left inside it, and
+feeding the screen effect it is named after through `CFG.glitch.perFuse` — so
+the picture coming apart *is* the countdown rather than a decoration beside it.
+Clear the turret and it winds back at `recover` (0.6×) and goes out. Let it
+reach 1 and:
+
+- every hostile on the field **fizzles out** over `fizzle` (0.9s) — marked, not
+  destroyed, so nothing is banked, nothing is counted and nothing is recorded;
+- the canvas narrator says *"You weren't ready. Simulation has stepped back."*;
+- the wave is **abandoned unscored** and the ladder drops a rung.
+
+Fourteen seconds against the rout's twelve because those twelve were a total
+and these fourteen are consecutive. Energy already on the floor is left alone —
+it was earned before the fuse blew — and so is the grey, which was never part
+of the wave.
+
+**Finding the timer found a five-build-old bug in what it reads.** A body
+entered `world.attackers` on contact and left it exactly one way: by dying.
+Nothing re-tested the distance and `e.attacking` was never written false
+anywhere outside the constructor, so a LURCHER shoved clear by a PULSE and left
+alive counted as attached, from across the field, for the rest of its life.
+Everything reading that set was reading *has ever touched you and is not dead
+yet*: the intake tax, the screen effect, the turret's breached accent, and the
+ladder's own contact clock. Survivable while it only tinted things. Not
+survivable under a countdown to losing a rung whose whole answer is shoving the
+thing off — precisely the case that never registered. The set is released as
+well as filled now, over the *set* rather than over `world.enemies`, because
+three bosses splice live bodies out of that list and a body released only by
+walking it would leak and hold the fuse lit for the rest of the run.
+
+Everything `score()` owes the next wave is paid by hand, because this path
+deliberately does not go through it. `overclock.armed` and `laneOffer` are
+cleared there and nowhere else; `grace` has no other writer at all, and without
+the line that arms it here it becomes a flag that can never be non-zero with
+four readers that can never take their other branch. A live trial is *answered*
+rather than charged twice: it falls back to the rung it was armed from and that
+fall is the step back.
+
+**Measured, 300 driven seconds a run, started past the opening at rung 5** with
+every anomaly answered (the tutorial's eight waves are exempt, and a run left
+alone spends 93% of its first five minutes in them — the first version of this
+probe measured nothing else):
+
+| run | fuse lit | fired | rung |
+|---|---|---|---|
+| fully bought, assists on | **never** | 0 | 5 → **17** |
+| stock, assists on | 16% of frames | 1 | 5 → 6 |
+| fully bought, hands off | 28% | ≥1 | 5 → 4 |
+| stock, hands off | 38% | ≥1 | 5 → **1** |
+
+A run that is coping is never touched by it. A stock turret on the assists sees
+it once in five minutes and still climbs. A run with nobody driving is walked
+back down, which is the whole job.
+
+It does not run during an anomaly or on a teach wave, and both guards put the
+fuse **out** rather than stepping over it — a fuse frozen behind the boss guard
+comes back nine tenths closed over a turret that has been clear for four
+minutes. On rung 1 it still resets the wave and says `WAVE RESET` instead of
+claiming a step back it cannot make.
+
+The verdict table's inability to go down is asserted by sweeping it — six
+values of `t` either side of both windows, seven of `k` up to twice the old
+rout threshold, four fields from cleared to untouched, and not one of the 168
+poses may come back below 0.
+
+### The collapse button stops moving (build 210)
+
+The fold at the head of each ammunition and mine stack stayed put when the
+stack folded — a control that hides itself is one nobody finds again — but it
+*moved*: measured at 390×844 it sat at y 570 with the stack open and y 726 with
+it shut. 156px of travel on the one control in the bar whose whole job is to be
+in the same place twice.
+
+The bar bottom-aligns its groups and a stack grows upward off a floor line that
+never moves, so the foot of the column is the only seat in it that does not.
+The stack opens above the button now and the same button closes it, and it
+lands level with the MINES and AMMO buttons in the bands either side, which are
+bottom-aligned for the same reason. 28px rather than 22, because at the foot it
+sits 14px above `#abilities` and a 22px target that close to PULSE is a mis-hit
+waiting to happen.
+
+Two traps, both from the scouting rather than from the failure: the slots must
+stay **flat siblings** of the fold, because `.qGroup.folded > .qc:not(.fold)` is
+a direct-child selector and wrapping them to reorder makes folding silently
+stop hiding anything — with no property flipped for a test to read back. And
+`.foldArrow` needed `flex: 0 0 auto`: it is a bare span, `.qc svg`'s flex rule
+does not reach it, and it was the flex item that gave ground — measured, 8px
+down to 3px at 320 the moment the label beside it had anything in it, clipped
+rather than scrolled, with nothing to read back.
 
 ### SCION, and what a graft does
 

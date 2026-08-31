@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '209';
+export const BUILD = '210';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '209';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '91a2f6d';
+export const REV = 'fd136f5';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -263,26 +263,27 @@ export const CFG = {
        *
        *   surge  t <= surgeWithin and k < surgeContact   +2
        *   clean  t <= cleanWithin and k < failContact    +1
-       *   rout   k >= routContact                        -1
        *   stall  anything else                            0
        *
        * `patience` still ends a wave; it is no longer itself the verdict --
        * it makes `t` infinite, which the table then reads.
        *
-       * ---- and only CONTACT steps the ladder back (build 208) ----
+       * ---- and from build 210 the table cannot step back at all ----
        *
-       * It used to drop on two consecutive stalls, and to call a wave a rout
-       * when most of it outlived the wave (`c < routBelow`). Both of those are
-       * "you were slow", and being slow is not the same as being in trouble:
-       * a run that clears everything at its own pace, with nothing ever
-       * reaching the turret, was being pushed down a ladder it was holding
-       * fine. The only thing that steps back now is something spending real
-       * time attached to the turret, which is the one signal that means the
-       * field is actually getting to you.
+       * There were two ways down before it and both were verdicts at the END
+       * of a wave: a streak of stalls until 208, and then `k >= routContact`
+       * -- twelve seconds attached, totted up across a wave and cashed in
+       * once the wave was over. A wave-end verdict is a bad instrument for
+       * "you were in trouble": it arrives up to a minute after the trouble
+       * did, it cannot be seen coming, and there is nothing to be done about
+       * it once it is owed. A player who spent the first ten seconds of a wave
+       * with something on the turret and then cleared the field perfectly was
+       * already condemned and had no way to know.
        *
-       * A wave that is merely slow HOLDS, for as long as it takes. Nothing
-       * about that is a trap: bodies march at the turret, so a wave genuinely
-       * beyond a run produces contact and is caught by the same clause.
+       * So the ladder no longer steps back on a verdict. It steps back on the
+       * GLITCH TIMER, which is live, visible, and recoverable while it runs --
+       * see `glitch` below. Every verdict here climbs or holds; -1 is not a
+       * value this table can produce any more.
        */
       surgeWithin: 3, // cleared this fast after the last release: a surge
       surgeContact: 2, // ...and with less than this on the turret
@@ -295,7 +296,6 @@ export const CFG = {
        * shape of the wave. AUDIT's third meter is the same number.
        */
       routBelow: 0.4,
-      routContact: 12, // ...as is this long with something attached
       probeLock: 60, // seconds before another trial rung may be armed
       /*
        * ---- the gates (build 203) ----
@@ -365,6 +365,48 @@ export const CFG = {
     // Three or more of one type in a regular wave arrive together in formation
     // rather than filing in. Tutorial waves never do — they always file in.
     formAt: 3,
+
+    /*
+     * ---- the glitch timer (build 210) ----
+     *
+     * The one thing in the game that puts a run back a rung without being
+     * asked to, and the whole of what replaced the wave-end rout.
+     *
+     * Something reaches the turret and holds on. After `arm` seconds of that,
+     * a fuse lights: `Director.glitch` climbs from 0 to 1 over `fuse` seconds
+     * of unbroken contact and is drawn as a closing ring round the machine
+     * with the seconds left inside it. Clear the turret and it falls back at
+     * `recover` times that rate; get it to 0 and it goes out. Let it reach 1
+     * and the simulation steps back: the field fizzles out over `fizzle`
+     * seconds, the wave is abandoned unscored, and the ladder drops a rung.
+     *
+     * Why a live clock rather than a verdict. The rout it replaces added up
+     * seconds of contact across a whole wave and cashed them in at the end,
+     * so the punishment arrived up to a minute after the thing that earned
+     * it, could not be seen coming, and could not be answered once it was
+     * owed -- ten bad seconds at the top of a wave condemned a wave that was
+     * then cleared perfectly. This is the same signal read the other way
+     * round: it is in front of you the whole time it is running, and shooting
+     * the thing off the turret is the answer to it.
+     *
+     * `fuse` is 14 rather than the rout's 12 because those twelve were a
+     * total and these fourteen are consecutive: nothing survives fourteen
+     * unbroken seconds on the mount that was not going to survive twelve
+     * scattered ones. `recover` at 0.6 makes a clean turret worth more than
+     * the contact cost, without making a tap of the trigger wipe the debt.
+     *
+     * Not to be confused with `CFG.glitch`, which is the screen effect. They
+     * are wired together -- `glitch.perFuse` below feeds the shader off this
+     * clock, so the picture comes apart as the timer runs down -- but one is
+     * a mechanic and the other is a look.
+     */
+    glitch: {
+      arm: 1.5, // seconds of unbroken contact before the fuse lights
+      fuse: 14, // ...and how long it then has to run
+      recover: 0.6, // fraction of the burn rate it comes back at, once clear
+      fizzle: 0.9, // seconds a body takes to dissolve when it goes
+      warn: 5, // seconds left when the ring starts reading as urgent
+    },
   },
 
   // ---- debris ----------------------------------------------------------
@@ -2291,6 +2333,20 @@ export const CFG = {
   glitch: {
     perAttacker: 0.34,
     max: 0.92,
+    /*
+     * ...and the timer drives it too, so the picture coming apart IS the
+     * countdown rather than a decoration beside it. Squared, so it is nothing
+     * for most of the fuse and most of the picture at the end of it.
+     *
+     * 0.3 rather than the 0.55 it was first written at, and the difference was
+     * a screenshot: 0.55 puts a single attacker plus a nine-tenths fuse at
+     * 0.79 of a 0.92 cap, and at that level the digits inside the ring are
+     * torn into unreadable glyphs -- the readout becoming illegible exactly
+     * when it matters most. The ring survives (it is a big shape), the number
+     * does not. At 0.3 the same moment is 0.64: still the worst the screen
+     * ever looks, and still countable.
+     */
+    perFuse: 0.3,
   },
 };
 

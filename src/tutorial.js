@@ -113,7 +113,8 @@ export const SCRIPT = [...OPENING, ...NOTES]
  * 0.78 per attached object, compounding, floored at CFG.energy.taxFloor with
  * CFG.energy.taxCap objects counted. So one costs 22% of what you bank, two
  * 39%, three 53%, five 70%, and past five nothing more. The feed's break-up
- * tops out at three (CFG.glitch: 0.34 each, capped at 0.92).
+ * tops out at three (CFG.glitch: 0.34 each, capped at 0.92) -- plus whatever
+ * the glitch timer is adding, which past about half a fuse is most of it.
  */
 export const ON_CONTACT = [
   /*
@@ -127,7 +128,14 @@ export const ON_CONTACT = [
    * working on a device that heard these lines a year ago.
    */
   'CORRUPTION. Something is holding the turret.\nThe barrel cannot reach it. PULSE can.',
-  'It cannot kill you. Each one taxes what you bank:\none costs 22%, two 39%, three 53%, five 70%.',
+  'Each one taxes what you bank: one costs 22%,\ntwo 39%, three 53%, five 70%.',
+  /*
+   * Added in build 210 with the glitch timer, and the line it replaces said
+   * "It cannot kill you" -- which was true when contact only cost energy and
+   * is not true now that it costs a rung. A player told once that a thing is
+   * harmless does not re-examine it later.
+   */
+  'And it runs the GLITCH down. Let the ring round the\nturret close and the simulation steps back a wave.',
 ].map((text) => ({ id: idOf(text), text, hold: holdFor(text) }));
 
 /*

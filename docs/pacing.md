@@ -123,7 +123,13 @@ unlock calibration axis): ~1k by tier 2 · ~5k by tier 5 · ~15k by tier 8 ·
 
 ## The save (decision 6)
 
-Four fields: `tier`, `hold` (0/1), `failStreak`, `earned`. *(Review fix —
+Four fields: `tier`, `hold` (0/1), `failStreak`, `earned`. *(`failStreak` was
+removed in build 208 with the stall streak it counted, and what replaced the
+step-back it guarded — the glitch timer, build 210 — is a live clock that is
+deliberately not saved: a run picked up from a file starts with a clear turret
+by construction, because the restore puts the wave back to the top. The save
+carries `tier`, `hold`, `grace`, `peak`, `probe`, `lane`, the two charges and
+`earned`.)* *(Review fix —
 the migration matters more than the fields: an old save has no `earned`, and
 seeding it at 0 would re-lock TOW for a veteran with 380 kills. On restore,
 `earned = max(d.earned ?? 0, kills × 12)` — the same conversion the

@@ -484,4 +484,55 @@ most once for any given target and cannot spin.
   WIDEST line on the field to test a stroke FLOOR watched BULWARK's 6.03, which
   is far above the floor at any scale and could not move whatever the code did
   -- it reported "frozen" on a demonstrably live build.
+- **`world.attackers` used to mean "has ever touched you and is not dead
+  yet".** A body entered on contact and left exactly one way -- by dying --
+  and `e.attacking` was never written false anywhere outside the constructor,
+  so a LURCHER shoved clear by a PULSE and left alive counted as attached from
+  across the field for the rest of its life. Four things read that set (the
+  intake tax, the screen effect, the turret's breached accent, the ladder's
+  contact clock) and all four were reading the wrong thing. Survivable while
+  it only tinted things; not survivable under build 210's glitch timer, whose
+  whole answer is shoving the thing off. `checkContact` releases as well as
+  fills now, iterating the SET rather than `world.enemies` -- three bosses
+  splice live bodies out of that list, and a body released only by walking it
+  leaks forever and holds the fuse lit for the rest of the run. The release
+  radius is four units wider than the grab, or a body resting on the rim
+  chatters in and out every frame and each entry fires `audio.glitchOn()`.
+- **A wave-end verdict is a bad instrument for "you were in trouble".** The
+  rout added up contact across a wave and cashed it in once the wave was over,
+  so the punishment landed up to a minute after the thing that earned it, could
+  not be seen coming, and could not be answered once owed. It is a live clock
+  from build 210 (`Director.burn` / `glitchOut`, `CFG.waves.glitch`) and the
+  verdict table has no way down at all -- asserted by sweeping all 168 cells of
+  it, not by sampling. Anything that adds a way down owes that sweep an update
+  and the user a reason, because "the glitch timer is the only involuntary way
+  down" is a promise the game now makes.
+- **A path that ends a wave without `score()` owes the next wave five things by
+  hand.** `overclock.armed` and `laneOffer` are cleared in `score()` and
+  NOWHERE else; `contact`, `hitPatience` and `take` are cleared there and in
+  `load()`. And `grace` has ONE writer in the whole codebase -- forget it and
+  it becomes a flag that can never be non-zero with four readers that can never
+  take their other branch, which is the `world.endless` shape from build 186
+  all over again. `resting = true` before anything else, or `update()` falls
+  into the end-of-wave block next frame and scores the same wave twice.
+- **`spent` has three readers and `dissolved` has one.** `spent` (autoTarget,
+  its hysteresis, the projectile sweep) keeps rounds and the assist off a body;
+  `dissolved` (the sweep) stops it paying and counting. Neither reaches blasts,
+  mines, patches or any ability, all of which test `dead` alone -- so a body
+  that must not be cashed in needs the guard inside `Enemy.destroy`, which is
+  the one door they all come through. That is what build 210's fizzle does.
+- **A probe that spawns a fresh body whenever the mount goes empty is measuring
+  its own pile-up.** Bodies stack at the same point, shove each other off, and
+  `Director.held` -- unbroken contact by design -- resets on every release, so
+  the fuse pays a 1.5s re-arm each time. It reported the timer firing 1.6s late
+  and the mount refusing to clear; both were the instrument. One body, pinned
+  and healed each frame, is what makes "fourteen unbroken seconds" unbroken.
+- **Reordering children inside `.qGroup` is safe; re-nesting them is not.**
+  `.qGroup.folded > .qc:not(.fold)` is a direct-child selector, so wrapping the
+  slots in a div to move the fold makes them grandchildren and folding silently
+  stops hiding anything -- with no property flipped for a test to read back.
+  And `.foldArrow` is a bare span that `.qc svg`'s `flex: 0 0 auto` does not
+  reach, so it was the flex item that gave ground: measured 8px down to 3px at
+  320 the moment the label beside it had text, clipped rather than scrolled,
+  `scrollWidth === clientWidth`, nothing to read back.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

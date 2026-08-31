@@ -3682,14 +3682,20 @@ body.booting #quickBar {
 /* ---------------------------------------------------------- the stack fold */
 
 /*
- * Show/hide at the head of each stack. Four mine slots and four ammunition
+ * Show/hide at the FOOT of each stack. Four mine slots and four ammunition
  * slots is a lot of column on a phone, and a run that lays no mines is
  * looking straight past that side of the screen. The button never folds
  * away with the stack -- a control that hides itself is one nobody finds.
+ *
+ * 28px, not the 22 it was at the head of the column. At the foot it sits on
+ * the floor line with `#abilities` 14px below it, and a 22px target with
+ * PULSE that close is a mis-hit waiting to happen -- the cell that used to
+ * hold this seat was a full 40. It is still the shortest thing in the bar,
+ * because it is the only control here that does nothing to the field.
  */
 .qc.fold {
-  height: 22px;
-  min-height: 22px;
+  height: 28px;
+  min-height: 28px;
   gap: 6px;
   padding: 0 8px;
   border-color: rgba(120, 190, 255, 0.16);
@@ -3697,6 +3703,11 @@ body.booting #quickBar {
 }
 .qc.fold .qLbl { color: #8fa6bd; }
 .foldArrow {
+  /* The arrow is a bare span and `.qc svg`'s `flex: 0 0 auto` does not reach
+     it, so it was the flex item that gave ground: measured, 8px down to 3px
+     at 320 the moment the label beside it had anything in it. `.qc` clips
+     rather than scrolls, so it failed with nothing to read back. */
+  flex: 0 0 auto;
   width: 8px;
   height: 8px;
   border-left: 1.6px solid #8fa6bd;

@@ -2825,9 +2825,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     /*
      * ---- the catch: a turret that cannot answer, parked high ----
      *
-     * Assists off and nothing bought, dropped in at tier 9. The wave scoring
-     * has three ways to notice and this trips at least one of them within a
-     * couple of waves.
+     * Assists off and nothing bought, dropped in at tier 9. From build 210
+     * there is exactly one thing that can catch it -- the glitch timer -- so
+     * the verdict the run was last given is asserted alongside the drop. Left
+     * as a live 500-second run rather than a posed one on purpose: it is the
+     * only end-to-end proof in the suite that the involuntary way down fires
+     * at all, off nothing but real frames.
      */
     g.restart();
     g.debugTeachAll();
@@ -2843,6 +2846,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       last = d().tier;
     }
     const caughtTo = d().tier;
+    const caughtLast = d().lastVerdict;
 
     // ---- HOLD pins the climb but never the relief ----
     g.restart();
@@ -2856,13 +2860,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const heldBefore = d().tier;
     d().score(w);
     const heldAfterClean = d().tier;
-    // ...and CONTACT must still step it back, and un-pin it. One wave, not
-    // two: from build 208 a rout is contact alone and there is no streak.
+    // ...and the GLITCH TIMER must still step it back, and un-pin it. From
+    // build 210 that is the only thing that can: the verdict table has no way
+    // down, so posing this through score() would assert nothing at all.
     d().hold = true;
-    d().contact = CFG.waves.tier.routContact + 1;
-    d().score(w);
+    d().glitchOut(w);
     const heldAfterFail = d().tier;
     const holdCleared = d().hold;
+    const heldGrace = d().grace;
 
     // ---- teach waves never move the ladder ----
     g.restart();
@@ -2876,8 +2881,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return { badBands, bandAt: { t1: bandRows[0], t9: bandRows[8], t80: bandRows[79] },
       hp1, compounds, step, hpAt: [10, 14, 20].map((t) => d().scaleAt(t).hp),
       climbFrom, climbed, climbFails, climbPeak, climbTraits, climbLast,
-      caughtFrom, caughtTo, downs,
-      heldBefore, heldAfterClean, heldAfterFail, holdCleared,
+      caughtFrom, caughtTo, downs, caughtLast,
+      heldBefore, heldAfterClean, heldAfterFail, holdCleared, heldGrace,
       teachVerdict, teachTier };
   });
 
@@ -2926,9 +2931,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.climbFails} failures standing, last verdict ${r.climbLast}, `
     + `wave carrying [${r.climbTraits}]`);
 
-  check('...and a turret that cannot is caught and set down',
-    r.caughtTo < r.caughtFrom && r.downs >= 1,
-    `tier ${r.caughtFrom} -> ${r.caughtTo}, ${r.downs} step-back(s)`);
+  check('...and a turret that cannot is caught and set down, by the glitch timer',
+    r.caughtTo < r.caughtFrom && r.downs >= 1 && r.caughtLast === 'glitch',
+    `tier ${r.caughtFrom} -> ${r.caughtTo}, ${r.downs} step-back(s), `
+    + `last verdict ${r.caughtLast}`);
 
   /*
    * HOLD is the one asymmetric control in the game: it pins the climb and not
@@ -2939,9 +2945,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('HOLD pins the climb, and never pins the fall',
     r.heldAfterClean === r.heldBefore
     && r.heldAfterFail === r.heldBefore - 1
-    && r.holdCleared === false,
+    && r.holdCleared === false && r.heldGrace === 1,
     `held at ${r.heldBefore}: clean wave -> ${r.heldAfterClean}, `
-    + `two failures -> ${r.heldAfterFail}, hold still on: ${r.holdCleared}`);
+    + `a glitch -> ${r.heldAfterFail}, hold still on: ${r.holdCleared}, `
+    + `grace armed ${r.heldGrace}`);
 
   check('...and the opening teaches without ever moving the ladder',
     r.teachVerdict === null && r.teachTier === 3,
@@ -3784,6 +3791,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // The words, for someone who has still not pressed it.
     g.hud.clearHint();
     g.hud.say(null);
+    /*
+     * The fuse is zeroed with `heldFor`, not left where the preamble put it.
+     * The nudge is a nine-second clock and the glitch timer is a fifteen-and-
+     * a-half-second one, both starting from the same first touch, so in a real
+     * run the nudge always lands first -- but this case has had a LURCHER on
+     * the mount through three 420ms style settles before it starts counting,
+     * and a fuse that blew inside the window fizzled the field and reset
+     * `heldFor` to 0, so the band was never asked for at all. Zeroing both is
+     * what makes the twenty frames below measure the nudge rather than the
+     * race. That the nudge wins the race is asserted on its own, next door.
+     */
+    if (w.director) { w.director.glitch = 0; w.director.held = 0; }
     w.heldFor = 0; w.heldSaid = 1e9;
     /*
      * Gated on `.show`, not on the text. clearHint() drops the class and
@@ -3796,8 +3815,21 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       return el.classList.contains('show')
         ? el.textContent.replace(/\s+/g, ' ').trim() : '';
     };
+    /*
+     * The body is PINNED to the mount for the window, and healed each frame.
+     *
+     * `w.heldFor` resets the moment nothing is attached, and from build 210
+     * `world.attackers` releases a body that has stopped touching -- so it is
+     * genuinely unbroken time now, where before it was "has ever touched you
+     * and is not dead yet". A LURCHER dropped on the turret and left to the
+     * physics gets shoved off it by the next thing that arrives, and the
+     * nine-second clock starts again from nothing every time. Which is the
+     * right behaviour for the nudge and the wrong setup for measuring it.
+     */
     let saidAt = null;
     for (let i = 0; i < 60 * 20 && saidAt === null; i++) {
+      if (e.dead) break;
+      e.x = s.x + 4; e.y = s.y - 6; e.vx = 0; e.vy = 0; e.hp = e.maxHp;
       g.update(1 / 60);
       if (band().includes('PULSE shoves off')) saidAt = +(w.heldFor).toFixed(1);
     }
@@ -3811,6 +3843,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     e2.spawnIn = 0; e2.vx = 0; e2.vy = 0;
     let again = false;
     for (let i = 0; i < 60 * 120; i++) {
+      if (!e2.dead) { e2.x = s.x + 4; e2.y = s.y - 6; e2.vx = 0; e2.vy = 0; e2.hp = e2.maxHp; }
       g.update(1 / 60);
       if (band().includes('PULSE shoves off')) { again = true; break; }
     }
@@ -5060,12 +5093,49 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       into.foldMines = shown('#foldMines');
       into.label = document.querySelector('#foldMines .qLbl').textContent;
     };
+    /*
+     * ...and where it sits, which is the whole of the build-210 change.
+     *
+     * `seat` is the button's own box and the box of the LAST slot above it, so
+     * "the fold is under the stack" is asserted as geometry rather than as DOM
+     * order -- `#quickBar` bottom-aligns its groups and the stack grows upward
+     * off a floor line, so DOM order and screen order are only the same while
+     * nobody adds a `column-reverse`.
+     */
+    const seat = (id) => {
+      const el = document.getElementById(id);
+      const b = el.getBoundingClientRect();
+      const group = el.closest('.qGroup');
+      const above = [...group.querySelectorAll('.qc:not(.fold)')]
+        .filter((c) => c.getBoundingClientRect().height > 0)
+        .map((c) => c.getBoundingClientRect());
+      const mid = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+      return {
+        bottom: Math.round(b.bottom), h: Math.round(b.height), w: Math.round(b.width),
+        // Every visible slot is above it, and none overlaps it.
+        under: above.every((c) => c.bottom <= b.top + 1),
+        cells: above.length,
+        groupBottom: Math.round(group.getBoundingClientRect().bottom),
+        // ...and nothing is sitting on top of it: the aim row spans the bar at
+        // this height and `#abilities` is 14px below the floor line.
+        onTop: mid === el || el.contains(mid),
+        live: getComputedStyle(el).pointerEvents !== 'none',
+      };
+    };
     g.hud.syncFolds();
     read(out.open);
+    out.seatOpen = seat('foldMines');
+    out.seatAmmo = seat('foldAmmo');
     press('foldMines'); press('foldAmmo');
     read(out.shut);
+    out.seatShut = seat('foldMines');
     press('foldMines'); press('foldAmmo');
     read(out.back);
+    // The bar is rebuilt from the arsenal's defaults on every purchase, so the
+    // seat has to survive one. See the AUTO AIM trap in CLAUDE.md.
+    g.hud.buildStrip();
+    g.hud.syncFolds();
+    out.seatRebuilt = seat('foldMines');
     return out;
   });
   check('folding a stack puts it away and leaves the way back',
@@ -5075,6 +5145,39 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `open ${r.open.mines}/${r.open.ammo}, folded ${r.shut.mines}/${r.shut.ammo} `
     + `(button still there: ${r.shut.foldMines}, says "${r.shut.label}"), `
     + `unfolded ${r.back.mines}/${r.back.ammo}`);
+
+  /*
+   * ---- and it does not move (build 210) ----
+   *
+   * The fold used to be the FIRST child of its group, at the head of the
+   * column. Measured at 390x844 it sat at y 570 with the stack open and y 726
+   * with it shut: 156px of travel on the one control in the bar whose entire
+   * job is to be in the same place both times, and 156px is most of a thumb's
+   * reach on a phone. The stack grows upward off a floor line that never
+   * moves, so the foot of the column is the only seat in it that does not --
+   * and it lands level with the MINES and AMMO buttons in the bands either
+   * side, which are bottom-aligned for the same reason.
+   *
+   * Asserted as geometry, as a hit test, and across a rebuild. The hit test is
+   * the one that matters: `#aimModes` spans the whole bar at this height and
+   * `#abilities` starts 14px below the floor line, so a control moved down
+   * here can be perfectly positioned and still be under something.
+   */
+  check('the fold sits at the foot of its stack, and stays there when it folds',
+    r.seatOpen.under && r.seatOpen.cells > 1 && r.seatShut.cells === 0
+    && r.seatOpen.bottom === r.seatShut.bottom
+    && r.seatOpen.bottom === r.seatOpen.groupBottom
+    && r.seatAmmo.under && r.seatAmmo.bottom === r.seatOpen.bottom
+    && r.seatRebuilt.bottom === r.seatOpen.bottom && r.seatRebuilt.under,
+    `open: bottom ${r.seatOpen.bottom} with ${r.seatOpen.cells} cells above it `
+    + `(group bottom ${r.seatOpen.groupBottom}); shut: bottom ${r.seatShut.bottom}; `
+    + `AMMO side ${r.seatAmmo.bottom}; after a rebuild ${r.seatRebuilt.bottom}`);
+
+  check('...and it is a target a thumb can actually land on, with nothing over it',
+    r.seatOpen.onTop && r.seatOpen.live && r.seatOpen.h >= 28 && r.seatOpen.w >= 44
+    && r.seatShut.onTop,
+    `${r.seatOpen.w}x${r.seatOpen.h}, topmost at its own centre ${r.seatOpen.onTop}, `
+    + `pressable ${r.seatOpen.live}; folded, topmost ${r.seatShut.onTop}`);
 
   // ...and the choice is a setting, so it survives the app being closed.
   const kept = await page.evaluate(async () => {
@@ -8704,19 +8807,35 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       // most of it outlived the wave
       routByRemains: pose({ t: 20, k: 1, left: 8 }),
       // ...or it was on the turret for a quarter of a minute
-      routByContact: pose({ t: 8, k: 15, left: 0 }),
+      heavyContact: pose({ t: 8, k: 15, left: 0 }),
       // patience ending the wave makes t infinite, which the table reads
       patience: pose({ t: Infinity, k: 0, left: 0 }),
       // grace: the wave after a drop cannot climb
       graced: pose({ t: 1, k: 0, left: 0, grace: 1 }),
       // HOLD pins the climb...
       pinned: pose({ t: 1, k: 0, left: 0, hold: true }),
-      // ...and not the relief
-      dropUnderHold: pose({ t: 20, k: 15, left: 8, hold: true }),
-      floor: pose({ t: 20, k: 15, left: 8, tier: 1 }),
     };
+    /*
+     * ...and the whole table, swept, because "no verdict can subtract" is a
+     * claim about every cell in it and not about the handful above. Three
+     * seconds of `t` either side of both windows, contact from nothing to
+     * twice the old rout threshold, and a field from cleared to untouched:
+     * 5 x 7 x 4 poses, and not one of them may come back with a move below 0.
+     * Posed at tier 20 so the floor guard cannot be what is doing the work.
+     */
+    const sweep = [];
+    for (const t of [0.5, 3, 4, 12, 13, Infinity]) {
+      for (const k of [0, 1.9, 2, 5.9, 6, 12, 24]) {
+        for (const left of [0, 2, 6, 10]) {
+          const out = pose({ t, k, left, asked: 10, tier: 20 });
+          if (out && out.moved < 0) sweep.push({ t, k, left, moved: out.moved });
+        }
+      }
+    }
+    res.sweep = sweep;
+    res.sweepOf = 6 * 7 * 4;
     res.cfg = { surgeWithin: T.surgeWithin, cleanWithin: T.cleanWithin,
-      failContact: T.failContact, routBelow: T.routBelow, routContact: T.routContact };
+      failContact: T.failContact, routBelow: T.routBelow };
     g.restart();
     return res;
   });
@@ -8741,24 +8860,38 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('a wave that mostly outlived you holds too, if it never reached you',
     r.routByRemains.verdict === 'stall' && r.routByRemains.moved === 0,
     `${v(r.routByRemains)} (8 of 10 still standing, nothing on the turret)`);
-  check('only contact steps the ladder back',
-    r.routByContact.verdict === 'rout' && r.routByContact.moved === -1,
-    `${v(r.routByContact)} (15 s of contact, field cleared)`);
+  /*
+   * Build 210: the table cannot go down at all, from any cell in it.
+   *
+   * The rout it lost was `k >= 12` -- twelve seconds of contact totted up
+   * across a wave and cashed in once the wave was over. A wave-end verdict is
+   * the wrong instrument for "you were in trouble": it arrives up to a minute
+   * after the trouble did, it cannot be seen coming, and there is nothing to
+   * be done about it once it is owed. Ten bad seconds at the top of a wave
+   * condemned a wave that was then cleared perfectly.
+   *
+   * The glitch timer is the same signal read the other way round -- live,
+   * on the screen, and answerable while it runs -- and it is now the only
+   * involuntary way down. Swept rather than sampled, because that is a claim
+   * about the whole table.
+   */
+  check('nothing this table can produce steps the ladder back',
+    r.sweep.length === 0 && r.heavyContact.moved === 0,
+    `${r.sweepOf - r.sweep.length}/${r.sweepOf} poses held; `
+    + `15 s on the turret is ${v(r.heavyContact)}`
+    + (r.sweep.length ? `; first drop ${JSON.stringify(r.sweep[0])}` : ''));
   check('patience ending a wave is read as a wave that never thinned, and holds',
     r.patience.verdict === 'stall' && r.patience.moved === 0
     && r.patience.reason === 'THE FIELD NEVER THINNED',
     `${v(r.patience)} — ${r.patience.reason}`);
-  check('...and a step back always names the contact that caused it',
-    /^\d+ S ON THE TURRET$/.test(r.routByContact.reason),
-    `the rout said "${r.routByContact.reason}"`);
+  check('...and a wave that held you for a while still says so',
+    /^\d+ S ON THE TURRET$/.test(r.heavyContact.reason),
+    `it said "${r.heavyContact.reason}"`);
   check('the wave after a step back cannot climb back into what did it',
     r.graced.verdict === 'surge' && r.graced.moved === 0,
     `${v(r.graced)} with grace armed (build 200 would have climbed straight back)`);
-  check('HOLD pins the climb and not the relief',
-    r.pinned.moved === 0 && r.dropUnderHold.moved === -1,
-    `pinned ${v(r.pinned)}, drop under hold ${v(r.dropUnderHold)}`);
-  check('...and nothing steps back off the bottom rung',
-    r.floor.moved === 0, `at tier 1: ${v(r.floor)}`);
+  check('HOLD pins the climb',
+    r.pinned.moved === 0, `pinned ${v(r.pinned)}`);
 }
 
 // --- a rung pays more than the one below it ---------------------------------
@@ -8937,11 +9070,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.past = d.tier;
 
     // ---- a drop is never gated: going back was not what had to be earned ----
+    // Posed through the glitch timer from build 210, because the verdict table
+    // no longer has a way down to pose. The gate is on the rung being LEFT,
+    // which is the case that matters: a gate that held the fall as well as the
+    // climb would strand a run on the one rung it has proved it cannot hold.
     g.restart(); w.reconciled.length = 0;
     d.setTier(gate); d.hold = false; d.grace = 0; d.probe = null;
-    d.order = [real]; d.at = 0; d.asked = 10; d.contact = 20; d.hitPatience = true;
+    d.order = [real]; d.at = 0; d.asked = 10; d.contact = 0; d.hitPatience = false;
     w.time = 1000; d.lastRelease = 1000;
-    out.routed = d.score(w).moved;
+    out.routed = d.glitchOut(w).moved;
 
     // ---- a trial may not vault a gate ----
     g.restart(); w.reconciled.length = 0;
@@ -9014,7 +9151,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('...and once the anomaly is reconciled the rung opens',
     r.past === 7, `at 6 with ORDINAL reconciled, a clean wave goes to ${r.past}`);
   check('a gate holds the climb and never the fall',
-    r.routed === -1, `a rout at the gate moved ${r.routed}`);
+    r.routed === -1, `a glitch at the gate moved ${r.routed}`);
   check('a trial cannot be used to vault a gate',
     r.trialOverGate === null && r.trialOnceOpen === true,
     `armed over a standing gate: ${JSON.stringify(r.trialOverGate)}; once open: ${r.trialOnceOpen}`);
@@ -10020,6 +10157,375 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `menu open ${r.scrollKeptOpen} (scrollTop ${r.scrollTop} of ${r.over})`);
   check('all five overlays exist to be bound',
     r.bound.length === 5, `found ${r.bound.join(', ')}`);
+}
+
+// --- the glitch timer: the only thing that takes a rung away -----------------
+/*
+ * Build 210 replaced the wave-end rout with a live clock, and the clock rests
+ * on one assumption the old verdict did not: that `world.attackers` means
+ * "on the turret NOW". It did not. A body entered the set on contact and left
+ * it exactly one way -- by dying -- and `e.attacking` was never written false
+ * anywhere outside the constructor, so a LURCHER shoved clear by a PULSE and
+ * left alive counted as attached from across the field for the rest of its
+ * life. Under a countdown to losing a rung, whose whole answer is shoving the
+ * thing off, that is unanswerable. The release is asserted first and on its
+ * own, because every case below it is measuring nothing if it is not there.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { CFG, WAVES } = await import('../src/config.js');
+    const w = g.world;
+    const d = w.director;
+    const G = CFG.waves.glitch;
+    const out = { cfg: { arm: G.arm, fuse: G.fuse, recover: G.recover, fizzle: G.fizzle } };
+    const s = w.shooter;
+    const real = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
+
+    /*
+     * The director parked in rest with its clocks out of reach. `burn()` runs
+     * ABOVE the resting branch, so the fuse still ticks while nothing else
+     * about the wave does -- which is the whole field cleared of everything
+     * that could otherwise move the numbers under the measurement.
+     */
+    const stage = (tier = 9) => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.spawnLock = 1e9;
+      d.driftTimer = 1e9;
+      d.order = [real]; d.at = 0;
+      d.resting = true; d.timer = 1e9;
+      d.asked = 10; d.contact = 0; d.hitPatience = false; d.take = 0;
+      d.setTier(tier); d.hold = false; d.grace = 0; d.probe = null;
+      d.held = 0; d.glitch = 0;
+      w.time = 1000; d.lastRelease = 1000;
+      w.drops.length = 0;
+      // The mount, explicitly. `reset()` clears the set but a body destroyed
+      // by debugClearField is dead-and-unswept for a frame and the set still
+      // holds it, so a stage() that only restarts can begin with a full mount.
+      for (const a of [...w.attackers]) { a.dead = true; a.attacking = false; }
+      w.attackers.clear();
+    };
+    /*
+     * ONE body, held in place rather than re-seated.
+     *
+     * The first version of this spawned a fresh LURCHER whenever the mount
+     * went empty, which piled bodies up at the same point: they shoved each
+     * other off, `held` -- which is UNBROKEN contact by design -- reset every
+     * time one was released, and the fuse cost itself a 1.5s re-arm on each.
+     * It reported the timer firing 1.6s late and the mount refusing to clear,
+     * both of which were the instrument. Pinned position and full health each
+     * frame is what makes "fourteen unbroken seconds" actually unbroken.
+     */
+    const seat = () => {
+      const e = g.debugSpawn('lurcher', s.x + 4, s.y - 6);
+      e.spawnIn = 0;
+      return e;
+    };
+    const hold = (e, secs, at = null) => {
+      for (let i = 0; i < Math.round(secs * 60); i++) {
+        if (e && !e.dead) {
+          e.x = at ? at.x : s.x + 4;
+          e.y = at ? at.y : s.y - 6;
+          e.vx = 0; e.vy = 0;
+          e.hp = e.maxHp;
+        }
+        g.update(1 / 60);
+      }
+    };
+
+    // ---- the set means "now" ----
+    stage();
+    const body = seat();
+    g.update(1 / 60);
+    out.onMount = w.attackers.size;
+    // Shoved clear and left alive -- the case the old set could not see.
+    body.x = s.x + 420; body.y = s.y - 380; body.vx = 0; body.vy = 0;
+    g.update(1 / 60);
+    out.offMount = w.attackers.size;
+    out.offFlag = body.attacking;
+    // ...and it may come back.
+    body.x = s.x + 4; body.y = s.y - 6;
+    g.update(1 / 60);
+    out.backOn = w.attackers.size;
+
+    // ---- the fuse lights late, and only late ----
+    stage();
+    const armer = seat();
+    hold(armer, G.arm - 0.5);
+    out.beforeArm = d.glitch;
+    hold(armer, 1);
+    out.afterArm = d.glitch;
+
+    // ---- ...and a clear turret winds it back out ----
+    stage();
+    const goer = seat();
+    hold(goer, G.arm + 4);
+    out.lit = d.glitch;
+    // Held OFF the mount rather than killed, so this measures the release and
+    // the recovery together -- a body destroyed would have left the set by the
+    // one route it always had.
+    // Four seconds of burn come back at 0.6x, so it owes six and two thirds.
+    // Read at half that and again past all of it: the first says it is coming
+    // back at the rate config names, the second that it actually goes out.
+    hold(goer, 3.33, { x: s.x + 420, y: s.y - 380 });
+    out.halfBack = d.glitch;
+    hold(goer, 4.5, { x: s.x + 420, y: s.y - 380 });
+    out.recovered = d.glitch;
+    out.recoveredClear = w.attackers.size;
+
+    // ---- and left alone it runs out ----
+    stage();
+    const burner = seat();
+    let firedAt = null;
+    for (let i = 0; i < 60 * 30 && firedAt === null; i++) {
+      hold(burner, 1 / 60);
+      if (d.lastVerdict === 'glitch') firedAt = +((i + 1) / 60).toFixed(1);
+    }
+    out.firedAt = firedAt;
+    out.expectAt = G.arm + G.fuse;
+
+    // ---- what firing does to the field ----
+    stage();
+    g.debugSpawn('mote', s.x - 90, 260).spawnIn = 0;
+    g.debugSpawn('mote', s.x + 90, 260).spawnIn = 0;
+    g.debugSpawnDrift();
+    // A mote of energy on the floor, made the way the game makes them.
+    const payer = g.debugSpawn('mote', s.x, 300);
+    payer.spawnIn = 0;
+    payer.destroy(w);
+    // One frame, so the sweep books that kill BEFORE the counters are read.
+    // `destroy()` only marks; `Game.sweep` is what calls registerKill, and
+    // taking the snapshot between the two charged this case for a kill it
+    // made itself.
+    g.update(1 / 60);
+    const dropsBefore = w.drops.filter((x) => !x.dead).length;
+    const energyBefore = Math.round(w.energy);
+    const killsBefore = w.kills;
+    const hostiles = w.enemies.filter((e) => !e.dead && !e.harmless).length;
+    const greyBefore = w.enemies.filter((e) => !e.dead && e.harmless).length;
+    w.autoAim = true;
+    const move = d.glitchOut(w);
+    out.fizzled = move.fizzled;
+    out.hostiles = hostiles;
+    out.marks = w.enemies.filter((e) => e.fizzle > 0)
+      .every((e) => e.spent === true && e.dissolved === true && !e.attacking);
+    out.greyKept = w.enemies.filter((e) => !e.dead && e.harmless && !e.fizzle).length === greyBefore;
+    out.targetsNone = g.autoTarget() === null;
+    // A blast landing on one of them during its second must not cash it in.
+    const victim = w.enemies.find((e) => e.fizzle > 0);
+    if (victim) victim.destroy(w);
+    // ...and a second later there is nothing of them left.
+    for (let i = 0; i < Math.round((G.fizzle + 0.4) * 60); i++) g.update(1 / 60);
+    out.gone = w.enemies.filter((e) => !e.dead && !e.harmless).length;
+    out.paid = Math.round(w.energy) - energyBefore;
+    out.counted = w.kills - killsBefore;
+    out.dropsKept = w.drops.filter((x) => !x.dead).length >= dropsBefore;
+
+    // ---- what firing does to the ladder and the wave ----
+    stage(9);
+    d.hold = true;
+    d.overclock.armed = true;
+    d.laneOffer = { id: 'x', until: 99 };
+    d.jobs = [{ id: 'mote', n: 1 }];
+    d.contact = 7; d.hitPatience = true; d.take = 500;
+    const m9 = d.glitchOut(w);
+    out.move9 = { moved: m9.moved, tier: m9.tier, from: m9.from,
+      verdict: m9.verdict, reason: m9.reason };
+    out.after9 = { grace: d.grace, hold: d.hold, resting: d.resting,
+      jobs: d.jobs.length, armed: d.overclock.armed, offer: d.laneOffer,
+      contact: d.contact, patience: d.hitPatience, take: d.take,
+      glitch: d.glitch, held: d.held, timerSane: d.timer > 0 && d.timer < 30 };
+
+    // ---- rung 1: the wave still resets, and nothing claims otherwise ----
+    stage(1);
+    g.debugSpawn('mote', s.x - 90, 260).spawnIn = 0;
+    const m1 = d.glitchOut(w);
+    out.move1 = { moved: m1.moved, tier: m1.tier };
+    out.reset1 = m1.fizzled > 0 && d.resting === true;
+
+    // ---- a trial that glitches is answered, not charged twice ----
+    stage(9);
+    d.peak = 9;
+    d.trial(12, w);
+    const beforeTrial = d.tier;
+    const mt = d.glitchOut(w);
+    out.trial = { armedAt: beforeTrial, to: mt.tier, moved: mt.moved,
+      probe: d.probe, locked: d.probeLock > 0 };
+
+    // ---- it does not run during an anomaly, nor while the game is teaching --
+    stage();
+    d.glitch = 0.5;
+    const boss = w.boss;
+    w.boss = { arriving: 0, dying: 0 };
+    d.update(w, 1 / 60);
+    out.underBoss = d.glitch;
+    w.boss = boss;
+    d.glitch = 0.5;
+    d.order = [0]; d.at = 0; // wave 0 is a teach wave
+    d.update(w, 1 / 60);
+    out.underTeach = d.glitch;
+
+    // ---- it says so, on the canvas, without spending a story beat ----
+    stage(9);
+    g.hud.say(null);
+    w.bossLine = null;
+    w.narrator.clear();
+    const storyBefore = w.narrator.index;
+    w.onTier(d.glitchOut(w));
+    out.said = w.narrator.active ? w.narrator.text : '';
+    out.storySpent = w.narrator.index - storyBefore;
+    out.alert = [...document.querySelectorAll('#alerts .alert')]
+      .map((el) => el.textContent).join(' | ');
+
+    // ---- and it is drawn, as a ring that closes with a number in it --------
+    /*
+     * On a recording stand-in rather than off the live canvas. The ring is one
+     * world unit of stroke over a floor band that is not black, and the perf
+     * governor has had the backing store down to 273x591 by the time the suite
+     * gets here -- a colour test on that is a test of how slow the cases above
+     * it ran. What is being asserted is that the thing draws the fuse, so the
+     * calls are what to read.
+     */
+    const rec = () => {
+      const calls = [];
+      const noop = () => {};
+      const ctx = new Proxy({ calls }, {
+        get(t, k) {
+          if (k === 'calls') return calls;
+          return (...a) => { calls.push({ k, a }); return noop(); };
+        },
+        set(t, k, v) { calls.push({ k, a: [v], set: true }); return true; },
+      });
+      return ctx;
+    };
+    stage();
+    d.glitch = 0;
+    const cold = rec();
+    g.drawGlitch(cold);
+    out.drawCold = cold.calls.length;
+    d.glitch = 0.5;
+    const warm = rec();
+    g.drawGlitch(warm);
+    out.drawArcs = warm.calls.filter((c) => c.k === 'arc').length;
+    out.drawText = (warm.calls.find((c) => c.k === 'fillText') || { a: [''] }).a[0];
+    d.glitch = 1 - 1.4 / G.fuse; // inside the warning window
+    const hot = rec();
+    g.drawGlitch(hot);
+    out.drawHot = (hot.calls.find((c) => c.k === 'fillText') || { a: [''] }).a[0];
+
+    g.debugClearField();
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+
+  check('the turret lets go of what is no longer on it',
+    r.onMount === 1 && r.offMount === 0 && r.offFlag === false && r.backOn === 1,
+    `on the mount ${r.onMount}, shoved clear and still alive ${r.offMount} `
+    + `(attacking ${r.offFlag}), walked back on ${r.backOn}`);
+
+  check('the fuse lights only after a body has held on for a moment',
+    r.beforeArm === 0 && r.afterArm > 0,
+    `${r.cfg.arm - 0.5}s of contact -> ${r.beforeArm}, ${r.cfg.arm + 0.5}s -> `
+    + `${r.afterArm.toFixed(3)}`);
+
+  check('...and clearing the turret winds it back out, at the rate config names',
+    r.lit > 0.2 && r.recovered === 0 && r.recoveredClear === 0
+    && Math.abs(r.halfBack - r.lit / 2) < 0.03,
+    `lit to ${r.lit.toFixed(3)} over ${r.cfg.arm + 4}s; held clear, half the `
+    + `time back -> ${r.halfBack.toFixed(3)} (half of lit is `
+    + `${(r.lit / 2).toFixed(3)}), all of it -> ${r.recovered.toFixed(3)} `
+    + `(mount ${r.recoveredClear})`);
+
+  check('...and left alone it runs out, on the clock config says',
+    r.firedAt !== null && Math.abs(r.firedAt - r.expectAt) < 1.2,
+    `fired at ${r.firedAt}s, expected ${r.expectAt}s (arm ${r.cfg.arm} + fuse ${r.cfg.fuse})`);
+
+  /*
+   * The field is WITHDRAWN, not killed. `destroy()` is what banks a body's
+   * energy, sheds its debris and counts it, and none of that is owed for a
+   * wave being taken back -- so the marks have to hold against everything
+   * that could still reach one during the second it takes to dissolve. The
+   * blast in the middle of this case is that: `spent` keeps rounds and the
+   * assist off them, but blasts, mines, patches and every ability test `dead`
+   * alone, which is why the guard is inside `destroy()`.
+   */
+  check('the field fizzles out, pays nothing, and counts for nothing',
+    r.fizzled === r.hostiles && r.hostiles > 0 && r.marks && r.targetsNone
+    && r.gone === 0 && r.paid === 0 && r.counted === 0
+    && r.dropsKept && r.greyKept,
+    `${r.fizzled} of ${r.hostiles} marked (flags ok ${r.marks}, assist sees none `
+    + `${r.targetsNone}); after ${r.cfg.fizzle}s ${r.gone} left, paid ${r.paid}, `
+    + `counted ${r.counted}, energy on the floor kept ${r.dropsKept}, grey kept ${r.greyKept}`);
+
+  /*
+   * Everything score() owes the next wave, paid by hand -- because this path
+   * deliberately does not go through score(). `overclock.armed` and
+   * `laneOffer` are cleared THERE and nowhere else, so a wave reset that skips
+   * it carries a spent OVERCLOCK charge and a lapsed lane offer into the wave
+   * after. And `grace` has no other writer at all: without the line that arms
+   * it here it becomes a flag that can never be non-zero, with four readers
+   * that can never take their other branch.
+   */
+  check('a glitch abandons the wave rather than scoring it',
+    r.after9.jobs === 0 && r.after9.resting === true && r.after9.timerSane
+    && r.after9.armed === false && r.after9.offer === null
+    && r.after9.contact === 0 && r.after9.patience === false && r.after9.take === 0
+    && r.after9.glitch === 0 && r.after9.held === 0,
+    `jobs ${r.after9.jobs}, resting ${r.after9.resting}, overclock still armed `
+    + `${r.after9.armed}, lane offer ${JSON.stringify(r.after9.offer)}, `
+    + `contact ${r.after9.contact}, take ${r.after9.take}`);
+
+  check('...and steps the ladder back one rung, arms grace, and un-pins HOLD',
+    r.move9.moved === -1 && r.move9.tier === r.move9.from - 1
+    && r.move9.verdict === 'glitch' && r.after9.grace === 1 && r.after9.hold === false,
+    `${r.move9.from} -> ${r.move9.tier} (${r.move9.verdict}, "${r.move9.reason}"), `
+    + `grace ${r.after9.grace}, hold ${r.after9.hold}`);
+
+  check('...and on the bottom rung it resets the wave without claiming a step back',
+    r.move1.moved === 0 && r.move1.tier === 1 && r.reset1,
+    `at tier 1: moved ${r.move1.moved}, field withdrawn and wave rested ${r.reset1}`);
+
+  /*
+   * A trial is a question the player asked, so it is answered rather than
+   * charged for twice: the fall back to the rung it was armed from IS the step
+   * back. Without this the run drops to the trial's floor and then a further
+   * rung below it, for one wave.
+   */
+  check('a trial that glitches is answered, not charged twice',
+    r.trial.to === 9 && r.trial.probe === null && r.trial.locked
+    && r.trial.moved === 9 - r.trial.armedAt,
+    `armed at ${r.trial.armedAt}, landed on ${r.trial.to} (moved ${r.trial.moved}), `
+    + `probe ${JSON.stringify(r.trial.probe)}, locked out ${r.trial.locked}`);
+
+  /*
+   * Both guards are whole-method returns that PUT THE FUSE OUT rather than
+   * step over it. A fuse frozen behind a boss guard comes back nine tenths
+   * closed over a turret that has been clear for four minutes.
+   */
+  check('nothing burns during an anomaly, and nothing burns while the game is teaching',
+    r.underBoss === 0 && r.underTeach === 0,
+    `half a fuse under a boss -> ${r.underBoss}, on a teach wave -> ${r.underTeach}`);
+
+  /*
+   * `show()` writes text and nothing else; `advance()` moves `index`, which is
+   * saved to disk as `story`. A line that spent one of the ten numbered beats
+   * would cost the player a beat they can never get back, every time the fuse
+   * blew.
+   */
+  check('it says so on the canvas, without spending a story beat',
+    /stepped back/i.test(r.said) && /weren/i.test(r.said) && r.storySpent === 0
+    && /STEPPED BACK/.test(r.alert),
+    `narrator: "${r.said}" (story beats spent ${r.storySpent}); alert: "${r.alert}"`);
+
+  check('...and it is drawn as a ring that closes, with the seconds inside it',
+    r.drawCold === 0 && r.drawArcs === 2
+    && /^\d+$/.test(String(r.drawText))
+    && /^\d+\.\d$/.test(String(r.drawHot)),
+    `out: ${r.drawCold} calls; half burnt: ${r.drawArcs} arcs reading `
+    + `"${r.drawText}"; inside the warning: "${r.drawHot}"`);
 }
 
 // --- report -----------------------------------------------------------------
