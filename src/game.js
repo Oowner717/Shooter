@@ -843,6 +843,21 @@ export class Game {
       const z = this.world.scale;
       return { x: (ev.clientX - r.left) / z, y: (ev.clientY - r.top) / z };
     };
+    /*
+     * The aim point, lifted clear of the thumb -- see CFG.touchLift.
+     *
+     * Kept separate from pos() rather than folded into it, because the two
+     * are asked different questions. Everything that decides WHERE THE HAND IS
+     * -- the lever's grab zone, the ability strip below the floor -- wants the
+     * contact point, and everything that decides WHAT IS BEING AIMED AT wants
+     * this. Folding the lift into pos() would move the lever's own hit zone up
+     * the screen by an inch.
+     *
+     * Clamped to the top of the arena so the lift cannot aim at nothing, and
+     * the point stored on `pointers` is this one, so the touch aid draws the
+     * crosshair where the rounds are actually going.
+     */
+    const aimPos = (p) => ({ x: p.x, y: Math.max(0, p.y - CFG.touchLift) });
 
     c.addEventListener('pointerdown', (ev) => {
       const w = this.world;
@@ -850,7 +865,18 @@ export class Game {
       const p = pos(ev);
       if (p.y > w.floorY + 10) return; // ability strip belongs to the thumb
       const s = w.shooter;
-      c.setPointerCapture?.(ev.pointerId);
+      /*
+       * Capture is a convenience, and it is allowed to fail.
+       *
+       * `?.` guards a missing method, not a throwing one -- and this throws
+       * NotFoundError whenever the pointer is no longer active, which happens
+       * for real when a touch ends between the event being queued and the
+       * handler running, and on any synthetic pointer. It sits first in the
+       * handler, so an exception here loses the WHOLE press: no aim, no shot,
+       * no grip on the lever. Losing the capture costs a drag that wanders off
+       * the canvas; losing the press costs the press.
+       */
+      try { c.setPointerCapture?.(ev.pointerId); } catch { /* pointer already gone */ }
 
       // Anything at or behind the turret grabs the lever; anything ahead of it
       // is a direct shot at the point you touched.
@@ -865,8 +891,12 @@ export class Game {
         s.shoot(w);
         this.fireTimer = CFG.shooter.gripFireInterval;
       } else {
-        this.pointers.set(ev.pointerId, p);
-        s.aimAt(p.x, p.y, false);
+        const a = aimPos(p);
+        // The contact point travels with the aim point: the touch aid draws a
+        // tether between them, so the lift reads as deliberate rather than as
+        // the crosshair having drifted off the thumb.
+        this.pointers.set(ev.pointerId, { ...a, tx: p.x, ty: p.y });
+        s.aimAt(a.x, a.y, false);
         s.aim = s.targetAim; // taps are instant, drags slew
         s.shoot(w);
         this.fireTimer = CFG.shooter.holdFireInterval;
@@ -883,9 +913,10 @@ export class Game {
         return;
       }
       if (!this.pointers.has(ev.pointerId)) return;
-      const p = pos(ev);
-      this.pointers.set(ev.pointerId, p);
-      w.shooter.aimAt(p.x, p.y, false);
+      const raw = pos(ev);
+      const a = aimPos(raw);
+      this.pointers.set(ev.pointerId, { ...a, tx: raw.x, ty: raw.y });
+      w.shooter.aimAt(a.x, a.y, false);
       ev.preventDefault();
     }, { passive: false });
 
@@ -2099,13 +2130,26 @@ export class Game {
   }
 
   /**
-   * Your thumb covers roughly a 44px disc of the screen. Anything under it
-   * gets an outline drawn wide enough to peek out from behind the finger.
+   * Where the rounds are going, drawn clear of the hand.
+   *
+   * Your thumb covers roughly a 44px disc, so the aim point is lifted above
+   * the contact patch (CFG.touchLift) and the crosshair is drawn at the lifted
+   * point -- which is the real aim, not a decoration offset from it. A tether
+   * runs back down to the finger so the gap reads as deliberate; without it
+   * the crosshair looks like it has come loose.
    */
   drawTouchAid(ctx) {
     if (this.pointers.size === 0) return;
     const w = this.world;
     for (const p of this.pointers.values()) {
+      if (p.tx !== undefined) {
+        ctx.strokeStyle = rgba('#59e0ff', 0.16);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(p.tx, p.ty);
+        ctx.lineTo(p.x, p.y + 26);
+        ctx.stroke();
+      }
       ctx.strokeStyle = rgba('#59e0ff', 0.34);
       ctx.lineWidth = 1.2;
       ctx.beginPath();

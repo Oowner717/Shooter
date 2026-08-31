@@ -1607,6 +1607,70 @@ accident that holds until it does not. The cache key counts `reconciled` now.
 At 320×568 with the meter row the rail is 48px, still clears the top bar, and
 `pillCap()` is 3 — so the readout costs no teaching-line slot.
 
+### Only contact steps the ladder back, and the crosshair clears the thumb (build 208)
+
+**Being slow is not being in trouble.** The ladder dropped a rung on two
+consecutive stalls, and called a wave a rout when most of it outlived the wave
+(`c < routBelow`). Both of those say *you were slow*, and a run that clears
+everything at its own pace with nothing ever reaching the turret was being
+pushed down a ladder it was holding fine. The table is now:
+
+| verdict | when | move |
+|---|---|---|
+| `surge` | `t ≤ 3` and `k < 2` | +2 |
+| `clean` | `t ≤ 12` and `k < 6` | +1 |
+| `rout` | **`k ≥ 12`** | −1 |
+| `stall` | anything else | 0 |
+
+The one thing that steps the ladder back is something spending real time
+attached to the turret. Nothing about that is a trap: bodies march at the
+turret, so a wave genuinely beyond a run produces contact and is caught by the
+same clause. Measured, `max` dropped in at rung 30 for 180s:
+
+| build | verdicts | rung |
+|---|---|---|
+| 207 | 4 stall, 2 rout | 30 → **27** |
+| 208 | 3 stall, 2 clean, **0 rout** | 30 → **33** |
+
+Median contact was 0s in both. The old run was being walked backwards by waves
+that never touched it.
+
+`c` is still measured — the alert and AUDIT both read it — but it no longer
+decides anything. **A step back now always names the contact that caused it**,
+because that is the only thing that can cause one; it used to lead with "THE
+FIELD NEVER THINNED" whenever patience ended the wave, which would now explain
+a drop with the one thing that cannot produce one.
+
+`failStreak` and `Director.fails` went with the streak they counted. Nothing
+incremented `fails` any more, and a counter nothing increments grows readers
+that can never take their other branch.
+
+**The crosshair sits above the finger.** A thumb covers roughly a 44px disc —
+about 71 world units at `zoom` — so aiming at the point you touch means aiming
+at the one part of the field you cannot see. `drawTouchAid` already drew a ring
+wide enough to peek out from behind the finger, which tells you *where* you are
+aiming and still not *what* you are aiming at.
+
+The **aim point itself** is lifted by `CFG.touchLift` (56 world units, about 35
+screen pixels), so the crosshair marks the real aim rather than being a
+decoration offset from it, and a faint tether runs back to the contact point so
+the gap reads as deliberate. The lift applies to aiming only: the lever is still
+grabbed where the hand physically is, because that is a thing you take hold of
+rather than a thing you point at.
+
+**Writing the case for it found a real bug.** `c.setPointerCapture?.(...)` sits
+first in the pointerdown handler, and `?.` guards a *missing* method rather than
+a throwing one — it throws `NotFoundError` whenever the pointer is no longer
+active, which happens for real when a touch ends between the event being queued
+and the handler running. An exception there loses the **whole press**: no aim,
+no shot, no grip. It is wrapped now. Losing the capture costs a drag that
+wanders off the canvas; losing the press costs the press.
+
+The first version of that case also passed while the press was being lost
+entirely — it compared the barrel's angle only against the finger, and the
+barrel had never moved from its rest position, which is also not the angle to
+the finger. It checks against rest and against the lifted point now.
+
 ### SCION, and what a graft does
 
 A large body worth more to the field dead than alive.

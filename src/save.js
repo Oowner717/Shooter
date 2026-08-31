@@ -218,11 +218,10 @@ export function captureRun(world, game) {
       at: world.director.at,
       cycle: world.director.cycle,
       /*
-       * The ladder. `tier` is where the run had climbed to, `hold` whether
-       * the player had pinned it, `fails` how close it was to stepping back
-       * -- all three, because coming back one failure from a step-back and
-       * coming back fresh are different situations and the run should
-       * remember which it was in.
+       * The ladder: where the run had climbed to, and whether the player had
+       * pinned it there. `fails` sat here too until build 208, when contact
+       * became the only thing that steps the ladder back and the streak it
+       * counted stopped existing.
        */
       tier: world.director.tier,
       /*
@@ -246,7 +245,6 @@ export function captureRun(world, game) {
         cd: +world.director.overclock.cd || 0, armed: !!world.director.overclock.armed },
       grace: world.director.grace | 0,
       hold: world.director.hold ? 1 : 0,
-      fails: world.director.fails,
     },
   };
 }

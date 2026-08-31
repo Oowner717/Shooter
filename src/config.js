@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '207';
+export const BUILD = '208';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '207';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'cac24e0';
+export const REV = '1aa8887';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -68,6 +68,23 @@ export const CFG = {
   // the field is physically larger than the display and objects read smaller
   // and further away. All game logic works in world units.
   zoom: 0.62,
+
+  /*
+   * How far ABOVE the finger the aim point sits, in world units.
+   *
+   * A thumb covers roughly a 44px disc, which at `zoom` is about 71 world
+   * units across -- so aiming at the point you touch means aiming at the one
+   * part of the field you cannot see. drawTouchAid already drew a ring wide
+   * enough to peek out from behind the finger, which shows you WHERE you are
+   * aiming and still not WHAT you are aiming at.
+   *
+   * So the aim point is lifted clear of the contact patch: 56 units, about 35
+   * screen pixels, which puts the crosshair's centre a comfortable margin
+   * above the top of the thumb. The lift is applied to the AIM only -- the
+   * lever is still grabbed where the hand physically is, because that is a
+   * thing you take hold of rather than a thing you point at.
+   */
+  touchLift: 56,
 
   // ---- frame / quality ------------------------------------------------
   maxDpr: 2,
@@ -244,21 +261,41 @@ export const CFG = {
        * thinning; `k`, seconds anything spent on the turret; and `c`, the
        * fraction of what was asked for that did not survive.
        *
-       *   surge  t <= surgeWithin and k < surgeContact      +2
-       *   clean  t <= cleanWithin and k < failContact       +1
-       *   stall  otherwise, if c >= routBelow, k < routContact   0, two -> -1
-       *   rout   c < routBelow or k >= routContact          -1 at once
+       *   surge  t <= surgeWithin and k < surgeContact   +2
+       *   clean  t <= cleanWithin and k < failContact    +1
+       *   rout   k >= routContact                        -1
+       *   stall  anything else                            0
        *
        * `patience` still ends a wave; it is no longer itself the verdict --
        * it makes `t` infinite, which the table then reads.
+       *
+       * ---- and only CONTACT steps the ladder back (build 208) ----
+       *
+       * It used to drop on two consecutive stalls, and to call a wave a rout
+       * when most of it outlived the wave (`c < routBelow`). Both of those are
+       * "you were slow", and being slow is not the same as being in trouble:
+       * a run that clears everything at its own pace, with nothing ever
+       * reaching the turret, was being pushed down a ladder it was holding
+       * fine. The only thing that steps back now is something spending real
+       * time attached to the turret, which is the one signal that means the
+       * field is actually getting to you.
+       *
+       * A wave that is merely slow HOLDS, for as long as it takes. Nothing
+       * about that is a trap: bodies march at the turret, so a wave genuinely
+       * beyond a run produces contact and is caught by the same clause.
        */
       surgeWithin: 3, // cleared this fast after the last release: a surge
       surgeContact: 2, // ...and with less than this on the turret
       cleanWithin: 12, // the ordinary clear
       failContact: 6, // seconds with anything attached, during one wave
-      routBelow: 0.4, // less of the wave than this killed is a rout, not a stall
+      /*
+       * Less of the wave than this killed. It no longer DECIDES anything -- it
+       * is the threshold the alert reads to say "most of it was still
+       * standing" rather than "it took too long", so the reason names the
+       * shape of the wave. AUDIT's third meter is the same number.
+       */
+      routBelow: 0.4,
       routContact: 12, // ...as is this long with something attached
-      failStreak: 2, // consecutive stalls before it steps back
       probeLock: 60, // seconds before another trial rung may be armed
       /*
        * ---- the gates (build 203) ----

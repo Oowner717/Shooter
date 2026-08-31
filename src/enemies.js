@@ -3021,7 +3021,6 @@ export class Director {
      */
     this.peak = 1;
     this.hold = false;
-    this.fails = 0; // consecutive failed waves
     this.contact = 0; // seconds anything spent on the turret this wave
     this.hitPatience = false; // ...and whether the field ever thinned
     this.lastRelease = 0; // world.time of the last object let out
@@ -3174,11 +3173,17 @@ export class Director {
     // sooner, and three seconds from the last release would be a surge handed
     // out for the arming rather than for the answering.
     const surgeWithin = this.overclock.armed ? T.overclockSurge : T.surgeWithin;
+    /*
+     * Only CONTACT steps the ladder back. A wave that was merely slow, or that
+     * mostly outlived its own wave without ever reaching the turret, holds --
+     * see the note on the table in config.js. `c` is still measured, because
+     * the alert and AUDIT both read it, but it no longer decides.
+     */
     let verdict;
     if (t <= surgeWithin && k < T.surgeContact) verdict = 'surge';
     else if (t <= T.cleanWithin && k < T.failContact) verdict = 'clean';
-    else if (c >= T.routBelow && k < T.routContact) verdict = 'stall';
-    else verdict = 'rout';
+    else if (k >= T.routContact) verdict = 'rout';
+    else verdict = 'stall';
     /*
      * RECALL names its own verdict, and only its verdict.
      *
@@ -3194,12 +3199,20 @@ export class Director {
 
     // Why it went the way it did, in the alert's own register. The dominant
     // cause, not a list: a step you did not ask for needs one reason.
-    const reason = this.hitPatience ? 'THE FIELD NEVER THINNED'
-      : k >= T.failContact ? `${Math.round(k)} S ON THE TURRET`
-        : c < T.routBelow ? 'MOST OF IT WAS STILL STANDING'
-          : verdict === 'surge' ? 'CLEARED BEFORE THE LAST ONE LANDED'
-            : verdict === 'clean' ? 'THE FIELD CAME BACK'
-              : 'IT TOOK TOO LONG';
+    /*
+     * A step back names the thing that caused it, and from build 208 that is
+     * always the contact -- so the contact is read FIRST for a rout. It used
+     * to lead with "THE FIELD NEVER THINNED" whenever patience ended the wave,
+     * which after this change would explain a drop with the one thing that can
+     * no longer cause one.
+     */
+    const reason = verdict === 'rout' ? `${Math.round(k)} S ON THE TURRET`
+      : this.hitPatience ? 'THE FIELD NEVER THINNED'
+        : k >= T.failContact ? `${Math.round(k)} S ON THE TURRET`
+          : c < T.routBelow ? 'MOST OF IT WAS STILL STANDING'
+            : verdict === 'surge' ? 'CLEARED BEFORE THE LAST ONE LANDED'
+              : verdict === 'clean' ? 'THE FIELD CAME BACK'
+                : 'IT TOOK TOO LONG';
 
     const from = this.tier;
     this.overclock.armed = false;   // spent by the wave it was armed on
@@ -3230,14 +3243,13 @@ export class Director {
       this.probeLock = T.probeLock;
       this.tier = won ? to : back;
       if (won) this.peak = Math.max(this.peak, to);
-      this.fails = 0;
       this.grace = 0;
       return { verdict, moved: this.tier - from, tier: this.tier, from, reason, margin,
         trial: won ? 'proven' : 'failed' };
     }
 
     let moved = 0;
-    if (verdict === 'rout' || (verdict === 'stall' && ++this.fails >= T.failStreak)) {
+    if (verdict === 'rout') {
       if (this.tier > 1) {
         this.tier--;
         moved = -1;
@@ -3248,11 +3260,9 @@ export class Director {
          */
         this.hold = false;
       }
-      this.fails = 0;
       // ...and the next wave cannot climb back into whatever did that.
       this.grace = 1;
     } else if (verdict === 'surge' || verdict === 'clean') {
-      this.fails = 0;
       const step = verdict === 'surge' ? 2 : 1;
       // HOLD pins the climb, and grace defers it by one wave. Both are spent
       // whether or not there was anything to hold back.
@@ -3285,7 +3295,6 @@ export class Director {
     if (world && this.climbTo(world, to) < to) return null;
     this.probe = { from: this.tier, to };
     this.tier = to;
-    this.fails = 0;
     return this.probe;
   }
 
@@ -3300,7 +3309,6 @@ export class Director {
   setTier(n) {
     this.tier = Math.max(1, Math.round(n));
     this.peak = Math.max(this.peak, this.tier);
-    this.fails = 0;
     return this.tier;
   }
 
@@ -3322,7 +3330,6 @@ export class Director {
      */
     this.probe = null;
     this.tier = Math.min(Math.max(1, Math.round(n)), Math.max(1, this.peak));
-    this.fails = 0;
     return this.tier;
   }
 
@@ -3634,8 +3641,8 @@ export class Director {
      * until the first begin() -- so a run saved in its first few seconds, or
      * by the page being hidden in them, writes `order: []`. That is a
      * perfectly good file. The old guard read it as a malformed one and
-     * returned, which silently threw away `tier`, `peak`, `hold` and `fails`
-     * with it: a player who had climbed to tier 12 and quit early in a wave
+     * returned, which silently threw away `tier`, `peak` and `hold` with
+     * it: a player who had climbed to tier 12 and quit early in a wave
      * came back to tier 1 and nothing said so.
      *
      * So an absent rotation now means only that there is no rotation to come
@@ -3689,7 +3696,6 @@ export class Director {
       this.peak = Math.max(this.peak, this.tier);
     }
     this.hold = !!d.hold;
-    this.fails = d.fails || 0;
     /*
      * The sheet's charges. `max` is replayed from the ledger like every other
      * upgrade, so only what is in hand and the clock have to be carried --

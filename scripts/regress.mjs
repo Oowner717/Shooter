@@ -2803,7 +2803,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const climbFrom = d().tier;
     for (let i = 0; i < 300 * 60; i++) g.update(1 / 60);
     const climbed = d().tier;
-    const climbFails = d().fails;
+    const climbFails = 0;
     const climbPeak = d().peak;
     const climbTraits = (d().traits || []).map((t) => t.id).join('+');
     const climbLast = d().lastVerdict;
@@ -2843,13 +2843,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const heldBefore = d().tier;
     d().score(w);
     const heldAfterClean = d().tier;
-    // ...and two failures must still step it back, and un-pin it.
+    // ...and CONTACT must still step it back, and un-pin it. One wave, not
+    // two: from build 208 a rout is contact alone and there is no streak.
     d().hold = true;
-    d().fails = 0;
-    for (let k = 0; k < CFG.waves.tier.failStreak; k++) {
-      d().contact = CFG.waves.tier.failContact + 1;
-      d().score(w);
-    }
+    d().contact = CFG.waves.tier.routContact + 1;
+    d().score(w);
     const heldAfterFail = d().tier;
     const holdCleared = d().hold;
 
@@ -2963,18 +2961,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const d = w.director;
     d.setTier(11);
     d.hold = true;
-    d.fails = 1;
     const blob = captureRun(w, g);
-    const wrote = { tier: blob.wave.tier, hold: blob.wave.hold, fails: blob.wave.fails };
+    const wrote = { tier: blob.wave.tier, hold: blob.wave.hold };
 
     // Round trip.
     d.reset();
     d.restore(w, blob.wave);
-    const back = { tier: d.tier, hold: d.hold, fails: d.fails };
+    const back = { tier: d.tier, hold: d.hold };
 
     // ...and a pre-ladder save, which has the wave block but no tier at all.
     const old = { ...blob.wave };
-    delete old.tier; delete old.hold; delete old.fails;
+    delete old.tier; delete old.hold;
     w.kills = 240;
     d.reset();
     d.restore(w, old);
@@ -2984,8 +2981,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return { wrote, back, migrated, fromKills: 240 };
   });
   check('the ladder is saved, restored, and migrated rather than reset',
-    r.wrote.tier === 11 && r.wrote.hold === 1 && r.wrote.fails === 1
-    && r.back.tier === 11 && r.back.hold === true && r.back.fails === 1
+    r.wrote.tier === 11 && r.wrote.hold === 1
+    && r.back.tier === 11 && r.back.hold === true
     && r.migrated > 1,
     `wrote ${JSON.stringify(r.wrote)}, read back ${JSON.stringify(r.back)}; `
     + `a pre-ladder save at ${r.fromKills} kills came back at tier ${r.migrated}`);
@@ -3183,7 +3180,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      */
     d.setTier(1); d.peak = 1; d.hold = false;
     d.restore(w, { ...file.wave, order: [], tier: 12, peak: 14, hold: 1, fails: 1 });
-    const noOrder = { tier: d.tier, peak: d.peak, hold: d.hold, fails: d.fails };
+    const noOrder = { tier: d.tier, peak: d.peak, hold: d.hold };
 
     /*
      * ---- the frame loop paints it ----
@@ -3323,9 +3320,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
   check('...and a save taken before the first wave still keeps its ladder',
     r.noOrder.tier === 12 && r.noOrder.peak === 14
-    && r.noOrder.hold === true && r.noOrder.fails === 1,
+    && r.noOrder.hold === true,
     `a file with an empty rotation restores tier ${r.noOrder.tier}, peak `
-    + `${r.noOrder.peak}, held ${r.noOrder.hold}, ${r.noOrder.fails} fail(s)`);
+    + `${r.noOrder.peak}, held ${r.noOrder.hold}`);
 
   /*
    * ...and the band is painted by the frame loop, not by luck.
@@ -8665,7 +8662,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * (asked - left) / asked; everything else is written straight onto the
      * director, which is what score() reads.
      */
-    const pose = ({ t, k, left, asked = 10, tier = 20, hold = false, grace = 0, fails = 0 }) => {
+    const pose = ({ t, k, left, asked = 10, tier = 20, hold = false, grace = 0 }) => {
       g.debugClearField();
       for (let i = 0; i < left; i++) g.debugSpawn('mote', 60 + i * 12, 120);
       d.probe = null;
@@ -8673,7 +8670,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       d.peak = tier;
       d.hold = hold;
       d.grace = grace;
-      d.fails = fails;
       d.order = [real]; d.at = 0;
       d.asked = asked;
       d.contact = k;
@@ -8690,8 +8686,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       clean: pose({ t: 8, k: 1, left: 0 }),
       // slow, but most of it died and nothing sat on the turret
       stall: pose({ t: 20, k: 1, left: 2 }),
-      // ...and the same wave again is the second stall
-      stall2: pose({ t: 20, k: 1, left: 2, fails: 1 }),
+      // ...and again: it still holds. There is no streak any more.
+      stall2: pose({ t: 20, k: 1, left: 2 }),
       // most of it outlived the wave
       routByRemains: pose({ t: 20, k: 1, left: 8 }),
       // ...or it was on the turret for a quarter of a minute
@@ -8718,20 +8714,30 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `${v(r.surge)} (t 1s, no contact, nothing left)`);
   check('the ordinary clear climbs one',
     r.clean.verdict === 'clean' && r.clean.moved === 1, v(r.clean));
-  check('slow but survived is a stall: it holds, and the second one steps back',
+  /*
+   * Build 208: being SLOW is not being in trouble. A run that clears
+   * everything at its own pace, with nothing ever reaching the turret, was
+   * being pushed down a ladder it was holding fine -- twice over, by a stall
+   * streak and by a wave "mostly outliving" itself. Both are gone. The one
+   * thing that steps the ladder back is something spending real time attached.
+   */
+  check('slow but untouched holds, however many times it happens',
     r.stall.verdict === 'stall' && r.stall.moved === 0
-    && r.stall2.verdict === 'stall' && r.stall2.moved === -1,
+    && r.stall2.verdict === 'stall' && r.stall2.moved === 0,
     `first ${v(r.stall)}, second ${v(r.stall2)}`);
-  check('a wave that mostly outlived you is a rout, and steps back at once',
-    r.routByRemains.verdict === 'rout' && r.routByRemains.moved === -1,
-    `${v(r.routByRemains)} (8 of 10 still standing)`);
-  check('...as is one that spent a quarter of a minute on the turret',
+  check('a wave that mostly outlived you holds too, if it never reached you',
+    r.routByRemains.verdict === 'stall' && r.routByRemains.moved === 0,
+    `${v(r.routByRemains)} (8 of 10 still standing, nothing on the turret)`);
+  check('only contact steps the ladder back',
     r.routByContact.verdict === 'rout' && r.routByContact.moved === -1,
     `${v(r.routByContact)} (15 s of contact, field cleared)`);
-  check('patience ending a wave is read as a wave that never thinned',
-    r.patience.verdict !== 'surge' && r.patience.verdict !== 'clean'
+  check('patience ending a wave is read as a wave that never thinned, and holds',
+    r.patience.verdict === 'stall' && r.patience.moved === 0
     && r.patience.reason === 'THE FIELD NEVER THINNED',
     `${v(r.patience)} — ${r.patience.reason}`);
+  check('...and a step back always names the contact that caused it',
+    /^\d+ S ON THE TURRET$/.test(r.routByContact.reason),
+    `the rout said "${r.routByContact.reason}"`);
   check('the wave after a step back cannot climb back into what did it',
     r.graced.verdict === 'surge' && r.graced.moved === 0,
     `${v(r.graced)} with grace armed (build 200 would have climbed straight back)`);
@@ -9597,7 +9603,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.runSeed = 123456;
     w.reconciled.length = 0; w.reconciled.push(1, 2);
     d.hold = true;
-    d.fails = 1;
     d.grace = 1;
     /*
      * Through trial(), not by writing `probe` beside a tier it disagrees with.
@@ -9615,7 +9620,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     d.overclock.held = 0; d.overclock.cd = 77; d.overclock.armed = true;
     const before = {
       runSeed: w.runSeed, reconciled: [...w.reconciled],
-      tier: d.tier, peak: d.peak, hold: d.hold, fails: d.fails, grace: d.grace,
+      tier: d.tier, peak: d.peak, hold: d.hold, grace: d.grace,
       probe: { ...d.probe }, lane: { ...d.lane },
       recall: { held: d.recall.held, cd: d.recall.cd, max: d.recall.max },
       overclock: { held: d.overclock.held, cd: d.overclock.cd,
@@ -9648,7 +9653,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.resume();
     out.after = {
       runSeed: w.runSeed, reconciled: [...w.reconciled],
-      tier: d.tier, peak: d.peak, hold: d.hold, fails: d.fails, grace: d.grace,
+      tier: d.tier, peak: d.peak, hold: d.hold, grace: d.grace,
       probe: d.probe ? { ...d.probe } : null, lane: d.lane ? { ...d.lane } : null,
       recall: { held: d.recall.held, cd: d.recall.cd, max: d.recall.max },
       overclock: { held: d.overclock.held, cd: d.overclock.cd,
@@ -9715,6 +9720,89 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${JSON.stringify(r.legacy.probe)}, grace ${r.legacy.grace}, `
     + `recall ${r.legacy.recallHeld} in hand of ${r.legacy.recallMax}, overclock armed `
     + `${r.legacy.overArmed}; and the rung it was on survived: ${r.legacy.tier}`);
+}
+
+// --- the crosshair is not under the thumb -----------------------------------
+/*
+ * A thumb covers roughly a 44px disc, which at `zoom` is about 71 world units
+ * across -- so aiming at the point you touch means aiming at the one part of
+ * the field you cannot see. drawTouchAid already drew a ring wide enough to
+ * peek out from behind the finger, which says WHERE you are aiming and still
+ * not WHAT you are aiming at.
+ *
+ * The aim point itself is lifted now, so the crosshair marks the real aim
+ * rather than being a decoration offset from it. Asserted through the actual
+ * pointer handler on the canvas, not by calling aimAt: what is being tested is
+ * the wiring between a thumb and a barrel, and a case that calls the method the
+ * handler calls tests neither.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { CFG } = await import('../src/config.js');
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    w.autoAim = false;
+    const c = g.canvas;
+    const box = c.getBoundingClientRect();
+    const z = w.scale;
+    // A touch well above the turret, so it is an aim and not a grab at the lever.
+    const wx = w.width / 2 + 40;
+    const wy = w.shooter.y - 300;
+    const ev = (type, id) => c.dispatchEvent(new PointerEvent(type, {
+      pointerId: id, bubbles: true, cancelable: true,
+      clientX: box.left + wx * z, clientY: box.top + wy * z,
+    }));
+    ev('pointerdown', 71);
+    const pt = [...g.pointers.values()][0] || null;
+    const aimed = w.shooter.targetAim;
+    ev('pointerup', 71);
+
+    // ...and the lever is still grabbed where the hand actually is.
+    const gy = w.shooter.y + 8;
+    const ev2 = (type, id) => c.dispatchEvent(new PointerEvent(type, {
+      pointerId: id, bubbles: true, cancelable: true,
+      clientX: box.left + (w.width / 2) * z, clientY: box.top + gy * z,
+    }));
+    ev2('pointerdown', 72);
+    const grabbed = g.gripPointer === 72;
+    ev2('pointerup', 72);
+
+    // The angle the turret would have taken aiming AT the finger, for contrast.
+    const at = Math.atan2(wy - w.shooter.y, wx - w.shooter.x);
+    const atAim = Math.atan2(wy - CFG.touchLift - w.shooter.y, wx - w.shooter.x);
+    g.restart();
+    return {
+      rest: -Math.PI / 2, atAim,
+      lift: CFG.touchLift, touchedAt: wy,
+      aimPoint: pt ? { x: pt.x, y: pt.y, tx: pt.tx, ty: pt.ty } : null,
+      aimed, atFinger: at, grabbed,
+      thumbWorld: 44 / CFG.zoom,
+    };
+  });
+
+  check('the aim point sits above the finger, by more than a thumb’s radius',
+    r.aimPoint && Math.abs(r.aimPoint.ty - r.touchedAt) < 0.01
+    && Math.abs((r.aimPoint.ty - r.aimPoint.y) - r.lift) < 0.01
+    && r.lift > r.thumbWorld / 2,
+    `touched at y ${r.touchedAt.toFixed(0)}, aiming at y ${r.aimPoint && r.aimPoint.y.toFixed(0)} `
+    + `— lifted ${r.lift} world units against a thumb radius of `
+    + `${(r.thumbWorld / 2).toFixed(0)}`);
+  /*
+   * Against BOTH the finger and the barrel's rest position. The first version
+   * compared only against the finger and passed while the press was being lost
+   * entirely to a setPointerCapture throw -- the barrel had never moved from
+   * -PI/2, which is also not the angle to the finger. A case that passes when
+   * nothing happened is not a case.
+   */
+  check('...and the barrel really points there, not at the finger',
+    Math.abs(r.aimed - r.atFinger) > 0.02 && Math.abs(r.aimed - r.rest) > 0.02
+    && Math.abs(r.aimed - r.atAim) < 0.02,
+    `barrel at ${r.aimed.toFixed(3)} rad; the finger is at ${r.atFinger.toFixed(3)}, `
+    + `the lifted point at ${r.atAim.toFixed(3)}, and rest is ${r.rest.toFixed(3)}`);
+  check('...while the lever is still taken hold of where the hand is',
+    r.grabbed, `a press below the turret grabbed the lever: ${r.grabbed}`);
 }
 
 // --- report -----------------------------------------------------------------
