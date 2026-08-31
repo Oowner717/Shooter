@@ -464,13 +464,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 133 since build 193, when HOT LOAD went entirely. It was 134 from 192,
+    // 131 since build 209, when TRACER and HEAVY each lost a level. It was
+    // 133 from build 193, when HOT LOAD went entirely; 134 from 192,
     // when HOT LOAD was capped at one level; 136 from 190, when REFLEX went;
     // 137 from 189, when DOUBLE TAP lost TRIPLE TAP; 138 from 183, when SIEVE
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 133
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 131
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -1773,12 +1774,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.projectiles.length = 0;
 
     const feed = NODE_BY_ID.get('rate').levels;
+    /*
+     * The tap is SPINE's from build 209, not BOLT's -- so the round has to be
+     * SPINE for there to be a tap to count at all. Left on BOLT this read
+     * `CFG.rounds.standard.tapFade` and `w.up.boltTap`, both of which are now
+     * undefined, and `1 + undefined` is NaN rather than a failure anyone can
+     * read.
+     */
     const taps = NODE_BY_ID.get('doubletap').levels;
-    const fade = CFG.rounds.standard.tapFade;
+    const fade = CFG.rounds.spine.tapFade;
 
     // Everything, then fire at nothing for four seconds and count the muzzle.
     g.debugGiveEnergy(200000);
     g.debugBuyAll();
+    g.toggleRound('spine');
     w.autoAim = false;
     w.autoFire = true;
     w.shooter.cooldown = 0;
@@ -1791,9 +1800,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.director.update = ran;
 
     // What the interval is, straight off the same arithmetic updateFiring does.
-    const interval = CFG.shooter.gripFireInterval * CFG.rounds.standard.rate * w.up.rate;
+    const interval = CFG.shooter.gripFireInterval * CFG.rounds.spine.rate * w.up.rate;
     return {
-      feed, taps, held: w.up.boltTap, fade, rate: w.up.rate,
+      feed, taps, held: w.up.spineTap, fade, rate: w.up.rate, round: w.round,
       rps: rounds / 4, pulls: 1 / interval,
       // 1 + fade: what one trigger pull is worth with DOUBLE TAP behind it.
       // It was 1 + fade + fade^2 while TRIPLE TAP existed.
@@ -1816,20 +1825,24 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `FEED x${r.feed}, DOUBLE TAP x${r.taps} (turret holds ${r.held}), `
     + `everything bought leaves the interval at x${r.rate.toFixed(4)}, tapFade ${r.fade}`);
   /*
-   * 3.9 pulls a second: 0.286 base and one FEED at 0.9, which is the whole of
-   * it. A stock turret pulls 3.5, so the entire cadence ladder is now worth
-   * 1.11x -- it was 1.47x before build 193 and 2.54x before 178, when FEED
-   * had two levels and HOT LOAD three. That collapse is deliberate and is
-   * written up in docs/pacing.md; what this case is for is noticing if any
-   * of it comes back.
+   * Measured on SPINE from build 209, because that is where DOUBLE TAP went
+   * and there is no tap to count anywhere else. SPINE's own `rate` is 1.45
+   * against BOLT's 1, so the pull figure is lower by exactly that and none of
+   * the cadence ladder has moved: `up.rate` is round-agnostic and is asserted
+   * on its own above.
    *
-   * The rounds figure is that times two taps times SALVO's every-eighth,
-   * which lands at 9.7 -- and scripts/tiers.mjs measures the same plateau at
-   * 9.6 off a different loadout against a different wall, which is two
-   * instruments agreeing rather than one agreeing with itself.
+   * 2.7 pulls a second: 0.286 base, SPINE's 1.45, and one FEED at 0.9. The
+   * rounds figure is that times two darts a pull times SALVO's every-eighth --
+   * which is genuinely noisy over a four-second window, since how many
+   * every-eighths land in it is a matter of phase. Measured 6.5 and 7.5 on two
+   * runs of the same build, so the window is set clear of both rather than
+   * against whichever one was seen first.
+   * The point of the window is unchanged -- it notices a fire-rate upgrade
+   * arriving or an old one taking a default back, and it is derived from
+   * `up.rate` either way.
    */
   check('a fully fed turret tops out where the cadence passes left it',
-    r.pulls > 3.7 && r.pulls < 4.1 && r.rps > 8 && r.rps < 11.5,
+    r.round === 'spine' && r.pulls > 2.5 && r.pulls < 2.9 && r.rps > 5.5 && r.rps < 8.5,
     `${r.pulls.toFixed(1)} pulls/s, ${r.rps.toFixed(1)} rounds/s, ${r.held + 1} rounds a pull`);
   check('...and the tail of a trigger pull is worth 1.5, not 1.75',
     Math.abs(r.pull - 1.5) < 1e-9, `one pull = ${r.pull.toFixed(2)} rounds of damage`);
@@ -9803,6 +9816,210 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `the lifted point at ${r.atAim.toFixed(3)}, and rest is ${r.rest.toFixed(3)}`);
   check('...while the lever is still taken hold of where the hand is',
     r.grabbed, `a press below the turret grabbed the lever: ${r.grabbed}`);
+}
+
+// --- the gun is silent through an arrival and an outro ----------------------
+/*
+ * An arrival is the one thing in this game that is purely watched, and an outro
+ * is the frame coming apart a piece at a time. Half of this was already true
+ * and invisible: an arrival pins the boss's health every frame, and an outro
+ * marks every boss body `spent`, which autoTarget and the collision pass both
+ * honour -- so rounds already did nothing. What was left was the noise, and a
+ * turret firing into a set piece for the 28-41 seconds those two take.
+ *
+ * Walked through all seven, because "and any boss added later" is the whole
+ * point: the seal is `Boss.sequencing()` on the base class, so a boss inherits
+ * it by existing rather than by its author remembering a mark. Counted at
+ * `projectiles.push`, which is where a round becomes real -- a body 30 units
+ * off the muzzle can be born and die inside one frame, and state watched
+ * BETWEEN frames sees neither.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { ANOMALIES } = await import('../src/anomaly.js');
+    const { CFG } = await import('../src/config.js');
+    const out = { bosses: [] };
+
+    for (const a of ANOMALIES) {
+      g.restart();
+      w.phase = 'staging';
+      w.apertures[a.n] = 1;
+      g.openBoss(a.n);
+      if (!w.boss) { out.bosses.push({ name: a.name, missing: true }); continue; }
+      w.autoAim = true;
+      w.autoFire = true;
+      const push = w.projectiles.push.bind(w.projectiles);
+      let firedArriving = 0;
+      let firedDying = 0;
+      let firedFighting = 0;
+      w.projectiles.push = (...ps) => {
+        const b = w.boss;
+        if (b && b.arriving > 0) firedArriving += ps.length;
+        else if (b && b.dying > 0) firedDying += ps.length;
+        else firedFighting += ps.length;
+        return push(...ps);
+      };
+      // Through the whole arrival.
+      let f = 0;
+      while (w.boss && w.boss.arriving > 0 && f < 60 * 40) { g.update(1 / 60); f++; }
+      const arrivalSecs = +(f / 60).toFixed(1);
+      // ...a beat of actual fight, so the counter is shown to read a one...
+      for (let i = 0; i < 90; i++) g.update(1 / 60);
+      // ...then the death, all the way to the end of it.
+      /*
+       * `Boss.die(world, C)` wants the boss's own config block; only ORDINAL's
+       * override takes one argument. The anomaly's `cfg` key is what every
+       * subclass passes itself, so the same call works for all seven.
+       */
+      if (w.boss) w.boss.die(w, CFG[a.cfg]);
+      let d = 0;
+      while (w.boss && !w.boss.done && d < 60 * 60) { g.update(1 / 60); d++; }
+      const outroSecs = +(d / 60).toFixed(1);
+      w.projectiles.push = push;
+      out.bosses.push({
+        name: a.name, arrivalSecs, outroSecs,
+        firedArriving, firedDying, firedFighting,
+      });
+      if (w.boss) { w.boss.clear(w); w.boss = null; w.bossN = 0; w.bossStage = 0; }
+    }
+
+    // ...and with no boss at all the gun is unaffected.
+    g.restart();
+    w.phase = 'staging';
+    w.shooter.cooldown = 0;
+    out.freeToFire = w.shooter.shoot(w) !== false;
+    g.restart();
+    return out;
+  });
+
+  const seen = r.bosses.filter((b) => !b.missing);
+  const silentIn = seen.filter((b) => b.firedArriving === 0);
+  const silentOut = seen.filter((b) => b.firedDying === 0);
+  const armed = seen.filter((b) => b.firedFighting > 0);
+  check('not a round leaves the barrel during any of the seven arrivals',
+    seen.length === 7 && silentIn.length === 7,
+    seen.map((b) => `${b.name} ${b.firedArriving} in ${b.arrivalSecs}s`).join(' · '));
+  check('...nor during any of the seven outros',
+    silentOut.length === 7,
+    seen.map((b) => `${b.name} ${b.firedDying} in ${b.outroSecs}s`).join(' · '));
+  /*
+   * A zero means nothing until the instrument has been shown to read a one --
+   * so the same counter, on the same run, watches the fight in between.
+   */
+  check('...and the same counter sees the gun firing in between, so the zeros mean something',
+    armed.length === 7 && r.freeToFire,
+    seen.map((b) => `${b.name} ${b.firedFighting}`).join(' · ')
+    + `; with no boss at all the gun fires: ${r.freeToFire}`);
+}
+
+// --- every overlay can be swiped away ---------------------------------------
+/*
+ * Bound through one helper (src/swipe.js) so the awkward parts live in one
+ * place, and the awkward parts are the whole of it.
+ *
+ * A LEAKED INLINE TRANSFORM IS THE FAILURE THAT MATTERS. Inline style beats
+ * `#menu.open { transform: none }`, so a drag that ends without cleaning up
+ * leaves a panel that is open, holds Game.paused, takes input, and cannot be
+ * seen -- the same family as the `[hidden]` trap this repo already records,
+ * and worse, because there is no way back to it. Asserted on the RENDERED box
+ * and on the inline style, never on the class.
+ *
+ * THE PANELS SCROLL, and the browser pans them with the same gesture, so a
+ * drag the content still wants must not be claimed.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    const out = {};
+    const drag = (el, from, to, target) => {
+      const t = target || el;
+      const mk = (type, x, y) => new PointerEvent(type, {
+        pointerId: 9, bubbles: true, cancelable: true, clientX: x, clientY: y,
+      });
+      t.dispatchEvent(mk('pointerdown', from.x, from.y));
+      // Several moves, because the helper needs to pass its slop before it
+      // claims anything -- a single jump to the end is not a drag.
+      for (let i = 1; i <= 6; i++) {
+        t.dispatchEvent(mk('pointermove',
+          from.x + ((to.x - from.x) * i) / 6, from.y + ((to.y - from.y) * i) / 6));
+      }
+      t.dispatchEvent(mk('pointerup', to.x, to.y));
+    };
+    const shown = (id) => document.getElementById(id).getBoundingClientRect().height > 0;
+    const inline = (id) => document.getElementById(id).style.transform;
+
+    // ---- the menu: swipe down ----
+    g.hud.menu.setOpen(true);
+    out.menuOpenBefore = g.hud.menu.open && g.paused;
+    drag(document.getElementById('menu'), { x: 200, y: 300 }, { x: 200, y: 520 });
+    out.menuClosed = !g.hud.menu.open;
+    out.menuUnpaused = !g.paused;
+    out.menuTransform = inline('menu');
+
+    // ---- the wave sheet: swipe up, and its centring transform survives ----
+    w.director.setTier(12); w.director.peak = 12;
+    g.openSheet(true);
+    out.sheetOpenBefore = g.sheetOpen;
+    drag(document.getElementById('waveSheet'), { x: 200, y: 220 }, { x: 200, y: 60 });
+    out.sheetClosed = !g.sheetOpen;
+    out.sheetTransform = inline('waveSheet');
+    out.sheetHidden = !shown('waveSheet');
+
+    // ---- a swipe the wrong way must not close anything ----
+    g.hud.menu.setOpen(true);
+    drag(document.getElementById('menu'), { x: 200, y: 300 }, { x: 200, y: 180 });
+    out.wrongWayKeptOpen = g.hud.menu.open;
+    // ...and neither must a short one.
+    drag(document.getElementById('menu'), { x: 200, y: 300 }, { x: 200, y: 330 });
+    out.shortKeptOpen = g.hud.menu.open;
+    out.afterRefusals = inline('menu');
+
+    // ---- a drag that the content wants to scroll is not claimed ----
+    // Reopened first: the short-swipe check above ran on a menu the wrong-way
+    // check had left open, and the state cascades. Reading `menu.open` here
+    // without reopening measured the previous step, not this one.
+    g.hud.menu.setOpen(true);
+    const panels = document.getElementById('menuPanels');
+    panels.scrollTop = 40;
+    const scrollable = panels.scrollHeight - panels.clientHeight > 1;
+    out.scrollTop = panels.scrollTop;
+    out.over = panels.scrollHeight - panels.clientHeight;
+    drag(document.getElementById('menu'), { x: 200, y: 300 }, { x: 200, y: 520 }, panels);
+    out.scrollable = scrollable;
+    out.scrollKeptOpen = g.hud.menu.open;
+    g.hud.menu.setOpen(false);
+
+    // ---- the loadout and the debug panel are bound too ----
+    out.bound = ['menu', 'loadout', 'waveSheet', 'aimModes', 'debugPanel']
+      .filter((id) => !!document.getElementById(id));
+    g.restart();
+    return out;
+  });
+
+  check('the menu goes away when it is pushed down, and lets the world go with it',
+    r.menuOpenBefore && r.menuClosed && r.menuUnpaused && r.menuTransform === '',
+    `open and holding the world ${r.menuOpenBefore} -> closed ${r.menuClosed}, `
+    + `world running ${r.menuUnpaused}, inline transform left behind `
+    + `"${r.menuTransform}"`);
+  check('the wave sheet goes up, and keeps the transform that centres it',
+    r.sheetOpenBefore && r.sheetClosed && r.sheetHidden && r.sheetTransform === '',
+    `closed ${r.sheetClosed}, off screen ${r.sheetHidden}, inline transform `
+    + `"${r.sheetTransform}"`);
+  check('a swipe the wrong way, or too short a one, changes nothing',
+    r.wrongWayKeptOpen && r.shortKeptOpen && r.afterRefusals === '',
+    `wrong way kept it open ${r.wrongWayKeptOpen}, short one ${r.shortKeptOpen}; `
+    + `nothing left on the element: "${r.afterRefusals}"`);
+  check('...and a drag the panel still wants to scroll is left to the panel',
+    r.scrollable && r.scrollKeptOpen,
+    `#menuPanels can scroll ${r.scrollable}; a drag starting inside it kept the `
+    + `menu open ${r.scrollKeptOpen} (scrollTop ${r.scrollTop} of ${r.over})`);
+  check('all five overlays exist to be bound',
+    r.bound.length === 5, `found ${r.bound.join(', ')}`);
 }
 
 // --- report -----------------------------------------------------------------

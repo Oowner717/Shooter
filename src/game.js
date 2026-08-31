@@ -604,6 +604,7 @@ export class Game {
     this.hud.setAim(w);
     this.hud.setToggle('autoFire', w.autoFire);
     this.hud.setKills(w.kills);
+    this.hud.setWavePct(w);
     this.hud.setEnergy(w.energy);
     this.hud.syncAbilities(w.abilities);
     this.hud.alert('SESSION RESTORED', 'info', 2.6);
@@ -1725,7 +1726,7 @@ export class Game {
    */
   watchBoss(dt) {
     const w = this.world;
-    if (w.boss.arriving > 0 || w.boss.dying > 0) { this.bossStageT = 0; return; }
+    if (w.boss.sequencing()) { this.bossStageT = 0; return; }
     if (w.bossStage !== this.bossStageWas) {
       this.bossStageWas = w.bossStage;
       this.bossStageT = 0;
@@ -1978,6 +1979,7 @@ export class Game {
     this.syncGate();
     const w = this.world;
     this.hud.setKills(w.kills);
+    this.hud.setWavePct(w);
     /*
      * The ladder's rail. It was missing from here and present only in
      * syncHudLight -- the path that runs while the world is HELD -- so the

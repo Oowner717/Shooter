@@ -303,12 +303,7 @@ the way it comes off a wall, keeping 70% of its damage each time, so one round
 crosses up to five objects. Note the geometry it wants: a rebound mirrors about
 the surface normal, so a shot fired dead-centre into a flat row comes straight
 back the way it came and leaves. It pays in a pocket, not against a wall —
-measured, one round through a cluster of six hit three of them for 57. It also gets **DOUBLE TAP** — a
-follow-up round that waits 0.06s at the muzzle rather than shortening the
-cadence, which reads as one trigger pull with a stutter in it and not as a
-faster gun. It had a second level, TRIPLE TAP, until build 189: it was the
-cadence cliff on its own, taking rounds a second from 7.6 to 25.9 across one
-tier of income. HE gets **CLUSTER**, four smaller bursts thrown out around the
+measured, one round through a cluster of six hit three of them for 57. HE gets **CLUSTER**, four smaller bursts thrown out around the
 first, which turns a circle into a patch of overlapping circles: measured, four
 bodies at 118 units that the plain burst does not reach at all. SHOT gets
 **DOUBLE-O** twice over — 5 pellets to 8 to 11, filling the cone in rather than
@@ -317,8 +312,15 @@ units out to 735 without ever removing it. ARC gets **SUPERCONDUCTOR**, which
 takes a link's falloff from 0.86 to 0.95 and keeps the far end of a chain
 worth having, and **LONG LEAD**, +60% jump range, which is what makes it work
 on a spread field rather than only a packed one. SPINE gets **ANNEALED**, 0.78
-to 0.92 per body, and **RAILED**, which puts it through armour entirely —
-measured at 13.2 to 20 against a BULWARK.
+to 0.92 per body, **RAILED**, which puts it through armour entirely —
+measured at 13.2 to 20 against a BULWARK — and, from build 209, **DOUBLE TAP**:
+a follow-up round that waits 0.06s at the muzzle rather than shortening the
+cadence, which reads as one trigger pull with a stutter in it and not as a
+faster gun. It sat on BOLT until then, where it doubled the round every run
+already starts with; on SPINE it is a second dart down the same line the first
+one opened, which is a pick rather than a default. It had a second level,
+TRIPLE TAP, until build 189: it was the cadence cliff on its own, taking rounds
+a second from 7.6 to 25.9 across one tier of income.
 
 - **HE** makes every round detonate on impact. It costs you better than half
   your rate of fire and the shells travel slower, so single targets are no
@@ -1671,6 +1673,62 @@ entirely — it compared the barrel's angle only against the finger, and the
 barrel had never moved from its rest position, which is also not the angle to
 the finger. It checks against rest and against the lifted point now.
 
+### Six small things, and one of them was a bug (build 209)
+
+**Every overlay goes away when it is pushed.** `src/swipe.js` binds one helper
+to the menu, the loadout, the wave sheet, the aim-mode row and the debug panel:
+push it the way it came in and it leaves. Three things in that file are load
+bearing and none of them are the gesture. A **leaked inline transform is an
+open panel parked off screen** — inline style beats `#menu.open { transform:
+none }`, so an abandoned drag leaves a panel that holds `Game.paused`, takes
+input and cannot be seen; every exit clears it, including a close arriving from
+elsewhere mid-drag. **The panels scroll**, and `html, body { touch-action:
+none }` means the browser pans them itself, so the helper walks up from the
+event's target and refuses any drag the content still has room for. And **half
+these controls fire on pointerdown**, so on those panels the gesture is only
+taken from the chrome.
+
+The flick threshold is the part that had to be measured rather than guessed.
+Velocity alone dismisses on a twitch — divide any distance by a short enough
+time and it is a flick — and synthetic pointers arrive in the same millisecond,
+so a thirty-pixel nudge read as 30 px/ms and threw the menu away. The fast path
+owes three quarters of the distance now, which a nudge cannot reach however
+fast it is made.
+
+**The counter says how much of the wave is down.** Energy was the only feedback
+a kill gave that was not the kill itself, and energy is a purse: it goes up when
+you bank and down when you buy, so it never says how far through anything you
+are. `Hud.setWavePct` reads asked-against-alive off the director and shows a
+whole percent, keyed on the percent rather than the count so it repaints when
+the number changes and not when a body does.
+
+**DOUBLE TAP is a SPINE upgrade.** On BOLT it doubled the round every run
+already starts with; on SPINE it is a second dart down the line the first one
+opened, which is a pick rather than a default. `up.boltTap` became
+`up.spineTap` and `tapGap`/`tapFade` moved with it. **TRACER and HEAVY are two
+levels each**, not three — both were uncapped, and `tree.js` reads
+`u.levels ?? 3`, so a node the author never capped is quietly sold three times.
+
+**The gun is silent through an arrival and a death.** `Shooter.canFire` asks
+`world.boss.sequencing()` — one method on the base `Boss`, so all seven get it
+and so does the eighth. It is deliberately a truthiness test on `world.boss`
+and a method call, and never a comparison against a world field: `world.lockout
+<= 0` against a deleted field disabled the gun for builds 82–84. The case for
+it counts rounds at `projectiles.push` across all seven arrivals and all seven
+outros, and — the half that matters — counts the same way in between, so the
+zeros mean something.
+
+**And the contact sheet found the sixth.** `scripts/contact.mjs` renders every
+image the tree draws onto one page: the turret nine times (bare, each TURRET
+part alone at full levels, everything) out of a running game, and every mark
+beside it. Five TURRET nodes were still selling the hung-on gadgets that build
+150 replaced with structure — ARRAY's "scanning dish on the mount" has been a
+flat fin off the back for sixty builds, SPINES' "spikes round the housing" are
+armour plates round the deck, SHROUD's "shield collar round the base" is a
+mantlet that closes round the breech and turns with the barrel. Nothing in the
+game shows a part on its own, so nothing had ever put the sentence next to the
+drawing.
+
 ### SCION, and what a graft does
 
 A large body worth more to the field dead than alive.
@@ -2016,7 +2074,19 @@ src/
 scripts/
   make-icons.mjs        regenerates icons/  (node scripts/make-icons.mjs)
   smoke.mjs             headless run through every phase (see below)
+  contact.mjs           a contact sheet of every image the tree draws
 ```
+
+`contact.mjs` is worth knowing about because the tree's imagery is in two
+places and neither is ever seen whole. The marks are 24x24 SVGs in a
+module-private table in `upgrades.js`; the TURRET branch is not marks at all
+but eighteen levels of structure on the drawn machine, so the only way to see
+what a node buys is to buy it. The sheet renders the turret nine times -- bare,
+each part alone at full levels, everything -- straight out of a running game,
+and lays every mark out beside it grouped by branch. It found five TURRET lines
+still describing the hung-on gadgets that build 150 replaced with structure
+(ARRAY's "scanning dish" has been a flat fin for sixty builds), which is the
+sort of thing only a side-by-side can show.
 
 ## Tuning
 

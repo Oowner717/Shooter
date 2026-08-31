@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '208';
+export const BUILD = '209';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '208';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '1aa8887';
+export const REV = '91a2f6d';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -549,24 +549,6 @@ export const CFG = {
       // it. It keeps this much of its damage each time, so a round crossing
       // four objects is worth roughly two and a half of them, not four.
       reboundFade: 0.7,
-      // DOUBLE TAP. The follow-up round leaves with the first and waits at
-      // the muzzle, so the pair reads as one trigger pull with a stutter in
-      // it rather than as a faster cadence.
-      tapGap: 0.06,
-      /*
-       * What the follow-up round keeps. 0.5 from build 178, down from 0.6.
-       *
-       * It was the larger half of a two-part cadence nerf, and the arithmetic
-       * it was chosen by no longer applies: scripts/tiers.mjs measured the
-       * ladder on 177, FEED's two levels worth 1.56x on rounds a second and
-       * the two taps 3x on top, so a trigger pull with TRIPLE TAP behind it
-       * came to 1 + 0.6 + 0.36 = 1.96 rounds' worth of damage, and 0.5 took
-       * that to 1.75. TRIPLE TAP went in build 189 and a pull is 1 + 0.5 =
-       * 1.5 now. The number is left where it is: it was picked to be nothing
-       * at all off a turret that has not bought the tap, which is still the
-       * shape a nerf here should have, and there is only one tap to fade.
-       */
-      tapFade: 0.5,
     },
     explosive: {
       rate: 2.1, // less than half the cadence
@@ -615,6 +597,23 @@ export const CFG = {
       damage: 20,
       pierce: 3, // bodies it goes through after the first
       fade: 0.78, // and what it keeps of its damage each time
+      /*
+       * ---- DOUBLE TAP lives here from build 209 ----
+       *
+       * It was BOLT's, and `up.boltTap` was read in exactly one place: the
+       * standard round's fire path. Moving the NODE under SPINE without moving
+       * the effect would have sold a card that does nothing to the round it
+       * sits beneath, which is worse than leaving it where it was.
+       *
+       * The follow-up leaves with the first and waits at the muzzle, so the
+       * pair reads as one trigger pull with a stutter in it rather than as a
+       * faster cadence -- and on SPINE that stutter is two darts through the
+       * same hole, which is what the round is for.
+       */
+      tapGap: 0.06,
+      // What the follow-up keeps. 0.5, as it was on BOLT: a pull is worth
+      // 1 + 0.5 = 1.5 rounds rather than two.
+      tapFade: 0.5,
     },
     /*
      * SLUG. One slow, heavy round with an enormous shove behind it.

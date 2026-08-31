@@ -32,7 +32,7 @@ export function freshUpgrades() {
     boltBounce: 0, // extra ricochets, off walls and now off bodies
     boltLife: 1,
     boltRebound: 0, // bodies a BOLT may bounce off instead of stopping in
-    boltTap: 0, // follow-up rounds behind every BOLT
+    spineTap: 0, // follow-up darts behind every SPINE
     shotPellets: 0, // extra pellets in a SHOT
     shotRange: 1, // and how far they get before they expire
     spiralArms: 1, // barrels SPIRAL sweeps with, and which way they turn
@@ -272,9 +272,11 @@ const SLEEPING = ANOMALIES.slice(1).map((a) => {
 export const UPGRADES = {
   AMMO: [
     { id: 'hollowpoint', name: 'HOLLOWPOINT', line: '+25% damage.', apply: scale('damage', 1.25) , icon: MARK.hollowpoint },
-    { id: 'tracer', name: 'TRACER', line: '+35% round speed.', apply: scale('speed', 1.35) , icon: MARK.tracer },
+    // Two levels, not the default three. tree.js reads `u.levels ?? 3`, so an
+    // uncapped node is sold three times whatever the author intended.
+    { id: 'tracer', name: 'TRACER', levels: 2, line: '+35% round speed.', apply: scale('speed', 1.35) , icon: MARK.tracer },
     { id: 'ricochet', name: 'RICOCHET', line: '+1 bounce off the arena edges.', apply: bump('bounces', 1) , icon: MARK.ricochet },
-    { id: 'heavy', name: 'HEAVY', line: '2x knockback on every hit.', apply: scale('impulse', 2) , icon: MARK.heavy },
+    { id: 'heavy', name: 'HEAVY', levels: 2, line: '2x knockback on every hit.', apply: scale('impulse', 2) , icon: MARK.heavy },
     { id: 'overpressure', name: 'OVERPRESSURE', line: '+40% HE blast radius.', apply: scale('blastR', 1.4) , icon: MARK.overpressure },
     { id: 'fifthlink', name: 'FIFTH LINK', line: 'ARC jumps 1 more time.', apply: bump('arcJumps', 1) , icon: MARK.fifthlink },
     // One level, because it is a second arm and not a dial. Left on the
@@ -305,8 +307,8 @@ export const UPGRADES = {
      * rounds now and the tail of it is worth 1.5 rather than 1.75.
      */
     { id: 'doubletap', name: 'DOUBLE TAP', levels: 1,
-      line: 'A second BOLT follows every shot, a beat behind and 40% weaker.',
-      apply: bump('boltTap', 1), icon: MARK.doubletap },
+      line: 'A second SPINE follows every shot, a beat behind and half as hard.',
+      apply: bump('spineTap', 1), icon: MARK.doubletap },
     { id: 'cluster', name: 'CLUSTER', levels: 1,
       line: 'An HE burst throws four smaller ones outward.',
       apply: set('cluster', true), icon: MARK.cluster },
@@ -359,7 +361,7 @@ export const UPGRADES = {
     { id: 'buckshot', name: 'BUCKSHOT', line: '+60% spall pellets.', apply: scale('spallPellets', 1.6) , icon: MARK.buckshot },
     { id: 'repulsor', name: 'REPULSOR', line: '+40% lode reach and push.', apply: (u) => { u.lodeReach *= 1.4; u.lodePush *= 1.4; } , icon: MARK.repulsor },
     { id: 'intake', name: 'INTAKE', levels: 1,
-      line: 'Energy is taken in on contact, no PULSE needed. Scoops at the base.',
+      line: 'Energy is taken in on contact, no PULSE needed. Louvres cut through the skirt.',
       apply: set('intake', true), icon: MARK.intake },
     { id: 'standing', name: 'STANDING ORDER', line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
   ],
@@ -390,12 +392,12 @@ export const UPGRADES = {
      * because the effect is what is being paid for.
      */
     { id: 'rate', name: 'FEED', levels: 1,
-      line: '+10% fire rate. A belt feed along the barrel.',
+      line: '+10% fire rate. A belt box on the breech flank.',
       apply: quicken('rate', 0.9), icon: MARK.rate },
-    { id: 'slew', name: 'GIMBAL', line: '+50% auto aim turn speed. Another ring on the mount.', apply: scale('slew', 1.5) , icon: MARK.slew },
-    { id: 'overwatch', name: 'SIGHT', line: '+25% damage while hands off the lever. A sight mast over the barrel.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },
-    { id: 'casing', name: 'SPINES', line: 'Objects touching you take 40 damage a second. Spikes round the housing.', apply: bump('casing', 40) , icon: MARK.casing },
-    { id: 'insulation', name: 'SHROUD', line: 'Corruption costs half as much energy. A shield collar round the base.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
+    { id: 'slew', name: 'GIMBAL', line: '+50% auto aim turn speed. Another row of teeth on the bearing.', apply: scale('slew', 1.5) , icon: MARK.slew },
+    { id: 'overwatch', name: 'SIGHT', line: '+25% damage while hands off the lever. A boxed sight along the barrel.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },
+    { id: 'casing', name: 'SPINES', line: 'Objects touching you take 40 damage a second. Armour plates round the deck.', apply: bump('casing', 40) , icon: MARK.casing },
+    { id: 'insulation', name: 'SHROUD', line: 'Corruption costs half as much energy. A mantlet closing round the breech.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
     /*
      * Two steps, and the only thing in the branch that changes what auto aim
      * can see rather than how it behaves once it has seen it. GIMBAL is how
@@ -432,8 +434,8 @@ export const UPGRADES = {
       }],
       apply: bump('driftAim', 1), icon: MARK.driftaim },
     { id: 'aimrange', name: 'ARRAY', levels: 2,
-      line: '+45% auto aim range. A scanning dish on the mount.',
-      tiers: [null, { name: 'DEEP ARRAY', line: '+45% again, on top of ARRAY. A second dish, and the sweep reaches the top of the field.' }],
+      line: '+45% auto aim range. A flat fin off the back.',
+      tiers: [null, { name: 'DEEP ARRAY', line: '+45% again, on top of ARRAY. A second fin, and the sweep reaches the top of the field.' }],
       apply: scale('aimRange', 1.45), icon: MARK.aimrange },
   ],
   /*

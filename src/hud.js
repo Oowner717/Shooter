@@ -2,6 +2,7 @@
 // be crisp, tappable and safe-area aware.
 
 import { ABILITIES } from './abilities.js';
+import { swipeToDismiss } from './swipe.js';
 import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
 import { pref, setPref } from './settings.js';
@@ -71,6 +72,8 @@ export class Hud {
       alerts: $('alerts'),
       energy: $('energyNum'),
       energyChip: $('energyChip'),
+      counter: $('counter'),
+      wavePct: $('wavePct'),
       energyBuys: $('energyBuys'),
       offer: $('offer'),
       loadout: $('loadout'),
@@ -180,6 +183,10 @@ export class Hud {
 
     this.el.loadScrim.addEventListener('click', () => game.closeLoadout());
     $('loadClose').addEventListener('click', () => game.closeLoadout());
+    // Down: it is bottom-anchored and enters from below. Its list scrolls, so
+    // the helper's scroll guard is what keeps a flick through the rack from
+    // throwing the panel away instead.
+    swipeToDismiss($('loadout'), { dir: 'down', onClose: () => game.closeLoadout() });
     /*
      * The bar at the foot of the sheet. Everything reading LOCKED on that list
      * is bought in the tree and nowhere else, so the screen that shows you
@@ -199,6 +206,9 @@ export class Hud {
     this.offerResume();
     this.showRecord();
     $('dbgClose').addEventListener('click', () => this.toggleDebug(false));
+    // Right: the debug panel is top-right anchored and is its own vertical
+    // scroller, so sideways is the one axis that does not fight the content.
+    swipeToDismiss($('debugPanel'), { dir: 'right', onClose: () => this.toggleDebug(false) });
 
     /*
      * The way in. A play-screen control, so pointerdown like the rest of them
@@ -355,6 +365,17 @@ export class Hud {
       b.addEventListener('contextmenu', (ev) => ev.preventDefault());
       this.el.aimModes.appendChild(b);
       return { mode, el: b };
+    });
+    /*
+     * Down: the row sits directly over the AUTO AIM cell it opened from, so
+     * down is the way it folds back. Bound HERE and not in buildStrip, which
+     * reruns on every purchase -- a listener per buy would stack. The row's
+     * cells act on pointerdown, so the gesture is taken from the gaps only.
+     */
+    swipeToDismiss(this.el.aimModes, {
+      dir: 'down',
+      canStart: (ev) => !ev.target.closest('button'),
+      onClose: () => this.openAimRow(false),
     });
   }
 
@@ -861,6 +882,39 @@ export class Hud {
   }
 
   /**
+   * How much of the running wave is down, beside the count.
+   *
+   * The count answers "how much have I ever shot" and the purse answers "what
+   * did it pay"; neither answers "how far through this am I", which is the
+   * question a kill actually raises. The rail already carries this as a bar --
+   * it is the third meter, the same number AUDIT shows -- and a bar is a shape
+   * rather than a figure. This is the figure, on the chip the kill count
+   * already owns.
+   *
+   * Keyed on whole per cent, not on the fraction: this runs every frame, and a
+   * value that changes on the third decimal is a layout every frame. Blank
+   * between waves rather than 0% or 100%, because neither is true of a field
+   * with nothing on it -- and an empty string collapses the element, so the
+   * chip is exactly as wide as it was before build 209 whenever there is
+   * nothing to say.
+   */
+  setWavePct(world) {
+    const d = world.director;
+    let pct = -1;
+    if (d && !d.resting && d.asked > 0) {
+      const alive = world.enemies.filter((e) => !e.dead && !e.harmless).length;
+      pct = Math.max(0, Math.min(100, Math.round(((d.asked - alive) / d.asked) * 100)));
+    }
+    if (pct === this.lastWavePct) return;
+    this.lastWavePct = pct;
+    this.el.wavePct.textContent = pct < 0 ? '' : `${pct}%`;
+    this.el.counter.classList.toggle('hasWave', pct >= 0);
+    // The chip changes width when the figure appears, and the bar above is
+    // sized against the digits in it -- see fitBar.
+    this.fitBar();
+  }
+
+  /**
    * Banked salvage, beside the count. The chip dims when the intake is being
    * sat on, because that is the only place the corruption costs anything the
    * player can read.
@@ -1067,6 +1121,18 @@ export class Hud {
     });
     this.el.sheetClose = $('sheetClose');
     this.el.sheetClose.addEventListener('pointerdown', () => g.openSheet(false));
+    /*
+     * ...and swiping it away. Up, because the sheet is anchored under the rail
+     * and up is the way it came. `base` keeps the centring transform it
+     * already carries -- without it the sheet leaps half a screen sideways the
+     * moment a finger lands. `canStart` keeps the gesture off the three
+     * buttons, which act on pointerdown and have therefore already fired.
+     */
+    swipeToDismiss(this.el.sheet, {
+      dir: 'up', base: 'translateX(-50%)',
+      canStart: (ev) => !ev.target.closest('button'),
+      onClose: () => g.openSheet(false),
+    });
     /*
      * ...and it closes the way the other two held things do: a key for a
      * keyboard, and it never survives a restart or a boss arriving. Opening

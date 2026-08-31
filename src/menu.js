@@ -17,6 +17,7 @@ import { ABILITIES } from './abilities.js';
 import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
 import { BUILD, REV } from './config.js';
+import { swipeToDismiss } from './swipe.js';
 import { TREE, NODES, priceOf } from './tree.js';
 import { svgMark } from './util.js';
 
@@ -99,6 +100,11 @@ export class Menu {
     this.el.btn.addEventListener('click', () => this.toggle());
     this.el.close.addEventListener('click', () => this.setOpen(false));
     this.el.scrim.addEventListener('click', () => this.setOpen(false));
+    // Down: the sheet enters from below and that is the way it goes back. Its
+    // panels scroll, and the helper refuses a drag the content still wants.
+    swipeToDismiss(this.el.root, {
+      dir: 'down', onClose: () => this.setOpen(false),
+    });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.open) this.setOpen(false);
     });

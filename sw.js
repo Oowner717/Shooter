@@ -55,6 +55,7 @@ const ASSETS = [
   './src/codex.js',
   './src/tutorial.js',
   './src/traits.js',
+  './src/swipe.js',
   './src/loadout.js',
   './src/patch.js',
 ];

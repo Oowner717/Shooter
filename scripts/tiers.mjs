@@ -199,11 +199,10 @@ const LINE = [
   // -- went in 193 too. Everything else here buys what a round is worth.
   'hollowpoint', 'rate',
   'hollowpoint', 'hollowpoint',
-  // One DOUBLE TAP, because there is only one to buy: TRIPLE TAP was its
-  // second level and went in build 189. The line asked for it twice and the
-  // second ask was skipped as `maxed` rather than breaking, but a calibration
-  // list should say what it means to buy.
-  'doubletap', 'overstuffed',
+  // DOUBLE TAP went to SPINE in build 209, effect and all -- it is no longer a
+  // BOLT node, and this bench measures BOLT, so buying it here would spend a
+  // tier's budget on a card that does nothing to the round being measured.
+  'overstuffed',
   'overstuffed', 'overstuffed', 'overstuffed',
   'overwatch', 'overwatch', 'overwatch',
   'salvo',

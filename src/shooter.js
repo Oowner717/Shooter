@@ -160,7 +160,23 @@ export class Shooter {
    * comparison against it silently answering the wrong way, and a `<=` answers
    * it in the direction that breaks things.
    */
-  canFire() {
+  canFire(world) {
+    /*
+     * ---- the gun is silent through an anomaly's arrival and its death ----
+     *
+     * Every round the turret fires arrives here: both pointer branches, the
+     * space key, updateFiring's cadence, and SPIRAL's sweep -- which zeroes
+     * the cooldown to bypass the cadence and is refused anyway, because this
+     * sits ahead of it. One place, and a boss added later cannot get past it
+     * without inheriting the answer.
+     *
+     * A truthiness test on `world.boss` and a method call, deliberately, and
+     * NEVER a comparison against a world field. The note above is the record
+     * of `world.lockout` -- this same feature -- being deleted in build 82 and
+     * leaving `undefined <= 0` answering false, so the turret could not fire
+     * at all for three builds and nothing caught it.
+     */
+    if (world && world.boss && world.boss.sequencing()) return false;
     return this.cooldown <= 0;
   }
 
@@ -171,7 +187,7 @@ export class Shooter {
    *   at less than a placed shot is worth; everything else leaves it at 1.
    */
   shoot(world, scale = 1) {
-    if (!this.canFire()) return false;
+    if (!this.canFire(world)) return false;
     const a = this.aim + spread(0.012);
     const slow = 1;
     const R = CFG.rounds;
@@ -269,20 +285,29 @@ export class Shooter {
       });
     } else if (world.round === 'spine') {
       const g = R.spine;
-      for (const f of fan) shot(a + f, {
-        speed: g.speed * slow,
-        r: 3.4,
-        damage: g.damage,
-        impulse: 30,
-        bounces: 0,
-        color: '#ff9ade',
-        core: '#ffffff',
-        trail: 0.05,
-        form: 'dart',
-        pierce: g.pierce + up.pierce,
-        pierceFade: up.spineFade || g.fade,
-        shred: up.spineShred,
-      });
+      // DOUBLE TAP holds its second dart at the muzzle rather than shortening
+      // the cadence: one trigger pull with a stutter in it, not a faster gun.
+      // It was BOLT's until build 209; see CFG.rounds.spine.
+      const taps = 1 + up.spineTap;
+      for (const f of fan) {
+        for (let t = 0; t < taps; t++) {
+          shot(a + f + (t ? spread(0.02) : 0), {
+            speed: g.speed * slow,
+            r: 3.4,
+            damage: g.damage * g.tapFade ** t,
+            impulse: 30,
+            bounces: 0,
+            color: '#ff9ade',
+            core: '#ffffff',
+            trail: 0.05,
+            form: 'dart',
+            hold: t * g.tapGap,
+            pierce: g.pierce + up.pierce,
+            pierceFade: up.spineFade || g.fade,
+            shred: up.spineShred,
+          });
+        }
+      }
     } else if (world.round === 'slug') {
       const g = R.slug;
       for (const f of fan) shot(a + f, {
@@ -368,24 +393,21 @@ export class Shooter {
     } else {
       const g = R.standard;
       // OVERSTUFFED rides on the bounce budget, so an extra ricochet is worth
-      // the same whether it comes off a wall or off a body. DOUBLE TAP holds
-      // its second round at the muzzle rather than shortening the cadence:
-      // one trigger pull with a stutter in it, not a faster gun.
-      const taps = 1 + up.boltTap;
+      // the same whether it comes off a wall or off a body. DOUBLE TAP was
+      // here until build 209 and is SPINE's now, effect and all -- moving the
+      // node alone would have sold a card that did nothing to the round it
+      // sat beneath.
       for (const f of fan) {
-        for (let t = 0; t < taps; t++) {
-          shot(a + f + (t ? spread(0.02) : 0), {
-            speed: CFG.bolt.speed * slow,
-            color: '#a8c4ff',
-            core: '#eef4ff',
-            damage: CFG.bolt.damage * g.tapFade ** t,
-            life: CFG.bolt.life * up.boltLife,
-            bounces: CFG.bolt.bounces + up.boltBounce,
-            hold: t * g.tapGap,
-            rebound: up.boltRebound,
-            reboundFade: g.reboundFade,
-          });
-        }
+        shot(a + f, {
+          speed: CFG.bolt.speed * slow,
+          color: '#a8c4ff',
+          core: '#eef4ff',
+          damage: CFG.bolt.damage,
+          life: CFG.bolt.life * up.boltLife,
+          bounces: CFG.bolt.bounces + up.boltBounce,
+          rebound: up.boltRebound,
+          reboundFade: g.reboundFade,
+        });
       }
     }
 

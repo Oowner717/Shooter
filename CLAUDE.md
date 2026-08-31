@@ -82,9 +82,14 @@ cannot tell a stage that is long because the boss is tough from one that is
 long because the turret spent it on minions -- DYNAMO's third stage was 46% of
 a 324-second fight and two thirds of it was IONs.
 
-**ORDINAL's canonical hash is `-960623607`** (seed 20260824, 9000 frames),
-re-baselined at build 207 when the wave economy changed what a body pays.
-Before that it was `117409503` from build 145, when the Phase C audit raised
+**ORDINAL's canonical hash is `1272664316`** (seed 20260824, 9000 frames),
+re-baselined at build 209, which changed what the turret shoots in two ways at
+once: the gun is now silent through a boss's arrival and its death (the probe
+runs from `openBoss` with auto-fire on, so the first two samples land inside a
+14.4-second arrival that now has an empty barrel), and DOUBLE TAP moved off
+BOLT onto SPINE, so the default round no longer carries a follow-up. Before
+that it was `-960623607` from build 207, when the wave economy changed what a
+body pays; `117409503` from build 145, when the Phase C audit raised
 the panel's health; `917805618` from 141, when TALLY went in; `-1210682079`
 from 137, when the assist gained its target memory; and `1109808491` from 127
 to 136. Each move was a change to ORDINAL or to targeting, which is the hash
@@ -195,6 +200,19 @@ Measured properly, off the purse and the floor: income *rises* from 4.3/s at
 tier 1 to 54/s at tier 12, then falls away as the wall makes clears longer.
 Which is the behaviour wanted, and it meant the bounty change build 179's notes
 recommended was never needed.
+
+`node scripts/contact.mjs [--out DIR]` is the only one that produces a picture
+rather than a table: every image the tree draws, on one page. The marks are
+24x24 SVGs in a module-private table in `upgrades.js` and the TURRET branch is
+not marks at all -- its eight nodes are eighteen levels of structure on the
+drawn machine -- so it renders the turret nine times out of a running game
+(bare, each part alone at full levels, everything) and lays the marks beside
+them grouped by branch. Nothing in the game shows a part on its own, which is
+why the sheet immediately found five TURRET lines still describing the hung-on
+gadgets build 150 replaced with structure: ARRAY had been selling a "scanning
+dish" for sixty builds and drawing a flat fin. It writes ASCII-only HTML
+because the page carries no charset of its own and a raw multiplication sign
+came back as two characters.
 
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three

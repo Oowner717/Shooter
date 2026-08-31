@@ -207,6 +207,22 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * How far through the running wave, beside the count. Dimmer than the count
+ * and set in the accent: the count is the run's own number and this is a
+ * running commentary on one wave, so it should read as the smaller of the two.
+ * Collapses to nothing between waves -- see Hud.setWavePct.
+ */
+#wavePct {
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: color-mix(in srgb, var(--accent) 62%, var(--dim));
+  font-variant-numeric: tabular-nums;
+  margin-left: 5px;
+}
+#counter:not(.hasWave) #wavePct { display: none; }
+
 #counter #killNum {
   font-size: 14px;
   font-weight: 700;
@@ -2735,6 +2751,14 @@ body.bossUp #waveRail { display: none; }
    which belongs to a wave that may not have been chosen yet. */
 .railNode.gate { border-color: color-mix(in srgb, var(--accent-2) 45%, transparent); }
 .railNode.gate.shut .rTraits { color: var(--accent-2); }
+
+/*
+ * A panel being pushed away. The transition is what makes a short swipe spring
+ * back, so it has to be OFF while the finger is on it -- otherwise the panel
+ * lags the thumb by the transition's own duration.
+ */
+#menu.swiping, #loadout.swiping, #waveSheet.swiping,
+#aimModes.swiping, #debugPanel.swiping { transition: none; }
 
 .railNode.trial {
   border-style: dashed;

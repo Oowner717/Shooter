@@ -304,6 +304,19 @@ export class Boss {
   }
 
   /** Everything of this boss's that is a placed body. Overridden per boss. */
+  /**
+   * Arrival or death: the two stretches that are a set piece and not a fight.
+   *
+   * Both fields are the base constructor's, and ORDINAL -- the one boss with
+   * its own arrival and death code -- keeps the same two names, so this is a
+   * contract rather than a convention. A boss written next year inherits the
+   * answer by existing, which is the property the `spent` mark has to be given
+   * by hand at a spawn site in seven files.
+   */
+  sequencing() {
+    return this.arriving > 0 || this.dying > 0;
+  }
+
   parts() {
     return [];
   }
