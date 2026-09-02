@@ -28,7 +28,6 @@ class Projectile {
      * of them reads as one sweep going out rather than as fifty unrelated
      * shots that happen to have started at the same place.
      */
-    this.spun = !!opts.spun;
     /*
      * Which flight form drawProjectiles gives it. Every round used to be the
      * same two-stroke tracer at a different hue, which is the disease the
@@ -693,26 +692,6 @@ export function drawProjectiles(ctx, world) {
         break;
     }
 
-    /*
-     * A spun round carries the sweep's own colour as a husk around whatever
-     * it actually is: the core stays the round's, so BOLT is still blue and
-     * RIME still ice, and the orange says where it came from.
-     */
-    if (p.spun) {
-      const a = p.spin + t * 9;
-      drawGlow(ctx, '#ff7a1a', p.x, p.y, p.r * 5.6, 0.4);
-      ctx.strokeStyle = rgba('#ffb066', 0.75);
-      ctx.lineWidth = p.r * 0.42;
-      ctx.beginPath();
-      for (let i = 0; i < 2; i++) {
-        const t2 = a + (i * Math.PI) / 2;
-        const c = Math.cos(t2) * p.r * 1.5;
-        const sn = Math.sin(t2) * p.r * 1.5;
-        ctx.moveTo(p.x - c, p.y - sn);
-        ctx.lineTo(p.x + c, p.y + sn);
-      }
-      ctx.stroke();
-    }
   }
   ctx.lineCap = 'butt';
   ctx.globalCompositeOperation = 'source-over';

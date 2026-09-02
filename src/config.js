@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '216';
+export const BUILD = '217';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '216';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e008025';
+export const REV = 'a5b923f';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -792,75 +792,52 @@ export const CFG = {
     blast: { r: 260, damage: 150, impulse: 900 }, // what it leaves behind
   },
 
-  // ---- spiral ---------------------------------------------------------
+  // ---- ward -----------------------------------------------------------
   /*
-   * SPIRAL. The barrel comes off its target and turns, firing the loaded
-   * round the whole way round.
+   * WARD. A shell stands up round the turret and stays up. Anything that
+   * crosses it is cut on the way through, and the shell throws an arc at
+   * whatever is nearest to it every so often.
    *
-   * It replaced CHORUS, and the reason was a gap rather than a complaint.
-   * Every ability in the bar acted on the field and away from the turret --
-   * PULSE shoves, LANCE pierces, WELL gathers, PRISM bursts, STASIS holds,
-   * DECOY redirects, HAIL throws a cone somewhere else -- and not one of them
-   * touched the turret's own gun, which is what the whole UPGRADES tree is
-   * about. Nine rounds and twenty fittings, and nothing in the bar cared
-   * which of them you were carrying.
+   * It replaced SPIRAL, which took the barrel off its target and turned it
+   * through three revolutions firing the loaded round. SPIRAL's whole idea
+   * was that it fired whatever you had loaded, so it was nine abilities in
+   * one -- and that is also why it never read as an ability: what happened
+   * when you pressed it depended entirely on the ammunition, so it had no
+   * picture of its own and no answer to "what did that do".
    *
-   * So this one does, and only that. It fires whatever is loaded, through
-   * every upgrade that round has, which makes it nine abilities rather than
-   * one: RIME chills the whole field, SPORE carpets it, TITHE marks
-   * everything within reach, HE turns a circle into a ring of clusters. It is
-   * also the only answer in the bar to being surrounded, which is the
-   * situation the game actually produces -- measured over a run, two thirds
-   * of all bodies are in the bottom half of the field, piling around you.
+   * WHAT MAKES IT NOT A SECOND PULSE. PULSE is an instant: one blast, r 340,
+   * a large shove, and it takes the energy in. WARD is a STATE -- it is up
+   * for six seconds, it reaches a third as far, it does not shove at all, and
+   * it does not collect. PULSE clears a space; WARD holds one. The two are
+   * the difference between an answer and a stance, and pressing PULSE while a
+   * WARD is up is a perfectly ordinary thing to do.
    *
-   * `interval` is the whole balance. The turret's ordinary cadence is
-   * CFG.shooter.gripFireInterval times the round's own `rate`, so a heavy
-   * round fires slower here exactly as it does everywhere else; this only
-   * removes the ceiling, it does not flatten the arsenal.
+   * It does answer the mount, and deliberately: a body on the turret is
+   * INSIDE the shell, so the arcs -- which take the nearest -- take it first.
+   * That is the same direction build 216 set for PILE, and the same reason:
+   * what the tree sells is a machine that increasingly looks after itself.
    */
-  spiral: {
-    life: 3.2, // seconds the barrel is off its target
+  ward: {
+    life: 6, // seconds the shell is up
+    r: 150, // and how far out it stands, before WIDEN
     /*
-     * A WHOLE number of revolutions, and that is the whole of why the barrel
-     * no longer snaps.
-     *
-     * It was 2.6, so the sweep ended 216 degrees from where it started and
-     * the only way back was to write the old angle in on one frame. That
-     * teleport was the most conspicuous thing about the ability. Three turns
-     * end where they began, so the restore below is a wrap of the number and
-     * not a move of the gun -- nothing on screen changes on that frame.
+     * Damage on the way THROUGH, not per second of standing inside. A body is
+     * cut once each time it crosses the surface, in either direction, with a
+     * short refractory so a body sitting exactly on the line is not billed
+     * every frame. That is what makes the shell a wall rather than a patch of
+     * burning ground -- and what stops it being a worse SPORE.
      */
-    turns: 3,
+    cut: 62,
+    recut: 0.55, // seconds before the same body may be cut again
+    push: 210, // just enough to knock it back off the surface
     /*
-     * ...and it gets there like a machine rather than like a tween. This much
-     * of the sweep at each end is spent spinning up and spinning down, with
-     * the middle at a constant rate: the barrel leans into the turn, holds,
-     * and comes to rest on its own mark. At 0.2 the peak rate is 7.4 rad/s
-     * against the 5.1 the old constant sweep ran at, and the round count does
-     * not move -- rounds are on `interval`, not on the angle.
+     * ...and the arcs. Every `every` seconds the shell throws `n` of them at
+     * the nearest bodies inside its own reach. This is the half that answers
+     * something already on the turret, and the half that makes the ability
+     * worth pressing when nothing is crossing yet.
      */
-    ramp: 0.2,
-    interval: 0.06, // seconds between rounds while it runs
-    // A round fired mid-sweep is not an aimed round, and a full sweep is
-    // fifty of them. Without this it out-damages the whole bar by a factor
-    // of three at a fifth of PRISM's cooldown.
-    damage: 0.7,
-    wobble: 0.05, // the sweep is a machine turning, not a laser
-    /*
-     * It is called SPIRAL and the first version drew a circle. The trail now
-     * winds outward from `rIn` to `rOut` across the sweep, so the shape on
-     * the screen is the shape in the name -- and it reads as one continuous
-     * opening turn rather than as a ring that happens to be rotating.
-     */
-    rIn: 40,
-    rOut: 118,
-    /*
-     * The barrel goes all the way round, which closes the gimbal's travel
-     * arc into a full circle -- the one time in the game that ring is ever
-     * whole. That is worth seeing, so it is not cleared on the frame: the
-     * upper half holds for a moment after the last round and fades over this.
-     */
-    settle: 0.6,
+    arc: { every: 0.6, n: 2, damage: 46, reach: 1.25 },
+    ramp: 0.35, // seconds the shell takes to stand up, and to go
   },
 
   /*

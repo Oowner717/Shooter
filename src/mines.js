@@ -38,16 +38,111 @@ const V = CFG.void;
 const KIND = { blast: M, snare: S, wire: W, knell: K, thorn: T, lode: L, spall: P, void: V };
 
 /** What each kind shows on the field. */
+/*
+ * What each kind shows on the field, and five of these moved in build 217.
+ *
+ * A mine sits on the field for fifteen seconds and five may be down at once,
+ * so its colour is doing more work than almost anything else on the screen --
+ * and four of them were wearing a colour that already meant something else:
+ *
+ *   WIRE  #7cffb2 is HAIL's ability colour, SPLITTER's and HERALD's body, and
+ *         TITHE's muzzle. Teal instead, which nothing in the bar uses.
+ *   LODE  #59e0ff is the SYSTEM colour -- the HUD, the turret's accent, PULSE
+ *         and the TURRET root all wear it. A mine cannot have the chrome's
+ *         colour. Azure, a clear step darker and bluer.
+ *   VOID  #b388ff sat thirteen degrees from SNARE's violet, and the two are
+ *         the pair a player most needs to tell apart: one deletes what walks
+ *         in, the other holds it. Indigo, which is its own card's tone.
+ *   KNELL #ff5d8f is the AMMUNITION branch root and BLOOM's body. Magenta.
+ *   BLAST #ff9f1c is WARDEN's body, and its core #ff2d55 is the game's damage
+ *         red -- the wave-reset flash, the breach ring. A step warmer, and a
+ *         hot cream core rather than a second red.
+ *
+ *   SPALL was amber on the field and red on its own chip. The chip wins:
+ *   it is the one a player learns the mine by, and BLAST moving to a warmer
+ *   amber is what leaves room for it.
+ *
+ * THORN and SNARE keep theirs: SNARE is deliberately WELL's violet, because
+ * the two do the same thing to a crowd, and THORN is deliberately near SPORE,
+ * because they leave the same ground.
+ */
 const TONE = {
-  blast: { live: '#ff9f1c', idle: '#9fb3c8', core: '#ff2d55' },
+  blast: { live: '#ffb247', idle: '#9fb3c8', core: '#ffe6d2' },
   snare: { live: '#c77dff', idle: '#8fa9c4', core: '#e0aaff' },
-  wire: { live: '#7cffb2', idle: '#8fa9c4', core: '#c9ffe4' },
-  knell: { live: '#ff5d8f', idle: '#9fb3c8', core: '#ffd6e2' },
+  wire: { live: '#22ffcf', idle: '#8fa9c4', core: '#eafff8' },
+  knell: { live: '#ff61f2', idle: '#9fb3c8', core: '#ffd6e2' },
   thorn: { live: '#c3eb4b', idle: '#8fa9c4', core: '#e6ffe6' },
-  lode: { live: '#59e0ff', idle: '#8fa9c4', core: '#d6f6ff' },
-  spall: { live: '#ffd166', idle: '#9fb3c8', core: '#fff0c8' },
-  void: { live: '#b388ff', idle: '#8fa9c4', core: '#1a0f2e' },
+  lode: { live: '#3fb9ff', idle: '#8fa9c4', core: '#e6f4ff' },
+  spall: { live: '#ff4d4d', idle: '#9fb3c8', core: '#ffe0d2' },
+  void: { live: '#7383ff', idle: '#8fa9c4', core: '#1a0f2e' },
 };
+
+/**
+ * How much of the tree a mine of this kind is carrying, 0 to 1.
+ *
+ * The TURRET branch's eight nodes are eighteen levels of visible STRUCTURE on
+ * the drawn machine, and a mine is the only other thing in the game the
+ * player buys upgrades FOR and then watches sit on the field. So mines are
+ * built the same way: every upgrade that touches a kind changes what it looks
+ * like, from its first level, and a mine that has been invested in is
+ * visibly a heavier object than one that has not.
+ *
+ * Read off `world.up` rather than off the ledger, so a node renamed or split
+ * changes nothing here -- and so the reading is of what the mine can actually
+ * DO rather than of what was bought. Six of these are shared by every kind
+ * and one or two are the kind's own; the total is normalised, so a fully
+ * bought BLAST (six of six) and a fully bought SPALL (eight of eight) both
+ * arrive at 1.
+ */
+export function mineGrade(world, kind) {
+  const up = world.up;
+  if (!up) return 0;
+  /*
+   * The shared six, MINUS the ones this kind cannot use.
+   *
+   * The docstring above promises a reading of what the mine can DO, and the
+   * first version did not honour it: it counted all six for every kind, so
+   * WIDE MOUTH made a THORN look heavier when THORN has no trigger mouth at
+   * all, and DEEP CHARGE and SHRAPNEL dressed a LODE that has no blast and
+   * does no damage. A mine that grew because of something it cannot use is
+   * the readout lying about the machine.
+   */
+  const mouth = !!KIND[kind].trigger;               // WIDE MOUTH
+  const bang = kind === 'blast' || kind === 'knell' || kind === 'spall'; // DEEP CHARGE
+  const hurts = bang || kind === 'thorn' || kind === 'wire';             // SHRAPNEL
+  let has = 0;
+  let of = 2; // PAIRED CHARGE and QUICK LAY reach every kind: both are about
+              // how many are on the field, which every mine has.
+  if (up.mineSalvo > 0) has++;
+  if (up.mineEvery < 1) has++;
+  // SALTED gives a spent mine a blast, so it reaches even the kinds that have
+  // none of their own -- it is the one that gives a LODE something to do.
+  of++;
+  if (up.mineFizzle) has++;
+  if (mouth) { of++; if (up.mineTrigger > 1) has++; }
+  if (bang) { of++; if (up.mineBlast > 1) has++; }
+  if (hurts) { of++; if (up.mineDamage > 1) has++; }
+  // ...and the ones that are its own.
+  const own = {
+    snare: [up.mineHold > 1],
+    wire: [up.wireDamage > 1],
+    knell: [up.mineTolls > 0],
+    lode: [up.lodeReach > 1],
+    spall: [up.spallPellets > 1, up.spallBurst > 1],
+    void: [up.voidReach > 1],
+    thorn: [up.patchR > 1],
+  }[kind] || [];
+  of += own.length;
+  for (const b of own) if (b) has++;
+  return has / of;
+}
+
+/** ...and what that does to how big the thing is drawn. */
+export function mineScale(world, kind) {
+  // A quarter larger fully bought. "Slightly larger" is the brief: a mine
+  // that doubled would crowd a field that may hold five of them.
+  return 1 + mineGrade(world, kind) * 0.26;
+}
 
 class Mine {
   constructor(kind, x0, y0, x1, y1, world0) {
@@ -291,8 +386,8 @@ function spall(world, m) {
       },
     });
   }
-  ring(m.x, m.y, m.r, 150, 0.3, '#ffd166', 3);
-  for (let k = 0; k < 10; k++) spark(m.x, m.y, spread(200), spread(200) - 120, '#ffe9c0', 0.3, 2);
+  ring(m.x, m.y, m.r, 150, 0.3, '#ff4d4d', 3);
+  for (let k = 0; k < 10; k++) spark(m.x, m.y, spread(200), spread(200) - 120, '#ffe0d2', 0.3, 2);
   shake(4);
   audio.boom();
 }
@@ -300,7 +395,7 @@ function spall(world, m) {
 /** VOID. Whatever walked into it is simply not there any more. */
 function swallow(world, m, e) {
   m.dead = true;
-  ring(m.x, m.y, e.r * 2.2, 6, 0.42, '#b388ff', 3);
+  ring(m.x, m.y, e.r * 2.2, 6, 0.42, '#7383ff', 3);
   for (let k = 0; k < 16; k++) {
     const a = rand(0, TAU);
     spark(e.x, e.y, Math.cos(a) * rand(40, 260), Math.sin(a) * rand(40, 260), '#c9a7ff', rand(0.25, 0.5), 2.2);
@@ -344,7 +439,7 @@ function cut(world, m, dt) {
       const ny = (e.y - hit.py) / d;
       e.applyDamage(world, W.damage * world.up.wireDamage * dt, nx, ny, W.shove * dt);
       if (Math.random() < 12 * dt) {
-        spark(hit.px, hit.py, spread(180), spread(180), '#7cffb2', 0.24, 2);
+        spark(hit.px, hit.py, spread(180), spread(180), '#22ffcf', 0.24, 2);
       }
     }
   };
@@ -360,7 +455,7 @@ function toll(world, m) {
   m.tolls--;
   m.tollTimer = K.gap;
   applyBlast(world, { x: m.x, y: m.y, r, damage, impulse: K.blast.impulse });
-  ring(m.x, m.y, m.r, r * 1.4, 0.42, '#ff5d8f', 4);
+  ring(m.x, m.y, m.r, r * 1.4, 0.42, '#ff61f2', 4);
   ripple(m.x, m.y, 1.1 + i * 0.3, r * 3);
   for (let k = 0; k < 14; k++) {
     const a = rand(0, TAU);
@@ -533,8 +628,13 @@ export function drawMines(ctx, world) {
       const pulse = 0.5 + 0.5 * Math.sin(world.time * 2.2 + m.spin);
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      drawGlow(ctx, '#59e0ff', m.x, m.y, rr * 0.8, 0.07 + pulse * 0.04);
-      ctx.strokeStyle = rgba('#59e0ff', 0.2 + pulse * 0.16);
+      /*
+       * No ambient haze. It was a full-radius drawGlow at a reach that
+       * REPULSOR takes past 250 units -- the most expensive thing any mine
+       * drew and the least informative, since the dashed ring and the
+       * chevrons are what actually say where the push reaches.
+       */
+      ctx.strokeStyle = rgba('#3fb9ff', 0.24 + pulse * 0.14);
       ctx.lineWidth = CFG.hairline * 1.4;
       ctx.setLineDash([CFG.hairline * 3, CFG.hairline * 7]);
       ctx.beginPath();
@@ -542,7 +642,7 @@ export function drawMines(ctx, world) {
       ctx.stroke();
       ctx.setLineDash([]);
       // a few marks running outward, so the direction is not a guess
-      ctx.strokeStyle = rgba('#d6f6ff', 0.3 + pulse * 0.25);
+      ctx.strokeStyle = rgba('#e6f4ff', 0.32 + pulse * 0.22);
       ctx.beginPath();
       for (let i = 0; i < 8; i++) {
         const a = (i / 8) * TAU + world.time * 0.5;
@@ -565,7 +665,7 @@ export function drawMines(ctx, world) {
       ctx.lineCap = 'round';
       // A wide soft pass and a hard core, so it reads as taut rather than drawn
       for (const [w2, alpha] of [[W.width * 2, 0.1 * t], [W.width * 0.8, 0.32 * t], [CFG.hairline * 1.4, 0.95 * t]]) {
-        ctx.strokeStyle = rgba('#7cffb2', alpha);
+        ctx.strokeStyle = rgba('#22ffcf', alpha);
         ctx.lineWidth = w2;
         ctx.beginPath();
         ctx.moveTo(ax, m.ay);
@@ -574,8 +674,8 @@ export function drawMines(ctx, world) {
       }
       // the two ends it is strung between
       for (const ex of [ax, bx]) {
-        drawGlow(ctx, '#7cffb2', ex, m.ay, 14, 0.4 * t);
-        ctx.strokeStyle = rgba('#c9ffe4', 0.9 * t);
+        drawGlow(ctx, '#22ffcf', ex, m.ay, 14, 0.4 * t);
+        ctx.strokeStyle = rgba('#eafff8', 0.9 * t);
         ctx.lineWidth = CFG.hairline * 1.6;
         ctx.beginPath();
         ctx.moveTo(ex, m.ay - 9);
@@ -588,40 +688,106 @@ export function drawMines(ctx, world) {
     ctx.save();
     ctx.translate(m.x, m.y);
 
+    /*
+     * ---- how much of the tree this one is carrying ----
+     *
+     * `R` is the DRAWN radius and `m.r` is the physical one -- the trigger
+     * mouth, the blast centre and the hit tests all stay on `m.r`, because a
+     * mine that got harder to walk into as you bought things would be a
+     * balance change wearing a paint job. What grows is the object.
+     *
+     * `pips` is the same reading as a count, drawn as a collar of marks round
+     * the seat: one for every upgrade this kind is carrying. It is the mine's
+     * version of the eighteen sockets on the turret -- something you can look
+     * at and see what you have put into it.
+     */
+    const gr = mineGrade(world, m.kind);
+    const R = m.r * (1 + gr * 0.26);
+    const pips = Math.round(gr * (m.kind === 'spall' ? 8 : m.kind === 'blast' || m.kind === 'thorn' ? 6 : 7));
+
     // The countdown to the next toll, drawn as an arc closing on the body.
     if (knell && m.landed && m.tolls > 0) {
       const frac = m.settle < K.arm
         ? clamp(m.settle / K.arm, 0, 1)
         : 1 - clamp(m.tollTimer / K.gap, 0, 1);
-      ctx.strokeStyle = rgba('#ff5d8f', 0.75);
+      ctx.strokeStyle = rgba('#ff61f2', 0.75);
       ctx.lineWidth = CFG.hairline * 2.2;
       ctx.beginPath();
-      ctx.arc(0, 0, m.r * 1.9, -Math.PI / 2, -Math.PI / 2 + frac * TAU);
+      ctx.arc(0, 0, R * 2.3, -Math.PI / 2, -Math.PI / 2 + frac * TAU);
       ctx.stroke();
       // one mark per toll it still owes
       ctx.fillStyle = rgba('#ffd6e2', 0.9);
       for (let k = 0; k < m.tolls; k++) {
         ctx.beginPath();
-        ctx.arc(-6 + k * 6, -m.r * 2.9, 1.7, 0, TAU);
+        ctx.arc(-6 + k * 6, -R * 3.1, 1.7, 0, TAU);
         ctx.fill();
       }
     }
 
     if (armed && m.cfg.trigger) {
-      // trigger radius, so you can read where it will catch something
-      const pulse = 0.5 + 0.5 * Math.sin(world.time * 4 + m.spin);
-      ctx.strokeStyle = rgba(accent, 0.14 + pulse * 0.16);
+      /*
+       * The trigger mouth, computed from THE SAME EXPRESSION the trigger test
+       * uses -- see the reach above. It was `m.r + cfg.trigger`, with neither
+       * WIDE MOUTH nor EVENT HORIZON in it, so a bought-out VOID advertised a
+       * mouth a fraction of the one it actually had: a circle that is a
+       * promise about where the mine will catch something, drawn in the wrong
+       * place. And it is on `m.r` rather than on the drawn radius, because
+       * the promise must not move because the body got heavier.
+       *
+       * It does not breathe any more either. Five mines is the ordinary
+       * steady state once QUICK LAY and PAIRED CHARGE are owned, and five
+       * dashed circles pulsing out of phase is the busiest thing on a quiet
+       * field. The dash turning slowly says "live" without any of that.
+       */
+      const own = m.kind === 'void' ? world.up.voidReach : 1;
+      ctx.strokeStyle = rgba(accent, 0.2);
       ctx.lineWidth = CFG.hairline;
       ctx.setLineDash([CFG.hairline * 4, CFG.hairline * 6]);
+      ctx.lineDashOffset = -world.time * 6 - m.spin * 20;
       ctx.beginPath();
-      ctx.arc(0, 0, m.r + m.cfg.trigger, 0, TAU);
+      ctx.arc(0, 0, m.r + m.cfg.trigger * world.up.mineTrigger * own, 0, TAU);
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
     }
 
     ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, accent, 0, 0, m.r * (flying ? 2.6 : 3.4), flying ? 0.3 : 0.24 + (armed ? 0.3 : 0));
+    drawGlow(ctx, accent, 0, 0, R * (flying ? 2.6 : 3.4), flying ? 0.3 : 0.24 + (armed ? 0.3 : 0));
     ctx.globalCompositeOperation = 'source-over';
+
+    /*
+     * ---- the seat ----
+     *
+     * A dark disc under the body with a lit rim, so a mine reads as an object
+     * standing ON the field rather than as a glyph drawn into it. It is also
+     * what stops the collar below floating: the pips sit on its edge.
+     */
+    if (!flying) {
+      ctx.fillStyle = 'rgba(6,11,20,0.72)';
+      ctx.beginPath();
+      ctx.arc(0, 0, R * 1.9, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = rgba(accent, 0.18 + (armed ? 0.14 : 0));
+      ctx.lineWidth = CFG.hairline;
+      ctx.stroke();
+      /*
+       * ...and the collar. One mark per upgrade this kind is carrying, so the
+       * first mine upgrade bought is visible on the very next mine laid --
+       * which is the whole of what was asked for. Spaced round the seat from
+       * the top, clockwise, so a run of them reads as a gauge filling.
+       */
+      for (let i = 0; i < pips; i++) {
+        const a = -Math.PI / 2 + (i / Math.max(6, pips)) * TAU;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        ctx.strokeStyle = rgba(tone.core, 0.55 + (armed ? 0.3 : 0));
+        ctx.lineWidth = CFG.hairline * 1.8;
+        ctx.beginPath();
+        ctx.moveTo(c * R * 1.72, sn * R * 1.72);
+        ctx.lineTo(c * R * 2.05, sn * R * 2.05);
+        ctx.stroke();
+      }
+    }
 
     ctx.rotate(m.spin);
     ctx.fillStyle = 'rgba(10,16,26,0.94)';
@@ -631,98 +797,98 @@ export function drawMines(ctx, world) {
     if (wire) {
       // a spool: a ring with the line running out of both sides of it
       ctx.beginPath();
-      ctx.arc(0, 0, m.r * 0.6, 0, TAU);
+      ctx.arc(0, 0, R * 0.6, 0, TAU);
       ctx.fill();
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(-m.r * 1.5, 0);
-      ctx.lineTo(m.r * 1.5, 0);
+      ctx.moveTo(-R * 1.5, 0);
+      ctx.lineTo(R * 1.5, 0);
       ctx.stroke();
     } else if (knell) {
       // a bell: a body that rings rather than a shell that bursts
       ctx.beginPath();
-      ctx.moveTo(-m.r, m.r * 0.75);
-      ctx.quadraticCurveTo(-m.r * 0.95, -m.r * 0.9, 0, -m.r);
-      ctx.quadraticCurveTo(m.r * 0.95, -m.r * 0.9, m.r, m.r * 0.75);
+      ctx.moveTo(-R, R * 0.75);
+      ctx.quadraticCurveTo(-R * 0.95, -R * 0.9, 0, -R);
+      ctx.quadraticCurveTo(R * 0.95, -R * 0.9, R, R * 0.75);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(0, m.r * 0.75, m.r * 0.26, 0, TAU);
+      ctx.arc(0, R * 0.75, R * 0.26, 0, TAU);
       ctx.fill();
       ctx.stroke();
     } else if (thorn) {
       // a burr: a small core with spines out of it in every direction
       ctx.beginPath();
-      ctx.arc(0, 0, m.r * 0.45, 0, TAU);
+      ctx.arc(0, 0, R * 0.45, 0, TAU);
       ctx.fill();
       ctx.stroke();
       ctx.beginPath();
       for (let i = 0; i < 8; i++) {
         const a = (i / 8) * TAU;
-        ctx.moveTo(Math.cos(a) * m.r * 0.45, Math.sin(a) * m.r * 0.45);
-        ctx.lineTo(Math.cos(a) * m.r * 1.5, Math.sin(a) * m.r * 1.5);
+        ctx.moveTo(Math.cos(a) * R * 0.45, Math.sin(a) * R * 0.45);
+        ctx.lineTo(Math.cos(a) * R * 1.5, Math.sin(a) * R * 1.5);
       }
       ctx.stroke();
     } else if (lode) {
       // two rings and a gap: something with a field around it
       ctx.beginPath();
-      ctx.arc(0, 0, m.r * 0.4, 0, TAU);
+      ctx.arc(0, 0, R * 0.4, 0, TAU);
       ctx.fill();
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(0, 0, m.r * 0.85, 0.5, Math.PI - 0.5);
-      ctx.moveTo(Math.cos(Math.PI + 0.5) * m.r * 0.85, Math.sin(Math.PI + 0.5) * m.r * 0.85);
-      ctx.arc(0, 0, m.r * 0.85, Math.PI + 0.5, TAU - 0.5);
+      ctx.arc(0, 0, R * 0.85, 0.5, Math.PI - 0.5);
+      ctx.moveTo(Math.cos(Math.PI + 0.5) * R * 0.85, Math.sin(Math.PI + 0.5) * R * 0.85);
+      ctx.arc(0, 0, R * 0.85, Math.PI + 0.5, TAU - 0.5);
       ctx.stroke();
     } else if (spallM) {
       // a wedge, facing the way it will throw
       ctx.beginPath();
-      ctx.moveTo(-m.r, m.r * 0.5);
-      ctx.lineTo(m.r, m.r * 0.5);
-      ctx.lineTo(m.r * 0.5, -m.r * 0.9);
-      ctx.lineTo(-m.r * 0.5, -m.r * 0.9);
+      ctx.moveTo(-R, R * 0.5);
+      ctx.lineTo(R, R * 0.5);
+      ctx.lineTo(R * 0.5, -R * 0.9);
+      ctx.lineTo(-R * 0.5, -R * 0.9);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
       ctx.beginPath();
       for (let i = -1; i <= 1; i++) {
-        ctx.moveTo(i * m.r * 0.45, -m.r * 0.9);
-        ctx.lineTo(i * m.r * 0.7, -m.r * 1.7);
+        ctx.moveTo(i * R * 0.45, -R * 0.9);
+        ctx.lineTo(i * R * 0.7, -R * 1.7);
       }
       ctx.stroke();
     } else if (voidM) {
       // a hole: filled dark, ringed bright, with nothing inside it
       ctx.fillStyle = 'rgba(6,4,14,0.98)';
       ctx.beginPath();
-      ctx.arc(0, 0, m.r, 0, TAU);
+      ctx.arc(0, 0, R, 0, TAU);
       ctx.fill();
       ctx.stroke();
       ctx.strokeStyle = rgba(accent, 0.4);
       ctx.beginPath();
-      ctx.arc(0, 0, m.r * 0.55, 0, TAU);
+      ctx.arc(0, 0, R * 0.55, 0, TAU);
       ctx.stroke();
     } else if (snare) {
       // four jaws, splayed open once it has hold of something
       const spread2 = 0.34 + m.open * 0.5;
       ctx.beginPath();
-      ctx.arc(0, 0, m.r * 0.42, 0, TAU);
+      ctx.arc(0, 0, R * 0.42, 0, TAU);
       ctx.fill();
       ctx.stroke();
       ctx.beginPath();
       for (let i = 0; i < 4; i++) {
         const a = (i / 4) * TAU;
-        ctx.moveTo(Math.cos(a) * m.r * 0.42, Math.sin(a) * m.r * 0.42);
-        ctx.lineTo(Math.cos(a) * m.r * 1.25, Math.sin(a) * m.r * 1.25);
-        ctx.lineTo(Math.cos(a + spread2) * m.r * 1.7, Math.sin(a + spread2) * m.r * 1.7);
+        ctx.moveTo(Math.cos(a) * R * 0.42, Math.sin(a) * R * 0.42);
+        ctx.lineTo(Math.cos(a) * R * 1.25, Math.sin(a) * R * 1.25);
+        ctx.lineTo(Math.cos(a + spread2) * R * 1.7, Math.sin(a + spread2) * R * 1.7);
       }
       ctx.stroke();
     } else {
       ctx.beginPath();
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * TAU;
-        const x = Math.cos(a) * m.r;
-        const y = Math.sin(a) * m.r;
+        const x = Math.cos(a) * R;
+        const y = Math.sin(a) * R;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.closePath();
@@ -734,17 +900,17 @@ export function drawMines(ctx, world) {
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
           const a = (i / 6) * TAU + 0.5;
-          ctx.moveTo(Math.cos(a) * m.r, Math.sin(a) * m.r);
-          ctx.lineTo(Math.cos(a) * m.r * 1.5, Math.sin(a) * m.r * 1.5);
+          ctx.moveTo(Math.cos(a) * R, Math.sin(a) * R);
+          ctx.lineTo(Math.cos(a) * R * 1.5, Math.sin(a) * R * 1.5);
         }
         ctx.stroke();
       }
     }
 
-    ctx.fillStyle = rgba(live ? tone.core : '#59e0ff',
+    ctx.fillStyle = rgba(live ? tone.core : '#9fb3c8',
       flying ? 0.5 : 0.4 + 0.6 * Math.abs(Math.sin(world.time * 5)));
     ctx.beginPath();
-    ctx.arc(0, 0, m.r * 0.3, 0, TAU);
+    ctx.arc(0, 0, R * 0.3, 0, TAU);
     ctx.fill();
     ctx.restore();
   }

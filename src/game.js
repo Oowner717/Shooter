@@ -177,7 +177,6 @@ export class Game {
       // Seconds SPIRAL still owns the barrel. Zero the rest of the time;
       // updateFiring stands down while it is up so the two are never both
       // driving the gun.
-      spiral: 0,
       autoSteering: false, // is auto aim traversing the barrel this frame?
       autoAim: false,
       /*
@@ -426,7 +425,7 @@ export class Game {
     /*
      * ...and SPIRAL, which was the one ability effect this did not clear.
      *
-     * `updateFiring` stands down while `world.spiral > 0` -- the sweep owns
+     * `updateFiring` used to stand down while a sweep owned
      * the barrel -- and the only thing that counts it back down is the effect
      * itself, which lives in `world.effects` and is emptied four lines above.
      * So a run reset during the sweep started with a gun that could not fire
@@ -435,8 +434,6 @@ export class Game {
      * using SPIRAL. The same class of bug as build 82's, found the same way --
      * by pressing every control and watching what stopped working.
      */
-    w.spiral = 0;
-    w.shooter.sweepFade = 0;
     w.nextStoryAt = CFG.storyEvery;
     w.energy = 0;
     w.earned = 0;
@@ -1349,8 +1346,12 @@ export class Game {
     const w = this.world;
     const s = w.shooter;
     if (w.phase === 'ending' || w.phase === 'boot') return;
-    // SPIRAL owns the gun while it runs, and fires it on its own cadence.
-    if (w.spiral > 0) return;
+    /*
+     * Nothing takes the gun away any more. SPIRAL did -- it owned the barrel
+     * for three seconds and fired it on its own cadence -- and WARD, which
+     * replaced it in build 217, is a shell round the machine that the gun
+     * goes on shooting through.
+     */
 
     const dragging = this.pointers.size > 0;
     const manual = s.gripHeld || dragging;

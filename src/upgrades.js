@@ -35,7 +35,6 @@ export function freshUpgrades() {
     spineTap: 0, // follow-up darts behind every SPINE
     shotPellets: 0, // extra pellets in a SHOT
     shotRange: 1, // and how far they get before they expire
-    spiralArms: 1, // barrels SPIRAL sweeps with, and which way they turn
     titheStep: 1, // how fast TITHE's mark deepens its own bite
     titheMarks: 0, // and how deep it may go past the eight it starts with
     salvo: 0, // every Nth shot fires three
@@ -67,6 +66,12 @@ export function freshUpgrades() {
     mineTolls: 0, // extra rings on a knell
     spallPellets: 1, // how much a spall throws...
     spallBurst: 1, // ...and how wide each pellet goes off where it lands
+    // WARD: how far the shell stands out, how hard it cuts, how long it holds
+    // and how many arcs it throws at once.
+    wardR: 1,
+    wardCut: 1,
+    wardLife: 1,
+    wardArcs: 0,
     lodeReach: 1, // how far a lode pushes, and how hard
     lodePush: 1,
     wireDamage: 1, // per second of contact on a wire
@@ -108,8 +113,19 @@ const MARK = {
   fifthlink: g('<circle cx="5" cy="17" r="2.2"/><circle cx="12" cy="8" r="2.2"/><circle cx="19" cy="16" r="2.2"/><path d="M6.4 15.3 10.6 9.8M13.5 9.5l4.2 4.7"/>'),
   // A mark that compounds on itself.
   compound: g('<path d="M4 19.4 9 13l3.6 3.2L20 5.6"/><path d="M15.6 5.6H20v4.4" fill="none"/><circle cx="9" cy="13" r="1.6" fill="currentColor" stroke="none"/><circle cx="12.6" cy="16.2" r="1.6" fill="currentColor" stroke="none"/>'),
-  counterspin: g('<path d="M12 4.6a7.4 7.4 0 1 1-7.2 5.7"/><path d="M4.4 5.6 4.8 10.3l4.6-.9" />'
-    + '<path d="M12 9.2a2.9 2.9 0 1 0 2.8 3.6" opacity=".75"/>'),
+  // The shell, standing further out.
+  bulwarkmark: g('<circle cx="12" cy="12" r="4.4"/><circle cx="12" cy="12" r="9.2" stroke-dasharray="2.4 2.6" opacity=".7"/>'
+    + '<path d="M12 2.2v2.4M12 19.4v2.4M2.2 12h2.4M19.4 12h2.4"/>'),
+  // ...cutting harder: a surface with something breaking on it.
+  edgemark: g('<circle cx="12" cy="12" r="8"/><path d="M4.6 7.2 19.4 16.8" opacity=".9"/>'
+    + '<path d="m9 9.6 1.8 1.8M13.2 12.6l1.8 1.8" opacity=".7"/>'
+    + '<circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/>'),
+  // ...and one more arc off it.
+  forkmark: g('<circle cx="6.4" cy="12" r="2.4" fill="currentColor" stroke="none"/>'
+    + '<path d="M8.6 11 15 6.6M8.6 13 15 17.4M8.8 12h6.4" opacity=".9"/>'
+    + '<circle cx="17" cy="6" r="1.5" fill="currentColor" stroke="none"/>'
+    + '<circle cx="17" cy="18" r="1.5" fill="currentColor" stroke="none"/>'
+    + '<circle cx="17" cy="12" r="1.5" fill="currentColor" stroke="none" opacity=".55"/>'),
   salvo: g('<path d="M5 21V7M12 21V4M19 21V7"/><path d="M2.6 9.4 5 7l2.4 2.4M9.6 6.4 12 4l2.4 2.4M16.6 9.4 19 7l2.4 2.4"/>'),
   // --- build 54: BOLT, HE, SCATTER, ARC and SPINE each get their own ---
   // A round coming off a body at an angle rather than stopping in it.
@@ -327,9 +343,6 @@ export const UPGRADES = {
     // One level, because it is a second arm and not a dial. Left on the
     // default three it would have sold four arms, which is not what the line
     // says and not what the name means.
-    { id: 'counterspin', name: 'COUNTERSPIN', levels: 1,
-      line: 'SPIRAL sweeps with a second arm, turning the other way.',
-      apply: bump('spiralArms', 1), icon: MARK.counterspin },
     { id: 'compound', name: 'COMPOUND', line: '+60% tithe mark bite.', apply: scale('titheStep', 1.6) , icon: MARK.compound },
     { id: 'throughandthrough', name: 'THROUGH AND THROUGH', line: '+2 bodies a spine pierces.', apply: bump('pierce', 2) , icon: MARK.throughandthrough },
     { id: 'sledge', name: 'SLEDGE', line: '+60% slug knockback.', apply: scale('slug', 1.6) , icon: MARK.sledge },
@@ -419,7 +432,14 @@ export const UPGRADES = {
     { id: 'secondgrowth', name: 'SECOND GROWTH', levels: 1,
       line: '+1 patch of burning ground at once.',
       apply: bump('patchCap', 1), icon: MARK.secondgrowth },
-    { id: 'buckshot', name: 'BUCKSHOT', line: '+60% spall pellets.', apply: scale('spallPellets', 1.6) , icon: MARK.buckshot },
+    /*
+     * Two levels, written out. It had none, and `tree.js` reads
+     * `u.levels ?? 3` -- so it was sold three times and a fully bought SPALL
+     * threw 14 * 1.6^3 = 57 projectiles in one frame, from up to four mines
+     * at once with PAIRED CHARGE. That is the HOT LOAD trap CLAUDE.md
+     * records, on a node that also happens to be a particle budget.
+     */
+    { id: 'buckshot', name: 'BUCKSHOT', levels: 2, line: '+60% spall pellets.', apply: scale('spallPellets', 1.6) , icon: MARK.buckshot },
     { id: 'splinter', name: 'SPLINTER', levels: 2,
       line: '+55% spall pellet blast radius.',
       apply: scale('spallBurst', 1.55), icon: MARK.splinter },
@@ -430,6 +450,22 @@ export const UPGRADES = {
     { id: 'shockfront', name: 'SHOCKFRONT', levels: 2,
       line: '+30% PULSE reach and push.',
       apply: (u) => { u.pulseR *= 1.3; u.pulsePush *= 1.3; }, icon: MARK.shockfront },
+    /*
+     * WARD's three. It is the second ability in the tree with shaping of its
+     * own (SPIRAL had one, PULSE has SHOCKFRONT) and it earns three because
+     * it is the only one that is a STATE rather than an event: how far it
+     * stands, how hard it cuts and how many arcs it throws are three separate
+     * decisions about the same six seconds.
+     */
+    { id: 'standoff', name: 'STANDOFF', levels: 2,
+      line: '+22% WARD radius.',
+      apply: scale('wardR', 1.22), icon: MARK.bulwarkmark },
+    { id: 'edged', name: 'EDGED', levels: 2,
+      line: '+35% WARD damage.',
+      apply: scale('wardCut', 1.35), icon: MARK.edgemark },
+    { id: 'fork', name: 'FORK', levels: 1,
+      line: '+1 arc off the WARD at a time.',
+      apply: bump('wardArcs', 1), icon: MARK.forkmark },
     { id: 'standing', name: 'STANDING ORDER', line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
   ],
   TURRET: [

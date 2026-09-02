@@ -196,7 +196,7 @@ const ABILITY_USE = {
   prism: 'PRISM. A shell that bursts, then beams every way.',
   stasis: 'STASIS. Objects stop. Your shots do not.',
   decoy: 'DECOY. A turret that is not yours. They go there.',
-  spiral: 'SPIRAL. The barrel comes off its target\nand turns, firing all the way round.',
+  ward: 'WARD. A shell stands up round the turret.\nIt cuts what crosses it and arcs at what is inside.',
 };
 
 /**
@@ -227,7 +227,7 @@ export const STARTING = ['standard', 'pulse', 'fan', 'autoAim', 'autoFire'];
 export const LOCKABLE = {
   rounds: ['explosive', 'shotgun', 'arc', 'spine', 'slug', 'rime', 'spore', 'tithe'],
   mines: ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'],
-  abilities: ['lance', 'well', 'prism', 'stasis', 'decoy', 'spiral'],
+  abilities: ['lance', 'well', 'prism', 'stasis', 'decoy', 'ward'],
 };
 
 /** Everything the run can ever hand over, for the debug panel and the tests. */

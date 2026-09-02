@@ -464,7 +464,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 136 since build 216, when SPLINTER went in at two levels. It was
+    // 139 since build 217: COUNTERSPIN's one level went with SPIRAL, WARD's
+    // three nodes brought five (STANDOFF 2, EDGED 2, FORK 1), and BUCKSHOT
+    // lost one -- it had no `levels` and the tree was selling it three times.
+    // It was
+    // 136 from build 216, when SPLINTER went in at two levels. And
     // 134 from build 215: SHOCKFRONT went in at two levels, and SIGHT's
     // three were replaced by PILE's three. And
     // 132 from build 214, when QUICK ARM (one level) was replaced by QUICK
@@ -477,7 +481,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 136
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 139
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -1120,7 +1124,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * tiers.mjs to assert something coarser than either.
      */
     const WAVE = [['bulwark', 3], ['tow', 2], ['warden', 3], ['scion', 2]];
-    const CAP = 120;
+    /*
+     * 160 from build 217, up from 120, and the change is to the MARGIN rather
+     * than to what is claimed.
+     *
+     * The claim is "something in the rack can still clear the top of the
+     * ladder", and the cap is only there to bound the runtime of a build
+     * where nothing can. At 120 it was inside the answer instead of outside
+     * it: measured across runs, HE and SCATTER came back with ONE body left
+     * of about thirty on some passes and a clean sweep on others, so the case
+     * went red about one run in three on a build that was demonstrably fine.
+     * The loop exits the instant the field is clear, so a higher cap costs
+     * nothing on a healthy build and only lengthens the failing case.
+     */
+    const CAP = 160;
     // Best first, measured: the case stops at the first round that answers,
     // so an intact arsenal costs one trial and a broken one costs nine.
     const ORDER = ['spore', 'explosive', 'shotgun', 'standard', 'tithe',
@@ -1973,146 +1990,170 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `wrote ${r.wrote}; a pre-clock save at 240 kills came back at ${r.migrated} earned`);
 }
 
-// --- a reset during SPIRAL does not leave the gun switched off --------------
+// --- WARD is a shell, not a second PULSE ------------------------------------
 /*
- * `updateFiring` stands down while `world.spiral > 0`, because the sweep owns
- * the barrel. The only thing that counts it back down is the SPIRAL effect
- * itself, and that lives in `world.effects`, which reset() empties.
+ * SPIRAL held this slot until build 217 and two cases held it: one that a
+ * reset mid-sweep did not leave the gun switched off (the sweep owned the
+ * barrel and only the effect could give it back), and one that the barrel
+ * came to rest where it began. Both are gone with the ability, and so are
+ * `world.spiral`, `sweepFade` and a round's `spun` flag -- three fields that
+ * nothing could set any more.
  *
- * So resetting inside the sweep -- a second's window, reachable from the menu
- * -- started the next run with a turret that could not fire and nothing left
- * alive to switch it back on. Permanent, silent, and the same shape as the
- * bug that cost builds 82 to 84.
+ * WARD owns nothing. It is a state the field is in, not a thing the turret
+ * does, so the gun goes on firing through it and there is no gun to give
+ * back.
  */
 {
   const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { BY_ID, freshUpgrades } = await import('../src/upgrades.js');
     const g = window.__sim;
     const w = g.world;
-    g.restart();
-    g.debugTeachAll();
-    // Restored below. reset() keeps the same Director object, so a stub left
-    // on it silences every case after this one.
-    const ranD = w.director.update;
-    w.director.update = () => {};
+    const s = w.shooter;
+    const P = CFG.ward;
+    const out = { r: P.r, life: P.life };
 
-    const spiralAt = [...document.querySelectorAll('#abilities .ab')]
-      .findIndex((el) => /SPIRAL/i.test(el.textContent));
-    g.useAbility(spiralAt);
-    for (let i = 0; i < 6; i++) g.update(1 / 60); // mid-sweep
-    const during = w.spiral;
+    const press = () => {
+      const i = w.abilities.slots.findIndex((x) => x.def.id === 'ward');
+      if (i < 0) return false;
+      const slot = w.abilities.slots[i];
+      slot.charges = Math.max(1, slot.charges); slot.cd = 0; slot.locked = 0;
+      g.useAbility(i);
+      return true;
+    };
+    const bare = () => {
+      g.debugClearField();
+      g.restart();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
+      w.up = freshUpgrades();
+      w.effects.length = 0;
+      w.autoAim = false; w.autoFire = false;
+    };
+    const pin = (id, at) => {
+      const e = g.debugSpawn(id, s.x, s.y - at);
+      if (!e) return null;
+      e.staged = false; e.spawnIn = 0; e.hp = 1e7; e.maxHp = 1e7;
+      e.invMass = 0; e.vx = 0; e.vy = 0;
+      return e;
+    };
 
-    // ...and out from under it.
-    g.restart();
-    const after = w.spiral;
+    out.inTree = w.abilities.slots.some((x) => x.def.id === 'ward');
+    out.gone = w.abilities.slots.some((x) => x.def.id === 'spiral');
 
-    // The only test that matters: can it shoot.
-    w.enemies.length = 0;
-    w.projectiles.length = 0;
-    const e = g.debugSpawn('mote', w.width / 2, w.shooter.y - 220);
-    e.staged = false; e.spawnIn = 0;
+    /*
+     * ---- the surface cuts what CROSSES it, once a crossing ----
+     *
+     * A body held still on the line must not be billed every frame: at
+     * `cut` apiece, sixty times a second, that is not a wall, it is a
+     * blender. A body walked through it must be.
+     */
+    bare();
+    const still = pin('mote', P.r);   // parked exactly on the surface
+    press();
+    for (let f = 0; f < 60 * 3; f++) { still.x = s.x; still.y = s.y - P.r; g.update(1 / 60); }
+    out.parked = Math.round(1e7 - still.hp);
+
+    bare();
+    const walker = pin('mote', P.r + 60);
+    press();
+    let crossings = 0;
+    let was = 1e7;
+    for (let f = 0; f < 60 * 4; f++) {
+      // In and out, slowly, four times.
+      const at = P.r + 60 - Math.abs(((f / 40) % 4) - 2) * 70;
+      walker.x = s.x; walker.y = s.y - at;
+      g.update(1 / 60);
+      if (walker.hp < was) { crossings++; was = walker.hp; }
+    }
+    out.crossings = crossings;
+    out.walked = Math.round(1e7 - walker.hp);
+
+    // ---- ...and the arcs take what is inside, including the mount --------
+    bare();
+    const onMount = pin('lurcher', 8);
+    press();
+    for (let f = 0; f < 60 * 3; f++) { onMount.x = s.x + 4; onMount.y = s.y - 6; g.update(1 / 60); }
+    out.mount = Math.round(1e7 - onMount.hp);
+
+    // ---- it does not take the gun ---------------------------------------
+    /*
+     * The one thing SPIRAL did that WARD must not. Counted at
+     * `projectiles.push`, which is where a round actually becomes one.
+     */
+    bare();
+    pin('mote', 220);
     w.autoAim = true; w.autoFire = true;
-    g.fireTimer = 0; w.shooter.cooldown = 0;
+    press();
     let rounds = 0;
     const push = w.projectiles.push.bind(w.projectiles);
     w.projectiles.push = (...ps) => { rounds += ps.length; return push(...ps); };
-    for (let i = 0; i < 120; i++) g.update(1 / 60);
+    for (let f = 0; f < 60 * 2; f++) g.update(1 / 60);
     w.projectiles.push = push;
+    out.rounds = rounds;
+    out.upWhileFiring = w.effects.some((x) => x instanceof Object && x.bolts);
 
-    w.director.update = ranD;
-    g.restart();
-    return { during: +during.toFixed(2), after, fade: w.shooter.sweepFade, rounds };
-  });
-
-  check('a reset during SPIRAL leaves a turret that can still fire',
-    r.during > 0 && r.after === 0 && r.fade === 0 && r.rounds > 0,
-    `spiral ${r.during} mid-sweep -> ${r.after} after the reset,`
-    + ` sweepFade ${r.fade}, ${r.rounds} rounds in two seconds`);
-}
-
-// --- the sweep comes to rest where it began ---------------------------------
-/*
- * SPIRAL used to teleport its own barrel.
- *
- * `turns` was 2.6, so the sweep ended 216 degrees from where it started, and
- * the ability put it back by writing the old angle in on one frame -- measured
- * here before the change, 3.12 radians of travel in a sixtieth of a second.
- * That snap was the most conspicuous thing about the whole ability, and no
- * case looked at it because every case looked at what the sweep DID rather
- * than at how the gun moved.
- *
- * Three things are asserted and none of them is a position. The gun moves
- * nothing on the frame the sweep hands it back; it finishes pointing where it
- * started; and it is slow at both ends and fast in the middle, which is the
- * difference between a machine turning and a number being interpolated.
- */
-{
-  const r = await page.evaluate(() => {
-    const g = window.__sim;
-    const w = g.world;
-    g.restart();
-    g.debugTeachAll();
-    const ranD = w.director.update;
-    w.director.update = () => {};
-    w.enemies.length = 0;
-    // Nothing else may touch the aim while this is measured.
-    w.autoAim = false;
-    w.autoFire = false;
-
-    const at = [...document.querySelectorAll('#abilities .ab')]
-      .findIndex((el) => /SPIRAL/i.test(el.textContent));
-    const from = w.shooter.aim;
-    g.useAbility(at);
-
-    // Headings, so a wrap at pi does not read as half a turn of travel.
-    const wrap = (d) => Math.atan2(Math.sin(d), Math.cos(d));
-    const steps = [];
-    let prev = w.shooter.aim;
-    let wasUp = true;
-    let handBack = null;
-    for (let i = 0; i < 400; i++) {
+    // ---- and grey stays grey --------------------------------------------
+    bare();
+    g.debugSpawnDrift();
+    for (let f = 0; f < 6; f++) g.update(1 / 60);
+    const drift = w.enemies.find((e) => e.harmless && !e.dead);
+    if (drift) { drift.hp = drift.maxHp; }
+    press();
+    for (let f = 0; f < 60 * 3; f++) {
+      if (drift) { drift.x = s.x; drift.y = s.y - P.r; drift.vx = 0; drift.vy = 0; }
       g.update(1 / 60);
-      const now = w.shooter.aim;
-      const up = w.spiral > 0;
-      steps.push({ d: Math.abs(wrap(now - prev)), up });
-      // The frame the barrel was given back, which is where a snap lives.
-      if (wasUp && !up && handBack === null) handBack = Math.abs(wrap(now - prev)) * 60;
-      wasUp = up;
-      prev = now;
-      if (!w.effects.some((e) => e.constructor.name === 'Spiral')) break;
     }
-    const during = steps.filter((x) => x.up);
-    const n = during.length;
-    const rate = (a, b) => {
-      const seg = during.slice(a, b);
-      return seg.length ? (seg.reduce((t, x) => t + x.d, 0) / seg.length) * 60 : 0;
+    out.drift = !drift || drift.hp === drift.maxHp;
+
+    // ---- the three upgrades reach it ------------------------------------
+    const reachOf = (id, n) => {
+      bare();
+      const d = BY_ID.get(id);
+      if (!d) return null;
+      for (let i = 0; i < n; i++) d.apply(w.up, w);
+      press();
+      for (let f = 0; f < 12; f++) g.update(1 / 60);
+      const ward = w.effects.find((x) => x.bolts);
+      return ward ? { r: Math.round(ward.r), cut: Math.round(ward.cut), arcs: ward.arcs } : null;
     };
-    const home = Math.abs(wrap(w.shooter.aim - from));
-    w.director.update = ranD;
+    out.plainW = reachOf('standoff', 0);
+    out.wide = reachOf('standoff', 2);
+    out.hard = reachOf('edged', 2);
+    out.forked = reachOf('fork', 1);
+
+    bare();
+    w.spawnLock = 0;
+    w.up = freshUpgrades();
     g.restart();
-    return {
-      frames: n,
-      opening: rate(0, Math.round(n * 0.1)),
-      middle: rate(Math.round(n * 0.45), Math.round(n * 0.55)),
-      closing: rate(Math.round(n * 0.9), n),
-      handBack, home,
-    };
+    return out;
   });
 
-  check('SPIRAL hands the barrel back without moving it',
-    r.frames > 60 && r.handBack !== null && r.handBack < 0.5 && r.home < 0.08,
-    `${r.frames} frames of sweep; ${r.handBack === null ? 'never handed back' : r.handBack.toFixed(2) + ' rad/s on the frame it let go'}`
-    + `, ${r.home.toFixed(3)} rad from where it started`);
+  check('WARD is in the bar and SPIRAL is not',
+    r.inTree && !r.gone, `ward ${r.inTree}, spiral ${r.gone}`);
 
-  /*
-   * ...and it gets there like a mass on a gimbal. The ends are asserted
-   * against the middle rather than against a number, so the shape survives
-   * CFG.spiral being retuned -- what must not come back is the straight line,
-   * where the first frame and the last both ran at the cruising rate.
-   */
-  check('...and it spins up and spins down rather than running flat',
-    r.opening < r.middle * 0.5 && r.closing < r.middle * 0.5 && r.middle > 3,
-    `${r.opening.toFixed(1)} rad/s opening · ${r.middle.toFixed(1)} cruising · `
-    + `${r.closing.toFixed(1)} closing`);
+  check('...and its surface cuts what crosses it, once a crossing',
+    r.parked > 0 && r.parked < r.walked * 0.8 && r.crossings >= 2,
+    `a body parked on the line for three seconds took ${r.parked}; one walked `
+    + `through it four times took ${r.walked} over ${r.crossings} separate cuts`);
+
+  check('...and its arcs reach what is on the turret itself',
+    r.mount > 0, `a body on the mount took ${r.mount} from three seconds of WARD`);
+
+  check('...and it never takes the gun, which is what SPIRAL did',
+    r.rounds > 0, `${r.rounds} rounds left the barrel during two seconds of WARD`);
+
+  check('...and grey stays grey',
+    r.drift, `a DRIFT held on the surface for three seconds: untouched ${r.drift}`);
+
+  check('...and STANDOFF, EDGED and FORK all reach the shell',
+    r.plainW && r.wide && r.hard && r.forked
+    && r.wide.r > r.plainW.r * 1.4 && r.hard.cut > r.plainW.cut * 1.7
+    && r.forked.arcs === r.plainW.arcs + 1,
+    `radius ${r.plainW && r.plainW.r} -> ${r.wide && r.wide.r}; cut `
+    + `${r.plainW && r.plainW.cut} -> ${r.hard && r.hard.cut}; arcs `
+    + `${r.plainW && r.plainW.arcs} -> ${r.forked && r.forked.arcs}`);
 }
 
 // --- nothing casts an ability for you ---------------------------------------
@@ -4360,189 +4401,56 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `clean mean ${r.clean.mean} -> capped mean ${r.capped.mean}`);
 }
 
-// --- SPIRAL is the one ability that is about the gun -------------------------
+// --- WARD is placed the way an ability is placed ----------------------------
 /*
- * It replaced CHORUS, and the reason was a gap rather than a complaint. Every
- * ability in the bar acted on the field and away from the turret -- PULSE
- * shoves, LANCE pierces, WELL gathers, PRISM bursts, STASIS holds, DECOY
- * redirects, HAIL throws a cone somewhere else -- and not one of them touched
- * the turret's own gun, which is what the whole UPGRADES tree is about. Nine
- * rounds and twenty fittings, and nothing in the bar cared which you carried.
+ * SPIRAL held this slot and this case asserted the thing SPIRAL was for: that
+ * it fired the LOADED round through that round's own upgrades, which made it
+ * nine abilities rather than one. That is also why it never read as an
+ * ability -- what happened when you pressed it depended entirely on the
+ * ammunition, so it had no picture of its own.
  *
- * So the thing to assert is not that it does damage, it is that it is the
- * gun: it fires the loaded round through that round's own upgrades, it takes
- * the barrel off whatever the assist had chosen, and it gives the barrel back
- * when it is done. A version that quietly fired BOLTs would pass a damage
- * check and be the wrong ability.
+ * What survives is the placement half, which is about the machinery rather
+ * than about SPIRAL: an ability has to be in ABILITIES, buyable in the tree,
+ * have a charge node, have a first-use line and be lockable. Miss one and the
+ * ability is real and unreachable, or reachable and silent.
  */
 {
   const r = await page.evaluate(async () => {
-    const g = window.__sim;
-    const w = g.world;
     const { ABILITIES } = await import('../src/abilities.js');
     const { FIRST_USE, LOCKABLE } = await import('../src/tutorial.js');
     const { NODES } = await import('../src/tree.js');
-
     const ids = ABILITIES.map((a) => a.id);
     const treeText = JSON.stringify(NODES.map((n) => [n.id, n.name, n.line]));
-    const gone = !/chorus/i.test(treeText) && !ids.includes('chorus')
-      && !FIRST_USE.chorus && !LOCKABLE.abilities.includes('chorus');
-    const placed = ids.includes('spiral') && /open_spiral/.test(treeText)
-      && /charge_spiral/.test(treeText) && !!FIRST_USE.spiral
-      && LOCKABLE.abilities.includes('spiral');
-
-    g.debugTeachAll();
-    g.debugClearField();
-    w.debug.noCooldown = true;
-    for (let i = 0; i < 20; i++) g.debugSpawn('mote', 200 + i * 18, 260);
-
-    const slot = w.abilities.slots.findIndex((sl) => sl && sl.def.id === 'spiral');
-    const s = w.shooter;
-
-    // Point the barrel somewhere deliberate, so "came off its target" is a
-    // fact about this run rather than about wherever it happened to be.
-    s.aim = 0;
-    const aimBefore = s.aim;
-
-    const fired = {};
-    const seen = new Set();
-    /*
-     * The charge is put back and the field is cleared before each sweep.
-     * Without the first, the second sweep never happens -- `noCooldown` zeroes
-     * the wait but not the charge count, so trigger() refuses and the case
-     * reads the FIRST sweep's rounds still in flight and reports both sweeps
-     * as identical. Which is exactly the failure the check is looking for, so
-     * it was a green-looking red for the wrong reason.
-     */
-    const round = (name) => {
-      w.round = name;
-      w.projectiles.length = 0;
-      const sl = w.abilities.slots[slot];
-      sl.charges = Math.max(1, sl.charges);
-      sl.cd = 0;
-      sl.locked = 0;
-      const went = !!g.useAbility(slot) || w.spiral > 0;
-      let turned = 0;
-      for (let i = 0; i < 200; i++) {
-        g.update(1 / 60);
-        turned = Math.max(turned, Math.abs(s.aim - aimBefore));
-        for (const p of w.projectiles) if (p.color) seen.add(p.color);
-      }
-      fired[name] = { turned: +turned.toFixed(2), spiral: +w.spiral.toFixed(2), went };
+    return {
+      ids,
+      // Gone, root and branch: the ability, its node, its charge, its line,
+      // its lock entry, and COUNTERSPIN which was its only upgrade.
+      gone: !/spiral/i.test(treeText) && !ids.includes('spiral')
+        && !FIRST_USE.spiral && !LOCKABLE.abilities.includes('spiral')
+        && !/counterspin/i.test(treeText),
+      placed: ids.includes('ward') && /open_ward/.test(treeText)
+        && /charge_ward/.test(treeText) && !!FIRST_USE.ward
+        && LOCKABLE.abilities.includes('ward'),
+      // ...and the three that shape it.
+      shaped: ['standoff', 'edged', 'fork'].filter((id) => new RegExp(`"${id}"`).test(treeText)).length,
+      colours: ABILITIES.map((a) => a.color),
     };
-    round('standard');
-    const coloursAfterBolt = new Set(seen);
-    seen.clear();
-    round('rime');
-    const rimeColours = new Set(seen);
-
-    // ...and the gun is handed back: spiral clears and firing resumes.
-    const handedBack = w.spiral === 0;
-    w.debug.noCooldown = false;
-    g.restart();
-    return { gone, placed, fired, handedBack,
-      boltColours: [...coloursAfterBolt], rimeColours: [...rimeColours],
-      tone: ABILITIES.find((a) => a.id === 'spiral')?.color };
   });
 
-  check('CHORUS is gone from the bar, the tree and the script, and SPIRAL is in all three',
-    r.gone && r.placed,
-    `chorus gone ${r.gone}, spiral placed ${r.placed}, tone ${r.tone}`);
-
-  // A full sweep is CFG.spiral.turns revolutions; anything under one turn
-  // means the barrel never actually came off its target.
-  const swept = r.fired.standard && r.fired.standard.turned > Math.PI * 2;
-  check('...and it takes the barrel off its target and hands it back',
-    swept && r.handedBack,
-    `turned ${r.fired.standard && r.fired.standard.turned} radians, `
-    + `handed back ${r.handedBack}`);
+  check('WARD is placed the way an ability has to be placed, and SPIRAL is gone',
+    r.placed && r.gone && r.shaped === 3,
+    `in ABILITIES, in the tree, with a charge node, a first-use line and a `
+    + `lock entry: ${r.placed}; SPIRAL and COUNTERSPIN gone: ${r.gone}; `
+    + `${r.shaped} of 3 shaping nodes placed`);
 
   /*
-   * The one that matters: it fires what is LOADED. A BOLT is #7aa2ff and a
-   * RIME round is #8fe3ff, so a sweep with RIME on the strip has to put
-   * different projectiles on the field than a sweep with BOLT. An
-   * implementation that always fired the default round would pass every
-   * other check here.
+   * Eight buttons on one strip, and the colour is the only thing telling them
+   * apart at a glance once the icons are 24px. A duplicate would be two
+   * controls that look like the same control.
    */
-  const differs = r.boltColours.length > 0 && r.rimeColours.length > 0
-    && r.rimeColours.some((c) => !r.boltColours.includes(c));
-  /*
-   * COUNTERSPIN, and the gimbal going home.
-   *
-   * Two things that both went wrong the first time and in the same way -- a
-   * multiplier applied twice, and a guard on a value that had already moved.
-   * COUNTERSPIN fired 118 rounds against one arm's 33, because the interval
-   * was divided by the arm count AND a round went out per arm, which is the
-   * doubling squared. And the aim was never wound back, because the restore
-   * was guarded on `world.spiral !== 0` while the running branch had already
-   * written zero to it -- so the gimbal's travel arc stayed spanning six
-   * radians and the ring sat closed for the rest of the run.
-   */
-  const extra = await page.evaluate(async () => {
-    const g = window.__sim;
-    const w = g.world;
-    const { NODES } = await import('../src/tree.js');
-    g.debugTeachAll();
-    g.debugClearField();
-    w.debug.noCooldown = true;
-    for (let i = 0; i < 24; i++) g.debugSpawn('mote', 160 + i * 16, 240);
-    const s = w.shooter;
-    const slot = w.abilities.slots.findIndex((sl) => sl && sl.def.id === 'spiral');
-    const sweep = (arms) => {
-      w.up.spiralArms = arms;
-      w.round = 'standard';
-      const sl = w.abilities.slots[slot];
-      sl.charges = Math.max(1, sl.charges); sl.cd = 0; sl.locked = 0;
-      s.aim = -Math.PI / 2;
-      const aim0 = s.aim;
-      const grip0 = s.gripAngle;
-      g.useAbility(slot);
-      const eff = w.effects.find((e) => e.arms);
-      const n = eff ? eff.arms.length : 0;
-      for (let i = 0; i < 300; i++) g.update(1 / 60);
-      return { n, rounds: eff ? eff.rounds : 0,
-        // Where the barrel and the grip ended up against where they began.
-        aimBack: Math.abs(s.aim - aim0) < 0.5,
-        gripSpan: +Math.abs(s.gripAngle - grip0).toFixed(2),
-        fade: s.sweepFade };
-    };
-    const one = sweep(1);
-    const two = sweep(2);
-    w.up.spiralArms = 1;
-    w.debug.noCooldown = false;
-    const inTree = JSON.stringify(NODES.map((n) => [n.id, n.name]));
-    g.restart();
-    return { one, two, hasNode: /counterspin/.test(inTree) && /COUNTERSPIN/.test(inTree) };
-  });
-
-  check('COUNTERSPIN adds an arm and doubles the sweep, rather than squaring it',
-    extra.hasNode && extra.one.n === 1 && extra.two.n === 2
-    && extra.two.rounds > extra.one.rounds * 1.6
-    && extra.two.rounds < extra.one.rounds * 2.6,
-    `in the tree ${extra.hasNode}; one arm ${extra.one.rounds} rounds, `
-    + `two arms ${extra.two.rounds} `
-    + `(${(extra.two.rounds / Math.max(1, extra.one.rounds)).toFixed(2)}x)`);
-
-  /*
-   * ...and the gimbal goes home. The travel arc is drawn from straight-down
-   * to wherever the grip is, so an aim left at `start + 2.6 turns` leaves it
-   * spanning the whole circle -- which is what a player saw for the rest of
-   * the run, every run, after every use.
-   */
-  check('...and the barrel and the gimbal are back where they started',
-    extra.one.aimBack && extra.two.aimBack
-    && extra.one.gripSpan < 0.5 && extra.two.gripSpan < 0.5
-    && extra.one.fade === 0,
-    `aim returned ${extra.one.aimBack}/${extra.two.aimBack}, `
-    + `grip off by ${extra.one.gripSpan}/${extra.two.gripSpan} rad, `
-    + `sweep overlay faded to ${extra.one.fade}`);
-
-  check('...and it fires whatever round is loaded, not a round of its own',
-    differs,
-    `BOLT sweep (went ${r.fired.standard && r.fired.standard.went}) left `
-    + `${r.boltColours.join(',') || 'nothing'}; RIME sweep `
-    + `(went ${r.fired.rime && r.fired.rime.went}) left `
-    + `${r.rimeColours.join(',') || 'nothing'}`);
+  check('...and no two abilities wear the same colour',
+    new Set(r.colours).size === r.colours.length,
+    `${r.colours.length} abilities, ${new Set(r.colours).size} distinct colours`);
 }
 
 // --- one voice at a time ----------------------------------------------------

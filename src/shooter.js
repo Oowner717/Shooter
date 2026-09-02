@@ -259,7 +259,6 @@ export class Shooter {
     this.gripAngle = Math.PI / 2; // straight down = barrel straight up
     // 1 while SPIRAL is sweeping, then decaying: how much of the gimbal's
     // closed travel circle is still drawn. See drawLever().
-    this.sweepFade = 0;
     this.gripHeld = false;
     this.gripGlow = 0;
   }
@@ -403,13 +402,8 @@ export class Shooter {
 
     // Every ammo upgrade lands here rather than inside each round, so a round
     // stays a description of what it does and the upgrades stay scalars.
-    // A round that left mid-sweep is drawn differently -- see
-    // drawProjectiles(). It is still the loaded round with all of its
-    // upgrades; it is only marked as having been thrown by the sweep.
-    const spun = world.spiral > 0;
     const shot = (angle, opts) => fire(world, this.muzzleX, this.muzzleY, angle, {
       ...opts,
-      spun,
       speed: (opts.speed || CFG.bolt.speed) * up.speed,
       damage: (opts.damage ?? CFG.bolt.damage) * up.damage * scale,
       impulse: (opts.impulse ?? CFG.bolt.impulse) * up.impulse,
@@ -1300,32 +1294,11 @@ export class Shooter {
      *
      * The travel arc runs from straight-down to wherever the grip is, and the
      * grip cannot leave the lower hemisphere -- so this ring is a smile, every
-     * frame of every run, except the three seconds SPIRAL owns the barrel and
-     * takes it the whole way round. That is the one time the gimbal is ever
-     * whole and it is worth seeing, so the upper half is drawn explicitly and
-     * held for a beat after the last round rather than snapping shut with the
-     * aim. `sweepFade` is 1 through the sweep and decays across CFG.spiral's
-     * settle afterwards.
+     * frame of every run. It was whole for the three seconds SPIRAL owned the
+     * barrel and took it the whole way round; that ability went in build 217
+     * and `sweepFade`, which was the only thing that ever closed the ring,
+     * went with it.
      */
-    if (this.sweepFade > 0) {
-      const f = this.sweepFade;
-      ctx.strokeStyle = rgba('#ff7a1a', 0.42 * f);
-      ctx.lineWidth = CFG.hairline * 3.4;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, len, down + clamp2, down - clamp2 + TAU);
-      ctx.stroke();
-      // The two ends where it meets the rail's own hard stops, so the closure
-      // reads as the ring completing rather than as a second ring over it.
-      for (const e of [-1, 1]) {
-        const a2 = down + e * clamp2;
-        ctx.strokeStyle = rgba('#ffd9a0', 0.5 * f);
-        ctx.lineWidth = CFG.hairline * 2.4;
-        ctx.beginPath();
-        ctx.moveTo(this.x + Math.cos(a2) * (len - 7), this.y + Math.sin(a2) * (len - 7));
-        ctx.lineTo(this.x + Math.cos(a2) * (len + 7), this.y + Math.sin(a2) * (len + 7));
-        ctx.stroke();
-      }
-    }
 
     // ---- the ball ----------------------------------------------------------
     ctx.save();

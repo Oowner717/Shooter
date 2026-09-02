@@ -37,7 +37,7 @@ const ICON = {
   // Two turrets. One of them is not there.
   decoy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.8 4.6v4.2"/><path d="M2.9 12.4 6.8 8.9l3.9 3.5v5.9H2.9z"/><circle cx="6.8" cy="14.6" r="1.3" fill="currentColor" stroke="none"/><path d="M17.2 4.6v4.2" stroke-dasharray="2.2 1.9"/><path d="M13.3 12.4l3.9-3.5 3.9 3.5v5.9h-7.8z" stroke-dasharray="2.2 1.9" opacity=".85"/></svg>',
   // Wreckage hauled up off the floor and thrown back out the top.
-  spiral: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12.2a2.6 2.6 0 1 1 2.4-3.6 5.2 5.2 0 1 1-8.1 6.1 8.4 8.4 0 1 1 14.4-2.3"/><circle cx="12" cy="12.2" r="1" fill="currentColor" stroke="none"/><path d="M20.7 12.4 22 9.6M20.7 12.4l-2.9-.6" opacity=".8"/></svg>',
+  ward: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><path d="M12 4.2v3.4M12 16.4v3.4M4.2 12h3.4M16.4 12h3.4" opacity=".75"/><path d="m14.6 9.4 3.1-3.1M6.3 17.7l3.1-3.1" opacity=".4"/></svg>',
 };
 
 
@@ -482,7 +482,7 @@ class Decoy {
  *
  * It fires the loaded round through every upgrade that round carries, so it is
  * nine different abilities depending on what is on the strip. It owns the aim
- * while it runs -- Game.updateFiring stands down on `world.spiral` -- and
+ * while it runs -- and
  * hands it straight back, because a barrel left pointing wherever the sweep
  * ended would be a worse gift than the sweep.
  */
@@ -523,203 +523,231 @@ function rateAt(k, r) {
   return 1;
 }
 
-class Spiral {
+/**
+ * WARD. A shell round the turret, up for a few seconds.
+ *
+ * Two halves, and they answer different things. The SURFACE cuts anything
+ * that crosses it, once per crossing with a short refractory -- so it is a
+ * wall, not a patch of ground, and a body that walks through it pays for
+ * walking through it rather than for standing near it. The ARCS take the
+ * nearest bodies INSIDE the shell every fraction of a second, which is what
+ * answers something already on the turret and what makes the ability worth
+ * pressing before anything has arrived.
+ *
+ * Rides in `world.effects` like every other ability effect. It does not touch
+ * the barrel, the aim or the round -- SPIRAL owned all three and that is most
+ * of why it was replaced.
+ */
+/*
+ * A cold near-white, and the only one in the bar.
+ *
+ * The first pass used #8ef0ff, which is 11.7 dE from PULSE's #59e0ff -- two
+ * cyan buttons side by side on an eight-slot strip, and the suite's own
+ * colour case says 25 is the floor. Every saturated hue is taken (cyan,
+ * green, amber, violet, magenta, periwinkle, red), so WARD takes the one
+ * register nothing else uses: hard light rather than a colour.
+ */
+const TONE_WARD = '#e8f0ff';
+
+class Ward {
   constructor(world) {
-    const P = CFG.spiral;
+    const P = CFG.ward;
+    const up = world.up;
     this.t = 0;
-    this.life = P.life;
-    this.settle = P.settle;
+    this.life = P.life * (up.wardLife || 1);
+    this.max = this.life;
     this.dead = false;
-    this.from = world.shooter.aim;
-    this.grip = world.shooter.gripAngle;
-    this.next = 0;
-    this.rounds = 0;
+    this.r = P.r * (up.wardR || 1);
+    this.cut = P.cut * (up.wardCut || 1);
+    this.arcs = P.arc.n + (up.wardArcs || 0);
+    this.next = P.arc.every;
     /*
-     * How much of the total turn has been made, 0 to 1. Not the same as how
-     * much of the TIME has passed -- see windAt -- and it is this one that
-     * everything geometric reads, because the trail winds outward with the
-     * angle and not with the clock.
+     * Who has been cut lately, and when. A body resting exactly on the
+     * surface would otherwise be billed every frame -- 60 times a second at
+     * `cut` apiece, which is not a wall, it is a blender. Keyed by the body
+     * and weak, so a shell up through a wave that churns hundreds of them
+     * does not carry every corpse to the end of it.
      */
-    this.wound = 0;
+    this.seen = new WeakMap();
     /*
-     * COUNTERSPIN adds a second arm turning the other way. Each arm carries
-     * its own angle and its own sign, so the upgrade is one more entry here
-     * rather than a special case in three places. The barrel is arm 0 and is
-     * the one the gun actually points along; the rest are traced.
+     * Which side of the surface each body was on last frame. A CROSSING is
+     * the sign changing; without this the shell would cut whatever happened
+     * to be near it rather than what went through it.
      */
-    this.arms = Array.from({ length: Math.max(1, world.up.spiralArms) }, (_, i) => ({
-      dir: i % 2 ? -1 : 1,
-      at: this.from + (i / Math.max(1, world.up.spiralArms)) * TAU,
-      a: this.from,
-    }));
-    world.spiral = P.life;
+    this.side = new WeakMap();
+    this.flash = 0; // the surface lighting where something just came through
+    this.hits = []; // {a, t} -- where, so the shell is marked where it was hit
+    this.bolts = []; // {x0,y0,x1,y1,t} -- the arcs, drawn for a moment
   }
 
-  /** Where an arm is, and how far out, at sweep fraction k. */
-  reach(k) {
-    const P = CFG.spiral;
-    return P.rIn + (P.rOut - P.rIn) * k;
+  /** 0 while it stands up, 1 while it holds, back to 0 as it goes. */
+  get open() {
+    const P = CFG.ward;
+    return Math.min(1, this.t / P.ramp) * Math.min(1, this.life / P.ramp);
   }
 
   update(world, dt) {
-    const P = CFG.spiral;
+    const P = CFG.ward;
     const s = world.shooter;
     this.t += dt;
+    this.life -= dt;
+    this.flash = Math.max(0, this.flash - dt * 3.4);
+    for (let i = this.hits.length - 1; i >= 0; i--) {
+      this.hits[i].t -= dt;
+      if (this.hits[i].t <= 0) this.hits.splice(i, 1);
+    }
+    for (let i = this.bolts.length - 1; i >= 0; i--) {
+      this.bolts[i].t -= dt;
+      if (this.bolts[i].t <= 0) this.bolts.splice(i, 1);
+    }
+    if (this.life <= 0) { this.dead = true; return; }
 
-    if (this.life > 0) {
-      this.life -= dt;
-      world.spiral = Math.max(0, this.life);
-      const k = clamp(this.t / P.life, 0, 1);
-      this.wound = windAt(k, P.ramp);
-      for (const arm of this.arms) {
-        arm.a = arm.at + arm.dir * this.wound * P.turns * TAU;
-      }
+    const rr = this.r * this.open;
+    if (rr < 4) return;
+
+    // ---- the surface ----
+    for (const e of world.enemies) {
       /*
-       * The sweep owns the barrel. This runs in the effects pass, after
-       * shooter.update(), so whatever the assist did to the aim this frame is
-       * overwritten rather than fought with. `targetAim` goes with it, because
-       * `aimError` is a getter off the two and the slew would otherwise spend
-       * the whole sweep correcting back to a target.
+       * `spent` and `fizzle` for the reason CLAUDE.md gives: a boss's own
+       * structure is still drawn through its ending and must not be shot at
+       * or cashed in. `harmless` keeps grey grey.
        */
-      /*
-       * The shake goes with the speed. A machine at rest does not shiver, and
-       * with the ramp in place the last tenth of a second is slow enough that
-       * a fixed wobble was the only thing still moving -- the barrel came to
-       * a stop and then twitched on the spot.
-       */
-      s.aim = this.arms[0].a + spread(P.wobble * rateAt(k, P.ramp));
-      s.targetAim = s.aim;
-      s.sweepFade = 1;
-
-      this.next -= dt;
-      // `while` rather than `if`: a long frame owes more than one round, and
-      // dropping them would make the sweep quietly weaker on a slow phone.
-      let guard = 12;
-      while (this.next <= 0 && guard-- > 0) {
-        /*
-         * One tick, one round per arm -- so COUNTERSPIN doubles the output
-         * and does not square it. The first version also divided the
-         * interval by the arm count, which is the same multiplier applied
-         * twice: two arms fired 118 rounds against one arm's 33.
-         */
-        this.next += P.interval;
-        for (const arm of this.arms) {
-          s.cooldown = 0;
-          const was = s.aim;
-          s.aim = arm.a + spread(P.wobble);
-          if (s.shoot(world, P.damage)) this.rounds++;
-          s.aim = was;
-        }
-      }
-      return;
+      if (e.dead || e.harmless || e.staged || e.spent || e.fizzle) continue;
+      const dx = e.x - s.x;
+      const dy = e.y - s.y;
+      const d = Math.hypot(dx, dy) || 1;
+      // Its EDGE against the surface, so a big body is met when it arrives
+      // rather than when its centre does.
+      const inside = d - e.r < rr;
+      const was = this.side.get(e);
+      this.side.set(e, inside);
+      if (was === undefined || was === inside) continue;
+      const last = this.seen.get(e) || -99;
+      if (world.time - last < P.recut) continue;
+      this.seen.set(e, world.time);
+      const nx = dx / d;
+      const ny = dy / d;
+      e.applyDamage(world, this.cut, nx, ny, P.push);
+      this.flash = 1;
+      this.hits.push({ a: Math.atan2(dy, dx), t: 0.4 });
+      spark(s.x + nx * rr, s.y + ny * rr, nx * 240, ny * 240, TONE_WARD, 0.24, 2.2);
+      audio.hit();
     }
 
-    /*
-     * Done firing, and the gun is already home.
-     *
-     * This unwraps the number rather than moving the barrel. `turns` is a
-     * whole number, so the last frame of the sweep leaves arm 0 at `from +
-     * turns * TAU`, which is the same DIRECTION as `from` and a different
-     * value -- and the value matters, because gripAngle is derived from it
-     * and an unwound aim leaves the gimbal's travel arc spanning nineteen
-     * radians for the rest of the run. That is what this is for; nothing on
-     * screen moves on this frame, which is the point.
-     *
-     * It used to be a genuine teleport: `turns` was 2.6, so the sweep ended
-     * 216 degrees out and the barrel was snapped back across it in one frame.
-     *
-     * Guarded on a flag rather than on `world.spiral !== 0`, which is what
-     * the first fix used and which never fired once: the running branch
-     * writes `Math.max(0, this.life)`, so by the frame the sweep ends the
-     * field it was testing had already reached zero on its own.
-     */
-    if (!this.restored) {
-      this.restored = true;
-      this.wound = 1;
-      world.spiral = 0;
-      s.aim = this.from;
-      s.targetAim = this.from;
-      s.gripAngle = this.grip;
+    // ---- and the arcs ----
+    this.next -= dt;
+    if (this.next > 0) return;
+    this.next = P.arc.every;
+    const reach = rr * P.arc.reach;
+    const near = [];
+    for (const e of world.enemies) {
+      if (e.dead || e.harmless || e.staged || e.spent || e.fizzle) continue;
+      const d = Math.hypot(e.x - s.x, e.y - s.y);
+      if (d > reach) continue;
+      near.push({ e, d });
     }
-    // ...and the closed circle fades rather than vanishing on the frame.
-    this.settle -= dt;
-    s.sweepFade = clamp(this.settle / CFG.spiral.settle, 0, 1);
-    if (this.settle <= 0) {
-      s.sweepFade = 0;
-      this.dead = true;
+    if (!near.length) return;
+    near.sort((a, b) => a.d - b.d);
+    for (let i = 0; i < Math.min(this.arcs, near.length); i++) {
+      const e = near[i].e;
+      const d = near[i].d || 1;
+      const nx = (e.x - s.x) / d;
+      const ny = (e.y - s.y) / d;
+      e.applyDamage(world, P.arc.damage * (up_or1(world, 'wardCut')), nx, ny, 0);
+      // From the SURFACE, not from the turret: the shell is what is throwing
+      // it, and a bolt starting at the machine would read as the gun firing.
+      this.bolts.push({
+        x0: s.x + nx * rr, y0: s.y + ny * rr, x1: e.x, y1: e.y, t: 0.16,
+        seed: Math.random() * 1000,
+      });
+      spark(e.x, e.y, spread(120), spread(120), '#dff3ff', 0.22, 2);
     }
+    audio.reflect();
   }
 
   draw(ctx, world) {
-    const P = CFG.spiral;
     const s = world.shooter;
-    const running = this.life > 0;
-    // How far round it has got, which is what the shape is drawn from. The
-    // clock only decides the fade.
-    const k = this.wound;
-    const fade = running
-      ? Math.min(1, this.t / 0.16)
-      : clamp(this.settle / P.settle, 0, 1);
-    if (fade <= 0) return;
-    const TONE = '#ff7a1a';
+    const k = this.open;
+    if (k < 0.02) return;
+    const rr = this.r * k;
+    const t = this.t;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    drawGlow(ctx, TONE, s.x, s.y, 90 + k * 70, 0.2 * fade);
 
     /*
-     * The trail is the swept path itself, wound outward.
-     *
-     * The first draft drew two thin arcs at a fixed radius and they were lost
-     * against the turret's own furniture -- the aim ray, the lever and the
-     * corruption ring all live in the same sixty pixels. The second drew a
-     * ring, which is not what the ability is called. This walks back along
-     * each arm's own history: every step is a shorter, dimmer, tighter piece
-     * of the same curve, so what is on the screen is where the gun has been.
+     * The shell: a thin bright surface with a soft interior behind it. It is
+     * drawn AT the radius it cuts at -- the whole point of the effect is that
+     * you can see where the line is, and a ring that fades as it grows would
+     * be dimmest exactly where the line matters. See CLAUDE.md.
      */
-    const STEPS = 26;
-    const back = 2.9; // radians of sweep still shown behind each arm
-    for (const arm of this.arms) {
-      let px = 0;
-      let py = 0;
-      for (let i = 0; i <= STEPS; i++) {
-        const f = i / STEPS;
-        const a = arm.a - arm.dir * f * back;
-        // How far through the sweep the arm was when it was there, so the
-        // trail winds in behind it instead of tracking a fixed radius.
-        const kk = Math.max(0, k - (f * back) / (P.turns * TAU));
-        const rr = this.reach(kk);
-        const x = s.x + Math.cos(a) * rr;
-        const y = s.y + Math.sin(a) * rr;
-        if (i > 0) {
-          const w = (1 - f) ** 1.5;
-          ctx.strokeStyle = rgba(TONE, (0.12 + 0.5 * w) * fade);
-          ctx.lineWidth = 1 + 5.5 * w;
-          ctx.beginPath();
-          ctx.moveTo(px, py);
-          ctx.lineTo(x, y);
-          ctx.stroke();
-        }
-        px = x;
-        py = y;
-      }
-      // The leading edge, where the rounds are actually leaving.
-      const hx = s.x + Math.cos(arm.a) * this.reach(k);
-      const hy = s.y + Math.sin(arm.a) * this.reach(k);
-      drawGlow(ctx, '#ffd9a0', hx, hy, 34, 0.55 * fade);
-      if (running) {
-        // ...and the line from the muzzle out to it, so the two read as one
-        // machine rather than as a turret and a separate spinning thing.
-        ctx.strokeStyle = rgba(TONE, 0.3 * fade);
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.moveTo(s.x, s.y);
-        ctx.lineTo(hx, hy);
-        ctx.stroke();
-      }
+    const beat = 0.5 + 0.5 * Math.sin(t * 3.1);
+    drawGlow(ctx, TONE_WARD, s.x, s.y, rr * 0.96, (0.1 + this.flash * 0.12) * k);
+    ctx.strokeStyle = rgba(TONE_WARD, (0.5 + beat * 0.14 + this.flash * 0.4) * k);
+    ctx.lineWidth = 2.2 + this.flash * 2.6;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, rr, 0, TAU);
+    ctx.stroke();
+    // ...and a second, fainter line just inside it, so the surface has
+    // thickness rather than being a drawn circle.
+    ctx.strokeStyle = rgba(TONE_WARD, 0.18 * k);
+    ctx.lineWidth = 6 + beat * 3;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, rr - 5, 0, TAU);
+    ctx.stroke();
+
+    /*
+     * The lattice: spokes from the machine to the surface, turning slowly.
+     * This is what says the shell belongs to the turret rather than being
+     * something the field did -- and it is what makes a still frame of it
+     * read as a made object.
+     */
+    const spokes = 10;
+    ctx.strokeStyle = rgba(TONE_WARD, 0.13 * k);
+    ctx.lineWidth = CFG.hairline * 1.6;
+    ctx.beginPath();
+    for (let i = 0; i < spokes; i++) {
+      const a = (i / spokes) * TAU + t * 0.42;
+      ctx.moveTo(s.x + Math.cos(a) * rr * 0.34, s.y + Math.sin(a) * rr * 0.34);
+      ctx.lineTo(s.x + Math.cos(a) * rr * 0.97, s.y + Math.sin(a) * rr * 0.97);
     }
-    if (running) drawGlow(ctx, '#ffd9a0', s.muzzleX, s.muzzleY, 28, 0.5 * fade);
+    ctx.stroke();
+
+    // Where something came through, marked on the surface for a moment.
+    for (const h of this.hits) {
+      const f = h.t / 0.4;
+      const w2 = 0.22 + (1 - f) * 0.5;
+      ctx.strokeStyle = rgba('#ffffff', 0.8 * f * k);
+      ctx.lineWidth = 3.4 * f + 1;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, rr, h.a - w2, h.a + w2);
+      ctx.stroke();
+    }
+
+    // ...and the arcs, drawn as a broken line rather than a straight one.
+    for (const b of this.bolts) {
+      const f = b.t / 0.16;
+      ctx.strokeStyle = rgba('#eaf6ff', 0.9 * f);
+      ctx.lineWidth = 1.6 + f * 1.4;
+      ctx.beginPath();
+      ctx.moveTo(b.x0, b.y0);
+      const seg = 4;
+      for (let i = 1; i <= seg; i++) {
+        const u = i / seg;
+        const jx = i === seg ? 0 : Math.sin(b.seed + i * 2.3) * 9;
+        const jy = i === seg ? 0 : Math.cos(b.seed + i * 1.7) * 9;
+        ctx.lineTo(b.x0 + (b.x1 - b.x0) * u + jx, b.y0 + (b.y1 - b.y0) * u + jy);
+      }
+      ctx.stroke();
+      drawGlow(ctx, TONE_WARD, b.x1, b.y1, 16 * f + 6, 0.55 * f);
+    }
     ctx.restore();
   }
+}
+
+/** A scalar off world.up that may not exist on an old save's table. */
+function up_or1(world, key) {
+  const v = world.up && world.up[key];
+  return typeof v === 'number' && v > 0 ? v : 1;
 }
 
 const SPECTRUM = ['#ff4d6d', '#ff9f1c', '#ffe066', '#7cffb2', '#59e0ff', '#8b5cf6', '#e0aaff'];
@@ -1047,17 +1075,23 @@ export const ABILITIES = [
     },
   },
   {
-    id: 'spiral',
-    name: 'SPIRAL',
-    color: '#ff7a1a',
-    cooldown: 20,
-    icon: ICON.spiral,
-    hint: 'SPIRAL — the barrel comes off its target and turns, firing all the way round.',
+    id: 'ward',
+    name: 'WARD',
+    color: '#e8f0ff',
+    cooldown: 18,
+    icon: ICON.ward,
+    hint: 'WARD — a shell stands up round the turret. It cuts what crosses it and arcs at what is inside.',
     run(world) {
-      world.effects.push(new Spiral(world));
-      ring(world.shooter.x, world.shooter.y, 16, 220, 0.4, '#ff7a1a', 3);
-      shake(3);
-      audio.ability('lance');
+      const s = world.shooter;
+      world.effects.push(new Ward(world));
+      // Drawn AT the radius it will stand at, opening outward -- the ring is
+      // the announcement of where the line is going to be.
+      const r = CFG.ward.r * (world.up.wardR || 1);
+      ring(s.x, s.y, 18, r, 0.42, '#e8f0ff', 3.2);
+      ring(s.x, s.y, 8, r * 0.55, 0.26, '#ffffff', 1.8);
+      ripple(s.x, s.y, 0.9, r * 2.2);
+      shake(4);
+      audio.ability('stasis');
     },
   },
 ];

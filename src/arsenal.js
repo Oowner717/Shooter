@@ -95,7 +95,7 @@ export const ARSENAL = [
     fx: 'Pins a whole crowd where it stands, for 2.4s.',
   },
   {
-    key: 'wire', kind: 'mine', group: 'mines', label: 'WIRE', icon: ICON.wire, tone: '#73ffad',
+    key: 'wire', kind: 'mine', group: 'mines', label: 'WIRE', icon: ICON.wire, tone: '#22ffcf',
     dmg: '72/s', fx: 'A line across the field. It cuts what crosses.',
   },
   {
@@ -107,7 +107,7 @@ export const ARSENAL = [
     dmg: '34/s', fx: 'Opens into burning ground and stays open.',
   },
   {
-    key: 'lode', kind: 'mine', group: 'mines', label: 'LODE', icon: ICON.lode, tone: '#59e1ff',
+    key: 'lode', kind: 'mine', group: 'mines', label: 'LODE', icon: ICON.lode, tone: '#3fb9ff',
     dmg: 'no damage',
     fx: 'Shoves everything near it away, and keeps on shoving.',
   },

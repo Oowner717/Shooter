@@ -97,11 +97,10 @@ const UNDER = {
   // rather than a number.
   pulse: ['shockfront'],
   fan: [], lance: [], well: [], prism: [], stasis: [], decoy: [],
-  // The only ability in the tree with a shaping upgrade of its own. The other
-  // seven are bought and then have nothing but a second charge to sell; this
-  // one has a knob on it, which is part of why it is the one that replaced
-  // CHORUS -- the tree is about the gun, and so is this.
-  spiral: ['counterspin'],
+  // WARD is the one with real shaping: how far the shell stands, how hard it
+  // cuts, and how many arcs come off it. It is a STATE rather than an event,
+  // which is what gives it three decisions to sell where an instant has one.
+  ward: ['standoff', 'edged', 'fork'],
 };
 
 /** Which arms hang off which category, in the order they are shown. */
@@ -113,7 +112,7 @@ const BRANCH = {
   mines: ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'],
   // PULSE and HAIL are the two the turret starts with. They are free where the
   // six below them are bought; their extra uses are not.
-  abilities: ['pulse', 'fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'spiral'],
+  abilities: ['pulse', 'fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'ward'],
   turret: [],
   anomaly: [],
 };
