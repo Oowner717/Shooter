@@ -39,6 +39,26 @@ class Glitch {
     this.roll += dt * 90;
   }
 
+  /**
+   * Let it go while the world is held.
+   *
+   * `present()` re-rolls every slice, every block and the tear line on each
+   * frame it draws -- that is what makes the corruption move -- and `draw()`
+   * keeps running while the menu is up even though `update()` returns at the
+   * top. So a paused game kept tearing and flickering behind the sheet at
+   * whatever level the last live frame left it on, which is the one place in
+   * the game where the picture has to be still enough to read.
+   *
+   * Faded rather than switched off, on the real clock, for the same reason
+   * settleScreen exists: a flash cut mid-decay reads as a broken frame. It
+   * costs nothing on the way back, because the rise is five times the decay
+   * and the level is rebuilt from live state the moment update() runs again.
+   */
+  settle(dt) {
+    this.burst = Math.max(0, this.burst - dt * 1.4);
+    this.level = Math.max(0, this.level - this.level * 9 * dt - 0.35 * dt);
+  }
+
   get active() {
     return this.level > 0.004;
   }

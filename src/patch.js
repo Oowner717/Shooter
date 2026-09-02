@@ -4,8 +4,8 @@
 // where it lands, and a THORN mine is a large one that lasts. It rides in
 // world.effects, which already has the update/draw/dead contract this needs.
 
-import { TAU, rand, spread, rgba, drawGlow } from './util.js';
-import { spark } from './fx.js';
+import { TAU, rand, spread, rgba, mixHex, drawGlow } from './util.js';
+import { fx, spark } from './fx.js';
 
 /**
  * How long a retired patch is left on the screen to go out in. Long enough to
@@ -50,14 +50,65 @@ export class Patch {
      */
     this.ground = true;
     /*
-     * Spores, not orbiting dots.
+     * ---- what the patch is made of ----
      *
-     * They used to be ten motes on fixed circular orbits, all the same size,
-     * all going the same way -- which reads as a dial rather than as ground
-     * that is burning. Each one now rises, drifts, fades and is reseeded, so
-     * the patch has something coming off it the whole time it is alive.
+     * Three layers, and none of them is a filled disc. It WAS a filled disc:
+     * 30% of a bright green over the whole ragged rim, an additive pass on
+     * top of that, a full-radius glow, and two hard polygon outlines -- which
+     * on a 390px screen is a solid slab a third of the width across, reading
+     * as spilled paint rather than as spores. Three of them (the cap) covered
+     * most of the lower half of the field in flat colour.
+     *
+     * `specks` is what has settled: the grain, and the only thing that says
+     * where the damage stops. Seeded uniformly by area, with a thin band at
+     * the rim -- a spore print has an edge. They die back from the outside in
+     * as the patch burns down, which is the timer the creeping inner ring
+     * used to be, at the cost of a second hard outline.
+     *
+     * `motes` is the cloud coming off it -- the only additive layer, and the
+     * one that has to carry "spores". Each rises, drifts, fades and is
+     * reseeded on its own clock.
      */
-    this.motes = Array.from({ length: 14 }, () => this.seedMote(rand(0, 1)));
+    const q = Math.max(0.45, fx.quality || 1);
+    /*
+     * Two tints, so the grain is not one flat colour. The pale one is the
+     * tone lifted most of the way to white and is what a spore catching the
+     * light looks like; the dark one is the tone dropped toward the ground.
+     * Cached per patch rather than per speck: mixHex parses.
+     */
+    this.pale = mixHex(this.tone, '#ffffff', 0.55);
+    this.dark = mixHex(this.tone, '#0a1408', 0.42);
+    /*
+     * Settled spores. Seeded uniformly by AREA (sqrt of a uniform, or they
+     * crowd the centre), plus a thin band right at the rim -- a spore print
+     * has an edge, and it is the only thing telling the player where the
+     * damage stops now that there is no outline.
+     */
+    /*
+     * A third of them in the rim band, not a quarter. At 24% of 58 that was
+     * fourteen specks around a whole circumference -- one every twenty-six
+     * degrees, which is not a ring, and the boundary is the one thing about
+     * this effect the player has to be able to find: everything standing
+     * inside it is being hurt.
+     */
+    const n = Math.round(104 * q);
+    const rimFrom = n - Math.round(n * 0.34);
+    this.specks = Array.from({ length: n }, (_, i) => {
+      const rim = i >= rimFrom;
+      const a = rim
+        // Spaced round the circle rather than dropped at random, or a
+        // fourteen-sample ring leaves gaps a quarter of a turn wide.
+        ? ((i - rimFrom) / (n - rimFrom)) * TAU + spread(0.16)
+        : rand(0, TAU);
+      const d = rim ? rand(0.88, 1) : Math.sqrt(rand(0, 1)) * 0.9;
+      return {
+        dx: Math.cos(a) * d, dy: Math.sin(a) * d, d,
+        r: rim ? rand(0.8, 1.7) : rand(0.7, 2.4),
+        a: rim ? rand(0.42, 0.8) : rand(0.3, 0.85),
+        pale: Math.random() < 0.34,
+      };
+    });
+    this.motes = Array.from({ length: Math.round(48 * q) }, () => this.seedMote(rand(0, 1)));
     // A ragged edge, fixed at birth: burning ground is not a circle. One
     // radius per spoke, reused every frame, so the outline holds still
     // instead of boiling.
@@ -82,16 +133,26 @@ export class Patch {
     this.max = Math.max(this.max, this.life);
   }
 
-  /** One spore: where it starts, how it drifts, how long it lasts. */
+  /**
+   * One spore: where it starts, how it drifts, how long it lasts.
+   *
+   * Seeded by area rather than by radius -- `rand(0.15, 0.98)` put as many
+   * spores in the inner tenth of the disc as in the outer half, which is the
+   * distribution of a dial and not of a cloud. Smaller and shorter-lived than
+   * before, because there are twice as many of them now and the cloud is the
+   * effect rather than a garnish on it.
+   */
   seedMote(age = 0) {
+    const life = rand(0.7, 1.7);
     return {
       a: rand(0, TAU),
-      d: rand(0.15, 0.98),
-      rise: rand(9, 26),
-      drift: spread(14),
-      size: rand(2.2, 5.4),
-      life: rand(0.9, 2.1),
-      t: age * rand(0.9, 2.1),
+      d: Math.sqrt(rand(0, 1)) * 0.96,
+      rise: rand(11, 34),
+      drift: spread(18),
+      size: rand(1.4, 3.6),
+      pale: Math.random() < 0.3,
+      life,
+      t: age * life,
     };
   }
 
@@ -143,60 +204,71 @@ export class Patch {
     // What is left of it, so ground that is nearly spent looks nearly spent
     // rather than blinking out at full strength.
     const left = Math.max(0, this.life / this.max);
+    const R = this.r;
     ctx.save();
 
     /*
-     * The ground first, under everything, in source-over: burning ground is
-     * something the field is standing ON, and drawn additively like the rest
-     * of the effect it read as a light shining from above instead.
+     * ---- the ground, in source-over ----
+     *
+     * Burning ground is something the field is standing ON; drawn additively
+     * like the rest of the effect it read as a light shining from above. One
+     * soft, wide, very dim haze and nothing else -- it used to be 30% of a
+     * bright green filled across the whole ragged rim, plus an additive pass,
+     * plus a full-radius glow, plus two hard outlines, which over near-black
+     * arrives as a flat olive slab a third of the screen wide. A first pass
+     * at this replaced the fill with nine soft blobs and they read as
+     * out-of-focus smudges: lumps are not more organic than a disc, they are
+     * just lumpier. The haze is a whisper of presence and the grain does the
+     * describing.
      */
-    ctx.globalAlpha = 0.3 * k;
-    ctx.fillStyle = this.tone;
-    this.rim(ctx, 0.97);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+    drawGlow(ctx, this.dark, this.x, this.y, R * 0.98, 0.44 * k * (0.4 + left * 0.6));
 
+    /*
+     * ---- what has settled ----
+     *
+     * The grain, the edge and the timer, all in one layer. They die back from
+     * the rim inward as the patch burns down, so the area visibly closes
+     * rather than dimming in place -- which is what the creeping inner ring
+     * used to do, at the cost of a second hard outline. Full extent until the
+     * last third: the first draft's `0.28 + left * 0.78` started biting
+     * immediately and drew a one-second-old patch smaller than the circle it
+     * was hurting things in.
+     */
+    const reach = Math.min(1.14, 0.26 + left * 1.1);
+    for (const sp of this.specks) {
+      if (sp.d > reach) continue;
+      // Softened only as the patch closes. At full extent `reach` sits clear
+      // of 1, so the rim band -- the only thing marking where the damage
+      // stops -- is drawn at its own alpha rather than at a quarter of it.
+      const edge = Math.min(1, (reach - sp.d) * 8);
+      ctx.fillStyle = rgba(sp.pale ? this.pale : this.tone,
+        Math.min(1, sp.a * k * edge));
+      ctx.beginPath();
+      ctx.arc(this.x + sp.dx * R, this.y + sp.dy * R, sp.r, 0, TAU);
+      ctx.fill();
+    }
+
+    /*
+     * ---- and the cloud coming off it ----
+     *
+     * The only additive layer, and the one carrying the whole idea. Forty-eight
+     * of them against the old fourteen, each smaller, shorter-lived and seeded
+     * by area rather than by radius. Up fast and out slow: a spore is
+     * brightest as it leaves the ground.
+     */
     ctx.globalCompositeOperation = 'lighter';
-    /*
-     * A thin additive pass over the same shape. The source-over ground alone
-     * is 30% of a bright green over near-black, which arrives as dark olive --
-     * the right value and the wrong hue. This puts the hue back without
-     * making the patch a light source: it is the interior that lifts, not
-     * the ground around it.
-     */
-    ctx.globalAlpha = 0.08 * k;
-    ctx.fillStyle = this.tone;
-    this.rim(ctx, 0.97);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    drawGlow(ctx, this.tone, this.x, this.y, this.r * 1.05, 0.26 * k);
-
-    /*
-     * Two rims. The outer one is where the patch reaches -- the line a body
-     * crosses to start taking damage -- and the inner one creeps in as the
-     * patch burns down, so the two closing on each other is the timer.
-     */
-    ctx.strokeStyle = rgba(this.tone, 0.78 * k);
-    ctx.lineWidth = 1.8;
-    this.rim(ctx, 1);
-    ctx.stroke();
-    ctx.strokeStyle = rgba(this.tone, 0.42 * k);
-    ctx.lineWidth = 1.2;
-    this.rim(ctx, 0.3 + left * 0.6);
-    ctx.stroke();
-
-    // ...and the spores coming off it.
     for (const m of this.motes) {
       const age = m.t / m.life;
       if (age >= 1) continue;
       const a = m.a + age * 0.5;
-      const d = this.r * m.d;
+      const d = R * m.d;
       const x = this.x + Math.cos(a) * d + m.drift * age;
       const y = this.y + Math.sin(a) * d - m.rise * age;
-      // Up fast, out slow: a spore is brightest as it leaves the ground.
       const fade = Math.min(1, age * 5) * (1 - age) ** 1.6;
-      drawGlow(ctx, this.tone, x, y, m.size * (0.8 + age * 1.1), 0.95 * fade * k);
+      drawGlow(ctx, m.pale ? this.pale : this.tone, x, y,
+        m.size * (0.8 + age * 1.4), 0.95 * fade * k);
     }
+
     ctx.restore();
   }
 }

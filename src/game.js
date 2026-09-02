@@ -1378,7 +1378,12 @@ export class Game {
       // Corruption is world state and stays frozen with the world, but a white
       // flash caught mid-decay would read as a broken frame rather than a
       // paused one, so the screen-level effects finish.
-      settleScreen(Math.min(dtRaw, CFG.maxFrameDelta));
+      const held = Math.min(dtRaw, CFG.maxFrameDelta);
+      settleScreen(held);
+      // ...and the corruption with them. draw() still runs while the menu is
+      // up and present() re-rolls its slices every frame, so without this the
+      // held frame goes on tearing behind the sheet. See Glitch.settle.
+      glitch.settle(held);
       this.hud.syncHudLight(w);
       return;
     }
@@ -1826,7 +1831,19 @@ export class Game {
       return;
     }
     this.bossStageT = (this.bossStageT || 0) + (w.dtRaw || dt);
-    if (this.bossStageT > CFG.boss.patience) this.withdrawBoss();
+    /*
+     * Measured against the boss AS IT ACTUALLY IS. The clock exists to stop
+     * an under-gunned run sitting in front of a gate for ever, and a tempered
+     * anomaly is longer by construction rather than by the player failing to
+     * hurt it -- so the allowance moves with the same multiplier its health
+     * did, or the fix for "the late fights are too short" would withdraw them
+     * instead. Identity at stock, where `hard` is 1 and this is the 90s it
+     * has always been. Measured at temper 3.4, TERMINUS's last stage runs
+     * 77.8s of the 90 -- a 14% margin against a fight that varies by more
+     * than that run to run, which is a net that would have started catching
+     * fights it was never meant to catch.
+     */
+    if (this.bossStageT > CFG.boss.patience * (w.boss.hard || 1)) this.withdrawBoss();
   }
 
   /**

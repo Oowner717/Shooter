@@ -62,7 +62,6 @@ class Mine {
     this.r = k.r;
     this.t = 0; // flight progress, 0..1
     this.settle = 0; // seconds since landing
-    this.armScale = 1; // QUICK ARM, set at the throw
     this.life = M.life;
     this.dead = false;
     this.spin = rand(0, TAU);
@@ -87,7 +86,7 @@ class Mine {
   }
 
   get armed() {
-    return this.landed && this.settle >= this.cfg.arm * this.armScale && this.hold <= 0;
+    return this.landed && this.settle >= this.cfg.arm && this.hold <= 0;
   }
 
   /** Snare only: currently holding a knot. */
@@ -127,7 +126,6 @@ export function throwMine(world, kind = 'blast') {
     if (!oldest.dead) oldest.dead = true;
   }
   const m = new Mine(kind, s.x, s.y - 20, site.x, site.y, world);
-  m.armScale = world.up.mineArm;
   if (kind === 'wire') {
     // The line is laid across the field, not along it, so it closes a lane
     // rather than sitting parallel to everything coming down. Kept inside the
@@ -230,7 +228,7 @@ function grip(world, m, dt) {
  */
 function retire(world, m) {
   if (m.dead) return;
-  if (!m.landed || m.settle < m.cfg.arm * m.armScale) { m.dead = true; return; }
+  if (!m.landed || m.settle < m.cfg.arm) { m.dead = true; return; }
   if (m.kind === 'blast') { detonate(world, m); return; }
   if (m.kind === 'spall') { spall(world, m); return; }
   if (m.kind === 'knell') { while (!m.dead && m.tolls > 0) toll(world, m); return; }
@@ -739,9 +737,10 @@ export function drawMines(ctx, world) {
  * pushes the old ones off one at a time rather than all at once.
  */
 /**
- * One clock for every kind, fixed at CFG.mines.throwEvery, and no upgrade may
- * move it. What an upgrade may do is put more down per throw: PAIRED CHARGE
- * widens the salvo, which is the only way the cap is reachable by laying.
+ * One clock for every kind. Two things in the tree reach it: PAIRED CHARGE
+ * widens the throw and QUICK LAY shortens the wait between throws, and either
+ * on its own is a way to put more on the field than the old steady state of
+ * one. The cap and the life are still nobody's to move.
  */
 export function mineCadence(world, timer, dt) {
   const kind = world.mine;
@@ -750,5 +749,5 @@ export function mineCadence(world, timer, dt) {
   if (next > 0) return next;
   const n = 1 + world.up.mineSalvo;
   for (let i = 0; i < n; i++) throwMine(world, kind);
-  return M.throwEvery;
+  return M.throwEvery * world.up.mineEvery;
 }

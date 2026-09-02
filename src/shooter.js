@@ -26,6 +26,50 @@ const SALVO_FAN = 0.09;
 import { applyBlast } from './enemies.js';
 import { audio } from './audio.js';
 
+/**
+ * What the tree has done to the gun, as one number, 1 at stock.
+ *
+ * Bosses are the only hostiles in the game with no scaling at all. `spawnOne`
+ * applies the tier's `scaleAt()` behind `!type.fixed` (enemies.js), every boss
+ * body is `fixed`, and each one is built by `new Enemy` inside `Boss.body()` --
+ * so a boss meets the authored literal whatever the player is carrying.
+ *
+ * Measured, seven anomalies, auto-aim and auto-fire, nothing bought against
+ * the whole tree bought: 227.0s -> 57.3s, 227.3 -> 43.4, 245.0 -> 47.5,
+ * 223.7 -> 43.3, 236.3 -> 41.5, 216.0 -> 41.0, 212.6 -> 67.8. Every one of
+ * them falls to about a fifth of the length it was tuned to.
+ *
+ * FOUR NODES CARRY ALL OF IT, and they cost 6,100 of the tree's 112,900:
+ * HOLLOWPOINT and SIGHT at 1.25 a level over three levels each, SALVO's every
+ * Nth shot, and what is left of FEED. Resetting those four alone returns a
+ * fully-bought fight to 98% of its stock length -- so this is the product to
+ * answer, not the ledger and not the spend. Half the tree is mines, abilities
+ * and defence: a player who bought those has not shortened any fight and must
+ * not be handed a harder boss for it.
+ *
+ * The terms are the gun's own, and deliberately read from the same places the
+ * gun reads them (`up.damage` and `up.overwatch` at the `shot()` above,
+ * `up.rate` in Game.update, `up.salvo` here) rather than re-derived from the
+ * tree. `overwatch` is gated the way the shot gates it -- it is worth nothing
+ * to a player aiming by hand -- but off `autoAim`, which is the toggle, rather
+ * than off the per-frame `autoSteering` the shot uses, because a boss's health
+ * is fixed when it arrives and must not depend on where a thumb was that
+ * frame.
+ *
+ * Asserted as a PRODUCT in regress.mjs rather than node by node, for the same
+ * reason `up.rate` is: a new damage node arriving is exactly the thing that
+ * would otherwise stop this tracking the gun, silently.
+ */
+export function gunScale(world) {
+  const up = world.up;
+  const out = up.damage
+    * ((world.autoAim || world.autoFire) ? up.overwatch : 1)
+    // SALVO is every Nth shot leaving as three, so two extra rounds in N.
+    * (up.salvo ? 1 + 2 / up.salvo : 1)
+    / (up.rate || 1);
+  return Math.max(1, out);
+}
+
 export class Shooter {
   constructor(x, y) {
     this.x = x;

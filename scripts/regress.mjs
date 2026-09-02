@@ -464,14 +464,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 131 since build 209, when TRACER and HEAVY each lost a level. It was
-    // 133 from build 193, when HOT LOAD went entirely; 134 from 192,
+    // 132 since build 214, when QUICK ARM (one level) was replaced by QUICK
+    // LAY (two). It was 131 from build 209, when TRACER and HEAVY each lost a
+    // level -- build 212 left it there, BLOOM OUT going 3 levels to 2 exactly
+    // paying for SECOND GROWTH. Before that: 133 from build 193, when HOT
+    // LOAD went entirely; 134 from 192,
     // when HOT LOAD was capped at one level; 136 from 190, when REFLEX went;
     // 137 from 189, when DOUBLE TAP lost TRIPLE TAP; 138 from 183, when SIEVE
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 131
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 132
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -3553,9 +3556,46 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       for (let i = 0; i < d.length; i += 4) excess += Math.max(0, d[i + 1] - d[i]);
       return Math.round(excess / 1000);
     };
+    /*
+     * ...and a second reading, in a BOX just outside the body, to show the
+     * patch is genuinely being drawn. It was one 2x2 pixel: fine against a
+     * filled disc and useless against build 214's patch, which is a scatter
+     * of small specks over a dim haze -- a point sample lands between them
+     * and reports the effect missing on a build where it is plainly there.
+     * Same disease as the HITBOXES floor line in CLAUDE.md.
+     */
+    /*
+     * ...and whether the patch is being drawn AT ALL, by differencing the two
+     * frames rather than by looking for green.
+     *
+     * It was one 2x2 pixel just outside the body: fine against a filled disc
+     * and useless against build 214's patch, which is a scatter of small
+     * specks over a dim haze -- a point sample lands between them and reports
+     * the effect missing on a build where it is plainly there. Widening it to
+     * a box did not help either, because the field's own lattice is a dim
+     * teal and swamps the signal: measured, 740 strongly-green pixels of
+     * lattice against 112 the patch adds. Nothing is moving between the two
+     * draws except the patch, so the difference IS the patch, and it needs no
+     * threshold tuned to whatever the effect happens to look like this build.
+     * Same disease as the HITBOXES floor line in CLAUDE.md, twice over.
+     */
+    const frame = () => {
+      const half = Math.round(126 * k);
+      const bx = Math.max(0, Math.round(e.x * k) - half);
+      const by = Math.max(0, Math.round(e.y * k) - half);
+      const bw = Math.min(c2.canvas.width - bx, half * 2);
+      const bh = Math.min(c2.canvas.height - by, half * 2);
+      return c2.getImageData(bx, by, bw, bh).data;
+    };
+    const litUp = (a, b) => {
+      let n = 0;
+      for (let i = 0; i < a.length; i += 4) if (b[i + 1] - a[i + 1] > 8) n++;
+      return n;
+    };
     w.effects.length = 0;
     g.draw();
     const bare = wash();
+    const frameBare = frame();
     const patch = new Patch(e.x, e.y, { r: 120, life: 6, dps: 0, tone: '#8eeb4b' });
     // Past its own quarter-second fade-in, or it is invisible everywhere and
     // the whole case reads a patch that is not being drawn at all.
@@ -3563,11 +3603,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.effects.push(patch);
     g.draw();
     const onGround = wash();
-    // ...and the patch is genuinely there: just outside the body it is green.
-    const px = Math.round((e.x + e.r + 18) * k);
-    const py = Math.round(e.y * k);
-    const edge = c2.getImageData(px, py, 2, 2).data;
-    const patchThere = edge[1] > edge[0] + 12;
+    // ...and the patch is genuinely there: pixels the patch lit that the bare
+    // frame did not, over the patch's own area.
+    const lit = litUp(frameBare, frame());
+    const patchThere = lit > 900;
     w.effects.length = 0;
 
     // The narrator, standing down. Spied rather than pixel-read: text on a
@@ -3587,14 +3626,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     g.debugClearField();
     g.restart();
-    return { bare, onGround, patchThere, ground: patch.ground === true,
-      without, withCaption };
+    return { bare, onGround, patchThere, lit,
+      ground: patch.ground === true, without, withCaption };
   });
 
   check('a patch is ground: under the body standing on it, not over it',
     r.ground && r.patchThere && r.onGround < r.bare * 1.3 + 40,
-    `green excess across the body's disc: bare ${r.bare}, on a patch ${r.onGround} `
-    + `(patch visible beside it: ${r.patchThere})`);
+    `green excess across the body's disc: bare ${r.bare}, on a patch ${r.onGround}; `
+    + `${r.lit} pixels over the patch's own area were lit by drawing it, so `
+    + `the patch is there (${r.patchThere})`);
 
   check('...and the narrator stands down while a boss is talking',
     r.without === 1 && r.withCaption === 0,
@@ -3754,11 +3794,35 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * computed style read on the frame the class changes is reading the
      * value it is leaving, not the one it is going to. Both are waited out.
      */
-    const settle = () => new Promise((res) => setTimeout(res, 420));
-    const look = async () => {
+    /*
+     * ...and the world keeps running through that 420ms, which is the whole
+     * of why this case was flaky.
+     *
+     * `.ab.urgent` is on for as long as something is attached, and the body
+     * this case puts on the mount is shoved off it by the physics inside the
+     * wait -- so the `cooling` read came back "ab essential" with no urgent
+     * class on about one run in three, on a build where nothing was wrong.
+     * Exactly the shape CLAUDE.md already records for this button: a light
+     * sampled at the end of a window rather than on frames where something is
+     * genuinely attached. `hold` re-pins and heals the body every frame of
+     * the wait, the way the measuring loops further down already do.
+     */
+    const settle = (hold) => new Promise((res) => {
+      const t0 = performance.now();
+      const tick = () => {
+        if (hold && !hold.dead) {
+          hold.x = w.shooter.x + 4; hold.y = w.shooter.y - 6;
+          hold.vx = 0; hold.vy = 0; hold.hp = hold.maxHp;
+        }
+        if (performance.now() - t0 >= 420) res();
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    const look = async (hold) => {
       const b = btn('PULSE');
       b.classList.remove('flash');
-      await settle();
+      await settle(hold);
       const cs = getComputedStyle(b);
       return { cls: b.className, border: cs.borderTopColor, anim: cs.animationName,
         lbl: getComputedStyle(b.querySelector('.lbl')).color };
@@ -3775,7 +3839,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const e = g.debugSpawn('lurcher', s.x + 4, s.y - 6);
     e.spawnIn = 0; e.vx = 0; e.vy = 0;
     for (let i = 0; i < 30; i++) g.update(1 / 60);
-    const held = await look();
+    const held = await look(e);
     const spread = others();
 
     // ...and with no charge in hand it must still mark itself, but must not
@@ -3784,7 +3848,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const keep = { charges: slot.charges, cd: slot.cd };
     slot.charges = 0; slot.cd = 9;
     sync();
-    const cooling = await look();
+    const cooling = await look(e);
     slot.charges = keep.charges; slot.cd = keep.cd;
     sync();
 
@@ -11519,6 +11583,386 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.boss.up && r.boss.chip === '' && r.boss.underBoss === 0 && r.boss.control === 5,
     `chip "${r.boss.chip}" during a fight; the paused wave took ${r.boss.underBoss} `
     + `of five deaths with an anomaly up and ${r.boss.control} of five without one`);
+}
+
+// --- the corruption is held with the world ---------------------------------
+/*
+ * `Game.update` returns at the top while the menu, the loadout or the wave
+ * sheet is open, so nothing about the world moves -- but `draw()` keeps
+ * running, and `Glitch.present` re-rolls every displaced slice, every noise
+ * block and the tear line on the frame it is called. So a held game went on
+ * tearing and flickering at whatever level the last live frame left it on,
+ * which is the one place in the game where the picture has to be still enough
+ * to read.
+ *
+ * Driven synthetically, off one fixed source buffer: a live run cannot answer
+ * "did the picture change" because the world under it is moving as well.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { glitch } = await import('../src/glitch.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    const was = { level: glitch.level, burst: glitch.burst };
+
+    // A source frame with enough in it that a displaced slice shows.
+    const src = document.createElement('canvas');
+    src.width = 240; src.height = 320;
+    const sc = src.getContext('2d');
+    for (let i = 0; i < 300; i++) {
+      sc.fillStyle = `hsl(${(i * 37) % 360} 80% 55%)`;
+      sc.fillRect((i * 53) % 240, (i * 91) % 320, 9, 5);
+    }
+    const dst = document.createElement('canvas');
+    dst.width = 240; dst.height = 320;
+    const dc = dst.getContext('2d');
+    /** A cheap signature of what present() actually put on the screen. */
+    const shot = () => {
+      dc.clearRect(0, 0, 240, 320);
+      glitch.present(dc, src, 240, 320);
+      const d = dc.getImageData(0, 0, 240, 320).data;
+      let h = 2166136261;
+      for (let i = 0; i < d.length; i += 61) { h ^= d[i]; h = Math.imul(h, 16777619); }
+      return h | 0;
+    };
+    const distinct = (n) => {
+      const s = new Set();
+      for (let i = 0; i < n; i++) s.add(shot());
+      return s.size;
+    };
+
+    // ---- live: the picture moves, which is the whole point of it ----------
+    glitch.level = 0.85; glitch.burst = 0;
+    out.liveLevel = glitch.level;
+    out.liveDistinct = distinct(8);
+
+    // ---- held: settle it the way a paused frame does ----------------------
+    /*
+     * Sixty frames of the paused path, on the real clock, which is one second
+     * of a player looking at the menu. The decay is the same shape
+     * settleScreen uses on the flash.
+     */
+    let steps = 0;
+    for (let i = 0; i < 60 && glitch.active; i++) { glitch.settle(1 / 60); steps++; }
+    out.settleFrames = steps;
+    out.heldLevel = +glitch.level.toFixed(4);
+    out.heldActive = glitch.active;
+    out.heldDistinct = distinct(8);
+
+    // ...and it is not a one-way door: the level is rebuilt from live state.
+    glitch.update(1 / 60, 0.9, 'normal');
+    out.backAfterOneFrame = glitch.level > 0.1;
+
+    // ---- and the paused path in the game actually calls it ----------------
+    /*
+     * Asserted through Game.update rather than by calling settle() directly:
+     * the whole defect was that the held path did not reach the corruption,
+     * and a case that calls settle() itself would have passed on the broken
+     * build. Same shape as the boss/director rule in CLAUDE.md.
+     */
+    g.restart();
+    w.phase = 'staging';
+    glitch.level = 0.8; glitch.burst = 0;
+    g.hud.menu.open = true;
+    const atOpen = glitch.level;
+    for (let i = 0; i < 30; i++) g.update(1 / 60);
+    out.paused = g.paused;
+    out.throughUpdate = { from: +atOpen.toFixed(3), to: +glitch.level.toFixed(4) };
+    g.hud.menu.open = false;
+
+    glitch.level = was.level; glitch.burst = was.burst;
+    g.restart();
+    return out;
+  });
+
+  check('a held frame stops tearing, and the world being still is not enough',
+    r.liveDistinct >= 6 && r.heldActive === false && r.heldDistinct === 1,
+    `live, one buffer presented eight times gave ${r.liveDistinct} different `
+    + `pictures; held it gave ${r.heldDistinct} (level ${r.liveLevel} -> `
+    + `${r.heldLevel} over ${r.settleFrames} frames)`);
+
+  check('...and the pause path in Game.update is what does it',
+    r.paused && r.throughUpdate.to < 0.02 && r.throughUpdate.from > 0.5,
+    `half a second of held frames took the level ${r.throughUpdate.from} -> `
+    + `${r.throughUpdate.to} without settle() being called by the case`);
+
+  check('...and it comes straight back when the world does',
+    r.backAfterOneFrame,
+    'one live frame at a level of 0.9 puts the corruption back');
+}
+
+// --- QUICK LAY sells the wait, which is the half a player feels -------------
+/*
+ * QUICK ARM sold `mineArm`: the settling time between a mine landing and it
+ * being able to trigger, 0.4s to 0.8s depending on the kind. Its line -- "a
+ * mine arms twice as fast after it lands" -- was read as the throw cooldown
+ * by everyone who read it, because that is the wait a player actually feels.
+ * It was a fifth of a second off a fifteen-second cycle.
+ *
+ * QUICK LAY is the cycle itself, two levels at 0.75: 15s to 11.25 to 8.44.
+ * `throwEvery` was documented as one of three numbers no upgrade may move; it
+ * is a dial now and the cap and the life are not, which is the part of that
+ * contract worth keeping.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { NODES } = await import('../src/tree.js');
+    const { BY_ID, freshUpgrades } = await import('../src/upgrades.js');
+    const { mineCadence } = await import('../src/mines.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = { every: CFG.mines.throwEvery, cap: CFG.mines.cap, life: CFG.mines.life };
+
+    // ---- the old node is gone, root and branch --------------------------
+    out.quickarmNode = NODES.some((n) => n.id === 'quickarm');
+    out.quickarmDef = !!BY_ID.get('quickarm');
+    out.freshHasArm = 'mineArm' in freshUpgrades();
+
+    // ---- the new one is in the tree, at two levels ----------------------
+    const node = NODES.find((n) => n.id === 'quicklay');
+    const def = BY_ID.get('quicklay');
+    out.placed = !!node;
+    out.levels = def ? def.levels : null;
+    out.freshHasEvery = 'mineEvery' in freshUpgrades();
+
+    // ---- and what it is worth, off the clock rather than off the table --
+    /*
+     * Measured through mineCadence, which is what the frame calls: it returns
+     * the next wait. A case that multiplied CFG by the scalar itself would
+     * pass on a build where nothing read the scalar at all.
+     */
+    const waitAfterAThrow = (levels) => {
+      g.debugClearField();
+      w.up = freshUpgrades();
+      for (let i = 0; i < levels; i++) def.apply(w.up, w);
+      w.mine = 'blast';
+      w.phase = 'staging';
+      // Ask for one throw: the timer runs out, mines are laid, and the number
+      // that comes back is the wait until the next lot.
+      return +mineCadence(w, 0, 1 / 60).toFixed(3);
+    };
+    out.waits = [0, 1, 2].map(waitAfterAThrow);
+
+    // ---- ...and nothing may sell a third level --------------------------
+    const priced = NODES.filter((n) => n.id === 'quicklay');
+    out.inTreeOnce = priced.length;
+
+    g.debugClearField();
+    w.up = freshUpgrades();
+    w.mine = null;
+    g.restart();
+    return out;
+  });
+
+  check('QUICK ARM is gone, and nothing is left reading for it',
+    !r.quickarmNode && !r.quickarmDef && !r.freshHasArm,
+    `in the tree ${r.quickarmNode}, in the table ${r.quickarmDef}, `
+    + `mineArm still on world.up ${r.freshHasArm}`);
+
+  check('QUICK LAY is in its place, two levels, and shortens the actual clock',
+    r.placed && r.levels === 2 && r.inTreeOnce === 1 && r.freshHasEvery
+    && Math.abs(r.waits[0] - r.every) < 1e-6
+    && Math.abs(r.waits[1] - r.every * 0.75) < 1e-3
+    && Math.abs(r.waits[2] - r.every * 0.5625) < 1e-3,
+    `the wait between throws goes ${r.waits.join('s -> ')}s across two levels, `
+    + `off a base of ${r.every}s`);
+
+  /*
+   * The cap and the life are still nobody's to move: five on the field,
+   * fifteen seconds each. What changed is only how often you may lay.
+   */
+  check('...and the cap and the life it is measured against did not move',
+    r.cap === 5 && r.life === 15 && r.waits[2] < r.life,
+    `cap ${r.cap}, life ${r.life}s, fastest throw ${r.waits[2]}s -- so a fully `
+    + `bought clock is a steady ${(r.life / r.waits[2]).toFixed(2)} mines, `
+    + `against one before`);
+}
+
+// --- an anomaly is worth what the gun is worth ------------------------------
+/*
+ * Bosses were the only hostiles in the game with no scaling at all. `spawnOne`
+ * applies the tier's scaleAt() behind `!type.fixed`, every boss body is
+ * `fixed`, and each one is built by `new Enemy` inside `Boss.body()` -- so an
+ * anomaly met the authored literal whatever the player was carrying.
+ *
+ * Measured, all seven, auto-aim and auto-fire, nothing bought against the
+ * whole tree bought: 227.0s -> 57.3s, 227.3 -> 43.4, 245.0 -> 47.5,
+ * 223.7 -> 43.3, 236.3 -> 41.5, 216.0 -> 41.0, 212.6 -> 67.8. Every one to
+ * about a fifth of its tuned length.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { gunScale } = await import('../src/shooter.js');
+    const { freshUpgrades } = await import('../src/upgrades.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = { cap: CFG.boss.temper, patience: CFG.boss.patience };
+
+    /** Open one anomaly and read what it was built out of. */
+    const open = (n, buy) => {
+      g.restart();
+      w.phase = 'staging';
+      w.autoAim = true; w.autoFire = true;
+      if (buy) { g.debugGiveEnergy(400000); g.debugBuyAll(); }
+      if (n === 1) w.aperture = 1; else w.apertures[n] = 1;
+      g.openBoss(n);
+      /*
+       * Past the arrival. ORDINAL's frame is not assembled during it -- at
+       * forty frames the only body on the field with `counts === false` is
+       * the core, which is how the first version of this case came to divide
+       * a 1900hp core by TALLY's 165 and report the structure at x53.
+       */
+      for (let f = 0; f < 60 * 30 && w.boss && w.boss.sequencing(); f++) g.update(1 / 60);
+      const b = w.boss;
+      if (!b) return null;
+      // TALLYs only: `counts === false` is every piece of the boss INCLUDING
+      // its core, and averaging a 1900hp core in with 165hp panels reported a
+      // structure multiplier of 53.
+      const panels = w.enemies.filter((e) => !e.dead && e.counts === false
+        && e.type.id === 'tally');
+      return { hard: b.hard, core: b.core ? b.core.maxHp : null,
+        pieces: panels.length,
+        hp: panels.reduce((a, e) => a + e.maxHp, 0), boss: b, panels };
+    };
+
+    // ---- the measure itself: a PRODUCT, not a list of nodes --------------
+    /*
+     * Asserted against a literal for the same reason regress asserts up.rate
+     * against one: a new damage node arriving is exactly the thing that would
+     * otherwise stop this tracking the gun, silently and with every case green.
+     */
+    g.restart();
+    w.up = freshUpgrades();
+    w.autoAim = true; w.autoFire = true;
+    out.stockScale = +gunScale(w).toFixed(4);
+    g.debugGiveEnergy(400000); g.debugBuyAll();
+    out.boughtScale = +gunScale(w).toFixed(3);
+    // ...and SIGHT is worth nothing to a player aiming by hand, which is how
+    // the shot itself gates it.
+    w.autoAim = false; w.autoFire = false;
+    out.byHandScale = +gunScale(w).toFixed(3);
+    w.autoAim = true; w.autoFire = true;
+
+    // ---- stock is an EXACT identity, which is what keeps the hash still --
+    /*
+     * The multiply is on the health the CONSTRUCTOR produced, not a recompute
+     * from `type.hp` -- the constructor applies rand(0.92, 1.1) to every body
+     * and fight.mjs seeds Math.random, so recomputing would throw that jitter
+     * away and move the canonical ORDINAL hash on a build where nothing was
+     * bought. Asserted by exact equality on `hard === 1`, and by a BAND when
+     * bought, because the jitter is +/-9% and a case pinned to a digit here
+     * would be flaky in the way CLAUDE.md's note describes.
+     */
+    const stock = open(1, false);
+    out.stockHard = stock ? stock.hard : null;
+    out.stockCore = stock ? Math.round(stock.core) : null;
+    const T = TYPE_BY_ID.tally;
+    const O = TYPE_BY_ID.ordinal;
+    out.stockCoreBand = stock ? Math.abs(stock.core / O.hp - 1) : null;
+
+    // ---- ...and a bought one is tempered, everywhere it is made ----------
+    const bought = open(1, true);
+    out.boughtHard = bought ? +bought.hard.toFixed(3) : null;
+    out.coreRatio = bought && stock ? +(bought.core / O.hp).toFixed(3) : null;
+    out.pieceRatio = bought && bought.pieces
+      ? +((bought.hp / bought.pieces) / T.hp).toFixed(3) : null;
+
+    // ---- ...including a piece put BACK after it was taken apart ----------
+    /*
+     * revive() and ORDINAL's two private copies of it write `type.hp` raw.
+     * Miss them and a re-formed panel comes back at authored health halfway
+     * through a tempered fight -- invisible, because nothing on the screen
+     * says what a panel is supposed to be worth.
+     */
+    const b = bought && bought.boss;
+    let revived = null;
+    if (b) {
+      const p = w.enemies.find((e) => !e.dead && e.counts === false
+        && e.type.id === 'tally');
+      if (p) { p.dead = true; b.revive(w, p, 1); revived = p.maxHp; }
+    }
+    out.revived = revived ? +(revived / T.hp).toFixed(3) : null;
+
+    // ---- and the withdrawal clock moves with it -------------------------
+    /*
+     * Measured at temper 3.4, TERMINUS's last stage ran 77.8s of the 90 --
+     * a net that would have started catching fights it was never meant to.
+     * Driven through Game.update rather than by reading the expression: the
+     * clock is spent in one place and a case that recomputes it proves
+     * nothing about the place that spends it.
+     */
+    const allowance = (hard) => {
+      g.restart();
+      w.phase = 'staging';
+      w.aperture = 1;
+      g.openBoss(1);
+      if (!w.boss) return null;
+      /*
+       * Past the arrival first. `watchBoss` zeroes the clock for as long as
+       * the boss is `sequencing()`, which the whole 14.4-second arrival is --
+       * so a case that opens the way and steps one frame is measuring the
+       * scene, not the clock, and reports the stock anomaly surviving a
+       * ninety-second stall it never had.
+       */
+      for (let f = 0; f < 60 * 30 && w.boss && w.boss.sequencing(); f++) g.update(1 / 60);
+      if (!w.boss || w.boss.sequencing()) return null;
+      w.boss.hard = hard;
+      g.bossStageWas = w.bossStage;
+      g.bossStageT = CFG.boss.patience * 1.02;   // just past the stock clock
+      const up = !!w.boss;
+      g.update(1 / 60);
+      return { was: up, still: !!w.boss };
+    };
+    out.stockClock = allowance(1);
+    out.hardClock = allowance(4);
+
+    g.restart();
+    w.up = freshUpgrades();
+    return out;
+  });
+
+  const want = 1.25 ** 3 * 1.25 ** 3 * 1.25 / 0.9;   // HOLLOWPOINT, SIGHT, SALVO, FEED
+
+  check('what the tree did to the gun is one number, and it is 1 at stock',
+    r.stockScale === 1 && Math.abs(r.boughtScale - want) < 0.02
+    && r.byHandScale < r.boughtScale * 0.55,
+    `stock ${r.stockScale}, fully bought ${r.boughtScale} (the product of `
+    + `HOLLOWPOINT, SIGHT, SALVO and FEED is ${want.toFixed(3)}), and `
+    + `${r.byHandScale} for a player aiming by hand, who SIGHT is worth `
+    + `nothing to`);
+
+  check('an anomaly opened by a stock turret is the anomaly as authored',
+    r.stockHard === 1 && r.stockCoreBand < 0.11,
+    `hard ${r.stockHard}, core ${r.stockCore} against an authored 1900 `
+    + `(${(r.stockCoreBand * 100).toFixed(1)}% off, which is the constructor's `
+    + `own jitter and nothing else -- the multiply is an identity at 1)`);
+
+  check('...and one opened by a bought turret is worth the gun that opened it',
+    Math.abs(r.boughtHard - r.cap) < 1e-6
+    && Math.abs(r.coreRatio / r.cap - 1) < 0.12
+    && Math.abs(r.pieceRatio / r.cap - 1) < 0.12,
+    `hard ${r.boughtHard} (capped at ${r.cap} from ${want.toFixed(2)}); core `
+    + `x${r.coreRatio} and structure x${r.pieceRatio} of authored`);
+
+  check('...and a piece put back mid-fight comes back tempered too',
+    r.revived !== null && Math.abs(r.revived / r.cap - 1) < 0.02,
+    `a revived panel is x${r.revived} of its authored health, against the `
+    + `x${r.cap} the rest of the boss is at`);
+
+  /*
+   * The clock exists to stop an under-gunned run sitting in front of a gate
+   * for ever. A tempered anomaly is longer by construction rather than by the
+   * player failing to hurt it, so the allowance moves with the same
+   * multiplier its health did.
+   */
+  check('...and the withdrawal clock is measured against the boss it is watching',
+    r.stockClock && !r.stockClock.still && r.hardClock && r.hardClock.still,
+    `just past ${r.patience}s: a stock anomaly withdraws (still up `
+    + `${r.stockClock && r.stockClock.still}), a x4 one does not `
+    + `(${r.hardClock && r.hardClock.still})`);
 }
 
 // --- report -----------------------------------------------------------------

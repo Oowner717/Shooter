@@ -39,6 +39,7 @@ import { audio } from './audio.js';
 import { shed } from './debris.js';
 import { background } from './background.js';
 import { registerAnomaly, makerOf, dressOf, anomalyOf } from './anomaly.js';
+import { gunScale } from './shooter.js';
 
 const O = () => CFG.ordinal;
 /** The five numbers every boss's ending shares. See CFG.boss. */
@@ -188,6 +189,14 @@ class Remainder {
 export class Boss {
   constructor(world, n) {
     this.n = n; // which of the seven. See anomaly.js.
+    /*
+     * How much harder this one is than it is authored, decided ONCE here and
+     * never re-read: a fight whose health moved while you were in it because
+     * you bought something, or because auto-aim was off for a frame, is not a
+     * fight anybody can read. Capped, because the point is a fight of the
+     * length it was tuned to and not a fight four times that. See gunScale.
+     */
+    this.hard = Math.min(gunScale(world), CFG.boss.temper);
     this.t = 0;
     this.stage = 1;
     this.stageT = 0;
@@ -284,6 +293,30 @@ export class Boss {
     e.invMass = 0;
     e.cruise = 0;
     e.accel = 0;
+    this.temper(e);
+    return e;
+  }
+
+  /**
+   * The gun's own multiplier, on the health of one of this boss's bodies.
+   *
+   * MULTIPLIES what the constructor produced; it does not recompute from
+   * `type.hp`. The constructor already applied `rand(0.92, 1.1)` to every
+   * body, and `fight.mjs` seeds `Math.random` for the canonical hash -- so
+   * reassigning from the type would throw that jitter away and move the hash
+   * on a build where nothing was bought. Multiplying by 1 is an exact
+   * identity on an already-rounded integer, which is what keeps the stock
+   * fight, and the hash, untouched.
+   *
+   * Also the door for the three places that put health BACK on a piece that
+   * had gone -- revive(), and ORDINAL's two private copies of it -- which
+   * write `type.hp` raw and would otherwise quietly un-temper a re-formed
+   * panel halfway through a fight.
+   */
+  temper(e) {
+    if (this.hard === 1) return;
+    e.maxHp = Math.round(e.maxHp * this.hard);
+    e.hp = Math.min(e.hp, e.maxHp);
     return e;
   }
 
@@ -367,7 +400,7 @@ export class Boss {
    */
   revive(world, p, hpFrac) {
     p.dead = false;
-    p.maxHp = p.type.hp;
+    p.maxHp = Math.round(p.type.hp * this.hard);
     p.hp = Math.round(p.maxHp * hpFrac);
     p.spawnIn = 0.4;
     p.flash = 1;
@@ -964,7 +997,7 @@ export class Ordinal extends Boss {
       if (!gone.length) continue;
       const p = gone[(Math.random() * gone.length) | 0];
       p.dead = false;
-      p.maxHp = TYPE_BY_ID.tally.hp;
+      p.maxHp = Math.round(TYPE_BY_ID.tally.hp * this.hard);
       p.hp = Math.round(p.maxHp * O().repairHp);
       p.spawnIn = 0.5;
       p.flash = 1;
@@ -1393,7 +1426,7 @@ export class Ordinal extends Boss {
       for (let k = 0; k < need && k < gone.length; k++) {
         const p = gone[k];
         p.dead = false;
-        p.maxHp = TYPE_BY_ID.tally.hp;
+        p.maxHp = Math.round(TYPE_BY_ID.tally.hp * this.hard);
         p.hp = Math.round(p.maxHp * 0.6);
         p.spawnIn = 0.4;
         p.flash = 1;

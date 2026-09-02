@@ -71,7 +71,7 @@ const UNDER = {
   // you are throwing, SALTED saves any spent mine. It sat under BLAST because
   // BLAST used to be the door to the tier; it is a category-wide group now,
   // and BLAST is left with nothing of its own.
-  mines: ['paired', 'quickarm', 'widemouth', 'salted', 'deepcharge', 'shrapnel'],
+  mines: ['paired', 'quicklay', 'widemouth', 'salted', 'deepcharge', 'shrapnel'],
   blast: [],
   snare: ['deadweight'],
   wire: ['hotwire'],

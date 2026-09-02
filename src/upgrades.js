@@ -52,7 +52,7 @@ export function freshUpgrades() {
     // upgrade may move any of them. What an upgrade may do is put more down
     // per throw, arm them sooner, or make a spent one worth something.
     mineSalvo: 0, // extra mines laid per throw
-    mineArm: 1, // multiplier on the settling time before one goes live
+    mineEvery: 1, // multiplier on the wait between throws
     mineFizzle: false, // a mine that runs out its life goes off instead
     mineBlast: 1, // radius of a blast mine and of a knell's tolls
     mineDamage: 1, // and how hard both of them land
@@ -341,13 +341,18 @@ export const UPGRADES = {
   FIELD: [
     { id: 'paired', name: 'PAIRED CHARGE', line: '+1 mine laid per throw.', apply: bump('mineSalvo', 1) , icon: MARK.deepmag },
     /*
- * `mineArm` scales CFG's per-mine `arm`: the settling time between a mine
- * landing and it being able to trigger, 0.4s to 0.8s depending on the kind.
- * It is not the wait between throws -- that is the mine timer, and nothing
- * here touches it. "Mines go live in half the time" was read as the throw
- * cooldown, which is the wrong half of the sentence to leave implicit.
- */
-{ id: 'quickarm', name: 'QUICK ARM', line: 'A mine arms twice as fast after it lands.', levels: 1, apply: scale('mineArm', 0.5) , icon: MARK.quicklay },
+     * The wait BETWEEN throws, which is the half of the sentence the node
+     * this replaces did not touch.
+     *
+     * QUICK ARM sold the settling time -- 0.4s to 0.8s between a mine landing
+     * and it being able to trigger -- and its line, "a mine arms twice as
+     * fast after it lands", was read as the throw cooldown by everyone who
+     * read it, because that is the wait a player actually feels. It was a
+     * fifth of a second off a fifteen-second cycle. This is the wait itself.
+     */
+    { id: 'quicklay', name: 'QUICK LAY', levels: 2,
+      line: '-25% wait between mine throws.',
+      apply: scale('mineEvery', 0.75), icon: MARK.quicklay },
     { id: 'deepcharge', name: 'DEEP CHARGE', line: '+35% mine blast radius.', apply: scale('mineBlast', 1.35) , icon: MARK.deepcharge },
     { id: 'widemouth', name: 'WIDE MOUTH', line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) , icon: MARK.widemouth },
     { id: 'eventhorizon', name: 'EVENT HORIZON', levels: 1,

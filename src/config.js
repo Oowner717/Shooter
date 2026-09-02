@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '213';
+export const BUILD = '214';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '213';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e9c8728';
+export const REV = 'e28125d';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -929,19 +929,24 @@ export const CFG = {
   // ---- auto mines -----------------------------------------------------
   mines: {
     /*
-     * Three numbers govern every kind, and no upgrade may move any of them.
-     * They are a contract with the player rather than a balance dial: five on
-     * the field, fifteen seconds each, one thrown every fifteen seconds.
+     * Five on the field, fifteen seconds each, one thrown every fifteen.
      *
-     * Note what that arithmetic means. A throw every fifteen seconds and a
-     * fifteen-second life is a steady state of one mine, laid as the last one
-     * goes — so the cap is a backstop rather than a target, and reaching it
-     * takes either a SEED offer, which lays three at once, or PAIRED CHARGE,
-     * which lays more per throw without touching any of the three.
+     * `cap` and `life` are still a contract with the player rather than a
+     * balance dial: nothing may move either, so the most that can ever be
+     * standing is five and none of them outlives its quarter minute.
+     *
+     * `throwEvery` was the third of those until build 214 and is a dial now.
+     * QUICK LAY takes two levels off it at 0.75 each -- 15s to 11.3 to 8.4 --
+     * which is the first thing in the tree that shortens the wait rather than
+     * widening the throw. Note the arithmetic it changes: a throw every
+     * fifteen seconds against a fifteen-second life is a steady state of ONE
+     * mine, laid as the last one goes, so the cap was a backstop nobody
+     * reached by laying. At 8.4s it is a steady 1.8, and with PAIRED CHARGE
+     * on top the cap is what you actually run into.
      */
     cap: 5,
     life: 15,
-    throwEvery: 15, // one clock for every kind, not one each
+    throwEvery: 15, // one clock for every kind, not one each; QUICK LAY scales it
     flight: 0.85, // seconds from turret to landing site
     arm: 0.4, // settling time before it can trigger
     r: 13,
@@ -2362,6 +2367,20 @@ export const CFG = {
      * visibly progressing is never interrupted.
      */
     patience: 90,
+    /*
+     * The most a bought turret may make an anomaly worth, as a multiplier on
+     * the health of its core and its structure. See gunScale in shooter.js
+     * for the measurement this answers: seven fights, all of them a fifth of
+     * their tuned length once the tree is bought out.
+     *
+     * A ceiling rather than the raw product (which reaches 5.30) because the
+     * multiplier reaches only structure and cores -- minions come through
+     * claim() and are deliberately left alone, since a longer fight already
+     * means more of them -- and because a boss's scripted beats do not
+     * stretch. Tuned against the bench rather than derived: see the note in
+     * regress.mjs.
+     */
+    temper: 4.2,
     riseFor: 2.1, // seconds a REMAINDER takes to reach the turret
     // What one leaves behind. One each, and the only source there is.
     remainder: 1,
