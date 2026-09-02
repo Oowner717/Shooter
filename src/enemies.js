@@ -946,22 +946,30 @@ export class Enemy {
   }
 
   /**
+   * `dirx, diry` is the round's unit TRAVEL DIRECTION, not a surface normal.
+   *
+   * It was called `nx, ny` for eleven builds and that name is the direct cause
+   * of three separate faults fixed in 211 -- PRISM's incidence test, both
+   * ricochets and the impact spin all read it as a normal, because it is
+   * spelled like one. The real normal comes from `contactAt` and is `c.nx,
+   * c.ny`; nothing should take a normal from this argument.
+   *
    * @returns 'reflect' | 'hit'
    */
-  takeHit(world, dmg, hx, hy, nx, ny, impulse, shred = 0, form = null, pr = 0) {
+  takeHit(world, dmg, hx, hy, dirx, diry, impulse, shred = 0, form = null, pr = 0) {
     /*
      * Where it actually landed. See `contactAt` in physics.js: the point the
      * projectile sweep hands over is a clamped closest-point on one frame of
      * travel, so only its component ACROSS the travel means anything -- and
      * that component is the exact impact parameter.
      */
-    const c = contactAt(this, hx, hy, nx, ny, pr);
+    const c = contactAt(this, hx, hy, dirx, diry, pr);
 
     /*
      * Prisms bounce glancing bolts; only a square-on hit lands.
      *
      * That is what this has always said and, until build 211, not what it did.
-     * The old test was `((hx - x) / r, (hy - y) / r) . (nx, ny)`, which
+     * The old test was `((hx - x) / r, (hy - y) / r) . (dirx, diry)`, which
      * divides by the RADIUS rather than by the offset's own length -- so it
      * reduced to how far along its last step the round happened to stop, and
      * the impact parameter did not enter it at all. Measured across five
@@ -979,14 +987,40 @@ export class Enemy {
       this.lastHit = form;
       this.lastHitT = world.time;
     }
-    this.applyDamage(world, dmg, nx, ny, impulse, shred, c.b);
+    // The shove is along the travel, which is what this argument is.
+    this.applyDamage(world, dmg, dirx, diry, impulse, shred, c.b);
     /*
-     * The landing, per form. The null path is byte-for-byte the old one --
-     * hitBurst with its own randomness -- because it is the path every hit
-     * in ORDINAL's canonical fight takes, and its draw count is load-bearing.
+     * The landing, per form -- AT THE CONTACT, ALONG THE NORMAL.
+     *
+     * Build 211 derived both of those and then drew the burst with neither.
+     * It passed `hx, hy` -- the clamped closest point on one frame of travel,
+     * which is the one part of the hit `contactAt`'s own header says is
+     * meaningless -- and `-dirx, -diry`, which is the reversed travel wearing
+     * a normal's old name. So the mechanics of an impact were right from 211
+     * and the picture of one was still the picture from 210.
+     *
+     * Measured over two live runs, 304 landed hits: the burst was drawn a
+     * median 20.9 world units from where the round actually met the surface
+     * (p90 36.6, max 45.0 -- a whole BULWARK radius), and 10.4% of bursts were
+     * drawn OUTSIDE the body they hit. Systematically short, too, never long:
+     * the step ends before the surface, so every burst sat between the turret
+     * and the impact, which is why it never looked obviously wrong.
+     *
+     * And the direction mattered as much as the point. `hitBurst` sprays in a
+     * cone about the vector it is handed, so reversed travel threw every
+     * impact straight back down the barrel line -- a rim graze and a centre
+     * punch sprayed identically. `c.nx, c.ny` is the real outward normal at
+     * the contact, so a graze now comes off the surface.
+     *
+     * ORDINAL's canonical hash does not move for this, and the reason is
+     * exact rather than hopeful: the hash mixes body positions and energy,
+     * particles are neither, and `hitBurst` makes the same number of rand()
+     * draws wherever it is told to put them. The load-bearing property of the
+     * default path is its DRAW COUNT, which is untouched. Re-run to confirm:
+     * 1796395127.
      */
-    if (form) impactFx(form, hx, hy, -nx, -ny, this.type.glow);
-    else hitBurst(hx, hy, -nx, -ny, this.type.glow);
+    if (form) impactFx(form, c.x, c.y, c.nx, c.ny, this.type.glow);
+    else hitBurst(c.x, c.y, c.nx, c.ny, this.type.glow);
     return 'hit';
   }
 
