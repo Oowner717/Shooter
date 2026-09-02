@@ -7,6 +7,12 @@
 import { TAU, rand, spread, rgba, drawGlow } from './util.js';
 import { spark } from './fx.js';
 
+/**
+ * How long a retired patch is left on the screen to go out in. Long enough to
+ * be seen going, short enough that the cap still reads as a cap.
+ */
+const RETIRE = 0.35;
+
 export class Patch {
   /**
    * @param opts r, life, dps, tone, and `tick` seconds between damage ticks.
@@ -25,6 +31,14 @@ export class Patch {
     this.t = 0;
     this.next = 0;
     this.dead = false;
+    /*
+     * Whose ground this is. SPORE's patches are capped and THORN's are not:
+     * a THORN is already limited by the mine cap, and tagging only the round
+     * keeps the two from being counted against each other. Read by the cap
+     * in shooter.js and nowhere else.
+     */
+    this.spore = !!opts.spore;
+    this.retired = false;
     /*
      * Drawn in the ground pass, under the bodies. Patches lived in
      * world.effects and effects draw AFTER enemies -- so burning ground was
@@ -48,6 +62,24 @@ export class Patch {
     // radius per spoke, reused every frame, so the outline holds still
     // instead of boiling.
     this.edge = Array.from({ length: 18 }, () => 0.82 + rand(0, 0.26));
+  }
+
+  /**
+   * Put out early, because a newer patch took its place.
+   *
+   * `next = Infinity` rather than `dps = 0`: applyDamage floors a hit at
+   * `Math.max(1, ...)`, so a patch on zero damage still takes a point off
+   * everything standing in it four times a second. Stopping the clock is the
+   * only way to stop the damage. The life is cut rather than zeroed so the
+   * ground is seen going out -- a patch that vanished on the frame the fourth
+   * one landed would read as a bug rather than as a limit.
+   */
+  retire() {
+    if (this.retired) return;
+    this.retired = true;
+    this.next = Infinity;
+    this.life = Math.min(this.life, RETIRE);
+    this.max = Math.max(this.max, this.life);
   }
 
   /** One spore: where it starts, how it drifts, how long it lasts. */

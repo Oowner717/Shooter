@@ -81,6 +81,12 @@ class Projectile {
 
 
 /**
+ * The circle a round stopped on, reused every hit. `contactAt` only reads
+ * x, y and r off it and keeps no reference, so one scratch is safe.
+ */
+const HIT = { x: 0, y: 0, r: 0 };
+
+/**
  * Advance every projectile and resolve what it runs into.
  * Order of precedence is purely "whichever is nearest along the path".
  */
@@ -267,6 +273,18 @@ function resolveSegment(world, p, ax, ay, bx, by) {
   let bestT = 2;
   let bestKind = null;
   let bestTarget = null;
+  /*
+   * The circle the hit test actually used, recorded with the hit.
+   *
+   * A round can stop on three different things -- a body, a WARDEN plate, a
+   * SCION ball -- and each has its own centre and radius. Keeping them here
+   * means one contactAt below covers all three, instead of the body case
+   * computing it twice (once in takeHit, once per bounce) and the other two
+   * not computing it at all.
+   */
+  let hitX = 0;
+  let hitY = 0;
+  let hitR = 0;
 
   const test = (list) => {
     for (let i = 0; i < list.length; i++) {
@@ -291,6 +309,7 @@ function resolveSegment(world, p, ax, ay, bx, by) {
             bestT = cs.t;
             bestKind = 'shard';
             bestTarget = { enemy: e, shard: s };
+            hitX = sx; hitY = sy; hitR = SHARD_R;
           }
         }
       }
@@ -313,6 +332,7 @@ function resolveSegment(world, p, ax, ay, bx, by) {
             bestT = cg.t;
             bestKind = 'graft';
             bestTarget = { enemy: e, graft: g };
+            hitX = gx; hitY = gy; hitR = CFG.graft.ball;
           }
         }
       }
@@ -323,6 +343,7 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         bestT = c.t;
         bestKind = 'enemy';
         bestTarget = e;
+        hitX = e.x; hitY = e.y; hitR = e.r;
       }
     }
   };
@@ -344,6 +365,23 @@ function resolveSegment(world, p, ax, ay, bx, by) {
   const sp = Math.hypot(p.vx, p.vy) || 1;
   const dirx = p.vx / sp;
   const diry = p.vy / sp;
+  /*
+   * Where the round actually met the thing it stopped on.
+   *
+   * `hx, hy` is a clamped closest point on one frame of travel and is not on
+   * the surface -- see contactAt's header. It is fine as the ARGUMENT to
+   * contactAt, which only reads its component across the travel, and it is
+   * wrong as a POSITION. Everything downstream that puts something in the
+   * world at the impact uses `c.x, c.y` instead: the burst a round goes off
+   * with, which for HE is a blast centre and for SPORE is a patch of ground.
+   *
+   * HIT is a scratch object rather than a literal because this is the hot
+   * path -- see the note at the top of physics.js.
+   */
+  HIT.x = hitX;
+  HIT.y = hitY;
+  HIT.r = hitR;
+  const c = contactAt(HIT, hx, hy, dirx, diry, p.r);
 
   switch (bestKind) {
     case 'enemy': {
@@ -367,7 +405,6 @@ function resolveSegment(world, p, ax, ay, bx, by) {
          * carried straight on. Both backwards. `contactAt` derives the real
          * normal from the impact parameter; see physics.js.
          */
-        const c = contactAt(e, hx, hy, dirx, diry, p.r);
         const d = p.vx * c.nx + p.vy * c.ny;
         p.vx = (p.vx - 2 * d * c.nx) * 0.92;
         p.vy = (p.vy - 2 * d * c.ny) * 0.92;
@@ -384,8 +421,8 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         for (let i = 0; i < 4; i++) spark(c.x, c.y, spread(220), spread(220), '#e0aaff', 0.22, 2.2);
         return;
       }
-      if (p.onHit) p.onHit(world, e, hx, hy);
-      if (p.chain) chainFrom(world, e, hx, hy, p.jumps);
+      if (p.onHit) p.onHit(world, e, c.x, c.y);
+      if (p.chain) chainFrom(world, e, c.x, c.y, p.jumps);
       audio.hit();
       // A piercing round carries on out the other side, weaker, ignoring what
       // it just went through for long enough not to hit it twice.
@@ -394,7 +431,7 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         p.damage *= p.pierceFade;
         p.ignore = e;
         p.ignoreT = 0.06;
-        for (let i = 0; i < 3; i++) spark(hx, hy, spread(140), spread(140), p.color, 0.18, 1.8);
+        for (let i = 0; i < 3; i++) spark(c.x, c.y, spread(140), spread(140), p.color, 0.18, 1.8);
         return;
       }
       // ...and a rebounding one comes back off it, the way it comes off a
@@ -407,7 +444,6 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         // the old one mirrored about the round's own line, so OVERSTUFFED sent
         // every square-on bolt straight back at the turret instead of off the
         // surface at the angle it arrived.
-        const c = contactAt(e, hx, hy, dirx, diry, p.r);
         const d = p.vx * c.nx + p.vy * c.ny;
         p.vx -= 2 * d * c.nx;
         p.vy -= 2 * d * c.ny;
@@ -419,24 +455,18 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         ricochetFx(p);
         return;
       }
-      endProjectile(world, p, hx, hy, true);
+      endProjectile(world, p, c.x, c.y, true);
       return;
     }
     case 'shard': {
-      bestTarget.enemy.hitShard(bestTarget.shard, p.damage, hx, hy, -dirx, -diry);
-      endProjectile(world, p, hx, hy, true);
+      bestTarget.enemy.hitShard(bestTarget.shard, p.damage, c.x, c.y, c.nx, c.ny);
+      endProjectile(world, p, c.x, c.y, true);
       return;
     }
     case 'graft': {
-      bestTarget.enemy.hitGraft(bestTarget.graft, p.damage, hx, hy);
-      endProjectile(world, p, hx, hy, true);
+      bestTarget.enemy.hitGraft(bestTarget.graft, p.damage, c.x, c.y);
+      endProjectile(world, p, c.x, c.y, true);
       return;
-    }
-    default: {
-      for (let i = 0; i < 3; i++) {
-        spark(hx, hy, spread(160) - dirx * 90, spread(160) - diry * 90, '#8fb6d8', 0.2, 1.8);
-      }
-      endProjectile(world, p, hx, hy, true);
     }
   }
 }

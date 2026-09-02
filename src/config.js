@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '211';
+export const BUILD = '212';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '211';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '7636537';
+export const REV = 'a16ac6d';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -750,7 +750,18 @@ export const CFG = {
       rate: 2.0,
       speed: 980,
       damage: 10,
-      patch: { r: 92, life: 4.5, dps: 46 },
+      /*
+       * `cap` is how many of these may burn at once, and it is the whole
+       * reason SPORE is a round rather than an answer. Patch damage is per
+       * body and stacks additively with no dedup, and the fire interval
+       * (0.286 * 2.0 = 0.572s) against a 4.5s life leaves 7.9 patches alive
+       * -- 362 damage a second stock against SCATTER's 135 and BOLT's 91,
+       * and against a boss with minions the ground was landing 45k a second
+       * into 8.5k of health. Three is the number that leaves it the best
+       * ground-denial round in the game without being the best of every
+       * other kind as well. SECOND GROWTH buys a fourth.
+       */
+      patch: { r: 92, life: 4.5, dps: 46, cap: 3 },
     },
     /*
      * TITHE. It barely hurts on the first hit, and that is the point: every

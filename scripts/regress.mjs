@@ -11121,6 +11121,185 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `stock ${r.parts} particles, fully bought ${r.bigParts}, budget ${r.maxParticles}`);
 }
 
+// --- SPORE's ground is capped, and laid where the round landed -------------
+/*
+ * Patch damage is per body, additive, with no cap and no dedup, so a round's
+ * real number was never its dps -- it was its dps times how many patches the
+ * fire rate kept alive. At 0.286 * 2.0 = 0.572s between shots against a 4.5s
+ * life that is 7.9 of them: 362 damage a second stock, against SCATTER's 135
+ * and BOLT's 91, and 8.2x the rack with BLOOM OUT bought. Against a boss with
+ * minions the ground was landing 45k a second into 8.5k of health.
+ *
+ * Three at a time from build 212, oldest out first, and SECOND GROWTH buys a
+ * fourth. The cases below hold the cap, the retirement, the upgrade, and the
+ * one thing the cap must NOT reach -- a THORN's ground, which the mine cap
+ * already limits and which would otherwise be counted against the round.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { Patch } = await import('../src/patch.js');
+    const g = window.__sim;
+    const w = g.world;
+    const s = w.shooter;
+    const S = CFG.rounds.spore;
+    const out = { cap: S.patch.cap };
+
+    const spores = () => w.effects.filter((f) => f.spore && !f.dead);
+    const live = () => spores().filter((f) => !f.retired).length;
+
+    /** A body that will not move and will not die, straight up the barrel. */
+    const pin = () => {
+      const e = g.debugSpawn('bulwark', s.x, s.y - 300);
+      e.staged = false; e.spawnIn = 0;
+      e.hp = 1e9; e.maxHp = 1e9; e.invMass = 0;
+      return e;
+    };
+    /** Fire one round and run it out, holding the body where it was put. */
+    const volley = (e, shots, onFrame) => {
+      for (let i = 0; i < shots; i++) {
+        s.cooldown = 0;
+        s.shoot(w);
+        for (let k = 0; k < 30 && w.projectiles.length; k++) {
+          e.vx = 0; e.vy = 0; e.av = 0;
+          g.update(1 / 60);
+          if (onFrame) onFrame();
+        }
+      }
+    };
+    const clear = () => {
+      g.debugClearField();
+      w.projectiles.length = 0;
+      w.effects.length = 0;
+      w.round = 'spore';
+      s.aim = -Math.PI / 2; s.targetAim = s.aim;
+    };
+
+    // ---- the ground goes down where the round met the body ----------------
+    /*
+     * `hx, hy` is a clamped closest point on ONE FRAME of travel and is not on
+     * the surface: measured over 304 landed hits it sat a median 20.9 world
+     * units from the real contact, p90 36.6, and 10.4% of the time outside the
+     * body altogether. The true point is exactly `e.r` from the centre by
+     * construction, which is what this measures -- a step end has no reason to
+     * land on that circle and, being systematically short, never did.
+     */
+    clear();
+    const e0 = pin();
+    let laid = null;
+    volley(e0, 1, () => {
+      const p = spores()[0];
+      if (p && !laid) laid = { x: p.x, y: p.y, ex: e0.x, ey: e0.y, er: e0.r };
+    });
+    out.laid = laid && +Math.abs(Math.hypot(laid.x - laid.ex, laid.y - laid.ey) - laid.er).toFixed(2);
+    out.r0 = laid && laid.er;
+
+    // ---- three at a time, and the oldest is the one that goes -------------
+    clear();
+    const e1 = pin();
+    let peak = 0;
+    const born = [];
+    volley(e1, 7, () => {
+      peak = Math.max(peak, live());
+      for (const p of spores()) if (!born.includes(p)) born.push(p);
+    });
+    out.peak = peak;
+    out.born = born.length;
+    // Oldest first: of the ones that ever burned, the retired set must be a
+    // PREFIX of the order they were laid in.
+    const outOrder = born.map((p) => (p.retired ? 1 : 0));
+    out.prefix = outOrder.join('').replace(/1*0*$/, '') === '';
+    out.stillLive = live();
+
+    // ---- ...and one put out early stops hurting what stands in it ---------
+    /*
+     * `next = Infinity` rather than `dps = 0`: applyDamage floors a hit at
+     * Math.max(1, ...), so a retired patch on zero damage would still take a
+     * point off everything in it four times a second. The control run is the
+     * instrument showing it can read a one.
+     */
+    clear();
+    const bite = (retire) => {
+      g.debugClearField();
+      w.effects.length = 0;
+      const b = g.debugSpawn('bulwark', s.x, s.y - 300);
+      b.staged = false; b.spawnIn = 0; b.hp = 1e6; b.maxHp = 1e6; b.invMass = 0;
+      const p = new Patch(b.x, b.y, { r: 200, life: 4, dps: 46, tone: '#8eeb4b', spore: true });
+      if (retire) p.retire();
+      const before = b.hp;
+      for (let k = 0; k < 90; k++) { b.vx = 0; b.vy = 0; p.update(w, 1 / 60); }
+      const took = before - b.hp;
+      b.dead = true;
+      return +took.toFixed(2);
+    };
+    out.burning = bite(false);
+    out.putOut = bite(true);
+
+    // ---- SECOND GROWTH buys a fourth --------------------------------------
+    clear();
+    w.up.patchCap += 1;
+    const e2 = pin();
+    let peak4 = 0;
+    volley(e2, 7, () => { peak4 = Math.max(peak4, live()); });
+    out.peak4 = peak4;
+    w.up.patchCap -= 1;
+
+    // ---- ...and a THORN's ground is not counted against the round ---------
+    /*
+     * A THORN makes the identical Patch and is already limited by the mine
+     * cap. Tagging only the round is what keeps the two from putting each
+     * other out -- the first version of this change capped every Patch in
+     * world.effects and a full spore rack silently doused the mines.
+     */
+    clear();
+    const e3 = pin();
+    for (let i = 0; i < 3; i++) {
+      g.debugThrowMine('thorn');
+      for (let k = 0; k < 90; k++) g.update(1 / 60);
+    }
+    const thornsBefore = w.effects.filter((f) => f.r && f.dps && !f.spore && !f.dead).length;
+    volley(e3, 7, null);
+    out.thornsBefore = thornsBefore;
+    out.thornsAfter = w.effects.filter((f) => f.r && f.dps && !f.spore && !f.dead && !f.retired).length;
+    out.sporesWithThorns = live();
+
+    g.debugClearField();
+    w.effects.length = 0;
+    w.projectiles.length = 0;
+    g.restart();
+    return out;
+  });
+
+  check('a SPORE patch is laid where the round met the body, not where its step ended',
+    r.laid !== null && r.laid < 1.5,
+    `the ground landed ${r.laid} units off the surface of a body of radius `
+    + `${r.r0}; the step end used to be a median 20.9 out`);
+
+  check('only three patches of burning ground may be alight at once',
+    r.peak === r.cap && r.born > r.cap && r.stillLive === r.cap,
+    `${r.born} laid over seven shots, never more than ${r.peak} alight at once `
+    + `against a cap of ${r.cap}, ${r.stillLive} still burning at the end`);
+
+  check('...and it is the oldest that goes out, so the round is about placement',
+    r.prefix && r.born > r.stillLive,
+    `${r.born - r.stillLive} of ${r.born} were put out, and they are the ones `
+    + `laid first, in order (${r.prefix})`);
+
+  check('...and one put out early stops hurting what stands in it',
+    r.burning > 0 && r.putOut === 0,
+    `a burning patch took ${r.burning} off a body in a second and a half; a `
+    + `retired one took ${r.putOut} (dps 0 alone would still take 1 a tick)`);
+
+  check('...and SECOND GROWTH buys a fourth',
+    r.peak4 === r.cap + 1,
+    `${r.peak4} alight with the node owned, against ${r.peak} without it`);
+
+  check('...and a THORN\'s ground is not counted against the round\'s cap',
+    r.thornsBefore > 0 && r.thornsAfter === r.thornsBefore && r.sporesWithThorns === r.cap,
+    `${r.thornsBefore} thorn patches down, ${r.thornsAfter} still burning after `
+    + `a full spore rack, alongside ${r.sporesWithThorns} of the round's own`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

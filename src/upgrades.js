@@ -44,9 +44,8 @@ export function freshUpgrades() {
     spineShred: 0, // fraction of a body's armour a SPINE ignores
     slug: 1, // how hard a SLUG shoves
     chill: 1, // how long RIME drags something down for
-    patchR: 1, // and how wide, how long and how hard a SPORE patch burns
-    patchLife: 1,
-    patchDps: 1,
+    patchR: 1, // how wide a SPORE patch burns...
+    patchCap: 0, // ...and how many more than three may burn at once
     bounty: 1, // TITHE's multiplier on a marked body
     // field
     // The cap, the lifetime and the throw clock are fixed in config and no
@@ -133,8 +132,10 @@ const MARK = {
   sledge: g('<rect x="3" y="9.4" width="7" height="5.2" rx="1"/><path d="M10 12h7"/><path d="M14.6 8.6 18.6 12l-4 3.4"/><path d="M20.6 8.4v7.2" opacity=".6"/>'),
   // Colder, for longer.
   deepfreeze: g('<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5 4.2 16.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>'),
-  // The patch, wider and hotter.
+  // The patch, wider.
   bloomout: g('<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.6" stroke-dasharray="2.2 2.6"/><circle cx="12" cy="12" r="10" stroke-dasharray="2.2 3.4" opacity=".6"/>'),
+  // One more patch of ground alight: two grounds, the second only just taken.
+  secondgrowth: g('<ellipse cx="7.6" cy="16.4" rx="5" ry="3.2"/><ellipse cx="16.6" cy="16.4" rx="5" ry="3.2" stroke-dasharray="2.2 2.4"/><path d="M7.6 13.2V8.6M16.6 13.2v-3" opacity=".8"/><circle cx="7.6" cy="6.6" r="1.7" fill="currentColor" stroke="none"/><circle cx="16.6" cy="8.4" r="1.4" fill="currentColor" stroke="none" opacity=".75"/>'),
   // A mark worth more.
   levy: g('<path d="M12 3.4 19.4 8v8L12 20.6 4.6 16V8z"/><path d="M12 7.6v8.8M9.6 9.8h4.8M9.6 14.2h4.8"/><path d="M16.6 4.4h4M18.6 2.4v4" opacity=".8"/>'),
   // More thrown, one way.
@@ -357,7 +358,18 @@ export const UPGRADES = {
     { id: 'deadweight', name: 'DEAD WEIGHT', line: '+65% snare hold time.', apply: scale('mineHold', 1.65) , icon: MARK.deadweight },
     { id: 'hotwire', name: 'HOT WIRE', line: '+50% wire damage.', apply: scale('wireDamage', 1.5) , icon: MARK.hotwire },
     { id: 'fourthbell', name: 'FOURTH BELL', line: '+1 toll on every knell.', apply: bump('mineTolls', 1) , icon: MARK.fourthbell },
-    { id: 'bloomout', name: 'BLOOM OUT', line: '+35% patch size, +45% burn.', apply: (u) => { u.patchR *= 1.35; u.patchDps *= 1.45; } , icon: MARK.bloomout },
+    /*
+     * Size only, and capped at two. It sold burn as well until build 212, and
+     * with no `levels` the tree sold it three times -- so it was worth 2.46x
+     * the radius and 3.05x the damage, on THORN's ground as much as on
+     * SPORE's, which took a THORN mine to 518 damage a second on its own.
+     * What SPORE wants from an upgrade is reach, because reach is what makes
+     * a patch worth placing; the damage it already has.
+     */
+    { id: 'bloomout', name: 'BLOOM OUT', levels: 2, line: '+35% patch size.', apply: scale('patchR', 1.35) , icon: MARK.bloomout },
+    { id: 'secondgrowth', name: 'SECOND GROWTH', levels: 1,
+      line: '+1 patch of burning ground at once.',
+      apply: bump('patchCap', 1), icon: MARK.secondgrowth },
     { id: 'buckshot', name: 'BUCKSHOT', line: '+60% spall pellets.', apply: scale('spallPellets', 1.6) , icon: MARK.buckshot },
     { id: 'repulsor', name: 'REPULSOR', line: '+40% lode reach and push.', apply: (u) => { u.lodeReach *= 1.4; u.lodePush *= 1.4; } , icon: MARK.repulsor },
     { id: 'intake', name: 'INTAKE', levels: 1,

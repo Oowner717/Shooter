@@ -355,10 +355,32 @@ export class Shooter {
         burst: (w, x, y) => {
           w.effects.push(new Patch(x, y, {
             r: g.patch.r * w.up.patchR,
-            life: g.patch.life * w.up.patchLife,
-            dps: g.patch.dps * w.up.patchDps,
+            life: g.patch.life,
+            dps: g.patch.dps,
             tone: '#8eeb4b',
+            spore: true,
           }));
+          /*
+           * Only so much ground may burn at once. Patch damage is per body
+           * and stacks with nothing stopping it, so the round's real number
+           * was never its dps but its dps times how many of them the fire
+           * rate kept alive -- see CFG.rounds.spore.patch.cap.
+           *
+           * The oldest goes out first, which is what makes SPORE a placement
+           * round: the fourth shot does not add to the third, it replaces
+           * the first, so where you put them is the decision.
+           *
+           * `w.effects` is in insertion order, so a forward walk is oldest
+           * first. Retired patches are skipped rather than counted, or a
+           * burst would put out one already going out and leave four burning.
+           */
+          const cap = g.patch.cap + w.up.patchCap;
+          let live = 0;
+          for (const fx of w.effects) if (fx.spore && !fx.retired) live++;
+          for (const fx of w.effects) {
+            if (live <= cap) break;
+            if (fx.spore && !fx.retired) { fx.retire(); live--; }
+          }
         },
       });
     } else if (world.round === 'tithe') {

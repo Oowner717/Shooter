@@ -173,7 +173,7 @@ export const ARSENAL = [
   },
   {
     key: 'spore', kind: 'round', group: 'ammo', label: 'SPORE', icon: ICON.spore, tone: '#8eeb4b',
-    dmg: '10 + 46/s', fx: 'Leaves burning ground where it bursts, for 4.5s.',
+    dmg: '10 + 46/s', fx: 'Leaves burning ground where it bursts, for 4.5s. Three at a time.',
   },
   {
     key: 'tithe', kind: 'round', group: 'ammo', label: 'TITHE', icon: ICON.tithe, tone: '#40e693',

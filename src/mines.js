@@ -392,7 +392,7 @@ export function updateMines(world, dt) {
         m.patch = new Patch(m.x, m.y, {
           r: T.patch.r * world.up.patchR,
           life: m.life,
-          dps: T.patch.dps * world.up.patchDps,
+          dps: T.patch.dps,
           tone: '#c3eb4b',
         });
         world.effects.push(m.patch);

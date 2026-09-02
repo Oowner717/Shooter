@@ -63,7 +63,7 @@ const UNDER = {
   rime: ['deepfreeze'],
   // BLOOM OUT widens every burning patch, which is SPORE's and THORN's alike.
   // It sits under the round because that is the one you meet first.
-  spore: ['bloomout'],
+  spore: ['bloomout', 'secondgrowth'],
   tithe: ['compound', 'levy', 'lien'],
 
   // ---- the field ----
