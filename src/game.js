@@ -353,7 +353,6 @@ export class Game {
         else self.hud.alert(`TIER ${tier} · ${reason}`, 'info', 3);
       },
       alert: (text, kind, dur) => self.hud.alert(text, kind, dur),
-      abilityTaken: (i) => self.hud.flashTaken(i),
       carry: (key) => self.carry(key),
     };
   }

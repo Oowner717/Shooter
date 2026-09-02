@@ -464,7 +464,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 141 since build 218, when SLIVER went in at two levels. It was
+    // 139 since build 219, when REPULSOR and STANDING ORDER were each capped
+    // at two levels -- neither had any, so the tree was selling both three
+    // times, which is the `u.levels ?? 3` trap for the second and third time.
+    // It was
+    // 141 from build 218, when SLIVER went in at two levels. And
     // 139 from build 217: COUNTERSPIN's one level went with SPIRAL, WARD's
     // three nodes brought five (STANDOFF 2, EDGED 2, FORK 1), and BUCKSHOT
     // lost one -- it had no `levels` and the tree was selling it three times.
@@ -482,7 +486,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 141
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 139
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -2018,7 +2022,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       const i = w.abilities.slots.findIndex((x) => x.def.id === 'ward');
       if (i < 0) return false;
       const slot = w.abilities.slots[i];
-      slot.charges = Math.max(1, slot.charges); slot.cd = 0; slot.locked = 0;
+      slot.charges = Math.max(1, slot.charges); slot.cd = 0;
       g.useAbility(i);
       return true;
     };
@@ -2239,7 +2243,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     };
     // Every cooldown in the game clear, so anything of that shape has a use
     // in hand the moment its condition is met.
-    for (const x of w.abilities.slots) { x.cd = 0; x.locked = 0; }
+    for (const x of w.abilities.slots) { x.cd = 0; }
     for (let i = 0; i < 60 * 7; i++) {
       mount();
       g.update(1 / 60);
@@ -2272,7 +2276,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * is pressed on the same counter, so a zero above means "nothing fired"
      * and not "nothing could have been seen firing".
      */
-    for (const x of w.abilities.slots) { x.cd = 0; x.locked = 0; }
+    for (const x of w.abilities.slots) { x.cd = 0; }
     g.update(1 / 60);
     seen = w.abilities.slots.map((x) => x.charges);
     const from = unasked;
@@ -3773,7 +3777,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const fire = (id) => {
       const i = w.abilities.slots.findIndex((x) => x && x.def.id === id);
       const sl = w.abilities.slots[i];
-      sl.charges = Math.max(1, sl.charges); sl.cd = 0; sl.locked = 0;
+      sl.charges = Math.max(1, sl.charges); sl.cd = 0;
       g.useAbility(i);
     };
     const hold = (secs) => {
@@ -3953,7 +3957,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     // ...and it stops for good once they use it.
     const idx = w.abilities.slots.indexOf(slot);
-    slot.charges = Math.max(1, slot.charges); slot.cd = 0; slot.locked = 0;
+    slot.charges = Math.max(1, slot.charges); slot.cd = 0;
     g.useAbility(idx);
     g.hud.clearHint();
     const e2 = g.debugSpawn('lurcher', s.x + 4, s.y - 6);
@@ -12522,7 +12526,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const press = () => {
       const slot = w.abilities.slots.find((x) => x.def.essential);
       if (!slot) return false;
-      slot.charges = Math.max(1, slot.charges); slot.cd = 0; slot.locked = 0;
+      slot.charges = Math.max(1, slot.charges); slot.cd = 0;
       g.useAbility(w.abilities.slots.indexOf(slot));
       return true;
     };
@@ -12818,6 +12822,171 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.loneePeak <= 1 + r.sliverN + r.sliverN * r.sliverN,
     `a single body took one dart and at most ${r.loneePeak} projectiles were `
     + `ever on the field at once`);
+}
+
+// --- NO COOLDOWN means no cooldown, not one use ----------------------------
+/*
+ * The toggle set the cost to 0, so `s.cd` stayed 0, so `update`'s
+ * `if (s.cd <= 0) continue` never reached the line that hands a charge back --
+ * and the charge had already been spent. One press each and the whole bar was
+ * dead until a restart, which is the exact opposite of what the switch says.
+ *
+ * It survived because the suite worked AROUND it rather than failing on it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.spawnLock = 1e9;
+    if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
+
+    const fires = (free) => {
+      g.restart();
+      w.phase = 'staging';
+      w.debug.noCooldown = free;
+      w.effects.length = 0;
+      const i = w.abilities.slots.findIndex((x) => x.def.essential);
+      let n = 0;
+      /*
+       * Counted off the CHARGE, not off useAbility's return, which is
+       * undefined either way -- a case that read the return would report
+       * zero presses on any build and pass or fail for the wrong reason.
+       *
+       * Ten presses in a row with a frame between them. With the toggle on
+       * every one should land; with it off, one should and the rest should
+       * be refused by the cooldown.
+       */
+      const slot = w.abilities.slots[i];
+      for (let k = 0; k < 10; k++) {
+        w.effects.length = 0;
+        g.useAbility(i);
+        // Counted off what the press PUT ON THE FIELD. Not off useAbility's
+        // return, which is undefined either way; and not off the charge,
+        // because the fix hands the charge straight back, so a charge that
+        // never drops is the thing working rather than the thing failing.
+        if (w.effects.length > 0) n++;
+        g.update(1 / 60);
+      }
+      const left = slot.charges;
+      w.debug.noCooldown = false;
+      return { n, left };
+    };
+    const off = fires(false);
+    const on = fires(true);
+
+    w.spawnLock = 0;
+    g.restart();
+    return { off, on };
+  });
+
+  check('NO COOLDOWN means no cooldown, and not one use each',
+    r.on.n === 10 && r.on.left > 0 && r.off.n === 1,
+    `ten presses with the toggle on fired ${r.on.n} times and left `
+    + `${r.on.left} charges (it fired once and left 0); with it off, `
+    + `${r.off.n}`);
+}
+
+// --- the ability audit of build 219 -----------------------------------------
+/*
+ * Three things the audit found, each of a shape this file already knows.
+ *
+ * STANDING ORDER is the `u.levels ?? 3` trap for the third time (HOT LOAD,
+ * REPULSOR, and now the one node that touches all eight buttons). Asserted as
+ * a PRODUCT, exactly as `up.rate` is, so a second cooldown node arriving is
+ * caught as surely as this one taking its default back.
+ *
+ * A blast honouring `spent` is CLAUDE.md's rule -- "anything that decides
+ * what may be shot has to honour it" -- and blasts never did, so a PULSE
+ * inside a dying boss was hitting the pieces the outro is made of.
+ *
+ * And HAIL's muzzle: it passed no `form`, so twenty-five pellets each took
+ * `fire`'s default two-sparks-and-a-dot and put seventy-five particles on one
+ * point -- the blob its own comment claims to have replaced with a wedge,
+ * still drawn underneath the wedge.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { fx } = await import('../src/fx.js');
+    const { NODE_BY_ID } = await import('../src/tree.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    const ran = w.director.update;
+    w.director.update = () => {};
+
+    // ---- 1. the cooldown ladder, as one number ----
+    g.debugGiveEnergy(400000);
+    g.debugBuyAll();
+    const cooldown = w.up.cooldown;
+    const standingLevels = NODE_BY_ID.get('standing').levels;
+
+    // ---- 2. a blast leaves a spent body finished ----
+    g.debugClearField();
+    const s = w.shooter;
+    const e = g.debugSpawn('bulwark', s.x + 60, s.y - 90);
+    e.spent = true;
+    const before = e.hp;
+    const i = w.abilities.slots.findIndex((x) => x.def.essential);
+    w.abilities.clearCooldowns();
+    g.useAbility(i);
+    const spentAfter = { hp: e.hp, dead: !!e.dead, x: e.x, y: e.y };
+    // ...and the same body, not spent, is very much hit.
+    g.debugClearField();
+    const e2 = g.debugSpawn('bulwark', s.x + 60, s.y - 90);
+    const before2 = e2.hp;
+    w.abilities.clearCooldowns();
+    g.useAbility(i);
+    const liveAfter = e2.hp;
+
+    // ---- 3. HAIL's muzzle ----
+    g.debugClearField();
+    const hail = w.abilities.slots.findIndex((x) => x.def.id === 'fan');
+    w.abilities.clearCooldowns();
+    fx.particles.clear();
+    w.projectiles.length = 0;
+    g.useAbility(hail);
+    const muzzle = fx.particles.active.length;
+    const rounds = w.projectiles.length;
+    const forms = new Set(w.projectiles.map((p) => p.form));
+
+    w.director.update = ran;
+    w.spawnLock = 0;
+    g.restart();
+    return {
+      cooldown, standingLevels,
+      before, spentAfter, before2, liveAfter,
+      muzzle, rounds, forms: [...forms],
+    };
+  });
+  /*
+   * 0.64 -- two levels of 0.8. It was 0.512, half of every clock on the bar,
+   * against a row that says "-20%" and neighbours that all name their cap.
+   */
+  check('the whole cooldown tree is one STANDING ORDER, and it is worth a third',
+    r.standingLevels === 2 && Math.abs(r.cooldown - 0.64) < 1e-9,
+    `STANDING ORDER x${r.standingLevels}, everything bought leaves every `
+    + `cooldown at x${r.cooldown.toFixed(4)}`);
+  check('...and a blast leaves a spent body finished, and a live one hit',
+    r.spentAfter.hp === r.before && r.spentAfter.dead === false
+    && r.liveAfter < r.before2,
+    `spent ${r.before} -> ${r.spentAfter.hp} (dead ${r.spentAfter.dead}), `
+    + `live ${r.before2} -> ${r.liveAfter}`);
+  /*
+   * 36 with the form (25 pellets one spark each, plus the 11-particle wedge)
+   * against 86 without it. The window is set clear of both rather than on the
+   * digit, because the wedge is authored and may be redrawn.
+   */
+  check('...and HAIL leaves as pellets, not as twenty-five muzzle flashes',
+    r.rounds === 25 && r.forms.length === 1 && r.forms[0] === 'pellet'
+    && r.muzzle > 20 && r.muzzle < 60,
+    `${r.rounds} rounds as ${JSON.stringify(r.forms)}, ${r.muzzle} particles at the barrel`);
 }
 
 // --- report -----------------------------------------------------------------

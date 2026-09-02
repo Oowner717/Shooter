@@ -4408,7 +4408,17 @@ export function applyBlast(world, blast) {
   const r2 = r * r;
   const hit = (list) => {
     for (const e of list) {
-      if (e.dead || e === source) continue;
+      /*
+       * `spent` for the reason CLAUDE.md gives: a boss's own structure is
+       * still drawn through its ending -- the arrest snaps the frame off a
+       * piece at a time and the infall takes the rest -- and "anything that
+       * decides what may be shot has to honour it". Rounds and the assist
+       * already did; blasts never have, so a PULSE (up to 574.6 units at two
+       * SHOCKFRONTs) or a mine going off inside a dying boss was damaging the
+       * pieces the outro is made of, and could take one before the sequence
+       * asked for it.
+       */
+      if (e.dead || e.spent || e === source) continue;
       const dx = e.x - x;
       const dy = e.y - y;
       const d2 = dx * dx + dy * dy;

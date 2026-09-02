@@ -10,7 +10,7 @@
 import { TAU, clamp, rand, spread, smoothstep, rgba, drawGlow, segClosest } from './util.js';
 import { spark, dot, ring, ripple, shake, flash } from './fx.js';
 import { CFG } from './config.js';
-import { fire } from './projectiles.js';
+import { fire, clampAim } from './projectiles.js';
 import { applyBlast, ENTRY_Y, drawIn } from './enemies.js';
 import { audio } from './audio.js';
 
@@ -241,7 +241,23 @@ class Well {
 
     const grab = (list) => {
       for (const e of list) {
-        if (e.dead) continue;
+        /*
+         * `staged` is still marching in and must not be yanked onto the field
+         * early; `fizzle` is dissolving and `spent` is a dead boss's frame.
+         * Grey is grabbed on purpose -- WELL drags EVERYTHING, and a knot of
+         * salvage is a fair thing to spend it on.
+         *
+         * `fizzle` in particular is CLAUDE.md's build-210 trap from the other
+         * side: `physicsStep` refuses to STEER a dissolving body, but this
+         * writes `vx`/`vy` directly and `integrate` runs regardless -- so a
+         * well up over a glitch fizzle hauled the whole dissolving field
+         * across the screen.
+         *
+         * Motes carry none of these marks and are exempt from the throw
+         * below: they already converge inside their own ceiling, and a mote
+         * that coasts is a mote that has stopped drifting to the turret.
+         */
+        if (e.dead || e.staged || e.spent || e.fizzle) continue;
         const dx = this.x - e.x;
         const dy = this.y - e.y;
         const d = Math.hypot(dx, dy);
@@ -257,6 +273,21 @@ class Well {
         e.vx += (wantX - e.vx) * blend;
         e.vy += (wantY - e.vy) * blend;
         e.av += 1.4 * dt;
+        /*
+         * ...and the well is allowed to actually move it.
+         *
+         * `integrate` clamps a body to `(cruise || 60) * 6` unless it has
+         * been thrown, and field cruise speeds run 23 to 150 -- so the
+         * collapse's 702 u/s reached about a third of the roster at all, and
+         * the median type took 35% of what the crush asked for. The graphic
+         * tightened and the knot kept closing at the same rate, which is the
+         * "picture is not the thing" disease this file keeps catching.
+         *
+         * Refreshed rather than set: it lapses a fifth of a second after the
+         * well lets go, and while it is up the body coasts instead of
+         * steering, which is what being dragged into a singularity is.
+         */
+        if (!e.isDrop) e.thrown = Math.max(e.thrown || 0, 0.2);
       }
     };
     grab(world.enemies);
@@ -554,7 +585,7 @@ class Ward {
     const P = CFG.ward;
     const up = world.up;
     this.t = 0;
-    this.life = P.life * (up.wardLife || 1);
+    this.life = P.life;
     this.max = this.life;
     this.dead = false;
     this.r = P.r * (up.wardR || 1);
@@ -768,7 +799,14 @@ function prismBurst(world, x, y) {
 
     const sweep = (list) => {
       for (const e of list) {
-        if (e.dead) continue;
+        /*
+         * The same guard the blast one line above this now carries. A beam
+         * runs 900 units, so a burst that fuses high enough reaches the queue
+         * still marching in, which nothing on the field is allowed to touch;
+         * `spent` is a dead boss's frame and `fizzle` is a body already
+         * dissolving.
+         */
+        if (e.dead || e.spent || e.fizzle || e.staged) continue;
         const c = segClosest(x, y, x1, y1, e.x, e.y);
         const rr = e.r + 18;
         if (c.d2 > rr * rr) continue;
@@ -779,9 +817,26 @@ function prismBurst(world, x, y) {
     sweep(world.drops);
   }
 
+  /*
+   * The seven rings end AT the blast, not 65% past it.
+   *
+   * They ran to `P.r * (1.05 + i*0.1)` -- 315 up to 495 against a blast that
+   * stops at 300 -- and `drawFx` strokes a ring at `alpha = t` and
+   * `width = w * t`, both running to nothing as it grows. So by the time each
+   * one reached the radius that actually hurt it was at 0.05 to 0.41 alpha
+   * and about a pixel wide, the brightest thing on screen was a knot in the
+   * middle, and the wave the player watches sweep out carried on for another
+   * 195 units over bodies that were never going to be touched. That is HE's
+   * build-211 fault and PULSE's build-216 one for the third time.
+   *
+   * They land staggered rather than together -- 0.82 to 1.0 of the radius --
+   * so the burst still opens as a wave, and the `Shock` holds the true edge
+   * after they are gone, which is exactly what PULSE does.
+   */
   for (let i = 0; i < SPECTRUM.length; i++) {
-    ring(x, y, 8 + i * 6, P.r * (1.05 + i * 0.1), 0.45 + i * 0.05, SPECTRUM[i], 3);
+    ring(x, y, 8 + i * 6, P.r * (0.82 + i * 0.03), 0.45 + i * 0.05, SPECTRUM[i], 3);
   }
+  world.effects.push(new Shock(x, y, P.r, '#ff6beb'));
   for (let i = 0; i < 46; i++) {
     const a = rand(0, TAU);
     spark(x, y, Math.cos(a) * rand(200, 780), Math.sin(a) * rand(200, 780),
@@ -796,12 +851,21 @@ function prismBurst(world, x, y) {
 
 // -------------------------------------------------------------- definitions
 
-/** Highest-value target ahead of the turret, for auto-aimed abilities. */
+/**
+ * Highest-value target ahead of the turret, for auto-aimed abilities.
+ *
+ * The guard is `autoTarget`'s, because this is the same decision: `spent` and
+ * `fizzle` are things that must not be shot (CLAUDE.md), and `harmless` is
+ * grey. It skipped only `dead` and `staged`, so LANCE -- a twelve-second
+ * ability whose hint says "the biggest threat" -- scored a DRIFT at 45.7
+ * against a MOTE's 33.3 and could be spent on salvage, or, during a boss
+ * ending, put 190 into the structure the outro is made of.
+ */
 function bestTarget(world) {
   let best = null;
   let score = -1;
   for (const e of world.enemies) {
-    if (e.dead || e.staged) continue;
+    if (e.dead || e.staged || e.spent || e.fizzle || e.harmless) continue;
     const s = e.r * 2 + e.hp * 0.3 - Math.hypot(e.x - world.shooter.x, e.y - world.shooter.y) * 0.14;
     if (s > score) { score = s; best = e; }
   }
@@ -810,7 +874,10 @@ function bestTarget(world) {
 
 /** Centre of the densest knot of objects — where a singularity is worth it. */
 function densestPoint(world) {
-  const list = world.enemies.filter((e) => !e.dead && !e.staged);
+  // Grey counts -- WELL drags EVERYTHING into the knot and is worth pressing
+  // on a field of salvage. `spent` and `fizzle` do not: one is a dead boss's
+  // frame and the other is already dissolving.
+  const list = world.enemies.filter((e) => !e.dead && !e.staged && !e.spent && !e.fizzle);
   if (!list.length) {
     return { x: world.shooter.x, y: world.shooter.y - 240 };
   }
@@ -889,10 +956,16 @@ export const ABILITIES = [
        * a held bloom on the turret itself, which is the thing that just did
        * it.
        */
-      ring(s.x, s.y, 20, 360, 0.42, '#59e0ff', 6);
-      ring(s.x, s.y, 10, 220, 0.28, '#ffffff', 2.4);
+      // ...and these are the ONE radius too. They were literals -- 360 and
+      // 220, written when 340 was the only radius there was -- so at two
+      // SHOCKFRONTs the punch was drawn at 63% of the edge it actually had.
+      ring(s.x, s.y, 20, R * 1.06, 0.42, '#59e0ff', 6);
+      ring(s.x, s.y, 10, R * 0.65, 0.28, '#ffffff', 2.4);
       // ...and the reach, held, at the radius the shove actually reached.
       world.effects.push(new Shock(s.x, s.y, R, '#59e0ff'));
+      // ...and the bloom on the machine that did it, which the note above has
+      // promised since build 215 and which was never actually drawn.
+      dot(s.x, s.y, 0, 0, '#dff6ff', 0.3, 34);
       ripple(s.x, s.y, 1.5, 800);
       shake(10);
       flash(0.18, '#bdf0ff');
@@ -936,6 +1009,18 @@ export const ABILITIES = [
           bounces: 0,
           color: '#7cffb2',
           trail: 0.03,
+          /*
+           * The same form SCATTER uses, and for the same reason: twenty-five
+           * of these leave at once. Unnamed, they fell to `fire`'s default
+           * muzzle -- two sparks and a dot APIECE, seventy-five particles on
+           * one point -- which is precisely the blob the comment below says
+           * this ability replaced with a drawn wedge, still being drawn
+           * underneath it. The wedge is 11 particles against a budget of 620
+           * scaled by quality, so on a busy field the authored thing is what
+           * gets dropped and the accident is what survives. It landed the
+           * same way: twenty-five generic hitBursts in one cone.
+           */
+          form: 'pellet',
         });
       }
       /*
@@ -965,16 +1050,39 @@ export const ABILITIES = [
     run(world) {
       const s = world.shooter;
       const target = bestTarget(world);
-      const a = target ? Math.atan2(target.y - s.y, target.x - s.x) : s.aim;
+      /*
+       * Clamped, and written BEFORE the muzzle is read.
+       *
+       * `s.aim = a` was the one writer in the game that did not go through
+       * `clampAim` -- every other one does (shooter.js, projectiles.js) --
+       * and DRIFT sinks past the turret by design, so a target below the
+       * barrel's own 77.9 degree limit is routine. The slew then chases
+       * `targetAim`, which is the same illegal angle, and nothing ever puts
+       * it back: the barrel sits under its stop and auto-fire shoots the
+       * floor.
+       *
+       * And the muzzle was read a line too early, off the OLD bearing, so
+       * the beam was drawn from where the barrel used to be while the damage
+       * was swept from the turret's centre -- two different lines, 32 units
+       * apart at the muzzle end. They are one line now: aim, then muzzle,
+       * then draw and sweep from the same point.
+       */
+      const a = clampAim(target ? Math.atan2(target.y - s.y, target.x - s.x) : s.aim);
+      s.aim = a;
+      s.targetAim = a;
+      const x0 = s.muzzleX;
+      const y0 = s.muzzleY;
       const len = Math.hypot(world.width, world.height) * 1.2;
-      const x1 = s.x + Math.cos(a) * len;
-      const y1 = s.y + Math.sin(a) * len;
-      world.effects.push(new Beam(s.muzzleX, s.muzzleY, x1, y1, '#ffd166'));
+      const x1 = x0 + Math.cos(a) * len;
+      const y1 = y0 + Math.sin(a) * len;
+      world.effects.push(new Beam(x0, y0, x1, y1, '#ffd166'));
 
       const hitList = (list) => {
         for (const e of list) {
-          if (e.dead) continue;
-          const c = segClosest(s.x, s.y, x1, y1, e.x, e.y);
+          // `spent` for the reason CLAUDE.md gives: a boss's own frame is
+          // still drawn through its ending and nothing may shoot it.
+          if (e.dead || e.spent) continue;
+          const c = segClosest(x0, y0, x1, y1, e.x, e.y);
           const rr = e.r + 26;
           if (c.d2 > rr * rr) continue;
           e.applyDamage(world, 190, Math.cos(a), Math.sin(a), 1500);
@@ -984,8 +1092,6 @@ export const ABILITIES = [
       hitList(world.enemies);
       hitList(world.drops);
 
-      s.aim = a;
-      s.targetAim = a;
       s.recoil = 1.6;
       shake(9);
       flash(0.14, '#fff3c4');
@@ -1104,12 +1210,12 @@ export class Abilities {
     // left. Everything starts at one, which is the cooldown-only behaviour the
     // game had before: a second charge is bought, one ability at a time, and
     // until it is bought there is nothing extra on screen to explain.
-    this.slots = ABILITIES.map((def) => ({ def, cd: 0, used: false, locked: 0, max: 1, charges: 1 }));
+    this.slots = ABILITIES.map((def) => ({ def, cd: 0, used: false, max: 1, charges: 1 }));
   }
 
   reset() {
     for (const s of this.slots) {
-      s.cd = 0; s.used = false; s.locked = 0; s.max = 1; s.charges = 1; s.cost = 0;
+      s.cd = 0; s.used = false; s.max = 1; s.charges = 1; s.cost = 0;
     }
   }
 
@@ -1128,7 +1234,6 @@ export class Abilities {
 
   update(dt) {
     for (const s of this.slots) {
-      if (s.locked > 0) s.locked = Math.max(0, s.locked - dt);
       if (s.cd <= 0) continue;
       s.cd = Math.max(0, s.cd - dt);
       if (s.cd > 0 || s.charges >= s.max) continue;
@@ -1149,41 +1254,27 @@ export class Abilities {
     for (const s of this.slots) { s.cd = 0; s.charges = s.max; }
   }
 
-  /**
-   * Takes an unlocked button away for a while, preferring
-   * one that is actually ready — removing something already on cooldown would
-   * cost the player nothing, and neither would removing one never unlocked.
-   * PULSE is never on the table.
-   * @returns the index taken, or -1 if there was nothing worth taking.
+  /*
+   * ---- the ability lock went in build 219 ----
+   *
+   * `lockRandom` took a button away for a while and was ORDINAL's SUBTRACT:
+   * "PULSE is never on the table", "removing something already on cooldown
+   * would cost the player nothing". It lost its one caller in BUILD 82,
+   * "delete ORDINAL", and when ORDINAL was rebuilt the lock was never
+   * rewired -- so for a hundred and thirty-six builds `s.locked` had no
+   * writer and five readers that could never take their other branch:
+   * `isLocked`, the `s.locked <= 0` term in `usable`, the decrement in
+   * `update`, `world.abilityTaken` -> `Hud.flashTaken`, and `.ab.locked` in
+   * the stylesheet. That is the `world.endless` shape CLAUDE.md records, and
+   * its rule is to delete the flag rather than maintain the branch.
+   *
+   * ORDINAL has its own character now -- the frame, the DIGITs, the mends --
+   * and it does not need a button taken away to have one.
    */
-  lockRandom(seconds, unlocked) {
-    const free = [];
-    const any = [];
-    for (let i = 0; i < this.slots.length; i++) {
-      const s = this.slots[i];
-      if (s.locked > 0 || s.def.essential) continue;
-      // Taking away something never bought costs the player nothing and reads
-      // as a greyed button going slightly greyer. SUBTRACT is ORDINAL's whole
-      // character; it has to land on something that was actually in hand.
-      if (unlocked && !unlocked.has(s.def.id)) continue;
-      any.push(i);
-      if (s.cd <= 0) free.push(i);
-    }
-    const pool = free.length ? free : any;
-    if (!pool.length) return -1;
-    const i = pool[(Math.random() * pool.length) | 0];
-    this.slots[i].locked = seconds;
-    return i;
-  }
-
-  isLocked(i) {
-    const s = this.slots[i];
-    return !!s && s.locked > 0;
-  }
 
   usable(i) {
     const s = this.slots[i];
-    return !!s && s.charges > 0 && s.locked <= 0;
+    return !!s && s.charges > 0;
   }
 
   /** @returns the slot if it fired, otherwise null. */
@@ -1195,11 +1286,23 @@ export class Abilities {
     // while; it was an ALLOCATION boost and went with that system, but the
     // read on `world.haste` stayed behind on a field nothing writes.
     const scale = world.up.cooldown;
-    s.cost = s.def.cooldown * scale * (world.debug.noCooldown ? 0 : 1);
+    const free = !!world.debug.noCooldown;
+    s.cost = s.def.cooldown * scale * (free ? 0 : 1);
     s.charges -= 1;
     // The clock is already running if this was a held charge; starting it over
     // would make the second use cost more than the first.
     if (s.cd <= 0) s.cd = s.cost;
+    /*
+     * NO COOLDOWN made every ability SINGLE USE, which is the opposite of
+     * what the toggle says.
+     *
+     * The cost goes to 0, so `s.cd` stays 0, so `update`'s `if (s.cd <= 0)
+     * continue` never reaches the line that hands a charge back -- and the
+     * charge was already spent above. One press each and the whole bar was
+     * dead until a restart. regress.mjs has a comment working around it
+     * rather than a case failing on it, which is how it survived.
+     */
+    if (free) s.charges = s.max;
     const first = !s.used;
     s.used = true;
     return { slot: s, first };

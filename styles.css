@@ -752,28 +752,6 @@ html, body {
   to { opacity: 1; transform: none; filter: none; }
 }
 
-/* The moment it is taken: a red jolt so the greying-out is not silent. */
-.ab.taken { animation: abTaken 0.55s ease-out; }
-@keyframes abTaken {
-  0% { transform: none; box-shadow: 0 0 0 0 rgba(255, 77, 109, 0.9); }
-  25% { transform: translateY(3px) scale(0.94); box-shadow: 0 0 0 8px rgba(255, 77, 109, 0.5); }
-  100% { transform: none; box-shadow: 0 0 0 16px rgba(255, 77, 109, 0); }
-}
-
-/* A button ORDINAL has taken away. */
-.ab.locked {
-  opacity: 0.32;
-  filter: grayscale(1);
-}
-.ab.locked::after {
-  content: '';
-  position: absolute;
-  inset: 8px;
-  border-top: 1.5px solid var(--warn);
-  transform: rotate(-32deg);
-  transform-origin: center;
-}
-
 /*
  * Not bought yet. Visible on purpose — the shape of what a turret can become
  * is part of what the offers are for — but it has to read as scenery rather

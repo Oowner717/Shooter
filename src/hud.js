@@ -674,19 +674,10 @@ export class Hud {
       frag.appendChild(b);
       this.slots.push({
         el: b, def, fill: b.querySelector('.fill'), pips, ready: null, frac: -1,
-        locked: null, held: -1, cap: -1, urgent: null, now: null,
+        held: -1, cap: -1, urgent: null, now: null,
       });
     });
     this.el.abilities.appendChild(frag);
-  }
-
-  /** ORDINAL taking a button: the same jolt as using one, in the wrong colour. */
-  flashTaken(i) {
-    const s = this.slots[i];
-    if (!s) return;
-    s.el.classList.remove('taken');
-    void s.el.offsetWidth;
-    s.el.classList.add('taken');
   }
 
   flashAbility(i) {
@@ -727,7 +718,6 @@ export class Hud {
       }
       // Quantised so an idle bar isn't restyled sixty times a second.
       const f = Math.round(abilities.readyFraction(i) * 100) / 100;
-      const locked = abilities.isLocked(i);
       if (s.frac !== f) {
         s.frac = f;
         s.fill.style.transform = `scaleY(${1 - f})`;
@@ -750,10 +740,6 @@ export class Hud {
       if (s.now !== now) {
         s.now = now;
         s.el.classList.toggle('now', now);
-      }
-      if (s.locked !== locked) {
-        s.locked = locked;
-        s.el.classList.toggle('locked', locked);
       }
       const { charges, max } = abilities.chargeState(i);
       if (s.held !== charges || s.cap !== max) {
@@ -1979,8 +1965,7 @@ export class Hud {
 
   /**
    * Which of the nineteen controls the opening has handed over. Sealed is not
-   * the same as ORDINAL's `locked`: locked is something taken away mid-fight,
-   * sealed is something not yet given. Both are visible; only one is a loss.
+   * a loss: it is something not yet given, and it is drawn to say so.
    */
   /**
    * The way in, and the thing that came through it.

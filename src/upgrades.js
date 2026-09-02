@@ -67,11 +67,14 @@ export function freshUpgrades() {
     mineTolls: 0, // extra rings on a knell
     spallPellets: 1, // how much a spall throws...
     spallBurst: 1, // ...and how wide each pellet goes off where it lands
-    // WARD: how far the shell stands out, how hard it cuts, how long it holds
-    // and how many arcs it throws at once.
+    // WARD: how far the shell stands out, how hard it cuts and how many arcs
+    // it throws at once. It held a fourth, `wardLife`, from the day WARD
+    // landed -- one reader in the constructor and no writer anywhere, because
+    // the duration node the comment promised was never authored. That is the
+    // `world.endless` shape CLAUDE.md records; the seconds are `CFG.ward.life`
+    // and nothing is for sale against them.
     wardR: 1,
     wardCut: 1,
-    wardLife: 1,
     wardArcs: 0,
     lodeReach: 1, // how far a lode pushes, and how hard
     lodePush: 1,
@@ -458,7 +461,17 @@ export const UPGRADES = {
     { id: 'splinter', name: 'SPLINTER', levels: 2,
       line: '+55% spall pellet blast radius.',
       apply: scale('spallBurst', 1.55), icon: MARK.splinter },
-    { id: 'repulsor', name: 'REPULSOR', line: '+40% lode reach and push.', apply: (u) => { u.lodeReach *= 1.4; u.lodePush *= 1.4; } , icon: MARK.repulsor },
+    /*
+     * Two levels, written out. It had none, and `tree.js` reads
+     * `u.levels ?? 3` -- so it was sold three times and a fully bought LODE
+     * reached 94 * 1.4^3 = 258 units and pushed 2.74x as hard. At two it is
+     * 184 units and 1.96x, which is still the widest field any mine makes.
+     *
+     * That radius is also drawn: the dashed ring and the chevrons are
+     * computed from `up.lodeReach`, so the third level was the most
+     * expensive circle on the field as well as the loudest.
+     */
+    { id: 'repulsor', name: 'REPULSOR', levels: 2, line: '+40% lode reach and push.', apply: (u) => { u.lodeReach *= 1.4; u.lodePush *= 1.4; } , icon: MARK.repulsor },
     { id: 'intake', name: 'INTAKE', levels: 1,
       line: 'Energy is taken in on contact, no PULSE needed. Louvres cut through the skirt.',
       apply: set('intake', true), icon: MARK.intake },
@@ -481,7 +494,15 @@ export const UPGRADES = {
     { id: 'fork', name: 'FORK', levels: 1,
       line: '+1 arc off the WARD at a time.',
       apply: bump('wardArcs', 1), icon: MARK.forkmark },
-    { id: 'standing', name: 'STANDING ORDER', line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
+    /*
+     * Two levels, written out -- 0.64 of every cooldown. It had none, and
+     * `tree.js` reads `u.levels ?? 3`, so the one node in this branch that
+     * touches all eight buttons was the one node in this branch with no cap:
+     * 0.8^3 = 0.512, half of every clock on the bar, against neighbours that
+     * all name their own number (STANDOFF 2, EDGED 2, FORK 1, SHOCKFRONT 2).
+     * The HOT LOAD and REPULSOR trap for the third time; see CLAUDE.md.
+     */
+    { id: 'standing', name: 'STANDING ORDER', levels: 2, line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
   ],
   TURRET: [
     /*
