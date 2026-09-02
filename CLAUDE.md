@@ -82,12 +82,17 @@ cannot tell a stage that is long because the boss is tough from one that is
 long because the turret spent it on minions -- DYNAMO's third stage was 46% of
 a 324-second fight and two thirds of it was IONs.
 
-**ORDINAL's canonical hash is `1831195238`** (seed 20260824, 9000 frames),
-re-baselined at build 211, which gave a round's impulse a place to land: the
-spin is now the impact parameter rather than `spread(push * 0.02)`, so bodies
-end a fight somewhere else, and the hash mixes every body's (x, y) every 300
-frames. The FIRST sample moved, which is the channel being the fight itself and
-not something downstream of it. Before that it was `1272664316` from build 209,
+**ORDINAL's canonical hash is `1796395127`** (seed 20260824, 9000 frames),
+re-baselined at build 211's fix pass, which moved both of `integrate`'s
+ceilings above the step they exist to bound. A cap applied after `x += vx * dt`
+does not cap that step, so bodies had been committing the frame the excess
+arrived on in full -- measured, 1.02% of substeps over their own limit, worst
+3.6x -- and correcting it changes where they end up. Note the SPIN sign fix in
+the same pass did NOT move it (it was re-run and came back identical), because
+the spin is drawn and not steered. Before that it was `1831195238` from build
+211, which gave a round's impulse a place to land: the spin is the impact
+parameter rather than `spread(push * 0.02)`, and the hash mixes every body's
+(x, y) every 300 frames. Before that it was `1272664316` from build 209,
 which changed what the turret shoots in two ways at once: the gun is now silent through a boss's arrival and its death (the probe
 runs from `openBoss` with auto-fire on, so the first two samples land inside a
 14.4-second arrival that now has an empty barrel), and DOUBLE TAP moved off
@@ -604,6 +609,26 @@ most once for any given target and cannot spin.
   dead-centre rounds landing), and both ricochets (mirroring about the round's
   own line, so a square-on bounce went back the way it came). If a fourth thing
   ever needs a surface normal, it is `contactAt`, not `(hit - centre)`.
+- **A cap applied after the step does not cap that step.** Both of
+  `integrate`'s ceilings -- the speed one from the day it was written, the spin
+  one added in build 211 -- sat below `x += vx * dt` and `angle += av * dt`, so
+  each bounded every frame except the one it existed to bound: the frame the
+  excess arrives on is committed in full and only then clipped. Measured, a
+  body handed the textbook rim spin turned 55.9 degrees on its first substep
+  against a cap that should have held it to 8.6, and bodies exceeded their own
+  speed cap on 1.02% of substeps. Clamp the state, then integrate it.
+- **A bounce that sets a position is overwritten by the caller.**
+  `updateProjectiles` computes the end of the step from the velocity the round
+  had BEFORE the sweep and then writes it unconditionally, so a reflected round
+  was teleported back to the un-reflected end of its own step -- measured on a
+  pinned PRISM, 16.2 to 16.9 units from the centre of a 20-unit body, i.e.
+  inside the thing it had just bounced off, with the velocity turned perfectly
+  correctly. `p.placed` is how a bounce says it has already chosen.
+- **A hit test against `e.r + p.r` has its contact geometry on THAT circle**,
+  not on `e.r`. Deriving the normal on the body's own radius under-turned every
+  bounce (14.5 degrees at b = 0.6r, 27 at 0.9r) and, because |b| reaches
+  `e.r + p.r`, flattened the outer fifth of the aperture to an incidence of
+  exactly 0 -- so the grazing shots that need the geometry most got none of it.
 - **A test that pins a SYMMETRY cannot see a SIGN.** Build 211's spin case
   asserted that two rim hits come out with opposite signs -- equally true of
   the correct model and of its mirror image -- and the mirror image is what

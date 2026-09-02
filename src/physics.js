@@ -82,6 +82,45 @@ export class Grid {
 
 /** Advance one body. Returns nothing; damping is frame-rate independent. */
 export function integrate(b, dt) {
+  /*
+   * A ceiling on the spin, which until build 211 did not exist.
+   *
+   * Here rather than at the impact, so every source answers to one limit: a
+   * round landing on the rim, a collision's tangential friction, and anything
+   * added later. See CFG.physics.maxSpin for why a physically correct rim
+   * impulse needs capping at all.
+   *
+   * And BEFORE the step, not after it, which is where it shipped: a clamp
+   * below `angle += av * dt` bounds every frame except the one it exists to
+   * bound, because the frame the excess arrives on is integrated in full and
+   * only then clipped. Measured, a body handed the textbook rim value of
+   * 117 rad/s turned 55.9 degrees on its first substep against a cap that
+   * should have held it to 8.6.
+   */
+  if (b.av > P.maxSpin) b.av = P.maxSpin;
+  else if (b.av < -P.maxSpin) b.av = -P.maxSpin;
+
+  /*
+   * Soft speed ceiling so a chain reaction can't fling anything to infinity.
+   * A body that has just been thrown is exempt for as long as it is coasting:
+   * that throw is bounded and deliberate, which is the case the clamp is not
+   * there to catch. See CFG.physics.thrownSpeed.
+   *
+   * Above the step for the same reason as the spin, and it sat below it from
+   * the day it was written: a cap applied after `x += vx * dt` does not cap
+   * that step, it caps the next one, so the frame the excess arrives on is
+   * committed in full. Measured over a live run, bodies exceeded their own cap
+   * on 1.02% of substeps -- 988 of 97,339 -- worst case a BULWARK travelling
+   * 3.6x its own ceiling for a frame.
+   */
+  const cap = b.thrown > 0 ? P.thrownSpeed : (b.cruise || 60) * P.maxSpeedFactor;
+  const sp2 = b.vx * b.vx + b.vy * b.vy;
+  if (sp2 > cap * cap) {
+    const s = cap / Math.sqrt(sp2);
+    b.vx *= s;
+    b.vy *= s;
+  }
+
   b.x += b.vx * dt;
   b.y += b.vy * dt;
   b.angle += b.av * dt;
@@ -90,28 +129,6 @@ export function integrate(b, dt) {
   b.vx *= d;
   b.vy *= d;
   b.av *= Math.exp(-P.angularDamping * dt);
-  /*
-   * ...and a ceiling on the spin, which until build 211 did not exist.
-   *
-   * Here rather than at the impact, so every source answers to one limit: a
-   * round landing on the rim, a collision's tangential friction, and anything
-   * added later. See CFG.physics.maxSpin for why a physically correct rim
-   * impulse needs capping at all.
-   */
-  if (b.av > P.maxSpin) b.av = P.maxSpin;
-  else if (b.av < -P.maxSpin) b.av = -P.maxSpin;
-
-  // Soft speed ceiling so a chain reaction can't fling anything to infinity.
-  // A body that has just been thrown is exempt for as long as it is coasting:
-  // that throw is bounded and deliberate, which is the case the clamp is not
-  // there to catch. See CFG.physics.thrownSpeed.
-  const cap = b.thrown > 0 ? P.thrownSpeed : (b.cruise || 60) * P.maxSpeedFactor;
-  const sp2 = b.vx * b.vx + b.vy * b.vy;
-  if (sp2 > cap * cap) {
-    const s = cap / Math.sqrt(sp2);
-    b.vx *= s;
-    b.vy *= s;
-  }
 }
 
 /**
@@ -204,17 +221,44 @@ export function resolvePair(a, b) {
  *
  * @param dirx,diry the round's unit travel direction
  */
-export function contactAt(e, hx, hy, dirx, diry) {
-  const r = e.r || 1;
-  // Clamped to the body's own radius: the hit test is against `e.r + p.r`, so
-  // a real graze reports |b| up to about 1.3r (measured p99 over a live run),
-  // and an unclamped sqrt(r^2 - b^2) is NaN -- which would propagate into vx
-  // and vy and leave the body at NaN for ever rather than throwing.
-  const b = clamp((hx - e.x) * -diry + (hy - e.y) * dirx, -r, r);
-  const depth = Math.sqrt(Math.max(0, r * r - b * b));
+export function contactAt(e, hx, hy, dirx, diry, pr = 0) {
+  /*
+   * On the circle the HIT TEST actually used, which is `e.r + p.r` and not
+   * `e.r`: two discs touch when their centres are that far apart, so that is
+   * the circle the line of centres -- the collision normal -- is defined on.
+   *
+   * Deriving it on `e.r` alone was wrong twice over. It under-turned every
+   * bounce, because the normal was taken at the wrong point on the arc; and
+   * because |b| runs up to `e.r + p.r`, the clamp flattened the outer band of
+   * the aperture to `incidence` exactly 0 and a normal square to the travel,
+   * so the grazing shots that need the geometry most got none of it. Measured
+   * on a PRISM (r 20) with a BOLT (r 4.2): under-turns of 14.5 degrees at
+   * b = 0.6r rising to 27 at 0.9r, and zero deflection across the outer fifth.
+   */
+  const R = (e.r || 1) + pr;
+  // Still clamped, because |b| can reach R exactly and an unclamped
+  // sqrt(R^2 - b^2) goes NaN on the rounding -- and a NaN velocity loses the
+  // body for the rest of the run rather than throwing.
+  const b = clamp((hx - e.x) * -diry + (hy - e.y) * dirx, -R, R);
+  const depth = Math.sqrt(Math.max(0, R * R - b * b));
   const ox = -diry * b - dirx * depth;
   const oy = dirx * b - diry * depth;
-  return { b, nx: ox / r, ny: oy / r, x: e.x + ox, y: e.y + oy, incidence: depth / r };
+  const nx = ox / R;
+  const ny = oy / R;
+  return {
+    b,
+    nx,
+    ny,
+    // Where the round's own centre sits at the moment of contact: what a
+    // bounce should be placed at.
+    cx: e.x + ox,
+    cy: e.y + oy,
+    // ...and where that is on the body's surface, which is what the picture
+    // of the impact wants.
+    x: e.x + nx * (e.r || 1),
+    y: e.y + ny * (e.r || 1),
+    incidence: depth / R,
+  };
 }
 
 export function impactDamage(a, b, impact) {

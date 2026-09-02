@@ -1789,6 +1789,34 @@ mirror image. It now names the turn a person watching the screen would give,
 for all six arrangements. A test that pins a symmetry and not a direction is a
 test that cannot see a sign.
 
+**Three more of the same class came out of an audit**, each derived from first
+principles and then measured in the running game:
+
+- **A cap applied after the step does not cap that step.** Both of
+  `integrate`'s ceilings sat below `x += vx·dt` — the speed one since it was
+  written, the spin one as shipped an hour earlier — so each bounded every
+  frame except the one it existed to bound. A body handed the textbook rim spin
+  turned 55.9° on its first substep against a cap that should have held it to
+  8.6°, and bodies exceeded their own speed cap on 1.02% of substeps (988 of
+  97,339), worst case a BULWARK at 3.6× its ceiling.
+- **A bounce that chose a position was overwritten by its caller.**
+  `updateProjectiles` computes the end of the step from the velocity the round
+  had *before* the sweep, then writes it unconditionally — so a reflected round
+  was put back at the un-reflected end of its own step. Measured on a pinned
+  PRISM: 16.2–16.9 units from the centre of a 20-unit body, *inside the thing
+  it had just bounced off*, with the velocity turned perfectly correctly. It
+  now ends at 25.2, clear of the surface.
+- **The contact geometry was built on the wrong circle.** The hit test is
+  against `e.r + p.r`, which is where two discs touch and therefore where the
+  line of centres is defined; deriving the normal on `e.r` under-turned every
+  bounce (14.5° at b = 0.6 r, 27° at 0.9 r) and flattened the outer fifth of
+  the aperture to an incidence of exactly zero, so the grazing shots that need
+  the geometry most got none of it.
+
+One candidate was **refuted 2–0** and left alone: the claim that `resolvePair`'s
+friction impulse is three times too large. Its algebra was right and none of its
+consequences reproduced.
+
 **The linear shove is deliberately unchanged.** An impulse applied off-centre
 still delivers all of itself to the centre of mass; where it landed adds
 angular momentum, it does not subtract linear. So the spin is free — HEAVY is

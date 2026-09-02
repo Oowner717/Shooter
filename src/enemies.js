@@ -948,14 +948,14 @@ export class Enemy {
   /**
    * @returns 'reflect' | 'hit'
    */
-  takeHit(world, dmg, hx, hy, nx, ny, impulse, shred = 0, form = null) {
+  takeHit(world, dmg, hx, hy, nx, ny, impulse, shred = 0, form = null, pr = 0) {
     /*
      * Where it actually landed. See `contactAt` in physics.js: the point the
      * projectile sweep hands over is a clamped closest-point on one frame of
      * travel, so only its component ACROSS the travel means anything -- and
      * that component is the exact impact parameter.
      */
-    const c = contactAt(this, hx, hy, nx, ny);
+    const c = contactAt(this, hx, hy, nx, ny, pr);
 
     /*
      * Prisms bounce glancing bolts; only a square-on hit lands.

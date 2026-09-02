@@ -68,7 +68,13 @@ class Projectile {
     // Rounds that leave a mark on what they hit rather than only hurting it.
     this.onHit = opts.onHit || null;
     this.dead = false;
-    this.ignore = null; // body we just reflected off
+    this.ignore = null;
+    /*
+     * Set by a bounce to say "I have already put this round where it belongs".
+     * Declared here rather than sprung into existence at the two sites that
+     * write it, so a recycled projectile can never inherit one.
+     */
+    this.placed = false; // body we just reflected off
     this.ignoreT = 0;
   }
 }
@@ -105,10 +111,23 @@ export function updateProjectiles(world, dt) {
       let nx = p.x + p.vx * dt;
       let ny = p.y + p.vy * dt;
 
+      p.placed = false;
       resolveSegment(world, p, p.x, p.y, nx, ny);
       if (!p.dead) {
-        p.x = nx;
-        p.y = ny;
+        /*
+         * `nx, ny` is the end of the step computed from the velocity the round
+         * had BEFORE the sweep, so writing it unconditionally threw away the
+         * position a bounce had just chosen -- and put the round back at the
+         * un-reflected end of its own step, which for a graze is inside the
+         * body it just came off. Measured on a pinned PRISM (r 20): a round
+         * grazing at 0.85r finished 16.9 units from the centre, and one at
+         * 0.95r finished 16.2, both well inside it, with the velocity turned
+         * perfectly correctly. It then spent `ignoreT` sitting in there.
+         */
+        if (!p.placed) {
+          p.x = nx;
+          p.y = ny;
+        }
 
         // arena-edge ricochet
         if (p.x < p.r && p.vx < 0) {
@@ -334,7 +353,7 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       // the per-form path. Passed as null for tracer to keep that path's
       // guard trivially cheap.
       const res = e.takeHit(world, p.damage, hx, hy, dirx, diry, p.impulse, p.shred,
-        p.form === 'tracer' ? null : p.form);
+        p.form === 'tracer' ? null : p.form, p.r);
       if (res === 'reflect') {
         /*
          * Mirror the velocity about the surface normal AT THE ENTRY POINT.
@@ -348,12 +367,16 @@ function resolveSegment(world, p, ax, ay, bx, by) {
          * carried straight on. Both backwards. `contactAt` derives the real
          * normal from the impact parameter; see physics.js.
          */
-        const c = contactAt(e, hx, hy, dirx, diry);
+        const c = contactAt(e, hx, hy, dirx, diry, p.r);
         const d = p.vx * c.nx + p.vy * c.ny;
         p.vx = (p.vx - 2 * d * c.nx) * 0.92;
         p.vy = (p.vy - 2 * d * c.ny) * 0.92;
-        p.x = c.x + c.nx * (p.r + 1);
-        p.y = c.y + c.ny * (p.r + 1);
+        // `cx, cy` is where the round's own centre is at contact, so a single
+        // unit clear of it is a round resting on the surface rather than one
+        // pushed a whole radius into open space.
+        p.x = c.cx + c.nx;
+        p.y = c.cy + c.ny;
+        p.placed = true;
         p.ignore = e;
         p.ignoreT = 0.08;
         p.color = '#ffd6ff';
@@ -384,12 +407,13 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         // the old one mirrored about the round's own line, so OVERSTUFFED sent
         // every square-on bolt straight back at the turret instead of off the
         // surface at the angle it arrived.
-        const c = contactAt(e, hx, hy, dirx, diry);
+        const c = contactAt(e, hx, hy, dirx, diry, p.r);
         const d = p.vx * c.nx + p.vy * c.ny;
         p.vx -= 2 * d * c.nx;
         p.vy -= 2 * d * c.ny;
-        p.x = c.x + c.nx * (p.r + 1);
-        p.y = c.y + c.ny * (p.r + 1);
+        p.x = c.cx + c.nx;
+        p.y = c.cy + c.ny;
+        p.placed = true;
         p.ignore = e;
         p.ignoreT = 0.08;
         ricochetFx(p);
