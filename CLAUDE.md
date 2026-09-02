@@ -379,14 +379,22 @@ most once for any given target and cannot spin.
   the frame they land. And sharing the counter with the case's own vacuity
   press reported one unasked cast on a clean build — the case catching itself.
   A zero means nothing until the instrument has been shown to read a one.
-- SPIRAL's `turns` must stay a WHOLE number. The sweep ends where the barrel
-  is left, and the ability then writes the starting angle back so `gripAngle`
-  is not carrying three revolutions of travel. At 2.6 turns that write was a
-  teleport — measured, 3.12 radians in one frame. At 3 it is the same
-  direction and nothing moves. `CFG.spiral.ramp` is the spin-up and spin-down
-  either side of it; at 0 both collapse to the flat sweep they replaced.
+- **Nothing in the bar takes the barrel any more.** SPIRAL owned the aim, the
+  cadence and the round for three seconds; WARD replaced it in build 217 and
+  is a shell round the machine that the gun goes on firing through. What the
+  removal left behind is the shape to watch for: `CFG.spiral` went, the class
+  went, and `windAt`/`rateAt` — the trapezoid that shaped its sweep — sat in
+  `abilities.js` for two builds with no caller and a forty-line header
+  explaining an ability that no longer existed. Nothing fails on dead private
+  functions; `bundle.mjs` will happily ship them. They came out in 219.
 - **An upgrade with no `levels` silently gets three.** `tree.js` reads
   `u.levels ?? 3`, so a node the author never capped is sold three times.
+  Caught three times now: HOT LOAD (193), BUCKSHOT (217), then REPULSOR and
+  STANDING ORDER together in 219 — the latter being the one node that touches
+  all eight ability buttons, at 0.8³ = 0.512 against a row saying "-20%".
+  `regress.mjs` pins the level TOTAL and asserts each ladder as a product
+  (`up.rate`, `up.cooldown`), which is what catches a new node arriving as
+  well as an old one taking its default back.
   HOT LOAD was 0.85³ on the fire interval — 1.63× on rounds a second, larger
   than the FEED nerf of build 178, which capped FEED for exactly that reason
   and stopped one node short. Check the tree's number, not the upgrade's,
@@ -524,6 +532,21 @@ most once for any given target and cannot spin.
   take their other branch, which is the `world.endless` shape from build 186
   all over again. `resting = true` before anything else, or `update()` falls
   into the end-of-wave block next frame and scores the same wave twice.
+- **`spent` is a rule for what may be SHOT; `staged` is a rule for what may be
+  CHOSEN.** Build 219's audit got this backwards in three places at once and
+  the distinction is the whole of it. `spent` (a boss's own frame through its
+  outro) has to be honoured by anything that does damage — rounds and the
+  assist always did, and `applyBlast`, PRISM's beams, LANCE's sweep and WELL's
+  knot never had, so any area effect pressed inside a dying boss was taking
+  the pieces the ending is made of. `staged` is the opposite: `config.js` says
+  in as many words that it "never gated projectile collision", only the
+  assists, so a body is shootable through most of its march in — and adding
+  `staged` to a damage path makes a blast visibly wash over a body on screen
+  and do nothing. Choosers (`autoTarget`, `bestTarget`, `densestPoint`) skip
+  it; damage does not. `fizzle` splits the same way: build 210 made a
+  dissolving body stop STEERING, not stop existing, so WELL's knot — which
+  writes `vx`/`vy` by hand — has to honour it and a blast or a beam does not.
+  `Enemy.destroy` is the door that refuses to cash it in, and that is enough.
 - **`spent` has three readers and `dissolved` has one.** `spent` (autoTarget,
   its hysteresis, the projectile sweep) keeps rounds and the assist off a body;
   `dissolved` (the sweep) stops it paying and counting. Neither reaches blasts,

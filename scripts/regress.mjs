@@ -12989,6 +12989,217 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `${r.rounds} rounds as ${JSON.stringify(r.forms)}, ${r.muzzle} particles at the barrel`);
 }
 
+// --- STASIS holds everything that moves, not most of it ---------------------
+/*
+ * "Objects freeze. Your shots do not." Three terms moved bodies without ever
+ * asking, and all three are the same shape: a path that returns from `drive`
+ * ABOVE its `slow` term, or a term applied outside `steer` entirely.
+ *
+ *  - a SCION's SEED goes through `hunt`, which had no stasis in it at all, so
+ *    seeds crossed a stopped field at sixty-five times a held body and
+ *    grafted anyway;
+ *  - a TOW's `windUp` is called after `drive` and had no stasis term, so the
+ *    one thing on the field that can be stopped by pressing a button wound up
+ *    and hurled its MASS at the mount through the freeze;
+ *  - `edgeEase` runs from `physicsStep`, outside steering, and pushed at its
+ *    full 300 u/s^2 -- about 140 u/s at the wall against a held body's 1.8.
+ *
+ * Measured as SPEED after the freeze has had time to settle, against the same
+ * arrangement unfrozen, because a ratio is what the hint promises and an
+ * absolute number is a balance figure that will move.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    const ran = w.director.update;
+    w.director.update = () => {};
+    const run = (n) => { for (let i = 0; i < n; i++) g.update(1 / 60); };
+
+    // ---- a SEED hunting a host ----
+    const seedSpeed = (freeze) => {
+      g.debugClearField();
+      const host = g.debugSpawn('bulwark', w.width / 2, 300);
+      host.staged = false;
+      const seed = g.debugSpawn('mote', w.width / 2 - 220, 300);
+      seed.staged = false;
+      seed.seed = true;
+      seed.seedT = 99;
+      w.stasis = freeze ? 99 : 0;
+      run(30);
+      const v = Math.hypot(seed.vx, seed.vy);
+      w.stasis = 0;
+      return { v, alive: !seed.dead, host: !!host };
+    };
+
+    // ---- a TOW winding up ----
+    const towWind = (freeze) => {
+      g.debugClearField();
+      const s = w.shooter;
+      const made = g.debugSpawnGroup('tow', 1);
+      /*
+       * `!e.dead` is load-bearing. `debugClearField` destroys bodies but the
+       * list is not swept until the next frame, so without it the second call
+       * finds the FIRST call's head -- still in `w.enemies`, still carrying
+       * the 0.5s of wind it did unfrozen -- and the case reports the freeze
+       * doing nothing on a build where it works.
+       */
+      const head = w.enemies.find((e) => !e.dead && e.type.id === 'tow' && e.tether);
+      if (head) {
+        head.staged = false;
+        head.x = s.x; head.y = s.y - 200;
+        if (head.tether.other) {
+          head.tether.other.staged = false;
+          head.tether.other.x = s.x - 60; head.tether.other.y = s.y - 200;
+        }
+      }
+      w.stasis = freeze ? 99 : 0;
+      run(30);
+      const wind = head ? (head.wind || 0) : -1;
+      w.stasis = 0;
+      return { wind, made: made ? made.length : 0 };
+    };
+
+    // ---- a body resting against the wall ----
+    const wallSpeed = (freeze) => {
+      g.debugClearField();
+      const e = g.debugSpawn('mote', 6, 320);
+      e.staged = false;
+      e.vx = 0; e.vy = 0;
+      w.stasis = freeze ? 99 : 0;
+      run(30);
+      const v = Math.abs(e.vx);
+      w.stasis = 0;
+      return v;
+    };
+
+    const out = {
+      seedFree: seedSpeed(false), seedHeld: seedSpeed(true),
+      towFree: towWind(false), towHeld: towWind(true),
+      wallFree: wallSpeed(false), wallHeld: wallSpeed(true),
+    };
+    w.director.update = ran;
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+  check('a STASIS holds a SEED, which went through hunt and was never asked',
+    r.seedFree.v > 15 && r.seedHeld.v < r.seedFree.v * 0.25,
+    `seed ${r.seedFree.v.toFixed(1)} u/s free, ${r.seedHeld.v.toFixed(1)} held`);
+  check('...and it stops a TOW winding up, the way it already stopped a lurch',
+    r.towFree.wind > 0.2 && r.towHeld.wind === 0 && r.towFree.made === 2,
+    `wind ${r.towFree.wind.toFixed(2)}s free, ${r.towHeld.wind.toFixed(2)}s held`);
+  check('...and the wall stops shoving, which it did at full strength',
+    r.wallFree > 20 && r.wallHeld < r.wallFree * 0.25,
+    `at the wall ${r.wallFree.toFixed(1)} u/s free, ${r.wallHeld.toFixed(1)} held`);
+}
+
+// --- what the audit found in WARD and DECOY ---------------------------------
+/*
+ * Two more of the same family, and both are "the picture is not the thing"
+ * turned inward -- the code disagreeing with the sentence beside it.
+ *
+ * WARD's surface tests a CROSSING, but `rr` is the radius times `open`, which
+ * ramps to nothing over the last third of a second. So the wall swept inward
+ * through everything standing in it on the way out and billed the lot: every
+ * body inside paid for one WARD twice, 226 damage at two EDGEDs, at the
+ * moment the ring had already faded. `config.js` says the opposite in as many
+ * words -- "a body that walks through it pays for walking through it rather
+ * than for standing near it". The case above this one could not see it: a
+ * parked body is inside the ARCS' reach too, so `parked > 0` was true either
+ * way. Cuts are told from arcs by size (62 against 46).
+ *
+ * And a DECOY was fooling the energy. The steering override had no `isDrop`
+ * guard where both its neighbouring branches do, and a mote steers at 132
+ * with accel 300 against `collectEnergy`'s 26 u/s^2 -- so pressing it stopped
+ * loose energy arriving at all for up to nine seconds.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    const ran = w.director.update;
+    w.director.update = () => {};
+    const s = w.shooter;
+    const P = CFG.ward;
+
+    // ---- WARD: a body that never moves is never cut ----
+    const idx = (id) => w.abilities.slots.findIndex((x) => x.def.id === id);
+    g.debugClearField();
+    const still = g.debugSpawn('mote', s.x, s.y - P.r);
+    still.staged = false;
+    still.maxHp = 1e7; still.hp = 1e7;
+    w.abilities.clearCooldowns();
+    g.useAbility(idx('ward'));
+    let cuts = 0;
+    let arcs = 0;
+    let was = still.hp;
+    // The whole shell plus its collapse, and the body pinned on the line for
+    // every frame of it.
+    for (let f = 0; f < 60 * 7; f++) {
+      still.x = s.x; still.y = s.y - P.r; still.vx = 0; still.vy = 0;
+      g.update(1 / 60);
+      const d = was - still.hp;
+      if (d > 0) {
+        if (Math.abs(d - P.cut) < 6) cuts++;
+        else if (Math.abs(d - P.arc.damage) < 6) arcs++;
+        was = still.hp;
+      }
+    }
+
+    // ---- DECOY: the energy is not fooled ----
+    g.debugClearField();
+    const mote = g.debugSpawn('mote', s.x + 40, s.y - 260);
+    mote.staged = false;
+    // Made a drop by hand: what matters is the branch, and the branch is
+    // `isDrop`. Moved into `w.drops` so nothing else treats it as hostile.
+    const drops = w.drops;
+    const near = (m) => Math.hypot(m.x - s.x, m.y - s.y);
+    const closes = (decoy) => {
+      g.debugClearField();
+      // Off to the side and well BELOW the decoy, which stands at about
+      // s.y - 300: with the bug the mote turns round and climbs to it, so the
+      // sign of the change is the whole assertion.
+      const e = g.debugSpawn('mote', s.x + 120, s.y - 140);
+      e.staged = false;
+      e.isDrop = true;
+      e.harmless = false;
+      w.abilities.clearCooldowns();
+      if (decoy) g.useAbility(idx('decoy'));
+      const d0 = near(e);
+      for (let f = 0; f < 60 * 2; f++) g.update(1 / 60);
+      return { d0, d1: near(e), dead: !!e.dead };
+    };
+    const free = closes(false);
+    const fooled = closes(true);
+
+    w.director.update = ran;
+    w.spawnLock = 0;
+    g.restart();
+    return { cuts, arcs, free, fooled, unused: [mote, drops].length };
+  });
+  check('a WARD cuts a body that walks through it, never one standing still',
+    r.cuts === 0 && r.arcs > 0,
+    `a body pinned on the line for the whole shell took ${r.cuts} surface `
+    + `cuts and ${r.arcs} arcs`);
+  check('...and a DECOY does not fool the energy, only the field',
+    r.free.d0 - r.free.d1 > 20 && r.fooled.d0 - r.fooled.d1 > 20
+    && (r.fooled.d0 - r.fooled.d1) > (r.free.d0 - r.free.d1) * 0.5,
+    `a mote closed ${r.free.d0.toFixed(0)} -> ${r.free.d1.toFixed(0)} with no `
+    + `decoy, ${r.fooled.d0.toFixed(0)} -> ${r.fooled.d1.toFixed(0)} with one`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

@@ -36,7 +36,9 @@ const BACKUP = 'sim7749-run-prev';
 const VERSION = 4;
 
 /** Only these two phases are a coherent place to pick a run up from. */
-const SAVABLE = new Set(['staging', 'lull']);
+// `staging` and nothing else: `boot` is the title screen and there has never
+// been a third value. `'lull'` sat here from build 82 and could never match.
+const SAVABLE = new Set(['staging']);
 
 /*
  * Write it down, and do not destroy a good file to do it.

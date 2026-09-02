@@ -930,7 +930,7 @@ export function drawMines(ctx, world) {
  */
 export function mineCadence(world, timer, dt) {
   const kind = world.mine;
-  if (!kind || world.phase === 'ending' || world.phase === 'boot') return timer;
+  if (!kind || world.phase === 'boot') return timer;
   const next = timer - dt;
   if (next > 0) return next;
   const n = 1 + world.up.mineSalvo;

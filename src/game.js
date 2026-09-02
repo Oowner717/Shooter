@@ -894,7 +894,7 @@ export class Game {
 
     c.addEventListener('pointerdown', (ev) => {
       const w = this.world;
-      if (w.phase === 'boot' || w.phase === 'frozen') return;
+      if (w.phase === 'boot') return;
       const p = pos(ev);
       if (p.y > w.floorY + 10) return; // ability strip belongs to the thumb
       const s = w.shooter;
@@ -968,14 +968,28 @@ export class Game {
     window.addEventListener('keydown', (ev) => {
       const n = parseInt(ev.key, 10);
       // Sealed buttons are refused at every entry point, keyboard included.
-      if (n >= 1 && n <= 5 && !this.abilitySealed(n - 1)) this.useAbility(n - 1);
+      // One key per slot, and there are eight. It stopped at 5, which was the
+      // count when the line was written, against a comment above it claiming
+      // every entry point is covered -- so STASIS, DECOY and WARD had no key.
+      const slots = this.world.abilities.slots.length;
+      if (n >= 1 && n <= slots && !this.abilitySealed(n - 1)) this.useAbility(n - 1);
       if (ev.key === ' ') this.world.shooter.shoot(this.world);
     });
   }
 
   useAbility(i) {
     const w = this.world;
-    if (w.phase === 'boot' || w.phase === 'ending' || w.phase === 'frozen') return;
+    /*
+     * `boot` and nothing else, because `boot` and `staging` are the only two
+     * values `world.phase` has ever held. This line tested `'ending'` and
+     * `'frozen'` as well, and so did six others across three files: neither
+     * has had a writer since build 82, so the outro protection this guard
+     * advertised did not exist and could not have. That is the `world.endless`
+     * shape CLAUDE.md records -- a constant threaded rather than a branch
+     * taken. What actually keeps an ability off a dying boss is `spent`, which
+     * every area effect now honours.
+     */
+    if (w.phase === 'boot') return;
     const res = w.abilities.trigger(w, i);
     if (!res) return;
     this.hud.flashAbility(i);
@@ -1211,7 +1225,7 @@ export class Game {
     // does before they press it, and a sentence saying so is in front of the
     // field. See PREFS.hints in settings.js.
     if (!pref('hints')) return false;
-    return this.world.phase === 'staging' || this.world.phase === 'lull';
+    return this.world.phase === 'staging';
   }
 
   /**
@@ -1344,7 +1358,7 @@ export class Game {
   updateFiring(dt) {
     const w = this.world;
     const s = w.shooter;
-    if (w.phase === 'ending' || w.phase === 'boot') return;
+    if (w.phase === 'boot') return;
     /*
      * Nothing takes the gun away any more. SPIRAL did -- it owned the barrel
      * for three seconds and fired it on its own cadence -- and WARD, which
@@ -1554,7 +1568,8 @@ export class Game {
     bodies.push(w.shooter);
     // The decoy is a static body too, so things pile up against it instead of
     // drifting through it — and it takes the collision damage of the pile.
-    if (w.decoy && !w.decoy.dead) bodies.push(w.decoy);
+    const decoyIn = !!(w.decoy && !w.decoy.dead);
+    if (decoyIn) bodies.push(w.decoy);
     this.grid.build(bodies);
     this.grid.eachPair(bodies, (a, b) => {
       // A dissolving body is scenery for the second it takes to go: it must
@@ -1593,7 +1608,15 @@ export class Game {
       if (a.applyDamage) a.applyDamage(w, dmg);
       if (b.applyDamage) b.applyDamage(w, dmg);
     });
-    if (w.decoy && !w.decoy.dead) bodies.pop();
+    /*
+     * Popped on the flag it was pushed on, not on the condition re-read.
+     * The pair loop can kill the decoy -- `applyDamage` on it calls `expire`,
+     * which nulls `world.decoy` -- so the pop tested false for something that
+     * had been pushed true, and the shooter was left in `bodies`. Harmless
+     * only because nothing past `clamped` is read, which is not a guarantee
+     * anyone should have to keep.
+     */
+    if (decoyIn) bodies.pop();
     bodies.pop(); // shooter is not integrated
 
     // Cables, after the contact solver so a TOW pair cannot be pulled apart by
@@ -1747,7 +1770,7 @@ export class Game {
    */
   checkContact() {
     const w = this.world;
-    if (w.phase === 'boot' || w.phase === 'ending') return;
+    if (w.phase === 'boot') return;
     const s = w.shooter;
     for (const e of [...w.attackers]) {
       const off = e.r + s.r + 6;
@@ -2240,13 +2263,6 @@ export class Game {
     const W = w.width;
     const H = w.height;
 
-    if (w.phase === 'frozen' && this.snapshot) {
-      const dst = this.ctx;
-      dst.setTransform(1, 0, 0, 1, 0, 0);
-      glitch.present(dst, this.snapshot, this.canvas.width, this.canvas.height);
-      return;
-    }
-
     const k = this.dpr * w.scale;
     ctx.setTransform(k, 0, 0, k, 0, 0);
     ctx.fillStyle = '#04050a';
@@ -2531,8 +2547,22 @@ export class Game {
     ctx.strokeStyle = `rgba(190,225,255,${0.5 * a})`;
     ctx.lineWidth = 1.4;
     ctx.beginPath();
-    for (const e of w.enemies) {
-      if (e.dead || e.staged) continue;
+    /*
+     * ...and the set has to be the set that is actually held, which it was
+     * not. It walked `w.enemies` and skipped `dead` and `staged` alone, so it
+     * marked a boss's fixed frame and a `thrown` body coasting through the
+     * freeze -- neither of which stasis has any hold on -- while omitting
+     * `staged` bodies, which ARE held and are on screen from the entry line
+     * down, and every mote, which is held too.
+     */
+    const brackets = [];
+    for (const e of [...w.enemies, ...w.drops]) {
+      if (e.dead || e.spent || e.fizzle) continue;
+      if (e.type && e.type.fixed && !e.isDrop) continue; // placed, never steered
+      if (e.thrown > 0) continue;                        // coasting, not held
+      brackets.push(e);
+    }
+    for (const e of brackets) {
       const r = e.r * 1.5;
       for (const [sx2, sy2] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
         const cx = e.x + sx2 * r;

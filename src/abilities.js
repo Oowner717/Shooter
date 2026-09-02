@@ -256,8 +256,12 @@ class Well {
          * Motes carry none of these marks and are exempt from the throw
          * below: they already converge inside their own ceiling, and a mote
          * that coasts is a mote that has stopped drifting to the turret.
+         *
+         * `staged` is deliberately NOT here: most of a body's march in is on
+         * screen, and a well that visibly fails to touch something beside it
+         * is worse than one that pulls a straggler in early.
          */
-        if (e.dead || e.staged || e.spent || e.fizzle) continue;
+        if (e.dead || e.spent || e.fizzle) continue;
         const dx = this.x - e.x;
         const dy = this.y - e.y;
         const d = Math.hypot(dx, dy);
@@ -307,8 +311,12 @@ class Well {
     if (this.life <= 0) {
       this.dead = true;
       applyBlast(world, { x: this.x, y: this.y, r: 210, damage: 105, impulse: 1000 });
-      ring(this.x, this.y, 10, 340, 0.42, '#e0aaff', 5);
-      ring(this.x, this.y, 0, 170, 0.26, '#ffffff', 2);
+      // At 210, not 62% past it. Fourth of the same fault -- a ring fades and
+      // thins as it grows, so drawn 10 -> 340 it crossed the edge that
+      // actually hurt at a third of its brightness and two pixels wide.
+      ring(this.x, this.y, 168, 222, 0.42, '#e0aaff', 5);
+      ring(this.x, this.y, 0, 105, 0.26, '#ffffff', 2);
+      world.effects.push(new Shock(this.x, this.y, 210, '#e0aaff'));
       ripple(this.x, this.y, 1.9, 720);
       flash(0.32, '#e0c2ff');
       shake(12);
@@ -391,7 +399,6 @@ class Decoy {
     this.life = D.life;
     this.dead = false;
     this.flash = 0;
-    this.spin = 0;
     this.born = 0;
     // static physics body, exactly like the turret
     this.vx = 0;
@@ -415,8 +422,14 @@ class Decoy {
     this.dead = true;
     const B = CFG.decoy.blast;
     applyBlast(world, { x: this.x, y: this.y, r: B.r, damage: B.damage, impulse: B.impulse });
-    ring(this.x, this.y, this.r, B.r * 1.5, 0.5, '#9be7ff', 6);
-    ring(this.x, this.y, 0, B.r * 0.7, 0.3, '#ffffff', 2.4);
+    // At the radius, not half again past it. It ran to `B.r * 1.5`, and a
+    // ring fades and thins as it grows, so it crossed the edge that actually
+    // hurt at a third of its brightness and two pixels wide, then swept
+    // another 130 units over bodies nothing could touch. The `Shock` holds
+    // the true edge after it, as PULSE's has since build 216.
+    ring(this.x, this.y, B.r * 0.8, B.r * 1.06, 0.5, '#9be7ff', 6);
+    ring(this.x, this.y, 0, B.r * 0.5, 0.3, '#ffffff', 2.4);
+    world.effects.push(new Shock(this.x, this.y, B.r, '#9be7ff'));
     ripple(this.x, this.y, 1.8, B.r * 4);
     flash(0.24, '#bdf0ff');
     shake(14);
@@ -431,7 +444,6 @@ class Decoy {
   update(world, dt) {
     this.born = Math.min(1, this.born + dt * 3);
     this.flash = Math.max(0, this.flash - dt * 3);
-    this.spin += dt * 1.6;
     this.life -= dt;
     if (this.life <= 0) this.expire(world);
   }
@@ -474,7 +486,9 @@ class Decoy {
     ctx.arc(0, 0, this.r * 0.42, 0, TAU);
     ctx.stroke();
     // The barrel, swinging as if it were looking for something. Off
-    // world.time so every decoy on the field is not in lockstep.
+    // world.time, which is also why the `spin` this class used to carry had
+    // no reader: `run` allows exactly one decoy, so there is no lockstep to
+    // break.
     ctx.save();
     ctx.rotate(-Math.PI / 2 + Math.sin(world.time * 1.3 + this.born) * 0.5);
     ctx.strokeRect(-4, -this.r * 1.62, 8, this.r * 0.9);
@@ -504,64 +518,14 @@ class Decoy {
 }
 
 /**
- * SPIRAL. The barrel comes off its target and turns, firing all the way round.
- *
- * The one ability that is about the turret rather than the field. Every other
- * entry in the bar does something somewhere else; this one takes the gun the
- * player has spent the whole tree building and removes the single constraint
- * on it, which is that it can only point one way at a time.
- *
- * It fires the loaded round through every upgrade that round carries, so it is
- * nine different abilities depending on what is on the strip. It owns the aim
- * while it runs -- and
- * hands it straight back, because a barrel left pointing wherever the sweep
- * ended would be a worse gift than the sweep.
- */
-/*
- * The sweep's motion, as a rate rather than as a position.
- *
- * `windAt` is what fraction of the total turn has been made at time fraction
- * k, and `rateAt` is how fast it is turning there as a fraction of the peak.
- * They are the same trapezoid: the rate ramps up over the first `r` of the
- * sweep, holds, and ramps back down over the last `r`, so the angle is that
- * integrated and normalised to finish at exactly 1.
- *
- * A turret is a mass on a gimbal. It was a straight line before -- full rate
- * on the first frame, full rate on the last, and then the angle written back
- * to the start on the frame after that -- and both ends of that read as a
- * mistake rather than as a machine. This is the same sweep with the two ends
- * given somewhere to come from and somewhere to go.
- *
- * The area under the trapezoid is (1 - r), which is what everything below is
- * divided by; at r = 0 both collapse to the straight line they replaced.
- */
-function windAt(k, r) {
-  if (r <= 0) return k;
-  const span = 1 - r;
-  if (k < r) return (k * k) / (2 * r * span);
-  if (k > 1 - r) {
-    const d = 1 - k;
-    return (span - (d * d) / (2 * r)) / span;
-  }
-  return (k - r / 2) / span;
-}
-
-/** ...and the rate it is turning at, 0 at both ends and 1 across the middle. */
-function rateAt(k, r) {
-  if (r <= 0) return 1;
-  if (k < r) return k / r;
-  if (k > 1 - r) return (1 - k) / r;
-  return 1;
-}
-
-/**
  * WARD. A shell round the turret, up for a few seconds.
  *
  * Two halves, and they answer different things. The SURFACE cuts anything
  * that crosses it, once per crossing with a short refractory -- so it is a
  * wall, not a patch of ground, and a body that walks through it pays for
  * walking through it rather than for standing near it. The ARCS take the
- * nearest bodies INSIDE the shell every fraction of a second, which is what
+ * nearest bodies within a quarter again of the shell every fraction of a
+ * second, which is what
  * answers something already on the turret and what makes the ability worth
  * pressing before anything has arrived.
  *
@@ -586,10 +550,12 @@ class Ward {
     const up = world.up;
     this.t = 0;
     this.life = P.life;
-    this.max = this.life;
     this.dead = false;
     this.r = P.r * (up.wardR || 1);
     this.cut = P.cut * (up.wardCut || 1);
+    // Snapshotted with the surface's, not read live. They disagreed: buying
+    // EDGED while a shell was up moved the arcs and not the cut.
+    this.arcDamage = P.arc.damage * (up.wardCut || 1);
     this.arcs = P.arc.n + (up.wardArcs || 0);
     this.next = P.arc.every;
     /*
@@ -606,6 +572,8 @@ class Ward {
      * to be near it rather than what went through it.
      */
     this.side = new WeakMap();
+    this.lastRr = -1; // last frame's surface radius, so a crossing the WALL
+                      // made is told from one a body made
     this.flash = 0; // the surface lighting where something just came through
     this.hits = []; // {a, t} -- where, so the shell is marked where it was hit
     this.bolts = []; // {x0,y0,x1,y1,t} -- the arcs, drawn for a moment
@@ -634,6 +602,14 @@ class Ward {
     if (this.life <= 0) { this.dead = true; return; }
 
     const rr = this.r * this.open;
+    /*
+     * Whether the SURFACE moved this frame, which is the exact question --
+     * both ramps, and the single frame either side of them where the clock
+     * says one thing and the radius says another. Testing `t < ramp ||
+     * life < ramp` instead is a frame out at each end.
+     */
+    const moved = rr !== this.lastRr;
+    this.lastRr = rr;
     if (rr < 4) return;
 
     // ---- the surface ----
@@ -653,6 +629,21 @@ class Ward {
       const was = this.side.get(e);
       this.side.set(e, inside);
       if (was === undefined || was === inside) continue;
+      /*
+       * ...and a crossing the SURFACE made does not count.
+       *
+       * `rr` is the radius times `open`, which ramps to 0 over the last third
+       * of a second, so the shell sweeps inward through everything standing
+       * in it on the way out -- and `recut` (0.55s) is long gone by then.
+       * Every body inside was billed twice for one WARD, 226 damage at two
+       * EDGEDs, at the moment the ring has already faded to nothing. The
+       * config says the opposite in as many words: "a body that walks through
+       * it pays for walking through it rather than for standing near it".
+       *
+       * The side is still recorded above, so a body that really does walk out
+       * during the collapse is billed on the next frame it moves.
+       */
+      if (moved) continue;
       const last = this.seen.get(e) || -99;
       if (world.time - last < P.recut) continue;
       this.seen.set(e, world.time);
@@ -684,7 +675,7 @@ class Ward {
       const d = near[i].d || 1;
       const nx = (e.x - s.x) / d;
       const ny = (e.y - s.y) / d;
-      e.applyDamage(world, P.arc.damage * (up_or1(world, 'wardCut')), nx, ny, 0);
+      e.applyDamage(world, this.arcDamage, nx, ny, 0);
       // From the SURFACE, not from the turret: the shell is what is throwing
       // it, and a bolt starting at the machine would read as the gun firing.
       this.bolts.push({
@@ -775,12 +766,6 @@ class Ward {
   }
 }
 
-/** A scalar off world.up that may not exist on an old save's table. */
-function up_or1(world, key) {
-  const v = world.up && world.up[key];
-  return typeof v === 'number' && v > 0 ? v : 1;
-}
-
 const SPECTRUM = ['#ff4d6d', '#ff9f1c', '#ffe066', '#7cffb2', '#59e0ff', '#8b5cf6', '#e0aaff'];
 
 /**
@@ -799,14 +784,9 @@ function prismBurst(world, x, y) {
 
     const sweep = (list) => {
       for (const e of list) {
-        /*
-         * The same guard the blast one line above this now carries. A beam
-         * runs 900 units, so a burst that fuses high enough reaches the queue
-         * still marching in, which nothing on the field is allowed to touch;
-         * `spent` is a dead boss's frame and `fizzle` is a body already
-         * dissolving.
-         */
-        if (e.dead || e.spent || e.fizzle || e.staged) continue;
+        // The same guard the blast one line above this now carries. Not
+        // `staged` and not `fizzle` -- see the note in LANCE's sweep.
+        if (e.dead || e.spent) continue;
         const c = segClosest(x, y, x1, y1, e.x, e.y);
         const rr = e.r + 18;
         if (c.d2 > rr * rr) continue;
@@ -1079,8 +1059,21 @@ export const ABILITIES = [
 
       const hitList = (list) => {
         for (const e of list) {
-          // `spent` for the reason CLAUDE.md gives: a boss's own frame is
-          // still drawn through its ending and nothing may shoot it.
+          /*
+          /*
+           * `spent` for the reason CLAUDE.md gives: a boss's own frame is
+           * still drawn through its ending and nothing may shoot it.
+           *
+           * NOT `staged`, and NOT `fizzle`. The audit asked for both. But
+           * `staged` only clears once a body's top edge passes
+           * `ENTRY_Y + entryDepth`, so most of the march down is on screen
+           * and `resolveSegment` lets an ordinary round hit every bit of it;
+           * and a dissolving body is still a physical body -- build 210 made
+           * it stop STEERING, not stop existing, and `Enemy.destroy` is what
+           * refuses to cash it in. A guard here would make a beam visibly
+           * wash over a body and do nothing, which is the worse fault, and
+           * every blast in the game would have to match it.
+           */
           if (e.dead || e.spent) continue;
           const c = segClosest(x0, y0, x1, y1, e.x, e.y);
           const rr = e.r + 26;
@@ -1186,15 +1179,24 @@ export const ABILITIES = [
     color: '#e8f0ff',
     cooldown: 18,
     icon: ICON.ward,
-    hint: 'WARD — a shell stands up round the turret. It cuts what crosses it and arcs at what is inside.',
+    hint: 'WARD — a shell stands up round the turret. It cuts what crosses it and arcs at what is near it.',
     run(world) {
       const s = world.shooter;
       world.effects.push(new Ward(world));
       // Drawn AT the radius it will stand at, opening outward -- the ring is
       // the announcement of where the line is going to be.
       const r = CFG.ward.r * (world.up.wardR || 1);
-      ring(s.x, s.y, 18, r, 0.42, '#e8f0ff', 3.2);
-      ring(s.x, s.y, 8, r * 0.55, 0.26, '#ffffff', 1.8);
+      /*
+       * ...and it has to be drawn AT that radius, which it was not.
+       * `drawFx` strokes a ring at `alpha = t` and `width = w * t`, both
+       * running to nothing as it grows, so a ring emitted from 18 out to `r`
+       * was brightest at the muzzle and exactly invisible where the line was
+       * going to stand. It opens just inside the radius now and drifts a
+       * tenth past it as it dies -- CLAUDE.md's rule for HE's burst, which is
+       * the same trap.
+       */
+      ring(s.x, s.y, r * 0.88, r * 1.1, 0.42, '#e8f0ff', 3.2);
+      ring(s.x, s.y, r * 0.4, r * 0.62, 0.26, '#ffffff', 1.8);
       ripple(s.x, s.y, 0.9, r * 2.2);
       shake(4);
       audio.ability('stasis');

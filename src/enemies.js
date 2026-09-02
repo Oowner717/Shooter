@@ -18,6 +18,25 @@ import { contactAt } from './physics.js';
 export const ENTRY_Y = 0;
 
 /**
+ * The thing a body is going at instead of the turret, or null for the turret.
+ *
+ * `!isDrop` because a mote is not fooled by a decoy, it is ENERGY, and this
+ * branch had no guard where both its neighbours do. A mote steers at 132 with
+ * accel 300 against `collectEnergy`'s 26 u/s^2 pull toward the turret, so the
+ * steering won outright: pressing DECOY stopped loose energy arriving at all
+ * for up to nine seconds, gathered it three hundred units up-field, and then
+ * threw it outward with the decoy's own parting blast. Worst with INTAKE,
+ * which only banks what touches the machine.
+ *
+ * One function because two places ask -- the steering target and the loiter
+ * clock, which was measuring to the turret while the body walked at the decoy.
+ */
+function decoyTarget(world, body) {
+  if (body.isDrop) return null;
+  return world.decoy && !world.decoy.dead ? world.decoy : null;
+}
+
+/**
  * A specimen portrait for the glossary, drawn with the same shape routines the
  * field uses so the two can never drift apart. Centred on the current
  * transform; `r` is the radius to draw at.
@@ -401,13 +420,23 @@ export class Enemy {
     // not fixed and wants the wall like anything else.
     if (this.type.fixed && !this.isDrop) return;
     const E = CFG.physics;
+    /*
+     * Held, at the same 0.12 the steering is held at. This runs AFTER `steer`
+     * and outside it, so a STASIS left it at full strength: 300 u/s^2 against
+     * the freeze's own 2.15/s settles at about 140 u/s at the wall, where a
+     * held body sits at 1.8 -- so the side bands, which are 96 units of a 629
+     * wide arena either side, plus every drift resting near the floor, went
+     * on visibly sliding for the whole four seconds. "Objects freeze" is the
+     * hint, and it has to be true of every term that moves one.
+     */
+    const slow = world.stasis > 0 ? 0.12 : 1;
     const left = this.x - this.r;
     const right = world.width - (this.x + this.r);
     const near = Math.min(left, right);
     if (near < E.edgeEase) {
       // Squared, so it is nothing at the outer limit and firm at the wall.
       const urge = (1 - Math.max(near, 0) / E.edgeEase) ** 2;
-      this.vx += (left < right ? 1 : -1) * E.edgePush * urge * dt;
+      this.vx += (left < right ? 1 : -1) * E.edgePush * urge * slow * dt;
     }
     // The floor is a wall too. A drift that has finished coming down would
     // otherwise settle onto the bottom edge and sit there at a dead stop,
@@ -415,7 +444,7 @@ export class Enemy {
     const below = world.floorY - (this.y + this.r);
     if (below < E.floorEase) {
       const urge = (1 - Math.max(below, 0) / E.floorEase) ** 2;
-      this.vy -= E.edgePush * urge * dt;
+      this.vy -= E.edgePush * urge * slow * dt;
     }
   }
 
@@ -470,9 +499,24 @@ export class Enemy {
       this.dissolved = true;
       return;
     }
-    const k = (this.accel / 100) * dt;
-    this.vx += ((dx / d) * this.cruise - this.vx) * clamp(k, 0, 1);
-    this.vy += ((dy / d) * this.cruise - this.vy) * clamp(k, 0, 1);
+    /*
+     * ...and it is held by a STASIS like everything else.
+     *
+     * `drive` returns to `hunt` ABOVE both its `slow` term and its damping,
+     * so a SEED had neither: three violet seeds sailed across a stopped field
+     * at 118 u/s -- sixty-five times a held body -- and grafted anyway, with
+     * the freeze overlay drawing brackets round them as though they were
+     * held. Same numbers as `drive`, applied in the same order.
+     */
+    const slow = world.stasis > 0 ? 0.12 : 1;
+    const k = (this.accel / 100) * slow * dt;
+    this.vx += ((dx / d) * this.cruise * slow - this.vx) * clamp(k, 0, 1);
+    this.vy += ((dy / d) * this.cruise * slow - this.vy) * clamp(k, 0, 1);
+    if (world.stasis > 0) {
+      const f = Math.exp(-1.6 * dt);
+      this.vx *= f;
+      this.vy *= f;
+    }
   }
 
   /**
@@ -527,6 +571,16 @@ export class Enemy {
     const s = world.shooter;
     if (Math.hypot(s.x - this.x, s.y - this.y) > H.range) { this.wind = 0; return; }
 
+    /*
+     * A STASIS stops the wind, exactly as it already stops a LURCHER's burst
+     * (see `lurchTimer` below). `steer` calls this after `drive` and it had
+     * no stasis term at all, so a TOW wound its 1.15 seconds inside the four
+     * of a freeze and let go at 620 u/s -- with `thrown` 2.2 on the MASS,
+     * which returns from `drive` above both the slow and the damping. The one
+     * thing on the field that can be stopped by pressing a button was the one
+     * thing that landed on the mount through it.
+     */
+    if (world.stasis > 0) return;
     this.wind = (this.wind || 0) + dt;
     const spin = clamp(this.wind / H.wind, 0, 1);
     // perpendicular to the cable, so the load comes round rather than in
@@ -609,10 +663,23 @@ export class Enemy {
     } else {
       tx = world.shooter.x;
       ty = world.shooter.y;
-      // A DECOY outranks the turret: that is the whole ability.
-      if (world.decoy && !world.decoy.dead) {
-        tx = world.decoy.x;
-        ty = world.decoy.y;
+      /*
+       * A DECOY outranks the turret: that is the whole ability -- for the
+       * things it is an ability against.
+       *
+       * `!this.isDrop` because a mote is not fooled by a decoy, it is
+       * ENERGY, and this branch had no guard where both its neighbours do.
+       * A mote steers at 132 with accel 300 against `collectEnergy`'s 26
+       * u/s^2 pull toward the turret, so the steering won outright: pressing
+       * DECOY stopped loose energy arriving for up to nine seconds, gathered
+       * it three hundred units up-field, and then threw it outward with the
+       * decoy's own parting blast. Worst with INTAKE, which only banks what
+       * touches the machine.
+       */
+      const lure = decoyTarget(world, this);
+      if (lure) {
+        tx = lure.x;
+        ty = lure.y;
       }
       /*
        * EBB: wreckage goes the other way.
@@ -679,7 +746,16 @@ export class Enemy {
     if (this.staged) cruise *= CFG.entrySpeed;
     // loiterers hang back at mid range before making their run
     if (this.route.dawdle && !this.staged) {
-      const dist = Math.hypot(world.shooter.x - this.x, world.shooter.y - this.y);
+      /*
+       * Measured to what it is actually going at, which without a DECOY is
+       * the turret and the same arithmetic it always was -- deliberately, so
+       * this cannot move the canonical hash. With one it is the decoy: a
+       * LOITER standing on a decoy 300 units up-field was measured against
+       * the turret, so it was permanently outside its own 260 and dawdled at
+       * the thing it had already reached for ever.
+       */
+      const to = decoyTarget(world, this) || world.shooter;
+      const dist = Math.hypot(to.x - this.x, to.y - this.y);
       if (dist > 260) cruise *= this.route.dawdle;
     }
     const speed = Math.hypot(this.vx, this.vy);
