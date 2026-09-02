@@ -911,13 +911,16 @@ export class Hud {
    * with nothing on it -- and an empty string collapses the element, so the
    * chip is exactly as wide as it was before build 209 whenever there is
    * nothing to say.
+   *
+   * Blank during a boss for the same reason: Game.update freezes the director
+   * for the whole of a fight, so the figure would sit on whatever the wave
+   * underneath was at and describe nothing on the screen. The boss has a bar.
    */
   setWavePct(world) {
     const d = world.director;
     let pct = -1;
-    if (d && !d.resting && d.asked > 0) {
-      const alive = world.enemies.filter((e) => !e.dead && !e.harmless).length;
-      pct = Math.max(0, Math.min(100, Math.round(((d.asked - alive) / d.asked) * 100)));
+    if (d && !d.resting && !world.boss && d.asked > 0) {
+      pct = Math.round(d.cleared(world) * 100);
     }
     if (pct === this.lastWavePct) return;
     this.lastWavePct = pct;
@@ -2131,9 +2134,8 @@ export class Hud {
     for (const c of this.railCells) c.el.classList.toggle('live', c === at && !dir.resting);
     if (!at) return;
     if (dir.resting) { at.meters = ''; return; }
-    const alive = world.enemies.filter((e) => !e.dead && !e.harmless).length;
     const since = Math.max(0, (world.time || 0) - dir.lastRelease);
-    const cleared = dir.asked > 0 ? Math.max(0, (dir.asked - alive) / dir.asked) : 0;
+    const cleared = dir.cleared(world);
     const f = [
       Math.min(1, dir.contact / T.failContact),
       Math.min(1, since / T.cleanWithin),
@@ -2187,7 +2189,7 @@ export class Hud {
         + `  ·  ${alive} OF ${d.asked} UP  ·  ${Math.round(hp)} HP`;
 
     const since = d.resting ? 0 : Math.max(0, (world.time || 0) - d.lastRelease);
-    const cleared = d.asked > 0 ? Math.max(0, (d.asked - alive) / d.asked) : 0;
+    const cleared = d.resting ? 0 : d.cleared(world);
     const meters = [
       ['ON THE TURRET', d.contact, T.failContact, `${d.contact.toFixed(1)}s`],
       ['SINCE THE LAST', since, T.cleanWithin, `${since.toFixed(1)}s`],

@@ -2030,6 +2030,19 @@ export class Game {
   registerKill() {
     const w = this.world;
     w.kills++;
+    /*
+     * ...and the running wave's own share of it, which is what the OBJECTS
+     * percentage is built from. Here rather than in the director because this
+     * is the one door every death comes through -- see Director.cleared.
+     *
+     * Not while a boss is up: Game.update freezes the director for the whole
+     * of a fight, so a 200-second ORDINAL would pour three hundred DIGIT
+     * deaths into whichever wave happened to be paused underneath it. Not
+     * while resting either -- a leftover killed between waves belongs to
+     * neither, and is in neither wave's field count.
+     */
+    const d = w.director;
+    if (d && !w.boss && !d.resting) d.slain++;
     this.teach();
     // The ten lines, one per `storyEvery` kills, and then it stops talking.
     // They used to be gated on the counted run — the run that no longer

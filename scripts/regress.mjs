@@ -9483,6 +9483,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       d.jobs.length = 0;
       w.time = 1000; d.lastRelease = 1000;
       const left = Math.round(10 * (1 - cleared));
+      // Killed AND still standing. RECALL scores what is down, and posing
+      // only the survivors used to be enough because the reading was
+      // `asked - alive` -- which meant a wave RECALLED before it had arrived
+      // scored a clean for nothing. See Director.cleared.
+      d.slain = 10 - left;
       for (let i = 0; i < left; i++) {
         const e = g.debugSpawn('mote', 40 + i * 14, 140);
         if (e) { e.staged = false; e.spawnIn = 0; }
@@ -9644,6 +9649,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     d.order = [real]; d.at = 0; d.resting = false;
     d.asked = 10; d.contact = 0; d.hitPatience = false;
     w.time = 1000; d.lastRelease = 1000;
+    /*
+     * Six of ten down, four still up. Posed as `slain` AND bodies, because
+     * the meter reads what was killed against what is still there -- it used
+     * to read `asked` minus the field, which called six of ten cleared on a
+     * wave nobody had shot at. See Director.cleared.
+     */
+    d.jobs.length = 0;
+    d.slain = 6;
     for (let i = 0; i < 4; i++) {
       const e = g.debugSpawn('mote', 40 + i * 20, 150);
       if (e) { e.staged = false; e.spawnIn = 0; }
@@ -11298,6 +11311,214 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.thornsBefore > 0 && r.thornsAfter === r.thornsBefore && r.sporesWithThorns === r.cap,
     `${r.thornsBefore} thorn patches down, ${r.thornsAfter} still burning after `
     + `a full spore rack, alongside ${r.sporesWithThorns} of the round's own`);
+}
+
+// --- the OBJECTS figure is clearing, not arrival ----------------------------
+/*
+ * `(asked - alive) / asked`, in four copies, is not a measure of clearing. It
+ * is a measure of ARRIVAL: `asked` is the whole wave and the bodies come out
+ * one at a time over the length of it, so the figure opened near 100% and fell
+ * as the wave landed. Measured over 38 waves of a driven run before the fix,
+ * the reading on the frame each wave began ran from 0 to 100 with a median of
+ * 75 -- for waves in identical condition, none of them shot at -- and the
+ * number ran BACKWARDS on 85 frames, worst single drop 67 points. And `alive`
+ * counts every hostile on the field while a wave puts out more bodies than it
+ * asks for, so a SPLITTER wave was pegged near 0 with most of it down.
+ *
+ * These cases hold the three things that were wrong: it starts at nothing, it
+ * moves only on a kill, and what a wave makes counts as work rather than as
+ * failure.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { WAVES } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const d = w.director;
+    const out = {};
+
+    /** Put the run on one authored wave, from the top, with a clear field. */
+    const pose = (pick) => {
+      g.debugClearField();
+      g.restart();
+      w.phase = 'staging';
+      w.autoAim = false; w.autoFire = false;
+      const i = WAVES.findIndex(pick);
+      d.order = [i]; d.at = 0;
+      d.resting = false;
+      d.load(w, WAVES[i]);
+      /*
+       * begin() does this and load() does not, so a wave posed by calling
+       * load() directly sits behind whatever the clock was left on -- and
+       * reset() leaves it on the 22-second opening grace. The splitter case
+       * below spent twenty seconds watching a wave that had not been let out
+       * yet and reported "no splitter wave found".
+       */
+      d.timer = 0;
+      w.time = 1000; d.lastRelease = 1000;
+      return i;
+    };
+    const pct = () => Math.round(d.cleared(w) * 100);
+    const up = () => w.enemies.filter((e) => !e.dead && !e.harmless && !e.fizzle).length;
+
+    // ---- it opens at nothing, and stays there for the whole arrival -------
+    const plain = pose((x) => !x.teach && x.of.length && x.of.every(([id]) => id === 'mote' || id === 'needle'));
+    out.wave = plain >= 0;
+    out.opening = pct();
+    // Seeded with the opening reading, so the reported maximum is over the
+    // WHOLE arrival including the frame the wave began on -- which is the
+    // frame the old one read 100% on.
+    const trail = [pct()];
+    // Let the wave arrive with the gun cold. Every one of these frames is a
+    // body landing and none of them is a kill, which is the whole of what the
+    // old reading got backwards.
+    for (let f = 0; f < 60 * 30 && d.jobs.length; f++) {
+      g.update(1 / 60);
+      trail.push(pct());
+    }
+    out.arrivalMax = trail.length ? Math.max(...trail) : -1;
+    out.arrivalUp = up();
+    out.arrived = !d.jobs.length;
+
+    // ---- ...and a kill is the only thing that moves it --------------------
+    const before = pct();
+    const victim = w.enemies.find((e) => !e.dead && !e.harmless);
+    if (victim) { victim.hp = 1; victim.applyDamage(w, 999, 0, 0, 0); }
+    g.update(1 / 60);
+    out.beforeKill = before;
+    out.afterKill = pct();
+    out.slain = d.slain;
+
+    // ---- ...and it never runs backwards while a wave is being cleared -----
+    /*
+     * Except where the wave MAKES something: a SPLITTER splitting adds work
+     * that was never asked for, and the figure moving down by exactly that is
+     * the field telling the truth. So this walks a wave with no splitter in
+     * it, and the splitter is its own case below.
+     */
+    pose((x) => !x.teach && x.of.length && x.of.every(([id]) => id === 'mote' || id === 'needle'));
+    w.autoAim = true; w.autoFire = true;
+    let back = 0; let worst = 0; let last = pct(); let peak = 0;
+    for (let f = 0; f < 60 * 90 && !d.resting; f++) {
+      g.update(1 / 60);
+      const p = pct();
+      if (p < last) { back++; worst = Math.max(worst, last - p); }
+      peak = Math.max(peak, p);
+      last = p;
+    }
+    out.back = back; out.worst = worst; out.peak = peak;
+
+    // ---- what a wave makes is work, not failure ---------------------------
+    /*
+     * `asked` counts the SPLITTER as one and it dies into two more, so the
+     * old reading could not tell "cleared" from "multiplied": measured, a
+     * splitter wave of asked 7 never read above 57% with six of its seven
+     * down, because the children it made were subtracted from its own total.
+     */
+    pose((x) => !x.teach && x.of.some(([id]) => id === 'splitter'));
+    for (let f = 0; f < 60 * 20 && d.jobs.length; f++) g.update(1 / 60);
+    const sp = w.enemies.find((e) => !e.dead && e.type.id === 'splitter');
+    out.foundSplitter = !!sp;
+    if (sp) {
+      const upBefore = up();
+      const pBefore = pct();
+      sp.hp = 1; sp.applyDamage(w, 999, 0, 0, 0);
+      for (let f = 0; f < 20; f++) g.update(1 / 60);
+      out.split = { upBefore, upAfter: up(), pBefore, pAfter: pct(), slain: d.slain };
+    }
+
+    // ---- and it is bounded, whatever the field does ------------------------
+    /*
+     * The old one clamped because it had to: `alive` routinely exceeded
+     * `asked` (measured, 15 up on a wave of 12) and the raw fraction went
+     * NEGATIVE. This one cannot leave [0, 1] by construction, and the field
+     * being flooded is the case that proves it.
+     */
+    g.debugClearField();
+    d.resting = false; d.asked = 4; d.jobs.length = 0; d.slain = 2;
+    for (let i = 0; i < 24; i++) {
+      const e = g.debugSpawn('mote', 30 + (i % 12) * 24, 120 + ((i / 12) | 0) * 40);
+      if (e) { e.staged = false; e.spawnIn = 0; }
+    }
+    out.flooded = pct();
+    d.slain = 0;
+    out.floodedNone = pct();
+
+    // ---- an anomaly says nothing on this chip -----------------------------
+    /*
+     * Game.update freezes the director for the whole of a fight, so the wave
+     * underneath cannot move -- and w.kills climbs the entire time off the
+     * boss's own bodies. Both halves are guarded: the chip goes blank, and
+     * registerKill does not pour a boss's dead into a paused wave.
+     *
+     * Driven through registerKill rather than by shooting a boss for ninety
+     * seconds: it is the one door every death comes through, and a case that
+     * waits for an anomaly to make one of its own is measuring the fight.
+     * The control below is what shows the counter can read a one at all --
+     * the same wave, the same call, with nothing in the sky.
+     */
+    g.debugClearField();
+    g.restart();
+    w.phase = 'staging';
+    d.resting = false; d.asked = 6; d.jobs.length = 0; d.slain = 0;
+    w.aperture = 1;
+    g.openBoss(1);
+    for (let f = 0; f < 60; f++) g.update(1 / 60);
+    g.hud.setWavePct(w);
+    const bossUp = !!w.boss;
+    const chip = g.hud.el.wavePct.textContent;
+    for (let i = 0; i < 5; i++) g.registerKill();
+    const underBoss = d.slain;
+    // ...and the control: no boss, same call, same wave.
+    w.boss = null;
+    for (let i = 0; i < 5; i++) g.registerKill();
+    out.boss = { up: bossUp, chip, underBoss, control: d.slain - underBoss };
+
+    g.debugClearField();
+    g.restart();
+    return out;
+  });
+
+  check('the wave figure opens at nothing, and the whole arrival leaves it there',
+    r.wave && r.opening === 0 && r.arrived && r.arrivalMax === 0 && r.arrivalUp > 1,
+    `opened at ${r.opening}%, highest ${r.arrivalMax}% across an `
+    + `arrival that put ${r.arrivalUp} bodies on the field with the gun cold `
+    + `(the old reading opened at a median 75% and fell to 0 as they landed)`);
+
+  check('...and a kill is the only thing that moves it',
+    r.beforeKill === 0 && r.afterKill > 0 && r.slain === 1,
+    `${r.beforeKill}% -> ${r.afterKill}% on the first body down (slain ${r.slain})`);
+
+  check('...and clearing a wave never takes the figure backwards',
+    r.back === 0 && r.peak > 0,
+    `${r.back} steps down over a wave driven to its end, worst ${r.worst} points, `
+    + `peaking at ${r.peak}% (the old one stepped down 85 times in 38 waves, `
+    + `worst drop 67 points)`);
+
+  /*
+   * The dip is the point: two bodies arrived that nothing had asked for, so
+   * the denominator grew and the same kills are a smaller share of it. What
+   * must NOT happen is the old behaviour, where the children were subtracted
+   * from the wave's own total and a splitter wave could not read its way past
+   * half however much of it you killed.
+   */
+  check('...and what a wave MAKES is counted as work rather than as failure',
+    r.foundSplitter && r.split && r.split.upAfter > r.split.upBefore
+    && r.split.slain > 0 && r.split.pAfter > 0,
+    r.split ? `the splitter went down and left ${r.split.upAfter - r.split.upBefore + 1} `
+      + `behind it: ${r.split.upBefore} up -> ${r.split.upAfter}, `
+      + `${r.split.pBefore}% -> ${r.split.pAfter}% with ${r.split.slain} down`
+      : 'no splitter wave found');
+
+  check('...and it cannot leave nought and a hundred, whatever the field does',
+    r.flooded > 0 && r.flooded < 100 && r.floodedNone === 0,
+    `24 up against an asked of 4: ${r.flooded}% with two down, ${r.floodedNone}% with none `
+    + `(the old fraction went negative here and was clamped)`);
+
+  check('...and an anomaly says nothing on it, and pours nothing into it',
+    r.boss.up && r.boss.chip === '' && r.boss.underBoss === 0 && r.boss.control === 5,
+    `chip "${r.boss.chip}" during a fight; the paused wave took ${r.boss.underBoss} `
+    + `of five deaths with an anomaly up and ${r.boss.control} of five without one`);
 }
 
 // --- report -----------------------------------------------------------------

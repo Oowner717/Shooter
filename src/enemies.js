@@ -3156,6 +3156,14 @@ export class Director {
     this.cycle = 0; // full passes finished — the first one carries the opening
     this.jobs = []; // what is left to release in the running wave
     this.asked = 0; // how many the running wave asked for, after the swell
+    /*
+     * How many of this wave's bodies are down. Counted rather than inferred:
+     * see cleared() for why subtracting the field from `asked` cannot answer
+     * that question. Fed from Game.registerKill, which is the one door every
+     * death comes through, and zeroed by load() for every wave including the
+     * teach ones.
+     */
+    this.slain = 0;
     this.timer = CFG.openingGrace; // until the next release, or the next wave
     this.wait = 0; // how long this wave has been waiting for the field to thin
     this.resting = true; // between waves rather than inside one
@@ -3422,6 +3430,7 @@ export class Director {
     this.contact = 0;
     this.hitPatience = false;
     this.take = 0;
+    this.slain = 0;
     if (ran) this.overclock.armed = false;
     this.laneOffer = null;
     this.held = 0;
@@ -3458,6 +3467,45 @@ export class Director {
     };
   }
 
+  /**
+   * How much of the running wave is down, from 0 to 1. The one place that
+   * decides it: the chip beside the count, the rail's third meter, AUDIT's
+   * CLEARED, RECALL's clean threshold and the alert's reason all read this.
+   *
+   * It used to be `(asked - alive) / asked` in four copies, and that is not a
+   * measure of clearing at all -- it is a measure of ARRIVAL. `asked` is the
+   * whole wave, fixed at load(), while the bodies come out one at a time over
+   * the length of it, so a wave nobody had touched opened near 100% and fell
+   * as it arrived. Measured over 12 waves of a driven run, the reading on the
+   * frame each wave began: 50, 0, 100, 33, 67, 40, 57, 25, 64, 27, 13, 44 --
+   * for twelve waves in identical condition, none of them shot at. One wave
+   * ran 100 -> 75 -> 50 -> 25 -> 0 with nothing killed at all, and then up to
+   * 25% on the first kill: the number ran backwards through the whole of the
+   * arrival and only then began to mean anything.
+   *
+   * It was wrong the other way too. `alive` counts every hostile on the field
+   * and a wave puts out more bodies than it asks for -- a SPLITTER's children,
+   * a TOW's MASS, anything a body makes -- so `alive` can exceed `asked` and
+   * peg the reading at 0. Measured: a wave of `asked` 12 had 15 up at once,
+   * and the SPLITTER wave never read above 57% with six of its seven down.
+   *
+   * So count the three states a body can be in and divide. Everything this
+   * wave has revealed is either dead (`slain`), on the field, or still to be
+   * let out, and the sum of those is the honest denominator -- honest because
+   * it grows when the wave makes something new rather than pretending it knew
+   * all along. A SPLITTER splitting does move the number down, by exactly the
+   * work it just added; that is the field telling the truth, not a glitch.
+   */
+  cleared(world) {
+    let queued = 0;
+    // A TOW is a job and two bodies -- the head plus the MASS it drags, both
+    // hostile, both counted by hostileCount and by the kill tally. Counting
+    // the job would make the denominator jump the moment one is released.
+    for (const j of this.jobs) queued += j.n * (j.type.tows ? 2 : 1);
+    const total = this.slain + hostileCount(world) + queued;
+    return total > 0 ? Math.min(1, this.slain / total) : 0;
+  }
+
   score(world, forced = null) {
     const T = CFG.waves.tier;
     const wave = this.wave;
@@ -3469,7 +3517,6 @@ export class Director {
      * shooting nothing.
      */
     if (!wave || wave.teach || this.asked === 0) return null;
-    const alive = world.enemies.filter((e) => !e.dead && !e.harmless).length;
     /*
      * The three numbers the table reads. `t` is how long the field took to
      * thin after the last object was let out -- infinite if patience ended the
@@ -3480,7 +3527,7 @@ export class Director {
      */
     const t = this.hitPatience ? Infinity : Math.max(0, (world.time || 0) - this.lastRelease);
     const k = this.contact;
-    const c = (this.asked - alive) / this.asked;
+    const c = this.cleared(world);
 
     // OVERCLOCK widens the surge window: a wave arriving twice as fast is over
     // sooner, and three seconds from the last release would be a surge handed
@@ -3761,6 +3808,7 @@ export class Director {
     this.wait = 0;
     this.lastRelease = world.time || 0;
     this.take = 0;
+    this.slain = 0;
     // A wave may ask for grey drift alongside it. It is not hostile, costs
     // nothing from the allotment, and is the whole of both the opening and the
     // bonus wave. Stacked upward rather than dropped in one row, so twenty-two
@@ -3899,8 +3947,15 @@ export class Director {
     const T = CFG.waves.tier;
     this.recall.held--;
     this.recall.cd = T.recallCd;
-    const alive = world.enemies.filter((e) => !e.dead && !e.harmless).length;
-    const cleared = this.asked > 0 ? (this.asked - alive) / this.asked : 1;
+    /*
+     * What was actually killed, not what had merely not arrived yet. Under
+     * the old reading a wave RECALLED in its first seconds scored near 100%
+     * cleared -- the bodies still queued counted as cleared -- so the charge
+     * bought a guaranteed clean for walking away from a wave before it
+     * started. It buys what it says it buys now: three quarters of the wave
+     * down.
+     */
+    const cleared = this.cleared(world);
     const clean = cleared >= T.recallClean;
     this.jobs.length = 0;
     this.hitPatience = false;
@@ -4030,6 +4085,7 @@ export class Director {
     this.timer = 1.5; // a beat to look at the field before it starts again
     this.jobs = [];
     this.asked = 0;
+    this.slain = 0;
   }
 
   /**
