@@ -1054,17 +1054,35 @@ export class Enemy {
       /*
        * ...and the spin is now the lever arm rather than a coin toss.
        *
-       * Δω = b·J/I with I = ½mr² for a uniform disc, which is the same model
+       * Δω = L/I with I = ½mr² for a uniform disc, which is the same model
        * `resolvePair` already uses for collision friction -- so a body shoved
        * by a round and a body scraped by another body agree about what spin
        * means. It used to be `spread(push * 0.02)`: a scatter proportional to
        * the shove and unrelated to where the round hit, so a rim shot and a
        * centre punch span the same amount, in a random direction.
        *
+       * ---- and the sign is NEGATIVE, which build 211 got wrong ----
+       *
+       * `lever` is measured along `perp = (-diry, dirx)`, and the impulse is
+       * `push` along `dir`, so the angular impulse is
+       *
+       *   L = r x J = (b*perp.x)(push*dir.y) - (b*perp.y)(push*dir.x)
+       *             = b*push*(-dir.y*dir.y - dir.x*dir.x)
+       *             = -b*push
+       *
+       * -- the two terms of the cross product have the same sign here, not
+       * opposite ones, because `perp` is the travel turned a quarter turn one
+       * way and the cross product turns it the other. Shipped as `+` and every
+       * body on the field turned the wrong way: measured across six
+       * arrangements of travel and offset, all six inverted. A round from
+       * below striking left of centre pushes the left side away from you,
+       * which is CLOCKWISE on a canvas whose y runs down, and it went
+       * anticlockwise.
+       *
        * Capped in `integrate`, because the honest value is very fast on a
        * light body -- see CFG.physics.maxSpin.
        */
-      if (lever) this.av += (2 * lever * push) / (this.r * this.r);
+      if (lever) this.av -= (2 * lever * push) / (this.r * this.r);
     }
     /*
      * TETHERED: the pair is one body with two shapes.

@@ -604,6 +604,20 @@ most once for any given target and cannot spin.
   dead-centre rounds landing), and both ricochets (mirroring about the round's
   own line, so a square-on bounce went back the way it came). If a fourth thing
   ever needs a surface normal, it is `contactAt`, not `(hit - centre)`.
+- **A test that pins a SYMMETRY cannot see a SIGN.** Build 211's spin case
+  asserted that two rim hits come out with opposite signs -- equally true of
+  the correct model and of its mirror image -- and the mirror image is what
+  shipped: every body on the field turned the wrong way, with the case green
+  and a player noticing before the suite did. `L = r x J = -b*push` when the
+  lever is measured along `perp = (-dir.y, dir.x)`; the two terms of the cross
+  product carry the SAME sign there, which is the easy thing to get wrong by
+  eye. Assert the direction somebody watching the screen would name, in every
+  arrangement of travel and offset, not that two of them differ.
+- **Canvas y runs down, so `ctx.rotate(+a)` is CLOCKWISE** and a body
+  integrated as `angle += av * dt` turns clockwise for positive `av`. The 2D
+  cross product written in these raw components is positive for a torque that
+  appears clockwise. Every rotational sign in the game has to be derived in
+  that frame, not in the one from a textbook.
 - **An off-centre impulse does not reduce the linear shove.** All of J reaches
   the centre of mass wherever it lands; the lever arm adds angular momentum on
   top. So build 211's spin cost the knockback ladder nothing and HEAVY is worth

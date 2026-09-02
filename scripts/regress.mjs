@@ -10820,18 +10820,46 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       e.vx = 0; e.vy = 0; e.av = 0; e.kicked = 0; e.hp = e.maxHp * 40; e.maxHp = e.hp;
       return e;
     };
-    // Same body, same impulse, same direction, hit in two places. Travelling
-    // up, so the hit point's x IS the impact parameter.
-    const shove = (b) => {
+    /*
+     * Same body, same impulse, hit in different places -- and the DIRECTION is
+     * what is read, not just that two of them differ.
+     *
+     * Canvas y runs down, so `ctx.rotate(+a)` is clockwise on screen and a
+     * positive `av` reads as clockwise. Each row below states the answer
+     * somebody watching would give, and the case asserts that answer.
+     *
+     * The first version of this checked only that the two rims came out with
+     * opposite signs, which is true of the correct model and of the inverted
+     * one alike -- and build 211 shipped inverted underneath it. Every body on
+     * the field turned the wrong way with the case green. A test that pins a
+     * symmetry and not a direction is a test that cannot see a sign.
+     */
+    const shove = (dir, off) => {
       const e = pin();
-      e.takeHit(w, 1, e.x + b, e.y + 200, 0, -1, 400);
+      // Put the hit point a long way back down the incoming line, which is
+      // where the projectile sweep actually reports them from.
+      e.takeHit(w, 1, e.x + off[0] - dir[0] * 200, e.y + off[1] - dir[1] * 200,
+        dir[0], dir[1], 400);
       const got = { v: +Math.hypot(e.vx, e.vy).toFixed(4), av: +e.av.toFixed(4) };
       e.dead = true;
       return got;
     };
-    out.centre = shove(0);
-    out.rim = shove(20);
-    out.rimOther = shove(-20);
+    out.centre = shove([0, -1], [0, 0]);
+    out.rim = shove([0, -1], [20, 0]);
+    out.rimOther = shove([0, -1], [-20, 0]);
+    // Six arrangements of travel and offset, each with the turn a person
+    // watching the screen would name. All six were inverted on build 211.
+    out.turns = [
+      ['up/left', [0, -1], [-14, 0], 'cw'],
+      ['up/right', [0, -1], [14, 0], 'acw'],
+      ['down/left', [0, 1], [-14, 0], 'acw'],
+      ['down/right', [0, 1], [14, 0], 'cw'],
+      ['right/above', [1, 0], [0, -14], 'cw'],
+      ['right/below', [1, 0], [0, 14], 'acw'],
+    ].map(([name, dir, off, want]) => {
+      const av = shove(dir, off).av;
+      return { name, want, got: av > 0 ? 'cw' : (av < 0 ? 'acw' : 'none'), av };
+    });
 
     // ...and the cap, which did not exist before: the honest rim value on a
     // light body is nearly nineteen revolutions a second.
@@ -10901,10 +10929,23 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     Math.abs(r.centre.v - r.rim.v) < 1e-6 && r.centre.v > 0
     && Math.abs(r.centre.av) < 1e-9
     && Math.abs(r.rim.av) > 0.05
-    && Math.sign(r.rim.av) === -Math.sign(r.rimOther.av)
     && Math.abs(Math.abs(r.rim.av) - Math.abs(r.rimOther.av)) < 1e-9,
     `centre: ${r.centre.v} u/s and ${r.centre.av} rad/s; rim: ${r.rim.v} u/s and `
     + `${r.rim.av} rad/s; the other rim ${r.rimOther.av} rad/s`);
+
+  /*
+   * ...and it turns the way a person watching would say it should.
+   *
+   * This is the assertion the first version of the case above was missing. It
+   * pinned the symmetry -- the two rims spin opposite each other -- which is
+   * equally true of the correct model and of its mirror image, and build 211
+   * shipped the mirror image underneath it: a round from below striking left
+   * of centre pushes that side away from you, which is clockwise, and every
+   * body on the field went anticlockwise.
+   */
+  check('...and it turns the way it should, in every arrangement',
+    r.turns.every((t) => t.got === t.want),
+    r.turns.map((t) => `${t.name} wanted ${t.want} got ${t.got} (${t.av})`).join('; '));
 
   check('...and nothing may spin faster than the cap',
     r.spinCap <= r.cap + 1e-6 && r.spinCap > 0,

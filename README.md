@@ -1768,6 +1768,27 @@ against `e.r + p.r`, p90 measured at 1.055 r — so it clamps before the square
 root, or a NaN velocity loses the body for the rest of the run without ever
 throwing.
 
+**The sign was wrong when it shipped, and the case could not see it.** A round
+from below striking left of centre pushes that side away from you, which is
+clockwise on a canvas whose y runs down — and every body on the field went
+anticlockwise. The angular impulse is
+
+```
+L = r × J = (b·perp_x)(push·dir_y) − (b·perp_y)(push·dir_x)
+          = b·push·(−dir_y² − dir_x²)  =  −b·push
+```
+
+— the two terms carry the *same* sign here, not opposite ones, because `perp`
+is the travel turned a quarter turn one way and the cross product turns it the
+other. It went in as `+`. Measured across six arrangements of travel and
+offset, all six inverted.
+
+The case that should have caught it asserted that two rim hits come out with
+**opposite** signs, which is equally true of the correct model and of its
+mirror image. It now names the turn a person watching the screen would give,
+for all six arrangements. A test that pins a symmetry and not a direction is a
+test that cannot see a sign.
+
 **The linear shove is deliberately unchanged.** An impulse applied off-centre
 still delivers all of itself to the centre of mass; where it landed adds
 angular momentum, it does not subtract linear. So the spin is free — HEAVY is
