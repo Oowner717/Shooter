@@ -47,7 +47,11 @@ class Pool {
 
 export const fx = {
   particles: new Pool(() => ({ ...PARTICLE_FIELDS })),
-  rings: new Pool(() => ({ x: 0, y: 0, r: 0, vr: 0, life: 0, max: 1, w: 3, color: '#fff', fill: 0 })),
+  // `a0`/`span` are declared here rather than sprung into existence by the
+  // one emitter that sets them: a recycled ring must never inherit the arc
+  // of whatever used the slot before it, and every field is written on spawn.
+  rings: new Pool(() => ({ x: 0, y: 0, r: 0, vr: 0, life: 0, max: 1, w: 3,
+    color: '#fff', fill: 0, a0: 0, span: TAU })),
   ripples: [], // consumed by the background grid
   shake: 0,
   shakeX: 0,
@@ -102,7 +106,7 @@ export function shard(x, y, vx, vy, color, life, r, sides = 3) {
   return p;
 }
 
-function ember(x, y, vx, vy, color, life, r) {
+export function ember(x, y, vx, vy, color, life, r) {
   if (fx.budgetLeft <= 0) return null;
   const p = fx.particles.spawn();
   p.x = x; p.y = y; p.vx = vx; p.vy = vy;
@@ -129,12 +133,22 @@ export function haul(x, y, tx, ty, color = '#9fe8ff', life = 0.45, r = 2.6) {
   return p;
 }
 
-export function ring(x, y, r0, r1, life, color, w = 3, fill = 0) {
+/**
+ * An expanding ring, or an arc of one.
+ *
+ * `a0`/`span` make it a segment rather than a circle, which is the whole of
+ * how build 211's HE burst is different every time: a shockwave drawn as three
+ * or four broken arcs at angles nobody chose twice has a silhouette, where a
+ * circle has only a radius. `span` of TAU (the default) is the closed ring
+ * every existing caller gets.
+ */
+export function ring(x, y, r0, r1, life, color, w = 3, fill = 0, a0 = 0, span = TAU) {
   const g = fx.rings.spawn();
   g.x = x; g.y = y; g.r = r0;
   g.vr = (r1 - r0) / life;
   g.life = g.max = life;
   g.color = color; g.w = w; g.fill = fill;
+  g.a0 = a0; g.span = span;
   return g;
 }
 
@@ -460,14 +474,20 @@ export function drawFx(ctx) {
     const g = rings[i];
     const t = clamp(g.life / g.max, 0, 1);
     if (g.fill) {
-      ctx.globalAlpha = t * g.fill;
+      // Multiplied in and put back. The bare `= 1` this used to end on was the
+      // forbidden form -- see the note on drawGlow in util.js -- and it was
+      // harmless only because nothing in the game had ever passed `fill`.
+      const was = ctx.globalAlpha;
+      ctx.globalAlpha = was * t * g.fill;
       drawGlow(ctx, g.color, g.x, g.y, g.r);
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = was;
     }
     ctx.strokeStyle = rgba(g.color, t * 0.95);
     ctx.lineWidth = Math.max(0.4, g.w * t);
     ctx.beginPath();
-    ctx.arc(g.x, g.y, Math.max(0.5, g.r), 0, TAU);
+    // `span` defaults to a full turn, so every ring authored before build 211
+    // draws exactly the circle it always did.
+    ctx.arc(g.x, g.y, Math.max(0.5, g.r), g.a0 || 0, (g.a0 || 0) + (g.span || TAU));
     ctx.stroke();
   }
 

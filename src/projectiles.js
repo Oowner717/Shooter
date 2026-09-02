@@ -5,6 +5,7 @@ import { CFG } from './config.js';
 import { TAU, rand, spread, rgba, drawGlow, segClosest, drawBolt } from './util.js';
 import { spark, dot, ring } from './fx.js';
 import { SHARD_R } from './enemies.js';
+import { contactAt } from './physics.js';
 import { audio } from './audio.js';
 
 class Projectile {
@@ -335,21 +336,29 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       const res = e.takeHit(world, p.damage, hx, hy, dirx, diry, p.impulse, p.shred,
         p.form === 'tracer' ? null : p.form);
       if (res === 'reflect') {
-        // mirror the velocity about the prism's surface normal
-        let nx = (hx - e.x) / (e.r || 1);
-        let ny = (hy - e.y) / (e.r || 1);
-        const nl = Math.hypot(nx, ny) || 1;
-        nx /= nl; ny /= nl;
-        const d = p.vx * nx + p.vy * ny;
-        p.vx = (p.vx - 2 * d * nx) * 0.92;
-        p.vy = (p.vy - 2 * d * ny) * 0.92;
-        p.x = hx + nx * (p.r + 1);
-        p.y = hy + ny * (p.r + 1);
+        /*
+         * Mirror the velocity about the surface normal AT THE ENTRY POINT.
+         *
+         * It used to normalise `(hit - centre)`, which sounds like a normal
+         * and is not: the hit point is a clamped closest-point on one frame of
+         * travel, so on a square-on shot that vector lies along the round's
+         * own line and mirroring about it sent the round back the way it came
+         * -- measured, a dead-centre bolt at a PRISM turned exactly 180
+         * degrees and flew at the turret, while a 0.9r graze turned 0 and
+         * carried straight on. Both backwards. `contactAt` derives the real
+         * normal from the impact parameter; see physics.js.
+         */
+        const c = contactAt(e, hx, hy, dirx, diry);
+        const d = p.vx * c.nx + p.vy * c.ny;
+        p.vx = (p.vx - 2 * d * c.nx) * 0.92;
+        p.vy = (p.vy - 2 * d * c.ny) * 0.92;
+        p.x = c.x + c.nx * (p.r + 1);
+        p.y = c.y + c.ny * (p.r + 1);
         p.ignore = e;
         p.ignoreT = 0.08;
         p.color = '#ffd6ff';
         e.flash = Math.max(e.flash, 0.35);
-        for (let i = 0; i < 4; i++) spark(hx, hy, spread(220), spread(220), '#e0aaff', 0.22, 2.2);
+        for (let i = 0; i < 4; i++) spark(c.x, c.y, spread(220), spread(220), '#e0aaff', 0.22, 2.2);
         return;
       }
       if (p.onHit) p.onHit(world, e, hx, hy);
@@ -371,15 +380,16 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       if (p.rebound > 0) {
         p.rebound--;
         p.damage *= p.reboundFade;
-        let nx = (hx - e.x) / (e.r || 1);
-        let ny = (hy - e.y) / (e.r || 1);
-        const nl = Math.hypot(nx, ny) || 1;
-        nx /= nl; ny /= nl;
-        const d = p.vx * nx + p.vy * ny;
-        p.vx -= 2 * d * nx;
-        p.vy -= 2 * d * ny;
-        p.x = hx + nx * (p.r + 1);
-        p.y = hy + ny * (p.r + 1);
+        // Same real normal as the PRISM bounce above, and for the same reason:
+        // the old one mirrored about the round's own line, so OVERSTUFFED sent
+        // every square-on bolt straight back at the turret instead of off the
+        // surface at the angle it arrived.
+        const c = contactAt(e, hx, hy, dirx, diry);
+        const d = p.vx * c.nx + p.vy * c.ny;
+        p.vx -= 2 * d * c.nx;
+        p.vy -= 2 * d * c.ny;
+        p.x = c.x + c.nx * (p.r + 1);
+        p.y = c.y + c.ny * (p.r + 1);
         p.ignore = e;
         p.ignoreT = 0.08;
         ricochetFx(p);

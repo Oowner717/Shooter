@@ -5,7 +5,7 @@ import { CFG } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, angleDelta } from './util.js';
 import { fire, clampAim } from './projectiles.js';
 import { Patch } from './patch.js';
-import { spark, ring, shake } from './fx.js';
+import { fx, spark, ring, shake, ripple, shard as fxShard, ember as fxEmber } from './fx.js';
 
 /*
  * Every level of every part in the TURRET branch, added up: 1 FEED, 3 GIMBAL,
@@ -1188,14 +1188,129 @@ function heBurst(world, x, y) {
         damage: b.damage * c.scale * world.up.damage,
         impulse: b.impulse * c.scale,
       });
-      ring(cx, cy, 3, r * c.scale * 1.3, 0.22, '#ff9f5c', 2.6);
+      /*
+       * A sub-blast is drawn only where it CHANGES THE OUTLINE. `out` is a
+       * fixed 78 units and is not scaled by OVERPRESSURE, so once the main
+       * radius passes about 210 every sub-blast is entirely inside it: at
+       * full upgrades the old version drew four small circles within one big
+       * one -- a Venn diagram in line art, and four rings of drawing for no
+       * shape at all. Stock, where CLUSTER genuinely makes a clover 252 units
+       * across, it still gets its ring.
+       */
+      if (c.out + r * c.scale > r * 1.02) heFx(cx, cy, r * c.scale, true);
     }
   }
-  ring(x, y, 4, r * 1.4, 0.26, '#ffb347', 3.4);
-  for (let i = 0; i < 12; i++) {
-    const a = rand(0, TAU);
-    spark(x, y, Math.cos(a) * rand(150, 460), Math.sin(a) * rand(150, 460), '#ffd166', rand(0.16, 0.36), 2.4);
+  heFx(x, y, r);
+  shake(clamp(r * 0.045, 2.4, 7));
+  audio.boom(0.7);
+}
+
+/**
+ * The detonation, drawn.
+ *
+ * Separated from `heBurst` so the picture can be produced without applying a
+ * blast -- which is what makes it possible to look at, and to assert, without
+ * a field. See CFG.rounds.explosive.fx for what each part is for and what was
+ * wrong with the one this replaces.
+ *
+ * Everything scales off `r`, the real blast radius, which runs from 96 units
+ * stock to 263 fully bought -- 84% of the width of a 390px screen. The counts
+ * scale with the square root of that rather than with the area, and are
+ * capped: the particle pass is additive, and a screen-filling burst drawn at
+ * full density does not read as bigger, it reads as white.
+ */
+export function heFx(x, y, r, light = false) {
+  const F = CFG.rounds.explosive.fx;
+  const R = CFG.rounds.explosive.blast.r;
+  const size = Math.min(F.cap, Math.sqrt(r / R));
+  const n = (base) => Math.max(3, Math.round(base * size * fx.quality));
+
+  /*
+   * The front: a closed circle drawn AT the damage radius, on the frame the
+   * damage lands, and the brightest thing in the burst.
+   *
+   * It starts at `r` rather than expanding into it, and that is the whole
+   * point. A ring fades and thins as it GROWS -- `drawFx` strokes it at
+   * `alpha = t` and `width = w * t`, both running from full at spawn to
+   * nothing at the end -- so a ring authored to expand into the blast radius
+   * is at its dimmest and thinnest exactly where the damage was. The one it
+   * replaces did that, and then overshot by another 40% on top. This one is
+   * brightest on frame one, at the radius, and drifts out a tenth as it goes.
+   *
+   * Everything else is behind it. The damage was a circle and the picture
+   * should not lie about that, however broken up the rest of it is.
+   */
+  ring(x, y, r, r * 1.1, F.front, '#fff0e2', 4.4);
+  // ...and the core going off inside it: a filled glow that collapses. `fill`
+  // has been an argument of `ring` since it was written and had no callers.
+  ring(x, y, r * 0.44, r * 0.1, F.front * 1.5, '#ff8a4c', 1.6, 0.5);
+
+  /*
+   * ...and then it comes apart. Two to four arcs, each starting somewhere
+   * nothing picks twice and covering somewhere between a third and two thirds
+   * of a turn, expanding past the radius as they fade. This is the whole of
+   * why two detonations do not look alike.
+   */
+  const arcs = light ? 1 : Math.round(rand(F.arcs[0], F.arcs[1]));
+  for (let i = 0; i < arcs; i++) {
+    const a0 = rand(0, TAU);
+    const span = rand(F.arcSpan[0], F.arcSpan[1]);
+    ring(x, y, r * rand(0.55, 0.8), r * rand(1.05, 1.35), F.tail * rand(0.7, 1),
+      i % 2 ? '#ff5638' : '#ff8a4c', rand(1.6, 3.4), 0, a0, span);
   }
-  shake(3);
-  audio.pop(1.3);
+
+  /*
+   * The debris, thrown along two or three lobes rather than evenly.
+   *
+   * An even ring of sparks is a radius drawn twice; lobes give the burst a
+   * direction it did not have, and a different one each time. The scatter
+   * inside a lobe is wide enough that the lobes read as weighting rather than
+   * as spokes.
+   */
+  const lobes = [];
+  const count = Math.round(rand(F.lobes[0], F.lobes[1]));
+  for (let i = 0; i < count; i++) lobes.push(rand(0, TAU));
+  const along = () => lobes[(Math.random() * lobes.length) | 0] + spread(F.lobeSpread);
+
+  /*
+   * Thrown far enough to CROSS the front ring, which is what makes a lobe a
+   * direction rather than a smudge. `reach` is in multiples of the blast
+   * radius over the particle's own life, so a spark that lives 0.3s and is
+   * asked for 1.6r leaves at 1.6 * r / 0.3 units a second -- the drag in
+   * updateFx then eats some of it, which is why the range tops out above 2.
+   */
+  const sparks = n(light ? F.sparks * 0.35 : F.sparks);
+  for (let i = 0; i < sparks; i++) {
+    // A fifth of them ignore the lobes, so the burst still has a floor of
+    // roundness under the shape -- without it a two-lobe draw reads as a
+    // cross rather than as an explosion.
+    const a = i % 5 === 0 ? rand(0, TAU) : along();
+    const life = rand(0.2, 0.46);
+    const sp = (rand(F.throw[0], F.throw[1]) * r) / life;
+    spark(x, y, Math.cos(a) * sp, Math.sin(a) * sp, i % 3 ? '#ffb066' : '#fff0e2',
+      life, rand(1.8, 3.4));
+  }
+  // A sub-blast gets the front, one arc and a handful of sparks and nothing
+  // else. Four of them at full treatment is a hundred particles a trigger pull
+  // for a shape the main burst has already drawn.
+  if (light) return;
+  const shards = n(F.shards);
+  for (let i = 0; i < shards; i++) {
+    const a = along();
+    const life = rand(0.45, 0.9);
+    const sp = (rand(F.throw[0] * 0.7, F.throw[1] * 0.8) * r) / life;
+    fxShard(x, y, Math.cos(a) * sp, Math.sin(a) * sp, '#ff7a3c',
+      life, rand(2, 3.8), 3 + ((Math.random() * 2) | 0));
+  }
+  // ...and the tail: embers rising off it, which is the thing the old burst
+  // had none of and the reason it was over in a sixth of a second.
+  // ...and the embers are the tail, not the body of it: few, small, and left
+  // rising after everything else has gone. Drawn at 2.6x their radius by the
+  // glow sprite, so a 3 here is already a wide soft blob.
+  const embers = n(F.embers);
+  for (let i = 0; i < embers; i++) {
+    fxEmber(x + spread(r * 0.6), y + spread(r * 0.6),
+      spread(70), -rand(30, 110), '#ff9f5c', rand(0.5, 1.1), rand(1, 1.9));
+  }
+  ripple(x, y, clamp(r / R, 0.7, 2), r * 3);
 }

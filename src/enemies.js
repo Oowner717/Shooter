@@ -8,6 +8,7 @@ import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow } from './
 import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul } from './fx.js';
 import { audio } from './audio.js';
 import { shed } from './debris.js';
+import { contactAt } from './physics.js';
 
 /**
  * The top of the visible field, in world units. Objects are queued above it
@@ -948,22 +949,37 @@ export class Enemy {
    * @returns 'reflect' | 'hit'
    */
   takeHit(world, dmg, hx, hy, nx, ny, impulse, shred = 0, form = null) {
-    // Prisms bounce glancing bolts; only a square-on hit lands.
-    if (this.type.reflect) {
-      const ndx = (hx - this.x) / this.r;
-      const ndy = (hy - this.y) / this.r;
-      const incidence = Math.abs(ndx * nx + ndy * ny);
-      if (incidence < this.type.reflect) {
-        audio.reflect();
-        return 'reflect';
-      }
+    /*
+     * Where it actually landed. See `contactAt` in physics.js: the point the
+     * projectile sweep hands over is a clamped closest-point on one frame of
+     * travel, so only its component ACROSS the travel means anything -- and
+     * that component is the exact impact parameter.
+     */
+    const c = contactAt(this, hx, hy, nx, ny);
+
+    /*
+     * Prisms bounce glancing bolts; only a square-on hit lands.
+     *
+     * That is what this has always said and, until build 211, not what it did.
+     * The old test was `((hx - x) / r, (hy - y) / r) . (nx, ny)`, which
+     * divides by the RADIUS rather than by the offset's own length -- so it
+     * reduced to how far along its last step the round happened to stop, and
+     * the impact parameter did not enter it at all. Measured across five
+     * sub-frame phases at eleven offsets: a dead-centre shot landed three
+     * times in five and bounced twice, and the incidence column was identical
+     * for every offset from 0 to 0.4r. A lottery on the frame boundary, with
+     * `reflect: 0.55` fitted to it.
+     */
+    if (this.type.reflect && c.incidence < this.type.reflect) {
+      audio.reflect();
+      return 'reflect';
     }
 
     if (form) {
       this.lastHit = form;
       this.lastHitT = world.time;
     }
-    this.applyDamage(world, dmg, nx, ny, impulse, shred);
+    this.applyDamage(world, dmg, nx, ny, impulse, shred, c.b);
     /*
      * The landing, per form. The null path is byte-for-byte the old one --
      * hitBurst with its own randomness -- because it is the path every hit
@@ -974,7 +990,12 @@ export class Enemy {
     return 'hit';
   }
 
-  applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0, shred = 0) {
+  /**
+   * @param lever the signed impact parameter, when the caller knows where the
+   *   hit landed. A blast has no lever arm by construction -- it pushes
+   *   through the centre -- so everything else leaves this at 0.
+   */
+  applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0, shred = 0, lever = 0) {
     if (this.dead) return;
     /*
      * An energy mote cannot be hurt. It is not wreckage to be broken up a
@@ -1021,9 +1042,29 @@ export class Enemy {
       const fade = 1 / (1 + (this.kicked || 0));
       this.kicked = (this.kicked || 0) + fade;
       const push = impulse * this.invMass * fade;
+      /*
+       * The linear part is UNCHANGED, and deliberately so: an impulse applied
+       * off-centre still delivers all of itself to the centre of mass. Where
+       * it landed adds angular momentum; it does not subtract linear. So this
+       * change costs the knockback ladder nothing -- HEAVY is worth exactly
+       * what it was worth -- and buys the spin for free.
+       */
       this.vx += nx * push;
       this.vy += ny * push;
-      this.av += spread(push * 0.02);
+      /*
+       * ...and the spin is now the lever arm rather than a coin toss.
+       *
+       * Δω = b·J/I with I = ½mr² for a uniform disc, which is the same model
+       * `resolvePair` already uses for collision friction -- so a body shoved
+       * by a round and a body scraped by another body agree about what spin
+       * means. It used to be `spread(push * 0.02)`: a scatter proportional to
+       * the shove and unrelated to where the round hit, so a rim shot and a
+       * centre punch span the same amount, in a random direction.
+       *
+       * Capped in `integrate`, because the honest value is very fast on a
+       * light body -- see CFG.physics.maxSpin.
+       */
+      if (lever) this.av += (2 * lever * push) / (this.r * this.r);
     }
     /*
      * TETHERED: the pair is one body with two shapes.

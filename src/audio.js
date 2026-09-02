@@ -241,10 +241,16 @@ class Audio {
     this.tone({ type: 'sine', f0: 200 / size, f1: 44, dur: 0.18 * size, gain: 0.11 });
   }
 
-  boom() {
+  /**
+   * A detonation. `scale` shortens and quietens it without changing its
+   * shape, so HE's round can be the same event as a BLAST mine's and still be
+   * plainly the smaller of the two -- it used to borrow `pop()`, which is what
+   * a dying body makes, and so sounded smaller than the thing it killed.
+   */
+  boom(scale = 1) {
     if (!this.ready) return;
-    this.noise({ dur: 1.1, gain: 0.34, f0: 1400, f1: 40, q: 0.6 });
-    this.tone({ type: 'sine', f0: 90, f1: 26, dur: 1.0, gain: 0.3 });
+    this.noise({ dur: 1.1 * scale, gain: 0.34 * scale, f0: 1400, f1: 40, q: 0.6 });
+    this.tone({ type: 'sine', f0: 90, f1: 26, dur: 1.0 * scale, gain: 0.3 * scale });
   }
 
   ability(kind) {

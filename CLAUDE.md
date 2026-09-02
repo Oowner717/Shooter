@@ -82,9 +82,13 @@ cannot tell a stage that is long because the boss is tough from one that is
 long because the turret spent it on minions -- DYNAMO's third stage was 46% of
 a 324-second fight and two thirds of it was IONs.
 
-**ORDINAL's canonical hash is `1272664316`** (seed 20260824, 9000 frames),
-re-baselined at build 209, which changed what the turret shoots in two ways at
-once: the gun is now silent through a boss's arrival and its death (the probe
+**ORDINAL's canonical hash is `1831195238`** (seed 20260824, 9000 frames),
+re-baselined at build 211, which gave a round's impulse a place to land: the
+spin is now the impact parameter rather than `spread(push * 0.02)`, so bodies
+end a fight somewhere else, and the hash mixes every body's (x, y) every 300
+frames. The FIRST sample moved, which is the channel being the fight itself and
+not something downstream of it. Before that it was `1272664316` from build 209,
+which changed what the turret shoots in two ways at once: the gun is now silent through a boss's arrival and its death (the probe
 runs from `openBoss` with auto-fire on, so the first two samples land inside a
 14.4-second arrival that now has an empty barrel), and DOUBLE TAP moved off
 BOLT onto SPINE, so the default round no longer carries a follow-up. Before
@@ -578,4 +582,45 @@ most once for any given target and cannot spin.
   ring case counted two arcs and regexp'd the digits, and passed against four
   substitute implementations -- including a ring that never closed and a clock
   that counted up. Record the ARGUMENTS and assert they move the right way.
+- **The hit point a projectile hands over is not on the surface, and only one
+  component of it means anything.** `resolveSegment` passes the closest point
+  on the round's ONE-FRAME STEP to the body's centre, clamped to the ends of
+  that step -- measured, a bolt fired dead-centre at a BULWARK reports a
+  contact point 48 units short of the centre, three units OUTSIDE a 45-unit
+  body, because its step ended there. The component ALONG the travel is
+  sub-frame phase and nothing else. The component ACROSS it is the exact impact
+  parameter and cannot be corrupted by the clamp, because the perpendicular
+  distance from the centre to the round's line is the same for every point on
+  that line. `contactAt` in physics.js derives everything from that one number;
+  nothing else in the hit point is safe to use. And |b| exceeds `r` in normal
+  play -- the hit test is against `e.r + p.r`, p90 measured at 1.055r -- so
+  clamp before any `sqrt(r*r - b*b)` or a NaN velocity loses the body for the
+  rest of the run without throwing.
+- **Three separate things had already been written against that vector as
+  though it were a normal**, and all three were wrong in the same way: the
+  spin (`spread(push * 0.02)`, a scatter unrelated to where the round hit),
+  PRISM's "only a square-on hit lands" (dividing by the RADIUS rather than by
+  the offset's own length, so it reduced to sub-frame phase -- measured 0 of 40
+  dead-centre rounds landing), and both ricochets (mirroring about the round's
+  own line, so a square-on bounce went back the way it came). If a fourth thing
+  ever needs a surface normal, it is `contactAt`, not `(hit - centre)`.
+- **An off-centre impulse does not reduce the linear shove.** All of J reaches
+  the centre of mass wherever it lands; the lever arm adds angular momentum on
+  top. So build 211's spin cost the knockback ladder nothing and HEAVY is worth
+  exactly what it was worth -- which is also why the change is safe to make
+  without a balance pass.
+- **A ring fades and thins as it GROWS.** `drawFx` strokes it at `alpha = t`
+  and `width = w * t`, both running from full at spawn to nothing at the end,
+  so a ring authored to expand INTO a radius is at its dimmest and thinnest
+  exactly where that radius is. HE's burst did that and then overshot by
+  another 40% on top, which is why the frame the damage landed on was the
+  least conspicuous frame of the effect. Draw the circle you mean at the radius
+  you mean it, and let it drift outward as it dies.
+- **Judging an effect off live screenshots measures the game's frame loop, not
+  the effect.** The first read of build 211's HE burst said it was gone by
+  frame 7; it was not, the rAF loop had aged the pool through the 90ms waits
+  between screenshots. Step `updateFx` by hand onto an offscreen canvas and
+  render a strip of frames -- and if something looks absent, measure the pixels
+  before believing your eyes: the front ring read as missing in a PNG and was
+  there at peak 246 of 255.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

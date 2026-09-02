@@ -1739,6 +1739,104 @@ mantlet that closes round the breech and turns with the barrel. Nothing in the
 game shows a part on its own, so nothing had ever put the sentence next to the
 drawing.
 
+### A round lands where it lands (build 211)
+
+The hit point the projectile sweep hands to `takeHit` is not a point on the
+surface. It is the closest point on the round's **one-frame step** to the
+body's centre, clamped to the ends of that step — measured, a bolt fired
+dead-centre at a BULWARK reports a contact point 48 units short of the centre,
+*three units outside a 45-unit body*, because its step happened to end there.
+The component of that vector along the round's travel is sub-frame phase and
+nothing else.
+
+Three separate pieces of code had been written against it as though it were a
+surface normal, and all three were wrong in the same way:
+
+| | what it did | what it should do |
+|---|---|---|
+| the spin | `spread(push * 0.02)` — a scatter proportional to the shove and unrelated to where the round hit | turn with the lever arm |
+| PRISM's reflect | divided by the *radius* rather than by the offset's own length, so it reduced to how far along its step the round stopped | "only a square-on hit lands", as its docstring has always said |
+| both ricochets | mirrored about that vector, which on a square-on shot *is* the round's own line | come off the surface at the angle they arrived |
+
+The one component that is exact is the part **across** the travel: the
+perpendicular distance from the centre to the round's line is the same for
+every point on that line, so the clamp cannot corrupt it. That is the impact
+parameter, it tracks a deliberate offset to the digit, and `contactAt` in
+physics.js derives the normal, the entry point and the incidence from it and
+from nothing else. Note `|b|` exceeds `r` in normal play — the hit test is
+against `e.r + p.r`, p90 measured at 1.055 r — so it clamps before the square
+root, or a NaN velocity loses the body for the rest of the run without ever
+throwing.
+
+**The linear shove is deliberately unchanged.** An impulse applied off-centre
+still delivers all of itself to the centre of mass; where it landed adds
+angular momentum, it does not subtract linear. So the spin is free — HEAVY is
+worth exactly what it was worth — and `Δω = b·J/I` with `I = ½mr²` is the same
+disc model `resolvePair` already used for collision friction, so a body shoved
+by a round and a body scraped by another body now agree about what spin means.
+
+That needed a **spin cap**, which the game had never had: the honest rim value
+for a stock bolt is 117 rad/s on a SEED, nineteen revolutions a second, which
+does not read as spinning at all. `CFG.physics.maxSpin` is 9 rad/s and lives in
+`integrate`, so every source answers to it.
+
+**PRISM was very nearly bullet-proof and nobody knew.** Firing real rounds from
+the turret at a pinned PRISM, 40 at each offset:
+
+| impact parameter | before | after (`reflect` 0.8) |
+|---|---|---|
+| dead centre | **0 / 40** | 40 / 40 |
+| 0.2 r | 5 / 40 | 40 / 40 |
+| 0.4 r | 0 / 40 | 39 / 40 |
+| 0.6 r | 0 / 40 | 24 / 40 |
+| 0.8 r | 0 / 40 | 2 / 40 |
+| 0.95 r | 0 / 40 | 0 / 40 |
+
+With real geometry and the inherited `reflect: 0.55` the same probe landed
+40 of 40 from dead centre out to 0.6 r — correct, and a very large swing for a
+body that had been effectively immune. **0.8 is chosen rather than inherited**:
+a round lands only if `|b| < 0.6 r`, three fifths of the width of the disc and
+a bit over a third of its area, which keeps PRISM a body you have to hit
+squarely without keeping it one you cannot hit at all.
+
+### HE goes off differently every time (build 211)
+
+The burst it replaces was one ochre outline circle, twelve sparks and a small
+shake: the shortest explosion authored in the game, with no shards, no embers,
+no ripple and no tail, and over in 0.15 s against a house length of 0.34–0.42 s
+plus a 0.5–1.6 s debris tail. Three things were wrong with it beyond being thin.
+
+**It drew the wrong circle.** The ring expanded to `r × 1.4` and only reached
+there at the end of its life — and a ring *fades and thins as it grows*
+(`drawFx` strokes it at `alpha = t`, `width = w · t`, both running to nothing),
+so it was faintest and thinnest exactly where the damage was, and the frame the
+damage landed on was the least conspicuous frame of the effect. The front is
+now a closed ring drawn **at** the blast radius, brightest on frame one, that
+drifts out a tenth as it dies.
+
+**It wore somebody else's colour.** `#ffd166` is NEEDLE's and GLUT's body
+colour and `#ff9f1c` is WARDEN's; the burst used the same two tones as the
+BLAST mine and read as a small one. Build 209 already made this correction for
+ARC, SPINE and BOLT — flight and burst colours come from the card's family —
+and HE was the one it missed.
+
+**It was the same every time.** Radius, colour, width, life, shake and sound
+were all literally constant; the only variation in the whole function was
+twelve spark angles, invisible against the lattice. Now the shockwave behind
+the front is **two to four broken arcs** at angles nothing picks twice, and the
+debris is thrown along **two or three random lobes** rather than evenly — a
+fifth of it ignores them, so the burst still has a floor of roundness under the
+shape. The lobes only became visible once the debris was thrown far enough to
+*cross* the front ring; the first draft's sparks were still a 20-unit starburst
+at frame 5 and gone by frame 9, so the directions they were supposed to
+describe never appeared. Asserted by binning the debris by direction: some
+directions are empty, and which ones changes from one detonation to the next.
+
+Sub-blasts get a lighter treatment, and only when they still change the
+outline: `cluster.out` is a fixed 78 units and is not scaled by OVERPRESSURE,
+so past about a 210-unit main radius every sub-blast is entirely inside it and
+the old version drew four small circles inside one big one.
+
 ### The glitch timer (build 210)
 
 The rout above was right about *what* it read and wrong about *when*. It added

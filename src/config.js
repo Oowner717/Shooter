@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '210';
+export const BUILD = '211';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '210';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '0dfe390';
+export const REV = '5cbb882';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -600,6 +600,58 @@ export const CFG = {
       // CLUSTER. The burst throws four smaller ones outward, so HE stops
       // being a circle and becomes a patch of overlapping circles.
       cluster: { n: 4, out: 78, scale: 0.5 },
+      /*
+       * ---- what the detonation looks like (build 211) ----
+       *
+       * The one it replaces was a single ochre outline circle, twelve sparks
+       * and a small shake: the shortest explosion authored in the game, with
+       * no shards, no embers, no ripple and no tail. Three things were wrong
+       * with it beyond being thin.
+       *
+       * IT DREW THE WRONG CIRCLE. The ring expanded to `r * 1.4` and only got
+       * there at the end of its life, so the picture ended 40% outside the
+       * radius the damage was applied at, and the frame the damage landed on
+       * was the smallest and least conspicuous frame of the whole effect.
+       * `front` is the ring that arrives AT the damage radius, fast, so the
+       * first thing you see is the shape of what was hit.
+       *
+       * IT WORE SOMEBODY ELSE'S COLOUR. #ffd166 is NEEDLE's and GLUT's body
+       * colour and #ff9f1c is WARDEN's; the burst was drawn in the same two
+       * tones as the BLAST mine and read as a small one. HE's own tone is the
+       * card's #ff5638, and build 209 already made this correction for ARC,
+       * SPINE and BOLT -- flight and burst colours come from the card's
+       * family. HE was the one it missed.
+       *
+       * IT WAS THE SAME EVERY TIME. Radius, colour, width, life, shake and
+       * sound were all literally constant; the only variation in the entire
+       * function was twelve spark angles, which are invisible against the
+       * lattice. `arcs` and `lobes` are the answer: the shockwave is drawn as
+       * a few broken arcs at angles nothing picks twice, and the debris is
+       * thrown along two or three randomly chosen directions rather than
+       * evenly, so a burst has a silhouette instead of only a radius.
+       */
+      fx: {
+        front: 0.13, // seconds the leading ring takes to reach the blast radius
+        tail: 0.46, // ...and how long the broken arcs behind it run for
+        arcs: [2, 4], // how many of them, per detonation
+        arcSpan: [0.5, 1.9], // radians each one covers
+        lobes: [2, 3], // directions the debris is thrown along
+        lobeSpread: 0.5, // radians of scatter within a lobe
+        sparks: 22, // at the stock radius; scaled by size, and capped
+        shards: 7,
+        embers: 4,
+        cap: 2.2, // the most any of those counts may be multiplied by
+        /*
+         * How far the debris gets, as a multiple of the blast radius over its
+         * own life. Under 1 it never leaves the core and the burst reads as a
+         * ring with a smudge in the middle -- which is what the first draft of
+         * this did: measured off a frame strip, the sparks were still a
+         * starburst 20 units across at frame 5 and gone by frame 9, so the
+         * lobes they were supposed to describe never became visible. They have
+         * to CROSS the ring to say anything about direction.
+         */
+        throw: [1.1, 2.4],
+      },
     },
     shotgun: {
       rate: 1.55,
@@ -1011,6 +1063,23 @@ export const CFG = {
   physics: {
     linearDamping: 0.55, // per-second exponential drag
     angularDamping: 0.9,
+    /*
+     * A ceiling on how fast anything may spin, in radians a second.
+     *
+     * There was none, and until build 211 nothing needed one: a round's spin
+     * was `spread(push * 0.02)`, a scatter unrelated to where it landed, and
+     * the only other source was body-on-body friction. Applying a round's
+     * impulse at the point it actually arrived makes the spin real, and real
+     * is fast -- the textbook rim value for a stock bolt is 117 rad/s on a
+     * SEED, nearly nineteen revolutions a second, which does not read as
+     * spinning at all. It reads as a strobe.
+     *
+     * 9 rad/s is about one and a half turns a second: fast enough that a rim
+     * hit is unmistakable, slow enough that the shape stays a shape. Applied
+     * in `integrate` rather than at the impact, so every source of spin --
+     * collisions included -- answers to the same limit.
+     */
+    maxSpin: 9,
     correction: 0.72, // positional correction factor
     slop: 0.4,
     /*
@@ -3334,7 +3403,27 @@ export const ENEMY_TYPES = [
     glow: '#c77dff',
     weight: 6,
     drops: 4, // energy it leaves when it comes apart
-    reflect: 0.55, // glancing bolts bounce off instead of landing
+    /*
+     * Glancing bolts bounce off instead of landing: a round lands only if the
+     * cosine of its angle of incidence is above this, which is |b| < 0.6r --
+     * three fifths of the width of the disc, a bit over a third of its area.
+     *
+     * 0.8 from build 211, and the number moved because the TEST moved. What it
+     * used to be compared against was not an incidence at all: `(hit - centre)`
+     * divided by the RADIUS rather than by its own length, which reduces to
+     * how far along its last step the round happened to stop. Measured on the
+     * build before, firing real rounds from the turret at a pinned PRISM, 40
+     * rounds at each offset: 0 of 40 landed dead centre, 5 of 40 at 0.2r, and
+     * 0 of 40 at every offset beyond that. A PRISM was very nearly immune to
+     * the gun from any angle, which is not what this line has ever said.
+     *
+     * With real geometry and the old 0.55 the same probe landed 40 of 40 from
+     * dead centre out to 0.6r -- correct, and a very large swing for a body
+     * that had been effectively bullet-proof. 0.8 is chosen rather than
+     * inherited: it keeps PRISM a body you have to hit squarely, which is the
+     * whole of its identity, without keeping it a body you cannot hit at all.
+     */
+    reflect: 0.8,
   },
 ];
 

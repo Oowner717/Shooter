@@ -10748,6 +10748,338 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   }
 }
 
+// --- a round lands where it lands ------------------------------------------
+/*
+ * Build 211 gave the impact a geometry. Three things were wrong before it, and
+ * all three came from the same mistake: `resolveSegment` hands `takeHit` the
+ * closest point on the round's ONE-FRAME STEP to the body's centre, clamped to
+ * the ends of that step, and three separate pieces of code treated that as a
+ * point on the surface.
+ *
+ *   THE SPIN was `spread(push * 0.02)` -- a scatter proportional to the shove
+ *   and unrelated to where the round hit, so a rim shot and a centre punch
+ *   span the same amount in a random direction.
+ *
+ *   PRISM's "only a square-on hit lands" divided by the RADIUS instead of by
+ *   the offset's own length, which reduces it to how far along its last step
+ *   the round happened to stop. The impact parameter did not enter it at all.
+ *
+ *   THE RICOCHET mirrored about that same vector, which on a square-on shot
+ *   lies along the round's own line -- so a bounce sent the round back the way
+ *   it came instead of off the surface.
+ *
+ * The one quantity in the hit point that IS exact is its component ACROSS the
+ * travel: the perpendicular distance from the centre to the round's line is
+ * the same for every point on that line, so the clamp cannot corrupt it. That
+ * is the impact parameter, and everything here is derived from it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { CFG } = await import('../src/config.js');
+    const { contactAt } = await import('../src/physics.js');
+    const w = g.world;
+    const out = {};
+
+    // ---- the geometry, on its own ----
+    const body = { x: 0, y: 0, r: 24 };
+    // Travelling straight up, so the impact parameter is just the hit point's x.
+    const at = (b, hy = 40) => contactAt(body, b, hy, 0, -1);
+    out.b = [0, 6, 12, 21.6].map((b) => +at(b).b.toFixed(9));
+    /*
+     * The property the whole change rests on: the answer does not depend on
+     * WHERE ALONG THE RAY the hit point fell. Measured on the live game before
+     * this, a bolt fired dead-centre at a BULWARK reported a contact point 48
+     * units short of the centre -- three units outside a 45-unit body -- purely
+     * because its step ended there.
+     */
+    out.invariant = [-300, -40, 0, 40, 300]
+      .map((hy) => +at(9, hy).b.toFixed(9))
+      .every((v, i, a2) => v === a2[0]);
+    out.incidence = [0, 6, 12, 21.6, 24].map((b) => +at(b).incidence.toFixed(3));
+    // |b| routinely exceeds r, because the hit test is against e.r + p.r.
+    // An unclamped sqrt(r^2 - b^2) is NaN, and a NaN velocity is a body lost
+    // for the rest of the run rather than an error anybody sees.
+    out.past = at(40);
+    out.finite = [40, -40, 1e6].every((b) => {
+      const c = at(b);
+      return Number.isFinite(c.nx) && Number.isFinite(c.ny)
+        && Number.isFinite(c.incidence) && Number.isFinite(c.x);
+    });
+    out.unit = [0, 6, 21.6, 40, -30].map((b) => +Math.hypot(at(b).nx, at(b).ny).toFixed(6));
+
+    // ---- what a hit does to a body ----
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.spawnLock = 1e9;
+    if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; w.director.resting = true; }
+    const pin = () => {
+      const e = g.debugSpawn('lurcher', 300, 300);
+      e.spawnIn = 0; e.staged = false;
+      e.vx = 0; e.vy = 0; e.av = 0; e.kicked = 0; e.hp = e.maxHp * 40; e.maxHp = e.hp;
+      return e;
+    };
+    // Same body, same impulse, same direction, hit in two places. Travelling
+    // up, so the hit point's x IS the impact parameter.
+    const shove = (b) => {
+      const e = pin();
+      e.takeHit(w, 1, e.x + b, e.y + 200, 0, -1, 400);
+      const got = { v: +Math.hypot(e.vx, e.vy).toFixed(4), av: +e.av.toFixed(4) };
+      e.dead = true;
+      return got;
+    };
+    out.centre = shove(0);
+    out.rim = shove(20);
+    out.rimOther = shove(-20);
+
+    // ...and the cap, which did not exist before: the honest rim value on a
+    // light body is nearly nineteen revolutions a second.
+    const seed = g.debugSpawn('seed', 300, 300);
+    seed.spawnIn = 0; seed.staged = false; seed.hp = 1e6; seed.maxHp = 1e6;
+    for (let i = 0; i < 6; i++) seed.takeHit(w, 0, seed.x + seed.r * 0.95, seed.y + 200, 0, -1, 400);
+    const { integrate } = await import('../src/physics.js');
+    integrate(seed, 1 / 60);
+    out.spinCap = +Math.abs(seed.av).toFixed(3);
+    out.cap = CFG.physics.maxSpin;
+    seed.dead = true;
+
+    // ---- PRISM: only a square-on hit lands, and it is not a lottery ----
+    const prism = () => {
+      const e = g.debugSpawn('prism', 300, 300);
+      e.spawnIn = 0; e.staged = false; e.vx = 0; e.vy = 0;
+      e.hp = 1e6; e.maxHp = 1e6;
+      return e;
+    };
+    const shoot = (b, hy) => {
+      const e = prism();
+      const res = e.takeHit(w, 1, e.x + b, e.y + hy, 0, -1, 0);
+      e.dead = true;
+      return res;
+    };
+    out.reflect = CFG.enemyTypes ? null : null;
+    // Five sub-frame phases at each offset. Before the fix the phase decided
+    // the outcome and the offset did not; now it is the other way round.
+    const phases = [-300, -80, -20, 20, 200];
+    out.square = phases.map((hy) => shoot(0, hy));
+    out.grazing = phases.map((hy) => shoot(19, hy));
+    out.squareAllHit = out.square.every((x) => x === 'hit');
+    out.grazeAllReflect = out.grazing.every((x) => x === 'reflect');
+
+    g.debugClearField();
+    g.restart();
+    return out;
+  });
+
+  check('the impact parameter is exact, and does not depend on where the step ended',
+    r.b.join(',') === '0,6,12,21.6' && r.invariant,
+    `hit points at x = 0/6/12/21.6 read b = ${r.b.join(', ')}; the same offset `
+    + `sampled at five points along the ray agrees with itself: ${r.invariant}`);
+
+  check('...and a graze past the radius stays finite rather than going NaN',
+    r.finite && r.past.incidence === 0 && Math.abs(r.past.b) === 24
+    && r.unit.every((u) => Math.abs(u - 1) < 1e-6),
+    `b = 40 on a 24-unit body clamps to ${r.past.b} with incidence `
+    + `${r.past.incidence}; every normal is a unit vector (${r.unit.join(', ')})`);
+
+  /*
+   * Incidence is 1 through the centre and 0 along the rim, which is the number
+   * PRISM's `reflect` has always been compared against and never received.
+   */
+  check('...and incidence runs from square-on to grazing',
+    r.incidence[0] === 1 && r.incidence[4] === 0
+    && r.incidence.every((v, i, a) => i === 0 || v < a[i - 1]),
+    `b = 0/6/12/21.6/24 gives incidence ${r.incidence.join(', ')}`);
+
+  /*
+   * The linear half is deliberately UNCHANGED. An impulse applied off-centre
+   * still delivers all of itself to the centre of mass -- where it landed adds
+   * angular momentum, it does not subtract linear -- so this costs the
+   * knockback ladder nothing and HEAVY is worth exactly what it was worth.
+   */
+  check('where a round lands decides the spin and not the shove',
+    Math.abs(r.centre.v - r.rim.v) < 1e-6 && r.centre.v > 0
+    && Math.abs(r.centre.av) < 1e-9
+    && Math.abs(r.rim.av) > 0.05
+    && Math.sign(r.rim.av) === -Math.sign(r.rimOther.av)
+    && Math.abs(Math.abs(r.rim.av) - Math.abs(r.rimOther.av)) < 1e-9,
+    `centre: ${r.centre.v} u/s and ${r.centre.av} rad/s; rim: ${r.rim.v} u/s and `
+    + `${r.rim.av} rad/s; the other rim ${r.rimOther.av} rad/s`);
+
+  check('...and nothing may spin faster than the cap',
+    r.spinCap <= r.cap + 1e-6 && r.spinCap > 0,
+    `six rim hits on a SEED settle at ${r.spinCap} rad/s against a cap of ${r.cap}`);
+
+  /*
+   * PRISM's own docstring has said "only a square-on hit lands" since it was
+   * written. Measured before the fix, across five sub-frame phases: a
+   * dead-centre shot landed three times in five, and the incidence column was
+   * identical for every offset from 0 to 0.4r -- the frame boundary decided,
+   * not the geometry.
+   */
+  check('a square-on shot always lands on a PRISM, and a graze always bounces',
+    r.squareAllHit && r.grazeAllReflect,
+    `dead centre at five sub-frame phases: ${r.square.join(', ')}; `
+    + `at 0.95r: ${r.grazing.join(', ')}`);
+}
+
+// --- HE goes off differently every time ------------------------------------
+/*
+ * The burst this replaces was a single ochre outline circle, twelve sparks and
+ * a small shake -- the shortest explosion authored in the game, with no
+ * shards, no embers, no ripple and no tail. Three things were wrong with it.
+ *
+ *   IT DREW THE WRONG CIRCLE. The ring expanded to `r * 1.4` and only reached
+ *   there at the end of its life, so the picture ended 40% outside the radius
+ *   the damage was applied at -- and because a ring fades and thins AS IT
+ *   GROWS, it was dimmest and thinnest exactly where the damage was. The frame
+ *   the damage landed on was the least conspicuous frame of the effect.
+ *
+ *   IT WORE SOMEBODY ELSE'S COLOUR. #ffd166 is NEEDLE's and GLUT's body colour
+ *   and #ff9f1c is WARDEN's; the burst was drawn in the same two tones as the
+ *   BLAST mine and read as a small one.
+ *
+ *   IT WAS THE SAME EVERY TIME. Radius, colour, width, life, shake and sound
+ *   were all constant; the only variation in the whole function was twelve
+ *   spark angles, which are invisible against the lattice.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { fx, updateFx } = await import('../src/fx.js');
+    const { heFx } = await import('../src/shooter.js');
+    const TAU = Math.PI * 2;
+    const R = CFG.rounds.explosive.blast.r;
+    const F = CFG.rounds.explosive.fx;
+    const out = { R, F, maxParticles: CFG.maxParticles };
+
+    const burst = (rr, light = false) => {
+      fx.reset();
+      heFx(315, 560, rr, light);
+      // `span` and `a0` are NOT rounded: the closed-ring test compares span
+      // against TAU, and rounding it to three places put it 1.85e-4 away from
+      // a full turn -- so every ring in the burst read as an arc and the front
+      // read as absent. The first version of this case did exactly that.
+      const rings = fx.rings.active.map((g) => ({
+        r: +g.r.toFixed(2), span: g.span ?? TAU, a0: g.a0 ?? 0,
+        fill: g.fill, color: g.color, life: +g.life.toFixed(3),
+      }));
+      return { rings, parts: fx.particles.active.length };
+    };
+
+    // ---- the front is AT the damage radius, closed, on frame one ----
+    const b0 = burst(R);
+    const closed = b0.rings.filter((x) => Math.abs(x.span - TAU) < 1e-6 && !x.fill);
+    out.front = closed[0] || null;
+    out.overshoot = +Math.max(...b0.rings.map((x) => x.r)).toFixed(2);
+    out.arcs = b0.rings.filter((x) => x.span < TAU - 1e-6).length;
+    out.parts = b0.parts;
+
+    // ---- and it is different every time ----
+    const sig = (b) => b.rings.filter((x) => x.span < TAU - 1e-6)
+      .map((x) => `${x.a0.toFixed(3)}/${x.span.toFixed(3)}`).join(',');
+    const sigs = [];
+    for (let i = 0; i < 12; i++) sigs.push(sig(burst(R)));
+    out.distinct = new Set(sigs).size;
+    out.of = sigs.length;
+
+    // ...and so is where the debris goes. Binned by direction: an even ring
+    // would fill every bin, lobes leave some empty, and WHICH are empty has to
+    // change from one detonation to the next or the lobes are decoration.
+    const lobeSig = () => {
+      fx.reset();
+      heFx(315, 560, R);
+      const bins = new Array(12).fill(0);
+      for (const p of fx.particles.active) {
+        const sp = Math.hypot(p.vx, p.vy);
+        if (sp < 40) continue;
+        bins[(((Math.atan2(p.vy, p.vx) + TAU) % TAU) / TAU * 12) | 0]++;
+      }
+      return bins;
+    };
+    const l1 = lobeSig();
+    const l2 = lobeSig();
+    out.lobeEmpty1 = l1.filter((x) => x === 0).length;
+    out.lobeEmpty2 = l2.filter((x) => x === 0).length;
+    out.lobeDiffer = l1.join(',') !== l2.join(',');
+    out.lobePeak = Math.max(...l1) / Math.max(1, l1.reduce((a, x) => a + x, 0) / 12);
+
+    // ---- it has a tail, where the old one was over in a sixth of a second --
+    fx.reset();
+    heFx(315, 560, R);
+    let alive = 0;
+    for (let f = 0; f < 200; f++) {
+      updateFx(1 / 60);
+      if (fx.particles.active.length || fx.rings.active.length) alive = f + 1;
+    }
+    out.life = +(alive / 60).toFixed(2);
+
+    // ---- a sub-blast is drawn lighter than the main one ----
+    const heavy = burst(R * 0.5);
+    const light = burst(R * 0.5, true);
+    out.heavyParts = heavy.parts;
+    out.lightParts = light.parts;
+    out.lightRings = light.rings.length;
+
+    // ---- and a screen-filling one does not cost proportionally more --------
+    const big = burst(R * 2.744); // OVERPRESSURE, all three levels
+    out.bigParts = big.parts;
+    fx.reset();
+    return out;
+  });
+
+  /*
+   * A ring is brightest and widest at SPAWN and fades as it grows, so a front
+   * authored to expand into the blast radius is at its faintest exactly where
+   * the damage was. This one starts there.
+   */
+  check('the HE front is a closed ring at the radius the damage was applied to',
+    r.front && Math.abs(r.front.r - r.R) < 1e-6 && r.overshoot <= r.R * 1.15,
+    `front drawn at ${r.front ? r.front.r : 'none'} against a blast radius of `
+    + `${r.R}; nothing in the burst starts beyond ${r.overshoot} (the old one `
+    + `ended at ${r.R * 1.4})`);
+
+  check('...and the shockwave behind it is broken into arcs nothing picks twice',
+    r.arcs >= r.F.arcs[0] && r.arcs <= r.F.arcs[1] && r.distinct === r.of,
+    `${r.arcs} arcs this time; ${r.distinct} of ${r.of} detonations had a `
+    + `different set of them`);
+
+  /*
+   * An even ring of sparks is the radius drawn twice. Lobes give the burst a
+   * direction, and a different one each time -- which is the whole of what
+   * "different every time" has to mean to be visible at 390px.
+   */
+  check('...and the debris is thrown along lobes, in a different pattern each time',
+    r.lobeEmpty1 > 0 && r.lobeEmpty2 > 0 && r.lobeDiffer && r.lobePeak > 1.6,
+    `${r.lobeEmpty1} of 12 directions empty on one burst and ${r.lobeEmpty2} on `
+    + `the next, and not the same ones (${r.lobeDiffer}); the busiest direction `
+    + `carries ${r.lobePeak.toFixed(1)}x the mean`);
+
+  check('...and it has a tail, where the old burst was over in a sixth of a second',
+    r.life > 0.6, `the last of it goes out at ${r.life}s`);
+
+  /*
+   * `out` is a fixed 78 units and is not scaled by OVERPRESSURE, so past about
+   * a 210-unit main radius every sub-blast is entirely inside it: the old
+   * version drew four small circles within one big one. The lighter treatment
+   * is what a sub-blast gets when it does still change the outline.
+   */
+  check('a cluster sub-blast is drawn lighter than the burst that threw it',
+    r.lightParts < r.heavyParts * 0.6 && r.lightRings <= 3 && r.lightParts > 0,
+    `sub-blast ${r.lightParts} particles and ${r.lightRings} rings against the `
+    + `main burst's ${r.heavyParts}`);
+
+  /*
+   * The particle pass is additive and a fully-bought blast is 84% of the width
+   * of a 390px screen. Drawn at full density that does not read as bigger, it
+   * reads as white -- and it would spend most of a 620-particle budget on one
+   * trigger pull.
+   */
+  check('...and a screen-filling blast does not cost proportionally more',
+    r.bigParts < r.parts * 2.4 && r.bigParts < r.maxParticles * 0.35,
+    `stock ${r.parts} particles, fully bought ${r.bigParts}, budget ${r.maxParticles}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

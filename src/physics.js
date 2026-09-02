@@ -90,6 +90,16 @@ export function integrate(b, dt) {
   b.vx *= d;
   b.vy *= d;
   b.av *= Math.exp(-P.angularDamping * dt);
+  /*
+   * ...and a ceiling on the spin, which until build 211 did not exist.
+   *
+   * Here rather than at the impact, so every source answers to one limit: a
+   * round landing on the rim, a collision's tangential friction, and anything
+   * added later. See CFG.physics.maxSpin for why a physically correct rim
+   * impulse needs capping at all.
+   */
+  if (b.av > P.maxSpin) b.av = P.maxSpin;
+  else if (b.av < -P.maxSpin) b.av = -P.maxSpin;
 
   // Soft speed ceiling so a chain reaction can't fling anything to infinity.
   // A body that has just been thrown is exempt for as long as it is coasting:
@@ -164,6 +174,49 @@ export function resolvePair(a, b) {
 }
 
 /** Mutual damage produced by an impact, before per-body armour. */
+/**
+ * Where a round actually met a body, and how square-on it arrived.
+ *
+ * ---- why this is not just `(hit - centre)` ----
+ *
+ * `resolveSegment` hands `takeHit` the closest point on the round's ONE-FRAME
+ * STEP to the body's centre, clamped to the ends of that step. That is not a
+ * point on the surface and it is not reliably inside the body: measured, a
+ * bolt fired dead-centre at a BULWARK reports a "contact point" 48 units short
+ * of the centre along the incoming line -- three units OUTSIDE a 45-unit body
+ * -- because the step ended before it got there. The component of that vector
+ * ALONG the round's travel is sub-frame phase and nothing else.
+ *
+ * The component ACROSS the travel is exact, and is the one number worth
+ * having: the perpendicular distance from the centre to the round's line is
+ * the same for every point on that line, so the clamp cannot corrupt it.
+ * Measured against deliberate offsets it tracks the impact parameter to the
+ * digit -- b = 0.25r on a LURCHER reads 6.00 of 24, b = 0.5r on a BULWARK
+ * reads 22.50 of 45.
+ *
+ * So everything here is derived from that one quantity plus the travel
+ * direction and the body's radius, and nothing is taken from the hit point
+ * except its lateral offset.
+ *
+ * Returns the signed impact parameter `b`, the outward unit normal at the
+ * entry point, that point itself, and `incidence` -- 1 for a shot through the
+ * centre, 0 for a graze along the rim.
+ *
+ * @param dirx,diry the round's unit travel direction
+ */
+export function contactAt(e, hx, hy, dirx, diry) {
+  const r = e.r || 1;
+  // Clamped to the body's own radius: the hit test is against `e.r + p.r`, so
+  // a real graze reports |b| up to about 1.3r (measured p99 over a live run),
+  // and an unclamped sqrt(r^2 - b^2) is NaN -- which would propagate into vx
+  // and vy and leave the body at NaN for ever rather than throwing.
+  const b = clamp((hx - e.x) * -diry + (hy - e.y) * dirx, -r, r);
+  const depth = Math.sqrt(Math.max(0, r * r - b * b));
+  const ox = -diry * b - dirx * depth;
+  const oy = dirx * b - diry * depth;
+  return { b, nx: ox / r, ny: oy / r, x: e.x + ox, y: e.y + oy, incidence: depth / r };
+}
+
 export function impactDamage(a, b, impact) {
   if (impact <= P.collisionThreshold) return 0;
   const invSum = a.invMass + b.invMass;
