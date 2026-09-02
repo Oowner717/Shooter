@@ -1784,6 +1784,15 @@ body.menuOpen #quickBar button,
 body.loadoutOpen #quickBar button,
 body.sheetOpen #quickBar button,
 body.sheetOpen #abilities button,
+/* ...and under the other two sheets, which had the group rule and not this
+   one. `#ui button { pointer-events: auto }` carries an id, so nothing built
+   out of classes turns a control back off -- measured with body.menuOpen,
+   getComputedStyle(PULSE).pointerEvents was 'auto' and a pointerdown
+   dispatched on the element spent the charge and started the cooldown. Only
+   the scrim's geometry was stopping a real thumb. Same shape as the
+   #quickBar note above it. */
+body.menuOpen #abilities button,
+body.loadoutOpen #abilities button,
 body.sheetOpen #waveRail button,
 body.aimOpen #quickBar .q_mines button,
 body.aimOpen #quickBar .q_ammo button,

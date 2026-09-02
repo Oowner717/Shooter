@@ -464,8 +464,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 134 since build 215: SHOCKFRONT went in at two levels, and SIGHT's
-    // three were replaced by PILE's three. It was
+    // 136 since build 216, when SPLINTER went in at two levels. It was
+    // 134 from build 215: SHOCKFRONT went in at two levels, and SIGHT's
+    // three were replaced by PILE's three. And
     // 132 from build 214, when QUICK ARM (one level) was replaced by QUICK
     // LAY (two). It was 131 from build 209, when TRACER and HEAVY each lost a
     // level -- build 212 left it there, BLOOM OUT going 3 levels to 2 exactly
@@ -476,7 +477,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 134
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 136
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -12066,20 +12067,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * promises is answerable.
      */
     /*
-     * A body INSIDE the birth radius is never touched; one just outside it
-     * always is. A pure geometry differential, and deliberately so: it needs
-     * no contact set, no charge and no fuse, so it cannot fail for a reason
-     * that has nothing to do with the promise it is making. The promise is
-     * that PILE is not a blast centred on the turret -- the glitch timer is
-     * the only involuntary way down the game has, its answer is shoving the
-     * thing off, and an unaskable blast on the mount would take that decision
-     * away without anyone noticing.
+     * The mount is INCLUDED from build 216, and this is the case that used to
+     * assert the opposite.
      *
-     * The first version of this drove 22 seconds of live waves with a body
-     * pinned to the mount and asserted on the fuse. It failed for three
-     * unrelated reasons in a row -- a teach wave zeroing the clock, a phase
-     * that never reached the director, a contact set that stayed empty -- and
-     * every one of those was the harness, not the game.
+     * Build 215 skipped anything whose centre was inside the birth radius, on
+     * the grounds that the glitch timer is the only involuntary way down and
+     * its answer -- shoving the thing off -- had to stay a decision the player
+     * makes. That was overruled: negating the glitch threat with what you have
+     * bought is a legitimate thing for the tree to sell. So a body held ON the
+     * machine is struck like any other, and the assertion is inverted rather
+     * than deleted, because "does it reach the mount" is still the question
+     * this upgrade lives or dies on -- it has just changed sign.
      */
     const reach = (at) => {
       bare(); own(3);
@@ -12088,13 +12086,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       e.staged = false; e.spawnIn = 0; e.vx = 0; e.vy = 0; e.hp = 1e7; e.maxHp = 1e7;
       const f = new Front(s.x, s.y, 3);
       w.effects.push(f);
+      // Held for one frame only: long enough for the front to be born on top
+      // of it, and then let go, so the shove is measured rather than fought.
+      let peak = at;
       for (let k = 0; k < 60; k++) {
-        e.x = s.x; e.y = s.y - at; e.vx = 0; e.vy = 0;
+        if (k === 0) { e.x = s.x; e.y = s.y - at; e.vx = 0; e.vy = 0; }
         g.update(1 / 60);
+        peak = Math.max(peak, Math.hypot(e.x - s.x, e.y - s.y));
       }
-      return { at, r: Math.round(e.r), hit: f.hit.has(e), hurt: e.hp < 1e7 };
+      return { at, hit: f.hit.has(e), hurt: e.hp < 1e7, peak: Math.round(peak),
+        gained: Math.round(peak - at) };
     };
-    out.inside = reach(Math.round(P.r0 * 0.5));
+    out.mount = reach(Math.round(P.r0 * 0.4));
     out.rim = reach(Math.round(P.r0 * 1.4));
 
     // ...and it does go off on its own, over and over, with nothing asked.
@@ -12175,16 +12178,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * thing off; an unaskable blast centred on the turret would take that
    * decision away. PILE cannot reach the mount, and PULSE still can.
    */
-  check('...and it cannot reach what is already on the turret',
-    r.inside && r.rim && !r.inside.hit && r.rim.hit && r.rim.hurt
-    && r.fired >= 5,
-    // Asked of the front's own record, not of the body's health: a body held
-    // ON the turret is taking impact damage off the collision solver the
-    // whole time, which is nothing to do with this upgrade.
-    `the front is born at ${r.r0}: not one wave reached a body held at `
-    + `${r.inside && r.inside.at} (${r.inside && r.inside.hit}); every one `
-    + `reached and hurt one at ${r.rim && r.rim.at} (${r.rim && r.rim.hit}). `
-    + `${r.fired} waves went out over 22s unasked`);
+  /*
+   * Asked of the front's own `hit` record as well as of the distance: a body
+   * on the mount is taking impact damage off the collision solver the whole
+   * time it is there, so its health alone cannot tell you what reached it.
+   */
+  check('...and it clears the turret itself, which is what it is for',
+    r.mount && r.rim && r.mount.hit && r.mount.gained > 40
+    && r.rim.hit && r.rim.hurt && r.fired >= 5,
+    `the front is born at ${r.r0}: a body sitting on the machine at `
+    + `${r.mount && r.mount.at} was struck (${r.mount && r.mount.hit}) and `
+    + `thrown to ${r.mount && r.mount.peak} (+${r.mount && r.mount.gained}); `
+    + `one at ${r.rim && r.rim.at} was too. ${r.fired} waves went out over 22s `
+    + `unasked`);
 
   check('...and what IS closing is thrown back, hardest when it is lightest',
     r.mote && r.bulwark && r.mote.gained > 120 && r.bulwark.gained < r.mote.gained * 0.35,
@@ -12302,6 +12308,450 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.shownAfter + r.queuedAfter === r.admitted && r.back > 1,
     `${r.shownAfter} up and ${r.queuedAfter} held of ${r.admitted} admitted; `
     + `${r.back} were up again once there was room`);
+}
+
+// --- picking a mine is a choice of kind, not a free mine --------------------
+/*
+ * `toggleMine` used to set `this.mineTimer = 0.2`, so selecting a kind laid
+ * one two tenths of a second later whatever the cadence had left to run.
+ * Tapping through the six mine buttons put six mines on the field in about a
+ * second, and switching kinds mid-cooldown reset the wait to nothing --
+ * reported as "a mine is set after every click of a mine button".
+ *
+ * The clock runs across a switch now: whatever is selected when it comes up is
+ * what gets laid. Switching still costs nothing, which is the point of the
+ * strip; it just does not buy anything either.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { freshUpgrades } = await import('../src/upgrades.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = { every: CFG.mines.throwEvery };
+
+    const clean = () => {
+      g.debugClearField();
+      g.restart();
+      w.phase = 'staging';
+      w.up = freshUpgrades();
+      w.mines.length = 0;
+      w.mine = null;
+      g.mineTimer = 0;
+    };
+    const laid = () => w.mines.length;
+
+    // ---- six taps in a second is one mine, not six ----------------------
+    clean();
+    g.toggleMine('blast');
+    for (let f = 0; f < 20; f++) g.update(1 / 60);
+    const afterFirst = laid();
+    for (const k of ['snare', 'thorn', 'lode', 'knell', 'wire']) {
+      g.toggleMine(k);
+      for (let f = 0; f < 12; f++) g.update(1 / 60);
+    }
+    out.tapped = { afterFirst, afterSix: laid(), timer: +g.mineTimer.toFixed(1) };
+
+    // ---- ...and switching does not shorten the wait ---------------------
+    /*
+     * Measured off the clock the frame loop actually keeps, not off a
+     * recomputation: the defect was a control writing to that clock, so a
+     * case that reads anything else would not have seen it.
+     */
+    clean();
+    g.toggleMine('blast');
+    for (let f = 0; f < 60 * 6; f++) g.update(1 / 60);
+    const midway = +g.mineTimer.toFixed(2);
+    g.toggleMine('snare');
+    g.toggleMine('thorn');
+    g.toggleMine('blast');
+    out.switched = { midway, after: +g.mineTimer.toFixed(2) };
+
+    // ---- ...and the cadence itself is still the cadence ------------------
+    clean();
+    g.toggleMine('blast');
+    const at = [];
+    let t = 0;
+    for (let f = 0; f < 60 * 40 && at.length < 3; f++) {
+      const before = laid();
+      g.update(1 / 60);
+      t += 1 / 60;
+      if (laid() > before) at.push(+t.toFixed(2));
+    }
+    out.gaps = at.slice(1).map((x, i) => +(x - at[i]).toFixed(2));
+
+    clean();
+    g.restart();
+    return out;
+  });
+
+  check('picking a mine kind does not lay one, and does not reset the clock',
+    r.tapped.afterFirst === 1 && r.tapped.afterSix === 1,
+    `one tap laid ${r.tapped.afterFirst}; five more kinds tapped over the next `
+    + `second laid ${r.tapped.afterSix - r.tapped.afterFirst} more (it used to `
+    + `lay one per tap)`);
+
+  check('...and the wait a switch interrupts is the wait it comes back to',
+    Math.abs(r.switched.midway - r.switched.after) < 1e-9,
+    `${r.switched.midway}s left before three switches, ${r.switched.after}s after`);
+
+  check('...and the cadence between mines is still the one config names',
+    r.gaps.length >= 1 && r.gaps.every((x) => Math.abs(x - r.every) < 0.1),
+    `${r.gaps.join('s, ')}s between throws against ${r.every}s`);
+}
+
+// --- SPLINTER, and what a mine is worth ------------------------------------
+/*
+ * Every mine that does damage went up 10% in build 216, and SPALL's pellets
+ * gained a burst where they land. VOID, SNARE and LODE are untouched because
+ * none of them has a damage number: VOID deletes, SNARE holds, LODE pushes.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { NODES } = await import('../src/tree.js');
+    const { BY_ID, freshUpgrades } = await import('../src/upgrades.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    // ---- the numbers, against what build 215 shipped --------------------
+    /*
+     * Asserted as a RATIO against the recorded old values rather than as new
+     * literals, so this reads as "they went up a tenth" -- which is the change
+     * -- rather than as a second copy of config.js that has to be kept in step.
+     */
+    const was = { blast: 95, fizzle: 44, thorn: 34, knell: 74, wire: 72, spall: 26 };
+    const now = {
+      blast: CFG.mines.blast.damage,
+      fizzle: CFG.mines.fizzle.damage,
+      thorn: CFG.thorn.patch.dps,
+      knell: CFG.knell.blast.damage,
+      wire: CFG.wire.damage,
+      spall: CFG.spall.damage,
+    };
+    out.ratios = Object.fromEntries(Object.entries(now)
+      .map(([k, v]) => [k, +(v / was[k]).toFixed(3)]));
+    // ...and the three that have no damage number still have none.
+    out.noDamage = ['void', 'snare', 'lode'].filter((k) => CFG[k] && CFG[k].damage === undefined);
+
+    // ---- SPLINTER is in the tree at two levels --------------------------
+    const node = NODES.find((n) => n.id === 'splinter');
+    const def = BY_ID.get('splinter');
+    out.placed = !!node;
+    out.levels = def ? def.levels : null;
+
+    // ---- ...and it widens what a pellet does where it lands -------------
+    /*
+     * Measured off bodies actually hurt by the fan, at a spread that no
+     * pellet can hit directly: a row set OUTSIDE the pellets' own line, so
+     * anything that takes damage took it from a burst. A case that measured
+     * total damage would be measuring the pellets.
+     */
+    /*
+     * A rank of bodies across the fan, and the mine PINNED under it.
+     *
+     * Two things had to be nailed down. The mine lands where `throwMine`
+     * decides, so a case that throws one and waits is measuring the throw --
+     * it reported 0 damage at both levels on about one run in three, which is
+     * the same answer a build with SPLINTER doing nothing would give. And a
+     * pellet that hits nothing simply times out 900 units up and bursts
+     * there, so the burst is only ever COLLATERAL: it is measured on the
+     * bodies beside the ones the pellets actually hit, which is what the
+     * upgrade is for.
+     */
+    /*
+     * A rank of bodies beside the fan, with the mine's LANDING SITE pinned.
+     *
+     * Five versions of this were flaky and every one was the harness rather
+     * than the game. A SPALL flies to a target `throwMine` picks, so a rank
+     * placed at a guessed spot is a coin toss -- runs came back 0/0, then 1
+     * hurt for 50, then 0/0, which is the answer a build with SPLINTER doing
+     * nothing would give. A version that patched `applyBlast` to record the
+     * radius could not work at all: an ES module export is a live binding and
+     * cannot be reassigned from outside, so it recorded zero bursts on a
+     * build that fires fourteen.
+     *
+     * `x1, y1` is where the mine is flying TO, and writing it before it lands
+     * is the one thing that makes the geometry the case's to choose. The
+     * witness is then placed at a distance no unbought burst can reach and
+     * every bought one can.
+     */
+    const fanRadii = (levels) => {
+      g.debugClearField();
+      g.restart();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
+      w.up = freshUpgrades();
+      for (let i = 0; i < levels; i++) def.apply(w.up, w);
+      w.mines.length = 0;
+      w.projectiles.length = 0;
+      const s = w.shooter;
+      const mx = w.width / 2;
+      const my = s.y - 170;
+      g.debugThrowMine('spall');
+      const m = w.mines[0];
+      if (!m) return null;
+      m.x1 = mx; m.y1 = my;
+      for (let f = 0; f < 60 * 4 && w.mines.length && !w.mines[0].landed; f++) g.update(1 / 60);
+      if (!w.mines.length) return null;
+      w.mines[0].settle = 99;
+      /*
+       * The target the pellets hit, dead ahead of the mine, and a witness
+       * beside it -- outside the FAN as well as outside the unbought burst,
+       * which is the arithmetic this case turns on.
+       *
+       * The fan is 0.9 radians wide, so its half-width at distance d is
+       * 0.483d. At 150 units that is 72, and a witness 44 units off the line
+       * was inside it and struck by pellets directly at both levels (measured
+       * 71 and 89 -- a real difference, but not the one being claimed). At 80
+       * units the fan is 39 wide: a witness at 50 is clear of it by 11, clear
+       * of the authored 26-unit burst by 24, and inside the 62.5 that two
+       * levels buy by 12.
+       */
+      const put = (x, y) => {
+        const e = g.debugSpawn('mote', x, y);
+        if (!e) return null;
+        e.staged = false; e.spawnIn = 0; e.hp = 1e6; e.maxHp = 1e6;
+        e.invMass = 0; e.vx = 0; e.vy = 0;
+        return e;
+      };
+      const target = put(mx, my - 80);
+      const witness = put(mx + 50, my - 80);
+      /*
+       * The body that sets it off, at the EDGE of the mouth rather than on
+       * top of it. `spall()` fires from `m.y - 4`, so a trigger body standing
+       * on the mine is born inside the fan and eats all fourteen pellets on
+       * frame one -- measured, the target 150 units up took exactly 0 while
+       * the projectiles vanished in nine frames. Four versions of this case
+       * failed on that, and none of them was the game.
+       */
+      const trip = put(mx + 38, my);
+      if (trip) { trip.hp = 1e6; trip.maxHp = 1e6; }
+      let fired = false;
+      for (let f = 0; f < 60 * 3; f++) {
+        for (const e of [target, witness, trip]) {
+          if (e) { e.vx = 0; e.vy = 0; }
+        }
+        if (trip) { trip.x = mx + 38; trip.y = my; }
+        if (target) { target.x = mx; target.y = my - 80; }
+        if (witness) { witness.x = mx + 50; witness.y = my - 80; }
+        g.update(1 / 60);
+        if (!w.mines.length) fired = true;
+      }
+      return {
+        fired,
+        target: target ? Math.round(1e6 - target.hp) : 0,
+        witness: witness ? Math.round(1e6 - witness.hp) : 0,
+      };
+    };
+    out.one = fanRadii(0);
+    out.two = fanRadii(2);
+
+    g.debugClearField();
+    w.spawnLock = 0;
+    w.up = freshUpgrades();
+    g.restart();
+    return out;
+  });
+
+  check('every mine that does damage does a tenth more of it',
+    Object.values(r.ratios).every((x) => Math.abs(x - 1.1) < 0.02)
+    && r.noDamage.length === 3,
+    Object.entries(r.ratios).map(([k, v]) => `${k} x${v}`).join(', ')
+    + `; and ${r.noDamage.join('/')} still have no damage number to raise`);
+
+  /*
+   * The witness is what the node bought: a body clear of the fan's own line,
+   * reached only by what the pellets leave behind. Measured stable across
+   * runs at 35 unbought against 62 with both levels -- a clean 1.8x, where
+   * the target in the fan barely moves (212 -> 227) because it is being hit
+   * by pellets either way. The target is the control: a case that watched
+   * only IT would pass on a build where SPLINTER did nothing at all.
+   */
+  check('SPLINTER is in the tree at two levels, and widens what a pellet leaves',
+    r.placed && r.levels === 2 && r.one && r.two && r.one.fired && r.two.fired
+    && r.one.target > 0 && r.two.target > 0
+    && r.one.witness > 0 && r.two.witness > r.one.witness * 1.5,
+    `the body in the fan took ${r.one.target} unbought and ${r.two.target} `
+    + `bought; a witness 50 units off the line took ${r.one.witness} and `
+    + `${r.two.witness}`);
+}
+
+// --- PULSE actually clears the mount, and pays what the floor is worth ------
+/*
+ * An audit of PULSE found four things wrong with it and one reason none of
+ * them had been caught: nothing in the suite ever pressed PULSE and looked at
+ * `world.attackers`. The existing case counts pixels and effects, and the
+ * release case proves the contact set releases by TELEPORTING a body 420 units
+ * away. So the ability's whole job was untested.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { BY_ID, freshUpgrades } = await import('../src/upgrades.js');
+    const g = window.__sim;
+    const w = g.world;
+    const s = w.shooter;
+    const out = {};
+
+    const seat = (id, buy) => {
+      g.debugClearField();
+      g.restart();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
+      w.up = freshUpgrades();
+      if (buy) { const d2 = BY_ID.get('shockfront'); for (let i = 0; i < 2; i++) d2.apply(w.up, w); }
+      const e = g.debugSpawn(id, s.x + 4, s.y - 6);
+      if (!e) return null;
+      e.staged = false; e.spawnIn = 0; e.hp = 1e7; e.maxHp = 1e7;
+      for (let f = 0; f < 30; f++) { e.x = s.x + 4; e.y = s.y - 6; e.vx = 0; e.vy = 0; g.update(1 / 60); }
+      return e;
+    };
+    const press = () => {
+      const slot = w.abilities.slots.find((x) => x.def.essential);
+      if (!slot) return false;
+      slot.charges = Math.max(1, slot.charges); slot.cd = 0; slot.locked = 0;
+      g.useAbility(w.abilities.slots.indexOf(slot));
+      return true;
+    };
+
+    /*
+     * The heaviest body in the game, WITH THE TURRET FIRING -- which is the
+     * case that was broken. `kicked` is the anti-knockback-lock counter and
+     * PULSE was paying it like a stray bolt: measured, an ordinary rate of
+     * fire took a BULWARK's separation from 6.38 units to 0.35, against the
+     * 6.4 it needs to be released. So the gun disarmed the one escape the
+     * game has, and the fuse kept closing through the press.
+     */
+    const clears = (id, firing) => {
+      const e = seat(id, false);
+      if (!e) return null;
+      w.autoAim = true;
+      w.autoFire = !!firing;
+      if (firing) {
+        // Long enough for `kicked` to settle where sustained fire keeps it.
+        for (let f = 0; f < 60 * 3; f++) {
+          e.x = s.x + 4; e.y = s.y - 6; e.vx = 0; e.vy = 0; e.hp = e.maxHp;
+          g.update(1 / 60);
+        }
+      }
+      const kicked = +(e.kicked || 0).toFixed(2);
+      const held = !!w.attackers.has(e);
+      press();
+      let clear = 0;
+      let peak = 0;
+      for (let f = 0; f < 60 * 2; f++) {
+        g.update(1 / 60);
+        peak = Math.max(peak, Math.hypot(e.x - s.x, e.y - s.y));
+        if (!w.attackers.has(e)) clear++;
+      }
+      w.autoFire = false;
+      return { held, kicked, clear, peak: Math.round(peak), thrown: e.thrown > 0 };
+    };
+    out.quiet = clears('bulwark', false);
+    out.firing = clears('bulwark', true);
+    out.mote = clears('mote', true);
+
+    // ---- SHOCKFRONT is worth something to a light body ------------------
+    /*
+     * It was worth nothing to eight of the fourteen types: applyBlast never
+     * set `thrown`, so `integrate` clamped every light body to `cruise * 6`
+     * and the extra impulse was thrown away by the cap. A MOTE took 24% of
+     * PULSE's rated shove and both levels of the node moved it not at all.
+     */
+    /*
+     * Measured as SPEED, not distance. With the cap lifted a MOTE is now
+     * thrown 447 units off the mount and leaves the arena either way, so
+     * distance saturates and reads 447 against 433 -- the field's edge, not
+     * the upgrade. The cap is a ceiling on velocity and velocity is what has
+     * to be watched. Sampled over the first few frames, before drag.
+     */
+    const speedOf = (buy) => {
+      const e = seat('mote', buy);
+      if (!e) return null;
+      const cap = Math.round((e.cruise || 60) * CFG.physics.maxSpeedFactor);
+      press();
+      // Raw, on the frame the impulse lands, before `integrate` clamps it --
+      // this is what SHOCKFRONT moves. And settled, after the clamp, which is
+      // what the body actually travels at.
+      const raw = Math.round(Math.hypot(e.vx, e.vy));
+      g.update(1 / 60);
+      const held = Math.round(Math.hypot(e.vx, e.vy));
+      return { raw, held, cap, thrown: e.thrown > 0 };
+    };
+    out.plain = speedOf(false);
+    out.bought = speedOf(true);
+
+    // ---- and it collects what the floor is actually worth ----------------
+    /*
+     * `absorb` banked the raw energy where `Enemy.destroy` banks
+     * `energy * bounty`, so taking a mote in paid the authored number while
+     * shooting the same mote paid the tier's compounding on top. Measured
+     * before the fix: tier 20 returned 16% of what destroying it paid.
+     */
+    const income = (tier) => {
+      g.debugClearField();
+      g.restart();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.up = freshUpgrades();
+      if (w.director) { w.director.setTier(tier); w.director.timer = 1e9; w.director.driftTimer = 1e9; }
+      const host = g.debugSpawn('bulwark', s.x, s.y - 120);
+      if (!host) return 0;
+      host.staged = false; host.spawnIn = 0;
+      host.applyDamage(w, host.hp + 1e6, 0, 0, 0);
+      for (let f = 0; f < 20; f++) g.update(1 / 60);
+      const drops = w.drops.length;
+      const before = w.energy;
+      press();
+      for (let f = 0; f < 90; f++) g.update(1 / 60);
+      return { drops, gained: Math.round(w.energy - before) };
+    };
+    out.low = income(1);
+    out.high = income(20);
+
+    g.debugClearField();
+    w.spawnLock = 0;
+    w.up = freshUpgrades();
+    w.autoFire = false;
+    g.restart();
+    return out;
+  });
+
+  check('PULSE gets the heaviest body off the turret, and the gun cannot stop it',
+    r.quiet && r.firing && r.quiet.held && r.firing.held
+    && r.quiet.clear > 100 && r.firing.clear > 100 && r.firing.kicked > 1,
+    `a BULWARK seated on the mount: quiet, released for ${r.quiet.clear} of 120 `
+    + `frames (thrown to ${r.quiet.peak}); under fire with kicked at `
+    + `${r.firing.kicked}, released for ${r.firing.clear} (thrown to `
+    + `${r.firing.peak}) -- it used to be 0`);
+
+  /*
+   * Two things, because the cap has two effects. It USED to hold a MOTE to
+   * `cruise * 6` -- 24% of PULSE's rated shove -- so the ability barely moved
+   * the commonest body on the field and SHOCKFRONT's +30% bought it nothing
+   * at all. A throw now lifts it to `physics.thrownSpeed`, and the impulse
+   * itself scales again. The settled speed is still capped, deliberately;
+   * what matters is that the ceiling is the throw's and not the body's.
+   */
+  check('...and a light body is thrown clear of its own speed cap',
+    r.plain && r.bought && r.plain.thrown
+    && r.plain.held > r.plain.cap
+    && r.bought.raw > r.plain.raw * 1.4,
+    `a MOTE leaves the mount at ${r.plain.held} u/s against its own cap of `
+    + `${r.plain.cap}; the shove itself goes ${r.plain.raw} -> ${r.bought.raw} `
+    + `with SHOCKFRONT (x${(r.bought.raw / Math.max(1, r.plain.raw)).toFixed(2)}), `
+    + `which the cap used to eat entirely`);
+
+  check('...and it banks what the wreckage is worth, not what it was authored at',
+    r.low.gained > 0 && r.high.gained > r.low.gained * 3,
+    `the same body's salvage taken in by PULSE: ${r.low.gained} at tier 1 from `
+    + `${r.low.drops} motes, ${r.high.gained} at tier 20 from ${r.high.drops} `
+    + `(x${(r.high.gained / Math.max(1, r.low.gained)).toFixed(1)}, and the `
+    + `tier's own compounding over 19 rungs is x${(1.1 ** 19).toFixed(1)})`);
 }
 
 // --- report -----------------------------------------------------------------

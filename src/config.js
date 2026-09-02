@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '215';
+export const BUILD = '216';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '215';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'ddd2e84';
+export const REV = 'e008025';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -872,7 +872,7 @@ export const CFG = {
     flight: 0.9,
     arm: 0.5,
     r: 12,
-    patch: { r: 104, dps: 34 },
+    patch: { r: 104, dps: 37 },
   },
   /*
    * LODE. Does no damage and cannot be triggered. It pushes, constantly, and
@@ -899,7 +899,14 @@ export const CFG = {
     pellets: 14,
     spread: 0.9, // radians of the fan
     speed: [900, 1240],
-    damage: 26,
+    damage: 29,
+    /*
+     * What each pellet does where it lands, on top of what it hits directly.
+     * Small on purpose: fourteen of these go off in a fan and the sum of them
+     * is the effect, so one of them being loud would be fourteen loud things.
+     * SPLINTER is the only thing that moves the radius.
+     */
+    burst: { r: 26, damage: 9, impulse: 110 },
   },
   /*
    * VOID. One thing, whatever it is, gone. It does not care about armour or
@@ -935,15 +942,18 @@ export const CFG = {
    * when it lands. It answers the thing SIGHT never did -- something closing
    * on the turret while the barrel is pointed elsewhere.
    *
-   * IT IS AN ANNULUS, NOT A BLAST, and that is the whole design. It is born at
-   * `r0` and only ever travels outward, so it CANNOT REACH WHAT IS ALREADY ON
-   * THE MOUNT: a body in contact sits at about `e.r + shooter.r + 2`, and a
-   * LURCHER at ~44 is inside `r0`. That is deliberate. The glitch timer is the
-   * only involuntary way down the game has, its answer is shoving the thing
-   * off, and PULSE is what shoves it -- an unaskable blast centred on the
-   * turret would quietly take that decision away and defuse the one clock the
-   * game promises is answerable. PULSE answers what has arrived. PILE answers
-   * what is closing.
+   * IT IS AN ANNULUS, NOT A BLAST: born at `r0` and only ever travelling
+   * outward, so the wave arrives at a body rather than enveloping the field.
+   * It DOES clear the mount, from build 216 -- a body sitting on the machine
+   * has its edge inside `r0` from the first frame and is struck there.
+   *
+   * Build 215 excluded the mount on the grounds that the glitch timer is the
+   * only involuntary way down and its answer, shoving the thing off, had to
+   * stay a decision the player makes. That was overruled: negating the glitch
+   * threat with what you have bought is a legitimate thing for the tree to
+   * sell, and the direction of the upgrade system is a machine that
+   * increasingly looks after itself. PULSE is still the only answer you can
+   * ASK FOR on the frame you need it; PILE is the one that arrives anyway.
    *
    * `thrown` is what makes it read: it exempts a struck body from its own
    * speed cap up to `physics.thrownSpeed` and stops it steering for half a
@@ -961,6 +971,13 @@ export const CFG = {
     tell: 0.35, // how long before it goes that the machine says so
   },
 
+  /*
+   * Every mine that does damage was raised 10% in build 216: BLAST 95 -> 105,
+   * SALTED's fizzle 44 -> 48, THORN's ground 34 -> 37/s, KNELL's toll 74 ->
+   * 81, WIRE 72 -> 79/s, SPALL's pellet 26 -> 29. VOID, SNARE and LODE are
+   * untouched because none of them has a damage number: VOID deletes, SNARE
+   * holds, LODE pushes.
+   */
   mines: {
     /*
      * Five on the field, fifteen seconds each, one thrown every fifteen.
@@ -986,8 +1003,8 @@ export const CFG = {
     r: 13,
     trigger: 26, // extra reach beyond the mine's own radius
     // Nerfed in build 49 from 140; SHRAPNEL is the way back past it.
-    blast: { r: 168, damage: 95, impulse: 760 },
-    fizzle: { r: 96, damage: 44, impulse: 300 }, // SALTED: what a spent one does
+    blast: { r: 168, damage: 105, impulse: 760 },
+    fizzle: { r: 96, damage: 48, impulse: 300 }, // SALTED: what a spent one does
   },
 
   // ---- snares ---------------------------------------------------------
@@ -1017,7 +1034,7 @@ export const CFG = {
     span: 150, // half-length of the line, world units
     open: 0.55, // seconds to unspool once it has settled
     width: 8, // contact half-width
-    damage: 72, // per second of contact, per body — was 105; see HOT WIRE
+    damage: 79, // per second of contact, per body — was 105; see HOT WIRE
     shove: 150, // pushed off the line rather than held on it
   },
 
@@ -1031,7 +1048,7 @@ export const CFG = {
     r: 13,
     tolls: 2, // was 3; FOURTH BELL buys the third back and a fourth beyond it
     gap: 1.15, // seconds between them
-    blast: { r: 118, damage: 74, impulse: 430 },
+    blast: { r: 118, damage: 81, impulse: 430 },
     grow: 0.5, // each toll this much wider than the one before
     fade: 0.72, // and this much of its damage
   },

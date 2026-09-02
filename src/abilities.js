@@ -814,17 +814,38 @@ export const ABILITIES = [
     run(world) {
       const s = world.shooter;
       const up = world.up;
+      /*
+       * ONE radius, read by the blast, the picture and the intake alike.
+       * They were three numbers: the blast scaled with SHOCKFRONT, the held
+       * ring was a literal 340 under a comment claiming it was the same line,
+       * and the intake was a flat 400. At two levels the blast reaches 574.6
+       * -- so the ring was drawn at 59% of the true edge, and everything in
+       * the 400-to-574 band was shoved outward and then not collected.
+       */
+      const R = 340 * up.pulseR;
       applyBlast(world, {
         x: s.x, y: s.y,
-        r: 340 * up.pulseR,
+        r: R,
         damage: 58,
         impulse: 1050 * up.pulsePush,
+        /*
+         * A THROW, not a hit that happens to push. This is the game's one
+         * answer to a body on the mount, and it was paying the stray-hit
+         * fade and the speed cap like a bolt: measured, an ordinary rate of
+         * fire took a BULWARK's separation from 6.38 units to 0.35, against
+         * the 6.4 it needs to be released -- so the turret firing disarmed
+         * the escape and the fuse kept closing through the press.
+         */
+        throwOff: true,
       });
       // ...and it draws the energy in. This is how the currency is collected:
       // objects drop it when they come apart, it drifts to the turret, and it
       // sits there until a PULSE takes it. INTAKE is the upgrade that stops
       // you having to ask.
-      drawIn(world, CFG.energy.pulse);
+      // ...never inside the blast. `CFG.energy.pulse` is authored a little
+      // wider than the stock 340, and that promise has to survive SHOCKFRONT
+      // or the widened blast flings energy out of the band that collects it.
+      drawIn(world, Math.max(CFG.energy.pulse, R));
       /*
        * Three rings on three clocks, not two on one.
        *
@@ -842,9 +863,8 @@ export const ABILITIES = [
        */
       ring(s.x, s.y, 20, 360, 0.42, '#59e0ff', 6);
       ring(s.x, s.y, 10, 220, 0.28, '#ffffff', 2.4);
-      // ...and the reach, held. 340 is the blast radius above, so the ring
-      // that stays is exactly the line the shove reached.
-      world.effects.push(new Shock(s.x, s.y, 340, '#59e0ff'));
+      // ...and the reach, held, at the radius the shove actually reached.
+      world.effects.push(new Shock(s.x, s.y, R, '#59e0ff'));
       ripple(s.x, s.y, 1.5, 800);
       shake(10);
       flash(0.18, '#bdf0ff');

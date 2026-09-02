@@ -1142,7 +1142,21 @@ export class Game {
     const w = this.world;
     w.mine = w.mine === kind ? null : kind;
     for (const k of MINE_KEYS) this.hud.setToggle(k, w.mine === k);
-    if (w.mine) this.mineTimer = 0.2;
+    /*
+     * The clock is NOT touched here, and that is the fix rather than an
+     * omission.
+     *
+     * It used to be `if (w.mine) this.mineTimer = 0.2` -- so picking a kind
+     * laid one two tenths of a second later, every time, whatever the cadence
+     * had left to run. Tapping through the six mine buttons put six mines on
+     * the field in about a second, and switching kinds mid-cooldown reset the
+     * wait to nothing. The cadence is CFG.mines.throwEvery for a reason and
+     * a control that skips it is not a choice of kind, it is a free mine.
+     *
+     * So the clock runs across a switch: whatever is selected when it comes
+     * up is what gets laid. Switching kinds still costs nothing, which is the
+     * point of the strip -- it just does not BUY anything either.
+     */
     this.announceToggle(kind, w.mine === kind);
   }
 

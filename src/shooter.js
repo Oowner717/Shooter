@@ -132,21 +132,31 @@ export class Front {
       const dy = e.y - this.y;
       const d = Math.hypot(dx, dy) || 1;
       /*
-       * Inside the birth radius is PULSE's business and never this one's.
+       * The mount is included, deliberately, from build 216.
        *
-       * Without this the edge test below reaches straight back inward: a
-       * LURCHER on the mount sits 7 units from the turret's centre with a
-       * radius of about 20, so `d - e.r` is NEGATIVE and every wave struck it
-       * on the frame it was born. Measured: 352 frames of contact with a body
-       * that the whole design says it must not be able to touch. The front
-       * only ever travels outward -- so must the test.
+       * Build 215 skipped anything inside the birth radius on the grounds
+       * that the glitch timer is the only involuntary way down and its answer
+       * -- shoving the thing off -- had to stay the player's decision. That
+       * was overruled: negating the glitch threat with what you have bought
+       * is a legitimate thing for the tree to sell, and the upgrade system's
+       * unspoken direction is toward a machine that increasingly looks after
+       * itself. So PILE clears the mount too, and PULSE stops being the only
+       * answer to a body on the turret -- it is still the only one you can
+       * ask for on the frame you need it.
+       *
+       * The front is still an annulus and still only travels outward; what
+       * changed is that a body whose EDGE the front has reached counts, and a
+       * body sitting on the machine has its edge inside `r0` from the first
+       * frame. Nothing else about the geometry moved.
        */
-      if (d < this.r0) continue;
       // The front has reached it, and had not on the frame before. The body's
       // own radius counts: a BULWARK is met when its edge is met.
       if (d - e.r > rr) continue;
       this.hit.add(e);
       this.cut++;
+      // Clamped at BOTH ends: a body on the mount is at `d < r0`, so the raw
+      // fraction goes above 1 and would hand it more impulse than the wave
+      // has. It gets the full share, not more than the full share.
       const f = 1 - Math.min(1, Math.max(0, (d - this.r0) / (span || 1)));
       const nx = dx / d;
       const ny = dy / d;

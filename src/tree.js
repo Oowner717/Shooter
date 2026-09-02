@@ -78,7 +78,7 @@ const UNDER = {
   knell: ['fourthbell'],
   thorn: [],
   lode: ['repulsor'],
-  spall: ['buckshot'],
+  spall: ['buckshot', 'splinter'],
   void: ['eventhorizon'],
 
   // ---- the way in ----

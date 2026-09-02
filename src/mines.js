@@ -258,6 +258,17 @@ function spall(world, m) {
   m.dead = true;
   const base = -Math.PI / 2;
   const n = Math.round(P.pellets * world.up.spallPellets);
+  /*
+   * SPLINTER: each pellet goes off where it lands.
+   *
+   * `up.spallBurst` is a MULTIPLIER on the radius, so a fan with the node
+   * unowned bursts at the authored 26 and the node widens it -- rather than
+   * a level count that has to be turned into a radius at the one site that
+   * reads it. The damage is not scaled by it: what SPLINTER sells is reach.
+   */
+  const B = P.burst;
+  const br = B.r * world.up.spallBurst;
+  const bd = B.damage * world.up.mineDamage;
   for (let i = 0; i < n; i++) {
     const off = ((i / Math.max(1, n - 1)) - 0.5) * P.spread + spread(0.03);
     fire(world, m.x, m.y - 4, base + off, {
@@ -269,6 +280,15 @@ function spall(world, m) {
       life: 0.85,
       color: '#ffd9a0',
       trail: 0.03,
+      /*
+       * Fourteen of these go off in one fan, so each one is deliberately
+       * quiet: no ring, no shake, no sound of its own. The sum of them is
+       * the effect, and one loud pellet would be fourteen loud things.
+       */
+      burst: (w, x, y) => {
+        applyBlast(w, { x, y, r: br, damage: bd, impulse: B.impulse });
+        ring(x, y, br * 0.3, br, 0.16, '#ffd9a0', 1.4);
+      },
     });
   }
   ring(m.x, m.y, m.r, 150, 0.3, '#ffd166', 3);

@@ -65,7 +65,8 @@ export function freshUpgrades() {
     mineDamage: 1, // and how hard both of them land
     mineHold: 1, // seconds a snare keeps what it caught
     mineTolls: 0, // extra rings on a knell
-    spallPellets: 1, // how much a spall throws
+    spallPellets: 1, // how much a spall throws...
+    spallBurst: 1, // ...and how wide each pellet goes off where it lands
     lodeReach: 1, // how far a lode pushes, and how hard
     lodePush: 1,
     wireDamage: 1, // per second of contact on a wire
@@ -146,6 +147,12 @@ const MARK = {
   // A mark worth more.
   levy: g('<path d="M12 3.4 19.4 8v8L12 20.6 4.6 16V8z"/><path d="M12 7.6v8.8M9.6 9.8h4.8M9.6 14.2h4.8"/><path d="M16.6 4.4h4M18.6 2.4v4" opacity=".8"/>'),
   // More thrown, one way.
+  // A pellet, and the ground it takes with it.
+  splinter: g('<path d="M12 3.4v6.2"/><path d="M9.6 9.6 12 12l2.4-2.4"/>'
+    + '<circle cx="12" cy="13.4" r="1.7" fill="currentColor" stroke="none"/>'
+    + '<path d="M6.4 15.6a8 8 0 0 0 11.2 0" opacity=".85"/>'
+    + '<path d="M3.4 18.6a12.4 12.4 0 0 0 17.2 0" opacity=".5"/>'
+    + '<path d="M5.6 8.2 3.4 6M18.4 8.2 20.6 6" opacity=".6"/>'),
   buckshot: g('<path d="M4.6 20h14.8"/><path d="M12 16V9M8 16 6 9.6M16 16l2-6.4M4.6 15 3 10M19.4 15 21 10" opacity=".95"/><circle cx="12" cy="6.4" r="1.6" fill="currentColor" stroke="none"/>'),
   // The wave off the mount, wider and harder. Three fronts, the outer two
   // opening: PULSE is the only thing that answers something already on you,
@@ -413,6 +420,9 @@ export const UPGRADES = {
       line: '+1 patch of burning ground at once.',
       apply: bump('patchCap', 1), icon: MARK.secondgrowth },
     { id: 'buckshot', name: 'BUCKSHOT', line: '+60% spall pellets.', apply: scale('spallPellets', 1.6) , icon: MARK.buckshot },
+    { id: 'splinter', name: 'SPLINTER', levels: 2,
+      line: '+55% spall pellet blast radius.',
+      apply: scale('spallBurst', 1.55), icon: MARK.splinter },
     { id: 'repulsor', name: 'REPULSOR', line: '+40% lode reach and push.', apply: (u) => { u.lodeReach *= 1.4; u.lodePush *= 1.4; } , icon: MARK.repulsor },
     { id: 'intake', name: 'INTAKE', levels: 1,
       line: 'Energy is taken in on contact, no PULSE needed. Louvres cut through the skirt.',

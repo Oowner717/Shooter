@@ -1029,7 +1029,12 @@ export class Enemy {
    *   hit landed. A blast has no lever arm by construction -- it pushes
    *   through the centre -- so everything else leaves this at 0.
    */
-  applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0, shred = 0, lever = 0) {
+  /**
+   * @param throwOff a deliberate shove rather than a hit that happens to
+   *   push. It skips the diminishing-returns fade and lifts the body's speed
+   *   cap for a moment -- see the note at the fade below.
+   */
+  applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0, shred = 0, lever = 0, throwOff = false) {
     if (this.dead) return;
     /*
      * An energy mote cannot be hurt. It is not wreckage to be broken up a
@@ -1072,9 +1077,31 @@ export class Enemy {
     this.hp -= real;
     this.flash = Math.min(1, this.flash + 0.5 + real / 260);
     if (impulse) {
-      // Diminishing returns on a stream of hits — see shoveFade().
-      const fade = 1 / (1 + (this.kicked || 0));
-      this.kicked = (this.kicked || 0) + fade;
+      /*
+       * Diminishing returns on a stream of hits — see shoveFade(). A
+       * deliberate THROW does not pay it, and does not pay the speed cap
+       * either.
+       *
+       * PULSE paid both, and it is the game's one escape from a body on the
+       * mount. Measured on a BULWARK, which needs 6.4 units of separation to
+       * be released: quiet, a PULSE moves it 6.38 -- it fails by two
+       * hundredths. Under ordinary fire `kicked` settles at 4.25, the fade is
+       * 0.19, and the same PULSE moves it 0.35 units. So the turret shooting
+       * disarmed the only answer to the glitch timer, and `world.attackers`
+       * never emptied, so `Director.held` never reset and the fuse kept
+       * closing through the press.
+       *
+       * The cap is the other half: `physics.integrate` clamps to `cruise * 6`
+       * unless `thrown` is set, and applyBlast never set it -- so PULSE was
+       * clipped on 8 of the 14 field types (a MOTE took 24% of its rated
+       * shove) and SHOCKFRONT's +30% bought those eight exactly nothing.
+       *
+       * Opt-in, so a mine or an HE burst is unchanged: only a caller that
+       * says it is throwing gets it.
+       */
+      const fade = throwOff ? 1 : 1 / (1 + (this.kicked || 0));
+      if (!throwOff) this.kicked = (this.kicked || 0) + fade;
+      if (throwOff) this.thrown = Math.max(this.thrown || 0, CFG.pile.thrown);
       const push = impulse * this.invMass * fade;
       /*
        * The linear part is UNCHANGED, and deliberately so: an impulse applied
@@ -3003,7 +3030,24 @@ export function drawIn(world, radius) {
 /** One mote taken in. */
 export function absorb(world, e, streak = false) {
   if (e.dead || !e.energy) return;
-  bank(world, e.energy, e.x, e.y);
+  /*
+   * WITH the mark, the way `Enemy.destroy` pays it (`this.energy *
+   * this.bounty`). This is the only collector PULSE's drawIn and INTAKE go
+   * through, and it banked the raw energy -- so taking a mote in paid the
+   * authored number while shooting the same mote paid the tier's compounding
+   * 1.10^(tier-1) on top of it, plus OVERCLOCK's double and whatever TITHE
+   * had marked it for.
+   *
+   * Measured, fourteen motes off a BULWARK, PULSE against destroying them:
+   * tier 1 113/113, tier 6 119/191, tier 12 125/358, tier 20 134/822. The
+   * ratios are 1/1.10^(tier-1) to three places, which is the whole of the
+   * bug. An ability whose one line is "takes in the energy" paid 16% of what
+   * the floor was worth by tier 20, and buying INTAKE lowered your income.
+   *
+   * The mark is put on the mote deliberately at the site that makes it (see
+   * the note there); nothing was reading it back.
+   */
+  bank(world, e.energy * (e.bounty || 1), e.x, e.y);
   // Drawn in from a distance rather than walked into: show it arriving, or
   // a PULSE that empties the floor is a number in the corner going up.
   if (streak) {
@@ -4395,7 +4439,8 @@ export function applyBlast(world, blast) {
           e.hitGraft(g, damage * (0.35 + gf * 0.65), gx, gy);
         }
       }
-      e.applyDamage(world, damage * (0.35 + falloff * 0.65), nx, ny, impulse * falloff);
+      e.applyDamage(world, damage * (0.35 + falloff * 0.65), nx, ny, impulse * falloff,
+        0, 0, !!blast.throwOff);
     }
   };
   hit(world.enemies);
