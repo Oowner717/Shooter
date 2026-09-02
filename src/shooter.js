@@ -225,6 +225,87 @@ export class Front {
   }
 }
 
+/**
+ * SLIVER. A SPINE comes apart on the way through the first thing it hits.
+ *
+ * An arc of fragments out the far side rather than one dart carrying on, each
+ * still piercing -- so a single body becomes a spray, and a body with
+ * anything behind it becomes several. The second level lets a fragment come
+ * apart in turn, which is where the three become nine.
+ *
+ * `p.splits` is the budget and it is spent HERE rather than counted down in
+ * the projectile, because a fragment is a new round: it is handed one less
+ * than its parent had, and a round with none simply carries on the way SPINE
+ * always did. That is what stops the levels multiplying without a ceiling.
+ *
+ * The fragments take their damage from what the parent had LEFT, not from the
+ * round's authored damage -- a SPINE that has already been through two bodies
+ * is weaker, and what comes off it has to be weaker too, or piercing deep
+ * would be a way of making the round stronger.
+ */
+function sliverOn(world, e, x, y, p) {
+  if (!p || p.splits <= 0) return;
+  /*
+   * SPENT HERE, on the round that is coming apart.
+   *
+   * A SPINE pierces three bodies as standard, and without this the parent
+   * split again at every one of them -- measured, one trigger pull into two
+   * pinned bodies made 13 projectiles at one level and 73 at two, against a
+   * ceiling of 13. That is not "an arc out of the first target", it is a
+   * cascade with the damage floor as its only bound.
+   *
+   * One round, one coming-apart. The budget passes DOWN to the fragments, so
+   * the second level is three becoming nine and stops there -- which is why
+   * it is READ before it is spent. Zeroing first and then handing out
+   * `p.splits - 1` gives every fragment -1, and the second level bought
+   * nothing at all: measured, four projectiles at one level and four at two.
+   */
+  const left = p.splits;
+  p.splits = 0;
+  const g = CFG.rounds.spine;
+  const S = g.sliver;
+  const sp = Math.hypot(p.vx, p.vy) || 1;
+  const base = Math.atan2(p.vy, p.vx);
+  const dmg = p.damage * S.damage;
+  // Nothing worth drawing: a fragment of a fragment of a fragment is a
+  // rounding error, and the field does not need the projectiles.
+  if (dmg < 1) return;
+  for (let i = 0; i < S.n; i++) {
+    const off = S.n === 1 ? 0 : ((i / (S.n - 1)) - 0.5) * S.spread;
+    fire(world, x, y, base + off, {
+      speed: sp * S.speed,
+      r: 2.6,
+      damage: dmg,
+      impulse: 14,
+      bounces: 0,
+      color: '#ffc2ec',
+      core: '#ffffff',
+      trail: 0.05,
+      form: 'dart',
+      pierce: S.pierce + world.up.pierce,
+      pierceFade: world.up.spineFade || g.fade,
+      shred: world.up.spineShred,
+      // One less than its parent had, so the second level is nine fragments
+      // and not a cascade without an end.
+      splits: left - 1,
+      onHit: sliverOn,
+      /*
+       * It must not split on the body it was BORN in. `fire` puts it at the
+       * contact point, inside the thing the parent was passing through, so
+       * without this every fragment would immediately hit that same body and
+       * come apart again on the frame it appeared.
+       */
+      ignore: e,
+    });
+  }
+  // The moment it comes apart, drawn where it happened.
+  ring(x, y, 3, 26, 0.2, '#ffc2ec', 1.6);
+  for (let i = 0; i < 4; i++) {
+    const a2 = base + spread(S.spread);
+    spark(x, y, Math.cos(a2) * rand(120, 260), Math.sin(a2) * rand(120, 260), '#ffd9f2', 0.18, 1.8);
+  }
+}
+
 export function gunScale(world) {
   const up = world.up;
   const out = up.damage
@@ -506,6 +587,8 @@ export class Shooter {
             pierce: g.pierce + up.pierce,
             pierceFade: up.spineFade || g.fade,
             shred: up.spineShred,
+            splits: up.spineSplit,
+            onHit: sliverOn,
           });
         }
       }

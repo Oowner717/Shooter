@@ -66,15 +66,30 @@ class Projectile {
     this.shred = opts.shred ?? 0;
     // Rounds that leave a mark on what they hit rather than only hurting it.
     this.onHit = opts.onHit || null;
+    /*
+     * SLIVER: how many more times this round may come apart on the way
+     * through something. Declared here rather than sprung into existence at
+     * the site that writes it, so a fragment can never inherit one from a
+     * recycled projectile -- the same reason `placed` and `fizzle` are
+     * declared where they are.
+     */
+    this.splits = opts.splits ?? 0;
     this.dead = false;
-    this.ignore = null;
+    /*
+     * A body this round may not hit. Normally set by a pierce or a bounce on
+     * the way past, so it cannot hit the same thing twice -- and settable at
+     * birth for a SLIVER fragment, which is created INSIDE the body its
+     * parent was passing through and would otherwise come apart again on the
+     * frame it appeared.
+     */
+    this.ignore = opts.ignore || null;
     /*
      * Set by a bounce to say "I have already put this round where it belongs".
      * Declared here rather than sprung into existence at the two sites that
      * write it, so a recycled projectile can never inherit one.
      */
     this.placed = false; // body we just reflected off
-    this.ignoreT = 0;
+    this.ignoreT = opts.ignore ? 0.06 : 0;
   }
 }
 
@@ -420,7 +435,10 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         for (let i = 0; i < 4; i++) spark(c.x, c.y, spread(220), spread(220), '#e0aaff', 0.22, 2.2);
         return;
       }
-      if (p.onHit) p.onHit(world, e, c.x, c.y);
+      // The round itself goes to the hook as well as the body it hit: SLIVER
+      // needs to know which way this one was travelling, how much damage it
+      // had left, and how many more times it may come apart.
+      if (p.onHit) p.onHit(world, e, c.x, c.y, p);
       if (p.chain) chainFrom(world, e, c.x, c.y, p.jumps);
       audio.hit();
       // A piercing round carries on out the other side, weaker, ignoring what

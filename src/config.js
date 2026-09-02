@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '217';
+export const BUILD = '218';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '217';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a5b923f';
+export const REV = '06c2c33';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -688,9 +688,60 @@ export const CFG = {
     spine: {
       rate: 1.45,
       speed: 1560,
-      damage: 20,
+      /*
+       * 34 from build 218, up from 20.
+       *
+       * Measured against the rack on a single target: SPINE was 48.2 damage a
+       * second where BOLT is 90.9, SCATTER 135.3 and HE 98.2 -- the weakest
+       * thing in the game that is not a utility round, and the reason it was
+       * never worth loading late. Its whole worth was in a column, and a
+       * column is something the field gives you rather than something you can
+       * ask for.
+       *
+       * At 34 it is 82 a second on one body, just under BOLT -- so it is a
+       * round you would carry, and everything it does through a line of
+       * bodies is on top of that rather than instead of it.
+       */
+      damage: 34,
       pierce: 3, // bodies it goes through after the first
       fade: 0.78, // and what it keeps of its damage each time
+      /*
+       * ---- SLIVER: what the round does to the first thing it hits ----
+       *
+       * Unbought, a SPINE goes through a body and carries on as one dart.
+       * With SLIVER it comes apart on the way through: an arc of fragments
+       * out the far side, each one still piercing, so a single body becomes a
+       * spray and a body with anything behind it becomes several.
+       *
+       * `depth` is how many times a fragment may itself come apart, and it is
+       * what the second level buys -- three slivers becoming nine, which is
+       * why the numbers below are as small as they are. `damage` is a
+       * fraction of what the round had left AT THE MOMENT IT SPLIT, so a
+       * fragment of a fragment is weak by construction and the total cannot
+       * run away with the levels.
+       */
+      sliver: {
+        n: 3,
+        /*
+         * 0.85 rather than 0.62. Measured against a column the two are within
+         * a few points of each other -- the fragments have depth to travel
+         * into either way -- but 0.62 is a 35-degree fan and reads as one
+         * dart fraying rather than as an arc. At 49 degrees it is visibly a
+         * spray, and it reaches bodies a little off the line the parent was
+         * on, which is the shape a real field actually presents.
+         */
+        spread: 0.85, // radians the arc covers, centred on the travel
+        /*
+         * 0.7, not 0.5. At a half, and with a round bounded to ONE
+         * coming-apart, two levels of SLIVER were worth 1.32x and 1.47x
+         * through a column -- a node you would not buy. At 0.7 the arc is
+         * genuinely three quarters of a fresh dart each, which is what makes
+         * the first level a decision and the second worth compounding.
+         */
+        damage: 0.7, // of what the round had left when it came apart
+        speed: 0.82,
+        pierce: 1, // ...and what a fragment carries on through, before `pierce`
+      },
       /*
        * ---- DOUBLE TAP lives here from build 209 ----
        *

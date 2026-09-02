@@ -58,7 +58,7 @@ const UNDER = {
   explosive: ['overpressure', 'cluster'],
   shotgun: ['doubleo', 'longshot'],
   arc: ['fifthlink', 'superconductor', 'longlead'],
-  spine: ['throughandthrough', 'annealed', 'railed', 'doubletap'],
+  spine: ['throughandthrough', 'sliver', 'annealed', 'railed', 'doubletap'],
   slug: ['sledge'],
   rime: ['deepfreeze'],
   // BLOOM OUT widens every burning patch, which is SPORE's and THORN's alike.

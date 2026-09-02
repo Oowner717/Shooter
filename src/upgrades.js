@@ -41,6 +41,7 @@ export function freshUpgrades() {
     pierce: 0, // extra bodies a SPINE carries on through
     spineFade: 0, // set, not scaled: what it keeps per body when ANNEALED is in
     spineShred: 0, // fraction of a body's armour a SPINE ignores
+    spineSplit: 0, // SLIVER: how many times a spine may come apart on the way through
     slug: 1, // how hard a SLUG shoves
     chill: 1, // how long RIME drags something down for
     patchR: 1, // how wide a SPORE patch burns...
@@ -150,6 +151,10 @@ const MARK = {
   deepmag: g('<ellipse cx="12" cy="7" rx="7.5" ry="2.8"/><path d="M4.5 7v5c0 1.6 3.4 2.8 7.5 2.8s7.5-1.2 7.5-2.8V7"/><path d="M4.5 12v5c0 1.6 3.4 2.8 7.5 2.8s7.5-1.2 7.5-2.8v-5"/>'),
   quicklay: g('<circle cx="15" cy="14" r="5"/><path d="M2 8h7M2 12h5M2 16h4" opacity=".7"/>'),
   // --- build 51: the ten new types ---
+  // A dart coming apart into an arc of smaller ones.
+  sliver: g('<path d="M2.6 12h6.2"/><circle cx="10.4" cy="12" r="1.7" fill="currentColor" stroke="none"/>'
+    + '<path d="m11.8 11 7.4-3.6M12 12h7.6M11.8 13l7.4 3.6"/>'
+    + '<path d="M17.8 5.6 21.4 7.4l-3.2 2.2M18.4 14.2l3 2.2-3.6 1.8" fill="currentColor" stroke="none" opacity=".85"/>'),
   // One more body to go through.
   throughandthrough: g('<path d="M2.5 12h19"/><circle cx="8" cy="12" r="2.4"/><circle cx="15" cy="12" r="2.4"/><path d="M19 9.6 21.6 12 19 14.4" fill="currentColor" stroke="none"/>'),
   // A shove with more behind it.
@@ -387,6 +392,16 @@ export const UPGRADES = {
     { id: 'longlead', name: 'LONG LEAD', levels: 1,
       line: '+60% ARC jump range. It works on a spread field, not only a packed one.',
       apply: scale('arcRange', 1.6), icon: MARK.longlead },
+    /*
+     * Two levels, and the second is worth more than the first because it is
+     * multiplicative: three fragments become nine. Named SLIVER rather than
+     * SPLINTER, which is SPALL's node from build 216 -- ids have to be unique
+     * and two upgrades called the same thing in one tree would be worse than
+     * a clash the build check would have caught anyway.
+     */
+    { id: 'sliver', name: 'SLIVER', levels: 2,
+      line: 'A spine comes apart into an arc of fragments through the first body it hits.',
+      apply: bump('spineSplit', 1), icon: MARK.sliver },
     { id: 'annealed', name: 'ANNEALED', levels: 1,
       line: 'A SPINE keeps 92% of its damage per body instead of 78%.',
       apply: set('spineFade', 0.92), icon: MARK.annealed },
@@ -507,7 +522,14 @@ export const UPGRADES = {
     { id: 'pile', name: 'PILE', levels: 3,
       line: 'A wave through the floor every 8s: what is closing gets thrown back. A weight in the deck.',
       apply: bump('pile', 1), icon: MARK.pile },
-    { id: 'casing', name: 'SPINES', line: 'Objects touching you take 40 damage a second. Armour plates round the deck.', apply: bump('casing', 40) , icon: MARK.casing },
+    /*
+     * 40 a level to 70 in build 218. At 120 a second fully bought it took 4.2
+     * seconds to kill a tier-20 body standing on the turret, against a fuse
+     * that runs out in fourteen -- so three levels of it bought about a third
+     * of an answer to the one thing it is for. At 210 that is 2.4 seconds,
+     * which is a plate stack that actually holds the mount.
+     */
+    { id: 'casing', name: 'SPINES', line: 'Objects touching you take 70 damage a second. Armour plates round the deck.', apply: bump('casing', 70) , icon: MARK.casing },
     { id: 'insulation', name: 'SHROUD', line: 'Corruption costs half as much energy. A mantlet closing round the breech.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
     /*
      * Two steps, and the only thing in the branch that changes what auto aim

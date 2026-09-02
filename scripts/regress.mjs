@@ -464,7 +464,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 139 since build 217: COUNTERSPIN's one level went with SPIRAL, WARD's
+    // 141 since build 218, when SLIVER went in at two levels. It was
+    // 139 from build 217: COUNTERSPIN's one level went with SPIRAL, WARD's
     // three nodes brought five (STANDOFF 2, EDGED 2, FORK 1), and BUCKSHOT
     // lost one -- it had no `levels` and the tree was selling it three times.
     // It was
@@ -481,7 +482,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 139
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 141
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -12660,6 +12661,163 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.low.drops} motes, ${r.high.gained} at tier 20 from ${r.high.drops} `
     + `(x${(r.high.gained / Math.max(1, r.low.gained)).toFixed(1)}, and the `
     + `tier's own compounding over 19 rungs is x${(1.1 ** 19).toFixed(1)})`);
+}
+
+// --- SPINE is worth loading, and SLIVER is what it does to a line -----------
+/*
+ * SPINE was the weakest thing in the rack that is not a utility round.
+ * Measured on a single target against the others: 48.2 damage a second, where
+ * BOLT is 90.9, HE 98.2 and SCATTER 135.3. Its whole worth was in a column,
+ * and a column is something the field gives you rather than something you can
+ * ask for -- so there was no reason to carry it late.
+ *
+ * 34 a dart from build 218, which is 82 a second on one body, and SLIVER is
+ * what the column is worth on top of that.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { NODES } = await import('../src/tree.js');
+    const { BY_ID, freshUpgrades } = await import('../src/upgrades.js');
+    const g = window.__sim;
+    const w = g.world;
+    const s = w.shooter;
+    const S = CFG.rounds.spine;
+    const base = CFG.shooter.gripFireInterval;
+    const out = { sliverN: S.sliver.n };
+
+    // ---- where it sits in the rack now -----------------------------------
+    const dps = (k, d) => d / (base * CFG.rounds[k].rate);
+    out.spine = +dps('spine', S.damage).toFixed(1);
+    out.bolt = +(CFG.bolt.damage / (base * CFG.rounds.standard.rate)).toFixed(1);
+
+    const def = BY_ID.get('sliver');
+    out.placed = NODES.some((n) => n.id === 'sliver');
+    out.levels = def ? def.levels : null;
+    // Two upgrades called the same thing would be worse than the clash
+    // check-build would have caught: SPLINTER is SPALL's, from build 216.
+    out.splinterStillSpall = NODES.some((n) => n.id === 'splinter');
+
+    /*
+     * ---- what one dart makes, counted at projectiles.push ----------------
+     *
+     * A dart is fired straight up into a pinned body and every projectile the
+     * frame produces is counted, which is the only place a round actually
+     * becomes one. Counting damage instead would be counting the body's
+     * armour and the pierce ladder as well.
+     */
+    const fragments = (levels) => {
+      g.debugClearField();
+      g.restart();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
+      w.up = freshUpgrades();
+      for (let i = 0; i < levels; i++) def.apply(w.up, w);
+      w.projectiles.length = 0;
+      w.round = 'spine';
+      /*
+       * A COLUMN, not a pair. The first body is what the round comes apart
+       * in; the rest are what the fragments have to travel into, and the
+       * second level is only visible if a fragment finds something of its
+       * own to come apart in. Two bodies 60 units apart overlap at a
+       * BULWARK's 45-unit radius, and the fan diverges past them -- so the
+       * case read 4 at both levels, which is the answer a build where the
+       * second level did nothing would give.
+       */
+      const held = [];
+      for (const at of [190, 300, 410, 520]) {
+        const e = g.debugSpawn('bulwark', s.x, s.y - at);
+        if (!e) continue;
+        e.staged = false; e.spawnIn = 0; e.hp = 1e7; e.maxHp = 1e7; e.invMass = 0;
+        held.push({ e, at });
+      }
+      s.aim = -Math.PI / 2; s.targetAim = s.aim;
+      let made = 0;
+      const push = w.projectiles.push.bind(w.projectiles);
+      w.projectiles.push = (...ps) => { made += ps.length; return push(...ps); };
+      s.cooldown = 0;
+      s.shoot(w);
+      for (let f = 0; f < 40; f++) {
+        for (const h of held) { h.e.x = s.x; h.e.y = s.y - h.at; h.e.vx = 0; h.e.vy = 0; }
+        g.update(1 / 60);
+      }
+      w.projectiles.push = push;
+      return made;
+    };
+    out.none = fragments(0);
+    out.one = fragments(1);
+    out.two = fragments(2);
+
+    /*
+     * ---- a fragment must not come apart in the body it was born in -------
+     *
+     * `fire` puts it at the contact point, which is INSIDE the thing its
+     * parent was passing through. Without an `ignore` on it every fragment
+     * would hit that same body on the frame it appeared and split again --
+     * a cascade off one dart, bounded only by the damage floor.
+     */
+    g.debugClearField();
+    g.restart();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    w.up = freshUpgrades();
+    def.apply(w.up, w); def.apply(w.up, w);
+    w.projectiles.length = 0;
+    w.round = 'spine';
+    const lone = g.debugSpawn('bulwark', s.x, s.y - 200);
+    lone.staged = false; lone.spawnIn = 0; lone.hp = 1e7; lone.maxHp = 1e7; lone.invMass = 0;
+    s.aim = -Math.PI / 2; s.targetAim = s.aim;
+    let peak = 0;
+    s.cooldown = 0;
+    s.shoot(w);
+    for (let f = 0; f < 60; f++) {
+      lone.x = s.x; lone.y = s.y - 200; lone.vx = 0; lone.vy = 0;
+      g.update(1 / 60);
+      peak = Math.max(peak, w.projectiles.length);
+    }
+    out.loneePeak = peak;
+
+    g.debugClearField();
+    w.spawnLock = 0;
+    w.up = freshUpgrades();
+    w.round = 'standard';
+    g.restart();
+    return out;
+  });
+
+  check('SPINE is worth carrying against one body, not only against a line',
+    r.spine > r.bolt * 0.8 && r.spine < r.bolt * 1.1,
+    `${r.spine} damage a second on a single target against BOLT's ${r.bolt} `
+    + `(it was 48.2, the weakest thing in the rack that is not a utility round)`);
+
+  check('SLIVER is in the tree at two levels, beside SPALL-s own SPLINTER',
+    r.placed && r.levels === 2 && r.splinterStillSpall,
+    `sliver placed ${r.placed} at ${r.levels} levels; splinter still there `
+    + `${r.splinterStillSpall}`);
+
+  /*
+   * One dart unbought, one dart plus its arc bought, and the arc's own arcs
+   * at the second level. Counted rather than inferred: the second level is
+   * multiplicative, so an off-by-one in the budget is the difference between
+   * nine fragments and a cascade.
+   */
+  check('...and a spine comes apart into an arc, and its arc comes apart again',
+    r.none === 1 && r.one === 1 + r.sliverN
+    && r.two > r.one && r.two <= 1 + r.sliverN + r.sliverN * r.sliverN,
+    `one trigger pull into a body made ${r.none} projectile unbought, `
+    + `${r.one} at one level and ${r.two} at two (the ceiling is `
+    + `${1 + r.sliverN + r.sliverN * r.sliverN})`);
+
+  /*
+   * The cascade this guards against is not hypothetical: a fragment is
+   * created at the contact point, INSIDE the body its parent was going
+   * through, so without an ignore it hits that body on the frame it appears.
+   */
+  check('...and a fragment does not come apart in the body it was born in',
+    r.loneePeak <= 1 + r.sliverN + r.sliverN * r.sliverN,
+    `a single body took one dart and at most ${r.loneePeak} projectiles were `
+    + `ever on the field at once`);
 }
 
 // --- report -----------------------------------------------------------------
