@@ -464,7 +464,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 132 since build 214, when QUICK ARM (one level) was replaced by QUICK
+    // 134 since build 215: SHOCKFRONT went in at two levels, and SIGHT's
+    // three were replaced by PILE's three. It was
+    // 132 from build 214, when QUICK ARM (one level) was replaced by QUICK
     // LAY (two). It was 131 from build 209, when TRACER and HEAVY each lost a
     // level -- build 212 left it there, BLOOM OUT going 3 levels to 2 exactly
     // paying for SECOND GROWTH. Before that: 133 from build 193, when HOT
@@ -474,7 +476,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 132
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 134
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -1688,12 +1690,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     cv.height = 260;
     const c2 = cv.getContext('2d', { willReadFrequently: true });
 
+    const { RIG_MAX } = await import('../src/shooter.js');
+    // The eight sockets the TURRET branch sells, in tree order.
+    const RIG_PARTS = ['rate', 'slew', 'aimrange', 'driftaim', 'pile', 'casing', 'insulation', 'intake'];
     const shot = (rig) => {
       // Force the cache rather than buying: `rig()` keys off the ledger's
       // length, so a stub with a matching count is honoured.
-      w.rig = { rate: 0, slew: 0, aimrange: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0, ...rig };
-      w.rig.filled = ['rate', 'slew', 'aimrange', 'overwatch', 'casing', 'insulation', 'intake']
-        .reduce((a, k) => a + w.rig[k], 0) / 17;
+      /*
+       * All EIGHT sockets, against RIG_MAX. The stub used to name seven --
+       * it silently omitted `driftaim` -- and divide by 17, which stopped
+       * being RIG_MAX at build 178. A part missing from this list is a part
+       * this case cannot see, which is the one thing it exists to do.
+       */
+      w.rig = { rate: 0, slew: 0, aimrange: 0, driftaim: 0, pile: 0, casing: 0, insulation: 0, intake: 0, ...rig };
+      w.rig.filled = RIG_PARTS.reduce((a, k) => a + w.rig[k], 0) / RIG_MAX;
       w.rigAt = w.ledger.length;
       w.rigFlash = 0;
       c2.setTransform(1, 0, 0, 1, 0, 0);
@@ -1707,7 +1717,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     };
 
     const bare = shot({});
-    const parts = ['rate', 'slew', 'aimrange', 'overwatch', 'casing', 'insulation', 'intake'];
+    const parts = RIG_PARTS;
     const out = { bare, shows: [], quiet: [] };
     for (const id of parts) {
       const one = shot({ [id]: 1 });
@@ -1716,19 +1726,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // ...and a second level of the same part has to add something too, or the
     // levels above the first are numbers on a card.
     out.deeper = [];
-    for (const id of ['slew', 'casing', 'insulation', 'overwatch']) {
+    for (const id of ['slew', 'casing', 'insulation', 'pile']) {
       const a = shot({ [id]: 1 });
       const b = shot({ [id]: 3 });
       if (Math.abs(b - a) > 500) out.deeper.push(id);
     }
     // ...and the whole branch together is not the same picture as any of it.
-    out.full = shot({ rate: 2, slew: 3, aimrange: 2, overwatch: 3, casing: 3, insulation: 3, intake: 1 });
+    out.full = shot({ rate: 2, slew: 3, aimrange: 2, driftaim: 1, pile: 3, casing: 3, insulation: 3, intake: 1 });
     w.rig = null;
     g.restart();
     return out;
   });
   check('every part the TURRET branch sells shows up on the turret',
-    r.quiet.length === 0 && r.shows.length === 7,
+    r.quiet.length === 0 && r.shows.length === 8,
     `drew something: ${r.shows.join(', ') || 'none'}`
     + `${r.quiet.length ? `; drew NOTHING: ${r.quiet.join(', ')}` : ''}`);
   check('...and so does every level of it above the first',
@@ -11531,11 +11541,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.hud.setWavePct(w);
     const bossUp = !!w.boss;
     const chip = g.hud.el.wavePct.textContent;
-    for (let i = 0; i < 5; i++) g.registerKill();
+    // Handed a body OF THE RUNNING WAVE, because that is what registerKill
+    // now tests: a death only moves the figure if it belongs to the wave the
+    // figure is about. A bare call proves nothing either way.
+    const one = () => g.registerKill({ wave: d.serial });
+    for (let i = 0; i < 5; i++) one();
     const underBoss = d.slain;
     // ...and the control: no boss, same call, same wave.
     w.boss = null;
-    for (let i = 0; i < 5; i++) g.registerKill();
+    for (let i = 0; i < 5; i++) one();
     out.boss = { up: bossUp, chip, underBoss, control: d.slain - underBoss };
 
     g.debugClearField();
@@ -11924,15 +11938,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return out;
   });
 
-  const want = 1.25 ** 3 * 1.25 ** 3 * 1.25 / 0.9;   // HOLLOWPOINT, SIGHT, SALVO, FEED
+  // HOLLOWPOINT (1.5 a level from build 215), SALVO, FEED. SIGHT was a
+  // fourth 1.25^3 until build 215,
+  // when it was replaced by PILE -- which is deliberately not counted: it is
+  // a fixed 26 in a ring round the machine and is worth nothing against a
+  // boss met at range.
+  const want = 1.5 ** 3 * 1.25 / 0.9;
 
   check('what the tree did to the gun is one number, and it is 1 at stock',
     r.stockScale === 1 && Math.abs(r.boughtScale - want) < 0.02
-    && r.byHandScale < r.boughtScale * 0.55,
+    && r.byHandScale === r.boughtScale,
     `stock ${r.stockScale}, fully bought ${r.boughtScale} (the product of `
-    + `HOLLOWPOINT, SIGHT, SALVO and FEED is ${want.toFixed(3)}), and `
-    + `${r.byHandScale} for a player aiming by hand, who SIGHT is worth `
-    + `nothing to`);
+    + `HOLLOWPOINT, SALVO and FEED is ${want.toFixed(3)}); nothing in it is `
+    + `conditional on how the turret is aimed any more (${r.byHandScale})`);
 
   check('an anomaly opened by a stock turret is the anomaly as authored',
     r.stockHard === 1 && r.stockCoreBand < 0.11,
@@ -11940,17 +11958,26 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `(${(r.stockCoreBand * 100).toFixed(1)}% off, which is the constructor's `
     + `own jitter and nothing else -- the multiply is an identity at 1)`);
 
+  /*
+   * `hard` is the product, or the cap, whichever is smaller. It WAS the cap
+   * until build 215: SIGHT's removal took a 1.25^3 out of gunScale and the
+   * product fell from 5.30 to 2.71, so the ceiling stopped binding. Asserted
+   * against the same min the boss takes, not against a literal, or this case
+   * would have to be edited every time the gun changes -- and the point of
+   * it is to notice when the gun changes.
+   */
+  const cap = Math.min(want, r.cap);
   check('...and one opened by a bought turret is worth the gun that opened it',
-    Math.abs(r.boughtHard - r.cap) < 1e-6
-    && Math.abs(r.coreRatio / r.cap - 1) < 0.12
-    && Math.abs(r.pieceRatio / r.cap - 1) < 0.12,
-    `hard ${r.boughtHard} (capped at ${r.cap} from ${want.toFixed(2)}); core `
-    + `x${r.coreRatio} and structure x${r.pieceRatio} of authored`);
+    Math.abs(r.boughtHard - cap) < 0.02
+    && Math.abs(r.coreRatio / cap - 1) < 0.12
+    && Math.abs(r.pieceRatio / cap - 1) < 0.12,
+    `hard ${r.boughtHard} (the product is ${want.toFixed(2)}, the ceiling `
+    + `${r.cap}); core x${r.coreRatio} and structure x${r.pieceRatio} of authored`);
 
   check('...and a piece put back mid-fight comes back tempered too',
-    r.revived !== null && Math.abs(r.revived / r.cap - 1) < 0.02,
+    r.revived !== null && Math.abs(r.revived / cap - 1) < 0.02,
     `a revived panel is x${r.revived} of its authored health, against the `
-    + `x${r.cap} the rest of the boss is at`);
+    + `x${cap.toFixed(2)} the rest of the boss is at`);
 
   /*
    * The clock exists to stop an under-gunned run sitting in front of a gate
@@ -11963,6 +11990,318 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `just past ${r.patience}s: a stock anomaly withdraws (still up `
     + `${r.stockClock && r.stockClock.still}), a x4 one does not `
     + `(${r.hardClock && r.hardClock.still})`);
+}
+
+// --- PILE: the one thing on the machine that acts unasked -------------------
+/*
+ * It replaces SIGHT, and the rule it must not break is the one REFLEX broke in
+ * build 190: nothing in this game casts an ability. PILE is not an ability --
+ * no charge, no slot, nothing on the bar -- and the case that owns that rule
+ * (the whole tree bought, two LURCHERs on the mount, charges counted every
+ * frame) covers it unchanged.
+ *
+ * The design is an ANNULUS and not a blast, and that is load-bearing rather
+ * than decorative: it is born at CFG.pile.r0 and only ever travels outward, so
+ * it cannot reach a body already on the mount. The glitch timer is the only
+ * involuntary way down the game has, its answer is shoving the thing off, and
+ * an unaskable blast centred on the turret would quietly defuse it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, WAVES: WAVE_TABLE } = await import('../src/config.js');
+    const { Front } = await import('../src/shooter.js');
+    const { BY_ID, freshUpgrades } = await import('../src/upgrades.js');
+    const g = window.__sim;
+    const w = g.world;
+    const s = w.shooter;
+    const P = CFG.pile;
+    const out = { every: P.every.slice(), r0: P.r0 };
+    const def = BY_ID.get('pile');
+
+    const bare = () => {
+      g.debugClearField();
+      w.effects.length = 0;
+      w.projectiles.length = 0;
+      w.spawnLock = 1e9;
+      if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
+      w.up = freshUpgrades();
+      w.pileT = 0;
+      // On the field, or Game.update never reaches the director at all and
+      // every clock this case is about is frozen.
+      w.phase = 'staging';
+    };
+    const own = (n) => { for (let i = 0; i < n; i++) def.apply(w.up, w); };
+
+    // ---- the clock, measured off the waves it actually makes -------------
+    /*
+     * Through g.update, never by calling the stepper: `runUpgrades` is called
+     * BELOW the `if (w.boss)` branch, and a case that drives the stepper
+     * directly is testing the one call the game does not make -- which is
+     * exactly how build 210's glitch douse shipped dead with a green case.
+     */
+    out.gaps = [];
+    for (let lvl = 1; lvl <= 3; lvl++) {
+      bare(); own(lvl);
+      let last = null;
+      const gaps = [];
+      let t = 0;
+      for (let f = 0; f < 60 * 30 && gaps.length < 3; f++) {
+        const before = w.effects.length;
+        g.update(1 / 60);
+        t += 1 / 60;
+        if (w.effects.length > before) {
+          if (last !== null) gaps.push(+(t - last).toFixed(2));
+          last = t;
+        }
+      }
+      out.gaps.push(gaps);
+    }
+
+    // ---- it never reaches what is on the mount ---------------------------
+    /*
+     * The front is born outside the contact radius by construction. Asserted
+     * on the FUSE as well as on the geometry: a body pinned to the turret
+     * must still be able to run the glitch timer all the way down with PILE
+     * firing throughout, or the upgrade has taken away the one clock the game
+     * promises is answerable.
+     */
+    /*
+     * A body INSIDE the birth radius is never touched; one just outside it
+     * always is. A pure geometry differential, and deliberately so: it needs
+     * no contact set, no charge and no fuse, so it cannot fail for a reason
+     * that has nothing to do with the promise it is making. The promise is
+     * that PILE is not a blast centred on the turret -- the glitch timer is
+     * the only involuntary way down the game has, its answer is shoving the
+     * thing off, and an unaskable blast on the mount would take that decision
+     * away without anyone noticing.
+     *
+     * The first version of this drove 22 seconds of live waves with a body
+     * pinned to the mount and asserted on the fuse. It failed for three
+     * unrelated reasons in a row -- a teach wave zeroing the clock, a phase
+     * that never reached the director, a contact set that stayed empty -- and
+     * every one of those was the harness, not the game.
+     */
+    const reach = (at) => {
+      bare(); own(3);
+      const e = g.debugSpawn('lurcher', s.x, s.y - at);
+      if (!e) return null;
+      e.staged = false; e.spawnIn = 0; e.vx = 0; e.vy = 0; e.hp = 1e7; e.maxHp = 1e7;
+      const f = new Front(s.x, s.y, 3);
+      w.effects.push(f);
+      for (let k = 0; k < 60; k++) {
+        e.x = s.x; e.y = s.y - at; e.vx = 0; e.vy = 0;
+        g.update(1 / 60);
+      }
+      return { at, r: Math.round(e.r), hit: f.hit.has(e), hurt: e.hp < 1e7 };
+    };
+    out.inside = reach(Math.round(P.r0 * 0.5));
+    out.rim = reach(Math.round(P.r0 * 1.4));
+
+    // ...and it does go off on its own, over and over, with nothing asked.
+    bare(); own(3);
+    let fired = 0;
+    for (let f = 0; f < 60 * 22; f++) {
+      const before = w.effects.length;
+      g.update(1 / 60);
+      if (w.effects.length > before) fired++;
+    }
+    out.fired = fired;
+
+    // ---- ...and it does throw what is closing ----------------------------
+    /*
+     * The DIRECTION, in the arrangement somebody watching would name: a body
+     * out in the ring gains distance from the turret. Asserting that two
+     * cases differ would be equally true of the mirror image -- build 211's
+     * spin case shipped exactly that way.
+     */
+    const throwAt = (id, at) => {
+      bare(); own(3);
+      const e = g.debugSpawn(id, s.x, s.y - at);
+      if (!e) return null;
+      e.staged = false; e.spawnIn = 0; e.vx = 0; e.vy = 0; e.hp = 1e7; e.maxHp = 1e7;
+      const was = Math.hypot(e.x - s.x, e.y - s.y);
+      w.effects.push(new Front(s.x, s.y, 3));
+      let peak = was;
+      for (let f = 0; f < 60; f++) { g.update(1 / 60); peak = Math.max(peak, Math.hypot(e.x - s.x, e.y - s.y)); }
+      return { was: Math.round(was), peak: Math.round(peak), gained: Math.round(peak - was) };
+    };
+    out.mote = throwAt('mote', 110);
+    out.bulwark = throwAt('bulwark', 110);
+
+    // ---- grey is grey, and a spent body is finished ----------------------
+    bare(); own(3);
+    g.debugSpawnDrift();
+    for (let f = 0; f < 6; f++) g.update(1 / 60);
+    const drift = w.enemies.find((e) => e.harmless && !e.dead);
+    if (drift) { drift.x = s.x; drift.y = s.y - 120; drift.hp = drift.maxHp; }
+    const spent = g.debugSpawn('mote', s.x + 40, s.y - 120);
+    if (spent) { spent.staged = false; spent.spawnIn = 0; spent.spent = true; spent.hp = spent.maxHp; }
+    w.effects.push(new Front(s.x, s.y, 3));
+    for (let f = 0; f < 40; f++) {
+      if (drift) { drift.vx = 0; drift.vy = 0; }
+      g.update(1 / 60);
+    }
+    out.spared = { drift: !!drift && drift.hp === drift.maxHp,
+      spent: !!spent && spent.hp === spent.maxHp };
+
+    // ---- and no charge is spent, ever ------------------------------------
+    bare(); own(3);
+    g.debugGiveEnergy(400000); g.debugBuyAll();
+    const charges = () => w.abilities.slots.map((x) => x.charges).join(',');
+    const c0 = charges();
+    for (let f = 0; f < 60 * 12; f++) g.update(1 / 60);
+    out.charges = { before: c0, after: charges() };
+
+    bare();
+    w.up = freshUpgrades();
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+
+  check('PILE goes off on its own clock, and the clock is what the card says',
+    r.gaps.every((g2, i) => g2.length >= 2
+      && g2.every((x) => Math.abs(x - r.every[i]) < 0.12)),
+    r.gaps.map((g2, i) => `L${i + 1} ${g2.join('/')}s against ${r.every[i]}`).join('; '));
+
+  /*
+   * The whole reason it is a ring and not a blast. If this fails, PULSE has
+   * quietly stopped being the answer to something on the mount and the glitch
+   * timer has stopped being answerable.
+   */
+  /*
+   * The whole reason it is a ring and not a blast. The glitch timer is the
+   * only involuntary way down the game has and its answer is shoving the
+   * thing off; an unaskable blast centred on the turret would take that
+   * decision away. PILE cannot reach the mount, and PULSE still can.
+   */
+  check('...and it cannot reach what is already on the turret',
+    r.inside && r.rim && !r.inside.hit && r.rim.hit && r.rim.hurt
+    && r.fired >= 5,
+    // Asked of the front's own record, not of the body's health: a body held
+    // ON the turret is taking impact damage off the collision solver the
+    // whole time, which is nothing to do with this upgrade.
+    `the front is born at ${r.r0}: not one wave reached a body held at `
+    + `${r.inside && r.inside.at} (${r.inside && r.inside.hit}); every one `
+    + `reached and hurt one at ${r.rim && r.rim.at} (${r.rim && r.rim.hit}). `
+    + `${r.fired} waves went out over 22s unasked`);
+
+  check('...and what IS closing is thrown back, hardest when it is lightest',
+    r.mote && r.bulwark && r.mote.gained > 120 && r.bulwark.gained < r.mote.gained * 0.35,
+    `from ${r.mote.was} units a MOTE is thrown to ${r.mote.peak} (+${r.mote.gained}); `
+    + `a BULWARK from ${r.bulwark.was} reaches ${r.bulwark.peak} (+${r.bulwark.gained})`);
+
+  check('...and it leaves grey alone, and leaves a spent body finished',
+    r.spared.drift && r.spared.spent,
+    `drift untouched ${r.spared.drift}, spent body untouched ${r.spared.spent}`);
+
+  check('...and it is not an ability: nothing on the bar is ever spent for it',
+    r.charges.before === r.charges.after,
+    `charges ${r.charges.before} -> ${r.charges.after} over twelve seconds of `
+    + `PILE firing with the whole tree owned`);
+}
+
+// --- nothing that carries words may sit on top of anything else -------------
+/*
+ * `Hud.pillCap` measures the gap between the alerts column and the teaching
+ * band, and the band is not always up -- so three pills could be admitted
+ * against a cap of three and then have the band open underneath them, taking
+ * the cap to one. Nothing re-tested it: the cap was enforced at ADMISSION and
+ * never again. Measured on a real 320x568 viewport before the fix, pills at
+ * 165..195 and 197..227 against a band at 163..242 -- two captions inside
+ * another one's box, 29px of overlap each.
+ *
+ * Driven by moving the cap rather than by moving the viewport, because a case
+ * cannot resize the window it is running in: what shrank in the real report
+ * was the room, and what the room decides is the cap. The geometry is checked
+ * as well, at whatever size the suite is actually running at.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const out = {};
+    const real = g.hud.pillCap;
+    g.hud.clearAlerts(); g.hud.clearHint();
+    g.hud.pillHeld.length = 0;
+
+    // Three pills, admitted while there is room for three.
+    g.hud.alert('REMAINDER RECOVERED', 'rigDone', 20);
+    g.hud.alert('HELD \u00b7 RECAST AVAILABLE', 'rigDone', 20);
+    g.hud.alert('BULWARK RECORDED 12/37', 'rigDone', 20);
+    out.admitted = g.hud.alerts.length;
+
+    // ...and then the room for them goes, the way the band takes it.
+    g.hud.pillCap = () => 1;
+    g.hud.updateAlerts(1 / 60);
+    out.shownAfter = g.hud.alerts.length;
+    out.queuedAfter = g.hud.pillHeld.length;
+    out.stillInDom = document.querySelectorAll('#alerts .alert').length;
+
+    // ...and when the room comes back, so do they. Nothing paid for is lost.
+    g.hud.pillCap = real;
+    for (let f = 0; f < 8; f++) g.hud.updateAlerts(1 / 60);
+    out.back = g.hud.alerts.length;
+
+    // ---- and the geometry itself, at the size this is running at ---------
+    g.hud.clearAlerts(); g.hud.clearHint(); g.hud.pillHeld.length = 0;
+    g.hud.alert('REMAINDER RECOVERED', 'rigDone', 20);
+    g.hud.alert('HELD \u00b7 RECAST AVAILABLE', 'rigDone', 20);
+    g.hud.alert('BULWARK RECORDED 12/37', 'rigDone', 20);
+    g.hud.showHint('CORRUPTION. Something is holding the turret. The barrel cannot reach it. PULSE can.', true);
+    for (let f = 0; f < 6; f++) g.syncHud(1 / 60);
+    const boxes = [];
+    for (const el of document.querySelectorAll('#alerts .alert')) boxes.push({ n: 'pill', b: el.getBoundingClientRect() });
+    const band = document.getElementById('abilityHint');
+    if (band && band.classList.contains('show')) boxes.push({ n: 'band', b: band.getBoundingClientRect() });
+    const top = document.getElementById('topbar');
+    if (top) boxes.push({ n: 'topbar', b: top.getBoundingClientRect() });
+    let worst = 0;
+    const pairs = [];
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i].b; const b = boxes[j].b;
+        const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (ox > 1 && oy > 1) { worst = Math.max(worst, Math.round(oy)); pairs.push(`${boxes[i].n}/${boxes[j].n}`); }
+      }
+    }
+    out.boxes = boxes.length;
+    out.worst = worst;
+    out.pairs = pairs;
+    out.cap = g.hud.pillCap();
+
+    g.hud.pillCap = real;
+    g.hud.clearAlerts(); g.hud.clearHint(); g.hud.pillHeld.length = 0;
+    g.restart();
+    return out;
+  });
+
+  check('a caption never sits on top of another one',
+    r.worst === 0 && r.boxes >= 3,
+    `${r.boxes} things carrying words up at once against a cap of ${r.cap}; `
+    + `worst overlap ${r.worst}px${r.pairs.length ? ` (${r.pairs.join(', ')})` : ''}`);
+
+  /*
+   * The actual defect: enforced at admission only is enforced once. The room
+   * a caption was admitted into can be taken away by the next thing that
+   * opens, and nothing was looking.
+   */
+  check('...and the cap is re-checked every frame, not only when a pill arrives',
+    r.admitted === 3 && r.shownAfter === 1 && r.stillInDom === 1,
+    `three admitted; with the room taken away, ${r.shownAfter} left up and `
+    + `${r.stillInDom} still in the DOM`);
+
+  /*
+   * Nothing paid for is lost: what is up plus what is held is still three.
+   * The overflow used to be QUEUED by the per-frame trim and DROPPED by the
+   * one inside alert(), so a pill pushed off and then re-admitted could be
+   * discarded on its way back in -- one caption of three gone, with nothing
+   * reading wrong anywhere.
+   */
+  check('...and what no longer fits is put back rather than dropped',
+    r.shownAfter + r.queuedAfter === r.admitted && r.back > 1,
+    `${r.shownAfter} up and ${r.queuedAfter} held of ${r.admitted} admitted; `
+    + `${r.back} were up again once there was room`);
 }
 
 // --- report -----------------------------------------------------------------

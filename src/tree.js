@@ -47,7 +47,7 @@ export const COST = {
 /** Where every leaf hangs. Ids are upgrade ids; the key is the parent node. */
 const UNDER = {
   // ---- the machine ----
-  turret: ['rate', 'slew', 'aimrange', 'driftaim', 'overwatch', 'casing', 'insulation', 'intake'],
+  turret: ['rate', 'slew', 'aimrange', 'driftaim', 'pile', 'casing', 'insulation', 'intake'],
 
   // ---- the rack ----
   // Whole-rack upgrades sit on the category; BOLT keeps only its own two.
@@ -91,7 +91,11 @@ const UNDER = {
   // REFLEX sat here until build 190, when it went: it fired PULSE for you,
   // and nothing in this game casts an ability for you.
   abilities: ['standing'],
-  pulse: [],
+  // The only ability besides SPIRAL with a knob of its own -- and it earns it
+  // for the same reason: PULSE is the one thing that answers a body already
+  // on the mount, so how far it reaches and how hard it throws is a decision
+  // rather than a number.
+  pulse: ['shockfront'],
   fan: [], lance: [], well: [], prism: [], stasis: [], decoy: [],
   // The only ability in the tree with a shaping upgrade of its own. The other
   // seven are bought and then have nothing but a second charge to sell; this

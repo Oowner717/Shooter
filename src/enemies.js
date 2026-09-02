@@ -1213,13 +1213,17 @@ export class Enemy {
         if (hostileCount(world) >= CFG.maxEnemies + 8) break;
         const a = (i / count) * TAU + rand(0, 1);
         const sp = rand(90, 190);
-        world.enemies.push(new Enemy(child, this.x + Math.cos(a) * this.r * 0.7, this.y + Math.sin(a) * this.r * 0.7, {
+        const kid = new Enemy(child, this.x + Math.cos(a) * this.r * 0.7, this.y + Math.sin(a) * this.r * 0.7, {
           vx: this.vx * 0.5 + Math.cos(a) * sp,
           vy: this.vy * 0.5 + Math.sin(a) * sp,
           staged: this.staged,
           spawnIn: 0.6,
-        }));
+        });
+        world.enemies.push(kid);
         world.released++;
+        // Made HERE rather than released, so it never goes through spawnOne:
+        // it takes the wave off the body it came out of. See tagBody.
+        tagBody(world, kid, this);
       }
     }
 
@@ -2793,6 +2797,30 @@ function release(world, type, x, y, opts) {
  * Infinity on every call since runs became endless in build 81. It is still
  * counted because the debug readout and the save both show it.
  */
+/**
+ * Which wave a body belongs to, and the wave's count of its own.
+ *
+ * The OBJECTS figure is "how many of THIS WAVE'S objects are down", and a
+ * wave's objects are not the same as the hostiles on the field: bodies from
+ * the wave before are still standing (a wave ends when the field THINS, not
+ * when it empties), and a wave produces more than it asked for -- a SPLITTER's
+ * children, a SEED, a TOW's MASS. Counting the field instead of the wave is
+ * what made the figure jump when a wave turned over with things still on it.
+ *
+ * `from` is the body that made this one, and its tag is inherited: a
+ * SPLITTER's children belong to the wave that released the SPLITTER even when
+ * it is torn open two waves later. Only bodies of the RUNNING wave are added
+ * to `made`, or a late split would inflate a total the figure is a fraction
+ * of, and the bar would go backwards.
+ */
+function tagBody(world, e, from) {
+  const d = world.director;
+  if (!d || e.harmless) return e;
+  e.wave = from ? (from.wave ?? d.serial) : d.serial;
+  if (e.wave === d.serial) d.made++;
+  return e;
+}
+
 export function spawnOne(world, type, x, y, opts = {}) {
   const e = new Enemy(type, x, y, { staged: true, spawnIn: 1, ...opts });
   /*
@@ -2831,7 +2859,7 @@ export function spawnOne(world, type, x, y, opts = {}) {
   }
   world.enemies.push(e);
   if (!e.harmless) world.released++;
-  return e;
+  return tagBody(world, e, null);
 }
 
 /**
@@ -3157,13 +3185,19 @@ export class Director {
     this.jobs = []; // what is left to release in the running wave
     this.asked = 0; // how many the running wave asked for, after the swell
     /*
-     * How many of this wave's bodies are down. Counted rather than inferred:
-     * see cleared() for why subtracting the field from `asked` cannot answer
-     * that question. Fed from Game.registerKill, which is the one door every
-     * death comes through, and zeroed by load() for every wave including the
+     * The running wave's own tally: which wave it is, how many bodies it has
+     * actually put on the field, and how many of those are down. Counted
+     * rather than inferred -- see cleared() for why subtracting the field
+     * from `asked` cannot answer the question, and tagBody for why the field
+     * is not the wave. `slain` is fed from Game.registerKill, the one door
+     * every death comes through; `made` from tagBody, the one door every
+     * hostile comes through. Zeroed by load() for every wave including the
      * teach ones.
      */
+    this.serial = 0;
+    this.made = 0;
     this.slain = 0;
+    this.done = false; // the running wave has been scored and is finished
     this.timer = CFG.openingGrace; // until the next release, or the next wave
     this.wait = 0; // how long this wave has been waiting for the field to thin
     this.resting = true; // between waves rather than inside one
@@ -3430,7 +3464,11 @@ export class Director {
     this.contact = 0;
     this.hitPatience = false;
     this.take = 0;
+    this.made = 0;
     this.slain = 0;
+    // NOT `done`: a wave the fuse took away was not finished. It keeps the
+    // number it had, which is the point of showing it.
+    this.done = false;
     if (ran) this.overclock.armed = false;
     this.laneOffer = null;
     this.held = 0;
@@ -3472,37 +3510,63 @@ export class Director {
    * decides it: the chip beside the count, the rail's third meter, AUDIT's
    * CLEARED, RECALL's clean threshold and the alert's reason all read this.
    *
-   * It used to be `(asked - alive) / asked` in four copies, and that is not a
-   * measure of clearing at all -- it is a measure of ARRIVAL. `asked` is the
-   * whole wave, fixed at load(), while the bodies come out one at a time over
-   * the length of it, so a wave nobody had touched opened near 100% and fell
-   * as it arrived. Measured over 12 waves of a driven run, the reading on the
-   * frame each wave began: 50, 0, 100, 33, 67, 40, 57, 25, 64, 27, 13, 44 --
-   * for twelve waves in identical condition, none of them shot at. One wave
-   * ran 100 -> 75 -> 50 -> 25 -> 0 with nothing killed at all, and then up to
-   * 25% on the first kill: the number ran backwards through the whole of the
-   * arrival and only then began to mean anything.
+   * IT COUNTS THE WAVE, NOT THE FIELD. Those are not the same set, and every
+   * version of this before build 215 measured the second while claiming the
+   * first:
    *
-   * It was wrong the other way too. `alive` counts every hostile on the field
-   * and a wave puts out more bodies than it asks for -- a SPLITTER's children,
-   * a TOW's MASS, anything a body makes -- so `alive` can exceed `asked` and
-   * peg the reading at 0. Measured: a wave of `asked` 12 had 15 up at once,
-   * and the SPLITTER wave never read above 57% with six of its seven down.
+   *   `(asked - alive) / asked`, in four copies, was not a measure of
+   *   clearing at all -- it was a measure of ARRIVAL. `asked` is the whole
+   *   wave, fixed at load(), while the bodies come out one at a time over the
+   *   length of it, so a wave nobody had touched opened near 100% and fell as
+   *   it arrived. Measured over 38 waves: opening reading median 75%, up to
+   *   100%, and it stepped DOWN on 85 frames, worst single drop 67 points.
    *
-   * So count the three states a body can be in and divide. Everything this
-   * wave has revealed is either dead (`slain`), on the field, or still to be
-   * let out, and the sum of those is the honest denominator -- honest because
-   * it grows when the wave makes something new rather than pretending it knew
-   * all along. A SPLITTER splitting does move the number down, by exactly the
-   * work it just added; that is the field telling the truth, not a glitch.
+   *   `slain / (slain + hostileCount + queued)` fixed the direction and
+   *   still counted the field. A wave ENDS WHEN THE FIELD THINS -- `thinAt`
+   *   allows a quarter of it to be left standing -- so the next wave began
+   *   with the last one's leftovers on the screen and in its denominator. The
+   *   figure could not reach 100% and turned over while there was plainly
+   *   still work in front of you, which is exactly what it was reported as
+   *   doing: "many objects still on field and it resets".
+   *
+   * So every hostile is stamped with the wave that produced it (tagBody),
+   * children take the stamp off the body they came out of, and this is a
+   * fraction of that wave's own bodies: how many it has actually put on the
+   * field, plus what it still has queued, against how many of them are down.
+   * Leftovers belong to the wave that released them and are counted there
+   * even when they die two waves later -- which is why the figure is not
+   * blanked between waves any more. It keeps climbing while the field is
+   * cleaned up, and reaches 100% when the wave is genuinely finished.
    */
+  /** How many of the running wave's own bodies are still up. */
+  standing(world) {
+    let n = 0;
+    for (const e of world.enemies) {
+      if (e.dead || e.harmless || e.fizzle) continue;
+      if (e.wave === this.serial) n++;
+    }
+    return n;
+  }
+
   cleared(world) {
+    /*
+     * A wave that has been SCORED is a wave that is finished, and reads as
+     * finished: whatever it left standing was inherited by the field rather
+     * than left uncleared, and the next wave will count it as its own if it
+     * is still there. Without this the bar turned over at a median 73% --
+     * which is the wave-end rule showing through, not the player's work --
+     * and "it reaches 75 and disappears" was half this and half the blanking.
+     *
+     * Deliberately NOT set by glitchOut: a wave the fuse took away was not
+     * finished, and it keeps its real number so the failure is legible.
+     */
+    if (this.done) return 1;
     let queued = 0;
     // A TOW is a job and two bodies -- the head plus the MASS it drags, both
-    // hostile, both counted by hostileCount and by the kill tally. Counting
-    // the job would make the denominator jump the moment one is released.
+    // hostile, both counted by the kill tally. Counting the job would make
+    // the denominator jump the moment one is released.
     for (const j of this.jobs) queued += j.n * (j.type.tows ? 2 : 1);
-    const total = this.slain + hostileCount(world) + queued;
+    const total = this.made + queued;
     return total > 0 ? Math.min(1, this.slain / total) : 0;
   }
 
@@ -3557,6 +3621,8 @@ export class Director {
      */
     if (forced) verdict = forced;
     this.lastVerdict = verdict;
+    // Read by cleared(): the wave is over, so the figure completes.
+    this.done = true;
 
     // Why it went the way it did, in the alert's own register. The dominant
     // cause, not a list: a step you did not ask for needs one reason.
@@ -3808,7 +3874,12 @@ export class Director {
     this.wait = 0;
     this.lastRelease = world.time || 0;
     this.take = 0;
+    // A new wave, and a new set of bodies to count. `serial` is what stamps
+    // them, in tagBody; nothing else may write it.
+    this.serial++;
+    this.made = 0;
     this.slain = 0;
+    this.done = false;
     // A wave may ask for grey drift alongside it. It is not hostile, costs
     // nothing from the allotment, and is the whole of both the opening and the
     // bonus wave. Stacked upward rather than dropped in one row, so twenty-two
@@ -4085,7 +4156,9 @@ export class Director {
     this.timer = 1.5; // a beat to look at the field before it starts again
     this.jobs = [];
     this.asked = 0;
+    this.made = 0;
     this.slain = 0;
+    this.done = false;
   }
 
   /**
@@ -4169,7 +4242,16 @@ export class Director {
     // Proportional to what this wave let out, so a big wave is not held to the
     // same empty field as a small one and does not simply time out every time.
     const thinAt = Math.max(CFG.waves.clearTo, Math.round(this.asked * CFG.waves.thinFrac));
-    if (hostileCount(world) > thinAt && this.wait < CFG.waves.patience) return;
+    /*
+     * THIS WAVE'S bodies, not the field's.
+     *
+     * It was `hostileCount(world)`, so the wave before's leftovers counted
+     * toward the threshold this wave has to get under -- which let a wave end
+     * having cleared less of itself the messier the field it inherited, and
+     * is the other half of "many objects still on field and it resets". A
+     * wave is over when the wave is over.
+     */
+    if (this.standing(world) > thinAt && this.wait < CFG.waves.patience) return;
     // Reaching patience means the field never came back. That is the wave
     // telling you it was too much, in the one number that already knew.
     if (this.wait >= CFG.waves.patience) this.hitPatience = true;

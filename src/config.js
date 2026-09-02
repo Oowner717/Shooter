@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '214';
+export const BUILD = '215';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '214';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e28125d';
+export const REV = 'ddd2e84';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -927,6 +927,40 @@ export const CFG = {
   },
 
   // ---- auto mines -----------------------------------------------------
+  /*
+   * PILE. The one thing on the machine that acts without being asked.
+   *
+   * It replaced SIGHT in build 215. What it is: a weight in a slot through the
+   * deck, dropped on a clock, and the wave that goes out through the floor
+   * when it lands. It answers the thing SIGHT never did -- something closing
+   * on the turret while the barrel is pointed elsewhere.
+   *
+   * IT IS AN ANNULUS, NOT A BLAST, and that is the whole design. It is born at
+   * `r0` and only ever travels outward, so it CANNOT REACH WHAT IS ALREADY ON
+   * THE MOUNT: a body in contact sits at about `e.r + shooter.r + 2`, and a
+   * LURCHER at ~44 is inside `r0`. That is deliberate. The glitch timer is the
+   * only involuntary way down the game has, its answer is shoving the thing
+   * off, and PULSE is what shoves it -- an unaskable blast centred on the
+   * turret would quietly take that decision away and defuse the one clock the
+   * game promises is answerable. PULSE answers what has arrived. PILE answers
+   * what is closing.
+   *
+   * `thrown` is what makes it read: it exempts a struck body from its own
+   * speed cap up to `physics.thrownSpeed` and stops it steering for half a
+   * second, so it visibly loses ground instead of being nudged and driving
+   * straight back in.
+   */
+  pile: {
+    every: [8, 5, 3], // seconds between waves, per level
+    r0: 54, // where the front is born -- inside this is PULSE's business
+    r: [168, 204, 240], // ...and how far it reaches, per level
+    speed: 620, // world units a second the front travels outward
+    damage: 26,
+    impulse: 900,
+    thrown: 0.5, // seconds a struck body is off its own cap and off its steering
+    tell: 0.35, // how long before it goes that the machine says so
+  },
+
   mines: {
     /*
      * Five on the field, fifteen seconds each, one thrown every fifteen.
@@ -2366,7 +2400,37 @@ export const CFG = {
      * a stage CHANGE rather than the whole fight, so a long fight that is
      * visibly progressing is never interrupted.
      */
-    patience: 90,
+    /*
+     * Raised from 90 in build 215, because at 90 it was not a safety net --
+     * it was the ending.
+     *
+     * Measured across three separate benches including the build-211
+     * baseline: TERMINUS's stock fight ends with its last stage reading
+     * EXACTLY 90.0s every single time. A stock turret has never beaten it;
+     * it withdraws, and the 212.6s that had been quoted as its length was
+     * the time it took to give up. Its stages naturally run 60-90s, so the
+     * clock was inside the fight rather than outside it.
+     *
+     * 150 leaves the net doing its job -- a run that genuinely cannot pass a
+     * gate still gets out rather than sitting there for ever -- while being
+     * clear of a stage that is visibly progressing. It is still measured off
+     * a stage CHANGE, not the whole fight, and it is still scaled by the
+     * boss's own temper (see Game.watchBoss).
+     */
+    patience: 150,
+    /*
+     * A beat after the boss comes apart before it says anything.
+     *
+     * The outro used to start on the frame `detonate()` fired, which is about
+     * 1.8 seconds after the core goes -- so the arrest, the infall and the
+     * detonation, which are the whole of the spectacle, were read through a
+     * caption. The death slams time to `endSlow` and ramps back over
+     * `slowFor` (3.6s); this holds the words until that ramp is nearly done,
+     * so the picture gets the slow motion to itself and the words arrive as
+     * time comes back. `endFor` is extended by the same amount, or the last
+     * lines would be cut off by the sequence ending underneath them.
+     */
+    outroWait: 3.2,
     /*
      * The most a bought turret may make an anomaly worth, as a multiplier on
      * the health of its core and its structure. See gunScale in shooter.js
@@ -2423,7 +2487,7 @@ export const CFG = {
     flash: 0.9, // seconds the machine flares while a part goes on
     ring: 0.2, // gimbal: each level adds a ring this much further out
     spine: 9, // spines: length of each spike, in world units
-    sight: 8, // sight: mast height per level
+    pile: 8, // pile: how far the weight travels in the deck, per level
     feed: 7, // feed: belt housing depth
     dish: 20, // array: dish aperture, growing with the level
   },

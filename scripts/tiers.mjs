@@ -204,7 +204,6 @@ const LINE = [
   // tier's budget on a card that does nothing to the round being measured.
   'overstuffed',
   'overstuffed', 'overstuffed', 'overstuffed',
-  'overwatch', 'overwatch', 'overwatch',
   'salvo',
   // SPINES is real damage here: a body that closes on the turret stands in it.
   'casing', 'casing', 'casing',

@@ -912,14 +912,24 @@ export class Hud {
    * chip is exactly as wide as it was before build 209 whenever there is
    * nothing to say.
    *
-   * Blank during a boss for the same reason: Game.update freezes the director
-   * for the whole of a fight, so the figure would sit on whatever the wave
+   * Blank during a boss, and only then: Game.update freezes the director for
+   * the whole of a fight, so the figure would sit on whatever the wave
    * underneath was at and describe nothing on the screen. The boss has a bar.
+   *
+   * It is NOT blanked between waves any more. It used to be -- "neither 0%
+   * nor 100% is true of a field with nothing on it" -- and that was written
+   * when the figure was a fraction of the field. It is a fraction of the
+   * WAVE now (see Director.cleared), and a wave that has ended with a few of
+   * its bodies still standing is a wave still being finished: the figure goes
+   * on climbing through the rest as they die, and reaches 100% when the last
+   * of them does. Blanking it there was the "it disappears at 75%" report --
+   * the wave ends when the FIELD thins, which it does with a quarter of the
+   * wave still up.
    */
   setWavePct(world) {
     const d = world.director;
     let pct = -1;
-    if (d && !d.resting && !world.boss && d.asked > 0) {
+    if (d && !world.boss && d.serial > 0) {
       pct = Math.round(d.cleared(world) * 100);
     }
     if (pct === this.lastWavePct) return;
@@ -1367,14 +1377,53 @@ export class Hud {
     if (tone) el.style.color = tone;
     el.textContent = text;
     this.el.alerts.appendChild(el);
-    this.alerts.push({ el, t: duration, text });
-    while (this.alerts.length > this.pillCap()) {
+    // `kind` and `tone` are kept so a pill pushed off by the cap can be put
+    // back on the queue as itself rather than as a plain one.
+    this.alerts.push({ el, t: duration, text, kind, tone });
+    this.trimAlerts();
+  }
+
+  /**
+   * Hold the column to what there is room for, and keep what does not fit.
+   *
+   * One place, called both when a pill arrives and every frame -- the cap is
+   * a measurement of the room and the room changes without anything arriving,
+   * which is the whole defect: three were admitted against a cap of three and
+   * the teaching band then opened underneath them and took the cap to one.
+   *
+   * The overflow goes back on the QUEUE rather than being dropped. It used to
+   * be dropped here and queued there, so a pill pushed off by the cap and
+   * then re-admitted by the drain could be discarded on its way back in --
+   * one caption of three lost with nothing reading wrong.
+   */
+  trimAlerts() {
+    const cap = this.pillCap();
+    while (this.alerts.length > cap) {
       const old = this.alerts.shift();
       old.el.remove();
+      this.pillHeld.unshift({ text: old.text, kind: old.kind, duration: Math.max(1.2, old.t), tone: old.tone });
+      while (this.pillHeld.length > 3) this.pillHeld.pop();
     }
+    return cap;
   }
 
   updateAlerts(dt) {
+    /*
+     * The cap is re-checked EVERY FRAME, not only when a pill arrives.
+     *
+     * `pillCap()` measures the gap between the alerts column and the teaching
+     * band, and the band is not always up -- so three pills could be admitted
+     * against a cap of three and then have the band open underneath them,
+     * taking the cap to one on a 320-wide screen. Nothing re-tested it, so
+     * two pills sat inside the band's box: measured at 320x568, pills at
+     * 165..195 and 197..227 against a band at 163..242, overlapping by 29px
+     * each. Enforced at admission only is enforced once.
+     *
+     * The overflow goes BACK on the queue rather than being dropped: a
+     * caption that has been paid for is shown when there is room for it, the
+     * same way one that never fitted in the first place is.
+     */
+    const cap = this.trimAlerts();
     for (let i = this.alerts.length - 1; i >= 0; i--) {
       const a = this.alerts[i];
       a.t -= dt;
@@ -1398,7 +1447,7 @@ export class Hud {
         this.el.hint.classList.remove('show');
         this.tutLines.length = 0;
       }
-    } else if (this.pillHeld.length && this.pillCap() >= 1) {
+    } else if (this.pillHeld.length && this.alerts.length < this.pillCap()) {
       const p = this.pillHeld.shift();
       this.alert(p.text, p.kind, p.duration, p.tone);
     } else if (this.voiceHeld.length && !this.speaking()) {
@@ -2189,7 +2238,7 @@ export class Hud {
         + `  ·  ${alive} OF ${d.asked} UP  ·  ${Math.round(hp)} HP`;
 
     const since = d.resting ? 0 : Math.max(0, (world.time || 0) - d.lastRelease);
-    const cleared = d.resting ? 0 : d.cleared(world);
+    const cleared = d.cleared(world);
     const meters = [
       ['ON THE TURRET', d.contact, T.failContact, `${d.contact.toFixed(1)}s`],
       ['SINCE THE LAST', since, T.cleanWithin, `${since.toFixed(1)}s`],

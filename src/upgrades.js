@@ -47,6 +47,13 @@ export function freshUpgrades() {
     patchR: 1, // how wide a SPORE patch burns...
     patchCap: 0, // ...and how many more than three may burn at once
     bounty: 1, // TITHE's multiplier on a marked body
+    // How far a PULSE reaches and how hard it throws. Both, because "push
+    // distance" is both: the speed cap clips a light body's shove hard --
+    // measured, a MOTE takes 23% of PULSE's rated impulse -- so impulse alone
+    // is an upgrade that does almost nothing to the most common thing on the
+    // field, and reach is what decides whether it is touched at all.
+    pulseR: 1,
+    pulsePush: 1,
     // field
     // The cap, the lifetime and the throw clock are fixed in config and no
     // upgrade may move any of them. What an upgrade may do is put more down
@@ -75,7 +82,7 @@ export function freshUpgrades() {
      * one that takes everything. See Game.aimModes.
      */
     driftAim: 0,
-    overwatch: 1, // damage while no hand is on the lever
+    pile: 0, // levels of the weight in the deck that answers what closes in
     casing: 0, // damage a second to whatever is touching the turret
     insulation: 1, // multiplier on how much corruption costs the intake
   };
@@ -140,6 +147,14 @@ const MARK = {
   levy: g('<path d="M12 3.4 19.4 8v8L12 20.6 4.6 16V8z"/><path d="M12 7.6v8.8M9.6 9.8h4.8M9.6 14.2h4.8"/><path d="M16.6 4.4h4M18.6 2.4v4" opacity=".8"/>'),
   // More thrown, one way.
   buckshot: g('<path d="M4.6 20h14.8"/><path d="M12 16V9M8 16 6 9.6M16 16l2-6.4M4.6 15 3 10M19.4 15 21 10" opacity=".95"/><circle cx="12" cy="6.4" r="1.6" fill="currentColor" stroke="none"/>'),
+  // The wave off the mount, wider and harder. Three fronts, the outer two
+  // opening: PULSE is the only thing that answers something already on you,
+  // and this is that answer arriving from further out.
+  shockfront: g('<circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/>'
+    + '<path d="M6.6 6.6a7.6 7.6 0 0 0 0 10.8"/><path d="M17.4 6.6a7.6 7.6 0 0 1 0 10.8"/>'
+    + '<path d="M3.1 3.1a12.6 12.6 0 0 0 0 17.8" opacity=".55"/>'
+    + '<path d="M20.9 3.1a12.6 12.6 0 0 1 0 17.8" opacity=".55"/>'
+    + '<path d="M8.8 12h6.4M13.4 9.9 15.5 12l-2.1 2.1" opacity=".9"/>'),
   // A field that reaches further and shoves harder.
   repulsor: g('<circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="6" stroke-dasharray="2.4 2.6"/><path d="M12 5.4V2.6M12 18.6v2.8M5.4 12H2.6M18.6 12h2.8"/><path d="M10.4 4.2 12 2.6l1.6 1.6M10.4 19.8 12 21.4l1.6-1.6" fill="currentColor" stroke="none" opacity=".85"/>'),
   // A charge going off wider than it used to: the same centre, one ring further.
@@ -164,7 +179,11 @@ const MARK = {
   // --- turret ---
   rate: g('<path d="M12 21V8"/><path d="M8.4 11.4 12 7l3.6 4.4"/><path d="M8.4 16.4 12 12l3.6 4.4" opacity=".5"/>'),
   slew: g('<path d="M4 16a8 8 0 0 1 16 0" stroke-dasharray="2.6 2.6"/><path d="M12 16V6"/><path d="M9 8.5 12 5.5l3 3"/><path d="M17 6.5l3 1.5-3 1.5" opacity=".7"/>'),
-  overwatch: g('<circle cx="12" cy="12" r="6.6"/><circle cx="12" cy="12" r="2.1" fill="currentColor" stroke="none"/><path d="M12 1.6v3.2M12 19.2v3.2M1.6 12h3.2M19.2 12h3.2"/>'),
+  // A weight in a slot, and the wave going out under it.
+  pile: g('<rect x="8.4" y="3" width="7.2" height="5.2" rx="1" fill="currentColor" stroke="none"/>'
+    + '<path d="M12 8.6v3.4"/><path d="M6.6 13.4h10.8"/>'
+    + '<path d="M4.2 16.4a11 11 0 0 0 15.6 0" opacity=".8"/>'
+    + '<path d="M2 19.8a15 15 0 0 0 20 0" opacity=".45"/>'),
   casing: g('<path d="M12 2.6 20 6v6.6c0 4.6-3.4 7.2-8 8.8-4.6-1.6-8-4.2-8-8.8V6z"/><path d="M12 8v8M8 12h8"/>'),
   insulation: g('<path d="M12 2.6 20 6v6.6c0 4.6-3.4 7.2-8 8.8-4.6-1.6-8-4.2-8-8.8V6z"/><path d="M7.5 12.5c1.6-2 3.4-2 4.5 0s2.9 2 4.5 0" opacity=".85"/>'),
   // A dish on a stem, and the sweep coming back off something further out.
@@ -272,7 +291,25 @@ const SLEEPING = ANOMALIES.slice(1).map((a) => {
 
 export const UPGRADES = {
   AMMO: [
-    { id: 'hollowpoint', name: 'HOLLOWPOINT', line: '+25% damage.', apply: scale('damage', 1.25) , icon: MARK.hollowpoint },
+    /*
+     * 1.4 a level from build 215, up from 1.25.
+     *
+     * SIGHT was a second 1.25^3 on the same quantity -- conditional on
+     * hands-off, and it went when PILE took its socket. That is a 1.95x cut
+     * to what a fully bought gun does, and it is too much: the suite's "does
+     * anything in the rack still answer the top of the ladder" case went red,
+     * with all nine rounds failing to clear a band-5 wave at tier 20. This
+     * puts most of it back, unconditionally and on the node whose whole job
+     * is damage, rather than by giving a defensive upgrade a damage term it
+     * has no business having. 1.5^3 / 1.25^3 = 1.73 of the 1.95, which leaves
+     * a fully bought gun at 88% of what it was.
+     *
+     * 1.4 first, and it was not enough: the ladder case passed on one run and
+     * failed on the next, which is a gun sitting exactly on the wall rather
+     * than one that clears it. A threshold a build lands on half the time is
+     * not a number anybody chose.
+     */
+    { id: 'hollowpoint', name: 'HOLLOWPOINT', line: '+50% damage.', apply: scale('damage', 1.5) , icon: MARK.hollowpoint },
     // Two levels, not the default three. tree.js reads `u.levels ?? 3`, so an
     // uncapped node is sold three times whatever the author intended.
     { id: 'tracer', name: 'TRACER', levels: 2, line: '+35% round speed.', apply: scale('speed', 1.35) , icon: MARK.tracer },
@@ -380,6 +417,9 @@ export const UPGRADES = {
     { id: 'intake', name: 'INTAKE', levels: 1,
       line: 'Energy is taken in on contact, no PULSE needed. Louvres cut through the skirt.',
       apply: set('intake', true), icon: MARK.intake },
+    { id: 'shockfront', name: 'SHOCKFRONT', levels: 2,
+      line: '+30% PULSE reach and push.',
+      apply: (u) => { u.pulseR *= 1.3; u.pulsePush *= 1.3; }, icon: MARK.shockfront },
     { id: 'standing', name: 'STANDING ORDER', line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
   ],
   TURRET: [
@@ -412,7 +452,15 @@ export const UPGRADES = {
       line: '+10% fire rate. A belt box on the breech flank.',
       apply: quicken('rate', 0.9), icon: MARK.rate },
     { id: 'slew', name: 'GIMBAL', line: '+50% auto aim turn speed. Another row of teeth on the bearing.', apply: scale('slew', 1.5) , icon: MARK.slew },
-    { id: 'overwatch', name: 'SIGHT', line: '+25% damage while hands off the lever. A boxed sight along the barrel.', apply: scale('overwatch', 1.25) , icon: MARK.overwatch },
+    /*
+     * The only thing on the machine that acts without being asked, and it is
+     * deliberately not an ability: no charge, no slot, nothing on the bar.
+     * See CFG.pile for why it is a ring that travels outward rather than a
+     * blast, and why that is what keeps the glitch fuse answerable.
+     */
+    { id: 'pile', name: 'PILE', levels: 3,
+      line: 'A wave through the floor every 8s: what is closing gets thrown back. A weight in the deck.',
+      apply: bump('pile', 1), icon: MARK.pile },
     { id: 'casing', name: 'SPINES', line: 'Objects touching you take 40 damage a second. Armour plates round the deck.', apply: bump('casing', 40) , icon: MARK.casing },
     { id: 'insulation', name: 'SHROUD', line: 'Corruption costs half as much energy. A mantlet closing round the breech.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
     /*

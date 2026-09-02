@@ -486,7 +486,12 @@ export class Boss {
    *   AFTER       the REMAINDER rises out of what is left and comes to you
    */
   die(world, C) {
-    this.dying = C.endFor;
+    // The pause the words are held for is added to the sequence rather than
+    // taken out of it: `endFor` is how long the ending lasts and the outro is
+    // written to fill it, so holding the captions inside the old length would
+    // simply cut the last of them off.
+    this.dying = C.endFor + B().outroWait;
+    this.blewFor = 0;
     this.beat = 0;
     this.lineFor = 0;
     world.bossLine = null;
@@ -505,12 +510,34 @@ export class Boss {
     background.surge(2);
   }
 
+  /**
+   * The last words, held back a beat.
+   *
+   * They used to start on the frame `detonate()` fired -- about 1.8 seconds
+   * after the core goes -- so the arrest snapping the frame off a piece at a
+   * time, the infall pulling the rest into the core, and the detonation
+   * itself were all read through a caption. `CFG.boss.outroWait` holds them
+   * until the slow-motion ramp is nearly done, so the picture gets the slow
+   * motion to itself and the words arrive as time comes back.
+   *
+   * On the RAW clock, like everything else in a death sequence: `dt` here is
+   * already scaled by world.timeScale and the death slams that to a tenth, so
+   * a pause counted in scaled time would run for as long as the ramp did.
+   *
+   * One method, because both this and ORDINAL's private copy of the sequence
+   * want it and a second copy of a rule is a second thing to keep in step.
+   */
+  outroStep(world, script, raw) {
+    if (!this.blew) return;
+    this.blewFor = (this.blewFor || 0) + raw;
+    if (this.blewFor < B().outroWait) return;
+    if (this.outroAt === undefined) { this.outroAt = 0; this.line = 0; this.lineT = 0; }
+    this.say(world, script, raw);
+  }
+
   dieStep(world, dt, C, outro) {
     this.hush(world);
-    if (this.blew) {
-      if (this.outroAt === undefined) { this.outroAt = 0; this.line = 0; this.lineT = 0; }
-      this.say(world, outro, world.dtRaw || dt);
-    }
+    this.outroStep(world, outro, world.dtRaw || dt);
     const raw = world.dtRaw || dt;
     this.dying -= raw;
     this.beat += raw;
@@ -1155,11 +1182,9 @@ export class Ordinal extends Boss {
 
     if (this.dying > 0) {
       this.hush(world);
-      // ...and what it has to say about it, once it has stopped exploding.
-      if (this.blew) {
-        if (this.outroAt === undefined) { this.outroAt = 0; this.line = 0; this.lineT = 0; }
-        this.say(world, OUTRO, world.dtRaw || dt);
-      }
+      // ...and what it has to say about it, once it has stopped exploding
+      // and the slow motion has had its beat. See Boss.outroStep.
+      this.outroStep(world, OUTRO, world.dtRaw || dt);
       /*
        * On the raw clock. `dt` here is already scaled by world.timeScale and
        * the death slams that to a tenth, so a sequence counted in scaled time
@@ -1543,7 +1568,8 @@ export class Ordinal extends Boss {
    */
   die(world) {
     const C = O();
-    this.dying = C.endFor;
+    this.dying = C.endFor + B().outroWait;
+    this.blewFor = 0;
     this.beat = 0; // how far through the sequence, in real seconds
     // A stage caption still counting down would clobber the outro's first
     // line the moment it expired.

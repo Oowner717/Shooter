@@ -19,7 +19,7 @@ import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
 import { Director, spawnOne, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectEnergy, drawIn, intakeRate, ENTRY_Y, dividend } from './enemies.js';
-import { Shooter } from './shooter.js';
+import { Shooter, Front } from './shooter.js';
 import { Abilities } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
@@ -387,6 +387,9 @@ export class Game {
     w.debris.length = 0;
     w.projectiles.length = 0;
     w.effects.length = 0;
+    // The PILE clock, with the effects it makes. A restart that left it part
+    // way through would fire a wave into a fresh field.
+    w.pileT = 0;
     w.mines.length = 0;
     w.pendingBlasts.length = 0;
     // The flag comes off with the membership, or the grab loop -- which skips
@@ -1623,6 +1626,32 @@ export class Game {
     }
 
     /*
+     * PILE: the weight in the deck, and the wave it sends out when it lands.
+     *
+     * Here rather than in the Shooter because this is the method for upgrades
+     * that do something on a clock -- and, crucially, `runUpgrades` is called
+     * BELOW the `if (w.boss)` branch in update(), so it runs during a fight.
+     * A clock written inside Director.update would be dead for the whole of
+     * an anomaly, which is exactly how build 210's glitch douse was lost.
+     *
+     * It is not an ability and must never become one: no charge, no slot,
+     * nothing on the bar. See the note below on REFLEX for the rule, and
+     * CFG.pile for why the wave is a ring that travels outward.
+     */
+    if (up.pile > 0) {
+      const P = CFG.pile;
+      const every = P.every[Math.min(up.pile, P.every.length) - 1];
+      w.pileT = (w.pileT ?? every) - dt;
+      if (w.pileT <= 0) {
+        w.pileT = every;
+        w.effects.push(new Front(s.x, s.y, up.pile));
+        ripple(s.x, s.y, 1.6, 520);
+        shake(1.6);
+        audio.thud();
+      }
+    } else w.pileT = 0;
+
+    /*
      * REFLEX used to sit here: PULSE fired itself once two things had hold of
      * the turret. It went in build 190, and the rule it broke is the one the
      * rest of the bar has always kept -- nothing in this game casts an ability
@@ -1945,7 +1974,7 @@ export class Game {
       // The glossary records anything actually destroyed, including harmless
       // drift and a TOW's mass, neither of which counts toward the tally.
       if (!e.dissolved) this.noteDestroyed(e);
-      if (e.counts && !e.dissolved) this.registerKill();
+      if (e.counts && !e.dissolved) this.registerKill(e);
       if (e.dissolved) {
         for (let k = 0; k < 4; k++) spark(e.x, e.y, spread(60), spread(60), e.type.glow, 0.4, 1.6);
       }
@@ -2044,7 +2073,7 @@ export class Game {
     return !!s && this.isSealed(s.def.id);
   }
 
-  registerKill() {
+  registerKill(e) {
     const w = this.world;
     w.kills++;
     /*
@@ -2059,7 +2088,20 @@ export class Game {
      * neither, and is in neither wave's field count.
      */
     const d = w.director;
-    if (d && !w.boss && !d.resting) d.slain++;
+    /*
+     * ...and the running wave's own share of it, if this body was one of the
+     * wave's. `e.wave` is stamped at the one door every hostile comes through
+     * (tagBody in enemies.js); a body from an earlier wave that is only now
+     * being cleaned up belongs to that wave and moves nothing here.
+     *
+     * Not while a boss is up: Game.update freezes the director for the whole
+     * of a fight, so a 200-second ORDINAL would pour three hundred DIGIT
+     * deaths into whichever wave happened to be paused underneath it. Not
+     * gated on `resting` any more, though -- a leftover killed between waves
+     * still belongs to the wave that released it, and the figure is now shown
+     * through the rest so you can watch it finish.
+     */
+    if (d && !w.boss && e && e.wave === d.serial) d.slain++;
     this.teach();
     // The ten lines, one per `storyEvery` kills, and then it stops talking.
     // They used to be gated on the counted run — the run that no longer
@@ -2613,9 +2655,12 @@ export class Game {
     const w = this.world;
     for (let i = 0; i < n && w.phase === 'staging'; i++) {
       // A debug kill is a body that was released, so the count the debug
-      // readout and the save both show moves with it.
+      // readout and the save both show moves with it -- and it belongs to the
+      // running wave, so the OBJECTS figure moves with it too. Both halves,
+      // or a debug kill would climb the tally and leave the bar behind.
       w.released += 1;
-      this.registerKill();
+      if (w.director) w.director.made += 1;
+      this.registerKill({ wave: w.director ? w.director.serial : 0 });
     }
   }
 

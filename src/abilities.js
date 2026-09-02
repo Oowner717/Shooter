@@ -813,7 +813,13 @@ export const ABILITIES = [
     hint: 'PULSE — hurts and shoves what is near you, and takes in the energy.',
     run(world) {
       const s = world.shooter;
-      applyBlast(world, { x: s.x, y: s.y, r: 340, damage: 58, impulse: 1050 });
+      const up = world.up;
+      applyBlast(world, {
+        x: s.x, y: s.y,
+        r: 340 * up.pulseR,
+        damage: 58,
+        impulse: 1050 * up.pulsePush,
+      });
       // ...and it draws the energy in. This is how the currency is collected:
       // objects drop it when they come apart, it drifts to the turret, and it
       // sits there until a PULSE takes it. INTAKE is the upgrade that stops

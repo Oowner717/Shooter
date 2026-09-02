@@ -9,7 +9,7 @@ import { fx, spark, ring, shake, ripple, shard as fxShard, ember as fxEmber } fr
 
 /*
  * Every level of every part in the TURRET branch, added up: 1 FEED, 3 GIMBAL,
- * 2 ARRAY, 2 SIEVE, 3 SIGHT, 3 SPINES, 3 SHROUD, 1 INTAKE. What `rig().filled` is a
+ * 2 ARRAY, 2 SIEVE, 3 PILE, 3 SPINES, 3 SHROUD, 1 INTAKE. What `rig().filled` is a
  * fraction of, and the one number that tells the machine it is finished.
  *
  * It is written out here rather than derived, because shooter.js reaching into
@@ -39,31 +39,185 @@ import { audio } from './audio.js';
  * 223.7 -> 43.3, 236.3 -> 41.5, 216.0 -> 41.0, 212.6 -> 67.8. Every one of
  * them falls to about a fifth of the length it was tuned to.
  *
- * FOUR NODES CARRY ALL OF IT, and they cost 6,100 of the tree's 112,900:
- * HOLLOWPOINT and SIGHT at 1.25 a level over three levels each, SALVO's every
- * Nth shot, and what is left of FEED. Resetting those four alone returns a
- * fully-bought fight to 98% of its stock length -- so this is the product to
+ * A HANDFUL OF NODES CARRY ALL OF IT, and they cost a few thousand of the
+ * tree's hundred-odd: HOLLOWPOINT at 1.25 a level over three, SALVO's every
+ * Nth shot, and what is left of FEED. Resetting them alone returns a
+ * fully-bought fight to nearly its stock length -- so this is the product to
  * answer, not the ledger and not the spend. Half the tree is mines, abilities
  * and defence: a player who bought those has not shortened any fight and must
  * not be handed a harder boss for it.
  *
+ * SIGHT was the fourth term and went in build 215, taking a 1.25^3 with it.
+ * PILE replaces it on the TURRET branch and is NOT counted here on purpose:
+ * it is a fixed 26 damage on a fixed clock in a ring round the machine, so
+ * against a boss -- one large body, met at range, in the middle of the field
+ * -- it is worth a few damage a second and nothing the fight can feel. What
+ * this measures is what the GUN does to the thing in front of it.
+ *
  * The terms are the gun's own, and deliberately read from the same places the
- * gun reads them (`up.damage` and `up.overwatch` at the `shot()` above,
- * `up.rate` in Game.update, `up.salvo` here) rather than re-derived from the
- * tree. `overwatch` is gated the way the shot gates it -- it is worth nothing
- * to a player aiming by hand -- but off `autoAim`, which is the toggle, rather
- * than off the per-frame `autoSteering` the shot uses, because a boss's health
- * is fixed when it arrives and must not depend on where a thumb was that
- * frame.
+ * gun reads them (`up.damage` at the `shot()` below, `up.rate` in
+ * Game.update, `up.salvo` here) rather than re-derived from the tree.
  *
  * Asserted as a PRODUCT in regress.mjs rather than node by node, for the same
  * reason `up.rate` is: a new damage node arriving is exactly the thing that
  * would otherwise stop this tracking the gun, silently.
  */
+/**
+ * The wave a PILE sends out through the floor.
+ *
+ * An ANNULUS, not a blast: born at `CFG.pile.r0` and only ever travelling
+ * outward, so it cannot reach what is already on the mount. See CFG.pile for
+ * why that is the design and not an accident.
+ *
+ * Rides in `world.effects`, which already has the update/draw/dead contract
+ * this needs -- and, because it also exposes `wellField()`, the background
+ * picks it up for free: Game.update collects a well off every effect that has
+ * one. Nothing in this game has ever pushed the lattice OUTWARD; WELL only
+ * ever pulled it in. That is what the effect is made of.
+ */
+export class Front {
+  constructor(x, y, level) {
+    const P = CFG.pile;
+    this.x = x;
+    this.y = y;
+    this.r0 = P.r0;
+    this.r = P.r[Math.min(level, P.r.length) - 1];
+    this.travel = Math.max(0.05, (this.r - this.r0) / P.speed);
+    this.life = this.travel + 0.45; // the substrate springs back after the front
+    this.t = 0;
+    this.dead = false;
+    this.hit = new Set(); // struck once, on the frame the front passes it
+    this.cut = 0; // ...and how many, which decides how loud the ending is
+  }
+
+  /** Where the front is now. */
+  get radius() {
+    return this.r0 + (this.r - this.r0) * Math.min(1, this.t / this.travel);
+  }
+
+  /**
+   * The substrate, pushed OUT.
+   *
+   * `background.warp` computes `pull = min(d * 0.97, d * f * 1.5)` from
+   * `f = (1 - d/reach) ** 1.7 * strength` and settles each lattice point at
+   * `d - pull`. A NEGATIVE strength makes `pull` negative, so `d - pull > d`
+   * and every point moves outward while the twist unwinds -- the opposite of
+   * what WELL does with the same three lines. It eases off over the last of
+   * the life so the field springs back rather than snapping.
+   */
+  wellField() {
+    const k = Math.min(1, this.t / this.travel);
+    const ease = this.t <= this.travel ? 1 : Math.max(0, 1 - (this.t - this.travel) / 0.45);
+    return { x: this.x, y: this.y, reach: this.radius + 90, strength: -0.85 * ease * (0.35 + k * 0.65) };
+  }
+
+  update(world, dt) {
+    this.t += dt;
+    if (this.t >= this.life) { this.dead = true; return; }
+    if (this.t > this.travel) return;
+    const P = CFG.pile;
+    const rr = this.radius;
+    const span = this.r - this.r0;
+    for (const e of world.enemies) {
+      /*
+       * `spent` and `fizzle` are here for the reason CLAUDE.md gives: a
+       * boss's own structure is still drawn through its ending and must not
+       * be shot at, shoved, or cashed in. `harmless` keeps grey grey -- an
+       * automatic thing that vaporised DRIFT would undercut SIEVE and break
+       * the promise the colour rule makes.
+       */
+      if (e.dead || e.harmless || e.staged || e.spent || e.fizzle) continue;
+      if (this.hit.has(e)) continue;
+      const dx = e.x - this.x;
+      const dy = e.y - this.y;
+      const d = Math.hypot(dx, dy) || 1;
+      /*
+       * Inside the birth radius is PULSE's business and never this one's.
+       *
+       * Without this the edge test below reaches straight back inward: a
+       * LURCHER on the mount sits 7 units from the turret's centre with a
+       * radius of about 20, so `d - e.r` is NEGATIVE and every wave struck it
+       * on the frame it was born. Measured: 352 frames of contact with a body
+       * that the whole design says it must not be able to touch. The front
+       * only ever travels outward -- so must the test.
+       */
+      if (d < this.r0) continue;
+      // The front has reached it, and had not on the frame before. The body's
+      // own radius counts: a BULWARK is met when its edge is met.
+      if (d - e.r > rr) continue;
+      this.hit.add(e);
+      this.cut++;
+      const f = 1 - Math.min(1, Math.max(0, (d - this.r0) / (span || 1)));
+      const nx = dx / d;
+      const ny = dy / d;
+      /*
+       * `thrown` BEFORE the impulse, or the cap clips the shove on the frame
+       * it is given: it exempts the body from `cruise * maxSpeedFactor` up to
+       * `physics.thrownSpeed` and stops it steering, which is what makes a
+       * struck body visibly lose ground instead of being nudged and driving
+       * straight back in.
+       */
+      e.thrown = Math.max(e.thrown || 0, P.thrown);
+      e.applyDamage(world, P.damage * (0.35 + f * 0.65), nx, ny, P.impulse * f);
+      // The same mark every time, so the cause is legible without the event
+      // being loud -- and only while there is budget for it.
+      if (this.cut <= 8 && fx.quality >= 0.7) {
+        spark(e.x - nx * e.r, e.y - ny * e.r, nx * 210, ny * 210, '#dff1ff', 0.22, 2);
+      }
+    }
+  }
+
+  /**
+   * Two arcs and nothing else. Colourless on purpose: it is the medium
+   * moving, not something added to it, and it is the only effect in the game
+   * with no hue to confuse with a round, a mine or a boss.
+   *
+   * Alpha rides in `rgba()` inside one save/restore and is never assigned to
+   * `globalAlpha` -- see the four bugs CLAUDE.md records of exactly that
+   * shape. No `flash()` ever: this goes off every three seconds for the rest
+   * of the run, and four hundred screen whites is a strobe.
+   */
+  draw(ctx) {
+    const k = Math.min(1, this.t / this.travel);
+    const rr = this.radius;
+    const left = Math.max(0, Math.min(1, (this.life - this.t) / 0.3));
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    // The wake, behind the front and wider.
+    ctx.strokeStyle = rgba('#b9d4e6', 0.4 * left * (1 - k * 0.35));
+    ctx.lineWidth = 5 + (1 - k) * 9;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, Math.max(2, rr - 8 - k * 10), 0, TAU);
+    ctx.stroke();
+    // ...and the front itself, thinning as it goes out.
+    ctx.strokeStyle = rgba('#ffffff', 0.85 * left * (1 - k * 0.5));
+    ctx.lineWidth = 2 + (1 - k) * 3.5;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, rr, 0, TAU);
+    ctx.stroke();
+    /*
+     * The scar: a dim residue drawn AT the radius the wave reached, after the
+     * front has gone. A ring that fades as it grows is dimmest exactly where
+     * its radius means something -- this is the frame that says how far it
+     * got. Skipped entirely when the strike cut nothing, which is most of
+     * them: an effect that is spectacular once is intolerable the four
+     * hundredth time, and the answer is to draw less when less happened.
+     */
+    if (this.cut > 0 && this.t > this.travel) {
+      const s2 = 1 - (this.t - this.travel) / 0.45;
+      ctx.strokeStyle = rgba('#8fb6d8', 0.3 * s2 * s2);
+      ctx.lineWidth = CFG.hairline * 1.6;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
 export function gunScale(world) {
   const up = world.up;
   const out = up.damage
-    * ((world.autoAim || world.autoFire) ? up.overwatch : 1)
     // SALVO is every Nth shot leaving as three, so two extra rounds in N.
     * (up.salvo ? 1 + 2 / up.salvo : 1)
     / (up.rate || 1);
@@ -247,8 +401,7 @@ export class Shooter {
       ...opts,
       spun,
       speed: (opts.speed || CFG.bolt.speed) * up.speed,
-      damage: (opts.damage ?? CFG.bolt.damage) * up.damage * scale
-        * (world.autoSteering || world.autoFire ? up.overwatch : 1),
+      damage: (opts.damage ?? CFG.bolt.damage) * up.damage * scale,
       impulse: (opts.impulse ?? CFG.bolt.impulse) * up.impulse,
       bounces: (opts.bounces ?? CFG.bolt.bounces) + up.bounces,
     });
@@ -696,6 +849,81 @@ export class Shooter {
       ctx.stroke();
     }
 
+    /*
+     * ---- PILE: a weight in a slot through the deck ------------------------
+     *
+     * Deck-plane structure, drawn with the machine and NOT rotating with the
+     * barrel -- it is part of the floor, which is where its wave comes from.
+     * It is also the countdown: the weight rides `world.pileT` up its rails
+     * and drops, so the clock is on the machine rather than on the top of the
+     * screen, where `Hud.pillCap` can legitimately return 0.
+     */
+    if (g.pile) {
+      const P = CFG.pile;
+      const every = P.every[Math.min(g.pile, P.every.length) - 1];
+      // 0 just after a strike, 1 at the top of its travel. `pileT` counts
+      // DOWN to the next one, so the weight is highest when the wait is
+      // longest and drops as it runs out.
+      const wind = clamp((world.pileT || 0) / every, 0, 1);
+      const lift = CFG.rig.pile * (0.25 + wind * 0.75) * 0.34;
+      const slotW = R * 0.34;
+      const slotH = R * 0.5;
+      // the slot itself, cut into the deck
+      ctx.fillStyle = '#070d15';
+      ctx.strokeStyle = rgba(accent, 0.34 * lit);
+      ctx.lineWidth = CFG.hairline * 1.6;
+      roundRectPath(ctx, -slotW / 2, -slotH * 0.9, slotW, slotH, 2);
+      ctx.fill();
+      ctx.stroke();
+      // the rails it rides
+      ctx.strokeStyle = rgba(accent, 0.22 * lit);
+      ctx.lineWidth = CFG.hairline;
+      ctx.beginPath();
+      ctx.moveTo(-slotW / 2 + 2, -slotH * 0.9);
+      ctx.lineTo(-slotW / 2 + 2, -slotH * 0.9 + slotH);
+      ctx.moveTo(slotW / 2 - 2, -slotH * 0.9);
+      ctx.lineTo(slotW / 2 - 2, -slotH * 0.9 + slotH);
+      ctx.stroke();
+      // ...and the weight in it, the only moving structure on the machine
+      const wy = -slotH * 0.9 + slotH - 6 - lift;
+      ctx.fillStyle = BODY;
+      ctx.strokeStyle = rgba('#bfe6ff', (0.5 + wind * 0.4) * lit);
+      ctx.lineWidth = CFG.hairline * 2;
+      roundRectPath(ctx, -slotW * 0.34, wy - 5, slotW * 0.68, 6, 1.4);
+      ctx.fill();
+      ctx.stroke();
+      // L2: the anvil under it, and buttresses. The machine goes bottom-heavy.
+      if (g.pile >= 2) {
+        ctx.fillStyle = '#0b1220';
+        ctx.strokeStyle = rgba(accent, 0.5 * lit);
+        ctx.lineWidth = CFG.hairline * 1.8;
+        roundRectPath(ctx, -slotW * 0.46, -slotH * 0.9 + slotH - 4, slotW * 0.92, 5, 1);
+        ctx.fill();
+        ctx.stroke();
+        for (const e of [-1, 1]) {
+          ctx.strokeStyle = rgba(accent, 0.32 * lit);
+          ctx.lineWidth = CFG.hairline * 2.2;
+          ctx.beginPath();
+          ctx.moveTo(e * slotW * 0.5, -slotH * 0.9 + slotH);
+          ctx.lineTo(e * R * 0.66, R * 0.34);
+          ctx.stroke();
+        }
+      }
+      /*
+       * L3: a ring inlaid flush in the deck at the radius the wave is born
+       * at, which flares as the weight lands. Drawn additively inside the
+       * same save/restore the machine already holds.
+       */
+      if (g.pile >= 3) {
+        const flare = Math.max(0, 1 - (every - (world.pileT || 0)) / 0.35);
+        ctx.strokeStyle = rgba('#bfe6ff', (0.16 + flare * 0.6) * lit);
+        ctx.lineWidth = CFG.hairline * (1.6 + flare * 3);
+        ctx.beginPath();
+        ctx.arc(0, 0, R * 0.86, 0, TAU);
+        ctx.stroke();
+      }
+    }
+
     // ---- the deck: the one part that is always there ----------------------
     ctx.fillStyle = BODY;
     ctx.strokeStyle = rgba(accent, 0.9);
@@ -944,43 +1172,6 @@ export class Shooter {
       }
     }
 
-    // ---- SIGHT: a boxed sight along the top of the barrel ------------------
-    if (g.overwatch) {
-      // Short, and seated on the jacket. At five units a level it grew longer
-      // than the barrel it was clamped to and read as a second stick lying
-      // across the machine.
-      const sl = 9 + g.overwatch * 3.2;
-      const sx = R * 0.5 - recoil;
-      ctx.fillStyle = BODY;
-      ctx.strokeStyle = rgba('#ffe08a', 0.9);
-      ctx.lineWidth = CFG.hairline * 1.8;
-      roundRectPath(ctx, sx, -bw - 7.5, sl, 7.5, 2);
-      ctx.fill();
-      ctx.stroke();
-      // the lens at the front of it, and a mount foot at the back
-      ctx.fillStyle = rgba('#ffe08a', 0.75);
-      ctx.beginPath();
-      ctx.arc(sx + sl - 3, -bw - 3.8, 2.4, 0, TAU);
-      ctx.fill();
-      ctx.strokeStyle = rgba('#ffe08a', 0.5);
-      ctx.lineWidth = CFG.hairline * 1.6;
-      ctx.beginPath();
-      ctx.moveTo(sx + 2.5, -bw);
-      ctx.lineTo(sx + 2.5, -bw + 3);
-      ctx.moveTo(sx + sl - 3, -bw);
-      ctx.lineTo(sx + sl - 3, -bw + 3);
-      ctx.stroke();
-      // ...and at the last level it puts a designator on the target
-      if (g.overwatch >= 3 && world.autoAim) {
-        ctx.strokeStyle = rgba('#ffe08a', 0.18 + 0.1 * Math.sin(t * 9));
-        ctx.lineWidth = CFG.hairline;
-        ctx.beginPath();
-        ctx.moveTo(sx + sl, -bw - 3.8);
-        ctx.lineTo(CFG.shooter.aimRange * world.up.aimRange, -bw - 3.8);
-        ctx.stroke();
-      }
-    }
-
     if (this.recoil > 0.02) {
       ctx.globalCompositeOperation = 'lighter';
       drawGlow(ctx, '#ffe9b0', R * 0.16 + bl + 6 - recoil, 0, 24 * this.recoil, this.recoil);
@@ -1028,7 +1219,7 @@ export class Shooter {
   rig(world) {
     const taken = world.ledger;
     if (world.rig && world.rigAt === taken.length) return world.rig;
-    const rig = { rate: 0, slew: 0, aimrange: 0, driftaim: 0, overwatch: 0, casing: 0, insulation: 0, intake: 0 };
+    const rig = { rate: 0, slew: 0, aimrange: 0, driftaim: 0, pile: 0, casing: 0, insulation: 0, intake: 0 };
     for (const id of taken) if (id in rig) rig[id]++;
     /*
      * ...and how much of the branch is on, as one number.
