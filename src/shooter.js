@@ -657,7 +657,18 @@ export class Shooter {
           w.effects.push(new Patch(x, y, {
             r: g.patch.r * w.up.patchR,
             life: g.patch.life,
-            dps: g.patch.dps,
+            /*
+             * ...and HOLLOWPOINT reaches the ground, which it never has.
+             *
+             * `up.damage` is applied to a round's own damage at `fire` time,
+             * and SPORE's own damage is 10 against a patch that does 46 a
+             * second for four and a half -- so the AMMO damage line reached
+             * about a ninth of the round. Measured on a pinned wall, SPORE
+             * went 89 dps to 158 with the whole tree bought, a ladder of
+             * x1.78 where every other round in the rack is x4.7 to x19.
+             * The same fault ARC's chain had, one round over.
+             */
+            dps: g.patch.dps * w.up.damage,
             tone: '#8eeb4b',
             spore: true,
           }));

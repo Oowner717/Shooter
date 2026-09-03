@@ -129,7 +129,10 @@ function tally(world, kind) {
    * machine, which is the exact fault the note above says this accounting was
    * written to stop. It named the right three and then listed five.
    */
-  const hurts = bang;                                                   // SHRAPNEL
+  // SHRAPNEL is `up.mineDamage`. It is read by `detonate`, `fizzle`, `toll`,
+  // SPALL's pellets and their bursts, and -- since build 220 -- THORN's
+  // ground. Not by WIRE's cut, which has `up.wireDamage` of its own.
+  const hurts = bang || kind === 'thorn';                               // SHRAPNEL
   let has = 0;
   let of = 2; // PAIRED CHARGE and QUICK LAY reach every kind: both are about
               // how many are on the field, which every mine has.
@@ -481,8 +484,21 @@ function swallow(world, m, e) {
     const a = rand(0, TAU);
     spark(e.x, e.y, Math.cos(a) * rand(40, 260), Math.sin(a) * rand(40, 260), '#c9a7ff', rand(0.25, 0.5), 2.2);
   }
-  // Destroyed, not dissolved: it counts, and it pays.
-  e.applyDamage(world, e.hp + 1e6, 0, 0, 0);
+  /*
+   * Destroyed, not damaged: it counts, and it pays.
+   *
+   * It went through `applyDamage` with `hp + 1e6`, and ARMORED intercepts
+   * that BEFORE the plate and before the ward -- "it is not a reduction, the
+   * hit did not happen" -- so an armoured body walked onto a VOID, spent it,
+   * and walked off untouched, against a row that says "one kill" and "the
+   * first thing to touch it is gone, whatever its health". No amount of
+   * damage can beat a rule that discards the hit; the answer is not to send
+   * a bigger number through the same door but to use the other one.
+   * `Enemy.destroy` is the door everything else comes through, and it is
+   * where the payout and build 210's fizzle guard both live.
+   */
+  e.hp = 0;
+  e.destroy(world);
   flash(0.12, '#d9c2ff');
   shake(6);
   audio.boom();
@@ -593,7 +609,16 @@ export function updateMines(world, dt) {
         m.patch = new Patch(m.x, m.y, {
           r: T.patch.r * world.up.patchR,
           life: m.life,
-          dps: T.patch.dps,
+          /*
+           * SHRAPNEL reaches THORN's ground, which it never has. `mineGrade`
+           * has counted `up.mineDamage` for THORN since the accounting was
+           * written -- `hurts = bang || thorn || wire` -- so the mine grew a
+           * mark and got visibly heavier for an upgrade that touched nothing
+           * in it. Measured, THORN's ladder was x1.28 where BLAST's is x3.10
+           * and SPALL's x8.61. It is the same fault as SPORE's patch and
+           * ARC's chain, on the third of the three.
+           */
+          dps: T.patch.dps * world.up.mineDamage,
           tone: '#c3eb4b',
         });
         world.effects.push(m.patch);
@@ -658,6 +683,17 @@ export function updateMines(world, dt) {
         if (e.dead || e.harmless || e.staged || e.spent) continue;
         const rr = reach + e.r;
         if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 <= rr * rr) {
+          /*
+           * ...except that VOID does not get to delete a boss.
+           *
+           * It deletes whatever touches it whatever its health, which is the
+           * whole of it -- and a boss's frame is `type.fixed`, placed by the
+           * boss every frame, so a mine that happened to land inside one
+           * would have taken a segment (or a core) out of the choreography in
+           * a single frame. Everything else here does damage, which a boss
+           * can be built to survive; this one cannot be survived.
+           */
+          if (m.kind === 'void' && e.type.fixed) continue;
           if (m.kind === 'snare') snap(world, m);
           else if (m.kind === 'spall') spall(world, m);
           else if (m.kind === 'void') swallow(world, m, e);

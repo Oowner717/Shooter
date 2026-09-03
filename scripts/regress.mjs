@@ -13874,6 +13874,124 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `the mark is worth x${r.want}`);
 }
 
+// --- burning ground takes the damage line, and VOID actually deletes --------
+/*
+ * `up.damage` is applied to a round's own damage at `fire` time, so anything
+ * a round LEAVES BEHIND was outside it. SPORE's own damage is 10 against a
+ * patch that does 46 a second for four and a half seconds, so the AMMO line
+ * reached about a ninth of the round: measured on a pinned wall, SPORE went
+ * 89 dps to 158 with the whole tree bought, a ladder of x1.78 where every
+ * other round is x4.7 to x19. THORN's ground had the same hole in it against
+ * SHRAPNEL -- x1.28 where BLAST is x3.10 -- and `mineGrade` had been
+ * crediting THORN with SHRAPNEL the whole time, so the mine grew a mark and
+ * got visibly heavier for an upgrade that touched nothing in it. Third
+ * instance of the fault ARC's chain had.
+ *
+ * And VOID. Its row says "one kill" and "the first thing to touch it is gone,
+ * whatever its health", and it did that by sending `hp + 1e6` through
+ * `applyDamage` -- which ARMORED intercepts BEFORE the plate and before the
+ * ward, because "it is not a reduction, the hit did not happen". So an
+ * armoured body walked onto a VOID, spent it, and walked off untouched. No
+ * number beats a rule that discards the hit; it goes through `Enemy.destroy`
+ * now, which is the door everything else comes through.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const setup = (bought) => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      if (bought) { g.debugGiveEnergy(500000); g.debugBuyAll(); }
+    };
+    const findPatch = () => w.effects.find((x) => x && typeof x.dps === 'number');
+
+    // ---- SPORE's ground ----
+    const spore = (bought) => {
+      setup(bought);
+      g.toggleRound('spore');
+      w.effects.length = 0;
+      const s = w.shooter;
+      const e = g.debugSpawn('bulwark', s.x, s.y - 240);
+      if (e) { e.staged = false; e.maxHp = 1e9; e.hp = 1e9; e.invMass = 0; }
+      w.autoAim = false; w.autoFire = true;
+      s.aim = -Math.PI / 2; s.targetAim = -Math.PI / 2; s.cooldown = 0;
+      for (let f = 0; f < 90; f++) {
+        if (e) { e.x = s.x; e.y = s.y - 240; e.hp = 1e9; }
+        s.aim = -Math.PI / 2; s.targetAim = -Math.PI / 2;
+        g.update(1 / 60);
+        if (findPatch()) break;
+      }
+      w.autoFire = false;
+      const p = findPatch();
+      return { dps: p ? p.dps : -1, line: w.up.damage };
+    };
+
+    // ---- THORN's ground ----
+    const thorn = (bought) => {
+      setup(bought);
+      w.effects.length = 0;
+      w.mines.length = 0;
+      g.debugThrowMine('thorn');
+      for (let f = 0; f < 120; f++) { g.update(1 / 60); if (findPatch()) break; }
+      const p = findPatch();
+      return { dps: p ? p.dps : -1, line: w.up.mineDamage };
+    };
+
+    // ---- VOID against an armoured body ----
+    const voidOn = (armoured) => {
+      setup(false);
+      w.mines.length = 0;
+      g.debugThrowMine('void');
+      const m = w.mines[w.mines.length - 1];
+      for (let f = 0; f < 120; f++) g.update(1 / 60);
+      if (!m) return { armoured, error: 'no mine' };
+      const e = g.debugSpawn('lurcher', m.x, m.y);
+      if (!e) return { armoured, error: 'no body' };
+      e.staged = false;
+      e.maxHp = 1e9; e.hp = 1e9;
+      if (armoured) {
+        e.traits = [{ id: 'armored' }];
+        e.plateT = 0;
+      }
+      for (let f = 0; f < 60; f++) {
+        if (!e.dead) { e.x = m.x; e.y = m.y; e.vx = 0; e.vy = 0; }
+        g.update(1 / 60);
+      }
+      return { armoured, gone: !!e.dead, mineSpent: !!m.dead };
+    };
+
+    const out = {
+      sporeBare: spore(false), sporeFull: spore(true),
+      thornBare: thorn(false), thornFull: thorn(true),
+      plain: voidOn(false), armoured: voidOn(true),
+      base: { spore: CFG.rounds.spore.patch.dps, thorn: CFG.thorn.patch.dps },
+    };
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+  check('SPORE-s burning ground takes the AMMO damage line',
+    r.sporeBare.dps > 0 && r.sporeFull.dps > 0
+    && Math.abs(r.sporeFull.dps - r.base.spore * r.sporeFull.line) < 0.01
+    && Math.abs(r.sporeBare.dps - r.base.spore) < 0.01,
+    `patch dps ${r.sporeBare.dps} bare -> ${r.sporeFull.dps} bought, against `
+    + `${r.base.spore} x an up.damage of ${r.sporeFull.line}`);
+  check('...and THORN-s takes SHRAPNEL, which mineGrade had been crediting it for',
+    r.thornBare.dps > 0 && r.thornFull.dps > 0
+    && Math.abs(r.thornFull.dps - r.base.thorn * r.thornFull.line) < 0.01,
+    `patch dps ${r.thornBare.dps} bare -> ${r.thornFull.dps} bought, against `
+    + `${r.base.thorn} x an up.mineDamage of ${r.thornFull.line}`);
+  check('...and a VOID deletes an ARMORED body, which absorbed it whole',
+    r.plain.gone === true && r.armoured.gone === true,
+    `plain ${JSON.stringify(r.plain)}, armoured ${JSON.stringify(r.armoured)}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;
