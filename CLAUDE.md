@@ -395,6 +395,12 @@ most once for any given target and cannot spin.
   `regress.mjs` pins the level TOTAL and asserts each ladder as a product
   (`up.rate`, `up.cooldown`), which is what catches a new node arriving as
   well as an old one taking its default back.
+  **The source of it was upgrades.js's own docstring**, which said in as many
+  words that "`levels` absent means without limit" and named HOLLOWPOINT as
+  the example -- one of the uncapped nodes. Seven have now shipped that way.
+  Build 220 corrected the paragraph and asked for the number to be written
+  out: a dial that genuinely wants three is one word longer, and a node with
+  no `levels` is indistinguishable from one whose author forgot.
   HOT LOAD was 0.85³ on the fire interval — 1.63× on rounds a second, larger
   than the FEED nerf of build 178, which capped FEED for exactly that reason
   and stopped one node short. Check the tree's number, not the upgrade's,
@@ -532,6 +538,52 @@ most once for any given target and cannot spin.
   take their other branch, which is the `world.endless` shape from build 186
   all over again. `resting = true` before anything else, or `update()` falls
   into the end-of-wave block next frame and scores the same wave twice.
+- **`up.damage` is applied at the MUZZLE, so anything a round leaves behind or
+  chains to is outside the damage line.** Three rounds had this and all three
+  were found in one sweep: ARC's chain (25 a jump against a dart of 11, so
+  88% of the round was immune and the ladder read x2.28 where BOLT's is
+  x4.74), SPORE's burning ground (46 a second against a round of 10 -- x1.78),
+  and THORN's, which `mineGrade` had been crediting to SHRAPNEL the whole time
+  so the mine grew a mark for an upgrade that touched nothing in it. The tell
+  is a `CFG` number read at a site the multiplier never reaches; the fix is to
+  multiply it there. Measure it: a per-round bench on a pinned wall makes the
+  odd one out obvious in a single table.
+- **A chain round measured against ONE body has its mechanism switched off.**
+  The first bench of ARC reported it the weakest round in the game at both
+  ends. It had nothing to jump to. Two bodies is the minimum honest instrument
+  and the ratio to assert is the chain's SHARE of the round, which is
+  dimensionless and cannot be flattered by a longer reach.
+- **A `Math.max` floor decays to nothing against a compounding ladder.**
+  TITHE's mark was `Math.max(e.bounty, 3.5)`, and a body's own bounty is
+  `bountyStep ^ (tier - 1)` = 1.10^(tier-1) -- which reaches 3.45 at tier 14,
+  so from tier 15 the mark on the round whose whole point is that it pays was
+  worth exactly nothing. The floor was there to stop eight marks compounding;
+  a flag plus a multiplier keeps the "once" and keeps the value.
+- **A branch that ends on `continue` skips whatever the bottom of the loop
+  does.** THORN and LODE were the two kinds of eight whose arm of
+  `updateMines` ended on one, and the only thing past it is the splice that
+  takes a dead mine off `world.mines`. So they never left the list, were
+  re-entered every frame with `life` already past zero, and called `fizzle`
+  again each time -- with SALTED bought that is a blast, a ring, a Shock and
+  an `audio.boom()` sixty times a second, for the rest of the run, per expired
+  mine. Measured 39 blasts in the second after one expired. Anything that can
+  be called twice needs to read its own `dead` back.
+- **ARMORED does not reduce a hit, it DISCARDS it** -- "the hit did not
+  happen", before the plate and before the ward. So no amount of damage kills
+  through it: VOID sent `hp + 1e6` through `applyDamage` and an armoured body
+  walked onto the mine, spent it, and walked off untouched, against a row that
+  says "one kill... whatever its health". Anything that must not be survivable
+  goes through `Enemy.destroy`, which is the door everything else uses.
+- **A throw has two halves and they are earned by CADENCE, not by weight.**
+  `throwOff` lifts the speed ceiling (`cruise * 6` -> `thrownSpeed`) AND the
+  repeated-shove fade. PULSE and PILE get both, because a press every seven or
+  eight seconds is a deliberate clear. SLUG does not, and the arithmetic
+  screams that it should -- 1500 impulse clipped to 137 u/s against a BULWARK,
+  so SLEDGE and HEAVY multiply a number the physics discards. It was tried,
+  lifting only the ceiling: a LURCHER under sustained SLUG with two HEAVYs
+  went out to 1293 units of an 817-unit field and never came back, which is
+  build 110 verbatim. A round fired 1.5 times a second cannot be exempt
+  however heavy it is. `regress.mjs` pins the ceiling and records the argument.
 - **`spent` is a rule for what may be SHOT; `staged` is a rule for what may be
   CHOSEN.** Build 219's audit got this backwards in three places at once and
   the distinction is the whole of it. `spent` (a boss's own frame through its
