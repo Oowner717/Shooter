@@ -37,7 +37,7 @@
 import { TYPE_BY_ID, ENEMY_TYPES } from './config.js';
 import { GROUP_MAX, FORMATION_SHAPES, drawSpecimen } from './enemies.js';
 import { ANOMALIES, anomalyOf, makerOf } from './anomaly.js';
-import { codex } from './codex.js';
+import { codex, FIELD_ENTRIES } from './codex.js';
 import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
 import { ledger, SRC_EXTRA } from './ledger.js';
@@ -86,6 +86,24 @@ export function sourceGroup(src) {
 }
 
 const GROUP_ORDER = ['AMMUNITION', 'MINES', 'ABILITIES', 'EVERYTHING ELSE'];
+
+/**
+ * What the picker offers: the field, and nothing an anomaly puts down.
+ *
+ * The first version listed every ENEMY_TYPE, which meant thirty-seven chips
+ * including seven boss cores and the fourteen pieces they make -- so ORDINAL
+ * could be put down as a bare core with none of its frame, a DIGIT could be
+ * spawned with no ORDINAL to have come off, and the six rows of the picker
+ * you had to scroll past to reach anything were mostly things that only exist
+ * inside a fight. A boss is summoned WHOLE from the ANOMALIES row underneath,
+ * which is the only way it is a boss at all.
+ *
+ * Derived from the glossary's own split rather than written out here:
+ * `FIELD_ENTRIES` is `CODEX` minus every id any anomaly puts on the field, so
+ * a new boss or a new minion is excluded by existing.
+ */
+const FIELD_IDS = new Set(FIELD_ENTRIES.map((e) => e.id));
+const SPAWNABLE = ENEMY_TYPES.filter((t) => FIELD_IDS.has(t.id));
 
 /** A number a player can read at a glance, not to four significant figures. */
 function num(v) {
@@ -162,7 +180,7 @@ export class Sandbox {
 
     const pick = document.createElement('div');
     pick.className = 'spawnPick';
-    for (const t of ENEMY_TYPES) {
+    for (const t of SPAWNABLE) {
       const b = document.createElement('button');
       b.className = 'spawnChip';
       b.title = t.name;
@@ -306,7 +324,9 @@ export class Sandbox {
     if (this.el.root) this.el.root.hidden = true;
     if (this.el.sheet) this.el.sheet.hidden = true;
     document.body.classList.remove('sandbox');
-    ledger.arm(false);
+    // Kept, not cleared: the menu shows the last session, and a table that
+    // vanished the moment you left would be a table nobody could quote.
+    ledger.disarm();
   }
 
   show(which) {
@@ -396,7 +416,7 @@ export class Sandbox {
     // first thing that is -- a picker whose GO does nothing is worse than a
     // picker that chose for you.
     if (!this.allowed(this.pick.id)) {
-      const first = ENEMY_TYPES.find((t) => this.allowed(t.id));
+      const first = SPAWNABLE.find((t) => this.allowed(t.id));
       if (first) this.pick.id = first.id;
       for (const [id, b] of this.chips) b.classList.toggle('on', id === this.pick.id);
     }
@@ -426,10 +446,14 @@ export class Sandbox {
     this.el.sust.textContent = num(ledger.total / Math.max(0.25, ledger.t));
     this.el.peak.textContent = num(ledger.peak);
     this.el.clock.textContent = clock(ledger.t);
-    this.el.over.textContent = ledger.total > 0
-      ? `${Math.round((ledger.over / ledger.total) * 100)}% OVERKILL` : '';
+    this.el.over.textContent = ledger.total > 0 || ledger.kills > 0
+      ? `${ledger.kills} DESTROYED  ·  ${ledger.total > 0
+        ? Math.round((ledger.over / ledger.total) * 100) : 0}% OVERKILL` : '';
 
-    const rows = ledger.table();
+    // A row with no damage and no kills is a source that did nothing, and the
+    // table should not carry it. VOID has no damage by design and is kept by
+    // the kills arm.
+    const rows = ledger.table().filter((r) => r.total > 0 || r.kills > 0);
     if (!rows.length) {
       this.el.table.innerHTML = '<p class="sbEmpty">Nothing has been hit yet. '
         + 'Put something down and shoot it.</p>';
@@ -443,14 +467,22 @@ export class Sandbox {
       parts.push(`<h4>${g}</h4>`);
       for (const r of mine) {
         const tone = sourceTone(r.src);
+        /*
+         * A source with kills and no damage is not a blank row: VOID deletes
+         * a body through `Enemy.destroy` and never touches `applyDamage`, so
+         * its damage really is zero and its whole contribution is the kill.
+         * Saying so beats a row of dashes.
+         */
+        const rate = r.total > 0 ? num(r.sustained) : '&mdash;';
+        const tot = r.total > 0 ? num(r.total) : `${r.kills} kill${r.kills === 1 ? '' : 's'}`;
         parts.push(
           '<div class="sbRow">'
           + `<i style="background:${tone}"></i>`
           + `<span class="sbName">${sourceName(r.src)}</span>`
           + `<span class="sbBar"><b style="width:${(r.total / top) * 100}%;`
           + `background:${rgba(tone, 0.55)}"></b></span>`
-          + `<span class="sbNum">${num(r.sustained)}</span>`
-          + `<span class="sbTot">${num(r.total)}</span>`
+          + `<span class="sbNum">${rate}</span>`
+          + `<span class="sbTot">${tot}</span>`
           + '</div>',
         );
       }
@@ -477,6 +509,26 @@ export class Sandbox {
       if (this.sheet === 'spawn') this.syncSpawn();
     }
   }
+}
+
+/**
+ * The last session, for the menu room. One line of headline and the three
+ * heaviest sources -- enough to be worth opening the tab for, and not so much
+ * that the room stops being a door.
+ */
+export function lastSession() {
+  if (!(ledger.t > 0) || (ledger.total <= 0 && ledger.kills <= 0)) return null;
+  return {
+    clock: clock(ledger.t),
+    total: num(ledger.total),
+    kills: ledger.kills,
+    dps: num(ledger.total / Math.max(0.25, ledger.t)),
+    top: ledger.table().filter((r) => r.total > 0 || r.kills > 0).slice(0, 3).map((r) => ({
+      name: sourceName(r.src),
+      tone: sourceTone(r.src),
+      value: r.total > 0 ? num(r.sustained) : `${r.kills} kill${r.kills === 1 ? '' : 's'}`,
+    })),
+  };
 }
 
 /** The tree node that opens the door, named in one place. */

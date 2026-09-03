@@ -4097,3 +4097,38 @@ body.menuOpen #sandbox { display: none !important; }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+
+/* The last session, in the SANDBOX room. The tab is worth opening outside the
+   bench because of this; before it, the room was one button and two thirds of
+   a screen of nothing. */
+.sbLast { width: 100%; margin-top: 18px; text-align: left; }
+.sbLast[hidden] { display: none !important; }
+.sbLast h5 {
+  margin-bottom: 7px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--dim);
+}
+.sbLastHead { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 8px; }
+.sbLastHead div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(14, 26, 42, 0.7);
+}
+.sbLastHead b { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sbLastHead em { font-size: 7.5px; font-style: normal; letter-spacing: 0.08em; color: var(--dim); }
+.sbLastRow {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0;
+  font-size: 11px;
+}
+.sbLastRow i { width: 8px; height: 8px; border-radius: 2px; }
+.sbLastRow b { font-weight: 600; font-variant-numeric: tabular-nums; }

@@ -1147,6 +1147,33 @@ most once for any given target and cannot spin.
   come out of the muzzle (HE's blast, ARC's chain, SPINE's splinters), because
   a counter that is right for BOLT and wrong for those is the failure worth
   guarding against.
+- **A total that adds up does not mean the table is right.** Build 233 swept
+  all 25 damage sources -- 9 rounds, 8 mines, 8 abilities -- against a pinned
+  wall and found FOUR mis-booked, every one of which passed the total-only
+  check build 232 shipped with, because a nameless hit still adds up. PULSE's
+  blast carried no source at all and went to `unattributed`; **HAIL's darts
+  and PRISM's shell fell through `fire`'s default to `world.round`**, so
+  pressing either read as the gun; and a BLOOM taking its neighbours with it
+  was nameless. The tell is the `unattributed` row, and the assertion that
+  catches it is WHICH ROWS EXIST, not a share of the total -- a share moves
+  with the window, because PILE fires on a clock of its own and lands on the
+  same wall (PULSE owned 58% of six seconds and 41% of twelve). The rule the
+  suite states: the source's own row is not empty, and no row exists that is
+  not the source, PILE or contact.
+  Two sources legitimately book no damage and both would read as broken
+  without saying so: SNARE's damage is the crowd grinding against itself, and
+  **VOID has no damage at all** -- it removes a body through `Enemy.destroy`,
+  which never reaches `applyDamage`, so `ledger.kill()` books it as a kill and
+  the panel prints "1 kill" where the rate would be. It also refuses a
+  practice dummy, which would otherwise be the one thing on the field able to
+  end a measurement.
+- **The sandbox picker is the FIELD, and a boss is summoned whole.** It listed
+  every ENEMY_TYPE at first -- 37 chips including seven boss cores and the
+  fourteen pieces they make -- so a bare ORDINAL core with none of its frame
+  could be put down, and a DIGIT with no ORDINAL to have come off. It is
+  `FIELD_ENTRIES` now, which is the glossary's own split (`CODEX` minus every
+  id any anomaly puts on the field), so a new boss or minion is excluded by
+  existing rather than by being added to a list.
 - **A mood transition does not actually ease, and has not for a long time.**
   `background.update` runs `mixHex(this.mood[key], this.target[key], k)` with
   `k = 1 - exp(-dt * 0.8)` -- about 0.013 at 60Hz -- and `mixHex` rounds to

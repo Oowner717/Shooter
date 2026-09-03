@@ -1061,6 +1061,7 @@ export const ABILITIES = [
       applyBlast(world, {
         x: s.x, y: s.y,
         r: R,
+        src: 'pulse',
         damage: 58,
         impulse: 1050 * up.pulsePush,
         /*
@@ -1141,6 +1142,10 @@ export const ABILITIES = [
       for (let i = 0; i < count; i++) {
         const a = s.aim + ((i / (count - 1)) - 0.5) * arc + spread(0.022);
         fire(world, s.muzzleX, s.muzzleY, a, {
+          // ...and it is HAIL's, not the loaded round's. `fire` defaults an
+          // untagged projectile to `world.round`, which is right for the nine
+          // things the rack fires and wrong for the two that are not rounds.
+          src: 'fan',
           speed: rand(1000, 1230),
           r: 3,
           damage: 15,
@@ -1277,6 +1282,7 @@ export const ABILITIES = [
       // Fused, not ballistic: it refracts after a fixed run whether or not it
       // hits anything, so the burst always lands somewhere you can see.
       fire(world, s.muzzleX, s.muzzleY, s.aim, {
+        src: 'prism',
         speed: 820,
         r: 8,
         damage: 30,

@@ -19,6 +19,7 @@ import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
 import { BUILD, REV } from './config.js';
 import { swipeToDismiss, swipeTabs } from './swipe.js';
+import { lastSession } from './sandbox.js';
 import { TREE, NODES, priceOf } from './tree.js';
 import { svgMark } from './util.js';
 
@@ -371,9 +372,21 @@ export class Menu {
       this.setOpen(false);
     });
     open.appendChild(go);
+    /*
+     * ...and what the last visit measured.
+     *
+     * The room was one button and two thirds of a screen of nothing under it.
+     * The numbers are the whole reason the bench exists, so the tab carries
+     * the last session's headline and its three heaviest sources -- which
+     * also means the figures survive walking out, which they did not until
+     * `ledger.disarm()` replaced the reset on the way out.
+     */
+    const last = document.createElement('div');
+    last.className = 'sbLast';
+    open.appendChild(last);
 
     p.append(shut, open);
-    this.sandboxRoom = { shut, open, go };
+    this.sandboxRoom = { shut, open, go, last };
   }
 
   /** The lock comes off the moment the run owns the node. */
@@ -385,6 +398,19 @@ export class Menu {
       r.open.hidden = !owned;
       // Only from a running field: the title screen and an ending are not one.
       r.go.disabled = this.game.world.phase !== 'staging';
+      const s = owned ? lastSession() : null;
+      r.last.hidden = !s;
+      r.last.innerHTML = s
+        ? `<h5>LAST SESSION</h5>
+           <div class="sbLastHead">
+             <div><b>${s.clock}</b><em>ON THE BENCH</em></div>
+             <div><b>${s.total}</b><em>DAMAGE</em></div>
+             <div><b>${s.dps}</b><em>DPS AVG</em></div>
+             <div><b>${s.kills}</b><em>DESTROYED</em></div>
+           </div>`
+          + s.top.map((t) => `<div class="sbLastRow"><i style="background:${t.tone}"></i>`
+            + `<span>${t.name}</span><b>${t.value}</b></div>`).join('')
+        : '';
     }
     if (this.lockTab) {
       // Two classes, not `hidden` on the padlock: `.tabLock` is given a

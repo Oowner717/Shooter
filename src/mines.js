@@ -32,6 +32,7 @@ import { spark, dot, ring, ripple, shake, flash, Shock } from './fx.js';
 import { Patch } from './patch.js';
 import { fire } from './projectiles.js';
 import { audio } from './audio.js';
+import { ledger } from './ledger.js';
 
 const M = CFG.mines;
 const S = CFG.snare;
@@ -628,6 +629,10 @@ function swallow(world, m, e) {
    * where the payout and build 210's fizzle guard both live.
    */
   e.hp = 0;
+  // Booked as a KILL and not as damage, because that is what it is: the mine
+  // has no damage number and deleting a body through `destroy` never reaches
+  // `applyDamage`. Without this the counter reports VOID as doing nothing.
+  ledger.kill('void');
   e.destroy(world);
   flash(0.12, '#d9c2ff');
   shake(6);
@@ -880,7 +885,14 @@ export function updateMines(world, dt) {
            * a single frame. Everything else here does damage, which a boss
            * can be built to survive; this one cannot be survived.
            */
-          if (m.kind === 'void' && e.type.fixed) continue;
+          /*
+           * ...nor a practice dummy. A dummy is a body that cannot die, so
+           * that a rate can be read off it without the reading being cut
+           * short; a mine that deletes one would be the one thing on the
+           * field able to end the measurement, and it would look like a bug
+           * rather than like the rule VOID actually has.
+           */
+          if (m.kind === 'void' && (e.type.fixed || e.dummy)) continue;
           if (m.kind === 'snare') snap(world, m);
           else if (m.kind === 'spall') spall(world, m);
           else if (m.kind === 'void') swallow(world, m, e);

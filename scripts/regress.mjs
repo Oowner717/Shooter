@@ -16330,6 +16330,244 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.dummyPaidNothing}, and it was actually being shot ${r.dummyTookFire}`);
 }
 
+/*
+ * ---- build 233: what the picker offers, and what the counter books ----
+ *
+ * Two separate promises. The picker is the field and nothing an anomaly puts
+ * down -- a boss is summoned WHOLE from the row underneath, because a bare
+ * ORDINAL core with none of its frame is not the fight and a DIGIT with no
+ * ORDINAL to have come off is not an object. And every damage path in the
+ * game books to the name a player would look for it under.
+ *
+ * The second is the one worth the runtime. The ledger's TOTAL matching the
+ * health a body lost only proves nothing is MISSING: a site that passes no
+ * source still books, under `unattributed`. Four things were wrong when this
+ * was first swept -- PULSE's blast had no source at all, HAIL's darts and
+ * PRISM's shell fell through `fire`'s default and were booked to the LOADED
+ * ROUND, and a BLOOM taking its neighbours with it was unattributed -- and
+ * every one of them passed a total-only check.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { ledger } = await import('../src/ledger.js');
+    const { NODES } = await import('../src/tree.js');
+    const { ARSENAL } = await import('../src/arsenal.js');
+    const { ABILITIES } = await import('../src/abilities.js');
+    const { ANOMALIES } = await import('../src/anomaly.js');
+    const { throwMine } = await import('../src/mines.js');
+    const { freshUpgrades } = await import('../src/upgrades.js');
+    const { codex } = await import('../src/codex.js');
+    const out = {};
+
+    // ---- the picker ------------------------------------------------------
+    codex.unlockAll();
+    g.restart();
+    g.debugGiveEnergy(60000);
+    g.buy('sandbox');
+    g.enterSandbox();
+    const sb = g.sandbox;
+    const offered = [...sb.chips.keys()];
+    const anomalyIds = new Set(ANOMALIES.flatMap((a) => a.types));
+    out.offered = offered.length;
+    out.leaked = offered.filter((id) => anomalyIds.has(id));
+    out.bossRow = [...sb.bossChips.keys()].length;
+    out.bossRowOpen = [...sb.bossChips.values()].filter((b) => !b.disabled).length;
+    g.exitSandbox();
+
+    // ---- every damage path -----------------------------------------------
+    const setup = () => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      w.up = freshUpgrades();
+      g.debugGiveEnergy(400000);
+      for (let p = 0; p < 4; p++) for (const n of NODES) if (n.id) g.buy(n.id);
+      w.mines.length = 0;
+      w.projectiles.length = 0;
+      w.effects.length = 0;
+      w.drops.length = 0;
+      w.debris.length = 0;
+      ledger.arm(true);
+    };
+    /*
+     * A wall that cannot die, cannot move and carries no armour, plate or
+     * ward -- so `took` is the delivered number and nothing about the BODY is
+     * in the reading. Nine hundred million health, because VOID deletes it
+     * whatever the number and the point is that the number does not matter.
+     */
+    const wall = (dy) => {
+      const s = w.shooter;
+      const e = g.debugSpawn('bulwark', s.x, s.y - dy);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.hp = 9e8;
+      e.maxHp = 9e8;
+      e.invMass = 0;
+      e.armor = 0;
+      e.ward = 0;
+      e.traits = [];
+      return e;
+    };
+    const run = (e, seconds, tick) => {
+      const s = w.shooter;
+      const hp0 = e.hp;
+      const home = { x: e.x, y: e.y };
+      for (let f = 0; f < 60 * seconds; f++) {
+        e.x = home.x; e.y = home.y; e.vx = 0; e.vy = 0;
+        s.aim = -Math.PI / 2; s.targetAim = s.aim;
+        if (tick) tick(f);
+        g.update(1 / 60);
+      }
+      const rows = ledger.table();
+      const res = {
+        took: +(hp0 - e.hp).toFixed(1),
+        booked: +ledger.total.toFixed(1),
+        kills: ledger.kills,
+        unattr: (rows.find((q) => q.src === 'unattributed') || {}).total || 0,
+        rows: rows.map((q) => [q.src, +q.total.toFixed(1), q.kills]),
+      };
+      ledger.arm(false);
+      w.autoAim = false;
+      w.autoFire = false;
+      return res;
+    };
+    const share = (res, key) => {
+      const row = res.rows.find((q) => q[0] === key);
+      return row && res.booked > 0 ? row[1] / res.booked : 0;
+    };
+
+    out.rounds = [];
+    for (const a of ARSENAL.filter((x) => x.kind === 'round')) {
+      setup();
+      w.round = a.key;
+      const e = wall(300);
+      w.autoAim = true;
+      w.autoFire = true;
+      const res = run(e, 4);
+      out.rounds.push({ key: a.key, label: a.label, ...res, share: share(res, a.key) });
+    }
+
+    out.mines = [];
+    for (const a of ARSENAL.filter((x) => x.kind === 'mine')) {
+      setup();
+      const e = wall(320);
+      throwMine(w, a.key);
+      const m = w.mines[w.mines.length - 1];
+      m.x1 = e.x;
+      m.y1 = e.y + 30;
+      if (a.key === 'wire') { m.ax = e.x - 150; m.bx = e.x + 150; m.ay = e.y; m.by = e.y; }
+      const res = run(e, 20);
+      out.mines.push({ key: a.key, label: a.label, ...res, share: share(res, a.key) });
+    }
+
+    out.abilities = [];
+    for (let i = 0; i < ABILITIES.length; i++) {
+      setup();
+      const a = ABILITIES[i];
+      w.loadout.abilities = ABILITIES.map((x) => x.id);
+      const e = wall(150);
+      const res = run(e, 14, (f) => { if (f === 30) g.useAbility(i); });
+      out.abilities.push({ key: a.id, label: a.name, ...res, share: share(res, a.id) });
+    }
+
+    // ---- VOID books a kill, and does not take a dummy ---------------------
+    setup();
+    g.buy('sandbox');
+    g.enterSandbox();
+    g.sandbox.dummy();
+    const d = w.enemies.find((x) => x.dummy);
+    if (d) { d.x = w.shooter.x; d.y = w.shooter.y - 300; }
+    throwMine(w, 'void');
+    const vm = w.mines[w.mines.length - 1];
+    vm.x1 = d ? d.x : w.shooter.x;
+    vm.y1 = d ? d.y : w.shooter.y - 300;
+    for (let f = 0; f < 60 * 8; f++) {
+      if (d) { d.x = w.shooter.x; d.y = w.shooter.y - 300; d.vx = 0; d.vy = 0; }
+      g.update(1 / 60);
+    }
+    out.dummySurvivedVoid = !!d && !d.dead;
+    g.exitSandbox();
+    g.restart();
+    w.up = freshUpgrades();
+    return out;
+  });
+
+  check('the picker offers the field, and an anomaly is summoned whole or not at all',
+    r.leaked.length === 0 && r.offered > 10 && r.bossRow === 7 && r.bossRowOpen === 7,
+    `${r.offered} field objects offered and ${r.leaked.length} anomaly ids leaked `
+    + `(${r.leaked.join(', ') || 'none'}); the ANOMALIES row carries `
+    + `${r.bossRow}, ${r.bossRowOpen} of them open`);
+
+  /*
+   * Asserted as WHICH ROWS EXIST, not as a share of the total.
+   *
+   * A share is the wrong instrument here and the first version of this used
+   * one. PILE is on the TURRET branch, fires on a clock of its own and lands
+   * on the same wall, so the source under test never owns 100% of a long
+   * window -- PULSE read 58% over six seconds and 41% over twelve, which is
+   * the window moving and not the game. What is actually being claimed is
+   * that every point booked has a name a player would look for it under, so
+   * that is what is checked: the source's own row is not empty, and no row
+   * exists that is not the source, PILE, or body-on-body contact.
+   *
+   * `unattributed` is the row this exists to catch. Four things landed in it
+   * on the first sweep -- PULSE's blast carried no source at all, HAIL's
+   * darts and PRISM's shell fell through `fire`'s default to the LOADED
+   * ROUND, and a BLOOM's death blast was nameless -- and every one of them
+   * passed a total-only check, because a nameless hit still adds up.
+   */
+  const EXTRA = new Set(['pile', 'contact']);
+  const stray = (x) => x.rows.filter((q) => q[0] !== x.key && !EXTRA.has(q[0]));
+  const bad = (list, wantsDamage = true) => list.filter((x) => x.unattr > 0
+    || Math.abs(x.took - x.booked) > Math.max(1, x.took * 0.002)
+    || stray(x).length > 0
+    || (wantsDamage && !(x.share > 0)));
+  const say = (list) => list.map((x) => {
+    const s2 = stray(x);
+    return `${x.label} ${(x.share * 100).toFixed(0)}%${s2.length ? ` STRAY:${s2.map((q) => q[0]).join('+')}` : ''}`;
+  }).join(' ');
+
+  check('every round books its damage to its own name and to no other',
+    bad(r.rounds || []).length === 0 && (r.rounds || []).length === 9,
+    say(r.rounds || []));
+
+  /*
+   * SNARE and VOID are the two exceptions and both are by design: a snare's
+   * damage is the crowd grinding against itself, which a single pinned wall
+   * cannot do, and VOID has no damage at all -- it removes a body through
+   * `Enemy.destroy`, which never reaches `applyDamage`, so its whole
+   * contribution is a kill and the ledger books it as one. LODE has no damage
+   * of its own either and still has a row, because SALTED gives a spent mine
+   * a blast and it is booked to the kind that left it.
+   */
+  const mines = (r.mines || []).filter((x) => x.key !== 'snare' && x.key !== 'void');
+  const voidRow = (r.mines || []).find((x) => x.key === 'void');
+  const snare = (r.mines || []).find((x) => x.key === 'snare');
+  check('every mine books its damage to its own name, and the two that have none say so',
+    bad(mines).length === 0 && mines.length === 6
+    && !!snare && snare.booked === 0
+    && !!voidRow && voidRow.booked === 0 && voidRow.kills === 1,
+    `${say(mines)}; SNARE books ${snare ? snare.booked : '?'} (its damage is the `
+    + `knot grinding), VOID ${voidRow ? voidRow.booked : '?'} damage and `
+    + `${voidRow ? voidRow.kills : '?'} kill`);
+
+  const abl = (r.abilities || []).filter((x) => x.key !== 'stasis');
+  const stasis = (r.abilities || []).find((x) => x.key === 'stasis');
+  check('every ability books its damage to its own name, and STASIS has none to book',
+    bad(abl).length === 0 && abl.length === 7
+    && !!stasis && stasis.share === 0 && stray(stasis).length === 0,
+    `${say(abl)}; STASIS does no damage of its own`);
+
+  check('...and VOID will not take a practice dummy',
+    r.dummySurvivedVoid,
+    `the dummy is ${r.dummySurvivedVoid ? 'still there' : 'GONE'} after walking a VOID`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

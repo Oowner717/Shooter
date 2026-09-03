@@ -1263,7 +1263,7 @@ export class Enemy {
      * zero against a practice dummy, and against a real wave the difference
      * between output and what output was worth.
      */
-    if (ledger.on) ledger.note(src, real, Math.max(0, real - this.hp));
+    if (ledger.on) ledger.note(src, real, Math.max(0, real - this.hp), real >= this.hp);
     this.hp -= real;
     this.flash = Math.min(1, this.flash + 0.5 + real / 260);
     if (impulse) {
@@ -1431,6 +1431,10 @@ export class Enemy {
       world.pendingBlasts.push({
         x: this.x, y: this.y, r: t.detonate.radius,
         damage: t.detonate.damage, impulse: 260, source: this,
+        // The field hurting itself. Booked under its own name rather than
+        // under whatever killed the BLOOM, because a chain running through a
+        // crowd is a thing the player did and not a thing the round did.
+        src: 'bloom',
       });
     }
 

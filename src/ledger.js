@@ -24,6 +24,13 @@
  *               the end of the hit. Against a practice dummy this is zero by
  *               construction; against a real wave it is how much of the output
  *               was wasted, which is a different and equally useful reading.
+ *   `kills`     how many bodies this source finished. Kept because damage on
+ *               its own cannot describe VOID, which does no damage at all --
+ *               it deletes one body through `Enemy.destroy`, whatever its
+ *               health, and a table with only a damage column reports the
+ *               game's most decisive mine as doing nothing. That is the same
+ *               shape as the KNELL complaint build 231 chased down, and a
+ *               counter is worth having only if it cannot make it again.
  *
  * ---- the two rates ----
  *
@@ -56,8 +63,9 @@ class Ledger {
     this.t = 0;
     this.total = 0;
     this.over = 0;
+    this.kills = 0;
     this.peak = 0;
-    /** src -> { total, over, hits, first, last } */
+    /** src -> { total, over, hits, kills, first, last } */
     this.by = new Map();
     /**
      * The rolling window, as a flat ring of (t, amount, src) rather than a
@@ -70,16 +78,30 @@ class Ledger {
     this.head = 0; // index of the oldest entry still inside the window
   }
 
-  /** Arm or disarm. Arming always starts from a clean slate. */
+  /** Arm, from a clean slate. */
   arm(on) {
     this.on = !!on;
     this.reset();
+  }
+
+  /**
+   * Stop recording and KEEP what was recorded.
+   *
+   * Leaving the bench used to `arm(false)`, which resets -- so the moment you
+   * walked out, the session you had just spent five minutes on was gone. The
+   * numbers are the whole point of the room; they outlive the visit now, and
+   * the menu shows the last one. Entering re-arms and clears, so a session is
+   * still one session.
+   */
+  disarm() {
+    this.on = false;
   }
 
   reset() {
     this.t = 0;
     this.total = 0;
     this.over = 0;
+    this.kills = 0;
     this.peak = 0;
     this.by.clear();
     this.wT.length = 0;
@@ -98,24 +120,50 @@ class Ledger {
    *   row is a bug this can actually show you.
    * @param real the delivered damage, after mitigation.
    * @param over the part of `real` past what the body had left.
+   * @param killed whether this hit is the one that finished it.
    */
-  note(src, real, over = 0) {
+  note(src, real, over = 0, killed = false) {
     if (!this.on || !(real > 0)) return;
     this.total += real;
     this.over += over;
+    if (killed) this.kills++;
     const key = src || 'unattributed';
-    let e = this.by.get(key);
-    if (!e) {
-      e = { total: 0, over: 0, hits: 0, first: this.t, last: this.t };
-      this.by.set(key, e);
-    }
+    const e = this.row(key);
     e.total += real;
     e.over += over;
     e.hits++;
+    if (killed) e.kills++;
     e.last = this.t;
     this.wT.push(this.t);
     this.wD.push(real);
     this.wS.push(key);
+  }
+
+  row(key) {
+    let e = this.by.get(key);
+    if (!e) {
+      e = { total: 0, over: 0, hits: 0, kills: 0, first: this.t, last: this.t };
+      this.by.set(key, e);
+    }
+    return e;
+  }
+
+  /**
+   * A body removed without being damaged.
+   *
+   * VOID is the only thing in the game that does this, and it does it through
+   * `Enemy.destroy` rather than `applyDamage` on purpose -- ARMORED DISCARDS a
+   * hit rather than reducing it, so no amount of damage can be guaranteed to
+   * kill and the mine whose whole promise is "one kill, whatever its health"
+   * cannot be built out of one. So it has nothing to book as damage, and
+   * without this its row would be empty.
+   */
+  kill(src) {
+    if (!this.on) return;
+    this.kills++;
+    const e = this.row(src || 'unattributed');
+    e.kills++;
+    e.last = this.t;
   }
 
   /**
@@ -181,12 +229,15 @@ class Ledger {
         total: e.total,
         over: e.over,
         hits: e.hits,
+        kills: e.kills,
         live: live.get(src) || 0,
         sustained: e.total / span,
         share: this.total > 0 ? e.total / this.total : 0,
       });
     }
-    rows.sort((a, b) => b.total - a.total);
+    // By damage, then by kills -- so VOID, which has no damage at all, still
+    // sorts above a row that did nothing rather than falling off the bottom.
+    rows.sort((a, b) => (b.total - a.total) || (b.kills - a.kills));
     return rows;
   }
 }
@@ -204,6 +255,7 @@ export const ledger = new Ledger();
  */
 export const SRC_EXTRA = {
   contact: { name: 'COLLISIONS', tone: '#9fb3c8' },
+  bloom: { name: 'BLOOM BLAST', tone: '#ff5d8f' },
   casing: { name: 'HARD CASING', tone: '#7cffb2' },
   pile: { name: 'PILE', tone: '#ffd166' },
   turret: { name: 'TURRET', tone: '#59e0ff' },
