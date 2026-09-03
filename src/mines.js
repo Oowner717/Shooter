@@ -713,7 +713,17 @@ function cut(world, m, dt) {
  */
 function toll(world, m) {
   const i = m.tollsMax - m.tolls;
-  const r = K.blast.r * (1 + i * K.grow) * world.up.mineBlast;
+  /*
+   * Evenly across `spread`, rather than `1 + i * grow` unbounded in `i`.
+   * The old form gave FOURTH BELL's two extra tolls to the far end of the
+   * ladder, so a node that reads "+1 toll" was also buying a ring two and a
+   * half bases wide; see the paragraph on `spread` in config.js. `tollsMax`
+   * is what the mine was laid with, so the ladder does not change shape under
+   * a mine that is already on the ground.
+   */
+  const n = Math.max(1, m.tollsMax);
+  const t = n > 1 ? i / (n - 1) : 1;
+  const r = K.blast.r * (1 + (K.spread - 1) * t) * world.up.mineBlast;
   const damage = K.blast.damage * K.fade ** i * world.up.mineDamage;
   m.tolls--;
   m.tollTimer = K.gap;

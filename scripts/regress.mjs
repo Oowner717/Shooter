@@ -15230,6 +15230,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const { CFG, TYPE_BY_ID } = await import('../src/config.js');
     const { NODES } = await import('../src/tree.js');
     const { freshUpgrades } = await import('../src/upgrades.js');
+    const { throwMine } = await import('../src/mines.js');
     const g = window.__sim;
     const w = g.world;
     const s = w.shooter;
@@ -15278,13 +15279,27 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const onSurface = splinters.filter(
       (q) => Math.abs(Math.hypot(q.x - wall.x, q.y - wall.y) - wall.r) < 3).length;
 
-    // ---- the four widest mines ---------------------------------------------
+    // ---- how much of the screen a mine may take ----------------------------
     /*
-     * Each one's MAXIMUM, computed the way the game computes it, with the
-     * whole tree owned. Pinned as a ceiling rather than as an equality: what
-     * the player asked for is that none of these fills the screen, and a
-     * ceiling is the statement of that. The field is about 630 units across,
-     * so a radius over 300 is already a circle wider than the screen.
+     * Every mine's MAXIMUM, with the whole tree owned, against the SCREEN it
+     * is drawn on rather than against a constant -- `innerWidth / CFG.zoom` is
+     * the field the player can actually see, and it is the only honest
+     * denominator for "it takes up most of the screen".
+     *
+     * The previous version of this case was four hand-typed ceilings, each set
+     * to whatever that build's value happened to be, under a comment saying
+     * "the field is about 630 units across, so a radius over 315 is a circle
+     * wider than the screen. Every one of these is now inside that" -- while
+     * asserting `knell < 400`, which is 120% of it. The rule and the number
+     * had come apart, so the case went green through the exact complaint it
+     * was written for, twice. It states the rule now and computes the numbers.
+     *
+     * Two tiers, and the split is what the eye does with each:
+     *   a BLAST is over in a quarter second and is read from its EDGE, so the
+     *   edge has to be on the screen with room -- half the width.
+     *   a standing reach is drawn continuously and is read from its CONTENTS
+     *   (bodies dragged in, ground burning), so it only has to fit -- two
+     *   thirds.
      */
     g.restart();
     g.debugTeachAll();
@@ -15292,14 +15307,64 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     for (let pass = 0; pass < 4; pass++) for (const n of NODES) if (n.id) g.buy(n.id);
     const up = w.up;
     const K = CFG.knell;
+    const screen = window.innerWidth / CFG.zoom;   // world units across the display
     const wide = {
+      screen: +screen.toFixed(0),
+      blastCap: +(screen * 0.25).toFixed(1),       // half the width, as a radius
+      holdCap: +(screen / 3).toFixed(1),           // two thirds, as a radius
       blast: CFG.mines.blast.r * up.mineBlast,
-      knell: K.blast.r * (1 + (K.tolls + up.mineTolls - 1) * K.grow) * up.mineBlast,
+      fizzle: CFG.mines.fizzle.r * up.mineBlast,
+      knell: K.blast.r * K.spread * up.mineBlast,
+      spall: CFG.spall.burst.r * up.spallBurst,
       lode: CFG.lode.reach * up.lodeReach,
       snare: CFG.snare.reach,
+      thorn: CFG.thorn.patch.r * up.patchR,
       lodePush: up.lodePush,
       deepLevels: (NODES.find((n) => n.id === 'deepcharge') || {}).levels,
     };
+
+    /*
+     * ...and what a KNELL actually draws, walked through a real mine rather
+     * than read off the expression above. FOURTH BELL used to put its two
+     * extra tolls PAST the end of the ladder, so the node that reads "+1 toll"
+     * was also the largest radius upgrade in the game; the widest ring must
+     * now be the same whether it is owned or not.
+     */
+    const tollRings = (bell) => {
+      g.restart();
+      g.debugClearField();
+      w.up = freshUpgrades();
+      w.up.mineTolls = bell;
+      w.mines.length = 0;
+      w.effects.length = 0;
+      throwMine(w, 'knell');
+      const m = w.mines[w.mines.length - 1];
+      if (!m) return null;
+      /*
+       * By identity, not by index. `effects` is compacted as things die, so a
+       * new Shock can land BELOW the mark a previous frame left -- the first
+       * version of this walked `effects.length` forward and saw one toll of
+       * two.
+       */
+      const seen = [];
+      const had = new Set();
+      for (let f = 0; f < 60 * 20; f++) {
+        if (m && !m.dead) { m.x = w.shooter.x; m.y = w.shooter.y - 200; }
+        g.update(1 / 60);
+        for (const e of w.effects) {
+          if (!e || !e.constructor || e.constructor.name !== 'Shock') continue;
+          if (had.has(e)) continue;
+          had.add(e);
+          seen.push(+e.r.toFixed(1));
+        }
+        if (m.dead) break;
+      }
+      return seen;
+    };
+    const bell0 = tollRings(0);
+    const bell2 = tollRings(2);
+    g.restart();
+    w.up = freshUpgrades();
 
     // ---- and where a mine may be laid --------------------------------------
     /*
@@ -15309,7 +15374,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * the spread is asserted too, or a broken site that always returned the
      * same point would pass the first arm on its own.
      */
-    const { throwMine } = await import('../src/mines.js');
     g.restart();
     g.debugTeachAll();
     g.debugClearField();
@@ -15353,7 +15417,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const m2 = g.menu || window.__menu;
     g.restart();
     return { splinters: splinters.length, far, onSurface, wallR: wall.r,
-      wide, above, bar: +bar.toFixed(0), lowest: +lowest.toFixed(0),
+      wide, bell0, bell2, above, bar: +bar.toFixed(0), lowest: +lowest.toFixed(0),
       clearsBar: lowRaw >= bar,
       highest: +highest.toFixed(0), floorY: +w.floorY.toFixed(0), tones,
       hasMenu: !!m2 };
@@ -15366,22 +15430,56 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `point they would all have been on the near face`);
 
   /*
-   * A ceiling apiece, and the numbers behind them. BLAST 413 -> 306 -> 215 and
-   * KNELL's last toll 726 -> 538 -> 378: the first step was build 223 capping
-   * DEEP CHARGE at two levels, the second is build 227 taking 30% off both
-   * base radii, and they multiply. LODE 184 -> 147 and SNARE 210 -> 168 came
-   * off their own reach in 223 and are untouched.
+   * BLAST 413 -> 306 -> 215 -> 156 and KNELL's last toll 726 -> 538 -> 378 ->
+   * 156, across builds 223, 227 and 229. The first two cuts were to one term
+   * apiece of a product of three -- base x toll growth x DEEP CHARGE -- and
+   * the complaint came back after both, because the other two terms were
+   * still multiplying. 229 takes the growth (see `spread` in config.js) and
+   * the node (1.35 -> 1.22 a level) as well.
    *
-   * The world is about 630 units across, so a radius over 315 is a circle
-   * wider than the screen. Every one of these is now inside that, which is
-   * the thing the ceilings are actually for.
+   * Stated against the screen, in screen widths, because that is the sentence
+   * the player wrote three times: "it takes up most of the screen".
    */
-  check('none of the four widest mines opens wider than the screen it is on',
-    r.wide.blast < 230 && r.wide.knell < 400 && r.wide.lode < 155
-    && r.wide.snare < 175 && r.wide.deepLevels === 2,
-    `fully bought: BLAST ${r.wide.blast.toFixed(0)}, KNELL's last toll `
-    + `${r.wide.knell.toFixed(0)}, LODE ${r.wide.lode.toFixed(0)}, SNARE `
-    + `${r.wide.snare.toFixed(0)}; DEEP CHARGE sells ${r.wide.deepLevels} levels`);
+  check('no mine blast opens wider than half the screen it is drawn on',
+    r.wide.blast <= r.wide.blastCap && r.wide.knell <= r.wide.blastCap
+    && r.wide.fizzle <= r.wide.blastCap && r.wide.spall <= r.wide.blastCap
+    && r.wide.deepLevels === 2,
+    `fully bought, against a ceiling of ${r.wide.blastCap} (half of a `
+    + `${r.wide.screen}-unit screen): BLAST ${r.wide.blast.toFixed(0)}, `
+    + `KNELL's widest toll ${r.wide.knell.toFixed(0)}, SALTED's fizzle `
+    + `${r.wide.fizzle.toFixed(0)}, SPALL's pellet ${r.wide.spall.toFixed(0)}; `
+    + `DEEP CHARGE sells ${r.wide.deepLevels} levels`);
+
+  /*
+   * The looser tier, and the reason for two of them: a blast is over in a
+   * quarter second and is read from its EDGE, so the edge has to be on the
+   * screen with room. A standing reach is drawn for as long as it lasts and is
+   * read from its CONTENTS -- bodies hauled into the knot, ground burning --
+   * so it only has to fit. None of the three has been touched since build 223.
+   */
+  check('...and no standing reach opens wider than two thirds of it',
+    r.wide.snare <= r.wide.holdCap && r.wide.lode <= r.wide.holdCap
+    && r.wide.thorn <= r.wide.holdCap,
+    `against a ceiling of ${r.wide.holdCap}: SNARE ${r.wide.snare.toFixed(0)}, `
+    + `LODE ${r.wide.lode.toFixed(0)}, THORN's ground ${r.wide.thorn.toFixed(0)}`);
+
+  /*
+   * The mechanism, watched rather than read: every Shock a KNELL pushes over
+   * its own life, with FOURTH BELL unowned and fully bought. Two tolls become
+   * four and the ladder fills IN -- same first ring, same last ring, two more
+   * between them. Under `1 + i * grow` the last ring went 1.5 bases to 2.5,
+   * which is how a node reading "+1 toll" came to be the largest radius
+   * upgrade in the game and why two cuts to the base did not hold.
+   */
+  const near = (a, b) => Math.abs(a - b) < 0.5;
+  check('FOURTH BELL fills the toll ladder in rather than extending past it',
+    r.bell0 && r.bell2 && r.bell0.length === 2 && r.bell2.length === 4
+    && near(r.bell0[0], r.bell2[0])
+    && near(r.bell0[r.bell0.length - 1], r.bell2[r.bell2.length - 1])
+    && r.bell2.every((v, i) => i === 0 || v > r.bell2[i - 1]),
+    `unbought ${JSON.stringify(r.bell0)}, fully bought `
+    + `${JSON.stringify(r.bell2)} -- same ends, and every ring wider than the `
+    + `one before it`);
 
   check('...and REPULSOR still throws as hard through the smaller circle',
     Math.abs(r.wide.lodePush - 1.96) < 0.01,

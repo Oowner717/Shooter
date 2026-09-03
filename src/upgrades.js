@@ -464,9 +464,18 @@ export const UPGRADES = {
      *
      * The eighth node to be caught by the missing-`levels` default; see the
      * paragraph at the end of this file.
+     *
+     * ...and 306 and 538 were still not inside it, nor were the 215 and 378
+     * that build 227's cut to the two base radii left. Build 229 takes the
+     * per-level value down as well, 1.35 to 1.22, because it is the term that
+     * reaches every kind and it was the largest of the three: a node selling
+     * RADIUS is quadratic in what it actually gives, so +35% a level was +82%
+     * of the area a level and x3.3 over the pair. At 1.22 the pair is x1.49
+     * on the radius and x2.2 on the area, which is still one of the biggest
+     * things in the tree and now reads honestly.
      */
     { id: 'deepcharge', name: 'DEEP CHARGE', levels: 2,
-      line: '+35% mine blast radius.', apply: scale('mineBlast', 1.35), icon: MARK.deepcharge },
+      line: '+22% mine blast radius.', apply: scale('mineBlast', 1.22), icon: MARK.deepcharge },
     { id: 'widemouth', name: 'WIDE MOUTH', levels: 3, line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) , icon: MARK.widemouth },
     { id: 'eventhorizon', name: 'EVENT HORIZON', levels: 1,
       line: 'A VOID reaches for what comes near, not just what touches it.',

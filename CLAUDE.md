@@ -1059,4 +1059,34 @@ most once for any given target and cannot spin.
   `jobsAt` -- the job count captured in `load()` -- because `jobs` is consumed
   as it goes and a wave cannot say how far through itself it is from what is
   left alone.
+- **A blast radius is a product, and cutting one term of it three builds
+  running does not hold.** BLAST and KNELL were reported as filling the screen
+  at builds 223, 227 and 229. 223 capped DEEP CHARGE's levels, 227 took 30%
+  off both base radii, and the complaint came back both times, because the
+  maximum is `base x toll growth x DEEP CHARGE` and each fix moved one term
+  while the other two went on multiplying: measured on a 414-point phone,
+  KNELL's last toll was **113% of the screen width** and BLAST 64%. Build 230
+  takes the other two -- `knell.grow` (an unbounded `1 + i * grow`, so FOURTH
+  BELL's two extra tolls were bought PAST the end of the ladder) is now
+  `knell.spread`, the ratio of the last toll to the first with however many
+  tolls there are spread evenly between, so the widest ring is
+  `r * spread * mineBlast` whatever is owned; and DEEP CHARGE is 1.22 a level
+  rather than 1.35, because a node selling RADIUS is quadratic in what it
+  gives and +35% a level was +82% of the area. Both mines now top out at 156,
+  half a 390-point screen.
+  **The guard was as wrong as the numbers, and had been green through the
+  complaint twice.** `regress.mjs` asserted four hand-typed ceilings, each set
+  to whatever the value of the day was -- `knell < 400` under a comment saying
+  "a radius over 315 is a circle wider than the screen. Every one of these is
+  now inside that". It states the rule now, against `innerWidth / CFG.zoom`:
+  a blast is read from its EDGE and gets half the screen; a standing reach
+  (SNARE 168, LODE 147, THORN 190) is read from its CONTENTS and gets two
+  thirds. A ceiling written to fit the current number is not a ceiling.
+  For the record, the biggest circles in the game are not mines: PULSE is
+  **575 fully bought (172% of the screen)**, PRISM 300, DECOY's death blast
+  260, PILE's top front 240, WELL 210. Those are deliberate presses on a
+  cooldown, centred on the machine, one at a time -- a mine is one of five,
+  scattered, going off on its own -- which is the whole reason the mine
+  ceiling is lower. If an ability is ever reported the same way, the numbers
+  are here.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

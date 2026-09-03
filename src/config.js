@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '229';
+export const BUILD = '230';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '229';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '175a9ac';
+export const REV = '485f2a7';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1205,22 +1205,33 @@ export const CFG = {
     r: 13,
     trigger: 26, // extra reach beyond the mine's own radius
     /*
-     * 118, down 30% from 168 in build 227, and the damage is untouched.
+     * ---- how wide a mine may open, and why this is the fourth attempt ----
      *
-     * Build 223 took a third off the MAXIMUM by capping DEEP CHARGE at the two
-     * levels it always meant to have, which left a bought BLAST at 306 units
-     * on a world about 630 across -- still very nearly the width of the
-     * screen, and still the thing the player was complaining about. That fix
-     * was to the ladder; this one is to the base, and the two multiply: 118
-     * stock and 215 fully bought.
+     * 105, and the fully bought maximum is 156: half the width of a 390-point
+     * phone. The rule this build writes down, and that `regress.mjs` now
+     * asserts against the ACTUAL viewport rather than against four hand-typed
+     * constants:
      *
-     * The damage stays where it is on purpose. What was wrong was never how
-     * hard a mine hits, it is that a circle wider than the screen is not a
-     * blast, it is a white flash with no shape to read -- and five may be down
-     * at once. Nerfed in build 49 from 140; SHRAPNEL is still the way back
-     * past the damage.
+     *   a BLAST is over in a quarter second and read from its EDGE, so its
+     *   edge has to be on the screen with room to spare -- no wider than half
+     *   of it. A standing reach (SNARE's knot, THORN's burn, LODE's push) is
+     *   drawn continuously and read from its CONTENTS, so it only has to fit;
+     *   two thirds is the ceiling there, and all three are already inside it.
+     *
+     * The base has now been cut three times -- 413 fully bought at build 222,
+     * 306 at 223 (DEEP CHARGE capped at two levels), 215 at 227 (30% off the
+     * base) and 156 here -- and the complaint came back after each of the
+     * first two, because each cut ONE term of a product of three: base x toll
+     * growth x DEEP CHARGE. Build 229 takes the other two as well; see
+     * `spread` under `knell` and DEEP CHARGE in upgrades.js.
+     *
+     * The damage stays where it is on purpose, as it did at 227. What was
+     * wrong was never how hard a mine hits, it is that a circle wider than the
+     * screen is not a blast, it is a white flash with no shape to read -- and
+     * five may be down at once. Nerfed in build 49 from 140; SHRAPNEL is still
+     * the way back past the damage.
      */
-    blast: { r: 118, damage: 105, impulse: 760 },
+    blast: { r: 105, damage: 105, impulse: 760 },
     fizzle: { r: 67, damage: 48, impulse: 300 }, // SALTED: what a spent one does
   },
 
@@ -1287,16 +1298,28 @@ export const CFG = {
     tolls: 2, // was 3; FOURTH BELL buys the third back and a fourth beyond it
     gap: 1.15, // seconds between them
     /*
-     * 83, down 30% from 118 in build 227, for the reason BLAST's is -- and
-     * more so, because this is the one that compounds. Every toll is `grow`
-     * wider than the last and FOURTH BELL buys two more of them, so the last
-     * ring of a fully bought KNELL is `r * (1 + 3 * grow) * mineBlast`: it was
-     * 726 units before build 223 capped DEEP CHARGE, 538 after, and it is 378
-     * now. The first toll is 83 and the last is a little over four times it,
-     * which is the shape the mine is for.
+     * 70, and the widest ring a KNELL can ever make is 156 -- half the width
+     * of a 390-point phone, the same ceiling BLAST is held to above.
+     *
+     * This is the one that compounded, and it is why two previous cuts did not
+     * hold. The toll ladder was `r * (1 + i * grow)` with `grow` 0.5, so every
+     * toll was half a base wider than the last AND FOURTH BELL bought two more
+     * tolls PAST the end of it: the last ring of a fully bought KNELL was
+     * `r * (1 + 3 * grow) * mineBlast` = 4.55 bases. 726 units before build
+     * 223, 538 after it, 378 after 227's cut to the base -- 113% of the width
+     * of the screen it was drawn on, measured, with up to five of them down.
+     *
+     * So `grow` is gone and `spread` replaces it: the RATIO of the last toll
+     * to the first, with however many tolls there are distributed evenly
+     * between the two. FOURTH BELL now fills the ladder in rather than
+     * extending it, so what it buys is two more tolls of damage and two more
+     * gaps of denial -- and the widest ring is `r * spread * mineBlast`
+     * whatever else is owned. At the stock two tolls the ladder is EXACTLY
+     * what it was (1.0 then 1.5), which is why 1.5 is the number: nothing
+     * about an unbought KNELL changes shape, only its base.
      */
-    blast: { r: 83, damage: 81, impulse: 430 },
-    grow: 0.5, // each toll this much wider than the one before
+    blast: { r: 70, damage: 81, impulse: 430 },
+    spread: 1.5, // the last toll is this much wider than the first
     fade: 0.72, // and this much of its damage
   },
 
