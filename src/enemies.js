@@ -861,9 +861,25 @@ export class Enemy {
       }
     }
 
-    // RIME wears off on its own. The chill is a drag rather
-    // than a speed cap, so a heavy body coasts further out of it than a light
-    // one — which is the same physics everything else here obeys.
+    /*
+     * RIME wears off on its own. The chill is a drag rather than a speed cap:
+     * a per-second multiplier on the velocity, applied here and NOT inside
+     * the steering.
+     *
+     * That makes it mass-INDEPENDENT -- `vx *= k` says nothing about mass --
+     * so the old sentence here, "a heavy body coasts further out of it than a
+     * light one", was describing physics this line does not do. What actually
+     * varies between bodies is `accel`: `drive` re-accelerates toward cruise
+     * every substep while this pulls the other way, so the steady state is
+     * set by how hard the body steers, not by what it weighs. A body that
+     * steers hard keeps a third to a half of its pace; one that barely steers
+     * is genuinely stopped.
+     *
+     * Deliberately not routed through the steering the way STASIS is: STASIS
+     * is a four-second freeze on a 21-second cooldown and RIME is a round
+     * fired twice a second, so a chill the steering could not answer would be
+     * a permanent field-wide stop.
+     */
     if (this.chill > 0) {
       this.chill -= dt;
       const k = CFG.rounds.rime.drag ** dt;

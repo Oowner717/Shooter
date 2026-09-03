@@ -227,16 +227,18 @@ of one mine**, laid as the last one goes — measured at throws on 0.2s, 15.2s,
 30.2s and 45.2s with one on the field at the end. The cap is a backstop, not a
 target.
 
-Reaching it takes something that does not touch the three: a **SEED** offer,
-which lays three at once, or **PAIRED CHARGE**, which lays more per throw.
-Measured peaks: 2 with nothing taken, 4 with one PAIRED CHARGE, 5 with two —
-and 5 with six, because five is five.
+What moves it is **QUICK LAY**, which takes the throw interval to 8.4s against
+a 15-second life — a steady 1.8 standing — and **PAIRED CHARGE**, which lays
+two per throw. Together that is a steady 3.6, peaking at 4. Measured: the
+field never reaches five by laying, so the cap remains a backstop. PAIRED
+CHARGE was capped at one level in build 220 for exactly that reason: uncapped
+it laid four a throw and the cap evicted three of them before they armed.
 
-**A sixth pushes the oldest off**, and it goes the way its kind goes: a BLAST
-bangs, a SPALL throws its fan, a KNELL rings out what it still owes. Being
-crowded off the field is not the same as being wasted. With the clock and the
-lifetime equal this should never come up by laying alone, which is the point of
-setting them equal.
+**If the cap is reached the oldest goes**, and it goes the way its kind goes:
+a BLAST bangs, a SPALL throws its fan, a KNELL rings out what it still owes,
+and the four that have no bang of their own fizzle — which is a blast too,
+once SALTED is taken. Being crowded off the field is not the same as being
+wasted.
 
 Switching kinds mid-run leaves what is already down to run out its own life.
 
@@ -244,26 +246,33 @@ Switching kinds mid-run leaves what is already down to run out its own life.
 it.** The point is that a mine's power is now something a run assembles rather
 than something it starts with:
 
-  | | base was | base is | upgrade | back to |
+  | | base was | base is | upgrade | fully bought |
   |---|---|---|---|---|
-  | BLAST damage | 140 | 95 | SHRAPNEL | 138 |
-  | SNARE hold | 3.6 s | 2.4 s | DEAD WEIGHT | 3.96 s |
-  | WIRE damage/s | 105 | 72 | HOT WIRE | 108 |
-  | KNELL tolls | 3 | 2 | FOURTH BELL | 3 |
+  | BLAST damage | 140 | 105 | SHRAPNEL ×3 | 320 |
+  | SNARE hold | 3.6 s | 2.4 s | DEAD WEIGHT ×3 | 10.8 s, capped by the mine's own life |
+  | WIRE damage/s | 105 | 79 | HOT WIRE ×3 | 267 |
+  | KNELL tolls | 3 | 2 | FOURTH BELL ×2 | 4 |
+
+  (Build 216 put a tenth back on every mine that does damage, which is why the
+  "base is" column no longer matches the third-off figures the paragraph above
+  describes.)
 
 - **BLAST** goes off on contact: one hard bang, damage and knockback.
 - **SNARE** does not go off. It opens, hauls everything within 210 units into
-  one pinned knot and holds it for three and a half seconds, wired visibly to
-  whatever it has caught. It deals **zero** damage of its own — measured —
+  one pinned knot and holds it for 2.4 seconds — up to 10.8 with DEAD WEIGHT,
+  and never past the mine's own life — wired visibly to whatever it has
+  caught. It deals **zero** damage of its own — measured —
   because the damage is the objects grinding against each other on the way in,
   and whatever you choose to put into a pile that cannot move. It collapses a
   165-unit spread down to about one.
 - **WIRE** is the only one that is not a point. It unspools a 300-unit line
-  across the field and cuts whatever crosses it, 105 damage a second for as
+  across the field and cuts whatever crosses it, 79 damage a second for as
   long as that thing stays on it, shoving it off rather than parking it in the
-  beam. Nothing triggers it, nothing uses it up and it does not expire: it is a
-  lane closed for good. Measured: a body on the line takes damage, a body 260
-  units off it takes none, and the wire is still there afterwards.
+  beam. Nothing triggers it and nothing uses it up: it is a lane closed until
+  its life runs out. The bite is on a quarter-second clock rather than per
+  frame, so it delivers the same 79 whatever the display is doing. Measured: a
+  body on the line takes damage, a body 260 units off it takes none, and the
+  wire is still there afterwards.
 
 - **THORN** is not a charge. It opens into a patch of burning ground and stays
   open — nothing triggers it and nothing uses it up, and anything standing on

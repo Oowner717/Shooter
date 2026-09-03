@@ -139,16 +139,14 @@ function tally(world, kind) {
   const bang = kind === 'blast' || kind === 'knell' || kind === 'spall'
     || !!up.mineFizzle;                                                 // DEEP CHARGE
   /*
-   * SHRAPNEL is `up.mineDamage`, and `up.mineDamage` is read in exactly three
-   * places: `detonate`, `fizzle` and `toll`. THORN's patch takes
-   * `T.patch.dps` raw and WIRE's cut takes `W.damage * up.wireDamage` and no
-   * more -- so crediting either of them here is the readout lying about the
-   * machine, which is the exact fault the note above says this accounting was
-   * written to stop. It named the right three and then listed five.
+   * SHRAPNEL is `up.mineDamage`. It is read by `detonate`, `fizzle`, `toll`,
+   * SPALL's pellets and their bursts, and -- since build 220 -- THORN's
+   * ground. Not by WIRE's cut, which carries `up.wireDamage` of its own and
+   * nothing else, so crediting WIRE here would be the readout lying about the
+   * machine: the exact fault the note at the top of this function says the
+   * accounting was written to stop. (A stale version of this paragraph
+   * survived directly above the one that corrected it.)
    */
-  // SHRAPNEL is `up.mineDamage`. It is read by `detonate`, `fizzle`, `toll`,
-  // SPALL's pellets and their bursts, and -- since build 220 -- THORN's
-  // ground. Not by WIRE's cut, which has `up.wireDamage` of its own.
   const hurts = bang || kind === 'thorn';                               // SHRAPNEL
   let has = 0;
   let of = 2; // PAIRED CHARGE and QUICK LAY reach every kind: both are about

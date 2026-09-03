@@ -184,7 +184,7 @@ export const ARSENAL = [
   },
   {
     key: 'rime', kind: 'round', group: 'ammo', label: 'RIME', icon: ICON.rime, tone: '#4de1ff',
-    dmg: '16', fx: 'Chills for 3.2s. What it touches barely moves.',
+    dmg: '16', fx: 'Chills for 3.2s. What it touches loses most of its pace, and the harder it steers the more it keeps.',
   },
   {
     key: 'spore', kind: 'round', group: 'ammo', label: 'SPORE', icon: ICON.spore, tone: '#8eeb4b',

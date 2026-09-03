@@ -210,12 +210,13 @@ function chainFrom(world, first, hx, hy, jumps) {
    * `up.damage` is applied at `fire` time to the round's own damage, so
    * ARC's dart scaled with the AMMO line and its four jumps did not -- and
    * the jumps are 88% of the round: 11 on the dart against 25 x (1 + 0.86 +
-   * 0.86^2 + 0.86^3) = 84 down the chain. So a fully bought AMMO line moved
-   * ARC's damage per round from 95 to 121, a factor of 1.27 against the
+   * 0.86^2 + 0.86^3) = 80.9 down the chain. So a fully bought AMMO line moved
+   * ARC's damage per round from 92 to 118, a factor of 1.28 against the
    * 3.375 its rows promise, and left it the weakest round in the rack at
-   * both ends -- measured on a pinned wall, 18 dps stock and 86 fully bought
-   * against SCATTER's 882. Every other secondary damage source in the game
-   * multiplies it explicitly; this one was simply never given it.
+   * both ends -- measured against five bodies in a row, 95 dps stock and 217
+   * fully bought, where it is 510 with the chain scaled. Every other
+   * secondary damage source in the game multiplies it explicitly; this one
+   * was simply never given it.
    */
   let damage = g.jumpDamage * up.damage;
   const r2 = range * range;

@@ -551,7 +551,16 @@ export class Shooter {
           r: 3.2,
           damage: g.damage,
           impulse: 44,
-          life: g.life * up.shotRange,
+          /*
+           * Divided by `up.speed`, so TRACER makes a pellet ARRIVE SOONER
+           * rather than travel further. `life` is a time and reach is
+           * `speed * life`, so without this TRACER was a x1.82 range node for
+           * SCATTER against LONG THROW's x1.55 -- a bigger range upgrade than
+           * the range upgrade, in a different branch, and it put the pellet
+           * past the reach config.js's own note says was deliberately cut.
+           * The cliff stays where LONG THROW puts it.
+           */
+          life: g.life * up.shotRange / up.speed,
           bounces: 0,
           color: '#ffd9a0',
           trail: 0.03,
@@ -1622,11 +1631,12 @@ function heBurst(world, x, y) {
         impulse: b.impulse * c.scale * world.up.impulse,
       });
       /*
-       * A sub-blast is drawn only where it CHANGES THE OUTLINE. `out` is a
-       * fixed 78 units and is not scaled by OVERPRESSURE, so once the main
-       * radius passes about 210 every sub-blast is entirely inside it: at
-       * full upgrades the old version drew four small circles within one big
-       * one -- a Venn diagram in line art, and four rings of drawing for no
+       * A sub-blast is drawn only where it CHANGES THE OUTLINE. This mattered
+       * while `out` was a fixed 78: the crossover was a main radius of 156,
+       * reached at the second OVERPRESSURE level (the guard's own cut is 150,
+       * because of the 1.02 margin), and beyond it every sub-blast sat
+       * entirely inside the main one -- four small circles within one big
+       * one, a Venn diagram in line art, and four rings of drawing for no
        * shape at all. Stock, where CLUSTER genuinely makes a clover 252 units
        * across, it still gets its ring.
        */

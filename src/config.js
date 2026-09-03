@@ -14,7 +14,7 @@ export const BUILD = '220';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '20919bb';
+export const REV = '1911648';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -640,7 +640,13 @@ export const CFG = {
         sparks: 22, // at the stock radius; scaled by size, and capped
         shards: 7,
         embers: 4,
-        cap: 2.2, // the most any of those counts may be multiplied by
+        /*
+     * A backstop, not a ceiling anything reaches: OVERPRESSURE's three levels
+     * take the radius to 2.744x and the count scales with its square root, so
+     * the largest multiplier the game can produce is 1.657. It is here so a
+     * future radius node cannot quietly ask for a thousand particles.
+     */
+    cap: 2.2,
         /*
          * How far the debris gets, as a multiple of the blast radius over its
          * own life. Under 1 it never leaves the core and the burst reads as a
@@ -767,8 +773,15 @@ export const CFG = {
      * come from what you shoved it into. That is the one thing it is no longer
      * allowed to do — a body a SLUG has just hit does no collision damage to
      * anything it is driven through, and takes none from it, for `calm`
-     * seconds. Everything else on the field still trades damage on impact;
-     * only what a SLUG threw is exempt.
+     * seconds. Everything else on the field still trades damage on impact.
+     *
+     * The mark travels: `eachPair` gives both bodies the larger of the two
+     * remaining times on any contact above the collision threshold, so what
+     * is exempt is a SLUG's whole chain and not only the body it hit. That is
+     * deliberate -- a slugged BULWARK ploughing through a crowd would
+     * otherwise be a damage round by proxy, which is the one thing this rule
+     * exists to prevent -- and it runs down rather than propagating for ever,
+     * because the time carried is the remainder and never a fresh `calm`.
      *
      * That left it paying a 2.4x rate penalty for a shove and nothing else,
      * so it hits hard per shot — 44, against BOLT's 26 — while staying under
@@ -1029,8 +1042,12 @@ export const CFG = {
      * widening the throw. Note the arithmetic it changes: a throw every
      * fifteen seconds against a fifteen-second life is a steady state of ONE
      * mine, laid as the last one goes, so the cap was a backstop nobody
-     * reached by laying. At 8.4s it is a steady 1.8, and with PAIRED CHARGE
-     * on top the cap is what you actually run into.
+     * reached by laying. At 8.4s it is a steady 1.8 throws, and PAIRED CHARGE
+     * -- capped at one level in build 220, because uncapped it laid four a
+     * throw and the cap evicted three of them -- doubles that to a steady 3.6
+     * standing, peaking at 4. So the cap is still a backstop: measured, the
+     * field never reaches five by laying. It is enforced in `throwMine`
+     * rather than at the clock because a throw puts down more than one.
      */
     cap: 5,
     life: 15,
@@ -3565,8 +3582,13 @@ export const ENEMY_TYPES = [
     drops: 4, // energy it leaves when it comes apart
     /*
      * Glancing bolts bounce off instead of landing: a round lands only if the
-     * cosine of its angle of incidence is above this, which is |b| < 0.6r --
-     * three fifths of the width of the disc, a bit over a third of its area.
+     * cosine of its angle of incidence is above this, which is
+     * |b| <= 0.6 * (e.r + p.r) -- the HIT aperture, not the body's own
+     * radius, so the window widens with the round: 0.73r for a BOLT. Three
+     * fifths of the aperture, and a bit under three quarters of the body's
+     * visible width. (It used to say "0.6r ... a bit over a third of its
+     * area": the radius is the wrong one, and an area fraction is not what a
+     * one-dimensional impact parameter measures.)
      *
      * 0.8 from build 211, and the number moved because the TEST moved. What it
      * used to be compared against was not an incidence at all: `(hit - centre)`
