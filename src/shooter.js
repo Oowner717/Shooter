@@ -498,13 +498,15 @@ export class Shooter {
   /**
    * One shot of whatever is loaded. Returns true if it actually went out.
    *
-   * @param scale a multiplier on the round's damage. SPIRAL fires mid-sweep
-   *   at less than a placed shot is worth; everything else leaves it at 1.
+   * SPIRAL left two numbers behind here when it went in build 217: a `scale`
+   * parameter that multiplied the round's damage -- it fired mid-sweep at
+   * less than a placed shot was worth, and every one of the ten live callers
+   * leaves it at 1 -- and a `const slow = 1` multiplied into the speed of all
+   * nine rounds. Both came out in 220.
    */
-  shoot(world, scale = 1) {
+  shoot(world) {
     if (!this.canFire(world)) return false;
     const a = this.aim + spread(0.012);
-    const slow = 1;
     const R = CFG.rounds;
     const up = world.up;
 
@@ -513,7 +515,7 @@ export class Shooter {
     const shot = (angle, opts) => fire(world, this.muzzleX, this.muzzleY, angle, {
       ...opts,
       speed: (opts.speed || CFG.bolt.speed) * up.speed,
-      damage: (opts.damage ?? CFG.bolt.damage) * up.damage * scale,
+      damage: (opts.damage ?? CFG.bolt.damage) * up.damage,
       impulse: (opts.impulse ?? CFG.bolt.impulse) * up.impulse,
       bounces: (opts.bounces ?? CFG.bolt.bounces) + up.bounces,
     });
@@ -545,7 +547,7 @@ export class Shooter {
       for (const f of fan) for (let i = 0; i < pellets; i++) {
         const off = ((i / (pellets - 1)) - 0.5) * g.spread + spread(0.02) + f;
         shot(a + off, {
-          speed: rand(g.speed[0], g.speed[1]) * slow,
+          speed: rand(g.speed[0], g.speed[1]),
           r: 3.2,
           damage: g.damage,
           impulse: 44,
@@ -559,7 +561,7 @@ export class Shooter {
     } else if (world.round === 'explosive') {
       const g = R.explosive;
       for (const f of fan) shot(a + f, {
-        speed: g.speed * slow,
+        speed: g.speed,
         r: 5.6,
         damage: g.damage,
         impulse: 70,
@@ -573,7 +575,7 @@ export class Shooter {
     } else if (world.round === 'arc') {
       const g = R.arc;
       for (const f of fan) shot(a + f, {
-        speed: g.speed * slow,
+        speed: g.speed,
         r: 4.6,
         damage: g.damage,
         impulse: 40,
@@ -601,7 +603,7 @@ export class Shooter {
       for (const f of fan) {
         for (let t = 0; t < taps; t++) {
           shot(a + f + (t ? spread(0.02) : 0), {
-            speed: g.speed * slow,
+            speed: g.speed,
             r: 3.4,
             damage: g.damage * g.tapFade ** t,
             impulse: 30,
@@ -622,7 +624,7 @@ export class Shooter {
     } else if (world.round === 'slug') {
       const g = R.slug;
       for (const f of fan) shot(a + f, {
-        speed: g.speed * slow,
+        speed: g.speed,
         r: 7.2,
         damage: g.damage,
         impulse: g.impulse * up.slug,
@@ -657,7 +659,7 @@ export class Shooter {
     } else if (world.round === 'rime') {
       const g = R.rime;
       for (const f of fan) shot(a + f, {
-        speed: g.speed * slow,
+        speed: g.speed,
         r: 4.4,
         damage: g.damage,
         impulse: 18,
@@ -671,7 +673,7 @@ export class Shooter {
     } else if (world.round === 'spore') {
       const g = R.spore;
       for (const f of fan) shot(a + f, {
-        speed: g.speed * slow,
+        speed: g.speed,
         r: 5,
         damage: g.damage,
         impulse: 24,
@@ -725,7 +727,7 @@ export class Shooter {
     } else if (world.round === 'tithe') {
       const g = R.tithe;
       for (const f of fan) shot(a + f, {
-        speed: g.speed * slow,
+        speed: g.speed,
         r: 4.2,
         damage: g.damage,
         impulse: 22,
@@ -769,14 +771,21 @@ export class Shooter {
       });
     } else {
       const g = R.standard;
-      // OVERSTUFFED rides on the bounce budget, so an extra ricochet is worth
-      // the same whether it comes off a wall or off a body. DOUBLE TAP was
-      // here until build 209 and is SPINE's now, effect and all -- moving the
-      // node alone would have sold a card that did nothing to the round it
-      // sat beneath.
+      /*
+       * OVERSTUFFED feeds BOTH budgets, which are separate: `boltBounce` is
+       * spent on the arena walls (`p.bounces`, in updateProjectiles) and
+       * `boltRebound` on bodies (`p.rebound`, in the sweep), and neither
+       * decrements the other. This comment used to claim one shared budget
+       * "worth the same whether it comes off a wall or off a body"; the row
+       * names all three effects now.
+       *
+       * DOUBLE TAP was here until build 209 and is SPINE's now, effect and
+       * all -- moving the node alone would have sold a card that did nothing
+       * to the round it sat beneath.
+       */
       for (const f of fan) {
         shot(a + f, {
-          speed: CFG.bolt.speed * slow,
+          speed: CFG.bolt.speed,
           color: '#a8c4ff',
           core: '#eef4ff',
           damage: CFG.bolt.damage,
@@ -1566,21 +1575,51 @@ function roundRectPath(ctx, x, y, w, h, r) {
 function heBurst(world, x, y) {
   const b = CFG.rounds.explosive.blast;
   const r = b.r * world.up.blastR;
-  applyBlast(world, { x, y, r, damage: b.damage * world.up.damage, impulse: b.impulse });
-  // CLUSTER. Four smaller ones thrown out around the first, so HE stops being
-  // a circle and becomes a patch of overlapping circles — the same total on
-  // one body, and a great deal more across a line of them.
+  /*
+   * ...and HEAVY reaches the blast, which is HE's whole shove.
+   *
+   * `up.impulse` is applied to a round's own impulse at `fire` time, and HE's
+   * own is 420 against a blast of 420 that lands on everything in 96 units --
+   * so the node that says "2x knockback on every hit" was worth x1.89 on the
+   * round a player buys it for, not x4. The same shape as ARC's chain and
+   * SPORE's ground: a multiplier applied at the muzzle to a number that is
+   * not the one doing the work.
+   */
+  applyBlast(world, {
+    x, y, r,
+    damage: b.damage * world.up.damage,
+    impulse: b.impulse * world.up.impulse,
+  });
+  /*
+   * CLUSTER. Four smaller ones thrown out around the first, so HE stops being
+   * a circle and becomes a patch of overlapping circles -- the same total on
+   * one body, and a great deal more across a line of them.
+   *
+   * The OFFSET scales with the radius, which it did not. `out` was a fixed 78
+   * while `r` grew to 263 with OVERPRESSURE, so the four sub-blasts slid
+   * inside the main one and every body near the centre took the main blast
+   * plus all four: measured, x2.28 on a single body at three levels, against
+   * a sentence promising "the same total on one body". Worse, the guard
+   * below stops DRAWING a sub-blast once it is inside the main circle -- so
+   * the levels at which they silently doubled single-target damage were
+   * exactly the levels at which they stopped being drawn at all.
+   *
+   * Self-similar, the clover keeps its shape at every level: the sub centres
+   * sit at 200-245 units from a 20-radius body's centre against a 132 sub
+   * radius at three levels, so the added single-target damage stays 0.
+   */
   if (world.up.cluster) {
     const c = CFG.rounds.explosive.cluster;
+    const out = c.out * world.up.blastR;
     for (let i = 0; i < c.n; i++) {
       const a = (i / c.n) * TAU + Math.PI / 4;
-      const cx = x + Math.cos(a) * c.out;
-      const cy = y + Math.sin(a) * c.out;
+      const cx = x + Math.cos(a) * out;
+      const cy = y + Math.sin(a) * out;
       applyBlast(world, {
         x: cx, y: cy,
         r: r * c.scale,
         damage: b.damage * c.scale * world.up.damage,
-        impulse: b.impulse * c.scale,
+        impulse: b.impulse * c.scale * world.up.impulse,
       });
       /*
        * A sub-blast is drawn only where it CHANGES THE OUTLINE. `out` is a
@@ -1591,7 +1630,7 @@ function heBurst(world, x, y) {
        * shape at all. Stock, where CLUSTER genuinely makes a clover 252 units
        * across, it still gets its ring.
        */
-      if (c.out + r * c.scale > r * 1.02) heFx(cx, cy, r * c.scale, true);
+      if (out + r * c.scale > r * 1.02) heFx(cx, cy, r * c.scale, true);
     }
   }
   heFx(x, y, r);

@@ -126,7 +126,20 @@ export class Patch {
     this.retired = true;
     this.next = Infinity;
     this.life = Math.min(this.life, RETIRE);
-    this.max = Math.max(this.max, this.life);
+    /*
+     * `= this.life`, not `Math.max(this.max, this.life)`.
+     *
+     * `life` has just been clamped DOWN to `RETIRE`, and `max` is the full
+     * authored life, so the max could never select its second argument -- it
+     * was a no-op that read as a guard. The consequence is in `draw`, where
+     * `left = life / max` drives the extent: leaving `max` at 4.5 while
+     * `life` drops to 0.35 makes `left` jump to 0.08 on the retire frame and
+     * the ground collapses to a fraction of its size in one step, which is
+     * the visible pop the retirement fade exists to prevent. With `max` set
+     * to the remaining life, `left` runs 1 -> 0 across the fade and the
+     * extent closes with the alpha.
+     */
+    this.max = this.life;
   }
 
   /**

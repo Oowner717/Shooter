@@ -29,7 +29,7 @@ export function freshUpgrades() {
     arcFalloff: 0, // set, not scaled: what a link keeps when SUPERCONDUCTOR is in
     arcRange: 1, // and how far a link will reach for the next body
     // BOLT's own three. Nothing else in the rack reads them.
-    boltBounce: 0, // extra ricochets, off walls and now off bodies
+    boltBounce: 0, // extra ricochets off the arena WALLS; bodies are boltRebound
     boltLife: 1,
     boltRebound: 0, // bodies a BOLT may bounce off instead of stopping in
     spineTap: 0, // follow-up darts behind every SPINE
@@ -371,8 +371,20 @@ export const UPGRADES = {
       line: 'A TITHE mark runs to 14 instead of 8. Far more on one long body.',
       apply: bump('titheMarks', 6), icon: MARK.lien },
     // --- build 54: the rounds that had nothing of their own ---
+    /*
+     * Three scalars, and the row used to name two of them. `boltBounce` and
+     * `boltRebound` are separate budgets with separate consumers -- walls and
+     * bodies -- and neither decrements the other, so a fully bought BOLT
+     * ricochets off the arena FIVE times against a stock one's one, which is
+     * more than RICOCHET sells for 2,550 in the same branch. And the third
+     * clause was true of a number nothing can reach: `CFG.bolt.life` is 2.2
+     * seconds and a BOLT crosses the tallest viewport this game runs at in
+     * well under one, so +30% life buys nothing in straight flight -- it is
+     * worth something only to a round still bouncing, which is exactly what
+     * the other two clauses are about.
+     */
     { id: 'overstuffed', name: 'OVERSTUFFED', levels: 4,
-      line: 'BOLT bounces off bodies instead of stopping. +1 rebound, +30% life.',
+      line: 'BOLT bounces off bodies instead of stopping. +1 rebound, +1 wall bounce, and it stays up longer to use them.',
       apply: (u) => { u.boltRebound += 1; u.boltBounce += 1; u.boltLife *= 1.3; }, icon: MARK.overstuffed },
     /*
      * One step, from build 189. It had two: TRIPLE TAP put a third BOLT
