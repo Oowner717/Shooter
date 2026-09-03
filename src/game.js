@@ -85,6 +85,10 @@ export class Game {
     this.pointers = new Map();
     this.gripPointer = null;
     this.fireTimer = 0;
+    // HARD CASING's bite runs on a clock rather than per frame; see
+    // `runUpgrades`. Declared here so a restart cannot inherit a part-spent
+    // one and so nothing has to guess whether it exists.
+    this.casingT = 0;
     this.mineTimer = 0;
     this.autoLock = null;
     this.autoHinted = {};
@@ -1655,10 +1659,23 @@ export class Game {
     const up = w.up;
     const s = w.shooter;
 
-    // HARD CASING: whatever is holding the turret pays for it.
+    /*
+     * HARD CASING: whatever is holding the turret pays for it.
+     *
+     * On a clock, not per frame, and for the same reason WIRE's cut is:
+     * `applyDamage` floors a hit at `Math.max(1, ...)`, so a per-frame bite
+     * of 70/60 = 1.17 is floored against anything with armour over 0.15 and,
+     * at 120Hz, against everything -- 120 a second from one level against a
+     * rated 70, with armour ignored entirely. Four bites a second is
+     * `Patch`'s rate and `CFG.wire.tick`'s.
+     */
     if (up.casing > 0) {
-      for (const e of w.attackers) {
-        if (!e.dead) e.applyDamage(w, up.casing * dt);
+      this.casingT -= dt;
+      if (this.casingT <= 0) {
+        this.casingT = CFG.wire.tick;
+        for (const e of w.attackers) {
+          if (!e.dead) e.applyDamage(w, up.casing * CFG.wire.tick);
+        }
       }
     }
 

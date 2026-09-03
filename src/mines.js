@@ -203,7 +203,33 @@ class Mine {
     this.by = y1;
     // knell only: tolls left, and the clock to the next one
     this.tolls = kind === 'knell' ? K.tolls + world0.up.mineTolls : 0;
+    /*
+     * ...and how many it started with. `toll` derived its index as
+     * `(K.tolls + up.mineTolls) - m.tolls` -- a LIVE read against a
+     * SNAPSHOT -- so buying FOURTH BELL with a knell already on the field
+     * shifted every remaining toll's index up and the mine skipped its
+     * first, tightest, hardest ring: 100.3 centre damage instead of 139.3,
+     * drawn 50% wider than it was owed. The upgrade you had just paid for
+     * made the mine you were watching weaker.
+     */
+    this.tollsMax = this.tolls;
     this.tollTimer = 0;
+    /*
+     * wire only: the clock its bite runs on. `cut` used to apply
+     * `damage * dt` and `shove * dt` every frame, and both halves were
+     * wrong for it. `applyDamage` floors a hit at `Math.max(1, ...)`, so a
+     * per-frame bite of 79/60 = 1.32 floors on anything with armour over
+     * 0.24 and, at 120Hz, on EVERYTHING -- 120 a second against a rated 79,
+     * with armour ignored entirely. And the shove pays the repeated-hit
+     * fade once per frame, so `kicked` climbed to 9.7 after a second of
+     * contact where sustained gunfire settles at 4.25: the wire delivered
+     * 17% of its nominal push, ran the OPPOSITE way from its damage across
+     * refresh rates, and then quietly disarmed every later shove on that
+     * body -- rounds and mine blasts alike -- for up to twenty seconds.
+     * Four bites a second, the same rate `Patch` uses and for the same
+     * stated reason.
+     */
+    this.cutT = 0;
   }
 
   get cfg() {
@@ -557,6 +583,14 @@ function cut(world, m, dt) {
   const mx = (m.ax + m.bx) / 2;
   const ax = mx + (m.ax - mx) * m.open;
   const bx = mx + (m.bx - mx) * m.open;
+  /*
+   * The bite runs on its own clock -- see `cutT` in the constructor. The
+   * sparks stay per-frame, because they are a picture of contact and not a
+   * quantity, and `Math.random() < 12 * dt` is already rate-independent.
+   */
+  m.cutT -= dt;
+  const bite = m.cutT <= 0;
+  if (bite) m.cutT = W.tick;
   const take = (list) => {
     for (const e of list) {
       // A damage path: `spent` yes, `staged` no. Grey stays grey.
@@ -567,7 +601,10 @@ function cut(world, m, dt) {
       const d = Math.sqrt(hit.d2) || 1;
       const nx = (e.x - hit.px) / d;
       const ny = (e.y - hit.py) / d;
-      e.applyDamage(world, W.damage * world.up.wireDamage * dt, nx, ny, W.shove * dt);
+      if (bite) {
+        e.applyDamage(world, W.damage * world.up.wireDamage * W.tick, nx, ny,
+          W.shove * W.tick);
+      }
       if (Math.random() < 12 * dt) {
         spark(hit.px, hit.py, spread(180), spread(180), '#22ffcf', 0.24, 2);
       }
@@ -584,7 +621,7 @@ function cut(world, m, dt) {
  * that buys the third back was written.
  */
 function toll(world, m) {
-  const i = (K.tolls + world.up.mineTolls) - m.tolls;
+  const i = m.tollsMax - m.tolls;
   const r = K.blast.r * (1 + i * K.grow) * world.up.mineBlast;
   const damage = K.blast.damage * K.fade ** i * world.up.mineDamage;
   m.tolls--;

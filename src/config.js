@@ -14,7 +14,7 @@ export const BUILD = '220';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '867f216';
+export const REV = '39e7c91';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1073,6 +1073,17 @@ export const CFG = {
     width: 8, // contact half-width
     damage: 79, // per second of contact, per body — was 105; see HOT WIRE
     shove: 150, // pushed off the line rather than held on it
+    /*
+     * ...and the clock both of those run on, four times a second, which is
+     * `Patch`'s and for the same stated reason: `applyDamage` floors a hit at
+     * `Math.max(1, ...)`, so a per-FRAME bite of 79/60 is floored on anything
+     * armoured and, at 120Hz, on everything. Per frame this wire delivered
+     * 120 a second against a rated 79 on a ProMotion phone and 79 on a 60Hz
+     * one, with armour mattering on one of them and not the other -- and its
+     * shove ran the opposite way across the same rates, because a per-frame
+     * impulse pays the repeated-hit fade once a frame.
+     */
+    tick: 0.25,
   },
 
   // ---- knells ----------------------------------------------------------

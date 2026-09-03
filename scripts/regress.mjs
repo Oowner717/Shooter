@@ -14179,6 +14179,139 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `x${r.high && (r.high.want.bounty / r.low.want.bounty).toFixed(2)}`);
 }
 
+// --- continuous damage does not change with the refresh rate ----------------
+/*
+ * `applyDamage` floors every hit at `Math.max(1, dmg * (1 - plate) * (1 -
+ * ward))`, and `Patch` has said in its own docstring since it was written
+ * that this is why it ticks four times a second rather than every frame.
+ * Two other continuous sources did not: WIRE's cut and HARD CASING.
+ *
+ * At 79 a second a wire's per-frame bite is 79/60 = 1.32, which floors on
+ * anything with armour over 0.24 -- BULWARK took 60/s against a rated 52 --
+ * and at 120Hz it is 0.66, floored on EVERYTHING: 120 a second against a
+ * rated 79, with armour ignored entirely. HARD CASING at 70 a level was the
+ * same shape. The rated number in the arsenal was right for one refresh rate
+ * and half the roster.
+ *
+ * WIRE's SHOVE was worse and ran the other way. A per-frame impulse pays the
+ * repeated-hit fade once per frame, so `kicked` reached 9.7 after a second of
+ * contact where sustained gunfire settles at 4.25 -- the wire delivered 17%
+ * of its nominal push, delivered 1.9x more of it at 30Hz than at 120Hz, and
+ * then scaled down every later shove on that body, rounds and mine blasts
+ * alike, for up to twenty seconds.
+ *
+ * Measured the only way that settles it: the same wall-clock second, stepped
+ * at two different rates, against a body that cannot die.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+
+    const { NODE_BY_ID } = await import('../src/tree.js');
+    const casingChain = [];
+    for (let n = NODE_BY_ID.get('casing'); n; n = n.parent) if (n.id) casingChain.unshift(n.id);
+
+    const overSecond = (step, arm) => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      w.autoAim = false;
+      w.autoFire = false;
+      const s = w.shooter;
+      const out = arm(s);
+      const e = out.body;
+      e.hp = 1e9;
+      e.maxHp = 1e9;
+      /*
+       * Read off HEALTH, and the body is given enough of it to survive the
+       * window rather than being healed inside it. Two earlier versions of
+       * this got it wrong in opposite directions: one healed to full every
+       * frame and measured `start - hp`, which is zero by construction; the
+       * other summed the `dmg` ARGUMENT at the door, which is `79 * dt` and
+       * therefore rate-independent whatever the code does -- the floor that
+       * is the whole subject of this case is applied inside `applyDamage`,
+       * after the argument.
+       */
+      const start = e.hp;
+      const n = Math.round(1 / step);
+      for (let f = 0; f < n; f++) {
+        out.hold();
+        g.update(step);
+      }
+      return { took: start - e.hp, kicked: +(e.kicked || 0).toFixed(2) };
+    };
+
+    // ---- WIRE: a body pinned on the line ----
+    const wire = (step) => overSecond(step, (s) => {
+      w.mines.length = 0;
+      g.debugThrowMine('wire');
+      const m = w.mines[w.mines.length - 1];
+      for (let f = 0; f < 120; f++) g.update(1 / 60);
+      const e = g.debugSpawn('bulwark', m.x1, m.ay);
+      e.staged = false;
+      e.invMass = 0;
+      return { body: e, hold: () => { e.x = m.x1; e.y = m.ay; } };
+    });
+
+    // ---- HARD CASING: a body held on the turret ----
+    const casing = (step) => overSecond(step, (s) => {
+      g.debugGiveEnergy(300000);
+      /*
+       * Its way in, and then ONE level of SPINES.
+       *
+       * The chain matters because `buy` refuses a node whose parents are
+       * unowned, and a silent 'locked' would leave `up.casing` at 0 with the
+       * case measuring nothing and reporting a pass. The single level matters
+       * because the floor this case is about only binds on small bites: at
+       * three levels `up.casing` is 210, which is 3.5 a frame at 60Hz and
+       * 1.75 at 120Hz, both clear of `Math.max(1, ...)` even through a
+       * BULWARK's armour -- so a fully bought turret cannot see the fault at
+       * all. One level is 70, which is 1.17 and 0.58.
+       */
+      for (const id of casingChain) {
+        if (id === 'casing') { g.buy(id); break; }
+        for (let i = 0; i < 4; i++) g.buy(id);
+      }
+      const e = g.debugSpawn('bulwark', s.x, s.y - 10);
+      e.staged = false;
+      e.invMass = 0;
+      return {
+        body: e,
+        hold: () => {
+          e.x = s.x; e.y = s.y - 10;
+          e.attacking = true;
+          w.attackers.add(e);
+        },
+      };
+    });
+
+    const out = {
+      wire60: wire(1 / 60), wire120: wire(1 / 120),
+      casing60: casing(1 / 60), casing120: casing(1 / 120),
+      casingOwned: w.up.casing,
+    };
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+  const near = (a, b, tol) => a > 0 && b > 0 && Math.abs(a - b) <= Math.max(a, b) * tol;
+  check('a WIRE cuts the same in a second however fast the frames come',
+    near(r.wire60.took, r.wire120.took, 0.28),
+    `${Math.round(r.wire60.took)} at 60Hz against ${Math.round(r.wire120.took)} at 120Hz`);
+  check('...and does not pin the body-s knockback while doing it',
+    r.wire60.kicked < 6 && r.wire120.kicked < 6,
+    `kicked reached ${r.wire60.kicked} at 60Hz and ${r.wire120.kicked} at 120Hz, `
+    + `against the 4.25 sustained gunfire settles at`);
+  check('...and HARD CASING bites the same, which had the same fault',
+    r.casingOwned > 0 && near(r.casing60.took, r.casing120.took, 0.28),
+    `${Math.round(r.casing60.took)} at 60Hz against ${Math.round(r.casing120.took)} `
+    + `at 120Hz, on a turret carrying ${r.casingOwned} a second of casing`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;
