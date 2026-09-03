@@ -71,7 +71,6 @@ const BRANCH_MARK = {
   ammo: bm('<circle cx="12" cy="7" r="2.8" fill="currentColor" stroke="none"/><path d="M12 21V12"/><path d="M8.6 15.5h6.8" opacity=".6"/>'),
   mines: bm('<path d="M3.5 19h17"/><path d="M8 19a4 4 0 0 1 8 0"/><path d="M12 12.5V7"/>'),
   abilities: bm('<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>'),
-  anomaly: bm('<circle cx="12" cy="12" r="6.4"/><path d="M12 2.4v3.2M12 18.4v3.2M2.4 12h3.2M18.4 12h3.2"/>'),
 };
 
 /*
@@ -443,7 +442,7 @@ export class Menu {
      * ammunition and field follow, and the doors are the last row: the thing
      * you go down to when you are ready, not the first thing you meet.
      */
-    const order = ['turret', 'ammo', 'mines', 'abilities', 'anomaly'];
+    const order = ['turret', 'ammo', 'mines', 'abilities'];
     const roots = TREE.filter((n) => n.kind === 'root');
     roots.sort((x, y) => order.indexOf(x.key) - order.indexOf(y.key));
     // RECAST is a leaf at the top of the tree because it is bought with a

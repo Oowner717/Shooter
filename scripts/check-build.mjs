@@ -368,19 +368,27 @@ if (dupTone.length) {
   console.error(`two anomalies share a colour: ${dupTone.join(', ')} — the tone is the identity`);
   process.exit(1);
 }
-const slotless = ANOMALIES.filter((a) => !ALL_UPGRADES.some((u) => u.id === a.key));
-if (slotless.length) {
-  console.error(`no upgrade sells the way in to: ${slotless.map((a) => a.name).join(', ')}`);
+/*
+ * Every anomaly stands on a rung, and the rungs only go up.
+ *
+ * This used to assert that an upgrade SOLD each way in and that its price
+ * matched the boss's own config. The tree's ANOMALY branch went in build 227,
+ * which leaves the GATE as the one way to meet one -- `CFG.waves.tier.gates`,
+ * index n-1, lit by Game.syncGate at no cost. So what has to hold moves to
+ * that table: an anomaly with no gate can never be reached at all, and a
+ * sequence that does not increase is a boss standing in front of one that
+ * comes after it.
+ */
+const gateRungs = CFG.waves.tier.gates;
+if (gateRungs.length !== ANOMALIES.length) {
+  console.error(`${ANOMALIES.length} anomalies against ${gateRungs.length} gate rungs `
+    + `(${gateRungs.join(', ')}); index i is anomaly i + 1, so every one needs its own`);
   process.exit(1);
 }
-const misprice = ANOMALIES.filter((a) => a.built).map((a) => {
-  const up = ALL_UPGRADES.find((u) => u.id === a.key);
-  const cfg = CFG[a.cfg];
-  return [a, up, cfg];
-}).filter(([, up, cfg]) => !cfg || up.cost !== cfg.cost);
-if (misprice.length) {
-  console.error(misprice.map(([a, up, cfg]) => `${a.name} is priced at ${up.cost} against `
-    + `CFG.${a.cfg}.cost ${cfg ? cfg.cost : '(no config)'}`).join('; '));
+const badGate = gateRungs.filter((t, i) => !(t > 0) || t !== Math.round(t)
+  || (i > 0 && t <= gateRungs[i - 1]));
+if (badGate.length) {
+  console.error(`the gate rungs are not whole and increasing: ${gateRungs.join(', ')}`);
   process.exit(1);
 }
 /*
@@ -486,8 +494,8 @@ if (misprice.length) {
 
 const built = ANOMALIES.filter((a) => a.built);
 const panels = CFG.ordinal.rings.reduce((n, r) => n + r.per * 4, 0);
-console.log(`${built.length} of ${ANOMALIES.length} anomalies built (`
-  + `${built.map((a) => `${a.name} ${ALL_UPGRADES.find((u) => u.id === a.key).cost}`).join(', ')})`);
+console.log(`${built.length} of ${ANOMALIES.length} anomalies built, each standing on its own rung (`
+  + `${built.map((a) => `${a.name} ${CFG.waves.tier.gates[a.n - 1]}`).join(', ')})`);
 console.log(`ORDINAL: ${panels} segments in ${CFG.ordinal.rings.length} closed frames`);
 
 // ---- REV: what these bytes actually are ------------------------------------

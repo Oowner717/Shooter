@@ -277,61 +277,19 @@ html, body {
 #energyBuys.on { display: inline-block; }
 
 /*
- * The record, on the title screen. The glossary is the only thing that
- * survives a reset — it was never yours, it is kept by whoever has been
- * counting — so it is the only honest answer a title screen can give to "how
- * far have I got".
- */
-#bootRecord {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 14px 0 4px;
-}
-#bootRecord[hidden] { display: none; }
-#bootRecord span {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 5px 10px;
-  border: 1px solid rgba(120, 190, 255, 0.2);
-  background: rgba(6, 12, 22, 0.5);
-  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
-}
-#bootRecord b {
-  font-size: 13px;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 12px rgba(89, 224, 255, 0.5);
-}
-#bootRecord em {
-  font-style: normal;
-  font-size: 8px;
-  letter-spacing: 0.14em;
-  color: #6d829a;
-}
-
-#resumeNote {
-  /* What is in the file is the whole basis of the CONTINUE / NEW RUN choice,
-     and it was the smallest thing on the screen: 8px at three to one. */
-  margin-top: 8px;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  color: #8fa6bd;
-  font-variant-numeric: tabular-nums;
-}
-#resumeNote[hidden] { display: none; }
-
-/*
- * Both of these are worth having and neither is worth the fold.
+ * The record and the resume detail are styled with the rest of the title
+ * screen, further down this file -- see `.bootStatus` and what follows it.
+ * They had a block of their own up here, beside the energy chip, from when
+ * the record was a row of inline chips rather than three tiles.
  *
- * On a 320x568 screen the briefing plus the five control rows already ends
- * within a pixel or two of the bottom — the buttons are the one thing on this
- * screen that has to be reachable without a scroll, and a record row and a
- * detail line put them 45px under it. Short screens get the buttons.
+ * Both are worth having and neither is worth the fold. On a 320x568 screen
+ * the wordmark plus the control rows already ends near the bottom, and the
+ * one button on this screen has to be reachable without a scroll -- so the
+ * tiles go on a short screen and the detail line, which is one line and is
+ * the whole basis of pressing CONTINUE, stays.
  */
 @media (max-height: 660px) {
-  #bootRecord, #resumeNote { display: none !important; }
+  #bootRecord { display: none !important; }
 }
 
 /* ---------------- options ---------------- */
@@ -2314,48 +2272,152 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
 
 .bootInner { max-width: 420px; width: 100%; }
 
-.bootKicker {
+/*
+ * ---- the status line ----
+ *
+ * The dot breathes and the figure on the right is the object count of the
+ * arena actually running behind this panel -- `phase = 'boot'` keeps the field
+ * live, so the one piece of motion up here is real telemetry rather than an
+ * animation of nothing.
+ */
+.bootStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 11px is the title screen's floor -- the same one the menu keeps, and the
+     suite walks every text node on this panel against it. */
   font-size: 11px;
-  letter-spacing: 0.42em;
+  letter-spacing: 0.18em;
   color: var(--dim);
-  margin-bottom: 14px;
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(120, 190, 255, 0.12);
+}
+.bootDot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #7cffb2;
+  box-shadow: 0 0 8px rgba(124, 255, 178, 0.8);
+  animation: bootPulse 2.4s ease-in-out infinite;
+}
+@keyframes bootPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.bootSess { color: #a3b8ce; }
+.bootLink { color: #7cffb2; }
+.bootTele {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  /* Solid rather than 0.6 alpha: composited over this ground that came out at
+     3.88:1, under the 4.5 the panel is held to. */
+  color: #8fa9c4;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
 }
 
-#boot h1 {
-  font-size: 30px;
-  line-height: 1.06;
-  letter-spacing: 0.22em;
+/*
+ * ---- the wordmark ----
+ *
+ * Two lines that read as one object: the word in a thin wide cap and the
+ * number heavy under it, with a sweep crossing it every few seconds. The
+ * sweep is a clipped gradient rather than an opacity flicker on the number --
+ * a flicker on the largest element on the screen reads as a fault in the
+ * display, which is a good joke exactly once and a distraction after that.
+ */
+.bootMark {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
   font-weight: 400;
-  margin-bottom: 18px;
-  text-shadow: 0 0 30px rgba(89, 224, 255, 0.35);
 }
-#boot h1 b {
+.bootMark span {
+  font-size: 13px;
+  letter-spacing: 0.62em;
+  color: #a3b8ce;
+  text-indent: 0.62em;
+}
+.bootMark b {
+  font-size: 68px;
+  line-height: 0.94;
   font-weight: 700;
-  font-size: 46px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   color: var(--accent);
-  animation: flickr 6s infinite steps(1);
+  text-shadow: 0 0 34px rgba(89, 224, 255, 0.45);
 }
-@keyframes flickr {
-  0%, 96%, 100% { opacity: 1; }
-  97% { opacity: 0.35; }
-  98% { opacity: 1; }
-  99% { opacity: 0.6; }
+.bootMark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 42%, rgba(191, 244, 255, 0.5) 50%, transparent 58%);
+  background-size: 260% 100%;
+  animation: bootSweep 7s ease-in-out infinite;
+  mix-blend-mode: overlay;
+}
+@keyframes bootSweep {
+  0%, 62% { background-position: 130% 0; }
+  86%, 100% { background-position: -30% 0; }
 }
 
 .bootBody {
-  font-size: 13px;
-  line-height: 1.78;
+  font-size: 12px;
+  line-height: 1.7;
   color: #a9c2da;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+  max-width: 34em;
 }
 
-.bootKeys { list-style: none; margin-bottom: 22px; }
+/*
+ * ---- what the device has to show for itself ----
+ *
+ * Three figures, as tiles rather than a sentence: they are compared with a
+ * glance and a sentence has to be read. Only there once there is something in
+ * it -- see Hud.showRecord() -- because a row of zeroes is a worse welcome
+ * than no row at all.
+ */
+#bootRecord {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 18px;
+}
+#bootRecord[hidden] { display: none; }
+#bootRecord span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 8px;
+  border: 1px solid rgba(120, 190, 255, 0.16);
+  background: rgba(9, 17, 30, 0.6);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+}
+#bootRecord b {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+/* The denominator is context, not the figure: same line, half the weight. */
+#bootRecord b i {
+  font-style: normal;
+  font-size: 11px;
+  color: #8fa9c4;
+}
+#bootRecord em {
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: #8fa9c4;
+}
+
+.bootKeys { list-style: none; margin: 18px 0 0; }
 .bootKeys li {
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 11px;
+  line-height: 1.5;
   color: #a3b8ce;
-  padding: 7px 0;
+  padding: 6px 0;
   border-top: 1px solid rgba(120, 190, 255, 0.09);
 }
 .bootKeys li span {
@@ -2364,58 +2426,134 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
   margin-right: 8px;
 }
 
+/*
+ * ---- the way in ----
+ *
+ * ONE primary. It is CONTINUE when there is a run on disk and BEGIN
+ * SIMULATION when there is not, and it is the same button either way -- NEW
+ * RUN used to sit beside CONTINUE, doing the destructive thing with the
+ * quieter label and a whole run behind it.
+ */
 #startBtn, #resumeBtn {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  padding: 16px;
+  padding: 17px;
   font-size: 12px;
   letter-spacing: 0.3em;
-  border-radius: 6px;
   border: 1px solid var(--accent);
-  background: rgba(89, 224, 255, 0.1);
+  background: linear-gradient(180deg, rgba(89, 224, 255, 0.16), rgba(89, 224, 255, 0.07));
   color: var(--accent);
   text-shadow: 0 0 12px rgba(89, 224, 255, 0.6);
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+  box-shadow: 0 0 26px -8px rgba(89, 224, 255, 0.7);
 }
 #startBtn:active, #resumeBtn:active { background: rgba(89, 224, 255, 0.3); }
-
-/* CONTINUE is the primary when there is something to continue: it carries the
-   count, so it reads as "your run" rather than as a second start button. BEGIN
-   drops back to an outline beside it, because from that screen it is now the
-   destructive one. */
-.bootGo { display: flex; gap: 8px; align-items: stretch; }
+.bootGo { display: flex; }
 .bootGo button { min-width: 0; white-space: nowrap; }
-#resumeBtn { flex: 1.35 1 0; }
-#resumeBtn:not([hidden]) ~ #startBtn { flex: 1 1 0; }
 #resumeBtn {
   border-color: #ffcf5c;
-  background: rgba(255, 207, 92, 0.12);
+  background: linear-gradient(180deg, rgba(255, 207, 92, 0.18), rgba(255, 207, 92, 0.07));
   color: #ffcf5c;
   text-shadow: 0 0 12px rgba(255, 207, 92, 0.55);
+  box-shadow: 0 0 26px -8px rgba(255, 207, 92, 0.7);
   letter-spacing: 0.2em;
 }
 #resumeBtn:active { background: rgba(255, 207, 92, 0.3); }
-/* Beside a CONTINUE, BEGIN is the destructive one: it drops the saved run.
-   It drops to an outline and to the word alone so the pair cannot be tapped
-   the wrong way round in a hurry. */
-#resumeBtn:not([hidden]) ~ #startBtn {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  background: transparent;
-  border-color: rgba(89, 224, 255, 0.4);
-  color: rgba(191, 244, 255, 0.75);
-  text-shadow: none;
-}
+/* When there is a run to continue, that is the button. */
+#resumeBtn:not([hidden]) ~ #startBtn { display: none; }
 
-.bootFoot {
-  margin-top: 16px;
+#resumeNote {
+  margin-top: 8px;
   text-align: center;
   font-size: 11px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
+  color: #8fa9c4;
+}
+#resumeNote[hidden] { display: none; }
+
+/*
+ * ---- the foot, and the one thing here that cannot be undone ----
+ */
+.bootFoot {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(120, 190, 255, 0.09);
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.1em;
   /* 5.8:1. It was #3d4d5e at 2.35:1 -- and the build number in it is the
      line two devices get compared by. */
   color: #7d90a6;
 }
+.bootWipe {
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: #ff6b7a;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.bootWipe:active { color: #ff6b7a; }
+.bootWipe[hidden] { display: none; }
+
+/* The word, asked for rather than a second tap: a typed word cannot be hit by
+   accident, and this throws a run away. */
+.bootAsk {
+  margin: 4px auto 10px;
+  max-width: 320px;
+  text-align: left;
+  border: 1px solid rgba(255, 107, 122, 0.34);
+  background: rgba(30, 8, 12, 0.6);
+  padding: 10px 11px;
+}
+.bootAsk[hidden] { display: none; }
+.bootAsk label {
+  display: block;
+  font-size: 11px;
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  color: #d8b6bc;
+  margin-bottom: 8px;
+}
+.bootAsk label b { color: #ff6b7a; letter-spacing: 0.2em; }
+.bootAskRow { display: flex; gap: 6px; }
+#wipeWord {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1 1 0;
+  min-width: 0;
+  background: rgba(4, 6, 12, 0.8);
+  border: 1px solid rgba(255, 107, 122, 0.34);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.28em;
+  text-align: center;
+  padding: 8px 4px;
+}
+#wipeWord:focus { outline: none; border-color: #ff6b7a; }
+#wipeGo, .bootAskNo {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 107, 122, 0.4);
+  background: rgba(255, 107, 122, 0.1);
+  color: #ff6b7a;
+}
+#wipeGo[disabled] { opacity: 0.35; color: #8fa9c4; border-color: var(--line); background: transparent; }
+.bootAskNo { border-color: var(--line); background: transparent; color: #8fa9c4; }
+
+.bootBuild { font-variant-numeric: tabular-nums; }
+.bootHome { margin-top: 4px; font-size: 11px; color: #7d90a6; }
 
 /* ---------------- the ladder ---------------- */
 /*
@@ -2836,8 +2974,17 @@ body.recede #abilities {
  * #endScreen element since the run stopped having an end, and nothing has set
  * the class since either.
  */
+/*
+ * ...and the rail with them, from build 227. It was not in this list, so the
+ * five rung nodes and the AUTO switch sat visibly on top of the title screen
+ * -- faint, but plainly interface, and directly behind the wordmark on a
+ * 320-wide phone. The title screen is a screen, not an overlay with the game's
+ * furniture showing through it; `#alerts` is here for the same reason.
+ */
 body.booting #topbar,
 body.booting #abilities,
+body.booting #waveRail,
+body.booting #alerts,
 body.booting #quickBar {
   opacity: 0;
   pointer-events: none;
@@ -2898,20 +3045,23 @@ body.booting #quickBar {
   .ab svg { width: 20px; height: 20px; }
   .ab .lbl { font-size: 9px; letter-spacing: 0.03em; }
 
-  /* The title screen scrolls rather than clipping, but a BEGIN button below
-     the fold on the smallest phone is a start button nobody finds. The copy
-     is the only thing here that can give ground. */
-  #boot h1 { font-size: 25px; margin-bottom: 12px; }
-  .bootKicker { margin-bottom: 10px; }
-  .bootBody { font-size: 10.5px; line-height: 1.6; margin-bottom: 14px; }
-  .bootKeys { margin-bottom: 14px; }
+  /* The title screen scrolls rather than clipping, but the one button on it
+     below the fold on the smallest phone is a start button nobody finds. The
+     wordmark and the copy are what give ground -- the record tiles and the
+     button do not, because they are the two things worth coming here for. */
+  .bootMark { margin-bottom: 10px; }
+  .bootMark span { font-size: 11px; letter-spacing: 0.5em; }
+  .bootMark b { font-size: 48px; }
+  /* Tighter, never smaller: 11px is the floor everywhere on this panel. */
+  .bootStatus { margin-bottom: 12px; padding-bottom: 8px; letter-spacing: 0.1em; }
+  .bootBody { font-size: 11px; line-height: 1.55; margin-bottom: 14px; }
+  #bootRecord { margin-bottom: 14px; }
+  #bootRecord b { font-size: 15px; }
+  .bootKeys { margin-top: 14px; }
   .bootKeys li { font-size: 11px; line-height: 1.5; padding: 4px 0; }
-  /* At 320 the panel already ends level with the fold, so the pair has to
-     cost no more height than the single button did. */
-  .bootGo button { padding: 12px 6px; }
-  #startBtn { padding: 13px; }
-  #resumeBtn:not([hidden]), #resumeBtn:not([hidden]) ~ #startBtn { padding: 12px 6px; }
-  #resumeBtn { font-size: 10px; letter-spacing: 0.12em; }
+  #startBtn, #resumeBtn { padding: 14px; }
+  #resumeBtn { font-size: 11px; letter-spacing: 0.16em; }
+  .bootFoot { margin-top: 14px; padding-top: 10px; }
   #resumeBtn:not([hidden]) ~ #startBtn { font-size: 10px; letter-spacing: 0.08em; }
 
   /* The opening lines carry their own break, and at 320 the plate's padding

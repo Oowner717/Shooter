@@ -962,4 +962,31 @@ most once for any given target and cannot spin.
   length is `sqrt(r^2 - b^2)` -- clamped at zero, because |b| runs up to
   `e.r + p.r` and a graze legitimately has no chord. `b` is the only component
   of the contact that is exact; see the build-211 note above.
+- **The GATE is the only way to meet an anomaly, and it already was.** The
+  tree's ANOMALY branch went in build 227 -- seven repeatable nodes, 100 to
+  500 energy each, gated `needs` on the boss before -- because an aperture was
+  the only thing in the tree that was not an upgrade to anything: it competed
+  for energy with the machine you would meet the boss with. What is left is
+  `CFG.waves.tier.gates` (index n-1) and `Game.syncGate`, which has lit the
+  banner at no cost since build 203.
+  **The removal nearly shipped a second granter.** Build 227 added `at:` rungs
+  to `ANOMALIES` and a `grantApertures` called from `onTier`, keyed 3/6/10/14
+  /19/25/32 -- against authored gates of 6/12/18/24/30/36/42. It would have
+  handed ORDINAL's way in at rung 3 while the ladder was still held at 6, and
+  it broke `syncGate`'s "topped up to one rather than added to" invariant,
+  which is what makes the gate un-farmable and what makes it come back after a
+  withdrawal. It was reverted before the suite ever ran it. **Before building a
+  mechanism, grep for the one that already does it** -- the README described
+  the gates in full, three sections down from where the change started.
+- **The title screen has one primary button, and RESET asks for a word.**
+  NEW RUN sat beside CONTINUE doing the destructive thing -- `Game.start`
+  calls `forgetRun` -- with the quieter label of the two. It is gone: the
+  primary is CONTINUE when there is a run on disk and BEGIN SIMULATION when
+  there is not (CSS hides the other), and starting over is a small RESET
+  SIMULATION at the foot that only exists when there is a save and asks you to
+  type DELETE. Everything on that panel is held to 11px and 4.5:1 by the
+  suite's own sweep -- **and that sweep read only the no-save state until
+  build 227**, so the record tiles, the resume line, the reset and its box were
+  never measured. It runs twice now. The tile labels are one word each for the
+  same reason: two words wrap in a third of a 390-wide panel at 11px.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

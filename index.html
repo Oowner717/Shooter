@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '226';
+  var BUILD = '227';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -295,36 +295,72 @@
     </section>
 
     <!-- ============ BOOT SCREEN ============ -->
+    <!--
+      The title screen, rebuilt in build 227. It stands over a live arena --
+      `phase = 'boot'` runs the field with drift in it, which is why the
+      readout at the top can be real telemetry rather than decoration.
+
+      One column, five things in it, in the order they are wanted: what this
+      is, what this device has to show for it, the way in, how to play, and
+      the way to throw it all away. There is exactly ONE primary button:
+      CONTINUE when there is a run on disk, BEGIN SIMULATION when there is
+      not. NEW RUN is gone -- it sat beside CONTINUE doing the destructive
+      thing with the quieter label.
+    -->
     <section id="boot">
       <div class="bootInner">
-        <div class="bootKicker">SESSION 7749 :: SHALLOWS OPEN</div>
-        <h1>SIMULATION<br><b>7749</b></h1>
+        <!-- Live: the dot breathes and the figure on the right is the object
+             count of the arena running behind this panel. See Hud.syncBoot. -->
+        <div class="bootStatus">
+          <span class="bootDot" aria-hidden="true"></span>
+          <span class="bootSess">SESSION 7749</span>
+          <span class="bootLink">SHALLOWS OPEN</span>
+          <span class="bootTele" id="bootTele" aria-hidden="true"></span>
+        </div>
+
+        <h1 class="bootMark"><span>SIMULATION</span><b>7749</b></h1>
         <p class="bootBody">
-          A turret. An open field. Five hundred shapes, and none of them is the point.<br>
-          Every shape here is standing in for something you have not met.<br>
-          Begin. The number at the end is not what we keep.
+          A turret, an open field, and five hundred shapes standing in for
+          something you have not met.
         </p>
-        <!-- Filled from CONTROLS in src/narrative.js, which the menu's SYSTEM
-             tab reads too, so the two cannot drift apart. -->
-        <ul class="bootKeys"></ul>
-        <!-- CONTINUE is shown only when there is a run on disk to pick up;
-             see Hud.offerResume(). The two share one row so that offering a
-             resume costs no vertical space: on a 320x568 screen this row ends
-             within a pixel or two of the fold, and a briefing line one wrap
-             longer is enough to push it under. NEW RUN always starts clean. -->
+
         <!-- What this device has to show for itself, across every run. Only
              there once there is something to say; see Hud.showRecord(). -->
         <div id="bootRecord" hidden></div>
 
         <div class="bootGo">
           <button id="resumeBtn" hidden>CONTINUE</button>
-          <button id="startBtn">NEW RUN</button>
+          <button id="startBtn">BEGIN SIMULATION</button>
         </div>
-        <!-- What is in the file, under the row rather than inside the button:
-             the two buttons share one line and a label long enough to say all
-             of it pushed NEW RUN off the side of a 390-wide screen. -->
+        <!-- What is in the file, under the button rather than inside it. -->
         <div id="resumeNote" hidden></div>
-        <div class="bootFoot">Add to Home Screen for fullscreen playback.</div>
+
+        <!-- Filled from CONTROLS in src/narrative.js, which the menu's SYSTEM
+             tab reads too, so the two cannot drift apart. -->
+        <ul class="bootKeys"></ul>
+
+        <div class="bootFoot">
+          <!--
+            The destructive one, small and last, and it asks for the word.
+            Only shown when there is a save to destroy -- a RESET on a device
+            with nothing on it is a button that cannot do anything. Pressing it
+            opens the field below rather than arming a second press: a typed
+            word cannot be hit by accident, which a second tap can.
+          -->
+          <button id="wipeBtn" class="bootWipe" type="button" hidden>RESET SIMULATION</button>
+          <div id="wipeAsk" class="bootAsk" hidden>
+            <label for="wipeWord">Type <b>DELETE</b> to wipe the saved run and begin again.</label>
+            <div class="bootAskRow">
+              <input id="wipeWord" type="text" inputmode="text" autocomplete="off"
+                     autocapitalize="characters" autocorrect="off" spellcheck="false"
+                     maxlength="6" aria-label="Type DELETE to confirm">
+              <button id="wipeGo" type="button" disabled>WIPE</button>
+              <button id="wipeNo" type="button" class="bootAskNo">CANCEL</button>
+            </div>
+          </div>
+          <div class="bootBuild" id="bootBuild"></div>
+          <div class="bootHome">Add to Home Screen for fullscreen playback.</div>
+        </div>
       </div>
     </section>
 

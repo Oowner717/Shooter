@@ -27,7 +27,7 @@
  * what stops the two drifting.
  */
 
-import { ALL_UPGRADES, UNLOCKS, CHARGES, BOSS_TONE } from './upgrades.js';
+import { ALL_UPGRADES, UNLOCKS, CHARGES } from './upgrades.js';
 import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
 
@@ -85,7 +85,6 @@ const UNDER = {
   // One leaf under its own heading, always available, never behind anything.
   // ...one slot per boss, in order. RECAST is not here — it sits above every
   // category; see TREE at the bottom of this file.
-  anomaly: ['aperture', 'aperture2', 'aperture3', 'aperture4', 'aperture5', 'aperture6', 'aperture7'],
 
   // ---- the abilities ----
   // REFLEX sat here until build 190, when it went: it fired PULSE for you,
@@ -115,7 +114,6 @@ const BRANCH = {
   // six below them are bought; their extra uses are not.
   abilities: ['pulse', 'fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'ward'],
   turret: [],
-  anomaly: [],
 };
 
 /** Free arms: things the turret already has when the run starts. */
@@ -188,7 +186,7 @@ function node(o) {
  * KNELL is one mine deep inside another branch; two categories sharing a hue
  * is the collision that matters.
  */
-const ROOT_TONE = { turret: '#59e0ff', ammo: '#ff5d8f', mines: '#ffb347', abilities: '#c9a7ff', anomaly: BOSS_TONE[0] };
+const ROOT_TONE = { turret: '#59e0ff', ammo: '#ff5d8f', mines: '#ffb347', abilities: '#c9a7ff' };
 
 /*
  * ---- and one register for the three ALL-X groups ----
@@ -216,13 +214,12 @@ const ROOT_TONE = { turret: '#59e0ff', ammo: '#ff5d8f', mines: '#ffb347', abilit
  * player does not get.
  */
 const GROUP_TONE = '#d7c49a';
-const ROOT_NAME = { turret: 'TURRET', ammo: 'AMMUNITION', mines: 'MINES', abilities: 'ABILITIES', anomaly: 'ANOMALY' };
+const ROOT_NAME = { turret: 'TURRET', ammo: 'AMMUNITION', mines: 'MINES', abilities: 'ABILITIES' };
 const ROOT_LINE = {
   turret: 'The machine itself. Everything here is yours from the first frame.',
   ammo: 'What leaves the barrel. BOLT is loaded before you start; the rest are bought.',
   mines: 'What you leave behind. Eight of them, none behind any other — buy them in any order.',
   abilities: 'What you hold. PULSE and HAIL can never be taken from you; the other six are bought.',
-  anomaly: 'Seven ways in, one colour each. One of them has something on the other side of it.',
 };
 
 /*
@@ -391,11 +388,16 @@ export const TREE = [
     line: 'Two decisions about the wave that is running, taken from the rail.',
     children: [leaf('recall'), leaf('overclock')],
   }),
-  ...['anomaly', 'turret', 'ammo', 'mines', 'abilities'].map((root) => node({
+  /*
+   * Four, not five. ANOMALY was the fifth and it sold the seven ways in; the
+   * branch went in build 227 and a way in is given at a rung instead -- see
+   * `at` in anomaly.js. Nothing else moved: RECAST is still above all of this,
+   * because it is still what the bosses leave rather than an upgrade to
+   * anything.
+   */
+  ...['turret', 'ammo', 'mines', 'abilities'].map((root) => node({
     kind: 'root', key: root, name: ROOT_NAME[root], free: true,
     tone: ROOT_TONE[root], line: ROOT_LINE[root],
-    // The ANOMALY heading carries every boss colour at once — see BOSS_TONE.
-    tones: root === 'anomaly' ? BOSS_TONE : null,
     children: [
       ...commons(root),
       ...(BRANCH[root] || []).map((k) => arm(k, KIND[root])),

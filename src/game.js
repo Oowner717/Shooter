@@ -263,6 +263,13 @@ export class Game {
        */
       reconciled: [],
       /*
+       * Which ways in this run has already been HANDED, from build 227. Its
+       * own record rather than a reading of `apertures`, because an aperture
+       * is spent when the way is opened and a spent one would be handed
+       * straight back on the next rung. Saved with the run.
+       */
+      offered: [],
+      /*
        * The run's own seed. Every wave's trait is a pure function of it, the
        * cycle and the wave's place in the rotation -- so the rail can show
        * what is coming before the wave exists, the save carries one integer

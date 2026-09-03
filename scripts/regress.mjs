@@ -78,9 +78,16 @@ await page.waitForTimeout(900);
  * begins at. The footer gets its own check because it once ended seven pixels
  * past a 664px viewport -- half of "BUILD N" simply off the screen -- and a
  * clipped element still passes a font-size sweep.
+ *
+ * BOTH STATES. This walked the panel exactly as a first launch finds it, so
+ * everything that only appears once there is a run on disk -- the record
+ * tiles, the resume detail, RESET SIMULATION and the box that asks for the
+ * word -- was never measured at all. Build 227 rebuilt this screen and put
+ * five new rows on it, four of them in that half. A sweep that reads one of
+ * two states is a floor for one of two states.
  */
 {
-  const r = await page.evaluate(() => {
+  const sweepTitle = () => page.evaluate(() => {
     const px = (v) => { const m = v.match(/rgba?\(([^)]+)\)/); if (!m) return null;
       const a2 = m[1].split(',').map(Number);
       return { r: a2[0], g: a2[1], b: a2[2], a: a2.length > 3 ? a2[3] : 1 }; };
@@ -119,9 +126,49 @@ await page.waitForTimeout(900);
     const keys = document.querySelectorAll('.bootKeys li').length;
     return { seen, bad, footBottom: Math.round(foot.bottom), vh: innerHeight, keys };
   });
+
+  const cold = await sweepTitle();
+  /*
+   * ...and again with a run on disk and the wipe box open, which is every row
+   * this panel can show. The save is written straight to storage rather than
+   * through a run, because what is being measured is the panel and not the
+   * game -- and it is taken away again, or the case after this one starts on a
+   * title screen offering a CONTINUE it did not ask for.
+   */
+  const warm = await page.evaluate(async () => {
+    const { saveRun } = await import('../src/save.js');
+    const { codex } = await import('../src/codex.js');
+    const g = window.__sim;
+    const was = g.world.phase;
+    g.world.phase = 'staging';
+    g.world.kills = 348;
+    g.world.energy = 2140;
+    codex.record('mote');
+    codex.record('ordinal');
+    saveRun(g.world, g);
+    g.world.phase = was;
+    g.hud.offerResume();
+    g.hud.showRecord();
+    document.getElementById('wipeBtn').click();
+    return true;
+  });
+  const hot = await sweepTitle();
+  await page.evaluate(async () => {
+    const { forgetRun } = await import('../src/save.js');
+    forgetRun();
+    document.getElementById('wipeNo').click();
+    window.__sim.hud.offerResume();
+    window.__sim.hud.showRecord();
+  });
+
+  const r = cold;
   check('the title clears the menu\'s floor, and nothing hangs off the screen',
     r.bad.length === 0 && r.seen > 6 && r.footBottom <= r.vh,
     `${r.seen} read; failing: ${r.bad.slice(0, 5)}; foot ${r.footBottom}/${r.vh}`);
+  check('...and so does every row it only shows once there is a run to continue',
+    warm && hot.bad.length === 0 && hot.seen > r.seen && hot.footBottom <= hot.vh,
+    `${hot.seen} read with a save and the wipe box open, against ${r.seen} without; `
+    + `failing: ${hot.bad.slice(0, 6)}; foot ${hot.footBottom}/${hot.vh}`);
   check('the title teaches the two ways to shoot and leaves the rest to the run',
     r.keys === 2, `${r.keys} control rows on the title`);
 }
@@ -692,12 +739,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  * suggest otherwise -- so the NEXT shelf and the "N more for the next"
  * countdown are gone. Both answered "what can I buy right now" as a ranking.
  *
- * The seven ways in ARE a sequence, and that one is enforced in the tree
- * rather than implied by furniture: each is shut until the boss before it has
- * been put down.
- *
- * ORDER. The section is headed YOUR MACHINE and it opened on ANOMALY, which
- * is a boss door, not the machine. The turret leads; the doors are last.
+ * ORDER. The section is headed YOUR MACHINE and it used to open on ANOMALY,
+ * which is a boss door and not the machine. The turret leads. The branch went
+ * entirely in build 227 -- see below -- so what is asserted now is that there
+ * are FOUR of them and none of them is a door.
  *
  * NO DEAD TRACKS. A repeatable card has no levels, so it gets no meter -- an
  * empty track that can never fill reads as something stuck. And no branch
@@ -717,42 +762,28 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const spill = [...document.querySelectorAll('.branchRow .branchName')]
       .filter((el) => el.scrollWidth > el.clientWidth).map((el) => el.textContent);
     const rows = [...document.querySelectorAll('.branchRow')];
-    for (const name of ['ANOMALY', 'TURRET']) {
-      rows.find((x) => x.querySelector('.branchName').textContent === name).click();
-    }
+    rows.find((x) => x.querySelector('.branchName').textContent === 'TURRET').click();
     const dead = [...document.querySelectorAll('.shopCard')].filter((c) => {
       if (!c.offsetParent) return false;
       const mt = c.querySelector('.shopMeter');
       return mt && !mt.children.length && getComputedStyle(mt).visibility !== 'hidden';
     }).length;
-    const doorsNow = () => [...document.querySelectorAll('.branchGrid .shopCard')]
-      .filter((c) => c.offsetParent && /APERTURE/.test(c.querySelector('.shopName').textContent))
-      .map((c) => c.classList.contains('locked'));
-    rows.find((x) => x.querySelector('.branchName').textContent === 'ANOMALY').click();
-    const first = doorsNow();
-    // ...and once the first boss is reconciled, exactly one more opens.
-    g.world.reconciled.push(1);
-    m.syncTree();
-    const after = doorsNow();
-    // Put it back: a reconciled boss left behind changes what later cases
-    // find available.
-    g.world.reconciled.length = 0;
-    m.syncTree();
+    // Nothing anywhere in the tree sells a way in any more.
+    const doors = [...document.querySelectorAll('.shopCard .shopName')]
+      .filter((el) => /APERTURE/.test(el.textContent)).length;
     m.setOpen(false);
-    return { order, spill, dead, first, after,
+    return { order, spill, dead, doors,
       shelf: !!document.querySelector('.shelf'), next: !!document.getElementById('treeNext') };
   });
   check('nothing in the shop suggests an order to buy in',
     !r.shelf && !r.next, `shelf ${r.shelf}, next line ${r.next}`);
-  check('the ways in are the one sequence, and each waits for the one before',
-    r.first.length === 7 && r.first[0] === false && r.first.slice(1).every(Boolean)
-    && r.after[0] === false && r.after[1] === false && r.after.slice(2).every(Boolean),
-    `shut at start ${r.first.filter(Boolean).length}/7; `
-    + `after the first is put down ${r.after.filter(Boolean).length}/7`);
-  check('the machine leads and the doors come last, with no name overflowing',
-    r.order[0] === 'TURRET' && r.order[r.order.length - 1] === 'ANOMALY'
-    && r.spill.length === 0 && r.dead === 0,
-    JSON.stringify({ order: r.order, spill: r.spill, deadTracks: r.dead }));
+  check('the machine leads, and no branch sells a way in any more',
+    r.order[0] === 'TURRET' && r.order.length === 4
+    && !r.order.includes('ANOMALY') && r.doors === 0,
+    JSON.stringify({ order: r.order, apertureCards: r.doors }));
+  check('...and no name overflows its meter, and no track is dead',
+    r.spill.length === 0 && r.dead === 0,
+    JSON.stringify({ spill: r.spill, deadTracks: r.dead }));
 }
 
 // --- energy is not a small copy of what dropped it ---------------------------
@@ -1626,8 +1657,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.restart();
     w.phase = 'staging';
     g.debugGiveEnergy(5000);
-    g.buy('aperture');
-    g.buy('aperture');
+    // Handed rather than bought from build 227. Two of them, because what
+    // this is about is that opening one spends one and a reload does not put
+    // it back -- and the ledger no longer carries an `aperture` id at all.
+    w.offered.length = 0;
+    w.apertures[1] = 2;
     const held = w.aperture;
     g.openBoss(); // spends one
     const spent = w.aperture;
@@ -1636,15 +1670,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const d = readRun();
     if (w.boss) { w.boss.clear(w); w.boss = null; }
     g.resume(); // the real restore path, off the real file
-    const back = { held, spent, saved: d ? d.aperture : null, restored: w.aperture,
+    const back = { held, spent, saved: d ? (d.apertures ? d.apertures[1] | 0 : null) : null,
+      restored: w.aperture,
       ledger: w.ledger.filter((x) => x === 'aperture').length };
     g.restart();
     return back;
   });
   check('a spent APERTURE is not handed back by a reload',
-    r.held === 2 && r.spent === 1 && r.saved === 1 && r.restored === 1 && r.ledger === 2,
-    `bought 2, spent 1 -> held ${r.spent}, saved ${r.saved}, restored ${r.restored}, `
-    + `ledger still records ${r.ledger}`);
+    r.held === 2 && r.spent === 1 && r.saved === 1 && r.restored === 1 && r.ledger === 0,
+    `held 2, spent 1 -> held ${r.spent}, saved ${r.saved}, restored ${r.restored}; `
+    + `the ledger records ${r.ledger} aperture purchases, because there are none`);
 }
 
 // --- ORDINAL leaves a REMAINDER, and RECAST is what spends it ---------------
@@ -5776,102 +5811,103 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
 // --- seven ways in, one colour each ------------------------------------------
 /*
- * ANOMALY holds a slot per boss. One of them has something behind it; the
- * other six are doors, shown because the shape of what is coming is worth
- * seeing and sealed because a way in that opens onto nothing is worse than a
- * door that plainly does not open.
+ * The seven ways in are given, not bought, from build 227.
  *
- * RECAST is not among them. It is not an upgrade to the machine, the rack or
- * the field — it is what you do with what the bosses leave — so it sits above
- * every category rather than inside one.
+ * They were an ANOMALY branch of the tree: one repeatable node each, priced
+ * 100 to 500 in energy and gated `needs` on the boss before. An aperture was
+ * the only thing in that tree that was not an upgrade to anything, so meeting
+ * a boss cost you the gun you would meet it with.
+ *
+ * What it competed with is the GATE, which has done this since build 203 and
+ * is now the only path: stand on an anomaly's rung and `Game.syncGate` lights
+ * the banner at no cost. Build 227 nearly shipped a second granter keyed to
+ * its own rungs, which would have handed ORDINAL's way in at 3 while the gate
+ * held the ladder at 6 -- so what this asserts is that there is exactly ONE
+ * table, that nothing sells a way in, and that the gate still lights.
+ *
+ * RECAST stays where it was: above every category rather than inside one,
+ * because it is not an upgrade to the machine, the rack or the field.
  */
 {
   const r = await page.evaluate(async () => {
     const g = window.__sim;
     const w = g.world;
+    const { CFG } = await import('../src/config.js');
     const { TREE, NODES } = await import('../src/tree.js');
-    const { BOSS_TONE } = await import('../src/upgrades.js');
     const { ANOMALIES } = await import('../src/anomaly.js');
     g.restart();
     w.phase = 'staging';
     g.debugGiveEnergy(9000);
     w.remainder = 2;
-
     const first = TREE[0];
-    const anomaly = NODES.find((n) => n.kind === 'root' && n.key === 'anomaly');
-    const slots = NODES.filter((n) => n.id && /^aperture/.test(n.id));
-    const live = slots.filter((n) => !n.dormant);
-    const sealed = slots.filter((n) => n.dormant);
+
     /*
-     * Every way in that exists is for sale, and nothing is behind anything
-     * else: the built ones all take the money on a cold run, and the ones
-     * that are not built refuse whatever has been broken.
+     * The gate, walked rung by rung. A jump to the top would be standing on
+     * the last one and could not tell "arrives at its own rung" from "arrives
+     * eventually"; the run has to be put on each in turn.
      */
+    const d = w.director;
+    const gates = CFG.waves.tier.gates;
     w.reconciled.length = 0;
-    const buys = slots.map((n) => ({ id: n.id, r: g.buy(n.id) }));
-    const tones = slots.map((n) => n.tone);
+    for (const a of ANOMALIES) w.apertures[a.n] = 0;
+    const lit = {};
+    const early = [];
+    for (let rung = 1; rung <= gates[gates.length - 1]; rung++) {
+      d.setTier(rung);
+      g.syncGate();
+      for (const a of ANOMALIES) {
+        if ((w.apertures[a.n] | 0) > 0 && lit[a.name] === undefined) {
+          lit[a.name] = rung;
+          if (rung !== gates[a.n - 1]) early.push(`${a.name} at ${rung} not ${gates[a.n - 1]}`);
+        }
+      }
+    }
+
+    /*
+     * ...and it is topped up to one rather than added to, which is what "the
+     * gate stays lit" means: opening the way spends the aperture and standing
+     * on the same rung hands it back, but standing there for a hundred frames
+     * does not hand back a hundred.
+     */
+    d.setTier(gates[0]);
+    w.apertures[1] = 0;
+    for (let i = 0; i < 20; i++) g.syncGate();
+    const relit = w.apertures[1] | 0;
+    // ...and not once the boss behind it has been put down.
+    w.reconciled.push(1);
+    w.apertures[1] = 0;
+    g.syncGate();
+    const afterDone = w.apertures[1] | 0;
+
     const out = {
       firstIsRecast: first.id === 'recast' && first.kind === 'upgrade',
       recastInTree: NODES.filter((n) => n.id === 'recast').length,
-      slots: slots.length,
-      live: live.length,
-      sealed: sealed.length,
-      names: slots.map((n) => n.name),
-      tones,
-      uniqueTones: new Set(tones).size,
-      matchesPalette: tones.join(',') === BOSS_TONE.join(','),
-      spectrum: (anomaly.tones || []).length,
-      opened: buys.filter((b) => b.r === 'ok').map((b) => b.id),
-      refused: buys.filter((b) => b.r === 'locked').map((b) => b.id),
-      held: [1, 2, 3, 4, 5, 6, 7].map((n) => w.apertures[n] | 0).join(','),
-      builtIds: slots.filter((n) => !n.dormant).map((n) => n.id),
-      anomalies: ANOMALIES.length,
+      slots: NODES.filter((n) => n.id && /^aperture/.test(n.id)).length,
+      roots: NODES.filter((n) => n.kind === 'root').map((n) => n.key),
       builtCount: ANOMALIES.filter((a) => a.built).length,
-      wantNames: ANOMALIES.map((a) => `${a.name} APERTURE`),
+      gates, lit, early, relit, afterDone,
     };
     w.reconciled.length = 0;
+    for (const a of ANOMALIES) w.apertures[a.n] = 0;
     g.restart();
     return out;
   });
-  /*
-   * The counts are derived, not written down. Every phase builds another boss
-   * and a hardcoded "two built, five sealed" is a test that has to be edited
-   * to stay true -- which is a test that eventually gets edited without being
-   * read. What is actually invariant is that the tree agrees with the table:
-   * a slot per anomaly, one live slot per built anomaly, and the names in the
-   * table's own order.
-   */
-  check('a tree slot per anomaly, live exactly where one is built',
-    r.firstIsRecast && r.recastInTree === 1
-    && r.slots === r.anomalies && r.live === r.builtCount
-    && r.sealed === r.anomalies - r.builtCount
-    && r.uniqueTones === r.anomalies && r.matchesPalette && r.spectrum === r.anomalies
-    && r.names.join() === r.wantNames.join(),
-    `${r.slots} slots (${r.live} live against ${r.builtCount} built, ${r.sealed} sealed), `
-    + `${r.uniqueTones} distinct colours, heading carries ${r.spectrum}; `
-    + `names ${JSON.stringify(r.names)}; first row is ${r.firstIsRecast ? 'RECAST' : 'NOT recast'}`);
-  /*
-   * One door at a time, and this reverses what it used to assert.
-   *
-   * Every built boss was for sale on a cold run, on the reasoning that gating
-   * them made a player who wanted the amber one go and break the magenta one
-   * first. That is true of the rest of the tree -- where nothing is behind
-   * anything and the panel is built not to imply otherwise -- and wrong here:
-   * these are numbered, each is built on the last, and a player meeting all
-   * seven at once has no idea which one is meant for them yet. So the
-   * sequence is enforced (`needs`, upgrades.js) rather than left as a hint,
-   * and it is the ONLY sequence in the tree.
-   *
-   * On a cold run exactly one opens; the other six refuse whether they are
-   * built or not, and the unbuilt ones would refuse anyway.
-   */
-  check('the ways in open one at a time, and only the first is cold-open',
-    r.opened.join() === 'aperture'
-    && r.refused.length === r.slots - 1
-    && r.held.split(',')[0] === '1'
-    && r.held.split(',').slice(1).every((x) => x === '0'),
-    `bought ${JSON.stringify(r.opened)} of ${r.slots} slots, refused ${r.refused.length}; `
-    + `ways in held ${r.held}`);
+
+  check('no tree node sells a way in, and RECAST still sits above every branch',
+    r.slots === 0 && !r.roots.includes('anomaly') && r.roots.length === 4
+    && r.firstIsRecast && r.recastInTree === 1,
+    `${r.slots} aperture nodes left; roots ${r.roots.join('/')}; `
+    + `first row is ${r.firstIsRecast ? 'RECAST' : 'NOT recast'}`);
+
+  check('every way in lights on its own gate rung, and none before it',
+    r.early.length === 0 && Object.keys(r.lit).length === r.builtCount,
+    `${r.early.join('; ') || 'each lit on its own rung'} — `
+    + `${JSON.stringify(r.lit)} against gates ${r.gates.join(',')}`);
+
+  check('...and the gate stays lit at one, and goes out once its boss is down',
+    r.relit === 1 && r.afterDone === 0,
+    `twenty frames on the rung with the way spent gives back ${r.relit}, not twenty; `
+    + `once reconciled it gives back ${r.afterDone}`);
 }
 
 // --- options, the way in, and a save that cannot be lost to one bad write ---
@@ -15215,7 +15251,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.director.update = () => {};
     const deep = w.floorY;
     const bar = deep * CFG.mines.keepTop;
-    let above = 0, lowest = 1e9, highest = -1e9;
+    let above = 0, lowest = 1e9, highest = -1e9, lowRaw = 1e9;
     for (let i = 0; i < 200; i++) {
       w.mines.length = 0;
       throwMine(w, 'blast');
@@ -15225,6 +15261,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       if (m.y1 < bar) above++;
       lowest = Math.min(lowest, m.y1);
       highest = Math.max(highest, m.y1);
+      // Raw, because the assertion below is an inequality against `bar` and
+      // both sides were being rounded before it: a site at 241.4 and a bar at
+      // 241.2 both read 241, and "no lower than the bar" failed on a rounding
+      // rather than on a mine.
+      lowRaw = Math.min(lowRaw, m.y1);
     }
     w.mines.length = 0;
 
@@ -15246,6 +15287,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.restart();
     return { splinters: splinters.length, far, onSurface, wallR: wall.r,
       wide, above, bar: +bar.toFixed(0), lowest: +lowest.toFixed(0),
+      clearsBar: lowRaw >= bar,
       highest: +highest.toFixed(0), floorY: +w.floorY.toFixed(0), tones,
       hasMenu: !!m2 };
   });
@@ -15257,13 +15299,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `point they would all have been on the near face`);
 
   /*
-   * A ceiling apiece, and the numbers behind them: BLAST 413 -> 306, KNELL's
-   * last toll 726 -> 538, LODE 184 -> 147, SNARE 210 -> 168. The first two
-   * come off DEEP CHARGE being capped at the two levels it always meant to
-   * have; the last two off their own reach.
+   * A ceiling apiece, and the numbers behind them. BLAST 413 -> 306 -> 215 and
+   * KNELL's last toll 726 -> 538 -> 378: the first step was build 223 capping
+   * DEEP CHARGE at two levels, the second is build 227 taking 30% off both
+   * base radii, and they multiply. LODE 184 -> 147 and SNARE 210 -> 168 came
+   * off their own reach in 223 and are untouched.
+   *
+   * The world is about 630 units across, so a radius over 315 is a circle
+   * wider than the screen. Every one of these is now inside that, which is
+   * the thing the ceilings are actually for.
    */
   check('none of the four widest mines opens wider than the screen it is on',
-    r.wide.blast < 320 && r.wide.knell < 560 && r.wide.lode < 155
+    r.wide.blast < 230 && r.wide.knell < 400 && r.wide.lode < 155
     && r.wide.snare < 175 && r.wide.deepLevels === 2,
     `fully bought: BLAST ${r.wide.blast.toFixed(0)}, KNELL's last toll `
     + `${r.wide.knell.toFixed(0)}, LODE ${r.wide.lode.toFixed(0)}, SNARE `
@@ -15275,7 +15322,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `against a reach of ${r.wide.lode.toFixed(0)} rather than 184`);
 
   check('a mine is never laid in the top fifth of the field',
-    r.above === 0 && r.highest > r.bar && r.lowest > r.bar
+    r.above === 0 && r.clearsBar && r.highest > r.bar
     && r.highest - r.lowest > 60,
     `200 sites, ${r.above} of them above the ${r.bar}-unit line `
     + `(a fifth of a ${r.floorY}-unit field); they ran ${r.bar} to `
@@ -15489,8 +15536,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * has to be provable as one -- the same total the BUILT readout asserts, by
    * a different route, so a level lost to a typo cannot hide behind it.
    */
+  /*
+   * `repeats` was 8 until build 227 -- the seven APERTUREs plus RECAST -- and
+   * is 1 now: the ways in are given at a rung rather than sold as repeatable
+   * nodes, so RECAST is the only thing left in the tree with no ceiling.
+   */
   check('...and writing the numbers out changed no ladder',
-    r.total === 105 && r.rungs === 53 && r.repeats === 8,
+    r.total === 105 && r.rungs === 53 && r.repeats === 1,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
     + `now written out, which has to be a refactor and nothing else)`);
@@ -15683,6 +15735,107 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `${r.loadout.rows} rows, ${r.loadout.slots} slots; HE on the strip ${r.loadout.wasOn}, `
     + `pressed: [${r.loadout.before}] -> [${r.loadout.after}]; closed -> loadoutOpen `
     + `${r.closed.loadout}`);
+}
+
+/*
+ * ---- RESET SIMULATION asks for the word ----
+ *
+ * The title screen used to carry NEW RUN beside CONTINUE: `Game.start` calls
+ * `forgetRun`, so it was the destructive one of the pair, wearing the quieter
+ * label, one thumb-width from the button that resumes. It is gone. Starting
+ * over is a small RESET SIMULATION at the foot of the screen, it only exists
+ * when there is a run to destroy, and it asks you to type the word.
+ *
+ * A typed word rather than the SYSTEM panel's arm-and-tap-again: that one is
+ * two taps deep inside a menu you went to on purpose, and this one is on the
+ * first screen of the game with a whole run behind it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { saveRun, readRun, forgetRun } = await import('../src/save.js');
+    const g = window.__sim;
+    const w = g.world;
+    const q = (id) => document.getElementById(id);
+    const shown = (id) => !!q(id) && !q(id).hidden;
+    const type = (v) => {
+      q('wipeWord').value = v;
+      q('wipeWord').dispatchEvent(new Event('input', { bubbles: true }));
+      return q('wipeGo').disabled;
+    };
+
+    // No save: nothing to reset, so no button offering to.
+    forgetRun();
+    g.hud.offerResume();
+    const cold = { wipe: shown('wipeBtn'), resume: shown('resumeBtn'),
+      start: getComputedStyle(q('startBtn')).display !== 'none',
+      label: q('startBtn').textContent };
+
+    // A save: CONTINUE is the only primary, and the reset appears under it.
+    const was = w.phase;
+    w.phase = 'staging';
+    w.kills = 348;
+    saveRun(w, g);
+    w.phase = was;
+    g.hud.offerResume();
+    const warm = { wipe: shown('wipeBtn'), resume: shown('resumeBtn'),
+      start: getComputedStyle(q('startBtn')).display !== 'none',
+      label: q('resumeBtn').textContent };
+    // ...and NEW RUN is gone rather than merely relabelled: nothing on this
+    // screen but the reset can take the save away.
+    const newRun = [...document.querySelectorAll('#boot button')]
+      .filter((b) => b.offsetParent && /NEW RUN/i.test(b.textContent)).length;
+
+    // The word. A partial does not arm it and neither does anything else.
+    q('wipeBtn').click();
+    const asked = { box: shown('wipeAsk'), btnGone: !shown('wipeBtn') };
+    const tries = {
+      empty: type(''),
+      partial: type('DELET'),
+      wrong: type('REMOVE'),
+      lower: type('delete'),
+      spaced: type('  DELETE '),
+    };
+
+    // Cancel puts it back untouched, and the save is still there.
+    q('wipeNo').click();
+    const cancelled = { box: shown('wipeAsk'), btn: shown('wipeBtn'), save: !!readRun() };
+
+    // And the real thing: the save goes and a run starts.
+    q('wipeBtn').click();
+    type('DELETE');
+    q('wipeGo').click();
+    const done = { save: !!readRun(), boot: q('boot').hidden, phase: w.phase,
+      box: shown('wipeAsk') };
+
+    forgetRun();
+    g.restart();
+    g.hud.offerResume();
+    return { cold, warm, newRun, asked, tries, cancelled, done };
+  });
+
+  check('the title offers one way in, and a reset only when there is one to make',
+    r.cold.wipe === false && r.cold.resume === false && r.cold.start === true
+    && r.cold.label === 'BEGIN SIMULATION'
+    && r.warm.wipe === true && r.warm.resume === true && r.warm.start === false
+    && r.warm.label === 'CONTINUE' && r.newRun === 0,
+    `no save: ${r.cold.label} alone, reset ${r.cold.wipe}; with one: `
+    + `${r.warm.label} alone, reset ${r.warm.wipe}; NEW RUN buttons left: ${r.newRun}`);
+
+  check('...and RESET SIMULATION will not fire until DELETE is typed',
+    r.asked.box && r.asked.btnGone
+    && r.tries.empty && r.tries.partial && r.tries.wrong
+    && r.tries.lower === false && r.tries.spaced === false,
+    `disabled after — empty ${r.tries.empty}, DELET ${r.tries.partial}, REMOVE `
+    + `${r.tries.wrong}; and armed by "delete" ${!r.tries.lower} and by "  DELETE " `
+    + `${!r.tries.spaced}`);
+
+  check('...cancelling changes nothing, and typing it wipes the run and begins one',
+    r.cancelled.box === false && r.cancelled.btn === true && r.cancelled.save === true
+    && r.done.save === false && r.done.boot === true && r.done.phase === 'staging'
+    && r.done.box === false,
+    `cancelled: box ${r.cancelled.box}, save still there ${r.cancelled.save}; `
+    + `confirmed: save ${r.done.save}, title ${r.done.boot ? 'gone' : 'STILL UP'}, `
+    + `phase ${r.done.phase}`);
 }
 
 // --- report -----------------------------------------------------------------

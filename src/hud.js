@@ -6,15 +6,15 @@ import { swipeToDismiss } from './swipe.js';
 import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
 import { pref, setPref } from './settings.js';
-import { BUILD, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
+import { BUILD, REV, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
 
-import { CODEX, codex, markLine } from './codex.js';
+import { CODEX, ANOMALY_ENTRIES, codex, markLine } from './codex.js';
 import { Menu } from './menu.js';
 import { holdFor, STACK, MIN_READ } from './tutorial.js';
 import { SLOTS, carried, freeSlot } from './loadout.js';
 import { heldList } from './anomaly.js';
-import { readRun } from './save.js';
+import { readRun, forgetRun } from './save.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -102,6 +102,13 @@ export class Hud {
       bossShell: $('bossShell'),
       boot: $('boot'),
       bootRecord: $('bootRecord'),
+      bootTele: $('bootTele'),
+      bootBuild: $('bootBuild'),
+      wipeBtn: $('wipeBtn'),
+      wipeAsk: $('wipeAsk'),
+      wipeWord: $('wipeWord'),
+      wipeGo: $('wipeGo'),
+      wipeNo: $('wipeNo'),
       resumeNote: $('resumeNote'),
       startBtn: $('startBtn'),
       resumeBtn: $('resumeBtn'),
@@ -158,20 +165,25 @@ export class Hud {
      * advice is false there and the line says so instead. Already standalone,
      * there is nothing to advise and only the build is left.
      */
-    const foot = document.querySelector('.bootFoot');
-    if (foot) {
-      const framed = window.top !== window.self;
-      const standalone =
-        navigator.standalone === true ||
-        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
-        (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches);
-      const advice = standalone
-        ? ''
-        : framed
-          ? 'Framed here. Open the page on its own to go borderless.'
-          : 'Add to Home Screen for fullscreen playback.';
-      foot.textContent = advice ? `${advice}  ·  BUILD ${BUILD}` : `BUILD ${BUILD}`;
-    }
+    const framed = window.top !== window.self;
+    const standalone =
+      navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches);
+    const advice = standalone
+      ? ''
+      : framed
+        ? 'Framed here. Open the page on its own to go borderless.'
+        : 'Add to Home Screen for fullscreen playback.';
+    const home = document.querySelector('.bootHome');
+    if (home) { home.textContent = advice; home.hidden = !advice; }
+    /*
+     * The build and the rev, on their own line. They are the two strings two
+     * devices get compared by, and they used to be glued to the end of the
+     * Home Screen advice -- which is the one line here that is sometimes empty,
+     * so on an installed copy the build number went with it.
+     */
+    if (this.el.bootBuild) this.el.bootBuild.textContent = `BUILD ${BUILD} · REV ${REV}`;
 
     /*
      * The loadout is the AMMO and MINES tabs of the menu from build 226; its
@@ -182,6 +194,55 @@ export class Hud {
 
     this.el.startBtn.addEventListener('click', () => game.start());
     this.el.resumeBtn.addEventListener('click', () => game.resume());
+    /*
+     * ---- RESET SIMULATION, on the title screen ----
+     *
+     * It asks for the word rather than for a second tap. A second tap is the
+     * pattern the SYSTEM panel's own wipe uses and it is right there -- that
+     * one is behind a menu, two taps deep, on a panel you went to on purpose.
+     * This one sits on the first screen of the game with a whole run behind
+     * it, and the cost of getting it wrong is the run. A typed word cannot be
+     * hit by accident.
+     *
+     * `Game.start` already calls `forgetRun()`, so the wipe and the new run
+     * are the one call: what this adds is the asking.
+     */
+    const askWipe = (on) => {
+      if (!this.el.wipeAsk) return;
+      this.el.wipeAsk.hidden = !on;
+      if (this.el.wipeBtn) this.el.wipeBtn.hidden = on || !readRun();
+      if (on) {
+        this.el.wipeWord.value = '';
+        this.el.wipeGo.disabled = true;
+        // Not focused: a keyboard thrown up over the title screen on a phone
+        // covers the thing it is asking about. The field is large and is the
+        // only thing in the box.
+      }
+    };
+    if (this.el.wipeBtn) this.el.wipeBtn.addEventListener('click', () => askWipe(true));
+    if (this.el.wipeNo) this.el.wipeNo.addEventListener('click', () => askWipe(false));
+    if (this.el.wipeWord) {
+      const check = () => {
+        // Trimmed and upper-cased, so a phone that capitalises the first
+        // letter and a thumb that adds a space are both still DELETE.
+        const said = this.el.wipeWord.value.trim().toUpperCase() === 'DELETE';
+        this.el.wipeGo.disabled = !said;
+        this.el.wipeWord.classList.toggle('ok', said);
+      };
+      this.el.wipeWord.addEventListener('input', check);
+      this.el.wipeWord.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' && !this.el.wipeGo.disabled) this.el.wipeGo.click();
+        if (ev.key === 'Escape') askWipe(false);
+      });
+    }
+    if (this.el.wipeGo) {
+      this.el.wipeGo.addEventListener('click', () => {
+        if (this.el.wipeGo.disabled) return;
+        askWipe(false);
+        forgetRun();
+        game.start();
+      });
+    }
     this.offerResume();
     this.showRecord();
     $('dbgClose').addEventListener('click', () => this.toggleDebug(false));
@@ -1755,23 +1816,66 @@ export class Hud {
    * Shown only once there is something in it: a first launch has no record
    * and a row of zeroes is a worse welcome than no row at all.
    */
+  /*
+   * Three tiles, and only the ones there is something to say in.
+   *
+   * Everything here is a fact the device already holds. The glossary is the
+   * only thing that survives a reset -- it was never yours, it is kept by
+   * whoever has been counting -- so it is the honest answer to "how far have I
+   * got"; an anomaly is in it only by having been taken apart; and the deepest
+   * rung comes off the saved run, so it is there exactly when CONTINUE is.
+   *
+   * A tile per fact rather than a sentence: they are compared at a glance and
+   * a sentence has to be read. `auto-fit` in the grid is what lets one, two or
+   * three of them lay out without three sets of rules.
+   */
   showRecord() {
     const el = this.el.bootRecord;
     if (!el) return;
-    const found = codex.found;
-    if (!found) { el.hidden = true; return; }
-    const bits = [`<b>${found}</b><em>of ${codex.total} recorded</em>`];
-    // ORDINAL in the glossary means one has been taken apart. There is no
-    // other way for it to get in there.
-    if (codex.has('ordinal')) bits.push('<b>◆</b><em>ORDINAL reconciled</em>');
-    el.innerHTML = bits.map((b) => `<span>${b}</span>`).join('');
+    const tile = (v, label) => `<span><b>${v}</b><em>${label}</em></span>`;
+    const bits = [];
+    if (codex.found) bits.push(tile(`${codex.found}<i>/${codex.total}</i>`, 'RECORDED'));
+    /*
+     * One word each, and that is a layout constraint rather than a style: the
+     * labels sit in a third of the panel at the 11px this screen is held to,
+     * and "ANOMALIES DOWN" wraps to two lines at 390 while the tile beside it
+     * does not. RECONCILED is the game's own verb for a boss taken apart --
+     * `world.reconciled` is the list.
+     */
+    const seen = ANOMALY_ENTRIES.filter((e) => codex.has(e.id)).length;
+    if (seen) bits.push(tile(seen, 'RECONCILED'));
+    const d = readRun();
+    const peak = d && d.wave && Number.isFinite(d.wave.peak) ? d.wave.peak : 0;
+    if (peak > 1) bits.push(tile(peak, 'DEEPEST'));
+    if (!bits.length) { el.hidden = true; return; }
+    el.innerHTML = bits.join('');
     el.hidden = false;
+  }
+
+  /**
+   * The one live thing on the title screen: the arena behind it.
+   *
+   * `phase = 'boot'` runs a real field with drift in it -- that is what the
+   * background of this screen IS -- so the readout is the object count of
+   * something actually being simulated rather than an animation of nothing.
+   * Diffed on the string, because this is called every frame.
+   */
+  syncBoot(world) {
+    const el = this.el.bootTele;
+    if (!el || this.el.boot.hidden) return;
+    const n = world.enemies.length + world.drops.length;
+    const txt = `${String(n).padStart(2, '0')} TRACKED`;
+    if (txt === this._teleTxt) return;
+    this._teleTxt = txt;
+    el.textContent = txt;
   }
 
   offerResume() {
     const d = readRun();
     const b = this.el.resumeBtn;
     if (!b) return;
+    if (this.el.wipeBtn) this.el.wipeBtn.hidden = !d;
+    if (this.el.wipeAsk) this.el.wipeAsk.hidden = true;
     if (!d) {
       b.hidden = true;
       if (this.el.resumeNote) this.el.resumeNote.hidden = true;
@@ -1809,9 +1913,15 @@ export class Hud {
       note.hidden = !bits.length;
     }
     b.hidden = false;
-    // Beside a CONTINUE the long form does not fit, and the short form is the
-    // more honest label anyway: from here, that button is a new run.
-    this.el.startBtn.textContent = 'NEW RUN';
+    /*
+     * ...and there is no NEW RUN beside it any more. It sat here doing the
+     * destructive thing -- `Game.start` forgets the run -- with the quieter
+     * label of the two and a whole run behind it. Starting over is RESET
+     * SIMULATION at the foot of the screen now, and it asks for the word.
+     * The button below is hidden by CSS while CONTINUE is up; its text is set
+     * anyway so that a wipe, which un-hides it, does not show a stale label.
+     */
+    this.el.startBtn.textContent = 'BEGIN SIMULATION';
   }
 
   hideBoot() {
@@ -1965,6 +2075,8 @@ export class Hud {
     const bar = this.el.bossBar;
     const boss = world.boss;
     this.syncApertures(world);
+    // The title screen's one live figure, while the title screen is up.
+    if (world.phase === 'boot') this.syncBoot(world);
 
     if (bar.hidden !== !boss) {
       bar.hidden = !boss;

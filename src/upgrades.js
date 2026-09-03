@@ -257,7 +257,6 @@ const quicken = (key, by) => (up) => { up[key] *= by; };
  * anomaly.js owns the identity of a boss now; this is the tree's view of it.
  */
 export { BOSS_TONE } from './anomaly.js';
-import { BOSS_TONE as TONES, ANOMALIES } from './anomaly.js';
 
 /*
  * II through VII: a door, a colour, and -- for one of them now -- something
@@ -278,52 +277,23 @@ import { BOSS_TONE as TONES, ANOMALIES } from './anomaly.js';
  * A slot that is not built stays sealed, and says so honestly rather than
  * pretending something would open it.
  */
-const HINT = {
-  2: 'Something in here keeps the hours.',
-  3: 'Something in here repeats itself.',
-  4: 'Something in here is oscillating.',
-  5: 'Something in here draws current.',
-  6: 'Something in here has a twin.',
-  7: 'Something in here is the edge of the field.',
-};
-
-const SLEEPING = ANOMALIES.slice(1).map((a) => {
-  const common = {
-    id: a.key,
-    name: `${a.name} APERTURE`,
-    repeat: true,
-    step: 0,
-    tone: a.tone,
-    icon: MARK.aperture,
-  };
-  if (!a.built) {
-    return {
-      ...common,
-      dormant: true,
-      cost: CFG.ordinal.cost,
-      line: `Not cut yet. ${HINT[a.n]}`,
-      apply: () => {},
-    };
-  }
-  return {
-    ...common,
-    /*
-     * One door at a time. `needs` is an anomaly number that has to be in
-     * world.reconciled before Game.available() will open this node, so the
-     * way in to the second boss is shut until the first has been put down.
-     *
-     * The rest of the tree has no order and is not meant to look as though
-     * it has one. These are the exception: they are a sequence, they are
-     * numbered, and each is built on the last -- so the sequence is enforced
-     * rather than merely implied by price.
-     */
-    needs: a.n - 1,
-    // Priced by its own config, which scripts/check-build.mjs holds it to.
-    cost: CFG[a.cfg].cost,
-    line: `A way in to ${a.name}. ${HINT[a.n]}`,
-    apply: (up, world) => { world.apertures[a.n] = (world.apertures[a.n] | 0) + 1; },
-  };
-});
+/*
+ * ---- the seven ways in are not bought any more ----
+ *
+ * `SLEEPING` built one repeatable tree node per anomaly here -- a door, a
+ * colour, a price from CFG and a `needs` gate on the one before -- and the
+ * ANOMALY branch of the tree sold them. Build 227 took the branch out: a way
+ * in is reached by standing on its GATE -- `CFG.waves.tier.gates`, and
+ * `Game.syncGate` lights the banner at no cost -- which has been the other
+ * way to meet an anomaly since build 203. An aperture was the only thing in
+ * this file that was not an upgrade to anything, and it competed for energy
+ * with the machine you would meet the boss with.
+ *
+ * RECAST below stays, and stays in this axis: it is still what the bosses
+ * leave behind, and it is still the only thing bought in a currency of its
+ * own. It sits at the top of the tree rather than in a branch -- see TREE in
+ * tree.js -- so it did not need the branch to reach it.
+ */
 
 export const UPGRADES = {
   AMMO: [
@@ -729,12 +699,6 @@ export const UPGRADES = {
       }, icon: MARK.standing },
   ],
   ANOMALY: [
-    { id: 'aperture', name: 'ORDINAL APERTURE', repeat: true,
-      cost: CFG.ordinal.cost, step: 0,
-      line: 'Opens the way. Something on the other side has been counting, and it will come through.',
-      apply: (up, world) => { world.aperture = (world.aperture || 0) + 1; },
-      tone: TONES[0], icon: MARK.aperture },
-    ...SLEEPING,
     /*
      * ---- what the count leaves behind ----
      *

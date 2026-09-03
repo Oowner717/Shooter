@@ -36,6 +36,22 @@
  * not written, and everything that lists bosses has to be able to tell the
  * difference without guessing from whether a constructor turned up.
  */
+/*
+ * ---- and the rung each one stands on is NOT here ----
+ *
+ * It is `CFG.waves.tier.gates`, index n-1, and it has been since build 203.
+ * Build 227 removed the tree's ANOMALY branch -- the seven repeatable nodes
+ * that sold a way in for energy -- which leaves the gate as the ONE way to
+ * meet an anomaly: stand on its rung and `Game.syncGate` lights the banner at
+ * no cost. That was always the better of the two paths; what it was competing
+ * with was a purchase that bought a boss with the energy you would have fought
+ * it with.
+ *
+ * Worth writing down because build 227 nearly shipped a second granter here,
+ * keyed to its own rungs, which would have handed ORDINAL's way in at rung 3
+ * while the gate held the ladder at 6. There is one gate table, it is in
+ * config, and `check-build.mjs` holds it to one rung per anomaly in order.
+ */
 export const ANOMALIES = [
   { n: 1, key: 'aperture', name: 'ORDINAL', tone: '#ff5ec8', cfg: 'ordinal', built: true,
     types: ['ordinal', 'tally', 'digit'] },

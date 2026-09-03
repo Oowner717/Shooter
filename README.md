@@ -1436,6 +1436,12 @@ All seven were built and none of them was on it. Past band 5 nothing new was
 ever introduced, and the only way to meet an anomaly was to buy an APERTURE out
 of the tree — so a run could climb to rung 40 having never seen one.
 
+**From build 227 the gate is the only way.** The tree's ANOMALY branch — seven
+repeatable nodes, 100 to 500 energy each — is gone: an aperture was the one
+thing in that tree that was not an upgrade to anything, so meeting a boss cost
+you the gun you would have met it with. Reaching the rung is the whole of it
+now.
+
 Seven rungs are **gates**: 6 ORDINAL, 12 GNOMON, 18 FRACTAL, 24 AMPLITUDE,
 30 DYNAMO, 36 PARITY, 42 TERMINUS. A gate rung is an ordinary rung for waves;
 the ladder simply **will not climb past it** until its anomaly is in

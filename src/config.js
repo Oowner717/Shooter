@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '226';
+export const BUILD = '227';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '226';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a19664d';
+export const REV = '7b83976';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1163,9 +1163,24 @@ export const CFG = {
     arm: 0.4, // settling time before it can trigger
     r: 13,
     trigger: 26, // extra reach beyond the mine's own radius
-    // Nerfed in build 49 from 140; SHRAPNEL is the way back past it.
-    blast: { r: 168, damage: 105, impulse: 760 },
-    fizzle: { r: 96, damage: 48, impulse: 300 }, // SALTED: what a spent one does
+    /*
+     * 118, down 30% from 168 in build 227, and the damage is untouched.
+     *
+     * Build 223 took a third off the MAXIMUM by capping DEEP CHARGE at the two
+     * levels it always meant to have, which left a bought BLAST at 306 units
+     * on a world about 630 across -- still very nearly the width of the
+     * screen, and still the thing the player was complaining about. That fix
+     * was to the ladder; this one is to the base, and the two multiply: 118
+     * stock and 215 fully bought.
+     *
+     * The damage stays where it is on purpose. What was wrong was never how
+     * hard a mine hits, it is that a circle wider than the screen is not a
+     * blast, it is a white flash with no shape to read -- and five may be down
+     * at once. Nerfed in build 49 from 140; SHRAPNEL is still the way back
+     * past the damage.
+     */
+    blast: { r: 118, damage: 105, impulse: 760 },
+    fizzle: { r: 67, damage: 48, impulse: 300 }, // SALTED: what a spent one does
   },
 
   // ---- snares ---------------------------------------------------------
@@ -1230,7 +1245,16 @@ export const CFG = {
     r: 13,
     tolls: 2, // was 3; FOURTH BELL buys the third back and a fourth beyond it
     gap: 1.15, // seconds between them
-    blast: { r: 118, damage: 81, impulse: 430 },
+    /*
+     * 83, down 30% from 118 in build 227, for the reason BLAST's is -- and
+     * more so, because this is the one that compounds. Every toll is `grow`
+     * wider than the last and FOURTH BELL buys two more of them, so the last
+     * ring of a fully bought KNELL is `r * (1 + 3 * grow) * mineBlast`: it was
+     * 726 units before build 223 capped DEEP CHARGE, 538 after, and it is 378
+     * now. The first toll is 83 and the last is a little over four times it,
+     * which is the shape the mine is for.
+     */
+    blast: { r: 83, damage: 81, impulse: 430 },
     grow: 0.5, // each toll this much wider than the one before
     fade: 0.72, // and this much of its damage
   },
