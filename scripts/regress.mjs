@@ -14091,6 +14091,94 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `body (${r.fired} round(s) left the barrel)`);
 }
 
+// --- a split child is a body of its tier, like every other body --------------
+/*
+ * `spawnOne` carried the tier's health and bounty under a comment calling it
+ * "the one place every hostile enters the world". It was not: a SPLITTER's
+ * children and a WARDEN's are made with `new Enemy` at the point the parent
+ * came apart, and `world.enemies.push`ed directly. So most of a splitting
+ * type's mass entered at TIER 1 rates however deep the run was -- a soft
+ * target that paid tier-1 energy, sitting beside an identical body that had
+ * arrived on its own with 8.6x the health.
+ *
+ * A SCION's seeds go the same way and are correctly untouched: they are
+ * `harmless`, which is the arm that keeps grey grey, and the multiplier has
+ * always skipped it.
+ *
+ * Asserted as the RATIO between a child at tier 1 and the same child deep,
+ * which must be `scaleAt(tier)` itself -- an assertion that cannot be
+ * satisfied by the children merely getting bigger for some other reason.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const en = await import('../src/enemies.js');
+    const { TYPE_BY_ID } = await import('../src/config.js');
+    // The splitting types, found rather than named, so a new one is covered.
+    const parent = Object.values(TYPE_BY_ID).find((t) => t.splits);
+
+    const at = (tier) => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      const d = w.director;
+      d.update = () => {};
+      // `setTier` is the machinery's setter and unlocks as it goes; `reach`
+      // is the player's and clamps. This is machinery.
+      d.setTier(tier);
+      d.wave = null;      // a teach wave is exempt by design
+      d.traits = [];
+      g.debugClearField();
+      const p = g.debugSpawn(parent.id, w.width / 2, 300);
+      if (!p) return null;
+      p.staged = false;
+      const before = w.enemies.length;
+      p.destroy(w);
+      const kids = w.enemies.filter((e) => !e.dead && e !== p && e.type.id === parent.splits.type);
+      const k = d.scaleAt(d.tier);
+      /*
+       * Averaged over the whole brood. A child's BASE health is drawn per
+       * body -- measured, four MOTEs came out at 29, 33, 31 and 33 against a
+       * type base of 31 -- so a single sample, and even a mean of four, moves
+       * the health ratio several percent run to run on a build where the
+       * arithmetic is exactly right. The health half of this case is
+       * therefore a sanity bound and the BOUNTY half is the exact one:
+       * bounty has no variance at all (1 at tier 1, exactly `k.bounty`
+       * deep), so it is the term that can be asserted to the digit.
+       */
+      const mean = (f) => (kids.length ? kids.reduce((n, e) => n + f(e), 0) / kids.length : 0);
+      return {
+        tier: d.tier, kids: kids.length, before,
+        hp: mean((e) => e.maxHp),
+        bounty: mean((e) => e.bounty),
+        want: k,
+      };
+    };
+    const low = at(1);
+    const high = at(14);
+    w.spawnLock = 0;
+    g.restart();
+    return { low, high, parent: parent && parent.id, child: parent && parent.splits.type };
+  });
+  const ok = r.low && r.high && r.low.kids > 0 && r.high.kids > 0
+    // Exact: bounty carries no per-body variance.
+    && Math.abs(r.low.bounty - r.low.want.bounty) < 1e-6
+    && Math.abs(r.high.bounty - r.high.want.bounty) < 1e-6
+    // ...and health scaled by something like the ladder rather than by 1.
+    && r.high.hp > r.low.hp * (r.high.want.hp / r.low.want.hp) * 0.85
+    && r.high.hp < r.low.hp * (r.high.want.hp / r.low.want.hp) * 1.15;
+  check('a split child is a body of its tier, like every other body', ok,
+    `${r.parent} -> ${r.child}: at tier ${r.low && r.low.tier} a child has `
+    + `${r.low && Math.round(r.low.hp)}hp and pays x${r.low && r.low.bounty.toFixed(2)}; `
+    + `at tier ${r.high && r.high.tier}, ${r.high && Math.round(r.high.hp)}hp and `
+    + `x${r.high && r.high.bounty.toFixed(2)} — the ladder says `
+    + `x${r.high && (r.high.want.hp / r.low.want.hp).toFixed(2)} and `
+    + `x${r.high && (r.high.want.bounty / r.low.want.bounty).toFixed(2)}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

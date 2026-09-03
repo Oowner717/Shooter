@@ -1345,6 +1345,12 @@ export class Enemy {
           staged: this.staged,
           spawnIn: 0.6,
         });
+        // The tier, which this used to miss entirely. It is made HERE and
+        // not released, so it never passes through `spawnOne` -- and the
+        // multiplier lived inside `spawnOne` under a comment claiming that
+        // was the one door. Most of a SPLITTER's and a WARDEN's mass was
+        // arriving at tier-1 health and paying tier-1 energy.
+        scaleToTier(world, kid, child);
         world.enemies.push(kid);
         world.released++;
         // Made HERE rather than released, so it never goes through spawnOne:
@@ -2947,42 +2953,54 @@ function tagBody(world, e, from) {
   return e;
 }
 
-export function spawnOne(world, type, x, y, opts = {}) {
-  const e = new Enemy(type, x, y, { staged: true, spawnIn: 1, ...opts });
-  /*
-   * The tier's health and bounty, applied at the one place every hostile
-   * enters the world.
-   *
-   * Deliberately not applied to the harmless: DRIFT is a promise the field
-   * keeps, and a tier-8 DRIFT with eight times the health is a grey object
-   * that does not die like a grey object. The bonus wave stays a bonus.
-   */
-  /*
-   * ...and not to a teach wave either. The opening is authored at exactly the
-   * size and difficulty it should be; a tier-40 multiplier on it turns the
-   * sentence "this is a NEEDLE" into a 29-second wall that teaches nothing.
-   */
+/**
+ * The tier's health, bounty and wave rules.
+ *
+ * This used to live inside `spawnOne` under a comment calling it "the one
+ * place every hostile enters the world", and that was not true: a SPLITTER's
+ * children and a SCION's seeds are made with `new Enemy` at the point their
+ * parent came apart, so most of a splitting type's mass entered the world at
+ * TIER 1 rates however deep the run was -- a soft target that paid tier-1
+ * energy, beside an identical body that had arrived on its own with 8.6x the
+ * health at tier 20. It is a function so the three sites can share it.
+ *
+ * Deliberately not applied to the harmless: DRIFT is a promise the field
+ * keeps, and a tier-8 DRIFT with eight times the health is a grey object that
+ * does not die like a grey object. The bonus wave stays a bonus -- and a
+ * SCION's seeds are harmless bodies, so they are covered by that arm rather
+ * than by an exception of their own.
+ *
+ * ...and not to a teach wave either. The opening is authored at exactly the
+ * size and difficulty it should be; a tier-40 multiplier on it turns the
+ * sentence "this is a NEEDLE" into a 29-second wall that teaches nothing.
+ */
+export function scaleToTier(world, e, type) {
   const d = world.director;
-  if (d && !e.harmless && !type.fixed && !d.wave?.teach) {
-    const k = d.scaleAt(d.tier);
-    e.maxHp *= k.hp;
-    e.hp = e.maxHp;
-    e.bounty *= k.bounty;
-    /*
-     * ...and the wave's rules, on the hostiles only.
-     *
-     * Grey is harmless: DRIFT and energy are never traited, which is why this
-     * sits inside the same guard as the tier multiplier rather than beside it.
-     * An ARMORED mote would break the one promise the colour rule makes.
-     */
-    if (d.traits && d.traits.length) {
-      e.traits = d.traits;
-      if (hasTrait(d.traits, 'swarm')) {
-        e.maxHp = Math.max(1, Math.round(e.maxHp * CFG.waves.tier.swarmHp));
-        e.hp = e.maxHp;
-      }
+  if (!d || e.harmless || type.fixed || d.wave?.teach) return e;
+  const k = d.scaleAt(d.tier);
+  e.maxHp *= k.hp;
+  e.hp = e.maxHp;
+  e.bounty *= k.bounty;
+  /*
+   * ...and the wave's rules, on the hostiles only.
+   *
+   * Grey is harmless: DRIFT and energy are never traited, which is why this
+   * sits inside the same guard as the tier multiplier rather than beside it.
+   * An ARMORED mote would break the one promise the colour rule makes.
+   */
+  if (d.traits && d.traits.length) {
+    e.traits = d.traits;
+    if (hasTrait(d.traits, 'swarm')) {
+      e.maxHp = Math.max(1, Math.round(e.maxHp * CFG.waves.tier.swarmHp));
+      e.hp = e.maxHp;
     }
   }
+  return e;
+}
+
+export function spawnOne(world, type, x, y, opts = {}) {
+  const e = new Enemy(type, x, y, { staged: true, spawnIn: 1, ...opts });
+  scaleToTier(world, e, type);
   world.enemies.push(e);
   if (!e.harmless) world.released++;
   return tagBody(world, e, null);
