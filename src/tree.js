@@ -98,9 +98,10 @@ const UNDER = {
   pulse: ['shockfront'],
   fan: [], lance: [], well: [], prism: [], stasis: [], decoy: [],
   // WARD is the one with real shaping: how far the shell stands, how hard it
-  // cuts, and how many arcs come off it. It is a STATE rather than an event,
-  // which is what gives it three decisions to sell where an instant has one.
-  ward: ['standoff', 'edged', 'fork'],
+  // cuts, how many arcs come off it, and whether it throws as it comes up.
+  // It is a STATE rather than an event, which is what gives it four decisions
+  // to sell where an instant has one.
+  ward: ['standoff', 'edged', 'fork', 'heave'],
 };
 
 /** Which arms hang off which category, in the order they are shown. */

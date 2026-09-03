@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '220';
+export const BUILD = '221';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '220';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '6a9185a';
+export const REV = '7189005';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -919,6 +919,22 @@ export const CFG = {
      * worth pressing when nothing is crossing yet.
      */
     arc: { every: 0.6, n: 2, damage: 46, reach: 1.25 },
+    // Seconds between discharges crawling along the surface. It fires whether
+    // or not anything is near, because a shell that only sparks when it is
+    // being touched reads as a wall that happens to hurt; this one has to
+    // read as dangerous before anything walks into it. The rate rises with
+    // `flash`, so it visibly gets angrier just after something crosses.
+    /*
+     * HEAVE: one outward shove on the frame the shell comes up, and only with
+     * the node. A throw rather than a hit that pushes -- the exemption PULSE
+     * and PILE have and SLUG deliberately does not, on the same rule: a press
+     * every eighteen seconds is a deliberate clear, and a round fired one and
+     * a half times a second is not. So the ceiling lifts to `thrownSpeed` and
+     * the repeated-shove fade is skipped, which is what makes a body visibly
+     * lose ground instead of being nudged and driving straight back in.
+     */
+    heave: 1180,
+    crackle: 0.085,
     ramp: 0.35, // seconds the shell takes to stand up, and to go
   },
 

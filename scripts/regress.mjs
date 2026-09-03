@@ -463,7 +463,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 134 since build 220, when the ammo-and-mine audit capped three more
+    // 135 since build 221, when HEAVE went in at one level -- the WARD's
+    // fourth node, and a switch rather than a dial. It was
+    // 134 from build 220, when the ammo-and-mine audit capped three more
     // nodes the tree was selling three times: FIFTH LINK to 1 (the round's
     // base is four jumps and the node is named for the fifth), PAIRED CHARGE
     // to 1 (the mine cap evicted what the other two levels laid) and FOURTH
@@ -491,7 +493,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 134
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 135
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -14299,6 +14301,242 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.casingOwned > 0 && near(r.casing60.took, r.casing120.took, 0.28),
     `${Math.round(r.casing60.took)} at 60Hz against ${Math.round(r.casing120.took)} `
     + `at 120Hz, on a turret carrying ${r.casingOwned} a second of casing`);
+}
+
+// --- every glossary icon sits inside its frame ------------------------------
+/*
+ * The cells are identical 36px squares and every specimen was drawn at a flat
+ * `w * 0.34`, which assumes the shapes are the same size as each other. They
+ * are not: measured across the whole glossary, NEEDLE and TOW reached the
+ * frame's edge exactly -- clipped, in a bordered tile -- WARDEN used 0.94 of
+ * it and TALLY 0.89, while ECHO used 0.61 and BULWARK 0.67. A 1.63x spread,
+ * with the biggest ones touching their own border.
+ *
+ * `specimenScale` measures each shape's true half-extent once and caches the
+ * correction, so a shape added later fits itself. Asserted on the RENDERED
+ * PIXELS of the real cells rather than on the scale factor, because the
+ * factor being right is not the claim -- the claim is that nothing touches
+ * the edge.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { codex } = await import('../src/codex.js');
+    const { ENEMY_TYPES } = await import('../src/config.js');
+    for (const t of ENEMY_TYPES) codex.record(t.id);
+    for (const id of ['ordinal', 'gnomon', 'fractal', 'amplitude', 'dynamo', 'parity',
+      'terminus', 'digit', 'dial', 'fraction', 'crest', 'pylon', 'pane', 'bound',
+      'tally', 'ion', 'plate', 'second', 'limit', 'echo', 'droplet', 'towMass', 'seed']) {
+      try { codex.record(id); } catch (_) { /* not every id is a codex entry */ }
+    }
+    g.hud.menu.setOpen(true);
+    g.hud.menu.show('codex');
+    const rows = [];
+    for (const c of document.querySelectorAll('.codexArt canvas')) {
+      if (!c.dataset.drawn) continue;
+      const W = c.width;
+      const d = c.getContext('2d', { willReadFrequently: true })
+        .getImageData(0, 0, W, W).data;
+      const half = W / 2;
+      let reach = 0;
+      for (let y = 0; y < W; y++) {
+        for (let x = 0; x < W; x++) {
+          if (d[(y * W + x) * 4 + 3] <= 8) continue;
+          reach = Math.max(reach, half - x, x + 1 - half, half - y, y + 1 - half);
+        }
+      }
+      const name = c.closest('.codexCell').querySelector('.codexName').textContent;
+      if (reach > 0) rows.push({ name, fill: +(reach / half).toFixed(3) });
+    }
+    g.hud.menu.setOpen(false);
+    return rows;
+  });
+  r.sort((a, b) => b.fill - a.fill);
+  const big = r.filter((x) => x.fill > 0.93);
+  const small = r.filter((x) => x.fill < 0.6);
+  check('every glossary icon is centred in its frame and touches no edge',
+    r.length > 30 && big.length === 0 && small.length === 0,
+    `${r.length} drawn, ${r.length ? `widest ${r[0].name} ${r[0].fill}, ` : ''}`
+    + `${r.length ? `narrowest ${r[r.length - 1].name} ${r[r.length - 1].fill}` : ''}`
+    + `${big.length ? ` | touching: ${big.map((x) => x.name).join(', ')}` : ''}`
+    + `${small.length ? ` | lost in the frame: ${small.map((x) => x.name).join(', ')}` : ''}`);
+}
+
+// --- HEAVE, and PILE no longer reading as WARD ------------------------------
+/*
+ * Two things from build 221.
+ *
+ * HEAVE is the WARD's fourth node and a switch rather than a dial: the shell
+ * throws everything out of it as it comes up, once, on the frame it is made.
+ * It lives in the constructor rather than in `update` because "once" has to
+ * be once, and a constructor already runs exactly once. `throwOff`, on the
+ * rule build 220 settled: a press every eighteen seconds is a deliberate
+ * clear and gets both halves of a throw, where SLUG at 1.5 rounds a second
+ * gets neither.
+ *
+ * And PILE. It was a white circle inside a pale-blue circle, both expanding,
+ * which is WARD's drawing at a different radius -- and it fires every eight
+ * seconds for the whole run, so it was also the most repeated thing on the
+ * screen. It is brass now, and a crest with lobes rather than a geometric
+ * ring. Asserted on the RENDERED PIXELS, because "looks like" is a claim
+ * about what reaches the screen and nothing else settles it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { Front } = await import('../src/shooter.js');
+    const { NODE_BY_ID } = await import('../src/tree.js');
+    const g = window.__sim;
+    const w = g.world;
+
+    // ---- HEAVE ----
+    /*
+     * The witness is a LURCHER and NOT a BULWARK, and the first version of
+     * this case got that wrong and failed on a working build. A shove is
+     * `impulse * invMass`, and BULWARK's invMass is 0.030 against 0.20-2.38
+     * for everything else in the game -- an order of magnitude down -- so it
+     * measured the one body a shove barely moves and reported 16.5 u/s as a
+     * defect. Measured against a fully-bought PULSE on the same body: 24.2.
+     * HEAVE was already 68% of the biggest shove in the game and the case
+     * said it did nothing. So the ordinary attacker carries the assertion,
+     * and the heavy one gets an arm of its own below, asserting the mass
+     * dependence rather than pretending it away.
+     */
+    const heaved = (buy, type = 'lurcher') => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      if (buy) {
+        g.debugGiveEnergy(400000);
+        const chain = [];
+        for (let n = NODE_BY_ID.get('heave'); n; n = n.parent) if (n.id) chain.unshift(n.id);
+        for (const id of chain) for (let i = 0; i < 4; i++) g.buy(id);
+      }
+      const s = w.shooter;
+      // Inside the shell, healed each frame, so what moves it is the shove
+      // and not its own legs and not its death.
+      const e = g.debugSpawn(type, s.x + 70, s.y - 40);
+      if (!e) return null;
+      e.staged = false;
+      e.hp = 1e9;
+      e.maxHp = 1e9;
+      e.vx = 0;
+      e.vy = 0;
+      const d0 = Math.hypot(e.x - s.x, e.y - s.y);
+      const i = w.abilities.slots.findIndex((x) => x.def.id === 'ward');
+      w.abilities.clearCooldowns();
+      g.useAbility(i);
+      // One frame: the shove lands on the frame the shell is made.
+      g.update(1 / 60);
+      const v = Math.hypot(e.vx, e.vy);
+      for (let f = 0; f < 30; f++) { e.hp = 1e9; g.update(1 / 60); }
+      return { owned: !!w.up.wardPush, v: +v.toFixed(1),
+        moved: +(Math.hypot(e.x - s.x, e.y - s.y) - d0).toFixed(1) };
+    };
+    const plain = heaved(false);
+    const bought = heaved(true);
+    const heavy = heaved(true, 'bulwark');
+
+    // ---- PILE against WARD, as pixels ----
+    const W = 420;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = W;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    const lit = () => {
+      const d = ctx.getImageData(0, 0, W, W).data;
+      let rr = 0, gg = 0, bb = 0, n = 0, peak = 0;
+      for (let q = 0; q < d.length; q += 4) {
+        const v = Math.max(d[q], d[q + 1], d[q + 2]);
+        if (v > peak) peak = v;
+        if (v < 30) continue;
+        rr += d[q]; gg += d[q + 1]; bb += d[q + 2]; n++;
+      }
+      return n ? { r: rr / n, g: gg / n, b: bb / n, n, peak } : { r: 0, g: 0, b: 0, n: 0, peak };
+    };
+    const pile = (cut) => {
+      const f = new Front(W / 2, W / 2, 1);
+      f.cut = cut;
+      f.t = 0.14;
+      ctx.fillStyle = '#04050a'; ctx.fillRect(0, 0, W, W);
+      f.draw(ctx);
+      return lit();
+    };
+    const quiet = pile(0);
+    const struck = pile(3);
+
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    w.director.update = () => {};
+    const wi = w.abilities.slots.findIndex((x) => x.def.id === 'ward');
+    w.abilities.clearCooldowns();
+    g.useAbility(wi);
+    const shell = w.effects.find((x) => x && x.surges);
+    for (let i = 0; i < 30; i++) shell.update(w, 1 / 60);
+    const s2 = w.shooter;
+    const ox = s2.x, oy = s2.y;
+    s2.x = W / 2; s2.y = W / 2;
+    ctx.fillStyle = '#04050a'; ctx.fillRect(0, 0, W, W);
+    shell.draw(ctx, w);
+    const ward = lit();
+    // ...and whether the surface is actually alive: the discharge is the
+    // brightest thing on it, and there has to be some.
+    let hot = 0;
+    const dd = ctx.getImageData(0, 0, W, W).data;
+    for (let q = 0; q < dd.length; q += 4) {
+      if (dd[q] > 200 && dd[q + 1] > 200 && dd[q + 2] > 200) hot++;
+    }
+    s2.x = ox; s2.y = oy;
+    g.restart();
+    return { plain, bought, heavy, quiet, struck, ward, hot, surges: shell.surges.length };
+  });
+
+  check('HEAVE throws what is inside the shell, and only with the node bought',
+    r.plain && r.bought && r.bought.owned === true && r.plain.owned === false
+    && r.bought.v > 60 && r.plain.v < r.bought.v * 0.2
+    && r.bought.moved > r.plain.moved + 30,
+    `without it the body left at ${r.plain && r.plain.v} u/s and gained `
+    + `${r.plain && r.plain.moved}u; with it, ${r.bought && r.bought.v} u/s and `
+    + `${r.bought && r.bought.moved}u`);
+
+  /*
+   * ...and the shove is an impulse, so what a body gets out of it is
+   * `impulse * invMass`. That is the whole reason the row says the heavy ride
+   * it out, and it is worth pinning: BULWARK is the only body in the game an
+   * order of magnitude down on invMass, and a future HEAVE that moved it as
+   * far as a LURCHER would be a shove that had stopped caring about mass.
+   * The floor is there so this cannot pass by HEAVE doing nothing at all.
+   */
+  check('...and what a body gets out of that shove is its own mass',
+    r.heavy && r.heavy.v > 8 && r.heavy.v < r.bought.v * 0.45,
+    `a LURCHER leaves at ${r.bought && r.bought.v} u/s, a BULWARK at `
+    + `${r.heavy && r.heavy.v}`);
+
+  /*
+   * PILE is warm and WARD is cold. Asserted as the sign of (red - blue) on the
+   * mean lit pixel, which is the one thing that cannot be argued with: WARD is
+   * hard white light leaning blue, PILE is brass leaning red.
+   */
+  const warm = r.quiet.r - r.quiet.b;
+  const cold = r.ward.r - r.ward.b;
+  check('PILE and WARD do not read as the same effect',
+    warm > 4 && cold < -4,
+    `PILE's mean lit pixel is r${r.quiet.r.toFixed(0)} b${r.quiet.b.toFixed(0)} `
+    + `(r-b ${warm.toFixed(1)}), WARD's is r${r.ward.r.toFixed(0)} `
+    + `b${r.ward.b.toFixed(0)} (r-b ${cold.toFixed(1)})`);
+
+  check('...and a PILE that struck nothing is the quieter of the two',
+    r.quiet.peak > 0 && r.struck.peak > r.quiet.peak * 1.4 && r.quiet.peak < 110,
+    `a pass that cut nothing peaks at ${r.quiet.peak} of 255; one that cut `
+    + `three peaks at ${r.struck.peak}`);
+
+  check('...and the WARD-s surface is visibly live, not a drawn circle',
+    r.surges > 0 && r.hot > 20,
+    `${r.surges} discharges crawling on it, ${r.hot} pixels of them near-white`);
 }
 
 // --- report -----------------------------------------------------------------

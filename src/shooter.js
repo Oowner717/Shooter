@@ -39,6 +39,16 @@ import { audio } from './audio.js';
  * one. Nothing in this game has ever pushed the lattice OUTWARD; WELL only
  * ever pulled it in. That is what the effect is made of.
  */
+/*
+ * PILE's two tones: the body of the swell and its lit crest.
+ *
+ * Brass, and deliberately nothing else in the game's palette -- the ability
+ * bar owns cyan, green, amber, violet, magenta, periwinkle, red and hard
+ * white, and this used to be drawn in the last of those, which is WARD's.
+ */
+const TONE_PILE = '#b8894e';
+const TONE_CREST = '#f0cf9a';
+
 export class Front {
   constructor(x, y, level) {
     const P = CFG.pile;
@@ -166,39 +176,82 @@ export class Front {
    * shape. No `flash()` ever: this goes off every three seconds for the rest
    * of the run, and four hundred screen whites is a strobe.
    */
+  /**
+   * A swell, not a ring.
+   *
+   * It was a white circle inside a pale-blue circle, both expanding -- which
+   * is WARD's drawing with a different radius, and WARD is a cold near-white
+   * shell that is up for six seconds. Side by side they read as the same
+   * effect. And this one fires every eight seconds for the whole run, so it
+   * is the most-repeated thing on the screen: at 0.85 alpha of pure white it
+   * was also the brightest.
+   *
+   * So: brass rather than white-blue, because it comes up through the deck
+   * and nothing else in the game is that colour; a crest with lobes rather
+   * than a geometric circle, so a still frame reads as water and not as a
+   * ring being resized; the lobes turn as the front travels, which is what
+   * makes it look like it is MOVING rather than growing; and it is quiet by
+   * default and only brightens on a pass that actually struck something --
+   * an effect that is spectacular once is intolerable the four hundredth
+   * time, which is the rule the scar below was already written to.
+   */
   draw(ctx) {
     const k = Math.min(1, this.t / this.travel);
     const rr = this.radius;
     const left = Math.max(0, Math.min(1, (this.life - this.t) / 0.3));
+    // Up fast, settling as it spreads -- a swell rather than a step.
+    const swell = Math.sin(Math.min(1, k * 1.15) * Math.PI) * 0.72 + 0.28;
+    // Loud only when it took something.
+    const bite = this.cut > 0 ? 1 : 0;
+    const turn = this.t * 1.5;
+
+    // One crest of the wave: a circle with a slow radial ripple in it.
+    const crest = (radius, amp, lobes, phase, tone, alpha, width) => {
+      if (alpha <= 0.004 || radius < 2) return;
+      ctx.strokeStyle = rgba(tone, alpha);
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      const n = 40;
+      for (let i = 0; i <= n; i++) {
+        const a = (i / n) * TAU;
+        const rad = radius + Math.sin(a * lobes + phase) * amp;
+        const px = this.x + Math.cos(a) * rad;
+        const py = this.y + Math.sin(a) * rad;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    };
+
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    // The wake, behind the front and wider.
-    ctx.strokeStyle = rgba('#b9d4e6', 0.4 * left * (1 - k * 0.35));
-    ctx.lineWidth = 5 + (1 - k) * 9;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, Math.max(2, rr - 8 - k * 10), 0, TAU);
-    ctx.stroke();
-    // ...and the front itself, thinning as it goes out.
-    ctx.strokeStyle = rgba('#ffffff', 0.85 * left * (1 - k * 0.5));
-    ctx.lineWidth = 2 + (1 - k) * 3.5;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, rr, 0, TAU);
-    ctx.stroke();
+    /*
+     * The ripple scales with the radius. At a flat few units it is 2.7% of a
+     * 168-unit circle, which is not a wave, it is a circle with a rounding
+     * error -- the first version of this was invisible for exactly that
+     * reason. A twentieth of the radius reads at every size the wave passes
+     * through.
+     */
+    const amp = rr * 0.052 * swell + 2;
+    // A small leading ripple ahead of the crest, the way water pushes one.
+    crest(rr + 9 + k * 7, amp * 0.45, 5, turn * 1.2, TONE_PILE,
+      0.07 * left * swell, 1 + (1 - k) * 1.2);
+    // The trough behind the crest: wide, dim, and further behind as it goes.
+    crest(Math.max(2, rr - 14 - k * 16), amp * 0.8, 5, -turn * 0.6, TONE_PILE,
+      (0.10 + bite * 0.06) * left * swell, 4 + (1 - k) * 5);
+    // ...and the crest itself, thinning as it spreads out.
+    crest(rr, amp, 5, turn, TONE_CREST,
+      (0.22 + bite * 0.20) * left * (1 - k * 0.35), 1.6 + (1 - k) * 2.2);
     /*
      * The scar: a dim residue drawn AT the radius the wave reached, after the
      * front has gone. A ring that fades as it grows is dimmest exactly where
      * its radius means something -- this is the frame that says how far it
      * got. Skipped entirely when the strike cut nothing, which is most of
-     * them: an effect that is spectacular once is intolerable the four
-     * hundredth time, and the answer is to draw less when less happened.
+     * them.
      */
-    if (this.cut > 0 && this.t > this.travel) {
+    if (bite && this.t > this.travel) {
       const s2 = 1 - (this.t - this.travel) / 0.45;
-      ctx.strokeStyle = rgba('#8fb6d8', 0.3 * s2 * s2);
-      ctx.lineWidth = CFG.hairline * 1.6;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.r, 0, TAU);
-      ctx.stroke();
+      crest(this.r, 2.2, 5, turn, TONE_PILE, 0.26 * s2 * s2, CFG.hairline * 1.6);
     }
     ctx.restore();
   }

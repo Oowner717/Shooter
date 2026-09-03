@@ -1326,13 +1326,84 @@ function heading(title, note) {
  * A specimen portrait, drawn once per entry with the same routines the field
  * uses, so the glossary can never drift out of step with the thing itself.
  */
+/*
+ * How much of the frame's half-width an icon is allowed to use. Under 1 by
+ * enough that nothing touches the border it is drawn inside.
+ */
+const SPECIMEN_FILL = 0.82;
+
+/** Per-id scale that makes a shape fill exactly that much. Measured once. */
+const specimenFit = new Map();
+let fitCanvas = null;
+
+/**
+ * Every specimen used to be drawn at a flat `w * 0.34`, and the shapes are
+ * not the same size as each other: measured across the whole glossary, NEEDLE
+ * and TOW reached the frame's edge exactly (and clipped), WARDEN 0.94 of it
+ * and TALLY 0.89, while ECHO used 0.61 and BULWARK 0.67. A 1.63x spread in a
+ * grid of identical square tiles, with the biggest ones touching their border.
+ *
+ * So the extent is measured rather than assumed: the shape is drawn once into
+ * a scratch canvas at a nominal radius, its alpha bounding box gives the true
+ * half-extent, and the ratio is cached per id. A shape added later fits
+ * itself. The measure runs once per id per session, off the same code path
+ * that draws the cell, so it cannot drift from it.
+ *
+ * The scratch is TWICE the frame, which is not a detail. A first version
+ * measured in a frame-sized canvas, and the two shapes that most needed
+ * fitting were exactly the two that had already clipped in it: NEEDLE reaches
+ * 2.24x the radius it is handed, so its measured extent came back pinned to
+ * the frame edge, the correction computed from it was far too small, and it
+ * clipped again. A measurement taken through the thing being corrected is not
+ * a measurement.
+ */
+function specimenScale(id, w) {
+  if (specimenFit.has(id)) return specimenFit.get(id);
+  let k = 1;
+  try {
+    const box = w * 2;
+    if (!fitCanvas) {
+      fitCanvas = document.createElement('canvas');
+      fitCanvas.width = box;
+      fitCanvas.height = box;
+    }
+    const c = fitCanvas.getContext('2d', { willReadFrequently: true });
+    c.clearRect(0, 0, box, box);
+    c.save();
+    c.translate(box / 2, box / 2);
+    drawCodexShape(c, id, w * 0.34);
+    c.restore();
+    const d = c.getImageData(0, 0, box, box).data;
+    const mid = box / 2;
+    let reach = 0;
+    for (let y = 0; y < box; y++) {
+      for (let x = 0; x < box; x++) {
+        if (d[(y * box + x) * 4 + 3] <= 8) continue;
+        // Half-extent from the centre on the wider of the two axes, which is
+        // what decides whether it touches a square frame.
+        const ex = Math.max(mid - x, x + 1 - mid);
+        const ey = Math.max(mid - y, y + 1 - mid);
+        if (ex > reach) reach = ex;
+        if (ey > reach) reach = ey;
+      }
+    }
+    if (reach > 0) k = ((w / 2) * SPECIMEN_FILL) / reach;
+  } catch (_) {
+    // A context that will not hand back pixels leaves every icon where it
+    // was; a glossary drawn at the old size is better than one not drawn.
+    k = 1;
+  }
+  specimenFit.set(id, k);
+  return k;
+}
+
 function drawSpecimen(canvas, id) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
   ctx.clearRect(0, 0, w, w);
   ctx.save();
   ctx.translate(w / 2, w / 2);
-  drawCodexShape(ctx, id, w * 0.34);
+  drawCodexShape(ctx, id, w * 0.34 * specimenScale(id, w));
   ctx.restore();
 }
 

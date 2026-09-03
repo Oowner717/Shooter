@@ -458,6 +458,13 @@ class Decoy {
  * register nothing else uses: hard light rather than a colour.
  */
 const TONE_WARD = '#e8f0ff';
+/*
+ * ...and the two the CHARGE is drawn in. The shell is structure and reads as
+ * hard light; what runs along it is electricity and has to read as hotter
+ * than the thing carrying it, or the surface looks inert.
+ */
+const TONE_ARC_HOT = '#ffffff';
+const TONE_ARC_SOFT = '#8fd4ff';
 
 class Ward {
   constructor(world) {
@@ -492,6 +499,52 @@ class Ward {
     this.flash = 0; // the surface lighting where something just came through
     this.hits = []; // {a, t} -- where, so the shell is marked where it was hit
     this.bolts = []; // {x0,y0,x1,y1,t} -- the arcs, drawn for a moment
+    /*
+     * ...and the discharge that runs ALONG the surface, which is what says
+     * the thing is live rather than merely present. `{ a, span, dir, t, seed }`
+     * -- where it started, how far round it reaches, which way it is
+     * crawling. Spawned on `this.crackle` whether or not anything is near:
+     * a shell that only sparks when it is being touched reads as a wall that
+     * happens to hurt, and this one is supposed to read as dangerous BEFORE
+     * anything walks into it.
+     */
+    this.surges = [];
+    this.crackle = 0;
+    // ...and the charge that flickers the whole surface, on a much faster
+    // clock than the old sine breath. Electricity does not breathe.
+    this.jitter = 0;
+
+    /*
+     * HEAVE: one shove, on the frame the shell is made.
+     *
+     * Here rather than in `update` because "once, on the way up" has to be
+     * once -- an update-side flag is a second thing that can go wrong, and
+     * this constructor already runs exactly once. `throwOff` for the reason
+     * CLAUDE.md gives: a press every eighteen seconds is a deliberate clear
+     * and gets both halves of a throw, where SLUG at 1.5 rounds a second
+     * gets neither.
+     */
+    if (up.wardPush) {
+      applyBlast(world, {
+        x: world.shooter.x, y: world.shooter.y,
+        r: this.r,
+        damage: 0,
+        impulse: P.heave,
+        throwOff: true,
+      });
+      ring(world.shooter.x, world.shooter.y, this.r * 0.3, this.r * 1.06, 0.34,
+        TONE_ARC_SOFT, 3.4);
+      world.effects.push(new Shock(world.shooter.x, world.shooter.y, this.r,
+        TONE_ARC_SOFT));
+      for (let i = 0; i < 18; i++) {
+        const a = rand(0, TAU);
+        spark(world.shooter.x + Math.cos(a) * this.r * 0.5,
+          world.shooter.y + Math.sin(a) * this.r * 0.5,
+          Math.cos(a) * rand(260, 620), Math.sin(a) * rand(260, 620),
+          TONE_ARC_SOFT, 0.34, 2.2);
+      }
+      shake(7);
+    }
   }
 
   /** 0 while it stands up, 1 while it holds, back to 0 as it goes. */
@@ -514,6 +567,32 @@ class Ward {
       this.bolts[i].t -= dt;
       if (this.bolts[i].t <= 0) this.bolts.splice(i, 1);
     }
+    /*
+     * The surface discharge. Two or three short arcs crawling round the shell
+     * at any moment, each living about a fifth of a second -- so the surface
+     * is never still and never the same shape twice, which is the whole of
+     * "this is live". Their rate rises with `flash`, so the shell visibly
+     * gets angrier for a moment after something crosses it.
+     */
+    for (let i = this.surges.length - 1; i >= 0; i--) {
+      this.surges[i].t -= dt;
+      if (this.surges[i].t <= 0) this.surges.splice(i, 1);
+    }
+    this.crackle -= dt * (1 + this.flash * 2.2);
+    if (this.crackle <= 0 && this.surges.length < 5) {
+      this.crackle = P.crackle * rand(0.55, 1.45);
+      this.surges.push({
+        a: rand(0, TAU),
+        span: rand(0.22, 0.85),
+        dir: Math.random() < 0.5 ? -1 : 1,
+        t: rand(0.18, 0.34),
+        max: 0.34,
+        seed: Math.random() * 1000,
+      });
+    }
+    // A fast, unsmooth flicker. The old surface breathed on a 3.1 rad/s sine,
+    // which is what a shield does; this is what a live one does.
+    this.jitter = 0.6 + 0.4 * Math.sin(this.t * 41) * Math.sin(this.t * 17.3);
     if (this.life <= 0) { this.dead = true; return; }
 
     const rr = this.r * this.open;
@@ -617,9 +696,9 @@ class Ward {
      * you can see where the line is, and a ring that fades as it grows would
      * be dimmest exactly where the line matters. See CLAUDE.md.
      */
-    const beat = 0.5 + 0.5 * Math.sin(t * 3.1);
+    const beat = this.jitter;
     drawGlow(ctx, TONE_WARD, s.x, s.y, rr * 0.96, (0.1 + this.flash * 0.12) * k);
-    ctx.strokeStyle = rgba(TONE_WARD, (0.5 + beat * 0.14 + this.flash * 0.4) * k);
+    ctx.strokeStyle = rgba(TONE_WARD, (0.44 + beat * 0.22 + this.flash * 0.4) * k);
     ctx.lineWidth = 2.2 + this.flash * 2.6;
     ctx.beginPath();
     ctx.arc(s.x, s.y, rr, 0, TAU);
@@ -631,6 +710,50 @@ class Ward {
     ctx.beginPath();
     ctx.arc(s.x, s.y, rr - 5, 0, TAU);
     ctx.stroke();
+
+    /*
+     * ---- the discharge, crawling along the surface ----
+     *
+     * This is the part that says the shell is DANGEROUS rather than merely
+     * present. A circle with a soft glow behind it is a bubble; a circle with
+     * something crawling round it that is never the same shape twice is a
+     * live conductor, and the difference costs two strokes.
+     *
+     * Drawn ON the surface, jagged across it, in a hotter tone than the shell
+     * itself -- so the shell reads as the structure and the crackle reads as
+     * the charge the structure is carrying. Each arc travels round while it
+     * lives, which is what stops the effect being a texture.
+     */
+    for (const g of this.surges) {
+      const f = Math.max(0, g.t / g.max);
+      const lead = g.a + g.dir * (1 - f) * g.span * 1.6;
+      const seg = 7;
+      const wob = 0.13 + f * 0.1;
+      for (const [tone, alpha, width] of [
+        [TONE_ARC_SOFT, 0.30 * f * k, 4.2],
+        [TONE_ARC_HOT, 0.95 * f * k, 1.5],
+      ]) {
+        ctx.strokeStyle = rgba(tone, alpha);
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        for (let i = 0; i <= seg; i++) {
+          const u = i / seg;
+          const a = lead + g.dir * u * g.span;
+          // Off the surface by a hair, alternating, so it reads as arcing
+          // across the shell rather than tracing it.
+          const off = i === 0 || i === seg ? 0
+            : Math.sin(g.seed + i * 2.7) * rr * wob * 0.12;
+          const rad = rr + off;
+          const px = s.x + Math.cos(a) * rad;
+          const py = s.y + Math.sin(a) * rad;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+      // The head of the arc, which is the brightest thing on the shell.
+      drawGlow(ctx, TONE_ARC_HOT, s.x + Math.cos(lead) * rr,
+        s.y + Math.sin(lead) * rr, 7 + f * 5, 0.5 * f * k);
+    }
 
     /*
      * The lattice: spokes from the machine to the surface, turning slowly.

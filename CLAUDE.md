@@ -775,4 +775,24 @@ most once for any given target and cannot spin.
   render a strip of frames -- and if something looks absent, measure the pixels
   before believing your eyes: the front ring read as missing in a PNG and was
   there at peak 246 of 255.
+- **A shove is `impulse * invMass`, so the WITNESS's mass is the instrument.**
+  Build 221's HEAVE case put a BULWARK inside the shell to be sure "what moves
+  it is the shove and not its own legs" and reported 16.5 u/s as a failure on a
+  working build. BULWARK's invMass is 0.030 against 0.20-2.38 for every other
+  body in the game -- an order of magnitude down, and the one body a shove
+  barely moves. Measured against a fully-bought PULSE on the SAME body: 24.2.
+  HEAVE was already 68% of the largest shove in the game. The ordinary attacker
+  carries the assertion now and the heavy one gets an arm asserting the mass
+  dependence, which is the thing worth pinning anyway.
+- **A fit measured in a frame the size of the frame is measured through the
+  clipping it exists to correct.** The glossary's icons are drawn into a square
+  and two of them (NEEDLE at 2.24x its own radius, TOW) already ran past the
+  edge, so a scratch canvas the size of the cell recorded a reach the frame had
+  truncated and computed a correction far too small -- they clipped again, by
+  less. Measure in a scratch twice the box and the reach is the shape's.
+- **A flat amplitude on a radius-scaled shape is not an amplitude.** PILE's
+  crest was authored at 4.5 units, which is 2.7% of a 168-unit front: invisible,
+  and it read as WARD at a different radius. Anything that has to be SEEN on a
+  shape whose size varies has to scale with it (`rr * 0.052` here, measured at
+  8.9%), with a flat term only as the floor for the small end.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

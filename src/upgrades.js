@@ -76,6 +76,7 @@ export function freshUpgrades() {
     wardR: 1,
     wardCut: 1,
     wardArcs: 0,
+    wardPush: false, // HEAVE: one outward shove as the shell comes up
     lodeReach: 1, // how far a lode pushes, and how hard
     lodePush: 1,
     wireDamage: 1, // per second of contact on a wire
@@ -130,6 +131,12 @@ const MARK = {
     + '<circle cx="17" cy="6" r="1.5" fill="currentColor" stroke="none"/>'
     + '<circle cx="17" cy="18" r="1.5" fill="currentColor" stroke="none"/>'
     + '<circle cx="17" cy="12" r="1.5" fill="currentColor" stroke="none" opacity=".55"/>'),
+  // ...and the shove as it stands up: a shell with everything leaving it.
+  heavemark: g('<circle cx="12" cy="12" r="5.2"/>'
+    + '<path d="M12 6.4V2.6M12 17.6v3.8M6.4 12H2.6M17.6 12h3.8"/>'
+    + '<path d="M10.4 4.2 12 2.6l1.6 1.6M10.4 19.8 12 21.4l1.6-1.6" opacity=".85"/>'
+    + '<path d="M4.2 10.4 2.6 12l1.6 1.6M19.8 10.4 21.4 12l-1.6 1.6" opacity=".85"/>'
+    + '<circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" opacity=".6"/>'),
   salvo: g('<path d="M5 21V7M12 21V4M19 21V7"/><path d="M2.6 9.4 5 7l2.4 2.4M9.6 6.4 12 4l2.4 2.4M16.6 9.4 19 7l2.4 2.4"/>'),
   // --- build 54: BOLT, HE, SCATTER, ARC and SPINE each get their own ---
   // A round coming off a body at an angle rather than stopping in it.
@@ -537,6 +544,16 @@ export const UPGRADES = {
     { id: 'fork', name: 'FORK', levels: 1,
       line: '+1 arc off the WARD at a time.',
       apply: bump('wardArcs', 1), icon: MARK.forkmark },
+    /*
+     * ONE level, written out, because it is a switch and not a dial: the
+     * shell either shoves as it comes up or it does not, and a second level
+     * of "once" is not a thing. See the paragraph at the end of this file --
+     * an absent `levels` means THREE, and seven nodes have shipped uncapped
+     * because somebody read the sentence that used to be there.
+     */
+    { id: 'heave', name: 'HEAVE', levels: 1,
+      line: 'The WARD shoves everything out of it as it comes up. Once, and the heavy ride it out.',
+      apply: set('wardPush', true), icon: MARK.heavemark },
     /*
      * Two levels, written out -- 0.64 of every cooldown. It had none, and
      * `tree.js` reads `u.levels ?? 3`, so the one node in this branch that
