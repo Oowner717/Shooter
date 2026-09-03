@@ -168,7 +168,22 @@ export class Front {
        * straight back in.
        */
       e.thrown = Math.max(e.thrown || 0, P.thrown);
-      e.applyDamage(world, P.damage * (0.35 + f * 0.65), nx, ny, P.impulse * f);
+      /*
+       * ...and a THROW, which is the other half `thrown` alone does not buy.
+       *
+       * The line above lifts the speed CEILING and the comment explains why.
+       * It does not lift the repeated-shove FADE: `applyDamage` scales any
+       * impulse by `1 / (1 + kicked)`, which settles around a fifth under
+       * ordinary fire -- so "what is closing gets thrown back", on a card
+       * that fires once every eight seconds, was landing at a fifth of its
+       * rated impulse exactly when the field was busy enough to need it.
+       * That is PULSE's build-216 fault on the other card that answers the
+       * mount. A once-every-eight-seconds sweep is a deliberate clear, which
+       * is what the exemption is for; SLUG at 1.5 a second is not, and is
+       * deliberately still paying it.
+       */
+      e.applyDamage(world, P.damage * (0.35 + f * 0.65), nx, ny, P.impulse * f,
+        0, 0, true);
       // The same mark every time, so the cause is legible without the event
       // being loud -- and only while there is budget for it.
       if (this.cut <= 8 && fx.quality >= 0.7) {

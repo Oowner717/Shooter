@@ -527,11 +527,23 @@ function repel(world, m, dt) {
 
 function cut(world, m, dt) {
   const reach = W.width * m.open;
+  /*
+   * The span it has actually unspooled, which is what the picture draws.
+   *
+   * `m.open` ramped the WIDTH and nothing else, so the line cut its whole
+   * 300-unit span from the first frame while being drawn creeping out of the
+   * middle over `W.open` -- 0.55 seconds -- and on the first frame drawn at
+   * no length at all. A body 140 units from the spool was cut by a wire that
+   * was not there yet. Same lerp as the draw, off the same `open`.
+   */
+  const mx = (m.ax + m.bx) / 2;
+  const ax = mx + (m.ax - mx) * m.open;
+  const bx = mx + (m.bx - mx) * m.open;
   const take = (list) => {
     for (const e of list) {
       // A damage path: `spent` yes, `staged` no. Grey stays grey.
       if (e.dead || e.spent || e.harmless) continue;
-      const hit = segClosest(m.ax, m.ay, m.bx, m.by, e.x, e.y);
+      const hit = segClosest(ax, m.ay, bx, m.by, e.x, e.y);
       const rr = reach + e.r;
       if (hit.d2 > rr * rr) continue;
       const d = Math.sqrt(hit.d2) || 1;
