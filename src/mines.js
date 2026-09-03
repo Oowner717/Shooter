@@ -1,5 +1,5 @@
-// Auto-laid mines, in four kinds. One kind is laid at a time. All four are
-// lobbed onto a random patch of ground, all four are inert for the whole
+// Auto-laid mines, in eight kinds. One kind is laid at a time. All eight are
+// lobbed onto a random patch of ground, all eight are inert for the whole
 // flight — passing straight through anything in the way — and none of them
 // does anything until it has settled. Harmless drift never sets one off.
 //
@@ -12,10 +12,18 @@
 //   side of itself and cuts anything that crosses it, for as long as that
 //   thing stays on the line. Nothing triggers it and nothing consumes it: it
 //   is a lane closed until it expires.
-// KNELL does not wait to be touched. It counts, and then it goes off three
-//   times where it lies, each wider and weaker than the last. BLAST punishes
-//   what walks into it; this denies the ground whether anything is there or
-//   not.
+// KNELL does not wait to be touched. It counts, and then it tolls where it
+//   lies — twice stock, four times with FOURTH BELL — each ring wider and
+//   weaker than the last. BLAST punishes what walks into it; this denies the
+//   ground whether anything is there or not.
+// THORN is not a charge at all. It opens into a patch of burning ground and
+//   stays open: nothing sets it off and nothing uses it up.
+// LODE holds a field open instead of a line, and pushes everything inside it
+//   outward for as long as it lives. No damage of its own either.
+// SPALL throws one fan of shot straight up the field on contact, and is
+//   spent. Each pellet bursts where it lands.
+// VOID deletes the first thing that touches it, whatever its health — except
+//   an anomaly's own structure, which is not survivable by design.
 
 import { CFG } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, segClosest } from './util.js';
@@ -120,7 +128,16 @@ function tally(world, kind) {
    * the readout lying about the machine.
    */
   const mouth = !!KIND[kind].trigger;               // WIDE MOUTH
-  const bang = kind === 'blast' || kind === 'knell' || kind === 'spall'; // DEEP CHARGE
+  /*
+   * ...and SALTED gives a blast to the kinds that have none of their own, so
+   * once it is owned DEEP CHARGE and SHRAPNEL genuinely do reach them --
+   * `fizzle` scales its radius by `up.mineBlast` and its damage by
+   * `up.mineDamage`. Without this a LODE with SALTED, DEEP CHARGE and
+   * SHRAPNEL all bought wore marks for none of the three that were doing
+   * anything to it.
+   */
+  const bang = kind === 'blast' || kind === 'knell' || kind === 'spall'
+    || !!up.mineFizzle;                                                 // DEEP CHARGE
   /*
    * SHRAPNEL is `up.mineDamage`, and `up.mineDamage` is read in exactly three
    * places: `detonate`, `fizzle` and `toll`. THORN's patch takes
@@ -265,15 +282,35 @@ function landingSite(world) {
   };
 }
 
-const LAY_TONE = { blast: 300, snare: 240, wire: 380, knell: 200 };
+/*
+ * The note a mine makes as it is thrown, one per kind.
+ *
+ * It held four of the eight for three builds -- the four that existed when it
+ * was written -- so THORN, LODE, SPALL and VOID were all laid with BLAST's
+ * own chime and a player had no way to hear which one had gone out. The
+ * fallback is deliberately not any kind's value now, so a ninth kind is
+ * audibly unnamed rather than quietly impersonating the first.
+ */
+const LAY_TONE = {
+  blast: 300, snare: 240, wire: 380, knell: 200,
+  thorn: 340, lode: 210, spall: 420, void: 160,
+};
 
 export function throwMine(world, kind = 'blast') {
   const s = world.shooter;
   const site = landingSite(world);
-  // The ceiling is enforced here rather than at the clock, because a SEED
-  // offer lays three at once and does not go through the clock at all. The
-  // oldest goes, and it goes the way its kind goes — a blast mine bangs, a
-  // spall throws, a void closes — so nothing simply evaporates.
+  /*
+   * The ceiling, enforced here rather than at the clock so that anything
+   * laying more than one at a time is covered by it too. The oldest goes,
+   * and it goes the way its kind goes -- a blast mine bangs, a spall throws,
+   * a void closes -- so nothing simply evaporates.
+   *
+   * `find` is the oldest because the list is spliced rather than swap-popped;
+   * see the removal at the bottom of `updateMines`. And the loop is rarely
+   * entered in ordinary play: with PAIRED CHARGE capped at one level a throw
+   * lays two against a cap of five, so the field peaks at four. It is a
+   * backstop, not a mechanism.
+   */
   while (laidCount(world) >= M.cap) {
     const oldest = world.mines.find((x) => !x.dead);
     if (!oldest) break;
@@ -296,14 +333,16 @@ export function throwMine(world, kind = 'blast') {
     m.x1 = cx;
   }
   world.mines.push(m);
-  audio.chime(LAY_TONE[kind] || 300);
+  audio.chime(LAY_TONE[kind] || 270);
 }
 
-/** How many of one kind are on the field. */
 /**
- * Everything on the field, of any kind. Nothing expires now, so the ceiling
- * has to be field-wide: counting per kind would let a player switch round the
- * four and hold four caps at once.
+ * Everything on the field, of any kind.
+ *
+ * Field-wide rather than per kind: counting per kind would let a player
+ * switch round the eight and hold eight caps at once. (Two stale docstrings
+ * were stacked here -- one saying it counted a single kind, the other saying
+ * nothing expires, against a fifteen-second `life`.)
  */
 export function laidCount(world) {
   let n = 0;
@@ -339,8 +378,19 @@ function detonate(world, m) {
 
 /** A snare opening: it stops being a trigger and starts being a fist. */
 function snap(world, m) {
-  m.hold = S.hold * world.up.mineHold;
-  m.settle = 0;
+  /*
+   * Bounded by what the mine has left to live.
+   *
+   * `CFG.mines.life` is 15 and its comment calls it a contract nothing may
+   * move -- "none of them outlives its quarter minute" -- and the gripping
+   * arm of `updateMines` runs the hold down without ever looking at `life`.
+   * With DEAD WEIGHT fully bought the hold is 10.8s, so a snare that snapped
+   * at 14.9 seconds stood for 25.7 and held a cap slot the whole time.
+   */
+  m.hold = Math.min(S.hold * world.up.mineHold, Math.max(0.1, m.life));
+  // (`m.settle = 0` sat here and nothing could read it: `armed` is
+  // `landed && settle >= arm && hold <= 0`, and `hold` is now positive, so
+  // the settle term cannot decide anything while a snare is gripping.)
   ring(m.x, m.y, S.reach, m.r * 2, 0.45, '#c77dff', 4);
   ripple(m.x, m.y, 1.1, S.reach * 3);
   shake(6);
@@ -359,6 +409,11 @@ function grip(world, m, dt) {
   const take = (list) => {
     for (const e of list) {
       /*
+       * `fixed` first: a boss's frame is placed by the boss every frame and
+       * `drive` re-zeroes its velocity, so a snare hauling at one is writing
+       * into a value that is overwritten before it is integrated -- and the
+       * wires were drawn to a knot that could not move.
+       *
        * `spent` and `fizzle`, not `staged` -- the rule CLAUDE.md records.
        * `spent` is a boss's own frame through its outro and nothing may act
        * on it; `fizzle` is a body dissolving, and this writes `vx`/`vy` by
@@ -367,7 +422,7 @@ function grip(world, m, dt) {
        * screen, and a snare that visibly fails to take something standing
        * in it is the worse fault.
        */
-      if (e.dead || e.spent || e.fizzle) continue;
+      if (e.dead || e.spent || e.fizzle || e.type.fixed) continue;
       const dx = m.x - e.x;
       const dy = m.y - e.y;
       const d2 = dx * dx + dy * dy;
@@ -390,11 +445,6 @@ function grip(world, m, dt) {
   }
 }
 
-/**
- * WIRE. Everything touching the line is cut for as long as it stays on it, and
- * shoved off the way it was leaning — so a body crossing takes a slice rather
- * than being parked in the beam and ground to nothing.
- */
 /**
  * A mine reaching the end of it — because its life ran out, or because a newer
  * one needed its place. It goes off the way its kind goes off, so being pushed
@@ -425,6 +475,19 @@ function retire(world, m) {
     audio.pop(0.9);
     return;
   }
+  /*
+   * THORN, LODE, WIRE and VOID: through `fizzle`, which is what all four
+   * already do at end of life and is what SALTED turns into a blast. It was
+   * a bare `m.dead = true`, so half the roster was evicted with nothing to
+   * show for it -- against this function's own first sentence, "it goes off
+   * the way its kind goes off, so being pushed off the field is not the same
+   * as being wasted", and against SALTED's row, which promises a spent mine
+   * goes off. THORN takes its ground with it the way its own end-of-life arm
+   * does. `fizzle` reads `m.dead` back on its first line, so it cannot
+   * double-fire.
+   */
+  if (m.kind === 'thorn' && m.patch) m.patch.retire();
+  fizzle(world, m);
   m.dead = true;
 }
 
@@ -523,7 +586,11 @@ function spall(world, m) {
 /** VOID. Whatever walked into it is simply not there any more. */
 function swallow(world, m, e) {
   m.dead = true;
-  ring(m.x, m.y, e.r * 2.2, 6, 0.42, '#7383ff', 3);
+  // Drawn AT the body, which is what it is a picture of. It was centred on
+  // the MINE and sized off the BODY, and WIDE MOUTH opens the two as much as
+  // 71 units apart -- so the collapse closed on empty ground beside the thing
+  // that had actually gone.
+  ring(e.x, e.y, e.r * 2.2, 6, 0.42, '#7383ff', 3);
   for (let k = 0; k < 16; k++) {
     const a = rand(0, TAU);
     spark(e.x, e.y, Math.cos(a) * rand(40, 260), Math.sin(a) * rand(40, 260), '#c9a7ff', rand(0.25, 0.5), 2.2);
@@ -569,6 +636,14 @@ function repel(world, m, dt) {
   }
 }
 
+/**
+ * WIRE. Everything touching the line is cut for as long as it stays on it, and
+ * shoved off the way it was leaning — so a body crossing takes a slice rather
+ * than being parked in the beam and ground to nothing.
+ *
+ * (This docstring sat stranded above `retire`, three functions away, from
+ * whenever the two were last moved past each other.)
+ */
 function cut(world, m, dt) {
   const reach = W.width * m.open;
   /*
@@ -827,10 +902,10 @@ export function drawMines(ctx, world) {
       ctx.strokeStyle = rgba('#e0aaff', 0.4 * m.open);
       ctx.lineWidth = CFG.hairline;
       ctx.beginPath();
-      for (const e of world.enemies) {
-        // The same set `grip` takes, or the picture is drawing a hold the
-        // snare does not have.
-        if (e.dead || e.spent || e.fizzle) continue;
+      // The same set `grip` takes, or the picture is drawing a hold the
+      // snare does not have -- `drops` included, which it used to leave out.
+      for (const e of [...world.enemies, ...world.drops]) {
+        if (e.dead || e.spent || e.fizzle || e.type.fixed) continue;
         if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 > S.reach * S.reach) continue;
         ctx.moveTo(m.x, m.y);
         ctx.lineTo(e.x, e.y);
@@ -1061,7 +1136,16 @@ export function drawMines(ctx, world) {
       ctx.arc(0, 0, R * 0.85, Math.PI + 0.5, TAU - 0.5);
       ctx.stroke();
     } else if (spallM) {
-      // a wedge, facing the way it will throw
+      /*
+       * A wedge, facing the way it will throw -- which means it must not
+       * turn. Everything else on a mine spins on `m.spin`, and this rode
+       * along with it while the fan itself always leaves straight up the
+       * field (`spall` fires on a fixed base bearing), so the one part of the
+       * drawing that is a PROMISE about direction was the one part pointing
+       * somewhere else. The seat, the glow, the dashed mouth and the pip
+       * collar are all drawn before this and go on turning.
+       */
+      ctx.rotate(-m.spin);
       ctx.beginPath();
       ctx.moveTo(-R, R * 0.5);
       ctx.lineTo(R, R * 0.5);

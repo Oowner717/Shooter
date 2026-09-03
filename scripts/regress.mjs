@@ -136,7 +136,6 @@ await page.waitForTimeout(1200);
   const r = await page.evaluate(() => {
     const w = window.__sim.world;
     const before = w.projectiles.length;
-    w.shooter.cooldown = 0;
     const fired = w.shooter.shoot(w);
     return { fired, made: w.projectiles.length - before };
   });
@@ -187,7 +186,7 @@ for (const id of rounds) {
   subsystems = (await drive(`round ${id}`, (k) => {
     const w = window.__sim.world;
     w.round = k;
-    for (let i = 0; i < 10; i++) { w.shooter.cooldown = 0; w.shooter.shoot(w); }
+    for (let i = 0; i < 10; i++) { w.shooter.shoot(w); }
   }, 250, id)) && subsystems;
 }
 const mines = await page.evaluate(async () => (await import('../src/tutorial.js')).LOCKABLE.mines);
@@ -1275,7 +1274,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       let hp = 0;
       for (const e of w.enemies) if (!e.harmless) hp += e.maxHp || 0;
       w.autoAim = true; w.autoFire = true;
-      g.fireTimer = 0; w.shooter.cooldown = 0;
+      g.fireTimer = 0;
       const live = () => w.enemies.filter((e) => !e.dead && !e.harmless).length;
       let t = 0;
       while (t < CAP && live() > 0) { g.update(S); t += S; }
@@ -1925,7 +1924,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.toggleRound('spine');
     w.autoAim = false;
     w.autoFire = true;
-    w.shooter.cooldown = 0;
     g.fireTimer = 0;
     let rounds = 0;
     const push = w.projectiles.push.bind(w.projectiles);
@@ -3616,7 +3614,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       s.aim = -Math.PI / 2; s.targetAim = s.aim;
       clear();
       for (let i = 0; i < 90 && !e.dead; i++) {
-        s.cooldown = 0;
         s.shoot(w);
         g.update(1 / 60);
       }
@@ -4168,7 +4165,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     for (const key of rounds) {
       w.projectiles.length = 0;
       w.round = key;
-      s.cooldown = 0;
       s.aim = 0;
       s.shoot(w);
       const p = w.projectiles[0];
@@ -10125,7 +10121,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // ...and with no boss at all the gun is unaffected.
     g.restart();
     w.phase = 'staging';
-    w.shooter.cooldown = 0;
     out.freeToFire = w.shooter.shoot(w) !== false;
     g.restart();
     return out;
@@ -11258,7 +11253,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     /** Fire one round and run it out, holding the body where it was put. */
     const volley = (e, shots, onFrame) => {
       for (let i = 0; i < shots; i++) {
-        s.cooldown = 0;
         s.shoot(w);
         for (let k = 0; k < 30 && w.projectiles.length; k++) {
           e.vx = 0; e.vy = 0; e.av = 0;
@@ -12842,7 +12836,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       let made = 0;
       const push = w.projectiles.push.bind(w.projectiles);
       w.projectiles.push = (...ps) => { made += ps.length; return push(...ps); };
-      s.cooldown = 0;
       s.shoot(w);
       for (let f = 0; f < 40; f++) {
         for (const h of held) { h.e.x = s.x; h.e.y = s.y - h.at; h.e.vx = 0; h.e.vy = 0; }
@@ -12875,7 +12868,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     lone.staged = false; lone.spawnIn = 0; lone.hp = 1e7; lone.maxHp = 1e7; lone.invMass = 0;
     s.aim = -Math.PI / 2; s.targetAim = s.aim;
     let peak = 0;
-    s.cooldown = 0;
     s.shoot(w);
     for (let f = 0; f < 60; f++) {
       lone.x = s.x; lone.y = s.y - 200; lone.vx = 0; lone.vy = 0;
@@ -13687,7 +13679,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.autoFire = true;
       s.aim = -Math.PI / 2;
       s.targetAim = -Math.PI / 2;
-      s.cooldown = 0;
       let rounds = 0;
       const push = w.projectiles.push.bind(w.projectiles);
       w.projectiles.push = (...ps) => { rounds += ps.length; return push(...ps); };
@@ -13849,7 +13840,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       e.hp = 1e9; e.maxHp = 1e9;
       w.autoAim = false; w.autoFire = true;
       w.shooter.aim = -Math.PI / 2; w.shooter.targetAim = -Math.PI / 2;
-      w.shooter.cooldown = 0;
       for (let f = 0; f < 60 * 3; f++) {
         e.x = w.shooter.x; e.y = w.shooter.y - 200; e.vx = 0; e.vy = 0;
         e.hp = 1e9;
@@ -13923,7 +13913,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       const e = g.debugSpawn('bulwark', s.x, s.y - 240);
       if (e) { e.staged = false; e.maxHp = 1e9; e.hp = 1e9; e.invMass = 0; }
       w.autoAim = false; w.autoFire = true;
-      s.aim = -Math.PI / 2; s.targetAim = -Math.PI / 2; s.cooldown = 0;
+      s.aim = -Math.PI / 2; s.targetAim = -Math.PI / 2;
       for (let f = 0; f < 90; f++) {
         if (e) { e.x = s.x; e.y = s.y - 240; e.hp = 1e9; }
         s.aim = -Math.PI / 2; s.targetAim = -Math.PI / 2;
@@ -14063,7 +14053,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.autoFire = false;
     s.aim = -Math.PI / 2;
     s.targetAim = -Math.PI / 2;
-    s.cooldown = 0;
     w.projectiles.length = 0;
     s.shoot(w);
     const fired = w.projectiles.length;

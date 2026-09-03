@@ -163,7 +163,14 @@ export function updateProjectiles(world, dt) {
           if (p.bounces > 0) { p.bounces--; p.x = W - p.r; p.vx = -p.vx; ricochetFx(p); }
           else endProjectile(world, p, p.x, p.y, true);
         }
-        if (p.y < -world.stageHeight || p.y > world.floorY + 60) p.dead = true;
+        // Through the same door as every other ending, so `impacted` has a
+        // caller that passes false and the line below means what it says. It
+        // was `p.dead = true` written straight onto the round, which left the
+        // parameter true at all six call sites and the docstring describing a
+        // path that never came through here.
+        if (p.y < -world.stageHeight || p.y > world.floorY + 60) {
+          endProjectile(world, p, p.x, p.y, false);
+        }
       }
     }
 

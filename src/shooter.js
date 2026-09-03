@@ -360,7 +360,6 @@ export class Shooter {
     this.targetAim = -Math.PI / 2;
     this.recoil = 0;
     this.heat = 0;
-    this.cooldown = 0;
     this.spin = 0;
 
     // --- lever ---
@@ -377,7 +376,6 @@ export class Shooter {
     this.aim = this.targetAim = -Math.PI / 2;
     this.recoil = 0;
     this.heat = 0;
-    this.cooldown = 0;
     this.gripAngle = Math.PI / 2;
     this.gripHeld = false;
     this.gripGlow = 0;
@@ -455,7 +453,6 @@ export class Shooter {
 
     this.recoil = Math.max(0, this.recoil - dt * 6.5);
     this.heat = Math.max(0, this.heat - dt * 1.4);
-    this.cooldown = Math.max(0, this.cooldown - dt);
     this.spin += dt * (0.6 + this.heat * 2.4);
   }
 
@@ -480,19 +477,22 @@ export class Shooter {
      * ---- the gun is silent through an anomaly's arrival and its death ----
      *
      * Every round the turret fires arrives here: both pointer branches, the
-     * space key, updateFiring's cadence, and SPIRAL's sweep -- which zeroes
-     * the cooldown to bypass the cadence and is refused anyway, because this
-     * sits ahead of it. One place, and a boss added later cannot get past it
-     * without inheriting the answer.
+     * space key and updateFiring's cadence. One place, and a boss added later
+     * cannot get past it without inheriting the answer.
      *
      * A truthiness test on `world.boss` and a method call, deliberately, and
      * NEVER a comparison against a world field. The note above is the record
      * of `world.lockout` -- this same feature -- being deleted in build 82 and
      * leaving `undefined <= 0` answering false, so the turret could not fire
      * at all for three builds and nothing caught it.
+     *
+     * There was a `this.cooldown <= 0` term here too. It had three writers,
+     * all of them assigning zero, and a decrement that could only ever
+     * subtract from zero -- SPIRAL zeroed it to bypass the cadence and SPIRAL
+     * went in build 217, taking the only thing that ever set it. The cadence
+     * itself lives in `updateFiring`, which is where it always was.
      */
-    if (world && world.boss && world.boss.sequencing()) return false;
-    return this.cooldown <= 0;
+    return !(world && world.boss && world.boss.sequencing());
   }
 
   /**
