@@ -2,25 +2,33 @@
 
 
 Every round type and every mine kind was read end to end by a separate reader,
-then each reader's claims were put to an adversarial pass. This file is what
-came out that has NOT been fixed, kept in the repo because the reports
-themselves lived in an ephemeral container.
+then each reader's claims were put to an adversarial pass. Nine of the twelve
+passes ran; three -- the tree, the machine and the picture sweeps -- hit a
+session limit and never adjudicated their reader's claims.
 
-Nine commits of build 220 already carry the fixes: the THORN/LODE runaway, the
-three secondary-damage holes (ARC's chain, SPORE's ground, THORN's ground),
-TITHE's decaying floor, VOID against ARMORED, the `spent`/`staged` sweep, the
-three uncapped count-nodes, the six stale arsenal rows, four overshooting
-rings, WIRE's span and PILE's fade. Each of those was proved by reverting it
-and watching a case fail; none of them is in this file.
+This file is what came out that has NOT been fixed. It is in the repo because
+the reports themselves lived in a session directory that goes away with the
+container, which is how 243 probe scripts were lost before build 101.
 
-What IS here is the remainder: things confirmed by the adversarial pass but
-left alone, and things no reader has adjudicated yet because the pass had not
-reached them. Nothing here is urgent -- the one runaway the audit found is
-already fixed. Read the severity, and check the claim before acting on it:
-the pass refuted about a third of what it was given.
+Ten commits of build 220 carry the fixes. Each was proved by reverting it and
+watching a named case fail, so none of them is in this file:
+
+  the THORN/LODE runaway (39 blasts a second, for ever, per expired mine)
+  ARC's chain, SPORE's ground and THORN's ground outside the damage line
+  TITHE's mark paying nothing from tier 15
+  split children entering at tier-1 health and tier-1 pay
+  VOID absorbed whole by ARMORED, and VOID deleting boss structure
+  the spent/staged sweep across all six mine paths
+  SLIVER splitting inside the body it was born in
+  three uncapped count-nodes, six stale arsenal rows, four overshooting rings
+  WIRE cutting where it was not yet drawn, PILE paying the shove fade
+  "the oldest goes" evicting the newest, a SNARE snapping and not holding
+
+What is left is below, in three parts. Read the severity, and check the claim
+before acting: the nine completed passes refuted eleven claims between them.
 
 
-## Adjudicated: confirmed by the adversarial pass, not yet fixed
+## Confirmed by the adversarial pass, not yet fixed
 
 ### 1. [medium] OVERSTUFFED applies a third, undeclared effect: +1 arena ricochet per level, which is RICOCHET's whole product
 
@@ -43,28 +51,7 @@ Both comments about it state a single shared budget that does not exist. shooter
 **Hash:** No. The canonical ORDINAL fight is a stock turret firing BOLT and PULSE, so `up.boltBounce` and `up.bounces` are both 0 and neither term is entered; the change is confined to freshUpgrades-driven scalars the probe leaves at their defaults.
 
 
-### 2. [medium] MINE — the gun's own header quotes HOLLOWPOINT at 1.25 a level when it is 1.5, and two downstream comments call the boss ceiling inert when it binds on every bought fight
-
-**Where:** `src/shooter.js:43 (stale term) vs src/upgrades.js:343; src/config.js:2485; scripts/regress.mjs:11977; src/boss.js:199`
-
-**Evidence:** shooter.js:43 — ` * tree's hundred-odd: HOLLOWPOINT at 1.25 a level over three, SALVO's every` — in the header that exists to say what `gunScale` is made of.
-
-HOLLOWPOINT is 1.5 a level and has been since build 215 (the same commit, 166930e, that wrote this header). upgrades.js:343 — `{ id: 'hollowpoint', name: 'HOLLOWPOINT', line: '+50% damage.', apply: scale('damage', 1.5) , icon: MARK.hollowpoint },` — no `levels`, so the tree sells 3 and `up.damage` = 1.5³ = 3.375, not 1.25³ = 1.953.
-
-The live product (shooter.js:324-329, `up.damage * (up.salvo ? 1 + 2 / up.salvo : 1) / (up.rate || 1)`) with SALVO 8 (upgrades.js:425, `set('salvo', 8)`, levels 1) and FEED 0.9 (upgrades.js:564-566, `quicken('rate', 0.9)`, levels 1) is 3.375 × 1.25 / 0.9 = 4.6875. regress.mjs:11955 already pins exactly that: `const want = 1.5 ** 3 * 1.25 / 0.9;`, and its own comment at :11953 says 'HOLLOWPOINT (1.5 a level from build 215)'.
-
-Two consumers of the stale figure are wrong in a way that inverts the conclusion:
-  config.js:2485 — ` * A ceiling rather than the raw product (which reaches 5.30) because the` — the raw product reaches 4.6875. 5.30 is the pre-215 number (1.25³ HOLLOWPOINT × 1.25³ SIGHT × 1.25 / 0.9 = 5.30).
-  regress.mjs:11977 — ` * product fell from 5.30 to 2.71, so the ceiling stopped binding.` — 2.71 is 1.25³ × 1.25 / 0.9, i.e. the product HOLLOWPOINT would give if it were still 1.25. The real product is 4.6875 against `temper: 4.2` (config.js:2492), so boss.js:199 `this.hard = Math.min(gunScale(world), CFG.boss.temper);` returns the CEILING, not the product, for every fully bought turret. The ceiling did not stop binding; it is the only thing setting a bought boss's core and structure health. The case itself is correct — regress.mjs:11985 `const cap = Math.min(want, r.cap);` — only its prose is wrong.
-
-**Consequence:** No player-visible defect today: the code computes the right number. But the three comments a tuner reads before touching `CFG.boss.temper` say the cap is 21% above a product it is actually 11% below, and say in as many words that it 'stopped binding'. Acting on that — raising or deleting the cap as inert — changes every bought anomaly's health by 4.6875/4.2 = 1.116x.
-
-**Suggested fix:** shooter.js:43: 'HOLLOWPOINT at 1.5 a level over three'. config.js:2485: the raw product reaches 4.69. regress.mjs:11977: the product fell from 5.30 to 4.69 and the ceiling still binds (4.2 < 4.69). No code change.
-
-**Hash:** No — comments only, and `temper` cannot reach the canonical fight in any case: the hash probe opens ORDINAL with a stock turret, where regress asserts `hard === 1` exactly (regress.mjs:11878-11880) and the multiply is an identity.
-
-
-### 3. [low] MINE — gunScale's 36-line docstring is orphaned: build 215 inserted `class Front` between it and the function, so it now documents the PILE wave
+### 2. [low] MINE — gunScale's 36-line docstring is orphaned: build 215 inserted `class Front` between it and the function, so it now documents the PILE wave
 
 **Where:** `src/shooter.js:29-64 (the header), :65-77 (a second header), :78 `export class Front {`, :324 `export function gunScale(world) {``
 
@@ -81,7 +68,7 @@ Cause, from history rather than guessed: at build 214 (`git show 574c668:src/sho
 **Hash:** No. Comment movement only.
 
 
-### 4. [low] CFG.bolt.life (2.2s) is unreachable on every viewport the game runs at, so the '+30% life' third of OVERSTUFFED's row buys nothing observable in straight flight
+### 3. [low] CFG.bolt.life (2.2s) is unreachable on every viewport the game runs at, so the '+30% life' third of OVERSTUFFED's row buys nothing observable in straight flight
 
 **Where:** `src/config.js:1153 `life: 2.2,`; src/shooter.js:771 `life: CFG.bolt.life * up.boltLife,`; src/projectiles.js:121, 154-158, 160; src/upgrades.js:375`
 
@@ -104,26 +91,7 @@ Every crossing angle is inside the clamp (the worst, n=4, is atan(3410/1279.5) =
 **Hash:** No, for a row-wording or `boltLife` change. It WOULD be worth re-running if anyone lowered `CFG.bolt.life` far enough to bind, since the canonical fight would then start expiring rounds — though for BOLT `p.burst` is null, so a life expiry and a field exit reach the same end state.
 
 
-### 5. [low] hitGraft is handed no surface normal and hard-codes (0, -1), so every SCION ball sprays straight up whatever direction it was shot from
-
-**Where:** `src/projectiles.js:522 (call) vs :517 (the shard branch, fixed); src/enemies.js:991, :995; src/fx.js:421`
-
-**Evidence:** projectiles.js:436 computes the real contact for all three hit kinds — `const c = contactAt(HIT, hx, hy, dirx, diry, p.r);` with `HIT.r` set to `CFG.graft.ball` for this case (:381) — and the shard branch uses it: :517 `bestTarget.enemy.hitShard(bestTarget.shard, p.damage, c.x, c.y, c.nx, c.ny);`. The graft branch throws it away: :522 `bestTarget.enemy.hitGraft(bestTarget.graft, p.damage, c.x, c.y);` — position only.
-
-enemies.js:991 `hitGraft(s, dmg, hx, hy) {` and :995 `hitBurst(hx, hy, 0, -1, '#d9c2ff');`.
-
-hitBurst sprays in a cone about the vector it is given — fx.js:421 `const a = Math.atan2(ny, nx) + spread(1.1);` — so (0, -1) is straight up, always. This is the same defect enemies.js:1093-1099 records fixing for bodies in build 211 ('a rim graze and a centre punch sprayed identically'); the shard path was swept and the graft path was not.
-
-Secondary, same call: neither `hitShard` nor `hitGraft` is told `p.form`, so every round in the rack lands on a plate or a ball wearing BOLT's generic burst.
-
-**Consequence:** Shooting a ball off a grafted host from the side throws its non-lethal spark burst upward instead of off the surface. Cosmetic, and only on bodies carrying SCION grafts.
-
-**Suggested fix:** Pass `c.nx, c.ny` at projectiles.js:522 and use them at enemies.js:995, mirroring :517/:974. Keep a (0,-1) default for the other caller, enemies.js:4543 (`e.hitGraft(g, damage * (0.35 + gf * 0.65), gx, gy);` inside applyBlast), which genuinely has no travel direction.
-
-**Hash:** No. `hitBurst`'s draw count is `(5 * fx.quality) | 0` regardless of direction, particles are not hashed, and ORDINAL has no grafts (SCION is a field type and the director is off during a fight).
-
-
-### 6. [low] endProjectile's `impacted` parameter is true at all six call sites and its docstring names a path that never goes through the function
+### 4. [low] endProjectile's `impacted` parameter is true at all six call sites and its docstring names a path that never goes through the function
 
 **Where:** `src/projectiles.js:107-110 (docstring and guard); calls at :121, :155, :158, :513, :518, :523; the field-exit path at :160`
 
@@ -140,7 +108,7 @@ The case the docstring names does not call it: :160 `if (p.y < -world.stageHeigh
 **Hash:** No. Both fixes end at `p.dead = true` with `p.burst` uncalled, exactly as now.
 
 
-### 7. [cosmetic] PRISM's reflect docstring states the landing window on the wrong radius and describes it as an area fraction the 2-D geometry cannot produce
+### 5. [cosmetic] PRISM's reflect docstring states the landing window on the wrong radius and describes it as an area fraction the 2-D geometry cannot produce
 
 **Where:** `src/config.js:3546-3548 and :3565; src/physics.js:238-243, :260; src/enemies.js:1065`
 
@@ -159,7 +127,7 @@ PRISM `r: 20` (config.js), BOLT `r: 4.2` (config.js:1150) -> R = 24.2, so the wi
 **Hash:** No. Comment only.
 
 
-### 8. [cosmetic] SPIRAL leftovers in the fire path: a `slow` constant multiplied into all nine rounds, a dead `scale` parameter, and an orphaned docstring in the Projectile constructor
+### 6. [cosmetic] SPIRAL leftovers in the fire path: a `slow` constant multiplied into all nine rounds, a dead `scale` parameter, and an orphaned docstring in the Projectile constructor
 
 **Where:** `src/shooter.js:495 and the nine multiplications at :536, :550, :564, :592, :613, :631, :645, :662, :688, :770; :489 and :492 and :504; src/projectiles.js:26-30`
 
@@ -176,22 +144,7 @@ projectiles.js:26-30 is a five-line block opening ` * Thrown by SPIRAL's sweep r
 **Hash:** No. `x * 1` is exact in IEEE754, so removing both multiplications leaves every number bit-identical; the rest is text.
 
 
-### 9. [cosmetic] BOLT's arsenal row says 'Nothing done to it' while BOLT is the only round in the rack that ricochets off the arena
-
-**Where:** `src/arsenal.js:153; src/config.js:1154; src/shooter.js:772 vs :526, :539, :553, :581, :619, :637, :651, :705`
-
-**Evidence:** arsenal.js:153 — `dmg: '26', fx: 'The fastest cadence there is. Nothing done to it.',`. The damage matches config.js:1152 (`damage: 26`) and the cadence claim is right (`rate: 1` for standard is the lowest in the table: HE 2.1, SCATTER 1.55, ARC 1.35, SPINE 1.45, SLUG 2.4, RIME 1.7, SPORE 2.0, TITHE 1.5).
-
-But config.js:1154 is `bounces: 1, // ricochets off the arena side edges`, reached through projectiles.js:21 `this.bounces = opts.bounces ?? CFG.bolt.bounces;`, and BOLT is the only round that lets it through: every other branch of `shoot()` passes `bounces: 0` explicitly (shooter.js:526, 539, 553, 581, 619, 637, 651, 705), as do the two ability rounds (abilities.js:904, :1040) and SPALL's pellets (mines.js:443). BOLT's branch passes `bounces: CFG.bolt.bounces + up.boltBounce` (shooter.js:772). So the stock BOLT carries a mechanic no other stock round has, on the row that says it has none — and it is observable: at the aim clamp the round reaches a side wall in about 0.21s and comes off it.
-
-**Consequence:** Small. A player reading the loadout sheet, the strip caption or the tree row (tree.js:150-155 renders `Damage ${a.dmg}. ` plus this text) is told BOLT is the plain one, and it is the only plain one that bounces off the walls.
-
-**Suggested fix:** Say it — 'The fastest cadence there is, and it comes off the arena walls once.' Setting `bounces: 0` instead is a balance change, not a copy change.
-
-**Hash:** Wording, no. Setting `CFG.bolt.bounces` to 0 WOULD move it: ORDINAL is fought with BOLT, rounds do reach the side walls at the clamp, and a round that dies at the wall instead of crossing back is a round that no longer lands. Re-baseline in the same commit if that route is taken.
-
-
-### 10. [medium] CLUSTER's "the same total on one body" holds only at OVERPRESSURE 0, and reaches x2.28 at OVERPRESSURE 3 — with the sub-rings unset at exactly the levels the damage arrives
+### 7. [medium] CLUSTER's "the same total on one body" holds only at OVERPRESSURE 0, and reaches x2.28 at OVERPRESSURE 3 — with the sub-rings unset at exactly the levels the damage arrives
 
 **Where:** `src/shooter.js:1558-1582; src/config.js:602`
 
@@ -204,7 +157,7 @@ But config.js:1154 is `bounces: 1, // ricochets off the arena side edges`, reach
 **Hash:** No. heBurst runs only for HE; the canonical ORDINAL probe fires BOLT and PULSE with nothing bought, so `up.cluster` is false and `up.blastR` is 1.
 
 
-### 11. [low] TRACER is a bigger SCATTER range node (x1.82) than LONG THROW (x1.55), and puts the pellet past the reach config.js deliberately cut — but the reader's field geometry is wrong
+### 8. [low] TRACER is a bigger SCATTER range node (x1.82) than LONG THROW (x1.55), and puts the pellet past the reach config.js deliberately cut — but the reader's field geometry is wrong
 
 **Where:** `src/shooter.js:503, 536-540; src/config.js:660-665; src/upgrades.js:346, 400-402`
 
@@ -217,7 +170,7 @@ But config.js:1154 is `bounces: 1, // ricochets off the arena side edges`, reach
 **Hash:** No. SCATTER is never loaded in the canonical fight and TRACER is never bought (up.speed = 1); a change confined to the `world.round === 'shotgun'` branch cannot reach the BOLT path.
 
 
-### 12. [low] HEAVY is worth x1.89 on an HE round, not x4: the blast impulse is the one term in heBurst the tree does not reach
+### 9. [low] HEAVY is worth x1.89 on an HE round, not x4: the blast impulse is the one term in heBurst the tree does not reach
 
 **Where:** `src/shooter.js:1557, 1571 vs src/shooter.js:505; src/upgrades.js:348`
 
@@ -230,7 +183,7 @@ But config.js:1154 is `bounces: 1, // ricochets off the arena side edges`, reach
 **Hash:** No. heBurst runs only for HE, which the canonical fight never loads; and up.impulse is 1 with nothing bought, so even moving the multiply inside applyBlast (which PULSE does use) leaves the arithmetic identical.
 
 
-### 13. [cosmetic] Three clamp arms in the HE burst that no radius the game can produce will ever reach
+### 10. [cosmetic] Three clamp arms in the HE burst that no radius the game can produce will ever reach
 
 **Where:** `src/config.js:643; src/shooter.js:1586, 1607, 1697`
 
@@ -243,7 +196,7 @@ But config.js:1154 is `bounces: 1, // ricochets off the arena side edges`, reach
 **Hash:** No. Drawing and screen shake only, HE only, and no rand() draws added or removed.
 
 
-### 14. [cosmetic] `front`'s config comment still describes the ring the build-211 fix removed
+### 11. [cosmetic] `front`'s config comment still describes the ring the build-211 fix removed
 
 **Where:** `src/config.js:634; src/shooter.js:1625`
 
@@ -256,7 +209,7 @@ But config.js:1154 is `bounces: 1, // ricochets off the arena side edges`, reach
 **Hash:** No. A comment.
 
 
-### 15. [cosmetic] The 'about 210 units' that justifies dropping the sub-blast rings is 156, and the guard actually written cuts at 150
+### 12. [cosmetic] The 'about 210 units' that justifies dropping the sub-blast rings is 156, and the guard actually written cuts at 150
 
 **Where:** `src/shooter.js:1574-1582; README.md:1884-1887`
 
@@ -269,20 +222,7 @@ But config.js:1154 is `bounces: 1, // ricochets off the arena side edges`, reach
 **Hash:** No. Comments.
 
 
-### 16. [cosmetic] 'Up to forty-five' per trigger pull is 33 — and all three sites say forty-five, including the one the reader called correct
-
-**Where:** `src/projectiles.js:555, 773; src/fx.js:298`
-
-**Evidence:** CONFIRMED, with a correction that makes it slightly worse. projectiles.js:773 `// A pellet is one of up to forty-five in the same trigger pull;` and fx.js:298 `// Up to forty-five of these land per salvo`. The reader cites projectiles.js as 'already correct' — it is not: 555 reads `* SCATTER. Up to forty-five of these can be in the air at once (DOUBLE-O / * pellets across a SALVO fan)`, and 'DOUBLE-O pellets across a SALVO fan' IS the per-pull number, which is 33: shooter.js:530 `const pellets = g.pellets + up.shotPellets;` with `pellets: 5` (config.js:658) and DOUBLE-O (upgrades.js:392-394, `levels: 2`, `bump('shotPellets', 3)`) → 11, times the three of shooter.js:523 `const fan = salvo ? [-SALVO_FAN, 0, SALVO_FAN] : [0];`. In the air is a different number and is 44, not 45: interval = 0.286 x 1.55 x up.rate(0.9) = 0.399s against life = 0.375 x 1.55 = 0.581s, so one previous 11-pellet pull overlaps a 33-pellet salvo pull; two do not (0.798 > 0.581), and SALVO is `set('salvo', 8)` at one level (upgrades.js:425) so two salvo pulls can never be adjacent.
-
-**Consequence:** None. Two figures a future 'can we afford a richer pellet?' decision would be made against, 36% high per pull. Worth noting the form is now shared: mines.js:457 gives SPALL's fan `form: 'pellet'` too, and that fan is 36 at full BUCKSHOT, so fx.js:298's sentence now covers a second source it does not mention.
-
-**Suggested fix:** 33 per trigger pull, 44 in the air, in all three places — and say the form is shared with SPALL's fan.
-
-**Hash:** No. Comments.
-
-
-### 17. [low] Two dead numbers threaded through every round the turret fires: `scale` and `slow`
+### 13. [low] Two dead numbers threaded through every round the turret fires: `scale` and `slow`
 
 **Where:** `src/shooter.js:492, 495 (and 504, 536, 551, 593, 614, 649, 663, 717, 768)`
 
@@ -295,7 +235,7 @@ But config.js:1154 is `bounces: 1, // ricochets off the arena side edges`, reach
 **Hash:** No — both are identity multiplications and neither adds nor removes a rand() draw, so the default BOLT path stays byte-for-byte, which is the property projectiles.js:762-771 says is load-bearing.
 
 
-### 18. [low] MINE: `Shooter.cooldown` can never be non-zero, so canFire's cadence guard has one arm that is never taken
+### 14. [low] MINE: `Shooter.cooldown` can never be non-zero, so canFire's cadence guard has one arm that is never taken
 
 **Where:** `src/shooter.js:351, 368, 446, 483`
 
@@ -308,7 +248,7 @@ But config.js:1154 is `bounces: 1, // ricochets off the arena side edges`, reach
 **Hash:** No. The canonical probe drives auto-fire through `Game.updateFiring`, which never consults the field's value beyond the always-true test.
 
 
-### 19. [low] MINE: the aimRange design note is written against an ENTRY_Y of 260 that has been 0 for many builds, and DEEP ARRAY's row inherits the error
+### 15. [low] MINE: the aimRange design note is written against an ENTRY_Y of 260 that has been 0 for many builds, and DEEP ARRAY's row inherits the error
 
 **Where:** `src/config.js:554-563; src/enemies.js:18; src/upgrades.js:621-624`
 
@@ -321,59 +261,7 @@ But config.js:1154 is `bounces: 1, // ricochets off the arena side edges`, reach
 **Hash:** No if only the comment and the row string change. Raising aimRange WOULD move it — the canonical probe runs with auto-fire and the assist on, so what the turret can point at is exactly the channel build 209's re-baseline went through.
 
 
-### 20. [low] A SLIVER fragment re-enters and re-splits inside the body it was born in — measured, a BULWARK takes 3 hits from one dart at SLIVER 1 and up to 8 at SLIVER 2
-
-**Where:** `/home/user/Shooter/src/shooter.js:307-313 (the stated intent), /home/user/Shooter/src/projectiles.js:92 and :122 (the implementation)`
-
-**Evidence:** The intent is written out at shooter.js:307-312: "It must not split on the body it was BORN in. `fire` puts it at the contact point, inside the thing the parent was passing through, so without this every fragment would immediately hit that same body and come apart again on the frame it appeared" — implemented one line down as `      ignore: e,` (shooter.js:313).
-
-That cover is a fixed TIME, not a distance:
-  projectiles.js:92 — `    this.ignoreT = opts.ignore ? 0.06 : 0;`
-  projectiles.js:122 — `    if (p.ignoreT > 0) p.ignoreT -= dt; else p.ignore = null;`
-The test precedes the decrement, so the cover survives ceil(0.06/dt) sweeps = 0.0667 s at 60 Hz (and 0.0667 s at 120 Hz — 8 sweeps of half the length).
-
-Geometry. `sliverOn` is handed `c.x, c.y` (projectiles.js:479 `if (p.onHit) p.onHit(world, e, c.x, c.y, p);`), which physics.js:258-259 puts on the body's own radius: `    x: e.x + nx * (e.r || 1),`. `nx, ny` is the outward normal at the ENTRY point, so a fragment is born on the near face and must cross the whole body. For an on-axis fragment the exit-the-hit-circle distance is 2*e.r + p.r; the hit test is `const rr = e.r + p.r;` (projectiles.js:391) and the fragment's r is 2.6 (shooter.js:292).
-
-Arithmetic. Fragment speed = parent speed * S.speed (shooter.js:291 `      speed: sp * S.speed,`), S.speed 0.82 (config.js:742), stock SPINE speed 1560 (config.js:690) => 1279.2 u/s. Cover = 1279.2 * 0.0667 = 85.3 units. BULWARK r 45 (config.js:2730) needs 2*45 + 2.6 = 92.6. 85.3 < 92.6, so the cover lapses with the fragment still inside.
-
-Measured, not argued. I drove the real modules headless (config + upgrades + enemies + projectiles + Shooter.shoot, world.round = 'spine', one BULWARK, takeHit counted, 40 frames at 1/60), pinned and unpinned, and the result is the same:
-  SLIVER 1, no TRACER: 3 takeHit calls on the BULWARK from one dart (34.00, then 23.80 and 23.80 — two of the three fragments come back into it). Eight repeats: 3,3,2,3,3,3,3,3.
-  SLIVER 2, no TRACER: 5 to 8 calls. One run logged, with spawn sites:
-    hit #1 dmg=34.00 hitpoint y=366.9 t=0.0833
-    spawn at (449.8, 355.0) dmg=23.80 splits=1   x3
-    hit #2 dmg=23.80 hitpoint y=440.3 t=0.1667
-    spawn at (449.8, 355.0) dmg=16.66 splits=0   x3
-    hit #3/#4/#5 dmg=16.66 t=0.2500
-  The body centre is y=400, so the grandchildren are created at y=355 — the NEAR face — while the fragment that made them was at y≈440, past the centre. The arc appears 85 units behind the thing that threw it, on the entry side.
-  SLIVER 1 with ONE level of TRACER (x1.35, cover 115.1 > 92.6): 1 call. Two levels: 1 call. So the fault exists only before TRACER is bought.
-  Every other ordinary type is clear: LURCHER (r 24), SPLITTER (29), NEEDLE (10), MOTE (12) all 1 call.
-
-The reader under-counted the reach. A GLUT fed to its ceiling is r 52 (config.js:2925 `    eat: { reach: 26, growth: 3.1, hpPer: 26, maxR: 52 },` — enemies.js:957 `      this.r = Math.min(cfg.maxR, this.r + cfg.growth);`) and measures 4 calls at SLIVER 1. FRACTAL's core is r 64 (config.js:3209), 130.6 units to clear, past even one TRACER level.
-
-The projectile COUNT is unaffected, which is why regress.mjs stays green: the ceiling is held by the `splits` budget (shooter.js:280-281 `  const left = p.splits;` / `  p.splits = 0;` and :305 `      splits: left - 1,`), not by the ignore.
-
-**Consequence:** On the game's heaviest ordinary body, and only before TRACER: one SPINE dart hits a BULWARK two or three times instead of once, each re-hit spending one of the fragment's pierces inside the body it was already in. At SLIVER 2 the visible half is worse — the fragment comes apart inside the BULWARK and the ring plus three grandchildren are drawn at the body's ENTRY face, ~85 units behind where the fragment actually is, so an arc authored to open out the far side appears behind the body instead. Damage is quietly higher than authored on exactly the type the round is least meant to beat by brute force.
-
-**Suggested fix:** Make the cover a distance rather than a fixed time. `ignoreT` is not currently an opt (projectiles.js:92 derives it from `opts.ignore`), so add one and pass it from `sliverOn` only: `ignoreT: (2 * (e.r || 1) + 2.6) / (sp * S.speed)`. Keep it local to `sliverOn` — changing the 0.06 default at projectiles.js:92 also moves a pierce's re-arm (projectiles.js:487 `        p.ignoreT = 0.06;`) and OVERSTUFFED's rebound, which is a much wider blast radius. Note the required time is per-body, so it cannot be a single constant: BULWARK needs 0.0724 s at stock speed, a fed GLUT 0.0833 s.
-
-**Hash:** No. The canonical run fires BOLT and PULSE only, so SPINE never comes apart in it; the change adds no `Math.random` draw on any path the run takes, moves no body and changes no energy. A change to the constructor default at projectiles.js:92 would touch BOLT's pierce/rebound re-arm — but the canonical run is unbought (`rebound` 0, `pierce` 0), so even that would not move it. Keep it local anyway.
-
-
-### 21. [cosmetic] SLUG's config header still compares itself to SPINE's pre-218 damage of 20
-
-**Where:** `/home/user/Shooter/src/config.js:774`
-
-**Evidence:** config.js:774 — `     * it now hits hardest of anything per shot — 44, against SPINE's 20 and`
-SPINE has been 34 since build 218: config.js:705 `      damage: 34,` under a header (config.js:692-704) that says "34 from build 218, up from 20". So the sentence's own point — that SLUG hits hardest per shot — survives (44 > 34), but the comparison number is two builds stale. This is the surviving half of the reader's claim 1; the player-facing half of that claim is refuted below.
-
-**Consequence:** None to the player. It is a comment. The cost is to the next reader, who is being told SPINE is 20 by a file whose other header says it is 34 — the same shape as the orphaned `windAt`/`rateAt` header CLAUDE.md records.
-
-**Suggested fix:** config.js:774 → "against SPINE's 34 and". Nothing else in the paragraph needs to move.
-
-**Hash:** No. Comment only.
-
-
-### 22. [cosmetic] MINE: `chainFrom`'s own header does the ARC arithmetic wrong — the chain is 80.89, not 84, and the two figures it derives from that are both ~3.4% high
+### 16. [cosmetic] MINE: `chainFrom`'s own header does the ARC arithmetic wrong — the chain is 80.89, not 84, and the two figures it derives from that are both ~3.4% high
 
 **Where:** `/home/user/Shooter/src/projectiles.js:196-206`
 
@@ -391,8 +279,637 @@ Constants checked: config.js:673-677 `      damage: 11,` / `      jumps: 4,` / `
 **Hash:** No. Comment only.
 
 
+### 17. [low] RIME's own comment credits the chill with a mass dependence it cannot have, and names the ordering backwards
 
-## Adjudicated: refuted, recorded so it is not re-reported
+**Where:** `src/enemies.js:864-871`
+
+**Evidence:** src/enemies.js:864-866 reads `// RIME wears off on its own. The chill is a drag rather` / `// than a speed cap, so a heavy body coasts further out of it than a light` / `// one — which is the same physics everything else here obeys.` The code under it is src/enemies.js:867-871: `if (this.chill > 0) {` / `this.chill -= dt;` / `const k = CFG.rounds.rime.drag ** dt;` / `this.vx *= k;` / `this.vy *= k;` — a bare velocity multiplier. No `invMass`, no `mass`, no force term. Coasting distance under it is the integral of v0*exp(-lambda*t) with lambda = -ln(0.02) = 3.912/s, i.e. 0.2556*v0 for every body on the field. I re-measured rather than argued: three bodies chilled and held with `thrown` so `drive()` early-returns, each handed vy = -200, stepped 30 frames of g.update(1/60) — MOTE (mass 0.734) travelled 38.805 units, BULWARK (mass 32.805) 38.805, NEEDLE (mass 0.420) 38.805. Unchilled control, same setup: 87.629 for all three. Identical to three decimals across a 78x mass range. The comment's LAST clause is correct — src/physics.js:128-130 `const d = Math.exp(-P.linearDamping * dt);` / `b.vx *= d;` is the same mass-independent form — which is what makes the middle clause read as deliberate and land as false. The ordering it names is also inverted for bodies that steer: measured sustained kept-fraction (chilled pace / quiet pace, body pinned so the bearing is constant, mean over the last 2s of a 6s run) is BULWARK 0.318, GLUT 0.302, DRIFT 0.284 — the heavy, low-`accel` types are held HARDEST — against NEEDLE 0.488 and ION 0.43-0.51. The term that decides it is `accel`, through `const k = (this.accel / 100) * authority * slow;` at src/enemies.js:792 feeding src/enemies.js:794 `this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);`.
+
+**Consequence:** None on screen — the chill works, it just does not work for the reason written beside it. The cost is to the next change: this is the paragraph a reader consults before touching RIME and it points at the one quantity that provably cannot affect it. Same shape as the orphaned COMPOUND header the project already deleted at src/upgrades.js:359-365 ("the comment said the opposite of what was true of the node it had come to sit above").
+
+**Suggested fix:** Rewrite src/enemies.js:864-866. The drag is a pure per-second velocity multiplier and is mass-independent by construction; what varies between bodies is `accel`, because steering re-accelerates toward cruise every substep and the steady state is (accel/100)*cruise / (accel/100 + 3.912 + 0.55). If a mass dependence is actually wanted it has to be written as a force (`v -= vhat * F * invMass * dt`), not as a multiply.
+
+**Hash:** No — comment only. Even a code change here would not move it: nothing writes `chill` in a fight that fires BOLT and PULSE, so the `if (this.chill > 0)` block never executes in the canonical 9000 frames.
+
+
+### 18. [low] RIME does not chill "to a crawl": steering puts back a third to a half of the pace, and three surfaces quote a number measured on a body that was not steering
+
+**Where:** `src/config.js:785, src/arsenal.js:187, README.md:343-344 against src/enemies.js:867-871 + src/enemies.js:794`
+
+**Evidence:** Three surfaces make the same overstatement. src/config.js:785 `* RIME. Drags whatever it touches to a crawl for a few seconds. It kills`; src/arsenal.js:187 `dmg: '16', fx: 'Chills for 3.2s. What it touches barely moves.'`; README.md:343-344 `- **RIME** drags whatever it touches to a crawl for a few seconds — measured` / `taking a body from 200 units a second to about 13.` The 0.02 at src/config.js:793 `drag: 0.02, // velocity kept per second while chilled` is only what a COASTING body keeps. The chill runs once per frame in `Enemy.update` (src/enemies.js:867-871); steering runs separately from `physicsStep` (src/game.js:1549 `b.steer(w, dt);`) at CFG.fixedStep = 1/120, and re-accelerates the body every substep: src/enemies.js:794 `this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);`. For any body below its own cruise, `flying` at src/enemies.js:790 clamps to 1 and `along` is +1, so `authority` is 1 and k = accel/100. Steady state is v* = k*cruise/(k + lambda + linearDamping) with lambda = 3.912 and linearDamping = 0.55 (src/config.js:1159), i.e. a kept fraction of (k+0.55)/(k+4.462). Measured, one RIME hit's worth (chill set to CFG.rounds.rime.chill) on a body already settled at its quiet pace, position pinned each frame so the bearing is constant and velocity untouched: NEEDLE 98.5 -> 50.8 u/s, reached inside 0.5s and flat until the chill expires at 3.2s (52% kept; model 0.496). MOTE 38.4 -> 15.5 (40%; model 0.385). BULWARK 8.7 -> 2.5 (29%; model 0.270). A nine-type sweep gives kept fractions from 0.28 (DRIFT) to 0.51 (ION). Two independent instruments — the closed form derived from the code, and the live run — agree to a few points on every row. The README's "200 units a second to about 13" is exactly the coasting case and nothing else: 200 * 0.02**0.7 = 12.9. NOTE on the reader's table: their MOTE row (74% kept) is wrong — it disagrees with their own model and with my measurement (38-40%); every other row of theirs holds.
+
+**Consequence:** A chilled NEEDLE at 50.8 u/s is still faster than an unchilled MOTE (38.4) and about the pace of an unchilled LURCHER (53.5). The round genuinely buys time — roughly a doubling of crossing time while the chill is up, which is what "it buys the time for everything else to" promises — but a player who reads "barely moves" and fires it at the fast light bodies gets a halving, and gets the best result (29%) on the slow heavy ones that were never the problem. `drag: 0.02` reads as a 98% removal that never happens to anything that steers.
+
+**Suggested fix:** Correct the three sentences, and only those. Say the chill roughly halves-to-quarters a body's pace while it is up, that the bite depends on the body's own `accel`, and re-take the README's measured figure on a steering body. Do NOT make the chill a term the steering answers to (the STASIS route at src/enemies.js:746 `const slow = world.stasis > 0 ? 0.12 : 1;`) on the strength of this finding — that would make `drag: 0.02` honest and would also be a large silent balance change to a round that currently works; it needs its own pass.
+
+**Hash:** No — words only. Nothing writes `chill` in a fight that fires BOLT and PULSE, so neither the drag block nor any new chill term inside `drive` is reachable in the canonical 9000 frames, provided any such term stays gated on `if (this.chill > 0)` rather than being computed unconditionally.
+
+
+### 19. [cosmetic] config.js states the SLUG exemption as "only what a SLUG threw"; the mark spreads on contact — and on ANY contact, not only damaging ones
+
+**Where:** `src/config.js:770-771 against src/game.js:1590-1600`
+
+**Evidence:** src/config.js:770-771: `* seconds. Everything else on the field still trades damage on impact;` / `* only what a SLUG threw is exempt.` The code is src/game.js:1590-1600 inside `grid.eachPair`: `if (a.slugged > 0 || b.slugged > 0) {` ... `const t = Math.max(a.slugged || 0, b.slugged || 0);` / `if (typeof a.slugged === 'number') a.slugged = t;` / `if (typeof b.slugged === 'number') b.slugged = t;` / `return;`. So anything that touches a marked body inherits the mark at its remaining time and is itself exempt from all collision damage in both directions until it runs out — not only what the SLUG threw. The propagation is deliberate and its reason is written at src/game.js:1591-1595; the sentence in config.js is the one that was never updated, and README.md:2213-2216 already describes the spread correctly, so config.js is the sole out-of-date surface. CORRECTION to the reader's version of this claim: they wrote that the spread happens "on every contact above `collisionThreshold`". It does not. The guard at src/game.js:1590 sits ABOVE `const dmg = impactDamage(a, b, impact);` at src/game.js:1601, and `collisionThreshold` is only consulted inside `impactDamage` (src/physics.js:265 `if (impact <= P.collisionThreshold) return 0;`). The only gate the spread passes is `if (impact <= 0) return;`, so a body drifting into a marked one at 5 u/s — a bump that could never have done damage — still inherits a full remaining exemption. The chain is still bounded: every member decays at dt per frame from the same value, so nothing can outlive 2.4s from the original hit.
+
+**Consequence:** One SLUG into a crowd switches collision damage off across the whole touching component of that crowd for up to `calm` 2.4s, including impacts the SLUG had nothing to do with, and the entry price is any contact at all rather than a damaging one. Bounded and short, so the behaviour is defensible; the stated rule is what is wrong.
+
+**Suggested fix:** Amend src/config.js:770-771 to say what src/game.js:1590-1600 does: the mark travels on contact at its remaining time, so what is exempt is the SLUG's chain and not only the body it hit, and it runs down rather than propagating for ever. Do not narrow the code to match the comment — the reason for the spread (a slugged BULWARK must not launch a MOTE at full damage) is sound and is written at the site.
+
+**Hash:** No — comment only. Even a change to the propagation would not move it: SLUG is never fired in the canonical fight, so `slugged` is 0 on every body and the branch at src/game.js:1590 is never taken.
+
+
+### 20. [cosmetic] config.js's SLUG rationale quotes SPINE at 20; SPINE has been 34 since build 218
+
+**Where:** `src/config.js:774 against src/config.js:705`
+
+**Evidence:** src/config.js:773-775: `* That left it paying a 2.4x rate penalty for a shove and nothing else, so` / `* it now hits hardest of anything per shot — 44, against SPINE's 20 and` / `* BOLT's 26 — while staying under BOLT on sustained damage.` src/config.js:705 is `damage: 34,` in the `spine` block, and its own header at src/config.js:700-709 spells out the move ("At 34 it is 82 a second on one body, just under BOLT"). BOLT is unchanged at src/config.js:1151 `damage: 26,`. So one of the three figures in that sentence is stale and the margin it argues from has narrowed from 24 to 10. ADJACENT AND LOWER CONFIDENCE, flagged rather than asserted: the same sentence's "hits hardest of anything per shot" is arguable against HE, which is src/config.js:598-599 `damage: 15,` plus `blast: { r: 96, damage: 44, impulse: 420 },` — a body at the burst centre takes `damage * (0.35 + falloff * 0.65)` (src/enemies.js:4546) which is the full 44 at falloff 1, on top of the 15, so 59 reaches the struck body per trigger pull. Whether "a hit" means the projectile alone is a reading call I cannot settle from the code, so I am not claiming it as a defect.
+
+**Consequence:** None in play. It is the comment that justifies SLUG's damage number, so the next person tuning SLUG reads "SPINE's 20" as the floor it has to clear when the floor is now 34.
+
+**Suggested fix:** Change "SPINE's 20" to "SPINE's 34" at src/config.js:774.
+
+**Hash:** No — comment only.
+
+
+### 21. [low] A SPORE patch's grain is drawn well inside the 92-unit circle it burns, and the header sentence describing the die-back is backwards
+
+**Where:** `src/patch.js:237 (the die-back), :181-182 (the damage circle), :232-233 (the sentence), :84-85 / :91-92 / :240-242 (three claims that the rim band marks the boundary)`
+
+**Evidence:** The damage circle never moves: patch.js:181-182 `const reach = rr + e.r;` / `if ((e.x - this.x) ** 2 + (e.y - this.y) ** 2 > reach * reach) continue;`, with `rr = this.r` = 92 (config.js:815 `patch: { r: 92, life: 4.5, dps: 46, cap: 3 },`).
+
+The picture does move: patch.js:237 `const reach = Math.min(1.14, 0.26 + left * 1.1);` and :239 `if (sp.d > reach) continue;`, with `left = Math.max(0, this.life / this.max)` (:206). Speck radii are patch.js:103 `const d = rim ? rand(0.88, 1) : Math.sqrt(rand(0, 1)) * 0.9;`.
+
+Re-derived on the authored 4.5s life:
+  reach >= 1.00 <=> left >= 0.74/1.1 = 0.67273 <=> t <= 1.473s — the FIRST 32.7% of life.
+  reach <  0.88 <=> left < 0.62/1.1 = 0.56364 <=> t > 1.964s — so the entire rim band is gone for the last 2.54s, 56.4% of the patch's life.
+  Full-alpha rim: `edge = Math.min(1, (reach - sp.d) * 8)` (:243), so a rim speck at the mean d = 0.94 needs reach >= 1.065, i.e. t <= 1.207s (26.8%). At reach = 1.00 that same speck is drawn at 0.48 of its alpha.
+  At t = 3.0s (left = 1/3): reach = 0.6267, so the outermost drawn grain sits at 57.7 units against a burn circle of 92 — 1.60x in radius, 2.55x in area.
+The sentence at :232-233 reads `used to do, at the cost of a second hard outline. Full extent until the` / `last third:` — full extent covers the FIRST third, not everything up to the last one.
+
+CORRECTION to the reader's arithmetic, which overstated this: they compared 57.7 against 92 + 24 = 116 for a LURCHER (config.js:2672 `r: 24,`) and reported 2.01x / 4.05x. Folding the body's own radius in is not a drawing error — `rr + e.r` is ordinary overlap geometry and no effect draws a body's radius into its own footprint. The honest comparison is grain radius against the patch's own 92, i.e. 1.60x / 2.55x.
+
+The haze does not stand in for the missing boundary. patch.js:224 `drawGlow(ctx, this.dark, this.x, this.y, R * 0.98, 0.44 * k * (0.4 + left * 0.6));` gives base alpha 0.264 at left = 1/3 (k = 1 there), and util.js:95-98 stops the sprite at `0.55 -> rgba(color, 0.12)` and `1 -> rgba(color, 0)`, so the composited alpha is 0.0254 at 0.627R and 0.0058 at 0.9R, of a tone already `mixHex(this.tone, '#0a1408', 0.42)` (patch.js:80). I did the gradient arithmetic; I did not render it.
+
+What is NOT a defect: the die-back itself is authored on purpose as the timer (patch.js:229-231, "They die back from the rim inward ... so the area visibly closes rather than dimming in place"). The defect is that the file states three separate times that the rim band is the boundary marker — :84-85 "it is the only thing telling the player where the damage stops now that there is no outline", :91-92 "the boundary is the one thing about this effect the player has to be able to find: everything standing inside it is being hurt", :240-242 "the rim band -- the only thing marking where the damage stops" — while the die-back removes it for 56% of the life and the boundary it marks has not moved at all.
+
+**Consequence:** Player-visible: from about two seconds in, a SPORE patch left alone has no drawn edge and burns bodies standing outside its visible grain — 1.6x further out in radius by t=3s. Worst in the case the round is designed for, a patch placed ahead of something and left to burn its full 4.5s; masked under sustained fire, where the cap at shooter.js:730 retires patches at about 1.7s old.
+
+**Suggested fix:** Exempt the rim band from the die-back so the boundary survives and only the interior grain thins: tag the rim specks at patch.js:96-110 and make :239 `if (!sp.rim && sp.d > reach) continue;`. Alternatively move the floor and the slope so full extent really does cover the first two thirds — `Math.min(1.14, 0.6 + left * 0.72)` holds reach >= 1 to left = 0.556 and never falls below 0.6. Either way, correct "Full extent until the last third" at patch.js:232-233.
+
+**Hash:** No — draw-only, and no Patch is constructed in the canonical BOLT+PULSE ORDINAL run (`new Patch` has exactly two callers, shooter.js:641 and mines.js:621).
+
+
+### 22. [cosmetic] `retire()`'s `this.max = Math.max(this.max, this.life)` can never select its second argument, and the patch it is meant to soften collapses to a third of its size on one frame
+
+**Where:** `src/patch.js:129, against :27, :128 and :157`
+
+**Evidence:** patch.js:124-130:
+  `retire() {`
+  `  if (this.retired) return;`
+  `  this.retired = true;`
+  `  this.next = Infinity;`
+  `  this.life = Math.min(this.life, RETIRE);`
+  `  this.max = Math.max(this.max, this.life);`
+  `}`
+`this.max` is written once, at :27 `this.max = this.life;`, and nowhere else in the file or in either caller. `this.life` only ever decreases — :157 `this.life -= dt;` and the `Math.min` on the line immediately above. So `this.life > this.max` is unreachable and the `Math.max` always returns `this.max`: a dead statement wearing the shape of a guard.
+
+What it costs, arithmetic on the SPORE cap under continuous fire (config.js:806 gives the interval as `0.286 * 2.0 = 0.572s`, cap 3, life 4.5): the fourth shot lands 1.716s after the first, and the first patch is retired. Immediately before: life 2.784, left 0.6187, reach = 0.26 + 0.6806 = 0.9406 (grain to 86.5 units), k = min(1, 1.716/0.25) * min(1, 2.784/0.8) = 1. Immediately after: life 0.35, left 0.35/4.5 = 0.0778, reach = 0.3456 (grain to 31.8 units), k = 0.4375. One frame: drawn radius -63%, haze alpha 0.339 -> 0.086.
+
+CORRECTION to the reader, who claimed this "defeats the comment above it": it does not defeat all of it. The comment at :120-122 asks for the ground to be "seen going out", and the going-out is carried by `k = ... * Math.min(1, this.life / 0.8)` at :203, which runs 0.4375 -> 0 over the full 0.35s either way. What is lost is only the extent, which jumps once and then crawls 0.346 -> 0.26.
+
+Also note, against the reader's proposed one-line fix: `this.max = this.life;` makes left = 1 at the retire instant, so reach jumps min(1.14, 1.36) = 1.14 — the extent pops OUTWARD from 0.9406 to full before closing. Smaller and in the better direction, but it is a pop, so check it on screen rather than assuming the line is free.
+
+**Consequence:** Cosmetic: the oldest burning patch snaps to a third of its drawn size on the frame the fourth shot lands, which is the reading the retirement was written to prevent, plus a statement in the code that cannot do anything.
+
+**Suggested fix:** `this.max = this.life;` at patch.js:129, so `left` runs 1 -> 0 across the 0.35s retirement and the extent closes with the alpha instead of jumping. Verify the outward pop at the retire instant on screen; if it reads badly, clamp `left` to what it was rather than resetting it.
+
+**Hash:** No — draw-only state, and no SPORE patch exists in the canonical BOLT+PULSE run.
+
+
+### 23. [low] A gripping SNARE holds a cap slot for up to 26.7s, against config's "none of them outlives its quarter minute"
+
+**Where:** `src/mines.js:669 vs src/mines.js:679, src/config.js:1013-1015, src/config.js:1048, src/upgrades.js:461`
+
+**Evidence:** The else-if chain in `updateMines` puts the hold ahead of the life: mines.js:669 `} else if (m.gripping) {` comes before mines.js:679 `} else if (m.life <= 0) {`, so `m.life` running out can never end a grip. `m.life -= dt` still runs (mines.js:617), it simply has no reader once `m.hold > 0`.
+
+config.js:1013-1015: "`cap` and `life` are still a contract with the player rather than a balance dial: nothing may move either, so the most that can ever be standing is five and none of them outlives its quarter minute."
+
+Arithmetic: `snap` sets `m.hold = S.hold * world.up.mineHold` (mines.js:316) off config.js:1048 `hold: 2.4, // seconds it keeps hold once it opens — was 3.6; see DEAD WEIGHT`. `mineHold` comes only from upgrades.js:461 `{ id: 'deadweight', name: 'DEAD WEIGHT', line: '+65% snare hold time.', apply: scale('mineHold', 1.65) ... }`, which carries no `levels`, so tree.js:205 `const levels = u.repeat ? Infinity : (u.levels ?? 3);` sells it three times: 1.65^3 = 4.4921, hold = 10.781s. Total field presence = flight 0.9 (config.js:1044) + life 15 + hold 10.781 = **26.68s**, every second of it counted by `laidCount` (mines.js:282-286, `if (!m.dead) n++`). Even at one level of DEAD WEIGHT it is 0.9 + 15 + 3.96 = 19.9s, so the contract is broken independently of how many levels the node has.
+
+This is also what makes the two findings above reachable. upgrades.js:429-438 argues the cap is unreachable by laying — "At one level a throw lays two, two throws leave four, and the cap is still the backstop it was authored as" — and that arithmetic is right for mines that die at 15s (throws at 0 / 8.44 / 16.875s with QUICK LAY x2 and PAIRED CHARGE x1 give a steady state of 4). Snares that outlive their life break it: two laid at t=0 and still gripping at t=16.875 make 4 on the field before the throw, and the second of the two new mines hits `laidCount >= 5` and evicts.
+
+**Consequence:** One of five cap slots is held for up to a quarter-minute past the life that config.js calls a contract; a player who bought DEAD WEIGHT is silently running a smaller effective cap. The knock-on is that the eviction path (findings 1 and 2) becomes reachable in ordinary play on a SNARE build, which the tree's own reasoning says it should not be.
+
+**Suggested fix:** Decide which half is true and make it so. Either clamp the grip to the remaining life (`m.hold = Math.min(m.hold, m.life)` in `snap`, or test `m.life <= 0` before the gripping arm at 669 and end the hold with the release effects of 673-678), or amend config.js:1013-1015 to say `life` bounds the trigger and not the hold, and correct README.md:250/256 with it. Note the second option leaves the cap reachable by laying and so leaves findings 1 and 2 live.
+
+**Hash:** no — no mine is laid in the canonical run
+
+
+### 24. [low] A SNARE snaps on boss structure and strings wires to a body `drive` re-zeroes every frame
+
+**Where:** `src/mines.js:700 (trigger guard), src/mines.js:318 (grip guard), src/mines.js:762 (draw guard), src/enemies.js:634`
+
+**Evidence:** The trigger loop's guard is mines.js:700 `        if (e.dead || e.harmless || e.staged || e.spent) continue;` and the only `fixed` exemption below it is VOID's: mines.js:708 `          if (m.kind === 'void' && e.type.fixed) continue;`. Boss structure is pushed straight into `world.enemies` (boss.js:389, 409, 797, 1041, 1178, 1460, and the same in dynamo.js / amplitude.js) carrying config.js:3021 `fixed: true, // the boss places it; physics never moves it`, and it is not `harmless`. So mines.js:709 `if (m.kind === 'snare') snap(world, m);` fires on a boss panel.
+
+`grip`'s guard is mines.js:318 `      if (e.dead || e.spent || e.fizzle) continue;` — no `fixed` — so it writes `e.vx`/`e.vy` onto the panel. enemies.js:634 `    if (this.type.fixed && !this.isDrop) { this.vx = 0; this.vy = 0; return; }` runs from `steer` (enemies.js:541) which `physicsStep` calls at game.js:1549 BEFORE `integrate` at 1554 — and `physicsStep` (game.js:1508) runs before `updateMines` (game.js:1518). So every velocity `grip` writes is zeroed on the next frame before anything integrates it.
+
+The draw block repeats the same guard, mines.js:762 `        if (e.dead || e.spent || e.fizzle) continue;`, under a comment at 761-762 that states the invariant: "The same set `grip` takes, or the picture is drawing a hold the snare does not have."
+
+Mines are laid throughout a fight: `mineCadence` is called at game.js:1515, outside the `if (w.boss) { ... } else { ... }` at game.js:1489-1502. SNARE's mouth is `m.r + S.trigger * up.mineTrigger` = 14 + 34 = 48 units unbought (config.js:1046-1047).
+
+**Consequence:** During a boss fight a snare that lands near the frame opens on it and draws violet wires to a segment that visibly does not move — the picture asserting a hold the physics has already thrown away. The snap itself is not wasted (the grip still takes every non-fixed body and every drop in the 210-unit reach), so this is a picture-vs-physics disagreement rather than a lost mine.
+
+**Suggested fix:** Add `|| e.type.fixed` to the snare's grip guard (mines.js:318) and to the matching draw guard (mines.js:762). Do NOT add it to the shared trigger guard at mines.js:700, which the reader proposed: that guard is shared by BLAST, SPALL and KNELL, whose damage on boss structure is legitimate and is the reason VOID needed its own line at 708. If the snap itself should not fire on structure alone, it wants a snare-specific test beside 708, not a change to 700.
+
+**Hash:** no — the writes it removes are zeroed by `drive` before anything integrates them, and the canonical run lays no mine
+
+
+### 25. [cosmetic] The snare's drawn wires walk world.enemies only; grip also hauls world.drops
+
+**Where:** `src/mines.js:760-767 (draw), src/mines.js:330-331 (grip)`
+
+**Evidence:** `grip` ends mines.js:330-331 `  take(world.enemies);` / `  take(world.drops);`, while the draw loop opens at mines.js:760 `      for (const e of world.enemies) {` and never touches `world.drops`. The guards match to the character (`if (e.dead || e.spent || e.fizzle) continue;` at 318 and 762) and the radius matches (`S.reach * S.reach`, 306 and 763) — only the list does not. The comment immediately above the draw loop, mines.js:761-762, states the invariant it breaks: "The same set `grip` takes, or the picture is drawing a hold the snare does not have."
+
+**Consequence:** Energy motes inside the 210-unit reach are dragged into the knot with no wire drawn to them. Small, and in the safe direction — a hold that exists and is not drawn rather than the reverse — but it is the stated invariant, and it is the only place in the file where the two lists disagree (`cut`, mines.js:355-356, takes both).
+
+**Suggested fix:** Iterate both lists in the draw block, or hoist the pair into one array walked by both. If the omission is deliberate (a dozen wires to motes would be clutter), say so in the comment at 761-762 instead of claiming the sets are identical.
+
+**Hash:** no — draw only
+
+
+### 26. [cosmetic] LAY_TONE covers four of eight kinds, and the four that fall through get BLAST's own chime
+
+**Where:** `src/mines.js:242, src/mines.js:273, src/mines.js:38`
+
+**Evidence:** mines.js:242 `const LAY_TONE = { blast: 300, snare: 240, wire: 380, knell: 200 };` and mines.js:273 `  audio.chime(LAY_TONE[kind] || 300);` against mines.js:38 `const KIND = { blast: M, snare: S, wire: W, knell: K, thorn: T, lode: L, spall: P, void: V };`. THORN, LODE, SPALL and VOID all take the `|| 300` fallback, and 300 is BLAST's own entry — so half the rack has no lay tone of its own and four kinds are indistinguishable by ear from BLAST at the moment of the throw. `audio.chime` (audio.js:336-340) is a pure two-partial sine on `f`, so the frequency is the entire distinction.
+
+**Consequence:** With one clock for all eight kinds (mines.js:1074-1079) and the kind switched from the strip, the throw sound is the only per-kind cue at lay time, and it is wrong for four of eight. No mechanical effect.
+
+**Suggested fix:** Four more entries in the table at 242, and pick a fallback that is not another kind's value. The stale module header at mines.js:1 ("Auto-laid mines, in four kinds", documenting only those four) and `laidCount`'s stacked stale docstrings at mines.js:276-281 ("How many of one kind are on the field" / "Nothing expires now" / "switch round the four") belong in the same pass.
+
+**Hash:** no
+
+
+### 27. [cosmetic] snap()'s `m.settle = 0` is a write nothing can read
+
+**Where:** `src/mines.js:317`
+
+**Evidence:** mines.js:316-317 `  m.hold = S.hold * world.up.mineHold;` / `  m.settle = 0;`. `S.hold` is 2.4 (config.js:1048) and `up.mineHold` is >= 1, so `m.gripping` (mines.js:222-224, `return this.hold > 0;`) is true from the instant `snap` returns.
+
+Every reader of `m.settle` is then unreachable for that mine: `armed` (mines.js:218) requires `this.hold <= 0`; the thorn/lode/knell/wire arms are gated on kind; `cutting` is wire-only; and `retire`'s `m.settle < m.cfg.arm` test (mines.js:379) reaches the same `m.dead = true` outcome as the fall-through at 384 for a gripping snare, so it cannot be distinguished either. On the frame `m.hold` reaches 0 the mine sets `m.dead = true` in the same branch (mines.js:673-674) and is spliced out at 718, so `armed` never comes back.
+
+**Consequence:** None. Listed because a write with no reachable reader is the `world.endless` shape CLAUDE.md flags, and the next reader of `snap` will assume the reset means something.
+
+**Suggested fix:** Delete line 317, or annotate it as deliberate belt-and-braces. Line 564 (`m.open += ((m.gripping ? 1 : 0) - m.open) * clamp(dt * 7, 0, 1);`) is NOT dead and should be left alone — the zero arm is shared with the seven non-snare kinds, for which `gripping` is always false.
+
+**Hash:** no
+
+
+### 28. [cosmetic] MINE (missed by the reader): the README's mines section contradicts config in six independent places, including its own two-line-apart kind count
+
+**Where:** `README.md:212, 219-222, 230-233, 249, 251, 252, 264-265`
+
+**Evidence:** The reader named two of these; there are six, and three are numeric.
+- README.md:212 "**Four kinds, one laid at a time**" against README.md:224 "One clock for all eight kinds" twelve lines later, and mines.js:38's eight-entry `KIND`.
+- README.md:219-222 "**Three numbers govern every kind, and no upgrade may move any of them.** ... five on the field · fifteen seconds each · one thrown every fifteen" against config.js:1017 "`throwEvery` was the third of those until build 214 and is a dial now" (QUICK LAY, upgrades.js:451-453, two levels of x0.75 -> 8.44s).
+- README.md:230-231 "a **SEED** offer, which lays three at once" — no such thing exists. `throwMine` has exactly two callers, `mineCadence` (mines.js:1086) and `debugThrowMine` (game.js:2756). The same ghost is cited as the justification for the eviction loop at mines.js:247-248.
+- README.md:232-233 "5 with two [PAIRED CHARGE]" against upgrades.js:440 `levels: 1`.
+- README.md:249 `| BLAST damage | 140 | 95 | SHRAPNEL | 138 |` against config.js:1034 `blast: { r: 168, damage: 105, impulse: 760 }` — the base is 105, not 95, and SHRAPNEL has no `levels` so the ladder is 1.45^3 = 3.048, i.e. 320, not 138. README.md:251 `| WIRE damage/s | 105 | 72 | HOT WIRE | 108 |` against config.js:1065 `damage: 79` and HOT WIRE at three levels (1.5^3 = 3.375 -> 267). README.md:252 `| KNELL tolls | 3 | 2 | FOURTH BELL | 3 |` against config.js:1077 `tolls: 2, // was 3; FOURTH BELL buys the third back and a fourth beyond it` plus upgrades.js:471 `levels: 2` -> 4.
+- README.md:264-265 WIRE "nothing uses it up and it does not expire: it is a lane closed for good" against mines.js:659 `      if (m.life <= 0) fizzle(world, m);`, and mines.js:657's own comment "it runs out its life".
+
+The in-game copy is correct where the README is not: arsenal.js:105 `dmg: '105'`, arsenal.js:110 `fx: 'Pins a whole crowd where it stands, for 2.4s.'`, arsenal.js:114 `dmg: '79/s'`, arsenal.js:118 `dmg: '81, twice'` — and arsenal.js:99-100 says regress.mjs checks that table against `CFG`. The README has no such check.
+
+**Consequence:** None in the game — the player-facing arsenal cards are right. It matters because the README is where the next reader goes for the mine doctrine, and it is currently the source for two wrong numbers (95, 72) and one non-existent feature (the SEED offer) that has already been copied into a code comment at mines.js:247-248.
+
+**Suggested fix:** One pass over README.md:210-266 against `CFG.mines` / `CFG.snare` / `CFG.wire` / `CFG.knell` and the FIELD block of upgrades.js, and delete the SEED-offer sentence from both README.md:230 and mines.js:247-248 (the eviction loop is still needed — PAIRED CHARGE lays two per throw — it just needs the true reason).
+
+**Hash:** no
+
+
+### 29. [medium] WIRE's cut is applied once per FRAME, so applyDamage's `Math.max(1, …)` floor makes its damage frame-rate-dependent and partly armour-blind (claim 2, confirmed with one correction)
+
+**Where:** `src/mines.js:552, src/enemies.js:1160, src/game.js:1518, src/game.js:1661`
+
+**Evidence:** src/mines.js:552 — `      e.applyDamage(world, W.damage * world.up.wireDamage * dt, nx, ny, W.shove * dt);` — inside `cut(world, m, dt)`, which is called once per frame from `updateMines` (src/mines.js:658 `      if (m.cutting) cut(world, m, dt);`). src/enemies.js:1160 — `    const real = Math.max(1, dmg * (1 - plate) * (1 - ward));`.
+
+The dt is the raw frame delta, not a fixed step. src/main.js:51 `  const dt = (now - last) / 1000;` -> src/game.js:1421 `    const real = Math.min(dtRaw, CFG.maxFrameDelta);` (config.js:100 `  maxFrameDelta: 0.1,`) -> src/game.js:1518 `    updateMines(w, dt);`. The game HAS a fixed step — config.js:98 `  fixedStep: 1 / 120,` — and src/game.js:1507-1511 runs `physicsStep(CFG.fixedStep)` on it; `updateMines` is outside that accumulator.
+
+Arithmetic, CFG.wire.damage = 79 (config.js:1065 `    damage: 79, // per second of contact, per body — was 105; see HOT WIRE`), wireDamage = 1:
+- 60 Hz: dmg/frame = 79/60 = 1.31667. Unarmoured real = 1.31667 -> 79.0/s, correct.
+- The floor binds whenever 1.31667*(1-plate) < 1, i.e. plate > 0.2405. In the current roster that is BULWARK (config.js:2738 `    armor: 0.34, // flat damage reduction`) -> 1.31667*0.66 = 0.869 -> floored to 1 -> 60/s against a rated 52.14/s (+15.1%); and boss patrol structure (config.js:2219 `    armorPatrol: 0.55,`) -> 0.5925 -> 1 -> 60/s against 35.55/s (+68.8%). Every other armour value in the roster (0.08-0.20) is below the binding point, so 60 Hz is otherwise honest.
+- 120 Hz (ProMotion, the branch's own target device): 79/120 = 0.65833 -> floored to 1 on EVERY body -> 120/s against a rated 79/s, +51.9%, with armour ignored entirely. One level of HOT WIRE does not lift it off the floor either: 79*1.5/120 = 0.9875.
+
+CORRECTION to the claim as filed: 'WIRE is the one continuous damage source that never got the tick' is false. src/game.js:1661 — `        if (!e.dead) e.applyDamage(w, up.casing * dt);` — SPINES/HARD CASING is also per-frame (70 a level, three levels in the tree, verified by importing tree.js). At 60 Hz one level gives 70/60 = 1.1667/frame, which floors against BULWARK (0.77 -> 1 -> 60/s against a rated 46.2/s) and against everything at 120 Hz. So the pattern has two instances, not one. The claim's own arithmetic for WIRE is otherwise correct to the digit and I reproduced all of it. patch.js is the only continuous source that ticks (patch.js:31 `    this.tick = opts.tick ?? 0.25;`) and its docstring at patch.js:118-124 states this exact floor as the reason.
+
+**Consequence:** The arsenal chip says `79/s` (src/arsenal.js:114 `    dmg: '79/s', fx: 'A line across the field. It cuts what crosses.',`) and a regress case pins that string against CFG. The wire delivers 79/s only on a 60 Hz display against a body with armour <= 0.24. On a 120 Hz phone it delivers at least 120/s against everything and armour stops mattering; on a 60 Hz phone a BULWARK takes 15% more than rated and a boss's armoured structure 69% more. The rated number is right for one refresh rate and one half of the roster.
+
+**Suggested fix:** Give `cut` the tick Patch already has: accumulate `m.cutT += dt` on the mine and apply `W.damage * world.up.wireDamage * TICK` once every TICK (0.25s to match Patch), leaving the shove per-frame or moving it with the bite (see the next finding — it wants the same tick). Do NOT fix it by touching `Math.max(1, …)` in applyDamage: that line is on every damage path in the game. Fix SPINES the same way at game.js:1661, or accept it as a separate item.
+
+**Hash:** No, if the fix is confined to `cut` in mines.js — `world.mine` is null by default (game.js:195 `      mine: null, // the one kind of mine being laid, or none`) and scripts/fight.mjs contains no reference to mine, wire or knell, so no mine is laid in the canonical ORDINAL run. YES if fixed by changing applyDamage's floor or its fade, which are on every damage path; that route re-baselines ORDINAL and should not be taken.
+
+
+### 30. [medium] MINE — WIRE is the only per-frame IMPULSE in the game, and the repeated-shove fade eats 83% of it, makes it frame-rate-dependent, and then pins every later shove on that body for ~20 seconds
+
+**Where:** `src/mines.js:552, src/enemies.js:1186-1187, src/enemies.js:1029, src/config.js:1066`
+
+**Evidence:** This is mine, not the reader's; it is the second half of the same line the reader's claim 2 is about.
+
+The impulse: src/mines.js:552 `      e.applyDamage(world, W.damage * world.up.wireDamage * dt, nx, ny, W.shove * dt);` — `W.shove * dt`, applied every frame. src/config.js:1066 — `    shove: 150, // pushed off the line rather than held on it`. The function header at src/mines.js:485-489 states the intent in as many words: 'Everything touching the line is cut for as long as it stays on it, and shoved off the way it was leaning — so a body crossing takes a slice rather than being parked in the beam and ground to nothing.'
+
+The fade: src/enemies.js:1186 `      const fade = throwOff ? 1 : 1 / (1 + (this.kicked || 0));` and :1187 `      if (!throwOff) this.kicked = (this.kicked || 0) + fade;`, bleeding off at src/enemies.js:1029 `    if (this.kicked > 0) this.kicked = Math.max(0, this.kicked - dt / CFG.physics.kickFade);` with config.js:1222 `    kickFade: 1.5,`. The wire passes no `throwOff`, so it pays the fade. Frame order is decay-then-apply: `e.update` (which calls shoveFade) is game.js:1465, `updateMines` is game.js:1518.
+
+Simulated exactly that loop (decay dt/1.5, then fade = 1/(1+k), k += fade, v += 150*dt*invMass*fade), one second of unbroken contact, Δv per unit invMass:
+  30 Hz -> k = 6.53, Δv = 35.88
+  60 Hz -> k = 9.69, Δv = 25.86
+  120 Hz -> k = 14.18, Δv = 18.56
+against 150 for the same total impulse delivered in one clean application. So at 60 Hz the wire delivers 17.2% of its nominal shove, and the delivered shove is 1.93x larger on a 30 Hz display than on a 120 Hz one — the shove runs the OPPOSITE way from the damage, which the same frame rate inflates. Two seconds: 60 Hz gives 37.68 against 300 nominal, 12.6%. A tick of 0.25s on the same total gives 74.9 in one second — 2.9x what the per-frame form delivers.
+
+The lingering half: `kicked` reaches 9.69 after one second on the wire and 13.75 after two, and bleeds at 1/1.5 = 0.667 per second — so it takes 14.5s to return to zero from one second of contact and 20.6s from two. Every non-`throwOff` shove on that body in that window is scaled by 1/(1+k): rounds' knockback, and every mine blast, since detonate/toll/fizzle call `applyBlast` with no `throwOff` and enemies.js:4546-4547 passes `!!blast.throwOff`. A KNELL toll landing on a body two seconds off a wire lands at 1/14.75 = 6.8% of its 430 impulse. This is precisely the fault the header at enemies.js:1165-1178 records for PULSE ('Under ordinary fire `kicked` settles at 4.25, the fade is 0.19') — and 9.69-13.75 is two to three times worse than the 'ordinary fire' figure that header calls the problem.
+
+WIRE is the ONLY per-frame impulse in the game. I checked every applyDamage caller: patch.js:186 `      e.applyDamage(world, bite, 0, 0, 0);` and game.js:1661 pass impulse 0; abilities.js:567 is gated by `P.recut`, :593 by `P.arc.every`, :708 and :996 are one-shot events; shooter.js:185 and enemies.js:4546 are blasts.
+
+**Consequence:** A body on the wire is not 'pushed off the line' — at 60 Hz a mid-weight body (density 1.5, r 20 -> massOf = 1.5*400*0.006 = 3.6, invMass 0.278) gains 7.2 u/s over a full second of contact where the config's 150 would give 41.7. It is 'parked in the beam', which is the outcome the function's own header says the shove exists to prevent. And the wire then quietly disarms the knockback on that body — including the mine blasts a mine loadout is built around — for up to twenty seconds after it has left the line, on a mechanism the player has no way to see.
+
+**Suggested fix:** Apply the shove on the same tick as the damage: one bite of `W.shove * TICK` every TICK inside `cut`, so `kicked` climbs at 4/s instead of at the refresh rate. That fixes the frame-rate dependence, restores the shove to roughly half its nominal, and stops a wire from pinning a body's `kicked` at three times what sustained gunfire produces. Do not fix it by exempting the wire with `throwOff` — that also lifts the speed ceiling, which is the build-110 failure CLAUDE.md and enemies.js:1188-1197 both record for SLUG.
+
+**Hash:** No, if confined to `cut` in mines.js — no mine is laid in the canonical ORDINAL run (world.mine defaults to null, game.js:195; scripts/fight.mjs never sets it). YES if fixed by changing `shoveFade`, `kickFade` or the `fade` expression in applyDamage, which are on every impulse in the game.
+
+
+### 31. [low] KNELL's toll COUNT is snapshotted at construction but its toll INDEX is read live, so buying FOURTH BELL with a knell on the field skips that knell's first, tightest, hardest ring (claim 1, confirmed — at low, not medium)
+
+**Where:** `src/mines.js:205 and src/mines.js:564`
+
+**Evidence:** src/mines.js:205 — `    this.tolls = kind === 'knell' ? K.tolls + world0.up.mineTolls : 0;` (constructed from `new Mine(kind, s.x, s.y - 20, site.x, site.y, world)`, mines.js:265). src/mines.js:564 — `  const i = (K.tolls + world.up.mineTolls) - m.tolls;`. One is a snapshot, the other a live read, and `i` is their difference, so any increase in `up.mineTolls` after the mine is built shifts every remaining toll's index up by that increase.
+
+The window is real: src/game.js:725 `    def.apply(w.up, w);` mutates `w.up` in place the instant a node is bought, and FOURTH BELL is `{ id: 'fourthbell', name: 'FOURTH BELL', levels: 2, line: '+1 toll on every knell.', apply: bump('mineTolls', 1) …}` (upgrades.js:471; I confirmed the TREE's number is 2 by importing tree.js, not the node's line). The menu freezes the world (game.js:1408 `    if (this.paused) {`) but mines are not touched while it is up, so the knell resumes with the new count. A knell is alive for flight 0.9 + arm 0.8 + gap 1.15 = 2.85s per throw (config.js:1073-1078), against a throw every 8.44s fully bought — roughly a fifth to a third of the time.
+
+Arithmetic with K.tolls = 2, grow = 0.5, fade = 0.72, blast = { r: 118, damage: 81 }, mineBlast = mineDamage = 1:
+- Untouched: i = 0 -> r 118, damage 81; i = 1 -> r 177, damage 58.32. Centre total 139.32.
+- Buy one level with the knell already down (m.tolls = 2, up.mineTolls = 1): toll 1 gets i = 3-2 = 1 -> r 177, damage 58.32; toll 2 gets i = 3-1 = 2 -> r 236, damage 41.99; m.tolls hits 0 and mines.js:584 `  if (m.tolls <= 0) m.dead = true;` kills it. Total 100.31 — 28.0% less, delivered as a 177-unit ring where a 118-unit one was owed.
+- Buy both levels: i = 2 then 3 -> 41.99 + 30.24 = 72.23, 48.2% less.
+Direction is one-way: `bump` only increases, so the error always makes the knell weaker and wider, never the reverse.
+
+src/mines.js:382 `  if (m.kind === 'knell') { while (!m.dead && m.tolls > 0) toll(world, m); return; }` reads the same live expression, so `retire` inherits it. (It still terminates — `m.tolls` decrements every call.)
+
+I am recording this at LOW rather than the claim's MEDIUM: the trigger is a single purchase landing inside a 2.85s window, at most twice a run, and the damage is a one-off. The logic error is real and the numbers are exact; the exposure is not medium-sized.
+
+**Consequence:** Buy FOURTH BELL while a knell is on the field and that knell loses its first ring: 100.3 centre damage instead of 139.3, drawn 50% wider than it should be. The upgrade you have just paid for makes the mine you are watching weaker. The countdown marks drawn at mines.js:869-874 (`for (let k = 0; k < m.tolls; k++)`) still show the right COUNT, so nothing on screen contradicts it.
+
+**Suggested fix:** Snapshot once. In the constructor add `this.tollsMax = K.tolls + world0.up.mineTolls;` beside line 205, and make line 564 `  const i = m.tollsMax - m.tolls;`. That fixes `retire`'s loop at the same time, and leaves a mid-knell purchase adding its ring at the END of the sequence, which is what '+1 toll on every knell' says.
+
+**Hash:** No — no mine is laid in the canonical ORDINAL run (world.mine is null by default, game.js:195; scripts/fight.mjs contains no reference to mine/wire/knell), and the change touches nothing outside `Mine`/`toll`.
+
+
+### 32. [low] `retire()` gives four of the eight kinds nothing at all — against its own docstring, and it costs SALTED its blast on every one of them
+
+**Where:** `src/mines.js:374-384`
+
+**Evidence:** This is the one half of the reader's claim 5 that survives; the headline does not (see refuted).
+
+src/mines.js:374 — the docstring: ` * one needed its place. It goes off the way its kind goes off, so being pushed` / 'off the field is not the same as being wasted.' The function:
+```
+function retire(world, m) {
+  if (m.dead) return;
+  if (!m.landed || m.settle < m.cfg.arm) { m.dead = true; return; }
+  if (m.kind === 'blast') { detonate(world, m); return; }
+  if (m.kind === 'spall') { spall(world, m); return; }
+  if (m.kind === 'knell') { while (!m.dead && m.tolls > 0) toll(world, m); return; }
+  if (m.kind === 'snare' && !m.gripping) { snap(world, m); return; }
+  m.dead = true;
+}
+```
+WIRE, THORN, LODE and VOID fall through to the bare `m.dead = true`. Every one of those four ends its ordinary life through `fizzle` — mines.js:645 (thorn), :655 (lode), :659 (wire), :679 (the generic arm void uses) — and `fizzle` is the ONLY door SALTED's blast comes through (mines.js:390-405, `if (world.up.mineFizzle) { applyBlast(…f.damage * world.up.mineDamage…) }`). SALTED's row is `{ id: 'salted', name: 'SALTED', line: 'A spent mine goes off instead of fizzling.', levels: 1, apply: set('mineFizzle', true) }` (upgrades.js:459). So an evicted WIRE/THORN/LODE/VOID silently pays the player nothing for a node they bought, and `tally` (mines.js:141-143) counts SALTED toward all four kinds' grade — the mine is drawn heavier for an upgrade that, on this path, does nothing.
+
+Reachability, which the claim denied: the eviction loop is `while (laidCount(world) >= M.cap)` (mines.js:250-254) with `cap: 5`. The claim's occupancy model — `flight + M.life` — is wrong for SNARE, and SNARE is the exception that makes the cap reachable. In `updateMines` the arm `} else if (m.gripping) {` (mines.js:670) sits ABOVE `} else if (m.life <= 0) {` (mines.js:679), while `m.life -= dt` (mines.js:615) runs unconditionally — so a gripping snare skips the life check entirely and lives flight + grip-time + hold. `m.hold = S.hold * world.up.mineHold` (mines.js:315) with `hold: 2.4` (config.js:1047) and DEAD WEIGHT at the tree's THREE levels (verified by importing tree.js; upgrades.js:461 has no `levels`) is 2.4 * 1.65^3 = 10.78s. A snare that grips at settle 10s dies at settle 20.8, i.e. 21.7s on the field, against the 16.875s that three throws span at the fully-bought cadence (15 * 0.75^2 = 8.4375s) and two mines a throw. Three throws x 2 = 6 >= 5. Even at base hold the ceiling is 0.9 + 15 + 2.4 = 18.3s, still past 16.875s. Derived from the update order rather than measured in a live run, so treat the exact frequency as unverified — but the loop is not dead code.
+
+**Consequence:** With SALTED owned, evicting a WIRE, THORN, LODE or VOID gives no blast, no ring, not even the six grey sparks the un-SALTED `fizzle` draws (mines.js:404) — the mine simply vanishes mid-field. That is 'wasted', which the docstring says explicitly must not happen.
+
+**Suggested fix:** Give the fallthrough `fizzle(world, m);` instead of `m.dead = true;` — `fizzle` guards on `m.dead` at its first line (mines.js:396) so it cannot double-fire, and it is already what those four kinds do at end of life. Fix the SEED comment above the loop at the same time (see the cosmetic finding).
+
+**Hash:** No — mines.js only, and no mine is laid in the canonical ORDINAL run.
+
+
+### 33. [cosmetic] A body standing on the WIRE is pinned at full hit-flash and drawn as a near-white disc (claim 6, confirmed at cosmetic, and it is not WIRE's alone)
+
+**Where:** `src/mines.js:552, src/enemies.js:1162, src/enemies.js:829, src/enemies.js:1420, src/enemies.js:1589`
+
+**Evidence:** Every applyDamage call adds src/enemies.js:1162 `    this.flash = Math.min(1, this.flash + 0.5 + real / 260);` and the only decay is src/enemies.js:829 `    this.flash = Math.max(0, this.flash - dt * 4.5);`, run once per frame from `Enemy.update` (game.js:1465), i.e. -0.075 a frame at 60 Hz. The wire adds +0.5 + 1.31667/260 = +0.50506 every frame. Stepping it: frame 1 -> 0.50506, frame 2 -> 0.43006 + 0.50506 = 0.93512, frame 3 -> 0.86012 + 0.50506 -> clamped to 1, and it never leaves 1 while contact holds (the increment is 6.7x the decay).
+
+Drawn at src/enemies.js:1420 `      drawGlow(ctx, t.glow, 0, 0, this.r * 2.1, 0.24 + this.flash * 0.5);` — alpha 0.74 against a resting 0.24, 3.08x — plus src/enemies.js:1589 `      ctx.globalAlpha = was * clamp(this.flash, 0, 1) * 0.7;` filling a white disc of radius `this.r * 0.92` under `globalCompositeOperation = 'lighter'` (enemies.js:1588, :1592-1594).
+
+Patch does not have this because it bites four times a second (patch.js:31 `    this.tick = opts.tick ?? 0.25;`), leaving 0.25*4.5 = 1.125 of decay between bites — more than enough to clear the flash.
+
+CORRECTION to the claim: this is not WIRE-only. SPINES/HARD CASING (game.js:1661, 70 a level x3 levels) adds +0.5045 a frame the same way, so a body held on the turret with SPINES bought is pinned white too. Same root cause, same fix.
+
+**Consequence:** Anything held on the wire washes out to a solid white disc under an inflated halo, so its type outline and its health dimming (`const dim = 0.45 + hpFrac * 0.55;`, enemies.js:1424) are unreadable for exactly as long as it is being cut. Cosmetic only — no damage, targeting or economy consequence.
+
+**Suggested fix:** Falls out of the 0.25s tick proposed for the damage: one bite every quarter second lets `flash` decay 1.125 between bites and the body reads normally, with a visible pulse per bite instead of a constant blank. No change to the flash system itself.
+
+**Hash:** No.
+
+
+### 34. [cosmetic] Two files still say the mine cap binds, against the arithmetic the node that changed it wrote down; and `throwMine`'s ceiling comment names a caller that does not exist
+
+**Where:** `src/config.js:1024, src/mines.js:886-887, src/mines.js:247-248`
+
+**Evidence:** This is the part of the reader's claim 5 that holds, with its headline removed.
+
+src/config.js:1024 — `     * on top the cap is what you actually run into.` (the sentence runs from :1022, 'At 8.4s it is a steady 1.8, and with PAIRED CHARGE / on top the cap is what you actually run into.')
+src/mines.js:886-887 — `       * It does not breathe any more either. Five mines is the ordinary` / `       * steady state once QUICK LAY and PAIRED CHARGE are owned…` — and this one is load-bearing for a drawing decision: it is the stated reason the trigger ring stopped pulsing.
+
+Both were written when PAIRED CHARGE was uncapped. Build 220 capped it and wrote the correct arithmetic in its own docstring, src/upgrades.js:437 — `     * At one level a throw lays two, two throws leave four, and the cap is` / 'still the backstop it was authored as.' I re-derived it: cadence 15 * 0.75^2 = 8.4375s (upgrades.js:451-453, QUICK LAY 2 levels), occupancy flight + life = 15.85-15.95s, so two throws overlap and never three; 2 throws x 2 mines = 4. `paired` is 1 level in the tree (verified by import). So the ordinary steady state is 4, not 5.
+
+Separately, src/mines.js:247-248 — `  // The ceiling is enforced here rather than at the clock, because a SEED` / `  // offer lays three at once and does not go through the clock at all.` There is no SEED offer. `throwMine` has exactly two callers — `mineCadence` (mines.js:1086) and `Game.debugThrowMine` (game.js:2756) — and grepping SEED across src/ finds only the enemy type (config.js:2839, codex.js:205) and its graft behaviour. The stated reason for where the ceiling lives is a mechanism that does not exist.
+
+**Consequence:** None at runtime. Three comments in three files disagree about a number a reader will use to reason about the field, and one of them is offered as the justification for a drawing choice. Two audits in a row have now reached for the cap and got a different answer depending on which comment they read.
+
+**Suggested fix:** Correct config.js:1022-1024 and mines.js:886-887 to four (and, if the trigger ring's no-pulse decision was argued from five, restate it on four — four dashed circles is still the argument). Replace the SEED sentence with what is actually true: the ceiling is enforced in `throwMine` because PAIRED CHARGE lays more than one per tick.
+
+**Hash:** No — comments only.
+
+
+### 35. [low] SALTED's blast is scaled by DEEP CHARGE and SHRAPNEL on every kind, but the collar credits neither to the kinds that only get a blast through SALTED
+
+**Where:** `src/mines.js:123 and :135 (the `bang`/`hurts` tests in `tally`), against src/mines.js:397-402 (`fizzle`'s blast) — reached by THORN at :639 and LODE at :655`
+
+**Evidence:** `tally` decides which of the shared six a kind may count:
+
+  123:   const bang = kind === 'blast' || kind === 'knell' || kind === 'spall'; // DEEP CHARGE
+  135:   const hurts = bang || kind === 'thorn';                               // SHRAPNEL
+  146:   if (bang) { of++; if (up.mineBlast > 1) has++; }
+  147:   if (hurts) { of++; if (up.mineDamage > 1) has++; }
+
+but SALTED is credited to every kind unconditionally eight lines above, with a comment saying why:
+
+  141:   // SALTED gives a spent mine a blast, so it reaches even the kinds that have
+  142:   // none of their own -- it is the one that gives a LODE something to do.
+  143:   of++;
+  144:   if (up.mineFizzle) has++;
+
+and that blast is scaled by BOTH excluded nodes:
+
+  400:       x: m.x, y: m.y, r: f.r * world.up.mineBlast,
+  401:       damage: f.damage * world.up.mineDamage, impulse: f.impulse,
+
+Neither node carries `levels` (upgrades.js:454 deepcharge, :460 shrapnel), so `tree.js:205`'s `u.levels ?? 3` sells three of each: 1.35^3 = 2.460 on radius, 1.45^3 = 3.049 on damage. Measured on the current files (stub world, real `mineGrade`/`mineMarks`, `CFG.mines.fizzle` = { r: 96, damage: 48 }):
+
+  LODE, four of four (PAIRED + QUICK LAY + SALTED + REPULSOR)
+      marks 4  grade 1.00  | its only blast: r 96.0   damage 48.0
+  ...plus DEEP CHARGE x3 + SHRAPNEL x3
+      marks 4  grade 1.00  | its only blast: r 236.2  damage 146.3
+
+So a LODE already reads "fully bought" — 4 of 4, grade 1.00, `mineScale` 1.26, the largest it can be drawn — while two further owned nodes are quietly tripling the only damage it ever does. Same shape, smaller, for WIRE, SNARE and VOID (both nodes) and for THORN (DEEP CHARGE only: `hurts` now includes thorn, `bang` does not, and a SALTED THORN's fizzle radius still goes 96 -> 236.2).
+
+This is the mirror of the fault the function's own header says it exists to prevent (mines.js:118-121, "A mine that grew because of something it cannot use is the readout lying about the machine") and of the docstring's promise that the reading is "of what the mine can actually DO" (mines.js:90-92). NOTE: the audited reader's version of this claim named THORN and SHRAPNEL, which is stale — build 220 part seven added `|| kind === 'thorn'` to :135 and put `up.mineDamage` on the patch at :632. Only the SALTED-conditional half survives, and it is readout-only: no damage or radius changes either way. I am flagging that it is arguable whether this is worth fixing — the exclusion may be a deliberate refusal to make the denominator depend on another purchase.
+
+**Consequence:** Player-visible but cosmetic: with SALTED owned, the collar and the drawn size of a LODE, WIRE, SNARE or VOID (and a THORN's, for DEEP CHARGE) stop moving while two more upgrades go on scaling what the mine does when it expires. A bought-out LODE reads 4 of 4 at 96/48 and at 236/146 alike.
+
+**Suggested fix:** Make the two tests depend on SALTED as well, in src/mines.js:123 and :135: `const bang = kind === 'blast' || kind === 'knell' || kind === 'spall' || !!up.mineFizzle;` and `const hurts = bang || kind === 'thorn';`. Grades do not regress when SALTED is bought (a LODE on 2 of 4 goes to 3 of 6, both 0.5) and the collar follows automatically because `drawMines:855` already reads `mineMarks`. If instead the exclusion is deliberate, say so in the comment at :141-142, which currently argues the opposite.
+
+**Hash:** No. `w.mine` is null on a fresh world (game.js:195, :487) and `mineCadence` returns the timer untouched when it is falsy (mines.js:1082), so the canonical ORDINAL run lays no mine and nothing in mines.js executes. `tally` is read only by `drawMines`.
+
+
+### 36. [low] The mine cap is never reached in play, so `throwMine`'s eviction loop and all of `retire()` are unreachable — and config.js says the opposite
+
+**Where:** `src/config.js:1023-1024 (the comment), src/mines.js:251-256 (the eviction loop) and src/mines.js:377-385 (`retire`)`
+
+**Evidence:** config.js promises the cap bites once PAIRED CHARGE is owned:
+
+  1022:      * mine, laid as the last one goes, so the cap was a backstop nobody
+  1023:      * reached by laying. At 8.4s it is a steady 1.8, and with PAIRED CHARGE
+  1024:      * on top the cap is what you actually run into.
+
+The arithmetic says it cannot. PAIRED CHARGE is `levels: 1` (upgrades.js:440) so a throw lays `1 + up.mineSalvo` = 2 (mines.js:1085); QUICK LAY is `levels: 2` at 0.75 (upgrades.js:451-453) so the wait is `15 * 0.5625` = 8.4375s (mines.js:1087); life is 15s (config.js:1027) and starts only after the flight, which is 0.85-0.95s. A mine therefore occupies the field for at most 15.95s, and 15.95 / 8.4375 = 1.89, so at most TWO throws — four mines — can ever be alive at once, against `cap: 5`.
+
+Measured, driving the real `mineCadence`/`updateMines` for 300 simulated seconds at 1/60 with `mineSalvo: 1, mineEvery: 0.5625`, kind THORN: peak mines on field 4, cap 5, peak patches 4, eviction never fired. regress.mjs already knows: its case at scripts/regress.mjs:13554-13557 asserts `afterTwo === 4` "against a cap of 5" and its comment at :13515-13516 says "Two throws, because one cannot reach the cap."
+
+`throwMine` is called from exactly two places — `mineCadence` (mines.js:1086) and `Game.debugThrowMine` (game.js:2755) — and the debug panel offers only THROW MINE/SNARE/WIRE/KNELL (hud.js:1553-1556). So `while (laidCount(world) >= M.cap)` at :251 and every arm of `retire` (detonate, spall, the knell drain, snap, and the bare `m.dead = true`) are dead in play, and unreachable for THORN and LODE by any route inside the game.
+
+That is what disposes of the audited reader's claim 3, and it also leaves a latent gap worth recording: `retire` (377-385) has no thorn arm and never touches `m.patch`, against the comment at mines.js:618-619 ("one is opened the moment it settles and kept in step with the mine, so killing the mine takes the ground with it"). Forced by hand — one armed THORN, then five more thrown in the same frame — I measured 6 live patches against 5 live mines, the orphan still carrying 12.9s of its 14.5s. It cannot happen in play today; it will the moment anything reaches the cap.
+
+**Consequence:** None a player can see today. The cost is that a contract the config calls load-bearing ("the most that can ever be standing is five") is enforced by a path nothing exercises, and the next change to QUICK LAY, PAIRED CHARGE, `life` or `throwEvery` switches that path on with a known bug in it (an evicted THORN's burning ground outliving the mine by up to 14.5s).
+
+**Suggested fix:** Two independent edits. (1) config.js:1023-1024: delete or correct the last sentence — measured peak is 4 of 5, which is what upgrades.js:437-439 and regress.mjs already say. (2) Give `retire` a thorn arm before the fall-through at mines.js:384, using the fade that already exists for SPORE's cap: `if (m.kind === 'thorn') { if (m.patch) m.patch.retire(); m.dead = true; return; }` — `Patch.retire()` (patch.js:124-130) stops the clock with `next = Infinity` and cuts the life to 0.35s so the ground is seen going out, which is what SPORE's cap uses and what a bare `m.patch.dead = true` would not give.
+
+**Hash:** No. Nothing in mines.js runs in the canonical fight: `w.mine` is null (game.js:195/487) and `mineCadence` (mines.js:1082) returns early.
+
+
+### 37. [cosmetic] `CFG.lode.push` is documented as an acceleration and used as a force
+
+**Where:** `src/config.js:915, consumed at src/mines.js:522`
+
+**Evidence:**   config.js:915:     push: 620, // acceleration outward, per second, at the centre
+
+  mines.js:522:     const f = (1 - d / reach) * L.push * world.up.lodePush * dt * e.invMass;
+  mines.js:523:     e.vx += (dx / d) * f;
+
+`dv = 620 * invMass * dt`, so 620 is a force and the acceleration it produces is `620 * invMass`. With `massOf = type.density * r * r * 0.006` (config.js:3765) and `invMass = 1 / mass` (enemies.js:200-201), measured off the real types: DRIFT r 17 d 0.55 -> invMass 1.049 -> 650 u/s^2; MOTE 1.362 -> 844; NEEDLE 2.381 -> 1476; LURCHER 0.214 -> 133; BULWARK 0.030 -> 18.9. A 78-fold spread against a comment that states one number. The contrast the claim draws is also correct: `grip` blends toward `S.pull` as a target velocity with no invMass term (mines.js:345-347), so SNARE genuinely is mass-independent and LODE is not.
+
+**Consequence:** None in play — the mass scaling is the same convention every impulse in the game uses (enemies.js:1131-1132). It matters only when someone retunes 620 expecting heavy bodies to move: at the centre a BULWARK gets 18.9 u/s^2 of it.
+
+**Suggested fix:** src/config.js:915 -> `push: 620, // outward force at the centre; the acceleration is this x invMass (650 on a DRIFT, 18.9 on a BULWARK)`.
+
+**Hash:** No — comment only, and no mine is laid in the canonical run.
+
+
+### 38. [cosmetic] mines.js carries four stacked or stranded docstrings, two of which state the opposite of the code beneath them
+
+**Where:** `src/mines.js:276-281, :1068-1073, :247-250, :367-371, :80-96`
+
+**Evidence:** The file's habit is to write a new docstring ABOVE the old one rather than replace it, and two of the survivors are from build 48 ("mines never expire, one field-wide cap of ten"):
+
+  276: /** How many of one kind are on the field. */
+  277: /**
+  278:  * Everything on the field, of any kind. Nothing expires now, so the ceiling
+  279:  * has to be field-wide: counting per kind would let a player switch round the
+  280:  * four and hold four caps at once.
+
+  1068: /**
+  1069:  * Cadence for whichever kind is selected. One kind is laid at a time, so there
+  1071:  * field, since nothing expires: the cap is field-wide, so laying a new kind
+
+Everything expires: `life: 15` (config.js:1027), whose own comment calls it a contract — "none of them outlives its quarter minute" (config.js:1015) — and `m.life -= dt` at mines.js:615 with a `life <= 0` arm on every one of the eight kinds. "The four" is also two builds stale; there are eight kinds.
+
+  247:   // The ceiling is enforced here rather than at the clock, because a SEED
+  248:   // offer lays three at once and does not go through the clock at all.
+
+No such caller exists. `throwMine` has exactly two callers: `mineCadence` (mines.js:1086, `n = 1 + up.mineSalvo`, max 2) and `Game.debugThrowMine` (game.js:2755, one). SEED is an enemy type (config.js:2839).
+
+  367: /**
+  368:  * WIRE. Everything touching the line is cut for as long as it stays on it...
+  371:  */
+  372: /**
+  373:  * A mine reaching the end of it...
+
+That WIRE docstring sits above `retire` (:377); `cut`, which it describes, is at :528 with no docstring at all.
+
+And mines.js:80-96, the old `mineGrade` header now sitting above `tally`, says "Six of these are shared by every kind" — contradicted by the very next comment (":116 The shared six, MINUS the ones this kind cannot use") and by the measured denominators: blast 6, knell 6, snare 5, thorn 5, void 5, wire 4, lode 4, spall 8.
+
+**Consequence:** None player-visible. The cost is the next reader: two of these say in as many words that mines never expire, in the file whose whole update loop is an expiry clock, and one names a caller that does not exist.
+
+**Suggested fix:** Delete the superseded halves: mines.js:276 (superseded by 277-281, which then needs "Nothing expires now" -> "Nothing is per-kind"), the "since nothing expires" clause at :1071, the SEED sentence at :247-248, and move :367-371 down to `cut` at :528. In :80-96, drop the "Six of these are shared by every kind" sentence.
+
+**Hash:** No — comments only.
+
+
+### 39. [medium] SPALL's wedge — "facing the way it will throw" — is drawn spinning while the fan always leaves straight up
+
+**Where:** `/home/user/Shooter/src/mines.js:941, :994-1007, :423, :590, :196`
+
+**Evidence:** CONFIRMED, and re-measured at both ends.
+
+mines.js:941 — `ctx.rotate(m.spin);` sits above the whole per-kind if/else chain.
+mines.js:994 — `      // a wedge, facing the way it will throw` — and the shape it introduces is drawn in LOCAL coordinates pointing up-screen: :997 `ctx.lineTo(R * 0.5, -R * 0.9);`, and the three spines at :1004-1006 `ctx.moveTo(i * R * 0.45, -R * 0.9); ctx.lineTo(i * R * 0.7, -R * 1.7);`.
+mines.js:196 — `this.spin = rand(0, TAU);` (a random start), :590 — `m.spin += dt * (m.armed ? 2.4 : 0.8);`.
+mines.js:423 — `  const base = -Math.PI / 2;` — the fan's direction, a constant, with nothing reading `m.spin` anywhere in `spall()`.
+
+MEASURED (playwright, headless, rAF stubbed, mine forced landed+armed at canvas centre).
+(a) The fan does not move. Spawning a body on the mouth at four spins and reading `atan2(p.vy, p.vx)` of the 14 pellets `spall()` creates:
+  spin 0deg   -> mean -90.23, range -117.0..-62.5
+  spin 90deg  -> mean -90.09, range -114.4..-63.2
+  spin 180deg -> mean -90.48, range -116.0..-65.4
+  spin 270deg -> mean -89.78, range -116.2..-64.7
+(b) The picture does move. `drawMines` rendered to a 200x200 offscreen canvas, luminance centroid of the annulus r=14..42:
+  spin 0 -> -94.3deg | 45 -> -51.8 | 90 -> -5.3 | 135 -> +44.7 | 180 -> +95.3 | 225 -> +141.9 | 270 -> -175.8 | 315 -> -135.6
+That is drawn = -94.3 + spin, slope 1.00. Instrument check: the same measurement on VOID (a rotationally symmetric disc) returns -136.93deg at all four spins, bit-identical, so the centroid is reading a real orientation and not noise.
+(c) Spin rate measured live off a landed armed SPALL over 120 frames: 2.4000 rad/s exactly — one revolution every 2.618 s. The picture and the damage therefore agree only at spin === 0 (mod 2pi), which has measure zero; mean absolute error over a uniform spin is 90deg.
+
+The wedge is the ONLY directional cue the mine has: the trigger mouth at :687-697 is a circle, drawn as a full `ctx.arc(0, 0, ..., 0, TAU)`, and the pip collar at :868-878 is anchored at -pi/2 regardless of spin.
+
+**Consequence:** Player-visible. The one mine in the game whose damage is directional carries a direction indicator that is wrong essentially always and turns a full revolution every 2.6 s. arsenal.js:131 tells the player the shot goes "straight up the field" — so the words are right and the object on the field contradicts them. A player reading the wedge to judge whether the fan will catch something reads a random number.
+
+**Suggested fix:** Counter-rotate inside the branch: `ctx.rotate(-m.spin);` as the first line of the `} else if (spallM) {` arm at mines.js:993. That leaves the seat, glow, dashed mouth and pip collar spinning exactly as they do now (they are all drawn before :941), and it does not disturb `m.spin`'s other reader, the dash offset at :888 `ctx.lineDashOffset = -world.time * 6 - m.spin * 20;`, which is computed before the rotate. Alternative: hoist :941 into the branches that want it.
+
+**Hash:** No. Draw-only, inside mines.js, and the canonical ORDINAL fight lays no mines (`fight.mjs` never sets `world.mine`, and `mineCadence` returns at its first guard `if (!kind || world.phase === 'boot') return timer;`).
+
+
+### 40. [low] `retire()` skips `fizzle` on four kinds and does not pick the oldest, and its comment names a caller that does not exist
+
+**Where:** `/home/user/Shooter/src/mines.js:247-256, :377-385, :719-720`
+
+**Evidence:** PARTIALLY CONFIRMED — the three concrete sub-defects hold; the reader's "dead code, the `world.endless` shape" framing does not (see refuted list).
+
+(1) The comment names a caller that does not exist. mines.js:247-248 — `  // The ceiling is enforced here rather than at the clock, because a SEED` / `  // offer lays three at once and does not go through the clock at all.` `throwMine` has exactly two callers in the tree: `mineCadence` at mines.js:1086 (`for (let i = 0; i < n; i++) throwMine(world, kind);`) and `Game.debugThrowMine` at game.js:2756. Nothing named SEED lays a mine — SEED is an enemy type (config.js:2841) and there is no mine offer anywhere.
+
+(2) The fall-through does not fizzle, against the comment two lines above it. mines.js:249-250 — `  // oldest goes, and it goes the way its kind goes — a blast mine bangs, a` / `  // spall throws, a void closes — so nothing simply evaporates.` But mines.js:377-385:
+```
+function retire(world, m) {
+  if (m.dead) return;
+  if (!m.landed || m.settle < m.cfg.arm) { m.dead = true; return; }
+  if (m.kind === 'blast') { detonate(world, m); return; }
+  if (m.kind === 'spall') { spall(world, m); return; }
+  if (m.kind === 'knell') { while (!m.dead && m.tolls > 0) toll(world, m); return; }
+  if (m.kind === 'snare' && !m.gripping) { snap(world, m); return; }
+  m.dead = true;
+}
+```
+There is no `fizzle(world, m)`, so void, thorn, lode, wire and a gripping snare evaporate — and SALTED (upgrades.js:459, "A spent mine goes off instead of fizzling") pays nothing on them. A VOID retired does not "close".
+MEASURED (SALTED bought, five armed mines of one kind laid, then one more throw to force the eviction; `fizzle` is the only path that pushes a `Shock` onto `world.effects`):
+  blast  effects +1 (detonate's Shock)   spall  projectiles +14 (the fan)
+  void   +0   thorn +0   lode +0   wire +0
+
+(3) The victim is not the oldest. mines.js:252 — `    const oldest = world.mines.find((x) => !x.dead);` against the compaction at mines.js:719-720 — `      list[i] = list[list.length - 1];` / `      list.pop();`. Swap-pop, so index 0 is whoever was last moved there, not the first laid. The comment at :249 says "The oldest goes".
+
+**Consequence:** None today. Measured over 400 s of live cadence with PAIRED CHARGE and QUICK LAY x2 (the maximum: `paired` is levels 1, `quicklay` returns "maxed" on the third buy), letting `Game.update` lay the mines: concurrent count is 2 or 4 and never 5, for void, spall, blast and thorn alike — `laidCount(world) >= M.cap` is never true, so `retire` runs only from the debug panel. The cost is a comment maintaining a caller that was deleted and two real bugs parked behind a backstop that has exactly one unit of margin.
+
+**Suggested fix:** Delete the SEED sentence at :247-248. Route the fall-through at :384 through `fizzle(world, m)` instead of `m.dead = true` (fizzle sets `m.dead` itself and is already guarded against a second call at :392). Pick the victim by lay order — a monotonic id on `Mine`, or preserve push order by splicing at :719 instead of swap-popping.
+
+**Hash:** No. mines.js only, and the canonical fight lays no mines.
+
+
+### 41. [low] VOID's collapse ring is sized off the body but centred on the mine, and WIDE MOUTH opens the two apart
+
+**Where:** `/home/user/Shooter/src/mines.js:482, :687, :697`
+
+**Evidence:** CONFIRMED, with the reader's attribution corrected.
+mines.js:482 — `  ring(m.x, m.y, e.r * 2.2, 6, 0.42, '#7383ff', 3);` — centred on the MINE, radius taken from the BODY. The sparks at :483-486 are on the body (`spark(e.x, e.y, ...)`), so the two ends of the effect are drawn from different anchors.
+The trigger at mines.js:687 — `      const reach = m.r + m.cfg.trigger * world.up.mineTrigger * own;` — and :697 `        if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 <= rr * rr) {` with `rr = reach + e.r`, so the body's centre can be `reach + e.r` from the mine.
+ARITHMETIC (V.r = 12, V.trigger = 18 at config.js:952):
+  stock                     reach = 12 + 18            = 30
+  EVENT HORIZON (x2.2, levels: 1, upgrades.js:456-458)  = 12 + 18*2.2      = 51.6
+  + WIDE MOUTH (no `levels` -> 3, 1.4^3 = 2.744)        = 12 + 18*2.744*2.2 = 120.66  (measured `up.mineTrigger` = 2.744)
+The ring covers the body only when `e.r * 2.2 >= reach + e.r`, i.e. `e.r >= reach / 1.2`. At stock that is `e.r >= 25` — already false for most of the roster, but the gap is a few units and reads as contiguous. Fully bought it is `e.r >= 100.6`, which nothing in the game satisfies:
+  BULWARK (r 45): body centre up to 165.66 from the mine, near edge at 120.66, ring 99 — 21.7 units of blank floor between the ring and the body.
+  a 12-unit body: centre up to 132.66, near edge 120.66, ring 26.4 — 94 units.
+Note the reader blamed EVENT HORIZON; EH alone leaves 51.6+45 = 96.6 against a 99 ring, i.e. still overlapping for a BULWARK. WIDE MOUTH is what opens it, and WIDE MOUTH is a shared node that also has no explicit `levels`.
+`ring` contracts here (r0 = e.r*2.2 -> r1 = 6) and drawFx strokes at `alpha = t*0.95` / `width = max(0.4, w*t)` (fx.js:586-587) with t running 1 -> 0, so the brightest, widest frame is the largest circle — the frame at which the mismatch is most visible.
+
+**Consequence:** Cosmetic, and only once the branch is bought. The swallow reads as two unrelated events: a bright ring closing over empty floor where the mine was, and a body bursting into sparks up to 130 units away. Nothing joins them.
+
+**Suggested fix:** Draw the collapse at the body — `ring(e.x, e.y, e.r * 2.2, 6, 0.42, '#7383ff', 3)` — or keep it on the mine and add a short stroke from `(m.x, m.y)` to `(e.x, e.y)` so the two ends read as one event.
+
+**Hash:** No. Draw-only.
+
+
+### 42. [cosmetic] SPALL and VOID both lay with BLAST's chime: `LAY_TONE` still holds only the original four kinds
+
+**Where:** `/home/user/Shooter/src/mines.js:242, :273`
+
+**Evidence:** CONFIRMED by reading; the premise is exact.
+mines.js:242 — `const LAY_TONE = { blast: 300, snare: 240, wire: 380, knell: 200 };`
+mines.js:273 — `  audio.chime(LAY_TONE[kind] || 300);`
+`KIND` at mines.js:137 has eight entries — `{ blast: M, snare: S, wire: W, knell: K, thorn: T, lode: L, spall: P, void: V }` — so thorn, lode, spall and void all fall to the `|| 300` default, which is not a neutral tone but BLAST's own entry. audio.js:336-340 `chime(f)` plays f and f*1.5, so the four are byte-identical to a BLAST being laid.
+The file's build-217 colour header at mines.js:40-67 spends 27 lines arguing that a mine's identity has to be readable at a glance because several may be down at once for fifteen seconds each; the audio channel says "blast" for half of them.
+
+**Consequence:** Minor, and only at the moment of laying — everything after the lay (arming, trigger, detonation) is distinct per kind.
+
+**Suggested fix:** Give the four added kinds their own entries in LAY_TONE, or drop the `|| 300` so a missing kind is silent rather than wrong.
+
+**Hash:** No. Audio only, and no mine is laid in the canonical fight.
+
+
+### 43. [cosmetic] MINE: a stale block comment survives directly above the comment that corrects it, inside `tally`
+
+**Where:** `/home/user/Shooter/src/mines.js:124-131 (stale) against :132-134 (correct)`
+
+**Evidence:** MY FINDING — the reader's claim 7 described the old text, which has been superseded; what they missed is that BOTH comments are now in the file, adjacent, saying opposite things.
+mines.js:124-131:
+```
+  /*
+   * SHRAPNEL is `up.mineDamage`, and `up.mineDamage` is read in exactly three
+   * places: `detonate`, `fizzle` and `toll`. THORN's patch takes
+   * `T.patch.dps` raw and WIRE's cut takes `W.damage * up.wireDamage` and no
+   * more -- so crediting either of them here is the readout lying about the
+   * machine, ...
+   */
+```
+mines.js:132-134, immediately below it:
+```
+  // SHRAPNEL is `up.mineDamage`. It is read by `detonate`, `fizzle`, `toll`,
+  // SPALL's pellets and their bursts, and -- since build 220 -- THORN's
+  // ground. Not by WIRE's cut, which has `up.wireDamage` of its own.
+```
+mines.js:135 — `  const hurts = bang || kind === 'thorn';                               // SHRAPNEL`
+The second is correct and the first is not. `up.mineDamage` has six reads in five functions: :291 (detonate), :401 (fizzle), :435 and :441 (spall's burst and pellet), :566 (toll), :633 (`dps: T.patch.dps * world.up.mineDamage`, THORN's ground, added in build 220). The stale block asserts THORN takes `T.patch.dps` raw, which :633 falsifies, and asserts crediting THORN "is the readout lying" — which is exactly what line :135 now deliberately does, correctly.
+
+**Consequence:** None to the player. But this comment is the rule anyone adding a mine kind will follow, and it now argues against the line it sits on. CLAUDE.md records that this same accounting has been miscounted twice already.
+
+**Suggested fix:** Delete mines.js:124-131. The three-line comment below it is correct and complete.
+
+**Hash:** No. Comment only.
+
+
+### 44. [cosmetic] MINE: config.js says the mine cap "is what you actually run into"; measured, it is 4 of 5
+
+**Where:** `/home/user/Shooter/src/config.js:1023-1024 against /home/user/Shooter/src/upgrades.js:437-438`
+
+**Evidence:** MY FINDING — turned up while re-deriving the reader's claim 6.
+config.js:1023-1024 — `     * mine, laid as the last one goes, so the cap was a backstop nobody` / `     * reached by laying. At 8.4s it is a steady 1.8, and with PAIRED CHARGE` / `     * on top the cap is what you actually run into.`
+upgrades.js:437-438, the PAIRED CHARGE note, says the opposite: `     * At one level a throw lays two, two throws leave four, and the cap is` / `     * still the backstop it was authored as.`
+ARITHMETIC: `throwEvery` 15 (config.js:1028) x `mineEvery` 0.75^2 = 8.4375 s between throws; `mineSalvo` 1 so two per throw; `life` 15 counted from landing (`m.life -= dt` at mines.js:583 sits below the `if (!m.landed) { ... continue; }` at :601-616), plus `flight` 0.85-1.0, so a mine exists 15.85-16.0 s. 15.85 / 8.4375 = 1.88, so at most two generations coexist: 4.
+MEASURED, 400 s of live cadence per kind with PAIRED CHARGE + QUICK LAY x2 bought and the mines laid by `Game.update` itself (my first attempt called `mineCadence` by hand as well and double-laid, reporting a spurious max of 5 — the instrument, not the game):
+  void 2 for 3037 frames, 4 for 20963, max 4 | spall/blast 2:3451, 4:20549, max 4 | thorn 2:3267, 4:20733, max 4
+upgrades.js is right and config.js is stale.
+
+**Consequence:** None to the player. Two comments in the same codebase give opposite answers about the same number, and the wrong one sits on the constant itself.
+
+**Suggested fix:** Amend config.js:1024 to match the measurement and the PAIRED CHARGE note: a steady 3.6, peaking at 4, against a cap of 5.
+
+**Hash:** No. Comment only.
+
+
+
+## Refuted, recorded so it is not re-reported
 
 - claim 3 (SPALL's pellets name no `form`) — ALREADY FIXED in the working tree, and the fix carries the very note the claim says is missing. mines.js:457 is `form: 'pellet',` inside the `spall()` fan, directly under a comment at :447-456 reading 'The same form SCATTER and HAIL use, and for the same reason: this fan is fourteen at zero upgrades and thirty-six with BUCKSHOT... every one of them was falling to `fire`'s DEFAULT muzzle arm, two sparks and a dot apiece, which is up to a hundred and eight particles on one point... Exactly the fault build 219 fixed on HAIL, one file over.' The claim's cited lines (mines.js:405-412) are stale; the current fan is at mines.js:437-471. The pellet arm at projectiles.js:776-780 is one computed spark, and the landing goes through impactFx's pellet case, exactly as the claim's own proposed fix asks. Nothing to do.
 
@@ -426,477 +943,94 @@ Constants checked: config.js:673-677 `      damage: 11,` / `      jumps: 4,` / `
 
 - Claim 9 (orphaned COUNTERSPIN header above COMPOUND) — already fixed, and the replacement text names the orphan explicitly. upgrades.js:358-364 now read: "The header that used to sit here explained a node that added a second ARM and argued it down to one level. COMPOUND is a percentage dial on TITHE's bite and IS on the default three, so the comment said the opposite of what was true of the node it had come to sit above. It was orphaned by a deletion, the way `windAt`/`rateAt` were in build 217." The old three lines the claim quotes are gone from the file.
 
+- CLAIM 1 (SLUG's shove is clipped by the cruise x6 cap, SLEDGE and HEAVY buy nothing, give SLUG `throwOff`) — REFUTED. The arithmetic is broadly right and the codebase already says so in its own words; the VERDICT is wrong, and the proposed fix is the exact change build 220 tried, measured, reverted, and then pinned with a test. (a) The reader cites src/shooter.js:601 `impulse: g.impulse * up.slug,` and appears not to have read the 26-line comment that begins on the very next line, src/shooter.js:604-630: `* ...and NOT a throw, which is the one thing about this round that` / `* looks wrong and is not. SLUG's 1500 is clipped by \`integrate\` to` / `* \`(cruise || 60) * 6\` -- 137 u/s against a BULWARK -- so SLEDGE's` / `* ladder and HEAVY's do multiply a number the physics discards, and` / `* the arithmetic says to lift the ceiling the way PULSE lifts it.` ... `* Measured, that reopens build 110.` (b) The same argument is repeated at the other end, src/enemies.js:1191-1198: `* Only a deliberate, one-press clear lifts the ceiling. Build 220 tried` / `* giving SLUG the same exemption on the grounds that its whole identity` / `* is the impulse and \`(cruise || 60) * 6\` clips it to 137 u/s against a` / `* BULWARK -- true arithmetic, and it reopens build 110`. (c) scripts/regress.mjs:1099-1190 is a shipped case, `check('SLUG-s shove is bounded by what it hits, and a throw-s ceiling is higher', ...)`, asserting `x.peak <= x.cap * 1.3`, whose header says in as many words "That reads like a defect and build 220's audit reported it as one. It is not." (d) CLAUDE.md:577-586 records the rule: "A throw has two halves and they are earned by CADENCE, not by weight." (e) I re-ran the A/B myself rather than taking the note on trust. Shipped build, HEAVY x2, auto-fire on an unkillable LURCHER for 25s: peak travel 228 u/s against a cap of 229, furthest 804 units from the turret. With `applyDamage` monkeypatched so a SLUG impulse passes `throwOff`: peak 718 u/s against `thrownSpeed` 720, furthest 1298 units — which is build 110 verbatim and matches the 1293 the comment records against an 817-unit field. The regress assertion goes red on the patched build (718 > 229*1.3 = 298). (f) The evidence also contains two factual errors that are probably what produced the verdict: "grep -rn throwOff src/*.js returns exactly one caller: abilities.js:829" is wrong — there are three sites, src/abilities.js:829 (PULSE sets it on a blast), src/enemies.js:4547 `0, 0, !!blast.throwOff);` (`applyBlast` threading it through), and src/shooter.js:185-186 `e.applyDamage(world, P.damage * (0.35 + f * 0.65), nx, ny, P.impulse * f,` / `0, 0, true);` (PILE, passing it positionally). SLUG's absence from that list is a decision that was made three times, not an oversight. What survives is only the residual the project already accepts and documents: the SLEDGE row sells a ladder the ceiling discards on the light half of the roster. That is knowingly left open at scripts/regress.mjs:1104-1113 and is not a new find.
 
-## Not yet adjudicated — raw reader claims, unverified
-
-
-The adversarial pass had covered three of twelve readers when this was written.
-Everything below is a single reader's claim with no second opinion on it, and
-some of it is certainly wrong -- the three completed passes refuted eleven
-claims between them, four of which were 'already fixed' and three of which
-were design preferences dressed as defects. Treat these as leads.
-
-
-### The STANDARD round (BOLT, CFG.rounds.standard / CFG.bolt) and the shared projectile machinery — src/projectiles.js, src/physics.js contactAt, src/fx.js impactFx, and the fire/draw switches
-
-- **[medium] OVERSTUFFED silently sells a fourth thing: +1 arena ricochet per level, which is RICOCHET's whole node**  
-  `src/upgrades.js:370-372; src/shooter.js:701-703, 713-714; src/upgrades.js:32,34; src/projectiles.js:63,154-158`  
-  A player who buys OVERSTUFFED for the body rebound also gets four extra wall ricochets they were never told about — BOLT goes from 1 side-wall bounce to 5 — and RICOCHET, a separately-priced node in the same branch, is largely redundant for the round OVERSTUFFED is filed under. Visible immediately: fire at the arena edge before and after.  
-  _Fix:_ Decide which one the node sells. Either drop `u.boltBounce += 1` from the apply (the row and the shooter comment then both become true), or keep it and say so in the line ('+1 rebound, +1 arena bounce, +30% life') and delete the shooter.js 'rides on the bounce budget' comment, which is false either way.
-
-- **[medium] CFG.bolt.life (2.2s) cannot bind on any phone viewport, at any upgrade level — so a third of OVERSTUFFED's row buys nothing**  
-  `src/config.js:1153 (`life: 2.2,`); src/shooter.js:712 (`life: CFG.bolt.life * up.boltLife,`); src/projectiles.js:20,121,160; src/upgrades.js:371-372`  
-  '+30% life' is one of the three things OVERSTUFFED's row advertises and, on a phone, it changes nothing a player can observe at any level — the round always leaves the field or runs out of wall bounces first. The only path that could ever reach the timer is a body rebound turning a round back down-field, which is the same node's other effect.  
-  _Fix:_ Either say what the extra life is actually for (it lengthens a rebounding round's total path, not its straight flight) or replace that third of the node with something reachable. `CFG.bolt.life` itself is fine as a backstop; it is the row selling a multiplier on it that is misleading.
-
-- **[medium] SPALL's 14–36 pellets name no `form`, so each one pays the default muzzle arm — the exact bug documented and fixed on HAIL one file over**  
-  `src/mines.js:405-412 (no `form:` key); src/projectiles.js:766-771 (the default arm); src/abilities.js:983-1003 (HAIL's fix and its note)`  
-  A SPALL going off puts 42 (up to 108 with BUCKSHOT) muzzle particles on the mine's own position, which is the brightest thing in the effect and is not what the mine was drawn to look like; on a busy field it can eat most of the particle budget and starve the authored effects. The pellets also fly as BOLT tracers rather than as the hot-metal pellet form SCATTER's identical shot uses, in the identical colour (#ffd9a0).  
-  _Fix:_ Add `form: 'pellet',` to the mines.js:405 fire() options. The pellet arm is one spark with computed velocities (projectiles.js:738-740) and the pellet impact is one spark (fx.js), which is what SCATTER and HAIL already get.
-
-- **[low] `endProjectile`'s `impacted` parameter is `true` at all six call sites, and its docstring describes a path that bypasses the function**  
-  `src/projectiles.js:107-111, 121, 155, 158, 475, 480, 485, 160`  
-  None today — the field-exit path reaches the same end state (dead, no burst) by a different route, so behaviour is correct. It is a maintenance trap: the next person to add a burst-carrying round reads the docstring, believes the parameter is live, and gets no help from it.  
-  _Fix:_ Either drop the parameter and the guard (the burst always fires when this is called), or route projectiles.js:160 through `endProjectile(world, p, p.x, p.y, false)` so the branch is real and the docstring true. The second is behaviour-identical and keeps one exit door.
-
-- **[low] `hitGraft` is handed no surface normal and hard-codes `0, -1` — the build-211 fault, still live on the graft path**  
-  `src/projectiles.js:484; src/enemies.js:983-990 (`hitGraft`), 987; compare src/enemies.js:1098-1099`  
-  Shooting a SCION ball off a host from the side sprays upward instead of off the surface. Cosmetic, and only on grafted bodies.  
-  _Fix:_ Pass `c.nx, c.ny` from projectiles.js:484 and use them in enemies.js:987, mirroring the shard branch at :479.
-
-- **[low] `contactAt` is computed twice per body hit, with identical inputs, against a comment saying it is not**  
-  `src/projectiles.js:290-298, 398, 407-408; src/enemies.js:1042; src/physics.js:224,248-261`  
-  None visible. Twice the arithmetic and twice the allocation on the hottest damage path in the game.  
-  _Fix:_ Have `takeHit` take the precomputed contact as an argument (resolveSegment is its only caller), or leave it and correct the comment so the next reader is not told the duplication was removed.
-
-- **[low] PRISM's `reflect` docstring misstates the landing window by ~2x and by a factor that depends on the round's own radius**  
-  `src/config.js:3545-3565; src/physics.js:238-243, 260; src/enemies.js:1057-1060`  
-  None to the code — the geometry is right and the regress case ('a square-on shot always lands on a PRISM, and a graze always bounces') passes. But anyone retuning `reflect` off this comment will be aiming at a number twice the size of the real one, which is how 0.55 was fitted to a broken test in the first place.  
-  _Fix:_ Rewrite as: lands iff |b| ≤ 0.6·(e.r + p.r), which is 0.73·r for a BOLT and moves with the round's radius; 60% of the hit aperture, 73% of the body's visible width. Drop 'a bit over a third of its area'.
-
-- **[cosmetic] Three of the eight named flight forms have no muzzle arm, so RIME, SPORE and TITHE leave the barrel wearing BOLT's flash**  
-  `src/projectiles.js:723-772 (the muzzle switch: cases pellet, shell, slab, arc, dart, default); src/fx.js:296-320+ (impactFx: pellet, shell, arc, dart, slab, flake, pod, tithe); src/projectiles.js:515-711 (the draw switch: all eight plus default)`  
-  Three of nine rounds are identifiable at the barrel only by colour, where the other six have a shape. Purely a picture gap; nothing about damage or the hash.  
-  _Fix:_ Either add three arms (a cold glint, a rising puff, a ledger ring — the same vocabulary impactFx already uses for those forms), or soften the header to say which forms have their own and why the rest share BOLT's. The added arms must use computed velocities only, per the block's own second rule.
-
-- **[low] SPIRAL leftovers in the BOLT fire path: a `slow` constant threaded through all nine rounds, a dead `scale` parameter, and an orphaned docstring in the Projectile constructor**  
-  `src/shooter.js:480 and 521,535,549,577,598,616,630,673,708; src/shooter.js:471-478 (`shoot(world, scale = 1)`) and :489; src/projectiles.js:25-30`  
-  None — both are ×1. It is dead weight in the hottest authoring surface in the game, and the orphaned comment actively misleads: it reads as documentation for `this.form`.  
-  _Fix:_ Delete `slow` and its nine multiplications, drop the `scale` parameter and the `* scale` at :489, and delete projectiles.js:25-30. (The same sweep would catch the other stranded SPIRAL comments now attached to unrelated fields at game.js:177, game.js:425-435 and shooter.js:341.)
-
-- **[medium] Six arsenal rows still quote pre-build-216/218 damage — the loadout sheet, the strip and the first-use caption all read them**  
-  `src/arsenal.js:90, 99, 103, 107, 116, 164; against src/config.js:1002-1006, 1037, 903, 1065, 1079, 930, 700`  
-  Every place the game states a number for these six is wrong, by 10% on five mines and by 70% on SPINE — the one round whose whole build-218 justification was that its old number made it not worth carrying. A player comparing SPINE (20) against BOLT (26) on the loadout sheet is reading the case for a decision that was reversed a build ago.  
-  _Fix:_ Update the six `dmg` strings to 105, 79/s, '81, twice', 37/s, '29 x 14', '34, fading'. Better: have `check-build.mjs` assert each `dmg` that is a bare quantity against its config number, the way it already asserts the tree's coverage — this is the second balance pass to leave the table behind.
-
-- **[cosmetic] drawFx still ends two particle branches on a bare `ctx.globalAlpha = 1`, the form the same file's own comment calls forbidden**  
-  `src/fx.js:551, 558, 585, 593; compare src/fx.js:567-573 and src/util.js:106-125`  
-  None today. It is the trap CLAUDE.md records costing four separate fixes before build 210's fizzle would fade — a property set at the call site and silently overwritten one layer down — left standing two lines from the note about it.  
-  _Fix:_ `const was = ctx.globalAlpha; ctx.globalAlpha = was * …; … ctx.globalAlpha = was;` in both branches, matching the `fill` branch above them.
-
-
-### EXPLOSIVE (HE) and SHOTGUN (SCATTER), end to end — config keys, geometry, picture vs damage, guards, tree, arsenal rows, particle cost, DOUBLE TAP / SALVO / ability bar
-
-- **[medium] CLUSTER stops being "the same total on one body" the moment OVERPRESSURE is bought — and stops being drawn at exactly the levels where it doubles single-target damage**  
-  `src/shooter.js:1499-1523; src/config.js:602`  
-  CLUSTER is sold as an area/line node ("the same total on one body") and is in fact a ×2.28 single-target blast-damage node once the HE line is finished — and the two levels where it more than doubles the damage inside the front ring are precisely the two where it draws nothing extra, so the picture is identical to an HE with no CLUSTER at all.  
-  _Fix:_ Scale the offset with the radius — `const cx = x + Math.cos(a) * c.out * world.up.blastR;` (same for cy, and in the draw guard) — which keeps the clover proportional, restores "the same total on one body" at every level, and keeps the sub-rings drawn because `out·blastR + 0.5r > 1.02r` holds for all L. Failing that, rewrite the comment and the row to say CLUSTER is a damage node above one OVERPRESSURE level.
-
-- **[medium] TRACER is a larger SCATTER range upgrade than LONG THROW, and puts the reach back past the value config.js deliberately cut**  
-  `src/shooter.js:489, src/shooter.js:521-525; src/config.js:660-665; src/upgrades.js:346, :396`  
-  "A tight cone that dies short. Close range only." (arsenal.js:157) and "The cone still ends, but further out." (upgrades.js:397) are both false on a bought gun: the cliff the round is built around is gone, and it is a whole-rack node with no SCATTER wording that removed it.  
-  _Fix:_ Take up.speed out of the pellet's reach rather than out of its speed — e.g. in the shotgun branch pass `life: g.life * up.shotRange / up.speed`, so TRACER makes pellets arrive sooner (which is what its row sells) without making them travel further. Alternatively give the pellet a distance budget instead of a life.
-
-- **[medium] HEAVY is worth ×1.6 on HE, not ×4: the blast impulse is the one term in heBurst that does not take the tree, while the blast damage does**  
-  `src/shooter.js:1498, src/shooter.js:1512; src/upgrades.js:348`  
-  On the one round whose knockback is 83% blast, the ammo branch's knockback node buys 60% more shove where its row promises 300% more. Nothing on screen or in the tree says the blast is exempt.  
-  _Fix:_ `impulse: b.impulse * world.up.impulse` at shooter.js:1498 and `b.impulse * c.scale * world.up.impulse` at :1512 (mines and abilities have their own impulse nodes and should stay as they are), or amend HEAVY's row to "on every hit" meaning the round and not its blast.
-
-- **[low] `fx.cap` is a ceiling no blast radius in the game can reach, and the ripple's lower clamp arm is likewise unreachable**  
-  `src/config.js:643; src/shooter.js:1548, src/shooter.js:1639`  
-  None visible. It is a guard that has never fired and a comment ("scaled by size, and capped", config.js:640) describing protection that is not in force — the counts are bounded by the ladder, not by the cap. It becomes live and silently raises every count 33% the day a fourth OVERPRESSURE level or a second blast-radius node lands.  
-  _Fix:_ Either set `cap` to a value the ladder can reach (1.66 is today's top, so 1.7 makes it a real ceiling with headroom) or delete it and say the counts are bounded by blastR's three levels. Same for the 0.7 in the ripple clamp.
-
-- **[low] The "about 210 units" figure that justifies dropping the sub-blast rings is 156, and the code's own cutoff is 150**  
-  `src/shooter.js:1515-1523; README.md:1884-1887`  
-  None on screen; it is the number the design decision is recorded with in two places, and it puts the change one whole level later than it happens.  
-  _Fix:_ Replace "about 210" with 156 (or with "from the second OVERPRESSURE level") in both the source comment and the README.
-
-- **[cosmetic] "Up to forty-five per trigger pull" is 33; 45 is only reachable as "in the air at once", and only with LONG THROW bought**  
-  `src/projectiles.js:735; src/fx.js:298 (cf. src/projectiles.js:516-518, which states it correctly)`  
-  None. Two of the three sites quote a per-pull figure 36% above the real one, which is the figure a future "can we afford a richer pellet?" decision would be made against.  
-  _Fix:_ Say 33 per trigger pull, 44 in the air, in all three places — or reference the one at projectiles.js:517 which is already correct.
-
-- **[low] The arsenal's "15 + 44 blast" is a figure no body ever takes, and the rack comparison that set SPINE's damage is measured against it**  
-  `src/arsenal.js:142; src/enemies.js:4501-4528; src/physics.js:258; src/config.js:694-695`  
-  HE's row overstates the delivered blast by 6% on the smallest bodies and 43% on the largest, where BOLT's "26" is delivered whole. And the rack table that justified raising SPINE to 34 compares it against two numbers neither of the other rounds actually delivers.  
-  _Fix:_ Either state the blast as "44 at the centre, less further out" on the row, or re-take the rack figures at a stated range and body size and record that in the SPINE note.
-
-- **[low] SPINE's arsenal row still says 20 against a config of 34 (out of scope, same table, four surfaces)**  
-  `src/arsenal.js:164; src/config.js (rounds.spine.damage = 34, build-218 note at :694-706)`  
-  Every surface in the game tells the player SPINE does 20 damage; it does 34. The pierce half of the row is still correct.  
-  _Fix:_ `dmg: '34, fading'`.
-
-- **[low] Two dead numbers in the fire path both rounds go through: `scale` and `slow`**  
-  `src/shooter.js:477, src/shooter.js:480 (and :489, :521, :535)`  
-  None at runtime. It is the shape CLAUDE.md records from SPIRAL's removal one layer up — `windAt`/`rateAt` sat with no caller for two builds — except here the dead value is threaded through every round rather than sitting in a private function, so it reads as a live knob.  
-  _Fix:_ Delete `slow` and the nine `* slow`, drop the `scale` parameter and its `* scale`, and strike the SPIRAL sentences from the `shoot` and `canFire` headers.
-
-- **[low] BUCKSHOT does not touch SCATTER at all, and the fan it does multiply is drawn with the expensive form SCATTER's exists to avoid**  
-  `src/upgrades.js:487; src/mines.js:391-405; src/projectiles.js:515-523 vs :702-708`  
-  SPALL's fully-bought fan costs roughly double the draw calls of the same number of SCATTER pellets, and 36 identical BOLT tracers read as a volley of bolts rather than as the "wall of shot" arsenal.js:117 promises. No damage consequence.  
-  _Fix:_ Add `form: 'pellet'` to the `fire()` options in mines.js:396 — the colour (#ffd9a0) and radius (3.4 against 3.2) already match SCATTER's pellet.
-
-
-### ARC (CFG.rounds.arc) and SPINE (CFG.rounds.spine), end to end: chain logic, FIFTH LINK, SLIVER/SPLINTER budget, THROUGH AND THROUGH, DOUBLE TAP, and what the tree's rows claim
-
-- **[high] SPINE's card still says DMG 20. Build 218 made it 34.**  
-  `/home/user/Shooter/src/arsenal.js:164 (also /home/user/Shooter/src/config.js:705, /home/user/Shooter/src/config.js:774)`  
-  The row a player reads before spending 900 energy on SPINE understates the round by 41% and, against the rest of the rack shown beside it in the same sheet, still ranks SPINE last — which is the judgement build 218 existed to reverse. The purchase decision is made on a number the round has not had for two builds.  
-  _Fix:_ `dmg: '34, fading'` at arsenal.js:164, and fix the SPINE figure in SLUG's header at config.js:774 while you are there.
-
-- **[high] ARC's chain damage never sees `up.damage` — 88% of the round is immune to the whole AMMO damage line**  
-  `/home/user/Shooter/src/projectiles.js:187 and /home/user/Shooter/src/projectiles.js:208 (contrast /home/user/Shooter/src/shooter.js:489, :694, :1498, :1511)`  
-  A player who loads ARC and buys the AMMO damage line gets 1.6x where the tree's rows promise 3.4x. Worse, `gunScale` (shooter.js:311 — `const out = up.damage * (up.salvo ? 1 + 2 / up.salvo : 1) / (up.rate || 1);`) is what boss.js:199 scales boss health by, so buying HOLLOWPOINT makes every boss 3.375x tougher while making an ARC round 1.63x stronger. ARC is the one round in the rack that gets punished for buying damage.  
-  _Fix:_ projectiles.js:187 → `let damage = g.jumpDamage * up.damage;`. If the flat chain is deliberate, it needs a comment saying so, because the three comparable sites in shooter.js all say the opposite.
-
-- **[low] `chainFrom` is a damage path with no `spent` guard, in the same file as the sweep that has one**  
-  `/home/user/Shooter/src/projectiles.js:195 (contrast /home/user/Shooter/src/projectiles.js:308)`  
-  Small and time-boxed: for 0.9 s after a glitch-out, ARC's links are drawn to visibly dissolving bodies and land damage that cannot be cashed in (`Enemy.destroy` refuses at enemies.js:1256 — `if (this.fizzle > 0) { this.dead = true; return; }`), while each corpse consumed by `seen` (projectiles.js:203) is a link the live body beside it does not get. A corpse whose remaining hp is under the link damage also pops out of existence mid-dissolve rather than finishing the fade, since `destroy` returns before `explode`.  
-  _Fix:_ projectiles.js:195 → `if (e.dead || e.spent || seen.has(e)) continue;`. Do NOT add `staged` — config.js says staged never gated projectile collision, and a chooser's rule on a damage path is the build-219 mistake.
-
-- **[low] A body killed by an ARC jump does not die "earthed" — only the one the round physically touched does**  
-  `/home/user/Shooter/src/projectiles.js:208, /home/user/Shooter/src/enemies.js:1063, /home/user/Shooter/src/fx.js:378-386`  
-  Player-visible but quiet: the round whose whole identity is the discharge shows the discharge death on the one body the dart touched and not on the four it earthed. Picture disagrees with damage.  
-  _Fix:_ In `chainFrom`, before projectiles.js:208: `best.lastHit = 'arc'; best.lastHitT = world.time;`
-
-- **[cosmetic] The chain is drawn in the pale blue build 209 took off ARC's flight**  
-  `/home/user/Shooter/src/projectiles.js:206 and :248 (contrast /home/user/Shooter/src/shooter.js:554-561, /home/user/Shooter/src/arsenal.js:159, /home/user/Shooter/src/fx.js:382)`  
-  The round's chip, its dart and its deaths are violet; the lightning between bodies is cyan. Same mismatch build 209 fixed, on the larger half of the effect. I am flagging rather than asserting — an author could reasonably want electricity blue — but three of the round's four visuals moved and this one did not.  
-  _Fix:_ `glow: '#a37bff', hot: '#e6d4ff'` on the Arc bolt and `'#c79bff'` on the link sparks, or a comment at projectiles.js:248 saying the blue is deliberate.
-
-- **[low] SLIVER's row says the same thing at both pips, and the second level is the multiplicative one**  
-  `/home/user/Shooter/src/upgrades.js:412-414, /home/user/Shooter/src/menu.js:420 and :435`  
-  The player has no way to tell what the second SLIVER level buys. Every other multi-level node whose second step is qualitatively different carries the difference in its header, not its row, but SLIVER is the one where the second step is worth more than the first.  
-  _Fix:_ Give the row the second level, e.g. 'A spine comes apart into an arc of fragments through the first body it hits. Again, at the second level.' — or split the ladder into two named nodes.
-
-- **[low] A SLIVER fragment can come apart inside the body it was born in — on a BULWARK, without TRACER**  
-  `/home/user/Shooter/src/shooter.js:292-297, /home/user/Shooter/src/projectiles.js:92, /home/user/Shooter/src/projectiles.js:122`  
-  On a BULWARK only, and only before TRACER is bought: one extra fragment hit and one pierce spent inside the birth body, and an arc that was meant to open out the far side opening inside it instead. No count blowup — the budget holds.  
-  _Fix:_ Make the cover a distance rather than a fixed 0.06 s: pass `ignoreT: (2 * e.r + 8) / (sp * S.speed)` from `sliverOn`. Keep it in `sliverOn`'s opts, not in the constructor default at projectiles.js:92, which OVERSTUFFED's rebound also uses.
-
-- **[low] THROUGH AND THROUGH has no `levels` and the tree sells it three times: +6 pierce, ten bodies**  
-  `/home/user/Shooter/src/upgrades.js:362, /home/user/Shooter/src/tree.js:205`  
-  None that contradicts a row. It is a balance question, not a defect: SPINE's stated identity is "3 more bodies behind the first" and a fully bought one goes through nine.  
-  _Fix:_ A decision, not a patch: leave it, or `levels: 2` (+4, seven bodies). If it is capped, regress.mjs's `=== 134` level total moves by the number of levels removed.
-
-- **[cosmetic] Orphaned header above COMPOUND, left behind when COUNTERSPIN went in build 217**  
-  `/home/user/Shooter/src/upgrades.js:358-360`  
-  None to the player. It is the `windAt`/`rateAt` shape CLAUDE.md records: a header explaining something that no longer exists, now attached to something it misdescribes, and the next reader capping COMPOUND on its authority.  
-  _Fix:_ Delete upgrades.js:358-360. (Whether COMPOUND itself should be three levels is a separate question outside this audit.)
-
-
-### SLUG (CFG.rounds.slug) and RIME (CFG.rounds.rime), end to end — build 219
-
-- **[high] SLUG's shove is clipped by the cruise×6 speed cap on 21 of 23 mobile types, and SLEDGE's whole ladder (and HEAVY's) buys those types nothing**  
-  `src/shooter.js:601, src/enemies.js:1113 + 1178-1181, src/physics.js:116, src/upgrades.js:363`  
-  SLEDGE ("+60% slug knockback", 3 levels, 500+850+1200 = 2550 energy on top of SLUG's 900) does literally nothing to MOTE, NEEDLE, SEED, DRIFT, GLUT, PLATE, TOW, HERALD, PRISM, SPLITTER, LURCHER and every boss minion — the bodies the player actually shoves. HEAVY's ×4 on top of it is equally inert on them. The round the config calls "an enormous shove" delivers 12-23% of its rated impulse to the light half of the roster; the two types that do feel the ladder are the two the player least wants to move.  
-  _Fix:_ Give the SLUG round the same opt-in PULSE already has: carry a `throwOff: true` on the projectile (src/shooter.js:595-612), thread it through `resolveSegment` → `takeHit` → `applyDamage` as a parameter defaulting to false, so the shove pays neither the `kicked` fade nor the cruise×6 clamp (it gets `thrownSpeed` 720 and `CFG.pile.thrown` instead, which is what PULSE gets). Do NOT raise the cap globally and do NOT change `applyDamage`'s default — either would change what BOLT does. Note the ladder will then be live and SLEDGE/HEAVY need a balance look for the first time.
-
-- **[medium] The RIME chill's own comment claims a mass dependence the code does not have, and names the wrong direction**  
-  `src/enemies.js:856-863`  
-  None on screen — the chill works, just not for the reason written next to it. The cost is to the next change: this is the one paragraph a reader consults before touching RIME, and it points at mass, which is the one quantity that cannot affect it. CLAUDE.md's `world.endless` and `(hit - centre)` entries are both this shape — a name that reads like a mechanism and is not one.  
-  _Fix:_ Correct the comment: the drag is a pure velocity multiplier and is mass-independent by construction; what varies between bodies is `accel`, because steering re-accelerates toward cruise every substep and the equilibrium is accel/(accel + 446) of cruise. If mass-dependence is actually wanted, it has to be a force (`v -= v̂ · F · invMass · dt`), not a multiply.
-
-- **[medium] RIME does not chill to "a crawl": the steering puts back three quarters of what the drag takes, and it is weakest against the fastest bodies**  
-  `src/config.js:785-793, src/arsenal.js:187, src/enemies.js:859-863 vs src/enemies.js:786-787`  
-  A player who reads "barely moves" and fires RIME at the fast light bodies gets roughly a halving, not a stop — and gets the best result on the slow heavy ones that were never the problem. Whether that is a bug or an unwritten trade is a judgement call I cannot make from the code; what is certainly wrong is that no surface says so, and `drag: 0.02` reads as an effective 98% removal that never happens against anything that steers.  
-  _Fix:_ Either (a) leave the mechanic and fix the words — say the chill halves-to-quarters a body's pace and that its bite depends on the body's own `accel` — or (b) make the chill a term the steering answers to, the way STASIS is (`const slow = world.stasis > 0 ? 0.12 : 1` at enemies.js:738, 372, 432, 511), so `cruise` and `k` are both scaled while chilled and the number in config is the number delivered. (b) is the one that makes `drag: 0.02` honest, and it is what the STASIS precedent in this codebase already does.
-
-- **[low] Neither SLUG's `slugged` nor RIME's `chill` is drawn: two multi-second status rules with no on-screen tell at all**  
-  `src/enemies.js:246 and :288 (the only writes outside shooter.js/game.js); no reader in any draw path`  
-  The player cannot see why a body driven through a crowd sometimes does 300 damage and sometimes none, nor which bodies are chilled and for how long. It is not a wrong picture, it is an absent one — but the SLUG case is the one rule the round's whole cost is justified by.  
-  _Fix:_ A cheap persistent tint would do: an outline shift toward `#b8c6d8` while `slugged > 0` and toward `#8fe3ff` while `chill > 0`, multiplied into whatever alpha the caller set and put back (never `= 1` on the way out — see CLAUDE.md's `drawGlow` entry).
-
-- **[low] `calm` spreads on contact, so "only what a SLUG threw is exempt" is not what the code does**  
-  `src/config.js:770-771 vs src/game.js:1590-1599`  
-  One SLUG into a crowd switches off collision damage across the whole touching component of that crowd for up to 2.4s, including impacts the SLUG had nothing to do with — a WELL knot or a BLOOM detonation landing inside a slugged pile trades nothing. Also protects a DECOY, which is otherwise designed to be worn down by the pile it collects. Bounded and short, so I do not think it is a defect; the stated rule is what is wrong.  
-  _Fix:_ Amend config.js:770-771 to say what game.js does: the mark spreads on contact at its remaining time, so what is exempt is the SLUG's chain, not only the body it hit. (Or, if the narrower rule is what is wanted, mark the recipient at a fraction of the remaining time so a second hop is visibly weaker — but that is a balance change, not a correction.)
-
-- **[cosmetic] config.js's SLUG rationale quotes SPINE at 20; SPINE has been 34 since build 218**  
-  `src/config.js:774, against src/config.js:705`  
-  None in play. It is a comment; but it is the comment that justifies SLUG's damage number, and the next person tuning SLUG will read "SPINE's 20" as the floor it has to clear.  
-  _Fix:_ Change "SPINE's 20" to "SPINE's 34" at config.js:774.
-
-- **[low] "Chills for 3.2s" is the base value; a fully bought DEEP FREEZE makes it 15.72s**  
-  `src/arsenal.js:187, src/upgrades.js:364, src/tree.js:63 + :205`  
-  The loadout sheet understates RIME's duration by 4.9× once the node is fully bought. Low, because the chill is refreshed by the next shot 0.486s later anyway — DEEP FREEZE only matters when you switch targets or switch rounds — but the number on screen is wrong for anyone who bought it.  
-  _Fix:_ Either render the effective value (`CFG.rounds.rime.chill * world.up.chill`) in the row, or reword to "Chills for 3.2s, longer with DEEP FREEZE". Note that a concurrent change landing during this audit added a regress case (`says('rime', CFG.rounds.rime.chill)`) that pins this string to the BASE value, so any fix has to move that assertion with it.
-
-
-### SPORE (CFG.rounds.spore) and TITHE (CFG.rounds.tithe), end to end: build 212's cap + node rework, build 214's AoE visuals, and TITHE's damage ramp and money path
-
-- **[high] TITHE's mark is a FLOOR on e.bounty, not a multiplier — so it pays less and less as the ladder climbs, and nothing at all from tier 15**  
-  `src/shooter.js:696; src/enemies.js:2947; src/enemies.js:3465; src/config.js:218; src/config.js:828`  
-  Player-visible. TITHE's whole economic identity — the reason to carry a round that "barely hurts on the first hit" — silently decays across the ladder and is worth exactly zero energy from tier 15 up (tier 7 on an OVERCLOCK wave). A player who marks a body at tier 20 sees the mark drawn on it (enemies.js:1441) and banks not one point more than if they had shot it with BOLT.  
-  _Fix:_ Make it a multiplier applied once per body rather than a floor: give Enemy a `tithed` flag and do `if (!e.tithed) { e.tithed = true; e.bounty *= g.bounty * w.up.bounty; }`. That keeps the authored 3.5x at every tier and keeps OVERCLOCK and the tier step stacking, which is what enemies.js:3116-3120 already claims happens. If 3.5x compounding on top of the tier is too much late, retune `CFG.rounds.tithe.bounty` — a number that is at least reachable.
-
-- **[medium] "each mark ... pays more" is false: the payment is set in full on the first hit and never deepens**  
-  `src/arsenal.js:195; src/config.js:818-822; src/shooter.js:693-696; src/enemies.js:1428-1430`  
-  Player-visible in the sense that the stated reward for staying on one body does not exist: one TITHE hit buys the entire payout, and the other thirteen buy only damage. No regress case asserts the payment (the TITHE case at regress.mjs:5005-5065 measures only the drawn mark's green pixels).  
-  _Fix:_ Either scale the bounty with depth at the site that owns the ramp — `const deep = e.marks / (g.marks + w.up.titheMarks); e.bounty = ... * (1 + (g.bounty - 1) * deep)` applied as a multiplier per the finding above — or, if a flat mark is what is wanted, correct arsenal.js:195, config.js:820 and enemies.js:1429 to say so. Whichever is chosen, it needs a case: `marks` is currently the only ramp in the game with no assertion on its payout side.
-
-- **[medium] Nothing in the game raises a SPORE patch's damage — including HOLLOWPOINT, which reaches only 11% of the round**  
-  `src/shooter.js:643; src/upgrades.js:47-48; src/shooter.js:489; src/projectiles.js:191-204 (working tree)`  
-  Player-visible: a SPORE build gets 1.27x out of the AMMO damage line where every other round gets 3.375x, and there is no node anywhere in the tree that makes burning ground burn harder. Note it also cuts the other way through build 214's `gunScale()` (shooter.js:309-315), which tempers boss health by `up.damage * salvo / up.rate` — a SPORE player pays the full temper for damage the round never received.  
-  _Fix:_ Either `dps: g.patch.dps * w.up.damage` at shooter.js:643 (and `T.patch.dps * world.up.damage` at mines.js:565 for THORN, which has the identical hole), or restore a dedicated ladder. Build 212 removed `patchDps` because BLOOM OUT was selling radius AND burn at three uncapped levels; the fix for that was capping the node, not removing the quantity from the damage line. If it is scaled, re-run the cap arithmetic in config.js:804-814 — 3 x 46 x 3.375 = 466/s single-target is above the 362 the cap was introduced to remove.
-
-- **[medium] A SPORE patch is drawn smaller than the circle it burns for two thirds of its life, and the rim band — "the only thing marking where the damage stops" — is gone for 56% of it**  
-  `src/patch.js:245-251; src/patch.js:185-186; src/patch.js:236-244; src/patch.js:232`  
-  Player-visible and exactly the defect patch.js:241-243 says was fixed: for most of a patch's life the burning ground is drawn well inside the ground that is burning, with no boundary marker at all after 1.96s. It matters most in the case the round is designed for — a patch placed ahead of something and then left alone, which lives the full 4.5s. Under sustained fire the cap retires patches at ~1.7s old so the worst of it is masked.  
-  _Fix:_ Exempt the rim band from the die-back (`if (!sp.rim && sp.d > reach) continue;`), so the boundary stays drawn and only the interior grain thins — the die-back still reads as a timer. Or move the floor and the slope so full extent covers the first two thirds: `Math.min(1.14, 0.6 + left * 0.72)` holds reach >= 1 to left = 0.556 and never falls below 0.6. Either way, correct the "Full extent until the last third" sentence.
-
-- **[low] `retire()`'s `this.max = Math.max(this.max, this.life)` is a statement that can never do anything, and it defeats the comment above it**  
-  `src/patch.js:133; src/patch.js:118-127; src/patch.js:214`  
-  Cosmetic but real: the fourth shot makes the oldest patch pop to a third of its size on one frame rather than closing over 0.35s — the reading the retirement comment exists to prevent. Plus a dead statement that looks like a guard.  
-  _Fix:_ `this.max = this.life;` — one character class of change, and it makes `left` run 1 -> 0 across the retirement so `reach` closes 1.14 -> 0.26 and `k` fades over the whole 0.35s, which is what the header describes.
-
-- **[low] `Patch.rim()` and `this.edge` have had no caller since build 214 — a private method with a docstring describing two layers that were deleted**  
-  `src/patch.js:195-207; src/patch.js:112-115`  
-  None for the player. This is the `windAt`/`rateAt` shape CLAUDE.md records from build 217: dead private code with a header that documents a feature that no longer exists, which nothing in the suite or the bundle will ever fail on.  
-  _Fix:_ Delete `rim()` and `this.edge` together with their comments. Nothing else reads either.
-
-- **[medium] upgrades.js's own end-of-file docstring says "`levels` absent means without limit" — the opposite of tree.js's `u.levels ?? 3`, and it is the documentation the levels trap keeps being read out of**  
-  `src/upgrades.js:797-805; src/tree.js:205; src/upgrades.js:792-796`  
-  No direct player consequence; it is the root cause of a defect class that has shipped five times, two of them balance blowouts (HOT LOAD at 0.85^3, STANDING ORDER at 0.8^3 behind a row saying -20%).  
-  _Fix:_ Rewrite the block to state the real rule ("absent means three, per tree.js's `u.levels ?? 3`; `repeat` is the only unbounded node") and re-attach it to something, or move it to `leaf()` in tree.js beside the line it describes. Deleting it outright is also better than leaving it.
-
-- **[low] LEVY carries no `levels` and is sold three times (3.5 -> 11.8125), with no note; COMPOUND has just been given that note in the working tree and LEVY was not**  
-  `src/upgrades.js:369; src/upgrades.js:365; src/tree.js:205; src/tree.js:67`  
-  None today, if three is what was wanted. It is a level count nothing in the tree, the suite or a comment pins, on the two nodes that carry TITHE's entire identity — which is the state HOT LOAD and STANDING ORDER were in.  
-  _Fix:_ Write `levels: 3` on both, or add the same one-line note LEVY's neighbour just got. If the level totals are being pinned in regress.mjs the way `up.rate` and `up.cooldown` are, add `up.bounty === 1.5 ** 3` and `up.titheStep === 1.6 ** 3` to that case.
-
-- **[cosmetic] The SPORE row says "Three at a time" and stays saying it after SECOND GROWTH buys a fourth**  
-  `src/arsenal.js:191; src/shooter.js:661; src/upgrades.js:477-479`  
-  Trivial: the loadout sheet understates the round by one patch for a player who has bought SECOND GROWTH. Flagging it mainly because the row is one of the six that had just gone stale in the same file for the same reason.  
-  _Fix:_ Either drop the sentence and let SECOND GROWTH's own row carry the count, or add `says('spore', CFG.rounds.spore.patch.cap)` to the new arsenal case so the base number cannot drift, and accept that the row describes the unbought round (which is what every other row does).
-
-
-### BLAST and SNARE mines end to end (src/mines.js, CFG.mines / CFG.snare, and every tree node that touches them)
-
-- **[medium] "The oldest goes" is not the oldest — updateMines swap-removes, so the eviction picks an arbitrary mine**  
-  `src/mines.js:225-229, src/mines.js:635-637, README.md:235`  
-  Player-visible on BLAST above all: the mine that bangs on eviction is not the fourteen-second-old one you had written off, it is (often) the one you just watched land. Same for SNARE: a snare that has been sitting armed on a lane gets skipped while a fresher one is spent. Reachable exactly where the config says the cap is reached — SEED's three-at-once (mines.js:222) and PAIRED CHARGE.  
-  _Fix:_ Give each Mine a monotonic serial in the constructor and pick `world.mines.reduce(...)` on the lowest live serial, or splice instead of swap-remove at 636-637 (the list is at most 5 long, so order-preserving removal costs nothing).
-
-- **[medium] A SNARE evicted by the cap plays its whole snap and then grips for zero frames**  
-  `src/mines.js:357-358, src/mines.js:229, src/mines.js:289-296`  
-  The eviction comment promises "nothing simply evaporates". A SNARE evicted this way emits the full 210-unit violet closing ring, a screen shake and the WELL sound, and holds nothing at all for zero of its 2.4 seconds. (The mirror case is quieter but also wrong: a snare evicted *while* gripping falls through to the bare `m.dead = true` at 358 and gets none of the release ring/sparks/`audio.pop(0.9)` that mines.js:602-605 gives a hold that ends normally.)  
-  _Fix:_ Either drop the snare arm from `retire` (let an evicted snare die silently, like WIRE/THORN/LODE/VOID do) or make eviction lazy — mark the victim and let `updateMines` run its hold out — but a snap that is cancelled in the same statement should not be paid for with a ring and a shake.
-
-- **[medium] The upgrade collar draws 7 marks for SNARE's 5 upgrades — `pips` re-derives a denominator that `mineGrade` already computed, and gets it wrong for six of eight kinds**  
-  `src/mines.js:771, src/mines.js:121-145, src/mines.js:838-843`  
-  The gauge over-reads by up to two marks on SNARE (and on VOID, KNELL, WIRE, LODE, THORN). This is the exact fault the `mineGrade` docstring at 100-108 was rewritten to stop — "A mine that grew because of something it cannot use is the readout lying about the machine" — fixed in the numerator and left in the denominator. BLAST is correct to the mark at every level.  
-  _Fix:_ Have `mineGrade` return (or a sibling expose) the `of` it already computes, and use it: `pips = Math.round(gr * of)`. That is one number instead of a hand-kept 8/6/7 table that has to be re-audited every time a kind gains a node.
-
-- **[low] DEAD WEIGHT is sold three times: a snare holds 10.8s, not the 3.96s the README documents, and outlives the 15-second "contract" by ten**  
-  `src/upgrades.js:461, src/config.js:1048, README.md:250, src/config.js:1013-1015`  
-  One of five cap slots is held for a quarter of a minute past the life that is advertised as a contract, and the documented ceiling on the hold is off by 2.7x. Uncertain whether the three levels are the trap or the intent: the level TOTAL is pinned at 134 by regress.mjs:495 and mines.js:373 reasons explicitly about "three DEEP CHARGEs", so the sibling defaults in FIELD look deliberate. What is not defensible either way is the README row and the life contract.  
-  _Fix:_ Decide it explicitly and write `levels:` on the node either way (that is the whole point of the `?? 3` rule), then correct README.md:250 and README.md:256 ("holds it for three and a half seconds" — the base is 2.4). If three levels stay, `CFG.mines.life`'s contract comment needs the gripping exception spelled out.
-
-- **[low] `mineGrade` credits SALTED to SNARE but not the two nodes that scale what SALTED does**  
-  `src/mines.js:112-120, src/mines.js:126-132, src/mines.js:362-379`  
-  None to the fight. It is the readout only: a SNARE build with SALTED + DEEP CHARGE + SHRAPNEL is measurably heavier than one with SALTED alone and reads identically, which is the same class of lie the block was written to remove. I am not certain this is unintended — a grade that changes shape depending on whether SALTED is owned is arguably worse — but the comment at 113-118 names `fizzle` and the code then excludes exactly the kinds that only reach it through `fizzle`.  
-  _Fix:_ Either make the two conditional on SALTED (`if (bang || up.mineFizzle)`), or amend 113-118 to say `detonate` and `toll` and that `fizzle` is deliberately not counted.
-
-- **[low] The snare's drawn wires walk `world.enemies` only; `grip` also hauls `world.drops`**  
-  `src/mines.js:677-684, src/mines.js:330-331`  
-  Energy motes inside the 210-unit reach are dragged into the knot with no wire drawn to them. Minor and in the safe direction (a hold that exists and is not drawn, rather than the reverse), but it is the stated invariant.  
-  _Fix:_ Factor the pair of lists into one array and iterate it in both places.
-
-- **[low] A SNARE snapped on a boss's frame draws wires to a knot it cannot move — `grip` never checks `type.fixed`**  
-  `src/mines.js:304-331, src/mines.js:616-632, src/enemies.js:~528 (drive)`  
-  The snare is spent — one of five slots and one of its two-to-ten seconds — on a body that cannot be hauled, and the draw block at 677-684 strings violet wires to it, which is precisely "the picture is drawing a hold the snare does not have". BLAST is unaffected: a blast on boss structure is legitimate damage.  
-  _Fix:_ Add `|| e.type.fixed` to the trigger guard at 623 and to the two `grip`/draw guards at 318/680. Note this is not a `spent` question — the frame is live at the time.
-
-- **[low] detonate's ring crosses the blast radius dimmer and thinner than the version its own comment says it replaced**  
-  `src/mines.js:266-276, src/mines.js:370-378, src/mines.js:512-515, src/fx.js:588-594`  
-  Small, and I want to be clear about why: each of the three pushes a `Shock` at exactly the true radius on the next line (275→277, 378→379, 515→516), and `Shock` opens to `this.r` and holds full for ~0.7s (fx.js:28-52). The Shock is what answers "how far did that reach", so the player is not misled — the ring's own peak just marks 131 instead of 168. The defect is in the claim, not the picture.  
-  _Fix:_ Draw them the way `spall`'s pellet burst (mines.js:436) and `snap` (mines.js:292) already do — contracting, `ring(x, y, br, br * 0.4, …)` — so the brightest, widest frame is on the radius, and let it drift inward as it dies. Or delete the ring and leave the Shock, which is already doing the work.
-
-- **[cosmetic] `mineScale` is exported and has no caller anywhere in the repo; `drawMines` re-implements it inline**  
-  `src/mines.js:148-153, src/mines.js:770`  
-  None today. It is the `windAt`/`rateAt` shape CLAUDE.md records from build 217-219 ("Nothing fails on dead private functions; bundle.mjs will happily ship them"), except this one is `export`ed, so even a dead-code sweep on module-private functions would miss it, and the duplicated 0.26 is a second place to forget.  
-  _Fix:_ Delete it and leave line 770, or call it from 770 and keep one literal.
-
-- **[cosmetic] `LAY_TONE` covers four of eight kinds; four are laid with BLAST's chime, and the module header still says "four kinds"**  
-  `src/mines.js:216, src/mines.js:247, src/mines.js:1-18, src/mines.js:38`  
-  Half the rack has no lay tone of its own and one of them is indistinguishable by ear from BLAST. Doc drift on top.  
-  _Fix:_ Four more entries in the table, and one pass over the header, `laidCount`'s comment and README.md:212. (README.md:219-222 is separately stale: "one thrown every fifteen ... no upgrade may move any of them" against QUICK LAY, which config.js:1017 says is a dial now; and README.md:232's "5 with two [PAIRED CHARGE]" against `levels: 1` at upgrades.js:440.)
-
-- **[cosmetic] Two inert writes on the snare path: `snap`'s `m.settle = 0`, and the `open` decay branch**  
-  `src/mines.js:291, src/mines.js:538`  
-  None. Listed because a write nothing can read and a branch nothing can take are the shape CLAUDE.md flags (`world.endless`), and the next reader of `snap` will assume the settle reset means something.  
-  _Fix:_ Drop line 291, or comment it as belt-and-braces. Leave 538 — it is shared with seven other kinds.
-
-- **[cosmetic] The drawn grip circle eases to the reach over ~0.31s while `grip` is at full 210 from the first frame**  
-  `src/mines.js:538, src/mines.js:666-672, src/mines.js:306`  
-  Minimal, and partly self-correcting: the wire bundle at 677-684 is drawn against the full `S.reach` from frame one, so the true reach is shown — just at `0.4 * m.open` alpha, i.e. faintly. The `snap` ring (292) also opens at exactly 210 at full brightness. So the reach is stated three ways and one of them lags.  
-  _Fix:_ None needed; noting it so the next audit does not report the circle as the reach.
-
-
-### WIRE and KNELL, end to end (src/mines.js)
-
-- **[medium] KNELL's toll count is fixed at construction but its toll INDEX is read live, so buying FOURTH BELL mid-knell skips the loud rings**  
-  `src/mines.js:179, src/mines.js:506, src/mines.js:356`  
-  Buy FOURTH BELL with a knell already on the field and that knell loses its first, tightest, hardest toll: 100.3 centre damage instead of 139.3, drawn as a 177-unit ring where a 118-unit one was owed. The upgrade you just paid for makes the next knell weaker.  
-  _Fix:_ Snapshot the count once: `this.tollsMax = K.tolls + world0.up.mineTolls` in the constructor, and `const i = m.tollsMax - m.tolls;` in `toll`. Fixes `retire`'s loop at the same time.
-
-- **[medium] WIRE's cut is applied per FRAME, and applyDamage's `Math.max(1, ...)` floor turns it into frame-rate-dependent, armour-ignoring damage**  
-  `src/mines.js:494, src/enemies.js:1155, src/patch.js:118-125`  
-  The arsenal chip says `79/s` (arsenal.js:114). The wire does 79/s only on a 60Hz display against an unarmoured body. On a 120Hz phone it does at least 120/s, and at low HOT WIRE levels it largely ignores armour — the more armoured the target, the further the real number is from the rated one, in the target's disfavour.  
-  _Fix:_ Tick it the way Patch does: accumulate `m.cutT += dt` in `cut` and apply `W.damage * world.up.wireDamage * TICK` every TICK (0.25s), with the same `dt`-scaled shove left per frame. Do NOT fix it by touching applyDamage's floor.
-
-- **[medium] The drawn wire is shorter than the cutting wire for the whole 0.55s unspool — only the width ramps with `open`, not the length**  
-  `src/mines.js:483, src/mines.js:488, src/mines.js:536, src/mines.js:725-727`  
-  For the first 0.55s of every wire, a body near either end of the lane takes full cut damage and a `W.shove` push from a patch of empty ground. This is the first half-second after the mine goes live, which is exactly when the player is looking at it.  
-  _Fix:_ Either interpolate the damaging endpoints in `cut` the same way the draw does (`ax = mx + (m.ax - mx) * m.open`), or stop shortening the drawn line and ramp only its alpha with `m.open` — one of the two, so the picture and the segment are the same segment.
-
-- **[low] The upgrade collar draws more marks than the mine carries: WIRE shows two marks for one upgrade, KNELL seven for six**  
-  `src/mines.js:771, src/mines.js:840, src/mines.js:110-145`  
-  Cosmetic, but it is the one readout the mine has for "what you have put into it", and it miscounts for six of eight kinds — a WIRE with one upgrade wears two marks and a fully bought one wears seven. That is the fault mineGrade's own docstring says the accounting exists to prevent ("a mine that grew because of something it cannot use is the readout lying about the machine").  
-  _Fix:_ Have `mineGrade` also expose its denominator (return `{ has, of }`, or add a `mineCount(world, kind)` that returns `has`) and draw `has` marks, instead of restating the count as a per-kind constant in the draw.
-
-- **[low] `CFG.mines.cap` cannot be reached since PAIRED CHARGE was capped, so `retire()` — including KNELL's ring-everything-now path and WIRE's silent fallthrough — is dead in play**  
-  `src/mines.js:225, src/mines.js:351-359, src/config.js:1024-1028, src/upgrades.js:439`  
-  None visible today — but `cap: 5`, the eviction loop, `retire()`, its KNELL `while (!m.dead && m.tolls > 0) toll(...)` and its stale SEED comment are all unreachable code and a dead number, maintained as if live. The CLAUDE.md shape: a threshold nothing can reach is a door that never opens.  
-  _Fix:_ Decide which it is: either lower `cap` (or restore a caller that lays more than two) so the backstop is real, or say in config.js that the cap is now unreachable and that `retire` is debug-only. If it is ever made reachable, `retire`'s fallthrough owes SALTED a `fizzle(world, m)` for wire/thorn/lode/void.
-
-- **[low] A body standing on the WIRE is pinned at full hit-flash and drawn as a white blob**  
-  `src/mines.js:494, src/enemies.js:1157, src/enemies.js:821, src/enemies.js:1425, src/enemies.js:1594`  
-  Anything held on the wire is washed to a near-solid white disc — you cannot read what type it is or how hurt it is while it is being cut, which is exactly the moment you want to.  
-  _Fix:_ Same tick as finding 2: one bite every 0.25s instead of one per frame lets flash decay between bites and the body reads normally.
-
-- **[cosmetic] A body killed by the WIRE wears the wrong death, or none**  
-  `src/mines.js:482-502, src/patch.js:188, src/enemies.js:1293`  
-  A body finished by the wire either shows no death form at all, or shows whatever round happened to touch it inside the previous half second — a body cut in half by a wire dies as if a SPINE did it. Cosmetic only.  
-  _Fix:_ Tag it in `cut` the way the patch does, with a form of its own (or the nearest existing one).
-
-- **[low] `mineScale` is a dead export — no caller anywhere, and drawMines inlines the same expression**  
-  `src/mines.js:149-153, src/mines.js:770`  
-  None at runtime. It is the `windAt`/`rateAt` shape CLAUDE.md records from builds 217-219: a documented private helper with no caller that `bundle.mjs` will ship, and a duplicated constant that can drift.  
-  _Fix:_ Either delete `mineScale` and leave the inline, or call it from drawMines (`const R = m.r * mineScale(world, m.kind)`) so the 0.26 has one home. It already recomputes `mineGrade`, so calling it costs nothing extra.
-
-- **[cosmetic] Two comments still say a KNELL "goes off three times"; it goes off twice**  
-  `src/mines.js:16-17, src/config.js:1070-1071`  
-  None player-visible — the arsenal chip was updated and these two were not. It is the next reader of the file who pays.  
-  _Fix:_ Change both to "twice" and note that FOURTH BELL takes it to four.
-
-
-### THORN and LODE, end to end (src/mines.js, src/patch.js), audited against build 220 (0555081) plus an unrelated dirty tree in enemies/projectiles/shooter
-
-- **[high] THORN and LODE are the only two mine kinds that never leave world.mines — their `continue` jumps past the splice**  
-  `src/mines.js:575, src/mines.js:581, src/mines.js:635-638`  
-  Player-visible and severe. Lay LODEs for a couple of minutes and the arena becomes a permanent repulsion field built from mines that expired long ago — light bodies are pinned at `integrate`'s cap and nothing closes on the turret; the field also fills with ghost LODE rings and THORN burrs that cannot be cleared, all of them costing draw time. `CFG.mines.cap`'s own comment calls 5 "a contract with the player"; the contract holds for what `laidCount` sees and for nothing else.  
-  _Fix:_ Let both kinds reach the splice: replace the two `continue`s with a fall-through to the removal block, or (simplest, and it also fixes the fizzle re-entry) put `if (m.dead) { list[i] = list[list.length-1]; list.pop(); continue; }` immediately after `const m = list[i];` at 531. Removing a dead THORN must also take its `m.patch` with it, or the ground leaks instead of the mine — see the retired-THORN finding.
-
-- **[high] `fizzle` has no idempotence guard, so an expired THORN or LODE fires SALTED's blast sixty times a second, forever**  
-  `src/mines.js:362-385, src/mines.js:571-574, src/mines.js:580`  
-  Game-breaking with SALTED owned and THORN or LODE selected. About fifteen seconds after the first mine expires the field becomes a grinder nothing survives, the audio layer is asked for sixty booms a second, and `world.effects` takes 2,400 Shocks a second. Without SALTED it is a permanent grey spark fountain at every site a THORN or LODE ever died, sixty frames a second.  
-  _Fix:_ Two independent guards, both worth having: `if (m.dead) return;` as the first line of `fizzle` (matching `retire`'s 351), and the loop-head removal from the previous finding so the mine is gone after the first call. The guard alone stops the damage; only the removal stops the draw and the LODE push.
-
-- **[medium] A THORN retired by the cap keeps its burning ground, against the comment saying it does not — and a THORN killed before it lands still lands and opens**  
-  `src/mines.js:559-561, src/mines.js:351-358, src/mines.js:541-554`  
-  More burning ground on the field than the mine cap allows, and it cannot be cleared by laying more (laying more is what creates it). A THORN cancelled before it ever armed still burns a 104-unit patch for fifteen seconds.  
-  _Fix:_ Give `retire()` a thorn case that kills `m.patch` alongside `m.dead`, and skip the flight/arm work for an already-dead mine (the loop-head `if (m.dead)` removal covers the second half). Whether the ground should survive a cap eviction is a design call — but the comment at 560-561 and the code have to agree either way.
-
-- **[medium] The pip collar over-reports: THORN draws six marks for four buyable upgrades, LODE seven for four**  
-  `src/mines.js:771, src/mines.js:110-145, src/mines.js:838-843`  
-  The gauge the mine wears reads high on six of eight kinds — for THORN and LODE, 50% high on the first purchase and never able to show a single mark. The drawn SIZE is correct (it is `gr` directly at 770), only the count is wrong, so the two halves of the same readout disagree.  
-  _Fix:_ Have `mineGrade` return the pair, or export the denominator, rather than restating it at 771: e.g. `mineGrade` returns `{ has, of }` and `drawMines` uses `pips = has`. That makes the collar literally "one mark per upgrade" and cannot drift when a node is added to `own`.
-
-- **[medium] `mineGrade` denies DEEP CHARGE and SHRAPNEL to THORN and LODE, but SALTED's fizzle reads both for exactly those kinds**  
-  `src/mines.js:111-120, src/mines.js:126-128, src/mines.js:367-368`  
-  Contradicts the docstring at 91-93 ("the reading is of what the mine can actually DO") in the same direction the comment says it was written to stop, just for a different pair of nodes. A player who has bought SALTED, DEEP CHARGE and SHRAPNEL has tripled what their THORN and LODE do when they expire and the mine shows nothing for it.  
-  _Fix:_ Make `bang` and `hurts` depend on SALTED as well: `const bang = blast/knell/spall || up.mineFizzle;` and likewise for `hurts`. Note this changes `of` for five kinds and so has to land with the pip-denominator fix above, or the collar drifts further.
-
-- **[low] `mineScale` is an exported function with no caller anywhere, and `drawMines` restates its arithmetic inline**  
-  `src/mines.js:148-153, src/mines.js:770`  
-  None today. The cost is the next person who edits `mineScale`'s 0.26 and sees no change on the field.  
-  _Fix:_ Either call it (`const R = m.r * mineScale(world, m.kind)` — it recomputes `mineGrade`, so pass `gr` in or have it take the grade) or delete it and leave the constant at 770 with the docstring.
-
-- **[low] `Patch.rim()` and the `edge` array it is the only reader of are dead code on THORN's ground**  
-  `src/patch.js:196-207, src/patch.js:110-113`  
-  None visible — a small per-patch allocation and a comment describing an outline the patch no longer draws.  
-  _Fix:_ Delete `rim()` and `this.edge`, or use `rim()` for the haze so the ground is actually ragged as the comment claims.
-
-- **[low] LODE pushes `world.enemies` only — not `world.drops` — where SNARE and WIRE both take the two lists**  
-  `src/mines.js:465, src/mines.js:330-331, src/mines.js:500-501, src/arsenal.js:126`  
-  Text overclaims; behaviour is the desirable one. No energy is stranded.  
-  _Fix:_ Change the two lines of text rather than the code — or, if drops really should be pushed, do it only after the ghost-field leak is fixed, because 19 dead overlapping fields would otherwise sweep the floor clean.
-
-- **[cosmetic] LODE and SNARE push grey `harmless` bodies; WIRE and the trigger test both refuse to touch them**  
-  `src/mines.js:468, src/mines.js:318, src/mines.js:486, src/mines.js:623`  
-  Grey drift is blown around by a LODE and hauled by a SNARE. Nothing is lost or gained; it is a picture question.  
-  _Fix:_ If it is intentional, say so in the comment at 466-467 the way `cut` does. If not, add `|| e.harmless` to 468 and 318.
-
-- **[cosmetic] `CFG.lode.push` is documented as an acceleration and used as a force**  
-  `src/config.js:915, src/mines.js:476`  
-  None in play. It matters when someone tunes 620 expecting heavy bodies to move.  
-  _Fix:_ `push: 620, // outward force at the centre; the acceleration it gives is this x invMass`.
-
-
-### SPALL and VOID mines, end to end (src/mines.js) — geometry, damage, upgrade wiring, mineGrade accounting, and picture-vs-damage
-
-- **[high] ARMORED absorbs VOID's swallow in full — the mine is spent and the body is untouched**  
-  `/home/user/Shooter/src/mines.js:455; /home/user/Shooter/src/enemies.js:1136-1140; /home/user/Shooter/src/enemies.js:264; /home/user/Shooter/src/config.js:940-942`  
-  The player lays a VOID on an ARMORED wave, a body walks in, the collapse ring plays, the screen flashes, `audio.boom()` fires, the mine is gone — and the target is standing there at full health with no wreckage. It fails hardest in exactly the case VOID exists for: a heavy body the turret has not been shooting, whose plate is therefore always up.  
-  _Fix:_ Do not route the swallow through the ARMORED gate. Cheapest correct form inside mines.js: in `swallow`, set `e.hp = 0` and call `e.destroy(world)` directly (destroy is the door that already refuses a fizzling body), or give `applyDamage` an opt-in `pierce`/`ignorePlate` argument defaulting false and pass it only here. Do NOT fix it by pre-clearing `e.plateT` — that hands the body a free plate on the next hit instead.
-
-- **[medium] SPALL's wedge — "facing the way it will throw" — is drawn spinning, while the fan always leaves straight up**  
-  `/home/user/Shooter/src/mines.js:857; /home/user/Shooter/src/mines.js:909-924; /home/user/Shooter/src/mines.js:170; /home/user/Shooter/src/mines.js:532; /home/user/Shooter/src/mines.js:390`  
-  The only mine in the game whose damage is directional carries a direction indicator that is wrong essentially always, and turns a full revolution every 2.6 seconds. A player reading the wedge to decide whether the fan will catch something reads a random number.  
-  _Fix:_ Draw the spall body outside the spin, or counter-rotate it: `ctx.rotate(-m.spin)` immediately inside the `spallM` branch (which leaves the seat, glow and pip collar spinning as before), or hoist the `ctx.rotate(m.spin)` at :857 into the branches that want it.
-
-- **[medium] A VOID deletes a live boss core outright, in one frame, from a randomly-placed mine**  
-  `/home/user/Shooter/src/mines.js:616-631; /home/user/Shooter/src/mines.js:455; /home/user/Shooter/src/boss.js:797; /home/user/Shooter/src/boss.js:289-297`  
-  If it is not intended: a mine the player does not aim (mines.js:207-214, `rand` over the whole open field) can end a gate fight worth several minutes, at a rate set by dice rather than by a decision. Note the trigger loop's own comment at :620-622 shows the author thought about bosses here — but only about `spent` structure during the outro, not about the live core.  
-  _Fix:_ If bosses are meant to be off-limits, the guard belongs in the trigger loop beside the existing four, on whatever already marks boss bodies (`e.ofBoss`, used by regress.mjs:5325) — skip them for `void` only, so BLAST/KNELL/SPALL keep hurting a boss normally. If it IS intended, say so in the VOID config note and in EVENT HORIZON's row, because nothing player-facing says a boss is a legal target.
-
-- **[low] VOID's pip collar draws seven marks for five upgrades; the denominator is a hardcoded 7 against a computed `of` of 5**  
-  `/home/user/Shooter/src/mines.js:771; /home/user/Shooter/src/mines.js:126-144; /home/user/Shooter/src/mines.js:838-843`  
-  The collar — sold at mines.js:838-841 as the mine's version of the turret's eighteen sockets, "something you can look at and see what you have put into it" — over-reports on six of the eight kinds. On VOID it shows 3 marks after two purchases and 7 after five.  
-  _Fix:_ Have `mineGrade` return `{ has, of }` (or export an `of` helper) and let the draw site use the real denominator, instead of the per-kind literal at :771. That also removes a second place to update when a kind gains a node.
-
-- **[low] SPALL's trigger mouth is a full circle; its fan is a 51.6° cone, and the drawn mouth says otherwise**  
-  `/home/user/Shooter/src/mines.js:611-631; /home/user/Shooter/src/mines.js:390; /home/user/Shooter/src/mines.js:404; /home/user/Shooter/src/mines.js:792-814`  
-  A body that reaches the SPALL from the side or from below — anything the wave has already walked past, anything a PULSE or a LODE has shoved sideways — springs the whole claymore and takes nothing, and the only thing on screen that says where the fan goes is the wedge, which is wrong for the separate reason above. Likely authored ("throws everything it has in one direction", config.js:917-919); the fault is that the picture does not say so.  
-  _Fix:_ Either draw SPALL's mouth as an arc rather than a full circle — `ring`/`ctx.arc` already take `a0`/`span` (fx.js:235, and the arc call at :813 could use `-π/2 ± 0.45`) — or gate the trigger on the bearing so the mine only springs on something it can actually hit. The first is the smaller change and keeps the mine's timing identical.
-
-- **[low] `retire()` cannot run in shipped play: the cap is never reached, and the comment that justifies it names a caller that does not exist**  
-  `/home/user/Shooter/src/mines.js:220-230; /home/user/Shooter/src/mines.js:351-359; /home/user/Shooter/src/mines.js:996-1004`  
-  None today — the branch cannot be entered outside the debug panel. The cost is the `world.endless` shape CLAUDE.md records: a path nobody can take, with a comment maintaining a caller that was deleted, and two real bugs hidden inside it that will land the day anything lays a third mine per throw or shortens the clock below 7.9 s.  
-  _Fix:_ Decide which it is. If the cap is still meant to be reachable, delete the stale SEED sentence, route `retire`'s fall-through through `fizzle(world, m)` so SALTED pays, and pick the victim by lay order (a monotonic id on the Mine, or push-order preserved by splicing instead of swap-popping). If it is not, say so where the cap is defined and keep `retire` only as the debug path it actually is.
-
-- **[cosmetic] `mineGrade`'s comment names three readers of `up.mineDamage`; there are four, and two of them are SPALL**  
-  `/home/user/Shooter/src/mines.js:113-118; /home/user/Shooter/src/mines.js:402; /home/user/Shooter/src/mines.js:408`  
-  None to the player. It is the comment that carries the rule for anyone adding a kind, so a reader following it would exclude SHRAPNEL from a new pellet-ish mine that does read `mineDamage`.  
-  _Fix:_ Say five reads in four functions — detonate, fizzle, toll and spall (twice, the pellet and its burst).
-
-- **[low] VOID's collapse ring is drawn on the mine while the body vanishes up to 165 units away, and EVENT HORIZON makes it worse**  
-  `/home/user/Shooter/src/mines.js:449-453; /home/user/Shooter/src/mines.js:615`  
-  With the VOID branch bought out, the swallow reads as two unrelated events: a ring closing over an empty patch of floor, and a body popping into sparks somewhere else. It is the mine's only feedback that it did anything.  
-  _Fix:_ Draw the collapse ring at the body — `ring(e.x, e.y, e.r * 2.2, 6, …)` — or add a second short stroke from `m` to `e` so the two ends read as one event.
-
-- **[cosmetic] SPALL draws a 150-unit expanding ring for a mine that has no radial damage at all**  
-  `/home/user/Shooter/src/mines.js:440`  
-  The mine reads as having made a ~100-unit radial blast when it made a 51.6° cone. Compounds the wedge and the mouth-vs-fan findings above: all three of SPALL's on-screen cues point away from what it actually did.  
-  _Fix:_ If it stays, shrink it to something SPALL owns — the mouth (`m.r + cfg.trigger * up.mineTrigger`) — or make it a cone: `ring` already takes `a0`/`span` (fx.js:235), so `ring(m.x, m.y, m.r, 120, 0.3, '#ff4d4d', 3, 0, -Math.PI/2 - 0.45, 0.9)` draws the fan it actually threw.
-
-- **[cosmetic] SPALL and VOID both lay with BLAST's chime: `LAY_TONE` still holds only the original four kinds**  
-  `/home/user/Shooter/src/mines.js:216; /home/user/Shooter/src/mines.js:247`  
-  Laying a VOID and laying a BLAST sound identical. Minor, and only on the lay — everything after that is distinct.  
-  _Fix:_ Give the four added kinds their own entries, or drop the `|| 300` fallback so a missing kind is silent rather than wrong.
+- CLAIM 4 (neither `slugged` nor `chill` is drawn — two multi-second status rules with no on-screen tell at all) — REFUTED as a defect; the premise is half right and the conclusion is a feature request. The grep is correct: no draw path reads either flag (`slugged` at src/enemies.js:246, :830, src/game.js:1590-1598, src/shooter.js:643; `chill` at src/enemies.js:288, :867-871, src/shooter.js:657, src/upgrades.js:46/:368). But "nothing on screen at all" is not what ships. Both rounds have their own impact AND their own death: src/fx.js:325-327 gives SLUG's 'slab' a concussion ring plus three slow dust dots; src/fx.js:330-336 gives RIME's 'flake' four ice shards and a glint; src/fx.js:363-370 gives 'flake' a six-shard icy death with a #8fe3ff ring and src/fx.js:396-400 gives 'slab' four heavy dots plus `ripple(x, y, 1.2, r * 6)`, both fired from src/enemies.js:1288-1289 when the kill is within half a second of the hit. A slugged collision is also visibly distinct from a damaging one: src/game.js:1599 `return;` sits above the three `spark(mx, my, ...)` calls at src/game.js:1605-1607, so a slugged impact throws no impact sparks where an ordinary one throws three. More decisively, nothing in the code, config, arsenal row, README or teaching line promises a persistent status indicator for either mark, so there is no statement for the behaviour to contradict — this is a proposal for a new visual, which the brief classes as a design preference rather than a fault. The reader's own framing ("It is not a wrong picture, it is an absent one") says the same thing.
+
+- CLAIM 7 ("Chills for 3.2s" is the base value; a fully bought DEEP FREEZE makes it 15.72s) — REFUTED. The arithmetic is right (src/tree.js:205 `const levels = u.repeat ? Infinity : (u.levels ?? 3);`, src/upgrades.js:368 `scale('chill', 1.7)` with no `levels`, 3.2 * 1.7**3 = 15.72) and the reader correctly declines to call the three levels a defect. But the conclusion that the arsenal string is wrong does not hold, because stating the ROUND's own number and letting upgrades move it is the table's convention throughout, and RIME is not singled out: src/arsenal.js:179 SPINE says `'Punches through 3 more bodies behind the first.'` against THROUGH AND THROUGH (src/upgrades.js:367, `bump('pierce', 2)` with no `levels`, so +6 — nine bodies bought against three quoted); src/arsenal.js:175 ARC says `'The hit jumps to 4 more nearby'` against FIFTH LINK; src/arsenal.js:191 SPORE says `'for 4.5s. Three at a time.'` against SECOND GROWTH. All four understate a fully bought build by the same construction. And the convention is deliberate and pinned: scripts/regress.mjs:13614-13630 holds every one of those strings to the CONFIG value — `says('rime', CFG.rounds.rime.chill);` at :13621 sits beside `says('spine', CFG.rounds.spine.pierce);` and `says('arc', CFG.rounds.arc.jumps);`, under a case named "...and the sentences beside them still describe the same machine". Rendering effective values would break that case for five rows at once and change the whole table's contract; it is a design decision about the loadout sheet, not a RIME fault.
+
+- OK LIST (not one of the reader's claims — things I checked in this code and found correct, so the next audit need not re-report them). (1) `Math.max(e.chill, ...)` at src/shooter.js:657 lacks the `|| 0` that SLUG's mark has at :643, which would make `chill` NaN on any body without the field. It cannot: I opened all seven bosses through `openBoss`, ran each to stage III for 30s and walked every body in `world.enemies` — every one is an `Enemy` instance with numeric `chill` and `slugged` (Enemy/ordinal+tally+digit, gnomon+dial+second, fractal+fraction+mite, amplitude+crest+droplet, pylon+ion, pane+parity+echo, terminus+bound+limit), and src/projectiles.js:396 only ever sets `bestKind = 'enemy'` off `test(world.enemies)`. No NaN path. (2) The `slugged` chain is genuinely bounded: every member decays by dt in the same `Enemy.update` (src/enemies.js:830) from the same value, so `Math.max` can only propagate a non-increasing number and nothing outlives 2.4s from the original hit. (3) The Decoy (src/abilities.js:306-325) has no `slugged` field, so `typeof a.slugged === 'number'` never marks it — it is protected from a slugged body's collision damage by the stated "takes none from it" rule, not by the propagation, contrary to the reader's aside. (4) SLUG's impulse does take HEAVY as well as SLEDGE: src/shooter.js:504 `impulse: (opts.impulse ?? CFG.bolt.impulse) * up.impulse,` multiplies `g.impulse * up.slug` from :601, so the ladder is 1500 * up.slug * up.impulse as the reader assumed. (5) Debris cannot inherit the mark — `if (a.inert || b.inert) return;` at src/game.js:1584 runs before the slugged guard. (6) The chill's `drag ** dt` is frame-rate independent by construction and its per-second constant is exactly `CFG.rounds.rime.drag`. (7) src/config.js:774's BOLT figure (26) still matches src/config.js:1151.
+
+- CLAIM 1 (TITHE's mark is a floor, worth nothing from tier 15) — ALREADY FIXED, and the fix is committed, not sitting in a working tree. `git status --porcelain` is empty; commit ff1da74 is "Build 220, part six: a TITHE mark paid nothing from tier 15". shooter.js:752-755 now reads `if (!e.tithed) {` / `e.tithed = true;` / `e.bounty *= g.bounty * w.up.bounty;` / `}` — the `Math.max` is gone, replaced by exactly the flag-plus-multiplier the claim proposed, with the crossover arithmetic recorded in the comment above it at shooter.js:739-751. The flag is declared in the constructor (enemies.js:297 `this.tithed = false;`, with a note at :291-296 explaining why it is declared rather than sprung into existence), and Enemy objects are never pooled (`new Enemy` at every site), so it cannot be inherited. A regress case pins it at both ends of the ladder: scripts/regress.mjs:13805-13871, `check('a TITHE mark multiplies what a body was worth, at every tier', ...)`, asserting `gain` = `CFG.rounds.tithe.bounty` to within 0.01 at tier 1 and tier 18. Nothing in the claim survives against the current file. (The one thing the fix did NOT do is make the tier bounty reach split children — that is my confirmed finding above.)
+
+- CLAIM 2 ("each mark ... pays more" is false) — REFUTED AS STATED. Its primary evidence no longer exists: arsenal.js:195 does not say `fx: 'Marks a body: each mark hurts it more and pays more.'` It says `fx: 'Marks a body: each mark hurts it more, and all of them pay 3.5x.'`, which is an accurate description of a flat multiplier applied once. And the behaviour is not an oversight to be argued about: shooter.js:739-751 states the design in as many words — a multiplier applied once, with the reason the floor existed at all ("eight marks must not compound to 3.5^8") — and scripts/regress.mjs:13805 pins it. Making the payout ramp with depth, as the claim proposes, would be a balance change to a deliberately flat number, not a bug fix. What genuinely survives is two stale internal comments (config.js:819-820, enemies.js:1446-1447); I have carried those forward as their own cosmetic finding rather than crediting the claim, because the claim's own remedy and its player-facing evidence are both wrong against the current tree.
+
+- CLAIM 3 (nothing raises a SPORE patch's damage; HOLLOWPOINT reaches only 11% of the round) — ALREADY FIXED, in both places the claim named. Commit e863acd is "Build 220, part seven: burning ground takes the damage line, and VOID deletes". shooter.js:643 is now `dps: g.patch.dps * w.up.damage,` under a header at :634-642 that carries the same measurement the claim did ("SPORE went 89 dps to 158 with the whole tree bought, a ladder of x1.78 where every other round in the rack is x4.7 to x19"). THORN's patch was fixed too, and better than the claim proposed: mines.js:634 is `dps: T.patch.dps * world.up.mineDamage,` — the MINE damage line (SHRAPNEL), not the ammo line, which is the correct ladder for a mine and is explained at mines.js:624-632. A regress case went in with it at scripts/regress.mjs:13873+. The claim's own worry about the cap does not land either: config.js:804-814 justifies `cap: 3` explicitly in STOCK terms ("362 damage a second stock against SCATTER's 135 and BOLT's 91"), and those stock numbers are unchanged — 3 x 46 = 138/s stock, as before.
+
+- CLAIM 6 (`Patch.rim()` and `this.edge` have had no caller since build 214) — ALREADY FIXED. Both are gone. patch.js:191-199 is now a tombstone comment in their place: `* \`rim()\` and the \`edge\` array it was the only reader of came out in build` / `* 220. Its docstring said "shared by the fill and the edge", and build 214` / `* replaced both of those layers...`. `grep -n "rim(\|this.edge" src/patch.js` returns nothing but that comment and the `rim` boolean on a speck (:97, :103, :106-107), which is a different thing entirely and is live. The 18 `rand()` draws the claim objected to are gone with it.
+
+- CLAIM 7 (upgrades.js's end-of-file docstring says "`levels` absent means without limit") — ALREADY FIXED. Commit f82b5c8 is "Build 220, part five: the documentation the levels trap keeps being read out of". upgrades.js:800-802 now reads `* **\`levels\` absent means THREE.** \`tree.js\` reads \`u.levels ?? 3\`, and the` / `* only thing that means "without limit" is \`repeat\`. This paragraph said the` / `* opposite for a long time...`, followed by the roll of seven nodes that shipped uncapped and a closing instruction ("Write the number"). It matches tree.js:205 `const levels = u.repeat ? Infinity : (u.levels ?? 3);` exactly.
+
+- CLAIM 8 (LEVY carries no `levels` and is sold three times, with no note) — REFUTED as a defect. The premise is true and the consequence is not. Verified live: `NODE_BY_ID.get('levy').levels` prints 3, so `up.bounty` reaches 1.5^3 = 3.375. But nothing anywhere mis-states it: upgrades.js:369 `{ id: 'levy', name: 'LEVY', line: '+50% tithe energy mark.', apply: scale('bounty', 1.5), icon: MARK.levy },` sells +50% a level and delivers +50% a level, which is what its card says at each level. It is one of SIXTEEN nodes with no explicit `levels` — hollowpoint, ricochet, overpressure, compound, throughandthrough, sledge, deepfreeze, levy, deepcharge, widemouth, shrapnel, deadweight, hotwire, slew, casing, insulation — every one of them a plain percentage dial for which three is the documented default, and HOLLOWPOINT's own header at upgrades.js:334-336 does the 1.5^3 arithmetic on purpose. The nodes the `levels` trap has actually caught were all nodes NAMED AFTER A COUNT they then overshot (FIFTH LINK making seven jumps, FOURTH BELL, BUCKSHOT's pellets, STANDING ORDER's "-20%" delivering 0.512); LEVY is not that shape. Singling it out of sixteen because its neighbour happened to get a comment in the same commit is a style preference, not a defect. The claim's own text concedes it ("Both are probably intended", "None today, if three is what was wanted").
+
+- CLAIM 9 (the SPORE row says "Three at a time" and stays saying it after SECOND GROWTH) — REFUTED. Every row in arsenal.js describes the UNBOUGHT round, and the suite enforces exactly that: scripts/regress.mjs:13576-13594 pins each row's numbers to bare `CFG` values (`spore: [CFG.rounds.spore.damage, CFG.rounds.spore.patch.dps]`), and :13617-13621 pins the counted sentences the same way — `says('arc', CFG.rounds.arc.jumps)` holds ARC at 4 jumps although FIFTH LINK sells a fifth, and `says('spine', CFG.rounds.spine.pierce)` holds SPINE although THROUGH AND THROUGH sells +2. "10 + 46/s" on the same SPORE row is likewise the unbought number and HOLLOWPOINT now multiplies it. Making "Three at a time" alone reflect an upgrade would make it the one inconsistent row in the file. One true observation buried in the claim, which is not the claim: the count is spelled as a word, so `says('spore', CFG.rounds.spore.patch.cap)` cannot be added without rewriting the string, and `patch.cap` is the only quoted count in the table that nothing pins. That is a test-coverage gap worth closing (change the row to "3 at a time" and add the assertion), not a defect in the game.
+
+- claim 3 (pips draws 7 marks for SNARE's 5) — ALREADY FIXED in the working tree, and the fix is the one the claim proposes. There is no `Math.round(gr * (m.kind === 'spall' ? 8 : ...))` anywhere in mines.js. The denominator was extracted into `tally(world, kind)` (mines.js:110-162), which returns `{ has, of }`; `mineGrade` (164-166) is the ratio and `mineMarks` (169-171) is the numerator, and `drawMines` reads mines.js:855 `    const pips = mineMarks(world, m.kind);`. The docstring at mines.js:99-108 records the exact defect claimed, in the past tense: "`drawMines` was reconstructing it as `round(grade * denominator)` off a denominator written out by hand -- `spall ? 8 : blast || thorn ? 6 : 7` ... It disagreed for six of the eight kinds, so a SNARE with five upgrades available drew seven marks and a WIRE with one drew two. There is one denominator now and it is this one." Verified for SNARE: `mouth = !!S.trigger` (34) is true, `bang` false, `hurts` false, so `of = 2 + 1 (SALTED) + 1 (mouth) + 1 (own: deadweight) = 5` and `pips = has <= 5`. The reader's own table of `of` values matches `tally` exactly — they audited a revision behind HEAD (their line numbers run ~25 low throughout).
+
+- claim 9 (`mineScale` is exported with no caller) — ALREADY FIXED, same refactor. mines.js:854 reads `    const R = m.r * mineScale(world, m.kind);` under the comment at mines.js:852-853: "Through `mineScale`, which existed and had no caller: this restated its arithmetic inline, so the exported one was dead and the two could drift." The duplicated 0.26 literal the claim objects to exists in exactly one place, mines.js:178.
+
+- claim 5 (mineGrade credits SALTED to SNARE but not DEEP CHARGE / SHRAPNEL) — the premise is quoted from the stale half of a stacked pair of comments, and the proposed fix would make a mine SHRINK when you buy an upgrade. The comment the claim cites (mines.js:126-132, "read in exactly three places") is superseded by the one directly above the line it describes, mines.js:133-135: "SHRAPNEL is `up.mineDamage`. It is read by `detonate`, `fizzle`, `toll`, SPALL's pellets and their bursts, and -- since build 220 -- THORN's ground", and the code matches THAT: mines.js:136 `  const hurts = bang || kind === 'thorn';`. More decisively, the denominator is deliberately a property of the KIND and not of the build, and the claim's fix (`if (bang || up.mineFizzle)`) makes it a property of the build: a SNARE owning PAIRED CHARGE, QUICK LAY, WIDE MOUTH and DEAD WEIGHT reads 4/5 = 0.80 today; under the fix, buying SALTED takes it to 5/7 = 0.714, so `mineScale` (mines.js:175-179, `1 + grade * 0.26`) drops from 1.208 to 1.186 and the mine gets visibly smaller the moment you buy something for it. A conditional denominator is a worse readout than the one-directional understatement it removes, and the reader concedes as much ("arguably worse"). The stacked stale comment at 126-132 is real doc drift and is folded into my README/doc-drift finding.
+
+- claim 8 (detonate's ring crosses the blast radius dimmer than the version it replaced) — the arithmetic is right and the conclusion is not a defect. Verified: `ring(x, y, r0, r1, life, color, w)` (fx.js:235-243) sets `vr = (r1-r0)/life`, and `drawFx` strokes at `ctx.strokeStyle = rgba(g.color, t * 0.95)` / `ctx.lineWidth = Math.max(0.4, g.w * t)` with `t = g.life/g.max` running 1->0 (fx.js:576, 586-587). mines.js:301 `ring(m.x, m.y, br * 0.78, br * 1.06, 0.4, '#ffb347', 5)` reaches `br` at elapsed (1-0.78)/(1.06-0.78) = 0.7857, i.e. t = 0.214, alpha 0.204, width 1.07px — the reader's numbers to three digits. But the true radius is not left to that ring: mines.js:303 `world.effects.push(new Shock(m.x, m.y, br, '#ffb347'));` opens to exactly `br` over 0.3s and holds `a = 1` until t = 0.70 (fx.js:46-52, `left = clamp((this.life - this.t) / 0.45, 0, 1)` with `life = 1.15`), stroked at 0.75 alpha, 2.4px, dashed and turning, with four axis ticks — so `br` is marked at full brightness for roughly four tenths of a second against the ring's 1/50th-second crossing. The pairing is systematic, not lucky: every expanding ring in the file has a Shock on the very next line (301/303, 411/412, 573/574) and the only two rings drawn contracting are exactly the two with no Shock behind them (`snap`, mines.js:318, and SPALL's per-pellet burst, mines.js:469, where 36 Shocks would be the clutter the comment there says it is avoiding). The comment's own headline is "At the radius, not half again past it" — the overshoot, which the change did fix (1.5br -> 1.06br). The reader states the player-visible consequence is nil and that "the defect is in the claim, not the picture"; by this audit's own rule that makes it a note, not a finding.
+
+- claim 4's headline ("DEAD WEIGHT is sold three times", framed as an instance of the `levels ?? 3` trap) — true as arithmetic, not a defect in itself. DEAD WEIGHT is one of FIVE uncapped percentage dials in the FIELD branch (upgrades.js:454 DEEP CHARGE, 455 WIDE MOUTH, 460 SHRAPNEL, 461 DEAD WEIGHT, 462 HOT WIRE), and three levels is the acknowledged value for them elsewhere in the codebase: mines.js:407-408 reasons about "At three DEEP CHARGEs the blast reaches 236" and mines.js:631 records BLAST's SHRAPNEL ladder as x3.10 (1.45^3 = 3.048). The tree's level TOTAL is pinned at 134 by regress.mjs:495 with a fifteen-line changelog above it, and that 134 includes these three. The seven nodes CLAUDE.md and upgrades.js:801-812 list as having shipped uncapped by ACCIDENT are all named after the number they were supposed to produce (FIFTH LINK, FOURTH BELL, PAIRED CHARGE, TRIPLE TAP) or contradict their own row text (STANDING ORDER's "-20%" at 0.8^3); DEAD WEIGHT's row says "+65% snare hold time" and is silent on how many times, exactly like its four siblings. The README row it is measured against (README.md:250) is one of four rows in a table where EVERY row is one-level-stale — BLAST 105 not 95 and 320 not 138, WIRE 79 not 72 and 267 not 108, KNELL 4 tolls not 3 — so nothing about that row is specific to DEAD WEIGHT. What does survive from claim 4 is the second consequence, the hold outliving `life`, which I have confirmed above as its own finding and which holds at one level as much as at three.
+
+- claim 12 (the drawn grip circle lags the reach) — the claim itself concludes "None needed", so there is no defect to confirm, and one of its two numbers is wrong. With `m.open += ((m.gripping ? 1 : 0) - m.open) * clamp(dt * 7, 0, 1)` (mines.js:564) at dt = 1/60 the per-frame factor is 7/60 = 0.11667 and `open_n = 1 - 0.88333^n`. After 6 frames that is 1 - 0.4751 = **0.525** (circle at 110 units), not the 0.47 the claim reports — 0.4751 is 0.88333^6, the remaining GAP, taken from the wrong side. (The 19-frame figure, 0.905, is right.) In any case the reach is announced correctly twice on the frame it opens: `snap`'s ring is `ring(m.x, m.y, S.reach, m.r * 2, ...)` (mines.js:318), drawn contracting from a full-brightness 210, and the wire bundle at mines.js:760-767 is tested against the full `S.reach` from frame one. Nothing here is wrong with the game.
+
+- claim 3 (the drawn wire is shorter than the cutting wire during the 0.55s unspool) — ALREADY FIXED in the working tree, in exactly the form the claim proposes, and the fix carries the claim's own reasoning. src/mines.js:537-540: `  const mx = (m.ax + m.bx) / 2;` / `  const ax = mx + (m.ax - mx) * m.open;` / `  const bx = mx + (m.bx - mx) * m.open;`, and the sweep on the next lines uses them: `      const hit = segClosest(ax, m.ay, bx, m.by, e.x, e.y);` (mines.js:545). The header directly above at mines.js:530-536 states the defect and its measurement verbatim: 'm.open ramped the WIDTH and nothing else, so the line cut its whole 300-unit span from the first frame while being drawn creeping out of the middle over W.open -- 0.55 seconds -- and on the first frame drawn at no length at all. A body 140 units from the spool was cut by a wire that was not there yet. Same lerp as the draw, off the same open.' The draw at mines.js:806-809 computes the identical `mx`/`ax`/`bx`. It landed in commit 332fb3b, 'Build 220, part eight: a WIRE cut where it was not yet drawn, and PILE paid the fade'. The claim's cited lines (483, 488, 536, 725-727) are stale by ~50 lines; the reader was auditing a tree that no longer exists. (I checked the inverse mismatch that survives — `reach = W.width * m.open` at mines.js:529 ramps the half-width while the drawn stroke widths are constant with only alpha ramping — and it is not worth a finding: W.width is 8 units against `rr = reach + e.r` with body radii of 10-45, so the ramp moves the contact band by at most a sixth of its size, in the direction that draws more than it cuts.)
+
+- claim 4 (the upgrade collar draws more marks than the mine carries: WIRE two for one, KNELL seven for six) — ALREADY FIXED, and the fix is the exact one the claim asks for. The hand-written per-kind denominator is gone: src/mines.js:855 now reads `    const pips = mineMarks(world, m.kind);`, and `mineMarks` is `export function mineMarks(world, kind) { return tally(world, kind).has; }` (mines.js:170-172) — the numerator itself, not a ratio restated against a constant. `tally` (mines.js:109-161) returns `{ has, of }` and `mineGrade` (mines.js:164-167) is now the ratio over the same computation. The claim's proposed fix is 'have mineGrade also expose its denominator (return { has, of }) … and draw has marks'; that is line-for-line what is in the file. The header at mines.js:97-107 even records the claim's own numbers: 'drawMines was reconstructing it as round(grade * denominator) off a denominator written out by hand -- spall ? 8 : blast || thorn ? 6 : 7 -- against the one this function actually computes. It disagreed for six of the eight kinds, so a SNARE with five upgrades available drew seven marks and a WIRE with one drew two. There is one denominator now and it is this one.' I re-derived WIRE's denominator independently (mouth false — CFG.wire has no `trigger` key, config.js:1058-1067; bang false; hurts false; so of = 2 + 1 + 1 = 4: PAIRED CHARGE, QUICK LAY, SALTED, HOT WIRE) and it matches the claim, but there is nothing left to fix.
+
+- claim 5's headline (`CFG.mines.cap` cannot be reached, so `retire()` is dead code in play) — REFUTED on two independent grounds, though a residue survives and I have confirmed it separately. (1) The behaviour is authored, deliberately, with a stated reason and a measurement, in the docstring of the very node that made it so: src/upgrades.js:429-439, 'ONE level, because the mine cap eats the rest. … Uncapped this node laid FOUR mines a throw against a fully bought QUICK LAY interval of 8.4 seconds and a 15-second life -- measured, two throws put eight on the field and left five, so three were retired before they had armed. The player pays for the third level and watches it evicted. At one level a throw lays two, two throws leave four, and the cap is still the backstop it was authored as.' A backstop the common case does not reach is what a backstop IS; config.js:1013-1016 calls `cap` 'a contract with the player rather than a balance dial: nothing may move it', which is a ceiling, not a promise that play presses against it. Reporting a deliberately unreached ceiling as a dead number is the `s.locked` shape inverted. (2) The claim's occupancy model is wrong, and its simulation inherits the error: it assumes every kind lives `flight + M.life`, but SNARE does not. In `updateMines` the arm `} else if (m.gripping) {` (mines.js:670) sits ABOVE `} else if (m.life <= 0) {` (mines.js:679) while `m.life -= dt` (mines.js:615) runs unconditionally, so a gripping snare skips the life check entirely and lives flight + grip-time + `S.hold * up.mineHold` — 10.78s of hold at DEAD WEIGHT's three tree levels (2.4 * 1.65^3; upgrades.js:461 has no `levels` and I confirmed the tree's number by import). A snare gripping at settle 10s is on the field 21.7s, past the 16.875s three throws span, which puts six mines down against a cap of 5. Even at base hold the ceiling is 18.3s, still past it. Nothing else can kill a gripping snare: `.life` appears only at mines.js:194, 615, 623, 638, 655, 659, 668, 679. So `retire` is reachable. The claim's two genuine observations — that `retire` gives WIRE (and THORN, LODE, VOID) nothing against its own docstring, and that the SEED comment names a caller that does not exist — are real, and I have confirmed both above rather than dismissing them with the headline.
+
+- claim 7 (a body killed by the WIRE wears the wrong death, or none) — the facts are right and the verdict is a design preference, the same shape as this audit's already-refuted 'RIME, SPORE and TITHE have no muzzle arm'. `cut` does not set `lastHit`, correctly observed. But WIRE is not being singled out by anything: the complete set of `lastHit` writers is enemies.js:1071-1072 (the projectile path, `this.lastHit = form;`), patch.js:184-185 (`e.lastHit = 'pod';`) and projectiles.js:239-240 (`best.lastHit = 'arc';`) — so no mine blast, no KNELL toll, no SPALL pellet burst, no VOID swallow, no PULSE, no PRISM, no LANCE, no WELL and no SPINES sets one either. `deathFx` (fx.js:360) switches on round FORMS — flake, shell, arc, dart, slab, pod, tithe — and `Enemy.destroy` describes it as exactly that: 'the death wears what killed it, if the kill is fresh: frozen through, burned out, earthed, bisected, crushed, gone to spores, or paid in full' (enemies.js:1283-1286). That is an enumeration of round identities, not a promise of universal coverage, and every death already gets the universal `explode(this.x, this.y, this.r, t.color, t.glow, …)` at enemies.js:1282. The 'wrong death' half is likewise not WIRE's: the 0.5s freshness guard at enemies.js:1288 is the authored answer to a stale tag, it applies identically to a body finished by a KNELL toll 0.4s after a SPINE hit, and the same header names that case as the reason the window exists ('a body tagged by RIME a while ago and finished by a PULSE did not die of ice'). Giving the wire a death form is a legitimate polish ask; it is not behaviour contradicting a stated claim.
+
+- claim 8 (`mineScale` is a dead export with no caller, and drawMines inlines the same expression) — ALREADY FIXED, and by the caller the claim asks for. src/mines.js:854 reads `    const R = m.r * mineScale(world, m.kind);`, under a comment at :852-853 naming the claim's own reasoning: 'Through `mineScale`, which existed and had no caller: this restated its arithmetic inline, so the exported one was dead and the two could drift.' `grep -rn mineScale src/ scripts/ *.html` now returns four lines: the definition at :175, its body at :178, the comment at :852 and the call at :854. The 0.26 has one home. Nothing to do.
+
+- ALSO CHECKED AND FOUND CORRECT (not a claim; recorded so the next audit does not re-report it): (a) `cut`'s guard is right per the CLAUDE.md rule — mines.js:544 `      if (e.dead || e.spent || e.harmless) continue;` — a damage path honouring `spent`, skipping `staged`, and leaving `fizzle` alone exactly as `applyBlast` does; the neighbouring steering paths correctly do the opposite (`grip` at mines.js:344 and `repel` at mines.js:513 both test `e.dead || e.spent || e.fizzle`, and the trigger CHOOSER at mines.js:691 correctly adds `staged`). (b) KNELL's toll goes through `applyBlast`, which honours `spent` (enemies.js:4515). (c) Neither ring in this code has the fade-and-thin fault: `toll` draws `ring(m.x, m.y, r * 0.76, r * 1.06, 0.42, '#ff61f2', 4)` (mines.js:576) and `fizzle` draws `ring(m.x, m.y, fr * 0.72, fr * 1.06, 0.32, '#ffb347', 3)` off `fr = f.r * world.up.mineBlast` (mines.js:401-402) — both land at the damage radius and both take the DEEP CHARGE scalar the blast takes. (d) WIRE's drawn extent matches its damaging extent for length (see refuted claim 3) and its widest drawn pass, `W.width * 2` = 16 across, matches the 8-unit contact half-width. (e) The knell's countdown arc and per-toll marks (mines.js:857-874) read `m.tolls`, the snapshot, so they cannot disagree with the mine even under the index bug above. (f) `up.wireDamage` has exactly one consumer (mines.js:552) and HOT WIRE's row '+50% wire damage' is per-level accurate at the tree's three levels. (g) One thing I noticed and deliberately did NOT report: `tally` does not credit DEEP CHARGE or SHRAPNEL to WIRE/SNARE/LODE/VOID, yet with SALTED owned `fizzle` scales its blast by both (`r: f.r * world.up.mineBlast, damage: f.damage * world.up.mineDamage`, mines.js:399-400). That is the inverse of the fault the docstring names ('a mine that grew because of something it cannot use'), it is conditional on a node the tally has no way to make the denominator depend on, and crediting it would make `of` vary with ownership and break the ratio. Worth a decision, not a defect.
+
+- Claim 1 (high) — "THORN and LODE never leave world.mines; their `continue` jumps past the splice". REFUTED: fixed in the working tree at commit cf9f65b, "Build 220, part four: a spent THORN or LODE went off sixty times a second, for ever" (tree is clean, HEAD 5d3f2a3). There is no `continue` in either arm: mines.js:617 `if (m.kind === 'thorn') {` and :653 `} else if (m.kind === 'lode') {` are arms of the same else-if chain the other six kinds are in, and mines.js:642-652 is a comment recording the exact fault the claim describes ("...and NO `continue`. This branch and LODE's below it both ended on one"). The splice at mines.js:718-721 is reached by all eight kinds. Measured on the current files (stub world, real throwMine/updateMines, dt 1/60, 25s against a 15s life, SALTED owned): world.mines.length 0 for blast, thorn, lode, wire, knell, snare, spall and void — the claim's "thorn in list after 40s: 1, dead=true, life=-24.1" does not reproduce. Its three consequences follow it: `drawMines` cannot draw a ghost that is not in the list, `repel` cannot push after death because the lode arm is spliced in the same iteration that kills it, and `fizzle` cannot be re-entered. The 6-space indent at mines.js:614 the claim cites as its tell is still there and is cosmetic.
+
+- Claim 2 (high) — "`fizzle` has no idempotence guard, so an expired THORN or LODE fires SALTED's blast sixty times a second". REFUTED: the guard is present, with a comment naming this defect. mines.js:388-396: `function fizzle(world, m) {` ... `389: /* Once. It sets `m.dead` on its first line and had no guard reading it, so 391: anything that could call it twice got two blasts -- and THORN and LODE 392: could call it every frame forever. */` `395: if (m.dead) return;` `396: m.dead = true;`. Measured with `audio.boom` counted over 25s per kind, SALTED owned: 1 boom for blast/thorn/lode/wire/snare/spall/void and 2 for knell (its two tolls, then no fizzle because `!m.dead` at :668 is false). Not 546. The arithmetic built on top of it (40 blasts a frame, 351,360 damage a second, 240 grey sparks a frame) has no premise left.
+
+- Claim 3 (medium) — "a THORN retired by the cap keeps its burning ground, and a THORN killed before it lands still lands and opens". REFUTED as stated, in both halves. (a) The flight half is simply false. The `!m.landed` arm (mines.js:601-612) does end on `continue`, so a dead mine is not spliced DURING flight — but it lands within `cfg.flight` (0.9s), and on the next frame it falls through to :614 with `m.settle` = one frame (0.0167s) against `T.arm` = 0.5 (config.js:901), so `!m.patch && m.settle >= T.arm` at :620 fails and the bottom-of-loop splice at :718 removes it before it can ever arm. Measured (set `m.dead` the frame after `throwMine`, which is exactly what `retire` does at :379, then run 3s): in list 0, patches opened 0. The claim's "landed true, patch opened: true, patch alive: true" does not reproduce. (b) The cap half is true as code — `retire` (mines.js:377-385) has no thorn arm and never touches `m.patch` — but its measurement requires reaching the cap, and the cap cannot be reached: peak on-field is 4 of 5 (measured over 300 simulated seconds at the fastest cadence the tree sells, and asserted by scripts/regress.mjs:13554-13557), while the only other caller of `throwMine` is a debug panel that offers no THORN or LODE button (hud.js:1553-1556). So "ten patches at 37 dps each on a field whose mine cap is five" is not a state the game can enter. I have carried the latent code gap, with the forced measurement (6 patches against 5 mines) and a fix, into a confirmed finding of my own rather than leaving it as a claim about play.
+
+- Claim 4 (medium) — "the pip collar over-reports: THORN draws six marks for four buyable upgrades, LODE seven for four". REFUTED: fixed. The hand-written denominator the claim quotes (`m.kind === 'spall' ? 8 : ... ? 6 : 7`) no longer exists; mines.js:97-107 is the comment recording its removal ("It disagreed for six of the eight kinds... There is one denominator now and it is this one"). `drawMines` now reads the numerator from the same function that computes the denominator: mines.js:855 `const pips = mineMarks(world, m.kind);`, and `mineMarks` (:170-172) returns `tally(world, kind).has`. Measured with exactly one node owned, every kind draws exactly one mark: blast 1 of 6, snare 1 of 5, wire 1 of 4, knell 1 of 6, thorn 1 of 5, lode 1 of 4, spall 1 of 8, void 1 of 5. The claim's "THORN of = 4" is stale too — it is 5, because SHRAPNEL is now credited to THORN at mines.js:135.
+
+- Claim 6 (low) — "`mineScale` is an exported function with no caller, and `drawMines` restates its arithmetic inline". REFUTED: fixed, and the fix carries the claim's own reasoning. mines.js:852-854: `// Through `mineScale`, which existed and had no caller: this restated its` / `// arithmetic inline, so the exported one was dead and the two could drift.` / `const R = m.r * mineScale(world, m.kind);`. The 0.26 is now written once, at mines.js:178.
+
+- Claim 7 (low) — "`Patch.rim()` and the `edge` array are dead code". REFUTED: already removed. patch.js:191-199 is the comment recording it — "`rim()` and the `edge` array it was the only reader of came out in build 220... The `windAt`/`rateAt` shape CLAUDE.md records". Neither the method nor `this.edge` exists in the file; the constructor runs from `this.dark` (:80) straight to `this.specks` (:96), and there is no `Array.from({ length: 18 }, ...)` anywhere in it.
+
+- Claim 8 (low) — "LODE pushes `world.enemies` only, not `world.drops`, where SNARE and WIRE take both". REFUTED as a defect, though the code reads as described (mines.js:511 against grip's :340-341 and cut's :553-554). The claim's own consequence line says the behaviour is the desirable one and asks only for a text edit, which makes it a wording preference, not a fault. And the wording is defensible: arsenal.js:127 `fx: 'Shoves everything near it away, and keeps on shoving.'` sits in a table of one-line contrasts — its neighbours read "The first thing to touch it is gone" and "It cuts what crosses" — so "everything" is contrasting with what triggers a mine, not enumerating world lists. Nothing is stranded either way: `applyBlast` takes `hit(world.drops)` (enemies.js:4551) and loose energy drifts turret-ward on its own (`CFG.energy.pull`). No player can observe a LODE failing to move a mote.
+
+- Claim 9 (cosmetic) — "LODE and SNARE push grey `harmless` bodies where WIRE and the trigger test refuse to". REFUTED: the premise that grey is exempt from being moved is not a rule this game has. `applyBlast`, the game's main area effect, has no harmless guard at all — enemies.js:4515 `if (e.dead || e.spent || e === source) continue;` — so a PULSE both damages and shoves DRIFT. The contract at config.js:2565-2568 is explicitly about what grey does to YOU ("it cannot touch the turret, it cannot corrupt the feed") and names `Game.checkContact()` as its enforcement, not the physics. The asymmetry the claim finds unexplained is the CLAUDE.md rule applied correctly: `cut` (mines.js:562) is a damage path and skips harmless; the trigger test (:707) is a chooser and skips harmless plus `staged`; `repel` (:513) and `grip` (:334) only write velocity and skip `spent` and `fizzle`. The claimant states there is no consequence and there is none.
+
+- Checked and found correct (not a claim — recorded so the next audit can skip it). THORN's patch is seeded `life: m.life` at arm (mines.js:623) and both clocks then take the same dt, so ground and mine end on the same frame — `if (m.patch) m.patch.dead = true` at :640 is belt-and-braces, not what keeps them in step. LODE's drawn reach ring uses the identical expression `repel` does (`L.reach * world.up.lodeReach`, :509 vs :774), so picture and push agree; REPULSOR scales reach and push together (upgrades.js:505, `levels: 2` -> 1.96 each) and `tally` counts it once (:158 `lode: [up.lodeReach > 1]`). THORN's ground takes the damage line (:632 `dps: T.patch.dps * world.up.mineDamage`) and SHRAPNEL is credited for it (:135). `Patch.update` skips `dead || spent || harmless` and not `staged` (patch.js:180) — a damage path, correct per the CLAUDE.md rule. `mineCadence` and `updateMines` are called outside game.js's `if (w.boss) { ... } else { director.update() }` (game.js:1513-1517), so mines do not freeze during a fight. `toggleMine` deliberately does not touch the throw clock (game.js:1156-1170), so tapping through the strip cannot buy a free mine. No `export let`/`export var` in mines.js or patch.js. Every mine kind's damage/trigger reach is drawn at the radius it acts at (the trigger ring at :898 uses the same `m.r + cfg.trigger * up.mineTrigger * own` as the test at :687), and both mine rings authored in build 220 are drawn contracting rather than expanding past the blast (:288-296, :403-410), so the "a ring fades and thins as it grows" trap is not present here.
+
+- CLAIM 1 (high) — "ARMORED absorbs VOID's swallow in full; the mine is spent and the body is untouched." ALREADY FIXED in the working tree, and the quoted line does not exist. The reader cites `mines.js:455 — e.applyDamage(world, e.hp + 1e6, 0, 0, 0);`. There is no such line anywhere in the current mines.js. `swallow` now ends at mines.js:500-501 with `  e.hp = 0;` / `  e.destroy(world);`, under an 11-line comment at :489-499 that names exactly this fault ("No amount of damage can beat a rule that discards the hit; the answer is not to send a bigger number through the same door but to use the other one"). CLAUDE.md line 571-576 already records it as fixed, and commit e863acd is titled "Build 220, part seven: burning ground takes the damage line, and VOID deletes". MEASURED (playwright, VOID armed, LURCHER pinned on it, `e.traits = [TRAIT_BY_ID.armored]` from src/traits.js): plain hp 192 -> 0, dead, drops +8, kills +1 | armored with the plate UP (plateT 0) hp 194 -> 0, dead, drops +8, kills +1 | armored with the plate down (plateT 5) hp 181 -> 0, dead, drops +8, kills +1. Instrument check that ARMORED is still live and still discards: an ordinary 50-damage hit on the same body goes 189 -> 189 (discarded, plateT set to 1), and the next one goes 189 -> 139. So the trait works and VOID goes around it.
+
+- CLAIM 3 (medium) — "A VOID deletes a live boss core outright, in one frame, from a randomly-placed mine." ALREADY FIXED, in the same commit. The trigger loop now carries a fifth guard the reader's quote omits: mines.js:708 — `          if (m.kind === 'void' && e.type.fixed) continue;` — under a comment at :700-707 that gives the reason ("Everything else here does damage, which a boss can be built to survive; this one cannot be survived"). MEASURED, an armed VOID pinned on the core with `b.arriving = 0; b.settle(w)`: ORDINAL 1784 -> 1784, GNOMON 1548 -> 1548, FRACTAL 8020 -> 8020, AMPLITUDE 3243 -> 3243, DYNAMO 3912 -> 3912, PARITY 8048 -> 8048, TERMINUS 7640 -> 7640 — every core alive, `coreDead: false`, and `mineDead: false`, so the mine is not even spent. Two checks that the fix is correctly scoped rather than over-broad: (a) all 14 `fixed` types are boss bodies (tally, ordinal, dial, gnomon, fraction, fractal, crest, amplitude, pylon, dynamo, pane, parity, bound, terminus) and the other 23 types are not, so no ordinary body lost VOID; (b) `continue` skips the body rather than the frame, and a non-fixed boss MINION spawned next to the same mine is still swallowed (dead: true, mineDead: true). The one thing the fix left undone is the player-facing row, which I have raised separately as a confirmed finding of my own.
+
+- CLAIM 4 (low) — "VOID's pip collar draws seven marks for five upgrades; a hardcoded 7 against a computed `of` of 5." ALREADY FIXED. The quoted line — `const pips = Math.round(gr * (m.kind === 'spall' ? 8 : ...))` — is gone. `mineGrade`'s body has been split into `tally(world, kind)` at mines.js:109-160, which returns `{ has, of }`; `mineGrade` (:163-166) returns `has / of`; a new `mineMarks` (:169-171) returns `tally(world, kind).has`; and the draw site at mines.js:855 reads `    const pips = mineMarks(world, m.kind);`. The header at :98-107 records the exact defect the reader describes, in the past tense ("It disagreed for six of the eight kinds, so a SNARE with five upgrades available drew seven marks and a WIRE with one drew two. There is one denominator now and it is this one"). MEASURED, buying the FIELD branch one node at a time and reading `mineMarks` after each: void 0,1,2,2(quicklay maxed),3,4,4,4 and spall 0,1,2,2,3,4,4,4,5,5,5,6 — one mark per owned upgrade, exactly, on all eight kinds.
+
+- CLAIM 5 (low) — "SPALL's trigger mouth is a full circle; its fan is a 51.6deg cone, and the drawn mouth says otherwise." The mechanic is real and I reproduced it, but it is authored deliberately, stated in config, AND disclosed to the player in as many words — so it is a design preference, not a defect. config.js:917-920: `   * SPALL. A claymore. It triggers like a BLAST but throws everything it has` / `   * in one direction instead of all of them — straight up the field, into` / `   * whatever is coming down it.` "Triggers like a BLAST" is an explicit statement that the mouth is omnidirectional; "in one direction" is an explicit statement that the fan is not. arsenal.js:130-131, the card the player actually reads, says `fx: 'Throws a wall of shot straight up the field on contact.'` — both halves again, in the player's own words. The dashed ring is a promise about where the mine will CATCH something (its own comment, mines.js:876-881) and it catches at every bearing, which is accurate. MEASURED for completeness (WARDEN r 22 pinned at d = 62, spin 0, nine bearings): -90deg 463 damage, -60deg 132, -45deg 33, -30deg 0, 0deg 0, +45deg 0, +90deg 0, +135deg 0, +180deg 0 — and `fired: true` at all nine. The falloff is the body's own angular half-width atan(22/62) = 19.5deg meeting the cone edge at -90 +/- 25.8deg, which is the arithmetic agreeing with itself rather than a defect. Note also that waves march down from the top toward a turret at the bottom, so the fan points at where bodies come FROM: the common case is the one that works. What is genuinely wrong here is the wedge, confirmed separately as claim 2 — that is a picture contradicting a stated rule, where this is a rule the game states twice.
+
+- CLAIM 9 (cosmetic) — "SPALL draws a 150-unit expanding ring for a mine that has no radial damage at all... 2.4x the largest real number in the mine and 5.8x the authored one." The arithmetic is wrong, and wrong in the direction that reverses the conclusion. The reader inventories SPALL's numbers as "trigger mouth 30, pellet burst 26, or 62.47 with SPLINTER" and omits the fan's own travel, which is the mine's dominant dimension: config.js:927 `    speed: [900, 1240],` against `life: 0.85` at mines.js:432, i.e. 765-1054 units nominal. MEASURED, tracking every pellet of one fan to its farthest point from the mine: 1,011 units. So the ring at mines.js:473 — `  ring(m.x, m.y, m.r, 150, 0.3, '#ff4d4d', 3);` — reaches 15% of the distance the mine's shot actually covers. It under-states the mine's reach; it does not over-state it, and it is nowhere near "2.4x the largest real number". The ring's own decay numbers the reader gives are correct (fx.js:238 `g.vr = (r1 - r0) / life;` = 460 u/s; fx.js:586-587 `rgba(g.color, t * 0.95)` and `Math.max(0.4, g.w * t)`, so radius 75 at t 0.543, alpha 0.516, width 1.63px) — but a bright flash at the seat that dies inside a third of a second, well inside a fan that goes ten times further, is not the CLAUDE.md "ring authored to expand INTO a damage radius" trap. There is no damage radius here for it to fall short of. The reader flags their own uncertainty on this one and the uncertainty was warranted.
+
+- CLAIM 6 (low), the FRAMING only — "`retire()` cannot run in shipped play... the `world.endless` shape CLAUDE.md records: a path nobody can take." The premise is right (I confirmed the cap is unreachable by measurement) but the diagnosis is not. CLAUDE.md's rule is about a flag NOTHING CAN SET, whose readers therefore have a permanently dead branch. This is a backstop that the author deliberately kept out of reach and said so, in the note on the very node that would otherwise breach it: upgrades.js:428-438, PAIRED CHARGE, `     * ONE level, because the mine cap eats the rest.` ... `     * At one level a throw lays two, two throws leave four, and the cap is` / `     * still the backstop it was authored as.` — 4 of 5, written out, with the measurement that produced it ("Uncapped this node laid FOUR mines a throw... two throws put eight on the field and left five"). A ceiling with one unit of margin, documented as such, is a safety net, not dead code; deleting it is how the next node that lays a third mine per throw ships unbounded. The three concrete sub-defects inside it (the SEED comment, `retire` not fizzling, `find` not picking the oldest) do stand and are confirmed separately.
+
+- CLAIM 7 (cosmetic) — "`mineGrade`'s comment names three readers of `up.mineDamage`; there are four, and two of them are SPALL." Superseded, and the count is wrong in both directions. The comment the reader quotes still exists at mines.js:124-131, but a corrected one has been added immediately below it at :132-134 naming detonate, fizzle, toll, SPALL's pellets and their bursts, and THORN's ground. And the true count is not four: `up.mineDamage` is read at mines.js:291, :401, :435, :441, :566 and :633 — six reads in five functions. The reader's proposed fix ("Say five reads in four functions") would install a third wrong number. The live defect here is not the count but that the superseded block was never deleted, raised separately as a confirmed finding of my own.
+
+- ALSO CHECKED AND FOUND CORRECT (short OK list, so the next audit does not re-report these). (a) `tally`'s exclusions are right per kind: `mouth = !!KIND[kind].trigger` (mines.js:121) correctly excludes THORN and LODE, which have no `trigger` key; `bang` (:122) covers blast/knell/spall, which are the three that read `up.mineBlast`; `hurts = bang || thorn` (:135) matches the six `up.mineDamage` reads. Denominators: void of=5, spall of=8, blast of=6 — all matching the measured mark counts. (b) The `spent`/`staged`/`fizzle` split is right in all four mine paths and matches the CLAUDE.md rule: `grip` (:337) and `repel` (:508) are steering and test `dead || spent || fizzle`; `cut` (:544) is damage and tests `dead || spent || harmless` with no `staged`; the trigger loop (:695) is a chooser and correctly DOES test `staged`. Each carries a comment saying which it is. (c) The SPALL pellet burst ring at :465 is drawn CONTRACTING (`ring(x, y, br, br * 0.4, ...)`), brightest at the radius that hurts — the correct form; likewise detonate at :300-301, fizzle at :407, toll at :572. (d) `fizzle` reads `f.r * world.up.mineBlast` for both the blast and the ring (:400, :406), so picture and damage share one number. (e) The trigger mouth is drawn from the same expression the trigger uses, EVENT HORIZON and WIDE MOUTH included (:687 vs :888). (f) No `export let`/`export var` in mines.js. (g) No bare `ctx.globalAlpha = 1` in mines.js; the one alpha manipulation in drawFx's ring path (fx.js:578-582) multiplies in and puts back. (h) `mineMarks`, `mineGrade` and `mineScale` are all live — no dead exports.
+
+
+## Never adjudicated — the three passes that did not run
+
+
+The tree, machine and picture readers' claims below have no second opinion on
+them at all. Some are certainly wrong: of the nine passes that did run, four
+of the eleven refutations were "already fixed" and three were design
+preferences dressed as defects. Treat these as leads, not findings.
 
 
 ### TREE audit — the ROUNDS and MINES branches (src/upgrades.js, src/tree.js) and every world.up key they write or read
@@ -983,11 +1117,6 @@ were design preferences dressed as defects. Treat these as leads.
   `/home/user/Shooter/src/mines.js:470`  
   A red circle briefly implies SPALL reaches 150 units all round it. The mine card and every other cue say "straight up the field", so the picture reads as a small BLAST for a third of a second.  
   _Fix:_ Replace with a wedge or an arc along the fan — `ring(m.x, m.y, m.r, 150, 0.3, '#ff4d4d', 3, 0, base - P.spread/2, P.spread)` uses the `a0`/`span` arguments `ring` has had since build 211 and costs nothing.
-
-- **[cosmetic] Two live comments say a KNELL rings three times; it rings twice**  
-  `/home/user/Shooter/src/mines.js:15-16 and /home/user/Shooter/src/mines.js:534`  
-  None to the player. It is a comment that will mislead the next reader into computing a KNELL's total off three tolls, which is how arsenal.js's own six stale `dmg` literals happened.  
-  _Fix:_ "twice" and "one of two", or write them as `K.tolls` so they cannot drift again.
 
 - **[cosmetic] The snare's drawn hold-wires claim parity with `grip` and skip the drops half of it**  
   `/home/user/Shooter/src/mines.js:712-719 (drawing) vs /home/user/Shooter/src/mines.js:353-354 (`grip`)`  
