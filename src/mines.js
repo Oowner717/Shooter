@@ -711,6 +711,17 @@ function cut(world, m, dt) {
  * three" from when the base was 3, and the base has been 2 since the node
  * that buys the third back was written.
  */
+/**
+ * The wait to a knell's next toll. Derived from the SPAN rather than fixed, so
+ * however many tolls a mine was laid with, they are spread evenly across the
+ * same window -- see `span` in config.js, and the paragraph on `spread` beside
+ * it, which is the same shape applied to the radius.
+ */
+function tollGap(m) {
+  const n = Math.max(1, m.tollsMax);
+  return n > 1 ? K.span / (n - 1) : K.span;
+}
+
 function toll(world, m) {
   const i = m.tollsMax - m.tolls;
   /*
@@ -726,7 +737,7 @@ function toll(world, m) {
   const r = K.blast.r * (1 + (K.spread - 1) * t) * world.up.mineBlast;
   const damage = K.blast.damage * K.fade ** i * world.up.mineDamage;
   m.tolls--;
-  m.tollTimer = K.gap;
+  m.tollTimer = tollGap(m);
   applyBlast(world, { x: m.x, y: m.y, r, damage, impulse: K.blast.impulse });
   // At the radius, on every toll. It was `r * 1.4`, and a knell draws this
   // two to five times in a row, so the overshoot was the most repeated
@@ -1035,7 +1046,7 @@ export function drawMines(ctx, world) {
     if (knell && m.landed && m.tolls > 0) {
       const frac = m.settle < K.arm
         ? clamp(m.settle / K.arm, 0, 1)
-        : 1 - clamp(m.tollTimer / K.gap, 0, 1);
+        : 1 - clamp(m.tollTimer / tollGap(m), 0, 1);
       ctx.strokeStyle = rgba('#ff61f2', 0.75);
       ctx.lineWidth = CFG.hairline * 2.2;
       ctx.beginPath();

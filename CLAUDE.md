@@ -1089,4 +1089,37 @@ most once for any given target and cannot spin.
   scattered, going off on its own -- which is the whole reason the mine
   ceiling is lower. If an ability is ever reported the same way, the numbers
   are here.
+- **A mine that ends itself has to be asked how long it LASTS.** Seven kinds
+  sit on the field for the whole of `CFG.mines.life` and a KNELL was gone
+  **2.85 seconds** after it was thrown, against 15.9 for every other kind and
+  a throw clock of 15 -- a live mine 19% of the time, and it spent that 19%
+  in the window before a wave had reached the ground it was denying. Measured
+  on a lane bodies actually walk down, it delivered **zero**; the player's
+  report was "KNELL doesn't do damage" and the mine's own docstring said it
+  "denies the ground whether anything is there or not". The cause was
+  arithmetic nobody had done: a knell dies on its LAST toll and `gap` was a
+  flat 1.15s, so two tolls were over in under three seconds. `knell.span` is
+  the window now -- first toll to last, with however many tolls there are
+  spread evenly inside it, the same shape `spread` gives the radius -- so
+  FOURTH BELL makes the bell ring more OFTEN rather than for longer, and the
+  mine denies its ground for about four fifths of its life either way.
+  `regress.mjs` lays one of each kind on an empty field and asserts none is
+  spent inside two thirds of its life, which is the one line that would have
+  caught it.
+- **Mines are benched three ways and each bench lies differently.** A pinned
+  crowd gives a duration mine fifteen seconds on stationary targets, so THORN
+  read 31,379 against BLAST's 2,899 -- an eleven-fold gap that is mostly the
+  instrument. A moving lane fixes that and under-samples the instant mines
+  instead: six bodies over a 550-unit lane means one ring of 105 units
+  catches nobody, and BLAST read **-16** on a run the static bench scores at
+  458. Pack the lane to a real wave's density and body-on-body grinding
+  becomes a control of 518 that swamps the signal. Read them together, and
+  always subtract a control run of the same crowd with no mine: bodies 46
+  apart with a radius of 24 OVERLAP, and `resolvePair` billed impactDamage
+  every frame -- which is how LODE, a mine with no damage at all, first
+  measured 1,207.
+  Where build 231 left them, static crowd, control-subtracted, stock/bought:
+  BLAST 653/4,211 · KNELL 442/3,917 · SPALL 456/4,274 · THORN 4,386/24,673 ·
+  WIRE 5,234/18,024 · VOID one kill whatever its health · SNARE and LODE zero
+  by design (SNARE's damage is the knot grinding: 32,932/91,019 loose).
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

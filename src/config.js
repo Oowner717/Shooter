@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '230';
+export const BUILD = '231';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '230';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '485f2a7';
+export const REV = 'e14a6b9';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1058,7 +1058,20 @@ export const CFG = {
     flight: 0.9,
     arm: 0.5,
     r: 12,
-    patch: { r: 104, dps: 37 },
+    /*
+     * 29 a second, down from 37 at build 231's audit -- the only mine trimmed
+     * by it, and the only one that was ahead on every bench that was run.
+     *
+     * It is the compounding shape again, one file over from BLAST's. A patch
+     * bills a body for as long as that body is INSIDE it, so what a THORN is
+     * worth is `dps x (time in the patch)` and the second term is itself
+     * bought: BLOOM OUT takes the radius to 190, which at a lurcher's 38 units
+     * a second is ten seconds of a fourteen-second life -- so the node sells
+     * duration as well as area and the two multiply against the dps. Measured
+     * on a twenty-body crowd it delivered 31,379 fully bought, against 18,024
+     * for the next best and 2,899 for BLAST.
+     */
+    patch: { r: 104, dps: 29 },
   },
   /*
    * LODE. Does no damage and cannot be triggered. It pushes, constantly, and
@@ -1231,7 +1244,20 @@ export const CFG = {
      * five may be down at once. Nerfed in build 49 from 140; SHRAPNEL is still
      * the way back past the damage.
      */
-    blast: { r: 105, damage: 105, impulse: 760 },
+    /*
+     * 150, up from 105 in build 231's mine audit.
+     *
+     * BLAST is the only mine in the eight that gets exactly ONE event: it has
+     * to be walked into, it fires once, and it is spent. THORN and WIRE bill
+     * every body in their zone for as long as the mine lives, SNARE grinds a
+     * knot for its whole hold, and a KNELL now tolls across its life. Measured
+     * on a twenty-body crowd, control-subtracted: BLAST delivered 458 stock
+     * against THORN's 5,596 and WIRE's 5,234, and it was the smallest of the
+     * damaging mines at both ends of the tree. The one-event mine has to hit
+     * hard enough to be worth the slot, which is what the radius cannot do for
+     * it -- and the radius is now held to half a screen by the rule above.
+     */
+    blast: { r: 105, damage: 150, impulse: 760 },
     fizzle: { r: 67, damage: 48, impulse: 300 }, // SALTED: what a spent one does
   },
 
@@ -1296,7 +1322,29 @@ export const CFG = {
     arm: 0.8,
     r: 13,
     tolls: 2, // was 3; FOURTH BELL buys the third back and a fourth beyond it
-    gap: 1.15, // seconds between them
+    /*
+     * How long the tolls take, first to last -- NOT the gap between them.
+     *
+     * It was `gap: 1.15`, a fixed wait, and the arithmetic of that was the
+     * whole of "KNELL does not do damage". A knell ends itself on its last
+     * toll, so two tolls 1.15s apart meant the mine was GONE 2.85 seconds
+     * after it was thrown (5.15 with FOURTH BELL) -- measured, against 15.9
+     * seconds for every one of the other seven kinds, and a throw clock of
+     * 15. A knell player had a live mine 19% of the time and bare ground for
+     * the rest of it, and the mine spent its whole existence in the window
+     * before a wave had reached the ground it was denying. Measured on a lane
+     * bodies actually walk down, it delivered ZERO.
+     *
+     * So the tolls are spread across the mine's life instead, the same shape
+     * as `spread` below: this is the span from the first to the last, with
+     * however many tolls there are distributed evenly inside it, and FOURTH
+     * BELL makes the bell ring MORE OFTEN over the same window rather than
+     * extending it. Stock is 1.7s and 12.2s from the throw; fully bought is
+     * every 3.5s across the same 10.5. Either way the mine denies its ground
+     * for about four fifths of its life, which is what the paragraph above
+     * has claimed since it was written.
+     */
+    span: 10.5,
     /*
      * 70, and the widest ring a KNELL can ever make is 156 -- half the width
      * of a 390-point phone, the same ceiling BLAST is held to above.
@@ -1318,7 +1366,14 @@ export const CFG = {
      * what it was (1.0 then 1.5), which is why 1.5 is the number: nothing
      * about an unbought KNELL changes shape, only its base.
      */
-    blast: { r: 70, damage: 81, impulse: 430 },
+    /*
+     * 95, up from 81 at build 231's audit, so a stock knell's two tolls come
+     * to about what one BLAST does -- 163 against 150 -- for a mine that
+     * cannot be aimed at anything and whose rings are the smaller of the two.
+     * The real answer to "a knell does no damage" was `span` above; this is
+     * the rest of it.
+     */
+    blast: { r: 70, damage: 95, impulse: 430 },
     spread: 1.5, // the last toll is this much wider than the first
     fade: 0.72, // and this much of its damage
   },

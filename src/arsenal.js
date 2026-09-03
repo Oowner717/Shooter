@@ -97,12 +97,14 @@ export const ICON = {
  * them.
  *
  * `regress.mjs` checks every one of them against `CFG` now. If you retune a
- * number in config.js, this table is the second half of that change.
+ * number in config.js, this table is the second half of that change -- which
+ * is what caught BLAST 105 -> 150, KNELL 81 -> 95 and THORN 37 -> 29 in build
+ * 231's mine audit, in the same run that made them.
  */
 export const ARSENAL = [
   {
     key: 'blast', kind: 'mine', group: 'mines', label: 'BLAST', icon: ICON.blast, tone: '#ffb247',
-    dmg: '105', fx: 'Triggers on contact. One hard bang.',
+    dmg: '150', fx: 'Triggers on contact. One hard bang.',
   },
   {
     key: 'snare', kind: 'mine', group: 'mines', label: 'SNARE', icon: ICON.snare, tone: '#c77dff',
@@ -115,11 +117,11 @@ export const ARSENAL = [
   },
   {
     key: 'knell', kind: 'mine', group: 'mines', label: 'KNELL', icon: ICON.knell, tone: '#ff61f2',
-    dmg: '81, twice', fx: 'Tolls where it lies, untouched, each one reaching further.',
+    dmg: '95, twice', fx: 'Tolls across its whole life, untouched, each ring wider.',
   },
   {
     key: 'thorn', kind: 'mine', group: 'mines', label: 'THORN', icon: ICON.thorn, tone: '#c3eb4b',
-    dmg: '37/s', fx: 'Opens into burning ground and stays open.',
+    dmg: '29/s', fx: 'Opens into burning ground and stays open.',
   },
   {
     key: 'lode', kind: 'mine', group: 'mines', label: 'LODE', icon: ICON.lode, tone: '#3fb9ff',

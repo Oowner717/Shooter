@@ -12594,9 +12594,28 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
 // --- SPLINTER, and what a mine is worth ------------------------------------
 /*
- * Every mine that does damage went up 10% in build 216, and SPALL's pellets
- * gained a burst where they land. VOID, SNARE and LODE are untouched because
- * none of them has a damage number: VOID deletes, SNARE holds, LODE pushes.
+ * Build 216 put 10% on every mine that does damage and SPALL's pellets gained
+ * a burst where they land. VOID, SNARE and LODE are untouched because none of
+ * them has a damage number: VOID deletes, SNARE holds, LODE pushes.
+ *
+ * Build 231's audit moved three of the six, and this case is the record of
+ * which and why -- measured on a twenty-body crowd with the control (the same
+ * crowd, no mine) subtracted, stock then fully bought:
+ *
+ *   BLAST     458 /  2,899     THORN   5,596 / 31,379
+ *   KNELL     377 /  3,270     WIRE    5,234 / 18,024
+ *   SPALL     456 /  4,261     VOID    one kill, whatever its health
+ *
+ * BLAST is the only kind that gets exactly ONE event, and it was the smallest
+ * of the six; THORN bills every body in its ground for as long as the mine
+ * lives and was ahead on every bench that was run. So BLAST 105 -> 150,
+ * KNELL 81 -> 95 and THORN's ground 37 -> 29 a second, which lands them at
+ * 653 / 4,214, 442 / 3,898 and 4,386 / 24,673.
+ *
+ * The ratios are pinned rather than printed. A readout with no assertion
+ * behind it rots -- build 227 shipped two of those -- and the previous
+ * version of this case pinned a flat 1.1 across all six, which is a snapshot
+ * of one past pass rather than a rule, so the audit had to come here anyway.
  */
 {
   const r = await page.evaluate(async () => {
@@ -12609,11 +12628,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     // ---- the numbers, against what build 215 shipped --------------------
     /*
-     * Asserted as a RATIO against the recorded old values rather than as new
-     * literals, so this reads as "they went up a tenth" -- which is the change
-     * -- rather than as a second copy of config.js that has to be kept in step.
+     * `was` is what build 230 shipped, and the ratios below are build 231's
+     * mine audit against it -- kept as ratios so the case reads as the change
+     * that was made rather than as a second copy of config.js.
      */
-    const was = { blast: 95, fizzle: 44, thorn: 34, knell: 74, wire: 72, spall: 26 };
+    const was = { blast: 105, fizzle: 48, thorn: 37, knell: 81, wire: 79, spall: 29 };
     const now = {
       blast: CFG.mines.blast.damage,
       fizzle: CFG.mines.fizzle.damage,
@@ -12748,10 +12767,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return out;
   });
 
-  check('every mine that does damage does a tenth more of it',
-    Object.values(r.ratios).every((x) => Math.abs(x - 1.1) < 0.02)
+  const R = r.ratios;
+  check('the mine audit moved three numbers and left the other three alone',
+    Math.abs(R.blast - 1.429) < 0.01 && Math.abs(R.knell - 1.173) < 0.01
+    && Math.abs(R.thorn - 0.784) < 0.01
+    && Math.abs(R.fizzle - 1) < 0.01 && Math.abs(R.wire - 1) < 0.01
+    && Math.abs(R.spall - 1) < 0.01
     && r.noDamage.length === 3,
-    Object.entries(r.ratios).map(([k, v]) => `${k} x${v}`).join(', ')
+    Object.entries(R).map(([k, v]) => `${k} x${v}`).join(', ')
     + `; and ${r.noDamage.join('/')} still have no damage number to raise`);
 
   /*
@@ -15347,8 +15370,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
        * two.
        */
       const seen = [];
+      const at = [];
       const had = new Set();
-      for (let f = 0; f < 60 * 20; f++) {
+      let f = 0;
+      for (; f < 60 * 30; f++) {
         if (m && !m.dead) { m.x = w.shooter.x; m.y = w.shooter.y - 200; }
         g.update(1 / 60);
         for (const e of w.effects) {
@@ -15356,13 +15381,44 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
           if (had.has(e)) continue;
           had.add(e);
           seen.push(+e.r.toFixed(1));
+          at.push(+(f / 60).toFixed(2));
         }
         if (m.dead) break;
       }
-      return seen;
+      return { rings: seen, at, gone: +(f / 60).toFixed(2) };
     };
     const bell0 = tollRings(0);
     const bell2 = tollRings(2);
+
+    /*
+     * ...and the rule the knell was breaking, asked of all eight: lay one on
+     * an empty field, touch nothing, and see how long it stays. Seven of them
+     * sat for their whole `life`; a knell was GONE in 2.85 seconds of fifteen,
+     * because it ends itself on its last toll and the tolls were 1.15s apart.
+     */
+    const sitFor = (kind) => {
+      g.restart();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      w.up = freshUpgrades();
+      w.mines.length = 0;
+      throwMine(w, kind);
+      const m = w.mines[w.mines.length - 1];
+      if (!m) return null;
+      for (let f = 0; f < 60 * 30; f++) {
+        g.update(1 / 60);
+        if (!w.mines.includes(m)) return +(f / 60).toFixed(2);
+      }
+      return 30;
+    };
+    const sat = {};
+    for (const k of ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void']) {
+      sat[k] = sitFor(k);
+    }
+    sat.life = CFG.mines.life;
+
     g.restart();
     w.up = freshUpgrades();
 
@@ -15417,7 +15473,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const m2 = g.menu || window.__menu;
     g.restart();
     return { splinters: splinters.length, far, onSurface, wallR: wall.r,
-      wide, bell0, bell2, above, bar: +bar.toFixed(0), lowest: +lowest.toFixed(0),
+      wide, bell0, bell2, sat, above, bar: +bar.toFixed(0), lowest: +lowest.toFixed(0),
       clearsBar: lowRaw >= bar,
       highest: +highest.toFixed(0), floorY: +w.floorY.toFixed(0), tones,
       hasMenu: !!m2 };
@@ -15472,14 +15528,57 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * upgrade in the game and why two cuts to the base did not hold.
    */
   const near = (a, b) => Math.abs(a - b) < 0.5;
+  const b0 = r.bell0 || {}, b2 = r.bell2 || {};
   check('FOURTH BELL fills the toll ladder in rather than extending past it',
-    r.bell0 && r.bell2 && r.bell0.length === 2 && r.bell2.length === 4
-    && near(r.bell0[0], r.bell2[0])
-    && near(r.bell0[r.bell0.length - 1], r.bell2[r.bell2.length - 1])
-    && r.bell2.every((v, i) => i === 0 || v > r.bell2[i - 1]),
-    `unbought ${JSON.stringify(r.bell0)}, fully bought `
-    + `${JSON.stringify(r.bell2)} -- same ends, and every ring wider than the `
+    b0.rings && b2.rings && b0.rings.length === 2 && b2.rings.length === 4
+    && near(b0.rings[0], b2.rings[0])
+    && near(b0.rings[b0.rings.length - 1], b2.rings[b2.rings.length - 1])
+    && b2.rings.every((v, i) => i === 0 || v > b2.rings[i - 1]),
+    `unbought ${JSON.stringify(b0.rings)}, fully bought `
+    + `${JSON.stringify(b2.rings)} -- same ends, and every ring wider than the `
     + `one before it`);
+
+  /*
+   * ...and the same in TIME, which is the half that mattered. `gap` was a
+   * fixed 1.15s, so a knell ended itself 2.85 seconds after it was thrown --
+   * see the case below. The span is what is fixed now: the first and last
+   * tolls land at the same moments however many there are, and FOURTH BELL
+   * makes the bell ring more OFTEN rather than for longer.
+   */
+  const spanOf = (b) => (b.at && b.at.length > 1 ? b.at[b.at.length - 1] - b.at[0] : 0);
+  check('...and in time as well, so a bought knell rings more often, not longer',
+    Math.abs(spanOf(b0) - spanOf(b2)) < 0.3 && spanOf(b0) > 6
+    && near(b0.at[0], b2.at[0]),
+    `unbought at ${JSON.stringify(b0.at)}s, fully bought at `
+    + `${JSON.stringify(b2.at)}s -- a span of ${spanOf(b0).toFixed(1)}s against `
+    + `${spanOf(b2).toFixed(1)}s`);
+
+  /*
+   * The rule the knell was breaking, and the one that would have caught it in
+   * one line: a mine laid on empty ground and never touched is a promise that
+   * it will be there when something arrives.
+   *
+   * Seven of the eight sat for the whole of `CFG.mines.life`. A KNELL ends
+   * itself on its LAST toll, and the tolls were 1.15 seconds apart -- so it
+   * was gone 2.85 seconds after being thrown, against 15.9 for every other
+   * kind and a throw clock of 15 seconds. A knell player had a live mine 19%
+   * of the time, and it spent that 19% in the window before a wave had
+   * reached the ground it was there to deny: measured on a lane bodies
+   * actually walk down, it delivered ZERO. The player's report was "KNELL
+   * does not do damage" and the mine's own docstring said it "denies the
+   * ground whether anything is there or not".
+   *
+   * Two thirds rather than the whole of it, because a knell legitimately ends
+   * on its last toll and that is inside the life by design.
+   */
+  const sat = r.sat || {};
+  const kinds = ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'];
+  const short = kinds.filter((k) => !(sat[k] >= sat.life * 0.66));
+  check('a mine nothing touches is still there when something arrives',
+    short.length === 0 && sat.knell > 10,
+    `on an empty field, against a ${sat.life}s life: `
+    + kinds.map((k) => `${k} ${sat[k]}s`).join(', ')
+    + (short.length ? ` -- ${short.join(', ')} gone inside two thirds of it` : ''));
 
   check('...and REPULSOR still throws as hard through the smaller circle',
     Math.abs(r.wide.lodePush - 1.96) < 0.01,
