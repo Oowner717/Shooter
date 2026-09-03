@@ -721,7 +721,7 @@ export const UPGRADES = {
   ],
 };
 
-export const AXES = ['AMMO', 'FIELD', 'TURRET', 'WAVE', 'ANOMALY'];
+const AXES = ['AMMO', 'FIELD', 'TURRET', 'WAVE', 'ANOMALY'];
 
 /*
  * The other two kinds of permanent thing the tree sells. They are not

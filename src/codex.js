@@ -279,7 +279,7 @@ class Codex {
 export const codex = new Codex();
 
 /** Every id any anomaly puts on the field, boss included. */
-export const ANOMALY_IDS = new Set(ANOMALIES.flatMap((a) => a.types));
+const ANOMALY_IDS = new Set(ANOMALIES.flatMap((a) => a.types));
 
 /** The glossary in two halves: what the field sends, and what a boss makes. */
 export const FIELD_ENTRIES = CODEX.filter((e) => !ANOMALY_IDS.has(e.id));

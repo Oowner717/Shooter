@@ -182,12 +182,12 @@ export function mineGrade(world, kind) {
 }
 
 /** ...and how many marks the collar draws, which is the numerator itself. */
-export function mineMarks(world, kind) {
+function mineMarks(world, kind) {
   return tally(world, kind).has;
 }
 
 /** ...and what the grade does to how big the thing is drawn. */
-export function mineScale(world, kind) {
+function mineScale(world, kind) {
   // A quarter larger fully bought. "Slightly larger" is the brief: a mine
   // that doubled would crowd a field that may hold five of them.
   return 1 + mineGrade(world, kind) * 0.26;
@@ -342,7 +342,7 @@ export function throwMine(world, kind = 'blast') {
  * were stacked here -- one saying it counted a single kind, the other saying
  * nothing expires, against a fifteen-second `life`.)
  */
-export function laidCount(world) {
+function laidCount(world) {
   let n = 0;
   for (const m of world.mines) if (!m.dead) n++;
   return n;
@@ -900,14 +900,20 @@ export function drawMines(ctx, world) {
       ctx.strokeStyle = rgba('#e0aaff', 0.4 * m.open);
       ctx.lineWidth = CFG.hairline;
       ctx.beginPath();
-      // The same set `grip` takes, or the picture is drawing a hold the
-      // snare does not have -- `drops` included, which it used to leave out.
-      for (const e of [...world.enemies, ...world.drops]) {
-        if (e.dead || e.spent || e.fizzle || e.type.fixed) continue;
-        if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 > S.reach * S.reach) continue;
+      /*
+       * The same set `grip` takes, or the picture is drawing a hold the snare
+       * does not have -- `drops` included, which it used to leave out. Both
+       * lists walked in place rather than concatenated: this is a draw path
+       * and it runs for every gripping snare, every frame.
+       */
+      const wire = (e) => {
+        if (e.dead || e.spent || e.fizzle || e.type.fixed) return;
+        if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 > S.reach * S.reach) return;
         ctx.moveTo(m.x, m.y);
         ctx.lineTo(e.x, e.y);
-      }
+      };
+      for (const e of world.enemies) wire(e);
+      for (const e of world.drops) wire(e);
       ctx.stroke();
       ctx.restore();
     }

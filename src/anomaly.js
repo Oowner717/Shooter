@@ -53,7 +53,7 @@ export const ANOMALIES = [
     types: ['terminus', 'bound', 'limit'] },
 ];
 
-export const ANOMALY_BY_N = new Map(ANOMALIES.map((a) => [a.n, a]));
+const ANOMALY_BY_N = new Map(ANOMALIES.map((a) => [a.n, a]));
 
 /**
  * Just the colours, in order. The tree paints ANOMALY's heading with all
@@ -210,7 +210,7 @@ export const ORDINAL_MOODS = [
 const ORDINAL_HUE = hueOf('#ff5ec8');
 
 /** ORDINAL's four skies, worn in another colour. */
-export function bossMoods(tone) {
+function bossMoods(tone) {
   const turn = hueOf(tone) - ORDINAL_HUE;
   return ORDINAL_MOODS.map((m) => ({
     top: rotate(m.top, turn),
@@ -277,7 +277,7 @@ ANOMALY_BY_N.get(1).glow = '#ff2f9e';
  * upgrade's apply and every existing test reading the same integer rather
  * than a second copy of it.
  */
-export function heldOf(world, n) {
+function heldOf(world, n) {
   const a = world.apertures;
   return a ? (a[n] | 0) : 0;
 }

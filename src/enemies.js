@@ -2990,7 +2990,7 @@ function tagBody(world, e, from) {
  * size and difficulty it should be; a tier-40 multiplier on it turns the
  * sentence "this is a NEEDLE" into a 29-second wall that teaches nothing.
  */
-export function scaleToTier(world, e, type) {
+function scaleToTier(world, e, type) {
   const d = world.director;
   if (!d || e.harmless || type.fixed || d.wave?.teach) return e;
   const k = d.scaleAt(d.tier);

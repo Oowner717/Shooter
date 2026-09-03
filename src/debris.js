@@ -30,7 +30,7 @@ import { TAU, clamp, rand, randInt, spread, rgba, mixHex } from './util.js';
 import { spark, ring } from './fx.js';
 import { audio } from './audio.js';
 
-export class Chunk {
+class Chunk {
   constructor(x, y, vx, vy, r, color, keep = false) {
     const D = CFG.debris;
     /*

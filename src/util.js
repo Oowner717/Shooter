@@ -165,7 +165,7 @@ export function jag(i, seed, tick) {
  * -- evenly spaced points with only a sideways offset give every segment the
  * same length and the same cadence.
  */
-export function boltPath(ax, ay, bx, by, seed, tick, amp = 1) {
+function boltPath(ax, ay, bx, by, seed, tick, amp = 1) {
   const dx = bx - ax;
   const dy = by - ay;
   const len = Math.hypot(dx, dy) || 1;

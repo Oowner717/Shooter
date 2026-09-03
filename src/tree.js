@@ -35,7 +35,7 @@ import { ABILITIES } from './abilities.js';
  * Prices. Flat per depth rather than per node, because pacing is not what this
  * is for yet — the shape is. One number to move when it is.
  */
-export const COST = {
+const COST = {
   round: 900, // a new round or mine
   mine: 900,
   ability: 1100,

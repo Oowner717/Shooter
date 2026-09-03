@@ -71,6 +71,10 @@ function titleRandom(fn) {
   try { return fn(); } finally { Math.random = real; }
 }
 
+/** The four corners a STASIS bracket is drawn at, flattened so the draw loop
+ *  allocates nothing. */
+const BRACKET_CORNERS = [-1, -1, 1, -1, -1, 1, 1, 1];
+
 export class Game {
   constructor(canvas) {
     this.canvas = canvas;
@@ -356,7 +360,13 @@ export class Game {
         else if (moved > 1) self.hud.alert(`SURGE · ${reason} · TIER ${tier}`, 'good', 4);
         else self.hud.alert(`TIER ${tier} · ${reason}`, 'info', 3);
       },
-      alert: (text, kind, dur) => self.hud.alert(text, kind, dur),
+      /*
+       * `alert` sat here too -- a passthrough to `hud.alert` with no caller
+       * anywhere, in src or in the suite. It went in build 220 alongside
+       * `abilityTaken`, which build 219 removed from this same block for the
+       * same reason: a hook the world offers and nothing takes is a hook that
+       * grows a maintainer.
+       */
       carry: (key) => self.carry(key),
     };
   }
@@ -2572,23 +2582,30 @@ export class Game {
      * `staged` bodies, which ARE held and are on screen from the entry line
      * down, and every mote, which is held too.
      */
-    const brackets = [];
-    for (const e of [...w.enemies, ...w.drops]) {
-      if (e.dead || e.spent || e.fizzle) continue;
-      if (e.type && e.type.fixed && !e.isDrop) continue; // placed, never steered
-      if (e.thrown > 0) continue;                        // coasting, not held
-      brackets.push(e);
-    }
-    for (const e of brackets) {
+    /*
+     * Both lists walked in place. This built `[...w.enemies, ...w.drops]` and
+     * then a `brackets` array on top of it, every frame a STASIS is up, and
+     * allocated four corner pairs per body inside the inner loop -- a couple
+     * of hundred throwaway arrays a frame on a busy field, in a draw path.
+     * BRACKET_CORNERS is a module constant.
+     */
+    const mark = (e) => {
+      if (e.dead || e.spent || e.fizzle) return;
+      if (e.type && e.type.fixed && !e.isDrop) return; // placed, never steered
+      if (e.thrown > 0) return;                        // coasting, not held
       const r = e.r * 1.5;
-      for (const [sx2, sy2] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      for (let i = 0; i < BRACKET_CORNERS.length; i += 2) {
+        const sx2 = BRACKET_CORNERS[i];
+        const sy2 = BRACKET_CORNERS[i + 1];
         const cx = e.x + sx2 * r;
         const cy = e.y + sy2 * r;
         ctx.moveTo(cx - sx2 * r * 0.42, cy);
         ctx.lineTo(cx, cy);
         ctx.lineTo(cx, cy - sy2 * r * 0.42);
       }
-    }
+    };
+    for (const e of w.enemies) mark(e);
+    for (const e of w.drops) mark(e);
     ctx.stroke();
 
     // The frame, clamped at the corners rather than outlined all the way

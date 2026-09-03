@@ -20,7 +20,7 @@ const VOL_KEY = 'sim7749-volume';
 const VOL_LAST_KEY = 'sim7749-volume-last';
 // What full means. Everything below is a fraction of it, so the mix is tuned
 // in one place and the setting only ever scales it.
-export const FULL_GAIN = 0.6;
+const FULL_GAIN = 0.6;
 // The steps offered. Not a continuous slider: a phone thumb on a 6px track is
 // a worse control than five targets you can hit without looking, and the game
 // already reads in segments everywhere else.
