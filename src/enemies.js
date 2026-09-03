@@ -1177,6 +1177,16 @@ export class Enemy {
        */
       const fade = throwOff ? 1 : 1 / (1 + (this.kicked || 0));
       if (!throwOff) this.kicked = (this.kicked || 0) + fade;
+      /*
+       * Only a deliberate, one-press clear lifts the ceiling. Build 220 tried
+       * giving SLUG the same exemption on the grounds that its whole identity
+       * is the impulse and `(cruise || 60) * 6` clips it to 137 u/s against a
+       * BULWARK -- true arithmetic, and it reopens build 110: measured, a
+       * LURCHER under sustained SLUG with two HEAVYs goes out to 1293 units
+       * of an 817-unit field and never comes back. A round fired one and a
+       * half times a second cannot be exempt from the ceiling however heavy
+       * it is; see the note at SLUG's own fire call and the case that pins it.
+       */
       if (throwOff) this.thrown = Math.max(this.thrown || 0, CFG.pile.thrown);
       const push = impulse * this.invMass * fade;
       /*

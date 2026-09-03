@@ -599,6 +599,23 @@ export class Shooter {
         r: 7.2,
         damage: g.damage,
         impulse: g.impulse * up.slug,
+        /*
+         * ...and NOT a throw, which is the one thing about this round that
+         * looks wrong and is not. SLUG's 1500 is clipped by `integrate` to
+         * `(cruise || 60) * 6` -- 137 u/s against a BULWARK -- so SLEDGE's
+         * ladder and HEAVY's do multiply a number the physics discards, and
+         * the arithmetic says to lift the ceiling the way PULSE lifts it.
+         *
+         * Measured, that reopens build 110. With the ceiling lifted and the
+         * repeated-hit fade still in place, a LURCHER under sustained SLUG
+         * with two HEAVYs is pushed out to 1293 units of an 817-unit field
+         * and never arrives -- "it closed to 400 units, was blown out to
+         * 1306, and was still out there twenty seconds later", which is the
+         * exact fault the fade and the ceiling were both written for. The
+         * ceiling is what makes "a body under sustained fire still closes"
+         * true, and a round fired 1.5 times a second cannot be exempt from
+         * it however heavy it is. `regress.mjs` holds the rule now.
+         */
         bounces: 0,
         color: '#b8c6d8',
         core: '#f2f6fb',

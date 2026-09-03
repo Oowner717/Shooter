@@ -1097,6 +1097,99 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       .join(' | '));
 }
 
+// --- ...and SLUG's shove is bounded by the body it hits ----------------------
+/*
+ * `integrate` clips an unthrown body to `(cruise || 60) * maxSpeedFactor` --
+ * 137 u/s against a BULWARK -- and only a deliberate one-press clear is
+ * exempt, by passing `throwOff`. So SLUG's 1500 impulse, and SLEDGE's ladder
+ * and HEAVY's on top of it, all multiply a number the physics then discards:
+ * measured, a stock SLUG moves a BULWARK 36 units and a fully bought one 364,
+ * where the raw arithmetic says thousands.
+ *
+ * That reads like a defect and build 220's audit reported it as one. It is
+ * not. The ceiling is what makes the case ABOVE this one true. Lifting it for
+ * SLUG -- keeping the repeated-hit fade, lifting only the ceiling -- was tried
+ * and measured, and a LURCHER under sustained SLUG with two HEAVYs went out to
+ * 1293 units of an 817-unit field and never came back. That is build 110
+ * verbatim: "it closed to 400 units, was blown out to 1306, and was still out
+ * there twenty seconds later."
+ *
+ * So this pins the ceiling rather than a change. The next reader to follow the
+ * same arithmetic gets a red test instead of shipping build 110 again.
+ *
+ * KNOWN AND NOT ASSERTED: an unkillable body under sustained SLUG with HEAVY
+ * bought does not arrive on the shipped build either, ceiling and all -- the
+ * cap bounds each shove and the CADENCE defeats it, since a LURCHER closing at
+ * 36 u/s cannot make back 216 u/s of outward every two thirds of a second.
+ * Nothing in normal play is both unkillable and mobile (SLUG lands 66 damage a
+ * second and a boss's frame is `fixed`), so what that describes is kiting
+ * rather than the build-110 lock. It is left alone deliberately; if a future
+ * change puts something unkillable and mobile on the field, this is the note
+ * to come back to.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const S = w.shooter;
+    g.restart();
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    g.debugClearField();
+    g.debugGiveEnergy(200000);
+    const bought = { heavy: 0, sledge: 0 };
+    for (let i = 0; i < 6; i++) {
+      if (g.buy('heavy') === 'ok') bought.heavy++;
+      if (g.buy('sledge') === 'ok') bought.sledge++;
+    }
+    g.toggleRound('slug');
+    const rows = [];
+    for (const type of ['lurcher', 'bulwark']) {
+      g.debugClearField();
+      const e = g.debugSpawn(type, S.x, S.y - 260);
+      if (!e) continue;
+      e.staged = false; e.spawnIn = 0;
+      e.hp = 1e9; e.maxHp = 1e9;
+      w.autoAim = true; w.autoFire = true;
+      /*
+       * Measured as DISPLACEMENT over the frame, not as the velocity left on
+       * the body afterwards. The impulse lands during the projectile sweep,
+       * which runs after physics, so reading `vx,vy` at the end of a frame
+       * reports a number that is clamped before it is ever travelled at --
+       * the first version of this saw 87,643 u/s against a cap of 627 and
+       * concluded the cap did nothing.
+       */
+      let peak = 0;
+      let px = e.x;
+      let py = e.y;
+      for (let f = 0; f < 60 * 3; f++) {
+        e.hp = 1e9;
+        g.update(1 / 60);
+        peak = Math.max(peak, Math.hypot(e.x - px, e.y - py) * 60);
+        px = e.x;
+        py = e.y;
+      }
+      rows.push({
+        type, cruise: Math.round(e.cruise || 0),
+        cap: Math.round((e.cruise || 60) * CFG.physics.maxSpeedFactor),
+        peak: Math.round(peak), thrownCap: CFG.physics.thrownSpeed,
+      });
+    }
+    w.autoAim = false; w.autoFire = false;
+    g.restart();
+    return { rows, bought };
+  });
+  // Headroom, because a substep can commit a little more than the clamp on the
+  // frame the excess arrives, and the arena's own edge push adds to it.
+  const ok = r.rows.length === 2 && r.rows.every((x) => x.peak <= x.cap * 1.3)
+    && r.rows.every((x) => x.cap < x.thrownCap);
+  check('SLUG-s shove is bounded by what it hits, and a throw-s ceiling is higher',
+    ok,
+    `HEAVY x${r.bought.heavy} | ` + r.rows.map((x) => `${x.type} cruise ${x.cruise}, `
+      + `travelled at most ${x.peak} u/s against a ceiling of ${x.cap} `
+      + `(a throw would be ${x.thrownCap})`).join(' | '));
+}
+
 // --- the late wall is answerable by the arsenal, if not by BOLT --------------
 /*
  * The plateau is intentional, and this is what makes that safe to say.
