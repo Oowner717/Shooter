@@ -13462,6 +13462,170 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `laid against a cap of ${r.cap}`);
 }
 
+// --- the arsenal's numbers are the config's numbers -------------------------
+/*
+ * Six of the seventeen `dmg` strings in arsenal.js had gone stale. Build 216
+ * put a tenth on every mine that does damage and build 218 took SPINE from 20
+ * to 34, and neither pass came back to the table -- so the loadout sheet, the
+ * quick strip and the first-use caption were all quoting BLAST at 95 against
+ * 105, WIRE 72 against 79, KNELL 74 against 81, THORN 34 against 37, SPALL's
+ * pellet 26 against 29 and SPINE 20 against 34.
+ *
+ * Every number in the row is pulled out of the string and checked, rather
+ * than the string being compared whole, so the prose is still free to change.
+ * A row that has no number in it (SNARE, LODE, VOID, the two AUTO controls)
+ * is required to have none.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { ARSENAL } = await import('../src/arsenal.js');
+    // What each row's numbers must be, in the order they appear in the string.
+    const want = {
+      blast: [CFG.mines.blast.damage],
+      snare: [],
+      wire: [CFG.wire.damage],
+      knell: [CFG.knell.blast.damage],
+      thorn: [CFG.thorn.patch.dps],
+      lode: [],
+      spall: [CFG.spall.damage, CFG.spall.pellets],
+      void: [],
+      standard: [CFG.bolt.damage],
+      explosive: [CFG.rounds.explosive.damage, CFG.rounds.explosive.blast.damage],
+      shotgun: [CFG.rounds.shotgun.damage, CFG.rounds.shotgun.pellets],
+      arc: [CFG.rounds.arc.damage, CFG.rounds.arc.jumpDamage],
+      spine: [CFG.rounds.spine.damage],
+      slug: [CFG.rounds.slug.damage],
+      rime: [CFG.rounds.rime.damage],
+      spore: [CFG.rounds.spore.damage, CFG.rounds.spore.patch.dps],
+      tithe: [CFG.rounds.tithe.damage],
+    };
+    const bad = [];
+    const seen = [];
+    for (const a of ARSENAL) {
+      if (!(a.key in want)) continue;
+      seen.push(a.key);
+      const got = (a.dmg || '').match(/\d+(?:\.\d+)?/g);
+      const nums = got ? got.map(Number) : [];
+      const exp = want[a.key];
+      if (nums.length !== exp.length || nums.some((n, i) => n !== exp[i])) {
+        bad.push(`${a.key}: "${a.dmg}" has [${nums}], config says [${exp}]`);
+      }
+    }
+    /*
+     * ...and the `fx` sentences that quote a count or a duration, which is the
+     * other half of the same drift. Only the ones that name a number.
+     */
+    const byKey = Object.fromEntries(ARSENAL.map((a) => [a.key, a]));
+    const prose = [];
+    const says = (key, n) => {
+      const t = byKey[key] ? byKey[key].fx : '';
+      if (!t.includes(String(n))) prose.push(`${key}: "${t}" does not say ${n}`);
+    };
+    says('snare', CFG.snare.hold);
+    says('arc', CFG.rounds.arc.jumps);
+    says('spine', CFG.rounds.spine.pierce);
+    says('rime', CFG.rounds.rime.chill);
+    says('spore', CFG.rounds.spore.patch.life);
+    return { bad, prose, seen: seen.length, of: Object.keys(want).length };
+  });
+  check('every number the arsenal quotes is the number config actually holds',
+    r.bad.length === 0 && r.seen === r.of,
+    r.bad.length ? r.bad.join('; ') : `${r.seen}/${r.of} rows checked`);
+  check('...and the sentences beside them still describe the same machine',
+    r.prose.length === 0, r.prose.join('; ') || 'five counted sentences agree');
+}
+
+// --- ARC's chain takes the damage line, which it never had ------------------
+/*
+ * `up.damage` is applied at `fire` time, to the round's own damage. ARC's
+ * dart therefore scaled with HOLLOWPOINT and its four jumps did not -- and
+ * the jumps are most of the round: 11 on the dart against 25 x (1 + 0.86 +
+ * 0.86^2 + 0.86^3) = 84 down the chain, so 88% of it was immune to the whole
+ * AMMO damage line. Measured against five bodies in a row, a fully bought
+ * turret went 95 dps to 217 where every other round in the rack multiplies
+ * by three or more; with the chain scaled it is 510, and the ladder x2.28
+ * becomes x5.37 against BOLT's x4.74.
+ *
+ * Asserted as the chain's SHARE of the round -- chained damage over struck
+ * damage -- which is `jumpDamage / damage` and must not move when the damage
+ * line is bought, because both terms take it. Without the fix the share
+ * collapses from 2.27 to 0.67. A dimensionless ratio is used rather than a
+ * factor of `up.damage` because the bought run also holds LONG LEAD and
+ * FIFTH LINK, which buy REACH and an extra jump: those add real damage and
+ * would push a raw ratio past any honest tolerance.
+ *
+ * Two bodies, not five, for the same reason -- one jump either way, so the
+ * geometry is identical in both runs and only the arithmetic differs.
+ *
+ * Note the instrument twice over: a chain round measured against ONE body has
+ * its whole mechanism switched off, and the first version of this bench read
+ * ARC as the weakest round in the game because of it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const bench = (bought) => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      if (bought) { g.debugGiveEnergy(500000); g.debugBuyAll(); }
+      g.toggleRound('arc');
+      const s = w.shooter;
+      const roster = [];
+      for (let i = 0; i < 2; i++) {
+        const e = g.debugSpawn('bulwark', s.x + i * 150, s.y - 300);
+        if (!e) continue;
+        e.staged = false;
+        e.invMass = 0;
+        e.maxHp = 1e9;
+        e.hp = 1e9;
+        roster.push({ e, x: e.x, y: e.y });
+      }
+      w.autoAim = false;
+      w.autoFire = true;
+      s.aim = -Math.PI / 2;
+      s.targetAim = -Math.PI / 2;
+      s.cooldown = 0;
+      let rounds = 0;
+      const push = w.projectiles.push.bind(w.projectiles);
+      w.projectiles.push = (...ps) => { rounds += ps.length; return push(...ps); };
+      for (let f = 0; f < 60 * 5; f++) {
+        for (const q of roster) { q.e.x = q.x; q.e.y = q.y; q.e.vx = 0; q.e.vy = 0; }
+        s.aim = -Math.PI / 2;
+        s.targetAim = -Math.PI / 2;
+        g.update(1 / 60);
+      }
+      w.projectiles.push = push;
+      // The first body is the one the barrel points at; the second can only
+      // have been reached by the chain.
+      const struck = 1e9 - roster[0].e.hp;
+      const chained = 1e9 - roster[1].e.hp;
+      return { rounds, struck, chained, share: struck > 0 ? chained / struck : 0 };
+    };
+    const bare = bench(false);
+    const full = bench(true);
+    const line = w.up.damage;
+    g.restart();
+    return {
+      bare, full, line,
+      want: CFG.rounds.arc.jumpDamage / CFG.rounds.arc.damage,
+    };
+  });
+  check('ARC-s chain takes the AMMO damage line, which it never had',
+    r.bare.chained > 0 && r.full.chained > 0
+    && Math.abs(r.bare.share - r.want) < r.want * 0.1
+    && Math.abs(r.full.share - r.want) < r.want * 0.1,
+    `the chain is ${r.bare.share.toFixed(2)}x the struck body bare and `
+    + `${r.full.share.toFixed(2)}x with the whole damage line bought; `
+    + `jumpDamage/damage is ${r.want.toFixed(2)} and up.damage is ${r.line}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

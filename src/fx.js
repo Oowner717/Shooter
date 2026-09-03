@@ -511,6 +511,17 @@ export function updateFx(dt) {
 
 export function drawFx(ctx) {
   const parts = fx.particles.active;
+  /*
+   * The caller's alpha, kept and put back.
+   *
+   * Two of the particle branches below assigned `globalAlpha` and ended on a
+   * bare `= 1`, and so did the end of this function -- the form the note
+   * beside the ring fill one screen down already calls forbidden, and the
+   * same one CLAUDE.md records costing four separate fixes before build 210's
+   * fizzle fade would come out at all. Harmless today because `Game.draw`
+   * enters at 1; it is the next caller that pays.
+   */
+  const enter = ctx.globalAlpha;
   ctx.globalCompositeOperation = 'lighter';
 
   for (let i = 0; i < parts.length; i++) {
@@ -531,7 +542,7 @@ export function drawFx(ctx) {
       ctx.lineTo(p.x - p.vx * (drawn ? 0.05 : 0.022), p.y - p.vy * (drawn ? 0.05 : 0.022));
       ctx.stroke();
     } else if (p.kind === KIND_SHARD) {
-      ctx.globalAlpha = clamp(t * 1.3, 0, 1);
+      ctx.globalAlpha = enter * clamp(t * 1.3, 0, 1);
       ctx.fillStyle = p.color;
       ctx.save();
       ctx.translate(p.x, p.y);
@@ -548,14 +559,14 @@ export function drawFx(ctx) {
       ctx.closePath();
       ctx.fill();
       ctx.restore();
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = enter;
     } else {
       // dot / ember — pre-rendered glow sprite
       const r = p.r * (p.kind === KIND_EMBER ? 2.6 : 1) * (0.35 + t * 0.65);
       const img = glowSprite(p.color);
-      ctx.globalAlpha = clamp(t, 0, 1) * p.glow;
+      ctx.globalAlpha = enter * clamp(t, 0, 1) * p.glow;
       ctx.drawImage(img, p.x - r * 2, p.y - r * 2, r * 4, r * 4);
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = enter;
     }
   }
 
@@ -582,13 +593,14 @@ export function drawFx(ctx) {
   }
 
   ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = enter;
 }
 
 export function drawFlash(ctx, w, h) {
   if (fx.flash <= 0.002) return;
-  ctx.globalAlpha = clamp(fx.flash, 0, 1);
+  const enter = ctx.globalAlpha;
+  ctx.globalAlpha = enter * clamp(fx.flash, 0, 1);
   ctx.fillStyle = fx.flashColor;
   ctx.fillRect(0, 0, w, h);
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = enter;
 }

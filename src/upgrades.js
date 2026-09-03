@@ -355,9 +355,13 @@ export const UPGRADES = {
      * authored later against the same shape ("+1 patch"), does carry its cap.
      */
     { id: 'fifthlink', name: 'FIFTH LINK', levels: 1, line: 'ARC jumps 1 more time.', apply: bump('arcJumps', 1) , icon: MARK.fifthlink },
-    // One level, because it is a second arm and not a dial. Left on the
-    // default three it would have sold four arms, which is not what the line
-    // says and not what the name means.
+    /*
+     * The header that used to sit here explained a node that added a second
+     * ARM and argued it down to one level. COMPOUND is a percentage dial on
+     * TITHE's bite and IS on the default three, so the comment said the
+     * opposite of what was true of the node it had come to sit above. It was
+     * orphaned by a deletion, the way `windAt`/`rateAt` were in build 217.
+     */
     { id: 'compound', name: 'COMPOUND', line: '+60% tithe mark bite.', apply: scale('titheStep', 1.6) , icon: MARK.compound },
     { id: 'throughandthrough', name: 'THROUGH AND THROUGH', line: '+2 bodies a spine pierces.', apply: bump('pierce', 2) , icon: MARK.throughandthrough },
     { id: 'sledge', name: 'SLEDGE', line: '+60% slug knockback.', apply: scale('slug', 1.6) , icon: MARK.sledge },

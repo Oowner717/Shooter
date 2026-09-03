@@ -412,13 +412,28 @@ function spall(world, m) {
       color: '#ffd9a0',
       trail: 0.03,
       /*
+       * The same form SCATTER and HAIL use, and for the same reason: this
+       * fan is fourteen at zero upgrades and thirty-six with BUCKSHOT. The
+       * comment below has said since the day it was written that each pellet
+       * is deliberately quiet -- and every one of them was falling to
+       * `fire`'s DEFAULT muzzle arm, two sparks and a dot apiece, which is up
+       * to a hundred and eight particles on one point, and then landing as
+       * thirty-six generic hitBursts. Exactly the fault build 219 fixed on
+       * HAIL, one file over.
+       */
+      form: 'pellet',
+      /*
        * Fourteen of these go off in one fan, so each one is deliberately
        * quiet: no ring, no shake, no sound of its own. The sum of them is
        * the effect, and one loud pellet would be fourteen loud things.
        */
       burst: (w, x, y) => {
         applyBlast(w, { x, y, r: br, damage: bd, impulse: B.impulse });
-        ring(x, y, br * 0.3, br, 0.16, '#ffd9a0', 1.4);
+        // Drawn CONTRACTING, brightest at the edge that hurts. A ring fades
+        // and thins as it grows, so `br * 0.3 -> br` put its dimmest, finest
+        // frame exactly on the blast radius -- the same trap as the four
+        // above, in the one place a Shock apiece would be thirty-six of them.
+        ring(x, y, br, br * 0.4, 0.16, '#ffd9a0', 1.4);
       },
     });
   }

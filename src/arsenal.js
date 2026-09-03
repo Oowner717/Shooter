@@ -84,10 +84,25 @@ export const ICON = {
  * `x N` is that many pieces, `+ N` is what follows the impact. `none` means
  * the mine does no damage of its own, which for SNARE and LODE is the point.
  */
+/*
+ * Every `dmg` here is a literal, and six of them had gone stale.
+ *
+ * Build 216 put a tenth on every mine that does damage and build 218 took
+ * SPINE from 20 to 34, and neither pass came back to this table -- so BLAST
+ * read 95 against 105, WIRE 72 against 79, KNELL 74 against 81, THORN 34
+ * against 37, SPALL's pellet 26 against 29 and SPINE 20 against 34. Three
+ * surfaces read these strings (the loadout sheet, the quick strip and the
+ * first-use caption), so a stale number is wrong in three places at once,
+ * and the rack comparison that SET SPINE's 34 was argued against one of
+ * them.
+ *
+ * `regress.mjs` checks every one of them against `CFG` now. If you retune a
+ * number in config.js, this table is the second half of that change.
+ */
 export const ARSENAL = [
   {
     key: 'blast', kind: 'mine', group: 'mines', label: 'BLAST', icon: ICON.blast, tone: '#ffb247',
-    dmg: '95', fx: 'Triggers on contact. One hard bang.',
+    dmg: '105', fx: 'Triggers on contact. One hard bang.',
   },
   {
     key: 'snare', kind: 'mine', group: 'mines', label: 'SNARE', icon: ICON.snare, tone: '#c77dff',
@@ -96,15 +111,15 @@ export const ARSENAL = [
   },
   {
     key: 'wire', kind: 'mine', group: 'mines', label: 'WIRE', icon: ICON.wire, tone: '#22ffcf',
-    dmg: '72/s', fx: 'A line across the field. It cuts what crosses.',
+    dmg: '79/s', fx: 'A line across the field. It cuts what crosses.',
   },
   {
     key: 'knell', kind: 'mine', group: 'mines', label: 'KNELL', icon: ICON.knell, tone: '#ff61f2',
-    dmg: '74, twice', fx: 'Tolls where it lies, untouched, each one reaching further.',
+    dmg: '81, twice', fx: 'Tolls where it lies, untouched, each one reaching further.',
   },
   {
     key: 'thorn', kind: 'mine', group: 'mines', label: 'THORN', icon: ICON.thorn, tone: '#c3eb4b',
-    dmg: '34/s', fx: 'Opens into burning ground and stays open.',
+    dmg: '37/s', fx: 'Opens into burning ground and stays open.',
   },
   {
     key: 'lode', kind: 'mine', group: 'mines', label: 'LODE', icon: ICON.lode, tone: '#3fb9ff',
@@ -113,7 +128,7 @@ export const ARSENAL = [
   },
   {
     key: 'spall', kind: 'mine', group: 'mines', label: 'SPALL', icon: ICON.spall, tone: '#ff4d4d',
-    dmg: '26 x 14', fx: 'Throws a wall of shot straight up the field on contact.',
+    dmg: '29 x 14', fx: 'Throws a wall of shot straight up the field on contact.',
   },
   {
     key: 'void', kind: 'mine', group: 'mines', label: 'VOID', icon: ICON.voidmine, tone: '#7383ff',
@@ -161,7 +176,7 @@ export const ARSENAL = [
   },
   {
     key: 'spine', kind: 'round', group: 'ammo', label: 'SPINE', icon: ICON.spine, tone: '#ff6bce',
-    dmg: '20, fading', fx: 'Punches through 3 more bodies behind the first.',
+    dmg: '34, fading', fx: 'Punches through 3 more bodies behind the first.',
   },
   {
     key: 'slug', kind: 'round', group: 'ammo', label: 'SLUG', icon: ICON.slug, tone: '#c1cee0',

@@ -169,6 +169,13 @@ export function updateProjectiles(world, dt) {
 }
 
 /**
+ * The round's violet, shared by the dart, the chain, the sparks and the
+ * earthed death. One constant, because build 209 moved three of the four and
+ * the fourth stayed cyan for eleven builds.
+ */
+const TONE_ARC = '#c79bff';
+
+/**
  * ARC. Jumps from what it hit to the nearest thing it has not touched yet, and
  * on again, drawing the link each time. Each link is a little weaker than the
  * last, so a long chain is worth setting up but never free.
@@ -184,7 +191,20 @@ function chainFrom(world, first, hx, hy, jumps) {
   if (first) seen.add(first);
   let x = hx;
   let y = hy;
-  let damage = g.jumpDamage;
+  /*
+   * ...and HOLLOWPOINT reaches the chain, which it never has.
+   *
+   * `up.damage` is applied at `fire` time to the round's own damage, so
+   * ARC's dart scaled with the AMMO line and its four jumps did not -- and
+   * the jumps are 88% of the round: 11 on the dart against 25 x (1 + 0.86 +
+   * 0.86^2 + 0.86^3) = 84 down the chain. So a fully bought AMMO line moved
+   * ARC's damage per round from 95 to 121, a factor of 1.27 against the
+   * 3.375 its rows promise, and left it the weakest round in the rack at
+   * both ends -- measured on a pinned wall, 18 dps stock and 86 fully bought
+   * against SCATTER's 882. Every other secondary damage source in the game
+   * multiplies it explicitly; this one was simply never given it.
+   */
+  let damage = g.jumpDamage * up.damage;
   const r2 = range * range;
 
   for (let jump = 0; jump < links; jump++) {
@@ -192,7 +212,10 @@ function chainFrom(world, first, hx, hy, jumps) {
     let bestD = r2;
     const scan = (list) => {
       for (const e of list) {
-        if (e.dead || seen.has(e)) continue;
+        // `spent` for the reason the sweep a hundred lines below this one
+        // gives: a boss's frame through its outro is drawn and nothing else.
+        // A round could not HIT one and the chain could jump into it.
+        if (e.dead || e.spent || seen.has(e)) continue;
         const d2 = (e.x - x) ** 2 + (e.y - y) ** 2;
         if (d2 < bestD) { bestD = d2; best = e; }
       }
@@ -203,8 +226,18 @@ function chainFrom(world, first, hx, hy, jumps) {
     seen.add(best);
     world.effects.push(new Arc(x, y, best.x, best.y));
     for (let i = 0; i < 3; i++) {
-      spark(best.x, best.y, spread(180), spread(180), '#9be7ff', 0.2, 2);
+      spark(best.x, best.y, spread(180), spread(180), TONE_ARC, 0.2, 2);
     }
+    /*
+     * Marked as an ARC hit, so a body the chain kills goes out EARTHED.
+     * `lastHit` is written in `Enemy.hit`, which is the projectile path, so
+     * a body killed by a jump had none and took the generic death -- the
+     * round whose whole identity is the discharge showed the discharge on
+     * the one body the dart touched and on none of the four it earthed.
+     * fx.js has had the form authored the whole time.
+     */
+    best.lastHit = 'arc';
+    best.lastHitT = world.time;
     best.applyDamage(world, damage);
     audio.reflect();
     x = best.x;
@@ -245,7 +278,12 @@ class Arc {
     const k = Math.max(0, this.life / this.max);
     ctx.globalCompositeOperation = 'lighter';
     drawBolt(ctx, this.x0, this.y0, this.x1, this.y1, {
-      glow: '#59e0ff', hot: '#bff0ff', alpha: k, width: 0.7,
+      // The round's own violet. Build 209 took ARC's flight off pale blue for
+      // the reason quoted at shooter.js's fire call -- "the one round whose
+      // whole identity is its colour of electricity" -- and moved the dart,
+      // the card and the death and left the LIGHTNING behind, which is the
+      // larger half of the effect.
+      glow: TONE_ARC, hot: '#eadcff', alpha: k, width: 0.7,
       seed: this.seed, tick: Math.floor(this.t * 26), forks: 2, amp: 0.8,
     });
     ctx.globalCompositeOperation = 'source-over';
