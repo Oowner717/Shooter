@@ -1,49 +1,42 @@
 /**
- * SANDBOX. The instrument, inside the game.
+ * THE RANGE. The instrument, inside the game.
  *
  * Every balance question this project has answered was answered by a
  * throwaway probe in a headless browser -- and three of those probes
  * published a finding that turned out to be the instrument rather than the
  * game. This is the same measurement taken from inside the running game, on
- * the phone, against the kit the player has actually bought: put a thing down,
- * shoot it, and read what each round, mine and ability is delivering.
+ * the phone, against the kit the player has actually bought.
+ *
+ * ---- one target and a counter ----
+ *
+ * It shipped as a SANDBOX: a picker of sixteen field objects, a row of seven
+ * anomalies, formations, group sizes, and the dummy as one option among them.
+ * All of that is gone. What is left is what the mode was actually for -- a
+ * practice dummy standing 420 units up-field and a readout of what your kit
+ * is doing to it -- and the name went with it, because a sandbox is a place
+ * you play with things and this is a place you measure one.
  *
  * ---- what it is not ----
  *
  * It is not a run. Nothing here is earned and nothing here is kept: no waves,
- * no energy, no salvage, no rules, no glitch timer, no boosts, and no ladder.
- * The one thing it borrows is the run's kit, because measuring a stock turret
- * would be measuring a turret nobody is playing.
+ * no energy, no salvage, no rules, no glitch timer, no boosts, no ladder and
+ * no anomalies. The one thing it borrows is the run's kit, because measuring
+ * a stock turret would be measuring a turret nobody is playing.
  *
  * Entering checkpoints the run and leaving restores it, so the field you come
  * back to is the same one `resume()` would have handed you after a reload --
  * your count, your kit and your salvage, standing on clear ground. While the
- * sandbox is up the run's own checkpoint clock is suspended, or the sandbox
- * would quietly overwrite the run it is standing on.
- *
- * ---- what may be spawned ----
- *
- * What has been destroyed at least once, ever -- `codex.seen`, the same
- * persistent record the glossary is drawn from. That is deliberate: the
- * sandbox is a place to re-examine things you have met, not a way to look at
- * the roster ahead of meeting it. Anomalies are on the same rule, so a boss
- * can be summoned once it has been broken once.
- *
- * A summoned anomaly here is an object and nothing more: no arrival banner, no
- * lines, no RECONCILED, no rung, no aperture spent, and -- unlike the real
- * thing -- the field it arrives on is left exactly as it was.
+ * range is up the run's own checkpoint clock is suspended, or it would
+ * quietly overwrite the run it is standing on.
  */
 
-import { TYPE_BY_ID, ENEMY_TYPES } from './config.js';
-import { GROUP_MAX, FORMATION_SHAPES, drawSpecimen } from './enemies.js';
-import { ANOMALIES, anomalyOf, makerOf } from './anomaly.js';
-import { codex, FIELD_ENTRIES } from './codex.js';
 import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
 import { ledger, SRC_EXTRA, WINDOWS, BAR_WINDOW } from './ledger.js';
 import { background } from './background.js';
-import { placeDummy } from './dummy.js';
-import { rgba } from './util.js';
+import { placeDummy, DUMMY } from './dummy.js';
+import { rgba, clamp } from './util.js';
+import { CFG } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -89,22 +82,19 @@ export function sourceGroup(src) {
 const GROUP_ORDER = ['AMMUNITION', 'MINES', 'ABILITIES', 'EVERYTHING ELSE'];
 
 /**
- * What the picker offers: the field, and nothing an anomaly puts down.
+ * What the mode is called, in one place.
  *
- * The first version listed every ENEMY_TYPE, which meant thirty-seven chips
- * including seven boss cores and the fourteen pieces they make -- so ORDINAL
- * could be put down as a bare core with none of its frame, a DIGIT could be
- * spawned with no ORDINAL to have come off, and the six rows of the picker
- * you had to scroll past to reach anything were mostly things that only exist
- * inside a fight. A boss is summoned WHOLE from the ANOMALIES row underneath,
- * which is the only way it is a boss at all.
+ * It was SANDBOX, and it was the wrong word twice over: a sandbox is where
+ * you play with things, and this had a picker of sixteen objects and seven
+ * anomalies to play with. All of that is gone -- there is one target and a
+ * counter, and the whole point is the number. So: the RANGE.
  *
- * Derived from the glossary's own split rather than written out here:
- * `FIELD_ENTRIES` is `CODEX` minus every id any anomaly puts on the field, so
- * a new boss or a new minion is excluded by existing.
+ * The internal names are all still `sandbox` and that is deliberate, not an
+ * oversight. `world.sandbox`, the `Sandbox` class and above all the tree
+ * node's id are what a saved run has written down -- renaming the id would
+ * take the node away from everyone who has bought it.
  */
-const FIELD_IDS = new Set(FIELD_ENTRIES.map((e) => e.id));
-const SPAWNABLE = ENEMY_TYPES.filter((t) => FIELD_IDS.has(t.id));
+export const RANGE_NAME = 'RANGE';
 
 /** A number a player can read at a glance, not to four significant figures. */
 function num(v) {
@@ -125,17 +115,26 @@ export class Sandbox {
   constructor(game) {
     this.game = game;
     this.on = false;
-    this.sheet = '';           // '' | 'spawn' | 'stats'
-    this.pick = { id: 'mote', count: 5, shape: '', where: 'field' };
-    this.chips = new Map();
-    this.bossChips = new Map();
-    this.rows = [];
+    this.tableOpen = false;
     this.el = {};
     this.build();
   }
 
   // ------------------------------------------------------------ the shell
 
+  /*
+   * ---- one bar and one panel, and both are always up ----
+   *
+   * It was a bar with a SPAWN sheet and a STATS sheet behind two toggles, and
+   * the stats sheet was 56vh of glass that landed exactly on top of the
+   * dummy. So you could read the rates or watch the thing they were about,
+   * and not both -- which is the one thing this mode exists to let you do.
+   *
+   * The rates are always on screen now, sized to clear the rig, and the only
+   * thing that folds is the per-source table under RESET COUNTER: that one is
+   * a list of unbounded length and it is the only part that has to be allowed
+   * to cover the field.
+   */
   build() {
     const root = $('sandbox');
     if (!root) return;
@@ -144,18 +143,11 @@ export class Sandbox {
     const bar = document.createElement('div');
     bar.id = 'sbBar';
     /*
-     * The bar's number is the TEN-SECOND rate, not the three-second one, and
-     * it is redrawn four times a second rather than sixty.
-     *
-     * It was the 3s rate at 60Hz, which is two bad decisions compounding: a
-     * weapon fired one and a half times a second moves a three-second window
-     * by a third on every round, and redrawing that every frame made a
-     * four-digit number that flickered continuously and could not be read at
-     * all. Ten seconds survives a reload and a cooldown; four times a second
-     * is fast enough to answer when you change round. The label says which
-     * window it is, because a rate with no window on it is not a number.
+     * The bar's number is the TEN-SECOND rate, redrawn four times a second
+     * rather than sixty -- see `BAR_WINDOW`. The label says which window it
+     * is, because a rate with no window on it is not a number.
      */
-    bar.innerHTML = '<span class="sbTag">SANDBOX</span>'
+    bar.innerHTML = `<span class="sbTag">${RANGE_NAME}</span>`
       + `<span id="sbDps"><b>0</b><em>DPS ${BAR_WINDOW}s</em></span>`;
     const mk = (id, text, fn) => {
       const b = document.createElement('button');
@@ -167,156 +159,53 @@ export class Sandbox {
       return b;
     };
     this.el.dps = bar.querySelector('#sbDps b');
-    this.el.spawnBtn = mk('sbSpawnBtn', 'SPAWN', () => this.show(this.sheet === 'spawn' ? '' : 'spawn'));
-    this.el.statsBtn = mk('sbStatsBtn', 'STATS', () => this.show(this.sheet === 'stats' ? '' : 'stats'));
+    mk('sbDummyBtn', 'DUMMY', () => this.dummy());
     mk('sbExit', 'EXIT', () => this.game.exitSandbox());
 
-    const sheet = document.createElement('div');
-    sheet.id = 'sbSheet';
-    sheet.hidden = true;
-    this.el.sheet = sheet;
-
-    this.el.spawnPane = this.buildSpawn();
-    this.el.statsPane = this.buildStats();
-    sheet.append(this.el.spawnPane, this.el.statsPane);
-    root.append(bar, sheet);
+    root.append(bar, this.buildPanel());
   }
 
-  /**
-   * The picker. Modelled on the debug panel's, and wearing its classes, so
-   * the two look like the same tool and neither carries a private stylesheet.
-   * What is different is the gate: only what the codex has seen.
-   */
-  buildSpawn() {
+  buildPanel() {
     const p = document.createElement('div');
-    p.className = 'sbPane';
-
-    const pick = document.createElement('div');
-    pick.className = 'spawnPick';
-    for (const t of SPAWNABLE) {
-      const b = document.createElement('button');
-      b.className = 'spawnChip';
-      b.title = t.name;
-      const c = document.createElement('canvas');
-      c.width = 64;
-      c.height = 64;
-      const ctx = c.getContext('2d');
-      ctx.translate(32, 32);
-      drawSpecimen(ctx, t.id, 20);
-      const name = document.createElement('span');
-      name.textContent = t.name;
-      b.append(c, name);
-      b.addEventListener('click', () => { this.pick.id = t.id; this.syncSpawn(); });
-      pick.appendChild(b);
-      this.chips.set(t.id, b);
-    }
-    this.el.pick = pick;
-
-    const row = (label, opts, read, write) => {
-      const r = document.createElement('div');
-      r.className = 'spawnRow';
-      const l = document.createElement('span');
-      l.className = 'spawnLabel';
-      l.textContent = label;
-      const box = document.createElement('div');
-      box.className = 'spawnOpts';
-      const cells = [];
-      for (const [text, value] of opts) {
-        const b = document.createElement('button');
-        b.textContent = text;
-        b.addEventListener('click', () => { write(value); this.syncSpawn(); });
-        box.appendChild(b);
-        cells.push([b, value]);
-      }
-      r.append(l, box);
-      this.rows.push({ cells, read });
-      return r;
-    };
-
-    const counts = [1, 3, 5, 8, 12, 20].filter((n) => n <= GROUP_MAX);
-    const howMany = row('HOW MANY', counts.map((n) => [String(n), n]),
-      () => this.pick.count, (v) => { this.pick.count = v; });
-    const shape = row('SHAPE', [['ANY', ''], ...FORMATION_SHAPES.map((k) => [k.toUpperCase(), k])],
-      () => this.pick.shape, (v) => { this.pick.shape = v; });
-    const where = row('ARRIVES', [['ABOVE', 'entry'], ['ON FIELD', 'field']],
-      () => this.pick.where, (v) => { this.pick.where = v; });
-
-    const go = document.createElement('button');
-    go.className = 'spawnGo';
-    go.addEventListener('click', () => this.spawn());
-    this.el.go = go;
-
-    /*
-     * The dummy. A body that does not move, does not attack, does not die and
-     * does not pay -- so a damage-per-second reading is a reading of the gun
-     * and not of how long a LURCHER happened to survive. It is the one thing
-     * here that is not a copy of something in the roster.
-     */
-    const dummy = document.createElement('button');
-    dummy.className = 'spawnGo sbDummy';
-    dummy.textContent = 'PRACTICE DUMMY';
-    dummy.addEventListener('click', () => this.dummy());
-
-    const bosses = document.createElement('div');
-    bosses.className = 'sbBosses';
-    const bh = document.createElement('span');
-    bh.className = 'spawnLabel';
-    bh.textContent = 'ANOMALIES';
-    bosses.appendChild(bh);
-    const brow = document.createElement('div');
-    brow.className = 'sbBossRow';
-    for (const a of ANOMALIES) {
-      const b = document.createElement('button');
-      b.className = 'sbBoss';
-      b.textContent = a.name;
-      b.style.setProperty('--tone', a.tone);
-      b.addEventListener('click', () => this.summon(a.n));
-      brow.appendChild(b);
-      this.bossChips.set(a.n, b);
-    }
-    bosses.appendChild(brow);
-    this.el.bosses = bosses;
-
-    const clear = document.createElement('button');
-    clear.className = 'spawnClear';
-    clear.textContent = 'CLEAR FIELD';
-    clear.addEventListener('click', () => this.game.debugClearField());
-
-    p.append(pick, howMany, shape, where, go, dummy, bosses, clear);
-    return p;
-  }
-
-  buildStats() {
-    const p = document.createElement('div');
-    p.className = 'sbPane';
-    p.hidden = true;
+    p.id = 'sbPanel';
 
     const head = document.createElement('div');
     head.className = 'sbStatHead';
     /*
      * Four rates, and each answers a different question. NOW is what is
-     * happening this second and is what the dummy's own bands are driven
-     * from; the two windows are for reading and comparing; RUN is over the
-     * whole counter and is the one that cannot be gamed by choosing when to
-     * look. Total and destroyed sit under them.
+     * happening this second and is what the rig's own bands are driven from;
+     * the two windows are for reading and comparing; RUN is over the whole
+     * counter and is the one that cannot be gamed by choosing when to look.
      */
-    head.innerHTML = `<div><b id="sbW0">0</b><em>DPS NOW</em></div>`
+    head.innerHTML = '<div><b id="sbW0">0</b><em>DPS NOW</em></div>'
       + `<div><b id="sbW1">0</b><em>DPS ${WINDOWS[1]}s</em></div>`
       + `<div><b id="sbW2">0</b><em>DPS ${WINDOWS[2]}s</em></div>`
       + '<div><b id="sbSust">0</b><em>DPS RUN</em></div>';
+
     const sub = document.createElement('div');
     sub.className = 'sbStatSub';
     sub.innerHTML = '<span id="sbClock">00:00</span>'
       + '<span id="sbTotal">0</span><span id="sbOver"></span>';
+
+    const acts = document.createElement('div');
+    acts.className = 'sbActs';
     const reset = document.createElement('button');
     reset.className = 'sbReset';
     reset.textContent = 'RESET COUNTER';
     reset.addEventListener('click', () => { ledger.reset(); this.syncStats(); });
+    const fold = document.createElement('button');
+    fold.className = 'sbFold';
+    fold.addEventListener('click', () => this.showTable(!this.tableOpen));
+    acts.append(reset, fold);
+
     const table = document.createElement('div');
     table.className = 'sbTable';
+    table.hidden = true;
 
-    p.append(head, sub, reset, table);
+    p.append(head, sub, acts, table);
+    this.el.panel = p;
     this.el.table = table;
+    this.el.fold = fold;
     this.el.win = WINDOWS.map((_, i) => head.querySelector(`#sbW${i}`));
     this.el.sust = head.querySelector('#sbSust');
     this.el.total = sub.querySelector('#sbTotal');
@@ -329,123 +218,76 @@ export class Sandbox {
 
   enter() {
     this.on = true;
-    this.sheet = '';
     if (this.el.root) this.el.root.hidden = false;
-    if (this.el.sheet) this.el.sheet.hidden = true;
     document.body.classList.add('sandbox');
     ledger.arm(true);
     background.setMood('sandbox', true);
-    this.syncSpawn();
+    // Folded on the way in, every time: the table is the only thing here
+    // that is allowed to cover the rig, and it should never do so uninvited.
+    this.showTable(false);
+    // ...and there is always something to shoot. The mode is one target and
+    // a counter; arriving to an empty field and having to ask for the target
+    // is a step that exists only because the old one could spawn other things.
+    this.dummy();
   }
 
   leave() {
     this.on = false;
-    this.sheet = '';
     if (this.el.root) this.el.root.hidden = true;
-    if (this.el.sheet) this.el.sheet.hidden = true;
     document.body.classList.remove('sandbox');
     // Kept, not cleared: the menu shows the last session, and a table that
     // vanished the moment you left would be a table nobody could quote.
     ledger.disarm();
   }
 
-  show(which) {
-    this.sheet = which;
-    if (!this.el.sheet) return;
-    this.el.sheet.hidden = !which;
-    this.el.spawnPane.hidden = which !== 'spawn';
-    this.el.statsPane.hidden = which !== 'stats';
-    this.el.spawnBtn.classList.toggle('on', which === 'spawn');
-    this.el.statsBtn.classList.toggle('on', which === 'stats');
-    if (which === 'spawn') this.syncSpawn();
-    if (which === 'stats') this.syncStats();
+  showTable(on) {
+    this.tableOpen = !!on;
+    if (!this.el.table) return;
+    this.el.table.hidden = !on;
+    this.el.fold.textContent = on ? 'HIDE SOURCES' : 'SHOW SOURCES';
+    this.el.fold.classList.toggle('on', !!on);
+    if (on) this.syncStats();
   }
 
-  // -------------------------------------------------------------- putting
-
-  /** Only what has been destroyed at least once, ever. */
-  allowed(id) {
-    return codex.has(id);
-  }
-
-  spawn() {
-    if (!this.allowed(this.pick.id)) return;
-    const made = this.game.debugSpawnGroup(this.pick.id, this.pick.count, {
-      shape: this.pick.shape || undefined,
-      where: this.pick.where,
-    });
-    const t = TYPE_BY_ID[this.pick.id];
-    this.game.hud.alert(`+${made.length} ${t ? t.name : this.pick.id}`, 'info', 1.2);
-  }
+  // -------------------------------------------------------------- the rig
 
   /**
-   * A body with no route, no legs and no end.
-   *
-   * Built out of the roster's heaviest shape and then unmade: `fixed` is what
-   * the boss frames use to say "the physics does not move this", `harmless`
-   * keeps it off the corruption path, and the health is topped back up every
-   * frame in `Game.update` so the reading is never cut short by the thing
-   * dying. It cannot be destroyed, so it cannot pay and cannot be counted.
+   * One dummy, and only ever one. Pressing DUMMY with one already standing
+   * replaces it where it stands rather than crowding a second onto the same
+   * spot -- which is what the button is actually for: putting the target back
+   * after a VOID or a stray PULSE has moved it.
    */
   dummy() {
-    if (!placeDummy(this.game)) return;
-    this.game.hud.alert('DUMMY PLACED', 'info', 1.2);
+    const w = this.game.world;
+    for (let i = w.enemies.length - 1; i >= 0; i--) {
+      if (w.enemies[i].dummy) w.enemies.splice(i, 1);
+    }
+    placeDummy(this.game, this.standoff());
   }
 
   /**
-   * An anomaly, as an object.
+   * How far up-field the rig stands, so that the readout never covers it.
    *
-   * `Game.openBoss` is the real door and does four things this must not: it
-   * spends an APERTURE, it hauls in and destroys everything already on the
-   * field, it puts a banner up, and its ending pays a rung and a RECONCILED.
-   * This is the constructor and the moods and nothing else -- which is what
-   * "like he is a regular object" means.
+   * Measured off the panel rather than assumed, because the answer is
+   * different on every phone: the world maps to the screen at `CFG.zoom` with
+   * no camera offset, so a 320x568 screen shows 916 world units of depth and
+   * a 390x844 shows 1361. A fixed 420 clears the panel on the second and puts
+   * the rig 208px BEHIND it on the first.
+   *
+   * A UI decision, so it is taken here and not in `dummy.js`: that module
+   * knows how to draw a rig, not what else is on the screen.
    */
-  summon(n) {
+  standoff() {
     const w = this.game.world;
-    if (w.boss) return;
-    const a = anomalyOf(n);
-    const make = makerOf(n);
-    if (!a || !make || !this.allowed(a.types[0])) return;
-    this.game.summonSandboxBoss(n, make);
-    this.show('');
+    const el = this.el.panel;
+    if (!el) return DUMMY.up;
+    const bottom = el.getBoundingClientRect().bottom / CFG.zoom;
+    // The furthest it may stand is just clear of the panel's bottom edge.
+    const far = Math.max(0, w.shooter.y - (bottom + DUMMY.r + DUMMY.clear));
+    return Math.round(clamp(Math.min(DUMMY.up, far), DUMMY.nearest, DUMMY.farthest));
   }
 
   // -------------------------------------------------------------- syncing
-
-  syncSpawn() {
-    for (const [id, b] of this.chips) {
-      const seen = this.allowed(id);
-      b.disabled = !seen;
-      b.classList.toggle('locked', !seen);
-      b.classList.toggle('on', seen && id === this.pick.id);
-    }
-    // If the selection is not something this device has met, move it to the
-    // first thing that is -- a picker whose GO does nothing is worse than a
-    // picker that chose for you.
-    if (!this.allowed(this.pick.id)) {
-      const first = SPAWNABLE.find((t) => this.allowed(t.id));
-      if (first) this.pick.id = first.id;
-      for (const [id, b] of this.chips) b.classList.toggle('on', id === this.pick.id);
-    }
-    for (const r of this.rows) {
-      const v = r.read();
-      for (const [b, value] of r.cells) b.classList.toggle('on', value === v);
-    }
-    const t = TYPE_BY_ID[this.pick.id];
-    if (this.el.go) {
-      this.el.go.textContent = this.allowed(this.pick.id)
-        ? `SPAWN ${this.pick.count} ${t ? t.name : ''}`.trim()
-        : 'NOTHING MET YET';
-      this.el.go.disabled = !this.allowed(this.pick.id);
-    }
-    for (const [n, b] of this.bossChips) {
-      const a = anomalyOf(n);
-      const ok = !!a && !!makerOf(n) && this.allowed(a.types[0]);
-      b.disabled = !ok;
-      b.classList.toggle('locked', !ok);
-    }
-  }
 
   syncStats() {
     if (!this.el.table) return;
@@ -459,6 +301,8 @@ export class Sandbox {
       ? `${ledger.kills} DESTROYED  ·  ${ledger.total > 0
         ? Math.round((ledger.over / ledger.total) * 100) : 0}% OVERKILL` : '';
 
+    // The table sorts and allocates, so it is only built while it is open.
+    if (!this.tableOpen) return;
     // A row with no damage and no kills is a source that did nothing, and the
     // table should not carry it. VOID has no damage by design and is kept by
     // the kills arm.
@@ -514,8 +358,7 @@ export class Sandbox {
     if (this.statT > 0) return;
     this.statT = 0.25;
     if (this.el.dps) this.el.dps.textContent = num(ledger.rate(BAR_WINDOW));
-    if (this.sheet === 'stats') this.syncStats();
-    if (this.sheet === 'spawn') this.syncSpawn();
+    this.syncStats();
   }
 }
 

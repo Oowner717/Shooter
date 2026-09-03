@@ -3871,12 +3871,10 @@ body.booting #quickBar {
  *
  * The bench. One bar across the top and one sheet under it.
  *
- * It borrows the debug spawner's structure -- `.spawnPick`, `.spawnRow`,
- * `.spawnGo` -- because the two are the same tool and a second private
- * layout would be a second thing to keep in step. What it does NOT borrow is
- * that panel's type: the debug screen runs at 7.5-10.5px because it is a
- * developer's, and everything here is a player's, so the sizes are lifted to
- * the 11px floor the title screen is already held to.
+ * Everything here is a player's, so it is held to the 11px floor the title
+ * screen is already held to -- the debug panel next door runs at 7.5-10.5px
+ * because it is a developer's, and this borrowed those sizes for one build
+ * while it still had that panel's spawn picker in it.
  */
 #sandbox {
   position: absolute;
@@ -3886,11 +3884,20 @@ body.booting #quickBar {
 }
 #sandbox[hidden] { display: none !important; }
 
+/*
+ * The bar takes the top bar's place rather than sitting under it.
+ *
+ * In the range the OBJECTS chip counts nothing and the energy chip buys
+ * nothing, so those 58px were being spent on two readouts that do not apply
+ * -- and on a 568-tall screen they were the difference between the panel
+ * clearing the rig and landing on it. The hamburger stays: the tree is worth
+ * reaching without leaving, and it is the only other door up there.
+ */
 #sbBar {
   position: absolute;
-  top: var(--rail-t);
+  top: var(--hud-t);
   left: max(10px, var(--safe-l));
-  right: max(10px, var(--safe-r));
+  right: calc(max(10px, var(--safe-r)) + 56px);
   height: 44px;
   display: flex;
   align-items: center;
@@ -3936,60 +3943,60 @@ body.booting #quickBar {
 }
 .sbBtn.on { border-color: #8fb8d8; color: #cfe6f6; background: rgba(143, 184, 216, 0.16); }
 
-#sbSheet {
+/*
+ * The panel, and it is ALWAYS up.
+ *
+ * It was a 56vh sheet behind a STATS toggle, and it landed exactly on the
+ * dummy -- so you could read the rates or watch the thing they were about,
+ * and not both. The four rates and the clock are about 116px together, which
+ * clears the rig on every screen the game is played at; the only thing that
+ * can cover the field is the per-source table, which is a list of unbounded
+ * length and folds away by default.
+ */
+#sbPanel {
   position: absolute;
-  top: calc(var(--rail-t) + 50px);
+  top: calc(var(--hud-t) + 50px);
   left: max(10px, var(--safe-l));
   right: max(10px, var(--safe-r));
-  max-height: 56vh;
+  max-height: 62vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 10px;
+  padding: 9px;
   border: 1px solid var(--line);
   border-radius: 9px;
-  background: rgba(8, 15, 24, 0.94);
+  background: rgba(8, 15, 24, 0.9);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
   pointer-events: auto;
 }
-#sbSheet[hidden] { display: none !important; }
-.sbPane[hidden] { display: none !important; }
+.sbTable[hidden] { display: none !important; }
 
-/* The picker, at player type sizes rather than the debug panel's. */
-#sbSheet .spawnPick { grid-template-columns: repeat(4, 1fr); gap: 5px; }
-#sbSheet .spawnChip { padding: 6px 2px 5px; }
-#sbSheet .spawnChip canvas { width: 34px; height: 34px; }
-#sbSheet .spawnChip span { font-size: 8.5px; }
-#sbSheet .spawnChip.locked { opacity: 0.25; }
-#sbSheet .spawnLabel { width: 62px; font-size: 9.5px; }
-#sbSheet .spawnOpts button { font-size: 11px; padding: 7px 8px; }
-#sbSheet .spawnGo { font-size: 11px; padding: 12px 6px; }
-#sbSheet .spawnGo:disabled { opacity: 0.4; }
-.sbDummy { border-color: #8fb8d8 !important; color: #cfe6f6 !important; }
-
-.sbBosses { margin-top: 10px; }
-.sbBossRow { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 5px; }
-.sbBoss {
+/* RESET and the fold, side by side: two full-width buttons stacked would be
+   28px of height spent on nothing, and that 28px is the margin the panel
+   clears the rig by on a 568-tall screen. */
+.sbActs { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin: 7px 0 0; }
+.sbFold {
   -webkit-appearance: none;
   appearance: none;
-  padding: 9px 4px;
+  padding: 9px 11px;
   font-size: 11px;
   letter-spacing: 0.1em;
   font-family: inherit;
-  border: 1px solid var(--tone, var(--line));
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: rgba(14, 26, 42, 0.85);
-  color: var(--tone, var(--ink));
+  background: rgba(16, 30, 46, 0.9);
+  color: var(--dim);
+  white-space: nowrap;
 }
-.sbBoss.locked { opacity: 0.24; border-color: var(--line); color: var(--dim); }
+.sbFold.on { border-color: #8fb8d8; color: #cfe6f6; }
 
 /* ---- the stats table ---- */
 .sbStatHead { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .sbStatHead div {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 7px 6px;
+  gap: 1px;
+  padding: 6px 5px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: rgba(14, 26, 42, 0.7);
@@ -3999,7 +4006,8 @@ body.booting #quickBar {
 .sbStatSub {
   display: flex;
   justify-content: space-between;
-  margin-top: 7px;
+  gap: 6px;
+  margin-top: 6px;
   font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--dim);
@@ -4009,7 +4017,6 @@ body.booting #quickBar {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  margin: 8px 0 4px;
   padding: 9px 6px;
   font-size: 11px;
   letter-spacing: 0.12em;
@@ -4050,7 +4057,7 @@ body.booting #quickBar {
  * The object count, the quick strip and the ability bar all stay: they are
  * the kit, and the kit is what the bench is for.
  */
-body.sandbox #energyChip,
+body.sandbox #barChips,
 body.sandbox #waveRail { display: none !important; }
 
 /* The SANDBOX room's open half. The shut half wears `.sealedRoom`, which
@@ -4089,14 +4096,7 @@ body.sandbox #waveRail { display: none !important; }
    screen is not the place to leave it standing. Same rule the aim row has. */
 body.menuOpen #sandbox { display: none !important; }
 
-/* The picker scrolls inside the sheet rather than pushing GO off the bottom:
-   thirty-seven chips at four across is nine rows, and the button that acts on
-   the chosen one has to stay in sight. */
-#sbSheet .spawnPick {
-  max-height: 30vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
+
 
 /* The last session, in the SANDBOX room. The tab is worth opening outside the
    bench because of this; before it, the room was one button and two thirds of
@@ -4132,3 +4132,18 @@ body.menuOpen #sandbox { display: none !important; }
 }
 .sbLastRow i { width: 8px; height: 8px; border-radius: 2px; }
 .sbLastRow b { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/*
+ * A short screen. 320x568 shows 916 world units of depth against a 390x844's
+ * 1361, so the readout and the rig are competing for a band that is 169 units
+ * tall -- and the rig is 136 of it. Ten pixels off the panel is the
+ * difference between the two clearing each other and not.
+ */
+@media (max-height: 660px) {
+  .sbStatHead div { padding: 5px 4px; }
+  .sbStatHead b { font-size: 13px; }
+  .sbStatHead em { font-size: 7.5px; }
+  .sbStatSub { margin-top: 4px; font-size: 10px; }
+  .sbActs { margin-top: 5px; }
+  .sbReset, .sbFold { padding: 7px 6px; }
+}

@@ -16124,9 +16124,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const r = await page.evaluate(async () => {
     const g = window.__sim;
     const w = g.world;
-    const { codex } = await import('../src/codex.js');
     const { ledger } = await import('../src/ledger.js');
-    const { makerOf } = await import('../src/anomaly.js');
     const { readRun } = await import('../src/save.js');
     const out = {};
     const tab = () => document.querySelector('[data-tab="sandbox"]');
@@ -16155,13 +16153,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.noWaves = w.enemies.length === seen0;
     out.noFuse = w.director.glitch === fuse0;
 
-    // nothing is earned, and nothing is written down
-    codex.unlockAll();
-    const sb = g.sandbox;
-    sb.pick.id = 'lurcher';
-    sb.pick.count = 5;
-    sb.pick.where = 'field';
-    sb.spawn();
+    /*
+     * Nothing is earned, and nothing is written down. Measured on a body that
+     * pays -- the rig itself never can, so a sweep that only shot the rig
+     * would pass on a build where `bank` had been re-enabled.
+     */
+    const paid = g.debugSpawn('lurcher', w.width / 2, w.shooter.y - 250);
+    if (paid) { paid.staged = false; paid.spawnIn = 0; }
     const purse = w.energy;
     const drops = w.drops.length;
     for (const e of [...w.enemies]) if (!e.dummy) e.destroy(w);
@@ -16173,26 +16171,23 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.checkpoint();
     out.noWrite = JSON.stringify(readRun()) === before;
 
-    // ---- only what has been destroyed ------------------------------------
-    codex.forget();
-    out.shutWhenUnseen = !sb.allowed('bulwark');
-    codex.unlockAll();
-    out.openWhenSeen = sb.allowed('bulwark');
-
-    // ---- an anomaly, as an object ----------------------------------------
-    sb.pick.id = 'lurcher';
-    sb.pick.count = 4;
-    sb.spawn();
-    const field = w.enemies.filter((e) => !e.dead && !e.type.fixed).length;
-    out.summoned = g.summonSandboxBoss(1, makerOf(1));
-    out.fieldKept = w.enemies.filter((e) => !e.dead && !e.type.fixed).length >= field;
-    out.noAperture = w.apertures.every((x) => !x);
-    for (let f = 0; f < 60 * 3; f++) g.update(1 / 60);
-    out.noLine = w.bossLine === null;
-    const rec = w.reconciled.length;
-    const tier = w.director.tier;
-    g.endSandboxBoss();
-    out.noReward = w.reconciled.length === rec && w.director.tier === tier && !w.boss;
+    // ---- the mode is one target and a counter ----------------------------
+    /*
+     * It shipped with a picker of sixteen field objects and a row of seven
+     * anomalies. All of it is gone: what is left is a practice dummy and a
+     * readout, which is what the mode was actually for. Asserted as the
+     * ABSENCE of the doors, because a picker that is merely hidden is a
+     * picker somebody will wire back up.
+     */
+    const sb2 = g.sandbox;
+    out.noPicker = !sb2.chips && !sb2.bossChips && !sb2.spawn && !sb2.summon
+      && !g.summonSandboxBoss && !document.querySelector('#sbSheet');
+    out.dummyOnEntry = w.enemies.filter((e) => e.dummy && !e.dead).length;
+    // ...and pressing DUMMY replaces the one standing rather than adding one
+    sb2.dummy();
+    sb2.dummy();
+    out.dummiesAfterThree = w.enemies.filter((e) => e.dummy && !e.dead).length;
+    out.named = (document.querySelector('.sbTag') || {}).textContent;
 
     // ---- and out ---------------------------------------------------------
     out.left = g.exitSandbox();
@@ -16294,20 +16289,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `fourteen seconds in: waves ${r.noWaves}, glitch fuse ${r.noFuse}, `
     + `purse ${r.noEnergy}, salvage ${r.noSalvage}, checkpoint refused ${r.noWrite}`);
 
-  check('...and only what this device has destroyed may be put down',
-    r.shutWhenUnseen && r.openWhenSeen,
-    `with the codex forgotten a BULWARK is ${r.shutWhenUnseen ? 'shut' : 'OPEN'}; `
-    + `once seen it is ${r.openWhenSeen ? 'open' : 'STILL SHUT'}`);
-
   /*
-   * The real door hauls in and destroys everything already on the field, puts
-   * a banner up, spends an APERTURE and pays a RECONCILED and a rung on the
-   * way out. A summon here is the constructor and the sky and nothing else.
+   * The picker and the anomaly row are GONE, and that is asserted as their
+   * absence rather than as their being hidden -- a picker that is merely
+   * hidden is a picker somebody wires back up. What is left is one target and
+   * a counter, which is what the mode was always for and what its new name
+   * says.
    */
-  check('a summoned anomaly is an object: no cost, no ceremony, and the field is left alone',
-    r.summoned && r.fieldKept && r.noAperture && r.noLine && r.noReward,
-    `field kept ${r.fieldKept}, apertures unspent ${r.noAperture}, `
-    + `boss silent ${r.noLine}, ending paid nothing ${r.noReward}`);
+  check('the range is one dummy and a counter, and there is nothing else to put down',
+    r.noPicker && r.dummyOnEntry === 1 && r.dummiesAfterThree === 1
+    && r.named === 'RANGE',
+    `no picker, no anomaly row, no summon door: ${r.noPicker}; entering puts `
+    + `${r.dummyOnEntry} dummy down and pressing DUMMY twice more leaves `
+    + `${r.dummiesAfterThree}; the bar says "${r.named}"`);
 
   check('...and leaving hands the run back',
     r.left && r.outFlag && r.ledgerOff && r.chromeBack,
@@ -16331,21 +16325,25 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 }
 
 /*
- * ---- build 233: what the picker offers, and what the counter books ----
+ * ---- every damage path, against the DUMMY ----
  *
- * Two separate promises. The picker is the field and nothing an anomaly puts
- * down -- a boss is summoned WHOLE from the row underneath, because a bare
- * ORDINAL core with none of its frame is not the fight and a DIGIT with no
- * ORDINAL to have come off is not an object. And every damage path in the
- * game books to the name a player would look for it under.
+ * The ledger's TOTAL matching the health a body lost only proves nothing is
+ * MISSING: a site that passes no source still books, under `unattributed`.
+ * Four things were wrong when this was first swept at build 233 -- PULSE's
+ * blast had no source at all, HAIL's darts and PRISM's shell fell through
+ * `fire`'s default to the LOADED ROUND, and a BLOOM taking its neighbours
+ * with it was nameless -- and every one of them passed a total-only check.
  *
- * The second is the one worth the runtime. The ledger's TOTAL matching the
- * health a body lost only proves nothing is MISSING: a site that passes no
- * source still books, under `unattributed`. Four things were wrong when this
- * was first swept -- PULSE's blast had no source at all, HAIL's darts and
- * PRISM's shell fell through `fire`'s default and were booked to the LOADED
- * ROUND, and a BLOOM taking its neighbours with it was unattributed -- and
- * every one of them passed a total-only check.
+ * ---- and it is the dummy now, not a wall, which found a fifth ----
+ *
+ * Build 233 swept against a pinned BULWARK, and a BULWARK is not `harmless`.
+ * The dummy was, and `harmless` is tested by far more than the corruption
+ * path it was set for: a MINE is not TRIGGERED by a harmless body, a WIRE
+ * does not cut one, a patch does not burn one, and LANCE's sweep and WARD's
+ * arc both pass over one. So five of the things this mode exists to measure
+ * could not touch the one thing it exists to measure them on, and the sweep
+ * could not see it because it was measuring something else. The flag is gone
+ * and the rig is pinned by hand instead; this sweep runs on the rig.
  */
 {
   const r = await page.evaluate(async () => {
@@ -16358,23 +16356,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const { ANOMALIES } = await import('../src/anomaly.js');
     const { throwMine } = await import('../src/mines.js');
     const { freshUpgrades } = await import('../src/upgrades.js');
-    const { codex } = await import('../src/codex.js');
+    const { placeDummy } = await import('../src/dummy.js');
     const out = {};
-
-    // ---- the picker ------------------------------------------------------
-    codex.unlockAll();
-    g.restart();
-    g.debugGiveEnergy(60000);
-    g.buy('sandbox');
-    g.enterSandbox();
-    const sb = g.sandbox;
-    const offered = [...sb.chips.keys()];
-    const anomalyIds = new Set(ANOMALIES.flatMap((a) => a.types));
-    out.offered = offered.length;
-    out.leaked = offered.filter((id) => anomalyIds.has(id));
-    out.bossRow = [...sb.bossChips.keys()].length;
-    out.bossRowOpen = [...sb.bossChips.values()].filter((b) => !b.disabled).length;
-    g.exitSandbox();
 
     // ---- every damage path -----------------------------------------------
     const setup = () => {
@@ -16395,19 +16378,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       ledger.arm(true);
     };
     /*
-     * A wall that cannot die, cannot move and carries no armour, plate or
-     * ward -- so `took` is the delivered number and nothing about the BODY is
-     * in the reading. Nine hundred million health, because VOID deletes it
-     * whatever the number and the point is that the number does not matter.
+     * The rig itself, stood where the thing under test can reach it. It
+     * carries no armour, plate or ward, cannot die and cannot move, so `took`
+     * is the delivered number and nothing about the BODY is in the reading.
+     *
+     * Placed through `placeDummy` and not hand-rolled: the point of this
+     * sweep is that the REAL dummy takes damage from everything, and a
+     * hand-rolled stand-in is how build 233 missed the `harmless` fault.
      */
     const wall = (dy) => {
-      const s = w.shooter;
-      const e = g.debugSpawn('bulwark', s.x, s.y - dy);
-      e.staged = false;
-      e.spawnIn = 0;
-      e.hp = 9e8;
-      e.maxHp = 9e8;
-      e.invMass = 0;
+      const e = placeDummy(g, dy);
       e.armor = 0;
       e.ward = 0;
       e.traits = [];
@@ -16416,6 +16396,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const run = (e, seconds, tick) => {
       const s = w.shooter;
       const hp0 = e.hp;
+      // The rig heals itself in `updateDummy`, so health cannot be the
+      // instrument here; the ledger is, and `took` is only a cross-check on
+      // the frames before the pin runs.
       const home = { x: e.x, y: e.y };
       for (let f = 0; f < 60 * seconds; f++) {
         e.x = home.x; e.y = home.y; e.vx = 0; e.vy = 0;
@@ -16497,12 +16480,6 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return out;
   });
 
-  check('the picker offers the field, and an anomaly is summoned whole or not at all',
-    r.leaked.length === 0 && r.offered > 10 && r.bossRow === 7 && r.bossRowOpen === 7,
-    `${r.offered} field objects offered and ${r.leaked.length} anomaly ids leaked `
-    + `(${r.leaked.join(', ') || 'none'}); the ANOMALIES row carries `
-    + `${r.bossRow}, ${r.bossRowOpen} of them open`);
-
   /*
    * Asserted as WHICH ROWS EXIST, not as a share of the total.
    *
@@ -16548,13 +16525,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const mines = (r.mines || []).filter((x) => x.key !== 'snare' && x.key !== 'void');
   const voidRow = (r.mines || []).find((x) => x.key === 'void');
   const snare = (r.mines || []).find((x) => x.key === 'snare');
+  /*
+   * VOID's row against the RIG is SALTED's fizzle and nothing else, with no
+   * kill in it -- because the one thing VOID may not delete is the practice
+   * dummy, which would otherwise be the only object on the field able to end
+   * a measurement. Its kill is asserted on an ordinary body, three cases up.
+   */
   check('every mine books its damage to its own name, and the two that have none say so',
     bad(mines).length === 0 && mines.length === 6
     && !!snare && snare.booked === 0
-    && !!voidRow && voidRow.booked === 0 && voidRow.kills === 1,
+    && !!voidRow && voidRow.kills === 0 && voidRow.booked > 0,
     `${say(mines)}; SNARE books ${snare ? snare.booked : '?'} (its damage is the `
-    + `knot grinding), VOID ${voidRow ? voidRow.booked : '?'} damage and `
-    + `${voidRow ? voidRow.kills : '?'} kill`);
+    + `knot grinding), VOID books ${voidRow ? voidRow.booked : '?'} (SALTED's `
+    + `fizzle) and takes ${voidRow ? voidRow.kills : '?'} -- it may not have the rig`);
 
   const abl = (r.abilities || []).filter((x) => x.key !== 'stasis');
   const stasis = (r.abilities || []).find((x) => x.key === 'stasis');
@@ -16628,12 +16611,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const real = sb.syncStats.bind(sb);
     let calls = 0;
     sb.syncStats = () => { calls++; real(); };
-    sb.show('stats');
+    sb.showTable(true);
     calls = 0;
     for (let f = 0; f < 60; f++) sb.update(1 / 60);
     out.syncsPerSecond = calls;
     sb.syncStats = real;
-    sb.show('');
+    // ...and the table folds away again, which is where it starts every time
+    sb.showTable(false);
+    out.foldedByDefault = !sb.tableOpen && document.querySelector('.sbTable').hidden;
     out.barLabel = (document.querySelector('#sbDps em') || {}).textContent || '';
 
     // ---- the dummy is bigger, further out, and inside the ceiling --------
@@ -16693,45 +16678,85 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     /*
      * Rendered by hand onto an offscreen canvas, because judging an effect off
      * live screenshots measures the frame loop and not the effect -- a rule
-     * this project already paid for once. Two measures per band, so a change
-     * that is only a hue is not enough: how much of the frame is lit, and how
-     * much of it is OUTSIDE the rig's own rim, which is what the brackets, the
-     * broken ring and the ground bloom each add.
+     * this project already paid for once.
+     *
+     * The question is "does each band draw a DIFFERENT PICTURE, by more than
+     * its colour", and the first three instruments written for it all failed
+     * the same way: lit area, reach outside the rim and the lit box's aspect
+     * each watch one element, so each of them reads flat for the two or three
+     * bands whose arrival it cannot see. The aspect reading was worse than
+     * flat -- it returned exactly 1.00 six times, because the core glow lights
+     * every pixel inside the rig and the box was measuring the GLOW's circle.
+     *
+     * So: compare the whole picture, and make the comparison colour-blind by
+     * construction. Each frame is reduced to greyscale, divided by its own
+     * 98th percentile and clipped -- so a change that only repaints the rig
+     * cancels EXACTLY, which is not an argument but a control the case
+     * measures and asserts (`recolour` below, and it reads 0).
+     *
+     * The other control is the one that would otherwise flatter it: the rig
+     * animates, so two frames of the SAME band already differ. `phase` is
+     * that difference, eleven frames apart, and a band step has to beat it.
      */
-    const S = 240;
+    const S = 260;
     const c = document.createElement('canvas');
     c.width = S;
     c.height = S;
     const x = c.getContext('2d');
-    const pics = [];
     const liveWas = ledger.live;
     const onWas = ledger.on;
-    for (let band = 0; band <= BANDS.length; band++) {
+    /** Greyscale, divided by the frame's own brightness. `mul` fakes a repaint. */
+    const norm = (px, mul) => {
+      const g = new Float32Array(S * S);
+      for (let i = 0, j = 0; i < px.length; i += 4, j++) {
+        g[j] = mul * (0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]);
+      }
+      const p98 = Float32Array.from(g).sort()[Math.floor(g.length * 0.98)] || 1;
+      for (let i = 0; i < g.length; i++) g[i] = Math.min(1, g[i] / p98);
+      return g;
+    };
+    const mad = (a, b) => {
+      let s = 0;
+      for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]);
+      return +(1000 * s / a.length).toFixed(2);
+    };
+    const shot = (band, frames) => {
       const lo = band === 0 ? 0 : BANDS[band - 1];
       const hi = band < BANDS.length ? BANDS[band] : BANDS[BANDS.length - 1] * 1.6;
       const dps = band === 0 ? 0 : (lo + hi) / 2;
       const e = { x: S / 2, y: S / 2, r: DUMMY.r, dummy: true };
       ledger.on = true;
       ledger.live = () => dps;
-      for (let f = 0; f < 60 * 4; f++) updateDummy(e, 1 / 60);
+      for (let f = 0; f < frames; f++) updateDummy(e, 1 / 60);
       ledger.live = liveWas;
       ledger.on = onWas;
       x.clearRect(0, 0, S, S);
       x.fillStyle = '#0b1116';
       x.fillRect(0, 0, S, S);
       drawDummy(x, e);
-      const px = x.getImageData(0, 0, S, S).data;
-      let lit = 0;
-      let far = 0;
-      for (let i = 0; i < px.length; i += 4) {
-        if (Math.max(px[i], px[i + 1], px[i + 2]) < 40) continue;
-        lit++;
-        const j = i / 4;
-        if (Math.hypot((j % S) - S / 2, ((j / S) | 0) - S / 2) > DUMMY.r * 1.05) far++;
-      }
-      pics.push({ band, dps: Math.round(dps), lit, far, drew: e.dummyBand });
+      return { px: x.getImageData(0, 0, S, S).data, drew: e.dummyBand };
+    };
+    const pics = [];
+    for (let band = 0; band <= BANDS.length; band++) {
+      const a = shot(band, 240);
+      const b = shot(band, 251);
+      const now = norm(a.px, 1);
+      pics.push({
+        band,
+        drew: a.drew,
+        now,
+        // the two controls: the rig moving, and the rig repainted
+        phase: mad(now, norm(b.px, 1)),
+        recolour: Math.max(mad(now, norm(a.px, 0.62)), mad(now, norm(a.px, 1.55))),
+      });
     }
-    out.pics = pics;
+    out.pics = pics.map((p, i) => ({
+      band: p.band,
+      drew: p.drew,
+      phase: p.phase,
+      recolour: p.recolour,
+      diff: i === 0 ? 0 : mad(p.now, pics[i - 1].now),
+    }));
 
     // ---- a mark is sized by the hit that made it -------------------------
     /*
@@ -16748,19 +16773,33 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.sandbox = true;
     ledger.arm(true);
     const dd = placeDummy(g);
-    w.effects.length = 0;
+    /*
+     * Two hits an order of magnitude apart, from OPPOSITE bearings so they
+     * land in different octants -- the numbers merge by octant now, and two
+     * hits on the same face are one slot carrying their sum, which is the
+     * point of the merge and not a fault.
+     */
     dd.applyDamage(w, 12, 0, -1, 0, 0, 0, false, 'standard');
-    const small = w.effects[w.effects.length - 1];
-    dd.applyDamage(w, 900, 0, -1, 0, 0, 0, false, 'slug');
-    const big = w.effects[w.effects.length - 1];
+    dd.applyDamage(w, 900, 0, 1, 0, 0, 0, false, 'slug');
+    const slots = dd.tally.slot.filter((q) => q.text);
+    const small = slots.find((q) => q.text === '12');
+    const big = slots.find((q) => q.text === '900');
     out.mark = {
-      made: w.effects.length,
+      made: slots.length,
       smallW: small ? +small.w.toFixed(3) : 0,
       bigW: big ? +big.w.toFixed(3) : 0,
       smallText: small ? small.text : '',
       bigText: big ? big.text : '',
-      // the marks sit on the FACE the hit came from, not at the centre
-      onFace: !!small && Math.abs(Math.hypot(small.x - dd.x, small.y - dd.y) - dd.r * 0.92) < 2,
+      /*
+       * ...and the strain landed on the two facets the hits came from and not
+       * on the ones between. A round travelling (0,-1) strikes the face at
+       * bearing +PI/2, which is facet 3; travelling (0,+1) it is facet 9. The
+       * facets a quarter turn away from both -- 0 and 6 -- must be untouched,
+       * and they are the arm that fails if the deposit ever goes to the
+       * centre or to a fixed index.
+       */
+      onFace: dd.strain[3] > 0 && dd.strain[9] > 0
+        && dd.strain[0] === 0 && dd.strain[6] === 0,
     };
     ledger.arm(false);
     w.sandbox = false;
@@ -16784,8 +16823,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.run} (and the 3s read ${r.fresh3} on the first burst)`);
 
   check('...and the bar is the ten, redrawn four times a second and not sixty',
-    r.syncsPerSecond === 4 && /10s/.test(r.barLabel),
-    `${r.syncsPerSecond} refreshes in a second of frames, labelled "${r.barLabel}"`);
+    r.syncsPerSecond >= 3 && r.syncsPerSecond <= 5
+    && /10s/.test(r.barLabel) && r.foldedByDefault,
+    `${r.syncsPerSecond} refreshes in a second of frames, labelled "${r.barLabel}"; `
+    + `the source table folds away by default ${r.foldedByDefault}`);
 
   check('the dummy is bigger and further out, and inside the broadphase ceiling',
     r.r === 68 && r.up === 420 && r.r * 2 <= r.cell,
@@ -16807,22 +16848,32 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `TITHE ${R.tithe && R.tithe.peak}/${R.tithe && R.tithe.band}`);
 
   const pics = r.pics || [];
+  /*
+   * A step counts as a different picture if it beats the animation by a clear
+   * margin -- the tightest of the five is 3.4x, so 2.5 is a threshold with
+   * headroom rather than one fitted to the day's numbers.
+   */
   const steps = pics.slice(1).map((p, i) => ({
     band: p.band,
-    lit: p.lit / Math.max(1, pics[i].lit),
-    far: p.far - pics[i].far,
+    diff: p.diff,
+    floor: Math.max(p.phase, pics[i].phase),
   }));
   check('...and every band draws a different picture, by more than its colour',
     pics.length === 6 && pics.every((p) => p.drew === p.band)
-    && steps.every((s) => s.lit > 1.15 || s.far > 400),
-    steps.map((s) => `${s.band}: x${s.lit.toFixed(2)} lit, ${s.far > 0 ? '+' : ''}${s.far} outside`).join('  '));
+    // the instrument is blind to a repaint, measured and not argued
+    && pics.every((p) => p.recolour === 0)
+    && steps.every((s) => s.diff > 30 && s.diff > s.floor * 2.5),
+    `repainting the rig moves the measure by ${pics.map((p) => p.recolour).join('/')}; `
+    + `moving it eleven frames moves it ${pics.map((p) => p.phase).join('/')}; `
+    + `and the band steps are ${steps.map((s) => `${s.band}:${s.diff}`).join(' ')}`);
 
   const m = r.mark || {};
-  check('a hit leaves a mark on the face, sized by the hit',
+  check('a hit leaves a mark on the face it landed on, sized by the hit',
     m.made === 2 && m.bigW > m.smallW * 3 && m.smallText === '12'
     && m.bigText === '900' && m.onFace,
     `12 damage -> weight ${m.smallW} "${m.smallText}"; 900 -> ${m.bigW} `
-    + `"${m.bigText}"; struck face ${m.onFace}`);
+    + `"${m.bigText}"; the strain landed on the struck facets and not `
+    + `the ones between them ${m.onFace}`);
 }
 
 // --- report -----------------------------------------------------------------

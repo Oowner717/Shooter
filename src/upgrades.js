@@ -775,8 +775,13 @@ export const UPGRADES = {
    * ought to feel like one. One level: it either exists or it does not.
    */
   TOOL: [
-    { id: 'sandbox', name: 'SANDBOX', levels: 1, cost: 20000, step: 0,
-      line: 'A field with no run in it. Put down anything you have destroyed, summon what you have broken, and read what every round, mine and ability is really doing.',
+    /*
+     * The id stays `sandbox` though the thing is called the RANGE now: a
+     * saved run writes bought ids into `world.ledger`, so renaming this one
+     * would take the node away from everyone who has already bought it.
+     */
+    { id: 'sandbox', name: 'RANGE', levels: 1, cost: 20000, step: 0,
+      line: 'A practice dummy and a counter, and nothing else on the field. Read exactly what every round, mine and ability is delivering.',
       apply: set('sandbox', true), tone: '#8fb8d8', icon: MARK.sandbox },
   ],
 };

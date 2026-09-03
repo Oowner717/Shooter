@@ -729,47 +729,6 @@ export class Game {
     return true;
   }
 
-  /**
-   * An anomaly on the bench: the constructor, its sky, and nothing else.
-   *
-   * `openAperture` is the real door and does four things that would each make
-   * this a run rather than a bench -- it spends an APERTURE, it hauls in and
-   * destroys everything already on the field (which is why a summon there
-   * banks the wave), it raises a banner, and its ending pays a RECONCILED and
-   * a rung. What is left here is the boss as an object, on a field that is
-   * left exactly as it was found.
-   */
-  summonSandboxBoss(n, make) {
-    const w = this.world;
-    if (!w.sandbox || w.boss) return false;
-    background.setBossMoods(dressOf(n).moods);
-    w.boss = make(w);
-    w.bossN = n;
-    w.bossStage = 1;
-    ripple(w.shooter.x, w.shooter.y - CFG.ordinal.standoff, 2.6, 900);
-    shake(20);
-    audio.boom();
-    return true;
-  }
-
-  /**
-   * ...and its ending, which is the same shape: take the boss off the field
-   * and give the field back. No RECONCILED, no rung, no lane offer, no
-   * banner, and the director is not told anything because it is not running.
-   */
-  endSandboxBoss() {
-    const w = this.world;
-    if (w.boss) w.boss.clear(w);
-    w.boss = null;
-    w.bossStage = 0;
-    w.bossN = 0;
-    w.bossLine = null;
-    w.timeScale = 1;
-    this.bossStageT = 0;
-    this.bossStageWas = 0;
-    background.setMood('sandbox', true);
-  }
-
   restart() {
     this.reset();
     forgetRun();
@@ -1621,10 +1580,8 @@ export class Game {
      */
     if (w.boss) {
       w.boss.update(w, dt);
-      // On the bench a boss is an object: it comes apart and the field carries
-      // on. `watchBoss` is the withdrawal clock, which is a rule about a run.
-      if (w.boss.done) { if (w.sandbox) this.endSandboxBoss(); else this.endBoss(); }
-      else if (!w.sandbox) this.watchBoss(dt);
+      if (w.boss.done) this.endBoss();
+      else this.watchBoss(dt);
       // The glitch timer is doused HERE and not inside Director.update, which
       // this branch is the reason nobody calls while an anomaly is up. The
       // guard at the top of that method reads as if it covered this and does
@@ -1682,13 +1639,9 @@ export class Game {
       // inside its own update, so this is cleared after it rather than gated
       // at seven call sites in seven files.
       w.bossLine = null;
-      for (const e of w.enemies) {
-        if (!e.dummy || e.dead) continue;
-        e.hp = e.maxHp;
-        e.vx = 0;
-        e.vy = 0;
-        updateDummy(e, real);
-      }
+      // The pin and the healing both live in `updateDummy` now, because the
+      // dummy stopped being `harmless` and therefore started steering.
+      for (const e of w.enemies) if (e.dummy && !e.dead) updateDummy(e, real);
       this.sandbox.update(real);
     }
     ledger.tick(real);

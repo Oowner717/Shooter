@@ -1204,17 +1204,78 @@ most once for any given target and cannot spin.
   fan and a plated damage number at the struck face, sized by the delivered
   damage) drawn after the rig so it survives a busy frame, and five BANDS of
   sustained state driven by the 3s rate. Each band arrives as a different
-  ELEMENT -- lit ticks on a 24-tick rev counter, brackets, a counter-rotating
-  broken ring, arcs, a ground bloom -- and not as more of the same one,
-  because a state that lives only in a hue is a state a colourblind player
-  never receives. Band 3 originally arrived as a colour change alone and had
-  to be given the broken ring.
+  ELEMENT -- lit ticks on a 24-tick encoder scale, then vents cracking open,
+  then the shutters closing across the face, then the cracks, then light
+  pooling on the deck and the top shutter jamming -- and not as more of the
+  same one, because a state that lives only in a hue is a state a colourblind
+  player never receives.
   Both halves are measured rather than eyeballed: `regress.mjs` drives real
   weapons at a real dummy to prove a fully bought turret reaches every band
   (stock BOLT 1, bought BOLT 3, SCATTER 4, TITHE 5, everything at once 4,700
   dps), and renders the rig to an offscreen canvas at each band to prove each
-  differs from the one below by lit pixels or by reach outside the rim -- not
-  by colour. Rendering it live would measure the frame loop instead.
+  draws a different picture with the colour divided out -- see the note on
+  that instrument below, which took five tries. Rendering it live would
+  measure the frame loop instead.
   **The radius ceiling is 72**: `GRID_CELL` is twice the largest body and
   `check-build.mjs` asserts the broadphase covers it, so the dummy is 68.
+- **`harmless` is "scenery", and a practice dummy is not scenery.** The dummy
+  wore it from build 232 to 234 purely to stop it walking at the turret, and
+  `harmless` is a refusal that FIVE damage paths honour: `updateMines` will
+  not trigger a mine for one, WIRE will not cut one, a `Patch` will not bite
+  one, LANCE's sweep skips it and WARD's arc skips it. So the one room in the
+  game whose entire job is measuring damage was silently missing five sources
+  -- and the player's report was "have Dummy trigger mines", which is the
+  visible corner of it. It is an ordinary body now: `dummyHome` is where it
+  was put and `updateDummy` writes `x`/`y` back to it every frame, because
+  the moment it stopped being harmless `drive()` started steering it at the
+  turret. **A flag borrowed for its side effect brings the rest of its
+  meaning with it**; buy the side effect you actually want.
+- **A readout drawn over the thing it reads is not a readout.** The bench's
+  panel sat 208px over the rig at 320x568 -- the whole point of the room is
+  watching the dummy while the number moves, and it could not be done. Three
+  things fixed it and all three are load-bearing: the bar moved up to
+  `--hud-t` and `#barChips`/`#waveRail` are hidden inside the room (there is
+  no wave and no purse), a `@media (max-height: 660px)` compaction, and
+  `standoff()` -- which measures the panel's own `getBoundingClientRect()
+  .bottom`, converts through `CFG.zoom`, and stands the dummy clear of it
+  rather than at a constant. A hand-picked distance is right on the phone it
+  was picked on.
+- **A band that is entered on the instantaneous rate flashes.** The dummy's
+  five bands were read straight off the 3s rate, so a weapon whose rate
+  crosses a boundary between rounds repainted the whole rig at 9Hz --
+  measured. It rises instantly (a hit that takes you into a band is answered
+  on the frame it lands) and falls one band per `DWELL` 0.7s, and only once
+  the rate is `MARGIN` 0.12 of that band's own width UNDER its floor. The
+  drawing then follows `dummyBandF`, a continuous position eased toward the
+  held band, so every element fades in over the half second the position
+  takes to cross rather than appearing between two frames. Worst one-frame
+  colour step measured 7.5 of 441 crossing a boundary, against 9.3 for the
+  jitter it replaced.
+- **Three instruments for "does each band draw a different picture" and all
+  three were flat.** Lit area, reach outside the rim and the lit box's aspect
+  each watch ONE element, so each reads nothing for the two or three bands
+  whose arrival it cannot see -- and the aspect reading was worse than flat,
+  returning exactly 1.00 six times because the core glow lights every pixel
+  inside the rig and the box was measuring the GLOW's circle rather than the
+  silhouette. Two more candidates were tried and thrown away for being
+  unstable: a vertical/horizontal ratio in the gimbal ring's annulus swings
+  0.57 to 2.73 on the ring's roll phase alone, and the lit-tick count cannot
+  be read off the picture at all because the halo floods the scale.
+  What works is comparing the WHOLE picture with the colour divided out:
+  greyscale, divided by the frame's own 98th percentile, clipped, then a mean
+  absolute difference. A repaint then cancels **exactly** -- the case asserts
+  that, feeding itself the same frame scaled 0.62 and 1.55 and requiring 0,
+  which is the instrument proving it is blind to the thing the case is about
+  rather than the author asserting it. The other control is the animation:
+  the same band eleven frames on differs by 3.2 to 26.1, and every band step
+  is 56 to 110, so the threshold is a multiple of the rig's own movement
+  (2.5x, against a measured worst case of 3.4x) and not a number fitted to
+  the day's output.
+- **The bench is the RANGE, and its ids are still `sandbox`.** Renamed in
+  build 235 because it stopped being a sandbox -- the object and boss picker
+  is gone and there is one dummy in there -- but `RANGE_NAME` is the only
+  place the word lives: the tree node id, the tab id, `Game.enterSandbox` and
+  the save's own record of what has been bought all still say `sandbox`,
+  because a save on a player's phone stores the node id and renaming it
+  would silently un-buy a 20,000-energy node.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

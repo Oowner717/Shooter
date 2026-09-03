@@ -122,7 +122,7 @@ const GROUPS = [
      * present and shut rather than absent, for the same reason the tree draws
      * the rows you cannot afford -- a door you can see is a thing to aim at.
      */
-    { id: 'sandbox', label: 'SANDBOX', locked: true },
+    { id: 'sandbox', label: 'RANGE', locked: true },
     { id: 'system', label: 'SETTINGS' },
   ] },
 ];
@@ -349,24 +349,24 @@ export class Menu {
     const shut = document.createElement('div');
     shut.className = 'sealedRoom';
     shut.innerHTML = `<span class="sealedMark" aria-hidden="true">${LOCK}</span>
-      <span class="sealedName">SANDBOX</span>
-      <span class="sealedLine">A field with no run in it. Put down anything you
-      have destroyed, summon anything you have broken, and read what every
-      round, mine and ability is really doing &mdash; on a counter, per
+      <span class="sealedName">THE RANGE</span>
+      <span class="sealedLine">A practice target and a counter, and nothing
+      else on the field. Shoot it with anything you have and read exactly what
+      every round, mine and ability is delivering &mdash; per second, per
       source. Nothing there is earned and nothing there is spent.</span>
       <span class="sealedLine sbCost">Bought from UPGRADES, at the top of the tree.</span>`;
 
     const open = document.createElement('div');
     open.className = 'sbRoom';
     open.hidden = true;
-    open.innerHTML = `<span class="sealedName">SANDBOX</span>
-      <span class="sealedLine">Waves, energy, corruption and rules are all off.
-      Your kit is exactly what it is in the run. Leave whenever you like &mdash;
-      the run is written down before you go in and handed back when you come
-      out.</span>`;
+    open.innerHTML = `<span class="sealedName">THE RANGE</span>
+      <span class="sealedLine">One practice dummy and four rates. Waves,
+      energy, corruption and rules are all off, and your kit is exactly what it
+      is in the run. Leave whenever you like &mdash; the run is written down
+      before you go in and handed back when you come out.</span>`;
     const go = document.createElement('button');
     go.className = 'sbEnter';
-    go.textContent = 'ENTER SANDBOX';
+    go.textContent = 'ENTER THE RANGE';
     go.addEventListener('click', () => {
       if (!this.game.enterSandbox()) return;
       this.setOpen(false);
