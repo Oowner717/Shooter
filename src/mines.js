@@ -360,6 +360,13 @@ function retire(world, m) {
 
 /** SALTED. A mine that simply ran out still leaves something behind. */
 function fizzle(world, m) {
+  /*
+   * Once. It sets `m.dead` on its first line and had no guard reading it, so
+   * anything that could call it twice got two blasts -- and THORN and LODE
+   * could call it every frame forever. Cheap, and it is the one door SALTED's
+   * blast comes through.
+   */
+  if (m.dead) return;
   m.dead = true;
   if (world.up.mineFizzle) {
     const f = M.fizzle;
@@ -572,16 +579,21 @@ export function updateMines(world, dt) {
         fizzle(world, m);
         if (m.patch) m.patch.dead = true;
       }
-      continue;
-    }
-
-    if (m.kind === 'lode') {
+      /*
+       * ...and NO `continue`. This branch and LODE's below it both ended on
+       * one, and the only thing past it is the splice that takes a dead mine
+       * off the list -- so THORN and LODE were the two kinds that never left
+       * `world.mines`. They stayed, were re-entered every frame with `life`
+       * already past zero, and called `fizzle` again on each one: with SALTED
+       * bought that is a blast, a ring, a Shock, sixteen sparks and an
+       * `audio.boom()` sixty times a second for the rest of the run, from a
+       * mine that expired thirty seconds ago. They are `else if` arms of the
+       * chain below now, which is where the other six kinds already were.
+       */
+    } else if (m.kind === 'lode') {
       if (m.settle >= L.arm) repel(world, m, dt);
       if (m.life <= 0) fizzle(world, m);
-      continue;
-    }
-
-    if (m.kind === 'wire') {
+    } else if (m.kind === 'wire') {
       // Nothing triggers it and nothing consumes it; it runs out its life.
       if (m.cutting) cut(world, m, dt);
       if (m.life <= 0) fizzle(world, m);

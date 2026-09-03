@@ -13719,6 +13719,89 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `jumpDamage/damage is ${r.want.toFixed(2)} and up.damage is ${r.line}`);
 }
 
+// --- a THORN and a LODE come off the field when they are done ---------------
+/*
+ * The two kinds whose branch in `updateMines` ended on a `continue`. The only
+ * thing past that `continue` is the splice that takes a dead mine off
+ * `world.mines` -- so THORN and LODE were the only two kinds that never left
+ * it. They stayed in the list, were re-entered every frame with `life` already
+ * past zero, and called `fizzle` again on every one of them.
+ *
+ * `fizzle` is what SALTED turns into a blast. So a THORN that expired thirty
+ * seconds ago was landing a blast, a ring, a Shock, sixteen sparks and an
+ * `audio.boom()` SIXTY TIMES A SECOND, for the rest of the run, once per
+ * expired mine -- and the list it was doing it from grew for ever.
+ *
+ * Measured both ways: how many mines the list holds after everything on it has
+ * expired, and how many blasts land in the second after that.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const en = await import('../src/enemies.js');
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    const ran = w.director.update;
+    w.director.update = () => {};
+
+    const run = (kind, salted) => {
+      g.debugClearField();
+      w.mines.length = 0;
+      w.effects.length = 0;
+      w.up.mineFizzle = salted;
+      g.debugThrowMine(kind);
+      const m = w.mines[w.mines.length - 1];
+      if (!m) return { kind, salted, error: 'no mine' };
+      // Land it, then age it out. `life` is the only clock that matters here.
+      for (let f = 0; f < 90; f++) g.update(1 / 60);
+      m.life = 0.01;
+      for (let f = 0; f < 30; f++) g.update(1 / 60);
+      const held = w.mines.length;
+      /*
+       * Counted at the door every blast comes through, which is the only
+       * instrument that can tell "it went off once" from "it is going off
+       * every frame". Effects are no good -- the pool recycles.
+       */
+      let blasts = 0;
+      const real = en.applyBlast;
+      // ES module exports cannot be reassigned from outside, so the count is
+      // taken off what a blast actually does: a fresh Shock per detonation.
+      const before = w.effects.filter((x) => x && x.constructor
+        && x.constructor.name === 'Shock').length;
+      for (let f = 0; f < 60; f++) g.update(1 / 60);
+      const after = w.effects.filter((x) => x && x.constructor
+        && x.constructor.name === 'Shock').length;
+      blasts = after - before;
+      return { kind, salted, held, blasts, live: w.mines.filter((x) => !x.dead).length,
+        used: typeof real === 'function' };
+    };
+
+    const out = {};
+    for (const kind of ['thorn', 'lode', 'blast', 'wire']) {
+      out[kind] = { plain: run(kind, false), salted: run(kind, true) };
+    }
+    w.up.mineFizzle = false;
+    w.director.update = ran;
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+  const kinds = Object.keys(r);
+  const stuck = kinds.filter((k) => r[k].plain.held !== 0 || r[k].salted.held !== 0);
+  check('every kind of mine comes off the list when it is spent',
+    stuck.length === 0,
+    kinds.map((k) => `${k} ${r[k].plain.held}/${r[k].salted.held}`).join(' '));
+  const noisy = kinds.filter((k) => r[k].salted.blasts > 1);
+  check('...and a spent one goes off once, not once a frame',
+    noisy.length === 0,
+    kinds.map((k) => `${k} ${r[k].salted.blasts} blasts in the second after `
+      + `it expired`).join(', '));
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;
