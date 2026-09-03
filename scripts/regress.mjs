@@ -536,7 +536,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 135 since build 229, when the rebalance took HOLLOWPOINT from three
+    // 136 since build 232, when SANDBOX went in at one level -- the tree's
+    // one node that is not an upgrade to anything, and sits beside RECAST
+    // above the four categories for the same reason. It was
+    // 135 from build 229, when the rebalance took HOLLOWPOINT from three
     // levels at 1.5 to five at 1.32 -- the same x4.0 arriving four cost-steps
     // further up the ladder, which is what pays for the gentler health slope.
     // It was
@@ -577,7 +580,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 135
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 136
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -15800,7 +15803,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * fifteen threes out was a refactor and had to be provable as one -- the
    * same total the BUILT readout asserts, by a different route, so a level
    * lost to a typo cannot hide behind it. 105 until build 229, which put two
-   * more levels on HOLLOWPOINT and nothing anywhere else.
+   * more levels on HOLLOWPOINT and nothing anywhere else; 107 until 232, when
+   * SANDBOX added a node of one level.
    */
   /*
    * `repeats` was 8 until build 227 -- the seven APERTUREs plus RECAST -- and
@@ -15808,7 +15812,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * nodes, so RECAST is the only thing left in the tree with no ceiling.
    */
   check('...and writing the numbers out changed no ladder',
-    r.total === 107 && r.rungs === 53 && r.repeats === 1,
+    r.total === 108 && r.rungs === 54 && r.repeats === 1,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
     + `now written out, which has to be a refactor and nothing else)`);
@@ -15969,7 +15973,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `AMMO -> ${r.ammoBtn.tab}, MINES -> ${r.minesBtn.tab}; the world holds under all of them`);
 
   check('...and only the open menu-s tabs are in the row',
-    JSON.stringify(r.hamburger.tabsShown) === '["codex","system"]'
+    JSON.stringify(r.hamburger.tabsShown) === '["codex","sandbox","system"]'
     && JSON.stringify(r.energy.tabsShown) === '["ammo","mines","tree","ultimate"]',
     `SYSTEM shows ${r.hamburger.tabsShown.join('/')}, ARSENAL shows ${r.energy.tabsShown.join('/')}`);
 
@@ -15978,9 +15982,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `MINES -> SYSTEM lands on ${r.switch.toSystem.tab}; back to ARSENAL lands on `
     + `${r.switch.back.tab} (not the first tab)`);
 
-  check('the six tabs are one strip, walked in either direction and stopping at the ends',
-    JSON.stringify(r.walk) === '["ammo","mines","tree","ultimate","codex","system","system","system"]'
-    && JSON.stringify(r.walkBack) === '["codex","ultimate","tree","mines","ammo","ammo","ammo"]',
+  // Seven since build 232, when SANDBOX went into SYSTEM between OBJECTS and
+  // SETTINGS. The walk is what proves the strip is one list and not two: it
+  // crosses from ARSENAL into SYSTEM at ULTIMATE -> OBJECTS without a stop.
+  check('the tabs are one strip, walked in either direction and stopping at the ends',
+    JSON.stringify(r.walk) === '["ammo","mines","tree","ultimate","codex","sandbox","system","system"]'
+    && JSON.stringify(r.walkBack) === '["sandbox","codex","ultimate","tree","mines","ammo","ammo"]',
     `forward ${r.walk.join(' ')}; back ${r.walkBack.join(' ')}`);
 
   check('a sideways drag on the panel moves one tab, and a downward one does not',
@@ -16102,6 +16109,225 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `cancelled: box ${r.cancelled.box}, save still there ${r.cancelled.save}; `
     + `confirmed: save ${r.done.save}, title ${r.done.boot ? 'gone' : 'STILL UP'}, `
     + `phase ${r.done.phase}`);
+}
+
+/*
+ * ---- build 232: the bench ----
+ *
+ * SANDBOX is a tool bought from the tree: a field with no run in it, where
+ * anything already destroyed can be put down and what the kit is doing to it
+ * read off a counter. Six things have to hold, and the last of them is the
+ * only one that matters -- a counter that is wrong is worse than no counter,
+ * because it will be believed.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { codex } = await import('../src/codex.js');
+    const { ledger } = await import('../src/ledger.js');
+    const { makerOf } = await import('../src/anomaly.js');
+    const { readRun } = await import('../src/save.js');
+    const out = {};
+    const tab = () => document.querySelector('[data-tab="sandbox"]');
+
+    // ---- the door ------------------------------------------------------
+    g.restart();
+    g.hud.menu.syncSandbox();
+    out.shutTab = !!tab() && tab().classList.contains('sealed');
+    out.refused = g.enterSandbox();
+    g.debugGiveEnergy(60000);
+    out.bought = g.buy('sandbox');
+    g.hud.menu.syncSandbox();
+    out.openTab = !tab().classList.contains('sealed') && tab().classList.contains('unlocked');
+    out.price = 20000;
+
+    // ---- in, and what is not there --------------------------------------
+    g.restart();
+    g.debugGiveEnergy(60000);
+    g.buy('sandbox');
+    out.entered = g.enterSandbox();
+    out.flag = w.sandbox;
+    out.chrome = document.body.classList.contains('sandbox');
+    const seen0 = w.enemies.length;
+    const fuse0 = w.director.glitch;
+    for (let f = 0; f < 60 * 14; f++) g.update(1 / 60);
+    out.noWaves = w.enemies.length === seen0;
+    out.noFuse = w.director.glitch === fuse0;
+
+    // nothing is earned, and nothing is written down
+    codex.unlockAll();
+    const sb = g.sandbox;
+    sb.pick.id = 'lurcher';
+    sb.pick.count = 5;
+    sb.pick.where = 'field';
+    sb.spawn();
+    const purse = w.energy;
+    const drops = w.drops.length;
+    for (const e of [...w.enemies]) if (!e.dummy) e.destroy(w);
+    for (let f = 0; f < 60; f++) g.update(1 / 60);
+    out.noEnergy = w.energy === purse;
+    out.noSalvage = w.drops.length === drops;
+    // `checkpoint` refuses from inside, so what is on disk is the run
+    const before = JSON.stringify(readRun());
+    g.checkpoint();
+    out.noWrite = JSON.stringify(readRun()) === before;
+
+    // ---- only what has been destroyed ------------------------------------
+    codex.forget();
+    out.shutWhenUnseen = !sb.allowed('bulwark');
+    codex.unlockAll();
+    out.openWhenSeen = sb.allowed('bulwark');
+
+    // ---- an anomaly, as an object ----------------------------------------
+    sb.pick.id = 'lurcher';
+    sb.pick.count = 4;
+    sb.spawn();
+    const field = w.enemies.filter((e) => !e.dead && !e.type.fixed).length;
+    out.summoned = g.summonSandboxBoss(1, makerOf(1));
+    out.fieldKept = w.enemies.filter((e) => !e.dead && !e.type.fixed).length >= field;
+    out.noAperture = w.apertures.every((x) => !x);
+    for (let f = 0; f < 60 * 3; f++) g.update(1 / 60);
+    out.noLine = w.bossLine === null;
+    const rec = w.reconciled.length;
+    const tier = w.director.tier;
+    g.endSandboxBoss();
+    out.noReward = w.reconciled.length === rec && w.director.tier === tier && !w.boss;
+
+    // ---- and out ---------------------------------------------------------
+    out.left = g.exitSandbox();
+    out.outFlag = w.sandbox === false;
+    out.ledgerOff = ledger.on === false;
+    out.chromeBack = !document.body.classList.contains('sandbox');
+
+    /*
+     * ---- the counter, against the health it claims to have taken ---------
+     *
+     * The ledger books inside `applyDamage`, past ARMORED's discard, past the
+     * plate, past a HERALD's ward and past the `Math.max(1, ...)` floor -- so
+     * its total for a source must equal the health that source actually took
+     * off a body, to the digit. Measured on a body that is NOT a dummy: a
+     * dummy is healed every frame, so `start - hp` on one is zero by
+     * construction and would prove nothing whatever the ledger said.
+     *
+     * Four rounds, because a counter that is right for BOLT and wrong for the
+     * three whose damage does not come out of the muzzle is the failure this
+     * is actually guarding against -- HE's blast, ARC's chain and SPINE's
+     * splinters are all booked at a different site from the dart.
+     */
+    const meter = (round) => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      ledger.arm(true);
+      w.round = round;
+      const s = w.shooter;
+      const e = g.debugSpawn('bulwark', s.x, s.y - 300);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.hp = 4e7;
+      e.maxHp = 4e7;
+      e.invMass = 0;
+      const hp0 = e.hp;
+      w.autoAim = true;
+      w.autoFire = true;
+      for (let f = 0; f < 60 * 6; f++) {
+        e.x = s.x; e.y = s.y - 300; e.vx = 0; e.vy = 0;
+        s.aim = -Math.PI / 2; s.targetAim = s.aim;
+        g.update(1 / 60);
+      }
+      const row = ledger.table().find((q) => q.src === round);
+      const res = {
+        round,
+        took: +(hp0 - e.hp).toFixed(2),
+        booked: +ledger.total.toFixed(2),
+        mine: row ? +row.total.toFixed(2) : 0,
+      };
+      ledger.arm(false);
+      w.autoAim = false;
+      w.autoFire = false;
+      return res;
+    };
+    out.meters = ['standard', 'explosive', 'arc', 'spine'].map(meter);
+
+    // ---- the dummy does not die, and does not pay ------------------------
+    g.restart();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    w.director.update = () => {};
+    g.debugGiveEnergy(60000);
+    g.buy('sandbox');
+    g.enterSandbox();
+    g.sandbox.dummy();
+    const d = w.enemies.find((e) => e.dummy);
+    const kills0 = w.kills;
+    const purse0 = w.energy;
+    if (d) { d.x = w.shooter.x; d.y = w.shooter.y - 300; }
+    w.autoAim = true;
+    w.autoFire = true;
+    for (let f = 0; f < 60 * 8; f++) g.update(1 / 60);
+    out.dummyAlive = !!d && !d.dead && d.hp === d.maxHp;
+    // UNCHANGED, not zero: the run bought SANDBOX out of a stocked purse two
+    // lines up, so it has forty thousand left. The first version of this
+    // asserted `energy === 0` and failed on a working build.
+    out.dummyPaidNothing = w.kills === kills0 && w.energy === purse0;
+    out.dummyTookFire = ledger.total > 0;
+    w.autoAim = false;
+    w.autoFire = false;
+    g.exitSandbox();
+    g.restart();
+    return out;
+  });
+
+  check('SANDBOX is shut until it is bought, and the tab says which',
+    r.shutTab && r.refused === false && r.bought === 'ok' && r.openTab,
+    `unbought: tab sealed ${r.shutTab}, enterSandbox() ${r.refused}; `
+    + `bought for ${r.price}: tab open ${r.openTab}`);
+
+  check('the bench has no waves, no fuse, no energy and writes nothing down',
+    r.entered && r.flag && r.chrome && r.noWaves && r.noFuse
+    && r.noEnergy && r.noSalvage && r.noWrite,
+    `fourteen seconds in: waves ${r.noWaves}, glitch fuse ${r.noFuse}, `
+    + `purse ${r.noEnergy}, salvage ${r.noSalvage}, checkpoint refused ${r.noWrite}`);
+
+  check('...and only what this device has destroyed may be put down',
+    r.shutWhenUnseen && r.openWhenSeen,
+    `with the codex forgotten a BULWARK is ${r.shutWhenUnseen ? 'shut' : 'OPEN'}; `
+    + `once seen it is ${r.openWhenSeen ? 'open' : 'STILL SHUT'}`);
+
+  /*
+   * The real door hauls in and destroys everything already on the field, puts
+   * a banner up, spends an APERTURE and pays a RECONCILED and a rung on the
+   * way out. A summon here is the constructor and the sky and nothing else.
+   */
+  check('a summoned anomaly is an object: no cost, no ceremony, and the field is left alone',
+    r.summoned && r.fieldKept && r.noAperture && r.noLine && r.noReward,
+    `field kept ${r.fieldKept}, apertures unspent ${r.noAperture}, `
+    + `boss silent ${r.noLine}, ending paid nothing ${r.noReward}`);
+
+  check('...and leaving hands the run back',
+    r.left && r.outFlag && r.ledgerOff && r.chromeBack,
+    `sandbox ${r.outFlag}, ledger disarmed ${r.ledgerOff}, chrome back ${r.chromeBack}`);
+
+  /*
+   * The one that matters. A counter that is wrong is worse than no counter.
+   */
+  const bad = (r.meters || []).filter(
+    (m) => !(m.took > 0) || Math.abs(m.took - m.booked) > Math.max(0.5, m.took * 0.002)
+      || Math.abs(m.mine - m.booked) > 0.5);
+  check('the counter books exactly the health it took, by source',
+    bad.length === 0,
+    (r.meters || []).map((m) => `${m.round}: took ${m.took}, booked ${m.booked} `
+      + `(${m.mine} to its own row)`).join('; '));
+
+  check('a practice dummy does not die, does not count and does not pay',
+    r.dummyAlive && r.dummyPaidNothing && r.dummyTookFire,
+    `alive on full health ${r.dummyAlive}, nothing counted or banked `
+    + `${r.dummyPaidNothing}, and it was actually being shot ${r.dummyTookFire}`);
 }
 
 // --- report -----------------------------------------------------------------

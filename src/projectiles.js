@@ -31,6 +31,12 @@ class Projectile {
      */
     this.form = opts.form || 'tracer';
     /*
+     * Who fired it, for the sandbox's ledger. `world.round` is the default
+     * because nearly every projectile in the game is the loaded round; the
+     * two that are not -- HAIL's darts and a SPALL's pellets -- say so.
+     */
+    this.src = opts.src || '';
+    /*
      * The marker's phase, off the launch bearing rather than off Math.random.
      *
      * A decorative `rand(0, TAU)` here draws once per projectile, and a
@@ -256,7 +262,7 @@ function chainFrom(world, first, hx, hy, jumps) {
      */
     best.lastHit = 'arc';
     best.lastHitT = world.time;
-    best.applyDamage(world, damage);
+    best.applyDamage(world, damage, 0, 0, 0, 0, 0, false, 'arc');
     audio.reflect();
     x = best.x;
     y = best.y;
@@ -461,7 +467,7 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       // the per-form path. Passed as null for tracer to keep that path's
       // guard trivially cheap.
       const res = e.takeHit(world, p.damage, hx, hy, dirx, diry, p.impulse, p.shred,
-        p.form === 'tracer' ? null : p.form, p.r);
+        p.form === 'tracer' ? null : p.form, p.r, p.src);
       if (res === 'reflect') {
         /*
          * Mirror the velocity about the surface normal AT THE ENTRY POINT.
@@ -788,6 +794,7 @@ export function drawProjectiles(ctx, world) {
 export function fire(world, x, y, angle, opts = {}) {
   const speed = opts.speed ?? CFG.bolt.speed;
   const p = new Projectile(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, opts);
+  if (!p.src) p.src = world.round || '';
   world.projectiles.push(p);
   /*
    * The muzzle, per form. Two rules hold this block together:

@@ -58,6 +58,8 @@ const ASSETS = [
   './src/swipe.js',
   './src/loadout.js',
   './src/patch.js',
+  './src/ledger.js',
+  './src/sandbox.js',
 ];
 
 self.addEventListener('install', (e) => {

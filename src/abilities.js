@@ -225,7 +225,7 @@ class Well {
 
     if (this.life <= 0) {
       this.dead = true;
-      applyBlast(world, { x: this.x, y: this.y, r: 210, damage: 105, impulse: 1000 });
+      applyBlast(world, { x: this.x, y: this.y, r: 210, damage: 105, impulse: 1000, src: 'well' });
       // At 210, not 62% past it. Fourth of the same fault -- a ring fades and
       // thins as it grows, so drawn 10 -> 340 it crossed the edge that
       // actually hurt at a third of its brightness and two pixels wide.
@@ -382,7 +382,7 @@ class Decoy {
     if (this.dead) return;
     this.dead = true;
     const B = CFG.decoy.blast;
-    applyBlast(world, { x: this.x, y: this.y, r: B.r, damage: B.damage, impulse: B.impulse });
+    applyBlast(world, { x: this.x, y: this.y, r: B.r, damage: B.damage, impulse: B.impulse, src: 'decoy' });
     // At the radius, not half again past it. It ran to `B.r * 1.5`, and a
     // ring fades and thins as it grows, so it crossed the edge that actually
     // hurt at a third of its brightness and two pixels wide, then swept
@@ -652,6 +652,7 @@ class Ward {
         damage: 0,
         impulse: P.heave,
         throwOff: true,
+        src: 'ward',
       });
       ring(world.shooter.x, world.shooter.y, this.r * 0.3, this.r * 1.06, 0.34,
         TONE_ARC_SOFT, 3.4);
@@ -764,7 +765,7 @@ class Ward {
       this.seen.set(e, world.time);
       const nx = dx / d;
       const ny = dy / d;
-      e.applyDamage(world, this.cut, nx, ny, P.push);
+      e.applyDamage(world, this.cut, nx, ny, P.push, 0, 0, false, 'ward');
       this.flash = 1;
       this.hits.push({ a: Math.atan2(dy, dx), t: 0.4 });
       spark(s.x + nx * rr, s.y + ny * rr, nx * 240, ny * 240, TONE_WARD, 0.24, 2.2);
@@ -790,7 +791,7 @@ class Ward {
       const d = near[i].d || 1;
       const nx = (e.x - s.x) / d;
       const ny = (e.y - s.y) / d;
-      e.applyDamage(world, this.arcDamage, nx, ny, 0);
+      e.applyDamage(world, this.arcDamage, nx, ny, 0, 0, 0, false, 'ward');
       // From the SURFACE, not from the turret: the shell is what is throwing
       // it, and a bolt starting at the machine would read as the gun firing.
       this.bolts.push({
@@ -933,7 +934,7 @@ const SPECTRUM = ['#ff4d6d', '#ff9f1c', '#ffe066', '#7cffb2', '#59e0ff', '#8b5cf
  */
 function prismBurst(world, x, y) {
   const P = CFG.prism;
-  applyBlast(world, { x, y, r: P.r, damage: P.damage, impulse: P.impulse });
+  applyBlast(world, { x, y, r: P.r, damage: P.damage, impulse: P.impulse, src: 'prism' });
 
   for (let i = 0; i < P.beams; i++) {
     const a = (i / P.beams) * TAU + rand(0, 0.3);
@@ -949,7 +950,7 @@ function prismBurst(world, x, y) {
         const c = segClosest(x, y, x1, y1, e.x, e.y);
         const rr = e.r + 18;
         if (c.d2 > rr * rr) continue;
-        e.applyDamage(world, P.beamDamage, Math.cos(a), Math.sin(a), 220);
+        e.applyDamage(world, P.beamDamage, Math.cos(a), Math.sin(a), 220, 0, 0, false, 'prism');
       }
     };
     sweep(world.enemies);
@@ -1237,7 +1238,7 @@ export const ABILITIES = [
           const c = segClosest(x0, y0, x1, y1, e.x, e.y);
           const rr = e.r + 26;
           if (c.d2 > rr * rr) continue;
-          e.applyDamage(world, 190, Math.cos(a), Math.sin(a), 1500);
+          e.applyDamage(world, 190, Math.cos(a), Math.sin(a), 1500, 0, 0, false, 'lance');
           spark(c.px, c.py, spread(300), spread(300), '#fff0c0', 0.3, 3);
         }
       };

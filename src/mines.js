@@ -369,7 +369,7 @@ function laidCount(world) {
 function detonate(world, m) {
   m.dead = true;
   const br = M.blast.r * world.up.mineBlast;
-  applyBlast(world, { x: m.x, y: m.y, r: br, damage: M.blast.damage * world.up.mineDamage, impulse: M.blast.impulse });
+  applyBlast(world, { x: m.x, y: m.y, r: br, damage: M.blast.damage * world.up.mineDamage, impulse: M.blast.impulse, src: 'blast' });
   /*
    * At the radius, not half again past it.
    *
@@ -522,6 +522,8 @@ function fizzle(world, m) {
     applyBlast(world, {
       x: m.x, y: m.y, r: f.r * world.up.mineBlast,
       damage: f.damage * world.up.mineDamage, impulse: f.impulse,
+      // SALTED's blast is booked to the kind that left it, not to BLAST.
+      src: m.kind,
     });
     /*
      * Two faults in one line: drawn 1.3x past the blast, and drawn off the
@@ -559,6 +561,7 @@ function spall(world, m) {
   for (let i = 0; i < n; i++) {
     const off = ((i / Math.max(1, n - 1)) - 0.5) * P.spread + spread(0.03);
     fire(world, m.x, m.y - 4, base + off, {
+      src: 'spall',
       speed: rand(P.speed[0], P.speed[1]),
       r: 3.4,
       damage: P.damage * world.up.mineDamage,
@@ -584,7 +587,7 @@ function spall(world, m) {
        * the effect, and one loud pellet would be fourteen loud things.
        */
       burst: (w, x, y) => {
-        applyBlast(w, { x, y, r: br, damage: bd, impulse: B.impulse });
+        applyBlast(w, { x, y, r: br, damage: bd, impulse: B.impulse, src: 'spall' });
         // Drawn CONTRACTING, brightest at the edge that hurts. A ring fades
         // and thins as it grows, so `br * 0.3 -> br` put its dimmest, finest
         // frame exactly on the blast radius -- the same trap as the four
@@ -694,7 +697,7 @@ function cut(world, m, dt) {
       const ny = (e.y - hit.py) / d;
       if (bite) {
         e.applyDamage(world, W.damage * world.up.wireDamage * W.tick, nx, ny,
-          W.shove * W.tick);
+          W.shove * W.tick, 0, 0, false, 'wire');
       }
       if (Math.random() < 12 * dt) {
         spark(hit.px, hit.py, spread(180), spread(180), '#22ffcf', 0.24, 2);
@@ -738,7 +741,7 @@ function toll(world, m) {
   const damage = K.blast.damage * K.fade ** i * world.up.mineDamage;
   m.tolls--;
   m.tollTimer = tollGap(m);
-  applyBlast(world, { x: m.x, y: m.y, r, damage, impulse: K.blast.impulse });
+  applyBlast(world, { x: m.x, y: m.y, r, damage, impulse: K.blast.impulse, src: 'knell' });
   // At the radius, on every toll. It was `r * 1.4`, and a knell draws this
   // two to five times in a row, so the overshoot was the most repeated
   // instance of the fault in the game.

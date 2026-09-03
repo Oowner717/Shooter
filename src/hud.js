@@ -1618,6 +1618,25 @@ export class Hud {
    * The portraits are the same drawSpecimen the glossary uses, so a chip can
    * never show something the field does not.
    */
+  /**
+   * The run's own chrome, off and on.
+   *
+   * Done with ONE class on the body and rules in the stylesheet rather than
+   * with `hidden` on five elements, for the reason CLAUDE.md records: an
+   * element the stylesheet gives a `display` to ignores `[hidden]` entirely,
+   * and every one of these has an id rule. The class is also what the
+   * sandbox's own bar positions itself against.
+   *
+   * What comes down: the energy chip and its buys pip (there is no purse),
+   * the wave rail (there are no waves), the boss line (a summoned anomaly
+   * says nothing here) and the ability hint band. What stays: the object
+   * count, the quick strip and the ability bar, because those are the kit and
+   * the kit is the whole point.
+   */
+  syncSandbox(world) {
+    document.body.classList.toggle('sandbox', !!(world && world.sandbox));
+  }
+
   buildSpawn() {
     const g = this.game;
     const el = this.el.dbgSpawn;

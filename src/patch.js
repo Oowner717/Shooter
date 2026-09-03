@@ -38,6 +38,9 @@ export class Patch {
      * in shooter.js and nowhere else.
      */
     this.spore = !!opts.spore;
+    // ...and the same answer for the ledger, which wants the name a player
+    // knows rather than the flag the cap reads.
+    this.src = opts.src || (this.spore ? 'spore' : 'thorn');
     this.retired = false;
     /*
      * Drawn in the ground pass, under the bodies. Patches lived in
@@ -197,7 +200,7 @@ export class Patch {
       // A body the ground finishes died of spores, and its death says so.
       e.lastHit = 'pod';
       e.lastHitT = world.time;
-      e.applyDamage(world, bite, 0, 0, 0);
+      e.applyDamage(world, bite, 0, 0, 0, 0, 0, false, this.src);
       spark(e.x, e.y, spread(60), spread(60) - 30, this.tone, 0.3, 1.6);
     }
   }

@@ -3866,3 +3866,234 @@ body.booting #quickBar {
 @media (prefers-reduced-motion: reduce) {
   .foldArrow { transition: none; }
 }
+
+/* ============================== SANDBOX ==============================
+ *
+ * The bench. One bar across the top and one sheet under it.
+ *
+ * It borrows the debug spawner's structure -- `.spawnPick`, `.spawnRow`,
+ * `.spawnGo` -- because the two are the same tool and a second private
+ * layout would be a second thing to keep in step. What it does NOT borrow is
+ * that panel's type: the debug screen runs at 7.5-10.5px because it is a
+ * developer's, and everything here is a player's, so the sizes are lifted to
+ * the 11px floor the title screen is already held to.
+ */
+#sandbox {
+  position: absolute;
+  inset: 0;
+  z-index: 46;
+  pointer-events: none;
+}
+#sandbox[hidden] { display: none !important; }
+
+#sbBar {
+  position: absolute;
+  top: var(--rail-t);
+  left: max(10px, var(--safe-l));
+  right: max(10px, var(--safe-r));
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(10, 18, 28, 0.86);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  pointer-events: auto;
+}
+.sbTag {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: #8fb8d8;
+  flex: none;
+}
+/* The counter. Tabular, because a rate that reflows as its digits change is
+   a rate you cannot watch. */
+#sbDps {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+#sbDps b { font-size: 17px; font-weight: 600; color: var(--ink); }
+#sbDps em { font-size: 9.5px; font-style: normal; letter-spacing: 0.12em; color: var(--dim); }
+
+.sbBtn {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  padding: 8px 9px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  font-family: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(16, 30, 46, 0.9);
+  color: var(--ink);
+}
+.sbBtn.on { border-color: #8fb8d8; color: #cfe6f6; background: rgba(143, 184, 216, 0.16); }
+
+#sbSheet {
+  position: absolute;
+  top: calc(var(--rail-t) + 50px);
+  left: max(10px, var(--safe-l));
+  right: max(10px, var(--safe-r));
+  max-height: 56vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(8, 15, 24, 0.94);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+  pointer-events: auto;
+}
+#sbSheet[hidden] { display: none !important; }
+.sbPane[hidden] { display: none !important; }
+
+/* The picker, at player type sizes rather than the debug panel's. */
+#sbSheet .spawnPick { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+#sbSheet .spawnChip { padding: 6px 2px 5px; }
+#sbSheet .spawnChip canvas { width: 34px; height: 34px; }
+#sbSheet .spawnChip span { font-size: 8.5px; }
+#sbSheet .spawnChip.locked { opacity: 0.25; }
+#sbSheet .spawnLabel { width: 62px; font-size: 9.5px; }
+#sbSheet .spawnOpts button { font-size: 11px; padding: 7px 8px; }
+#sbSheet .spawnGo { font-size: 11px; padding: 12px 6px; }
+#sbSheet .spawnGo:disabled { opacity: 0.4; }
+.sbDummy { border-color: #8fb8d8 !important; color: #cfe6f6 !important; }
+
+.sbBosses { margin-top: 10px; }
+.sbBossRow { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 5px; }
+.sbBoss {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 9px 4px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  font-family: inherit;
+  border: 1px solid var(--tone, var(--line));
+  border-radius: 6px;
+  background: rgba(14, 26, 42, 0.85);
+  color: var(--tone, var(--ink));
+}
+.sbBoss.locked { opacity: 0.24; border-color: var(--line); color: var(--dim); }
+
+/* ---- the stats table ---- */
+.sbStatHead { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.sbStatHead div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(14, 26, 42, 0.7);
+}
+.sbStatHead b { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sbStatHead em { font-size: 8.5px; font-style: normal; letter-spacing: 0.1em; color: var(--dim); }
+.sbStatSub {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 7px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.sbReset {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  margin: 8px 0 4px;
+  padding: 9px 6px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  font-family: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(16, 30, 46, 0.9);
+  color: var(--ink);
+}
+.sbTable h4 {
+  margin: 10px 0 4px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--dim);
+}
+.sbRow, .sbHeadRow {
+  display: grid;
+  grid-template-columns: 8px 1fr 46px 42px 46px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+.sbHeadRow { font-size: 8.5px; letter-spacing: 0.12em; color: var(--dim); }
+.sbRow i { width: 8px; height: 8px; border-radius: 2px; display: block; }
+.sbName { font-size: 11px; letter-spacing: 0.05em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sbBar { height: 6px; border-radius: 3px; background: rgba(120, 190, 255, 0.1); overflow: hidden; }
+.sbBar b { display: block; height: 100%; }
+.sbNum, .sbTot { font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+.sbTot { color: var(--dim); }
+.sbEmpty { margin-top: 12px; font-size: 11px; line-height: 1.5; color: var(--dim); }
+
+/*
+ * ...and the run's own chrome, taken down.
+ *
+ * One class on the body, with a rule per element, because `hidden` loses to
+ * any id rule that sets `display` -- the trap CLAUDE.md keeps a note about.
+ * The object count, the quick strip and the ability bar all stay: they are
+ * the kit, and the kit is what the bench is for.
+ */
+body.sandbox #energyChip,
+body.sandbox #waveRail { display: none !important; }
+
+/* The SANDBOX room's open half. The shut half wears `.sealedRoom`, which
+   ULTIMATE already defines. */
+.sbRoom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 26px 18px;
+  text-align: center;
+}
+.sbRoom[hidden] { display: none !important; }
+.sealedRoom[hidden] { display: none !important; }
+.sbCost { color: #8fb8d8; }
+.sbEnter {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: 6px;
+  padding: 13px 22px;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  font-family: inherit;
+  border: 1px solid #8fb8d8;
+  border-radius: 7px;
+  background: rgba(143, 184, 216, 0.14);
+  color: #cfe6f6;
+}
+.sbEnter:disabled { opacity: 0.4; }
+
+/* The padlock comes off when the run buys the node. A class, because
+   `[hidden]` loses to the rule that gives `.tabLock` its display. */
+.menuTab.unlocked .tabLock { display: none !important; }
+
+/* The bench's own furniture is play-screen furniture: a sheet over the whole
+   screen is not the place to leave it standing. Same rule the aim row has. */
+body.menuOpen #sandbox { display: none !important; }
+
+/* The picker scrolls inside the sheet rather than pushing GO off the bottom:
+   thirty-seven chips at four across is nine rows, and the button that acts on
+   the chosen one has to stay in sight. */
+#sbSheet .spawnPick {
+  max-height: 30vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}

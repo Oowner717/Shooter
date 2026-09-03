@@ -95,6 +95,13 @@ export function freshUpgrades() {
     pile: 0, // levels of the weight in the deck that answers what closes in
     casing: 0, // damage a second to whatever is touching the turret
     insulation: 1, // multiplier on how much corruption costs the intake
+    /*
+     * SANDBOX. The one flag in this table that changes nothing about the
+     * machine: it opens a tab. Kept here rather than on the game, because
+     * "what has this run bought" is exactly what `world.up` is, and a door
+     * that lived anywhere else would have to be saved and restored by hand.
+     */
+    sandbox: false,
   };
 }
 
@@ -232,6 +239,12 @@ const MARK = {
     + '<circle cx="14.3" cy="13.7" r="1.5" fill="currentColor" stroke="none"/>'
     + '<path d="M2 21.4 22 2.6" opacity=".45"/>'),
   // Something coming apart and reassembling as something else.
+  /*
+   * SANDBOX: a body on a bench, with a rule under it. It is the only mark in
+   * the table that draws a piece of EQUIPMENT rather than something the
+   * turret does -- which is the point, since the thing it sells is a tool.
+   */
+  sandbox: g('<rect x="3.4" y="4.2" width="17.2" height="12" rx="1.4"/><path d="M3.4 19.6h17.2"/><path d="M6.6 16.2v3.4M17.4 16.2v3.4"/><circle cx="12" cy="10.2" r="2.8" fill="currentColor" stroke="none" opacity=".75"/><path d="M6.4 13.4h2.2M15.4 13.4h2.2"/>'),
   recast: g('<path d="M12 2.6 19 6.4v7.2L12 17.4 5 13.6V6.4z"/><path d="M12 9.4l3.2 1.8v3.4L12 16.4l-3.2-1.8v-3.4z" fill="currentColor" stroke="none" opacity=".8"/><path d="M4.4 19.4a9 9 0 0 0 15.2 0" stroke-dasharray="2.4 2.6"/><path d="M2.6 17.2 4.4 20l2.8-1" fill="none"/>'),
 };
 
@@ -747,9 +760,28 @@ export const UPGRADES = {
       apply: () => {},
       tone: '#ffd9f6', icon: MARK.recast },
   ],
+  /*
+   * ---- the one thing the tree sells that is not part of the game ----
+   *
+   * Everything else here upgrades the machine, the rack, the field or the
+   * wave. SANDBOX buys an INSTRUMENT: a field with no run in it, where
+   * anything already met can be put down and what the kit is doing to it can
+   * be read off a counter. Nothing bought here is carried back into a run and
+   * nothing in a run is spent there.
+   *
+   * Priced at 20,000, which is deliberately steep -- about a fifth of the
+   * whole tree, and three or four rounds' worth. It is a decision to stop
+   * upgrading for a while in order to find out what the upgrades did, and it
+   * ought to feel like one. One level: it either exists or it does not.
+   */
+  TOOL: [
+    { id: 'sandbox', name: 'SANDBOX', levels: 1, cost: 20000, step: 0,
+      line: 'A field with no run in it. Put down anything you have destroyed, summon what you have broken, and read what every round, mine and ability is really doing.',
+      apply: set('sandbox', true), tone: '#8fb8d8', icon: MARK.sandbox },
+  ],
 };
 
-const AXES = ['AMMO', 'FIELD', 'TURRET', 'WAVE', 'ANOMALY'];
+const AXES = ['AMMO', 'FIELD', 'TURRET', 'WAVE', 'ANOMALY', 'TOOL'];
 
 /*
  * The other two kinds of permanent thing the tree sells. They are not

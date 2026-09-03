@@ -9,6 +9,7 @@ import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, rin
 import { audio } from './audio.js';
 import { shed } from './debris.js';
 import { contactAt } from './physics.js';
+import { ledger } from './ledger.js';
 
 /**
  * The top of the visible field, in world units. Objects are queued above it
@@ -657,7 +658,7 @@ export class Enemy {
      */
     applyBlast(world, {
       x: mass.x, y: mass.y, r: H.clear.r,
-      damage: 0, impulse: H.clear.impulse, throwOff: true, source: mass,
+      damage: 0, impulse: H.clear.impulse, throwOff: true, source: mass, src: 'contact',
     });
 
     // Straight at the turret, at a speed nothing else on the field has, and
@@ -1131,7 +1132,7 @@ export class Enemy {
    *
    * @returns 'reflect' | 'hit'
    */
-  takeHit(world, dmg, hx, hy, dirx, diry, impulse, shred = 0, form = null, pr = 0) {
+  takeHit(world, dmg, hx, hy, dirx, diry, impulse, shred = 0, form = null, pr = 0, src = '') {
     /*
      * Where it actually landed. See `contactAt` in physics.js: the point the
      * projectile sweep hands over is a clamped closest-point on one frame of
@@ -1163,7 +1164,7 @@ export class Enemy {
       this.lastHitT = world.time;
     }
     // The shove is along the travel, which is what this argument is.
-    this.applyDamage(world, dmg, dirx, diry, impulse, shred, c.b);
+    this.applyDamage(world, dmg, dirx, diry, impulse, shred, c.b, false, src);
     /*
      * The landing, per form -- AT THE CONTACT, ALONG THE NORMAL.
      *
@@ -1209,7 +1210,13 @@ export class Enemy {
    *   push. It skips the diminishing-returns fade and lifts the body's speed
    *   cap for a moment -- see the note at the fade below.
    */
-  applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0, shred = 0, lever = 0, throwOff = false) {
+  /**
+   * @param src who is doing it -- an ARSENAL key, an ability id, or one of the
+   *   few names in `SRC_EXTRA`. Recorded by the sandbox's ledger and ignored
+   *   entirely in a normal run; see ledger.js for why it is taken here and not
+   *   at the call site.
+   */
+  applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0, shred = 0, lever = 0, throwOff = false, src = '') {
     if (this.dead) return;
     /*
      * An energy mote cannot be hurt. It is not wreckage to be broken up a
@@ -1249,6 +1256,14 @@ export class Enemy {
     // the fraction of this body's armour the round simply does not meet.
     const plate = this.armor * (1 - shred);
     const real = Math.max(1, dmg * (1 - plate) * (1 - ward));
+    /*
+     * Booked HERE, and this is the only honest place for it: past ARMORED's
+     * discard, past the plate, past a HERALD's ward and past the floor. The
+     * overkill is the part of the hit the body did not have left to take --
+     * zero against a practice dummy, and against a real wave the difference
+     * between output and what output was worth.
+     */
+    if (ledger.on) ledger.note(src, real, Math.max(0, real - this.hp));
     this.hp -= real;
     this.flash = Math.min(1, this.flash + 0.5 + real / 260);
     if (impulse) {
@@ -1478,7 +1493,13 @@ export class Enemy {
     // Energy: destructible, pushable, does not count toward the tally. A body
     // carries its worth between its pieces, so what a thing pays is what it
     // was made of.
-    const n = t.drops || 0;
+    /*
+     * ...and none of it on the bench. The sandbox has no purse, so salvage
+     * there would be a floor filling with motes that can never be spent --
+     * and the intake's own animation on a screen that is deliberately quiet.
+     * Refused at the source rather than at `bank`, so nothing is made either.
+     */
+    const n = world.sandbox ? 0 : (t.drops || 0);
     const worth = Math.max(n, Math.round(massOf(t, this.r) * CFG.energy.perMass));
     const each = Math.max(CFG.energy.minValue, Math.round(worth / Math.max(1, n)));
     for (let i = 0; i < n; i++) {
@@ -3201,6 +3222,9 @@ export function dividend(world) {
 }
 
 function bank(world, amount, x, y) {
+  // Nothing is earned on the bench. This is the one place energy enters a
+  // run, so it is the one place that has to say so.
+  if (world.sandbox) return;
   const got = amount * intakeRate(world) * dividend(world);
   world.energy += got;
   // The one place energy enters a run, so the one place the lifetime counter
@@ -4716,7 +4740,7 @@ export function applyBlast(world, blast) {
         }
       }
       e.applyDamage(world, damage * (0.35 + falloff * 0.65), nx, ny, impulse * falloff,
-        0, 0, !!blast.throwOff);
+        0, 0, !!blast.throwOff, blast.src);
     }
   };
   hit(world.enemies);

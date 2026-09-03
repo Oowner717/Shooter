@@ -36,6 +36,8 @@ import { SCRIPT, ON_CONTACT, ON_GLITCH, STILL_HELD, CONTROL_LINES, FIRST_USE, AL
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
+import { Sandbox } from './sandbox.js';
+import { ledger } from './ledger.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 
@@ -109,6 +111,13 @@ export class Game {
 
     this.world = Game.bindAperture(this.makeWorld());
     this.hud = new Hud(this);
+    /*
+     * The bench. Built once, at boot, whether or not the run has bought it:
+     * it is a few hundred elements and building it lazily would mean a first
+     * tap that stutters, which is the one moment a tool has to feel ready.
+     * Its door is `world.up.sandbox`; see Menu's SANDBOX tab.
+     */
+    this.sandbox = new Sandbox(this);
     this.hud.setSound(audio.enabled);
 
     this.bindInput();
@@ -161,6 +170,14 @@ export class Game {
       kills: 0,
       released: 0, // hostile objects let out so far; counted, not capped
       phase: 'boot', // boot | staging
+      /*
+       * The bench, and it is a mode rather than a phase on purpose: `phase`
+       * says whether the field is running, and the sandbox is a running field
+       * with the run taken out of it. Read by the director's arm in `update`,
+       * by `bank`, by `checkpoint`, by the HUD's chrome and by the boss's two
+       * endings; set only by enterSandbox/exitSandbox.
+       */
+      sandbox: false,
 
       enemies: [],
       drops: [], // energy on the floor, waiting to be taken in
@@ -661,7 +678,95 @@ export class Game {
    * is hidden — on a phone that is the last thing anything reliably gets.
    */
   checkpoint() {
+    // Never from inside the sandbox. The bench borrows the run's kit and then
+    // spends it, kills things that do not count and stands on a field that is
+    // not a wave -- writing any of that down would quietly overwrite the run
+    // the player is going to come back to.
+    if (this.world.sandbox) return;
     saveRun(this.world, this);
+  }
+
+  /**
+   * ---- into the bench, and back out ----
+   *
+   * Both directions are the same move: write the run down, clear the field,
+   * and put the run's kit back on it. That is exactly what `resume()` already
+   * does after a reload, so the sandbox borrows it rather than growing a
+   * second restore -- which also means the field you come back to is the one
+   * the game's own documented behaviour promises ("your count, your kit and
+   * your salvage, standing on clear ground") rather than a special case.
+   *
+   * The order matters going in: the checkpoint must be taken BEFORE the flag
+   * is set, or `checkpoint`'s own guard above swallows it and leaving would
+   * restore whatever was last written minutes ago.
+   */
+  enterSandbox() {
+    const w = this.world;
+    if (w.sandbox) return false;
+    if (!w.up.sandbox) return false;
+    if (w.phase !== 'staging') return false;
+    this.checkpoint();
+    w.sandbox = true;
+    this.resume();
+    // `resume` restores a run, and a run has a wave rail, a purse and a fuse.
+    // None of those exist here.
+    w.phase = 'staging';
+    this.sandbox.enter();
+    this.hud.syncSandbox(w);
+    return true;
+  }
+
+  exitSandbox() {
+    const w = this.world;
+    if (!w.sandbox) return false;
+    this.sandbox.leave();
+    w.sandbox = false;
+    this.resume();
+    background.setMood(w.dawn ? 'dawn' : 'staging', true);
+    this.hud.syncSandbox(w);
+    this.hud.alert('SIMULATION ONLINE', 'info', 2.2);
+    return true;
+  }
+
+  /**
+   * An anomaly on the bench: the constructor, its sky, and nothing else.
+   *
+   * `openAperture` is the real door and does four things that would each make
+   * this a run rather than a bench -- it spends an APERTURE, it hauls in and
+   * destroys everything already on the field (which is why a summon there
+   * banks the wave), it raises a banner, and its ending pays a RECONCILED and
+   * a rung. What is left here is the boss as an object, on a field that is
+   * left exactly as it was found.
+   */
+  summonSandboxBoss(n, make) {
+    const w = this.world;
+    if (!w.sandbox || w.boss) return false;
+    background.setBossMoods(dressOf(n).moods);
+    w.boss = make(w);
+    w.bossN = n;
+    w.bossStage = 1;
+    ripple(w.shooter.x, w.shooter.y - CFG.ordinal.standoff, 2.6, 900);
+    shake(20);
+    audio.boom();
+    return true;
+  }
+
+  /**
+   * ...and its ending, which is the same shape: take the boss off the field
+   * and give the field back. No RECONCILED, no rung, no lane offer, no
+   * banner, and the director is not told anything because it is not running.
+   */
+  endSandboxBoss() {
+    const w = this.world;
+    if (w.boss) w.boss.clear(w);
+    w.boss = null;
+    w.bossStage = 0;
+    w.bossN = 0;
+    w.bossLine = null;
+    w.timeScale = 1;
+    this.bossStageT = 0;
+    this.bossStageWas = 0;
+    background.setMood('sandbox', true);
   }
 
   restart() {
@@ -1515,8 +1620,10 @@ export class Game {
      */
     if (w.boss) {
       w.boss.update(w, dt);
-      if (w.boss.done) this.endBoss();
-      else this.watchBoss(dt);
+      // On the bench a boss is an object: it comes apart and the field carries
+      // on. `watchBoss` is the withdrawal clock, which is a rule about a run.
+      if (w.boss.done) { if (w.sandbox) this.endSandboxBoss(); else this.endBoss(); }
+      else if (!w.sandbox) this.watchBoss(dt);
       // The glitch timer is doused HERE and not inside Director.update, which
       // this branch is the reason nobody calls while an anomaly is up. The
       // guard at the top of that method reads as if it covered this and does
@@ -1524,7 +1631,13 @@ export class Game {
       // back still lit four minutes later. The field belongs to the anomaly
       // while it is up; so does the turret, and so does this.
       w.director.douse();
-    } else {
+    } else if (!w.sandbox) {
+      /*
+       * No waves on the bench, and therefore none of what the director owns:
+       * no releases, no rules, no OVERCLOCK, no lane offers, no verdict and no
+       * glitch fuse. It is the one place in the game where nothing arrives
+       * that you did not ask for.
+       */
       w.director.update(w, dt);
     }
 
@@ -1553,8 +1666,36 @@ export class Game {
     }
     updateFx(dt);
 
+    /*
+     * The dummies, topped back up.
+     *
+     * Healing a body each frame and reading `start - hp` measures nothing --
+     * that is a rule this project learned the hard way -- but the ledger books
+     * damage at `applyDamage`, before the health is touched, so a body that
+     * cannot die does not hide anything. What it buys is a reading that is not
+     * cut short: a fully bought turret takes a BULWARK apart in four seconds,
+     * which is not long enough to read a rate off.
+     */
+    if (w.sandbox) {
+      // A summoned anomaly does not talk. Its script writes `bossLine` from
+      // inside its own update, so this is cleared after it rather than gated
+      // at seven call sites in seven files.
+      w.bossLine = null;
+      for (const e of w.enemies) {
+        if (!e.dummy || e.dead) continue;
+        e.hp = e.maxHp;
+        e.vx = 0;
+        e.vy = 0;
+      }
+      this.sandbox.update(real);
+    }
+    ledger.tick(real);
+
     this.syncHud(dt);
-    this.updateGlitch(dtRaw);
+    // No fuse on the bench. `updateGlitch` is the corruption timer's own
+    // clock as well as the shader's, and a bench that slowly corrupted while
+    // you stood next to a dummy would be a rule in a place that has none.
+    if (!w.sandbox) this.updateGlitch(dtRaw);
   }
 
   physicsStep(dt) {
@@ -1632,8 +1773,8 @@ export class Game {
       for (let i = 0; i < 3; i++) {
         spark(mx, my, spread(impact * 1.4), spread(impact * 1.4), '#ffffff', 0.16, 1.8);
       }
-      if (a.applyDamage) a.applyDamage(w, dmg);
-      if (b.applyDamage) b.applyDamage(w, dmg);
+      if (a.applyDamage) a.applyDamage(w, dmg, 0, 0, 0, 0, 0, false, 'contact');
+      if (b.applyDamage) b.applyDamage(w, dmg, 0, 0, 0, 0, 0, false, 'contact');
     });
     /*
      * Popped on the flag it was pushed on, not on the condition re-read.
@@ -1697,7 +1838,7 @@ export class Game {
       if (this.casingT <= 0) {
         this.casingT = CFG.wire.tick;
         for (const e of w.attackers) {
-          if (!e.dead) e.applyDamage(w, up.casing * CFG.wire.tick);
+          if (!e.dead) e.applyDamage(w, up.casing * CFG.wire.tick, 0, 0, 0, 0, 0, false, 'casing');
         }
       }
     }

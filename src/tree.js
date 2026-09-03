@@ -370,6 +370,12 @@ function commons(root) {
 export const TREE = [
   leaf('recast'),
   /*
+   * ...and the bench, for the same reason and one of its own: SANDBOX is not
+   * an upgrade to anything, it is the instrument you look at the upgrades
+   * with. A category of one would say less than the row does.
+   */
+  leaf('sandbox'),
+  /*
    * ...and the wave's own two, for the same reason RECAST is up here.
    *
    * Neither upgrades the machine, the rack or the field -- they are decisions

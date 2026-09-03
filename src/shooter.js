@@ -157,7 +157,7 @@ export class Front {
        * deliberately still paying it.
        */
       e.applyDamage(world, P.damage * (0.35 + f * 0.65), nx, ny, P.impulse * f,
-        0, 0, true);
+        0, 0, true, 'pile');
       // The same mark every time, so the cause is legible without the event
       // being loud -- and only while there is budget for it.
       if (this.cut <= 8 && fx.quality >= 0.7) {
@@ -903,7 +903,7 @@ export class Shooter {
            * long fight without ever changing ammunition.
            */
           const extra = e.marks * g.step * w.up.titheStep;
-          if (extra > 0) e.applyDamage(w, g.damage * w.up.damage * extra, 0, 0, 0);
+          if (extra > 0) e.applyDamage(w, g.damage * w.up.damage * extra, 0, 0, 0, 0, 0, false, 'tithe');
           e.marks = Math.min(g.marks + w.up.titheMarks, e.marks + 1);
           /*
            * A MULTIPLIER on what the body was already worth, applied once --
@@ -1744,6 +1744,7 @@ function heBurst(world, x, y) {
     x, y, r,
     damage: b.damage * world.up.damage,
     impulse: b.impulse * world.up.impulse,
+    src: 'explosive',
   });
   /*
    * CLUSTER. Four smaller ones thrown out around the first, so HE stops being
@@ -1775,6 +1776,7 @@ function heBurst(world, x, y) {
         r: r * c.scale,
         damage: b.damage * c.scale * world.up.damage,
         impulse: b.impulse * c.scale * world.up.impulse,
+        src: 'explosive',
       });
       /*
        * A sub-blast is drawn only where it CHANGES THE OUTLINE. This mattered

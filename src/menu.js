@@ -111,6 +111,17 @@ const GROUPS = [
   ] },
   { id: 'system', label: 'SYSTEM', tabs: [
     { id: 'codex', label: 'OBJECTS' },
+    /*
+     * The bench. Under SYSTEM rather than ARSENAL because it is not something
+     * you fire, lay or buy -- it is a tool for looking at the ones that are --
+     * and because ARSENAL's row is already four wide on a 320 screen.
+     *
+     * `locked` is not `sealed`: ULTIMATE's seal is permanent and says so,
+     * while this one opens the moment the run buys SANDBOX. So the tab is
+     * present and shut rather than absent, for the same reason the tree draws
+     * the rows you cannot afford -- a door you can see is a thing to aim at.
+     */
+    { id: 'sandbox', label: 'SANDBOX', locked: true },
     { id: 'system', label: 'SETTINGS' },
   ] },
 ];
@@ -140,9 +151,13 @@ export class Menu {
     this.buildLoadout('mines');
     this.buildTree();
     this.buildUltimate();
+    this.buildSandbox();
     this.buildCodex();
     this.buildSystem();
     this.show('tree');
+    // The lock starts on: a fresh run has not bought it, and `show` above does
+    // not visit a tab it is not showing.
+    this.syncSandbox();
     // Sideways through the tabs. Bound on the scroller rather than the sheet
     // so the dismiss below, which owns the vertical axis, never sees it.
     swipeTabs(this.el.panels, {
@@ -191,7 +206,7 @@ export class Menu {
     // sheet and opening it again is exactly that gap, with the four seconds
     // still running. Measured: arm a card, close, reopen, and one tap spent.
     this.armRow(null);
-    if (on) { this.syncCodex(); this.syncTree(); }
+    if (on) { this.syncCodex(); this.syncTree(); this.syncSandbox(); }
     // The machine only draws while it is being looked at.
     if (on && this.tab === 'tree') this.runHero(); else this.stopHero();
   }
@@ -219,9 +234,12 @@ export class Menu {
       b.className = `menuTab${t.sealed ? ' sealed' : ''}`;
       b.dataset.tab = t.id;
       b.dataset.group = t.group;
-      b.innerHTML = t.sealed
+      b.innerHTML = t.sealed || t.locked
         ? `<span class="tabLock" aria-hidden="true">${LOCK}</span>${t.label}`
         : t.label;
+      // A lock that can come off. Re-read every time the sheet opens, because
+      // the tab is bought from the tree two tabs along.
+      if (t.locked) this.lockTab = b;
       b.addEventListener('click', () => this.show(t.id));
       tf.appendChild(b);
     }
@@ -270,6 +288,7 @@ export class Menu {
     this.el.panels.scrollTop = 0;
     if (tab === 'codex') this.syncCodex();
     if (tab === 'tree') this.syncTree();
+    if (tab === 'sandbox') this.syncSandbox();
     // The loadout tabs are filled by the HUD, which owns the strip they
     // describe; it is told which group is up and does the rest.
     if ((tab === 'ammo' || tab === 'mines') && this.game.hud) {
@@ -317,6 +336,66 @@ export class Menu {
    * than with an empty grid: a locked door that looks like a locked door is a
    * promise, and an empty room is a bug report.
    */
+  /**
+   * The SANDBOX room: what it is, and the way in.
+   *
+   * Two states in one panel rather than two panels. Shut, it says what the
+   * thing is and what it costs, because a locked door that does not say what
+   * is behind it is a locked door nobody saves for. Open, it is one button.
+   */
+  buildSandbox() {
+    const p = this.panel('sandbox', 'sandbox');
+    const shut = document.createElement('div');
+    shut.className = 'sealedRoom';
+    shut.innerHTML = `<span class="sealedMark" aria-hidden="true">${LOCK}</span>
+      <span class="sealedName">SANDBOX</span>
+      <span class="sealedLine">A field with no run in it. Put down anything you
+      have destroyed, summon anything you have broken, and read what every
+      round, mine and ability is really doing &mdash; on a counter, per
+      source. Nothing there is earned and nothing there is spent.</span>
+      <span class="sealedLine sbCost">Bought from UPGRADES, at the top of the tree.</span>`;
+
+    const open = document.createElement('div');
+    open.className = 'sbRoom';
+    open.hidden = true;
+    open.innerHTML = `<span class="sealedName">SANDBOX</span>
+      <span class="sealedLine">Waves, energy, corruption and rules are all off.
+      Your kit is exactly what it is in the run. Leave whenever you like &mdash;
+      the run is written down before you go in and handed back when you come
+      out.</span>`;
+    const go = document.createElement('button');
+    go.className = 'sbEnter';
+    go.textContent = 'ENTER SANDBOX';
+    go.addEventListener('click', () => {
+      if (!this.game.enterSandbox()) return;
+      this.setOpen(false);
+    });
+    open.appendChild(go);
+
+    p.append(shut, open);
+    this.sandboxRoom = { shut, open, go };
+  }
+
+  /** The lock comes off the moment the run owns the node. */
+  syncSandbox() {
+    const owned = !!(this.game.world.up && this.game.world.up.sandbox);
+    const r = this.sandboxRoom;
+    if (r) {
+      r.shut.hidden = owned;
+      r.open.hidden = !owned;
+      // Only from a running field: the title screen and an ending are not one.
+      r.go.disabled = this.game.world.phase !== 'staging';
+    }
+    if (this.lockTab) {
+      // Two classes, not `hidden` on the padlock: `.tabLock` is given a
+      // `display` by an id-carrying rule and would ignore the attribute --
+      // the trap CLAUDE.md keeps a note about, and the reason the AUTO AIM
+      // row shipped unable to close.
+      this.lockTab.classList.toggle('sealed', !owned);
+      this.lockTab.classList.toggle('unlocked', owned);
+    }
+  }
+
   buildUltimate() {
     const p = this.panel('ultimate', 'ultimate');
     p.innerHTML = `<div class="sealedRoom">

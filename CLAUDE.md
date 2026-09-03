@@ -1122,4 +1122,41 @@ most once for any given target and cannot spin.
   BLAST 653/4,211 · KNELL 442/3,917 · SPALL 456/4,274 · THORN 4,386/24,673 ·
   WIRE 5,234/18,024 · VOID one kill whatever its health · SNARE and LODE zero
   by design (SNARE's damage is the knot grinding: 32,932/91,019 loose).
+- **The SANDBOX is the instrument, and `ledger.js` is why it can be believed.**
+  Build 232. A tree node (20,000, one level, beside RECAST above the four
+  categories, because it is not an upgrade to anything) opens a SANDBOX tab
+  under SYSTEM. Inside: no waves, no energy, no salvage, no rules, no glitch
+  fuse, no checkpoint, a flat slate sky, and the run's own kit. What may be
+  put down is `codex.seen` -- what this device has destroyed at least once --
+  and that gates the anomalies too. Entering checkpoints the run and leaving
+  `resume()`s it, so both directions are the restore the game already had.
+  **`checkpoint()` refuses from inside**, or the bench would overwrite the run
+  it is standing on.
+  The counter is `ledger.note(src, real, over)` called from ONE place --
+  inside `Enemy.applyDamage`, past ARMORED's discard, past the plate, past a
+  HERALD's ward and past the `Math.max(1, ...)` floor -- so what it books is
+  what the body lost. Recording the ARGUMENT instead would be recording what
+  the caller asked for, which is the instrument fault build 231 already paid
+  for. Sources are ARSENAL keys and ABILITIES ids so the panel takes its
+  labels from the same tables the rest of the interface does; the handful that
+  are neither are in `SRC_EXTRA`. It is armed only in the sandbox and `note`
+  returns on its first line otherwise, because `applyDamage` runs tens of
+  thousands of times in a boss fight.
+  The case that matters asserts the ledger's total equals the health a body
+  actually lost, for four rounds -- BOLT plus the three whose damage does not
+  come out of the muzzle (HE's blast, ARC's chain, SPINE's splinters), because
+  a counter that is right for BOLT and wrong for those is the failure worth
+  guarding against.
+- **A mood transition does not actually ease, and has not for a long time.**
+  `background.update` runs `mixHex(this.mood[key], this.target[key], k)` with
+  `k = 1 - exp(-dt * 0.8)` -- about 0.013 at 60Hz -- and `mixHex` rounds to
+  whole channels every step. So a channel closer than about 38 to its target
+  moves by less than half a unit, rounds back to itself, and NEVER ARRIVES:
+  measured, staging -> sandbox sat at the starting colour for twelve seconds
+  and moved only when `background.update(1)` was called by hand. Every mood in
+  the game is affected, and the ones that appear to work are arriving on their
+  few far-apart channels only. Build 232 did NOT fix it -- the fix changes the
+  look of staging, the lull and all four boss skies and is its own decision --
+  and added `setMood(name, snap)` instead, which the sandbox uses because a
+  mode change should be instant anyway.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

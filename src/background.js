@@ -37,6 +37,16 @@ const MOODS = {
    */
   dawn: { top: '#0d0b0a', mid: '#241f18', low: '#070606', line: '#7a6a4e', neb: ['#3d3320', '#2c2a24', '#1f2430'], accent: '#ffd9a3' },
   ending: { top: '#000000', mid: '#0a0a0a', low: '#000000', line: '#555555', neb: ['#222222', '#111111', '#191919'], accent: '#cccccc' },
+  /*
+   * The sandbox, and it is deliberately the one sky in the game that is not
+   * atmospheric. Every other mood is a place: staging's cold blue, the lull's
+   * ember, a boss's own hue. This is a bench -- a flat neutral slate with a
+   * cool grid over it and no nebula worth the name -- so that a player can
+   * never be a beat unsure whether the field they are looking at is a run.
+   * Lifted well off black on purpose: the arena reads as lit workspace rather
+   * than as deep field.
+   */
+  sandbox: { top: '#101820', mid: '#16222c', low: '#0b1116', line: '#4a708c', neb: ['#1b2a36', '#18242e', '#141d26'], accent: '#8fb8d8' },
 };
 
 const GLYPHS = 'アカサタナハマヤラワ0123456789ABCDEF<>/\\|[]{}=+*#%$@';
@@ -148,8 +158,27 @@ class Background {
     this.holdY = y;
   }
 
-  setMood(name) {
-    if (MOODS[name]) this.target = MOODS[name];
+  /**
+   * @param snap put the palette there NOW rather than easing to it.
+   *
+   * Every other mood change in the game is a thing that happened to the field
+   * and should arrive over a few seconds. The sandbox is not: it is a
+   * different place, and a bench that spends ten seconds looking like the run
+   * you just left is a bench you are not sure you are in yet.
+   *
+   * (Worth knowing while you are here: the ease itself does not work at small
+   * differences. `mixHex` rounds to whole channels every frame and `k` is
+   * about 0.013 at 60Hz, so any channel closer than ~38 to its target never
+   * moves at all. That is a live fault in every transition this game has and
+   * it is NOT fixed here -- it changes the look of staging, lull and all four
+   * boss skies, which is its own decision.)
+   */
+  setMood(name, snap = false) {
+    if (!MOODS[name]) return;
+    this.target = MOODS[name];
+    if (!snap) return;
+    for (const key of ['top', 'mid', 'low', 'line', 'accent']) this.mood[key] = this.target[key];
+    this.mood.neb = this.target.neb;
   }
 
   /**
