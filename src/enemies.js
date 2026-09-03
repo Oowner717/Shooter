@@ -4133,6 +4133,12 @@ export class Director {
     }
     this.jobs = jobs;
     /*
+     * How many releases this wave is, so `emit` knows how far through itself
+     * it is. Recorded rather than derived, because `jobs` is shifted down to
+     * nothing as the wave goes out and there would be no denominator left.
+     */
+    this.jobsAt = jobs.length;
+    /*
      * ---- every wave starts clean ----
      *
      * score() returns early for a teach wave, and used to do so BEFORE
@@ -4530,7 +4536,16 @@ export class Director {
     const teach = this.wave && this.wave.teach;
     const rest = teach ? CFG.waves.teachRest : CFG.waves.rest;
     this.resting = true;
-    this.timer = rand(rest[0], rest[1]);
+    /*
+     * ...and the quiet after it is worth what the wave was. A flat 2-4 seconds
+     * is the same punctuation after a wave of five and a wave of thirty, which
+     * is no punctuation at all: the heavy ones are exactly the ones you need a
+     * beat to look at the field after. `restPer` a body asked for, capped, so
+     * the swell at the top of the ladder cannot turn the rest into a wait.
+     */
+    const P = CFG.waves.press;
+    const earned = teach ? 0 : Math.min(P.restCap, (this.asked || 0) * P.restPer);
+    this.timer = rand(rest[0], rest[1]) + earned;
     // The wave is over: score it, and let the world announce any move.
     const moved = this.score(world);
     if (moved && world.onTier) world.onTier(moved);
@@ -4551,10 +4566,33 @@ export class Director {
   /** Put the next job on the field. */
   emit(world) {
     const wave = this.wave;
-    const gap = wave && wave.teach ? CFG.waves.teachGap : CFG.waves.gap;
+    const teach = wave && wave.teach;
+    const gap = teach ? CFG.waves.teachGap : CFG.waves.gap;
+    /*
+     * ---- a wave PRESSES as it goes (build 229) ----
+     *
+     * The gap was a flat roll for every release, so a wave arrived as a
+     * metronome: the same beat from the first body to the last, whatever the
+     * wave was. Twenty-nine waves all delivered at one tempo is a field that
+     * fills rather than a wave that happens.
+     *
+     * It runs from `press.open` on the first release to `press.close` on the
+     * last, across this wave's own job list -- so a wave opens wide enough to
+     * see what is arriving and closes tight enough to be a press. The two are
+     * either side of 1, so the wave takes about as long as it did and the
+     * change is in the shape rather than the length; the verdict table reads
+     * `t` from the LAST release, which is the beat this moves least.
+     *
+     * The opening is exempt. Its whole point is that there is time to look at
+     * each new thing, and a tutorial that speeds up is a tutorial that stops
+     * teaching.
+     */
+    const P = CFG.waves.press;
+    const done = this.jobsAt > 1 ? 1 - (this.jobs.length - 1) / (this.jobsAt - 1) : 1;
+    const press = teach ? 1 : P.open + (P.close - P.open) * clamp(done, 0, 1);
     // OVERCLOCK halves the gap: the same wave, arriving at twice the rate.
     const squeeze = this.overclock.armed ? CFG.waves.tier.overclockGap : 1;
-    this.timer = rand(gap[0], gap[1]) * squeeze;
+    this.timer = rand(gap[0], gap[1]) * press * squeeze;
 
     // The field cap is a hard ceiling on top of the wave. Hold the job rather
     // than dropping it: a wave is a group, and losing half of it to a cap the

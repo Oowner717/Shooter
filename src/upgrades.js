@@ -314,7 +314,25 @@ export const UPGRADES = {
      * than one that clears it. A threshold a build lands on half the time is
      * not a number anybody chose.
      */
-    { id: 'hollowpoint', name: 'HOLLOWPOINT', levels: 3, line: '+50% damage.', apply: scale('damage', 1.5) , icon: MARK.hollowpoint },
+    /*
+     * ---- five levels of 1.32, not three of 1.5 (build 229) ----
+     *
+     * This node is the entire damage curve. It is the only multiplier in the
+     * game that applies to whatever is loaded, and at three levels of 1.5 it
+     * was worth x3.375 and was AFFORDABLE BY TIER 6 -- measured, dps went 130
+     * at tier 1 to 423 at tier 6 and was still 423 at tier 20 with 109,550
+     * spent. Every rung past the sixth bought a gun that could not hit any
+     * harder, against health compounding at `hpStep` for ever.
+     *
+     * Five levels of 1.32 is x4.00 at the top and, more to the point, four
+     * cost steps further up the ladder: the tree goes on converting income
+     * into damage until about tier 14 instead of stopping at 6, which is
+     * where docs/pacing.md wanted the wall to start rather than to be over.
+     * A level is worth less than it was, so the early game is a shade
+     * gentler and the late game is where the difference lands -- which is the
+     * shape the plateau needed and the opposite of what a flat buff does.
+     */
+    { id: 'hollowpoint', name: 'HOLLOWPOINT', levels: 5, line: '+32% damage.', apply: scale('damage', 1.32) , icon: MARK.hollowpoint },
     // Two levels, not the default three. tree.js reads `u.levels ?? 3`, so an
     // uncapped node is sold three times whatever the author intended.
     { id: 'tracer', name: 'TRACER', levels: 2, line: '+35% round speed.', apply: scale('speed', 1.35) , icon: MARK.tracer },

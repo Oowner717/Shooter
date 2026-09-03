@@ -536,7 +536,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 133 since build 225, when DOUBLE TAP came out -- the last node in the
+    // 135 since build 229, when the rebalance took HOLLOWPOINT from three
+    // levels at 1.5 to five at 1.32 -- the same x4.0 arriving four cost-steps
+    // further up the ladder, which is what pays for the gentler health slope.
+    // It was
+    // 133 from build 225, when DOUBLE TAP came out -- the last node in the
     // game that multiplied throughput, and at a flat 1.5 rounds a trigger pull
     // worth more than the whole fire-rate ladder. It was
     // 134 from build 223, when DEEP CHARGE was capped at two levels. It had
@@ -573,7 +577,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 133
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 135
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -9206,12 +9210,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   /*
    * Per point of damage a deep rung still pays less -- bounty is deliberately
    * a shade under health, so a rung stays harder than the one below it. What
-   * changed is the SHAPE: a 2x decline across 39 rungs instead of a 12x one.
+   * changed is the SHAPE: rung 40 pays 0.70 of rung 1 rather than 0.08.
    * The run-level answer is the probe's, and it is the opposite sign: energy
    * per second RISES with the rung, because the wave grows too.
+   *
+   * The ABSOLUTE figure is what is pinned, not the ratio against the retired
+   * linear bounty. That ratio moves with `hpStep` -- build 229 took health
+   * from 1.12 to 1.085 a rung, which makes the linear scheme less ruinous as
+   * well, so a threshold written against it drifts every time the health
+   * slope is touched and stops describing the thing it is named for. Rung 40
+   * keeping over half of rung 1's rate is the promise; being clear of the
+   * linear scheme is the second arm and no longer carries the case.
    */
   check('...so a deep rung is no longer the pay cut it was',
-    r.payPerHp / r.payPerHpOld > 5,
+    r.payPerHp > 0.5 && r.payPerHp < 1 && r.payPerHp / r.payPerHpOld > 2,
     `energy per point of damage at rung 40, against rung 1: `
     + `${r.payPerHp.toFixed(3)} now against ${r.payPerHpOld.toFixed(3)} under the linear bounty `
     + `— ${(r.payPerHp / r.payPerHpOld).toFixed(1)}x better`);
@@ -12116,12 +12128,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return out;
   });
 
-  // HOLLOWPOINT (1.5 a level from build 215), SALVO, FEED. SIGHT was a
-  // fourth 1.25^3 until build 215,
+  // HOLLOWPOINT (five levels at 1.32 from build 229's rebalance; it was three
+  // at 1.5 from 215), SALVO, FEED. SIGHT was a fourth 1.25^3 until build 215,
   // when it was replaced by PILE -- which is deliberately not counted: it is
   // a fixed 26 in a ring round the machine and is worth nothing against a
   // boss met at range.
-  const want = 1.5 ** 3 * 1.25 / 0.9;
+  const want = 1.32 ** 5 * 1.25 / 0.9;
 
   check('what the tree did to the gun is one number, and it is 1 at stock',
     r.stockScale === 1 && Math.abs(r.boughtScale - want) < 0.02
@@ -15587,9 +15599,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.repeat}`);
 
   /*
-   * And the ladder did not move. Writing fifteen threes out is a refactor and
-   * has to be provable as one -- the same total the BUILT readout asserts, by
-   * a different route, so a level lost to a typo cannot hide behind it.
+   * And the ladder moved by exactly what the rebalance moved it by. Writing
+   * fifteen threes out was a refactor and had to be provable as one -- the
+   * same total the BUILT readout asserts, by a different route, so a level
+   * lost to a typo cannot hide behind it. 105 until build 229, which put two
+   * more levels on HOLLOWPOINT and nothing anywhere else.
    */
   /*
    * `repeats` was 8 until build 227 -- the seven APERTUREs plus RECAST -- and
@@ -15597,7 +15611,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * nodes, so RECAST is the only thing left in the tree with no ceiling.
    */
   check('...and writing the numbers out changed no ladder',
-    r.total === 105 && r.rungs === 53 && r.repeats === 1,
+    r.total === 107 && r.rungs === 53 && r.repeats === 1,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
     + `now written out, which has to be a refactor and nothing else)`);

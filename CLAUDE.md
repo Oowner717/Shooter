@@ -225,8 +225,23 @@ skimming. Three cadence nodes have gone since -- TRIPLE TAP (189), HOT LOAD
   BOLT column is now failing at four of the top five rungs rather than one.
 - Spend caps at **109,550 for 135 buys**, which is the whole tree.
 
-Nothing was changed on the strength of this; it is recorded so the next
-reader is working from the current number rather than from 177's.
+That reading is what build 229's rebalance answered, and the table above is
+now history -- kept because it is the measurement the change was made against.
+**HOLLOWPOINT went 3 levels at 1.5 to 5 at 1.32** (the same x4.00, arriving
+four cost-steps further up the ladder, because at three levels the whole
+damage curve was affordable by about tier 6 and every rung above that was
+health climbing against a gun that had stopped), **`hpStep` 1.12 -> 1.085**
+and **`bountyStep` 1.10 -> 1.075**. Re-measured, worst body in the band: 4.0s
+at tier 9, 4.3s at 10, 6.2s at 14, 10.3s at 20, 25.6s at 32 -- which is plan
+B's 2-4s through about tier 10 and past 6s by about 14 -- and waves start
+missing the 120s cap at tier 22 rather than 16. The full derivation and both
+tables are in `docs/pacing.md` under build 229.
+
+**The hash did not move and did not need to.** Both slopes are
+`step ^ (tier - 1)`, exactly 1 at tier 1, and `fight.mjs` runs at tier 1 --
+re-run and identical at 1796395127. That is the one shape of energy change
+the "run it on any build that touches energy" rule above will legitimately
+show nothing for; run it anyway, because knowing it did not move is the point.
 
 Two instrument bugs cost a table each and are worth not repeating: a body
 spawned 240 units above the *floor* is 30 units off the muzzle, dies inside one
@@ -482,9 +497,11 @@ most once for any given target and cannot spin.
   fraction); `check-build.mjs` fails the build for one, which also catches an
   upgrade written but not yet hung on the tree -- one `leaf()` never sees and
   so can never throw for. The fifteen nodes that had been living on the
-  default now write `levels: 3` out, so the ladder is unchanged: 106 levels
-  across 54 upgrade nodes, pinned by its own case as well as by the BUILT
-  readout's 134.
+  default now write `levels: 3` out, so the ladder was unchanged by that pass:
+  106 levels across 54 upgrade nodes at the time, pinned by its own case as
+  well as by the BUILT readout. Build 229's rebalance is the only thing that
+  has moved it since, by exactly the two levels it put on HOLLOWPOINT -- 108
+  across 54, and a BUILT readout of 135.
   **A defaulted value that is indistinguishable from a chosen one is the
   shape to watch for**, whatever the field. The fix is never a better comment;
   it is making the omission impossible to write.
@@ -1028,4 +1045,18 @@ most once for any given target and cannot spin.
   drift -- both shipped, both exited 0, and one of them carried a comment
   calling itself live telemetry. If a probe or a panel prints a number, either
   assert it or expect it to rot.
+- **A wave has an arc from build 229, and it lives in `CFG.waves.press`.**
+  Every release used to be a flat draw from `gap` and every wave ended on a
+  flat draw from `rest`, so the seam between two waves was the only pacing the
+  game had. `emit()` now scales the gap from `press.open` on a wave's first
+  release to `press.close` on its last, linearly in how much of the wave has
+  been sent -- measured 2.0s down to 1.0s at tiers 3, 8, 14 and 20 -- and the
+  rest earns `restPer` a body on top of `rest`, capped at `restCap`, so a long
+  wave buys a longer breath (about 5.0s). Two things it must not touch: teach
+  waves are exempt (they are authored beats and the arc fights them), and
+  `overclockGap` still multiplies on top, so an armed wave reads as a squeeze
+  against the arc rather than against a flat line. The progress term needs
+  `jobsAt` -- the job count captured in `load()` -- because `jobs` is consumed
+  as it goes and a wave cannot say how far through itself it is from what is
+  left alone.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

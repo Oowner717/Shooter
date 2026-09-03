@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '228';
+export const BUILD = '229';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '228';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '1b4b327';
+export const REV = '175a9ac';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -132,7 +132,28 @@ export const CFG = {
     // matter how fast the field clears. Only the opening uses it.
     patience: 26, // ...and the longest it will ever wait for that
     gap: [0.85, 1.7], // seconds between releases inside a regular wave
-    rest: [2.2, 3.8], // quiet between two regular waves
+    rest: [2.6, 4.2], // quiet between two regular waves, before `press.restPer`
+    /*
+     * ---- the shape of a wave, and the beat after it (build 229) ----
+     *
+     * `gap` above was rolled flat for every release, so every wave in the game
+     * arrived at one tempo from its first body to its last, and the quiet
+     * between two waves was the same whether the wave had been five bodies or
+     * thirty. That is a field filling and emptying rather than a wave.
+     *
+     * `open` and `close` are the multiplier on the gap at the first release
+     * and at the last, interpolated across the wave's own job list. They sit
+     * either side of 1 and average about 1.02, so a wave takes as long as it
+     * did -- what changed is that it now has a front and a back: wide enough
+     * at the top to see what is arriving, tight enough at the end to be a
+     * press. The opening's teach waves are exempt, because a tutorial that
+     * speeds up is a tutorial that has stopped teaching.
+     *
+     * `restPer` is the beat a wave earns for its size, on top of `rest`, and
+     * `restCap` is what stops the swell at the top of the ladder turning that
+     * beat into a wait. A wave of six earns 1.1s, one of thirty earns the cap.
+     */
+    press: { open: 1.45, close: 0.6, restPer: 0.18, restCap: 2.6 },
     // The opening is much slower on both counts. Objects join one at a time
     // with a long beat between them, because the whole point of the tutorial
     // waves is that there is time to look at each new thing.
@@ -203,7 +224,27 @@ export const CFG = {
        * tier 16 at 8.1s against 8.0 and tier 20 at 12.4 against 13.9, where
        * 1.11 undershoots and 1.13 leaves half the gap. See docs/pacing.md.
        */
-      hpStep: 1.12,
+      /*
+       * 1.105 from build 229, down from 1.12, and it is the other half of a
+       * cadence nerf again -- exactly as 1.17 -> 1.12 was in build 194.
+       *
+       * That change paid for TRIPLE TAP (189) and HOT LOAD (193). DOUBLE TAP
+       * went in build 225 and NOTHING paid for it: the plateau fell 717 to
+       * 423 and the slope did not move, so the ladder was being climbed with
+       * 59% of the gun it was calibrated against. Measured at build 228's
+       * audit, the wall landed six rungs early -- docs/pacing.md asks for the
+       * slowest body in a band to pass 6s at about tier 15 and it passed it
+       * at 9, and the heaviest band-5 wave stopped clearing at 16 rather than
+       * 19.
+       *
+       * Chosen off the ratio the design was calibrated at rather than by
+       * feel. Build 179's good state was health x19.7 at tier 20 against
+       * 1,438 dps -- 0.0137 of a second per point. Today's dps is 423 with
+       * HOLLOWPOINT deepened to x4.00, so the health that lands the same TTK
+       * at tier 20 is about x6.9, and 6.9^(1/19) is 1.105. Swept against
+       * tiers.mjs afterwards; see the table in docs/pacing.md.
+       */
+      hpStep: 1.085,
       /*
        * ---- what a rung pays (build 202) ----
        *
@@ -215,7 +256,7 @@ export const CFG = {
        * Compounding too, and a little slower than health, so a rung is still
        * harder than the one below it -- just no longer poorer.
        */
-      bountyStep: 1.10, // energy x bountyStep^(tier-1), against hpStep 1.12
+      bountyStep: 1.075, // energy x bountyStep^(tier-1), against hpStep 1.085
       /*
        * A surge pays half again on what that wave was worth, banked in one
        * lump at the turret. The ladder's own reward for the thing it most

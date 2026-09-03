@@ -725,3 +725,89 @@ A measured number nobody re-measures is not a measurement any more, it is a
 claim. When a build moves the ladder, the economy or the damage line, either
 re-run the bench and date the table, or move the section under its build
 heading where the past tense makes it safe.
+
+## Build 229 — the rebalance, and the wave gets a shape
+
+Two separate things, done together because the second is unreadable while the
+first is wrong.
+
+### The damage curve
+
+Build 228's audit re-measured the ladder and found what the plateau had become
+once three cadence nodes had gone (TRIPLE TAP 189, HOT LOAD 193, DOUBLE TAP
+225): **dps plateaued at 423** against build 177's 2,050, and the wall had
+come back as the worst body rather than the wave — BULWARK 6.4s at tier 9 and
+**21.0s at tier 20**, with the heaviest band-5 wave missing the 120s cap at
+four of the top five rungs. Plan B's target is 2–4s through about tier 10,
+passing 6s by about tier 14. Tier 14 was already past 10s.
+
+Nothing was going to fix that by adding cadence back — the cadence ladder is
+deliberately worth 1.11× now and that is a decision, not an oversight. So the
+two curves either side of it moved instead:
+
+| lever | was | now |
+| --- | --- | --- |
+| HOLLOWPOINT | 3 levels × 1.50 (×3.375) | **5 levels × 1.32 (×4.00)** |
+| `hpStep` | 1.12 | **1.085** |
+| `bountyStep` | 1.10 | **1.075** |
+
+`hpStep` is derived rather than swept blind. Build 179 calibrated the slope
+against the damage line of the day: health ×19.7 at tier 20 against 1,438 dps
+is 0.0137 seconds a point. Today's line is 423 dps with HOLLOWPOINT at ×4.00,
+which holds that ratio at health ×6.9 across 19 rungs — 6.9^(1/19) ≈ 1.105.
+Swept from there and settled at 1.085, which lands the band rather than the
+endpoint.
+
+HOLLOWPOINT is deepened rather than strengthened for a reason that is not
+about its total: it is the entire damage curve, and at three levels the whole
+of it was affordable by about tier 6, so every rung above that was health
+climbing against a gun that had stopped. Five levels at 1.32 arrives at the
+same ×4.00 four cost-steps further up the ladder, which is where the wall was
+forming.
+
+`bountyStep` follows it down, and stays a shade under `hpStep` — that is the
+invariant from build 201 and it is what keeps a rung harder than the one
+below it. Energy per point of damage at rung 40 is 0.70 of rung 1 (it was
+0.50 at the old pair, and 0.08 under the linear bounty the pair replaced).
+`regress.mjs` pins that figure absolutely now rather than as a ratio against
+the retired scheme, because the ratio moves whenever `hpStep` does.
+
+**Measured** (`tiers.mjs --from 1 --to 20 --runs 2`, then 21–32 at one run),
+worst body in the band:
+
+| tier | 9 | 10 | 14 | 20 | 22 | 32 |
+| --- | --- | --- | --- | --- | --- | --- |
+| TTK | 4.0s | 4.3s | 6.2s | 10.3s | — | 25.6s |
+
+Which is plan B: inside the 2–4s band through tier 10, passing 6s at 14, and
+a wall above 20. Waves start missing the 120s cap at **tier 22** rather than
+16. The plateau is still there and is still intentional (see the section
+above it); what moved is where it starts to bite.
+
+The ORDINAL hash did **not** move and was not re-baselined. Both slopes are
+`step ^ (tier - 1)`, which is exactly 1 at tier 1, and the fight probe runs at
+tier 1 — re-run and identical at `1796395127`. That is the hash agreeing with
+the arithmetic, not the hash failing to notice.
+
+### The wave gets a shape
+
+A wave was a flat draw from `gap` for every release and then a flat draw from
+`rest` at the end, so every wave at a tier felt the same all the way through
+and the seam between two waves was the only pacing the game had. `CFG.waves.press`
+gives the wave an arc instead:
+
+```
+press: { open: 1.45, close: 0.6, restPer: 0.18, restCap: 2.6 }
+```
+
+`emit()` scales the gap by a factor that runs from `open` on the first release
+of a wave to `close` on the last, linearly in how much of the wave has been
+sent — so a wave opens loose and closes tight, and the pressure a player feels
+is a ramp rather than a constant. Measured at tiers 3, 8, 14 and 20: first gap
+about **2.0s**, last about **1.0s**. `rest` went `[2.2, 3.8]` to `[2.6, 4.2]`
+and earns `restPer` a body on top of that, capped at `restCap` — so a long
+wave buys a longer breath than a short one, measured about **5.0s** after a
+full wave. Teach waves are exempt from both: they are authored beats and the
+arc would fight them. OVERCLOCK's `overclockGap` still multiplies on top,
+which is what makes an armed wave read as a squeeze against the arc rather
+than against a flat line.

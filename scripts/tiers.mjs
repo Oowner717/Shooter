@@ -197,7 +197,11 @@ const LINE = [
   // One FEED, and that is the whole cadence line: it was capped in 178 and
   // halved in 193, and HOT LOAD -- three levels of it, on the tree's default
   // -- went in 193 too. Everything else here buys what a round is worth.
+  // Five levels from build 229, not three: this is the whole damage curve and
+  // it is what keeps the tree paying past tier 6. All five are in the line, in
+  // the order income reaches them.
   'hollowpoint', 'rate',
+  'hollowpoint', 'hollowpoint',
   'hollowpoint', 'hollowpoint',
   // DOUBLE TAP used to be skipped here: it went to SPINE in build 209 and this
   // bench measures BOLT, so buying it would have spent a tier's budget on a
