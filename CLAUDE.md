@@ -16,12 +16,44 @@ phases rather than spending it.
 
 "Quick" on a request means the minimum viable verification and nothing else.
 
+## The default is FAST (build 225 onward)
+
+Builds 220-224 each ran a full audit's worth of verification for a handful of
+requests, and it made shipping anything slow. The user asked for the review
+process to be lighter, with **full audits every few sessions instead of every
+build**. So the ceiling below is the default, and anything above it is opt-in:
+
+**A normal change gets, in total:**
+- `node scripts/check-build.mjs --stamp` — always, it is the cheapest guard
+  in the repo and REV goes stale on every source edit.
+- **ONE** run of `scripts/regress.mjs`.
+- `node scripts/bundle.mjs` if a served file changed.
+
+**That is the whole list.** Not per change — per REQUEST.
+
+**Skip by default, and say so in the reply rather than doing them:**
+- The ORDINAL hash, unless the change touches energy, targeting or the boss.
+  (That rule is unchanged and is the one exception worth keeping: a canonical
+  number nobody checks re-baselines itself.)
+- `smoke.mjs`, `tiers.mjs`, `dps.mjs`, `variance.mjs`, `contact.mjs`.
+- Revert-and-fail proofs on new cases. Worth it for a subtle mechanism the
+  case could pass without; not worth it for a removal, a config number, a
+  colour, or anything whose case would obviously fail without the change.
+- Re-running the suite to chase a known flake. Note it and move on.
+- Bespoke measurement probes. Reach for one when a number is genuinely
+  unknown and the answer changes the design -- not to confirm something the
+  code already says plainly.
+
+**Still non-negotiable, because each has cost a shipped bug:**
+- One green suite run before pushing.
+- A case for anything that ships broken.
+- `--stamp` last, or installed copies never update.
+
 ## Do not, unless asked
 
 - Adversarial review workflows or multi-agent fan-outs. They are the single
   largest cost and are almost never what the request needed.
 - Reviewing parts of the app the change did not touch.
-- Running the full regression suite. Run it when asked, or before publishing.
 
 ## The suite, for when it is wanted
 
@@ -364,6 +396,14 @@ most once for any given target and cannot spin.
   two rows (69px) and cost that slot; one row (44px) plus a boss-bar
   reservation only made during a fight keeps it. Measure `pillCap()` at
   320x568 before adding anything to the top of the screen.
+- **Fire rate and DOUBLE TAP are both gone from the tree.** HOT LOAD went in
+  193, TRIPLE TAP in 189, and DOUBLE TAP in 225 -- so `up.rate` on a fully
+  bought turret is 0.9, the whole cadence ladder is worth 1.11x, and nothing
+  in the game multiplies rounds a pull any more. DOUBLE TAP was the largest of
+  them by far at a flat 1.5 rounds a trigger pull, larger than every fire-rate
+  node put together, and it was on ONE round of nine. `regress.mjs` asserts
+  the absence of any node whose id ends in `tap` as well as the product, which
+  is what catches a replacement arriving under a new name.
 - **Nothing in this game casts an ability.** REFLEX fired PULSE for you once
   two things had hold of the turret; it went in build 190 along with the node,
   because an upgrade that spends a charge unasked is a charge you do not have

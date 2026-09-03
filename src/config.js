@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '224';
+export const BUILD = '225';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '224';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '068dc2b';
+export const REV = '0d37cd6';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -804,22 +804,19 @@ export const CFG = {
         pierce: 1, // ...and what a fragment carries on through, before `pierce`
       },
       /*
-       * ---- DOUBLE TAP lives here from build 209 ----
+       * ---- and DOUBLE TAP is gone, with `tapGap` and `tapFade` ----
        *
-       * It was BOLT's, and `up.boltTap` was read in exactly one place: the
-       * standard round's fire path. Moving the NODE under SPINE without moving
-       * the effect would have sold a card that does nothing to the round it
-       * sits beneath, which is worse than leaving it where it was.
+       * It moved here from BOLT in build 209, lost TRIPLE TAP in 189, and came
+       * out entirely in build 225. It was the last cadence node in the game:
+       * `up.rate` on a fully bought turret is 0.9 and the whole rate ladder is
+       * worth 1.11x, so a node worth a flat 1.5 rounds a trigger pull was
+       * larger than every fire-rate upgrade put together. And it was worth
+       * that on SPINE alone, which made one round in nine carry the biggest
+       * throughput node in the tree.
        *
-       * The follow-up leaves with the first and waits at the muzzle, so the
-       * pair reads as one trigger pull with a stutter in it rather than as a
-       * faster cadence -- and on SPINE that stutter is two darts through the
-       * same hole, which is what the round is for.
+       * SPINE's own answer to volume is `shatter` above, which is area rather
+       * than cadence and is what the round was given one for.
        */
-      tapGap: 0.06,
-      // What the follow-up keeps. 0.5, as it was on BOLT: a pull is worth
-      // 1 + 0.5 = 1.5 rounds rather than two.
-      tapFade: 0.5,
     },
     /*
      * SLUG. One slow, heavy round with an enormous shove behind it.

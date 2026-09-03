@@ -322,9 +322,10 @@ takes a link's falloff from 0.86 to 0.95 and keeps the far end of a chain
 worth having, and **LONG LEAD**, +60% jump range, which is what makes it work
 on a spread field rather than only a packed one. SPINE gets **ANNEALED**, 0.78
 to 0.92 per body, **RAILED**, which puts it through armour entirely —
-measured at 13.2 to 20 against a BULWARK — and, from build 209, **DOUBLE TAP**:
-a follow-up round that waits 0.06s at the muzzle rather than shortening the
-cadence, which reads as one trigger pull with a stutter in it and not as a
+measured at 13.2 to 20 against a BULWARK. It had **DOUBLE TAP** from build 209
+to 225 — a follow-up round that waited 0.06s at the muzzle rather than
+shortening the cadence, which read as one trigger pull with a stutter in it
+and not as a
 faster gun. It sat on BOLT until then, where it doubled the round every run
 already starts with; on SPINE it is a second dart down the same line the first
 one opened, which is a pick rather than a default. It had a second level,
@@ -1738,10 +1739,12 @@ are. `Hud.setWavePct` reads asked-against-alive off the director and shows a
 whole percent, keyed on the percent rather than the count so it repaints when
 the number changes and not when a body does.
 
-**DOUBLE TAP is a SPINE upgrade.** On BOLT it doubled the round every run
-already starts with; on SPINE it is a second dart down the line the first one
-opened, which is a pick rather than a default. `up.boltTap` became
-`up.spineTap` and `tapGap`/`tapFade` moved with it. **TRACER and HEAVY are two
+**DOUBLE TAP is gone** (build 225). It was BOLT's, moved to SPINE in 209, lost
+TRIPLE TAP in 189, and came out entirely: it was the last node in the game that
+multiplied throughput, and at a flat 1.5 rounds a trigger pull it was worth
+more than the whole fire-rate ladder put together — on one round in nine.
+SPINE's answer to volume is `shatter`, which is area rather than cadence.
+**TRACER and HEAVY are two
 levels each**, not three — both were uncapped, and `tree.js` reads
 `u.levels ?? 3`, so a node the author never capped is quietly sold three times.
 

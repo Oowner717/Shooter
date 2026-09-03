@@ -754,34 +754,27 @@ export class Shooter {
       });
     } else if (world.round === 'spine') {
       const g = R.spine;
-      // DOUBLE TAP holds its second dart at the muzzle rather than shortening
-      // the cadence: one trigger pull with a stutter in it, not a faster gun.
-      // It was BOLT's until build 209; see CFG.rounds.spine.
-      const taps = 1 + up.spineTap;
       for (const f of fan) {
-        for (let t = 0; t < taps; t++) {
-          shot(a + f + (t ? spread(0.02) : 0), {
-            speed: g.speed,
-            r: 3.4,
-            damage: g.damage * g.tapFade ** t,
-            impulse: 30,
-            bounces: 0,
-            color: '#ff9ade',
-            core: '#ffffff',
-            trail: 0.05,
-            form: 'dart',
-            hold: t * g.tapGap,
-            pierce: g.pierce + up.pierce,
-            pierceFade: up.spineFade || g.fade,
-            shred: up.spineShred,
-            splits: up.spineSplit,
-            // The round proper sheds a fan out the far side of everything it
-            // pierces; SLIVER's cascade above is on top of that and is what
-            // the node buys. See CFG.rounds.spine.shatter.
-            shatter: true,
-            onHit: shatterOn,
-          });
-        }
+        shot(a + f, {
+          speed: g.speed,
+          r: 3.4,
+          damage: g.damage,
+          impulse: 30,
+          bounces: 0,
+          color: '#ff9ade',
+          core: '#ffffff',
+          trail: 0.05,
+          form: 'dart',
+          pierce: g.pierce + up.pierce,
+          pierceFade: up.spineFade || g.fade,
+          shred: up.spineShred,
+          splits: up.spineSplit,
+          // The round proper sheds a fan out the far side of everything it
+          // pierces; SLIVER's cascade above is on top of that and is what
+          // the node buys. See CFG.rounds.spine.shatter.
+          shatter: true,
+          onHit: shatterOn,
+        });
       }
     } else if (world.round === 'slug') {
       const g = R.slug;

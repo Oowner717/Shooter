@@ -199,9 +199,10 @@ const LINE = [
   // -- went in 193 too. Everything else here buys what a round is worth.
   'hollowpoint', 'rate',
   'hollowpoint', 'hollowpoint',
-  // DOUBLE TAP went to SPINE in build 209, effect and all -- it is no longer a
-  // BOLT node, and this bench measures BOLT, so buying it here would spend a
-  // tier's budget on a card that does nothing to the round being measured.
+  // DOUBLE TAP used to be skipped here: it went to SPINE in build 209 and this
+  // bench measures BOLT, so buying it would have spent a tier's budget on a
+  // card that does nothing to the round being measured. It came out entirely
+  // in build 225 and there is nothing left to skip.
   'overstuffed',
   'overstuffed', 'overstuffed', 'overstuffed',
   'salvo',

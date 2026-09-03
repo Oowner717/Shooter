@@ -32,7 +32,6 @@ export function freshUpgrades() {
     boltBounce: 0, // extra ricochets off the arena WALLS; bodies are boltRebound
     boltLife: 1,
     boltRebound: 0, // bodies a BOLT may bounce off instead of stopping in
-    spineTap: 0, // follow-up darts behind every SPINE
     shotPellets: 0, // extra pellets in a SHOT
     shotRange: 1, // and how far they get before they expire
     titheStep: 1, // how fast TITHE's mark deepens its own bite
@@ -142,7 +141,6 @@ const MARK = {
   // A round coming off a body at an angle rather than stopping in it.
   overstuffed: g('<circle cx="17" cy="7.6" r="2.6"/><path d="M2.6 4.4 14.6 9.4"/><path d="M14.8 10.4 4.6 19.6"/><path d="M5.4 15.6 4 20.6l5-1.4" fill="currentColor" stroke="none"/>'),
   // One trigger pull, two rounds out of it.
-  doubletap: g('<circle cx="8.4" cy="6.6" r="2.4" fill="currentColor" stroke="none"/><path d="M8.4 21V10.4"/><circle cx="16.6" cy="10.4" r="2.4" fill="currentColor" stroke="none" opacity=".7"/><path d="M16.6 21v-7.4" opacity=".7"/>'),
   // One burst becoming five.
   cluster: g('<circle cx="12" cy="12" r="2.8"/><circle cx="5" cy="6.4" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="6.4" r="1.8" fill="currentColor" stroke="none"/><circle cx="5" cy="17.6" r="1.8" fill="currentColor" stroke="none"/><circle cx="19" cy="17.6" r="1.8" fill="currentColor" stroke="none"/><path d="M9.9 9.9 6.4 7.4M14.1 9.9l3.5-2.5M9.9 14.1l-3.5 2.5M14.1 14.1l3.5 2.5" opacity=".45"/>'),
   // More of them in the same cone.
@@ -402,9 +400,6 @@ export const UPGRADES = {
      * The second level is gone rather than retuned: a trigger pull is two
      * rounds now and the tail of it is worth 1.5 rather than 1.75.
      */
-    { id: 'doubletap', name: 'DOUBLE TAP', levels: 1,
-      line: 'A second SPINE follows every shot, a beat behind and half as hard.',
-      apply: bump('spineTap', 1), icon: MARK.doubletap },
     { id: 'cluster', name: 'CLUSTER', levels: 1,
       line: 'An HE burst throws four smaller ones outward.',
       apply: set('cluster', true), icon: MARK.cluster },
@@ -605,9 +600,9 @@ export const UPGRADES = {
      * It was worth knowing what this did NOT fix. scripts/tiers.mjs measured
      * the whole cadence ladder on build 177: FEED's two levels together came
      * to 1.56x on rounds a second, and DOUBLE TAP into TRIPLE TAP came to 3x
-     * on top of it -- the cliff was the taps, not this. TRIPLE TAP itself
-     * went in build 189, which is the last of that ladder. See
-     * CFG.rounds.standard.tapFade and docs/pacing.md.
+     * on top of it -- the cliff was the taps, not this. TRIPLE TAP went in
+     * build 189 and DOUBLE TAP in 225, so that ladder is now empty and this
+     * node is the whole of it. See docs/pacing.md.
      */
     /*
      * This branch is named for what it bolts on rather than for the stat it

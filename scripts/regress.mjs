@@ -463,7 +463,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 134 since build 223, when DEEP CHARGE was capped at two levels. It had
+    // 133 since build 225, when DOUBLE TAP came out -- the last node in the
+    // game that multiplied throughput, and at a flat 1.5 rounds a trigger pull
+    // worth more than the whole fire-rate ladder. It was
+    // 134 from build 223, when DEEP CHARGE was capped at two levels. It had
     // none, so the tree sold three -- 1.35^3 -- which put a bought BLAST at a
     // 413-unit radius and a KNELL's last toll at 726 on a world about 630
     // units wide. The eighth node caught by `u.levels ?? 3`. It was
@@ -497,7 +500,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 134
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 133
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -1949,14 +1952,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     const feed = NODE_BY_ID.get('rate').levels;
     /*
-     * The tap is SPINE's from build 209, not BOLT's -- so the round has to be
-     * SPINE for there to be a tap to count at all. Left on BOLT this read
-     * `CFG.rounds.standard.tapFade` and `w.up.boltTap`, both of which are now
-     * undefined, and `1 + undefined` is NaN rather than a failure anyone can
-     * read.
+     * ...and nothing else. DOUBLE TAP came out in build 225 -- it was the last
+     * node in the game that multiplied throughput, and at a flat 1.5 rounds a
+     * pull it was worth more than the entire fire-rate ladder. Asserted as the
+     * ABSENCE of any such node rather than as its level count, so a
+     * replacement arriving under a different name is caught too.
      */
-    const taps = NODE_BY_ID.get('doubletap').levels;
-    const fade = CFG.rounds.spine.tapFade;
+    const tapNodes = [...NODE_BY_ID.keys()].filter((k) => /tap$/.test(k));
 
     // Everything, then fire at nothing for four seconds and count the muzzle.
     g.debugGiveEnergy(200000);
@@ -1975,11 +1977,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // What the interval is, straight off the same arithmetic updateFiring does.
     const interval = CFG.shooter.gripFireInterval * CFG.rounds.spine.rate * w.up.rate;
     return {
-      feed, taps, held: w.up.spineTap, fade, rate: w.up.rate, round: w.round,
+      feed, tapNodes, rate: w.up.rate, round: w.round,
       rps: rounds / 4, pulls: 1 / interval,
-      // 1 + fade: what one trigger pull is worth with DOUBLE TAP behind it.
-      // It was 1 + fade + fade^2 while TRIPLE TAP existed.
-      pull: 1 + fade,
     };
   });
   /*
@@ -1993,10 +1992,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * an old one quietly taking a default back.
    */
   check('the whole cadence tree is one FEED, and it is worth a tenth',
-    r.feed === 1 && r.taps === 1 && r.held === 1
-    && Math.abs(r.rate - 0.9) < 1e-9 && Math.abs(r.fade - 0.5) < 1e-9,
-    `FEED x${r.feed}, DOUBLE TAP x${r.taps} (turret holds ${r.held}), `
-    + `everything bought leaves the interval at x${r.rate.toFixed(4)}, tapFade ${r.fade}`);
+    r.feed === 1 && r.tapNodes.length === 0 && Math.abs(r.rate - 0.9) < 1e-9,
+    `FEED x${r.feed} and no tap node left (${r.tapNodes.join(' ') || 'none'}); `
+    + `everything bought leaves the interval at x${r.rate.toFixed(4)}`);
   /*
    * Measured on SPINE from build 209, because that is where DOUBLE TAP went
    * and there is no tap to count anywhere else. SPINE's own `rate` is 1.45
@@ -2005,20 +2003,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * on its own above.
    *
    * 2.7 pulls a second: 0.286 base, SPINE's 1.45, and one FEED at 0.9. The
-   * rounds figure is that times two darts a pull times SALVO's every-eighth --
-   * which is genuinely noisy over a four-second window, since how many
-   * every-eighths land in it is a matter of phase. Measured 6.5 and 7.5 on two
-   * runs of the same build, so the window is set clear of both rather than
-   * against whichever one was seen first.
+   * rounds figure is that times ONE dart a pull -- DOUBLE TAP came out in
+   * build 225 and it was the second -- times SALVO's every-eighth, which is
+   * genuinely noisy over a four-second window since how many every-eighths
+   * land in it is a matter of phase. Measured 3.3; the window is set clear of
+   * that rather than against it, the same span the two-dart version carried.
    * The point of the window is unchanged -- it notices a fire-rate upgrade
    * arriving or an old one taking a default back, and it is derived from
    * `up.rate` either way.
    */
   check('a fully fed turret tops out where the cadence passes left it',
-    r.round === 'spine' && r.pulls > 2.5 && r.pulls < 2.9 && r.rps > 5.5 && r.rps < 8.5,
-    `${r.pulls.toFixed(1)} pulls/s, ${r.rps.toFixed(1)} rounds/s, ${r.held + 1} rounds a pull`);
-  check('...and the tail of a trigger pull is worth 1.5, not 1.75',
-    Math.abs(r.pull - 1.5) < 1e-9, `one pull = ${r.pull.toFixed(2)} rounds of damage`);
+    r.round === 'spine' && r.pulls > 2.5 && r.pulls < 2.9 && r.rps > 2.6 && r.rps < 4.6,
+    `${r.pulls.toFixed(1)} pulls/s, ${r.rps.toFixed(1)} rounds/s`);
 }
 
 // --- the unlock clock runs on what a run has earned, not on what it killed --
@@ -15455,7 +15451,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * a different route, so a level lost to a typo cannot hide behind it.
    */
   check('...and writing the numbers out changed no ladder',
-    r.total === 106 && r.rungs === 54 && r.repeats === 8,
+    r.total === 105 && r.rungs === 53 && r.repeats === 8,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
     + `now written out, which has to be a refactor and nothing else)`);
