@@ -380,7 +380,25 @@ function retire(world, m) {
   if (m.kind === 'blast') { detonate(world, m); return; }
   if (m.kind === 'spall') { spall(world, m); return; }
   if (m.kind === 'knell') { while (!m.dead && m.tolls > 0) toll(world, m); return; }
-  if (m.kind === 'snare' && !m.gripping) { snap(world, m); return; }
+  if (m.kind === 'snare' && !m.gripping) {
+    /*
+     * It snaps and then lets go, in one beat.
+     *
+     * `retire` is called with the mine about to be marked dead, and
+     * `updateMines` has no dead check at the top of its loop -- so an evicted
+     * snare entered the gripping arm exactly ONCE, held for a single frame,
+     * and was spliced at the bottom of the same iteration. The player got the
+     * whole 210-unit closing ring, the shake and the WELL sound, which is the
+     * feedback that means a snare has taken a crowd, and nothing was held.
+     * The release effects go with it now, so it reads as a grab that could
+     * not be kept rather than as a hold that silently did not happen.
+     */
+    snap(world, m);
+    ring(m.x, m.y, m.r * 2, S.reach * 0.8, 0.3, '#8b5cf6', 2);
+    for (let k = 0; k < 10; k++) spark(m.x, m.y, spread(180), spread(180), '#c77dff', 0.4, 2);
+    audio.pop(0.9);
+    return;
+  }
   m.dead = true;
 }
 
@@ -559,7 +577,12 @@ function cut(world, m, dt) {
   take(world.drops);
 }
 
-/** KNELL. One of three, each wider than the one before and worth less. */
+/**
+ * KNELL. One toll of `CFG.knell.tolls` plus FOURTH BELL, each wider than the
+ * one before and worth less. Two stock, four fully bought -- it said "one of
+ * three" from when the base was 3, and the base has been 2 since the node
+ * that buys the third back was written.
+ */
 function toll(world, m) {
   const i = (K.tolls + world.up.mineTolls) - m.tolls;
   const r = K.blast.r * (1 + i * K.grow) * world.up.mineBlast;
@@ -716,8 +739,18 @@ export function updateMines(world, dt) {
     }
 
     if (m.dead) {
-      list[i] = list[list.length - 1];
-      list.pop();
+      /*
+       * Spliced, not swap-removed.
+       *
+       * The swap wrote the LAST element into slot i, and the eviction above
+       * picks `world.mines.find((x) => !x.dead)` -- slot 0. Mines expire in
+       * age order, so the oldest was the one that vacated slot 0 and the
+       * NEWEST was the one moved into it: "the oldest goes" evicted the mine
+       * the player had just watched land, while three older ones sat on. The
+       * list is at most five long, so order-preserving removal is free and it
+       * restores the invariant the `find` was written against.
+       */
+      list.splice(i, 1);
     }
   }
 }

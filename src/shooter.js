@@ -40,7 +40,7 @@ import { audio } from './audio.js';
  * them falls to about a fifth of the length it was tuned to.
  *
  * A HANDFUL OF NODES CARRY ALL OF IT, and they cost a few thousand of the
- * tree's hundred-odd: HOLLOWPOINT at 1.25 a level over three, SALVO's every
+ * tree's hundred-odd: HOLLOWPOINT at 1.5 a level over three, SALVO's every
  * Nth shot, and what is left of FEED. Resetting them alone returns a
  * fully-bought fight to nearly its stock length -- so this is the product to
  * answer, not the ledger and not the spend. Half the tree is mines, abilities
@@ -309,8 +309,20 @@ function sliverOn(world, e, x, y, p) {
        * contact point, inside the thing the parent was passing through, so
        * without this every fragment would immediately hit that same body and
        * come apart again on the frame it appeared.
+       *
+       * ...and the cover has to be a DISTANCE, which it was not. It was the
+       * flat 0.06s every `ignore` gets, and the contact point is on the
+       * body's near face -- `contactAt` puts it at `e.x + nx * e.r` -- so a
+       * fragment must cross a whole diameter to be clear of it. Measured, a
+       * BULWARK took three hits from one dart at SLIVER 1 and up to eight at
+       * SLIVER 2, each re-hit spending a pierce inside the body it was
+       * already in, and at level 2 the ring and the three grandchildren were
+       * drawn at the entry face rather than out the far side. The time here
+       * is the crossing, per body and per fragment speed, with a little over
+       * for the fan's off-axis members.
        */
       ignore: e,
+      ignoreT: (2 * ((e && e.r) || 1) + 4) / Math.max(1, sp * S.speed),
     });
   }
   // The moment it comes apart, drawn where it happened.

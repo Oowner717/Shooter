@@ -14,7 +14,7 @@ export const BUILD = '220';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '874ea36';
+export const REV = '1ad57e5';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -770,9 +770,11 @@ export const CFG = {
      * seconds. Everything else on the field still trades damage on impact;
      * only what a SLUG threw is exempt.
      *
-     * That left it paying a 2.4x rate penalty for a shove and nothing else, so
-     * it now hits hardest of anything per shot — 44, against SPINE's 20 and
-     * BOLT's 26 — while staying under BOLT on sustained damage.
+     * That left it paying a 2.4x rate penalty for a shove and nothing else,
+     * so it hits hard per shot — 44, against BOLT's 26 — while staying under
+     * BOLT on sustained damage. It was written against SPINE at 20 and SPINE
+     * has been 34 since build 218, so it is no longer the hardest single
+     * round; the rate penalty and the shove are the trade, not the ceiling.
      */
     slug: {
       rate: 2.4,
@@ -816,10 +818,17 @@ export const CFG = {
     },
     /*
      * TITHE. It barely hurts on the first hit, and that is the point: every
-     * hit on the same body deepens the mark, and a deeper mark takes more from
-     * this round and pays more when it goes. Left on a single large thing it
-     * ramps into real damage without ever changing ammunition, which is what a
-     * long fight against one body needs.
+     * hit on the same body deepens the mark, and a deeper mark takes more
+     * from this round. Left on a single large thing it ramps into real damage
+     * without ever changing ammunition, which is what a long fight against
+     * one body needs.
+     *
+     * The PAYMENT does not deepen and never has -- it is one multiplier on
+     * what the body was already worth, set on the first hit and held. Build
+     * 220 made it a multiplier rather than a floor, because a floor of 3.5
+     * against a tier bounty of 1.10^(tier-1) was worth nothing from tier 15;
+     * it did not make it ramp. Two comments and the arsenal row all used to
+     * say it did.
      */
     tithe: {
       rate: 1.5,
@@ -1068,7 +1077,8 @@ export const CFG = {
 
   // ---- knells ----------------------------------------------------------
   // The fourth kind. It does not wait to be touched — it counts, and then it
-  // goes off three times where it lies, each wider and weaker than the last.
+  // goes off twice where it lies, each wider and weaker than the last, and
+  // four times with FOURTH BELL fully bought.
   // A blast mine punishes what walks into it; this one denies the ground.
   knell: {
     flight: 0.9,
@@ -2482,7 +2492,7 @@ export const CFG = {
      * for the measurement this answers: seven fights, all of them a fifth of
      * their tuned length once the tree is bought out.
      *
-     * A ceiling rather than the raw product (which reaches 5.30) because the
+     * A ceiling rather than the raw product (which reaches 4.69) because the
      * multiplier reaches only structure and cores -- minions come through
      * claim() and are deliberately left alone, since a longer fight already
      * means more of them -- and because a boss's scripted beats do not

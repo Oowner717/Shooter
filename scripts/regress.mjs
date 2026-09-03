@@ -11974,7 +11974,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   /*
    * `hard` is the product, or the cap, whichever is smaller. It WAS the cap
    * until build 215: SIGHT's removal took a 1.25^3 out of gunScale and the
-   * product fell from 5.30 to 2.71, so the ceiling stopped binding. Asserted
+   * product fell from 5.30 to 4.69. The ceiling still binds -- 4.2 is under
+ * 4.69, so `Math.min` returns the cap on every bought fight, and the cap is
+ * what sets a bought anomaly's health. The 2.71 this used to say was
+ * HOLLOWPOINT priced at 1.25 a level, which it has not been since 215. Asserted
    * against the same min the boss takes, not against a literal, or this case
    * would have to be edited every time the gun changes -- and the point of
    * it is to notice when the gun changes.
@@ -13990,6 +13993,102 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('...and a VOID deletes an ARMORED body, which absorbed it whole',
     r.plain.gone === true && r.armoured.gone === true,
     `plain ${JSON.stringify(r.plain)}, armoured ${JSON.stringify(r.armoured)}`);
+}
+
+// --- a SLIVER fragment does not come apart in the body it was born in -------
+/*
+ * The intent is written out at `sliverOn`: "It must not split on the body it
+ * was BORN in. `fire` puts it at the contact point, inside the thing the
+ * parent was passing through, so without this every fragment would
+ * immediately hit that same body and come apart again on the frame it
+ * appeared." It was implemented as `ignore: e` -- and that cover is a fixed
+ * 0.06 seconds, while the contact point is on the body's NEAR face, so a
+ * fragment has a whole diameter to cross before it is clear.
+ *
+ * Measured on a BULWARK, the game's widest ordinary body: one dart landed
+ * three separate hits at SLIVER 1 and up to eight at SLIVER 2, each re-hit
+ * spending one of the fragment's pierces inside the body it was already in --
+ * and at level 2 the ring and the three grandchildren were drawn at the entry
+ * face, most of a body's width behind where the fan was meant to open.
+ *
+ * The cover is a distance now, per body and per fragment speed. Counted as
+ * HITS ON ONE BODY from ONE dart, which is the quantity the comment is about;
+ * a bench that counted damage would be confounded by the fan's own spread.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    const ran = w.director.update;
+    w.director.update = () => {};
+    g.debugGiveEnergy(400000);
+    /*
+     * SLIVER and its way in, and nothing else that touches the round.
+     * `buy` refuses a node whose parents are unowned, so the chain has to be
+     * walked -- the first version of this case called `buy('sliver')` three
+     * times, got 'locked' three times, and measured a turret with no SLIVER
+     * on it at all.
+     */
+    const { NODE_BY_ID } = await import('../src/tree.js');
+    const chain = [];
+    for (let n = NODE_BY_ID.get('sliver'); n; n = n.parent) if (n.id) chain.unshift(n.id);
+    for (const id of chain) for (let i = 0; i < 4; i++) g.buy(id);
+    const bought = [];
+    for (let i = 0; i < g.owned('sliver'); i++) bought.push(i);
+    g.toggleRound('spine');
+
+    /*
+     * One dart, fired by hand at a body pinned square in front of the barrel,
+     * with the hit counted on the body itself. `applyDamage` is the door every
+     * hit comes through, so it is wrapped rather than inferred from health --
+     * a fragment's damage varies with its generation and would not count.
+     */
+    const s = w.shooter;
+    const e = g.debugSpawn('bulwark', s.x, s.y - 300);
+    if (!e) return { error: 'no body' };
+    e.staged = false;
+    e.invMass = 0;
+    e.maxHp = 1e9;
+    e.hp = 1e9;
+    let hits = 0;
+    const real = e.applyDamage.bind(e);
+    e.applyDamage = (...a) => { hits++; return real(...a); };
+
+    w.autoAim = false;
+    w.autoFire = false;
+    s.aim = -Math.PI / 2;
+    s.targetAim = -Math.PI / 2;
+    s.cooldown = 0;
+    w.projectiles.length = 0;
+    s.shoot(w);
+    const fired = w.projectiles.length;
+    for (let f = 0; f < 60; f++) {
+      e.x = s.x; e.y = s.y - 300; e.vx = 0; e.vy = 0; e.hp = 1e9;
+      g.update(1 / 60);
+    }
+    e.applyDamage = real;
+
+    w.director.update = ran;
+    w.spawnLock = 0;
+    const levels = bought.length;
+    g.restart();
+    return { hits, fired, levels, r: e.r };
+  });
+  /*
+   * The dart itself, plus at most the fan members whose own path really does
+   * cross the body. Eight was the measured worst case before the fix, and
+   * three the measured best; the window is set clear of both rather than on
+   * either.
+   */
+  check('a SLIVER fragment does not come apart in the body it was born in',
+    !r.error && r.levels === 2 && r.fired >= 1 && r.hits >= 1 && r.hits <= 2,
+    `one dart at SLIVER x${r.levels} landed ${r.hits} hits on a ${r.r}-unit `
+    + `body (${r.fired} round(s) left the barrel)`);
 }
 
 // --- report -----------------------------------------------------------------

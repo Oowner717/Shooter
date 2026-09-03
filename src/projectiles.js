@@ -89,7 +89,13 @@ class Projectile {
      * write it, so a recycled projectile can never inherit one.
      */
     this.placed = false; // body we just reflected off
-    this.ignoreT = opts.ignore ? 0.06 : 0;
+    /*
+     * How long that cover lasts. The default 0.06s is a re-arm after a
+     * pierce or a bounce, where the round is already leaving; a SLIVER
+     * fragment is born INSIDE its host and has to cross the whole body, so
+     * it passes its own -- see `sliverOn`.
+     */
+    this.ignoreT = opts.ignore ? (opts.ignoreT ?? 0.06) : 0;
   }
 }
 
@@ -519,7 +525,11 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       return;
     }
     case 'graft': {
-      bestTarget.enemy.hitGraft(bestTarget.graft, p.damage, c.x, c.y);
+      // The normal `contactAt` already computed, the way the shard branch
+      // above uses it. It was position only, and `hitGraft` hard-coded
+      // (0, -1) -- so a ball shot off the side of a host sprayed straight up.
+      // Build 211 swept exactly this for bodies and missed this path.
+      bestTarget.enemy.hitGraft(bestTarget.graft, p.damage, c.x, c.y, c.nx, c.ny);
       endProjectile(world, p, c.x, c.y, true);
       return;
     }
@@ -552,8 +562,9 @@ export function drawProjectiles(ctx, world) {
 
     switch (p.form) {
       /*
-       * SCATTER. Up to forty-five of these can be in the air at once (DOUBLE-O
-       * pellets across a SALVO fan), so this is the one form that had to get
+       * SCATTER. Thirty-three of these leave on one trigger pull with
+       * DOUBLE-O and SALVO bought, and more than that are in the air at once
+       * because they outlive a pull, so this is the one form that had to get
        * CHEAPER: one stroke and a half-size glow, against the old recipe's
        * two strokes, a glow and a filled arc. A pellet is hot metal, not a
        * little tracer.
@@ -770,7 +781,7 @@ export function fire(world, x, y, angle, opts = {}) {
    *    fancier muzzle provably cannot move the seeded stream.
    */
   switch (p.form) {
-    // A pellet is one of up to forty-five in the same trigger pull; the old
+    // A pellet is one of up to thirty-three in the same trigger pull; the old
     // two-sparks-and-a-dot per PROJECTILE made the muzzle the brightest
     // thing in the salvo. One spark, straight out.
     case 'pellet':

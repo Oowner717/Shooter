@@ -433,6 +433,14 @@ most once for any given target and cannot spin.
   each body within `--slack` (80 units) of where it was put and never touches
   its velocity. A probe that immobilises what it measures has changed the
   thing it is measuring.
+- **"ORDINAL can be fought on the assists alone" is the one case known to be
+  flaky and not yet diagnosed.** It failed twice in build 220's session and
+  passed on an immediate re-run both times, with nothing changed between them
+  -- the failing runs report reaching stages 1+2 in the 85s cap with the outer
+  frame at 0.08. Everything else in this file about flakes is a case that was
+  measured at the wrong moment or against the wrong margin, and this one has
+  not been shown to be either. If it fails, re-run before believing it, and if
+  you have the budget, find out which.
 - **A flaky case is a case measured at the wrong moment or against the wrong
   margin, and both showed up in one sitting.** "A body under sustained fire
   still closes" gave a LURCHER 26s to arrive when it takes 16-17s quiet and

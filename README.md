@@ -287,7 +287,7 @@ than something it starts with:
 - **KNELL** does not wait to be touched. It counts, and then it goes off three
   times where it lies, each half again as wide as the last and worth 72% of its
   damage. BLAST punishes what walks into it; KNELL denies the ground whether
-  anything is there or not — measured firing all three tolls with the field
+  anything is there or not — measured firing every toll with the field
   empty.
 
 ### The ammunition

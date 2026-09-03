@@ -133,7 +133,7 @@ export const ARSENAL = [
   {
     key: 'void', kind: 'mine', group: 'mines', label: 'VOID', icon: ICON.voidmine, tone: '#7383ff',
     dmg: 'one kill',
-    fx: 'The first thing to touch it is gone, whatever its health.',
+    fx: 'The first thing to touch it is gone, whatever its health. An anomaly-s own structure is beyond it.',
   },
 
   {
@@ -150,7 +150,7 @@ export const ARSENAL = [
 
   {
     key: 'standard', kind: 'round', group: 'ammo', label: 'BOLT', icon: ICON.std, tone: '#7aa2ff',
-    dmg: '26', fx: 'The fastest cadence there is. Nothing done to it.',
+    dmg: '26', fx: 'The fastest cadence there is, and the only one that comes back off the arena walls.',
   },
   {
     key: 'explosive', kind: 'round', group: 'ammo', label: 'HE', icon: ICON.he, tone: '#ff5638',

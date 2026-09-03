@@ -295,7 +295,9 @@ export function flash(alpha, color = '#ffffff') {
  */
 export function impactFx(form, x, y, nx, ny, color) {
   switch (form) {
-    // Up to forty-five of these land per salvo: one spark and out, which is
+    // Up to thirty-three of these land per trigger pull -- five pellets, six
+    // more from DOUBLE-O, three rounds on SALVO's every eighth: one spark and
+    // out, which is
     // also a quarter of what the generic burst cost.
     case 'pellet':
       spark(x, y, nx * 160 + spread(60), ny * 160 + spread(60), color, 0.14, 1.8);

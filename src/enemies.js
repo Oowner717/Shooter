@@ -988,11 +988,16 @@ export class Enemy {
    * is the whole point of it being a thing on the outside rather than a state
    * on the inside.
    */
-  hitGraft(s, dmg, hx, hy) {
+  /*
+   * `nx, ny` defaults to straight up for the one caller that genuinely has no
+   * travel direction -- `applyBlast`, which pushes through the centre. The
+   * projectile path passes the real normal off `contactAt`.
+   */
+  hitGraft(s, dmg, hx, hy, nx = 0, ny = -1) {
     if (!s.alive) return;
     s.hp -= dmg;
     if (s.hp > 0) {
-      hitBurst(hx, hy, 0, -1, '#d9c2ff');
+      hitBurst(hx, hy, nx, ny, '#d9c2ff');
       return;
     }
     s.alive = false;
