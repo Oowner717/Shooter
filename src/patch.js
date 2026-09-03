@@ -109,10 +109,6 @@ export class Patch {
       };
     });
     this.motes = Array.from({ length: Math.round(48 * q) }, () => this.seedMote(rand(0, 1)));
-    // A ragged edge, fixed at birth: burning ground is not a circle. One
-    // radius per spoke, reused every frame, so the outline holds still
-    // instead of boiling.
-    this.edge = Array.from({ length: 18 }, () => 0.82 + rand(0, 0.26));
   }
 
   /**
@@ -192,19 +188,15 @@ export class Patch {
     }
   }
 
-  /** The ragged outline, as a path. Shared by the fill and the edge. */
-  rim(ctx, scale = 1) {
-    const n = this.edge.length;
-    ctx.beginPath();
-    for (let i = 0; i <= n; i++) {
-      const a = (i % n) / n * TAU;
-      const rr = this.r * this.edge[i % n] * scale;
-      const x = this.x + Math.cos(a) * rr;
-      const y = this.y + Math.sin(a) * rr;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-  }
+  /*
+   * `rim()` and the `edge` array it was the only reader of came out in build
+   * 220. Its docstring said "shared by the fill and the edge", and build 214
+   * replaced both of those layers when it made SPORE's ground read as spores
+   * rather than as a solid disc -- so it had described two things that no
+   * longer existed for six builds, and had no caller for the same six. The
+   * `windAt`/`rateAt` shape CLAUDE.md records: nothing fails on a dead
+   * private method and `bundle.mjs` will happily ship one.
+   */
 
   draw(ctx) {
     // Fades in fast and out slowly, so it never appears or vanishes on a frame.

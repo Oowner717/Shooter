@@ -796,12 +796,30 @@ export const BY_ID = new Map(
  */
 /*
  * How many times one upgrade may ever be taken, and what its card says at each
- * level. `levels` absent means without limit, which is still the right answer
- * for a plain scalar — HOLLOWPOINT has no natural ceiling. `levels: 1` is the
- * old one-shot: a switch cannot be thrown twice. Anything in between is an
- * upgrade with a shape to it, and `tiers` lets a level be a different card:
- * a second level of SIEVE is not "SIEVE again", it is OPEN SIEVE and it hands
- * over a position the first one did not, and the offer should say so.
+ * level.
+ *
+ * **`levels` absent means THREE.** `tree.js` reads `u.levels ?? 3`, and the
+ * only thing that means "without limit" is `repeat`. This paragraph said the
+ * opposite for a long time -- "`levels` absent means without limit, which is
+ * still the right answer for a plain scalar" -- and it is the documentation
+ * the trap keeps being read out of: six nodes have now shipped uncapped
+ * because their author read this and believed it. HOT LOAD (build 193, 0.85
+ * cubed on the fire interval, worth more than the FEED nerf that had just
+ * been made for the same reason), BUCKSHOT (217), REPULSOR and STANDING
+ * ORDER (219, the latter halving every clock on the ability bar against a row
+ * that says -20%), then FIFTH LINK, FOURTH BELL and PAIRED CHARGE (220), each
+ * of which is named after the number it was supposed to produce and produced
+ * a larger one.
+ *
+ * `levels: 1` is the one-shot: a switch cannot be thrown twice. Anything in
+ * between is an upgrade with a shape to it, and `tiers` lets a level be a
+ * different card: a second level of SIEVE is not "SIEVE again", it is OPEN
+ * SIEVE and it hands over a position the first one did not, and the offer
+ * should say so.
+ *
+ * Write the number. A percentage dial that genuinely wants three is one word
+ * longer and costs nothing; a node with no `levels` is indistinguishable from
+ * one whose author forgot.
  */
 
 

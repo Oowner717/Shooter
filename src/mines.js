@@ -94,9 +94,21 @@ const TONE = {
  * bought BLAST (six of six) and a fully bought SPALL (eight of eight) both
  * arrive at 1.
  */
-export function mineGrade(world, kind) {
+/**
+ * The same tally, as its two halves: how many of the upgrades this kind can
+ * use are owned, and how many there are.
+ *
+ * Both are wanted. `mineGrade` is the ratio, which sizes the body; the COUNT
+ * is what the collar of marks around it draws, and `drawMines` was
+ * reconstructing it as `round(grade * denominator)` off a denominator written
+ * out by hand -- `spall ? 8 : blast || thorn ? 6 : 7` -- against the one this
+ * function actually computes. It disagreed for six of the eight kinds, so a
+ * SNARE with five upgrades available drew seven marks and a WIRE with one
+ * drew two. There is one denominator now and it is this one.
+ */
+function tally(world, kind) {
   const up = world.up;
-  if (!up) return 0;
+  if (!up) return { has: 0, of: 1 };
   /*
    * The shared six, MINUS the ones this kind cannot use.
    *
@@ -142,10 +154,21 @@ export function mineGrade(world, kind) {
   }[kind] || [];
   of += own.length;
   for (const b of own) if (b) has++;
-  return has / of;
+  return { has, of };
 }
 
-/** ...and what that does to how big the thing is drawn. */
+/** How much of the tree a mine of this kind is carrying, 0 to 1. */
+export function mineGrade(world, kind) {
+  const { has, of } = tally(world, kind);
+  return of > 0 ? has / of : 0;
+}
+
+/** ...and how many marks the collar draws, which is the numerator itself. */
+export function mineMarks(world, kind) {
+  return tally(world, kind).has;
+}
+
+/** ...and what the grade does to how big the thing is drawn. */
 export function mineScale(world, kind) {
   // A quarter larger fully bought. "Slightly larger" is the brief: a mine
   // that doubled would crowd a field that may hold five of them.
@@ -778,9 +801,10 @@ export function drawMines(ctx, world) {
      * version of the eighteen sockets on the turret -- something you can look
      * at and see what you have put into it.
      */
-    const gr = mineGrade(world, m.kind);
-    const R = m.r * (1 + gr * 0.26);
-    const pips = Math.round(gr * (m.kind === 'spall' ? 8 : m.kind === 'blast' || m.kind === 'thorn' ? 6 : 7));
+    // Through `mineScale`, which existed and had no caller: this restated its
+    // arithmetic inline, so the exported one was dead and the two could drift.
+    const R = m.r * mineScale(world, m.kind);
+    const pips = mineMarks(world, m.kind);
 
     // The countdown to the next toll, drawn as an arc closing on the body.
     if (knell && m.landed && m.tolls > 0) {
