@@ -31,6 +31,19 @@ function inBranch(n, key) {
   return false;
 }
 
+/**
+ * Does this row apply to everything in its category rather than to one arm?
+ *
+ * The same walk up, looking for the `universal` mark tree.js puts on the three
+ * ALL-X groups. A node under ALL MINES is universal; DEEP CHARGE is, SLEDGE --
+ * which hangs off SLUG -- is not. Read off the group rather than off a list of
+ * ids, so a node moved between the two changes register by being moved.
+ */
+function universal(n) {
+  for (let at = n; at; at = at.parent) if (at.universal) return true;
+  return false;
+}
+
 const $ = (id) => document.getElementById(id);
 
 /*
@@ -341,7 +354,7 @@ export class Menu {
         } else if (n.name && n.kind === 'group') {
           // A heading over a set that belongs to no one arm: ALL ROUNDS.
           const g = document.createElement('div');
-          g.className = 'grpLab';
+          g.className = `grpLab${n.universal ? ' univ' : ''}`;
           g.style.setProperty('--tone', this.toneOf(n));
           g.textContent = n.name;
           grid.appendChild(g);
@@ -414,7 +427,15 @@ export class Menu {
   makeCard(n, root) {
     const c = document.createElement('button');
     c.type = 'button';
-    c.className = `shopCard${n.kind === 'arm' ? ' arm' : ''}`;
+    /*
+     * `univ` marks a row that applies to everything in its category rather
+     * than to the arm beside it -- everything under ALL ROUNDS, ALL MINES and
+     * ALL ABILITIES. It carries the same distinction the bone tone does (see
+     * GROUP_TONE in tree.js) in a second channel, because a rule expressed
+     * only as a colour is a rule a colourblind player does not get -- and
+     * because the colour it replaced was BLAST's to within dE 0.6.
+     */
+    c.className = `shopCard${n.kind === 'arm' ? ' arm' : ''}${universal(n) ? ' univ' : ''}`;
     if (n.id) c.dataset.id = n.id;
     c.style.setProperty('--tone', this.toneOf(n));
     const max = n.repeat ? 0 : (n.levels || 1);

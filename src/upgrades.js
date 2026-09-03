@@ -433,7 +433,7 @@ export const UPGRADES = {
      * a clash the build check would have caught anyway.
      */
     { id: 'sliver', name: 'SLIVER', levels: 2,
-      line: 'A spine comes apart into an arc of fragments through the first body it hits.',
+      line: 'The spine itself comes apart too, into piercing fragments that carry on down the line.',
       apply: bump('spineSplit', 1), icon: MARK.sliver },
     { id: 'annealed', name: 'ANNEALED', levels: 1,
       line: 'A SPINE keeps 92% of its damage per body instead of 78%.',
@@ -470,7 +470,21 @@ export const UPGRADES = {
     { id: 'quicklay', name: 'QUICK LAY', levels: 2,
       line: '-25% wait between mine throws.',
       apply: scale('mineEvery', 0.75), icon: MARK.quicklay },
-    { id: 'deepcharge', name: 'DEEP CHARGE', line: '+35% mine blast radius.', apply: scale('mineBlast', 1.35) , icon: MARK.deepcharge },
+    /*
+     * TWO levels, written out. It had none, so `tree.js`'s `u.levels ?? 3`
+     * sold three -- 1.35^3 = 2.46x -- and that put a fully bought BLAST at a
+     * 413-unit radius and a fully bought KNELL's last toll at 726, against a
+     * world about 630 units wide on a 390-pixel phone. A blast wider than the
+     * screen is not a powerful blast, it is a white circle, and the mine that
+     * made it is unreadable in the moment it matters. At two levels they are
+     * 306 and 538: still the largest things the tree sells, still visibly
+     * bigger than an unbought one, and both inside the field they go off in.
+     *
+     * The eighth node to be caught by the missing-`levels` default; see the
+     * paragraph at the end of this file.
+     */
+    { id: 'deepcharge', name: 'DEEP CHARGE', levels: 2,
+      line: '+35% mine blast radius.', apply: scale('mineBlast', 1.35), icon: MARK.deepcharge },
     { id: 'widemouth', name: 'WIDE MOUTH', line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) , icon: MARK.widemouth },
     { id: 'eventhorizon', name: 'EVENT HORIZON', levels: 1,
       line: 'A VOID reaches for what comes near, not just what touches it.',
@@ -521,7 +535,19 @@ export const UPGRADES = {
      * computed from `up.lodeReach`, so the third level was the most
      * expensive circle on the field as well as the loudest.
      */
-    { id: 'repulsor', name: 'REPULSOR', levels: 2, line: '+40% lode reach and push.', apply: (u) => { u.lodeReach *= 1.4; u.lodePush *= 1.4; } , icon: MARK.repulsor },
+    /*
+     * The reach and the push are no longer the same number.
+     *
+     * They were both 1.4, so two levels took a LODE's field from 94 units to
+     * 184 -- and a LODE does not go off, it holds a circle open for its whole
+     * life, so its radius is on the screen continuously rather than for the
+     * two frames a blast is. What the node is FOR is the shove; the width is
+     * what makes it unreadable next to everything else standing on the field.
+     * Reach compounds to 1.5625 now (94 -> 147) and the push is untouched at
+     * 1.96, so a fully bought LODE throws exactly as hard through a circle a
+     * fifth smaller.
+     */
+    { id: 'repulsor', name: 'REPULSOR', levels: 2, line: '+25% lode reach, +40% push.', apply: (u) => { u.lodeReach *= 1.25; u.lodePush *= 1.4; } , icon: MARK.repulsor },
     { id: 'intake', name: 'INTAKE', levels: 1,
       line: 'Energy is taken in on contact, no PULSE needed. Louvres cut through the skirt.',
       apply: set('intake', true), icon: MARK.intake },

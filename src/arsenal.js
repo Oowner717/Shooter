@@ -176,7 +176,7 @@ export const ARSENAL = [
   },
   {
     key: 'spine', kind: 'round', group: 'ammo', label: 'SPINE', icon: ICON.spine, tone: '#ff6bce',
-    dmg: '34, fading', fx: 'Punches through 3 more bodies behind the first.',
+    dmg: '34, fading', fx: 'Punches through 3 more bodies and sprays splinters out of each.',
   },
   {
     key: 'slug', kind: 'round', group: 'ammo', label: 'SLUG', icon: ICON.slug, tone: '#c1cee0',

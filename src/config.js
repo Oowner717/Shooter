@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '222';
+export const BUILD = '223';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '222';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '7310c04';
+export const REV = '0e15a4c';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -720,6 +720,53 @@ export const CFG = {
       pierce: 3, // bodies it goes through after the first
       fade: 0.78, // and what it keeps of its damage each time
       /*
+       * ---- SHATTER: what the round sheds on the way OUT, and what makes it
+       * an area round rather than a line one ----
+       *
+       * SPINE's worth was entirely in what you could line up behind the first
+       * target, and a column is something the field gives you rather than
+       * something you can ask for -- so it was a round whose good case you
+       * could not create. It sheds a fan of splinters out the FAR side of
+       * every body it passes through now: a dart into a crowd is a dart plus
+       * three sprays of shrapnel, and the round stops needing the field's
+       * permission to be worth loading.
+       *
+       * OUT THE FAR SIDE, not at the point of impact, and the difference is
+       * the whole effect. The contact point is on the NEAR face -- physics'
+       * `contactAt` puts it at `e.x + nx * e.r` -- so a fan spawned there
+       * opens backwards into the space the round has already crossed and
+       * covers nothing new. The exit is derived from the impact parameter and
+       * the body's own radius; see `shatterOn` in shooter.js.
+       *
+       * The splinters shed nothing themselves. That bound is deliberate and it
+       * is what keeps this from being SLIVER's cascade a second time: the
+       * round pierces at most `pierce + 1` bodies, so a SPINE makes at most
+       * four fans of three, and the ceiling is a number rather than a product
+       * of the levels.
+       */
+      shatter: {
+        n: 3,
+        /*
+         * 1.5 radians -- 86 degrees, and wider than SLIVER's 49 on purpose.
+         * SLIVER's arc is made of darts that still pierce and are still
+         * looking for the next body in the line, so it wants to stay near the
+         * parent's bearing. These are shrapnel: their job is the ground
+         * either side of the line, which is the ground the round was not
+         * already covering.
+         */
+        spread: 1.5,
+        damage: 0.32, // of what the round had left AT THAT EXIT
+        speed: 0.5,
+        /*
+         * Short, and this is the number that keeps the effect readable on a
+         * phone. At 0.5 speed a splinter travels 780 * 0.26 = 203 units, so
+         * the spray is a patch about the size of one body's neighbourhood
+         * rather than a second volley crossing the field.
+         */
+        life: 0.26,
+        r: 2.2,
+      },
+      /*
        * ---- SLIVER: what the round does to the first thing it hits ----
        *
        * Unbought, a SPINE goes through a body and carries on as one dart.
@@ -1102,6 +1149,18 @@ export const CFG = {
      */
     cap: 5,
     life: 15,
+    /*
+     * The top of the field, as a fraction of its depth, that a mine is never
+     * thrown into.
+     *
+     * It was a flat 70 units off the entry line -- about a ninth of the field
+     * -- so a mine could be laid essentially on the line bodies come in on,
+     * spend its flight and its arming time (1.25 to 1.7 seconds, by kind)
+     * before the wave had gathered, and then go off on whichever body crossed
+     * first. A fifth of the field is the buffer, and it is a FRACTION rather
+     * than a number of units so it stays a fifth on every screen.
+     */
+    keepTop: 0.2,
     throwEvery: 15, // one clock for every kind, not one each; QUICK LAY scales it
     flight: 0.85, // seconds from turret to landing site
     arm: 0.4, // settling time before it can trigger
@@ -1123,7 +1182,16 @@ export const CFG = {
     r: 14,
     trigger: 34, // a wider mouth, because it wants a crowd
     hold: 2.4, // seconds it keeps hold once it opens — was 3.6; see DEAD WEIGHT
-    reach: 210,
+    /*
+     * 168, down a fifth from 210 in build 223. Nothing in the tree scales a
+     * SNARE's reach, so this number IS its maximum -- and unlike a blast it is
+     * drawn for the whole of the mine's life, hauling everything inside it
+     * into one knot. At 210 on a world about 630 units wide it was taking two
+     * thirds of the screen's width and most of what was on it; the knot is
+     * the effect, and a knot that eats the entire field is a wave ending
+     * rather than a mine working.
+     */
+    reach: 168,
     pull: 300, // inward speed it drives what it catches
   },
 

@@ -463,7 +463,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 135 since build 221, when HEAVE went in at one level -- the WARD's
+    // 134 since build 223, when DEEP CHARGE was capped at two levels. It had
+    // none, so the tree sold three -- 1.35^3 -- which put a bought BLAST at a
+    // 413-unit radius and a KNELL's last toll at 726 on a world about 630
+    // units wide. The eighth node caught by `u.levels ?? 3`. It was
+    // 135 from build 221, when HEAVE went in at one level -- the WARD's
     // fourth node, and a switch rather than a dial. It was
     // 134 from build 220, when the ammo-and-mine audit capped three more
     // nodes the tree was selling three times: FIFTH LINK to 1 (the round's
@@ -493,7 +497,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 135
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 134
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -1352,14 +1356,29 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const S = w.shooter;
     const en = await import('../src/enemies.js');
     const { CFG, TYPE_BY_ID } = await import('../src/config.js');
-    // A clean field, and nothing left running over it: an earlier case in this
-    // file can leave a WELL or a STASIS up, and either of them will drag a
-    // thrown MASS off the turret it was aimed at.
+    /*
+     * A clean field, and nothing left running over it: an earlier case in this
+     * file can leave a WELL or a STASIS up, and either of them will drag a
+     * thrown MASS off the turret it was aimed at.
+     *
+     * The list was half of one, and the missing half made this case fail about
+     * one run in three. Everything below the effects is a BODY IN THE
+     * BROADPHASE that an earlier case put there -- wreckage, uncollected
+     * salvage, a round still in flight -- and the load crosses 620 units a
+     * second through whatever is in the way. `up` goes back to stock for the
+     * same reason: a hundred cases run before this one and several of them buy
+     * the tree, and none of what they bought is meant to be part of the
+     * question.
+     */
     w.director.timer = 1e9; w.director.driftTimer = 1e9;
     w.autoAim = false; w.autoFire = false;
     for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
     for (const e of w.effects) e.dead = true; w.effects.length = 0;
+    for (const d of w.drops) d.dead = true; w.drops.length = 0;
+    w.debris.length = 0;
+    w.projectiles.length = 0;
     w.mines.length = 0;
+    w.up = (await import('../src/upgrades.js')).freshUpgrades();
     w.stasis = 0;
     w.timeScale = 1;
     w.attackers.clear();
@@ -1369,11 +1388,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const mass = made.find((e) => e.type.id === 'towMass');
     head.staged = false; head.spawnIn = 0; mass.staged = false; mass.spawnIn = 0;
     let released = null; let peak = 0; let landed = null;
+    let minD = 1e9; let wasAttacking = false; let liveMines = 0; let liveFx = 0;
     for (let s = 0; s < 1500; s++) {
       g.update(1 / 60);
       peak = Math.max(peak, w.shock);
       if (released === null && !head.tether) {
         released = { speed: Math.round(Math.hypot(mass.vx, mass.vy)), thrown: mass.thrown > 0, hurled: !!mass.hurled };
+      }
+      if (released) {
+        minD = Math.min(minD, Math.hypot(mass.x - S.x, mass.y - S.y));
+        if (mass.attacking) wasAttacking = true;
+        liveMines = Math.max(liveMines, w.mines.length);
+        liveFx = Math.max(liveFx, w.effects.length);
       }
       /*
        * The landing is read off the corruption spike, not off the MASS being
@@ -1391,8 +1417,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const H = TYPE_BY_ID.tow.hurl;
     for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
     w.shock = 0; w.attackers.clear();
-    return { released, landed, peak: +peak.toFixed(2), want: H.shock, speed: H.speed };
+    return { released, landed, peak: +peak.toFixed(2), want: H.shock, speed: H.speed,
+      minD: Math.round(minD), need: Math.round(mass.r + S.r + 2), wasAttacking,
+      massDead: mass.dead, headDead: head.dead, liveMines, liveFx,
+      stasis: w.stasis, scale: w.timeScale };
   });
+  /*
+   * The landing arm of this used to fail about one run in three, and BOTH
+   * halves of that were real. The instrument was reading a body moving 10.3
+   * units a frame against a two-unit contact tolerance sampled once a frame
+   * -- fixed in `Game.checkContact`, which sweeps the step now the way
+   * `resolveSegment` has always swept a projectile's. And the case was
+   * clearing half the field it said it was clearing. `minD` is reported either
+   * way so a future failure says which of the two it is.
+   */
   check('a TOW throws its MASS at the turret and the hit spikes corruption',
     !!r.released && r.released.speed >= r.speed * 0.9 && r.released.hurled
     && !!r.landed && r.peak >= r.want * 0.95 && r.landed.after === 0,
@@ -12791,7 +12829,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const s = w.shooter;
     const S = CFG.rounds.spine;
     const base = CFG.shooter.gripFireInterval;
-    const out = { sliverN: S.sliver.n };
+    // `fans` is how many bodies the dart actually gets out the far side of --
+    // itself plus its pierce -- capped at the column the probe puts down. Read
+    // from config rather than written out, so a change to either moves the
+    // expectation with it instead of failing this case.
+    const COLUMN = 4;
+    const out = { sliverN: S.sliver.n, shatterN: S.shatter.n,
+      fans: Math.min(COLUMN, S.pierce + 1) };
 
     // ---- where it sits in the rack now -----------------------------------
     const dps = (k, d) => d / (base * CFG.rounds[k].rate);
@@ -12907,12 +12951,29 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * multiplicative, so an off-by-one in the budget is the difference between
    * nine fragments and a cascade.
    */
-  check('...and a spine comes apart into an arc, and its arc comes apart again',
-    r.none === 1 && r.one === 1 + r.sliverN
-    && r.two > r.one && r.two <= 1 + r.sliverN + r.sliverN * r.sliverN,
-    `one trigger pull into a body made ${r.none} projectile unbought, `
-    + `${r.one} at one level and ${r.two} at two (the ceiling is `
-    + `${1 + r.sliverN + r.sliverN * r.sliverN})`);
+  /*
+   * The base fan is UNBOUGHT and is the round's own area effect: one splinter
+   * fan out of every body the dart gets through, so the column of four is a
+   * dart plus four sprays. What SLIVER adds on top is the cascade -- the round
+   * proper coming apart into piercing fragments, once, the budget passing down
+   * so the second level is three becoming nine and stopping.
+   *
+   * Every term is read from config, and the ceiling is asserted as well as the
+   * step: the two systems multiply if the splinters are ever allowed to shed
+   * splinters of their own, and that is the failure SLIVER already had once.
+   */
+  const base = 1 + r.fans * r.shatterN;
+  check('a SPINE sprays out of every body it gets through, bought or not',
+    r.none === base && r.fans > 1,
+    `a trigger pull through a column of four made ${r.none} projectiles `
+    + `unbought: one dart and ${r.fans} fans of ${r.shatterN}`);
+
+  check('...and SLIVER adds its cascade on top, and only its cascade',
+    r.one === base + r.sliverN
+    && r.two === base + r.sliverN + r.sliverN * r.sliverN,
+    `${r.none} unbought, ${r.one} at one level and ${r.two} at two `
+    + `(the ceiling is ${base + r.sliverN + r.sliverN * r.sliverN}; a splinter `
+    + `that shed splinters of its own would have no ceiling at all)`);
 
   /*
    * The cascade this guards against is not hypothetical: a fragment is
@@ -12920,9 +12981,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * through, so without an ignore it hits that body on the frame it appears.
    */
   check('...and a fragment does not come apart in the body it was born in',
-    r.loneePeak <= 1 + r.sliverN + r.sliverN * r.sliverN,
+    r.loneePeak <= 1 + r.shatterN + r.sliverN + r.sliverN * r.sliverN,
     `a single body took one dart and at most ${r.loneePeak} projectiles were `
-    + `ever on the field at once`);
+    + `ever on the field at once, against a ceiling of `
+    + `${1 + r.shatterN + r.sliverN + r.sliverN * r.sliverN}`);
 }
 
 // --- NO COOLDOWN means no cooldown, not one use ----------------------------
@@ -15016,6 +15078,289 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.past !== null && r.past < 0,
     `two seconds after arriving it is ${r.past} units past the turret centre `
     + `(a static body has no inverse mass, so resolvePair refuses to plow it)`);
+}
+
+/*
+ * ---- build 223: the four things this build changed ----
+ *
+ * SPINE's splinters come out the FAR side; the four widest mines are a fifth
+ * narrower; a mine is never laid in the top fifth of the field; and the ALL-X
+ * rows no longer wear the colour of the first arm in their branch.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { NODES } = await import('../src/tree.js');
+    const { freshUpgrades } = await import('../src/upgrades.js');
+    const g = window.__sim;
+    const w = g.world;
+    const s = w.shooter;
+    const S = CFG.rounds.spine;
+
+    // ---- the splinters come out the FAR side -------------------------------
+    /*
+     * The whole point of the change, and the one thing that cannot be inferred
+     * from a projectile count: a fan spawned at the CONTACT point opens
+     * backwards across ground the round has already crossed and covers nothing
+     * new. The contact point is the near face -- `contactAt` puts it at
+     * `e.x + nx * e.r` -- so "did it come out the other side" is measured as
+     * where each splinter was BORN relative to the body's centre, along the
+     * dart's own travel. Fired straight up, so the far side is up-field: a
+     * splinter born past the centre has a smaller y than the body has.
+     */
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    w.director.update = () => {};
+    w.up = freshUpgrades();
+    w.round = 'spine';
+    w.projectiles.length = 0;
+    const wall = g.debugSpawn('bulwark', s.x, s.y - 260);
+    wall.staged = false; wall.spawnIn = 0; wall.hp = 1e7; wall.maxHp = 1e7;
+    wall.invMass = 0;
+    s.aim = -Math.PI / 2; s.targetAim = s.aim;
+    const born = [];
+    const push0 = w.projectiles.push.bind(w.projectiles);
+    w.projectiles.push = (...ps) => {
+      for (const q of ps) born.push({ x: q.x, y: q.y, r: q.r });
+      return push0(...ps);
+    };
+    s.shoot(w);
+    for (let f = 0; f < 30; f++) {
+      wall.x = s.x; wall.y = s.y - 260; wall.vx = 0; wall.vy = 0;
+      g.update(1 / 60);
+    }
+    w.projectiles.push = push0;
+    // The dart is the first thing pushed and is born at the muzzle; every
+    // later one is a splinter.
+    const splinters = born.slice(1);
+    const far = splinters.filter((q) => q.y < wall.y).length;
+    const onSurface = splinters.filter(
+      (q) => Math.abs(Math.hypot(q.x - wall.x, q.y - wall.y) - wall.r) < 3).length;
+
+    // ---- the four widest mines ---------------------------------------------
+    /*
+     * Each one's MAXIMUM, computed the way the game computes it, with the
+     * whole tree owned. Pinned as a ceiling rather than as an equality: what
+     * the player asked for is that none of these fills the screen, and a
+     * ceiling is the statement of that. The field is about 630 units across,
+     * so a radius over 300 is already a circle wider than the screen.
+     */
+    g.restart();
+    g.debugTeachAll();
+    g.debugGiveEnergy(400000);
+    for (let pass = 0; pass < 4; pass++) for (const n of NODES) if (n.id) g.buy(n.id);
+    const up = w.up;
+    const K = CFG.knell;
+    const wide = {
+      blast: CFG.mines.blast.r * up.mineBlast,
+      knell: K.blast.r * (1 + (K.tolls + up.mineTolls - 1) * K.grow) * up.mineBlast,
+      lode: CFG.lode.reach * up.lodeReach,
+      snare: CFG.snare.reach,
+      lodePush: up.lodePush,
+      deepLevels: (NODES.find((n) => n.id === 'deepcharge') || {}).levels,
+    };
+
+    // ---- and where a mine may be laid --------------------------------------
+    /*
+     * Two hundred sites, because the site is a `rand` and one draw proves
+     * nothing. Asserted against the FIELD's depth rather than a constant --
+     * the buffer is a fraction so that it stays a fifth on every screen -- and
+     * the spread is asserted too, or a broken site that always returned the
+     * same point would pass the first arm on its own.
+     */
+    const { throwMine } = await import('../src/mines.js');
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    w.director.update = () => {};
+    const deep = w.floorY;
+    const bar = deep * CFG.mines.keepTop;
+    let above = 0, lowest = 1e9, highest = -1e9;
+    for (let i = 0; i < 200; i++) {
+      w.mines.length = 0;
+      throwMine(w, 'blast');
+      const m = w.mines[w.mines.length - 1];
+      if (!m) continue;
+      // `y1` is the landing site; `y`/`y0` is the muzzle it was lobbed from.
+      if (m.y1 < bar) above++;
+      lowest = Math.min(lowest, m.y1);
+      highest = Math.max(highest, m.y1);
+    }
+    w.mines.length = 0;
+
+    // ---- and the colour the ALL-X rows wear --------------------------------
+    const toneOf = (key) => {
+      const n = NODES.find((x) => x.key === key);
+      return n ? n.tone : null;
+    };
+    const tones = {
+      minesAll: toneOf('mines_all'),
+      ammoAll: toneOf('ammo_all'),
+      abilitiesAll: toneOf('abilities_all'),
+      blast: toneOf('blast'),
+      minesRoot: toneOf('mines'),
+    };
+    // ...and that a card under one of them actually carries the mark, which is
+    // the half a tone cannot express.
+    const m2 = g.menu || window.__menu;
+    g.restart();
+    return { splinters: splinters.length, far, onSurface, wallR: wall.r,
+      wide, above, bar: +bar.toFixed(0), lowest: +lowest.toFixed(0),
+      highest: +highest.toFixed(0), floorY: +w.floorY.toFixed(0), tones,
+      hasMenu: !!m2 };
+  });
+
+  check('a SPINE-s splinters are born on the FAR side of what it went through',
+    r.splinters > 0 && r.far === r.splinters && r.onSurface === r.splinters,
+    `${r.far} of ${r.splinters} splinters were born past the body's centre, `
+    + `${r.onSurface} of them on its surface (r ${r.wallR}) -- at the contact `
+    + `point they would all have been on the near face`);
+
+  /*
+   * A ceiling apiece, and the numbers behind them: BLAST 413 -> 306, KNELL's
+   * last toll 726 -> 538, LODE 184 -> 147, SNARE 210 -> 168. The first two
+   * come off DEEP CHARGE being capped at the two levels it always meant to
+   * have; the last two off their own reach.
+   */
+  check('none of the four widest mines opens wider than the screen it is on',
+    r.wide.blast < 320 && r.wide.knell < 560 && r.wide.lode < 155
+    && r.wide.snare < 175 && r.wide.deepLevels === 2,
+    `fully bought: BLAST ${r.wide.blast.toFixed(0)}, KNELL's last toll `
+    + `${r.wide.knell.toFixed(0)}, LODE ${r.wide.lode.toFixed(0)}, SNARE `
+    + `${r.wide.snare.toFixed(0)}; DEEP CHARGE sells ${r.wide.deepLevels} levels`);
+
+  check('...and REPULSOR still throws as hard through the smaller circle',
+    Math.abs(r.wide.lodePush - 1.96) < 0.01,
+    `lode push x${r.wide.lodePush.toFixed(2)} with both levels, unchanged, `
+    + `against a reach of ${r.wide.lode.toFixed(0)} rather than 184`);
+
+  check('a mine is never laid in the top fifth of the field',
+    r.above === 0 && r.highest > r.bar && r.lowest > r.bar
+    && r.highest - r.lowest > 60,
+    `200 sites, ${r.above} of them above the ${r.bar}-unit line `
+    + `(a fifth of a ${r.floorY}-unit field); they ran ${r.bar} to `
+    + `${r.highest}`);
+
+  /*
+   * dE in CIELAB, which is the only way to say "these are the same colour"
+   * about two hex strings. 25 is the floor the ability-bar case already uses.
+   * ALL MINES against BLAST measured 0.6 before this build -- #ffb347 against
+   * #ffb247, one unit of green apart.
+   */
+  const dE = (a, b) => {
+    const lab = (h) => {
+      const v = [1, 3, 5].map((i) => parseInt(h.substr(i, 2), 16) / 255)
+        .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+      const [rr, gg, bb] = v;
+      const X = rr * 0.4124 + gg * 0.3576 + bb * 0.1805;
+      const Y = rr * 0.2126 + gg * 0.7152 + bb * 0.0722;
+      const Z = rr * 0.0193 + gg * 0.1192 + bb * 0.9505;
+      const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+      const fx = f(X / 0.95047), fy = f(Y), fz = f(Z / 1.08883);
+      return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+    };
+    const p = lab(a), q = lab(b);
+    return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+  };
+  const gap = r.tones.minesAll && r.tones.blast ? dE(r.tones.minesAll, r.tones.blast) : 0;
+  check('ALL MINES is not the colour of the first mine in the branch',
+    gap > 25,
+    `ALL MINES ${r.tones.minesAll} against BLAST ${r.tones.blast}: dE `
+    + `${gap.toFixed(1)} (it was #ffb347 against #ffb247, dE 0.6)`);
+
+  check('...and the three ALL-X headings share one register, which no arm uses',
+    r.tones.minesAll && r.tones.minesAll === r.tones.ammoAll
+    && r.tones.minesAll === r.tones.abilitiesAll
+    && r.tones.minesAll !== r.tones.minesRoot,
+    `ALL ROUNDS ${r.tones.ammoAll}, ALL MINES ${r.tones.minesAll}, `
+    + `ALL ABILITIES ${r.tones.abilitiesAll}; the MINES heading itself is `
+    + `still ${r.tones.minesRoot}`);
+}
+
+/*
+ * ---- a load that breaks itself on you still landed on you ----
+ *
+ * `checkContact` skipped `e.dead`, and the physics runs before it: the pair
+ * solver bills `impactDamage` to both sides, so a MASS arriving at 620 with
+ * 280 health routinely destroys itself on the turret inside the frame it
+ * arrives -- and was already dead when the contact loop looked. So the
+ * corruption spike, which is the whole reason a thrown MASS is a different
+ * event from something walking into you, fired only when the load SURVIVED.
+ * The harder it hit you, the less likely it was to register.
+ *
+ * Measured before the fix over eight releases: four landed at 52 units against
+ * a 55-unit band, died on the frame they arrived, and did nothing at all --
+ * and that is what made the TOW case above fail about one run in three.
+ *
+ * Driven by putting a load on the turret and killing it in the same frame,
+ * rather than by throwing one, because a real throw only shows it on the
+ * releases where the impact happens to be lethal.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const s = w.shooter;
+
+    const land = (survive) => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      w.autoAim = false; w.autoFire = false;
+      w.attackers.clear();
+      w.shock = 0;
+      const e = g.debugSpawn('towMass', s.x, s.y - 300);
+      if (!e) return null;
+      e.staged = false; e.spawnIn = 0;
+      // Enough to walk away from the impact, or not enough -- which is the
+      // only difference between the two arms.
+      e.hp = survive ? 1e9 : 40;
+      e.maxHp = e.hp;
+      e.hurled = true;
+      e.thrown = 2.2;
+      const rr = e.r + s.r + 2;
+      e.x = s.x; e.y = s.y - rr * 0.9;
+      e.vx = 0; e.vy = 260;
+      let peak = 0;
+      // EVER in the set, not in it at the end: the release loop at the top of
+      // checkContact lets go at `r + 6`, and a body that bounces off the
+      // turret at 260 u/s clears that inside the window. Reading the end state
+      // would have said "never gripped" about a body that gripped and let go.
+      let everIn = false;
+      for (let f = 0; f < 12; f++) {
+        g.update(1 / 60);
+        peak = Math.max(peak, w.shock);
+        if (w.attackers.has(e)) everIn = true;
+      }
+      return { shock: +peak.toFixed(2), dead: e.dead, inSet: everIn };
+    };
+
+    const tough = land(true);
+    const broke = land(false);
+    g.restart();
+    return { tough, broke };
+  });
+
+  check('a hurled MASS that breaks on the turret still spikes corruption',
+    r.broke && r.broke.dead === true && r.broke.shock > 0,
+    `a load with 40 health died on the turret and spiked to `
+    + `${r.broke && r.broke.shock} (it used to spike to 0, because the physics `
+    + `kills it before the contact loop looks)`);
+
+  check('...and being wrecked is still not a grip: it lands, and it is gone',
+    r.broke && r.broke.inSet === false && r.tough && r.tough.shock > 0
+    && r.tough.inSet === true,
+    `wrecked: in the attacker set ${r.broke && r.broke.inSet}; intact: `
+    + `${r.tough && r.tough.inSet}, spike ${r.tough && r.tough.shock} `
+    + `(a dead body in that set is one nothing ever releases)`);
 }
 
 // --- report -----------------------------------------------------------------

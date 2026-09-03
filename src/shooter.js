@@ -275,7 +275,102 @@ export class Front {
  * is weaker, and what comes off it has to be weaker too, or piercing deep
  * would be a way of making the round stronger.
  */
-function sliverOn(world, e, x, y, p) {
+/**
+ * Where a round comes OUT of the body it just went into.
+ *
+ * The hit hands over a point on the NEAR face, and only one component of the
+ * contact means anything: `c.b`, the impact parameter -- the perpendicular
+ * distance from the body's centre to the round's own line, which is the same
+ * for every point on that line and so cannot be corrupted by the clamp the hit
+ * point suffers (see physics.contactAt). Everything here is derived from it.
+ *
+ * The closest point on the line to the centre is `centre + perp * b`; the
+ * chord's half-length on the body's own radius is `sqrt(r^2 - b^2)`. Clamped
+ * at zero because |b| runs up to `e.r + p.r` -- the hit test is against the
+ * sum -- so a graze legitimately has no chord at all, and an unclamped sqrt
+ * goes NaN on it and loses the fragments for the rest of the run without
+ * throwing.
+ */
+function exitPoint(e, p, c, dirx, diry) {
+  const r = e.r || 1;
+  const b = c ? c.b : 0;
+  const half = Math.sqrt(Math.max(0, r * r - b * b));
+  return {
+    x: e.x + -diry * b + dirx * half,
+    y: e.y + dirx * b + diry * half,
+  };
+}
+
+/**
+ * SPINE, on the way out of a body: a fan of splinters, and SLIVER's cascade.
+ *
+ * Two separate things sharing one hook because they happen at the same moment
+ * and off the same geometry, and they are worth telling apart:
+ *
+ *   SHATTER is what every SPINE does, bought or not, at the exit of every body
+ *   it pierces -- three splinters across 86 degrees, short-lived, piercing
+ *   nothing and shedding nothing. It is the area effect, and it is bounded by
+ *   `pierce`: four bodies, four fans, twelve splinters, whatever the tree says.
+ *
+ *   SLIVER is what the node buys: the round proper comes apart into piercing
+ *   fragments that carry on down the line, once, with the budget passing down
+ *   so the second level is three becoming nine and stops there.
+ *
+ * Both now spawn at the FAR face. They used to spawn at the contact point,
+ * which is the near one, so a fan opened backwards across ground the round had
+ * already crossed -- and at SLIVER 2 the ring and the three grandchildren were
+ * drawn at the entry face rather than out the far side, which is the report
+ * the `ignoreT` crossing-time below was written to answer. With the spawn at
+ * the exit the cover is a formality rather than the load-bearing part.
+ */
+function shatterOn(world, e, x, y, p, c) {
+  if (!p) return;
+  const sp0 = Math.hypot(p.vx, p.vy) || 1;
+  const dirx = p.vx / sp0;
+  const diry = p.vy / sp0;
+  const out = exitPoint(e, p, c, dirx, diry);
+  if (p.shatter) shatterFan(world, e, p, out, dirx, diry, sp0);
+  sliverOn(world, e, out.x, out.y, p, dirx, diry, sp0);
+}
+
+/** The splinters themselves: shrapnel out the far side, and nothing more. */
+function shatterFan(world, e, p, out, dirx, diry, sp) {
+  const S = CFG.rounds.spine.shatter;
+  const dmg = p.damage * S.damage;
+  if (dmg < 1) return;
+  const base = Math.atan2(diry, dirx);
+  for (let i = 0; i < S.n; i++) {
+    const off = S.n === 1 ? 0 : ((i / (S.n - 1)) - 0.5) * S.spread;
+    fire(world, out.x, out.y, base + off, {
+      speed: sp * S.speed,
+      r: S.r,
+      damage: dmg,
+      impulse: 10,
+      bounces: 0,
+      life: S.life,
+      color: '#ffb0e4',
+      core: '#ffffff',
+      trail: 0.04,
+      form: 'dart',
+      /*
+       * No `pierce`, no `onHit`, no `splits`, no `shatter`. A splinter that
+       * shed splinters is a cascade with the damage floor as its only bound,
+       * which is the failure SLIVER already had once and which `mineGrade`
+       * and the field cap would both feel on a phone.
+       *
+       * The outer members of an 86-degree fan can still be aimed back into
+       * the body they came out of, so they carry the same cover a SLIVER
+       * fragment does -- shorter, because they start on the surface and
+       * outside it rather than in the middle of the thing.
+       */
+      ignore: e,
+      ignoreT: (((e && e.r) || 1) + 4) / Math.max(1, sp * S.speed),
+    });
+  }
+  ring(out.x, out.y, 2, 20, 0.16, '#ffb0e4', 1.4);
+}
+
+function sliverOn(world, e, x, y, p, dirx, diry, sp) {
   if (!p || p.splits <= 0) return;
   /*
    * SPENT HERE, on the round that is coming apart.
@@ -296,8 +391,7 @@ function sliverOn(world, e, x, y, p) {
   p.splits = 0;
   const g = CFG.rounds.spine;
   const S = g.sliver;
-  const sp = Math.hypot(p.vx, p.vy) || 1;
-  const base = Math.atan2(p.vy, p.vx);
+  const base = Math.atan2(diry, dirx);
   const dmg = p.damage * S.damage;
   // Nothing worth drawing: a fragment of a fragment of a fragment is a
   // rounding error, and the field does not need the projectiles.
@@ -320,26 +414,23 @@ function sliverOn(world, e, x, y, p) {
       // One less than its parent had, so the second level is nine fragments
       // and not a cascade without an end.
       splits: left - 1,
-      onHit: sliverOn,
+      onHit: shatterOn,
       /*
-       * It must not split on the body it was BORN in. `fire` puts it at the
-       * contact point, inside the thing the parent was passing through, so
-       * without this every fragment would immediately hit that same body and
-       * come apart again on the frame it appeared.
+       * It must not come apart again on the body it was born on.
        *
-       * ...and the cover has to be a DISTANCE, which it was not. It was the
-       * flat 0.06s every `ignore` gets, and the contact point is on the
-       * body's near face -- `contactAt` puts it at `e.x + nx * e.r` -- so a
-       * fragment must cross a whole diameter to be clear of it. Measured, a
-       * BULWARK took three hits from one dart at SLIVER 1 and up to eight at
-       * SLIVER 2, each re-hit spending a pierce inside the body it was
-       * already in, and at level 2 the ring and the three grandchildren were
-       * drawn at the entry face rather than out the far side. The time here
-       * is the crossing, per body and per fragment speed, with a little over
-       * for the fan's off-axis members.
+       * This used to be the load-bearing fix and is now a formality, which is
+       * worth writing down because the number changed with it. `fire` put the
+       * fragment at the CONTACT point -- the near face, `e.x + nx * e.r` --
+       * so it was born inside the thing its parent was passing through and
+       * had to cross a whole diameter to be clear: measured, a BULWARK took
+       * three hits from one dart at SLIVER 1 and up to eight at SLIVER 2,
+       * each re-hit spending a pierce inside the body it was already in. Born
+       * at the EXIT face from build 223, a fragment on the parent's bearing is
+       * already leaving, and only the off-axis members of the fan have
+       * anything to clear at all -- one radius rather than two.
        */
       ignore: e,
-      ignoreT: (2 * ((e && e.r) || 1) + 4) / Math.max(1, sp * S.speed),
+      ignoreT: (((e && e.r) || 1) + 4) / Math.max(1, sp * S.speed),
     });
   }
   // The moment it comes apart, drawn where it happened.
@@ -684,7 +775,11 @@ export class Shooter {
             pierceFade: up.spineFade || g.fade,
             shred: up.spineShred,
             splits: up.spineSplit,
-            onHit: sliverOn,
+            // The round proper sheds a fan out the far side of everything it
+            // pierces; SLIVER's cascade above is on top of that and is what
+            // the node buys. See CFG.rounds.spine.shatter.
+            shatter: true,
+            onHit: shatterOn,
           });
         }
       }

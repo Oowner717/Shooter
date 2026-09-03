@@ -270,9 +270,27 @@ class Mine {
   }
 }
 
-/** Somewhere in the open field, clear of the top edge and of the turret itself. */
+/**
+ * Somewhere in the open field, clear of the turret and well clear of the top.
+ *
+ * `M.keepTop` of the field is off limits, and that is the whole change here
+ * from build 223: the buffer was a flat 70 units off `ENTRY_Y`, which on a
+ * field about 630 units deep is a ninth of it, so a mine could land more or
+ * less on the line objects come in on. Two things are wrong with that and both
+ * are about the mine being wasted rather than about it being unfair. A mine has
+ * `flight` and then `arm` before it can do anything -- 1.25 to 1.7 seconds
+ * depending on the kind -- so one thrown at the entry line spends its settling
+ * time where the wave has not arrived yet and then triggers on the first thing
+ * to cross, which is the leading body of a wave that has not gathered. And a
+ * KNELL or a SNARE put down there does its work above the top of what is
+ * coming, on nothing.
+ *
+ * A fifth of the field, measured off the field's own depth rather than as a
+ * constant, so it stays a fifth on every screen the game is played at.
+ */
 function landingSite(world) {
-  const top = ENTRY_Y + 70;
+  const deep = Math.max(1, world.floorY - ENTRY_Y);
+  const top = ENTRY_Y + deep * M.keepTop;
   const bottom = world.shooter.y - 130;
   return {
     x: rand(60, world.width - 60),

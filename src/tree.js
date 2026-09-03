@@ -189,6 +189,33 @@ function node(o) {
  * is the collision that matters.
  */
 const ROOT_TONE = { turret: '#59e0ff', ammo: '#ff5d8f', mines: '#ffb347', abilities: '#c9a7ff', anomaly: BOSS_TONE[0] };
+
+/*
+ * ---- and one register for the three ALL-X groups ----
+ *
+ * A group wore its CATEGORY's tone, and `Menu.toneOf` walks up to the nearest
+ * one -- so every upgrade under ALL MINES came out `#ffb347`, which is BLAST's
+ * `#ffb247` to within one unit of green. Measured in CIELAB: **dE 0.6**. Not
+ * "similar", the same colour. So the eight rows that apply to every mine you
+ * lay were indistinguishable from the eight that apply only to the first one
+ * in the branch, and ALL ROUNDS had a milder case of it against HE.
+ *
+ * The fix is not another hue, because there is no hue left: cyan, azure,
+ * mint, teal, periwinkle, violet, magenta, rose, red, amber, gold and three
+ * greens are all spoken for by an arm, an ability or a root, and the suite's
+ * own floor for two things that must be told apart is dE 25. So this takes
+ * the one register nothing else uses -- a warm unsaturated bone, against a
+ * palette that is otherwise entirely saturated colour plus two COLD neutrals
+ * (SLUG's steel, WARD's white). Nearest neighbour dE 34.1.
+ *
+ * Shared by all three deliberately. The axis being drawn is not "which
+ * category" -- the heading above already says that -- it is "this applies to
+ * everything you have, not to the thing beside it", and that is one idea and
+ * should look like one. `.shopCard.univ` in styles.css carries it structurally
+ * as well, because a rule that lives only in a hue is a rule a colourblind
+ * player does not get.
+ */
+const GROUP_TONE = '#d7c49a';
 const ROOT_NAME = { turret: 'TURRET', ammo: 'AMMUNITION', mines: 'MINES', abilities: 'ABILITIES', anomaly: 'ANOMALY' };
 const ROOT_LINE = {
   turret: 'The machine itself. Everything here is yours from the first frame.',
@@ -275,8 +302,8 @@ function commons(root) {
   const g = GROUP[root];
   if (!g || !kids.length) return kids;
   return [node({
-    kind: 'group', key: `${root}_all`, free: true,
-    name: g.name, line: g.line, tone: ROOT_TONE[root], children: kids,
+    kind: 'group', key: `${root}_all`, free: true, universal: true,
+    name: g.name, line: g.line, tone: GROUP_TONE, children: kids,
   })];
 }
 

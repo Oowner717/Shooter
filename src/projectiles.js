@@ -68,6 +68,16 @@ class Projectile {
      * declared where they are.
      */
     this.splits = opts.splits ?? 0;
+    /*
+     * SPINE: this round sheds a fan of splinters on the way OUT of every body
+     * it passes through. Distinct from `splits` above, which is SLIVER's
+     * cascade budget and belongs to the round proper -- the splinters are
+     * shrapnel and shed nothing themselves, so a SPINE's total is bounded by
+     * how many bodies it can pierce and cannot run away with the levels.
+     * Declared here for the same reason `splits` is: so a recycled projectile
+     * cannot inherit one.
+     */
+    this.shatter = !!opts.shatter;
     this.dead = false;
     /*
      * A body this round may not hit. Normally set by a pierce or a bounce on
@@ -481,10 +491,18 @@ function resolveSegment(world, p, ax, ay, bx, by) {
         for (let i = 0; i < 4; i++) spark(c.x, c.y, spread(220), spread(220), '#e0aaff', 0.22, 2.2);
         return;
       }
-      // The round itself goes to the hook as well as the body it hit: SLIVER
-      // needs to know which way this one was travelling, how much damage it
-      // had left, and how many more times it may come apart.
-      if (p.onHit) p.onHit(world, e, c.x, c.y, p);
+      /*
+       * The round itself goes to the hook as well as the body it hit: SLIVER
+       * needs to know which way this one was travelling, how much damage it
+       * had left, and how many more times it may come apart.
+       *
+       * ...and `c` with it, from build 223. SPINE's splinters come off the FAR
+       * side of the body, and the exit point is not in the hit: `c.x, c.y` is
+       * on the near face. Only `c.b` -- the impact parameter, the one
+       * component of the contact that is exact (see physics.contactAt) -- can
+       * give you the chord, and therefore where the round comes out.
+       */
+      if (p.onHit) p.onHit(world, e, c.x, c.y, p, c);
       if (p.chain) chainFrom(world, e, c.x, c.y, p.jumps);
       audio.hit();
       // A piercing round carries on out the other side, weaker, ignoring what

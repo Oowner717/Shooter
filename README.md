@@ -341,7 +341,15 @@ a second from 7.6 to 25.9 across one tier of income.
   devastating up close and useless at anything else.
 - **SPINE** does not stop at the first thing. No chaining and no repeating: it
   carries straight out the far side, a little weaker each time. Measured
-  through a column of three at 13, 10 and 8.
+  through a column of three at 13, 10 and 8. **And it shatters as it leaves**:
+  three splinters fan out of the far face of every body it gets through, so a
+  dart into a crowd is a dart plus a spray per exit — an area round rather
+  than a line one. Out of the *far* side, which is the whole of it: a fan at
+  the point of impact opens backwards across ground the round already crossed.
+  The splinters shed nothing themselves, so the ceiling is four bodies and
+  twelve splinters whatever the tree says; **SLIVER** buys the cascade on top,
+  the round proper coming apart into piercing fragments that carry on down the
+  line.
 - **SLUG** hits harder than anything else per shot and moves what it hits a very
   long way — measured at 44 damage and 100-plus units of travel on one shot. It
   used to do 14, on the theory that the damage would come from whatever you

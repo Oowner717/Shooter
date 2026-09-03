@@ -1800,12 +1800,30 @@ export class Game {
       w.attackers.delete(e);
     }
     for (const e of w.enemies) {
-      if (e.dead || e.attacking || e.harmless || e.fizzle > 0) continue;
+      /*
+       * ---- a load that breaks itself on you still landed on you ----
+       *
+       * The `dead` guard used to cover this whole loop, and the physics runs
+       * BEFORE it: the pair solver bills `impactDamage` to both sides, so a
+       * MASS arriving at 620 with 280 health routinely destroys itself on the
+       * turret inside the same frame it arrives, and by the time this ran it
+       * was already `dead` and skipped. So the corruption spike -- the entire
+       * reason a hurled MASS is a different event from something walking into
+       * you -- fired only when the load SURVIVED the impact. The harder it hit
+       * you, the less likely it was to register: measured over eight releases,
+       * four of them landed at 52 units against a 55-unit band, died on the
+       * frame they arrived, and did nothing at all.
+       *
+       * A body that is dead is still exempt from everything else here. It
+       * cannot become an attacker -- there is nothing left to grip you, and a
+       * dead body in `world.attackers` is a set entry nothing will ever
+       * release, which is the leak build 210 fixed. It gets the spike it
+       * earned and nothing more.
+       */
+      const landing = !!e.hurled && !e.harmless && !e.fizzle;
+      if ((e.dead && !landing) || e.attacking || e.harmless || e.fizzle > 0) continue;
       const rr = e.r + s.r + 2;
       if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= rr * rr) {
-        e.attacking = true;
-        w.attackers.add(e);
-        audio.glitchOn();
         /*
          * A MASS that was thrown at you is not the same event as something
          * walking into you. It lands as a spike of corruption in its own
@@ -1822,6 +1840,12 @@ export class Game {
         } else {
           shake(7);
         }
+        // ...and that is all a wrecked one gets: no grip, and no entry in a
+        // set that only live bodies are ever released from.
+        if (e.dead) continue;
+        e.attacking = true;
+        w.attackers.add(e);
+        audio.glitchOn();
         ring(s.x, s.y, 10, 120, 0.3, '#ff2d55', 3);
       }
     }

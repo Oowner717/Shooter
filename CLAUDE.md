@@ -842,4 +842,51 @@ most once for any given target and cannot spin.
   on the digit counts of three numbers and had NO caller for the kill count,
   having been re-run by accident all this time through the sibling that was
   just deleted.
+- **A `dead` guard written for one branch covered the branch beside it.**
+  `checkContact` skipped `e.dead` for the whole loop, and physics runs before
+  it -- the pair solver bills `impactDamage` to both sides, so a MASS arriving
+  at 620 with 280 health routinely destroys itself on the turret inside the
+  frame it arrives and was already dead when the contact loop looked. The
+  corruption spike is the entire reason a thrown MASS is a different event from
+  something walking into you, and it fired only when the load SURVIVED: the
+  harder it hit you, the less likely it was to register. Measured, four of
+  eight releases landed at 52 units against a 55-unit band and did nothing.
+  The spike is exempt from the guard now; becoming an ATTACKER is not, because
+  a dead body in `world.attackers` is an entry nothing ever releases.
+- **...and the obvious fix for that was not the bug, which is why it was
+  reverted.** The first read said the contact test was a point test sampled
+  once a frame against a body moving 10.3 units a frame, so it was rewritten to
+  sweep the step the way `resolveSegment` sweeps a projectile. It took the
+  probe from 4/8 to 8/8 and was still wrong: a 620 u/s body cannot tunnel a
+  55-unit DISC -- it is inside for ten frames -- and the case written to prove
+  the tunnelling failed, reporting the body sampled inside every time. It only
+  helped by catching the load one frame earlier and thereby racing the death.
+  A fix that improves the number without the mechanism being real is a
+  coincidence; write the case that would fail if it were not.
+- **A case that fails one run in three can be two faults, and here it was.**
+  The death ordering above, and the case clearing half the field it said it was
+  clearing -- it emptied `enemies`, `effects` and `mines` under a comment about
+  needing a clean field, and left `drops`, `debris`, `projectiles` and a fully
+  bought `world.up` from the hundred cases that run before it. Fix the code
+  fault and the instrument fault separately, or neither is shown.
+- **Every saturated hue in this game is spoken for, so tell things apart by
+  REGISTER.** The tree's ALL MINES group wore `ROOT_TONE.mines` `#ffb347` and
+  BLAST wears `#ffb247`: **dE 0.6 in CIELAB**, which is not "similar", it is
+  the same colour, and `Menu.toneOf` walks up to the nearest tone so every row
+  under ALL MINES inherited it. Cyan, azure, mint, teal, periwinkle, violet,
+  magenta, rose, red, amber, gold and three greens are all taken by an arm, an
+  ability or a root, so the three ALL-X groups took the one register left -- a
+  warm unsaturated bone against a palette of saturated colour plus two COLD
+  neutrals -- and a `.univ` class carries the same distinction structurally,
+  because a rule that lives only in a hue is one a colourblind player never
+  receives. Measure hex pairs in Lab; two strings that look different in a
+  diff can be the same colour on a screen.
+- **A fan spawned at the point of impact opens BACKWARDS.** `contactAt` hands
+  over a point on the NEAR face (`e.x + nx * e.r`), so SLIVER's arc was
+  created in the space the round had already crossed and covered nothing new.
+  The exit is not in the hit and has to be derived: the closest point on the
+  round's line to the centre is `centre + perp * b`, and the chord's half
+  length is `sqrt(r^2 - b^2)` -- clamped at zero, because |b| runs up to
+  `e.r + p.r` and a graze legitimately has no chord. `b` is the only component
+  of the contact that is exact; see the build-211 note above.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

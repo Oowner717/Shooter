@@ -3437,6 +3437,36 @@ body.booting #quickBar {
   border-bottom: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
 }
 
+/*
+ * ---- the rows that apply to EVERYTHING, in a second channel ----
+ *
+ * `--tone` already separates them: the three ALL-X groups wear a warm bone
+ * (GROUP_TONE in tree.js) where every arm wears its own saturated hue, which
+ * is the fix for ALL MINES having been BLAST's colour to within dE 0.6.
+ *
+ * This is the same statement made structurally, because a distinction carried
+ * only in a hue is one a colourblind player does not receive -- and because
+ * these rows sit in the same grid as the arm rows they are meant to be told
+ * apart from. A universal card carries a second inset edge, so it reads as a
+ * card with something around it rather than as a card of a different colour;
+ * the heading over them repeats the same doubling as a rule under a rule.
+ *
+ * `inset` rather than a real border so the box model is untouched -- these
+ * cards sit in a grid with the arm cards and must not be a pixel wider.
+ */
+.shopCard.univ {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--tone, #d7c49a) 26%, transparent),
+    inset 0 0 0 4px rgba(6, 12, 22, 0.86),
+    inset 0 0 0 5px color-mix(in srgb, var(--tone, #d7c49a) 42%, transparent),
+    0 0 16px -4px color-mix(in srgb, var(--tone, #d7c49a) 42%, transparent);
+}
+
+.grpLab.univ {
+  border-bottom-style: double;
+  border-bottom-width: 4px;
+}
+
 /* ------------------------------------------------- the card's other states */
 
 /*
