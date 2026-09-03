@@ -308,6 +308,18 @@ most once for any given target and cannot spin.
   duplicated once in `index.html` and guarded by `scripts/check-build.mjs`.
 - A new module must be added to the `ASSETS` list in `sw.js` or the game breaks
   offline. `check-build.mjs` fails if one is missing.
+- **The menu is two menus in one sheet from build 226.** ARSENAL (AMMO,
+  MINES, UPGRADES, ULTIMATE) and SYSTEM (OBJECTS, SETTINGS); `GROUPS` in
+  menu.js is the whole definition. The loadout sheet (`#loadout`, `#loadScrim`,
+  `body.loadoutOpen`, `Hud.showLoadout/hideLoadout`) is gone -- it is the
+  first two tabs, with one set of slots/list/door per group (`#loadSlots_ammo`
+  etc.) and `Game.loadoutOpen` is a getter off the menu. Doors: hamburger ->
+  SYSTEM, energy chip -> UPGRADES, the strip's AMMO/MINES -> that tab,
+  `Menu.openTab(id)` for all of them; `openTo(branch)` is still the tree-branch
+  jump. The panel swipes sideways through all six (`swipeTabs` in swipe.js,
+  bound on `#menuPanels` so the sheet's own down-swipe never sees it) and
+  crosses menus at the edge. ULTIMATE is `sealed` on purpose: a locked tab
+  that looks locked, with a room that says so.
 - Play-screen controls bind on `pointerdown`, not `click`, so a tap registers
   when the thumb lands. Tests must dispatch `pointerdown` to press them.
 - A regress case that stubs `world.director.update` MUST put it back. `reset()`
@@ -487,14 +499,21 @@ most once for any given target and cannot spin.
   each body within `--slack` (80 units) of where it was put and never touches
   its velocity. A probe that immobilises what it measures has changed the
   thing it is measuring.
-- **"ORDINAL can be fought on the assists alone" is the one case known to be
-  flaky and not yet diagnosed.** It failed twice in build 220's session and
-  passed on an immediate re-run both times, with nothing changed between them
-  -- the failing runs report reaching stages 1+2 in the 85s cap with the outer
-  frame at 0.08. Everything else in this file about flakes is a case that was
-  measured at the wrong moment or against the wrong margin, and this one has
-  not been shown to be either. If it fails, re-run before believing it, and if
-  you have the budget, find out which.
+- **Two flakes were run down in build 226, and both were the TOW case's
+  disease from 223.** "ORDINAL can be fought on the assists alone" passed 14
+  of 14 in isolation and failed about one run in fifteen in the suite: it
+  called `restart()` and assumed that was a clean world, and a hundred cases
+  run before it. Its setup now sets the round, the tree, the aim mode, the
+  time scale and every field list explicitly. "EBB sends the wreckage the
+  other way" opened its window on the frame of the body's death and measured
+  the EXPLOSION -- wreckage leaves at 70-240 u/s in every direction -- so the
+  untraited baseline read 741 -> 744, three units OUT on motes whose whole
+  job is to come in. It waits three quarters of a second for the throw to
+  spend itself now. The rule both share: **a case that fails one run in N and
+  passes alone is inheriting state, and `restart()` is not a reset of
+  everything a case can leave behind.** Set what the question depends on.
+  The third flicker, "the debris is thrown along lobes", is a randomised
+  burst pattern and has not been run down.
 - **A flaky case is a case measured at the wrong moment or against the wrong
   margin, and both showed up in one sitting.** "A body under sustained fire
   still closes" gave a LURCHER 26s to arrive when it takes 16-17s quiet and

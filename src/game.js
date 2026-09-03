@@ -447,7 +447,6 @@ export class Game {
     w.earned = 0;
     w.up = freshUpgrades();
     w.ledger.length = 0;
-    this.loadoutOpen = null;
     // Never survives a restart: a held state whose opener is gone is a paused
     // world with no visible way out.
     this.sheetOpen = false;
@@ -799,9 +798,19 @@ export class Game {
 
   /** The simulation holds while the menu is open, so a change costs nothing. */
   get paused() {
-    return !!this.loadoutOpen
-      || !!this.sheetOpen
+    return !!this.sheetOpen
       || !!(this.hud && this.hud.menu && this.hud.menu.open);
+  }
+
+  /**
+   * Which loadout group is up, or null. Derived from the menu since build 226
+   * -- the loadout is its AMMO and MINES tabs -- rather than held here, so
+   * there is one open-state for the sheet and not two that have to agree.
+   */
+  get loadoutOpen() {
+    const m = this.hud && this.hud.menu;
+    if (!m || !m.open) return null;
+    return m.tab === 'ammo' || m.tab === 'mines' ? m.tab : null;
   }
 
   /**
@@ -1081,14 +1090,13 @@ export class Game {
     return true;
   }
 
+  /** The strip's AMMO and MINES buttons: that tab of the menu. */
   openLoadout(group) {
-    this.loadoutOpen = group;
-    this.hud.showLoadout(this.world, group);
+    if (this.hud && this.hud.menu) this.hud.menu.openTab(group === 'mines' ? 'mines' : 'ammo');
   }
 
   closeLoadout() {
-    this.loadoutOpen = null;
-    this.hud.hideLoadout();
+    if (this.loadoutOpen && this.hud && this.hud.menu) this.hud.menu.setOpen(false);
   }
 
   toggleAuto(key) {

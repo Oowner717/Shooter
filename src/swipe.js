@@ -166,3 +166,85 @@ export function swipeToDismiss(el, {
   // from somewhere else mid-gesture.
   return clear;
 }
+
+
+/**
+ * Swipe SIDEWAYS through a set of tabs, on a panel that scrolls up and down.
+ *
+ * Same discipline as `swipeToDismiss`, one axis over: nothing is claimed until
+ * the pointer has moved `slop` along x with less movement along y, and never
+ * if something between the target and `el` can still scroll sideways the way
+ * the content would have to travel -- `#loadSlots` is a flex row and does not,
+ * but a wide table under OBJECTS would, and it must keep its own drag. The
+ * vertical scroller is untouched by construction: a drag that is more up-down
+ * than side-to-side is refused on the second pointermove and the browser has
+ * the pan.
+ *
+ * The panel peeks a little as it is pulled so the gesture reads before it
+ * commits, and is put back on every exit -- the leaked-inline-transform trap
+ * `swipeToDismiss` documents is the same trap here.
+ *
+ * @param onPrev  a swipe to the RIGHT: the tab before this one comes in
+ * @param onNext  a swipe to the LEFT: the tab after it
+ */
+export function swipeTabs(el, { onPrev, onNext, threshold = 56, slop = 12, peek = 0.28 } = {}) {
+  if (!el || !onPrev || !onNext) return () => {};
+  let id = null;
+  let x0 = 0;
+  let y0 = 0;
+  let t0 = 0;
+  let live = false;
+
+  const clear = () => {
+    id = null;
+    live = false;
+    el.style.transform = '';
+    el.classList.remove('swiping');
+  };
+  const down = (ev) => {
+    if (id !== null) return;
+    id = ev.pointerId;
+    x0 = ev.clientX;
+    y0 = ev.clientY;
+    t0 = performance.now();
+    live = false;
+  };
+  const move = (ev) => {
+    if (ev.pointerId !== id) return;
+    const dx = ev.clientX - x0;
+    const dy = ev.clientY - y0;
+    if (!live) {
+      if (Math.abs(dx) < slop) return;
+      if (Math.abs(dy) > Math.abs(dx)) { id = null; return; }
+      if (canScroll(ev.target, el, 'x', dx > 0 ? 1 : -1)) { id = null; return; }
+      live = true;
+      el.classList.add('swiping');
+      try { el.setPointerCapture(ev.pointerId); } catch { /* already gone */ }
+    }
+    el.style.transform = `translateX(${dx * peek}px)`;
+    ev.preventDefault();
+  };
+  const up = (ev) => {
+    if (ev.pointerId !== id) return;
+    const dx = ev.clientX - x0;
+    const speed = Math.abs(dx) / Math.max(1, performance.now() - t0);
+    // The same rule as a dismiss: a flick still has to have gone somewhere.
+    const go = live && (Math.abs(dx) > threshold || (speed > 0.5 && Math.abs(dx) > threshold * 0.75));
+    const was = live;
+    clear();
+    if (!go) return;
+    if (was) {
+      const eat = (e) => { e.stopPropagation(); e.preventDefault(); };
+      el.addEventListener('click', eat, { capture: true, once: true });
+      setTimeout(() => el.removeEventListener('click', eat, { capture: true }), 0);
+    }
+    if (dx > 0) onPrev(); else onNext();
+  };
+
+  el.addEventListener('pointerdown', down);
+  el.addEventListener('pointermove', move, { passive: false });
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', clear);
+  el.addEventListener('lostpointercapture', clear);
+  return clear;
+}

@@ -10,6 +10,7 @@
 import { CODEX, FIELD_ENTRIES, ANOMALY_ENTRIES, codex } from './codex.js';
 import { CONTROLS } from './narrative.js';
 import { ARSENAL, ARSENAL_GROUPS, specRows } from './arsenal.js';
+import { SLOTS } from './loadout.js';
 
 /** Every arm, by the key the tree calls it — BOLT is `standard` in here. */
 const ARM_BY_KEY = new Map(ARSENAL.map((a) => [a.key === 'standard' ? 'bolt' : a.key, a]));
@@ -17,7 +18,7 @@ import { ABILITIES } from './abilities.js';
 import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
 import { BUILD, REV } from './config.js';
-import { swipeToDismiss } from './swipe.js';
+import { swipeToDismiss, swipeTabs } from './swipe.js';
 import { TREE, NODES, priceOf } from './tree.js';
 import { svgMark } from './util.js';
 
@@ -55,6 +56,16 @@ const bm = (body) => svgMark(body, 1.8);
 /** What an arm card says across its top. A round is not an upgrade to one. */
 const NEW_WORD = { ammo: 'ROUND', mines: 'MINE', abilities: 'ABILITY' };
 
+/** A padlock, for the sealed tab and its room. */
+const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">'
+  + '<rect x="5.5" y="10.5" width="13" height="10"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/>'
+  + '<circle cx="12" cy="15.5" r="1.3" fill="currentColor" stroke="none"/></svg>';
+/** The tree, for the door at the foot of a loadout tab. */
+const TREE_MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" '
+  + 'stroke-linecap="square"><path d="M12 21V9M12 9 5 4M12 9l7-5"/>'
+  + '<circle cx="12" cy="22" r="1.4" fill="currentColor" stroke="none"/>'
+  + '<circle cx="4.4" cy="3.2" r="1.6"/><circle cx="19.6" cy="3.2" r="1.6"/></svg>';
+
 const BRANCH_MARK = {
   turret: bm('<path d="M12 21V9"/><path d="M9 12 12 8.6 15 12"/><path d="M4.6 18.6 12 21l7.4-2.4"/>'),
   ammo: bm('<circle cx="12" cy="7" r="2.8" fill="currentColor" stroke="none"/><path d="M12 21V12"/><path d="M8.6 15.5h6.8" opacity=".6"/>'),
@@ -73,25 +84,46 @@ const RIG_LEVELS = NODES
   .reduce((a2, n) => a2 + (n.levels || 1), 0);
 
 /*
- * Three, not four. ARSENAL was a second screen describing the same rounds and
- * mines the tree sells — you read the specs on one tab and bought them on
- * another, and the tab you bought on said less about them than the tab you
- * did not. The tree carries the arsenal's own rows now: its art, its label and
- * its DMG/FX pair, with the price on the end. What is left of ARSENAL is the
- * two that run on their own, which are not bought and so belong under the
- * tree rather than in it.
+ * Two menus in one sheet, from build 226.
+ *
+ * ARSENAL is everything you do to the machine: which rounds are on the strip,
+ * which mines, the tree that sells the rest, and a sealed room above the tree
+ * for what comes later. SYSTEM is everything that is not a decision -- what
+ * the objects are, and the settings. They were one flat row of three tabs
+ * (UPGRADES / OBJECTS / SYSTEM) plus a separate sheet for the loadout that
+ * the strip's AMMO and MINES buttons opened, so the four things a player
+ * touches most were in two different places with two different closes.
+ *
+ * The header switches menus; the row under it is the current menu's tabs;
+ * the panel swipes sideways through them and crosses into the other menu at
+ * the edge, so the whole thing is also one strip of six.
+ *
+ * ULTIMATE is a locked tab on purpose -- the room exists so the shape of the
+ * menu does not change when something goes in it, and so the player knows
+ * there is a tier above the tree before it opens. `sealed` keeps the tab
+ * visible but marks it, and its panel says so.
  */
-const TABS = [
-  { id: 'tree', label: 'UPGRADES' },
-  { id: 'codex', label: 'OBJECTS' },
-  { id: 'system', label: 'SYSTEM' },
+const GROUPS = [
+  { id: 'arsenal', label: 'ARSENAL', tabs: [
+    { id: 'ammo', label: 'AMMO' },
+    { id: 'mines', label: 'MINES' },
+    { id: 'tree', label: 'UPGRADES' },
+    { id: 'ultimate', label: 'ULTIMATE', sealed: true },
+  ] },
+  { id: 'system', label: 'SYSTEM', tabs: [
+    { id: 'codex', label: 'OBJECTS' },
+    { id: 'system', label: 'SETTINGS' },
+  ] },
 ];
+const TABS = GROUPS.flatMap((g) => g.tabs.map((t) => ({ ...t, group: g.id })));
+const TAB_BY_ID = new Map(TABS.map((t) => [t.id, t]));
 
 export class Menu {
   constructor(game) {
     this.game = game;
     this.el = {
       root: $('menu'),
+      groups: $('menuGroups'),
       tabs: $('menuTabs'),
       panels: $('menuPanels'),
       btn: $('menuBtn'),
@@ -105,12 +137,28 @@ export class Menu {
     this.lastFound = -1;
 
     this.buildTabs();
+    this.buildLoadout('ammo');
+    this.buildLoadout('mines');
     this.buildTree();
+    this.buildUltimate();
     this.buildCodex();
     this.buildSystem();
     this.show('tree');
+    // Sideways through the tabs. Bound on the scroller rather than the sheet
+    // so the dismiss below, which owns the vertical axis, never sees it.
+    swipeTabs(this.el.panels, {
+      onPrev: () => this.step(-1),
+      onNext: () => this.step(1),
+    });
 
-    this.el.btn.addEventListener('click', () => this.toggle());
+    // The hamburger is the SYSTEM door: OBJECTS and SETTINGS. ARSENAL has
+    // three doors of its own on the field -- the energy chip and the strip's
+    // AMMO and MINES buttons -- so the one button that is not about a
+    // decision opens the menu that is not about one.
+    this.el.btn.addEventListener('click', () => {
+      if (this.open) { this.setOpen(false); return; }
+      this.openTab(this.group() === 'system' ? this.tab : 'codex');
+    });
     this.el.close.addEventListener('click', () => this.setOpen(false));
     this.el.scrim.addEventListener('click', () => this.setOpen(false));
     // Down: the sheet enters from below and that is the way it goes back. Its
@@ -150,30 +198,135 @@ export class Menu {
   }
 
   buildTabs() {
-    const frag = document.createDocumentFragment();
+    const gf = document.createDocumentFragment();
+    for (const g of GROUPS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'menuGroup';
+      b.dataset.group = g.id;
+      b.textContent = g.label;
+      // Into the group on the tab it was last on, so switching back and
+      // forth does not lose your place.
+      b.addEventListener('click', () => this.show(this.last[g.id] || g.tabs[0].id));
+      gf.appendChild(b);
+    }
+    this.el.groups.appendChild(gf);
+    this.last = {};
+
+    const tf = document.createDocumentFragment();
     for (const t of TABS) {
       const b = document.createElement('button');
-      b.className = 'menuTab';
+      b.type = 'button';
+      b.className = `menuTab${t.sealed ? ' sealed' : ''}`;
       b.dataset.tab = t.id;
-      b.textContent = t.label;
+      b.dataset.group = t.group;
+      b.innerHTML = t.sealed
+        ? `<span class="tabLock" aria-hidden="true">${LOCK}</span>${t.label}`
+        : t.label;
       b.addEventListener('click', () => this.show(t.id));
-      frag.appendChild(b);
+      tf.appendChild(b);
     }
-    this.el.tabs.appendChild(frag);
+    this.el.tabs.appendChild(tf);
+  }
+
+  /** Which menu the current tab belongs to. */
+  group() {
+    const t = TAB_BY_ID.get(this.tab);
+    return t ? t.group : GROUPS[0].id;
+  }
+
+  /** The tab `n` places along the strip of six, wrapping at neither end. */
+  step(n) {
+    const i = TABS.findIndex((t) => t.id === this.tab);
+    const j = Math.max(0, Math.min(TABS.length - 1, i + n));
+    if (j !== i) this.show(TABS[j].id);
+    return this.tab;
+  }
+
+  /** Open the sheet on a tab: the one call every door on the field makes. */
+  openTab(tab) {
+    if (!TAB_BY_ID.has(tab)) return false;
+    this.setOpen(true);
+    this.show(tab);
+    return true;
   }
 
   show(tab) {
+    if (!TAB_BY_ID.has(tab)) tab = 'tree';
     this.tab = tab;
+    const group = this.group();
+    this.last[group] = tab;
     // Same rule as the sheet: leaving this tab abandons whatever was armed.
     this.armRow(null);
-    for (const b of this.el.tabs.children) b.classList.toggle('on', b.dataset.tab === tab);
+    for (const b of this.el.groups.children) b.classList.toggle('on', b.dataset.group === group);
+    // Only this menu's tabs are in the row. The other menu's are hidden
+    // rather than removed, so the row is one element built once.
+    for (const b of this.el.tabs.children) {
+      b.hidden = b.dataset.group !== group;
+      b.classList.toggle('on', b.dataset.tab === tab);
+    }
     for (const p of this.el.panels.children) p.hidden = p.dataset.panel !== tab;
     // The panels share one scroller. Leaving the tree scrolled halfway and
     // switching to a short tab landed on its bottom edge, or on nothing.
     this.el.panels.scrollTop = 0;
     if (tab === 'codex') this.syncCodex();
     if (tab === 'tree') this.syncTree();
+    // The loadout tabs are filled by the HUD, which owns the strip they
+    // describe; it is told which group is up and does the rest.
+    if ((tab === 'ammo' || tab === 'mines') && this.game.hud) {
+      this.game.hud.showLoadoutPanel(this.game.world, tab);
+    }
     if (this.open && tab === 'tree') this.runHero(); else this.stopHero();
+  }
+
+  /*
+   * ---- the two loadout tabs ----
+   *
+   * The rows themselves are rendered by Hud.syncLoadoutSheet, which has owned
+   * that job since the loadout was a sheet of its own; what is built here is
+   * the room -- the slots, the list, and the door to the tree at the foot --
+   * one set per group, so AMMO and MINES keep their own scroll and their own
+   * door. The HUD is handed the elements by id, the way it always was.
+   */
+  buildLoadout(group) {
+    const p = this.panel(group, 'loadout');
+    const note = document.createElement('div');
+    note.className = 'loadNote';
+    note.textContent = `choose what sits on the strip · ${SLOTS[group]} slots`;
+    const slots = document.createElement('div');
+    slots.className = 'loadSlots';
+    slots.id = `loadSlots_${group}`;
+    const list = document.createElement('div');
+    list.className = 'loadList';
+    list.id = `loadList_${group}`;
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'loadMore';
+    more.id = `loadMore_${group}`;
+    more.innerHTML = `<span class="loadMoreIcon" aria-hidden="true">${TREE_MARK}</span>`
+      + '<span class="loadMoreBody"><span class="loadMoreName">UPGRADES</span>'
+      + '<span class="loadMoreLine"></span></span>'
+      + '<span class="loadMoreGo" aria-hidden="true">&#8250;</span>';
+    // The door: this group's own branch of the tree, not the top of it.
+    more.addEventListener('click', () => this.openTo(group));
+    p.append(note, slots, list, more);
+    return p;
+  }
+
+  /*
+   * ULTIMATE. Sealed, and the panel says so in the game's own voice rather
+   * than with an empty grid: a locked door that looks like a locked door is a
+   * promise, and an empty room is a bug report.
+   */
+  buildUltimate() {
+    const p = this.panel('ultimate', 'ultimate');
+    p.innerHTML = `<div class="sealedRoom">
+      <span class="sealedMark" aria-hidden="true">${LOCK}</span>
+      <span class="sealedName">SEALED</span>
+      <span class="sealedLine">A tier above the tree. Nothing here opens yet;
+      what goes in it is being built.</span>
+    </div>`;
+    return p;
   }
 
   panel(id, cls = '') {
@@ -824,6 +977,8 @@ export class Menu {
   openTo(key) {
     this.setOpen(true);
     this.show('tree');
+    // From a loadout tab this is a jump inside the same sheet now, not a
+    // sheet closing and another opening; the landing below is the same.
     /*
      * A branch, not a row. The callers ask for 'ammo' or 'mines' -- the
      * loadout sheet is where you find out a round is sealed and this is the

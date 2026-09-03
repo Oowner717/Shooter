@@ -189,6 +189,14 @@ strip, so the sheet carries the two records instead:
   has not been unlocked yet, but it is a reference: there is no second copy of
   a control in here.
 - **OBJECTS** — the glossary (below).
+
+**The menu is two menus in one sheet** (build 226). The header switches
+between **ARSENAL** — AMMO and MINES (which of what you own is on the strip),
+UPGRADES (the tree), and a sealed ULTIMATE tab for the tier above it — and
+**SYSTEM** — OBJECTS and SETTINGS. Swipe the panel sideways to move through
+the tabs, and it crosses menus at the edge; push the sheet down to close it.
+The hamburger opens SYSTEM; the energy chip and the strip's AMMO and MINES
+buttons open ARSENAL on the tab they name.
 - **SYSTEM** — sound, reset, the debug panel, the controls, and the build
   number.
 

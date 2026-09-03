@@ -257,7 +257,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const g = window.__sim;
     g.hud.menu.setOpen(true);
     const out = {};
-    for (const tab of ['system', 'codex', 'tree']) {
+    for (const tab of ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'system']) {
       g.hud.menu.show(tab);
       const shown = [...document.querySelectorAll('#menuPanels .menuPanel')]
         .filter((el) => getComputedStyle(el).display !== 'none')
@@ -312,7 +312,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * not a floor.
      */
     const panels = [];
-    for (const tab of ['tree', 'codex', 'system']) {
+    for (const tab of ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'system']) {
       g.hud.menu.show(tab);
       panels.push(document.querySelector(`[data-panel="${tab}"]`));
     }
@@ -1503,9 +1503,25 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const r = await page.evaluate(async () => {
     const g = window.__sim;
     const w = g.world;
+    const { freshUpgrades } = await import('../src/upgrades.js');
     g.restart();
+    /*
+     * Nothing inherited. This case failed about one run in fifteen and passed
+     * fourteen of fourteen in isolation, which is the TOW case's disease from
+     * build 223 over again: `restart` clears the field but a hundred cases
+     * run before this one, and what they leave on the world -- a round, a
+     * bought tree, an aim mode, a stubbed director, a time scale -- is not
+     * part of the question. Everything the assists' 85 seconds depend on is
+     * set here rather than assumed.
+     */
     w.phase = 'staging';
     for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    for (const e of w.effects) e.dead = true; w.effects.length = 0;
+    w.drops.length = 0; w.debris.length = 0; w.projectiles.length = 0; w.mines.length = 0;
+    w.up = freshUpgrades();
+    w.round = 'standard';
+    w.aimMode = 'field';
+    w.timeScale = 1; w.stasis = 0; w.decoy = null;
     w.director.timer = 1e9; w.director.driftTimer = 1e9;
     w.autoAim = true; w.autoFire = true;
     w.aperture = 1;
@@ -2839,9 +2855,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * a button: it went to 25% opacity and stayed fully live underneath.
      */
     const pe = () => getComputedStyle(document.getElementById('tgAutoFire')).pointerEvents;
-    g.hud.showLoadout(w, 'mines');
+    g.openLoadout('mines');
     const underSheet = pe();
-    g.hud.hideLoadout();
+    g.closeLoadout();
     g.hud.menu.setOpen(true);
     const underMenu = pe();
     g.hud.menu.setOpen(false);
@@ -6288,6 +6304,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * it sits 14px lower than it ever will and reads as hanging off the bottom
    * of the screen.
    */
+  /*
+   * The loadout is the AMMO and MINES tabs of the menu from build 226, and the
+   * door to the tree is at the foot of each tab's panel. It used to be pinned
+   * outside the sheet's scroller; the panel is inside the menu's now, so what
+   * is asserted is that the door is there, is this group's, is full width,
+   * and is the last thing in the panel -- and that pressing it lands on the
+   * branch, which is the half that matters.
+   */
   const read = async (group) => {
     await page.evaluate((g) => {
       window.__sim.debugGiveEnergy(4000);
@@ -6295,23 +6319,24 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       window.__sim.openLoadout(g);
     }, group);
     await page.waitForTimeout(320);
-    return page.evaluate(() => {
-      const bar = document.getElementById('loadMore');
-      const list = document.getElementById('loadList');
-      const sheet = document.getElementById('loadout').getBoundingClientRect();
+    return page.evaluate((g) => {
+      const m = window.__sim.hud.menu;
+      const bar = document.getElementById(`loadMore_${g}`);
+      const list = document.getElementById(`loadList_${g}`);
+      const panel = document.querySelector(`[data-panel="${g}"]`);
+      const pb = panel.getBoundingClientRect();
       const bb = bar.getBoundingClientRect();
       return {
+        tab: m.open && m.tab,
+        group: m.group(),
         name: bar.querySelector('.loadMoreName').textContent,
         line: bar.querySelector('.loadMoreLine').textContent,
-        // Outside the scroller and at the foot of the sheet: a door that
-        // scrolls away is a door most people never find.
         belowList: bb.top >= list.getBoundingClientRect().bottom - 1,
-        atFoot: Math.abs(sheet.bottom - bb.bottom) <= 2,
-        wide: bb.width >= sheet.width - 4,
-        onScreen: bb.bottom <= window.innerHeight + 1 && bb.top >= 0,
-        box: [Math.round(bb.top), Math.round(bb.bottom), Math.round(window.innerHeight)],
+        last: panel.lastElementChild === bar,
+        wide: bb.width >= pb.width - 4,
+        shown: getComputedStyle(panel).display !== 'none' && bb.height > 0,
       };
-    });
+    }, group);
   };
   const ammo = await read('ammo');
   // Press it: the sheet goes, the tree comes up standing on AMMUNITION. Every
@@ -6319,11 +6344,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // in cannot spoil it.
   const jump = await page.evaluate(() => {
     const g = window.__sim;
-    document.getElementById('loadMore').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document.getElementById('loadMore_ammo').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const landed = document.querySelector('.branchRow.landed');
     const head = document.querySelector('.menuPanel.tree .treeHead');
     return {
-      sheetShut: document.getElementById('loadout').hidden,
+      sheetShut: g.hud.menu.tab !== 'ammo',
       stillOpen: g.loadoutOpen,
       menu: g.hud.menu.open && g.hud.menu.tab,
       on: landed && landed.querySelector('.branchName').textContent,
@@ -6338,7 +6363,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const rest = await page.evaluate(() => {
     const g = window.__sim;
     const w = g.world;
-    document.getElementById('loadMore').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document.getElementById('loadMore_mines').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const second = document.querySelector('.branchRow.landed');
     const jump2 = { on: second && second.querySelector('.branchName').textContent,
       marks: document.querySelectorAll('.branchRow.landed').length };
@@ -6353,9 +6378,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return { jump2, parts, total: m.reachCount(w),
       sum: roots.reduce((a, k) => a + parts[k], 0), missing };
   });
-  check('the loadout sheet carries a bar to its own branch of the tree',
-    ammo.name === 'AMMUNITION UPGRADES' && mines.name === 'MINE UPGRADES'
-    && [ammo, mines].every((x) => x.belowList && x.atFoot && x.wide && x.onScreen),
+  check('each loadout tab carries a door to its own branch of the tree',
+    ammo.tab === 'ammo' && mines.tab === 'mines' && ammo.group === 'arsenal'
+    && ammo.name === 'AMMUNITION UPGRADES' && mines.name === 'MINE UPGRADES'
+    && [ammo, mines].every((x) => x.belowList && x.last && x.wide && x.shown),
     JSON.stringify({ ammo, mines }));
   check('pressing it closes the sheet and stands the tree on that branch',
     jump.sheetShut && jump.stillOpen === null && jump.menu === 'tree'
@@ -9466,9 +9492,22 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
        * started, which is a probe measuring its own omission.
        */
       d.update = () => {};                       // no new waves mid-measurement
-      for (let i = 0; i < 60; i++) g.update(1 / 60);
+      /*
+       * AFTER the burst, not through it. A body's wreckage leaves it at 70 to
+       * 240 u/s in every direction and the motes spend the best part of a
+       * second still flying outward on that throw, so a window that opens on
+       * the frame of death is measuring the explosion rather than the
+       * steering: the untraited baseline read 741 -> 744 on one run -- three
+       * units OUT, on motes whose whole job is to come in -- and the case
+       * failed on a working build. Three quarters of a second for the throw
+       * to spend itself, and then a second and a half of what this is about.
+       */
+      for (let i = 0; i < 45; i++) g.update(1 / 60);
+      const d0b = far();
+      for (let i = 0; i < 90; i++) g.update(1 / 60);
       const d1 = far();
-      return { n: motes.length, from: +d0.toFixed(0), to: d1 === null ? null : +d1.toFixed(0) };
+      return { n: motes.length, thrown: +d0.toFixed(0), from: d0b === null ? null : +d0b.toFixed(0),
+        to: d1 === null ? null : +d1.toFixed(0) };
     };
     const realUpdate = Object.getPrototypeOf(d).update;
     out.ebbPlain = drift(null);
@@ -9521,10 +9560,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `${r.tethered.pairs} of ${r.tethered.of} bodies paired; hurting one hurt the other `
     + `by the same amount: ${r.tethered.shared} (took ${r.tetherTries} hit(s) to land one)`);
   check('EBB sends the wreckage the other way',
-    r.directorRestored && r.ebb && r.ebbPlain
+    r.directorRestored && r.ebb && r.ebbPlain && r.ebb.from !== null && r.ebbPlain.from !== null
     && r.ebb.to > r.ebb.from && r.ebbPlain.to < r.ebbPlain.from,
-    `traited: ${r.ebb && `${r.ebb.from} -> ${r.ebb.to}`} units from the turret; `
-    + `untraited: ${r.ebbPlain && `${r.ebbPlain.from} -> ${r.ebbPlain.to}`}`);
+    `once the throw is spent -- traited: ${r.ebb && `${r.ebb.from} -> ${r.ebb.to}`} units `
+    + `from the turret; untraited: ${r.ebbPlain && `${r.ebbPlain.from} -> ${r.ebbPlain.to}`}`);
   check('a gate offers two lanes, and taking one fixes it for a stretch',
     r.offered && r.tookWrong === null && r.lane && r.lane.until === 12 + r.laneFor
     && r.offerCleared,
@@ -10263,7 +10302,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.hud.menu.setOpen(false);
 
     // ---- the loadout and the debug panel are bound too ----
-    out.bound = ['menu', 'loadout', 'waveSheet', 'aimModes', 'debugPanel']
+    out.bound = ['menu', 'waveSheet', 'aimModes', 'debugPanel']
       .filter((id) => !!document.getElementById(id));
     g.restart();
     return out;
@@ -10286,8 +10325,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.scrollable && r.scrollKeptOpen,
     `#menuPanels can scroll ${r.scrollable}; a drag starting inside it kept the `
     + `menu open ${r.scrollKeptOpen} (scrollTop ${r.scrollTop} of ${r.over})`);
-  check('all five overlays exist to be bound',
-    r.bound.length === 5, `found ${r.bound.join(', ')}`);
+  check('all four overlays exist to be bound',
+    r.bound.length === 4, `found ${r.bound.join(', ')} (the loadout is a menu tab from 226)`);
 }
 
 // --- the glitch timer: the only thing that takes a rung away -----------------
@@ -15455,6 +15494,195 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
     + `now written out, which has to be a refactor and nothing else)`);
+}
+
+/*
+ * ---- build 226: two menus in one sheet, and the doors onto them ----
+ *
+ * ARSENAL (AMMO, MINES, UPGRADES, ULTIMATE) and SYSTEM (OBJECTS, SETTINGS).
+ * The loadout sheet the strip's two buttons used to open is the first two
+ * tabs; the hamburger opens SYSTEM; the energy chip opens UPGRADES; the panel
+ * swipes sideways through the six and crosses menus at the edge; and ULTIMATE
+ * is sealed and says so. Each door is pressed the way a thumb presses it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const m = g.hud.menu;
+    const w = g.world;
+    const out = {};
+    const tap = (el) => {
+      el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, isPrimary: true }));
+      el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7, isPrimary: true }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    };
+    const state = () => ({ open: m.open, tab: m.tab, group: m.group(),
+      tabsShown: [...document.querySelectorAll('#menuTabs .menuTab')]
+        .filter((b) => getComputedStyle(b).display !== 'none').map((b) => b.dataset.tab),
+      paused: g.paused, loadout: g.loadoutOpen });
+    m.setOpen(false);
+
+    // ---- the four doors ----
+    tap(document.getElementById('menuBtn'));
+    out.hamburger = state();
+    m.setOpen(false);
+    tap(document.getElementById('energyChip'));
+    out.energy = state();
+    m.setOpen(false);
+    tap(document.getElementById('cfgAmmo'));
+    out.ammoBtn = state();
+    m.setOpen(false);
+    tap(document.getElementById('cfgMines'));
+    out.minesBtn = state();
+
+    // ---- the switch in the header, and it remembers the tab ----
+    m.openTab('mines');
+    tap(document.querySelector('.menuGroup[data-group="system"]'));
+    const toSystem = state();
+    tap(document.querySelector('.menuGroup[data-group="arsenal"]'));
+    const back = state();
+    out.switch = { toSystem, back };
+
+    // ---- sideways, across the whole strip ----
+    m.openTab('ammo');
+    const walk = [m.tab];
+    for (let i = 0; i < 7; i++) walk.push(m.step(1));
+    const walkBack = [];
+    for (let i = 0; i < 7; i++) walkBack.push(m.step(-1));
+    out.walk = walk; out.walkBack = walkBack;
+
+    // ---- a real sideways drag on the panel moves one tab, and a vertical
+    // one does not ----
+    const drag = (el, from, to, steps = 6) => {
+      const ev = (type, x, y) => el.dispatchEvent(new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerId: 9, isPrimary: true, clientX: x, clientY: y,
+      }));
+      ev('pointerdown', from.x, from.y);
+      for (let i = 1; i <= steps; i++) {
+        ev('pointermove', from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
+      }
+      ev('pointerup', to.x, to.y);
+    };
+    m.openTab('tree');
+    const panels = document.getElementById('menuPanels');
+    drag(panels, { x: 300, y: 400 }, { x: 120, y: 405 });
+    out.swipeLeft = { tab: m.tab, inline: panels.style.transform, open: m.open };
+    drag(panels, { x: 120, y: 400 }, { x: 300, y: 405 });
+    out.swipeRight = { tab: m.tab, open: m.open };
+    drag(panels, { x: 200, y: 300 }, { x: 205, y: 480 });
+    out.swipeDownOnPanel = { tab: m.tab, open: m.open };
+
+    // ---- ULTIMATE is sealed and the room says so ----
+    m.openTab('ultimate');
+    const room = document.querySelector('[data-panel="ultimate"] .sealedRoom');
+    const tabBtn = document.querySelector('.menuTab[data-tab="ultimate"]');
+    out.ultimate = { tab: m.tab, sealedTab: tabBtn.classList.contains('sealed'),
+      lockOnTab: !!tabBtn.querySelector('.tabLock svg'),
+      room: !!room && getComputedStyle(room).display !== 'none',
+      says: room ? room.textContent.replace(/\s+/g, ' ').trim().slice(0, 40) : '',
+      cards: document.querySelectorAll('[data-panel="ultimate"] .shopCard').length };
+
+    return out;
+  });
+
+  /*
+   * A tick between the gestures and the press, and it is load-bearing. Every
+   * live drag arms a one-shot capture-phase click eater on its element so a
+   * claimed swipe cannot also land as a tap on what is underneath, and clears
+   * it on `setTimeout(0)` -- which never runs inside one synchronous
+   * `evaluate`. Three synthetic drags above left three eaters armed, and the
+   * press below was swallowed at the capture phase on the way down to its
+   * row: "HE on the strip true, pressed: [...] -> [...]", identical either
+   * side, on a working build. A thumb never meets this because the browser
+   * ticks between gestures; the case has to tick too.
+   */
+  await page.waitForTimeout(20);
+  const r2 = await page.evaluate(async () => {
+    const g = window.__sim;
+    const m = g.hud.menu;
+    const w = g.world;
+    const out = {};
+    const tap = (el) => {
+      el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, isPrimary: true }));
+      el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7, isPrimary: true }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    };
+    const state = () => ({ open: m.open, tab: m.tab, group: m.group(), paused: g.paused,
+      loadout: g.loadoutOpen });
+
+    // ---- the loadout still works as a tab: a row toggles the strip ----
+    /*
+     * From a KNOWN strip. `restart` then `debugTeachAll` owns the rack and
+     * fills the five ammunition slots the same way every time, so the row to
+     * press is a name and not a search: HE is on the strip, is not the last
+     * round on it, and pressing it takes it off. Two earlier versions picked a
+     * row by class and picked one the strip had every right to refuse -- a
+     * fresh run has one row and it is the last round; a full strip makes
+     * every row not on it `stuck`. The strip is reported either side so a
+     * failure says what the press did rather than only that it did nothing.
+     */
+    g.restart();
+    g.debugTeachAll();
+    m.openTab('ammo');
+    const rows = document.querySelectorAll('#loadList_ammo .loadRow:not(.sealed)').length;
+    const target = document.getElementById('ldExplosive');
+    const before = [...w.loadout.ammo];
+    const wasOn = !!target && target.classList.contains('on');
+    if (target) tap(target);
+    const after = [...w.loadout.ammo];
+    out.loadout = { rows, wasOn, before: before.join(','), after: after.join(','),
+      changed: JSON.stringify(before) !== JSON.stringify(after),
+      slots: document.querySelectorAll('#loadSlots_ammo .loadSlot').length };
+    if (target) tap(target); // and put it back
+
+    m.setOpen(false);
+    out.closed = state();
+    return out;
+  });
+  Object.assign(r, r2);
+
+  check('the hamburger opens SYSTEM, and the three field doors open ARSENAL',
+    r.hamburger.open && r.hamburger.group === 'system' && r.hamburger.tab === 'codex'
+    && r.energy.open && r.energy.tab === 'tree' && r.energy.group === 'arsenal'
+    && r.ammoBtn.tab === 'ammo' && r.minesBtn.tab === 'mines'
+    && r.ammoBtn.loadout === 'ammo' && r.minesBtn.loadout === 'mines'
+    && r.hamburger.paused && r.ammoBtn.paused,
+    `hamburger -> ${r.hamburger.group}/${r.hamburger.tab}, energy -> ${r.energy.tab}, `
+    + `AMMO -> ${r.ammoBtn.tab}, MINES -> ${r.minesBtn.tab}; the world holds under all of them`);
+
+  check('...and only the open menu-s tabs are in the row',
+    JSON.stringify(r.hamburger.tabsShown) === '["codex","system"]'
+    && JSON.stringify(r.energy.tabsShown) === '["ammo","mines","tree","ultimate"]',
+    `SYSTEM shows ${r.hamburger.tabsShown.join('/')}, ARSENAL shows ${r.energy.tabsShown.join('/')}`);
+
+  check('the switch in the header crosses menus and remembers where you were',
+    r.switch.toSystem.group === 'system' && r.switch.back.tab === 'mines',
+    `MINES -> SYSTEM lands on ${r.switch.toSystem.tab}; back to ARSENAL lands on `
+    + `${r.switch.back.tab} (not the first tab)`);
+
+  check('the six tabs are one strip, walked in either direction and stopping at the ends',
+    JSON.stringify(r.walk) === '["ammo","mines","tree","ultimate","codex","system","system","system"]'
+    && JSON.stringify(r.walkBack) === '["codex","ultimate","tree","mines","ammo","ammo","ammo"]',
+    `forward ${r.walk.join(' ')}; back ${r.walkBack.join(' ')}`);
+
+  check('a sideways drag on the panel moves one tab, and a downward one does not',
+    r.swipeLeft.tab === 'ultimate' && r.swipeLeft.inline === '' && r.swipeLeft.open
+    && r.swipeRight.tab === 'tree' && r.swipeDownOnPanel.tab === 'tree',
+    `left from UPGRADES -> ${r.swipeLeft.tab} (inline transform left "${r.swipeLeft.inline}"), `
+    + `right -> ${r.swipeRight.tab}, down -> ${r.swipeDownOnPanel.tab} still open ${r.swipeDownOnPanel.open}`);
+
+  check('ULTIMATE is sealed, wears a lock, and its room says so rather than standing empty',
+    r.ultimate.tab === 'ultimate' && r.ultimate.sealedTab && r.ultimate.lockOnTab
+    && r.ultimate.room && /SEALED/.test(r.ultimate.says) && r.ultimate.cards === 0,
+    `tab sealed ${r.ultimate.sealedTab}, lock ${r.ultimate.lockOnTab}, room "${r.ultimate.says}", `
+    + `${r.ultimate.cards} cards for sale in it`);
+
+  check('the AMMO tab still changes the strip, the way the sheet did',
+    r.loadout.rows > 0 && r.loadout.slots > 0 && r.loadout.wasOn && r.loadout.changed
+    && !r.closed.open && r.closed.loadout === null,
+    `${r.loadout.rows} rows, ${r.loadout.slots} slots; HE on the strip ${r.loadout.wasOn}, `
+    + `pressed: [${r.loadout.before}] -> [${r.loadout.after}]; closed -> loadoutOpen `
+    + `${r.closed.loadout}`);
 }
 
 // --- report -----------------------------------------------------------------

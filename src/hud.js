@@ -75,13 +75,6 @@ export class Hud {
       counter: $('counter'),
       energyBuys: $('energyBuys'),
       offer: $('offer'),
-      loadout: $('loadout'),
-      loadMore: $('loadMore'),
-      loadScrim: $('loadScrim'),
-      loadTitle: $('loadTitle'),
-      loadNote: $('loadNote'),
-      loadSlots: $('loadSlots'),
-      loadList: $('loadList'),
       counterLabel: document.querySelector('#counter em'),
       abilities: $('abilities'),
       hint: $('abilityHint'),
@@ -180,25 +173,12 @@ export class Hud {
       foot.textContent = advice ? `${advice}  ·  BUILD ${BUILD}` : `BUILD ${BUILD}`;
     }
 
-    this.el.loadScrim.addEventListener('click', () => game.closeLoadout());
-    $('loadClose').addEventListener('click', () => game.closeLoadout());
-    // Down: it is bottom-anchored and enters from below. Its list scrolls, so
-    // the helper's scroll guard is what keeps a flick through the rack from
-    // throwing the panel away instead.
-    swipeToDismiss($('loadout'), { dir: 'down', onClose: () => game.closeLoadout() });
     /*
-     * The bar at the foot of the sheet. Everything reading LOCKED on that list
-     * is bought in the tree and nowhere else, so the screen that shows you
-     * what you have not got now has a door to the place that sells it -- and
-     * it lands on this group's own branch rather than on the top of eighty
-     * rows. The sheet closes on the way out: two stacked modals over the field
-     * is one more than anybody asked for.
+     * The loadout is the AMMO and MINES tabs of the menu from build 226; its
+     * rooms are built by Menu.buildLoadout and this class fills them. The door
+     * at the foot of each -- to that group's own branch of the tree -- is
+     * wired there too, so nothing here closes one sheet to open another.
      */
-    this.el.loadMore.addEventListener('click', () => {
-      const group = this.loadGroup;
-      game.closeLoadout();
-      this.menu.openTo(group === 'mines' ? 'mines' : 'ammo');
-    });
 
     this.el.startBtn.addEventListener('click', () => game.start());
     this.el.resumeBtn.addEventListener('click', () => game.resume());
@@ -221,10 +201,7 @@ export class Hud {
      * within reach right now — the one figure that decides whether opening it
      * is worth the tap.
      */
-    this.el.energyChip.addEventListener('click', () => {
-      this.menu.setOpen(true);
-      this.menu.show('tree');
-    });
+    this.el.energyChip.addEventListener('click', () => this.menu.openTab('tree'));
 
     /*
      * The banner is a list now, one row per boss whose way in is held, so
@@ -543,39 +520,34 @@ export class Hud {
    * what is owned — a stack of four with two things in it should say what the
    * other two could be.
    */
-  showLoadout(world, group) {
-    this.openAimRow(false);
+  /** The menu has put a loadout tab up; fill it for that group. */
+  showLoadoutPanel(world, group) {
     this.loadGroup = group;
-    this.el.loadTitle.textContent = group === 'mines' ? 'MINES' : 'AMMUNITION';
-    this.el.loadNote.textContent = `choose what sits on the strip · ${SLOTS[group]} slots`;
-    // Un-hidden first: syncLoadoutSheet does nothing while the sheet is down,
-    // so filling it before showing it filled nothing at all.
-    this.el.loadout.hidden = false;
-    this.el.loadScrim.hidden = false;
     this.syncLoadoutSheet(world);
-    void this.el.loadout.offsetWidth;
-    this.el.loadout.classList.add('open');
-    this.el.loadScrim.classList.add('on');
-    document.body.classList.add('loadoutOpen');
   }
 
-  hideLoadout() {
-    this.el.loadout.classList.remove('open');
-    this.el.loadScrim.classList.remove('on');
-    this.el.loadout.hidden = true;
-    this.el.loadScrim.hidden = true;
-    document.body.classList.remove('loadoutOpen');
+  /** The three elements of the loadout tab that is up. */
+  loadEls() {
+    const g = this.loadGroup;
+    if (!g) return null;
+    const slots = $(`loadSlots_${g}`);
+    const list = $(`loadList_${g}`);
+    const more = $(`loadMore_${g}`);
+    return slots && list ? { slots, list, more } : null;
   }
 
   syncLoadoutSheet(world) {
     const group = this.loadGroup;
-    if (!group || this.el.loadout.hidden) return;
+    const els = this.loadEls();
+    // Nothing to fill until the menu has that tab up.
+    if (!group || !els || !this.menu || !this.menu.open) return;
+    if (this.menu.tab !== group) return;
     const keys = world.loadout[group];
 
     // The slots, in the order they appear on the strip: bottom cell first.
     // A filled one is a button, and pressing it takes that thing back off the
     // strip — the shortest way to undo a choice is to press the choice.
-    this.el.loadSlots.innerHTML = '';
+    els.slots.innerHTML = '';
     for (const key of keys) {
       const a = key && ARSENAL.find((x) => x.key === key);
       const d = document.createElement(a ? 'button' : 'div');
@@ -593,13 +565,13 @@ export class Hud {
           if (!this.game.toggleCarry(a.key)) this.refuse(d);
         });
       }
-      this.el.loadSlots.appendChild(d);
+      els.slots.appendChild(d);
     }
 
     // And everything of that kind, owned or not.
     const full = freeSlot(world.loadout, group) < 0;
     const lastAmmo = group === 'ammo' && keys.filter(Boolean).length <= 1;
-    this.el.loadList.innerHTML = '';
+    els.list.innerHTML = '';
     let sealed = 0;
     for (const a of ARSENAL.filter((x) => x.group === group)) {
       const owned = world.unlocked.has(a.key);
@@ -621,7 +593,7 @@ export class Hud {
           if (!this.game.toggleCarry(a.key)) this.refuse(b);
         });
       }
-      this.el.loadList.appendChild(b);
+      els.list.appendChild(b);
     }
 
     /*
@@ -631,7 +603,7 @@ export class Hud {
      * still sealed in it, then nothing -- because "0 within reach" beside a
      * button is a reason not to press it, and there is always a reason.
      */
-    const bar = this.el.loadMore;
+    const bar = els.more;
     if (bar) {
       const branch = group === 'mines' ? 'mines' : 'ammo';
       const reach = this.menu ? this.menu.reachCount(world, branch) : 0;

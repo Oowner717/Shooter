@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '225';
+  var BUILD = '226';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -245,38 +245,11 @@
          at the edge of the screen so it collides with nothing, and it is inert
          to the touch. -->
 
-    <!-- ============ LOADOUT ============ -->
-    <!-- Which of the owned rounds and mines are on the strip. The strip has a
-         fixed number of cells and the arsenal does not, so the two stopped
-         being the same list. -->
-    <div id="loadScrim" hidden></div>
-    <section id="loadout" hidden aria-label="Loadout">
-      <header class="loadHead">
-        <span id="loadTitle">AMMUNITION</span>
-        <em id="loadNote">choose what sits on the strip</em>
-        <button id="loadClose" aria-label="Close">&#10005;</button>
-      </header>
-      <div id="loadSlots"></div>
-      <div id="loadList"></div>
-      <!-- The way out of the sheet and into the tree. Everything sealed on
-           this list is unsealed there and nowhere else, so the screen that
-           shows you what you have not got needs a door to the place that
-           sells it. Filled in by Hud.syncLoadoutSheet(); it lands on this
-           group's own branch, not on the top of the tree. -->
-      <button id="loadMore" type="button">
-        <span class="loadMoreIcon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-               stroke-linecap="square"><path d="M12 21V9M12 9 5 4M12 9l7-5"/>
-            <circle cx="12" cy="22" r="1.4" fill="currentColor" stroke="none"/>
-            <circle cx="4.4" cy="3.2" r="1.6"/><circle cx="19.6" cy="3.2" r="1.6"/></svg>
-        </span>
-        <span class="loadMoreBody">
-          <span class="loadMoreName">UPGRADES</span>
-          <span class="loadMoreLine"></span>
-        </span>
-        <span class="loadMoreGo" aria-hidden="true">&#8250;</span>
-      </button>
-    </section>
+    <!-- The LOADOUT sheet that stood here -- which owned rounds and mines are
+         on the strip -- is the AMMO and MINES tabs of the menu from build 226.
+         Its rows and its door to the tree are built by Menu.buildLoadout and
+         filled by Hud.syncLoadoutSheet, exactly as before; only the room they
+         are in changed. -->
 
     <!-- ============ THE STRIP ============ -->
     <!-- Mines, the two that run on their own, then ammunition. Built from
@@ -293,9 +266,14 @@
     <!-- Built from data in src/menu.js: a new round, assist or object needs a
          table entry and no markup. -->
     <div id="menuScrim"></div>
+    <!-- Two menus in one sheet. The header is the switch between them --
+         ARSENAL (what you fire, lay, buy) and SYSTEM (what things are, and
+         the settings) -- and the row under it is that menu's tabs. Built from
+         GROUPS in src/menu.js. Swipe the panel sideways to move through the
+         tabs, and push the sheet down to close it. -->
     <section id="menu" aria-label="Menu">
       <header class="menuBar">
-        <div class="menuTitle">SIMULATION <b>7749</b></div>
+        <nav id="menuGroups" aria-label="Menus"></nav>
         <button id="menuClose" class="menuX" aria-label="Close menu">✕</button>
       </header>
       <nav id="menuTabs"></nav>
