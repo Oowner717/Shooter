@@ -192,7 +192,7 @@ export const ARSENAL = [
   },
   {
     key: 'tithe', kind: 'round', group: 'ammo', label: 'TITHE', icon: ICON.tithe, tone: '#40e693',
-    dmg: '8, and rising', fx: 'Marks a body: each mark hurts it more and pays more.',
+    dmg: '8, and rising', fx: 'Marks a body: each mark hurts it more, and all of them pay 3.5x.',
   },
 ];
 

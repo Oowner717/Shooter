@@ -287,6 +287,14 @@ export class Enemy {
     // Marks left on a body by the rounds that do not simply hurt it.
     this.chill = 0; // RIME: seconds of being dragged to a crawl
     this.bounty = 1; // TITHE: what its energy is worth when it goes
+    /*
+     * ...and whether a TITHE mark has already been applied to it. Declared
+     * here rather than sprung into existence at the site that writes it, for
+     * the same reason `placed` and `splits` are: a body must never inherit
+     * one. The flag exists because the mark is a MULTIPLIER applied once,
+     * not a floor -- see the note at TITHE's `onHit`.
+     */
+    this.tithed = false;
     this.marks = 0; // ...and how deep the mark is, which is what TITHE rides on
     this.spawnIn = opts.spawnIn ?? 0; // brief materialise animation
 

@@ -710,7 +710,23 @@ export class Shooter {
           const extra = e.marks * g.step * w.up.titheStep;
           if (extra > 0) e.applyDamage(w, g.damage * w.up.damage * extra, 0, 0, 0);
           e.marks = Math.min(g.marks + w.up.titheMarks, e.marks + 1);
-          e.bounty = Math.max(e.bounty, g.bounty * w.up.bounty);
+          /*
+           * A MULTIPLIER on what the body was already worth, applied once --
+           * not a floor under it.
+           *
+           * It was `Math.max(e.bounty, g.bounty * up.bounty)`, and the floor
+           * is what the `Math.max` was for: eight marks must not compound to
+           * 3.5^8. But a body's own bounty is `bountyStep ^ (tier - 1)` =
+           * 1.10^(tier-1), so the tier climbs INTO the floor and then past
+           * it: 1.10^13 = 3.45 at tier 14, so from tier 15 an unbought TITHE
+           * mark paid exactly nothing, on the round whose whole point is
+           * that it pays. The `tithed` flag keeps the once, and the
+           * multiplier keeps the mark worth the same 3.5x at every tier.
+           */
+          if (!e.tithed) {
+            e.tithed = true;
+            e.bounty *= g.bounty * w.up.bounty;
+          }
         },
       });
     } else {

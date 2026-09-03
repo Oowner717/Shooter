@@ -13802,6 +13802,78 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       + `it expired`).join(', '));
 }
 
+// --- a TITHE mark is worth the same at every tier ---------------------------
+/*
+ * It was `e.bounty = Math.max(e.bounty, g.bounty * up.bounty)` -- a FLOOR
+ * under the body's own worth rather than a multiplier on it. The floor is
+ * what the `Math.max` was for, and the reason is real: eight marks must not
+ * compound to 3.5^8.
+ *
+ * But a body's own bounty is `bountyStep ^ (tier - 1)` = 1.10^(tier - 1),
+ * which climbs into the floor and then straight past it -- 1.10^13 = 3.45 at
+ * tier 14 -- so from tier 15 an unbought TITHE mark paid EXACTLY NOTHING, on
+ * the one round whose whole point is that it pays. A `tithed` flag keeps the
+ * once and the multiplier keeps the mark worth 3.5x wherever it lands.
+ *
+ * Asserted at both ends of the ladder, because the fault is invisible at one
+ * of them: at tier 1 the old code and the new agree to the digit.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    const ran = w.director.update;
+    w.director.update = () => {};
+    g.toggleRound('tithe');
+    const T = CFG.rounds.tithe;
+
+    // A body carrying the bounty its tier would have given it, marked once.
+    const at = (tier) => {
+      g.debugClearField();
+      const e = g.debugSpawn('lurcher', w.shooter.x, w.shooter.y - 200);
+      if (!e) return null;
+      e.staged = false;
+      e.bounty = CFG.waves.tier.bountyStep ** (tier - 1);
+      const before = e.bounty;
+      // Through the round itself, not by hand: the point is what the round
+      // does, and marking a body twice must not compound.
+      e.hp = 1e9; e.maxHp = 1e9;
+      w.autoAim = false; w.autoFire = true;
+      w.shooter.aim = -Math.PI / 2; w.shooter.targetAim = -Math.PI / 2;
+      w.shooter.cooldown = 0;
+      for (let f = 0; f < 60 * 3; f++) {
+        e.x = w.shooter.x; e.y = w.shooter.y - 200; e.vx = 0; e.vy = 0;
+        e.hp = 1e9;
+        w.shooter.aim = -Math.PI / 2; w.shooter.targetAim = -Math.PI / 2;
+        g.update(1 / 60);
+      }
+      w.autoFire = false;
+      return { tier, before, after: e.bounty, marks: e.marks };
+    };
+    const low = at(1);
+    const high = at(18);
+    w.director.update = ran;
+    w.spawnLock = 0;
+    g.restart();
+    return { low, high, want: T.bounty };
+  });
+  const gain = (o) => (o && o.before > 0 ? o.after / o.before : 0);
+  check('a TITHE mark multiplies what a body was worth, at every tier',
+    r.low && r.high && r.low.marks > 1 && r.high.marks > 1
+    && Math.abs(gain(r.low) - r.want) < 0.01
+    && Math.abs(gain(r.high) - r.want) < 0.01,
+    `tier 1: ${r.low && r.low.before.toFixed(2)} -> ${r.low && r.low.after.toFixed(2)} `
+    + `(x${gain(r.low).toFixed(2)}); tier 18: ${r.high && r.high.before.toFixed(2)} -> `
+    + `${r.high && r.high.after.toFixed(2)} (x${gain(r.high).toFixed(2)}); `
+    + `the mark is worth x${r.want}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;
