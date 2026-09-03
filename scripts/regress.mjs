@@ -16568,6 +16568,263 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `the dummy is ${r.dummySurvivedVoid ? 'still there' : 'GONE'} after walking a VOID`);
 }
 
+/*
+ * ---- build 234: the rates, and the thing they are read off ----
+ *
+ * The counter was one three-second window redrawn sixty times a second, which
+ * is two faults compounding: a weapon fired one and a half times a second
+ * moves a three-second window by a third on every round, and redrawing that
+ * every frame made a four-digit number that flickered continuously. There are
+ * three windows off one ring now and the bar shows the ten.
+ *
+ * And the dummy is the same reading in a form you can watch: a mark per hit
+ * sized by that hit, and five bands of sustained state that arrive as
+ * different ELEMENTS rather than as more of the same one -- because a state
+ * that lives only in a hue is a state a colourblind player never receives.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { ledger, WINDOWS, BAR_WINDOW } = await import('../src/ledger.js');
+    const { NODES } = await import('../src/tree.js');
+    const { freshUpgrades } = await import('../src/upgrades.js');
+    const { codex } = await import('../src/codex.js');
+    const { BANDS, bandOf, placeDummy, drawDummy, updateDummy, DUMMY } =
+      await import('../src/dummy.js');
+    const { CFG, GRID_CELL } = await import('../src/config.js');
+    const out = { windows: WINDOWS, bar: BAR_WINDOW, bands: BANDS };
+
+    // ---- a window is a window --------------------------------------------
+    /*
+     * Two bursts, forty seconds apart, read at the end. Every window has to
+     * give a different answer or they are not windows: the three sees only
+     * the second, the thirty sees only the second as well but averages it
+     * over its own span, and the run average carries both over the whole
+     * clock. Forty seconds and not twenty, because the denominator is
+     * `min(win, elapsed)` -- with less history than the window, the thirty and
+     * the run average are the same number BY DESIGN, and a case that stopped
+     * there would have proved nothing about either.
+     */
+    ledger.arm(true);
+    for (let i = 0; i < 10; i++) ledger.note('standard', 100);
+    ledger.tick(1);
+    out.fresh3 = +ledger.rate(3).toFixed(1);
+    for (let i = 0; i < 40; i++) ledger.tick(1);
+    ledger.note('standard', 500);
+    ledger.tick(1);
+    out.old3 = +ledger.rate(3).toFixed(1);
+    out.old30 = +ledger.rate(30).toFixed(1);
+    out.run = +(ledger.total / ledger.t).toFixed(1);
+    out.elapsed = +ledger.t.toFixed(1);
+    ledger.arm(false);
+
+    // ---- the bar does not redraw every frame ------------------------------
+    g.restart();
+    g.debugGiveEnergy(60000);
+    g.buy('sandbox');
+    g.enterSandbox();
+    const sb = g.sandbox;
+    const real = sb.syncStats.bind(sb);
+    let calls = 0;
+    sb.syncStats = () => { calls++; real(); };
+    sb.show('stats');
+    calls = 0;
+    for (let f = 0; f < 60; f++) sb.update(1 / 60);
+    out.syncsPerSecond = calls;
+    sb.syncStats = real;
+    sb.show('');
+    out.barLabel = (document.querySelector('#sbDps em') || {}).textContent || '';
+
+    // ---- the dummy is bigger, further out, and inside the ceiling --------
+    const d = placeDummy(g);
+    out.r = d ? d.r : 0;
+    out.up = +(w.shooter.y - (d ? d.y : 0)).toFixed(0);
+    out.cell = GRID_CELL;
+    g.exitSandbox();
+
+    // ---- every band is reachable ------------------------------------------
+    /*
+     * With real weapons against a real dummy, not by writing a number into
+     * the rig. Four of the game's own things, chosen because between them
+     * they cover the ladder: a stock BOLT for the bottom, and a bought BOLT,
+     * SCATTER and TITHE for the rest.
+     */
+    const reach = (round, seconds, buy) => {
+      g.restart();
+      g.debugTeachAll();
+      codex.unlockAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      w.up = freshUpgrades();
+      if (buy) {
+        g.debugGiveEnergy(400000);
+        for (let p = 0; p < 4; p++) for (const n of NODES) if (n.id) g.buy(n.id);
+      }
+      w.sandbox = true;
+      ledger.arm(true);
+      placeDummy(g);
+      w.round = round;
+      w.autoAim = true;
+      w.autoFire = true;
+      let peak = 0;
+      for (let f = 0; f < 60 * seconds; f++) {
+        w.shooter.aim = -Math.PI / 2;
+        w.shooter.targetAim = w.shooter.aim;
+        g.update(1 / 60);
+        peak = Math.max(peak, ledger.live());
+      }
+      w.autoAim = false;
+      w.autoFire = false;
+      ledger.arm(false);
+      w.sandbox = false;
+      return { peak: +peak.toFixed(0), band: bandOf(peak) };
+    };
+    out.reach = {
+      stock: reach('standard', 6, false),
+      bolt: reach('standard', 6, true),
+      scatter: reach('shotgun', 6, true),
+      tithe: reach('tithe', 7, true),
+    };
+
+    // ---- and every band is a different picture ---------------------------
+    /*
+     * Rendered by hand onto an offscreen canvas, because judging an effect off
+     * live screenshots measures the frame loop and not the effect -- a rule
+     * this project already paid for once. Two measures per band, so a change
+     * that is only a hue is not enough: how much of the frame is lit, and how
+     * much of it is OUTSIDE the rig's own rim, which is what the brackets, the
+     * broken ring and the ground bloom each add.
+     */
+    const S = 240;
+    const c = document.createElement('canvas');
+    c.width = S;
+    c.height = S;
+    const x = c.getContext('2d');
+    const pics = [];
+    const liveWas = ledger.live;
+    const onWas = ledger.on;
+    for (let band = 0; band <= BANDS.length; band++) {
+      const lo = band === 0 ? 0 : BANDS[band - 1];
+      const hi = band < BANDS.length ? BANDS[band] : BANDS[BANDS.length - 1] * 1.6;
+      const dps = band === 0 ? 0 : (lo + hi) / 2;
+      const e = { x: S / 2, y: S / 2, r: DUMMY.r, dummy: true };
+      ledger.on = true;
+      ledger.live = () => dps;
+      for (let f = 0; f < 60 * 4; f++) updateDummy(e, 1 / 60);
+      ledger.live = liveWas;
+      ledger.on = onWas;
+      x.clearRect(0, 0, S, S);
+      x.fillStyle = '#0b1116';
+      x.fillRect(0, 0, S, S);
+      drawDummy(x, e);
+      const px = x.getImageData(0, 0, S, S).data;
+      let lit = 0;
+      let far = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        if (Math.max(px[i], px[i + 1], px[i + 2]) < 40) continue;
+        lit++;
+        const j = i / 4;
+        if (Math.hypot((j % S) - S / 2, ((j / S) | 0) - S / 2) > DUMMY.r * 1.05) far++;
+      }
+      pics.push({ band, dps: Math.round(dps), lit, far, drew: e.dummyBand });
+    }
+    out.pics = pics;
+
+    // ---- a mark is sized by the hit that made it -------------------------
+    /*
+     * Two hits an order of magnitude apart on the same dummy, and the marks
+     * they leave compared. This is the per-hit channel, and it is the one
+     * that would be silently lost: the rig's own state would go on working
+     * perfectly while every round looked identical.
+     */
+    g.restart();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    w.director.update = () => {};
+    w.sandbox = true;
+    ledger.arm(true);
+    const dd = placeDummy(g);
+    w.effects.length = 0;
+    dd.applyDamage(w, 12, 0, -1, 0, 0, 0, false, 'standard');
+    const small = w.effects[w.effects.length - 1];
+    dd.applyDamage(w, 900, 0, -1, 0, 0, 0, false, 'slug');
+    const big = w.effects[w.effects.length - 1];
+    out.mark = {
+      made: w.effects.length,
+      smallW: small ? +small.w.toFixed(3) : 0,
+      bigW: big ? +big.w.toFixed(3) : 0,
+      smallText: small ? small.text : '',
+      bigText: big ? big.text : '',
+      // the marks sit on the FACE the hit came from, not at the centre
+      onFace: !!small && Math.abs(Math.hypot(small.x - dd.x, small.y - dd.y) - dd.r * 0.92) < 2,
+    };
+    ledger.arm(false);
+    w.sandbox = false;
+    g.restart();
+    w.up = freshUpgrades();
+    void CFG;
+    return out;
+  });
+
+  check('there are three windows on one ring, and they disagree the way windows do',
+    JSON.stringify(r.windows) === '[3,10,30]' && r.bar === 10
+    // 1000 and not 1000/3: the denominator is `min(win, elapsed)`, and one
+    // second in there is only a second of history to divide by. A window
+    // cannot report a rate over time that has not happened.
+    && Math.abs(r.fresh3 - 1000) < 0.5
+    && Math.abs(r.old3 - 500 / 3) < 0.5
+    && Math.abs(r.old30 - 500 / 30) < 0.5
+    && Math.abs(r.run - 1500 / r.elapsed) < 0.5,
+    `1000 at the start and 500 forty seconds later, read at ${r.elapsed}s: `
+    + `the 3s says ${r.old3}, the 30s says ${r.old30}, the run average says `
+    + `${r.run} (and the 3s read ${r.fresh3} on the first burst)`);
+
+  check('...and the bar is the ten, redrawn four times a second and not sixty',
+    r.syncsPerSecond === 4 && /10s/.test(r.barLabel),
+    `${r.syncsPerSecond} refreshes in a second of frames, labelled "${r.barLabel}"`);
+
+  check('the dummy is bigger and further out, and inside the broadphase ceiling',
+    r.r === 68 && r.up === 420 && r.r * 2 <= r.cell,
+    `radius ${r.r} against a BULWARK's 45 and a cell of ${r.cell}; standing `
+    + `${r.up} units up-field`);
+
+  /*
+   * The bands are only worth having if the turret can get to them. Stock is
+   * band 1 and a fully bought one walks the rest: BOLT to 3, SCATTER to 4 and
+   * TITHE past 1,800 into 5.
+   */
+  const R = r.reach || {};
+  check('a fully upgraded turret reaches every band the dummy can show',
+    R.stock && R.stock.band >= 1 && R.bolt && R.bolt.band >= 3
+    && R.scatter && R.scatter.band >= 4 && R.tithe && R.tithe.band >= 5,
+    `stock BOLT ${R.stock && R.stock.peak}/band ${R.stock && R.stock.band}; `
+    + `bought BOLT ${R.bolt && R.bolt.peak}/${R.bolt && R.bolt.band}, `
+    + `SCATTER ${R.scatter && R.scatter.peak}/${R.scatter && R.scatter.band}, `
+    + `TITHE ${R.tithe && R.tithe.peak}/${R.tithe && R.tithe.band}`);
+
+  const pics = r.pics || [];
+  const steps = pics.slice(1).map((p, i) => ({
+    band: p.band,
+    lit: p.lit / Math.max(1, pics[i].lit),
+    far: p.far - pics[i].far,
+  }));
+  check('...and every band draws a different picture, by more than its colour',
+    pics.length === 6 && pics.every((p) => p.drew === p.band)
+    && steps.every((s) => s.lit > 1.15 || s.far > 400),
+    steps.map((s) => `${s.band}: x${s.lit.toFixed(2)} lit, ${s.far > 0 ? '+' : ''}${s.far} outside`).join('  '));
+
+  const m = r.mark || {};
+  check('a hit leaves a mark on the face, sized by the hit',
+    m.made === 2 && m.bigW > m.smallW * 3 && m.smallText === '12'
+    && m.bigText === '900' && m.onFace,
+    `12 damage -> weight ${m.smallW} "${m.smallText}"; 900 -> ${m.bigW} `
+    + `"${m.bigText}"; struck face ${m.onFace}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

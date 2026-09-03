@@ -1186,4 +1186,35 @@ most once for any given target and cannot spin.
   look of staging, the lull and all four boss skies and is its own decision --
   and added `setMood(name, snap)` instead, which the sandbox uses because a
   mode change should be instant anyway.
+- **A rate needs a window on it, and a readout needs a cadence.** The
+  sandbox's counter was one three-second window redrawn every frame: a weapon
+  fired 1.5 times a second moves a three-second window by a third on every
+  round, and at 60Hz that is a four-digit number flickering continuously.
+  `ledger` keeps ONE ring, thirty seconds deep, and `rate(win)` reads any
+  window off it (walked backwards from the newest entry, so the 3s rate the
+  dummy is driven from is not a scan of thirty seconds of history). Three are
+  used -- 3s drives the dummy, 10s is the bar, 30s is for comparing -- plus
+  the run average, which is the one that cannot be gamed by choosing when to
+  look. The bar refreshes 4 times a second. **The denominator is
+  `min(win, elapsed)`**: with less history than the window, the 30s rate and
+  the run average are the same number by design, and a case that reads them
+  one second in gets the burst divided by one second, not by three.
+- **The practice dummy is a readout, not a target** (build 234, `dummy.js`).
+  Two channels that must not drown each other: a MARK per hit (ring, spark
+  fan and a plated damage number at the struck face, sized by the delivered
+  damage) drawn after the rig so it survives a busy frame, and five BANDS of
+  sustained state driven by the 3s rate. Each band arrives as a different
+  ELEMENT -- lit ticks on a 24-tick rev counter, brackets, a counter-rotating
+  broken ring, arcs, a ground bloom -- and not as more of the same one,
+  because a state that lives only in a hue is a state a colourblind player
+  never receives. Band 3 originally arrived as a colour change alone and had
+  to be given the broken ring.
+  Both halves are measured rather than eyeballed: `regress.mjs` drives real
+  weapons at a real dummy to prove a fully bought turret reaches every band
+  (stock BOLT 1, bought BOLT 3, SCATTER 4, TITHE 5, everything at once 4,700
+  dps), and renders the rig to an offscreen canvas at each band to prove each
+  differs from the one below by lit pixels or by reach outside the rim -- not
+  by colour. Rendering it live would measure the frame loop instead.
+  **The radius ceiling is 72**: `GRID_CELL` is twice the largest body and
+  `check-build.mjs` asserts the broadphase covers it, so the dummy is 68.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

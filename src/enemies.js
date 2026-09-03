@@ -10,6 +10,7 @@ import { audio } from './audio.js';
 import { shed } from './debris.js';
 import { contactAt } from './physics.js';
 import { ledger } from './ledger.js';
+import { drawDummy, dummyHit } from './dummy.js';
 
 /**
  * The top of the visible field, in world units. Objects are queued above it
@@ -1264,6 +1265,10 @@ export class Enemy {
      * between output and what output was worth.
      */
     if (ledger.on) ledger.note(src, real, Math.max(0, real - this.hp), real >= this.hp);
+    // ...and the dummy IS a readout: it shows the delivered number, for the
+    // same reason the ledger books it -- what the caller asked for is not
+    // what the body lost.
+    if (this.dummy) dummyHit(world, this, real, nx, ny);
     this.hp -= real;
     this.flash = Math.min(1, this.flash + 0.5 + real / 260);
     if (impulse) {
@@ -1539,6 +1544,10 @@ export class Enemy {
   // ------------------------------------------------------------------ draw
 
   draw(ctx, world) {
+    // The practice dummy is its own object, not one of the roster's shapes
+    // wearing a hat -- the BULWARK it is built out of is how it gets physics
+    // and a damage path for free, and nothing else.
+    if (this.dummy) { drawDummy(ctx, this, world); return; }
     const t = this.type;
     const hpFrac = clamp(this.hp / this.maxHp, 0, 1);
     /*

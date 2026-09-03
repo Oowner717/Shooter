@@ -34,10 +34,10 @@
  *
  * ---- the two rates ----
  *
- * `live` is a rolling window (`WINDOW` seconds) and is what the counter on the
- * screen shows -- it answers "what am I doing right now". `sustained` is
- * `total / elapsed` since the last reset and is what a comparison wants, since
- * a burst weapon and a steady one have to be judged over the same clock.
+ * `rate(win)` is a rolling window over the ring; see `WINDOWS` below for the
+ * three the interface uses and why. `sustained` is `total / elapsed` since the
+ * last reset and is what a comparison wants, since a burst weapon and a steady
+ * one have to be judged over the same clock.
  *
  * ---- cost ----
  *
@@ -47,15 +47,34 @@
  * `applyDamage` runs tens of thousands of times in a boss fight.
  */
 
-/** Seconds of history behind the live rate. */
-const WINDOW = 3;
-
 /**
- * Long enough that a slow weapon is not reported as idle between shots, short
- * enough that the number answers to the trigger. SLUG at 1.5 rounds a second
- * puts four or five in this window; PULSE on a seven-second cooldown will show
- * a spike and fall back, which is the truth about PULSE.
+ * How much history the ring keeps, and the windows read off it.
+ *
+ * There was one window, three seconds, and it was the only rate on the screen.
+ * Three seconds is short enough that a weapon fired 1.5 times a second makes
+ * the number jump every round -- and the counter was also being redrawn every
+ * frame, so the bar flickered through four digits a second and could not be
+ * read at all, let alone compared.
+ *
+ * So: one ring, thirty seconds deep, and any window read off it.
+ *
+ *   3s   what is happening RIGHT NOW. Still wanted -- it is what the dummy's
+ *        own effects are driven from, where responsiveness is the point and
+ *        legibility is not.
+ *   10s  what the bar shows. Long enough to survive a reload or a cooldown,
+ *        short enough to answer when you change round.
+ *   30s  what a comparison wants. A burst weapon and a steady one only look
+ *        alike over a window that contains several of the bursts.
+ *
+ * ...and the session average is on top of those, over however long the
+ * counter has been running, which is the one number that cannot be gamed by
+ * choosing when to look.
  */
+const HISTORY = 30;
+export const WINDOWS = [3, 10, 30];
+
+/** The rate the bar shows, and the one the panel leads with. */
+export const BAR_WINDOW = 10;
 
 class Ledger {
   constructor() {
@@ -176,7 +195,7 @@ class Ledger {
   tick(dt) {
     if (!this.on) return;
     this.t += dt;
-    const cut = this.t - WINDOW;
+    const cut = this.t - HISTORY;
     while (this.head < this.wT.length && this.wT[this.head] < cut) this.head++;
     // Compact when the dead prefix is most of the ring, so a long session does
     // not grow three unbounded arrays. Amortised O(1) per entry.
@@ -190,20 +209,38 @@ class Ledger {
     if (l > this.peak) this.peak = l;
   }
 
-  /** Damage a second over the last `WINDOW` seconds, everything together. */
-  live() {
+  /**
+   * Damage a second over the last `win` seconds, everything together.
+   *
+   * Walked backwards from the newest entry and stopped at the window's edge,
+   * so a short window costs a short walk however deep the ring is -- the 3s
+   * rate is read every frame to drive the dummy, and it must not be a scan of
+   * thirty seconds of history to get it.
+   */
+  rate(win = BAR_WINDOW) {
     if (!this.on) return 0;
+    const cut = this.t - win;
     let sum = 0;
-    for (let i = this.head; i < this.wD.length; i++) sum += this.wD[i];
-    return sum / Math.min(WINDOW, Math.max(0.25, this.t));
+    for (let i = this.wD.length - 1; i >= this.head; i--) {
+      if (this.wT[i] < cut) break;
+      sum += this.wD[i];
+    }
+    return sum / Math.min(win, Math.max(0.25, this.t));
+  }
+
+  /** The fastest of the three windows: what is happening right now. */
+  live() {
+    return this.rate(WINDOWS[0]);
   }
 
   /** ...and the same, split by source. */
-  liveBy() {
+  liveBy(win = WINDOWS[0]) {
     const out = new Map();
     if (!this.on) return out;
-    const span = Math.min(WINDOW, Math.max(0.25, this.t));
-    for (let i = this.head; i < this.wD.length; i++) {
+    const cut = this.t - win;
+    const span = Math.min(win, Math.max(0.25, this.t));
+    for (let i = this.wD.length - 1; i >= this.head; i--) {
+      if (this.wT[i] < cut) break;
       out.set(this.wS[i], (out.get(this.wS[i]) || 0) + this.wD[i]);
     }
     for (const [k, v] of out) out.set(k, v / span);
@@ -220,7 +257,7 @@ class Ledger {
    * above one fired for a minute.
    */
   table() {
-    const live = this.liveBy();
+    const live = this.liveBy(BAR_WINDOW);
     const span = Math.max(0.25, this.t);
     const rows = [];
     for (const [src, e] of this.by) {

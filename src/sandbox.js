@@ -40,8 +40,9 @@ import { ANOMALIES, anomalyOf, makerOf } from './anomaly.js';
 import { codex, FIELD_ENTRIES } from './codex.js';
 import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
-import { ledger, SRC_EXTRA } from './ledger.js';
+import { ledger, SRC_EXTRA, WINDOWS, BAR_WINDOW } from './ledger.js';
 import { background } from './background.js';
+import { placeDummy } from './dummy.js';
 import { rgba } from './util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -142,8 +143,20 @@ export class Sandbox {
 
     const bar = document.createElement('div');
     bar.id = 'sbBar';
+    /*
+     * The bar's number is the TEN-SECOND rate, not the three-second one, and
+     * it is redrawn four times a second rather than sixty.
+     *
+     * It was the 3s rate at 60Hz, which is two bad decisions compounding: a
+     * weapon fired one and a half times a second moves a three-second window
+     * by a third on every round, and redrawing that every frame made a
+     * four-digit number that flickered continuously and could not be read at
+     * all. Ten seconds survives a reload and a cooldown; four times a second
+     * is fast enough to answer when you change round. The label says which
+     * window it is, because a rate with no window on it is not a number.
+     */
     bar.innerHTML = '<span class="sbTag">SANDBOX</span>'
-      + '<span id="sbDps"><b>0</b><em>DPS</em></span>';
+      + `<span id="sbDps"><b>0</b><em>DPS ${BAR_WINDOW}s</em></span>`;
     const mk = (id, text, fn) => {
       const b = document.createElement('button');
       b.id = id;
@@ -280,13 +293,21 @@ export class Sandbox {
 
     const head = document.createElement('div');
     head.className = 'sbStatHead';
-    head.innerHTML = '<div><b id="sbTotal">0</b><em>DAMAGE</em></div>'
-      + '<div><b id="sbLive">0</b><em>DPS NOW</em></div>'
-      + '<div><b id="sbSust">0</b><em>DPS AVG</em></div>'
-      + '<div><b id="sbPeak">0</b><em>DPS PEAK</em></div>';
+    /*
+     * Four rates, and each answers a different question. NOW is what is
+     * happening this second and is what the dummy's own bands are driven
+     * from; the two windows are for reading and comparing; RUN is over the
+     * whole counter and is the one that cannot be gamed by choosing when to
+     * look. Total and destroyed sit under them.
+     */
+    head.innerHTML = `<div><b id="sbW0">0</b><em>DPS NOW</em></div>`
+      + `<div><b id="sbW1">0</b><em>DPS ${WINDOWS[1]}s</em></div>`
+      + `<div><b id="sbW2">0</b><em>DPS ${WINDOWS[2]}s</em></div>`
+      + '<div><b id="sbSust">0</b><em>DPS RUN</em></div>';
     const sub = document.createElement('div');
     sub.className = 'sbStatSub';
-    sub.innerHTML = '<span id="sbClock">00:00</span><span id="sbOver"></span>';
+    sub.innerHTML = '<span id="sbClock">00:00</span>'
+      + '<span id="sbTotal">0</span><span id="sbOver"></span>';
     const reset = document.createElement('button');
     reset.className = 'sbReset';
     reset.textContent = 'RESET COUNTER';
@@ -296,10 +317,9 @@ export class Sandbox {
 
     p.append(head, sub, reset, table);
     this.el.table = table;
-    this.el.total = head.querySelector('#sbTotal');
-    this.el.live = head.querySelector('#sbLive');
+    this.el.win = WINDOWS.map((_, i) => head.querySelector(`#sbW${i}`));
     this.el.sust = head.querySelector('#sbSust');
-    this.el.peak = head.querySelector('#sbPeak');
+    this.el.total = sub.querySelector('#sbTotal');
     this.el.clock = sub.querySelector('#sbClock');
     this.el.over = sub.querySelector('#sbOver');
     return p;
@@ -368,19 +388,7 @@ export class Sandbox {
    * dying. It cannot be destroyed, so it cannot pay and cannot be counted.
    */
   dummy() {
-    const w = this.game.world;
-    const e = this.game.debugSpawn('bulwark', w.width / 2, w.shooter.y - 300);
-    if (!e) return;
-    e.staged = false;
-    e.spawnIn = 0;
-    e.dummy = true;
-    e.harmless = true;
-    e.counts = false;
-    e.invMass = 0;
-    e.vx = 0;
-    e.vy = 0;
-    e.hp = 1e9;
-    e.maxHp = 1e9;
+    if (!placeDummy(this.game)) return;
     this.game.hud.alert('DUMMY PLACED', 'info', 1.2);
   }
 
@@ -441,10 +449,11 @@ export class Sandbox {
 
   syncStats() {
     if (!this.el.table) return;
-    this.el.total.textContent = num(ledger.total);
-    this.el.live.textContent = num(ledger.live());
+    for (let i = 0; i < WINDOWS.length; i++) {
+      this.el.win[i].textContent = num(ledger.rate(WINDOWS[i]));
+    }
     this.el.sust.textContent = num(ledger.total / Math.max(0.25, ledger.t));
-    this.el.peak.textContent = num(ledger.peak);
+    this.el.total.textContent = `${num(ledger.total)} DAMAGE`;
     this.el.clock.textContent = clock(ledger.t);
     this.el.over.textContent = ledger.total > 0 || ledger.kills > 0
       ? `${ledger.kills} DESTROYED  ·  ${ledger.total > 0
@@ -501,13 +510,12 @@ export class Sandbox {
    */
   update(dt) {
     if (!this.on) return;
-    if (this.el.dps) this.el.dps.textContent = num(ledger.live());
     this.statT = (this.statT || 0) - dt;
-    if (this.statT <= 0) {
-      this.statT = 0.25;
-      if (this.sheet === 'stats') this.syncStats();
-      if (this.sheet === 'spawn') this.syncSpawn();
-    }
+    if (this.statT > 0) return;
+    this.statT = 0.25;
+    if (this.el.dps) this.el.dps.textContent = num(ledger.rate(BAR_WINDOW));
+    if (this.sheet === 'stats') this.syncStats();
+    if (this.sheet === 'spawn') this.syncSpawn();
   }
 }
 

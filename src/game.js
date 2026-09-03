@@ -38,6 +38,7 @@ import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 import { Sandbox } from './sandbox.js';
 import { ledger } from './ledger.js';
+import { updateDummy } from './dummy.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 
@@ -1686,6 +1687,7 @@ export class Game {
         e.hp = e.maxHp;
         e.vx = 0;
         e.vy = 0;
+        updateDummy(e, real);
       }
       this.sandbox.update(real);
     }

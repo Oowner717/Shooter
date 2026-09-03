@@ -60,6 +60,7 @@ const ASSETS = [
   './src/patch.js',
   './src/ledger.js',
   './src/sandbox.js',
+  './src/dummy.js',
 ];
 
 self.addEventListener('install', (e) => {
