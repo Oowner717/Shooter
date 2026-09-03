@@ -244,6 +244,14 @@ export class Enemy {
     // directions. A SLUG shoves as hard as it ever did and pays out nothing
     // for what it shoves things into — see CFG.rounds.slug.calm.
     this.slugged = 0;
+    /*
+     * Seconds left of taking no share of a contact -- read by
+     * `physics.resolvePair`, which treats a plowing body as infinitely massive
+     * against anything that has mass of its own. Only a hurled MASS sets it
+     * today, on the same clock as `thrown`, and only against movable bodies:
+     * the turret and the DECOY are static and stop it dead.
+     */
+    this.plow = 0;
     this.seed = type.id === 'seed';
     this.seedT = this.seed ? CFG.graft.life : 0;
     this.host = null;
@@ -577,7 +585,20 @@ export class Enemy {
     const mass = this.tether.other;
     if (!mass || mass.dead) return;
     const s = world.shooter;
-    if (Math.hypot(s.x - this.x, s.y - this.y) > H.range) { this.wind = 0; return; }
+    /*
+     * Out of range: the wind BLEEDS rather than resets.
+     *
+     * It was `this.wind = 0`, and gunfire shoves the head backwards for as
+     * long as it is being shot at, so one knockback near the end of the hold
+     * cost the whole hold. Measured over five pairs at tier 9, one head wound
+     * for four seconds across two attempts and threw nothing: it kept being
+     * pushed a few units past 430 and starting again. Bleeding at `holdWind` a
+     * second makes leaving range cost ground instead of the attempt.
+     */
+    if (Math.hypot(s.x - this.x, s.y - this.y) > H.range) {
+      this.wind = Math.max(0, (this.wind || 0) - dt * H.holdWind);
+      return;
+    }
 
     /*
      * A STASIS stops the wind, exactly as it already stops a LURCHER's burst
@@ -601,23 +622,71 @@ export class Enemy {
     this.tether.len = this.type.tows.length * (1 - spin * 0.45); // and it draws in
 
     if (this.wind < H.wind) return;
+    this.release(world, 1);
+  }
 
-    // Let go. Straight at the turret, at a speed nothing else on the field
-    // has, and coasting -- `thrown` is what stops a released body steering.
+  /**
+   * Let go of the load.
+   *
+   * Split out of `windUp` because there are two ways to reach it now: the wind
+   * completing, and the head dying with the cable still on (see
+   * `Enemy.destroy`). `full` is how much of the hold it got -- 1 from a
+   * completed wind, `wind / H.wind` from a death -- and it scales the speed
+   * between `H.partial` and 1, so an early kill still buys a slower MASS.
+   */
+  release(world, full) {
+    const H = this.type.hurl;
+    const mass = this.tether && this.tether.other;
+    if (!mass || mass.dead) return false;
+    const s = world.shooter;
+    const k = H.partial + (1 - H.partial) * clamp(full, 0, 1);
+
+    /*
+     * Shove the neighbourhood first, and only then let go.
+     *
+     * A TOW arrives with a wave rather than alone, so the frame it releases on
+     * is routinely a frame with three or four other bodies inside the swing.
+     * The load then started its 620 already in contact with them: even with
+     * the plow below, the first frame is spent trading impulse instead of
+     * travelling, and the throw read as a drop. This is the same shape as
+     * PULSE and PILE -- a deliberate clear, so `throwOff` -- and it does no
+     * damage: it exists to make room, not to be a second attack.
+     *
+     * `source: mass` keeps the load out of its own blast; the head is inside
+     * it and is supposed to be, which is why the pair visibly comes apart.
+     */
+    applyBlast(world, {
+      x: mass.x, y: mass.y, r: H.clear.r,
+      damage: 0, impulse: H.clear.impulse, throwOff: true, source: mass,
+    });
+
+    // Straight at the turret, at a speed nothing else on the field has, and
+    // coasting -- `thrown` is what stops a released body steering.
     const dx = s.x - mass.x;
     const dy = s.y - mass.y;
     const d = Math.hypot(dx, dy) || 1;
-    mass.vx = (dx / d) * H.speed;
-    mass.vy = (dy / d) * H.speed;
+    mass.vx = (dx / d) * H.speed * k;
+    mass.vy = (dy / d) * H.speed * k;
     mass.av = spread(9);
     mass.thrown = 2.2;
+    /*
+     * ...and it does not give ground on the way in. `plow` is read by
+     * `resolvePair`: the load takes no share of any contact with a body that
+     * has mass of its own, so it crosses a crowd instead of stopping four
+     * bodies into it. The turret and the DECOY are static and are deliberately
+     * NOT plowed through -- see the header on resolvePair. Same clock as
+     * `thrown`, because a load that has finished coasting is a body again.
+     */
+    mass.plow = 2.2;
     mass.hurled = true;
     this.tether = null;
     mass.tether = null;
     this.wind = 0;
     this.hurled = true; // spent: it never gets another one
     ring(this.x, this.y, this.r, this.r * 5, 0.3, this.type.color, 2);
+    ring(mass.x, mass.y, mass.r, H.clear.r, 0.34, this.type.glow, 3);
     audio.thud();
+    return true;
   }
 
   drive(world, dt) {
@@ -828,6 +897,7 @@ export class Enemy {
     if (this.spawnIn > 0) this.spawnIn = Math.max(0, this.spawnIn - dt * 2.2);
     this.flash = Math.max(0, this.flash - dt * 4.5);
     if (this.slugged > 0) this.slugged = Math.max(0, this.slugged - dt);
+    if (this.plow > 0) this.plow = Math.max(0, this.plow - dt);
     if (this.plateT > 0) this.plateT = Math.max(0, this.plateT - dt);
     /*
      * MENDING: it closes unless you keep hitting it.
@@ -1312,6 +1382,31 @@ export class Enemy {
     audio.pop(clamp(this.r / 22, 0.5, 2.4));
 
     if (this.isDrop) return;
+
+    /*
+     * A TOW lets go of its load as it dies.
+     *
+     * Measured at tier 9 against a bought damage line, five pairs released the
+     * way the director releases them: two of the five threw nothing at all.
+     * One head was dead at 7.2 seconds, still 600 units out, having never
+     * begun to wind -- 135 health across an approach that takes the better
+     * part of half a minute. The type's entire picture is the load coming off
+     * the cable, and the commonest thing a TOW did was be shot before anyone
+     * saw it.
+     *
+     * So the release is not a reward for surviving the wind, it is what the
+     * body is FOR, and the wind decides how hard rather than whether: a head
+     * killed cold throws at `hurl.partial` of full speed, one killed on the
+     * last frame of its wind at all of it. Killing it early is still the right
+     * play and still buys most of what it used to; it stops being an erasure.
+     *
+     * Before `t.detonate` and the rest deliberately -- the load leaves under
+     * its own release, with its own clearing shove, rather than being scattered
+     * by whatever else this death is about to do.
+     */
+    if (t.hurl && this.tether) {
+      this.release(world, (this.wind || 0) / t.hurl.wind);
+    }
 
     // Bloom: takes the neighbourhood with it.
     if (t.detonate) {

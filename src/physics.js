@@ -135,6 +135,35 @@ export function integrate(b, dt) {
  * Resolve a circle/circle contact.
  * @returns impact speed along the normal (0 if no contact / separating).
  */
+/*
+ * ---- and one body that does not give ground: `plow` ----
+ *
+ * A hurled MASS is 280hp of armoured lump crossing the field at 620, and the
+ * whole read of the type is that it is coming and you are in the way. Against
+ * an ordinary contact it is not: `j` is shared by inverse mass, so a MASS is
+ * slowed by every MOTE it clips, and a TOW that let go inside a crowd -- which
+ * is the case that happens, because a TOW arrives with a wave rather than
+ * alone -- threw a wrecking ball that stopped four bodies in.
+ *
+ * `plow` marks a body that takes NO share of a contact: no positional
+ * correction, no normal impulse, no friction, no spin. The whole of the
+ * response goes to the other side, which is thrown clear at the full weight of
+ * the collision rather than at the half it would have shared. That is the
+ * cheapest honest model of a thing too heavy to stop, and it costs nothing on
+ * any frame where nothing is plowing.
+ *
+ * TWO GUARDS, both load-bearing.
+ *
+ * It only applies against a body with mass of its own (`invMass > 0`). The
+ * turret and the DECOY are static -- `invMass = 0`, `mass = Infinity` -- and a
+ * plow that ignored them would let the MASS pass straight THROUGH the thing it
+ * was thrown at, which is the one outcome the type must never have. Against
+ * those two it is an ordinary contact and stops dead, exactly as before.
+ *
+ * And it is asymmetric per side: if both bodies are plowing, neither yields
+ * and the contact resolves as though both were static, which returns 0 rather
+ * than dividing by an inverse sum of nothing.
+ */
 export function resolvePair(a, b) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -145,17 +174,23 @@ export function resolvePair(a, b) {
   const d = Math.sqrt(d2);
   const nx = dx / d;
   const ny = dy / d;
-  const invSum = a.invMass + b.invMass;
+  // A plowing body is infinitely massive FOR THIS CONTACT, and only against
+  // something that can actually be moved -- see the header.
+  const aPlow = a.plow > 0 && b.invMass > 0;
+  const bPlow = b.plow > 0 && a.invMass > 0;
+  const ia = aPlow ? 0 : a.invMass;
+  const ib = bPlow ? 0 : b.invMass;
+  const invSum = ia + ib;
   if (invSum <= 0) return 0;
 
   // --- positional correction (Baumgarte) ---
   const pen = Math.max(rr - d - P.slop, 0);
   if (pen > 0) {
     const corr = (pen / invSum) * P.correction;
-    a.x -= nx * corr * a.invMass;
-    a.y -= ny * corr * a.invMass;
-    b.x += nx * corr * b.invMass;
-    b.y += ny * corr * b.invMass;
+    a.x -= nx * corr * ia;
+    a.y -= ny * corr * ia;
+    b.x += nx * corr * ib;
+    b.y += ny * corr * ib;
   }
 
   // --- normal impulse ---
@@ -166,10 +201,27 @@ export function resolvePair(a, b) {
 
   const e = a.restitution < b.restitution ? a.restitution : b.restitution;
   const j = (-(1 + e) * vn) / invSum;
-  a.vx -= nx * j * a.invMass;
-  a.vy -= ny * j * a.invMass;
-  b.vx += nx * j * b.invMass;
-  b.vy += ny * j * b.invMass;
+  a.vx -= nx * j * ia;
+  a.vy -= ny * j * ia;
+  b.vx += nx * j * ib;
+  b.vy += ny * j * ib;
+  /*
+   * ...and what a plow throws has to be ALLOWED to leave.
+   *
+   * The whole impulse lands on one side now, so the struck body comes off at
+   * roughly twice what it used to -- and `integrate` clips anything not
+   * `thrown` to `cruise * maxSpeedFactor`, which for a heavy body is well
+   * under the speed the plow is travelling at. Clipped, it stays inside the
+   * plow's radius, and a contact that cannot separate is `impactDamage` on
+   * both bodies every frame at a relative 620: measured before this line, a
+   * MASS and the BULWARK it hit deleted each other in four frames.
+   *
+   * Short, because it is a shove out of the way and not a throw across the
+   * field -- long enough to clear the plow, not long enough to stop the body
+   * coming back.
+   */
+  if (aPlow) b.thrown = Math.max(b.thrown || 0, P.plowThrow);
+  else if (bPlow) a.thrown = Math.max(a.thrown || 0, P.plowThrow);
 
   // --- tangential friction -> spin ---
   const tx = -ny;
@@ -179,13 +231,13 @@ export function resolvePair(a, b) {
   let jt = -vt / invSum;
   const maxJt = j * mu;
   jt = clamp(jt, -maxJt, maxJt);
-  a.vx -= tx * jt * a.invMass;
-  a.vy -= ty * jt * a.invMass;
-  b.vx += tx * jt * b.invMass;
-  b.vy += ty * jt * b.invMass;
+  a.vx -= tx * jt * ia;
+  a.vy -= ty * jt * ia;
+  b.vx += tx * jt * ib;
+  b.vy += ty * jt * ib;
   // Δω = -2·jt·invMass / r for a uniform disc (I = ½mr²).
-  if (a.invMass > 0) a.av -= (2 * jt * a.invMass) / a.r;
-  if (b.invMass > 0) b.av -= (2 * jt * b.invMass) / b.r;
+  if (ia > 0) a.av -= (2 * jt * ia) / a.r;
+  if (ib > 0) b.av -= (2 * jt * ib) / b.r;
 
   return -vn;
 }

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '221';
+export const BUILD = '222';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '221';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '7189005';
+export const REV = '7310c04';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -868,6 +868,32 @@ export const CFG = {
   // pile somewhere else — and the pile is not on top of you.
   decoy: {
     life: 9,
+    /*
+     * ...and what a SECOND press is worth while one is still up.
+     *
+     * It used to be worth less than nothing: `run` called `expire` on the
+     * standing decoy, which is its DEATH -- a 260-unit blast in the middle of
+     * the pile it had gathered -- and then put a fresh one down. So the one
+     * ability whose whole job is to hold a pile somewhere else answered a
+     * second press by detonating the thing holding it. Measured: a body 98
+     * units off the decoy went from 196 health to 82.9 on the press, and the
+     * pile it was part of took a 900 shove outward.
+     *
+     * Worth saying plainly, because it was a mechanic and not only a bug --
+     * with two charges it was an on-demand blast, and taking it away is a
+     * real removal as well as a fix.
+     *
+     * A press adds `life` to what is left instead, up to `lifeCap`. The cap is
+     * three presses' worth and exists so the ceiling is a number rather than
+     * whatever the charge upgrade happens to allow; the second charge is the
+     * only way to get two presses inside one decoy's life anyway, since the
+     * cooldown is longer than the life.
+     *
+     * Note the OTHER clock is unchanged: a decoy dies on `hp` as readily as on
+     * time, and a press does not repair it. Which is why the drawing now shows
+     * both -- see Decoy.draw.
+     */
+    lifeCap: 27,
     hp: 900,
     r: 24,
     ahead: 300, // world units up-field from the turret
@@ -1283,6 +1309,20 @@ export const CFG = {
      * without it. Deliberate throws are exempt and use thrownSpeed above.
      */
     kickFade: 1.5,
+    /*
+     * How long a body a PLOW throws is exempt from the ordinary speed clamp.
+     *
+     * A plowing body (today: a hurled MASS, see CFG.enemyTypes tow.hurl) takes
+     * no share of a contact, so the whole impulse lands on what it struck --
+     * roughly twice the ordinary share, and well over `cruise * maxSpeedFactor`
+     * for anything heavy. Clipped back to that, the struck body cannot get out
+     * of the plow's radius, and a contact that cannot separate bills
+     * `impactDamage` to both of them every frame at the closing speed.
+     *
+     * Half a second: long enough to clear, short enough that the body is
+     * steering again before it has gone anywhere.
+     */
+    plowThrow: 0.5,
     collisionDamage: 0.42, // damage per unit of (impact speed * reduced mass)
     collisionThreshold: 62, // impact speed below this is a harmless bump
   },
@@ -3023,8 +3063,55 @@ export const ENEMY_TYPES = [
      *
      * The head keeps coming, lighter and unencumbered, which is the second
      * half of the beat.
+     *
+     * ---- why `range` is 640 and `wind` is 0.78 (build 222) ----
+     *
+     * Because two TOWs in five never threw anything at all. Measured at tier 9
+     * against a bought damage line, five pairs, from the distance the director
+     * actually releases them at: a pair arrives 1065-1147 units out and took
+     * 18.7 to 27.0 SECONDS to close to the old 430 -- most of a minute of
+     * approach, under fire, on a head with 135 health. One head died at 7.2s
+     * having never begun to wind. Another began at 27.0s, reached 0.97 of its
+     * 1.15, and was knocked back out of range.
+     *
+     * `range` 640 starts the wind six to eight seconds earlier in that
+     * approach, and `wind` 0.78 is a third off the hold. Both are the same
+     * fix as `holdWind` below and as the death-throw in `Enemy.destroy`: the
+     * type's whole picture is the load coming off the cable, and a TOW that is
+     * shot down first is a body with an ability nobody has seen.
      */
-    hurl: { range: 430, wind: 1.15, speed: 620, shock: 0.62, shockFor: 1.8 },
+    hurl: {
+      range: 640,
+      wind: 0.78,
+      speed: 620,
+      /*
+       * What is left of the wind when the head is shoved back out of range.
+       *
+       * It used to be nothing -- `this.wind = 0`, a hard reset -- so a single
+       * knockback at 0.9 of the way through cost the whole hold, and gunfire
+       * shoves the head backwards continuously. That is the run above that
+       * wound for four seconds across two attempts and threw nothing. It
+       * bleeds off at this rate a second instead, so leaving range costs
+       * ground rather than the attempt.
+       */
+      holdWind: 0.5,
+      /*
+       * The load comes off the cable whether or not the head lives to let go.
+       *
+       * `partial` is the least of the throw a head gets for dying with the
+       * cable still on: a wind at 0 throws at 0.58 of `speed`, a full one at
+       * 1.0, linearly between. So killing the head early is still worth doing
+       * -- it buys a slower MASS, and slower is the difference between one you
+       * cannot answer and one you can -- but it no longer erases the load.
+       */
+      partial: 0.58,
+      // What the release shoves out of its own way, so a TOW that let go
+      // inside a crowd throws a wrecking ball rather than a stuck one. See
+      // `clearWay` in enemies.js.
+      clear: { r: 108, impulse: 900 },
+      shock: 0.62,
+      shockFor: 1.8,
+    },
   },
   {
     // The mass on the end of a TOW's cable. Never rolled for on its own.
@@ -3749,11 +3836,38 @@ export const WAVES = [
   { of: [['bulwark', 2], ['herald', 1]], band: 5 },
   { of: [['glut', 3], ['mote', 4]], band: 3 },
   { of: [['glut', 2], ['splitter', 2]], band: 3 },
-  // A TOW is two bodies -- the head and the MASS on its cable -- so these are
-  // heavier than they read. Never more than one pair alongside anything else.
+  /*
+   * A TOW is two bodies -- the head and the MASS on its cable -- so these are
+   * heavier than they read, and `check-build.mjs` counts them as two when it
+   * measures a wave against the eleven-body ceiling.
+   *
+   * There were three of these and now there are seven, which is band 5's
+   * largest single presence. The reason is not that the type was rare in the
+   * table -- three of twenty-five is an ordinary share -- but that it was rare
+   * on the FIELD: two pairs in five threw nothing at all before build 222 (see
+   * tow.hurl), so half of what did arrive was a lime head with a lump behind
+   * it and no beat. With the load coming off the cable reliably, the type has
+   * a picture worth meeting, and one pair a wave is not enough of the band to
+   * teach it.
+   *
+   * The old note said "never more than one pair alongside anything else". That
+   * held while a MASS was a coin flip; three pairs is the point of the last two
+   * here, and eleven bodies is still the ceiling.
+   */
   { of: [['tow', 2], ['needle', 3]], band: 5 },
   { of: [['tow', 1], ['bulwark', 1], ['mote', 4]], band: 5 },
   { of: [['tow', 1], ['prism', 2], ['needle', 3]], band: 5 },
+  // A pair and a beacon: the HERALD is what keeps you looking away while the
+  // load comes round.
+  { of: [['tow', 2], ['herald', 1], ['mote', 2]], band: 5 },
+  // Two pairs into a lane already full of splitting bodies, which is the case
+  // the plow was written for -- a MASS that stops four bodies in is a dropped
+  // ball, and this is the wave where you find out it does not.
+  { of: [['tow', 2], ['splitter', 2]], band: 5 },
+  // Three. Six of the eleven bodies are the pairs, and the loads do not arrive
+  // together: each head winds on its own approach.
+  { of: [['tow', 3], ['needle', 2]], band: 5 },
+  { of: [['tow', 2], ['glut', 2], ['mote', 1]], band: 5 },
 
   /*
    * The bonus. Grey and nothing else: no hostiles, no risk, no cost to the

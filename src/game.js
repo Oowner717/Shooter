@@ -645,7 +645,6 @@ export class Game {
     this.hud.setAim(w);
     this.hud.setToggle('autoFire', w.autoFire);
     this.hud.setKills(w.kills);
-    this.hud.setWavePct(w);
     this.hud.setEnergy(w.energy);
     this.hud.syncAbilities(w.abilities);
     this.hud.alert('SESSION RESTORED', 'info', 2.6);
@@ -2136,9 +2135,13 @@ export class Game {
     const w = this.world;
     w.kills++;
     /*
-     * ...and the running wave's own share of it, which is what the OBJECTS
-     * percentage is built from. Here rather than in the director because this
-     * is the one door every death comes through -- see Director.cleared.
+     * ...and the running wave's own share of it, which is what the rail's third
+     * bar and AUDIT's CLEARED row are built from -- and, through
+     * `Director.score`, the wave verdict itself. (It fed a per-cent on the
+     * OBJECTS chip too until build 222, when that came out; the reference is
+     * updated here because a comment naming a screen that no longer exists is
+     * the next reader's wrong turn.) Here rather than in the director because
+     * this is the one door every death comes through -- see Director.cleared.
      *
      * Not while a boss is up: Game.update freezes the director for the whole
      * of a fight, so a 200-second ORDINAL would pour three hundred DIGIT
@@ -2208,7 +2211,6 @@ export class Game {
     this.syncGate();
     const w = this.world;
     this.hud.setKills(w.kills);
-    this.hud.setWavePct(w);
     /*
      * The ladder's rail. It was missing from here and present only in
      * syncHudLight -- the path that runs while the world is HELD -- so the

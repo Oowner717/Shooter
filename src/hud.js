@@ -73,7 +73,6 @@ export class Hud {
       energy: $('energyNum'),
       energyChip: $('energyChip'),
       counter: $('counter'),
-      wavePct: $('wavePct'),
       energyBuys: $('energyBuys'),
       offer: $('offer'),
       loadout: $('loadout'),
@@ -879,53 +878,32 @@ export class Hud {
     if (n === this.lastKills) return;
     this.lastKills = n;
     this.el.killNum.textContent = n;
-  }
-
-  /**
-   * How much of the running wave is down, beside the count.
-   *
-   * The count answers "how much have I ever shot" and the purse answers "what
-   * did it pay"; neither answers "how far through this am I", which is the
-   * question a kill actually raises. The rail already carries this as a bar --
-   * it is the third meter, the same number AUDIT shows -- and a bar is a shape
-   * rather than a figure. This is the figure, on the chip the kill count
-   * already owns.
-   *
-   * Keyed on whole per cent, not on the fraction: this runs every frame, and a
-   * value that changes on the third decimal is a layout every frame. Blank
-   * between waves rather than 0% or 100%, because neither is true of a field
-   * with nothing on it -- and an empty string collapses the element, so the
-   * chip is exactly as wide as it was before build 209 whenever there is
-   * nothing to say.
-   *
-   * Blank during a boss, and only then: Game.update freezes the director for
-   * the whole of a fight, so the figure would sit on whatever the wave
-   * underneath was at and describe nothing on the screen. The boss has a bar.
-   *
-   * It is NOT blanked between waves any more. It used to be -- "neither 0%
-   * nor 100% is true of a field with nothing on it" -- and that was written
-   * when the figure was a fraction of the field. It is a fraction of the
-   * WAVE now (see Director.cleared), and a wave that has ended with a few of
-   * its bodies still standing is a wave still being finished: the figure goes
-   * on climbing through the rest as they die, and reaches 100% when the last
-   * of them does. Blanking it there was the "it disappears at 75%" report --
-   * the wave ends when the FIELD thins, which it does with a quarter of the
-   * wave still up.
-   */
-  setWavePct(world) {
-    const d = world.director;
-    let pct = -1;
-    if (d && !world.boss && d.serial > 0) {
-      pct = Math.round(d.cleared(world) * 100);
-    }
-    if (pct === this.lastWavePct) return;
-    this.lastWavePct = pct;
-    this.el.wavePct.textContent = pct < 0 ? '' : `${pct}%`;
-    this.el.counter.classList.toggle('hasWave', pct >= 0);
-    // The chip changes width when the figure appears, and the bar above is
-    // sized against the digits in it -- see fitBar.
+    /*
+     * The count is one of the three digit runs `fitBar` is keyed on, and
+     * until build 222 nothing here called it: the per-cent figure beside this
+     * number did, on the same chip, on effectively every frame of a wave. So
+     * the bar re-fitted for a growing count by accident, through a sibling
+     * that has now been removed. Called here, it fires when the count gains a
+     * digit and at no other time -- which is what the sig was always for.
+     */
     this.fitBar();
   }
+
+  /*
+   * ---- what used to be here: the per-wave figure ----
+   *
+   * `setWavePct` wrote a per cent into an `<i>` on the OBJECTS chip -- how
+   * much of the running wave was down, beside how much the run had ever shot.
+   * It came out in build 222 at the player's request, and the request is a
+   * fair reading of the chip: two numbers about two different things, sharing
+   * one label, one of them a lifetime total and the other a fraction of the
+   * thing in front of you. What the chip is FOR is the total.
+   *
+   * `Director.cleared` is untouched and still has three readers -- the third
+   * bar on the live rail cell, AUDIT's CLEARED meter, and `score`, which is
+   * the wave verdict itself. The number was never the problem; a figure
+   * pinned to the count was.
+   */
 
   /**
    * Banked salvage, beside the count. The chip dims when the intake is being

@@ -795,4 +795,51 @@ most once for any given target and cannot spin.
   and it read as WARD at a different radius. Anything that has to be SEEN on a
   shape whose size varies has to scale with it (`rr * 0.052` here, measured at
   8.9%), with a flat term only as the floor for the small end.
+- **A rotation convention copied without its FRAME turns the drawing ninety
+  degrees.** The turret draws its barrel along local +x and turns it by `aim`,
+  which is `-PI/2` for straight up. The DECOY draws its along local -y -- which
+  is already up -- and then applied the same `-PI/2` on top, and
+  `rotate(-PI/2)` sends local -y to world -x. So the stand-in for the turret
+  stood there aiming across the field, for every build it has existed. Measured
+  in two equal windows the same distance out from the mount: 16 lit pixels
+  above and 70 to the left. Nobody saw it in sixty builds because a hexagon with
+  a stub on it reads as a turret whichever way the stub points.
+- **...and it was found only because it fouled a different measurement.** The
+  case for the decoy's life reads the six sides of its mount, and one of them --
+  the left edge -- would not dim at any life however far the clock ran down. It
+  was the barrel lying along that chord. A probe precise enough to have one
+  outlier is a probe that can find something you were not looking for; a probe
+  that sums the whole frame cannot. Which is the same lesson from the other
+  side: **the first version of that case summed every lit pixel** and read a 13%
+  drop across two thirds of a life, because `drawGlow` at 3.4 radii is by far
+  the brightest thing in the frame and does not depend on the clock at all.
+- **A hold that RESETS on leaving its range is a hold that never completes under
+  fire.** A TOW winds its load for a fixed time inside `hurl.range` and
+  `windUp` set `this.wind = 0` the moment the head drifted back out -- and
+  gunfire shoves the head backwards continuously. Measured at tier 9 over five
+  pairs released the way the director releases them: **two of the five threw
+  nothing at all**, one of them having wound for four seconds across two
+  attempts. It bleeds at `holdWind` a second now, so leaving range costs ground
+  rather than the attempt. The same measurement is why `range` went 430 to 640
+  (a pair arrives 1065-1147 units out and took 18.7-27.0 SECONDS to close to
+  430) and why the head lets go as it dies.
+- **A body that takes its share of every contact cannot cross a crowd.** A
+  hurled MASS is the fastest thing on the field and `resolvePair` shares `j` by
+  inverse mass, so it was slowed by every MOTE it clipped: measured, nine bodies
+  in the way and it stopped 323 units short of a turret it reaches in 0.70s
+  across an empty field. `plow` marks a body that takes no share at all. Two
+  guards make it safe and both are load-bearing: it applies only against a body
+  with `invMass > 0`, so the turret and the DECOY -- static, the two things it
+  must never pass through -- stop it dead; and what it throws is marked
+  `thrown`, because the whole impulse now lands on one side and `integrate`
+  would otherwise clip the struck body back inside the plow's radius, where a
+  contact that cannot separate bills `impactDamage` to both every frame. Before
+  that line, a MASS and the BULWARK it hit deleted each other in four frames.
+- **Removing a readout means finding its other readers.** The per-wave per-cent
+  came off the OBJECTS chip and `Director.cleared` stayed, because three other
+  things draw it: the rail's third bar, AUDIT's CLEARED row, and `score`, which
+  is the wave verdict itself. What did have to move was `fitBar` -- it is keyed
+  on the digit counts of three numbers and had NO caller for the kill count,
+  having been re-run by accident all this time through the sibling that was
+  just deleted.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

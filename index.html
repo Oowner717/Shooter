@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '221';
+  var BUILD = '222';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -92,12 +92,12 @@
       -->
       <div id="barChips">
       <div id="counter" class="chip">
+        <!-- Every object this run has destroyed, and nothing else. The
+             per-wave figure that used to sit beside it went in build 222:
+             two numbers about different things on one chip, and the one
+             about the wave is on the rail and in AUDIT already. -->
         <span id="killNum">0</span>
         <em>OBJECTS</em>
-        <!-- How much of the running wave is down. The count says how much you
-             have ever shot; this says how far through the thing in front of
-             you are, which is the question a kill actually answers. -->
-        <i id="wavePct"></i>
       </div>
       <!--
         The way into the tree. Energy is what upgrades cost, so the number is

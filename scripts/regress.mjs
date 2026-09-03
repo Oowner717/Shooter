@@ -11547,9 +11547,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.aperture = 1;
     g.openBoss(1);
     for (let f = 0; f < 60; f++) g.update(1 / 60);
-    g.hud.setWavePct(w);
     const bossUp = !!w.boss;
-    const chip = g.hud.el.wavePct.textContent;
+    // The chip this used to read is gone (build 222). What it was really
+    // asserting is that a paused wave takes nothing from a boss's dead, and
+    // that is still `cleared` -- which the rail and AUDIT both draw.
+    const frozen = d.cleared(w);
     // Handed a body OF THE RUNNING WAVE, because that is what registerKill
     // now tests: a death only moves the figure if it belongs to the wave the
     // figure is about. A bare call proves nothing either way.
@@ -11559,7 +11561,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // ...and the control: no boss, same call, same wave.
     w.boss = null;
     for (let i = 0; i < 5; i++) one();
-    out.boss = { up: bossUp, chip, underBoss, control: d.slain - underBoss };
+    out.boss = { up: bossUp, frozen, after: d.cleared(w), underBoss,
+      control: d.slain - underBoss };
 
     g.debugClearField();
     g.restart();
@@ -11602,10 +11605,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `24 up against an asked of 4: ${r.flooded}% with two down, ${r.floodedNone}% with none `
     + `(the old fraction went negative here and was clamped)`);
 
-  check('...and an anomaly says nothing on it, and pours nothing into it',
-    r.boss.up && r.boss.chip === '' && r.boss.underBoss === 0 && r.boss.control === 5,
-    `chip "${r.boss.chip}" during a fight; the paused wave took ${r.boss.underBoss} `
-    + `of five deaths with an anomaly up and ${r.boss.control} of five without one`);
+  check('...and an anomaly pours nothing into it',
+    r.boss.up && r.boss.underBoss === 0 && r.boss.control === 5
+    && r.boss.after === r.boss.frozen,
+    `the paused wave took ${r.boss.underBoss} of five deaths with an anomaly up `
+    + `and ${r.boss.control} of five without one; the figure sat at `
+    + `${r.boss.frozen} throughout`);
 }
 
 // --- the corruption is held with the world ---------------------------------
@@ -14537,6 +14542,480 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('...and the WARD-s surface is visibly live, not a drawn circle',
     r.surges > 0 && r.hot > 20,
     `${r.surges} discharges crawling on it, ${r.hot} pixels of them near-white`);
+}
+
+/*
+ * ---- build 222: the DECOY's two clocks, and the OBJECTS chip ----
+ *
+ * A second press used to call `expire` on the standing decoy, and `expire` is
+ * the decoy's DEATH -- a 260-unit blast at 150 damage with a 900 shove, thrown
+ * into the middle of the pile the decoy existed to hold somewhere that was not
+ * on top of you. So the ability whose entire job is holding the field away
+ * answered a second press by putting the field back. It adds to the clock now.
+ *
+ * And the drawing carries how long it has left, which it never did: the only
+ * tell for time was the last 1.6 seconds fading out, which is a warning that
+ * arrives after the decision it was meant to inform. Asserted on the RENDERED
+ * PIXELS, because "you can see how long it has" is a claim about what reaches
+ * the screen and nothing else settles it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const slot = () => w.abilities.slots.findIndex((x) => x.def.id === 'decoy');
+
+    const fresh = () => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      w.abilities.clearCooldowns();
+    };
+
+    // ---- a second press extends rather than detonates ----------------------
+    fresh();
+    g.useAbility(slot());
+    const first = w.decoy;
+    // Four seconds off the clock, so the extension has somewhere to land.
+    for (let f = 0; f < 240; f++) g.update(1 / 60);
+    const before = { life: +first.life.toFixed(2), hp: first.hp, dead: first.dead };
+    // A witness inside the blast the old path would have thrown, so "it did
+    // not detonate" is measured on the field rather than on a flag.
+    const near = g.debugSpawn('lurcher', first.x + 90, first.y + 40);
+    if (near) { near.staged = false; near.spawnIn = 0; }
+    const witnessHp = near ? near.hp : -1;
+    w.abilities.clearCooldowns();
+    g.useAbility(slot());
+    const after = {
+      same: w.decoy === first,
+      life: +w.decoy.life.toFixed(2),
+      hp: w.decoy.hp,
+      dead: first.dead,
+      maxLife: +w.decoy.maxLife.toFixed(2),
+      witness: near ? near.hp : -1,
+    };
+
+    // ---- and it stops at the ceiling --------------------------------------
+    for (let i = 0; i < 6; i++) { w.abilities.clearCooldowns(); g.useAbility(slot()); }
+    const capped = +w.decoy.life.toFixed(2);
+
+    // ---- what the drawing says about the clock -----------------------------
+    /*
+     * Rendered onto an offscreen canvas at two points on one decoy's life, and
+     * NOT off the live one: `draw` is called from the frame loop, so a
+     * screenshot measures the loop rather than the drawing (the rule build 211
+     * paid for on HE's burst). The turret's own silhouette is what carries it
+     * -- six sides going out one at a time -- so the measurement is total lit
+     * ink on the mount, which cannot be flattered by the fade at the end
+     * because the fade is only the last 1.6 seconds and the samples are taken
+     * well outside it.
+     */
+    const W = 220;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = W;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    /*
+     * Per SIDE, not per canvas. The first version summed every lit pixel on
+     * the frame and read a 13% drop across two thirds of a life, which is not
+     * the effect failing -- it is the AMBIENT GLOW, `drawGlow` at 3.4 radii,
+     * which is by far the brightest thing here and does not depend on the
+     * clock at all. Same shape as the streak and stroke-floor probes CLAUDE.md
+     * records: the quantity was real and had nothing to do with the claim.
+     *
+     * The claim is that the mount's six sides go out one at a time, so the
+     * measurement walks each side's own CHORD -- vertex to vertex, which is at
+     * 0.866r at its midpoint and nowhere near the circle of radius r -- and
+     * takes the brightest pixel on it. The dash means most samples land in a
+     * gap; the maximum is what survives that. Comparing sides against each
+     * other inside one frame is glow-neutral by construction: they sit at the
+     * same radii and carry the same ambient underneath.
+     */
+    const sides = (d) => {
+      const dd = w.decoy;
+      dd.life = d;
+      dd.maxLife = CFG.decoy.life;
+      dd.born = 1;
+      dd.restacked = 0;
+      /*
+       * The barrel's sweep pinned to dead centre, which is not tidiness: it
+       * swings +/-0.5 rad scaled by the life left, and at the wide end it
+       * crosses the chord of whichever side it is leaning over -- so a case
+       * that left it to `world.time` would read one side bright or dim
+       * depending on where in the sweep the sample happened to land. That is
+       * the "measured at the wrong moment" flake CLAUDE.md keeps a list of.
+       */
+      w.time = (Math.PI - dd.born) / 1.3;
+      const ox = dd.x, oy = dd.y;
+      dd.x = W / 2; dd.y = W / 2;
+      ctx.fillStyle = '#04050a'; ctx.fillRect(0, 0, W, W);
+      dd.draw(ctx, w);
+      dd.x = ox; dd.y = oy;
+      const px = ctx.getImageData(0, 0, W, W).data;
+      const at = (x, y) => {
+        const q = ((y | 0) * W + (x | 0)) * 4;
+        return Math.max(px[q], px[q + 1], px[q + 2]);
+      };
+      const out = [];
+      for (let i = 0; i < 6; i++) {
+        const a0 = -Math.PI / 2 + (i / 6) * Math.PI * 2;
+        const a1 = -Math.PI / 2 + ((i + 1) / 6) * Math.PI * 2;
+        const x0 = W / 2 + Math.cos(a0) * dd.r;
+        const y0 = W / 2 + Math.sin(a0) * dd.r;
+        const x1 = W / 2 + Math.cos(a1) * dd.r;
+        const y1 = W / 2 + Math.sin(a1) * dd.r;
+        let best = 0;
+        // Away from the shared vertices, so a side cannot borrow its
+        // neighbour's ink at the corner they have in common -- and clear of
+        // the barrel, which stands out of the top vertex.
+        for (let t = 0.3; t <= 0.7; t += 0.004) {
+          const x = x0 + (x1 - x0) * t;
+          const y = y0 + (y1 - y0) * t;
+          for (let o = -1; o <= 1; o++) best = Math.max(best, at(x + o, y), at(x, y + o));
+        }
+        out.push(best);
+      }
+      return out;
+    };
+    const full = sides(CFG.decoy.life);
+    const third = sides(CFG.decoy.life * 0.34);
+    /*
+     * ...and which way the barrel points, off the same drawing. The barrel is
+     * the only thing that reaches past 1.3 radii, so the two windows below --
+     * straight up and straight left of the mount, the same size and the same
+     * distance out -- contain the barrel and nothing else.
+     */
+    sides(CFG.decoy.life);
+    const px2 = ctx.getImageData(0, 0, W, W).data;
+    const box = (cx, cy, half) => {
+      let n = 0;
+      for (let y = cy - half; y <= cy + half; y++) {
+        for (let x = cx - half; x <= cx + half; x++) {
+          const q = ((y | 0) * W + (x | 0)) * 4;
+          if (Math.max(px2[q], px2[q + 1], px2[q + 2]) > 90) n++;
+        }
+      }
+      return n;
+    };
+    const rr = w.decoy.r;
+    const barrel = {
+      up: box(W / 2, W / 2 - rr * 1.7, 9),
+      left: box(W / 2 - rr * 1.7, W / 2, 9),
+    };
+    // ...and the ONE control that matters: health held constant across both.
+    // If the two readings differed because the plating arc moved, the drawing
+    // would be expressing health twice and time not at all.
+    const hpHeld = w.decoy.hp;
+
+    g.restart();
+    return { before, after, capped, cap: CFG.decoy.lifeCap, life: CFG.decoy.life,
+      witnessHp, full, third, hpHeld, barrel };
+  });
+
+  check('a second DECOY adds to the clock instead of killing the one that is up',
+    r.after.same === true && r.after.dead === false
+    && r.after.life > r.before.life + r.life * 0.9
+    && r.after.witness === r.witnessHp,
+    `${r.before.life}s left -> ${r.after.life}s on the same decoy `
+    + `(${r.after.same ? 'same object' : 'REPLACED'}); a body 98 units off it `
+    + `went ${r.witnessHp} -> ${r.after.witness} hp, where the old path threw a `
+    + `150-damage blast across 260 units`);
+
+  check('...and the clock has a ceiling rather than however many charges allow',
+    r.capped === r.cap,
+    `six more presses reach ${r.capped}s against a cap of ${r.cap}`);
+
+  /*
+   * At full life every side of the mount reads the same; at a third, the ones
+   * past the boundary have gone. Both arms are needed: the first is what shows
+   * the instrument can read a lit side at all, and without it "side 5 is dim"
+   * would pass on a drawing that had no mount in it.
+   */
+  const evenAtFull = r.full && Math.min(...r.full) > Math.max(...r.full) * 0.85;
+  const goneAtThird = r.third && r.third[5] < r.third[0] * 0.7
+    && r.third[4] < r.third[0] * 0.7;
+  /*
+   * The barrel points UP, which it did not until build 222.
+   *
+   * `rotate(-Math.PI / 2 + sweep)` copied the real turret's convention without
+   * its frame: the machine draws its barrel along local +x and turns it by
+   * `aim` (-PI/2 for up); the decoy draws its along local -y, which is already
+   * up, and then took the same -PI/2 on top. `rotate(-PI/2)` sends local -y to
+   * world -x, so the stand-in for the turret aimed across the field. Asserted
+   * as ink in the quadrant above the mount against ink to the left of it, on
+   * the same drawing, with the sweep pinned -- a claim about which way
+   * something points is a claim about pixels.
+   */
+  check('the DECOY-s barrel points the way the turret-s does',
+    r.barrel && r.barrel.up > r.barrel.left * 3 && r.barrel.up - r.barrel.left > 30,
+    `above the mount ${r.barrel && r.barrel.up} lit pixels, to the left of it `
+    + `${r.barrel && r.barrel.left} -- and the left window is not zero because `
+    + `the ambient glow reaches 3.4 radii, which is why the two windows are the `
+    + `same size at the same distance out`);
+
+  check('...and how much of it is left is drawn on the machine',
+    r.full && Math.max(...r.full) > 60 && evenAtFull && goneAtThird
+    && r.third[0] > r.third[5],
+    `the mount's six sides read [${r.full}] at full life and [${r.third}] at a `
+    + `third of it, with health held at ${r.hpHeld} across both`);
+}
+
+/*
+ * ---- build 222: the OBJECTS chip is a total and nothing else ----
+ *
+ * The per-wave figure that sat beside it came out at the player's request. The
+ * case is here because a chip is easy to put back by accident and because the
+ * thing that remains has to be the LIFETIME count -- `world.kills`, which is
+ * fed from the one death door and survives a wave turning over.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    w.director.update = () => {};
+    const d = w.director;
+    d.resting = false; d.asked = 4; d.jobs.length = 0; d.slain = 0; d.made = 4;
+    g.syncHud ? g.syncHud() : null;
+    for (let f = 0; f < 3; f++) g.update(1 / 60);
+    const chip = document.getElementById('counter');
+    const text0 = chip.textContent.replace(/\s+/g, ' ').trim();
+    // Five deaths of the running wave: the count moves, and nothing else on
+    // the chip does.
+    for (let i = 0; i < 5; i++) g.registerKill({ wave: d.serial });
+    for (let f = 0; f < 3; f++) g.update(1 / 60);
+    const text1 = chip.textContent.replace(/\s+/g, ' ').trim();
+    const num = document.getElementById('killNum').textContent;
+    const pctEl = !!document.getElementById('wavePct');
+    // ...and it is the LIFETIME total, not the wave's: end the wave and the
+    // number does not go back.
+    const before = w.kills;
+    d.done = true; d.resting = true;
+    for (let f = 0; f < 3; f++) g.update(1 / 60);
+    const kept = document.getElementById('killNum').textContent;
+    g.restart();
+    return { text0, text1, num, pctEl, kills: before, kept,
+      cleared: typeof d.cleared === 'function' };
+  });
+
+  check('the OBJECTS chip carries the total destroyed and no per-wave figure',
+    r.pctEl === false && !/%/.test(r.text0) && !/%/.test(r.text1)
+    && r.num === String(r.kills) && r.kills === 5,
+    `chip reads "${r.text1}" after five deaths (the element that held the `
+    + `per-cent is ${r.pctEl ? 'STILL THERE' : 'gone'})`);
+
+  check('...and the number it keeps is the run-s, not the wave-s',
+    r.kept === String(r.kills) && r.cleared === true,
+    `${r.kept} still shown once the wave is scored and resting; `
+    + `Director.cleared ${r.cleared ? 'still exists for the rail and AUDIT' : 'IS GONE'}`);
+}
+
+/*
+ * ---- build 222: the TOW actually throws the thing it is carrying ----
+ *
+ * Measured at tier 9 against a bought damage line, five pairs released the way
+ * the director releases them: TWO OF FIVE THREW NOTHING. One head was dead at
+ * 7.2 seconds and 600 units out, having never begun to wind -- 135 health
+ * across an approach that took 18.7 to 27.0 seconds to close to the old
+ * 430-unit hurl range. Another wound for four seconds across two attempts and
+ * threw nothing, because gunfire kept shoving it a few units back out of range
+ * and `windUp` reset the hold to zero every time.
+ *
+ * Four things answer that and each has an arm here: the range, the shorter
+ * hold, the wind that bleeds instead of resetting, and the load coming off the
+ * cable when the head dies. Plus the plow, which is what makes a throw into a
+ * crowd a throw rather than a drop.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const H = TYPE_BY_ID.tow.hurl;
+
+    const fresh = () => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      w.autoAim = false;
+      w.autoFire = false;
+    };
+    // A real pair. `debugSpawn` makes the head alone -- CLAUDE.md's note, and
+    // a probe that builds one that way is measuring 135hp against the 415 the
+    // game sends.
+    const pair = () => {
+      g.debugSpawnGroup('tow', 1, { staged: false });
+      const head = w.enemies.find((e) => e.type.id === 'tow' && !e.dead);
+      const mass = w.enemies.find((e) => e.type.id === 'towMass' && !e.dead);
+      if (head) { head.staged = false; head.spawnIn = 0; }
+      if (mass) { mass.staged = false; mass.spawnIn = 0; }
+      return { head, mass };
+    };
+
+    // ---- a head killed cold still lets go ---------------------------------
+    /*
+     * Killed through `destroy`, which is the door every death comes through,
+     * and killed COLD -- `wind` untouched at zero -- because that is the case
+     * the measurement found: not a head that nearly made it, a head that never
+     * started. The load must leave, and leave slower than a completed wind.
+     */
+    fresh();
+    const cold = pair();
+    let coldOut = null;
+    if (cold.head && cold.mass) {
+      cold.head.destroy(w);
+      g.update(1 / 60);
+      coldOut = {
+        hurled: !!cold.mass.hurled,
+        v: +Math.hypot(cold.mass.vx, cold.mass.vy).toFixed(0),
+        tether: !!cold.mass.tether,
+      };
+    }
+
+    // ---- ...and one that finished its wind throws harder -------------------
+    fresh();
+    const hot = pair();
+    let hotOut = null;
+    if (hot.head && hot.mass) {
+      hot.head.wind = H.wind;
+      hot.head.destroy(w);
+      g.update(1 / 60);
+      hotOut = { hurled: !!hot.mass.hurled,
+        v: +Math.hypot(hot.mass.vx, hot.mass.vy).toFixed(0) };
+    }
+
+    // ---- the wind bleeds when it is shoved out of range, not resets --------
+    /*
+     * Driven through `windUp` with the head parked outside the range, because
+     * that is exactly what gunfire does to it -- and the whole failure was
+     * that one shove past the line cost the entire hold.
+     */
+    fresh();
+    const shoved = pair();
+    let bleed = null;
+    if (shoved.head) {
+      const s = w.shooter;
+      shoved.head.x = s.x;
+      shoved.head.y = s.y - (H.range * 0.5);
+      // Inside: it winds.
+      for (let f = 0; f < 24; f++) shoved.head.windUp(w, 1 / 60);
+      const inside = +(shoved.head.wind || 0).toFixed(3);
+      // Outside: half a second of it.
+      shoved.head.y = s.y - (H.range + 200);
+      for (let f = 0; f < 30; f++) shoved.head.windUp(w, 1 / 60);
+      bleed = { inside, outside: +(shoved.head.wind || 0).toFixed(3) };
+    }
+
+    // ---- the load crosses a crowd ------------------------------------------
+    /*
+     * The same trial twice, plow off and plow on, with a wall of nine bodies
+     * between the load and the turret. Everything is healed each frame so the
+     * question is only ever "did it get there", never "did it kill its way
+     * there"; and the empty-field arm is the control that shows the plow
+     * changes NOTHING when there is nothing to plow -- without it the case
+     * could pass on a load that had simply been made faster.
+     */
+    const cross = (crowd, plow) => {
+      fresh();
+      const s = w.shooter;
+      const blockers = [];
+      for (let i = 0; i < crowd; i++) {
+        const e = g.debugSpawn(['lurcher', 'splitter', 'bulwark', 'prism', 'glut'][i % 5],
+          s.x - 60 + (i % 3) * 60, s.y - 150 - ((i / 3) | 0) * 55);
+        if (e) { e.staged = false; e.spawnIn = 0; e.hp = 1e9; e.maxHp = 1e9; blockers.push(e); }
+      }
+      const m = g.debugSpawn('towMass', s.x, s.y - 420);
+      if (!m) return null;
+      m.staged = false; m.spawnIn = 0; m.hp = 1e9; m.maxHp = 1e9;
+      m.vx = 0; m.vy = H.speed; m.thrown = 2.2;
+      m.plow = plow ? 2.2 : 0;
+      let t = 0, closest = 1e9;
+      while (t < 3 && !m.dead) {
+        for (const b of blockers) b.hp = 1e9;
+        m.hp = 1e9;
+        g.update(1 / 60); t += 1 / 60;
+        closest = Math.min(closest, Math.hypot(m.x - s.x, m.y - s.y));
+      }
+      return { closest: +closest.toFixed(0), stopped: m.y < s.y - 200 };
+    };
+    const clearOff = cross(0, false);
+    const clearOn = cross(0, true);
+    const jamOff = cross(9, false);
+    const jamOn = cross(9, true);
+
+    // ---- ...and it does not cross the TURRET -------------------------------
+    /*
+     * The one thing the plow must never do. The turret and the DECOY are
+     * static -- invMass 0 -- and `resolvePair` only plows against a body with
+     * mass of its own, so both stop it dead. Measured as "it is still on the
+     * near side of the thing it was thrown at" a full second after arriving.
+     */
+    fresh();
+    const s2 = w.shooter;
+    const through = g.debugSpawn('towMass', s2.x, s2.y - 300);
+    let past = null;
+    if (through) {
+      through.staged = false; through.spawnIn = 0; through.hp = 1e9; through.maxHp = 1e9;
+      through.vx = 0; through.vy = H.speed; through.thrown = 2.2; through.plow = 2.2;
+      let deepest = -1e9;
+      for (let f = 0; f < 120; f++) {
+        through.hp = 1e9;
+        g.update(1 / 60);
+        deepest = Math.max(deepest, through.y - s2.y);
+      }
+      past = +deepest.toFixed(0);
+    }
+
+    g.restart();
+    return { coldOut, hotOut, bleed, clearOff, clearOn, jamOff, jamOn, past,
+      H: { range: H.range, wind: H.wind, speed: H.speed, partial: H.partial,
+        holdWind: H.holdWind } };
+  });
+
+  check('a TOW killed before it can wind still lets go of its load',
+    r.coldOut && r.coldOut.hurled === true && r.coldOut.tether === false
+    && r.coldOut.v > r.H.speed * r.H.partial * 0.8,
+    `a head destroyed with the wind at zero threw its MASS at ${r.coldOut && r.coldOut.v} `
+    + `u/s (two pairs in five used to throw nothing at all)`);
+
+  check('...and a completed wind is still worth more than an interrupted one',
+    r.hotOut && r.coldOut && r.hotOut.v > r.coldOut.v * 1.3,
+    `${r.coldOut && r.coldOut.v} u/s cold against ${r.hotOut && r.hotOut.v} u/s `
+    + `off a full wind, so killing the head early still buys the slower load`);
+
+  check('...and a shove out of range costs the wind ground, not the attempt',
+    r.bleed && r.bleed.inside > 0.3 && r.bleed.outside > 0
+    && r.bleed.outside < r.bleed.inside,
+    `0.4s inside the range wound to ${r.bleed && r.bleed.inside}; half a second `
+    + `outside it left ${r.bleed && r.bleed.outside} (it used to leave nothing)`);
+
+  check('a hurled MASS crosses a crowd it would otherwise have stopped in',
+    r.jamOn && r.jamOff && r.clearOn && r.clearOff
+    && r.jamOff.closest > r.clearOff.closest + 40
+    && r.jamOn.closest < r.clearOn.closest + 12,
+    `nine bodies in the way: it got to ${r.jamOff && r.jamOff.closest} units of the `
+    + `turret without the plow and ${r.jamOn && r.jamOn.closest} with it, against `
+    + `${r.clearOn && r.clearOn.closest} across an empty field`);
+
+  check('...and the plow does nothing at all when there is nothing to plow',
+    r.clearOn && r.clearOff && Math.abs(r.clearOn.closest - r.clearOff.closest) <= 4,
+    `empty field: ${r.clearOff && r.clearOff.closest} units without it, `
+    + `${r.clearOn && r.clearOn.closest} with it`);
+
+  check('...and it never plows through the turret, which is what it is thrown at',
+    r.past !== null && r.past < 0,
+    `two seconds after arriving it is ${r.past} units past the turret centre `
+    + `(a static body has no inverse mass, so resolvePair refuses to plow it)`);
 }
 
 // --- report -----------------------------------------------------------------

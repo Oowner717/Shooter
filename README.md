@@ -408,7 +408,16 @@ up-field; `Enemy.steer` picks it over you, so a scattered field becomes one pile
 somewhere that is not on top of you. It is a static physics body, so things heap
 up against it rather than drifting through, and it takes the collision damage of
 everything it catches — 900 hit points, nine seconds, and a 260-unit blast when
-it finally goes. Only one at a time; casting again detonates the old one.
+it finally goes.
+
+Still only one at a time, but **casting again now adds nine seconds to the one
+that is standing**, up to twenty-seven. It used to detonate it: pressing the
+ability whose whole job is holding the pile away threw a 150-damage blast into
+the middle of that pile and shoved it back over you. It has **two clocks** — the
+nine seconds and the 900 hit points — and a second press extends only the first,
+so the drawing carries both: the plating arc outside the mount is health, and
+the mount's own six sides go out one at a time as the time runs down, the dashes
+opening up and the barrel going still as it dies.
 
 **CHORUS** is the only ability that does nothing on its own. It binds every
 hostile on the field for six seconds — no damage, no hold — and from then on,
@@ -2151,6 +2160,20 @@ They unlock progressively as the count climbs.
   bodies under a distance constraint, so the pair swings across the field and
   shoves whatever it catches, and both count — a TOW is **two** of the five
   hundred. Cut either end and the cable goes slack.
+
+  Inside 640 units it winds the load up for three quarters of a second and
+  **throws it at you at 620** — faster than anything else on the field, and it
+  does not give ground on the way in: a hurled MASS takes no share of any
+  contact with a body that has mass of its own, so it crosses a crowd instead
+  of stopping in one. The turret and the DECOY are the exceptions and stop it
+  dead, which is the entire point of it.
+
+  **The load leaves whether or not the head lives to let it go.** Kill the head
+  cold and the MASS is still thrown, at 58% of full speed; kill it on the last
+  frame of the wind and at all of it. So shooting the head early is still the
+  right play — it buys a slower load — but it no longer erases one. Before this,
+  two pairs in five threw nothing at all: the head has 135 hit points against an
+  approach that took the better part of half a minute.
 - **DRIFT** — harmless. No goal, no destination, no threat: it wanders on a
   slow random walk, never breaches the turret, never triggers a mine, is never
   auto-targeted and does not count toward the tally. It is there to be shot at

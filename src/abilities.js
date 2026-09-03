@@ -312,8 +312,19 @@ class Decoy {
     this.hp = D.hp;
     this.maxHp = D.hp;
     this.life = D.life;
+    /*
+     * What the life ring is drawn against. It moves, because `life` does: a
+     * second press adds nine seconds to whatever is left, so a ring drawn
+     * against the constant would sit pinned at full for the first nine
+     * seconds of an eighteen-second decoy and tell you nothing. Against the
+     * high-water mark it starts full on every press and empties honestly.
+     */
+    this.maxLife = D.life;
     this.dead = false;
     this.flash = 0;
+    // The re-projection pulse, so a press that landed on a standing decoy is
+    // visibly a press that landed. Ages out over its own second.
+    this.restacked = 0;
     this.born = 0;
     // static physics body, exactly like the turret
     this.vx = 0;
@@ -330,6 +341,41 @@ class Decoy {
     this.hp -= dmg;
     this.flash = Math.min(1, this.flash + dmg / 200);
     if (this.hp <= 0) this.expire(world);
+  }
+
+  /**
+   * A second press, while this one is still standing.
+   *
+   * It adds to the clock rather than replacing the decoy, which is the whole
+   * of the change: the previous behaviour was `expire`, and `expire` is not a
+   * tidy dismissal -- it is the decoy's death, a 260-unit 150-damage blast
+   * with a 900 shove, thrown into the middle of the pile the decoy had spent
+   * its life gathering. Pressing the pile-holder twice scattered the pile.
+   *
+   * Time only. The plating is not repaired, deliberately: a decoy has two
+   * clocks and this ability extends one of them, so the drawing carries both
+   * and the player can see which one is actually going to end it.
+   */
+  restack(world) {
+    const D = CFG.decoy;
+    const before = this.life;
+    this.life = Math.min(D.lifeCap, this.life + D.life);
+    this.maxLife = Math.max(this.maxLife, this.life);
+    // Nothing to show if it was already at the ceiling, and a pulse that
+    // fires when nothing happened is a pulse that stops meaning anything.
+    if (this.life <= before + 1e-6) return false;
+    this.restacked = 1;
+    ring(this.x, this.y, this.r * 0.5, this.r * 6, 0.42, '#59e0ff', 3);
+    ripple(this.x, this.y, 0.8, 380);
+    for (let i = 0; i < 14; i++) {
+      const a = rand(0, TAU);
+      spark(this.x + Math.cos(a) * this.r, this.y + Math.sin(a) * this.r,
+        Math.cos(a) * rand(60, 200), Math.sin(a) * rand(60, 200),
+        '#9be7ff', rand(0.2, 0.45), 2);
+    }
+    shake(4);
+    audio.ability('pulse');
+    return true;
   }
 
   expire(world) {
@@ -359,14 +405,52 @@ class Decoy {
   update(world, dt) {
     this.born = Math.min(1, this.born + dt * 3);
     this.flash = Math.max(0, this.flash - dt * 3);
+    this.restacked = Math.max(0, this.restacked - dt * 1.4);
     this.life -= dt;
     if (this.life <= 0) this.expire(world);
   }
 
+  /*
+   * ---- how long it has left, on the machine rather than beside it ----
+   *
+   * A decoy has two clocks and the drawing carried one of them: an arc of
+   * plating at `r + 7` for health, and nothing at all for the nine seconds.
+   * The only tell for time was the last 1.6 of it fading out, which is a
+   * warning that arrives after the decision it was meant to inform -- by then
+   * the pile is already coming back at you and there is nothing to do about
+   * it. And the ability now STACKS, so "how long has it got" is a question
+   * the player can actually answer with a button, which makes showing the
+   * answer worth twice what it was.
+   *
+   * It is expressed as the machine coming apart rather than as a second
+   * gauge, on the argument that the hexagonal mount IS the design -- it is
+   * the real turret's silhouette, which is the entire reason anything walks
+   * at it. So:
+   *
+   *   THE SIX SIDES GO OUT ONE AT A TIME. Six segments, `lf * 6` of them lit,
+   *   the one on the boundary dimming through as it goes. Countable at a
+   *   glance without being a number, and the same six every time however
+   *   long the decoy was stacked to, because `maxLife` is the high-water mark
+   *   rather than the config constant.
+   *
+   *   WHAT IS LEFT GETS LESS SOLID. The dash runs from [5,4] at full to about
+   *   [1.4,7.6] at empty, so the projection visibly stops holding together
+   *   rather than simply losing pieces.
+   *
+   *   AND IT STOPS LOOKING AROUND. The barrel's sweep is scaled by `lf`, so a
+   *   decoy near the end of its life goes still -- which is the tell that
+   *   reads from furthest away, since motion is what the eye catches first.
+   *
+   * The health arc is unchanged and still at `r + 7`; a life ring would have
+   * been a second arc of the same shape in a different colour, which is two
+   * gauges to tell apart in a fight rather than one thing falling apart.
+   */
   draw(ctx, world) {
     const k = this.born;
     const hpf = clamp(this.hp / this.maxHp, 0, 1);
     const going = clamp(this.life / 1.6, 0, 1);
+    const lf = clamp(this.life / Math.max(1e-6, this.maxLife), 0, 1);
+    const re = this.restacked;
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.globalAlpha = k * (0.45 + going * 0.55);
@@ -385,17 +469,27 @@ class Decoy {
      * hexagonal mount and barrel, hollow and dashed, and the barrel sweeps:
      * a decoy that stands perfectly still is obviously not a gun.
      */
-    ctx.strokeStyle = rgba('#9be7ff', 0.9);
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 4]);
-    ctx.beginPath();
-    for (let i = 0; i <= 6; i++) {
-      const a2 = -Math.PI / 2 + (i / 6) * TAU;
-      const px = Math.cos(a2) * this.r;
-      const py = Math.sin(a2) * this.r;
-      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    ctx.lineWidth = 2 + re * 1.4;
+    // Solid at full, gappy at the end: the projection stops holding together
+    // as well as losing pieces.
+    ctx.setLineDash([1.4 + 3.6 * lf, 4 + 3.6 * (1 - lf)]);
+    // Six sides, each its own path, because they go out one at a time. `lit`
+    // is how many are still whole; the one straddling the boundary carries
+    // the fraction, so the countdown is smooth and still countable.
+    const lit = lf * 6;
+    for (let i = 0; i < 6; i++) {
+      const held = clamp(lit - i, 0, 1);
+      // Never zero: a side that vanished outright would leave a shape that is
+      // not a hexagon, and the silhouette is the whole point of the thing.
+      ctx.strokeStyle = rgba('#9be7ff', (0.1 + 0.8 * held) * (1 + re * 0.5));
+      const a0 = -Math.PI / 2 + (i / 6) * TAU;
+      const a1 = -Math.PI / 2 + ((i + 1) / 6) * TAU;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a0) * this.r, Math.sin(a0) * this.r);
+      ctx.lineTo(Math.cos(a1) * this.r, Math.sin(a1) * this.r);
+      ctx.stroke();
     }
-    ctx.stroke();
+    ctx.strokeStyle = rgba('#9be7ff', 0.9);
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.arc(0, 0, this.r * 0.42, 0, TAU);
@@ -405,7 +499,34 @@ class Decoy {
     // no reader: `run` allows exactly one decoy, so there is no lockstep to
     // break.
     ctx.save();
-    ctx.rotate(-Math.PI / 2 + Math.sin(world.time * 1.3 + this.born) * 0.5);
+    /*
+     * ---- the barrel pointed LEFT for its whole life ----
+     *
+     * This was `rotate(-Math.PI / 2 + sweep)`, copying the real turret's
+     * convention without copying the frame it is a convention IN. The machine
+     * draws its barrel along local +x and turns it by `aim`, which is -PI/2
+     * for straight up. The decoy draws its barrel along local -y -- already
+     * up -- and then applied the same -PI/2 on top, and `rotate(-PI/2)` sends
+     * local -y to world -x. So the stand-in for the turret stood there aiming
+     * across the field at nothing, at ninety degrees to the thing it exists to
+     * impersonate, and the drawing's own comment says why that matters:
+     * anything walking at it should be walking at something that looks like
+     * what it was walking at before.
+     *
+     * Found by measurement rather than by eye, and only because it fouled
+     * something else: the case below reads the six sides of the mount, and one
+     * of them -- the left edge, side 4 -- would not dim at any life however far
+     * the clock ran down. It was the barrel lying along it. Measured either
+     * way, in two nineteen-pixel windows the same distance out from the mount:
+     * 16 lit above and 70 to the left before, 70 above and 16 to the left
+     * after. The 16 is the ambient glow, which reaches 3.4 radii and is in both
+     * windows whatever the barrel does.
+     *
+     * The sweep is all that is left, and it is scaled by what the decoy has
+     * left: a decoy near the end of its life goes still, which is the tell
+     * that carries furthest since motion is what the eye takes first.
+     */
+    ctx.rotate(Math.sin(world.time * 1.3 + this.born) * 0.5 * lf);
     ctx.strokeRect(-4, -this.r * 1.62, 8, this.r * 0.9);
     ctx.strokeStyle = rgba('#d8f4ff', 0.8);
     ctx.beginPath();
@@ -423,7 +544,7 @@ class Decoy {
 
     // a lure sweeping outward, so it reads as calling rather than sitting
     const sweep = (world.time * 1.2) % 1;
-    ctx.strokeStyle = rgba('#59e0ff', 0.3 * (1 - sweep));
+    ctx.strokeStyle = rgba('#59e0ff', (0.3 + re * 0.45) * (1 - sweep));
     ctx.lineWidth = 1.6;
     ctx.beginPath();
     ctx.arc(0, 0, this.r + 10 + sweep * 150, 0, TAU);
@@ -1198,8 +1319,18 @@ export const ABILITIES = [
     icon: ICON.decoy,
     hint: 'DECOY — a turret that is not yours. They go for it instead.',
     run(world) {
-      // Only one at a time; a second would just split the pile.
-      if (world.decoy && !world.decoy.dead) world.decoy.expire(world);
+      /*
+       * A second press while one is up ADDS to its clock. It used to call
+       * `expire` on the standing decoy -- which is not a dismissal, it is the
+       * decoy's death: a 260-unit blast at 150 damage with a 900 shove, right
+       * in the middle of the pile the decoy existed to hold. So the ability
+       * whose whole job is keeping the field somewhere that is not on top of
+       * you answered a second press by blowing the field back over you.
+       *
+       * Still one at a time, which was the original comment's point and is
+       * still true; what changed is which one.
+       */
+      if (world.decoy && !world.decoy.dead) { world.decoy.restack(world); return; }
       const s = world.shooter;
       const top = ENTRY_Y + 60;
       const d = new Decoy(s.x, clamp(s.y - CFG.decoy.ahead, top, s.y - 120));
