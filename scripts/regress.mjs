@@ -15363,6 +15363,104 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `(a dead body in that set is one nothing ever releases)`);
 }
 
+/*
+ * ---- build 224: there is no default number of levels ----
+ *
+ * `tree.js` read `u.levels ?? 3`, so a node whose author never capped it was
+ * silently sold three times. EIGHT shipped that way between builds 178 and
+ * 223 -- HOT LOAD, BUCKSHOT, REPULSOR, STANDING ORDER, FIFTH LINK, PAIRED
+ * CHARGE, FOURTH BELL, DEEP CHARGE -- and every one was found late, by a probe
+ * or a player rather than by the suite, because a node relying on the default
+ * and a node deliberately set to three were the same text. The mistake was
+ * invisible, which is the whole fault; correcting the docstring in build 220
+ * did not help for exactly that reason.
+ *
+ * The number is mandatory now. This asserts the three things that has to mean:
+ * every upgrade declares one, the tree REFUSES a node that does not, and the
+ * ladder nobody meant to change did not change.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { ALL_UPGRADES } = await import('../src/upgrades.js');
+    const { NODES } = await import('../src/tree.js');
+
+    const capped = ALL_UPGRADES.filter((u) => !u.repeat);
+    const silent = capped.filter((u) => u.levels === undefined);
+    const bad = capped.filter((u) => !(u.levels > 0) || u.levels !== Math.round(u.levels));
+
+    /*
+     * ...and that the refusal is REAL, which is the half a count cannot show.
+     * Without this the case passes on a build where the `?? 3` is still there
+     * and every author has simply happened to write the number -- which is
+     * exactly the state build 220 left, and DEEP CHARGE shipped uncapped three
+     * builds later. `levelsOf` is the rule itself, exported for this.
+     */
+    const { levelsOf } = await import('../src/tree.js');
+    const tries = [
+      ['no levels at all', { id: 'a', name: 'A' }],
+      ['zero', { id: 'b', name: 'B', levels: 0 }],
+      ['negative', { id: 'c', name: 'C', levels: -2 }],
+      ['a fraction', { id: 'd', name: 'D', levels: 2.5 }],
+    ];
+    const refused = tries.map(([what, u]) => {
+      try { return { what, threw: false, got: levelsOf(u) }; }
+      catch (e) { return { what, threw: true }; }
+    });
+    // ...and the control: a node that DOES declare one comes back with it, so
+    // a `levelsOf` that threw on everything could not pass this.
+    let good = null;
+    try { good = levelsOf({ id: 'e', name: 'E', levels: 2 }); } catch (e) { good = 'threw'; }
+    // Named on THIS side of the bridge: `Infinity` does not survive
+    // JSON-serialisation out of the page and arrives as null, which would make
+    // the assertion read as a test for absence rather than for infinity.
+    let repeat = null;
+    try {
+      const v = levelsOf({ id: 'f', name: 'F', repeat: true });
+      repeat = Number.isFinite(v) ? v : 'infinite';
+    } catch (e) { repeat = 'threw'; }
+
+    /*
+     * The ladder itself. Counted over UPGRADE nodes only -- `NODES` also holds
+     * the arms and the ability charges, which carry `levels: 1` from `node()`
+     * and are not what this refactor touched.
+     */
+    const rungs = NODES.filter((n) => n.id && n.kind === 'upgrade'
+      && Number.isFinite(n.levels));
+    const total = rungs.reduce((a, n) => a + n.levels, 0);
+    const repeats = NODES.filter((n) => n.id && !Number.isFinite(n.levels)).length;
+
+    return { count: capped.length, silent: silent.map((u) => u.id),
+      bad: bad.map((u) => u.id), refused, good, repeat,
+      total, rungs: rungs.length, repeats };
+  });
+
+  check('every upgrade writes out how many times it may be bought',
+    r.silent.length === 0 && r.bad.length === 0 && r.count > 50,
+    `${r.count} capped upgrades, ${r.silent.length} of them silent`
+    + `${r.silent.length ? ` (${r.silent.join(' ')})` : ''}`
+    + `${r.bad.length ? `; malformed: ${r.bad.join(' ')}` : ''}`);
+
+  check('...and the tree refuses one that does not, rather than guessing three',
+    r.refused && r.refused.every((x) => x.threw) && r.good === 2
+    && r.repeat === 'infinite',
+    `${r.refused.filter((x) => x.threw).length}/${r.refused.length} malformed `
+    + `declarations refused (${r.refused.filter((x) => !x.threw)
+      .map((x) => `${x.what} -> ${x.got}`).join(', ') || 'none slipped through'}); `
+    + `a node declaring 2 still comes back ${r.good}, and a repeatable one `
+    + `${r.repeat}`);
+
+  /*
+   * And the ladder did not move. Writing fifteen threes out is a refactor and
+   * has to be provable as one -- the same total the BUILT readout asserts, by
+   * a different route, so a level lost to a typo cannot hide behind it.
+   */
+  check('...and writing the numbers out changed no ladder',
+    r.total === 106 && r.rungs === 54 && r.repeats === 8,
+    `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
+    + `repeatable ones (fifteen of those levels were the silent default and are `
+    + `now written out, which has to be a refactor and nothing else)`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

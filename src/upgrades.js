@@ -347,13 +347,13 @@ export const UPGRADES = {
      * than one that clears it. A threshold a build lands on half the time is
      * not a number anybody chose.
      */
-    { id: 'hollowpoint', name: 'HOLLOWPOINT', line: '+50% damage.', apply: scale('damage', 1.5) , icon: MARK.hollowpoint },
+    { id: 'hollowpoint', name: 'HOLLOWPOINT', levels: 3, line: '+50% damage.', apply: scale('damage', 1.5) , icon: MARK.hollowpoint },
     // Two levels, not the default three. tree.js reads `u.levels ?? 3`, so an
     // uncapped node is sold three times whatever the author intended.
     { id: 'tracer', name: 'TRACER', levels: 2, line: '+35% round speed.', apply: scale('speed', 1.35) , icon: MARK.tracer },
-    { id: 'ricochet', name: 'RICOCHET', line: '+1 bounce off the arena edges.', apply: bump('bounces', 1) , icon: MARK.ricochet },
+    { id: 'ricochet', name: 'RICOCHET', levels: 3, line: '+1 bounce off the arena edges.', apply: bump('bounces', 1) , icon: MARK.ricochet },
     { id: 'heavy', name: 'HEAVY', levels: 2, line: '2x knockback on every hit.', apply: scale('impulse', 2) , icon: MARK.heavy },
-    { id: 'overpressure', name: 'OVERPRESSURE', line: '+40% HE blast radius.', apply: scale('blastR', 1.4) , icon: MARK.overpressure },
+    { id: 'overpressure', name: 'OVERPRESSURE', levels: 3, line: '+40% HE blast radius.', apply: scale('blastR', 1.4) , icon: MARK.overpressure },
     /*
      * ONE level, because the node is named after the number it produces.
      * `CFG.rounds.arc.jumps` is 4, so one more is the fifth link the row is
@@ -369,11 +369,11 @@ export const UPGRADES = {
      * opposite of what was true of the node it had come to sit above. It was
      * orphaned by a deletion, the way `windAt`/`rateAt` were in build 217.
      */
-    { id: 'compound', name: 'COMPOUND', line: '+60% tithe mark bite.', apply: scale('titheStep', 1.6) , icon: MARK.compound },
-    { id: 'throughandthrough', name: 'THROUGH AND THROUGH', line: '+2 bodies a spine pierces.', apply: bump('pierce', 2) , icon: MARK.throughandthrough },
-    { id: 'sledge', name: 'SLEDGE', line: '+60% slug knockback.', apply: scale('slug', 1.6) , icon: MARK.sledge },
-    { id: 'deepfreeze', name: 'DEEP FREEZE', line: '+70% rime chill time.', apply: scale('chill', 1.7) , icon: MARK.deepfreeze },
-    { id: 'levy', name: 'LEVY', line: '+50% tithe energy mark.', apply: scale('bounty', 1.5) , icon: MARK.levy },
+    { id: 'compound', name: 'COMPOUND', levels: 3, line: '+60% tithe mark bite.', apply: scale('titheStep', 1.6) , icon: MARK.compound },
+    { id: 'throughandthrough', name: 'THROUGH AND THROUGH', levels: 3, line: '+2 bodies a spine pierces.', apply: bump('pierce', 2) , icon: MARK.throughandthrough },
+    { id: 'sledge', name: 'SLEDGE', levels: 3, line: '+60% slug knockback.', apply: scale('slug', 1.6) , icon: MARK.sledge },
+    { id: 'deepfreeze', name: 'DEEP FREEZE', levels: 3, line: '+70% rime chill time.', apply: scale('chill', 1.7) , icon: MARK.deepfreeze },
+    { id: 'levy', name: 'LEVY', levels: 3, line: '+50% tithe energy mark.', apply: scale('bounty', 1.5) , icon: MARK.levy },
     { id: 'lien', name: 'LIEN', levels: 1,
       line: 'A TITHE mark runs to 14 instead of 8. Far more on one long body.',
       apply: bump('titheMarks', 6), icon: MARK.lien },
@@ -485,14 +485,14 @@ export const UPGRADES = {
      */
     { id: 'deepcharge', name: 'DEEP CHARGE', levels: 2,
       line: '+35% mine blast radius.', apply: scale('mineBlast', 1.35), icon: MARK.deepcharge },
-    { id: 'widemouth', name: 'WIDE MOUTH', line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) , icon: MARK.widemouth },
+    { id: 'widemouth', name: 'WIDE MOUTH', levels: 3, line: '+40% mine trigger range.', apply: scale('mineTrigger', 1.4) , icon: MARK.widemouth },
     { id: 'eventhorizon', name: 'EVENT HORIZON', levels: 1,
       line: 'A VOID reaches for what comes near, not just what touches it.',
       apply: scale('voidReach', 2.2), icon: MARK.eventhorizon },
     { id: 'salted', name: 'SALTED', line: 'A spent mine goes off instead of fizzling.', levels: 1, apply: set('mineFizzle', true) , icon: MARK.longfuse },
-    { id: 'shrapnel', name: 'SHRAPNEL', line: '+45% mine blast damage.', apply: scale('mineDamage', 1.45) , icon: MARK.shrapnel },
-    { id: 'deadweight', name: 'DEAD WEIGHT', line: '+65% snare hold time.', apply: scale('mineHold', 1.65) , icon: MARK.deadweight },
-    { id: 'hotwire', name: 'HOT WIRE', line: '+50% wire damage.', apply: scale('wireDamage', 1.5) , icon: MARK.hotwire },
+    { id: 'shrapnel', name: 'SHRAPNEL', levels: 3, line: '+45% mine blast damage.', apply: scale('mineDamage', 1.45) , icon: MARK.shrapnel },
+    { id: 'deadweight', name: 'DEAD WEIGHT', levels: 3, line: '+65% snare hold time.', apply: scale('mineHold', 1.65) , icon: MARK.deadweight },
+    { id: 'hotwire', name: 'HOT WIRE', levels: 3, line: '+50% wire damage.', apply: scale('wireDamage', 1.5) , icon: MARK.hotwire },
     /*
      * TWO levels, which is what `CFG.knell.tolls` says in as many words:
      * "was 3; FOURTH BELL buys the third back and a fourth beyond it". Two
@@ -619,7 +619,7 @@ export const UPGRADES = {
     { id: 'rate', name: 'FEED', levels: 1,
       line: '+10% fire rate. A belt box on the breech flank.',
       apply: quicken('rate', 0.9), icon: MARK.rate },
-    { id: 'slew', name: 'GIMBAL', line: '+50% auto aim turn speed. Another row of teeth on the bearing.', apply: scale('slew', 1.5) , icon: MARK.slew },
+    { id: 'slew', name: 'GIMBAL', levels: 3, line: '+50% auto aim turn speed. Another row of teeth on the bearing.', apply: scale('slew', 1.5) , icon: MARK.slew },
     /*
      * The only thing on the machine that acts without being asked, and it is
      * deliberately not an ability: no charge, no slot, nothing on the bar.
@@ -636,8 +636,8 @@ export const UPGRADES = {
      * of an answer to the one thing it is for. At 210 that is 2.4 seconds,
      * which is a plate stack that actually holds the mount.
      */
-    { id: 'casing', name: 'SPINES', line: 'Objects touching you take 70 damage a second. Armour plates round the deck.', apply: bump('casing', 70) , icon: MARK.casing },
-    { id: 'insulation', name: 'SHROUD', line: 'Corruption costs half as much energy. A mantlet closing round the breech.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
+    { id: 'casing', name: 'SPINES', levels: 3, line: 'Objects touching you take 70 damage a second. Armour plates round the deck.', apply: bump('casing', 70) , icon: MARK.casing },
+    { id: 'insulation', name: 'SHROUD', levels: 3, line: 'Corruption costs half as much energy. A mantlet closing round the breech.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
     /*
      * Two steps, and the only thing in the branch that changes what auto aim
      * can see rather than how it behaves once it has seen it. GIMBAL is how
@@ -853,18 +853,32 @@ export const BY_ID = new Map(
  * How many times one upgrade may ever be taken, and what its card says at each
  * level.
  *
- * **`levels` absent means THREE.** `tree.js` reads `u.levels ?? 3`, and the
- * only thing that means "without limit" is `repeat`. This paragraph said the
- * opposite for a long time -- "`levels` absent means without limit, which is
- * still the right answer for a plain scalar" -- and it is the documentation
- * the trap keeps being read out of: six nodes have now shipped uncapped
- * because their author read this and believed it. HOT LOAD (build 193, 0.85
- * cubed on the fire interval, worth more than the FEED nerf that had just
- * been made for the same reason), BUCKSHOT (217), REPULSOR and STANDING
- * ORDER (219, the latter halving every clock on the ability bar against a row
- * that says -20%), then FIFTH LINK, FOURTH BELL and PAIRED CHARGE (220), each
- * of which is named after the number it was supposed to produce and produced
- * a larger one.
+ * **`levels` IS REQUIRED.** There is no default any more, and this paragraph
+ * is the reason there is not: it is the documentation the trap kept being read
+ * out of, and it has been wrong in two different directions.
+ *
+ * For a long time it said an absent `levels` meant "without limit, which is
+ * still the right answer for a plain scalar". It never did -- `tree.js` read
+ * `u.levels ?? 3` -- and the only thing that has ever meant "without limit" is
+ * `repeat`. Build 220 corrected the sentence to say THREE and asked authors to
+ * write the number out. That was still not enough, because it left the silence
+ * in place: a node relying on the default and a node deliberately set to three
+ * were the same text, so the mistake stayed invisible and DEEP CHARGE shipped
+ * uncapped three builds later.
+ *
+ * EIGHT nodes shipped that way between builds 178 and 223, and every one was
+ * found late, by a probe or a player rather than by the suite. HOT LOAD (193,
+ * 0.85 cubed on the fire interval, worth more than the FEED nerf that had just
+ * been made for the same reason), BUCKSHOT (217), REPULSOR and STANDING ORDER
+ * (219, the latter halving every clock on the ability bar against a row that
+ * says -20%), FIFTH LINK, FOURTH BELL and PAIRED CHARGE (220, each named after
+ * the number it was supposed to produce and producing a larger one), and DEEP
+ * CHARGE (223, 2.46x -- a blast wider than the screen it is drawn on).
+ *
+ * So build 224 removed the default rather than the misunderstanding. `leaf()`
+ * throws on a node that declares no levels and `check-build.mjs` fails the
+ * build for one, so the number cannot be omitted and cannot be guessed at.
+ * Every capped upgrade in this file writes its own out, three included.
  *
  * `levels: 1` is the one-shot: a switch cannot be thrown twice. Anything in
  * between is an upgrade with a shape to it, and `tiers` lets a level be a
@@ -872,9 +886,9 @@ export const BY_ID = new Map(
  * SIEVE and it hands over a position the first one did not, and the offer
  * should say so.
  *
- * Write the number. A percentage dial that genuinely wants three is one word
- * longer and costs nothing; a node with no `levels` is indistinguishable from
- * one whose author forgot.
+ * `repeat` is the one node with no ceiling, and it is a different idea: the
+ * count is how many you are HOLDING rather than what you own, and it goes down
+ * again. Only the APERTUREs and RECAST.
  */
 
 

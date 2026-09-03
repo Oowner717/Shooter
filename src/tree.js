@@ -225,12 +225,60 @@ const ROOT_LINE = {
   anomaly: 'Seven ways in, one colour each. One of them has something on the other side of it.',
 };
 
+/*
+ * ---- there is no default number of levels, and there used to be ----
+ *
+ * This read `u.levels ?? 3`, and that one `??` is the single most expensive
+ * line this repository has written. A node whose author never capped it was
+ * silently sold THREE times, and eight of them shipped that way across builds
+ * 178 to 223: HOT LOAD (0.85^3 on the fire interval, a larger cadence buff
+ * than the FEED nerf that had just been made for exactly that reason),
+ * BUCKSHOT, REPULSOR, STANDING ORDER (0.8^3 = 0.512 against a row promising
+ * -20%, on the one node that touches all eight ability buttons), FIFTH LINK,
+ * PAIRED CHARGE, FOURTH BELL (five tolls from a node named for the fourth) and
+ * DEEP CHARGE (2.46x, a blast wider than the screen it is drawn on).
+ *
+ * Every one was found late, by a probe or a player rather than by the suite,
+ * because a node relying on the default and a node deliberately set to three
+ * were the same text. That is the whole fault: the mistake was INVISIBLE. A
+ * cap corrected in build 220 -- the docstring in upgrades.js had actually
+ * promised that an absent `levels` meant "without limit" -- did not help,
+ * because it left the silence in place.
+ *
+ * So the number is mandatory now. Every upgrade writes its own out, three
+ * included, and a node that forgets throws here rather than quietly becoming
+ * a ladder nobody priced. `check-build.mjs` asserts the same thing so it is
+ * caught before a page ever loads.
+ *
+ * `repeat` is the one exemption and is a different idea: no ceiling at all,
+ * because the count is not what you own but how many you are holding, and it
+ * goes down again. Only APERTURE and RECAST.
+ */
+/**
+ * How many times an upgrade may be bought, or a throw.
+ *
+ * Split out of `leaf` and exported ONLY so the suite can exercise the refusal
+ * directly -- which is a real and stated reason, and the alternative was a
+ * case that asserts the absence of a `??` by reading the source as text. The
+ * rule is the load-bearing part of this file and a case that cannot make it
+ * fire is not a case; `leaf` is unreachable from outside, and feeding a
+ * malformed node through the whole tree builder means adding it to a branch
+ * table that is module-private too.
+ */
+export function levelsOf(u) {
+  if (u && u.repeat) return Infinity;
+  if (!u || !(u.levels > 0) || u.levels !== Math.round(u.levels)) {
+    throw new Error(`tree: upgrade "${(u && u.id) || '?'}" declares no levels. `
+      + 'Write the number out -- there is no default, deliberately: see the '
+      + 'note above leaf().');
+  }
+  return u.levels;
+}
+
 function leaf(id) {
   const u = UP_BY_ID.get(id);
   if (!u) throw new Error(`tree: no upgrade "${id}"`);
-  // `repeat` is a node with no ceiling at all: the count is not what you own,
-  // it is how many you are holding, and it goes down again. Only APERTURE.
-  const levels = u.repeat ? Infinity : (u.levels ?? 3);
+  const levels = levelsOf(u);
   return node({
     kind: 'upgrade', id, key: id, name: u.name, line: u.line, icon: u.icon,
     levels, repeat: !!u.repeat, currency: u.currency || null,

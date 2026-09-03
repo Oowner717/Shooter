@@ -387,8 +387,9 @@ most once for any given target and cannot spin.
   `abilities.js` for two builds with no caller and a forty-line header
   explaining an ability that no longer existed. Nothing fails on dead private
   functions; `bundle.mjs` will happily ship them. They came out in 219.
-- **An upgrade with no `levels` silently gets three.** `tree.js` reads
-  `u.levels ?? 3`, so a node the author never capped is sold three times.
+- **`levels` is mandatory from build 224, and there is no default.** This was
+  `u.levels ?? 3` in `tree.js`, so a node the author never capped was sold
+  three times.
   Caught three times now: HOT LOAD (193), BUCKSHOT (217), then REPULSOR and
   STANDING ORDER together in 219 — the latter being the one node that touches
   all eight ability buttons, at 0.8³ = 0.512 against a row saying "-20%".
@@ -397,10 +398,23 @@ most once for any given target and cannot spin.
   well as an old one taking its default back.
   **The source of it was upgrades.js's own docstring**, which said in as many
   words that "`levels` absent means without limit" and named HOLLOWPOINT as
-  the example -- one of the uncapped nodes. Seven have now shipped that way.
+  the example -- one of the uncapped nodes. EIGHT shipped that way in the end.
   Build 220 corrected the paragraph and asked for the number to be written
-  out: a dial that genuinely wants three is one word longer, and a node with
-  no `levels` is indistinguishable from one whose author forgot.
+  out, and **that was not enough, which is the lesson**: correcting the
+  documentation left the SILENCE in place, so a node relying on the default
+  and a node deliberately set to three were still the same text, the mistake
+  was still invisible, and DEEP CHARGE shipped uncapped three builds later.
+  Build 224 removed the default instead. `tree.js` exports `levelsOf`, which
+  throws on a node that declares none (or declares zero, a negative or a
+  fraction); `check-build.mjs` fails the build for one, which also catches an
+  upgrade written but not yet hung on the tree -- one `leaf()` never sees and
+  so can never throw for. The fifteen nodes that had been living on the
+  default now write `levels: 3` out, so the ladder is unchanged: 106 levels
+  across 54 upgrade nodes, pinned by its own case as well as by the BUILT
+  readout's 134.
+  **A defaulted value that is indistinguishable from a chosen one is the
+  shape to watch for**, whatever the field. The fix is never a better comment;
+  it is making the omission impossible to write.
   HOT LOAD was 0.85³ on the fire interval — 1.63× on rounds a second, larger
   than the FEED nerf of build 178, which capped FEED for exactly that reason
   and stopped one node short. Check the tree's number, not the upgrade's,

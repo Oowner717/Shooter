@@ -87,6 +87,32 @@ if (rigMax !== turretLevels) {
 console.log(`the turret's ${turretLevels} sockets match what the TURRET branch sells`);
 
 /*
+ * ...and every upgrade says how many times it may be bought.
+ *
+ * `tree.js` used to read `u.levels ?? 3`, so a node whose author never capped
+ * it was silently sold three times -- and eight shipped that way between
+ * builds 178 and 223, every one of them found late by a probe or a player
+ * because a node relying on the default and a node deliberately set to three
+ * were the same text. `leaf()` throws on a missing number now, which is a
+ * failure at page load; this is the same statement at build time, where it
+ * belongs, and it catches an upgrade that has been WRITTEN but not yet hung
+ * on the tree -- one `leaf()` never sees and so can never throw for.
+ *
+ * `repeat` is the exemption: no ceiling at all, because the count is how many
+ * you are holding rather than what you own. Only the APERTUREs and RECAST.
+ */
+const uncapped = ALL_UPGRADES.filter((u) => !u.repeat && !(u.levels > 0));
+if (uncapped.length) {
+  console.error(`${uncapped.length} upgrade(s) declare no levels: `
+    + `${uncapped.map((u) => u.id).join(' ')}. Write the number out -- there is `
+    + 'no default, deliberately; see the note above leaf() in tree.js');
+  process.exit(1);
+}
+const repeats = ALL_UPGRADES.filter((u) => u.repeat).map((u) => u.id);
+console.log(`all ${ALL_UPGRADES.length - repeats.length} capped upgrades write their own `
+  + `level count out; ${repeats.length} repeatable (${repeats.join(' ')})`);
+
+/*
  * Colour is a contract: grey means harmless. See the rule above ENEMY_TYPES.
  *
  * It is checked rather than trusted because it is the kind of rule a single
