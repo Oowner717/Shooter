@@ -279,7 +279,7 @@ function leaf(id) {
   return node({
     kind: 'upgrade', id, key: id, name: u.name, line: u.line, icon: u.icon,
     levels, repeat: !!u.repeat, currency: u.currency || null,
-    dormant: !!u.dormant, needs: u.needs || 0, rung: u.rung || 0,
+    dormant: !!u.dormant, rung: u.rung || 0,
     tone: u.tone || '#9fb3c8',
     // An upgrade may price itself. Only APERTURE does: it is not a step on a
     // ladder, it is the same purchase every time, and it costs what it costs.

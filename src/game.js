@@ -684,19 +684,23 @@ export class Game {
   }
 
   /**
-   * Is this node's parent bought, or free -- and is whatever it waits on done?
+   * Is this node's parent bought, or free -- and has the run stood high enough?
    *
-   * `needs` is an anomaly number: a way in to the second boss does not open
-   * until the first has been broken at least once, which is progression
-   * rather than a purchase and so is not something a parent node can say.
+   * `needs` used to be the other half of this: an anomaly number, so the way
+   * in to the second boss stayed shut until the first had been broken. The
+   * only nodes that ever carried one were the seven APERTUREs, and build 227
+   * removed those with the ANOMALY branch -- which left a field nothing wrote,
+   * threaded through `leaf()` as a constant 0, and a test here that could
+   * never be true. That is the `world.endless` shape CLAUDE.md keeps a note
+   * about, so it went with them in build 228 rather than waiting to grow a
+   * second reader.
+   *
+   * `rung` is the same idea on the ladder rather than on the bosses: sealed
+   * until the run has STOOD on that rung. Peak, not the current tier, so
+   * stepping back down to breathe does not seal something already earned.
+   * RECALL and OVERCLOCK are the two that carry one.
    */
   available(n) {
-    if (n.needs && !this.world.reconciled.includes(n.needs)) return false;
-    /*
-     * ...and `rung` is the same idea on the ladder rather than on the bosses:
-     * sealed until the run has STOOD on that rung. Peak, not the current tier,
-     * so stepping back down to breathe does not seal something already earned.
-     */
     if (n.rung && (this.world.director.peak | 0) < n.rung) return false;
     for (let p = n.parent; p; p = p.parent) {
       if (p.free) continue;

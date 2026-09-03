@@ -207,6 +207,27 @@ Tiers 1-5 are untouched to the digit: DOUBLE TAP is not affordable until 6.
 What it costs is the late wall — a BULWARK at tier 20 goes 13.9s to 15.6s,
 and the heaviest wave of band 5 stops clearing inside the 120s cap.
 
+**Re-measured at build 227's audit** (tiers 1-20, two runs), because the two
+paragraphs above are dated 177 and 189 and read as current if you are
+skimming. Three cadence nodes have gone since -- TRIPLE TAP (189), HOT LOAD
+(193), DOUBLE TAP (225) -- and the shape is different:
+
+- **dps plateaus at 423**, from about tier 6 to tier 20, against the 2,050 of
+  build 177. Rounds a second tops out at **4.8**, against 25.9 with TRIPLE TAP
+  and 17.0 after it went. The whole cadence ladder is one FEED at 1.11x.
+- **The late wall is back and is the worst body, not the wave.** BULWARK's TTK
+  climbs 6.4s at tier 9 to **21.0s at tier 20**; a TOW's head goes 3.3s to
+  10.8s. Build 177's finding was that single-body TTK settled at about 1.0s
+  and was therefore the wrong wall to watch. It is the right one again.
+- The heaviest band-5 wave does **not** clear inside the 120s cap at tiers 16,
+  17, 19 and 20. That is the documented plateau and the arsenal is the answer
+  to it -- SPORE cleared it in 64s against BOLT's 160 at build 195 -- but the
+  BOLT column is now failing at four of the top five rungs rather than one.
+- Spend caps at **109,550 for 135 buys**, which is the whole tree.
+
+Nothing was changed on the strength of this; it is recorded so the next
+reader is working from the current number rather than from 177's.
+
 Two instrument bugs cost a table each and are worth not repeating: a body
 spawned 240 units above the *floor* is 30 units off the muzzle, dies inside one
 frame, and takes its round and its damage with it — both counters watched state
@@ -989,4 +1010,22 @@ most once for any given target and cannot spin.
   build 227**, so the record tiles, the resume line, the reset and its box were
   never measured. It runs twice now. The tile labels are one word each for the
   same reason: two words wrap in a third of a 390-wide panel at 11px.
+- **`ROOT_TONE.mines` is still BLAST's colour, and that is known.** Measured
+  at build 227's audit across all 45 tones in the game: `#ffb347` against
+  BLAST's `#ffb247` is **dE 0.6**. Build 223 fixed the ALL MINES *group* by
+  giving the three ALL-X headings their own bone register; the MINES *root*
+  heading was not part of that and still matches the first arm under it. Left
+  alone deliberately -- the warm band is full (SCATTER 15.7, LANCE 16.7,
+  GNOMON 22.6 away), and the same heading-matches-a-child shape is deliberate
+  for TURRET, whose root IS PULSE's `#59e0ff` at dE 0. Do not "fix" it by
+  picking a new category colour without asking; the only well-separated
+  regions left are greens, and green means energy.
+- **A readout with no assertion behind it can go wrong and stay green, and
+  two did in one build.** `smoke.mjs` printed the whole title footer under
+  "running build:" because 227 moved the build number into a child element,
+  and the title's own "07 TRACKED" was pinned at seven forever because
+  `Game.update` holds the boot field at seven drifters and nothing kills
+  drift -- both shipped, both exited 0, and one of them carried a comment
+  calling itself live telemetry. If a probe or a panel prints a number, either
+  assert it or expect it to rot.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

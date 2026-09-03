@@ -209,8 +209,16 @@ console.log('--- deep-field stats ---\n' + deepStats);
 console.log('past the old count:', JSON.stringify(stillPlaying));
 console.log('phase after restart:', finalPhase,
   '| tier:', await page.evaluate(() => window.__sim.world.director.tier));
-const runningBuild = await page.evaluate(() => document.querySelector('.bootFoot')?.textContent || '');
-console.log('running build:', runningBuild.replace(/^.*BUILD /, '') || '(unknown)');
+/*
+ * Off `#bootBuild`, which is the element that holds it. This read the whole of
+ * `.bootFoot` and stripped everything up to "BUILD " -- and build 227 put the
+ * RESET SIMULATION control and its confirm box inside that footer, so the
+ * probe started printing the entire wipe dialogue under "running build:". It
+ * still exited 0, which is the point worth remembering: a readout with no
+ * assertion behind it can go wrong and stay green.
+ */
+const runningBuild = await page.evaluate(() => document.getElementById('bootBuild')?.textContent || '');
+console.log('running build:', runningBuild.replace(/^BUILD /, '') || '(unknown)');
 console.log('console errors:', errors.length);
 for (const e of errors.slice(0, 20)) console.log('  !', e);
 

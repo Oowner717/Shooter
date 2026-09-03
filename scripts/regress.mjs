@@ -171,6 +171,32 @@ await page.waitForTimeout(900);
     + `failing: ${hot.bad.slice(0, 6)}; foot ${hot.footBottom}/${hot.vh}`);
   check('the title teaches the two ways to shoot and leaves the rest to the run',
     r.keys === 2, `${r.keys} control rows on the title`);
+
+  /*
+   * ...and the one thing on it that claims to be live actually is.
+   *
+   * The readout shipped in build 227 as an object count, under a comment
+   * calling it a reading off the arena running behind the panel rather than an
+   * animation of nothing. `Game.update` holds the boot field at seven
+   * drifters and nothing kills drift, so it was seven from the first frame to
+   * the last -- one distinct value over 240 frames, measured. A number that
+   * cannot change is decoration, and the comment made it a lie as well. There
+   * is a clock in it now, and this is what says so.
+   */
+  const live = await page.evaluate(() => {
+    const g = window.__sim;
+    const seen = new Set();
+    for (let i = 0; i < 60 * 4; i++) {
+      g.update(1 / 60);
+      g.hud.syncBoss(g.world);
+      seen.add(document.getElementById('bootTele').textContent);
+    }
+    return { phase: g.world.phase, n: seen.size, first: [...seen][0], last: [...seen].pop() };
+  });
+  check('...and the readout on it moves, rather than only claiming to',
+    live.phase === 'boot' && live.n >= 3 && /T\+\d\d:\d\d/.test(live.first),
+    `${live.n} distinct readings over four seconds of the title screen: `
+    + `"${live.first}" .. "${live.last}"`);
 }
 
 await page.evaluate(() => document.getElementById('startBtn').click());
@@ -6396,7 +6422,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     };
   });
   const mines = await read('mines');
-  const rest = await page.evaluate(() => {
+  const rest = await page.evaluate(async () => {
+    const { TREE } = await import('../src/tree.js');
     const g = window.__sim;
     const w = g.world;
     document.getElementById('loadMore_mines').dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -6406,7 +6433,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // The branch counts have to add up to the tree's own, or one of them is
     // counting rows that belong to somebody else.
     const m = g.hud.menu;
-    const roots = ['turret', 'ammo', 'mines', 'abilities', 'anomaly'];
+    /*
+     * Derived from the tree rather than written out. This listed the five
+     * roots by hand and still named `anomaly` after build 227 removed it --
+     * `reachCount` returns 0 for a key that is not a branch, so the sum went
+     * on matching the total and the case went on passing while asserting a
+     * sum over a branch that does not exist. A hand-kept list of the thing
+     * being measured cannot catch the thing being measured changing.
+     */
+    const roots = TREE.filter((n) => n.kind === 'root').map((n) => n.key);
     const parts = Object.fromEntries(roots.map((k) => [k, m.reachCount(w, k)]));
     const missing = m.openTo('no-such-branch-key');
     m.setOpen(false);
@@ -11233,6 +11268,23 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // ...and so is where the debris goes. Binned by direction: an even ring
     // would fill every bin, lobes leave some empty, and WHICH are empty has to
     // change from one detonation to the next or the lobes are decoration.
+    /*
+     * EIGHT bursts, not two, and the statistic is the concentration.
+     *
+     * This drew two and required BOTH to leave one of twelve 30-degree bins
+     * empty, which is a property of a single random draw rather than of the
+     * effect: measured over 200 detonations, a burst fills all twelve about
+     * once in 200, so two draws failed roughly one run in a hundred and the
+     * case was on the flake list for three builds. It is about 33 particles
+     * spread over 12 bins -- an empty bin is likely, not certain.
+     *
+     * What is actually being claimed is that the debris goes in LOBES rather
+     * than an even ring, and the honest measure of that is how far the busiest
+     * direction is above the mean: an even ring is 1.0 by construction, and
+     * the measured floor over 200 bursts is 2.18 (p5 2.55, median 3.27). The
+     * worst of eight is asserted, so it is a statement about every burst
+     * rather than about a lucky one.
+     */
     const lobeSig = () => {
       fx.reset();
       heFx(315, 560, R);
@@ -11244,12 +11296,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       }
       return bins;
     };
-    const l1 = lobeSig();
-    const l2 = lobeSig();
-    out.lobeEmpty1 = l1.filter((x) => x === 0).length;
-    out.lobeEmpty2 = l2.filter((x) => x === 0).length;
-    out.lobeDiffer = l1.join(',') !== l2.join(',');
-    out.lobePeak = Math.max(...l1) / Math.max(1, l1.reduce((a, x) => a + x, 0) / 12);
+    const lobes = [];
+    for (let i = 0; i < 8; i++) lobes.push(lobeSig());
+    const peakOf = (b) => Math.max(...b) / Math.max(1, b.reduce((a, x) => a + x, 0) / 12);
+    out.lobeWorstPeak = Math.min(...lobes.map(peakOf));
+    // ...and most of them leave a direction bare, which is the picture the
+    // concentration produces. Six of eight, against a per-burst rate of 199
+    // in 200 -- clear of the truth rather than sitting on it.
+    out.lobeWithGap = lobes.filter((b) => b.some((x) => x === 0)).length;
+    out.lobeDistinct = new Set(lobes.map((b) => b.join(','))).size;
 
     // ---- it has a tail, where the old one was over in a sixth of a second --
     fx.reset();
@@ -11297,10 +11352,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * "different every time" has to mean to be visible at 390px.
    */
   check('...and the debris is thrown along lobes, in a different pattern each time',
-    r.lobeEmpty1 > 0 && r.lobeEmpty2 > 0 && r.lobeDiffer && r.lobePeak > 1.6,
-    `${r.lobeEmpty1} of 12 directions empty on one burst and ${r.lobeEmpty2} on `
-    + `the next, and not the same ones (${r.lobeDiffer}); the busiest direction `
-    + `carries ${r.lobePeak.toFixed(1)}x the mean`);
+    r.lobeWorstPeak > 1.8 && r.lobeWithGap >= 6 && r.lobeDistinct === 8,
+    `over eight bursts the weakest still puts ${r.lobeWorstPeak.toFixed(1)}x the mean `
+    + `into one direction (an even ring is 1.0), ${r.lobeWithGap}/8 left a direction `
+    + `bare, and ${r.lobeDistinct}/8 patterns were distinct`);
 
   check('...and it has a tail, where the old burst was over in a sixth of a second',
     r.life > 0.6, `the last of it goes out at ${r.life}s`);

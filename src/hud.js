@@ -1856,15 +1856,30 @@ export class Hud {
    * The one live thing on the title screen: the arena behind it.
    *
    * `phase = 'boot'` runs a real field with drift in it -- that is what the
-   * background of this screen IS -- so the readout is the object count of
-   * something actually being simulated rather than an animation of nothing.
-   * Diffed on the string, because this is called every frame.
+   * background of this screen IS -- so this is a reading off something
+   * actually being simulated rather than an animation of nothing.
+   *
+   * THE COUNT ALONE WAS NOT ONE, and it shipped in build 227 wearing this
+   * paragraph. `Game.update` tops the boot field up to seven drifters and
+   * nothing kills drift, so `enemies.length` is seven from the first frame to
+   * the last: measured over 240 frames, one distinct value. A number that
+   * cannot change is decoration with a comment claiming otherwise, which is
+   * worse than decoration.
+   *
+   * The clock is what moves. `world.time` advances through the whole of the
+   * title screen -- 5.0 seconds over 300 frames, measured -- so the readout is
+   * an uptime beside the count, and the count is honest about being a ceiling
+   * the field is held at. Diffed on the string, because this runs every frame
+   * and it only changes once a second.
    */
   syncBoot(world) {
     const el = this.el.bootTele;
     if (!el || this.el.boot.hidden) return;
+    const t = Math.max(0, world.time | 0);
+    const mm = String((t / 60) | 0).padStart(2, '0');
+    const ss = String(t % 60).padStart(2, '0');
     const n = world.enemies.length + world.drops.length;
-    const txt = `${String(n).padStart(2, '0')} TRACKED`;
+    const txt = `T+${mm}:${ss} · ${String(n).padStart(2, '0')} TRACKED`;
     if (txt === this._teleTxt) return;
     this._teleTxt = txt;
     el.textContent = txt;
