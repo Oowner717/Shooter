@@ -8,7 +8,7 @@
 // charge and behaves as a plain cooldown, with nothing extra drawn on it.
 
 import { TAU, clamp, rand, spread, smoothstep, rgba, drawGlow, segClosest } from './util.js';
-import { spark, dot, ring, ripple, shake, flash } from './fx.js';
+import { spark, dot, ring, ripple, shake, flash, Shock } from './fx.js';
 import { CFG } from './config.js';
 import { fire, clampAim } from './projectiles.js';
 import { applyBlast, ENTRY_Y, drawIn } from './enemies.js';
@@ -42,91 +42,6 @@ const ICON = {
 
 
 // ------------------------------------------------------------------ effects
-
-/**
- * PULSE's reach, after the punch has landed.
- *
- * fx's ring() fades linearly on BOTH width and alpha -- `lineWidth = w * t`
- * and `alpha = t * 0.95` -- so a ring asked to live a whole second spends
- * most of it at sub-pixel width and 0.1 alpha, which is to say invisible. Two
- * extra ring() calls were the first attempt at making PULSE persist and they
- * could not be seen at all four hundred milliseconds in.
- *
- * So this owns its envelope instead: it opens fast to the blast's real edge,
- * HOLDS there thin and steady, and only then goes. The point is that the
- * shove is over in a quarter second while the question the player has -- how
- * far did that actually reach -- is answered for a second afterwards.
- */
-class Shock {
-  constructor(x, y, r, color) {
-    this.x = x;
-    this.y = y;
-    this.r = r;
-    this.color = color;
-    this.t = 0;
-    this.open = 0.3; // seconds to reach full radius
-    this.life = 1.15;
-    this.dead = false;
-  }
-
-  update(_world, dt) {
-    this.t += dt;
-    if (this.t >= this.life) this.dead = true;
-  }
-
-  draw(ctx) {
-    const k = clamp(this.t / this.open, 0, 1);
-    // Ease out: fast at the front, settling onto the edge.
-    const e = 1 - (1 - k) ** 3;
-    const rr = this.r * e;
-    // Full while opening, then a long steady hold, then away.
-    const left = clamp((this.life - this.t) / 0.45, 0, 1);
-    const a = Math.min(1, k * 3) * left;
-    if (a <= 0.01) return;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    /*
-     * Dashed, and turning.
-     *
-     * The first version was a thin solid cyan circle, and it was drawing
-     * correctly the whole time and could not be seen: the substrate is a
-     * polar lattice of solid cyan arcs, so a solid cyan arc at radius 340 is
-     * indistinguishable from the sky it is drawn on. A traced ring reads as
-     * background; a measured one does not. The slow rotation is what stops it
-     * looking like a dotted line somebody left there.
-     */
-    ctx.strokeStyle = rgba(this.color, 0.75 * a);
-    ctx.lineWidth = 2.4 + (1 - k) * 5;
-    ctx.setLineDash([16, 11]);
-    ctx.lineDashOffset = -this.t * 40;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, rr, 0, TAU);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    // Four marks on the axes, which no polar lattice has.
-    ctx.strokeStyle = rgba('#d8f6ff', 0.6 * a);
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let i = 0; i < 4; i++) {
-      const ang = (i / 4) * TAU;
-      const cx = Math.cos(ang);
-      const cy = Math.sin(ang);
-      ctx.moveTo(this.x + cx * (rr - 7), this.y + cy * (rr - 7));
-      ctx.lineTo(this.x + cx * (rr + 7), this.y + cy * (rr + 7));
-    }
-    ctx.stroke();
-    // A leading edge while it is still travelling, so the opening reads as
-    // something moving outward rather than a circle being resized.
-    if (k < 1) {
-      ctx.strokeStyle = rgba('#ffffff', 0.5 * (1 - k) * a);
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, rr, 0, TAU);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-}
 
 /**
  * LANCE's beam, in three parts on two clocks.

@@ -172,8 +172,16 @@ export class Patch {
     const bite = this.dps * this.tick;
     const rr = this.r;
     for (const e of world.enemies) {
-      // Harmless drift is not worth burning, and staged rows are not here yet.
-      if (e.dead || e.staged || e.harmless) continue;
+      /*
+       * Harmless drift is not worth burning. `spent` is a boss's own frame
+       * through its ending and nothing may burn that either -- this had it
+       * exactly backwards, skipping `staged` (which a DAMAGE path must not:
+       * config.js says in as many words that `staged` never gated projectile
+       * collision, and most of a body's march in is on screen) and not
+       * skipping `spent` (which it must). Both patches, SPORE's and THORN's,
+       * come through here.
+       */
+      if (e.dead || e.spent || e.harmless) continue;
       const reach = rr + e.r;
       if ((e.x - this.x) ** 2 + (e.y - this.y) ** 2 > reach * reach) continue;
       // A body the ground finishes died of spores, and its death says so.

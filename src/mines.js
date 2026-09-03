@@ -20,7 +20,7 @@
 import { CFG } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, segClosest } from './util.js';
 import { applyBlast, ENTRY_Y } from './enemies.js';
-import { spark, dot, ring, ripple, shake, flash } from './fx.js';
+import { spark, dot, ring, ripple, shake, flash, Shock } from './fx.js';
 import { Patch } from './patch.js';
 import { fire } from './projectiles.js';
 import { audio } from './audio.js';
@@ -109,7 +109,15 @@ export function mineGrade(world, kind) {
    */
   const mouth = !!KIND[kind].trigger;               // WIDE MOUTH
   const bang = kind === 'blast' || kind === 'knell' || kind === 'spall'; // DEEP CHARGE
-  const hurts = bang || kind === 'thorn' || kind === 'wire';             // SHRAPNEL
+  /*
+   * SHRAPNEL is `up.mineDamage`, and `up.mineDamage` is read in exactly three
+   * places: `detonate`, `fizzle` and `toll`. THORN's patch takes
+   * `T.patch.dps` raw and WIRE's cut takes `W.damage * up.wireDamage` and no
+   * more -- so crediting either of them here is the readout lying about the
+   * machine, which is the exact fault the note above says this accounting was
+   * written to stop. It named the right three and then listed five.
+   */
+  const hurts = bang;                                                   // SHRAPNEL
   let has = 0;
   let of = 2; // PAIRED CHARGE and QUICK LAY reach every kind: both are about
               // how many are on the field, which every mine has.
@@ -255,8 +263,18 @@ function detonate(world, m) {
   m.dead = true;
   const br = M.blast.r * world.up.mineBlast;
   applyBlast(world, { x: m.x, y: m.y, r: br, damage: M.blast.damage * world.up.mineDamage, impulse: M.blast.impulse });
-  ring(m.x, m.y, m.r, br * 1.5, 0.4, '#ffb347', 5);
-  ring(m.x, m.y, 0, br * 0.7, 0.24, '#ffffff', 2);
+  /*
+   * At the radius, not half again past it.
+   *
+   * `drawFx` strokes a ring at `alpha = t * 0.95` and `width = w * t`, both
+   * running to nothing as it grows, so drawn `m.r -> br * 1.5` it crossed the
+   * edge that actually hurt at about a third of its brightness and two pixels
+   * wide, then swept another half a radius over bodies nothing touched. Sixth
+   * of this family; PULSE, PRISM, DECOY, WELL and HE all ended the same way.
+   */
+  ring(m.x, m.y, br * 0.78, br * 1.06, 0.4, '#ffb347', 5);
+  ring(m.x, m.y, 0, br * 0.5, 0.24, '#ffffff', 2);
+  world.effects.push(new Shock(m.x, m.y, br, '#ffb347'));
   ripple(m.x, m.y, 1.4, br * 4);
   for (let i = 0; i < 22; i++) {
     const a = rand(0, TAU);
@@ -288,7 +306,16 @@ function grip(world, m, dt) {
   const r2 = S.reach * S.reach;
   const take = (list) => {
     for (const e of list) {
-      if (e.dead || e.staged) continue;
+      /*
+       * `spent` and `fizzle`, not `staged` -- the rule CLAUDE.md records.
+       * `spent` is a boss's own frame through its outro and nothing may act
+       * on it; `fizzle` is a body dissolving, and this writes `vx`/`vy` by
+       * hand exactly as WELL's knot does, so it is steering and has to
+       * honour it. `staged` came OUT: most of a body's march in is on
+       * screen, and a snare that visibly fails to take something standing
+       * in it is the worse fault.
+       */
+      if (e.dead || e.spent || e.fizzle) continue;
       const dx = m.x - e.x;
       const dy = m.y - e.y;
       const d2 = dx * dx + dy * dy;
@@ -340,7 +367,16 @@ function fizzle(world, m) {
       x: m.x, y: m.y, r: f.r * world.up.mineBlast,
       damage: f.damage * world.up.mineDamage, impulse: f.impulse,
     });
-    ring(m.x, m.y, m.r, f.r * 1.3, 0.32, '#ffb347', 3);
+    /*
+     * Two faults in one line: drawn 1.3x past the blast, and drawn off the
+     * UNSCALED `f.r` while the blast above it is `f.r * up.mineBlast`. At
+     * three DEEP CHARGEs the blast reaches 236 and this was drawing 125 --
+     * so the same line was 30% too wide at zero upgrades and 47% too narrow
+     * at full, which is the one way to be wrong in both directions at once.
+     */
+    const fr = f.r * world.up.mineBlast;
+    ring(m.x, m.y, fr * 0.72, fr * 1.06, 0.32, '#ffb347', 3);
+    world.effects.push(new Shock(m.x, m.y, fr, '#ffb347'));
     for (let k = 0; k < 8; k++) spark(m.x, m.y, spread(180), spread(180), '#ffd9a0', 0.35, 1.8);
     audio.boom();
     return;
@@ -412,7 +448,9 @@ function repel(world, m, dt) {
   const reach = L.reach * world.up.lodeReach;
   const rr = reach * reach;
   for (const e of world.enemies) {
-    if (e.dead || e.staged) continue;
+    // The same rule as the snare's grip above: a continuous field that
+    // writes velocity is steering, so `spent` and `fizzle` and not `staged`.
+    if (e.dead || e.spent || e.fizzle) continue;
     const dx = e.x - m.x;
     const dy = e.y - m.y;
     const d2 = dx * dx + dy * dy;
@@ -430,7 +468,8 @@ function cut(world, m, dt) {
   const reach = W.width * m.open;
   const take = (list) => {
     for (const e of list) {
-      if (e.dead || e.harmless || e.staged) continue;
+      // A damage path: `spent` yes, `staged` no. Grey stays grey.
+      if (e.dead || e.spent || e.harmless) continue;
       const hit = segClosest(m.ax, m.ay, m.bx, m.by, e.x, e.y);
       const rr = reach + e.r;
       if (hit.d2 > rr * rr) continue;
@@ -455,7 +494,11 @@ function toll(world, m) {
   m.tolls--;
   m.tollTimer = K.gap;
   applyBlast(world, { x: m.x, y: m.y, r, damage, impulse: K.blast.impulse });
-  ring(m.x, m.y, m.r, r * 1.4, 0.42, '#ff61f2', 4);
+  // At the radius, on every toll. It was `r * 1.4`, and a knell draws this
+  // two to five times in a row, so the overshoot was the most repeated
+  // instance of the fault in the game.
+  ring(m.x, m.y, r * 0.76, r * 1.06, 0.42, '#ff61f2', 4);
+  world.effects.push(new Shock(m.x, m.y, r, '#ff61f2'));
   ripple(m.x, m.y, 1.1 + i * 0.3, r * 3);
   for (let k = 0; k < 14; k++) {
     const a = rand(0, TAU);
@@ -556,8 +599,13 @@ export function updateMines(world, dt) {
       const own = m.kind === 'void' ? world.up.voidReach : 1;
       const reach = m.r + m.cfg.trigger * world.up.mineTrigger * own;
       for (const e of world.enemies) {
-        // Only things that could corrupt the feed can set a mine off.
-        if (e.dead || e.harmless || e.staged) continue;
+        /*
+         * Only things that could corrupt the feed can set a mine off -- and
+         * this is a CHOOSER, so `staged` belongs here where it does not
+         * belong in the damage paths above. `spent` joins it: a boss's frame
+         * through its own outro must not spring a mine either.
+         */
+        if (e.dead || e.harmless || e.staged || e.spent) continue;
         const rr = reach + e.r;
         if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 <= rr * rr) {
           if (m.kind === 'snare') snap(world, m);
@@ -612,7 +660,9 @@ export function drawMines(ctx, world) {
       ctx.lineWidth = CFG.hairline;
       ctx.beginPath();
       for (const e of world.enemies) {
-        if (e.dead || e.staged) continue;
+        // The same set `grip` takes, or the picture is drawing a hold the
+        // snare does not have.
+        if (e.dead || e.spent || e.fizzle) continue;
         if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 > S.reach * S.reach) continue;
         ctx.moveTo(m.x, m.y);
         ctx.lineTo(e.x, e.y);

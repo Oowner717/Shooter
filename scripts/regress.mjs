@@ -464,7 +464,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // 139 since build 219, when REPULSOR and STANDING ORDER were each capped
+    // 134 since build 220, when the ammo-and-mine audit capped three more
+    // nodes the tree was selling three times: FIFTH LINK to 1 (the round's
+    // base is four jumps and the node is named for the fifth), PAIRED CHARGE
+    // to 1 (the mine cap evicted what the other two levels laid) and FOURTH
+    // BELL to 2 (`CFG.knell.tolls` names the count in its own comment). It
+    // was
+    // 139 from build 219, when REPULSOR and STANDING ORDER were each capped
     // at two levels -- neither had any, so the tree was selling both three
     // times, which is the `u.levels ?? 3` trap for the second and third time.
     // It was
@@ -486,7 +492,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 139
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 134
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -13198,6 +13204,262 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     && (r.fooled.d0 - r.fooled.d1) > (r.free.d0 - r.free.d1) * 0.5,
     `a mote closed ${r.free.d0.toFixed(0)} -> ${r.free.d1.toFixed(0)} with no `
     + `decoy, ${r.fooled.d0.toFixed(0)} -> ${r.fooled.d1.toFixed(0)} with one`);
+}
+
+// --- the mine layer had the spent/staged rule exactly backwards -------------
+/*
+ * Build 219 settled the rule for abilities and CLAUDE.md records it: `spent`
+ * is a mark for what may be SHOT and every damage path must honour it;
+ * `staged` is a mark for what may be CHOSEN and a damage path must NOT, since
+ * `config.js` says in as many words that it "never gated projectile
+ * collision" and most of a body's march in is on screen.
+ *
+ * Every one of the six paths in the mine layer had it the other way round --
+ * SNARE's grip, LODE's repel, WIRE's cut, the shared patch that SPORE and
+ * THORN both use, and the snare's drawn wires all skipped `staged` and none
+ * of them skipped `spent`. So a mine burned, cut, hauled and drew the frame
+ * of a boss that was already dead, and visibly did nothing to a body walking
+ * in over it.
+ *
+ * Asserted as a differential, both ways, because a guard that refuses
+ * everything passes a one-sided test. Shown to read a one, too: with the
+ * three `spent` terms taken back out, THORN reports 111 against 111, WIRE
+ * 237 against 201 and LODE 181 against 181.
+ *
+ * SNARE is the exception and is worth knowing about: its arm is closed by the
+ * TRIGGER guard rather than by `grip`'s, because a `spent` body cannot spring
+ * the mine in the first place. `grip` keeps its own guard for the case the
+ * trigger cannot reach -- a body that becomes `spent` while already held,
+ * which is a boss dying inside a snare.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    const ran = w.director.update;
+    w.director.update = () => {};
+    w.autoFire = false;
+    w.autoAim = false;
+
+    /*
+     * One mine of one kind, landed and armed, with a witness pinned on it for
+     * three seconds. `mark` is written onto the witness before the clock
+     * starts: 'spent' must be left alone, 'staged' must not.
+     */
+    const run = (kind, mark) => {
+      g.debugClearField();
+      w.mines.length = 0;
+      w.effects.length = 0;
+      g.debugThrowMine(kind);
+      const m = w.mines[w.mines.length - 1];
+      for (let f = 0; f < 100; f++) g.update(1 / 60);
+      if (!m) return { kind, mark, error: 'no mine' };
+      const e = g.debugSpawn('lurcher', m.x, m.y - 6);
+      if (!e) return { kind, mark, error: 'no witness' };
+      e.staged = false;
+      e.maxHp = 1e9;
+      e.hp = 1e9;
+      if (mark) e[mark] = true;
+      const startHp = e.hp;
+      let moved = 0;
+      let px = e.x;
+      let py = e.y;
+      for (let f = 0; f < 60 * 3; f++) {
+        // Pinned, healed and re-marked every frame: the question is whether
+        // the mine acts on it at all, not whether it survives.
+        e.hp = Math.min(e.hp, 1e9);
+        if (mark) e[mark] = true;
+        e.dead = false;
+        /*
+         * ...and its own legs taken away, which the first version of this
+         * case forgot. A LURCHER walks 76 to 136 units in three seconds
+         * under its own steering, which is far more than LODE's push, so the
+         * case was measuring the witness and not the mine and reported a
+         * `spent` body being pushed HARDER. `cruise` 0 makes `drive` steer
+         * toward a standstill, so every unit of travel left is the mine's.
+         */
+        e.cruise = 0;
+        e.accel = 400;
+        g.update(1 / 60);
+        moved += Math.hypot(e.x - px, e.y - py);
+        px = e.x;
+        py = e.y;
+      }
+      return { kind, mark, took: Math.round(startHp - e.hp), moved: Math.round(moved) };
+    };
+
+    /*
+     * The two FIELD mines are measured differently, because a witness with
+     * legs drowns them. LODE's push and SNARE's haul are per-frame writes to
+     * velocity, so: pin the body where the field is strongest, zero its
+     * velocity every frame, set `thrown` so `drive` returns before it can
+     * steer, and sum the speed each frame leaves behind. What is left is the
+     * field and nothing else. The first version let the body walk and
+     * reported a `spent` body being pushed HARDER than a live one, which was
+     * a LURCHER's own legs at 76 to 136 units against a shove of a few.
+     */
+    const field = (kind, mark) => {
+      g.debugClearField();
+      w.mines.length = 0;
+      w.effects.length = 0;
+      g.debugThrowMine(kind);
+      const m = w.mines[w.mines.length - 1];
+      for (let f = 0; f < 100; f++) g.update(1 / 60);
+      if (!m) return { kind, mark, push: -1 };
+      /*
+       * Put it in the middle once it has landed. `landingSite` picks at
+       * random, and the arena's own `edgeEase` pushes 300 u/s^2 through a
+       * 96-unit band at each side -- so a mine that happened to land near a
+       * wall added a shove of its own to the measurement and the LODE arm
+       * swung 97 to 181 run to run on where the site fell.
+       */
+      m.x = w.width / 2;
+      m.y = w.floorY - 320;
+      m.x1 = m.x;
+      m.y1 = m.y;
+      const e = g.debugSpawn('lurcher', m.x + 30, m.y);
+      if (!e) return { kind, mark, push: -1 };
+      e.staged = false;
+      e.maxHp = 1e9;
+      e.hp = 1e9;
+      let push = 0;
+      for (let f = 0; f < 60 * 2; f++) {
+        e.x = m.x + 30;
+        e.y = m.y;
+        e.vx = 0;
+        e.vy = 0;
+        e.hp = 1e9;
+        e.dead = false;
+        e.thrown = 1;          // `drive` returns before it can steer
+        if (mark) e[mark] = true;
+        g.update(1 / 60);
+        push += Math.hypot(e.vx, e.vy);
+      }
+      return { kind, mark, push: Math.round(push) };
+    };
+
+    const out = {};
+    for (const kind of ['thorn', 'wire']) {
+      out[kind] = {
+        clean: run(kind, null),
+        spent: run(kind, 'spent'),
+        staged: run(kind, 'staged'),
+      };
+    }
+    for (const kind of ['lode', 'snare']) {
+      out[kind] = {
+        clean: field(kind, null),
+        spent: field(kind, 'spent'),
+        staged: field(kind, 'staged'),
+      };
+    }
+    w.director.update = ran;
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+
+  // THORN and WIRE do damage; LODE and SNARE move things. Each is measured on
+  // the quantity it actually produces.
+  const hurt = (o) => o.took;
+  const shove = (o) => o.moved;
+  const cases = [
+    ['a THORN patch', 'thorn', hurt],
+    ['a WIRE', 'wire', hurt],
+  ];
+  for (const [name, kind, of] of cases) {
+    const o = r[kind];
+    check(`${name} leaves a spent body finished, and still takes one arriving`,
+      of(o.clean) > 0 && of(o.spent) === 0 && of(o.staged) > 0,
+      `unmarked ${of(o.clean)}, spent ${of(o.spent)}, staged ${of(o.staged)}`);
+  }
+  for (const [name, kind] of [['a LODE pushes', 'lode'], ['a SNARE hauls', 'snare']]) {
+    const o = r[kind];
+    check(`...and ${name} what is arriving and not what is spent`,
+      o.clean.push > 0 && o.staged.push > 0 && o.spent.push === 0,
+      `two seconds of field: unmarked ${o.clean.push}, spent ${o.spent.push}, `
+      + `staged ${o.staged.push}`);
+  }
+}
+
+// --- three more nodes the tree was selling three times ----------------------
+/*
+ * The `u.levels ?? 3` trap for the fourth, fifth and sixth time. What makes
+ * these three different from the percentage ladders around them is that each
+ * is named after the number it is supposed to produce, and two of them are
+ * contradicted by a comment in config.js:
+ *
+ *   FIFTH LINK   ARC's base is 4 jumps; the fifth is one more. It made seven.
+ *   FOURTH BELL  `CFG.knell.tolls` says "buys the third back and a fourth
+ *                beyond it" -- two levels from a base of two. It rang five.
+ *   PAIRED CHARGE  the mine cap is 5 and its comment calls it a contract
+ *                nothing may move; at four a throw the cap evicted what the
+ *                player had just paid for.
+ *
+ * Asserted on the RESULT each node produces, not on its \`levels\`, so a
+ * change to the base number is caught as well as a change to the cap.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { NODE_BY_ID } = await import('../src/tree.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    const ran = w.director.update;
+    w.director.update = () => {};
+    g.debugGiveEnergy(500000);
+    g.debugBuyAll();
+
+    // ...and what a fully bought salvo actually leaves standing, which is the
+    // question the cap answers. Two throws, because one cannot reach the cap.
+    const live = () => w.mines.filter((m) => !m.dead).length;
+    g.debugClearField();
+    w.mines.length = 0;
+    const salvo = 1 + w.up.mineSalvo;
+    for (let i = 0; i < salvo; i++) g.debugThrowMine('blast');
+    for (let f = 0; f < 120; f++) g.update(1 / 60);
+    const afterOne = live();
+    for (let i = 0; i < salvo; i++) g.debugThrowMine('blast');
+    const afterTwo = live();
+    const laid = w.mines.length;
+
+    const out = {
+      levels: {
+        fifthlink: NODE_BY_ID.get('fifthlink').levels,
+        fourthbell: NODE_BY_ID.get('fourthbell').levels,
+        paired: NODE_BY_ID.get('paired').levels,
+      },
+      jumps: CFG.rounds.arc.jumps + w.up.arcJumps,
+      tolls: CFG.knell.tolls + w.up.mineTolls,
+      salvo, afterOne, afterTwo, laid, cap: CFG.mines.cap,
+    };
+    w.director.update = ran;
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+  check('a fully bought ARC makes five jumps, which is what FIFTH LINK is named for',
+    r.levels.fifthlink === 1 && r.jumps === 5,
+    `FIFTH LINK x${r.levels.fifthlink}, ARC jumps ${r.jumps}`);
+  check('...and a fully bought KNELL rings four times, which is what the config says',
+    r.levels.fourthbell === 2 && r.tolls === 4,
+    `FOURTH BELL x${r.levels.fourthbell}, tolls ${r.tolls}`);
+  check('...and a fully bought salvo does not lay more than the cap can hold',
+    r.levels.paired === 1 && r.salvo === 2
+    && r.afterOne === 2 && r.afterTwo === 4 && r.afterTwo === r.laid,
+    `PAIRED CHARGE x${r.levels.paired} lays ${r.salvo} a throw; one throw `
+    + `leaves ${r.afterOne} standing, two leave ${r.afterTwo} of ${r.laid} `
+    + `laid against a cap of ${r.cap}`);
 }
 
 // --- report -----------------------------------------------------------------

@@ -347,7 +347,14 @@ export const UPGRADES = {
     { id: 'ricochet', name: 'RICOCHET', line: '+1 bounce off the arena edges.', apply: bump('bounces', 1) , icon: MARK.ricochet },
     { id: 'heavy', name: 'HEAVY', levels: 2, line: '2x knockback on every hit.', apply: scale('impulse', 2) , icon: MARK.heavy },
     { id: 'overpressure', name: 'OVERPRESSURE', line: '+40% HE blast radius.', apply: scale('blastR', 1.4) , icon: MARK.overpressure },
-    { id: 'fifthlink', name: 'FIFTH LINK', line: 'ARC jumps 1 more time.', apply: bump('arcJumps', 1) , icon: MARK.fifthlink },
+    /*
+     * ONE level, because the node is named after the number it produces.
+     * `CFG.rounds.arc.jumps` is 4, so one more is the fifth link the row is
+     * selling. It had no `levels` at all, and `tree.js` reads `u.levels ?? 3`
+     * -- so the tree sold three and an ARC made SEVEN jumps. SECOND GROWTH,
+     * authored later against the same shape ("+1 patch"), does carry its cap.
+     */
+    { id: 'fifthlink', name: 'FIFTH LINK', levels: 1, line: 'ARC jumps 1 more time.', apply: bump('arcJumps', 1) , icon: MARK.fifthlink },
     // One level, because it is a second arm and not a dial. Left on the
     // default three it would have sold four arms, which is not what the line
     // says and not what the name means.
@@ -414,7 +421,19 @@ export const UPGRADES = {
     { id: 'salvo', name: 'SALVO', line: 'Every 8th shot fires 3 rounds.', levels: 1, apply: set('salvo', 8) , icon: MARK.salvo },
   ],
   FIELD: [
-    { id: 'paired', name: 'PAIRED CHARGE', line: '+1 mine laid per throw.', apply: bump('mineSalvo', 1) , icon: MARK.deepmag },
+    /*
+     * ONE level, because the mine cap eats the rest.
+     *
+     * `CFG.mines.cap` is 5 and its own comment calls it "a contract with the
+     * player rather than a balance dial: nothing may move it". Uncapped this
+     * node laid FOUR mines a throw against a fully bought QUICK LAY interval
+     * of 8.4 seconds and a 15-second life -- measured, two throws put eight
+     * on the field and left five, so three were retired before they had
+     * armed. The player pays for the third level and watches it evicted.
+     * At one level a throw lays two, two throws leave four, and the cap is
+     * still the backstop it was authored as.
+     */
+    { id: 'paired', name: 'PAIRED CHARGE', levels: 1, line: '+1 mine laid per throw.', apply: bump('mineSalvo', 1) , icon: MARK.deepmag },
     /*
      * The wait BETWEEN throws, which is the half of the sentence the node
      * this replaces did not touch.
@@ -437,7 +456,15 @@ export const UPGRADES = {
     { id: 'shrapnel', name: 'SHRAPNEL', line: '+45% mine blast damage.', apply: scale('mineDamage', 1.45) , icon: MARK.shrapnel },
     { id: 'deadweight', name: 'DEAD WEIGHT', line: '+65% snare hold time.', apply: scale('mineHold', 1.65) , icon: MARK.deadweight },
     { id: 'hotwire', name: 'HOT WIRE', line: '+50% wire damage.', apply: scale('wireDamage', 1.5) , icon: MARK.hotwire },
-    { id: 'fourthbell', name: 'FOURTH BELL', line: '+1 toll on every knell.', apply: bump('mineTolls', 1) , icon: MARK.fourthbell },
+    /*
+     * TWO levels, which is what `CFG.knell.tolls` says in as many words:
+     * "was 3; FOURTH BELL buys the third back and a fourth beyond it". Two
+     * from a base of two is four. It had no `levels`, so the tree sold three
+     * and a knell rang FIVE times -- and each toll is wider and lands its own
+     * blast, so the node the config describes as buying one bell back was
+     * buying three.
+     */
+    { id: 'fourthbell', name: 'FOURTH BELL', levels: 2, line: '+1 toll on every knell.', apply: bump('mineTolls', 1) , icon: MARK.fourthbell },
     /*
      * Size only, and capped at two. It sold burn as well until build 212, and
      * with no `levels` the tree sold it three times -- so it was worth 2.46x
