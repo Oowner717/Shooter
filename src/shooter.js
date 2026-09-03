@@ -27,42 +27,6 @@ import { applyBlast } from './enemies.js';
 import { audio } from './audio.js';
 
 /**
- * What the tree has done to the gun, as one number, 1 at stock.
- *
- * Bosses are the only hostiles in the game with no scaling at all. `spawnOne`
- * applies the tier's `scaleAt()` behind `!type.fixed` (enemies.js), every boss
- * body is `fixed`, and each one is built by `new Enemy` inside `Boss.body()` --
- * so a boss meets the authored literal whatever the player is carrying.
- *
- * Measured, seven anomalies, auto-aim and auto-fire, nothing bought against
- * the whole tree bought: 227.0s -> 57.3s, 227.3 -> 43.4, 245.0 -> 47.5,
- * 223.7 -> 43.3, 236.3 -> 41.5, 216.0 -> 41.0, 212.6 -> 67.8. Every one of
- * them falls to about a fifth of the length it was tuned to.
- *
- * A HANDFUL OF NODES CARRY ALL OF IT, and they cost a few thousand of the
- * tree's hundred-odd: HOLLOWPOINT at 1.5 a level over three, SALVO's every
- * Nth shot, and what is left of FEED. Resetting them alone returns a
- * fully-bought fight to nearly its stock length -- so this is the product to
- * answer, not the ledger and not the spend. Half the tree is mines, abilities
- * and defence: a player who bought those has not shortened any fight and must
- * not be handed a harder boss for it.
- *
- * SIGHT was the fourth term and went in build 215, taking a 1.25^3 with it.
- * PILE replaces it on the TURRET branch and is NOT counted here on purpose:
- * it is a fixed 26 damage on a fixed clock in a ring round the machine, so
- * against a boss -- one large body, met at range, in the middle of the field
- * -- it is worth a few damage a second and nothing the fight can feel. What
- * this measures is what the GUN does to the thing in front of it.
- *
- * The terms are the gun's own, and deliberately read from the same places the
- * gun reads them (`up.damage` at the `shot()` below, `up.rate` in
- * Game.update, `up.salvo` here) rather than re-derived from the tree.
- *
- * Asserted as a PRODUCT in regress.mjs rather than node by node, for the same
- * reason `up.rate` is: a new damage node arriving is exactly the thing that
- * would otherwise stop this tracking the gun, silently.
- */
-/**
  * The wave a PILE sends out through the floor.
  *
  * An ANNULUS, not a blast: born at `CFG.pile.r0` and only ever travelling
@@ -333,6 +297,47 @@ function sliverOn(world, e, x, y, p) {
   }
 }
 
+/**
+ * What the tree has done to the gun, as one number, 1 at stock.
+ *
+ * (This sat at the top of the file for five builds, describing `Front` --
+ * build 215 inserted the PILE wave between it and the function it belongs to,
+ * so the first thing anyone opening shooter.js read was thirty-seven lines of
+ * boss-scaling arithmetic attached to a class that has nothing to do with it.)
+ *
+ * Bosses are the only hostiles in the game with no scaling at all. `spawnOne`
+ * applies the tier's `scaleAt()` behind `!type.fixed` (enemies.js), every boss
+ * body is `fixed`, and each one is built by `new Enemy` inside `Boss.body()` --
+ * so a boss meets the authored literal whatever the player is carrying.
+ *
+ * Measured, seven anomalies, auto-aim and auto-fire, nothing bought against
+ * the whole tree bought: 227.0s -> 57.3s, 227.3 -> 43.4, 245.0 -> 47.5,
+ * 223.7 -> 43.3, 236.3 -> 41.5, 216.0 -> 41.0, 212.6 -> 67.8. Every one of
+ * them falls to about a fifth of the length it was tuned to.
+ *
+ * A HANDFUL OF NODES CARRY ALL OF IT, and they cost a few thousand of the
+ * tree's hundred-odd: HOLLOWPOINT at 1.5 a level over three, SALVO's every
+ * Nth shot, and what is left of FEED. Resetting them alone returns a
+ * fully-bought fight to nearly its stock length -- so this is the product to
+ * answer, not the ledger and not the spend. Half the tree is mines, abilities
+ * and defence: a player who bought those has not shortened any fight and must
+ * not be handed a harder boss for it.
+ *
+ * SIGHT was the fourth term and went in build 215, taking a 1.25^3 with it.
+ * PILE replaces it on the TURRET branch and is NOT counted here on purpose:
+ * it is a fixed 26 damage on a fixed clock in a ring round the machine, so
+ * against a boss -- one large body, met at range, in the middle of the field
+ * -- it is worth a few damage a second and nothing the fight can feel. What
+ * this measures is what the GUN does to the thing in front of it.
+ *
+ * The terms are the gun's own, and deliberately read from the same places the
+ * gun reads them (`up.damage` at the `shot()` below, `up.rate` in
+ * Game.update, `up.salvo` here) rather than re-derived from the tree.
+ *
+ * Asserted as a PRODUCT in regress.mjs rather than node by node, for the same
+ * reason `up.rate` is: a new damage node arriving is exactly the thing that
+ * would otherwise stop this tracking the gun, silently.
+ */
 export function gunScale(world) {
   const up = world.up;
   const out = up.damage
@@ -364,8 +369,8 @@ export class Shooter {
 
     // --- lever ---
     this.gripAngle = Math.PI / 2; // straight down = barrel straight up
-    // 1 while SPIRAL is sweeping, then decaying: how much of the gimbal's
-    // closed travel circle is still drawn. See drawLever().
+    // Is a hand on the rod? `drawLever` closes the gimbal's travel circle
+    // while it is, and the auto-traverse stands down.
     this.gripHeld = false;
     this.gripGlow = 0;
   }

@@ -133,11 +133,12 @@ export class Patch {
      * authored life, so the max could never select its second argument -- it
      * was a no-op that read as a guard. The consequence is in `draw`, where
      * `left = life / max` drives the extent: leaving `max` at 4.5 while
-     * `life` drops to 0.35 makes `left` jump to 0.08 on the retire frame and
-     * the ground collapses to a fraction of its size in one step, which is
-     * the visible pop the retirement fade exists to prevent. With `max` set
-     * to the remaining life, `left` runs 1 -> 0 across the fade and the
-     * extent closes with the alpha.
+     * `life` drops to 0.35 makes `left` jump to 0.08 on the retire frame, and
+     * `left` sets the haze's alpha -- so the ground dropped most of its
+     * presence in one step, which is the visible pop the retirement fade
+     * exists to prevent. With `max` set to the remaining life, `left` runs
+     * 1 -> 0 smoothly across the fade. (It drove the drawn EXTENT too until
+     * build 220 fixed that separately; see `draw`.)
      */
     this.max = this.life;
   }
@@ -239,20 +240,29 @@ export class Patch {
     /*
      * ---- what has settled ----
      *
-     * The grain, the edge and the timer, all in one layer. They die back from
-     * the rim inward as the patch burns down, so the area visibly closes
-     * rather than dimming in place -- which is what the creeping inner ring
-     * used to do, at the cost of a second hard outline. Full extent until the
-     * last third: the first draft's `0.28 + left * 0.78` started biting
-     * immediately and drew a one-second-old patch smaller than the circle it
-     * was hurting things in.
+     * The grain, the edge and the timer, all in one layer.
+     *
+     * They used to die back from the rim inward as the patch burned down, so
+     * "the area visibly closes rather than dimming in place". The trouble is
+     * that the area does NOT close: `bite` tests `this.r` and nothing else,
+     * for the whole life. Re-derived, `0.26 + left * 1.1` holds full extent
+     * for the FIRST 33% of a patch's life -- the comment here said the last
+     * third -- and drops the rim band entirely for the final 56%, by which
+     * point the outermost grain sits at 58 units against a burn circle of 92.
+     * A player reading the picture stands a body just outside the grain and
+     * it burns anyway.
+     *
+     * So the extent is fixed and the ALPHA carries the ending, which `k`
+     * already does: it fades over the last 0.8s of life, and over the 0.35s
+     * of a retirement (see `retire`). The picture is the damage now, and the
+     * ragged rim is drawn for as long as there is anything to be outside of.
      */
-    const reach = Math.min(1.14, 0.26 + left * 1.1);
+    const reach = 1.14;
     for (const sp of this.specks) {
       if (sp.d > reach) continue;
-      // Softened only as the patch closes. At full extent `reach` sits clear
-      // of 1, so the rim band -- the only thing marking where the damage
-      // stops -- is drawn at its own alpha rather than at a quarter of it.
+      // `reach` sits clear of 1, so the rim band -- the only thing marking
+      // where the damage stops -- is drawn at its own alpha rather than at a
+      // fraction of it.
       const edge = Math.min(1, (reach - sp.d) * 8);
       ctx.fillStyle = rgba(sp.pale ? this.pale : this.tone,
         Math.min(1, sp.a * k * edge));

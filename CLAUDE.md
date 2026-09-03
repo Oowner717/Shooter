@@ -546,6 +546,15 @@ most once for any given target and cannot spin.
   take their other branch, which is the `world.endless` shape from build 186
   all over again. `resting = true` before anything else, or `update()` falls
   into the end-of-wave block next frame and scores the same wave twice.
+- **A redundant `export` hides dead code from the sweep that would find it.**
+  Thirteen symbols were exported with no consumer outside their own file and
+  none in the suite, and one of them -- `mineScale` -- had no caller at all
+  while `drawMines` restated its arithmetic inline. Exporting for the suite is
+  a real and stated reason; exporting because the symbol happened to be at the
+  top of the file is how a dead function survives a grep. Two sweeps that came
+  back CLEAN in build 220 and need not be repeated soon: every key in the
+  `world.up` defaults table has a writer and a reader, and styles.css has no
+  dead selectors beyond the two documented false-positive shapes.
 - **`up.damage` is applied at the MUZZLE, so anything a round leaves behind or
   chains to is outside the damage line.** Three rounds had this and all three
   were found in one sweep: ARC's chain (25 a jump against a dart of 11, so
@@ -567,6 +576,27 @@ most once for any given target and cannot spin.
   so from tier 15 the mark on the round whose whole point is that it pays was
   worth exactly nothing. The floor was there to stop eight marks compounding;
   a flag plus a multiplier keeps the "once" and keeps the value.
+- **Continuous damage has to run on a CLOCK, not on the frame.**
+  `applyDamage` floors every hit at `Math.max(1, dmg * (1 - plate) * (1 -
+  ward))`, and `Patch` ticks four times a second for exactly that reason. Two
+  other sources did not: WIRE's cut at 79/s is 1.32 a frame at 60Hz, which
+  floors on anything with armour over 0.24, and 0.66 at 120Hz, which floors on
+  EVERYTHING -- 120 a second against a rated 79, armour ignored. HARD CASING
+  was the same. A per-frame IMPULSE is worse and runs the other way: it pays
+  the repeated-hit fade once a frame, so a second on the wire took `kicked` to
+  9.7 at 60Hz and 14.2 at 120 against the 4.25 sustained gunfire settles at --
+  the shove delivered a sixth of nominal, more of it the slower the display,
+  and then scaled down every later shove on that body for twenty seconds.
+  `CFG.wire.tick` is the shared rate. Never fix this by touching the floor or
+  the fade: they are on every damage path and that route re-baselines ORDINAL.
+- **Three instruments for one measurement, and two of them were tautologies.**
+  Measuring that fault: healing the body each frame and reading `start - hp`
+  is zero by construction; summing the `dmg` ARGUMENT at the door is `79 * dt`
+  and therefore rate-independent whatever the code does, because the floor is
+  applied INSIDE `applyDamage`. Only delivered health, on a body given enough
+  to survive the window, measures it. And buy ONE level of the upgrade: at
+  three the bite clears the floor at both rates and a fully bought turret
+  cannot see the fault at all.
 - **A branch that ends on `continue` skips whatever the bottom of the loop
   does.** THORN and LODE were the two kinds of eight whose arm of
   `updateMines` ended on one, and the only thing past it is the splice that

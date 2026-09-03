@@ -182,9 +182,6 @@ export class Game {
 
       // status effects
       stasis: 0,
-      // Seconds SPIRAL still owns the barrel. Zero the rest of the time;
-      // updateFiring stands down while it is up so the two are never both
-      // driving the gun.
       autoSteering: false, // is auto aim traversing the barrel this frame?
       autoAim: false,
       /*
@@ -436,16 +433,14 @@ export class Game {
     w.stasis = 0;
     w.decoy = null;
     /*
-     * ...and SPIRAL, which was the one ability effect this did not clear.
-     *
-     * `updateFiring` used to stand down while a sweep owned
-     * the barrel -- and the only thing that counts it back down is the effect
-     * itself, which lives in `world.effects` and is emptied four lines above.
-     * So a run reset during the sweep started with a gun that could not fire
-     * and nothing left alive to ever re-enable it: not a stutter, a permanent
-     * dead turret, reachable by pressing RESET SIMULATION within a second of
-     * using SPIRAL. The same class of bug as build 82's, found the same way --
-     * by pressing every control and watching what stopped working.
+     * Nothing on the bar owns the barrel any more, so there is no third thing
+     * to clear here. SPIRAL was: `updateFiring` stood down while a sweep held
+     * the gun, and the only thing that counted it back down lived in
+     * `world.effects`, which is emptied four lines above -- so a reset during
+     * a sweep left a permanently dead turret, reachable by pressing RESET
+     * SIMULATION within a second of using it. The lesson outlives the
+     * ability: an effect that disables something must not be the only thing
+     * that can re-enable it.
      */
     w.nextStoryAt = CFG.storyEvery;
     w.energy = 0;

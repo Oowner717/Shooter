@@ -23,12 +23,6 @@ class Projectile {
     this.core = opts.core || '#ffffff';
     this.trail = opts.trail ?? 0.024;
     /*
-     * Thrown by SPIRAL's sweep rather than aimed. It is the same round with
-     * the same upgrades -- this only changes how it is drawn, so a field full
-     * of them reads as one sweep going out rather than as fifty unrelated
-     * shots that happen to have started at the same place.
-     */
-    /*
      * Which flight form drawProjectiles gives it. Every round used to be the
      * same two-stroke tracer at a different hue, which is the disease the
      * bodies had before build 166: nine rounds, one recipe, and the only

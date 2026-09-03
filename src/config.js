@@ -14,7 +14,7 @@ export const BUILD = '220';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a642234';
+export const REV = '6a9185a';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -551,16 +551,24 @@ export const CFG = {
      *
      * It used to have no limit at all: `autoTarget` walked every live object
      * in the cone and took the nearest, so the assist covered the whole field
-     * corner to corner. At 390x844 the turret sits at y=996 of a 1361-unit
-     * world and objects go live at y=260, which puts the far corner 800 units
-     * away — auto aim held all of it, and the only thing that ever changed
-     * about it was how fast the barrel got there.
+     * corner to corner, and the only thing that ever changed about it was how
+     * fast the barrel got there.
      *
-     * 400 is the near half: a little past the middle of the live field
-     * straight up, and about two thirds of the way out to the top corners.
-     * Anything further in is yours to shoot by hand until ARRAY is bought,
-     * and two levels of it (x1.45 each) come to 841 — the whole field again,
-     * with the corner inside it.
+     * Re-derived at 390x844 off an `ENTRY_Y` of 0, which is what it has been
+     * since "Remove the wall and the gate" — the paragraph this replaces was
+     * still measuring from 260 and every statement it made about coverage was
+     * wrong by that much. The turret sits at y=996 with the top of the field
+     * at y=0, so the live column above it is 996 units and the far top corner
+     * is 1045 away.
+     *
+     * So 400 is 40% of the column straight up and a little over a third of
+     * the way to a corner. Anything beyond is yours to shoot by hand until
+     * ARRAY is bought; two levels of it (x1.45 each) reach 841, which covers
+     * six sevenths of the column and leaves the corner 204 units outside.
+     * On a short screen (320x568, turret at y=551) 841 does cover everything,
+     * corners included — which is why DEEP ARRAY's row used to promise the
+     * top of the field and was only true on the smallest phone the game runs
+     * on.
      */
     aimRange: 400,
 
@@ -784,7 +792,8 @@ export const CFG = {
      * because the time carried is the remainder and never a fresh `calm`.
      *
      * That left it paying a 2.4x rate penalty for a shove and nothing else,
-     * so it hits hard per shot — 44, against BOLT's 26 — while staying under
+     * so it hits hard per shot — 44, against BOLT's 26 and SPINE's 34 —
+     * while staying under
      * BOLT on sustained damage. It was written against SPINE at 20 and SPINE
      * has been 34 since build 218, so it is no longer the hardest single
      * round; the rate penalty and the shove are the trade, not the ceiling.

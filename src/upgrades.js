@@ -632,7 +632,7 @@ export const UPGRADES = {
       apply: bump('driftAim', 1), icon: MARK.driftaim },
     { id: 'aimrange', name: 'ARRAY', levels: 2,
       line: '+45% auto aim range. A flat fin off the back.',
-      tiers: [null, { name: 'DEEP ARRAY', line: '+45% again, on top of ARRAY. A second fin, and the sweep reaches the top of the field.' }],
+      tiers: [null, { name: 'DEEP ARRAY', line: '+45% again, on top of ARRAY. A second fin, and the sweep covers most of the way up the field.' }],
       apply: scale('aimRange', 1.45), icon: MARK.aimrange },
   ],
   /*
