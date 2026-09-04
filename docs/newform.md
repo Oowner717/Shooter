@@ -477,3 +477,36 @@ drift the gate becomes unreachable in that run, silently.
 
 This also removes the energy half of the gate from P9: there is no purse test, and
 `available()` needs only the boss count and the turret branch.
+
+---
+
+## 10. Settled: era 2 draws everything smaller
+
+The 127px finding in 8.1 is accepted rather than mitigated. Era 2 does **not** reclaim
+chrome; it shows a larger world in the same play band, with everything drawn 35%
+smaller. NEEDLE 12.4px across becomes 8.1, BULWARK 55.8 becomes 36.3, and screen
+coverage by enemies falls to 42%.
+
+Three consequences follow, and one of them changes from optional to required.
+
+**The stroke fix is now mandatory, not a nicety.** 8.6 measured the build-199
+regression returning: at dpr 2 the world-unit floor goes 1.008 -> 1.551 while
+`r * m.line` is unchanged, clamping 9 of the 16 field types instead of 4 — DRIFT, TOW,
+GLUT, HERALD and PRISM all collapse onto MOTE's outline. If everything is also 35%
+smaller, the outline is doing even more of the work, and CLAUDE.md's measurement is
+that a body reads almost entirely as its outline with the fill at 7-9% of its
+brightness. **`materialOf`'s `line` gets x1/0.65 in era 2, and `t._mat` is invalidated
+on the switch.** Without it the roster stops being distinguishable.
+
+**The six build lots have a screen-pixel budget, not a world-unit one.** They are
+drawn into the same 127px band as everything else, so P5 sizes them in CSS px and
+converts, rather than picking world units and hoping.
+
+**The lever is fine, and this was worth checking.** `gripR: 24` is purely a DRAWN
+radius: the grab test is `p.y > s.y - s.r` (`game.js:1032`), a half-plane, not a hit
+circle on the knob. So the knob draws smaller while the grab zone stays "everywhere
+below the turret", which is unchanged in screen terms because `shooter.standoff`
+scales to hold the turret at the same CSS position. **No touch target regresses.**
+
+That is the general rule for this ruling: it settles what is DRAWN. Anything that is
+also *touched* needs checking separately — and the lever was the only candidate.
