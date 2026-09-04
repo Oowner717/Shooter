@@ -32,8 +32,8 @@
 
 import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
-import { ledger, soak, soakBeads, soakNext, SOAK_BEADS, SRC_EXTRA,
-  WINDOWS } from './ledger.js';
+import { ledger, soak, soakBeads, soakNext, SOAK_BEADS, SRC_EXTRA, WINDOWS,
+  BAR_WINDOW } from './ledger.js';
 import { background } from './background.js';
 import { BEAD_REACH, placeDummy, DUMMY } from './dummy.js';
 import { rgba, clamp } from './util.js';
@@ -193,6 +193,39 @@ export class Sandbox {
      * spends three quarters of a 8.5px label on a word that is the same in
      * every column and leaves no room for the one that is not.
      */
+    /*
+     * ---- one line up, everything else behind a button ----
+     *
+     * The panel was 212px on a 414x896 phone -- a caption, four tiles, a
+     * session line, the record and two buttons, all of it up all the time --
+     * and that is a quarter of the screen spent on a readout in a room whose
+     * whole point is watching the thing the readout is about. It covered the
+     * rig, and `standoff` could only answer by walking the rig backwards until
+     * it hit its own floor.
+     *
+     * So the default is ONE ROW: the ten-second rate, which is the number you
+     * actually watch, and how far round the record has got. Everything else --
+     * the other three windows, the clock, the session total, the record's own
+     * bar, RESET and the source table -- is behind the chevron.
+     *
+     * `standoff` measures THIS row and not the panel, so what is behind the
+     * chevron is allowed to cover the field the way the source table always
+     * has, and the rig does not move when you open it. Expand to read, fold to
+     * shoot.
+     */
+    const line = document.createElement('div');
+    line.className = 'sbLine';
+    line.innerHTML = `<b id="sbLead">0</b><em>DPS ${WINDOWS[1]}s</em>`
+      + `<span class="sbLineRec" id="sbLineRec">0/${SOAK_BEADS}</span>`;
+    const more = document.createElement('button');
+    more.className = 'sbMoreBtn';
+    more.setAttribute('aria-label', 'More statistics');
+    more.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      this.showMore(!this.moreOpen);
+    });
+    line.appendChild(more);
+
     const cap = document.createElement('div');
     cap.className = 'sbCap';
     cap.innerHTML = '<span>DAMAGE A SECOND</span><span class="sbCapWin">'
@@ -219,16 +252,8 @@ export class Sandbox {
      */
     const sub = document.createElement('div');
     sub.className = 'sbStatSub';
-    /*
-     * The third span is the record again, and it is the SHORT-SCREEN copy of
-     * it: on a 568-tall phone `.sbRec` below costs 22px the rig does not have,
-     * so the media query hides that row and shows this instead. Same number,
-     * one line, no bar. It is display-only in CSS -- never the `hidden`
-     * attribute, which loses to any rule that sets a display.
-     */
     sub.innerHTML = '<span id="sbClock">00:00</span>'
-      + '<span id="sbTotal">0</span>'
-      + '<span id="sbSoakMini">0</span>';
+      + '<span id="sbTotal">0</span>';
 
     /*
      * ---- and the one line that is NOT the session ----
@@ -273,8 +298,24 @@ export class Sandbox {
     table.className = 'sbTable';
     table.hidden = true;
 
-    p.append(cap, head, sub, rec, acts, table);
+    /*
+     * `hidden` AND a `[hidden]` guard in the stylesheet, because `.sbMore` is
+     * given a `display` -- the trap CLAUDE.md keeps a note about, which has
+     * shipped three times: the property flips, every test that reads it back
+     * agrees, and the element stays on the screen taking taps.
+     */
+    const box = document.createElement('div');
+    box.className = 'sbMore';
+    box.hidden = true;
+    box.append(cap, head, sub, rec, acts, table);
+
+    p.append(line, box);
     this.el.panel = p;
+    this.el.line = line;
+    this.el.more = more;
+    this.el.box = box;
+    this.el.lead = line.querySelector('#sbLead');
+    this.el.lineRec = line.querySelector('#sbLineRec');
     this.el.acts = acts;
     this.el.table = table;
     this.el.fold = fold;
@@ -282,7 +323,6 @@ export class Sandbox {
     this.el.sust = head.querySelector('#sbSust');
     this.el.total = sub.querySelector('#sbTotal');
     this.el.clock = sub.querySelector('#sbClock');
-    this.el.soakMini = sub.querySelector('#sbSoakMini');
     this.el.soak = rec.querySelector('#sbSoak');
     this.el.soakBar = rec.querySelector('#sbSoakBar');
     this.el.beads = rec.querySelector('#sbBeads');
@@ -299,6 +339,8 @@ export class Sandbox {
     background.setMood('sandbox', true);
     // Folded on the way in, every time: the table is the only thing here
     // that is allowed to cover the rig, and it should never do so uninvited.
+    // Folded on the way in, every time, for the same reason the table is.
+    this.showMore(false);
     this.showTable(false);
     /*
      * Filled BEFORE the rig is placed, and that ordering is load-bearing:
@@ -336,15 +378,47 @@ export class Sandbox {
    * somebody is measuring against it.
    */
   onResize() {
+    this.placed = false;
+    this.restand();
+  }
+
+  /**
+   * Put the rig where the readout now leaves room for it.
+   *
+   * Only when it is actually wrong by more than a few units, because moving
+   * the target is the one thing this room must not do while somebody is
+   * measuring against it -- so a rotation moves it and opening the stats does
+   * not (`standoff` measures the lead row, which does not change size).
+   */
+  restand() {
     if (!this.on) return;
     const w = this.game.world;
     const d = w.enemies.find((e) => e.dummy && !e.dead);
     if (!d) return;
     const up = this.standoff();
+    if (up === null) return;
+    this.placed = true;
     const y = w.shooter.y - up;
     if (Math.abs(y - d.y) < 8) return;
     d.y = y;
     if (d.dummyHome) d.dummyHome.y = y;
+  }
+
+  /**
+   * Open or fold everything below the lead row.
+   *
+   * The rig does NOT move for this, deliberately: `standoff` measures the lead
+   * row, so the block behind the chevron is allowed to cover the field the way
+   * the source table always has been. Moving the target when you open a
+   * readout is the one thing a room for measuring must not do.
+   */
+  showMore(on) {
+    this.moreOpen = !!on;
+    if (!this.el.box) return;
+    this.el.box.hidden = !on;
+    this.el.more.classList.toggle('on', !!on);
+    if (on) this.syncStats();
+    else this.showTable(false);
   }
 
   showTable(on) {
@@ -369,7 +443,12 @@ export class Sandbox {
     for (let i = w.enemies.length - 1; i >= 0; i--) {
       if (w.enemies[i].dummy) w.enemies.splice(i, 1);
     }
-    placeDummy(this.game, this.standoff());
+    const up = this.standoff();
+    // `null` is "the panel could not be measured yet" -- see `standoff`. The
+    // rig goes down at its preferred distance and `update` puts it right on
+    // the first frame the readout is actually on the screen.
+    this.placed = up !== null;
+    placeDummy(this.game, up === null ? DUMMY.up : up);
   }
 
   /**
@@ -396,19 +475,38 @@ export class Sandbox {
      * rig's distance was a function of what happened to be open when a button
      * was pressed.
      */
-    const el = this.el.acts;
+    const el = this.el.line;
     const p = this.el.panel;
     if (!el || !p) return DUMMY.up;
     /*
-     * The actions row's bottom PLUS the panel's own bottom padding and border,
-     * which is where the closed panel really ends. Measuring the row alone
-     * under-reported by six pixels, and six pixels is the whole of `clear` at
-     * this zoom -- the rig came out flush against the glass rather than
-     * standing off it.
+     * The LEAD ROW's bottom plus the panel's own bottom padding and border,
+     * which is where the folded panel really ends. Three earlier versions of
+     * this line each measured something that grows: the panel itself (which is
+     * 62dvh with the source table open, so pressing DUMMY there parked the rig
+     * at its floor for good), the actions row without the padding under it
+     * (and that padding is the whole of `clear` at this zoom, so the rig came
+     * out flush against the glass), and the panel before `syncStats` had
+     * filled it (10px short). What is measured has to be the part that cannot
+     * change size.
      */
+    const box = el.getBoundingClientRect();
+    /*
+     * ---- and it refuses to answer off a panel that is not on the screen ----
+     *
+     * `getBoundingClientRect()` on a `display: none` element returns all
+     * zeros, and `#sandbox` is `display: none` while `body.menuOpen` is set --
+     * so entering through the room's own ENTER button, which is the ONLY way a
+     * player gets in, measured a bottom edge of zero and stood the rig at
+     * `DUMMY.up` regardless of how tall the readout was. Reported from a
+     * phone: a 212px panel with the rig behind it, on a build whose own case
+     * said 55px of clearance, because the case called `enterSandbox()`
+     * directly and never had the menu open. `null` here means "not yet";
+     * `dummy()` leaves `placed` false and `update()` tries again.
+     */
+    if (!box.height) return null;
     const cs = getComputedStyle(p);
     const pad = (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
-    const bottom = (el.getBoundingClientRect().bottom + pad) / CFG.zoom;
+    const bottom = (box.bottom + pad) / CFG.zoom;
     // The furthest it may stand is just clear of the panel's bottom edge.
     /*
      * Cleared by the SHELL's outer edge and not by the body radius. The record
@@ -425,12 +523,6 @@ export class Sandbox {
 
   syncStats() {
     if (!this.el.table) return;
-    for (let i = 0; i < WINDOWS.length; i++) {
-      this.el.win[i].textContent = num(ledger.rate(WINDOWS[i]));
-    }
-    this.el.sust.textContent = num(ledger.total / Math.max(0.25, ledger.t));
-    this.el.total.textContent = `${num(ledger.total)} DAMAGE`;
-    this.el.clock.textContent = clock(ledger.t);
     /*
      * The record. `soakBeads` is the ladder, not the number -- the beads are
      * an odometer with a decade a shell, so 50% of them is 220,000 damage and
@@ -438,12 +530,23 @@ export class Sandbox {
      * the stop for the whole first hour.
      */
     const beads = soakBeads(soak.total);
+    // The lead row first: it is the only part that is up when the rest is
+    // folded, so it is the only part that must be right every tick.
+    this.el.lead.textContent = num(ledger.rate(BAR_WINDOW));
+    this.el.lineRec.textContent = beads >= SOAK_BEADS
+      ? `${SOAK_BEADS}/${SOAK_BEADS}` : `${Math.floor(beads)}/${SOAK_BEADS}`;
+    if (!this.moreOpen) return;
     this.el.soak.textContent = num(soak.total);
-    this.el.soakMini.textContent = `${num(soak.total)} LIFETIME`;
     this.el.beads.textContent = beads >= SOAK_BEADS
       ? 'COMPLETE'
       : `${Math.floor(beads)}/${SOAK_BEADS}  ·  ${num(soakNext(soak.total))} TO NEXT`;
     this.el.soakBar.style.width = `${(beads / SOAK_BEADS) * 100}%`;
+    for (let i = 0; i < WINDOWS.length; i++) {
+      this.el.win[i].textContent = num(ledger.rate(WINDOWS[i]));
+    }
+    this.el.sust.textContent = num(ledger.total / Math.max(0.25, ledger.t));
+    this.el.total.textContent = `${num(ledger.total)} DAMAGE`;
+    this.el.clock.textContent = clock(ledger.t);
 
     // The table sorts and allocates, so it is only built while it is open.
     if (!this.tableOpen) return;
@@ -507,6 +610,9 @@ export class Sandbox {
     this.statT = (this.statT || 0) - dt;
     if (this.statT > 0) return;
     this.statT = 0.25;
+    // The panel was not on the screen when the rig went down -- see
+    // `standoff`. This is the first tick after the menu closed behind us.
+    if (!this.placed) this.restand();
     this.syncStats();
     /*
      * ...and the record to disk every eight seconds. `add` is called once per

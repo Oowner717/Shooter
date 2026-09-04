@@ -17123,6 +17123,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(size);
     rows.push(await page.evaluate(async (vh) => {
+      let out0 = {};
       const { CFG } = await import('../src/config.js');
       const { soak } = await import('../src/ledger.js');
       const g = window.__sim;
@@ -17132,13 +17133,29 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       // A four-digit record and a running clock: the widest the panel gets.
       const heldTotal = soak.total;
       soak.total = 640000;
-      g.enterSandbox();
+      /*
+       * Through the room's own door, and that is the whole point of this
+       * case's setup. Every earlier version called `g.enterSandbox()`
+       * directly, which is the one path a player never takes -- and it is
+       * exactly the path that hid build 236's fault: `body.menuOpen #sandbox`
+       * is `display: none`, `getBoundingClientRect()` on a `display: none`
+       * element returns all zeros, and `standoff` therefore measured a panel
+       * of no height and put the rig at its preferred distance under a 212px
+       * readout. Green case, and a screenshot from a phone showing the rig
+       * behind the panel.
+       */
+      g.hud.menu.setOpen(true);
+      g.hud.menu.openTab('sandbox');
+      document.querySelector('.sbEnter').click();
+      // ...and one tick, because the deferred re-place is `update`'s job.
+      for (let i = 0; i < 20; i++) g.update(1 / 60);
       const gapNow = () => {
         const p = document.querySelector('#sbPanel').getBoundingClientRect();
         const d = g.world.enemies.find((e) => e.dummy && !e.dead);
         return d ? +(((d.y - d.r) * CFG.zoom) - p.bottom).toFixed(1) : -999;
       };
       const onEntry = gapNow();
+      out0 = { folded: !g.sandbox.moreOpen, lead: !!document.querySelector('.sbLine #sbLead') };
       // ...and after the panel has been filled in and a hit has landed, which
       // is the moment the old sub line used to wrap and take it 12px taller.
       const d = g.world.enemies.find((e) => e.dummy && !e.dead);
@@ -17146,19 +17163,24 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       for (let i = 0; i < 40; i++) g.update(1 / 60);
       const settled = gapNow();
       /*
-       * ...and with the source table open, which is the one thing here that is
-       * allowed to cover the field. The rig must NOT have moved for it: it did,
-       * to `DUMMY.nearest`, and folding the table again did not put it back.
+       * ...and with everything open, which is what is allowed to cover the
+       * field: `standoff` measures the LEAD ROW, so neither the stats block
+       * nor the source table may move the target. The rig has been moved by
+       * both in the past -- to `DUMMY.nearest`, permanently, because folding
+       * them again does not put it back.
        */
       const before = d.y;
+      g.sandbox.showMore(true);
       g.sandbox.showTable(true);
       g.sandbox.dummy();
+      for (let i = 0; i < 20; i++) g.update(1 / 60);
       const moved = Math.abs((g.world.enemies.find((e) => e.dummy && !e.dead) || d).y - before);
       g.sandbox.showTable(false);
+      g.sandbox.showMore(false);
       g.exitSandbox();
       soak.total = heldTotal;
       soak.dirty = false;
-      return { w: vh, onEntry, settled, moved: +moved.toFixed(1) };
+      return { w: vh, onEntry, settled, moved: +moved.toFixed(1), ...out0 };
     }, size.width));
   }
   await page.setViewportSize(held);
@@ -17168,9 +17190,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     rows.map((x) => `${x.w}: ${x.onEntry}px clear on entry, ${x.settled}px once `
       + 'the numbers are in').join('; '));
 
-  check('...and opening the source table does not move the target',
+  check('...and opening either fold does not move the target',
     rows.every((x) => x.moved < 1),
     rows.map((x) => `${x.w}: the rig moved ${x.moved} units`).join('; '));
+
+  check('...and what is up by default is one row carrying the ten-second rate',
+    rows.every((x) => x.folded && x.lead),
+    rows.map((x) => `${x.w}: folded ${x.folded}, lead rate present ${x.lead}`).join('; '));
 }
 
 // --- report -----------------------------------------------------------------

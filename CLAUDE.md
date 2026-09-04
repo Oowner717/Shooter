@@ -1348,10 +1348,32 @@ most once for any given target and cannot spin.
   `far` to zero and parked the rig at `nearest` permanently, because folding
   the table again does not put it back.
 - **The clearance is a case now, at 320x568 and 390x844, on entry and once
-  the numbers are in.** This promise has been broken three times by three
+  the numbers are in.** This promise has been broken four times by four
   different mechanisms and nothing ever failed, because `standoff` always
-  returns a number -- it just silently clamps. A guard that watches the
+  returned a number -- it just silently clamped. A guard that watches the
   measured gap is the only thing that can see it.
+- **`getBoundingClientRect()` on a `display: none` element is all zeros, and
+  the room is `display: none` at the exact moment you enter it.**
+  `body.menuOpen #sandbox { display: none }`, and the ENTER button called
+  `enterSandbox()` and THEN `setOpen(false)` -- so `standoff` measured a
+  panel of no height and stood the rig at its preferred distance under a
+  212px readout. Reported from a phone, on a build whose own case claimed
+  55px of clearance, **because the case called `enterSandbox()` directly and
+  never had the menu open**. That is the CLAUDE.md rule about pressing
+  controls through their handler, on a path nobody thought of as a control:
+  the door is a control. The sheet closes first now, `standoff` returns
+  `null` rather than a number it cannot stand behind, and `update` re-places
+  the rig on the first tick the panel is actually rendered.
+- **The default is ONE ROW.** Four tiles, a caption, a session line, the
+  record and two buttons is 212px on a 414x896 phone -- a quarter of the
+  screen, permanently, in a room whose whole point is watching the thing the
+  numbers are about. What is up by default is the ten-second rate and how far
+  round the record has got; everything else is behind a chevron. And
+  `standoff` measures THAT ROW, not the panel, so the fold is allowed to cover
+  the field the way the source table always has and the target does not move
+  when you open it. Expand to read, fold to shoot. The thing `standoff`
+  measures has to be the part that cannot change size -- three earlier
+  versions each measured something that grows.
 - **A readout that cannot move is not a readout.** The testbed's sub line
   carried "n DESTROYED · n% OVERKILL", and both are pinned at zero there by
   construction: the dummy has a billion health and is healed every frame,

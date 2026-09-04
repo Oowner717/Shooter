@@ -3972,6 +3972,67 @@ body.booting #quickBar {
 }
 .sbTable[hidden] { display: none !important; }
 
+/*
+ * ---- the lead row: the one thing that is always up ----
+ *
+ * The ten-second rate, how far round the record has got, and the chevron.
+ * This is what `Sandbox.standoff` measures, so it is the ONE part of the
+ * readout that must not change size -- the numbers are tabular and the
+ * lifetime cell is a fixed shape for exactly that reason.
+ */
+.sbLine {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-variant-numeric: tabular-nums;
+}
+.sbLine b { font-size: 20px; font-weight: 600; color: var(--ink); line-height: 1.15; }
+.sbLine em {
+  font-size: 11px;
+  font-style: normal;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+}
+.sbLineRec {
+  margin-left: auto;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #8fb8d8;
+}
+/* The chevron. A bare caret drawn in CSS rather than an svg, because it is
+   two lines and the file already has three of these. */
+.sbMoreBtn {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: 38px;
+  min-height: 34px;
+  align-self: center;
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(16, 30, 46, 0.9);
+}
+.sbMoreBtn::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -6px 0 0 -4px;
+  border-right: 1.5px solid #a9c0d6;
+  border-bottom: 1.5px solid #a9c0d6;
+  transform: rotate(45deg);
+  transition: transform 0.16s ease, margin 0.16s ease;
+}
+.sbMoreBtn.on { border-color: #8fb8d8; }
+.sbMoreBtn.on::before { transform: rotate(225deg); margin-top: -2px; }
+
+/* Everything else. `[hidden]` needs the guard because this carries a display. */
+.sbMore { margin-top: 8px; }
+.sbMore[hidden] { display: none !important; }
+
 /* RESET and the fold, side by side: two full-width buttons stacked would be
    28px of height spent on nothing, and that 28px is the margin the panel
    clears the rig by on a 568-tall screen. */
@@ -4029,6 +4090,7 @@ body.booting #quickBar {
 }
 .sbRecTag { color: #8fb8d8; }
 .sbRecBar {
+  min-width: 46px;
   height: 5px;
   border-radius: 3px;
   background: rgba(120, 190, 255, 0.1);
@@ -4058,7 +4120,6 @@ body.booting #quickBar {
 }
 .sbStatHead b { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .sbStatHead em { font-size: 11px; font-style: normal; letter-spacing: 0.08em; color: var(--dim); }
-#sbSoakMini { display: none; }
 .sbStatSub {
   display: flex;
   justify-content: space-between;
@@ -4265,6 +4326,7 @@ body.menuOpen #sandbox { display: none !important; }
  */
 @media (max-height: 660px) {
   #sbPanel { padding: 6px; }
+  .sbLine b { font-size: 18px; }
   .sbCap { display: none; }
   .sbStatHead { gap: 5px; }
   /* The tiles lie DOWN on a short screen: "4.2k 10s" on one line instead of
@@ -4286,11 +4348,12 @@ body.menuOpen #sandbox { display: none !important; }
   /* The record keeps its number and gives up its rule and its second line: it
      is the row that must not be dropped, because it is the only one on the
      panel that is still true tomorrow. */
-  /* The record's own row costs 22px here and the rig does not have them. It
-     is folded into the line above instead -- same number, one line, no bar --
-     which is the whole 22px in one move and keeps both readouts on screen. */
-  .sbRec { display: none; }
-  #sbSoakMini { display: inline; color: #8fb8d8; }
+  /* The record keeps its own two-row shape here. It was folded onto one line
+     while the panel was fighting for height; now that everything below the
+     lead row is behind a chevron and allowed to cover the field, the height
+     is not worth the collapsed bar it cost -- `1fr` between two long cells
+     went to zero and the shell's own progress bar simply was not drawn. */
+  .sbRec { margin-top: 5px; padding-top: 5px; }
   .sbActs { margin-top: 5px; }
   .sbReset, .sbFold { padding: 7px 6px; }
 }

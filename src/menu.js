@@ -372,8 +372,21 @@ export class Menu {
     go.className = 'sbEnter';
     go.textContent = 'ENTER THE TESTBED';
     go.addEventListener('click', () => {
-      if (!this.game.enterSandbox()) return;
+      /*
+       * The sheet closes FIRST, and that ordering is the whole of a bug that
+       * shipped in 236. `body.menuOpen #sandbox` is `display: none`, and
+       * `getBoundingClientRect()` on a `display: none` element returns all
+       * zeros -- so `Sandbox.standoff`, which stands the rig clear of the
+       * readout's measured bottom edge, measured zero and put the rig at its
+       * preferred distance with a 212px panel on top of it. Every case for it
+       * called `enterSandbox()` directly and never had the menu open.
+       *
+       * `standoff` refuses to answer off an unrendered panel now as well, so
+       * this ordering is belt and the refusal is braces.
+       */
+      if (this.game.world.sandbox || this.game.world.phase !== 'staging') return;
       this.setOpen(false);
+      this.game.enterSandbox();
     });
     open.appendChild(go);
     /*
