@@ -3721,6 +3721,43 @@ export class Director {
    * that skips it silently carries a spent OVERCLOCK charge and a lapsed lane
    * offer into the wave after.
    */
+  /**
+   * Everything a wave owes the next one, paid by hand.
+   *
+   * Extracted from `glitchOut` because it now has a second caller: a change of
+   * ERA takes the field away without scoring it, exactly as a blown fuse does,
+   * and the two must not keep separate copies of this list. `score()` clears
+   * `overclock.armed` and `laneOffer` and NOWHERE else does, so a path that
+   * skips either silently carries a spent charge and a lapsed lane offer into
+   * the wave after -- and `grace`, which the callers set, has one writer in the
+   * whole codebase.
+   *
+   * `resting` first and before anything else, because `update()` falls straight
+   * into the end-of-wave block on the next frame without it and scores the same
+   * wave twice.
+   *
+   * @param ran whether a wave was actually running. A fuse that blows in the
+   *   rest between two waves has answered nothing, and charging the player an
+   *   OVERCLOCK charge for a wave that never started is not free.
+   */
+  abandonWave(ran) {
+    this.jobs.length = 0;
+    this.resting = true;
+    this.timer = rand(CFG.waves.rest[0], CFG.waves.rest[1]);
+    this.contact = 0;
+    this.hitPatience = false;
+    this.take = 0;
+    this.made = 0;
+    this.slain = 0;
+    // NOT `done`: a wave that was taken away was not finished. It keeps the
+    // number it had, which is the point of showing it.
+    this.done = false;
+    if (ran) this.overclock.armed = false;
+    this.laneOffer = null;
+    this.held = 0;
+    this.glitch = 0;
+  }
+
   glitchOut(world) {
     const T = CFG.waves.tier;
     const G = CFG.waves.glitch;
@@ -3764,24 +3801,7 @@ export class Director {
       fizzled++;
     }
 
-    // The wave is abandoned, not scored. `resting` first and before anything
-    // else, because update() falls straight into the end-of-wave block on the
-    // next frame without it and scores the wave a second time.
-    this.jobs.length = 0;
-    this.resting = true;
-    this.timer = rand(CFG.waves.rest[0], CFG.waves.rest[1]);
-    this.contact = 0;
-    this.hitPatience = false;
-    this.take = 0;
-    this.made = 0;
-    this.slain = 0;
-    // NOT `done`: a wave the fuse took away was not finished. It keeps the
-    // number it had, which is the point of showing it.
-    this.done = false;
-    if (ran) this.overclock.armed = false;
-    this.laneOffer = null;
-    this.held = 0;
-    this.glitch = 0;
+    this.abandonWave(ran);
 
     let moved = 0;
     if (this.probe) {

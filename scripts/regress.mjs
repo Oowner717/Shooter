@@ -17199,6 +17199,127 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     rows.map((x) => `${x.w}: folded ${x.folded}, lead rate present ${x.lead}`).join('; '));
 }
 
+// --- the era, and what changing it costs ------------------------------------
+/*
+ * P1 of the NEW FORM plan: the field can be exchanged without the run paying
+ * for it. See docs/newform.md.
+ *
+ * The assertion that matters is the one about ENERGY, and it is easy to write
+ * so that it passes while being wrong. `bank()` puts motes on the FLOOR — so a
+ * clear that cashed bodies in would leave `w.energy` untouched for a second or
+ * two while `w.drops` filled with pickups, and an energy-only check would sail
+ * through it. All three are asserted: the purse, the lifetime total, and the
+ * floor.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    g.restart();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+
+    // A field with something in every list, so a clear that names three of
+    // them cannot pass. CLAUDE.md keeps a note about exactly that case.
+    g.debugFillField();
+    for (let i = 0; i < 30; i++) g.update(1 / 60);
+    g.debugThrowMine('blast');
+    w.shooter.shoot(w);
+    const before = {
+      energy: w.energy, earned: w.earned,
+      enemies: w.enemies.length, mines: w.mines.length,
+    };
+    out.hadField = before.enemies > 0 && before.mines > 0;
+
+    // ...and something attached, because membership and the flag come off
+    // together or the grab loop can never take that body back.
+    const near = w.enemies.find((e) => !e.dead && !e.harmless);
+    if (near) { near.attacking = true; w.attackers.add(near); }
+    out.hadAttacker = w.attackers.size > 0;
+
+    // ---- the switch ------------------------------------------------------
+    out.switched = g.setEra(2);
+    out.era = w.era;
+    out.lists = {
+      enemies: w.enemies.length, drops: w.drops.length, debris: w.debris.length,
+      projectiles: w.projectiles.length, effects: w.effects.length,
+      mines: w.mines.length, blasts: w.pendingBlasts.length,
+    };
+    out.attackersCleared = w.attackers.size === 0 && (!near || near.attacking === false);
+    // The three that would each hide a leak the other two miss.
+    out.paidNothing = w.energy === before.energy
+      && w.earned === before.earned && w.drops.length === 0;
+
+    // ...and a frame afterwards, because a body coming apart pushes a blast on
+    // its way out and the drain happens before that could land.
+    for (let i = 0; i < 6; i++) g.update(1 / 60);
+    out.stillClear = w.enemies.length === 0 && w.drops.length === 0
+      && w.energy === before.energy;
+
+    // ---- the debts the abandoned wave owes -------------------------------
+    const d = w.director;
+    d.overclock.armed = true;
+    d.laneOffer = { at: 1 };
+    d.resting = false;
+    g.setEra(1);
+    out.debts = d.resting === true && d.overclock.armed === false
+      && d.laneOffer === null && d.grace === 1 && d.jobs.length === 0;
+
+    // ---- and it is one variable, so it cannot disagree with itself -------
+    out.oneVariable = !('field' in w) && !('form' in w);
+
+    g.restart();
+    return out;
+  });
+
+  check('changing era takes the field and the run pays nothing for it',
+    r.hadField && r.hadAttacker && r.switched && r.era === 2
+    && Object.values(r.lists).every((n) => n === 0)
+    && r.attackersCleared && r.paidNothing && r.stillClear,
+    `every list empty ${JSON.stringify(r.lists)}; attackers released `
+    + `${r.attackersCleared}; purse, lifetime and floor all unmoved `
+    + `${r.paidNothing}; still clear a frame later ${r.stillClear}`);
+
+  check('...and it pays the next wave everything the abandoned one owed',
+    r.debts && r.oneVariable,
+    `resting, overclock disarmed, lane offer dropped, grace set, jobs emptied `
+    + `${r.debts}; the era is one variable and not two ${r.oneVariable}`);
+}
+
+// --- ...and it does not survive a reload, which is the whole safety argument -
+/*
+ * The debug panel is an ungated cell in the SETTINGS tab — four taps from any
+ * player, and in the bundle. So "debug-only" is not what makes an unfinished
+ * era 2 safe; THIS is: `world.era` is deliberately absent from `captureRun`
+ * until the door is built, so a tap on the stepper reverts on the next reload
+ * rather than stranding the run.
+ *
+ * When the door lands, this case inverts and asserts the opposite.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { captureRun } = await import('../src/save.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.phase = 'staging';
+    g.setEra(2);
+    const file = captureRun(w, g);
+    const out = { wrote: !!file, inSave: file ? 'era' in file : true, era: w.era };
+    // ...and through the real door, not by poking the field back.
+    g.resume();
+    out.afterReload = g.world.era;
+    g.restart();
+    return out;
+  });
+
+  check('era 2 is reachable from the debug panel and does not survive a reload',
+    r.wrote && r.inSave === false && r.era === 2 && r.afterReload === 1,
+    `the save was written ${r.wrote} and does not carry the era ${!r.inSave}; `
+    + `set to ${r.era}, and a restore comes back at ${r.afterReload}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

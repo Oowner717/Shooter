@@ -275,11 +275,32 @@ export class Game {
        */
       apertures: [0, 0, 0, 0, 0, 0, 0, 0],
       /*
-       * Which bosses have ever been broken. Progression rather than run
-       * state -- it is what unseals the next slot in the tree -- so it
-       * survives a reset and rides the save.
+       * Which bosses have been broken THIS RUN.
+       *
+       * The comment here used to say it survives a reset. It does not:
+       * `reset()` clears it forty lines down, and `start()` and `restart()`
+       * both call `reset()` and `forgetRun()`. What makes it look permanent is
+       * the restore -- `resume()` calls `reset()` and then hands it back from
+       * the file. So it is run state that RIDES the save, not progress that
+       * outlives it, and the difference matters: it is half of what NEW FORM
+       * is gated on, and the device-level answer to the same question
+       * (`codex.has('terminus')`, which the title screen's RECONCILED tile
+       * uses) is a different number.
        */
       reconciled: [],
+      /*
+       * Which era the run is in: 1 is the field the game has always had, 2 is
+       * the one NEW FORM opens. The form and the field are the same fact, so
+       * they are ONE field and cannot disagree -- there is nothing here to
+       * keep in sync.
+       *
+       * Deliberately NOT in `captureRun` yet. Until the door is built the only
+       * way here is the debug stepper, which ships to every player
+       * (`menu.js` puts DEBUG in SETTINGS, ungated), and a tap that wrote
+       * itself to disk would strand a run in an unfinished era across every
+       * reload. It joins the save in the same commit as the unlock.
+       */
+      era: 1,
       /*
        * Which ways in this run has already been HANDED, from build 227. Its
        * own record rather than a reading of `apertures`, because an aperture
@@ -448,6 +469,15 @@ export class Game {
     // restore. A run that is genuinely new -- RESET SIMULATION throws the
     // save away -- starts with nothing broken.
     w.reconciled.length = 0;
+    /*
+     * ...and the era, on exactly that lifecycle. Forgetting this line is not a
+     * cosmetic miss: `setEra` refuses a switch to the era it is already in, so
+     * a world that came out of `reset()` still at 2 makes the next `setEra(2)`
+     * a no-op that clears nothing -- and `resume()`, which is `reset()` plus
+     * the file, hands back an era the file does not even carry. Both of P1's
+     * cases failed on this one missing line.
+     */
+    w.era = 1;
     w.runSeed = (Math.random() * 0x7fffffff) | 0;
     w.remainder = 0;
     w.remainderGained = 0;
@@ -679,6 +709,87 @@ export class Game {
      * there the message is true.
      */
     if (!w.sandbox) this.hud.alert('SESSION RESTORED', 'info', 2.6);
+  }
+
+  /**
+   * ---- change era ----
+   *
+   * The field is taken away and handed back at the other scale. Nothing is
+   * cashed in: the request is "remove all objects, release no energy", and the
+   * way this game already does that is `Director.glitchOut`, which MARKS
+   * bodies rather than destroying them. `Enemy.destroy` is what banks a
+   * body's energy, sheds its debris and counts it, and `destroy` refuses a
+   * fizzling body outright -- so a mine or a blast landing during the switch
+   * cannot cash one in either.
+   *
+   * Two modes, and the difference is not cosmetic. `glitchOut` gives a body
+   * `fizzle` seconds to dissolve, which is the right thing for the evolution's
+   * first beat and the wrong thing for a debug stepper, where the field should
+   * simply be gone. `instant` marks them and kills them in the same frame.
+   *
+   * What is NOT here: the tier, the ledger, the purse, `earned`, `reconciled`.
+   * A change of era is a change of field, not a new run.
+   */
+  setEra(n, { instant = true } = {}) {
+    const w = this.world;
+    const to = n === 2 ? 2 : 1;
+    if (w.era === to) return false;
+    w.era = to;
+
+    /*
+     * The field. DRIFT is NOT exempt here, unlike in `glitchOut` -- the
+     * ambient trickle is exempt from a withdrawn WAVE because it was never
+     * part of it, but it is absolutely part of the FIELD, and a change of era
+     * takes the field.
+     */
+    const G = CFG.waves.glitch;
+    for (const e of w.enemies) {
+      if (e.dead) continue;
+      e.spent = true;
+      e.dissolved = true;
+      e.attacking = false;
+      if (instant) { e.fizzle = 0; e.dead = true; } else e.fizzle = G.fizzle;
+    }
+    if (instant) w.enemies.length = 0;
+
+    /*
+     * ...and the six lists that are not `enemies`, which is the half of this
+     * that has been got wrong before: a clear that names three of them under a
+     * comment about needing a clean field is CLAUDE.md's own scar. Blasts are
+     * drained LAST, because a body coming apart pushes one on its way out.
+     */
+    w.drops.length = 0;
+    w.debris.length = 0;
+    w.projectiles.length = 0;
+    w.effects.length = 0;
+    w.mines.length = 0;
+    w.pendingBlasts.length = 0;
+
+    // Membership and flag come off together, or the grab loop -- which skips
+    // anything already `attacking` -- can never take a body back.
+    for (const e of w.attackers) e.attacking = false;
+    w.attackers.clear();
+
+    // The standing kit that is of the field rather than of the run.
+    w.decoy = null;
+    w.stasis = 0;
+    w.shock = 0;
+    w.pileT = 0;
+    w.heldFor = 0;
+    w.heldSaid = 1e9;
+
+    // Everything the abandoned wave owes the next one, and `grace`, which has
+    // one writer in the whole codebase and becomes a flag that can never be
+    // non-zero if a caller forgets it.
+    w.director.abandonWave(!w.director.resting);
+    w.director.grace = 1;
+    w.director.douse();
+
+    // `reset()` does not call this and neither does `resume()`, so nothing
+    // re-derives the geometry on its own. Harmless while both eras share a
+    // scale; load-bearing the moment they do not.
+    this.resize();
+    return true;
   }
 
   /**
@@ -3068,6 +3179,24 @@ export class Game {
   /** Put the opening back, for looking at it again. */
   debugForgetTaught() {
     forgetLines();
+  }
+
+  /** Step the era. One variable, so the form and the field cannot disagree. */
+  debugStepEra() {
+    const w = this.world;
+    const to = w.era === 1 ? 2 : 1;
+    this.setEra(to);
+    this.hud.alert(`ERA ${to}`, 'info', 2.2);
+  }
+
+  /**
+   * The evolution, when there is one. P8 builds it; the button is here from
+   * P1 so that the debug grid, and `smoke.mjs`'s exact-text walk of it, do not
+   * have to change when it lands.
+   */
+  debugEvolve() {
+    this.hud.alert('EVOLUTION NOT BUILT YET', 'info', 2.4);
+    return false;
   }
 
   debugCodexAll() {

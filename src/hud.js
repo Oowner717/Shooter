@@ -9,7 +9,7 @@ import { pref, setPref } from './settings.js';
 import { BUILD, REV, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
 
-import { CODEX, ANOMALY_ENTRIES, codex, markLine } from './codex.js';
+import { CODEX, ANOMALY_ENTRIES, codex, markLine, forgetPlayer } from './codex.js';
 import { Menu } from './menu.js';
 import { holdFor, STACK, MIN_READ } from './tutorial.js';
 import { SLOTS, carried, freeSlot } from './loadout.js';
@@ -239,7 +239,16 @@ export class Hud {
       this.el.wipeGo.addEventListener('click', () => {
         if (this.el.wipeGo.disabled) return;
         askWipe(false);
+        /*
+         * RESET SIMULATION is the NEW GAME equivalent, so it wipes the device
+         * and not merely the run. It called `forgetRun()` alone until build
+         * 238, which left the glossary, the opening lines and the testbed's
+         * lifetime record standing -- so the game had two resets with
+         * different meanings and the smaller one wore the bigger one's name.
+         * The SYSTEM panel's DANGER cell has always done this; now they agree.
+         */
         forgetRun();
+        forgetPlayer();
         game.start();
       });
     }
@@ -1584,6 +1593,16 @@ export class Hud {
       ['RESTART', () => g.restart()],
       ['CODEX ALL', () => g.debugCodexAll()],
       ['CODEX WIPE', () => g.debugCodexWipe()],
+      /*
+       * The era, and it steps rather than toggles because there will be more
+       * than two of them one day and a toggle would have to be rewritten.
+       * The form and the field are one variable, so they cannot be stepped
+       * apart -- which is the whole reason they are one variable.
+       */
+      ['ERA →', () => g.debugStepEra()],
+      // Not built yet: the evolution is P8. The button exists from here so the
+      // walk in `smoke.mjs` and the debug grid do not have to change later.
+      ['EVOLVE (P8)', () => g.debugEvolve()],
     ];
     const toggles = [
       ['NO COOLDOWN', 'noCooldown'],

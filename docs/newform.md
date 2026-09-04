@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: planned, not started. No game code has been written for this.**
+**Status: P1 shipped in build 238. P2 is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -326,7 +326,7 @@ thing to run if the budget allows:
 ## Checklist
 
 - [ ] P0 · this file
-- [ ] P1 · the era, the switch, the reset convergence
+- [x] P1 · the era, the switch, the reset convergence — **build 238**
 - [ ] P2 · the camera
 - [ ] P3 · the constant sweep
 - [ ] P4 · the yard
@@ -510,3 +510,26 @@ scales to hold the turret at the same CSS position. **No touch target regresses.
 
 That is the general rule for this ruling: it settles what is DRAWN. Anything that is
 also *touched* needs checking separately — and the lever was the only candidate.
+
+---
+
+## 11. P1, as built (build 238)
+
+- `world.era`, run-level, on the `reconciled` lifecycle: cleared by `reset()`,
+  absent from `captureRun` until the door.
+- `Game.setEra(n, { instant })` — the field taken without cashing anything in.
+  Two modes, because `fizzle` gives a body seconds to dissolve (right for the
+  evolution's first beat, wrong for a stepper).
+- `Director.abandonWave(ran)` extracted from `glitchOut`, so the two callers
+  cannot keep separate copies of what a wave owes the next one.
+- RESET SIMULATION calls `forgetPlayer()` — one true reset.
+- Debug: ERA → and a stubbed EVOLVE (P8), added now so `smoke.mjs`'s
+  exact-text walk of the grid does not have to change later.
+- The `reconciled` docstring corrected: it claimed to survive a reset.
+
+**Both cases failed first, on one missing line, and it was the trap the audit had
+already named.** `reset()` did not clear `era`, so `setEra(2)` on a world already at
+2 returned early and cleared nothing, and `resume()` handed back an era the save does
+not carry. The audit's list of "what `reset()` does NOT clear" is where this feature
+lives; anything added to the world belongs on that list or on a written reason why
+not.
