@@ -332,6 +332,27 @@ dish" for sixty builds and drawing a flat fin. It writes ASCII-only HTML
 because the page carries no charset of its own and a raw multiplication sign
 came back as two characters.
 
+**It has no assertion and exits 0 whatever it draws**, so it is a sheet to look
+at and NOT an instrument. Build 246's plan named it as the guard for "the MK1
+turret is unchanged"; it cannot be one -- and worse, its cell scale is
+`(S * 0.17) / sh.r`, which divides by the very radius a change would move, so a
+turret twice the size produces a very similar sheet. There is no golden-image
+mechanism anywhere in `scripts/`: every visual instrument in this repo compares
+two renders inside ONE process. An "unchanged" claim across a change therefore
+needs a digest taken before it and again after, in the same container -- the
+same differential rule the ORDINAL hash now carries.
+
+**And a case that asserts a PROXY cannot see the thing it is a proxy for
+moving.** Two cases and one design decision were each restating `s.r * 2.4` as
+"how far the machine paints" -- a constant somebody measured once, on a BARE
+machine, when the fully rigged one paints 2.393r. `Shooter.reach(world)` is
+computed from `drawMachine`'s own expressions and is asserted against the
+painted pixels to be a tight upper bound. Two things that version got wrong and
+that any similar helper will: a stroke is centred on its path, so every filled
+part paints half a line width outside its own geometry (5% fully rigged, 19%
+bare); and the barrel is a rounded rect laid along the aim from `R * 0.16`, so
+its reach is the far CORNER, not the axial tip.
+
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three
 builds), the trigger itself, every round/mine/ability/object type running once

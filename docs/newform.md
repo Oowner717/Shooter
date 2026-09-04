@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P5 (245) shipped. P6 (the MK2 turret) is next.**
+**Status: P1 (238) - P6a (246) shipped. P6b+c (the radius and the fold, together) is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -335,7 +335,8 @@ thing to run if the budget allows:
 - [x] P4c · the wall's one-way rule (build 244)
 - [ ] ~~P4~~ · the yard
 - [x] P5 · the build lots (build 245)
-- [ ] P6 · the MK2 turret
+- [x] P6a · the plumbing and the instruments (build 246)
+- [ ] P6b+c · the radius and the fold, in one build
 - [ ] P7 · balance, era 2 only
 - [ ] P8 · the cinematic
 - [ ] P9 · the door
@@ -1029,3 +1030,100 @@ control press on empty ground beside it that must refuse nothing and still fire.
 
 Hash `-1765830468`, unmoved against the before-run taken on this container at
 build 244. 496 green.
+
+## 19. P6a, as built (build 246) — the plumbing, and three of P6's own instructions refuted
+
+P6 changes a physical constant five subsystems read, against a 500-line drawing
+with eight sockets, so it ships as two builds. **P6a moves no pixel at either
+era.** It puts the instruments in place *before* the thing they measure — the
+inversion of how build 210's ring case was written, which is why that one
+passed against four substitute implementations.
+
+### The parity number is exact, and that settles the radius question
+
+`26 * (0.62 / 0.403) === 40` is **true in doubles, with a delta of exactly 0**.
+So `shooter.r` joining `SCALED` in P6b+c gives 40.0 at era 2 — not a chosen
+number, the parity number: `26 * 0.62` and `40 * 0.403` are both 16.12 CSS px.
+
+Measured before the change: at era 2 the machine's median drawn radius is
+**19.8 CSS px against era 1's 26** — the camera ratio exactly (0.762×), with
+lit area confirming it (4232 → 2424, and 0.762² = 0.581). The turret is
+currently 24% smaller on the glass than at era 1 while everything round it got
+bigger. (The first version of that probe read *identical* reach at both eras,
+because the furthest lit pixel is a HUD element that already holds its screen
+size — the build-199 "widest line" trap again. A percentile of the lit mass
+sees it; the maximum cannot.)
+
+### Three of the phase's own instructions were wrong
+
+**1. The proportional-hysteresis instruction is REFUTED, and following it would
+re-open a fixed bug.** What sets a body's resting distance is `resolvePair`'s
+positional correction, and neither term contains a radius: `pen = max(rr - d -
+slop, 0)` with `slop` an absolute 0.4 and `correction` an absolute 0.72, and
+the turret's `invMass` is 0 so the whole correction lands on the body. So
+equilibrium is `e.r + s.r - slop` at every radius and both margins — 2.4 to
+grab, 6.4 to release — are radius-free. `s.r` cancels. Proportional would put
+release at +9.23 at r=40: three extra units of grip on a body PULSE has already
+shoved clear, and `world.attackers` is what holds the glitch fuse lit, which is
+the build-210 leak. The two offsets get CFG seats so the finding is machine
+readable and the case can force a release.
+
+**2. `contact.mjs` cannot be the "MK1 unchanged" instrument.** It has no
+assertion and exits 0 whatever it draws — and its cell scale is
+`(S * 0.17) / sh.r`, which divides by the very radius a change would move. It
+is a sheet to look at. There is no golden-image mechanism anywhere in
+`scripts/`, so an unchanged-claim needs a digest taken before and after in the
+same container: the ORDINAL differential rule, applied to pixels.
+
+**3. My own P5 lot case was measuring a proxy against an empty rig.** It
+asserted clearance against `s.r * 2.4` — a constant measured once on a bare
+machine — and `restart()` clears `w.ledger`, so it was measuring the smallest
+version of the thing it was protecting. It forces the full rig now and measures
+`Shooter.reach()`.
+
+### `Shooter.reach()` and what it got wrong first
+
+Computed from `drawMachine`'s own expressions, and validated against the
+painted pixels: **38.38 against 38.33 bare, 63.03 against 62.51 fully rigged**.
+The first version understated by 5% rigged and 19% bare, for two reasons worth
+carrying: a stroke is centred on its path, so every filled part paints half a
+line width outside its own geometry; and the barrel is a rounded rect laid
+along the aim from `R * 0.16`, so its reach is the far **corner**, not the
+axial tip.
+
+### The band case took four instruments
+
+Driving a body in and sampling per frame measured two things badly: the grab
+distance swung ±0.6 because the body crosses 2–4 units a frame, and a *release*
+was invisible because `checkContact` releases and re-grabs inside one call, so
+the net state after `update` is always "attacking". A control at `releasePad =
+0.2` didn't work either — the equilibrium sits 0.4 *inside* touching, so that
+pad still holds. What works is geometry: place the body at an exact distance
+and call the method. Four raw memberships per radius, two true and two false,
+identical at r = 26, 40 and 52.
+
+### Also in
+
+The broadphase guard now walks the two static bodies (`Math.max(2 *
+MAX_BODY_R, MAX_BODY_R + STATIC_R)` — a *max*, because `2 * MAX_BODY_R` is the
+binding term for two grafted BULWARKs and replacing it outright would be
+strictly weaker). The dead `DARK` local. The machine's header docstring, which
+listed SIGHT — deleted at build 215, no `rig()` key, no node, nothing drawn —
+and omitted SIEVE and PILE, both drawn.
+
+Two flakes of mine were re-tuned: the era-1 aperture control asked for 15
+bodies against a run-to-run swing of 13–22, and the wall-crossing arm gave a
+LURCHER four seconds to cover ground needing 32 u/s. Both were margins set near
+the truth rather than clear of it.
+
+Hash `-1765830468`, unmoved. 498 green — though one run in four showed a single
+failure I did not capture and could not reproduce in two further runs.
+
+### P6b+c must ship as ONE build
+
+At r=40 with MK1's barrel proportions the flashed envelope is 101.45 against a
+build-lot inner edge of 98.46 — **the radius alone is red**. The fold is what
+pays for it: the MK2 grows *inboard*, its envelope falling from 2.393r to about
+2.010r, which is also what keeps `s.r * 2.4`, the fuse ring's `2.35 + filled *
+0.55`, the contact cell's 2.94r and the hero card's 190 all meaning what they
+mean. Splitting them would land a red build.

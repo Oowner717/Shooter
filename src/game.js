@@ -2170,7 +2170,7 @@ export class Game {
     if (w.phase === 'boot') return;
     const s = w.shooter;
     for (const e of [...w.attackers]) {
-      const off = e.r + s.r + 6;
+      const off = e.r + s.r + CFG.shooter.releasePad;
       if (!e.dead && !e.fizzle && (e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= off * off) continue;
       e.attacking = false;
       w.attackers.delete(e);
@@ -2198,7 +2198,7 @@ export class Game {
        */
       const landing = !!e.hurled && !e.harmless && !e.fizzle;
       if ((e.dead && !landing) || e.attacking || e.harmless || e.fizzle > 0) continue;
-      const rr = e.r + s.r + 2;
+      const rr = e.r + s.r + CFG.shooter.grabPad;
       if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= rr * rr) {
         /*
          * A MASS that was thrown at you is not the same event as something

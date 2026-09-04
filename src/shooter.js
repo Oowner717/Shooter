@@ -1023,9 +1023,8 @@ export class Shooter {
    * around it. At forty units across on a phone that reads as clutter, and
    * clutter is not a reward.
    *
-   * So every part is now STRUCTURE. It changes the body's outline, it is drawn
-   * opaque with hard edges, and it is drawn in the same pass as the thing it
-   * belongs to:
+   * So every part is now STRUCTURE. It changes the body's outline and it is
+   * drawn in the same pass as the thing it belongs to:
    *
    *   SPINES   the hull. Armour plates round the deck, growing it outward --
    *            the machine is physically bigger by the end.
@@ -1034,9 +1033,17 @@ export class Shooter {
    *   GIMBAL   the bearing. A toothed race under the deck, a row of teeth
    *            per level.
    *   ARRAY    the fin. A flat panel blade off the back, not a dish.
+   *   SIEVE    the screen. Combs across the array's mouth, one per level.
    *   FEED     the drum. A belt box on the breech's flank with rounds in it.
-   *   SIGHT    the block. A boxed sight along the barrel with a lit lens.
+   *   PILE     the bed. A hard shelf under the deck the charge is built on.
    *   INTAKE   the vents. Louvres cut through the skirt.
+   *
+   * Two corrections, because this list was read as spec: SIGHT was listed here
+   * for sixty builds and has not existed since build 215 -- there is no
+   * `sight` key in `rig()`, no node in upgrades.js and nothing drawn -- while
+   * SIEVE and PILE are both drawn and were both missing. And "opaque with hard
+   * edges" is true only of the FILLS (0.98-1.00); the strokes run 0.12 to 0.95
+   * and most are multiplied by `lit`.
    *
    * Bare, it is a plain dark hexagon with a stub barrel and one lit line --
    * basic on purpose, so that there is somewhere to go.
@@ -1050,7 +1057,6 @@ export class Shooter {
     const R = this.r * (1 + filled * 0.34) * (1 + flash * 0.06);
     const lit = 0.55 + filled * 0.45;
 
-    const DARK = 'rgba(7,14,23,0.98)';
     const BODY = 'rgba(20,34,52,0.99)';
     const FACE = 'rgba(30,50,74,0.99)';
 
@@ -1563,6 +1569,53 @@ export class Shooter {
     world.rig = rig;
     world.rigAt = taken.length;
     return rig;
+  }
+
+  /**
+   * How far the machine's STRUCTURE paints from its own centre, in world units.
+   *
+   * Every term below is the same expression `drawMachine` uses, read off the
+   * live rig -- so this is a description of the drawing and not a second copy
+   * of it that can drift. It covers structure only: the muzzle flash, the
+   * breached halo and the recoil glow are LIGHT, they come and go, and a
+   * clearance rule written against them would be a rule about a flash.
+   *
+   * It exists because two cases and one design decision were each restating
+   * `s.r * 2.4` -- a constant somebody measured once, on a bare machine. A
+   * case that asserts a proxy cannot see the thing it is a proxy for moving.
+   */
+  reach(world) {
+    const g = this.rig(world);
+    const flash = clamp((world.rigFlash || 0) / CFG.rig.flash, 0, 1);
+    const R = this.r * (1 + (g.filled || 0) * 0.34) * (1 + flash * 0.06);
+    /*
+     * A stroke is centred on its path, so every filled part paints half a line
+     * width outside the geometry that defines it. Left out, this understated
+     * the machine by 5% fully rigged and 19% bare -- and an envelope a
+     * clearance rule leans on has to be an UPPER bound or the rule is decoration.
+     */
+    const pad = 1.2;
+    let far = R + pad;                                  // the bare hexagon
+    if (g.casing) far = Math.max(far, R * (1 + (g.casing - 1) * 0.16) + pad);
+    if (g.slew) far = Math.max(far, R * (1.06 + (g.slew - 1) * 0.13) + 3.4 + pad);
+    /*
+     * The barrel is a rounded rect laid along the aim from `R * 0.16`, so its
+     * reach is the far CORNER and not the axial tip: at full rig that is 62.2
+     * against an axial 61.5, and the corner is what a lot would meet first.
+     */
+    const bl = R * (1.24 + g.rate * 0.11 + g.casing * 0.08);
+    const bw = 6.5 + g.casing * 0.9;
+    far = Math.max(far, Math.hypot(R * 0.16 + bl + pad, bw + pad));
+    // ARRAY and SIEVE are seated at R*0.8 and reach outward in ABSOLUTE units
+    // that do not scale with the machine -- which is exactly what makes them
+    // read as hung on rather than built in.
+    const seats = g.aimrange > 0 ? g.aimrange : 1;
+    for (let i = 0; i < seats; i++) {
+      const h = g.aimrange > i ? 18 + i * 8 : 10;
+      far = Math.max(far, R * 0.8 + h);
+      for (let L = 0; L < g.driftaim; L++) far = Math.max(far, R * 0.8 + h + 2.5 + L * 3.2);
+    }
+    return far;
   }
 
   /**

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '245';
+export const BUILD = '246';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '245';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '680e8b6';
+export const REV = '8bbac6c';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -589,6 +589,37 @@ export const CFG = {
   // ---- shooter --------------------------------------------------------
   shooter: {
     r: 26,
+    /*
+     * ---- the contact band, and why it is NOT proportional to `r` ----
+     *
+     * A body becomes an attacker at `e.r + s.r + grabPad` and is released at
+     * `e.r + s.r + releasePad`; the 4 units between them stop a body resting
+     * on the rim flipping in and out every frame, each entry firing
+     * `audio.glitchOn()`.
+     *
+     * The NEW FORM plan instructed that these become proportional to `r`
+     * before the machine grows, "or a body on the rim chatters". That is
+     * REFUTED, and implementing it would re-open a fixed bug. What sets a
+     * body's resting distance is `resolvePair`'s positional correction, and
+     * neither term in it contains a radius: `pen = max(rr - d - slop, 0)` with
+     * `slop` an absolute 0.4 and `correction` an absolute 0.72, and the
+     * turret's `invMass` is 0 so the whole correction goes to the body. So
+     * equilibrium is `e.r + s.r - slop` at EVERY radius, and the margins are
+     * `grabPad + slop` = 2.4 and `releasePad + slop` = 6.4 whatever `r` is.
+     * `s.r` cancels exactly.
+     *
+     * Chatter needs a body to cross the whole band inside one frame -- above
+     * about 240 u/s radially at 60Hz -- which comes from shoves and never from
+     * the equilibrium, and growing `r` changes none of those terms.
+     *
+     * And proportional would be a REGRESSION: 4/26 at r=40 puts release at
+     * +9.23, three extra units of grip on a body PULSE has already shoved
+     * clear -- and `world.attackers` is what holds the glitch fuse lit, which
+     * is the build-210 leak. They have seats so the finding is machine
+     * readable and so the case can force a release to prove its instrument.
+     */
+    grabPad: 2,
+    releasePad: 6,
     standoff: 210, // world units between the turret and the ability strip
     // Every cadence below is 30% slower than it was through build 80: 0.2 and
     // 0.22 became 0.286 and 0.314. The turret is meant to be a thing you
@@ -4246,6 +4277,8 @@ const SCALED = [
   'entryDepth', 'entrySpeed',
   // the machine: where it stands, how far it sees, what it is held by
   'shooter.standoff', 'shooter.aimRange', 'shooter.gripLen', 'shooter.gripR',
+  // NOTE: `shooter.grabPad` and `shooter.releasePad` are deliberately NOT
+  // here. See the note beside them in the shooter block.
   // the intake, which is a travel-time problem and nothing else
   'energy.pull', 'energy.pulse', 'drop.speed', 'drop.accel',
   // the thumb, which covers the same disc of GLASS whatever the scale

@@ -152,17 +152,35 @@ console.log(`colour rule holds: ${GREY} is the only grey, on ${
  * chosen, and this is what keeps the derivation honest — it went wrong once
  * already, when grafts made a BULWARK 72 against a cell of 96.
  */
-const { MAX_BODY_R, GRID_CELL } = await import(new URL('../src/config.js', import.meta.url));
-if (!(GRID_CELL >= 2 * MAX_BODY_R)) {
-  console.error(`broadphase cell ${GRID_CELL} is under 2 x the largest body (${MAX_BODY_R}); `
-    + 'two of those can overlap two cells apart and never be tested');
+const CFGMOD = await import(new URL('../src/config.js', import.meta.url));
+const { MAX_BODY_R, GRID_CELL, CFG: BCFG } = CFGMOD;
+/*
+ * ...and the two STATIC bodies, which `MAX_BODY_R` cannot see because it walks
+ * `ENEMY_TYPES` alone. `Game.update` pushes the turret and the DECOY into the
+ * same grid as everything else, so a cell that covers the largest pair of
+ * bodies but not turret-plus-BULWARK is a cell with a hole in it, and nothing
+ * in the repo would report it. The turret's radius is about to grow.
+ *
+ * It is a MAX and not a replacement: `2 * MAX_BODY_R` is the binding term for
+ * two grafted BULWARKs, which is a real coexisting pair, and swapping it for
+ * `MAX_BODY_R + MAX_STATIC_R` would be strictly weaker than the guard this
+ * replaces.
+ */
+const STATIC_R = Math.max(BCFG.shooter.r, BCFG.decoy.r);
+const NEED = Math.max(2 * MAX_BODY_R, MAX_BODY_R + STATIC_R);
+if (!(GRID_CELL >= NEED)) {
+  console.error(`broadphase cell ${GRID_CELL} is under ${NEED} — the largest body is `
+    + `${MAX_BODY_R} and the largest static body (turret ${BCFG.shooter.r}, decoy `
+    + `${BCFG.decoy.r}) is ${STATIC_R}; two of those can overlap two cells apart `
+    + 'and never be tested');
   process.exit(1);
 }
 if (!readFileSync(new URL('../src/game.js', import.meta.url), 'utf8').includes('GRID_CELL')) {
   console.error('src/game.js no longer uses GRID_CELL — the grid is sized by something unguarded');
   process.exit(1);
 }
-console.log(`broadphase cell ${GRID_CELL} covers the largest body (${MAX_BODY_R})`);
+console.log(`broadphase cell ${GRID_CELL} covers the largest body (${MAX_BODY_R}) and `
+  + `the largest static one (${STATIC_R}); worst pair ${MAX_BODY_R + STATIC_R}, needs ${NEED}`);
 
 /*
  * A covered body must not read as an energy mote.

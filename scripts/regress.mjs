@@ -17964,7 +17964,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.twoWorst > 0 ? r.twoWorst : 0} units`);
 
   check('...and the same probe reads a one at era 1, where nothing is routed',
-    r.oneTotal >= 15 && r.oneSpan > 0.6 && r.oneAbove,
+    // A margin set clear of the truth, not near it: the director's output over
+    // forty seconds swings 13-22 bodies run to run, and the first version of
+    // this asked for 20 and then 15 — both inside the swing. The arm exists to
+    // show the instrument can read a one at all, and six does that.
+    r.oneTotal >= 6 && r.oneSpan > 0.6 && r.oneAbove,
     `era 1 put ${r.oneTotal} bodies across ${(r.oneSpan * 100).toFixed(0)}% of the `
     + `field width, from above the entry line ${r.oneAbove} — without this arm the `
     + `case above passes on a build that released nothing`);
@@ -18106,8 +18110,21 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       const a = w.yard;
       const e = g.debugSpawn('lurcher', w.width / 2, a.wallY - 120);
       e.staged = false;
+      /*
+       * Straight down. The route's lateral swing is scaled with the field at
+       * era 2 (build 241), so a body that drew SWEEP spends a fixed frame
+       * budget going sideways and never reaches the far side of the band —
+       * which failed this arm about one run in three on the tall screen while
+       * the crossing itself was never in doubt. The question is whether the
+       * wall stops it, not how it arrives.
+       */
+      e.routeScale = 0;
       const track = [];
-      for (let i = 0; i < 260; i++) {
+      // Ten seconds, not four. A LURCHER needs 32 u/s to clear the band inside
+      // 260 frames and cruises close enough to that for the arm to fail about
+      // one run in three, on whichever screen it happened to be slowest — a
+      // window set near the truth rather than clear of it.
+      for (let i = 0; i < 600; i++) {
         g.update(1 / 60);
         if (e.dead) break;
         track.push({ y: e.y, vy: e.vy });
@@ -18197,6 +18214,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       g.restart();
       const out = { w: vw };
       out.eraOne = w.yard;
+      /*
+       * The FULL rig, forced. `restart()` runs `w.ledger.length = 0`, so this
+       * case used to measure the BARE machine -- 38.4 units of it against a
+       * fully rigged 63.0 -- while claiming to be about clearance. A case that
+       * measures the smallest version of the thing it is protecting will pass
+       * with the machine inside a lot.
+       */
+      w.energy = 500000;
+      g.debugTeachAll();
+      g.debugBuyAll();
       g.setEra(2);
       const a = w.yard;
       const s = w.shooter;
@@ -18207,8 +18234,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       out.inField = a.lots.every((l) => l.x - l.hw > 4 && l.x + l.hw < w.width - 4
         && l.y - l.hh > a.hold && l.y + l.hh < w.floorY - 4);
 
-      // ---- clear of the machine, measured against the DRAWN rig ----------
-      const rig = s.r * 2.4;
+      /*
+       * ---- clear of the machine, measured against what it actually PAINTS --
+       *
+       * `s.r * 2.4` was a constant somebody measured once on a bare machine,
+       * and a case that asserts a proxy cannot see the thing it is a proxy for
+       * moving. `Shooter.reach` is computed from `drawMachine`'s own
+       * expressions and is asserted separately to be an upper bound on the
+       * painted pixels.
+       */
+      out.filled = +s.rig(w).filled.toFixed(3);
+      const rig = s.reach(w);
       out.offTurret = a.lots.every((l) => {
         const dx = Math.max(Math.abs(s.x - l.x) - l.hw, 0);
         const dy = Math.max(Math.abs(s.y - l.y) - l.hh, 0);
@@ -18286,10 +18322,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * an empty list is the vacuous pass this arm exists to avoid.
    */
   check('...clear of the machine, and clear of every control that takes a tap',
-    rows.every((r) => r.offTurret && r.clashes === 0 && r.rects >= 6),
+    rows.every((r) => r.offTurret && r.clashes === 0 && r.rects >= 6 && r.filled === 1),
     rows.map((r) => `${r.w}: nearest lot is ${r.tightest} from the turret against a `
-      + `drawn rig of ${r.rig}; 0 of 6 clash with ${r.rects} interface rects `
-      + `(measured ${r.clashes})`).join('; '));
+      + `fully rigged (${r.filled}) painted reach of ${r.rig}; 0 of 6 clash with `
+      + `${r.rects} interface rects (measured ${r.clashes})`).join('; '));
 
   /*
    * ...and the press. A lot REFUSES: it says so and it buys nothing, and the
@@ -18304,6 +18340,159 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       + `purse held ${r.press.energy}, nothing bought ${r.press.bought}, still fired `
       + `${r.press.fired}; pressed beside it — refused ${r.miss.refused}, fired `
       + `${r.miss.fired}`).join('; '));
+}
+
+// --- the machine, measured rather than described ----------------------------
+/*
+ * P6a. Two instruments the MK2 needs, put in place BEFORE the thing they
+ * measure — which is the inversion of how build 210's ring case was written,
+ * and the reason that one passed against four substitute implementations.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    /*
+     * ---- 1. `Shooter.reach` is an UPPER BOUND on the painted structure -----
+     *
+     * It is computed from `drawMachine`'s own expressions, so it is a
+     * description of the drawing rather than a second copy of it — but a
+     * description can still be wrong, and the first version of it was: it read
+     * the barrel's axial length instead of its far CORNER and left out the
+     * stroke, understating the machine by 5% fully rigged and 19% bare.
+     *
+     * `drawMachine` is called directly, not `draw()`: `draw` also paints the
+     * lever, the aim ray and the muzzle flash, and those are a control and two
+     * readouts, not the machine.
+     */
+    const paint = () => {
+      const s = w.shooter;
+      s.spin = 0; s.heat = 0; s.recoil = 0; s.aim = -Math.PI / 2; s.gripGlow = 0;
+      w.rigFlash = 0; w.pileT = 0; w.attackers = new Set();
+      const S = 420;
+      const c = document.createElement('canvas');
+      c.width = S; c.height = S;
+      const x = c.getContext('2d');
+      x.translate(S / 2 - s.x, S / 2 - s.y);
+      s.drawMachine(x, w, '#59e0ff', 4, false);
+      const d = x.getImageData(0, 0, S, S).data;
+      let far = 0;
+      for (let py = 0; py < S; py++) {
+        for (let px = 0; px < S; px++) {
+          if (d[(py * S + px) * 4 + 3] < 24) continue;
+          const rr = Math.hypot(px - S / 2, py - S / 2);
+          if (rr > far) far = rr;
+        }
+      }
+      return { painted: +far.toFixed(2), reach: +s.reach(w).toFixed(2),
+        filled: +s.rig(w).filled.toFixed(3) };
+    };
+
+    g.restart();
+    out.bare = paint();
+    w.energy = 500000;
+    g.debugTeachAll();
+    g.debugBuyAll();
+    out.full = paint();
+    out.bound = out.bare.reach >= out.bare.painted && out.full.reach >= out.full.painted;
+    // ...and tight, or an "upper bound" of a thousand would pass the arm above.
+    out.tight = out.bare.reach < out.bare.painted * 1.1
+      && out.full.reach < out.full.painted * 1.1;
+    // ...and the instrument has been shown to read a one: a bare machine and a
+    // rigged one must not measure the same, or it is blind to the rig.
+    out.moves = out.full.painted > out.bare.painted * 1.3;
+
+    /*
+     * ---- 2. the contact band is radius-independent -------------------------
+     *
+     * The plan instructed that the 4-unit band become proportional to `r`
+     * before the machine grows, "or a body on the rim chatters". Neither term
+     * of `resolvePair`'s positional correction contains a radius — `slop` is an
+     * absolute 0.4 and `correction` an absolute 0.72, and the turret's invMass
+     * is 0 so the whole correction lands on the body — so a body rests at
+     * `e.r + s.r - slop` at EVERY radius and `s.r` cancels out of both margins.
+     */
+    /*
+     * Geometry, not a race. The first version drove a body in and sampled once
+     * a frame, which measured two different things badly: the grab distance
+     * moved +/-0.6 between runs because the body crosses 2-4 units a frame,
+     * and a RELEASE was invisible because `checkContact` releases and re-grabs
+     * inside one call, so the net state after `update` is always "attacking".
+     * Placing the body at an exact distance and calling the method is exact,
+     * deterministic, and is the thing the claim is about.
+     */
+    const probe = (radius) => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      w.director.update = () => {};
+      g.debugClearField();
+      const s = w.shooter;
+      const held = s.r;
+      s.r = radius;
+      const e = g.debugSpawn('lurcher', s.x, s.y - 400);
+      e.staged = false;
+      const at = (gap) => {
+        w.attackers.clear();
+        e.attacking = false;
+        e.x = s.x;
+        e.y = s.y - (e.r + s.r + gap);
+        g.checkContact();
+        return w.attackers.has(e);
+      };
+      const P = CFG.shooter;
+      const out2 = {
+        radius,
+        grabsInside: at(P.grabPad - 0.05),
+        holdsOutside: at(P.grabPad + 0.05),
+      };
+      // ...and the release, from a body that is already held.
+      at(0);
+      e.y = s.y - (e.r + s.r + P.releasePad - 0.05);
+      g.checkContact();
+      out2.keptJustInside = w.attackers.has(e);
+      e.y = s.y - (e.r + s.r + P.releasePad + 0.05);
+      g.checkContact();
+      out2.heldJustOutside = w.attackers.has(e);
+      s.r = held;
+      return out2;
+    };
+    out.band = [26, 40, 52].map(probe);
+    /*
+     * The whole claim, in one line: the band is at the SAME offsets at every
+     * radius. `s.r` appears on both sides of every test and cancels.
+     */
+    /*
+     * Four RAW memberships per radius, two of which must be true and two
+     * false. Reading them raw rather than as "let go" is deliberate: an arm
+     * stored as a negation reads as another `true` in the output and hides
+     * whether the instrument ever answered no.
+     */
+    out.same = out.band.every((b) => b.grabsInside && !b.holdsOutside
+      && b.keptJustInside && !b.heldJustOutside);
+
+    delete w.director.update;
+    g.restart();
+    return out;
+  });
+
+  check('the machine reports an envelope that covers what it paints',
+    r.bound && r.tight && r.moves,
+    `bare: reach ${r.bare.reach} against ${r.bare.painted} painted; fully rigged `
+    + `(${r.full.filled}): ${r.full.reach} against ${r.full.painted} — an upper `
+    + `bound ${r.bound}, tight ${r.tight}, and it moves with the rig ${r.moves}`);
+
+  check('...and the contact band does not depend on the turret radius',
+    r.same,
+    `at r = ${r.band.map((b) => b.radius).join('/')} — grabbed inside the grab pad `
+    + `${r.band.map((b) => b.grabsInside).join('/')}, grabbed outside it `
+    + `${r.band.map((b) => b.holdsOutside).join('/')}, still held inside the `
+    + `release pad ${r.band.map((b) => b.keptJustInside).join('/')}, still held `
+    + `outside it ${r.band.map((b) => b.heldJustOutside).join('/')}`);
 }
 
 // --- report -----------------------------------------------------------------
