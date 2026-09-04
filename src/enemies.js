@@ -817,9 +817,7 @@ export class Enemy {
        * whatever the route. An arc is how a thing arrives; it is not how it
        * spends the endgame.
        */
-      const reach = clamp(d / 520, 0, 1) ** r.commit;
-      const closing = clamp((d - 170) / 210, 0, 1);
-      let lateral = r.width * this.routeScale * this.routeSide * reach * closing;
+      let lateral = routeLateral(r, d) * this.routeScale * this.routeSide;
       if (r.weave) lateral *= Math.sin(t * r.weave + this.phase);
       tx += -dy * lateral;
       ty += dx * lateral;
@@ -857,7 +855,10 @@ export class Enemy {
        */
       const to = decoyTarget(world, this) || world.shooter;
       const dist = Math.hypot(to.x - this.x, to.y - this.y);
-      if (dist > 260) cruise *= this.route.dawdle;
+      // A depth threshold, not a capability: 260 is a fifth of era 1's column and
+      // would be an eighth of era 2's, so a loiterer would dawdle over 1273 units
+      // instead of 736 and take 1.72x longer where everything else takes 1.54x.
+      if (dist > 260 * CFG.scale) cruise *= this.route.dawdle;
     }
     const speed = Math.hypot(this.vx, this.vy);
     /*
@@ -3392,6 +3393,27 @@ function formationOffset(shape, i, count, gap) {
     }
     default: return [spread(gap * 1.4), spread(gap * 1.4)];
   }
+}
+
+/**
+ * How far off the true bearing a route swings at a given range, in world units
+ * and before the body's own `routeScale`/`routeSide`.
+ *
+ * Pulled out of `drive` so it can be measured. All four numbers in it are the
+ * SHAPE of an approach rather than a capability, so all four scale with the
+ * view: left alone at era 2 a SWEEP's 300-unit swing draws 121 CSS px against
+ * era 1's 186, and the fold-in -- an absolute 380 units -- happens across 153
+ * px instead of 236. Every route flattens 35% toward DIRECT, which is the one
+ * thing a wider field was supposed to show off. Speeds are untouched by
+ * ruling; this is distance, and distance is what the camera changed.
+ *
+ * `CFG.scale` is 1 at era 1, so this is the arithmetic it always was there.
+ */
+export function routeLateral(r, d) {
+  const k = CFG.scale;
+  const reach = clamp(d / (520 * k), 0, 1) ** r.commit;
+  const closing = clamp((d - 170 * k) / (210 * k), 0, 1);
+  return r.width * k * reach * closing;
 }
 
 /** A formation queued above the screen, marching down into it. */

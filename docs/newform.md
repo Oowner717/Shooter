@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238), P2 (239), P3a (240) shipped. P3b is next.**
+**Status: P1 (238), P2 (239), P3a (240), P3b (241) shipped. P4 is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -329,7 +329,7 @@ thing to run if the budget allows:
 - [x] P1 · the era, the switch, the reset convergence — **build 238**
 - [x] P2 · the camera — **build 239**
 - [x] P3a · the scale, and the reach that makes era 2 playable — **build 240**
-- [ ] P3b · the rest of the sweep: ability radii, mine radii, the HUD-in-world literals, ROUTES, the lattice
+- [x] P3b · the rest of the sweep: the use-site literals (build 241)
 - [ ] P4 · the yard
 - [ ] P5 · the build lots
 - [ ] P6 · the MK2 turret
@@ -607,3 +607,84 @@ which over-covers even era 2 twice, and SCATTER is the one with an authored rang
 x`CFG.scale` and the memo is keyed on the scale. Measured at dpr 2: without it era 2
 clamps 16 of 37 types instead of 11 — DRIFT, TOW, GLUT, HERALD and PRISM all collapse
 onto MOTE's outline, on a roster already drawn 35% smaller. With it, 11 at both eras.
+
+## 14. P3b, as built (build 241)
+
+P3a took everything that lives in `CFG`, via the `SCALED` table that throws on
+a path CFG does not have. P3b is what is left: distances written as literals
+at the site that uses them, where no table can reach them and nothing can
+enumerate what was missed.
+
+**The rule the sweep was run against**, and it is the whole of P3b: *a distance
+that is part of the MACHINE keeps its world size; a distance that is part of
+the PICTURE keeps its size on the glass.* A body's radius, a mine's body, the
+clearance a formation needs either side of itself — machine, left alone. An
+aim ray, a cone tick, a lock bracket, a story line's wrap, the substrate's own
+lattice — picture, multiplied by `CFG.scale`.
+
+Six sites moved:
+
+| site | was | why |
+|---|---|---|
+| `enemies.js` `routeLateral` | `width`, `d/520`, `(d-170)/210` | the shape of an approach |
+| `enemies.js` LOITER dawdle | `dist > 260` | a depth threshold, not a capability |
+| `shooter.js` aim ray | `300 + gripGlow * 320` | a readout that says where you point |
+| `shooter.js` cone tick | `reach ± 14` | an annotation on the assist arc |
+| `game.js` `drawAutoLock` | `+16 + (1 - converged) * 42` | HUD brackets drawn in world |
+| `game.js` narrator wrap | `min(W - 70, 470)` | a screen width, in world units |
+| `background.js` lattice | `lineWidth = 1` | the substrate's own stroke |
+
+**`routeLateral` was extracted rather than patched in place.** Four numbers
+decide the shape of every approach in the game and all four were inline in
+`drive`, where nothing could measure them. It is now one exported pure
+function, and the case reads it at four screen-equivalent ranges: a body
+`D * CFG.scale` world units out is at the same point on the glass at either
+era, so the swing it holds there in CSS px is the shape the player sees.
+Measured, SWEEP: 186, 186, 119.19, 15.71, 0 — identical at both eras. Left
+alone it would have been 121 CSS px against 186 at long range, with the
+fold-in happening across 153 px instead of 236: **every route flattening 35%
+toward DIRECT**, on the one field a wider view exists to show off.
+
+**The lattice was nearly fixed the wrong way and the wrong way was greener.**
+The first edit was `Math.max(1, CFG.hairline)` — the floor everything else on
+the field already uses, and it does fix era 2. It also changes **era 1 at dpr
+1**, where `CFG.hairline` is 2.016 world units against the 1 written there:
+twice as thick, on a field this pass promised not to touch. It is `1 *
+CFG.scale` instead, which is bit-identical at era 1 by construction and holds
+0.62 CSS px at era 2. *A floor and a scale agree at the era you are looking at
+and disagree at the one you are not.*
+
+**And that edit did not compile — `background.js` had no `CFG` import.**
+`node --check` passed it, because an undefined identifier is not a syntax
+error; it would have thrown on the first frame. The import was added. The
+suite would have caught it, but only because the suite draws.
+
+**Two things were checked and deliberately left:**
+
+- **`spawnFormation` / `spawnGroup`'s `Math.min(world.width * 0.22, 190)`.**
+  The fraction wins at era 1 (138 on a 390-wide phone) and the cap wins at
+  era 2 (213 vs 190), which reads like a bug and is not: the margin exists to
+  leave room for the SHAPE, the shape is sized `type.r * 2.5 + 8` and does not
+  scale, so the world-unit cap is the term that is actually right. Machine,
+  not picture.
+- **The two regress guards that read `CFG.zoom` live** — the mine-blast
+  ceiling (`innerWidth / CFG.zoom`) and the thumb radius (`44 / CFG.zoom`).
+  Both were on the P3b list to be pinned to era-1 numbers and neither needs
+  it: every radius they compare against is in `SCALED`, so numerator and
+  denominator move by exactly the same factor and the ratios are
+  era-invariant by construction. They are era-1-only cases either way, since
+  the suite restarts at era 1.
+
+Two cases, 480 green. `an approach keeps its shape on the glass at either
+scale` (with a liveness control — the first version asserted the closest
+sample was 0 at D=200, where `closing` is 0.143, so it failed on a working
+build and the control was the thing that was wrong) and `...and so does the
+substrate, which has no config entry to scale`, which records `lineWidth` off
+the real `drawLattice` through a proxy ctx rather than reading it back off the
+canvas — a 0.62 CSS px line under a colour test is the HITBOXES floor trap
+verbatim.
+
+**Not done, and not needed:** no ORDINAL hash. P3b touches no energy, no
+targeting and no boss; `CFG.scale` is exactly 1 at era 1 and `fight.mjs` runs
+at era 1, so every multiplication in this build is a no-op on the frames the
+hash mixes. The two cases above are the proof that the sites are live.

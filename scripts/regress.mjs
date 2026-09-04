@@ -17494,6 +17494,96 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.two.clamped} at era 2 — these must match, or the ladder collapsed`);
 }
 
+// --- and the rest of the sweep: the shape of an approach, and the substrate -
+/*
+ * P3b. P3a took the numbers that live in `CFG` (the `SCALED` table, which
+ * throws on a path that is not there). What is left is the literals written
+ * at their use site, and they split two ways: a distance that is part of the
+ * MACHINE keeps its world size, and a distance that is part of the PICTURE
+ * keeps its size on the glass. These are the second kind.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, ROUTES } = await import('../src/config.js');
+    const { routeLateral } = await import('../src/enemies.js');
+    const background = (await import('../src/background.js')).background;
+    const g = window.__sim;
+    g.restart();
+    const out = {};
+
+    /*
+     * The arc, read at four screen-equivalent ranges. A body `D * CFG.scale`
+     * world units out is at the same point on the GLASS at either era, so the
+     * swing it is holding there, in CSS px, is the shape the player sees --
+     * and that is what must not move. Left unscaled the whole family flattens
+     * 35% toward DIRECT, which is the one thing a wider field exists to show.
+     */
+    const arc = (era) => {
+      g.setEra(era);
+      const rows = {};
+      for (const rt of ROUTES) {
+        rows[rt.id] = [900, 520, 340, 200, 170]
+          .map((D) => +(routeLateral(rt, D * CFG.scale) * CFG.zoom).toFixed(2));
+      }
+      return rows;
+    };
+    out.arcOne = arc(1);
+    out.arcTwo = arc(2);
+    out.arcHeld = JSON.stringify(out.arcOne) === JSON.stringify(out.arcTwo);
+    // ...and it has to be a curve rather than a flat zero, or the above is
+    // two columns of nothing agreeing with each other.
+    const sw = out.arcOne.sweep;
+    out.arcLive = sw[0] > 100 && sw[4] === 0
+      && sw.every((v, i) => i === 0 || v <= sw[i - 1]);
+
+    /*
+     * The substrate's polar lattice, which has no `CFG` entry and asks for a
+     * flat world-unit width. Recorded off the real draw call rather than read
+     * back off the canvas: the line is well under a device pixel and a colour
+     * test on it is the HITBOXES floor trap over again.
+     */
+    const widths = (era) => {
+      g.setEra(era);
+      const seen = [];
+      const stub = new Proxy({}, {
+        get(t, k) {
+          if (k === 'lineWidth') return t._lw;
+          if (k === 'stroke') return () => seen.push(t._lw);
+          if (k === 'createLinearGradient' || k === 'createRadialGradient') {
+            return () => ({ addColorStop() {} });
+          }
+          if (k === 'measureText') return () => ({ width: 10 });
+          if (k === 'canvas') return { width: 400, height: 800 };
+          return () => {};
+        },
+        set(t, k, v) { t[k === 'lineWidth' ? '_lw' : k] = v; return true; },
+      });
+      background.drawLattice(stub, 640, 1360);
+      return seen.map((v) => +(v * CFG.zoom).toFixed(3));
+    };
+    out.latOne = widths(1);
+    out.latTwo = widths(2);
+    out.latHeld = out.latOne.length > 0
+      && JSON.stringify(out.latOne) === JSON.stringify(out.latTwo);
+    // era 1 must be the literal that was there before the sweep, to the digit
+    out.latEraOne = out.latOne.every((v) => Math.abs(v - 0.62) < 1e-9);
+
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('an approach keeps its shape on the glass at either scale',
+    r.arcHeld && r.arcLive,
+    `SWEEP holds ${JSON.stringify(r.arcOne.sweep)} CSS px at era 1 against `
+    + `${JSON.stringify(r.arcTwo.sweep)} at era 2; the curve is live ${r.arcLive}`);
+
+  check('...and so does the substrate, which has no config entry to scale',
+    r.latHeld && r.latEraOne,
+    `the lattice strokes ${JSON.stringify(r.latOne)} CSS px at era 1 and `
+    + `${JSON.stringify(r.latTwo)} at era 2 — era 1 must still be 1 world unit`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

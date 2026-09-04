@@ -2624,7 +2624,11 @@ export class Game {
       ctx,
       W / 2,
       ENTRY_Y + (w.shooter.y - ENTRY_Y) * 0.46,
-      Math.min(W - 70, 470),
+      // A SCREEN width in world units: 470 is 291 CSS px at era 1 and would be
+      // 189 at era 2, so every story line would re-wrap to half again as many
+      // lines, into a band `pillCap()` already measures at zero headroom on a
+      // 568-tall screen.
+      Math.min(W - 70 * CFG.scale, 470 * CFG.scale),
       background.mood.accent,
       13 / w.scale,
     );
@@ -2814,7 +2818,9 @@ export class Game {
     if (!e || e.dead) return;
     const w = this.world;
     const converged = clamp(1 - w.shooter.aimError / 0.9, 0, 1);
-    const r = (e.r || 40) + 16 + (1 - converged) * 42;
+    // HUD-in-world: the two constants are a gap and a travel on the GLASS, so
+    // they hold their CSS size rather than shrinking with the field.
+    const r = (e.r || 40) + (16 + (1 - converged) * 42) * CFG.scale;
     const a = 0.25 + converged * 0.5;
     const spin = w.time * (0.7 + (1 - converged) * 2.4);
     ctx.save();

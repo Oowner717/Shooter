@@ -3,6 +3,7 @@
 // Cheap on purpose: one gradient, three cached nebula sprites, a polar
 // lattice, a few pre-rendered glyph columns and a dust field.
 
+import { CFG } from './config.js';
 import { clamp, rand, rgba, mixHex, makeCanvas, glowSprite } from './util.js';
 import { ORDINAL_MOODS } from './anomaly.js';
 import { fx } from './fx.js';
@@ -395,7 +396,19 @@ class Background {
     const ripples = fx.ripples;
     const bright = 1 + this.pulse * 1.6;
 
-    ctx.lineWidth = 1;
+    /*
+     * A world-unit width, which was fine while the scale never moved: 1 world
+     * unit is 0.62 CSS px at era 1 and would be 0.40 at era 2, i.e. the
+     * substrate thins out exactly as the field it has to fill gets bigger.
+     *
+     * Scaled rather than floored at `CFG.hairline`. The floor would ALSO fix
+     * era 2, and it would change era 1 at dpr 1 -- hairline is 2.016 world
+     * units there against the 1 written here -- which is an uninvited look
+     * change on the field this pass is supposed to leave alone. `CFG.scale`
+     * is exactly 1 at era 1, so the line is bit-identical there and holds its
+     * 0.62 CSS px at era 2.
+     */
+    ctx.lineWidth = 1 * CFG.scale;
 
     // Rays. Two points each while nothing is pulling on them, and subdivided
     // only while something is — a straight line cannot bend, and paying for

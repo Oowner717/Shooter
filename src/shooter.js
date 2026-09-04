@@ -977,7 +977,11 @@ export class Shooter {
     // you are aiming by feel rather than by pointing at a target.
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const rayLen = 300 + this.gripGlow * 320;
+    // A readout, not structure: the ray says where the barrel points and its
+    // length is a screen length. Unscaled it is 186 CSS px at era 1 and 121 at
+    // era 2, so the one line that answers "where am I aiming" gets shorter
+    // exactly as the field it has to cross gets bigger.
+    const rayLen = (300 + this.gripGlow * 320) * CFG.scale;
     const rx = this.x + Math.cos(this.aim) * rayLen;
     const ry = this.y + Math.sin(this.aim) * rayLen;
     const grad = ctx.createLinearGradient(this.x, this.y, rx, ry);
@@ -1101,8 +1105,11 @@ export class Shooter {
         const a = -Math.PI / 2 + side * cone;
         const c = Math.cos(a);
         const sn = Math.sin(a);
-        ctx.moveTo(c * (reach - 14), sn * (reach - 14));
-        ctx.lineTo(c * (reach + 14), sn * (reach + 14));
+        // The tick is an annotation on the arc, so it keeps its length on the
+        // glass; the arc's own radius is `aimRange`, which is in SCALED.
+        const tick = 14 * CFG.scale;
+        ctx.moveTo(c * (reach - tick), sn * (reach - tick));
+        ctx.lineTo(c * (reach + tick), sn * (reach + tick));
       }
       ctx.stroke();
       ctx.setLineDash([]);

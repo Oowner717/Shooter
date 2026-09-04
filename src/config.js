@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '240';
+export const BUILD = '241';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '240';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '265151e';
+export const REV = '5f57707';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4191,67 +4191,81 @@ export function setZoom(era, sandbox) {
    * is four chances to miss one, and this is none.
    */
   CFG.scale = CFG.ZOOMS[1] / CFG.zoom;
-
-  /*
-   * The entry line, and the speed that makes it free.
-   *
-   * `entryDepth` is a SCREEN distance written in world units: its whole job is
-   * to hold the assists off a body until it is clear of the interface, and the
-   * interface reaches world y 261 at era 1 and 402 at era 2. Scaling it is not
-   * optional -- left at 260 the bug it was written to kill comes straight
-   * back, and objects arrive and die in the one strip of the field you cannot
-   * watch.
-   *
-   * `entrySpeed` scales WITH it, and this is the one place the "enemy speeds
-   * do not scale" ruling does not reach: it is a staging multiplier applied
-   * only while `staged` (see `Enemy.drive`), not a field speed, and its own
-   * note says it exists so "the extra 260 units cost the run no time". Leave
-   * it and the march-in stops being free -- which matters more than it looks,
-   * because the ladder's three clocks (`surgeWithin` 3s, `cleanWithin` 12s,
-   * `patience` 26s) are all measured in the seconds it controls. 2.6 x 1.538
-   * is 4.0, and that is exact rather than fitted: 400/(4c) = 260/(2.6c).
-   */
-  CFG.entryDepth = BASE.entryDepth * CFG.scale;
-  CFG.entrySpeed = BASE.entrySpeed * CFG.scale;
-
-  /*
-   * How far the turret stands off the ability strip. Also a screen distance in
-   * world units -- its own comment says so -- so it scales to keep the machine
-   * at the same CSS position rather than creeping down onto the strip.
-   */
-  CFG.shooter.standoff = BASE.standoff * CFG.scale;
-
-  /*
-   * The assist's reach, and the two halves of the energy economy.
-   *
-   * The economy is a travel-time problem and nothing else: there is no
-   * collection radius, wreckage drifts the whole way in and lands on the
-   * turret. A column 54% longer costs 54% more time per mote against a hard
-   * `maxDrops` cap, so income per second falls and `world.earned` -- which
-   * gates every object type -- falls with it.
-   */
-  CFG.shooter.aimRange = BASE.aimRange * CFG.scale;
-  CFG.energy.pull = BASE.pull * CFG.scale;
-  CFG.drop.speed = BASE.dropSpeed * CFG.scale;
-  CFG.drop.accel = BASE.dropAccel * CFG.scale;
+  for (const path of SCALED) setPath(path, BASE[path], CFG.scale);
 }
 
 /**
- * The era-1 values of everything `setZoom` derives.
+ * ---- every world distance the TURRET side owns ----
  *
- * Captured once at module load, before anything can have written over them, so
- * the numbers above stay the numbers written in the tables rather than a
- * second copy that can drift from them.
+ * One table rather than seventy edits, and that is the point: a reviewer can
+ * read this list and say what is missing, where seventy scattered `* CFG.scale`
+ * expressions can only be audited by grepping for the ones that are not there.
+ * Each is captured at module load into `BASE` and rewritten by `setZoom`, so no
+ * READ site anywhere in the game changes -- the same shape `CFG.hairline` has
+ * had since build 199.
+ *
+ * What is deliberately NOT here, and why:
+ *
+ *   enemy speeds, cruise, accel, the boss standoffs   the user's ruling: only
+ *       turret-owned variables follow the field. New faster bodies come later.
+ *   `entrySpeed`                                      IS here, and is the one
+ *       carve-out: it is a staging multiplier applied only while `staged`, not
+ *       a field speed, and without it the march-in stops being free.
+ *   angles -- `shotgun.spread`, `sliver.spread`, `aimClamp`, `ward.arc.reach`
+ *       radians and ratios do not scale with a field.
+ *   `shooter.r`                                       the turret's PHYSICAL
+ *       radius, which the MK2 phase owns. Moving it here would change contact,
+ *       the intake band and the attackers grab as a side effect of a camera
+ *       change.
+ *   times, damages, costs, healths                    not distances.
  */
-const BASE = {
-  entryDepth: CFG.entryDepth,
-  entrySpeed: CFG.entrySpeed,
-  standoff: CFG.shooter.standoff,
-  aimRange: CFG.shooter.aimRange,
-  pull: CFG.energy.pull,
-  dropSpeed: CFG.drop.speed,
-  dropAccel: CFG.drop.accel,
-};
+const SCALED = [
+  // the field's own shape, and the speed that keeps arriving free
+  'entryDepth', 'entrySpeed',
+  // the machine: where it stands, how far it sees, what it is held by
+  'shooter.standoff', 'shooter.aimRange', 'shooter.gripLen', 'shooter.gripR',
+  // the intake, which is a travel-time problem and nothing else
+  'energy.pull', 'energy.pulse', 'drop.speed', 'drop.accel',
+  // the thumb, which covers the same disc of GLASS whatever the scale
+  'touchLift',
+  // rounds: what they are, and what they leave behind
+  'bolt.r', 'rounds.explosive.blast.r', 'rounds.arc.jumpRange',
+  'rounds.spine.shatter.r', 'rounds.spore.patch.r',
+  // mines: the body, the default blast, and each kind's own reach
+  'mines.r', 'mines.blast.r', 'mines.fizzle.r',
+  'knell.r', 'knell.blast.r', 'snare.r', 'snare.trigger', 'snare.reach',
+  'lode.r', 'lode.reach', 'thorn.r', 'thorn.patch.r',
+  'spall.r', 'spall.trigger', 'spall.burst.r', 'void.r', 'void.trigger',
+  'wire.r', 'wire.span', 'wire.width',
+  // the bar
+  'decoy.r', 'decoy.ahead', 'decoy.blast.r',
+  'pile.r0', 'pile.r', 'ward.r', 'prism.r', 'prism.beamLen',
+];
+
+function atPath(path) {
+  let o = CFG;
+  const bits = path.split('.');
+  for (let i = 0; i < bits.length - 1; i++) o = o && o[bits[i]];
+  return [o, bits[bits.length - 1]];
+}
+
+function setPath(path, base, k) {
+  const [o, last] = atPath(path);
+  if (!o) return;
+  o[last] = Array.isArray(base) ? base.map((v) => v * k) : base * k;
+}
+
+/**
+ * The era-1 value of everything in `SCALED`, captured once at module load
+ * before anything can have written over it — so the numbers stay the ones
+ * written in the tables above rather than a second copy that can drift.
+ */
+const BASE = {};
+for (const path of SCALED) {
+  const [o, last] = atPath(path);
+  if (!o) throw new Error(`config: SCALED names "${path}", which is not in CFG`);
+  BASE[path] = Array.isArray(o[last]) ? [...o[last]] : o[last];
+}
 
 /**
  * How an object crosses the field. Every one picks a route at spawn, so two
