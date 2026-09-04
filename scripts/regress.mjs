@@ -17320,6 +17320,93 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `set to ${r.era}, and a restore comes back at ${r.afterReload}`);
 }
 
+// --- the camera, and the two things every drawn frame rests on --------------
+/*
+ * P2 of the NEW FORM plan. The scale is per-era from build 238 and is written
+ * by `setZoom` on every resize, the way `setHairline` writes the stroke floor.
+ *
+ * `world.width * world.scale === screen width` is not a tidiness check. The
+ * frame clear is `ctx.setTransform(dpr * w.scale, ...)` then `fillRect(0, 0,
+ * W, H)` with W in WORLD units -- so if the identity ever breaks, the game
+ * clears part of a frame and leaves the rest, and nothing else would say so.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    g.restart();
+    w.phase = 'staging';
+    const sw = window.innerWidth;
+    const sh = window.innerHeight;
+
+    const read = () => ({
+      zoom: CFG.zoom,
+      width: +w.width.toFixed(3),
+      height: +w.height.toFixed(3),
+      floorY: +w.floorY.toFixed(3),
+      shooterY: +w.shooter.y.toFixed(3),
+      hairline: +CFG.hairline.toFixed(6),
+      // the identity the frame clear depends on, both axes
+      spans: Math.abs(w.width * w.scale - sw) < 1e-6
+        && Math.abs(w.height * w.scale - sh) < 1e-6,
+    });
+
+    out.one = read();
+    g.setEra(2);
+    out.two = read();
+    g.setEra(1);
+    out.back = read();
+
+    // ---- era 1 is untouched, to the digit ------------------------------
+    out.unchanged = JSON.stringify(out.one) === JSON.stringify(out.back);
+    // ...and era 2 is exactly x0.65, not approximately
+    out.ratio = +(out.two.zoom / out.one.zoom).toFixed(6);
+    out.deeper = +(out.two.height / out.one.height).toFixed(4);
+
+    // ---- the stroke floor followed the scale ---------------------------
+    // It is derived from the zoom, so it must have moved with it; if setZoom
+    // ran after setHairline the floor would be one resize behind.
+    out.floorFollowed = out.two.hairline > out.one.hairline;
+
+    // ---- the testbed is pinned to era 1, from either era ----------------
+    g.world.energy = 999999;
+    g.buy('sandbox');
+    g.setEra(2);
+    const inTwo = CFG.zoom;
+    g.enterSandbox();
+    out.benchZoom = CFG.zoom;
+    out.benchSpans = Math.abs(w.width * w.scale - sw) < 1e-6;
+    g.exitSandbox();
+    out.afterBench = CFG.zoom;
+    out.wasInTwo = inTwo;
+
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('the camera scale is per era, and every frame still spans the screen',
+    r.one.zoom === 0.62 && r.two.zoom === 0.403 && r.ratio === 0.65
+    && r.one.spans && r.two.spans && r.back.spans,
+    `era 1 ${r.one.zoom} -> era 2 ${r.two.zoom} (x${r.ratio}); the field is `
+    + `${r.deeper}x deeper; width x scale equals the screen at both `
+    + `${r.one.spans && r.two.spans}`);
+
+  check('...and era 1 comes back to the digit, with the stroke floor following',
+    r.unchanged && r.floorFollowed,
+    `era 1 before and after a round trip: ${r.unchanged ? 'identical' : 'MOVED'}; `
+    + `hairline ${r.one.hairline} -> ${r.two.hairline} at era 2, which it must, `
+    + `because it is derived from the zoom`);
+
+  check('...and the testbed is pinned to era 1 whatever era it was entered from',
+    r.wasInTwo === 0.403 && r.benchZoom === 0.62 && r.benchSpans
+    && r.afterBench === 0.403,
+    `entered from era 2 (${r.wasInTwo}), the bench draws at ${r.benchZoom} and `
+    + `still spans the screen ${r.benchSpans}; leaving returns to ${r.afterBench}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

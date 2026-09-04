@@ -1,6 +1,6 @@
 // World state, phase machine, physics stepping and the render pipeline.
 
-import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID, setHairline } from './config.js';
+import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID, setHairline, setZoom } from './config.js';
 import { Ordinal, openAperture } from './boss.js';
 // Imported for the side effect: a boss module registers its constructor
 // with anomaly.js on load, and nothing else references it by name.
@@ -478,6 +478,21 @@ export class Game {
      * cases failed on this one missing line.
      */
     w.era = 1;
+    /*
+     * ...and the geometry derived from it, but ONLY when the scale is actually
+     * stale. `reset()` has never called `resize()`, and setting the era back to
+     * 1 without re-deriving leaves the world at era 2's width, height, floor
+     * and turret position while claiming to be era 1.
+     *
+     * Conditional rather than unconditional, and the first version was not:
+     * `resize()` also re-derives the backing store from `fx.quality`, so a
+     * plain `restart()` began applying a quality some earlier caller had left
+     * on the floor -- which is CLAUDE.md's own note about the governor, from
+     * the other side. Two consecutive draws stopped being identical and a case
+     * that had nothing to do with the era failed. Comparing the scale means a
+     * same-era restart is untouched and only a return from era 2 pays.
+     */
+    if (this.canvas && CFG.zoom !== CFG.ZOOMS[w.sandbox ? 1 : w.era]) this.resize();
     w.runSeed = (Math.random() * 0x7fffffff) | 0;
     w.remainder = 0;
     w.remainderGained = 0;
@@ -834,7 +849,23 @@ export class Game {
     if (w.phase !== 'staging') return false;
     this.checkpoint();
     w.sandbox = true;
+    /*
+     * The era is carried across by hand. Both doors go through `resume()`,
+     * which is `reset()` plus the file -- `reset()` clears the era and the
+     * file does not carry it yet, so a visit to the bench would silently put
+     * an evolved run back to era 1. When the era joins the save at the door
+     * phase the restore will do this itself and these two lines become belt
+     * and braces rather than the mechanism.
+     */
+    const era = w.era;
     this.resume();
+    w.era = era;
+    // The bench is pinned to era 1's scale, and NOTHING re-derives the
+    // geometry on its own: `resume()` calls `reset()`, and `reset()` does not
+    // call `resize()`. Without this, entering from era 2 leaves the world at
+    // era 2's dimensions while the room is drawn at era 1's, and the rig's
+    // clearance case fails on a build where the room looks fine.
+    this.resize();
     // `resume` restores a run, and a run has a wave rail, a purse and a fuse.
     // None of those exist here.
     w.phase = 'staging';
@@ -848,7 +879,11 @@ export class Game {
     if (!w.sandbox) return false;
     this.sandbox.leave();
     w.sandbox = false;
+    const era = w.era;
     this.resume();
+    w.era = era;
+    // ...and back to the era's own scale on the way out, for the same reason.
+    this.resize();
     background.setMood(w.dawn ? 'dawn' : 'staging', true);
     this.hud.syncSandbox(w);
     this.hud.alert('SIMULATION ONLINE', 'info', 2.2);
@@ -1046,6 +1081,12 @@ export class Game {
     const dpr = clamp(window.devicePixelRatio || 1, 1, CFG.maxDpr) * this.qualityScale();
 
     this.dpr = dpr;
+    /*
+     * The era's scale FIRST, because everything below is derived from it --
+     * the stroke floor most immediately, which would otherwise be one resize
+     * behind. The testbed is exempt and says so in `setZoom`.
+     */
+    setZoom(this.world.era, this.world.sandbox);
     // The stroke floor is a device-pixel measure, so it follows the scale the
     // canvas is actually drawn at -- including the governor's own factor.
     setHairline(dpr);

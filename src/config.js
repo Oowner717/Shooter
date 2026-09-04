@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '238';
+export const BUILD = '239';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '238';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '7d1ac4f';
+export const REV = '27d6e17';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -64,10 +64,34 @@ export const CFG = {
   storyEvery: 50, // one story line per this many kills (10 lines total)
 
   // ---- camera ---------------------------------------------------------
-  // World units per screen pixel. Below 1 the arena is drawn zoomed out, so
-  // the field is physically larger than the display and objects read smaller
-  // and further away. All game logic works in world units.
+  /*
+   * World units per screen pixel. Below 1 the arena is drawn zoomed out, so
+   * the field is physically larger than the display and objects read smaller
+   * and further away. All game logic works in world units.
+   *
+   * LIVE from build 238: `setZoom` writes this on every resize from the era
+   * the world is in, exactly the way `setHairline` writes `CFG.hairline`.
+   * That is deliberately the shape it takes -- a property on `CFG`, written by
+   * a function, read fresh at every use -- because `bundle.mjs` copies module
+   * exports into a registry once, so an `export let` would be a live binding
+   * in the served build and a SNAPSHOT in the bundle: green suite, clean boot,
+   * and quietly a different game. It guards `export let`; it cannot guard a
+   * module-local `const z = CFG.zoom`, so nothing may cache this.
+   *
+   * The value here is era 1's and is the module-load default. See `ZOOMS`.
+   */
   zoom: 0.62,
+  /*
+   * The scale per era, indexed from 1.
+   *
+   * Era 2 is era 1 x 0.65 -- 54% more world in each direction, so a 390x844
+   * phone goes from 1361 units of depth to 2094. What that does NOT do is
+   * open the window: the chrome and the ability strip are CSS-anchored, so
+   * the unobstructed play band is 127 CSS px at BOTH eras (measured at
+   * 320x568). Era 2 shows a larger world in the same space with everything
+   * drawn 35% smaller, which is the deliberate reading -- see docs/newform.md.
+   */
+  ZOOMS: [0, 0.62, 0.403],
 
   /*
    * How far ABOVE the finger the aim point sits, in world units.
@@ -4134,6 +4158,22 @@ export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));
  */
 export function setHairline(dpr) {
   CFG.hairline = 1.25 / (Math.max(dpr, 0.1) * CFG.zoom);
+}
+
+/**
+ * The camera scale for an era, written where everything reads it.
+ *
+ * Called from `Game.resize` BEFORE `setHairline`, because the stroke floor is
+ * derived from the zoom and would otherwise be one resize behind.
+ *
+ * The testbed is exempt by ruling: it is a bench, not a battlefield, and its
+ * whole geometry -- the rig's standoff, the bead shell, the panel clearance
+ * case -- is measured against era 1's scale. `world.sandbox` is already the
+ * flag for "a mode where the director does not run"; it is also the flag for
+ * "a mode at the base scale".
+ */
+export function setZoom(era, sandbox) {
+  CFG.zoom = sandbox ? CFG.ZOOMS[1] : (CFG.ZOOMS[era] || CFG.ZOOMS[1]);
 }
 
 /**

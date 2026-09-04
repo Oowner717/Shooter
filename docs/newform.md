@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 shipped in build 238. P2 is next.**
+**Status: P1 (238) and P2 (239) shipped. P3 is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -327,7 +327,7 @@ thing to run if the budget allows:
 
 - [ ] P0 · this file
 - [x] P1 · the era, the switch, the reset convergence — **build 238**
-- [ ] P2 · the camera
+- [x] P2 · the camera — **build 239**
 - [ ] P3 · the constant sweep
 - [ ] P4 · the yard
 - [ ] P5 · the build lots
@@ -533,3 +533,36 @@ already named.** `reset()` did not clear `era`, so `setEra(2)` on a world alread
 not carry. The audit's list of "what `reset()` does NOT clear" is where this feature
 lives; anything added to the world belongs on that list or on a written reason why
 not.
+
+---
+
+## 12. P2, as built (build 239)
+
+The scale is per era and lives where every reader already looks. `CFG.ZOOMS` is
+`[0, 0.62, 0.403]` and `setZoom(era, sandbox)` writes `CFG.zoom` on every resize,
+exactly the way `setHairline` writes the stroke floor. That shape was chosen over a
+`world.view` object for one reason: `CFG.zoom` is a property on `CFG` written by a
+function, which is the form `bundle.mjs` cannot silently snapshot. All nine readers
+work unchanged.
+
+`setZoom` runs BEFORE `setHairline` in `resize()`, because the floor is derived from
+the zoom and would otherwise be one resize behind.
+
+**Three real bugs, all caught by the new cases:**
+
+1. **`reset()` cleared the era but re-derived nothing**, leaving the world at era 2's
+   width, height, floor and turret position while claiming era 1.
+2. **Leaving the testbed un-evolved the run.** Both doors go through `resume()`, which
+   is `reset()` plus the file; `reset()` clears the era and the file does not carry it
+   yet. Carried across by hand, with a note that the restore takes over at the door.
+3. **The first fix was too broad and broke an unrelated case.** An unconditional
+   `resize()` in `reset()` also re-derives the backing store from `fx.quality`, so a
+   plain `restart()` began applying a quality some earlier caller had left low — two
+   consecutive draws stopped being identical. That is CLAUDE.md's governor note from
+   the other side. It is conditional on the scale actually being stale now, so a
+   same-era restart is untouched.
+
+**Era 2 is now visually correct and mechanically wrong**, which is expected and is why
+P3 exists: the field is 1.54x deeper with era-1 reach. It is debug-only and reverts on
+reload. Shipping the zoom before the constants is deliberate — it makes P3's sweep
+measurable rather than a guess.
