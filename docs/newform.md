@@ -69,7 +69,7 @@ together. Field changes clear everything and release no energy.
 | ruling | |
 |---|---|
 | field scale | **×0.65**. `CFG.zoom` 0.62 → 0.403. Reach ×1.538. 390×844 goes 1361 → **2094** units deep, 629 → **968** wide. |
-| the node | The existing **RECAST**, repriced to **energy + seven REMAINDERs**. |
+| the node | The existing **RECAST**, repriced to **seven REMAINDERs, zero energy**. |
 | enemy speeds | **Do not scale.** Only turret-owned variables change. Faster enemies come later. |
 | the testbed | **Not touched.** Era-1 zoom whatever the era. |
 | boss standoffs | **Not touched.** Only matter on the old field. |
@@ -447,3 +447,33 @@ measured become inert.
 - Density: the same ~11 bodies at tier 10 in 2.37x the area. Screen coverage by
   enemies falls to **42%**. Era 2 is not busier, it is **emptier**.
 - Dead time is only **+1.1s** — not the problem. The emptiness is spatial.
+
+---
+
+## 9. The price, settled: seven REMAINDERs and no energy
+
+`CFG.ordinal.recast: 1 -> 7`. One number. RECAST already declares
+`currency: 'remainder'` and the whole purchase path already handles it, so the
+single-currency blocker in 8.4 **disappears entirely** — no change to `game.js:817`,
+`menu.js:1084`, `menu.js:1090` or `priceOf`, and no decision about what a card prints
+when a thing has two costs.
+
+**And the price is exactly affordable, by construction rather than by luck:**
+
+- `remainder: 1` per boss (`config.js:2806`), granted when the collectible reaches the
+  turret (`boss.js:129`).
+- `withdrawBoss` reconciles nothing AND grants nothing — it only alerts
+  (`game.js:2100-2117`).
+- So **reconciled count and remainders granted move in lockstep**, and the gate stops
+  RECAST being bought before the seventh boss, so none can be spent early.
+
+Seven bosses beaten is exactly seven remainders held. The price IS the requirement,
+stated in the currency the bosses pay in, and REMAINDER finally has something worth
+saving for instead of a one-per-boss no-op.
+
+**The case this rests on**, and it is the whole reason the price works:
+*`world.reconciled.length` equals the number of remainders granted.* If those two ever
+drift the gate becomes unreachable in that run, silently.
+
+This also removes the energy half of the gate from P9: there is no purse test, and
+`available()` needs only the boss count and the turret branch.
