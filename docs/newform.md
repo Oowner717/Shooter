@@ -336,3 +336,114 @@ thing to run if the budget allows:
 - [ ] P8 · the cinematic
 - [ ] P9 · the door
 - [ ] P10 · the reveal pass
+
+---
+
+## 8. Second review — three lenses, run after the plan was committed
+
+Play-test, instruments, and refutation. Everything below is measured against source.
+
+### 8.1 THE FINDING THAT CHALLENGES THE PREMISE: the rescale buys ZERO screen
+
+Measured live at 320x568: `#alerts` bottom is 162px, `#quickBar` top is 289px. The
+unobstructed play band is **127 CSS px — at BOTH eras.**
+
+| | era 1 (z 0.62) | era 2 (z 0.403) |
+|---|---|---|
+| chrome bottom | 261 wu | **402 wu** |
+| quickBar top | 466 wu | 717 wu |
+| clear band | 205 wu | 315 wu |
+| **clear band in CSS px** | **127** | **127** |
+
+The chrome and the strip are CSS-anchored, so scaling the world does not open the
+window — it only shrinks what is drawn in it. "See the full battlefield" is entirely
+a matter of every body being drawn 35% smaller in the same space, and the yard, the
+building, the wall and the six lots have to fit in that same 127px on the binding
+screen. **This needs a decision from the user before P2 starts.**
+
+### 8.2 `CFG.entrySpeed` is the number that makes era 2 work, and no version of the plan named it
+
+Its docstring: *"the march in runs this much faster than the object's own cruise, so
+the extra 260 units cost the run no time."* Scale `entryDepth` and leave `entrySpeed`
+and the march-in stops being free. **It is a staging multiplier applied only while
+`staged` (`enemies.js:825`), not a field speed — so the "speeds do not scale" ruling
+does not forbid it.**
+
+`entrySpeed: 2.6 -> 4.0`, and 4.0 is exact rather than fitted: 400/(4c) = 260/(2.6c).
+
+Why it matters more than it looks: three ladder clocks are measured in the seconds it
+controls — `surgeWithin: 3`, `cleanWithin: 12`, `patience: 26`. Era 2 as specified
+spends **0.5s to 2.3s of pure travel inside a 3-second surge window**. A surge is +2
+tiers and a stall is 0, so the ladder would climb slowest exactly where it must climb
+fastest, and the alert would read IT TOOK TOO LONG on waves the player crushed.
+
+### 8.3 `entryDepth` is 400, not 360 — my number came from a stale docstring
+
+The comment says the interface reaches world y 234. It reaches **261** today. So
+`entryDepth: 260` is already 1.3wu short rather than "just clear of all of it", and
+the era-2 value is 162/0.403 = **402**, i.e. 260 x 1.5385 = 400. The 360 in the plan
+was the stale 234 scaled, and lands 42wu ABOVE the chrome — reinstating the exact bug
+the constant exists to kill.
+
+### 8.4 Three blockers for the RECAST ruling
+
+- **The purchase path is single-currency by construction**, in three places that each
+  read `n.currency === 'remainder' ? w.remainder : w.energy` (`game.js:817`,
+  `menu.js:1084`, `menu.js:1090`). One purse, one price, one deduction. "Energy plus
+  seven REMAINDERs" is a change to all three plus `priceOf` plus the card's print.
+- **`dormant` is a second live gate** already in the tree (`game.js:805`,
+  `menu.js:796/1083/1209`, `tree.js:282`), documented as *"a slot that is not built
+  stays dormant"*. P9's "a new gate predicate" overstates the work.
+- **`noteRig` already computes the gate** (`game.js:854`) and stores `w.rigDone` — but
+  `rigDone` is set only on a purchase and `resume()` replays the ledger without
+  calling it, so **it is false after every reload of a completed turret.** A gate hung
+  on the flag fails closed on resume. Use the recomputed `every()`.
+
+### 8.5 The ULTIMATE tab already wraps, today, on a clean build
+
+My "8 characters" was CLAUDE.md's THREE-tab measurement applied to ARSENAL's FOUR-tab
+strip. Measured padlocked: AMMO/MINES 70.8px, UPGRADES/ULTIMATE 80.2px, and inside
+the ULTIMATE tab **the padlock sits orphaned on its own line above the word**, at
+both 320 and 390. 80.2 is min-content, so those two steal 4.7px each from their
+siblings. P9 needs a shorter label, a `nowrap` + shrink strategy, or no padlock on
+that tab — and CLAUDE.md's bullet should say *three-tab strip*.
+
+### 8.6 The build-199 stroke regression returns, measured
+
+`setHairline` divides by the era zoom, so at dpr 2 the world-unit floor goes
+1.008 -> **1.551** while `r * m.line` is unchanged. Types clamped to the floor go
+**11 -> 16 of 37**, and **4 -> 9 of the 16 field types** — DRIFT, TOW, GLUT, HERALD
+and PRISM all fall under and get MOTE's outline, on top of reading 35% smaller.
+Fix: multiply `line` in `materialOf` by 1/0.65 in era 2 and invalidate the `t._mat`
+memo on the switch.
+
+### 8.7 The aperture
+
+**Three spawn sites, not one**: `emit` (`enemies.js:4649`), `spawnFormation`'s `cx`
+(`:3379`), and ambient `spawnDrift` (`:3463`). P4's "nothing spawns outside the
+aperture" fails on the drift trickle within seconds unless drift is exempted by
+decision rather than by accident.
+
+**It cannot be narrow.** A formation is laid out by `formationOffset` then clamped to
+the FIELD, not the aperture: a mote x4 wave spans **570 units at tier 20 — 59% of the
+968-wide field**. Either give `spawnFormation` the aperture bounds or force
+`shape: 'column'` inside it.
+
+**And below the entry line the aperture is invisible**: `ROUTES` fan bodies +/-300
+units within a few hundred of travel, so from y~400 down the field looks as it does
+today. `ROUTES[].width` is absolute, so every approach is also **35% straighter**.
+
+**Auto-aim gets strictly better**: arrival bearing spread collapses ±21.2° -> ±7.6°,
+traverse work falls to 36%, and `aimStick` plus every target-switch cost this game has
+measured become inert.
+
+### 8.8 The shape of era 2, in numbers
+
+- Crossing times, weighted: **17.6s -> 27.4s**. BULWARK 32.6 -> 51.6. A LOITERer
+  dawdles against a bare `dist > 260` (`enemies.js:838`) that did not scale: BULWARK
+  46.1 -> **79.2s**.
+- **Era 2 is exactly 2.00x more forgiving** — 1.54x longer inside a reach that also
+  scaled, at 1.3x damage. At `hpStep 1.085` that is **8.5 tiers of headroom**.
+- Density: the same ~11 bodies at tier 10 in 2.37x the area. Screen coverage by
+  enemies falls to **42%**. Era 2 is not busier, it is **emptier**.
+- Dead time is only **+1.1s** — not the problem. The emptiness is spatial.
