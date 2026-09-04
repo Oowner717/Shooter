@@ -25,6 +25,7 @@
 // VOID deletes the first thing that touches it, whatever its health — except
 //   an anomaly's own structure, which is not survivable by design.
 
+import { yardHold } from './yard.js';
 import { CFG } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, segClosest } from './util.js';
 import { applyBlast, ENTRY_Y } from './enemies.js';
@@ -291,7 +292,9 @@ class Mine {
  */
 function landingSite(world) {
   const deep = Math.max(1, world.floorY - ENTRY_Y);
-  const top = ENTRY_Y + deep * M.keepTop;
+  // ...and never past the wall. `yardHold` is 0 at era 1, which is ENTRY_Y, so
+  // this is `Math.max(x, 0)` on a value already at or below the entry line.
+  const top = Math.max(ENTRY_Y + deep * M.keepTop, yardHold(world));
   const bottom = world.shooter.y - 130;
   return {
     x: rand(60, world.width - 60),

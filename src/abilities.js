@@ -13,6 +13,7 @@ import { CFG } from './config.js';
 import { fire, clampAim } from './projectiles.js';
 import { applyBlast, ENTRY_Y, drawIn } from './enemies.js';
 import { audio } from './audio.js';
+import { yardHold, holdBelow } from './yard.js';
 
 /*
  * Ability marks. Each one draws what the ability does to the field rather than
@@ -1265,8 +1266,11 @@ export const ABILITIES = [
     hint: 'WELL — drags everything into a knot, then collapses.',
     run(world) {
       const p = densestPoint(world);
-      world.effects.push(new Well(p.x, p.y));
-      ring(p.x, p.y, 320, 30, 0.5, '#c77dff', 3);
+      // The chooser is allowed to point past the wall -- the crowd it is
+      // reading is often up there -- and the knot is not allowed to go.
+      const y = holdBelow(world, p.x, p.y, 40);
+      world.effects.push(new Well(p.x, y));
+      ring(p.x, y, 320, 30, 0.5, '#c77dff', 3);
       audio.ability('well');
     },
   },
@@ -1339,8 +1343,12 @@ export const ABILITIES = [
        */
       if (world.decoy && !world.decoy.dead) { world.decoy.restack(world); return; }
       const s = world.shooter;
-      const top = ENTRY_Y + 60;
-      const d = new Decoy(s.x, clamp(s.y - CFG.decoy.ahead, top, s.y - 120));
+      // A DECOY is the one friendly summon that is a physics body, and it is
+      // the one the wall most obviously has to stop: its whole job is standing
+      // where things are, and past the wall there is nothing to stand among.
+      const top = Math.max(ENTRY_Y + 60, yardHold(world) + CFG.decoy.r);
+      const d = new Decoy(s.x, holdBelow(world, s.x,
+        clamp(s.y - CFG.decoy.ahead, top, s.y - 120), CFG.decoy.r));
       world.decoy = d;
       world.effects.push(d);
       ring(d.x, d.y, 6, 300, 0.5, '#59e0ff', 4);

@@ -151,6 +151,29 @@ export const ON_GLITCH = (() => {
 })();
 
 /*
+ * The wall across the field, which is the one rule in this game with nowhere to
+ * be looked up.
+ *
+ * Everything else the player has to understand is an OBJECT, and objects are in
+ * the glossary: `codex.record` fires when a thing comes apart, the OBJECTS tab
+ * counts what has been recorded, and the denominator is reachable because all
+ * thirty-seven of them can be destroyed. The wall cannot -- it is not a body at
+ * all, it is a line and three placement clamps -- so an entry for it would be
+ * an entry that never fills in and a denominator that can never be reached.
+ *
+ * So it is a line instead, keyed off the moment the rule first bites rather
+ * than off arriving in era 2: `world.yard.consulted` is set the first time
+ * anything is put down at all, which is when "your things stop here" is worth
+ * a sentence and not before. Same shape as ON_GLITCH above and for the same
+ * reason -- a mechanic you cannot look up, explained by one line at the moment
+ * it happens.
+ */
+export const ON_WALL = (() => {
+  const text = 'The line is theirs to cross, not yours.\nYour mines, decoys and knots stay below it.';
+  return { id: idOf(text), text, hold: holdFor(text) };
+})();
+
+/*
  * ...and if it is still there a while later, said again.
  *
  * Everything else in this file is once per device and that is right for it:

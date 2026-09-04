@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238), P2 (239), P3a (240), P3b (241), P4a (242), P4b (243) shipped. P4c is next.**
+**Status: P1 (238) - P4c (244) shipped. P4 is complete; P5 (the build lots) is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -332,7 +332,7 @@ thing to run if the budget allows:
 - [x] P3b · the rest of the sweep: the use-site literals (build 241)
 - [x] P4a · the yard and the sky (build 242)
 - [x] P4b · the aperture (build 243)
-- [ ] P4c · the wall's one-way rule
+- [x] P4c · the wall's one-way rule (build 244)
 - [ ] ~~P4~~ · the yard
 - [ ] P5 · the build lots
 - [ ] P6 · the MK2 turret
@@ -918,3 +918,69 @@ outlive every restart after them. This aperture case is the first since that
 family to need a wave, and it measured **zero releases in forty seconds at
 both eras** while passing in isolation. It sets both explicitly. Fixing the
 eighteen is a separate pass and is recorded in CLAUDE.md.
+
+## 17. P4c, as built (build 244) — P4 complete
+
+**The wall is three placement clamps and a drawn line. It is in `physics.js`
+nowhere.**
+
+The rule is ONE-WAY, so the enemy half needs no mechanism at all: nothing stops
+a body, so nothing is written, and *"enemy objects pass through"* is true by
+construction — `drive`, `physicsStep`, `clampToArena` and the routes never
+consult it. Only the friendly half is a rule, and it is a **placement** rule
+because of a measured fact: **of every friendly summon in the game, exactly one
+is a physics body, and it does not move.** The DECOY is pushed into the
+broadphase with `invMass: 0`; mines fly a parametric arc in `world.mines`,
+projectiles live in `world.projectiles`, and Patch/Front/Ward/Well live in
+`world.effects` — `physics.js` can see none of them, and its only collision
+test is `a.r + b.r`. A wall spanning the field would be twenty-odd circles,
+each a body, each a slot of `CFG.maxEnemies`, to stop one stationary decoy.
+
+The three sites: `landingSite` (one door, all eight mine kinds, `debugThrowMine`
+included), the DECOY, and WELL. All three are `Math.max(existing, 0)` or an
+identity at era 1, and no random draw moves — the hash came back
+`-1765830468`, the value measured on this container at HEAD before the change.
+
+**The rule is taught, not listed.** `codex.record` fires when a thing comes
+apart, so an indestructible fixture could never be recorded and the OBJECTS
+denominator could never be reached — the brief was right about the mechanism
+and wrong about the conclusion, because the denominator only breaks if someone
+*writes the entry*. `codex.total` stays 37 and `FIELD_ENTRIES` stays 16.
+`ON_WALL` is a first-use line in `sim7749-lines`, keyed off
+`world.yard.consulted` — the first time anything is put down at all, which is
+when *"your things stop here"* is worth a sentence and not before. `ON_GLITCH`
+is the precedent and the reason is identical: a mechanic you cannot look up.
+
+**What it costs, stated rather than hidden.** At 320×568 the visible mine
+ground goes 127 CSS px → 69.9 (a 45% cut); at 390×844 it is 24%. That is the
+requirement doing what it says. If P7 wants ground back the lever is
+`CFG.yard.gap`/`clear`, **never `CFG.mines.keepTop`**, which is a fraction of a
+screen-varying floor while the wall is screen-anchored — touching it splits the
+two phones.
+
+### Two assertions I wrote wrong, and what they taught
+
+- **A mine's flight legitimately dips into the clearance band.** I asserted the
+  arc must stay below `hold`; measured, it peaks 22 units into that band at
+  320×568. The band is *what the clearance is for* — the rule is that the arc
+  must not cross the **wall**, and the landing must be at or below the hold.
+  Two different lines, and the case now asserts them separately.
+- **`consulted` is per-world and my pass-through arm reset it.** It asserted a
+  flag that only a placement can set, in the one arm that places nothing.
+
+### Deliberately not clamped, each for a stated reason
+
+SPORE's and THORN's patches (residue of something already legally placed, and
+sliding a patch away from the hit that made it is the worse failure); every
+turret-anchored reach — PULSE at 574.6 fully bought, PRISM 300, PILE 240, WARD
+150, LANCE, and STASIS which has no spatial term at all; and every projectile.
+Those cross the wall the way rounds do, because a round is the gun's reach and
+not a summon.
+
+### The DECOY case asserts a model, not a movement
+
+At 320×568 the wall binds it (wanted 386.6 against a floor of 644.4); at
+390×844 it does not (wanted 1071.2, floor 644.4), because the turret sits 461
+units further down a longer field. A case that only checked "it moved" would be
+**vacuous on the large screen and would say so nowhere**, so the case asserts
+`bound` explicitly and requires it true on one screen and false on the other.

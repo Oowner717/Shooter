@@ -32,7 +32,7 @@ import { NODES, NODE_BY_ID, priceOf } from './tree.js';
 
 /** The turret branch, for the fitting announcements and the completion one. */
 const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
-import { SCRIPT, ON_CONTACT, ON_GLITCH, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_WALL, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
@@ -2224,6 +2224,11 @@ export class Game {
      * ever, at the only point in a run where there is nothing to see.
      */
     if (w.director && w.director.glitch > 0 && this.hintsAllowed) this.sayOnce([ON_GLITCH]);
+    // ...and the wall, the first time anything is put down under it. Keyed off
+    // the rule being CONSULTED rather than off arriving in era 2: a sentence
+    // about where your things stop is worth reading when you have just put one
+    // somewhere, and is noise before that.
+    if (w.yard && w.yard.consulted && this.hintsAllowed) this.sayOnce([ON_WALL]);
   }
 
   /**

@@ -17975,6 +17975,206 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       + `${p.gapMin} apart, frame 2 moved ${p.moved}`).join('; '));
 }
 
+// --- the wall is one-way, and the one way is theirs ------------------------
+/*
+ * P4c. The rule is ONE-WAY, so the enemy half needs no mechanism: nothing
+ * stops a body, so nothing is written, and "enemy objects pass through" is
+ * true by construction. Only the friendly half is a rule, and it is a
+ * PLACEMENT rule because of a measured fact -- of every friendly summon in the
+ * game exactly ONE is a physics body and it does not move.
+ */
+{
+  const held = page.viewportSize();
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    rows.push(await page.evaluate(async (vw) => {
+      const { CFG } = await import('../src/config.js');
+      const { throwMine } = await import('../src/mines.js');
+      const g = window.__sim;
+      const w = g.world;
+      const out = { w: vw };
+
+      const clean = (era) => {
+        g.restart();
+        // The damage-bench family leaves both of these behind; see the note on
+        // the aperture case above.
+        delete w.director.update;
+        w.spawnLock = 0;
+        w.phase = 'staging';
+        g.debugTeachAll();
+        g.debugGiveEnergy(200000);
+        if (era === 2) g.setEra(2);
+        w.director.update = () => {};
+        g.debugClearField();
+        w.mines.length = 0;
+      };
+
+      const KINDS = ['blast', 'knell', 'spall', 'thorn', 'wire', 'void', 'snare', 'lode'];
+
+      // ---- mines, at both eras -------------------------------------------
+      const mines = (era) => {
+        clean(era);
+        const a = w.yard;
+        const lands = [];
+        const peaks = [];
+        for (const k of KINDS) {
+          for (let i = 0; i < 5; i++) {
+            w.mines.length = 0;
+            throwMine(w, k);
+            const m = w.mines[w.mines.length - 1];
+            if (!m) continue;
+            lands.push(m.y1);
+            /*
+             * ...and the FLIGHT, separately, against the wall rather than
+             * against the hold. The arc lifts 120 units off its own chord, so
+             * it legitimately dips into the `clear` band -- which is what that
+             * band is for. What it must never do is cross the line itself.
+             */
+            let peak = Infinity;
+            for (let f = 0; f <= 12; f++) {
+              const e = f / 12;
+              peak = Math.min(peak, m.y0 + (m.y1 - m.y0) * e - Math.sin(e * Math.PI) * 120);
+            }
+            peaks.push(peak);
+          }
+        }
+        const deep = Math.max(1, w.floorY - 0);
+        return {
+          land: Math.min(...lands),
+          peak: Math.min(...peaks),
+          unclamped: 0 + deep * CFG.mines.keepTop,
+          hold: a ? a.hold : 0,
+          wallY: a ? a.wallY : 0,
+          consulted: a ? !!a.consulted : false,
+        };
+      };
+      out.mineTwo = mines(2);
+      out.mineOne = mines(1);
+
+      // ---- the DECOY ------------------------------------------------------
+      const decoy = (era) => {
+        clean(era);
+        const a = w.yard;
+        const i = w.abilities.slots.findIndex((x) => x.def.id === 'decoy');
+        w.abilities.clearCooldowns();
+        g.useAbility(i);
+        const d = w.decoy;
+        const wanted = w.shooter.y - CFG.decoy.ahead;
+        return {
+          y: d ? +d.y.toFixed(1) : null,
+          wanted: +wanted.toFixed(1),
+          floor: a ? +(a.hold + CFG.decoy.r).toFixed(1) : 0,
+          // whether the wall was the BINDING constraint on this screen at all
+          bound: a ? wanted < a.hold + CFG.decoy.r : false,
+        };
+      };
+      out.decoyTwo = decoy(2);
+      out.decoyOne = decoy(1);
+
+      // ---- WELL, whose chooser is allowed to point past the wall ----------
+      /*
+       * `densestPoint` is module-private in abilities.js and is left that way:
+       * pinning the only crowd on the field at a known height says where it
+       * points without an export that exists for a test. The era-1 arm is what
+       * proves the chooser really is aiming at the crowd -- there the knot
+       * lands ON it -- so the era-2 arm can attribute the move to the clamp.
+       */
+      const well = (era) => {
+        clean(era);
+        const a = w.yard;
+        const at = a ? a.mouthY + 60 : 120;
+        for (let i = 0; i < 6; i++) {
+          const e = g.debugSpawn('lurcher', w.width / 2 + (i - 3) * 18, at);
+          if (e) { e.staged = false; e.vx = 0; e.vy = 0; }
+        }
+        const i = w.abilities.slots.findIndex((x) => x.def.id === 'well');
+        w.abilities.clearCooldowns();
+        g.useAbility(i);
+        const knot = w.effects.filter((e) => e.constructor && e.constructor.name === 'Well').pop();
+        return {
+          crowd: +at.toFixed(1),
+          knot: knot ? +knot.y.toFixed(1) : null,
+          hold: a ? +a.hold.toFixed(1) : 0,
+        };
+      };
+      out.wellTwo = well(2);
+      out.wellOne = well(1);
+
+      // ---- ...and theirs goes straight through ----------------------------
+      clean(2);
+      const a = w.yard;
+      const e = g.debugSpawn('lurcher', w.width / 2, a.wallY - 120);
+      e.staged = false;
+      const track = [];
+      for (let i = 0; i < 260; i++) {
+        g.update(1 / 60);
+        if (e.dead) break;
+        track.push({ y: e.y, vy: e.vy });
+      }
+      const band = track.filter((t) => Math.abs(t.y - a.wallY) < 30);
+      out.crossed = track.length > 2 && e.y > a.wallY + 20;
+      out.backwards = band.filter((t) => t.vy < 0).length;
+      out.monotonic = band.every((t, i) => i === 0 || t.y >= band[i - 1].y - 0.001);
+
+      delete w.director.update;
+      g.setEra(1);
+      g.restart();
+      return out;
+    }, size.width));
+  }
+  await page.setViewportSize(held);
+  const [small, big] = rows;
+
+  check('nothing of yours can be put down past the wall',
+    rows.every((r) => r.mineTwo.land >= r.mineTwo.hold - 0.01
+      && r.mineTwo.peak >= r.mineTwo.wallY - 0.01
+      && r.mineTwo.unclamped < r.mineTwo.hold
+      && r.mineTwo.consulted
+      && r.mineOne.hold === 0 && r.mineOne.land < r.mineTwo.hold),
+    rows.map((r) => `${r.w}: eight kinds land no higher than `
+      + `${r.mineTwo.land.toFixed(0)} against a hold of ${r.mineTwo.hold.toFixed(0)} and fly no `
+      + `higher than ${r.mineTwo.peak.toFixed(0)} against a wall at `
+      + `${r.mineTwo.wallY.toFixed(0)} — and the unclamped band would have started at `
+      + `${r.mineTwo.unclamped.toFixed(0)}, so the clamp is what bound it; era 1 `
+      + `reaches ${r.mineOne.land.toFixed(0)}`).join('; '));
+
+  /*
+   * The DECOY is asserted through its MODEL, not through "it moved". At
+   * 320x568 the wall is the binding constraint and at 390x844 it is not --
+   * the turret sits 461 units further down a longer field -- so a case that
+   * only checked for movement would be vacuous on the large screen and would
+   * say so nowhere.
+   */
+  check('...including the one that is actually a physics body',
+    rows.every((r) => r.decoyTwo.y >= r.decoyTwo.floor - 0.01
+      && r.decoyOne.y !== null && Math.abs(r.decoyOne.y - r.decoyOne.wanted) < 0.01)
+    && small.decoyTwo.bound && !big.decoyTwo.bound,
+    rows.map((r) => `${r.w}: decoy wanted y ${r.decoyTwo.wanted}, floor `
+      + `${r.decoyTwo.floor}, stood at ${r.decoyTwo.y} (wall binding `
+      + `${r.decoyTwo.bound}); era 1 stood at ${r.decoyOne.y} against `
+      + `${r.decoyOne.wanted}`).join('; '));
+
+  check('...and a knot is refused where the crowd it was reading is not',
+    rows.every((r) => r.wellTwo.crowd < r.wellTwo.hold
+      && r.wellTwo.knot >= r.wellTwo.hold - 0.01
+      && Math.abs(r.wellOne.knot - r.wellOne.crowd) < 60),
+    rows.map((r) => `${r.w}: the crowd stood at ${r.wellTwo.crowd}, above a hold of `
+      + `${r.wellTwo.hold}, and the knot went to ${r.wellTwo.knot}; at era 1 the `
+      + `same press lands on the crowd itself (${r.wellOne.knot} vs `
+      + `${r.wellOne.crowd})`).join('; '));
+
+  /*
+   * The half no other case here can see: the moment anyone gives the wall a
+   * body, a clamp or an edge term, the one-way rule silently becomes two-way
+   * and every arm above still passes.
+   */
+  check('...and theirs goes straight through it, which is the whole point',
+    rows.every((r) => r.crossed && r.backwards === 0 && r.monotonic),
+    rows.map((r) => `${r.w}: crossed ${r.crossed}, ${r.backwards} frames of `
+      + `reversed vy in the band, monotonic ${r.monotonic}`).join('; '));
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

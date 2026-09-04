@@ -44,7 +44,7 @@ import { clamp, rgba, mixHex } from './util.js';
 export function syncYard(world, entryY) {
   if (world.era !== 2 || world.sandbox) { world.yard = null; return null; }
   const Y = CFG.yard;
-  const a = world.yard || { lit: null };
+  const a = world.yard || { lit: null, flare: 0, flareX: 0, consulted: false };
   /*
    * The mouth sits exactly ON the entry line, and that is the one placement
    * that costs nothing. `ENTRY_Y + CFG.entryDepth` is already three things: the
@@ -61,6 +61,9 @@ export function syncYard(world, entryY) {
   a.mouthHalf = Y.mouthHalf;
   a.faceHalf = Y.faceHalf;
   a.wallY = a.mouthY + Y.gap;
+  // The top of the player's ground: the wall plus a body's worth of clearance,
+  // so nothing is placed sitting ON the line it is not allowed past.
+  a.hold = a.wallY + Y.clear;
   // The mass recedes off the top of the field. It is bigger than what fits,
   // deliberately: the enemy's side does not end where the screen does.
   a.top = entryY - 260;
@@ -68,6 +71,47 @@ export function syncYard(world, entryY) {
   if (!a.lit || a.lit.length !== teeth) a.lit = new Float32Array(teeth);
   world.yard = a;
   return a;
+}
+
+/**
+ * The top of the player's ground. Literally 0 -- which is `ENTRY_Y` -- at
+ * era 1, so every caller is `Math.max(whatever it already was, 0)` there and
+ * every existing value is provably at or below the entry line already.
+ */
+export function yardHold(world) {
+  const a = world.yard;
+  if (!a) return 0;
+  a.consulted = true;
+  return a.hold;
+}
+
+/**
+ * Refuse a placement above the wall, and RECORD it at the x where it happened.
+ * Identity at era 1.
+ *
+ * ---- why the wall is three clamps and not a collider
+ *
+ * The rule is ONE-WAY, so the enemy half needs no mechanism at all: nothing
+ * stops a body, so nothing is written, and "enemy objects pass through" is true
+ * by construction -- `drive`, `physicsStep` and the routes never consult it.
+ * Only the friendly half is a rule, and it is a PLACEMENT rule because of a
+ * measured fact: of every friendly summon in the game, exactly ONE is a physics
+ * body, and it does not move. The DECOY is pushed into the broadphase with
+ * `invMass: 0`; mines fly a parametric arc in `world.mines`, projectiles live
+ * in `world.projectiles`, and Patch/Front/Ward/Well live in `world.effects` --
+ * `physics.js` can see none of them. Its only collision test is `a.r + b.r`, so
+ * a wall spanning the field would be twenty-odd circles, each a body, each a
+ * slot of `CFG.maxEnemies`, to stop one stationary decoy.
+ */
+export function holdBelow(world, x, y, pad = 0) {
+  const a = world.yard;
+  if (!a) return y;
+  a.consulted = true;
+  const floor = a.hold + pad;
+  if (y >= floor) return y;
+  a.flare = 1;
+  a.flareX = x;
+  return floor;
 }
 
 /**
@@ -128,6 +172,7 @@ export function mouthSlots(world, r, gap, count) {
 export function updateYard(world, dt) {
   const a = world.yard;
   if (!a) return;
+  if (a.flare > 0) a.flare = Math.max(0, a.flare - dt * 0.9);
   const lit = a.lit;
   const band = 26 * CFG.scale;
   const w = world.width || 1;
@@ -272,6 +317,26 @@ export function drawYard(ctx, world, mood) {
     ctx.moveTo(x - tick * 0.7, a.wallY);
     ctx.lineTo(x, a.wallY + tick);
     ctx.lineTo(x + tick * 0.7, a.wallY);
+    ctx.stroke();
+  }
+
+  /*
+   * ...and a refusal, drawn where it happened. A rule the player is told about
+   * once is a rule they forget; a rule that answers at the point of the press
+   * is one they learn. The tick points INWARD -- back toward their own ground
+   * -- against the wall's own outward chevrons, so the two read as opposites.
+   */
+  if (a.flare > 0) {
+    const f = a.flare;
+    ctx.strokeStyle = rgba(mood.accent, 0.35 + f * 0.6);
+    ctx.lineWidth = hl * (2 + f * 2.6);
+    const wide = (26 + (1 - f) * 40) * k;
+    ctx.beginPath();
+    ctx.moveTo(a.flareX - wide, a.wallY);
+    ctx.lineTo(a.flareX + wide, a.wallY);
+    ctx.moveTo(a.flareX - tick * 0.7, a.wallY + tick);
+    ctx.lineTo(a.flareX, a.wallY);
+    ctx.lineTo(a.flareX + tick * 0.7, a.wallY + tick);
     ctx.stroke();
   }
 

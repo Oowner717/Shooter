@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '243';
+export const BUILD = '244';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '243';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '07a4fce';
+export const REV = 'ae67926';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4231,7 +4231,7 @@ export function setZoom(era, sandbox) {
  * phone. `gap` is the visible depth of the enemy's side, 43.4 CSS px at both
  * of the screens the suite measures.
  */
-CFG.yard = { gap: 105, mouthHalf: 130, faceHalf: 175, tooth: 34 };
+CFG.yard = { gap: 105, mouthHalf: 130, faceHalf: 175, tooth: 34, clear: 24 };
 
 const SCALED = [
   // the field's own shape, and the speed that keeps arriving free
@@ -4255,7 +4255,7 @@ const SCALED = [
   'decoy.r', 'decoy.ahead', 'decoy.blast.r',
   'pile.r0', 'pile.r', 'ward.r', 'prism.r', 'prism.beamLen',
   // the yard, which is a picture and keeps its size on the glass
-  'yard.gap', 'yard.mouthHalf', 'yard.faceHalf', 'yard.tooth',
+  'yard.gap', 'yard.mouthHalf', 'yard.faceHalf', 'yard.tooth', 'yard.clear',
 ];
 
 function atPath(path) {
