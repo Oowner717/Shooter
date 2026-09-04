@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P6a (246) shipped. P6b+c (the radius and the fold, together) is next.**
+**Status: P1 (238) - P6 (247) shipped. P7 (balance, era 2 only) is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -336,7 +336,7 @@ thing to run if the budget allows:
 - [ ] ~~P4~~ · the yard
 - [x] P5 · the build lots (build 245)
 - [x] P6a · the plumbing and the instruments (build 246)
-- [ ] P6b+c · the radius and the fold, in one build
+- [x] P6b+c · the radius and the fold, in one build (build 247)
 - [ ] P7 · balance, era 2 only
 - [ ] P8 · the cinematic
 - [ ] P9 · the door
@@ -1127,3 +1127,84 @@ pays for it: the MK2 grows *inboard*, its envelope falling from 2.393r to about
 2.010r, which is also what keeps `s.r * 2.4`, the fuse ring's `2.35 + filled *
 0.55`, the contact cell's 2.94r and the hero card's 190 all meaning what they
 mean. Splitting them would land a red build.
+
+## 20. P6b+c, as built (build 247) — the MK2
+
+Shipped as one build, because the two halves are not independent: at r=40 with
+MK1's barrel proportions the machine reaches into a build lot, and the fold is
+what pays for the radius.
+
+### The radius is parity, and parity is exact
+
+`shooter.r` joins `SCALED`. `26 * (0.62 / 0.403) === 40` **in doubles, delta
+exactly 0** — `26 * 0.62` and `40 * 0.403` are both 16.12 CSS px. Not a chosen
+number. The machine had been shrinking as the camera pulled back (measured, a
+median drawn radius of 19.8 CSS px at era 2 against era 1's 26), and this puts
+it back; the fold is what makes it read *bigger*.
+
+`SCALED` moves the TABLE and `new Shooter` reads `CFG.shooter.r` once, with
+`reset()` never re-reading it — so `Game.resize` writes the running machine's
+radius, and `resize` is the single funnel every door goes through.
+
+### The gate is `CFG.mk2 = CFG.scale > 1`, never `world.era`
+
+One writer in `setZoom`, on the line after `CFG.scale`, so the form and the
+size come from the same expression and cannot disagree. This is not tidiness:
+both bench doors carry the era across by hand while `setZoom` pins the bench to
+era 1's scale, so `w.era === 2 && w.sandbox` is reachable — and a shape gated
+on the era would draw the MK2 at the MK1's radius in the one room a player pays
+20,000 energy for.
+
+### What folded, and why alpha was not the answer
+
+The plan said to fold three "hung-on" pieces and that everything else is
+already 0.97–0.99 alpha. **The alpha premise is half wrong**: ARRAY fills at
+0.99, the same as the hull. What makes ARRAY and SIEVE read as bolted on is
+GEOMETRY — they are seated at `R * 0.8`, *inside* a hull that reaches 1.32R,
+with absolute extents floating in half a radius of air that nothing joins. So
+the MK2 seats them on the outer plate at `R * 1.08` and sizes them off the
+machine.
+
+Alongside: the hull goes `1.0 + 0.16i` → `1.10 + 0.20i` with the per-plate
+twist cut from 0.26 to 0.08, so three separately rotated rings become one
+bevelled mass; the race recesses to `1.14 + 0.12i`; and the barrel becomes a
+siege gun — two thirds the length, more than twice the width.
+
+**Measured: the painted envelope falls from 2.404r to 2.14r.** Bigger
+absolutely (62.5 → 85.6 world units) and tighter per radius, which is exactly
+what buys the clearance: **12.88 units to the build lot, identical at 320×568
+and 390×844**.
+
+### How "MK1 is unchanged" was actually established
+
+There is no golden-image mechanism in this repo and `contact.mjs` cannot fail,
+so the claim rests on a **before/after digest taken in this container**: ten
+ledgers (bare, each of the eight sockets alone at full levels, everything),
+rendered through `drawMachine` directly with spin, heat, recoil, aim, grip,
+rigFlash, pileT, attackers, time and the hairline all pinned. **All ten
+byte-identical before and after.** Every substitution is a ternary selecting
+between two literal expressions — never a re-association, which is what moved
+the hash at build 241.
+
+In the suite the falsifiable version is different and needs no golden data:
+each era is rendered into the same cell at a scale derived from **its own
+envelope**, so size is divided out — the very self-normalising that makes
+`contact.mjs` blind here, used deliberately. Revert the fold and the two frames
+become the same picture and the case reads its own control (which must be
+exactly 0).
+
+### `reach()` and the pad, twice wrong
+
+The allowance for what a part paints outside its own geometry was a flat 1.2,
+which understated MK1 by 5% rigged and 19% bare; then a flat 3.4, which covered
+MK1 and not MK2, whose barrel is more than twice as wide. It is `MK ? R * 0.115
+: 3.4` now — MK2's ornament is proportional to the machine so its allowance is
+too. **Fitting one number to whatever the day's render measured is how a
+ceiling stops being a ceiling**; it is asserted against painted pixels at both
+eras, bare and fully rigged.
+
+One note corrected in the same commit: a draft claimed the hull had become the
+furthest thing on the MK2. It has not — the barrel still is, by about four
+units.
+
+Hash `-1765830468`, unmoved. 501 green.

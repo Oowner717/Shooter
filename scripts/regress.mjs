@@ -18495,6 +18495,149 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `outside it ${r.band.map((b) => b.heldJustOutside).join('/')}`);
 }
 
+// --- the MK2: the machine the new form stands up as -------------------------
+/*
+ * P6b+c, in one build because they are not independent: at r=40 with MK1's
+ * barrel proportions the machine reaches into a build lot, and the FOLD is
+ * what pays for the radius.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, setHairline } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    // ---- the radius is parity on the glass, and the gate follows it -------
+    const at = (fn) => { fn(); const s = w.shooter;
+      return { r: s.r, css: +(s.r * CFG.zoom).toFixed(4), mk2: !!CFG.mk2 }; };
+    g.restart();
+    out.one = at(() => {});
+    out.two = at(() => g.setEra(2));
+    w.energy = 999999; g.buy('sandbox');
+    out.bench = at(() => g.enterSandbox());
+    out.back = at(() => g.exitSandbox());
+    g.setEra(1);
+    out.home = at(() => {});
+
+    /*
+     * ---- and the two forms are DIFFERENT PICTURES, not one picture at two
+     * sizes -------------------------------------------------------------
+     *
+     * Each era is rendered into the same cell at a scale derived from its own
+     * envelope, so the size is divided out — which is precisely the flaw that
+     * makes `contact.mjs` useless as a guard here, turned into the instrument.
+     * Revert the fold and the two frames become the same picture and this
+     * fails. The control is the same era against itself, which must read 0.
+     */
+    const frame = (era) => {
+      g.restart();
+      w.energy = 500000;
+      g.debugTeachAll();
+      g.debugBuyAll();
+      g.setEra(era);
+      const s = w.shooter;
+      s.spin = 0; s.heat = 0; s.recoil = 0; s.aim = -Math.PI / 2; s.gripGlow = 0;
+      w.rigFlash = 0; w.pileT = 0; w.attackers = new Set(); w.time = 4;
+      setHairline(1);
+      const S = 200;
+      const k = (S * 0.46) / s.reach(w);
+      const c = document.createElement('canvas');
+      c.width = S; c.height = S;
+      const x = c.getContext('2d');
+      x.translate(S / 2, S / 2);
+      x.scale(k, k);
+      x.translate(-s.x, -s.y);
+      s.drawMachine(x, w, '#59e0ff', 4, false);
+      const d = x.getImageData(0, 0, S, S).data;
+      // greyscale, normalised by the frame's own 98th percentile, so a
+      // difference in brightness or in opacity cannot masquerade as a
+      // difference in shape.
+      const grey = new Float32Array(S * S);
+      for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+        grey[p] = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) * (d[i + 3] / 255);
+      }
+      const sorted = Float32Array.from(grey).sort();
+      const hi = sorted[Math.floor(sorted.length * 0.98)] || 1;
+      for (let i = 0; i < grey.length; i++) grey[i] = Math.min(1, grey[i] / hi);
+      return grey;
+    };
+    const diff = (a, b) => {
+      let s2 = 0;
+      for (let i = 0; i < a.length; i++) s2 += Math.abs(a[i] - b[i]);
+      return +((s2 / a.length) * 1000).toFixed(2);
+    };
+    const f1 = frame(1);
+    const f1b = frame(1);
+    const f2 = frame(2);
+    out.control = diff(f1, f1b);       // the same era twice: must be exactly 0
+    out.fold = diff(f1, f2);           // the fold, with the size divided out
+
+    // ---- ...and the envelope still covers what it paints, at era 2 --------
+    const paint = (era) => {
+      g.restart();
+      w.energy = 500000;
+      g.debugTeachAll();
+      g.debugBuyAll();
+      g.setEra(era);
+      const s = w.shooter;
+      s.spin = 0; s.heat = 0; s.recoil = 0; s.aim = -Math.PI / 2; s.gripGlow = 0;
+      w.rigFlash = 0; w.attackers = new Set();
+      const S = 520;
+      const c = document.createElement('canvas');
+      c.width = S; c.height = S;
+      const x = c.getContext('2d');
+      x.translate(S / 2 - s.x, S / 2 - s.y);
+      s.drawMachine(x, w, '#59e0ff', 4, false);
+      const d = x.getImageData(0, 0, S, S).data;
+      let far = 0;
+      for (let py = 0; py < S; py++) {
+        for (let px = 0; px < S; px++) {
+          if (d[(py * S + px) * 4 + 3] < 24) continue;
+          const rr = Math.hypot(px - S / 2, py - S / 2);
+          if (rr > far) far = rr;
+        }
+      }
+      return { painted: +far.toFixed(2), reach: +s.reach(w).toFixed(2),
+        ratio: +(far / s.r).toFixed(3), lot: w.yard ? +(Math.abs(w.yard.lots[0].x - s.x)
+          - w.yard.lots[0].hw).toFixed(2) : null };
+    };
+    out.p1 = paint(1);
+    out.p2 = paint(2);
+
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('the second form is the same machine at the same size on the glass',
+    r.one.r === 26 && r.two.r === 40 && r.home.r === 26 && r.back.r === 40
+    && r.bench.r === 26 && r.one.css === r.two.css
+    && r.one.mk2 === false && r.two.mk2 === true && r.bench.mk2 === false,
+    `r ${r.one.r} -> ${r.two.r}, and both draw ${r.one.css} CSS px — parity, not a `
+    + `chosen number; the bench stays at ${r.bench.r} with mk2 ${r.bench.mk2}, and `
+    + `leaving it returns ${r.back.r}; era 1 comes home at ${r.home.r}`);
+
+  /*
+   * The size divided out, which is exactly the self-normalising that makes
+   * `contact.mjs` blind here — used deliberately, so what is left is the fold
+   * and nothing else. Revert the fold and this reads its own control.
+   */
+  check('...and it is a different machine, not the same one drawn bigger',
+    r.control === 0 && r.fold > 12,
+    `the same era rendered twice differs by ${r.control} (must be exactly 0); the `
+    + `two forms, scaled to the same envelope, differ by ${r.fold}`);
+
+  check('...and it grew INBOARD, which is what buys the clearance',
+    r.p2.ratio < r.p1.ratio && r.p2.painted > r.p1.painted
+    && r.p1.reach >= r.p1.painted && r.p2.reach >= r.p2.painted
+    && r.p2.lot - r.p2.painted > 8,
+    `painted ${r.p1.painted} (${r.p1.ratio}r) at era 1 against ${r.p2.painted} `
+    + `(${r.p2.ratio}r) at era 2 — bigger absolutely, tighter per radius; the `
+    + `envelope covers it (${r.p2.reach}) and clears the build lot at `
+    + `${r.p2.lot} by ${(r.p2.lot - r.p2.painted).toFixed(2)}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

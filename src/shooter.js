@@ -1056,6 +1056,14 @@ export class Shooter {
     // immediately as the machine taking up more room than it used to.
     const R = this.r * (1 + filled * 0.34) * (1 + flash * 0.06);
     const lit = 0.55 + filled * 0.45;
+    /*
+     * The second form. Read from CFG and not from `world.era`, because the
+     * bench carries an era across its own door while pinning the SCALE -- so
+     * a shape gated on the era draws the MK2 at the MK1's radius in there.
+     * `CFG.mk2` is written by `setZoom` off the same expression as `CFG.scale`,
+     * so the form and the size cannot disagree. False at era 1 by construction.
+     */
+    const MK = !!CFG.mk2;
 
     const BODY = 'rgba(20,34,52,0.99)';
     const FACE = 'rgba(30,50,74,0.99)';
@@ -1134,7 +1142,7 @@ export class Shooter {
     if (g.slew) {
       // the race: a machined ring with teeth cut in it, one row per level
       for (let i = 0; i < g.slew; i++) {
-        const rr = R * (1.06 + i * 0.13);
+        const rr = R * (MK ? 1.14 + i * 0.12 : 1.06 + i * 0.13);
         ctx.strokeStyle = rgba('#7fa8c8', (0.5 + 0.14 * i) * lit);
         ctx.lineWidth = 2.2;
         ctx.beginPath();
@@ -1147,8 +1155,9 @@ export class Shooter {
           const a = this.spin * (i % 2 ? -0.5 : 0.5) + (k / teeth) * TAU;
           const c = Math.cos(a);
           const sn = Math.sin(a);
+          const th = MK ? R * 0.10 : 3.4;
           ctx.moveTo(c * rr, sn * rr);
-          ctx.lineTo(c * (rr + 3.4), sn * (rr + 3.4));
+          ctx.lineTo(c * (rr + th), sn * (rr + th));
         }
         ctx.stroke();
       }
@@ -1157,29 +1166,31 @@ export class Shooter {
     // ---- SPINES: the hull. Armour that makes the machine bigger -----------
     if (g.casing) {
       for (let i = 0; i < g.casing; i++) {
-        const rr = R * (1.0 + i * 0.16);
+        const rr = R * (MK ? 1.10 + i * 0.20 : 1.0 + i * 0.16);
         const last = i === g.casing - 1;
         ctx.fillStyle = i ? BODY : FACE;
         // The outermost plate carries the bright edge: the silhouette is what
         // the eye reads first and it should be the lit line, not an inner one.
         ctx.strokeStyle = rgba(last ? '#bfe6ff' : accent, (last ? 0.7 : 0.3) * lit);
         ctx.lineWidth = CFG.hairline * (last ? 2.6 : 2);
-        poly(6, rr, Math.PI / 6 + i * 0.26);
+        poly(6, rr, Math.PI / 6 + i * (MK ? 0.08 : 0.26));
         ctx.fill();
         ctx.stroke();
       }
       // chamfers: a bright short stroke on each plate's outer corner, which is
       // what makes a stack of hexagons read as bevelled metal
-      const rr = R * (1.0 + (g.casing - 1) * 0.16);
+      const rr = R * (MK ? 1.10 + (g.casing - 1) * 0.20 : 1.0 + (g.casing - 1) * 0.16);
       ctx.strokeStyle = rgba('#bfe6ff', 0.5 * lit);
       ctx.lineWidth = CFG.hairline * 1.8;
       ctx.beginPath();
       for (let k = 0; k < 6; k++) {
-        const a = (k / 6) * TAU + Math.PI / 6 + (g.casing - 1) * 0.26;
+        const a = (k / 6) * TAU + Math.PI / 6 + (g.casing - 1) * (MK ? 0.08 : 0.26);
         const c = Math.cos(a);
         const sn = Math.sin(a);
-        ctx.moveTo(c * rr * 0.86 - sn * 4, sn * rr * 0.86 + c * 4);
-        ctx.lineTo(c * rr - sn * 1, sn * rr + c * 1);
+        const ch = MK ? R * 0.115 : 4;
+        const cn = MK ? R * 0.029 : 1;
+        ctx.moveTo(c * rr * 0.86 - sn * ch, sn * rr * 0.86 + c * ch);
+        ctx.lineTo(c * rr - sn * cn, sn * rr + c * cn);
       }
       ctx.stroke();
     }
@@ -1313,19 +1324,33 @@ export class Shooter {
       const a = -Math.PI / 2 + (i ? 1 : -1) * 1.78;
       const c = Math.cos(a);
       const sn = Math.sin(a);
-      const h = 18 + i * 8;
+      /*
+       * ---- what the fold IS, in one place ----
+       *
+       * ARRAY and SIEVE read as bolted on, and it is not their alpha -- ARRAY
+       * fills at 0.99, the same as the hull. It is that they are seated at
+       * `R * 0.8`, INSIDE a hull that reaches 1.32R, with absolute extents
+       * that float in half a radius of air nothing joins. So the MK2 seats
+       * them on the outer plate's face and sizes them off the machine: a
+       * shoulder pod rooted in the hull and reaching to just under the barrel,
+       * rather than a fin hanging in a gap.
+       */
+      const h = MK ? R * (0.28 + i * 0.10) : 18 + i * 8;
+      const seat = MK ? 1.08 : 0.8;
       ctx.save();
-      ctx.translate(c * R * 0.8, sn * R * 0.8);
+      ctx.translate(c * R * seat, sn * R * seat);
       ctx.rotate(a);
-      ctx.fillStyle = 'rgba(12,26,40,0.99)';
+      ctx.fillStyle = MK ? 'rgb(12,26,40)' : 'rgba(12,26,40,0.99)';
       ctx.strokeStyle = rgba('#8fd8ff', 0.85 * lit);
       ctx.lineWidth = CFG.hairline * 1.8;
       // a blade: narrow at the mount, square at the tip
       ctx.beginPath();
-      ctx.moveTo(0, -3.5);
-      ctx.lineTo(h, -6.5);
-      ctx.lineTo(h, 6.5);
-      ctx.lineTo(0, 3.5);
+      const rt = MK ? R * 0.10 : 3.5;
+      const tp = MK ? R * 0.155 : 6.5;
+      ctx.moveTo(0, -rt);
+      ctx.lineTo(h, -tp);
+      ctx.lineTo(h, tp);
+      ctx.lineTo(0, rt);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
@@ -1359,13 +1384,15 @@ export class Shooter {
         const a = -Math.PI / 2 + (i ? 1 : -1) * 1.78;
         const c = Math.cos(a);
         const sn = Math.sin(a);
-        const h = g.aimrange > i ? 18 + i * 8 : 10;
+        const h = MK
+          ? (g.aimrange > i ? R * (0.28 + i * 0.10) : R * 0.16)
+          : (g.aimrange > i ? 18 + i * 8 : 10);
         ctx.save();
-        ctx.translate(c * R * 0.8, sn * R * 0.8);
+        ctx.translate(c * R * (MK ? 1.08 : 0.8), sn * R * (MK ? 1.08 : 0.8));
         ctx.rotate(a);
         for (let L = 0; L < layers; L++) {
-          const x = h + 2.5 + L * 3.2;
-          const span = 7.5 + L * 2.4;
+          const x = h + (MK ? R * 0.04 + L * R * 0.05 : 2.5 + L * 3.2);
+          const span = MK ? R * 0.13 + L * R * 0.03 : 7.5 + L * 2.4;
           ctx.strokeStyle = rgba('#b8f0a0', (0.9 - L * 0.2) * lit);
           ctx.lineWidth = CFG.hairline * 1.6;
           ctx.beginPath();
@@ -1375,9 +1402,11 @@ export class Shooter {
           ctx.lineWidth = CFG.hairline;
           ctx.strokeStyle = rgba('#b8f0a0', (0.6 - L * 0.15) * lit);
           ctx.beginPath();
+          const cw = MK ? R * 0.048 : 3;
+          const cp = MK ? R * 0.048 : 3;
           for (let k = -2; k <= 2; k++) {
-            ctx.moveTo(x - 3, k * 3);
-            ctx.lineTo(x, k * 3);
+            ctx.moveTo(x - cw, k * cp);
+            ctx.lineTo(x, k * cp);
           }
           ctx.stroke();
         }
@@ -1462,12 +1491,25 @@ export class Shooter {
     // Longer with a heavier feed, and longer again once it is armoured: the
     // gun has to stay the biggest thing on the machine or the machine stops
     // reading as a gun.
-    const bl = R * (1.24 + g.rate * 0.11 + g.casing * 0.08);
-    ctx.fillStyle = 'rgba(18,34,52,0.99)';
+    /*
+     * MK2 is a siege gun: a barrel two thirds the length and more than twice
+     * the width, on a hull that has grown out to meet it. That is what pays
+     * for the radius -- measured, the painted envelope falls from 2.404r to
+     * 2.14r, so a machine half again as wide clears the build lots either
+     * side of it by 12.9 units at both screen sizes.
+     *
+     * The barrel is still the furthest thing on the machine, by about four
+     * units over the hull. An earlier draft of this note claimed the hull had
+     * taken that place; it had not, and the note above is era 1's and stays
+     * true at both.
+     */
+    const bl = R * (MK ? 1.08 + g.rate * 0.06 + g.casing * 0.04
+      : 1.24 + g.rate * 0.11 + g.casing * 0.08);
+    ctx.fillStyle = MK ? 'rgb(18,34,52)' : 'rgba(18,34,52,0.99)';
     ctx.strokeStyle = rgba(accent, 0.95);
     ctx.lineWidth = 2;
-    const bw = 6.5 + g.casing * 0.9;
-    roundRectPath(ctx, R * 0.16 - recoil, -bw, bl, bw * 2, 4);
+    const bw = MK ? R * (0.19 + g.casing * 0.026) : 6.5 + g.casing * 0.9;
+    roundRectPath(ctx, R * 0.16 - recoil, -bw, bl, bw * 2, MK ? R * 0.09 : 4);
     ctx.fill();
     ctx.stroke();
     // the bore, as a line, and the heat at the muzzle end where it would be
@@ -1594,26 +1636,52 @@ export class Shooter {
      * the machine by 5% fully rigged and 19% bare -- and an envelope a
      * clearance rule leans on has to be an UPPER bound or the rule is decoration.
      */
-    const pad = 1.2;
+    const MK = !!CFG.mk2;
+    /*
+     * What a part paints OUTSIDE the geometry that defines it: half of the
+     * widest structural stroke, plus the muzzle brake's ports, which stand off
+     * the barrel's flank. A flat 1.2 covered neither -- it understated MK1 by
+     * 5% rigged and 19% bare -- and a flat 3.4 covered MK1 and not MK2, whose
+     * barrel is more than twice as wide.
+     *
+     * MK2's ornament is proportional to the machine, so its allowance is too;
+     * MK1's is absolute, so its allowance stays absolute. Fitting one number
+     * to whatever the day's render happened to measure is how a ceiling stops
+     * being a ceiling. Asserted against the painted pixels at both eras, bare
+     * and fully rigged.
+     */
+    const pad = MK ? R * 0.115 : 3.4;
     let far = R + pad;                                  // the bare hexagon
-    if (g.casing) far = Math.max(far, R * (1 + (g.casing - 1) * 0.16) + pad);
-    if (g.slew) far = Math.max(far, R * (1.06 + (g.slew - 1) * 0.13) + 3.4 + pad);
+    if (g.casing) {
+      far = Math.max(far, R * (MK ? 1.10 + (g.casing - 1) * 0.20
+        : 1 + (g.casing - 1) * 0.16) + pad);
+    }
+    if (g.slew) {
+      const rr = R * (MK ? 1.14 + (g.slew - 1) * 0.12 : 1.06 + (g.slew - 1) * 0.13);
+      far = Math.max(far, rr + (MK ? R * 0.10 : 3.4) + pad);
+    }
     /*
      * The barrel is a rounded rect laid along the aim from `R * 0.16`, so its
      * reach is the far CORNER and not the axial tip: at full rig that is 62.2
      * against an axial 61.5, and the corner is what a lot would meet first.
      */
-    const bl = R * (1.24 + g.rate * 0.11 + g.casing * 0.08);
-    const bw = 6.5 + g.casing * 0.9;
+    const bl = R * (MK ? 1.08 + g.rate * 0.06 + g.casing * 0.04
+      : 1.24 + g.rate * 0.11 + g.casing * 0.08);
+    const bw = MK ? R * (0.19 + g.casing * 0.026) : 6.5 + g.casing * 0.9;
     far = Math.max(far, Math.hypot(R * 0.16 + bl + pad, bw + pad));
     // ARRAY and SIEVE are seated at R*0.8 and reach outward in ABSOLUTE units
     // that do not scale with the machine -- which is exactly what makes them
     // read as hung on rather than built in.
     const seats = g.aimrange > 0 ? g.aimrange : 1;
+    const seat = R * (MK ? 1.08 : 0.8);
     for (let i = 0; i < seats; i++) {
-      const h = g.aimrange > i ? 18 + i * 8 : 10;
-      far = Math.max(far, R * 0.8 + h);
-      for (let L = 0; L < g.driftaim; L++) far = Math.max(far, R * 0.8 + h + 2.5 + L * 3.2);
+      const h = MK
+        ? (g.aimrange > i ? R * (0.28 + i * 0.10) : R * 0.16)
+        : (g.aimrange > i ? 18 + i * 8 : 10);
+      far = Math.max(far, seat + h + pad);
+      for (let L = 0; L < g.driftaim; L++) {
+        far = Math.max(far, seat + h + (MK ? R * 0.04 + L * R * 0.05 : 2.5 + L * 3.2) + pad);
+      }
     }
     return far;
   }

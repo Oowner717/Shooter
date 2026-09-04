@@ -1191,6 +1191,14 @@ export class Game {
     world.floorY = (sh - (safeBottom + barH + 22)) / z;
     world.shooter.x = world.width / 2;
     world.shooter.y = this.shooterY;
+    /*
+     * `new Shooter` reads `CFG.shooter.r` once and `reset()` never re-reads
+     * it, so putting the radius in SCALED moves the table and leaves the
+     * running machine where it was. `resize()` is the single funnel every door
+     * goes through -- boot, `setEra`, both bench doors, the governor and the
+     * stale-scale guard in `reset` -- and it has already called `setZoom`.
+     */
+    world.shooter.r = CFG.shooter.r;
     // The yard is a function of the era and the screen and is stored nowhere,
     // so a rotation re-derives it and a reload cannot strand a stale one. THE
     // ONE WRITER.

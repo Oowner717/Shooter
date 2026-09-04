@@ -17,7 +17,7 @@ const ARM_BY_KEY = new Map(ARSENAL.map((a) => [a.key === 'standard' ? 'bolt' : a
 import { ABILITIES } from './abilities.js';
 import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
-import { BUILD, REV } from './config.js';
+import { CFG, BUILD, REV } from './config.js';
 import { swipeToDismiss, swipeTabs } from './swipe.js';
 import { lastSession, lifetime } from './sandbox.js';
 import { TREE, NODES, priceOf } from './tree.js';
@@ -980,8 +980,11 @@ export class Menu {
     // left for the fraction than the drawing needs.
     const t = (now % 600000) / 1000;
     // Big enough to read the parts on. The machine grows with the rig, so the
-    // scale is against the finished radius rather than the current one.
-    const k = (h / dpr / 190) * dpr;
+    // scale is against the finished radius rather than the current one -- and
+    // 190 is a span in WORLD units, so it follows the field: left bare, an
+    // era-2 machine needs 80 units of room below the mount against 72 the card
+    // would give it, and clips with nothing to report it.
+    const k = (h / dpr / (190 * CFG.scale)) * dpr;
     ctx.save();
     ctx.translate(w / 2, h * 0.62);
     ctx.scale(k, k);

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '246';
+export const BUILD = '247';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '246';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '8bbac6c';
+export const REV = '9cf37a3';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4222,6 +4222,15 @@ export function setZoom(era, sandbox) {
    * is four chances to miss one, and this is none.
    */
   CFG.scale = CFG.ZOOMS[1] / CFG.zoom;
+  /*
+   * ...and whether the machine wears its second form. Derived from the SAME
+   * expression that makes era 1 a no-op, and never from `world.era`: both
+   * bench doors carry the era across by hand, so `w.era === 2 && w.sandbox`
+   * is a reachable state, and a shape gated on the era would draw the MK2 at
+   * the MK1's radius in the one room a player pays 20,000 energy for. One
+   * source, so the form and the size cannot disagree.
+   */
+  CFG.mk2 = CFG.scale > 1;
   for (const path of SCALED) setPath(path, BASE[path], CFG.scale);
 }
 
@@ -4276,9 +4285,18 @@ const SCALED = [
   // the field's own shape, and the speed that keeps arriving free
   'entryDepth', 'entrySpeed',
   // the machine: where it stands, how far it sees, what it is held by
-  'shooter.standoff', 'shooter.aimRange', 'shooter.gripLen', 'shooter.gripR',
-  // NOTE: `shooter.grabPad` and `shooter.releasePad` are deliberately NOT
-  // here. See the note beside them in the shooter block.
+  'shooter.r', 'shooter.standoff', 'shooter.aimRange', 'shooter.gripLen', 'shooter.gripR',
+  /*
+   * `shooter.r` is here from build 247, and the value it lands on is not a
+   * choice: `26 * (0.62 / 0.403)` is EXACTLY 40 in doubles, because
+   * `26 * 0.62` and `40 * 0.403` are both 16.12 CSS px. The machine had been
+   * shrinking as the camera pulled back -- measured, a median drawn radius of
+   * 19.8 CSS px at era 2 against era 1's 26, the camera ratio precisely -- so
+   * this is parity on the glass, and the FOLD is what makes it read bigger.
+   *
+   * NOTE: `shooter.grabPad` and `shooter.releasePad` are deliberately NOT
+   * here. See the note beside them in the shooter block.
+   */
   // the intake, which is a travel-time problem and nothing else
   'energy.pull', 'energy.pulse', 'drop.speed', 'drop.accel',
   // the thumb, which covers the same disc of GLASS whatever the scale
