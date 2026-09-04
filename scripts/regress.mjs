@@ -17527,6 +17527,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       }
       return rows;
     };
+    // The exact product `drive` used to form, to the BIT -- not to two places.
+    // Anything else here is a re-association, and a re-association is a change.
+    out.bitwise = ROUTES.every((rt) => [900, 400, 260].every((D) => {
+      const k = CFG.scale;
+      const reach = Math.min(Math.max(D / (520 * k), 0), 1) ** rt.commit;
+      const closing = Math.min(Math.max((D - 170 * k) / (210 * k), 0), 1);
+      return routeLateral(rt, D, 0.83, -1)
+        === rt.width * k * 0.83 * -1 * reach * closing;
+    }));
     out.arcOne = arc(1);
     out.arcTwo = arc(2);
     out.arcHeld = JSON.stringify(out.arcOne) === JSON.stringify(out.arcTwo);
@@ -17573,10 +17582,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return out;
   });
 
+  /*
+   * ...and the era-1 product is formed in the ORDER `drive` formed it before
+   * the helper existed. Floating-point multiplication is not associative, and
+   * the first version of `routeLateral` applied the body's own two factors to
+   * the ANSWER instead of taking them in -- which is the same value in exact
+   * arithmetic, a different one in the last bit, and it moved ORDINAL's hash
+   * on a build whose whole claim was that era 1 could not change.
+   */
   check('an approach keeps its shape on the glass at either scale',
-    r.arcHeld && r.arcLive,
+    r.arcHeld && r.arcLive && r.bitwise,
     `SWEEP holds ${JSON.stringify(r.arcOne.sweep)} CSS px at era 1 against `
-    + `${JSON.stringify(r.arcTwo.sweep)} at era 2; the curve is live ${r.arcLive}`);
+    + `${JSON.stringify(r.arcTwo.sweep)} at era 2; the curve is live ${r.arcLive}, `
+    + `and the product is formed in drive's own order ${r.bitwise}`);
 
   check('...and so does the substrate, which has no config entry to scale',
     r.latHeld && r.latEraOne,
@@ -17811,6 +17829,150 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     && JSON.stringify(r.twoDrone) === '[33,420,0.045]',
     `era 1 ${JSON.stringify(r.oneDrone)}, a new run ${JSON.stringify(r.restartDrone)}, `
     + `era 2 ${JSON.stringify(r.twoDrone)}`);
+}
+
+// --- the aperture: everything comes out of the building ---------------------
+/*
+ * P4b. Three doors reach the field in a run -- the director's single release,
+ * its formation release, and the ambient drift -- and at era 2 all three go
+ * through the mouth. Splits, blooms and seeded hosts are exempt by decision:
+ * they come off a parent already standing on the field, so the case counts a
+ * birth only ABOVE the door and says so.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { spawnFormation } = await import('../src/enemies.js');
+    const g = window.__sim;
+    const w = g.world;
+
+    // Walk the three doors for a while and record where each body was BORN,
+    // sampled before physics has had a frame to move it.
+    const run = (era, secs) => {
+      g.restart();
+      /*
+       * ---- put the director back, and unlock spawning -------------------
+       *
+       * Eighteen cases in the damage-bench family write
+       * `w.director.update = () => {}` and pin `w.spawnLock = 1e9`, and NONE
+       * of them puts either back. `reset()` keeps the same Director object, so
+       * both outlive every restart after them -- this is the first case in the
+       * suite since that family to actually need a wave, and it measured zero
+       * releases in forty seconds at both eras while passing in isolation.
+       * `restart()` is not a reset of everything a case can leave behind; set
+       * what the question depends on.
+       */
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(60000);
+      if (era === 2) g.setEra(2);
+      w.director.setTier(8);
+      const seen = new Set();
+      const born = [];
+      const sample = () => {
+        for (const e of w.enemies) {
+          if (seen.has(e)) continue;
+          seen.add(e);
+          born.push({ x: e.x, y: e.y, r: e.r, id: e.type.id });
+        }
+      };
+      sample();
+      for (let i = 0; i < 60 * secs; i++) { g.update(1 / 60); sample(); }
+      return born;
+    };
+
+    const out = {};
+    const two = run(2, 40);
+    const a = w.yard;
+    out.mouth = { x: +a.mouthX.toFixed(1), half: +a.mouthHalf.toFixed(1), y: +a.mouthY.toFixed(1) };
+    // Only births above the door: anything born below it came off a parent.
+    const doors = two.filter((b) => b.y < a.mouthY);
+    out.twoTotal = two.length;
+    out.twoDoors = doors.length;
+    // The towed MASS rides its head out with a `spread(30)` of its own, which
+    // is a deliberate exemption and is why the bound carries it.
+    out.twoWorst = doors.length
+      ? +Math.max(...doors.map((b) => Math.abs(b.x - a.mouthX) - a.mouthHalf - 40 - b.r)).toFixed(1)
+      : 999;
+    out.twoKinds = [...new Set(doors.map((b) => b.id))].length;
+    out.sawDrift = doors.some((b) => b.id === 'drift');
+
+    /*
+     * ...and the same probe at era 1, which is the arm without which the one
+     * above passes on a build where the director released nothing. A zero
+     * means nothing until the instrument has been shown to read a one.
+     */
+    g.setEra(1);
+    const one = run(1, 40);
+    out.oneTotal = one.length;
+    const xs = one.map((b) => b.x);
+    out.oneSpan = xs.length ? +((Math.max(...xs) - Math.min(...xs)) / w.width).toFixed(2) : 0;
+    out.oneAbove = one.some((b) => b.y < 0);
+
+    /*
+     * A formation has to come out of the door WITHOUT landing on itself. The
+     * authored shapes are era 1's and an open sky is what they are for: at the
+     * population ceiling BLOOM x12's `line` spans 995 world units against a
+     * 968-wide field, so no door passes it with its spacing intact. Rows are
+     * the only layout that both fits and keeps its clearance -- and frame 2 is
+     * where a clamped one gives itself away, because the pair solver blows a
+     * stack apart the moment it runs.
+     */
+    g.restart();
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.phase = 'staging';
+    g.debugTeachAll();
+    g.setEra(2);
+    const packs = [['bloom', 12], ['bulwark', 8], ['mote', 20], ['scion', 8]];
+    const rows = [];
+    for (const [id, n] of packs) {
+      const t = TYPE_BY_ID[id];
+      w.enemies.length = 0;
+      w.director.update = () => {};
+      const made = spawnFormation(w, [t], n);
+      const yd = w.yard;
+      const outside = made.filter((e) => Math.abs(e.x - yd.mouthX) > yd.mouthHalf + 2).length;
+      let closest = Infinity;
+      for (let i = 0; i < made.length; i++) {
+        for (let j = i + 1; j < made.length; j++) {
+          if (Math.abs(made[i].y - made[j].y) > 1) continue;
+          closest = Math.min(closest, Math.hypot(made[i].x - made[j].x, made[i].y - made[j].y)
+            - (made[i].r + made[j].r));
+        }
+      }
+      const before = made.map((e) => e.x);
+      for (let i = 0; i < 2; i++) g.update(1 / 60);
+      const moved = Math.max(...made.map((e, i) => Math.abs(e.x - before[i])));
+      rows.push({ id, n: made.length, outside, gapMin: +(closest === Infinity ? 99 : closest).toFixed(1),
+        moved: +moved.toFixed(2) });
+    }
+    out.packs = rows;
+    // ...and put the director back, or every case after this one starves.
+    delete w.director.update;
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('everything a wave sends comes out of the building',
+    r.twoDoors > 20 && r.twoKinds >= 2 && r.sawDrift && r.twoWorst <= 0,
+    `${r.twoDoors} of ${r.twoTotal} births were at the door (${r.twoKinds} kinds, `
+    + `drift among them ${r.sawDrift}); the worst overshot the door by `
+    + `${r.twoWorst > 0 ? r.twoWorst : 0} units`);
+
+  check('...and the same probe reads a one at era 1, where nothing is routed',
+    r.oneTotal >= 15 && r.oneSpan > 0.6 && r.oneAbove,
+    `era 1 put ${r.oneTotal} bodies across ${(r.oneSpan * 100).toFixed(0)}% of the `
+    + `field width, from above the entry line ${r.oneAbove} — without this arm the `
+    + `case above passes on a build that released nothing`);
+
+  check('...and a formation fits through it without landing on itself',
+    r.packs.every((p) => p.outside === 0 && p.gapMin >= 7 && p.moved < 6),
+    r.packs.map((p) => `${p.id}x${p.n}: ${p.outside} outside, closest pair `
+      + `${p.gapMin} apart, frame 2 moved ${p.moved}`).join('; '));
 }
 
 // --- report -----------------------------------------------------------------

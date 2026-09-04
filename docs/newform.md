@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238), P2 (239), P3a (240), P3b (241), P4a (242) shipped. P4b is next.**
+**Status: P1 (238), P2 (239), P3a (240), P3b (241), P4a (242), P4b (243) shipped. P4c is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -331,7 +331,7 @@ thing to run if the budget allows:
 - [x] P3a · the scale, and the reach that makes era 2 playable — **build 240**
 - [x] P3b · the rest of the sweep: the use-site literals (build 241)
 - [x] P4a · the yard and the sky (build 242)
-- [ ] P4b · the aperture
+- [x] P4b · the aperture (build 243)
 - [ ] P4c · the wall's one-way rule
 - [ ] ~~P4~~ · the yard
 - [ ] P5 · the build lots
@@ -858,3 +858,63 @@ must leave a working game.
 - **`lull`, `breach` and `ending` are dead moods** — nothing in `src/` or
   `scripts/` passes any of them to `setMood`. Left alone: `breach` is authored
   for exactly the cinematic's act I. P8 or P10.
+
+## 16. P4b, as built (build 243) — and the hash is not what it says it is
+
+The aperture: `throughMouth` and `mouthSlots` in `yard.js`, and the three doors
+that reach the field in a run — the director's single release, its formation
+release, and the ambient drift. Splits, blooms and seeded hosts are exempt by
+decision: they come off a parent already standing on the field, and the case
+counts a birth only *above* the door and says so. `spawnGroup` is the debug
+door and passes `here: true`.
+
+**The y is untouched, and that was free.** A released body is `staged` from -50
+down to `ENTRY_Y + entryDepth`, which *is* the mouth — and the interface covers
+the field to within 36 CSS px of it. So the only part of the march anyone sees
+is the last stretch, inside the doorway, drawn over the throat. The chrome does
+the occlusion; no draw-order change, no spawn-y change.
+
+**Drift needed the opposite treatment**, because it is the one thing that is
+not `staged`: it appears exactly where it is put, so left alone it would have
+gone on arriving from the top of the field while everything else walked out of
+the door — the one case the requirement names by name. It is laid inside the
+throat, keeping its caller's stagger as an offset.
+
+**Formations arrive as rows through the door, and that is arithmetic.** At the
+population ceiling the widest authored job is BLOOM ×12, whose `line` spans 995
+world units against a 968-wide field. Clamping stacks bodies on the door edges
+and the pair solver blows them apart on the next frame; scaling the offsets
+crushes `gap` — the thing that exists to stop overlap — to a seventh of what
+the body needs. The case measures **frame 2**, which is where a clamped layout
+gives itself away.
+
+### The two things this build found, neither of them in its own diff
+
+**1. `fight.mjs`'s hash is a differential instrument and `1796395127` is not
+reproducible.** Run on build **211 itself** — the build whose commit baselined
+it — this container returns **`-1510979434`**. A number that cannot be
+reproduced on its own build is not a property of the code. The probe runs
+through `**`, `sin`, `cos`, `atan2`, `hypot` and `exp`, none of which IEEE-754
+pins, so the hash is a property of the code *and the container*, and every
+cross-session comparison against a written-down value is unsound. Measured
+here: 211 → `-1510979434`; 229, 230, 233, 237, 238, 240 → `-1765830468`.
+CLAUDE.md is rewritten to say take your own before-run in the session you are
+working in, record the delta and its cause, and stop re-baselining.
+
+**2. Build 241's P3b regression, which that discipline caught.** Extracting
+`routeLateral` re-associated a floating-point product — `width * routeScale *
+routeSide * reach * closing` became `(width * k * reach * closing) *
+routeScale * routeSide` — the same value in exact arithmetic, a different one
+in the last bit, compounding over 9000 frames, on the build whose entire claim
+was that era 1 could not change. The two factors are passed in now so the
+era-1 product is `drive`'s original order to the bit; `regress.mjs` asserts it
+with `===` rather than to two decimal places, and the hash returned to
+`-1765830468`. **A refactor that only reorders arithmetic is still a change.**
+
+**3. The suite has been starving its own later cases.** Eighteen cases in the
+damage-bench family write `w.director.update = () => {}` and `w.spawnLock =
+1e9` and put neither back; `reset()` keeps the same Director object, so both
+outlive every restart after them. This aperture case is the first since that
+family to need a wave, and it measured **zero releases in forty seconds at
+both eras** while passing in isolation. It sets both explicitly. Fixing the
+eighteen is a separate pass and is recorded in CLAUDE.md.

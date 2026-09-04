@@ -71,6 +71,55 @@ export function syncYard(world, entryY) {
 }
 
 /**
+ * Map a field-wide x into the door. Identity at era 1.
+ *
+ * Load-bearing: it draws NO random on either branch, so era 1 keeps not merely
+ * its values but its exact `Math.random` call ORDER -- which is what ORDINAL's
+ * canonical hash mixes, and what a reordered roll would silently re-baseline.
+ */
+export function throughMouth(world, x, r) {
+  const a = world.yard;
+  if (!a) return x;
+  const half = Math.max(8, a.mouthHalf - r - 4);
+  const k = half / (world.width / 2);
+  return clamp(a.mouthX + (x - world.width / 2) * k, a.mouthX - half, a.mouthX + half);
+}
+
+/**
+ * Where a formation's bodies stand so the WHOLE of it comes out of the door:
+ * rows across the mouth, stacked upward, centred on it. Absolute x, relative y.
+ * Null at era 1, where `formationOffset`'s six shapes keep the sky they were
+ * authored for.
+ *
+ * Rows rather than the authored shapes, and that is arithmetic rather than
+ * taste. At the population ceiling the widest authored job is BLOOM x12, whose
+ * `line` spans 995 world units against a 968-wide field -- no door can pass
+ * that with its spacing intact. Clamping the offsets stacks bodies on the two
+ * door edges and the pair solver blows them apart on the next frame; scaling
+ * them crushes `gap`, which is the thing that exists to stop overlap, to a
+ * seventh of what the body needs. `pitch` is `2r + 8`, so overlap is
+ * impossible by construction.
+ *
+ * It also SHORTENS the worst spawn column rather than lengthening it: three
+ * rows of BULWARK reach 331 units above the door where the authored `column`
+ * of eight reaches 903.
+ */
+export function mouthSlots(world, r, gap, count) {
+  const a = world.yard;
+  if (!a) return null;
+  const half = Math.max(8, a.mouthHalf - r - 4);
+  const pitch = r * 2 + 8;
+  const per = Math.max(1, Math.floor((half * 2) / pitch));
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const row = Math.floor(i / per);
+    const n = Math.min(per, count - row * per);
+    out.push([a.mouthX + ((i % per) - (n - 1) / 2) * pitch, -row * gap]);
+  }
+  return out;
+}
+
+/**
  * The wall lights where something crosses it, for the whole run -- so the rule
  * is restated by every arrival rather than by one caption at the start.
  *

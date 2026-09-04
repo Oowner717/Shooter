@@ -114,7 +114,48 @@ cannot tell a stage that is long because the boss is tough from one that is
 long because the turret spent it on minions -- DYNAMO's third stage was 46% of
 a 324-second fight and two thirds of it was IONs.
 
-**ORDINAL's canonical hash is `1796395127`** (seed 20260824, 9000 frames),
+**ORDINAL's hash is a DIFFERENTIAL instrument, not a canonical number, and the
+absolute value below is not reproducible.** Build 243 ran `fight.mjs --seed
+20260824 --hash 9000` on build **211 itself** -- the build whose own commit
+baselined `1796395127` -- and got **`-1510979434`**. The number cannot be
+reproduced on the build it was taken on, so it is not a property of the code:
+it is a property of the code *and the container*. The probe's arithmetic runs
+through `**`, `Math.sin`, `Math.cos`, `Math.atan2`, `Math.hypot` and
+`Math.exp`, none of which IEEE-754 pins to the bit, and V8 changes them between
+versions.
+
+So **every cross-container comparison against a written-down hash is unsound**,
+including the "run it on any build that touches energy" rule as it was
+practised: a fresh container reports a move that is not there, and cannot
+report one that is. Measured in this container, builds 229 through 240 all give
+`-1765830468` and build 211 gives `-1510979434`; the eighteen builds between
+them include the 229 rebalance, three mine passes and the whole ledger, so the
+"one number, carried forward" reading of the history below is fiction.
+
+**How to use it now: take the before yourself, in the session you are working
+in.** Run the hash on `HEAD` before your change and again after it, in the same
+container. A move you did not intend is still the bug it was always there to
+catch -- that is how build 241's regression below was found -- but the
+reference is the run you just took, never a number from a previous session.
+Re-baselining is therefore meaningless and should stop; record the DELTA and
+its cause instead.
+
+**Build 241 moved it and the cause was arithmetic, not behaviour.** Extracting
+`routeLateral` out of `drive` re-associated a product: `width * routeScale *
+routeSide * reach * closing` became `(width * k * reach * closing) *
+routeScale * routeSide`, which is the same value in exact arithmetic and a
+different one in the last bit, compounding over 9000 frames -- on the one build
+whose entire claim was that era 1 could not change. The two factors are passed
+INTO the helper now so the era-1 product is formed in `drive`'s original order
+to the bit, `regress.mjs` asserts that with `===` rather than to two decimal
+places, and the hash came back to `-1765830468`. **A refactor that only reorders
+arithmetic is still a change**, and "to two places" cannot see it.
+
+The history below is kept because each entry names a real change and its reason,
+which is still worth reading; the numbers in it are not comparable to anything
+you will measure. The old baseline text follows.
+
+**ORDINAL's canonical hash was recorded as `1796395127`** (seed 20260824, 9000 frames),
 re-baselined at build 211's fix pass, which moved both of `integrate`'s
 ceilings above the step they exist to bound. A cap applied after `x += vx * dt`
 does not cap that step, so bodies had been committing the frame the excess
@@ -312,6 +353,18 @@ shot has to honour it, including the assist's hysteresis, which kept a lock on
 a spent body for eighteen percent of TERMINUS's outro because it tested `dead`,
 `staged` and `harmless` and nothing else.
 Add a case to it whenever something ships broken — that is the whole rule.
+
+**Eighteen cases in the damage-bench family leave the director stubbed and
+`spawnLock` pinned, and nothing puts either back.** They write
+`w.director.update = () => {}` and `w.spawnLock = 1e9` (the first is from
+regress.mjs's own line ~13908 onward), and `reset()` keeps the same Director
+object, so both outlive every restart after them. The earlier cases that do
+this all save and restore; this family does not. Build 243's aperture case was
+the first since to actually need a wave and measured **zero releases in forty
+seconds at both eras** while passing in isolation. It sets both explicitly now.
+Until the family is fixed, **any new case downstream of it that needs the
+director must `delete w.director.update` and clear `spawnLock` itself** —
+`restart()` is not a reset of everything a case can leave behind.
 
 Before build 101 this section pointed at a session scratchpad. There were 243
 probe scripts in it behind a hand-kept runner list; 21 of the 43 the list named

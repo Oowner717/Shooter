@@ -11,6 +11,7 @@ import { shed } from './debris.js';
 import { contactAt } from './physics.js';
 import { ledger } from './ledger.js';
 import { drawDummy, dummyHit } from './dummy.js';
+import { throughMouth, mouthSlots } from './yard.js';
 
 /**
  * The top of the visible field, in world units. Objects are queued above it
@@ -817,7 +818,7 @@ export class Enemy {
        * whatever the route. An arc is how a thing arrives; it is not how it
        * spends the endgame.
        */
-      let lateral = routeLateral(r, d) * this.routeScale * this.routeSide;
+      let lateral = routeLateral(r, d, this.routeScale, this.routeSide);
       if (r.weave) lateral *= Math.sin(t * r.weave + this.phase);
       tx += -dy * lateral;
       ty += dx * lateral;
@@ -3409,11 +3410,22 @@ function formationOffset(shape, i, count, gap) {
  *
  * `CFG.scale` is 1 at era 1, so this is the arithmetic it always was there.
  */
-export function routeLateral(r, d) {
+export function routeLateral(r, d, routeScale = 1, routeSide = 1) {
   const k = CFG.scale;
   const reach = clamp(d / (520 * k), 0, 1) ** r.commit;
   const closing = clamp((d - 170 * k) / (210 * k), 0, 1);
-  return r.width * k * reach * closing;
+  /*
+   * The body's own two factors are passed IN rather than applied to the
+   * answer, and the order of this product is not free. Floating-point
+   * multiplication is not associative, so pulling this out of `drive` as
+   * `routeLateral(r, d) * routeScale * routeSide` re-associated it and moved
+   * every body by a bit a frame -- which compounds, and moved ORDINAL's
+   * canonical hash on a build whose whole claim was that era 1 could not
+   * change. `k` is exactly 1 there and `width * 1` is exact, so written this
+   * way the era-1 product is the one `drive` formed before build 241, to the
+   * bit. A refactor that only reorders arithmetic is still a change.
+   */
+  return r.width * k * routeScale * routeSide * reach * closing;
 }
 
 /** A formation queued above the screen, marching down into it. */
@@ -3427,11 +3439,19 @@ export function spawnFormation(world, kinds, count) {
   const single = kinds.filter((k) => !k.tows);
   const type = weightedPick(single.length ? single : kinds);
   const gap = type.r * 2.5 + 8;
+  /*
+   * Rolled HERE and not one line earlier. `cx` above is drawn before the type
+   * is picked, so hoisting `weightedPick` above the `spread` -- or the spread
+   * below it -- swaps two `Math.random` calls at era 1 and re-baselines
+   * ORDINAL for a change that is supposed to be a no-op there. `mouthSlots`
+   * draws nothing and is null at era 1.
+   */
+  const slots = mouthSlots(world, type.r, gap, count);
   const made = [];
 
   for (let i = 0; i < count; i++) {
-    const [ox, oy] = formationOffset(shape, i, count, gap);
-    const x = clamp(cx + ox, type.r + 4, world.width - type.r - 4);
+    const [ox, oy] = slots ? slots[i] : formationOffset(shape, i, count, gap);
+    const x = slots ? ox : clamp(cx + ox, type.r + 4, world.width - type.r - 4);
     const y = -60 + oy - rand(0, 30);
     /*
      * release(), not spawnOne(). The line above drops towed types when there
@@ -3491,7 +3511,7 @@ export function spawnGroup(world, id, count, opts = {}) {
       : cy + oy - rand(0, 30);
     // Drift is not released, it is let go: it has its own entry velocities and
     // is not counted against anything.
-    if (type.harmless) { made.push(spawnDrift(world, { x, y })); continue; }
+    if (type.harmless) { made.push(spawnDrift(world, { x, y, here: true })); continue; }
     made.push(...release(world, type, x, y, {
       staged: !onField,
       spawnIn: onField ? 0.25 : 1,
@@ -3504,9 +3524,27 @@ export function spawnGroup(world, id, count, opts = {}) {
 /** Loose, aimless matter that comes down with everything else. */
 export function spawnDrift(world, opts = {}) {
   const type = TYPE_BY_ID.drift;
-  const x = opts.x ?? clamp(world.width / 2 + spread(world.width * 0.8),
+  // The two `??` lines stay exactly where they are: the caller at the ambient
+  // site rolls its own stagger before this runs, and moving either roll swaps
+  // the draw order at era 1.
+  let x = opts.x ?? clamp(world.width / 2 + spread(world.width * 0.8),
     type.r + 6, world.width - type.r - 6);
-  const y = opts.y ?? ENTRY_Y + rand(10, 40);
+  let y = opts.y ?? ENTRY_Y + rand(10, 40);
+  /*
+   * Drift is not `staged`, so unlike everything else it has no march to hide
+   * behind the interface -- it appears exactly where it is put. Left alone at
+   * era 2 it would go on arriving from the top of the field while every other
+   * object walked out of the door, which is the one thing the requirement
+   * names by name. It is laid inside the THROAT instead, keeping whatever
+   * stagger its caller asked for as an offset and clamped to the depth of the
+   * opening. `here` is the escape for a caller placing something deliberately.
+   */
+  const a = opts.here ? null : world.yard;
+  if (a) {
+    x = throughMouth(world, x, type.r);
+    y = clamp(a.mouthY - 30 * CFG.scale - (ENTRY_Y + 40 - y),
+      a.mouthY - 88 * CFG.scale, a.mouthY - 12 * CFG.scale);
+  }
   const e = new Enemy(type, x, y, { staged: false, spawnIn: 1, vx: spread(30), vy: rand(10, 50) });
   world.enemies.push(e);
   return e;
@@ -4714,6 +4752,18 @@ export class Director {
     // Two SCIONs arriving on top of each other seed the same host twice and
     // read as one event rather than two decisions.
     if (t.id === 'scion') x = scionLane(world, t, x);
+    /*
+     * ...and at era 2 everything comes out of the building. Applied to the
+     * ANSWER rather than replacing the roll, so era 1 draws exactly the
+     * randoms it always did, in the order it always did.
+     *
+     * The y is deliberately untouched. A released body is `staged` from -50
+     * down to `ENTRY_Y + entryDepth`, which IS the mouth -- and the interface
+     * covers the field to within 36 CSS px of it, so the only part of that
+     * march anyone sees is the last stretch, inside the doorway, drawn over
+     * the throat. The chrome does the occlusion for free.
+     */
+    x = throughMouth(world, x, t.r);
     release(world, t, x, -50 - rand(0, 40));
     this.lastRelease = world.time || 0;
   }
