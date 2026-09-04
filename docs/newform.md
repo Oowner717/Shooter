@@ -1,0 +1,338 @@
+# NEW FORM / NEW FIELD — the build plan
+
+**Status: planned, not started. No game code has been written for this.**
+
+This file is the resumption mechanism. A session picking this up with no memory of the
+conversation that produced it should be able to read this and know exactly what was
+decided, what was checked, and what to do next.
+
+## How this plan was made, and how far the review got
+
+- **Six read-only audits** ran over the subsystems the change touches: the camera and
+  every absolute distance, the spawn path, the turret, progression and persistence,
+  the HUD furniture, and the existing set pieces. Their findings are folded in below
+  and several of them changed the design.
+- **One adversarial review** of five agents attacked the result — resumability, blast
+  radius, the house rules in CLAUDE.md, the player's experience, and a completeness
+  pass. **It found four load-bearing claims in the first draft to be false.** Those
+  are corrected here; the draft is not preserved.
+- **A second adversarial review was started and stopped** before any agent finished,
+  on the user's instruction. So this plan has had one round of attack, not two. The
+  lenses that did not get to run were: refute round one, cost each phase against the
+  50-minute budget, play-test era 2 on paper, force the soft decisions, and attack the
+  proposed cases as instruments. **Section 7 records what it was going to ask**, and
+  those questions are still open.
+
+## Verified by hand, not by an agent
+
+Two structural decisions were checked directly against source and both came back
+stronger than the plan claimed:
+
+**The cinematic as a `world.phase` is a bigger win than "it stops the autosave".**
+`world.phase` has 25 readers and only two values today; the dominant test is
+`!== 'staging'`, which fails CLOSED. A third value makes every one of them do the
+right thing unprompted — `Director.update` douses (`enemies.js:4501`), `openBoss`
+refuses (`game.js:2006`), `syncGate` returns (`game.js:2045`), teaching stops
+(`game.js:1558`), the story narrator stops advancing (`game.js:2328`), `openSheet`
+refuses (`game.js:919`), the testbed door disables (`menu.js:387,417`), and
+`SAVABLE` excludes the checkpoint. `Game.update` gates on `paused`, not `phase`, so
+the cinematic's own clock still runs.
+
+**`Director.glitchOut` really does shed nothing.** `fizzle` counts down to
+`dead = true` (`enemies.js:896`) and never calls `destroy()`, and `destroy()`'s own
+first guard (`enemies.js:1385`) refuses to cash in a fizzling body. Two refinements
+the plan did not have:
+
+- `glitchOut` **skips DRIFT** (`enemies.js:3758`) and walks `world.enemies` alone, so
+  the six other list clears are genuinely needed on top.
+- `fizzle` takes TIME — bodies fade rather than vanish. That is the show in act I of
+  the cinematic and it is wrong for a debug era switch, where they should just be
+  gone. **`setEra` needs both modes**, which no version of the plan has said.
+
+---
+
+# NEW FORM / NEW FIELD — build plan (revision 3)
+
+Consolidated. Revisions 1 and 2 were a plan and a list of corrections to it; this is
+the plan as it now stands, with the corrections folded in and the changelog dropped.
+
+---
+
+## 1. THE REQUEST, AND WHAT THE USER HAS RULED
+
+A NEW FORM upgrade, unlocked by seven bosses AND a complete turret branch; bought;
+then a banner; then a cinematic evolution into a larger, opaque turret; then a
+permanently wider field with an enemy building, a wall, and six empty build lots.
++30% base damage. Ranges rescaled. Debug switching between forms/views, locked
+together. Field changes clear everything and release no energy.
+
+| ruling | |
+|---|---|
+| field scale | **×0.65**. `CFG.zoom` 0.62 → 0.403. Reach ×1.538. 390×844 goes 1361 → **2094** units deep, 629 → **968** wide. |
+| the node | The existing **RECAST**, repriced to **energy + seven REMAINDERs**. |
+| enemy speeds | **Do not scale.** Only turret-owned variables change. Faster enemies come later. |
+| the testbed | **Not touched.** Era-1 zoom whatever the era. |
+| boss standoffs | **Not touched.** Only matter on the old field. |
+| past saves | **Not a concern.** |
+| progression | **Run-level, one run, one save file.** RESET SIMULATION is the New Game equivalent and wipes the device. |
+| +30% damage | **Era 2 only.** |
+
+---
+
+## 2. THE THING THAT WAS ALREADY THERE
+
+`RECAST` is this feature, declared and waiting since before this request
+(`upgrades.js:757`), under a docstring that says: *"What it will do is change what the
+turret IS rather than what it has: every other purchase bolts something onto the
+machine, and this one is meant to replace it."*
+
+And `ULTIMATE` is the room for it (`menu.js:462`): *"A tier above the tree. Nothing
+here opens yet; what goes in it is being built."* Already padlocked, already in
+ARSENAL, already the 8 characters CLAUDE.md measured as the locked-tab ceiling.
+
+Neither is new work. Both are work that was deferred with a note.
+
+---
+
+## 3. ARCHITECTURE — five decisions that shape every phase
+
+**(a) One variable.** `world.era ∈ {1, 2}`. Form and field are the same fact, so they
+are one field and cannot disagree. That is a stronger answer to "lock them together"
+than two flags kept in sync.
+
+**(b) The camera is the new subsystem and everything else is its user.** Today the
+renderer is ONE transform (`game.js:2446`) with no offset, and the entire codebase
+contains **three** scale compensations. The era zoom needs the scale to vary; the
+cinematic needs scale AND a centre to animate. Build `world.view` once.
+
+**(c) The cinematic is a `world.phase`, not a flag.** `SAVABLE = new Set(['staging'])`
+then excludes it for free, and the six autosave writes that would otherwise land
+mid-transformation stop existing. This is the single cheapest correctness win in the
+plan.
+
+**(d) The yard needs a new mark.** CLAUDE.md: *"`spent` is a rule for what may be
+SHOT; `staged` is a rule for what may be CHOSEN"*, and `config.js` says `staged`
+"never gated projectile collision". A body in the yard must be immune to both, so it
+is a third mark, honoured by every damage path — the build-233 25-source sweep is the
+instrument that proves it.
+
+**(e) The clear-field primitive is `Director.glitchOut`, not `openAperture`.**
+`openAperture` **pays out** (`boss.js:1919`: *"opening the way mid-wave banks the
+wave"*), walks only `world.enemies`, skips `type.fixed`, and re-enters the field on
+the way out. `glitchOut` marks `fizzle`/`spent`/`dissolved` instead of destroying, so
+nothing banks and no motes shed; it clears `attackers` AND each `e.attacking`; and it
+already pays the five things `score()` owes plus `grace`. The refusal door is
+`Enemy.destroy`'s own `fizzle` guard, which is CLAUDE.md's rule verbatim.
+
+---
+
+## 4. THE PHASES
+
+Every phase: green suite → `check-build.mjs --stamp` → `bundle.mjs` → commit → push.
+`docs/newform.md` carries the checklist so a fresh session resumes from disk.
+
+**The debug panel ships to every player** (`menu.js:1426`, an ungated cell in
+SETTINGS, four taps). "Debug-only" is not a safety argument. The safety argument is
+that **`world.era` is not written to the save until P9** — a stepper tap reverts on
+reload.
+
+### P0 · the plan on disk
+`docs/newform.md`: the phases, the rulings, the trap catalogue, the checklist.
+Nothing lost if abandoned.
+
+### P1 · the era, the switch, and the reset convergence
+- `world.era`, session-only (NOT in `captureRun` yet).
+- `Game.setEra(n)` modelled on `glitchOut`: names all seven lists (`enemies`, `drops`,
+  `debris`, `projectiles`, `effects`, `mines`, `pendingBlasts`), drains
+  `pendingBlasts` LAST because a detonating body pushes one on its way out, and pays
+  the five things `score()` owes plus `grace`.
+- Debug: an ERA stepper and a stub evolution trigger.
+- RESET SIMULATION calls `forgetPlayer()` — one true reset, the New Game equivalent.
+- The `reconciled` docstring at `game.js:274` corrected: it claims to survive a reset
+  and does not.
+- **Cases**: era 2 by debug does NOT survive a reload; the switch leaves all seven
+  lists empty and `w.energy`, `w.earned` and `w.drops.length` unchanged — an
+  energy-only assertion passes while the floor fills with pickups.
+
+### P2 · the camera
+- `world.view` = scale + this game's first offset. All nine `CFG.zoom` readers
+  repointed. Read through the object every time, never cached at module scope
+  (`bundle.mjs` guards `export let` but not a module-local const).
+- `resize()` called explicitly from `setEra`, `enterSandbox` and `exitSandbox` — none
+  of the three calls it today, and `reset()` does not either.
+- The governor pinned: `resize()` has three callers inside it and re-allocates the
+  3.3 MB sky overlay.
+- The testbed pinned to era-1 scale.
+- **Cases**: era 1 unchanged to the digit; `world.width * world.scale === screen
+  width` (the frame clear depends on it); the testbed's clearance case passes when
+  entered FROM era 2.
+
+### P3 · the constant sweep
+Every turret-owned and screen-anchored distance, in three buckets, each verified
+differently: reach ("same fraction of the field"), screen-anchored ("same CSS px"),
+and the third bucket the completeness pass found — **every HUD-in-world literal**,
+because only three scale compensations exist in the whole codebase and the eight
+overlay elements are all bare literals that shrink 35%.
+- **Named**: `entryDepth: 260` (→ 360+, or bodies die behind the chrome again),
+  `shooter.standoff: 210`, `gripLen: 112`/`gripR: 24`, the narrator's wrap `470`,
+  PULSE's literal `340`, `WELL_REACH = 430` + four literals, LANCE's `e.r + 26`,
+  `decoy.ahead: 300` + `s.y - 120`, `pile.r0/r`, `arc.jumpRange: 210`,
+  `landingSite`'s `shooter.y - 130`, `energy.pull: 26`, `drop.speed/accel`,
+  `touchLift: 56`, the lattice's floorless `lineWidth = 1`, two `Math.min` caps that
+  flip from fraction-wins to cap-wins.
+- **SCATTER is the only round with an authored range** (`shotgun.life: 0.375`); the
+  other eight ride `bolt.life: 2.2` and already over-cover the field twice. Scale
+  `speed`, not `life` — `life` makes every round read 35% slower, a different game.
+- **The energy economy is a travel-time problem**: motes drift the whole way in, so
+  the 54%-longer column costs income against a hard `maxDrops: 128`, and `earned`
+  gates every object type.
+- **Cases**: era 1 unchanged; the mine blast ceiling and thumb-lift guards pinned to
+  era-1 numbers before anything moves, because both derive from `CFG.zoom` and would
+  wave the change through.
+
+### P4 · the yard
+Building, wall, the yard mark, one aperture, era 2's sky, era 2's drone.
+- **State in one line what the building and wall ARE.** If `ENEMY_TYPE`s, three
+  `check-build` guards move in the same commit: `DERIVED` exits 1 for a type no wave
+  releases; grey requires `harmless` and chroma < 0.28 fails; `smallestShell` is a
+  `Math.min` a small fixture drags under.
+- The building's mouth sits **below 360 world units** — the chrome band.
+- The sky is **five unconditional call sites**, not one, and contends with `dawn`,
+  which every era-2 run has just set.
+- `setDroneMood` gains a second caller or goes.
+- **The wall rule has nowhere to be explained**: `codex.record` fires when a thing
+  comes apart, so an indestructible fixture can never be recorded and the OBJECTS
+  tab's denominator could never be reached. Decide here, not in polish.
+- **Cases**: nothing spawns outside the aperture; nothing in the yard takes damage
+  from any of the 25 sources; era 1 spawning unchanged.
+
+### P5 · the build lots
+Six boxes, drawn, tappable, refusing with a reason.
+- **Cases**: inside the field at both screen sizes; no overlap with the turret, strip
+  or ability bar; tapping cannot buy.
+
+### P6 · the MK2 turret
+- Fold the three hung-on pieces (SIEVE screens, FEED drums, ARRAY fins) into one
+  silhouette. Everything else on the machine is already 0.97–0.99 alpha.
+- `Menu.drawHero`'s bare `190` breaks; `contact.mjs`'s `(S*0.17)/sh.r` self-normalises
+  and does not.
+- `CFG.shooter.r` is the PHYSICAL radius — contact, INTAKE, the attackers grab, and
+  the broadphase, which `check-build` guards by walking `ENEMY_TYPES` only. The
+  release hysteresis is a fixed 4 units chosen against r=26 and must become
+  proportional or a body on the rim chatters.
+- Clean the stale SIGHT docstring and the dead `DARK` local while in there.
+- **Cases**: MK1 unchanged (the contact sheet is the instrument); every socket drawn;
+  the broadphase guard walks the shooter and the DECOY.
+
+### P7 · balance
++30% base damage on every round and mine, **era 2 only**. ORDINAL re-baselined in the
+same commit with the reason. ARC/SPORE/THORN are already inside the damage line.
+- **Cases**: era 1 damage unchanged to the digit; each of the nine rounds and eight
+  mines measured on a pinned wall, not read off the constant.
+
+### P8 · the cinematic
+The beat sheet in §5. A `world.phase`. `world.debug.noGlitch` already exists and is
+the branch to reuse. Captions are `world.bossLine`, which makes the narrator's
+stand-down free. A reduced-motion arm and a skip, because SCREEN SHAKE / OFF is a
+real setting and eight `prefers-reduced-motion` blocks already exist. A `smoke.mjs`
+arm, because it is the repo's only screenshotting probe and it cannot currently leave
+era 1.
+
+### P9 · the door, last
+- ULTIMATE room filled: shut state with two live counters, open state with one
+  button — the TESTBED room's two halves.
+- **A new gate predicate**, because `needs` was deleted in build 228 and
+  `Game.available` tests only `rung` and the parent chain. The two stale docstrings
+  advertising `needs` die in the same commit.
+- RECAST → **NEW FORM** on the row; `id: 'recast'` never changes.
+- `repeat: true` **deleted** in the same edit as `levels: 1`, or the level count is
+  dead text — `levelsOf` returns `Infinity` for a repeat node before the mandatory
+  throw. check-build's printed line moves to `0 repeatable ()`; pin it.
+- The gate is **the eight `parent.key === 'turret'` nodes, 18 levels** — defined as
+  the hero readout reaching its own denominator, so requirement and readout are the
+  same fact. `notALevel` covers TESTBED **and** RECAST.
+- `era` joins `captureRun` here.
+- The five discoverability sites: the ULTIMATE room, the row's line, `game.js:2404`
+  (which becomes a lie for the first six bosses), `game.js:2143` (the seventh
+  anomaly, the moment), and the hero readout. **Not** the title screen — a fourth
+  tile breaks a measured wrap.
+- **Cases**: `era === 2 ⇒ reconciled.length === 7`; the gate cannot be met early; the
+  branch denominator equals `RIG_MAX`.
+
+### P10 · the reveal pass
+Story beat timing, a playthrough at both sizes, the bundle booted by hand, CLAUDE.md.
+
+---
+
+## 5. THE CINEMATIC
+
+`world.ledger` is an **ordered** list of every purchase, so the machine comes apart
+**in the order the player built it**. Free, and different for every run.
+
+| act | t | what |
+|---|---|---|
+| I · the field is taken | 0 → 4.0 | Everything `fizzle`s and is hauled into the turret. Nothing pays out. The sky drains. |
+| II · the approach | 4.0 → 9.0 | Camera pushes to ~1.1, closer than the game has ever been. The strip and ability bar retreat. |
+| III · the unmaking | 9.0 → 15.5 | Eighteen sockets detach in ledger order, one every ~0.35s, each falling into the core. |
+| IV · the core | 15.5 → 19.0 | One point of light. Held. Silence. |
+| V · the ignition | 19.0 → 23.5 | The new form builds outward from the core as one shell. The sky turns over. |
+| VI · the pull-back | 23.5 → 30.0 | Back through 0.62 and out to 0.403. The New Field arrives in view for the first time. |
+
+30 seconds against TERMINUS's 21.6, the longest thing in the game today.
+
+**Acceptance**: rendered offscreen at fixed times — the band-sweep instrument — each
+act differing from the last by more than the animation's own noise; ledger order
+honoured; the zoom passes 0.62 exactly once outbound; nothing on the field, in the
+purse or in `earned` moves across the whole 30 seconds.
+
+**Audio is unbuilt.** The longest cue in the game is 270ms and `boom()` is ungated, so
+a 40-body clear on act I is 40 overlapping detonations. P8 owns a track or says it has
+none.
+
+---
+
+## 6. OPEN
+
+1. What the building and the wall ARE (`ENEMY_TYPE` or fixture) — decides three
+   check-build guards and the codex question. Recommend: fixtures, not types.
+2. Where the wall rule is explained, given `codex.record` fires on destruction.
+3. Whether the cinematic can be skipped, and what the reduced-motion arm is.
+
+
+---
+
+## 7. What the second review was going to ask, and nobody has answered
+
+It was stopped before any agent reported. These are still open and are the first
+thing to run if the budget allows:
+
+1. **Refute round one.** Its findings are load-bearing and unchecked by anyone but
+   their author. Particularly: is `glitchOut` really enough (partly answered by hand
+   above), was `needs` really deleted, is the ULTIMATE tab really unsealable at
+   runtime, and does `entryDepth`'s scaling break the thing its own comment says
+   `entrySpeed` compensates for.
+2. **Cost each phase.** P3 "the constant sweep" is the most likely to be hand-waving —
+   nobody has COUNTED the constants. Is it 20 or 200? And is P6 (the MK2 turret, in a
+   500-line `drawMachine`) an edit or a fork?
+3. **Play-test era 2 on paper.** Crossing times per body type, on-screen density at
+   tier 10, what one aperture does to the shape of a wave, and how much dead time a
+   2.37x-area field with unchanged enemy speeds actually produces.
+4. **Force the soft decisions.** Every "probably" and "decide in Pn" in this document.
+5. **Attack the cases as instruments.** CLAUDE.md is full of probes that measured the
+   wrong thing; the cinematic's acceptance criterion is borrowed from the dummy band
+   sweep and may not transfer — that sweep compares a STATIC rig at different values,
+   while consecutive cinematic acts differ by design.
+
+## Checklist
+
+- [ ] P0 · this file
+- [ ] P1 · the era, the switch, the reset convergence
+- [ ] P2 · the camera
+- [ ] P3 · the constant sweep
+- [ ] P4 · the yard
+- [ ] P5 · the build lots
+- [ ] P6 · the MK2 turret
+- [ ] P7 · balance, era 2 only
+- [ ] P8 · the cinematic
+- [ ] P9 · the door
+- [ ] P10 · the reveal pass
