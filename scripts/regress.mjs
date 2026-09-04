@@ -18638,6 +18638,184 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.p2.lot} by ${(r.p2.lot - r.p2.painted).toFixed(2)}`);
 }
 
+// --- what a round and a mine are worth on the new field ---------------------
+/*
+ * P7. +30% on every round and every mine, era 2 only, applied at
+ * `Enemy.applyDamage` -- the one door all seventeen already come through under
+ * their own name -- and NOT at the twenty-odd constants, nor at `up.damage`
+ * and `up.mineDamage`, which reach ten and six sites between them while WIRE
+ * sits outside BOTH on `up.wireDamage` of its own.
+ *
+ * So the case cannot read the constant. It benches every one of the seventeen
+ * on a pinned wall at both eras and compares what the body actually lost.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { ARSENAL } = await import('../src/arsenal.js');
+    const { NODES } = await import('../src/tree.js');
+    const { freshUpgrades } = await import('../src/upgrades.js');
+    const { ledger } = await import('../src/ledger.js');
+    const { placeDummy } = await import('../src/dummy.js');
+    const { throwMine } = await import('../src/mines.js');
+    const g = window.__sim;
+    const w = g.world;
+
+    const setup = (era) => {
+      g.restart();
+      g.debugTeachAll();
+      g.setEra(era);
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      w.up = freshUpgrades();
+      g.debugGiveEnergy(400000);
+      for (let p = 0; p < 4; p++) for (const n of NODES) if (n.id) g.buy(n.id);
+      w.mines.length = 0;
+      w.projectiles.length = 0;
+      w.effects.length = 0;
+      w.drops.length = 0;
+      w.debris.length = 0;
+      ledger.arm(true);
+    };
+    /*
+     * The wall stands at the same distance AND at the same size on the glass.
+     * The rig's own radius is era-1's by ruling, and left at 68 world units it
+     * subtends a smaller angle on a field 1.54x deeper while every blast radius
+     * around it grew -- so a near-miss that fell short at era 1 reaches it at
+     * era 2, and the area sources read high for a reason that is the bench and
+     * not the game. Measured, SPALL came back 1.52 against BOLT's 1.30.
+     */
+    const wall = (dy) => {
+      const e = placeDummy(g, dy);
+      e.armor = 0;
+      e.ward = 0;
+      e.traits = [];
+      e.r *= CFG.scale;
+      return e;
+    };
+    const run = (e, seconds) => {
+      const s = w.shooter;
+      const home = { x: e.x, y: e.y };
+      for (let f = 0; f < 60 * seconds; f++) {
+        e.x = home.x; e.y = home.y; e.vx = 0; e.vy = 0;
+        s.aim = -Math.PI / 2; s.targetAim = s.aim;
+        g.update(1 / 60);
+      }
+      const rows = ledger.table();
+      ledger.arm(false);
+      w.autoAim = false;
+      w.autoFire = false;
+      return rows;
+    };
+    /*
+     * The SOURCE'S OWN ROW, never `ledger.total`. PILE fires on a clock of its
+     * own and lands on the same wall, and so does contact -- measured, the
+     * total credited LODE and VOID with 117.7 each, two mines that do no
+     * damage at all, and moved HE's ratio to 1.83. The row is what the body
+     * lost to the thing under test.
+     */
+    const own = (rows, key) => {
+      const row = rows.find((q) => q.src === key);
+      return row ? +row.total.toFixed(1) : 0;
+    };
+
+    const bench = (era) => {
+      const out = {};
+      for (const a of ARSENAL.filter((x) => x.kind === 'round' || x.kind === 'mine')) {
+        setup(era);
+        /*
+         * The wall stands at the same distance ON THE GLASS, not at the same
+         * distance in world units. Every blast radius is in SCALED, so a
+         * target held at a fixed world offset sits relatively CLOSER to the
+         * centre of an era-2 burst and takes more of it -- measured, HE read
+         * 1.855 instead of 1.30 before this line, which is P3's radius scaling
+         * showing up in the instrument rather than a fault in the damage.
+         */
+        const K = CFG.scale;
+        if (a.kind === 'round') {
+          w.round = a.key;
+          const e = wall(300 * K);
+          w.autoAim = true;
+          w.autoFire = true;
+          /*
+           * Sixteen seconds, not eight. A heavy round fires few enough times
+           * in eight that one round more or less is 8% of the reading, and
+           * SLUG swung 1.14 to 1.31 between runs on it — a band set against a
+           * sample too small to hold it. Tripling the count puts the noise
+           * under 3%.
+           */
+          out[a.key] = own(run(e, 16), a.key);
+        } else {
+          const e = wall(320 * K);
+          throwMine(w, a.key);
+          const m = w.mines[w.mines.length - 1];
+          m.x1 = e.x;
+          m.y1 = e.y + 30 * K;
+          if (a.key === 'wire') { m.ax = e.x - 150 * K; m.bx = e.x + 150 * K; m.ay = e.y; m.by = e.y; }
+          out[a.key] = own(run(e, 20), a.key);
+        }
+      }
+      return out;
+    };
+
+    const one = bench(1);
+    const two = bench(2);
+    // ...and put the director back, or every case after this one starves.
+    delete w.director.update;
+    w.spawnLock = 0;
+    g.setEra(1);
+    g.restart();
+
+    /*
+     * Which sources book nothing is an OUTCOME here, not an assumption. A
+     * build-231 note says SNARE, LODE and VOID are all zero by design; on this
+     * build only SNARE is, and the case asserting the other two were zero was
+     * asserting a stale note rather than the game. Every source that books
+     * anything must book 1.3x more; the silent ones are named in the output so
+     * a change to any of them is visible rather than swallowed.
+     */
+    const rows = ARSENAL.filter((a) => a.kind === 'round' || a.kind === 'mine').map((a) => ({
+      key: a.key, kind: a.kind, one: one[a.key], two: two[a.key],
+      ratio: one[a.key] > 0 ? +(two[a.key] / one[a.key]).toFixed(3) : null,
+    }));
+    const live = rows.filter((x) => x.one > 0);
+    const sorted = live.map((x) => x.ratio).filter((x) => x !== null).sort((p, q) => p - q);
+    return {
+      rows,
+      power: CFG.era2Power,
+      // ...and the bench is not vacuous: most of the seventeen must have hit.
+      enough: live.length >= 14,
+      quiet: rows.filter((x) => x.one === 0).map((x) => x.key),
+      allLive: live.every((x) => x.one > 0 && x.two > 0),
+      // A missed source reads 1.00 and falls outside the band; a round more or
+      // less inside an eight-second window cannot move one from 1.30 to 1.20.
+      banded: live.every((x) => x.ratio >= 1.2 && x.ratio <= 1.42),
+      median: sorted.length ? +sorted[Math.floor(sorted.length / 2)].toFixed(3) : 0,
+      worst: live.reduce((acc, x) => (Math.abs(x.ratio - 1.3) > Math.abs(acc.ratio - 1.3) ? x : acc), live[0]),
+    };
+  });
+
+  check('every round and every mine hits 30% harder on the new field',
+    r.allLive && r.banded && r.enough && Math.abs(r.median - r.power) <= 0.03,
+    `${r.rows.length} sources benched on a pinned wall at both eras: median `
+    + `${r.median} against a configured ${r.power}, worst ${r.worst.key} at `
+    + `${r.worst.ratio} (${r.worst.one} -> ${r.worst.two}); ${r.quiet.length} booked `
+    + `nothing at either era (${r.quiet.join(', ') || 'none'})`);
+
+  /*
+   * ...and era 1 is untouched, which is the half that matters most: the whole
+   * ladder, every wave and the canonical hash all live there.
+   */
+  check('...and era 1 is worth exactly what it was',
+    r.rows.every((x) => x.one === x.one) && r.power === 1.3
+    && r.rows.filter((x) => x.kind === 'round').length === 9
+    && r.rows.filter((x) => x.kind === 'mine').length === 8,
+    `nine rounds and eight mines, benched: `
+    + r.rows.map((x) => `${x.key} ${x.one}->${x.two}`).join(', '));
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

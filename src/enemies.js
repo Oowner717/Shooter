@@ -12,6 +12,23 @@ import { contactAt } from './physics.js';
 import { ledger } from './ledger.js';
 import { drawDummy, dummyHit } from './dummy.js';
 import { throughMouth, mouthSlots } from './yard.js';
+import { ARSENAL } from './arsenal.js';
+
+/*
+ * Every round and every mine, by the key each already books its damage under.
+ * DERIVED from the arsenal rather than written out, so a new round or mine is
+ * in it by existing -- the failure mode this replaces is a hand-kept list that
+ * misses whatever was added after it was written.
+ *
+ * Abilities are deliberately absent: they are not ammo, and the ruling names
+ * ammo and mines. So are contact, PILE and the DECOY's blast. And the filter
+ * is not decoration -- `ARSENAL` carries nineteen entries, not seventeen: the
+ * strip's AUTO AIM and AUTO FIRE toggles sit in the same table under
+ * `kind: 'auto'`, and neither is a weapon.
+ */
+const POWERED = new Set(ARSENAL
+  .filter((a) => a.kind === 'round' || a.kind === 'mine')
+  .map((a) => a.key));
 
 /**
  * The top of the visible field, in world units. Objects are queued above it
@@ -1243,6 +1260,17 @@ export class Enemy {
    */
   applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0, shred = 0, lever = 0, throwOff = false, src = '') {
     if (this.dead) return;
+    /*
+     * The new field's damage, at the one door all seventeen come through. The
+     * `!== 1` is not decoration: `applyDamage` runs tens of thousands of times
+     * in a boss fight, and at era 1 this must cost a comparison and nothing
+     * else -- no set lookup, no multiply, no rounding.
+     *
+     * Before the plate, the ward and the `Math.max(1, ...)` floor, so a
+     * stronger round is still reduced by armour in proportion. NOT by touching
+     * the floor or the fade, which are on every damage path.
+     */
+    if (CFG.power !== 1 && POWERED.has(src)) dmg *= CFG.power;
     /*
      * An energy mote cannot be hurt. It is not wreckage to be broken up a
      * second time — it is the charge the object was carrying, and the only

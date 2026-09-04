@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '247';
+export const BUILD = '248';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '247';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '9cf37a3';
+export const REV = '6711339';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -80,6 +80,13 @@ export const CFG = {
    *
    * The value here is era 1's and is the module-load default. See `ZOOMS`.
    */
+  /*
+   * What the new field is worth. Applied to rounds and mines only -- the
+   * user's ruling is "+30% base damage on all ammo and mines" -- and to
+   * nothing the turret does directly, nothing an ability does, and nothing a
+   * body does to you.
+   */
+  era2Power: 1.3,
   zoom: 0.62,
   /*
    * The scale per era, indexed from 1.
@@ -4231,6 +4238,21 @@ export function setZoom(era, sandbox) {
    * source, so the form and the size cannot disagree.
    */
   CFG.mk2 = CFG.scale > 1;
+  /*
+   * ...and what a round or a mine is worth on the new field. One number, one
+   * writer, derived from the same expression as the scale and the form, so
+   * era 1 is EXACTLY 1 and multiplying by it there is the identity.
+   *
+   * It is applied at `Enemy.applyDamage` -- the one door every one of the
+   * seventeen already comes through under its own name -- and NOT at the
+   * twenty-odd constants in this file, and not at `up.damage` and
+   * `up.mineDamage` either. Those two reach ten and six sites between them and
+   * WIRE is outside BOTH, on `up.wireDamage` of its own: a per-multiplier
+   * change would have shipped one of the eight mines unboosted, which is the
+   * "a CFG number read at a site the multiplier never reaches" fault this repo
+   * has already paid for three times in one sweep.
+   */
+  CFG.power = CFG.scale > 1 ? CFG.era2Power : 1;
   for (const path of SCALED) setPath(path, BASE[path], CFG.scale);
 }
 
@@ -4303,6 +4325,17 @@ const SCALED = [
   'touchLift',
   // rounds: what they are, and what they leave behind
   'bolt.r', 'rounds.explosive.blast.r', 'rounds.arc.jumpRange',
+  /*
+   * HE's clover, found by P7's bench and NOT by P3's sweep. The sub-blast
+   * RADIUS is scaled two lines up and the distance the sub centres sit at was
+   * not, so at era 2 a 132-unit sub grew to 203 while its centre stayed 200
+   * from the body -- and the clover stopped being self-similar. The docstring
+   * at shooter.js's cluster block guarantees "the added single-target damage
+   * stays 0" on exactly that geometry; measured, HE delivered 1.85x instead of
+   * the 1.30 every other round did, which is CLUSTER silently doubling
+   * single-target damage, the fault build 220 removed.
+   */
+  'rounds.explosive.cluster.out',
   'rounds.spine.shatter.r', 'rounds.spore.patch.r',
   // mines: the body, the default blast, and each kind's own reach
   'mines.r', 'mines.blast.r', 'mines.fizzle.r',

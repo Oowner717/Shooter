@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P6 (247) shipped. P7 (balance, era 2 only) is next.**
+**Status: P1 (238) - P7 (248) shipped. P8 (the cinematic) is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -337,7 +337,7 @@ thing to run if the budget allows:
 - [x] P5 · the build lots (build 245)
 - [x] P6a · the plumbing and the instruments (build 246)
 - [x] P6b+c · the radius and the fold, in one build (build 247)
-- [ ] P7 · balance, era 2 only
+- [x] P7 · balance (build 248), era 2 only
 - [ ] P8 · the cinematic
 - [ ] P9 · the door
 - [ ] P10 · the reveal pass
@@ -1208,3 +1208,63 @@ furthest thing on the MK2. It has not — the barrel still is, by about four
 units.
 
 Hash `-1765830468`, unmoved. 501 green.
+
+## 21. P7, as built (build 248)
+
++30% on every round and every mine, era 2 only. `CFG.power` is written by
+`setZoom` off the same expression as `CFG.scale` and `CFG.mk2`, so it is
+**exactly 1** at era 1 and multiplying by it there is the identity.
+
+### One door, not twenty
+
+It is applied at `Enemy.applyDamage` — the one place all seventeen already
+arrive under their own name — and **not** at the twenty-odd damage constants,
+and not at `up.damage` / `up.mineDamage` either. Those two reach ten and six
+sites between them, and **WIRE is outside both**, on `up.wireDamage` of its
+own: a per-multiplier change would have shipped one of the eight mines
+unboosted. The source set is derived from `ARSENAL`, so a new round or mine is
+in it by existing.
+
+Two details that matter: the guard is `CFG.power !== 1` *first*, because
+`applyDamage` runs tens of thousands of times in a boss fight and era 1 must
+cost a comparison and nothing else; and `ARSENAL` carries **nineteen** entries,
+not seventeen — AUTO AIM and AUTO FIRE live in the same table under
+`kind: 'auto'` and neither is a weapon.
+
+### The bench found a real gap in P3's sweep
+
+**`rounds.explosive.cluster.out` was not in `SCALED` while the sub-blast radius
+was.** So at era 2 a 132-unit sub grew to 203 while its centre stayed 200 units
+from the body, and HE's clover stopped being self-similar — the cluster block's
+own docstring guarantees "the added single-target damage stays 0" on exactly
+that geometry. Measured, HE delivered **1.85×** against every other round's
+1.30: CLUSTER silently doubling single-target damage, which is the fault build
+220 removed. It is in `SCALED` now.
+
+That is what "measure it, don't read it off the constant" is for. Reading the
+constants would have reported +30% and shipped it.
+
+### Three faults in the instrument, all mine
+
+- **`ledger.total` is not the source's damage.** PILE fires on its own clock
+  onto the same wall, and the total credited LODE and VOID with 117.7 each —
+  two mines that mostly do none. The source's own **row** is the measure.
+- **A fixed world distance is not a fixed geometry.** Every blast radius is in
+  `SCALED`, so a target held 300 world units out sits relatively closer to the
+  centre of an era-2 burst. The wall stands at `300 * CFG.scale` now.
+- **...and neither is a fixed target size.** The rig's radius is era-1's by
+  ruling, so a near-miss that fell short at era 1 reaches it at era 2. SPALL
+  read 1.52 until the bench scaled the target too.
+
+Also corrected: a build-231 note says SNARE, LODE and VOID all book nothing by
+design. On this build **only SNARE does** — the other two book, and book 1.30×.
+The case treats "books nothing" as an outcome it reports rather than an
+assumption it asserts.
+
+And the window went 8s → 16s for rounds: a heavy round fires few enough times
+in eight seconds that one round either way is 8% of the reading, and SLUG swung
+1.14 to 1.31 between runs. A band set against a sample too small to hold it.
+
+Median across all sixteen live sources: **1.300** against a configured 1.3.
+Hash `-1765830468` unmoved, MK1's ten machine digests still byte-identical,
+503 green over two consecutive runs.
