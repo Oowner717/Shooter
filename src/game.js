@@ -32,14 +32,14 @@ import { NODES, NODE_BY_ID, priceOf } from './tree.js';
 
 /** The turret branch, for the fitting announcements and the completion one. */
 const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
-import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_WALL, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_WALL, ON_LOTS, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 import { Sandbox } from './sandbox.js';
 import { ledger, soak } from './ledger.js';
 import { updateDummy } from './dummy.js';
-import { syncYard, updateYard, drawYard } from './yard.js';
+import { syncYard, updateYard, drawYard, lotAt, refuseLot } from './yard.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 
@@ -1258,6 +1258,18 @@ export class Game {
       this.hud.dismissHint();
       // ...and a row left open is never in the way of playing.
       this.hud.openAimRow(false);
+
+      /*
+       * A build lot REFUSES, and refusing is all it does: the press goes on to
+       * aim and fire exactly as it always did. Four of the six sit where the
+       * thumb goes to shoot, so a lot that swallowed the press would cost a
+       * shot every time you defended the ground it stands on -- and this is a
+       * disabled control, which is the weakest possible claim on a tap.
+       *
+       * It is checked before the grip/aim branch because the two works stand
+       * level with the turret, on the grip side of it.
+       */
+      if (refuseLot(w, lotAt(w, p.x, p.y)) && this.hintsAllowed) this.sayOnce([ON_LOTS]);
 
       if (this.gripPointer === null && p.y > s.y - s.r) {
         this.gripPointer = ev.pointerId;

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '244';
+export const BUILD = '245';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '244';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'ae67926';
+export const REV = '680e8b6';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4231,7 +4231,15 @@ export function setZoom(era, sandbox) {
  * phone. `gap` is the visible depth of the enemy's side, 43.4 CSS px at both
  * of the screens the suite measures.
  */
-CFG.yard = { gap: 105, mouthHalf: 130, faceHalf: 175, tooth: 34, clear: 24 };
+CFG.yard = {
+  gap: 105, mouthHalf: 130, faceHalf: 175, tooth: 34, clear: 24,
+  // The six lots. Two works beside the machine and four emplacements in front
+  // of it, measured off the turret so they hold their place on the glass at
+  // either screen -- the field is 1.22x deeper at 390x844 and the interface
+  // either side of them is not.
+  lotSide: 104, lotW: 40, lotH: 30,
+  lotAhead: 124, lotStep: 70, gunW: 23, gunH: 20,
+};
 
 const SCALED = [
   // the field's own shape, and the speed that keeps arriving free
@@ -4256,6 +4264,8 @@ const SCALED = [
   'pile.r0', 'pile.r', 'ward.r', 'prism.r', 'prism.beamLen',
   // the yard, which is a picture and keeps its size on the glass
   'yard.gap', 'yard.mouthHalf', 'yard.faceHalf', 'yard.tooth', 'yard.clear',
+  'yard.lotSide', 'yard.lotW', 'yard.lotH',
+  'yard.lotAhead', 'yard.lotStep', 'yard.gunW', 'yard.gunH',
 ];
 
 function atPath(path) {

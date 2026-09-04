@@ -18175,6 +18175,137 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       + `reversed vy in the band, monotonic ${r.monotonic}`).join('; '));
 }
 
+// --- the six lots: ground reserved, and nothing else ------------------------
+/*
+ * P5. Two works beside the machine and four emplacements in front of it,
+ * drawn as dashed empty boxes in the same language the quick strip already
+ * uses for a slot with nothing in it. They are field furniture by the same
+ * argument as the building: in none of the lists anything walks.
+ *
+ * The whole risk here is spatial, so the case measures against the REAL
+ * interface rects rather than against numbers copied out of the design.
+ */
+{
+  const held = page.viewportSize();
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    rows.push(await page.evaluate(async (vw) => {
+      const { CFG } = await import('../src/config.js');
+      const g = window.__sim;
+      const w = g.world;
+      g.restart();
+      const out = { w: vw };
+      out.eraOne = w.yard;
+      g.setEra(2);
+      const a = w.yard;
+      const s = w.shooter;
+      out.n = a.lots.length;
+      out.kinds = a.lots.map((l) => l.kind).join(',');
+
+      // ---- inside the field, and below the wall --------------------------
+      out.inField = a.lots.every((l) => l.x - l.hw > 4 && l.x + l.hw < w.width - 4
+        && l.y - l.hh > a.hold && l.y + l.hh < w.floorY - 4);
+
+      // ---- clear of the machine, measured against the DRAWN rig ----------
+      const rig = s.r * 2.4;
+      out.offTurret = a.lots.every((l) => {
+        const dx = Math.max(Math.abs(s.x - l.x) - l.hw, 0);
+        const dy = Math.max(Math.abs(s.y - l.y) - l.hh, 0);
+        return Math.hypot(dx, dy) > rig;
+      });
+      out.rig = +rig.toFixed(1);
+      out.tightest = +Math.min(...a.lots.map((l) => {
+        const dx = Math.max(Math.abs(s.x - l.x) - l.hw, 0);
+        const dy = Math.max(Math.abs(s.y - l.y) - l.hh, 0);
+        return Math.hypot(dx, dy);
+      })).toFixed(1);
+
+      /*
+       * ---- and clear of every control, off the controls themselves -------
+       * Not off a table of numbers: a lot that lands under the quick strip is
+       * a lot nobody can see and a tap nobody can make, and the strip's own
+       * geometry is the only honest witness to where it is.
+       */
+      const z = CFG.zoom;
+      const rects = [];
+      for (const sel of ['#barChips', '#waveRail', '#abilityBar', '.qGroup', '#menuBtn']) {
+        for (const el of document.querySelectorAll(sel)) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            rects.push([r.left / z, r.top / z, r.right / z, r.bottom / z]);
+          }
+        }
+      }
+      out.rects = rects.length;
+      out.clashes = a.lots.filter((l) => rects.some((r) =>
+        l.x + l.hw > r[0] && l.x - l.hw < r[2] && l.y + l.hh > r[1] && l.y - l.hh < r[3])).length;
+
+      // ---- pressing one refuses, cannot buy, and does NOT eat the shot ----
+      const c = document.querySelector('canvas');
+      const box = c.getBoundingClientRect();
+      const gun = a.lots[3];
+      const before = { energy: w.energy, bought: w.ledger.length, shots: w.projectiles.length };
+      w.projectiles.length = 0;
+      c.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, cancelable: true, pointerId: 31, isPrimary: true,
+        clientX: box.left + gun.x * z, clientY: box.top + gun.y * z,
+      }));
+      out.press = {
+        refused: gun.refused,
+        energy: w.energy === before.energy,
+        bought: w.ledger.length === before.bought,
+        fired: w.projectiles.length > 0,
+      };
+
+      // ...and a press on empty ground refuses nothing.
+      a.lots.forEach((l) => { l.refused = 0; });
+      w.projectiles.length = 0;
+      c.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, cancelable: true, pointerId: 32, isPrimary: true,
+        clientX: box.left + (gun.x + gun.hw * 3) * z, clientY: box.top + (gun.y - gun.hh * 3) * z,
+      }));
+      out.miss = { refused: Math.max(...a.lots.map((l) => l.refused)), fired: w.projectiles.length > 0 };
+
+      g.setEra(1);
+      g.restart();
+      return out;
+    }, size.width));
+  }
+  await page.setViewportSize(held);
+
+  check('six lots stand on the era-2 field and nowhere else',
+    rows.every((r) => r.eraOne === null && r.n === 6
+      && r.kinds === 'works,works,gun,gun,gun,gun' && r.inField),
+    rows.map((r) => `${r.w}: era 1 ${r.eraOne}, era 2 ${r.n} lots (${r.kinds}), `
+      + `all inside the field below the wall ${r.inField}`).join('; '));
+
+  /*
+   * Against the interface's own rects, and there are enough of them to be sure
+   * the sweep found the interface at all -- a clash count of zero taken over
+   * an empty list is the vacuous pass this arm exists to avoid.
+   */
+  check('...clear of the machine, and clear of every control that takes a tap',
+    rows.every((r) => r.offTurret && r.clashes === 0 && r.rects >= 6),
+    rows.map((r) => `${r.w}: nearest lot is ${r.tightest} from the turret against a `
+      + `drawn rig of ${r.rig}; 0 of 6 clash with ${r.rects} interface rects `
+      + `(measured ${r.clashes})`).join('; '));
+
+  /*
+   * ...and the press. A lot REFUSES: it says so and it buys nothing, and the
+   * same press still aims and fires -- four of the six sit exactly where the
+   * thumb goes to shoot, so a lot that swallowed the press would cost a shot
+   * every time you defended the ground it stands on.
+   */
+  check('...and pressing one refuses, buys nothing, and still fires',
+    rows.every((r) => r.press.refused > 0 && r.press.energy && r.press.bought
+      && r.press.fired && r.miss.refused === 0 && r.miss.fired),
+    rows.map((r) => `${r.w}: pressed a lot — refused ${r.press.refused.toFixed(2)}, `
+      + `purse held ${r.press.energy}, nothing bought ${r.press.bought}, still fired `
+      + `${r.press.fired}; pressed beside it — refused ${r.miss.refused}, fired `
+      + `${r.miss.fired}`).join('; '));
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

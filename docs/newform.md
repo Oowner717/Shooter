@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P4c (244) shipped. P4 is complete; P5 (the build lots) is next.**
+**Status: P1 (238) - P5 (245) shipped. P6 (the MK2 turret) is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -334,7 +334,7 @@ thing to run if the budget allows:
 - [x] P4b · the aperture (build 243)
 - [x] P4c · the wall's one-way rule (build 244)
 - [ ] ~~P4~~ · the yard
-- [ ] P5 · the build lots
+- [x] P5 · the build lots (build 245)
 - [ ] P6 · the MK2 turret
 - [ ] P7 · balance, era 2 only
 - [ ] P8 · the cinematic
@@ -984,3 +984,48 @@ At 320×568 the wall binds it (wanted 386.6 against a floor of 644.4); at
 units further down a longer field. A case that only checked "it moved" would be
 **vacuous on the large screen and would say so nowhere**, so the case asserts
 `bound` explicitly and requires it true on one screen and false on the other.
+
+## 18. P5, as built (build 245)
+
+Two works beside the machine and four emplacements in front of it, drawn as
+dashed empty boxes with a hairline ghost of what would stand there. They live
+on `world.yard` — that object is everything the era-2 field puts on the ground,
+theirs above the wall and yours below it — so they inherit the gate, the null
+check, the single draw call and the non-membership that makes all of it free at
+era 1.
+
+**Sited off the TURRET, not off the field.** The field is 1.22× deeper at
+390×844 than at 320×568 and the interface either side of it is not, so a lot
+placed as a fraction of the field lands under the quick strip on one of the two
+phones. Measured at era 2, the works land at x 175–299 and 495–619 on the
+narrow screen against strip columns that end at 144 and begin at 650.
+
+**They refuse; they do not swallow.** Four of the six sit exactly where the
+thumb goes to shoot, so a lot that ate the press would cost a shot every time
+you defended the ground it stands on — and this is a *disabled* control, which
+is the weakest possible claim on a tap. The press pulses the lot, says
+`ON_LOTS` once, and then goes on to aim and fire exactly as it always did. The
+check runs before the grip/aim branch because the two works stand level with
+the turret, on the grip side of it.
+
+**Drawn in the language the interface already has for this.** A dashed box with
+nothing in it is what the quick strip's empty slots look like; a second
+vocabulary for "a place for a thing you do not have yet" is a second thing to
+learn. They are the dimmest things on the field on purpose.
+
+### The case measures against the interface, not against the design
+
+The whole risk in P5 is spatial, so the overlap arm sweeps the **real**
+`getBoundingClientRect()` of `#barChips`, `#waveRail`, `#abilityBar`, every
+`.qGroup` and the menu button, converts them through `CFG.zoom`, and asserts no
+lot rect intersects any of them — with a floor on the rect count, because zero
+clashes over an empty list is exactly the vacuous pass the arm exists to avoid.
+Clearance from the machine is measured against the **drawn rig** (`r * 2.4`),
+not `r`: nearest lot 98 units against a rig of 62 at 320×568.
+
+The press arm asserts four things at once — the lot refused, the purse did not
+move, `world.ledger` did not grow, and a projectile *was* fired — plus a
+control press on empty ground beside it that must refuse nothing and still fire.
+
+Hash `-1765830468`, unmoved against the before-run taken on this container at
+build 244. 496 green.

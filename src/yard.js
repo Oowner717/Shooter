@@ -69,8 +69,71 @@ export function syncYard(world, entryY) {
   a.top = entryY - 260;
   const teeth = Math.max(8, Math.round(world.width / Y.tooth));
   if (!a.lit || a.lit.length !== teeth) a.lit = new Float32Array(teeth);
+
+  /*
+   * ---- and the six lots, which are YOURS ----
+   *
+   * `world.yard` is everything the era-2 field puts on the ground: theirs
+   * above the wall, yours below it. One object, one gate, one null check and
+   * one draw call rather than a second parallel thing that would need all four
+   * again -- and the lots are field furniture by exactly the same argument as
+   * the building, in none of the lists anything walks.
+   *
+   * Sited off the TURRET rather than off the field, so they hold their place
+   * on the glass: the field is 1.22x deeper at 390x844 than at 320x568 and the
+   * interface either side of them is not. Measured at era 2, the works land at
+   * x 175..299 and 495..619 on the narrow screen against a quick strip whose
+   * columns end at 144 and begin at 650.
+   */
+  const s = world.shooter;
+  const lots = a.lots && a.lots.length === 6 ? a.lots : [
+    { kind: 'works' }, { kind: 'works' },
+    { kind: 'gun' }, { kind: 'gun' }, { kind: 'gun' }, { kind: 'gun' },
+  ].map((l) => ({ ...l, refused: 0 }));
+  for (let i = 0; i < 2; i++) {
+    const l = lots[i];
+    l.x = s.x + (i === 0 ? -Y.lotSide : Y.lotSide);
+    l.y = s.y;
+    l.hw = Y.lotW;
+    l.hh = Y.lotH;
+  }
+  for (let i = 0; i < 4; i++) {
+    const l = lots[2 + i];
+    l.x = s.x + (i - 1.5) * Y.lotStep;
+    l.y = s.y - Y.lotAhead;
+    l.hw = Y.gunW;
+    l.hh = Y.gunH;
+  }
+  a.lots = lots;
+
   world.yard = a;
   return a;
+}
+
+/**
+ * Which lot is under a point, or -1. Era 1 has none, so it is always -1 there.
+ *
+ * A lot REFUSES rather than swallows: the press that found it still aims and
+ * still fires. Four of the six sit exactly where the thumb goes to shoot, and
+ * a control that eats a shot to tell you something is a control that costs the
+ * player the fight to read a sentence.
+ */
+export function lotAt(world, x, y) {
+  const a = world.yard;
+  if (!a) return -1;
+  for (let i = 0; i < a.lots.length; i++) {
+    const l = a.lots[i];
+    if (Math.abs(x - l.x) <= l.hw && Math.abs(y - l.y) <= l.hh) return i;
+  }
+  return -1;
+}
+
+/** ...and say so: a pulse on the lot, and one line, the first time. */
+export function refuseLot(world, i) {
+  const a = world.yard;
+  if (!a || i < 0 || !a.lots[i]) return false;
+  a.lots[i].refused = 1;
+  return true;
 }
 
 /**
@@ -173,6 +236,7 @@ export function updateYard(world, dt) {
   const a = world.yard;
   if (!a) return;
   if (a.flare > 0) a.flare = Math.max(0, a.flare - dt * 0.9);
+  for (const l of a.lots) if (l.refused > 0) l.refused = Math.max(0, l.refused - dt * 1.4);
   const lit = a.lit;
   const band = 26 * CFG.scale;
   const w = world.width || 1;
@@ -337,6 +401,47 @@ export function drawYard(ctx, world, mood) {
     ctx.moveTo(a.flareX - tick * 0.7, a.wallY + tick);
     ctx.lineTo(a.flareX, a.wallY);
     ctx.lineTo(a.flareX + tick * 0.7, a.wallY + tick);
+    ctx.stroke();
+  }
+
+  /* ---- the six lots ------------------------------------------------------
+   * Drawn in the same language the empty quick-slots use -- a dashed box with
+   * nothing in it -- because that is already what this game's interface means
+   * by "a place for a thing you do not have yet", and a second vocabulary for
+   * the same idea is a second thing to learn. They are the dimmest thing on
+   * the field on purpose: six boxes that cannot be used must never compete
+   * with anything that can.
+   */
+  for (const l of a.lots) {
+    const f = l.refused;
+    ctx.setLineDash([5 * k, 5 * k]);
+    ctx.lineWidth = hl * (1.2 + f * 1.8);
+    ctx.strokeStyle = rgba(mood.line, 0.22 + f * 0.5);
+    ctx.strokeRect(l.x - l.hw, l.y - l.hh, l.hw * 2, l.hh * 2);
+    ctx.setLineDash([]);
+    /*
+     * ...and what would stand there, as a hairline ghost. A works is a squat
+     * block, an emplacement is a barrel on a mount -- enough that the two
+     * kinds are different at a glance without either being legible enough to
+     * read as something you own.
+     */
+    ctx.strokeStyle = rgba(mood.line, 0.16 + f * 0.34);
+    ctx.lineWidth = hl;
+    ctx.beginPath();
+    if (l.kind === 'works') {
+      const bw = l.hw * 0.46;
+      const bh = l.hh * 0.5;
+      ctx.rect(l.x - bw, l.y - bh, bw * 2, bh * 2);
+      ctx.moveTo(l.x - bw, l.y - bh);
+      ctx.lineTo(l.x, l.y - bh - l.hh * 0.34);
+      ctx.lineTo(l.x + bw, l.y - bh);
+    } else {
+      const rr = l.hw * 0.36;
+      ctx.moveTo(l.x + rr, l.y + rr * 0.5);
+      ctx.arc(l.x, l.y + rr * 0.5, rr, 0, Math.PI, true);
+      ctx.moveTo(l.x, l.y + rr * 0.5);
+      ctx.lineTo(l.x, l.y - rr * 1.5);
+    }
     ctx.stroke();
   }
 

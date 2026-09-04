@@ -174,6 +174,19 @@ export const ON_WALL = (() => {
 })();
 
 /*
+ * The six lots, said the first time one is pressed.
+ *
+ * Not on arriving in era 2, and not on a schedule: a dashed box you have not
+ * touched is not a question you have asked. It is also why the lots refuse
+ * rather than swallow -- the press that gets this sentence is the same press
+ * that fired the gun.
+ */
+export const ON_LOTS = (() => {
+  const text = 'Ground is reserved, not yet yours.\nWorks beside the machine, emplacements in front of it.';
+  return { id: idOf(text), text, hold: holdFor(text) };
+})();
+
+/*
  * ...and if it is still there a while later, said again.
  *
  * Everything else in this file is once per device and that is right for it:
