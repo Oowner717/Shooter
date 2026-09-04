@@ -17584,6 +17584,235 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${JSON.stringify(r.latTwo)} at era 2 — era 1 must still be 1 world unit`);
 }
 
+// --- the yard: the enemy's side of the era-2 field ---------------------------
+/*
+ * P4a. The building and the wall are FIELD FURNITURE, not bodies: one derived
+ * plain object at `world.yard`, living in no list that any damage source,
+ * chooser, sweep, broadphase, spawn budget or codex walks.
+ *
+ * That is the whole of its immunity, and it is a stronger guarantee than a
+ * mark can give. All twenty-five damage sources reach health through
+ * `applyDamage` or `destroy`, and every path to those iterates `enemies`,
+ * `drops`, `debris`, `effects` or the per-frame `bodies` array; a thing in
+ * none of them needs ZERO guard lines, against the nineteen a `penned` mark
+ * would have to keep agreeing with forever. The arms below therefore assert
+ * the STRUCTURE -- a tripwire, not a measurement, and it is labelled as one.
+ */
+{
+  const held = page.viewportSize();
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    rows.push(await page.evaluate(async (vw) => {
+      const { CFG } = await import('../src/config.js');
+      const g = window.__sim;
+      const w = g.world;
+      g.restart();
+      const out = { w: vw };
+
+      // ---- era 1 has no yard, in every state that can reach one -----------
+      out.one = w.yard;
+      g.setEra(2);
+      const a = w.yard;
+      out.two = a && {
+        // in CSS px, which is the quantity that must not move between screens
+        depth: +((a.wallY - a.mouthY) * CFG.zoom).toFixed(2),
+        mouth: +(2 * a.mouthHalf * CFG.zoom).toFixed(2),
+        face: +(2 * a.faceHalf * CFG.zoom).toFixed(2),
+        mouthY: +(a.mouthY * CFG.zoom).toFixed(1),
+        wallY: +(a.wallY * CFG.zoom).toFixed(1),
+        onEntryLine: Math.abs(a.mouthY - CFG.entryDepth) < 1e-9,
+        centred: Math.abs(a.mouthX - w.width / 2) < 1e-9,
+        onScreen: a.faceHalf < w.width / 2,
+        teeth: a.lit.length,
+      };
+      // ...it survives the switch that creates it, which every design putting
+      // the building in a list fails: setEra empties all seven.
+      out.survives = !!w.yard && w.enemies.length === 0 && w.effects.length === 0;
+
+      // ---- and it is in none of the lists anything walks -------------------
+      const lists = ['enemies', 'drops', 'debris', 'effects', 'mines', 'projectiles'];
+      out.inNoList = lists.every((k) => !(w[k] || []).includes(a))
+        && !(w.attackers && w.attackers.has && w.attackers.has(a));
+      out.notABody = a.hp === undefined && a.applyDamage === undefined
+        && a.invMass === undefined && a.type === undefined && a.r === undefined;
+
+      g.setEra(1);
+      out.back = w.yard;
+      g.setEra(2);
+      g.restart();
+      out.afterRestart = w.yard;
+      return out;
+    }, size.width));
+  }
+  await page.setViewportSize(held);
+  const [small, big] = rows;
+
+  check('the yard is era 2 only, and it is not in anything',
+    rows.every((r) => r.one === null && r.back === null && r.afterRestart === null
+      && r.two && r.survives && r.inNoList && r.notABody),
+    rows.map((r) => `${r.w}: era 1 ${r.one}, era 2 ${r.two ? 'built' : 'MISSING'}, `
+      + `in no list ${r.inNoList}, not a body ${r.notABody}, survives the switch `
+      + `${r.survives}, back to ${r.back}, after restart ${r.afterRestart}`).join('; '));
+
+  /*
+   * ...and it is a PICTURE, so it holds its size on the glass. Write any of
+   * the four as a fraction of `world.width` or `floorY` -- which differ by
+   * 1.22x between these two screens -- and the CSS arms diverge. This is
+   * P3b's picture-versus-machine rule turned into a guard.
+   */
+  check('...and it holds its size on the glass, and fits on the narrow screen',
+    small.two && big.two
+    && Math.abs(small.two.depth - big.two.depth) < 0.5
+    && Math.abs(small.two.mouth - big.two.mouth) < 0.5
+    && Math.abs(small.two.face - big.two.face) < 0.5
+    && rows.every((r) => r.two.onEntryLine && r.two.centred && r.two.onScreen
+      && r.two.wallY > 162 && r.two.teeth >= 8),
+    `320: ${small.two && small.two.depth}px of enemy yard, a ${small.two && small.two.mouth}px `
+    + `door in a ${small.two && small.two.face}px face; 390: ${big.two && big.two.depth} / `
+    + `${big.two && big.two.mouth} / ${big.two && big.two.face} — and the wall sits at `
+    + `${small.two && small.two.wallY}px, clear of the 162px chrome`);
+
+  /*
+   * The mouth is ON the entry line, and that is the placement that costs
+   * nothing: the line is already where `staged` clears and where the fast
+   * march ends, so "a body walks out of the door" and "a body becomes live"
+   * are the same event. A mouth anywhere below it retires `CFG.entrySpeed`
+   * at era 2 -- a constant still threaded and no longer reachable, which is
+   * the `world.endless` shape.
+   */
+  check('...and the door is the entry line itself, so entrySpeed keeps its reader',
+    rows.every((r) => r.two.onEntryLine)
+    && Math.abs(small.two.mouthY - big.two.mouthY) < 0.5,
+    `the mouth is at ${small.two.mouthY} CSS px on both screens, which is `
+    + `ENTRY_Y + CFG.entryDepth exactly`);
+}
+
+// --- the sky and the bed that go with the field ------------------------------
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { background } = await import('../src/background.js');
+    const { audio } = await import('../src/audio.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    const out = {};
+
+    // Record ARGUMENTS, not call names: a spy that counts calls passes against
+    // an implementation that shifts the bed the wrong way.
+    const real = audio.setDroneMood.bind(audio);
+    const said = [];
+    audio.setDroneMood = (a, b, c) => { said.push([a, b, c]); return real(a, b, c); };
+    const last = () => said[said.length - 1];
+
+    const sky = () => ({
+      top: background.mood.top, mid: background.mood.mid, low: background.mood.low,
+      line: background.mood.line, accent: background.mood.accent,
+    });
+    // ...and whether it actually ARRIVED, rather than being on its way. The
+    // ease cannot move a channel closer than 37.8, so an un-snapped mood sits
+    // stalled with its gradient untouched and its nebula snapped.
+    const arrived = () => background.mood.top === background.target.top
+      && background.mood.mid === background.target.mid
+      && background.mood.low === background.target.low;
+
+    // The state every era-2 run is actually in: endBoss(7) sets dawn one line
+    // before it sets the sky, and seven bosses is the gate era 2 stands on.
+    w.dawn = true;
+    g.syncSky();
+    out.dawnAsked = background.target.mid;
+    out.dawnDrone = last();
+    /*
+     * ...and SNAPPED by hand, because the control needs the previous sky to
+     * actually be on the screen. It is not, on any era-1 mood: the ease moves
+     * a channel by `round(delta * 0.0132)`, so anything closer than 37.8 never
+     * moves at all, and the first version of this case read the sky it was
+     * about to set as the sky it was replacing. That is the documented
+     * transition fault, and it is why era 2 snaps.
+     */
+    background.setMood('dawn', true);
+    out.dawnFirst = sky();
+
+    said.length = 0;
+    g.setEra(2);
+    out.two = sky();
+    out.twoArrived = arrived();
+    out.twoName = g.skyName();
+    out.twoDrone = last();
+    out.beatsDawn = w.dawn === true;
+
+    /*
+     * Back to era 1, and dawn has to come back with it -- FIRST, before the
+     * bench trip below, because leaving the bench goes through `resume()` ->
+     * `reset()`, which sets `w.dawn = false`. The first version of this case
+     * asked for the handback after that round trip and read `staging`, which
+     * is the correct answer to a different question.
+     */
+    g.setEra(1);
+    out.oneName = g.skyName();
+    out.oneDrone = last();
+    g.setEra(2);
+
+    // the bench keeps its own room, and coming back out restores BOTH halves.
+    // The node has to be BOUGHT: `enterSandbox` refuses without it and returns
+    // false, and a case that never got through the door reads the field it
+    // never left.
+    said.length = 0;
+    w.energy = 999999;
+    g.buy('sandbox');
+    out.entered = g.enterSandbox();
+    out.bench = g.skyName();
+    out.benchYard = w.yard;
+    g.exitSandbox();
+    out.afterBench = g.skyName();
+    out.afterBenchDrone = last();
+    out.afterBenchYard = !!w.yard;
+
+    g.restart();
+    out.restartName = g.skyName();
+    out.restartDrone = last();
+
+    audio.setDroneMood = real;
+    return out;
+  });
+
+  check('era 2 has its own sky, it beats dawn, and it arrives whole',
+    r.twoName === 'newfield' && r.oneName === 'dawn' && r.restartName === 'staging'
+    && r.beatsDawn && r.twoArrived
+    && r.two.top !== r.dawnFirst.top && r.two.mid !== r.dawnFirst.mid,
+    `dawn was asked for and up (${r.dawnAsked} / ${r.dawnFirst.mid}); era 2 shows ${r.twoName} (${r.two.mid}) with `
+    + `w.dawn still ${r.beatsDawn} and the gradient arrived ${r.twoArrived}; era 1 `
+    + `hands back ${r.oneName}, a new run ${r.restartName}`);
+
+  /*
+   * The bench is the hole all three designs left: leaving it goes through
+   * `resume()` -> `reset()`, and `setEra` refuses to re-fire for an era the
+   * world is already in — so the era-2 sky used to be left standing over the
+   * era-1 bed for the rest of the run.
+   */
+  check('...and the bench keeps its own room and hands both halves back',
+    r.entered === true && r.bench === 'sandbox' && r.benchYard === null
+    && r.afterBench === 'newfield' && r.afterBenchYard
+    && r.afterBenchDrone && r.afterBenchDrone[0] === 33,
+    `in the room: ${r.bench}, yard ${r.benchYard}; out of it: ${r.afterBench}, `
+    + `yard ${r.afterBenchYard}, bed ${JSON.stringify(r.afterBenchDrone)}`);
+
+  /*
+   * `setDroneMood` had ONE caller from the day it was written, passing
+   * (41, 320, 0.05) — which restates startDrone's own three initial values, so
+   * it had never shifted anything and its docstring had never been true. Era
+   * 1's triple is the audible identity and must not move by a digit.
+   */
+  check('...and the ambient bed follows the field, with era 1 unchanged to the digit',
+    JSON.stringify(r.oneDrone) === '[41,320,0.05]'
+    && JSON.stringify(r.restartDrone) === '[41,320,0.05]'
+    && JSON.stringify(r.dawnDrone) === '[41,320,0.05]'
+    && JSON.stringify(r.twoDrone) === '[33,420,0.045]',
+    `era 1 ${JSON.stringify(r.oneDrone)}, a new run ${JSON.stringify(r.restartDrone)}, `
+    + `era 2 ${JSON.stringify(r.twoDrone)}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

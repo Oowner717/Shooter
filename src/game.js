@@ -39,6 +39,7 @@ import { registerCodexShape } from './menu.js';
 import { Sandbox } from './sandbox.js';
 import { ledger, soak } from './ledger.js';
 import { updateDummy } from './dummy.js';
+import { syncYard, updateYard, drawYard } from './yard.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 
@@ -302,6 +303,13 @@ export class Game {
        */
       era: 1,
       /*
+       * The enemy's side of the era-2 field, derived in `resize` and null at
+       * era 1 and in the testbed. Declared here and not only assigned there
+       * because the suite runs the world behind a Proxy that records reads,
+       * and a field that appears later is a ghost field to it.
+       */
+      yard: null,
+      /*
        * Which ways in this run has already been HANDED, from build 227. Its
        * own record rather than a reading of `apertures`, because an aperture
        * is spent when the way is opened and a spent one would be handed
@@ -478,6 +486,10 @@ export class Game {
      * cases failed on this one missing line.
      */
     w.era = 1;
+    // ...and everything derived from the era. `resize()` below re-derives this
+    // too, but only when the SCALE is stale -- and P1's own postmortem is that
+    // "the conditional resize will get it" is not a reason to leave it out.
+    w.yard = null;
     /*
      * ...and the geometry derived from it, but ONLY when the scale is actually
      * stale. `reset()` has never called `resize()`, and setting the era back to
@@ -584,8 +596,7 @@ export class Game {
     glitch.reset();
     // A new game is a new field, and the edge is back up. See endBoss.
     w.dawn = false;
-    background.setMood('staging');
-    audio.setDroneMood(41, 320, 0.05);
+    this.syncSky();
 
     this.pointers.clear();
     this.gripPointer = null;
@@ -599,6 +610,59 @@ export class Game {
     this.hud.setEnergy(0);
     background.setDread(0);
     this.hud.syncAbilities(w.abilities);
+  }
+
+  /**
+   * Which ambient sky this world is standing in, DERIVED rather than stored.
+   *
+   * There are exactly five ambient call sites -- `reset`, `exitSandbox`,
+   * `withdrawBoss`, `endBoss` and the bench's own -- and three of them used to
+   * write `w.dawn ? 'dawn' : 'staging'` longhand. A fourth condition written
+   * four times is four chances to miss one, and a missed one leaves era 1's
+   * sky up after a withdrawn boss at era 2 with nothing in the suite noticing.
+   *
+   * ---- the era beats dawn, and that is a ruling
+   *
+   * `endBoss(7)` sets `w.dawn` one line before it sets the sky, and seven
+   * reconciled anomalies is exactly the gate that makes era 2 reachable -- so
+   * the two arrive on the same frame, every run. Dawn is what the OLD field
+   * looks like once the ladder is finished; era 2 is a different field, not a
+   * later hour of the same one. Stepping back to era 1 hands dawn back
+   * correctly, because this is a derivation and not a stored value.
+   */
+  skyName() {
+    const w = this.world;
+    if (w.sandbox) return 'sandbox';
+    if (w.era === 2) return 'newfield';
+    return w.dawn ? 'dawn' : 'staging';
+  }
+
+  /**
+   * ...and put it up, with the ambient bed that belongs to it.
+   *
+   * ---- era 2 SNAPS, and that is arithmetic rather than taste
+   *
+   * `background.update` eases with `k = 1 - exp(-dt * 0.8)`, which is 0.0132 at
+   * 60Hz, and `mixHex` rounds to whole channels every step -- so a channel
+   * needs a distance of 37.8 to move at all, and a larger one stalls exactly
+   * 37 short. Across the ambient family the largest gradient delta between any
+   * two moods is under that, so an EASED era-2 sky would move the lattice and
+   * the accent and leave the entire gradient where it was, while the nebula
+   * snapped regardless. Half a sky reads as a rendering fault. Snapping is
+   * already the practice for a change of PLACE, at the bench's door and on the
+   * way back out of it.
+   *
+   * The drone comes with it. `setDroneMood` has had ONE caller since it was
+   * written, passing (41, 320, 0.05) -- which restates `startDrone`'s own three
+   * initial values, so it has never shifted anything and its docstring has
+   * never been true. Era 1's triple is unchanged to the digit and is the
+   * audible identity; era 2 goes lower, more open and slightly quieter.
+   */
+  syncSky(snap = false) {
+    const name = this.skyName();
+    background.setMood(name, snap || name === 'newfield');
+    if (name === 'newfield') audio.setDroneMood(33, 420, 0.045);
+    else audio.setDroneMood(41, 320, 0.05);
   }
 
   start() {
@@ -804,6 +868,9 @@ export class Game {
     // re-derives the geometry on its own. Harmless while both eras share a
     // scale; load-bearing the moment they do not.
     this.resize();
+    // ...and the sky, AFTER the resize, because that rebuilds the nebula and
+    // the overlay off the new dimensions.
+    this.syncSky(true);
     return true;
   }
 
@@ -884,7 +951,14 @@ export class Game {
     w.era = era;
     // ...and back to the era's own scale on the way out, for the same reason.
     this.resize();
-    background.setMood(w.dawn ? 'dawn' : 'staging', true);
+    /*
+     * ...and the sky and the bed with it. This used to write the era-1 pair
+     * longhand, which was the hole: leaving the bench goes through `resume()`
+     * -> `reset()`, and `setEra` refuses to re-fire for an era the world is
+     * already in, so a bench visit at era 2 left the era-2 sky standing over
+     * the era-1 drone for the rest of the run.
+     */
+    this.syncSky(true);
     this.hud.syncSandbox(w);
     this.hud.alert('SIMULATION ONLINE', 'info', 2.2);
     return true;
@@ -1117,6 +1191,10 @@ export class Game {
     world.floorY = (sh - (safeBottom + barH + 22)) / z;
     world.shooter.x = world.width / 2;
     world.shooter.y = this.shooterY;
+    // The yard is a function of the era and the screen and is stored nowhere,
+    // so a rotation re-derives it and a reload cannot strand a stale one. THE
+    // ONE WRITER.
+    syncYard(world, ENTRY_Y);
 
     this.grid.resize(world.width, world.height + STAGE_HEIGHT, GRID_CELL);
     background.resize(world.width, world.height, world.width / 2, ENTRY_Y);
@@ -1784,6 +1862,7 @@ export class Game {
     collectEnergy(w, dt);
     this.runUpgrades(dt);
     updateMines(w, dt);
+    updateYard(w, dt);
     this.resolveBlasts();
     this.checkContact();
     this.sweep(w.enemies);
@@ -2263,7 +2342,7 @@ export class Game {
     const d = w.director;
     if (!d.jobs.length) d.resting = true;
     d.timer = CFG.boss.after;
-    background.setMood(w.dawn ? 'dawn' : 'staging');
+    this.syncSky();
     this.hud.alert('IT HAS STOPPED COUNTING · FOR NOW', 'remainder', 5);
   }
 
@@ -2293,7 +2372,7 @@ export class Game {
      * a new game is a new field, and the edge is back up.
      */
     if (n === 7) w.dawn = true;
-    background.setMood(w.dawn ? 'dawn' : 'staging');
+    this.syncSky();
     /*
      * ...and the gate it was standing on is open now. The rung past it is the
      * fight's own reward: the ladder was held there and nothing else was going
@@ -2606,6 +2685,10 @@ export class Game {
 
     background.draw(ctx, W, H);
 
+    // The yard, straight onto the substrate: behind every body, every drop and
+    // every piece of wreckage, which is what scenery has to mean here.
+    drawYard(ctx, w, background.mood);
+
     /*
      * Ground first: anything in effects that declares itself ground (the
      * SPORE and THORN patches) is part of the floor and draws under every
@@ -2623,7 +2706,11 @@ export class Game {
     if (!w.bossLine) w.narrator.draw(
       ctx,
       W / 2,
-      ENTRY_Y + (w.shooter.y - ENTRY_Y) * 0.46,
+      // ...and clear of the yard, which at era 2 the 0.46 lands on: the story
+      // band would otherwise sit on the building's sill, behind the chrome.
+      w.yard
+        ? Math.max(ENTRY_Y + (w.shooter.y - ENTRY_Y) * 0.46, w.yard.wallY + 130 * CFG.scale)
+        : ENTRY_Y + (w.shooter.y - ENTRY_Y) * 0.46,
       // A SCREEN width in world units: 470 is 291 CSS px at era 1 and would be
       // 189 at era 2, so every story line would re-wrap to half again as many
       // lines, into a band `pillCap()` already measures at zero headroom on a

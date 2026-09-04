@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238), P2 (239), P3a (240), P3b (241) shipped. P4 is next.**
+**Status: P1 (238), P2 (239), P3a (240), P3b (241), P4a (242) shipped. P4b is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -330,7 +330,10 @@ thing to run if the budget allows:
 - [x] P2 · the camera — **build 239**
 - [x] P3a · the scale, and the reach that makes era 2 playable — **build 240**
 - [x] P3b · the rest of the sweep: the use-site literals (build 241)
-- [ ] P4 · the yard
+- [x] P4a · the yard and the sky (build 242)
+- [ ] P4b · the aperture
+- [ ] P4c · the wall's one-way rule
+- [ ] ~~P4~~ · the yard
 - [ ] P5 · the build lots
 - [ ] P6 · the MK2 turret
 - [ ] P7 · balance, era 2 only
@@ -688,3 +691,170 @@ verbatim.
 targeting and no boss; `CFG.scale` is exactly 1 at era 1 and `fight.mjs` runs
 at era 1, so every multiplication in this build is a no-op on the frames the
 hash mixes. The two cases above are the proof that the sites are live.
+
+## 15. P4 — the ruling, and P4a as built (build 242)
+
+The phase brief demanded one line stating what the building and the wall ARE,
+because the answer moves check-build guards. Six readers surveyed the type
+table, the spawn path, the damage-and-mark family, the moods, the draw order
+and the codex; three designs were written from different lenses and each was
+attacked on four (era-1 safety, mark completeness, wall physics, shippability).
+All three came back with fatals. Every decisive claim below was then
+re-verified by hand, and two of the survey's were wrong.
+
+### The one line
+
+**The building and the wall are FIELD FURNITURE, not bodies: one derived plain
+object at `world.yard`, built in `Game.resize`, null at era 1 and in the
+testbed, living in no list that any damage source, chooser, sweep, broadphase,
+spawn budget or codex walks.**
+
+### Why — immunity by NON-MEMBERSHIP, not by a mark
+
+The plan assumed a `penned` mark. It is the wrong tool, and the argument is
+countable. All twenty-five damage sources reach health through exactly two
+doors, `Enemy.applyDamage` and `Enemy.destroy`, and every path to those
+iterates `world.enemies`, `world.drops`, `world.debris`, `world.effects` or
+the per-frame `bodies` array. A thing in none of them needs **zero** guard
+lines. A mark needs **nineteen** sites to keep agreeing with it forever — and
+this repo has shipped a mark honoured by four paths out of five more than
+once: the practice dummy wore `harmless` for its side effect and silently lost
+five damage sources, and the three sites that decide what may be shot have
+already drifted apart.
+
+Non-membership also answers the thing a mark cannot: `Game.setEra` empties all
+seven lists on its way in, so **a building in `world.enemies` is deleted by the
+very switch that creates it.**
+
+The case for it is therefore a **tripwire, not a measurement**, and is labelled
+as one: it asserts the yard is in none of the six lists, has no `hp`,
+`applyDamage`, `invMass`, `type` or `r`, and survives the era switch. An
+assertion that a thing outside every list takes no damage would be vacuous.
+
+### Three statements in the P4 brief were wrong. Struck.
+
+- **"Three check-build guards move."** With this design **zero** move — the
+  build reports 41 modules and every other line unchanged. Even for the
+  `ENEMY_TYPE` route only `DERIVED` fails closed.
+- **`smallestShell` is structurally unreachable**, not a risk:
+  `Math.min(... Math.max(t.r + gap, CFG.wardShell.min))` is floored at 26 for
+  *any* radius, against a threshold of `CFG.drop.max * 1.5 * 3` = 19.8. No
+  fixture, large or small, can move it. The build prints "ward shell floor 26
+  is 3.9x" and always will.
+- **"The mouth sits below 360 world units"** — 360 came from a docstring
+  claiming the interface reaches world y 234 when it reaches 261. The chrome
+  reaches **402** at era 2.
+
+### The mouth is ON the entry line, and that is the placement that costs nothing
+
+`ENTRY_Y + CFG.entryDepth` is already three things: the bottom of the interface
+(402 measured, against a mouth at 400), the line a body clears `staged` on, and
+the end of the fast march `CFG.entrySpeed` exists for. Putting the door there
+makes *"a body walks out"* and *"a body becomes live"* the same visible event
+for free. **A mouth anywhere below the line quietly retires `entrySpeed` at
+era 2** — a constant still threaded and no longer reachable, which is the
+`world.endless` shape arriving three builds after the phase that scaled it.
+
+### The codex ruling: no entry, no id, nothing moves
+
+`codex.record` has exactly ONE production caller and it is reachable only past
+`if (!e.dead) continue`, so an indestructible fixture can never be recorded —
+the brief's premise is correct. The conclusion is avoidable, because the
+denominator only becomes unreachable if someone *also writes the entry*.
+`codex.total` stays 37, `FIELD_ENTRIES` stays 16, and the wall's rule will be
+taught in P4c by a first-use line in `sim7749-lines`, which is this repo's
+existing mechanism for a rule with no object (`ON_GLITCH` is the precedent).
+
+### The gate is `era === 2 && !sandbox`, and the second term is load-bearing
+
+`setZoom(era, sandbox)` pins the bench to era 1's *scale* without touching
+`world.era`, and both bench doors carry the era across by hand — so
+`era === 2 && sandbox === true` is a real, reachable state the suite already
+makes the round trip of. A gate on the era alone paints a building and a wall
+across the practice range, at era 1's scale, in the one room whose entire job
+is measuring damage against a clean field.
+
+### The sky: one derivation, five sites, and the era beats dawn
+
+`Game.skyName()` / `Game.syncSky(snap)` replace the five ambient call sites —
+three of which wrote `w.dawn ? 'dawn' : 'staging'` longhand. **`endBoss(7)`
+sets `w.dawn` one line before it sets the sky**, and seven reconciled anomalies
+is exactly the gate era 2 stands on, so the two arrive on the same frame every
+run. Era wins: dawn is what the *old* field looks like once the ladder is
+finished; era 2 is a different field, not a later hour of the same one.
+
+**It snaps, and that is arithmetic.** The ease is `k = 1 - exp(-dt * 0.8)` =
+0.0132 at 60Hz and `mixHex` rounds per channel, so a channel needs a distance
+of 37.8 to move at all. Across the ambient family the largest gradient delta is
+under that, so an eased era-2 sky would move the lattice and the accent and
+leave the **entire gradient** where it was, while the nebula snapped regardless.
+That fault also broke the first version of the case: the control read the sky
+it was about to set as the sky it was replacing, because era-1 moods never
+arrive either. The case snaps its own control by hand now.
+
+**`setDroneMood` has its second caller, and its first was a no-op.** It has
+had one caller since it was written, passing `(41, 320, 0.05)` — which restates
+`startDrone`'s own three initial values (`gain 0.05`, `filt 320`, `osc 41`), so
+it has never shifted anything and its docstring has never been true. Era 1's
+triple is unchanged to the digit and is asserted as the audible identity; era 2
+is `(33, 420, 0.045)`. Putting it in `syncSky` rather than in `setEra` closes a
+hole all three designs left: leaving the bench goes through `resume()` →
+`reset()`, and `setEra` refuses to re-fire for an era the world is already in,
+so a bench visit at era 2 left the era-2 sky standing over the era-1 bed for
+the rest of the run.
+
+### The building had to be redrawn once, and the first version was invisible
+
+It was filled `mixHex(mood.low, mood.line, 0.2)` — measured, within a few units
+of the sky. The building was drawn, correctly placed, and **invisible**, with
+only the doorway spill carrying it. A structure that size against a dark sky
+reads as a *silhouette* with lit detail, which is also what it is. Screenshots
+at both sizes are what found it; the geometry had been green the whole time.
+
+Two instrument notes from that pass: the glitch shader tears the whole frame
+and is useless for judging a drawing (the first 320×568 shot was unreadable),
+and at 320×568 the visible face is only ~36 CSS px tall, so the ribs and the
+door columns do most of their work in the strips between the rail's cells.
+
+`CFG.yard.gap` went 70 → 105 off those shots: 43 CSS px of enemy side reads as
+a stripe, 65 reads as a place.
+
+### Split, and why
+
+P4 is three builds, because the full diff is one new module, five CFG numbers,
+five SCALED paths, ~14 source sites and eleven cases — against a phase budget
+of one request and one suite run, and a user constraint that a credit wall
+must leave a working game.
+
+- **P4a (242, shipped)** — `src/yard.js`, `CFG.yard`, the SCALED paths, `sw.js`,
+  the four wiring sites, the sky and the bed. Era 2 gains a visible enemy side
+  with its own sky. Nothing about spawning or placement moves.
+- **P4b** — the aperture: `throughMouth` and `mouthSlots`, and the three spawn
+  sites. **The ORDINAL hash belongs to this build alone**, because it is the
+  only one of the three that touches a `Math.random` call path `fight.mjs`
+  exercises. `spawnFormation` rolls `cx` *before* it picks the type, so the
+  mouth override must be applied after the pick and the two must not be
+  reordered — that swaps two draws at era 1.
+- **P4c** — the wall's one-way rule: `yardHold`/`holdBelow` and the three
+  placement clamps (`landingSite`, DECOY, WELL), plus `ON_WALL`.
+  `landingSite` needs **no** `x` hoist — the survey claimed one, and `top`
+  involves no random draw.
+
+### Open, and carried forward
+
+- **The yard's depth is screen-anchored** at 65 CSS px on every phone, per
+  P3b's picture rule. If the enemy's side should feel bigger on a bigger
+  screen, `gap` becomes a fraction of `(floorY - mouthY)` — one line.
+- **P4c will cost the era-2 mine field ground**, and the lever is
+  `CFG.yard.gap`/`clear`, never `CFG.mines.keepTop`, which is a fraction of a
+  screen-varying floor and would split the two phones.
+- **Rounds fly through the building, deliberately.** A membrane at the mouth
+  would make ~80 world units of every boss's frame unshootable — ORDINAL's
+  core sits at y 468 at 320×568 era 2 with its outer ring reaching 318 — and
+  would turn every missed HE into a burst on the staged queue, since
+  `applyBlast` never tests `staged`.
+- **The `newfield` hexes are provisional** and have not been swept in Lab
+  against the other 45 tones. P10 owns the reveal pass.
+- **`lull`, `breach` and `ending` are dead moods** — nothing in `src/` or
+  `scripts/` passes any of them to `setMood`. Left alone: `breach` is authored
+  for exactly the cinematic's act I. P8 or P10.

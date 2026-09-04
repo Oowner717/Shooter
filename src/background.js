@@ -37,6 +37,18 @@ const MOODS = {
    * one after something happened to it.
    */
   dawn: { top: '#0d0b0a', mid: '#241f18', low: '#070606', line: '#7a6a4e', neb: ['#3d3320', '#2c2a24', '#1f2430'], accent: '#ffd9a3' },
+  /*
+   * The new field. Cold indigo, deeper and flatter than staging, because era 2
+   * is a different place and not a later hour of the same one. The lattice is
+   * desaturated `#2f7fb8` -> `#4a54a8` deliberately: at era 2 there is 2.37x as
+   * much of it on the screen, and at staging's weight it would be the loudest
+   * thing in the field.
+   *
+   * Provisional: these five have NOT been swept in Lab against the other
+   * forty-five tones in the game. P10 owns the reveal pass and this is the
+   * cheapest thing in the phase to change.
+   */
+  newfield: { top: '#050310', mid: '#141033', low: '#03020b', line: '#4a54a8', neb: ['#191a4d', '#241a52', '#0d1140'], accent: '#9aa8ff' },
   ending: { top: '#000000', mid: '#0a0a0a', low: '#000000', line: '#555555', neb: ['#222222', '#111111', '#191919'], accent: '#cccccc' },
   /*
    * The sandbox, and it is deliberately the one sky in the game that is not

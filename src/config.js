@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '241';
+export const BUILD = '242';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '241';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '5f57707';
+export const REV = '7b13ee5';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4219,6 +4219,20 @@ export function setZoom(era, sandbox) {
  *       change.
  *   times, damages, costs, healths                    not distances.
  */
+/*
+ * ---- THE YARD ----
+ *
+ * The enemy's side of the era-2 field: a building the whole ladder walks out
+ * of, and a wall across the bottom of it. Era 2 only; `world.yard` is null at
+ * era 1 and in the testbed, and every number below is a no-op there.
+ *
+ * All of it is a PICTURE rather than a machine, so all of it is in `SCALED`
+ * and holds its size on the glass -- the building must not grow on a taller
+ * phone. `gap` is the visible depth of the enemy's side, 43.4 CSS px at both
+ * of the screens the suite measures.
+ */
+CFG.yard = { gap: 105, mouthHalf: 130, faceHalf: 175, tooth: 34 };
+
 const SCALED = [
   // the field's own shape, and the speed that keeps arriving free
   'entryDepth', 'entrySpeed',
@@ -4240,6 +4254,8 @@ const SCALED = [
   // the bar
   'decoy.r', 'decoy.ahead', 'decoy.blast.r',
   'pile.r0', 'pile.r', 'ward.r', 'prism.r', 'prism.beamLen',
+  // the yard, which is a picture and keeps its size on the glass
+  'yard.gap', 'yard.mouthHalf', 'yard.faceHalf', 'yard.tooth',
 ];
 
 function atPath(path) {

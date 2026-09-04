@@ -61,6 +61,7 @@ const ASSETS = [
   './src/ledger.js',
   './src/sandbox.js',
   './src/dummy.js',
+  './src/yard.js',
 ];
 
 self.addEventListener('install', (e) => {
