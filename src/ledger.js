@@ -61,8 +61,8 @@
  *   3s   what is happening RIGHT NOW. Still wanted -- it is what the dummy's
  *        own effects are driven from, where responsiveness is the point and
  *        legibility is not.
- *   10s  what the bar shows. Long enough to survive a reload or a cooldown,
- *        short enough to answer when you change round.
+ *   10s  what the panel leads with. Long enough to survive a reload or a
+ *        cooldown, short enough to answer when you change round.
  *   30s  what a comparison wants. A burst weapon and a steady one only look
  *        alike over a window that contains several of the bursts.
  *
@@ -73,7 +73,13 @@
 const HISTORY = 30;
 export const WINDOWS = [3, 10, 30];
 
-/** The rate the bar shows, and the one the panel leads with. */
+/**
+ * The one the panel leads with, and `rate()`'s default.
+ *
+ * It was on the bar as well until build 236, four pixels above the tile
+ * carrying the same number -- and at 320 the label wrapped, so the bar read
+ * "DPS" over "10s" beside a figure.
+ */
 export const BAR_WINDOW = 10;
 
 class Ledger {
@@ -83,7 +89,12 @@ class Ledger {
     this.total = 0;
     this.over = 0;
     this.kills = 0;
-    this.peak = 0;
+    /*
+     * `peak` was here, written on every tick and read by NOTHING -- and it
+     * cost a full backwards walk of the 3s window per frame to maintain. The
+     * rig's own peak flag is `e.dummyPeak` in dummy.js, which is a decayed
+     * maximum of the STRAIN and not of the rate, and has always been its own.
+     */
     /** src -> { total, over, hits, kills, first, last } */
     this.by = new Map();
     /**
@@ -121,7 +132,6 @@ class Ledger {
     this.total = 0;
     this.over = 0;
     this.kills = 0;
-    this.peak = 0;
     this.by.clear();
     this.wT.length = 0;
     this.wD.length = 0;
@@ -205,8 +215,6 @@ class Ledger {
       this.wS.splice(0, this.head);
       this.head = 0;
     }
-    const l = this.live();
-    if (l > this.peak) this.peak = l;
   }
 
   /**
@@ -233,20 +241,6 @@ class Ledger {
     return this.rate(WINDOWS[0]);
   }
 
-  /** ...and the same, split by source. */
-  liveBy(win = WINDOWS[0]) {
-    const out = new Map();
-    if (!this.on) return out;
-    const cut = this.t - win;
-    const span = Math.min(win, Math.max(0.25, this.t));
-    for (let i = this.wD.length - 1; i >= this.head; i--) {
-      if (this.wT[i] < cut) break;
-      out.set(this.wS[i], (out.get(this.wS[i]) || 0) + this.wD[i]);
-    }
-    for (const [k, v] of out) out.set(k, v / span);
-    return out;
-  }
-
   /**
    * The table the stats panel draws: one row per source, heaviest first.
    *
@@ -257,7 +251,6 @@ class Ledger {
    * above one fired for a minute.
    */
   table() {
-    const live = this.liveBy(BAR_WINDOW);
     const span = Math.max(0.25, this.t);
     const rows = [];
     for (const [src, e] of this.by) {
@@ -267,7 +260,6 @@ class Ledger {
         over: e.over,
         hits: e.hits,
         kills: e.kills,
-        live: live.get(src) || 0,
         sustained: e.total / span,
         share: this.total > 0 ? e.total / this.total : 0,
       });
@@ -298,3 +290,150 @@ export const SRC_EXTRA = {
   turret: { name: 'TURRET', tone: '#59e0ff' },
   unattributed: { name: 'UNATTRIBUTED', tone: '#ff5d8f' },
 };
+
+/**
+ * ---- the soak: what this device has ever put into a dummy ----
+ *
+ * The ledger above is a SESSION. It is armed on the way into the bench and
+ * cleared on the way in again, which is right for a measurement -- a rate you
+ * cannot reset is a rate you cannot use -- and wrong for a record. This is the
+ * record: one number, every point of damage ever delivered to a practice
+ * dummy on this device, and it is what the rig's own accretion is drawn from.
+ *
+ * ---- why it is not in the save ----
+ *
+ * `sim7749-run` is the RUN, and three separate things throw it away: starting
+ * over, `Game.restart`, and the title screen's RESET SIMULATION. A record that
+ * a new run deletes is not a record. Worse, `captureRun` refuses to write
+ * anywhere but `staging` and `Game.checkpoint` refuses outright while the
+ * bench is up -- so a number living in the run file could not be written at
+ * the one moment it is actually moving.
+ *
+ * So it is a key of its own, which is what every device-level fact in this
+ * game already is: the glossary (`sim7749-codex`), the lines already said
+ * (`sim7749-lines`), the preferences and the volume. It follows the codex
+ * exactly -- loaded once at module load, written only when it has changed,
+ * and cleared by `forgetPlayer()` and by nothing else, because that is the
+ * one function in the game that means "the next launch is a first launch".
+ *
+ * ---- why it is flushed rather than written ----
+ *
+ * `add` is called from `dummyHit`, which is called once per delivered hit: a
+ * fully bought turret puts four thousand points a second into the rig across
+ * dozens of hits. `localStorage.setItem` on each of those would be a write per
+ * frame, on the main thread, on a phone. So the number is kept in memory and
+ * flushed on a clock and at every point the game already writes the run down
+ * -- see `Game.checkpoint`, which flushes this BEFORE its own bench guard.
+ */
+const SOAK_KEY = 'sim7749-soak';
+
+/**
+ * ---- the ladder, in beads ----
+ *
+ * The rig wears the record as small beads in a shell round it, and the shell
+ * has to do two things at once that pull against each other: show a new player
+ * something on their first magazine, and still have somewhere to go after
+ * hours. A flat "one bead per X damage" can do one or the other. One bead per
+ * thousand and a fully bought turret fills any honest maximum in four minutes;
+ * one bead per million and stock BOLT earns its first after four hours.
+ *
+ * So it is an odometer. Five shells of twenty beads, and each shell's beads
+ * are worth TEN TIMES the one inside it:
+ *
+ *   shell 1   1k each      20k      the first bead is 17s of stock BOLT
+ *   shell 2   10k each     220k     ...and 4s of a bought one
+ *   shell 3   100k each    2.22M
+ *   shell 4   1M each      22.2M
+ *   shell 5   10M each     222.22M  a full set
+ *
+ * A full set is 222,220,000 points of damage, which is **13.1 hours** of a
+ * fully bought turret held on the rig without a pause (measured: 4,700 dps,
+ * `regress.mjs`), or 1,028 hours of the stock gun. That is the "very high
+ * maximum" the request asked for, and the decade steps are what keep the first
+ * hour visibly moving anyway -- three quarters of the beads are earned inside
+ * the first 2.2M, which is eight minutes of the bought gun.
+ *
+ * The count is returned FRACTIONAL so the newest bead can be drawn arriving
+ * rather than appearing between two frames -- the same rule the band position
+ * follows.
+ */
+export const SOAK_SHELLS = 5;
+export const SOAK_PER_SHELL = 20;
+export const SOAK_BEADS = SOAK_SHELLS * SOAK_PER_SHELL;
+/** What a bead in the innermost shell is worth. Every shell out is x10. */
+const SOAK_UNIT = 1000;
+/** What each shell's bead is worth, and what the whole shell costs. */
+const SOAK_EACH = [];
+for (let k = 0; k < SOAK_SHELLS; k++) SOAK_EACH.push(SOAK_UNIT * (10 ** k));
+/** Damage for a full set. */
+export const SOAK_CAP = SOAK_EACH.reduce((a, e) => a + e * SOAK_PER_SHELL, 0);
+
+/** How many beads `total` has earned, fractionally. */
+export function soakBeads(total) {
+  let left = Math.max(0, +total || 0);
+  let n = 0;
+  for (let k = 0; k < SOAK_SHELLS; k++) {
+    const shell = SOAK_EACH[k] * SOAK_PER_SHELL;
+    if (left >= shell) { n += SOAK_PER_SHELL; left -= shell; continue; }
+    return n + left / SOAK_EACH[k];
+  }
+  return SOAK_BEADS;
+}
+
+/** What the next bead costs from here, for the readout. 0 once the set is full. */
+export function soakNext(total) {
+  const n = soakBeads(total);
+  if (n >= SOAK_BEADS) return 0;
+  const k = Math.min(SOAK_SHELLS - 1, Math.floor(n / SOAK_PER_SHELL));
+  return Math.ceil((1 - (n % 1)) * SOAK_EACH[k]);
+}
+
+class Soak {
+  constructor() {
+    this.total = 0;
+    this.dirty = false;
+    this.load();
+  }
+
+  load() {
+    try {
+      const raw = localStorage.getItem(SOAK_KEY);
+      if (raw === null) return;
+      const v = Number(raw);
+      // Bounded on read, the way `settings.js` and `audio.js` bound theirs: a
+      // hand-edited string must not be able to poison the drawing.
+      if (Number.isFinite(v) && v > 0) this.total = Math.min(v, SOAK_CAP * 4);
+    } catch {
+      /* private mode, or an unreadable store: the record starts here */
+    }
+  }
+
+  /** One delivered hit on a dummy. */
+  add(d) {
+    if (!(d > 0)) return;
+    this.total += d;
+    this.dirty = true;
+  }
+
+  /** Write it down, if it has moved. Cheap enough to call on any clock. */
+  flush() {
+    if (!this.dirty) return false;
+    this.dirty = false;
+    try {
+      localStorage.setItem(SOAK_KEY, String(Math.round(this.total)));
+      return true;
+    } catch {
+      return false; // no store: the number still stands for as long as the tab does
+    }
+  }
+
+  forget() {
+    this.total = 0;
+    this.dirty = false;
+    try {
+      localStorage.removeItem(SOAK_KEY);
+    } catch { /* nothing to forget */ }
+  }
+}
+
+export const soak = new Soak();

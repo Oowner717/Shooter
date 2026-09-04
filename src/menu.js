@@ -19,7 +19,7 @@ import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
 import { BUILD, REV } from './config.js';
 import { swipeToDismiss, swipeTabs } from './swipe.js';
-import { lastSession } from './sandbox.js';
+import { lastSession, lifetime } from './sandbox.js';
 import { TREE, NODES, priceOf } from './tree.js';
 import { svgMark } from './util.js';
 
@@ -122,7 +122,7 @@ const GROUPS = [
      * present and shut rather than absent, for the same reason the tree draws
      * the rows you cannot afford -- a door you can see is a thing to aim at.
      */
-    { id: 'sandbox', label: 'RANGE', locked: true },
+    { id: 'sandbox', label: 'TESTBED', locked: true },
     { id: 'system', label: 'SETTINGS' },
   ] },
 ];
@@ -349,24 +349,28 @@ export class Menu {
     const shut = document.createElement('div');
     shut.className = 'sealedRoom';
     shut.innerHTML = `<span class="sealedMark" aria-hidden="true">${LOCK}</span>
-      <span class="sealedName">THE RANGE</span>
-      <span class="sealedLine">A practice target and a counter, and nothing
-      else on the field. Shoot it with anything you have and read exactly what
-      every round, mine and ability is delivering &mdash; per second, per
-      source. Nothing there is earned and nothing there is spent.</span>
+      <span class="sealedName">THE TESTBED</span>
+      <span class="sealedLine">An instrumented target and a counter, and
+      nothing else on the field. Shoot it with anything you have and read
+      exactly what every round, mine and ability is delivering &mdash; per
+      second, per source. Nothing there is earned and nothing there is spent,
+      but the rig keeps a record of everything you have ever put into it.</span>
       <span class="sealedLine sbCost">Bought from UPGRADES, at the top of the tree.</span>`;
 
     const open = document.createElement('div');
     open.className = 'sbRoom';
     open.hidden = true;
-    open.innerHTML = `<span class="sealedName">THE RANGE</span>
-      <span class="sealedLine">One practice dummy and four rates. Waves,
+    open.innerHTML = `<span class="sealedName">THE TESTBED</span>
+      <span class="sealedLine">One instrumented dummy and four rates. Waves,
       energy, corruption and rules are all off, and your kit is exactly what it
       is in the run. Leave whenever you like &mdash; the run is written down
-      before you go in and handed back when you come out.</span>`;
+      before you go in and handed back when you come out.</span>
+      <span class="sealedLine">The counter resets every visit. The shell of
+      beads the rig wears does not: that is every point of damage this device
+      has ever delivered, and it takes a hundred of them to close.</span>`;
     const go = document.createElement('button');
     go.className = 'sbEnter';
-    go.textContent = 'ENTER THE RANGE';
+    go.textContent = 'ENTER THE TESTBED';
     go.addEventListener('click', () => {
       if (!this.game.enterSandbox()) return;
       this.setOpen(false);
@@ -399,24 +403,44 @@ export class Menu {
       // Only from a running field: the title screen and an ending are not one.
       r.go.disabled = this.game.world.phase !== 'staging';
       const s = owned ? lastSession() : null;
-      r.last.hidden = !s;
-      r.last.innerHTML = s
-        ? `<h5>LAST SESSION</h5>
+      /*
+       * ...and the record under it, which is a different kind of number and
+       * says so. The session is gone when the app is killed; this one is what
+       * the rig is wearing and it is still there next week. Shown whenever
+       * there is one, even on a launch where the room has not been opened,
+       * because that is the whole point of it being a record.
+       */
+      const lt = owned ? lifetime() : null;
+      r.last.hidden = !s && !lt;
+      const head = s
+        ? `<h5 class="first">LAST SESSION</h5>
            <div class="sbLastHead">
-             <div><b>${s.clock}</b><em>ON THE BENCH</em></div>
+             <div><b>${s.clock}</b><em>ELAPSED</em></div>
              <div><b>${s.total}</b><em>DAMAGE</em></div>
              <div><b>${s.dps}</b><em>DPS AVG</em></div>
-             <div><b>${s.kills}</b><em>DESTROYED</em></div>
            </div>`
           + s.top.map((t) => `<div class="sbLastRow"><i style="background:${t.tone}"></i>`
             + `<span>${t.name}</span><b>${t.value}</b></div>`).join('')
         : '';
+      const rec = lt
+        ? `<h5${head ? '' : ' class="first"'}>LIFETIME</h5>
+           <div class="sbLife">
+             <span class="sbLifeBar"><b style="width:${lt.pct.toFixed(1)}%"></b></span>
+             <span class="sbLifeNum">${lt.total}</span>
+             <span class="sbLifeOf">${lt.beads >= lt.of ? 'SHELL COMPLETE'
+               : `${lt.beads}/${lt.of} &middot; ${lt.next} TO NEXT`}</span>
+           </div>`
+        : '';
+      r.last.innerHTML = head + rec;
     }
     if (this.lockTab) {
-      // Two classes, not `hidden` on the padlock: `.tabLock` is given a
-      // `display` by an id-carrying rule and would ignore the attribute --
-      // the trap CLAUDE.md keeps a note about, and the reason the AUTO AIM
-      // row shipped unable to close.
+      // Two classes, not `hidden` on the padlock: `.tabLock` carries
+      // `display: inline-block`, so `[hidden]`'s user-agent rule -- one class
+      // of specificity, and it loses to any author rule -- would flip the
+      // attribute and leave the lock on the screen. The trap CLAUDE.md keeps
+      // a note about, and the reason the AUTO AIM row shipped unable to
+      // close. (This comment used to say the rule carried an id. It does
+      // not; a bare class is enough to win, which is the point.)
       this.lockTab.classList.toggle('sealed', !owned);
       this.lockTab.classList.toggle('unlocked', owned);
     }

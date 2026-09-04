@@ -37,7 +37,7 @@ import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
 import { Sandbox } from './sandbox.js';
-import { ledger } from './ledger.js';
+import { ledger, soak } from './ledger.js';
 import { updateDummy } from './dummy.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
@@ -671,7 +671,14 @@ export class Game {
     this.hud.setKills(w.kills);
     this.hud.setEnergy(w.energy);
     this.hud.syncAbilities(w.abilities);
-    this.hud.alert('SESSION RESTORED', 'info', 2.6);
+    /*
+     * ...except on the way into the testbed, which goes through `resume()`
+     * for its field rather than because a session was restored. The pill
+     * announced a restore that had not happened, over a readout it covers.
+     * Leaving is still announced -- `exitSandbox` says SIMULATION ONLINE, and
+     * there the message is true.
+     */
+    if (!w.sandbox) this.hud.alert('SESSION RESTORED', 'info', 2.6);
   }
 
   /**
@@ -679,6 +686,14 @@ export class Game {
    * is hidden — on a phone that is the last thing anything reliably gets.
    */
   checkpoint() {
+    /*
+     * The soak first, and deliberately ABOVE the bench guard below: this is
+     * the one number that moves while the bench is up, and every trigger that
+     * reaches here -- the slow timer, `visibilitychange`, `pagehide`, a
+     * purchase -- is a moment worth writing it at. It is a no-op unless it has
+     * actually changed.
+     */
+    soak.flush();
     // Never from inside the sandbox. The bench borrows the run's kit and then
     // spends it, kills things that do not count and stands on a field that is
     // not a wave -- writing any of that down would quietly overwrite the run
@@ -954,6 +969,9 @@ export class Game {
     this.grid.resize(world.width, world.height + STAGE_HEIGHT, GRID_CELL);
     background.resize(world.width, world.height, world.width / 2, ENTRY_Y);
 
+    // The testbed stands its rig off the readout's measured bottom edge, and
+    // a rotation moves that edge by tens of pixels. A no-op outside the room.
+    if (this.sandbox) this.sandbox.onResize();
   }
 
   qualityScale() {

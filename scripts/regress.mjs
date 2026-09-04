@@ -383,9 +383,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * every one of OBJECTS' 78 pieces of text was under 11px and 72 of them
      * failed 4.5:1, the worst at 1.82. A floor that applies to one tab is
      * not a floor.
+     *
+     * ...and `sandbox` was missing from this very list for four builds, which
+     * is the same mistake sitting inside the paragraph complaining about it.
+     * The TESTBED room went in at 232 and was never measured: its LAST
+     * SESSION labels run at 7.5px, which is the DEBUG panel's floor, in a
+     * room a player buys for 20,000 energy. The node is bought first so the
+     * open half of the room is the half that gets measured -- the shut half
+     * is one heading and two lines and was the only part visible before.
      */
+    g.world.energy = 999999;
+    g.buy('sandbox');
+    g.hud.menu.syncSandbox();
     const panels = [];
-    for (const tab of ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'system']) {
+    for (const tab of ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'sandbox', 'system']) {
       g.hud.menu.show(tab);
       panels.push(document.querySelector(`[data-panel="${tab}"]`));
     }
@@ -16188,6 +16199,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     sb2.dummy();
     out.dummiesAfterThree = w.enemies.filter((e) => e.dummy && !e.dead).length;
     out.named = (document.querySelector('.sbTag') || {}).textContent;
+    /*
+     * ...and the same name in the other two places it is written. The bar
+     * takes it from `RANGE_NAME` in sandbox.js, the tab from `GROUPS` in
+     * menu.js and the card from the tree -- three files, and every rename
+     * this room has had moved a subset of them.
+     */
+    const tabEl = document.querySelector('.menuTab[data-tab="sandbox"]');
+    out.tabbed = tabEl ? tabEl.textContent.trim() : '';
+    const node = (await import('../src/upgrades.js')).UPGRADES.TOOL
+      .find((u) => u.id === 'sandbox');
+    out.noded = node ? node.name : '';
+    out.nodeId = node ? node.id : '';
 
     // ---- and out ---------------------------------------------------------
     out.left = g.exitSandbox();
@@ -16296,12 +16319,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * a counter, which is what the mode was always for and what its new name
    * says.
    */
-  check('the range is one dummy and a counter, and there is nothing else to put down',
+  check('the testbed is one dummy and a counter, and there is nothing else to put down',
     r.noPicker && r.dummyOnEntry === 1 && r.dummiesAfterThree === 1
-    && r.named === 'RANGE',
+    // The name is pinned in all THREE places it is written, because it lives
+    // in three files: the bar takes it from `RANGE_NAME`, the tab from
+    // `GROUPS` and the card from the tree. It was RANGE for one build and
+    // SANDBOX for three before that, and each rename moved a subset.
+    && r.named === 'TESTBED' && r.tabbed === 'TESTBED' && r.noded === 'TESTBED'
+    // ...and the id under all of it has never moved, because a save has it.
+    && r.nodeId === 'sandbox',
     `no picker, no anomaly row, no summon door: ${r.noPicker}; entering puts `
     + `${r.dummyOnEntry} dummy down and pressing DUMMY twice more leaves `
-    + `${r.dummiesAfterThree}; the bar says "${r.named}"`);
+    + `${r.dummiesAfterThree}; the bar says "${r.named}", the tab "${r.tabbed}" `
+    + `and the tree "${r.noded}" on id "${r.nodeId}"`);
 
   check('...and leaving hands the run back',
     r.left && r.outFlag && r.ledgerOff && r.chromeBack,
@@ -16569,7 +16599,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const r = await page.evaluate(async () => {
     const g = window.__sim;
     const w = g.world;
-    const { ledger, WINDOWS, BAR_WINDOW } = await import('../src/ledger.js');
+    const { ledger, soak, WINDOWS, BAR_WINDOW } = await import('../src/ledger.js');
     const { NODES } = await import('../src/tree.js');
     const { freshUpgrades } = await import('../src/upgrades.js');
     const { codex } = await import('../src/codex.js');
@@ -16619,7 +16649,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // ...and the table folds away again, which is where it starts every time
     sb.showTable(false);
     out.foldedByDefault = !sb.tableOpen && document.querySelector('.sbTable').hidden;
-    out.barLabel = (document.querySelector('#sbDps em') || {}).textContent || '';
+    /*
+     * Every window the panel offers, and the unit said once above them. The
+     * bar carried the ten-second rate too until build 236 -- the same number
+     * as the second tile, four pixels above it, and at 320 its label wrapped.
+     * So what is pinned is that all four windows are named and that NONE of
+     * them is repeated in the bar, which is the thing that went wrong.
+     */
+    out.tileLabels = [...document.querySelectorAll('.sbStatHead em')]
+      .map((e) => e.textContent).join(',');
+    out.barHasRate = !!document.querySelector('#sbBar #sbDps');
+    out.capLabel = (document.querySelector('.sbCap span') || {}).textContent || '';
 
     // ---- the dummy is bigger, further out, and inside the ceiling --------
     const d = placeDummy(g);
@@ -16705,6 +16745,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const x = c.getContext('2d');
     const liveWas = ledger.live;
     const onWas = ledger.on;
+    /*
+     * No shell. The soak accumulates across the whole suite -- every case that
+     * shoots a dummy adds to it -- so leaving it live would make this
+     * measurement depend on how much damage the hundred cases before it
+     * happened to do. It is the same picture in every band either way; what it
+     * would corrupt is the phase control, which is what the thresholds are set
+     * against.
+     */
+    const soakWas = soak.total;
+    soak.total = 0;
     /** Greyscale, divided by the frame's own brightness. `mul` fakes a repaint. */
     const norm = (px, mul) => {
       const g = new Float32Array(S * S);
@@ -16750,6 +16800,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         recolour: Math.max(mad(now, norm(a.px, 0.62)), mad(now, norm(a.px, 1.55))),
       });
     }
+    soak.total = soakWas;
     out.pics = pics.map((p, i) => ({
       band: p.band,
       drew: p.drew,
@@ -16822,11 +16873,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `the 3s says ${r.old3}, the 30s says ${r.old30}, the run average says `
     + `${r.run} (and the 3s read ${r.fresh3} on the first burst)`);
 
-  check('...and the bar is the ten, redrawn four times a second and not sixty',
+  check('...and every window says which one it is, once, four times a second',
     r.syncsPerSecond >= 3 && r.syncsPerSecond <= 5
-    && /10s/.test(r.barLabel) && r.foldedByDefault,
-    `${r.syncsPerSecond} refreshes in a second of frames, labelled "${r.barLabel}"; `
-    + `the source table folds away by default ${r.foldedByDefault}`);
+    // Each tile names its own window -- the first said "NOW" and did not,
+    // against a room whose own docstring says a rate with no window on it is
+    // not a number -- and the unit is said once, over the row.
+    && r.tileLabels === '3s,10s,30s,RUN' && /SECOND/.test(r.capLabel)
+    // ...and the bar does not carry a fifth copy of one of them.
+    && !r.barHasRate && r.foldedByDefault,
+    `${r.syncsPerSecond} refreshes in a second of frames; the tiles say `
+    + `"${r.tileLabels}" under "${r.capLabel}", the bar carries a rate `
+    + `${r.barHasRate}; the source table folds away by default ${r.foldedByDefault}`);
 
   check('the dummy is bigger and further out, and inside the broadphase ceiling',
     r.r === 68 && r.up === 420 && r.r * 2 <= r.cell,
@@ -16874,6 +16931,246 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `12 damage -> weight ${m.smallW} "${m.smallText}"; 900 -> ${m.bigW} `
     + `"${m.bigText}"; the strain landed on the struck facets and not `
     + `the ones between them ${m.onFace}`);
+}
+
+// --- the record the rig wears -----------------------------------------------
+/*
+ * The soak: every point of damage this device has ever put into a dummy, worn
+ * as a shell of beads round the rig and kept on disk.
+ *
+ * Three things have to hold and they fail in different ways, so each gets its
+ * own arm. It has to COUNT what was delivered -- not what a caller asked for,
+ * which is the instrument fault this project has now paid for three times. It
+ * has to SURVIVE, which means surviving the two things that wipe a run and not
+ * surviving the one thing that means "the next launch is a first launch". And
+ * the shell has to actually show it, which is measured off the drawing rather
+ * than off the number that drives it.
+ *
+ * The whole case saves and restores `sim7749-soak` around itself, the way the
+ * lines case does for `sim7749-lines`: the suite drives thousands of points of
+ * damage into dummies before it gets here, and a case that read the live value
+ * would be reading everything that ran before it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { soak, soakBeads, soakNext, SOAK_BEADS, SOAK_CAP } = await import('../src/ledger.js');
+    const { placeDummy, drawDummy, updateDummy, DUMMY } = await import('../src/dummy.js');
+    const { forgetPlayer } = await import('../src/codex.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    const heldSoak = localStorage.getItem('sim7749-soak');
+    const heldTotal = soak.total;
+
+    // ---- the ladder ------------------------------------------------------
+    /*
+     * An odometer with a decade a shell: twenty beads at a thousand each,
+     * then twenty at ten thousand, and so on for five shells. Asserted at
+     * every shell boundary, because the whole point of the shape is that the
+     * first bead is seventeen seconds of the stock gun and the hundredth is
+     * hours of a bought one.
+     */
+    out.ladder = [0, 1000, 20000, 220000, 2220000, 22220000, SOAK_CAP, SOAK_CAP * 9]
+      .map((d) => +soakBeads(d).toFixed(3));
+    out.cap = SOAK_CAP;
+    out.beadsMax = SOAK_BEADS;
+    out.nextAtZero = soakNext(0);
+    out.nextWhenFull = soakNext(SOAK_CAP);
+
+    // ---- what it counts --------------------------------------------------
+    g.restart();
+    g.debugClearField();
+    w.phase = 'staging';
+    w.spawnLock = 1e9;
+    w.director.update = () => {};
+    w.sandbox = true;
+    soak.total = 0;
+    const d = placeDummy(g);
+    /*
+     * Through `applyDamage`, not through `soak.add`: what is being asserted
+     * is that the number the RIG books is the delivered one. 500 asked for
+     * against an armour plate is not 500 booked, and a case that called the
+     * store directly could not tell the difference.
+     */
+    const hp0 = d.hp;
+    for (let i = 0; i < 4; i++) d.applyDamage(w, 250, 0, -1, 0, 0, 0, false, 'standard');
+    out.booked = Math.round(soak.total);
+    out.lost = Math.round(hp0 - d.hp);
+
+    // ---- what the shell draws off it -------------------------------------
+    /*
+     * Rendered by hand onto an offscreen canvas at four totals, and counted
+     * as CONNECTED BLOBS outside the rig rather than as lit pixels: the beads
+     * are the only hard geometry past 1.20R, so a blob count there is the
+     * bead count, and a measure of lit area would move with the halo instead.
+     */
+    const S = 300;
+    const c = document.createElement('canvas');
+    c.width = S; c.height = S;
+    const x = c.getContext('2d');
+    const shell = (total) => {
+      soak.total = total;
+      const e = { x: S / 2, y: S / 2, r: DUMMY.r, dummy: true };
+      for (let f = 0; f < 120; f++) updateDummy(e, 1 / 60);
+      x.clearRect(0, 0, S, S);
+      x.fillStyle = '#000000';
+      x.fillRect(0, 0, S, S);
+      drawDummy(x, e);
+      const px = x.getImageData(0, 0, S, S).data;
+      // A flood fill over everything bright enough to be a bead, outside the
+      // rig's own furthest geometry.
+      const seen = new Uint8Array(S * S);
+      let blobs = 0;
+      const lit = (i) => {
+        const j = i * 4;
+        const cx = (i % S) - S / 2;
+        const cy = ((i / S) | 0) - S / 2;
+        if (Math.hypot(cx, cy) < DUMMY.r * 1.24) return false;
+        return (0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2]) > 28;
+      };
+      const stack = [];
+      for (let i = 0; i < S * S; i++) {
+        if (seen[i] || !lit(i)) continue;
+        blobs++;
+        stack.push(i);
+        seen[i] = 1;
+        while (stack.length) {
+          const k = stack.pop();
+          const kx = k % S;
+          for (const n of [k - 1, k + 1, k - S, k + S]) {
+            if (n < 0 || n >= S * S || seen[n]) continue;
+            if (Math.abs((n % S) - kx) > 1) continue;
+            if (!lit(n)) continue;
+            seen[n] = 1;
+            stack.push(n);
+          }
+        }
+      }
+      return blobs;
+    };
+    out.drawn = [0, 5000, 220000, SOAK_CAP].map(shell);
+
+    // ---- and that it survives the things it has to survive ----------------
+    soak.total = 12345;
+    soak.flush();
+    out.onDisk = Number(localStorage.getItem('sim7749-soak'));
+    // A new run wipes the save. It must not wipe this.
+    w.sandbox = false;
+    g.start();
+    out.throughStart = Math.round(soak.total);
+    // ...and the one door that does mean "forget me".
+    forgetPlayer();
+    out.throughForget = Math.round(soak.total);
+    out.goneFromDisk = localStorage.getItem('sim7749-soak') === null;
+
+    // ---- put the device back the way it was found ------------------------
+    soak.total = heldTotal;
+    soak.dirty = false;
+    if (heldSoak === null) localStorage.removeItem('sim7749-soak');
+    else localStorage.setItem('sim7749-soak', heldSoak);
+    g.restart();
+    return out;
+  });
+
+  check('the record is an odometer: a decade a shell, and a full set is hours',
+    JSON.stringify(r.ladder) === JSON.stringify([0, 1, 20, 40, 60, 80, 100, 100])
+    && r.beadsMax === 100 && r.cap === 222220000
+    // The first bead is cheap and the last one is not: that is the whole shape.
+    && r.nextAtZero === 1000 && r.nextWhenFull === 0,
+    `${r.beadsMax} beads for ${r.cap} damage (13.1 hours at the 4,700 dps a `
+    + `fully bought turret sustains); the shell boundaries read ${r.ladder}`);
+
+  check('...and what it counts is what the body lost, not what was asked for',
+    r.booked === r.lost && r.booked === 1000,
+    `four hits of 250 booked ${r.booked} against ${r.lost} taken off the rig`);
+
+  check('...and the shell round the rig is that count, drawn',
+    JSON.stringify(r.drawn) === JSON.stringify([0, 5, 40, 100]),
+    `beads outside 1.24R at 0 / 5k / 220k / a full set: ${r.drawn}`);
+
+  check('...and it outlives a new run, and dies only with the record',
+    r.onDisk === 12345 && r.throughStart === 12345
+    && r.throughForget === 0 && r.goneFromDisk,
+    `written as ${r.onDisk}; a new run leaves ${r.throughStart}; `
+    + `forgetPlayer leaves ${r.throughForget} and takes the key ${r.goneFromDisk}`);
+}
+
+// --- the readout does not cover the thing it reads ---------------------------
+/*
+ * The one promise this room makes.
+ *
+ * It has been broken twice by the same mechanism and neither time did anything
+ * fail: `Sandbox.standoff` measures the panel and stands the rig clear of it,
+ * so ANY change that makes the panel taller moves the rig back -- until the
+ * clamp at `DUMMY.nearest` bites, and then it silently overlaps. Build 234's
+ * stats sheet landed 208px over the rig. Build 236's LIFETIME row landed 29px
+ * over it, and then 10px, and then 1px, each time on a build that looked
+ * right on a 390-wide phone.
+ *
+ * So it is measured, at the size that binds: 320x568 shows 916 world units of
+ * depth against a 390x844's 1361, and the turret is at world y 551 either way.
+ * Both are checked, because a fix that clears the small screen by shrinking
+ * something can push the large one past `DUMMY.up`.
+ *
+ * Two states, because the height is not constant: as ENTERED, and once the
+ * numbers have been filled in. The second is the one that has actually failed
+ * -- the panel was measured while its rows were still empty, and grew by 10px
+ * on the first sync.
+ */
+{
+  const held = page.viewportSize();
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    rows.push(await page.evaluate(async (vh) => {
+      const { CFG } = await import('../src/config.js');
+      const { soak } = await import('../src/ledger.js');
+      const g = window.__sim;
+      g.start();
+      g.world.energy = 999999;
+      g.buy('sandbox');
+      // A four-digit record and a running clock: the widest the panel gets.
+      const heldTotal = soak.total;
+      soak.total = 640000;
+      g.enterSandbox();
+      const gapNow = () => {
+        const p = document.querySelector('#sbPanel').getBoundingClientRect();
+        const d = g.world.enemies.find((e) => e.dummy && !e.dead);
+        return d ? +(((d.y - d.r) * CFG.zoom) - p.bottom).toFixed(1) : -999;
+      };
+      const onEntry = gapNow();
+      // ...and after the panel has been filled in and a hit has landed, which
+      // is the moment the old sub line used to wrap and take it 12px taller.
+      const d = g.world.enemies.find((e) => e.dummy && !e.dead);
+      d.applyDamage(g.world, 4200, 0, -1, 0, 0, 0, false, 'standard');
+      for (let i = 0; i < 40; i++) g.update(1 / 60);
+      const settled = gapNow();
+      /*
+       * ...and with the source table open, which is the one thing here that is
+       * allowed to cover the field. The rig must NOT have moved for it: it did,
+       * to `DUMMY.nearest`, and folding the table again did not put it back.
+       */
+      const before = d.y;
+      g.sandbox.showTable(true);
+      g.sandbox.dummy();
+      const moved = Math.abs((g.world.enemies.find((e) => e.dummy && !e.dead) || d).y - before);
+      g.sandbox.showTable(false);
+      g.exitSandbox();
+      soak.total = heldTotal;
+      soak.dirty = false;
+      return { w: vh, onEntry, settled, moved: +moved.toFixed(1) };
+    }, size.width));
+  }
+  await page.setViewportSize(held);
+
+  check('the testbed readout never covers the rig it is about, on either screen',
+    rows.every((x) => x.onEntry > 0 && x.settled > 0),
+    rows.map((x) => `${x.w}: ${x.onEntry}px clear on entry, ${x.settled}px once `
+      + 'the numbers are in').join('; '));
+
+  check('...and opening the source table does not move the target',
+    rows.every((x) => x.moved < 1),
+    rows.map((x) => `${x.w}: the rig moved ${x.moved} units`).join('; '));
 }
 
 // --- report -----------------------------------------------------------------

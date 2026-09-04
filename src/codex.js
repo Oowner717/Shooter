@@ -6,6 +6,7 @@
 // story: flat, observed, second person where it helps, never a tutorial.
 
 import { ANOMALIES } from './anomaly.js';
+import { soak } from './ledger.js';
 
 const KEY = 'sim7749-codex';
 
@@ -354,6 +355,9 @@ export function markLine(id) {
 export function forgetPlayer() {
   codex.forget();
   forgetLines();
+  // The bench's lifetime record. Progress rather than comfort, so it goes the
+  // way the glossary goes and not the way the volume does.
+  soak.forget();
   try {
     // forget() leaves an empty record behind; a device that has never been
     // opened has no record at all, and that is what this is meant to look

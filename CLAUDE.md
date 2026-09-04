@@ -1278,4 +1278,117 @@ most once for any given target and cannot spin.
   the save's own record of what has been bought all still say `sandbox`,
   because a save on a player's phone stores the node id and renaming it
   would silently un-buy a 20,000-energy node.
+- **A record is not a run, and the run file cannot hold one.** The testbed's
+  lifetime damage total lives in `sim7749-soak`, its own localStorage key,
+  because `sim7749-run` is deleted by starting over, by `Game.restart` and by
+  the title screen's RESET SIMULATION -- and because `captureRun` refuses to
+  write from anywhere but `staging` while `Game.checkpoint` refuses outright
+  from inside the room, so a number that only moves in the testbed could not
+  be written from there at all. Every device-level fact in this game is
+  already shaped this way (`sim7749-codex`, `sim7749-lines`, the prefs, the
+  volume): loaded once at module load, bounded on read, written only when it
+  has changed, and cleared by `forgetPlayer()` and nothing else -- which is
+  the one function that means "the next launch is a first launch". `add` is
+  called once per delivered hit and a bought turret lands dozens a second, so
+  it is flushed on a clock and from `Game.checkpoint`, above that function's
+  own bench guard.
+- **"One bead per X damage" and "a very high maximum" are the same request
+  pulling in opposite directions, and an odometer is the answer.** One bead
+  per thousand and a fully bought turret fills any honest ceiling in four
+  minutes; one per million and the stock gun earns its first after four
+  hours. `SOAK_SHELLS` is five shells of twenty, each shell's bead worth TEN
+  TIMES the one inside it: the first costs 1k (17 seconds of stock BOLT) and
+  a full set costs 222,220,000, which is 13.1 hours of the 4,700 dps a fully
+  bought turret sustains. Three quarters of the beads are earned inside the
+  first eight minutes and the last twenty take hours, which is the shape a
+  "very high maximum" actually wants.
+- **A sphere projected to 2D fills the DISC, not a ring.** The literal reading
+  of "wrapped in spheres" puts half the beads on top of the head -- the one
+  thing in the room you aim at and read. The shell is five concentric RINGS of
+  twenty instead, one per decade of the ladder, filling clockwise from twelve
+  o'clock and 43% larger in the bead each ring out. The first version stippled
+  all hundred across one annulus by golden angle, which fills more evenly and
+  is prettier and cannot be READ -- the decade is the whole point of an
+  odometer and a stipple hides it. Radial separation does not carry it alone
+  either: 6.1 units between rings is 3.8 CSS px at this zoom, so the size
+  ladder says the same thing a second way. A closed ring gets a joining circle
+  and a partial one does not, so shutting a decade is a visible event.
+- **A record does not move, and that is not only a taste argument.** The shell
+  is in the rig's FIXED register with the collar and the encoder scale -- lit
+  from below instead, the lower half at twice the alpha, matching band 5's
+  deck pool. Debris moves; the one thing a record must never be mistaken for
+  is debris. It also keeps it out of the band sweep's way: `regress.mjs`
+  compares whole normalised frames against a control of the same band eleven
+  frames apart, and a hundred rotating dots would inflate that control for a
+  reason unrelated to bands -- and inflate it MORE the longer the device had
+  been played, so the sweep's headroom would shrink as the player played. The
+  case pins `soak.total = 0` for the same reason.
+- **A `Float32Array` never compares equal to the literal you put in it.**
+  `BEAD_S[i]` held the bead's alpha and the draw loop skipped on
+  `BEAD_S[i] !== lit` against a literal `0.66` -- true for every bead, because
+  what comes back is the float32 nearest 0.66 and not the double. So NO beads
+  were drawn at any total, and the joining circles still were, which is why it
+  looked like a finished feature: five clean empty rings, and the count they
+  exist to show invisible. Typed arrays hold flags as integers, or the
+  comparison is against the array's own element.
+- **The rig's furthest hard geometry is 1.20R and the docstring said 1.14R.**
+  The trunnions are `rect(-RR - R * 0.08, ...)` with `RR = 1.12R`, so their
+  corner is at 1.201R. And `Game.drawAutoLock` -- which is not in dummy.js at
+  all -- puts four arcs at `e.r + 16` = 1.24R once converged, in the same
+  annulus. Anything added round the rig has to be checked against BOTH files;
+  the shell starts at 1.30R for that reason.
+- **A panel measured before it is filled is measured short.** `standoff` runs
+  from `enter()` and stood the rig clear of a panel whose rows were still
+  empty -- it grew 10px on the first `syncStats` and landed on the rig. It
+  syncs first now. Two more of the same shape in one sitting: it measured the
+  ACTIONS ROW's bottom without the panel's own bottom padding, which at
+  `CFG.zoom` is the entire 12-unit `clear`, so the rig came out flush against
+  the glass; and it had been measuring the PANEL, whose bottom is 62dvh away
+  when the source table is open -- so pressing DUMMY with the table open drove
+  `far` to zero and parked the rig at `nearest` permanently, because folding
+  the table again does not put it back.
+- **The clearance is a case now, at 320x568 and 390x844, on entry and once
+  the numbers are in.** This promise has been broken three times by three
+  different mechanisms and nothing ever failed, because `standoff` always
+  returns a number -- it just silently clamps. A guard that watches the
+  measured gap is the only thing that can see it.
+- **A readout that cannot move is not a readout.** The testbed's sub line
+  carried "n DESTROYED · n% OVERKILL", and both are pinned at zero there by
+  construction: the dummy has a billion health and is healed every frame,
+  VOID refuses it, and there is nothing else on the field because there are
+  no waves. The 27 characters they cost took the line to 304px inside a 280px
+  box at 320, where it WRAPPED, took the panel 12px taller and landed it on
+  the rig -- on the first hit, after `standoff` had already measured.
+- **A sweep with a hand-kept list will miss whatever is added after it was
+  written.** `regress.mjs`'s menu contrast sweep enumerates its tabs by name
+  and `sandbox` was not among them for four builds, under a comment reading
+  "a floor that applies to one tab is not a floor". Measured once it was
+  added: the room's LAST SESSION labels ran at 7.5px -- the DEBUG panel's
+  floor, in a room a player buys for 20,000 energy -- and its headings at
+  9.5px. The room's own CSS header had claimed the 11px floor the whole time.
+  Note the sweep also needs the room POPULATED: `.sbLast` is hidden with no
+  session, so adding the tab alone would have measured three text nodes and
+  passed.
+- **Two dead fields in `ledger.js` were each costing a window walk.**
+  `peak` was written on every `tick` and read by nothing (the rig's peak flag
+  is `e.dummyPeak`, a decayed maximum of the STRAIN, and always was), and
+  `table()` called `liveBy(BAR_WINDOW)` -- a second walk plus a `Map` -- four
+  times a second to fill a `live` column the panel does not draw. The tell for
+  both is the same: a field on a returned object with no reader.
+- **The menu tab strip is 8 characters while a tab is LOCKED**, measured:
+  302px of strip, three tabs, 4px padding a side, 11px at 0.22em = 9.022px a
+  character, and the padlock takes 14 of it. The failure mode is not a clip --
+  `.menuTab` has no `white-space: nowrap`, so an over-long label wraps and
+  makes the whole strip 12px taller, and past 10 characters it steals width
+  from its siblings. Nothing flips a property a test can read back. Design to
+  the LOCKED width: a 20,000-energy tab is padlocked for most of a run, and
+  that is exactly the state its label most needs to read in.
+- **The room is the TESTBED, and the ids are still `sandbox`.** It was SANDBOX
+  for three builds and THE RANGE for one, and the id has never moved through
+  any of it, because a saved run writes bought ids into `world.ledger` and
+  renaming this one takes a 20,000-energy node away from everyone who has
+  bought it. `regress.mjs` pins the name in all THREE places it is written --
+  the bar from `RANGE_NAME`, the tab from `GROUPS`, the card from the tree --
+  because it lives in three files and each of the two previous renames moved
+  a subset of them.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

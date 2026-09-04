@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '235';
+  var BUILD = '236';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -266,7 +266,7 @@
     <!-- The bench. One bar across the top and one sheet under it, both built
          by src/sandbox.js; hidden unless the run has bought SANDBOX and gone
          into it. `body.sandbox` is what takes the run's own chrome down. -->
-    <section id="sandbox" aria-label="Sandbox" hidden></section>
+    <section id="sandbox" aria-label="TESTBED" hidden></section>
 
     <!-- ============ MENU ============ -->
     <!-- Built from data in src/menu.js: a new round, assist or object needs a

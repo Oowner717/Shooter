@@ -907,7 +907,10 @@ html, body {
 }
 .menuTab.on { color: var(--accent); border-bottom-color: var(--accent); background: rgba(89, 224, 255, 0.06); }
 .menuTab[hidden] { display: none; }
-.menuTab.sealed { color: rgba(150, 180, 210, 0.42); }
+/* 0.42 measured 2.48:1, which is a navigation label a player cannot read.
+   The state is carried by the padlock and the border anyway, so the text can
+   afford to be legible. */
+.menuTab.sealed { color: rgba(150, 180, 210, 0.68); }
 .menuTab.sealed.on { color: var(--dim); border-bottom-color: rgba(150, 180, 210, 0.5); background: rgba(150, 180, 210, 0.04); }
 .tabLock { display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: -1px; }
 .tabLock svg { width: 10px; height: 10px; display: block; }
@@ -3914,25 +3917,22 @@ body.booting #quickBar {
   font-size: 11px;
   letter-spacing: 0.16em;
   color: #8fb8d8;
-  flex: none;
+  /* Takes the slack, so the two doors sit hard right whatever the name is. */
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-/* The counter. Tabular, because a rate that reflows as its digits change is
-   a rate you cannot watch. */
-#sbDps {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-}
-#sbDps b { font-size: 17px; font-weight: 600; color: var(--ink); }
-#sbDps em { font-size: 9.5px; font-style: normal; letter-spacing: 0.12em; color: var(--dim); }
-
+/* 36px in a 44px bar, against the 31 they were: the bar is already the full
+   height and the buttons were floating 6.5px of dead glass above and below
+   themselves. A thumb covers roughly a 44px disc (config.js). */
 .sbBtn {
   -webkit-appearance: none;
   appearance: none;
   flex: none;
-  padding: 8px 9px;
+  min-height: 36px;
+  padding: 8px 10px;
   font-size: 11px;
   letter-spacing: 0.1em;
   font-family: inherit;
@@ -3941,7 +3941,6 @@ body.booting #quickBar {
   background: rgba(16, 30, 46, 0.9);
   color: var(--ink);
 }
-.sbBtn.on { border-color: #8fb8d8; color: #cfe6f6; background: rgba(143, 184, 216, 0.16); }
 
 /*
  * The panel, and it is ALWAYS up.
@@ -3958,7 +3957,9 @@ body.booting #quickBar {
   top: calc(var(--hud-t) + 50px);
   left: max(10px, var(--safe-l));
   right: max(10px, var(--safe-r));
-  max-height: 62vh;
+  /* `dvh`, like the rest of the file: 62vh on iOS is 62% of the LARGE
+     viewport, i.e. of a screen the URL bar is not on. */
+  max-height: 62dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 9px;
@@ -3978,6 +3979,7 @@ body.booting #quickBar {
 .sbFold {
   -webkit-appearance: none;
   appearance: none;
+  min-height: 36px;
   padding: 9px 11px;
   font-size: 11px;
   letter-spacing: 0.1em;
@@ -3985,12 +3987,65 @@ body.booting #quickBar {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: rgba(16, 30, 46, 0.9);
-  color: var(--dim);
+  /* Was `--dim`, which measures 4.28:1 on this plate over every sky the room
+     uses -- under the 4.5 the rest of the player's interface is held to. */
+  color: #a9c0d6;
   white-space: nowrap;
 }
 .sbFold.on { border-color: #8fb8d8; color: #cfe6f6; }
 
 /* ---- the stats table ---- */
+/* The unit, said once over the row instead of four times inside it. */
+.sbCap {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 1px 5px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+}
+.sbCapWin { color: rgba(150, 180, 210, 0.55); }
+
+/*
+ * The record: the one row here that is not the session.
+ *
+ * A hairline above it and a tag of its own, because RESET COUNTER clears
+ * everything else on the panel and does not touch this -- a player who could
+ * not tell them apart would read the reset as broken.
+ */
+.sbRec {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.sbRecTag { color: #8fb8d8; }
+.sbRecBar {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(120, 190, 255, 0.1);
+  overflow: hidden;
+}
+.sbRecBar b {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: rgba(125, 148, 176, 0.85);
+  transition: width 0.3s linear;
+}
+.sbRecNum { font-size: 12px; color: var(--ink); }
+/* Third column, on its own line under the number: "47/100 · 40k TO NEXT" is
+   too long to sit beside it at 320 and too useful to drop. */
+.sbRecOf { grid-column: 3; font-size: 11px; text-align: right; }
+
 .sbStatHead { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .sbStatHead div {
   display: flex;
@@ -4002,7 +4057,8 @@ body.booting #quickBar {
   background: rgba(14, 26, 42, 0.7);
 }
 .sbStatHead b { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.sbStatHead em { font-size: 8.5px; font-style: normal; letter-spacing: 0.1em; color: var(--dim); }
+.sbStatHead em { font-size: 11px; font-style: normal; letter-spacing: 0.08em; color: var(--dim); }
+#sbSoakMini { display: none; }
 .sbStatSub {
   display: flex;
   justify-content: space-between;
@@ -4017,6 +4073,7 @@ body.booting #quickBar {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
+  min-height: 36px;
   padding: 9px 6px;
   font-size: 11px;
   letter-spacing: 0.12em;
@@ -4028,7 +4085,7 @@ body.booting #quickBar {
 }
 .sbTable h4 {
   margin: 10px 0 4px;
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.16em;
   color: var(--dim);
@@ -4040,7 +4097,7 @@ body.booting #quickBar {
   gap: 6px;
   padding: 4px 0;
 }
-.sbHeadRow { font-size: 8.5px; letter-spacing: 0.12em; color: var(--dim); }
+.sbHeadRow { font-size: 11px; letter-spacing: 0.08em; color: var(--dim); }
 .sbRow i { width: 8px; height: 8px; border-radius: 2px; display: block; }
 .sbName { font-size: 11px; letter-spacing: 0.05em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sbBar { height: 6px; border-radius: 3px; background: rgba(120, 190, 255, 0.1); overflow: hidden; }
@@ -4059,6 +4116,33 @@ body.booting #quickBar {
  */
 body.sandbox #barChips,
 body.sandbox #waveRail { display: none !important; }
+
+/*
+ * ...and the two things left up there, put right.
+ *
+ * The bar sits at `--hud-t` and `#topbar` sits at `--hud-t + 8px`, so the
+ * hamburger was 8px lower than the bar beside it -- two staggered 44px boxes
+ * across the top of the screen. And `#sbPanel` starts at `--hud-t + 50` while
+ * the button's box ends at `--hud-t + 52`, so the panel (z 46, the highest in
+ * this file, `pointer-events: auto` across its whole rectangle) sat on the
+ * door's bottom 2px and ate those taps.
+ *
+ * Both are fixed by moving the BUTTON rather than the panel: a pixel spent
+ * pushing the panel down is a pixel the rig does not get, and on a 568-tall
+ * screen the rig clears the panel by six of them.
+ */
+body.sandbox #topbar { top: var(--hud-t); }
+body.sandbox #menuBtn { z-index: 47; }
+
+/*
+ * The alerts column is behind the panel in this room, and it is reachable:
+ * the hamburger is still live, the tree is two taps away, and buying anything
+ * fires `${tier} FITTED`. `#alerts` lives at `--under-rail`, which is inside
+ * the panel's box on every screen -- so it is lifted over it rather than
+ * moved, because a 2.6s pill over a readout is better than a 2.6s pill
+ * nobody sees, and moving it would put it on the rig instead.
+ */
+body.sandbox #alerts { z-index: 47; }
 
 /* The SANDBOX room's open half. The shut half wears `.sealedRoom`, which
    ULTIMATE already defines. */
@@ -4086,7 +4170,8 @@ body.sandbox #waveRail { display: none !important; }
   background: rgba(143, 184, 216, 0.14);
   color: #cfe6f6;
 }
-.sbEnter:disabled { opacity: 0.4; }
+/* 0.4 put the label at 3.23:1 and said nothing about why. */
+.sbEnter:disabled { opacity: 0.62; }
 
 /* The padlock comes off when the run buys the node. A class, because
    `[hidden]` loses to the rule that gives `.tabLock` its display. */
@@ -4104,13 +4189,16 @@ body.menuOpen #sandbox { display: none !important; }
 .sbLast { width: 100%; margin-top: 18px; text-align: left; }
 .sbLast[hidden] { display: none !important; }
 .sbLast h5 {
-  margin-bottom: 7px;
-  font-size: 9.5px;
+  margin: 16px 0 7px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.16em;
   color: var(--dim);
 }
-.sbLastHead { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 8px; }
+/* The first heading in the block, whichever it is: with no session on record
+   LIFETIME is the only one there and must not be pushed down. */
+.sbLast h5.first { margin-top: 0; }
+.sbLastHead { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 8px; }
 .sbLastHead div {
   display: flex;
   flex-direction: column;
@@ -4121,7 +4209,7 @@ body.menuOpen #sandbox { display: none !important; }
   background: rgba(14, 26, 42, 0.7);
 }
 .sbLastHead b { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.sbLastHead em { font-size: 7.5px; font-style: normal; letter-spacing: 0.08em; color: var(--dim); }
+.sbLastHead em { font-size: 11px; font-style: normal; letter-spacing: 0.04em; color: var(--dim); }
 .sbLastRow {
   display: grid;
   grid-template-columns: 8px 1fr auto;
@@ -4133,17 +4221,76 @@ body.menuOpen #sandbox { display: none !important; }
 .sbLastRow i { width: 8px; height: 8px; border-radius: 2px; }
 .sbLastRow b { font-weight: 600; font-variant-numeric: tabular-nums; }
 
+/* The record, under the session. Same shape as the panel's own LIFETIME row
+   so the two readouts of one number look like one number. */
+.sbLife {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.sbLifeBar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(120, 190, 255, 0.1);
+  overflow: hidden;
+}
+.sbLifeBar b { display: block; height: 100%; min-width: 2px; background: rgba(125, 148, 176, 0.85); }
+.sbLifeNum { font-size: 13px; font-weight: 600; color: var(--ink); }
+.sbLifeOf {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+}
+
 /*
  * A short screen. 320x568 shows 916 world units of depth against a 390x844's
  * 1361, so the readout and the rig are competing for a band that is 169 units
  * tall -- and the rig is 136 of it. Ten pixels off the panel is the
  * difference between the two clearing each other and not.
  */
+/*
+ * ---- 568 tall, and every pixel of the panel is one the rig does not get ----
+ *
+ * `Sandbox.standoff` stands the dummy clear of the panel's measured bottom
+ * edge, but it clamps at `DUMMY.nearest` -- and on a 320x568 screen the turret
+ * sits at world y 551, so the clamp is what governs and the panel simply has
+ * to fit above it. Measured: 127px is the whole budget, against 180 on a
+ * 390x844. So the caption goes (the room is the unit), the record's second
+ * line folds up beside its first, and everything else gives a pixel or two.
+ * `regress.mjs` asserts the clearance at 320x568 rather than trusting this.
+ */
 @media (max-height: 660px) {
-  .sbStatHead div { padding: 5px 4px; }
+  #sbPanel { padding: 6px; }
+  .sbCap { display: none; }
+  .sbStatHead { gap: 5px; }
+  /* The tiles lie DOWN on a short screen: "4.2k 10s" on one line instead of
+     stacked, which is 14px of the ~16 the 11px floor cost. Measured at 320:
+     68px of column against 56px of content, so nothing wraps. */
+  .sbStatHead div {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 3px;
+    padding: 5px 5px;
+  }
   .sbStatHead b { font-size: 13px; }
-  .sbStatHead em { font-size: 7.5px; }
-  .sbStatSub { margin-top: 4px; font-size: 10px; }
+  /* 11px stands. Everything in this room is a player's, and the 11px floor is
+     the one the title screen, the menu and the strip are all held to -- so the
+     pixels come out of the padding and the buttons, not out of the type. */
+  .sbStatSub { margin-top: 4px; }
+  .sbBtn, .sbReset, .sbFold { min-height: 34px; }
+  /* The record keeps its number and gives up its rule and its second line: it
+     is the row that must not be dropped, because it is the only one on the
+     panel that is still true tomorrow. */
+  /* The record's own row costs 22px here and the rig does not have them. It
+     is folded into the line above instead -- same number, one line, no bar --
+     which is the whole 22px in one move and keeps both readouts on screen. */
+  .sbRec { display: none; }
+  #sbSoakMini { display: inline; color: #8fb8d8; }
   .sbActs { margin-top: 5px; }
   .sbReset, .sbFold { padding: 7px 6px; }
 }

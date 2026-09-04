@@ -776,12 +776,14 @@ export const UPGRADES = {
    */
   TOOL: [
     /*
-     * The id stays `sandbox` though the thing is called the RANGE now: a
-     * saved run writes bought ids into `world.ledger`, so renaming this one
-     * would take the node away from everyone who has already bought it.
+     * The id stays `sandbox` though the thing is called the TESTBED now -- it
+     * was THE RANGE for one build and a SANDBOX for three before that, and
+     * the id has never moved through any of it. A saved run writes bought ids
+     * into `world.ledger`, so renaming this one takes a 20,000-energy node
+     * away from everyone who has already bought it.
      */
-    { id: 'sandbox', name: 'RANGE', levels: 1, cost: 20000, step: 0,
-      line: 'A practice dummy and a counter, and nothing else on the field. Read exactly what every round, mine and ability is delivering.',
+    { id: 'sandbox', name: 'TESTBED', levels: 1, cost: 20000, step: 0,
+      line: 'An instrumented dummy and a counter, and nothing else on the field. Read exactly what every round, mine and ability is delivering, and the rig keeps a record of everything you ever put into it.',
       apply: set('sandbox', true), tone: '#8fb8d8', icon: MARK.sandbox },
   ],
 };

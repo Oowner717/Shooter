@@ -55,7 +55,7 @@
 import { CFG } from './config.js';
 import { TAU, clamp, rand, spread, smoothstep, rgba, drawGlow, mixHex, jag } from './util.js';
 import { spark, shard, ripple } from './fx.js';
-import { ledger } from './ledger.js';
+import { ledger, soak, soakBeads, SOAK_BEADS, SOAK_PER_SHELL } from './ledger.js';
 
 export const DUMMY = {
   r: 68,
@@ -173,6 +173,108 @@ function detent(a) {
 // Everything below is built once at module load and written in place. The
 // draw path allocates nothing: the rig is drawn sixty times a second and an
 // array literal per frame is a collection you can feel.
+
+/**
+ * ---- the soak shell: what this device has ever put into a dummy ----
+ *
+ * The bands are a RATE and the marks are a HIT. Neither of them remembers
+ * anything: walk out of the room and the rig is bare again. This is the third
+ * channel and the only one that is a RECORD -- one small bead for every step
+ * of the odometer in `ledger.js`, standing off the machine, and it is still
+ * there next week.
+ *
+ * ---- five rings of twenty, and why not a scatter ----
+ *
+ * The ladder is an odometer with a decade a ring, so the DRAWING is one too:
+ * ring k is worth ten times the one inside it, fills clockwise from twelve
+ * o'clock, and is 43% larger in the bead. The first version stippled all
+ * hundred across one annulus by golden angle, which fills evenly and is
+ * prettier and cannot be READ -- the decade is the whole point of the ladder
+ * and a stipple hides it. Radial separation alone does not carry it either:
+ * 6.1 units between rings is 3.8 CSS px at this zoom, so the size ladder says
+ * the same thing a second way.
+ *
+ * A completed ring gets a joining circle at a tenth alpha and a partial one
+ * does not, so closing a decade is a visible event and a full set reads as a
+ * cage of five rings rather than a hundred loose dots.
+ *
+ * `RING_PHASE` is the golden conjugate of one bead's pitch, so no two rings
+ * ever line up. Whole-step offsets put rings 1/3/5 and 2/4 into register and
+ * the shell grows radial SPOKES, which is a boss's frame -- exactly the read
+ * to avoid on a body.
+ *
+ * ---- where it sits ----
+ *
+ * Outside everything. The furthest hard geometry on the rig is the trunnions
+ * at 1.20R (`-RR - R * 0.08` with RR = 1.12R) and `Game.drawAutoLock` -- which
+ * is not in this file at all -- puts four arcs at `e.r + 16` = 1.24R once it
+ * has converged. Ring 1's inner bead edge is at 1.29R, clear of both at every
+ * roll angle, so the beads can never cover the head, the shutters, the
+ * aperture or the encoder scale. `DUMMY.reach` is the outer edge, and
+ * `Sandbox.standoff` stands the rig off the readout by THAT rather than by
+ * the body radius, or the top of the shell goes under the panel.
+ *
+ * ---- and why none of it moves ----
+ *
+ * A record does not move. Debris does, and debris is the one thing this must
+ * never be mistaken for -- so the shell joins the rig's FIXED register, with
+ * the collar and the deck plate and the encoder scale. It is lit from below
+ * instead: the lower half at twice the alpha of the upper, matching band 5's
+ * deck pool and the encoder's own six-o'clock origin. Two static passes, both
+ * precomputed.
+ *
+ * That is also what keeps it out of the band sweep's way. `regress.mjs`
+ * compares whole normalised frames against a control of the same band eleven
+ * frames apart; a hundred rotating dots would inflate that control for a
+ * reason that has nothing to do with bands, and would inflate it MORE the
+ * longer the device had been played.
+ *
+ * The one moving part is the bead being earned, and it has no animation state
+ * -- it grows and drifts into its slot as a pure function of the fraction, so
+ * a reload resumes it at exactly the size it had.
+ */
+const RINGS = SOAK_BEADS / SOAK_PER_SHELL;
+/**
+ * A cool NEUTRAL grey, and the only achromatic thing in the picture.
+ *
+ * Measured in CIELAB against what it is drawn beside: 17.7 from the rig's own
+ * `#8fb8d8`, 26.7 from its fixed structure `#4a6379`, 25.9 from the shard
+ * white, and 64 to 71 from the three warm stops the rig wears whenever a
+ * bought turret is firing. Every hue in this game is spoken for; achromatic
+ * is the register nothing owns, and "not lit by the machine" is what a record
+ * should look like.
+ */
+const BEAD_TONE = '#98a0a8';
+/** Unit vector per bead: cos and sin of its fixed bearing. */
+const BEAD_CX = new Float32Array(SOAK_BEADS);
+const BEAD_CY = new Float32Array(SOAK_BEADS);
+/*
+ * 0 or 1, NOT the alpha. It held the alpha and the draw loop compared
+ * `BEAD_S[i] !== lit` against the literal -- and a Float32Array reads 0.66
+ * back as the float32 nearest 0.66, which is not the double 0.66, so the
+ * test was true for every bead and NOTHING was drawn. The joining circles
+ * still were, so the shell looked like five empty rings and the count it is
+ * supposed to show was invisible at every total.
+ */
+const BEAD_S = new Uint8Array(SOAK_BEADS);
+const BEAD_R = new Float32Array(SOAK_BEADS);
+const BEAD_SZ = new Float32Array(SOAK_BEADS);
+/** The outer edge of the whole shell, as a fraction of R. */
+export const BEAD_REACH = 1.32 + 0.09 * (RINGS - 1) + 0.026 + 0.005 * (RINGS - 1);
+for (let i = 0; i < SOAK_BEADS; i++) {
+  const k = Math.floor(i / SOAK_PER_SHELL);
+  const j = i % SOAK_PER_SHELL;
+  // Twelve o'clock, then clockwise: canvas +y is down, so increasing angle
+  // turns clockwise on screen.
+  const a = -Math.PI / 2 + j * (TAU / SOAK_PER_SHELL)
+    + k * 0.381966 * (TAU / SOAK_PER_SHELL);
+  BEAD_CX[i] = Math.cos(a);
+  BEAD_CY[i] = Math.sin(a);
+  BEAD_R[i] = 1.32 + 0.09 * k;
+  BEAD_SZ[i] = 0.026 + 0.005 * k;
+  // Lit from the deck. Static, so this is a table and not a per-frame sine.
+  BEAD_S[i] = Math.sin(a) > 0 ? 1 : 0;
+}
 
 const TICKS = 24;
 const TICK_C = new Float32Array(TICKS);
@@ -463,6 +565,15 @@ class Tally {
 export function dummyHit(world, e, dmg, nx, ny) {
   if (!(dmg > 0)) return;
   ensureRig(e);
+  /*
+   * The record, before anything else. `dmg` is the DELIVERED damage -- this is
+   * called from `applyDamage` past ARMORED's discard, past the plate, past a
+   * ward and past the `Math.max(1, ...)` floor -- so what is booked is what
+   * the rig actually lost, which is the same rule the ledger follows and for
+   * the same reason. It is kept in memory and flushed on a clock; see
+   * `Soak` in ledger.js for why it is not a write per hit.
+   */
+  soak.add(dmg);
   const w = weightOf(dmg);
   /*
    * The contact face. `nx, ny` is the round's travel for a projectile and the
@@ -584,6 +695,78 @@ export function drawDummy(ctx, e) {
   drawGlow(ctx, tone, 0, 0, R * (1.7 + s * 1.5),
     0.05 + lit0 * (0.05 + s * 0.4) + flash * 0.18);
   ctx.globalCompositeOperation = 'source-over';
+
+  // ---- the soak shell: the record, in beads -----------------------------
+  /*
+   * Drawn here, between the halo and the machine: outside every part of the
+   * rig by construction (the first bead's inner edge is at 1.29R and the
+   * furthest hard geometry is 1.20R), and under the additive glows so the
+   * inner ring catches the core's light the way anything else standing near
+   * it would.
+   *
+   * Three fills for the whole shell -- the far half, the near half, and the
+   * one arriving -- plus one stroke for however many rings are closed.
+   * `BEAD_TONE` is a constant and the two alphas are constants, so this
+   * contributes exactly three entries to the `rgba` cache for the life of the
+   * process and never touches `glowSprite`, whose cache has no ceiling.
+   */
+  const beads = soakBeads(soak.total);
+  if (beads > 0) {
+    const full = Math.min(SOAK_BEADS, Math.floor(beads));
+    for (let pass = 0; pass < 2; pass++) {
+      ctx.fillStyle = rgba(BEAD_TONE, pass ? 0.78 : 0.4);
+      ctx.beginPath();
+      for (let i = 0; i < full; i++) {
+        if (BEAD_S[i] !== pass) continue;
+        const rr = R * BEAD_R[i];
+        const bx = BEAD_CX[i] * rr;
+        const by = BEAD_CY[i] * rr;
+        const sz = R * BEAD_SZ[i];
+        ctx.moveTo(bx + sz, by);
+        ctx.arc(bx, by, sz, 0, TAU);
+      }
+      ctx.fill();
+    }
+    /*
+     * ...and a joining circle for each CLOSED ring, so shutting a decade is
+     * something you see happen. A partial ring gets none: an empty circle
+     * with three beads on it would promise a ring that is not there yet.
+     */
+    const closed = Math.floor(full / SOAK_PER_SHELL);
+    if (closed > 0) {
+      ctx.strokeStyle = rgba(BEAD_TONE, 0.1);
+      ctx.lineWidth = hair * 1.2;
+      ctx.beginPath();
+      for (let k = 0; k < closed; k++) {
+        // Off the bead table, not a second copy of its arithmetic.
+        const rr = R * BEAD_R[k * SOAK_PER_SHELL];
+        ctx.moveTo(rr, 0);
+        ctx.arc(0, 0, rr, 0, TAU);
+      }
+      ctx.stroke();
+    }
+    /*
+     * ...and the one being earned, which is the whole difference between a
+     * record and a picture of a record: it grows and drifts out into its slot
+     * over the damage it costs. No animation state -- the fraction IS the
+     * arrival, so it survives a reload at exactly the size it had. At the
+     * first ring that takes a fifth of a second on a bought turret and you
+     * watch it land; at the fifth it takes an hour and it does not appear to
+     * move at all, which is correct.
+     */
+    const frac = Math.min(1, beads - full);
+    if (full < SOAK_BEADS && frac > 0.02) {
+      const i = full;
+      const rr = R * BEAD_R[i] + (1 - frac) * R * 0.05;
+      ctx.globalAlpha = was * frac;
+      ctx.fillStyle = rgba(BEAD_TONE, BEAD_S[i] ? 0.78 : 0.4);
+      ctx.beginPath();
+      ctx.arc(BEAD_CX[i] * rr, BEAD_CY[i] * rr,
+        R * BEAD_SZ[i] * (0.45 + 0.55 * frac), 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = was;
+    }
+  }
 
   // ---- the deck plate and its strut (fixed) ----------------------------
   ctx.fillStyle = 'rgba(9,14,20,0.95)';

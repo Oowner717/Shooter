@@ -829,7 +829,22 @@ export class Hud {
      * drains in update(). `id` is what makes the marking honest: the caller
      * no longer records the line as said, this does, when it is painted.
      */
-    if (tutorial && (this.speaking() || this.hintTimer > 0)) {
+    /*
+     * ...and the same rule again for the TESTBED, which is the one room where
+     * the band lands on the only thing in it.
+     *
+     * The rig stands as far up-field as the readout leaves room for, and on a
+     * 320x568 screen that is 6px under the panel -- which is exactly where
+     * this band opens. Measured on a fresh device: entering the testbed put
+     * "Swing the grip under the turret" across the middle of the dummy.
+     *
+     * Held rather than dropped, for the reason the paragraph above gives: a
+     * first-use line is marked said when it PAINTS, so a line thrown away
+     * here is one the player never gets. It waits, and says itself when the
+     * testbed is closed.
+     */
+    const inBench = !!(this.game && this.game.world && this.game.world.sandbox);
+    if (tutorial && (inBench || this.speaking() || this.hintTimer > 0)) {
       this.voiceHeld.push({ text, hold, id });
       // Deep enough to hold every control a thumb can reach in one burst.
       while (this.voiceHeld.length > 8) this.voiceHeld.shift();
