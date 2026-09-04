@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '248';
+export const BUILD = '249';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '248';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '6711339';
+export const REV = '4a73934';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4293,6 +4293,32 @@ export function setZoom(era, sandbox) {
  * phone. `gap` is the visible depth of the enemy's side, 43.4 CSS px at both
  * of the screens the suite measures.
  */
+/*
+ * ---- THE EVOLUTION ----
+ *
+ * Six acts, and `acts` is the mark each one OPENS on. Thirty seconds against
+ * TERMINUS's 21.6, which is the longest thing in the game today.
+ *
+ *   0 -> 4.0   the field is taken. Nothing pays out.
+ *   4.0 -> 9.0 the approach. The camera pushes to `close`, nearer than the
+ *              game has ever been.
+ *   9.0 -> 15.5 the unmaking, in the order the run was built (P8b).
+ *   15.5 -> 19.0 the core. One point of light, held.
+ *   19.0 -> 23.5 the ignition. The era flips HERE, so the new form is what
+ *              builds outward.
+ *   23.5 -> 30.0 the pull-back, out to the new field.
+ *
+ * `quick` is the reduced-motion span: the same acts in the same order at a
+ * fifth of the length, rather than a different sequence nobody has watched.
+ */
+CFG.evolve = {
+  span: 30,
+  quick: 6,
+  close: 1.1,
+  skipAt: 1.5,
+  acts: [0, 4.0, 9.0, 15.5, 19.0, 23.5, 30],
+};
+
 CFG.yard = {
   gap: 105, mouthHalf: 130, faceHalf: 175, tooth: 34, clear: 24,
   // The six lots. Two works beside the machine and four emplacements in front

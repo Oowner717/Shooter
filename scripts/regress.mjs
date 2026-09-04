@@ -18816,6 +18816,131 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + r.rows.map((x) => `${x.key} ${x.one}->${x.two}`).join(', '));
 }
 
+// --- the evolution: thirty seconds that cost nothing ------------------------
+/*
+ * P8a. The camera, the phase and the clock. No art yet: what this build claims
+ * is that the thing runs for thirty seconds, takes the field without paying for
+ * it, moves nothing that belongs to the run, lands on the new field, and can be
+ * skipped into exactly the state it would otherwise have reached.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const arm = () => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(50000);
+      w.director.setTier(9);
+      /*
+       * A field with things on it, a purse, and salvage on the floor. Twenty
+       * seconds and not four: the director's `grace` is a second on its own
+       * and the first wave's arc opens at a two-second gap, so four left the
+       * field empty and the case was arming nothing.
+       */
+      for (let i = 0; i < 60 * 20; i++) g.update(1 / 60);
+      g.debugThrowMine('blast');
+      return {
+        energy: w.energy, earned: w.earned, kills: w.kills,
+        bodies: w.enemies.length, drops: w.drops.length, mines: w.mines.length,
+      };
+    };
+
+    const before = arm();
+    out.before = before;
+    out.armed = before.bodies > 0 && before.energy > 0;
+    out.began = g.beginEvolve();
+    out.phase = w.phase;
+    // ...and the field is gone, with nothing paid for it.
+    out.tookField = w.enemies.length === 0 && w.drops.length === 0
+      && w.mines.length === 0 && w.effects.length === 0 && w.debris.length === 0
+      && w.projectiles.length === 0 && w.pendingBlasts.length === 0;
+    out.paidNothing = w.energy === before.energy && w.earned === before.earned
+      && w.kills === before.kills;
+
+    /*
+     * Thirty seconds, sampled. The camera is the only thing allowed to move.
+     * `world.scale * world.camera` is what the player actually sees, and it
+     * must cross era 1's own 0.62 EXACTLY ONCE, outbound — twice would be the
+     * push-in and the pull-out sharing a path, and never would mean the era
+     * flip jumped the picture.
+     */
+    const seen = [];
+    const crossings = [];
+    let last = w.scale * w.camera;
+    let released = 0;
+    for (let f = 0; f < 60 * 31; f++) {
+      g.update(1 / 60);
+      const now = w.scale * w.camera;
+      if ((last - CFG.ZOOMS[1]) * (now - CFG.ZOOMS[1]) < 0) crossings.push(+now.toFixed(4));
+      last = now;
+      released += w.enemies.length;
+      if (f % 180 === 0) seen.push(+now.toFixed(4));
+    }
+    out.samples = seen;
+    out.crossings = crossings.length;
+    out.everReleased = released;
+    out.ended = w.evolve === null && w.phase === 'staging' && w.era === 2
+      && w.camera === 1;
+    out.after = { energy: w.energy, earned: w.earned, kills: w.kills };
+    out.stillPaidNothing = w.energy === before.energy && w.earned === before.earned
+      && w.kills === before.kills;
+    // ...and the push actually happened, or every arm above is about a still.
+    out.pushed = Math.max(...seen) > CFG.ZOOMS[1] * 1.5;
+
+    // ---- a skip lands in the same place -------------------------------------
+    arm();
+    g.beginEvolve();
+    out.refused = g.skipEvolve();          // too early: must refuse
+    for (let f = 0; f < 60 * 3; f++) g.update(1 / 60);
+    out.skipped = g.skipEvolve();
+    out.skipEnd = w.evolve === null && w.phase === 'staging' && w.era === 2
+      && w.camera === 1 && w.enemies.length === 0;
+
+    // ---- and it will not start from anywhere it should not ------------------
+    g.setEra(1);
+    g.restart();
+    w.phase = 'staging';
+    out.fromEra2 = (() => { g.setEra(2); const ok = g.beginEvolve(); g.setEra(1); return ok; })();
+
+    delete w.director.update;
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('the evolution takes the field and pays nothing for it',
+    r.armed && r.began && r.phase === 'evolve' && r.tookField && r.paidNothing
+    && r.stillPaidNothing && r.everReleased === 0,
+    `armed with ${r.before.bodies} bodies, ${r.before.drops} drops and a purse of `
+    + `${r.before.energy}; it began (${r.began}), the phase is `
+    + `${r.phase}, all seven lists are empty ${r.tookField}, and across thirty `
+    + `seconds nothing was released (${r.everReleased}) and the purse, the `
+    + `lifetime and the count never moved ${r.stillPaidNothing}`);
+
+  /*
+   * The camera is a VIEW multiplier: it never touches `CFG.zoom`, `world.width`
+   * or `CFG.scale`, because those are the field. What the player sees is
+   * `world.scale * world.camera`, and that is what this samples.
+   */
+  check('...and the camera pushes in, flips the field, and comes back out once',
+    r.pushed && r.crossings === 1 && r.ended,
+    `the view ran ${r.samples.join(' -> ')}, crossing era 1's own 0.62 `
+    + `${r.crossings} time(s); it ended on era 2 at camera 1 ${r.ended}`);
+
+  check('...and a skip is refused at first, then lands exactly where it would have',
+    r.refused === false && r.skipped === true && r.skipEnd && r.fromEra2 === false,
+    `skipped in the first moment: ${r.refused} (must be false); skipped after `
+    + `three seconds: ${r.skipped}, landing on era 2 with a clear field `
+    + `${r.skipEnd}; and it refuses to start from era 2 (${r.fromEra2})`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

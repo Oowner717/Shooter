@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P7 (248) shipped. P8 (the cinematic) is next.**
+**Status: P1 (238) - P8a (249) shipped. P8b (the acts) is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -338,7 +338,9 @@ thing to run if the budget allows:
 - [x] P6a · the plumbing and the instruments (build 246)
 - [x] P6b+c · the radius and the fold, in one build (build 247)
 - [x] P7 · balance (build 248), era 2 only
-- [ ] P8 · the cinematic
+- [x] P8a · the camera, the phase and the clock (build 249)
+- [ ] P8b · the acts: the unmaking, the core, the ignition
+- [ ] P8c · audio, the smoke arm, the banner
 - [ ] P9 · the door
 - [ ] P10 · the reveal pass
 
@@ -1268,3 +1270,77 @@ in eight seconds that one round either way is 8% of the reading, and SLUG swung
 Median across all sixteen live sources: **1.300** against a configured 1.3.
 Hash `-1765830468` unmoved, MK1's ten machine digests still byte-identical,
 503 green over two consecutive runs.
+
+## 22. P8a, as built (build 249)
+
+The camera, the phase and the clock. No art: what this build claims is that the
+thing runs for thirty seconds, takes the field without paying for it, moves
+nothing that belongs to the run, lands on the new field, and can be skipped
+into exactly the state it would otherwise have reached.
+
+### It is a `world.phase`, and that does most of the work
+
+`world.phase = 'evolve'` and two dozen readers whose dominant test is
+`!== 'staging'` **all fail closed**: the director stops releasing, the story
+stops, the menu's tier controls disable, the bench refuses its door, and
+`SAVABLE` is `new Set(['staging'])` — so **not one autosave is written across
+the whole thirty seconds**, which is six of them that would otherwise have
+captured a half-evolved run.
+
+What `phase` does *not* stop only tests `'boot'`: firing, mines and abilities.
+Those are handled by the evolution owning the frame — `update` runs
+`updateEvolve` and returns, so no physics, no steering, no intake, no mine
+clock and no fuse advance. That is what lets the case assert the purse,
+`earned`, the kill count and all seven lists are untouched from the first frame
+to the last.
+
+### The camera is a VIEW multiplier and touches nothing else
+
+`world.camera` never writes `CFG.zoom`, `world.width`, `world.floorY` or
+`CFG.scale`. Writing an arbitrary zoom would drag every one of the fifty-odd
+`SCALED` paths continuously and **flip `CFG.mk2` the instant it crossed 0.62** —
+a different game every frame of the push-in. At `camera === 1` the draw
+transform is the one this game has always had, to the digit.
+
+Measured through a run: view 0.62 → 0.829 → **1.1 by act III**, held through the
+unmaking and the core, and **still exactly 1.1 across the era flip** at act V —
+`0.62 × 1.7742` and `0.403 × 2.7295` are the same number, so the picture does
+not jump on the frame the field changes — then out to 0.403. It crosses era 1's
+own 0.62 exactly once, outbound, which the case asserts: twice would be the
+push and the pull sharing a path, never would mean the flip jumped.
+
+The clear had to move to the device. At camera > 1 the world box no longer
+spans the screen, and a `fillRect(0, 0, world.width, world.height)` leaves the
+last frame around the edges.
+
+### `takeField` extracted rather than copied
+
+`setEra` already had the clear that names all seven lists and drains
+`pendingBlasts` last. The cinematic needs the same thing without the era
+switch, so it is one method now with one caller each. A second copy naming
+three of the seven under a comment about needing a clean field is this repo's
+own scar.
+
+### The skip and the reduced-motion arm
+
+A tap anywhere skips, refused for the first 1.5s so a tap still in flight when
+the banner was pressed cannot eat the thing the player just asked for — and a
+skip lands in *exactly* the end state, asserted against the full run's.
+Reduced motion runs the same acts in the same order at a fifth of the length
+rather than a different sequence nobody has watched; it triggers on
+`prefers-reduced-motion` **or** SCREEN SHAKE / OFF, which is a multiplier whose
+OFF is `0` and not `false`.
+
+### An instrument note
+
+The first filmstrip was read wrong: the page's own rAF loop advances the clock
+between the step and the screenshot, so `film-17.png` was not t=17. That is
+CLAUDE.md's "judging an effect off live screenshots measures the frame loop"
+verbatim. The numbers above come from reading the state at the step; the
+picture comes from freezing `g.paused` before the shot.
+
+Three cases, 506 green, hash `-1765830468` unmoved.
+
+**P8b owns**: the unmaking in ledger order, the core, the ignition, the sky
+turnover, the captions through `world.bossLine`, and the DOM chrome retreating
+through act II — it is still at full opacity in the shot above.

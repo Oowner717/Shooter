@@ -310,6 +310,14 @@ export class Game {
        */
       yard: null,
       /*
+       * The view multiplier, and the cinematic's own clock. Both declared here
+       * rather than assigned when the evolution starts, because the suite runs
+       * the world behind a Proxy that records reads and a field that appears
+       * later is a ghost field to it.
+       */
+      camera: 1,
+      evolve: null,
+      /*
        * Which ways in this run has already been HANDED, from build 227. Its
        * own record rather than a reading of `apertures`, because an aperture
        * is spent when the way is opened and a spent one would be handed
@@ -809,12 +817,17 @@ export class Game {
    * What is NOT here: the tier, the ledger, the purse, `earned`, `reconciled`.
    * A change of era is a change of field, not a new run.
    */
-  setEra(n, { instant = true } = {}) {
+  /**
+   * Take the field, paying nothing for it.
+   *
+   * Extracted from `setEra` when the cinematic needed the same thing without
+   * the era switch. It is the whole of the clear and not a subset: three of
+   * the seven lists under a comment about needing a clean field is this
+   * repo's own scar, and blasts drain LAST because a body coming apart pushes
+   * one on its way out.
+   */
+  takeField(instant = true) {
     const w = this.world;
-    const to = n === 2 ? 2 : 1;
-    if (w.era === to) return false;
-    w.era = to;
-
     /*
      * The field. DRIFT is NOT exempt here, unlike in `glitchOut` -- the
      * ambient trickle is exempt from a withdrawn WAVE because it was never
@@ -863,6 +876,126 @@ export class Game {
     w.director.abandonWave(!w.director.resting);
     w.director.grace = 1;
     w.director.douse();
+
+  }
+
+  /*
+   * ========================= THE EVOLUTION =========================
+   *
+   * Six acts over thirty seconds, against TERMINUS's 21.6 -- the longest thing
+   * in the game. It is a `world.phase` and not a flag, because `phase` already
+   * has two dozen readers whose dominant test is `!== 'staging'` and every one
+   * of them therefore FAILS CLOSED: the director stops releasing, the story
+   * stops, the menu's tier controls disable, the bench refuses its door, and
+   * -- the one that would otherwise have shipped six autosaves of a
+   * half-evolved run -- `SAVABLE` is `new Set(['staging'])`, so nothing is
+   * written to disk across the whole thirty seconds.
+   *
+   * What `phase` does NOT stop is guarded by hand below: firing, mines and
+   * abilities all only test `'boot'`.
+   */
+  beginEvolve() {
+    const w = this.world;
+    if (w.phase !== 'staging' || w.boss || w.era !== 1) return false;
+    const E = CFG.evolve;
+    /*
+     * The field is taken and pays NOTHING -- no salvage, no bounty, no kill.
+     * `takeField` is the same clear the era switch uses, which is the point:
+     * one implementation, and it names all seven lists.
+     */
+    this.takeField(true);
+    w.phase = 'evolve';
+    w.camera = 1;
+    w.evolve = { t: 0, act: 0, span: this.reducedMotion() ? E.quick : E.span, skipAt: E.skipAt };
+    w.mineTimer = 0;
+    this.mineTimer = 0;
+    // The fuse is doused and stays doused: `Director.update` is not reached at
+    // all in this phase, but the fuse it had is still lit until it is told.
+    w.director.douse();
+    this.hud.clearAlerts();
+    return true;
+  }
+
+  /** Whether the player has asked for less of this. */
+  reducedMotion() {
+    // SCREEN SHAKE is a MULTIPLIER with values [0, 0.5, 1] and OFF is 0, not
+    // false -- somebody who has turned the shake off has already said they
+    // want less of this.
+    if (pref('shake') === 0) return true;
+    try {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch { return false; }
+  }
+
+  /**
+   * Drive it. Called from `update` before anything else, and it OWNS the frame:
+   * nothing about the field advances while this is running.
+   */
+  updateEvolve(dt) {
+    const w = this.world;
+    const v = w.evolve;
+    if (!v) return;
+    const E = CFG.evolve;
+    const k = v.span / E.span;                 // the reduced-motion compression
+    v.t += dt;
+    const at = (mark) => mark * k;
+    /*
+     * The camera. It pushes to `E.close` through act II, holds through the
+     * unmaking and the core, and comes back out through act VI -- and the era
+     * flips at the top of act V, where the multiplier is stepped by exactly
+     * the ratio of the two zooms so the picture does not jump. 0.62 x 1.7742
+     * and 0.403 x 2.7295 are the same number on the glass.
+     */
+    const seg = (a, b) => clamp((v.t - at(a)) / Math.max(1e-6, at(b) - at(a)), 0, 1);
+    const ease = (x) => x * x * (3 - 2 * x);
+    const push = CFG.evolve.close / CFG.ZOOMS[1];
+    if (v.t < at(E.acts[1])) {
+      w.camera = 1;
+    } else if (v.t < at(E.acts[4])) {
+      w.camera = 1 + (push - 1) * ease(seg(E.acts[1], E.acts[2]));
+    } else {
+      if (w.era !== 2) {
+        this.setEra(2);
+        // ...and the picture does not move on the frame the field does.
+        w.camera = push * (CFG.ZOOMS[1] / CFG.ZOOMS[2]);
+      }
+      const out = push * (CFG.ZOOMS[1] / CFG.ZOOMS[2]);
+      w.camera = out + (1 - out) * ease(seg(E.acts[5], E.acts[6]));
+    }
+    v.act = E.acts.findIndex((m, i) => v.t < at(E.acts[i + 1] ?? 1e9));
+    if (v.t >= v.span) this.endEvolve();
+  }
+
+  /** Land it, from the end or from a skip. Both arrive in the same state. */
+  endEvolve() {
+    const w = this.world;
+    if (!w.evolve) return false;
+    if (w.era !== 2) this.setEra(2);
+    w.camera = 1;
+    w.evolve = null;
+    w.phase = 'staging';
+    this.takeField(true);
+    this.checkpoint();
+    return true;
+  }
+
+  /**
+   * A skip, refused for the first moment of it. A tap in flight when the
+   * banner was pressed must not eat the thing the player just asked for.
+   */
+  skipEvolve() {
+    const w = this.world;
+    if (!w.evolve || w.evolve.t < w.evolve.skipAt) return false;
+    return this.endEvolve();
+  }
+
+  setEra(n, { instant = true } = {}) {
+    const w = this.world;
+    const to = n === 2 ? 2 : 1;
+    if (w.era === to) return false;
+    w.era = to;
+
+    this.takeField(instant);
 
     // `reset()` does not call this and neither does `resume()`, so nothing
     // re-derives the geometry on its own. Harmless while both eras share a
@@ -1244,6 +1377,12 @@ export class Game {
     c.addEventListener('pointerdown', (ev) => {
       const w = this.world;
       if (w.phase === 'boot') return;
+      /*
+       * The evolution takes the whole canvas. A tap does not aim and does not
+       * fire; once the refusal window has passed it skips, and a skip lands in
+       * exactly the state the full run lands in.
+       */
+      if (w.evolve) { this.skipEvolve(); ev.preventDefault(); return; }
       const p = pos(ev);
       if (p.y > w.floorY + 10) return; // ability strip belongs to the thumb
       const s = w.shooter;
@@ -1779,6 +1918,29 @@ export class Game {
       return;
     }
     const real = Math.min(dtRaw, CFG.maxFrameDelta);
+    /*
+     * The evolution OWNS the frame. It runs before anything else and returns,
+     * so nothing about the field advances across its thirty seconds -- no
+     * physics, no steering, no intake, no mine clock, no fuse. `world.phase`
+     * already stops the director, the story, the menu's tiers and every
+     * autosave; this is what stops the rest, and it is why the acceptance
+     * case can assert that the purse, `earned` and all seven lists are
+     * untouched from the first frame to the last.
+     *
+     * The screen-level effects still settle, for the same reason they do
+     * behind an open menu: a white flash caught mid-decay reads as a broken
+     * frame rather than a held one.
+     */
+    if (w.evolve) {
+      this.updateEvolve(real);
+      settleScreen(real);
+      glitch.settle(real);
+      background.update(real);
+      w.narrator.update(real);
+      this.hud.updateAlerts(real);
+      this.hud.syncHudLight(w);
+      return;
+    }
     let dt = real;
     if (w.debug.slowmo) dt *= 0.25;
     // The unscaled step, for the few things that must not stretch with the
@@ -2700,10 +2862,37 @@ export class Game {
     const W = w.width;
     const H = w.height;
 
-    const k = this.dpr * w.scale;
-    ctx.setTransform(k, 0, 0, k, 0, 0);
+    /*
+     * ---- the camera ----
+     *
+     * `world.camera` is a VIEW multiplier and nothing else: it never touches
+     * `CFG.zoom`, `world.width`, `world.floorY` or `CFG.scale`, because those
+     * are the FIELD and the cinematic does not change the field until it flips
+     * the era. Writing an arbitrary zoom would drag every one of the fifty-odd
+     * `SCALED` paths continuously and flip `CFG.mk2` the instant it crossed
+     * 0.62, which is a different game every frame of the push-in.
+     *
+     * It zooms about the turret and slides the turret toward the middle of the
+     * glass as it goes, so the machine is what the shot is of. At `camera === 1`
+     * the transform below is the one this game has always had, to the digit.
+     */
+    const cam = w.camera || 1;
+    const k = this.dpr * w.scale * cam;
+    // The clear covers the DEVICE, not the world box: at camera > 1 the world
+    // box no longer spans the screen and the edges keep the last frame.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#04050a';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    if (cam === 1) {
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+    } else {
+      const f = w.shooter;
+      const nat = this.dpr * w.scale;                 // where the turret sits at rest
+      const mid = Math.min(1, (cam - 1) / 0.9);        // ...and how far to the middle
+      const tx = nat * f.x * (1 - mid) + (ctx.canvas.width / 2) * mid;
+      const ty = nat * f.y * (1 - mid) + (ctx.canvas.height / 2) * mid;
+      ctx.setTransform(k, 0, 0, k, tx - k * f.x, ty - k * f.y);
+    }
 
     ctx.save();
     ctx.translate(fx.shakeX, fx.shakeY);
@@ -3354,7 +3543,8 @@ export class Game {
    * have to change when it lands.
    */
   debugEvolve() {
-    this.hud.alert('EVOLUTION NOT BUILT YET', 'info', 2.4);
+    if (this.beginEvolve()) return true;
+    this.hud.alert('EVOLUTION NEEDS A QUIET ERA-1 FIELD', 'info', 2.4);
     return false;
   }
 
