@@ -173,12 +173,34 @@ export const SHARD_R = 12;
  * is fifty-seven of them.
  */
 export function materialOf(t) {
-  if (t._mat) return t._mat;
+  /*
+   * Memoised per type, and the memo is keyed on the SCALE as well, because
+   * `line` is now era-dependent -- see below. A memo that ignored the era
+   * would hand era 2 era 1's ladder for the life of the process.
+   */
+  if (t._mat && t._matAt === CFG.scale) return t._mat;
   const heavy = clamp(((t.density ?? 1) - 0.5) / 2.2, 0, 1);
+  t._matAt = CFG.scale;
   t._mat = {
     heavy,
     fill: 0.07 + heavy * 0.3, // 0.07 wisp, 0.37 solid
-    line: 0.062 + heavy * 0.072, // x radius
+    /*
+     * x radius -- and x the era's scale, which is the whole of build 199's
+     * finding arriving from the other direction.
+     *
+     * A body is stroked at `max(CFG.hairline, r * line)`, and the hairline is
+     * a DEVICE-pixel floor: it divides by the zoom, so pulling the camera back
+     * raises the floor in world units while `r * line` does not move. Measured
+     * at dpr 2, era 2 raises the floor 1.008 -> 1.551 and clamps 9 of the 16
+     * field types instead of 4 -- DRIFT, TOW, GLUT, HERALD and PRISM all
+     * collapse onto MOTE's outline. The line ladder is authored across 17.3x
+     * and a body reads almost entirely as its outline, the fill being 7-9% of
+     * its brightness, so that is most of the roster becoming the same object.
+     *
+     * Scaling `line` with the field holds the ladder against a floor that
+     * moved. Era 1 is untouched: `CFG.scale` is exactly 1 there.
+     */
+    line: (0.062 + heavy * 0.072) * CFG.scale,
     plate: !!t.armor,
   };
   return t._mat;

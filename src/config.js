@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '239';
+export const BUILD = '240';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '239';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '27d6e17';
+export const REV = '265151e';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4174,7 +4174,84 @@ export function setHairline(dpr) {
  */
 export function setZoom(era, sandbox) {
   CFG.zoom = sandbox ? CFG.ZOOMS[1] : (CFG.ZOOMS[era] || CFG.ZOOMS[1]);
+  /*
+   * ---- and everything the field's size implies ----
+   *
+   * `CFG.scale` is how much further everything turret-owned has to reach for
+   * the machine to cover the same FRACTION of a field that got deeper. It is
+   * DERIVED from the zoom rather than declared beside it, so the two cannot
+   * drift, and it is exactly 1.0 in era 1 -- which is what makes "era 1 is
+   * unchanged" true by construction instead of true by testing. Every site
+   * that multiplies by it is a no-op in era 1, so the sweep can be applied
+   * freely and a missed site is the only failure mode.
+   *
+   * Below it, the handful of constants with several readers each. They follow
+   * `CFG.hairline`'s shape -- a base that is written down once and a live
+   * value the game reads -- because wrapping four call sites in an expression
+   * is four chances to miss one, and this is none.
+   */
+  CFG.scale = CFG.ZOOMS[1] / CFG.zoom;
+
+  /*
+   * The entry line, and the speed that makes it free.
+   *
+   * `entryDepth` is a SCREEN distance written in world units: its whole job is
+   * to hold the assists off a body until it is clear of the interface, and the
+   * interface reaches world y 261 at era 1 and 402 at era 2. Scaling it is not
+   * optional -- left at 260 the bug it was written to kill comes straight
+   * back, and objects arrive and die in the one strip of the field you cannot
+   * watch.
+   *
+   * `entrySpeed` scales WITH it, and this is the one place the "enemy speeds
+   * do not scale" ruling does not reach: it is a staging multiplier applied
+   * only while `staged` (see `Enemy.drive`), not a field speed, and its own
+   * note says it exists so "the extra 260 units cost the run no time". Leave
+   * it and the march-in stops being free -- which matters more than it looks,
+   * because the ladder's three clocks (`surgeWithin` 3s, `cleanWithin` 12s,
+   * `patience` 26s) are all measured in the seconds it controls. 2.6 x 1.538
+   * is 4.0, and that is exact rather than fitted: 400/(4c) = 260/(2.6c).
+   */
+  CFG.entryDepth = BASE.entryDepth * CFG.scale;
+  CFG.entrySpeed = BASE.entrySpeed * CFG.scale;
+
+  /*
+   * How far the turret stands off the ability strip. Also a screen distance in
+   * world units -- its own comment says so -- so it scales to keep the machine
+   * at the same CSS position rather than creeping down onto the strip.
+   */
+  CFG.shooter.standoff = BASE.standoff * CFG.scale;
+
+  /*
+   * The assist's reach, and the two halves of the energy economy.
+   *
+   * The economy is a travel-time problem and nothing else: there is no
+   * collection radius, wreckage drifts the whole way in and lands on the
+   * turret. A column 54% longer costs 54% more time per mote against a hard
+   * `maxDrops` cap, so income per second falls and `world.earned` -- which
+   * gates every object type -- falls with it.
+   */
+  CFG.shooter.aimRange = BASE.aimRange * CFG.scale;
+  CFG.energy.pull = BASE.pull * CFG.scale;
+  CFG.drop.speed = BASE.dropSpeed * CFG.scale;
+  CFG.drop.accel = BASE.dropAccel * CFG.scale;
 }
+
+/**
+ * The era-1 values of everything `setZoom` derives.
+ *
+ * Captured once at module load, before anything can have written over them, so
+ * the numbers above stay the numbers written in the tables rather than a
+ * second copy that can drift from them.
+ */
+const BASE = {
+  entryDepth: CFG.entryDepth,
+  entrySpeed: CFG.entrySpeed,
+  standoff: CFG.shooter.standoff,
+  aimRange: CFG.shooter.aimRange,
+  pull: CFG.energy.pull,
+  dropSpeed: CFG.drop.speed,
+  dropAccel: CFG.drop.accel,
+};
 
 /**
  * How an object crosses the field. Every one picks a route at spawn, so two

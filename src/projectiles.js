@@ -792,7 +792,24 @@ export function drawProjectiles(ctx, world) {
 
 /** Muzzle spawn helper shared by the turret and the abilities. */
 export function fire(world, x, y, angle, opts = {}) {
-  const speed = opts.speed ?? CFG.bolt.speed;
+  /*
+   * x the era's scale, and this one line is every round in the game: `fire`
+   * is the shared muzzle for the turret and the abilities alike, so both the
+   * default and each round's own `opts.speed` pass through it.
+   *
+   * SPEED and not `life`, which is the same range by arithmetic and a
+   * different game to look at: a round drawn at 65% of era 1's scale and
+   * travelling 1.538x faster in world units crosses the SCREEN at exactly the
+   * pace it always did, where stretching `life` instead would leave every
+   * round visibly 35% slower.
+   *
+   * It also happens to be the only round-range fix era 2 needs. Eight of the
+   * nine ride `bolt.life: 2.2`, which over-covers even era 2's column twice
+   * over; SCATTER is the one with an authored range (`shotgun.life: 0.375`)
+   * and it is 420-533 units, a third of era 2's field. Scaling the speed
+   * carries it without touching the table.
+   */
+  const speed = (opts.speed ?? CFG.bolt.speed) * CFG.scale;
   const p = new Projectile(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, opts);
   if (!p.src) p.src = world.round || '';
   world.projectiles.push(p);

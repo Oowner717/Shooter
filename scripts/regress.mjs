@@ -17407,6 +17407,93 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `still spans the screen ${r.benchSpans}; leaving returns to ${r.afterBench}`);
 }
 
+// --- what a deeper field costs the machine, and what it must not cost -------
+/*
+ * P3 of the NEW FORM plan. `CFG.scale` is the field's own depth ratio, derived
+ * from the zoom so the two cannot drift, and it is EXACTLY 1 in era 1 — which
+ * is what makes "era 1 is unchanged" true by construction rather than by test.
+ * Every site that multiplies by it is a no-op there, so a missed site is the
+ * only way this can be wrong, and that is what the arms below look for.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, materialOf, ENEMY_TYPES } = await import('../src/config.js')
+      .then(async (c) => ({ ...c, ...(await import('../src/enemies.js')) }));
+    const g = window.__sim;
+    g.restart();
+    const out = {};
+
+    const read = () => ({
+      scale: +CFG.scale.toFixed(4),
+      entryDepth: +CFG.entryDepth.toFixed(1),
+      entrySpeed: +CFG.entrySpeed.toFixed(3),
+      standoff: +CFG.shooter.standoff.toFixed(1),
+      aimRange: +CFG.shooter.aimRange.toFixed(1),
+      pull: +CFG.energy.pull.toFixed(2),
+      dropSpeed: +CFG.drop.speed.toFixed(1),
+      // the drawn line ladder, as the count of types the stroke FLOOR clamps
+      clamped: ENEMY_TYPES.filter((t) => {
+        const m = materialOf(t);
+        return t.r * m.line < 1.25 / (2 * CFG.zoom);
+      }).length,
+    });
+
+    out.one = read();
+    g.setEra(2);
+    out.two = read();
+    g.setEra(1);
+    out.back = read();
+    out.unchanged = JSON.stringify(out.one) === JSON.stringify(out.back);
+
+    // The march in stays free: depth / (cruise * entrySpeed) is the same time.
+    out.marchHeld = Math.abs(
+      (out.two.entryDepth / out.two.entrySpeed)
+      - (out.one.entryDepth / out.one.entrySpeed)) < 0.01;
+
+    // A round crosses the SCREEN at the pace it always did.
+    const px = (e) => {
+      g.setEra(e);
+      return CFG.bolt.speed * CFG.scale * CFG.zoom;
+    };
+    out.screenSpeed = [+px(1).toFixed(3), +px(2).toFixed(3)];
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('the field scale is derived, and era 1 is exactly 1 of it',
+    r.one.scale === 1 && r.two.scale === 1.5385 && r.unchanged,
+    `era 1 scale ${r.one.scale}, era 2 ${r.two.scale}; era 1 after a round `
+    + `trip is ${r.unchanged ? 'identical' : 'CHANGED'}`);
+
+  check('...and the entry line clears the chrome without costing the wave time',
+    r.two.entryDepth === 400 && r.two.entrySpeed === 4
+    && r.marchHeld,
+    `entryDepth ${r.one.entryDepth} -> ${r.two.entryDepth} (the interface `
+    + `reaches 402 at era 2), entrySpeed ${r.one.entrySpeed} -> `
+    + `${r.two.entrySpeed}; the march in takes the same time ${r.marchHeld}`);
+
+  check('...and the reach, the intake and the rounds all followed the field',
+    r.two.aimRange === 615.4 && r.two.standoff === 323.1
+    && r.two.pull > r.one.pull && r.two.dropSpeed > r.one.dropSpeed
+    && r.screenSpeed[0] === r.screenSpeed[1],
+    `aim ${r.one.aimRange} -> ${r.two.aimRange}, standoff ${r.one.standoff} -> `
+    + `${r.two.standoff}, intake ${r.one.pull} -> ${r.two.pull}; a round still `
+    + `crosses the screen at ${r.screenSpeed[1]} px/s against ${r.screenSpeed[0]}`);
+
+  /*
+   * The one that would otherwise go wrong silently. The hairline is a DEVICE
+   * pixel floor, so it rises in world units as the camera pulls back while
+   * `r * line` does not — and build 199 already paid for what that does: the
+   * line ladder collapses and half the roster draws with MOTE's outline, on a
+   * roster that is already 35% smaller.
+   */
+  check('...and the stroke ladder holds against a floor that moved',
+    r.one.clamped === r.two.clamped,
+    `${r.one.clamped} of the roster clamped to the floor at era 1, `
+    + `${r.two.clamped} at era 2 — these must match, or the ladder collapsed`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

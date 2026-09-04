@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) and P2 (239) shipped. P3 is next.**
+**Status: P1 (238), P2 (239), P3a (240) shipped. P3b is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -328,7 +328,8 @@ thing to run if the budget allows:
 - [ ] P0 · this file
 - [x] P1 · the era, the switch, the reset convergence — **build 238**
 - [x] P2 · the camera — **build 239**
-- [ ] P3 · the constant sweep
+- [x] P3a · the scale, and the reach that makes era 2 playable — **build 240**
+- [ ] P3b · the rest of the sweep: ability radii, mine radii, the HUD-in-world literals, ROUTES, the lattice
 - [ ] P4 · the yard
 - [ ] P5 · the build lots
 - [ ] P6 · the MK2 turret
@@ -566,3 +567,43 @@ the zoom and would otherwise be one resize behind.
 P3 exists: the field is 1.54x deeper with era-1 reach. It is debug-only and reverts on
 reload. Shipping the zoom before the constants is deliberate — it makes P3's sweep
 measurable rather than a guess.
+
+---
+
+## 13. P3a, as built (build 240)
+
+**`CFG.scale` is derived, not declared**: `CFG.ZOOMS[1] / CFG.zoom`, written by
+`setZoom`. It is exactly 1.0 in era 1, which is the whole design — every site that
+multiplies by it is a no-op there, so "era 1 is unchanged" is true by CONSTRUCTION
+and a missed site is the only way the sweep can be wrong.
+
+Constants with several readers follow `CFG.hairline`'s shape — a `BASE` table
+captured at module load and a live value the game reads — because wrapping four call
+sites in an expression is four chances to miss one, and this is none.
+
+| | era 1 | era 2 |
+|---|---|---|
+| `entryDepth` | 260 | **400** (the interface reaches world y 402) |
+| `entrySpeed` | 2.6 | **4.0** (exact: 400/4c = 260/2.6c) |
+| `shooter.standoff` | 210 | 323.1 |
+| `aimRange` | 400 | 615.4 |
+
+**`entrySpeed` is the carve-out from the "speeds do not scale" ruling**, and it is a
+real one: it is a staging multiplier applied only while `staged`, not a field speed,
+and its own note says it exists so the extra depth costs the run no time. Left at 2.6
+the march-in stops being free — and the ladder's three clocks (`surgeWithin` 3s,
+`cleanWithin` 12s, `patience` 26s) are all measured in the seconds it controls, so era
+2 would have spent up to 2.3s of a 3s surge window on travel and reported IT TOOK TOO
+LONG on waves the player crushed.
+
+**One line covered every round in the game**: `fire()` is the shared muzzle for the
+turret and the abilities, so scaling the speed there carries all nine. SPEED and not
+`life` — same range by arithmetic, different game to look at, because a round drawn at
+65% scale travelling 1.538x faster crosses the SCREEN at exactly the pace it always
+did. It is also the only round-range fix era 2 needed: eight rounds ride `bolt.life`
+which over-covers even era 2 twice, and SCATTER is the one with an authored range.
+
+**The stroke ladder is held against a floor that moved.** `materialOf`'s `line` is
+x`CFG.scale` and the memo is keyed on the scale. Measured at dpr 2: without it era 2
+clamps 16 of 37 types instead of 11 — DRIFT, TOW, GLUT, HERALD and PRISM all collapse
+onto MOTE's outline, on a roster already drawn 35% smaller. With it, 11 at both eras.
