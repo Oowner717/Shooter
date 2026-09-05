@@ -19353,11 +19353,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  * "After purchase, a banner; when clicked, the animation." So the banner is up
  * only between those two moments, and pressing it is the door.
  *
- * Asserted on the RENDERED BOX and never on `hidden`: `[hidden] { display:
- * none }` is the user agent's, at one class of specificity, and loses to any
- * author rule written on an id -- so the property flips, every test that reads
- * it back agrees, and the element stays on the screen taking taps. That is
- * builds 185-186 verbatim, reported three times and green every time.
+ * ---- this case lied once, and the way it lied is the point ----
+ *
+ * Its first version called `g.hud.syncNewForm(w)` by hand after each step and
+ * reported the banner gone during the cinematic. It is not the HUD block that
+ * runs during the cinematic: that block sits after `update`'s early return for
+ * the phase, so for thirty seconds nothing syncs the banner at all. Measured
+ * through the real loop, it sat over the whole thing. A case that calls the
+ * method the game is supposed to call tests the method.
+ *
+ * So nothing below calls a sync. Every reading is taken after `g.update`, and
+ * off the RENDERED BOX rather than `hidden` -- `[hidden] { display: none }` is
+ * the user agent's, at one class of specificity, and loses to any author rule
+ * on an id, so the property flips, a test that reads it back agrees, and the
+ * element stays on the screen taking taps. That is builds 185-186 verbatim.
  */
 {
   const r = await page.evaluate(async () => {
@@ -19365,10 +19374,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const w = g.world;
     const out = {};
     const bar = document.getElementById('newFormBar');
-    const shown = () => {
-      const b = bar.getBoundingClientRect();
-      return b.height > 0 && b.width > 0;
-    };
+    const shown = () => bar.getBoundingClientRect().height > 0;
     const press = () => bar.dispatchEvent(new PointerEvent('pointerdown',
       { bubbles: true, cancelable: true, pointerId: 41, isPrimary: true }));
 
@@ -19376,56 +19382,70 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     delete w.director.update;
     w.spawnLock = 0;
     w.phase = 'staging';
-    g.hud.syncNewForm(w);
+    g.update(1 / 60);
     out.beforeBuy = shown();
 
-    // ...armed, the way buying it arms it.
+    // ...armed, the way buying it arms it, and seen through a frame.
     w.newForm = 'armed';
-    g.hud.syncNewForm(w);
+    g.update(1 / 60);
     out.armed = shown();
 
-    // ...and pressed. Through the handler, on the element, with pointerdown --
-    // a case that calls the method the handler calls tests the logic and not
-    // the control.
+    /*
+     * Pressed through its handler, on the element, with `pointerdown` -- and
+     * read on the SAME frame. A banner that goes on the next frame is a banner
+     * the player sees flash under their thumb.
+     */
     press();
+    out.atPress = shown();
     out.began = !!w.evolve;
-    g.hud.syncNewForm(w);
-    out.duringRun = shown();
 
-    while (w.evolve) g.update(1 / 60);
-    g.hud.syncNewForm(w);
+    // ...and it stays gone for the whole thirty seconds, sampled through the
+    // real loop at four points across the acts.
+    const at = {};
+    for (let f = 0; f < 60 * 31; f++) {
+      g.update(1 / 60);
+      if (f === 0) at.frame1 = shown();
+      if (f === 60 * 5) at.act2 = shown();
+      if (f === 60 * 12) at.act3 = shown();
+      if (f === 60 * 25) at.act6 = shown();
+    }
+    out.during = at;
+    out.everBack = Object.values(at).some(Boolean);
     out.afterRun = shown();
     out.state = w.newForm;
     out.era = w.era;
 
-    // ...and it does not come back on the new field.
+    // ...and nothing puts it back over the field it already changed.
     w.newForm = 'armed';
-    g.hud.syncNewForm(w);
+    g.update(1 / 60);
     out.armedAtEraTwo = shown();
 
     g.setEra(1);
     delete w.director.update;
     g.restart();
-    g.hud.syncNewForm(g.world);
+    g.update(1 / 60);
     out.afterRestart = shown();
     return out;
   });
 
   check('the banner is up between buying the NEW FORM and taking it, and only then',
     r.beforeBuy === false && r.armed === true && r.began === true
-    && r.duringRun === false && r.afterRun === false && r.state === 'done'
-    && r.era === 2 && r.afterRestart === false,
+    && r.afterRun === false && r.state === 'done' && r.era === 2
+    && r.afterRestart === false,
     `before buying: ${r.beforeBuy}; armed: ${r.armed}; pressed -> the evolution `
-    + `began ${r.began} and the banner went ${!r.duringRun}; after it, shown `
-    + `${r.afterRun} with newForm ${JSON.stringify(r.state)} on era ${r.era}; `
-    + `after a restart ${r.afterRestart}`);
+    + `began ${r.began}; after it, shown ${r.afterRun} with newForm `
+    + `${JSON.stringify(r.state)} on era ${r.era}; after a restart `
+    + `${r.afterRestart}`);
 
   /*
-   * ...and it cannot come back once the field has changed. `newForm` is set to
-   * 'done' by `endEvolve`, but a save from an older build, or a hand-set flag,
-   * must not put a second banner over the new field -- there is nothing left
-   * for it to open.
+   * The arm the first version could not see. Nothing here syncs anything: the
+   * readings come out of `g.update`, which is what the game actually runs.
    */
+  check('...and it goes on the frame it is pressed, and stays gone',
+    r.atPress === false && r.everBack === false,
+    `shown on the press frame: ${r.atPress} (must be false); across the thirty `
+    + `seconds ${JSON.stringify(r.during)}`);
+
   check('...and nothing can put it back over the field it already changed',
     r.armedAtEraTwo === false,
     `forced to 'armed' at era 2, the banner is shown ${r.armedAtEraTwo}`);

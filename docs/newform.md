@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P9b (254). The plan's structure is complete; P10 (the reveal pass) is what is left.**
+**Status: P1 (238) - P9b (255). The plan's structure is complete; P10 (the reveal pass) is what is left.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -1622,3 +1622,35 @@ about a thing that now exists, which is exactly what a reveal pass is for, and
 writing them now would mean writing them twice.
 
 516 green, hash `-1765830468` unmoved, smoke clean.
+
+## 28. Build 255 — the banner stayed on screen, and its case said it did not
+
+Reported from play: the button does not go away when you press it. It was true,
+and it was true for the whole thirty seconds.
+
+**The cause.** `Hud.syncNewForm` is called from a HUD block that sits *below*
+`update`'s early return for the `evolve` phase. For thirty seconds the
+evolution owns the frame and returns before that block, so nothing syncs the
+banner at all — it was hidden only when the cinematic ended and the ordinary
+update path resumed. Measured through the real loop: shown at the press frame,
+at 1s, at 10s and at 25s.
+
+**Why the case did not catch it, which is the part worth keeping.** It called
+`g.hud.syncNewForm(w)` by hand after each step and read the result. That tests
+the function; the game never called it. The case's own comment quoted
+CLAUDE.md's rule about pressing controls through their handler — and then broke
+the same rule one level up, on the *sync* rather than on the press.
+
+**The fix is in two places and both are needed.** `beginEvolve` hides it on the
+frame it is pressed, because a banner that goes on the *next* frame is one the
+player sees flash under their thumb; and the evolve branch names
+`syncNewForm` explicitly, because anything that must stay right across those
+thirty seconds has to be named there — the block that normally owns it is
+unreachable.
+
+**The case now touches no sync at all.** Every reading comes out of `g.update`,
+off the rendered box, sampled at the press frame and at four points across the
+acts. Reverted, it fails with exactly the reported symptom:
+`{"frame1":true,"act2":true,"act3":true,"act6":true}`.
+
+517 green, hash `-1765830468` unmoved.

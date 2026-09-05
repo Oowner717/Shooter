@@ -988,6 +988,17 @@ export class Game {
     glitch.reset();
     w.shock = 0;
     this.hud.clearAlerts();
+    /*
+     * ...and the banner, HERE, on the frame it was pressed.
+     *
+     * Not left to the HUD block that normally syncs it: that block sits after
+     * `update`'s early return for this phase, so during the thirty seconds the
+     * evolution owns the frame it is never reached -- measured, the banner sat
+     * over the whole cinematic and only went when it ended. Its own case
+     * passed because the case called `syncNewForm` by hand after pressing,
+     * which tests the function and not the game.
+     */
+    this.hud.syncNewForm(w);
     return true;
   }
 
@@ -2148,6 +2159,9 @@ export class Game {
       w.narrator.update(real);
       this.hud.updateAlerts(real);
       this.hud.syncHudLight(w);
+      // The HUD block that owns this sits below the return, so anything that
+      // must stay right across the thirty seconds has to be named here.
+      this.hud.syncNewForm(w);
       return;
     }
     let dt = real;
