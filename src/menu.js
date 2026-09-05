@@ -159,6 +159,7 @@ export class Menu {
     // The lock starts on: a fresh run has not bought it, and `show` above does
     // not visit a tab it is not showing.
     this.syncSandbox();
+    this.syncUltimate();
     // Sideways through the tabs. Bound on the scroller rather than the sheet
     // so the dismiss below, which owns the vertical axis, never sees it.
     swipeTabs(this.el.panels, {
@@ -207,7 +208,7 @@ export class Menu {
     // sheet and opening it again is exactly that gap, with the four seconds
     // still running. Measured: arm a card, close, reopen, and one tap spent.
     this.armRow(null);
-    if (on) { this.syncCodex(); this.syncTree(); this.syncSandbox(); }
+    if (on) { this.syncCodex(); this.syncTree(); this.syncSandbox(); this.syncUltimate(); }
     // The machine only draws while it is being looked at.
     if (on && this.tab === 'tree') this.runHero(); else this.stopHero();
   }
@@ -290,6 +291,7 @@ export class Menu {
     if (tab === 'codex') this.syncCodex();
     if (tab === 'tree') this.syncTree();
     if (tab === 'sandbox') this.syncSandbox();
+    if (tab === 'ultimate') this.syncUltimate();
     // The loadout tabs are filled by the HUD, which owns the strip they
     // describe; it is told which group is up and does the rest.
     if ((tab === 'ammo' || tab === 'mines') && this.game.hud) {
@@ -459,15 +461,102 @@ export class Menu {
     }
   }
 
+  /**
+   * ULTIMATE: what is above the tree, and how far off it is.
+   *
+   * Two states in one panel, the shape the testbed's room already uses. Shut,
+   * it names the two things that gate it and COUNTS them, because a locked
+   * door that does not say how far off it is, is a locked door nobody saves
+   * for -- and both halves of this gate are things you are doing anyway, so
+   * the counters move on their own. Open, it is one button.
+   *
+   * The counters are read off the same facts `Game.rigDone` and the price are:
+   * there is no second definition of "finished" anywhere.
+   */
   buildUltimate() {
     const p = this.panel('ultimate', 'ultimate');
-    p.innerHTML = `<div class="sealedRoom">
-      <span class="sealedMark" aria-hidden="true">${LOCK}</span>
-      <span class="sealedName">SEALED</span>
-      <span class="sealedLine">A tier above the tree. Nothing here opens yet;
-      what goes in it is being built.</span>
-    </div>`;
+    const shut = document.createElement('div');
+    shut.className = 'sealedRoom';
+    shut.innerHTML = `<span class="sealedMark" aria-hidden="true">${LOCK}</span>
+      <span class="sealedName">NEW FORM</span>
+      <span class="sealedLine">Not an upgrade to the machine &mdash; a
+      different machine, on a field you have not seen. Everything you have
+      built comes with it.</span>
+      <span class="sealedLine ufNeed"></span>
+      <span class="sealedLine ufNeed2"></span>
+      <span class="sealedLine sbCost">Bought from UPGRADES, at the top of the
+      tree, with what the anomalies leave behind.</span>`;
+
+    const open = document.createElement('div');
+    open.className = 'sbRoom';
+    open.hidden = true;
+    open.innerHTML = `<span class="sealedName">NEW FORM</span>
+      <span class="sealedLine">The field is taken, the machine comes apart in
+      the order you built it, and what stands up is not the same turret. Thirty
+      seconds. Tap to cut it short at any point &mdash; it lands in the same
+      place either way.</span>`;
+    const go = document.createElement('button');
+    /*
+     * `ufEnter`, NOT `sbEnter`. The testbed's door owns that class and its own
+     * case reaches for it with a bare `document.querySelector('.sbEnter')` --
+     * and this panel is built FIRST, so a shared class silently handed the
+     * testbed's case this button instead. It clicked BEGIN, started a
+     * thirty-second cinematic, never entered the room, and died on a dummy
+     * that was never placed. A selector another thing already owns is not a
+     * style choice.
+     */
+    go.className = 'ufEnter';
+    go.textContent = 'BEGIN';
+    go.addEventListener('click', () => {
+      // The sheet closes FIRST, for the reason the testbed's door records: a
+      // panel that is `display: none` measures zero, and act I is a camera
+      // move that wants a real viewport under it.
+      this.setOpen(false);
+      this.game.beginEvolve();
+    });
+    open.appendChild(go);
+    p.append(shut, open);
+    this.ultimateRoom = { shut, open, go,
+      need: shut.querySelector('.ufNeed'), need2: shut.querySelector('.ufNeed2') };
     return p;
+  }
+
+  /**
+   * ...and the two counters under it, live.
+   *
+   * Called from `sync`, so they move while you watch. Both are read off the
+   * same facts the GATE is read off -- `Game.rigDone` and `reconciled.length`
+   * against the price -- so the room cannot say you are ready while the tree
+   * says locked.
+   */
+  syncUltimate() {
+    const r = this.ultimateRoom;
+    if (!r) return;
+    const g = this.game;
+    const w = g.world;
+    const done = g.owned('recast') > 0 || w.era === 2;
+    r.shut.hidden = done;
+    r.open.hidden = !done;
+    if (done) {
+      // Already on the new field: the room has nothing left to offer.
+      r.go.disabled = w.era === 2 || w.phase !== 'staging' || !!w.evolve;
+      r.go.textContent = w.era === 2 ? 'DONE' : 'BEGIN';
+      return;
+    }
+    // Off `NODES` and `RIG_LEVELS`, which is the denominator the hero readout
+    // already counts against -- not a second walk with its own filter.
+    let have = 0;
+    for (const n of NODES) {
+      if (!n.id || !n.parent || n.parent.key !== 'turret') continue;
+      have += g.owned(n.id);
+    }
+    const want = RIG_LEVELS;
+    const anom = w.reconciled.length;
+    const need = CFG.ordinal.recast;
+    r.need.textContent = `THE MACHINE FINISHED \u00b7 ${have} of ${want}`;
+    r.need.classList.toggle('ufMet', want > 0 && have >= want);
+    r.need2.textContent = `EVERY ANOMALY RECONCILED \u00b7 ${Math.min(anom, need)} of ${need}`;
+    r.need2.classList.toggle('ufMet', anom >= need);
   }
 
   panel(id, cls = '') {
@@ -1617,6 +1706,10 @@ export class Menu {
     if (purse !== this.lastPurse) {
       this.lastPurse = purse;
       this.game.hud.setBuys(this.reachCount(world));
+      // ...and the two counters above the tree, which move on exactly the
+      // things this key already watches: a level bought and a REMAINDER
+      // earned. Keyed rather than per-frame, for the reason `fitBar` is.
+      if (this.open) this.syncUltimate();
     }
     for (const a of ARSENAL) {
       const on = a.kind === 'round' ? world.round === a.key

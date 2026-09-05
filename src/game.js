@@ -3010,6 +3010,7 @@ export class Game {
     this.hud.syncAbilities(w.abilities);
     this.hud.syncLoadout(w);
     this.hud.syncSeals();
+    this.hud.syncNewForm(w);
     /*
      * A REMAINDER arriving is the rarest event in the run -- one per ORDINAL,
      * and the only currency there is a second of. It gets said plainly, held

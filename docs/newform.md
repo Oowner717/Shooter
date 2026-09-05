@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P9a (253). P9b (the room, the banner, the discoverability sites) is next.**
+**Status: P1 (238) - P9b (254). The plan's structure is complete; P10 (the reveal pass) is what is left.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -342,7 +342,7 @@ thing to run if the budget allows:
 - [x] P8b · the acts: the unmaking, the core, the ignition (build 250)
 - [x] P8c · audio and the smoke arm (251, 252). The banner is P9's.
 - [x] P9a · the node, the gate, the save (build 253)
-- [ ] P9b · the ULTIMATE room, the banner, the five discoverability sites
+- [x] P9b · the ULTIMATE room and the banner (build 254). Two story lines left for P10.
 - [ ] P10 · the reveal pass
 
 ---
@@ -1576,3 +1576,49 @@ The gate case tests each half **alone**: a gate only ever tested with both
 halves missing cannot tell an AND from an OR.
 
 514 green, hash `-1765830468` unmoved.
+
+## 27. P9b, as built (build 254)
+
+**The ULTIMATE room is two states in one panel**, the shape the testbed's room
+already uses. Shut, it names what is behind the door and **counts both halves
+of the gate** — `THE MACHINE FINISHED · n of 18` and `EVERY ANOMALY RECONCILED
+· n of 7` — because a locked door that does not say how far off it is, is a
+locked door nobody saves for, and both halves move on their own while you play.
+The counters are read off the same facts `rigDone()` and the price are, so the
+room cannot say ready while the tree says locked. Open, it is one button.
+
+**The banner is up only between buying the NEW FORM and taking it**, and
+pressing it is the door. It sits over the middle of the field rather than in
+the top furniture on purpose: `Hud.pillCap` measures the gap up there and can
+legitimately return 0 on a 568-tall screen, so anything added to that column
+costs a teaching line.
+
+Its case asserts the **rendered box**, never `hidden` — `[hidden] { display:
+none }` is the user agent's, at one class of specificity, and loses to any
+author rule on an id, so the property flips and the element stays on screen
+taking taps. Builds 185–186 verbatim. And it is pressed **through its handler,
+on the element, with `pointerdown`**.
+
+### Two things the cases caught
+
+**1. A selector another thing already owns.** My BEGIN button was
+`className = 'sbEnter'` — the class the testbed's door owns — and
+`buildUltimate` runs *before* `buildSandbox`, so the testbed's own case, which
+reaches for a bare `document.querySelector('.sbEnter')`, silently got my button
+instead. It pressed BEGIN, started a thirty-second cinematic, never entered the
+room, and died on a dummy that was never placed. It is `ufEnter` now and the
+case is scoped to its panel.
+
+**2. The banner could appear over the field it had already changed.** Forcing
+`newForm = 'armed'` at era 2 showed it — and `beginEvolve` refuses there, so it
+would have been a visible button that does nothing. Its condition IS
+`beginEvolve`'s own now.
+
+### Not done, and why
+
+The two story lines the plan lists — `game.js`'s "there is nothing above the
+tree" and the seventh-anomaly moment — are **left for P10**. They are prose
+about a thing that now exists, which is exactly what a reveal pass is for, and
+writing them now would mean writing them twice.
+
+516 green, hash `-1765830468` unmoved, smoke clean.

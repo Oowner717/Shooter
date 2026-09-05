@@ -113,6 +113,7 @@ export class Hud {
       startBtn: $('startBtn'),
       resumeBtn: $('resumeBtn'),
       quickBar: $('quickBar'),
+      newFormBar: $('newFormBar'),
     };
 
     this.slots = [];
@@ -2413,6 +2414,40 @@ export class Hud {
    * What still has to run while the simulation is held: the interface itself,
    * so a cell lights the instant it is tapped and the readout keeps up.
    */
+  /**
+   * The banner, up only between buying the NEW FORM and taking it.
+   *
+   * `hidden` alone is not enough on an element the stylesheet gives a
+   * `display` to -- `[hidden]` is the user agent's, at one class of
+   * specificity, and loses to any author rule on an id. `#newFormBar[hidden]`
+   * carries its own guard in styles.css for that reason; twenty selectors in
+   * there already do.
+   */
+  syncNewForm(world) {
+    const b = this.el.newFormBar;
+    if (!b) return;
+    if (!b._wired) {
+      b._wired = true;
+      // `pointerdown`, like every other play-screen control: a tap registers
+      // when the thumb lands, and the suite presses it the same way.
+      b.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        this.game.beginEvolve();
+      });
+    }
+    /*
+     * `era === 1` is not redundant with the flag. `endEvolve` sets `newForm`
+     * to 'done', but a save from an older build, a hand-set flag or any future
+     * path that arms it twice must not put a banner over the field it has
+     * already changed -- and `beginEvolve` refuses at era 2, so it would be a
+     * button that does nothing. The condition here IS `beginEvolve`'s own,
+     * which is what keeps a visible door from being a shut one.
+     */
+    const on = world.newForm === 'armed' && world.era === 1 && !world.evolve
+      && !world.sandbox && world.phase === 'staging' && !world.boss;
+    if (b.hidden !== !on) b.hidden = !on;
+  }
+
   syncHudLight(world) {
     // The sheet is live while the world is held: the meters are what the
     // verdict will be read from, and a frozen readout would be a lie.

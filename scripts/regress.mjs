@@ -15932,7 +15932,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       lockOnTab: !!tabBtn.querySelector('.tabLock svg'),
       room: !!room && getComputedStyle(room).display !== 'none',
       says: room ? room.textContent.replace(/\s+/g, ' ').trim().slice(0, 40) : '',
-      cards: document.querySelectorAll('[data-panel="ultimate"] .shopCard').length };
+      cards: document.querySelectorAll('[data-panel="ultimate"] .shopCard').length,
+      // ...and the two counters, which are the point of the room being shut
+      // rather than empty: a locked door that does not say how far off it is
+      // is a locked door nobody saves for.
+      needs: [...document.querySelectorAll('[data-panel="ultimate"] .ufNeed, '
+        + '[data-panel="ultimate"] .ufNeed2')].map((e) => e.textContent.trim()),
+      met: document.querySelectorAll('[data-panel="ultimate"] .ufMet').length,
+      // ...and no way in while it is shut.
+      door: !!document.querySelector('[data-panel="ultimate"] .ufEnter'),
+      doorShown: (() => {
+        const b = document.querySelector('[data-panel="ultimate"] .ufEnter');
+        return !!b && !!(b.offsetWidth || b.offsetHeight);
+      })() };
 
     return out;
   });
@@ -16026,11 +16038,23 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `left from UPGRADES -> ${r.swipeLeft.tab} (inline transform left "${r.swipeLeft.inline}"), `
     + `right -> ${r.swipeRight.tab}, down -> ${r.swipeDownOnPanel.tab} still open ${r.swipeDownOnPanel.open}`);
 
-  check('ULTIMATE is sealed, wears a lock, and its room says so rather than standing empty',
+  /*
+   * From build 254 the room says what is behind the door and COUNTS the two
+   * things that open it, rather than saying only that it is shut. The tab
+   * stays sealed and the lock stays on it: neither half of the gate is met on
+   * a fresh run, and the door must not be reachable.
+   */
+  check('ULTIMATE is sealed, and its room counts the two things that open it',
     r.ultimate.tab === 'ultimate' && r.ultimate.sealedTab && r.ultimate.lockOnTab
-    && r.ultimate.room && /SEALED/.test(r.ultimate.says) && r.ultimate.cards === 0,
-    `tab sealed ${r.ultimate.sealedTab}, lock ${r.ultimate.lockOnTab}, room "${r.ultimate.says}", `
-    + `${r.ultimate.cards} cards for sale in it`);
+    && r.ultimate.room && /NEW FORM/.test(r.ultimate.says) && r.ultimate.cards === 0
+    && r.ultimate.needs.length === 2
+    && /THE MACHINE FINISHED . 0 of 18/.test(r.ultimate.needs[0])
+    && /EVERY ANOMALY RECONCILED . 0 of 7/.test(r.ultimate.needs[1])
+    && r.ultimate.met === 0 && r.ultimate.door && !r.ultimate.doorShown,
+    `tab sealed ${r.ultimate.sealedTab}, lock ${r.ultimate.lockOnTab}, room `
+    + `"${r.ultimate.says}", ${r.ultimate.cards} cards; it counts `
+    + `${JSON.stringify(r.ultimate.needs)} with ${r.ultimate.met} met, and the `
+    + `door exists (${r.ultimate.door}) but is not shown (${!r.ultimate.doorShown})`);
 
   check('the AMMO tab still changes the strip, the way the sheet did',
     r.loadout.rows > 0 && r.loadout.slots > 0 && r.loadout.wasOn && r.loadout.changed
@@ -17165,7 +17189,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
        */
       g.hud.menu.setOpen(true);
       g.hud.menu.openTab('sandbox');
-      document.querySelector('.sbEnter').click();
+      // Scoped to the panel. A bare `.sbEnter` matched the NEW FORM room's
+      // button once that room grew one, because it is built first.
+      document.querySelector('#sandbox .sbEnter, .sandbox .sbEnter').click();
       // ...and one tick, because the deferred re-place is `update`'s job.
       for (let i = 0; i < 20; i++) g.update(1 / 60);
       const gapNow = () => {
@@ -19320,6 +19346,89 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('...and buying it arms the banner rather than starting the animation',
     r.armed === 'armed',
     `world.newForm is ${JSON.stringify(r.armed)} — bought, not begun`);
+}
+
+// --- the banner: bought, then taken ----------------------------------------
+/*
+ * "After purchase, a banner; when clicked, the animation." So the banner is up
+ * only between those two moments, and pressing it is the door.
+ *
+ * Asserted on the RENDERED BOX and never on `hidden`: `[hidden] { display:
+ * none }` is the user agent's, at one class of specificity, and loses to any
+ * author rule written on an id -- so the property flips, every test that reads
+ * it back agrees, and the element stays on the screen taking taps. That is
+ * builds 185-186 verbatim, reported three times and green every time.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    const bar = document.getElementById('newFormBar');
+    const shown = () => {
+      const b = bar.getBoundingClientRect();
+      return b.height > 0 && b.width > 0;
+    };
+    const press = () => bar.dispatchEvent(new PointerEvent('pointerdown',
+      { bubbles: true, cancelable: true, pointerId: 41, isPrimary: true }));
+
+    g.restart();
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.phase = 'staging';
+    g.hud.syncNewForm(w);
+    out.beforeBuy = shown();
+
+    // ...armed, the way buying it arms it.
+    w.newForm = 'armed';
+    g.hud.syncNewForm(w);
+    out.armed = shown();
+
+    // ...and pressed. Through the handler, on the element, with pointerdown --
+    // a case that calls the method the handler calls tests the logic and not
+    // the control.
+    press();
+    out.began = !!w.evolve;
+    g.hud.syncNewForm(w);
+    out.duringRun = shown();
+
+    while (w.evolve) g.update(1 / 60);
+    g.hud.syncNewForm(w);
+    out.afterRun = shown();
+    out.state = w.newForm;
+    out.era = w.era;
+
+    // ...and it does not come back on the new field.
+    w.newForm = 'armed';
+    g.hud.syncNewForm(w);
+    out.armedAtEraTwo = shown();
+
+    g.setEra(1);
+    delete w.director.update;
+    g.restart();
+    g.hud.syncNewForm(g.world);
+    out.afterRestart = shown();
+    return out;
+  });
+
+  check('the banner is up between buying the NEW FORM and taking it, and only then',
+    r.beforeBuy === false && r.armed === true && r.began === true
+    && r.duringRun === false && r.afterRun === false && r.state === 'done'
+    && r.era === 2 && r.afterRestart === false,
+    `before buying: ${r.beforeBuy}; armed: ${r.armed}; pressed -> the evolution `
+    + `began ${r.began} and the banner went ${!r.duringRun}; after it, shown `
+    + `${r.afterRun} with newForm ${JSON.stringify(r.state)} on era ${r.era}; `
+    + `after a restart ${r.afterRestart}`);
+
+  /*
+   * ...and it cannot come back once the field has changed. `newForm` is set to
+   * 'done' by `endEvolve`, but a save from an older build, or a hand-set flag,
+   * must not put a second banner over the new field -- there is nothing left
+   * for it to open.
+   */
+  check('...and nothing can put it back over the field it already changed',
+    r.armedAtEraTwo === false,
+    `forced to 'armed' at era 2, the banner is shown ${r.armedAtEraTwo}`);
 }
 
 // --- report -----------------------------------------------------------------

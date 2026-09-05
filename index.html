@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '253';
+  var BUILD = '254';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -257,6 +257,18 @@
          no markup. Everything here is live during play: tapping one never
          opens or pauses anything. -->
     <div id="quickBar"></div>
+
+    <!-- ============ NEW FORM ============ -->
+    <!-- The banner, up only between buying the NEW FORM and taking it. It sits
+         over the middle of the field rather than in the top furniture on
+         purpose: `Hud.pillCap` measures the gap up there and can legitimately
+         return 0 on a 568-tall screen, so anything added to that column costs
+         a teaching line. This is one-time and the field is empty behind it
+         anyway once it is pressed. -->
+    <button id="newFormBar" hidden>
+      <span class="nfTitle">NEW FORM READY</span>
+      <span class="nfLine">Everything you built, on a field you have not seen.</span>
+    </button>
 
     <!-- ============ ABILITIES ============ -->
     <div id="abilityHint"></div>

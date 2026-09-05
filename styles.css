@@ -4218,7 +4218,7 @@ body.sandbox #alerts { z-index: 47; }
 .sbRoom[hidden] { display: none !important; }
 .sealedRoom[hidden] { display: none !important; }
 .sbCost { color: #8fb8d8; }
-.sbEnter {
+.sbEnter, .ufEnter {
   -webkit-appearance: none;
   appearance: none;
   margin-top: 6px;
@@ -4232,7 +4232,7 @@ body.sandbox #alerts { z-index: 47; }
   color: #cfe6f6;
 }
 /* 0.4 put the label at 3.23:1 and said nothing about why. */
-.sbEnter:disabled { opacity: 0.62; }
+.sbEnter:disabled, .ufEnter:disabled { opacity: 0.62; }
 
 /* The padlock comes off when the run buys the node. A class, because
    `[hidden]` loses to the rule that gives `.tabLock` its display. */
@@ -4387,3 +4387,63 @@ body.evolving #waveRail { transform: translateY(-18px); }
   body.evolving #waveRail,
   body.evolving #menuBtn { transition: opacity 0.3s linear; transform: none; }
 }
+
+/* The two counters in the NEW FORM room. A met half is stated as met rather
+ * than only coloured: a rule that lives in a hue is one a colourblind player
+ * never receives. */
+.sealedRoom .ufNeed,
+.sealedRoom .ufNeed2 {
+  font: 600 11px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.08em;
+  color: #7fa8c8;
+  opacity: 0.75;
+}
+.sealedRoom .ufMet { color: #7ef0b0; opacity: 1; }
+.sealedRoom .ufMet::after { content: " \2713"; }
+
+/* ---- the NEW FORM banner -------------------------------------------------
+ * Over the middle of the field, not in the top furniture: `Hud.pillCap`
+ * measures the gap up there and can legitimately return 0 on a 568-tall
+ * screen, so anything added to that column costs a teaching line. This is up
+ * once in a run and the field behind it is about to be taken anyway.
+ *
+ * The `[hidden]` guard is not optional. `[hidden] { display: none }` is the
+ * user agent's, at one class of specificity, and loses to any author rule
+ * written on an id — so without this the property flips, every test that reads
+ * it back agrees, and the element stays on the screen taking taps.
+ */
+#newFormBar {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  max-width: 84vw;
+  padding: 14px 22px;
+  border: 1px solid #ffd9f6;
+  border-radius: 10px;
+  background: rgba(10, 6, 16, 0.88);
+  box-shadow: 0 0 24px rgba(255, 217, 246, 0.18);
+  color: #ffd9f6;
+  pointer-events: auto;
+  animation: nfBreathe 2.6s ease-in-out infinite;
+}
+#newFormBar[hidden] { display: none; }
+#newFormBar .nfTitle {
+  font: 700 15px/1.1 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.16em;
+}
+#newFormBar .nfLine {
+  font: 500 11px/1.4 ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.04em;
+  color: #cfd8e6;
+  text-align: center;
+}
+@keyframes nfBreathe {
+  0%, 100% { box-shadow: 0 0 20px rgba(255, 217, 246, 0.14); }
+  50% { box-shadow: 0 0 34px rgba(255, 217, 246, 0.30); }
+}
+@media (prefers-reduced-motion: reduce) { #newFormBar { animation: none; } }
