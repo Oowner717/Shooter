@@ -21771,6 +21771,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * it could not reach the centre of anything larger than 34 at all:
      * measured against a BULWARK, four bursts delivered EXACTLY ZERO, twice,
      * to the decimal.
+     *
+     * ...and it is FOUR PRESSES, because one is too noisy to threshold. See
+     * the note inside.
      */
     const air = (buy, type, dist, mates) => {
       const s = clean();
@@ -21784,12 +21787,23 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       }
       ledger.reset();
       ledger.on = true;
-      w.abilities.clearCooldowns();
-      g.useAbility(slot());
-      // Pinned, so what is measured is the fan and not the crowd grinding.
-      for (let f = 0; f < 90; f++) {
-        for (const bd of bodies) { bd.e.vx = 0; bd.e.vy = 0; bd.e.x = bd.x; bd.e.y = bd.y; }
-        g.update(1 / 60);
+      /*
+       * FOUR presses and not one. Which pellets land is not fixed -- 34 of
+       * them across 1.85 rad with a per-pellet jitter, against a body that
+       * subtends about 0.27 -- so a single fan lands four pellets on one run
+       * and six on the next, and a ratio taken off one press swings 1.15 to
+       * 1.53. That is a window set near the truth rather than clear of it,
+       * which is this suite's most repeated flake. Four presses average it
+       * down to where the threshold has room.
+       */
+      for (let press = 0; press < 4; press++) {
+        w.abilities.clearCooldowns();
+        g.useAbility(slot());
+        // Pinned, so what is measured is the fan and not the crowd grinding.
+        for (let f = 0; f < 90; f++) {
+          for (const bd of bodies) { bd.e.vx = 0; bd.e.vy = 0; bd.e.x = bd.x; bd.e.y = bd.y; }
+          g.update(1 / 60);
+        }
       }
       const rows = ledger.table().map((x) => x.src).sort();
       ledger.on = false;
@@ -21871,6 +21885,237 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${(r.threeAir.took / r.three.took).toFixed(2)}), which is the node `
     + `doing what it is for; and it books to HAIL's own row and nothing else `
     + `(${r.threeAir.rows})`);
+}
+
+// --- the ASSAY's door picks its room ---------------------------------------
+/*
+ * Build 263. The three-way control was only ever on the room's own bar, so
+ * the one place you could choose a room was inside the room you had already
+ * been put in. It is in the tab that opens it now.
+ *
+ * What must NOT change is build 262's rule, and it is what this mostly
+ * asserts: entering DEFAULTS to the era the run is standing in, and a pick
+ * lasts exactly as long as the sheet is up. A chooser that remembered would be
+ * the silent wrong-room bug back under another name -- a run at era 2 whose
+ * last visit ended on ERA I coming back to era 1's field with no way to tell
+ * that from the room being broken.
+ *
+ * Pressed through the CONTROLS, on the elements, with the sheet actually open
+ * -- which is the trap the 236 standoff bug was: every case for that door
+ * called `enterSandbox()` directly and never had the menu open, and the door
+ * IS a control.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const m = g.hud.menu;
+    const out = {};
+
+    const arm = (era) => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(400000);
+      g.buy('sandbox');
+      g.setEra(era);
+      w.director.update = () => {};
+      g.debugClearField();
+      m.setOpen(true);
+      m.openTab('sandbox');
+    };
+    const row = () => [...document.querySelectorAll('#sbDoorEras .sbEra')];
+    const picked = () => {
+      const b = row().find((x) => x.classList.contains('on'));
+      return b ? Number(b.dataset.era) : 0;
+    };
+    const room = () => ({ era: w.era, zoom: CFG.zoom, mk2: !!CFG.mk2,
+      r: w.shooter.r, form: (w.enemies.find((e) => e.dummy) || {}).dummyForm || 0 });
+
+    // ---- the row is there, is three, and is legible ----------------------
+    arm(1);
+    const cells = row();
+    out.cells = cells.length;
+    out.boxed = cells.every((b) => b.getBoundingClientRect().height > 0);
+    out.px = Math.min(...cells.map((b) => parseFloat(getComputedStyle(b).fontSize)));
+    out.locked = !!cells[2].querySelector('.sbEraLock');
+
+
+    // ---- and it opens on the era the run is standing in -------------------
+    out.defaultOne = picked();
+
+    /*
+     * ---- a pick, then the door ------------------------------------------
+     *
+     * `click`, because that is what this row and the ENTER beside it bind --
+     * the play screen's `pointerdown` rule is for play-screen controls, and a
+     * sheet control that answered to a different event from its neighbour
+     * would be a second vocabulary on one surface.
+     */
+    cells[1].click();
+    out.afterPick = picked();
+    document.querySelector('#sandbox .sbEnter, .sandbox .sbEnter').click();
+    out.enteredTwo = room();
+
+    // ...and from inside, the row is live and the door says you are through.
+    m.setOpen(true);
+    m.openTab('sandbox');
+    const go = document.querySelector('#sandbox .sbEnter, .sandbox .sbEnter');
+    out.insideLabel = go.textContent;
+    out.insideDisabled = go.disabled;
+    out.insidePicked = picked();
+    row()[0].click();
+    out.switched = room();
+
+    // ---- ERA III refuses, and changes nothing ----------------------------
+    const was = picked();
+    row()[2].click();
+    out.lockedPick = picked();
+    out.lockedSame = picked() === was;
+    out.shook = row()[2].classList.contains('refuse');
+
+    m.setOpen(false);
+    g.exitSandbox();
+
+    /*
+     * ---- ...and the pick does not outlive the sheet ----------------------
+     *
+     * The run is at era 1 here and the last thing chosen was era 2, so a
+     * chooser that remembered would show 2. It must show 1.
+     */
+    m.setOpen(true);
+    m.openTab('sandbox');
+    out.afterReopen = picked();
+    // ...and the door still points where the row says, with nothing picked.
+    document.querySelector('#sandbox .sbEnter, .sandbox .sbEnter').click();
+    out.defaultRoom = room();
+    g.exitSandbox();
+    m.setOpen(false);
+
+    delete w.director.update;
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('the ASSAY door picks its room, and it defaults to where you stand',
+    r.cells === 3 && r.boxed && r.px >= 11 && r.locked
+    && r.defaultOne === 1 && r.afterPick === 2
+    && r.enteredTwo.era === 2 && r.enteredTwo.mk2 === true
+    && r.enteredTwo.r === 40 && r.enteredTwo.form === 2,
+    `three cells, all rendered (${r.boxed}) at ${r.px}px with a padlock on the `
+    + `third (${r.locked}); a run at era 1 opens the tab on ERA `
+    + `${r.defaultOne}, a press moves it to ${r.afterPick}, and ENTER lands in `
+    + `${JSON.stringify(r.enteredTwo)}`);
+
+  /*
+   * The one that keeps build 262's rule. The run is at era 1 and the last
+   * thing picked was era 2; a chooser that remembered would show 2 and enter
+   * the wrong room silently, which is exactly the bug the room's own tab was
+   * fixed for.
+   */
+  check('...and a pick lasts as long as the sheet and not a moment longer',
+    r.afterReopen === 1 && r.defaultRoom.era === 1 && r.defaultRoom.r === 26
+    && r.defaultRoom.mk2 === false && r.defaultRoom.form === 1,
+    `after entering era 2's room and leaving, a fresh sheet opens on ERA `
+    + `${r.afterReopen} and the door lands in ${JSON.stringify(r.defaultRoom)}`);
+
+  check('...and from inside it switches on the spot, and ERA III refuses',
+    r.insideDisabled && /IN THE ASSAY/.test(r.insideLabel)
+    && r.insidePicked === 2 && r.switched.era === 1 && r.switched.r === 26
+    && r.switched.form === 1
+    && r.lockedSame && r.shook,
+    `with the sheet over the room the button reads "${r.insideLabel}" and is `
+    + `disabled (${r.insideDisabled}); the row showed ${r.insidePicked} and a `
+    + `press moved the room to ${JSON.stringify(r.switched)}; ERA III left the `
+    + `pick at ${r.lockedPick} (${r.lockedSame}) and shook (${r.shook})`);
+}
+
+/*
+ * ...and no label in the row WRAPS, on either screen.
+ *
+ * Its own block because it has to be measured at 320, where the suite does
+ * not run: "ERA III" plus its padlock is the long one and the cell there is
+ * 73px. A wrap does not clip -- it makes the cell taller, and because these
+ * are grid cells the row stretches ALL THREE to match, so nothing about the
+ * picture is ragged and no property flips for a test to read back.
+ *
+ * ---- and the first instrument for it was blind ------------------------
+ *
+ * It compared the three cells' heights and required them equal. Proved
+ * against the pre-fix CSS: with the guard removed every cell went 32px to
+ * 44px TOGETHER, difference zero, case green. It was measuring raggedness,
+ * which is not what wrapping does here.
+ *
+ * What works is a differential against a cell that CANNOT wrap: the third
+ * button is cloned, forced to one line, measured and thrown away. If the live
+ * one is taller than its own forced-single-line copy, something wrapped --
+ * and the copy is one line by construction, so the comparison cannot go
+ * vacuous.
+ *
+ * Both arms are load-bearing and the proof shows why. Reverted by DELETING
+ * the guard, the twin's inline `nowrap` holds and the height comparison
+ * catches it. Reverted by an `!important` override -- which is what was
+ * actually run -- the override beats the twin's inline style too, both
+ * measure 44px, and it is the computed `white-space` that reports `normal`
+ * and fails. Measured either way: 32/32 and passing on this build, 44/44
+ * with `white-space: normal` and failing.
+ */
+{
+  const held = page.viewportSize();
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    rows.push(await page.evaluate((vw) => {
+      const g = window.__sim;
+      const w = g.world;
+      const m = g.hud.menu;
+      g.restart();
+      delete w.director.update;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(400000);
+      g.buy('sandbox');
+      m.setOpen(true);
+      m.openTab('sandbox');
+      const cells = [...document.querySelectorAll('#sbDoorEras .sbEra')];
+      const box = cells.map((b) => b.getBoundingClientRect());
+      // A copy of the longest label that cannot wrap, measured in the same
+      // cell, and then gone. One line by construction.
+      const long = cells[2];
+      const twin = long.cloneNode(true);
+      twin.style.whiteSpace = 'nowrap';
+      twin.style.position = 'absolute';
+      twin.style.visibility = 'hidden';
+      twin.style.width = `${long.getBoundingClientRect().width}px`;
+      long.parentNode.appendChild(twin);
+      const oneLine = +twin.getBoundingClientRect().height.toFixed(1);
+      twin.remove();
+      const ws = getComputedStyle(long).whiteSpace;
+      m.setOpen(false);
+      g.restart();
+      return {
+        w: vw,
+        n: cells.length,
+        ws,
+        oneLine,
+        tall: +Math.max(...box.map((x) => x.height)).toFixed(1),
+        short: +Math.min(...box.map((x) => x.height)).toFixed(1),
+        cell: +Math.min(...box.map((x) => x.width)).toFixed(1),
+      };
+    }, size.width));
+  }
+  await page.setViewportSize(held);
+
+  check('...and nothing in the row wraps, on either screen',
+    rows.every((x) => x.n === 3 && x.ws === 'nowrap'
+      && x.tall <= x.oneLine + 0.6),
+    rows.map((x) => `${x.w}: three cells ${x.short}-${x.tall}px tall in `
+      + `${x.cell}px of width, against ${x.oneLine}px for the longest label `
+      + `forced to one line (white-space ${x.ws})`).join('; '));
 }
 
 // --- report -----------------------------------------------------------------

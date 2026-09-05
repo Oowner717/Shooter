@@ -2440,3 +2440,66 @@ passed — but the point of running it is knowing that.
 One known flake seen once and not reproduced: *"the debris is thrown along
 lobes"*, which CLAUDE.md already records as an un-run-down randomised burst
 pattern.
+
+## 36. Build 264 — the ASSAY's door picks its room
+
+> "Have option in Assay menu to switch Eras."
+
+The three-way control went in with build 262 and it was only ever on the
+**room's own bar** — so the one place you could choose a room was inside the
+room you had already been put in. It is in the tab that opens it now, between
+the copy and ENTER.
+
+What must not change is 262's rule, and it is what most of the case asserts:
+
+- The row is **seeded from the era the run is standing in** every time the
+  sheet opens, and a pick lasts exactly as long as the sheet is up
+  (`Menu.setOpen` clears it). A chooser that remembered would be the silent
+  wrong-room bug back under another name.
+- `Game.enterSandbox(era)` takes an argument, and the *default* is still
+  `world.era`. Anything that is not 1 or 2 falls back rather than refusing — a
+  bench that will not open is worse than one that opens where you already
+  were — and the control refuses ERA III with the same shake the room's row
+  gives.
+- **It is live from inside.** `body.menuOpen #sandbox` hides the room's own bar
+  while the sheet is over it, so with the sheet open this is the only era
+  control on the screen: a press there switches rooms on the spot, and ENTER
+  reads YOU ARE IN THE ASSAY and is disabled.
+
+`click` and not `pointerdown`, because it sits beside ENTER, which is a click.
+The play screen's `pointerdown` rule is for play-screen controls; one
+vocabulary per surface.
+
+### Two things the suite caught, and one instrument that was blind
+
+**"ERA III" wrapped at 320.** 11px is the swept menu floor and at `.18em` the
+label plus its padlock is 82px against a 73px cell. A wrap does not clip — it
+makes the cell taller, and because these are grid cells the row stretches all
+three to match, so the picture is not even ragged and no property flips. Fixed
+with `white-space: nowrap` on `.sbEra` and the tracking down to `.1em` to pay
+for the 11px.
+
+**The first instrument for that was blind, and it was proved blind rather than
+argued.** It compared the three cells' heights and required them equal; run
+against the pre-fix CSS, every cell went 32px to 44px *together*, difference
+zero, case green. It measures raggedness, which is not what wrapping does here.
+What works is a differential against a copy of the longest cell forced to one
+line — one line by construction, so it cannot go vacuous — with the computed
+`white-space` asserted beside it. Both arms earn their place: delete the guard
+and the twin catches it; override it with `!important` and only the computed
+property does.
+
+**A gun that walked home on the first idle frame re-acquired worse than one
+that never walked home.** Build 263 gave an emplacement a rest bearing; a DRIFT
+wanders in and out of a 300-unit reach, and setting off for rest on every gap
+cost a full slew back each time — measured, it took a DRIFT from inside the
+bench's twenty-second cap to outside it. `CFG.gun.rest` is 0.6s: longer than
+any gap a body crossing the reach makes, shorter than a wait.
+
+**And the AIRBURST ratio was fitted to one run.** Which pellets land is not
+fixed — 34 across 1.85 rad against a body subtending 0.27 — so a single fan
+lands four pellets on one run and six on the next, and the single-body ratio
+swung 1.15 to 1.53 against a threshold of 1.3. Four presses, averaged. That is
+this suite's most repeated flake and it is worth naming every time.
+
+562 green.

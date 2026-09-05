@@ -158,6 +158,8 @@ export function syncGuns(world) {
       hw: l.hw,
       hh: l.hh,
       aim: had ? had.aim : -Math.PI / 2,
+      // How long it has had nothing to shoot at. See the dwell in `updateGuns`.
+      idle: had ? (had.idle || 0) : 0,
       cool: had ? had.cool : 0,
       recoil: had ? had.recoil : 0,
       target: null,
@@ -260,22 +262,34 @@ export function updateGuns(world, dt) {
     g.target = t;
     /*
      * ...and with nothing to shoot it comes back to REST, which is straight
-     * up-field.
+     * up-field -- after a DWELL, and the dwell is not decoration.
      *
      * It used to keep whatever bearing its last target left it on, for ever.
      * One gun looks like it is watching something; four, each frozen at the
      * angle of a different body that died a minute ago, look like four things
      * knocked askew -- and they never recover, because nothing writes `aim`
      * again until the next target. Reported as the line being crooked, which
-     * it was. It slews home at the same rate it tracks, so a gun swinging
-     * back is a gun that has finished rather than a gun that has snapped.
+     * it was.
+     *
+     * Walking home the instant a target goes is worse than not walking home
+     * at all, though, and the suite caught it: a DRIFT wanders in and out of
+     * a 300-unit reach, and a gun that set off for rest on every gap spent
+     * the next second slewing BACK. Measured, it took a DRIFT from inside the
+     * bench's twenty-second cap to outside it. So a gap of `CFG.gun.rest`
+     * seconds is a pause and anything longer is finished, and it slews home
+     * at the same rate it tracks -- a gun swinging back is a gun that has
+     * given up rather than a gun that has snapped.
      */
     if (!t) {
-      const d0 = angleDelta(g.aim, REST);
-      const step0 = st.slew * dt;
-      g.aim += clamp(d0, -step0, step0);
+      g.idle = (g.idle || 0) + dt;
+      if (g.idle > CFG.gun.rest) {
+        const d0 = angleDelta(g.aim, REST);
+        const step0 = st.slew * dt;
+        g.aim += clamp(d0, -step0, step0);
+      }
       continue;
     }
+    g.idle = 0;
     /*
      * Aimed at where it will BE, the same lead the machine's assist takes --
      * without it a fixture with a 0.55s cadence spends most of its rounds

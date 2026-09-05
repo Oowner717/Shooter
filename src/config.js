@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '263';
+export const BUILD = '264';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '263';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '5ffa03a';
+export const REV = '522b6ee';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4523,6 +4523,19 @@ CFG.gun = {
   slew: 3.4, // radians a second the little barrel comes round at
   spread: 0.055, // VOLLEY's fan, per extra round
   cost: 2600, // flat, per lot -- see lotPrice
+  /*
+   * How long a gap in the shooting is a PAUSE rather than the end of it.
+   *
+   * With nothing to shoot an emplacement walks its barrel back to straight
+   * up-field, because four of them each frozen on the bearing of a different
+   * body that died a minute ago is what "the mini turrets look crooked" was.
+   * Setting off on the first frame with no target is the other failure: a
+   * body that wanders in and out of reach -- a DRIFT does exactly that --
+   * costs a full slew back every time, and the bench measured it taking a
+   * DRIFT from inside a twenty-second cap to outside it. Six tenths is longer
+   * than any gap a body crossing the reach makes and shorter than a wait.
+   */
+  rest: 0.6,
 };
 
 CFG.yard = {

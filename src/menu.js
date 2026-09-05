@@ -221,6 +221,12 @@ export class Menu {
     // sheet and opening it again is exactly that gap, with the four seconds
     // still running. Measured: arm a card, close, reopen, and one tap spent.
     this.armRow(null);
+    /*
+     * ...and the ASSAY door forgets which room was picked, for the same
+     * reason. A pick is for this visit to the sheet; `doorEra` falls back to
+     * the era the run is standing in, which is where entering has to default.
+     */
+    this.sandboxEra = null;
     if (on) { this.syncCodex(); this.syncTree(); this.syncSandbox(); this.syncUltimate(); }
     // The machine only draws while it is being looked at.
     if (on && this.tab === 'tree') this.runHero(); else this.stopHero();
@@ -386,6 +392,46 @@ export class Menu {
       second form and D2 on it, and a third that is not built yet. Each keeps
       its own numbers and its own record, and resetting one resets only
       that one.</span>`;
+    /*
+     * ---- which room, chosen AT THE DOOR ---------------------------------
+     *
+     * The same three-way control the room carries on its own bar, in the tab
+     * that opens it -- so "which era am I measuring in" is a decision you can
+     * take before you walk in rather than one tap after. Reported as wanting
+     * an option to switch eras from the ASSAY menu, which until now could only
+     * be done from inside.
+     *
+     * The rule build 262 settled is untouched and this is what preserves it:
+     * the row is SEEDED from the era the run is standing in every time the
+     * sheet opens, and a pick lasts only as long as the sheet is up. Where you
+     * are is a fact; where you last were is not, and a chooser that remembered
+     * would be the silent wrong-room bug back under a different name.
+     *
+     * It is LIVE from inside as well. `body.menuOpen #sandbox` hides the
+     * room's own bar while the sheet is over it, so with the sheet open this
+     * is the only era control on the screen -- pressing one there switches
+     * rooms on the spot rather than arming a door you are already through.
+     *
+     * `click` and not `pointerdown`: the play screen binds on the thumb
+     * landing, and this is a sheet control sitting beside ENTER, which is a
+     * click. One vocabulary per surface.
+     */
+    const eras = document.createElement('div');
+    eras.id = 'sbDoorEras';
+    this.sandboxEras = [];
+    for (const [n, label] of [[1, 'ERA I'], [2, 'ERA II'], [3, 'ERA III']]) {
+      const b = document.createElement('button');
+      b.className = 'sbEra';
+      b.dataset.era = String(n);
+      b.innerHTML = n === 3
+        ? `<span class="sbEraLock" aria-hidden="true">${LOCK}</span>${label}`
+        : label;
+      b.addEventListener('click', () => this.pickEra(n, b));
+      eras.appendChild(b);
+      this.sandboxEras.push(b);
+    }
+    open.appendChild(eras);
+
     const go = document.createElement('button');
     go.className = 'sbEnter';
     go.textContent = 'ENTER THE ASSAY';
@@ -403,8 +449,9 @@ export class Menu {
        * this ordering is belt and the refusal is braces.
        */
       if (this.game.world.sandbox || this.game.world.phase !== 'staging') return;
+      const to = this.doorEra();
       this.setOpen(false);
-      this.game.enterSandbox();
+      this.game.enterSandbox(to);
     });
     open.appendChild(go);
     /*
@@ -421,7 +468,37 @@ export class Menu {
     open.appendChild(last);
 
     p.append(shut, open);
-    this.sandboxRoom = { shut, open, go, last };
+    this.sandboxRoom = { shut, open, go, eras, last };
+  }
+
+  /**
+   * Which room the door is pointed at.
+   *
+   * Inside, it is simply where you are. Outside, it is what has been picked
+   * since the sheet opened, and failing that the era the run is standing in --
+   * which is build 262's rule, kept as the DEFAULT rather than replaced by a
+   * remembered preference.
+   */
+  doorEra() {
+    const w = this.game.world;
+    if (w.sandbox) return w.era === 2 ? 2 : 1;
+    if (this.sandboxEra === 1 || this.sandboxEra === 2) return this.sandboxEra;
+    return w.era === 2 ? 2 : 1;
+  }
+
+  /** A press on the door's era row. */
+  pickEra(n, b) {
+    // A door that does not open says so, once, where it was pressed -- the
+    // same refusal the room's own row gives, because it is the same control.
+    if (n === 3) {
+      b.classList.remove('refuse');
+      void b.offsetWidth;
+      b.classList.add('refuse');
+      return;
+    }
+    if (this.game.world.sandbox) this.game.setBenchEra(n);
+    else this.sandboxEra = n;
+    this.syncSandbox();
   }
 
   // ------------------------------------------------------------ emplacements
@@ -528,6 +605,20 @@ export class Menu {
       r.open.hidden = !owned;
       // Only from a running field: the title screen and an ending are not one.
       r.go.disabled = this.game.world.phase !== 'staging';
+      /*
+       * Which room is pointed at, and what the button then says. From inside
+       * the sheet the door is not a door -- you are through it -- so it says
+       * so rather than offering to open what is already open.
+       */
+      const at = this.doorEra();
+      const inside = !!this.game.world.sandbox;
+      for (const b of this.sandboxEras || []) {
+        const on = Number(b.dataset.era) === at;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', String(on));
+      }
+      r.go.textContent = inside ? 'YOU ARE IN THE ASSAY' : 'ENTER THE ASSAY';
+      r.go.disabled = inside || this.game.world.phase !== 'staging';
       const s = owned ? lastSession() : null;
       /*
        * ...and the record under it, which is a different kind of number and

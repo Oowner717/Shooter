@@ -1573,6 +1573,25 @@ came from before believing the other one covers it.
   it -- 408 units on one run and 455 on the next, because which pellets land is
   not fixed. Assert the SHAPE: closing on every sample, and most of the ground
   given back. The same disease as the LURCHER window in build 226.
+- **A WRAP in a grid row is invisible to a raggedness test.** "ERA III" plus
+  its padlock is 82px against a 73px cell at 320, and it wrapped. The cells are
+  grid items, so the row stretched ALL THREE to the taller height together: the
+  picture is not ragged, no property flips, and a case comparing the three
+  heights passes. Proved rather than argued -- run against the pre-fix CSS
+  every cell went 32px to 44px, difference zero, green. What works is a
+  differential against a CLONE of the longest cell forced to one line (one line
+  by construction, so it cannot go vacuous) with the computed `white-space`
+  asserted beside it: delete the guard and the twin catches it, override the
+  guard with `!important` and only the computed property does. And it has to be
+  measured at 320, where the suite does not run.
+- **A control that walks home on the first idle frame re-acquires worse than
+  one that never walks home.** Build 263 gave an emplacement a rest bearing
+  because four of them frozen on dead bodies' bearings is what "crooked" was;
+  setting off on the first frame with no target then cost a full slew back
+  every time a DRIFT wandered out of reach and back, and the bench measured it
+  taking a DRIFT from inside a twenty-second cap to outside it. `CFG.gun.rest`
+  is the dwell: longer than any gap a body crossing the reach makes, shorter
+  than a wait.
 - **A held reach RING belongs to an ability that reaches in a circle, and
   nothing else.** PULSE's `Shock` is honest because PULSE is a circle. The same
   thing on HAIL -- 334 units, the fan's own `speed * life` -- claims the 254

@@ -1345,7 +1345,7 @@ export class Game {
    * is set, or `checkpoint`'s own guard above swallows it and leaving would
    * restore whatever was last written minutes ago.
    */
-  enterSandbox() {
+  enterSandbox(era) {
     const w = this.world;
     if (w.sandbox) return false;
     if (!w.up.sandbox) return false;
@@ -1353,21 +1353,26 @@ export class Game {
     this.checkpoint();
     w.sandbox = true;
     /*
-    /*
-     * Which room: ALWAYS the era the run is standing in. Somebody who has
-     * taken the new field is measuring things on the new field, and the tabs
-     * move it from there.
+     * Which room. The DEFAULT is the era the run is standing in, and `era` is
+     * a door naming one instead -- the ASSAY tab's own three-way control, so
+     * "which era am I measuring in" can be decided before walking in.
      *
-     * It remembered the last room used for one build, which reads as a
-     * kindness and is not: a run at era 2 whose last visit ended on the ERA I
-     * tab came back to era 1's field, silently, with no way to tell that from
-     * the room being broken. Where you are is a fact and where you last were
-     * is not; the tab is one tap.
+     * The default is the load-bearing half and build 262 settled it. The room
+     * remembered the last one used for one build, which reads as a kindness
+     * and is not: a run at era 2 whose last visit ended on the ERA I tab came
+     * back to era 1's field, silently, with no way to tell that from the room
+     * being broken. Where you are is a fact and where you last were is not.
+     * An argument is neither -- it is somebody asking, this time.
+     *
+     * Anything that is not 1 or 2 falls back rather than refusing, because the
+     * only caller that can name 3 is a bug and a bench that will not open is
+     * worse than one that opens where you already were. The CONTROL refuses
+     * era 3 with a shake, which is where a player meets it.
      *
      * Read BEFORE the resume, because `resume()` is `reset()` plus the file
      * and `reset()` puts the world back at era 1.
      */
-    this.benchEra = w.era === 2 ? 2 : 1;
+    this.benchEra = (era === 1 || era === 2) ? era : (w.era === 2 ? 2 : 1);
     this.resume();
     w.era = this.benchEra;
     /*
