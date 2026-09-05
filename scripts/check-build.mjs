@@ -31,6 +31,40 @@ if (config !== html) {
 }
 console.log(`build ${config} consistent`);
 
+/*
+ * ...and index.html's literal has to sit inside the window the foreground
+ * update check reads.
+ *
+ * `main.js` range-fetches the first `PROBE_BYTES` of index.html every time the
+ * app comes forward and compares the build in it with the one it is running --
+ * that is the ONLY thing that updates an installed copy which iOS never
+ * evicts, because everything else fires on `load` and a home-screen session
+ * survives backgrounding for days. If the literal ever drifts past the window
+ * the check silently stops finding it, the app silently stops updating, and
+ * nothing says so. Exactly the guard bundle.mjs keeps on its own rev stamp,
+ * for exactly the same reason.
+ *
+ * The window is read out of main.js rather than restated here, so there is one
+ * number and this is a reader of it.
+ */
+const mainSrc = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const probeM = mainSrc.match(/const PROBE_BYTES = (\d+);/);
+if (!probeM) {
+  console.error('src/main.js: no PROBE_BYTES -- the foreground update check is gone');
+  process.exit(1);
+}
+const probe = Number(probeM[1]);
+const htmlSrc = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const at = Buffer.byteLength(htmlSrc.slice(0, htmlSrc.indexOf(`var BUILD = '${html}'`)), 'utf8');
+const end = at + Buffer.byteLength(`var BUILD = '${html}';`, 'utf8');
+if (end > probe) {
+  console.error(`index.html's build literal ends at byte ${end}, outside the `
+    + `${probe}-byte window main.js reads on every foreground -- installed `
+    + `copies would stop updating and say nothing`);
+  process.exit(1);
+}
+console.log(`update probe: the build literal ends at byte ${end} of ${probe}`);
+
 // The worker's precache list is hand-written, so a new module can be shipped
 // without being reachable offline. src/arsenal.js was added in build 21 and
 // missed this list; the fetch handler would have papered over it for anyone

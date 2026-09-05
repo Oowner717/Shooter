@@ -395,21 +395,40 @@ that was a suite.
 
 ## How an installed copy updates itself
 
-The single-file build ships no `sw.js`, so `main.js`'s registration is switched
-off in it and no service worker is ever involved — which means nothing pins it
-and nothing updates it either. So the page does it: a rev stamp in the first
-hundred bytes of the head, and a script that range-fetches its own first 2KB,
-compares, and reloads once if it differs.
+**There are TWO installs and they update by different mechanisms.** Getting one
+right and leaving the other alone is how the same bug shipped twice.
 
-It asks **on load and on every return to the foreground**. It used to ask once
-per session, guarded on its own rev — which reads as "once per launch" and is
-not: a home-screen app's session survives backgrounding for days, so an install
-that is never evicted checks on its first cold start and never again. That is
-how a phone sat on build 113 while the server had 114, and why the updates that
-*did* land were the ones where iOS had happened to evict the app.
+**The single-file build** ships no `sw.js`, so `main.js`'s registration is
+switched off in it and no service worker is ever involved — which means nothing
+pins it and nothing updates it either. So the page does it: a rev stamp in the
+first hundred bytes of the head, and a script that range-fetches its own first
+2KB, compares, and reloads once if it differs.
 
-The loop guard is on the incoming rev, not on the check, so it will reload at
-most once for any given target and cannot spin.
+**The served build** — GitHub Pages off this branch, which is what the phone's
+home-screen link actually is — has `sw.js`, which is network-first with a cache
+name derived from BUILD, plus an escape hatch inline in index.html's head. Both
+of those are correct and both fire on `load`.
+
+**`load` is once per COLD START, which is not once per launch.** A home-screen
+app's session survives backgrounding for days, so an install that is never
+evicted checks on its first launch and never again. That is how a phone sat on
+build 113 while the server had 114 — and, five builds' worth of "fixed" later,
+how a phone sat on **257** with 258 live and the Pages deploy green, because the
+build-113 fix went into the bundle and nothing put it into the served build.
+
+So both ask **on load and on every return to the foreground**. The served build
+does it in `main.js`'s `askServer()`: a range request for the first
+`PROBE_BYTES` (4096) of index.html, the build literal read out of it, reload if
+it differs. `check-build.mjs` fails the build if that literal ever drifts
+outside the window — without it the check silently stops finding anything and
+the app silently stops updating, which is the same class of failure as the rev
+stamp bundle.mjs pins inside its own first 2KB.
+
+The loop guard is on the incoming rev/build, not on the check, so it will reload
+at most once for any given target and cannot spin.
+
+**A fix to one of these two paths is half a fix.** Ask which install the report
+came from before believing the other one covers it.
 
 ## Repo facts worth not rediscovering
 

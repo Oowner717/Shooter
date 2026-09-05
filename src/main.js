@@ -70,6 +70,13 @@ if ('serviceWorker' in navigator) {
   // code and the cached code cannot disagree.
   const hadController = !!navigator.serviceWorker.controller;
   let reloading = false;
+  // How much of index.html the foreground check reads, and what it looks for
+  // in it. `check-build.mjs` asserts the literal lands inside the window.
+  const PROBE_BYTES = 4096;
+  const PROBE_RE = /var BUILD = '([^']+)'/;
+  let asking = false;
+  let lastAsk = 0;
+  let reloadFor = null;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController || reloading) return;
     reloading = true;
@@ -79,5 +86,65 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register(`./sw.js?b=${BUILD}`)
       .then((reg) => reg.update().catch(() => {}))
       .catch(() => {});
+    askServer();
   });
+
+  /*
+   * ---- ...and it has to ASK AGAIN, on every return to the foreground ----
+   *
+   * Everything above this fires on `load`, and so does index.html's own cache
+   * escape hatch. That is once per COLD START, which is not once per launch:
+   * a home-screen app's session survives backgrounding for days, so an install
+   * iOS never evicts registers its worker on its first launch and never checks
+   * again. Reported from a phone sitting on build 257 with 258 live and the
+   * Pages deploy green: the app had simply never been loaded again.
+   *
+   * This is the build-113 fault verbatim, and the fix is the one the SINGLE
+   * FILE build already has. It was written there, in the page's own head,
+   * because the bundle has no worker to lean on -- and the served build, which
+   * is what the home-screen link actually is, never got it. Two update paths,
+   * one of them fixed.
+   *
+   * It reads the build out of the first `PROBE_BYTES` of index.html rather
+   * than fetching the page: the literal sits at byte 2197 and the whole file
+   * is 18kB, so a range request is a tenth of the traffic on a check that runs
+   * every time the app comes forward. `check-build.mjs` fails the build if that
+   * literal ever moves outside the window -- the same guard, and the same
+   * reason, as the rev stamp bundle.mjs pins inside its own first 2kB.
+   *
+   * The loop guard is on the INCOMING build and not on the check, so it will
+   * reload at most once for any given target and cannot spin.
+   */
+  function askServer() {
+    const now = Date.now();
+    if (asking || reloading || now - lastAsk < 4000) return;
+    asking = true;
+    lastAsk = now;
+    navigator.serviceWorker.getRegistration()
+      .then((reg) => (reg ? reg.update().catch(() => {}) : null))
+      .catch(() => {})
+      .then(() => fetch('./index.html', {
+        cache: 'no-store',
+        headers: { Range: `bytes=0-${PROBE_BYTES - 1}` },
+      }))
+      // 206 if the host honoured the range, 200 if it ignored it. Either
+      // carries the literal; a host that does neither is offline and there is
+      // nothing to update to.
+      .then((res) => (res && res.ok ? res.text() : null))
+      .then((text) => {
+        const m = text && PROBE_RE.exec(text);
+        if (!m || m[1] === BUILD || reloadFor === m[1]) return;
+        reloadFor = m[1];
+        reloading = true;
+        window.location.reload();
+      })
+      .catch(() => {})
+      .then(() => { asking = false; });
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) askServer();
+  });
+  // ...and a bfcache restore, which does not fire `visibilitychange` at all.
+  window.addEventListener('pageshow', () => askServer());
 }

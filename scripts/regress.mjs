@@ -20172,6 +20172,86 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `a toggle ${r.toggle} (both must stay up); ${r.count} buttons`);
 }
 
+// --- an installed copy asks the server when it comes forward ----------------
+/*
+ * Reported from a phone: the home-screen link was on build 257 with 258 live
+ * and the Pages deploy green.
+ *
+ * Everything that updated the served build fired on `load` -- the worker
+ * registration in main.js and index.html's own cache escape hatch -- and that
+ * is once per COLD START, which is not once per launch. A home-screen app's
+ * session survives backgrounding for days, so an install iOS never evicts
+ * checks on its first launch and never again. It is the build-113 fault
+ * verbatim; the SINGLE FILE build was fixed then and the SERVED build, which
+ * is what the home-screen link actually is, was not.
+ *
+ * Two things are asserted here and neither is "it reloads": a reload would take
+ * the harness's page down with it, and the reload is one line behind a
+ * comparison that is fully covered by the two arms below.
+ *
+ *  1. The PROBE finds the right build. It is a range request for the first
+ *     4096 bytes and the literal sits at 2215, so this rots the moment the
+ *     head grows -- `check-build.mjs` fails the build for that statically, and
+ *     this proves the request works against a real server and that the regex
+ *     matches what is actually returned.
+ *  2. Coming forward ASKS. The listener is what was missing, so a case that
+ *     only checked the parsing would pass on the build that was reported.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { BUILD } = await import('../src/config.js');
+    const out = { build: BUILD };
+
+    // ---- the probe reads what the server actually has --------------------
+    const res = await fetch('./index.html', {
+      cache: 'no-store', headers: { Range: 'bytes=0-4095' },
+    });
+    out.status = res.status;
+    const text = await res.text();
+    out.bytes = text.length;
+    const m = /var BUILD = '([^']+)'/.exec(text);
+    out.found = m ? m[1] : null;
+
+    // ---- ...and coming forward asks ---------------------------------------
+    /*
+     * The spy is on `fetch` and records the URL and the RANGE, not the call:
+     * a check that fetched the whole 18kB page every time the app came forward
+     * would satisfy a counter and would be a different thing.
+     */
+    const real = window.fetch;
+    const seen = [];
+    window.fetch = (u, o) => {
+      seen.push({ u: String(u), range: (o && o.headers && o.headers.Range) || null,
+        store: (o && o.cache) || null });
+      return real(u, o);
+    };
+    document.dispatchEvent(new Event('visibilitychange'));
+    await new Promise((r2) => setTimeout(r2, 60));
+    out.asked = seen.filter((s) => s.u.includes('index.html'));
+    // ...and it does not ask again on the next frame: an app switched back and
+    // forth would otherwise fetch on every flick.
+    const n = seen.length;
+    document.dispatchEvent(new Event('visibilitychange'));
+    await new Promise((r2) => setTimeout(r2, 60));
+    out.throttled = seen.length === n;
+    window.fetch = real;
+    return out;
+  });
+
+  check('the probe reads the build the server is actually serving',
+    (r.status === 206 || r.status === 200) && r.found === r.build && r.bytes > 100,
+    `a ${r.status} for the first 4096 bytes returned ${r.bytes} characters and `
+    + `build ${r.found}, against a running ${r.build}`);
+
+  check('...and the app asks for it every time it comes forward',
+    r.asked.length === 1 && r.asked[0].range === 'bytes=0-4095'
+    && r.asked[0].store === 'no-store' && r.throttled,
+    `coming forward made ${r.asked.length} request for index.html `
+    + `(range ${r.asked[0] && r.asked[0].range}, cache `
+    + `${r.asked[0] && r.asked[0].store}); a second one inside the window is `
+    + `held off ${r.throttled}`);
+}
+
 // --- the door: what NEW FORM costs and what it needs ------------------------
 /*
  * P9a. The price is seven REMAINDERs and no energy — one per anomaly, so the
