@@ -15,12 +15,13 @@ import { SLOTS } from './loadout.js';
 /** Every arm, by the key the tree calls it — BOLT is `standard` in here. */
 const ARM_BY_KEY = new Map(ARSENAL.map((a) => [a.key === 'standard' ? 'bolt' : a.key, a]));
 import { ABILITIES } from './abilities.js';
+import { gunAmmo } from './turrets.js';
 import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
 import { CFG, BUILD, REV } from './config.js';
 import { swipeToDismiss, swipeTabs } from './swipe.js';
 import { lastSession, lifetime } from './sandbox.js';
-import { TREE, NODES, priceOf } from './tree.js';
+import { TREE, NODES, DETACHED, priceOf } from './tree.js';
 import { svgMark } from './util.js';
 
 /**
@@ -122,7 +123,18 @@ const GROUPS = [
      * present and shut rather than absent, for the same reason the tree draws
      * the rows you cannot afford -- a door you can see is a thing to aim at.
      */
-    { id: 'sandbox', label: 'TESTBED', locked: true },
+    { id: 'sandbox', label: 'TESTBED', locked: 'sandbox' },
+    /*
+     * The emplacements. Under SYSTEM and not ARSENAL, which is where it
+     * belongs by subject -- and cannot go, measured: ARSENAL's row is already
+     * four wide at 320, its two eight-character labels (UPGRADES, ULTIMATE)
+     * are at 80px each with 302px of strip, and a fifth tab takes every label
+     * to 60px. SYSTEM at four renders exactly as ARSENAL at four does today.
+     *
+     * `locked` names the thing that opens it rather than being a flag,
+     * because there are two locked tabs now and they open on different facts.
+     */
+    { id: 'guns', label: 'TURRETS', locked: 'guns' },
     { id: 'system', label: 'SETTINGS' },
   ] },
 ];
@@ -144,6 +156,9 @@ export class Menu {
     this.open = false;
     this.tab = 'tree';
     this.cells = new Map(); // key -> element, for the active-state sync
+    // Locked tabs, by what opens them. Two of them, and they open on
+    // different facts -- TESTBED on a node, TURRETS on a gun standing.
+    this.lockTabs = new Map();
     this.codexCells = new Map();
     this.lastFound = -1;
 
@@ -153,6 +168,7 @@ export class Menu {
     this.buildTree();
     this.buildUltimate();
     this.buildSandbox();
+    this.buildGuns();
     this.buildCodex();
     this.buildSystem();
     this.show('tree');
@@ -241,7 +257,7 @@ export class Menu {
         : t.label;
       // A lock that can come off. Re-read every time the sheet opens, because
       // the tab is bought from the tree two tabs along.
-      if (t.locked) this.lockTab = b;
+      if (t.locked) this.lockTabs.set(t.locked, b);
       b.addEventListener('click', () => this.show(t.id));
       tf.appendChild(b);
     }
@@ -291,6 +307,7 @@ export class Menu {
     if (tab === 'codex') this.syncCodex();
     if (tab === 'tree') this.syncTree();
     if (tab === 'sandbox') this.syncSandbox();
+    if (tab === 'guns') this.syncGuns();
     if (tab === 'ultimate') this.syncUltimate();
     // The loadout tabs are filled by the HUD, which owns the strip they
     // describe; it is told which group is up and does the rest.
@@ -408,6 +425,101 @@ export class Menu {
     this.sandboxRoom = { shut, open, go, last };
   }
 
+  // ------------------------------------------------------------ emplacements
+
+  /**
+   * The TURRETS tab: what the line is, what it is carrying, and six upgrades.
+   *
+   * Shut, it says what an emplacement is and where you buy one, because the
+   * only place you CAN buy one is a lot on the field and a tab that opened
+   * onto six rows you cannot reach would be a worse door than a locked one.
+   *
+   * Open, it is the switch, one line of state, and the six. The rows are the
+   * tree's own `makeCard`, pushed into `this.items`, so pricing, levels,
+   * affordability, the arm-then-buy press and the whole of `syncTree` are the
+   * tree's -- there is exactly one purchase path in this game and this is not
+   * a second one.
+   */
+  buildGuns() {
+    const p = this.panel('guns', 'guns');
+
+    const shut = document.createElement('div');
+    shut.className = 'sealedRoom';
+    shut.innerHTML = `<span class="sealedMark" aria-hidden="true">${LOCK}</span>
+      <span class="sealedName">THE EMPLACEMENTS</span>
+      <span class="sealedLine">Six small auto-turrets, one per build lot on the
+      new field. Each is bought once, stands where you put it, and shoots
+      whatever comes into its reach &mdash; no aim mode, no ammunition slot,
+      nothing to steer. What they buy is ground you no longer have to
+      face.</span>
+      <span class="sealedLine sbCost">Tap a build lot on the field to raise the
+      first one. This opens when it stands.</span>`;
+
+    const open = document.createElement('div');
+    open.className = 'gunRoom';
+    open.hidden = true;
+
+    const head = document.createElement('div');
+    head.className = 'gunHead';
+    head.innerHTML = '<span class="sealedName">THE EMPLACEMENTS</span>'
+      + '<span class="gunState"></span>';
+
+    /*
+     * The switch. One control, and it is the only setting they have: the line
+     * is running or it is not. It says what it WILL DO rather than what is
+     * true -- a button labelled with its own state is a button you have to
+     * read twice.
+     */
+    const sw = document.createElement('button');
+    sw.type = 'button';
+    sw.className = 'gunSwitch';
+    sw.addEventListener('click', () => {
+      const w = this.game.world;
+      w.gunsOn = w.gunsOn === false;
+      this.syncGuns();
+      this.game.checkpoint();
+    });
+
+    const grid = document.createElement('div');
+    grid.className = 'branchGrid gunGrid';
+    /*
+     * The six, and they are the tree's cards. `makeCard` takes a root only for
+     * an arm's noun, and these are leaves, so `null` is the honest argument.
+     */
+    // The NODES and not the upgrade defs: `makeCard` and `syncTree` read
+    // `levels`, `cost`, `step`, `tiers` and `needs` off a node, which is what
+    // `leaf()` builds. `DETACHED` is that, for the six that live in here.
+    this.gunNodes = DETACHED;
+    for (const n of this.gunNodes) {
+      const card = this.makeCard(n, null);
+      grid.appendChild(card);
+      this.items.push({ n, card });
+    }
+
+    open.append(head, sw, grid);
+    p.append(shut, open);
+    this.gunRoom = { shut, open, sw, state: head.querySelector('.gunState') };
+  }
+
+  /** The lock comes off the moment one is standing. */
+  syncGuns() {
+    const w = this.game.world;
+    const n = (w.guns || []).length;
+    this.setLock('guns', n > 0);
+    const r = this.gunRoom;
+    if (!r) return;
+    r.shut.hidden = n > 0;
+    r.open.hidden = n === 0;
+    if (!n) return;
+    const on = w.gunsOn !== false;
+    const ammo = gunAmmo(w);
+    r.sw.textContent = on ? 'STAND THE LINE DOWN' : 'BRING THE LINE UP';
+    r.sw.classList.toggle('off', !on);
+    r.state.textContent = `${n} OF 6 STANDING \u00b7 ${on ? 'RUNNING' : 'STOOD DOWN'} \u00b7 ${ammo.name}`;
+    // The cards are the tree's, so their state is the tree's sync.
+    this.syncTree();
+  }
+
   /** The lock comes off the moment the run owns the node. */
   syncSandbox() {
     const owned = !!(this.game.world.up && this.game.world.up.sandbox);
@@ -448,17 +560,22 @@ export class Menu {
         : '';
       r.last.innerHTML = head + rec;
     }
-    if (this.lockTab) {
-      // Two classes, not `hidden` on the padlock: `.tabLock` carries
-      // `display: inline-block`, so `[hidden]`'s user-agent rule -- one class
-      // of specificity, and it loses to any author rule -- would flip the
-      // attribute and leave the lock on the screen. The trap CLAUDE.md keeps
-      // a note about, and the reason the AUTO AIM row shipped unable to
-      // close. (This comment used to say the rule carried an id. It does
-      // not; a bare class is enough to win, which is the point.)
-      this.lockTab.classList.toggle('sealed', !owned);
-      this.lockTab.classList.toggle('unlocked', owned);
-    }
+    this.setLock('sandbox', owned);
+  }
+
+  /**
+   * A lock that can come off.
+   *
+   * Two classes, not `hidden` on the padlock: `.tabLock` carries
+   * `display: inline-block`, so `[hidden]`'s user-agent rule -- one class of
+   * specificity, and it loses to any author rule -- would flip the attribute
+   * and leave the lock on the screen. The trap CLAUDE.md keeps a note about.
+   */
+  setLock(which, owned) {
+    const b = this.lockTabs.get(which);
+    if (!b) return;
+    b.classList.toggle('sealed', !owned);
+    b.classList.toggle('unlocked', owned);
   }
 
   /**
@@ -1711,6 +1828,9 @@ export class Menu {
       // earned. Keyed rather than per-frame, for the reason `fitBar` is.
       if (this.open) this.syncUltimate();
     }
+    // ...and the emplacement tab's lock, which opens on a purchase made on the
+    // FIELD rather than in here -- so nothing else in this sync would notice.
+    this.setLock('guns', (world.guns || []).length > 0);
     for (const a of ARSENAL) {
       const on = a.kind === 'round' ? world.round === a.key
         : a.kind === 'mine' ? world.mine === a.key

@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P9b (255), builds 256-260's walls and transformation. The plan's structure is complete; P10 (the reveal pass) is what is left.**
+**Status: P1 (238) - P9b (255), builds 256-261's walls, transformation and emplacements. The plan's structure is complete; P10 (the reveal pass) is what is left.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -2056,3 +2056,107 @@ that glows.
 Not done: WARD's surface arm is not in the case. At 320×568 the shell reaches
 231 against a wall 287 out even with WIDEN, so an arm for it would be vacuous
 on every screen — the guard is in and asserted by inspection only.
+
+## 33. Build 261 — the emplacements
+
+The build lots have stood empty since P5 shipped them: ground reserved, drawn,
+and refusing every press with a line about not being built yet. This is what
+they were reserved for.
+
+**Six small auto-turrets, one per lot, bought on the field.** A press on a lot
+is the purchase -- there is no confirm and no sheet, because the lot IS the
+control and a dialog over the field would take the fight away to spend 2,600
+energy. What has not changed is the half of the old rule that always mattered:
+the press still aims and still fires. Four of the six sit exactly where the
+thumb goes to shoot, so a lot that swallowed a press would cost a shot every
+time you defended the ground it stands on.
+
+**What one is, and what it deliberately is not.** It points at the nearest
+object in reach and fires on a timer. No aim mode, no ammunition slot, no
+ability, no cooldown, and no decision once it is standing. The machine in the
+middle is where the decisions are, and six more things asking to be steered
+would take the field away from it. `r` 16 against the second form's 40, damage
+3.4 against BOLT's 26, `interval` 0.55 against the machine's 0.286 -- about a
+twentieth of the machine's output each. **What an emplacement buys is COVER,
+not damage.**
+
+Grey is NOT skipped: "auto shoot all objects" is the whole rule, and the
+machine's own assist already has three aim modes and SIEVE to sell. What is
+skipped is what nothing may shoot -- the dead, the staged, a boss's spent
+frame, a dissolving body, and anything behind the wall.
+
+**`world.guns` is a list of LOT INDICES.** The yard is derived in `resize` and
+thrown away on every rotation, era change and bench door -- it is furniture,
+not state -- so a gun's place is its lot's place and is re-derived with it. Six
+bits is the whole of what a run has to remember, and `syncGuns` rebuilds the
+rest.
+
+**Every upgrade is global, and that is the design.** All six scalars live on
+`world.up` and `turrets.js` reads them at the point of use, so a node bought
+while six guns are standing reaches all six on the next frame and a gun built
+afterwards arrives with all of it. The alternative -- upgrades that attach to a
+gun -- would have made the sixth lot worth less than the first, which is a trap
+rather than a decision. The case asserts exactly that: a gun built after the
+six are bought is identical to the one that was standing when they were.
+
+**The six live outside the tree**, in `tree.js`'s `DETACHED`, and the TURRETS
+tab is their only door. That is the point of them: they are not offered to a
+run that has nothing to apply them to, and the tree cannot express "locked
+behind a thing bought on the field" -- its gates are rungs and parents.
+They are ordinary nodes in every other respect: built by the tree's own
+`leaf`, in `NODE_BY_ID`, bought through `Game.buy`, recorded in `world.ledger`,
+replayed by the restore, and rendered with the tree's own `makeCard` into
+`this.items` so `syncTree` prices them. There is one purchase path in this
+game and this is not a second one. `ELSEWHERE` is what stops `check-build`
+reporting them as content nobody can buy, and it is keyed by ID so that adding
+a seventh without deciding where it lives still fails the build.
+
+MUNITION is the one that changes what they fire, and the whole line re-arms on
+the frame it lands: every standing gun's core wears the round's own colour, so
+"it applies to all of them" is seen rather than believed.
+
+### The numbers that were pinned between two rules
+
+The four lots ahead were one row at `lotStep` 70, which put the inner pair 54
+units either side of the turret's own column -- two guns firing up one lane,
+reading as a single object. They are a shallow V now: `lotStep` 96 opens the
+nearest pair to 144 apart and `lotStagger` 34 drops the inner two back.
+
+Both numbers are bounded at 320x568, which is the screen that binds -- the
+turret stands 250 units below the wall's hold line there and 934 below it at
+390x844:
+
+- `lotAhead` cannot grow past about 142, or the outer pair's top crosses the
+  hold line and the player has placed something above the wall. At 150 it
+  did, by 12 units, and the lots case caught it.
+- `lotStagger` cannot grow much past 34, or the inner pair comes back far
+  enough to sit inside the second form's painted reach.
+
+### Four things this build got wrong first
+
+- **`priceOf` is ADDITIVE.** `cost + step * have`, not a multiplier -- the
+  first version wrote `step: 1.55` and priced a second level of CALIBRE at
+  901.55. Caught by looking at the rendered tab, which is the only place that
+  number is ever read.
+- **`NODE_BY_ID` was built from `NODES` alone**, so all six read `locked` from
+  `Game.buy`: written, offered, and unbuyable. It is `[...NODES, ...DETACHED]`
+  now, and the docstring says what it is for.
+- **`#8fa9c4` is DRIFT's grey** and was the first steel bolt's colour. The
+  colour rule `check-build` enforces is that grey means harmless, so a grey
+  round would have said the emplacements could not hurt anything. The line
+  wears its own desaturated steel ladder instead, stepping up in tone and size
+  across the three rounds so the step is legible without colour.
+- **`restart()` calls `forgetRun()`.** The save round-trip arm used it and
+  reported a resume that brought back nothing -- which was the case deleting
+  the file it was about to read. It uses `reset()`.
+
+### ...and one fault in build 259's updater, found by the suite
+
+`askServer` chained the build probe behind `registration.update()`, which
+settles when the browser has finished fetching and comparing the worker script
+-- a network round trip it is entitled to take its time over. A single slow or
+hung update left `asking` true for the rest of the session and **the app never
+checked again**, which is the same failure that function exists to fix, one
+level down. The worker is nudged and not waited on now.
+
+546 green, ORDINAL hash `-1765830468` before and after in this container.

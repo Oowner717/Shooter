@@ -92,6 +92,20 @@ export function freshUpgrades() {
      * one that takes everything. See Game.aimModes.
      */
     driftAim: 0,
+    /*
+     * ---- the emplacements ----
+     *
+     * Six scalars for six nodes, all GLOBAL: `turrets.js` reads them at the
+     * point of use, so a node bought while six guns are standing reaches all
+     * six on the next frame, and a gun built afterwards arrives with it. That
+     * is the whole reason they are here rather than on the guns.
+     */
+    gunDamage: 1,
+    gunRate: 1, // multiplier on the interval, so lower is faster
+    gunRange: 1,
+    gunSlew: 1,
+    gunSalvo: 0, // extra rounds a shot, fanned
+    gunAmmo: 0, // index into turrets.js's GUN_AMMO
     pile: 0, // levels of the weight in the deck that answers what closes in
     casing: 0, // damage a second to whatever is touching the turret
     insulation: 1, // multiplier on how much corruption costs the intake
@@ -113,6 +127,17 @@ export function freshUpgrades() {
  */
 
 const g = svgMark;
+
+/*
+ * The emplacement line's own colour: a desaturated steel blue.
+ *
+ * Every saturated hue in this game is spoken for by an arm, an ability or a
+ * root, and the three ALL-X groups already took the one warm bone register.
+ * This is the cool equivalent -- issued equipment beside a rack the player
+ * chose -- and it is the same tone the guns themselves and their rounds are
+ * drawn in, so the tab, the fixture and the round all read as one thing.
+ */
+const GUN_TONE = '#8fb8e8';
 
 const MARK = {
   // --- ammo ---
@@ -594,6 +619,69 @@ export const UPGRADES = {
      */
     { id: 'standing', name: 'STANDING ORDER', levels: 2, line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
   ],
+  /*
+   * ---- the emplacements, and why they are not in the tree ----
+   *
+   * Six upgrades to the line of small auto-turrets, and the ONLY place they
+   * can be reached is the TURRETS tab -- which is locked until a gun is
+   * standing. That is the point of them: they are not offered to a run that
+   * has nothing to apply them to, and the tree cannot express "locked behind
+   * a thing bought on the field" without growing a second gate beside `needs`.
+   *
+   * They are still ordinary upgrade nodes in every other respect -- ids in
+   * `BY_ID`, bought through `Game.buy`, recorded in `world.ledger`, replayed
+   * by the restore -- so nothing about the purchase, the price ladder or the
+   * save is a special case. `tree.js`'s `ELSEWHERE` is what stops
+   * `check-build` reporting them as content nobody can buy.
+   *
+   * Every one is global. See the note beside `gunDamage` in the defaults.
+   */
+  GUN: [
+    /*
+     * `needs` on every one, and it is not decoration: the TAB is locked until
+     * a gun is standing, and a control that refuses is not the same as a rule
+     * that holds -- `Game.buy` is reachable from the debug panel, from a
+     * restore and from anything written next year. The gate is in the model.
+     *
+     * `tone` on every one for a reason of the same shape: `toneOf` walks up
+     * `parent` and these have none, so without it the whole line would render
+     * in the slate a node with no branch falls back to.
+     *
+     * `step` is ADDITIVE -- `priceOf` is `cost + step * have`, not a
+     * multiplier -- and the first version of these wrote 1.55 and 1.9, which
+     * priced a second level of CALIBRE at 901.55. The prices below are the
+     * tree's own shape: a round number, and a round number more each level.
+     * The whole line, six lots and every level, is about 40k.
+     */
+    { id: 'gundamage', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'CALIBRE', levels: 3, cost: 900, step: 500,
+      line: '+35% damage from every emplacement, standing or not yet built.',
+      apply: scale('gunDamage', 1.35), icon: MARK.hollowpoint },
+    { id: 'gunrate', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'CADENCE', levels: 3, cost: 900, step: 500,
+      line: '-16% between rounds, on the whole line.',
+      apply: quicken('gunRate', 0.84), icon: MARK.rate },
+    { id: 'gunrange', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'SIGHTLINE', levels: 2, cost: 1100, step: 700,
+      line: '+30% reach. An emplacement holds more of the ground it stands on.',
+      apply: scale('gunRange', 1.3), icon: MARK.aimrange },
+    { id: 'gunslew', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'TRAVERSE', levels: 2, cost: 900, step: 600,
+      line: '+40% traverse. Less of the cadence is spent coming round.',
+      apply: scale('gunSlew', 1.4), icon: MARK.slew },
+    { id: 'gunsalvo', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'VOLLEY', levels: 2, cost: 1600, step: 1200,
+      line: 'One more round a shot, fanned. More metal, not less accuracy.',
+      apply: bump('gunSalvo', 1), icon: MARK.salvo },
+    /*
+     * The one that changes what they FIRE, and the reason the rack in
+     * turrets.js is a list rather than a constant. Two levels, two steps up
+     * it, and the whole line re-arms on the frame it lands -- the core of
+     * every standing gun wears the round's own colour, so "it applies to all
+     * of them" is seen and not believed.
+     */
+    { id: 'gunammo', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'MUNITION', levels: 2, cost: 2200, step: 1800,
+      line: 'The whole line re-arms: SABOT, and then FERRITE.',
+      tiers: [null, { name: 'MUNITION · FERRITE',
+        line: 'And again: twice the issued damage, and it carries through the '
+          + 'first thing it kills.' }],
+      apply: bump('gunAmmo', 1), icon: MARK.tracer },
+  ],
   TURRET: [
     /*
      * One step, from build 178. It had two -- FEED and RUNAWAY FEED, 0.64 of
@@ -810,7 +898,7 @@ export const UPGRADES = {
   ],
 };
 
-const AXES = ['AMMO', 'FIELD', 'TURRET', 'WAVE', 'ANOMALY', 'TOOL'];
+const AXES = ['AMMO', 'FIELD', 'TURRET', 'GUN', 'WAVE', 'ANOMALY', 'TOOL'];
 
 /*
  * The other two kinds of permanent thing the tree sells. They are not

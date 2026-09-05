@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '260';
+export const BUILD = '261';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '260';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '7e9be60';
+export const REV = '4d28d19';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4408,6 +4408,37 @@ CFG.evolve = {
   ],
 };
 
+/*
+ * ---- the emplacements ----
+ *
+ * Six small auto-turrets, one per build lot, at era 2. See src/turrets.js for
+ * what one is and why it is deliberately the simplest shooting thing in the
+ * game; these are its numbers.
+ *
+ * `damage` 3.4 against BOLT's 26 and `interval` 0.55 against the machine's
+ * 0.286 stock: about a twentieth of the machine's output each, so all six
+ * standing and fully upgraded is a supporting line and never the main gun.
+ * That ratio is the design -- what an emplacement buys is COVER, not damage.
+ *
+ * `r` 16 against the second form's 40, so it reads as a fixture beside the
+ * machine rather than as a second player, and `range` 300 is a third of the
+ * era-2 field's depth: enough to hold the ground it stands on and not enough
+ * to hold the field from one corner of it.
+ */
+CFG.gun = {
+  r: 16,
+  bolt: 2.6, // the round's own radius -- BOLT's is 4.2
+  range: 300,
+  interval: 0.55, // seconds between rounds
+  damage: 3.4,
+  speed: 900,
+  impulse: 26,
+  life: 1.2,
+  slew: 3.4, // radians a second the little barrel comes round at
+  spread: 0.055, // VOLLEY's fan, per extra round
+  cost: 2600, // flat, per lot -- see lotPrice
+};
+
 CFG.yard = {
   gap: 105, mouthHalf: 130, faceHalf: 175, tooth: 34, clear: 24,
   // The six lots. Two works beside the machine and four emplacements in front
@@ -4427,7 +4458,26 @@ CFG.yard = {
    * they move away from the machine without moving into the interface.
    */
   lotSide: 118, lotW: 34, lotH: 30,
-  lotAhead: 124, lotStep: 70, gunW: 23, gunH: 20,
+  /*
+   * The four ahead, spread wider and STAGGERED from build 261.
+   *
+   * They were four boxes in one row at `lotStep` 70, which put the inner pair
+   * 54 units either side of the turret's own column -- close enough that an
+   * emplacement on each was two guns firing up the same lane, and the row read
+   * as one object. `lotStep` 96 opens the pair to 144 apart, and `lotStagger`
+   * drops the inner two 46 units back so the four are a shallow V rather than
+   * a line: they cover four bearings instead of one, and nothing hides behind
+   * anything.
+   *
+   * The three numbers are pinned between two rules at 320x568, which is the
+   * screen that binds -- the turret stands 250 units below the wall's hold
+   * line there and 934 below it at 390x844. `lotAhead` cannot grow, or the
+   * outer pair's top crosses the hold line and the player has placed
+   * something above the wall; `lotStagger` cannot grow, or the inner pair
+   * comes back far enough to sit inside the second form's painted reach. Both
+   * are asserted, at both screens.
+   */
+  lotAhead: 134, lotStep: 96, lotStagger: 34, gunW: 23, gunH: 20,
 };
 
 const SCALED = [
@@ -4475,8 +4525,13 @@ const SCALED = [
   'pile.r0', 'pile.r', 'ward.r', 'prism.r', 'prism.beamLen',
   // the yard, which is a picture and keeps its size on the glass
   'yard.gap', 'yard.mouthHalf', 'yard.faceHalf', 'yard.tooth', 'yard.clear',
+  // The emplacements, for the same reason everything turret-owned is here:
+  // they stand on a field 1.54x deeper and have to cover the same fraction of
+  // it. `interval`, `slew` and `spread` are NOT scaled -- a cadence and an
+  // angular rate are not lengths.
+  'gun.r', 'gun.bolt', 'gun.range', 'gun.speed',
   'yard.lotSide', 'yard.lotW', 'yard.lotH',
-  'yard.lotAhead', 'yard.lotStep', 'yard.gunW', 'yard.gunH',
+  'yard.lotAhead', 'yard.lotStep', 'yard.lotStagger', 'yard.gunW', 'yard.gunH',
 ];
 
 function atPath(path) {

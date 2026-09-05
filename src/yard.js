@@ -100,7 +100,9 @@ export function syncYard(world, entryY) {
   for (let i = 0; i < 4; i++) {
     const l = lots[2 + i];
     l.x = s.x + (i - 1.5) * Y.lotStep;
-    l.y = s.y - Y.lotAhead;
+    // ...and the inner pair stands back, so the four are a shallow V and not a
+    // row. See the note on `lotStagger` in config.js.
+    l.y = s.y - Y.lotAhead + (i === 1 || i === 2 ? Y.lotStagger : 0);
     l.hw = Y.gunW;
     l.hh = Y.gunH;
   }

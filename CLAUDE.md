@@ -1506,6 +1506,15 @@ came from before believing the other one covers it.
   the bar from `RANGE_NAME`, the tab from `GROUPS`, the card from the tree --
   because it lives in three files and each of the two previous renames moved
   a subset of them.
+- **The six emplacement upgrades are NOT in the tree**, and that is deliberate:
+  their only door is the TURRETS tab, which is locked until a gun is standing,
+  and the tree's gates are rungs and parents. They are ordinary nodes in every
+  other respect -- `tree.js`'s `DETACHED` builds them with `leaf`, they are in
+  `NODE_BY_ID` (which is `[...NODES, ...DETACHED]`, and was `NODES` alone for
+  one build, which made all six unbuyable), and `ELSEWHERE` is what stops
+  `check-build` calling them content nobody can buy. `priceOf` is ADDITIVE --
+  `cost + step * have` -- so a `step` written as a multiplier prices the second
+  level at `cost + 1.55`.
 - **Anything of OURS that is drawn at era 2 goes through `Game.ours(ctx, fn)`**,
   which clips to below the wall. Mines, effects, rounds, fx -- three scopes in
   `Game.draw`. A new draw routine belongs inside one of them, not beside them;

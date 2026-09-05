@@ -182,7 +182,7 @@ export const ON_WALL = (() => {
  * that fired the gun.
  */
 export const ON_LOTS = (() => {
-  const text = 'Ground is reserved, not yet yours.\nWorks beside the machine, emplacements in front of it.';
+  const text = 'An emplacement stands here.\nOne small auto-turret, bought once, and it holds this ground for you.';
   return { id: idOf(text), text, hold: holdFor(text) };
 })();
 

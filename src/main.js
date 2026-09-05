@@ -120,13 +120,22 @@ if ('serviceWorker' in navigator) {
     if (asking || reloading || now - lastAsk < 4000) return;
     asking = true;
     lastAsk = now;
+    /*
+     * The worker is nudged and NOT waited on. `registration.update()` settles
+     * when the browser has finished fetching and comparing the worker script,
+     * which is a network round trip it is entitled to take its time over --
+     * and chaining the check behind it means a single slow or hung update
+     * leaves `asking` true for the rest of the session and the app never
+     * checks again. That is the same failure this whole function exists to
+     * fix, one level down. Fire it, forget it, and go and ask.
+     */
     navigator.serviceWorker.getRegistration()
-      .then((reg) => (reg ? reg.update().catch(() => {}) : null))
-      .catch(() => {})
-      .then(() => fetch('./index.html', {
-        cache: 'no-store',
-        headers: { Range: `bytes=0-${PROBE_BYTES - 1}` },
-      }))
+      .then((reg) => { if (reg) reg.update().catch(() => {}); })
+      .catch(() => {});
+    fetch('./index.html', {
+      cache: 'no-store',
+      headers: { Range: `bytes=0-${PROBE_BYTES - 1}` },
+    })
       // 206 if the host honoured the range, 200 if it ignored it. Either
       // carries the literal; a host that does neither is offline and there is
       // nothing to update to.

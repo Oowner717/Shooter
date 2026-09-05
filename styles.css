@@ -4447,3 +4447,32 @@ body.evolving #waveRail { transform: translateY(-18px); }
   50% { box-shadow: 0 0 34px rgba(255, 217, 246, 0.30); }
 }
 @media (prefers-reduced-motion: reduce) { #newFormBar { animation: none; } }
+
+/* ---- the emplacements ---------------------------------------------------
+ *
+ * The TURRETS tab. The shut state reuses `.sealedRoom` wholesale -- it is the
+ * same shape of door as the testbed's and there is no reason for a second
+ * vocabulary. Open, it is a header, one switch and the tree's own card grid,
+ * so almost everything here is spacing.
+ */
+.gunRoom { display: flex; flex-direction: column; gap: 10px; }
+/* `.gunRoom` gives itself a `display`, so it owes `[hidden]` a guard: the user
+ * agent's `[hidden] { display: none }` is one class of specificity and loses
+ * to any author rule written on a class. Without this the property flips, the
+ * test reads it back happily, and the room stays on the screen. */
+.gunRoom[hidden] { display: none !important; }
+.gunHead { display: flex; flex-direction: column; gap: 4px; }
+.gunState {
+  font-size: 11px; letter-spacing: .16em; color: #8fb8e8; opacity: .85;
+  font-variant-numeric: tabular-nums;
+}
+.gunSwitch {
+  align-self: stretch; padding: 11px 12px; border-radius: 8px;
+  border: 1px solid rgba(143, 184, 232, .55); background: rgba(143, 184, 232, .10);
+  color: #cfe0f2; font-size: 12px; letter-spacing: .18em; cursor: pointer;
+}
+.gunSwitch.off { border-color: rgba(159, 179, 200, .4); background: rgba(159, 179, 200, .06); color: #9fb3c8; }
+.gunSwitch:active { background: rgba(143, 184, 232, .2); }
+/* The grid is `.branchGrid`, which is laid out for a branch that is open
+ * inside a wrapper. Here it is the whole panel, so it needs no inset. */
+.gunGrid { margin: 0; }

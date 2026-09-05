@@ -206,6 +206,20 @@ export function captureRun(world, game) {
      * that it is bought and paid for it is part of the run.
      */
     era: world.era,
+    /*
+     * The emplacements: which lots have one, and whether the line is running.
+     *
+     * The list of INDICES and nothing else -- a gun's place is its lot's place
+     * and the lots are re-derived on every resize, so there is nothing else
+     * about one that is a fact about the run. The six upgrades are ordinary
+     * ledger ids and come back with `taken` like everything else.
+     *
+     * Additive, and the VERSION is deliberately not bumped: a file this build
+     * writes is still readable by the shape before it, and a file written
+     * before this reads back as a run with no emplacements, which it was.
+     */
+    guns: [...(world.guns || [])],
+    gunsOn: world.gunsOn !== false,
     // ...and the same for what a boss left. Both are held counts that go
     // down again, which the ledger has no way of recording.
     remainder: world.remainder | 0,

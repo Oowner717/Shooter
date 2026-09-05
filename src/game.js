@@ -40,6 +40,7 @@ import { Sandbox } from './sandbox.js';
 import { ledger, soak } from './ledger.js';
 import { updateDummy } from './dummy.js';
 import { syncYard, updateYard, drawYard, lotAt, refuseLot, shielded, wallLine } from './yard.js';
+import { syncGuns, updateGuns, drawGuns, gunGlow, buildGun, lotPrice, gunCount } from './turrets.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 
@@ -310,6 +311,19 @@ export class Game {
        */
       yard: null,
       /*
+       * The emplacements. `guns` is the RUN's fact -- which lots have one, as
+       * a sorted list of indices -- and is saved; `gunAt` is the derived thing
+       * the field is drawn and stepped from, rebuilt by `syncGuns` off the
+       * lots whenever the yard is. `gunsOn` is the one switch they have.
+       *
+       * All three declared here for the reason `yard` is: the suite runs the
+       * world behind a Proxy that records reads, and a field that appears
+       * later is a ghost field to it.
+       */
+      guns: [],
+      gunAt: [],
+      gunsOn: true,
+      /*
        * The view multiplier, and the cinematic's own clock. Both declared here
        * rather than assigned when the evolution starts, because the suite runs
        * the world behind a Proxy that records reads and a field that appears
@@ -517,6 +531,11 @@ export class Game {
     // too, but only when the SCALE is stale -- and P1's own postmortem is that
     // "the conditional resize will get it" is not a reason to leave it out.
     w.yard = null;
+    // ...and what stood on it. `guns` is a run's purchase and goes back with
+    // the run; `gunAt` is derived and `resize` rebuilds it from an empty yard.
+    w.guns = [];
+    w.gunAt = [];
+    w.gunsOn = true;
     /*
      * ...and the geometry derived from it, but ONLY when the scale is actually
      * stale. `reset()` has never called `resize()`, and setting the era back to
@@ -766,6 +785,17 @@ export class Game {
      */
     w.era = d.era === 2 ? 2 : 1;
     if (w.era === 2) w.newForm = 'done';
+    /*
+     * ...and what is standing on the lots, restored beside the era for the
+     * same reason: `syncGuns` runs off the yard, the yard is derived in the
+     * resize below, and both want to be right in one pass. Bounded on the way
+     * in -- a file is data and an index out of range would be a gun standing
+     * on nothing.
+     */
+    w.guns = Array.isArray(d.guns)
+      ? [...new Set(d.guns.filter((n) => Number.isInteger(n) && n >= 0 && n < 6))].sort((p2, q) => p2 - q)
+      : [];
+    w.gunsOn = d.gunsOn !== false;
     w.unlocked = new Set(d.unlocked);
     for (const k of STARTING) w.unlocked.add(k);
     w.loadout = { mines: [...d.loadout.mines], ammo: [...d.loadout.ammo] };
@@ -1451,6 +1481,52 @@ export class Game {
    * the button, so a stale panel can never spend energy it does not have.
    * @returns 'ok' | 'locked' | 'maxed' | 'poor'
    */
+  /**
+   * A tap on a build lot.
+   *
+   * One press, one emplacement, one price -- there is no confirm and no menu,
+   * because the lot IS the control and a sheet over the field would take the
+   * fight away to spend three thousand energy. What it cannot do is take the
+   * shot: every branch returns to the aim path, which is why this reports
+   * through the lot's own flare and a caption rather than through a dialog.
+   *
+   * The flare is the refusal the lots have always had, kept for the two
+   * answers that are refusals -- no purse, and one already standing.
+   */
+  pressLot(i) {
+    const w = this.world;
+    if (i < 0) return false;
+    const had = gunCount(w);
+    const r = buildGun(w, i);
+    if (r === 'ok') {
+      const g = w.gunAt[w.gunAt.length - 1] || w.yard.lots[i];
+      ring(g.x, g.y, CFG.gun.r * 0.4, CFG.gun.r * 3.4, 0.55, '#8fb8e8', 2);
+      for (let k = 0; k < 14; k++) {
+        const a = (k / 14) * TAU;
+        spark(g.x, g.y, Math.cos(a) * rand(60, 190), Math.sin(a) * rand(60, 190),
+          '#cfe0f2', rand(0.2, 0.45), 1.8);
+      }
+      audio.amend();
+      this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
+      /*
+       * The first one opens the tab, so the menu has to be told. `syncSeals`
+       * is not enough -- the lock is on a TAB and not on a strip cell -- and
+       * the sheet is very often shut when this happens, so it is the menu's
+       * own sync that has to run rather than a class toggle here.
+       */
+      if (!had) this.hud.menu.sync(w);
+      this.hud.menu.syncGuns();
+      this.checkpoint();
+      if (this.hintsAllowed) this.sayOnce([ON_LOTS]);
+      return true;
+    }
+    refuseLot(w, i);
+    if (r === 'poor' && this.hintsAllowed) {
+      this.hud.alert(`EMPLACEMENT · ${Math.round(lotPrice())} ENERGY`, 'info', 2.2);
+    }
+    return false;
+  }
+
   buy(id) {
     const w = this.world;
     const n = NODE_BY_ID.get(id);
@@ -1640,6 +1716,9 @@ export class Game {
     // so a rotation re-derives it and a reload cannot strand a stale one. THE
     // ONE WRITER.
     syncYard(world, ENTRY_Y);
+    // ...and the emplacements follow the ground they are bolted to. After the
+    // yard, always: a gun's place IS its lot's place.
+    syncGuns(world);
 
     this.grid.resize(world.width, world.height + STAGE_HEIGHT, GRID_CELL);
     background.resize(world.width, world.height, world.width / 2, ENTRY_Y);
@@ -1711,16 +1790,18 @@ export class Game {
       this.hud.openAimRow(false);
 
       /*
-       * A build lot REFUSES, and refusing is all it does: the press goes on to
-       * aim and fire exactly as it always did. Four of the six sit where the
-       * thumb goes to shoot, so a lot that swallowed the press would cost a
-       * shot every time you defended the ground it stands on -- and this is a
-       * disabled control, which is the weakest possible claim on a tap.
+       * A build lot BUILDS, and the press still goes on to aim and fire.
+       *
+       * That second half is the rule and it has not changed since the lots
+       * were only ever refusing: four of the six sit exactly where the thumb
+       * goes to shoot, so a lot that swallowed the press would cost a shot
+       * every time you defended the ground it stands on. Buying an
+       * emplacement is a side effect of a tap that is still a shot.
        *
        * It is checked before the grip/aim branch because the two works stand
        * level with the turret, on the grip side of it.
        */
-      if (refuseLot(w, lotAt(w, p.x, p.y)) && this.hintsAllowed) this.sayOnce([ON_LOTS]);
+      this.pressLot(lotAt(w, p.x, p.y));
 
       if (this.gripPointer === null && p.y > s.y - s.r) {
         this.gripPointer = ev.pointerId;
@@ -2376,6 +2457,7 @@ export class Game {
     collectEnergy(w, dt);
     this.runUpgrades(dt);
     updateMines(w, dt);
+    updateGuns(w, dt);
     updateYard(w, dt);
     this.resolveBlasts();
     this.checkContact();
@@ -3294,6 +3376,11 @@ export class Game {
 
     this.ours(ctx, () => {
       drawMines(ctx, w);
+      // The emplacements: structure, drawn with the mines rather than with the
+      // machine, because that is what they are -- fixtures on the ground, over
+      // the yard and under the effects. Inside `ours` like everything of ours,
+      // though a lot cannot be past the wall in the first place.
+      drawGuns(ctx, w);
       for (const e of w.effects) if (!e.ground) e.draw(ctx, w);
     });
 
@@ -3366,6 +3453,9 @@ export class Game {
     this.drawGlitch(ctx);
     this.ours(ctx, () => {
       drawProjectiles(ctx, w);
+      // ...and their muzzles, with the effects: a shot is an event and the
+      // gun is furniture, so the two are drawn in different passes.
+      gunGlow(ctx, w);
       drawFx(ctx);
     });
     this.drawTouchAid(ctx);

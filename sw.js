@@ -62,6 +62,7 @@ const ASSETS = [
   './src/sandbox.js',
   './src/dummy.js',
   './src/yard.js',
+  './src/turrets.js',
 ];
 
 self.addEventListener('install', (e) => {

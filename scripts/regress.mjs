@@ -396,7 +396,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.buy('sandbox');
     g.hud.menu.syncSandbox();
     const panels = [];
-    for (const tab of ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'sandbox', 'system']) {
+    for (const tab of ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'sandbox', 'guns', 'system']) {
       g.hud.menu.show(tab);
       panels.push(document.querySelector(`[data-panel="${tab}"]`));
     }
@@ -15897,10 +15897,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     // ---- sideways, across the whole strip ----
     m.openTab('ammo');
+    /*
+     * One step PAST the end in each direction, so the last entry repeating is
+     * what proves it stops rather than wraps. Off the strip's own length and
+     * not a literal: the count was 7 for eight builds and went stale the
+     * moment TURRETS was added, reporting a walk that was correct.
+     */
+    const strip = [...document.getElementById('menuTabs').children].map((b) => b.dataset.tab);
     const walk = [m.tab];
-    for (let i = 0; i < 7; i++) walk.push(m.step(1));
+    for (let i = 0; i < strip.length; i++) walk.push(m.step(1));
     const walkBack = [];
-    for (let i = 0; i < 7; i++) walkBack.push(m.step(-1));
+    for (let i = 0; i < strip.length; i++) walkBack.push(m.step(-1));
     out.walk = walk; out.walkBack = walkBack;
 
     // ---- a real sideways drag on the panel moves one tab, and a vertical
@@ -16015,7 +16022,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `AMMO -> ${r.ammoBtn.tab}, MINES -> ${r.minesBtn.tab}; the world holds under all of them`);
 
   check('...and only the open menu-s tabs are in the row',
-    JSON.stringify(r.hamburger.tabsShown) === '["codex","sandbox","system"]'
+    JSON.stringify(r.hamburger.tabsShown) === '["codex","sandbox","guns","system"]'
     && JSON.stringify(r.energy.tabsShown) === '["ammo","mines","tree","ultimate"]',
     `SYSTEM shows ${r.hamburger.tabsShown.join('/')}, ARSENAL shows ${r.energy.tabsShown.join('/')}`);
 
@@ -16024,12 +16031,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `MINES -> SYSTEM lands on ${r.switch.toSystem.tab}; back to ARSENAL lands on `
     + `${r.switch.back.tab} (not the first tab)`);
 
-  // Seven since build 232, when SANDBOX went into SYSTEM between OBJECTS and
-  // SETTINGS. The walk is what proves the strip is one list and not two: it
-  // crosses from ARSENAL into SYSTEM at ULTIMATE -> OBJECTS without a stop.
+  // Eight since build 261, when TURRETS went into SYSTEM between TESTBED and
+  // SETTINGS -- seven since 232, when SANDBOX did the same. The walk is what
+  // proves the strip is one list and not two: it crosses from ARSENAL into
+  // SYSTEM at ULTIMATE -> OBJECTS without a stop.
   check('the tabs are one strip, walked in either direction and stopping at the ends',
-    JSON.stringify(r.walk) === '["ammo","mines","tree","ultimate","codex","sandbox","system","system"]'
-    && JSON.stringify(r.walkBack) === '["sandbox","codex","ultimate","tree","mines","ammo","ammo"]',
+    JSON.stringify(r.walk) === '["ammo","mines","tree","ultimate","codex","sandbox","guns","system","system"]'
+    && JSON.stringify(r.walkBack) === '["guns","sandbox","codex","ultimate","tree","mines","ammo","ammo"]',
     `forward ${r.walk.join(' ')}; back ${r.walkBack.join(' ')}`);
 
   check('a sideways drag on the panel moves one tab, and a downward one does not',
@@ -19032,7 +19040,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       out.clashes = a.lots.filter((l) => rects.some((r) =>
         l.x + l.hw > r[0] && l.x - l.hw < r[2] && l.y + l.hh > r[1] && l.y - l.hh < r[3])).length;
 
-      // ---- pressing one refuses, cannot buy, and does NOT eat the shot ----
+      /*
+       * ---- pressing one with an empty purse refuses, and does NOT eat the
+       * shot ----
+       *
+       * The lots BUILD from build 261, so the half of this that was "it can
+       * never buy" is gone and is covered by the emplacement case. What is
+       * left is the half that was always the point: a press that cannot go
+       * through still aims and still fires, because four of the six sit
+       * exactly where the thumb goes to shoot. The purse is emptied on
+       * purpose -- a refusal is the state under test.
+       */
+      w.energy = 0;
       const c = document.querySelector('canvas');
       const box = c.getBoundingClientRect();
       const gun = a.lots[3];
@@ -19088,13 +19107,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * thumb goes to shoot, so a lot that swallowed the press would cost a shot
    * every time you defended the ground it stands on.
    */
-  check('...and pressing one refuses, buys nothing, and still fires',
+  check('...and pressing one it cannot afford refuses, and still fires',
     rows.every((r) => r.press.refused > 0 && r.press.energy && r.press.bought
       && r.press.fired && r.miss.refused === 0 && r.miss.fired),
-    rows.map((r) => `${r.w}: pressed a lot — refused ${r.press.refused.toFixed(2)}, `
-      + `purse held ${r.press.energy}, nothing bought ${r.press.bought}, still fired `
-      + `${r.press.fired}; pressed beside it — refused ${r.miss.refused}, fired `
-      + `${r.miss.fired}`).join('; '));
+    rows.map((r) => `${r.w}: pressed a lot on an empty purse — refused `
+      + `${r.press.refused.toFixed(2)}, purse held ${r.press.energy}, nothing `
+      + `bought ${r.press.bought}, still fired ${r.press.fired}; pressed beside `
+      + `it — refused ${r.miss.refused}, fired ${r.miss.fired}`).join('; '));
 }
 
 // --- the machine, measured rather than described ----------------------------
@@ -20501,6 +20520,326 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.arcsOver} arcs drawn over it; PILE's front reaches ${r.pileReach} `
     + `against a wall ${r.pileToWall} out and marked the body behind it `
     + `${r.struckThrown} and the one below ${r.openThrown}`);
+}
+
+// --- the emplacements: six lots, six guns, one line -------------------------
+/*
+ * The build lots have stood empty since build 245 -- ground reserved, drawn,
+ * and refusing every press. This is what they were for.
+ *
+ * The three things worth pinning are the three that could each ship broken on
+ * their own: that a lot is a PURCHASE and still not a swallowed shot, that the
+ * upgrades reach every gun whether it was standing when they were bought or
+ * not, and that the tab they live in cannot be reached until one is.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { gunStats, gunAmmo, gunCount, GUN_AMMO } = await import('../src/turrets.js');
+    const { DETACHED, NODE_BY_ID, coverage } = await import('../src/tree.js');
+    const { shielded } = await import('../src/yard.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const clean = (era) => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(400000);
+      g.setEra(era);
+      w.director.update = () => {};
+      g.debugClearField();
+      w.mines.length = 0;
+      w.projectiles.length = 0;
+      w.effects.length = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+    };
+
+    // ---- era 1 has no lots and no guns -----------------------------------
+    clean(1);
+    out.eraOneYard = !w.yard;
+    out.eraOnePress = g.pressLot(0);
+    out.eraOneGuns = w.gunAt.length;
+
+    // ---- a lot is a purchase, and it does not eat the shot ----------------
+    clean(2);
+    const a = w.yard;
+    out.lots = a.lots.length;
+    /*
+     * SPREAD, measured. The four ahead were one row at `lotStep` 70, which put
+     * the inner pair 54 units either side of the turret's own column -- two
+     * guns up one lane. The nearest pair is 144 apart now and the inner two
+     * stand 46 back, so the four are a shallow V.
+     */
+    const ahead = a.lots.slice(2);
+    out.gap = +Math.min(...ahead.slice(1).map((l, i) => Math.abs(l.x - ahead[i].x))).toFixed(0);
+    out.depths = new Set(ahead.map((l) => Math.round(l.y))).size;
+    // ...and no two lots overlap, which a wider spread could have broken.
+    out.overlap = a.lots.some((l, i) => a.lots.some((m, j) => j > i
+      && Math.abs(l.x - m.x) < l.hw + m.hw && Math.abs(l.y - m.y) < l.hh + m.hh));
+
+    const purse0 = w.energy;
+    const c = document.querySelector('canvas');
+    const box = c.getBoundingClientRect();
+    const z = CFG.zoom;
+    const lot = a.lots[3];
+    w.projectiles.length = 0;
+    c.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, cancelable: true, pointerId: 71, isPrimary: true,
+      clientX: box.left + lot.x * z, clientY: box.top + lot.y * z,
+    }));
+    out.pressBuilt = gunCount(w) === 1 && (w.guns || []).includes(3);
+    out.pressPaid = purse0 - w.energy === CFG.gun.cost;
+    // ...the whole reason the lots have never swallowed a press: four of the
+    // six sit exactly where the thumb goes to shoot.
+    out.pressFired = w.projectiles.length > 0;
+    // ...and a second press on the same lot buys nothing and still fires.
+    const purse1 = w.energy;
+    w.projectiles.length = 0;
+    c.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, cancelable: true, pointerId: 72, isPrimary: true,
+      clientX: box.left + lot.x * z, clientY: box.top + lot.y * z,
+    }));
+    out.twiceCount = gunCount(w);
+    out.twicePaid = w.energy === purse1;
+    out.twiceFired = w.projectiles.length > 0;
+
+    // ---- it shoots, and it shoots everything -----------------------------
+    clean(2);
+    const a2 = w.yard;
+    g.pressLot(3);
+    const gun = w.gunAt[0];
+    const kill = (id, dx, dy) => {
+      const e = g.debugSpawn(id, gun.x + dx, gun.y + dy);
+      e.staged = false;
+      e.traits = null;
+      const hp0 = e.hp;
+      let f = 0;
+      while (!e.dead && f < 60 * 20) { g.update(1 / 60); f++; }
+      return { dead: e.dead, took: +(hp0 - e.hp).toFixed(1), s: +(f / 60).toFixed(2) };
+    };
+    out.mote = kill('mote', 0, -120);
+    // "auto shoot all objects": grey is not skipped, which is the one place
+    // this differs from the machine's own assist.
+    out.drift = kill('drift', 30, -140);
+    // ...and nothing behind the wall, which nothing of ours may touch.
+    const behind = g.debugSpawn('lurcher', gun.x, a2.wallY - 24 - 20);
+    behind.staged = false;
+    out.behindShielded = shielded(w, behind);
+    const bh = behind.hp;
+    for (let i = 0; i < 60 * 6; i++) g.update(1 / 60);
+    out.behindSafe = behind.hp === bh;
+
+    // ---- the six upgrades reach every gun, standing or not ---------------
+    clean(2);
+    out.detached = DETACHED.length;
+    out.inBuyMap = DETACHED.every((n) => NODE_BY_ID.get(n.id) === n);
+    out.covered = coverage().missing.length === 0 && coverage().extra.length === 0;
+    // ...and none of them can be bought before one is standing. The TAB is
+    // locked, but a control that refuses is not the same as a rule that holds.
+    out.shutBuys = DETACHED.map((n) => g.buy(n.id));
+    g.pressLot(2);
+    const base = gunStats(w);
+    out.openBuys = DETACHED.map((n) => g.buy(n.id));
+    const one = gunStats(w);
+    out.moved = {
+      damage: one.damage > base.damage,
+      interval: one.interval < base.interval,
+      range: one.range > base.range,
+      slew: one.slew > base.slew,
+      salvo: one.salvo > base.salvo,
+      ammo: one.ammo.key !== base.ammo.key,
+    };
+    /*
+     * The load-bearing one: a gun built AFTER the six is identical to the one
+     * that was standing when they were bought. Every scalar is global and read
+     * at the point of use, so there is nothing to migrate -- and the failure
+     * this rules out is the sixth lot being worth less than the first.
+     */
+    g.pressLot(5);
+    const late = w.gunAt.find((x) => x.lot === 5);
+    out.lateBuilt = !!late;
+    out.lateSame = JSON.stringify(gunStats(w)) === JSON.stringify(one);
+    out.bothFire = w.gunAt.length === 2;
+
+    // ---- the switch stops the firing and not the gun ---------------------
+    clean(2);
+    g.pressLot(3);
+    const g2 = w.gunAt[0];
+    const t1 = g.debugSpawn('mote', g2.x, g2.y - 120);
+    t1.staged = false;
+    w.gunsOn = false;
+    const h1 = t1.hp;
+    for (let i = 0; i < 60 * 5; i++) g.update(1 / 60);
+    out.offTook = +(h1 - t1.hp).toFixed(1);
+    out.offStanding = w.gunAt.length;
+    w.gunsOn = true;
+    for (let i = 0; i < 60 * 5; i++) g.update(1 / 60);
+    out.onTook = +(h1 - t1.hp).toFixed(1);
+
+    /*
+     * ---- and it survives a reload ---------------------------------------
+     *
+     * `reset()` and not `restart()`: `restart` calls `forgetRun`, which
+     * deletes the file this is about to read. The first version of this arm
+     * did exactly that and reported a resume that brought back nothing --
+     * which was the case throwing the save away, not the save losing it.
+     */
+    clean(2);
+    g.pressLot(1);
+    g.pressLot(4);
+    g.buy('gunammo');
+    w.gunsOn = false;
+    g.checkpoint();
+    g.reset();
+    out.gone = gunCount(w);
+    g.resume();
+    out.backGuns = [...(w.guns || [])];
+    out.backOn = w.gunsOn;
+    out.backAmmo = gunAmmo(w).key;
+    out.backStanding = w.gunAt.length;
+    out.ammoCount = GUN_AMMO.length;
+
+    delete w.director.update;
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('a build lot buys one emplacement, and never eats the shot',
+    r.eraOneYard && r.eraOnePress === false && r.eraOneGuns === 0
+    && r.lots === 6 && r.gap >= 120 && r.depths === 2 && !r.overlap
+    && r.pressBuilt && r.pressPaid && r.pressFired
+    && r.twiceCount === 1 && r.twicePaid && r.twiceFired,
+    `era 1 has no yard (${r.eraOneYard}) and refuses the press (${r.eraOnePress}); `
+    + `at era 2 the four ahead are ${r.gap} apart across ${r.depths} depths with `
+    + `no overlap (${!r.overlap}); one press built it (${r.pressBuilt}), paid `
+    + `(${r.pressPaid}) and still fired (${r.pressFired}); a second bought `
+    + `nothing (${r.twicePaid}) and still fired (${r.twiceFired})`);
+
+  check('...and it shoots every object in reach, and nothing behind the wall',
+    r.mote.dead && r.drift.dead && r.behindShielded && r.behindSafe,
+    `a MOTE died in ${r.mote.s}s taking ${r.mote.took}, DRIFT in ${r.drift.s}s `
+    + `(grey is not skipped -- "all objects" is the whole rule); a body behind `
+    + `the wall took nothing (${r.behindSafe})`);
+
+  /*
+   * `lateSame` is the one that matters. Every scalar is global and read at the
+   * point of use, so a gun built after the line was upgraded arrives with all
+   * of it -- the failure this rules out is the sixth lot being worth less than
+   * the first, which would be a trap rather than a decision.
+   */
+  check('six upgrades, and they reach guns that do not exist yet',
+    r.detached === 6 && r.inBuyMap && r.covered
+    && r.shutBuys.every((x) => x === 'locked')
+    && r.openBuys.every((x) => x === 'ok')
+    && Object.values(r.moved).every(Boolean)
+    && r.lateBuilt && r.lateSame && r.bothFire,
+    `${r.detached} nodes, all in the buy map (${r.inBuyMap}) and all accounted `
+    + `for by the tree's coverage (${r.covered}); with nothing standing they `
+    + `read ${[...new Set(r.shutBuys)].join('/')} and with one standing `
+    + `${[...new Set(r.openBuys)].join('/')}; every stat moved `
+    + `(${JSON.stringify(r.moved)}); a gun built afterwards is identical `
+    + `(${r.lateSame})`);
+
+  check('...and the switch stops the firing, not the gun',
+    r.offTook === 0 && r.offStanding === 1 && r.onTook > 0,
+    `stood down it delivered ${r.offTook} over five seconds with `
+    + `${r.offStanding} still standing; brought up, ${r.onTook}`);
+
+  check('...and the line comes back with the run',
+    r.gone === 0 && JSON.stringify(r.backGuns) === '[1,4]' && r.backOn === false
+    && r.backAmmo === 'sabot' && r.backStanding === 2 && r.ammoCount === 3,
+    `a restart left ${r.gone}; the resume brought back `
+    + `${JSON.stringify(r.backGuns)} standing ${r.backStanding}, stood down `
+    + `(${r.backOn === false}), carrying ${r.backAmmo} of ${r.ammoCount}`);
+}
+
+// --- the TURRETS tab is shut until one is standing --------------------------
+/*
+ * The lock is the whole reason those six live outside the tree: they are not
+ * offered to a run with nothing to apply them to. Asserted off the RENDERED
+ * BOX and the panel's own two states, never off `hidden` -- `.gunRoom` gives
+ * itself a `display`, which beats the user agent's `[hidden]` rule, and that
+ * is the trap this repo has paid for twice.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    g.restart();
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.phase = 'staging';
+    g.debugTeachAll();
+    g.debugGiveEnergy(400000);
+    g.setEra(2);
+    w.director.update = () => {};
+    g.debugClearField();
+
+    const tab = document.querySelector('.menuTab[data-tab="guns"]');
+    const box = (el) => (el ? el.getBoundingClientRect().height > 0 : null);
+    g.hud.menu.setOpen(true);
+    g.hud.menu.openTab('guns');
+    const room = g.hud.menu.gunRoom;
+
+    out.label = tab && tab.textContent.trim();
+    out.shutSealed = tab.classList.contains('sealed');
+    out.shutDoor = box(room.shut);
+    out.shutRows = box(room.open);
+    out.rows = room.open.querySelectorAll('.shopCard').length;
+
+    // ...and building one on the field opens it, with the sheet SHUT, which
+    // is where a player will be when they buy.
+    g.hud.menu.setOpen(false);
+    g.pressLot(2);
+    g.hud.menu.setOpen(true);
+    g.hud.menu.openTab('guns');
+    out.openSealed = tab.classList.contains('sealed');
+    out.openDoor = box(room.shut);
+    out.openRows = box(room.open);
+    out.state = room.state.textContent;
+
+    // ...and the switch is a control, pressed through its handler.
+    const was = w.gunsOn;
+    room.sw.click();
+    out.flipped = w.gunsOn !== was;
+    out.switchSays = room.sw.textContent;
+    room.sw.click();
+    out.flippedBack = w.gunsOn === was;
+
+    // ...and the strip of tabs still fits: four in SYSTEM, none of them
+    // wrapping past what ARSENAL's four already do.
+    const strip = document.getElementById('menuTabs');
+    const up = [...strip.children].filter((b) => !b.hidden);
+    out.tabs = up.length;
+    out.clipped = up.some((b) => b.scrollWidth > b.clientWidth + 1);
+    g.hud.menu.setOpen(false);
+
+    delete w.director.update;
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('the TURRETS tab is shut until an emplacement stands',
+    r.label === 'TURRETS' && r.shutSealed && r.shutDoor === true && r.shutRows === false
+    && r.openSealed === false && r.openDoor === false && r.openRows === true
+    && r.rows === 6 && r.tabs === 4 && !r.clipped,
+    `shut: sealed ${r.shutSealed}, the door is up (${r.shutDoor}) and the six `
+    + `rows are not (${r.shutRows}); after one is built: sealed ${r.openSealed}, `
+    + `door ${r.openDoor}, rows ${r.openRows} (${r.rows} of them) reading `
+    + `"${r.state}"; ${r.tabs} tabs in SYSTEM, none clipped (${!r.clipped})`);
+
+  check('...and its switch is a control that flips the line',
+    r.flipped && r.flippedBack && /LINE/.test(r.switchSays),
+    `pressed, it flipped (${r.flipped}) and said "${r.switchSays}"; pressed `
+    + `again it came back (${r.flippedBack})`);
 }
 
 // --- the door: what NEW FORM costs and what it needs ------------------------

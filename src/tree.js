@@ -436,7 +436,18 @@ export function flatten(nodes = TREE, parent = null, out = []) {
 }
 
 export const NODES = flatten();
-export const NODE_BY_ID = new Map(NODES.filter((n) => n.id).map((n) => [n.id, n]));
+
+/*
+ * The emplacement line: six upgrades whose only door is the TURRETS tab, which
+ * is locked until a gun is standing. The tree cannot express that gate -- it
+ * is a purchase made on the FIELD, not a node behind another node -- so they
+ * live outside it, and `ELSEWHERE` below is what stops `check-build` reporting
+ * them as content nobody can buy.
+ *
+ * Listed by id rather than by axis so that adding a seventh without deciding
+ * where it lives still fails the build.
+ */
+const ELSEWHERE_IDS = ['gundamage', 'gunrate', 'gunrange', 'gunslew', 'gunsalvo', 'gunammo'];
 
 /** What a node costs at the level about to be bought. `have` is 0-based. */
 export function priceOf(n, have = 0) {
@@ -448,8 +459,42 @@ export function priceOf(n, have = 0) {
  * browser. Every purchasable thing in upgrades.js must appear in the tree
  * exactly once, or it is content nobody can ever buy.
  */
+/*
+ * The nodes that are bought somewhere other than the tree.
+ *
+ * Built with the tree's own `leaf`, so they are ordinary nodes in every
+ * respect -- the same field list, the same price ladder, the same `needs`
+ * predicate -- and they are in `NODE_BY_ID`, which is what `Game.buy` gates
+ * on. They are simply not in `TREE`, so no branch draws them.
+ */
+export const DETACHED = ELSEWHERE_IDS.map(leaf);
+
+/**
+ * Every node that can be BOUGHT, wherever it is offered from. `Game.buy` gates
+ * on this, so a node missing from it is a node no button can ever spend on --
+ * which is what the six emplacement upgrades were for one build.
+ */
+export const NODE_BY_ID = new Map(
+  [...NODES, ...DETACHED].filter((n) => n.id).map((n) => [n.id, n]),
+);
+
+/*
+ * Ids that are deliberately NOT in the tree, and where they are instead.
+ *
+ * The tree is the canonical place a permanent thing is offered, and
+ * `coverage()` exists to catch one that was written and never placed -- which
+ * is content nobody can buy. The emplacement line is the one exception, and it
+ * is an exception for a reason the tree cannot express: those six are only
+ * reachable once a gun is STANDING, which is a purchase made on the field
+ * rather than a node in a branch, and the tree has no gate of that shape.
+ *
+ * Listed by id rather than by axis so that adding a seventh GUN node without
+ * deciding where it lives still fails the build.
+ */
+export const ELSEWHERE = new Map(ELSEWHERE_IDS.map((id) => [id, 'the TURRETS tab']));
+
 export function coverage() {
-  const placed = NODES.filter((n) => n.id).map((n) => n.id);
+  const placed = [...NODES.filter((n) => n.id).map((n) => n.id), ...ELSEWHERE.keys()];
   const dupes = placed.filter((id, i) => placed.indexOf(id) !== i);
   const want = [...ALL_UPGRADES.map((u) => u.id), ...UNLOCKS.map((u) => u.id),
     ...CHARGES.map((u) => u.id)];
