@@ -341,7 +341,8 @@ thing to run if the budget allows:
 - [x] P8a · the camera, the phase and the clock (build 249)
 - [x] P8b · the acts: the unmaking, the core, the ignition (build 250)
 - [x] P8c · audio and the smoke arm (251, 252). The banner is P9's.
-- [ ] P9 · the door
+- [x] P9a · the node, the gate, the save (build 253)
+- [ ] P9b · the ULTIMATE room, the banner, the five discoverability sites
 - [ ] P10 · the reveal pass
 
 ---
@@ -1515,3 +1516,63 @@ the core, one modulation, one voice, and the seventeen thuds the unmaking
 already made. A complete gesture at its own scale. Not a soundtrack.
 
 511 green, hash `-1765830468` unmoved, smoke clean.
+
+## 26. P9a, as built (build 253) — the node, the gate and the save
+
+**RECAST is NEW FORM, and `id: 'recast'` never changes.** A saved run writes
+bought ids into `world.ledger`, so renaming the id takes a paid-for node away
+from everyone who has it — the same reason the testbed is still `sandbox` in
+three places after two renames.
+
+**`repeat: true` and `levels: 1` moved together**, which they had to:
+`levelsOf` returns `Infinity` for a repeat node *before* it reaches the
+mandatory-levels throw, so a level count beside a `repeat` is dead text.
+check-build's line went `1 repeatable (recast)` → **`0 repeatable ()`**, and the
+ladder 108/54 → **109/55**.
+
+**Seven REMAINDERs, no energy** — one per anomaly, so the price *is* the
+ladder. It cannot be farmed, cannot be saved up early, and cannot be paid in
+the currency everything else takes. The boss's own alert now reads
+`n OF 7 · NEW FORM, IN THE TREE`: the count is the progress bar.
+
+**`needs` is a predicate, and it is not the `needs` build 228 deleted** — that
+one was a node id, this is a function of the world. The gate is `rigDone() &&
+reconciled.length >= 7`, and `rigDone` is defined as *the hero readout reaching
+its own denominator*, so the requirement and the thing that displays it are the
+same fact and cannot drift apart.
+
+**`era` joins the save here and not before.** While the only way to era 2 was a
+debug stepper, writing it to disk would have stranded a run in an unfinished
+era across every reload. The restore also has to `resize()`: `reset()` puts the
+world at era 1, the restore sets it back, and nothing between them re-derives
+the scale, the form, the yard or the lots — and `setEra` *cannot* do it,
+because the world is already at the era it needs to be at and it refuses.
+
+### Three faults this build found
+
+**1. `tree.js` copies an EXPLICIT field list.** `available()` consulted
+`n.needs` while `n.needs` was undefined, so NEW FORM was buyable with one
+REMAINDER out of seven — gate written, gate never consulted. Anything a node
+needs has to be named in that builder.
+
+**2. `debugBuyAll` was handing out the NEW FORM for free.** The loop calls
+`apply` and pushes the ledger **directly** — it never consults `available()`
+and never spends the currency. It skipped `repeat` nodes for exactly this
+reason ("handing out ways in is not what MAX UPGRADES means"), and the moment
+NEW FORM stopped being one it started being granted, silently, with the button
+still saying "+N upgrades". It skips anything gated or on its own currency now,
+stated as the rule rather than as an id, so the next one is covered by
+existing. **The BUILT readout is therefore still 136** — I had already written
+137 into the case before finding this.
+
+**3. Two of my own cases were asserting the old design**, correctly, and had to
+be inverted rather than patched: P1's *"era 2 does not survive a reload"* is
+now *"era 2 is bought, so it survives"*, and *"RECAST is the only thing that
+spends it"* is now *"one REMAINDER is not a NEW FORM"*. A third was measuring
+its own noise — it counted every `tone()` in thirty seconds as the ignition,
+including fifty-five purchase sounds.
+
+The gate case tests each half **alone**: a gate only ever tested with both
+halves missing cannot tell an AND from an OR.
+
+514 green, hash `-1765830468` unmoved.
