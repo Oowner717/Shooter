@@ -196,14 +196,28 @@ class Audio {
     this.drone = { a, b, filt, g };
   }
 
-  /** Shift the ambient bed for a phase change. */
-  setDroneMood(base, cutoff, level) {
+  /**
+   * Shift the ambient bed for a phase change.
+   *
+   * `tc` is the time constant, and it is the whole of what the evolution
+   * needed from this file: everything it writes is a DESTINATION on four
+   * params that have been running since `init()`, so there is no queue, no
+   * pending node and nothing anyone has to cancel when a skip lands. The
+   * cinematic's own scheduling problem disappears rather than being solved.
+   *
+   * The default is 1.4, which is what the two existing callers -- both inside
+   * `Game.syncSky`, both three-argument -- already emit. It is asserted rather
+   * than assumed, so it cannot be quietly retuned out from under them.
+   */
+  setDroneMood(base, cutoff, level, tc = 1.4) {
     if (!this.drone) return;
     const t = this.ctx.currentTime;
-    this.drone.a.frequency.setTargetAtTime(base, t, 1.4);
-    this.drone.b.frequency.setTargetAtTime(base * 1.014, t, 1.4);
-    this.drone.filt.frequency.setTargetAtTime(cutoff, t, 1.4);
-    this.drone.g.gain.setTargetAtTime(level, t, 1.4);
+    // `setTargetAtTime` throws on a non-positive time constant.
+    const k = Math.max(0.02, tc);
+    this.drone.a.frequency.setTargetAtTime(base, t, k);
+    this.drone.b.frequency.setTargetAtTime(base * 1.014, t, k);
+    this.drone.filt.frequency.setTargetAtTime(cutoff, t, k);
+    this.drone.g.gain.setTargetAtTime(level, t, k);
   }
 
   // ---------------------------------------------------------------- cues

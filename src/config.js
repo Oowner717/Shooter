@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '251';
+export const BUILD = '252';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '251';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '7e11a04';
+export const REV = '298850b';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4319,6 +4319,62 @@ CFG.evolve = {
   acts: [0, 4.0, 9.0, 15.5, 19.0, 23.5, 30],
   // One an act. Short on purpose: the band is 470 world units wide and the
   // shot is of the machine, not of the writing.
+  /*
+   * ---- what the room does, act by act ----
+   *
+   * `[base, cutoff, level, tc]`, one row an act, written onto the four params
+   * `startDrone` has owned since `audio.init()`. Not a score: this game has no
+   * way to schedule a note -- `tone()` reads `ctx.currentTime` at the moment it
+   * is called and takes no time argument -- and no way to cancel one against a
+   * skip that can land anywhere in the thirty seconds. A bed made of
+   * destinations needs neither.
+   *
+   * The bed has also never stopped: `startDrone` starts six nodes at init and
+   * nothing in the codebase ever stops them -- there is no `stopDrone` and no
+   * `disconnect` anywhere in src/. The room has never once been quiet. So the
+   * cheapest gesture available here is also the only unheard one, which is why
+   * act IV's level is a hard 0 and why that is the point of the piece.
+   *
+   *   I    the substrate drains. Base HELD -- what changes is the room, not
+   *        the machine -- and the cutoff takes a 41Hz sawtooth from about
+   *        seven passed harmonics to three.
+   *   II   the approach. Above era 1's own 0.05: the camera is nearer than
+   *        the game has ever been, so the room is fuller.
+   *   III  the unmaking, thinned to 60% so the seventeen existing thuds ARE
+   *        the act. Their measured spacing is 362ms against a thud audible
+   *        for about 58ms, so act III is 84% silence.
+   *   IV   the core. Zero, and it ARRIVES: measured, the render reaches
+   *        exactly 0 RMS and 0 peak inside the act, at full span and at
+   *        reduced motion both.
+   *   V    the ignition, at a seventh of the time constant -- the era-2 bed
+   *        appears out of nothing in about three quarters of a second.
+   *   VI   the pull-back, slowly.
+   *
+   * ROW VI MUST EQUAL `syncSky`'s era-2 triple, and that is an assertion and
+   * not a comment: after `endEvolve` the era is already 2, so `setEra` does
+   * not fire and NOTHING re-issues the bed for the rest of the run. Wherever
+   * row VI leaves it is where era 2 lives.
+   */
+  bed: [
+    [41, 150, 0.038, 1.0],
+    [41, 260, 0.056, 1.6],
+    [41, 120, 0.030, 1.2],
+    [41, 90, 0, 0.35],
+    [33, 420, 0.045, 0.25],
+    [33, 420, 0.045, 1.0],
+  ],
+  /*
+   * One voice, at the era flip. A triangle at 132 falling to 66 -- four times
+   * and twice the new tonic, so it is locked to the bed it lands on and
+   * timbrally apart from it, the bed being a sawtooth.
+   *
+   * Measured through a two-pole highpass at 200Hz, a crude model of what a
+   * phone can actually reproduce: a pure 33Hz sine -- the obvious choice --
+   * comes back 23.7 dB down on this and would have shipped inaudible. Band
+   * energy here is 79% of a `boom`, and the peak with the drone under it is
+   * -17.9 dBFS, under the compressor's -14 threshold.
+   */
+  spark: { type: 'triangle', f0: 132, f1: 66, gain: 0.18, attack: 0.02, dur: 2.4 },
   lines: [
     'The field is yours. All of it.',
     'Closer.',

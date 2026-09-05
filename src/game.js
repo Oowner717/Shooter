@@ -494,6 +494,18 @@ export class Game {
      * cases failed on this one missing line.
      */
     w.era = 1;
+    /*
+     * ...and the cinematic, which `endEvolve` was the only writer of. A
+     * restart taken mid-evolution left `world.evolve` standing on a fresh run:
+     * the clock kept advancing, `update` kept returning early, and the new run
+     * flipped itself to era 2 when the old one's thirty seconds were up. The
+     * same shape as the `world.era` fault P1 shipped and for the same reason —
+     * `reset()` is where a run's state is put back, and a field that only its
+     * own happy path clears is a field that survives.
+     */
+    w.evolve = null;
+    w.camera = 1;
+    if (typeof document !== 'undefined') document.body.classList.remove('evolving');
     // ...and everything derived from the era. `resize()` below re-derives this
     // too, but only when the SCALE is stale -- and P1's own postmortem is that
     // "the conditional resize will get it" is not a reason to leave it out.
@@ -1057,6 +1069,20 @@ export class Game {
         w.rig = null;
         w.rigAt = -1;
         this.setEra(2);
+        /*
+         * The one voice in the piece, and it cannot be stranded: it fires only
+         * from inside this block, never from `endEvolve`'s own `setEra`. A
+         * skip before the flip never plays it; a skip after has already
+         * played it.
+         *
+         * AFTER `setEra`, because that runs `syncSky(true)` which writes the
+         * era-2 bed at the default time constant -- and the sheet's own act-V
+         * row, arriving on the next act edge, is what makes it a swell out of
+         * silence rather than a 4.2-second fade.
+         */
+        const S = E.spark;
+        audio.tone({ type: S.type, f0: S.f0, f1: S.f1, gain: S.gain,
+          attack: S.attack, dur: S.dur * Math.max(k, 0.35) });
         // ...and the picture does not move on the frame the field does.
         w.camera = push * (CFG.ZOOMS[1] / CFG.ZOOMS[2]);
       }
@@ -1073,6 +1099,15 @@ export class Game {
       v.said = v.act;
       const line = E.lines[v.act];
       if (line) w.narrator.show(line);
+      /*
+       * ...and the room. The guard is mandatory, not defensive: `findIndex`
+       * returns 6 at exactly `t === span` -- measured 5 at 29.99 and 6 at
+       * 30.00 -- and this block runs BEFORE the `endEvolve` below it, so
+       * without it the last frame reads `bed[6]` and throws. `E.lines` has the
+       * same shape and the same guard for the same reason.
+       */
+      const bed = E.bed[v.act];
+      if (bed) audio.setDroneMood(bed[0], bed[1], bed[2], bed[3] * k);
       // The chrome stands down from the approach and comes back with the
       // field. A class rather than eight inline styles, so the retreat is
       // one CSS rule and reduced motion gets it for free.

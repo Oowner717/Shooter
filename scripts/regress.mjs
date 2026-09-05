@@ -17721,7 +17721,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // an implementation that shifts the bed the wrong way.
     const real = audio.setDroneMood.bind(audio);
     const said = [];
-    audio.setDroneMood = (a, b, c) => { said.push([a, b, c]); return real(a, b, c); };
+    // Four arguments from build 252: the time constant. A three-argument spy
+    // would have recorded the era-1 and era-2 triples correctly and been blind
+    // to the whole of the cinematic's bed.
+    audio.setDroneMood = (a, b, c, d) => { said.push([a, b, c, d]); return real(a, b, c, d); };
     const last = () => said[said.length - 1];
 
     const sky = () => ({
@@ -17823,10 +17826,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * 1's triple is the audible identity and must not move by a digit.
    */
   check('...and the ambient bed follows the field, with era 1 unchanged to the digit',
-    JSON.stringify(r.oneDrone) === '[41,320,0.05]'
-    && JSON.stringify(r.restartDrone) === '[41,320,0.05]'
-    && JSON.stringify(r.dawnDrone) === '[41,320,0.05]'
-    && JSON.stringify(r.twoDrone) === '[33,420,0.045]',
+    JSON.stringify(r.oneDrone) === '[41,320,0.05,null]'
+    && JSON.stringify(r.restartDrone) === '[41,320,0.05,null]'
+    && JSON.stringify(r.dawnDrone) === '[41,320,0.05,null]'
+    && JSON.stringify(r.twoDrone) === '[33,420,0.045,null]',
     `era 1 ${JSON.stringify(r.oneDrone)}, a new run ${JSON.stringify(r.restartDrone)}, `
     + `era 2 ${JSON.stringify(r.twoDrone)}`);
 }
@@ -19012,6 +19015,155 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `skipped in the first moment: ${r.refused} (must be false); skipped after `
     + `three seconds: ${r.skipped}, landing on era 2 with a clear field `
     + `${r.skipEnd}; and it refuses to start from era 2 (${r.fromEra2})`);
+}
+
+// --- what the room does while the machine comes apart -----------------------
+/*
+ * P8c. Not a score, and the commit does not call it one: one bed shaped across
+ * the six acts, about two and a half seconds of true silence at the core, one
+ * modulation, one voice, and the seventeen thuds the unmaking already made.
+ *
+ * It is a bed rather than a score for an engineering reason and not a taste
+ * one: `tone()` reads `ctx.currentTime` at the moment it is called and takes
+ * no time argument, so nothing in this game can be placed ahead of itself, and
+ * there is no cancel of any kind against a skip that can land anywhere in the
+ * thirty seconds. Everything here is a DESTINATION on four params that have
+ * been running since `audio.init()` — no queue, nothing pending, nothing to
+ * cancel.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { audio } = await import('../src/audio.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const real = audio.setDroneMood.bind(audio);
+    const said = [];
+    audio.setDroneMood = (a, b, c, d) => { said.push([a, b, c, d]); return real(a, b, c, d); };
+    const tone0 = audio.tone.bind(audio);
+    const voices = [];
+    audio.tone = (o) => { voices.push(o); return tone0(o); };
+
+    // ---- the default is what the two existing callers already got ---------
+    said.length = 0;
+    g.restart();
+    out.eraOne = said[said.length - 1];
+
+    // ---- drive the whole thing and read the sheet off the wire ------------
+    said.length = 0;
+    voices.length = 0;
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.phase = 'staging';
+    g.debugTeachAll();
+    g.debugGiveEnergy(400000);
+    g.debugBuyAll();
+    said.length = 0;
+    g.beginEvolve();
+    while (w.evolve) g.update(1 / 60);
+    // Arguments, not call names: a spy that counted calls would pass against a
+    // sheet that played the acts backwards.
+    out.said = said;
+    out.voices = voices.length;
+    out.voice = voices[0] || null;
+
+    const bed = CFG.evolve.bed;
+    // The six rows, in order, each with its time constant.
+    out.rows = bed.map((b, i) => JSON.stringify([b[0], b[1], b[2], b[3]]));
+    out.fired = said.filter((x) => bed.some((b, i) => b[0] === x[0] && b[1] === x[1]
+      && b[2] === x[2] && Math.abs(b[3] - x[3]) < 1e-9)).length;
+    /*
+     * Their RELATIVE order, not their indices. The era flip at act V calls
+     * `syncSky(true)`, which puts the era-2 triple on the wire at the default
+     * time constant — so `said` carries seven calls, not six, and an
+     * index-for-index comparison reports the sheet out of order on a build
+     * where it is perfectly in order.
+     */
+    const whereIs = (b) => said.findIndex((x) => x[0] === b[0] && x[1] === b[1]
+      && x[2] === b[2] && Math.abs(x[3] - b[3]) < 1e-9);
+    out.at = bed.map(whereIs);
+    out.inOrder = out.at.every((n, i) => n >= 0 && (i === 0 || n > out.at[i - 1]));
+    out.extra = said.length - 6;
+    // ...and it never reaches for a seventh row: `findIndex` returns 6 at
+    // exactly t === span and this runs before `endEvolve`.
+    out.noSeventh = bed.length === 6 && CFG.evolve.lines.length === 6
+      && CFG.evolve.acts.length === 7;
+    out.silent = bed[3][2] === 0;
+
+    /*
+     * The load-bearing one. After `endEvolve` the era is already 2, so
+     * `setEra` does not fire and NOTHING re-issues the bed for the rest of the
+     * run: wherever the last row leaves the room is where era 2 lives. So the
+     * last row must be exactly what `syncSky` puts on era 2 — read off the
+     * wire, not copied from the table.
+     */
+    said.length = 0;
+    g.setEra(1);
+    g.restart();
+    g.setEra(2);
+    const sky2 = said[said.length - 1];
+    out.sky2 = sky2;
+    out.lastMatches = !!sky2 && sky2[0] === bed[5][0] && sky2[1] === bed[5][1]
+      && sky2[2] === bed[5][2];
+
+    // ---- and a restart mid-cinematic does not leave it running ------------
+    g.setEra(1);
+    g.restart();
+    g.beginEvolve();
+    for (let f = 0; f < 60 * 6; f++) g.update(1 / 60);
+    out.midRun = !!w.evolve;
+    g.restart();
+    out.afterRestart = w.evolve === null && w.camera === 1 && w.phase === 'staging'
+      && w.era === 1;
+    // ...and it stays gone: the old clock must not flip the fresh run over.
+    for (let f = 0; f < 60 * 40; f++) g.update(1 / 60);
+    out.stillEraOne = w.era === 1 && w.evolve === null;
+
+    audio.setDroneMood = real;
+    audio.tone = tone0;
+    delete w.director.update;
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('the room is shaped act by act, and it goes silent at the core',
+    r.inOrder && r.fired === 6 && r.noSeventh && r.silent,
+    `six rows fired in order ${r.inOrder} at ${JSON.stringify(r.at)} of `
+    + `${6 + r.extra} calls (the extra is the era flip's own syncSky): `
+    + `${r.rows.join(' ')} — and act IV's level is a hard zero ${r.silent}`);
+
+  /*
+   * ...and the ignition. One voice, and a triangle rather than the obvious low
+   * sine: measured through a two-pole highpass at 200Hz — what a phone can
+   * actually reproduce — a 33Hz sine comes back 23.7 dB down and would have
+   * shipped inaudible.
+   */
+  check('...and the ignition has exactly one voice, pitched to be heard',
+    r.voices === 1 && r.voice && r.voice.type === 'triangle'
+    && r.voice.f0 === 132 && r.voice.f1 === 66,
+    `${r.voices} voice in the whole thirty seconds: `
+    + `${r.voice && r.voice.type} ${r.voice && r.voice.f0} -> ${r.voice && r.voice.f1}`);
+
+  check('...and the last act leaves the room where era 2 lives',
+    r.lastMatches && JSON.stringify(r.eraOne) === '[41,320,0.05,null]',
+    `the last row is ${r.rows[5]} and syncSky puts ${JSON.stringify(r.sky2)} on era 2 — `
+    + `these must match, because nothing re-issues the bed after the cinematic `
+    + `ends; era 1 still gets ${JSON.stringify(r.eraOne)} at the default`);
+
+  /*
+   * And the bug this build found rather than shipped: `endEvolve` was the only
+   * writer of `world.evolve`, so a restart taken mid-cinematic left the clock
+   * standing on a fresh run — `update` kept returning early and the new run
+   * flipped itself to era 2 when the old one's thirty seconds were up.
+   */
+  check('...and a restart taken mid-evolution does not carry it into the next run',
+    r.midRun && r.afterRestart && r.stillEraOne,
+    `six seconds in it was running (${r.midRun}); after a restart it is gone `
+    + `${r.afterRestart}, and forty seconds later the fresh run is still era 1 `
+    + `${r.stillEraOne}`);
 }
 
 // --- report -----------------------------------------------------------------

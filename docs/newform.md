@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P8c pt.1 (251) shipped. The audio decision is open; P9 (the door) is next.**
+**Status: P1 (238) - P8 complete (252). P9 (the door) is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -340,7 +340,7 @@ thing to run if the budget allows:
 - [x] P7 · balance (build 248), era 2 only
 - [x] P8a · the camera, the phase and the clock (build 249)
 - [x] P8b · the acts: the unmaking, the core, the ignition (build 250)
-- [ ] P8c · audio, the smoke arm, the banner
+- [x] P8c · audio and the smoke arm (251, 252). The banner is P9's.
 - [ ] P9 · the door
 - [ ] P10 · the reveal pass
 
@@ -1446,3 +1446,72 @@ in the game is 270ms, `boom()` is ungated, and the plan says P8 "owns a track or
 says it has none". A survey and design pass is running; whatever it concludes —
 including a reasoned refusal — belongs here as a decision with its reasons, not
 as a silent omission.
+
+## 25. P8c part two, as built (build 252) — the audio, decided
+
+**BUILD, but the bed and not a score — and the commit does not call it one.**
+
+The refusal case died on a measurement. Driving the real cinematic with a
+wrapper on the audio bed gave **one event in thirty seconds** — a single
+`setDroneMood(33, 420, 0.045)` at t=19, and that a side effect of `syncSky`
+rather than a cue — plus 17 thuds. That is the entire soundtrack of the payoff
+of seven boss fights.
+
+**It does not become a score either, and that is an engineering fact.** Three
+things a score needs are absent: `tone()` and `noise()` read
+`this.ctx.currentTime` at the moment they are called and take no time
+argument, so **nothing in this game can be placed ahead of itself**; there is
+no cancel of any kind against a skip that can land anywhere in [1.5, 30]; and
+`reset()` did not clear `world.evolve`, so a queue would have outlived its own
+run. A bed made of `setTargetAtTime` destinations on params that have been
+running since `audio.init()` needs none of the three — no queue, nothing
+pending, nothing to cancel.
+
+**And the one gesture available is the only unheard one.** `startDrone` starts
+six nodes at init and *nothing in the codebase ever stops them* — there is no
+`stopDrone`, and no `disconnect` anywhere in `src/`. **The room has never once
+been quiet.** Every other sound this piece could make has been heard hundreds
+of times. So act IV's level is a hard `0`, and the render reaches **exactly 0
+RMS and 0 peak** inside the act, at full span and at reduced motion both.
+
+**Row VI must equal what `syncSky` puts on era 2, and that is an assertion.**
+After `endEvolve` the era is already 2, so `setEra` does not fire and nothing
+re-issues the bed for the rest of the run: wherever the last row leaves the
+room is where era 2 lives. The case reads both off the wire rather than
+comparing the table with itself.
+
+**One voice, and a triangle rather than the obvious low sine.** Measured
+through a two-pole highpass at 200 Hz — a crude model of what a phone can
+reproduce — a 33 Hz sine comes back **23.7 dB down** on a triangle at 132→66
+and would have shipped inaudible. 132 and 66 are four and two times the new
+tonic, so it is locked to the bed and timbrally apart from it. Peak with the
+drone under it is −17.9 dBFS, under the compressor's −14.
+
+### The bug this found rather than shipped
+
+**`reset()` never cleared `world.evolve`** — `endEvolve` was its only writer. A
+restart taken mid-cinematic left the clock standing on a fresh run: `update`
+kept returning early and the new run flipped *itself* to era 2 when the old
+one's thirty seconds were up. Same shape as the `world.era` fault P1 shipped,
+and for the same reason — `reset()` is where a run's state is put back, and a
+field only its own happy path clears is a field that survives.
+
+### Engine cost: one optional parameter
+
+`setDroneMood(base, cutoff, level, tc = 1.4)`. Its two call sites both pass
+three arguments and both get exactly what they got before; the default is
+**asserted**, not assumed, so it cannot be quietly retuned. No new module, so
+`sw.js` is untouched. Not one byte of any of the twelve cues changes, `boom()`
+stays ungated, and the ordinary game sounds identical.
+
+The existing drone case had to widen its spy from three arguments to four — a
+three-argument spy would have recorded the era-1 and era-2 triples correctly
+and been **blind to the whole of the bed**.
+
+### What the piece is, honestly
+
+One bed shaped across six acts, about two and a half seconds of true silence at
+the core, one modulation, one voice, and the seventeen thuds the unmaking
+already made. A complete gesture at its own scale. Not a soundtrack.
+
+511 green, hash `-1765830468` unmoved, smoke clean.
