@@ -44,8 +44,14 @@ const COST = {
   step: 350, // ...and this much more for every level after the first
 };
 
-/** Where every leaf hangs. Ids are upgrade ids; the key is the parent node. */
-const UNDER = {
+/**
+ * Where every leaf hangs. Ids are upgrade ids; the key is the parent node.
+ *
+ * Exported from build 250 because the evolution takes the machine apart in the
+ * order it was built and needs to know which ledger entries ARE the machine.
+ * A second copy of the eight socket ids is a second thing to keep in step.
+ */
+export const UNDER = {
   // ---- the machine ----
   turret: ['rate', 'slew', 'aimrange', 'driftaim', 'pile', 'casing', 'insulation', 'intake'],
 

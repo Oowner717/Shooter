@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '249';
+export const BUILD = '250';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '249';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '4a73934';
+export const REV = 'a771e57';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4317,6 +4317,16 @@ CFG.evolve = {
   close: 1.1,
   skipAt: 1.5,
   acts: [0, 4.0, 9.0, 15.5, 19.0, 23.5, 30],
+  // One an act. Short on purpose: the band is 470 world units wide and the
+  // shot is of the machine, not of the writing.
+  lines: [
+    'The field is yours. All of it.',
+    'Closer.',
+    'Every part, in the order you built it.',
+    'What is left is the idea of a machine.',
+    'NEW FORM.',
+    'And a field to put it on.',
+  ],
 };
 
 CFG.yard = {

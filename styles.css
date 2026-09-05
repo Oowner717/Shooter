@@ -4357,3 +4357,33 @@ body.menuOpen #sandbox { display: none !important; }
   .sbActs { margin-top: 5px; }
   .sbReset, .sbFold { padding: 7px 6px; }
 }
+
+/* ---- the evolution -------------------------------------------------------
+ * The chrome stands down for the approach and the unmaking. One rule rather
+ * than eight inline styles, so it is legible and so reduced motion inherits
+ * it: the class is applied on the same act boundaries whatever the span.
+ * `pointer-events` goes with it — a control that has faded out must not still
+ * take the tap that was meant to skip.
+ */
+body.evolving #quickBar,
+body.evolving #abilities,
+body.evolving #abilityHint,
+body.evolving #barChips,
+body.evolving #waveRail,
+body.evolving #menuBtn {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(14px);
+  transition: opacity 1.4s ease, transform 1.4s ease;
+}
+body.evolving #abilities { transform: translateY(28px); }
+body.evolving #barChips,
+body.evolving #waveRail { transform: translateY(-18px); }
+@media (prefers-reduced-motion: reduce) {
+  body.evolving #quickBar,
+  body.evolving #abilities,
+  body.evolving #abilityHint,
+  body.evolving #barChips,
+  body.evolving #waveRail,
+  body.evolving #menuBtn { transition: opacity 0.3s linear; transform: none; }
+}

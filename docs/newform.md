@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P8a (249) shipped. P8b (the acts) is next.**
+**Status: P1 (238) - P8b (250) shipped. P8c (audio, the banner, the smoke arm) is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -339,7 +339,7 @@ thing to run if the budget allows:
 - [x] P6b+c · the radius and the fold, in one build (build 247)
 - [x] P7 · balance (build 248), era 2 only
 - [x] P8a · the camera, the phase and the clock (build 249)
-- [ ] P8b · the acts: the unmaking, the core, the ignition
+- [x] P8b · the acts: the unmaking, the core, the ignition (build 250)
 - [ ] P8c · audio, the smoke arm, the banner
 - [ ] P9 · the door
 - [ ] P10 · the reveal pass
@@ -1344,3 +1344,65 @@ Three cases, 506 green, hash `-1765830468` unmoved.
 **P8b owns**: the unmaking in ledger order, the core, the ignition, the sky
 turnover, the captions through `world.bossLine`, and the DOM chrome retreating
 through act II — it is still at full opacity in the shot above.
+
+## 23. P8b, as built (build 250)
+
+All six acts, on the clock P8a built.
+
+### The unmaking is free, and different every run
+
+`world.ledger` is already ordered, so the machine comes apart **in the order
+this player built it**. It is done by truncating the effective ledger from the
+front of its turret entries: `rig()` caches on `world.rigAt === ledger.length`,
+so a shorter list is enough to redraw the machine with one fewer part — and
+`drawMachine` never learns the cinematic exists, which is what keeps P6's ten
+byte-identical MK1 digests meaningful.
+
+The case asserts the survivors are the **tail** of the build order, not merely
+a subset of it: a set comparison could not tell "in the order you built it"
+from any other order. Measured mid-act-III: 11 of 18 shed, 7 left, tail
+confirmed, rig no longer full — and everything the player bought is back by the
+ignition and whole at the end.
+
+### The core, and the form building out of it
+
+Acts IV and V are done at the **call site** in `Game.draw`, not inside
+`drawMachine`: the machine's own drawing carries the MK1-unchanged promise, and
+a cinematic has no business in there. A scale about the turret and one point of
+light are both things the caller can do from outside.
+
+### `takeField(false)`, not `true`
+
+Act I is the field being *taken*, and a cut to an empty arena is not that. The
+bodies fizzle and are hauled into the turret; `takeField` marks each `spent`
+and `dissolved` first, so none pays, counts or can be shot on the way out. The
+P8a case had asserted an empty list on the frame after the press — true of the
+instant clear, and not the beat — so it now asserts the lists are empty **by
+the end of act I**, and that bodies were still fizzling one frame in.
+
+### Two things reused rather than built
+
+`breach` — authored for exactly "everything drains out of the substrate" and
+with **no caller anywhere in the codebase** until now — is act I's sky. And
+`UNDER` is exported from `tree.js` so the socket list has one home; a second
+copy of the eight ids is a second thing to keep in step.
+
+Moods **snap** at act boundaries rather than easing, because `mixHex` cannot
+move a channel closer than 37.8 and an eased mood arrives two thirds of the way
+and stops. A cut is honest; a stalled dissolve is a rendering fault.
+
+### An instrument note, again
+
+Two probes were wrong before they were right. Sharing one page across five
+shots let the live rAF loop advance the clock between the step and the
+screenshot, so the readings stopped matching the marks they claimed — one page
+load per shot fixed it. And the chrome's retreat is CSS, which runs on
+wall-clock while the acts run on game time, so a probe that compresses 17
+game-seconds into milliseconds catches the fade half-done. Neither was a fault
+in the game.
+
+Four cases, 507 green over three consecutive runs, hash `-1765830468` unmoved.
+
+**P8c owns**: audio (the longest cue in the game is 270ms and `boom()` is
+ungated, so act I would be forty overlapping detonations if it used what
+exists), the banner that starts it, and `smoke.mjs`'s era-2 arm.

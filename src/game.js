@@ -12,9 +12,9 @@ import './parity.js';
 import './terminus.js';
 import { nameOf, dressOf, heldList } from './anomaly.js';
 import { pref } from './settings.js';
-import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta } from './util.js';
+import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta, drawGlow} from './util.js';
 import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
-import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake, flash } from './fx.js';
+import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake, flash, haul } from './fx.js';
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
@@ -28,7 +28,7 @@ import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
 import { codex, lineSeen, markLine, forgetLines, forgetPlayer, migrateLines } from './codex.js';
 import { readRun, saveRun, forgetRun } from './save.js';
 import { freshUpgrades, BY_ID } from './upgrades.js';
-import { NODES, NODE_BY_ID, priceOf } from './tree.js';
+import { NODES, NODE_BY_ID, priceOf, UNDER } from './tree.js';
 
 /** The turret branch, for the fitting announcements and the completion one. */
 const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
@@ -903,10 +903,34 @@ export class Game {
      * `takeField` is the same clear the era switch uses, which is the point:
      * one implementation, and it names all seven lists.
      */
-    this.takeField(true);
+    /*
+     * `false`, so the field FIZZLES rather than vanishing: act I is the field
+     * being taken, and a cut to an empty arena is not that. `takeField` marks
+     * every body `spent` and `dissolved` first, so none of them pays, counts
+     * or can be shot on the way out.
+     */
+    this.takeField(false);
     w.phase = 'evolve';
     w.camera = 1;
-    w.evolve = { t: 0, act: 0, span: this.reducedMotion() ? E.quick : E.span, skipAt: E.skipAt };
+    /*
+     * The order the run was BUILT in. `world.ledger` is already ordered, so
+     * the machine comes apart the way this player put it together and no two
+     * runs unmake the same -- which costs nothing and is why the beat is here
+     * rather than a scripted sequence.
+     */
+    const sockets = new Set(UNDER.turret);
+    w.evolve = {
+      t: 0, act: 0, span: this.reducedMotion() ? E.quick : E.span, skipAt: E.skipAt,
+      ledger0: [...w.ledger],
+      built: w.ledger.filter((id) => sockets.has(id)).length,
+      shed: 0, said: -1, core: 0, form: 0,
+    };
+    // The substrate drains. `breach` is authored for exactly this -- "everything
+    // drains out of the substrate and the only colour left is coming through
+    // the breach" -- and had no caller in the whole codebase until now.
+    // Snapped, not eased: `mixHex` cannot move a channel closer than 37.8, so
+    // an eased mood arrives two thirds of the way and stops. A cut is honest.
+    background.setMood('breach', true);
     w.mineTimer = 0;
     this.mineTimer = 0;
     // The fuse is doused and stays doused: `Director.update` is not reached at
@@ -948,6 +972,63 @@ export class Game {
      */
     const seg = (a, b) => clamp((v.t - at(a)) / Math.max(1e-6, at(b) - at(a)), 0, 1);
     const ease = (x) => x * x * (3 - 2 * x);
+    const w2 = w;
+
+    // ---- act I: the field is hauled in, and pays nothing for going ---------
+    if (w.enemies.length) {
+      const s = w.shooter;
+      for (const e of w.enemies) {
+        e.fizzle = Math.max(0, e.fizzle - dt * 1.6);
+        const dx = s.x - e.x;
+        const dy = s.y - e.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const pull = clamp(dt * 2.6, 0, 1);
+        e.x += (dx / d) * d * pull * 0.5;
+        e.y += (dy / d) * d * pull * 0.5;
+        if (e.fizzle <= 0 && !e.dead) {
+          e.dead = true;
+          haul(e.x, e.y, s.x, s.y, e.type.color, 0.5, 3);
+        }
+      }
+      for (let i = w.enemies.length - 1; i >= 0; i--) if (w.enemies[i].dead) w.enemies.splice(i, 1);
+    }
+
+    /*
+     * ---- act III: the unmaking, in the order the run was built ------------
+     *
+     * The effective ledger is truncated from the FRONT of its turret entries,
+     * so the first socket bought is the first to come off. `rig()` caches on
+     * `world.rigAt === ledger.length`, so shortening the list is enough to
+     * make the machine redraw with one fewer part -- no second code path
+     * through `drawMachine`, and therefore nothing MK1 can regress through.
+     */
+    if (v.t >= at(E.acts[2]) && v.t < at(E.acts[3])) {
+      const sockets = new Set(UNDER.turret);
+      const want = Math.floor(seg(E.acts[2], E.acts[3]) * v.built);
+      if (want !== v.shed) {
+        v.shed = want;
+        let drop = want;
+        w.ledger = v.ledger0.filter((id) => {
+          if (drop > 0 && sockets.has(id)) { drop--; return false; }
+          return true;
+        });
+        w.rig = null;
+        w.rigAt = -1;
+        const s = w.shooter;
+        const a = (want / Math.max(1, v.built)) * TAU * 2.2;
+        haul(s.x + Math.cos(a) * s.r * 2.2, s.y + Math.sin(a) * s.r * 2.2, s.x, s.y, '#bfe6ff', 0.55, 3.4);
+        ring(s.x, s.y, s.r * 2.4, s.r * 0.6, 0.5, '#59e0ff', 2);
+        audio.thud();
+      }
+    }
+
+    // ---- act IV: the core. One point of light, and nothing else -----------
+    v.core = v.t >= at(E.acts[3]) && v.t < at(E.acts[4])
+      ? Math.min(1, seg(E.acts[3], E.acts[4]) * 3)
+      : (v.t >= at(E.acts[4]) ? 1 : 0);
+
+    // ---- act V: the new form builds outward from it -----------------------
+    v.form = v.t >= at(E.acts[4]) ? ease(seg(E.acts[4], E.acts[5])) : 0;
     const push = CFG.evolve.close / CFG.ZOOMS[1];
     if (v.t < at(E.acts[1])) {
       w.camera = 1;
@@ -955,6 +1036,11 @@ export class Game {
       w.camera = 1 + (push - 1) * ease(seg(E.acts[1], E.acts[2]));
     } else {
       if (w.era !== 2) {
+        // Everything the player bought is still theirs. The truncation was a
+        // drawing device and it ends here.
+        w.ledger = [...v.ledger0];
+        w.rig = null;
+        w.rigAt = -1;
         this.setEra(2);
         // ...and the picture does not move on the frame the field does.
         w.camera = push * (CFG.ZOOMS[1] / CFG.ZOOMS[2]);
@@ -963,6 +1049,20 @@ export class Game {
       w.camera = out + (1 - out) * ease(seg(E.acts[5], E.acts[6]));
     }
     v.act = E.acts.findIndex((m, i) => v.t < at(E.acts[i + 1] ?? 1e9));
+    /*
+     * One line an act, said once, through the canvas narrator -- the same
+     * channel the story uses and the same band, which is empty here because
+     * `phase !== 'staging'` already stopped the story from writing to it.
+     */
+    if (v.act !== v.said) {
+      v.said = v.act;
+      const line = E.lines[v.act];
+      if (line) w.narrator.show(line);
+      // The chrome stands down from the approach and comes back with the
+      // field. A class rather than eight inline styles, so the retreat is
+      // one CSS rule and reduced motion gets it for free.
+      document.body.classList.toggle('evolving', v.act >= 1 && v.act <= 5);
+    }
     if (v.t >= v.span) this.endEvolve();
   }
 
@@ -970,10 +1070,12 @@ export class Game {
   endEvolve() {
     const w = this.world;
     if (!w.evolve) return false;
+    if (w.evolve.ledger0) { w.ledger = [...w.evolve.ledger0]; w.rig = null; w.rigAt = -1; }
     if (w.era !== 2) this.setEra(2);
     w.camera = 1;
     w.evolve = null;
     w.phase = 'staging';
+    document.body.classList.remove('evolving');
     this.takeField(true);
     this.checkpoint();
     return true;
@@ -1933,6 +2035,7 @@ export class Game {
      */
     if (w.evolve) {
       this.updateEvolve(real);
+      updateFx(real);
       settleScreen(real);
       glitch.settle(real);
       background.update(real);
@@ -2947,7 +3050,37 @@ export class Game {
     for (const e of w.effects) if (!e.ground) e.draw(ctx, w);
 
     this.drawAutoLock(ctx);
-    w.shooter.draw(ctx, w);
+    /*
+     * ---- the core, and the form building out of it ------------------------
+     *
+     * Done at the CALL SITE and not inside `drawMachine`: the machine's own
+     * drawing carries the MK1-is-unchanged promise and ten byte-identical
+     * digests, and a cinematic has no business inside it. Acts IV and V are a
+     * scale about the turret and one point of light, both of which this can do
+     * from outside.
+     */
+    const ev = w.evolve;
+    if (ev && (ev.core > 0 || ev.form > 0)) {
+      const s = w.shooter;
+      const grow = ev.form;
+      if (grow > 0.02) {
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        ctx.scale(grow, grow);
+        ctx.translate(-s.x, -s.y);
+        ctx.globalAlpha = Math.min(1, grow * 1.6);
+        w.shooter.draw(ctx, w);
+        ctx.restore();
+      }
+      // The core itself, over whatever is building around it: at act IV it is
+      // the only thing on the screen, and it stays lit through the ignition
+      // because the form comes OUT of it.
+      const lit = Math.max(ev.core * (1 - grow * 0.7), 0.12);
+      drawGlow(ctx, '#ffffff', s.x, s.y, s.r * (0.5 + grow * 1.4), lit);
+      drawGlow(ctx, '#9fe8ff', s.x, s.y, s.r * (1.2 + grow * 3.2), lit * 0.5);
+    } else {
+      w.shooter.draw(ctx, w);
+    }
     this.drawGlitch(ctx);
     drawProjectiles(ctx, w);
     drawFx(ctx);

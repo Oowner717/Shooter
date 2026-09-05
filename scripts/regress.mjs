@@ -17958,7 +17958,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   });
 
   check('everything a wave sends comes out of the building',
-    r.twoDoors > 20 && r.twoKinds >= 2 && r.sawDrift && r.twoWorst <= 0,
+    // Clear of the truth, not near it: forty seconds of director output swings
+    // 13-30 births run to run, and this asked for 20 and then 15.
+    r.twoDoors >= 8 && r.twoKinds >= 2 && r.sawDrift && r.twoWorst <= 0,
     `${r.twoDoors} of ${r.twoTotal} births were at the door (${r.twoKinds} kinds, `
     + `drift among them ${r.sawDrift}); the worst overshot the door by `
     + `${r.twoWorst > 0 ? r.twoWorst : 0} units`);
@@ -18857,7 +18859,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.armed = before.bodies > 0 && before.energy > 0;
     out.began = g.beginEvolve();
     out.phase = w.phase;
-    // ...and the field is gone, with nothing paid for it.
+    /*
+     * ...and the field goes, over act I rather than in a cut: `takeField(false)`
+     * marks every body `spent` and `dissolved` and leaves it fizzling, so it
+     * pays nothing, counts nothing and cannot be shot on the way out. The
+     * first version of this asserted an EMPTY list on the frame after the
+     * press, which was true of the instant clear and is not the beat.
+     */
+    out.duringActI = w.enemies.length;
+    for (let f = 0; f < 60 * 5; f++) g.update(1 / 60);
     out.tookField = w.enemies.length === 0 && w.drops.length === 0
       && w.mines.length === 0 && w.effects.length === 0 && w.debris.length === 0
       && w.projectiles.length === 0 && w.pendingBlasts.length === 0;
@@ -18875,7 +18885,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const crossings = [];
     let last = w.scale * w.camera;
     let released = 0;
-    for (let f = 0; f < 60 * 31; f++) {
+    for (let f = 0; f < 60 * 26; f++) {
       g.update(1 / 60);
       const now = w.scale * w.camera;
       if ((last - CFG.ZOOMS[1]) * (now - CFG.ZOOMS[1]) < 0) crossings.push(+now.toFixed(4));
@@ -18917,10 +18927,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
   check('the evolution takes the field and pays nothing for it',
     r.armed && r.began && r.phase === 'evolve' && r.tookField && r.paidNothing
-    && r.stillPaidNothing && r.everReleased === 0,
+    && r.stillPaidNothing && r.everReleased === 0 && r.duringActI > 0,
     `armed with ${r.before.bodies} bodies, ${r.before.drops} drops and a purse of `
     + `${r.before.energy}; it began (${r.began}), the phase is `
-    + `${r.phase}, all seven lists are empty ${r.tookField}, and across thirty `
+    + `${r.phase}, ${r.duringActI} bodies were still fizzling one frame in and `
+    + `all seven lists are empty by the end of act I ${r.tookField}, and across `
     + `seconds nothing was released (${r.everReleased}) and the purse, the `
     + `lifetime and the count never moved ${r.stillPaidNothing}`);
 
@@ -18933,6 +18944,68 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.pushed && r.crossings === 1 && r.ended,
     `the view ran ${r.samples.join(' -> ')}, crossing era 1's own 0.62 `
     + `${r.crossings} time(s); it ended on era 2 at camera 1 ${r.ended}`);
+
+  /*
+   * The unmaking, which is the beat P8b exists for: the machine comes apart in
+   * the order the run was BUILT, which costs nothing and is different every
+   * run. It is done by truncating the effective ledger from the front of its
+   * turret entries -- `rig()` caches on `world.rigAt === ledger.length`, so a
+   * shorter list is enough to redraw the machine with one fewer part, and
+   * `drawMachine` never learns the cinematic exists.
+   */
+  const u = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { UNDER } = await import('../src/tree.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    g.restart();
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.phase = 'staging';
+    g.debugTeachAll();
+    g.debugGiveEnergy(400000);
+    g.debugBuyAll();
+    const sockets = new Set(UNDER.turret);
+    const built = w.ledger.filter((id) => sockets.has(id));
+    out.built = built.length;
+    out.order = built.join(',');
+    g.beginEvolve();
+    out.declared = w.evolve.built;
+
+    // ...to the middle of act III, and read what is left of the machine.
+    const E = CFG.evolve;
+    const to = (mark) => { while (w.evolve && w.evolve.t < mark) g.update(1 / 60); };
+    to((E.acts[2] + E.acts[3]) / 2);
+    out.shed = w.evolve ? w.evolve.shed : -1;
+    const left = w.ledger.filter((id) => sockets.has(id));
+    out.leftN = left.length;
+    // The survivors must be the TAIL of the build order, exactly -- that is
+    // what "in the order you built it" means, and a set comparison could not
+    // tell it from any other order.
+    out.tail = left.join(',') === built.slice(built.length - left.length).join(',');
+    out.rigFell = w.shooter.rig(w).filled < 1;
+
+    // ...and everything the player bought comes back, whole.
+    to(E.acts[5]);
+    out.restored = w.ledger.filter((id) => sockets.has(id)).length;
+    while (w.evolve) g.update(1 / 60);
+    out.after = w.ledger.filter((id) => sockets.has(id)).length;
+    out.rigWhole = w.shooter.rig(w).filled === 1;
+    delete w.director.update;
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('...and the machine comes apart in the order it was built',
+    u.built === 18 && u.declared === 18 && u.shed > 4 && u.shed < 18
+    && u.leftN === u.built - u.shed && u.tail && u.rigFell
+    && u.restored === 18 && u.after === 18 && u.rigWhole,
+    `${u.built} turret levels bought; halfway through the unmaking ${u.shed} had `
+    + `gone and ${u.leftN} were left, and they are the TAIL of the build order `
+    + `${u.tail} with the rig no longer full ${u.rigFell}; by the ignition `
+    + `${u.restored} are back and at the end ${u.after}, rig whole ${u.rigWhole}`);
 
   check('...and a skip is refused at first, then lands exactly where it would have',
     r.refused === false && r.skipped === true && r.skipEnd && r.fromEra2 === false,
