@@ -34,12 +34,13 @@ import { clamp, rgba, mixHex } from './util.js';
  *
  * ---- the gate is `era === 2 && !sandbox`, and the second term is load-bearing
  *
- * `setZoom(era, sandbox)` pins the testbed to era 1's SCALE without touching
- * `world.era`, and both bench doors carry the era across by hand -- so
- * `era === 2 && sandbox === true` is a real, reachable state that the suite
- * already makes the round trip of. A gate on the era alone paints a building
- * and a wall across the practice range, at era 1's scale, in the one room
- * whose entire job is measuring damage against a clean field.
+ * The bench is three rooms from build 262, one per era, and its era-2 room is
+ * the era-2 FIELD at the era-2 scale with the second form standing on it. What
+ * it is NOT is the era-2 yard: "the new field, with no spawn building and no
+ * wall" is the ruling, and it is the right one -- a building nothing comes out
+ * of and a wall nothing crosses are two large objects explaining rules that do
+ * not apply in a room with no waves. So `era === 2 && sandbox === true` is a
+ * real and now ordinary state, and this is what makes it a clean field.
  */
 export function syncYard(world, entryY) {
   if (world.era !== 2 || world.sandbox) { world.yard = null; return null; }

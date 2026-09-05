@@ -20,7 +20,7 @@ import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
 import { CFG, BUILD, REV } from './config.js';
 import { swipeToDismiss, swipeTabs } from './swipe.js';
-import { lastSession, lifetime } from './sandbox.js';
+import { lastSession, lifetime, LOCK } from './sandbox.js';
 import { TREE, NODES, DETACHED, priceOf } from './tree.js';
 import { svgMark } from './util.js';
 
@@ -59,9 +59,6 @@ const bm = (body) => svgMark(body, 1.8);
 const NEW_WORD = { ammo: 'ROUND', mines: 'MINE', abilities: 'ABILITY' };
 
 /** A padlock, for the sealed tab and its room. */
-const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">'
-  + '<rect x="5.5" y="10.5" width="13" height="10"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/>'
-  + '<circle cx="12" cy="15.5" r="1.3" fill="currentColor" stroke="none"/></svg>';
 /** The tree, for the door at the foot of a loadout tab. */
 const TREE_MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" '
   + 'stroke-linecap="square"><path d="M12 21V9M12 9 5 4M12 9l7-5"/>'
@@ -123,7 +120,7 @@ const GROUPS = [
      * present and shut rather than absent, for the same reason the tree draws
      * the rows you cannot afford -- a door you can see is a thing to aim at.
      */
-    { id: 'sandbox', label: 'TESTBED', locked: 'sandbox' },
+    { id: 'sandbox', label: 'ASSAY', locked: 'sandbox' },
     /*
      * The emplacements. Under SYSTEM and not ARSENAL, which is where it
      * belongs by subject -- and cannot go, measured: ARSENAL's row is already
@@ -157,7 +154,7 @@ export class Menu {
     this.tab = 'tree';
     this.cells = new Map(); // key -> element, for the active-state sync
     // Locked tabs, by what opens them. Two of them, and they open on
-    // different facts -- TESTBED on a node, TURRETS on a gun standing.
+    // different facts -- ASSAY on a node, TURRETS on a gun standing.
     this.lockTabs = new Map();
     this.codexCells = new Map();
     this.lastFound = -1;
@@ -368,7 +365,7 @@ export class Menu {
     const shut = document.createElement('div');
     shut.className = 'sealedRoom';
     shut.innerHTML = `<span class="sealedMark" aria-hidden="true">${LOCK}</span>
-      <span class="sealedName">THE TESTBED</span>
+      <span class="sealedName">THE ASSAY</span>
       <span class="sealedLine">An instrumented target and a counter, and
       nothing else on the field. Shoot it with anything you have and read
       exactly what every round, mine and ability is delivering &mdash; per
@@ -379,17 +376,19 @@ export class Menu {
     const open = document.createElement('div');
     open.className = 'sbRoom';
     open.hidden = true;
-    open.innerHTML = `<span class="sealedName">THE TESTBED</span>
-      <span class="sealedLine">One instrumented dummy and four rates. Waves,
+    open.innerHTML = `<span class="sealedName">THE ASSAY</span>
+      <span class="sealedLine">One instrumented rig and four rates. Waves,
       energy, corruption and rules are all off, and your kit is exactly what it
       is in the run. Leave whenever you like &mdash; the run is written down
       before you go in and handed back when you come out.</span>
-      <span class="sealedLine">The counter resets every visit. The shell of
-      beads the rig wears does not: that is every point of damage this device
-      has ever delivered, and it takes a hundred of them to close.</span>`;
+      <span class="sealedLine">Three rooms, one per era: the old field with
+      DUMMY on it, the new field &mdash; no building, no wall &mdash; with the
+      second form and D2 on it, and a third that is not built yet. Each keeps
+      its own numbers and its own record, and resetting one resets only
+      that one.</span>`;
     const go = document.createElement('button');
     go.className = 'sbEnter';
-    go.textContent = 'ENTER THE TESTBED';
+    go.textContent = 'ENTER THE ASSAY';
     go.addEventListener('click', () => {
       /*
        * The sheet closes FIRST, and that ordering is the whole of a bug that

@@ -1,5 +1,5 @@
 /**
- * THE TESTBED. The instrument, inside the game.
+ * THE ASSAY. The instrument, inside the game.
  *
  * Every balance question this project has answered was answered by a
  * throwaway probe in a headless browser -- and three of those probes
@@ -93,14 +93,25 @@ const GROUP_ORDER = ['AMMUNITION', 'MINES', 'ABILITIES', 'EVERYTHING ELSE'];
  * It was THE RANGE for that one build, which was better and still wrong: a
  * range is where you practise your aim, and nothing here is about aim. What
  * the room actually is, is a rig with one instrumented specimen on it, and
- * the thing under test is the machine you brought. So: the TESTBED.
+ * the thing under test is the machine you brought. So: the ASSAY -- to assay
+ * is to determine what something actually contains.
  *
  * The internal names are all still `sandbox` and that is deliberate, not an
  * oversight. `world.sandbox`, the `Sandbox` class and above all the tree
  * node's id are what a saved run has written down -- renaming the id would
  * take a 20,000-energy node away from everyone who has bought it.
  */
-export const RANGE_NAME = 'TESTBED';
+export const RANGE_NAME = 'ASSAY';
+
+/**
+ * The padlock, and it lives here rather than in menu.js because menu.js
+ * already imports from this file -- putting it the other way round is a cycle,
+ * and `bundle.mjs` orders modules by an acyclic walk. A shared glyph belongs
+ * in the lower module.
+ */
+export const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square">'
+  + '<rect x="5.5" y="10.5" width="13" height="10"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/>'
+  + '<circle cx="12" cy="15.5" r="1.3" fill="currentColor" stroke="none"/></svg>';
 
 /** A number a player can read at a glance, not to four significant figures. */
 function num(v) {
@@ -171,7 +182,67 @@ export class Sandbox {
     mk('sbDummyBtn', 'DUMMY', () => this.dummy());
     mk('sbExit', 'EXIT', () => this.game.exitSandbox());
 
-    root.append(bar, this.buildPanel());
+    root.append(bar, this.buildEras(), this.buildPanel());
+  }
+
+  /**
+   * Three rooms, one per era.
+   *
+   * Its own row rather than three more buttons in the bar: the bar is the
+   * name and the two doors, and at 320 it has no width left. This is a
+   * segmented control -- which room you are in, always visible, one tap each
+   * -- and it sits ABOVE the panel so the readout's bottom edge, which is
+   * what `standoff` measures the rig against, is unaffected by it.
+   *
+   * The label is the era and nothing else. "ERA I" is what the tab is; what
+   * each room contains is the room, and a row of tabs explaining themselves
+   * is a row nobody reads twice.
+   */
+  buildEras() {
+    const row = document.createElement('div');
+    row.id = 'sbEras';
+    this.el.eras = [];
+    for (const [n, label] of [[1, 'ERA I'], [2, 'ERA II'], [3, 'ERA III']]) {
+      const b = document.createElement('button');
+      b.className = 'sbEra';
+      b.dataset.era = String(n);
+      /*
+       * The padlock is a SPAN and not a class on the button, for the reason
+       * the menu's own locked tabs carry one: a mark you can see is a door,
+       * and a button that is merely dim is a button that looks broken.
+       */
+      b.innerHTML = n === 3
+        ? `<span class="sbEraLock" aria-hidden="true">${LOCK}</span>${label}`
+        : label;
+      b.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        const r = this.game.setBenchEra(n);
+        if (r === 'locked') this.refuseEra(b);
+      });
+      row.appendChild(b);
+      this.el.eras.push(b);
+    }
+    return row;
+  }
+
+  /** A door that does not open says so, once, where it was pressed. */
+  refuseEra(b) {
+    b.classList.remove('refuse');
+    void b.offsetWidth;
+    b.classList.add('refuse');
+  }
+
+  /** Which room is up, on the row. */
+  syncEra() {
+    const at = this.game.world.era;
+    for (const b of this.el.eras || []) {
+      const n = Number(b.dataset.era);
+      const on = n === at;
+      if (b._on === on) continue;
+      b._on = on;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
   }
 
   buildPanel() {
@@ -349,6 +420,7 @@ export class Sandbox {
      * clear of a panel 10px shorter than the one that was about to be drawn,
      * and it landed on the rig on the first frame.
      */
+    this.syncEra();
     this.syncStats();
     // ...and there is always something to shoot. The mode is one target and
     // a counter; arriving to an empty field and having to ask for the target
@@ -448,7 +520,9 @@ export class Sandbox {
     // rig goes down at its preferred distance and `update` puts it right on
     // the first frame the readout is actually on the screen.
     this.placed = up !== null;
-    placeDummy(this.game, up === null ? DUMMY.up : up);
+    // ...and WHICH rig. The era-2 room gets D2; see d2.js for what it is and
+    // for why every feature of it is Dummy's.
+    placeDummy(this.game, up === null ? DUMMY.up : up, w.era === 2 ? 2 : 1);
   }
 
   /**

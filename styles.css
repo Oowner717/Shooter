@@ -4476,3 +4476,34 @@ body.evolving #waveRail { transform: translateY(-18px); }
 /* The grid is `.branchGrid`, which is laid out for a branch that is open
  * inside a wrapper. Here it is the whole panel, so it needs no inset. */
 .gunGrid { margin: 0; }
+
+/* ---- the ASSAY's three rooms -------------------------------------------
+ *
+ * A segmented control under the bar: which era's room you are in. Its own row
+ * rather than three more buttons in the bar, which at 320 has no width left --
+ * and ABOVE the panel, so the readout's bottom edge (what `standoff` measures
+ * the rig against) is not moved by it.
+ */
+#sbEras {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+  margin: 4px 8px 0;
+}
+.sbEra {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 7px 4px; border-radius: 6px;
+  border: 1px solid rgba(143, 184, 216, .28); background: rgba(10, 16, 24, .72);
+  color: #8fa9c4; font-size: 10px; letter-spacing: .18em; cursor: pointer;
+}
+.sbEra.on {
+  border-color: rgba(143, 184, 216, .8); background: rgba(143, 184, 216, .14);
+  color: #dbe6f2;
+}
+.sbEraLock { display: inline-block; width: 9px; height: 9px; opacity: .75; }
+.sbEraLock svg { width: 100%; height: 100%; display: block; }
+/* A door that does not open says so where it was pressed, once. */
+.sbEra.refuse { animation: sbRefuse .34s ease-out; }
+@keyframes sbRefuse {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  60% { transform: translateX(3px); }
+}

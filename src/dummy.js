@@ -56,6 +56,7 @@ import { CFG } from './config.js';
 import { TAU, clamp, rand, spread, smoothstep, rgba, drawGlow, mixHex, jag } from './util.js';
 import { spark, shard, ripple } from './fx.js';
 import { ledger, soak, soakBeads, SOAK_BEADS, SOAK_PER_SHELL } from './ledger.js';
+import { drawD2 } from './d2.js';
 
 export const DUMMY = {
   r: 68,
@@ -667,6 +668,25 @@ export function drawDummy(ctx, e) {
   const hair = CFG.hairline;
 
   /*
+   * ---- two forms, one rig ----
+   *
+   * Everything above this line is shared and none of it is form: the pin, the
+   * strain, the band walk, the marks and the record are `updateDummy`'s and
+   * `dummyHit`'s, and the eight values below are the band machinery's reading
+   * of them. D2 is handed that reading and paints; it computes none of it.
+   *
+   * HANDED OVER rather than imported, and that is not only tidiness: `d2.js`
+   * importing `toneAt`, `arrived` and `detent` back out of here is a CYCLE,
+   * and `bundle.mjs` orders modules by an acyclic walk. The single-file build
+   * is where this game has already lost fifty-three builds to a module-graph
+   * surprise, and a cycle is not a thing to find out about from a dead page.
+   */
+  if (e.dummyForm === 2) {
+    drawD2(ctx, e, { R, s, bf, t, flash, tone, lit0, a1, a2, a3, a4, a5, hair });
+    return;
+  }
+
+  /*
    * The mount leans as it works: the ring foreshortens and tips. Two
    * incommensurate judder frequencies once the trim is gone, so it never
    * resolves into a clean oscillation and reads as a servo fighting itself.
@@ -1126,10 +1146,13 @@ export function drawDummy(ctx, e) {
  * `updateDummy` puts it back every frame. `counts` still keeps it out of the
  * tally, and it cannot die, so it can never pay.
  */
-export function placeDummy(game, up = DUMMY.up) {
+export function placeDummy(game, up = DUMMY.up, form = 1) {
   const w = game.world;
   const e = game.debugSpawn('bulwark', w.width / 2, w.shooter.y - up);
   if (!e) return null;
+  // Which rig this is. The ONLY thing about a dummy that differs between the
+  // rooms; everything else on it is set the same way for both.
+  e.dummyForm = form === 2 ? 2 : 1;
   e.staged = false;
   e.spawnIn = 0;
   e.dummy = true;

@@ -1498,14 +1498,43 @@ came from before believing the other one covers it.
   from its siblings. Nothing flips a property a test can read back. Design to
   the LOCKED width: a 20,000-energy tab is padlocked for most of a run, and
   that is exactly the state its label most needs to read in.
-- **The room is the TESTBED, and the ids are still `sandbox`.** It was SANDBOX
-  for three builds and THE RANGE for one, and the id has never moved through
-  any of it, because a saved run writes bought ids into `world.ledger` and
-  renaming this one takes a 20,000-energy node away from everyone who has
-  bought it. `regress.mjs` pins the name in all THREE places it is written --
-  the bar from `RANGE_NAME`, the tab from `GROUPS`, the card from the tree --
-  because it lives in three files and each of the two previous renames moved
-  a subset of them.
+- **The room is the ASSAY, and the ids are still `sandbox`.** It was SANDBOX
+  for three builds, THE RANGE for one and TESTBED for twenty-six, and the id
+  has never moved through any of it, because a saved run writes bought ids
+  into `world.ledger` and renaming this one takes a 20,000-energy node away
+  from everyone who has bought it. `regress.mjs` pins the name in all THREE
+  places it is written -- the bar from `RANGE_NAME`, the tab from `GROUPS`,
+  the card from the tree -- because it lives in three files and each of the
+  three previous renames moved a subset of them. Comments and docs that say
+  "the testbed" are history and are left alone; the NAME is one constant.
+- **The assay is three rooms and each room is an ERA, not a scale.** Until
+  build 262 the bench pinned era 1's scale without touching `world.era`:
+  `setZoom(era, sandbox)` took a second argument and both doors carried the
+  era across by hand. `setZoom(era)` reads the era and nothing else now, and
+  the tabs are era 1 (old field, r 26, Dummy), era 2 (new field, r 40, D2)
+  and a padlocked era 3. Neither room has a yard -- the gate is still
+  `era === 2 && !sandbox`, because a building nothing comes out of and a wall
+  nothing crosses explain rules that do not apply where there are no waves.
+  **It is entered on the era you are standing in.** Remembering the last tab
+  reads as a kindness and is not: a run at era 2 whose last visit ended on
+  ERA I came back to era 1's field, silently, in the one room whose whole job
+  is measuring.
+- **Per-era state is a STATE SWAP, not a facade.** `ledger.select(era)`
+  snapshots the live counter into `store[era]` and assigns the incoming one
+  over itself, because `ledger` is read by name in five files and one missed
+  forward would read era 1's number in era 2's room forever. `on` is
+  deliberately not per era -- it means "the counter is armed", which is a
+  property of being in the room. `soak.select(era)` flushes before swapping
+  between three keys, and **era 1 keeps the original `sim7749-soak`**: a new
+  key for it would quietly reset the one record in this game that takes
+  thirteen hours to fill. `forget()` removes all three.
+- **A module cycle is invisible until `bundle.mjs` orders the files.** It
+  walks the graph acyclically, so two modules that import each other put one
+  ahead of its own dependency in the single-file build -- green suite, clean
+  build, different game in the form the phone installs, which is the `export
+  let` snapshot all over again. `dummy.js` HANDS the band reading to
+  `drawD2(ctx, e, {...})` rather than importing anything back, and a glyph
+  both files want (LOCK) lives in the LOWER one.
 - **The six emplacement upgrades are NOT in the tree**, and that is deliberate:
   their only door is the TURRETS tab, which is locked until a gun is standing,
   and the tree's gates are rungs and parents. They are ordinary nodes in every

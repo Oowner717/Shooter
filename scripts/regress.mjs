@@ -16370,13 +16370,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * a counter, which is what the mode was always for and what its new name
    * says.
    */
-  check('the testbed is one dummy and a counter, and there is nothing else to put down',
+  check('the assay is one rig and a counter, and there is nothing else to put down',
     r.noPicker && r.dummyOnEntry === 1 && r.dummiesAfterThree === 1
     // The name is pinned in all THREE places it is written, because it lives
     // in three files: the bar takes it from `RANGE_NAME`, the tab from
-    // `GROUPS` and the card from the tree. It was RANGE for one build and
-    // SANDBOX for three before that, and each rename moved a subset.
-    && r.named === 'TESTBED' && r.tabbed === 'TESTBED' && r.noded === 'TESTBED'
+    // `GROUPS` and the card from the tree. It was TESTBED for twenty-six
+    // builds, THE RANGE for one and SANDBOX for three before that, and every
+    // one of those renames moved a subset of the three.
+    && r.named === 'ASSAY' && r.tabbed === 'ASSAY' && r.noded === 'ASSAY'
     // ...and the id under all of it has never moved, because a save has it.
     && r.nodeId === 'sandbox',
     `no picker, no anomaly row, no summon door: ${r.noPicker}; entering puts `
@@ -16403,6 +16404,315 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.dummyAlive && r.dummyPaidNothing && r.dummyTookFire,
     `alive on full health ${r.dummyAlive}, nothing counted or banked `
     + `${r.dummyPaidNothing}, and it was actually being shot ${r.dummyTookFire}`);
+}
+
+// --- the assay is three rooms, and each keeps its own numbers ---------------
+/*
+ * One room per era from build 262. Era 1 is the old field at the old scale
+ * with DUMMY on it; era 2 is the new field -- no building and no wall, which
+ * is `syncYard`'s own `!sandbox` term -- at the new scale with the second form
+ * and D2 on it; era 3 is a door with nothing behind it.
+ *
+ * The three claims worth pinning are the three that could each ship broken on
+ * their own: that a room is a whole FIELD and not a repainted one, that the
+ * numbers are per room and a reset in one is a reset in one, and that walking
+ * out puts the RUN's era back rather than the room's.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { ledger, soak } = await import('../src/ledger.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const arm = (era) => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(400000);
+      g.debugBuyAll();
+      if (era === 2) g.setEra(2);
+      w.director.update = () => {};
+    };
+    const rig = () => w.enemies.find((e) => e.dummy && !e.dead) || null;
+    const room = () => {
+      const e = rig();
+      return { era: w.era, zoom: CFG.zoom, mk2: !!CFG.mk2, yard: !!w.yard,
+        turret: w.shooter.r, form: e ? e.dummyForm : null, rigs: w.enemies.filter((x) => x.dummy && !x.dead).length };
+    };
+    /*
+     * Fired through the MACHINE and not by writing a number into the ledger:
+     * the claim is that a room's counter records what happens in that room,
+     * and a counter written to directly would be true of a build with no
+     * rooms at all.
+     */
+    const shoot = (n) => {
+      const s = w.shooter;
+      s.aim = -Math.PI / 2;
+      s.heat = 0;
+      for (let i = 0; i < n; i++) { s.shoot(w); for (let k = 0; k < 8; k++) g.update(1 / 60); }
+    };
+
+    // ---- entered from an era-1 run: the era-1 room -----------------------
+    arm(1);
+    out.entered = g.enterSandbox();
+    out.one = room();
+    shoot(20);
+    out.oneCount = ledger.total > 0;
+    const one0 = Math.round(ledger.total);
+    const oneSoak0 = Math.round(soak.total);
+
+    // ---- ERA II: a different field, a different machine, a different rig --
+    out.to2 = g.setBenchEra(2);
+    out.two = room();
+    out.twoFresh = Math.round(ledger.total) === 0 && Math.round(soak.total) === 0;
+    shoot(20);
+    const two0 = Math.round(ledger.total);
+    out.twoCount = two0 > 0;
+
+    // ---- ERA III is a door that does not open ----------------------------
+    out.to3 = g.setBenchEra(3);
+    out.stillTwo = w.era === 2;
+
+    // ---- ...and era 1's numbers were waiting where they were left --------
+    out.back1 = g.setBenchEra(1);
+    out.oneKept = Math.round(ledger.total) === one0 && Math.round(soak.total) === oneSoak0;
+    /*
+     * The reset, through the button and not through `ledger.reset()`: the
+     * claim is about a control, and the room's own RESET COUNTER is what a
+     * player presses. Pressed with `pointerdown`, which is what every control
+     * on this screen binds.
+     */
+    const btn = document.querySelector('#sandbox .sbReset');
+    out.hasReset = !!btn;
+    if (btn) btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    out.oneCleared = Math.round(ledger.total) === 0;
+    // ...and it cleared ONE room. This is the whole of "stats are contained
+    // in each Era".
+    g.setBenchEra(2);
+    out.twoUntouched = Math.round(ledger.total) === two0;
+    // ...and the record is per room too, and a counter reset never touches it.
+    out.twoRecordKept = Math.round(soak.total) > 0;
+
+    // ---- leaving puts the RUN's era back, not the room's ------------------
+    out.left = g.exitSandbox();
+    out.runAfterOne = { era: w.era, zoom: CFG.zoom, mk2: !!CFG.mk2 };
+
+    // ---- ...and a run at era 2 enters the era-2 room and comes back to it -
+    arm(2);
+    g.enterSandbox();
+    out.fromTwo = room();
+    g.setBenchEra(1);
+    g.exitSandbox();
+    out.runAfterTwo = { era: w.era, zoom: CFG.zoom, mk2: !!CFG.mk2, yard: !!w.yard };
+
+    delete w.director.update;
+    g.setEra(1);
+    g.restart();
+    ledger.select(1);
+    soak.select(1);
+    return out;
+  });
+
+  check('the assay is three rooms: a field, a machine and a rig apiece',
+    r.entered && r.to2 === 'ok'
+    && r.one.era === 1 && r.one.zoom === 0.62 && r.one.mk2 === false
+    && r.one.turret === 26 && r.one.form === 1 && r.one.rigs === 1
+    && r.two.era === 2 && r.two.zoom === 0.403 && r.two.mk2 === true
+    && r.two.turret === 40 && r.two.form === 2 && r.two.rigs === 1
+    // ...and NEITHER has a yard. "The new field, with no spawn building and
+    // no wall" is the ruling, and `syncYard`'s `!sandbox` term is what holds
+    // it -- a building nothing comes out of and a wall nothing crosses are
+    // two large objects explaining rules that do not apply in here.
+    && r.one.yard === false && r.two.yard === false,
+    `ERA I: zoom ${r.one.zoom}, turret r ${r.one.turret}, mk2 ${r.one.mk2}, rig `
+    + `form ${r.one.form}; ERA II: zoom ${r.two.zoom}, r ${r.two.turret}, mk2 `
+    + `${r.two.mk2}, form ${r.two.form}; neither has a yard `
+    + `(${r.one.yard || r.two.yard})`);
+
+  check('...and ERA III is a door with nothing behind it',
+    r.to3 === 'locked' && r.stillTwo,
+    `pressing it reads "${r.to3}" and the room does not move (still era 2: `
+    + `${r.stillTwo})`);
+
+  /*
+   * The load-bearing one. `ledger` and `soak` are read by name in five files,
+   * so the three sets of numbers are SWAPPED STATE behind one object rather
+   * than three objects behind a facade -- a facade would need a forward per
+   * field, and a missed one reads era 1's number in era 2's room.
+   */
+  check('...and each room keeps its own numbers, and a reset resets one room',
+    r.oneCount && r.twoFresh && r.twoCount && r.oneKept
+    && r.hasReset && r.oneCleared && r.twoUntouched && r.twoRecordKept,
+    `era 1 counted (${r.oneCount}); era 2 opened at zero (${r.twoFresh}) and `
+    + `counted its own (${r.twoCount}); era 1's were waiting (${r.oneKept}); `
+    + `RESET COUNTER cleared era 1 (${r.oneCleared}) and left era 2 alone `
+    + `(${r.twoUntouched}), with era 2's record still standing `
+    + `(${r.twoRecordKept})`);
+
+  /*
+   * Leaving used to carry `w.era` across the resume by hand, which was correct
+   * while the bench could not change the era and is exactly wrong now that its
+   * tabs do -- it would walk the era-2 room's era out into an era-1 run.
+   */
+  check('...and walking out returns the RUN to its own era, not the room to it',
+    r.left && r.runAfterOne.era === 1 && r.runAfterOne.zoom === 0.62
+    && r.runAfterOne.mk2 === false
+    && r.fromTwo.era === 2 && r.fromTwo.form === 2
+    && r.runAfterTwo.era === 2 && r.runAfterTwo.zoom === 0.403
+    && r.runAfterTwo.mk2 === true && r.runAfterTwo.yard === true,
+    `an era-1 run left the ERA I room at era ${r.runAfterOne.era}/`
+    + `${r.runAfterOne.zoom}; an era-2 run entered the ERA II room `
+    + `(form ${r.fromTwo.form}), walked to ERA I, and left at era `
+    + `${r.runAfterTwo.era}/${r.runAfterTwo.zoom} with its yard back `
+    + `(${r.runAfterTwo.yard})`);
+}
+
+// --- D2 is Dummy's features and none of Dummy's picture ---------------------
+/*
+ * "All the same features, completely different animations, visuals and
+ * design." Those are two claims and they need two instruments.
+ *
+ * The FEATURES are shared by construction and asserted as such: `updateDummy`
+ * and `dummyHit` are the same code for both, so the test is that the same
+ * damage produces the same band, the same strain and the same record on both
+ * rigs. If that ever stops being true, one of them has grown a copy.
+ *
+ * The PICTURE is the frame-comparison instrument the Dummy band sweep already
+ * uses -- greyscale, normalised by the frame's own 98th percentile, mean
+ * absolute difference -- which is blind to brightness and opacity by
+ * construction and therefore cannot report "different" for a recolour.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { drawDummy, updateDummy, dummyHit, BANDS } = await import('../src/dummy.js');
+    const { ledger, soak } = await import('../src/ledger.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    g.restart();
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.phase = 'staging';
+    g.debugTeachAll();
+    g.debugGiveEnergy(400000);
+    g.debugBuyAll();
+    w.director.update = () => {};
+    g.enterSandbox();
+
+    const rigOf = (era) => { g.setBenchEra(era); return w.enemies.find((e) => e.dummy && !e.dead); };
+
+    // ---- the features are the same code, so they answer the same ----------
+    const probe = (era) => {
+      const e = rigOf(era);
+      // A clean rig and a clean record, so the two are compared from the same
+      // place rather than from wherever the last arm left them.
+      e.dummyStrain = 0; e.dummyBandF = 0; e.dummyBand = 0; e.dummyHeld = 0;
+      e.dummyPeak = 0; e.dummyFlash = 0;
+      ledger.reset();
+      const soak0 = soak.total;
+      // A rate that lands squarely in band 3, delivered through the one door
+      // both rigs share.
+      for (let i = 0; i < 90; i++) {
+        dummyHit(w, e, 10, 0, -1);
+        ledger.note('bolt', 10, 0);
+        ledger.tick(1 / 60);
+        updateDummy(e, 1 / 60);
+      }
+      return { form: e.dummyForm, band: e.dummyBand, strain: +e.dummyStrain.toFixed(3),
+        bandF: +e.dummyBandF.toFixed(2), peak: +e.dummyPeak.toFixed(3),
+        booked: +(soak.total - soak0).toFixed(0), r: e.r };
+    };
+    const p1 = probe(1);
+    const p2 = probe(2);
+    out.p1 = p1;
+    out.p2 = p2;
+    out.sameFeatures = p1.band === p2.band && p1.strain === p2.strain
+      && p1.bandF === p2.bandF && p1.peak === p2.peak && p1.booked === p2.booked
+      && p1.booked === 900;
+    out.twoForms = p1.form === 1 && p2.form === 2;
+
+    // ---- ...and none of the picture --------------------------------------
+    /*
+     * Rendered at the SAME on-canvas size, with the colour divided out, so
+     * what is left is the shape. The control is the same rig rendered twice:
+     * it must be exactly 0, which is the instrument proving it is blind to
+     * everything except form before it is allowed to report a difference.
+     */
+    const S = 220;
+    const c = document.createElement('canvas');
+    c.width = S; c.height = S;
+    const x = c.getContext('2d', { willReadFrequently: true });
+    const frame = (e, band) => {
+      e.dummyBandF = band; e.dummyStrain = band / 5; e.dummyPeak = band / 5;
+      e.dummyT = 4.2; e.dummyFlash = 0;
+      x.setTransform(1, 0, 0, 1, 0, 0);
+      x.clearRect(0, 0, S, S);
+      const k = (S * 0.34) / e.r;
+      x.setTransform(k, 0, 0, k, S / 2 - e.x * k, S / 2 - e.y * k);
+      drawDummy(x, e);
+      x.setTransform(1, 0, 0, 1, 0, 0);
+      const d = x.getImageData(0, 0, S, S).data;
+      const grey = new Float32Array(S * S);
+      for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+        grey[p] = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) * (d[i + 3] / 255);
+      }
+      const sorted = Float32Array.from(grey).sort();
+      const hi = sorted[Math.floor(sorted.length * 0.98)] || 1;
+      for (let i = 0; i < grey.length; i++) grey[i] = Math.min(1, grey[i] / hi);
+      return grey;
+    };
+    const diff = (a, b) => {
+      let s2 = 0;
+      for (let i = 0; i < a.length; i++) s2 += Math.abs(a[i] - b[i]);
+      return +((s2 / a.length) * 1000).toFixed(2);
+    };
+    const e1 = rigOf(1);
+    const f1a = frame(e1, 3);
+    const f1b = frame(e1, 3);
+    out.control = diff(f1a, f1b);
+    const e2 = rigOf(2);
+    const f2 = frame(e2, 3);
+    out.apart = diff(f1a, f2);
+    // ...and the two are apart at EVERY band, not only the one sampled.
+    out.perBand = [];
+    for (let b2 = 1; b2 <= 5; b2++) {
+      const a = frame(rigOf(1), b2);
+      const b3 = frame(rigOf(2), b2);
+      out.perBand.push(diff(a, b3));
+    }
+    out.bands = BANDS.length;
+
+    g.exitSandbox();
+    delete w.director.update;
+    g.setEra(1);
+    g.restart();
+    ledger.select(1);
+    soak.select(1);
+    return out;
+  });
+
+  check('D2 answers exactly as Dummy does, because it is the same machinery',
+    r.twoForms && r.sameFeatures,
+    `the same 900 damage on both: band ${r.p1.band}/${r.p2.band}, strain `
+    + `${r.p1.strain}/${r.p2.strain}, band position ${r.p1.bandF}/${r.p2.bandF}, `
+    + `peak ${r.p1.peak}/${r.p2.peak}, booked ${r.p1.booked}/${r.p2.booked}`);
+
+  /*
+   * 60 is a long way clear of anything a recolour or a size change could
+   * produce -- the instrument returns exactly 0 for the same rig twice and
+   * the Dummy sweep's own band-to-band steps are 56 to 110 -- so a difference
+   * of this size is a different drawing and not a different tint.
+   */
+  check('...and looks nothing like it, at every band',
+    r.control === 0 && r.apart > 60 && r.perBand.every((d) => d > 60),
+    `the same rig twice differs by ${r.control} (must be exactly 0); the two `
+    + `rigs, at the same size with the colour divided out, differ by `
+    + `${r.apart} at band 3 and ${r.perBand.join('/')} across bands 1-5`);
 }
 
 /*
@@ -17445,7 +17755,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // ran after setHairline the floor would be one resize behind.
     out.floorFollowed = out.two.hairline > out.one.hairline;
 
-    // ---- the testbed is pinned to era 1, from either era ----------------
+    /*
+     * ---- the assay is THREE rooms, one per era -------------------------
+     *
+     * It was pinned to era 1's scale whatever era it was entered from, and
+     * that pin went in build 262: the era-2 room is the era-2 FIELD with the
+     * second form standing on it, which is the whole point of having one.
+     * Entering from era 2 therefore lands in the era-2 room, and the era-1
+     * tab takes the same visit back to era 1's scale without leaving.
+     */
     g.world.energy = 999999;
     g.buy('sandbox');
     g.setEra(2);
@@ -17453,6 +17771,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.enterSandbox();
     out.benchZoom = CFG.zoom;
     out.benchSpans = Math.abs(w.width * w.scale - sw) < 1e-6;
+    out.benchOne = g.setBenchEra(1) === 'ok' ? CFG.zoom : 0;
+    out.benchOneSpans = Math.abs(w.width * w.scale - sw) < 1e-6;
+    out.benchBack = g.setBenchEra(2) === 'ok' ? CFG.zoom : 0;
     g.exitSandbox();
     out.afterBench = CFG.zoom;
     out.wasInTwo = inTwo;
@@ -17475,11 +17796,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `hairline ${r.one.hairline} -> ${r.two.hairline} at era 2, which it must, `
     + `because it is derived from the zoom`);
 
-  check('...and the testbed is pinned to era 1 whatever era it was entered from',
-    r.wasInTwo === 0.403 && r.benchZoom === 0.62 && r.benchSpans
+  check('...and the assay is one room per era, entered on the era you are in',
+    r.wasInTwo === 0.403 && r.benchZoom === 0.403 && r.benchSpans
+    && r.benchOne === 0.62 && r.benchOneSpans && r.benchBack === 0.403
     && r.afterBench === 0.403,
-    `entered from era 2 (${r.wasInTwo}), the bench draws at ${r.benchZoom} and `
-    + `still spans the screen ${r.benchSpans}; leaving returns to ${r.afterBench}`);
+    `entered from era 2 (${r.wasInTwo}), the bench draws at ${r.benchZoom}; the `
+    + `ERA I tab takes it to ${r.benchOne} and ERA II back to ${r.benchBack}, `
+    + `both still spanning the screen (${r.benchSpans && r.benchOneSpans}); `
+    + `leaving returns the RUN to ${r.afterBench}`);
 }
 
 // --- what a deeper field costs the machine, and what it must not cost -------
@@ -19285,10 +19609,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // ---- the radius is parity on the glass, and the gate follows it -------
     const at = (fn) => { fn(); const s = w.shooter;
       return { r: s.r, css: +(s.r * CFG.zoom).toFixed(4), mk2: !!CFG.mk2 }; };
+    /*
+     * The assay carries the era it was ENTERED on from build 262 -- it is one
+     * room per era, and the era-2 room stands the second form up at r 40. So
+     * both directions are read here: entering from era 1 must stay at 26 with
+     * mk2 false, entering from era 2 must stay at 40 with mk2 true, and each
+     * exit must put the run's own era back. Before 262 the room pinned era 1
+     * unconditionally and only the first of those four was true.
+     */
     g.restart();
-    out.one = at(() => {});
-    out.two = at(() => g.setEra(2));
     w.energy = 999999; g.buy('sandbox');
+    out.one = at(() => {});
+    out.benchOne = at(() => g.enterSandbox());
+    out.backOne = at(() => g.exitSandbox());
+    out.two = at(() => g.setEra(2));
     out.bench = at(() => g.enterSandbox());
     out.back = at(() => g.exitSandbox());
     g.setEra(1);
@@ -19389,12 +19723,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   });
 
   check('the second form is the same machine at the same size on the glass',
-    r.one.r === 26 && r.two.r === 40 && r.home.r === 26 && r.back.r === 40
-    && r.bench.r === 26 && r.one.css === r.two.css
-    && r.one.mk2 === false && r.two.mk2 === true && r.bench.mk2 === false,
+    r.one.r === 26 && r.two.r === 40 && r.home.r === 26 && r.one.css === r.two.css
+    && r.one.mk2 === false && r.two.mk2 === true
+    && r.benchOne.r === 26 && r.benchOne.mk2 === false && r.backOne.r === 26
+    && r.bench.r === 40 && r.bench.mk2 === true && r.back.r === 40,
     `r ${r.one.r} -> ${r.two.r}, and both draw ${r.one.css} CSS px — parity, not a `
-    + `chosen number; the bench stays at ${r.bench.r} with mk2 ${r.bench.mk2}, and `
-    + `leaving it returns ${r.back.r}; era 1 comes home at ${r.home.r}`);
+    + `chosen number; the assay entered at era 1 stands at ${r.benchOne.r} (mk2 `
+    + `${r.benchOne.mk2}) and comes back to ${r.backOne.r}, entered at era 2 it `
+    + `stands at ${r.bench.r} (mk2 ${r.bench.mk2}) and comes back to ${r.back.r}; `
+    + `era 1 comes home at ${r.home.r}`);
 
   /*
    * The size divided out, which is exactly the self-normalising that makes

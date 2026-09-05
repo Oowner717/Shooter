@@ -1353,22 +1353,31 @@ export class Game {
     this.checkpoint();
     w.sandbox = true;
     /*
-     * The era is carried across by hand. Both doors go through `resume()`,
-     * which is `reset()` plus the file -- `reset()` clears the era and the
-     * file does not carry it yet, so a visit to the bench would silently put
-     * an evolved run back to era 1. When the era joins the save at the door
-     * phase the restore will do this itself and these two lines become belt
-     * and braces rather than the mechanism.
+    /*
+     * Which room: ALWAYS the era the run is standing in. Somebody who has
+     * taken the new field is measuring things on the new field, and the tabs
+     * move it from there.
+     *
+     * It remembered the last room used for one build, which reads as a
+     * kindness and is not: a run at era 2 whose last visit ended on the ERA I
+     * tab came back to era 1's field, silently, with no way to tell that from
+     * the room being broken. Where you are is a fact and where you last were
+     * is not; the tab is one tap.
+     *
+     * Read BEFORE the resume, because `resume()` is `reset()` plus the file
+     * and `reset()` puts the world back at era 1.
      */
-    const era = w.era;
+    this.benchEra = w.era === 2 ? 2 : 1;
     this.resume();
-    w.era = era;
-    // The bench is pinned to era 1's scale, and NOTHING re-derives the
-    // geometry on its own: `resume()` calls `reset()`, and `reset()` does not
-    // call `resize()`. Without this, entering from era 2 leaves the world at
-    // era 2's dimensions while the room is drawn at era 1's, and the rig's
-    // clearance case fails on a build where the room looks fine.
+    w.era = this.benchEra;
+    /*
+     * NOTHING re-derives the geometry on its own: `resume()` calls `reset()`,
+     * and `reset()` does not call `resize()`. Without this the world keeps
+     * the dimensions the run had while the room is drawn at the room's era.
+     */
     this.resize();
+    ledger.select(w.era);
+    soak.select(w.era);
     // `resume` restores a run, and a run has a wave rail, a purse and a fuse.
     // None of those exist here.
     w.phase = 'staging';
@@ -1377,16 +1386,67 @@ export class Game {
     return true;
   }
 
+  /**
+   * Move the bench to another era's room.
+   *
+   * One room per era from build 262: era 1 is the old field at the old scale
+   * with Dummy on it, era 2 is the new field -- no building and no wall, see
+   * `syncYard` -- at the new scale with the second form and D2 on it, and era
+   * 3 is a door with nothing behind it yet.
+   *
+   * Everything the room owns moves with it: the counter and the record are
+   * per era (`ledger.select`, `soak.select`), which is what "stats are
+   * contained in each Era" means, and the rig is put down again because its
+   * standoff is measured in world units against a field that just changed
+   * depth by half as much again.
+   *
+   * @returns 'ok' | 'here' | 'locked' | 'no'
+   */
+  setBenchEra(n) {
+    const w = this.world;
+    if (!w.sandbox) return 'no';
+    const to = n | 0;
+    if (to === 3) return 'locked';
+    if (to !== 1 && to !== 2) return 'no';
+    if (to === w.era) return 'here';
+    /*
+     * The record first, and flushed by `select` before the swap: it is
+     * written on an eight-second clock, so up to eight seconds of the room
+     * you are leaving would otherwise go with the tab press.
+     */
+    ledger.select(to);
+    soak.select(to);
+    this.benchEra = to;
+    w.era = to;
+    // The field's depth, the machine's form and the stroke floor all follow
+    // the era, and none of them re-derives itself.
+    this.resize();
+    this.syncSky(true);
+    this.sandbox.dummy();
+    this.sandbox.syncEra();
+    this.sandbox.syncStats();
+    return 'ok';
+  }
+
   exitSandbox() {
     const w = this.world;
     if (!w.sandbox) return false;
     this.sandbox.leave();
     w.sandbox = false;
-    const era = w.era;
+    /*
+     * The RUN's era, and it comes off the file rather than being carried
+     * across by hand. It was carried until build 262 -- `const era = w.era`
+     * either side of the resume -- which was correct while the bench could
+     * not change the era and is exactly wrong now that its tabs do: it would
+     * have walked the era-2 room's era back out into an era-1 run.
+     * `resume()` reads `d.era`, and `enterSandbox` checkpoints before it
+     * opens the door, so the file is the run's own answer.
+     */
     this.resume();
-    w.era = era;
     // ...and back to the era's own scale on the way out, for the same reason.
     this.resize();
+    ledger.select(1);
+    soak.select(1);
     /*
      * ...and the sky and the bed with it. This used to write the era-1 pair
      * longhand, which was the hole: leaving the bench goes through `resume()`
@@ -1671,9 +1731,11 @@ export class Game {
     /*
      * The era's scale FIRST, because everything below is derived from it --
      * the stroke floor most immediately, which would otherwise be one resize
-     * behind. The testbed is exempt and says so in `setZoom`.
+     * behind. Nothing is exempt from build 262: `setZoom` reads the era and
+     * nothing else, and the assay's three rooms ARE eras rather than a scale
+     * pinned under one.
      */
-    setZoom(this.world.era, this.world.sandbox);
+    setZoom(this.world.era);
     // The stroke floor is a device-pixel measure, so it follows the scale the
     // canvas is actually drawn at -- including the governor's own factor.
     setHairline(dpr);

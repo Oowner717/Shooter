@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '261';
+export const BUILD = '262';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '261';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '4d28d19';
+export const REV = '41246e8';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4204,14 +4204,16 @@ export function setHairline(dpr) {
  * Called from `Game.resize` BEFORE `setHairline`, because the stroke floor is
  * derived from the zoom and would otherwise be one resize behind.
  *
- * The testbed is exempt by ruling: it is a bench, not a battlefield, and its
- * whole geometry -- the rig's standoff, the bead shell, the panel clearance
- * case -- is measured against era 1's scale. `world.sandbox` is already the
- * flag for "a mode where the director does not run"; it is also the flag for
- * "a mode at the base scale".
+ * It took a `sandbox` flag until build 262 and pinned the bench to era 1's
+ * scale whatever era it was entered from. That went with the bench becoming
+ * three rooms: an ASSAY tab per era, and era 2's room is the era-2 FIELD with
+ * the second form standing on it, which is the whole point of having one. The
+ * bench's era is `world.era` like everywhere else now -- `enterSandbox` sets
+ * it, `exitSandbox` lets the restore put the run's own back -- so there is one
+ * answer to "which era is this" and nothing to keep in step.
  */
-export function setZoom(era, sandbox) {
-  CFG.zoom = sandbox ? CFG.ZOOMS[1] : (CFG.ZOOMS[era] || CFG.ZOOMS[1]);
+export function setZoom(era) {
+  CFG.zoom = CFG.ZOOMS[era] || CFG.ZOOMS[1];
   /*
    * ---- and everything the field's size implies ----
    *

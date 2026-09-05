@@ -2160,3 +2160,113 @@ checked again**, which is the same failure that function exists to fix, one
 level down. The worker is nudged and not waited on now.
 
 546 green, ORDINAL hash `-1765830468` before and after in this container.
+
+## 34. Build 262 — the ASSAY is three rooms
+
+The bench has been renamed three times and this is the fourth: SANDBOX (232),
+THE RANGE (235), TESTBED (236), and now **ASSAY** — the user picked it from
+five. `RANGE_NAME` is still the only place the word lives and the ids are
+still `sandbox`, for the reason build 236 recorded and which has only got more
+expensive since: a saved run writes bought node ids into `world.ledger`, so
+renaming this one takes a 20,000-energy node away from everyone who has bought
+it. `regress.mjs` pins the name in all three places it is written — the bar
+from `RANGE_NAME`, the tab from `GROUPS`, the card from the tree — because it
+lives in three files and every one of the three previous renames moved a
+subset of them.
+
+### The room is an ERA, not a scale
+
+Until now the bench was one room that pinned era 1's SCALE without touching
+`world.era`: `setZoom(era, sandbox)` took a second argument, both bench doors
+carried the era across by hand, and `era === 2 && sandbox === true` was a
+strange reachable state that three separate comments had to explain. That is
+gone. `setZoom(era)` reads the era and nothing else, and the room's three tabs
+**are** eras:
+
+| tab | field | scale | machine | dummy |
+| --- | --- | --- | --- | --- |
+| ERA I | old field, no yard | 0.62, mk1 | r 26 | Dummy |
+| ERA II | new field, no yard | 0.403, mk2 | r 40 | D2 |
+| ERA III | — | — | — | padlocked |
+
+"The new field with no spawn building and no wall" is the user's ruling and it
+is the right one: a building nothing comes out of and a wall nothing crosses
+are two large objects explaining rules that do not apply in a room with no
+waves. So the yard's gate stays `era === 2 && !sandbox` — the same expression,
+now guarding an ordinary state rather than a strange one.
+
+**The room is entered on the era you are standing in**, and that was a
+correction. The first version remembered the last tab you had used, which
+reads as a kindness and is not: a run at era 2 whose last visit ended on the
+ERA I tab came back to era 1's field, silently, in the one room whose whole
+job is measuring. `enterSandbox` reads `world.era` and nothing else;
+`setBenchEra` is what moves between rooms once you are inside, and it returns
+`'ok' | 'here' | 'locked' | 'no'` rather than a boolean so the refusal shake
+can tell "already here" from "not yet".
+
+### D2 — a suspended field
+
+The user's brief was that D2 has all of Dummy's features and none of its
+animation, visuals or design, and picked **suspended field** from three
+sketches: a core held inside a cage of rings, where the bands destabilise the
+orbits rather than damaging a hull. Every one of Dummy's five bands has a
+counterpart drawn a completely different way:
+
+| band | Dummy | D2 |
+| --- | --- | --- |
+| 1 | lit ticks on the encoder scale | stations light on the outer ring |
+| 2 | vents crack open | the rings wobble out of phase |
+| 3 | shutters close across the face | the outermost ring leaves formation |
+| 4 | cracks | the rings break into arcs, and judder |
+| 5 | light pools on the deck, top shutter jams | the core breaches, axial plume, the outer ring tumbles |
+
+The lifetime record is the same odometer in a different register: a hundred
+stations on one great ring at `R * 1.44` rather than five concentric shells,
+so a decade closing is still a visible event and the record still cannot be
+mistaken for debris — it does not move.
+
+`d2.js` imports `./util.js` and `./ledger.js` and nothing else. The band
+reading is **handed over** by `dummy.js` — `drawD2(ctx, e, { R, s, t, flash,
+tone, lit0, a1..a5, hair })` — rather than imported back, because
+`bundle.mjs` orders modules by an acyclic walk and a cycle between the two
+would put one of them ahead of its own dependency in the single-file build.
+That is the same class of fault as the `export let` snapshot: green suite,
+clean build, and a different game in the form the phone actually installs.
+
+### The stats are per era, and the record is too
+
+The user asked for stats contained in each era, with a reset in one era
+touching only that era. Both halves are a **state swap**, not a facade:
+
+- `ledger.select(era)` snapshots the live counter into `store[era]` and
+  assigns the incoming one over itself. A facade — `ledger.era1.total` and a
+  forwarding layer — would have been tidier and is the wrong shape here,
+  because `ledger` is read by name in five files and one missed forward reads
+  era 1's number in era 2's room, silently, forever. `on` is deliberately not
+  per era: it is "is the counter armed", which is a property of being in the
+  room at all.
+- `soak.select(era)` flushes the current shell to disk before swapping keys.
+  There are three: `sim7749-soak`, `sim7749-soak2`, `sim7749-soak3`. **Era 1
+  keeps the original key**, so every shell a player has already earned
+  survives the update — a new key for era 1 would have quietly reset the one
+  number in this game that takes thirteen hours to fill. `forget()` removes
+  all three, because that is the one function meaning "the next launch is a
+  first launch".
+
+### What was got wrong first
+
+- **D2's first tilts (0.42 / -0.30 / 0.18) foreshortened the rings to 91%,
+  96% and 98% of their own width** — three concentric circles, drawn as an
+  orbit cage and reading as a target. Measured rather than eyeballed, and
+  raised to 1.16 / 0.72 / 1.34 with the strokes thinned, so the cage reads as
+  depth from the first frame.
+- **`enterSandbox` remembered the last room.** See above; the fix is one line
+  and the reason is a paragraph.
+- **The era-parity case pinned the bench at r 26 with `mk2` false**, which was
+  the old rule stated as an assertion. It reads both directions now — entered
+  at era 1 it stands at 26, entered at era 2 at 40, and each exit puts the
+  run's own era back — because a case that only knows the era-1 door cannot
+  see the era-2 one arriving.
+
+552 green. The ORDINAL hash was **not** run: this build touches the bench, the
+counter and the room's furniture and nothing in energy, targeting or the boss.

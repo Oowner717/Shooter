@@ -840,7 +840,7 @@ export class Hud {
      * no longer records the line as said, this does, when it is painted.
      */
     /*
-     * ...and the same rule again for the TESTBED, which is the one room where
+     * ...and the same rule again for the ASSAY, which is the one room where
      * the band lands on the only thing in it.
      *
      * The rig stands as far up-field as the readout leaves room for, and on a

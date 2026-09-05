@@ -85,6 +85,11 @@ export const BAR_WINDOW = 10;
 class Ledger {
   constructor() {
     this.on = false;
+    // Which room's numbers are loaded, and the other two, parked. See
+    // `select` -- `on` is deliberately NOT per era: it is whether the bench
+    // is recording at all, which is a property of the door and not the room.
+    this.era = 1;
+    this.store = {};
     this.t = 0;
     this.total = 0;
     this.over = 0;
@@ -106,6 +111,39 @@ class Ledger {
     this.wD = [];
     this.wS = [];
     this.head = 0; // index of the oldest entry still inside the window
+  }
+
+  /**
+   * ---- three counters, one object ----
+   *
+   * The room is three rooms from build 262 -- one per era -- and each keeps
+   * its own numbers: "stats are contained in each Era, and resetting the
+   * stats in an Era only does so in that Era".
+   *
+   * That is done by SWAPPING STATE and not by three objects behind a facade,
+   * for one reason: `ledger` is read directly by name in five files
+   * (`ledger.on`, `ledger.total`, `ledger.by`, `ledger.note(...)`), and a
+   * facade would need a forward per field with a missed one silently reading
+   * era 1's number in era 2's room. The object identity never changes, so
+   * every existing reader is correct by construction and the only thing that
+   * had to be got right is the list below -- which is the constructor's own
+   * field list, and is asserted against it.
+   */
+  select(era) {
+    const to = era === 3 ? 3 : (era === 2 ? 2 : 1);
+    if (to === this.era) return this;
+    this.store[this.era] = this.snap();
+    this.era = to;
+    const had = this.store[to];
+    if (had) Object.assign(this, had);
+    else this.reset();
+    return this;
+  }
+
+  /** Everything `reset` clears, plus `t`. The state a room owns. */
+  snap() {
+    return { t: this.t, total: this.total, over: this.over, kills: this.kills,
+      by: this.by, wT: this.wT, wD: this.wD, wS: this.wS, head: this.head };
   }
 
   /** Arm, from a clean slate. */
@@ -325,7 +363,16 @@ export const SRC_EXTRA = {
  * flushed on a clock and at every point the game already writes the run down
  * -- see `Game.checkpoint`, which flushes this BEFORE its own bench guard.
  */
-const SOAK_KEY = 'sim7749-soak';
+/*
+ * One record per era, from build 262.
+ *
+ * Era 1 keeps the original key, so a device that has been filling its shell
+ * since build 235 keeps every bead of it -- a rename here would silently
+ * reset a record that is explicitly documented as the one thing a new run
+ * does not throw away. The other two start empty because they never existed.
+ */
+const SOAK_KEYS = { 1: 'sim7749-soak', 2: 'sim7749-soak2', 3: 'sim7749-soak3' };
+const SOAK_KEY = SOAK_KEYS[1];
 
 /**
  * ---- the ladder, in beads ----
@@ -392,12 +439,32 @@ class Soak {
   constructor() {
     this.total = 0;
     this.dirty = false;
+    this.era = 1;
     this.load();
+  }
+
+  /**
+   * Point the record at a room. Flushes the one it is leaving FIRST -- the
+   * write is on an eight-second clock, so up to eight seconds of the era you
+   * are walking out of would otherwise be lost on the way.
+   */
+  select(era) {
+    const to = era === 3 ? 3 : (era === 2 ? 2 : 1);
+    if (to === this.era) return this;
+    this.flush();
+    this.era = to;
+    this.total = 0;
+    this.load();
+    return this;
+  }
+
+  get key() {
+    return SOAK_KEYS[this.era] || SOAK_KEY;
   }
 
   load() {
     try {
-      const raw = localStorage.getItem(SOAK_KEY);
+      const raw = localStorage.getItem(this.key);
       if (raw === null) return;
       const v = Number(raw);
       // Bounded on read, the way `settings.js` and `audio.js` bound theirs: a
@@ -420,18 +487,19 @@ class Soak {
     if (!this.dirty) return false;
     this.dirty = false;
     try {
-      localStorage.setItem(SOAK_KEY, String(Math.round(this.total)));
+      localStorage.setItem(this.key, String(Math.round(this.total)));
       return true;
     } catch {
       return false; // no store: the number still stands for as long as the tab does
     }
   }
 
+  /** All three, because `forgetPlayer` means the next launch is a first one. */
   forget() {
     this.total = 0;
     this.dirty = false;
     try {
-      localStorage.removeItem(SOAK_KEY);
+      for (const k of Object.values(SOAK_KEYS)) localStorage.removeItem(k);
     } catch { /* nothing to forget */ }
   }
 }
