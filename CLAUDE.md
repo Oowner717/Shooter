@@ -1506,4 +1506,10 @@ came from before believing the other one covers it.
   the bar from `RANGE_NAME`, the tab from `GROUPS`, the card from the tree --
   because it lives in three files and each of the two previous renames moved
   a subset of them.
+- **Anything of OURS that is drawn at era 2 goes through `Game.ours(ctx, fn)`**,
+  which clips to below the wall. Mines, effects, rounds, fx -- three scopes in
+  `Game.draw`. A new draw routine belongs inside one of them, not beside them;
+  the case counts `clip` calls per frame and fails on any other number. Theirs
+  (bodies, drops, wreckage, the yard) and the touch aid are deliberately
+  outside it.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

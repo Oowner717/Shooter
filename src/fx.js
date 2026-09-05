@@ -190,7 +190,10 @@ export const fx = {
  */
 export function edgeHit(x, y, power = 1, axis = 0, color = '#9fd8ff') {
   const e = fx.edges;
-  const p = clamp(power, 0.25, 3);
+  // 0.25..1.5, not ..3: the mark's size follows this, and a body thrown into
+  // a wall at 600 u/s was drawing a bruise a third of the screen tall. The
+  // hardest hit now paints a mark twice the softest one, and no more.
+  const p = clamp(power, 0.25, 1.5);
   /*
    * Merged rather than stacked. A body resting against a wall is clamped every
    * frame, and a round grazing one can ricochet twice inside a step -- without
@@ -199,15 +202,20 @@ export function edgeHit(x, y, power = 1, axis = 0, color = '#9fd8ff') {
    * must never look like.
    */
   for (const m of e) {
-    if (m.axis === axis && Math.abs((axis ? m.x : m.y) - (axis ? x : y)) < 26) {
-      m.life = Math.max(m.life, 0.42);
+    // The same EDGE, not only the same axis: the two side walls share an axis
+    // and a mark on the right was swallowing a fresh one on the left at the
+    // same height, keeping its own x -- the case for it reported one mark at
+    // x 629 for a round that hit the wall at x 0.
+    if (m.axis !== axis || (axis ? m.y !== y : m.x !== x)) continue;
+    if (Math.abs((axis ? m.x : m.y) - (axis ? x : y)) < 26) {
+      m.life = Math.max(m.life, 0.3);
       m.p = Math.max(m.p, p);
       if (axis) m.x = x; else m.y = y;
       return;
     }
   }
   if (e.length > 12) e.shift();
-  e.push({ x, y, axis, p, life: 0.42, max: 0.42, color });
+  e.push({ x, y, axis, p, life: 0.3, max: 0.3, color });
 }
 
 export function spark(x, y, vx, vy, color, life = 0.35, r = 2.2) {
@@ -571,11 +579,20 @@ export function drawFx(ctx) {
    * is a bruise on the air rather than a line -- there is no wall, and the
    * moment this looks like one it has answered the wrong question.
    */
+  /*
+   * SMALL. The first version reached 34 + 26p units into the field and 30 +
+   * 34p either side of the contact, at era 2's scale on top -- a bruise up to
+   * 172 x 406 world units, a third of the screen, in the round's own colour.
+   * Reported, with screenshots, as looking like nothing so much as a fault.
+   * A mark that says "there is a wall here" is a few units of it lighting up
+   * under the thing that touched it and nothing more; anything the eye has to
+   * look AT has already answered the wrong question.
+   */
   for (const m of fx.edges) {
     const t = m.life / m.max;
-    const a = t * t * 0.5;
-    const reach = (34 + m.p * 26) * CFG.scale;
-    const half = (30 + m.p * 34) * CFG.scale;
+    const a = t * t * 0.32;
+    const reach = (7 + m.p * 5) * CFG.scale;
+    const half = (10 + m.p * 9) * CFG.scale;
     ctx.save();
     let g;
     if (m.axis) {
@@ -599,12 +616,21 @@ export function drawFx(ctx) {
       ctx.fillRect(dir > 0 ? m.x : m.x - reach, m.y - half, reach, half * 2);
     }
     // ...and the edge itself, brightest at the point of contact and gone
-    // within a couple of body-widths either side.
-    ctx.strokeStyle = rgba(m.color, a * 1.7);
-    ctx.lineWidth = CFG.hairline * (1.4 + m.p);
+    // within a couple of body-widths either side. Drawn on OUR face of the
+    // line: a stroke is centred on its path, so a line on the edge itself
+    // paints half its width on their side, and the wall is theirs.
+    const lw = CFG.hairline * (1.2 + m.p * 0.6);
+    ctx.strokeStyle = rgba(m.color, a * 1.9);
+    ctx.lineWidth = lw;
     ctx.beginPath();
-    if (m.axis) { ctx.moveTo(m.x - half * 0.6, m.y); ctx.lineTo(m.x + half * 0.6, m.y); }
-    else { ctx.moveTo(m.x, m.y - half * 0.6); ctx.lineTo(m.x, m.y + half * 0.6); }
+    if (m.axis) {
+      ctx.moveTo(m.x - half * 0.6, m.y + lw / 2);
+      ctx.lineTo(m.x + half * 0.6, m.y + lw / 2);
+    } else {
+      const dir = m.x < 1 ? 1 : -1;
+      ctx.moveTo(m.x + dir * lw / 2, m.y - half * 0.6);
+      ctx.lineTo(m.x + dir * lw / 2, m.y + half * 0.6);
+    }
     ctx.stroke();
     ctx.restore();
   }

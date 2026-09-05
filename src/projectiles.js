@@ -6,7 +6,7 @@ import { TAU, rand, spread, rgba, drawGlow, segClosest, drawBolt } from './util.
 import { spark, dot, ring, edgeHit } from './fx.js';
 import { SHARD_R } from './enemies.js';
 import { contactAt } from './physics.js';
-import { wallLine } from './yard.js';
+import { wallLine, shielded } from './yard.js';
 import { audio } from './audio.js';
 
 class Projectile {
@@ -301,7 +301,10 @@ function chainFrom(world, first, hx, hy, jumps) {
         // `spent` for the reason the sweep a hundred lines below this one
         // gives: a boss's frame through its outro is drawn and nothing else.
         // A round could not HIT one and the chain could jump into it.
-        if (e.dead || e.spent || seen.has(e)) continue;
+        // ...and `shielded`: a jump into the yard would land on a body the
+        // guard in `applyDamage` refuses, and still spend the jump, draw the
+        // arc across the wall and mark the body EARTHED.
+        if (e.dead || e.spent || seen.has(e) || shielded(world, e)) continue;
         const d2 = (e.x - x) ** 2 + (e.y - y) ** 2;
         if (d2 < bestD) { bestD = d2; best = e; }
       }

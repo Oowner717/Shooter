@@ -412,8 +412,31 @@ export function drawYard(ctx, world, mood) {
    */
   const lit = a.lit;
   const seg = world.width / lit.length;
-  ctx.lineWidth = hl * 2;
-  ctx.strokeStyle = rgba(mood.line, 0.62);
+  /*
+   * SOLID, from build 260. It was one hairline and a row of chevrons, and with
+   * nothing of ours able to cross it -- rounds stop, blasts stop, beams and
+   * shells are clipped -- a hairline was reading as a guide, not a thing.
+   * A band with a body: a dark fill under the line so it has a thickness, a
+   * bright edge on the near face where everything of ours arrives, and a
+   * short underglow into our half. Still quiet; the chevrons still carry the
+   * direction.
+   */
+  const thick = 6 * k;
+  ctx.fillStyle = rgba(mood.low, 0.9);
+  ctx.fillRect(0, a.wallY - thick, world.width, thick);
+  const under = ctx.createLinearGradient(0, a.wallY, 0, a.wallY + 22 * k);
+  under.addColorStop(0, rgba(mood.line, 0.22));
+  under.addColorStop(1, rgba(mood.line, 0));
+  ctx.fillStyle = under;
+  ctx.fillRect(0, a.wallY, world.width, 22 * k);
+  ctx.lineWidth = hl * 1.4;
+  ctx.strokeStyle = rgba(mood.line, 0.5);
+  ctx.beginPath();
+  ctx.moveTo(0, a.wallY - thick);
+  ctx.lineTo(world.width, a.wallY - thick);
+  ctx.stroke();
+  ctx.lineWidth = hl * 3.2;
+  ctx.strokeStyle = rgba(mood.line, 0.92);
   ctx.beginPath();
   ctx.moveTo(0, a.wallY);
   ctx.lineTo(world.width, a.wallY);

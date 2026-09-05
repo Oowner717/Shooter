@@ -39,7 +39,7 @@ import { registerCodexShape } from './menu.js';
 import { Sandbox } from './sandbox.js';
 import { ledger, soak } from './ledger.js';
 import { updateDummy } from './dummy.js';
-import { syncYard, updateYard, drawYard, lotAt, refuseLot, shielded } from './yard.js';
+import { syncYard, updateYard, drawYard, lotAt, refuseLot, shielded, wallLine } from './yard.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 
@@ -3258,7 +3258,7 @@ export class Game {
      * body, not over them. The rest of the effects stay where they were,
      * after the bodies, because a blast or a beam IS over the field.
      */
-    for (const e of w.effects) if (e.ground) e.draw(ctx, w);
+    this.ours(ctx, () => { for (const e of w.effects) if (e.ground) e.draw(ctx, w); });
 
     // Story sits in the quiet upper band, behind every entity, so it can never
     // hide a target — and never competes with the lever for space.
@@ -3292,8 +3292,10 @@ export class Game {
     // belong on top of the segments they run between.
     if (w.boss) w.boss.draw(ctx, w);
 
-    drawMines(ctx, w);
-    for (const e of w.effects) if (!e.ground) e.draw(ctx, w);
+    this.ours(ctx, () => {
+      drawMines(ctx, w);
+      for (const e of w.effects) if (!e.ground) e.draw(ctx, w);
+    });
 
     this.drawAutoLock(ctx);
     /*
@@ -3362,8 +3364,10 @@ export class Game {
       w.shooter.draw(ctx, w);
     }
     this.drawGlitch(ctx);
-    drawProjectiles(ctx, w);
-    drawFx(ctx);
+    this.ours(ctx, () => {
+      drawProjectiles(ctx, w);
+      drawFx(ctx);
+    });
     this.drawTouchAid(ctx);
 
     if (w.debug.hitboxes) this.drawHitboxes(ctx);
@@ -3533,6 +3537,36 @@ export class Game {
     ctx.restore();
   }
 
+  /**
+   * Draw something of OURS, and none of it past the wall.
+   *
+   * Everything the player owns -- a round, a mine's ring, a blast, a beam, a
+   * shell, a patch, a spark -- is refused by the wall mechanically, and each
+   * of them was still DRAWN across it: PRISM's beams ran up into the yard,
+   * WARD's shell stood over the building, a mine's reach ring sat on their
+   * side. Reported, with screenshots, as the wall not being a wall. One clip
+   * at the call site rather than a wall test inside twenty draw routines: the
+   * mechanism is that nothing of ours can be painted above the line, and a
+   * routine written next year is inside it by existing.
+   *
+   * Theirs is not clipped -- bodies, drops, wreckage, the yard -- because
+   * theirs comes DOWN through it. And the touch aid is not, because a thumb
+   * may point anywhere.
+   *
+   * At era 1 `wallLine` is null and this is a call with nothing round it.
+   */
+  ours(ctx, draw) {
+    const w = this.world;
+    const line = wallLine(w);
+    if (line === null) { draw(); return; }
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-w.width, line, w.width * 3, (w.floorY - line) + 4000);
+    ctx.clip();
+    draw();
+    ctx.restore();
+  }
+
   drawAutoLock(ctx) {
     const e = this.autoLock;
     if (!e || e.dead) return;
@@ -3622,7 +3656,8 @@ export class Game {
      * BRACKET_CORNERS is a module constant.
      */
     const mark = (e) => {
-      if (e.dead || e.spent || e.fizzle) return;
+      // ...and nothing behind the wall, which the freeze does not hold.
+      if (e.dead || e.spent || e.fizzle || shielded(w, e)) return;
       if (e.type && e.type.fixed && !e.isDrop) return; // placed, never steered
       if (e.thrown > 0) return;                        // coasting, not held
       const r = e.r * 1.5;

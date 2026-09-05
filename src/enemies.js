@@ -439,13 +439,29 @@ export class Enemy {
   // ------------------------------------------------------------- behaviour
 
   /** Aimless bodies: a slow random walk with no destination at all. */
+  /**
+   * Whether STASIS has hold of THIS body. `world.stasis` is one global clock
+   * and eleven places in the steering read it; every one of them read it as
+   * "the field is frozen", which at era 2 included everything standing behind
+   * the wall -- so an ability that is refused at the line was holding the
+   * enemy's own yard still. The press already skipped shielded bodies for its
+   * one-off damp (abilities.js); the lasting effect did not. One predicate,
+   * eleven readers, and the next one is inside it by existing.
+   *
+   * At era 1 `shielded` is false on its first property read, so this is the
+   * comparison it always was.
+   */
+  frozen(world) {
+    return world.stasis > 0 && !shielded(world, this);
+  }
+
   wander(world, dt) {
     this.wanderTimer -= dt;
     if (this.wanderTimer <= 0) {
       this.wanderTimer = rand(1.6, 4.2);
       this.wanderAngle += spread(1.9);
     }
-    const slow = world.stasis > 0 ? 0.12 : 1;
+    const slow = this.frozen(world) ? 0.12 : 1;
     let cruise = this.cruise * slow;
     const k = (this.accel / 100) * slow * 0.9;
     let dx = Math.cos(this.wanderAngle);
@@ -474,7 +490,7 @@ export class Enemy {
 
     this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);
     this.vy += (dy * cruise - this.vy) * clamp(k * dt, 0, 1);
-    if (world.stasis > 0) {
+    if (this.frozen(world)) {
       const f = Math.exp(-1.6 * dt);
       this.vx *= f;
       this.vy *= f;
@@ -505,7 +521,7 @@ export class Enemy {
      * on visibly sliding for the whole four seconds. "Objects freeze" is the
      * hint, and it has to be true of every term that moves one.
      */
-    const slow = world.stasis > 0 ? 0.12 : 1;
+    const slow = this.frozen(world) ? 0.12 : 1;
     const left = this.x - this.r;
     const right = world.width - (this.x + this.r);
     const near = Math.min(left, right);
@@ -584,11 +600,11 @@ export class Enemy {
      * the freeze overlay drawing brackets round them as though they were
      * held. Same numbers as `drive`, applied in the same order.
      */
-    const slow = world.stasis > 0 ? 0.12 : 1;
+    const slow = this.frozen(world) ? 0.12 : 1;
     const k = (this.accel / 100) * slow * dt;
     this.vx += ((dx / d) * this.cruise * slow - this.vx) * clamp(k, 0, 1);
     this.vy += ((dy / d) * this.cruise * slow - this.vy) * clamp(k, 0, 1);
-    if (world.stasis > 0) {
+    if (this.frozen(world)) {
       const f = Math.exp(-1.6 * dt);
       this.vx *= f;
       this.vy *= f;
@@ -669,7 +685,7 @@ export class Enemy {
      * thing on the field that can be stopped by pressing a button was the one
      * thing that landed on the mount through it.
      */
-    if (world.stasis > 0) return;
+    if (this.frozen(world)) return;
     this.wind = (this.wind || 0) + dt;
     const spin = clamp(this.wind / H.wind, 0, 1);
     // perpendicular to the cable, so the load comes round rather than in
@@ -870,7 +886,7 @@ export class Enemy {
     dx = Math.cos(ang);
     dy = Math.sin(ang);
 
-    const slow = world.stasis > 0 ? 0.12 : 1;
+    const slow = this.frozen(world) ? 0.12 : 1;
     // Something that has already breached the turret commits to it, so the
     // corruption it causes is always clearable.
     let cruise = this.cruise * slow * (this.attacking ? 1.3 : 1);
@@ -924,7 +940,7 @@ export class Enemy {
     this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);
     this.vy += (dy * cruise - this.vy) * clamp(k * dt, 0, 1);
 
-    if (world.stasis > 0) {
+    if (this.frozen(world)) {
       const f = Math.exp(-1.6 * dt);
       this.vx *= f;
       this.vy *= f;
@@ -933,7 +949,7 @@ export class Enemy {
     // Lurchers shove themselves forward in bursts instead of gliding.
     if (this.type.lurch) {
       this.lurchTimer -= dt;
-      if (this.lurchTimer <= 0 && world.stasis <= 0) {
+      if (this.lurchTimer <= 0 && !this.frozen(world)) {
         this.lurchTimer = rand(1.1, 2.4);
         this.vx += dx * rand(40, 90);
         this.vy += dy * rand(40, 90);
@@ -985,7 +1001,7 @@ export class Enemy {
      */
     const balls = this.graftCount;
     if (balls) {
-      const spin = world.stasis > 0 ? 0.12 : 1;
+      const spin = this.frozen(world) ? 0.12 : 1;
       for (const g of this.grafts) g.a += this.graftSpin * dt * spin;
       if (this.hp < this.maxHp) {
         this.hp = Math.min(this.maxHp, this.hp + CFG.graft.regen * balls * dt);
@@ -1023,7 +1039,7 @@ export class Enemy {
     }
 
     if (this.shards) {
-      const spin = world.stasis > 0 ? 0.12 : 1;
+      const spin = this.frozen(world) ? 0.12 : 1;
       for (const s of this.shards) s.a += this.shardSpin * dt * spin;
     }
 

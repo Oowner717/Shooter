@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P9b (255), builds 256-257's walls, build 258's transformation. The plan's structure is complete; P10 (the reveal pass) is what is left.**
+**Status: P1 (238) - P9b (255), builds 256-260's walls and transformation. The plan's structure is complete; P10 (the reveal pass) is what is left.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -2001,3 +2001,58 @@ arrive inside the second. It counts only while `w.evolve` is set now. The
 camera arms still need the full window, which is why it is 31 seconds.
 
 534 green, hash `-1765830468` before and after in this container.
+
+## 32. Build 260 — the wall is solid, and nothing of ours is drawn past it
+
+Reported with four screenshots: PRISM's beams running up into the yard, WARD's
+shell standing over the building, a mine's reach ring on their side of the
+line, and the wall's own contact marks — "looks like shit". Mechanically the
+wall was already refusing all of it (256, 257). The PICTURE said otherwise, and
+the picture is what a player believes.
+
+**One clip, at the call site.** `Game.ours(ctx, draw)` clips to below
+`wallLine` and every draw of OURS goes through it — ground patches, mines and
+effects, rounds and fx — three scopes in `Game.draw`. Not a wall test inside
+twenty draw routines: the mechanism is that nothing of ours can be PAINTED
+above the line, and a routine written next year is inside it by existing.
+Theirs is not clipped, because theirs comes down through it; the touch aid is
+not, because a thumb may point anywhere. At era 1 `wallLine` is null and it is
+a call with nothing round it. The case floods the whole field through it and
+counts lit pixels either side of the line, then spies `clip` across one real
+frame at each era and requires era 2 to clip exactly three more times — any
+other count is a group left outside.
+
+**The mark was a third of the screen.** `edgeHit` reached 34 + 26p units into
+the field and 30 + 34p either side, times era 2's scale, with p up to 3: a
+bruise up to 172 × 406 world units in the round's own colour. It is 7 + 5p by
+10 + 9p now, p capped at 1.5, alpha peak 0.32, life 0.3s. Measured, the hardest
+mark paints under 60 × 30 world units and none of it above the line. A mark
+that says "there is a wall here" is a few units lighting up under the thing
+that touched it; anything the eye has to look AT has answered the wrong
+question.
+
+**The wall itself has a body now**: a dark 6-unit band under the line, a bright
+near face, a short underglow into our half. With nothing able to cross it a
+hairline was reading as a guide, not a thing.
+
+**Four more things stop at it mechanically**, all from the build-257 audit's
+backlog and each one line: STASIS's HOLD (`Enemy.frozen(world)` replaces the
+eleven raw `world.stasis > 0` reads in the steering — the press already skipped
+shielded bodies, the lasting effect did not, and the brackets in `drawStasis`
+skip them too), ARC's chain (a jump into the yard was refused by the damage
+guard and still spent the jump, drew the arc across the wall and marked the
+body EARTHED), PILE's front (`thrown` is written before the guarded damage
+call), and WARD's surface (the arcs loop eight lines below already had it).
+
+**The MK2, two things.** Its hull plates were stacked with a 0.08 rad twist per
+level — MK1's 0.26 twist is deliberate, MK2's read as a bent machine — and are
+square to the deck now. And the pivot: MK1's port is nine ABSOLUTE units and
+stays so to the digit; on a machine 1.54× deeper that was a dot at the root of
+a barrel three times its width, the one part the barrel turns on and the
+smallest thing on it. MK2's is proportional at 0.30R — an outer race with
+sixteen teeth turning against the barrel, a recessed dish, the iris, and a core
+that glows.
+
+Not done: WARD's surface arm is not in the case. At 320×568 the shell reaches
+231 against a wall 287 out even with WIDEN, so an arm for it would be vacuous
+on every screen — the guard is in and asserted by inspection only.

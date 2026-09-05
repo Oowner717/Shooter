@@ -24,7 +24,7 @@ export const RIG_MAX = 18;
 /** How wide SALVO throws its three. */
 const SALVO_FAN = 0.09;
 import { applyBlast } from './enemies.js';
-import { wallLine } from './yard.js';
+import { wallLine, shielded } from './yard.js';
 import { audio } from './audio.js';
 
 /**
@@ -127,6 +127,10 @@ export class Front {
       // The front has reached it, and had not on the frame before. The body's
       // own radius counts: a BULWARK is met when its edge is met.
       if (d - e.r > rr) continue;
+      // ...and not through the wall. `thrown` is written below BEFORE the
+      // guarded damage call, so a body behind the line was being marked as
+      // struck by a wave that could not reach it.
+      if (shielded(world, e)) continue;
       this.hit.add(e);
       this.cut++;
       // Clamped at BOTH ends: a body on the mount is at `d < r0`, so the raw
@@ -1262,7 +1266,9 @@ export class Shooter {
         // the eye reads first and it should be the lit line, not an inner one.
         ctx.strokeStyle = rgba(last ? RIM : accent, (last ? 0.7 : 0.3) * lit);
         ctx.lineWidth = CFG.hairline * (last ? 2.6 : 2);
-        poly(6, rr, Math.PI / 6 + i * (MK ? 0.08 : 0.26));
+        // MK1's plates are a twisted stack on purpose; MK2's are SQUARE to the
+        // deck, because a machine whose hexagons do not line up reads as bent.
+        poly(6, rr, Math.PI / 6 + i * (MK ? 0 : 0.26));
         ctx.fill();
         ctx.stroke();
       }
@@ -1273,7 +1279,7 @@ export class Shooter {
       ctx.lineWidth = CFG.hairline * 1.8;
       ctx.beginPath();
       for (let k = 0; k < 6; k++) {
-        const a = (k / 6) * TAU + Math.PI / 6 + (g.casing - 1) * (MK ? 0.08 : 0.26);
+        const a = (k / 6) * TAU + Math.PI / 6 + (g.casing - 1) * (MK ? 0 : 0.26);
         const c = Math.cos(a);
         const sn = Math.sin(a);
         const ch = MK ? R * 0.115 : 4;
@@ -1718,28 +1724,87 @@ export class Shooter {
     ctx.restore();
 
     // ---- the core port, recessed in the deck ------------------------------
-    ctx.fillStyle = 'rgba(4,9,15,0.98)';
-    ctx.beginPath();
-    ctx.arc(0, 0, 9, 0, TAU);
-    ctx.fill();
-    ctx.strokeStyle = rgba(accent, 0.55);
-    ctx.lineWidth = CFG.hairline * 1.6;
-    ctx.beginPath();
-    ctx.arc(0, 0, 9, 0, TAU);
-    ctx.stroke();
-    // three iris blades, turning against the bearing
-    ctx.strokeStyle = rgba(accent, 0.6);
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    for (let i = 0; i < 3; i++) {
-      const a = -this.spin * 0.7 + (i / 3) * TAU;
-      ctx.arc(0, 0, 6.2, a, a + 0.7);
+    /*
+     * MK1's port is ABSOLUTE -- 9, 6.2 and 3 units -- and stays so, to the
+     * digit. MK2's is proportional, because the same nine units on a machine
+     * 1.54x deeper was a dot at the root of a barrel three times its width:
+     * the one part of the machine the barrel turns ON, and the smallest thing
+     * on it. It is a bearing now -- an outer race with a ring of teeth, a
+     * recessed dish, the iris, and a core that glows -- at about a third of
+     * the deck.
+     */
+    if (MK) {
+      const pr = R * 0.30;
+      // the race, with its teeth turning against the barrel
+      ctx.fillStyle = 'rgb(4,9,15)';
+      ctx.beginPath();
+      ctx.arc(0, 0, pr, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = rgba(RIM, 0.55);
+      ctx.lineWidth = CFG.hairline * 2.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, pr, 0, TAU);
+      ctx.stroke();
+      ctx.strokeStyle = rgba(accent, 0.5);
+      ctx.lineWidth = CFG.hairline * 1.6;
+      ctx.beginPath();
+      for (let k = 0; k < 16; k++) {
+        const a = this.spin * 0.35 + (k / 16) * TAU;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        ctx.moveTo(c * pr * 0.80, sn * pr * 0.80);
+        ctx.lineTo(c * pr * 0.94, sn * pr * 0.94);
+      }
+      ctx.stroke();
+      // the dish
+      ctx.strokeStyle = rgba(accent, 0.7);
+      ctx.lineWidth = CFG.hairline * 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, pr * 0.66, 0, TAU);
+      ctx.stroke();
+      // three iris blades, turning against the bearing
+      ctx.strokeStyle = rgba(RIM, 0.75);
+      ctx.lineWidth = CFG.hairline * 2.6;
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const a = -this.spin * 0.7 + (i / 3) * TAU;
+        ctx.arc(0, 0, pr * 0.46, a, a + 0.8);
+      }
+      ctx.stroke();
+      // ...and the core, lit
+      const hot = this.heat > 0.35 ? '#ffd6a0' : accent;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      drawGlow(ctx, hot, 0, 0, pr * (0.9 + this.recoil * 0.5), 0.35 + this.heat * 0.4);
+      ctx.restore();
+      ctx.fillStyle = rgba(hot, 0.75 + this.heat * 0.25);
+      ctx.beginPath();
+      ctx.arc(0, 0, pr * (0.22 + this.recoil * 0.12), 0, TAU);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = 'rgba(4,9,15,0.98)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 9, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = rgba(accent, 0.55);
+      ctx.lineWidth = CFG.hairline * 1.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, 9, 0, TAU);
+      ctx.stroke();
+      // three iris blades, turning against the bearing
+      ctx.strokeStyle = rgba(accent, 0.6);
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const a = -this.spin * 0.7 + (i / 3) * TAU;
+        ctx.arc(0, 0, 6.2, a, a + 0.7);
+      }
+      ctx.stroke();
+      ctx.fillStyle = rgba(this.heat > 0.35 ? '#ffd6a0' : accent, 0.55 + this.heat * 0.4);
+      ctx.beginPath();
+      ctx.arc(0, 0, 3 + this.recoil * 1.6, 0, TAU);
+      ctx.fill();
     }
-    ctx.stroke();
-    ctx.fillStyle = rgba(this.heat > 0.35 ? '#ffd6a0' : accent, 0.55 + this.heat * 0.4);
-    ctx.beginPath();
-    ctx.arc(0, 0, 3 + this.recoil * 1.6, 0, TAU);
-    ctx.fill();
 
     /*
      * Breached, and only then, the machine is lit from outside. It is the one

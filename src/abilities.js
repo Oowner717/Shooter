@@ -739,6 +739,9 @@ class Ward {
        * or cashed in. `harmless` keeps grey grey.
        */
       if (e.dead || e.harmless || e.staged || e.spent || e.fizzle) continue;
+      // ...and the wall, which the arcs loop below already honours: a shell
+      // that reaches the line must not report cutting what is behind it.
+      if (shielded(world, e)) continue;
       const dx = e.x - s.x;
       const dy = e.y - s.y;
       const d = Math.hypot(dx, dy) || 1;

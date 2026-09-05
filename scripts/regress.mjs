@@ -18323,13 +18323,30 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     };
 
     // ---- era 1: the sides light, and nothing else does -------------------
+    /*
+     * Read on the FRAME the mark appears, not after the round is gone. A
+     * stock round ricochets once, so it meets the left wall at frame 2 and the
+     * right wall at frame 26 -- and the first version of this read `fx.edges`
+     * after thirty frames, by which time the left mark had expired and the
+     * right one stood alone. It passed until build 260 only because the
+     * emitter then merged marks across the two side walls and kept the first
+     * one's x: a stale mark, held at the right answer by a bug.
+     */
     clean(1);
     let sideBursts = 0;
     fire(w, 40, w.floorY - 300, Math.PI, { burst: () => { sideBursts++; } });
-    for (let i = 0; i < 30 && w.projectiles.length; i++) g.update(1 / 60);
-    out.sideMarks = fx.edges.length;
-    out.sideAxis = fx.edges[0] ? fx.edges[0].axis : null;
-    out.sideX = fx.edges[0] ? +fx.edges[0].x.toFixed(1) : null;
+    let sideMarks = 0; let sideAxis = null; let sideX = null;
+    for (let i = 0; i < 30 && w.projectiles.length; i++) {
+      g.update(1 / 60);
+      if (fx.edges.length && sideX === null) {
+        sideMarks = fx.edges.length;
+        sideAxis = fx.edges[0].axis;
+        sideX = +fx.edges[0].x.toFixed(1);
+      }
+    }
+    out.sideMarks = sideMarks;
+    out.sideAxis = sideAxis;
+    out.sideX = sideX;
 
     // ...and it is a bruise, not paint: gone inside a second.
     for (let i = 0; i < 60; i++) g.update(1 / 60);
@@ -20250,6 +20267,240 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `(range ${r.asked[0] && r.asked[0].range}, cache `
     + `${r.asked[0] && r.asked[0].store}); a second one inside the window is `
     + `held off ${r.throttled}`);
+}
+
+// --- the wall is solid, and nothing of ours is drawn past it ----------------
+/*
+ * Reported, with four screenshots: PRISM's beams running up into the yard,
+ * WARD's shell standing over the building, a mine's reach ring sitting on
+ * their side of the line, and the wall's own contact marks -- a bruise up to
+ * 172 x 406 world units at era 2, in the round's colour -- "looking like a
+ * fault". Mechanically the wall was already refusing all of it; the picture
+ * said otherwise, and the picture is what a player believes.
+ *
+ * Two mechanisms and a size, and the first is the one that matters:
+ * `Game.ours` clips every draw of OURS -- mines, effects, rounds, fx -- to
+ * below the line, at the call site, so a routine written next year is inside
+ * it by existing. Theirs is not clipped, because theirs comes down through
+ * it. The second is that four more things now stop at it mechanically --
+ * STASIS's hold, ARC's chain, PILE's front, WARD's surface. And the mark is
+ * a few units of edge lighting up rather than a third of the screen.
+ */
+{
+  const held = page.viewportSize();
+  await page.setViewportSize({ width: 320, height: 568 });
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { fx, edgeHit, drawFx } = await import('../src/fx.js');
+    const { shielded } = await import('../src/yard.js');
+    const { ABILITIES } = await import('../src/abilities.js');
+    const { Front } = await import('../src/shooter.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const clean = (era) => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(400000);
+      g.setEra(era);
+      w.director.update = () => {};
+      g.debugClearField();
+      w.mines.length = 0;
+      w.projectiles.length = 0;
+      w.effects.length = 0;
+      fx.edges.length = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+    };
+    const body = (id, x, y) => {
+      const e = g.debugSpawn(id, x, y);
+      e.staged = false;
+      e.traits = null;
+      e.plateT = 0;
+      return e;
+    };
+    const lit = (d, W, y0, y1) => {
+      let n = 0;
+      for (let y = Math.max(0, y0); y < y1; y++) {
+        for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 8) n++;
+      }
+      return n;
+    };
+
+    // ---- the clip: nothing of ours above the line, all of it below ---------
+    clean(2);
+    const a = w.yard;
+    out.wallY = +a.wallY.toFixed(1);
+    const kk = 0.5;
+    const oc = document.createElement('canvas');
+    oc.width = Math.ceil(w.width * kk);
+    oc.height = Math.ceil((w.floorY + 40) * kk);
+    const oct = oc.getContext('2d', { willReadFrequently: true });
+    const wallRow = Math.floor(a.wallY * kk);
+    const paint = (fn) => {
+      oct.setTransform(1, 0, 0, 1, 0, 0);
+      oct.clearRect(0, 0, oc.width, oc.height);
+      oct.setTransform(kk, 0, 0, kk, 0, 0);
+      fn(oct);
+      oct.setTransform(1, 0, 0, 1, 0, 0);
+      return oct.getImageData(0, 0, oc.width, oc.height).data;
+    };
+    // A PULSE-sized ring across the whole field, drawn through `ours`.
+    const flood = (c) => { c.fillStyle = '#ffffff'; c.fillRect(-100, -100, w.width + 200, w.floorY + 200); };
+    const clipped = paint((c) => g.ours(c, () => flood(c)));
+    out.above = lit(clipped, oc.width, 0, wallRow - 1);
+    out.below = lit(clipped, oc.width, wallRow + 2, oc.height);
+    // ...and the same flood at era 1 is not clipped at all.
+    g.setEra(1);
+    const open = paint((c) => g.ours(c, () => flood(c)));
+    out.openAbove = lit(open, oc.width, 0, wallRow - 1);
+    g.setEra(2);
+
+    /*
+     * ...and `Game.draw` actually goes through it. A spy on the prototype's
+     * `clip`, counted across one frame at each era: era 2 has to clip exactly
+     * three more times than era 1 (ground effects; mines and effects; rounds
+     * and fx), and any other count means a group was left outside.
+     */
+    const proto = CanvasRenderingContext2D.prototype;
+    const realClip = proto.clip;
+    let clips = 0;
+    proto.clip = function (...args) { clips++; return realClip.apply(this, args); };
+    clean(1); g.draw(); const clipsOne = clips;
+    clips = 0;
+    clean(2); g.draw(); const clipsTwo = clips;
+    proto.clip = realClip;
+    out.clipsOne = clipsOne;
+    out.clipsTwo = clipsTwo;
+
+    // ---- the mark is small ------------------------------------------------
+    clean(2);
+    edgeHit(w.width / 2, a.wallY, 1.5, 1, '#ff9f5c');
+    const mk = paint((c) => drawFx(c));
+    let minX = 1e9, maxX = -1, minY = 1e9, maxY = -1;
+    for (let y = 0; y < oc.height; y++) {
+      for (let x = 0; x < oc.width; x++) {
+        if (mk[(y * oc.width + x) * 4 + 3] > 8) {
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+      }
+    }
+    out.mark = maxX < 0 ? null : {
+      w: +((maxX - minX + 1) / kk / CFG.scale).toFixed(1),
+      h: +((maxY - minY + 1) / kk / CFG.scale).toFixed(1),
+      above: +((a.wallY - minY / kk)).toFixed(1),
+    };
+
+    // ---- STASIS does not hold what is behind the wall -----------------------
+    clean(2);
+    const y2 = w.yard;
+    const safe = body('lurcher', w.shooter.x - 100, y2.wallY - 24 - 30);
+    const near = body('lurcher', w.shooter.x + 100, y2.wallY + 90);
+    out.safeShielded = shielded(w, safe);
+    out.nearOpen = !shielded(w, near);
+    ABILITIES.find((ab) => ab.id === 'stasis').run(w);
+    const sy = safe.y;
+    const ny = near.y;
+    for (let i = 0; i < 90; i++) {
+      g.update(1 / 60);
+      safe.y = sy;
+      near.y = ny;
+    }
+    out.stasisOn = w.stasis > 0;
+    out.safeSpeed = +Math.hypot(safe.vx, safe.vy).toFixed(1);
+    out.nearSpeed = +Math.hypot(near.vx, near.vy).toFixed(1);
+    out.cruise = +safe.cruise.toFixed(1);
+
+    // ---- ARC's chain does not jump across it -----------------------------
+    clean(2);
+    const y3 = w.yard;
+    const legal = body('lurcher', w.shooter.x, y3.wallY + 70);
+    const hidden = body('lurcher', w.shooter.x + 40, y3.wallY - 24 - 12);
+    out.hiddenShielded = shielded(w, hidden);
+    out.hiddenNear = Math.hypot(hidden.x - legal.x, hidden.y - legal.y)
+      < CFG.rounds.arc.jumpRange * w.up.arcRange;
+    w.round = 'arc';
+    const s = w.shooter;
+    s.aimAt(legal.x, legal.y, false);
+    s.aim = s.targetAim;
+    s.heat = 0;
+    let shot = false;
+    for (let i = 0; i < 20 && !shot; i++) shot = s.shoot(w);
+    for (let i = 0; i < 90; i++) g.update(1 / 60);
+    out.arcShot = shot;
+    out.legalHit = legal.lastHit || null;
+    out.hiddenHit = hidden.lastHit || null;
+    out.arcsOver = w.effects.filter((e) => e.constructor && e.constructor.name === 'Arc'
+      && Math.min(e.y0 ?? 1e9, e.y1 ?? 1e9) < y3.wallY).length;
+
+    // ---- PILE's front stops at it ----------------------------------------
+    /*
+     * PILE is a TURRET node, not an ability: its front is launched by the
+     * shooter off `world.pileT`. The guard under test is inside `Front.update`,
+     * so the front is pushed directly at its top level -- the trigger is not
+     * what is being asked about. 320x568 on purpose: the wall is 287 above the
+     * machine there and the level-3 front reaches 369, so the front actually
+     * meets it; on the tall screen it never does and the arm asks nothing.
+     */
+    clean(2);
+    const y4 = w.yard;
+    const struck = body('lurcher', w.shooter.x, y4.wallY - 24 - 10);
+    const open2 = body('lurcher', w.shooter.x + 60, y4.wallY + 60);
+    out.pileReach = +(CFG.pile.r[2]).toFixed(0);
+    out.pileToWall = +(w.shooter.y - y4.wallY).toFixed(0);
+    struck.thrown = 0; open2.thrown = 0;
+    w.effects.push(new Front(w.shooter.x, w.shooter.y, 3));
+    const sx4 = struck.y; const ox4 = open2.y;
+    // The PEAK, not the end: `thrown` is a 0.5s clock that runs down every
+    // frame, so a body struck on frame 20 reads 0 again by frame 60 -- the
+    // first version read both bodies at 0 and could not tell struck from
+    // spared.
+    let struckPeak = 0; let openPeak = 0;
+    for (let i = 0; i < 60; i++) {
+      g.update(1 / 60);
+      struck.y = sx4; open2.y = ox4;
+      struckPeak = Math.max(struckPeak, struck.thrown || 0);
+      openPeak = Math.max(openPeak, open2.thrown || 0);
+    }
+    out.struckThrown = +struckPeak.toFixed(2);
+    out.openThrown = +openPeak.toFixed(2);
+
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+  await page.setViewportSize(held);
+
+  check('nothing of ours is drawn past the wall, and all of it is drawn below',
+    r.above === 0 && r.below > 1000 && r.openAbove > 1000
+    && r.clipsTwo === r.clipsOne + 3,
+    `a field-wide fill through Game.ours lit ${r.above} pixels above the wall and `
+    + `${r.below} below at era 2, and ${r.openAbove} above at era 1 where there `
+    + `is no wall; a frame clips ${r.clipsOne} times at era 1 and ${r.clipsTwo} `
+    + `at era 2`);
+
+  check('...and the contact mark is a few units, not a third of the screen',
+    r.mark && r.mark.w < 60 && r.mark.h < 30 && r.mark.above < 4,
+    `the hardest mark paints ${r.mark && r.mark.w} x ${r.mark && r.mark.h} world `
+    + `units, ${r.mark && r.mark.above} of it above the line`);
+
+  check('...and STASIS, ARC and PILE all stop at it too',
+    r.safeShielded && r.nearOpen && r.stasisOn
+    && r.safeSpeed > r.cruise * 0.6 && r.nearSpeed < r.cruise * 0.3
+    && r.arcShot && r.legalHit === 'arc' && r.hiddenHit === null && r.arcsOver === 0
+    && r.hiddenShielded && r.hiddenNear
+    && r.pileReach > r.pileToWall && r.struckThrown === 0 && r.openThrown > 0,
+    `under STASIS a body behind the wall runs at ${r.safeSpeed} of ${r.cruise} `
+    + `while one below it is held at ${r.nearSpeed}; ARC earthed the body it hit `
+    + `(${r.legalHit}) and not the one behind the wall (${r.hiddenHit}), with `
+    + `${r.arcsOver} arcs drawn over it; PILE's front reaches ${r.pileReach} `
+    + `against a wall ${r.pileToWall} out and marked the body behind it `
+    + `${r.struckThrown} and the one below ${r.openThrown}`);
 }
 
 // --- the door: what NEW FORM costs and what it needs ------------------------
