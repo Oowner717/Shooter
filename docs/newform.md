@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P8b (250) shipped. P8c (audio, the banner, the smoke arm) is next.**
+**Status: P1 (238) - P8c pt.1 (251) shipped. The audio decision is open; P9 (the door) is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -1406,3 +1406,43 @@ Four cases, 507 green over three consecutive runs, hash `-1765830468` unmoved.
 **P8c owns**: audio (the longest cue in the game is 270ms and `boom()` is
 ungated, so act I would be forty overlapping detonations if it used what
 exists), the banner that starts it, and `smoke.mjs`'s era-2 arm.
+
+## 24. P8c part one, as built (build 251)
+
+**`smoke.mjs` can leave era 1.** It is the repo's only screenshotting probe and
+it could not, which meant the new field — the building, the wall, the six lots
+and the MK2 — had never been photographed by the game's own instrument, only by
+throwaway probes that died with the session.
+
+It buys the machine, presses the evolution, runs the **first seconds under the
+real frame loop** (t=6.7, act 1, view 0.889 — that is what a smoke test is
+for), then steps the remainder by hand rather than spending thirty wall-clock
+seconds, and shoots the arrival. And it **asserts**: era 2, camera 1, phase
+staging, `evolve` null, a yard with six lots, `shooter.r === 40` — pushed onto
+`errors`, so the exit code carries it. This file's own comment is about a
+readout that went wrong and stayed green for fifty-three builds; a screenshot
+with nothing behind it is that again.
+
+**The glitch is off for the animation, which was an explicit requirement and
+was not met.** `Director.douse()` puts out the FUSE; `glitch` is the shader the
+fuse drives, and it decays over seconds — so entering the evolution off a
+breached turret carried a screenful of tearing into act I, whose whole point is
+that the field is already gone. `beginEvolve` resets the shader and clears
+`world.shock`.
+
+**A note I nearly wrote the wrong way round.** The captions in the smoke shots
+come out scrambled, and the obvious reading is that the glitch is tearing them.
+It is not: `Narrator.draw` scrambles a line on its way OUT by design
+(`narrative.js:150`), so a caption caught mid-fade is *meant* to look like
+that. I had already written the docstring blaming the glitch before checking.
+The fix is right for its own reason; the reason I first gave for it was wrong.
+
+507 green, hash `-1765830468` unmoved.
+
+### Open: the audio
+
+Still unanswered, and it is a real decision rather than a task: the longest cue
+in the game is 270ms, `boom()` is ungated, and the plan says P8 "owns a track or
+says it has none". A survey and design pass is running; whatever it concludes —
+including a reasoned refusal — belongs here as a decision with its reasons, not
+as a silent omission.

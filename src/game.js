@@ -936,6 +936,21 @@ export class Game {
     // The fuse is doused and stays doused: `Director.update` is not reached at
     // all in this phase, but the fuse it had is still lit until it is told.
     w.director.douse();
+    /*
+     * ...and the corruption itself, which `douse` does not touch: `douse` puts
+     * the FUSE out and `glitch` is the shader the fuse drives. The requirement
+     * is that the glitch is off for the animation, and entering the evolution
+     * off a breached turret otherwise carries a screenful of tearing into
+     * act I -- `settle` decays it over seconds, and the whole point of act I
+     * is that the field is already gone.
+     *
+     * NOTE, because it was nearly written down the other way: the scrambled
+     * captions in a smoke shot are NOT this. `Narrator.draw` scrambles a line
+     * on its way OUT by design (narrative.js:150), so a caption caught
+     * mid-fade is meant to look like that.
+     */
+    glitch.reset();
+    w.shock = 0;
     this.hud.clearAlerts();
     return true;
   }

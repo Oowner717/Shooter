@@ -198,6 +198,63 @@ await sleep(1800);
 await page.screenshot({ path: `${SHOTS}/10-restart.png` });
 
 /*
+ * ---- the evolution, and the field on the other side of it ----------------
+ *
+ * This probe could not leave era 1 until build 251, which meant the NEW FIELD
+ * -- the building, the wall, the six lots and the MK2 -- had never been
+ * photographed by the game's own instrument, only by throwaway probes.
+ *
+ * It runs the first seconds under the REAL frame loop, because that is what a
+ * smoke test is for, and then steps the remainder by hand rather than spending
+ * thirty wall-clock seconds inside a probe that already takes a minute.
+ *
+ * And it ASSERTS. This file's own comment two paragraphs down is about a
+ * readout that went wrong and stayed green for fifty-three builds; a
+ * screenshot with nothing behind it is that again.
+ */
+// The machine has to be BUILT for the unmaking to have anything to take
+// apart -- eighteen sockets in ledger order, and a bare turret sheds nothing.
+await page.evaluate(() => {
+  const g = window.__sim;
+  g.debugGiveEnergy(400000);
+  g.debugBuyAll();
+  g.debugEvolve();
+});
+await sleep(2500);
+await page.screenshot({ path: `${SHOTS}/11-evolve-field-taken.png` });
+await sleep(3500);
+await page.screenshot({ path: `${SHOTS}/12-evolve-approach.png` });
+const evoMid = await page.evaluate(() => {
+  const w = window.__sim.world;
+  return w.evolve ? { t: +w.evolve.t.toFixed(1), act: w.evolve.act, phase: w.phase,
+    view: +(w.scale * w.camera).toFixed(3) } : null;
+});
+// ...the rest by hand, so this does not cost thirty seconds of wall clock.
+await page.evaluate(() => {
+  const g = window.__sim;
+  const E = 60 * 40;
+  for (let i = 0; i < E && g.world.evolve; i++) g.update(1 / 60);
+  g.draw();
+});
+await sleep(1600);
+await page.screenshot({ path: `${SHOTS}/13-new-field.png` });
+const evoEnd = await page.evaluate(() => {
+  const w = window.__sim.world;
+  return { era: w.era, camera: w.camera, phase: w.phase, evolve: w.evolve,
+    yard: !!w.yard, lots: w.yard ? w.yard.lots.length : 0, r: w.shooter.r,
+    zoom: +(w.scale).toFixed(3) };
+});
+if (!evoMid || evoMid.phase !== 'evolve') {
+  errors.push(`the evolution did not run under the frame loop: ${JSON.stringify(evoMid)}`);
+}
+if (evoEnd.era !== 2 || evoEnd.camera !== 1 || evoEnd.phase !== 'staging'
+  || evoEnd.evolve !== null || !evoEnd.yard || evoEnd.lots !== 6 || evoEnd.r !== 40) {
+  errors.push(`the new field is not what it should be: ${JSON.stringify(evoEnd)}`);
+}
+console.log('evolution, mid-run:', JSON.stringify(evoMid));
+console.log('the new field:', JSON.stringify(evoEnd));
+
+/*
  * Read off the world rather than off a chip. The FIELD readout this used to
  * scrape became the ladder's control in build 177 -- and a phase check that
  * depends on a particular element existing was only ever testing the markup.
