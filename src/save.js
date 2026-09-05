@@ -199,6 +199,13 @@ export function captureRun(world, game) {
     // Which bosses have ever been broken. Progression -- it is what unseals
     // the next slot -- so it is recorded rather than recomputed.
     reconciled: [...world.reconciled],
+    /*
+     * The era, from build 253 and not before. It was deliberately absent while
+     * the only way to reach era 2 was a debug stepper: writing an unfinished
+     * era to disk would have stranded a run in one across every reload. Now
+     * that it is bought and paid for it is part of the run.
+     */
+    era: world.era,
     // ...and the same for what a boss left. Both are held counts that go
     // down again, which the ledger has no way of recording.
     remainder: world.remainder | 0,

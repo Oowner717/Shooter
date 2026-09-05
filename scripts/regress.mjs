@@ -547,6 +547,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
+    // UNCHANGED at build 253, and that is the interesting part. NEW FORM
+    // stopped being a `repeat` node and took `levels: 1`, which would have put
+    // this at 137 -- except that `debugBuyAll` was granting it, which is the
+    // fault that change exposed: the loop calls `apply` and pushes the ledger
+    // directly, never consulting `available()` and never spending the
+    // currency, so MAX UPGRADES was handing out a seven-REMAINDER gated
+    // transformation for free and saying "+N upgrades" while it did. It skips
+    // anything gated or on its own currency now, so the readout is 136 for the
+    // same reason it always was. It has been
     // 136 since build 232, when SANDBOX went in at one level -- the tree's
     // one node that is not an upgrade to anything, and sits beside RECAST
     // above the four categories for the same reason. It was
@@ -1779,12 +1788,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.restart();
     return out;
   });
-  check('ORDINAL leaves one REMAINDER, and RECAST is the only thing that spends it',
-    r.cantYet === 'poor' && r.held === 1 && /REMAINDER/.test(r.said) && r.bought === 'ok'
-    && r.spent === 0 && r.again === 'poor' && r.energyKept,
-    `before ${r.before} (buy: ${r.cantYet}), after the death ${r.held} held, `
-    + `buy: ${r.bought} -> ${r.spent} held, again: ${r.again}, energy untouched ${r.energyKept}; `
-    + `said "${r.said}"`);
+  /*
+   * One per anomaly, and NEW FORM costs seven -- so a single ORDINAL leaves
+   * you a seventh of the way and the tree says `locked`, not `poor`. That is
+   * the price ruling working: it cannot be farmed, cannot be saved up early,
+   * and cannot be paid in the currency everything else takes.
+   */
+  check('ORDINAL leaves one REMAINDER, and one is not a NEW FORM',
+    r.cantYet === 'locked' && r.held === 1 && /REMAINDER/.test(r.said)
+    && r.bought === 'locked' && r.spent === 1 && r.again === 'locked' && r.energyKept,
+    `before ${r.before} (buy: ${r.cantYet}), after the death ${r.held} held of the `
+    + `seven it takes, buy: ${r.bought} -> ${r.spent} still held, again: `
+    + `${r.again}, energy untouched ${r.energyKept}; said "${r.said}"`);
 }
 
 // --- what ORDINAL leaves behind ---------------------------------------------
@@ -15818,12 +15833,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * SANDBOX added a node of one level.
    */
   /*
-   * `repeats` was 8 until build 227 -- the seven APERTUREs plus RECAST -- and
-   * is 1 now: the ways in are given at a rung rather than sold as repeatable
-   * nodes, so RECAST is the only thing left in the tree with no ceiling.
+   * `repeats` was 8 until build 227 -- the seven APERTUREs plus RECAST -- then
+   * 1, and is 0 from build 253: NEW FORM stopped being repeatable when it
+   * stopped doing nothing. There is one of it and you buy it once, so it
+   * carries `levels: 1` like everything else, and the two had to move together
+   * -- `levelsOf` returns Infinity for a repeat node before it ever reaches
+   * the mandatory-levels throw, so a level count beside a `repeat` is dead
+   * text. 108 across 54 became 109 across 55.
    */
   check('...and writing the numbers out changed no ladder',
-    r.total === 108 && r.rungs === 54 && r.repeats === 1,
+    r.total === 109 && r.rungs === 55 && r.repeats === 0,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
     + `now written out, which has to be a refactor and nothing else)`);
@@ -17306,18 +17325,40 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.phase = 'staging';
     g.setEra(2);
     const file = captureRun(w, g);
+    /*
+     * ...and actually WRITTEN. `captureRun` builds the object; `checkpoint` is
+     * what puts it on disk and `resume` reads the disk, so without this the
+     * case reloaded whatever an earlier case had left there and reported the
+     * era not surviving a trip it never took.
+     */
+    g.checkpoint();
     const out = { wrote: !!file, inSave: file ? 'era' in file : true, era: w.era };
     // ...and through the real door, not by poking the field back.
     g.resume();
     out.afterReload = g.world.era;
+    // ...and the SCALE with it: `reset()` puts the world at era 1 and the
+    // restore sets the era back, and nothing between them re-derives the
+    // geometry. `setEra` cannot do it -- the world is already at the era it
+    // needs to be at, and it refuses.
+    out.scaleBack = +g.world.scale.toFixed(3);
     g.restart();
     return out;
   });
 
-  check('era 2 is reachable from the debug panel and does not survive a reload',
-    r.wrote && r.inSave === false && r.era === 2 && r.afterReload === 1,
-    `the save was written ${r.wrote} and does not carry the era ${!r.inSave}; `
-    + `set to ${r.era}, and a restore comes back at ${r.afterReload}`);
+  /*
+   * INVERTED at build 253, and the inversion is the phase. While the only way
+   * to reach era 2 was a debug stepper, writing the era to disk would have
+   * stranded a run in an unfinished one across every reload -- so the case
+   * asserted it did NOT carry, and that was right for two dozen builds. Now it
+   * is bought and paid for, so it is part of the run and must survive.
+   */
+  check('era 2 is bought, so it survives a reload',
+    r.wrote && r.inSave === true && r.era === 2 && r.afterReload === 2
+    && r.scaleBack === 0.403,
+    `the save was written ${r.wrote} and carries the era ${r.inSave}; set to `
+    + `${r.era}, a restore comes back at ${r.afterReload} with the field at `
+    + `${r.scaleBack} — the geometry has to follow it through the door, not a `
+    + `frame later`);
 }
 
 // --- the camera, and the two things every drawn frame rests on --------------
@@ -19066,8 +19107,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // Arguments, not call names: a spy that counted calls would pass against a
     // sheet that played the acts backwards.
     out.said = said;
-    out.voices = voices.length;
-    out.voice = voices[0] || null;
+    /*
+     * The SPARK, not every sound. Other cues legitimately fire across thirty
+     * seconds and their frequencies vary run to run; what must be exactly one
+     * is the ignition. A missing spark reads 0 here and a doubled one reads 2,
+     * so the claim is no weaker for being specific.
+     */
+    const sparks = voices.filter((v) => v && v.type === CFG.evolve.spark.type
+      && v.f0 === CFG.evolve.spark.f0);
+    out.voices = sparks.length;
+    out.voice = sparks[0] || null;
+    out.others = voices.length - sparks.length;
 
     const bed = CFG.evolve.bed;
     // The six rows, in order, each with its time constant.
@@ -19144,7 +19194,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('...and the ignition has exactly one voice, pitched to be heard',
     r.voices === 1 && r.voice && r.voice.type === 'triangle'
     && r.voice.f0 === 132 && r.voice.f1 === 66,
-    `${r.voices} voice in the whole thirty seconds: `
+    `${r.voices} spark in the whole thirty seconds (${r.others} other cues): `
     + `${r.voice && r.voice.type} ${r.voice && r.voice.f0} -> ${r.voice && r.voice.f1}`);
 
   check('...and the last act leaves the room where era 2 lives',
@@ -19164,6 +19214,112 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `six seconds in it was running (${r.midRun}); after a restart it is gone `
     + `${r.afterRestart}, and forty seconds later the fresh run is still era 1 `
     + `${r.stillEraOne}`);
+}
+
+// --- the door: what NEW FORM costs and what it needs ------------------------
+/*
+ * P9a. The price is seven REMAINDERs and no energy — one per anomaly, so the
+ * price IS the ladder — and the gate is "every anomaly reconciled, and the
+ * machine finished". Neither is a rung and neither is a parent, which is why
+ * `needs` had to become a predicate: the `needs` build 228 deleted was a node
+ * id, and no position in the tree can express this.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { NODE_BY_ID } = await import('../src/tree.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    const n = NODE_BY_ID.get('recast');
+
+    // The id NEVER changes: a saved run writes bought ids into `world.ledger`,
+    // so renaming it takes a paid-for node away from everyone who has it.
+    out.id = n && n.id;
+    out.name = n && n.name;
+    out.levels = n && n.levels;
+    out.repeat = n && n.repeat;
+    out.currency = n && n.currency;
+    out.cost = n && n.cost;
+    out.hasGate = !!(n && n.needs);
+
+    const arm = () => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(400000);
+    };
+
+    // ---- nothing, then each half of the gate on its own -------------------
+    arm();
+    w.remainder = 99;
+    out.bare = g.buy('recast');                    // no machine, no anomalies
+    out.rigDoneBare = g.rigDone();
+
+    arm();
+    w.remainder = 99;
+    g.debugBuyAll();
+    out.rigDoneFull = g.rigDone();
+    out.machineOnly = g.buy('recast');             // machine finished, no anomalies
+
+    arm();
+    w.remainder = 99;
+    w.reconciled = [1, 2, 3, 4, 5, 6, 7];
+    out.anomaliesOnly = g.buy('recast');           // anomalies, no machine
+
+    // ...and six anomalies is not seven.
+    arm();
+    w.remainder = 99;
+    g.debugBuyAll();
+    w.reconciled = [1, 2, 3, 4, 5, 6];
+    out.sixOfSeven = g.buy('recast');
+
+    // ---- both halves, and the right currency ------------------------------
+    arm();
+    g.debugBuyAll();
+    w.reconciled = [1, 2, 3, 4, 5, 6, 7];
+    w.remainder = CFG.ordinal.recast - 1;
+    const purse = w.energy;
+    out.oneShort = g.buy('recast');                // gate met, price not
+    w.remainder = CFG.ordinal.recast;
+    out.bought = g.buy('recast');
+    out.paidRemainders = w.remainder;
+    out.energyUntouched = w.energy === purse;
+    out.armed = w.newForm;
+    out.owned = g.owned('recast');
+    out.again = g.buy('recast');                   // one level, and one only
+
+    delete w.director.update;
+    g.restart();
+    return out;
+  });
+
+  check('NEW FORM keeps its id, costs seven REMAINDERs and no energy',
+    r.id === 'recast' && r.name === 'NEW FORM' && r.levels === 1 && r.repeat === false
+    && r.currency === 'remainder' && r.cost === 7 && r.hasGate
+    && r.oneShort === 'poor' && r.bought === 'ok' && r.paidRemainders === 0
+    && r.energyUntouched && r.owned === 1 && r.again === 'maxed',
+    `id ${r.id} (never renamed), shown as ${r.name}, ${r.levels} level, repeat `
+    + `${r.repeat}, ${r.cost} ${r.currency}s; six is ${r.oneShort}, seven is `
+    + `${r.bought} leaving ${r.paidRemainders}, the purse untouched `
+    + `${r.energyUntouched}, and a second buy is ${r.again}`);
+
+  /*
+   * ...and the gate, both halves, each shown to refuse ON ITS OWN. A gate that
+   * is only ever tested with both halves missing cannot tell an AND from an OR.
+   */
+  check('...and it cannot be reached early, by either half alone',
+    r.bare === 'locked' && r.machineOnly === 'locked' && r.anomaliesOnly === 'locked'
+    && r.sixOfSeven === 'locked' && r.rigDoneBare === false && r.rigDoneFull === true,
+    `nothing: ${r.bare}; the machine finished but no anomalies: ${r.machineOnly}; `
+    + `all seven anomalies but a bare machine: ${r.anomaliesOnly}; six of seven `
+    + `with the machine done: ${r.sixOfSeven}`);
+
+  check('...and buying it arms the banner rather than starting the animation',
+    r.armed === 'armed',
+    `world.newForm is ${JSON.stringify(r.armed)} — bought, not begun`);
 }
 
 // --- report -----------------------------------------------------------------

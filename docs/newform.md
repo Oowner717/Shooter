@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P8 complete (252). P9 (the door) is next.**
+**Status: P1 (238) - P9a (253). P9b (the room, the banner, the discoverability sites) is next.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was

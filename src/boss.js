@@ -93,7 +93,7 @@ function slotAt(half, per, side, i) {
  * broken there is something left over. It is not energy: energy is what
  * objects are made of and there is a floor of it after every wave. This is
  * the one thing in the game there is exactly one of per ORDINAL, and the only
- * thing a RECAST can be paid for with.
+ * thing a NEW FORM can be paid for with.
  *
  * It rises out of the detonation, hangs for a beat where the core was so it
  * is seen, and then comes to the turret on its own. Nothing has to be done to

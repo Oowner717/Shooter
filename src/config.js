@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '252';
+export const BUILD = '253';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '252';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '298850b';
+export const REV = 'bfd375e';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1773,7 +1773,7 @@ export const CFG = {
     endFor: 13.4,
     pull: 900, // how hard the infall drags loose bodies
     pay: 900, // energy on the floor when it lets go
-    recast: 1, // REMAINDERs a RECAST costs
+    recast: 7, // REMAINDERs a NEW FORM costs -- one per anomaly, so the price IS the ladder
   },
 
   /*

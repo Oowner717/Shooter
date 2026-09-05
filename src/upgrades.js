@@ -754,10 +754,32 @@ export const UPGRADES = {
      * turret *is* rather than what it has: every other purchase bolts
      * something onto the machine, and this one is meant to replace it.
      */
-    { id: 'recast', name: 'RECAST', repeat: true,
+    /*
+     * The id stays `recast` FOREVER. A saved run writes bought ids into
+     * `world.ledger`, so renaming this one takes the thing away from everyone
+     * who has bought it -- the same reason the testbed is still `sandbox` in
+     * three places after two renames.
+     *
+     * `repeat` is gone and `levels: 1` replaces it, and the two must move
+     * TOGETHER: `levelsOf` returns `Infinity` for a repeat node before it ever
+     * reaches the mandatory-levels throw, so a level count beside a `repeat`
+     * is dead text. There is one of these and you buy it once.
+     */
+    { id: 'recast', name: 'NEW FORM', levels: 1,
       currency: 'remainder', cost: CFG.ordinal.recast, step: 0,
-      line: 'A new form for the turret. Not yet built — the REMAINDER is spent and nothing changes.',
-      apply: () => {},
+      /*
+       * Seven REMAINDERs and no energy, by ruling. One per anomaly, so the
+       * price IS the ladder: it cannot be farmed, cannot be saved up early,
+       * and cannot be paid in the currency everything else takes.
+       */
+      needs: (g) => g.rigDone() && g.world.reconciled.length >= 7,
+      needsLine: 'Needs every anomaly reconciled, and the machine finished.',
+      line: 'A new form for the turret, and a field to put it on.',
+      // (up, world), like every other apply in this file. Buying it ARMS the
+      // banner; it does not run the cinematic. "After purchase, a banner; when
+      // clicked, the animation" is the ruling, and a thirty-second cutscene
+      // that starts the instant a tree row is tapped is not that.
+      apply: (up, world) => { if (world) world.newForm = 'armed'; },
       tone: '#ffd9f6', icon: MARK.recast },
   ],
   /*

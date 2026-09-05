@@ -89,7 +89,7 @@ export const UNDER = {
 
   // ---- the way in ----
   // One leaf under its own heading, always available, never behind anything.
-  // ...one slot per boss, in order. RECAST is not here — it sits above every
+  // ...one slot per boss, in order. NEW FORM is not here — it sits above every
   // category; see TREE at the bottom of this file.
 
   // ---- the abilities ----
@@ -285,6 +285,14 @@ function leaf(id) {
   return node({
     kind: 'upgrade', id, key: id, name: u.name, line: u.line, icon: u.icon,
     levels, repeat: !!u.repeat, currency: u.currency || null,
+    /*
+     * The gate predicate, and it has to be listed HERE: this builder copies an
+     * EXPLICIT set of fields off the upgrade, so anything not named is simply
+     * not on the node. `available()` consulted `n.needs` for a whole build
+     * while `n.needs` was undefined and NEW FORM was buyable with one
+     * REMAINDER out of seven.
+     */
+    needs: u.needs || null, needsLine: u.needsLine || '',
     dormant: !!u.dormant, rung: u.rung || 0,
     tone: u.tone || '#9fb3c8',
     // An upgrade may price itself. Only APERTURE does: it is not a step on a

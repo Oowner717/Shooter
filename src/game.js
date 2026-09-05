@@ -28,7 +28,7 @@ import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
 import { codex, lineSeen, markLine, forgetLines, forgetPlayer, migrateLines } from './codex.js';
 import { readRun, saveRun, forgetRun } from './save.js';
 import { freshUpgrades, BY_ID } from './upgrades.js';
-import { NODES, NODE_BY_ID, priceOf, UNDER } from './tree.js';
+import { NODES, NODE_BY_ID, priceOf, UNDER, levelsOf } from './tree.js';
 
 /** The turret branch, for the fitting announcements and the completion one. */
 const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
@@ -318,6 +318,12 @@ export class Game {
       camera: 1,
       evolve: null,
       /*
+       * null until NEW FORM is bought, 'armed' while the banner is up, 'done'
+       * once the field has changed. Declared here for the suite's ghost-field
+       * Proxy, like the two above it.
+       */
+      newForm: null,
+      /*
        * Which ways in this run has already been HANDED, from build 227. Its
        * own record rather than a reading of `apertures`, because an aperture
        * is spent when the way is opened and a spent one would be handed
@@ -331,7 +337,7 @@ export class Game {
        * instead of a list, and two runs of the same seed are the same run.
        */
       runSeed: (Math.random() * 0x7fffffff) | 0,
-      // What a boss leaves behind, and the only thing RECAST can be bought
+      // What a boss leaves behind, and the only thing NEW FORM can be bought
       // with. `remainderGained` is the announcement queue: the collectible
       // banks itself and the HUD is the thing that can say so.
       remainder: 0,
@@ -505,6 +511,7 @@ export class Game {
      */
     w.evolve = null;
     w.camera = 1;
+    w.newForm = null;
     if (typeof document !== 'undefined') document.body.classList.remove('evolving');
     // ...and everything derived from the era. `resize()` below re-derives this
     // too, but only when the SCALE is stale -- and P1's own postmortem is that
@@ -744,6 +751,14 @@ export class Game {
       w.reconciled = d.reconciled.filter((n) => Number.isFinite(n)).map((n) => n | 0);
     }
     if (Number.isFinite(d.remainder)) w.remainder = Math.max(0, d.remainder | 0);
+    /*
+     * The era, and it is restored BEFORE the resize below so the geometry, the
+     * scale, the form and the yard are all derived from it in one pass rather
+     * than one of them arriving a frame late. A file written before build 253
+     * has no `era` key and lands on 1, which is what it was.
+     */
+    w.era = d.era === 2 ? 2 : 1;
+    if (w.era === 2) w.newForm = 'done';
     w.unlocked = new Set(d.unlocked);
     for (const k of STARTING) w.unlocked.add(k);
     w.loadout = { mines: [...d.loadout.mines], ammo: [...d.loadout.ammo] };
@@ -789,6 +804,15 @@ export class Game {
     for (const k of d.hinted || []) this.autoHinted[k] = true;
     // Back to the wave the run was left on, from the top of it.
     w.director.restore(w, d.wave);
+
+    /*
+     * ...and the geometry, if the file came back on the new field. `reset()`
+     * put the world at era 1 and the restore above set the era back; nothing
+     * between them re-derives the scale, the form, the yard or the lots, and
+     * `setEra` cannot be used because the world is ALREADY at the era it needs
+     * to be at and it would refuse.
+     */
+    if (w.era === 2) { this.resize(); this.syncSky(true); }
 
     this.hud.buildStrip();
     for (const k of [...MINE_KEYS, ...ROUND_KEYS]) this.hud.setToggle(k, false);
@@ -1125,6 +1149,7 @@ export class Game {
     w.camera = 1;
     w.evolve = null;
     w.phase = 'staging';
+    w.newForm = 'done';
     document.body.classList.remove('evolving');
     this.takeField(true);
     this.checkpoint();
@@ -1285,7 +1310,38 @@ export class Game {
    * stepping back down to breathe does not seal something already earned.
    * RECALL and OVERCLOCK are the two that carry one.
    */
+  /**
+   * Every level the TURRET branch sells, and whether the player has all of it.
+   *
+   * Defined as the hero readout reaching its own denominator, so the
+   * requirement and the thing that displays it are the SAME FACT and cannot
+   * drift apart. Off the tree rather than off `RIG_MAX`, for the same reason
+   * the readout is.
+   */
+  rigDone() {
+    let have = 0;
+    let want = 0;
+    for (const n of NODES) {
+      if (!n.id || !n.parent || n.parent.key !== 'turret') continue;
+      want += levelsOf(n);
+      have += this.owned(n.id);
+    }
+    return want > 0 && have >= want;
+  }
+
+  /**
+   * @param n a tree node
+   * @returns whether it may be bought at all right now
+   */
   available(n) {
+    /*
+     * `needs` is a PREDICATE, and it is not the `needs` build 228 deleted --
+     * that one was a node id and this one is a function of the world. It is
+     * here because NEW FORM's gate is not a rung and not a parent: it is
+     * "every anomaly reconciled, and the machine finished", which no position
+     * in the tree can express.
+     */
+    if (n.needs && !n.needs(this)) return false;
     if (n.rung && (this.world.director.peak | 0) < n.rung) return false;
     for (let p = n.parent; p; p = p.parent) {
       if (p.free) continue;
@@ -1312,7 +1368,7 @@ export class Game {
     if (!n.repeat && have >= (n.levels || 1)) return 'maxed';
     const price = priceOf(n, have);
     /*
-     * Most of the tree is bought with energy. RECAST is bought with what
+     * Most of the tree is bought with energy. NEW FORM is bought with what
      * ORDINAL leaves behind, and a node says which by naming a currency --
      * so there is one purchase path and one place a price is checked, rather
      * than a second buy button that could drift out of step with this one.
@@ -2972,7 +3028,9 @@ export class Game {
       // about it. One line ran off both edges of a 390-wide screen.
       const from = w.remainderFrom || 1;
       this.hud.alert(`${nameOf(from)} LEFT A REMAINDER`, 'remainder', 6);
-      this.hud.alert(`${w.remainder} HELD · RECAST, IN THE TREE`, 'found', 6,
+      // Seven of these buy the NEW FORM, so the count IS the progress bar --
+      // "3 OF 7" says how far off it is in a way "3 HELD" never did.
+      this.hud.alert(`${w.remainder} OF ${CFG.ordinal.recast} · NEW FORM, IN THE TREE`, 'found', 6,
         dressOf(from).bar[1][1]);
       this.checkpoint();
     }
@@ -3669,6 +3727,20 @@ export class Game {
       // array itself refused to grow. It is also not an upgrade: handing out
       // ways in is not what MAX UPGRADES means.
       if (n.repeat) continue;
+      /*
+       * ...and neither is handing out the NEW FORM. This loop calls `apply`
+       * and pushes the ledger DIRECTLY: it never consults `available()` and
+       * never spends the currency, so the moment NEW FORM stopped being a
+       * `repeat` node and became a one-level node, MAX UPGRADES started
+       * granting a seven-REMAINDER gated transformation for free — and it did
+       * it silently, because the button says "+N upgrades" and N simply went
+       * up by one.
+       *
+       * Anything with a gate or a currency of its own is not an upgrade to the
+       * machine and is not what this button means. Stated as the rule rather
+       * than as `n.id !== 'recast'`, so the next one is covered by existing.
+       */
+      if (n.needs || (n.currency && n.currency !== 'energy')) continue;
       for (let have = this.owned(n.id); have < (n.levels || 1); have++) {
         def.apply(w.up, w);
         w.ledger.push(n.id);
