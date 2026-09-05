@@ -18264,6 +18264,259 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       + `reversed vy in the band, monotonic ${r.monotonic}`).join('; '));
 }
 
+/*
+ * ---- the invisible walls, and the one that swallows ------------------------
+ *
+ * The field has always been a box, and nothing has ever drawn the sides of it,
+ * so a round ricocheting off one bounced off nothing and a body shoved into
+ * one stopped against nothing. `edgeHit` lights the stretch that was touched
+ * for about half a second and nothing else -- and the case for it has to
+ * assert BOTH halves, because "a wall that is visible when touched" and "a
+ * wall that is visible" differ only in what happens next.
+ *
+ * The enemy's wall at era 2 is the other rule and the opposite one: rounds and
+ * abilities are ABSORBED at it -- no bounce, no burst -- and nothing the
+ * player owns reaches a body with no pixel past its bottom line. The arms
+ * below take that from both ends: what a shielded body does not take, and what
+ * a body leaning down through the line does, on the same press.
+ *
+ * The era-1 arms are the control, and they are not decoration: `shielded` is
+ * `!!world.yard && ...`, so every guard in this feature is one property read
+ * away from being switched off for the whole game.
+ */
+{
+  const out = await page.evaluate(async () => {
+    const { fire } = await import('../src/projectiles.js');
+    const { fx } = await import('../src/fx.js');
+    const { applyBlast } = await import('../src/enemies.js');
+    const { ABILITIES } = await import('../src/abilities.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const clean = (era) => {
+      g.restart();
+      // The damage-bench family leaves both of these behind; see the note on
+      // the aperture case above.
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(200000);
+      g.setEra(era);
+      w.director.update = () => {};
+      g.debugClearField();
+      w.mines.length = 0;
+      w.projectiles.length = 0;
+      fx.edges.length = 0;
+    };
+
+    const body = (id, x, y) => {
+      const e = g.debugSpawn(id, x, y);
+      e.staged = false;
+      // ARMORED discards the first hit each second, and a discarded hit is
+      // indistinguishable from a refused one -- which is the entire question
+      // these arms ask.
+      e.traits = null;
+      e.plateT = 0;
+      return e;
+    };
+
+    // ---- era 1: the sides light, and nothing else does -------------------
+    clean(1);
+    let sideBursts = 0;
+    fire(w, 40, w.floorY - 300, Math.PI, { burst: () => { sideBursts++; } });
+    for (let i = 0; i < 30 && w.projectiles.length; i++) g.update(1 / 60);
+    out.sideMarks = fx.edges.length;
+    out.sideAxis = fx.edges[0] ? fx.edges[0].axis : null;
+    out.sideX = fx.edges[0] ? +fx.edges[0].x.toFixed(1) : null;
+
+    // ...and it is a bruise, not paint: gone inside a second.
+    for (let i = 0; i < 60; i++) g.update(1 / 60);
+    out.faded = fx.edges.length;
+
+    /*
+     * Sustained contact merges rather than stacks. Twelve rounds into the same
+     * stretch of wall is what a held trigger does, and without the merge each
+     * one is its own mark in the same place -- which composites to a solid
+     * painted line, the one thing this must never look like.
+     */
+    fx.edges.length = 0;
+    for (let k = 0; k < 12; k++) {
+      fire(w, 40, w.floorY - 300 + k * 2, Math.PI, {});
+      for (let i = 0; i < 6 && w.projectiles.length; i++) g.update(1 / 60);
+    }
+    out.merged = fx.edges.length;
+
+    // ---- era 1: a round leaves the top, silently -------------------------
+    clean(1);
+    let topBursts = 0;
+    fire(w, w.width / 2, 120, -Math.PI / 2, { burst: () => { topBursts++; } });
+    let fr = 0;
+    while (w.projectiles.length && fr < 200) { g.update(1 / 60); fr++; }
+    out.topGone = w.projectiles.length === 0;
+    out.topFrames = fr;
+    out.topMarks = fx.edges.length;
+    out.topBursts = topBursts;
+
+    // ---- era 2: absorbed at their wall -----------------------------------
+    clean(2);
+    const a = w.yard;
+    out.wallY = +a.wallY.toFixed(1);
+    let wallBursts = 0;
+    const shot = fire(w, w.width / 2, a.wallY + 120, -Math.PI / 2,
+      { burst: () => { wallBursts++; } });
+    let wf = 0;
+    while (w.projectiles.length && wf < 200) { g.update(1 / 60); wf++; }
+    out.wallGone = w.projectiles.length === 0;
+    out.wallFrames = wf;
+    out.wallBursts = wallBursts;
+    out.wallOver = +(shot.y - a.wallY).toFixed(1);
+    const mk = fx.edges.filter((m) => m.axis === 1);
+    out.wallMarks = mk.length;
+    out.wallMarkOff = mk.length ? +Math.abs(mk[0].y - a.wallY).toFixed(2) : null;
+
+    // ---- era 2: what a shielded body does not take -----------------------
+    clean(2);
+    const y2 = w.yard;
+    const safe = body('lurcher', w.width / 2 - 140, y2.wallY - 90);
+    const lean = body('lurcher', w.width / 2 + 140, y2.wallY - 6);
+    out.safeClear = +(y2.wallY - (safe.y + safe.r)).toFixed(1);
+    out.leanPast = +((lean.y + lean.r) - y2.wallY).toFixed(1);
+
+    const hSafe = safe.hp;
+    const hLean = lean.hp;
+    applyBlast(w, { x: w.width / 2, y: y2.wallY + 260, r: 1400, damage: 40,
+      impulse: 0, src: 'explosive' });
+    out.safeBlast = +(hSafe - safe.hp).toFixed(2);
+    out.leanBlast = +(hLean - lean.hp).toFixed(2);
+
+    // a round's own damage, named the way the muzzle names it
+    const h2 = safe.hp;
+    safe.applyDamage(w, 40, 0, 0, 0, 0, 0, false, 'bolt');
+    out.safeBolt = +(h2 - safe.hp).toFixed(2);
+
+    // ...and the shove that comes with it
+    safe.vx = 0; safe.vy = 0;
+    safe.applyDamage(w, 40, 1, 0, 1200, 0, 0, false, 'pulse');
+    out.safeShove = +Math.hypot(safe.vx, safe.vy).toFixed(3);
+
+    /*
+     * Theirs still lands. The guard is written as the COMPLEMENT of the
+     * player's sources for exactly this reason, and an arm that only proves
+     * "nothing gets through" would pass just as well on a wall that had turned
+     * the enemy half into a sanctuary from itself.
+     */
+    const h3 = safe.hp;
+    safe.applyDamage(w, 40, 0, 0, 0, 0, 0, false, 'contact');
+    out.safeContact = +(h3 - safe.hp).toFixed(2);
+
+    // ---- era 2: nor is it chosen, gripped or frozen ----------------------
+    const s = w.shooter;
+    safe.x = s.x;
+    lean.x = s.x;
+    /*
+     * ARRAY, and not decoration: the wall stands 1061 units off the machine on
+     * the tall screen against a stock assist reach of 615, so without the
+     * upgrade BOTH arms return null and the case passes on a build with no
+     * guard in it at all. Bought, the assist reaches past the wall -- which is
+     * also the only state in which the guard can matter.
+     */
+    w.up.aimRange = 4;
+    out.aimReach = +g.aimRange.toFixed(0);
+    out.aimSafe = +Math.hypot(safe.x - s.x, safe.y - s.y).toFixed(0);
+    out.aimLean = +Math.hypot(lean.x - s.x, lean.y - s.y).toFixed(0);
+    w.autoAim = true;
+    w.aimMode = 'field';
+    g.autoLock = null;
+    const onlySafe = w.enemies.filter((e) => e !== lean);
+    const held = w.enemies.slice();
+    w.enemies.length = 0;
+    w.enemies.push(...onlySafe);
+    out.lockedSafe = g.autoTarget() === safe;
+    w.enemies.length = 0;
+    w.enemies.push(lean);
+    g.autoLock = null;
+    out.lockedLean = g.autoTarget() === lean;
+    w.enemies.length = 0;
+    w.enemies.push(...held);
+
+    safe.vx = 90; safe.vy = 40;
+    lean.vx = 90; lean.vy = 40;
+    /*
+     * STASIS through its own `run` rather than through the bar. The control is
+     * not what is under test -- the guard inside the freeze is -- and pressing
+     * it for real would mean owning it, having a charge, and clearing a
+     * cooldown, none of which this arm is about.
+     */
+    ABILITIES.find((ab) => ab.id === 'stasis').run(w);
+    out.frozenSafe = +Math.hypot(safe.vx, safe.vy).toFixed(1);
+    out.frozenLean = +Math.hypot(lean.vx, lean.vy).toFixed(1);
+
+    // ---- era 1: none of it applies ---------------------------------------
+    clean(1);
+    out.eraOneYard = !w.yard;
+    const one = body('lurcher', w.width / 2, 150);
+    const h4 = one.hp;
+    applyBlast(w, { x: w.width / 2, y: 420, r: 1400, damage: 40, impulse: 0,
+      src: 'explosive' });
+    out.eraOneBlast = +(h4 - one.hp).toFixed(2);
+
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('a round that meets a side lights it, and only where it met it',
+    out.sideMarks === 1 && out.sideAxis === 0 && out.sideX === 0 && out.faded === 0
+    && out.merged >= 1 && out.merged <= 3,
+    `${out.sideMarks} mark on the left wall (axis ${out.sideAxis}, x ${out.sideX}), `
+    + `gone to ${out.faded} a second later; twelve rounds into the same stretch `
+    + `leave ${out.merged}`);
+
+  check('...and at era 1 a round simply leaves the top',
+    out.topGone && out.topMarks === 0 && out.topBursts === 0 && out.topFrames > 4,
+    `gone after ${out.topFrames} frames with ${out.topMarks} marks and `
+    + `${out.topBursts} bursts`);
+
+  /*
+   * `burst` is the assertion for "no HE explosion" and not a ring count: it is
+   * the callback `endProjectile` invokes when `impacted` is true, so a round
+   * absorbed with `impacted: false` cannot call it whatever the effect pool
+   * happens to be doing that frame.
+   */
+  check('their wall swallows a round -- no bounce, no burst',
+    out.wallGone && out.wallBursts === 0 && out.wallMarks === 1
+    && out.wallMarkOff < 0.01 && out.wallOver > -2 && out.wallFrames > 2,
+    `absorbed after ${out.wallFrames} frames, ${out.wallOver} past the wall at `
+    + `${out.wallY}, ${out.wallBursts} bursts, ${out.wallMarks} mark on it `
+    + `(${out.wallMarkOff} off the line)`);
+
+  check('nothing of yours reaches a body with no pixel past the wall',
+    out.safeClear > 0 && out.leanPast > 0
+    && out.safeBlast === 0 && out.leanBlast > 0
+    && out.safeBolt === 0 && out.safeShove === 0
+    && out.safeContact > 0,
+    `a body ${out.safeClear} clear of the line took ${out.safeBlast} from a `
+    + `blast, ${out.safeBolt} from a round and ${out.safeShove} u/s of shove; `
+    + `one leaning ${out.leanPast} past it took ${out.leanBlast}; their own `
+    + `collisions still bill it ${out.safeContact}`);
+
+  check('...nor is it aimed at, nor frozen by an ability',
+    out.lockedLean && !out.lockedSafe
+    && out.aimReach > out.aimSafe && out.aimReach > out.aimLean
+    && out.frozenSafe > 80 && out.frozenLean < 30,
+    `the assist takes the one leaning through (${out.lockedLean}) and not the `
+    + `one behind (${out.lockedSafe}), both inside a bought reach of `
+    + `${out.aimReach} (${out.aimSafe} and ${out.aimLean} out); STASIS leaves `
+    + `it at ${out.frozenSafe} u/s and takes the other to ${out.frozenLean}`);
+
+  check('...and era 1 has no wall to stand behind',
+    out.eraOneYard && out.eraOneBlast > 0,
+    `no yard (${out.eraOneYard}); the same blast on the same body at the top of `
+    + `the era-1 field takes ${out.eraOneBlast}`);
+}
+
 // --- the six lots: ground reserved, and nothing else ------------------------
 /*
  * P5. Two works beside the machine and four emplacements in front of it,

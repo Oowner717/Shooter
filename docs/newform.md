@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P9b (255). The plan's structure is complete; P10 (the reveal pass) is what is left.**
+**Status: P1 (238) - P9b (255), plus build 256's walls. The plan's structure is complete; P10 (the reveal pass) is what is left.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -1654,3 +1654,81 @@ acts. Reverted, it fails with exactly the reported symptom:
 `{"frame1":true,"act2":true,"act3":true,"act6":true}`.
 
 517 green, hash `-1765830468` unmoved.
+
+## 29. Build 256 — the walls nothing could see
+
+Reported from play: things bounce off nothing at the edges of the screen, and
+it is not clear why. The field has always been a box with hard sides and
+nothing has ever drawn them.
+
+**The answer is not to draw them.** Four permanent lines round a field whose
+whole look is open space is a worse picture than the question it answers. So
+the walls are invisible until they are touched, and then only the stretch that
+was touched, for about half a second: `fx.edges` and `edgeHit(x, y, power,
+axis, color)` in fx.js. A gradient perpendicular to the edge, fading along it,
+plus a short brighter line at the point of contact — a bruise on the air rather
+than a line, because the moment it looks like a wall it has answered the wrong
+question.
+
+Three things about the emitter are load-bearing:
+
+- **Marks MERGE rather than stack.** A body resting against a wall is clamped
+  every frame and a round can ricochet twice inside one step. Without the
+  26-unit merge, sustained contact composites dozens of marks in one place and
+  reads as a painted wall. The case fires twelve rounds into the same stretch
+  and asserts the result is one to three marks, not twelve.
+- **It draws FIRST, under everything.** A wall painted over the round that just
+  bounced off it reads as the round going behind the wall.
+- **Sides only.** The floor is drawn and always has been, so a body landing on
+  it stops against something visible and has nothing to explain —
+  `clampToArena` returns the same impact for both, and taking the floor branch
+  out is the whole difference between answering the question and decorating.
+
+**Era 1 keeps its open top.** A round leaving through the top goes through
+`endProjectile(..., false)` — no burst — and lights nothing. That was already
+true; the case pins it, because it is the one edge of the box that is
+deliberately not a wall.
+
+**Era 2's wall is the opposite rule and it is now enforced from both ends.**
+
+- A round that reaches `yard.wallY` moving up is ABSORBED: `endProjectile(...,
+  false)`, so an HE is swallowed rather than detonating against it. `resolveSegment`
+  runs first in the same step, so a body leaning down through the line is still
+  hit before the absorption is considered.
+- `shielded(world, e)` in yard.js is the other half of `holdBelow`: true for a
+  body with no pixel past the wall's bottom line (`e.y + e.r <= wallY`), and
+  false the moment `world.yard` is absent, so era 1 and the testbed pay one
+  property read.
+- The guard sits in `Enemy.applyDamage`, before the power multiplier, before
+  ARMORED and before the impulse. That one door covers every round, mine,
+  patch, beam and blast in the game.
+- The four things that do NOT come through that door — LODE's push, SNARE's
+  grip, WELL's knot and STASIS — honour it themselves, because each writes
+  `vx`/`vy` by hand. So do the choosers: `autoTarget`, `bestTarget`,
+  `densestPoint` and the mine trigger, because holding a lock on something that
+  cannot be hurt is the turret aiming at nothing.
+- `applyBlast` lights the wall where a shockwave reaches it. Nothing past it is
+  touched, but the blast plainly stopped against something.
+
+**The guard is written as the COMPLEMENT of the player's sources.** `ENEMY_SRC`
+is `contact` and `bloom` — two bodies grinding, and a BLOOM taking its
+neighbours with it. A hand-kept list of PLAYER sources is the shape CLAUDE.md
+warns about: the next round or ability added would be absent from it and would
+therefore be the one thing able to shoot through a wall. Enumerating what is
+not the player's fails the other way, where the worst a miss can do is stop
+something that should have been allowed.
+
+**The case failed first, and it failed for the right reason.** The autoTarget
+arm put both bodies on the turret's own column and asked the assist to choose:
+the wall stands 1061 units off the machine on the tall screen against a stock
+assist reach of 615, so BOTH arms returned null and the arm would have passed
+on a build with no guard in it at all. It buys ARRAY (`w.up.aimRange = 4`) and
+asserts the reach covers both distances, which is the arm proving it can see a
+one before it is allowed to report a zero.
+
+`burst` is the assertion for "no HE explosion" rather than a ring count: it is
+the callback `endProjectile` invokes when `impacted` is true, so a round
+absorbed with `impacted: false` cannot call it whatever the effect pool happens
+to be doing that frame.
+
+523 green, hash `-1765830468` before and after in this container.

@@ -25,7 +25,7 @@
 // VOID deletes the first thing that touches it, whatever its health — except
 //   an anomaly's own structure, which is not survivable by design.
 
-import { yardHold } from './yard.js';
+import { yardHold, shielded } from './yard.js';
 import { CFG } from './config.js';
 import { TAU, clamp, rand, spread, rgba, drawGlow, segClosest } from './util.js';
 import { applyBlast, ENTRY_Y } from './enemies.js';
@@ -442,7 +442,7 @@ function grip(world, m, dt) {
        * screen, and a snare that visibly fails to take something standing
        * in it is the worse fault.
        */
-      if (e.dead || e.spent || e.fizzle || e.type.fixed) continue;
+      if (e.dead || e.spent || e.fizzle || e.type.fixed || shielded(world, e)) continue;
       const dx = m.x - e.x;
       const dy = m.y - e.y;
       const d2 = dx * dx + dy * dy;
@@ -649,7 +649,8 @@ function repel(world, m, dt) {
   for (const e of world.enemies) {
     // The same rule as the snare's grip above: a continuous field that
     // writes velocity is steering, so `spent` and `fizzle` and not `staged`.
-    if (e.dead || e.spent || e.fizzle) continue;
+    // `shielded` is the wall: a body wholly on the enemy side is not pushed.
+    if (e.dead || e.spent || e.fizzle || shielded(world, e)) continue;
     const dx = e.x - m.x;
     const dy = e.y - m.y;
     const d2 = dx * dx + dy * dy;
@@ -876,6 +877,9 @@ export function updateMines(world, dt) {
          * through its own outro must not spring a mine either.
          */
         if (e.dead || e.harmless || e.staged || e.spent) continue;
+        // ...and nothing behind the wall springs one, or a mine laid at the
+        // hold line would be spent on a body it could not have damaged.
+        if (shielded(world, e)) continue;
         const rr = reach + e.r;
         if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 <= rr * rr) {
           /*

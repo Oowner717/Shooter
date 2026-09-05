@@ -5,13 +5,13 @@
 import { CFG, WAVES, TYPE_BY_ID, ROUTES, massOf } from './config.js';
 import { traitsFor, traitAt, has as hasTrait, TRAIT_BY_ID } from './traits.js';
 import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
-import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul } from './fx.js';
+import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul, edgeHit } from './fx.js';
 import { audio } from './audio.js';
 import { shed } from './debris.js';
 import { contactAt } from './physics.js';
 import { ledger } from './ledger.js';
 import { drawDummy, dummyHit } from './dummy.js';
-import { throughMouth, mouthSlots } from './yard.js';
+import { throughMouth, mouthSlots, shielded } from './yard.js';
 import { ARSENAL } from './arsenal.js';
 
 /*
@@ -29,6 +29,24 @@ import { ARSENAL } from './arsenal.js';
 const POWERED = new Set(ARSENAL
   .filter((a) => a.kind === 'round' || a.kind === 'mine')
   .map((a) => a.key));
+
+/**
+ * The two damage sources the wall does NOT stand between, written as the
+ * COMPLEMENT of the player's list on purpose.
+ *
+ * The rule is "nothing the player does reaches a body entirely on the far
+ * side of the wall", and a hand-kept list of player sources is exactly the
+ * shape CLAUDE.md warns about: the next round, mine or ability added would be
+ * absent from it and would therefore be the one thing able to shoot through a
+ * wall. Enumerating what is NOT the player's fails the other way -- a new
+ * source is guarded by default, and the worst a miss can do is stop something
+ * that should have been allowed.
+ *
+ * `contact` is two bodies grinding against each other, which is theirs and
+ * happens on their side all the time; `bloom` is a BLOOM taking its
+ * neighbours with it, which is theirs too.
+ */
+const ENEMY_SRC = new Set(['contact', 'bloom']);
 
 /**
  * The top of the visible field, in world units. Objects are queued above it
@@ -1260,6 +1278,14 @@ export class Enemy {
    */
   applyDamage(world, dmg, nx = 0, ny = 0, impulse = 0, shred = 0, lever = 0, throwOff = false, src = '') {
     if (this.dead) return;
+    /*
+     * Behind the wall is safe. Before the power multiplier, before ARMORED
+     * and before the impulse, because none of it happened: a body with no
+     * pixel past the wall's bottom line takes no damage and is not shoved.
+     * `shielded` is false the moment `world.yard` is absent, so era 1 and the
+     * testbed pay one property read.
+     */
+    if (!ENEMY_SRC.has(src) && shielded(world, this)) return;
     /*
      * The new field's damage, at the one door all seventeen come through. The
      * `!== 1` is not decoration: `applyDamage` runs tens of thousands of times
@@ -4851,6 +4877,14 @@ export function graft(world, host) {
 export function applyBlast(world, blast) {
   const { x, y, r, damage, impulse, source } = blast;
   const r2 = r * r;
+  /*
+   * A shockwave that reaches the wall lights it. Nothing past it is touched --
+   * `applyDamage` refuses -- but the blast plainly stopped against something,
+   * and the whole point of the marks is that nothing in this game stops
+   * against nothing.
+   */
+  const yard = world.yard;
+  if (yard && y - r <= yard.wallY) edgeHit(x, yard.wallY, r / 200, 1, blast.color || '#9fd8ff');
   const hit = (list) => {
     for (const e of list) {
       /*

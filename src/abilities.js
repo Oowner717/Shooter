@@ -13,7 +13,7 @@ import { CFG } from './config.js';
 import { fire, clampAim } from './projectiles.js';
 import { applyBlast, ENTRY_Y, drawIn } from './enemies.js';
 import { audio } from './audio.js';
-import { yardHold, holdBelow } from './yard.js';
+import { yardHold, holdBelow, shielded } from './yard.js';
 
 /*
  * Ability marks. Each one draws what the ability does to the field rather than
@@ -177,7 +177,9 @@ class Well {
          * screen, and a well that visibly fails to touch something beside it
          * is worse than one that pulls a straggler in early.
          */
-        if (e.dead || e.spent || e.fizzle) continue;
+        // ...and `shielded`, because the knot writes `vx`/`vy` by hand and
+        // a body behind the wall is not the player's to move.
+        if (e.dead || e.spent || e.fizzle || shielded(world, e)) continue;
         const dx = this.x - e.x;
         const dy = this.y - e.y;
         const d = Math.hypot(dx, dy);
@@ -781,6 +783,7 @@ class Ward {
     const near = [];
     for (const e of world.enemies) {
       if (e.dead || e.harmless || e.staged || e.spent || e.fizzle) continue;
+      if (shielded(world, e)) continue;
       const d = Math.hypot(e.x - s.x, e.y - s.y);
       if (d > reach) continue;
       near.push({ e, d });
@@ -1007,6 +1010,8 @@ function bestTarget(world) {
   let score = -1;
   for (const e of world.enemies) {
     if (e.dead || e.staged || e.spent || e.fizzle || e.harmless) continue;
+    // Nothing behind the wall is worth a press: it cannot be hurt.
+    if (shielded(world, e)) continue;
     const s = e.r * 2 + e.hp * 0.3 - Math.hypot(e.x - world.shooter.x, e.y - world.shooter.y) * 0.14;
     if (s > score) { score = s; best = e; }
   }
@@ -1018,7 +1023,8 @@ function densestPoint(world) {
   // Grey counts -- WELL drags EVERYTHING into the knot and is worth pressing
   // on a field of salvage. `spent` and `fizzle` do not: one is a dead boss's
   // frame and the other is already dissolving.
-  const list = world.enemies.filter((e) => !e.dead && !e.staged && !e.spent && !e.fizzle);
+  const list = world.enemies.filter((e) => !e.dead && !e.staged && !e.spent && !e.fizzle
+    && !shielded(world, e));
   if (!list.length) {
     return { x: world.shooter.x, y: world.shooter.y - 240 };
   }
@@ -1312,7 +1318,12 @@ export const ABILITIES = [
     hint: 'STASIS — objects freeze. Your shots do not.',
     run(world) {
       world.stasis = 4;
-      for (const e of world.enemies) { e.vx *= 0.1; e.vy *= 0.1; e.av *= 0.1; }
+      // Everything but what is behind the wall: the freeze is an ability and
+      // the enemy half is not the player's to hold still.
+      for (const e of world.enemies) {
+        if (shielded(world, e)) continue;
+        e.vx *= 0.1; e.vy *= 0.1; e.av *= 0.1;
+      }
       for (const e of world.drops) { e.vx *= 0.1; e.vy *= 0.1; e.av *= 0.1; }
       ring(world.shooter.x, world.shooter.y, 20, Math.hypot(world.width, world.height), 0.5, '#9fe8ff', 4);
       flash(0.2, '#d6f4ff');

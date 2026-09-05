@@ -3,7 +3,7 @@
 
 import { CFG } from './config.js';
 import { TAU, rand, spread, rgba, drawGlow, segClosest, drawBolt } from './util.js';
-import { spark, dot, ring } from './fx.js';
+import { spark, dot, ring, edgeHit } from './fx.js';
 import { SHARD_R } from './enemies.js';
 import { contactAt } from './physics.js';
 import { audio } from './audio.js';
@@ -165,13 +165,40 @@ export function updateProjectiles(world, dt) {
           p.y = ny;
         }
 
-        // arena-edge ricochet
+        /*
+         * ---- the arena's sides ----
+         *
+         * They have always been here and have never been drawn, so a round
+         * ricocheting off one bounced off nothing. `edgeHit` lights the
+         * stretch that was touched for about half a second and nothing else,
+         * whether the round bounced or ended there.
+         */
         if (p.x < p.r && p.vx < 0) {
+          edgeHit(0, p.y, Math.abs(p.vx) / 700, 0, p.color);
           if (p.bounces > 0) { p.bounces--; p.x = p.r; p.vx = -p.vx; ricochetFx(p); }
           else endProjectile(world, p, p.x, p.y, true);
         } else if (p.x > W - p.r && p.vx > 0) {
+          edgeHit(W, p.y, Math.abs(p.vx) / 700, 0, p.color);
           if (p.bounces > 0) { p.bounces--; p.x = W - p.r; p.vx = -p.vx; ricochetFx(p); }
           else endProjectile(world, p, p.x, p.y, true);
+        }
+
+        /*
+         * ---- and the enemy's wall, at era 2 ----
+         *
+         * ABSORBED, never bounced and never burst: `impacted` is false, so an
+         * HE that reaches it is swallowed rather than detonating against it.
+         * The wall is theirs and it is one-way -- their objects walk down
+         * through it and nothing of yours goes up through it.
+         *
+         * Tested against the round's LEADING edge (`p.y - p.r`) so a round is
+         * taken the moment any part of it would be past the line, which is the
+         * same rule the damage guard uses from the other side.
+         */
+        const yard = world.yard;
+        if (!p.dead && yard && p.y - p.r <= yard.wallY && p.vy < 0) {
+          edgeHit(p.x, yard.wallY, Math.abs(p.vy) / 700, 1, p.color);
+          endProjectile(world, p, p.x, Math.max(p.y, yard.wallY), false);
         }
         // Through the same door as every other ending, so `impacted` has a
         // caller that passes false and the line below means what it says. It

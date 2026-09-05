@@ -143,6 +143,20 @@ export const fx = {
   rings: new Pool(() => ({ x: 0, y: 0, r: 0, vr: 0, life: 0, max: 1, w: 3,
     color: '#fff', fill: 0, a0: 0, span: TAU })),
   ripples: [], // consumed by the background grid
+  /*
+   * The arena's edges, lit only where something just met one.
+   *
+   * The field has always been a box with hard sides and nothing has ever drawn
+   * them, so a round ricocheting off the left edge bounced off nothing and a
+   * body shoved into it stopped against nothing. Drawing the walls would be
+   * worse -- four permanent lines round a field whose whole look is open
+   * space. So they are invisible until they are touched, and then only the
+   * stretch that was touched, for about half a second.
+   *
+   * A plain array and not a `Pool`: there are never more than a handful, each
+   * is five numbers, and the pool's whole reason is per-frame particle churn.
+   */
+  edges: [],
   shake: 0,
   shakeX: 0,
   shakeY: 0,
@@ -154,6 +168,7 @@ export const fx = {
     this.particles.clear();
     this.rings.clear();
     this.ripples.length = 0;
+    this.edges.length = 0;
     this.shake = 0;
     this.flash = 0;
   },
@@ -164,6 +179,36 @@ export const fx = {
 };
 
 // ---------------------------------------------------------------- emitters
+
+/**
+ * Something met an edge of the field. `axis` is 0 for a side wall (the mark
+ * runs vertically, at `x`) and 1 for the floor (horizontally, at `y`).
+ *
+ * `power` is how hard, and it only ever widens and brightens the mark -- an
+ * edge is not a thing that can be broken, so nothing about it depends on what
+ * hit it beyond how much of it lit up.
+ */
+export function edgeHit(x, y, power = 1, axis = 0, color = '#9fd8ff') {
+  const e = fx.edges;
+  const p = clamp(power, 0.25, 3);
+  /*
+   * Merged rather than stacked. A body resting against a wall is clamped every
+   * frame, and a round grazing one can ricochet twice inside a step -- without
+   * this, an edge under sustained contact accumulates dozens of marks in the
+   * same place and reads as a solid painted wall, which is the one thing this
+   * must never look like.
+   */
+  for (const m of e) {
+    if (m.axis === axis && Math.abs((axis ? m.x : m.y) - (axis ? x : y)) < 26) {
+      m.life = Math.max(m.life, 0.42);
+      m.p = Math.max(m.p, p);
+      if (axis) m.x = x; else m.y = y;
+      return;
+    }
+  }
+  if (e.length > 12) e.shift();
+  e.push({ x, y, axis, p, life: 0.42, max: 0.42, color });
+}
 
 export function spark(x, y, vx, vy, color, life = 0.35, r = 2.2) {
   if (fx.budgetLeft <= 0) return null;
@@ -460,6 +505,11 @@ export function explode(x, y, r, color, glow, power = 1) {
 // ------------------------------------------------------------- simulation
 
 export function updateFx(dt) {
+  const edges = fx.edges;
+  for (let i = edges.length - 1; i >= 0; i--) {
+    edges[i].life -= dt;
+    if (edges[i].life <= 0) edges.splice(i, 1);
+  }
   const parts = fx.particles.active;
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i];
@@ -512,6 +562,53 @@ export function updateFx(dt) {
 // ---------------------------------------------------------------- drawing
 
 export function drawFx(ctx) {
+  /*
+   * The edges first, under everything: they are the FIELD, not an effect on
+   * top of it, and a wall drawn over a round that just bounced off it reads
+   * as the round going behind the wall.
+   *
+   * A gradient perpendicular to the edge and fading along it, so what is seen
+   * is a bruise on the air rather than a line -- there is no wall, and the
+   * moment this looks like one it has answered the wrong question.
+   */
+  for (const m of fx.edges) {
+    const t = m.life / m.max;
+    const a = t * t * 0.5;
+    const reach = (34 + m.p * 26) * CFG.scale;
+    const half = (30 + m.p * 34) * CFG.scale;
+    ctx.save();
+    let g;
+    if (m.axis) {
+      /*
+       * Downward, into our half. The only horizontal edge in the game is the
+       * enemy wall at era 2, and everything that meets it comes up from below
+       * -- a bruise spreading the other way would be lighting THEIR side of a
+       * line that is theirs.
+       */
+      g = ctx.createLinearGradient(0, m.y, 0, m.y + reach);
+      g.addColorStop(0, rgba(m.color, a));
+      g.addColorStop(1, rgba(m.color, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(m.x - half, m.y, half * 2, reach);
+    } else {
+      const dir = m.x < 1 ? 1 : -1;          // which way the field is
+      g = ctx.createLinearGradient(m.x, 0, m.x + dir * reach, 0);
+      g.addColorStop(0, rgba(m.color, a));
+      g.addColorStop(1, rgba(m.color, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(dir > 0 ? m.x : m.x - reach, m.y - half, reach, half * 2);
+    }
+    // ...and the edge itself, brightest at the point of contact and gone
+    // within a couple of body-widths either side.
+    ctx.strokeStyle = rgba(m.color, a * 1.7);
+    ctx.lineWidth = CFG.hairline * (1.4 + m.p);
+    ctx.beginPath();
+    if (m.axis) { ctx.moveTo(m.x - half * 0.6, m.y); ctx.lineTo(m.x + half * 0.6, m.y); }
+    else { ctx.moveTo(m.x, m.y - half * 0.6); ctx.lineTo(m.x, m.y + half * 0.6); }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   const parts = fx.particles.active;
   /*
    * The caller's alpha, kept and put back.

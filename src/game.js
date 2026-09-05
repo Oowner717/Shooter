@@ -14,7 +14,7 @@ import { nameOf, dressOf, heldList } from './anomaly.js';
 import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta, drawGlow} from './util.js';
 import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
-import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake, flash, haul } from './fx.js';
+import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, shake, flash, haul, edgeHit } from './fx.js';
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
@@ -39,7 +39,7 @@ import { registerCodexShape } from './menu.js';
 import { Sandbox } from './sandbox.js';
 import { ledger, soak } from './ledger.js';
 import { updateDummy } from './dummy.js';
-import { syncYard, updateYard, drawYard, lotAt, refuseLot } from './yard.js';
+import { syncYard, updateYard, drawYard, lotAt, refuseLot, shielded } from './yard.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 
@@ -1996,6 +1996,13 @@ export class Game {
        * in both directions at once. See Game.aimModes.
        */
       if (e.dead || e.staged || e.spent) continue;
+      /*
+       * ...and the wall. A body with no pixel past its bottom line cannot be
+       * damaged (see `Enemy.applyDamage`) and rounds are absorbed at the line
+       * anyway, so holding a lock on one is the turret aiming at something it
+       * cannot touch. `shielded` is false at era 1.
+       */
+      if (shielded(w, e)) continue;
       if (mode === 'field' && e.harmless) continue;
       if (mode === 'drift' && !e.harmless) continue;
       const dx = e.x - s.x;
@@ -2419,6 +2426,20 @@ export class Game {
       const impact = clampToArena(b, w.width, STAGE_HEIGHT, w.floorY);
       if (impact > 240) {
         spark(b.x, b.y, spread(impact), spread(impact), b.type.glow, 0.18, 1.8);
+      }
+      /*
+       * ...and the SIDE it met, if it met one. Anything at all, not just a
+       * hard one: the question this answers is "why did that stop against
+       * nothing", and a body leaning on a wall at 30 u/s asks it exactly as
+       * loudly as one thrown into it at 600.
+       *
+       * Only the sides. The floor is drawn and always has been, so a body
+       * landing on it stops against something visible and has nothing to
+       * explain; `clampToArena` returns the same impact for both.
+       */
+      if (impact > 4) {
+        if (b.x - b.r <= 1) edgeHit(0, b.y, impact / 260, 0, b.type.glow);
+        else if (b.x + b.r >= w.width - 1) edgeHit(w.width, b.y, impact / 260, 0, b.type.glow);
       }
     }
   }

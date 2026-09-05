@@ -178,6 +178,25 @@ export function holdBelow(world, x, y, pad = 0) {
 }
 
 /**
+ * The wall's other half. `holdBelow` keeps friendly PLACEMENTS on our side of
+ * it; this keeps friendly EFFECTS there. A body with no pixel past the wall's
+ * bottom line cannot be damaged, dragged, frozen, shoved or aimed at by
+ * anything the player owns -- which is the visual promise the wall makes: the
+ * enemy half is theirs, and standing in it is safe.
+ *
+ * The test is the body's LOWEST pixel (`y + r`) and not its centre, because
+ * the ruling is about the picture. A body leaning down through the line is
+ * visibly reachable, so it is reachable; one entirely above it is not.
+ *
+ * False at era 1 and in the testbed, where `world.yard` does not exist -- the
+ * one property read is all this costs on that path.
+ */
+export function shielded(world, e) {
+  const a = world.yard;
+  return !!a && e.y + e.r <= a.wallY;
+}
+
+/**
  * Map a field-wide x into the door. Identity at era 1.
  *
  * Load-bearing: it draws NO random on either branch, so era 1 keeps not merely
