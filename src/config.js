@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '262';
+export const BUILD = '263';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '262';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '41246e8';
+export const REV = '5ffa03a';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1007,6 +1007,90 @@ export const CFG = {
       step: 0.55, // extra TITHE damage per mark already on it
       marks: 8, // and it stops deepening here
     },
+  },
+
+  /*
+   * ---- hail -------------------------------------------------------------
+   *
+   * The wide one. Twenty-five pellets in a tight cone until build 263, with
+   * every number written as a literal at the call site -- so nothing in the
+   * game could read what HAIL was worth without reading its `run`.
+   *
+   * ---- the fan, and what widening it costs -----------------------------
+   *
+   * `arc` 1.12 -> 1.85 rad (64 degrees -> 106) with the count 25 -> 34. Those
+   * two together are close to density-neutral: 22.3 pellets a radian became
+   * 18.4. A body of radius 20 at 200 units subtends 0.2 rad, so it now eats
+   * about 3.7 pellets where it used to eat 4.5 -- HAIL is 18% WEAKER against
+   * one body and 36% more metal across the field. That is the trade the
+   * request asks for in as many words ("a large fan of shots"): it stops
+   * being a burst you point at something and becomes an answer to a crowd.
+   *
+   * ---- the blowback, which is the whole of the rest ---------------------
+   *
+   * `impulse` 34 -> 265, and it is a THROW.
+   *
+   * 34 was never going to be felt. A shove is `impulse * invMass` and the
+   * ordinary body runs 0.20 to 2.38, so 34 bought between 7 and 81 u/s of an
+   * approach -- and worse, an untagged hit pays `1 / (1 + kicked)`, which is
+   * applied and ACCUMULATED per pellet. Twenty-five pellets landing together
+   * meant the second was worth half the first and the tenth a tenth of it, so
+   * the harder HAIL connected the less each pellet pushed. The shove it was
+   * rated for did not exist at any range.
+   *
+   * `throwOff` is what fixes both halves: the fade is skipped and the speed
+   * ceiling lifts from `cruise * 6` to `physics.thrownSpeed`. The rule for
+   * granting it is CADENCE and not weight -- PULSE and PILE have it, SLUG is
+   * refused it, and the line is a deliberate press against a round fired one
+   * and a half times a second. HAIL is a button with a five-second clock on
+   * it (3.2s with both STANDING ORDERs), one press at a time, so it is on
+   * the near side of that line with PULSE.
+   *
+   * What bounds it is the ceiling it just lifted to and not the number: 3.7
+   * pellets at 265 is 980 of impulse, against PULSE's 1050 at zero falloff --
+   * and whatever the total, `thrownSpeed` 720 clips the result and `thrown`
+   * 0.5s is how long the body is off its steering. 720 for half a second is
+   * 360 units of ground given up, after which it turns round and comes back.
+   * That is the build-110 guard: what threw a body off the field for good was
+   * SUSTAINED fire, not one press.
+   *
+   * ---- AIRBURST ---------------------------------------------------------
+   *
+   * `burst` is the upgrade's blast and is inert without it. What it buys is
+   * measured rather than asserted, on a pinned witness over ninety frames:
+   * one LURCHER 105 -> 161, three of them shoulder to shoulder 270 -> 505,
+   * one BULWARK 118.8 -> 162. It is worth half again against one body and
+   * nearly double against a crowd, which is the shape a fan should have.
+   */
+  hail: {
+    pellets: 34,
+    arc: 1.85, // radians, corner to corner
+    jitter: 0.02, // ...and how much each pellet wanders inside its share
+    speed: [980, 1240],
+    r: 3,
+    damage: 15,
+    impulse: 265,
+    life: 0.62,
+    /*
+     * AIRBURST. Nothing reads these without `up.fanBurst`.
+     *
+     * ---- why 58 and not 34, which is what it was first --------------------
+     *
+     * `applyBlast` measures centre to centre. A pellet's burst goes off where
+     * the pellet STOPPED, which is on the far body's SURFACE -- so a blast of
+     * radius R centred there reaches that body's own centre only if R exceeds
+     * its radius. At 34 it was smaller than half the bodies in the game:
+     * measured against a pinned BULWARK, four pellets landed for 118.8 and
+     * the four bursts that followed them delivered EXACTLY ZERO, twice, to
+     * the decimal. A number that looked conservative was in fact switched
+     * off for everything large.
+     *
+     * 58 clears every body in the game except a BULWARK (72) and the assay's
+     * own rig, and what it is really for is the NEIGHBOURS: the burst is
+     * chip damage that spreads sideways off whatever a pellet found, which
+     * is the thing a fan of thirty-four cannot do on its own.
+     */
+    burst: { r: 58, damage: 11, impulse: 150 },
   },
 
   // ---- decoy ----------------------------------------------------------
@@ -4461,25 +4545,28 @@ CFG.yard = {
    */
   lotSide: 118, lotW: 34, lotH: 30,
   /*
-   * The four ahead, spread wider and STAGGERED from build 261.
+   * The four ahead, spread wide and LEVEL from build 263.
    *
    * They were four boxes in one row at `lotStep` 70, which put the inner pair
    * 54 units either side of the turret's own column -- close enough that an
    * emplacement on each was two guns firing up the same lane, and the row read
-   * as one object. `lotStep` 96 opens the pair to 144 apart, and `lotStagger`
-   * drops the inner two 46 units back so the four are a shallow V rather than
-   * a line: they cover four bearings instead of one, and nothing hides behind
-   * anything.
+   * as one object. Build 261 answered that twice over: `lotStep` 96 opened the
+   * nearest pair to 144 apart AND `lotStagger` dropped the inner two 34 units
+   * back into a shallow V. The step is what fixed the lane; the stagger just
+   * made four fixtures sit crooked, and it is gone -- reported as exactly
+   * that. Four guns at 144, 288 apart on one line, which is what a line of
+   * emplacements is.
    *
-   * The three numbers are pinned between two rules at 320x568, which is the
-   * screen that binds -- the turret stands 250 units below the wall's hold
-   * line there and 934 below it at 390x844. `lotAhead` cannot grow, or the
-   * outer pair's top crosses the hold line and the player has placed
-   * something above the wall; `lotStagger` cannot grow, or the inner pair
-   * comes back far enough to sit inside the second form's painted reach. Both
-   * are asserted, at both screens.
+   * `lotAhead` is pinned at 320x568, which is the screen that binds -- the
+   * turret stands 250 units below the wall's hold line there and 934 below it
+   * at 390x844. It cannot grow past about 142, or the top of a lot crosses the
+   * hold line and the player has placed something above the wall. It is
+   * asserted, at both screens, and levelling the inner pair moved them 34
+   * units UP-field into the same bound the outer pair was already tested
+   * against, which is why straightening costs nothing: the outer pair was
+   * always the binding case.
    */
-  lotAhead: 134, lotStep: 96, lotStagger: 34, gunW: 23, gunH: 20,
+  lotAhead: 134, lotStep: 96, gunW: 23, gunH: 20,
 };
 
 const SCALED = [
@@ -4516,6 +4603,17 @@ const SCALED = [
    */
   'rounds.explosive.cluster.out',
   'rounds.spine.shatter.r', 'rounds.spore.patch.r',
+  /*
+   * HAIL's airburst, on the same rule as HE's blast two lines up: a radius is
+   * a length and has to cover the same fraction of a field 1.54x deeper.
+   *
+   * `hail.r` and `hail.speed` are deliberately NOT here, and that is a
+   * preserved inconsistency rather than a decision: they were literals at the
+   * call site and scaled with nothing, so putting them in would change what
+   * HAIL does at era 2 as a side effect of moving a number into a table. The
+   * rack is no better -- `bolt.r` is scaled and `bolt.speed` is not.
+   */
+  'hail.burst.r',
   // mines: the body, the default blast, and each kind's own reach
   'mines.r', 'mines.blast.r', 'mines.fizzle.r',
   'knell.r', 'knell.blast.r', 'snare.r', 'snare.trigger', 'snare.reach',
@@ -4533,7 +4631,7 @@ const SCALED = [
   // angular rate are not lengths.
   'gun.r', 'gun.bolt', 'gun.range', 'gun.speed',
   'yard.lotSide', 'yard.lotW', 'yard.lotH',
-  'yard.lotAhead', 'yard.lotStep', 'yard.lotStagger', 'yard.gunW', 'yard.gunH',
+  'yard.lotAhead', 'yard.lotStep', 'yard.gunW', 'yard.gunH',
 ];
 
 function atPath(path) {

@@ -1535,6 +1535,82 @@ came from before believing the other one covers it.
   let` snapshot all over again. `dummy.js` HANDS the band reading to
   `drawD2(ctx, e, {...})` rather than importing anything back, and a glyph
   both files want (LOCK) lives in the LOWER one.
+- **`applyBlast` measures CENTRE TO CENTRE, so a blast smaller than the body it
+  went off against cannot touch that body.** A round's burst fires where the
+  round STOPPED, which is on the far body's surface, so a blast of radius R
+  centred there reaches that body's own centre only if R exceeds its radius.
+  AIRBURST shipped at 34 for one afternoon: measured on a pinned BULWARK
+  (r 45), four bursts delivered **exactly zero, twice, to the decimal**, while
+  the pellets that carried them delivered 118.8. A number that looks
+  conservative can be inert. Bodies run to r 72 and the assay's rig is 68, so
+  anything meant to hurt what it hits needs a radius past those; anything at
+  58 or under is a NEIGHBOUR effect, which is a legitimate design and has to
+  be said out loud rather than discovered.
+- **`endProjectile` bursts a round on EXPIRY as well as on impact.** Only
+  leaving the field is exempt (`impacted` false); `if (p.life <= 0)
+  endProjectile(..., true)` is the same door HE goes through. So "make this
+  round explosive" also buys a blast at the end of every MISS, at
+  `speed * life` out -- and with a fixed `life` every round of a volley does it
+  on the SAME FRAME. HAIL's thirty-four were thirty-four rings and sixty-eight
+  embers in one tick, gone before they read as anything; the lives are
+  jittered 12% so the wall arrives over a tenth of a second.
+- **An untagged hit pays AND ACCUMULATES the repeated-shove fade, so a
+  multi-projectile ability taxes itself.** `applyDamage` scales impulse by
+  `1 / (1 + kicked)` and then adds to `kicked` -- per pellet. HAIL's
+  twenty-five landing together meant the second was worth half the first and
+  the tenth a tenth of it: **the harder it connected the less each pellet
+  pushed**, which is the opposite of what a fan is for. `throwOff` skips the
+  fade and lifts the ceiling to `physics.thrownSpeed`, and it is earned by
+  CADENCE -- PULSE, PILE, HEAVE and now HAIL, all buttons with clocks on them;
+  SLUG at 1.5 rounds a second is still refused it.
+  **The control for a throw needs no build without it.** With the exemption a
+  body may exceed its OWN un-exempt ceiling (`cruise * maxSpeedFactor`), which
+  is arithmetically impossible otherwise -- measured, a LURCHER at 333 u/s
+  against a cap of 220. Assert against the witness's own cap, not a number.
+- **A recovery assertion that races a variable throw is a flake.** "The body is
+  back inside where it started within eight seconds" is a race between a
+  recovery walk of about 35 u/s and however far that press happened to throw
+  it -- 408 units on one run and 455 on the next, because which pellets land is
+  not fixed. Assert the SHAPE: closing on every sample, and most of the ground
+  given back. The same disease as the LURCHER window in build 226.
+- **A held reach RING belongs to an ability that reaches in a circle, and
+  nothing else.** PULSE's `Shock` is honest because PULSE is a circle. The same
+  thing on HAIL -- 334 units, the fan's own `speed * life` -- claims the 254
+  degrees the 106-degree wedge does not reach, INCLUDING THE GROUND BEHIND THE
+  TURRET, and rendered it was the loudest thing in the frame by a distance: a
+  dashed hoop most of the screen wide over embers a fifth as bright. The reach
+  of a directional press is drawn by what crosses it. `regress.mjs` asserts
+  ZERO held circles on HAIL, with the reason, because this is the kind of thing
+  that reads well in a diff.
+- **Overlapping OUTLINES scribble; overlapping GLOWS add.** AIRBURST's pop was
+  a 58-unit ring and thirty-four of them go off along one line: rendered, it
+  was a lattice of hoops laid over the bodies rather than anything exploding.
+  A filled dot at the radius the damage is applied at reads as a string of
+  detonations. Anything that fires in NUMBERS has to be drawn as something
+  that composites, and the only way to know is to render it and look.
+- **A `kind` field that nothing reads is a promise the field is making and the
+  code is not keeping.** The six build lots have carried `kind: 'works'` /
+  `'gun'` since build 245 and the lot drawing has honoured it the whole time --
+  a squat block on the two beside the machine, a barrel on the four ahead --
+  while `buildGun` took an index and checked only that a lot existed. Eighteen
+  builds of putting an emplacement on a slot drawn as a building. The guard
+  belongs in `buildGun` AND in `syncGuns`: the first because `buildGun` is
+  reachable from a restore and the debug panel, the second because a save
+  written before the guard can legitimately carry a gun on a works lot and
+  `syncGuns` is the one place every gun passes through on its way to the
+  screen.
+- **A fixture that only writes its aim when it has a target never recovers
+  one.** Four emplacements each frozen on the bearing of a different body that
+  died a minute ago is what "the mini turrets look crooked" was. Anything that
+  tracks needs a REST bearing and a way home, slewed at the tracking rate so
+  it reads as finished rather than snapped.
+- **A price charged in silence reads as free.** An emplacement has cost 2600
+  since it existed and the purse was correctly debited; the only time the
+  number was ever spoken was in the refusal you got for being too poor to pay
+  it, so a player who could afford one was told the price precisely never.
+  Reported as "have energy cost to place turret" on a build that already did.
+  A cost belongs where the decision is taken -- on the lot, under the thumb --
+  and the transaction owes a receipt.
 - **The six emplacement upgrades are NOT in the tree**, and that is deliberate:
   their only door is the TURRETS tab, which is locked until a gun is standing,
   and the tree's gates are rungs and parents. They are ordinary nodes in every

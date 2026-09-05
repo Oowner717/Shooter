@@ -1144,23 +1144,94 @@ export const ABILITIES = [
     color: '#7cffb2',
     cooldown: 5,
     icon: ICON.fan,
-    hint: 'HAIL — 25 pellets in a tight cone.',
+    hint: 'HAIL — a wide fan of pellets that throws a crowd back.',
     run(world) {
       const s = world.shooter;
-      const count = 25;
-      const arc = 1.12; // narrower than it was, so the pellets land together
+      const H = CFG.hail;
+      const up = world.up;
+      const count = H.pellets;
+      const arc = H.arc;
+      /*
+       * AIRBURST. One closure for the whole fan rather than one per pellet:
+       * thirty-four identical closures allocated on every press is thirty-four
+       * allocations for one behaviour, and the blast reads `up` at the moment
+       * it goes off anyway.
+       *
+       * It books to 'fan' and not to `world.round`. That is the rule the
+       * build-233 sweep found four sources breaking: what a blast is worth
+       * belongs on the row of the thing that made it, and PRISM's shell and
+       * HAIL's own darts were the two that fell through `fire`'s default onto
+       * the loaded round. The pellets have said 'fan' since; the blast has to
+       * say it too or pressing HAIL reads as the gun.
+       */
+      const B = H.burst;
+      const burst = up.fanBurst ? (w, x, y) => {
+        applyBlast(w, {
+          x, y, r: B.r,
+          damage: B.damage,
+          impulse: B.impulse,
+          // ...and the same exemption the pellet itself carries, for the same
+          // reason: this is half of one deliberate press, not a stray hit.
+          throwOff: true,
+          src: 'fan',
+        });
+        /*
+         * A FILLED pop and not an outline ring, which is what it was first.
+         *
+         * Thirty-four rings of 58 units going off along one line overlap into
+         * a band of scribble -- rendered and looked at, it read as a lattice
+         * of hoops laid over the bodies rather than as anything exploding.
+         * Outlines cross; glows add. So the burst is a dot at the radius the
+         * damage is actually applied at, with two embers off it, and a string
+         * of them along the fan reads as a string of detonations.
+         */
+        dot(x, y, 0, 0, '#c8ffe2', 0.18, B.r * 0.62);
+        for (let k = 0; k < 2; k++) {
+          const aa = rand(0, TAU);
+          spark(x, y, Math.cos(aa) * rand(70, 190), Math.sin(aa) * rand(70, 190),
+            '#7cffb2', 0.2, 1.8);
+        }
+      } : null;
       for (let i = 0; i < count; i++) {
-        const a = s.aim + ((i / (count - 1)) - 0.5) * arc + spread(0.022);
+        const a = s.aim + ((i / (count - 1)) - 0.5) * arc + spread(H.jitter);
         fire(world, s.muzzleX, s.muzzleY, a, {
           // ...and it is HAIL's, not the loaded round's. `fire` defaults an
           // untagged projectile to `world.round`, which is right for the nine
           // things the rack fires and wrong for the two that are not rounds.
           src: 'fan',
-          speed: rand(1000, 1230),
-          r: 3,
-          damage: 15,
-          impulse: 34,
-          life: 0.62,
+          speed: rand(H.speed[0], H.speed[1]),
+          r: H.r,
+          damage: H.damage,
+          impulse: H.impulse,
+          /*
+           * A THROW, and the whole of "large blowback".
+           *
+           * See the paragraph at `CFG.hail`: an untagged hit pays and
+           * accumulates `1 / (1 + kicked)` PER PELLET, so a fan landing
+           * together taxed itself -- the tenth pellet delivered a tenth of
+           * what the first did, and the harder HAIL connected the less each
+           * one pushed. `throwOff` skips the fade and lifts the ceiling to
+           * `physics.thrownSpeed`, which is what bounds the result rather
+           * than the impulse number.
+           */
+          throwOff: true,
+          /*
+           * The life is JITTERED, and with AIRBURST bought that is what stops
+           * the far end of the fan being one frame.
+           *
+           * `endProjectile` fires a round's burst on expiry as well as on
+           * impact -- `if (p.life <= 0) endProjectile(..., true)`, which is
+           * the same door HE goes through -- so a pellet that hits nothing
+           * still goes off at the end of its flight, about 640 units out. At
+           * a fixed life all thirty-four did it on the SAME frame: thirty-four
+           * rings and sixty-eight embers in one tick, and an arc of blasts
+           * that appeared and was gone. Twelve per cent of life is enough that
+           * the wall of flak arrives over about a tenth of a second and reads
+           * as a wall rather than as a flicker, and it costs the un-upgraded
+           * fan nothing but a little more scatter at its far edge.
+           */
+          life: H.life * rand(0.88, 1),
+          burst,
           bounces: 0,
           color: '#7cffb2',
           trail: 0.03,
@@ -1179,19 +1250,78 @@ export const ABILITIES = [
         });
       }
       /*
-       * The cast, at the barrel. Twenty-five pellets leaving at once was
-       * twenty-five muzzle flashes on top of each other and no single event
-       * -- so the cone itself is drawn once: a wedge of embers thrown along
-       * the spread, and a bloom where they all came from.
+       * ---- the cast, and why it was so quiet ------------------------------
+       *
+       * Thirty-four pellets leaving at once is thirty-four muzzle flashes on
+       * top of each other and no single event, so the cone is drawn ONCE: the
+       * fan itself, and a bloom where it came from. That much was already
+       * true. What was not is that the whole cast came to ten sparks, one dot
+       * and one 70-unit ring against a PULSE that spends forty sparks, two
+       * rings, a held Shock, a ripple, a screen flash and a shake of ten --
+       * so the two abilities the turret is ISSUED with looked like a siege
+       * engine and a cough.
+       *
+       * Itemised against PULSE, which is the loudest thing in the game and
+       * the ceiling this deliberately stays under:
+       *
+       *   PULSE  40 sparks · 2 rings · 1 Shock · 1 dot · ripple · flash 0.18
+       *          · shake 10
+       *   HAIL   31 sparks · 2 rings · 1 dot · ripple · flash 0.10 · shake 7
+       *
+       * The difference in kind is that PULSE's is a CIRCLE and HAIL's is a
+       * WEDGE: every element here is thrown along the fan, so what the press
+       * looks like is the shape of what it just did.
        */
-      for (let i = 0; i < 10; i++) {
-        const a = s.aim + ((i / 9) - 0.5) * arc;
-        spark(s.muzzleX, s.muzzleY, Math.cos(a) * 420, Math.sin(a) * 420, '#c8ffe2', 0.22, 2.4);
+      /*
+       * The leading edge: one ember per two pellets, thrown along the fan at
+       * the speed the pellets leave at, so the wedge opens with them rather
+       * than sitting at the barrel.
+       */
+      const edge = Math.max(8, Math.round(count / 2));
+      for (let i = 0; i < edge; i++) {
+        const a = s.aim + ((i / (edge - 1)) - 0.5) * arc;
+        spark(s.muzzleX, s.muzzleY, Math.cos(a) * rand(520, 760),
+          Math.sin(a) * rand(520, 760), '#c8ffe2', 0.26, 2.6);
       }
-      dot(s.muzzleX, s.muzzleY, 0, 0, '#e6fff2', 0.16, 20);
-      ring(s.muzzleX, s.muzzleY, 6, 70, 0.24, '#7cffb2', 2.4);
+      /*
+       * ...and a slower shell behind it, at a third of the speed and four
+       * times the life. PULSE's lesson, verbatim: a set of embers that all
+       * clear the screen at the same moment reads as one frame rather than as
+       * a blast with a wake.
+       */
+      for (let i = 0; i < 14; i++) {
+        const a = s.aim + (rand(0, 1) - 0.5) * arc;
+        spark(s.muzzleX + Math.cos(a) * 30, s.muzzleY + Math.sin(a) * 30,
+          Math.cos(a) * rand(120, 300), Math.sin(a) * rand(120, 300),
+          '#7cffb2', 0.9, 2.2);
+      }
+      dot(s.muzzleX, s.muzzleY, 0, 0, '#e6fff2', 0.22, 34);
+      /*
+       * Two rings at the MUZZLE, and no held front.
+       *
+       * A ring in this game is stroked at `alpha = t` and `width = w * t`,
+       * both running from full at spawn to nothing at the end -- so a ring
+       * authored to expand INTO a radius is at its dimmest and thinnest
+       * exactly where that radius is. Both of these are drawn at the size
+       * they mean and drift outward as they die. They are small and centred
+       * on the machine, which is the true claim: the machine did this.
+       *
+       * A `Shock` at the fan's own reach was tried and reverted, and the
+       * reason is worth keeping. PULSE's held front is honest because PULSE
+       * IS a circle -- it reached everything inside that radius. HAIL reaches
+       * a 106-degree wedge, and a 334-unit circle drawn round the muzzle
+       * claims the other 254 degrees as well, INCLUDING THE GROUND BEHIND
+       * THE TURRET. Rendered and looked at, it was also the loudest thing in
+       * the frame by a distance: a dashed hoop most of the screen wide, over
+       * a fan of embers a fifth as bright. The reach of a directional press
+       * is drawn by the pellets crossing it, which is already on the screen.
+       */
+      ring(s.muzzleX, s.muzzleY, 10, 96, 0.3, '#e6fff2', 3);
+      ring(s.muzzleX, s.muzzleY, 26, 150, 0.5, '#7cffb2', 2);
+      ripple(s.muzzleX, s.muzzleY, 0.9, 520);
       s.recoil = 1;
-      shake(4);
+      shake(7);
+      flash(0.1, '#c8ffe2');
       audio.ability('fan');
     },
   },

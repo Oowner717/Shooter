@@ -101,9 +101,9 @@ export function syncYard(world, entryY) {
   for (let i = 0; i < 4; i++) {
     const l = lots[2 + i];
     l.x = s.x + (i - 1.5) * Y.lotStep;
-    // ...and the inner pair stands back, so the four are a shallow V and not a
-    // row. See the note on `lotStagger` in config.js.
-    l.y = s.y - Y.lotAhead + (i === 1 || i === 2 ? Y.lotStagger : 0);
+    // ...and all four on ONE line. The stagger that made them a shallow V is
+    // gone; see the note on `lotAhead` in config.js.
+    l.y = s.y - Y.lotAhead;
     l.hw = Y.gunW;
     l.hh = Y.gunH;
   }
@@ -310,7 +310,7 @@ export function updateYard(world, dt) {
  * the table is architectural), and it is UNLIT -- no glow sprite, no hit flash,
  * no wobble, no outline ladder. A colourblind player receives all four.
  */
-export function drawYard(ctx, world, mood) {
+export function drawYard(ctx, world, mood, price = 0) {
   const a = world.yard;
   if (!a) return;
   const hl = CFG.hairline;
@@ -485,7 +485,9 @@ export function drawYard(ctx, world, mood) {
    * the field on purpose: six boxes that cannot be used must never compete
    * with anything that can.
    */
-  for (const l of a.lots) {
+  const built = world.guns || [];
+  for (let li = 0; li < a.lots.length; li++) {
+    const l = a.lots[li];
     const f = l.refused;
     ctx.setLineDash([5 * k, 5 * k]);
     ctx.lineWidth = hl * (1.2 + f * 1.8);
@@ -516,6 +518,36 @@ export function drawYard(ctx, world, mood) {
       ctx.lineTo(l.x, l.y - rr * 1.5);
     }
     ctx.stroke();
+    /*
+     * ...and what it COSTS, on the ground, under the ghost.
+     *
+     * An emplacement has been 2600 energy since it existed and the purse was
+     * charged silently: the only time the number was ever spoken was in the
+     * refusal you got for being too poor to pay it, so a player who could
+     * afford one was told the price precisely never and a turret read as
+     * free. Reported as exactly that.
+     *
+     * On the lot rather than in a pill, because that is where the decision is
+     * taken -- the thumb is already there -- and it goes the moment the lot
+     * is built on. Plated, for the reason the glitch readout is plated: this
+     * is small type over whatever the field happens to be, and the sky under
+     * era 2's lots is not a constant.
+     */
+    if (price > 0 && l.kind === 'gun' && !built.includes(li)) {
+      const px = Math.max(8, 9.5 / k);
+      const label = String(Math.round(price));
+      ctx.font = `${px}px ui-monospace, "SF Mono", Menlo, monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const ty = l.y + l.hh - px * 0.9;
+      const half = ctx.measureText(label).width / 2 + px * 0.36;
+      ctx.fillStyle = `rgba(6,11,19,${0.72 + f * 0.24})`;
+      ctx.beginPath();
+      ctx.rect(l.x - half, ty - px * 0.62, half * 2, px * 1.24);
+      ctx.fill();
+      ctx.fillStyle = rgba(mood.line, 0.5 + f * 0.45);
+      ctx.fillText(label, l.x, ty);
+    }
   }
 
   ctx.restore();

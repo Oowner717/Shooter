@@ -547,7 +547,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
-    // UNCHANGED at build 253, and that is the interesting part. NEW FORM
+    // 137 from build 263, when AIRBURST went in at one level -- HAIL's first
+    // node, and a switch rather than a dial: the pellets either go off where
+    // they land or they do not. It was
+    // 136, UNCHANGED at build 253, and that is the interesting part. NEW FORM
     // stopped being a `repeat` node and took `levels: 1`, which would have put
     // this at 137 -- except that `debugBuyAll` was granting it, which is the
     // fault that change exposed: the loop calls `apply` and pushes the ledger
@@ -600,7 +603,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 136
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 137
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -13332,14 +13335,22 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `spent ${r.before} -> ${r.spentAfter.hp} (dead ${r.spentAfter.dead}), `
     + `live ${r.before2} -> ${r.liveAfter}`);
   /*
-   * 36 with the form (25 pellets one spark each, plus the 11-particle wedge)
-   * against 86 without it. The window is set clear of both rather than on the
-   * digit, because the wedge is authored and may be redrawn.
+   * A RULE rather than a window, because the window was fitted to the wedge of
+   * the day and build 263 redrew it.
+   *
+   * `fire`'s default muzzle costs about three particles a round, so an
+   * untagged fan is `rounds * 3` on one point plus whatever the cast spends --
+   * which is the blob the named form exists to replace, still being drawn
+   * underneath it. Measured at 263: 34 pellets at one particle each plus a
+   * 32-emitter cast is 66, against about 134 unnamed. The lower bound is what
+   * stops it passing on a build with no cast at all.
    */
-  check('...and HAIL leaves as pellets, not as twenty-five muzzle flashes',
-    r.rounds === 25 && r.forms.length === 1 && r.forms[0] === 'pellet'
-    && r.muzzle > 20 && r.muzzle < 60,
-    `${r.rounds} rounds as ${JSON.stringify(r.forms)}, ${r.muzzle} particles at the barrel`);
+  check('...and HAIL leaves as pellets, not as one muzzle flash per pellet',
+    r.rounds === 34 && r.forms.length === 1 && r.forms[0] === 'pellet'
+    && r.muzzle > r.rounds && r.muzzle < r.rounds * 3,
+    `${r.rounds} rounds as ${JSON.stringify(r.forms)}, ${r.muzzle} particles at `
+    + `the barrel -- the cast plus one apiece, against about ${r.rounds * 3} if `
+    + `they fell to the default muzzle`);
 }
 
 // --- STASIS holds everything that moves, not most of it ---------------------
@@ -15839,10 +15850,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * carries `levels: 1` like everything else, and the two had to move together
    * -- `levelsOf` returns Infinity for a repeat node before it ever reaches
    * the mandatory-levels throw, so a level count beside a `repeat` is dead
-   * text. 108 across 54 became 109 across 55.
+   * text. 108 across 54 became 109 across 55, and 263's AIRBURST -- one level,
+   * because the pellets either go off or they do not -- makes it 110 across 56.
    */
   check('...and writing the numbers out changed no ladder',
-    r.total === 109 && r.rungs === 55 && r.repeats === 0,
+    r.total === 110 && r.rungs === 56 && r.repeats === 0,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
     + `now written out, which has to be a refactor and nothing else)`);
@@ -20872,7 +20884,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 {
   const r = await page.evaluate(async () => {
     const { CFG } = await import('../src/config.js');
-    const { gunStats, gunAmmo, gunCount, GUN_AMMO } = await import('../src/turrets.js');
+    const { gunStats, gunAmmo, gunCount, GUN_AMMO, buildGun, syncGuns } = await import('../src/turrets.js');
     const { DETACHED, NODE_BY_ID, coverage } = await import('../src/tree.js');
     const { shielded } = await import('../src/yard.js');
     const g = window.__sim;
@@ -20907,10 +20919,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const a = w.yard;
     out.lots = a.lots.length;
     /*
-     * SPREAD, measured. The four ahead were one row at `lotStep` 70, which put
-     * the inner pair 54 units either side of the turret's own column -- two
-     * guns up one lane. The nearest pair is 144 apart now and the inner two
-     * stand 46 back, so the four are a shallow V.
+     * SPREAD, measured, and LEVEL from build 263.
+     *
+     * The four ahead were one row at `lotStep` 70, which put the inner pair 54
+     * units either side of the turret's own column -- two guns up one lane.
+     * Build 261 answered that twice: the step went to 96 (the nearest pair is
+     * 144 apart) AND `lotStagger` dropped the inner two into a shallow V. The
+     * step is what fixed the lane; the V just made four fixtures sit crooked,
+     * and it is gone. `depths` is 1 now and asserted as 1 -- it was asserted
+     * as 2, which is the old rule written down as a fact.
      */
     const ahead = a.lots.slice(2);
     out.gap = +Math.min(...ahead.slice(1).map((l, i) => Math.abs(l.x - ahead[i].x))).toFixed(0);
@@ -20918,6 +20935,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // ...and no two lots overlap, which a wider spread could have broken.
     out.overlap = a.lots.some((l, i) => a.lots.some((m, j) => j > i
       && Math.abs(l.x - m.x) < l.hw + m.hw && Math.abs(l.y - m.y) < l.hh + m.hh));
+    /*
+     * ---- the two beside the machine are WORKS, and refuse a gun ----------
+     *
+     * They have carried `kind: 'works'` since build 245 and the field has
+     * ghosted a squat block on them the whole time, while `buildGun` read the
+     * index and not the kind -- so a press put an emplacement on a slot drawn
+     * as a building. Both halves are asserted: the MODEL refuses (`buildGun`
+     * is reachable from a restore and from the debug panel, and a control
+     * that refuses is not the same as a rule that holds), and the PRESS
+     * refuses without eating the shot.
+     */
+    out.kinds = a.lots.map((l) => l.kind).join(',');
+    out.worksRefused = [0, 1].map((i) => buildGun(w, i));
 
     const purse0 = w.energy;
     const c = document.querySelector('canvas');
@@ -20944,6 +20974,26 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.twiceCount = gunCount(w);
     out.twicePaid = w.energy === purse1;
     out.twiceFired = w.projectiles.length > 0;
+
+    /*
+     * ...and the same press on a WORKS lot builds nothing, spends nothing and
+     * still fires. Through the HANDLER and not through `pressLot`, because
+     * `pressLot` is not what fires the gun -- the pointerdown listener calls
+     * it and then shoots, and a case that calls the method tests the logic
+     * and not the control. The first version of this arm did exactly that and
+     * reported "still fired: false" on a working build.
+     */
+    const worksPurse = w.energy;
+    const worksGuns = gunCount(w);
+    w.projectiles.length = 0;
+    c.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, cancelable: true, pointerId: 73, isPrimary: true,
+      clientX: box.left + a.lots[0].x * z, clientY: box.top + a.lots[0].y * z,
+    }));
+    out.worksPaid = w.energy === worksPurse;
+    out.worksGuns = gunCount(w) - worksGuns;
+    out.worksFired = w.projectiles.length > 0;
+    out.worksRefusedPulse = a.lots[0].refused > 0;
 
     // ---- it shoots, and it shoots everything -----------------------------
     clean(2);
@@ -21027,7 +21077,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * which was the case throwing the save away, not the save losing it.
      */
     clean(2);
-    g.pressLot(1);
+    // 2 and 4, not 1 and 4: lot 1 is a WORKS slot and refuses a gun from
+    // build 263. It was written before the kinds were honoured.
+    g.pressLot(2);
     g.pressLot(4);
     g.buy('gunammo');
     w.gunsOn = false;
@@ -21041,6 +21093,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.backStanding = w.gunAt.length;
     out.ammoCount = GUN_AMMO.length;
 
+    /*
+     * ---- ...and a save written before 263 does not stand one on a works ---
+     *
+     * `world.guns` is six bits of lot indices and nothing else, so a run saved
+     * while the kinds were unenforced can legitimately carry a 0 or a 1 in it.
+     * `syncGuns` is the one place every gun in the run passes through on its
+     * way to being drawn, and it is where that is refused -- the alternative
+     * is a migration, which throws away a gun the player did buy on a lot that
+     * is still legal.
+     */
+    w.guns = [0, 1, 3];
+    syncGuns(w);
+    out.legacyStanding = w.gunAt.map((x) => x.lot).join(',');
+
     delete w.director.update;
     g.setEra(1);
     g.restart();
@@ -21049,14 +21115,30 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
   check('a build lot buys one emplacement, and never eats the shot',
     r.eraOneYard && r.eraOnePress === false && r.eraOneGuns === 0
-    && r.lots === 6 && r.gap >= 120 && r.depths === 2 && !r.overlap
+    && r.lots === 6 && r.gap >= 120 && r.depths === 1 && !r.overlap
     && r.pressBuilt && r.pressPaid && r.pressFired
     && r.twiceCount === 1 && r.twicePaid && r.twiceFired,
     `era 1 has no yard (${r.eraOneYard}) and refuses the press (${r.eraOnePress}); `
-    + `at era 2 the four ahead are ${r.gap} apart across ${r.depths} depths with `
+    + `at era 2 the four ahead are ${r.gap} apart on ${r.depths} line with `
     + `no overlap (${!r.overlap}); one press built it (${r.pressBuilt}), paid `
     + `(${r.pressPaid}) and still fired (${r.pressFired}); a second bought `
     + `nothing (${r.twicePaid}) and still fired (${r.twiceFired})`);
+
+  /*
+   * The two beside the machine were never emplacement ground: they carry
+   * `kind: 'works'` and the field has ghosted a building on them since build
+   * 245, while `buildGun` read the index and not the kind. Both halves --
+   * the model and the control -- because `buildGun` is reachable from a
+   * restore and from the debug panel.
+   */
+  check('...and the two works slots beside the machine are not for guns',
+    r.kinds === 'works,works,gun,gun,gun,gun'
+    && r.worksRefused.every((x) => x === 'kind')
+    && r.worksPaid && r.worksGuns === 0 && r.worksFired && r.worksRefusedPulse,
+    `the six are ${r.kinds}; buildGun answers ${r.worksRefused.join('/')} on the `
+    + `two works lots; a thumb on one built nothing (+${r.worksGuns}), spent `
+    + `nothing (${r.worksPaid}), pulsed the lot (${r.worksRefusedPulse}) and `
+    + `still fired (${r.worksFired})`);
 
   check('...and it shoots every object in reach, and nothing behind the wall',
     r.mote.dead && r.drift.dead && r.behindShielded && r.behindSafe,
@@ -21089,11 +21171,148 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.offStanding} still standing; brought up, ${r.onTook}`);
 
   check('...and the line comes back with the run',
-    r.gone === 0 && JSON.stringify(r.backGuns) === '[1,4]' && r.backOn === false
-    && r.backAmmo === 'sabot' && r.backStanding === 2 && r.ammoCount === 3,
+    r.gone === 0 && JSON.stringify(r.backGuns) === '[2,4]' && r.backOn === false
+    && r.backAmmo === 'sabot' && r.backStanding === 2 && r.ammoCount === 3
+    && r.legacyStanding === '3',
     `a restart left ${r.gone}; the resume brought back `
     + `${JSON.stringify(r.backGuns)} standing ${r.backStanding}, stood down `
-    + `(${r.backOn === false}), carrying ${r.backAmmo} of ${r.ammoCount}`);
+    + `(${r.backOn === false}), carrying ${r.backAmmo} of ${r.ammoCount}; a `
+    + `pre-263 save carrying [0,1,3] stands only ${r.legacyStanding}`);
+}
+
+// --- what a lot costs, and where a gun points with nothing to shoot ---------
+/*
+ * Three things build 263 straightened, and each shipped wrong on its own.
+ *
+ * The PRICE was charged in silence: 2600 left the purse and the only time the
+ * number was ever spoken was in the refusal you got for being too poor to pay
+ * it, so a player who could afford one was told the price precisely never.
+ *
+ * The REST BEARING did not exist. `updateGuns` writes `aim` only when it has a
+ * target, so a gun kept whatever angle the last thing it shot at left it on,
+ * for ever. Four of them, each frozen on a different dead body, is what
+ * "straighten out the four mini turrets" was about.
+ *
+ * The PAD was sized off the gun's own radius -- `R * 3` by `R * 2.3`, 48 by
+ * 36.8, against a lot box of 46 by 40 -- so the thing that reads as bolted to
+ * the ground overhung its own dashed outline sideways and fell short of it
+ * top and bottom.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { lotPrice, gunCount } = await import('../src/turrets.js');
+    const { drawYard } = await import('../src/yard.js');
+    const { background } = await import('../src/background.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    g.restart();
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.phase = 'staging';
+    g.debugTeachAll();
+    g.debugGiveEnergy(400000);
+    g.setEra(2);
+    w.director.update = () => {};
+    g.debugClearField();
+    w.mines.length = 0;
+    w.projectiles.length = 0;
+    w.effects.length = 0;
+    w.autoAim = false;
+    w.autoFire = false;
+
+    const a = w.yard;
+    const lot = a.lots[3];
+
+    /*
+     * ---- the price is DRAWN on an empty gun lot -------------------------
+     *
+     * Rendered rather than asserted off a property, and the control is the
+     * same yard drawn with the price switched off: what is left is the digits
+     * and nothing else. Counting lit pixels in the lot's lower band and NOT
+     * over the whole canvas, for the reason the wall case records -- a
+     * whole-frame diff reports every unrelated thing that moved.
+     */
+    const band = (price) => {
+      const S = 220;
+      const c = document.createElement('canvas');
+      c.width = S; c.height = S;
+      const x = c.getContext('2d');
+      // the lot's own lower half, where the plate sits, centred in the frame
+      x.translate(S / 2 - lot.x, S / 2 - (lot.y + lot.hh * 0.5));
+      drawYard(x, w, background.mood, price);
+      const d = x.getImageData(0, 0, S, S).data;
+      let lit = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 24) lit++;
+      return lit;
+    };
+    out.priceOff = band(0);
+    out.priceOn = band(lotPrice());
+    out.price = Math.round(lotPrice());
+
+    // ...and it goes the moment the lot is built on, because the decision has
+    // been taken. Same frame, same everything, one gun standing.
+    g.pressLot(3);
+    out.built = gunCount(w) === 1;
+    out.priceBuilt = band(lotPrice());
+
+    /*
+     * ---- the pad is the LOT's box, not a multiple of the gun's radius ----
+     *
+     * The second arm is the revert-and-fail built in: the old expressions are
+     * evaluated here, and if a change ever puts them back the equality below
+     * cannot hold while this stays false.
+     */
+    const gun = w.gunAt[0];
+    out.padW = gun.hw === lot.hw && gun.hh === lot.hh;
+    out.padWas = +(CFG.gun.r * 1.5).toFixed(2);
+    out.padIs = +lot.hw.toFixed(2);
+    out.padDiffered = Math.abs(CFG.gun.r * 1.5 - lot.hw) > 0.5
+      || Math.abs(CFG.gun.r * 1.15 - lot.hh) > 0.5;
+
+    /*
+     * ---- and with nothing to shoot it comes home ------------------------
+     *
+     * A body put off to one side, tracked until the aim has plainly left
+     * rest, then removed -- and the question is whether the aim comes back.
+     * The first arm is the control: a gun with a live target must NOT be at
+     * rest, or "it came home" is a sentence about a gun that never left.
+     */
+    const REST = -Math.PI / 2;
+    const off = (aim) => {
+      let d = aim - REST;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      return +Math.abs(d).toFixed(3);
+    };
+    const e = g.debugSpawn('mote', gun.x + 220, gun.y - 40);
+    e.staged = false;
+    e.hp = 1e9;
+    for (let i = 0; i < 60 * 2; i++) { e.hp = 1e9; g.update(1 / 60); }
+    out.tracking = off(gun.aim);
+    e.dead = true;
+    w.enemies.length = 0;
+    for (let i = 0; i < 60 * 3; i++) g.update(1 / 60);
+    out.rested = off(gun.aim);
+
+    delete w.director.update;
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('a lot says what it costs, and a gun with nothing to shoot comes home',
+    r.priceOn > r.priceOff && r.built && r.priceBuilt === r.priceOff
+    && r.padW && r.padDiffered
+    && r.tracking > 0.35 && r.rested < 0.02,
+    `the empty lot lights ${r.priceOn} pixels against ${r.priceOff} with the `
+    + `price switched off -- ${r.price} energy, drawn where the thumb already `
+    + `is -- and once built it is back to ${r.priceBuilt}; the pad is the lot's `
+    + `own ${r.padIs} and not the gun's ${r.padWas} (${r.padDiffered} that `
+    + `those differ); the aim left rest by ${r.tracking} rad on a target and `
+    + `came back to ${r.rested}`);
 }
 
 // --- the TURRETS tab is shut until one is standing --------------------------
@@ -21386,6 +21605,272 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('...and nothing can put it back over the field it already changed',
     r.armedAtEraTwo === false,
     `forced to 'armed' at era 2, the banner is shown ${r.armedAtEraTwo}`);
+}
+
+// --- HAIL: a wide fan that throws, and AIRBURST -----------------------------
+/*
+ * Build 263. Four things, and three of them could each ship broken alone.
+ *
+ * THE THROW. HAIL's pellets carried `impulse: 34` and no exemption, so the
+ * shove it was rated for did not exist at any range: a shove is
+ * `impulse * invMass` and the ordinary body runs 0.20 to 2.38, and worse, an
+ * untagged hit pays AND ACCUMULATES `1 / (1 + kicked)` per pellet -- so
+ * twenty-five landing together taxed themselves and the tenth was worth a
+ * tenth of the first. The harder it connected the less each pellet pushed.
+ *
+ * The control here needs no toggle and cannot pass by accident: with
+ * `throwOff` the ceiling lifts from `cruise * maxSpeedFactor` to
+ * `physics.thrownSpeed`, so a measured speed ABOVE a body's own un-exempt cap
+ * is arithmetically impossible without the exemption being live. Measured,
+ * 333 u/s against a LURCHER's cap of 220.
+ *
+ * THE WITNESS IS A LURCHER. CLAUDE.md records why: BULWARK's invMass is 0.030
+ * against 0.20-2.38 for everything else, so it is the one body a shove barely
+ * moves, and the HEAVE case reported a working build as broken by choosing it.
+ * It gets an arm of its own asserting the mass dependence instead.
+ *
+ * AND IT COMES BACK, which is the build-110 guard. What threw a body off the
+ * field for good was SUSTAINED fire, not one press: `thrown` is 0.5s and the
+ * ceiling only applies while it lasts, so the body coasts out and then walks
+ * back in. Measured over eight seconds: 408, 384, 334, 283, 246, 206, 147,
+ * 110 from a start of 180.
+ *
+ * The assertion is the SHAPE and not the distance, and the first version got
+ * that wrong: it required the body to be back inside its starting range
+ * within eight seconds, which is a race between a recovery walk of about 35
+ * u/s and however far that press happened to throw it -- 408 on one run and
+ * 455 on the next, because which pellets land is not fixed. What is fixed is
+ * that it closes on every sample and gives back most of the ground, and that
+ * is what is asserted.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { fx } = await import('../src/fx.js');
+    const { ledger } = await import('../src/ledger.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const clean = () => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      const s = w.shooter;
+      s.aim = -Math.PI / 2;
+      s.targetAim = -Math.PI / 2;
+      w.autoAim = false;
+      w.autoFire = false;
+      return s;
+    };
+    const slot = () => w.abilities.slots.findIndex((x) => x.def.id === 'fan');
+
+    /*
+     * ---- the throw ------------------------------------------------------
+     *
+     * Healed every frame so what moves it is the shove and not its death, and
+     * `peak` is read after each step -- the ceiling is applied at the TOP of
+     * `integrate` (clamp the state, then integrate it), so a velocity handed
+     * over by a hit is legitimately seen once before it is clipped. It is the
+     * comparison against the body's OWN un-exempt cap that carries the arm,
+     * not the absolute number.
+     */
+    const shove = (type, dist) => {
+      const s = clean();
+      const e = g.debugSpawn(type, s.x, s.y - dist);
+      if (!e) return null;
+      e.staged = false; e.hp = 1e9; e.maxHp = 1e9; e.vx = 0; e.vy = 0;
+      const d0 = Math.hypot(e.x - s.x, e.y - s.y);
+      w.abilities.clearCooldowns();
+      g.useAbility(slot());
+      let peak = 0;
+      let thrown = 0;
+      for (let f = 0; f < 60; f++) {
+        e.hp = 1e9;
+        g.update(1 / 60);
+        const v = Math.hypot(e.vx, e.vy);
+        if (v > peak) peak = v;
+        if ((e.thrown || 0) > thrown) thrown = e.thrown;
+      }
+      const far = Math.hypot(e.x - s.x, e.y - s.y);
+      // ...and then eight seconds of it walking back in.
+      const trail = [];
+      for (let k = 0; k < 8; k++) {
+        for (let f = 0; f < 60; f++) { e.hp = 1e9; g.update(1 / 60); }
+        trail.push(Math.round(Math.hypot(e.x - s.x, e.y - s.y)));
+      }
+      return {
+        cap: +((e.cruise || 60) * CFG.physics.maxSpeedFactor).toFixed(1),
+        invMass: +(e.invMass || 0).toFixed(4),
+        peak: +peak.toFixed(1),
+        thrown: +thrown.toFixed(2),
+        pushed: +(far - d0).toFixed(1),
+        start: Math.round(d0),
+        trail,
+        alive: !e.dead && w.enemies.includes(e),
+      };
+    };
+    out.near = shove('lurcher', 180);
+    out.heavy = shove('bulwark', 180);
+
+    /*
+     * ---- the fan, and the cast -------------------------------------------
+     *
+     * The bearings come off the projectiles themselves, so the arc asserted is
+     * the one the pellets actually left on and not the one the config names.
+     * The cast is read off the POOLS -- what it spent -- rather than off a
+     * list of call names, which CLAUDE.md records as proving almost nothing.
+     *
+     * `shocks` is asserted at ZERO and that is the load-bearing half. A held
+     * front at the fan's reach was written, rendered, looked at and reverted:
+     * PULSE's is honest because PULSE IS a circle, and a 334-unit circle round
+     * HAIL's muzzle claims the 254 degrees the fan does not reach, including
+     * the ground behind the turret -- and it was the loudest thing in the
+     * frame by a distance. This is what stops it coming back.
+     */
+    const s2 = clean();
+    w.abilities.clearCooldowns();
+    const p0 = fx.particles.active.length;
+    const r0 = fx.rings.active.length;
+    w.effects.length = 0;
+    g.useAbility(slot());
+    out.cast = {
+      sparks: fx.particles.active.length - p0,
+      rings: fx.rings.active.length - r0,
+      shake: +fx.shake.toFixed(2),
+      flash: +fx.flash.toFixed(3),
+      shocks: w.effects.length,
+    };
+    const ang = w.projectiles.map((q) => Math.atan2(q.vy, q.vx));
+    out.n = ang.length;
+    out.want = CFG.hail.pellets;
+    out.spread = +(Math.max(...ang) - Math.min(...ang)).toFixed(3);
+    out.arc = CFG.hail.arc;
+    out.jitter = CFG.hail.jitter;
+    // ...and every one of them is tagged, which is what the two rules above
+    // are carried by: the exemption and the ledger row.
+    out.allThrow = w.projectiles.every((q) => q.throwOff === true);
+    out.allFan = w.projectiles.every((q) => q.src === 'fan');
+    out.muzzleFar = +Math.max(...w.projectiles.map((q) =>
+      Math.hypot(q.x - s2.x, q.y - s2.y))).toFixed(1);
+
+    /*
+     * ---- AIRBURST --------------------------------------------------------
+     *
+     * Delivered health on bodies given enough to survive the window, NOT a
+     * healed body (`start - hp` on a healed body is zero by construction) and
+     * NOT the damage argument at the door (`applyDamage` floors inside).
+     *
+     * The three-abreast arm is the one that states what the node is FOR. A
+     * burst goes off on the SURFACE of what the pellet found and `applyBlast`
+     * measures centre to centre, so most of its circle lands on whatever is
+     * standing beside it -- and at the 34-unit radius this shipped with first
+     * it could not reach the centre of anything larger than 34 at all:
+     * measured against a BULWARK, four bursts delivered EXACTLY ZERO, twice,
+     * to the decimal.
+     */
+    const air = (buy, type, dist, mates) => {
+      const s = clean();
+      g.debugGiveEnergy(400000);
+      const bought = buy ? g.buy('airburst') : 'skipped';
+      const bodies = [];
+      for (let k = 0; k < mates; k++) {
+        const e = g.debugSpawn(type, s.x + (k - (mates - 1) / 2) * 46, s.y - dist);
+        e.staged = false; e.hp = 40000; e.maxHp = 40000;
+        bodies.push({ e, x: e.x, y: e.y, hp0: e.hp });
+      }
+      ledger.reset();
+      ledger.on = true;
+      w.abilities.clearCooldowns();
+      g.useAbility(slot());
+      // Pinned, so what is measured is the fan and not the crowd grinding.
+      for (let f = 0; f < 90; f++) {
+        for (const bd of bodies) { bd.e.vx = 0; bd.e.vy = 0; bd.e.x = bd.x; bd.e.y = bd.y; }
+        g.update(1 / 60);
+      }
+      const rows = ledger.table().map((x) => x.src).sort();
+      ledger.on = false;
+      return {
+        bought,
+        armed: !!w.up.fanBurst,
+        r: +bodies[0].e.r.toFixed(1),
+        took: +bodies.reduce((n, bd) => n + (bd.hp0 - bd.e.hp), 0).toFixed(1),
+        rows: rows.join(','),
+      };
+    };
+    out.one = air(false, 'lurcher', 180, 1);
+    out.oneAir = air(true, 'lurcher', 180, 1);
+    out.three = air(false, 'lurcher', 180, 3);
+    out.threeAir = air(true, 'lurcher', 180, 3);
+
+    delete w.director.update;
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+
+  /*
+   * `peak > cap` is the whole arm: with the ordinary clamp a LURCHER cannot
+   * exceed `cruise * 6` however hard it is hit, so a number above it proves
+   * the exemption is live without needing a build without it to compare
+   * against.
+   */
+  check('HAIL throws a crowd back, and it is a throw and not a hit that pushes',
+    r.near.peak > r.near.cap && r.near.thrown > 0 && r.near.pushed > 150
+    && r.allThrow && r.allFan
+    && r.heavy.peak < r.near.peak && r.heavy.pushed < r.near.pushed
+    && r.heavy.invMass < r.near.invMass,
+    `a LURCHER (invMass ${r.near.invMass}) peaked at ${r.near.peak} u/s against `
+    + `its own un-exempt ceiling of ${r.near.cap} -- impossible without the `
+    + `exemption -- and gave up ${r.near.pushed} units of ground; a BULWARK `
+    + `(${r.heavy.invMass}) peaked at ${r.heavy.peak} and gave up `
+    + `${r.heavy.pushed}, which is mass and not magic; all ${r.n} pellets carry `
+    + `the throw (${r.allThrow}) and book to HAIL (${r.allFan})`);
+
+  /*
+   * The build-110 guard. A LURCHER coasts out while `thrown` lasts and then
+   * walks back in; what threw a body off the field for good was sustained
+   * fire, not one press on a five-second clock.
+   */
+  check('...and the ground it buys is given back, which is what bounds it',
+    r.near.alive
+    && r.near.trail.every((v, i) => i < 2 || v < r.near.trail[i - 1])
+    && r.near.trail[7] < r.near.trail[1] * 0.6,
+    `thrown from ${r.near.start} out to ${r.near.trail[0]}, then `
+    + `${r.near.trail.join(' -> ')} over eight seconds -- closing on every `
+    + `sample and back inside ${(r.near.trail[7] / r.near.trail[1] * 100).toFixed(0)}% `
+    + `of where the throw left it, still on the field (${r.near.alive})`);
+
+  check('...and the fan is as wide as the config says, and the cast shows it',
+    r.n === r.want && Math.abs(r.spread - r.arc) <= r.jitter * 2 + 0.01
+    && r.cast.rings === 2 && r.cast.shocks === 0 && r.cast.sparks > 40
+    && r.cast.shake >= 7 && r.cast.flash > 0,
+    `${r.n} pellets across ${r.spread} rad against an authored ${r.arc} (the `
+    + `difference is the per-pellet jitter, ${r.jitter}); the cast spends `
+    + `${r.cast.sparks} embers, ${r.cast.rings} rings at the muzzle, a shake of `
+    + `${r.cast.shake} and a flash of ${r.cast.flash} -- and ${r.cast.shocks} `
+    + `held circles, because a directional press does not reach in a circle`);
+
+  /*
+   * The crowd ratio is the assertion that states what the node is for: the
+   * burst is worth more to three bodies standing together than to one,
+   * because it goes off on a surface and most of its circle lands next door.
+   * A share of the total would not say that; the two ratios do.
+   */
+  check('AIRBURST goes off where the pellets land, and the crowd pays for it',
+    r.oneAir.armed && r.one.armed === false
+    && r.oneAir.took > r.one.took * 1.3
+    && (r.threeAir.took / r.three.took) > (r.oneAir.took / r.one.took)
+    && r.one.rows === 'fan' && r.threeAir.rows === 'fan',
+    `one body ${r.one.took} -> ${r.oneAir.took} (x`
+    + `${(r.oneAir.took / r.one.took).toFixed(2)}); three abreast `
+    + `${r.three.took} -> ${r.threeAir.took} (x`
+    + `${(r.threeAir.took / r.three.took).toFixed(2)}), which is the node `
+    + `doing what it is for; and it books to HAIL's own row and nothing else `
+    + `(${r.threeAir.rows})`);
 }
 
 // --- report -----------------------------------------------------------------

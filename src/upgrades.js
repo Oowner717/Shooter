@@ -53,6 +53,9 @@ export function freshUpgrades() {
     // field, and reach is what decides whether it is touched at all.
     pulseR: 1,
     pulsePush: 1,
+    // AIRBURST: HAIL's pellets go off where they land. A switch and not a
+    // dial -- see the node.
+    fanBurst: false,
     // field
     // The cap, the lifetime and the throw clock are fixed in config and no
     // upgrade may move any of them. What an upgrade may do is put more down
@@ -223,6 +226,23 @@ const MARK = {
     + '<path d="M3.1 3.1a12.6 12.6 0 0 0 0 17.8" opacity=".55"/>'
     + '<path d="M20.9 3.1a12.6 12.6 0 0 1 0 17.8" opacity=".55"/>'
     + '<path d="M8.8 12h6.4M13.4 9.9 15.5 12l-2.1 2.1" opacity=".9"/>'),
+  /*
+   * AIRBURST: the fan, with each pellet going off where it lands.
+   *
+   * A wedge opening from the mount at the foot -- which is what HAIL IS, and
+   * what no other mark in this branch draws -- with three of the pellets
+   * shown as small bursts along its edge rather than as points. The wedge is
+   * the ability and the bursts are the node, so the mark says which part of
+   * HAIL is for sale.
+   */
+  airburst: g('<path d="M12 21.4 5 6.4M12 21.4l7-15" opacity=".85"/>'
+    + '<path d="M8.6 14 12 12.6l3.4 1.4" opacity=".5"/>'
+    + '<circle cx="6.2" cy="5.4" r="1.7" fill="currentColor" stroke="none"/>'
+    + '<circle cx="12" cy="3.4" r="1.7" fill="currentColor" stroke="none"/>'
+    + '<circle cx="17.8" cy="5.4" r="1.7" fill="currentColor" stroke="none"/>'
+    + '<path d="M6.2 2.2v1.1M6.2 7.5v1.1M3.6 5.4H2.5M8.8 5.4h1.1" opacity=".7"/>'
+    + '<path d="M12 .2v1.1M12 5.5v1.1M9.4 3.4H8.3M14.6 3.4h1.1" opacity=".7"/>'
+    + '<path d="M17.8 2.2v1.1M17.8 7.5v1.1M15.2 5.4h-1.1M20.4 5.4h1.1" opacity=".7"/>'),
   // A field that reaches further and shoves harder.
   repulsor: g('<circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="6" stroke-dasharray="2.4 2.6"/><path d="M12 5.4V2.6M12 18.6v2.8M5.4 12H2.6M18.6 12h2.8"/><path d="M10.4 4.2 12 2.6l1.6 1.6M10.4 19.8 12 21.4l1.6-1.6" fill="currentColor" stroke="none" opacity=".85"/>'),
   // A charge going off wider than it used to: the same centre, one ring further.
@@ -583,6 +603,29 @@ export const UPGRADES = {
     { id: 'shockfront', name: 'SHOCKFRONT', levels: 2,
       line: '+30% PULSE reach and push.',
       apply: (u) => { u.pulseR *= 1.3; u.pulsePush *= 1.3; }, icon: MARK.shockfront },
+    /*
+     * HAIL's one, and ONE level -- written out, because it is a switch and not
+     * a dial: the pellets either go off where they land or they do not, and a
+     * second level of "once" is not a thing. `levels` has been mandatory since
+     * build 224 and there is no default; see the paragraph at the end of this
+     * file for the eight nodes that shipped uncapped before there wasn't.
+     *
+     * What it is worth is measured, on a pinned witness: one LURCHER goes 105
+     * to 161, one BULWARK 118.8 to 162, and THREE LURCHERs shoulder to
+     * shoulder go 270 to 505. Half again against one body and nearly double
+     * against a crowd -- because a burst goes off on the SURFACE of what the
+     * pellet found and most of its circle lands on whatever is standing
+     * beside it. A fan is mostly gaps; this is the node that closes them.
+     *
+     * And the pellets that hit NOTHING go off too, at the end of their
+     * flight about 640 units out: `endProjectile` bursts a round on expiry as
+     * well as on impact, which is the door HE already goes through. That is a
+     * wall of flak at the fan's far edge, and the pellet lives are jittered
+     * so it arrives over a tenth of a second rather than in one frame.
+     */
+    { id: 'airburst', name: 'AIRBURST', levels: 1,
+      line: 'HAIL\'s pellets go off where they land.',
+      apply: set('fanBurst', true), icon: MARK.airburst },
     /*
      * WARD's three. It is the second ability in the tree with shaping of its
      * own (SPIRAL had one, PULSE has SHOCKFRONT) and it earns three because

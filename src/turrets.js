@@ -139,13 +139,24 @@ export function syncGuns(world) {
   const out = [];
   for (const i of owned) {
     const l = a.lots[i];
-    if (!l) continue;
+    // `kind` again, and not belt-and-braces: a save written before build 263
+    // can legitimately carry a gun on a works lot, and this is the one place
+    // every gun in the run passes through on its way to being drawn.
+    if (!l || l.kind !== 'gun') continue;
     const had = was.find((g) => g.lot === i);
     out.push({
       lot: i,
       x: l.x,
       y: l.y,
       r: CFG.gun.r,
+      // The pad is the LOT's own box and not a multiple of the gun's radius.
+      // It was `R * 3` by `R * 2.3` -- 48 by 36.8 against a lot of 46 by 40 --
+      // so the thing that is supposed to read as bolted to the ground
+      // overhung its own dashed outline by a unit on each side and fell an
+      // unit and a half short top and bottom. Four of them, all differently
+      // wrong against the boxes still drawn under them.
+      hw: l.hw,
+      hh: l.hh,
       aim: had ? had.aim : -Math.PI / 2,
       cool: had ? had.cool : 0,
       recoil: had ? had.recoil : 0,
@@ -166,12 +177,29 @@ export function lotPrice() {
 }
 
 /**
- * Build one. Returns 'ok', 'poor', 'built' or 'no' -- the same vocabulary
- * `Game.buy` uses, so the press site can report either the same way.
+ * Build one. Returns 'ok', 'poor', 'built', 'kind' or 'no' -- the same
+ * vocabulary `Game.buy` uses, so the press site can report either the same way.
+ *
+ * ---- 'kind', and why the check belongs HERE ----
+ *
+ * The six lots have never all been the same thing: two of them stand either
+ * side of the machine and carry `kind: 'works'`, and the four ahead carry
+ * `kind: 'gun'`. `syncYard` has written that since build 245 and the LOT
+ * DRAWING has honoured it the whole time -- a works ghosts a squat block, an
+ * emplacement ghosts a barrel on a mount -- so the field has been promising
+ * two different things and building the same one on both. Reported as exactly
+ * that: an emplacement standing on a slot drawn as a building.
+ *
+ * The guard is in the model rather than at the press, for the reason
+ * CLAUDE.md gives about the wave rail: a control that refuses is not the same
+ * as a rule that holds. `buildGun` is reachable from a restore, from the
+ * debug panel and from anything written next year, and the press site is only
+ * one of its callers.
  */
 export function buildGun(world, i) {
   const a = world.yard;
   if (!a || i < 0 || !a.lots[i]) return 'no';
+  if (a.lots[i].kind !== 'gun') return 'kind';
   const owned = world.guns || (world.guns = []);
   if (owned.includes(i)) return 'built';
   const price = lotPrice();
@@ -214,6 +242,12 @@ function pick(world, g, range) {
  * draws -- switched off is a state you can see, and a gun that vanished when
  * you turned it off would read as sold rather than as idle.
  */
+/**
+ * Where a gun points with nothing to shoot: straight up-field, the way the
+ * machine itself rests. One constant, so all four agree.
+ */
+const REST = -Math.PI / 2;
+
 export function updateGuns(world, dt) {
   const guns = world.gunAt;
   if (!guns || !guns.length) return;
@@ -224,7 +258,24 @@ export function updateGuns(world, dt) {
     g.cool = Math.max(0, g.cool - dt);
     const t = on ? pick(world, g, st.range) : null;
     g.target = t;
-    if (!t) continue;
+    /*
+     * ...and with nothing to shoot it comes back to REST, which is straight
+     * up-field.
+     *
+     * It used to keep whatever bearing its last target left it on, for ever.
+     * One gun looks like it is watching something; four, each frozen at the
+     * angle of a different body that died a minute ago, look like four things
+     * knocked askew -- and they never recover, because nothing writes `aim`
+     * again until the next target. Reported as the line being crooked, which
+     * it was. It slews home at the same rate it tracks, so a gun swinging
+     * back is a gun that has finished rather than a gun that has snapped.
+     */
+    if (!t) {
+      const d0 = angleDelta(g.aim, REST);
+      const step0 = st.slew * dt;
+      g.aim += clamp(d0, -step0, step0);
+      continue;
+    }
     /*
      * Aimed at where it will BE, the same lead the machine's assist takes --
      * without it a fixture with a 0.55s cadence spends most of its rounds
@@ -307,11 +358,14 @@ export function drawGuns(ctx, world) {
     ctx.translate(g.x, g.y);
 
     // the pad it is bolted to, which is what makes it read as built rather
-    // than as parked
+    // than as parked -- and it is exactly the box the empty lot drew, so the
+    // gun lands ON the ground that was reserved for it
+    const pw = g.hw || R * 1.5;
+    const ph = g.hh || R * 1.15;
     ctx.strokeStyle = rgba('#5d7086', on ? 0.5 : 0.28);
     ctx.lineWidth = hl * 1.4;
     ctx.beginPath();
-    ctx.rect(-R * 1.5, -R * 1.15, R * 3, R * 2.3);
+    ctx.rect(-pw, -ph, pw * 2, ph * 2);
     ctx.stroke();
 
     ctx.rotate(g.aim + Math.PI / 2);

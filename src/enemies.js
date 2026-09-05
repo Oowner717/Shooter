@@ -1208,7 +1208,7 @@ export class Enemy {
    *
    * @returns 'reflect' | 'hit'
    */
-  takeHit(world, dmg, hx, hy, dirx, diry, impulse, shred = 0, form = null, pr = 0, src = '') {
+  takeHit(world, dmg, hx, hy, dirx, diry, impulse, shred = 0, form = null, pr = 0, src = '', throwOff = false) {
     /*
      * Where it actually landed. See `contactAt` in physics.js: the point the
      * projectile sweep hands over is a clamped closest-point on one frame of
@@ -1239,8 +1239,13 @@ export class Enemy {
       this.lastHit = form;
       this.lastHitT = world.time;
     }
-    // The shove is along the travel, which is what this argument is.
-    this.applyDamage(world, dmg, dirx, diry, impulse, shred, c.b, false, src);
+    /*
+     * The shove is along the travel, which is what this argument is -- and
+     * whether it is a THROW comes from the round. It was hardcoded `false`
+     * here, which was right while nothing fired by the turret was a
+     * deliberate clear and wrong the moment HAIL became one.
+     */
+    this.applyDamage(world, dmg, dirx, diry, impulse, shred, c.b, throwOff, src);
     /*
      * The landing, per form -- AT THE CONTACT, ALONG THE NORMAL.
      *

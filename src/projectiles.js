@@ -18,6 +18,21 @@ class Projectile {
     this.r = opts.r ?? CFG.bolt.r;
     this.damage = opts.damage ?? CFG.bolt.damage;
     this.impulse = opts.impulse ?? CFG.bolt.impulse;
+    /*
+     * A DELIBERATE SHOVE rather than a hit that happens to push -- the
+     * exemption PULSE, PILE and HEAVE carry and SLUG deliberately does not.
+     * It skips the repeated-shove fade and lifts the speed ceiling to
+     * `physics.thrownSpeed`; see the paragraph at `CFG.hail`, and the rule
+     * in CLAUDE.md about a throw being earned by CADENCE and not by weight.
+     *
+     * Off by default and it must stay that way: every round in the rack is
+     * fired one and a half times a second, and CLAUDE.md records what
+     * happened the one time something on that cadence was exempted -- a
+     * LURCHER went out to 1293 units of an 817-unit field and never came
+     * back. HAIL is the only projectile in the game that sets it, because
+     * HAIL is a button with a clock on it.
+     */
+    this.throwOff = !!opts.throwOff;
     this.life = opts.life ?? CFG.bolt.life;
     this.bounces = opts.bounces ?? CFG.bolt.bounces;
     this.color = opts.color || '#bff4ff';
@@ -532,7 +547,7 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       // the per-form path. Passed as null for tracer to keep that path's
       // guard trivially cheap.
       const res = e.takeHit(world, p.damage, hx, hy, dirx, diry, p.impulse, p.shred,
-        p.form === 'tracer' ? null : p.form, p.r, p.src);
+        p.form === 'tracer' ? null : p.form, p.r, p.src, p.throwOff);
       if (res === 'reflect') {
         /*
          * Mirror the velocity about the surface normal AT THE ENTRY POINT.

@@ -2270,3 +2270,173 @@ touching only that era. Both halves are a **state swap**, not a facade:
 
 552 green. The ORDINAL hash was **not** run: this build touches the bench, the
 counter and the room's furniture and nothing in energy, targeting or the boss.
+
+## 35. Build 263 — HAIL throws, and the line stands straight
+
+Two requests in one build, and they share nothing but the session.
+
+### HAIL
+
+> "Large blowback from Hail ability. Make Hail more powerful looking. Have it
+> spread a large fan of shots that pushback and put in an upgrade that makes
+> them explosive."
+
+**The blowback did not exist, and the reason is arithmetic.** A pellet carried
+`impulse: 34` and no exemption. A shove is `impulse * invMass` and the ordinary
+body runs 0.20 to 2.38, so 34 bought between 7 and 81 u/s of an approach — and
+worse, an untagged hit pays *and accumulates* `1 / (1 + kicked)` **per
+pellet**. Twenty-five landing together taxed themselves: the second was worth
+half the first and the tenth a tenth of it. **The harder HAIL connected, the
+less each pellet pushed.**
+
+`throwOff` fixes both halves — the fade is skipped and the ceiling lifts from
+`cruise * maxSpeedFactor` to `physics.thrownSpeed`. The rule for granting it is
+CADENCE and not weight: PULSE and PILE have it, SLUG is refused it, and the
+line is a deliberate press against a round fired one and a half times a second.
+HAIL is a button with a five-second clock on it, one press at a time, so it
+sits with PULSE. It is the first projectile in the game to carry it, which is
+why `Projectile` grew a `throwOff` and `takeHit` grew a twelfth parameter —
+that call had `false` hardcoded in it, which was right while nothing the turret
+fired was a deliberate clear.
+
+Measured on a pinned witness, `impulse` 34 → 265:
+
+| | LURCHER | BULWARK |
+|---|---|---|
+| invMass | 0.214 | 0.030 |
+| un-exempt ceiling (`cruise * 6`) | 220 u/s | 140 u/s |
+| peak after one HAIL | **333 u/s** | 93 u/s |
+| ground given up | **207 units** | 61 units |
+
+The LURCHER's peak is *above its own un-exempt ceiling*, which is
+arithmetically impossible without the exemption — so the case needs no build
+without it to compare against. The BULWARK arm is the mass dependence, and it
+is there because CLAUDE.md records the HEAVE case reporting a working build as
+broken by choosing the one body a shove barely moves.
+
+**And it comes back**, which is the build-110 guard: `thrown` lasts 0.5s, so
+the body coasts out and then walks back in at about 35 u/s. Measured over eight
+seconds: 408, 384, 334, 283, 246, 206, 147, 110, from a start of 180. What
+threw a body off the field for good was *sustained* fire, not one press.
+
+**The fan.** `arc` 1.12 → 1.85 rad (64° → 106°), count 25 → 34. Close to
+density-neutral — 22.3 pellets a radian became 18.4 — so a 20-unit body at 200
+units eats about 3.7 pellets where it ate 4.5. HAIL is **18% weaker against one
+body and 36% more metal across the field**, which is the trade "a large fan"
+asks for: it stops being a burst you point at something and becomes an answer
+to a crowd.
+
+**The cast.** Itemised against PULSE, which is the ceiling it stays under:
+
+| | sparks | rings | Shock | dot | ripple | flash | shake |
+|---|---|---|---|---|---|---|---|
+| PULSE | 40 | 2 | 1 | 1 | yes | 0.18 | 10 |
+| HAIL (before) | 10 | 1 | — | 1 | — | — | 4 |
+| HAIL (now) | 31 | 2 | **0** | 1 | yes | 0.10 | 7 |
+
+The difference in kind is that PULSE's is a circle and HAIL's is a **wedge**:
+every element is thrown along the fan, so the press looks like the shape of
+what it just did.
+
+**The zero in that table is the interesting entry.** A held `Shock` at the
+fan's own reach — `speed * life * 0.55`, 334 units — was written, rendered,
+looked at, and reverted. PULSE's held front is honest because PULSE *is* a
+circle: it reached everything inside that radius. HAIL reaches a 106° wedge,
+and a 334-unit circle drawn round the muzzle claims the other 254° as well,
+**including the ground behind the turret**. It was also, by a distance, the
+loudest thing in the frame: a dashed hoop most of the screen wide over a fan of
+embers a fifth as bright. The reach of a directional press is drawn by the
+pellets crossing it, which is already on the screen. The case asserts zero held
+circles, with the reason, so it cannot come back by accident.
+
+**And AIRBURST's pop is a filled glow, not an outline ring** — for the same
+reason, found the same way. Thirty-four 58-unit rings going off along one line
+overlap into a lattice of hoops laid over the bodies; rendered, it read as
+scribble rather than as anything exploding. Outlines cross, glows add.
+
+### AIRBURST
+
+One level, because it is a switch and not a dial. It hangs under HAIL in the
+ABILITIES branch, which had `fan: []` until now.
+
+**It shipped switched off for half the game and the measurement caught it.**
+`applyBlast` measures **centre to centre**, and a pellet's burst goes off where
+the pellet stopped — on the far body's *surface*. So a blast of radius R
+centred there reaches that body's own centre only if R exceeds its radius. At
+the 34 it was first written with, four bursts on a pinned BULWARK (r 45)
+delivered **exactly zero, twice, to the decimal**, while the pellets delivered
+118.8. A number that looked conservative was in fact inert for everything
+large.
+
+At 58 it clears every body in the game but a BULWARK, and what it is really for
+is the neighbours:
+
+| | plain | AIRBURST | |
+|---|---|---|---|
+| one LURCHER | 105 | 161 | ×1.53 |
+| one BULWARK | 118.8 | 162 | ×1.36 |
+| three LURCHERs abreast | 270 | 505 | **×1.87** |
+
+The crowd ratio exceeding the single ratio is what the case asserts, because
+that is the claim: the burst goes off on a surface and most of its circle lands
+next door. A share of the total would not say it.
+
+**And the pellets that hit nothing go off too.** `endProjectile` bursts a round
+on expiry as well as on impact — `if (p.life <= 0) endProjectile(..., true)`,
+the same door HE goes through — so an un-upgraded miss is silent and an
+upgraded one is a wall of flak at about 640 units. At a fixed `life` all
+thirty-four did it on the same frame: thirty-four rings and sixty-eight embers
+in one tick, gone before it read as anything. The pellet lives are jittered 12%
+so it arrives over a tenth of a second.
+
+### The emplacements
+
+> "Straighten out the four mini turrets. Have energy cost to place turret. The
+> two building slots beside turret are not for mini turrets."
+
+**The two beside the machine were never emplacement ground, and the field had
+been saying so for eighteen builds.** They carry `kind: 'works'` and are ghosted
+as a squat block where the four ahead are ghosted as a barrel on a mount —
+written in build 245, drawn ever since, and never read: `buildGun` took an index
+and checked that a lot existed. The guard is in the model rather than at the
+press, because `buildGun` is reachable from a restore and from the debug panel,
+and `syncGuns` carries it too — a save written before this build can legitimately
+hold a gun on lot 0 or 1, and that is the one place every gun passes through on
+its way to being drawn.
+
+**Straightened, three ways, because "crooked" was three things:**
+
+- `lotStagger` is gone. Build 261 answered "two guns up one lane" twice over —
+  `lotStep` 70 → 96 *and* a 34-unit stagger into a shallow V. The step is what
+  fixed the lane; the V just made four fixtures sit crooked. It costs nothing
+  to remove: it moved the inner pair 34 units *up*-field into the same
+  `lotAhead` bound the outer pair was already tested against.
+- **A gun with nothing to shoot now comes home.** `updateGuns` writes `aim`
+  only when it has a target, so a gun kept whatever bearing the last thing it
+  shot at left it on, for ever. One looks like it is watching something; four,
+  each frozen on a different body that died a minute ago, look like four things
+  knocked askew — and they never recovered, because nothing wrote `aim` again
+  until the next target. Rest is straight up-field, slewed home at the tracking
+  rate.
+- **The pad is the lot's own box.** It was `R * 3` by `R * 2.3` — 48 by 36.8
+  against a lot of 46 by 40 — so the thing that reads as bolted to the ground
+  overhung its dashed outline sideways and fell short of it top and bottom.
+
+**The price was charged in silence.** An emplacement has cost 2600 since it
+existed and the deduction worked; the only time the number was ever *spoken*
+was in the refusal you got for being too poor to pay it, so a player who could
+afford one was told the price precisely never and a turret read as free. It is
+on the lot now, plated, under the ghost — where the thumb already is — and it
+goes the moment the lot is built on. The press answers with a receipt.
+
+### Verification
+
+558 green. ORDINAL's hash taken on `HEAD` and on the change in the same
+container: **`-1765830468` both times.** It could not have moved — nothing here
+touches energy, targeting or the boss, `fight.mjs` buys nothing, and the
+`takeHit` signature change passes the same `false` every existing round already
+passed — but the point of running it is knowing that.
+
+One known flake seen once and not reproduced: *"the debris is thrown along
+lobes"*, which CLAUDE.md already records as an un-run-down randomised burst
+pattern.

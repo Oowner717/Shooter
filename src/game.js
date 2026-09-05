@@ -1569,6 +1569,14 @@ export class Game {
       audio.amend();
       this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
       /*
+       * ...and SAY what it cost. The purse falls by 2600 on this frame and
+       * the chip that shows it is one line of digits among several -- so the
+       * one moment a player is certain what an emplacement is worth is the
+       * moment they are told. The price is on the lot as well; this is the
+       * receipt for it.
+       */
+      this.hud.alert(`EMPLACEMENT · -${Math.round(lotPrice())} ENERGY`, 'info', 2);
+      /*
        * The first one opens the tab, so the menu has to be told. `syncSeals`
        * is not enough -- the lock is on a TAB and not on a strip cell -- and
        * the sheet is very often shut when this happens, so it is the menu's
@@ -1583,6 +1591,16 @@ export class Game {
     refuseLot(w, i);
     if (r === 'poor' && this.hintsAllowed) {
       this.hud.alert(`EMPLACEMENT · ${Math.round(lotPrice())} ENERGY`, 'info', 2.2);
+    }
+    /*
+     * The two beside the machine are not emplacement ground and never were --
+     * they carry `kind: 'works'` and the field has drawn them as a building
+     * since build 245. Until 263 `buildGun` did not read that, so a press put
+     * a turret on a slot ghosted as a block. It refuses now, and says which
+     * of the six are yours to build a gun on rather than only saying no.
+     */
+    if (r === 'kind' && this.hintsAllowed) {
+      this.hud.alert('WORKS · NOT AN EMPLACEMENT LOT', 'info', 2.2);
     }
     return false;
   }
@@ -3394,7 +3412,7 @@ export class Game {
 
     // The yard, straight onto the substrate: behind every body, every drop and
     // every piece of wreckage, which is what scenery has to mean here.
-    drawYard(ctx, w, background.mood);
+    drawYard(ctx, w, background.mood, lotPrice());
 
     /*
      * Ground first: anything in effects that declares itself ground (the
