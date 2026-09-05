@@ -193,7 +193,35 @@ export function holdBelow(world, x, y, pad = 0) {
  */
 export function shielded(world, e) {
   const a = world.yard;
-  return !!a && e.y + e.r <= a.wallY;
+  return !!a && !world.boss && e.y + e.r <= a.wallY;
+}
+
+/**
+ * The wall's line, or null when there is no wall in force. Everything that has
+ * to STOP at it -- a round's step, the assist's drawn boundary, the aim ray --
+ * asks here rather than reading `world.yard.wallY` itself, so the wall is in
+ * force in exactly one place and cannot be half-suspended.
+ *
+ * ---- why an anomaly suspends it
+ *
+ * A boss does not fit behind it. Measured at 320x568 era 2: the wall stands at
+ * 561.5 and the turret at 848.1, so the open field between them is 287 units,
+ * while the boss standoffs are 340-380 UNSCALED -- ORDINAL, GNOMON, FRACTAL and
+ * TERMINUS all place their core above the line (ORDINAL 53.4 units clear of it,
+ * TERMINUS 118.5), and TERMINUS's ring alone is 500 across. Under the build-256
+ * guard those four are untargetable and unkillable: `autoTarget` returns null
+ * and every round is swallowed at the line.
+ *
+ * It cannot happen in the shipped game -- `Director.heldBy` returns 0 once an
+ * anomaly is reconciled, and era 2 is gated on all seven being reconciled, so
+ * `syncGate` never lights another aperture and there is no door onto a boss at
+ * era 2. This is a guard against the version of that which is not true, not a
+ * fix for a live fault; the wall belongs to the wave field, and an anomaly is
+ * what happens instead of the wave field.
+ */
+export function wallLine(world) {
+  const a = world.yard;
+  return a && !world.boss ? a.wallY : null;
 }
 
 /**

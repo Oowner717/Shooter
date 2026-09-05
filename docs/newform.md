@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P9b (255), plus build 256's walls. The plan's structure is complete; P10 (the reveal pass) is what is left.**
+**Status: P1 (238) - P9b (255), plus builds 256-257's walls. The plan's structure is complete; P10 (the reveal pass) is what is left.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -1732,3 +1732,135 @@ absorbed with `impacted: false` cannot call it whatever the effect pool happens
 to be doing that frame.
 
 523 green, hash `-1765830468` before and after in this container.
+
+## 30. Build 257 — the assist stops at the wall
+
+Reported from play: "have auto-aim stop at enemy wall; the turret should not be
+able to target anything beyond the enemy wall." Build 256 had put `shielded`
+into `autoTarget`'s main loop and nowhere else, which left both halves of that
+half done.
+
+**The function was half done, in the shape this repo has been caught by twice.**
+`autoTarget`'s hysteresis block is the same legality question asked a second
+time, and the second copy did not get the new rule — exactly as it did not get
+`spent` in build 219 until a boss had held a lock through 18% of its own outro.
+`heldLive` is set before the loop's `continue`s, so a body shoved back behind
+the wall still reached that block, passed every test it applied, and kept the
+lock. Reverted and measured: **90 of 90 frames still locked, 0 damage taken** —
+the barrel slewing to it, the gun firing, the reticle painting, every round
+swallowed at the line. Three ordinary things push a straddler over: a bolt's own
+knockback, a PULSE (340 unscaled, 53 units past the wall), and LODE's repel.
+
+Both callers take one `legal` predicate now:
+`(e) => !e.dead && !e.staged && !e.spent && !shielded(w, e)`. `harmless` is
+deliberately outside it — the loop applies it by aim mode and the hysteresis
+applies a flat version, and folding those would be a behaviour change dressed
+as a tidy-up. **A rule that has to be written twice is a rule that will be
+applied once.**
+
+**The picture was not done at all, and the obvious fix was the wrong one.**
+Measured at 320x568 era 2: the wall stands 286.6 units above the turret and the
+STOCK reach is 615.4, so with nothing bought the dashed arc ran 328.8 units into
+the enemy's half, through their building, both cone ticks inside the yard.
+
+Clipping the RADIUS — `min(reach, y - wallY)` — was checked and rejected on
+arithmetic, not taste: **reach is a radius and the wall is a line.** At 286.6
+against 615.4 it throws away the whole lower-outer cone, and a body 392 units
+out at 1.18 rad off vertical is 724 deep, well past the line, a target the
+assist takes and the gun kills. It would also make both levels of ARRAY buy
+nothing on that screen — the `world.endless` shape, a bought node still threaded
+and no longer reachable — and make the card a lie in the one direction that
+cannot be defended.
+
+So the boundary is drawn as what it is. `wallPhi = acos(up / reach)` is the
+half-angle inside which the wall is nearer than the reach: outside it the
+boundary is the arc, inside it the boundary is the wall itself, and the two
+meet. At 320x568 stock that is a dashed run along the wall turning down into
+two short arc stubs at the cone edges. At era 1 `wallLine` is null, `wallPhi` is
+0, and it is the single `ctx.arc` it has always been.
+
+One trap inside it: **`ctx.arc` draws a line from the current point to where the
+sweep STARTS**, so the `moveTo` has to be the low angle and not the near one. On
+the left shoulder those are opposite ends, and the difference is a chord laid
+across the cone.
+
+**Three more one-liners on the same promise.** The aim ray is clipped at the
+wall (bearing is still the player's — manual aim may point into the yard, and a
+body leaning down through the line is a legitimate manual shot; the reach the
+line draws is not). `drawTouchAid`'s per-body ring skips a shielded body — it is
+the topmost mark on the frame and `touchLift` is 86 units at era 2, so a thumb
+well inside the play band can put the crosshair on the wall. And `applyBlast`
+skips a shielded body in the blast loop, because the graft loop calls `hitGraft`
+directly five lines before the guarded `applyDamage` call.
+
+**A round's whole STEP stops at the wall now, not just its end.** Build 256
+absorbed the round after `resolveSegment` had swept the entire frame step — 26
+units at 60Hz, 426 at `CFG.maxFrameDelta` — so the sweep reached across the line.
+`applyDamage` refuses the damage, but three things sit above that guard and were
+reached anyway: `hitShard` and `hitGraft`, which take no world and have no guard
+of their own, and PRISM's `reflect`, which answers a hit before any damage is
+computed. Clipping the step is the class rather than the three. The era-1
+expressions are untouched and nothing in the clip runs there.
+
+**What is deliberately NOT clipped away**: a WARDEN's shards ride at
+`orbitR + SHARD_R`, well outside its own radius. Measured, one shard hung **2.7
+units past the wall** and was taken while the body it belongs to lost nothing.
+That is the rule the wall states, applied to a body that is not a circle.
+
+**The instrument had to be rebuilt once.** A whole-frame diff of the live canvas
+reported 123 changed pixels above the wall for a readout that provably draws
+none: the arc is a hairline at 0.12 alpha over a lattice that is already blue, so
+the band that has to be read is the whole top half of the field rather than the
+one row the build-109 case gets away with — and after five hundred cases that
+band is full of things the toggle did not put there. The drawing arms render to
+an OFFSCREEN canvas instead and count LIT PIXELS ABOVE THE WALL, which is a
+reading and not a difference. The first version of the lock arm was wrong too:
+it put its challenger 420 units up, which on the short screen is itself behind
+the wall, so the arm asked nothing. `challengerLegal` is asserted now.
+
+**Reverted, both mechanisms fail loudly**: the lock arm reports `STALE` and 90 of
+90 frames held, and the arc puts 267 lit pixels past the wall at stock reach and
+76 at one ARRAY. (At two ARRAY the arc leaves the top of the frame entirely and
+reads 0 — the low multipliers are what carry that proof.)
+
+### Recorded and deliberately not built
+
+An audit of every path found more than the request covers. These are real,
+measured, and left alone on purpose:
+
+- **STASIS's freeze is global.** `world.stasis` has eleven readers in
+  enemies.js with no per-body test; the `shielded` guard build 256 added covers
+  only the one-off damp on the press frame. Its drawn brackets (`drawStasis`'s
+  `mark`) have no wall test either.
+- **SNARE's drawn wires and LODE's reach ring** paint past the wall to bodies
+  neither of them is acting on — 221 and 189 units past it — eight hundred lines
+  from a docstring saying the picture must be the set `grip` actually takes.
+- **WARD's surface loop** (abilities.js:741) reports cutting a body the wall
+  protects; the arcs loop eight lines below it does carry the guard.
+- **ARC's chain** jumps to a shielded body: no damage lands, but the jump is
+  spent and drawn, and `lastHit` is written.
+- **PILE's front** writes `thrown` before the guarded `applyDamage` call.
+- **`aimLead` uses `CFG.bolt.speed` raw**, missing both `up.speed` and
+  `CFG.scale` — 0.023 rad of lead error at era 2. Not a wall bug at all.
+- **AUTO FIRE keeps firing at the last bearing** when a lock is dropped, wall or
+  otherwise, and `up.slew` silently stops applying the moment `autoSteering`
+  goes false.
+
+### The era-2 boss landmine, which is why `wallLine` consults `world.boss`
+
+Measured at 320x568 era 2: the wall is at 561.5 and the turret at 848.1, so the
+open field between them is **287 units**, while boss standoffs are 340-380 and
+are NOT in `SCALED`. ORDINAL, GNOMON, FRACTAL and TERMINUS all place their core
+above the line (ORDINAL 53.4 clear of it, TERMINUS 118.5), and TERMINUS's ring
+alone is 500 across. Under the build-256 guard those four are untargetable and
+unkillable: `autoTarget` returns null and every round is swallowed.
+
+It cannot happen in the shipped game — `Director.heldBy` returns 0 once an
+anomaly is reconciled, era 2 is gated on all seven being reconciled, so
+`syncGate` never lights another aperture and there is no door onto a boss at
+era 2. `wallLine` returns null while `world.boss` is up anyway, because a boss
+does not FIT behind the wall and the wall belongs to the wave field. **Anyone
+adding an era-2 anomaly should read this paragraph first.**
+
+529 green, hash `-1765830468` before and after in this container, bundle booted
+by hand over http for the first `shooter.js -> yard.js` edge.

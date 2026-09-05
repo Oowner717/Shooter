@@ -24,6 +24,7 @@ export const RIG_MAX = 18;
 /** How wide SALVO throws its three. */
 const SALVO_FAN = 0.09;
 import { applyBlast } from './enemies.js';
+import { wallLine } from './yard.js';
 import { audio } from './audio.js';
 
 /**
@@ -981,7 +982,21 @@ export class Shooter {
     // length is a screen length. Unscaled it is 186 CSS px at era 1 and 121 at
     // era 2, so the one line that answers "where am I aiming" gets shorter
     // exactly as the field it has to cross gets bigger.
-    const rayLen = (300 + this.gripGlow * 320) * CFG.scale;
+    let rayLen = (300 + this.gripGlow * 320) * CFG.scale;
+    /*
+     * ...and it stops at their wall. The ray answers "where am I aiming", and
+     * a ray drawn 186 CSS px into a half of the field nothing of yours can
+     * cross is answering it wrongly -- the barrel may still POINT up there
+     * (bearing is the player's, and a body leaning down through the line is a
+     * legitimate manual shot), but the reach the line draws is not.
+     *
+     * `sin(aim)` is negative pointing up, so this only ever shortens; at era 1
+     * `wallLine` is null and the ray is the expression it always was.
+     */
+    const line = wallLine(world);
+    if (line !== null && Math.sin(this.aim) < -1e-3) {
+      rayLen = Math.min(rayLen, (this.y - line) / -Math.sin(this.aim));
+    }
     const rx = this.x + Math.cos(this.aim) * rayLen;
     const ry = this.y + Math.sin(this.aim) * rayLen;
     const grad = ctx.createLinearGradient(this.x, this.y, rx, ry);
@@ -1102,15 +1117,66 @@ export class Shooter {
     if (world.autoAim) {
       const reach = CFG.shooter.aimRange * world.up.aimRange;
       const cone = CFG.shooter.aimClamp;
+      /*
+       * ---- ...and it stops at their wall ----
+       *
+       * The assist refuses anything with no pixel past the wall's bottom line
+       * (`Game.autoTarget`), so the region it will actually take a target in is
+       * the sector cut off by that line -- and the arc alone drew the sector
+       * without the cut. Measured at 320x568 era 2: the wall stands 286.6 units
+       * above the turret and the STOCK reach is 615.4, so with nothing bought
+       * the arc ran 328.8 units into the enemy's half, straight through their
+       * building, and both cone ticks landed inside the yard. The one readout
+       * that exists to say where the assist stops was claiming ground it had
+       * been refusing since build 256.
+       *
+       * Clipping the RADIUS instead was tried on paper and is the wrong answer:
+       * `min(reach, y - wallY)` is 286.6 against 615.4 on that screen, which
+       * throws away the whole lower-outer cone -- a LURCHER 392 units out and
+       * 1.18 rad off vertical is 724 deep, well past the line, a target the
+       * assist takes and the gun kills -- and it would make both levels of
+       * ARRAY buy nothing there, which is the `world.endless` shape: a bought
+       * node still threaded and no longer reachable.
+       *
+       * So the boundary is drawn as what it is. `wallPhi` is the half-angle
+       * inside which the wall is nearer than the reach: outside it the
+       * boundary is the arc, inside it the boundary is the wall itself, and
+       * the two meet. At era 1 `wallLine` is null, `wallPhi` is 0, and this is
+       * the single `ctx.arc` it has always been.
+       */
+      const line = wallLine(world);
+      const up = line === null ? Infinity : Math.max(0, this.y - line);
+      const wallPhi = up < reach ? Math.acos(clamp(up / reach, 0, 1)) : 0;
+
       ctx.strokeStyle = rgba(accent, 0.12 + flash * 0.3);
       ctx.lineWidth = CFG.hairline;
       ctx.setLineDash([CFG.hairline * 5, CFG.hairline * 11]);
       ctx.beginPath();
-      ctx.arc(0, 0, reach, -Math.PI / 2 - cone, -Math.PI / 2 + cone);
+      if (wallPhi <= 0) {
+        ctx.arc(0, 0, reach, -Math.PI / 2 - cone, -Math.PI / 2 + cone);
+      } else if (wallPhi < cone) {
+        // the two shoulders the wall does not reach across
+        for (const side of [-1, 1]) {
+          // `arc` draws a line from the current point to where the sweep
+          // STARTS, so the moveTo has to be the low angle and not the near
+          // one -- on the left shoulder those are opposite ends and the
+          // difference is a chord laid across the cone.
+          const lo = -Math.PI / 2 + Math.min(side * wallPhi, side * cone);
+          const hi = -Math.PI / 2 + Math.max(side * wallPhi, side * cone);
+          ctx.moveTo(Math.cos(lo) * reach, Math.sin(lo) * reach);
+          ctx.arc(0, 0, reach, lo, hi);
+        }
+      }
+      if (wallPhi > 0) {
+        // ...and the wall itself, across as much of the cone as reaches it
+        const half = up * Math.tan(Math.min(cone, wallPhi));
+        ctx.moveTo(-half, -up);
+        ctx.lineTo(half, -up);
+      }
       ctx.stroke();
       /*
-       * ...and the two edges of the cone, as short ticks at the arc. The arc
-       * alone says how far and says nothing about how wide, and "past the
+       * ...and the two edges of the cone, as short ticks at the boundary. The
+       * arc alone says how far and says nothing about how wide, and "past the
        * shoulder" is the other half of why the assist ignores something --
        * see the note on aimClamp in config.js.
        */
@@ -1119,11 +1185,13 @@ export class Shooter {
         const a = -Math.PI / 2 + side * cone;
         const c = Math.cos(a);
         const sn = Math.sin(a);
-        // The tick is an annotation on the arc, so it keeps its length on the
-        // glass; the arc's own radius is `aimRange`, which is in SCALED.
+        // The tick is an annotation on the boundary, so it keeps its length on
+        // the glass; the boundary's own radius is in SCALED. Where the wall is
+        // what the cone edge runs into, the tick goes there instead.
         const tick = 14 * CFG.scale;
-        ctx.moveTo(c * (reach - tick), sn * (reach - tick));
-        ctx.lineTo(c * (reach + tick), sn * (reach + tick));
+        const at = Math.min(reach, up / Math.max(1e-3, Math.cos(cone)));
+        ctx.moveTo(c * (at - tick), sn * (at - tick));
+        ctx.lineTo(c * (at + tick), sn * (at + tick));
       }
       ctx.stroke();
       ctx.setLineDash([]);

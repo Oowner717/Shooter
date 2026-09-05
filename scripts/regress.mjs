@@ -18517,6 +18517,419 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `the era-1 field takes ${out.eraOneBlast}`);
 }
 
+// --- the assist stops at the wall, and says so ------------------------------
+/*
+ * "Have auto-aim stop at enemy wall. Turret should not be able to target
+ * anything beyond the enemy wall."
+ *
+ * Build 256 put `shielded` in `autoTarget`'s main loop and nowhere else, which
+ * left both halves of that half done.
+ *
+ * The FUNCTION was half done because the hysteresis block after the loop is the
+ * same legality question asked a second time, and the second copy did not get
+ * the new rule -- the same way it did not get `spent` in build 219 until a boss
+ * had held a lock through 18% of its own outro. `heldLive` is set before the
+ * loop's `continue`s, so a held body that has since been shoved behind the wall
+ * still reaches that block, passes every test it applies, and keeps the lock:
+ * the barrel goes on slewing to it, the gun goes on firing, the reticle goes on
+ * painting, and every round is swallowed at the line. Both callers take one
+ * `legal` predicate now. `harmless` is deliberately not in it -- the loop
+ * applies it by aim mode and the hysteresis applies a flat version, and folding
+ * those would be a behaviour change dressed as a tidy-up.
+ *
+ * The PICTURE was not done at all. Measured at 320x568 era 2 before this: the
+ * wall stands 286.6 units above the turret and the STOCK reach is 615.4, so
+ * with nothing bought the dashed arc ran 328.8 units into the enemy's half,
+ * through their building, with both cone ticks inside the yard. Clipping the
+ * RADIUS is the obvious fix and is the wrong one: `min(reach, y - wallY)` is
+ * 286.6 there, which throws away the entire lower-outer cone -- a body 392
+ * units out at 1.18 rad off vertical is 724 deep, well past the line, and is a
+ * target the assist takes and the gun kills -- and it would make both levels of
+ * ARRAY buy nothing on that screen, which is `world.endless`'s shape. The
+ * boundary is drawn as what it actually is instead: the arc where the reach
+ * binds, the wall line where the wall binds, meeting where they cross.
+ */
+{
+  const wasSize = page.viewportSize();
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    rows.push(await page.evaluate(async (vw) => {
+      const { shielded, wallLine } = await import('../src/yard.js');
+      const g = window.__sim;
+      const w = g.world;
+      const out = { w: vw };
+
+      const clean = (era) => {
+        g.restart();
+        // The damage-bench family leaves both of these behind; see the note on
+        // the aperture case above.
+        delete w.director.update;
+        w.spawnLock = 0;
+        w.phase = 'staging';
+        g.debugTeachAll();
+        g.debugGiveEnergy(300000);
+        g.setEra(era);
+        w.director.update = () => {};
+        g.debugClearField();
+        w.mines.length = 0;
+        w.projectiles.length = 0;
+        w.effects.length = 0;
+        w.up.aimRange = 1;
+        w.autoAim = false;
+        w.autoFire = false;
+        g.pointers.clear();
+        g.autoLock = null;
+      };
+      const body = (id, x, y) => {
+        const e = g.debugSpawn(id, x, y);
+        e.staged = false;
+        e.traits = null;
+        e.plateT = 0;
+        return e;
+      };
+
+      // ---- the lock, through the hysteresis and not around it -------------
+      /*
+       * `g.autoLock` is NEVER nulled between the two calls, which is the whole
+       * arm: build 256's own case nulled it before every `autoTarget()` and so
+       * exercised only the main loop -- it was green on the build that had this
+       * bug.
+       */
+      clean(2);
+      const a = w.yard;
+      out.wallY = +a.wallY.toFixed(1);
+      out.toWall = +(w.shooter.y - a.wallY).toFixed(1);
+      w.up.aimRange = 4;
+      w.autoAim = true;
+      w.aimMode = 'field';
+      const lean = body('lurcher', w.shooter.x, a.wallY - 24 + 8);
+      out.leanLegal = !shielded(w, lean);
+      out.locked = g.autoTarget() === lean;
+      g.autoLock = g.autoTarget();
+      // shoved back behind the line, and nothing else about it changed
+      lean.y = a.wallY - lean.r - 20;
+      out.nowShielded = shielded(w, lean);
+      /*
+       * An EMPTY field is the arm that fails on revert: with no challenger,
+       * `bestScore` is Infinity and the hysteresis's margin test passes
+       * unconditionally, so the stale lock is returned rather than merely
+       * preferred.
+       */
+      const alone = g.autoTarget();
+      out.heldAlone = alone === null ? 'null' : (alone === lean ? 'STALE' : 'other');
+      /*
+       * The challenger goes 200 units up and not 400: at 320x568 the wall is
+       * only 286.6 above the machine, so a body further out than that is itself
+       * behind it and the arm asks nothing. Asserted rather than assumed.
+       */
+      const far = body('lurcher', w.shooter.x + 60, w.shooter.y - 200);
+      out.challengerLegal = !shielded(w, far);
+      g.autoLock = lean;
+      const pick = g.autoTarget();
+      out.heldVsFar = pick === far ? 'far' : (pick === lean ? 'STALE' : 'other');
+
+      // ...and through the real loop, with the gun running
+      g.autoLock = lean;
+      w.autoFire = true;
+      far.dead = true;
+      w.enemies = w.enemies.filter((e) => e !== far);
+      const hp0 = lean.hp;
+      let stillLocked = 0;
+      for (let i = 0; i < 90; i++) {
+        g.update(1 / 60);
+        lean.y = a.wallY - lean.r - 20;
+        lean.vy = 0;
+        if (g.autoLock === lean) stillLocked++;
+      }
+      out.framesLocked = stillLocked;
+      out.tookFire = +(hp0 - lean.hp).toFixed(2);
+      w.autoFire = false;
+
+      // ---- era 1 keeps its hysteresis --------------------------------------
+      clean(1);
+      out.eraOneWall = wallLine(w) === null;
+      w.autoAim = true;
+      w.aimMode = 'field';
+      const one = body('lurcher', w.shooter.x, w.shooter.y - 260);
+      g.autoLock = one;
+      out.eraOneHolds = g.autoTarget() === one;
+
+      // ---- what the machine draws ------------------------------------------
+      /*
+       * Rendered to an OFFSCREEN canvas, not diffed off the live one.
+       *
+       * A whole-frame diff was tried first and cannot work here: the readout is
+       * a hairline at 0.12 alpha over a lattice that is already blue, so the
+       * band that has to be read is the entire top half of the field rather
+       * than the one row the build-109 arc case gets away with -- and by the
+       * time five hundred cases have run, that band is full of things the
+       * toggle did not put there. It reported 123 changed pixels above the wall
+       * for a readout that provably draws none. The offscreen frame is
+       * transparent and carries the machine and nothing else, so LIT PIXELS
+       * ABOVE THE WALL is a direct reading rather than a difference, with
+       * nothing for it to be noisy about.
+       */
+      clean(2);
+      const a2 = w.yard;
+      const kk = 0.5;
+      const oc = document.createElement('canvas');
+      oc.width = Math.ceil(w.width * kk);
+      oc.height = Math.ceil((w.floorY + 40) * kk);
+      const oct = oc.getContext('2d', { willReadFrequently: true });
+      const paint = (fn) => {
+        oct.setTransform(1, 0, 0, 1, 0, 0);
+        oct.clearRect(0, 0, oc.width, oc.height);
+        oct.setTransform(kk, 0, 0, kk, 0, 0);
+        fn(oct);
+        oct.setTransform(1, 0, 0, 1, 0, 0);
+        return oct.getImageData(0, 0, oc.width, oc.height).data;
+      };
+      // Two rows clear of the line, so the boundary drawn ON the wall is not
+      // counted as something drawn past it.
+      const wallRow = Math.floor(a2.wallY * kk) - 2;
+      const lit = (d, y0, y1) => {
+        let n = 0;
+        for (let y = Math.max(0, y0); y < Math.min(oc.height, y1); y++) {
+          for (let x = 0; x < oc.width; x++) if (d[(y * oc.width + x) * 4 + 3] > 8) n++;
+        }
+        return n;
+      };
+      const s = w.shooter;
+      s.aim = -Math.PI / 2;
+      s.gripGlow = 0;
+      s.recoil = 0;
+
+      // the machine with the readout off: nothing of it is up there at all
+      w.autoAim = false;
+      out.bare = lit(paint((c) => s.draw(c, w)), 0, wallRow);
+
+      out.arc = {};
+      for (const mult of [1, 1.45, 2.1025]) {
+        w.up.aimRange = mult;
+        w.autoAim = true;
+        const d = paint((c) => s.draw(c, w));
+        out.arc[mult] = { over: lit(d, 0, wallRow), drawn: lit(d, 0, oc.height) };
+      }
+      w.autoAim = false;
+      w.up.aimRange = 1;
+
+      // ...the aim ray, the other line the machine paints up the field
+      const rayBare = lit(paint((c) => s.draw(c, w)), 0, oc.height);
+      s.gripGlow = 1;
+      const rayOn = paint((c) => s.draw(c, w));
+      out.rayOver = lit(rayOn, 0, wallRow);
+      out.rayDrawn = lit(rayOn, 0, oc.height) - rayBare;
+      s.gripGlow = 0;
+
+      /*
+       * ...and the ring the thumb puts on what it is aiming at.
+       *
+       * The pointer map is written directly rather than through a real
+       * `pointerdown`: what is under test is the draw loop's filter, not the
+       * control's wiring, and a real press also fires the gun and slews the
+       * barrel. The entry is the shape `onPointerDown` stores -- the crosshair,
+       * plus the contact it was lifted from.
+       *
+       * `drawTouchAid` alone, and the reading is the difference the BODY makes,
+       * because the crosshair itself is allowed up there: manual aim may point
+       * into the yard, and only the ring claims a target.
+       */
+      const safe = body('lurcher', w.shooter.x, a2.wallY - 24 - 30);
+      out.ringShielded = shielded(w, safe);
+      g.pointers.set(1, { x: safe.x, y: safe.y, tx: safe.x, ty: safe.y + 120 });
+      const withSafe = lit(paint((c) => g.drawTouchAid(c)), 0, oc.height);
+      safe.dead = true;
+      const noSafe = lit(paint((c) => g.drawTouchAid(c)), 0, oc.height);
+      out.ringOver = withSafe - noSafe;
+      g.pointers.clear();
+
+      // ...and the same crosshair on a body the wall does NOT cover rings it,
+      // which is the instrument showing it can read a one.
+      const near = body('lurcher', w.shooter.x, a2.wallY + 90);
+      out.ringNear = !shielded(w, near);
+      g.pointers.set(2, { x: near.x, y: near.y, tx: near.x, ty: near.y + 120 });
+      const withNear = lit(paint((c) => g.drawTouchAid(c)), 0, oc.height);
+      near.dead = true;
+      const noNear = lit(paint((c) => g.drawTouchAid(c)), 0, oc.height);
+      out.ringDrawn = withNear - noNear;
+      g.pointers.clear();
+
+      g.setEra(1);
+      g.restart();
+      return out;
+    }, size.width));
+  }
+  await page.setViewportSize(wasSize);
+
+  check('the assist lets go of a body the wall has taken',
+    rows.every((r) => r.leanLegal && r.locked && r.nowShielded && r.challengerLegal
+      && r.heldAlone === 'null' && r.heldVsFar === 'far'
+      && r.framesLocked === 0 && r.tookFire === 0),
+    rows.map((r) => `${r.w}: locked ${r.locked}, then behind the wall — alone `
+      + `${r.heldAlone}, against a challenger ${r.heldVsFar}, ${r.framesLocked} `
+      + `of 90 frames still locked, ${r.tookFire} damage taken`).join('; '));
+
+  check('...and era 1, which has no wall, keeps its lock',
+    rows.every((r) => r.eraOneWall && r.eraOneHolds),
+    rows.map((r) => `${r.w}: no wall (${r.eraOneWall}), lock held `
+      + `${r.eraOneHolds}`).join('; '));
+
+  /*
+   * `drawn` is the half that stops a fix passing by DELETING the readout, and
+   * it is not a formality: on the small screen at stock reach the whole arc is
+   * above the wall, so an implementation that simply clipped the arc away would
+   * leave the player with no reach readout at all on the screen it matters most
+   * on. What is drawn there instead is the wall line itself.
+   */
+  check('the assist draws where it stops, and it stops at the wall',
+    rows.every((r) => r.bare === 0
+      && [1, 1.45, 2.1025].every((m) => r.arc[m].over === 0 && r.arc[m].drawn > 200)),
+    rows.map((r) => `${r.w}: wall at ${r.wallY}, ${r.toWall} above the machine, `
+      + `and the machine alone puts ${r.bare} past it; `
+      + [1, 1.45, 2.1025].map((m) => `x${m} ${r.arc[m].over} over / `
+        + `${r.arc[m].drawn} drawn`).join(', ')).join('; '));
+
+  check('...and neither the aim ray nor the thumb ring crosses it',
+    rows.every((r) => r.rayOver === 0 && r.rayDrawn > 40
+      && r.ringShielded && r.ringOver === 0
+      && r.ringNear && r.ringDrawn > 40),
+    rows.map((r) => `${r.w}: ray ${r.rayOver} over / ${r.rayDrawn} drawn; a `
+      + `shielded body under the crosshair adds ${r.ringOver} lit pixels, one `
+      + `below the line adds ${r.ringDrawn}`).join('; '));
+}
+
+// --- a round's step stops at the wall, not just its end ---------------------
+/*
+ * Build 256 absorbed a round AFTER `resolveSegment` had swept the whole frame
+ * step, and a step is 26 units at 60Hz and 426 at `CFG.maxFrameDelta`. So the
+ * sweep reached across the line and hit what was behind it. The guard in
+ * `applyDamage` covers most of what that touches -- but three things sit above
+ * it and were reached anyway: `hitShard` and `hitGraft`, which take no world
+ * and have no guard of their own, and PRISM's `reflect`, which answers a hit
+ * before any damage is computed.
+ *
+ * Clipping the STEP is the class rather than the three.
+ *
+ * What is NOT clipped away is the point of the companion arms. A body leaning
+ * down through the line is still hit -- and so is the one part of a body that
+ * is through it: a WARDEN's shards ride at `orbitR + SHARD_R`, well outside its
+ * own radius, and measured here a shard hung 2.7 units past the wall and was
+ * taken while the body it belongs to lost nothing. That is the rule the wall
+ * states, applied to a body that is not a circle.
+ */
+{
+  const out = await page.evaluate(async () => {
+    const { fire } = await import('../src/projectiles.js');
+    const { applyBlast, graft, SHARD_R } = await import('../src/enemies.js');
+    const { fx } = await import('../src/fx.js');
+    const { shielded } = await import('../src/yard.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const clean = () => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(300000);
+      g.setEra(2);
+      w.director.update = () => {};
+      g.debugClearField();
+      w.mines.length = 0;
+      w.projectiles.length = 0;
+      w.effects.length = 0;
+      fx.edges.length = 0;
+    };
+    const body = (id, x, y) => {
+      const e = g.debugSpawn(id, x, y);
+      e.staged = false;
+      e.traits = null;
+      e.plateT = 0;
+      return e;
+    };
+    // The STEP is what this is about, so it is driven at the largest one the
+    // game will take -- 426 world units at era 2, against a wall 286.6 above
+    // the machine on the short screen.
+    const shoot = (from, n, dt) => {
+      let bursts = 0;
+      for (let k = 0; k < n; k++) {
+        fire(w, w.shooter.x, from, -Math.PI / 2, { burst: () => { bursts++; } });
+        for (let i = 0; i < 60 && w.projectiles.length; i++) g.update(dt);
+      }
+      return bursts;
+    };
+
+    // ---- a body wholly behind it keeps everything it has -----------------
+    clean();
+    const a = w.yard;
+    const wd = body('warden', w.shooter.x, a.wallY - 130);
+    out.wardenShielded = shielded(w, wd);
+    out.wardenClear = +(a.wallY - (wd.y + wd.orbitR + SHARD_R)).toFixed(1);
+    out.shardsBefore = wd.shards.filter((x) => x.alive).length;
+    out.bigStep = shoot(a.wallY + 380, 4, 0.1);
+    out.shardsAfter = wd.shards.filter((x) => x.alive).length;
+    out.wardenLost = +(wd.maxHp - wd.hp).toFixed(2);
+    out.wallMarks = fx.edges.filter((m) => m.axis === 1).length;
+
+    // ---- ...and a body leaning through it is still hit -------------------
+    clean();
+    const a2 = w.yard;
+    const lean = body('lurcher', w.shooter.x, a2.wallY - 24 + 8);
+    const h0 = lean.hp;
+    shoot(a2.wallY + 300, 4, 1 / 60);
+    out.leanTook = +(h0 - lean.hp).toFixed(1);
+
+    // ---- a shielded PRISM does not answer a hit it never took ------------
+    clean();
+    const a3 = w.yard;
+    const pr = body('prism', w.shooter.x, a3.wallY - 90);
+    out.prismShielded = shielded(w, pr);
+    pr.flash = 0;
+    shoot(a3.wallY + 380, 4, 0.1);
+    out.prismFlash = +pr.flash.toFixed(3);
+    out.prismLost = +(pr.maxHp - pr.hp).toFixed(2);
+    out.stray = w.projectiles.filter((p) => p.y < a3.wallY).length;
+
+    // ---- and a blast does not pop a ball off one ------------------------
+    clean();
+    const a4 = w.yard;
+    const host = body('lurcher', w.shooter.x, a4.wallY - 90);
+    graft(w, host);
+    graft(w, host);
+    out.graftBefore = host.graftCount | 0;
+    const gh = host.hp;
+    applyBlast(w, { x: w.shooter.x, y: a4.wallY + 30, r: 1400, damage: 900,
+      impulse: 0, src: 'explosive' });
+    out.graftAfter = host.graftCount | 0;
+    out.hostLost = +(gh - host.hp).toFixed(2);
+
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check("a round's whole STEP stops at the wall, not just its end",
+    out.wardenShielded && out.wardenClear > 0
+    && out.shardsAfter === out.shardsBefore && out.wardenLost === 0
+    && out.bigStep === 0 && out.wallMarks === 1
+    && out.leanTook > 0,
+    `a WARDEN ${out.wardenClear} clear of the line kept ${out.shardsAfter} of `
+    + `${out.shardsBefore} shards and lost ${out.wardenLost}, with ${out.bigStep} `
+    + `bursts and ${out.wallMarks} mark on the wall, under four rounds stepped `
+    + `at the frame cap; a body leaning through takes ${out.leanTook}`);
+
+  check('...so nothing behind it reflects, and no blast pops a ball off it',
+    out.prismShielded && out.prismFlash === 0 && out.prismLost === 0
+    && out.stray === 0
+    && out.graftBefore === 2 && out.graftAfter === 2 && out.hostLost === 0,
+    `a shielded PRISM flashed ${out.prismFlash} and lost ${out.prismLost}, with `
+    + `${out.stray} rounds left past the line; a shielded host kept `
+    + `${out.graftAfter} of ${out.graftBefore} balls and lost ${out.hostLost}`);
+}
+
 // --- the six lots: ground reserved, and nothing else ------------------------
 /*
  * P5. Two works beside the machine and four emplacements in front of it,

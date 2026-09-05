@@ -4898,6 +4898,14 @@ export function applyBlast(world, blast) {
        * asked for it.
        */
       if (e.dead || e.spent || e === source) continue;
+      /*
+       * ...and the wall, HERE and not only in `applyDamage`. The graft loop
+       * below calls `hitGraft` directly -- it takes no world and has no guard
+       * of its own -- so a blast under the line was popping the balls off a
+       * body it could not otherwise touch, five lines before the guarded call
+       * that would have refused it.
+       */
+      if (shielded(world, e)) continue;
       const dx = e.x - x;
       const dy = e.y - y;
       const d2 = dx * dx + dy * dy;

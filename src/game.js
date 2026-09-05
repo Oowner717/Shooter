@@ -1978,31 +1978,49 @@ export class Game {
     // a body by taking it out of world.enemies without killing it.
     let heldLive = false;
     const held = this.autoLock;
+    /*
+     * ---- what may be shot at, in ONE place ----
+     *
+     * The loop below and the hysteresis block after it are the same question
+     * asked twice, and the second copy has now fallen behind the first twice:
+     * `spent` was added to the loop in build 219 and to the hysteresis in the
+     * same pass only after a boss held a lock for 18% of its own outro, and
+     * `shielded` was added to the loop in build 256 and NOT to the hysteresis
+     * -- so the assist went on holding a lock on a body a PULSE had shoved
+     * back behind the wall, kept slewing to it, kept firing at it, and painted
+     * the reticle on it, while every round was swallowed at the line.
+     *
+     * A rule that has to be written twice is a rule that will be applied once.
+     * This is the predicate; both callers use it and neither restates it.
+     *
+     * `harmless` is deliberately NOT in here. It is mode-dependent in the loop
+     * (see the SIEVE note below) and the hysteresis applies its own flat
+     * version of it, so folding the two would be a behaviour change dressed as
+     * a tidy-up.
+     *
+     * ...`spent` is a body that is part of an ending rather than part of a
+     * fight. A boss's structure is still drawn all the way through its death --
+     * the arrest snaps it off one piece at a time and that is the whole beat --
+     * so it cannot simply be killed or parked at the moment the bar empties. It
+     * can stop being a target. Measured over the seven outros, AMPLITUDE had
+     * thirteen bodies still on the field and something legal to shoot on 85% of
+     * the frames of its own payout.
+     *
+     * ...and `shielded` is the wall. A body with no pixel past its bottom line
+     * cannot be damaged (see `Enemy.applyDamage`) and rounds stop at the line
+     * anyway, so aiming at one is the turret claiming reach it does not have.
+     * False at era 1, where there is no wall, at the cost of one property read.
+     */
+    const legal = (e) => !e.dead && !e.staged && !e.spent && !shielded(w, e);
     for (const e of w.enemies) {
       if (e === held) heldLive = true;
-      /*
-       * ...and `spent`, which is a body that is part of an ending rather than
-       * part of a fight. A boss's structure is still drawn all the way through
-       * its death -- the arrest snaps it off one piece at a time and that is
-       * the whole beat -- so it cannot simply be killed or parked at the
-       * moment the bar empties. It can stop being a target. Measured over the
-       * seven outros, AMPLITUDE had thirteen bodies still on the field and
-       * something legal to shoot on 85% of the frames of its own payout.
-       */
       /*
        * `harmless` is the DRIFT rule, and SIEVE is the one thing that lifts
        * it. DRIFT lifts it the other way round -- grey and NOTHING else, so a
        * player sweeping salvage is not also being defended -- and ALL lifts it
        * in both directions at once. See Game.aimModes.
        */
-      if (e.dead || e.staged || e.spent) continue;
-      /*
-       * ...and the wall. A body with no pixel past its bottom line cannot be
-       * damaged (see `Enemy.applyDamage`) and rounds are absorbed at the line
-       * anyway, so holding a lock on one is the turret aiming at something it
-       * cannot touch. `shielded` is false at era 1.
-       */
-      if (shielded(w, e)) continue;
+      if (!legal(e)) continue;
       if (mode === 'field' && e.harmless) continue;
       if (mode === 'drift' && !e.harmless) continue;
       const dx = e.x - s.x;
@@ -2053,8 +2071,7 @@ export class Game {
      * decides which of two legal targets to keep, not whether a target is
      * legal at all.
      */
-    if (heldLive && held !== best && !held.dead && !held.staged && !held.harmless
-      && !held.spent) {
+    if (heldLive && held !== best && legal(held) && !held.harmless) {
       const hx = held.x - s.x;
       const hy = held.y - s.y;
       const hd = Math.hypot(hx, hy);
@@ -3282,7 +3299,13 @@ export class Game {
       ctx.stroke();
 
       for (const e of w.enemies) {
-        if (e.dead) continue;
+        // ...and not one the wall is standing in front of. This is the ring
+        // that says "this is the thing under your thumb", drawn last and so
+        // the topmost mark on the frame -- and `touchLift` puts the crosshair
+        // 86 units above the contact at era 2, so a thumb well inside the play
+        // band can land it on the wall itself. Every round aimed there stops at
+        // the line, so the ring was naming a target that could not be taken.
+        if (e.dead || shielded(w, e)) continue;
         const d2 = (e.x - p.x) ** 2 + (e.y - p.y) ** 2;
         if (d2 > 74 * 74) continue;
         ctx.strokeStyle = rgba(e.type.color, 0.9);

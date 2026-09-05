@@ -6,6 +6,7 @@ import { TAU, rand, spread, rgba, drawGlow, segClosest, drawBolt } from './util.
 import { spark, dot, ring, edgeHit } from './fx.js';
 import { SHARD_R } from './enemies.js';
 import { contactAt } from './physics.js';
+import { wallLine } from './yard.js';
 import { audio } from './audio.js';
 
 class Projectile {
@@ -147,6 +148,41 @@ export function updateProjectiles(world, dt) {
       let nx = p.x + p.vx * dt;
       let ny = p.y + p.vy * dt;
 
+      /*
+       * ---- their wall, clipped BEFORE the sweep ----
+       *
+       * This used to run after `resolveSegment`, against the end of the step --
+       * and the step is up to 26 units at 60Hz and 426 at `CFG.maxFrameDelta`,
+       * so the sweep reached across the line and hit whatever was on the far
+       * side before the round was ever taken. `Enemy.applyDamage` refuses the
+       * damage, but three things sit ABOVE that guard and were reached anyway:
+       * `hitShard` and `hitGraft` (which take no world and have no guard of
+       * their own), and PRISM's `reflect`, which answers a hit before any
+       * damage is computed. So a round could strip a WARDEN's shards, pop a
+       * graft and bounce off a PRISM, all behind a wall it never crossed.
+       *
+       * Clipping the STEP fixes the class rather than the three: the round's
+       * frame ends at the wall, the sweep only ever looks at our side of it,
+       * and a body leaning down through the line is still hit because its
+       * circle reaches into the clipped step.
+       *
+       * The two expressions above are untouched and nothing here runs at era 1
+       * -- `wallLine` is null, so the era-1 step is formed and swept exactly as
+       * it always was, to the bit. See CLAUDE.md on build 241: a refactor that
+       * only reorders arithmetic is still a change.
+       */
+      const line = wallLine(world);
+      let atWall = false;
+      if (line !== null && p.vy < 0 && ny - p.r <= line) {
+        const stop = line + p.r;
+        // `t` is how much of this step is left before the line. A round that
+        // begins the frame already past it takes no step at all.
+        const t = p.y > stop ? (stop - p.y) / (ny - p.y) : 0;
+        nx = p.x + (nx - p.x) * t;
+        ny = p.y + (ny - p.y) * t;
+        atWall = true;
+      }
+
       p.placed = false;
       resolveSegment(world, p, p.x, p.y, nx, ny);
       if (!p.dead) {
@@ -184,21 +220,20 @@ export function updateProjectiles(world, dt) {
         }
 
         /*
-         * ---- and the enemy's wall, at era 2 ----
+         * ...and the round the clip above brought to the wall is taken there.
          *
          * ABSORBED, never bounced and never burst: `impacted` is false, so an
          * HE that reaches it is swallowed rather than detonating against it.
          * The wall is theirs and it is one-way -- their objects walk down
          * through it and nothing of yours goes up through it.
          *
-         * Tested against the round's LEADING edge (`p.y - p.r`) so a round is
-         * taken the moment any part of it would be past the line, which is the
-         * same rule the damage guard uses from the other side.
+         * `!p.placed` because a bounce has already chosen where this round is
+         * and which way it is now going; it will meet the wall again on its own
+         * terms if it is still coming.
          */
-        const yard = world.yard;
-        if (!p.dead && yard && p.y - p.r <= yard.wallY && p.vy < 0) {
-          edgeHit(p.x, yard.wallY, Math.abs(p.vy) / 700, 1, p.color);
-          endProjectile(world, p, p.x, Math.max(p.y, yard.wallY), false);
+        if (atWall && !p.dead && !p.placed) {
+          edgeHit(p.x, line, Math.abs(p.vy) / 700, 1, p.color);
+          endProjectile(world, p, p.x, p.y, false);
         }
         // Through the same door as every other ending, so `impacted` has a
         // caller that passes false and the line below means what it says. It
