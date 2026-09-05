@@ -19337,7 +19337,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         }
       }
       return { painted: +far.toFixed(2), reach: +s.reach(w).toFixed(2),
-        ratio: +(far / s.r).toFixed(3), lot: w.yard ? +(Math.abs(w.yard.lots[0].x - s.x)
+        ratio: +(far / s.r).toFixed(3),
+        // ...and what it comes to on the glass, which is the only place the
+        // two forms are ever compared: the field is drawn at CFG.zoom.
+        glass: +(far * CFG.zoom).toFixed(2),
+        lot: w.yard ? +(Math.abs(w.yard.lots[0].x - s.x)
           - w.yard.lots[0].hw).toFixed(2) : null };
     };
     out.p1 = paint(1);
@@ -19366,14 +19370,33 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `the same era rendered twice differs by ${r.control} (must be exactly 0); the `
     + `two forms, scaled to the same envelope, differ by ${r.fold}`);
 
-  check('...and it grew INBOARD, which is what buys the clearance',
-    r.p2.ratio < r.p1.ratio && r.p2.painted > r.p1.painted
+  /*
+   * ...and it is BIGGER, which is a reversal and a deliberate one.
+   *
+   * Until build 258 this case asserted the opposite -- that the MK2 painted a
+   * SMALLER fraction of its own radius (2.14r against MK1's 2.404r), because
+   * growing inboard was what bought the clearance from the build lots. The
+   * consequence nobody had measured is that the second form was then 11%
+   * SMALLER ON THE GLASS than a fully rigged first form: the radius is at
+   * parity by construction (26 x 0.62 and 40 x 0.403 are the same 16.1 CSS px)
+   * and everything hung on it was tighter, so the reward for the whole
+   * evolution was a machine that looked like less. Reported as exactly that.
+   *
+   * The glass is what the assertion is in now, because the glass is what the
+   * player compares -- they saw the MK1 a minute ago. The clearance is bought
+   * by the LOTS stepping back (`CFG.yard.lotSide` 104 -> 122) rather than by
+   * the machine staying small: the works belong to the machine, and the
+   * machine got bigger.
+   */
+  check('...and the second form is BIGGER on the glass, with the works stood back',
+    r.p2.glass > r.p1.glass * 1.03 && r.p2.painted > r.p1.painted
     && r.p1.reach >= r.p1.painted && r.p2.reach >= r.p2.painted
     && r.p2.lot - r.p2.painted > 8,
-    `painted ${r.p1.painted} (${r.p1.ratio}r) at era 1 against ${r.p2.painted} `
-    + `(${r.p2.ratio}r) at era 2 — bigger absolutely, tighter per radius; the `
-    + `envelope covers it (${r.p2.reach}) and clears the build lot at `
-    + `${r.p2.lot} by ${(r.p2.lot - r.p2.painted).toFixed(2)}`);
+    `painted ${r.p1.painted} (${r.p1.ratio}r, ${r.p1.glass} CSS px) at era 1 `
+    + `against ${r.p2.painted} (${r.p2.ratio}r, ${r.p2.glass} CSS px) at era 2 — `
+    + `${((r.p2.glass / r.p1.glass - 1) * 100).toFixed(1)}% bigger where it is `
+    + `looked at; the envelope covers it (${r.p2.reach}) and clears the build `
+    + `lot at ${r.p2.lot} by ${(r.p2.lot - r.p2.painted).toFixed(2)}`);
 }
 
 // --- what a round and a mine are worth on the new field ---------------------
@@ -19626,7 +19649,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       const now = w.scale * w.camera;
       if ((last - CFG.ZOOMS[1]) * (now - CFG.ZOOMS[1]) < 0) crossings.push(+now.toFixed(4));
       last = now;
-      released += w.enemies.length;
+      /*
+       * ...only WHILE it is running. The window is 31 seconds against a
+       * 30-second cinematic so that the camera arms below can see it land, and
+       * counting bodies across the whole of it made the claim "nothing is
+       * released during the evolution AND for a second afterwards" -- which is
+       * not the claim, and which is a margin set at the truth rather than
+       * clear of it. Measured in isolation the first wave after the cinematic
+       * arrives later than that; measured five hundred cases in, with whatever
+       * the director has been left holding, it can arrive inside the second.
+       */
+      if (w.evolve) released += w.enemies.length;
       if (f % 180 === 0) seen.push(+now.toFixed(4));
     }
     out.samples = seen;
@@ -19812,27 +19845,35 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.others = voices.length - sparks.length;
 
     const bed = CFG.evolve.bed;
-    // The six rows, in order, each with its time constant.
+    // The five rows, in order, each with its time constant.
     out.rows = bed.map((b, i) => JSON.stringify([b[0], b[1], b[2], b[3]]));
     out.fired = said.filter((x) => bed.some((b, i) => b[0] === x[0] && b[1] === x[1]
       && b[2] === x[2] && Math.abs(b[3] - x[3]) < 1e-9)).length;
     /*
-     * Their RELATIVE order, not their indices. The era flip at act V calls
-     * `syncSky(true)`, which puts the era-2 triple on the wire at the default
-     * time constant — so `said` carries seven calls, not six, and an
-     * index-for-index comparison reports the sheet out of order on a build
+     * Their RELATIVE order, not their indices. The era flip inside act IV calls
+     * `syncSky`, which puts the era-2 triple on the wire at the default time
+     * constant — so `said` carries one more call than the sheet has rows, and
+     * an index-for-index comparison reports the sheet out of order on a build
      * where it is perfectly in order.
      */
     const whereIs = (b) => said.findIndex((x) => x[0] === b[0] && x[1] === b[1]
       && x[2] === b[2] && Math.abs(x[3] - b[3]) < 1e-9);
     out.at = bed.map(whereIs);
     out.inOrder = out.at.every((n, i) => n >= 0 && (i === 0 || n > out.at[i - 1]));
-    out.extra = said.length - 6;
-    // ...and it never reaches for a seventh row: `findIndex` returns 6 at
-    // exactly t === span and this runs before `endEvolve`.
-    out.noSeventh = bed.length === 6 && CFG.evolve.lines.length === 6
-      && CFG.evolve.acts.length === 7;
-    out.silent = bed[3][2] === 0;
+    out.extra = said.length - bed.length;
+    /*
+     * ...and it never reaches past the last row: `findIndex` returns the row
+     * count at exactly t === span and this runs before `endEvolve`.
+     *
+     * FIVE acts from build 258, not six. The old act IV was the bare core --
+     * one point of light on an empty screen -- and it went, so the unmaking
+     * runs straight into the transformation. The SILENCE it carried did not
+     * go: it moved onto the unmaking, which is where the thuds are, and the
+     * ignition still arrives out of nothing.
+     */
+    out.noSeventh = bed.length === 5 && CFG.evolve.lines.length === 5
+      && CFG.evolve.acts.length === 6;
+    out.silent = bed[2][2] === 0;
 
     /*
      * The load-bearing one. After `endEvolve` the era is already 2, so
@@ -19847,8 +19888,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.setEra(2);
     const sky2 = said[said.length - 1];
     out.sky2 = sky2;
-    out.lastMatches = !!sky2 && sky2[0] === bed[5][0] && sky2[1] === bed[5][1]
-      && sky2[2] === bed[5][2];
+    const last = bed[bed.length - 1];
+    out.lastMatches = !!sky2 && sky2[0] === last[0] && sky2[1] === last[1]
+      && sky2[2] === last[2];
 
     // ---- and a restart mid-cinematic does not leave it running ------------
     g.setEra(1);
@@ -19871,11 +19913,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return out;
   });
 
-  check('the room is shaped act by act, and it goes silent at the core',
-    r.inOrder && r.fired === 6 && r.noSeventh && r.silent,
-    `six rows fired in order ${r.inOrder} at ${JSON.stringify(r.at)} of `
-    + `${6 + r.extra} calls (the extra is the era flip's own syncSky): `
-    + `${r.rows.join(' ')} — and act IV's level is a hard zero ${r.silent}`);
+  check('the room is shaped act by act, and it goes silent at the unmaking',
+    r.inOrder && r.fired === 5 && r.noSeventh && r.silent,
+    `five rows fired in order ${r.inOrder} at ${JSON.stringify(r.at)} of `
+    + `${5 + r.extra} calls (the extra is the era flip's own syncSky): `
+    + `${r.rows.join(' ')} — and act III's level is a hard zero ${r.silent}`);
 
   /*
    * ...and the ignition. One voice, and a triangle rather than the obvious low
@@ -19891,7 +19933,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
   check('...and the last act leaves the room where era 2 lives',
     r.lastMatches && JSON.stringify(r.eraOne) === '[41,320,0.05,null]',
-    `the last row is ${r.rows[5]} and syncSky puts ${JSON.stringify(r.sky2)} on era 2 — `
+    `the last row is ${r.rows[r.rows.length - 1]} and syncSky puts ${JSON.stringify(r.sky2)} on era 2 — `
     + `these must match, because nothing re-issues the bed after the cinematic `
     + `ends; era 1 still gets ${JSON.stringify(r.eraOne)} at the default`);
 
@@ -19906,6 +19948,228 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `six seconds in it was running (${r.midRun}); after a restart it is gone `
     + `${r.afterRestart}, and forty seconds later the fresh run is still era 1 `
     + `${r.stillEraOne}`);
+}
+
+// --- a mood actually arrives ------------------------------------------------
+/*
+ * The ease was broken from the day it was written, and it took until build 258
+ * for anything to check.
+ *
+ * `background.update` ran `mixHex(this.mood[key], this.target[key], k)` with
+ * `k` about 0.013 at 60Hz, and `mixHex` rounds to whole channels every step --
+ * so a channel closer than about 38 to its target moved by less than half a
+ * unit, rounded back to itself, and NEVER ARRIVED. Measured before the fix,
+ * staging -> sandbox sat at its starting colour for twelve seconds. Every mood
+ * in the game was affected; the ones that appeared to work were arriving on
+ * their few far-apart channels only, which is why so much of this game snaps
+ * its moods instead of easing them.
+ *
+ * The state is carried as floats now and rounded only on the way out.
+ *
+ * Three arms, and the middle one is the one that fails on revert: PART WAY
+ * after a second, ARRIVED after eight, and a snap still snaps. An arm that only
+ * checked the end state would pass on a build that cut instead of easing.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { background } = await import('../src/background.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    const out = {};
+    const KEYS = ['top', 'mid', 'low', 'line', 'accent'];
+    const chan = (h) => {
+      const n = parseInt(h.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    };
+    const far = (a, b) => Math.max(...KEYS.map((k) => Math.max(
+      ...chan(a[k]).map((v, i) => Math.abs(v - chan(b[k])[i])))));
+
+    // A pair with SMALL differences on every channel is the whole point: the
+    // fault was invisible on a mood that happened to move a long way.
+    background.setMood('staging', true);
+    const from = { ...background.mood };
+    background.setMood('sandbox');
+    const to = background.target;
+    out.spread = far(from, to);
+    out.start = far(background.mood, to);
+
+    const run = (secs) => { for (let i = 0; i < secs * 60; i++) background.update(1 / 60); };
+    run(1);
+    out.at1 = far(background.mood, to);
+    run(7);
+    out.at8 = far(background.mood, to);
+    // ...and twelve more seconds cannot make it worse
+    run(12);
+    out.at20 = far(background.mood, to);
+
+    // ...and a snap is still a snap, on the frame it is asked for.
+    background.setMood('staging', true);
+    out.snapped = far(background.mood, background.target);
+
+    /*
+     * ...and the rate the caller asks for is honoured. The evolution's sky
+     * crossing is the one place that needs a pace of its own, and a `rate`
+     * that did nothing would leave it looking exactly like the ambient one.
+     */
+    background.setMood('sandbox', false, 4);
+    for (let i = 0; i < 30; i++) background.update(1 / 60);
+    out.fastHalf = far(background.mood, background.target);
+    background.setMood('staging', true);
+    background.setMood('sandbox');
+    for (let i = 0; i < 30; i++) background.update(1 / 60);
+    out.slowHalf = far(background.mood, background.target);
+
+    background.setMood('staging', true);
+    g.restart();
+    return out;
+  });
+
+  check('a background transition actually arrives',
+    r.spread > 8 && r.start === r.spread && r.at1 > 0 && r.at1 < r.spread
+    && r.at8 === 0 && r.at20 === 0 && r.snapped === 0,
+    `the two moods differ by ${r.spread} on their worst channel; a second in it `
+    + `is ${r.at1} away (moving, not arrived), eight seconds in ${r.at8}, twenty `
+    + `in ${r.at20}; a snap lands at ${r.snapped}`);
+
+  check('...and a caller can ask for its own pace',
+    r.fastHalf < r.slowHalf,
+    `half a second at rate 4 leaves ${r.fastHalf} to go against ${r.slowHalf} at `
+    + `the ambient rate`);
+}
+
+// --- the machine is on screen for the whole of the evolution ----------------
+/*
+ * Reported from play, with a screenshot: three and a half seconds of an empty
+ * black field with one dot of light in the middle of it. That was act IV, "what
+ * is left is the idea of a machine" -- the turret was not drawn AT ALL for the
+ * whole act, and the new form was then scaled up from zero out of nothing.
+ *
+ * It is five acts now, the unmaking runs straight into the transformation, and
+ * the machine is painted on every frame of the piece.
+ *
+ * The instrument is a call spy that records the ALPHA rather than the call, for
+ * the reason CLAUDE.md gives about spies: a build that drew the machine at
+ * alpha 0 would satisfy a count and would be the reported bug exactly. The
+ * failing frames on the old build are not subtle -- there were 210 of them at
+ * full span with no call at all.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    g.restart();
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.phase = 'staging';
+    g.debugTeachAll();
+    g.debugGiveEnergy(400000);
+    g.debugBuyAll();
+    w.director.update = () => {};
+
+    const s = w.shooter;
+    const real = s.draw.bind(s);
+    let painted = 0;
+    let faintest = 1;
+    s.draw = (ctx, world) => { painted++; faintest = Math.min(faintest, ctx.globalAlpha); return real(ctx, world); };
+
+    out.began = g.beginEvolve();
+    let frames = 0;
+    let blank = 0;
+    let worstBlank = 0;
+    let run = 0;
+    const eras = [];
+    while (w.evolve && frames < 60 * 40) {
+      painted = 0;
+      g.update(1 / 60);
+      g.draw();
+      frames++;
+      if (painted === 0) { blank++; run++; worstBlank = Math.max(worstBlank, run); } else run = 0;
+      eras.push(w.era);
+    }
+    s.draw = real;
+    out.frames = frames;
+    out.blank = blank;
+    out.worstBlank = worstBlank;
+    out.faintest = +faintest.toFixed(3);
+    out.flipped = eras.indexOf(2);
+    out.flipAt = +(out.flipped / 60).toFixed(2);
+    out.acts = CFG.evolve.acts.length;
+    out.lines = CFG.evolve.lines.length;
+    // ...and the flip lands inside act IV, not at an act edge: that is what
+    // "the unmaking runs into the transformation" means as a number.
+    out.inAct4 = out.flipAt > CFG.evolve.acts[3] && out.flipAt < CFG.evolve.acts[4];
+    out.era = w.era;
+
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('the machine is never off the screen during the evolution',
+    r.began && r.blank === 0 && r.faintest > 0.2 && r.frames > 60 * 25,
+    `${r.frames} frames, ${r.blank} of them with the machine undrawn (worst run `
+    + `${r.worstBlank}), and the faintest it was ever drawn at is `
+    + `${r.faintest} alpha`);
+
+  check('...and the field turns over INSIDE the transformation, not at an edge',
+    r.inAct4 && r.acts === 6 && r.lines === 5 && r.era === 2,
+    `five acts (${r.acts} marks, ${r.lines} lines) and the era flipped at `
+    + `${r.flipAt}s, inside act IV`);
+}
+
+// --- the debug panel gets out of the way ------------------------------------
+/*
+ * A button that makes something happen on the field hands you a view of the
+ * panel and not of the thing you asked for -- 340px of opaque glass over a
+ * 390px screen. Every action closes it now. The two exceptions are a door
+ * (SPAWN GROUP opens a screen, and closing the panel would shut the screen it
+ * just opened) and the toggles, whose `on` class IS the readout.
+ *
+ * Pressed through `click()` on the element, and read off the RENDERED BOX
+ * rather than the `hidden` property -- CLAUDE.md's rule, because
+ * `[hidden] { display: none }` is the user agent's at one class of specificity
+ * and loses to any author rule written on an id.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    const out = {};
+    const panel = document.getElementById('debugPanel');
+    const up = () => panel.getBoundingClientRect().height > 0;
+    const find = (t) => [...document.querySelectorAll('#dbgGrid button')]
+      .find((b) => b.textContent.trim() === t);
+    const press = (t) => { g.hud.toggleDebug(true); const b = find(t); if (!b) return null; b.click(); return up(); };
+
+    out.opens = (() => { g.hud.toggleDebug(true); return up(); })();
+    out.action = press('CLEAR FIELD');
+    out.action2 = press('+50 KILLS');
+    out.spawn = press('SPAWN GROUP…');
+    g.hud.showSpawn(false);
+    out.toggle = press('HITBOXES');
+    w.debug.hitboxes = false;
+    find('HITBOXES').classList.remove('on');
+    // ...and the labels the panel is built from are all still pressable
+    g.hud.toggleDebug(true);
+    out.count = document.querySelectorAll('#dbgGrid button').length;
+    out.evolveLabel = !!find('EVOLVE');
+    g.hud.toggleDebug(false);
+    for (const k of Object.keys(w.debug)) w.debug[k] = false;
+    g.restart();
+    return out;
+  });
+
+  check('a debug action closes the panel and a door does not',
+    r.opens === true && r.action === false && r.action2 === false
+    && r.spawn === true && r.toggle === true && r.count > 20 && r.evolveLabel,
+    `panel up ${r.opens}; after CLEAR FIELD ${r.action} and +50 KILLS `
+    + `${r.action2} (both must be false); after SPAWN GROUP ${r.spawn} and after `
+    + `a toggle ${r.toggle} (both must stay up); ${r.count} buttons`);
 }
 
 // --- the door: what NEW FORM costs and what it needs ------------------------

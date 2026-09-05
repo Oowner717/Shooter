@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '257';
+export const BUILD = '258';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '257';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '0afc5b6';
+export const REV = '4229584';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4316,7 +4316,26 @@ CFG.evolve = {
   quick: 6,
   close: 1.1,
   skipAt: 1.5,
-  acts: [0, 4.0, 9.0, 15.5, 19.0, 23.5, 30],
+  /*
+   * FIVE acts from build 258, not six. The old act IV was the bare core --
+   * one point of light on an otherwise empty screen for three and a half
+   * seconds, with the machine gone entirely -- and it was reported as a hole
+   * in the piece: the machine is stripped part by part and then simply is not
+   * there any more, so the new form arrives from nothing rather than out of
+   * the old one. The unmaking now runs straight into the transformation, and
+   * the bare MK1 is on screen until the moment it becomes the MK2.
+   *
+   *   I    0.0 - 4.0    the field is taken
+   *   II   4.0 - 9.0    the approach
+   *   III  9.0 - 15.5   the unmaking, in the order the run was built
+   *   IV  15.5 - 22.0   the transformation: the bare machine draws light in,
+   *                     the field turns over, the second form comes out of it
+   *   V   22.0 - 30.0   the pull-back
+   */
+  acts: [0, 4.0, 9.0, 15.5, 22.0, 30],
+  // How far into act IV the flip lands: the charge is everything before it and
+  // the new form is everything after. 0.38 of 6.5s is a 2.5s wind-up.
+  flipAt: 0.38,
   // One an act. Short on purpose: the band is 470 world units wide and the
   // shot is of the machine, not of the writing.
   /*
@@ -4340,26 +4359,31 @@ CFG.evolve = {
    *        seven passed harmonics to three.
    *   II   the approach. Above era 1's own 0.05: the camera is nearer than
    *        the game has ever been, so the room is fuller.
-   *   III  the unmaking, thinned to 60% so the seventeen existing thuds ARE
-   *        the act. Their measured spacing is 362ms against a thud audible
-   *        for about 58ms, so act III is 84% silence.
-   *   IV   the core. Zero, and it ARRIVES: measured, the render reaches
-   *        exactly 0 RMS and 0 peak inside the act, at full span and at
-   *        reduced motion both.
-   *   V    the ignition, at a seventh of the time constant -- the era-2 bed
-   *        appears out of nothing in about three quarters of a second.
-   *   VI   the pull-back, slowly.
+   *   III  the unmaking, and it goes to ZERO. The seventeen existing thuds ARE
+   *        the act -- their measured spacing is 362ms against a thud audible
+   *        for about 58ms -- so the room emptying under them is the act's own
+   *        shape, and it is what the ignition then arrives out of. This used
+   *        to be a thinned 0.030 with the silence held in a separate act IV
+   *        whose PICTURE was an empty screen; the silence was worth keeping
+   *        and the empty screen was not, so the two were separated and the
+   *        silence moved here. The time constant is long enough (1.9s of a
+   *        6.5s act) that the room drains rather than cuts.
+   *   IV   the transformation. Two rows would be right and only one is
+   *        available, so this is the IGNITION -- a seventh of a time constant,
+   *        so the era-2 bed appears out of the silence in about a quarter of
+   *        a second, ON the flip. What happens before the flip is the room
+   *        still empty from act III, which is exactly what a wind-up wants.
+   *   V    the pull-back, slowly.
    *
-   * ROW VI MUST EQUAL `syncSky`'s era-2 triple, and that is an assertion and
+   * ROW V MUST EQUAL `syncSky`'s era-2 triple, and that is an assertion and
    * not a comment: after `endEvolve` the era is already 2, so `setEra` does
    * not fire and NOTHING re-issues the bed for the rest of the run. Wherever
-   * row VI leaves it is where era 2 lives.
+   * the last row leaves it is where era 2 lives.
    */
   bed: [
     [41, 150, 0.038, 1.0],
     [41, 260, 0.056, 1.6],
-    [41, 120, 0.030, 1.2],
-    [41, 90, 0, 0.35],
+    [41, 90, 0, 1.9],
     [33, 420, 0.045, 0.25],
     [33, 420, 0.045, 1.0],
   ],
@@ -4379,7 +4403,6 @@ CFG.evolve = {
     'The field is yours. All of it.',
     'Closer.',
     'Every part, in the order you built it.',
-    'What is left is the idea of a machine.',
     'NEW FORM.',
     'And a field to put it on.',
   ],
@@ -4391,7 +4414,19 @@ CFG.yard = {
   // of it, measured off the turret so they hold their place on the glass at
   // either screen -- the field is 1.22x deeper at 390x844 and the interface
   // either side of them is not.
-  lotSide: 104, lotW: 40, lotH: 30,
+  /*
+   * `lotSide` was 104 and `lotW` 40 until build 258. The second form paints
+   * 102.3 world units at era 2 against 85.6 before it, and the works stood
+   * 98.5 clear of the turret -- so the machine growing put them under it. The
+   * works step back rather than the machine being held to the furniture's old
+   * place: the works belong to the machine.
+   *
+   * Stepping back alone does not fit. At `lotSide` 118 with the old width the
+   * OUTER edge lands on the quick strip's left column at 320x568, which the
+   * clash sweep catches; the works are narrower as well as further out, so
+   * they move away from the machine without moving into the interface.
+   */
+  lotSide: 118, lotW: 34, lotH: 30,
   lotAhead: 124, lotStep: 70, gunW: 23, gunH: 20,
 };
 

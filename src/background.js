@@ -4,7 +4,7 @@
 // lattice, a few pre-rendered glyph columns and a dust field.
 
 import { CFG } from './config.js';
-import { clamp, rand, rgba, mixHex, makeCanvas, glowSprite } from './util.js';
+import { clamp, rand, rgba, makeCanvas, glowSprite } from './util.js';
 import { ORDINAL_MOODS } from './anomaly.js';
 import { fx } from './fx.js';
 
@@ -64,10 +64,41 @@ const MOODS = {
 
 const GLYPHS = 'アカサタナハマヤラワ0123456789ABCDEF<>/\\|[]{}=+*#%$@';
 
+/** '#rrggbb' -> [r, g, b], and back. */
+function chan(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function hex(c) {
+  const b = (v) => Math.max(0, Math.min(255, Math.round(v)));
+  return `#${((1 << 24) | (b(c[0]) << 16) | (b(c[1]) << 8) | b(c[2])).toString(16).slice(1)}`;
+}
+
+const MOOD_KEYS = ['top', 'mid', 'low', 'line', 'accent'];
+
 class Background {
   constructor() {
     this.mood = { ...MOODS.staging };
+    /*
+     * ...and the same five colours again, as FLOATS.
+     *
+     * The ease used to run on the hex strings themselves: `mixHex` rounds to
+     * whole channels every step and `k` is about 0.013 at 60Hz, so a channel
+     * closer than about 38 to its target moved by less than half a unit,
+     * rounded back to itself, and NEVER ARRIVED. Measured, staging -> sandbox
+     * sat at its starting colour for twelve seconds. Every mood in the game
+     * was affected and the ones that looked like they worked were arriving on
+     * their few far-apart channels only, which is why so much of this game
+     * snaps its moods instead.
+     *
+     * The state is carried at full precision here and rounded only on the way
+     * OUT, so an ease of any size arrives. `mixHex` is untouched -- it has
+     * other callers and it is not wrong, it is just not a place to keep state.
+     */
+    this.moodF = {};
+    for (const key of MOOD_KEYS) this.moodF[key] = chan(MOODS.staging[key]);
     this.target = MOODS.staging;
+    this.moodRate = 0;
     this.t = 0;
     this.flow = 0;
     this.dust = [];
@@ -179,18 +210,22 @@ class Background {
    * different place, and a bench that spends ten seconds looking like the run
    * you just left is a bench you are not sure you are in yet.
    *
-   * (Worth knowing while you are here: the ease itself does not work at small
-   * differences. `mixHex` rounds to whole channels every frame and `k` is
-   * about 0.013 at 60Hz, so any channel closer than ~38 to its target never
-   * moves at all. That is a live fault in every transition this game has and
-   * it is NOT fixed here -- it changes the look of staging, lull and all four
-   * boss skies, which is its own decision.)
+   * (The ease itself was broken from the day it was written and is fixed as of
+   * build 258 -- see the note on `moodF` in the constructor. Every transition
+   * in this game now actually arrives, which changes the look of staging, the
+   * lull and all four boss skies: they used to stall part of the way across
+   * and sit there. `rate` is seconds-ish of time constant for the callers that
+   * want a different pace from the ambient one.)
    */
-  setMood(name, snap = false) {
+  setMood(name, snap = false, rate = 0) {
     if (!MOODS[name]) return;
     this.target = MOODS[name];
+    this.moodRate = rate > 0 ? rate : 0;
     if (!snap) return;
-    for (const key of ['top', 'mid', 'low', 'line', 'accent']) this.mood[key] = this.target[key];
+    for (const key of MOOD_KEYS) {
+      this.mood[key] = this.target[key];
+      this.moodF[key] = chan(this.target[key]);
+    }
     this.mood.neb = this.target.neb;
   }
 
@@ -306,10 +341,14 @@ class Background {
     this.focusX += (tx - this.focusX) * fk;
     this.focusY += (ty - this.focusY) * fk;
 
-    // Ease the palette toward the current phase.
-    const k = 1 - Math.exp(-dt * 0.8);
-    for (const key of ['top', 'mid', 'low', 'line', 'accent']) {
-      this.mood[key] = mixHex(this.mood[key], this.target[key], k);
+    // Ease the palette toward the current phase, at full precision, and round
+    // only on the way out.
+    const k = 1 - Math.exp(-dt * (this.moodRate || 0.8));
+    for (const key of MOOD_KEYS) {
+      const to = chan(this.target[key]);
+      const at = this.moodF[key];
+      for (let i = 0; i < 3; i++) at[i] += (to[i] - at[i]) * k;
+      this.mood[key] = hex(at);
     }
     this.mood.neb = this.target.neb;
 

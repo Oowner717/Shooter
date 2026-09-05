@@ -685,9 +685,16 @@ export class Game {
    * never been true. Era 1's triple is unchanged to the digit and is the
    * audible identity; era 2 goes lower, more open and slightly quieter.
    */
-  syncSky(snap = false) {
+  syncSky(snap = false, rate = 0) {
     const name = this.skyName();
-    background.setMood(name, snap || name === 'newfield');
+    /*
+     * `newfield` used to be forced to SNAP here whatever the caller asked,
+     * because the ease did not work and an eased arrival stalled part of the
+     * way across (see background.js's `moodF`). It arrives now, so the caller
+     * decides -- which is what makes the evolution's sky change a transition
+     * rather than a cut.
+     */
+    background.setMood(name, snap, rate);
     if (name === 'newfield') audio.setDroneMood(33, 420, 0.045);
     else audio.setDroneMood(41, 320, 0.05);
   }
@@ -959,14 +966,22 @@ export class Game {
       t: 0, act: 0, span: this.reducedMotion() ? E.quick : E.span, skipAt: E.skipAt,
       ledger0: [...w.ledger],
       built: w.ledger.filter((id) => sockets.has(id)).length,
-      shed: 0, said: -1, core: 0, form: 0,
+      shed: 0, said: -1, charge: 0, form: 0, flipped: 0,
     };
-    // The substrate drains. `breach` is authored for exactly this -- "everything
-    // drains out of the substrate and the only colour left is coming through
-    // the breach" -- and had no caller in the whole codebase until now.
-    // Snapped, not eased: `mixHex` cannot move a channel closer than 37.8, so
-    // an eased mood arrives two thirds of the way and stops. A cut is honest.
-    background.setMood('breach', true);
+    /*
+     * The substrate drains. `breach` is authored for exactly this -- "everything
+     * drains out of the substrate and the only colour left is coming through
+     * the breach" -- and had no caller in the whole codebase until now.
+     *
+     * EASED, over about act I. It was snapped, and had to be: the ease could
+     * not move a channel closer than 37.8 to its target, so an eased mood
+     * arrived two thirds of the way and stopped, and a cut was the honest
+     * version of that. The ease arrives now (background.js's `moodF`), so act
+     * I is the field draining and the room draining together rather than a cut
+     * followed by four seconds of nothing changing.
+     */
+    const kk = (this.reducedMotion() ? E.quick : E.span) / E.span;
+    background.setMood('breach', false, 1.0 / Math.max(kk, 0.2));
     w.mineTimer = 0;
     this.mineTimer = 0;
     // The fuse is doused and stays doused: `Director.update` is not reached at
@@ -1027,10 +1042,10 @@ export class Game {
     const at = (mark) => mark * k;
     /*
      * The camera. It pushes to `E.close` through act II, holds through the
-     * unmaking and the core, and comes back out through act VI -- and the era
-     * flips at the top of act V, where the multiplier is stepped by exactly
-     * the ratio of the two zooms so the picture does not jump. 0.62 x 1.7742
-     * and 0.403 x 2.7295 are the same number on the glass.
+     * unmaking and the wind-up, and comes back out through act V -- and the
+     * era flips PART WAY INTO act IV, where the multiplier is stepped by
+     * exactly the ratio of the two zooms so the picture does not jump.
+     * 0.62 x 1.7742 and 0.403 x 2.7295 are the same number on the glass.
      */
     const seg = (a, b) => clamp((v.t - at(a)) / Math.max(1e-6, at(b) - at(a)), 0, 1);
     const ease = (x) => x * x * (3 - 2 * x);
@@ -1084,17 +1099,45 @@ export class Game {
       }
     }
 
-    // ---- act IV: the core. One point of light, and nothing else -----------
-    v.core = v.t >= at(E.acts[3]) && v.t < at(E.acts[4])
-      ? Math.min(1, seg(E.acts[3], E.acts[4]) * 3)
-      : (v.t >= at(E.acts[4]) ? 1 : 0);
-
-    // ---- act V: the new form builds outward from it -----------------------
-    v.form = v.t >= at(E.acts[4]) ? ease(seg(E.acts[4], E.acts[5])) : 0;
+    /*
+     * ---- act IV: the transformation ---------------------------------------
+     *
+     * One act with a seam in it rather than two acts with a hole between them.
+     * Before the seam the BARE machine is still on screen and drawing light
+     * into itself; at the seam the field turns over; after it the second form
+     * comes out of the first. `flip` is the moment, as a fraction of the act,
+     * so the wind-up and the arrival are one number apart and cannot drift.
+     */
+    const inAct4 = v.t >= at(E.acts[3]);
+    const p4 = inAct4 ? seg(E.acts[3], E.acts[4]) : 0;
+    const flip = E.flipAt;
+    // The wind-up: 0 at the top of the act, 1 at the seam, and it stays 1
+    // afterwards because the new form comes OUT of what was gathered.
+    v.charge = inAct4 ? ease(clamp(p4 / flip, 0, 1)) : 0;
+    // ...and the form, from the seam to the end of the act.
+    v.form = p4 > flip ? ease(clamp((p4 - flip) / (1 - flip), 0, 1)) : 0;
+    /*
+     * ...and the wind-up is EMITTED, not only drawn: motes hauled in out of
+     * the dark on a clock that tightens as the seam approaches, so the second
+     * before the flip is visibly the machine taking something in. `haul` is
+     * the same emitter act I uses to take the field, which is the point --
+     * this is the last of it arriving.
+     */
+    if (inAct4 && p4 < flip) {
+      const s = w.shooter;
+      v.gathT = (v.gathT || 0) - dt;
+      if (v.gathT <= 0) {
+        v.gathT = (0.085 - 0.055 * v.charge) * k;
+        const a = rand(0, TAU);
+        const d = s.r * (5.5 - 3.0 * v.charge) * (1 + rand(0, 0.5));
+        haul(s.x + Math.cos(a) * d, s.y + Math.sin(a) * d, s.x, s.y,
+          v.charge > 0.55 ? '#dff6ff' : '#8fdcff', 0.34 + v.charge * 0.2, 2.2 + v.charge * 2.6);
+      }
+    }
     const push = CFG.evolve.close / CFG.ZOOMS[1];
     if (v.t < at(E.acts[1])) {
       w.camera = 1;
-    } else if (v.t < at(E.acts[4])) {
+    } else if (p4 <= flip) {
       w.camera = 1 + (push - 1) * ease(seg(E.acts[1], E.acts[2]));
     } else {
       if (w.era !== 2) {
@@ -1103,26 +1146,35 @@ export class Game {
         w.ledger = [...v.ledger0];
         w.rig = null;
         w.rigAt = -1;
-        this.setEra(2);
+        /*
+         * `sky: 'ease'`, which is the whole difference between a transition
+         * and a cut. Every other caller of `setEra` is a change of PLACE -- a
+         * restore, a debug step, a bench door -- and wants the snap; this one
+         * is the field turning over in front of you, and the sky crossing from
+         * the breach to the new field over about two and a half seconds is
+         * most of what makes it read as one event.
+         */
+        this.setEra(2, { sky: 'ease', skyRate: 0.45 / Math.max(k, 0.35) });
         /*
          * The one voice in the piece, and it cannot be stranded: it fires only
          * from inside this block, never from `endEvolve`'s own `setEra`. A
          * skip before the flip never plays it; a skip after has already
          * played it.
          *
-         * AFTER `setEra`, because that runs `syncSky(true)` which writes the
-         * era-2 bed at the default time constant -- and the sheet's own act-V
-         * row, arriving on the next act edge, is what makes it a swell out of
-         * silence rather than a 4.2-second fade.
+         * AFTER `setEra`, because that runs `syncSky` which writes the era-2
+         * bed at the default time constant -- and the sheet's own act-IV row,
+         * arriving on the act edge just before it, is what makes it a swell
+         * out of silence rather than a 4.2-second fade.
          */
         const S = E.spark;
         audio.tone({ type: S.type, f0: S.f0, f1: S.f1, gain: S.gain,
           attack: S.attack, dur: S.dur * Math.max(k, 0.35) });
         // ...and the picture does not move on the frame the field does.
         w.camera = push * (CFG.ZOOMS[1] / CFG.ZOOMS[2]);
+        this.evolveFlash();
       }
       const out = push * (CFG.ZOOMS[1] / CFG.ZOOMS[2]);
-      w.camera = out + (1 - out) * ease(seg(E.acts[5], E.acts[6]));
+      w.camera = out + (1 - out) * ease(seg(E.acts[4], E.acts[5]));
     }
     v.act = E.acts.findIndex((m, i) => v.t < at(E.acts[i + 1] ?? 1e9));
     /*
@@ -1146,9 +1198,40 @@ export class Game {
       // The chrome stands down from the approach and comes back with the
       // field. A class rather than eight inline styles, so the retreat is
       // one CSS rule and reduced motion gets it for free.
-      document.body.classList.toggle('evolving', v.act >= 1 && v.act <= 5);
+      document.body.classList.toggle('evolving', v.act >= 1 && v.act <= 4);
     }
     if (v.t >= v.span) this.endEvolve();
+  }
+
+  /**
+   * The seam. Everything that happens on the ONE frame the field turns over.
+   *
+   * Kept out of `updateEvolve` because that function is already the longest
+   * thing in this file and because this is a list rather than a rule: three
+   * rings at three sizes and three lifetimes so the front does not read as one
+   * hoop, a fan of sparks thrown outward against the motes that were being
+   * hauled in a frame earlier, a ripple the background grid actually answers,
+   * and a flash. `shake` is a multiplier the player already owns -- somebody
+   * who has turned it off gets none of it -- so it needs no guard of its own.
+   */
+  evolveFlash() {
+    const w = this.world;
+    const s = w.shooter;
+    const R = s.r;
+    flash(0.5, '#dff6ff');
+    shake(7);
+    ripple(s.x, s.y, 2.2, R * 14);
+    ring(s.x, s.y, R * 0.4, R * 5.5, 0.55, '#ffffff', 5);
+    ring(s.x, s.y, R * 0.8, R * 9.0, 0.85, '#8fdcff', 3);
+    ring(s.x, s.y, R * 1.4, R * 14.0, 1.25, '#5f7cff', 2);
+    for (let i = 0; i < 40; i++) {
+      const a = (i / 40) * TAU + rand(-0.06, 0.06);
+      const sp = rand(260, 900);
+      spark(s.x + Math.cos(a) * R * 0.8, s.y + Math.sin(a) * R * 0.8,
+        Math.cos(a) * sp, Math.sin(a) * sp,
+        i % 3 ? '#dff6ff' : '#8fdcff', rand(0.3, 0.8), rand(1.6, 3.4));
+    }
+    audio.boom();
   }
 
   /** Land it, from the end or from a skip. Both arrive in the same state. */
@@ -1177,7 +1260,7 @@ export class Game {
     return this.endEvolve();
   }
 
-  setEra(n, { instant = true } = {}) {
+  setEra(n, { instant = true, sky = 'snap', skyRate = 0 } = {}) {
     const w = this.world;
     const to = n === 2 ? 2 : 1;
     if (w.era === to) return false;
@@ -1190,8 +1273,10 @@ export class Game {
     // scale; load-bearing the moment they do not.
     this.resize();
     // ...and the sky, AFTER the resize, because that rebuilds the nebula and
-    // the overlay off the new dimensions.
-    this.syncSky(true);
+    // the overlay off the new dimensions. `sky` is 'snap' for every ordinary
+    // caller -- a debug era step, a restore, the bench doors -- and 'ease' for
+    // the one that is a transition rather than a change of place.
+    this.syncSky(sky === 'snap', skyRate);
     return true;
   }
 
@@ -3221,24 +3306,58 @@ export class Game {
      * from outside.
      */
     const ev = w.evolve;
-    if (ev && (ev.core > 0 || ev.form > 0)) {
+    if (ev && (ev.charge > 0 || ev.form > 0)) {
       const s = w.shooter;
       const grow = ev.form;
-      if (grow > 0.02) {
-        ctx.save();
+      /*
+       * ---- the transformation, drawn --------------------------------------
+       *
+       * The machine is on screen for ALL of it, which is the whole change. It
+       * used to vanish for three and a half seconds and the new form was then
+       * scaled up from zero out of an empty frame -- built from nothing rather
+       * than made out of what was there.
+       *
+       * Before the seam the bare MK1 is drawn as it is, with light gathering
+       * on it. After the seam `world.shooter.draw` is already the MK2 (the era
+       * has flipped), so all this has to do is bring it in from a little under
+       * size with its own light still on it. 0.86 and not 0: at 0 it reads as
+       * a new object arriving, and at 0.86 it reads as the same object opening
+       * out, which is what the piece is about.
+       */
+      ctx.save();
+      if (grow > 0) {
+        const sc = 0.86 + 0.14 * grow;
         ctx.translate(s.x, s.y);
-        ctx.scale(grow, grow);
+        ctx.scale(sc, sc);
         ctx.translate(-s.x, -s.y);
-        ctx.globalAlpha = Math.min(1, grow * 1.6);
-        w.shooter.draw(ctx, w);
+        ctx.globalAlpha = Math.min(1, 0.25 + grow * 1.5);
+      }
+      w.shooter.draw(ctx, w);
+      ctx.restore();
+      /*
+       * ...and the light. It gathers on the bare machine through the wind-up,
+       * blooms at the seam, and settles back as the new form takes over --
+       * `1 - grow` rather than a second envelope, so it cannot outlive the
+       * thing it is lighting.
+       */
+      const lit = ev.charge * (1 - grow * 0.82);
+      if (lit > 0.01) {
+        drawGlow(ctx, '#ffffff', s.x, s.y, s.r * (0.7 + ev.charge * 0.9 + grow * 1.2), lit);
+        drawGlow(ctx, '#8fdcff', s.x, s.y, s.r * (1.6 + ev.charge * 2.0 + grow * 2.6), lit * 0.55);
+      }
+      // The seam itself: a bright rim that runs out through the new form as it
+      // opens, gone by the time it is fully out.
+      if (grow > 0 && grow < 1) {
+        const t = 1 - grow;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = rgba('#e8fbff', t * 0.75);
+        ctx.lineWidth = CFG.hairline * (1 + t * 3);
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * (0.9 + grow * 1.9), 0, TAU);
+        ctx.stroke();
         ctx.restore();
       }
-      // The core itself, over whatever is building around it: at act IV it is
-      // the only thing on the screen, and it stays lit through the ignition
-      // because the form comes OUT of it.
-      const lit = Math.max(ev.core * (1 - grow * 0.7), 0.12);
-      drawGlow(ctx, '#ffffff', s.x, s.y, s.r * (0.5 + grow * 1.4), lit);
-      drawGlow(ctx, '#9fe8ff', s.x, s.y, s.r * (1.2 + grow * 3.2), lit * 0.5);
     } else {
       w.shooter.draw(ctx, w);
     }

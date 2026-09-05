@@ -1574,9 +1574,21 @@ export class Hud {
      *
      * `wide` spans both columns; SPAWN GROUP opens a screen rather than doing
      * something, so it gets the width and the ellipsis that say so.
+     *
+     * ---- and the fourth field: whether the panel STAYS ----
+     *
+     * The panel is 340px of opaque glass over a 390px screen, so a button that
+     * makes something happen on the field hands you a view of the panel and
+     * not of the thing you asked for. Every action closes it. The exception is
+     * the one that needs a second tap to mean anything -- SPAWN GROUP opens a
+     * screen, and closing the panel on the way in would shut the screen you
+     * just opened. Toggles keep it open too, and for a different reason: the
+     * `on` class on the button IS the readout, so closing on a toggle hides
+     * the state you just set, and turning two of them on would cost two
+     * reopenings.
      */
     const actions = [
-      ['SPAWN GROUP…', () => this.showSpawn(true), 'wide'],
+      ['SPAWN GROUP…', () => this.showSpawn(true), 'wide', true],
       ['+50 KILLS', () => g.debugAddKills(50)],
       ['NEXT STORY', () => g.debugNextStory()],
       ['UNLOCK ALL', () => g.debugUnlockAll()],
@@ -1601,9 +1613,7 @@ export class Hud {
        * apart -- which is the whole reason they are one variable.
        */
       ['ERA →', () => g.debugStepEra()],
-      // Not built yet: the evolution is P8. The button exists from here so the
-      // walk in `smoke.mjs` and the debug grid do not have to change later.
-      ['EVOLVE (P8)', () => g.debugEvolve()],
+      ['EVOLVE', () => g.debugEvolve()],
     ];
     const toggles = [
       ['NO COOLDOWN', 'noCooldown'],
@@ -1614,11 +1624,15 @@ export class Hud {
     ];
 
     const frag = document.createDocumentFragment();
-    for (const [label, fn, cls] of actions) {
+    for (const [label, fn, cls, stay] of actions) {
       const b = document.createElement('button');
       b.textContent = label;
       if (cls) b.classList.add(cls);
-      b.addEventListener('click', fn);
+      b.addEventListener('click', () => {
+        fn();
+        // ...and get out of the way, unless this one is a door. See above.
+        if (!stay) this.toggleDebug(false);
+      });
       frag.appendChild(b);
     }
     for (const [label, key] of toggles) {

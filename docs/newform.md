@@ -1,6 +1,6 @@
 # NEW FORM / NEW FIELD — the build plan
 
-**Status: P1 (238) - P9b (255), plus builds 256-257's walls. The plan's structure is complete; P10 (the reveal pass) is what is left.**
+**Status: P1 (238) - P9b (255), builds 256-257's walls, build 258's transformation. The plan's structure is complete; P10 (the reveal pass) is what is left.**
 
 This file is the resumption mechanism. A session picking this up with no memory of the
 conversation that produced it should be able to read this and know exactly what was
@@ -1864,3 +1864,140 @@ adding an era-2 anomaly should read this paragraph first.**
 
 529 green, hash `-1765830468` before and after in this container, bundle booted
 by hand over http for the first `shooter.js -> yard.js` edge.
+
+## 31. Build 258 — the transformation, and a second form worth arriving at
+
+Reported from play, with a screenshot: three and a half seconds of an empty
+black field with one dot of light in the middle of it.
+
+**That was act IV.** "What is left is the idea of a machine" — the turret was
+not drawn AT ALL for the whole act, and the new form was then scaled up from
+zero out of an empty frame. The machine is stripped part by part and then
+simply is not there, so the second form arrives from nothing rather than out of
+the first one.
+
+**Five acts now, not six.** The unmaking runs straight into the transformation:
+
+    I    0.0 - 4.0    the field is taken
+    II   4.0 - 9.0    the approach
+    III  9.0 - 15.5   the unmaking, in the order the run was built
+    IV  15.5 - 22.0   the transformation
+    V   22.0 - 30.0   the pull-back
+
+Act IV is one act with a SEAM in it rather than two acts with a hole between
+them. `CFG.evolve.flipAt` is 0.38, so the wind-up is 2.5s and the arrival is
+4.0s, and the two cannot drift apart. Before the seam the bare MK1 is on screen
+drawing light into itself — motes hauled in on a clock that tightens as the
+seam approaches, through the same emitter act I uses to take the field. At the
+seam the field turns over. After it the second form comes out of the first at
+`0.86 + 0.14 * form` rather than from zero: **at 0 it reads as a new object
+arriving, and at 0.86 it reads as the same object opening out**, which is what
+the piece is about.
+
+**The silence was worth keeping and the empty screen was not**, so the two were
+separated. The old act IV's bed row was a hard 0 whose PICTURE was the hole;
+the zero moved onto the unmaking, where the seventeen thuds already are, and
+the ignition still arrives out of nothing.
+
+**The seam's own frame** is `Game.evolveFlash`: three rings at three sizes and
+three lifetimes so the front does not read as one hoop, forty sparks thrown
+outward against the motes that were being hauled in a frame earlier, a ripple
+the background grid answers, a flash and a boom. `shake` is a multiplier the
+player already owns, so somebody who has turned it off gets none of it.
+
+### The background ease, which has been broken since it was written
+
+`background.update` ran `mixHex(this.mood[key], this.target[key], k)` with `k`
+about 0.013 at 60Hz, and `mixHex` rounds to whole channels every step — so a
+channel closer than about 38 to its target moved by less than half a unit,
+rounded back to itself, and **never arrived**. Measured before the fix,
+staging → sandbox sat at its starting colour for twelve seconds. Every mood in
+the game was affected; the ones that appeared to work were arriving on their
+few far-apart channels only, which is why so much of this game SNAPS its moods.
+
+The state is carried as floats (`background.moodF`) and rounded only on the way
+out. `mixHex` is untouched — it has other callers and it is not wrong, it is
+just not a place to keep state.
+
+Three things follow from it, and all three were previously impossible:
+`beginEvolve` eases the breach over act I instead of cutting to it; `syncSky`
+no longer forces `newfield` to snap, so `setEra(2, { sky: 'ease' })` from
+inside the cinematic crosses the sky over about 2.5s; and every ordinary
+transition in the game — staging, the lull, all four boss skies — now actually
+completes. **That last one is a visible change to the rest of the game** and it
+is the one this was always going to cost.
+
+`regress.mjs` asserts a mood is PART WAY after a second and ARRIVED after
+eight. An arm that only checked the end state would pass on a build that cut.
+
+### The MK2, and a reversal
+
+The old case asserted that the second form grew INBOARD — 2.14r against MK1's
+2.404r — because that is what bought clearance from the build lots. **The
+consequence nobody had measured is that it was then 11% smaller ON THE GLASS
+than a fully rigged first form.** The radius is at parity by construction
+(26 × 0.62 and 40 × 0.403 are the same 16.1 CSS px) and everything hung on it
+was tighter, so the reward for the whole evolution was a machine that looked
+like less.
+
+It paints 102.3 world units now against 85.6, which is **41.2 CSS px against a
+rigged MK1's 38.8** — 6.4% bigger where the player actually compares them, and
+19.5% bigger than the MK2 was. What is new on it:
+
+- **A vented collar** in the gap between the deck and the first hull plate, so
+  it is visible whatever is bought — structure, not an upgrade, and what a
+  stripped MK2 has that a stripped MK1 does not.
+- **Six buttresses** rooted in the deck's corners out to 1.29R, each with a lit
+  spine so it reads as a rib rather than a flap.
+- A wider deck (1.02R against 0.92R), a heavier barrel, a deeper race, and
+  bolts that are proportional instead of a flat 1.5 world units — a speck on a
+  machine 1.54× deeper.
+
+**The colour goes one way only: colder.** `#8fdcff` against `#59e0ff` is dE
+12.7 in CIELAB — far enough to read as a different grade of light beside the
+old machine, near enough to be obviously the same machine. Nothing gets a new
+hue, because every saturated hue in this game is already spoken for; the
+upgrade is carried by temperature and luminance, which is also the one axis a
+colourblind player still receives. The rim goes `#bfe6ff` → `#e8fbff` and the
+structure under it goes deeper and bluer.
+
+**The clearance is bought by the works stepping back**, not by the machine
+staying small: `lotSide` 104 → 118 and `lotW` 40 → 34. Stepping back alone does
+not fit — at 118 with the old width the outer edge lands on the quick strip's
+left column at 320×568, which the clash sweep catches — so the works are
+narrower as well as further out.
+
+### `reach()` was understating the machine on exactly the device that struggles
+
+The envelope assumed a nominal stroke. The widest structural stroke is
+`CFG.hairline * 2.6`, and `CFG.hairline` is set on every resize from the scale
+the canvas is really drawn at — the quality governor's factor included. So it
+GROWS when the governor shrinks the backing store.
+
+Measured at era 2, fully rigged: at quality 1 the hairline is 3.10 world units
+and the machine paints 90.27; at quality 0.5 it is 4.43 and it paints 91.76,
+against a fixed envelope of 91.39. **The bound held on a fast device and failed
+on a slow one**, which is the worst shape a clearance rule can have. `reach()`
+carries `CFG.hairline * 1.3` on the structural terms now — and only those: the
+barrel's far corner already pays `pad` twice and its painted extent is
+identical at both qualities, at both eras, bare and rigged.
+
+### The debug panel
+
+Every action closes it. Two exceptions: SPAWN GROUP is a door, and closing the
+panel would shut the screen it just opened; and the toggles, whose `on` class
+IS the readout, so closing on one hides the state you just set and turning two
+on would cost two reopenings. Asserted off the RENDERED BOX, not the `hidden`
+property.
+
+### The one flake, and why the case was wrong rather than the code
+
+"The evolution takes the field and pays nothing for it" summed `w.enemies.length`
+across a 31-second window against a 30-second cinematic, so its claim was
+"nothing is released during the evolution AND for a second afterwards". In
+isolation the first wave after the cinematic arrives later than that; five
+hundred cases in, with whatever the director has been left holding, it can
+arrive inside the second. It counts only while `w.evolve` is set now. The
+camera arms still need the full window, which is why it is 31 seconds.
+
+534 green, hash `-1765830468` before and after in this container.

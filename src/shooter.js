@@ -972,7 +972,13 @@ export class Shooter {
   draw(ctx, world) {
     const breached = world.attackers.size > 0;
     const t = world.time;
-    const accent = breached ? '#ff5d5d' : '#59e0ff';
+    /*
+     * The machine's own light, and the second form's is COLDER: `#8fdcff`
+     * against `#59e0ff` is dE 12.7 in CIELAB, which reads as a different grade
+     * of the same light rather than as a different colour. Breached is still
+     * red at both, because that is a warning and not a grade.
+     */
+    const accent = breached ? '#ff5d5d' : (CFG.mk2 ? '#8fdcff' : '#59e0ff');
 
     // Aim ray. It reaches further while the ball is held, because that is when
     // you are aiming by feel rather than by pointing at a target.
@@ -1080,8 +1086,23 @@ export class Shooter {
      */
     const MK = !!CFG.mk2;
 
-    const BODY = 'rgba(20,34,52,0.99)';
-    const FACE = 'rgba(30,50,74,0.99)';
+    /*
+     * ---- the second form's palette ----
+     *
+     * Slightly, and in one direction: COLDER. MK1's accent is `#59e0ff` and
+     * MK2's is `#8fdcff` -- dE 12.7 in CIELAB, which is far enough to read as
+     * a different grade of light beside the old machine and near enough to be
+     * obviously the same machine. Nothing gets a new hue: CLAUDE.md's rule is
+     * that every saturated hue in this game is already spoken for by an arm,
+     * an ability or a root, so the upgrade is carried by TEMPERATURE and
+     * LUMINANCE instead, which is also the one axis a colourblind player still
+     * receives. The rim goes the same way, `#bfe6ff` to a near-white
+     * `#e8fbff`, and the structure under it goes deeper and bluer so the lit
+     * lines have more to sit against.
+     */
+    const BODY = MK ? 'rgb(14,28,50)' : 'rgba(20,34,52,0.99)';
+    const FACE = MK ? 'rgb(24,44,78)' : 'rgba(30,50,74,0.99)';
+    const RIM = MK ? '#e8fbff' : '#bfe6ff';
 
     const poly = (n, rr, turn, cx = 0, cy = 0) => {
       ctx.beginPath();
@@ -1210,7 +1231,7 @@ export class Shooter {
     if (g.slew) {
       // the race: a machined ring with teeth cut in it, one row per level
       for (let i = 0; i < g.slew; i++) {
-        const rr = R * (MK ? 1.14 + i * 0.12 : 1.06 + i * 0.13);
+        const rr = R * (MK ? 1.38 + i * 0.15 : 1.06 + i * 0.13);
         ctx.strokeStyle = rgba('#7fa8c8', (0.5 + 0.14 * i) * lit);
         ctx.lineWidth = 2.2;
         ctx.beginPath();
@@ -1223,7 +1244,7 @@ export class Shooter {
           const a = this.spin * (i % 2 ? -0.5 : 0.5) + (k / teeth) * TAU;
           const c = Math.cos(a);
           const sn = Math.sin(a);
-          const th = MK ? R * 0.10 : 3.4;
+          const th = MK ? R * 0.132 : 3.4;
           ctx.moveTo(c * rr, sn * rr);
           ctx.lineTo(c * (rr + th), sn * (rr + th));
         }
@@ -1234,12 +1255,12 @@ export class Shooter {
     // ---- SPINES: the hull. Armour that makes the machine bigger -----------
     if (g.casing) {
       for (let i = 0; i < g.casing; i++) {
-        const rr = R * (MK ? 1.10 + i * 0.20 : 1.0 + i * 0.16);
+        const rr = R * (MK ? 1.32 + i * 0.247 : 1.0 + i * 0.16);
         const last = i === g.casing - 1;
         ctx.fillStyle = i ? BODY : FACE;
         // The outermost plate carries the bright edge: the silhouette is what
         // the eye reads first and it should be the lit line, not an inner one.
-        ctx.strokeStyle = rgba(last ? '#bfe6ff' : accent, (last ? 0.7 : 0.3) * lit);
+        ctx.strokeStyle = rgba(last ? RIM : accent, (last ? 0.7 : 0.3) * lit);
         ctx.lineWidth = CFG.hairline * (last ? 2.6 : 2);
         poly(6, rr, Math.PI / 6 + i * (MK ? 0.08 : 0.26));
         ctx.fill();
@@ -1247,8 +1268,8 @@ export class Shooter {
       }
       // chamfers: a bright short stroke on each plate's outer corner, which is
       // what makes a stack of hexagons read as bevelled metal
-      const rr = R * (MK ? 1.10 + (g.casing - 1) * 0.20 : 1.0 + (g.casing - 1) * 0.16);
-      ctx.strokeStyle = rgba('#bfe6ff', 0.5 * lit);
+      const rr = R * (MK ? 1.32 + (g.casing - 1) * 0.247 : 1.0 + (g.casing - 1) * 0.16);
+      ctx.strokeStyle = rgba(RIM, 0.5 * lit);
       ctx.lineWidth = CFG.hairline * 1.8;
       ctx.beginPath();
       for (let k = 0; k < 6; k++) {
@@ -1338,16 +1359,86 @@ export class Shooter {
       }
     }
 
+    /*
+     * ---- MK2 only: the buttresses and the collar --------------------------
+     *
+     * The second form is meant to read as a heavier machine and not as the
+     * first one drawn bigger, and the two things that do that cheaply are
+     * MASS at the corners and DEPTH at the rim.
+     *
+     * Six wedges rooted in the deck's corners and running out to 1.16R, and a
+     * vented collar in the gap between the deck (0.92R) and the first hull
+     * plate (1.19R) -- so the collar is visible whatever is bought, which is
+     * the point: it is structure, not an upgrade, and it is what a stripped
+     * MK2 has that a stripped MK1 does not.
+     *
+     * Under the deck, so the deck's own outline still carries the silhouette
+     * and neither of these competes with it.
+     */
+    if (MK) {
+      const cr = R * 1.20;
+      // the collar: a machined band with vents cut through it
+      ctx.fillStyle = BODY;
+      ctx.strokeStyle = rgba(accent, 0.34 * lit);
+      ctx.lineWidth = CFG.hairline * 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, cr, 0, TAU);
+      ctx.arc(0, 0, R * 1.06, 0, TAU, true);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = rgba(RIM, 0.42 * lit);
+      ctx.lineWidth = CFG.hairline * 2.4;
+      ctx.beginPath();
+      for (let k = 0; k < 18; k++) {
+        const a = (k / 18) * TAU + this.spin * 0.12;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        ctx.moveTo(c * R * 1.08, sn * R * 1.08);
+        ctx.lineTo(c * cr * 0.995, sn * cr * 0.995);
+      }
+      ctx.stroke();
+      // the buttresses, one per corner, tapering outward
+      ctx.fillStyle = FACE;
+      ctx.strokeStyle = rgba(accent, 0.5 * lit);
+      ctx.lineWidth = CFG.hairline * 1.6;
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * TAU + Math.PI / 6;
+        ctx.save();
+        ctx.rotate(a);
+        ctx.beginPath();
+        ctx.moveTo(R * 0.82, -R * 0.22);
+        ctx.lineTo(R * 1.29, -R * 0.095);
+        ctx.lineTo(R * 1.29, R * 0.095);
+        ctx.lineTo(R * 0.82, R * 0.22);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // ...and a lit spine along each one, which is what makes it read as a
+        // rib rather than a flap
+        ctx.strokeStyle = rgba(RIM, 0.5 * lit);
+        ctx.lineWidth = CFG.hairline * 1.2;
+        ctx.beginPath();
+        ctx.moveTo(R * 0.90, 0);
+        ctx.lineTo(R * 1.25, 0);
+        ctx.stroke();
+        ctx.strokeStyle = rgba(accent, 0.5 * lit);
+        ctx.lineWidth = CFG.hairline * 1.6;
+        ctx.restore();
+      }
+    }
+
     // ---- the deck: the one part that is always there ----------------------
     ctx.fillStyle = BODY;
     ctx.strokeStyle = rgba(accent, 0.9);
     ctx.lineWidth = CFG.hairline * (2 + filled * 1.4);
-    poly(6, R * 0.92, Math.PI / 6);
+    // The second form's deck is wider too, or a bigger machine reads as a small
+    // one inside a large halo.
+    poly(6, R * (MK ? 1.02 : 0.92), Math.PI / 6);
     ctx.fill();
     ctx.stroke();
     ctx.strokeStyle = rgba(accent, 0.26 + filled * 0.24);
     ctx.lineWidth = CFG.hairline;
-    poly(6, R * 0.74, Math.PI / 6);
+    poly(6, R * (MK ? 0.82 : 0.74), Math.PI / 6);
     ctx.stroke();
     // bolts at the corners: six small marks, and a drawn hexagon becomes a
     // machined one
@@ -1355,7 +1446,9 @@ export class Shooter {
     for (let k = 0; k < 6; k++) {
       const a = (k / 6) * TAU + Math.PI / 6;
       ctx.beginPath();
-      ctx.arc(Math.cos(a) * R * 0.83, Math.sin(a) * R * 0.83, 1.5, 0, TAU);
+      // Proportional on MK2 and absolute on MK1, the same split every other
+      // ornament here uses -- a flat 1.5 is a speck on a machine 1.54x deeper.
+      ctx.arc(Math.cos(a) * R * (MK ? 0.92 : 0.83), Math.sin(a) * R * (MK ? 0.92 : 0.83), MK ? R * 0.042 : 1.5, 0, TAU);
       ctx.fill();
     }
 
@@ -1404,7 +1497,7 @@ export class Shooter {
        * rather than a fin hanging in a gap.
        */
       const h = MK ? R * (0.28 + i * 0.10) : 18 + i * 8;
-      const seat = MK ? 1.08 : 0.8;
+      const seat = MK ? 1.29 : 0.8;
       ctx.save();
       ctx.translate(c * R * seat, sn * R * seat);
       ctx.rotate(a);
@@ -1456,7 +1549,7 @@ export class Shooter {
           ? (g.aimrange > i ? R * (0.28 + i * 0.10) : R * 0.16)
           : (g.aimrange > i ? 18 + i * 8 : 10);
         ctx.save();
-        ctx.translate(c * R * (MK ? 1.08 : 0.8), sn * R * (MK ? 1.08 : 0.8));
+        ctx.translate(c * R * (MK ? 1.29 : 0.8), sn * R * (MK ? 1.29 : 0.8));
         ctx.rotate(a);
         for (let L = 0; L < layers; L++) {
           const x = h + (MK ? R * 0.04 + L * R * 0.05 : 2.5 + L * 3.2);
@@ -1571,12 +1664,12 @@ export class Shooter {
      * taken that place; it had not, and the note above is era 1's and stays
      * true at both.
      */
-    const bl = R * (MK ? 1.08 + g.rate * 0.06 + g.casing * 0.04
+    const bl = R * (MK ? 1.33 + g.rate * 0.075 + g.casing * 0.048
       : 1.24 + g.rate * 0.11 + g.casing * 0.08);
     ctx.fillStyle = MK ? 'rgb(18,34,52)' : 'rgba(18,34,52,0.99)';
     ctx.strokeStyle = rgba(accent, 0.95);
     ctx.lineWidth = 2;
-    const bw = MK ? R * (0.19 + g.casing * 0.026) : 6.5 + g.casing * 0.9;
+    const bw = MK ? R * (0.24 + g.casing * 0.032) : 6.5 + g.casing * 0.9;
     roundRectPath(ctx, R * 0.16 - recoil, -bw, bl, bw * 2, MK ? R * 0.09 : 4);
     ctx.fill();
     ctx.stroke();
@@ -1718,30 +1811,54 @@ export class Shooter {
      * being a ceiling. Asserted against the painted pixels at both eras, bare
      * and fully rigged.
      */
-    const pad = MK ? R * 0.115 : 3.4;
+    const pad = MK ? R * 0.132 : 3.4;
+    /*
+     * ...and the STROKE the structure is actually drawn with, which is not a
+     * nominal number. The widest structural stroke is `CFG.hairline * 2.6` on
+     * the outermost hull plate, and `CFG.hairline` is set on every resize from
+     * the scale the canvas is really drawn at -- the quality governor's factor
+     * included. So it GROWS when the governor shrinks the backing store, and
+     * an envelope that assumed the nominal stroke understates the machine on
+     * exactly the device that is struggling.
+     *
+     * Measured at era 2, fully rigged: at quality 1 the hairline is 3.10 world
+     * units and the machine paints 90.27; at quality 0.5 it is 4.43 and the
+     * machine paints 91.76, against a fixed envelope of 91.39. The bound held
+     * on a fast device and failed on a slow one, which is the worst shape a
+     * clearance rule can have.
+     *
+     * Only on the terms it applies to. The barrel's far CORNER already pays
+     * `pad` twice, once along and once across, and its painted extent does not
+     * move with the hairline -- measured identical at both qualities, at both
+     * eras, bare and rigged.
+     */
+    const edge = CFG.hairline * 1.3;
     let far = R + pad;                                  // the bare hexagon
+    // ...and MK2's buttresses, which a bare second form paints past its own
+    // deck with nothing bought at all. See the note beside them in drawMachine.
+    if (MK) far = Math.max(far, R * 1.29 + pad + edge);
     if (g.casing) {
-      far = Math.max(far, R * (MK ? 1.10 + (g.casing - 1) * 0.20
-        : 1 + (g.casing - 1) * 0.16) + pad);
+      far = Math.max(far, R * (MK ? 1.15 + (g.casing - 1) * 0.215
+        : 1 + (g.casing - 1) * 0.16) + pad + edge);
     }
     if (g.slew) {
-      const rr = R * (MK ? 1.14 + (g.slew - 1) * 0.12 : 1.06 + (g.slew - 1) * 0.13);
-      far = Math.max(far, rr + (MK ? R * 0.10 : 3.4) + pad);
+      const rr = R * (MK ? 1.38 + (g.slew - 1) * 0.15 : 1.06 + (g.slew - 1) * 0.13);
+      far = Math.max(far, rr + (MK ? R * 0.132 : 3.4) + pad + edge);
     }
     /*
      * The barrel is a rounded rect laid along the aim from `R * 0.16`, so its
      * reach is the far CORNER and not the axial tip: at full rig that is 62.2
      * against an axial 61.5, and the corner is what a lot would meet first.
      */
-    const bl = R * (MK ? 1.08 + g.rate * 0.06 + g.casing * 0.04
+    const bl = R * (MK ? 1.33 + g.rate * 0.075 + g.casing * 0.048
       : 1.24 + g.rate * 0.11 + g.casing * 0.08);
-    const bw = MK ? R * (0.19 + g.casing * 0.026) : 6.5 + g.casing * 0.9;
+    const bw = MK ? R * (0.24 + g.casing * 0.032) : 6.5 + g.casing * 0.9;
     far = Math.max(far, Math.hypot(R * 0.16 + bl + pad, bw + pad));
     // ARRAY and SIEVE are seated at R*0.8 and reach outward in ABSOLUTE units
     // that do not scale with the machine -- which is exactly what makes them
     // read as hung on rather than built in.
     const seats = g.aimrange > 0 ? g.aimrange : 1;
-    const seat = R * (MK ? 1.08 : 0.8);
+    const seat = R * (MK ? 1.29 : 0.8);
     for (let i = 0; i < seats; i++) {
       const h = MK
         ? (g.aimrange > i ? R * (0.28 + i * 0.10) : R * 0.16)
