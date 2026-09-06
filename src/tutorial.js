@@ -187,6 +187,20 @@ export const ON_LOTS = (() => {
 })();
 
 /*
+ * ...and the two beside the machine, which are not that.
+ *
+ * They carry `kind: 'works'` and are ghosted as a building, and pressing one
+ * refuses. Said once per device rather than raised as a pill on every press:
+ * `pressLot` runs from the canvas pointerdown, so before build 268 every shot
+ * aimed through one of those two boxes -- and they sit right beside the
+ * machine -- put a caption up. The lot's flare answers the rest.
+ */
+export const ON_WORKS = (() => {
+  const text = 'Not emplacement ground.\nThe two beside the machine are works lots; the four ahead take a turret.';
+  return { id: idOf(text), text, hold: holdFor(text) };
+})();
+
+/*
  * ...and if it is still there a while later, said again.
  *
  * Everything else in this file is once per device and that is right for it:

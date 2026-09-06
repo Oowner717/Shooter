@@ -24,9 +24,24 @@ positives (see the bottom of this file).
   floor was in the wrong units too. `Game.drawGlitch` is the pattern to copy.
 - **`AIRBURST` was inert against the ASSAY rig** (fixed in 265; radius 58 → 74).
 
+## Fixed in build 268 (phase 2)
+
+Items 1-4 below are done. Left in place with their
+file:line so the next reader can see what was claimed against what was found.
+
+- **`#sbEras` was worse than reported.** It is the only in-flow child of an
+  `inset: 0` absolute parent whose two siblings are both absolute, so it
+  rendered at the top of the VIEWPORT behind the bar -- and `#sandbox` is
+  `pointer-events: none` with each child opting in, which it never did. The
+  room's own era row has been invisible where it was drawn and untappable
+  since build 262. It is positioned between the bar and the panel now, the
+  panel moved down 36px to make room, and a real `pointerdown` on it moves the
+  world.
+- `exitSandbox`, the works pill and the purchase flare, all as described below.
+
 ## Open — ships-broken
 
-1. **`exitSandbox` hardcodes `ledger.select(1)` / `soak.select(1)`**, so after an
+1. ~~**`exitSandbox` hardcodes `ledger.select(1)` / `soak.select(1)`**, so after an
    ERA II session the menu's LAST SESSION and LIFETIME rows show era 1's — or
    nothing. `src/game.js:1453-1454`; read via `src/sandbox.js:708-746` from
    `src/menu.js:625,633`. Contradicts `disarm`'s and `lastSession`'s docstrings.
@@ -34,17 +49,18 @@ positives (see the bottom of this file).
    unpositioned static child of an `inset: 0` absolutely-positioned section,
    rendering at the top of the viewport behind the ASSAY bar.
    `styles.css:4487-4490`, `src/sandbox.js:185`. **Not confirmed by screenshot**
-   — the images taken this session were of the menu row, not the in-room row.
-   Check this first; it is either serious or nothing.
+   **FIXED 268**, and it was serious: see above.
 
 ## Open — wrong but hidden
 
-3. **Every aim press inside a works lot raises a pill, for ever.** The refusal
+3. ~~**Every aim press inside a works lot raises a pill, for ever.** The refusal
    uses `hud.alert`, not `sayOnce`, and `pressLot` runs on every canvas
-   pointerdown. `src/game.js:1607-1609`, reached from `src/game.js:1889`.
-4. **The purchase effect fires on the highest lot index, not the lot bought.**
+   pointerdown. `src/game.js:1607-1609`, reached from `src/game.js:1889`.~~
+   **FIXED 268** -- `sayOnce([ON_WORKS])`, the idiom the lots already use.
+4. ~~**The purchase effect fires on the highest lot index, not the lot bought.**
    `src/game.js:1567` — `w.gunAt[w.gunAt.length - 1]`, and `gunAt` is sorted by
-   lot, so buying lot 2 after lot 5 flashes lot 5.
+   lot, so buying lot 2 after lot 5 flashes lot 5.~~ **FIXED 268** --
+   `gunAt.find(x => x.lot === i)`.
 5. **HAIL's particle spend is ~4.7× what it was and none of it scales with
    `fx.quality`.** On the device the governor exists for, one press asks for
    about 60% of the reduced budget. Compare `fx.js`'s own `hitBurst`/`explode`,

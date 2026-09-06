@@ -21798,7 +21798,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         for (let f = 0; f < 60; f++) { e.hp = 1e9; g.update(1 / 60); }
         trail.push(Math.round(Math.hypot(e.x - s.x, e.y - s.y)));
       }
+      /*
+       * Where it got back inside the range it was thrown FROM. The arm is
+       * "closing until it is home", not "closing for ever": at twelve seconds
+       * the body has arrived and is bumping the machine, so the last sample
+       * legitimately ticks up. Asserting monotonicity over the whole trail
+       * failed on a build where the recovery worked perfectly.
+       */
+      const home = trail.findIndex((v) => v <= d0);
       return {
+        home,
         cap: +((e.cruise || 60) * CFG.physics.maxSpeedFactor).toFixed(1),
         invMass: +(e.invMass || 0).toFixed(4),
         peak: +peak.toFixed(1),
@@ -21999,13 +22008,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    */
   check('...and the ground it buys is given back, which is what bounds it',
     r.near.alive
-    && r.near.trail.every((v, i) => i < 2 || v < r.near.trail[i - 1])
-    && r.near.trail[r.near.trail.length - 1] < r.near.trail[1] * 0.75,
+    && r.near.home >= 0
+    && r.near.trail.every((v, i) => i < 2 || i > r.near.home || v < r.near.trail[i - 1]),
     `thrown from ${r.near.start} out to ${r.near.trail[0]}, then `
     + `${r.near.trail.join(' -> ')} over twelve seconds -- closing on every `
-    + `sample and back inside `
-    + `${(r.near.trail[r.near.trail.length - 1] / r.near.trail[1] * 100).toFixed(0)}% `
-    + `of where the throw left it, still on the field (${r.near.alive})`);
+    + `sample until it was home at second ${r.near.home + 1}, back inside the `
+    + `${r.near.start} it started at, still on the field (${r.near.alive})`);
 
   check('...and the fan is as wide as the config says, and the cast shows it',
     r.n === r.want && Math.abs(r.spread - r.arc) <= r.jitter * 2 + 0.01

@@ -32,7 +32,7 @@ import { NODES, NODE_BY_ID, priceOf, UNDER, levelsOf } from './tree.js';
 
 /** The turret branch, for the fitting announcements and the completion one. */
 const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
-import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_WALL, ON_LOTS, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_WALL, ON_LOTS, ON_WORKS, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
@@ -1462,8 +1462,20 @@ export class Game {
     this.resume();
     // ...and back to the era's own scale on the way out, for the same reason.
     this.resize();
-    ledger.select(1);
-    soak.select(1);
+    /*
+     * The counter is LEFT where it was, and that is the fix rather than the
+     * omission it looks like.
+     *
+     * This forced `ledger.select(1)` and `soak.select(1)` on the way out, so
+     * a session spent in the ERA II room was swapped away on the frame you
+     * left it and the menu's LAST SESSION and LIFETIME rows showed era 1's --
+     * or nothing at all, on a run that had never used era 1's room. Those
+     * rows exist to survive walking out; that is what `disarm` is for.
+     *
+     * Nothing needs the swap: `note` returns on its first line when the
+     * counter is not armed, so an unselected room costs nothing between
+     * visits, and `enterSandbox` and `setBenchEra` both select on the way in.
+     */
     /*
      * ...and the sky and the bed with it. This used to write the era-1 pair
      * longhand, which was the hole: leaving the bench goes through `resume()`
@@ -1576,7 +1588,13 @@ export class Game {
     const had = gunCount(w);
     const r = buildGun(w, i);
     if (r === 'ok') {
-      const g = w.gunAt[w.gunAt.length - 1] || w.yard.lots[i];
+      /*
+       * The lot just bought, BY INDEX. `gunAt` is built by walking
+       * `world.guns`, which is sorted ascending, so "the last one" is the
+       * highest lot index and not the newest -- buy lot 5 and then lot 2 and
+       * the flare went off on lot 5.
+       */
+      const g = w.gunAt.find((x) => x.lot === i) || w.yard.lots[i];
       ring(g.x, g.y, CFG.gun.r * 0.4, CFG.gun.r * 3.4, 0.55, '#8fb8e8', 2);
       for (let k = 0; k < 14; k++) {
         const a = (k / 14) * TAU;
@@ -1616,9 +1634,16 @@ export class Game {
      * a turret on a slot ghosted as a block. It refuses now, and says which
      * of the six are yours to build a gun on rather than only saying no.
      */
-    if (r === 'kind' && this.hintsAllowed) {
-      this.hud.alert('WORKS · NOT AN EMPLACEMENT LOT', 'info', 2.2);
-    }
+    /*
+     * ...ONCE, and not on every press. `pressLot` runs from the canvas
+     * pointerdown, so every shot aimed through a works lot's box -- and both
+     * of them sit right beside the machine, where the thumb is -- raised a
+     * pill. `sayOnce` is the idiom the lots already use for the line that
+     * explains what an emplacement is, it is marked said when it PAINTS, and
+     * `PREFS.hints` turns it off with everything else. The lot's own flare,
+     * from `refuseLot` above, is what answers every press after the first.
+     */
+    if (r === 'kind' && this.hintsAllowed) this.sayOnce([ON_WORKS]);
     return false;
   }
 
