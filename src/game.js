@@ -32,7 +32,7 @@ import { NODES, NODE_BY_ID, priceOf, UNDER, levelsOf } from './tree.js';
 
 /** The turret branch, for the fitting announcements and the completion one. */
 const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
-import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_WALL, ON_LOTS, ON_WORKS, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_WALL, ON_LOTS, ON_WORKS, ON_CEILING, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
@@ -3021,6 +3021,45 @@ export class Game {
   }
 
   /**
+   * ...and the gate that is not an anomaly.
+   *
+   * Its own function beside `syncGate` and not a branch inside it, because the
+   * two are opened by different things and say different words: an aperture is
+   * answered by fighting, and this one only by becoming. There is no
+   * `w.apertures` entry to hand out either -- nothing is granted here, the way
+   * out is in the tree.
+   *
+   * Once per arrival, guarded on `capLit` the way the banner is guarded on
+   * `gateLit`, and it CLEARS when the hold lifts so a run that somehow came
+   * back down and up again is told again. The band is said once per device;
+   * the pill is per arrival, because the pill is the thing that answers "why
+   * did the arrow stop working".
+   */
+  syncEraCap() {
+    const w = this.world;
+    const d = w.director;
+    if (!d || w.boss || w.phase !== 'staging') return;
+    const at = d.eraHeld(w);
+    if (!at) { this.capLit = 0; return; }
+    if (this.capLit !== at) {
+      this.capLit = at;
+      this.hud.alert('CEILING · THIS FORM CLIMBS NO HIGHER', 'rigDone', 5);
+    }
+    /*
+     * ...and the band is OFFERED until it actually goes up, not once.
+     *
+     * `sayOnce` refuses while another line is still being read and DROPS what
+     * it was given -- it does not queue -- so a once-only trigger calling it
+     * loses the line outright if the moment is busy. Arriving at the ceiling
+     * is exactly such a moment: a wave has just been scored and its own
+     * caption may be up. The line marks itself said when it PAINTS, so asking
+     * again every frame until `lineSeen` agrees is self-limiting and costs a
+     * set lookup on the frames between.
+     */
+    if (this.hintsAllowed && !lineSeen(ON_CEILING.id)) this.sayOnce([ON_CEILING]);
+  }
+
+  /**
    * The anomaly stops counting.
    *
    * A gate that cannot be passed is a run that cannot continue, so a boss that
@@ -3119,7 +3158,21 @@ export class Game {
     this.bossStageT = 0;
     this.bossStageWas = 0;
     this.gateLit = 0;
-    if (d.gateAt(d.tier) === n) {
+    // ...and the ceiling's, beside it and for the same reason: a fresh run has
+    // not been told anything yet.
+    this.capLit = 0;
+    /*
+     * ...and the step past the gate you just answered is refused if the rung
+     * above is held by the FORM.
+     *
+     * This is `setTier`, the machinery's own setter, which unlocks as it goes
+     * -- it does not go through `climbTo` and so does not see the anomaly
+     * gates at all, which is right, because the gate it is stepping over is
+     * the one that was just answered. It did not see the era cap either, so
+     * reconciling TERMINUS at rung 42 walked the run straight to 43 and over
+     * the ceiling that exists to stop exactly that.
+     */
+    if (d.gateAt(d.tier) === n && !d.eraHeld(w, d.tier)) {
       d.setTier(d.tier + 1);
       // ...and the anomaly leaves a choice behind it. Two rules, on the rail,
       // taken by tapping one. Nothing is held and nothing is asked.
@@ -3334,6 +3387,7 @@ export class Game {
     // The gate keeps its own banner lit. Idempotent, so it does not matter
     // which of the six ways onto a gate rung the run took to get here.
     this.syncGate();
+    this.syncEraCap();
     const w = this.world;
     this.hud.setKills(w.kills);
     /*

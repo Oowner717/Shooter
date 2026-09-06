@@ -1356,8 +1356,16 @@ export class Hud {
      * Up is live at the ceiling now -- it arms a trial there. It goes dead
      * only while one is already running or the lockout after one has not run
      * down, which is the difference between "nothing to do" and "not yet".
+     *
+     * ...and DEAD at the era ceiling, which is a third thing again. A trial is
+     * still a climb -- `Director.arm` runs it through `climbTo` and so refuses
+     * one past the form's own ladder -- so the rule already held there and the
+     * CONTROL did not say so: the arrow lit, the press did nothing, and the
+     * player was left to work out which of the two was broken. A rule that
+     * holds silently is half a rule.
      */
-    $('railUp').disabled = !!dir.probe || (n >= peak && dir.probeLock > 0);
+    $('railUp').disabled = !!dir.probe || (n >= peak && dir.probeLock > 0)
+      || !!dir.eraHeld(world);
     /*
      * ...and the skip is there only when it has somewhere to go. A control
      * that is present and inert on most of a run is a control that reads as

@@ -3839,6 +3839,28 @@ export class Director {
   }
 
   /**
+   * Is the ladder held here by the FORM rather than by an anomaly?
+   *
+   * `CFG.waves.tier.eraGate` is the rung the first machine's ladder ends on.
+   * Past it there is nothing cut for a turret built like that one, and the way
+   * through is not to answer something -- it is to become something else. The
+   * test is `newForm === 'done'` and not `=== 'armed'`: buying NEW FORM arms a
+   * banner, and taking it is what changes the field. Half of it does not open
+   * a gate.
+   *
+   * Takes the rung rather than reading `this.tier`, because `climbTo` walks a
+   * rung at a time and has to be able to ask about each one on the way -- the
+   * same reason `gateAt` does.
+   *
+   * @returns the rung it is held at, or 0
+   */
+  eraHeld(world, tier = this.tier) {
+    const at = CFG.waves.tier.eraGate;
+    if (!at || tier < at) return 0;
+    return (world.newForm === 'done') ? 0 : at;
+  }
+
+  /**
    * The highest rung a climb from here may actually reach.
    *
    * Walks up one rung at a time and stops at the first gate whose anomaly is
@@ -3851,6 +3873,8 @@ export class Director {
     while (at < want) {
       const n = this.gateAt(at);
       if (n && !(world.reconciled || []).includes(n)) return at;
+      // ...and the one gate that is not an anomaly. See `eraHeld`.
+      if (this.eraHeld(world, at)) return at;
       at++;
     }
     return want;

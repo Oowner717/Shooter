@@ -2790,3 +2790,87 @@ would have split them.
 
 569 green. ORDINAL's hash `-1765830468`, unchanged — era 1 spawns DRIFT
 unstaged, so the reordered guard is inert there.
+
+## 41. Build 272 — the ladder ends where the first form does
+
+> "Block user from progressing in the wave system after 7th boss until New Form
+> is bought and used... They can still earn energy, but wave system will be
+> locked from moving."
+
+The first of three phases: the gate itself. The two new anomalies that live
+above it come next.
+
+`CFG.waves.tier.eraGate` is **42** — TERMINUS's own gate rung, deliberately
+the same number rather than one above it. Standing on 42 having reconciled the
+seventh is the exact moment the first form has nothing left to be sent against,
+and a rung of empty ladder between the two would read as the game having simply
+run out.
+
+The test is `world.newForm === 'done'`, **not `'armed'`**. Buying NEW FORM puts
+a banner up; taking it is what changes the field, and half of it does not open
+a gate. That distinction is what stops the check being written against the
+ledger, which is the easier and wrong thing to look at.
+
+### There were three doors, and only one was obvious
+
+- `climbTo` walks a rung at a time and is where every ordinary climb is
+  refused. One line.
+- **`endBoss` steps the ladder past the gate it just answered** with `setTier`
+  — the machinery's setter, which unlocks as it goes and never consults
+  `climbTo`. So reconciling TERMINUS at 42 walked the run straight to 43, over
+  the ceiling that exists to stop exactly that. Guarded.
+- A **trial** was already safe: `Director.arm` runs its target through
+  `climbTo` under a comment reading "a trial is still a climb: it may not be
+  used to step over a gate". It cost nothing and it was already right.
+
+...but the rail's up arrow stayed **lit** at the ceiling, so the rule held
+while the control said nothing: the arrow pressed, the press did nothing, and
+the player was left to work out which of the two was broken. A rule that holds
+silently is half a rule.
+
+### What it says
+
+A pill on arrival — `CEILING · THIS FORM CLIMBS NO HIGHER` — and a band, once
+per device:
+
+> Seven answered. The ladder is cut for a shape you have outgrown.
+> Waves still come and still pay here — but nothing above this rung was built
+> for this machine. NEW FORM is in the tree.
+
+The second line is doing the real work. This is a **state**, not an event: the
+run will sit in it for as long as seven REMAINDERs take to afford, and a state
+the player cannot name is a game that looks broken. So it says what has stopped
+(the climb), what has not (everything else), and what to spend on.
+
+**And the band is offered until it paints, not once.** `sayOnce` refuses while
+another line is being read and *drops* what it was given — it does not queue —
+so a once-only trigger calling it loses the line outright if the moment is
+busy. Arriving at the ceiling is exactly such a moment: a wave has just been
+scored and its caption may be up. It is asked again every frame until
+`lineSeen` agrees, which is self-limiting because the line marks itself said
+when it paints.
+
+### The case, and four ways it lied first
+
+The suite asserts the rule (`climbTo` refuses, `'armed'` is not enough, `done`
+releases), the second door (driven through `openBoss`/`endBoss`, not by calling
+the step), the words, and — because the request says so in as many words — that
+**the field still runs**: forty seconds at the ceiling still releases waves and
+still banks energy, and the rung never moves.
+
+Each of these was wrong before it was right, and all four are on CLAUDE.md's
+list:
+
+- the "still pays" arm ran forty seconds with the gun **idle** and asserted the
+  purse had moved. Energy enters through `bank()` and nothing banks if nothing
+  dies: it was asserting that a field nobody is shooting pays.
+- the message arm used `restart()`, which leaves the game on the **title
+  screen**, where the update loop `syncEraCap` runs from never reaches it.
+- it then **started on** the ceiling rather than arriving at it, so `capLit`
+  was still set from the arm above and the once-per-arrival guard suppressed
+  everything.
+- and the arms above it call `debugTeachAll`, which marks every line said **on
+  the device**, so `sayOnce` had nothing left to offer. `forgetLines()` for
+  that arm.
+
+573 green. ORDINAL's hash `-1765830468`, unchanged.

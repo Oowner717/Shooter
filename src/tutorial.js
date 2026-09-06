@@ -201,6 +201,21 @@ export const ON_WORKS = (() => {
 })();
 
 /*
+ * ...and the rung the first machine's ladder ends on.
+ *
+ * Said once, on the frame the run first stands where it can no longer climb.
+ * The band rather than a pill alone because this is not an event, it is a
+ * STATE -- the run is going to sit in it for as long as it takes to afford
+ * seven REMAINDERs -- and a state the player cannot name is a game that looks
+ * broken. Everything else keeps working, which the second line says outright:
+ * the waves still come and still pay, and what has stopped is the climb.
+ */
+export const ON_CEILING = (() => {
+  const text = 'Seven answered. The ladder is cut for a shape you have outgrown.\nWaves still come and still pay here — but nothing above this rung was built for this machine. NEW FORM is in the tree.';
+  return { id: idOf(text), text, hold: holdFor(text) };
+})();
+
+/*
  * ...and if it is still there a while later, said again.
  *
  * Everything else in this file is once per device and that is right for it:

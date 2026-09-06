@@ -810,6 +810,21 @@ came from before believing the other one covers it.
   an `audio.boom()` sixty times a second, for the rest of the run, per expired
   mine. Measured 39 blasts in the second after one expired. Anything that can
   be called twice needs to read its own `dead` back.
+- **`setTier` is the machinery's setter and does not gate.** `climbTo` is where
+  every ordinary climb is refused, and `endBoss` steps past the gate it just
+  answered with `setTier`, which never consults it -- so a new gate written
+  into `climbTo` alone is a gate with a second door standing open. Build 272's
+  era ceiling walked straight over itself that way: reconcile the seventh at
+  rung 42 and the run was at 43. A TRIAL is already safe, and says so in a
+  comment: `Director.arm` runs its target through `climbTo`.
+- **`sayOnce` DROPS a line it cannot say; it does not queue.** It refuses while
+  another line is still being read, so a once-only trigger that calls it loses
+  the line outright if the moment is busy -- and arriving anywhere interesting
+  is a busy moment, because a wave has just been scored. Offer it every frame
+  until `lineSeen` agrees; the line marks itself said when it PAINTS, so that
+  is self-limiting. And a case for one has to `forgetLines()` if anything
+  upstream of it called `debugTeachAll`, which marks every line said on the
+  DEVICE.
 - **`drive()`'s early returns are ORDERED, and the harmless one sat above the
   staged one.** Every harmless body went to `wander()` from the frame it
   appeared, whatever its state -- so DRIFT alone fanned out INSIDE the era-2

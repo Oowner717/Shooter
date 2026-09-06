@@ -22880,6 +22880,242 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `disagree with the rule`);
 }
 
+// --- the ladder ends where the first form does ------------------------------
+/*
+ * Build 272. Seven anomalies are the first machine's whole ladder, and past
+ * TERMINUS's own gate at rung 42 there is nothing cut for a turret built like
+ * that one. The way through is not to answer something -- it is to become
+ * something else.
+ *
+ * The two things this pins are the two ways past it, and one of them was NOT
+ * closed by the obvious change. `climbTo` walks a rung at a time and is where
+ * every ordinary climb is refused; but `endBoss` steps the ladder past the
+ * gate it just answered with `setTier`, the MACHINERY's setter, which unlocks
+ * as it goes and never consults `climbTo` at all. So reconciling TERMINUS at
+ * 42 walked the run straight to 43, over the ceiling that exists to stop it.
+ *
+ * ...and it must be `newForm === 'done'`, not `'armed'`. Buying NEW FORM puts
+ * a banner up; TAKING it is what changes the field, and half of it does not
+ * open a gate. That arm is what stops the test being written against the
+ * ledger, which is the easier and wrong thing to check.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    /*
+     * The arms above use `debugTeachAll`, which marks every line said ON THE
+     * DEVICE -- it writes `sim7749-lines` -- so by the time the message arm
+     * runs, `sayOnce` has nothing left to offer and the case would report a
+     * silent build on one that speaks. The record is cleared for that arm, and
+     * this is why it is imported.
+     */
+    const { forgetLines } = await import('../src/codex.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    const CAP = CFG.waves.tier.eraGate;
+    out.cap = CAP;
+    // The ceiling is the last anomaly's own rung, deliberately -- a rung of
+    // empty ladder between the two would read as the game running out.
+    out.isLastGate = CFG.waves.tier.gates[CFG.waves.tier.gates.length - 1] === CAP;
+
+    const arm = (form) => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 1e9;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(400000);
+      w.director.update = () => {};
+      // every anomaly answered, which is the state the ceiling is about
+      w.reconciled = CFG.waves.tier.gates.map((_, i) => i + 1);
+      w.newForm = form;
+      const d = w.director;
+      d.setTier(CAP);
+      return d;
+    };
+
+    // ---- an ordinary climb is refused, and everything else still runs ----
+    const d1 = arm(null);
+    out.climbNone = d1.climbTo(w, CAP + 6);
+    out.heldNone = d1.eraHeld(w);
+    // ...and ARMED is not enough: the banner is up and the field has not
+    // turned over, which is the whole distinction.
+    const d2 = arm('armed');
+    out.climbArmed = d2.climbTo(w, CAP + 6);
+    // ...and DONE lets it go.
+    const d3 = arm('done');
+    out.climbDone = d3.climbTo(w, CAP + 6);
+    out.heldDone = d3.eraHeld(w);
+
+    // ---- ...and the rung BELOW the ceiling still climbs to it -------------
+    const d4 = arm(null);
+    d4.setTier(CAP - 3);
+    out.climbUpTo = d4.climbTo(w, CAP + 4);
+
+    /*
+     * ---- the other way past, which the first fix did not close ------------
+     *
+     * Through `endBoss`, which is the game's own path and not a method call:
+     * `openBoss` then the boss destroyed, so the step past the answered gate
+     * runs exactly as it does in a run.
+     */
+    arm(null);
+    w.director.setTier(CAP);
+    w.apertures = w.apertures || [];
+    w.apertures[7] = 1;
+    g.openBoss(7);
+    out.opened = !!w.boss;
+    if (w.boss) {
+      w.boss.hp = 0;
+      w.boss.dead = true;
+      g.endBoss();
+    }
+    out.tierAfterBoss = w.director.tier;
+
+    // ...and with the form taken, the same path DOES step.
+    arm('done');
+    w.director.setTier(CAP);
+    w.apertures[7] = 1;
+    g.openBoss(7);
+    if (w.boss) { w.boss.hp = 0; w.boss.dead = true; g.endBoss(); }
+    out.tierAfterBossDone = w.director.tier;
+
+    /*
+     * ---- and the run is not stopped, only the CLIMB -----------------------
+     *
+     * "They can still earn energy" is the request in as many words, so it is
+     * asserted: at the ceiling a wave is still released and banking it still
+     * pays. A gate that stopped the field would be a different feature.
+     */
+    arm(null);
+    delete w.director.update;
+    w.spawnLock = 0;
+    g.debugClearField();
+    /*
+     * ...and the turret actually FIGHTS. The first version of this arm ran
+     * forty seconds with the gun idle and then asserted the purse had moved:
+     * energy enters a run through `bank()` and nothing banks if nothing dies,
+     * so it was asserting that a field nobody was shooting pays -- which is
+     * not the claim and cannot be true on any build.
+     */
+    w.autoAim = true;
+    w.autoFire = true;
+    g.debugBuyAll();
+    const purse0 = w.energy;
+    const earned0 = w.earned;
+    let released = 0;
+    for (let f = 0; f < 60 * 40; f++) {
+      g.update(1 / 60);
+      released = Math.max(released, w.enemies.length);
+    }
+    out.released = released;
+    // `earned` is LIFETIME banked and only `bank()` writes it, so it is the
+    // honest half: the purse also falls when the tree is bought from.
+    out.earnedBy = Math.round(w.earned - earned0);
+    out.stillPays = w.earned > earned0;
+    out.tierHeldThrough = w.director.tier;
+
+    /*
+     * ---- ...and the player is TOLD, which is the other half of the ask -----
+     *
+     * Deliberately without `debugTeachAll`: it marks every line said, so a
+     * case armed the usual way would find `sayOnce` skipping and would be
+     * asserting that a silent build is silent.
+     *
+     * The hint is captured by its ARGUMENT and not by counting calls -- a spy
+     * that records names proves almost nothing, which this suite has paid for
+     * before. What is asserted is that the words the player reads name the
+     * way out.
+     */
+    /*
+     * `start()` and not `restart()`: `syncEraCap` runs from the live update
+     * loop, and a restart leaves the game on the TITLE screen where that loop
+     * does not reach it. The first version of this arm read an empty pill and
+     * an empty line on a build that raises both -- it was measuring a game
+     * that had not begun.
+     */
+    g.start();
+    forgetLines();
+    delete w.director.update;
+    w.spawnLock = 1e9;
+    w.phase = 'staging';
+    w.director.update = () => {};
+    w.reconciled = CFG.waves.tier.gates.map((_, i) => i + 1);
+    w.newForm = null;
+    /*
+     * ...and it ARRIVES at the ceiling rather than starting on it. `capLit`
+     * guards the pill to once per arrival and clears itself on any frame the
+     * hold is not on, so a case that set the rung before its first update
+     * inherited the flag from the arm above and measured a build that had
+     * already said its piece. Half a second at rung 1 clears it, which is what
+     * a real run does on its way up.
+     */
+    for (let f = 0; f < 30; f++) g.update(1 / 60);
+    out.clearedBelow = g.capLit;
+    w.director.setTier(CAP);
+    const said = [];
+    const realHint = g.hud.showHint.bind(g.hud);
+    g.hud.showHint = (t, once) => { said.push(String(t)); return realHint(t, once); };
+    const pills = [];
+    const realAlert = g.hud.alert.bind(g.hud);
+    g.hud.alert = (t, k, d2, tone) => { pills.push(String(t)); return realAlert(t, k, d2, tone); };
+    for (let f = 0; f < 60 * 6; f++) g.update(1 / 60);
+    g.hud.showHint = realHint;
+    g.hud.alert = realAlert;
+    out.pill = pills.find((t) => /CEILING/.test(t)) || '';
+    out.said = said.find((t) => /NEW FORM/.test(t)) || '';
+    out.capLit = g.capLit;
+    // ...and it names the way out rather than only saying no.
+    out.namesTheWay = /NEW FORM/.test(out.said) && /pay|come/i.test(out.said);
+
+    delete w.director.update;
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+
+  check('the ladder ends where the first form does, and only the FORM opens it',
+    r.isLastGate
+    && r.climbNone === r.cap && r.heldNone === r.cap
+    && r.climbArmed === r.cap
+    && r.climbDone > r.cap && r.heldDone === 0
+    && r.climbUpTo === r.cap,
+    `the ceiling is rung ${r.cap}, which is the last anomaly's own gate `
+    + `(${r.isLastGate}); a climb from it reaches ${r.climbNone} with no NEW `
+    + `FORM and ${r.climbArmed} with it merely BOUGHT -- the banner is not the `
+    + `field -- and ${r.climbDone} once it has been taken; from three rungs `
+    + `below it still climbs up to ${r.climbUpTo}`);
+
+  /*
+   * `setTier` is the machinery's setter and does not go through `climbTo`, so
+   * this is a second door and it was open. Driven through `openBoss`/`endBoss`
+   * rather than by calling the step, because the step is not a control.
+   */
+  check('...and answering the seventh does not step over the ceiling either',
+    r.opened && r.tierAfterBoss === r.cap && r.tierAfterBossDone === r.cap + 1,
+    `reconciling the seventh at ${r.cap} leaves the run at ${r.tierAfterBoss} `
+    + `without the new form and steps it to ${r.tierAfterBossDone} with it`);
+
+  /*
+   * A rule the player cannot name is a game that looks broken, and this one is
+   * a STATE they will sit in for as long as seven REMAINDERs take to afford.
+   * The pill answers "why did the arrow stop"; the band says what to spend on
+   * and, as importantly, that everything else still works.
+   */
+  check('...and it says so, and says what to do about it',
+    r.clearedBelow === 0 && r.capLit === r.cap
+    && /CEILING/.test(r.pill) && r.namesTheWay,
+    `below it the flag is ${r.clearedBelow}; arriving raised "${r.pill}" and `
+    + `said "${r.said}"`);
+
+  check('...and what is held is the climb, not the run: waves still come and pay',
+    r.released > 0 && r.stillPays && r.tierHeldThrough === r.cap,
+    `forty seconds at the ceiling released up to ${r.released} bodies at once `
+    + `and banked ${r.earnedBy} energy (${r.stillPays}), and the rung never `
+    + `left ${r.cap}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

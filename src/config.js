@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '271';
+export const BUILD = '272';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '271';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'ad2df60';
+export const REV = '442e443';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -384,6 +384,29 @@ export const CFG = {
        * Index i is anomaly n = i + 1; see ANOMALIES in anomaly.js.
        */
       gates: [6, 12, 18, 24, 30, 36, 42],
+      /*
+       * ---- and the one gate that is not an anomaly (build 272) ----------
+       *
+       * The seven above are opened by ANSWERING something. This one is opened
+       * by BECOMING something: past rung 42 -- TERMINUS's own gate, and the
+       * last thing the first form was ever built to meet -- the ladder will
+       * not climb until the field has actually turned over. Not until NEW FORM
+       * is bought, which is only half of it, but until it has been TAKEN:
+       * `world.newForm === 'done'`, which `endEvolve` writes and which a
+       * restore at era 2 writes for a run that did it in a previous session.
+       *
+       * Everything else goes on working. Waves still arrive at the capped
+       * rung, they still pay, the tree still fills -- what stops is the
+       * CLIMB, which is the one thing on the other side of the change. A run
+       * that is stuck here is a run that is being told what to spend on.
+       *
+       * It is deliberately the same number as the last anomaly gate rather
+       * than one above it: standing on 42 having reconciled TERMINUS is the
+       * exact moment the first form has nothing left to be sent against, and
+       * a rung of empty ladder between the two would read as the game having
+       * simply run out.
+       */
+      eraGate: 42,
       /*
        * ---- traits (build 204) ----
        *
