@@ -534,7 +534,18 @@ export function drawYard(ctx, world, mood, price = 0) {
      * era 2's lots is not a constant.
      */
     if (price > 0 && l.kind === 'gun' && !built.includes(li)) {
-      const px = Math.max(8, 9.5 / k);
+      /*
+       * CSS pixels through `CFG.zoom`, NOT through `CFG.scale`.
+       *
+       * `k` is `CFG.scale` -- the era's size ratio, 1 and 1.538 -- and a world
+       * unit is `CFG.zoom` CSS px. Dividing by the wrong one asked for 9.5
+       * world units and got 5.9 CSS px at era 1, and the `Math.max(8, ...)`
+       * floor (also in world units) pinned it at 3.2 CSS px at era 2, where
+       * the lots actually are. A price nobody can read is the silence this
+       * was written to end. `Game.drawGlitch` is the pattern: pick the CSS
+       * size, divide by the zoom, floor in the same units.
+       */
+      const px = Math.max(9, 11 / CFG.zoom);
       const label = String(Math.round(price));
       ctx.font = `${px}px ui-monospace, "SF Mono", Menlo, monospace`;
       ctx.textAlign = 'center';

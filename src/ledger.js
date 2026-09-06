@@ -140,10 +140,28 @@ class Ledger {
     return this;
   }
 
-  /** Everything `reset` clears, plus `t`. The state a room owns. */
+  /**
+   * Everything `reset` clears, plus `t`. The state a room owns.
+   *
+   * ---- the four COPIES, which are the whole of it -----------------------
+   *
+   * `by`, `wT`, `wD` and `wS` were parked by REFERENCE, and `reset` empties
+   * them IN PLACE (`by.clear()`, `wT.length = 0`) -- so the snapshot handed to
+   * the store was the same Map and the same three rings the next room then
+   * cleared. All three rooms shared one source table and one rate window;
+   * only the five primitives were ever per era. The case did not see it
+   * because it read `ledger.total`, which is one of the five.
+   *
+   * Found by an adversarial review of builds 262-265, reported independently
+   * by three of its eight readers, against a docstring above that says each
+   * room keeps its own and that the field list "is asserted against" the
+   * constructor's -- which it was not. It is now: see `regress.mjs`, which
+   * fills a room's table, leaves, fills another and comes back to the first.
+   */
   snap() {
     return { t: this.t, total: this.total, over: this.over, kills: this.kills,
-      by: this.by, wT: this.wT, wD: this.wD, wS: this.wS, head: this.head };
+      by: new Map(this.by), wT: [...this.wT], wD: [...this.wD], wS: [...this.wS],
+      head: this.head };
   }
 
   /** Arm, from a clean slate. */
