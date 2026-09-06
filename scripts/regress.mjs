@@ -21271,7 +21271,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 {
   const r = await page.evaluate(async () => {
     const { CFG } = await import('../src/config.js');
-    const { lotPrice, gunCount } = await import('../src/turrets.js');
+    const { lotPrice, gunCount, drawGuns } = await import('../src/turrets.js');
     const { drawYard } = await import('../src/yard.js');
     const { background } = await import('../src/background.js');
     const g = window.__sim;
@@ -21353,6 +21353,55 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      */
     const gun = w.gunAt[0];
     out.padW = gun.hw === lot.hw && gun.hh === lot.hh;
+    /*
+     * ...and RENDERED, because two fields on the model is not a pad. Reverting
+     * the geometry to `R * 3` by `R * 2.3` would leave the two fields alone
+     * and keep this green, which is the hole review found in it.
+     *
+     * `drawGuns` is drawn into a frame centred on the lot and the painted
+     * extent is measured against the lot's own box: the pad has to reach the
+     * box's width and no further sideways. The barrel legitimately runs past
+     * it vertically -- it is a barrel -- so only the horizontal reach is
+     * asserted, which is the axis the old expression was wrong on.
+     */
+    {
+      const S = 200;
+      const paintHalf = () => {
+        const c2 = document.createElement('canvas');
+        c2.width = S; c2.height = S;
+        const x2 = c2.getContext('2d');
+        x2.translate(S / 2 - gun.x, S / 2 - gun.y);
+        drawGuns(x2, w);
+        const d2 = x2.getImageData(0, 0, S, S).data;
+        let far = 0;
+        for (let py = 0; py < S; py++) {
+          for (let px2 = 0; px2 < S; px2++) {
+            if (d2[(py * S + px2) * 4 + 3] < 24) continue;
+            const dx = Math.abs(px2 - S / 2);
+            if (dx > far) far = dx;
+          }
+        }
+        return +far.toFixed(1);
+      };
+      /*
+       * A DIFFERENTIAL against the old geometry, and the first version of this
+       * was not one. It measured the painted half-width and required it within
+       * 2 of the lot's 35.38 -- but the expression it exists to rule out,
+       * `R * 1.5`, is 36.92, and a stroke is centred on its path so the paint
+       * runs about 2.6 past whichever of them is in force. Two candidates 1.5
+       * apart cannot be told apart by a measurement with 2.6 of bleed: it read
+       * 38 for both. So `drawGuns` is run twice -- once as shipped, once with
+       * `hw`/`hh` deleted, which is exactly what makes it fall back to
+       * `R * 1.5` -- and the two pictures must differ, with the shipped one
+       * the narrower. Revert the geometry and the two runs become identical.
+       */
+      out.paintedHalf = paintHalf();
+      const hw = gun.hw; const hh = gun.hh;
+      delete gun.hw; delete gun.hh;
+      out.paintedOld = paintHalf();
+      gun.hw = hw; gun.hh = hh;
+      out.padPainted = out.paintedOld > out.paintedHalf;
+    }
     out.padWas = +(CFG.gun.r * 1.5).toFixed(2);
     out.padIs = +lot.hw.toFixed(2);
     out.padDiffered = Math.abs(CFG.gun.r * 1.5 - lot.hw) > 0.5
@@ -21391,11 +21440,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
   check('a lot says what it costs, and a gun with nothing to shoot comes home',
     r.priceOn > r.priceOff && r.built && r.priceGone
-    && r.padW && r.padDiffered
+    && r.padW && r.padDiffered && r.padPainted
     && r.tracking > 0.35 && r.rested < 0.02,
     `the empty lot lights ${r.priceOn} pixels against ${r.priceOff} with the `
     + `price switched off -- ${r.price} energy, drawn where the thumb already `
-    + `is -- and once built it is back to ${r.priceBuilt}; the pad is the lot's `
+    + `is -- and once built it is back to ${r.priceBuilt}; the pad paints out to `
+    + `${r.paintedHalf} against ${r.paintedOld} on the geometry it replaced `
+    + `(${r.padPainted}); it is the lot's `
     + `own ${r.padIs} and not the gun's ${r.padWas} (${r.padDiffered} that `
     + `those differ); the aim left rest by ${r.tracking} rad on a target and `
     + `came back to ${r.rested}`);
@@ -22372,6 +22423,99 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     rows.map((x) => `${x.w}: three cells ${x.short}-${x.tall}px tall in `
       + `${x.cell}px of width, against ${x.oneLine}px for the longest label `
       + `forced to one line (white-space ${x.ws})`).join('; '));
+}
+
+// --- the ASSAY room's OWN era row, pressed the way a thumb presses it -------
+/*
+ * Build 268. This row went in at 262 and did not work once until 268, and the
+ * suite was green through all six builds -- because every room switch in it
+ * goes through `g.setBenchEra()`, which is the method the handler calls.
+ *
+ * What was wrong was invisible to the model entirely. `#sbEras` was the only
+ * in-flow child of `#sandbox`, which is `position: absolute; inset: 0`, and
+ * both its siblings are absolute too -- so it flowed from the top of the
+ * VIEWPORT and rendered underneath the bar. And `#sandbox` is
+ * `pointer-events: none` with each child opting in, which it never did.
+ *
+ * So this asserts the two things a model can never see: WHERE the box is, and
+ * whether a point inside it belongs to the button. `elementFromPoint` is the
+ * right instrument for the second and CLAUDE.md says why -- it skips whatever
+ * is already off, so getting the cell back IS the proof it is live. Then the
+ * press itself, with `pointerdown`, which is what this row binds.
+ */
+{
+  const held = page.viewportSize();
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    rows.push(await page.evaluate((vw) => {
+      const g = window.__sim;
+      const w = g.world;
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(900000);
+      g.buy('sandbox');
+      // as a purchase leaves it -- the id is `recast`, and it is the LEDGER
+      // that survives the resume `enterSandbox` does.
+      if (!w.ledger.includes('recast')) w.ledger.push('recast');
+      w.newForm = 'armed';
+      w.director.update = () => {};
+      g.enterSandbox(1);
+
+      const box = (sel) => {
+        const e = document.querySelector(sel);
+        if (!e) return null;
+        const r = e.getBoundingClientRect();
+        return { top: Math.round(r.top), bot: Math.round(r.bottom), h: Math.round(r.height) };
+      };
+      const bar = box('#sbBar');
+      const eras = box('#sbEras');
+      const panel = box('#sbPanel');
+      const cells = [...document.querySelectorAll('#sbEras .sbEra')];
+
+      /*
+       * Does a point in the middle of ERA II belong to ERA II? A row with
+       * `pointer-events: none` inherited from `#sandbox` hands back whatever
+       * is behind it, and a row flowed to the top of the viewport hands back
+       * the bar.
+       */
+      const r2 = cells[1].getBoundingClientRect();
+      const at = document.elementFromPoint(r2.left + r2.width / 2, r2.top + r2.height / 2);
+      const owns = !!(at && at.closest('#sbEras .sbEra') === cells[1]);
+
+      // ...and then the press, through the handler, on the element.
+      const before = w.era;
+      cells[1].dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+      const moved = { era: w.era, r: w.shooter.r,
+        form: (w.enemies.find((e) => e.dummy) || {}).dummyForm || 0 };
+      // ...and back, so the row is a control and not a one-way trip.
+      cells[0].dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+      const back = { era: w.era, r: w.shooter.r };
+
+      g.exitSandbox();
+      delete w.director.update;
+      g.setEra(1);
+      g.restart();
+      return {
+        w: vw, cells: cells.length, bar, eras, panel, owns, before, moved, back,
+        // clear of the bar above it and the panel below it, with no overlap
+        placed: !!(bar && eras && panel && eras.top >= bar.bot && panel.top >= eras.bot),
+      };
+    }, size.width));
+  }
+  await page.setViewportSize(held);
+
+  check("the ASSAY room's own era row is where it is drawn, and takes a press",
+    rows.every((x) => x.cells === 3 && x.placed && x.owns
+      && x.before === 1 && x.moved.era === 2 && x.moved.r === 40 && x.moved.form === 2
+      && x.back.era === 1 && x.back.r === 26),
+    rows.map((x) => `${x.w}: bar ${x.bar.top}-${x.bar.bot}, row ${x.eras.top}-`
+      + `${x.eras.bot}, panel from ${x.panel.top} (clear ${x.placed}); the point `
+      + `at ERA II's centre belongs to ERA II (${x.owns}); a pointerdown took `
+      + `it to ${JSON.stringify(x.moved)} and back to ${JSON.stringify(x.back)}`).join('; '));
 }
 
 // --- report -----------------------------------------------------------------

@@ -1503,9 +1503,13 @@ came from before believing the other one covers it.
   has never moved through any of it, because a saved run writes bought ids
   into `world.ledger` and renaming this one takes a 20,000-energy node away
   from everyone who has bought it. `regress.mjs` pins the name in all THREE
-  places it is written -- the bar from `RANGE_NAME`, the tab from `GROUPS`,
-  the card from the tree -- because it lives in three files and each of the
-  three previous renames moved a subset of them. Comments and docs that say
+  places it is written FROM A CONSTANT -- the bar from `RANGE_NAME`, the tab
+  from `GROUPS`, the card from the tree -- because those three live in three
+  files and each of the three previous renames moved a subset of them. Note
+  the name is ALSO typed out by hand in four more user-visible places that
+  nothing pins: `menu.js`'s sealed heading, its open heading and its ENTER
+  button, and `index.html`'s `aria-label`. A fifth rename has to sweep for the
+  string, not just re-run the case. Comments and docs that say
   "the testbed" are history and are left alone; the NAME is one constant.
 - **The assay is three rooms and each room is an ERA, not a scale.** Until
   build 262 the bench pinned era 1's scale without touching `world.era`:
@@ -1515,10 +1519,15 @@ came from before believing the other one covers it.
   and a padlocked era 3. Neither room has a yard -- the gate is still
   `era === 2 && !sandbox`, because a building nothing comes out of and a wall
   nothing crosses explain rules that do not apply where there are no waves.
-  **It is entered on the era you are standing in.** Remembering the last tab
-  reads as a kindness and is not: a run at era 2 whose last visit ended on
-  ERA I came back to era 1's field, silently, in the one room whose whole job
-  is measuring.
+  **It is entered on the era you are standing in, by DEFAULT.** Remembering
+  the last tab reads as a kindness and is not: a run at era 2 whose last visit
+  ended on ERA I came back to era 1's field, silently, in the one room whose
+  whole job is measuring. From build 264 the ASSAY tab carries the same
+  three-way control and `enterSandbox(era)` takes an argument, so the door can
+  NAME a room -- the era you are standing in is what it falls back to, and a
+  pick lasts only as long as the sheet is up. From 266 era 2 is shut until the
+  NEW FORM is owned (`eraShut`), and from 268 the room's own row is positioned
+  and can actually be pressed.
 - **Per-era state is a STATE SWAP, not a facade.** `ledger.select(era)`
   snapshots the live counter into `store[era]` and assigns the incoming one
   over itself, because `ledger` is read by name in five files and one missed
@@ -1559,8 +1568,10 @@ came from before believing the other one covers it.
   exactly 0 -- a case whose whole subject is that the two look nothing alike,
   reporting them identical, and not erroring. It throws on anything but 'ok'
   or 'here' now, and asserts `world.era` actually moved.
-- **The ASSAY's rig is r 68 and no BODY in the game is, so the room that
-  measures damage under-reports anything centred on a surface.** AIRBURST at
+- **The ASSAY's rig is r 68, larger than every BASE body, so the room that
+  measures damage under-reports anything centred on a surface.** (Only a fully
+  grafted BULWARK, at 72, is bigger; the largest base body is the FRACTAL core
+  at 64.) AIRBURST at
   58 measured x1.5 to x1.9 in the field and 1140 -> 1170 in the bench, which is
   zero inside the noise: a player buys the node, takes it to the room whose
   whole job is telling them what a source is worth, and the room says nothing
@@ -1639,7 +1650,8 @@ came from before believing the other one covers it.
   than a wait.
 - **A held reach RING belongs to an ability that reaches in a circle, and
   nothing else.** PULSE's `Shock` is honest because PULSE is a circle. The same
-  thing on HAIL -- 334 units, the fan's own `speed * life` -- claims the 254
+  thing on HAIL -- 334 units, which is `speed * life * 0.55` and not
+  `speed * life` (that is 608-769) -- claims the 254
   degrees the 106-degree wedge does not reach, INCLUDING THE GROUND BEHIND THE
   TURRET, and rendered it was the loudest thing in the frame by a distance: a
   dashed hoop most of the screen wide over embers a fifth as bright. The reach

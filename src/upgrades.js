@@ -610,18 +610,23 @@ export const UPGRADES = {
      * build 224 and there is no default; see the paragraph at the end of this
      * file for the eight nodes that shipped uncapped before there wasn't.
      *
-     * What it is worth is measured, on a pinned witness: one LURCHER goes 105
-     * to 161, one BULWARK 118.8 to 162, and THREE LURCHERs shoulder to
-     * shoulder go 270 to 505. Half again against one body and nearly double
+     * What it is worth is measured, on a pinned witness over twelve presses,
+     * at build 265's radius of 74: one LURCHER goes 1170 to 1900, one BULWARK
+     * 1426 to 2000, three LURCHERs shoulder to shoulder 3245 to 6573, and the
+     * ASSAY's own rig 1140 to 1484.  (At the 58 this shipped with for one
+     * build the rig read 1170 against 1140, which is zero -- see CFG.hail.) Half again against one body and nearly double
      * against a crowd -- because a burst goes off on the SURFACE of what the
      * pellet found and most of its circle lands on whatever is standing
      * beside it. A fan is mostly gaps; this is the node that closes them.
      *
-     * And the pellets that hit NOTHING go off too, at the end of their
-     * flight about 640 units out: `endProjectile` bursts a round on expiry as
-     * well as on impact, which is the door HE already goes through. That is a
-     * wall of flak at the fan's far edge, and the pellet lives are jittered
-     * so it arrives over a tenth of a second rather than in one frame.
+     * And a pellet that hits nothing but RUNS OUT goes off too:
+     * `endProjectile` bursts on expiry as well as on impact, which is the door
+     * HE already goes through. Only leaving the FIELD is exempt (`impacted`
+     * false) -- and a 106-degree fan is wider than the field long before it is
+     * 640 units out, so on the screens this game runs most of the fan exits
+     * sideways and never bursts. What reaches expiry is the near-vertical part
+     * of it. The lives are jittered so that much arrives over a tenth of a
+     * second rather than in one frame.
      */
     { id: 'airburst', name: 'AIRBURST', levels: 1,
       line: 'HAIL\'s pellets go off where they land.',

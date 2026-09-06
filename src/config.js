@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '268';
+export const BUILD = '269';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '268';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '7b48beb';
+export const REV = 'd7e028a';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4332,7 +4332,9 @@ export function setZoom(era) {
   /*
    * ...and whether the machine wears its second form. Derived from the SAME
    * expression that makes era 1 a no-op, and never from `world.era`: both
-   * bench doors carry the era across by hand, so `w.era === 2 && w.sandbox`
+   * bench doors carried the era across by hand until build 262 -- which is
+   * why this paragraph reads as it does; the state it describes was real then.
+   * The doors set the era now. Historically, `w.era === 2 && w.sandbox`
    * is a reachable state, and a shape gated on the era would draw the MK2 at
    * the MK1's radius in the one room a player pays 20,000 energy for. One
    * source, so the form and the size cannot disagree.
@@ -4634,11 +4636,17 @@ const SCALED = [
    * HAIL's airburst, on the same rule as HE's blast two lines up: a radius is
    * a length and has to cover the same fraction of a field 1.54x deeper.
    *
-   * `hail.r` and `hail.speed` are deliberately NOT here, and that is a
-   * preserved inconsistency rather than a decision: they were literals at the
-   * call site and scaled with nothing, so putting them in would change what
-   * HAIL does at era 2 as a side effect of moving a number into a table. The
-   * rack is no better -- `bolt.r` is scaled and `bolt.speed` is not.
+   * `hail.r` is deliberately NOT here, and that is a preserved inconsistency
+   * rather than a decision: it was a literal at the call site and scaled with
+   * nothing, so putting it in would change what HAIL does at era 2 as a side
+   * effect of moving a number into a table.
+   *
+   * `hail.speed` is not here either and does not need to be: `fire()` scales
+   * EVERY round's speed by `CFG.scale` at the muzzle
+   * (`projectiles.js`, `const speed = (opts.speed ?? CFG.bolt.speed) *
+   * CFG.scale`), so a speed in this table would be scaled twice. An earlier
+   * version of this note said `bolt.speed` was unscaled for the same reason
+   * and was simply wrong about the mechanism.
    */
   'hail.burst.r',
   // mines: the body, the default blast, and each kind's own reach

@@ -148,3 +148,35 @@ CLAUDE.md's "a window set near the truth rather than clear of it". Build 263's
 rest bearing made it worse and build 264's dwell (`CFG.gun.rest`) made it
 better, but the instrument is still wrong: hold the DRIFT's distance the way
 `tiers.mjs` holds a body, or size the budget off the body's own crossing time.
+
+
+## Phase 3 (build 269)
+
+Closed:
+
+- **9** — the room's own `#sbEras` row has a case now, and it is the one that
+  would have caught the six-build bug: it asserts WHERE the box is (clear of
+  the bar above and the panel below) and that `elementFromPoint` at ERA II's
+  centre hands back ERA II, which is the only thing that can see a
+  `pointer-events` hole. Then it presses with `pointerdown` and requires the
+  world to move, and to move back. At 320 and 390.
+- **8** — the pad arm renders `drawGuns` now. Note the first attempt at this
+  did NOT close the hole and was replaced: it measured the painted half-width
+  against the lot's 35.38, but the expression it rules out is `R * 1.5` =
+  36.92 and a centred stroke paints ~2.6 past either, so it read 38 for both.
+  It is a differential against the old geometry now -- `drawGuns` run twice,
+  the second time with `hw`/`hh` deleted, which is exactly the fallback path.
+- All ten **false claims** in the prose, corrected in place with the reason.
+
+Still open:
+
+- **6** — the AIRBURST field arm still witnesses only a LURCHER. The ASSAY-rig
+  arm added in 267 covers the large-body case, so this is now redundancy
+  rather than a hole; left as a note.
+- **7** — the throw case samples velocity before the clamp. The arm still
+  holds arithmetically (`peak > cruise * 6` is impossible without `throwOff`
+  on either side of the clamp), but it and the SLUG case, which rejects this
+  instrument by name, should agree on one reading.
+- **5** — HAIL's particle spend does not scale with `fx.quality`. Recorded in
+  the docstring and the doc; the fix is a `q` term on the cast's counts, and
+  it wants measuring on a reduced budget rather than guessing.

@@ -1268,6 +1268,12 @@ export const ABILITIES = [
        *          · shake 10
        *   HAIL   31 sparks · 2 rings · 1 dot · ripple · flash 0.10 · shake 7
        *
+       * ...and that row is the CAST only. Each pellet also spawns its own
+       * muzzle particle through `fire`, so a press measures about 66 -- and
+       * the pellets go first, so under budget pressure it is the authored
+       * wedge that gets dropped and the accident that survives. Neither
+       * scales with `fx.quality`; see docs/audit-266-open.md.
+       *
        * The difference in kind is that PULSE's is a CIRCLE and HAIL's is a
        * WEDGE: every element here is thrown along the fan, so what the press
        * looks like is the shape of what it just did.

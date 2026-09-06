@@ -2334,6 +2334,14 @@ to a crowd.
 | HAIL (before) | 10 | 1 | — | 1 | — | — | 4 |
 | HAIL (now) | 31 | 2 | **0** | 1 | yes | 0.10 | 7 |
 
+**That table counts the CAST only, and the cast is not what a press costs.**
+Every pellet also spawns its own muzzle particle through `fire`, so a press
+is about 66 particles measured, not 31 — and the pellets are spawned *first*,
+so under budget pressure the authored wedge is what gets dropped rather than
+the accident. With AIRBURST the bursts add two embers apiece on top. None of
+it scales with `fx.quality`, which is recorded as open in
+`docs/audit-266-open.md`.
+
 The difference in kind is that PULSE's is a circle and HAIL's is a **wedge**:
 every element is thrown along the fan, so the press looks like the shape of
 what it just did.
@@ -2368,7 +2376,9 @@ delivered **exactly zero, twice, to the decimal**, while the pellets delivered
 118.8. A number that looked conservative was in fact inert for everything
 large.
 
-At 58 it clears every body in the game but a BULWARK, and what it is really for
+At 58 it clears every body in the game but a BULWARK -- which was wrong, and
+build 265 corrected it: FRACTAL's core is r 64 and a fully grafted BULWARK 72,
+so 58 cleared neither, nor the assay's own r-68 rig. What it is really for
 is the neighbours:
 
 | | plain | AIRBURST | |
