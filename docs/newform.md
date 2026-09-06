@@ -2721,3 +2721,72 @@ one sitting:
 
 567 green. ORDINAL's hash `-1765830468`, unchanged — nothing in a boss fight
 carries `throwOff` against an armoured body.
+
+## 40. Build 271 — DRIFT comes out of the door, and mines shrink at era 2
+
+> "Objects should float out past the gate before fanning out. I think harmful
+> objects do, but Drift doesn't. Drift should too. Mines should be smaller.
+> Make mines smaller in era 2."
+
+### The cause was not at the spawn site
+
+`spawnDrift` hands the body `vx: spread(30)` on the frame it appears, which
+looks like the whole of it — and zeroing that changed **nothing**. `drive()`
+has a stack of early returns and the harmless one sat *above* the staged one:
+
+```js
+if (this.harmless && !this.isDrop) { this.wander(world, dt); return; }
+...
+if (this.staged) { /* the march: straight down, swaying a little */ }
+```
+
+So a harmless body wandered from its first frame whatever its state, and
+`wander` put the lateral straight back. One `&& !this.staged` is the fix, and
+a staged DRIFT then falls through to the same march every hostile takes.
+
+Measured at era 2, gate at y 400:
+
+| | before | after |
+|---|---|---|
+| spawned | y 334, lateral already on it, unstaged | y 339, **staged, lateral 0** |
+| widest lateral during the march | — | **26 u/s** (a hostile's own is 59) |
+| comes loose at | never staged | **y 418**, past the gate |
+
+The held lateral lives on `e.fan`, declared in the constructor beside the other
+per-body state and applied on the frame `staged` goes false — so the fan
+happens *at* the gate rather than above it. Era 1 has no yard, no throat and no
+gate, and is untouched.
+
+### The case is asserted against the hostile, not against a number
+
+A fixed bound was written first and was wrong twice over in one run: it passed
+DRIFT at 26 and failed the control at 59, so it would have called a working
+build broken *while claiming the field disagreed with itself*. "The way a
+hostile does" only has one honest form — DRIFT's march must be no wider than a
+hostile's.
+
+The lateral on the release frame is recorded and deliberately **not** asserted:
+`spread(30)` is a uniform draw that is legitimately near zero about one run in
+fifteen, and a case requiring it to jump is a coin toss dressed as a rule. It
+read 2 on the run that exposed this.
+
+### Mines
+
+Every mine radius is in `SCALED`, so a mine held its size *on the glass* across
+the eras — 13 world units at era 1 and 20 at era 2, both 8.06 CSS px. That is
+right for a picture and wrong for these: five of them on a field half again as
+deep read as clutter where the same five at era 1 read as placed.
+
+`CFG.mines.era2` is 0.7 and is applied where a mine takes its radius, not to
+the eight `CFG` entries the kinds read — so a ninth kind is covered by existing
+rather than by being added to a list. A mine is **5.64 CSS px at era 2 against
+8.06 at era 1**.
+
+It moves the **trigger reach** with it, and that is deliberate rather than a
+side effect: `m.r + cfg.trigger` is the reach, and the ring that draws that
+reach is computed from the same `m.r` — so a smaller mine has a smaller mouth
+and the picture cannot come apart from the rule. A factor on the drawing alone
+would have split them.
+
+569 green. ORDINAL's hash `-1765830468`, unchanged — era 1 spawns DRIFT
+unstaged, so the reordered guard is inert there.

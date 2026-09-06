@@ -810,6 +810,24 @@ came from before believing the other one covers it.
   an `audio.boom()` sixty times a second, for the rest of the run, per expired
   mine. Measured 39 blasts in the second after one expired. Anything that can
   be called twice needs to read its own `dead` back.
+- **`drive()`'s early returns are ORDERED, and the harmless one sat above the
+  staged one.** Every harmless body went to `wander()` from the frame it
+  appeared, whatever its state -- so DRIFT alone fanned out INSIDE the era-2
+  doorway while every hostile went straight down and opened up only past the
+  gate. Zeroing its spawn velocity did nothing: `wander` put the lateral back
+  on the next frame, which is the tell that a spawn-site fix is treating a
+  symptom. The march and the wander are different states and the guard has to
+  say so.
+- **A lateral held for later belongs on the BODY, declared in the constructor.**
+  `e.fan` is applied on the frame `staged` goes false, beside the release that
+  already existed -- not sprung into existence at the spawn site, for the same
+  reason `placed`, `fizzle` and `ignoreT` are declared where they are.
+- **Everything a mine measures comes off `m.r`, so one factor moves the picture
+  and the rule together.** `CFG.mines.era2` is applied where a mine takes its
+  radius rather than to the eight `CFG` entries the kinds read, so a ninth kind
+  is covered by existing -- and the trigger reach (`m.r + cfg.trigger`) and the
+  ring that DRAWS that reach both follow it, which a factor on the drawing
+  alone would have split.
 - **ARMORED discards a HIT, and a THROW is not a hit.** Its branch in
   `applyDamage` returned before the impulse block, so with the plate up a
   PULSE delivered nothing at all -- no damage, which is the trait working, and

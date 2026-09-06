@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '270';
+export const BUILD = '271';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '270';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '3d4223f';
+export const REV = 'ad2df60';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1353,6 +1353,26 @@ export const CFG = {
    * holds, LODE pushes.
    */
   mines: {
+  /*
+   * ---- how much of a mine there is at era 2 ---------------------------
+   *
+   * Every mine radius is in `SCALED`, so a mine holds its size ON THE GLASS
+   * across the eras -- 13 world units at era 1 and 20 at era 2, both of which
+   * come to 8.06 CSS px. That is the right default for a picture and the
+   * wrong one for these: five of them on a field half again as deep read as
+   * clutter where the same five at era 1 read as placed.
+   *
+   * So they take a factor at era 2 and nothing else does. It is applied where
+   * a mine takes its radius rather than to each of the eight `CFG` entries,
+   * so a kind added later is covered by existing rather than by being added
+   * to a list -- and it moves the TRIGGER reach with it (`m.r + cfg.trigger`),
+   * which is deliberate: a smaller mine has a smaller mouth, and the ring
+   * that draws that reach is computed from the same `m.r`, so the picture
+   * cannot come apart from the rule.
+   *
+   * 0.7 puts a mine at 5.64 CSS px against era 1's 8.06.
+   */
+  era2: 0.7,
     /*
      * Five on the field, fifteen seconds each, one thrown every fifteen.
      *

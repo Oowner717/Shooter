@@ -22725,6 +22725,161 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.heaveShock} -- the radius the shove is about, not the shell's`);
 }
 
+// --- DRIFT comes out of the door before it fans, and mines are smaller ------
+/*
+ * Build 271, two requests.
+ *
+ * "Objects should float out past the gate before fanning out. I think harmful
+ * objects do, but Drift doesn't." They do and it did not, and the cause was
+ * not where it looked: `spawnDrift` handed the body `vx: spread(30)` on the
+ * frame it appeared, but zeroing that changed nothing, because `drive()` sends
+ * every harmless body to `wander()` in a branch that sat ABOVE the `staged`
+ * one. So DRIFT could not march however it was spawned -- the wander put the
+ * lateral back on the next frame.
+ *
+ * Measured before the fix, at era 2: spawned at y 334 with a lateral already
+ * on it, against a gate at 400, where a hostile at the same depth runs
+ * straight down and only steers once it is past. After: staged at spawn,
+ * |vx| under 30 for the whole march, released at y 423 (the gate plus its own
+ * radius) and the lateral doubles on the frame it comes loose.
+ *
+ * "Mines should be smaller in era 2." Every mine radius is in `SCALED`, so a
+ * mine held its size ON THE GLASS across the eras -- 13 world units at era 1
+ * and 20 at era 2, both 8.06 CSS px. `CFG.mines.era2` is the one factor that
+ * is not that.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { spawnDrift } = await import('../src/enemies.js');
+    const { throwMine } = await import('../src/mines.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const arm = (era) => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 1e9;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(900000);
+      if (!w.ledger.includes('recast')) w.ledger.push('recast');
+      w.newForm = 'armed';
+      g.setEra(era);
+      w.director.update = () => {};
+      g.debugClearField();
+    };
+
+    // ---- era 2: it marches, then it fans ---------------------------------
+    arm(2);
+    const gate = w.yard.mouthY;
+    out.gate = Math.round(gate);
+    const d = spawnDrift(w, {});
+    out.bornStaged = !!d.staged;
+    out.bornVx = Math.round(d.vx);
+    /*
+     * Walked one frame at a time, because a sample every quarter second steps
+     * straight over the release. What is recorded is the WIDEST lateral it
+     * ever has while still above the gate -- and that is asserted against a
+     * HOSTILE's own march rather than against a number, which is the only
+     * honest form of "the way a hostile does". A fixed bound was tried and
+     * was wrong twice over: it passed DRIFT at 26 and failed the control at
+     * 59, so the case would have called a working build broken while claiming
+     * the field disagreed with itself.
+     *
+     * The lateral on the release frame is recorded and NOT asserted. It is
+     * `spread(30)` -- a uniform draw that is legitimately near zero about one
+     * run in fifteen -- and a case that required it to jump would be a coin
+     * toss dressed as a rule.
+     */
+    let heldMax = 0;
+    let looseAt = 0;
+    let looseVx = 0;
+    for (let f = 0; f < 60 * 6 && !looseAt; f++) {
+      g.update(1 / 60);
+      if (d.staged) heldMax = Math.max(heldMax, Math.abs(d.vx));
+      else { looseAt = d.y; looseVx = Math.abs(d.vx); }
+    }
+    out.heldMax = Math.round(heldMax);
+    out.looseAt = Math.round(looseAt);
+    out.looseVx = Math.round(looseVx);
+    // ...and it came loose PAST the gate, which is the whole request.
+    out.pastGate = looseAt > gate;
+
+    /*
+     * ...and a HOSTILE at the same depth is the control. If a hostile fanned
+     * inside the throat too, "DRIFT alone did not" would be a claim about the
+     * whole field and this case would be asserting the wrong thing.
+     */
+    g.debugClearField();
+    const h = g.debugSpawn('lurcher', w.yard.mouthX, gate - 60);
+    h.staged = true;
+    h.vx = 0;
+    let hostMax = 0;
+    for (let f = 0; f < 60 * 6 && h.staged; f++) {
+      g.update(1 / 60);
+      if (h.staged) hostMax = Math.max(hostMax, Math.abs(h.vx));
+    }
+    out.hostMax = Math.round(hostMax);
+
+    // ---- era 1 is untouched: no yard, no gate, no march -------------------
+    arm(1);
+    const d1 = spawnDrift(w, {});
+    out.eraOneStaged = !!d1.staged;
+    out.eraOneVx = Math.round(Math.abs(d1.vx));
+
+    // ---- and a mine is smaller at era 2, ON THE GLASS ---------------------
+    const mineR = () => { w.mines.length = 0; throwMine(w, 'blast'); return w.mines[0].r; };
+    const r1 = mineR();
+    const z1 = CFG.zoom;
+    arm(2);
+    const r2 = mineR();
+    const z2 = CFG.zoom;
+    out.r1 = +r1.toFixed(2);
+    out.r2 = +r2.toFixed(2);
+    out.css1 = +(r1 * z1).toFixed(2);
+    out.css2 = +(r2 * z2).toFixed(2);
+    out.shrink = +(out.css2 / out.css1).toFixed(3);
+    out.want = CFG.mines.era2;
+    /*
+     * ...and the TRIGGER reach moved with it, which is the half a factor on
+     * the drawing alone would have left behind: the ring that draws the reach
+     * is computed from the same `m.r`, so the picture cannot come apart from
+     * the rule.
+     */
+    const m = w.mines[0];
+    m.armed = true;
+    out.reach = +(m.r + (m.cfg.trigger || 0) * (w.up.mineTrigger || 1)).toFixed(1);
+    out.reachUsesR = out.reach > m.r;
+
+    delete w.director.update;
+    w.spawnLock = 0;
+    g.setEra(1);
+    g.restart();
+    return out;
+  });
+
+  check('DRIFT floats out past the gate before it fans, the way a hostile does',
+    r.bornStaged && r.bornVx === 0
+    && r.pastGate && r.heldMax <= r.hostMax
+    && r.eraOneStaged === false && r.eraOneVx > 0,
+    `at era 2 it is born staged with no lateral and its march never exceeds `
+    + `${r.heldMax} u/s of lateral, against ${r.hostMax} for a hostile doing `
+    + `the same thing; it comes loose at y ${r.looseAt}, past the gate at `
+    + `${r.gate} (${r.pastGate}), and fans from there (${r.looseVx} on the `
+    + `release frame, a draw and not a rule); era 1 has no gate and is `
+    + `unchanged (staged ${r.eraOneStaged}, lateral ${r.eraOneVx})`);
+
+  check('...and a mine is smaller at era 2, on the glass and in its reach',
+    Math.abs(r.shrink - r.want) < 0.02 && r.css2 < r.css1 && r.reachUsesR,
+    `a mine is ${r.r1} world units at era 1 and ${r.r2} at era 2, which is `
+    + `${r.css1} against ${r.css2} CSS px -- x${r.shrink} on the glass, against `
+    + `an authored ${r.want}; the trigger reach is ${r.reach} and is computed `
+    + `from the same radius (${r.reachUsesR}), so the ring that draws it cannot `
+    + `disagree with the rule`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

@@ -344,6 +344,15 @@ export class Enemy {
     this.wanderAngle = rand(0, TAU);
     this.wanderTimer = 0;
     this.stagedFor = 0;
+    /*
+     * A lateral held back until the body is loose. DRIFT is the only thing
+     * that uses it: at era 2 it is laid inside the throat, and it used to be
+     * given its sideways drift at the moment it appeared -- so it fanned out
+     * INSIDE the doorway while every hostile went straight down and opened up
+     * only once it was past the gate. Declared here rather than sprung into
+     * existence at the spawn site, for the reason `placed` and `fizzle` are.
+     */
+    this.fan = 0;
     // Debris used to expire after 22-30s. It does not any more: a fragment
     // carries salvage, and salvage that rots is a clock the player is losing
     // to. The floor drains by being collected instead — pulled into the
@@ -797,7 +806,19 @@ export class Enemy {
      * salvage you have to go and fetch was the one object whose salvage was
      * never coming to you.
      */
-    if (this.harmless && !this.isDrop) {
+    /*
+     * ...and NOT while it is still marching in. This branch sat above the
+     * `staged` one, so a harmless body wandered from the frame it appeared
+     * whatever its state -- which is why DRIFT alone fanned out inside the
+     * doorway at era 2 while every hostile went straight down and opened up
+     * only once it was past the gate. Zeroing its spawn velocity did nothing;
+     * `wander` put the lateral back on the next frame.
+     *
+     * A staged DRIFT falls through to the staged march below, which is the
+     * same sway every hostile takes on the way in, and picks the wander back
+     * up on the frame it comes loose.
+     */
+    if (this.harmless && !this.isDrop && !this.staged) {
       this.wander(world, dt);
       return;
     }
@@ -1061,8 +1082,14 @@ export class Enemy {
       this.stagedFor += dt;
       if (this.stagedFor > 14) this.vy += 130 * dt;
       // Past the entry line: it is loose in the arena now, and somewhere the
-      // player can actually watch it be dealt with.
-      if (this.y - this.r > ENTRY_Y + CFG.entryDepth) this.staged = false;
+      // player can actually watch it be dealt with. At era 2 that line IS the
+      // mouth -- `ENTRY_Y + entryDepth` and `yard.mouthY` are both 400 -- so
+      // this is the frame a body clears the gate on.
+      if (this.y - this.r > ENTRY_Y + CFG.entryDepth) {
+        this.staged = false;
+        // ...and only NOW does it fan. See `fan` in the constructor.
+        if (this.fan) { this.vx += this.fan; this.fan = 0; }
+      }
     }
   }
 
@@ -3646,7 +3673,26 @@ export function spawnDrift(world, opts = {}) {
     y = clamp(a.mouthY - 30 * CFG.scale - (ENTRY_Y + 40 - y),
       a.mouthY - 88 * CFG.scale, a.mouthY - 12 * CFG.scale);
   }
-  const e = new Enemy(type, x, y, { staged: false, spawnIn: 1, vx: spread(30), vy: rand(10, 50) });
+  /*
+   * ...and at era 2 it MARCHES OUT before it fans, which is what everything
+   * else does and what DRIFT alone did not.
+   *
+   * It was laid in the throat and handed `vx: spread(30)` on the same frame,
+   * so it opened up sideways while it was still inside the doorway -- measured
+   * at spawn, y 334 against a gate at 400 with a lateral already on it, where
+   * a hostile at the same depth runs straight until it is past 400 and only
+   * then steers. Reported as exactly that.
+   *
+   * `staged` is the mechanism the rest of the field uses and the release line
+   * is already the gate, so the drift is held on `fan` and applied on the
+   * frame the body comes loose. Era 1 has no yard, no throat and no gate, and
+   * is untouched: it keeps the immediate lateral it has always had.
+   */
+  const lateral = spread(30);
+  const e = new Enemy(type, x, y, a
+    ? { staged: true, spawnIn: 1, vx: 0, vy: rand(10, 50) }
+    : { staged: false, spawnIn: 1, vx: lateral, vy: rand(10, 50) });
+  if (a) e.fan = lateral;
   world.enemies.push(e);
   return e;
 }

@@ -205,7 +205,9 @@ class Mine {
     this.y1 = y1;
     this.x = x0;
     this.y = y0;
-    this.r = k.r;
+    // Smaller at era 2 -- see `CFG.mines.era2`. Here rather than on each of the
+    // eight kinds' own `CFG` entries, so a ninth is covered by existing.
+    this.r = k.r * (CFG.mk2 ? M.era2 : 1);
     this.t = 0; // flight progress, 0..1
     this.settle = 0; // seconds since landing
     this.life = M.life;
