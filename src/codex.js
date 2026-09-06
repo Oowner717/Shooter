@@ -212,6 +212,21 @@ export const CODEX = [
     name: 'DRIFT',
     line: 'No heading, no destination, no threat. It is not counted, and AUTO AIM will not take it — a DRIFT is only ever shot on purpose. Worth 10 ENERGY against a MOTE\u2019s 4, which is the reason to bother.',
   },
+  {
+    id: 'axiom',
+    name: 'AXIOM',
+    line: 'It states a rule and holds you to it. Nothing you carry is yours while its clauses stand.',
+  },
+  {
+    id: 'clause',
+    name: 'CLAUSE',
+    line: 'One of your buttons, held shut. Break it and you have that much of yourself back.',
+  },
+  {
+    id: 'lemma',
+    name: 'LEMMA',
+    line: 'A small argument in support of a larger one. It exists to keep you off the clause that sent it.',
+  },
 ];
 
 const IDS = new Set(CODEX.map((e) => e.id));

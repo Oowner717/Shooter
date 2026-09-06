@@ -67,6 +67,16 @@ export const ANOMALIES = [
     types: ['parity', 'pane', 'echo'] },
   { n: 7, key: 'aperture7', name: 'TERMINUS', tone: '#ff4d6d', cfg: 'terminus', built: true,
     types: ['terminus', 'bound', 'limit'] },
+  /*
+   * ...and the ones past the change. Their gates are above the era ceiling at
+   * rung 42, so the first form can never meet them, and their tones are DEEP
+   * where the seven above are bright: the hue wheel is full at seven and the
+   * widest gap left is 43 degrees, which is not enough to separate two bright
+   * colours at a glance. Register, not hue -- the move the tree's three ALL-X
+   * headings already make.
+   */
+  { n: 8, key: 'aperture8', name: 'AXIOM', tone: '#d9b310', cfg: 'axiom', built: true,
+    types: ['axiom', 'clause', 'lemma'] },
 ];
 
 const ANOMALY_BY_N = new Map(ANOMALIES.map((a) => [a.n, a]));

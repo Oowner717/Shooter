@@ -1620,15 +1620,38 @@ export class Abilities {
    * and it does not need a button taken away to have one.
    */
 
-  usable(i) {
+  /**
+   * ...and from build 273 something CAN take a button again.
+   *
+   * `world.abilityHold` is a Set of ability ids held shut by something
+   * standing on the field -- today AXIOM's clauses, one id each. A SET OF IDS
+   * on the world rather than a countdown on the slot, and deliberately: what
+   * holds a button here is a body, and the honest model of "until that thing
+   * is dead" is the thing itself. A timer would be a second copy of the boss's
+   * state that has to be kept in step with it, which is how `lockRandom` came
+   * to have five readers and no writer in the first place.
+   *
+   * `essential` is never held. PULSE is the answer to something sitting on the
+   * mount where the barrel cannot reach, and a boss that could take it can pin
+   * you against your own machine -- so the guard is here, in the reader, and
+   * not only in whatever writes the set.
+   */
+  isHeld(world, i) {
     const s = this.slots[i];
-    return !!s && s.charges > 0;
+    if (!s || s.def.essential) return false;
+    const held = world && world.abilityHold;
+    return !!held && held.has(s.def.id);
+  }
+
+  usable(i, world) {
+    const s = this.slots[i];
+    return !!s && s.charges > 0 && !this.isHeld(world, i);
   }
 
   /** @returns the slot if it fired, otherwise null. */
   trigger(world, index) {
     const s = this.slots[index];
-    if (!s || !this.usable(index)) return null;
+    if (!s || !this.usable(index, world)) return null;
     s.def.run(world);
     // STANDING ORDER shortens every cooldown. HASTE used to halve them for a
     // while; it was an ALLOCATION boost and went with that system, but the

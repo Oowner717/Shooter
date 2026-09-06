@@ -6578,8 +6578,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * a slot that takes the money and opens onto nothing.
    */
   check('every anomaly is named and coloured, and built exactly when it can be made',
-    r.seven === 7 && r.named && r.built.join() === r.makeable.join()
-    && r.tones.split(',').length === 7 && new Set(r.tones.split(',')).size === 7,
+    r.seven === 8 && r.named && r.built.join() === r.makeable.join()
+    && r.tones.split(',').length === 8 && new Set(r.tones.split(',')).size === 8,
     `${r.seven} anomalies, flagged built ${r.built}, actually makeable ${r.makeable}, `
     + `tones ${r.tones}`);
   check('a boss dresses its own gauge and sky, and ORDINAL keeps the authored one',
@@ -8826,9 +8826,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     r.two.solidOverWisp > 1.5,
     `solid over wisp as drawn at dpr 2: ${r.two.solidOverWisp.toFixed(2)}x `
     + '(build 198: 1.00x — identical)');
+  /*
+   * The SPREAD is the claim and the count is a report. `clamped` was pinned at
+   * the literal 18 while the roster was 37 types, which was exact and became a
+   * maintenance trap the moment a boss added three more: the eighth anomaly
+   * took it to 19 of 40 without changing anything about dpr 1 at all. What
+   * "left exactly where it was" means is the ladder the roster is drawn
+   * across, and that is `spread`, unchanged at 4.25 since build 198.
+   */
   check('a low-dpr display is left exactly where it was',
-    r.one.clamped === 18 && Math.abs(r.one.spread - 4.25) < 0.01,
-    `dpr 1 — clamped ${r.one.clamped}/37, spread ${r.one.spread.toFixed(2)}x `
+    Math.abs(r.one.spread - 4.25) < 0.01 && r.one.clamped < r.one.total * 0.55,
+    `dpr 1 — clamped ${r.one.clamped}/${r.one.total}, spread ${r.one.spread.toFixed(2)}x `
     + '(build 198: 18/37 and 4.25x)');
   check('the stroke-floor case puts the floor back where the game had it',
     r.restored && r.dprKept, `restored: ${r.restored}, dpr kept: ${r.dprKept}`);
@@ -9399,8 +9407,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return out;
   });
 
-  check('the seven anomalies stand on rungs of the ladder',
-    r.gates.length === 7 && r.gates.every((x, i) => i === 0 || x > r.gates[i - 1]),
+  check('every anomaly stands on its own rung of the ladder',
+    r.gates.length === 8 && r.gates.every((x, i) => i === 0 || x > r.gates[i - 1]),
     `gates at ${r.gates.join(', ')}`);
   check('a gate rung can be climbed to, and not past',
     r.intoGate.to === 6 && r.atGate.to === 6,
@@ -10320,18 +10328,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const silentIn = seen.filter((b) => b.firedArriving === 0);
   const silentOut = seen.filter((b) => b.firedDying === 0);
   const armed = seen.filter((b) => b.firedFighting > 0);
-  check('not a round leaves the barrel during any of the seven arrivals',
-    seen.length === 7 && silentIn.length === 7,
+  check('not a round leaves the barrel during any arrival',
+    seen.length === 8 && silentIn.length === 8,
     seen.map((b) => `${b.name} ${b.firedArriving} in ${b.arrivalSecs}s`).join(' · '));
-  check('...nor during any of the seven outros',
-    silentOut.length === 7,
+  check('...nor during any outro',
+    silentOut.length === 8,
     seen.map((b) => `${b.name} ${b.firedDying} in ${b.outroSecs}s`).join(' · '));
   /*
    * A zero means nothing until the instrument has been shown to read a one --
    * so the same counter, on the same run, watches the fight in between.
    */
   check('...and the same counter sees the gun firing in between, so the zeros mean something',
-    armed.length === 7 && r.freeToFire,
+    armed.length === 8 && r.freeToFire,
     seen.map((b) => `${b.name} ${b.firedFighting}`).join(' · ')
     + `; with no boss at all the gun fires: ${r.freeToFire}`);
 }
@@ -22788,6 +22796,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * 59, so the case would have called a working build broken while claiming
      * the field disagreed with itself.
      *
+     * ...and there is HEADROOM on the comparison, because both sides are draws
+     * -- the sway is a sine on a random phase and the two bodies do not share
+     * one. Measured across runs the pair come out anywhere from 25/59 to
+     * 25/23, and an exact `<=` failed on the second of those by two units.
+     * What the arm is for is that DRIFT's march is not MATERIALLY wider than a
+     * hostile's, and half again is that claim with the noise allowed for.
+     *
      * The lateral on the release frame is recorded and NOT asserted. It is
      * `spread(30)` -- a uniform draw that is legitimately near zero about one
      * run in fifteen -- and a case that required it to jump would be a coin
@@ -22862,7 +22877,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
   check('DRIFT floats out past the gate before it fans, the way a hostile does',
     r.bornStaged && r.bornVx === 0
-    && r.pastGate && r.heldMax <= r.hostMax
+    && r.pastGate && r.heldMax <= r.hostMax * 1.5
     && r.eraOneStaged === false && r.eraOneVx > 0,
     `at era 2 it is born staged with no lateral and its march never exceeds `
     + `${r.heldMax} u/s of lateral, against ${r.hostMax} for a hostile doing `
@@ -22915,9 +22930,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const out = {};
     const CAP = CFG.waves.tier.eraGate;
     out.cap = CAP;
-    // The ceiling is the last anomaly's own rung, deliberately -- a rung of
-    // empty ladder between the two would read as the game running out.
-    out.isLastGate = CFG.waves.tier.gates[CFG.waves.tier.gates.length - 1] === CAP;
+    /*
+     * The ceiling is the SEVENTH anomaly's own rung, deliberately -- a rung of
+     * empty ladder between the two would read as the game running out. It was
+     * asserted as the LAST gate, which was the same thing right up until the
+     * eighth anomaly went in above it and made that a claim about how many
+     * bosses exist rather than about where the first form's ladder ends.
+     */
+    out.isLastGate = CFG.waves.tier.gates[6] === CAP;
 
     const arm = (form) => {
       g.restart();
@@ -23081,7 +23101,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     && r.climbArmed === r.cap
     && r.climbDone > r.cap && r.heldDone === 0
     && r.climbUpTo === r.cap,
-    `the ceiling is rung ${r.cap}, which is the last anomaly's own gate `
+    `the ceiling is rung ${r.cap}, which is the seventh anomaly's own gate `
     + `(${r.isLastGate}); a climb from it reaches ${r.climbNone} with no NEW `
     + `FORM and ${r.climbArmed} with it merely BOUGHT -- the banner is not the `
     + `field -- and ${r.climbDone} once it has been taken; from three rungs `
@@ -23114,6 +23134,145 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `forty seconds at the ceiling released up to ${r.released} bodies at once `
     + `and banked ${r.earnedBy} energy (${r.stillPays}), and the rung never `
     + `left ${r.cap}`);
+}
+
+// --- AXIOM: it takes your buttons, and gives them back one at a time --------
+/*
+ * The eighth anomaly, and the first that only exists past the change. What is
+ * new about it is not a shape: it is that the fight is fought with LESS THAN
+ * YOU BROUGHT. Five clauses stand in a ring and each holds one of your ability
+ * buttons shut; the core is `spent` -- drawn, skipped by the assist, rounds
+ * passing through -- until the last of them is gone.
+ *
+ * Three things have to be true together or it is a different feature: the
+ * buttons are actually refused, PULSE is never among them, and every one comes
+ * back when its own clause dies. The last is the one a build could get subtly
+ * wrong -- freeing the wrong id, or all of them at once -- so the case kills
+ * ONE clause and asserts exactly that one button returned.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    g.start();
+    g.debugTeachAll();
+    g.debugGiveEnergy(900000);
+    g.debugBuyAll();
+    w.phase = 'staging';
+    w.apertures = w.apertures || [];
+    w.apertures[8] = 1;
+    out.opened = g.openBoss(8);
+    const bs = w.boss;
+    out.kind = bs ? bs.constructor.name : null;
+    out.clauses = bs ? bs.clauses.length : 0;
+    out.holds = [...w.abilityHold].sort().join(',');
+    out.want = [...CFG.axiom.holds].sort().join(',');
+    out.coreSpent = bs ? !!bs.core.spent : null;
+    // PULSE is never taken, and the guard is in the READER as well as in the
+    // table -- a boss that could take it can pin you against your own machine.
+    out.pulseHeld = CFG.axiom.holds.includes('pulse');
+
+    const idx = (id) => w.abilities.slots.findIndex((s) => s.def.id === id);
+    w.abilities.clearCooldowns();
+    out.fanRefused = w.abilities.trigger(w, idx('fan')) === null;
+    out.pulseFires = w.abilities.trigger(w, idx('pulse')) !== null;
+
+    /*
+     * The ARRIVAL has to run out first, and this is not setup dressing: while
+     * it runs, `arriveStep` heals every part back to full each frame and
+     * `update` returns before `freed` is ever reached. A clause killed during
+     * the arrival is a clause that is alive again on the next frame -- so the
+     * first version of this case broke one, waited half a second, and reported
+     * that nothing was freed on a build where everything works.
+     */
+    for (let f = 0; f < 60 * (CFG.axiom.arrive + 2); f++) g.update(1 / 60);
+    out.arrived = bs.arriving <= 0;
+
+    /*
+     * ...and ONE clause, so the arm can tell "it freed the right button" from
+     * "it freed everything". The clause that holds HAIL is found by what it
+     * says it holds, not by its index, because that is how the boss finds it.
+     */
+    const one = bs.clauses.find((p) => p.holds === 'fan');
+    one.hp = 0;
+    one.dead = true;
+    for (let f = 0; f < 30; f++) g.update(1 / 60);
+    w.abilities.clearCooldowns();
+    out.afterOne = [...w.abilityHold].sort().join(',');
+    out.fanBack = w.abilities.trigger(w, idx('fan')) !== null;
+    out.lanceStillHeld = w.abilityHold.has('lance');
+    out.stillSpent = !!bs.core.spent;
+
+    // ...and the core opens on the frame the last one goes, not before.
+    for (const c of bs.clauses) { c.hp = 0; c.dead = true; }
+    for (let f = 0; f < 30; f++) g.update(1 / 60);
+    out.afterAll = w.abilityHold.size;
+    out.openSpent = !!bs.core.spent;
+    out.stage = bs.stage;
+
+    // ...and it dies like the other seven: nothing left flying, nothing held.
+    w.boss.core.hp = 0;
+    w.boss.core.dead = true;
+    for (let f = 0; f < 60 * 26 && w.boss; f++) g.update(1 / 60);
+    out.ended = !w.boss;
+    out.reconciled = (w.reconciled || []).includes(8);
+    out.heldAfter = w.abilityHold.size;
+    out.leftovers = w.enemies.filter((e) => ['axiom', 'clause', 'lemma'].includes(e.type.id)
+      && !e.dead).length;
+
+    /*
+     * ---- and a WITHDRAWAL gives them back too ---------------------------
+     *
+     * `hush` runs on the way out by either door, and the one that matters is
+     * the withdrawal: a boss that gives up and leaves must not take five of
+     * your buttons with it. Driven through `Boss.hush`, which is the path the
+     * patience timeout takes.
+     */
+    g.restart();
+    g.debugTeachAll();
+    g.debugGiveEnergy(900000);
+    g.debugBuyAll();
+    w.phase = 'staging';
+    w.apertures[8] = 1;
+    g.openBoss(8);
+    out.heldAgain = w.abilityHold.size;
+    w.boss.hush(w);
+    out.heldAfterHush = w.abilityHold.size;
+
+    g.restart();
+    return out;
+  });
+
+  check('AXIOM holds five of your buttons, and PULSE is never one of them',
+    r.opened && r.kind === 'Axiom' && r.clauses === 5
+    && r.holds === r.want && r.pulseHeld === false
+    && r.coreSpent && r.fanRefused && r.pulseFires && r.arrived,
+    `it opened with ${r.clauses} clauses holding ${r.holds}; PULSE is not among `
+    + `them (${!r.pulseHeld}) and still fires (${r.pulseFires}) while HAIL is `
+    + `refused (${r.fanRefused}); the core is out of reach (${r.coreSpent})`);
+
+  /*
+   * The arm that separates "it frees a button" from "it frees THE button": one
+   * clause dies and exactly one id leaves the set.
+   */
+  check('...and one clause gives back exactly the one button it was holding',
+    r.afterOne.split(',').length === 4 && !r.afterOne.includes('fan')
+    && r.fanBack && r.lanceStillHeld && r.stillSpent
+    && r.afterAll === 0 && r.openSpent === false && r.stage >= 2,
+    `killing the clause that held HAIL left ${r.afterOne} -- HAIL fires again `
+    + `(${r.fanBack}) and LANCE does not (${r.lanceStillHeld}) -- and the core `
+    + `was still out of reach (${r.stillSpent}); with the ring gone nothing is `
+    + `held and the core opens (${!r.openSpent}) at stage ${r.stage}`);
+
+  check('...and it lets go of everything by either door',
+    r.ended && r.reconciled && r.heldAfter === 0 && r.leftovers === 0
+    && r.heldAgain === 5 && r.heldAfterHush === 0,
+    `its death reconciled it (${r.reconciled}) with ${r.leftovers} of its own `
+    + `still flying and ${r.heldAfter} buttons still held; a WITHDRAWAL from `
+    + `${r.heldAgain} held leaves ${r.heldAfterHush}`);
 }
 
 // --- report -----------------------------------------------------------------

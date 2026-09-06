@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '272';
+export const BUILD = '273';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '272';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '442e443';
+export const REV = '089b51d';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -383,7 +383,7 @@ export const CFG = {
        *
        * Index i is anomaly n = i + 1; see ANOMALIES in anomaly.js.
        */
-      gates: [6, 12, 18, 24, 30, 36, 42],
+      gates: [6, 12, 18, 24, 30, 36, 42, 48],
       /*
        * ---- and the one gate that is not an anomaly (build 272) ----------
        *
@@ -1030,6 +1030,75 @@ export const CFG = {
       step: 0.55, // extra TITHE damage per mark already on it
       marks: 8, // and it stops deepening here
     },
+  },
+
+  /*
+   * ---- axiom -------------------------------------------------------------
+   *
+   * The eighth anomaly, and the first that only exists past the change: its
+   * gate is rung 48, above the era ceiling at 42, so nothing on the first
+   * field can ever meet it.
+   *
+   * ---- what it does that the seven do not ----
+   *
+   * Every one of them is answered by shooting the right part of it. This one
+   * is answered by shooting the right part of it WITH LESS THAN YOU BROUGHT.
+   * Five CLAUSES stand in a ring, and while a clause stands it holds one of
+   * your ability buttons shut. Break it and that button comes back for the
+   * rest of the fight. The core cannot be hurt while any clause stands, so
+   * the fight is: get your kit back, in the order you choose, with what is
+   * left of it.
+   *
+   * PULSE is never taken. That is ORDINAL's rule -- `essential` on the
+   * ability, "the answer to something sitting on the mount where the barrel
+   * cannot reach" -- and a boss that could take it is a boss that can pin you
+   * against your own machine with no way out.
+   *
+   * ---- and it brings the ability lock back, deliberately ----
+   *
+   * `Abilities.lockRandom` was deleted in build 219 because it had no writer
+   * and five readers that could never take their other branch -- the
+   * `world.endless` shape CLAUDE.md records, whose rule is to delete the flag
+   * rather than maintain the branch. The rule is not "never lock a button";
+   * it is "do not keep a mechanism nothing drives". This drives one.
+   */
+  axiom: {
+    cost: 250,
+    standoff: 400,
+    arrive: 14.4,
+    coreR: 40,
+    // The four beats of the arrival, as every anomaly has them: the base's
+    // `arriveStep` reads `C.beats` and nothing supplies a default.
+    beats: [0.14, 0.36, 0.6, 1],
+    clauses: 5,
+    ring: 190, // how far the clauses stand from the core...
+    ringII: 150, // ...and how close they draw in once the ring is broken open
+    spin: 0.22, // rad/s, and it grows with the stage
+    /*
+     * Which buttons it holds, in the order the clauses are built. Ids rather
+     * than indices: a slot's index is the loadout's business and changes with
+     * what is owned, and a clause holding "whatever is in slot 3" would hold a
+     * different thing on two different runs.
+     *
+     * PULSE is not here and must never be. Everything else is fair.
+     */
+    holds: ['fan', 'lance', 'well', 'prism', 'stasis'],
+    lemma: { every: 3.4, n: 2 },
+    stageCore: 0.66,
+    stageOpen: 0.33,
+    /*
+     * The ending, on the base's own clocks. `arrest` is the ring being snapped
+     * off a clause at a time, `infall` the core taking the rest, `endFor` the
+     * whole sequence and `pull` how hard the hole draws. None of these has a
+     * default -- `Boss.die`, `arrest`, `infall` and `dieStep` read them
+     * straight off the block -- which is why the first version of this boss
+     * fought correctly and then threw on the frame its core died.
+     */
+    arrest: 0.7,
+    infall: 1.1,
+    endFor: 13.4,
+    pull: 900,
+    pay: 900,
   },
 
   /*
@@ -4058,6 +4127,78 @@ export const ENEMY_TYPES = [
     weight: 0,
     drops: 3,
     debris: 5,
+  },
+  {
+    // The eighth. It states a rule and holds you to it: while a CLAUSE stands
+    // the button it names will not fire, and the core cannot be touched.
+    id: 'axiom',
+    opens: 0,
+    name: 'AXIOM',
+    shape: 'axiom',
+    r: 40,
+    hp: 7400,
+    large: true,
+    fixed: true,
+    density: 10,
+    speed: 0,
+    accel: 0,
+    restitution: 0.2,
+    wobble: 0,
+    armor: 0.18,
+    /*
+     * A DEEP gold, and the register is the point. The seven are all bright --
+     * the tree paints them in a row and they read as one family -- and the hue
+     * wheel is full at seven: the widest gap left is 43 degrees, which is not
+     * enough to tell two bright colours apart at a glance. So the anomalies
+     * past the change are dark where the others are light. Chroma 0.79, well
+     * clear of the 0.28 the colour rule asks for.
+     */
+    color: '#d9b310',
+    glow: '#9c7d05',
+    weight: 0,
+    drops: 30,
+    debris: 24,
+  },
+  {
+    // A CLAUSE: it holds one of your buttons shut and does nothing else.
+    // Killing it is the only way to get that button back.
+    id: 'clause',
+    opens: 0,
+    name: 'CLAUSE',
+    shape: 'clause',
+    r: 22,
+    hp: 640,
+    fixed: true,
+    density: 5,
+    speed: 0,
+    accel: 0,
+    restitution: 0.3,
+    wobble: 0,
+    armor: 0.1,
+    color: '#f2cf3a',
+    glow: '#c9a412',
+    weight: 0,
+    drops: 6,
+    debris: 8,
+  },
+  {
+    // A LEMMA: what a clause sends out to keep you off it.
+    id: 'lemma',
+    opens: 0,
+    name: 'LEMMA',
+    shape: 'lemma',
+    r: 11,
+    hp: 96,
+    density: 0.9,
+    speed: 92,
+    accel: 210,
+    restitution: 0.7,
+    wobble: 0.4,
+    color: '#ffe98a',
+    glow: '#d9b310',
+    weight: 0,
+    drops: 2,
+    debris: 4,
   },
   {
     /*

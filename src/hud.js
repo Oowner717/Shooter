@@ -743,7 +743,8 @@ export class Hud {
    * a new argument is a caller that will forget it.
    */
   syncAbilities(abilities) {
-    const held = this.game.world.attackers.size;
+    const world = this.game.world;
+    const held = world.attackers.size;
     for (let i = 0; i < this.slots.length; i++) {
       const s = this.slots[i];
       /*
@@ -773,10 +774,25 @@ export class Hud {
       // the fraction sitting at the 1 it had always been, the diff never fired,
       // and the button never lit. WELL, PRISM and STASIS could be bought and
       // still look sealed until something else happened to move the bar.
-      const ready = abilities.usable(i);
+      const ready = abilities.usable(i, world);
       if (s.ready !== ready) {
         s.ready = ready;
         s.el.classList.toggle('ready', ready);
+      }
+      /*
+       * ...and a button something is HOLDING says so, with a mark and not only
+       * by being un-ready: `ready` is also false on a cooldown and on an
+       * ability nobody owns, and three states that look the same are one state
+       * as far as the player is concerned. `.ab.held` is the class; see AXIOM,
+       * which is the only thing in the game that writes `world.abilityHold`.
+       */
+      // `shut` and not `held`: `held` is already the attacker count at the top
+      // of this function, and shadowing it is a temporal-dead-zone throw that
+      // takes the whole interface out on the frame a boss opens.
+      const shut = abilities.isHeld(world, i);
+      if (s.wasHeld !== shut) {
+        s.wasHeld = shut;
+        s.el.classList.toggle('held', shut);
       }
       const now = urgent && ready;
       if (s.now !== now) {

@@ -10,6 +10,7 @@ import './amplitude.js';
 import './dynamo.js';
 import './parity.js';
 import './terminus.js';
+import './axiom.js';
 import { nameOf, dressOf, heldList } from './anomaly.js';
 import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta, drawGlow} from './util.js';
@@ -337,6 +338,18 @@ export class Game {
        * Proxy, like the two above it.
        */
       newForm: null,
+      /*
+       * Which ability buttons something standing on the field is holding shut,
+       * by id. Empty on every ordinary frame; AXIOM's clauses are the only
+       * thing in the game that writes it, one id each, and the set is cleared
+       * by its death and by its withdrawal alike.
+       *
+       * Declared HERE and not sprung into existence by the boss, because the
+       * suite sweeps for reads of fields the world does not have -- and a set
+       * that only exists while a particular anomaly is up is a field every
+       * reader has to null-check for ever.
+       */
+      abilityHold: new Set(),
       /*
        * Which ways in this run has already been HANDED, from build 227. Its
        * own record rather than a reading of `apertures`, because an aperture

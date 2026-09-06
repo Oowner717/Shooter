@@ -29,6 +29,7 @@ const ASSETS = [
   './src/util.js',
   './src/parity.js',
   './src/terminus.js',
+  './src/axiom.js',
   './src/physics.js',
   './src/fractal.js',
   './src/fx.js',

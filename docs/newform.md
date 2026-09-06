@@ -2874,3 +2874,88 @@ list:
   that arm.
 
 573 green. ORDINAL's hash `-1765830468`, unchanged.
+
+## 42. Build 273 — AXIOM, the eighth anomaly
+
+Phase two of three. Its gate is rung **48**, above the era ceiling at 42, so
+the first form can never meet it.
+
+### What it does that the seven do not
+
+Every one of them is answered by shooting the right part of it. This one is
+answered by shooting the right part of it **with less than you brought**.
+
+Five CLAUSES stand in a ring, and each holds one of your ability buttons shut
+for as long as it stands. Break a clause and that button comes back for the
+rest of the fight. The core is `spent` — drawn, skipped by the assist, rounds
+passing through it — until the last clause is gone, so there is nothing else to
+shoot and no way to skip the argument. The fight is a question about **order**:
+which of your five held buttons you want back first, bought with the only two
+things the ring leaves you, the gun and PULSE.
+
+**PULSE is never taken.** That is ORDINAL's rule — `essential`, "the answer to
+something sitting on the mount where the barrel cannot reach" — and a boss that
+could take it can pin you against your own machine with no way out. The guard
+is in the *reader* (`Abilities.isHeld` refuses to hold an essential) as well as
+in the table it reads, so a future clause list cannot get it wrong.
+
+### It brings the ability lock back, and that is not a contradiction
+
+`Abilities.lockRandom` was deleted in build 219 for having no writer and five
+readers that could never take their other branch — the `world.endless` shape,
+whose rule is "delete the flag rather than maintain the branch". The rule is
+not *never lock a button*; it is *do not keep a mechanism nothing drives*. This
+drives one.
+
+And what it drives is a **set of ids on the world**, not a countdown on a slot.
+What holds a button here is a body standing on the field, so the honest model
+of "until that thing is dead" is the thing itself — a timer would be a second
+copy of the boss's state that has to be kept in step with it, which is exactly
+how the old lock ended up with five readers and no writer.
+
+`world.abilityHold` is declared in `newWorld` and **filled** rather than
+replaced. Assigning a fresh Set over it would leave the interface reading the
+old one — the `export let` snapshot in miniature.
+
+### `spent`, rather than a guard in `applyDamage`
+
+The core is unreachable while the ring stands, and the mark for that already
+exists: `spent` is what a dying boss's own structure wears, and every damage
+path in the game honours it. A ninth guard inside `applyDamage` would have been
+a ninth thing for every area effect to remember. `spent` comes off in exactly
+one place — the frame the last clause dies — so "the argument is finished" and
+"the core can be shot" are the same event by construction.
+
+### Five things the base class asks for that nothing defaults
+
+Written down because the next boss will need them and the failure mode is not a
+missing-key error, it is a fight that works and then throws on a particular
+frame:
+
+- `beats` — `arriveStep` destructures `C.beats` and the arrival throws without
+  it, on the first frame.
+- `arrest`, `infall`, `endFor`, `pull` — the death sequence. AXIOM fought
+  correctly for four minutes and threw the moment its core died.
+
+### What the suite said, and what was actually wrong
+
+Nine cases failed and seven of them said "seven": hardcoded counts of anomalies,
+gates, arrivals and outros. Two were real:
+
+- **`world.abilityHold` was read 15,673 times and never declared.** The suite
+  sweeps for reads of fields the world does not have, and it caught it on the
+  first run.
+- **`a low-dpr display is left exactly where it was` pinned `clamped === 18`**
+  out of a 37-type roster. Three new bodies made it 19 of 40 without changing
+  anything about dpr 1. The claim is the *spread* — the ladder the roster is
+  drawn across, 4.25× since build 198 — and the count is a report.
+
+...and my own AXIOM case lied twice before it was right. It killed a clause
+**during the arrival**, where `arriveStep` heals every part back to full each
+frame and `update` returns before the free-the-button pass is ever reached — so
+it reported nothing freed on a build where everything works. And the DRIFT
+case's hostile control failed by two units on a second look: both sides are
+random draws off a sine with an unshared phase, and an exact `<=` between two
+draws is a coin toss. It has headroom now.
+
+576 green. ORDINAL's hash `-1765830468`, unchanged.
