@@ -2589,3 +2589,66 @@ about how much of the machine a 20,000-energy instrument is allowed to show
 you, and that is the user's call rather than a bug to fix in a review.
 
 563 green. ORDINAL's hash unchanged.
+
+## 38. Build 266 — era 2's room is locked behind the NEW FORM
+
+The review that produced build 265 found and deliberately did not change one
+thing: a run that had never taken NEW FORM could walk into the assay's ERA II
+room and see the second form. `setBenchEra(2)` had never been gated — 262
+shipped it that way and 264's door made it one tap from the menu. The user's
+ruling is to lock it, so it is locked.
+
+**The gate is ownership, not arrival.** `world.newForm` is `null` → `'armed'`
+(the node bought, the banner up) → `'done'` (the field turned over), and the
+room opens at `'armed'`: buying it *is* earning it, and a player who has paid
+seven REMAINDERs has not had anything spoiled for them.
+
+`eraShut(world, n)` is the whole rule and it lives in `sandbox.js` beside the
+row it paints. Four places read it — the room's own bar, the menu's door row,
+`setBenchEra` and `enterSandbox` — because a control that refuses is not the
+same as a rule that holds, and `setBenchEra` is reachable from the debug panel
+and from anything written next year.
+
+### The padlock has to be able to come OFF
+
+Era 3 is locked for ever, so its mark could be written into `innerHTML` at
+build time. Era 2 opens **mid-run**, on the frame the node is bought, and a
+lock that is only ever added is a lock that can never come off. So the padlock
+is always in the markup and shown by a class: `.sbEra.shut`, hidden by
+`.sbEra:not(.shut) .sbEraLock`, which is three classes against the one on
+`.sbEraLock` and therefore wins. Writing it the other way round — a `.shut`
+rule alone — loses to the base rule and puts a lock on every cell.
+
+The case asserts exactly that transition, and `sameNodes` is the arm that
+carries it: the row is read, the node is bought, the row is read again, and the
+buttons must be *the same DOM nodes* with the mark gone.
+
+The two rows are one definition now — `ERA_TABS`, `eraCell`, `eraShut`,
+`refuseEra`, `syncEraRow`, exported from `sandbox.js`, which `menu.js` already
+imported `LOCK` from. Three tabs described in two files was two lists to keep
+in step.
+
+### Four things this broke, and one it exposed
+
+Turning the gate on failed four existing cases, all for the same reason: they
+visit era 2's room and none of them owned NEW FORM. `debugBuyAll` deliberately
+skips it — it is gated and priced in a currency of its own — so each case now
+writes the state a purchase leaves: **the id in the ledger** (which is what
+survives the checkpoint-and-resume `enterSandbox` performs) plus the flag its
+`apply` sets.
+
+**The id is `recast`, not `newform`.** A probe pushed `newform`, the restore's
+replay silently dropped it (`BY_ID.get(id)` misses, `continue` skips the
+`ledger.push` too), and the flag was gone by the time the room opened — which
+read exactly like the gate being broken. One run lost to a name.
+
+**And the D2 case was passing for a bad reason.** Its `rigOf(era)` called
+`setBenchEra` and read whatever rig was on the field; a *refused* switch hands
+back the rig you were already looking at, so with the gate on it compared era
+1's rig against itself and reported a difference of exactly 0 — a case whose
+whole subject is that the two rigs look nothing alike, reporting them
+identical, without erroring. `rigOf` throws if the bench did not actually move
+now. A case that navigates has to check that it arrived.
+
+564 green. The ORDINAL hash was not run: this touches a menu gate and nothing
+in energy, targeting or the boss.

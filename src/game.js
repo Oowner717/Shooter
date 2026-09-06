@@ -36,7 +36,7 @@ import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_WALL, ON_LOTS, STILL_HELD, CONTROL_LI
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
-import { Sandbox } from './sandbox.js';
+import { Sandbox, eraShut } from './sandbox.js';
 import { ledger, soak } from './ledger.js';
 import { updateDummy } from './dummy.js';
 import { syncYard, updateYard, drawYard, lotAt, refuseLot, shielded, wallLine } from './yard.js';
@@ -1364,15 +1364,18 @@ export class Game {
      * being broken. Where you are is a fact and where you last were is not.
      * An argument is neither -- it is somebody asking, this time.
      *
-     * Anything that is not 1 or 2 falls back rather than refusing, because the
-     * only caller that can name 3 is a bug and a bench that will not open is
-     * worse than one that opens where you already were. The CONTROL refuses
-     * era 3 with a shake, which is where a player meets it.
+     * Anything the run may not have falls back rather than refusing, because
+     * a bench that will not open is worse than one that opens where you
+     * already were. The CONTROLS refuse a shut room with a shake, which is
+     * where a player meets it. Two rooms can be shut: era 3 always, and era 2
+     * until the NEW FORM is owned -- see `eraShut`, which both rows paint from
+     * and which `setBenchEra` holds in the model.
      *
      * Read BEFORE the resume, because `resume()` is `reset()` plus the file
      * and `reset()` puts the world back at era 1.
      */
-    this.benchEra = (era === 1 || era === 2) ? era : (w.era === 2 ? 2 : 1);
+    const ask = era === 1 || (era === 2 && !!w.newForm) ? era : 0;
+    this.benchEra = ask || (w.era === 2 ? 2 : 1);
     this.resume();
     w.era = this.benchEra;
     /*
@@ -1411,8 +1414,17 @@ export class Game {
     const w = this.world;
     if (!w.sandbox) return 'no';
     const to = n | 0;
-    if (to === 3) return 'locked';
-    if (to !== 1 && to !== 2) return 'no';
+    if (to !== 1 && to !== 2 && to !== 3) return 'no';
+    /*
+     * Era 3 is a door with nothing behind it. Era 2 is a door with something
+     * behind it you have not earned yet: the second form is the payoff of the
+     * whole evolution, and the bench showing it to a run that has never bought
+     * NEW FORM spends that reveal for a tap. It opens the moment the node is
+     * bought -- `world.newForm` is 'armed' then and 'done' once it has been
+     * taken -- rather than once the field has actually turned over, because
+     * buying it IS earning it.
+     */
+    if (eraShut(w, to)) return 'locked';
     if (to === w.era) return 'here';
     /*
      * The record first, and flushed by `select` before the swap: it is

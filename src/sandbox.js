@@ -128,6 +128,78 @@ function clock(t) {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
+/**
+ * The three tabs, in order. One table, because the row is built in two places
+ * -- the room's own bar and the tab that opens it -- and two lists of the same
+ * three things is two lists to keep in step.
+ */
+export const ERA_TABS = [[1, 'ERA I'], [2, 'ERA II'], [3, 'ERA III']];
+
+/**
+ * One cell of an era row.
+ *
+ * ---- the padlock is always PRESENT and shown by a class ----
+ *
+ * It used to be written into `innerHTML` at build time, for era 3 only, which
+ * was fine while the only locked room was the one that is locked for ever.
+ * Era 2 is locked until NEW FORM is owned and opens mid-run, so the mark has
+ * to be able to arrive without the row being rebuilt -- and a lock that is
+ * only ever added is a lock that can never come off.
+ *
+ * Shown with `.sbEra.shut`, hidden by `.sbEra:not(.shut) .sbEraLock`, which is
+ * three classes against the one on `.sbEraLock` and therefore wins. It is a
+ * SPAN and not a dimming, for the reason the menu's own locked tabs carry one:
+ * a mark you can see is a door, and a button that is merely dim is a button
+ * that looks broken.
+ */
+export function eraCell(n, label) {
+  const b = document.createElement('button');
+  b.className = 'sbEra';
+  b.dataset.era = String(n);
+  b.innerHTML = `<span class="sbEraLock" aria-hidden="true">${LOCK}</span>`
+    + `<span class="sbEraName">${label}</span>`;
+  return b;
+}
+
+/** Which rooms are shut. Era 3 always; era 2 until the NEW FORM is owned. */
+export function eraShut(world, n) {
+  if (n === 3) return true;
+  if (n === 2) return !world.newForm;
+  return false;
+}
+
+/** A door that does not open says so, once, where it was pressed. */
+export function refuseEra(b) {
+  b.classList.remove('refuse');
+  void b.offsetWidth;
+  b.classList.add('refuse');
+}
+
+/**
+ * Paint an era row: which room is up, and which are shut.
+ *
+ * Shared by both rows so a rule written once is obeyed in both places. `at` is
+ * which cell reads as current, which is the world's era in the room and the
+ * DOOR's choice in the menu -- the only thing the two rows disagree about.
+ */
+export function syncEraRow(cells, world, at) {
+  for (const b of cells || []) {
+    const n = Number(b.dataset.era);
+    const on = n === at;
+    const shut = eraShut(world, n);
+    if (b._on !== on) {
+      b._on = on;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
+    if (b._shut !== shut) {
+      b._shut = shut;
+      b.classList.toggle('shut', shut);
+      b.setAttribute('aria-disabled', String(shut));
+    }
+  }
+}
+
 export class Sandbox {
   constructor(game) {
     this.game = game;
@@ -201,48 +273,22 @@ export class Sandbox {
   buildEras() {
     const row = document.createElement('div');
     row.id = 'sbEras';
-    this.el.eras = [];
-    for (const [n, label] of [[1, 'ERA I'], [2, 'ERA II'], [3, 'ERA III']]) {
-      const b = document.createElement('button');
-      b.className = 'sbEra';
-      b.dataset.era = String(n);
-      /*
-       * The padlock is a SPAN and not a class on the button, for the reason
-       * the menu's own locked tabs carry one: a mark you can see is a door,
-       * and a button that is merely dim is a button that looks broken.
-       */
-      b.innerHTML = n === 3
-        ? `<span class="sbEraLock" aria-hidden="true">${LOCK}</span>${label}`
-        : label;
+    this.el.eras = ERA_TABS.map((t) => {
+      const b = eraCell(t[0], t[1]);
       b.addEventListener('pointerdown', (ev) => {
         ev.preventDefault();
-        const r = this.game.setBenchEra(n);
-        if (r === 'locked') this.refuseEra(b);
+        const r = this.game.setBenchEra(t[0]);
+        if (r === 'locked') refuseEra(b);
       });
       row.appendChild(b);
-      this.el.eras.push(b);
-    }
+      return b;
+    });
     return row;
   }
 
-  /** A door that does not open says so, once, where it was pressed. */
-  refuseEra(b) {
-    b.classList.remove('refuse');
-    void b.offsetWidth;
-    b.classList.add('refuse');
-  }
-
-  /** Which room is up, on the row. */
+  /** Which room is up, and which are shut. */
   syncEra() {
-    const at = this.game.world.era;
-    for (const b of this.el.eras || []) {
-      const n = Number(b.dataset.era);
-      const on = n === at;
-      if (b._on === on) continue;
-      b._on = on;
-      b.classList.toggle('on', on);
-      b.setAttribute('aria-pressed', String(on));
-    }
+    syncEraRow(this.el.eras, this.game.world, this.game.world.era);
   }
 
   buildPanel() {

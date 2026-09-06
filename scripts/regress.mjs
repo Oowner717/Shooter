@@ -16446,6 +16446,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       g.debugTeachAll();
       g.debugGiveEnergy(400000);
       g.debugBuyAll();
+      /*
+       * ...and the NEW FORM is OWNED, which era 2's room is gated on from
+       * build 266. `debugBuyAll` deliberately skips it -- it is gated and on
+       * its own currency, seven REMAINDERs -- so the state is written the way
+       * a purchase leaves it: the id in the ledger, which is what survives the
+       * checkpoint-and-resume `enterSandbox` does, and the flag it applies.
+       * The id is `recast`; there is no `newform` id and pushing one is
+       * silently dropped by the restore, which cost this probe a run.
+       */
+      if (!w.ledger.includes('recast')) w.ledger.push('recast');
+      w.newForm = 'armed';
       if (era === 2) g.setEra(2);
       w.director.update = () => {};
     };
@@ -16613,10 +16624,31 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.debugTeachAll();
     g.debugGiveEnergy(400000);
     g.debugBuyAll();
+    /*
+     * ...and the NEW FORM is OWNED, because era 2's room is gated on it from
+     * build 266 and this case's whole subject is the rig that stands in it.
+     * `debugBuyAll` skips it deliberately -- it is gated and priced in seven
+     * REMAINDERs -- so the state is written the way a purchase leaves it: the
+     * id in the LEDGER (which survives the resume `enterSandbox` does) plus
+     * the flag its `apply` sets. The id is `recast`, not `newform`.
+     */
+    if (!w.ledger.includes('recast')) w.ledger.push('recast');
+    w.newForm = 'armed';
     w.director.update = () => {};
     g.enterSandbox();
 
-    const rigOf = (era) => { g.setBenchEra(era); return w.enemies.find((e) => e.dummy && !e.dead); };
+    /*
+     * A shut room hands back the rig you were already looking at, so a case
+     * that compares two rooms has to know it actually moved. Without this the
+     * D2 arms compared era 1's rig with itself and reported a difference of
+     * exactly 0 -- which is what the gate did to them before the line above.
+     */
+    const rigOf = (era) => {
+      const moved = g.setBenchEra(era);
+      if (moved !== 'ok' && moved !== 'here') throw new Error(`bench refused era ${era}: ${moved}`);
+      if (w.era !== era) throw new Error(`bench did not reach era ${era}`);
+      return w.enemies.find((e) => e.dummy && !e.dead);
+    };
 
     // ---- the features are the same code, so they answer the same ----------
     const probe = (era) => {
@@ -21998,7 +22030,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const m = g.hud.menu;
     const out = {};
 
-    const arm = (era) => {
+    const arm = (era, form = true) => {
       g.restart();
       delete w.director.update;
       w.spawnLock = 0;
@@ -22006,6 +22038,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       g.debugTeachAll();
       g.debugGiveEnergy(400000);
       g.buy('sandbox');
+      /*
+       * NEW FORM owned unless the arm is about not owning it. Written the way
+       * a purchase leaves it -- the id in the LEDGER, which is what survives
+       * the checkpoint-and-resume `enterSandbox` does, plus the flag its
+       * `apply` sets. The id is `recast`; there is no `newform` id, and a
+       * pushed one is silently dropped by the restore, which cost a probe run.
+       */
+      if (form) { w.ledger.push('recast'); w.newForm = 'armed'; }
       g.setEra(era);
       w.director.update = () => {};
       g.debugClearField();
@@ -22080,6 +22120,53 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.exitSandbox();
     m.setOpen(false);
 
+    /*
+     * ---- ...and era 2 is SHUT until the NEW FORM is owned ----------------
+     *
+     * The second form is the payoff of the whole evolution, and a bench that
+     * shows it to a run which has never bought NEW FORM spends that reveal
+     * for a tap. Both rows and both doors are held to it, because `eraShut`
+     * is one rule read in four places -- the room's bar, the menu's row,
+     * `setBenchEra` and `enterSandbox` -- and a control that refuses is not
+     * the same as a rule that holds.
+     */
+    arm(1, false);
+    const shutCells = row();
+    out.shutMarks = shutCells.map((b) => (b.classList.contains('shut') ? 'X' : '-')
+      + (getComputedStyle(b.querySelector('.sbEraLock')).display === 'none' ? '' : 'L')).join(' ');
+    shutCells[1].click();
+    out.shutPick = picked();
+    out.shutShook = shutCells[1].classList.contains('refuse');
+    m.setOpen(false);
+    // the model, not only the control: both doors refuse it
+    g.enterSandbox(2);
+    out.shutEnter = { era: w.era, r: w.shooter.r };
+    out.shutTab = g.setBenchEra(2);
+    g.exitSandbox();
+
+    /*
+     * ...and it opens the moment the node is owned, WITHOUT the row being
+     * rebuilt -- which is why the padlock is always in the markup and shown
+     * by a class. A mark that is only ever added is a mark that can never
+     * come off.
+     */
+    w.ledger.push('recast');
+    w.newForm = 'armed';
+    m.setOpen(true);
+    m.openTab('sandbox');
+    const openCells = row();
+    out.openMarks = openCells.map((b) => (b.classList.contains('shut') ? 'X' : '-')
+      + (getComputedStyle(b.querySelector('.sbEraLock')).display === 'none' ? '' : 'L')).join(' ');
+    out.sameNodes = openCells[1] === shutCells[1];
+    openCells[1].click();
+    out.openPick = picked();
+    m.setOpen(false);
+    g.enterSandbox(2);
+    out.openEnter = { era: w.era, r: w.shooter.r,
+      form: (w.enemies.find((e) => e.dummy) || {}).dummyForm || 0 };
+    out.openTab = g.setBenchEra(1) === 'ok' && g.setBenchEra(2) === 'ok';
+    g.exitSandbox();
+
     delete w.director.update;
     g.setEra(1);
     g.restart();
@@ -22107,6 +22194,25 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     && r.defaultRoom.mk2 === false && r.defaultRoom.form === 1,
     `after entering era 2's room and leaving, a fresh sheet opens on ERA `
     + `${r.afterReopen} and the door lands in ${JSON.stringify(r.defaultRoom)}`);
+
+  /*
+   * Era 3 is a door with nothing behind it; era 2 is a door with something
+   * behind it you have not earned. `sameNodes` is the arm that matters for the
+   * second: the lock has to come OFF the button that was already there, mid
+   * run, without the row being rebuilt.
+   */
+  check('...and era 2 is shut until the NEW FORM is owned, then it opens',
+    r.shutMarks === '- XL XL' && r.shutPick === 1 && r.shutShook
+    && r.shutEnter.era === 1 && r.shutEnter.r === 26 && r.shutTab === 'locked'
+    && r.openMarks === '- - XL' && r.sameNodes && r.openPick === 2
+    && r.openEnter.era === 2 && r.openEnter.r === 40 && r.openEnter.form === 2
+    && r.openTab,
+    `without it the row reads "${r.shutMarks}" (X shut, L padlocked), a press `
+    + `leaves the pick at ${r.shutPick} and shakes (${r.shutShook}), the door `
+    + `lands in ${JSON.stringify(r.shutEnter)} and the room's own tab answers `
+    + `${r.shutTab}; owned, the SAME buttons (${r.sameNodes}) read `
+    + `"${r.openMarks}", the pick takes (${r.openPick}) and the door lands in `
+    + `${JSON.stringify(r.openEnter)}`);
 
   check('...and from inside it switches on the spot, and ERA III refuses',
     r.insideDisabled && /IN THE ASSAY/.test(r.insideLabel)

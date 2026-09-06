@@ -20,7 +20,8 @@ import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
 import { CFG, BUILD, REV } from './config.js';
 import { swipeToDismiss, swipeTabs } from './swipe.js';
-import { lastSession, lifetime, LOCK } from './sandbox.js';
+import { lastSession, lifetime, LOCK, ERA_TABS, eraCell, eraShut, refuseEra,
+  syncEraRow } from './sandbox.js';
 import { TREE, NODES, DETACHED, priceOf } from './tree.js';
 import { svgMark } from './util.js';
 
@@ -418,18 +419,12 @@ export class Menu {
      */
     const eras = document.createElement('div');
     eras.id = 'sbDoorEras';
-    this.sandboxEras = [];
-    for (const [n, label] of [[1, 'ERA I'], [2, 'ERA II'], [3, 'ERA III']]) {
-      const b = document.createElement('button');
-      b.className = 'sbEra';
-      b.dataset.era = String(n);
-      b.innerHTML = n === 3
-        ? `<span class="sbEraLock" aria-hidden="true">${LOCK}</span>${label}`
-        : label;
-      b.addEventListener('click', () => this.pickEra(n, b));
+    this.sandboxEras = ERA_TABS.map((t) => {
+      const b = eraCell(t[0], t[1]);
+      b.addEventListener('click', () => this.pickEra(t[0], b));
       eras.appendChild(b);
-      this.sandboxEras.push(b);
-    }
+      return b;
+    });
     open.appendChild(eras);
 
     const go = document.createElement('button');
@@ -482,20 +477,24 @@ export class Menu {
   doorEra() {
     const w = this.game.world;
     if (w.sandbox) return w.era === 2 ? 2 : 1;
-    if (this.sandboxEra === 1 || this.sandboxEra === 2) return this.sandboxEra;
+    // A pick that has since been shut cannot be honoured -- and cannot happen
+    // either, because `pickEra` refuses one. Belt, because the door is the
+    // thing that would silently open the wrong room.
+    if ((this.sandboxEra === 1 || this.sandboxEra === 2)
+      && !eraShut(w, this.sandboxEra)) return this.sandboxEra;
     return w.era === 2 ? 2 : 1;
   }
 
   /** A press on the door's era row. */
   pickEra(n, b) {
-    // A door that does not open says so, once, where it was pressed -- the
-    // same refusal the room's own row gives, because it is the same control.
-    if (n === 3) {
-      b.classList.remove('refuse');
-      void b.offsetWidth;
-      b.classList.add('refuse');
-      return;
-    }
+    /*
+     * A door that does not open says so, once, where it was pressed -- the
+     * same refusal the room's own row gives, because it is the same control
+     * and `eraShut` is the same rule. Era 3 is shut for ever; era 2 is shut
+     * until the NEW FORM is owned, which is the reveal the evolution exists
+     * for and not something a 20,000-energy instrument gets to spend.
+     */
+    if (eraShut(this.game.world, n)) { refuseEra(b); return; }
     if (this.game.world.sandbox) this.game.setBenchEra(n);
     else this.sandboxEra = n;
     this.syncSandbox();
@@ -615,11 +614,7 @@ export class Menu {
        */
       const at = this.doorEra();
       const inside = !!this.game.world.sandbox;
-      for (const b of this.sandboxEras || []) {
-        const on = Number(b.dataset.era) === at;
-        b.classList.toggle('on', on);
-        b.setAttribute('aria-pressed', String(on));
-      }
+      syncEraRow(this.sandboxEras, this.game.world, at);
       r.go.textContent = inside ? 'YOU ARE IN THE ASSAY' : 'ENTER THE ASSAY';
       r.go.disabled = inside || this.game.world.phase !== 'staging';
       const s = owned ? lastSession() : null;

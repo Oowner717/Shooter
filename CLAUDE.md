@@ -1535,6 +1535,30 @@ came from before believing the other one covers it.
   let` snapshot all over again. `dummy.js` HANDS the band reading to
   `drawD2(ctx, e, {...})` rather than importing anything back, and a glyph
   both files want (LOCK) lives in the LOWER one.
+- **A mark that is only ever ADDED is a mark that can never come off.** Era
+  3's padlock could be written into `innerHTML` at build time because that room
+  is shut for ever; era 2's room opens MID-RUN on the frame NEW FORM is bought,
+  so its lock is always in the markup and shown by a class. `.sbEra:not(.shut)
+  .sbEraLock` is three classes against the one on `.sbEraLock` and wins;
+  written the other way round -- a `.shut` rule alone -- it loses to the base
+  rule and every cell wears a padlock. The case reads the row, buys the node,
+  reads it again, and asserts the buttons are the SAME DOM nodes with the mark
+  gone.
+- **The NEW FORM node's id is `recast`.** There is no `newform` id -- that is
+  the name of the `world.newForm` FLAG (`null` / `'armed'` / `'done'`), which
+  is a different thing. A probe that pushed `newform` into the ledger had it
+  silently dropped by the restore (`BY_ID.get(id)` misses and the `continue`
+  skips the `ledger.push` as well), and the state was gone by the time the
+  room opened, which reads exactly like the feature being broken. Anything
+  that needs NEW FORM owned writes `recast` into the LEDGER -- that is what
+  survives the checkpoint-and-resume `enterSandbox` does -- and sets the flag.
+- **A case that NAVIGATES has to check that it arrived.** The D2 case's
+  `rigOf(era)` called `setBenchEra` and read whatever rig was on the field; a
+  refused switch hands back the rig you were already looking at, so once era 2
+  was gated it compared era 1's rig with itself and reported a difference of
+  exactly 0 -- a case whose whole subject is that the two look nothing alike,
+  reporting them identical, and not erroring. It throws on anything but 'ok'
+  or 'here' now, and asserts `world.era` actually moved.
 - **The ASSAY's rig is r 68 and no BODY in the game is, so the room that
   measures damage under-reports anything centred on a surface.** AIRBURST at
   58 measured x1.5 to x1.9 in the field and 1140 -> 1170 in the bench, which is
