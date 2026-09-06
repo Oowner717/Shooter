@@ -2959,3 +2959,100 @@ random draws off a sine with an unshared phase, and an exact `<=` between two
 draws is a coin toss. It has headroom now.
 
 576 green. ORDINAL's hash `-1765830468`, unchanged.
+
+---
+
+## Build 274 — TESSERA, the ninth anomaly
+
+Gate rung 54. The second of the two past the change, and it completes the
+ladder the era ceiling was put in for: seven anomalies the first form can meet,
+two it cannot.
+
+### What it does that the eight do not
+
+AXIOM takes things away from *you*. This one takes away the *field*.
+
+It lays a lattice of tiles on the ground between you and it, and a tile it has
+laid is ground your rounds do not cross. The core is reachable from the first
+frame — which is the opposite of AXIOM, whose core is `spent` until its ring
+falls — and the *line* to it is not. What the fight is about is a corridor you
+keep having to re-cut: shoot a tile and it lifts, and the next pass lays
+another somewhere else.
+
+### It is one mechanism, not two
+
+A tile is an ordinary body. What stops a round is the same projectile sweep
+that stops one on anything else — there is no second collision system and no
+special case anywhere in `updateProjectiles`. A "wall your shots cannot cross"
+written as its own test in the projectile loop would have been a ninth thing
+that every round, mine, blast, beam and ability had to be taught about, which
+is precisely the shape `spent`, `shielded` and `staged` each cost a build to
+get right across every damage path. This one costs nothing because it is not
+new: a body table entry and a placement rule is the whole of it.
+
+The suite asserts it as *delivered health* rather than as a damage argument or
+a vanished projectile — either of which a round that sailed past the tile and
+hit the core would also satisfy. Three seconds up the centre line put 300 into
+the tile and **zero** into the core standing behind it.
+
+### An odd-by-odd grid centred on a point has a cell ON that point
+
+`cols: 5`, `rows: 3`, laid centred on the core, puts a berth at `(0, 0)`: a
+tile *inside* the boss, invisible behind a core of radius 38, and the first
+thing any round up the centre line meets. It was there for the whole of the
+first day's work and nothing in the fight looked wrong, because a tile drawn
+under a core reads as the core.
+
+`CFG.tessera.ahead` (132, two pitches) pushes the slab down the field toward
+the machine instead, which is both the fix and the design: the near row sits
+one pitch below the core, 66 units from its centre against the 64 a tile of 26
+needs to clear a core of 38, and the lateral slide only ever increases that.
+The case asserts it off the tiles' own laid positions against the two radii,
+not off the constant — a berth closer than `coreR + tile.r` is a tile inside
+the boss whatever the arithmetic that put it there.
+
+### The re-lay is what makes it a corridor
+
+`relay()` fills the *emptiest ground nearest the machine* first. A random fill
+would re-tile the far edge as often as the lane you just opened and the fight
+would have no pressure in it; what makes this a corridor is that the ground it
+wants back most is the ground you just took.
+
+**The first version of that case was no instrument at all.** It opened two
+lanes, one near and one far, and asserted the near one came back — and `lay.n`
+is 2, so *both* did, on any ordering whatsoever. The arm opens the whole slab
+and runs one pass now: two tiles come back, both in the row nearest the
+machine, one of them on the centre line. Sorted the other way it lands in the
+far row, unsorted it lands in array order, and the case sees both.
+
+### A cut lane costs you something coming down it
+
+A tile that has gone throws a SHARD — an ordinary steerable body, and the same
+`this.body()` trap AXIOM's lemmas hit the day before: `body` builds *structure*
+(`mass = Infinity`, `invMass = 0`, `cruise = 0`, `accel = 0`, no `ofBoss`), so
+a shard built that way cannot steer, cannot be shoved, and is walked straight
+past by the ending's `takeMinions`. Measured: four shards still flying after
+the outro, in a game whose suite has a case for exactly that. `claim(new
+Enemy(...))` is the door for anything that moves.
+
+### Two counts that were maintenance traps, and one window set near the truth
+
+- **`clamped <= 12`** in the stroke-floor sweep. Exact when the roster was 40
+  types and wrong the moment the ninth anomaly took it to 43, without a single
+  stroke changing. It is a *share* now — under 40% at dpr 2 against build 198's
+  49% — which is the claim the case's own name makes. The identical trap was
+  recorded one check below it for dpr 1 in build 273 and fixed only there.
+- **Five counts of eight** — anomalies, gates, arrivals, outros, the armed
+  sweep — went to nine, as they have on every anomaly since the first.
+- **"...and it shoots every object in reach"** failed about one run in three
+  and passed alone, which is always inherited state or a bad margin. Measured:
+  a DRIFT died at 7.5 seconds having wandered 406 units from the emplacement,
+  which is the far edge of the reach — a window set *near* the truth rather
+  than clear of it, failing on the wander rather than on the rule. Both
+  witnesses are held within 80 units of where they were put now, the way
+  `tiers.mjs` holds a body and for the reason recorded there: the claim is
+  about what the gun *chooses* to shoot, not about whether it can chase. The
+  velocity is never touched.
+
+580 green. ORDINAL's hash `-1765830468`, unchanged — the ninth anomaly is not
+in the wave ladder and the probe fights the first.

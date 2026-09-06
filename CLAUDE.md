@@ -1746,4 +1746,27 @@ came from before believing the other one covers it.
   the case counts `clip` calls per frame and fails on any other number. Theirs
   (bodies, drops, wreckage, the yard) and the touch aid are deliberately
   outside it.
+- **An odd-by-odd grid centred on a point has a cell ON that point.** TESSERA's
+  lattice is `cols: 5` by `rows: 3` and was laid centred on the core, so the
+  middle berth landed at (0, 0) -- a tile inside the boss, invisible behind a
+  core of radius 38, and the first thing any round up the centre line met. It
+  looked right for a whole day's work, because a tile drawn under a core reads
+  as the core. `CFG.tessera.ahead` pushes the slab down the field instead, and
+  the case asserts it off the tiles' own laid positions against the two radii
+  rather than off the constant: a berth closer than `coreR + tile.r` is a tile
+  inside the boss whatever arithmetic put it there.
+- **A test whose setup gives the mechanism no choice cannot see the choice.**
+  The first arm for TESSERA's "re-laid nearest the machine first" opened TWO
+  lanes and asserted the near one came back -- and `lay.n` is 2, so both did,
+  on any ordering whatsoever. It opens the whole slab and runs one pass now, so
+  the pass has to CHOOSE and what it chose is the assertion. The same shape as
+  the chain-round bench that measured ARC against one body: if the setup makes
+  every implementation agree, the case is measuring nothing.
+- **A count of the roster is a maintenance trap; assert the SHARE.** The
+  stroke-floor sweep pinned `clamped <= 12` of 40 types and failed the moment
+  the ninth anomaly took the roster to 43, without one stroke changing. Its own
+  neighbour carried a note saying exactly this, about the same field at dpr 1,
+  and was fixed only there. Anything keyed on how many things exist rots when
+  something is added; the claim in that case's name is "half the roster", so
+  the rule is a fraction.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

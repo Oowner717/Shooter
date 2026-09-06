@@ -46,6 +46,7 @@ import { ring, ripple, spark, shake, flash } from './fx.js';
 import { audio } from './audio.js';
 import { background } from './background.js';
 import { registerAnomaly, dressOf } from './anomaly.js';
+import { Enemy } from './enemies.js';
 import { Boss } from './boss.js';
 
 const A = () => CFG.axiom;
@@ -223,8 +224,15 @@ export class Axiom extends Boss {
     if (!live.length) return;
     for (let i = 0; i < C.lemma.n; i++) {
       const from = live[(Math.random() * live.length) | 0];
-      const e = this.body('lemma', from.x, from.y);
-      e.staged = false;
+      /*
+       * `claim(new Enemy(...))` and NOT `this.body(...)`: `body` builds
+       * STRUCTURE, with `invMass 0`, no cruise and no accel, and it does not
+       * mark `ofBoss` -- so a minion made that way cannot steer, cannot be
+       * shoved, and is not taken by the ending. See the same note in
+       * tessera.js, where the suite caught it.
+       */
+      const e = this.claim(new Enemy(TYPE_BY_ID.lemma, from.x, from.y,
+        { staged: false, spawnIn: 0.2 }));
       const a = Math.atan2(world.shooter.y - from.y, world.shooter.x - from.x) + rand(-0.5, 0.5);
       e.vx = Math.cos(a) * 60;
       e.vy = Math.sin(a) * 60;

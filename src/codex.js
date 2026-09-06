@@ -227,6 +227,21 @@ export const CODEX = [
     name: 'LEMMA',
     line: 'A small argument in support of a larger one. It exists to keep you off the clause that sent it.',
   },
+  {
+    id: 'tessera',
+    name: 'TESSERA',
+    line: 'It does not come to you and it does not have to. It lays the ground between you and it, one tile at a time.',
+  },
+  {
+    id: 'tile',
+    name: 'TILE',
+    line: 'Laid ground. Nothing you fire crosses it while it is down, and it has no interest in you at all.',
+  },
+  {
+    id: 'shard',
+    name: 'SHARD',
+    line: 'What comes off a tile you have taken. Cutting the corridor is not free.',
+  },
 ];
 
 const IDS = new Set(CODEX.map((e) => e.id));

@@ -11,6 +11,7 @@ import './dynamo.js';
 import './parity.js';
 import './terminus.js';
 import './axiom.js';
+import './tessera.js';
 import { nameOf, dressOf, heldList } from './anomaly.js';
 import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta, drawGlow} from './util.js';

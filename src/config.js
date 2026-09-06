@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '273';
+export const BUILD = '274';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '273';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '089b51d';
+export const REV = '552d367';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -383,7 +383,7 @@ export const CFG = {
        *
        * Index i is anomaly n = i + 1; see ANOMALIES in anomaly.js.
        */
-      gates: [6, 12, 18, 24, 30, 36, 42, 48],
+      gates: [6, 12, 18, 24, 30, 36, 42, 48, 54],
       /*
        * ---- and the one gate that is not an anomaly (build 272) ----------
        *
@@ -1094,6 +1094,71 @@ export const CFG = {
      * straight off the block -- which is why the first version of this boss
      * fought correctly and then threw on the frame its core died.
      */
+    arrest: 0.7,
+    infall: 1.1,
+    endFor: 13.4,
+    pull: 900,
+    pay: 900,
+  },
+
+  /*
+   * ---- tessera -----------------------------------------------------------
+   *
+   * The ninth, and the second of the two past the change. Gate rung 54.
+   *
+   * ---- what it does that the eight do not ----
+   *
+   * AXIOM takes things away from you. This one takes away the FIELD: it tiles
+   * the ground it stands on, and a tile it has laid is ground your rounds do
+   * not cross. Shoot a tile and it lifts; the ground under it is yours again
+   * until the next pass lays another.
+   *
+   * So the question is spatial where AXIOM's is about order: the boss is
+   * always reachable and the LINE to it is not, and what you are managing is
+   * a corridor you keep having to re-cut. It is the only anomaly whose body
+   * is the space between you and it.
+   *
+   * ---- and it is one mechanism, not two ----
+   *
+   * A tile is an ordinary body with `plow: false` and a mark on it. What stops
+   * a round is the same projectile sweep that stops one on anything else --
+   * there is no second collision system and no special case in
+   * `updateProjectiles`. A tile simply has a great deal of surface and no
+   * interest in coming to you, which is a shape the physics already supports.
+   */
+  tessera: {
+    cost: 250,
+    standoff: 420,
+    arrive: 14.4,
+    beats: [0.14, 0.36, 0.6, 1],
+    coreR: 38,
+    /*
+     * The lattice. `cols` across by `rows` deep, laid on a grid `pitch` apart
+     * and centred under the core -- so at stock it is a five-by-three slab
+     * 132 units on a side, standing between the machine and the thing that
+     * laid it.
+     */
+    cols: 5,
+    rows: 3,
+    pitch: 66,
+    /*
+     * ...and the slab is pushed DOWN the field toward the machine by `ahead`,
+     * which is not decoration. Laid centred on the core -- which is what the
+     * first version did -- the middle berth of an odd-by-odd grid lands at
+     * (0, 0), i.e. exactly on the core: a tile inside the boss, invisible,
+     * and the first thing any round up the centre line meets. It is also the
+     * wrong shape for the design, which is a corridor to cut rather than a
+     * shell to break. Two pitches puts the near row one pitch below the core,
+     * 66 units from its centre against the 64 a tile (26) needs to clear a
+     * core of 38 -- and the lateral slide only ever increases that.
+     */
+    ahead: 132,
+    lay: { every: 5.2, n: 2 }, // how often it re-tiles, and how many at a time
+    layII: 3.4, // ...and how often once it is angry
+    drift: 26, // how far the whole slab slides side to side
+    driftRate: 0.3,
+    stageCore: 0.62,
+    stageOpen: 0.3,
     arrest: 0.7,
     infall: 1.1,
     endFor: 13.4,
@@ -4127,6 +4192,75 @@ export const ENEMY_TYPES = [
     weight: 0,
     drops: 3,
     debris: 5,
+  },
+  {
+    // The ninth. It tiles the ground between you and it, and a tile is ground
+    // your rounds do not cross until you have taken it off.
+    id: 'tessera',
+    opens: 0,
+    name: 'TESSERA',
+    shape: 'tessera',
+    r: 38,
+    hp: 7800,
+    large: true,
+    fixed: true,
+    density: 10,
+    speed: 0,
+    accel: 0,
+    restitution: 0.2,
+    wobble: 0,
+    armor: 0.2,
+    /*
+     * Deep violet-red, and dark for the reason AXIOM's gold is dark: the
+     * anomalies past the change are a register of their own. Chroma 0.62.
+     */
+    color: '#8c2f5a',
+    glow: '#5c1236',
+    weight: 0,
+    drops: 32,
+    debris: 24,
+  },
+  {
+    // A TILE. It does not chase and it does not hit you; it simply is where
+    // you wanted to shoot.
+    id: 'tile',
+    opens: 0,
+    name: 'TILE',
+    shape: 'tile',
+    r: 26,
+    hp: 300,
+    fixed: true,
+    density: 6,
+    speed: 0,
+    accel: 0,
+    restitution: 0.2,
+    wobble: 0,
+    armor: 0.06,
+    color: '#c2477f',
+    glow: '#8c2f5a',
+    weight: 0,
+    drops: 3,
+    debris: 6,
+  },
+  {
+    // A SHARD off a tile that has been taken: the only thing here that comes
+    // at you, and it is what makes cutting the corridor cost something.
+    id: 'shard',
+    opens: 0,
+    name: 'SHARD',
+    shape: 'shard',
+    r: 10,
+    hp: 78,
+    density: 0.8,
+    speed: 104,
+    accel: 240,
+    restitution: 0.75,
+    wobble: 0.5,
+    color: '#ff7ab0',
+    glow: '#c2477f',
+    weight: 0,
+    drops: 2,
+    debris: 3,
   },
   {
     // The eighth. It states a rule and holds you to it: while a CLAUSE stands

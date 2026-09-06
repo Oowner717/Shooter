@@ -77,6 +77,8 @@ export const ANOMALIES = [
    */
   { n: 8, key: 'aperture8', name: 'AXIOM', tone: '#d9b310', cfg: 'axiom', built: true,
     types: ['axiom', 'clause', 'lemma'] },
+  { n: 9, key: 'aperture9', name: 'TESSERA', tone: '#8c2f5a', cfg: 'tessera', built: true,
+    types: ['tessera', 'tile', 'shard'] },
 ];
 
 const ANOMALY_BY_N = new Map(ANOMALIES.map((a) => [a.n, a]));
