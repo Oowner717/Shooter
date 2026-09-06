@@ -21103,9 +21103,25 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * is a migration, which throws away a gun the player did buy on a lot that
      * is still legal.
      */
+    const purse = w.energy;
     w.guns = [0, 1, 3];
     syncGuns(w);
     out.legacyStanding = w.gunAt.map((x) => x.lot).join(',');
+    /*
+     * ...and PRUNED and refunded, not merely skipped. Skipping alone leaves
+     * the index in `world.guns`, which is written back out by every save
+     * after it and is what `gunCount` and the TURRETS tab's lock read -- so
+     * the run would go on counting two emplacements that do not exist and
+     * can never be built, for ever. Found by review, and the arm that would
+     * have caught it is the LIST and the purse, not the standing guns.
+     */
+    out.legacyList = [...(w.guns || [])].join(',');
+    out.legacyRefund = w.energy - purse;
+    out.legacyWant = 2 * CFG.gun.cost;
+    // ...and it is self-limiting: a second pass finds nothing and pays nothing.
+    const purse2 = w.energy;
+    syncGuns(w);
+    out.legacyAgain = w.energy === purse2 && [...(w.guns || [])].join(',') === '3';
 
     delete w.director.update;
     g.setEra(1);
@@ -21173,11 +21189,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('...and the line comes back with the run',
     r.gone === 0 && JSON.stringify(r.backGuns) === '[2,4]' && r.backOn === false
     && r.backAmmo === 'sabot' && r.backStanding === 2 && r.ammoCount === 3
-    && r.legacyStanding === '3',
+    && r.legacyStanding === '3' && r.legacyList === '3'
+    && r.legacyRefund === r.legacyWant && r.legacyAgain,
     `a restart left ${r.gone}; the resume brought back `
     + `${JSON.stringify(r.backGuns)} standing ${r.backStanding}, stood down `
     + `(${r.backOn === false}), carrying ${r.backAmmo} of ${r.ammoCount}; a `
-    + `pre-263 save carrying [0,1,3] stands only ${r.legacyStanding}`);
+    + `pre-263 save carrying [0,1,3] stands only ${r.legacyStanding}, is pruned `
+    + `to [${r.legacyList}] with ${r.legacyRefund} handed back, and a second `
+    + `pass changes nothing (${r.legacyAgain})`);
 }
 
 // --- what a lot costs, and where a gun points with nothing to shoot ---------
@@ -21820,6 +21839,47 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.three = air(false, 'lurcher', 180, 3);
     out.threeAir = air(true, 'lurcher', 180, 3);
 
+    /*
+     * ---- and the same weapon in the room that measures weapons -----------
+     *
+     * Off the LEDGER, because that is what the room shows the player, and in
+     * the room itself rather than against a stand-in: the rig's radius is the
+     * whole point of the arm and no other body in the game has it.
+     */
+    const bench = (buy) => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugGiveEnergy(900000);
+      w.phase = 'staging';
+      g.buy('sandbox');
+      if (buy) g.buy('airburst');
+      g.enterSandbox(1);
+      const rig = w.enemies.find((e) => e.dummy);
+      const s = w.shooter;
+      s.aim = -Math.PI / 2;
+      s.targetAim = -Math.PI / 2;
+      w.autoAim = false;
+      w.autoFire = false;
+      ledger.reset();
+      ledger.on = true;
+      for (let k = 0; k < 8; k++) {
+        w.abilities.clearCooldowns();
+        g.useAbility(slot());
+        for (let f = 0; f < 80; f++) g.update(1 / 60);
+      }
+      const total = Math.round(ledger.total);
+      ledger.on = false;
+      const rr = rig ? +rig.r.toFixed(0) : 0;
+      g.exitSandbox();
+      return { total, rr };
+    };
+    const bp = bench(false);
+    const ba = bench(true);
+    out.benchPlain = bp.total;
+    out.benchAir = ba.total;
+    out.rigR = ba.rr;
+    out.burstR = CFG.hail.burst.r;
+
     delete w.director.update;
     w.spawnLock = 0;
     g.restart();
@@ -21874,6 +21934,31 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * because it goes off on a surface and most of its circle lands next door.
    * A share of the total would not say that; the two ratios do.
    */
+  /*
+   * ...and it is VISIBLE IN THE ASSAY, which is the arm the first version of
+   * this case did not have and which review found the hole in.
+   *
+   * The bench's rig is r 68 -- larger than any body in the game, because it is
+   * a target and not an attacker -- and `applyBlast` measures centre to
+   * centre from a burst that goes off on the SURFACE of what the pellet
+   * found. At the 58 this shipped with, the burst could not reach the rig's
+   * centre at all: measured over twelve presses, 1140 without AIRBURST and
+   * 1170 with it, which is zero inside the noise, in the one room whose whole
+   * job is telling you what a source is worth. The field said x1.5 to x1.9 at
+   * the same time.
+   *
+   * So the assertion is stated as the RULE and not as the number: the burst
+   * has to be wider than the rig, and the rig has to be able to see it. A
+   * radius alone would pass on a build where the rig grew.
+   */
+  check('...and the ASSAY can see it, which is the whole job of that room',
+    r.rigR > 0 && r.burstR > r.rigR
+    && r.benchAir > r.benchPlain * 1.15,
+    `the rig is r ${r.rigR} and the burst is ${r.burstR}, so it reaches the `
+    + `centre of the one thing that room contains; measured there, `
+    + `${r.benchPlain} without the node and ${r.benchAir} with it `
+    + `(x${(r.benchAir / r.benchPlain).toFixed(2)})`);
+
   check('AIRBURST goes off where the pellets land, and the crowd pays for it',
     r.oneAir.armed && r.one.armed === false
     && r.oneAir.took > r.one.took * 1.3

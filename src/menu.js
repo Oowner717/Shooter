@@ -603,12 +603,15 @@ export class Menu {
     if (r) {
       r.shut.hidden = owned;
       r.open.hidden = !owned;
-      // Only from a running field: the title screen and an ending are not one.
-      r.go.disabled = this.game.world.phase !== 'staging';
       /*
        * Which room is pointed at, and what the button then says. From inside
        * the sheet the door is not a door -- you are through it -- so it says
        * so rather than offering to open what is already open.
+       *
+       * `disabled` is written ONCE. Build 264 added the `inside` term below
+       * and left the old `phase !== 'staging'` write standing above it, dead
+       * -- two writes of one property where the first cannot be observed,
+       * which is a lie about the intended state sitting in the diff.
        */
       const at = this.doorEra();
       const inside = !!this.game.world.sandbox;

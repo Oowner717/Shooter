@@ -2503,3 +2503,89 @@ swung 1.15 to 1.53 against a threshold of 1.3. Four presses, averaged. That is
 this suite's most repeated flake and it is worth naming every time.
 
 562 green.
+
+## 37. Build 265 — what an adversarial review of 262-264 found
+
+Three defects, all in work shipped in the previous two builds, all found by
+reading rather than by playing.
+
+### AIRBURST was worth nothing in the one room built to measure it
+
+`applyBlast` measures **centre to centre**, and a pellet's burst goes off on
+the *surface* of whatever the pellet found — so a blast of radius R reaches
+that body's own centre only if R exceeds its radius. Build 263 found that at
+34 and raised it to 58, which fixed every ordinary body and left it broken
+where it matters most: **the assay's rig is r 68**, larger than any body in the
+game because it is a target and not an attacker.
+
+Measured over twelve presses, in the room:
+
+| | no AIRBURST | AIRBURST |
+|---|---|---|
+| the assay rig (r 68) | 1140 | **1170 — zero inside the noise** |
+| one LURCHER, in the field | 1170 | 2005 (×1.71) |
+| three abreast | 3245 | 6130 (×1.89) |
+
+A player buys the node, takes it to the bench to see what it did, and the bench
+says nothing happened. That is the room's entire job and it was lying.
+
+`74` is the smallest radius that clears everything the burst must be able to
+hurt — the rig at 68, the FRACTAL core at 64 (the largest base body) and a
+fully grafted BULWARK at 72 — and the damage comes down 11 → 10 to pay for the
+area. Re-measured at twelve presses: the rig ×0.98 → **×1.30**, one LURCHER
+×1.71 → ×1.62, three abreast ×1.89 → ×2.03, a BULWARK ×1.36 → ×1.40. The field
+is where it was and the instrument tells the truth.
+
+The case asserts the **rule** — the burst is wider than the rig, and the rig
+measures a gain — not the radius, because a radius alone would pass on a build
+where the rig grew.
+
+**And the tuning probe lied first.** It set `CFG.hail.burst.r` and then entered
+the room; `hail.burst.r` is in `SCALED`, so `enterSandbox`'s `resize()` →
+`setZoom()` restored it from `BASE` before a single pellet flew, and every
+variant silently measured 58. The numbers only separated once the radius was
+written *after* the last resize. A probe that mutates a `SCALED` value has to
+do it downstream of every `resize` on its path.
+
+### A pre-263 save kept paying for guns it could never have
+
+Build 263 made `buildGun` refuse a works lot and `syncGuns` skip one — but
+skipping is not enough. `world.guns` is a list of lot indices, and a run saved
+in 261 or 262 with a gun on lot 0 or 1 kept that index: written back out by
+every save after it, counted by `world.guns.length`, which is what unlocks the
+TURRETS tab and what `gunCount` returns. The run would have gone on counting
+two emplacements that do not exist and can never be built, for ever.
+
+They are pruned from the list now and the 2600 apiece is handed back — a
+purchase the game should not have sold is a refund, not a quiet deletion. It is
+self-limiting (after one pass there is nothing to prune), which is what makes
+it safe from a function that runs on every resize, and the case asserts the
+list and the purse rather than the standing guns, which is the half that was
+already right.
+
+### A dead write
+
+`syncSandbox` set `r.go.disabled` twice — build 264 added the `inside` term and
+left the old `phase !== 'staging'` write standing above it, unobservable. Two
+writes of one property where the first cannot be seen is a lie about the
+intended state sitting in the diff.
+
+### Checked and clean
+
+- Every other caller of `takeHit` passes the same `false` it always did.
+- The rest dwell's `idle` is initialised in `syncGuns` and reset on every
+  frame with a target.
+- The door's era row is inside `.sbRoom`, which carries its `[hidden]` guard.
+- A pick does not survive the sheet, including across a swipe to another tab
+  and back (the sheet is still up, which is the stated rule).
+
+### One thing found and deliberately NOT changed
+
+**A run that has never taken NEW FORM can walk into the ERA II room and see the
+second form.** `setBenchEra(2)` has no gate and never has — build 262 shipped
+it that way and 264's door makes it one tap from the menu. It undercuts the
+evolution set-piece, which is a real cost, but gating it is a design decision
+about how much of the machine a 20,000-energy instrument is allowed to show
+you, and that is the user's call rather than a bug to fix in a review.
+
+563 green. ORDINAL's hash unchanged.

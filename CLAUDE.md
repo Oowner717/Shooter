@@ -1535,6 +1535,27 @@ came from before believing the other one covers it.
   let` snapshot all over again. `dummy.js` HANDS the band reading to
   `drawD2(ctx, e, {...})` rather than importing anything back, and a glyph
   both files want (LOCK) lives in the LOWER one.
+- **The ASSAY's rig is r 68 and no BODY in the game is, so the room that
+  measures damage under-reports anything centred on a surface.** AIRBURST at
+  58 measured x1.5 to x1.9 in the field and 1140 -> 1170 in the bench, which is
+  zero inside the noise: a player buys the node, takes it to the room whose
+  whole job is telling them what a source is worth, and the room says nothing
+  happened. Anything that must be legible THERE needs a radius past 68 --
+  74 clears the rig, the FRACTAL core at 64 and a fully grafted BULWARK at 72.
+  Bench a new damage source in the assay as well as on a body, or the number
+  the player will actually read is the one nobody measured.
+- **A probe that mutates a `SCALED` value must do it AFTER the last resize on
+  its path.** `setZoom` rewrites every entry from `BASE`, and `enterSandbox`,
+  `setBenchEra`, `setEra` and `restart` all resize -- so a tuning probe that
+  set `CFG.hail.burst.r` and then entered the room measured the ORIGINAL value
+  for every variant and produced a table of noise that looked like a result.
+- **Skipping a bad entry is not the same as removing it.** Build 263 made
+  `syncGuns` skip a gun standing on a works lot; the index stayed in
+  `world.guns`, which is what the save writes, what `gunCount` returns and what
+  unlocks the TURRETS tab -- so a pre-263 run counted two emplacements for ever
+  that it could not build and could not sell. A list that is persisted and
+  counted has to be PRUNED, and a purchase that can no longer be delivered is a
+  refund rather than a quiet deletion.
 - **`applyBlast` measures CENTRE TO CENTRE, so a blast smaller than the body it
   went off against cannot touch that body.** A round's burst fires where the
   round STOPPED, which is on the far body's surface, so a blast of radius R

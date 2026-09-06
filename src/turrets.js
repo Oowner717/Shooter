@@ -137,11 +137,31 @@ export function syncGuns(world) {
   const owned = world.guns || [];
   const was = world.gunAt || [];
   const out = [];
-  for (const i of owned) {
+  /*
+   * ---- and a pre-263 save is PRUNED, not just skipped ------------------
+   *
+   * `world.guns` is six bits of lot indices and nothing else, so a run saved
+   * while the kinds were unenforced (builds 261 and 262) can legitimately
+   * carry a 0 or a 1 in it. Skipping those on the way to the screen is not
+   * enough on its own: the index stays in the list, is written back out by
+   * every save after it, and `world.guns.length` -- which is what unlocks
+   * the TURRETS tab and what `gunCount` returns -- goes on counting an
+   * emplacement that does not exist and can never be built.
+   *
+   * So it is taken out of the list and the 2600 is handed back. The player
+   * paid for something the game should not have sold them; the lot refuses
+   * now, and a purchase that cannot be delivered is a refund rather than a
+   * quiet deletion. It is self-limiting -- after one pass there is nothing
+   * left to prune -- which is what makes it safe to do from a function that
+   * runs on every resize.
+   */
+  const bad = owned.filter((i) => !a.lots[i] || a.lots[i].kind !== 'gun');
+  if (bad.length) {
+    world.guns = owned.filter((i) => !bad.includes(i));
+    world.energy = (world.energy || 0) + bad.length * lotPrice();
+  }
+  for (const i of world.guns || []) {
     const l = a.lots[i];
-    // `kind` again, and not belt-and-braces: a save written before build 263
-    // can legitimately carry a gun on a works lot, and this is the one place
-    // every gun in the run passes through on its way to being drawn.
     if (!l || l.kind !== 'gun') continue;
     const had = was.find((g) => g.lot === i);
     out.push({

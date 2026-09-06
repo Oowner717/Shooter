@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '264';
+export const BUILD = '265';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '264';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '522b6ee';
+export const REV = '65489d5';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1074,7 +1074,7 @@ export const CFG = {
     /*
      * AIRBURST. Nothing reads these without `up.fanBurst`.
      *
-     * ---- why 58 and not 34, which is what it was first --------------------
+     * ---- why 74, and why 34 and 58 were both wrong ----------------------
      *
      * `applyBlast` measures centre to centre. A pellet's burst goes off where
      * the pellet STOPPED, which is on the far body's SURFACE -- so a blast of
@@ -1082,15 +1082,29 @@ export const CFG = {
      * its radius. At 34 it was smaller than half the bodies in the game:
      * measured against a pinned BULWARK, four pellets landed for 118.8 and
      * the four bursts that followed them delivered EXACTLY ZERO, twice, to
-     * the decimal. A number that looked conservative was in fact switched
-     * off for everything large.
+     * the decimal.
      *
-     * 58 clears every body in the game except a BULWARK (72) and the assay's
-     * own rig, and what it is really for is the NEIGHBOURS: the burst is
-     * chip damage that spreads sideways off whatever a pellet found, which
-     * is the thing a fan of thirty-four cannot do on its own.
+     * 58 fixed that for ordinary bodies and left it broken in the ONE PLACE A
+     * PLAYER LOOKS. The assay's rig is r 68 -- larger than any body in the
+     * game, because it is a target and not an attacker -- so a 58-unit burst
+     * on its surface could not reach its centre either, and the room whose
+     * whole job is telling you what a source is worth reported AIRBURST as
+     * worth nothing. Measured over twelve presses: 1140 without it and 1170
+     * with it, which is zero inside the noise, against x1.5 to x1.9 on the
+     * same weapon in the field. Found by review, not by play.
+     *
+     * 74 is the smallest number that clears everything it must be able to
+     * hurt: the rig at 68, the FRACTAL core at 64 (the largest base body) and
+     * a fully grafted BULWARK at 72. The damage comes down 11 -> 10 to pay
+     * for the area, and the field is where it was -- measured at twelve
+     * presses, one LURCHER x1.71 -> x1.62, three abreast x1.89 -> x2.03, a
+     * BULWARK x1.36 -> x1.40, and the rig x0.98 -> x1.30.
+     *
+     * What it is FOR is still the neighbours: chip damage that spreads
+     * sideways off whatever a pellet found, which a fan of thirty-four cannot
+     * do on its own. It just has to work on the thing it hit as well.
      */
-    burst: { r: 58, damage: 11, impulse: 150 },
+    burst: { r: 74, damage: 10, impulse: 150 },
   },
 
   // ---- decoy ----------------------------------------------------------
