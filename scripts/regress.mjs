@@ -22098,10 +22098,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * So the assertion is stated as the RULE and not as the number: the burst
    * has to be wider than the rig, and the rig has to be able to see it. A
    * radius alone would pass on a build where the rig grew.
+   *
+   * The margin is 1.10 and the threshold was 1.15, which was fitted to a
+   * TWELVE-press measurement while this case runs eight: it read 1.13 and
+   * failed on a working build. Broken, the same arm reads 0.98 to 1.03, so
+   * 1.10 still separates them -- and the radius arm above is what actually
+   * carries the claim.
    */
   check('...and the ASSAY can see it, which is the whole job of that room',
     r.rigR > 0 && r.burstR > r.rigR
-    && r.benchAir > r.benchPlain * 1.15,
+    && r.benchAir > r.benchPlain * 1.1,
     `the rig is r ${r.rigR} and the burst is ${r.burstR}, so it reaches the `
     + `centre of the one thing that room contains; measured there, `
     + `${r.benchPlain} without the node and ${r.benchAir} with it `
@@ -22516,6 +22522,207 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       + `${x.eras.bot}, panel from ${x.panel.top} (clear ${x.placed}); the point `
       + `at ERA II's centre belongs to ERA II (${x.owns}); a pointerdown took `
       + `it to ${JSON.stringify(x.moved)} and back to ${JSON.stringify(x.back)}`).join('; '));
+}
+
+// --- a THROW is not swallowed by ARMORED, and HEAVE reaches past the shell --
+/*
+ * Build 270, both halves of one request: "review PULSE and make sure its push
+ * always works", and "have WARD push everything away like PULSE does".
+ *
+ * ---- what was wrong with PULSE ----
+ *
+ * `applyDamage`'s ARMORED branch returns before the impulse block, so with the
+ * plate up a PULSE delivered nothing at all -- no damage, which is the trait
+ * doing its job, and no SHOVE, which is the trait reaching something it was
+ * never about. PULSE is the game's one answer to a body sitting on the mount
+ * where the barrel cannot reach: pressing it and watching nothing happen is
+ * the whole of the report. The `isDrop` branch four lines above already
+ * applies the impulse before returning and says why.
+ *
+ * The witness is a LURCHER given the trait by hand, not a BULWARK: a shove is
+ * `impulse * invMass` and BULWARK's is 0.030 against 0.20-2.38 for everything
+ * else, which is the mistake the HEAVE case made on a working build.
+ *
+ * `plateT <= 0` is the state the bug lives in and it has to be forced, because
+ * a body that has been hit in the last second has its plate down and would be
+ * shoved either way -- a case that did not pin it would pass on the broken
+ * build about half the time.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    /*
+     * The REAL trait object. `has(list, id)` walks the list testing `t.id`, so
+     * `traits = ['armored']` -- a list of strings -- matches nothing and the
+     * body is not armoured at all. The first version of this case did that and
+     * reported plate-up and plate-down as identical to the decimal, which is
+     * what a case looks like when its subject was never switched on.
+     */
+    const { TRAIT_BY_ID } = await import('../src/traits.js');
+    const { NODE_BY_ID } = await import('../src/tree.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const clean = () => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 1e9;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugClearField();
+      w.director.update = () => {};
+      w.autoAim = false;
+      w.autoFire = false;
+    };
+    const slotOf = (id) => w.abilities.slots.findIndex((x) => x.def.id === id);
+
+    /*
+     * One press, one witness, measured as SPEED on the frame after -- and the
+     * body is healed so what moves it is the shove and not its death.
+     */
+    /*
+     * NOT healed each frame. A body given 1e9 cannot die to a 58-damage blast,
+     * so the heal bought nothing and cost the whole damage reading: `hp0 - hp`
+     * on a healed body is zero by construction, which is the tautology
+     * CLAUDE.md names first in its list. The first version of this case
+     * reported the unarmoured control taking 0 and called the trait held.
+     */
+    const press = (id, armored, dist, node) => {
+      clean();
+      if (node) {
+        g.debugGiveEnergy(400000);
+        // Through the PARENTS, the way the existing HEAVE case does it: a
+        // bare `g.buy('heave')` is refused while WARD is unowned.
+        const chain = [];
+        for (let n = NODE_BY_ID.get(node); n; n = n.parent) if (n.id) chain.unshift(n.id);
+        for (const cid of chain) for (let k = 0; k < 4; k++) g.buy(cid);
+      }
+      const s = w.shooter;
+      const e = g.debugSpawn('lurcher', s.x, s.y - dist);
+      if (!e) return null;
+      e.staged = false; e.hp = 1e9; e.maxHp = 1e9; e.vx = 0; e.vy = 0;
+      if (armored) { e.traits = [TRAIT_BY_ID.armored]; e.plateT = 0; }
+      const hp0 = e.hp;
+      const d0 = Math.hypot(e.x - s.x, e.y - s.y);
+      w.effects.length = 0;
+      w.abilities.clearCooldowns();
+      g.useAbility(slotOf(id));
+      // The held front, read on the frame it is made -- it expires long
+      // before the window below is over.
+      const shock = w.effects.reduce((m, x) => (typeof x.r === 'number' && x.r > m ? x.r : m), 0);
+      const plate = +(e.plateT || 0).toFixed(2);
+      /*
+       * ...and `thrown` on the frame it is set. `CFG.pile.thrown` is 0.5s and
+       * the window below is thirty frames, so reading it at the END finds it
+       * just expired -- which is how this arm failed on a build where the
+       * throw plainly landed.
+       */
+      const thrown = +(e.thrown || 0).toFixed(2);
+      let peak = 0;
+      for (let f = 0; f < 30; f++) {
+        g.update(1 / 60);
+        const v = Math.hypot(e.vx, e.vy);
+        if (v > peak) peak = v;
+      }
+      return {
+        peak: +peak.toFixed(1),
+        moved: +(Math.hypot(e.x - s.x, e.y - s.y) - d0).toFixed(1),
+        took: +(hp0 - e.hp).toFixed(1),
+        thrown,
+        shock: Math.round(shock),
+        plate,
+      };
+    };
+
+    // ---- PULSE, plate down and plate up ---------------------------------
+    out.plain = press('pulse', false, 120, null);
+    out.armored = press('pulse', true, 120, null);
+
+    /*
+     * ...and the trait still WORKS: the armoured body took nothing where the
+     * plain one took the blast. Without this arm the fix could have been
+     * "delete the ARMORED branch" and the case would not have noticed.
+     */
+    out.traitHolds = out.armored.took === 0 && out.plain.took > 0;
+    // ...and the plate was spent by the press, which is what ARMORED charges.
+    out.plateSpent = out.armored.plate > 0;
+
+    /*
+     * ...and ordinary GUNFIRE is unchanged -- no `throwOff`, so a plated round
+     * is still a round that did not happen. This is the half of the trait the
+     * fix must not touch.
+     */
+    clean();
+    {
+      const s = w.shooter;
+      const e = g.debugSpawn('lurcher', s.x, s.y - 120);
+      e.staged = false; e.hp = 1e9; e.maxHp = 1e9; e.vx = 0; e.vy = 0;
+      e.traits = ['armored']; e.plateT = 0;
+      s.aim = -Math.PI / 2;
+      s.heat = 0;
+      const d0 = Math.hypot(e.x - s.x, e.y - s.y);
+      s.shoot(w);
+      for (let f = 0; f < 20; f++) g.update(1 / 60);
+      /*
+       * DISPLACEMENT away from the machine, not speed. A LURCHER walks at
+       * about 35 u/s of its own accord, so `Math.hypot(vx, vy)` reads 17 on a
+       * body nothing has touched -- the first version of this arm asserted
+       * that number was 0 and failed on a working build, measuring the body's
+       * legs and calling them a shove.
+       *
+       * ...and it is asserted against a PULSE's own displacement rather than
+       * against zero, for the same reason one step down: a body left alone for
+       * twenty frames does not sit still, and this one drifts about 2 units
+       * out. What the arm is for is that a plated ROUND is nothing like a
+       * throw -- 2 units against 64 -- so if the exemption ever leaked off
+       * `throwOff` and onto ordinary fire, the round's own impulse would show
+       * up here immediately.
+       */
+      out.gunPlated = +(Math.hypot(e.x - s.x, e.y - s.y) - d0).toFixed(2);
+    }
+
+    // ---- HEAVE reaches past the shell ------------------------------------
+    out.shellR = CFG.ward.r;
+    out.heaveR = CFG.ward.heaveR;
+    /*
+     * The witness stands OUTSIDE the shell and inside the new reach, which is
+     * the whole of the change: at `this.r` it was untouched, and the arm is
+     * worthless anywhere else because both radii cover the same ground there.
+     */
+    const at = Math.round((CFG.ward.r + CFG.ward.heaveR) / 2);
+    out.heaveOut = press('ward', false, at, 'heave');
+    out.heaveShock = out.heaveOut.shock;
+
+    delete w.director.update;
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+
+  check("PULSE's shove is not swallowed by ARMORED, and the trait still holds",
+    r.armored.peak > 0 && r.armored.thrown > 0 && r.armored.moved > 20
+    && r.traitHolds && r.plateSpent
+    && r.gunPlated < r.plain.moved * 0.1,
+    `plate DOWN: ${r.plain.peak} u/s and ${r.plain.moved} units, taking `
+    + `${r.plain.took}; plate UP: ${r.armored.peak} u/s and ${r.armored.moved} `
+    + `units, taking ${r.armored.took} -- the shove lands and the damage does `
+    + `not (${r.traitHolds}), and the plate was spent (${r.plateSpent}); an `
+    + `ordinary round on a plated body is nothing like a throw `
+    + `(${r.gunPlated} units against the press's ${r.plain.moved})`);
+
+  /*
+   * The reach is the claim. At the shell's own 150 a body standing between the
+   * shell and PULSE's ground was untouched, which is what "push everything
+   * away like PULSE" was about.
+   */
+  check('...and HEAVE throws what is outside the shell, not just what is under it',
+    r.heaveR > r.shellR * 1.5 && r.heaveOut.peak > 0 && r.heaveOut.moved > 20
+    && r.heaveOut.thrown > 0 && r.heaveShock >= r.heaveR,
+    `the shell stands at ${r.shellR} and the shove reaches ${r.heaveR}; a body `
+    + `between the two took ${r.heaveOut.peak} u/s and gave up `
+    + `${r.heaveOut.moved} units, and the held front is drawn at `
+    + `${r.heaveShock} -- the radius the shove is about, not the shell's`);
 }
 
 // --- report -----------------------------------------------------------------

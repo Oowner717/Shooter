@@ -810,6 +810,17 @@ came from before believing the other one covers it.
   an `audio.boom()` sixty times a second, for the rest of the run, per expired
   mine. Measured 39 blasts in the second after one expired. Anything that can
   be called twice needs to read its own `dead` back.
+- **ARMORED discards a HIT, and a THROW is not a hit.** Its branch in
+  `applyDamage` returned before the impulse block, so with the plate up a
+  PULSE delivered nothing at all -- no damage, which is the trait working, and
+  no shove, which is the trait reaching something it was never about. PULSE is
+  the game's ONE answer to a body sitting on the mount where the barrel cannot
+  reach; pressing it and watching nothing happen was the report. Anything with
+  `throwOff` (PULSE, PILE, HEAVE, HAIL -- all buttons with clocks) now keeps
+  its impulse through that return, and the `isDrop` branch four lines above
+  had been doing exactly this, and saying why, since it was written. Ordinary
+  gunfire is untouched: no `throwOff`, so a plated round is still a round that
+  did not happen.
 - **ARMORED does not reduce a hit, it DISCARDS it** -- "the hit did not
   happen", before the plate and before the ward. So no amount of damage kills
   through it: VOID sent `hp + 1e6` through `applyDamage` and an armoured body

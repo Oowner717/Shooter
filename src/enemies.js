@@ -1342,6 +1342,32 @@ export class Enemy {
     if (this.traits && hasTrait(this.traits, 'armored') && this.plateT <= 0) {
       this.plateT = CFG.waves.tier.plateEvery;
       this.flash = Math.min(1, this.flash + 0.35);
+      /*
+       * ...but a THROW still lands, and this return used to swallow it.
+       *
+       * ARMORED discards a HIT -- "the hit did not happen" -- and a deliberate
+       * shove is not a hit. Everything with `throwOff` is a button with a
+       * clock on it (PULSE, PILE, HEAVE, HAIL), and PULSE is the game's ONE
+       * answer to a body sitting on the mount where the barrel cannot reach.
+       * With the plate up, that answer did nothing at all: no damage, which is
+       * the trait working, and no shove either, which is the trait reaching
+       * something it was never about. A player pressing the only button that
+       * clears the mount, and watching nothing happen.
+       *
+       * The `isDrop` branch four lines up already does exactly this and says
+       * why: the impulse is applied before the return because being unable to
+       * HURT a thing is not the same as being unable to MOVE it.
+       *
+       * Ordinary gunfire is untouched -- it carries no `throwOff`, so a plated
+       * round is still a round that did not happen, which is the whole of the
+       * trait against the gun.
+       */
+      if (throwOff && impulse) {
+        this.thrown = Math.max(this.thrown || 0, CFG.pile.thrown);
+        const push = impulse * this.invMass;
+        this.vx += nx * push;
+        this.vy += ny * push;
+      }
       return;
     }
     // MENDING counts hits, and needs the one before last: two inside the

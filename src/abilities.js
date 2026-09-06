@@ -649,22 +649,34 @@ class Ward {
      * gets neither.
      */
     if (up.wardPush) {
+      /*
+       * ...and it reaches PAST the shell. `this.r` cleared only the ground the
+       * shell was about to stand on; `CFG.ward.heaveR` is PULSE's circle less
+       * a little, which is what "push everything away like PULSE" asks for.
+       * The reach scales with STANDOFF (`up.wardR`) the way the shell does, so
+       * the node stays a shove around your own wall rather than drifting away
+       * from it.
+       */
+      const hr = P.heaveR * (up.wardR || 1);
       applyBlast(world, {
         x: world.shooter.x, y: world.shooter.y,
-        r: this.r,
+        r: hr,
         damage: 0,
         impulse: P.heave,
         throwOff: true,
         src: 'ward',
       });
-      ring(world.shooter.x, world.shooter.y, this.r * 0.3, this.r * 1.06, 0.34,
+      // Drawn at the radius it is ABOUT, not at the shell's -- a ring strokes
+      // at `alpha = t` and thins as it grows, so one authored to expand into a
+      // radius is dimmest exactly where that radius is.
+      ring(world.shooter.x, world.shooter.y, hr * 0.72, hr * 1.04, 0.34,
         TONE_ARC_SOFT, 3.4);
-      world.effects.push(new Shock(world.shooter.x, world.shooter.y, this.r,
+      world.effects.push(new Shock(world.shooter.x, world.shooter.y, hr,
         TONE_ARC_SOFT));
       for (let i = 0; i < 18; i++) {
         const a = rand(0, TAU);
-        spark(world.shooter.x + Math.cos(a) * this.r * 0.5,
-          world.shooter.y + Math.sin(a) * this.r * 0.5,
+        spark(world.shooter.x + Math.cos(a) * hr * 0.4,
+          world.shooter.y + Math.sin(a) * hr * 0.4,
           Math.cos(a) * rand(260, 620), Math.sin(a) * rand(260, 620),
           TONE_ARC_SOFT, 0.34, 2.2);
       }

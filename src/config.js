@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '269';
+export const BUILD = '270';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '269';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'd7e028a';
+export const REV = '3d4223f';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1205,6 +1205,21 @@ export const CFG = {
      * lose ground instead of being nudged and driving straight back in.
      */
     heave: 1180,
+    /*
+     * ...and how far that shove REACHES, which is not the shell.
+     *
+     * It was `this.r` -- the shell's own 150 -- so HEAVE cleared the ground
+     * the shell was about to occupy and nothing else, and a body two steps
+     * outside stood and watched. The node is bought to be the WARD's answer
+     * to a crowd, and a crowd is not inside a 150-unit circle. 300 is PULSE's
+     * ground (340) less a little, which is the comparison the request makes
+     * and the right one: PULSE is a bigger circle on a shorter clock, HEAVE
+     * is nearly as big once every eighteen seconds and leaves a wall behind.
+     *
+     * In SCALED beside `ward.r`, because it is a length and has to cover the
+     * same fraction of a field half again as deep.
+     */
+    heaveR: 300,
     crackle: 0.085,
     ramp: 0.35, // seconds the shell takes to stand up, and to go
   },
@@ -4657,7 +4672,7 @@ const SCALED = [
   'wire.r', 'wire.span', 'wire.width',
   // the bar
   'decoy.r', 'decoy.ahead', 'decoy.blast.r',
-  'pile.r0', 'pile.r', 'ward.r', 'prism.r', 'prism.beamLen',
+  'pile.r0', 'pile.r', 'ward.r', 'ward.heaveR', 'prism.r', 'prism.beamLen',
   // the yard, which is a picture and keeps its size on the glass
   'yard.gap', 'yard.mouthHalf', 'yard.faceHalf', 'yard.tooth', 'yard.clear',
   // The emplacements, for the same reason everything turret-owned is here:

@@ -2662,3 +2662,62 @@ now. A case that navigates has to check that it arrived.
 
 564 green. The ORDINAL hash was not run: this touches a menu gate and nothing
 in energy, targeting or the boss.
+
+## 39. Build 270 — a throw is not a hit, and HEAVE reaches past its own shell
+
+> "Review Pulse and make sure its push always works. I want Ward to push away
+> enemies upon use. Change upgrade to push everything away upon use like Pulse."
+
+**PULSE's push did not always work, and the reason is one `return`.**
+`applyDamage`'s ARMORED branch fires before the impulse block, so with the
+plate up a PULSE delivered *nothing*: no damage, which is the trait doing its
+job, and no shove, which is the trait reaching something it was never about.
+PULSE is the game's one answer to a body sitting on the mount where the barrel
+cannot reach — pressing it and watching nothing happen is the whole report.
+
+The `isDrop` branch four lines above already applies the impulse before
+returning, and says why: being unable to *hurt* a thing is not the same as
+being unable to *move* it. A throw now survives the same way. Ordinary gunfire
+is untouched — it carries no `throwOff`, so a plated round is still a round
+that did not happen, which is the whole of the trait against the gun.
+
+Measured on a pinned LURCHER (not a BULWARK — its invMass is an order of
+magnitude down, and choosing it is how the HEAVE case once reported a working
+build as broken):
+
+| | plate down | plate up |
+|---|---|---|
+| peak | 144.3 u/s | **144.3 u/s** |
+| ground given up | 63.8 | **63.8** |
+| damage taken | 44.7 | **0** |
+
+The shove is identical to the decimal and the damage is still refused, which is
+both halves of the claim. A plated *round* moves the same body 2.3 units
+against the press's 63.8.
+
+**HEAVE reached only as far as the shell.** It fired at `this.r` — WARD's own
+150 — so it cleared the ground the shell was about to stand on and a body two
+steps outside stood and watched. `CFG.ward.heaveR` is 300, PULSE's circle less
+a little, and it scales with STANDOFF the way the shell does. The ring and the
+held front are drawn at that radius rather than the shell's, for the reason
+CLAUDE.md gives about rings that thin as they grow.
+
+### Four instrument faults in one case, all mine
+
+Worth listing, because each is on CLAUDE.md's own list and I wrote all four in
+one sitting:
+
+- `e.traits = ['armored']` — `has(list, id)` walks the list testing `t.id`, so
+  a list of strings matches nothing. The case reported plate-up and plate-down
+  identical **to the decimal**, which is what it looks like when a case's
+  subject was never switched on. `TRAIT_BY_ID` is a plain object, not a Map.
+- The body was healed every frame, so `hp0 - hp` was zero by construction and
+  the unarmoured control "took 0" — the first tautology on CLAUDE.md's list.
+- `thrown` was read at the end of a thirty-frame window and `CFG.pile.thrown`
+  is half a second, so it had just expired. Read on the frame it is set.
+- The gun arm measured `hypot(vx, vy)` and asserted 0. A LURCHER walks at 35
+  u/s of its own accord; the case was measuring the body's legs and calling
+  them a shove. It is displacement now, against a PULSE's own.
+
+567 green. ORDINAL's hash `-1765830468`, unchanged — nothing in a boss fight
+carries `throwOff` against an armoured body.

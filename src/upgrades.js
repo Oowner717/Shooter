@@ -655,7 +655,7 @@ export const UPGRADES = {
      * because somebody read the sentence that used to be there.
      */
     { id: 'heave', name: 'HEAVE', levels: 1,
-      line: 'The WARD shoves everything out of it as it comes up. Once, and the heavy ride it out.',
+      line: 'The WARD throws everything near you outward as it comes up. Once, and the heavy ride it out.',
       apply: set('wardPush', true), icon: MARK.heavemark },
     /*
      * Two levels, written out -- 0.64 of every cooldown. It had none, and
