@@ -2365,10 +2365,27 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
  * live, so the one piece of motion up here is real telemetry rather than an
  * animation of nothing.
  */
+/*
+ * ---- one clean row, or two, and never a ragged three ------------------
+ *
+ * This is a flex row and its children had no `white-space`, so at every phone
+ * width the TEXT inside them wrapped instead of the row doing it: measured,
+ * three line boxes at 320, 390 and 414, and at 320 the readout hung 32px off
+ * the right edge -- the first line of the first screen, clipped, on the width
+ * that binds. Nothing could see it: the suite's sweep walks font sizes and
+ * contrast, and a wrap flips no property and clips nothing a colour test can
+ * read.
+ *
+ * Each part is `nowrap` and the ROW is what wraps, so it is one line where
+ * there is room and two where there is not, with the readout keeping the
+ * right-hand end of whichever line it lands on.
+ */
 .bootStatus {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  row-gap: 4px;
   /* 11px is the title screen's floor -- the same one the menu keeps, and the
      suite walks every text node on this panel against it. */
   font-size: 11px;
@@ -2388,14 +2405,15 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
   animation: bootPulse 2.4s ease-in-out infinite;
 }
 @keyframes bootPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
-.bootSess { color: #a3b8ce; }
-.bootLink { color: #7cffb2; }
+.bootSess { color: #a3b8ce; white-space: nowrap; }
+.bootLink { color: #7cffb2; white-space: nowrap; }
 .bootTele {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
   /* Solid rather than 0.6 alpha: composited over this ground that came out at
      3.88:1, under the 4.5 the panel is held to. */
   color: #8fa9c4;
+  white-space: nowrap;
   letter-spacing: 0.1em;
   white-space: nowrap;
 }
@@ -2634,7 +2652,18 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
   background: rgba(255, 107, 122, 0.1);
   color: #ff6b7a;
 }
-#wipeGo[disabled] { opacity: 0.35; color: #8fa9c4; border-color: var(--line); background: transparent; }
+/*
+ * DISABLED, and in a real colour rather than behind an alpha.
+ *
+ * It was `opacity: 0.35` over `#8fa9c4`, which composites to 1.92:1 against
+ * this panel's ground -- and the suite's own contrast sweep is blind to
+ * opacity, so it read the UNCOMPOSITED 8.08 and passed. A readout the guard
+ * cannot see is a readout with no guard. #707f94 is the same hue without the
+ * alpha at 4.92:1 -- clear of the 4.5 this panel is held to rather than on it,
+ * because the first attempt was computed against the wrong ground and the
+ * sweep caught it at 3.63. It still reads as plainly off.
+ */
+#wipeGo[disabled] { color: #707f94; border-color: var(--line); background: transparent; }
 .bootAskNo { border-color: var(--line); background: transparent; color: #8fa9c4; }
 
 .bootBuild { font-variant-numeric: tabular-nums; }

@@ -1962,4 +1962,26 @@ came from before believing the other one covers it.
   readout that changes for 0.9s in every 4.5 is invisible to it. Sample every
   frame, and carry a control that is known to move -- forty distinct clock
   readings beside one count is a bug; one of each is a dead probe.
+- **A flex row whose children have no `white-space` wraps the TEXT, not the
+  row.** `.bootStatus` did that at every phone width -- three line boxes, and
+  at 320 the readout hung 32px off the right edge, on the first line of the
+  first screen. Nothing could see it: the panel's sweep walks font sizes and
+  contrast, and a wrap flips no property and clips nothing a colour test can
+  read. `nowrap` on each part plus `flex-wrap` on the row is one clean line
+  where there is room and two where there is not. And count rows by each
+  child's vertical CENTRE, not its top -- `align-items: center` puts a 6px dot
+  at a different top from the text beside it, and counting tops reported three
+  rows for a clean two-row band.
+- **A contrast sweep that reads the declared colour is blind to `opacity`.**
+  `#wipeGo[disabled]` was `opacity: 0.35` over `#8fa9c4`, which composites to
+  1.92:1 -- and the sweep recorded the uncomposited 8.08 and passed. Express a
+  disabled state as a real colour. (And compute the candidate against the
+  ground the sweep actually uses: the first replacement was picked against the
+  wrong one and came in at 3.63.)
+- **`ANOMALY_ENTRIES` is every id an anomaly puts on the field**, core plus
+  structure plus minion, because it is `CODEX` filtered by
+  `ANOMALIES.flatMap((a) => a.types)`. The title screen's RECONCILED tile
+  counted it, so one destroyed TALLY -- which ORDINAL sheds by the dozen in
+  its first stage -- read as an anomaly reconciled. `types[0]` is the core,
+  and having the core is having taken it apart.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

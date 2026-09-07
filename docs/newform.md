@@ -3619,3 +3619,63 @@ word each; and the primary-button rule holds — exactly one of CONTINUE and
 BEGIN SIMULATION is ever rendered, with RESET SIMULATION following the save.
 
 607 green.
+
+---
+
+## Build 281 — the title screen's status band, and two the sweep could not see
+
+The four-lens review landed after 280 shipped and found three more, one of
+which 280 had made worse.
+
+### The first line of the first screen was clipped
+
+`.bootStatus` is a flex row and its children had no `white-space`, so at every
+phone width the **text inside them** wrapped instead of the row doing it.
+Measured: three line boxes at 320, 390 and 414, and at 320 the readout hung
+**32 pixels off the right edge**. Build 280's `DEEP FIELD OPEN` — longer than
+the string it replaced — took it to four rows.
+
+Nothing could see it. The panel's sweep walks font sizes and contrast, and a
+wrap flips no property and clips nothing a colour test can read.
+
+Each part is `nowrap` and the **row** is what wraps now, so it is one line
+where there is room and two where there is not, with the readout keeping the
+right-hand end of whichever line it lands on. `DEEP FIELD OPEN` is `DEEPS
+OPEN`, so the deeper state is not the wider one. Measured after: **two rows,
+no clipping, at 320 / 390 / 414 in both states.**
+
+The case counts rows by each part's vertical **centre**, not its top: the band
+is `align-items: center`, so the 6px dot sits at a different top from the 13px
+text beside it, and counting tops reported three rows for a clean two-row band
+— the instrument disagreeing with the picture.
+
+### RECONCILED counted boss minions
+
+`ANOMALY_ENTRIES` is `CODEX` filtered by `ANOMALIES.flatMap(a => a.types)` —
+core, structure **and** minion for each of the nine. So a single destroyed
+TALLY, which is a thing ORDINAL sheds by the dozen in its first stage, read as
+one anomaly RECONCILED on the title screen of a device that had never finished
+a fight. It counts `types[0]`, the core, which is the thing you only have if
+you took it apart.
+
+### A contrast failure the contrast sweep was blind to
+
+`#wipeGo[disabled]` was `opacity: 0.35` over `#8fa9c4`, which composites to
+**1.92:1** — and the sweep reads the *uncomposited* colour, so it recorded 8.08
+and passed. A readout the guard cannot see is a readout with no guard. The
+disabled state is a real colour now.
+
+Worth recording how it was fixed: my first choice was computed against the
+wrong ground and the sweep caught it at **3.63**. The second is 4.92 — clear of
+the floor rather than sitting on it.
+
+608 green.
+
+### Still open from the review
+
+Named rather than fixed: the typed-word tolerance in the RESET flow is
+unreachable on a real keyboard and its case bypasses the attribute that makes
+it so; two arms of that case are vacuous because the suite hid the title screen
+sixteen thousand lines earlier; the loader assigns three fields the validator
+never checks; and the panel stays live and tappable for half a second after it
+is dismissed.

@@ -2226,7 +2226,7 @@ export class Hud {
    */
   setLink(deep) {
     const el = this.el.bootLink;
-    if (el) el.textContent = deep ? 'DEEP FIELD OPEN' : 'SHALLOWS OPEN';
+    if (el) el.textContent = deep ? 'DEEPS OPEN' : 'SHALLOWS OPEN';
   }
 
   showRecord() {
@@ -2242,7 +2242,16 @@ export class Hud {
      * does not. RECONCILED is the game's own verb for a boss taken apart --
      * `world.reconciled` is the list.
      */
-    const seen = ANOMALY_ENTRIES.filter((e) => codex.has(e.id)).length;
+    /*
+     * The CORES, not everything an anomaly puts on the field.
+     * `ANOMALY_ENTRIES` is `CODEX` filtered by `ANOMALIES.flatMap(a => a.types)`
+     * -- core, structure AND minion for each of the nine -- so a single
+     * destroyed TALLY, which is a thing ORDINAL sheds by the dozen in its
+     * first stage, read as one anomaly RECONCILED on the title screen of a
+     * device that had never finished a fight. `types[0]` is the core, and
+     * having the core in the codex is having taken it apart.
+     */
+    const seen = ANOMALIES.filter((a) => codex.has(a.types[0])).length;
     if (seen) bits.push(tile(seen, 'RECONCILED'));
     const d = readRun();
     const peak = d && d.wave && Number.isFinite(d.wave.peak) ? d.wave.peak : 0;

@@ -24844,6 +24844,37 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const two = linkNow();
     out.link = { none, one, two };
 
+    /*
+     * ...and the band measured at BOTH widths and in BOTH states, because the
+     * deep string is a different length and the narrow screen is the one that
+     * binds. `setViewportSize` is not available from inside the page, so the
+     * band is measured against a forced width on the panel itself -- the same
+     * thing the layout does, and it is the only element on the row.
+     */
+    const band = document.querySelector('.bootStatus');
+    const held = document.getElementById('boot').style.width;
+    out.band = [];
+    for (const wpx of [320, 390]) {
+      document.getElementById('boot').style.width = `${wpx}px`;
+      for (const deep of [false, true]) {
+        g.hud.setLink(deep);
+        const bb = band.getBoundingClientRect();
+        const kids = [...band.children];
+        const rows = new Set(kids.map((c) => {
+          const b = c.getBoundingClientRect();
+          return Math.round((b.top + b.bottom) / 2 / 6);
+        })).size;
+        const last = kids[kids.length - 1].getBoundingClientRect();
+        out.band.push({
+          w: wpx, state: deep ? 'deep' : 'shallow', rows,
+          clipped: last.right > bb.right + 0.5,
+          overhang: Math.round(last.right - bb.right),
+        });
+      }
+    }
+    document.getElementById('boot').style.width = held;
+    g.hud.setLink(false);
+
     g.restart();
     return out;
   });
@@ -24866,9 +24897,29 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * telemetry beside it. Asserted in both states, and asserted as CHANGING
    * between them -- a line pinned to either string would satisfy one arm.
    */
+  /*
+   * ---- and the band it sits in is one row, or two, and never clipped ----
+   *
+   * `.bootStatus` is a flex row whose children had no `white-space`, so the
+   * TEXT inside them wrapped instead of the row doing it: three line boxes at
+   * 320, 390 and 414, and at 320 the readout hung 32px off the right edge --
+   * the first line of the first screen, clipped, at the width that binds.
+   * Nothing could see it: the panel's sweep walks font sizes and contrast, and
+   * a wrap flips no property and clips nothing a colour test can read.
+   *
+   * Rows are counted by each part's vertical CENTRE and not its top: the band
+   * is `align-items: center`, so the 6px dot sits at a different top from the
+   * 13px text beside it and counting tops reported three rows for a clean
+   * two-row band -- the instrument disagreeing with the picture.
+   */
+  check('...and the status band is at most two rows, and never runs off the edge',
+    r.band.every((b) => b.rows <= 2 && !b.clipped),
+    r.band.map((b) => `${b.w}: ${b.rows} row(s)${b.clipped ? ` CLIPPED by ${b.overhang}px` : ''}`
+      + ` (${b.state})`).join(' · '));
+
   check('...and the link says which field is on the other end of it',
     r.link.none === 'SHALLOWS OPEN' && r.link.one === 'SHALLOWS OPEN'
-    && r.link.two === 'DEEP FIELD OPEN',
+    && r.link.two === 'DEEPS OPEN',
     `no save: "${r.link.none}"; an era-1 run: "${r.link.one}"; an era-2 run: `
     + `"${r.link.two}"`);
 
