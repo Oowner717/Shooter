@@ -2426,7 +2426,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  * too -- `.ab.urgent` breathes for as long as anything is attached.
  */
 {
-  const r = await page.evaluate(() => {
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
     const g = window.__sim;
     const w = g.world;
     g.restart();
@@ -2607,11 +2608,69 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     bareShock = sawShock;
     bareWard = sawWard;
 
+    /*
+     * ---- and the CADENCE, on a field where only one thing makes a Shock --
+     *
+     * The two windows above own the WHOLE TREE, because that is what the
+     * charge claim needs -- and eight things in this game push a `Shock`
+     * (PULSE, WELL, PILE's front, HEAVE, and four of the mines). Measured, the
+     * fully-owned window reported "3 PULSE in seven seconds" against a six
+     * second clock, and every one of the extra two was a mine. A counter that
+     * cannot tell what made the thing it counted is the instrument fault this
+     * suite has paid for three times.
+     *
+     * So the cadence is measured on a field where nothing else can make one:
+     * a clean run with ONLY the flag set, no mines, no tree. What is asserted
+     * is the interval, which is a far stronger claim than "at least one fired"
+     * -- a node that fires every frame and a node that fires once both satisfy
+     * that, and the six seconds is the whole of what was asked for.
+     */
+    const cadence = (flag, name) => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.director.update = () => {};
+      g.debugTeachAll();
+      w.phase = 'staging';
+      w.enemies.length = 0;
+      w.effects.length = 0;
+      w.mines.length = 0;
+      w.attackers.clear();
+      w.up.flinch = false;
+      w.up.deadbolt = false;
+      w.up[flag] = true;
+      if (flag === 'deadbolt') w.unlocked.add('ward');
+      const seenAt = [];
+      let was = 0;
+      let clock = 0;
+      for (let f = 0; f < 60 * 20; f++) {
+        for (let n = w.attackers.size; n < 1; n++) {
+          const e = g.debugSpawn('lurcher', w.shooter.x + 4, w.shooter.y - 6);
+          e.spawnIn = 0; e.vx = 0; e.vy = 0; e.staged = false;
+        }
+        g.update(1 / 60);
+        clock += 1 / 60;
+        const n = w.effects.filter((e) => e.constructor.name === name && !e.dead).length;
+        if (n > was) seenAt.push(+clock.toFixed(2));
+        was = n;
+      }
+      const gaps = seenAt.slice(1).map((v, i) => +(v - seenAt[i]).toFixed(2));
+      return { n: seenAt.length, gaps };
+    };
+    const flinchRun = cadence('flinch', 'Shock');
+    // WARD's is life PLUS clock -- the clock is held at full while the shell
+    // stands, which is what stops six seconds over a six-second life being a
+    // wall. So its period is twice FLINCH's by construction.
+    const deadboltRun = cadence('deadbolt', 'Ward');
+    const every = CFG.reflex.every;
+    const wardLife = CFG.ward.life;
+
     w.director.update = ranD;
     g.restart();
     return { gripped, held, heldOne, auto, who: whoAuto, lit, litWhenHeld, sampledHeld,
       pressed, slots: w.abilities.slots.length,
-      castShock, castWard, ownedUnasked, bareShock, bareWard, bareUnasked, bareHeld };
+      castShock, castWard, ownedUnasked, bareShock, bareWard, bareUnasked, bareHeld,
+      flinchRun, deadboltRun, every, wardLife };
   });
 
   /*
@@ -2660,19 +2719,41 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * window is one cast each, and the window is deliberately not long enough
    * to make two look like one.
    */
-  check('...and FLINCH and DEADBOLT are the two that do fire, and only when owned',
-    r.castShock >= 1 && r.castWard >= 1
-    && r.bareShock === 0 && r.bareWard === 0
-    && r.bareUnasked === 0 && r.bareHeld > 350
-    // ...and it WORKS: the mount is occupied for less of the owned window
-    // than of the control, because the thing that fires is what clears it.
-    && r.bareHeld > r.heldOne,
-    `owned: ${r.castShock} PULSE and ${r.castWard} WARD off the machine in `
-    + `seven seconds, ${r.ownedUnasked} charges spent for them, and the mount `
-    + `occupied for ${r.heldOne}/420 frames; not owned, on the same seven `
-    + `seconds: ${r.bareShock} and ${r.bareWard}, ${r.bareUnasked} charges, `
-    + `and the mount occupied for ${r.bareHeld}/420 -- the difference being `
-    + `what the two nodes threw off it`);
+  /*
+   * The control is the arm that makes the owned numbers mean anything: with
+   * both flags off, over the same seven seconds with the same bodies on the
+   * mount, NOTHING arrives and no charge moves. The owned side is deliberately
+   * only asserted as "something did" -- what it was is measured below, on a
+   * field where only one thing can make it.
+   */
+  check('...and with neither node owned nothing arrives and no charge moves',
+    r.bareShock === 0 && r.bareWard === 0 && r.bareUnasked === 0
+    && r.bareHeld > 350 && r.castShock >= 1 && r.castWard >= 1,
+    `owned, seven seconds: ${r.castShock} Shock and ${r.castWard} Ward arrived `
+    + `for ${r.ownedUnasked} charges; NOT owned, the same seven seconds with `
+    + `something held for ${r.bareHeld}/420 frames: ${r.bareShock} and `
+    + `${r.bareWard}, ${r.bareUnasked} charges`);
+
+  /*
+   * ...and the SIX SECONDS, which is the whole of what was asked for. Measured
+   * on a clean field with one flag set and no tree, because eight things in
+   * this game push a `Shock` and the fully-owned window above cannot tell
+   * which one it counted -- it read three PULSEs in seven seconds against a
+   * six-second clock, and two of them were mines.
+   *
+   * DEADBOLT's period is TWICE FLINCH's by construction and that is the
+   * design, not a slip: the clock is held at full while its own shell stands,
+   * so the six seconds begin when the shell falls. `every` equal to `life`
+   * counted from the cast is 100% duty and a permanent wall.
+   */
+  check('...and each fires on its own six seconds, not on the frame you are grabbed',
+    r.flinchRun.n >= 3 && r.flinchRun.gaps.every((v) => Math.abs(v - r.every) < 0.3)
+    && r.deadboltRun.n >= 1
+    && r.deadboltRun.gaps.every((v) => Math.abs(v - (r.every + r.wardLife)) < 0.4),
+    `FLINCH over twenty seconds: ${r.flinchRun.n} at ${r.flinchRun.gaps.join('/')}s `
+    + `against a clock of ${r.every}; DEADBOLT: ${r.deadboltRun.n} at `
+    + `${r.deadboltRun.gaps.join('/')}s against ${r.every} + a ${r.wardLife}s `
+    + 'shell it waits out');
 }
 
 // --- every control on the play screen answers a real press ------------------
@@ -4525,7 +4606,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.hud.toggleDebug(true);
     const label = (b) => (b.textContent || '').trim() || b.className;
 
-    const pressAll = (sel) => {
+    const pressAll = (sel, screen) => {
       const out = [];
       const n = document.querySelectorAll(sel).length;
       for (let i = 0; i < n; i++) {
@@ -4534,10 +4615,15 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         const name = label(b);
         const was = caught.length;
         b.click();
-        // The spawn screen can be left by its own BACK; put it back so the
-        // remaining controls are still reachable.
-        if (sel === '#dbgSpawn button' && document.getElementById('dbgSpawn').hidden) {
-          g.hud.showSpawn(true);
+        /*
+         * A sub-screen can be left by its own BACK; put it back so the
+         * remaining controls on it are still reachable. Generalised over the
+         * screen name rather than written for the spawn one, because there
+         * are two of them from build 276 and the second would otherwise stop
+         * one press in.
+         */
+        if (screen && document.getElementById(sel.split(' ')[0].slice(1)).hidden) {
+          g.hud.showScreen(screen);
         }
         out.push({ name, threw: caught.length > was ? caught[caught.length - 1] : null });
       }
@@ -4545,9 +4631,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     };
 
     const panel = pressAll('#dbgGrid button');
-    g.hud.showSpawn(true);
-    const spawn = pressAll('#dbgSpawn button');
-    g.hud.showSpawn(false);
+    g.hud.showScreen('spawn');
+    const spawn = pressAll('#dbgSpawn button', 'spawn');
+    /*
+     * ...and the BOSS FIGHT screen, which is nine anomaly rows and a BACK.
+     * Pressing them opens and abandons nine fights and moves the era twice,
+     * so the era, the form flag and the field are all put back below -- the
+     * rule this family already owes every case downstream of it.
+     */
+    g.hud.showScreen('boss');
+    const boss = pressAll('#dbgBoss button', 'boss');
+    g.hud.showScreen('');
+    if (g.world.boss) g.withdrawBoss();
+    if (g.world.era !== 1) g.debugStepEra();
+    g.world.newForm = null;
 
     window.removeEventListener('error', onErr);
     window.removeEventListener('unhandledrejection', onErr);
@@ -4555,14 +4652,24 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // Toggles are left wherever the presses put them.
     for (const k of Object.keys(g.world.debug)) g.world.debug[k] = false;
     g.restart();
-    return { panel, spawn };
+    return { panel, spawn, boss };
   });
 
-  const broke = [...r.panel, ...r.spawn].filter((x) => x.threw);
+  const broke = [...r.panel, ...r.spawn, ...r.boss].filter((x) => x.threw);
+  /*
+   * The floors are a FRACTION of what is there rather than a number set well
+   * under it: `>= 20` against a grid of 24 meant a third of the panel could
+   * stop being built and this would stay green, which is the same shape as
+   * the stroke-floor sweep's hand-typed count. They are set just under the
+   * real figures instead -- 24 grid, 40-odd spawn, 10 boss -- so a control
+   * that stops being rendered is a failure and not a shrug.
+   */
   check('every control in the debug panel can be pressed without throwing',
-    broke.length === 0 && r.panel.length >= 20 && r.spawn.length >= 40,
-    `${r.panel.length} panel + ${r.spawn.length} spawn-screen controls; `
-    + `${broke.length} threw${broke.length ? `: ${broke.slice(0, 3).map((b) => `${b.name} (${b.threw})`).join('; ')}` : ''}`);
+    broke.length === 0 && r.panel.length >= 24 && r.spawn.length >= 40
+    && r.boss.length >= 10,
+    `${r.panel.length} grid + ${r.spawn.length} spawn + ${r.boss.length} boss `
+    + `controls; ${broke.length} threw`
+    + `${broke.length ? `: ${broke.slice(0, 3).map((b) => `${b.name} (${b.threw})`).join('; ')}` : ''}`);
 }
 
 // --- the panel's two live readouts say what is true now --------------------
@@ -22280,14 +22387,38 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * walks back in; what threw a body off the field for good was sustained
    * fire, not one press on a five-second clock.
    */
+  /*
+   * From its PEAK, not from a fixed sample. `i < 2` was a window set near the
+   * truth rather than clear of it: how far a pellet-fan throws is a draw --
+   * which pellets land is not fixed -- so how long the body coasts before its
+   * own legs win is a draw too, and a trail of 442 -> 450 -> 455 -> 439 is a
+   * body still going out on the third sample and a perfectly good recovery.
+   * What the claim actually is -- the ground is given back -- is that it turns
+   * round EARLY and closes from there without going out again.
+   */
+  /*
+   * The SHAPE, from its own peak, and MOST of the ground back -- not all of it
+   * inside a fixed twelve seconds. Both of the numbers this arm used to carry
+   * were windows set near the truth rather than clear of it: how far a
+   * pellet-fan throws is a draw, because which pellets land is not fixed, so
+   * both how long it coasts and how far it has to walk are draws too.
+   * Measured over two runs, 442 out and home by second 12, then 512 out and
+   * still 11 units short at second 12 -- the same working recovery, one of
+   * them failing an exact `home` test. CLAUDE.md's rule, from the first time
+   * this case was written.
+   */
+  const peak = Math.max(...r.near.trail);
+  const peakAt = r.near.trail.indexOf(peak);
+  const back = (peak - r.near.trail[r.near.trail.length - 1]) / (peak - r.near.start);
   check('...and the ground it buys is given back, which is what bounds it',
     r.near.alive
-    && r.near.home >= 0
-    && r.near.trail.every((v, i) => i < 2 || i > r.near.home || v < r.near.trail[i - 1]),
-    `thrown from ${r.near.start} out to ${r.near.trail[0]}, then `
-    + `${r.near.trail.join(' -> ')} over twelve seconds -- closing on every `
-    + `sample until it was home at second ${r.near.home + 1}, back inside the `
-    + `${r.near.start} it started at, still on the field (${r.near.alive})`);
+    && peakAt <= 4
+    && back > 0.7
+    && r.near.trail.every((v, i) => i <= peakAt || v < r.near.trail[i - 1]),
+    `thrown from ${r.near.start} out to ${peak} by second ${peakAt + 1}, then `
+    + `${r.near.trail.join(' -> ')} -- closing on every sample from its `
+    + `furthest and ${Math.round(back * 100)}% of the ground given back inside `
+    + `twelve seconds, still on the field (${r.near.alive})`);
 
   check('...and the fan is as wide as the config says, and the cast shows it',
     r.n === r.want && Math.abs(r.spread - r.arc) <= r.jitter * 2 + 0.01
@@ -23976,6 +24107,227 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `never more than ${r.openMost} shell up at once, standing for ${r.dutyPct}% `
     + `of twenty-six seconds of being gripped -- a ${r.wardLife}s life on a `
     + `${r.every}s clock that does not run while the shell is up`);
+}
+
+// --- the debug panel goes straight to any fight, in that fight's era -------
+/*
+ * Build 276. The ordinary way to an anomaly is its rung, and TESSERA's is
+ * fifty-four of them, so before this a fight could not be looked at without
+ * either playing to it or writing a probe.
+ *
+ * The ERA is the load-bearing part and is the reason this is not two lines.
+ * AXIOM and TESSERA are gated past `eraGate` precisely so the first form can
+ * never meet them, and NOTHING ELSE ENFORCES IT: `openAperture` asks only for
+ * an aperture to spend. A teleport that granted one and opened the boss would
+ * put an era-2 fight on an era-1 field, at an era-1 scale, with the first
+ * machine standing in it -- a fight nobody has designed or looked at, and one
+ * that would look like a boss bug rather than like a debug bug.
+ *
+ * The TIER is the deliberate non-behaviour, and it is asserted for the same
+ * reason `check-build` asserts absences: a boss's difficulty is `gunScale`
+ * and not the rung, so moving the tier would change nothing about the fight
+ * while permanently raising `peak` and unlocking every rung below it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { ANOMALIES } = await import('../src/anomaly.js');
+    const { anomalyEra } = await import('../src/boss.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    /*
+     * ---- the era each row claims is DERIVED, not typed -------------------
+     *
+     * Against the gate table and the era ceiling rather than against nine
+     * literals: a tenth anomaly has to be covered by existing. Written as
+     * the rule and not as the answer, so this arm cannot be satisfied by a
+     * hand-kept list that happens to agree today.
+     */
+    const T = CFG.waves.tier;
+    out.eraRule = ANOMALIES.every((a) => (
+      anomalyEra(a.n) === (T.gates[a.n - 1] > T.eraGate ? 2 : 1)
+    ));
+    out.eras = ANOMALIES.map((a) => anomalyEra(a.n)).join('');
+    out.gates = T.gates.join(',');
+
+    // ---- refusals, and they are SPOKEN --------------------------------
+    /*
+     * A debug control that does nothing and says nothing is indistinguishable
+     * from a broken one, which is how five buttons calling deleted methods
+     * survived builds 81-82. Each refusal returns its own reason.
+     */
+    g.restart();
+    w.phase = 'boot';
+    out.fromBoot = g.debugBoss(1);
+    g.start();
+    g.debugTeachAll();
+    g.debugGiveEnergy(200000);
+    w.phase = 'staging';
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.director.update = () => {};
+    out.unbuilt = g.debugBoss(99);
+
+    // ---- and the panel's own rows, pressed through their handler --------
+    /*
+     * Pressed, not called. CLAUDE.md's rule, and the reason the AUTO AIM row
+     * shipped unable to close: a case that calls the method the handler calls
+     * is testing the logic and not the control.
+     */
+    g.hud.toggleDebug(true);
+    g.hud.showScreen('boss');
+    const rows = [...document.querySelectorAll('.dbgBossRow')];
+    out.rows = rows.length;
+    /*
+     * The RENDERED box, never the property. `.dbgBoss` is display:grid, which
+     * outranks the hidden attribute on its own -- the trap CLAUDE.md records
+     * for `#aimModes`, where the property flipped, every test agreed, and the
+     * element stayed on the screen taking taps.
+     */
+    out.rowsUp = rows.filter((b) => b.getBoundingClientRect().height > 0).length;
+    out.gridDown = document.getElementById('dbgGrid').getBoundingClientRect().height === 0;
+    out.names = rows.map((b) => b.querySelector('.dbgBossName').textContent).join(',');
+    out.wantNames = ANOMALIES.map((a) => a.name).join(',');
+    out.rungs = rows.map((b) => b.querySelector('.dbgBossAt').textContent).join(',');
+    out.wantRungs = ANOMALIES.map((a) => `RUNG ${T.gates[a.n - 1]}`).join(',');
+
+    const tier0 = w.director.tier;
+    const peak0 = w.director.peak;
+
+    // The ninth, which is era 2, pressed from era 1.
+    out.eraBefore = w.era;
+    rows[8].click();
+    out.jumped = {
+      era: w.era, bossN: w.bossN, kind: w.boss ? w.boss.constructor.name : null,
+      newForm: w.newForm, phase: w.phase,
+      tier: w.director.tier, peak: w.director.peak,
+      panelShut: g.hud.el.debug.hidden,
+    };
+
+    /*
+     * ---- and straight from one fight to another, across the boundary -----
+     *
+     * `openAperture` refuses on its own first line if a boss is up, so this
+     * has to drop the one standing -- and dropping it is `endBoss`'s teardown
+     * WITHOUT its reward. Two things outlive the boss object if they are not
+     * put back: `timeScale`, so a fight abandoned at stage IV leaves the field
+     * in slow motion for ever, and `bossLine`. And nothing may be reconciled:
+     * the fight was abandoned, not won.
+     */
+    w.timeScale = 0.35; // as a stage-IV fight would have left it
+    const rec0 = [...(w.reconciled || [])];
+    g.hud.toggleDebug(true);
+    g.hud.showScreen('boss');
+    [...document.querySelectorAll('.dbgBossRow')][2].click();
+    out.swapped = {
+      era: w.era, bossN: w.bossN, kind: w.boss ? w.boss.constructor.name : null,
+      ts: w.timeScale, line: w.bossLine,
+      // Nothing of the abandoned fight is still on the field.
+      leftovers: w.enemies.filter((e) => !e.dead && e.ofBoss === 9).length,
+      reconciled: JSON.stringify(w.reconciled) !== JSON.stringify(rec0),
+    };
+    out.tierHeld = w.director.tier === tier0 && w.director.peak === peak0;
+    out.tierWas = `${tier0}/${peak0}`;
+    out.tierNow = `${w.director.tier}/${w.director.peak}`;
+
+    // ---- the marks the screen paints -----------------------------------
+    g.hud.toggleDebug(true);
+    g.hud.showScreen('boss');
+    const now = [...document.querySelectorAll('.dbgBossRow')];
+    out.marked = now.filter((b) => b.classList.contains('on')).length;
+    out.markedIs = now.findIndex((b) => b.classList.contains('on')) + 1;
+    // At era 1, the two era-2 rows are the ones that would move you.
+    out.away = now.filter((b) => b.classList.contains('away')).length;
+
+    // ...and BACK returns to the grid rather than leaving both up.
+    document.querySelector('#dbgBoss .spawnBack').click();
+    out.backToGrid = document.getElementById('dbgGrid').getBoundingClientRect().height > 0
+      && document.getElementById('dbgBoss').getBoundingClientRect().height === 0;
+
+    // ---- the bench is not the field ------------------------------------
+    /*
+     * ...and the case CHECKS THAT IT ARRIVED. `enterSandbox` refuses without
+     * the 20,000-energy node, so the first version of this arm asked the
+     * question from an ordinary field and got the ordinary answer -- reporting
+     * the guard missing on a build where it works. CLAUDE.md's rule, from the
+     * D2 case that compared era 1's rig with itself.
+     */
+    g.hud.toggleDebug(false);
+    if (w.boss) { w.boss.clear(w); w.boss = null; w.bossN = 0; w.bossStage = 0; }
+    g.restart();
+    g.debugTeachAll();
+    g.debugGiveEnergy(200000);
+    w.phase = 'staging';
+    g.buy('sandbox');
+    g.enterSandbox(1);
+    out.inBench = !!w.sandbox;
+    out.fromBench = g.debugBoss(1);
+    g.exitSandbox();
+
+    delete w.director.update;
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+
+  check('the debug panel lists every anomaly, with the rung and era it is met at',
+    r.rows === 9 && r.rowsUp === 9 && r.gridDown
+    && r.names === r.wantNames && r.rungs === r.wantRungs
+    && r.eraRule && r.eras === '111111122',
+    `${r.rows} rows, ${r.rowsUp} of them actually rendered with the grid down `
+    + `(${r.gridDown}): ${r.names}; at ${r.rungs}; eras ${r.eras}, each derived `
+    + `from gates ${r.gates} against the era ceiling rather than typed out `
+    + `(${r.eraRule})`);
+
+  /*
+   * The one that matters. Nothing but this stops an era-2 fight being opened
+   * on an era-1 field -- `openAperture` asks only for an aperture.
+   */
+  check('...and pressing one takes you to that fight, in that fight\'s era',
+    r.eraBefore === 1 && r.jumped.era === 2 && r.jumped.bossN === 9
+    && r.jumped.kind === 'Tessera' && r.jumped.newForm === 'done'
+    && r.jumped.phase === 'staging' && r.jumped.panelShut,
+    `pressed TESSERA from era ${r.eraBefore}: era ${r.jumped.era}, `
+    + `${r.jumped.kind} up as boss ${r.jumped.bossN}, newForm ${r.jumped.newForm}, `
+    + `phase ${r.jumped.phase}, and the panel got out of the way `
+    + `(${r.jumped.panelShut})`);
+
+  check('...and one fight can be swapped for another without leaving the last one behind',
+    r.swapped.era === 1 && r.swapped.bossN === 3 && r.swapped.kind === 'Fractal'
+    && r.swapped.ts === 1 && r.swapped.line === null
+    && r.swapped.leftovers === 0 && r.swapped.reconciled === false,
+    `TESSERA -> FRACTAL: era ${r.swapped.era}, ${r.swapped.kind} up, time scale `
+    + `back to ${r.swapped.ts} from a stage-IV 0.35, boss line ${r.swapped.line}, `
+    + `${r.swapped.leftovers} of the abandoned fight still flying, and nothing `
+    + `reconciled for a fight that was left (${!r.swapped.reconciled})`);
+
+  /*
+   * The deliberate NON-behaviour, asserted because it is invisible otherwise.
+   * `setTier` raises `peak` and never lowers it, so a teleport that moved the
+   * rung would permanently unlock every rung below the boss it took you to --
+   * a debug button quietly handing over a ladder.
+   */
+  check('...and it does not move the ladder, because a fight is not scaled by the rung',
+    r.tierHeld,
+    `tier/peak ${r.tierWas} before three teleports, ${r.tierNow} after`);
+
+  check('...and the two rows it cannot take you to say so, and the live one is marked',
+    r.marked === 1 && r.markedIs === 3 && r.away === 2 && r.backToGrid,
+    `${r.marked} row marked live (row ${r.markedIs}), ${r.away} marked as being `
+    + `in the other era, and BACK returns to the grid (${r.backToGrid})`);
+
+  /*
+   * ...and every refusal has its own answer. A debug control that does nothing
+   * and says nothing is indistinguishable from a broken one -- which is how
+   * five buttons calling deleted methods survived builds 81-82.
+   */
+  check('...and it refuses from the title screen, from the ASSAY, and for a boss that is not built',
+    r.fromBoot === 'boot' && r.inBench && r.fromBench === 'bench'
+    && r.unbuilt === 'unbuilt',
+    `boot: "${r.fromBoot}", assay (and the case got there: ${r.inBench}): `
+    + `"${r.fromBench}", anomaly 99: "${r.unbuilt}"`);
 }
 
 // --- report -----------------------------------------------------------------

@@ -13,7 +13,16 @@ import { CODEX, ANOMALY_ENTRIES, codex, markLine, forgetPlayer } from './codex.j
 import { Menu } from './menu.js';
 import { holdFor, STACK, MIN_READ } from './tutorial.js';
 import { SLOTS, carried, freeSlot } from './loadout.js';
-import { heldList } from './anomaly.js';
+import { heldList, ANOMALIES } from './anomaly.js';
+/*
+ * ...and where a fight is FOUGHT, which is derived from its own gate rung and
+ * lives beside `openAperture` rather than on the table. Checked for a cycle
+ * before it went in -- `boss.js` reaches config, util, enemies, fx, audio,
+ * debris, background, anomaly and shooter, and none of them reaches back
+ * here. A cycle is invisible until `bundle.mjs` orders the files, and then it
+ * is a different game in the form the phone installs.
+ */
+import { anomalyEra } from './boss.js';
 import { readRun, forgetRun } from './save.js';
 
 const $ = (id) => document.getElementById(id);
@@ -82,6 +91,7 @@ export class Hud {
       debug: $('debugPanel'),
       dbgGrid: $('dbgGrid'),
       dbgSpawn: $('dbgSpawn'),
+      dbgBoss: $('dbgBoss'),
       dbgStats: $('dbgStats'),
       bossCaption: $('bossCaption'),
       apertureBar: $('apertureBar'),
@@ -129,8 +139,13 @@ export class Hud {
     this.lastKills = -1;
 
     this.buildAbilities();
+    // Which mine the panel's THROW button is holding. On the Hud rather than
+    // on the world: it is a property of the panel, not of the run, and a
+    // restart must not silently move it.
+    this.dbgMine = 0;
     this.buildDebug();
     this.buildSpawn();
+    this.buildBosses();
     this.buildRail();
 
     this.menu = new Menu(game);
@@ -1611,25 +1626,79 @@ export class Hud {
      * the state you just set, and turning two of them on would cost two
      * reopenings.
      */
+    /*
+     * ---- GROUPED, and the group heading is a row of its own -------------
+     *
+     * Twenty-one buttons in one flat list is a list you read end to end every
+     * time, and the panel is 280px of two columns -- so the clusters that were
+     * already there implicitly are said out loud. A `head` entry spans both
+     * columns and is not a button, which is why the loop below builds it
+     * separately rather than styling a disabled one: a thing that looks like a
+     * control and refuses every press is worse than a label.
+     */
+    /*
+     * Arm-to-confirm, for the two actions in this grid that destroy something
+     * a new run does not put back. Returns the handler; the button it is
+     * attached to is found from the event, so nothing has to be threaded
+     * through the builder. `armT` is per BUTTON rather than per panel, so two
+     * armed buttons cannot disarm each other.
+     */
+    const arm = (label, run) => function armed(ev) {
+      const b = ev && ev.currentTarget;
+      if (!b) { run(); return; }
+      if (b.dataset.armed) {
+        clearTimeout(+b.dataset.armT);
+        delete b.dataset.armed;
+        b.classList.remove('ask');
+        b.textContent = label;
+        run();
+        return;
+      }
+      b.dataset.armed = '1';
+      b.classList.add('ask');
+      b.textContent = 'TAP AGAIN';
+      b.dataset.armT = String(setTimeout(() => {
+        delete b.dataset.armed;
+        b.classList.remove('ask');
+        b.textContent = label;
+      }, 4000));
+    };
+
     const actions = [
-      ['SPAWN GROUP…', () => this.showSpawn(true), 'wide', true],
-      ['+50 KILLS', () => g.debugAddKills(50)],
-      ['NEXT STORY', () => g.debugNextStory()],
-      ['UNLOCK ALL', () => g.debugUnlockAll()],
-      ['MAX UPGRADES', () => g.debugBuyAll()],
-      ['+10000 ENERGY', () => g.debugGiveEnergy(10000)],
+      ['THE FIELD', 'head'],
+      ['SPAWN GROUP…', () => this.showScreen('spawn'), 'wide', true],
       ['SPAWN WAVE', () => g.debugSpawnWave()],
+      ['SPAWN DRIFT', () => g.debugSpawnDrift()],
       ['FILL FIELD', () => g.debugFillField()],
       ['CLEAR FIELD', () => g.debugClearField()],
+
+      /*
+       * ---- the mines: two cells for eight kinds, not four for four -------
+       *
+       * It was THROW MINE / SNARE / WIRE / KNELL -- four buttons for four of
+       * the EIGHT kinds, and a fifth of the whole panel. Which four was not a
+       * decision anybody made; they are the four that existed when the panel
+       * was written. The kind steps and the throw button's LABEL is the
+       * readout, the same idiom `ERA →` uses, so all eight are reachable in
+       * two cells and none of them is privileged. `MINE_KEYS` comes off the
+       * arsenal, so a ninth kind is covered by existing.
+       */
+      ['THE RACK', 'head'],
+      [() => `THROW ${MINE_KEYS[this.dbgMine].toUpperCase()}`,
+        () => g.debugThrowMine(MINE_KEYS[this.dbgMine])],
+      ['MINE →', () => {
+        this.dbgMine = (this.dbgMine + 1) % MINE_KEYS.length;
+        this.syncDebug();
+      }, null, true],
+
+      ['THE RUN', 'head'],
+      ['BOSS FIGHT…', () => this.showScreen('boss'), 'wide', true],
+      ['+10000 ENERGY', () => g.debugGiveEnergy(10000)],
+      ['+50 KILLS', () => g.debugAddKills(50)],
+      ['MAX UPGRADES', () => g.debugBuyAll()],
+      ['UNLOCK ALL', () => g.debugUnlockAll()],
+      ['NEXT STORY', () => g.debugNextStory()],
       ['GLITCH TEST', () => g.debugGlitch()],
-      ['THROW MINE', () => g.debugThrowMine('blast')],
-      ['THROW SNARE', () => g.debugThrowMine('snare')],
-      ['THROW WIRE', () => g.debugThrowMine('wire')],
-      ['THROW KNELL', () => g.debugThrowMine('knell')],
-      ['SPAWN DRIFT', () => g.debugSpawnDrift()],
-      ['RESTART', () => g.restart()],
-      ['CODEX ALL', () => g.debugCodexAll()],
-      ['CODEX WIPE', () => g.debugCodexWipe()],
       /*
        * The era, and it steps rather than toggles because there will be more
        * than two of them one day and a toggle would have to be rewritten.
@@ -1638,6 +1707,30 @@ export class Hud {
        */
       ['ERA →', () => g.debugStepEra()],
       ['EVOLVE', () => g.debugEvolve()],
+      /*
+       * ---- and the two that DESTROY, which now ask ----------------------
+       *
+       * This panel is reachable by any player: `menu.js` puts DEBUG in
+       * SETTINGS, ungated. `Game.restart` calls `forgetRun`, which removes
+       * the save AND the backup behind it; `debugCodexWipe` clears what this
+       * device has ever destroyed, which no new run puts back. Both were one
+       * tap, in a grid where every other button is additive, with the quieter
+       * label of the two -- which is exactly why NEW RUN came off the title
+       * screen in build 227, and why RESET SIMULATION asks for a typed word.
+       *
+       * A typed word is too much for a debug grid. Arming is not: the first
+       * press swaps the label to ASK and starts a four-second window, the
+       * second press does it, and walking away disarms. Note `stay` is true
+       * on both -- a button that closed the panel on the first press would
+       * hide the state it had just entered.
+       */
+      ['RESTART', arm('RESTART', () => g.restart()), null, true],
+
+      // This device, not this run: the codex outlives every restart, so these
+      // two are the only actions here that touch something a new game keeps.
+      ['THIS DEVICE', 'head'],
+      ['CODEX ALL', () => g.debugCodexAll()],
+      ['CODEX WIPE', arm('CODEX WIPE', () => g.debugCodexWipe()), null, true],
     ];
     const toggles = [
       ['NO COOLDOWN', 'noCooldown'],
@@ -1648,17 +1741,49 @@ export class Hud {
     ];
 
     const frag = document.createDocumentFragment();
+    /*
+     * Anything whose label depends on state is re-read by `syncDebug` rather
+     * than written once here -- the same rule `buildStrip` learned the hard
+     * way, where anything the interface had written onto a cell was silently
+     * reset by the next rebuild.
+     */
+    this.dbgLive = [];
     for (const [label, fn, cls, stay] of actions) {
+      if (fn === 'head') {
+        const h = document.createElement('div');
+        h.className = 'dbgHeadRow';
+        h.textContent = label;
+        frag.appendChild(h);
+        continue;
+      }
       const b = document.createElement('button');
-      b.textContent = label;
+      if (typeof label === 'function') {
+        b.textContent = label();
+        this.dbgLive.push({ el: b, label });
+      } else {
+        b.textContent = label;
+      }
       if (cls) b.classList.add(cls);
-      b.addEventListener('click', () => {
-        fn();
+      // The EVENT is passed on: an armed action finds its own button from it,
+      // so nothing about arming has to be threaded through this builder.
+      b.addEventListener('click', (ev) => {
+        fn(ev);
         // ...and get out of the way, unless this one is a door. See above.
         if (!stay) this.toggleDebug(false);
       });
       frag.appendChild(b);
     }
+    /*
+     * The toggles keep their own heading for the same reason the actions have
+     * them: what they have in common is that pressing one changes a RULE
+     * rather than doing something, which is why they leave the panel open --
+     * the `on` class is the readout, and closing on a toggle hides the state
+     * you just set.
+     */
+    const th = document.createElement('div');
+    th.className = 'dbgHeadRow';
+    th.textContent = 'THE RULES';
+    frag.appendChild(th);
     for (const [label, key] of toggles) {
       const b = document.createElement('button');
       b.textContent = label;
@@ -1670,6 +1795,11 @@ export class Hud {
       frag.appendChild(b);
     }
     this.el.dbgGrid.appendChild(frag);
+  }
+
+  /** Repaint whatever in the grid is a readout rather than a fixed label. */
+  syncDebug() {
+    for (const x of this.dbgLive || []) x.el.textContent = x.label();
   }
 
   // ----------------------------------------------------------- spawn screen
@@ -1841,19 +1971,117 @@ export class Hud {
     this.syncSpawn();
   }
 
-  /** Swap the panel between the button grid and the spawn screen. */
-  showSpawn(on) {
+  /**
+   * Which of the panel's screens is up: '' for the button grid, or the name
+   * of a screen.
+   *
+   * One switch rather than a pair of `hidden` writes per screen, because
+   * there are two of them now and a third would otherwise have to remember to
+   * turn the other two off -- exactly the shape that let a menu tab sit on top
+   * of every other tab in build 89. The grid is the one that shows when
+   * nothing else does.
+   */
+  showScreen(name) {
     this.miniSpawn(false);
-    this.el.dbgSpawn.hidden = !on;
-    this.el.dbgGrid.hidden = on;
-    // The picker needs three columns to be readable, which the 280px panel
-    // does not have. It widens only while the screen is up.
-    this.el.debug.classList.toggle('wide', !!on);
-    if (on) this.syncSpawn(true);
+    this.el.dbgSpawn.hidden = name !== 'spawn';
+    this.el.dbgBoss.hidden = name !== 'boss';
+    this.el.dbgGrid.hidden = !!name;
+    // The spawn picker needs three columns to be readable, which the 280px
+    // panel does not have. It widens only while that one screen is up.
+    this.el.debug.classList.toggle('wide', name === 'spawn');
+    if (name === 'spawn') this.syncSpawn(true);
+    if (name === 'boss') this.syncBosses();
   }
 
-  spawnOpen() {
-    return !this.el.dbgSpawn.hidden;
+  /** Kept as its own name because the suite presses this one by hand. */
+  showSpawn(on) {
+    this.showScreen(on ? 'spawn' : '');
+  }
+
+  // ------------------------------------------------------------ the fights
+
+  /*
+   * Straight to any anomaly, in the era that anomaly belongs to.
+   *
+   * The ordinary way to a fight is its rung, and TESSERA's is fifty-four of
+   * them -- so before this, looking at the ninth boss meant either playing to
+   * it or writing a probe. One row each, in ladder order, wearing its own
+   * colour, saying which rung it stands on and which era it is fought in.
+   *
+   * Built ONCE like the spawn picker: the list is `ANOMALIES` and nothing
+   * about a row changes except the two marks `syncBosses` paints on it.
+   */
+  buildBosses() {
+    const el = this.el.dbgBoss;
+    const head = document.createElement('div');
+    head.className = 'spawnHead';
+    const back = document.createElement('button');
+    back.className = 'spawnBack';
+    back.textContent = '\u2039 BACK';
+    back.addEventListener('click', () => this.showScreen(''));
+    const tally = document.createElement('span');
+    tally.className = 'spawnTally';
+    tally.textContent = 'GO STRAIGHT TO A FIGHT';
+    head.append(back, tally);
+    el.appendChild(head);
+
+    this.bossRows = [];
+    for (const a of ANOMALIES) {
+      const era = anomalyEra(a.n);
+      const b = document.createElement('button');
+      b.className = 'dbgBossRow';
+      const dot = document.createElement('span');
+      dot.className = 'dbgBossDot';
+      dot.style.background = a.tone;
+      const name = document.createElement('span');
+      name.className = 'dbgBossName';
+      name.textContent = a.name;
+      const at = document.createElement('span');
+      at.className = 'dbgBossAt';
+      at.textContent = `RUNG ${CFG.waves.tier.gates[a.n - 1]}`;
+      const eraEl = document.createElement('span');
+      eraEl.className = 'dbgBossEra';
+      eraEl.textContent = `ERA ${era}`;
+      b.append(dot, name, at, eraEl);
+      b.addEventListener('click', () => this.goBoss(a));
+      el.appendChild(b);
+      this.bossRows.push({ n: a.n, el: b, era });
+    }
+  }
+
+  /**
+   * Press one. The refusals are SPOKEN rather than swallowed: a debug control
+   * that does nothing and says nothing is indistinguishable from a broken one,
+   * which is how five buttons calling deleted methods survived builds 81-82.
+   */
+  goBoss(a) {
+    const r = this.game.debugBoss(a.n);
+    const say = {
+      unbuilt: `${a.name} IS NOT BUILT`,
+      boot: 'START A RUN FIRST',
+      bench: 'NOT FROM THE ASSAY',
+      evolving: 'NOT MID-EVOLUTION',
+      refused: `${a.name} REFUSED`,
+    };
+    if (r === 'ok') this.toggleDebug(false);
+    else this.alert(say[r] || `${a.name} REFUSED`, 'info', 2.4);
+    this.syncBosses();
+  }
+
+  /**
+   * The two marks: which fight is up, and which rows would move the era.
+   *
+   * Read off `world.era` every time the screen opens rather than stored at
+   * build time, because the era changes under it -- the ERA step button is
+   * two taps away in the same panel.
+   */
+  syncBosses() {
+    const w = this.game.world;
+    if (!this.bossRows) return;
+    for (const r of this.bossRows) {
+      r.el.classList.toggle('on', w.bossN === r.n);
+      r.el.classList.toggle('away', r.era !== w.era);
+    }
   }
 
   /**
@@ -1884,6 +2112,14 @@ export class Hud {
   toggleDebug(force) {
     const next = force === undefined ? this.el.debug.hidden : force;
     this.el.debug.hidden = !next;
+    /*
+     * ...and it comes back on the GRID. Closing it while a sub-screen was up
+     * left it there, so the next DEBUG press opened a 244px panel showing one
+     * button and no way to tell what had happened -- the panel remembering a
+     * state nobody asked it to remember. Done on the way OUT rather than on
+     * the way in, so the door is the cheap call.
+     */
+    if (!next) this.showScreen('');
   }
 
   setStats(text) {

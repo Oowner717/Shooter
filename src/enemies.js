@@ -3187,7 +3187,14 @@ function scionLane(world, type, x) {
  * which ignores the return, and wrong for the spawn screen, which counts it:
  * three TOWs put six bodies on the field and the panel said three.
  */
-function release(world, type, x, y, opts) {
+/*
+ * Exported from build 276 for `debugFillField`, which had been building its
+ * field out of `spawnOne`. A TOW is a PAIR -- a head plus the MASS it drags --
+ * and only `release` makes both, so a fill was putting down 135hp heads
+ * against the 415 the director actually sends. CLAUDE.md records the same
+ * fault costing a published finding in build 192.
+ */
+export function release(world, type, x, y, opts) {
   if (type.tows) return spawnTow(world, x, y, opts);
   const made = [spawnOne(world, type, x, y, opts)];
   /*
@@ -3637,9 +3644,19 @@ export function spawnGroup(world, id, count, opts = {}) {
     const y = onField
       ? clamp(cy + oy, ENTRY_Y + 40, world.floorY - type.r - 24)
       : cy + oy - rand(0, 30);
-    // Drift is not released, it is let go: it has its own entry velocities and
-    // is not counted against anything.
-    if (type.harmless) { made.push(spawnDrift(world, { x, y, here: true })); continue; }
+    /*
+     * Drift is not released, it is let go: it has its own entry velocities and
+     * is not counted against anything.
+     *
+     * Branched on the ID and not on `harmless`, because TWO types carry that
+     * flag -- DRIFT and SEED, what a SCION leaves -- and `spawnDrift` opens
+     * with `const type = TYPE_BY_ID.drift`, ignoring whatever it was reached
+     * for. So the debug picker's SEED chip, which has its own portrait and its
+     * own name, put down five DRIFTs and the panel said "+5 SEED": the exact
+     * thing its own comment says that alert exists to prevent. A SEED is an
+     * ordinary body and falls through to `release` like everything else.
+     */
+    if (type.id === 'drift') { made.push(spawnDrift(world, { x, y, here: true })); continue; }
     made.push(...release(world, type, x, y, {
       staged: !onField,
       spawnIn: onField ? 0.25 : 1,

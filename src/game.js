@@ -1,7 +1,7 @@
 // World state, phase machine, physics stepping and the render pipeline.
 
 import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID, setHairline, setZoom } from './config.js';
-import { Ordinal, openAperture } from './boss.js';
+import { Ordinal, openAperture, anomalyEra } from './boss.js';
 // Imported for the side effect: a boss module registers its constructor
 // with anomaly.js on load, and nothing else references it by name.
 import './gnomon.js';
@@ -12,7 +12,7 @@ import './parity.js';
 import './terminus.js';
 import './axiom.js';
 import './tessera.js';
-import { nameOf, dressOf, heldList } from './anomaly.js';
+import { nameOf, dressOf, heldList, ANOMALIES, makerOf } from './anomaly.js';
 import { pref } from './settings.js';
 import { TAU, clamp, rand, spread, rgba, makeCanvas, weightedPick, angleDelta, drawGlow} from './util.js';
 import { Grid, integrate, resolvePair, clampToArena, impactDamage } from './physics.js';
@@ -20,14 +20,14 @@ import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, sha
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectEnergy, drawIn, intakeRate, ENTRY_Y, dividend } from './enemies.js';
+import { Director, spawnOne, release, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectEnergy, drawIn, intakeRate, ENTRY_Y, dividend } from './enemies.js';
 import { Shooter, Front } from './shooter.js';
 import { Abilities, wardStanding } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator } from './narrative.js';
 import { Hud, ROUND_KEYS, MINE_KEYS } from './hud.js';
-import { codex, lineSeen, markLine, forgetLines, forgetPlayer, migrateLines } from './codex.js';
+import { codex, lineSeen, markLine, forgetPlayer, migrateLines } from './codex.js';
 import { readRun, saveRun, forgetRun } from './save.js';
 import { freshUpgrades, BY_ID } from './upgrades.js';
 import { NODES, NODE_BY_ID, priceOf, UNDER, levelsOf } from './tree.js';
@@ -277,7 +277,19 @@ export class Game {
        * boss, and it is the *same integer*, not a copy: the save format, the
        * APERTURE upgrade's apply and every test still read and write it.
        */
-      apertures: [0, 0, 0, 0, 0, 0, 0, 0],
+      /*
+       * One slot per anomaly, plus an unused slot 0 -- SIZED OFF `ANOMALIES`
+       * rather than written out, because it was written out and it was WRONG.
+       * Eight zeroes covers indices 0..7, so AXIOM (8) and TESSERA (9) had no
+       * slot at all from the builds that added them: `syncGate` extended the
+       * array by writing past its end, which works in-session and is silently
+       * undone by the restore -- `load()` bounds its copy loop by
+       * `w.apertures.length` on the FRESH world, which is this literal. So a
+       * run that had earned the eighth or ninth way in lost it on the next
+       * launch, and nothing could see it because the array still had the value
+       * for the whole of the session it was earned in.
+       */
+      apertures: new Array(ANOMALIES.length + 1).fill(0),
       /*
        * Which bosses have been broken THIS RUN.
        *
@@ -795,7 +807,12 @@ export class Game {
      * build, and they still load.
      */
     if (Array.isArray(d.apertures)) {
-      for (let n = 1; n < w.apertures.length; n++) {
+      // Bounded by the ANOMALY COUNT and not by either array's length: the
+      // fresh world's was short of the roster for two builds (see the note on
+      // `apertures` in makeWorld), and a saved file's is whatever the build
+      // that wrote it had. Reading past the roster would restore a way in to
+      // a boss that does not exist.
+      for (let n = 1; n <= ANOMALIES.length; n++) {
         w.apertures[n] = Math.max(0, d.apertures[n] | 0);
       }
     } else if (Number.isFinite(d.aperture)) w.aperture = Math.max(0, d.aperture | 0);
@@ -3573,7 +3590,15 @@ export class Game {
         `fps    ${this.fps.toFixed(0)}\n`
         + `phase  ${w.phase}\n`
         + `kills  ${w.kills}  released ${w.released}\n`
-        + `obj    ${hostileCount(w)} hostile + ${w.enemies.length - hostileCount(w)} drift + ${w.drops.length} frag + ${w.debris.length} wreck\n`
+        /*
+         * `driftCount` and NOT `enemies.length - hostileCount`. The
+         * subtraction is harmless PLUS dead-and-unswept PLUS dissolving --
+         * `hostileCount` excludes all three -- so the figure was loudest
+         * exactly when it was most wrong: through a clear, or through a
+         * boss's outro where spent structure piles up. The spawn screen's own
+         * tally has used the right counter all along.
+         */
+        + `obj    ${hostileCount(w)} hostile + ${driftCount(w)} drift + ${w.drops.length} frag + ${w.debris.length} wreck\n`
         + `shots  ${w.projectiles.length}\n`
         + `parts  ${fx.particles.active.length}\n`
         + `dpr    ${this.dpr.toFixed(2)}  q ${fx.quality.toFixed(2)}  work ${this.frameWork.toFixed(1)}ms\n`
@@ -4221,11 +4246,21 @@ export class Game {
     return spawnOne(w, t, x ?? w.width / 2, y ?? ENTRY_Y + 120, { staged: false, spawnIn: 0.2 });
   }
 
+  /**
+   * Fill it up.
+   *
+   * Through `release` and NOT `spawnOne`, from build 276: a TOW is a head plus
+   * the MASS it drags, and only `release` makes the pair. TOW carries weight 5
+   * of about 110, so roughly one body in twenty was a head with no load and no
+   * cable -- 135hp against the 415 the director sends. `smoke.mjs` drives its
+   * whole soak through here, so the field it was soaking was not a field the
+   * director could produce. CLAUDE.md, build 192, on the same mistake.
+   */
   debugFillField() {
     const w = this.world;
     while (hostileCount(w) < CFG.maxEnemies) {
       const t = weightedPick(ENEMY_TYPES);
-      spawnOne(w, t, rand(t.r + 10, w.width - t.r - 10), rand(ENTRY_Y + 60, w.floorY - 120), {
+      release(w, t, rand(t.r + 10, w.width - t.r - 10), rand(ENTRY_Y + 60, w.floorY - 120), {
         staged: false,
         spawnIn: 0.4,
       });
@@ -4381,14 +4416,22 @@ export class Game {
   }
 
   /** Put the opening back, for looking at it again. */
-  debugForgetTaught() {
-    forgetLines();
-  }
 
   /** Step the era. One variable, so the form and the field cannot disagree. */
   debugStepEra() {
     const w = this.world;
     const to = w.era === 1 ? 2 : 1;
+    /*
+     * The FLAG with the era, which this did not do until build 276. `load()`
+     * writes `newForm = 'done'` beside `era = 2` for a reason -- `eraHeld`
+     * returns the rung-42 ceiling unless the flag is 'done', and the bench's
+     * era-2 door reads it too -- so a debug step to era 2 left the run on a
+     * field past the ceiling with the ladder still holding it at 42. Coming
+     * back down it goes to 'armed' rather than null: a run that had bought
+     * NEW FORM still owns it, and the banner is the door to taking it again.
+     */
+    if (to === 2) w.newForm = 'done';
+    else if (w.newForm === 'done') w.newForm = 'armed';
     this.setEra(to);
     this.hud.alert(`ERA ${to}`, 'info', 2.2);
   }
@@ -4413,6 +4456,95 @@ export class Game {
   debugCodexWipe() {
     codex.forget();
     this.hud.menu.syncCodex();
+  }
+
+  /**
+   * ---- straight to any fight, in the era that fight belongs to -----------
+   *
+   * Getting to an anomaly the ordinary way means climbing to its rung, which
+   * for TESSERA is fifty-four of them -- so a fight is not something that can
+   * be looked at on the way to fixing it. This is the way in.
+   *
+   * The ERA is the load-bearing part and is not decoration. AXIOM and TESSERA
+   * are gated past `eraGate` precisely so the first form can never meet them,
+   * and NOTHING ELSE ENFORCES THAT: `openAperture` asks only for an aperture
+   * to spend, so opening the eighth from era 1 would have put an era-2 fight
+   * on an era-1 field at an era-1 scale with the first machine standing in
+   * it -- a fight nobody has ever designed or looked at. `anomalyEra` derives
+   * it from the same gate table the ladder uses.
+   *
+   * The TIER is deliberately NOT set. A boss's difficulty is `gunScale` --
+   * what the gun does, capped at `CFG.boss.temper` -- and not the rung, so
+   * moving the tier would change nothing about the fight while permanently
+   * raising `peak` and unlocking every rung below it. The rung is shown on
+   * the row instead, because it is worth knowing and not worth doing.
+   *
+   * Returns a short reason rather than a boolean, so the panel can say which
+   * of the five refusals it hit instead of doing nothing at all.
+   */
+  debugBoss(n) {
+    const w = this.world;
+    if (!ANOMALIES.some((a) => a.n === n) || !makerOf(n)) return 'unbuilt';
+    // `openBoss` refuses anything but `staging`, and the title screen and the
+    // ending are not the field. Said here so the panel can explain it.
+    if (w.phase === 'boot') return 'boot';
+    // ...and the ASSAY is not the field either: it has no waves, no energy
+    // and no rules, and a boss standing in it would be all three back.
+    if (w.sandbox) return 'bench';
+    /*
+     * ...and not through the evolution either. `beginEvolve` sets `w.evolve`
+     * and `Game.update` returns early on it, so nothing would step the boss --
+     * and `endEvolve` then calls `setEra(2)`, whose `takeField` empties the
+     * lists the boss's own structure lives in.
+     */
+    if (w.evolve) return 'evolving';
+
+    /*
+     * Anything already up goes first, or `openAperture` refuses on its own
+     * first line -- and it goes through `withdrawBoss`, which is the teardown
+     * that already exists for a fight that ENDS WITHOUT BEING WON. Writing a
+     * fourth copy of it here is how `this.bossStageT` and `bossStageWas` get
+     * left running: the patience clock is not on the boss object, so a boss
+     * dropped without resetting it hands the next one a clock that is already
+     * most of the way to withdrawing it. Nothing is reconciled and no rung is
+     * handed over, which is the difference from `endBoss` and is right --
+     * the fight was abandoned, not beaten.
+     */
+    if (w.boss) this.withdrawBoss();
+
+    const era = anomalyEra(n);
+    if (w.era !== era) {
+      /*
+       * The flag as well as the era. `load()` writes `newForm = 'done'` beside
+       * `era = 2` for the same reason: the second form and the second field
+       * are one state, and a run standing at era 2 while the ladder still
+       * thinks the change has not happened is a run the era ceiling holds at
+       * rung 42 on a field that is past it.
+       */
+      if (era === 2) w.newForm = 'done';
+      // ...and DOWN as well as up. Left at 'done' on the way back to era 1,
+      // the rung-42 ceiling build 272 exists to enforce is off for ever and
+      // the NEW FORM banner can never be offered again.
+      else if (w.newForm === 'done') w.newForm = 'armed';
+      this.setEra(era);
+    }
+
+    // `staging` is what `openBoss` wants, and dropping a boss above may have
+    // left the phase alone anyway. Set it rather than test it.
+    w.phase = 'staging';
+    w.apertures = w.apertures || [];
+    /*
+     * ...and the grant is PUT BACK if the open refuses. `openAperture` spends
+     * one on the way in, so a granted-then-refused teleport leaves a free way
+     * in sitting in the store -- which the banner then offers the player for
+     * nothing. Remembered rather than assumed, because "it cannot refuse from
+     * here" is exactly the sort of claim that stops being true.
+     */
+    const had = w.apertures[n] || 0;
+    w.apertures[n] = Math.max(1, had);
+    if (this.openBoss(n)) return 'ok';
+    w.apertures[n] = had;
+    return 'refused';
   }
 
 }

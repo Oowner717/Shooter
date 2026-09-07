@@ -1833,4 +1833,40 @@ came from before believing the other one covers it.
   the two-guns-up-one-lane fault build 261 widened that row to fix. They keep
   the OUTER pair's column, so every clash bound is one that pair already
   passed.
+- **An array indexed by a roster must be SIZED off that roster.**
+  `world.apertures` was eight zeroes written out by hand against nine
+  anomalies, so AXIOM and TESSERA had no slot. `syncGate` extends the array by
+  writing past its end, which works for the whole session -- and `load()`
+  bounds its restore loop by `w.apertures.length` on the FRESH world, so the
+  way in was silently dropped on the next launch. A hand-written length is the
+  same trap as a hand-kept list; `new Array(ANOMALIES.length + 1).fill(0)`.
+- **A flag two types share is not an id.** `spawnGroup` branched on
+  `type.harmless` to route DRIFT through `spawnDrift` -- and SEED is harmless
+  too, while `spawnDrift` opens with `TYPE_BY_ID.drift` and ignores what it was
+  reached for. So the debug picker's SEED chip put down five DRIFTs and the
+  panel said "+5 SEED", which is the one thing that alert's comment says it
+  exists to prevent. Branch on the id when the branch is about one type.
+- **A debug panel any player can open owes the destructive buttons a second
+  tap.** DEBUG is in SETTINGS ungated, `Game.restart` calls `forgetRun` (which
+  removes the save AND the backup behind it) and `debugCodexWipe` clears what
+  the device has ever destroyed. Both were one tap in a grid where everything
+  else is additive -- the same shape as the NEW RUN button build 227 took off
+  the title screen. Arming is enough here; a typed word is for RESET.
+- **The era and `world.newForm` are one state and both doors have to move
+  both.** `eraHeld` returns the rung-42 ceiling unless the flag is 'done', so a
+  debug era step to 2 left the run past the ceiling with the ladder still
+  holding it at 42 -- and left at 'done' coming back DOWN, the ceiling build
+  272 exists to enforce is off for ever and the NEW FORM banner can never be
+  offered again. Up sets 'done'; down sets 'armed'.
+- **A boss teardown is `withdrawBoss`, and there are four copies of it.** The
+  one for a fight that ends WITHOUT being won already exists; a hand-rolled
+  copy drops `bossStageT`/`bossStageWas` -- the patience clock, which is on the
+  Game and not on the boss -- so the next boss inherits a clock most of the way
+  to withdrawing it.
+- **A sweep that enumerates selectors misses the screen added after it.** The
+  debug press-everything case walked `#dbgGrid` and `#dbgSpawn`; the BOSS FIGHT
+  screen's ten controls, the only path to `debugBoss`, were pressed by nothing.
+  Its floors were `>= 20` against a grid of 24, so a third of the panel could
+  stop being built and it would stay green -- a floor set well under the truth
+  is a floor that cannot see anything.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

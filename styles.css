@@ -2092,7 +2092,25 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
 }
 .dbgGrid button:active { background: rgba(89, 224, 255, 0.24); }
 .dbgGrid button.on { border-color: var(--accent); color: var(--accent); }
+/* Armed: the two that destroy something a new run does not put back. */
+.dbgGrid button.ask { border-color: #ff5d5d; color: #ff5d5d; }
 .dbgGrid button.wide { grid-column: span 2; }
+
+/*
+ * A group heading. A DIV and not a disabled button: a thing that looks like a
+ * control and refuses every press is worse than a label, and the panel already
+ * has enough real controls to keep track of.
+ */
+.dbgHeadRow {
+  grid-column: span 2;
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  color: var(--dim);
+  padding: 6px 2px 1px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1px;
+}
+.dbgHeadRow:first-child { padding-top: 0; }
 
 .dbgStats {
   margin-top: 8px;
@@ -2119,8 +2137,49 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
 }
 #debugPanel.wide { width: min(340px, calc(100vw - 16px)); }
 
-/* .dbgGrid is display:grid, which outranks the hidden attribute on its own. */
-.dbgGrid[hidden], .dbgSpawn[hidden] { display: none; }
+/*
+ * .dbgGrid is display:grid, which outranks the hidden attribute on its own --
+ * and so does .dbgBoss. Anything here that is given a `display` and is also
+ * hidden by attribute owes itself this line; see CLAUDE.md on `[hidden]`.
+ */
+.dbgGrid[hidden], .dbgSpawn[hidden], .dbgBoss[hidden] { display: none; }
+
+/* ---------------- debug: the fights ---------------- */
+
+/*
+ * One row per anomaly, in ladder order, each wearing its own colour -- which
+ * is the identity in this game: a player who has seen amber once knows what
+ * is arriving. The rung and the era are on the row because both are facts
+ * about getting there, and the era is the one the button actually changes.
+ */
+.dbgBoss { display: grid; grid-template-columns: 1fr; gap: 4px; }
+.dbgBossRow {
+  -webkit-appearance: none;
+  appearance: none;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: rgba(14, 26, 42, 0.8);
+  color: var(--ink);
+  text-align: left;
+}
+.dbgBossRow:active { background: rgba(89, 224, 255, 0.24); }
+.dbgBossDot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.dbgBossName { font-size: 10px; letter-spacing: 0.12em; white-space: nowrap; }
+.dbgBossAt, .dbgBossEra {
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+  white-space: nowrap;
+}
+/* The one that is a state change rather than a number, so it reads as one. */
+.dbgBossRow.away .dbgBossEra { color: var(--accent); }
+/* Live: the fight that is up right now, so the list is a readout as well. */
+.dbgBossRow.on { border-color: var(--accent); }
 
 .spawnHead {
   display: flex;

@@ -1899,6 +1899,24 @@ export class Ordinal extends Boss {
 }
 
 /**
+ * Which era an anomaly belongs to.
+ *
+ * DERIVED from its own gate rung rather than declared on it, so a tenth
+ * anomaly is covered by existing rather than by being added to a list --
+ * `ANOMALIES` deliberately holds no rung at all (see the header there: the
+ * gate table is `CFG.waves.tier.gates` and build 227 nearly shipped a second
+ * copy of it). `CFG.waves.tier.eraGate` is where the first form's ladder
+ * ends, so anything gated past it is a fight the first form was never built
+ * to reach: 1-7 at rungs 6..42 are era 1, AXIOM at 48 and TESSERA at 54 are
+ * era 2. One table decides both facts and they cannot come apart.
+ */
+export function anomalyEra(n) {
+  const T = CFG.waves.tier;
+  const rung = (T.gates || [])[n - 1];
+  return rung > T.eraGate ? 2 : 1;
+}
+
+/**
  * Open the way to anomaly `n`. Spends one of its APERTUREs, stops the field,
  * and puts the boss on it.
  *

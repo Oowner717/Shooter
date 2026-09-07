@@ -3200,3 +3200,116 @@ Same shape as the `export let` snapshot and the `[hidden]` trap — a thing set,
 and silently not applied one layer down.
 
 587 green. ORDINAL's hash `-1765830468`, unchanged.
+
+---
+
+## Build 276 — a way straight to any fight, and a debug panel worth reading
+
+### BOSS FIGHT… — the era is the load-bearing part
+
+Nine rows, in ladder order, each wearing its own colour and saying which rung
+it stands on and which era it is fought in. Press one and you are in it.
+
+The **era** is not decoration and is the whole reason this is not two lines.
+AXIOM and TESSERA are gated past `eraGate` precisely so the first form can
+never meet them, and *nothing else enforces that*: `openAperture` asks only for
+an aperture to spend. A teleport that granted one and opened the boss would put
+an era-2 fight on an era-1 field, at an era-1 scale, with the first machine
+standing in it — a fight nobody has designed, and one that would read as a boss
+bug rather than a debug bug. `anomalyEra(n)` derives it from the same gate
+table the ladder uses, so a tenth anomaly is covered by existing.
+
+The **tier** is the deliberate non-behaviour, and it is asserted. A boss's
+difficulty is `gunScale` — what the gun does — and not the rung, so moving the
+tier would change nothing about the fight while permanently raising `peak` and
+unlocking every rung below it: a debug button quietly handing over a ladder.
+
+Every refusal is spoken (`boot`, `bench`, `evolving`, `unbuilt`, `refused`)
+rather than swallowed. A debug control that does nothing and says nothing is
+indistinguishable from a broken one, which is how five buttons calling deleted
+methods survived builds 81–82.
+
+### What the review found that was not the new feature
+
+- **`world.apertures` was eight slots for nine anomalies.** A shipped bug.
+  `makeWorld` wrote eight zeroes — indices 0..7 — while apertures are indexed
+  by anomaly number 1..9. `syncGate` extended the array by writing past its
+  end, which works in-session and is silently undone by the restore, because
+  `load()` bounds its copy loop by `w.apertures.length` on the **fresh** world.
+  So a run that earned AXIOM's or TESSERA's way in lost it on the next launch,
+  and nothing could see it because the value was correct all session. Sized off
+  `ANOMALIES` now, and the restore is bounded by the roster.
+- **The spawn screen's SEED chip put down DRIFT.** `spawnGroup` branched on
+  `type.harmless`, and *two* types carry it — DRIFT and SEED, what a SCION
+  leaves — while `spawnDrift` opens with `TYPE_BY_ID.drift` and ignores what it
+  was reached for. So a chip with its own portrait spawned five DRIFTs and the
+  panel said "+5 SEED": the exact thing that alert's own comment says it exists
+  to prevent. Branches on the id now.
+- **FILL FIELD built half-TOWs.** `spawnOne` makes the head; only `release`
+  makes the pair. TOW is weight 5 of ~110, so about one body in twenty was a
+  135hp head against the 415 the director sends — and `smoke.mjs` drives its
+  whole soak through here, so the field it was soaking was not one the director
+  could produce. CLAUDE.md records this costing a published finding in 192.
+- **`ERA →` moved the field and not the flag.** `eraHeld` returns the rung-42
+  ceiling unless `newForm === 'done'`, and `load()` writes the flag beside the
+  era for that reason — so a debug step to era 2 left the run on a field past
+  the ceiling with the ladder still holding it at 42. Both era doors now move
+  the flag, and **in both directions**: left at `'done'` on the way back down,
+  the ceiling build 272 exists to enforce is off for ever and the NEW FORM
+  banner can never be offered again.
+- **`debugForgetTaught` had no caller** anywhere in `src/`, `scripts/` or
+  `index.html`. Gone, with its now-unused import.
+- **STATS called dead and dissolving bodies "drift".** The line was
+  `enemies.length - hostileCount`, and `hostileCount` excludes harmless *plus*
+  dead-and-unswept *plus* fizzling — so the figure was loudest exactly when it
+  was most wrong, through a clear or a boss's outro. `driftCount` is the
+  counter that means it, and the spawn screen has used it all along.
+
+### The clean-up
+
+Twenty-one buttons in one flat list became five named groups — THE FIELD, THE
+RACK, THE RUN, THIS DEVICE, THE RULES — with the heading a `div` rather than a
+disabled button, because a thing that looks like a control and refuses every
+press is worse than a label.
+
+**Four THROW buttons covered four of the eight mine kinds**, and which four was
+not a decision anybody made: they are the four that existed when the panel was
+written. Forty lines up in the same file is the note explaining why
+`MINE_KEYS` stopped being a hand-kept list. It is two cells now — a stepper and
+a throw whose *label is the readout*, the idiom `ERA →` already uses — so all
+eight are reachable and a ninth is covered by existing.
+
+**RESTART and CODEX WIPE now arm.** This panel is reachable by any player
+(`menu.js` puts DEBUG in SETTINGS, ungated), `Game.restart` calls `forgetRun`
+which removes the save *and* the backup behind it, and `debugCodexWipe` clears
+what this device has ever destroyed, which no new run puts back. Both were one
+tap in a grid where every other button is additive — which is why NEW RUN came
+off the title screen in build 227. A typed word is too much for a debug grid;
+arming is not.
+
+And closing the panel puts it back on the grid: it used to stay on whatever
+sub-screen was up, so the next press opened a 244px panel showing one button.
+
+### The suite
+
+The press-everything sweep reached `#dbgGrid` and `#dbgSpawn` and stopped, so
+the new screen's ten controls — the only path to `debugBoss` — were pressed by
+nothing. It reaches all three now, and its floors are set just under the real
+figures instead of six buttons below them: `>= 20` against a grid of 24 meant a
+third of the panel could stop being built and the case would stay green.
+
+Two flakes were run down rather than re-run, both the same disease:
+
+- **The HAIL recovery arm** asserted a body was back inside its start within a
+  fixed twelve seconds. How far a pellet-fan throws is a draw, so how long it
+  coasts and how far it walks are draws too — 442 out and home by second 12 on
+  one run, 512 out and eleven units short on the next, the same working
+  recovery. It asserts the shape now: turns round early, closes from its own
+  peak, most of the ground back.
+- **The FLINCH/DEADBOLT counter read three PULSEs in seven seconds** against a
+  six-second clock. Eight things in this game push a `Shock`, and the window
+  owned the whole tree, so two of them were mines. The cadence is measured on a
+  clean field with one flag set — and the interval is the assertion, which is a
+  far stronger claim than "at least one fired". Measured: 6.02s, 6.02s, 6.01s.
+
+594 green. ORDINAL's hash `-1765830468`, unchanged.
