@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '279';
+export const BUILD = '280';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '279';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '1f00517';
+export const REV = '6d399fa';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4955,6 +4955,28 @@ CFG.gun = {
    * than any gap a body crossing the reach makes and shorter than a wait.
    */
   rest: 0.6,
+};
+
+/*
+ * ---- the title screen's own field --------------------------------------
+ *
+ * `phase = 'boot'` runs a real arena behind the title panel, which is what
+ * makes the readout on it telemetry rather than decoration. It was topped up
+ * to `hold` drifters and NOTHING ever removed one, so the same seven wandered
+ * for as long as the screen was open: measured over forty seconds, one
+ * distinct value, and the panel's own "07 TRACKED" was that constant printed
+ * beside a running clock. A number that cannot change is decoration wearing a
+ * comment that says otherwise.
+ *
+ * So the field turns over. Every `every` seconds the oldest drifter is retired
+ * -- through `fizzle`, which is the dissolve build 210 already has and which
+ * `Enemy.destroy` refuses to cash in, so nothing is banked and nothing is
+ * counted on a screen where neither would mean anything -- and the top-up
+ * brings another in at the top. The picture breathes and the count is true.
+ */
+CFG.title = {
+  hold: 7, // drifters the field is held at
+  every: 4.5, // ...and how often the oldest of them is retired
 };
 
 CFG.yard = {

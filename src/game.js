@@ -2552,9 +2552,37 @@ export class Game {
     w.teaching = this.teaching;
     if (this.teaching && w.phase === 'staging') this.teach();
 
-    // The title's field, topped up as it falls off the bottom. Only while the
-    // title is up: from `staging` on, the director owns what is on the field.
-    if (w.phase === 'boot' && driftCount(w) < 7) titleRandom(() => spawnDrift(w));
+    /*
+     * ---- the title's field, and it TURNS OVER -------------------------
+     *
+     * Topped up to `CFG.title.hold`, and the oldest retired on a clock, which
+     * it was not: nothing removed drift, so the same seven wandered for as
+     * long as the screen was open and the panel's "07 TRACKED" was a constant
+     * printed beside a running clock. See CFG.title.
+     *
+     * Retired through `fizzle` and `dissolved` rather than `destroy`: that is
+     * the dissolve build 210 already has, the sweep removes it, and
+     * `Enemy.destroy` refuses to cash a dissolved body in -- so nothing is
+     * banked and nothing is counted on a screen where neither would mean
+     * anything. `driftCount` skips a fizzling body, so the top-up brings the
+     * replacement in on the same frame the old one starts going.
+     *
+     * Only while the title is up: from `staging` on, the director owns what is
+     * on the field.
+     */
+    if (w.phase === 'boot') {
+      const T = CFG.title;
+      if (driftCount(w) < T.hold) titleRandom(() => spawnDrift(w));
+      this.titleT = (this.titleT || 0) + dt;
+      if (this.titleT >= T.every) {
+        this.titleT = 0;
+        const old = w.enemies.find((e) => e.harmless && !e.dead && !e.fizzle);
+        if (old) {
+          old.fizzle = CFG.waves.glitch.fizzle;
+          old.dissolved = true;
+        }
+      }
+    } else this.titleT = 0;
 
     // ---- status timers ----
     w.stasis = Math.max(0, w.stasis - dt);

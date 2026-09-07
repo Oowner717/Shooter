@@ -1944,4 +1944,22 @@ came from before believing the other one covers it.
   eight times over, then the run bottoming out at tier 1 where the fuse stops
   catching it. Assert the verdict that accompanied the EVENT, not the one left
   on the floor afterwards.
+- **A readout is only telemetry if the thing behind it can change.** The title
+  screen's "NN TRACKED" printed `world.enemies.length` off a real field -- and
+  `Game.update` topped that field up to seven drifters while NOTHING removed
+  one, so it was seven for as long as the screen was open: measured over forty
+  seconds at 60Hz, one distinct value. Noticing in a docstring is not fixing
+  it; the comment beside it had already settled for calling the number "honest
+  about being a ceiling", which is a sentence the player cannot read under a
+  number that looks live. The field turns over now, through `fizzle` -- the
+  dissolve `Enemy.destroy` refuses to cash in -- so nothing is banked into
+  `world.earned` or counted on a screen where neither would mean anything.
+  The same sweep found "SHALLOWS OPEN" beside it: a literal in the markup with
+  no writer, in the same live green.
+- **A probe that samples on a clock can alias against the thing it watches.**
+  The first version of that case sampled every five seconds against a
+  4.5-second turnover and reported ONE distinct value on a working build. A
+  readout that changes for 0.9s in every 4.5 is invisible to it. Sample every
+  frame, and carry a control that is known to move -- forty distinct clock
+  readings beside one count is a bug; one of each is a dead probe.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

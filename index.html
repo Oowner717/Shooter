@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '279';
+  var BUILD = '280';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -335,7 +335,7 @@
         <div class="bootStatus">
           <span class="bootDot" aria-hidden="true"></span>
           <span class="bootSess">SESSION 7749</span>
-          <span class="bootLink">SHALLOWS OPEN</span>
+          <span class="bootLink" id="bootLink">SHALLOWS OPEN</span>
           <span class="bootTele" id="bootTele" aria-hidden="true"></span>
         </div>
 

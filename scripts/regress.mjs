@@ -24759,6 +24759,127 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `(${r.stillBench}) with ${r.rigStill} of ${r.rigWas} rig still on the field`);
 }
 
+// --- the title screen's telemetry is telemetry -----------------------------
+/*
+ * Build 280, and this is the case CLAUDE.md said was missing by name:
+ *
+ *   "a readout with no assertion behind it can go wrong and stay green, and
+ *    two did in one build... the title's own '07 TRACKED' was pinned at seven
+ *    forever because Game.update holds the boot field at seven drifters and
+ *    nothing kills drift -- both shipped, both exited 0, and one of them
+ *    carried a comment calling itself live telemetry."
+ *
+ * It was still true three builds later. Measured over forty seconds at 60Hz:
+ * ONE distinct value for the count, and the clock beside it running. The field
+ * turns over now -- the oldest drifter is retired on a clock through `fizzle`,
+ * which `Enemy.destroy` refuses to cash in, so nothing is banked or counted on
+ * a screen where neither would mean anything -- and this is what holds it.
+ *
+ * Sampled EVERY FRAME. The first version of this probe sampled every five
+ * seconds against a 4.5-second turnover and reported one distinct value on a
+ * working build: a readout that changes for 0.9s in every 4.5 is invisible to
+ * a sampler that aliases against it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    g.restart();
+    w.phase = 'boot';
+    g.hud.el.boot.hidden = false;
+    // A clean field, so what is counted is the title's own.
+    w.enemies.length = 0;
+    w.drops.length = 0;
+    w.time = 0;
+
+    const counts = new Set();
+    const clocks = new Set();
+    // Which BODIES have been on the field, so "it turns over" is about the
+    // things and not only about the number.
+    const bodies = new Set();
+    let peak = 0;
+    for (let f = 0; f < 60 * 40; f++) {
+      g.update(1 / 60);
+      g.hud.syncBoot(w);
+      const t = g.hud.el.bootTele.textContent;
+      const m = /T\+(\d\d:\d\d) · (\d\d) TRACKED/.exec(t);
+      if (m) { clocks.add(m[1]); counts.add(m[2]); }
+      for (const e of w.enemies) if (e.harmless) bodies.add(e);
+      peak = Math.max(peak, w.enemies.filter((e) => e.harmless && !e.dead).length);
+    }
+    out.counts = [...counts].sort().join('/');
+    out.nCounts = counts.size;
+    out.nClocks = clocks.size;
+    out.everSeen = bodies.size;
+    out.hold = CFG.title.hold;
+    out.peak = peak;
+    out.standing = w.enemies.filter((e) => e.harmless && !e.dead).length;
+
+    /*
+     * ...and NOTHING is banked or counted for a retirement. The title screen
+     * runs a real field, so a drifter removed through `Enemy.destroy` would
+     * pay `CFG.energy.drift` into `world.earned` -- which is what the object
+     * gates are keyed on -- and walk the kill tally forward, both of them on a
+     * screen the player has not started a run from.
+     */
+    out.earned = w.earned | 0;
+    out.kills = w.kills | 0;
+    out.energy = Math.round(w.energy || 0);
+
+    // ---- and the link line, in all three states it can be in -----------
+    const linkNow = () => g.hud.el.bootLink.textContent.trim();
+    g.restart();
+    g.hud.offerResume();
+    const none = linkNow();
+    g.start();
+    g.checkpoint();
+    g.hud.offerResume();
+    const one = linkNow();
+    g.debugStepEra();
+    g.checkpoint();
+    g.hud.offerResume();
+    const two = linkNow();
+    out.link = { none, one, two };
+
+    g.restart();
+    return out;
+  });
+
+  /*
+   * TWO distinct counts is the whole assertion. One is the bug; the clock
+   * beside it is the control, because a readout that had stopped updating
+   * altogether would also show one count -- and forty distinct clock values
+   * prove the sampler was reading a live element the whole time.
+   */
+  check('the title screen\'s object count is telemetry and not a constant',
+    r.nCounts >= 2 && r.nClocks >= 30 && r.everSeen > r.hold,
+    `over forty seconds: ${r.nCounts} distinct counts (${r.counts}) against `
+    + `${r.nClocks} distinct clock readings, and ${r.everSeen} different bodies `
+    + `have been on a field held at ${r.hold}`);
+
+  /*
+   * ...and the OTHER constant on that row. "SHALLOWS OPEN" was a literal in
+   * the markup with no writer anywhere, wearing the same live green as the
+   * telemetry beside it. Asserted in both states, and asserted as CHANGING
+   * between them -- a line pinned to either string would satisfy one arm.
+   */
+  check('...and the link says which field is on the other end of it',
+    r.link.none === 'SHALLOWS OPEN' && r.link.one === 'SHALLOWS OPEN'
+    && r.link.two === 'DEEP FIELD OPEN',
+    `no save: "${r.link.none}"; an era-1 run: "${r.link.one}"; an era-2 run: `
+    + `"${r.link.two}"`);
+
+  check('...and the field it counts turns over without paying for it',
+    r.peak <= r.hold && r.standing >= r.hold - 2
+    && r.earned === 0 && r.kills === 0 && r.energy === 0,
+    `held at ${r.hold}, peaked at ${r.peak}, standing at ${r.standing}; `
+    + `a retirement banked ${r.earned} lifetime energy, ${r.energy} in the `
+    + `purse and walked the tally to ${r.kills}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

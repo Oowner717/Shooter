@@ -3563,3 +3563,59 @@ to switch off. `.dbgBossDot { flex: 0 0 auto }` — the row is a grid.
   a step-back now, which is what the claim was always about.
 
 604 green.
+
+---
+
+## Build 280 — the title screen's two constants
+
+Two things on this screen were printed in live green beside a running clock and
+neither of them could ever change. CLAUDE.md named one of them three builds ago
+and it was still there.
+
+### "07 TRACKED" was seven for as long as the screen was open
+
+`syncBoot` prints `T+mm:ss · NN TRACKED` off a real field — `phase = 'boot'`
+runs an arena with drift in it, which is what makes the readout telemetry
+rather than decoration. But `Game.update` topped the field up to seven drifters
+and **nothing ever removed one**, so the same seven wandered for as long as you
+looked at it. Measured over forty seconds at 60Hz: **one distinct value.**
+
+The docstring beside it had already noticed, and settled for saying the count
+"is honest about being a ceiling the field is held at" — which is a comment the
+player cannot read, under a number that looks like a live count.
+
+So the field turns over. Every `CFG.title.every` seconds the oldest drifter is
+retired and the top-up brings another in at the top. The retirement goes
+through **`fizzle`** — the dissolve build 210 already has, which
+`Enemy.destroy` refuses to cash in — so nothing is banked into `world.earned`
+(which the object gates key on) and nothing walks the kill tally, on a screen
+where neither would mean anything. Measured after: **two distinct counts**, and
+more bodies have crossed the field than the seven it is held at.
+
+The case samples **every frame**. The first version sampled every five seconds
+against a 4.5-second turnover and reported one distinct value on a working
+build — a readout that changes for 0.9s in every 4.5 is invisible to a sampler
+that aliases against it. The clock beside the count is the control: forty
+distinct clock readings prove the sampler was reading a live element the whole
+time, so one count would have been the bug and not a dead probe.
+
+### "SHALLOWS OPEN" had no writer anywhere
+
+A literal in the markup, in the same live green, on the row that looks like a
+connection status. The era is in the save and was shown nowhere else on this
+screen — and a device that has taken the NEW FORM genuinely does have a
+different field on the other end of the link. It says `DEEP FIELD OPEN` there
+now, from one writer called in both branches of `offerResume`, so the line
+cannot be left saying the wrong one.
+
+Asserted in all three states and asserted as **changing** between them: a line
+pinned to either string would satisfy a single-state arm.
+
+### What was measured and found sound
+
+The panel fits without scrolling at 320x568 (463px of 568) and at 390x844; no
+text on it is under 11px in either state; the record tile labels are still one
+word each; and the primary-button rule holds — exactly one of CONTINUE and
+BEGIN SIMULATION is ever rendered, with RESET SIMULATION following the save.
+
+607 green.

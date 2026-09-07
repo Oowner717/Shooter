@@ -113,6 +113,7 @@ export class Hud {
       boot: $('boot'),
       bootRecord: $('bootRecord'),
       bootTele: $('bootTele'),
+      bootLink: $('bootLink'),
       bootBuild: $('bootBuild'),
       wipeBtn: $('wipeBtn'),
       wipeAsk: $('wipeAsk'),
@@ -2218,6 +2219,16 @@ export class Hud {
    * a sentence has to be read. `auto-fit` in the grid is what lets one, two or
    * three of them lay out without three sets of rules.
    */
+  /**
+   * Which field is on the other end of the link, said in the game's own
+   * shallow/deep framing. One writer, called from `offerResume` in both of
+   * its branches, so the line cannot be left saying the wrong one.
+   */
+  setLink(deep) {
+    const el = this.el.bootLink;
+    if (el) el.textContent = deep ? 'DEEP FIELD OPEN' : 'SHALLOWS OPEN';
+  }
+
   showRecord() {
     const el = this.el.bootRecord;
     if (!el) return;
@@ -2281,6 +2292,7 @@ export class Hud {
     if (this.el.wipeBtn) this.el.wipeBtn.hidden = !d;
     if (this.el.wipeAsk) this.el.wipeAsk.hidden = true;
     if (!d) {
+      this.setLink(false);
       b.hidden = true;
       if (this.el.resumeNote) this.el.resumeNote.hidden = true;
       this.el.startBtn.textContent = 'BEGIN SIMULATION';
@@ -2317,6 +2329,18 @@ export class Hud {
       note.hidden = !bits.length;
     }
     b.hidden = false;
+    /*
+     * ...and the status line says which FIELD is on the other end of it.
+     *
+     * "SHALLOWS OPEN" was a literal in the markup with no writer anywhere,
+     * styled the same live green as the telemetry beside it -- a constant
+     * dressed as a state, which is the fault this screen's own count had. The
+     * era is in the save and is not shown anywhere else here: a device that
+     * has taken the NEW FORM has a different field on the other end of the
+     * link, and the one line that looks like a connection status is where
+     * that belongs.
+     */
+    this.setLink(d.era === 2);
     /*
      * ...and there is no NEW RUN beside it any more. It sat here doing the
      * destructive thing -- `Game.start` forgets the run -- with the quieter
