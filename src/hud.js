@@ -9,7 +9,7 @@ import { pref, setPref } from './settings.js';
 import { BUILD, REV, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
 
-import { CODEX, ANOMALY_ENTRIES, codex, markLine, forgetPlayer } from './codex.js';
+import { CODEX, FIELD_ENTRIES, ANOMALY_ENTRIES, codex, markLine, forgetPlayer } from './codex.js';
 import { Menu } from './menu.js';
 import { holdFor, STACK, MIN_READ } from './tutorial.js';
 import { SLOTS, carried, freeSlot } from './loadout.js';
@@ -1618,10 +1618,11 @@ export class Hud {
      *
      * The panel is 340px of opaque glass over a 390px screen, so a button that
      * makes something happen on the field hands you a view of the panel and
-     * not of the thing you asked for. Every action closes it. The exception is
-     * the one that needs a second tap to mean anything -- SPAWN GROUP opens a
-     * screen, and closing the panel on the way in would shut the screen you
-     * just opened. Toggles keep it open too, and for a different reason: the
+     * not of the thing you asked for. Every action closes it. The exceptions
+     * are the ones that need a second tap to mean anything -- SPAWN GROUP and
+     * BOSS FIGHT open a screen, and closing the panel on the way in would shut
+     * the screen you just opened; MINE and the two armed ones want the press
+     * after this one. Toggles keep it open too, for a different reason: the
      * `on` class on the button IS the readout, so closing on a toggle hides
      * the state you just set, and turning two of them on would cost two
      * reopenings.
@@ -1724,7 +1725,18 @@ export class Hud {
        * on both -- a button that closed the panel on the first press would
        * hide the state it had just entered.
        */
-      ['RESTART', arm('RESTART', () => g.restart()), null, true],
+      /*
+       * ...and it refuses from inside the ASSAY. `Game.restart` empties
+       * `world.enemies` -- where the rig lives -- and resets `world.up`,
+       * while `checkpoint` already refuses from in there on the grounds that
+       * writing any of it down would overwrite the run you are going to come
+       * back to. Restarting from the bench took the room's kit and its rig
+       * with it and left you standing in a room with nothing in it.
+       */
+      ['RESTART', arm('RESTART', () => {
+        if (g.world.sandbox) { this.alert('NOT FROM THE ASSAY', 'info', 2.4); return; }
+        g.restart();
+      }), null, true],
 
       // This device, not this run: the codex outlives every restart, so these
       // two are the only actions here that touch something a new game keeps.
@@ -1784,6 +1796,7 @@ export class Hud {
     th.className = 'dbgHeadRow';
     th.textContent = 'THE RULES';
     frag.appendChild(th);
+    this.dbgToggles = [];
     for (const [label, key] of toggles) {
       const b = document.createElement('button');
       b.textContent = label;
@@ -1792,6 +1805,7 @@ export class Hud {
         g.world.debug[key] = !g.world.debug[key];
         b.classList.toggle('on', g.world.debug[key]);
       });
+      this.dbgToggles.push({ el: b, key });
       frag.appendChild(b);
     }
     this.el.dbgGrid.appendChild(frag);
@@ -1800,6 +1814,21 @@ export class Hud {
   /** Repaint whatever in the grid is a readout rather than a fixed label. */
   syncDebug() {
     for (const x of this.dbgLive || []) x.el.textContent = x.label();
+  }
+
+  /**
+   * Re-read every toggle's lamp off the flag it is a lamp FOR.
+   *
+   * The class is written by the cell's own handler and by nothing else, so
+   * anything that sets `world.debug.*` from outside the panel -- a restore, a
+   * probe, the suite putting the flags back after pressing every control --
+   * left the cells lit for a state that was no longer true, and the panel
+   * then lied about itself to everything downstream. A readout whose only
+   * writer is one of its own readers is one that goes stale silently.
+   */
+  syncDebugToggles() {
+    const d = (this.game.world && this.game.world.debug) || {};
+    for (const t of this.dbgToggles || []) t.el.classList.toggle('on', !!d[t.key]);
   }
 
   // ----------------------------------------------------------- spawn screen
@@ -1847,6 +1876,10 @@ export class Hud {
     // and a group queued above the arena spends its first four seconds off the
     // top of the screen -- which reads as nothing having happened at all.
     this.spawn = { id: ENEMY_TYPES[0].id, count: 5, shape: '', where: 'field' };
+    // ...and it must be one the picker actually shows first; see the split
+    // below. `ENEMY_TYPES[0]` happens to be a field type today and that is
+    // not something this should be relying on.
+
     this.spawnCells = new Map();
     this.spawnRows = [];
     this.spawnTallyText = '';
@@ -1868,7 +1901,27 @@ export class Hud {
 
     const pick = document.createElement('div');
     pick.className = 'spawnPick';
-    for (const t of ENEMY_TYPES) {
+    /*
+     * ---- the field first, and the boss pieces behind their own heading ---
+     *
+     * The picker was all 43 ENEMY_TYPES in table order, which puts nine boss
+     * cores and the twenty pieces they make in among the things that actually
+     * come down on their own -- so finding a MOTE meant reading past ORDINAL,
+     * TALLY and DIGIT. `FIELD_ENTRIES` is the split the glossary already makes
+     * (`CODEX` minus every id any anomaly puts on the field), and build 233
+     * made the same fix to the ASSAY's picker for the same reason.
+     *
+     * The boss pieces are KEPT, which is where this differs from the ASSAY:
+     * that room refuses them because a bare core with none of its frame is
+     * not a thing the game can produce, and this is the debug panel, where
+     * putting one DIGIT down to watch it is the entire point. They are simply
+     * not in the way any more -- and the BOSS FIGHT screen, which summons one
+     * whole, is two taps away for the other job.
+     */
+    const fieldIds = new Set(FIELD_ENTRIES.map((e) => e.id));
+    const inField = ENEMY_TYPES.filter((t) => fieldIds.has(t.id));
+    const ofBoss = ENEMY_TYPES.filter((t) => !fieldIds.has(t.id));
+    const chip = (t) => {
       const b = document.createElement('button');
       b.className = 'spawnChip';
       b.title = t.name;
@@ -1886,6 +1939,14 @@ export class Hud {
       b.addEventListener('click', () => { this.spawn.id = t.id; this.syncSpawn(true); });
       pick.appendChild(b);
       this.spawnCells.set(t.id, b);
+    };
+    for (const t of inField) chip(t);
+    if (ofBoss.length) {
+      const h = document.createElement('div');
+      h.className = 'dbgHeadRow spawnSplit';
+      h.textContent = 'OF AN ANOMALY';
+      pick.appendChild(h);
+      for (const t of ofBoss) chip(t);
     }
 
     const row = (label, opts, read, write) => {

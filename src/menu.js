@@ -1722,32 +1722,27 @@ export class Menu {
     const rows = [
       ['DEBUG', 'developer panel', () => { this.setOpen(false); g.hud.toggleDebug(true); }],
     ];
-    for (const [label, sub, run, ask] of rows) {
+    /*
+     * ---- and the arm that used to be here was UNREACHABLE ---------------
+     *
+     * This loop destructured four fields -- `[label, sub, run, ask]` -- from a
+     * table whose one row has three, so `ask` was `undefined` for every cell
+     * and the twenty lines of arming behind it could never run: the armed
+     * class, the "tap again" swap, the four-second timeout and the disarm.
+     * The identical twelve lines are LIVE on the wipe cell seventy lines
+     * below, which is where the behaviour actually lives, so this was a
+     * second copy that had never executed once.
+     *
+     * Deleted rather than wired up, because the thing it would have guarded
+     * has its guard elsewhere now: build 276 gave the debug panel's own
+     * RESTART and CODEX WIPE an arm-to-confirm at the point of the press,
+     * which is nearer the danger than a tile that opens a panel.
+     */
+    for (const [label, sub, run] of rows) {
       const b = document.createElement('button');
       b.className = 'menuCell';
       b.innerHTML = `<span class="cellName">${label}</span><span class="cellSub">${sub}</span>`;
       b.addEventListener('click', () => {
-        // Anything that throws the run away asks first. There is no undo and
-        // the button sits one tap from the volume control.
-        if (ask && this.armedCell !== b) {
-          if (this.armedCell) this.armedCell.classList.remove('armed');
-          this.armedCell = b;
-          b.classList.add('armed');
-          b.querySelector('.cellSub').textContent = 'tap again — this cannot be undone';
-          clearTimeout(this.cellTimer);
-          this.cellTimer = setTimeout(() => {
-            b.classList.remove('armed');
-            b.querySelector('.cellSub').textContent = sub;
-            this.armedCell = null;
-          }, 4000);
-          return;
-        }
-        if (ask) {
-          clearTimeout(this.cellTimer);
-          b.classList.remove('armed');
-          b.querySelector('.cellSub').textContent = sub;
-          this.armedCell = null;
-        }
         run();
         this.syncSystem();
       });

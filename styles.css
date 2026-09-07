@@ -2168,7 +2168,8 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
   text-align: left;
 }
 .dbgBossRow:active { background: rgba(89, 224, 255, 0.24); }
-.dbgBossDot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+/* `flex` was here and the row is a GRID, where it does nothing. */
+.dbgBossDot { width: 8px; height: 8px; border-radius: 50%; }
 .dbgBossName { font-size: 10px; letter-spacing: 0.12em; white-space: nowrap; }
 .dbgBossAt, .dbgBossEra {
   font-size: 8px;
@@ -2231,6 +2232,10 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
 #debugPanel.wide.mini { width: min(244px, calc(100vw - 16px)); }
 #debugPanel.mini .spawnGo { margin-top: 2px; }
 #debugPanel.mini .spawnTally { white-space: nowrap; }
+
+/* The picker's own divider: a `.dbgHeadRow` has to span all three columns
+   here rather than the grid's two. */
+.spawnPick .spawnSplit { grid-column: span 3; }
 
 .spawnPick {
   display: grid;
@@ -2938,7 +2943,11 @@ body.bossUp #waveRail { display: none; }
  * lags the thumb by the transition's own duration.
  */
 #menu.swiping, #waveSheet.swiping,
-#aimModes.swiping, #debugPanel.swiping { transition: none; }
+/*
+ * `#debugPanel` was named here too and has no `transition` of its own to
+ * switch off -- a rule that has never done anything. `#aimModes` does.
+ */
+#aimModes.swiping { transition: none; }
 
 .railNode.trial {
   border-style: dashed;

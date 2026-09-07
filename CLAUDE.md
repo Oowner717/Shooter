@@ -1924,4 +1924,24 @@ came from before believing the other one covers it.
   six codex entries sharing one generic icon. `regress.mjs` reads the source
   and requires every declared shape to have a case, AND renders each against
   `drawChip` to catch a case that exists and calls the same generic function.
+- **A loop that destructures more fields than its table has is a dead branch,
+  not a default.** `buildSystem`'s cell loop read `[label, sub, run, ask]` from
+  rows of three, so `ask` was `undefined` for every cell and twenty lines of
+  arm-to-confirm behind it could never run -- while the identical twelve lines
+  sat live seventy lines below on the wipe cell. Nothing fails on it and
+  `bundle.mjs` ships it; the tell is a destructured name with no supplier.
+- **A lamp whose only writer is one of its own readers goes stale silently.**
+  A debug toggle's `.on` class was written by that cell's handler and by
+  nothing else, so a restore, a probe or the suite putting `world.debug.*` back
+  left the cell lit for a state that was no longer true. `syncDebugToggles()`
+  re-reads each from the flag it is a lamp for -- and the case proves it is an
+  instrument by asserting ZERO lit BEFORE the sync, or "2 after" would only be
+  showing the cells had followed the flag anyway.
+- **A verdict sampled at the end of a window is whatever happened last, not
+  what the claim is about.** "A turret that cannot cope is set down BY THE
+  GLITCH TIMER" asserted `lastVerdict === 'glitch'` and failed reporting
+  "tier 9 -> 1, 8 step-backs, last verdict stall" -- the mechanism working
+  eight times over, then the run bottoming out at tier 1 where the fuse stops
+  catching it. Assert the verdict that accompanied the EVENT, not the one left
+  on the floor afterwards.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

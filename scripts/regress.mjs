@@ -3357,13 +3357,28 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const caughtFrom = d().tier;
     let downs = 0;
     let last = d().tier;
+    /*
+     * Every verdict, not only the last one. The last verdict is whatever the
+     * wave that happened to be running when the window closed ended on -- and
+     * a run that has already been set down to tier 1 stops being caught by
+     * the fuse and starts ending waves on `stall`, so this failed on a build
+     * where the mechanism worked eight times over: "tier 9 -> 1, 8 step-backs,
+     * last verdict stall". The claim is that the GLITCH TIMER is what set it
+     * down, which is a question about the verdicts that accompanied the
+     * step-backs, not about the final one.
+     */
+    const verdicts = new Set();
+    let byGlitch = 0;
     for (let i = 0; i < 500 * 60; i++) {
       g.update(1 / 60);
-      if (d().tier < last) downs++;
+      if (d().lastVerdict) verdicts.add(d().lastVerdict);
+      if (d().tier < last) { downs++; if (d().lastVerdict === 'glitch') byGlitch++; }
       last = d().tier;
     }
     const caughtTo = d().tier;
     const caughtLast = d().lastVerdict;
+    const caughtByGlitch = byGlitch;
+    const caughtVerdicts = [...verdicts].join(',');
 
     // ---- HOLD pins the climb but never the relief ----
     g.restart();
@@ -3398,7 +3413,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return { badBands, bandAt: { t1: bandRows[0], t9: bandRows[8], t80: bandRows[79] },
       hp1, compounds, step, hpAt: [10, 14, 20].map((t) => d().scaleAt(t).hp),
       climbFrom, climbed, climbFails, climbPeak, climbTraits, climbLast,
-      caughtFrom, caughtTo, downs, caughtLast,
+      caughtFrom, caughtTo, downs, caughtLast, caughtByGlitch, caughtVerdicts,
       heldBefore, heldAfterClean, heldAfterFail, holdCleared, heldGrace,
       teachVerdict, teachTier };
   });
@@ -3449,9 +3464,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `wave carrying [${r.climbTraits}]`);
 
   check('...and a turret that cannot is caught and set down, by the glitch timer',
-    r.caughtTo < r.caughtFrom && r.downs >= 1 && r.caughtLast === 'glitch',
-    `tier ${r.caughtFrom} -> ${r.caughtTo}, ${r.downs} step-back(s), `
-    + `last verdict ${r.caughtLast}`);
+    r.caughtTo < r.caughtFrom && r.downs >= 1 && r.caughtByGlitch >= 1,
+    `tier ${r.caughtFrom} -> ${r.caughtTo}, ${r.downs} step-back(s) of which `
+    + `${r.caughtByGlitch} carried the glitch verdict; verdicts seen `
+    + `[${r.caughtVerdicts}], last ${r.caughtLast}`);
 
   /*
    * HOLD is the one asymmetric control in the game: it pins the climb and not
@@ -4649,8 +4665,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     window.removeEventListener('error', onErr);
     window.removeEventListener('unhandledrejection', onErr);
     g.hud.toggleDebug(false);
-    // Toggles are left wherever the presses put them.
+    /*
+     * Toggles are left wherever the presses put them, so the FLAGS go back --
+     * and so do the BUTTONS. Clearing `world.debug` alone left every toggle
+     * cell still wearing `.on`, because the class is written by the cell's own
+     * handler and nothing re-reads the flag: the panel then lied about its own
+     * state for every case after this one, and for anybody who opened it. The
+     * same shape as `buildStrip` resetting a cell the interface had written
+     * on -- a readout with a writer that is not the thing it reads.
+     */
     for (const k of Object.keys(g.world.debug)) g.world.debug[k] = false;
+    g.hud.syncDebugToggles();
     g.restart();
     return { panel, spawn, boss };
   });
@@ -22409,16 +22434,27 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    */
   const peak = Math.max(...r.near.trail);
   const peakAt = r.near.trail.indexOf(peak);
-  const back = (peak - r.near.trail[r.near.trail.length - 1]) / (peak - r.near.start);
+  const back = (peak - Math.min(...r.near.trail.slice(peakAt))) / (peak - r.near.start);
+  /*
+   * ...and the closing is only asserted UNTIL IT IS HOME. Past that the body
+   * is milling around the turret like anything else on the field, so a sample
+   * that ticks up from 50 to 54 is not the throw failing to decay -- it is a
+   * LURCHER walking. The third window this arm has had set near the truth
+   * rather than clear of it; the claim is the ground coming back, and the
+   * ground is back the moment it is inside where it started.
+   */
+  let homeAt = r.near.trail.findIndex((v, i) => i > peakAt && v <= r.near.start);
+  if (homeAt < 0) homeAt = r.near.trail.length - 1;
   check('...and the ground it buys is given back, which is what bounds it',
     r.near.alive
     && peakAt <= 4
     && back > 0.7
-    && r.near.trail.every((v, i) => i <= peakAt || v < r.near.trail[i - 1]),
+    && r.near.trail.every((v, i) => i <= peakAt || i > homeAt || v < r.near.trail[i - 1]),
     `thrown from ${r.near.start} out to ${peak} by second ${peakAt + 1}, then `
     + `${r.near.trail.join(' -> ')} -- closing on every sample from its `
-    + `furthest and ${Math.round(back * 100)}% of the ground given back inside `
-    + `twelve seconds, still on the field (${r.near.alive})`);
+    + `furthest until it was home at second ${homeAt + 1}, and `
+    + `${Math.round(back * 100)}% of the ground given back inside twelve `
+    + `seconds, still on the field (${r.near.alive})`);
 
   check('...and the fan is as wide as the config says, and the cast shows it',
     r.n === r.want && Math.abs(r.spread - r.arc) <= r.jitter * 2 + 0.01
@@ -24601,6 +24637,126 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     flat.length === 0 && empty.length === 0 && r.selfZero === 0,
     five.map((k) => `${k} ${r.vsChip[k]} from a chip (ink ${r.ink[k]})`).join(' · ')
     + `; the same shape twice differs by ${r.selfZero}`);
+}
+
+// --- the debug panel's three quieter faults ---------------------------------
+/*
+ * Build 279, all three found by review and none of them able to fail anything.
+ *
+ * 1. The spawn picker listed all 43 ENEMY_TYPES in table order, so nine boss
+ *    cores and the twenty pieces they make sat in among the things that come
+ *    down on their own -- finding a MOTE meant reading past ORDINAL, TALLY and
+ *    DIGIT. The pieces are KEPT, because putting one down to watch it is the
+ *    whole point of a debug spawner; they are simply behind their own heading.
+ * 2. A toggle's lamp is written by its own handler and by nothing else, so
+ *    anything setting `world.debug.*` from outside left the cell lit for a
+ *    state that was no longer true.
+ * 3. RESTART empties `world.enemies`, where the ASSAY's rig lives, and resets
+ *    `world.up`, which is the room's kit -- and `checkpoint` already refuses
+ *    from in there for the same reason.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { FIELD_ENTRIES } = await import('../src/codex.js');
+    const { ENEMY_TYPES } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    g.restart();
+    g.debugTeachAll();
+    g.debugGiveEnergy(200000);
+    w.phase = 'staging';
+
+    // ---- 1. the picker: field first, and everything still reachable -----
+    g.hud.toggleDebug(true);
+    g.hud.showScreen('spawn');
+    const chips = [...document.querySelectorAll('.spawnChip')];
+    const split = document.querySelector('.spawnSplit');
+    out.chips = chips.length;
+    out.types = ENEMY_TYPES.length;
+    out.splitUp = !!split && split.getBoundingClientRect().height > 0;
+    // Everything the roster has is still offered -- the split is an ORDER,
+    // not a filter, which is where this differs from the ASSAY's picker.
+    out.allRendered = chips.filter((c) => c.getBoundingClientRect().height > 0).length;
+    const before = [];
+    for (const c of chips) {
+      if (split && (c.compareDocumentPosition(split) & Node.DOCUMENT_POSITION_PRECEDING)) break;
+      before.push(c.querySelector('span').textContent);
+    }
+    const fieldNames = new Set(FIELD_ENTRIES.map((e) => {
+      const t = ENEMY_TYPES.find((x) => x.id === e.id);
+      return t ? t.name : null;
+    }).filter(Boolean));
+    out.aheadOfSplit = before.length;
+    out.wantAhead = fieldNames.size;
+    // ...and not one of the things ahead of the heading is a boss's.
+    out.strays = before.filter((n) => !fieldNames.has(n)).join(',');
+
+    // ---- 2. a toggle's lamp follows the flag, not only the press --------
+    g.hud.showScreen('');
+    const lamp = () => [...document.querySelectorAll('#dbgGrid button')]
+      .filter((b) => b.classList.contains('on')).length;
+    for (const k of Object.keys(w.debug)) w.debug[k] = false;
+    g.hud.syncDebugToggles();
+    out.lampsOff = lamp();
+    // Set the flags from OUTSIDE the panel, which is what a restore, a probe
+    // and the suite's own press-everything sweep all do.
+    w.debug.stats = true;
+    w.debug.hitboxes = true;
+    out.lampsStale = lamp();          // ...the cells have not been told yet
+    g.hud.syncDebugToggles();
+    out.lampsOn = lamp();
+    for (const k of Object.keys(w.debug)) w.debug[k] = false;
+    g.hud.syncDebugToggles();
+    out.lampsBack = lamp();
+
+    // ---- 3. RESTART refuses from inside the ASSAY ----------------------
+    g.hud.toggleDebug(false);
+    g.buy('sandbox');
+    g.enterSandbox(1);
+    out.inBench = !!w.sandbox;
+    const rigWas = w.enemies.filter((e) => e.dummy).length;
+    g.hud.toggleDebug(true);
+    const restart = [...document.querySelectorAll('#dbgGrid button')]
+      .find((b) => b.textContent === 'RESTART');
+    restart.click();                  // arms
+    restart.click();                  // ...and would fire
+    out.stillBench = !!w.sandbox;
+    out.rigStill = w.enemies.filter((e) => e.dummy).length;
+    out.rigWas = rigWas;
+    g.hud.toggleDebug(false);
+    g.exitSandbox();
+
+    for (const k of Object.keys(w.debug)) w.debug[k] = false;
+    g.hud.syncDebugToggles();
+    g.restart();
+    return out;
+  });
+
+  check('the spawn picker puts the field first and keeps every boss piece behind it',
+    r.chips === r.types && r.allRendered === r.chips && r.splitUp
+    && r.aheadOfSplit === r.wantAhead && r.strays === '',
+    `${r.chips} chips for ${r.types} types, all rendered (${r.allRendered}); `
+    + `${r.aheadOfSplit} of them ahead of the OF AN ANOMALY heading against `
+    + `${r.wantAhead} field types, and ${r.strays || 'nothing'} of a boss's `
+    + 'among them');
+
+  /*
+   * The middle reading is the one that makes this an instrument: `lampsStale`
+   * has to be 0 to prove the cells genuinely do not follow the flag on their
+   * own, or `lampsOn` being 2 would prove nothing about the sync.
+   */
+  check('...and a toggle\'s lamp is re-read from the flag it is a lamp for',
+    r.lampsOff === 0 && r.lampsStale === 0 && r.lampsOn === 2 && r.lampsBack === 0,
+    `all off: ${r.lampsOff} lit; two flags set from outside the panel: `
+    + `${r.lampsStale} lit before the sync and ${r.lampsOn} after; cleared `
+    + `again: ${r.lampsBack}`);
+
+  check('...and RESTART refuses from inside the ASSAY, rig and all',
+    r.inBench && r.stillBench && r.rigWas === 1 && r.rigStill === 1,
+    `in the room (${r.inBench}), two taps on RESTART left it standing `
+    + `(${r.stillBench}) with ${r.rigStill} of ${r.rigWas} rig still on the field`);
 }
 
 // --- report -----------------------------------------------------------------

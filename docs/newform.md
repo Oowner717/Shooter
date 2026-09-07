@@ -3490,3 +3490,76 @@ of its health is a stationary core on an empty field); TESSERA's `layII` is its
 only stage term; `CFG` `cost` runs 100→500 for anomalies 1–7 and then falls
 back to 250 for both of these; and `pay` is 900 for both where TERMINUS at rung
 42 pays 1400.
+
+---
+
+## Build 279 — the rest of the debug-panel review
+
+Build 276 took the loud half. These are the quiet ones, and none of them could
+fail anything.
+
+### An arm that had never executed once
+
+`buildSystem`'s cell loop destructures four fields — `[label, sub, run, ask]` —
+from a table whose one row has three. So `ask` was `undefined` for every cell
+and the twenty lines behind it could never run: the armed class, the "tap again
+— this cannot be undone" swap, the four-second timeout, the disarm. The
+identical twelve lines are **live** seventy lines below on the wipe cell, which
+is where the behaviour actually lives.
+
+Deleted rather than wired up, because the thing it would have guarded now has
+its guard nearer the danger: build 276 gave the panel's own RESTART and CODEX
+WIPE an arm-to-confirm at the point of the press.
+
+### RESTART took the ASSAY's rig with it
+
+`Game.restart` empties `world.enemies` — where the rig lives — and resets
+`world.up`, which is the room's kit. `checkpoint` already refuses from in there
+on the grounds that writing any of it down would overwrite the run you are
+going to come back to; RESTART had no such guard, so restarting from the bench
+left you standing in a room with nothing in it. It refuses and says so.
+
+### The spawn picker read past nine boss cores to reach a MOTE
+
+All 43 ENEMY_TYPES in table order, so nine cores and the twenty pieces they
+make sat among the things that come down on their own. The boss pieces are
+**kept** — putting one DIGIT down to watch it is the whole point of a debug
+spawner, and this is where it differs from the ASSAY's picker, which refuses
+them because a bare core with none of its frame is not something the game can
+produce. They are simply behind their own heading now, with `FIELD_ENTRIES` —
+the split the glossary already makes — deciding the order. All 43 still render
+and all 43 are still one tap.
+
+### A lamp whose only writer was one of its readers
+
+A toggle's `.on` class is written by that cell's own handler and by nothing
+else, so anything setting `world.debug.*` from outside the panel — a restore, a
+probe, the suite putting the flags back after pressing every control — left the
+cell lit for a state that was no longer true. `syncDebugToggles()` re-reads
+each lamp from the flag it is a lamp for, and the press-everything sweep calls
+it after clearing the flags, which it had not been doing.
+
+The case's middle reading is what makes it an instrument: it sets two flags
+from outside and asserts **zero** lamps lit *before* the sync, so `2 after`
+proves the sync rather than proving the cells were following the flag anyway.
+
+### And two rules that had never done anything
+
+`#debugPanel.swiping { transition: none }` — `#debugPanel` has no `transition`
+to switch off. `.dbgBossDot { flex: 0 0 auto }` — the row is a grid.
+
+### Two flakes, both windows set near the truth
+
+- **The HAIL recovery arm**, for the third time. It now walked all the way
+  home and *past* where it started (149% of the ground given back), then
+  ticked 50 → 54 on the last sample — a LURCHER milling around the turret,
+  not a throw failing to decay. The closing is asserted only until it is
+  home.
+- **"a turret that cannot is caught and set down, by the glitch timer"**
+  asserted the *last* verdict was `glitch`. A run already set down to tier 1
+  stops being caught by the fuse and starts ending waves on `stall`, so this
+  failed reporting "tier 9 → 1, 8 step-backs, last verdict stall" — the
+  mechanism working eight times over. It asserts the verdict that accompanied
+  a step-back now, which is what the claim was always about.
+
+604 green.
