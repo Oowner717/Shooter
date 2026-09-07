@@ -547,6 +547,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   // and that the finished one reads as finished.
   const num = (t) => parseInt(t, 10);
   check('the room tells an empty machine from a finished one',
+    // 139 from build 275, when FLINCH and DEADBOLT went in at one level each
+    // -- the two that cast, both switches rather than dials. It was
     // 137 from build 263, when AIRBURST went in at one level -- HAIL's first
     // node, and a switch rather than a dial: the pellets either go off where
     // they land or they do not. It was
@@ -603,7 +605,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 137
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 139
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -2479,6 +2481,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      */
     let litWhenHeld = 0;
     let sampledHeld = 0;
+    let heldOne = 0;
     let seen = w.abilities.slots.map((x) => x.charges);
     const who = [];
     const tick = () => {
@@ -2487,6 +2490,40 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         seen[k] = x.charges;
       });
     };
+    /*
+     * ---- and what the two that DO cast are counted by ------------------
+     *
+     * FLINCH and DEADBOLT (build 275) fire PULSE and WARD while something has
+     * hold of the machine. They cannot be seen by the charge counter above --
+     * that is the whole of their design, and the reason they do not break the
+     * rule 190 wrote down -- so the EFFECT is counted instead, by what each
+     * ability's `run` puts on the field. `debugBuyAll` owns both, so this
+     * window is the OWNED one and the control below turns them off.
+     */
+    const effects = () => {
+      let shocks = 0;
+      let wards = 0;
+      for (const e of w.effects) {
+        const n = e.constructor.name;
+        if (n === 'Shock') shocks++;
+        else if (n === 'Ward') wards++;
+      }
+      return { shocks, wards };
+    };
+    let sawShock = 0;
+    let sawWard = 0;
+    let lastFx = effects();
+    const fxTick = () => {
+      const now = effects();
+      // Counted as ARRIVALS. The pool ages, so a level read at the end sees
+      // whatever happened to still be alive -- the same "measure at the
+      // moment, not after it" fault the charge counter above took three goes
+      // to learn.
+      if (now.shocks > lastFx.shocks) sawShock += now.shocks - lastFx.shocks;
+      if (now.wards > lastFx.wards) sawWard += now.wards - lastFx.wards;
+      lastFx = now;
+    };
+
     // Every cooldown in the game clear, so anything of that shape has a use
     // in hand the moment its condition is met.
     for (const x of w.abilities.slots) { x.cd = 0; }
@@ -2494,7 +2531,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       mount();
       g.update(1 / 60);
       tick();
+      fxTick();
       if (w.attackers.size >= 2) held++;
+      if (w.attackers.size >= 1) heldOne++;
       gripped = Math.max(gripped, w.attackers.size);
       if (i % 30 === 0 && w.attackers.size > 0) {
         sampledHeld++;
@@ -2503,6 +2542,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         if (g.hud.slots[p].el.classList.contains('urgent')) litWhenHeld++;
       }
     }
+    const castShock = sawShock;
+    const castWard = sawWard;
+    const ownedUnasked = unasked;
     /*
      * Closed off before the press below, and this is the fourth version of
      * this counter. The third shared it with the vacuity check and reported
@@ -2530,19 +2572,107 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     tick();
     const pressed = unasked - from === 1;
 
+    /*
+     * ---- the CONTROL: the same seven seconds with neither node owned -----
+     *
+     * Without it "the bar fires itself twice a second" and "nothing fires by
+     * itself" both produce a number, and the number alone cannot say which.
+     * `world.up` is what `runUpgrades` reads, so turning the two flags off is
+     * exactly the un-bought machine and nothing else changes.
+     */
+    w.up.flinch = false;
+    w.up.deadbolt = false;
+    w.enemies.length = 0;
+    w.attackers.clear();
+    w.effects.length = 0;
+    for (const x of w.abilities.slots) { x.cd = 0; }
+    let bareShock = 0;
+    let bareWard = 0;
+    let bareHeld = 0;
+    lastFx = effects();
+    sawShock = 0;
+    sawWard = 0;
+    const seenBare = w.abilities.slots.map((x) => x.charges);
+    let bareUnasked = 0;
+    for (let i = 0; i < 60 * 7; i++) {
+      mount();
+      g.update(1 / 60);
+      fxTick();
+      w.abilities.slots.forEach((x, k) => {
+        if (x.charges < seenBare[k]) bareUnasked += seenBare[k] - x.charges;
+        seenBare[k] = x.charges;
+      });
+      if (w.attackers.size >= 1) bareHeld++;
+    }
+    bareShock = sawShock;
+    bareWard = sawWard;
+
     w.director.update = ranD;
     g.restart();
-    return { gripped, held, auto, who: whoAuto, lit, litWhenHeld, sampledHeld,
-      pressed, slots: w.abilities.slots.length };
+    return { gripped, held, heldOne, auto, who: whoAuto, lit, litWhenHeld, sampledHeld,
+      pressed, slots: w.abilities.slots.length,
+      castShock, castWard, ownedUnasked, bareShock, bareWard, bareUnasked, bareHeld };
   });
 
-  check('nothing on the bar goes off by itself, and the button says so instead',
-    r.gripped >= 2 && r.held > 350 && r.auto === 0 && r.lit && r.pressed,
-    `${r.gripped} on the mount and two held for ${r.held} of 420 frames, `
-    + `every one of ${r.slots} abilities owned: ${r.auto} charges spent `
-    + `unasked over seven seconds${r.who.length ? ` (${r.who.join(', ')})` : ''}; `
-    + `PULSE lit on ${r.litWhenHeld}/${r.sampledHeld} of the frames sampled with `
-    + `something on the mount, and the same counter sees a press ${r.pressed}`);
+  /*
+   * ---- the rule as it stands from build 275 ---------------------------
+   *
+   * It was "nothing on the bar goes off by itself", and FLINCH and DEADBOLT
+   * are two upgrades that make PULSE and WARD do exactly that. What build 190
+   * actually objected to survives unchanged and is what this still asserts:
+   *
+   *   "an upgrade that spends a charge unasked is a charge you do not have
+   *    when you need it"
+   *
+   * So the claim is now about the CHARGE, not about the cast. Nothing spends
+   * one unasked -- with every node in the game owned, including the two that
+   * cast -- because they call `def.run(world)` and never `trigger()`. That is
+   * a stronger thing to guard than the old wording, because it is the thing
+   * that was wrong with REFLEX; "no ability ever fires itself" was only ever
+   * a proxy for it, and the proxy is what has changed.
+   *
+   * `heldOne` rather than `held`, and at a much lower floor: with FLINCH and
+   * DEADBOLT owned, PULSE throws the bodies off the mount every six seconds
+   * and the WARD cuts what is left, so "two of them held for most of the
+   * window" is no longer true and its being untrue is the feature working.
+   * Measured, 235 of 420 frames against the control's 400-odd -- so the floor
+   * here is set clear of that rather than near it, and the comparison between
+   * the two windows is asserted in the FLINCH check below, where it is the
+   * claim rather than the setup. What this one needs is only that the mount
+   * was occupied enough for a zero from the charge counter to mean something.
+   */
+  check('nothing on the bar SPENDS A CHARGE by itself, and the button still says so',
+    r.gripped >= 2 && r.heldOne > 120 && r.auto === 0 && r.lit && r.pressed,
+    `${r.gripped} on the mount and something held for ${r.heldOne} of 420 `
+    + `frames (two of them for ${r.held}): every one of ${r.slots} abilities `
+    + `owned, ${r.auto} charges spent unasked over seven seconds`
+    + `${r.who.length ? ` (${r.who.join(', ')})` : ''}; PULSE lit on `
+    + `${r.litWhenHeld}/${r.sampledHeld} of the frames sampled with something `
+    + `on the mount, and the same counter sees a press ${r.pressed}`);
+
+  /*
+   * ...and the other half, which is the one a build could get wrong in the
+   * quiet direction: the two nodes have to actually FIRE. Measured as
+   * arrivals in `world.effects` -- the object each ability's `run` puts on
+   * the field -- against a control of the same seven seconds with the two
+   * flags off, so a zero from the counter means "it did not fire" and not
+   * "the counter cannot see it". Six-second clocks over a seven-second
+   * window is one cast each, and the window is deliberately not long enough
+   * to make two look like one.
+   */
+  check('...and FLINCH and DEADBOLT are the two that do fire, and only when owned',
+    r.castShock >= 1 && r.castWard >= 1
+    && r.bareShock === 0 && r.bareWard === 0
+    && r.bareUnasked === 0 && r.bareHeld > 350
+    // ...and it WORKS: the mount is occupied for less of the owned window
+    // than of the control, because the thing that fires is what clears it.
+    && r.bareHeld > r.heldOne,
+    `owned: ${r.castShock} PULSE and ${r.castWard} WARD off the machine in `
+    + `seven seconds, ${r.ownedUnasked} charges spent for them, and the mount `
+    + `occupied for ${r.heldOne}/420 frames; not owned, on the same seven `
+    + `seconds: ${r.bareShock} and ${r.bareWard}, ${r.bareUnasked} charges, `
+    + `and the mount occupied for ${r.bareHeld}/420 -- the difference being `
+    + `what the two nodes threw off it`);
 }
 
 // --- every control on the play screen answers a real press ------------------
@@ -15870,9 +16000,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * the mandatory-levels throw, so a level count beside a `repeat` is dead
    * text. 108 across 54 became 109 across 55, and 263's AIRBURST -- one level,
    * because the pellets either go off or they do not -- makes it 110 across 56.
+   * Build 275's FLINCH and DEADBOLT are one level each for the same reason,
+   * and make it 112 across 58.
    */
   check('...and writing the numbers out changed no ladder',
-    r.total === 110 && r.rungs === 56 && r.repeats === 0,
+    r.total === 112 && r.rungs === 58 && r.repeats === 0,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
     + `now written out, which has to be a refactor and nothing else)`);
@@ -19360,9 +19492,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${out.graftAfter} of ${out.graftBefore} balls and lost ${out.hostLost}`);
 }
 
-// --- the six lots: ground reserved, and nothing else ------------------------
+// --- the four lots: ground reserved, and nothing else -----------------------
 /*
- * P5. Two works beside the machine and four emplacements in front of it,
+ * P5. Two works beside the machine and two emplacements in front of it,
  * drawn as dashed empty boxes in the same language the quick strip already
  * uses for a slot with nothing in it. They are field furniture by the same
  * argument as the building: in none of the lists anything walks.
@@ -19452,7 +19584,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
        * The lots BUILD from build 261, so the half of this that was "it can
        * never buy" is gone and is covered by the emplacement case. What is
        * left is the half that was always the point: a press that cannot go
-       * through still aims and still fires, because four of the six sit
+       * through still aims and still fires, because two of the four sit
        * exactly where the thumb goes to shoot. The purse is emptied on
        * purpose -- a refusal is the state under test.
        */
@@ -19489,9 +19621,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   }
   await page.setViewportSize(held);
 
-  check('six lots stand on the era-2 field and nowhere else',
-    rows.every((r) => r.eraOne === null && r.n === 6
-      && r.kinds === 'works,works,gun,gun,gun,gun' && r.inField),
+  check('four lots stand on the era-2 field and nowhere else',
+    rows.every((r) => r.eraOne === null && r.n === 4
+      && r.kinds === 'works,works,gun,gun' && r.inField),
     rows.map((r) => `${r.w}: era 1 ${r.eraOne}, era 2 ${r.n} lots (${r.kinds}), `
       + `all inside the field below the wall ${r.inField}`).join('; '));
 
@@ -19503,12 +19635,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('...clear of the machine, and clear of every control that takes a tap',
     rows.every((r) => r.offTurret && r.clashes === 0 && r.rects >= 6 && r.filled === 1),
     rows.map((r) => `${r.w}: nearest lot is ${r.tightest} from the turret against a `
-      + `fully rigged (${r.filled}) painted reach of ${r.rig}; 0 of 6 clash with `
-      + `${r.rects} interface rects (measured ${r.clashes})`).join('; '));
+      + `fully rigged (${r.filled}) painted reach of ${r.rig}; ${r.clashes} of `
+      + `${r.n} lots clash with ${r.rects} interface rects`).join('; '));
 
   /*
    * ...and the press. A lot REFUSES: it says so and it buys nothing, and the
-   * same press still aims and fires -- four of the six sit exactly where the
+   * same press still aims and fires -- two of the four sit exactly where the
    * thumb goes to shoot, so a lot that swallowed the press would cost a shot
    * every time you defended the ground it stands on.
    */
@@ -20940,7 +21072,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.struckThrown} and the one below ${r.openThrown}`);
 }
 
-// --- the emplacements: six lots, six guns, one line -------------------------
+// --- the emplacements: four lots, two guns, one line ------------------------
 /*
  * The build lots have stood empty since build 245 -- ground reserved, drawn,
  * and refusing every press. This is what they were for.
@@ -20990,15 +21122,22 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     /*
      * SPREAD, measured, and LEVEL from build 263.
      *
-     * The four ahead were one row at `lotStep` 70, which put the inner pair 54
-     * units either side of the turret's own column -- two guns up one lane.
-     * Build 261 answered that twice: the step went to 96 (the nearest pair is
-     * 144 apart) AND `lotStagger` dropped the inner two into a shallow V. The
-     * step is what fixed the lane; the V just made four fixtures sit crooked,
-     * and it is gone. `depths` is 1 now and asserted as 1 -- it was asserted
-     * as 2, which is the old rule written down as a fact.
+     * There were four ahead until build 275 and there are two. They were one
+     * row at `lotStep` 70, which put the inner pair 54 units either side of
+     * the turret's own column -- two guns up one lane. Build 261 answered that
+     * twice: the step went to 96 (the nearest pair 144 apart) AND `lotStagger`
+     * dropped the inner two into a shallow V. The step is what fixed the lane;
+     * the V just made four fixtures sit crooked, and it went in 263. `depths`
+     * is 1 and asserted as 1 -- it was asserted as 2, which is the old rule
+     * written down as a fact.
+     *
+     * So 144 is the FLOOR here and it is build 261's own number, not the
+     * current value: the survivors stand at 288 because they keep the outer
+     * pair's column, and the arithmetic that would have failed this --
+     * `(i - 0.5) * lotStep`, the obvious way to centre two -- gives 96 and is
+     * back inside the lane overlap that row was widened to fix.
      */
-    const ahead = a.lots.slice(2);
+    const ahead = a.lots.filter((l) => l.kind === 'gun');
     out.gap = +Math.min(...ahead.slice(1).map((l, i) => Math.abs(l.x - ahead[i].x))).toFixed(0);
     out.depths = new Set(ahead.map((l) => Math.round(l.y))).size;
     // ...and no two lots overlap, which a wider spread could have broken.
@@ -21141,10 +21280,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * The load-bearing one: a gun built AFTER the six is identical to the one
      * that was standing when they were bought. Every scalar is global and read
      * at the point of use, so there is nothing to migrate -- and the failure
-     * this rules out is the sixth lot being worth less than the first.
+     * this rules out is the LAST lot being worth less than the first.
+     *
+     * Lot 3, which is the second and last emplacement from build 275. It was
+     * 5, of four gun lots at 2..5.
      */
-    g.pressLot(5);
-    const late = w.gunAt.find((x) => x.lot === 5);
+    g.pressLot(3);
+    const late = w.gunAt.find((x) => x.lot === 3);
     out.lateBuilt = !!late;
     out.lateSame = JSON.stringify(gunStats(w)) === JSON.stringify(one);
     out.bothFire = w.gunAt.length === 2;
@@ -21173,10 +21315,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * which was the case throwing the save away, not the save losing it.
      */
     clean(2);
-    // 2 and 4, not 1 and 4: lot 1 is a WORKS slot and refuses a gun from
-    // build 263. It was written before the kinds were honoured.
+    // 2 and 3, which are the two gun lots. It was 1 and 4 before build 263,
+    // where lot 1 is a WORKS slot and refuses a gun, and 2 and 4 until 275,
+    // which took the row of four emplacements down to two.
     g.pressLot(2);
-    g.pressLot(4);
+    g.pressLot(3);
     g.buy('gunammo');
     w.gunsOn = false;
     g.checkpoint();
@@ -21192,7 +21335,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     /*
      * ---- ...and a save written before 263 does not stand one on a works ---
      *
-     * `world.guns` is six bits of lot indices and nothing else, so a run saved
+     * `world.guns` is four bits of lot indices and nothing else, so a run saved
      * while the kinds were unenforced can legitimately carry a 0 or a 1 in it.
      * `syncGuns` is the one place every gun in the run passes through on its
      * way to being drawn, and it is where that is refused -- the alternative
@@ -21219,6 +21362,27 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     syncGuns(w);
     out.legacyAgain = w.energy === purse2 && [...(w.guns || [])].join(',') === '3';
 
+    /*
+     * ---- ...and a save written before 275 does not stand one on NOTHING ---
+     *
+     * The row of four emplacements became two, so lot indices 4 and 5 name no
+     * lot at all in a run that carries them. That is the same fault as a gun
+     * on a works lot and it is caught by the same guard -- `!a.lots[i]` was
+     * the first term of the prune from the day it was written -- but "it is
+     * covered by an existing guard" is a claim, and an unasserted claim about
+     * a save format is how a run silently counts an emplacement it can never
+     * build. Asserted here rather than argued: pruned from the LIST, which is
+     * what `gunCount` and the TURRETS tab's lock read, and paid back.
+     */
+    const purse3 = w.energy;
+    w.guns = [3, 4, 5];
+    syncGuns(w);
+    out.shrunkStanding = w.gunAt.map((x) => x.lot).join(',');
+    out.shrunkList = [...(w.guns || [])].join(',');
+    out.shrunkRefund = w.energy - purse3;
+    out.shrunkWant = 2 * CFG.gun.cost;
+    out.shrunkCount = gunCount(w);
+
     delete w.director.update;
     g.setEra(1);
     g.restart();
@@ -21227,11 +21391,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
   check('a build lot buys one emplacement, and never eats the shot',
     r.eraOneYard && r.eraOnePress === false && r.eraOneGuns === 0
-    && r.lots === 6 && r.gap >= 120 && r.depths === 1 && !r.overlap
+    && r.lots === 4 && r.gap >= 144 && r.depths === 1 && !r.overlap
     && r.pressBuilt && r.pressPaid && r.pressFired
     && r.twiceCount === 1 && r.twicePaid && r.twiceFired,
     `era 1 has no yard (${r.eraOneYard}) and refuses the press (${r.eraOnePress}); `
-    + `at era 2 the four ahead are ${r.gap} apart on ${r.depths} line with `
+    + `at era 2 the two ahead are ${r.gap} apart on ${r.depths} line with `
     + `no overlap (${!r.overlap}); one press built it (${r.pressBuilt}), paid `
     + `(${r.pressPaid}) and still fired (${r.pressFired}); a second bought `
     + `nothing (${r.twicePaid}) and still fired (${r.twiceFired})`);
@@ -21244,10 +21408,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * restore and from the debug panel.
    */
   check('...and the two works slots beside the machine are not for guns',
-    r.kinds === 'works,works,gun,gun,gun,gun'
+    r.kinds === 'works,works,gun,gun'
     && r.worksRefused.every((x) => x === 'kind')
     && r.worksPaid && r.worksGuns === 0 && r.worksFired && r.worksRefusedPulse,
-    `the six are ${r.kinds}; buildGun answers ${r.worksRefused.join('/')} on the `
+    `the four are ${r.kinds}; buildGun answers ${r.worksRefused.join('/')} on the `
     + `two works lots; a thumb on one built nothing (+${r.worksGuns}), spent `
     + `nothing (${r.worksPaid}), pulsed the lot (${r.worksRefusedPulse}) and `
     + `still fired (${r.worksFired})`);
@@ -21262,7 +21426,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   /*
    * `lateSame` is the one that matters. Every scalar is global and read at the
    * point of use, so a gun built after the line was upgraded arrives with all
-   * of it -- the failure this rules out is the sixth lot being worth less than
+   * of it -- the failure this rules out is the LAST lot being worth less than
    * the first, which would be a trap rather than a decision.
    */
   check('six upgrades, and they reach guns that do not exist yet',
@@ -21284,7 +21448,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.offStanding} still standing; brought up, ${r.onTook}`);
 
   check('...and the line comes back with the run',
-    r.gone === 0 && JSON.stringify(r.backGuns) === '[2,4]' && r.backOn === false
+    r.gone === 0 && JSON.stringify(r.backGuns) === '[2,3]' && r.backOn === false
     && r.backAmmo === 'sabot' && r.backStanding === 2 && r.ammoCount === 3
     && r.legacyStanding === '3' && r.legacyList === '3'
     && r.legacyRefund === r.legacyWant && r.legacyAgain,
@@ -21294,6 +21458,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `pre-263 save carrying [0,1,3] stands only ${r.legacyStanding}, is pruned `
     + `to [${r.legacyList}] with ${r.legacyRefund} handed back, and a second `
     + `pass changes nothing (${r.legacyAgain})`);
+
+  /*
+   * The 275 half of the same guard. Two lots went; a run that had bought them
+   * is holding indices that name nothing, and what has to come back is the
+   * ENERGY and the COUNT -- `gunCount` is what unlocks the TURRETS tab, so a
+   * stale index is a tab that stays open onto emplacements nobody can place.
+   */
+  check('...and a save from when there were four emplacements is refunded down to two',
+    r.shrunkStanding === '3' && r.shrunkList === '3' && r.shrunkCount === 1
+    && r.shrunkRefund === r.shrunkWant,
+    `a pre-275 save carrying [3,4,5] stands only ${r.shrunkStanding}, is pruned `
+    + `to [${r.shrunkList}] (count ${r.shrunkCount}) with ${r.shrunkRefund} of `
+    + `${r.shrunkWant} handed back for the two lots that no longer exist`);
 }
 
 // --- what a lot costs, and where a gun points with nothing to shoot ---------
@@ -21361,7 +21538,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       drawYard(x, w, background.mood, price);
       /*
        * Counted inside the LOT'S OWN BOX and not over the whole frame. The
-       * lots are 96 apart and the window is 220 wide, so a neighbour's price
+       * lots were 96 apart and the window is 220 wide, so a neighbour's price
        * sits in it -- which did not matter while the text was 3.2 CSS px and
        * did the moment build 267 made it legible: the "gone once built" arm
        * read 1190 against 850 and failed, on a build where lot 3's own price
@@ -22877,10 +23054,22 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.hostMax = Math.round(hostMax);
 
     // ---- era 1 is untouched: no yard, no gate, no march -------------------
+    /*
+     * A POPULATION, not one spawn. This was a single `spawnDrift` with
+     * `Math.round(Math.abs(d1.vx)) > 0` asserted on it -- and the lateral is a
+     * random draw, so a draw under half a unit rounds to zero and the case
+     * fails on the die rather than on the rule. Build 273's notes record the
+     * same disease in the same case, on its hostile control, and it was fixed
+     * only there. Twenty-four of them and the MEAN, which cannot be a coin
+     * toss, plus the claim that says what "unchanged" means: not one of them
+     * is staged, because there is no gate at era 1 to be held behind.
+     */
     arm(1);
-    const d1 = spawnDrift(w, {});
-    out.eraOneStaged = !!d1.staged;
-    out.eraOneVx = Math.round(Math.abs(d1.vx));
+    const ones = [];
+    for (let k = 0; k < 24; k++) ones.push(spawnDrift(w, {}));
+    out.eraOneStaged = ones.some((d) => d.staged);
+    out.eraOneVx = +(ones.reduce((a, d) => a + Math.abs(d.vx), 0) / ones.length).toFixed(1);
+    out.eraOneStill = ones.filter((d) => Math.abs(d.vx) < 0.5).length;
 
     // ---- and a mine is smaller at era 2, ON THE GLASS ---------------------
     const mineR = () => { w.mines.length = 0; throwMine(w, 'blast'); return w.mines[0].r; };
@@ -22916,13 +23105,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('DRIFT floats out past the gate before it fans, the way a hostile does',
     r.bornStaged && r.bornVx === 0
     && r.pastGate && r.heldMax <= r.hostMax * 1.5
-    && r.eraOneStaged === false && r.eraOneVx > 0,
+    && r.eraOneStaged === false && r.eraOneVx > 1 && r.eraOneStill < 12,
     `at era 2 it is born staged with no lateral and its march never exceeds `
     + `${r.heldMax} u/s of lateral, against ${r.hostMax} for a hostile doing `
     + `the same thing; it comes loose at y ${r.looseAt}, past the gate at `
     + `${r.gate} (${r.pastGate}), and fans from there (${r.looseVx} on the `
     + `release frame, a draw and not a rule); era 1 has no gate and is `
-    + `unchanged (staged ${r.eraOneStaged}, lateral ${r.eraOneVx})`);
+    + `unchanged (none of 24 staged: ${!r.eraOneStaged}, mean lateral `
+    + `${r.eraOneVx} with ${r.eraOneStill} of them under half a unit)`);
 
   check('...and a mine is smaller at era 2, on the glass and in its reach',
     Math.abs(r.shrink - r.want) < 0.02 && r.css2 < r.css1 && r.reachUsesR,
@@ -23493,6 +23683,299 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `cutting 3 tiles shed ${r.shed} shards, all of them steerable and its own `
     + `(${r.shardsSteer}); the death reconciled it (${r.reconciled}) leaving `
     + `"${r.leftovers || 'nothing'}" still flying`);
+}
+
+// --- DRIFT springs a mine, because a mine is ground and not a weapon --------
+/*
+ * Build 275. `harmless` is the one refusal DRIFT carries, and CLAUDE.md
+ * records that it is honoured by FIVE paths: WIRE's cut, a Patch's bite,
+ * LANCE's sweep, WARD's arc -- all damage -- and the mine TRIGGER, which is
+ * not. The trigger is a chooser, and what it was choosing was a THREAT: "only
+ * things that could corrupt the feed can set a mine off". A mine is not aimed
+ * at anything. It is ground that goes off when something stands on it, and a
+ * DRIFT walking over five of them and nothing happening is the report.
+ *
+ * Three things have to hold together, and a bare "the mine went off" satisfies
+ * none of them on its own -- a mine expires by itself in fifteen seconds and a
+ * mine on a busy field is sprung by something else:
+ *
+ * 1. A DRIFT alone on the field springs it, and springs it EARLY -- inside a
+ *    couple of seconds, not at the end of its life, which is what expiry looks
+ *    like from outside.
+ * 2. A control on the same frames with the field empty does NOT spring it, so
+ *    the instrument is reading the body and not the clock.
+ * 3. The four refusals that are damage paths are still refusals. This change
+ *    is one line in one chooser and must not have leaked into them -- the way
+ *    borrowing `harmless` for its side effect leaked five of them onto the
+ *    practice dummy in build 232.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { throwMine } = await import('../src/mines.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const clean = () => {
+      g.restart();
+      // The damage-bench family leaves both of these behind; see the note on
+      // the aperture case above.
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveEnergy(200000);
+      w.director.update = () => {};
+      g.debugClearField();
+      w.mines.length = 0;
+      w.effects.length = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+    };
+
+    /*
+     * One mine, laid by hand where the body will be, then armed and settled
+     * the way the field does it -- a mine that has not armed cannot be sprung
+     * by anything and would read as the change not working.
+     */
+    const lay = (x, y) => {
+      w.mines.length = 0;
+      throwMine(w, 'blast');
+      const m = w.mines[0];
+      m.x = x; m.y = y;
+      m.landed = true;
+      m.t = 1;
+      m.settle = m.cfg.arm + 1;
+      return m;
+    };
+
+    const watch = (m, secs) => {
+      for (let f = 0; f < 60 * secs; f++) {
+        g.update(1 / 60);
+        if (m.dead || !w.mines.includes(m)) return +(f / 60).toFixed(2);
+      }
+      return null;
+    };
+
+    // ---- 1. a DRIFT springs one ------------------------------------------
+    clean();
+    const s = w.shooter;
+    const at = { x: s.x + 60, y: s.y - 220 };
+    let m = lay(at.x, at.y);
+    out.armed = m.armed;
+    const d = g.debugSpawn('drift', at.x, at.y);
+    d.staged = false;
+    d.spawnIn = 0;
+    out.isHarmless = !!d.harmless;
+    out.driftSprungAt = watch(m, 6);
+    out.driftLost = +(d.type.hp - d.hp).toFixed(1);
+
+    // ---- 2. ...and an empty field does not ------------------------------
+    /*
+     * The control, and it is the arm that makes the number above mean
+     * anything: a mine ends by itself when `life` runs out, so "it is gone"
+     * is true of a working build and of a build where nothing changed. Same
+     * frames, same mine, nothing standing on it.
+     */
+    clean();
+    m = lay(at.x, at.y);
+    out.bareSprungAt = watch(m, 6);
+    out.bareAlive = w.mines.includes(m) && !m.dead;
+
+    // ---- 3. the four damage paths still refuse it ------------------------
+    /*
+     * Read off the source rather than driven, because each of the four is a
+     * different mechanism on a different clock and what is being asserted is
+     * that ONE line moved. A DRIFT held under each in turn would be four more
+     * benches for a claim about a chooser.
+     */
+    const src = await Promise.all(['../src/mines.js', '../src/abilities.js']
+      .map((p) => fetch(p).then((x) => x.text())));
+    const all = src.join('\n');
+    // WIRE's cut and a Patch's bite live in mines.js; LANCE's sweep and
+    // WARD's arc in abilities.js. Every one of them still names `harmless`.
+    out.stillRefusing = (all.match(/e\.harmless|\.harmless\b/g) || []).length;
+    out.triggerLine = /if \(e\.dead \|\| e\.staged \|\| e\.spent\) continue;/.test(src[0]);
+    out.triggerHadHarmless = /e\.dead \|\| e\.harmless \|\| e\.staged \|\| e\.spent/.test(src[0]);
+
+    g.restart();
+    return out;
+  });
+
+  check('a DRIFT springs a mine, and an empty field does not',
+    r.armed && r.isHarmless
+    && r.driftSprungAt !== null && r.driftSprungAt < 2
+    && r.bareSprungAt === null && r.bareAlive,
+    `an armed mine with one DRIFT standing on it went in ${r.driftSprungAt}s `
+    + `(the DRIFT lost ${r.driftLost}); the same mine over the same six `
+    + `seconds with nothing on the field is still there (${r.bareAlive})`);
+
+  /*
+   * ...and the change is ONE line in the chooser. `harmless` is still what
+   * WIRE, a Patch, LANCE and WARD refuse, and a sweep that only counted the
+   * trigger would not notice one of those four going with it.
+   */
+  check('...and the four damage paths that refuse scenery still refuse it',
+    r.triggerLine && !r.triggerHadHarmless && r.stillRefusing >= 4,
+    `the trigger no longer names harmless (${!r.triggerHadHarmless}) and reads `
+    + `dead/staged/spent (${r.triggerLine}); ${r.stillRefusing} refusals of it `
+    + `are left across mines.js and abilities.js`);
+}
+
+// --- what FLINCH and DEADBOLT REFUSE, which is the whole of their safety ----
+/*
+ * Build 275. Both call `def.run(world)` rather than `Abilities.trigger`, which
+ * is what keeps the player's charge, cooldown and first-use caption out of it
+ * -- and `trigger` is also the door that closes three things on the way in.
+ * Calling `run` means closing them by hand, and every one of the three fails
+ * SILENTLY if it is not:
+ *
+ *   SEALED   WARD is in LOCKABLE.abilities and has to be bought. Nothing about
+ *            owning DEADBOLT owns WARD, and a ledger replay pushes bought ids
+ *            straight in without consulting the tree -- so an unconditional
+ *            `run` stands up a shell the run does not have.
+ *   HELD     AXIOM's clauses hold ability ids shut. An automatic cast that
+ *            ignored the hold is a second door through the eighth anomaly's
+ *            entire mechanic. `isHeld` refuses `essential` at the reader, so
+ *            PULSE is exempt on purpose and only WARD can be held.
+ *   BUSY     `run` pushes a NEW Ward every time. Nothing refuses a duplicate,
+ *            so two shells at the same radius cut and arc the same bodies
+ *            twice -- which has never mattered because the only caller was a
+ *            button on an eighteen-second cooldown against a six-second life.
+ *            Holding the CLOCK on it, not just the cast, is also what stops a
+ *            six-second clock over a six-second life being a permanent wall.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { wardStanding } = await import('../src/abilities.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    const s = () => w.shooter;
+    const grip = () => {
+      // Topped up every frame: the whole point of these two is that they
+      // clear the mount, so a body put down once is gone by the next cast.
+      for (let n = w.attackers.size; n < 1; n++) {
+        const e = g.debugSpawn('lurcher', s().x + 4, s().y - 6);
+        e.spawnIn = 0; e.vx = 0; e.vy = 0; e.staged = false;
+      }
+    };
+    const clean = () => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.director.update = () => {};
+      g.debugTeachAll();
+      g.debugGiveEnergy(200000);
+      w.enemies.length = 0;
+      w.effects.length = 0;
+      w.attackers.clear();
+      w.autoAim = false;
+      w.autoFire = false;
+    };
+    // How many shells stood up over `secs`, counted as ARRIVALS, and the most
+    // that were ever up at once.
+    const shells = (secs) => {
+      let seen = 0;
+      let most = 0;
+      let had = 0;
+      for (let f = 0; f < 60 * secs; f++) {
+        grip();
+        g.update(1 / 60);
+        let n = 0;
+        for (const e of w.effects) if (e.constructor.name === 'Ward' && !e.dead) n++;
+        if (n > had) seen += n - had;
+        had = n;
+        most = Math.max(most, n);
+      }
+      return { seen, most };
+    };
+
+    out.wardLife = CFG.ward.life;
+    out.every = CFG.reflex.every;
+
+    // ---- SEALED: DEADBOLT owned, WARD not bought -------------------------
+    clean();
+    w.up.deadbolt = true;
+    w.unlocked.delete('ward');
+    out.sealedIs = g.abilitySealed(w.abilities.slots.findIndex((x) => x.def.id === 'ward'));
+    out.sealedShells = shells(26).seen;
+
+    // ...and the control: the same fourteen seconds with WARD bought.
+    clean();
+    w.up.deadbolt = true;
+    w.unlocked.add('ward');
+    const open = shells(26);
+    out.openShells = open.seen;
+    out.openMost = open.most;
+
+    // ---- HELD: AXIOM's clause has the button --------------------------
+    clean();
+    w.up.deadbolt = true;
+    w.unlocked.add('ward');
+    w.abilityHold.add('ward');
+    out.heldShells = shells(26).seen;
+    // ...and PULSE cannot be held at all, which is the guard in the READER.
+    const pi = w.abilities.slots.findIndex((x) => x.def.essential);
+    w.abilityHold.add('pulse');
+    out.pulseHoldable = w.abilities.isHeld(w, pi);
+    w.abilityHold.clear();
+
+    // ---- BUSY: never two shells, and the clock waits for the first ------
+    /*
+     * `wardStanding` is the exported predicate the cast uses, asserted here
+     * against the same frames so the case and the code are asking the same
+     * question of the same object rather than two `constructor.name` tests.
+     */
+    clean();
+    w.up.deadbolt = true;
+    w.unlocked.add('ward');
+    let standing = 0;
+    let frames = 0;
+    for (let f = 0; f < 60 * 26; f++) {
+      grip();
+      g.update(1 / 60);
+      frames++;
+      if (wardStanding(w)) standing++;
+    }
+    out.dutyPct = Math.round((100 * standing) / frames);
+
+    g.restart();
+    return out;
+  });
+
+  /*
+   * Twenty-six seconds, because the period is TWELVE -- six standing and six
+   * of clock. A window of fourteen gives one cast on a working build and one
+   * on a build that fires once and then jams, which is no instrument at all.
+   */
+  check('DEADBOLT will not stand up a WARD the run has not bought',
+    r.sealedIs === true && r.sealedShells === 0 && r.openShells >= 2,
+    `with WARD sealed (${r.sealedIs}) twenty-six seconds of being gripped stood `
+    + `up ${r.sealedShells} shells; with it bought, the same twenty-six stood `
+    + `up ${r.openShells}`);
+
+  check('...nor one an anomaly is holding shut, and PULSE can never be held',
+    r.heldShells === 0 && r.pulseHoldable === false,
+    `with 'ward' in world.abilityHold: ${r.heldShells} shells in twenty-six `
+    + `seconds; PULSE put in the same set is still not held (${r.pulseHoldable}) `
+    + 'because isHeld refuses `essential` at the reader');
+
+  /*
+   * The duty cycle is the assertion, not the shell count: a shell lasts as
+   * long as the clock, so "it fired six times" is true of the correct build
+   * and of one that leaves a wall standing for ever. Six up and six down is
+   * about half; a clock counted from the CAST instead of from the fall would
+   * read close to 100 and is the failure this rules out.
+   */
+  check('...and one shell at a time, which is what stops six seconds being a wall',
+    r.openMost === 1 && r.dutyPct > 25 && r.dutyPct < 75,
+    `never more than ${r.openMost} shell up at once, standing for ${r.dutyPct}% `
+    + `of twenty-six seconds of being gripped -- a ${r.wardLife}s life on a `
+    + `${r.every}s clock that does not run while the shell is up`);
 }
 
 // --- report -----------------------------------------------------------------

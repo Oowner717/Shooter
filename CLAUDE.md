@@ -545,12 +545,43 @@ came from before believing the other one covers it.
   node put together, and it was on ONE round of nine. `regress.mjs` asserts
   the absence of any node whose id ends in `tap` as well as the product, which
   is what catches a replacement arriving under a new name.
-- **Nothing in this game casts an ability.** REFLEX fired PULSE for you once
-  two things had hold of the turret; it went in build 190 along with the node,
-  because an upgrade that spends a charge unasked is a charge you do not have
-  when you need it. The telling was never the automation's: `.ab.urgent`
-  breathes on the PULSE button for as long as anything is attached, bought or
-  not. `regress.mjs` holds the rule with the whole tree owned.
+- **Nothing in this game spends a CHARGE unasked** -- which is narrower than
+  the rule that stood from build 190 to 274, and is the thing that was
+  actually wrong. REFLEX fired PULSE for you once two things had hold of the
+  turret and went through `Abilities.trigger`, which spends `s.charges`,
+  starts `s.cd` and sets `s.used`. Build 275's FLINCH and DEADBOLT put the
+  behaviour back and call `def.run(world)` instead: the effect happens, with
+  every ring, spark, shake and `audio.ability(...)` it carries, and the
+  button is untouched. The telling is unchanged and is still not the
+  automation's: `.ab.urgent` breathes on the PULSE button for as long as
+  anything is attached, bought or not. `regress.mjs` holds the charge rule
+  with the whole tree owned, and holds the other half separately -- that the
+  two nodes DO fire, counted as arrivals in `world.effects` against a control
+  of the same window with both flags off.
+- **Calling `run()` instead of `trigger()` means closing three doors by hand,
+  and all three fail silently.** SEALED: WARD is in `LOCKABLE.abilities` and
+  nothing about owning DEADBOLT owns WARD, so an unconditional `run` stands up
+  a shell the run has not bought -- and a ledger replay pushes ids in without
+  consulting the tree. HELD: `world.abilityHold` is AXIOM's, and a cast that
+  ignored it is a second door through the eighth anomaly's whole mechanic
+  (`isHeld` refuses `essential` at the reader, so PULSE is exempt on purpose).
+  BUSY: `run` pushes a NEW `Ward` every time and nothing refuses a duplicate,
+  so two shells at one radius cut and arc the same bodies twice -- which never
+  mattered while the only caller was a button on an 18s cooldown against a 6s
+  life. `wardStanding(world)` is exported for that rather than a
+  `constructor.name` test at the call site, which survives a rename and
+  quietly stops matching.
+- **A clock reset by the condition it answers is not a cooldown.** FLINCH's
+  and DEADBOLT's were zeroed whenever `world.attackers` emptied, so the first
+  grab of a wave was answered instantly -- and these two upgrades are what
+  CLEARS the mount, so the mount is empty a lot and the clock re-armed
+  continuously. Measured: a WARD standing for 100% of twenty-six seconds of
+  being gripped, a permanent wall bought with one level. A cooldown runs down
+  ALWAYS and the condition only decides when it is spent, which still answers
+  the first grab immediately because the clock ran out during the quiet. And
+  for a STATE ability the clock is held at full while its own effect stands,
+  or `every` equal to `life` is 100% duty by construction: 6 up and 6 down is
+  what "6 second cooldown" has to mean when the thing lasts 6 seconds.
 - The counter behind that rule took **four** versions and every wrong one
   reported a clean bar through a turret firing itself twice a second. Hooking
   `Game.useAbility` caught nothing and was never shown to catch anything.
@@ -1769,4 +1800,37 @@ came from before believing the other one covers it.
   and was fixed only there. Anything keyed on how many things exist rots when
   something is added; the claim in that case's name is "half the roster", so
   the rule is a fraction.
+- **A renamed entry in `SCALED` stops being scaled, silently and totally.**
+  `yard.lotStep` became `lotSpread` and `SCALED` still named the old path. The
+  module-load guard tested `!o` -- the PARENT object -- and `CFG.yard` was
+  still there, so it passed: `BASE[path]` is `undefined`, `setPath` writes
+  `undefined * scale` (NaN) into a key nothing reads, and a value that had been
+  scaled on every resize simply is not any more. The two era-2 lots kept their
+  era-1 spread and NO arm in the suite could see it, because every assertion
+  about them is a floor the unscaled number still clears. The guard checks the
+  LEAF now and requires a number. Same shape as the `export let` snapshot and
+  the `[hidden]` trap: a thing set, and silently not applied one layer down.
+- **`harmless` is a refusal FIVE paths honour, and one of them was a chooser
+  in the wrong clothes.** WIRE's cut, a `Patch`'s bite, LANCE's sweep and
+  WARD's arc are damage and still refuse it; the mine TRIGGER was refusing it
+  under a comment reading "only things that could corrupt the feed can set a
+  mine off", which makes a mine a weapon aimed at a threat. It is ground that
+  goes off when something stands on it. Build 275 took `harmless` out of that
+  one line, so a DRIFT springs a mine. What it costs was measured BEFORE the
+  change: at tier 1, five of six mines have a DRIFT inside their trigger reach
+  within a median 6.8s of a 15s life, against a field of ten drifters and no
+  hostiles -- so an early mine now mostly pays out in DRIFT, which is worth
+  energy, rather than sitting inert. Two of four by tier 8.
+- **A mine case needs a control, because a mine ends by itself.** `life` is 15
+  and "the mine is gone" is true of a working build and of one where nothing
+  changed. The arm is the same mine over the same frames with an empty field,
+  still standing.
+- **The lot count was written out in four places and the fix is a table.** A
+  `length === 6` guard, two loop bounds and a `(i - 1.5)` centring term that
+  only made sense for four. `LOTS` in yard.js is the count now. And where two
+  survivors STAND is a real decision, not arithmetic: `(i - 0.5) * lotStep` is
+  the obvious way to centre two and puts them 96 apart, which is back inside
+  the two-guns-up-one-lane fault build 261 widened that row to fix. They keep
+  the OUTER pair's column, so every clash bound is one that pair already
+  passed.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

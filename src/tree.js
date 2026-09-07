@@ -94,13 +94,19 @@ export const UNDER = {
 
   // ---- the abilities ----
   // REFLEX sat here until build 190, when it went: it fired PULSE for you,
-  // and nothing in this game casts an ability for you.
+  // and nothing in this game casts an ability for you. Build 275 puts the
+  // behaviour back as FLINCH and DEADBOLT -- under the BUTTON each one fires
+  // rather than up here, because "PULSE goes off by itself" is a fact about
+  // PULSE and belongs beside SHOCKFRONT, the other thing you can buy for it.
+  // What 190 objected to was the CHARGE, and neither of them spends one; see
+  // the note on both in upgrades.js.
   abilities: ['standing'],
   // The only ability besides SPIRAL with a knob of its own -- and it earns it
   // for the same reason: PULSE is the one thing that answers a body already
   // on the mount, so how far it reaches and how hard it throws is a decision
-  // rather than a number.
-  pulse: ['shockfront'],
+  // rather than a number. FLINCH is the third thing that follows from that:
+  // if it is the answer to being gripped, it can be the automatic one.
+  pulse: ['shockfront', 'flinch'],
   // ...and HAIL's, from build 263. It is the other free ability and the other
   // one that answers a crowd rather than a body, and AIRBURST is the decision
   // its fan poses: a fan is mostly gaps, and this is what closes them.
@@ -110,7 +116,7 @@ export const UNDER = {
   // cuts, how many arcs come off it, and whether it throws as it comes up.
   // It is a STATE rather than an event, which is what gives it four decisions
   // to sell where an instant has one.
-  ward: ['standoff', 'edged', 'fork', 'heave'],
+  ward: ['standoff', 'edged', 'fork', 'heave', 'deadbolt'],
 };
 
 /** Which arms hang off which category, in the order they are shown. */

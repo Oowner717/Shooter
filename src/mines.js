@@ -873,12 +873,32 @@ export function updateMines(world, dt) {
       const reach = m.r + m.cfg.trigger * world.up.mineTrigger * own;
       for (const e of world.enemies) {
         /*
-         * Only things that could corrupt the feed can set a mine off -- and
-         * this is a CHOOSER, so `staged` belongs here where it does not
-         * belong in the damage paths above. `spent` joins it: a boss's frame
-         * through its own outro must not spring a mine either.
+         * A CHOOSER, so `staged` belongs here where it does not belong in the
+         * damage paths above: a body still coming through the doorway has not
+         * arrived on the ground the mine is denying. `spent` joins it -- a
+         * boss's frame through its own outro must not spring a mine either.
+         *
+         * ---- and `harmless` came OUT of this line in build 275 -----------
+         *
+         * It read "only things that could corrupt the feed can set a mine
+         * off", which made a mine a weapon aimed at a THREAT. A mine is not
+         * aimed at anything: it is ground that goes off when something stands
+         * on it, and scenery standing on it is something standing on it. A
+         * DRIFT walked over five of them and nothing happened, which is the
+         * report -- and it is also the last of the five refusals `harmless`
+         * was quietly buying (WIRE's cut, a Patch's bite, LANCE's sweep and
+         * WARD's arc are the others, and they are damage paths that stay).
+         *
+         * What it costs is real and was measured before it was made: at tier
+         * 1, five of six mines have a DRIFT inside their trigger reach within
+         * a median 6.8 seconds of a fifteen-second life, against a field
+         * holding ten drifters and no hostiles. So an early-game mine now
+         * mostly pays out in DRIFT -- which is worth energy, banks through
+         * `CFG.energy.drift`, and is a legitimate thing for a mine to be
+         * spent on -- rather than sitting inert. It is far less by tier 8
+         * (two of four) as the field fills with things that are not scenery.
          */
-        if (e.dead || e.harmless || e.staged || e.spent) continue;
+        if (e.dead || e.staged || e.spent) continue;
         // ...and nothing behind the wall springs one, or a mine laid at the
         // hold line would be spent on a body it could not have damaged.
         if (shielded(world, e)) continue;

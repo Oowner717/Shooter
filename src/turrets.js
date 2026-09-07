@@ -27,9 +27,16 @@
  * `world.yard` is derived in `Game.resize` and thrown away on every rotation,
  * era change and bench door -- it is furniture, not state. A gun's PLACE is
  * therefore the lot's place and is re-derived with it; the only thing that is
- * a fact about the run is WHICH LOTS HAVE ONE, which is six bits. `world.guns`
+ * a fact about the run is WHICH LOTS HAVE ONE, which is four bits. `world.guns`
  * is that: a sorted list of lot indices, saved with the run, and everything
  * else about a gun is recomputed from the lot it stands on.
+ *
+ * ...and it is why build 275 cost nothing to migrate. Taking the row of four
+ * emplacements down to two removed lot indices 4 and 5 from the world, and a
+ * run saved with a gun on one of them arrives holding an index that names
+ * nothing. `syncGuns` already prunes-and-refunds exactly that -- it was
+ * written in 263 for a gun standing on a WORKS lot -- so the shrink is caught
+ * by a guard that already existed, and the 2600 goes back to the purse.
  *
  * ---- why every upgrade is global ----
  *
@@ -50,7 +57,7 @@ import { spark } from './fx.js';
 /**
  * The ammunition the emplacements carry, in the order MUNITION steps through.
  *
- * One rack for all six -- "they all shoot the same type of ammo" is the rule,
+ * One rack for every gun -- "they all shoot the same type of ammo" is the rule,
  * and it is what makes MUNITION a decision about the whole line rather than
  * six decisions. Each entry is a complete round: the numbers a gun fires with
  * and the form `drawProjectiles` gives it.
@@ -140,9 +147,11 @@ export function syncGuns(world) {
   /*
    * ---- and a pre-263 save is PRUNED, not just skipped ------------------
    *
-   * `world.guns` is six bits of lot indices and nothing else, so a run saved
+   * `world.guns` is four bits of lot indices and nothing else, so a run saved
    * while the kinds were unenforced (builds 261 and 262) can legitimately
-   * carry a 0 or a 1 in it. Skipping those on the way to the screen is not
+   * carry a 0 or a 1 in it -- and a run saved before build 275 took the row
+   * of four emplacements down to two can carry a 4 or a 5, which now names no
+   * lot at all. Skipping either on the way to the screen is not
    * enough on its own: the index stays in the list, is written back out by
    * every save after it, and `world.guns.length` -- which is what unlocks
    * the TURRETS tab and what `gunCount` returns -- goes on counting an
@@ -173,7 +182,7 @@ export function syncGuns(world) {
       // It was `R * 3` by `R * 2.3` -- 48 by 36.8 against a lot of 46 by 40 --
       // so the thing that is supposed to read as bolted to the ground
       // overhung its own dashed outline by a unit on each side and fell an
-      // unit and a half short top and bottom. Four of them, all differently
+      // unit and a half short top and bottom. All of them differently
       // wrong against the boxes still drawn under them.
       hw: l.hw,
       hh: l.hh,

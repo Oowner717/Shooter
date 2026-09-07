@@ -22,7 +22,7 @@ import { glitch } from './glitch.js';
 import { audio } from './audio.js';
 import { Director, spawnOne, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectEnergy, drawIn, intakeRate, ENTRY_Y, dividend } from './enemies.js';
 import { Shooter, Front } from './shooter.js';
-import { Abilities } from './abilities.js';
+import { Abilities, wardStanding } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
 import { updateMines, drawMines, mineCadence, throwMine } from './mines.js';
 import { Narrator } from './narrative.js';
@@ -352,6 +352,18 @@ export class Game {
        */
       abilityHold: new Set(),
       /*
+       * FLINCH's and DEADBOLT's clocks -- the two upgrades that cast. See
+       * `runUpgrades` and CFG.reflex. Declared HERE for the reason
+       * `abilityHold` above is: the suite sweeps for reads of fields the world
+       * does not have, and a clock that springs into existence the first time
+       * something grabs the machine is a field every reader has to guess at.
+       * They are NOT saved: a clock part-way through is about this second and
+       * not about the run, and a restore that inherited one would fire on the
+       * first frame back.
+       */
+      flinchT: 0,
+      deadboltT: 0,
+      /*
        * Which ways in this run has already been HANDED, from build 227. Its
        * own record rather than a reading of `apertures`, because an aperture
        * is spent when the way is opened and a spent one would be handed
@@ -493,8 +505,11 @@ export class Game {
     w.projectiles.length = 0;
     w.effects.length = 0;
     // The PILE clock, with the effects it makes. A restart that left it part
-    // way through would fire a wave into a fresh field.
+    // way through would fire a wave into a fresh field. FLINCH's and
+    // DEADBOLT's go with it, for the same reason.
     w.pileT = 0;
+    w.flinchT = 0;
+    w.deadboltT = 0;
     w.mines.length = 0;
     w.pendingBlasts.length = 0;
     // The flag comes off with the membership, or the grab loop -- which skips
@@ -954,6 +969,8 @@ export class Game {
     w.stasis = 0;
     w.shock = 0;
     w.pileT = 0;
+    w.flinchT = 0;
+    w.deadboltT = 0;
     w.heldFor = 0;
     w.heldSaid = 1e9;
 
@@ -1605,7 +1622,7 @@ export class Game {
       /*
        * The lot just bought, BY INDEX. `gunAt` is built by walking
        * `world.guns`, which is sorted ascending, so "the last one" is the
-       * highest lot index and not the newest -- buy lot 5 and then lot 2 and
+       * highest lot index and not the newest -- buy lot 3 and then lot 2 and
        * the flare went off on lot 5.
        */
       const g = w.gunAt.find((x) => x.lot === i) || w.yard.lots[i];
@@ -1646,7 +1663,7 @@ export class Game {
      * they carry `kind: 'works'` and the field has drawn them as a building
      * since build 245. Until 263 `buildGun` did not read that, so a press put
      * a turret on a slot ghosted as a block. It refuses now, and says which
-     * of the six are yours to build a gun on rather than only saying no.
+     * of the four are yours to build a gun on rather than only saying no.
      */
     /*
      * ...ONCE, and not on every press. `pressLot` runs from the canvas
@@ -1929,7 +1946,7 @@ export class Game {
        * A build lot BUILDS, and the press still goes on to aim and fire.
        *
        * That second half is the rule and it has not changed since the lots
-       * were only ever refusing: four of the six sit exactly where the thumb
+       * were only ever refusing: two of the four sit exactly where the thumb
        * goes to shoot, so a lot that swallowed the press would cost a shot
        * every time you defended the ground it stands on. Buying an
        * emplacement is a side effect of a tap that is still a shot.
@@ -2820,17 +2837,108 @@ export class Game {
     } else w.pileT = 0;
 
     /*
-     * REFLEX used to sit here: PULSE fired itself once two things had hold of
-     * the turret. It went in build 190, and the rule it broke is the one the
-     * rest of the bar has always kept -- nothing in this game casts an ability
-     * for you. A charge spent without being asked is a charge you did not have
-     * when you needed it, and the ability whose whole job is answering a
-     * crowd is the worst one to take that decision away on.
+     * ---- FLINCH and DEADBOLT: the two that cast ------------------------
      *
-     * The telling was never the automation's anyway. `.ab.urgent` breathes on
-     * the PULSE button for as long as anything is attached, with or without
-     * the upgrade -- see Hud.syncAbilities. That is what stays.
+     * REFLEX sat here until build 190, when it went with the rule written
+     * down beside it: nothing in this game casts an ability for you, because
+     * a charge spent without being asked is a charge you did not have when
+     * you needed it. Build 275 puts the behaviour back and keeps the rule,
+     * by taking the ONE thing 190 actually objected to out of it.
+     *
+     * `def.run(world)`, NOT `abilities.trigger(...)`. `trigger` spends
+     * `s.charges`, starts `s.cd` and sets `s.used` -- the charge, the clock
+     * and the first-use caption, all three of which belong to the player.
+     * `run` is the effect on its own. So an owner of FLINCH gets a PULSE off
+     * the machine while something is gripping it AND still has their own
+     * PULSE in hand, which is the only version of this that is not a tax.
+     *
+     * Here rather than anywhere nearer the abilities because this is the
+     * method for upgrades that do something on a clock, and because
+     * `runUpgrades` is called BELOW the `if (w.boss)` branch in `update()`.
+     * A clock written inside `Director.update` is dead for the whole of an
+     * anomaly -- which is exactly how build 210's glitch douse was lost --
+     * and "something has hold of the machine" is at its most true in a fight.
+     *
+     * The condition is `w.attackers.size`, which is the game's own answer to
+     * "is something attached": filled and RELEASED by `checkContact`, four
+     * units of hysteresis apart so a body resting on the rim cannot chatter.
+     * The clock only runs while that is true, so neither of these can be
+     * farmed on an empty field -- and it is reset when it is not, so the
+     * first grab of a wave is answered immediately rather than on whatever
+     * was left of a clock from the last one.
+     *
+     * DEADBOLT asks `isHeld` and FLINCH does not have to. AXIOM's clauses can
+     * hold WARD shut; they can never hold PULSE, which is `essential` and is
+     * refused by `isHeld` itself. An automatic cast that ignored the hold
+     * would be a second door straight through the eighth anomaly's whole
+     * mechanic -- the `setTier`-past-`climbTo` shape, again.
+     *
+     * The telling is unchanged and is still not the automation's. `.ab.urgent`
+     * breathes on the PULSE button for as long as anything is attached, with
+     * or without either node -- see Hud.syncAbilities.
      */
+    const R = CFG.reflex;
+    /*
+     * ---- a COOLDOWN, which means it runs whether or not you are held ----
+     *
+     * The first version reset the clock to zero the moment `w.attackers` was
+     * empty, so that the first grab of a wave was answered on the frame it
+     * happened. That is wrong, and wrong in the one direction that matters:
+     * these two upgrades are what CLEARS the mount, so the mount is empty a
+     * lot -- and a clock zeroed on release re-arms instantly and fires again
+     * the moment anything touches you. Measured, a WARD stood for 100% of
+     * twenty-six seconds of being gripped: a permanent wall bought with one
+     * level, which is exactly what the six seconds exist to prevent.
+     *
+     * So it is an ordinary cooldown. It runs down always, and being gripped
+     * is only the condition for SPENDING it -- which still answers the first
+     * grab of a wave immediately, because the clock ran out during the quiet.
+     *
+     * `busy` is the other half and only WARD has one. A PULSE is an instant;
+     * a WARD is a STATE, `run` pushes a new shell every time it is called and
+     * nothing refuses a duplicate, so two at the same radius cut and arc the
+     * same bodies twice. Holding the clock AT FULL while the shell stands is
+     * what makes six seconds mean six seconds: the countdown begins when the
+     * shell FALLS, so it is six up and six down while you are held rather
+     * than a wall. Counted from the cast instead, a 6s clock over a 6s life
+     * is 100% and the node is a different, much larger thing.
+     */
+    const cast = (id, key, busy) => {
+      const i = w.abilities.slots.findIndex((x) => x.def.id === id);
+      if (i < 0) return;
+      const slot = w.abilities.slots[i];
+      w[key] -= dt;
+      // Held at full while its own effect is standing; see above.
+      if (busy && busy(w)) { w[key] = R.every; return; }
+      if (w[key] > 0) return;
+      // Armed, and waiting for something to answer. The clock does not go
+      // negative without bound -- it sits at zero until it is spent.
+      w[key] = 0;
+      if (w.attackers.size === 0) return;
+      /*
+       * Two refusals, and both are doors `trigger()` would have closed for us
+       * -- calling `run` directly means closing them here, and each fails
+       * silently if it is not.
+       *
+       * SEALED: WARD is in LOCKABLE.abilities and has to be bought. Nothing
+       * about owning DEADBOLT owns WARD, and a ledger replay pushes bought
+       * ids straight in without consulting the tree, so an unconditional
+       * `run` stands up a shell the run does not have. PULSE is `essential`
+       * and free and cannot hit this.
+       *
+       * HELD: AXIOM's clauses hold ability ids shut. An automatic cast that
+       * ignored the hold would be a second door straight through the eighth
+       * anomaly's whole mechanic -- the `setTier`-past-`climbTo` shape.
+       * `isHeld` refuses `essential` at the reader, deliberately: a boss that
+       * could take PULSE can pin you against your own machine.
+       */
+      if (!slot.def.essential && this.isSealed(id)) return;
+      if (w.abilities.isHeld(w, i)) return;
+      w[key] = R.every;
+      slot.def.run(w);
+    };
+    if (up.flinch) cast('pulse', 'flinchT', null);
+    if (up.deadbolt) cast('ward', 'deadboltT', wardStanding);
 
     /*
      * Somebody who has not worked out what PULSE is for.

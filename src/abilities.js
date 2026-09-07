@@ -590,6 +590,22 @@ const TONE_WARD = '#e8f0ff';
 const TONE_ARC_HOT = '#ffffff';
 const TONE_ARC_SOFT = '#8fd4ff';
 
+/**
+ * Is a shell standing right now?
+ *
+ * Exported because build 275's DEADBOLT needs it and a `constructor.name`
+ * test at the call site would be a second copy of this class's identity in
+ * another file -- the kind that survives a rename and quietly stops matching.
+ * Nothing refuses a duplicate WARD on its own: `run` pushes a new one every
+ * time it is called, so two shells at the same radius cut and arc the same
+ * bodies twice. That never mattered while the only caller was a button on an
+ * eighteen-second cooldown against a six-second life.
+ */
+export function wardStanding(world) {
+  for (const e of world.effects) if (e instanceof Ward && !e.dead) return true;
+  return false;
+}
+
 class Ward {
   constructor(world) {
     const P = CFG.ward;

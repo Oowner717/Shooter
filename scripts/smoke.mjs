@@ -201,7 +201,7 @@ await page.screenshot({ path: `${SHOTS}/10-restart.png` });
  * ---- the evolution, and the field on the other side of it ----------------
  *
  * This probe could not leave era 1 until build 251, which meant the NEW FIELD
- * -- the building, the wall, the six lots and the MK2 -- had never been
+ * -- the building, the wall, the lots and the MK2 -- had never been
  * photographed by the game's own instrument, only by throwaway probes.
  *
  * It runs the first seconds under the REAL frame loop, because that is what a

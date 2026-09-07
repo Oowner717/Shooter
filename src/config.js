@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '274';
+export const BUILD = '275';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '274';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '552d367';
+export const REV = 'f0f00b4';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1500,6 +1500,35 @@ export const CFG = {
     impulse: 900,
     thrown: 0.5, // seconds a struck body is off its own cap and off its steering
     tell: 0.35, // how long before it goes that the machine says so
+  },
+
+  /*
+   * ---- the two nodes that CAST, and the one rule that makes them safe ----
+   *
+   * Build 190 took REFLEX out and CLAUDE.md has said "nothing in this game
+   * casts an ability" ever since. Build 275 puts two of them back, at the
+   * author's decision, and the objection 190 raised is still correct and is
+   * answered rather than overruled:
+   *
+   *   "an upgrade that spends a charge unasked is a charge you do not have
+   *    when you need it"
+   *
+   * REFLEX went through `Abilities.trigger`, which spends `s.charges` and
+   * starts `s.cd`. FLINCH and DEADBOLT call `def.run(world)` directly, so the
+   * EFFECT happens and the BUTTON is untouched: charges, cooldown and the
+   * first-use caption all belong to the player still. What they cost is the
+   * clock below and nothing else, and that clock is theirs -- STANDING ORDER
+   * shortens ability cooldowns and deliberately does not reach it, because
+   * this is not an ability's cooldown.
+   *
+   * Six seconds, both, as asked. It is longer than PULSE's own 7 is not --
+   * which is the point worth stating: at six this is a FASTER PULSE than the
+   * button, and it is meant to be, because it only ever fires when something
+   * already has hold of the machine. It cannot be farmed: `world.attackers`
+   * is empty the rest of the time and the clock only runs down when it is not.
+   */
+  reflex: {
+    every: 6, // ...each, on its own clock. See Game.runUpgrades.
   },
 
   /*
@@ -4889,7 +4918,7 @@ CFG.gun = {
 
 CFG.yard = {
   gap: 105, mouthHalf: 130, faceHalf: 175, tooth: 34, clear: 24,
-  // The six lots. Two works beside the machine and four emplacements in front
+  // The four lots. Two works beside the machine and two emplacements in front
   // of it, measured off the turret so they hold their place on the glass at
   // either screen -- the field is 1.22x deeper at 390x844 and the interface
   // either side of them is not.
@@ -4907,7 +4936,10 @@ CFG.yard = {
    */
   lotSide: 118, lotW: 34, lotH: 30,
   /*
-   * The four ahead, spread wide and LEVEL from build 263.
+   * ---- the TWO ahead, and why they stand where the outer pair did --------
+   *
+   * There were four, and build 275 took two of them out. The history is worth
+   * keeping because it is what fixes where the surviving pair goes.
    *
    * They were four boxes in one row at `lotStep` 70, which put the inner pair
    * 54 units either side of the turret's own column -- close enough that an
@@ -4915,20 +4947,25 @@ CFG.yard = {
    * as one object. Build 261 answered that twice over: `lotStep` 96 opened the
    * nearest pair to 144 apart AND `lotStagger` dropped the inner two 34 units
    * back into a shallow V. The step is what fixed the lane; the stagger just
-   * made four fixtures sit crooked, and it is gone -- reported as exactly
-   * that. Four guns at 144, 288 apart on one line, which is what a line of
-   * emplacements is.
+   * made four fixtures sit crooked, and it went in 263.
+   *
+   * So the ONE thing that row had already been tuned for is lane separation,
+   * and dropping to two must not undo it. `(i - 0.5) * lotStep` -- the obvious
+   * arithmetic -- would have put the survivors at +/-48, which is 96 apart:
+   * tighter than the inner pair build 261 widened, and back to two guns up one
+   * lane. `lotSpread` is where the OUTER pair stood instead, 144 either side
+   * and 288 apart, so the surviving two keep the separation the row was
+   * measured with and every clash bound is one the outer pair already passed.
    *
    * `lotAhead` is pinned at 320x568, which is the screen that binds -- the
    * turret stands 250 units below the wall's hold line there and 934 below it
    * at 390x844. It cannot grow past about 142, or the top of a lot crosses the
    * hold line and the player has placed something above the wall. It is
-   * asserted, at both screens, and levelling the inner pair moved them 34
-   * units UP-field into the same bound the outer pair was already tested
-   * against, which is why straightening costs nothing: the outer pair was
-   * always the binding case.
+   * asserted at both screens, and the outer pair was always the binding case
+   * for the sideways clash too, which is why keeping their column costs
+   * nothing to check.
    */
-  lotAhead: 134, lotStep: 96, gunW: 23, gunH: 20,
+  lotAhead: 134, lotSpread: 144, gunW: 23, gunH: 20,
 };
 
 const SCALED = [
@@ -4999,7 +5036,7 @@ const SCALED = [
   // angular rate are not lengths.
   'gun.r', 'gun.bolt', 'gun.range', 'gun.speed',
   'yard.lotSide', 'yard.lotW', 'yard.lotH',
-  'yard.lotAhead', 'yard.lotStep', 'yard.gunW', 'yard.gunH',
+  'yard.lotAhead', 'yard.lotSpread', 'yard.gunW', 'yard.gunH',
 ];
 
 function atPath(path) {
@@ -5024,7 +5061,29 @@ const BASE = {};
 for (const path of SCALED) {
   const [o, last] = atPath(path);
   if (!o) throw new Error(`config: SCALED names "${path}", which is not in CFG`);
-  BASE[path] = Array.isArray(o[last]) ? [...o[last]] : o[last];
+  /*
+   * ---- and the LEAF, not just the parent object ------------------------
+   *
+   * This tested `!o` alone until build 275, and `o` is the object the leaf
+   * hangs on -- so `yard.lotStep` still passed after `lotStep` was renamed to
+   * `lotSpread`, because `CFG.yard` was still there. What happens then is
+   * silent and total: `BASE[path]` is `undefined`, `setPath` writes
+   * `undefined * scale` -- NaN -- into a key nothing reads, and the value that
+   * WAS being scaled every resize simply stops being scaled. The lots kept
+   * their era-1 spread at era 2 and nothing in the suite could see it, because
+   * every arm about them asserts a floor the unscaled number still clears.
+   *
+   * A renamed entry is the likely way in, and it is exactly the shape of the
+   * `export let` and `[hidden]` traps this repo already carries: a thing set,
+   * and silently not applied one layer down. The leaf has to be a number or an
+   * array of them -- `typeof undefined` is the whole of the check.
+   */
+  const v = o[last];
+  const ok = Array.isArray(v) ? v.length > 0 && v.every((x) => typeof x === 'number')
+    : typeof v === 'number';
+  if (!ok) throw new Error(`config: SCALED names "${path}", which is ${JSON.stringify(v)} `
+    + 'rather than a number -- a renamed or deleted entry stops being scaled silently');
+  BASE[path] = Array.isArray(v) ? [...v] : v;
 }
 
 /**

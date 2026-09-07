@@ -109,6 +109,14 @@ export function freshUpgrades() {
     gunSlew: 1,
     gunSalvo: 0, // extra rounds a shot, fanned
     gunAmmo: 0, // index into turrets.js's GUN_AMMO
+    /*
+     * The two that CAST. Both are switches, both fire only while something is
+     * attached to the machine, and both run on `CFG.reflex.every` of their
+     * own -- see the note there and in `Game.runUpgrades`. They are flags and
+     * not levels because "once" has no second step.
+     */
+    flinch: false, // PULSE fires itself while something has hold of you
+    deadbolt: false, // ...and WARD does
     pile: 0, // levels of the weight in the deck that answers what closes in
     casing: 0, // damage a second to whatever is touching the turret
     insulation: 1, // multiplier on how much corruption costs the intake
@@ -171,6 +179,21 @@ const MARK = {
     + '<path d="M10.4 4.2 12 2.6l1.6 1.6M10.4 19.8 12 21.4l1.6-1.6" opacity=".85"/>'
     + '<path d="M4.2 10.4 2.6 12l1.6 1.6M19.8 10.4 21.4 12l-1.6 1.6" opacity=".85"/>'
     + '<circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" opacity=".6"/>'),
+  /*
+   * FLINCH and DEADBOLT: the pair that go off by themselves. Both are drawn
+   * as a GRIP plus the answer to it, so the two read as the same idea at two
+   * radii -- a claw on the machine, and the thing that comes off it.
+   */
+  flinchmark: g('<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/>'
+    + '<path d="M12 12 6.6 6.6M12 12l5.4-5.4" opacity=".8"/>'
+    + '<path d="M6.6 6.6 5.2 4.2 7.6 5.6M17.4 6.6l1.4-2.4-2.4 1.4" opacity=".8"/>'
+    + '<circle cx="12" cy="12" r="6.4" opacity=".55"/>'
+    + '<circle cx="12" cy="12" r="9.8" opacity=".28"/>'),
+  deadboltmark: g('<circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/>'
+    + '<path d="M12 12 6.6 6.6M12 12l5.4-5.4" opacity=".8"/>'
+    + '<path d="M6.6 6.6 5.2 4.2 7.6 5.6M17.4 6.6l1.4-2.4-2.4 1.4" opacity=".8"/>'
+    + '<path d="M12 3.2a8.8 8.8 0 0 1 8.8 8.8 8.8 8.8 0 0 1-8.8 8.8 8.8 8.8 0 0 1-8.8-8.8"/>'
+    + '<path d="M3.2 12a8.8 8.8 0 0 1 2.6-6.2" opacity=".4"/>'),
   salvo: g('<path d="M5 21V7M12 21V4M19 21V7"/><path d="M2.6 9.4 5 7l2.4 2.4M9.6 6.4 12 4l2.4 2.4M16.6 9.4 19 7l2.4 2.4"/>'),
   // --- build 54: BOLT, HE, SCATTER, ARC and SPINE each get their own ---
   // A round coming off a body at an angle rather than stopping in it.
@@ -666,6 +689,39 @@ export const UPGRADES = {
      * The HOT LOAD and REPULSOR trap for the third time; see CLAUDE.md.
      */
     { id: 'standing', name: 'STANDING ORDER', levels: 2, line: '-20% ability cooldowns.', apply: quicken('cooldown', 0.8) , icon: MARK.standing },
+    /*
+     * ---- the two that go off by themselves ------------------------------
+     *
+     * Build 190 removed REFLEX and wrote the rule down: "nothing in this game
+     * casts an ability", because an upgrade that SPENDS A CHARGE unasked is a
+     * charge you do not have when you need it. These two put the behaviour
+     * back without putting the objection back, and the distinction is the
+     * whole design: they call the ability's `run()` and not `trigger()`, so
+     * the effect happens and the button is untouched -- your charge is still
+     * in hand, your cooldown has not started, and the first-use caption has
+     * not been spent explaining a press you did not make.
+     *
+     * ONE level each, written out, for the reason HEAVE and AIRBURST are: it
+     * is a switch and not a dial. A second level of "it also does this" is
+     * not a thing, and `levels` has been mandatory with no default since
+     * build 224.
+     *
+     * They fire only while `world.attackers` is non-empty -- something has
+     * hold of the machine -- on a six-second clock of their OWN, which
+     * STANDING ORDER does not reach. See CFG.reflex and Game.runUpgrades.
+     *
+     * DEADBOLT honours `world.abilityHold` and FLINCH does not need to:
+     * AXIOM's clauses can hold WARD shut and can never hold PULSE, which is
+     * `essential`. An automatic cast that ignored the hold would be a second
+     * door straight through the eighth anomaly's entire mechanic -- the same
+     * shape as `setTier` walking past the gate `climbTo` had just answered.
+     */
+    { id: 'flinch', name: 'FLINCH', levels: 1,
+      line: 'PULSE fires itself while something has hold of you, every 6s. It never spends a charge.',
+      apply: set('flinch', true), icon: MARK.flinchmark },
+    { id: 'deadbolt', name: 'DEADBOLT', levels: 1,
+      line: 'The WARD stands itself up while something has hold of you, every 6s. It never spends a charge.',
+      apply: set('deadbolt', true), icon: MARK.deadboltmark },
   ],
   /*
    * ---- the emplacements, and why they are not in the tree ----

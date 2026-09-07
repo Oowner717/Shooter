@@ -24,6 +24,32 @@
 import { CFG } from './config.js';
 import { clamp, rgba, mixHex } from './util.js';
 
+/*
+ * ---- the lots, as ONE table -------------------------------------------
+ *
+ * There were six until build 275 -- two works and FOUR emplacements -- and
+ * the count lived in four places: a `length === 6` guard, two loop bounds and
+ * a `(i - 1.5)` centring term that only made sense for four. Dropping to two
+ * meant touching all four and finding the fifth, which is the shape a count
+ * written out by hand always has. The table is the count now: the guard reads
+ * its length, each loop reads its own kind's, and the centring is `lotSpread`
+ * rather than an index arithmetic that has to know how many there are.
+ *
+ * Order matters and is depended on elsewhere: works first, then guns. A saved
+ * run stores LOT INDICES in `world.guns` (see turrets.js), so this order is
+ * part of the save format -- and it is why an index that no longer names a
+ * gun lot has to be pruned and refunded rather than skipped.
+ */
+const LOTS = [
+  { kind: 'works' }, { kind: 'works' },
+  { kind: 'gun' }, { kind: 'gun' },
+];
+const WORKS_LOTS = LOTS.filter((l) => l.kind === 'works').length;
+const GUN_LOTS = LOTS.filter((l) => l.kind === 'gun').length;
+
+/** How many emplacements the field has room for. The one number to ask. */
+export function gunLots() { return GUN_LOTS; }
+
 /**
  * Derive the yard, or clear it. The ONE writer, called from `Game.resize`.
  *
@@ -72,7 +98,7 @@ export function syncYard(world, entryY) {
   if (!a.lit || a.lit.length !== teeth) a.lit = new Float32Array(teeth);
 
   /*
-   * ---- and the six lots, which are YOURS ----
+   * ---- and the four lots, which are YOURS ----
    *
    * `world.yard` is everything the era-2 field puts on the ground: theirs
    * above the wall, yours below it. One object, one gate, one null check and
@@ -87,21 +113,24 @@ export function syncYard(world, entryY) {
    * columns end at 144 and begin at 650.
    */
   const s = world.shooter;
-  const lots = a.lots && a.lots.length === 6 ? a.lots : [
-    { kind: 'works' }, { kind: 'works' },
-    { kind: 'gun' }, { kind: 'gun' }, { kind: 'gun' }, { kind: 'gun' },
-  ].map((l) => ({ ...l, refused: 0 }));
-  for (let i = 0; i < 2; i++) {
+  const lots = a.lots && a.lots.length === LOTS.length ? a.lots
+    : LOTS.map((l) => ({ ...l, refused: 0 }));
+  for (let i = 0; i < WORKS_LOTS; i++) {
     const l = lots[i];
     l.x = s.x + (i === 0 ? -Y.lotSide : Y.lotSide);
     l.y = s.y;
     l.hw = Y.lotW;
     l.hh = Y.lotH;
   }
-  for (let i = 0; i < 4; i++) {
-    const l = lots[2 + i];
-    l.x = s.x + (i - 1.5) * Y.lotStep;
-    // ...and all four on ONE line. The stagger that made them a shallow V is
+  for (let i = 0; i < GUN_LOTS; i++) {
+    const l = lots[WORKS_LOTS + i];
+    /*
+     * The two ahead stand where the OUTER pair of four stood, 288 apart --
+     * NOT at `(i - 0.5) * step`, which would be 96 apart and is the very lane
+     * overlap build 261 widened the row to fix. See `lotSpread` in config.js.
+     */
+    l.x = s.x + (i === 0 ? -Y.lotSpread : Y.lotSpread);
+    // ...and both on ONE line. The stagger that made them a shallow V is
     // gone; see the note on `lotAhead` in config.js.
     l.y = s.y - Y.lotAhead;
     l.hw = Y.gunW;
@@ -477,7 +506,7 @@ export function drawYard(ctx, world, mood, price = 0) {
     ctx.stroke();
   }
 
-  /* ---- the six lots ------------------------------------------------------
+  /* ---- the four lots -----------------------------------------------------
    * Drawn in the same language the empty quick-slots use -- a dashed box with
    * nothing in it -- because that is already what this game's interface means
    * by "a place for a thing you do not have yet", and a second vocabulary for

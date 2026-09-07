@@ -3056,3 +3056,147 @@ Enemy(...))` is the door for anything that moves.
 
 580 green. ORDINAL's hash `-1765830468`, unchanged — the ninth anomaly is not
 in the wave ladder and the probe fights the first.
+
+---
+
+## Build 275 — two upgrades that cast, DRIFT springs a mine, two emplacements
+
+Three requests, and two of them reverse a decision this repo had written down
+as a rule. Both reversals are the author's; what follows is what each cost.
+
+### FLINCH and DEADBOLT — the rule was about the CHARGE, not the cast
+
+Build 190 removed REFLEX and CLAUDE.md has said "nothing in this game casts an
+ability" ever since. The reason it gave is narrower than the rule it wrote:
+
+> an upgrade that spends a charge unasked is a charge you do not have when you
+> need it
+
+REFLEX went through `Abilities.trigger`, which spends `s.charges`, starts
+`s.cd` and sets `s.used`. FLINCH and DEADBOLT call `def.run(world)` directly,
+so the **effect** happens and the **button** is untouched: your charge is in
+hand, your cooldown has not started, and the first-use caption has not been
+spent explaining a press you did not make. `run` already emits every ring,
+spark, shake and `audio.ability(...)` — a direct call is a complete, audible,
+visible cast that costs nothing on the bar.
+
+One level each, in FIELD, hung under the button each fires: FLINCH beside
+SHOCKFRONT under PULSE, DEADBOLT beside STANDOFF/EDGED/FORK/HEAVE under WARD.
+They live in `Game.runUpgrades`, which is where SPINES and PILE already are and
+which is called **below** the `if (w.boss)` branch — a clock written inside
+`Director.update` is dead for the whole of an anomaly, which is how build 210's
+glitch douse was lost.
+
+**Calling `run` directly means closing three doors `trigger` would have closed,
+and every one of them fails silently.**
+
+- **SEALED.** WARD is in `LOCKABLE.abilities` and has to be bought. Nothing
+  about owning DEADBOLT owns WARD, and a ledger replay pushes bought ids in
+  without consulting the tree — so an unconditional `run` stands up a shell the
+  run does not have. PULSE is `essential` and free and cannot hit this.
+- **HELD.** AXIOM's clauses hold ability ids shut. A cast that ignored
+  `abilityHold` would be a second door straight through the eighth anomaly's
+  whole mechanic — the `setTier`-past-`climbTo` shape. `isHeld` refuses
+  `essential` at the reader, so PULSE is exempt on purpose: a boss that could
+  take PULSE can pin you against your own machine.
+- **BUSY.** `run` pushes a **new** `Ward` every time and nothing refuses a
+  duplicate — two shells at one radius cut and arc the same bodies twice. It
+  never mattered while the only caller was a button on an 18s cooldown against
+  a 6s life. `wardStanding(world)` is exported for it, rather than a
+  `constructor.name` test at the call site that would survive a rename and
+  quietly stop matching.
+
+### ...and "6 second cooldown" had to be measured before it meant anything
+
+The first version zeroed the clock whenever `world.attackers` was empty, so
+that the first grab of a wave was answered on the frame it happened. That is
+wrong in the one direction that matters: **these two upgrades are what clears
+the mount**, so the mount is empty a lot, and a clock zeroed on release re-arms
+instantly. Measured: a WARD standing for **100% of twenty-six seconds** of
+being gripped — a permanent wall bought with one level, which would make WARD's
+own button pointless.
+
+It is an ordinary cooldown now: it runs down always, and being gripped is only
+the condition for spending it — which still answers the first grab immediately,
+because the clock ran out during the quiet. And DEADBOLT's is held **at full
+while its own shell stands**, so the six seconds begin when the shell falls.
+Measured after: six up, six down, 50%. Counted from the cast instead, a 6s
+clock over a 6s life is 100% and the node is a different, much larger thing.
+
+The guard case is renamed rather than deleted. It was "nothing on the bar goes
+off by itself"; it is "nothing on the bar **spends a charge** by itself" — the
+thing that was actually wrong with REFLEX. The old wording was only ever a
+proxy for it. It also gained the half a build could get wrong quietly: the two
+nodes have to **fire**, measured as arrivals in `world.effects` against a
+control of the same seven seconds with both flags off, so a zero means "it did
+not fire" rather than "the counter cannot see it".
+
+**What it costs the fuse.** An auto-PULSE every six seconds against a glitch
+timer that arms in 1.5s and runs out in fourteen roughly halves the pressure
+of being held. That is the feature working, and it is stated here because
+"the glitch timer is the only involuntary way down" is a promise the game makes.
+
+### DRIFT springs a mine — the trigger was choosing a threat
+
+`harmless` is a refusal five paths honour: WIRE's cut, a `Patch`'s bite,
+LANCE's sweep, WARD's arc — all damage — and the mine **trigger**, which is
+not. The trigger's comment read "only things that could corrupt the feed can
+set a mine off", which makes a mine a weapon aimed at a threat. A mine is not
+aimed at anything: it is ground that goes off when something stands on it, and
+scenery standing on it is something standing on it. One line, in one chooser;
+the four damage paths are untouched and the case asserts that they still name
+`harmless`.
+
+**What it costs, measured before the change was made.** At tier 1, five of six
+mines have a DRIFT inside their trigger reach within a median 6.8 seconds of a
+fifteen-second life, against a field holding ten drifters and no hostiles. So
+an early-game mine now mostly pays out in DRIFT — which is worth energy and
+banks through `CFG.energy.drift`, so it is a legitimate thing for a mine to be
+spent on — rather than sitting inert. It is far less by tier 8 (two of four) as
+the field fills with things that are not scenery. `applyBlast` does not skip
+`harmless`, so a blast sprung by a DRIFT actually kills it; SNARE's `grip` does
+not either, so a DRIFT can be knotted.
+
+The case has a control, because a mine ends by itself in fifteen seconds and
+"it is gone" is true of a working build and of one where nothing changed: an
+armed mine with one DRIFT on it goes in under two seconds, and the same mine
+over the same six seconds with an empty field is still standing.
+
+### Four emplacements become two
+
+`LOTS` is one table now. The count lived in four places — a `length === 6`
+guard, two loop bounds, and a `(i - 1.5)` centring term that only made sense
+for four — and the fix for that is not to edit four numbers.
+
+**Where the survivors stand is the one real decision.** `(i - 0.5) * lotStep`,
+the obvious way to centre two, puts them ±48 — 96 apart, tighter than the inner
+pair build 261 widened, and back inside the two-guns-up-one-lane fault that row
+was tuned to fix. `lotSpread` is where the **outer** pair stood instead, so the
+survivors keep the separation the row was measured with and every clash bound
+is one the outer pair already passed.
+
+**The migration cost nothing and that is not luck.** `world.guns` is a list of
+lot indices, so a run saved with a gun on lot 4 or 5 arrives holding an index
+that names nothing — and `syncGuns`'s prune-and-refund, written in 263 for a
+gun on a works lot, opens with `!a.lots[i]`. It catches this by existing. But
+"an existing guard covers it" is a claim, so it is asserted rather than argued:
+pruned from the **list** (which is what `gunCount` and the TURRETS tab's lock
+read) and 2600 a lot handed back.
+
+### A renamed constant fell out of `SCALED` and nothing could see it
+
+`lotStep` became `lotSpread` and `SCALED` still named `yard.lotStep`. The
+module-load guard tested `!o` — the **parent** object — and `CFG.yard` was
+still there, so it passed. What follows is silent and total: `BASE[path]` is
+`undefined`, `setPath` writes `undefined * scale` (NaN) into a key nothing
+reads, and the value that had been scaled on every resize simply stops being
+scaled. The two lots kept their era-1 spread at era 2, and **no arm in the
+suite could see it** — every assertion about them is a floor the unscaled
+number still clears.
+
+Found by the review, not by the suite. The guard checks the **leaf** now and
+requires a number, and it was proved by putting the old name back: it throws.
+Same shape as the `export let` snapshot and the `[hidden]` trap — a thing set,
+and silently not applied one layer down.
+
+587 green. ORDINAL's hash `-1765830468`, unchanged.
