@@ -148,6 +148,26 @@ export class Tessera extends Boss {
     const p = this.body('tile', this.x + b.dx, this.y + b.dy);
     b.tile = p;
     this.tiles.push(p);
+    /*
+     * ---- pushed ONCE, and only when the arrival is not going to do it ----
+     *
+     * `Boss.arriveStep` walks `parts()` and pushes anything not yet `landed`
+     * into `world.enemies` as the boss unfolds -- which is how every other
+     * anomaly gets its structure onto the field, and why they push only their
+     * CORE from the constructor. This one lays its opening slab in the
+     * constructor and pushed each tile there as well, so all fifteen were
+     * entered TWICE: drawn twice, `update`d twice, and damaged twice by every
+     * blast, mine and PULSE, because those walk the list. A tile re-laid
+     * during the fight took normal damage, so half the slab was quietly a
+     * different body from the other half.
+     *
+     * So the opening fifteen are left for `arriveStep` -- which also gives
+     * them the unfold every other boss's structure gets -- and anything laid
+     * afterwards is pushed here and marked `landed`, which is the same flag
+     * `arriveStep` uses to mean "already on the field".
+     */
+    if (this.arriving > 0) return true;
+    p.landed = true;
     world.enemies.push(p);
     return true;
   }

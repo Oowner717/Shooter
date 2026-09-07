@@ -1900,4 +1900,28 @@ came from before believing the other one covers it.
   from what the run OWNS and let a clause hold nothing when there is nothing
   left to take; and never put a null in the hold set, which is a hold nothing
   can ever release.
+- **`Boss.arriveStep` is what puts structure on the field, so a boss pushes
+  only its CORE from the constructor.** It walks `parts()` and pushes anything
+  not yet `landed` into `world.enemies`. TESSERA lays its opening slab in the
+  constructor and pushed each tile there too, so all fifteen were entered
+  TWICE -- drawn twice, updated twice, and DAMAGED twice by every blast, mine
+  and PULSE, because those walk the list. A tile re-laid mid-fight was pushed
+  once, so half the slab was quietly a different body. Count ENTRIES
+  (`enemies.filter((x) => x === e).length`), not bodies: the entry count is
+  what the damage paths iterate.
+- **`clear` is the door every boss teardown comes through; `hush` is not.**
+  `Game.withdrawBoss`, `reset()` and `openAperture`'s teardown all call
+  `clear`. AXIOM released `world.abilityHold` in `hush` alone, under a
+  docstring saying that was the withdrawal path -- so a patience timeout, a
+  restart mid-fight or a second aperture left five ability buttons dead for
+  the rest of the run, with the only writer of that Set gone from the field.
+  The suite was green because its case drove `boss.hush(w)` by hand: the
+  method, not the door. Anything a boss must give back belongs in `clear`.
+- **A `shape` with no case in the draw switch is a silent fallback, not an
+  error.** `axiom`, `clause`, `lemma`, `tessera` and `tile` all declared one
+  and all five fell through to `drawChip` on the field and `drawShard` in the
+  glossary -- a TILE, which is laid ground, drawn as an irregular blob, and
+  six codex entries sharing one generic icon. `regress.mjs` reads the source
+  and requires every declared shape to have a case, AND renders each against
+  `drawChip` to catch a case that exists and calls the same generic function.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

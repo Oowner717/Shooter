@@ -23602,6 +23602,42 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.heldAfterHush = w.abilityHold.size;
 
     /*
+     * ---- ...and through the DOOR, which is the one that was open --------
+     *
+     * The arm above drives `boss.hush(w)` BY HAND, and that is why this
+     * shipped broken: `Game.withdrawBoss` -- what a patience timeout actually
+     * calls -- goes through `clear`, not `hush`. So did `reset()` and so did
+     * `openAperture`'s teardown. A fight that timed out left five ability
+     * buttons dead for the rest of the run, with the only thing that could
+     * ever release them gone from the field, and the suite was green because
+     * it called the method instead of the door. CLAUDE.md's rule about
+     * pressing controls through their handler, on a path nobody thought of
+     * as a control.
+     */
+    const byDoor = (name, act) => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugGiveEnergy(200000);
+      g.debugUnlockAll();
+      w.phase = 'staging';
+      w.apertures = w.apertures || [];
+      w.apertures[8] = 1;
+      g.openBoss(8);
+      const before = w.abilityHold.size;
+      act();
+      return { name, before, after: w.abilityHold.size };
+    };
+    out.doors = [
+      byDoor('withdrawBoss', () => g.withdrawBoss()),
+      byDoor('restart', () => g.restart()),
+      byDoor('another aperture', () => {
+        w.apertures[1] = 1;
+        if (w.boss) { w.boss.clear(w); w.boss = null; w.bossN = 0; w.bossStage = 0; }
+        g.openBoss(1);
+      }),
+    ];
+
+    /*
      * ---- and what it takes is what the run actually OWNS ---------------
      *
      * `CFG.axiom.holds` is an order of preference, not the answer. Four of
@@ -23674,6 +23710,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `[${r.own.one}]; owning everything, [${r.own.all}] against a table of `
     + `[${r.own.want}] -- and never an empty id in the set (${r.own.noNulls}), `
     + 'which would be a hold nothing could ever release');
+
+  check('...and every door that takes it off the field gives the buttons back',
+    r.doors.every((d) => d.before === 5 && d.after === 0),
+    r.doors.map((d) => `${d.name}: ${d.before} held -> ${d.after}`).join(' \u00b7 ')
+    + ' (driven through the doors, not through hush(), which is why this'
+    + ' shipped broken)');
 
   check('...and it lets go of everything by either door',
     r.ended && r.reconciled && r.heldAfter === 0 && r.leftovers === 0
@@ -23807,6 +23849,31 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.layN = CFG.tessera.lay.n;
 
     /*
+     * ---- and every tile is on the field exactly ONCE --------------------
+     *
+     * `Boss.arriveStep` walks `parts()` and pushes anything not yet `landed`
+     * into `world.enemies` -- which is how every other anomaly gets its
+     * structure onto the field, and why they push only their CORE from the
+     * constructor. This one lays its opening slab in the constructor and
+     * pushed each tile there as well, so all fifteen were entered TWICE:
+     * drawn twice, updated twice, and damaged twice by every blast, mine and
+     * PULSE, because those walk the list. A tile re-laid during the fight was
+     * pushed once, so half the slab was quietly a different body.
+     *
+     * Counted as ENTRIES and not as bodies: `enemies.filter(...).length` is
+     * what the damage paths actually iterate, which is the thing that was
+     * wrong.
+     */
+    const entries = (e) => w.enemies.filter((x) => x === e).length;
+    out.twice = bs.berths.filter((b) => b.tile && entries(b.tile) !== 1).length;
+    out.coreTwice = entries(bs.core);
+    reset();
+    bs.berths[0].tile.dead = true;
+    bs.berths[0].cut = 0;
+    bs.relay(w);
+    out.freshTwice = entries(bs.berths[0].tile);
+
+    /*
      * ---- and a cut berth STAYS cut, which is what makes it a corridor ----
      *
      * `relay` fills the emptiest ground nearest the machine first, and with no
@@ -23907,6 +23974,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * whole fight and TESSERA withdrew on the patience clock, unbeaten, with
    * `world.reconciled` still empty.
    */
+  check('...and every tile is on the field exactly once, laid or re-laid',
+    r.twice === 0 && r.coreTwice === 1 && r.freshTwice === 1,
+    `${r.twice} of the opening tiles are double-entered in world.enemies, the `
+    + `core is entered ${r.coreTwice} time(s), and one re-laid mid-fight `
+    + `${r.freshTwice}`);
+
   check('...and ground it has just lost stays lost, which is what makes it a corridor',
     r.heldOpen === 0 && r.thenFills > 0,
     `a whole slab cut and one re-laying pass put back ${r.heldOpen} tiles while `
@@ -24437,6 +24510,97 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     && r.unbuilt === 'unbuilt',
     `boot: "${r.fromBoot}", assay (and the case got there: ${r.inBench}): `
     + `"${r.fromBench}", anomaly 99: "${r.unbuilt}"`);
+}
+
+// --- every body draws its own shape, and the last two bosses did not --------
+/*
+ * Build 277. Five of the six ids AXIOM and TESSERA brought -- `axiom`,
+ * `clause`, `lemma`, `tessera`, `tile` -- declared a `shape` string that
+ * neither draw switch in enemies.js had a case for, so all five fell through
+ * to `drawChip` on the field and `drawShard` in the glossary. A TILE, which is
+ * a piece of laid ground, was an irregular five-point blob; a CLAUSE was the
+ * same blob in a slightly different gold; and all six new codex entries showed
+ * one generic icon. Every one of the seven anomalies before them has three
+ * bespoke shapes.
+ *
+ * Asserted two ways, because either alone is weak. The STATIC arm reads the
+ * source: every `shape` any ENEMY_TYPE declares must have a case, which is a
+ * rule a tenth boss is covered by rather than a list. The DRAWN arm renders
+ * each of the five and compares it against `drawChip` at the same radius --
+ * because a case that exists and calls the same generic function is the same
+ * bug with more lines.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { ENEMY_TYPES } = await import('../src/config.js');
+    const { drawSpecimen } = await import('../src/enemies.js');
+    const out = {};
+
+    // ---- 1. every declared shape has a case, read off the source --------
+    const src = await fetch('../src/enemies.js').then((x) => x.text());
+    const cases = new Set([...src.matchAll(/case '([a-z0-9]+)':/g)].map((m) => m[1]));
+    const shapes = [...new Set(ENEMY_TYPES.map((t) => t.shape).filter(Boolean))];
+    out.shapes = shapes.length;
+    out.missing = shapes.filter((sh) => !cases.has(sh)).join(',');
+
+    // ---- 2. ...and each of the five actually draws something else -------
+    /*
+     * Rendered at 2x into a scratch twice the box, for the reason CLAUDE.md
+     * records about the glossary's icons: a shape measured in a frame its own
+     * size is measured through the clipping the frame imposed.
+     */
+    const S = 96;
+    const shot = (id) => {
+      const c = document.createElement('canvas');
+      c.width = S; c.height = S;
+      const x = c.getContext('2d');
+      x.translate(S / 2, S / 2);
+      drawSpecimen(x, id, 22);
+      const d = x.getImageData(0, 0, S, S).data;
+      // Alpha only: the point is the SILHOUETTE, and two of these five are
+      // deliberately the same gold as each other.
+      const a = new Uint8Array(S * S);
+      let ink = 0;
+      for (let i = 0; i < S * S; i++) { a[i] = d[i * 4 + 3]; ink += d[i * 4 + 3]; }
+      return { a, ink: Math.round(ink / 1000) };
+    };
+    const diff = (p, q) => {
+      let sum = 0;
+      for (let i = 0; i < p.a.length; i++) sum += Math.abs(p.a[i] - q.a[i]);
+      return Math.round(sum / 1000);
+    };
+    // MOTE is the plainest thing in the game and is what `drawChip` draws, so
+    // it is the control: a shape that fell through would sit on top of it.
+    const chip = shot('mote');
+    const ids = ['axiom', 'clause', 'lemma', 'tessera', 'tile'];
+    out.vsChip = {};
+    out.ink = {};
+    for (const id of ids) {
+      const p = shot(id);
+      out.vsChip[id] = diff(p, chip);
+      out.ink[id] = p.ink;
+    }
+    /*
+     * ...and the instrument proves it can read a ZERO: the same id twice is 0
+     * by construction, so a difference is a difference and not noise in the
+     * rasteriser.
+     */
+    out.selfZero = diff(shot('tile'), shot('tile'));
+    return out;
+  });
+
+  const five = Object.keys(r.vsChip);
+  const flat = five.filter((k) => r.vsChip[k] < 40);
+  const empty = five.filter((k) => r.ink[k] < 20);
+  check('every shape an object declares has a case to draw it',
+    r.missing === '',
+    `${r.shapes} distinct shapes declared across the roster; `
+    + `${r.missing ? `no case for: ${r.missing}` : 'every one has a case'}`);
+
+  check('...and the last two bosses\' five draw something, and not the generic chip',
+    flat.length === 0 && empty.length === 0 && r.selfZero === 0,
+    five.map((k) => `${k} ${r.vsChip[k]} from a chip (ink ${r.ink[k]})`).join(' · ')
+    + `; the same shape twice differs by ${r.selfZero}`);
 }
 
 // --- report -----------------------------------------------------------------

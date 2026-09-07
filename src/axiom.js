@@ -367,6 +367,29 @@ export class Axiom extends Boss {
     if (world.abilityHold) world.abilityHold.clear();
   }
 
+  /**
+   * ...and by the OTHER door, which is the one that was open.
+   *
+   * `hush` is the patience timeout's name for what it does, and the docstring
+   * above said so -- but `Game.withdrawBoss` does not call it. It calls
+   * `clear`, and so does `reset()` and so does `openAperture`'s teardown. So
+   * a fight that timed out, a restart mid-fight, or opening a second aperture
+   * left five ability buttons dead FOR THE REST OF THE RUN, with the only
+   * thing that could ever release them gone from the field.
+   *
+   * The suite was green through all of it because its case drives
+   * `boss.hush(w)` by hand -- the method, not the door. CLAUDE.md's rule
+   * about pressing controls through their handler, on a path nobody thought
+   * of as a control.
+   *
+   * `clear` is the one door every teardown comes through, so the release
+   * belongs here and `hush` keeps it only for the sequence it names.
+   */
+  clear(world) {
+    super.clear(world);
+    if (world.abilityHold) world.abilityHold.clear();
+  }
+
   // --------------------------------------------------------------- draw
 
   draw(ctx, world) {

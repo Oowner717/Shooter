@@ -135,6 +135,11 @@ export function drawSpecimen(ctx, id, r) {
     case 'echo': drawEcho(ctx, r, 0, 0); break;
     case 'bound': drawBound(ctx, r, 1); break;
     case 'terminus': drawTerminus(ctx, r, 0, 0, 1); break;
+    case 'axiom': drawAxiom(ctx, r, 0, 0, 1); break;
+    case 'clause': drawClause(ctx, r, 1); break;
+    case 'lemma': drawLemma(ctx, r, 0, 0); break;
+    case 'tessera': drawTessera(ctx, r, 0, 0, 1); break;
+    case 'tile': drawTile(ctx, r, 1); break;
     case 'limit': drawLimit(ctx, r, 0, 0); break;
     case 'hex': drawHex(ctx, r); break;
     case 'blob': drawBlob(ctx, r, 0.6, 0); break;
@@ -1872,6 +1877,11 @@ export class Enemy {
       case 'echo': drawEcho(ctx, this.r, this.phase, world.time); break;
       case 'bound': drawBound(ctx, this.r, hpFrac); break;
       case 'terminus': drawTerminus(ctx, this.r, this.phase, world.time, hpFrac); break;
+      case 'axiom': drawAxiom(ctx, this.r, this.phase, world.time, hpFrac); break;
+      case 'clause': drawClause(ctx, this.r, hpFrac); break;
+      case 'lemma': drawLemma(ctx, this.r, this.phase, world.time); break;
+      case 'tessera': drawTessera(ctx, this.r, this.phase, world.time, hpFrac); break;
+      case 'tile': drawTile(ctx, this.r, hpFrac); break;
       case 'limit': drawLimit(ctx, this.r, this.phase, world.time); break;
       case 'tow': drawTowHead(ctx, this.r); break;
       case 'mass': drawTowMass(ctx, this.r, hpFrac); break;
@@ -2449,6 +2459,155 @@ function drawTerminus(ctx, r, phase, t, hpFrac) {
 }
 
 /** A LIMIT: a caret pointing the way it is going, which is inward. */
+/*
+ * ---- AXIOM's three, and TESSERA's two ---------------------------------
+ *
+ * These five shipped in builds 273-274 declaring a `shape` that neither draw
+ * switch had a case for, so all five fell through to `drawChip` in the field
+ * and `drawShard` in the glossary: a TILE -- a piece of laid ground -- was an
+ * irregular five-point blob, a CLAUSE was the same blob in a slightly
+ * different gold, and all six new codex entries showed one generic icon.
+ * Every one of the seven anomalies before them has three shapes of its own.
+ *
+ * The two families are drawn as what they ARE, which is the whole reason a
+ * player can read this game at a glance: AXIOM is an argument, so it is
+ * brackets and rules; TESSERA is a survey, so it is squares and grid.
+ */
+
+/** AXIOM: a proposition. A slab between heavy brackets, ruled through. */
+function drawAxiom(ctx, r, phase, t, hpFrac) {
+  const w = r * 0.92;
+  const h = r * 0.6;
+  const k = Math.max(CFG.hairline, r * 0.07);
+  ctx.beginPath();
+  ctx.rect(-w, -h, w * 2, h * 2);
+  ctx.fill();
+  ctx.stroke();
+  // The brackets, which is what makes it a statement rather than a box.
+  ctx.save();
+  ctx.lineWidth = k * 1.8;
+  const bx = w * 1.32;
+  const by = h * 1.28;
+  ctx.beginPath();
+  ctx.moveTo(-bx + r * 0.16, -by); ctx.lineTo(-bx, -by);
+  ctx.lineTo(-bx, by); ctx.lineTo(-bx + r * 0.16, by);
+  ctx.moveTo(bx - r * 0.16, -by); ctx.lineTo(bx, -by);
+  ctx.lineTo(bx, by); ctx.lineTo(bx - r * 0.16, by);
+  ctx.stroke();
+  ctx.restore();
+  // ...and the rules inside it go out as it is argued down.
+  const lines = 3;
+  const lit = Math.ceil(lines * clamp(hpFrac, 0, 1));
+  const stroke = ctx.strokeStyle;
+  ctx.save();
+  ctx.lineWidth = k;
+  for (let i = 0; i < lines; i++) {
+    const y = -h + ((i + 1) * h * 2) / (lines + 1);
+    ctx.strokeStyle = i < lit ? stroke : rgba('#3a3018', 0.9);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.72, y);
+    ctx.lineTo(w * (i === lines - 1 ? 0.3 : 0.72), y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** CLAUSE: one bracketed fragment of it, turned to face the ring. */
+function drawClause(ctx, r, hpFrac) {
+  const w = r * 0.78;
+  const h = r * 0.5;
+  const k = Math.max(CFG.hairline, r * 0.11);
+  ctx.beginPath();
+  ctx.rect(-w, -h, w * 2, h * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.lineWidth = k;
+  const bx = w * 1.36;
+  ctx.beginPath();
+  ctx.moveTo(-bx + r * 0.2, -h * 1.3); ctx.lineTo(-bx, -h * 1.3);
+  ctx.lineTo(-bx, h * 1.3); ctx.lineTo(-bx + r * 0.2, h * 1.3);
+  ctx.moveTo(bx - r * 0.2, -h * 1.3); ctx.lineTo(bx, -h * 1.3);
+  ctx.lineTo(bx, h * 1.3); ctx.lineTo(bx - r * 0.2, h * 1.3);
+  ctx.stroke();
+  // One rule, and it shortens as the clause is broken.
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.6, 0);
+  ctx.lineTo(-w * 0.6 + w * 1.2 * clamp(hpFrac, 0.08, 1), 0);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** LEMMA: a step in the proof. The therefore-mark, three dots. */
+function drawLemma(ctx, r, phase, t) {
+  const spin = phase + t * 1.1;
+  const d = r * 0.52;
+  ctx.save();
+  ctx.rotate(spin);
+  for (let i = 0; i < 3; i++) {
+    const a = -Math.PI / 2 + (i * TAU) / 3;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * d, Math.sin(a) * d, r * 0.34, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** TESSERA: the survey plate. A square with its own grid cut across it. */
+function drawTessera(ctx, r, phase, t, hpFrac) {
+  const w = r * 0.82;
+  const k = Math.max(CFG.hairline, r * 0.06);
+  ctx.beginPath();
+  ctx.rect(-w, -w, w * 2, w * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.lineWidth = k;
+  // Two cuts each way: the same three-by-three the field is laid on, so the
+  // core says what it does without a caption.
+  for (let i = 1; i < 3; i++) {
+    const o = -w + (w * 2 * i) / 3;
+    ctx.beginPath();
+    ctx.moveTo(o, -w); ctx.lineTo(o, w);
+    ctx.moveTo(-w, o); ctx.lineTo(w, o);
+    ctx.stroke();
+  }
+  // ...and the survey mark at the centre, which fades as it is argued down.
+  ctx.globalAlpha *= clamp(hpFrac, 0.15, 1);
+  ctx.beginPath();
+  ctx.rect(-w * 0.22, -w * 0.22, w * 0.44, w * 0.44);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** TILE: laid ground. A plain square, and it is meant to be plain. */
+function drawTile(ctx, r, hpFrac) {
+  const w = r * 0.88;
+  const k = Math.max(CFG.hairline, r * 0.07);
+  ctx.beginPath();
+  ctx.rect(-w, -w, w * 2, w * 2);
+  ctx.fill();
+  ctx.stroke();
+  /*
+   * A cut mark that OPENS as the tile is broken, so a slab under fire reads
+   * as ground coming apart rather than as ground getting dimmer. It is the
+   * only state a tile has and it is the thing the fight is about.
+   */
+  const cut = 1 - clamp(hpFrac, 0, 1);
+  if (cut > 0.02) {
+    ctx.save();
+    ctx.lineWidth = k;
+    const g = w * 0.86 * cut;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.86, -g); ctx.lineTo(w * 0.86, g);
+    ctx.moveTo(-w * 0.86, g); ctx.lineTo(w * 0.86, -g);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawLimit(ctx, r, phase, t) {
   ctx.beginPath();
   ctx.moveTo(0, r);

@@ -3414,3 +3414,79 @@ recorded because the same instrument found it and nothing else has ever asked.
 
 597 green. ORDINAL's hash `-1765830468`, unchanged — neither fight is in the
 wave ladder and the probe fights the first.
+
+---
+
+## Build 278 — what the five-lens review found in the last two fights
+
+Build 277 was my own measurement; this is what the review turned up on top of
+it. Three of its findings were real and severe, and all three had shipped green.
+
+### TESSERA's opening slab was on the field TWICE
+
+`Boss.arriveStep` walks `parts()` and pushes anything not yet `landed` into
+`world.enemies` — which is how every other anomaly gets its structure onto the
+field, and why they push only their **core** from the constructor. TESSERA lays
+its opening slab in the constructor and pushed each tile there as well, so all
+fifteen were entered twice: **drawn twice, updated twice, and damaged twice** by
+every blast, mine and PULSE, because those walk the list. A tile re-laid during
+the fight was pushed once, so half the slab was quietly a different body from
+the other half.
+
+The opening fifteen are left for `arriveStep` now — which also gives them the
+unfold every other boss's structure gets — and anything laid afterwards is
+pushed once and marked `landed`.
+
+### AXIOM kept your buttons after it left
+
+`hush` clears `world.abilityHold`, and its docstring said it runs on the
+withdrawal. **It does not.** `Game.withdrawBoss` calls `clear`, and so does
+`reset()`, and so does `openAperture`'s teardown. So a fight that timed out on
+the patience clock, a restart mid-fight, or opening a second aperture left
+**five ability buttons dead for the rest of the run**, with the only thing that
+could ever release them gone from the field.
+
+The suite was green through all of it because its case drives `boss.hush(w)`
+by hand — the method, not the door. That is CLAUDE.md's rule about pressing
+controls through their handler, on a path nobody thought of as a control. The
+release lives in `clear` now, which is the one door every teardown comes
+through, and the case drives all three doors.
+
+### Five of the six new bodies were drawn as generic blobs
+
+`axiom`, `clause`, `lemma`, `tessera` and `tile` each declared a `shape` string
+that **neither draw switch had a case for**, so all five fell through to
+`drawChip` on the field and `drawShard` in the glossary. A TILE — a piece of
+laid ground — was an irregular five-point blob; a CLAUSE was the same blob in a
+slightly different gold; and all six new codex entries showed one generic icon.
+Every one of the seven anomalies before them has three bespoke shapes.
+
+They are drawn as what they *are*, which is the whole reason this game can be
+read at a glance. AXIOM is an argument: the core is a proposition between heavy
+brackets with rules through it that go out as it is argued down, a CLAUSE is one
+bracketed fragment of it, and a LEMMA is the therefore-mark. TESSERA is a
+survey: the core is a plate with its own three-by-three grid cut across it, and
+a TILE is a plain square with a cut that **opens** as it is broken — so a slab
+under fire reads as ground coming apart rather than as ground getting dimmer.
+
+The guard is two arms, because either alone is weak. The static one reads the
+source and requires every `shape` any ENEMY_TYPE declares to have a case — a
+rule a tenth boss is covered by rather than a list. The drawn one renders each
+of the five and compares the silhouette against `drawChip` at the same radius,
+because a case that exists and calls the same generic function is the same bug
+with more lines. The instrument proves it can read a zero: the same shape twice
+differs by 0.
+
+601 green. Both fights still beaten — AXIOM 209s stock / 116s bought, TESSERA
+297s / 93s.
+
+### Still open from the review
+
+Named here rather than fixed, because each is a design decision rather than a
+defect: **neither fight escalates** (AXIOM's `enterStage` changes nothing
+mechanical — `ringII` and `spin * stage` act on clauses that are all dead when
+stage II begins, and `sendLemma` returns early once the ring is gone, so most
+of its health is a stationary core on an empty field); TESSERA's `layII` is its
+only stage term; `CFG` `cost` runs 100→500 for anomalies 1–7 and then falls
+back to 250 for both of these; and `pay` is 900 for both where TERMINUS at rung
+42 pays 1400.
