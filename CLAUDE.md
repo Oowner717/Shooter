@@ -1984,4 +1984,38 @@ came from before believing the other one covers it.
   counted it, so one destroyed TALLY -- which ORDINAL sheds by the dozen in
   its first stage -- read as an anomaly reconciled. `types[0]` is the core,
   and having the core is having taken it apart.
+- **A case that runs downstream of the title screen being dismissed measures
+  all-zero boxes.** The suite presses BEGIN in its first two hundred lines and
+  `hideBoot` sets `#boot.hidden`; nothing ever put it back. So the layout case
+  six thousand lines later read `{0,0,0,0}` for every box and two of its three
+  arms could not fail -- `overlap` needed `shown`, `off` filtered on `shown`,
+  and `start.b <= vh` was `0 <= 844`. The RESET case found NEW RUN with an
+  `offsetParent` filter, and `offsetParent` is null throughout a `display:
+  none` subtree, so the one arm about the button being GONE answered 0 whether
+  it was there or not. Put the panel up, measure, put it back -- and carry a
+  liveness guard, or the case agrees with itself.
+- **`maxlength` constrains a thumb and not a script, so a case that assigns
+  `.value` can assert a tolerance nobody can reach.** The RESET field was
+  capped at 6 against the word DELETE, while the handler documented forgiving
+  a leading or trailing space -- which cannot be typed into a field that is
+  already full. Type one character at a time with the attribute in force, and
+  assert the field has room for what the handler forgives.
+- **A contrast sweep that reads the declared colour is blind to `opacity`, and
+  the fix belongs in the SWEEP.** Build 281 changed the one control that was
+  dimmed that way; 282 made the walk accumulate the opacity chain into the
+  foreground's alpha, up the same ancestors the backgrounds already walk --
+  because dimming with `opacity` is the cheapest thing in the stylesheet and
+  the next one would have been invisible again.
+- **An absolute zero can be a claim about the whole suite's leftovers.** "A
+  title-screen retirement banks nothing" passed alone and failed in the suite
+  at exactly 6, which is `CFG.energy.drift` to the digit; clearing every list
+  and switch did not stop it. The honest form is an A/B -- the same window with
+  the mechanism on and off -- so whatever else is banking banks the same in
+  both, with a vacuity guard that the two windows differ in what they did.
+- **A destructive control has to name what it destroys.** RESET SIMULATION said
+  "wipe the saved run" and called `forgetPlayer` as well, taking the glossary,
+  the taught lines and the ASSAY's thirteen-hour record -- while `showRecord`'s
+  docstring said twice that the glossary survives a reset, which stopped being
+  true in build 238. The tiles it destroys are two hundred pixels above the
+  field where the word is typed.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

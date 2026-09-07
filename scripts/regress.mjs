@@ -112,11 +112,26 @@ await page.waitForTimeout(900);
       seen++;
       let bg = { r: 4, g: 8, b: 14, a: 1 };
       const chain = [];
+      /*
+       * ---- and the OPACITY chain, which this was blind to ---------------
+       *
+       * It composited `color` over the background-colour chain and never
+       * looked at `opacity` -- so `#wipeGo[disabled]`, which was `opacity:
+       * 0.35` over `#8fa9c4`, was recorded at 8.08:1 and passed while
+       * rendering at 1.92:1. The stylesheet's cheapest way to dim text was
+       * the one thing the guard could not see. Accumulated up the same chain
+       * the backgrounds already walk, and folded into the foreground's alpha.
+       */
+      let dim = 1;
       for (let e = el; e; e = e.parentElement) {
-        const q = px(getComputedStyle(e).backgroundColor);
+        const ecs = getComputedStyle(e);
+        const q = px(ecs.backgroundColor);
         if (q && q.a > 0) chain.unshift(q);
+        const o = parseFloat(ecs.opacity);
+        if (Number.isFinite(o) && o < 1) dim *= o;
       }
       for (const q of chain) bg = over(q, bg);
+      fg.a *= dim;
       const size = parseFloat(cs.fontSize);
       const large = size >= 24 || (size >= 18.66 && parseInt(cs.fontWeight, 10) >= 700);
       const ratio = cr(over(fg, bg), bg);
@@ -6359,23 +6374,50 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       return { t: Math.round(q.top), b: Math.round(q.bottom), l: Math.round(q.left),
         r: Math.round(q.right), shown: !el.hidden && q.height > 0 };
     };
-    const at = (w, h) => {
-      // The boot screen is laid out by CSS alone, so measuring it at another
-      // size means asking the page to be that size.
-      document.documentElement.style.setProperty('width', `${w}px`);
-      document.documentElement.style.setProperty('height', `${h}px`);
-      return null;
-    };
-    at(0, 0);
-    document.documentElement.style.removeProperty('width');
-    document.documentElement.style.removeProperty('height');
-    return { start: box('startBtn'), resume: box('resumeBtn'), record: box('bootRecord'),
+    /*
+     * ---- and the panel has to be UP to be measured ---------------------
+     *
+     * This case runs six thousand lines after the suite pressed BEGIN, and
+     * `hideBoot` sets `#boot.hidden` half a second later -- so every box read
+     * here was `{0,0,0,0}` with `shown` false, and the whole check passed on
+     * a panel that was `display: none`. Two of its three arms are about
+     * elements being on screen and could not fail: `overlap` needs
+     * `resume.shown`, `off` filters on `shown`, and `start.b <= vh` is
+     * `0 <= 844`. The `at(w, h)` helper above it was dead twice over -- called
+     * with (0, 0) and undone on the next line -- and could not have worked
+     * anyway, because it sets `documentElement`'s width while the case judges
+     * against `window.innerWidth`, which does not move.
+     *
+     * So it is put back up, both states are measured, and the liveness of the
+     * instrument is asserted alongside the claim.
+     */
+    const boot = document.getElementById('boot');
+    const wasHidden = boot.hidden;
+    const wasOut = boot.classList.contains('out');
+    boot.hidden = false;
+    boot.classList.remove('out');
+    g.hud.offerResume();
+    g.hud.showRecord();
+    const cold = { start: box('startBtn'), resume: box('resumeBtn'), record: box('bootRecord') };
+    // ...and with a run on disk, which is the state CONTINUE exists in.
+    g.debugGiveEnergy(50);
+    g.world.kills = 41;
+    g.checkpoint();
+    g.hud.offerResume();
+    g.hud.showRecord();
+    const warm = { start: box('startBtn'), resume: box('resumeBtn'), record: box('bootRecord') };
+    boot.hidden = wasHidden;
+    if (wasOut) boot.classList.add('out');
+    return { cold, warm, start: cold.start, resume: cold.resume, record: cold.record,
       vw: window.innerWidth, vh: window.innerHeight };
   });
-  const overlap = r.start && r.resume && r.resume.shown
-    && !(r.resume.r <= r.start.l || r.start.r <= r.resume.l);
-  const off = [r.start, r.resume, r.record]
-    .filter((x) => x && x.shown && (x.l < 0 || x.r > r.vw)).length;
+  const boxes = [...Object.values(r.cold), ...Object.values(r.warm)];
+  const off = boxes.filter((x) => x && x.shown && (x.l < 0 || x.r > r.vw)).length;
+  // Exactly one primary, in each state -- the rule build 227 put in, and the
+  // thing this case's `overlap` term was reaching for.
+  const primaries = (o) => [o.start, o.resume].filter((x) => x && x.shown).length;
+  const onePrimary = primaries(r.cold) === 1 && primaries(r.warm) === 1;
+  const below = boxes.filter((x) => x && x.shown && x.b > r.vh).length;
   /*
    * ...and CONTINUE says CONTINUE. It read "CONTINUE · 137 / 500" and that
    * goal had been meaningless since build 81 — every run is endless — but it
@@ -6397,10 +6439,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     label.btn.trim() === 'CONTINUE' && !/\/\s*\d/.test(label.btn) && /137/.test(label.note),
     `button "${label.btn}", note "${label.note}"`);
 
-  check('the title screen keeps its buttons on screen and side by side',
-    !!r.start && !overlap && off === 0 && r.start.b <= r.vh,
-    `${r.vw}x${r.vh}: NEW RUN ends at ${r.start && r.start.b}, overlap ${overlap}, `
-    + `${off} off the side`);
+  /*
+   * The liveness guard is the first term and it is the point: this case passed
+   * for builds on all-zero boxes. If nothing on the panel has a rendered box,
+   * it fails rather than agreeing with itself.
+   */
+  check('the title screen keeps its one primary on screen, in both save states',
+    boxes.some((x) => x && x.shown) && onePrimary && off === 0 && below === 0,
+    `${r.vw}x${r.vh}: with no save ${r.cold.start.shown ? 'BEGIN' : '?'} up `
+    + `(ends at ${r.cold.start.b}), with a save `
+    + `${r.warm.resume.shown ? 'CONTINUE' : '?'} up (ends at ${r.warm.resume.b}); `
+    + `${primaries(r.cold)}/${primaries(r.warm)} primaries rendered, ${off} off `
+    + `the side, ${below} below the fold`);
 }
 
 // --- the boss gauge reads what is actually happening ------------------------
@@ -16385,12 +16435,47 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const g = window.__sim;
     const w = g.world;
     const q = (id) => document.getElementById(id);
-    const shown = (id) => !!q(id) && !q(id).hidden;
+    /*
+     * ---- the RENDERED BOX, and the panel has to be up to have one --------
+     *
+     * `!q(id).hidden` was the whole of this, which is the trap CLAUDE.md names
+     * by name: `[hidden] { display: none }` is the user agent's, at one class
+     * of specificity, and loses to any author rule written on an id -- so the
+     * property flips, every test agrees, and the element stays on screen
+     * taking taps. `#resumeBtn` was in fact the one element on this panel
+     * with no `[hidden]` guard of its own.
+     *
+     * And the panel is put UP first. The suite pressed BEGIN sixteen thousand
+     * lines ago and `hideBoot` set `#boot.hidden`, so every box below was
+     * `{0,0,0,0}` -- which is why the NEW RUN arm passed: `offsetParent` is
+     * null for everything inside a `display: none` subtree, so the filter
+     * found nothing whether or not the button was there.
+     */
+    const boot = q('boot');
+    const wasHidden = boot.hidden;
+    const wasOut = boot.classList.contains('out');
+    boot.hidden = false;
+    boot.classList.remove('out');
+    const shown = (id) => !!q(id) && q(id).getBoundingClientRect().height > 0;
+    /*
+     * Typed ONE CHARACTER AT A TIME, with `maxlength` in force. Assigning
+     * `.value` outright is not what a thumb does and `maxlength` does not
+     * constrain it -- which is how the documented "a thumb that adds a space
+     * is still DELETE" tolerance was asserted green while being unreachable
+     * on a real keyboard at `maxlength="6"`.
+     */
     const type = (v) => {
-      q('wipeWord').value = v;
-      q('wipeWord').dispatchEvent(new Event('input', { bubbles: true }));
+      const el = q('wipeWord');
+      el.value = '';
+      for (const ch of v) {
+        if (el.value.length >= el.maxLength) break;
+        el.value += ch;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }));
       return q('wipeGo').disabled;
     };
+    const room = q('wipeWord').maxLength;
 
     // No save: nothing to reset, so no button offering to.
     forgetRun();
@@ -16411,8 +16496,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       label: q('resumeBtn').textContent };
     // ...and NEW RUN is gone rather than merely relabelled: nothing on this
     // screen but the reset can take the save away.
+    // By TEXT, with no `offsetParent` filter: that filter is null for every
+    // element in a display:none subtree, so it answered 0 whether the button
+    // was there or not.
     const newRun = [...document.querySelectorAll('#boot button')]
-      .filter((b) => b.offsetParent && /NEW RUN/i.test(b.textContent)).length;
+      .filter((b) => /NEW RUN/i.test(b.textContent)).length;
+    const buttons = document.querySelectorAll('#boot button').length;
 
     // The word. A partial does not arm it and neither does anything else.
     q('wipeBtn').click();
@@ -16433,38 +16522,56 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     q('wipeBtn').click();
     type('DELETE');
     q('wipeGo').click();
-    const done = { save: !!readRun(), boot: q('boot').hidden, phase: w.phase,
+    /*
+     * The panel going is asserted on the class and not on `hidden`, because
+     * `hideBoot` sets the class NOW and the attribute on a 500ms timeout --
+     * and `out` is also what carries `pointer-events: none`, so it is the
+     * thing that actually stops the dead panel taking taps. Reading `hidden`
+     * here only ever passed because the suite had pressed BEGIN sixteen
+     * thousand lines earlier and the attribute was already set.
+     */
+    const done = { save: !!readRun(), out: q('boot').classList.contains('out'),
+      taps: getComputedStyle(q('boot')).pointerEvents, phase: w.phase,
       box: shown('wipeAsk') };
 
+    boot.hidden = wasHidden;
+    if (wasOut) boot.classList.add('out');
     forgetRun();
     g.restart();
     g.hud.offerResume();
-    return { cold, warm, newRun, asked, tries, cancelled, done };
+    return { cold, warm, newRun, buttons, asked, tries, cancelled, done, room };
   });
 
   check('the title offers one way in, and a reset only when there is one to make',
     r.cold.wipe === false && r.cold.resume === false && r.cold.start === true
     && r.cold.label === 'BEGIN SIMULATION'
     && r.warm.wipe === true && r.warm.resume === true && r.warm.start === false
-    && r.warm.label === 'CONTINUE' && r.newRun === 0,
+    && r.warm.label === 'CONTINUE' && r.newRun === 0 && r.buttons >= 4,
     `no save: ${r.cold.label} alone, reset ${r.cold.wipe}; with one: `
-    + `${r.warm.label} alone, reset ${r.warm.wipe}; NEW RUN buttons left: ${r.newRun}`);
+    + `${r.warm.label} alone, reset ${r.warm.wipe}; NEW RUN buttons left: `
+    + `${r.newRun} of ${r.buttons} on the panel`);
 
   check('...and RESET SIMULATION will not fire until DELETE is typed',
     r.asked.box && r.asked.btnGone
     && r.tries.empty && r.tries.partial && r.tries.wrong
-    && r.tries.lower === false && r.tries.spaced === false,
+    && r.tries.lower === false && r.tries.spaced === false
+    // ...and the field has room for the spaces the handler forgives. At
+    // `maxlength="6"` it did not, so that last arm asserted behaviour no
+    // thumb could reach.
+    && r.room >= 8,
     `disabled after — empty ${r.tries.empty}, DELET ${r.tries.partial}, REMOVE `
     + `${r.tries.wrong}; and armed by "delete" ${!r.tries.lower} and by "  DELETE " `
-    + `${!r.tries.spaced}`);
+    + `${!r.tries.spaced}, typed a character at a time into a field with room `
+    + `for ${r.room}`);
 
   check('...cancelling changes nothing, and typing it wipes the run and begins one',
     r.cancelled.box === false && r.cancelled.btn === true && r.cancelled.save === true
-    && r.done.save === false && r.done.boot === true && r.done.phase === 'staging'
-    && r.done.box === false,
+    && r.done.save === false && r.done.out === true && r.done.phase === 'staging'
+    && r.done.box === false && r.done.taps === 'none',
     `cancelled: box ${r.cancelled.box}, save still there ${r.cancelled.save}; `
-    + `confirmed: save ${r.done.save}, title ${r.done.boot ? 'gone' : 'STILL UP'}, `
-    + `phase ${r.done.phase}`);
+    + `confirmed: save ${r.done.save}, title `
+    + `${r.done.out ? 'dismissed' : 'STILL UP'} and taking no taps `
+    + `(pointer-events ${r.done.taps}), phase ${r.done.phase}`);
 }
 
 /*
@@ -24790,9 +24897,28 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.restart();
     w.phase = 'boot';
     g.hud.el.boot.hidden = false;
-    // A clean field, so what is counted is the title's own.
+    /*
+     * ---- and SET WHAT THE QUESTION DEPENDS ON --------------------------
+     *
+     * `restart()` is not a reset of everything a case can leave behind, and
+     * this one asks whether a retirement PAYS -- so anything an earlier case
+     * left that can destroy a drifter answers it instead. Measured: in
+     * isolation this banks exactly 0 over forty seconds; six hundred cases
+     * upstream it banked 6, which is `CFG.energy.drift` to the digit -- one
+     * drifter killed by a mine, a bought SPINES, or auto-fire that was still
+     * on. The lists and the two switches are set explicitly now.
+     */
     w.enemies.length = 0;
     w.drops.length = 0;
+    w.debris.length = 0;
+    w.projectiles.length = 0;
+    w.effects.length = 0;
+    w.mines.length = 0;
+    w.autoAim = false;
+    w.autoFire = false;
+    w.energy = 0;
+    w.earned = 0;
+    w.kills = 0;
     w.time = 0;
 
     const counts = new Set();
@@ -24819,15 +24945,50 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.standing = w.enemies.filter((e) => e.harmless && !e.dead).length;
 
     /*
-     * ...and NOTHING is banked or counted for a retirement. The title screen
+     * ...and NOTHING is banked or counted FOR A RETIREMENT. The title screen
      * runs a real field, so a drifter removed through `Enemy.destroy` would
      * pay `CFG.energy.drift` into `world.earned` -- which is what the object
      * gates are keyed on -- and walk the kill tally forward, both of them on a
      * screen the player has not started a run from.
+     *
+     * Measured as an A/B and not as an absolute. In isolation this field banks
+     * exactly 0 over forty seconds; six hundred cases upstream it banked 6,
+     * which is `CFG.energy.drift` to the digit -- something else in the
+     * inherited world was killing a drifter, and clearing every list and
+     * switch did not stop it. An absolute zero here is therefore a claim about
+     * the whole suite's leftovers rather than about this feature. The same
+     * window run twice, once with the turnover ON and once with it held off,
+     * measures the retirements and nothing else: whatever else is banking
+     * banks the same in both.
      */
-    out.earned = w.earned | 0;
-    out.kills = w.kills | 0;
-    out.energy = Math.round(w.energy || 0);
+    const bank = (retire) => {
+      const held = CFG.title.every;
+      if (!retire) CFG.title.every = 1e9;
+      g.restart();
+      w.phase = 'boot';
+      w.enemies.length = 0;
+      w.drops.length = 0;
+      w.energy = 0;
+      w.earned = 0;
+      w.kills = 0;
+      let gone = 0;
+      const was = new Set();
+      for (let f = 0; f < 60 * 30; f++) {
+        g.update(1 / 60);
+        for (const e of w.enemies) if (e.harmless) was.add(e);
+        gone = was.size;
+      }
+      CFG.title.every = held;
+      return { earned: w.earned | 0, kills: w.kills | 0, seen: gone };
+    };
+    const on = bank(true);
+    const off = bank(false);
+    out.onEarned = on.earned;
+    out.offEarned = off.earned;
+    out.onSeen = on.seen;
+    out.offSeen = off.seen;
+    out.paidPerRetire = on.earned - off.earned;
+    out.retired = on.seen - off.seen;
 
     // ---- and the link line, in all three states it can be in -----------
     const linkNow = () => g.hud.el.bootLink.textContent.trim();
@@ -24923,12 +25084,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `no save: "${r.link.none}"; an era-1 run: "${r.link.one}"; an era-2 run: `
     + `"${r.link.two}"`);
 
+  /*
+   * `retired > 0` is the vacuity guard: with the turnover held off the same
+   * window must see FEWER distinct bodies, or the A/B is comparing two
+   * identical runs and a difference of zero means nothing.
+   */
   check('...and the field it counts turns over without paying for it',
     r.peak <= r.hold && r.standing >= r.hold - 2
-    && r.earned === 0 && r.kills === 0 && r.energy === 0,
-    `held at ${r.hold}, peaked at ${r.peak}, standing at ${r.standing}; `
-    + `a retirement banked ${r.earned} lifetime energy, ${r.energy} in the `
-    + `purse and walked the tally to ${r.kills}`);
+    && r.retired > 0 && r.paidPerRetire === 0,
+    `held at ${r.hold}, peaked at ${r.peak}, standing at ${r.standing}; over the `
+    + `same thirty seconds the turnover put ${r.retired} more bodies through the `
+    + `field (${r.onSeen} against ${r.offSeen}) and banked ${r.paidPerRetire} `
+    + `more for them (${r.onEarned} against ${r.offEarned})`);
 }
 
 // --- report -----------------------------------------------------------------

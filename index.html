@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '281';
+  var BUILD = '282';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -370,11 +370,19 @@
           -->
           <button id="wipeBtn" class="bootWipe" type="button" hidden>RESET SIMULATION</button>
           <div id="wipeAsk" class="bootAsk" hidden>
-            <label for="wipeWord">Type <b>DELETE</b> to wipe the saved run and begin again.</label>
+            <label for="wipeWord">Type <b>DELETE</b> to wipe this device — the saved run,
+                     the glossary and every record on it.</label>
             <div class="bootAskRow">
               <input id="wipeWord" type="text" inputmode="text" autocomplete="off"
                      autocapitalize="characters" autocorrect="off" spellcheck="false"
-                     maxlength="6" aria-label="Type DELETE to confirm">
+                     maxlength="12" aria-label="Type DELETE to confirm">
+              <!-- 12, not 6. The handler trims and upper-cases so that "a phone
+                   that capitalises the first letter and a thumb that adds a space
+                   are both still DELETE" -- and at 6 the field is already full at
+                   DELETE, so a trailing space cannot be typed and a leading one
+                   leaves room for DELET. The tolerance could not fire for any real
+                   thumb; only the suite reached it, by assigning `.value` directly,
+                   which `maxlength` does not constrain. -->
               <button id="wipeGo" type="button" disabled>WIPE</button>
               <button id="wipeNo" type="button" class="bootAskNo">CANCEL</button>
             </div>

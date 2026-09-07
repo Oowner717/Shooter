@@ -3679,3 +3679,102 @@ it so; two arms of that case are vacuous because the suite hid the title screen
 sixteen thousand lines earlier; the loader assigns three fields the validator
 never checks; and the panel stays live and tappable for half a second after it
 is dismissed.
+
+---
+
+## Build 282 — the title screen's destructive control, and two vacuous cases
+
+### RESET SIMULATION understated what it destroys
+
+The label read *"Type DELETE to wipe the saved run and begin again."* The
+handler calls `forgetRun()` **and** `forgetPlayer()`, and `forgetPlayer` clears
+the glossary, every teaching line, the ASSAY's lifetime damage record — which
+takes about thirteen hours to fill — and three more keys. The word DELETE is
+typed two hundred pixels below a `RECORDED 3/43` tile that the same button
+destroys, and the label did not mention it.
+
+Worse, `showRecord`'s own docstring said **twice** that "the glossary is the
+only thing in the game that survives a reset". That stopped being true in
+build 238, when `forgetPlayer` went onto this button. Both are corrected, and
+the label now names the device.
+
+### The confirmation could not be confirmed the way it documents
+
+`maxlength="6"` against the word DELETE. The handler trims and upper-cases,
+with a comment saying "a phone that capitalises the first letter and a thumb
+that adds a space are both still DELETE" — but at six characters the field is
+already full at DELETE, so a trailing space cannot be typed and a leading one
+leaves room for DELET. **The tolerance could not fire for any real thumb.**
+
+Only the suite reached it, by assigning `.value` directly — which `maxlength`
+does not constrain. The field has room for twelve now, and the case types one
+character at a time with the attribute in force and asserts the field has room
+for the spaces the handler forgives.
+
+### Two cases that were passing on all-zero boxes
+
+The suite presses BEGIN in its first two hundred lines, and `hideBoot` sets
+`#boot.hidden` half a second later. Nothing ever put it back — so:
+
+- **The layout case** ran six thousand lines downstream and measured
+  `{0,0,0,0}` for every box. Two of its three arms could not fail: `overlap`
+  needed `resume.shown`, `off` filtered on `shown`, and `start.b <= vh` was
+  `0 <= 844`. Its `at(w, h)` viewport helper was dead twice over — called with
+  `(0, 0)` and undone on the next line — and could not have worked anyway,
+  since it set `documentElement`'s width while the case judged against
+  `window.innerWidth`, which does not move.
+- **The RESET case** found NEW RUN buttons with an `offsetParent` filter, and
+  `offsetParent` is null for everything inside a `display: none` subtree — so
+  the one arm whose whole subject is that the button is gone answered 0
+  whether it was there or not. Its `shown()` read the `.hidden` **property**,
+  which is the trap CLAUDE.md names by name; and `#resumeBtn` turned out to be
+  the one element on this panel with no `[hidden]` CSS guard of its own.
+
+Both put the panel up, measure it, and put it back. `shown()` reads the
+rendered box. The layout case carries a liveness guard — if nothing on the
+panel has a box, it fails rather than agreeing with itself — and now asserts
+the primary-button rule in **both** save states, which is what its `overlap`
+term was reaching for.
+
+### A save the loader let through and the run could not use
+
+`readSlot` validated five fields; `resume()` then assigned `w.released`,
+`w.energy` and `w.nextStoryAt` straight out of the file with no coercion, while
+every field around them carried `|| 0`. A file with `energy: null` passed the
+gate, the title offered CONTINUE, and the run came back with a purse of NaN and
+a tree that could never be bought from. The title screen's own resume note was
+*stricter than the loader behind it*. Refused now, which drops it to the BACKUP
+slot and then to BEGIN — the whole point of there being two slots.
+
+### And three smaller ones
+
+- **The dismissed panel took taps for half a second.** `#boot.out` animated
+  opacity and nothing else, while the panel kept `inset: 0` and
+  `pointer-events: auto` and `hidden` arrived on a 500ms timeout — and an
+  element at opacity 0 still hit-tests. A tap where the primary had been
+  pressed it again: `start()` twice is a second reset.
+- **`.ok` was written on the wipe field on every keystroke and no rule anywhere
+  styled it**, so the one moment the screen most needs to confirm the word
+  painted nothing on the field the thumb is watching.
+- **A 10px rule** sat in a panel whose own comment states an 11px floor, on an
+  element that is `display: none` whenever the rule matches.
+
+### The contrast sweep can see opacity now
+
+It composited `color` over the background chain and never read `opacity` — so
+the one control on the panel that was dimmed that way was recorded at 8.08:1
+while rendering at 1.92:1. It accumulates the opacity chain into the
+foreground's alpha, up the same ancestors the backgrounds already walk.
+
+### ...and the payment claim became an A/B
+
+"A retirement banks nothing" was asserted as an absolute zero, and it passed in
+isolation and failed in the suite at exactly 6 — `CFG.energy.drift` to the
+digit. Clearing every list and switch did not stop it, so an absolute zero
+there was a claim about six hundred cases' leftovers rather than about this
+feature. The same window is run twice, once with the turnover on and once with
+it held off; whatever else is banking banks the same in both. The vacuity guard
+is that the two windows must see a **different** number of bodies, or the A/B
+is comparing two identical runs.
+
+608 green.

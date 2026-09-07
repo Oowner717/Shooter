@@ -2200,19 +2200,24 @@ export class Hud {
    * The record, on the title screen: what this device has to show for itself
    * across every run it has ever had.
    *
-   * The glossary is the only thing in the game that survives a reset — it was
-   * never yours, it is kept by whoever has been counting — so it is the only
-   * honest measure of "how far have I got" that a title screen can offer.
+   * The glossary outlives every RUN — it was never yours, it is kept by
+   * whoever has been counting — so it is the only honest measure of "how far
+   * have I got" that a title screen can offer. It does NOT outlive a RESET,
+   * and this said it did: `forgetPlayer` went onto that button in build 238
+   * and takes the glossary, the opening lines and the ASSAY's lifetime record
+   * with the run. The word DELETE is typed two hundred pixels under these
+   * tiles and it destroys them; the label above the field says so now.
    * Shown only once there is something in it: a first launch has no record
    * and a row of zeroes is a worse welcome than no row at all.
    */
   /*
    * Three tiles, and only the ones there is something to say in.
    *
-   * Everything here is a fact the device already holds. The glossary is the
-   * only thing that survives a reset -- it was never yours, it is kept by
-   * whoever has been counting -- so it is the honest answer to "how far have I
-   * got"; an anomaly is in it only by having been taken apart; and the deepest
+   * Everything here is a fact the device already holds. The glossary outlives
+   * every run -- it was never yours, it is kept by whoever has been counting
+   * -- so it is the honest answer to "how far have I got"; it does not outlive
+   * RESET SIMULATION, which is the button directly below these tiles;
+   * an anomaly is in it only by having been taken apart; and the deepest
    * rung comes off the saved run, so it is there exactly when CONTINUE is.
    *
    * A tile per fact rather than a sentence: they are compared at a glance and

@@ -90,7 +90,22 @@ function readSlot(key) {
     if (!raw) return null;
     const d = JSON.parse(raw);
     if (!d || d.v !== VERSION) return null;
+    /*
+     * ---- every number the restore assigns WITHOUT a fallback -------------
+     *
+     * `resume()` writes `w.released`, `w.energy` and `w.nextStoryAt` straight
+     * out of the file while the fields around them all carry `|| 0`. So a
+     * file with `energy: null` or a truncated number passed this gate, the
+     * title offered CONTINUE, and the run came back with a purse of NaN and a
+     * tree that could never be bought from. Refused here instead, which drops
+     * it through to the BACKUP slot and then to BEGIN -- the whole point of
+     * there being two slots.
+     *
+     * The title screen's own resume note was already stricter than the loader
+     * behind it: it guards each figure with `Number.isFinite` before printing.
+     */
     if (!Number.isFinite(d.kills)) return null;
+    if (!Number.isFinite(d.energy) || !Number.isFinite(d.released)) return null;
     // Shapes the restore indexes into directly rather than reading defensively.
     if (!d.loadout || !Array.isArray(d.loadout.mines) || !Array.isArray(d.loadout.ammo)) return null;
     if (!Array.isArray(d.taken) || !Array.isArray(d.unlocked)) return null;

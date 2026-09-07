@@ -2352,6 +2352,18 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
 .bootInner { margin-block: auto; }
 #boot[hidden] { display: none; }
 
+/*
+ * ...and it stops taking taps on the frame it starts leaving.
+ *
+ * This animated opacity, transform and blur and nothing else, while `#boot`
+ * keeps `inset: 0` and `pointer-events: auto` and `hidden` arrives on a 500ms
+ * timeout -- and an element at opacity 0 still hit-tests. So for half a second
+ * after the way in, every tap landed on a dead full-screen panel instead of
+ * the field, and a tap where the primary had been pressed it AGAIN: `start()`
+ * twice is a second reset and a second SIMULATION ONLINE.
+ */
+#boot.out { pointer-events: none; }
+
 #boot.out { animation: bootOut 0.5s ease-in forwards; }
 @keyframes bootOut { to { opacity: 0; transform: scale(1.06); filter: blur(6px); } }
 
@@ -2565,6 +2577,13 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
 #resumeBtn:active { background: rgba(255, 207, 92, 0.3); }
 /* When there is a run to continue, that is the button. */
 #resumeBtn:not([hidden]) ~ #startBtn { display: none; }
+/*
+ * ...and CONTINUE's own guard, which it was the one element on this panel
+ * without. `[hidden] { display: none }` is the user agent's, at one class of
+ * specificity, and loses to any author rule written on an id -- so a button
+ * this panel hides by attribute owes itself this line. See CLAUDE.md.
+ */
+#resumeBtn[hidden] { display: none; }
 
 #resumeNote {
   margin-top: 8px;
@@ -2640,6 +2659,14 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
   padding: 8px 4px;
 }
 #wipeWord:focus { outline: none; border-color: #ff6b7a; }
+/*
+ * ...and ACCEPTED. `hud.js` has toggled `.ok` on this field on every keystroke
+ * since the box was written and nothing in this stylesheet has ever styled it,
+ * so the one moment the screen most needs to confirm the word painted nothing
+ * on the field the thumb is looking at -- the only signal was an 11px label
+ * beside it losing its disabled state.
+ */
+#wipeWord.ok { border-color: #ff6b7a; color: #ff6b7a; }
 #wipeGo, .bootAskNo {
   -webkit-appearance: none;
   appearance: none;
@@ -3180,7 +3207,10 @@ body.booting #quickBar {
   #startBtn, #resumeBtn { padding: 14px; }
   #resumeBtn { font-size: 11px; letter-spacing: 0.16em; }
   .bootFoot { margin-top: 14px; padding-top: 10px; }
-  #resumeBtn:not([hidden]) ~ #startBtn { font-size: 10px; letter-spacing: 0.08em; }
+  /* A 10px rule for BEGIN SIMULATION sat here. The identical selector
+     already sets `display: none`, so it could never paint -- and 10px is
+     under the 11px floor this panel's own comment states. Left from build
+     227, when NEW RUN stood beside CONTINUE and had to shrink. */
 
   /* The opening lines carry their own break, and at 320 the plate's padding
      was enough to wrap each half again — four rendered lines for a two-line
