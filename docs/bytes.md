@@ -31,8 +31,8 @@ Measured against the current config, at 1 point = 1 kB:
 | cheapest tree node | 500 | 500 kB |
 | an ability | 1,100 | 1.10 MB |
 | an emplacement lot | 2,600 | 2.60 MB |
-| the ASSAY | 20,000 | **20.0 MB** |
-| everything buyable (156 levels) | 158,807 | **159 MB** |
+| the ASSAY (dearest single price) | 20,000 | **20.0 MB** |
+| everything buyable | 174,400 | **174 MB** |
 | lifetime banked, long run | ~500,000+ | **500 MB → low GB** |
 
 `bank()` does not round — `got = amount * intakeRate * dividend` — so
@@ -40,6 +40,12 @@ sub-kilobyte amounts already exist in the game today and are simply invisible.
 Under the intake tax they become the thing the **B** unit is for. B, kB and MB
 are all reachable without touching a single balance number; GB arrives on a
 long run's lifetime total.
+
+> **Corrected after the inventory.** My first pass put the total at 158,807 by
+> walking the tree. That misses the six emplacements, which are bought on the
+> FIELD at `CFG.gun.cost` 2,600 each and are not tree nodes: 158,800 across 155
+> levels plus 15,600 is **174,400**. It is the kind of miss this whole document
+> exists to prevent, and it is recorded rather than quietly fixed.
 
 ---
 
@@ -155,19 +161,86 @@ exact text, and the suite, which finds elements by id.
 
 ---
 
-## 6. What could break, and the guard for each
+## 6. What would break — measured, not guessed
 
-| hazard | guard |
-|---|---|
-| `Hud.fitBar` is keyed on **digit counts** (CLAUDE.md: keying it on values forced 874 layouts in ten seconds). `21.7 MB` has a different width behaviour from `12500`. | Key it on the formatted string's **length**, which is the thing that actually changes, and keep the once-a-frame diff. |
-| The chip gets one character wider at worst. | Measure the bar at 320×568 with the widest producible string and assert no clip — the `fitBar` case already exists to extend. |
-| A price that is no longer a whole number of bytes. | `check-build.mjs`: every cost/step is an integer. |
-| Sub-byte amounts accumulating invisibly. | `bank()` keeps its fractional accumulator; only the **display** floors. Assert that the purse and the displayed figure never disagree by a whole unit. |
-| A pre-change save read as 1000× poorer. | The migration above, plus a case that loads a v4 file with no `unit` and asserts the purse and every `opens` gate survive. |
-| A number printed raw somewhere the sweep does not look. | A regress case that walks every text node on the play screen, the menu and the title and fails on any bare integer of four digits or more in a currency slot. This is the case that makes the rename *complete* rather than mostly complete. |
-| `tiers.mjs`'s `pay` columns (which once summed bounty *multipliers* and published a false finding). | Re-run it and check the shape of the curve is identical to the recorded one, since nothing about the economy should have moved. |
+A four-surface sweep found **378 distinct sites** and 53 hazards. The ones that
+change the plan:
 
----
+**`priceOf` is ADDITIVE.** `cost + step * have` — so scaling `cost` alone and
+leaving `step` silently changes the *shape* of every ladder, not just its
+level. Both scale together, or the second level of everything gets cheaper
+relative to the first. This is the single easiest way to get the change wrong.
+
+**`world.energy | 0` truncates to 32 bits.** `menu.js:1905` uses it as the diff
+key that decides whether the chip badge is recomputed at all. Today the purse
+is in the hundreds of thousands and the cast is invisible; in bytes a late run
+reaches billions, and `2147483648 | 0` is negative. It becomes `Math.floor`,
+and every other `| 0` on currency is swept at the same time.
+
+**`CFG.energy` is not all currency.** `pulse: 400` is a *radius*, `pull: 26` a
+*speed*, and `tax`/`taxFloor`/`taxCap` are *multipliers*. A blanket multiply
+over that object corrupts four values that are not money. Worse, renaming the
+block breaks two `SCALED` path strings — which is exactly the fault build 275
+fixed and wrote a guard for. Rename the block only with that guard watching.
+
+**The chip's label is written by JavaScript, not markup.** `hud.js:1085`
+rewrites that `<em>` on every `setEnergy`, swapping between the word and the
+`×1.24` dividend multiplier. Changing `index.html` alone leaves the old word
+live the first time the purse moves — and the slot already has two jobs, so the
+unit cannot simply move into it. Compounding that: `styles.css:3161` drops the
+`<em>` entirely below 372px, so a unit living in the label is a unit a narrow
+phone never sees. **The unit belongs in the figure**, not the label.
+
+**`fitBar` fails silently in the direction that clips.** It is keyed on digit
+*counts*: `12500` is 5 digits and 5 characters, `12.5 MB` is 3 digits and 7.
+The string gets **wider** while the key gets **smaller**, so the guard stops
+re-measuring exactly when it needs to, into a group that is `overflow: hidden`.
+Re-key on the rendered strings' length — never on the values, which cost 874
+forced layouts in ten seconds.
+
+**`rollBank` animates the tree's figure**, tweening `Math.round(from + (to −
+from) * e)` every frame for 260ms, and it carries a hard-coded magnitude that
+decides whether it animates at all. A naively formatted roll flickers its
+prefix as it crosses 1000. Roll the *number* and format once per frame at a
+prefix chosen from the destination.
+
+**`tabular-nums` stops four readouts jittering**, and a prefixed string breaks
+that assumption — the digits align, the unit does not.
+
+**The price is painted on the canvas** at `yard.js:578` onto a plate sized from
+`measureText`, so a longer string changes *geometry*, not just text.
+
+**`.shopPrice` has seven rules** at different type sizes, and the armed card
+sets `content: attr(data-price)` at **30px** in a grid cell that stretches its
+whole row. That is the largest type any currency figure appears in.
+
+**Teaching captions are identified by a hash of their own text** (`idOf`).
+Rewording the five ENERGY captions makes them five *new* lines, so every device
+that has already been taught them is taught them again. That is a shipped
+behaviour change and it belongs in the plan, not in a surprise.
+
+**Two figures in player-facing prose are already wrong.** `codex.js:213` says
+DRIFT is "Worth 10 ENERGY against a MOTE's 4": `CFG.energy.drift` is **6**, and
+a MOTE's `drops: 4` is the *number of motes it sheds*, not an amount. A
+mechanical noun-swap would ship a second falsehood on top of the first.
+
+**A payout with no unit at all**: `MARGIN +${margin}` (`game.js:459`) does not
+grep for "energy" and would be missed by any sweep that looks for the word.
+
+**The ASSAY's numbers are not currency** — they are damage per second and a
+lifetime damage odometer. A global re-unit sweep would wrongly prefix them.
+
+**REMAINDER shares the price slot, the header and the affordability
+comparison.** A careless sweep gives it byte prefixes and NEW FORM reads "7 B".
+
+**The ten object gates are interlocked** with the pre-180 kill migration and
+`check-build`'s frozen `KILL_GATES`; they key on `earned`, so they move with
+the rescale and must be re-checked together, not one at a time.
+
+**Nine `cost:` fields in the boss configs are dead** — nothing has read them
+since build 227 removed the tree's ANOMALY branch. Rescaling them is wasted
+work that *looks* like coverage. They should be deleted, and
+`check-build.mjs:412` carries a stale comment promising to check them.
 
 ## 7. Phases
 
@@ -184,8 +257,16 @@ Each phase ends green, with the suite run and the build pushed.
 4. **The words.** Copy, captions, the glossary, the headings, the ids. The
    "no bare integer" sweep goes in here, because it is what proves phase 4 is
    finished.
-5. **The check.** Re-run `tiers.mjs` and the ORDINAL hash and confirm neither
-   moved — which is the whole claim of §1.
+5. **The check.** Re-run `tiers.mjs` and confirm the income curve's SHAPE is
+   unchanged, which is the whole claim of §1.
+
+   **The ORDINAL hash will move, and that is not a regression.** It mixes
+   `w.energy` every 300 frames, so multiplying the purse by 1000 moves it by
+   construction — I claimed otherwise in the first draft of this plan and was
+   wrong. The procedure is the one CLAUDE.md already sets out for it: take the
+   hash on HEAD before the change and again after, in the same container, and
+   record the DELTA with its cause. What would be a real finding is the hash
+   moving on a build that did *not* touch the purse.
 
 Phase 1 is worth doing on its own and is safe to stop after.
 
@@ -199,3 +280,35 @@ Phase 1 is worth doing on its own and is safe to stop after.
 - **No binary prefixes.** kB is 1000 B, as asked. KiB/MiB are not used.
 - **No change to REMAINDER.**
 - **No renaming of object types.**
+
+---
+
+## 9. The inventory
+
+A four-surface sweep, each surface checked by a second reader for what the
+first missed. **378 distinct sites** across `src/`, `scripts/`, `index.html`
+and `styles.css`:
+
+| kind | count | what it means |
+|---|---|---|
+| LOGIC | 161 | arithmetic or a comparison a rescale could break |
+| TEST | 144 | a case asserting a price, a payout, a label or a width |
+| VALUE | 114 | a literal amount |
+| DISPLAY | 88 | a place an amount becomes text |
+| WORD | 80 | a user-visible "energy" |
+| COMMENT | 78 | a docstring stating a number that would become false |
+| FIELD | 59 | a variable, property or save key holding currency |
+
+The full list is in the workflow journal at `wf_1313e22b-743`. The parts that
+decide the design are in §6; the rest is execution.
+
+**Two things the sweep confirmed rather than found**, and both are load-bearing
+for §2 and §3:
+
+- **There is no number formatter anywhere in the repo.** Every currency figure
+  today is `String(n)`, `Math.floor(n)` or `Math.round(n)` interpolated into a
+  template. So `fmtBytes` is genuinely new code and every call site is a site
+  that has never had one.
+- **The purse is a float and always has been.** `bank()` does not round, and
+  every reader truncates on the way out. Bytes do not make it fractional; they
+  make the existing fraction visible, which is the whole of §1.
