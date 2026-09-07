@@ -159,7 +159,13 @@ export class Tessera extends Boss {
    */
   relay(world) {
     const C = T();
-    const empty = this.berths.filter((b) => !b.tile || b.tile.dead);
+    /*
+     * A berth that was cut recently is not re-laid, however empty it is. Read
+     * the note on `regrow` in config.js: without it the front of a lane comes
+     * back on the very next pass, and a corridor you cannot stand in is a
+     * door -- measured, a whole fight in which the core took zero damage.
+     */
+    const empty = this.berths.filter((b) => (!b.tile || b.tile.dead) && !(b.cut > 0));
     if (!empty.length) return;
     /*
      * Nearest to the machine first. A random fill would re-tile the far edge
@@ -189,6 +195,8 @@ export class Tessera extends Boss {
     for (const b of this.berths) {
       if (!b.tile || !b.tile.dead || b.shed) continue;
       b.shed = true;
+      // ...and the ground it stood on is open, and stays open. See `regrow`.
+      b.cut = this.stage >= 2 ? T().regrowII : T().regrow;
       /*
        * `claim(new Enemy(...))` and NOT `this.body(...)`. `body` builds
        * STRUCTURE -- it sets `mass = Infinity`, `invMass = 0`, `cruise = 0`
@@ -227,6 +235,25 @@ export class Tessera extends Boss {
       p.y = this.y + b.dy;
       p.vx = 0;
       p.vy = 0;
+      /*
+       * ---- and a tile is GROUND, not a target ---------------------------
+       *
+       * `staged` is the mark for "may not be CHOSEN", and config.js says in as
+       * many words that it never gated projectile collision -- which is
+       * exactly the pair this fight needs. Without it the assist prefers a
+       * tile to the core every time, because the slab stands `ahead` of the
+       * core and is therefore always nearer: measured over a whole fight, the
+       * core took 189 of its 8218 while the tiles took 16,618. The player was
+       * not cutting a corridor, they were mowing a lawn that grew back, and
+       * the boss withdrew on the patience clock having never been hurt.
+       *
+       * With it, you aim at the CORE and the ground in front of it is what
+       * your rounds meet on the way -- which is the sentence at the top of
+       * this file, finally true. Re-asserted here rather than set once at
+       * `layAt`, because `Enemy.update` clears `staged` on the frame a body
+       * passes the entry line and every tile is laid well below it.
+       */
+      p.staged = true;
     }
   }
 
@@ -269,9 +296,24 @@ export class Tessera extends Boss {
     this.place(dt);
     this.shed(world);
 
+    /*
+     * The berth cooldowns, and the tile roster.
+     *
+     * `this.tiles` is what `parts()` hands back, and `layAt` pushes to it on
+     * every lay -- so over a long fight it grew without bound: measured, 53
+     * entries for 15 berths, and every one of them walked by the base's
+     * `temper`, its arrest and the ending. Pruned here, which is the one place
+     * that runs every frame and knows which are still standing.
+     */
+    const angry = this.stage >= 2;
+    for (const b of this.berths) if (b.cut > 0) b.cut -= dt;
+    if (this.tiles.length > this.berths.length) {
+      this.tiles = this.tiles.filter((p) => !p.dead);
+    }
+
     this.layT -= dt;
     if (this.layT <= 0) {
-      this.layT = this.stage >= 2 ? C.layII : C.lay.every;
+      this.layT = angry ? C.layII : C.lay.every;
       this.relay(world);
     }
 

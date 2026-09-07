@@ -1869,4 +1869,35 @@ came from before believing the other one covers it.
   Its floors were `>= 20` against a grid of 24, so a third of the panel could
   stop being built and it would stay green -- a floor set well under the truth
   is a floor that cannot see anything.
+- **`!world.boss` is not "the boss was beaten", and that hid an unwinnable
+  fight for three builds.** A WITHDRAWAL clears it too. `world.reconciled`
+  is the only honest test, and measured with it: TESSERA withdrew at 164s with
+  its core on FULL, having taken zero damage all fight, and TERMINUS does not
+  finish at stock at all. Any probe that asks "did it die" has to ask
+  `reconciled.includes(n)`.
+- **Structure that REGROWS in front of a core is a tax, not a health bar.**
+  The other seven put their health in structure that is on the way to the core,
+  so shooting it is progress; TESSERA's slab stands `ahead` of its core and is
+  re-laid for ever, so every round spent on it is a round the core never sees.
+  Two numbers have to be checked against each other and neither is obvious:
+  what the player CUTS a second (76 dps stock, one 300hp tile per 3.9s) against
+  what the boss LAYS (two per 5.2s was one per 2.6s). The boss won 1.5 to 1 and
+  the corridor could never open. And a cut berth needs a COOLDOWN before it is
+  re-laid, or the front of a lane comes back on the next pass -- a corridor you
+  cannot stand in is a door.
+- **`staged` is the mark for a body that must be SHOT THROUGH rather than shot
+  at.** It gates the choosers and never gated projectile collision, which is
+  exactly the pair a wall-of-bodies design needs: without it the assist prefers
+  the nearer body every time, and TESSERA's core took 189 of 8,218 while its
+  tiles took 16,618. Re-assert it every frame from wherever the body's state is
+  owned -- `Enemy.update` clears `staged` on the frame a body passes the entry
+  line, and structure is laid well below it.
+- **An upgrade id in a boss's config is a preference, not a fact.** AXIOM held
+  five ability ids of which FOUR are in `LOCKABLE.abilities` and have to be
+  bought, so a run that arrived at rung 48 having spent elsewhere lost exactly
+  one button to a boss whose whole identity is taking them -- the other four
+  clauses held sealed ids, which is holding nothing while looking like it. Pick
+  from what the run OWNS and let a clause hold nothing when there is nothing
+  left to take; and never put a null in the hold set, which is a hold nothing
+  can ever release.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

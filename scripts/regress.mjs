@@ -23601,6 +23601,47 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.boss.hush(w);
     out.heldAfterHush = w.abilityHold.size;
 
+    /*
+     * ---- and what it takes is what the run actually OWNS ---------------
+     *
+     * `CFG.axiom.holds` is an order of preference, not the answer. Four of
+     * the five ids in it are in `LOCKABLE.abilities` and have to be bought;
+     * only HAIL is free. So a run that reached rung 48 having spent its
+     * energy on rounds, mines and the machine met a boss whose whole identity
+     * is "it takes your buttons" and lost exactly ONE -- the other four
+     * clauses held ids that were sealed already, which is to say they held
+     * nothing while looking like they did. Driven at three levels of
+     * ownership, because the fully-owned case that every other arm here uses
+     * is the one case where the old code and the new one agree.
+     */
+    const owning = (ids) => {
+      g.restart();
+      g.debugGiveEnergy(900000);
+      w.phase = 'staging';
+      w.unlocked.clear();
+      for (const k of ids) w.unlocked.add(k);
+      w.apertures = w.apertures || [];
+      w.apertures[8] = 1;
+      g.openBoss(8);
+      const got = [...w.abilityHold];
+      w.boss.hush(w);
+      w.boss.clear(w);
+      w.boss = null; w.bossN = 0; w.bossStage = 0;
+      return got;
+    };
+    const a0 = owning([]);
+    const a1 = owning(['lance']);
+    const aAll = owning(['lance', 'well', 'prism', 'stasis', 'decoy', 'ward']);
+    out.own = {
+      none: a0.join(','),
+      one: a1.join(','),
+      all: aAll.join(','),
+      want: CFG.axiom.holds.join(','),
+      // A null in the set is a hold `freed` can never match and `isHeld` can
+      // never be asked about -- it would shut a button for the whole fight.
+      noNulls: [a0, a1, aAll].every((x) => x.every(Boolean)),
+    };
+
     g.restart();
     return out;
   });
@@ -23625,6 +23666,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `(${r.fanBack}) and LANCE does not (${r.lanceStillHeld}) -- and the core `
     + `was still out of reach (${r.stillSpent}); with the ring gone nothing is `
     + `held and the core opens (${!r.openSpent}) at stage ${r.stage}`);
+
+  check('...and what it takes is what the run actually owns',
+    r.own.none === 'fan' && r.own.one === 'fan,lance'
+    && r.own.all === r.own.want && r.own.noNulls,
+    `owning nothing it holds [${r.own.none}]; owning LANCE as well, `
+    + `[${r.own.one}]; owning everything, [${r.own.all}] against a table of `
+    + `[${r.own.want}] -- and never an empty id in the set (${r.own.noNulls}), `
+    + 'which would be a hold nothing could ever release');
 
   check('...and it lets go of everything by either door',
     r.ended && r.reconciled && r.heldAfter === 0 && r.leftovers === 0
@@ -23755,6 +23804,47 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.laidNear = back.filter((b) => b.dy === nearRow).length;
     out.laidCentre = back.some((b) => b.dx === 0);
     out.rows = [...new Set(bs.berths.map((b) => b.dy))].sort((a, b) => a - b).join('/');
+    out.layN = CFG.tessera.lay.n;
+
+    /*
+     * ---- and a cut berth STAYS cut, which is what makes it a corridor ----
+     *
+     * `relay` fills the emptiest ground nearest the machine first, and with no
+     * cooldown that means the front of a lane comes back on the very next
+     * pass. Measured before `regrow` went in: over a whole fight the core took
+     * ZERO -- the player was mowing a lawn that grew back, and the boss
+     * withdrew on the patience clock having never been hurt.
+     */
+    reset();
+    for (const b of bs.berths) b.tile.dead = true;
+    bs.shed(w);                       // which is what marks them cut
+    bs.relay(w);
+    out.heldOpen = bs.berths.filter((b) => b.tile && !b.tile.dead).length;
+    // ...and once the cooldown runs out it fills again, or it is not a
+    // cooldown, it is a hole in the slab.
+    for (const b of bs.berths) b.cut = 0;
+    bs.relay(w);
+    out.thenFills = bs.berths.filter((b) => b.tile && !b.tile.dead).length;
+    out.regrow = CFG.tessera.regrow;
+
+    /*
+     * ---- and a tile is GROUND, not a target -----------------------------
+     *
+     * `staged` is the mark for "may not be CHOSEN" and it never gated
+     * projectile collision, which is exactly the pair this fight needs: the
+     * slab stands `ahead` of the core, so without it the assist prefers a
+     * tile every time and the core is never shot. Asserted on the mark AND on
+     * what the assist actually picks, because the mark alone is a proxy.
+     */
+    reset();
+    // A frame, because the mark is re-asserted in `place()` -- `Enemy.update`
+    // clears `staged` on the frame a body passes the entry line and every
+    // tile is laid well below it, so the boss owns it every tick or not at
+    // all. Reading it without stepping reads whatever the revive left.
+    g.update(1 / 60);
+    out.tilesStaged = bs.berths.every((b) => b.tile && b.tile.staged);
+    const picked = g.autoTarget ? g.autoTarget() : null;
+    out.picksTile = !!(picked && picked.type && picked.type.id === 'tile');
 
     /*
      * ---- cutting one costs you something coming down the lane -------------
@@ -23804,10 +23894,29 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.coreTook} into the core standing behind it`);
 
   check('...and a cut lane is re-laid nearest the machine first',
-    r.laid === 2 && r.laidNear === 2 && r.laidCentre,
-    `one pass over an empty slab laid ${r.laid} tiles, ${r.laidNear} of them in `
-    + `the row nearest the machine (rows at ${r.rows} below the core) and one `
-    + `on the centre line (${r.laidCentre})`);
+    // `lay.n`, not the literal it happened to be: build 277 took it from two
+    // to one, and a count written to fit the day's value is not a rule.
+    r.laid === r.layN && r.laidNear === r.layN && r.laidCentre,
+    `one pass over an empty slab laid ${r.laid} of ${r.layN} tiles, `
+    + `${r.laidNear} of them in the row nearest the machine (rows at ${r.rows} `
+    + `below the core) and one on the centre line (${r.laidCentre})`);
+
+  /*
+   * The two that make it a corridor rather than a door. Both were measured
+   * before they existed: without them the core took nothing at all over a
+   * whole fight and TESSERA withdrew on the patience clock, unbeaten, with
+   * `world.reconciled` still empty.
+   */
+  check('...and ground it has just lost stays lost, which is what makes it a corridor',
+    r.heldOpen === 0 && r.thenFills > 0,
+    `a whole slab cut and one re-laying pass put back ${r.heldOpen} tiles while `
+    + `the ${r.regrow}s cooldown ran; with the cooldown spent, ${r.thenFills}`);
+
+  check('...and a tile is ground the assist will not aim at, only meet',
+    r.tilesStaged && !r.picksTile,
+    `every tile carries \`staged\` (${r.tilesStaged}), so the assist does not `
+    + `choose one (${!r.picksTile}) -- rounds still stop on them, which is the `
+    + 'arm above'); 
 
   check('...and what it sheds can steer, and none of it outlives the ending',
     r.shed === 3 && r.shardsSteer && r.ended && r.reconciled && r.leftovers === '',

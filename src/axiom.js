@@ -111,10 +111,36 @@ export class Axiom extends Boss {
      * hands back the right button without anything having to remember which
      * clause was which.
      */
+    /*
+     * ---- and WHAT it holds is what this run actually owns ---------------
+     *
+     * `C.holds` is the order of preference, not the answer. Four of the five
+     * ids in it -- LANCE, WELL, PRISM, STASIS -- are in `LOCKABLE.abilities`
+     * and have to be bought; only HAIL is free. So a run that reached rung 48
+     * having spent its energy on rounds, mines and the machine met a boss
+     * whose entire identity is "it takes your buttons away" and lost exactly
+     * ONE button: the other four clauses held ids that were sealed already,
+     * which is to say they held nothing at all while looking like they did.
+     *
+     * So the pool is what the run has: the table's order first, then anything
+     * else it owns, and PULSE never (it is `essential`, and `isHeld` refuses
+     * it at the reader anyway -- a boss that could take PULSE can pin you
+     * against your own machine). A clause past the end of the pool holds
+     * NOTHING and is plain structure, which is honest: there was nothing left
+     * to take.
+     */
+    const owns = (id) => id === 'fan' || world.unlocked.has(id);
+    const pool = C.holds.filter(owns);
+    for (const slot of world.abilities.slots) {
+      const id = slot.def.id;
+      if (slot.def.essential || pool.includes(id) || !owns(id)) continue;
+      pool.push(id);
+    }
+
     this.clauses = [];
     for (let i = 0; i < C.clauses; i++) {
       const p = this.body('clause', this.x, this.y);
-      p.holds = C.holds[i % C.holds.length];
+      p.holds = pool[i] || null;
       p.at = (i / C.clauses) * TAU;
       this.clauses.push(p);
     }
@@ -128,7 +154,11 @@ export class Axiom extends Boss {
      * miniature.
      */
     world.abilityHold.clear();
-    for (const id of this.hold0) world.abilityHold.add(id);
+    // ...and a clause that holds NOTHING puts nothing in the set. `hold0` can
+    // carry nulls now (see the pool above), and a null in here is an entry
+    // `freed` can never match and `isHeld` can never be asked about -- a hold
+    // that nothing can ever release.
+    for (const id of this.hold0) if (id) world.abilityHold.add(id);
 
     background.setFocus(this.x, this.y);
     background.setDread(1, 0);
@@ -210,7 +240,15 @@ export class Axiom extends Boss {
      * comes off here and nowhere else, so "the argument is finished" and "the
      * core can be shot" are the same event by construction.
      */
-    if (!this.opened && !held.size) {
+    /*
+     * ...and it is the RING being gone, not the SET being empty. Those were
+     * the same thing only while every clause held something -- and once the
+     * pool above can be shorter than the ring, a run owning two abilities
+     * would have opened the core after two clauses and fought a shorter boss
+     * for being worse equipped, which is backwards. The clauses are the
+     * argument; the argument is finished when there is none of it left.
+     */
+    if (!this.opened && this.clauses.every((p) => p.dead)) {
       this.opened = true;
       this.core.spent = false;
       this.enterStage(world, 2);

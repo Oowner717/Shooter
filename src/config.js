@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '276';
+export const BUILD = '277';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '276';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e5f281d';
+export const REV = '1f50b33';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1153,8 +1153,38 @@ export const CFG = {
      * core of 38 -- and the lateral slide only ever increases that.
      */
     ahead: 132,
-    lay: { every: 5.2, n: 2 }, // how often it re-tiles, and how many at a time
-    layII: 3.4, // ...and how often once it is angry
+    /*
+     * ---- how fast it re-tiles, and why these numbers are what they are ---
+     *
+     * It was `{ every: 5.2, n: 2 }` with `layII: 3.4`, and MEASURED that made
+     * the fight unwinnable at stock. The arithmetic nobody had done:
+     *
+     *   a stock gun puts about 76 damage a second into the slab, so it cuts
+     *   one 300hp tile every 3.9 seconds. Two tiles every 5.2 seconds is one
+     *   laid every 2.6. The boss out-laid the player 1.5 to 1, the corridor
+     *   could never open, and over a whole fight the core took EXACTLY ZERO --
+     *   164 seconds of shooting ground, and then it withdrew on the patience
+     *   clock with `reconciled` still empty.
+     *
+     * One at a time, every 7 seconds, is one laid against 1.8 cut. That is
+     * the margin the player needs to open a lane at all, and `layII` closes
+     * it to 4.7 -- still slower than the cut, but only just, which is what the
+     * second stage is for.
+     */
+    lay: { every: 7, n: 1 }, // how often it re-tiles, and how many at a time
+    layII: 4.7, // ...and how often once it is angry
+    /*
+     * ...and a berth that has been cut STAYS cut for this long.
+     *
+     * The rate above is only half of it. `relay` fills the emptiest ground
+     * nearest the machine first -- which is the point, it is what makes the
+     * ground it wants back most the ground you just took -- but with no
+     * cooldown that means the front of a lane is refilled on the very next
+     * pass, so a lane can never be held open long enough to shoot down. A
+     * corridor you cannot stand in is a door.
+     */
+    regrow: 9, // seconds before a cut berth may be re-laid
+    regrowII: 5.5, // ...and once it is angry
     drift: 26, // how far the whole slab slides side to side
     driftRate: 0.3,
     stageCore: 0.62,
@@ -4230,7 +4260,18 @@ export const ENEMY_TYPES = [
     name: 'TESSERA',
     shape: 'tessera',
     r: 38,
-    hp: 7800,
+    /*
+     * 7800 until build 277, which is PARITY's 7600 -- and it was the wrong
+     * comparison, because those seven put their health in structure that is
+     * ON THE WAY to the core, so shooting it is progress. This one's slab is
+     * a TAX: it stands in front of the core, it grows back, and every round
+     * spent on it is a round the core never sees. Measured at stock, the
+     * player splits 58 damage a second about 22/36 between core and ground,
+     * so a core of 7800 is a 340-second fight -- outside the family's 219-278
+     * and long enough for a single stage to brush the 150-second patience
+     * clock and withdraw a boss that was being beaten.
+     */
+    hp: 5600,
     large: true,
     fixed: true,
     density: 10,

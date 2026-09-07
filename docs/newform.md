@@ -3313,3 +3313,104 @@ Two flakes were run down rather than re-run, both the same disease:
   far stronger claim than "at least one fired". Measured: 6.02s, 6.02s, 6.01s.
 
 594 green. ORDINAL's hash `-1765830468`, unchanged.
+
+---
+
+## Build 277 — the last two fights, measured
+
+Both era-2 anomalies were reviewed against the seven before them, and the
+headline is that one of them could not be won.
+
+### TESSERA could not be beaten, and the number is zero
+
+Driven at stock, auto-aim and auto-fire, the ninth anomaly ran 164 seconds and
+then **withdrew on the patience clock with `world.reconciled` still empty**.
+Over the whole fight its core took **0 of 8,425** while the tiles took 12,558.
+
+Two causes, and both had to go:
+
+**The boss out-laid the player.** A stock gun puts about 76 damage a second
+into the slab, so it cuts one 300hp tile every 3.9 seconds; `lay: {every: 5.2,
+n: 2}` is one laid every 2.6. The corridor could never open — 1.5 tiles laid
+for every one cut. It is `{every: 7, n: 1}` now, which is one laid against 1.8
+cut, and `layII` closes that to 4.7 for the second stage.
+
+**And a cut berth came straight back.** `relay` fills the emptiest ground
+nearest the machine first, which is the point of it — but with no cooldown the
+front of a lane is refilled on the very next pass, so a lane could never be
+held open long enough to shoot down it. `regrow` (9s, 5.5 once angry) is how
+long a cut berth stays cut. A corridor you cannot stand in is a door.
+
+### ...and the assist would not look past the ground
+
+Even with the slab cut to a third, the core took 189 of 8,218. The reason is
+geometry: the slab stands `ahead` of the core, so a tile is always the nearer
+body and `autoTarget` picks it every time. The player was not cutting a
+corridor, they were mowing a lawn that grew back.
+
+The mark for this already existed. `staged` is the rule for what may be
+**chosen**, and config.js says in as many words that it never gated projectile
+collision — which is exactly the pair this fight needs. Tiles carry it now
+(re-asserted in `place()`, because `Enemy.update` clears `staged` the frame a
+body passes the entry line and every tile is laid well below it). You aim at
+the **core**, and the ground in front of it is what your rounds meet on the
+way, which is the sentence at the top of that file finally being true.
+
+Measured after: the core takes 86% of its health over the fight, the stages
+advance 1 → 3 → 4, and it is **BEATEN at 301/328/327 seconds** across three
+runs at stock, 90/92/92 fully bought.
+
+The core came down 7,800 → 5,600 with it. 7,800 was PARITY's 7,600, and that
+was the wrong comparison: those seven put their health in structure that is
+*on the way* to the core, so shooting it is progress. This one's slab is a
+**tax** — it stands in front, it grows back, and every round spent on it is a
+round the core never sees.
+
+`this.tiles` was also leaking: `layAt` pushes on every lay and nothing pruned
+it, so it reached 53 entries for 15 berths and the base's `temper`, arrest and
+ending walked all of them. Pruned each frame.
+
+### AXIOM took away buttons the run had never bought
+
+`CFG.axiom.holds` is `['fan','lance','well','prism','stasis']` — and four of
+those five are in `LOCKABLE.abilities` and have to be **bought**. Only HAIL is
+free. So a run that reached rung 48 having spent its energy on rounds, mines
+and the machine met a boss whose entire identity is *it takes your buttons
+away* and lost exactly one: the other four clauses held ids that were sealed
+already, which is to say they held nothing while looking like they did.
+
+The table is an order of preference now, not the answer. The pool is what the
+run actually owns — the table's order first, then anything else it has, and
+PULSE never — and a clause past the end of the pool holds **nothing** and is
+plain structure, which is honest: there was nothing left to take.
+
+Two things that had to move with it. A null must not go into `world.abilityHold`
+(it is a hold `freed` can never match and `isHeld` can never be asked about —
+a button shut for the whole fight). And the core now opens on the **ring** being
+gone rather than on the set being empty: those were the same thing only while
+every clause held something, and otherwise a run owning two abilities would
+have opened the core after two clauses and fought a *shorter* boss for being
+worse equipped.
+
+### The family table, measured
+
+Stock, auto-aim and auto-fire, `reconciled` as the test — because `!world.boss`
+is also true of a withdrawal, which is how this went unnoticed:
+
+| | stock | bought |
+|---|---|---|
+| ORDINAL | beaten 278s | 159s |
+| GNOMON | beaten 219s | 181s |
+| FRACTAL | beaten 269s | 181s |
+| AMPLITUDE | beaten 254s | 125s |
+| DYNAMO | beaten 247s | 150s |
+| PARITY | beaten 237s | 77s |
+| TERMINUS | **withdrew 400s, core 6%** | 231s |
+| AXIOM | beaten 203s | 113s |
+| TESSERA | beaten 327s (was: withdrew) | 92s |
+
+TERMINUS not finishing at stock is pre-existing and untouched here; it is
+recorded because the same instrument found it and nothing else has ever asked.
+
+597 green. ORDINAL's hash `-1765830468`, unchanged — neither fight is in the
+wave ladder and the probe fights the first.
