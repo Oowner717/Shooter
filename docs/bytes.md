@@ -279,6 +279,17 @@ Each phase ends green, with the suite run and the build pushed.
 
 Phase 1 is worth doing on its own and is safe to stop after.
 
+**Phase 4 shipped in build 287.** Every player-facing string moved to the §5
+vocabulary, and the "no bare integer" sweep that proves it is finished went in
+with it -- three cases (the string tables by shape, the rendered chrome, and
+every price slot), each shown to fail against a deliberately reintroduced
+violation before its green was believed. Comments and docstrings are not swept;
+they are history.
+
+Two figures in DRIFT's glossary entry were wrong before this change and are
+corrected here: it claimed 10 against a MOTE's 4, where the flat drift payment
+is 6 and the MOTE's 4 was its mote COUNT. The line states the ratio now.
+
 **Phase 2b shipped in build 286.** `world.energy` -> `world.bytes`,
 `e.energy` -> `e.bytes`, `setEnergy` -> `setBytes`, `debugGiveEnergy` ->
 `debugGiveBytes`, and the chip's three ids. Three names stayed and each has a

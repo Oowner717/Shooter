@@ -60,7 +60,7 @@ export const ENTRY_Y = 0;
  *
  * `!isDrop` because a mote is not fooled by a decoy, it is ENERGY, and this
  * branch had no guard where both its neighbours do. A mote steers at 132 with
- * accel 300 against `collectEnergy`'s 26 u/s^2 pull toward the turret, so the
+ * accel 300 against `collectData`'s 26 u/s^2 pull toward the turret, so the
  * steering won outright: pressing DECOY stopped loose energy arriving at all
  * for up to nine seconds, gathered it three hundred units up-field, and then
  * threw it outward with the decoy's own parting blast. Worst with INTAKE,
@@ -368,7 +368,7 @@ export class Enemy {
     this.bytes = opts.bytes || 0;
     // Marks left on a body by the rounds that do not simply hurt it.
     this.chill = 0; // RIME: seconds of being dragged to a crawl
-    this.bounty = 1; // TITHE: what its energy is worth when it goes
+    this.bounty = 1; // TITHE: what its data is worth when it goes
     /*
      * ...and whether a TITHE mark has already been applied to it. Declared
      * here rather than sprung into existence at the site that writes it, for
@@ -848,7 +848,7 @@ export class Enemy {
        *
        * `!this.isDrop` because a mote is not fooled by a decoy, it is
        * ENERGY, and this branch had no guard where both its neighbours do.
-       * A mote steers at 132 with accel 300 against `collectEnergy`'s 26
+       * A mote steers at 132 with accel 300 against `collectData`'s 26
        * u/s^2 pull toward the turret, so the steering won outright: pressing
        * DECOY stopped loose energy arriving for up to nine seconds, gathered
        * it three hundred units up-field, and then threw it outward with the
@@ -3671,7 +3671,7 @@ export function absorb(world, e, streak = false) {
   e.dissolved = true;
 }
 
-export function collectEnergy(world, dt) {
+export function collectData(world, dt) {
   const S = CFG.energy;
   const s = world.shooter;
   const list = world.drops;
@@ -3976,7 +3976,7 @@ export class Director {
     this.held = 0;
     this.glitch = 0;
     this.lastRelease = 0; // world.time of the last object let out
-    this.take = 0; // raw energy this wave has been worth, for the margin
+    this.take = 0; // raw bytes this wave has been worth, for the margin
     this.traits = []; // the rules this wave is carrying; see traits.js
     this.pairing = null; // TETHERED: the body waiting for a partner
     /*

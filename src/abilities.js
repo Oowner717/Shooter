@@ -1083,7 +1083,7 @@ export const ABILITIES = [
     // the turret where the barrel cannot reach, so ORDINAL can never take it.
     essential: true,
     icon: ICON.pulse,
-    hint: 'PULSE — hurts and shoves what is near you, and takes in the energy.',
+    hint: 'PULSE — hurts and shoves what is near you, and takes in the data.',
     run(world) {
       const s = world.shooter;
       const up = world.up;

@@ -1,6 +1,6 @@
-// Wreckage, as distinct from energy.
+// Wreckage, as distinct from DATA.
 //
-// Energy is the currency: small, bright, drawn to the turret, taken in by a
+// Data is the currency: small, bright, drawn to the turret, taken in by a
 // PULSE. Debris is none of those things. It cannot be collected, it cannot
 // hurt you, and it is not counted. It bounces off whatever it meets and then
 // it leaves the field.

@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '286';
+  var BUILD = '287';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -86,9 +86,11 @@
         The three readouts share one shrinkable box so that the menu button,
         which is the door to everything, can never be pushed off the right
         edge by a number growing. With a mid-run purse (1759 OBJECTS, 15921
-        ENERGY) the button ran 4px off a 414 screen, 28 off a 390 and 40 off
-        a 320: the chips are nowrap and nothing was allowed to give, so the
-        overflow went to the last item in the row.
+        of the currency) the button ran 4px off a 414 screen, 28 off a 390 and
+        40 off a 320: the chips are nowrap and nothing was allowed to give, so
+        the overflow went to the last item in the row. The figure is formatted
+        from build 285 and the label slot beside it is empty unless the depth
+        dividend is live, so the chip is narrower than either of those.
       -->
       <div id="barChips">
       <div id="counter" class="chip">
@@ -100,13 +102,17 @@
         <em>OBJECTS</em>
       </div>
       <!--
-        The way into the tree. Energy is what upgrades cost, so the number is
+        The way into the tree. Bytes are what upgrades cost, so the number is
         the button: tapping what you have opens what it buys. It used to live
         one level down behind the hamburger, which put the most-used screen in
         the game behind two taps and a tab.
+
+        The `em` is empty and `plain` is on the button on purpose: the figure
+        carries its own unit from build 285, so the slot only has something to
+        say when there is a dividend. Hud.setBytes writes both.
       -->
-      <button id="bytesChip" class="chip btn" aria-label="Upgrades">
-        <em>ENERGY</em><span id="bytesNum">0</span><i id="bytesBuys"></i>
+      <button id="bytesChip" class="chip btn plain" aria-label="Upgrades">
+        <em></em><span id="bytesNum">0</span><i id="bytesBuys"></i>
       </button>
       </div>
       <button id="menuBtn" class="chip btn menuBtn" aria-label="Menu">

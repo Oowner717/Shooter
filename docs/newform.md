@@ -4118,3 +4118,62 @@ samples over every body, the boss and the purse.
 624 green. One run failed "ORDINAL can be fought on the assists alone" and
 passed on the next; that is the case build 226 already ran down as a
 one-in-fifteen, noted rather than chased.
+
+## Build 287 — nothing the player reads calls it ENERGY
+
+Phase 4 of `docs/bytes.md`, and the last of the migration proper. Five teaching
+captions, the PULSE first-use line and its ability hint, three upgrade lines,
+the DRIFT glossary entry, the UPGRADES control row, the tree's heading, the
+chip's own label in the markup, and the ASSAY's description. The vocabulary is
+the plan's §5 table: **DATA** for the stuff on the floor, **BYTES** for the
+amount, and the currency's own word is simply gone from the chip because the
+figure carries its unit.
+
+### The captions become new lines, and that is right
+
+`idOf` hashes a line's text, so rewording one makes it a line this device has
+not been told and it is taught again. §6 filed that as a shipped behaviour
+change to declare rather than discover — and `tutorial.js`'s own note beside
+`idOf` had already settled it: *"a line whose wording changes is a new line
+too — which is right, because the reason to change it was that the old one said
+something else."* That is exactly this. A caption saying ENERGY is a caption
+describing a currency the game does not have.
+
+### Two figures in the glossary were wrong, and the fix is a ratio
+
+DRIFT's entry said **"Worth 10 ENERGY against a MOTE's 4."** Both numbers were
+false. `CFG.energy.drift` — the flat amount a harmless body is paid, and it is
+flat, `bank()` takes it instead of the mass worth — has been **6**, not 10. And
+a MOTE's "4" was its `drops`, which is the NUMBER of motes it sheds, not what
+they are worth: measured, a MOTE is 2.64 kB from its own mass against a DRIFT's
+6.00 kB. Rather than write two fresh numbers that can rot the same way, the
+line now states the **ratio** — worth more than twice a MOTE — which is what
+the sentence was always about.
+
+### The sweep is what says phase 4 is finished
+
+Three cases, and each had to be shown to read a one before its zero meant
+anything.
+
+- **The word sweep** walks every player-facing string table from its own module
+  — captions, first-use lines, every array export in `tutorial.js` found by
+  shape rather than by name, the glossary, every upgrade name and line, every
+  ability name and hint, the control rows — and requires none of them to say
+  ENERGY. Found by shape, so a seventh line table is covered by existing.
+- **The chrome sweep** does the same on the rendered DOM, because a heading
+  built in `innerHTML` is not in any table.
+- **The figure sweep** is the other half of "finished": every price slot must
+  hold a formatted amount, a REMAINDER count with its diamond, or one of the
+  three states that are not prices. A slot showing `500000` has no words in it
+  and the word sweep is blind to it.
+
+Proved rather than asserted: the word was put back in one upgrade line and one
+heading and the unit taken off one price, and **all three sweeps failed**,
+along with build 285's price-slot case. Then restored, and 627 green.
+
+**Comments and docstrings are deliberately not swept.** They are history, and
+this repo already keeps history under old names — the ASSAY has been three
+things and its notes still say testbed. What is swept is what a player can
+read. The one exception was `debris.js`'s header, which does not describe
+history but *defines* the distinction it is drawing, and was therefore simply
+false.

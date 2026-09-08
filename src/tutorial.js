@@ -59,7 +59,7 @@ const OPENING = [
   // Says the rule, not just this object: grey is a promise the whole field
   // keeps, and it is worth more to a player as a rule than as one fact.
   { text: 'The grey ones are DRIFT.\nGrey is always harmless. Nothing grey can hurt you.' },
-  { text: 'AUTO AIM ignores them. Shoot one\nyourself \u2014 they hold extra ENERGY.' },
+  { text: 'AUTO AIM ignores them. Shoot one\nyourself \u2014 they carry more BYTES.' },
 ];
 
 /**
@@ -72,8 +72,8 @@ const NOTES = [
   // the same few seconds — is that thing dangerous, why is it moving toward
   // me, and what am I supposed to do about it. No, it is coming to you, and
   // PULSE takes it in. The INTAKE upgrade is what eventually removes the third.
-  { at: 1, text: 'Broken objects leave ENERGY.\nIt is not an enemy. It drifts to you.' },
-  { at: 2, text: 'PULSE takes in the energy near you.\nENERGY is the green number.' },
+  { at: 1, text: 'Broken objects leave DATA.\nIt is not an enemy. It drifts to you.' },
+  { at: 2, text: 'PULSE takes in the data near you.\nBYTES are the green number.' },
   /*
    * The three lines that were here described ALLOCATION and AMENDMENT -- three
    * cards, one taken -- and neither exists. AMENDMENT went in build 83 and its
@@ -81,7 +81,7 @@ const NOTES = [
    * the game had not had for a year. What is left points at the one place
    * everything is actually bought.
    */
-  { at: 20, text: 'ENERGY buys everything.\nTap the green number to spend it.' },
+  { at: 20, text: 'BYTES buy everything.\nTap the green number to spend them.' },
   { at: 120, text: 'Everything you are not carrying is still out there.\nIt is all in UPGRADES, and none of it expires.' },
 ];
 
@@ -254,7 +254,7 @@ const ABILITY_USE = {
   // because it is the one assist that stops defending you.
   aimDrift: 'AUTO AIM: DRIFT. It takes grey and nothing else.\nIt is not watching the field while it does.',
   aimAll: 'AUTO AIM: ALL. Grey and hostile together.\nThere is nothing left to tell it.',
-  pulse: 'PULSE. Hurts and shoves what is near you,\nand takes in the energy on the floor.',
+  pulse: 'PULSE. Hurts and shoves what is near you,\nand takes in the data on the floor.',
   fan: 'HAIL. Twenty-five pellets in one tight cone.',
   lance: 'LANCE. A beam through the biggest thing out there.',
   well: 'WELL. Drags everything into a knot, then collapses it.',

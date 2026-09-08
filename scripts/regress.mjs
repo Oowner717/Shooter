@@ -3137,6 +3137,139 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `NEW FORM "${r.recast && r.recast.tag}" (wanted ${r.recastWant})`);
 }
 
+// --- nothing the player reads still calls it ENERGY -------------------------
+/*
+ * The sweep that says phase 4 of the byte migration is finished, and it has to
+ * be a sweep rather than a list: the word was in five teaching captions, a
+ * first-use line, an ability hint, three upgrade lines, a glossary entry, a
+ * control row, the tree's heading and the chip's own label, in seven files.
+ * A hand-kept list of those is a list that misses whatever is written next.
+ *
+ * Every player-facing string TABLE is walked from its own module, so a string
+ * added to any of them is covered by existing -- which is the shape
+ * `check-build.mjs` already uses for the tree's coverage of buyable ids.
+ *
+ * Comments and docstrings are deliberately NOT swept. They are history, and
+ * this repo already keeps history that names things by their old names -- the
+ * ASSAY has been three things and its notes still say testbed. What is swept
+ * is what a player can read.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const [tut, cod, upg, nar, abl] = await Promise.all([
+      import('../src/tutorial.js'), import('../src/codex.js'),
+      import('../src/upgrades.js'), import('../src/narrative.js'),
+      import('../src/abilities.js'),
+    ]);
+    const said = [];
+    const add = (where, text) => { if (typeof text === 'string' && text) said.push([where, text]); };
+
+    for (const e of tut.SCRIPT) add('caption', e.text);
+    for (const [k, v] of Object.entries(tut.FIRST_USE || {})) add(`first-use ${k}`, v);
+    for (const [k, v] of Object.entries(tut.STILL_HELD || {})) add(`still-held ${k}`, v);
+    /*
+     * Every exported line table in tutorial.js, found by SHAPE rather than by
+     * name: ON_CONTACT, ON_GLITCH, ON_WALL, ON_LOTS, ON_WORKS, ON_CEILING are
+     * six of them and there will be a seventh. An entry is either a string or
+     * an object with `text`, so both are taken.
+     */
+    for (const [k, v] of Object.entries(tut)) {
+      if (!Array.isArray(v)) continue;
+      for (const t of v) add(`table ${k}`, typeof t === 'string' ? t : (t && t.text));
+    }
+    for (const e of cod.CODEX || []) { add(`codex ${e.id}`, e.name); add(`codex ${e.id}`, e.line); }
+    for (const u of upg.ALL_UPGRADES || []) { add(`upgrade ${u.id}`, u.name); add(`upgrade ${u.id}`, u.line); }
+    for (const a of abl.ABILITIES || []) { add(`ability ${a.id}`, a.name); add(`ability ${a.id}`, a.hint); }
+    for (const row of nar.CONTROLS || []) {
+      add(`control ${row[0]}`, row[0]);
+      try { add(`control ${row[0]}`, typeof row[1] === 'function' ? row[1]() : row[1]); } catch { /* needs a world */ }
+    }
+
+    const out = {};
+    out.swept = said.length;
+    out.hits = said.filter(([, t]) => /energy/i.test(t)).map(([w, t]) => `${w}: ${t.slice(0, 60)}`);
+
+    // ...and the headings the interface builds, read off the rendered DOM
+    // rather than off a table, because that is where they actually live.
+    const g = window.__sim;
+    g.hud.menu.setOpen(true);
+    g.hud.menu.openTab('tree');
+    g.hud.menu.syncTree();
+    const chrome = [...document.querySelectorAll('#menuPanels *, #ui .chip *')]
+      .map((el) => (el.children.length ? '' : (el.textContent || '').trim()))
+      .filter(Boolean);
+    out.chromeSwept = chrome.length;
+    out.chromeHits = chrome.filter((t) => /energy/i.test(t)).slice(0, 6);
+    out.treeHead = (document.querySelector('.treeHeadName') || {}).textContent || null;
+    g.hud.menu.setOpen(false);
+    return out;
+  });
+
+  check('nothing the player reads calls the currency ENERGY any more',
+    r.hits.length === 0 && r.swept > 150,
+    `${r.swept} strings swept across the captions, the glossary, the tree, the `
+    + `abilities and the control rows; ${r.hits.length} still say it`
+    + (r.hits.length ? `: ${r.hits.slice(0, 4).join(' | ')}` : ''));
+
+  check('...nor does anything the interface paints, and the tree says BYTES',
+    r.chromeHits.length === 0 && r.treeHead === 'BYTES',
+    `${r.chromeSwept} rendered strings, ${r.chromeHits.length} saying it`
+    + `${r.chromeHits.length ? ` (${r.chromeHits.join(', ')})` : ''}; `
+    + `the tree's heading is "${r.treeHead}"`);
+}
+
+// --- ...and no amount is painted as a bare integer --------------------------
+/*
+ * The other half of "finished": every figure the player reads carries a unit.
+ * A price slot showing `500000` is a slot the formatter never reached, and it
+ * is invisible to the word sweep above because it contains no words at all.
+ *
+ * The four shapes a price slot is allowed to hold are the ones the interface
+ * actually uses -- a formatted amount, a REMAINDER count with its diamond, and
+ * the three states that are not prices (owned, shut, armed).
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { MB } = await import('../src/config.js');
+    const held = w.bytes;
+    w.bytes = MB(400);
+    g.hud.setBytes(w.bytes, 1, 1);
+    g.hud.menu.setOpen(true);
+    g.hud.menu.openTab('tree');
+    g.hud.menu.syncTree();
+
+    const OK = /^(?:\u00b7|\u2713|BUY|ISSUED|\d+\u25c6|-?[\d.]+ (?:B|kB|MB|GB|TB|PB))$/;
+    const bad = [];
+    let seen = 0;
+    for (const el of document.querySelectorAll('#menuPanels .shopPrice')) {
+      const t = (el.textContent || '').trim();
+      if (!t) continue;
+      seen++;
+      if (!OK.test(t)) bad.push(t);
+    }
+    // ...and the two figures outside the cards.
+    const chip = (document.getElementById('bytesNum').textContent || '').trim();
+    const bank = (g.hud.menu.el.treeBank.textContent || '').trim();
+    const out = {
+      seen, bad: [...new Set(bad)].slice(0, 6), chip, bank,
+      chipOk: OK.test(chip), bankOk: OK.test(bank),
+    };
+    g.hud.menu.setOpen(false);
+    w.bytes = held;
+    g.hud.setBytes(w.bytes, 1, 1);
+    return out;
+  });
+
+  check('every figure the player reads carries a unit, and none is a bare integer',
+    r.seen > 40 && r.bad.length === 0 && r.chipOk && r.bankOk,
+    `${r.seen} price slots, ${r.bad.length} bare`
+    + `${r.bad.length ? `: ${r.bad.join(', ')}` : ''}; the chip reads "${r.chip}" `
+    + `and the tree's purse "${r.bank}"`);
+}
+
+
 // --- the assist says where it stops, and what it will take ------------------
 /*
  * Three things that are all one idea: the player can see what the assist is

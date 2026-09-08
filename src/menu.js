@@ -385,7 +385,7 @@ export class Menu {
     open.hidden = true;
     open.innerHTML = `<span class="sealedName">THE ASSAY</span>
       <span class="sealedLine">One instrumented rig and four rates. Waves,
-      energy, corruption and rules are all off, and your kit is exactly what it
+      bytes, corruption and rules are all off, and your kit is exactly what it
       is in the run. Leave whenever you like &mdash; the run is written down
       before you go in and handed back when you come out.</span>
       <span class="sealedLine">Three rooms, one per era: the old field with
@@ -807,7 +807,7 @@ export class Menu {
      */
     const head = document.createElement('div');
     head.className = 'treeHead';
-    head.innerHTML = '<span class="treeHeadName">ENERGY</span>'
+    head.innerHTML = '<span class="treeHeadName">BYTES</span>'
       + '<span class="treeSouls" id="treeSouls" hidden></span>'
       + '<b id="treeBank">0</b>';
 

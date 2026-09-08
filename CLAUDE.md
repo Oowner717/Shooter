@@ -2199,4 +2199,22 @@ came from before believing the other one covers it.
   hash came back identical -- which is what "nothing but names moved" looks
   like measured instead of asserted. A rename that moves it has done something
   else as well.
+- **A rename sweep needs TWO instruments, because half the sites have no words
+  in them.** Build 287 took ENERGY out of every player-facing string, and a
+  price slot painting `500000` would have passed that sweep untouched -- it
+  contains no word to find. The pair is a word sweep over every string table
+  plus a FIGURE sweep asserting every rendered amount matches the shapes the
+  interface is allowed to paint. And enumerate the tables by SHAPE, not by
+  name: `tutorial.js` exports six line tables and there will be a seventh.
+- **A teaching line reworded is a NEW line, and that is the intended
+  behaviour.** `idOf` hashes the text, so every device that has been told the
+  old one is told the new one -- which `tutorial.js` has said beside `idOf`
+  since it was written: the reason to change the wording was that the old one
+  said something else. Declare it in the notes rather than discovering it.
+- **A figure quoted in prose rots, so quote the RATIO.** DRIFT's glossary entry
+  said "Worth 10 ENERGY against a MOTE's 4" and both numbers were false --
+  `CFG.energy.drift` had been 6 for years, and the MOTE's "4" was its `drops`,
+  the NUMBER of motes it sheds rather than what they are worth. Two fresh
+  numbers would rot the same way; "worth more than twice a MOTE" is what the
+  sentence was always about and it follows the config.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

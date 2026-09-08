@@ -20,7 +20,7 @@ import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, sha
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, release, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectEnergy, drawIn, intakeRate, ENTRY_Y, dividend } from './enemies.js';
+import { Director, spawnOne, release, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectData, drawIn, intakeRate, ENTRY_Y, dividend } from './enemies.js';
 import { Shooter, Front } from './shooter.js';
 import { Abilities, wardStanding } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
@@ -185,7 +185,7 @@ export class Game {
       sandbox: false,
 
       enemies: [],
-      drops: [], // energy on the floor, waiting to be taken in
+      drops: [], // data on the floor, waiting to be taken in
       debris: [], // inert wreckage, on its way off the field
       projectiles: [],
       effects: [],
@@ -221,7 +221,7 @@ export class Game {
       autoFire: false,
       mine: null, // the one kind of mine being laid, or none
 
-      bytes: 0, // banked; nothing carries across a reset
+      bytes: 0, // written to the run; nothing carries across a reset
       /*
        * ...and every energy ever banked this run, which only ever goes up.
        *
@@ -2654,7 +2654,7 @@ export class Game {
 
     updateProjectiles(w, dt);
     this.mineTimer = mineCadence(w, this.mineTimer, dt);
-    collectEnergy(w, dt);
+    collectData(w, dt);
     this.runUpgrades(dt);
     updateMines(w, dt);
     updateGuns(w, dt);

@@ -210,7 +210,19 @@ export const CODEX = [
   {
     id: 'drift',
     name: 'DRIFT',
-    line: 'No heading, no destination, no threat. It is not counted, and AUTO AIM will not take it — a DRIFT is only ever shot on purpose. Worth 10 ENERGY against a MOTE\u2019s 4, which is the reason to bother.',
+    /*
+     * ---- both figures in this line were wrong, and had been for a while ---
+     *
+     * It said "Worth 10 ENERGY against a MOTE's 4". `CFG.energy.drift` -- the
+     * flat amount a harmless body is paid, and it IS flat, `bank()` takes it
+     * instead of the mass worth -- has been 6, not 10; and a MOTE's "4" was
+     * its `drops`, which is the NUMBER of motes it sheds and not what they
+     * are worth. Measured off the config: a DRIFT pays 6.00 kB and a MOTE
+     * 2.64 kB from its own mass. Rather than write two fresh numbers that can
+     * go stale the same way, the line states the RATIO, which is what the
+     * sentence was always about.
+     */
+    line: 'No heading, no destination, no threat. It is not counted, and AUTO AIM will not take it — a DRIFT is only ever shot on purpose. It is worth more than twice a MOTE, which is the reason to bother.',
   },
   {
     id: 'axiom',

@@ -84,7 +84,7 @@ export function freshUpgrades() {
     wireDamage: 1, // per second of contact on a wire
     mineTrigger: 1,
     voidReach: 1, // VOID's mouth alone, which nothing else widens
-    intake: false, // energy that touches the turret is taken in without a PULSE
+    intake: false, // data that touches the turret is taken in without a PULSE
     cooldown: 1, // multiplier on every ability's cooldown
     // turret
     slew: 1,
@@ -439,7 +439,7 @@ export const UPGRADES = {
     { id: 'throughandthrough', name: 'THROUGH AND THROUGH', levels: 3, line: '+2 bodies a spine pierces.', apply: bump('pierce', 2) , icon: MARK.throughandthrough },
     { id: 'sledge', name: 'SLEDGE', levels: 3, line: '+60% slug knockback.', apply: scale('slug', 1.6) , icon: MARK.sledge },
     { id: 'deepfreeze', name: 'DEEP FREEZE', levels: 3, line: '+70% rime chill time.', apply: scale('chill', 1.7) , icon: MARK.deepfreeze },
-    { id: 'levy', name: 'LEVY', levels: 3, line: '+50% tithe energy mark.', apply: scale('bounty', 1.5) , icon: MARK.levy },
+    { id: 'levy', name: 'LEVY', levels: 3, line: '+50% on what a TITHE mark is worth.', apply: scale('bounty', 1.5) , icon: MARK.levy },
     { id: 'lien', name: 'LIEN', levels: 1,
       line: 'A TITHE mark runs to 14 instead of 8. Far more on one long body.',
       apply: bump('titheMarks', 6), icon: MARK.lien },
@@ -621,7 +621,7 @@ export const UPGRADES = {
      */
     { id: 'repulsor', name: 'REPULSOR', levels: 2, line: '+25% lode reach, +40% push.', apply: (u) => { u.lodeReach *= 1.25; u.lodePush *= 1.4; } , icon: MARK.repulsor },
     { id: 'intake', name: 'INTAKE', levels: 1,
-      line: 'Energy is taken in on contact, no PULSE needed. Louvres cut through the skirt.',
+      line: 'Data is taken in on contact, no PULSE needed. Louvres cut through the skirt.',
       apply: set('intake', true), icon: MARK.intake },
     { id: 'shockfront', name: 'SHOCKFRONT', levels: 2,
       line: '+30% PULSE reach and push.',
@@ -833,7 +833,7 @@ export const UPGRADES = {
      * which is a plate stack that actually holds the mount.
      */
     { id: 'casing', name: 'SPINES', levels: 3, line: 'Objects touching you take 70 damage a second. Armour plates round the deck.', apply: bump('casing', 70) , icon: MARK.casing },
-    { id: 'insulation', name: 'SHROUD', levels: 3, line: 'Corruption costs half as much energy. A mantlet closing round the breech.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
+    { id: 'insulation', name: 'SHROUD', levels: 3, line: 'Corruption costs half as many bytes. A mantlet closing round the breech.', apply: scale('insulation', 0.5) , icon: MARK.insulation },
     /*
      * Two steps, and the only thing in the branch that changes what auto aim
      * can see rather than how it behaves once it has seen it. GIMBAL is how
