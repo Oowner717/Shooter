@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '289';
+export const BUILD = '290';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '289';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'd51d7af';
+export const REV = '62ec394';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1589,6 +1589,35 @@ export const CFG = {
    * holds, LODE pushes.
    */
   mines: {
+  /*
+   * ---- THE MINE LINE IS OUT OF PLAY -----------------------------------
+   *
+   * Every line of it is still here -- `mines.js` entire, all eight kinds in
+   * `arsenal.js`, the twenty-one upgrades in `upgrades.js`, the MINES tab and
+   * its loadout sheet, the strip's own stack, the `mine`/`mines` fields in
+   * the world and in the save. What is gone is every DOOR into it, and this
+   * flag is the one thing that shuts them:
+   *
+   *   tree.js    the MINES root is not built, so its twenty-one ids are in no
+   *              branch, no `NODE_BY_ID` and no ledger replay -- and they are
+   *              excused from `coverage()` by a list DERIVED from the root
+   *              that was dropped, so it cannot go stale
+   *   menu.js    the MINES tab is not in `GROUPS` and its loadout sheet is
+   *              not built, so there is nothing to open and nothing to pick
+   *   hud.js     the strip's mine stack, its fold and its MINES button are
+   *              not filled -- the two bands are still created, because
+   *              `#quickBar` is `space-between` and dropping them would walk
+   *              AIM and FIRE out from under the thumb -- and the debug
+   *              panel's THROW cell goes with them
+   *   game.js    `mineCadence`, `updateMines` and `drawMines` are not called,
+   *              `pickMine` refuses, `debugThrowMine` refuses, and a restore
+   *              comes back carrying none
+   *
+   * Set it true and every one of those comes back with no other edit. The
+   * suite asserts the whole list and is run BOTH ways, so a door left open is
+   * a red case rather than something a player finds.
+   */
+    inPlay: false,
   /*
    * ---- how much of a mine there is at era 2 ---------------------------
    *

@@ -269,6 +269,17 @@ subsystems = (await drive('energy', () => window.__sim.debugGiveBytes(200000000)
  */
 const GUN_LINE = await page.evaluate(async () =>
   (await import('../src/config.js')).CFG.gun.inPlay);
+
+/*
+ * ...and the same for the mine line, which went out of play in build 290.
+ * Every case that LAYS one is a case about that line: `throwMine` still works
+ * when called straight out of the module, but `updateMines` and `drawMines`
+ * are no longer driven, so a mine put on the field never ticks and never
+ * paints. Guarding on the flag rather than deleting means turning the line
+ * back on brings its own tests with it.
+ */
+const MINE_LINE = await page.evaluate(async () =>
+  (await import('../src/config.js')).CFG.mines.inPlay);
 subsystems = (await drive('buy all', () => window.__sim.debugBuyAll(), 700)) && subsystems;
 subsystems = (await drive('fill', () => window.__sim.debugFillField(), 700)) && subsystems;
 
@@ -286,7 +297,11 @@ for (const id of rounds) {
     for (let i = 0; i < 10; i++) { w.shooter.shoot(w); }
   }, 250, id)) && subsystems;
 }
-const mines = await page.evaluate(async () => (await import('../src/tutorial.js')).LOCKABLE.mines);
+// ...and each kind of mine, while the line is in play. `debugThrowMine`
+// refuses when it is not, so the sweep would be driving nothing.
+const mines = MINE_LINE
+  ? await page.evaluate(async () => (await import('../src/tutorial.js')).LOCKABLE.mines)
+  : [];
 for (const id of mines) {
   subsystems = (await drive(`mine ${id}`, (k) => window.__sim.debugThrowMine(k), 250, id)) && subsystems;
 }
@@ -354,7 +369,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const g = window.__sim;
     g.hud.menu.setOpen(true);
     const out = {};
-    for (const tab of ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'system']) {
+    // The tabs the sheet actually has. It was a written-out list of six, and
+    // it named `mines`, which went out of play in build 290 -- `show` on an
+    // absent tab leaves the previous panel up, so the case reported MINES
+    // showing the TREE panel rather than the list being stale.
+    for (const tab of [...document.querySelectorAll('#menuPanels .menuPanel')]
+      .map((el) => el.dataset.panel)) {
       g.hud.menu.show(tab);
       const shown = [...document.querySelectorAll('#menuPanels .menuPanel')]
         .filter((el) => getComputedStyle(el).display !== 'none')
@@ -419,11 +439,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.world.bytes = 999999000;
     g.buy('sandbox');
     g.hud.menu.syncSandbox();
-    const panels = [];
-    for (const tab of ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'sandbox', 'guns', 'system']) {
-      g.hud.menu.show(tab);
-      panels.push(document.querySelector(`[data-panel="${tab}"]`));
-    }
+    /*
+     * ...and the panels are asked of the DOM rather than written out. The list
+     * here was eight tab names, and it was wrong twice in one build: `mines`
+     * and `guns` are both out of play now, `querySelector` returned null for
+     * each, and `createTreeWalker(null)` throws -- so a floor that exists to
+     * be a floor for EVERY tab was, once again, a hand-kept list. Every panel
+     * that exists is measured; one added later is covered by existing.
+     */
+    const panels = [...document.querySelectorAll('#menuPanels [data-panel]')];
+    for (const panel of panels) g.hud.menu.show(panel.dataset.panel);
     g.hud.menu.show('tree');
     const nodes = [];
     for (const panel of panels) {
@@ -629,7 +654,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // gained its second level; 137 from 182 when SIEVE went in; 136 from 178
     // when FEED lost a level; and 137 before that from 169, when SPIRAL
     // gained COUNTERSPIN.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === 139
+    // ...and 104 while the mine line is out of play, which is the same
+    // number less the 35 levels the MINES branch offered. Both are named
+    // rather than derived from the tree, because the whole point of this
+    // figure is that it is a hand-checked history: a total taken from the
+    // tree would agree with the tree whatever the tree did.
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === (MINE_LINE ? 139 : 104)
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -663,7 +693,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     m.setOpen(true);
     m.show('tree');
     const out = { arms: [], clipped: [], mods: 0, headed: 0 };
-    for (const name of ['AMMUNITION', 'MINES', 'ABILITIES']) {
+    /*
+     * The branches that are actually THERE, read off the panel. It was a
+     * written-out list of three, and MINES went out of play in build 290 --
+     * so `find` returned undefined and the case threw before it asserted
+     * anything. The claim is about every branch that sells things, so ask the
+     * screen which those are: a branch added or removed is covered by
+     * existing. TURRET is skipped for the reason it always was -- it has no
+     * arms, so it has nothing for the arm-heading arm to look at.
+     */
+    const names = [...document.querySelectorAll('.branchRow .branchName')]
+      .map((x) => x.textContent)
+      .filter((n) => n !== 'TURRET');
+    out.branches = names;
+    for (const name of names) {
       // Open, not toggle: an earlier case may have left this branch open,
       // and a click on an open branch shuts it.
       const row = [...document.querySelectorAll('.branchRow')]
@@ -712,13 +755,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return out;
   });
   // Nine rounds, eight mines, eight abilities.
+  // 25 arms with the mine line in play, 17 without it -- the eight ways into
+  // the eight kinds. The claim is that every arm HEADS its own group, which
+  // is not about how many there are.
   check('every round, mine and ability heads its own group of upgrades',
-    r.arms.length === 25 && r.mods > 0 && r.headed === r.mods
+    r.arms.length === (MINE_LINE ? 25 : 17) && r.mods > 0 && r.headed === r.mods
     && r.arms.every((a) => /^(NEW )?(ROUND|MINE|ABILITY)$/.test(a.kind)),
     `${r.arms.length} arms, ${r.headed}/${r.mods} mods under one`);
   check('an unlock does not read as an upgrade: full width, and its own numbers',
     r.arms.every((a) => a.wide)
-    && r.arms.filter((a) => a.spec).length >= 17,
+    && r.arms.filter((a) => a.spec).length >= (MINE_LINE ? 17 : 9),
     JSON.stringify(r.arms.slice(0, 3)));
   check('nothing in the shop ends in an ellipsis',
     r.clipped.length === 0, `cut off: ${r.clipped.slice(0, 6)}`);
@@ -859,8 +905,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   });
   check('nothing in the shop suggests an order to buy in',
     !r.shelf && !r.next, `shelf ${r.shelf}, next line ${r.next}`);
+  // Four roots, or three while the mine line is out of play. The claim is
+  // that the MACHINE leads and that no branch sells a way in, neither of
+  // which is about how many branches there are.
   check('the machine leads, and no branch sells a way in any more',
-    r.order[0] === 'TURRET' && r.order.length === 4
+    r.order[0] === 'TURRET' && r.order.length === (MINE_LINE ? 4 : 3)
     && !r.order.includes('ANOMALY') && r.doors === 0,
     JSON.stringify({ order: r.order, apertureCards: r.doors }));
   check('...and no name overflows its meter, and no track is dead',
@@ -3449,6 +3498,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  */
 {
   const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
     const g = window.__sim;
     const w = g.world;
     g.restart();
@@ -3503,8 +3553,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * the two stacks set none, so later-in-the-DOM is all they have.
      */
     const lift = getComputedStyle(row).zIndex;
+    // The stacks that are actually there. It was a written-out pair, and the
+    // mine stack went out of play in build 290 -- `querySelector` returned
+    // null and `getComputedStyle(null)` throws.
     const stacks = ['q_mines', 'q_ammo']
-      .map((c) => getComputedStyle(document.querySelector(`.${c}`)).zIndex).join(',');
+      .map((c) => document.querySelector(`.${c}`))
+      .filter(Boolean)
+      .map((el) => getComputedStyle(el).zIndex).join(',');
 
     // ...and pressing the cell again takes it off the screen, not just out of
     // a property.
@@ -3531,7 +3586,10 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * a button: it went to 25% opacity and stayed fully live underneath.
      */
     const pe = () => getComputedStyle(document.getElementById('tgAutoFire')).pointerEvents;
-    g.openLoadout('mines');
+    // Either loadout sheet covers the strip the same way; MINES went out of
+    // play in build 290, so `openLoadout('mines')` opens nothing and the
+    // strip stays live, which reads as the rule being broken.
+    g.openLoadout(CFG.mines.inPlay ? 'mines' : 'ammo');
     const underSheet = pe();
     g.closeLoadout();
     g.hud.menu.setOpen(true);
@@ -5057,9 +5115,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * real figures instead -- 24 grid, 40-odd spawn, 10 boss -- so a control
    * that stops being rendered is a failure and not a shrug.
    */
+  // The floors drop by the two mine cells and their heading while the line is
+  // out of play. A floor set well under the truth cannot see a panel that
+  // stopped being built, which is why they are named rather than loosened.
   check('every control in the debug panel can be pressed without throwing',
-    broke.length === 0 && r.panel.length >= 24 && r.spawn.length >= 40
-    && r.boss.length >= 10,
+    broke.length === 0 && r.panel.length >= (MINE_LINE ? 24 : 21)
+    && r.spawn.length >= 40 && r.boss.length >= 10,
     `${r.panel.length} grid + ${r.spawn.length} spawn + ${r.boss.length} boss `
     + `controls; ${broke.length} threw`
     + `${broke.length ? `: ${broke.slice(0, 3).map((b) => `${b.name} (${b.threw})`).join('; ')}` : ''}`);
@@ -5814,8 +5875,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return { seen, bad, ground: `rgb(${Math.round(ground.r)},${Math.round(ground.g)},${Math.round(ground.b)})`,
       skies: skies.length, cells: cells.length };
   });
+  /*
+   * The vacuity guard is a SHARE of the cells the sweep found, not a count of
+   * words. It was `seen >= 20`, sized for a strip with the mine stack on it --
+   * and the mine line went out of play in build 290, taking four cells with
+   * it, so a floor whose whole job was "the sweep found the strip" started
+   * reporting the strip as missing. A count of the roster rots when the roster
+   * changes; what has to hold is that nearly every cell yielded a word.
+   */
   check('every word on the strip and the ability bar clears 11px and 4.5:1 on the worst sky',
-    r.bad.length === 0 && r.seen >= 20,
+    r.bad.length === 0 && r.cells >= 12 && r.seen >= r.cells - 2,
     `${r.seen} read over ${r.ground} (brightest of ${r.skies} boss skies); failing: ${r.bad.slice(0, 6)}`
     + ` | ${r.seen} words across ${r.cells} cells`);
 }
@@ -5968,18 +6037,31 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  * or putting the stack away takes the way back with it.
  */
 {
-  const r = await page.evaluate(() => {
+  const r = await page.evaluate((mineLine) => {
     const g = window.__sim;
+    /*
+     * The SUBJECT stack is whichever one is there. It was always the mine
+     * stack, with the ammunition stack pressed alongside it; the mine line
+     * went out of play in build 290 and its stack is not filled, so the
+     * subject is the ammunition stack instead. The mechanism is one piece of
+     * code -- `fillStack`, `stackFold`, `syncFolds` -- and proving it on
+     * either stack proves it.
+     */
+    const K = mineLine ? 'Mines' : 'Ammo';
+    const k = mineLine ? 'mines' : 'ammo';
     const shown = (sel) => [...document.querySelectorAll(sel)]
       .filter((el) => el.getBoundingClientRect().height > 0).length;
-    const press = (id) => document.getElementById(id)
-      .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
-    const out = { open: {}, shut: {}, back: {} };
+    const press = (id) => {
+      const el = document.getElementById(id);
+      if (el) el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    };
+    const both = () => { if (mineLine) press('foldMines'); press('foldAmmo'); };
+    const out = { open: {}, shut: {}, back: {}, stack: k };
     const read = (into) => {
-      into.mines = shown('.q_mines .qc');
+      into.mines = shown(`.q_${k} .qc`);
       into.ammo = shown('.q_ammo .qc');
-      into.foldMines = shown('#foldMines');
-      into.label = document.querySelector('#foldMines .qLbl').textContent;
+      into.foldMines = shown(`#fold${K}`);
+      into.label = document.querySelector(`#fold${K} .qLbl`).textContent;
     };
     /*
      * ...and where it sits, which is the whole of the build-210 change.
@@ -6012,27 +6094,27 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     };
     g.hud.syncFolds();
     read(out.open);
-    out.seatOpen = seat('foldMines');
+    out.seatOpen = seat(`fold${K}`);
     out.seatAmmo = seat('foldAmmo');
-    press('foldMines'); press('foldAmmo');
+    both();
     read(out.shut);
-    out.seatShut = seat('foldMines');
-    press('foldMines'); press('foldAmmo');
+    out.seatShut = seat(`fold${K}`);
+    both();
     read(out.back);
     // The bar is rebuilt from the arsenal's defaults on every purchase, so the
     // seat has to survive one. See the AUTO AIM trap in CLAUDE.md.
     g.hud.buildStrip();
     g.hud.syncFolds();
-    out.seatRebuilt = seat('foldMines');
+    out.seatRebuilt = seat(`fold${K}`);
     return out;
-  });
+  }, MINE_LINE);
   check('folding a stack puts it away and leaves the way back',
     r.shut.mines === 1 && r.shut.ammo === 1 && r.shut.foldMines === 1
     && r.open.mines > 1 && r.back.mines === r.open.mines
-    && r.shut.label === 'MINES' && r.open.label === '',
-    `open ${r.open.mines}/${r.open.ammo}, folded ${r.shut.mines}/${r.shut.ammo} `
+    && r.shut.label === r.stack.toUpperCase() && r.open.label === '',
+    `the ${r.stack} stack: open ${r.open.mines}, folded ${r.shut.mines} `
     + `(button still there: ${r.shut.foldMines}, says "${r.shut.label}"), `
-    + `unfolded ${r.back.mines}/${r.back.ammo}`);
+    + `unfolded ${r.back.mines}`);
 
   /*
    * ---- and it does not move (build 210) ----
@@ -6458,6 +6540,137 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `DETACHED ${r.detached}, in NODE_BY_ID ${r.inTree.length}, still authored `
     + `${r.authored}/6, still excused by ELSEWHERE ${r.excused}/6; a ledger `
     + `naming one replays ${r.replayThrew ? `and throws: ${r.replayThrew}` : 'cleanly'}`);
+}
+
+// --- no mine can be laid, and nothing offers one ----------------------------
+/*
+ * Asked for directly, the same way the emplacement line was: take the mines
+ * out of the game without taking them out of the code.
+ *
+ * So `mines.js` is untouched, all eight kinds are still in `arsenal.js`, the
+ * twenty-one upgrades are still in `upgrades.js`, and the MINES tab, its
+ * loadout sheet and the strip's own stack are all still written. What is gone
+ * is every DOOR, and `CFG.mines.inPlay` is the one thing that shuts them.
+ *
+ * Four doors in four files, which is why this is a case and not a hope: the
+ * tree that sells them, the sheet that carries them, the strip that lays them,
+ * and the loop that ticks and draws them. Shutting three is a system that is
+ * still reachable by the fourth.
+ *
+ * Written to hold BOTH ways. Set the flag true and every arm here flips with
+ * it, so this is also the description of what turning the line back on
+ * restores -- and the suite is run each way to prove it rather than say it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const { TREE, NODE_BY_ID, ELSEWHERE, coverage } = await import('../src/tree.js');
+    const { ALL_UPGRADES, UNLOCKS } = await import('../src/upgrades.js');
+    const { ARSENAL } = await import('../src/arsenal.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = { inPlay: CFG.mines.inPlay };
+
+    g.restart();
+    w.phase = 'staging';
+    g.debugTeachAll();
+    g.debugGiveBytes(500000000);
+    g.debugBuyAll();
+
+    // ---- the LOOP: nothing can put a mine on the field -------------------
+    w.mines.length = 0;
+    const keys = ARSENAL.filter((x) => x.kind === 'mine').map((x) => x.key);
+    out.kinds = keys.length;
+    for (const k of keys) g.debugThrowMine(k);
+    out.thrown = w.mines.length;
+    // ...and the picker will not load one either, so the cadence has nothing
+    // to lay even if it ran.
+    w.mine = null;
+    for (const k of keys) g.toggleMine(k);
+    out.picked = w.mine;
+    // ...and a full minute of the real loop lays none.
+    for (let i = 0; i < 60 * 60; i++) g.update(1 / 60);
+    out.afterAMinute = w.mines.length;
+
+    // ---- the TREE: the twenty-one are in no branch -----------------------
+    out.roots = TREE.filter((n) => n.kind === 'root').map((n) => n.key);
+    const MINE_IDS = ['open_blast', 'open_snare', 'open_wire', 'open_knell',
+      'open_thorn', 'open_lode', 'open_spall', 'open_void',
+      'quicklay', 'widemouth', 'salted', 'deepcharge', 'shrapnel', 'paired',
+      'deadweight', 'hotwire', 'fourthbell', 'repulsor', 'buckshot',
+      'splinter', 'eventhorizon'];
+    out.inTree = MINE_IDS.filter((id) => NODE_BY_ID.has(id)).length;
+    // Across BOTH tables: the eight ways in are UNLOCKS and the thirteen that
+    // modify them are upgrades, which is the split `coverage()` itself walks.
+    const authoredIn = [...ALL_UPGRADES, ...UNLOCKS];
+    out.authored = MINE_IDS.filter((id) => authoredIn.some((u) => u.id === id)).length;
+    out.asUpgrades = MINE_IDS.filter((id) => ALL_UPGRADES.some((u) => u.id === id)).length;
+    out.asUnlocks = MINE_IDS.filter((id) => UNLOCKS.some((u) => u.id === id)).length;
+    out.excused = MINE_IDS.filter((id) => ELSEWHERE.has(id)).length;
+    // ...and the build's own coverage guard is still exact, which is what
+    // says none of them became content nobody can buy.
+    const cov = coverage();
+    out.covered = cov.missing.length === 0 && cov.extra.length === 0;
+    // ...and buying one is refused rather than silently applied.
+    out.bought = g.buy('open_blast');
+
+    // ---- the SHEET and the STRIP -----------------------------------------
+    g.hud.menu.setOpen(true);
+    out.tabs = [...document.querySelectorAll('#menuTabs .menuTab')].map((t) => t.textContent.trim());
+    out.panels = [...document.querySelectorAll('#menuPanels [data-panel]')].map((p2) => p2.dataset.panel);
+    g.hud.menu.setOpen(false);
+    g.hud.buildStrip();
+    out.stackCells = document.querySelectorAll('.q_mines .qc').length;
+    out.cfgButton = !!document.getElementById('cfgMines');
+    // The two bands stay, because #quickBar is space-between and dropping
+    // them would walk AIM and FIRE out from under the thumb.
+    out.bands = document.querySelectorAll('#quickBar .qGroup').length;
+    const aim = document.getElementById('tgAutoAim').getBoundingClientRect();
+    out.aimMid = Math.round(aim.left + aim.width / 2);
+    out.barMid = Math.round(document.getElementById('quickBar').getBoundingClientRect().width / 2);
+
+    g.restart();
+    return out;
+  });
+
+  const off = !r.inPlay;
+  check(off ? 'no mine can be laid, and nothing offers one'
+    : 'the mine line is in play: eight kinds, and a throw lays one',
+    off
+      ? (r.thrown === 0 && r.afterAMinute === 0 && r.picked === null
+        && r.inTree === 0 && r.bought !== 'ok')
+      : (r.thrown > 0 && r.picked !== null && r.inTree === 21),
+    `${r.kinds} kinds authored; ${r.thrown} laid by a throw, `
+    + `${r.afterAMinute} after a minute of the loop, picker holds `
+    + `${r.picked}; ${r.inTree} of 21 in the tree, buying one says `
+    + `"${r.bought}"`);
+
+  check('...and the twenty-one upgrades stay in the code, and the build stays covered',
+    r.authored === 21 && r.covered && (off ? r.excused === 21 : r.excused === 0),
+    `${r.authored}/21 still authored (${r.asUpgrades} upgrades, `
+    + `${r.asUnlocks} ways in), ${r.excused} excused from coverage, `
+    + `coverage exact: ${r.covered}`);
+
+  check(off ? '...and there is no MINES tab, no panel, no stack and no button'
+    : '...and MINES is a tab with a stack and a button again',
+    off
+      ? (!r.tabs.some((t) => /MINE/i.test(t)) && !r.panels.includes('mines')
+        && r.stackCells === 0 && r.cfgButton === false)
+      : (r.tabs.some((t) => /MINE/i.test(t)) && r.panels.includes('mines')
+        && r.stackCells > 0 && r.cfgButton === true),
+    `tabs ${r.tabs.join('/')}; panels ${r.panels.join('/')}; `
+    + `${r.stackCells} stack cells, MINES button ${r.cfgButton}`);
+
+  /*
+   * ...and the strip did not move. The two bands are still created with the
+   * stack empty, because `#quickBar` is `justify-content: space-between`:
+   * dropping them would let the middle group -- AIM and FIRE, the two cells
+   * placed where the thumb rests -- walk off to the left edge. Asserted as
+   * geometry, because that is the thing that would actually be wrong.
+   */
+  check('...and AIM and FIRE are still in the middle of the bar',
+    r.bands === 5 && Math.abs(r.aimMid - r.barMid) < r.barMid * 0.25,
+    `${r.bands} bands; AIM sits at ${r.aimMid} against a bar midpoint of ${r.barMid}`);
 }
 
 /*
@@ -6922,7 +7135,8 @@ if (!GUN_LINE) {
   });
 
   check('no tree node sells a way in, and RECAST still sits above every branch',
-    r.slots === 0 && !r.roots.includes('anomaly') && r.roots.length === 4
+    r.slots === 0 && !r.roots.includes('anomaly')
+    && r.roots.length === (MINE_LINE ? 4 : 3)
     && r.firstIsRecast && r.recastInTree === 1,
     `${r.slots} aperture nodes left; roots ${r.roots.join('/')}; `
     + `first row is ${r.firstIsRecast ? 'RECAST' : 'NOT recast'}`);
@@ -7458,15 +7672,24 @@ if (!GUN_LINE) {
         ? Math.round(landed.getBoundingClientRect().top - head.getBoundingClientRect().bottom) : null,
     };
   });
-  const mines = await read('mines');
-  const rest = await page.evaluate(async () => {
+  /*
+   * ...and the MINES tab's door, while there is one. The mine line went out of
+   * play in build 290, so the tab and its panel are not built and the door
+   * cannot be read -- the AMMO half of every arm below carries the claim on
+   * its own, which is what it was always doing for its own tab.
+   */
+  const mines = MINE_LINE ? await read('mines') : null;
+  const rest = await page.evaluate(async (mineLine) => {
     const { TREE } = await import('../src/tree.js');
     const g = window.__sim;
     const w = g.world;
-    document.getElementById('loadMore_mines').dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    const second = document.querySelector('.branchRow.landed');
-    const jump2 = { on: second && second.querySelector('.branchName').textContent,
-      marks: document.querySelectorAll('.branchRow.landed').length };
+    let jump2 = null;
+    if (mineLine) {
+      document.getElementById('loadMore_mines').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const second = document.querySelector('.branchRow.landed');
+      jump2 = { on: second && second.querySelector('.branchName').textContent,
+        marks: document.querySelectorAll('.branchRow.landed').length };
+    }
     // The branch counts have to add up to the tree's own, or one of them is
     // counting rows that belong to somebody else.
     const m = g.hud.menu;
@@ -7485,16 +7708,19 @@ if (!GUN_LINE) {
     g.closeLoadout();
     return { jump2, parts, total: m.reachCount(w),
       sum: roots.reduce((a, k) => a + parts[k], 0), missing };
-  });
+  }, MINE_LINE);
+  const tabs = [ammo, mines].filter(Boolean);
   check('each loadout tab carries a door to its own branch of the tree',
-    ammo.tab === 'ammo' && mines.tab === 'mines' && ammo.group === 'arsenal'
-    && ammo.name === 'AMMUNITION UPGRADES' && mines.name === 'MINE UPGRADES'
-    && [ammo, mines].every((x) => x.belowList && x.last && x.wide && x.shown),
+    ammo.tab === 'ammo' && ammo.group === 'arsenal'
+    && ammo.name === 'AMMUNITION UPGRADES'
+    && (!mines || (mines.tab === 'mines' && mines.name === 'MINE UPGRADES'))
+    && tabs.every((x) => x.belowList && x.last && x.wide && x.shown),
     JSON.stringify({ ammo, mines }));
   check('pressing it closes the sheet and stands the tree on that branch',
     jump.sheetShut && jump.stillOpen === null && jump.menu === 'tree'
     && jump.on === 'AMMUNITION' && jump.branchOpen && jump.clearOfHead >= 0
-    && rest.jump2.on === 'MINES' && rest.jump2.marks === 1 && rest.missing === false,
+    && rest.missing === false
+    && (!MINE_LINE || (rest.jump2.on === 'MINES' && rest.jump2.marks === 1)),
     JSON.stringify({ jump, jump2: rest.jump2, unknownKey: rest.missing }));
   check('a branch count is a part of the tree count, and the parts are the whole',
     rest.sum === rest.total && rest.total > 0,
@@ -12574,11 +12800,19 @@ if (!GUN_LINE) {
      * other out -- the first version of this change capped every Patch in
      * world.effects and a full spore rack silently doused the mines.
      */
+    /*
+     * The THORN control, while the mine line is in play. Its point is that
+     * capping SPORE's patches does not douse a mine's -- with no mines there
+     * is nothing to douse, and `debugThrowMine` refuses, so the arm below is
+     * asserted only when there is something for it to be about.
+     */
     clear();
     const e3 = pin();
-    for (let i = 0; i < 3; i++) {
-      g.debugThrowMine('thorn');
-      for (let k = 0; k < 90; k++) g.update(1 / 60);
+    if (CFG.mines.inPlay) {
+      for (let i = 0; i < 3; i++) {
+        g.debugThrowMine('thorn');
+        for (let k = 0; k < 90; k++) g.update(1 / 60);
+      }
     }
     const thornsBefore = w.effects.filter((f) => f.r && f.dps && !f.spore && !f.dead).length;
     volley(e3, 7, null);
@@ -12617,7 +12851,8 @@ if (!GUN_LINE) {
     r.peak4 === r.cap + 1,
     `${r.peak4} alight with the node owned, against ${r.peak} without it`);
 
-  check('...and a THORN\'s ground is not counted against the round\'s cap',
+  // ...and against a THORN's ground, while there is a mine line to lay one.
+  if (MINE_LINE) check('...and a THORN\'s ground is not counted against the round\'s cap',
     r.thornsBefore > 0 && r.thornsAfter === r.thornsBefore && r.sporesWithThorns === r.cap,
     `${r.thornsBefore} thorn patches down, ${r.thornsAfter} still burning after `
     + `a full spore rack, alongside ${r.sporesWithThorns} of the round's own`);
@@ -12947,92 +13182,98 @@ if (!GUN_LINE) {
     'one live frame at a level of 0.9 puts the corruption back');
 }
 
-// --- QUICK LAY sells the wait, which is the half a player feels -------------
 /*
- * QUICK ARM sold `mineArm`: the settling time between a mine landing and it
- * being able to trigger, 0.4s to 0.8s depending on the kind. Its line -- "a
- * mine arms twice as fast after it lands" -- was read as the throw cooldown
- * by everyone who read it, because that is the wait a player actually feels.
- * It was a fifth of a second off a fifteen-second cycle.
- *
- * QUICK LAY is the cycle itself, two levels at 0.75: 15s to 11.25 to 8.44.
- * `throwEvery` was documented as one of three numbers no upgrade may move; it
- * is a dial now and the cap and the life are not, which is the part of that
- * contract worth keeping.
+ * Asleep with the mine line. See "no mine can be laid, and nothing offers one"
+ * for what holds while it is out of play.
  */
-{
-  const r = await page.evaluate(async () => {
-    const { CFG } = await import('../src/config.js');
-    const { NODES } = await import('../src/tree.js');
-    const { BY_ID, freshUpgrades } = await import('../src/upgrades.js');
-    const { mineCadence } = await import('../src/mines.js');
-    const g = window.__sim;
-    const w = g.world;
-    const out = { every: CFG.mines.throwEvery, cap: CFG.mines.cap, life: CFG.mines.life };
+if (MINE_LINE) {
+  // --- QUICK LAY sells the wait, which is the half a player feels -------------
+  /*
+   * QUICK ARM sold `mineArm`: the settling time between a mine landing and it
+   * being able to trigger, 0.4s to 0.8s depending on the kind. Its line -- "a
+   * mine arms twice as fast after it lands" -- was read as the throw cooldown
+   * by everyone who read it, because that is the wait a player actually feels.
+   * It was a fifth of a second off a fifteen-second cycle.
+   *
+   * QUICK LAY is the cycle itself, two levels at 0.75: 15s to 11.25 to 8.44.
+   * `throwEvery` was documented as one of three numbers no upgrade may move; it
+   * is a dial now and the cap and the life are not, which is the part of that
+   * contract worth keeping.
+   */
+  {
+    const r = await page.evaluate(async () => {
+      const { CFG } = await import('../src/config.js');
+      const { NODES } = await import('../src/tree.js');
+      const { BY_ID, freshUpgrades } = await import('../src/upgrades.js');
+      const { mineCadence } = await import('../src/mines.js');
+      const g = window.__sim;
+      const w = g.world;
+      const out = { every: CFG.mines.throwEvery, cap: CFG.mines.cap, life: CFG.mines.life };
 
-    // ---- the old node is gone, root and branch --------------------------
-    out.quickarmNode = NODES.some((n) => n.id === 'quickarm');
-    out.quickarmDef = !!BY_ID.get('quickarm');
-    out.freshHasArm = 'mineArm' in freshUpgrades();
+      // ---- the old node is gone, root and branch --------------------------
+      out.quickarmNode = NODES.some((n) => n.id === 'quickarm');
+      out.quickarmDef = !!BY_ID.get('quickarm');
+      out.freshHasArm = 'mineArm' in freshUpgrades();
 
-    // ---- the new one is in the tree, at two levels ----------------------
-    const node = NODES.find((n) => n.id === 'quicklay');
-    const def = BY_ID.get('quicklay');
-    out.placed = !!node;
-    out.levels = def ? def.levels : null;
-    out.freshHasEvery = 'mineEvery' in freshUpgrades();
+      // ---- the new one is in the tree, at two levels ----------------------
+      const node = NODES.find((n) => n.id === 'quicklay');
+      const def = BY_ID.get('quicklay');
+      out.placed = !!node;
+      out.levels = def ? def.levels : null;
+      out.freshHasEvery = 'mineEvery' in freshUpgrades();
 
-    // ---- and what it is worth, off the clock rather than off the table --
-    /*
-     * Measured through mineCadence, which is what the frame calls: it returns
-     * the next wait. A case that multiplied CFG by the scalar itself would
-     * pass on a build where nothing read the scalar at all.
-     */
-    const waitAfterAThrow = (levels) => {
+      // ---- and what it is worth, off the clock rather than off the table --
+      /*
+       * Measured through mineCadence, which is what the frame calls: it returns
+       * the next wait. A case that multiplied CFG by the scalar itself would
+       * pass on a build where nothing read the scalar at all.
+       */
+      const waitAfterAThrow = (levels) => {
+        g.debugClearField();
+        w.up = freshUpgrades();
+        for (let i = 0; i < levels; i++) def.apply(w.up, w);
+        w.mine = 'blast';
+        w.phase = 'staging';
+        // Ask for one throw: the timer runs out, mines are laid, and the number
+        // that comes back is the wait until the next lot.
+        return +mineCadence(w, 0, 1 / 60).toFixed(3);
+      };
+      out.waits = [0, 1, 2].map(waitAfterAThrow);
+
+      // ---- ...and nothing may sell a third level --------------------------
+      const priced = NODES.filter((n) => n.id === 'quicklay');
+      out.inTreeOnce = priced.length;
+
       g.debugClearField();
       w.up = freshUpgrades();
-      for (let i = 0; i < levels; i++) def.apply(w.up, w);
-      w.mine = 'blast';
-      w.phase = 'staging';
-      // Ask for one throw: the timer runs out, mines are laid, and the number
-      // that comes back is the wait until the next lot.
-      return +mineCadence(w, 0, 1 / 60).toFixed(3);
-    };
-    out.waits = [0, 1, 2].map(waitAfterAThrow);
+      w.mine = null;
+      g.restart();
+      return out;
+    });
 
-    // ---- ...and nothing may sell a third level --------------------------
-    const priced = NODES.filter((n) => n.id === 'quicklay');
-    out.inTreeOnce = priced.length;
+    check('QUICK ARM is gone, and nothing is left reading for it',
+      !r.quickarmNode && !r.quickarmDef && !r.freshHasArm,
+      `in the tree ${r.quickarmNode}, in the table ${r.quickarmDef}, `
+      + `mineArm still on world.up ${r.freshHasArm}`);
 
-    g.debugClearField();
-    w.up = freshUpgrades();
-    w.mine = null;
-    g.restart();
-    return out;
-  });
+    check('QUICK LAY is in its place, two levels, and shortens the actual clock',
+      r.placed && r.levels === 2 && r.inTreeOnce === 1 && r.freshHasEvery
+      && Math.abs(r.waits[0] - r.every) < 1e-6
+      && Math.abs(r.waits[1] - r.every * 0.75) < 1e-3
+      && Math.abs(r.waits[2] - r.every * 0.5625) < 1e-3,
+      `the wait between throws goes ${r.waits.join('s -> ')}s across two levels, `
+      + `off a base of ${r.every}s`);
 
-  check('QUICK ARM is gone, and nothing is left reading for it',
-    !r.quickarmNode && !r.quickarmDef && !r.freshHasArm,
-    `in the tree ${r.quickarmNode}, in the table ${r.quickarmDef}, `
-    + `mineArm still on world.up ${r.freshHasArm}`);
-
-  check('QUICK LAY is in its place, two levels, and shortens the actual clock',
-    r.placed && r.levels === 2 && r.inTreeOnce === 1 && r.freshHasEvery
-    && Math.abs(r.waits[0] - r.every) < 1e-6
-    && Math.abs(r.waits[1] - r.every * 0.75) < 1e-3
-    && Math.abs(r.waits[2] - r.every * 0.5625) < 1e-3,
-    `the wait between throws goes ${r.waits.join('s -> ')}s across two levels, `
-    + `off a base of ${r.every}s`);
-
-  /*
-   * The cap and the life are still nobody's to move: five on the field,
-   * fifteen seconds each. What changed is only how often you may lay.
-   */
-  check('...and the cap and the life it is measured against did not move',
-    r.cap === 5 && r.life === 15 && r.waits[2] < r.life,
-    `cap ${r.cap}, life ${r.life}s, fastest throw ${r.waits[2]}s -- so a fully `
-    + `bought clock is a steady ${(r.life / r.waits[2]).toFixed(2)} mines, `
-    + `against one before`);
+    /*
+     * The cap and the life are still nobody's to move: five on the field,
+     * fifteen seconds each. What changed is only how often you may lay.
+     */
+    check('...and the cap and the life it is measured against did not move',
+      r.cap === 5 && r.life === 15 && r.waits[2] < r.life,
+      `cap ${r.cap}, life ${r.life}s, fastest throw ${r.waits[2]}s -- so a fully `
+      + `bought clock is a steady ${(r.life / r.waits[2]).toFixed(2)} mines, `
+      + `against one before`);
+  }
 }
 
 // --- an anomaly is worth what the gun is worth ------------------------------
@@ -13553,296 +13794,308 @@ if (!GUN_LINE) {
     + `${r.back} were up again once there was room`);
 }
 
-// --- picking a mine is a choice of kind, not a free mine --------------------
 /*
- * `toggleMine` used to set `this.mineTimer = 0.2`, so selecting a kind laid
- * one two tenths of a second later whatever the cadence had left to run.
- * Tapping through the six mine buttons put six mines on the field in about a
- * second, and switching kinds mid-cooldown reset the wait to nothing --
- * reported as "a mine is set after every click of a mine button".
- *
- * The clock runs across a switch now: whatever is selected when it comes up is
- * what gets laid. Switching still costs nothing, which is the point of the
- * strip; it just does not buy anything either.
+ * Asleep with the mine line. See "no mine can be laid, and nothing offers one"
+ * for what holds while it is out of play.
  */
-{
-  const r = await page.evaluate(async () => {
-    const { CFG } = await import('../src/config.js');
-    const { freshUpgrades } = await import('../src/upgrades.js');
-    const g = window.__sim;
-    const w = g.world;
-    const out = { every: CFG.mines.throwEvery };
+if (MINE_LINE) {
+  // --- picking a mine is a choice of kind, not a free mine --------------------
+  /*
+   * `toggleMine` used to set `this.mineTimer = 0.2`, so selecting a kind laid
+   * one two tenths of a second later whatever the cadence had left to run.
+   * Tapping through the six mine buttons put six mines on the field in about a
+   * second, and switching kinds mid-cooldown reset the wait to nothing --
+   * reported as "a mine is set after every click of a mine button".
+   *
+   * The clock runs across a switch now: whatever is selected when it comes up is
+   * what gets laid. Switching still costs nothing, which is the point of the
+   * strip; it just does not buy anything either.
+   */
+  {
+    const r = await page.evaluate(async () => {
+      const { CFG } = await import('../src/config.js');
+      const { freshUpgrades } = await import('../src/upgrades.js');
+      const g = window.__sim;
+      const w = g.world;
+      const out = { every: CFG.mines.throwEvery };
 
-    const clean = () => {
-      g.debugClearField();
+      const clean = () => {
+        g.debugClearField();
+        g.restart();
+        w.phase = 'staging';
+        w.up = freshUpgrades();
+        w.mines.length = 0;
+        w.mine = null;
+        g.mineTimer = 0;
+      };
+      const laid = () => w.mines.length;
+
+      // ---- six taps in a second is one mine, not six ----------------------
+      clean();
+      g.toggleMine('blast');
+      for (let f = 0; f < 20; f++) g.update(1 / 60);
+      const afterFirst = laid();
+      for (const k of ['snare', 'thorn', 'lode', 'knell', 'wire']) {
+        g.toggleMine(k);
+        for (let f = 0; f < 12; f++) g.update(1 / 60);
+      }
+      out.tapped = { afterFirst, afterSix: laid(), timer: +g.mineTimer.toFixed(1) };
+
+      // ---- ...and switching does not shorten the wait ---------------------
+      /*
+       * Measured off the clock the frame loop actually keeps, not off a
+       * recomputation: the defect was a control writing to that clock, so a
+       * case that reads anything else would not have seen it.
+       */
+      clean();
+      g.toggleMine('blast');
+      for (let f = 0; f < 60 * 6; f++) g.update(1 / 60);
+      const midway = +g.mineTimer.toFixed(2);
+      g.toggleMine('snare');
+      g.toggleMine('thorn');
+      g.toggleMine('blast');
+      out.switched = { midway, after: +g.mineTimer.toFixed(2) };
+
+      // ---- ...and the cadence itself is still the cadence ------------------
+      clean();
+      g.toggleMine('blast');
+      const at = [];
+      let t = 0;
+      for (let f = 0; f < 60 * 40 && at.length < 3; f++) {
+        const before = laid();
+        g.update(1 / 60);
+        t += 1 / 60;
+        if (laid() > before) at.push(+t.toFixed(2));
+      }
+      out.gaps = at.slice(1).map((x, i) => +(x - at[i]).toFixed(2));
+
+      clean();
       g.restart();
-      w.phase = 'staging';
-      w.up = freshUpgrades();
-      w.mines.length = 0;
-      w.mine = null;
-      g.mineTimer = 0;
-    };
-    const laid = () => w.mines.length;
+      return out;
+    });
 
-    // ---- six taps in a second is one mine, not six ----------------------
-    clean();
-    g.toggleMine('blast');
-    for (let f = 0; f < 20; f++) g.update(1 / 60);
-    const afterFirst = laid();
-    for (const k of ['snare', 'thorn', 'lode', 'knell', 'wire']) {
-      g.toggleMine(k);
-      for (let f = 0; f < 12; f++) g.update(1 / 60);
-    }
-    out.tapped = { afterFirst, afterSix: laid(), timer: +g.mineTimer.toFixed(1) };
+    check('picking a mine kind does not lay one, and does not reset the clock',
+      r.tapped.afterFirst === 1 && r.tapped.afterSix === 1,
+      `one tap laid ${r.tapped.afterFirst}; five more kinds tapped over the next `
+      + `second laid ${r.tapped.afterSix - r.tapped.afterFirst} more (it used to `
+      + `lay one per tap)`);
 
-    // ---- ...and switching does not shorten the wait ---------------------
-    /*
-     * Measured off the clock the frame loop actually keeps, not off a
-     * recomputation: the defect was a control writing to that clock, so a
-     * case that reads anything else would not have seen it.
-     */
-    clean();
-    g.toggleMine('blast');
-    for (let f = 0; f < 60 * 6; f++) g.update(1 / 60);
-    const midway = +g.mineTimer.toFixed(2);
-    g.toggleMine('snare');
-    g.toggleMine('thorn');
-    g.toggleMine('blast');
-    out.switched = { midway, after: +g.mineTimer.toFixed(2) };
+    check('...and the wait a switch interrupts is the wait it comes back to',
+      Math.abs(r.switched.midway - r.switched.after) < 1e-9,
+      `${r.switched.midway}s left before three switches, ${r.switched.after}s after`);
 
-    // ---- ...and the cadence itself is still the cadence ------------------
-    clean();
-    g.toggleMine('blast');
-    const at = [];
-    let t = 0;
-    for (let f = 0; f < 60 * 40 && at.length < 3; f++) {
-      const before = laid();
-      g.update(1 / 60);
-      t += 1 / 60;
-      if (laid() > before) at.push(+t.toFixed(2));
-    }
-    out.gaps = at.slice(1).map((x, i) => +(x - at[i]).toFixed(2));
-
-    clean();
-    g.restart();
-    return out;
-  });
-
-  check('picking a mine kind does not lay one, and does not reset the clock',
-    r.tapped.afterFirst === 1 && r.tapped.afterSix === 1,
-    `one tap laid ${r.tapped.afterFirst}; five more kinds tapped over the next `
-    + `second laid ${r.tapped.afterSix - r.tapped.afterFirst} more (it used to `
-    + `lay one per tap)`);
-
-  check('...and the wait a switch interrupts is the wait it comes back to',
-    Math.abs(r.switched.midway - r.switched.after) < 1e-9,
-    `${r.switched.midway}s left before three switches, ${r.switched.after}s after`);
-
-  check('...and the cadence between mines is still the one config names',
-    r.gaps.length >= 1 && r.gaps.every((x) => Math.abs(x - r.every) < 0.1),
-    `${r.gaps.join('s, ')}s between throws against ${r.every}s`);
+    check('...and the cadence between mines is still the one config names',
+      r.gaps.length >= 1 && r.gaps.every((x) => Math.abs(x - r.every) < 0.1),
+      `${r.gaps.join('s, ')}s between throws against ${r.every}s`);
+  }
 }
 
-// --- SPLINTER, and what a mine is worth ------------------------------------
 /*
- * Build 216 put 10% on every mine that does damage and SPALL's pellets gained
- * a burst where they land. VOID, SNARE and LODE are untouched because none of
- * them has a damage number: VOID deletes, SNARE holds, LODE pushes.
- *
- * Build 231's audit moved three of the six, and this case is the record of
- * which and why -- measured on a twenty-body crowd with the control (the same
- * crowd, no mine) subtracted, stock then fully bought:
- *
- *   BLAST     458 /  2,899     THORN   5,596 / 31,379
- *   KNELL     377 /  3,270     WIRE    5,234 / 18,024
- *   SPALL     456 /  4,261     VOID    one kill, whatever its health
- *
- * BLAST is the only kind that gets exactly ONE event, and it was the smallest
- * of the six; THORN bills every body in its ground for as long as the mine
- * lives and was ahead on every bench that was run. So BLAST 105 -> 150,
- * KNELL 81 -> 95 and THORN's ground 37 -> 29 a second, which lands them at
- * 653 / 4,214, 442 / 3,898 and 4,386 / 24,673.
- *
- * The ratios are pinned rather than printed. A readout with no assertion
- * behind it rots -- build 227 shipped two of those -- and the previous
- * version of this case pinned a flat 1.1 across all six, which is a snapshot
- * of one past pass rather than a rule, so the audit had to come here anyway.
+ * Asleep with the mine line. See "no mine can be laid, and nothing offers one"
+ * for what holds while it is out of play.
  */
-{
-  const r = await page.evaluate(async () => {
-    const { CFG } = await import('../src/config.js');
-    const { NODES } = await import('../src/tree.js');
-    const { BY_ID, freshUpgrades } = await import('../src/upgrades.js');
-    const g = window.__sim;
-    const w = g.world;
-    const out = {};
-
-    // ---- the numbers, against what build 215 shipped --------------------
-    /*
-     * `was` is what build 230 shipped, and the ratios below are build 231's
-     * mine audit against it -- kept as ratios so the case reads as the change
-     * that was made rather than as a second copy of config.js.
-     */
-    const was = { blast: 105, fizzle: 48, thorn: 37, knell: 81, wire: 79, spall: 29 };
-    const now = {
-      blast: CFG.mines.blast.damage,
-      fizzle: CFG.mines.fizzle.damage,
-      thorn: CFG.thorn.patch.dps,
-      knell: CFG.knell.blast.damage,
-      wire: CFG.wire.damage,
-      spall: CFG.spall.damage,
-    };
-    out.ratios = Object.fromEntries(Object.entries(now)
-      .map(([k, v]) => [k, +(v / was[k]).toFixed(3)]));
-    // ...and the three that have no damage number still have none.
-    out.noDamage = ['void', 'snare', 'lode'].filter((k) => CFG[k] && CFG[k].damage === undefined);
-
-    // ---- SPLINTER is in the tree at two levels --------------------------
-    const node = NODES.find((n) => n.id === 'splinter');
-    const def = BY_ID.get('splinter');
-    out.placed = !!node;
-    out.levels = def ? def.levels : null;
-
-    // ---- ...and it widens what a pellet does where it lands -------------
-    /*
-     * Measured off bodies actually hurt by the fan, at a spread that no
-     * pellet can hit directly: a row set OUTSIDE the pellets' own line, so
-     * anything that takes damage took it from a burst. A case that measured
-     * total damage would be measuring the pellets.
-     */
-    /*
-     * A rank of bodies across the fan, and the mine PINNED under it.
-     *
-     * Two things had to be nailed down. The mine lands where `throwMine`
-     * decides, so a case that throws one and waits is measuring the throw --
-     * it reported 0 damage at both levels on about one run in three, which is
-     * the same answer a build with SPLINTER doing nothing would give. And a
-     * pellet that hits nothing simply times out 900 units up and bursts
-     * there, so the burst is only ever COLLATERAL: it is measured on the
-     * bodies beside the ones the pellets actually hit, which is what the
-     * upgrade is for.
-     */
-    /*
-     * A rank of bodies beside the fan, with the mine's LANDING SITE pinned.
-     *
-     * Five versions of this were flaky and every one was the harness rather
-     * than the game. A SPALL flies to a target `throwMine` picks, so a rank
-     * placed at a guessed spot is a coin toss -- runs came back 0/0, then 1
-     * hurt for 50, then 0/0, which is the answer a build with SPLINTER doing
-     * nothing would give. A version that patched `applyBlast` to record the
-     * radius could not work at all: an ES module export is a live binding and
-     * cannot be reassigned from outside, so it recorded zero bursts on a
-     * build that fires fourteen.
-     *
-     * `x1, y1` is where the mine is flying TO, and writing it before it lands
-     * is the one thing that makes the geometry the case's to choose. The
-     * witness is then placed at a distance no unbought burst can reach and
-     * every bought one can.
-     */
-    const fanRadii = (levels) => {
-      g.debugClearField();
-      g.restart();
-      w.phase = 'staging';
-      w.spawnLock = 1e9;
-      if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
-      w.up = freshUpgrades();
-      for (let i = 0; i < levels; i++) def.apply(w.up, w);
-      w.mines.length = 0;
-      w.projectiles.length = 0;
-      const s = w.shooter;
-      const mx = w.width / 2;
-      const my = s.y - 170;
-      g.debugThrowMine('spall');
-      const m = w.mines[0];
-      if (!m) return null;
-      m.x1 = mx; m.y1 = my;
-      for (let f = 0; f < 60 * 4 && w.mines.length && !w.mines[0].landed; f++) g.update(1 / 60);
-      if (!w.mines.length) return null;
-      w.mines[0].settle = 99;
-      /*
-       * The target the pellets hit, dead ahead of the mine, and a witness
-       * beside it -- outside the FAN as well as outside the unbought burst,
-       * which is the arithmetic this case turns on.
-       *
-       * The fan is 0.9 radians wide, so its half-width at distance d is
-       * 0.483d. At 150 units that is 72, and a witness 44 units off the line
-       * was inside it and struck by pellets directly at both levels (measured
-       * 71 and 89 -- a real difference, but not the one being claimed). At 80
-       * units the fan is 39 wide: a witness at 50 is clear of it by 11, clear
-       * of the authored 26-unit burst by 24, and inside the 62.5 that two
-       * levels buy by 12.
-       */
-      const put = (x, y) => {
-        const e = g.debugSpawn('mote', x, y);
-        if (!e) return null;
-        e.staged = false; e.spawnIn = 0; e.hp = 1e6; e.maxHp = 1e6;
-        e.invMass = 0; e.vx = 0; e.vy = 0;
-        return e;
-      };
-      const target = put(mx, my - 80);
-      const witness = put(mx + 50, my - 80);
-      /*
-       * The body that sets it off, at the EDGE of the mouth rather than on
-       * top of it. `spall()` fires from `m.y - 4`, so a trigger body standing
-       * on the mine is born inside the fan and eats all fourteen pellets on
-       * frame one -- measured, the target 150 units up took exactly 0 while
-       * the projectiles vanished in nine frames. Four versions of this case
-       * failed on that, and none of them was the game.
-       */
-      const trip = put(mx + 38, my);
-      if (trip) { trip.hp = 1e6; trip.maxHp = 1e6; }
-      let fired = false;
-      for (let f = 0; f < 60 * 3; f++) {
-        for (const e of [target, witness, trip]) {
-          if (e) { e.vx = 0; e.vy = 0; }
-        }
-        if (trip) { trip.x = mx + 38; trip.y = my; }
-        if (target) { target.x = mx; target.y = my - 80; }
-        if (witness) { witness.x = mx + 50; witness.y = my - 80; }
-        g.update(1 / 60);
-        if (!w.mines.length) fired = true;
-      }
-      return {
-        fired,
-        target: target ? Math.round(1e6 - target.hp) : 0,
-        witness: witness ? Math.round(1e6 - witness.hp) : 0,
-      };
-    };
-    out.one = fanRadii(0);
-    out.two = fanRadii(2);
-
-    g.debugClearField();
-    w.spawnLock = 0;
-    w.up = freshUpgrades();
-    g.restart();
-    return out;
-  });
-
-  const R = r.ratios;
-  check('the mine audit moved three numbers and left the other three alone',
-    Math.abs(R.blast - 1.429) < 0.01 && Math.abs(R.knell - 1.173) < 0.01
-    && Math.abs(R.thorn - 0.784) < 0.01
-    && Math.abs(R.fizzle - 1) < 0.01 && Math.abs(R.wire - 1) < 0.01
-    && Math.abs(R.spall - 1) < 0.01
-    && r.noDamage.length === 3,
-    Object.entries(R).map(([k, v]) => `${k} x${v}`).join(', ')
-    + `; and ${r.noDamage.join('/')} still have no damage number to raise`);
-
+if (MINE_LINE) {
+  // --- SPLINTER, and what a mine is worth ------------------------------------
   /*
-   * The witness is what the node bought: a body clear of the fan's own line,
-   * reached only by what the pellets leave behind. Measured stable across
-   * runs at 35 unbought against 62 with both levels -- a clean 1.8x, where
-   * the target in the fan barely moves (212 -> 227) because it is being hit
-   * by pellets either way. The target is the control: a case that watched
-   * only IT would pass on a build where SPLINTER did nothing at all.
+   * Build 216 put 10% on every mine that does damage and SPALL's pellets gained
+   * a burst where they land. VOID, SNARE and LODE are untouched because none of
+   * them has a damage number: VOID deletes, SNARE holds, LODE pushes.
+   *
+   * Build 231's audit moved three of the six, and this case is the record of
+   * which and why -- measured on a twenty-body crowd with the control (the same
+   * crowd, no mine) subtracted, stock then fully bought:
+   *
+   *   BLAST     458 /  2,899     THORN   5,596 / 31,379
+   *   KNELL     377 /  3,270     WIRE    5,234 / 18,024
+   *   SPALL     456 /  4,261     VOID    one kill, whatever its health
+   *
+   * BLAST is the only kind that gets exactly ONE event, and it was the smallest
+   * of the six; THORN bills every body in its ground for as long as the mine
+   * lives and was ahead on every bench that was run. So BLAST 105 -> 150,
+   * KNELL 81 -> 95 and THORN's ground 37 -> 29 a second, which lands them at
+   * 653 / 4,214, 442 / 3,898 and 4,386 / 24,673.
+   *
+   * The ratios are pinned rather than printed. A readout with no assertion
+   * behind it rots -- build 227 shipped two of those -- and the previous
+   * version of this case pinned a flat 1.1 across all six, which is a snapshot
+   * of one past pass rather than a rule, so the audit had to come here anyway.
    */
-  check('SPLINTER is in the tree at two levels, and widens what a pellet leaves',
-    r.placed && r.levels === 2 && r.one && r.two && r.one.fired && r.two.fired
-    && r.one.target > 0 && r.two.target > 0
-    && r.one.witness > 0 && r.two.witness > r.one.witness * 1.5,
-    `the body in the fan took ${r.one.target} unbought and ${r.two.target} `
-    + `bought; a witness 50 units off the line took ${r.one.witness} and `
-    + `${r.two.witness}`);
+  {
+    const r = await page.evaluate(async () => {
+      const { CFG } = await import('../src/config.js');
+      const { NODES } = await import('../src/tree.js');
+      const { BY_ID, freshUpgrades } = await import('../src/upgrades.js');
+      const g = window.__sim;
+      const w = g.world;
+      const out = {};
+
+      // ---- the numbers, against what build 215 shipped --------------------
+      /*
+       * `was` is what build 230 shipped, and the ratios below are build 231's
+       * mine audit against it -- kept as ratios so the case reads as the change
+       * that was made rather than as a second copy of config.js.
+       */
+      const was = { blast: 105, fizzle: 48, thorn: 37, knell: 81, wire: 79, spall: 29 };
+      const now = {
+        blast: CFG.mines.blast.damage,
+        fizzle: CFG.mines.fizzle.damage,
+        thorn: CFG.thorn.patch.dps,
+        knell: CFG.knell.blast.damage,
+        wire: CFG.wire.damage,
+        spall: CFG.spall.damage,
+      };
+      out.ratios = Object.fromEntries(Object.entries(now)
+        .map(([k, v]) => [k, +(v / was[k]).toFixed(3)]));
+      // ...and the three that have no damage number still have none.
+      out.noDamage = ['void', 'snare', 'lode'].filter((k) => CFG[k] && CFG[k].damage === undefined);
+
+      // ---- SPLINTER is in the tree at two levels --------------------------
+      const node = NODES.find((n) => n.id === 'splinter');
+      const def = BY_ID.get('splinter');
+      out.placed = !!node;
+      out.levels = def ? def.levels : null;
+
+      // ---- ...and it widens what a pellet does where it lands -------------
+      /*
+       * Measured off bodies actually hurt by the fan, at a spread that no
+       * pellet can hit directly: a row set OUTSIDE the pellets' own line, so
+       * anything that takes damage took it from a burst. A case that measured
+       * total damage would be measuring the pellets.
+       */
+      /*
+       * A rank of bodies across the fan, and the mine PINNED under it.
+       *
+       * Two things had to be nailed down. The mine lands where `throwMine`
+       * decides, so a case that throws one and waits is measuring the throw --
+       * it reported 0 damage at both levels on about one run in three, which is
+       * the same answer a build with SPLINTER doing nothing would give. And a
+       * pellet that hits nothing simply times out 900 units up and bursts
+       * there, so the burst is only ever COLLATERAL: it is measured on the
+       * bodies beside the ones the pellets actually hit, which is what the
+       * upgrade is for.
+       */
+      /*
+       * A rank of bodies beside the fan, with the mine's LANDING SITE pinned.
+       *
+       * Five versions of this were flaky and every one was the harness rather
+       * than the game. A SPALL flies to a target `throwMine` picks, so a rank
+       * placed at a guessed spot is a coin toss -- runs came back 0/0, then 1
+       * hurt for 50, then 0/0, which is the answer a build with SPLINTER doing
+       * nothing would give. A version that patched `applyBlast` to record the
+       * radius could not work at all: an ES module export is a live binding and
+       * cannot be reassigned from outside, so it recorded zero bursts on a
+       * build that fires fourteen.
+       *
+       * `x1, y1` is where the mine is flying TO, and writing it before it lands
+       * is the one thing that makes the geometry the case's to choose. The
+       * witness is then placed at a distance no unbought burst can reach and
+       * every bought one can.
+       */
+      const fanRadii = (levels) => {
+        g.debugClearField();
+        g.restart();
+        w.phase = 'staging';
+        w.spawnLock = 1e9;
+        if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
+        w.up = freshUpgrades();
+        for (let i = 0; i < levels; i++) def.apply(w.up, w);
+        w.mines.length = 0;
+        w.projectiles.length = 0;
+        const s = w.shooter;
+        const mx = w.width / 2;
+        const my = s.y - 170;
+        g.debugThrowMine('spall');
+        const m = w.mines[0];
+        if (!m) return null;
+        m.x1 = mx; m.y1 = my;
+        for (let f = 0; f < 60 * 4 && w.mines.length && !w.mines[0].landed; f++) g.update(1 / 60);
+        if (!w.mines.length) return null;
+        w.mines[0].settle = 99;
+        /*
+         * The target the pellets hit, dead ahead of the mine, and a witness
+         * beside it -- outside the FAN as well as outside the unbought burst,
+         * which is the arithmetic this case turns on.
+         *
+         * The fan is 0.9 radians wide, so its half-width at distance d is
+         * 0.483d. At 150 units that is 72, and a witness 44 units off the line
+         * was inside it and struck by pellets directly at both levels (measured
+         * 71 and 89 -- a real difference, but not the one being claimed). At 80
+         * units the fan is 39 wide: a witness at 50 is clear of it by 11, clear
+         * of the authored 26-unit burst by 24, and inside the 62.5 that two
+         * levels buy by 12.
+         */
+        const put = (x, y) => {
+          const e = g.debugSpawn('mote', x, y);
+          if (!e) return null;
+          e.staged = false; e.spawnIn = 0; e.hp = 1e6; e.maxHp = 1e6;
+          e.invMass = 0; e.vx = 0; e.vy = 0;
+          return e;
+        };
+        const target = put(mx, my - 80);
+        const witness = put(mx + 50, my - 80);
+        /*
+         * The body that sets it off, at the EDGE of the mouth rather than on
+         * top of it. `spall()` fires from `m.y - 4`, so a trigger body standing
+         * on the mine is born inside the fan and eats all fourteen pellets on
+         * frame one -- measured, the target 150 units up took exactly 0 while
+         * the projectiles vanished in nine frames. Four versions of this case
+         * failed on that, and none of them was the game.
+         */
+        const trip = put(mx + 38, my);
+        if (trip) { trip.hp = 1e6; trip.maxHp = 1e6; }
+        let fired = false;
+        for (let f = 0; f < 60 * 3; f++) {
+          for (const e of [target, witness, trip]) {
+            if (e) { e.vx = 0; e.vy = 0; }
+          }
+          if (trip) { trip.x = mx + 38; trip.y = my; }
+          if (target) { target.x = mx; target.y = my - 80; }
+          if (witness) { witness.x = mx + 50; witness.y = my - 80; }
+          g.update(1 / 60);
+          if (!w.mines.length) fired = true;
+        }
+        return {
+          fired,
+          target: target ? Math.round(1e6 - target.hp) : 0,
+          witness: witness ? Math.round(1e6 - witness.hp) : 0,
+        };
+      };
+      out.one = fanRadii(0);
+      out.two = fanRadii(2);
+
+      g.debugClearField();
+      w.spawnLock = 0;
+      w.up = freshUpgrades();
+      g.restart();
+      return out;
+    });
+
+    const R = r.ratios;
+    check('the mine audit moved three numbers and left the other three alone',
+      Math.abs(R.blast - 1.429) < 0.01 && Math.abs(R.knell - 1.173) < 0.01
+      && Math.abs(R.thorn - 0.784) < 0.01
+      && Math.abs(R.fizzle - 1) < 0.01 && Math.abs(R.wire - 1) < 0.01
+      && Math.abs(R.spall - 1) < 0.01
+      && r.noDamage.length === 3,
+      Object.entries(R).map(([k, v]) => `${k} x${v}`).join(', ')
+      + `; and ${r.noDamage.join('/')} still have no damage number to raise`);
+
+    /*
+     * The witness is what the node bought: a body clear of the fan's own line,
+     * reached only by what the pellets leave behind. Measured stable across
+     * runs at 35 unbought against 62 with both levels -- a clean 1.8x, where
+     * the target in the fan barely moves (212 -> 227) because it is being hit
+     * by pellets either way. The target is the control: a case that watched
+     * only IT would pass on a build where SPLINTER did nothing at all.
+     */
+    check('SPLINTER is in the tree at two levels, and widens what a pellet leaves',
+      r.placed && r.levels === 2 && r.one && r.two && r.one.fired && r.two.fired
+      && r.one.target > 0 && r.two.target > 0
+      && r.one.witness > 0 && r.two.witness > r.one.witness * 1.5,
+      `the body in the fan took ${r.one.target} unbought and ${r.two.target} `
+      + `bought; a witness 50 units off the line took ${r.one.witness} and `
+      + `${r.two.witness}`);
+  }
 }
 
 // --- PULSE actually clears the mount, and pays what the floor is worth ------
@@ -14152,8 +14405,11 @@ if (!GUN_LINE) {
     `${r.spine} damage a second on a single target against BOLT's ${r.bolt} `
     + `(it was 48.2, the weakest thing in the rack that is not a utility round)`);
 
+  // SPLINTER is SPALL's and goes out of the tree with the mine line; SLIVER
+  // is SPINE's and stays. The pair was asserted together because the two were
+  // once confused for each other.
   check('SLIVER is in the tree at two levels, beside SPALL-s own SPLINTER',
-    r.placed && r.levels === 2 && r.splinterStillSpall,
+    r.placed && r.levels === 2 && (!MINE_LINE || r.splinterStillSpall),
     `sliver placed ${r.placed} at ${r.levels} levels; splinter still there `
     + `${r.splinterStillSpall}`);
 
@@ -14583,184 +14839,190 @@ if (!GUN_LINE) {
     + `decoy, ${r.fooled.d0.toFixed(0)} -> ${r.fooled.d1.toFixed(0)} with one`);
 }
 
-// --- the mine layer had the spent/staged rule exactly backwards -------------
 /*
- * Build 219 settled the rule for abilities and CLAUDE.md records it: `spent`
- * is a mark for what may be SHOT and every damage path must honour it;
- * `staged` is a mark for what may be CHOSEN and a damage path must NOT, since
- * `config.js` says in as many words that it "never gated projectile
- * collision" and most of a body's march in is on screen.
- *
- * Every one of the six paths in the mine layer had it the other way round --
- * SNARE's grip, LODE's repel, WIRE's cut, the shared patch that SPORE and
- * THORN both use, and the snare's drawn wires all skipped `staged` and none
- * of them skipped `spent`. So a mine burned, cut, hauled and drew the frame
- * of a boss that was already dead, and visibly did nothing to a body walking
- * in over it.
- *
- * Asserted as a differential, both ways, because a guard that refuses
- * everything passes a one-sided test. Shown to read a one, too: with the
- * three `spent` terms taken back out, THORN reports 111 against 111, WIRE
- * 237 against 201 and LODE 181 against 181.
- *
- * SNARE is the exception and is worth knowing about: its arm is closed by the
- * TRIGGER guard rather than by `grip`'s, because a `spent` body cannot spring
- * the mine in the first place. `grip` keeps its own guard for the case the
- * trigger cannot reach -- a body that becomes `spent` while already held,
- * which is a boss dying inside a snare.
+ * Asleep with the mine line. See "no mine can be laid, and nothing offers one"
+ * for what holds while it is out of play.
  */
-{
-  const r = await page.evaluate(async () => {
-    const g = window.__sim;
-    const w = g.world;
-    g.restart();
-    g.debugTeachAll();
-    g.debugClearField();
-    w.phase = 'staging';
-    w.spawnLock = 1e9;
-    const ran = w.director.update;
-    w.director.update = () => {};
-    w.autoFire = false;
-    w.autoAim = false;
-
-    /*
-     * One mine of one kind, landed and armed, with a witness pinned on it for
-     * three seconds. `mark` is written onto the witness before the clock
-     * starts: 'spent' must be left alone, 'staged' must not.
-     */
-    const run = (kind, mark) => {
+if (MINE_LINE) {
+  // --- the mine layer had the spent/staged rule exactly backwards -------------
+  /*
+   * Build 219 settled the rule for abilities and CLAUDE.md records it: `spent`
+   * is a mark for what may be SHOT and every damage path must honour it;
+   * `staged` is a mark for what may be CHOSEN and a damage path must NOT, since
+   * `config.js` says in as many words that it "never gated projectile
+   * collision" and most of a body's march in is on screen.
+   *
+   * Every one of the six paths in the mine layer had it the other way round --
+   * SNARE's grip, LODE's repel, WIRE's cut, the shared patch that SPORE and
+   * THORN both use, and the snare's drawn wires all skipped `staged` and none
+   * of them skipped `spent`. So a mine burned, cut, hauled and drew the frame
+   * of a boss that was already dead, and visibly did nothing to a body walking
+   * in over it.
+   *
+   * Asserted as a differential, both ways, because a guard that refuses
+   * everything passes a one-sided test. Shown to read a one, too: with the
+   * three `spent` terms taken back out, THORN reports 111 against 111, WIRE
+   * 237 against 201 and LODE 181 against 181.
+   *
+   * SNARE is the exception and is worth knowing about: its arm is closed by the
+   * TRIGGER guard rather than by `grip`'s, because a `spent` body cannot spring
+   * the mine in the first place. `grip` keeps its own guard for the case the
+   * trigger cannot reach -- a body that becomes `spent` while already held,
+   * which is a boss dying inside a snare.
+   */
+  {
+    const r = await page.evaluate(async () => {
+      const g = window.__sim;
+      const w = g.world;
+      g.restart();
+      g.debugTeachAll();
       g.debugClearField();
-      w.mines.length = 0;
-      w.effects.length = 0;
-      g.debugThrowMine(kind);
-      const m = w.mines[w.mines.length - 1];
-      for (let f = 0; f < 100; f++) g.update(1 / 60);
-      if (!m) return { kind, mark, error: 'no mine' };
-      const e = g.debugSpawn('lurcher', m.x, m.y - 6);
-      if (!e) return { kind, mark, error: 'no witness' };
-      e.staged = false;
-      e.maxHp = 1e9;
-      e.hp = 1e9;
-      if (mark) e[mark] = true;
-      const startHp = e.hp;
-      let moved = 0;
-      let px = e.x;
-      let py = e.y;
-      for (let f = 0; f < 60 * 3; f++) {
-        // Pinned, healed and re-marked every frame: the question is whether
-        // the mine acts on it at all, not whether it survives.
-        e.hp = Math.min(e.hp, 1e9);
-        if (mark) e[mark] = true;
-        e.dead = false;
-        /*
-         * ...and its own legs taken away, which the first version of this
-         * case forgot. A LURCHER walks 76 to 136 units in three seconds
-         * under its own steering, which is far more than LODE's push, so the
-         * case was measuring the witness and not the mine and reported a
-         * `spent` body being pushed HARDER. `cruise` 0 makes `drive` steer
-         * toward a standstill, so every unit of travel left is the mine's.
-         */
-        e.cruise = 0;
-        e.accel = 400;
-        g.update(1 / 60);
-        moved += Math.hypot(e.x - px, e.y - py);
-        px = e.x;
-        py = e.y;
-      }
-      return { kind, mark, took: Math.round(startHp - e.hp), moved: Math.round(moved) };
-    };
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      const ran = w.director.update;
+      w.director.update = () => {};
+      w.autoFire = false;
+      w.autoAim = false;
 
-    /*
-     * The two FIELD mines are measured differently, because a witness with
-     * legs drowns them. LODE's push and SNARE's haul are per-frame writes to
-     * velocity, so: pin the body where the field is strongest, zero its
-     * velocity every frame, set `thrown` so `drive` returns before it can
-     * steer, and sum the speed each frame leaves behind. What is left is the
-     * field and nothing else. The first version let the body walk and
-     * reported a `spent` body being pushed HARDER than a live one, which was
-     * a LURCHER's own legs at 76 to 136 units against a shove of a few.
-     */
-    const field = (kind, mark) => {
-      g.debugClearField();
-      w.mines.length = 0;
-      w.effects.length = 0;
-      g.debugThrowMine(kind);
-      const m = w.mines[w.mines.length - 1];
-      for (let f = 0; f < 100; f++) g.update(1 / 60);
-      if (!m) return { kind, mark, push: -1 };
       /*
-       * Put it in the middle once it has landed. `landingSite` picks at
-       * random, and the arena's own `edgeEase` pushes 300 u/s^2 through a
-       * 96-unit band at each side -- so a mine that happened to land near a
-       * wall added a shove of its own to the measurement and the LODE arm
-       * swung 97 to 181 run to run on where the site fell.
+       * One mine of one kind, landed and armed, with a witness pinned on it for
+       * three seconds. `mark` is written onto the witness before the clock
+       * starts: 'spent' must be left alone, 'staged' must not.
        */
-      m.x = w.width / 2;
-      m.y = w.floorY - 320;
-      m.x1 = m.x;
-      m.y1 = m.y;
-      const e = g.debugSpawn('lurcher', m.x + 30, m.y);
-      if (!e) return { kind, mark, push: -1 };
-      e.staged = false;
-      e.maxHp = 1e9;
-      e.hp = 1e9;
-      let push = 0;
-      for (let f = 0; f < 60 * 2; f++) {
-        e.x = m.x + 30;
-        e.y = m.y;
-        e.vx = 0;
-        e.vy = 0;
+      const run = (kind, mark) => {
+        g.debugClearField();
+        w.mines.length = 0;
+        w.effects.length = 0;
+        g.debugThrowMine(kind);
+        const m = w.mines[w.mines.length - 1];
+        for (let f = 0; f < 100; f++) g.update(1 / 60);
+        if (!m) return { kind, mark, error: 'no mine' };
+        const e = g.debugSpawn('lurcher', m.x, m.y - 6);
+        if (!e) return { kind, mark, error: 'no witness' };
+        e.staged = false;
+        e.maxHp = 1e9;
         e.hp = 1e9;
-        e.dead = false;
-        e.thrown = 1;          // `drive` returns before it can steer
         if (mark) e[mark] = true;
-        g.update(1 / 60);
-        push += Math.hypot(e.vx, e.vy);
+        const startHp = e.hp;
+        let moved = 0;
+        let px = e.x;
+        let py = e.y;
+        for (let f = 0; f < 60 * 3; f++) {
+          // Pinned, healed and re-marked every frame: the question is whether
+          // the mine acts on it at all, not whether it survives.
+          e.hp = Math.min(e.hp, 1e9);
+          if (mark) e[mark] = true;
+          e.dead = false;
+          /*
+           * ...and its own legs taken away, which the first version of this
+           * case forgot. A LURCHER walks 76 to 136 units in three seconds
+           * under its own steering, which is far more than LODE's push, so the
+           * case was measuring the witness and not the mine and reported a
+           * `spent` body being pushed HARDER. `cruise` 0 makes `drive` steer
+           * toward a standstill, so every unit of travel left is the mine's.
+           */
+          e.cruise = 0;
+          e.accel = 400;
+          g.update(1 / 60);
+          moved += Math.hypot(e.x - px, e.y - py);
+          px = e.x;
+          py = e.y;
+        }
+        return { kind, mark, took: Math.round(startHp - e.hp), moved: Math.round(moved) };
+      };
+
+      /*
+       * The two FIELD mines are measured differently, because a witness with
+       * legs drowns them. LODE's push and SNARE's haul are per-frame writes to
+       * velocity, so: pin the body where the field is strongest, zero its
+       * velocity every frame, set `thrown` so `drive` returns before it can
+       * steer, and sum the speed each frame leaves behind. What is left is the
+       * field and nothing else. The first version let the body walk and
+       * reported a `spent` body being pushed HARDER than a live one, which was
+       * a LURCHER's own legs at 76 to 136 units against a shove of a few.
+       */
+      const field = (kind, mark) => {
+        g.debugClearField();
+        w.mines.length = 0;
+        w.effects.length = 0;
+        g.debugThrowMine(kind);
+        const m = w.mines[w.mines.length - 1];
+        for (let f = 0; f < 100; f++) g.update(1 / 60);
+        if (!m) return { kind, mark, push: -1 };
+        /*
+         * Put it in the middle once it has landed. `landingSite` picks at
+         * random, and the arena's own `edgeEase` pushes 300 u/s^2 through a
+         * 96-unit band at each side -- so a mine that happened to land near a
+         * wall added a shove of its own to the measurement and the LODE arm
+         * swung 97 to 181 run to run on where the site fell.
+         */
+        m.x = w.width / 2;
+        m.y = w.floorY - 320;
+        m.x1 = m.x;
+        m.y1 = m.y;
+        const e = g.debugSpawn('lurcher', m.x + 30, m.y);
+        if (!e) return { kind, mark, push: -1 };
+        e.staged = false;
+        e.maxHp = 1e9;
+        e.hp = 1e9;
+        let push = 0;
+        for (let f = 0; f < 60 * 2; f++) {
+          e.x = m.x + 30;
+          e.y = m.y;
+          e.vx = 0;
+          e.vy = 0;
+          e.hp = 1e9;
+          e.dead = false;
+          e.thrown = 1;          // `drive` returns before it can steer
+          if (mark) e[mark] = true;
+          g.update(1 / 60);
+          push += Math.hypot(e.vx, e.vy);
+        }
+        return { kind, mark, push: Math.round(push) };
+      };
+
+      const out = {};
+      for (const kind of ['thorn', 'wire']) {
+        out[kind] = {
+          clean: run(kind, null),
+          spent: run(kind, 'spent'),
+          staged: run(kind, 'staged'),
+        };
       }
-      return { kind, mark, push: Math.round(push) };
-    };
+      for (const kind of ['lode', 'snare']) {
+        out[kind] = {
+          clean: field(kind, null),
+          spent: field(kind, 'spent'),
+          staged: field(kind, 'staged'),
+        };
+      }
+      w.director.update = ran;
+      w.spawnLock = 0;
+      g.restart();
+      return out;
+    });
 
-    const out = {};
-    for (const kind of ['thorn', 'wire']) {
-      out[kind] = {
-        clean: run(kind, null),
-        spent: run(kind, 'spent'),
-        staged: run(kind, 'staged'),
-      };
+    // THORN and WIRE do damage; LODE and SNARE move things. Each is measured on
+    // the quantity it actually produces.
+    const hurt = (o) => o.took;
+    const shove = (o) => o.moved;
+    const cases = [
+      ['a THORN patch', 'thorn', hurt],
+      ['a WIRE', 'wire', hurt],
+    ];
+    for (const [name, kind, of] of cases) {
+      const o = r[kind];
+      check(`${name} leaves a spent body finished, and still takes one arriving`,
+        of(o.clean) > 0 && of(o.spent) === 0 && of(o.staged) > 0,
+        `unmarked ${of(o.clean)}, spent ${of(o.spent)}, staged ${of(o.staged)}`);
     }
-    for (const kind of ['lode', 'snare']) {
-      out[kind] = {
-        clean: field(kind, null),
-        spent: field(kind, 'spent'),
-        staged: field(kind, 'staged'),
-      };
+    for (const [name, kind] of [['a LODE pushes', 'lode'], ['a SNARE hauls', 'snare']]) {
+      const o = r[kind];
+      check(`...and ${name} what is arriving and not what is spent`,
+        o.clean.push > 0 && o.staged.push > 0 && o.spent.push === 0,
+        `two seconds of field: unmarked ${o.clean.push}, spent ${o.spent.push}, `
+        + `staged ${o.staged.push}`);
     }
-    w.director.update = ran;
-    w.spawnLock = 0;
-    g.restart();
-    return out;
-  });
-
-  // THORN and WIRE do damage; LODE and SNARE move things. Each is measured on
-  // the quantity it actually produces.
-  const hurt = (o) => o.took;
-  const shove = (o) => o.moved;
-  const cases = [
-    ['a THORN patch', 'thorn', hurt],
-    ['a WIRE', 'wire', hurt],
-  ];
-  for (const [name, kind, of] of cases) {
-    const o = r[kind];
-    check(`${name} leaves a spent body finished, and still takes one arriving`,
-      of(o.clean) > 0 && of(o.spent) === 0 && of(o.staged) > 0,
-      `unmarked ${of(o.clean)}, spent ${of(o.spent)}, staged ${of(o.staged)}`);
-  }
-  for (const [name, kind] of [['a LODE pushes', 'lode'], ['a SNARE hauls', 'snare']]) {
-    const o = r[kind];
-    check(`...and ${name} what is arriving and not what is spent`,
-      o.clean.push > 0 && o.staged.push > 0 && o.spent.push === 0,
-      `two seconds of field: unmarked ${o.clean.push}, spent ${o.spent.push}, `
-      + `staged ${o.staged.push}`);
   }
 }
 
@@ -14797,24 +15059,37 @@ if (!GUN_LINE) {
     g.debugGiveBytes(500000000);
     g.debugBuyAll();
 
-    // ...and what a fully bought salvo actually leaves standing, which is the
-    // question the cap answers. Two throws, because one cannot reach the cap.
+    /*
+     * ...and what a fully bought salvo actually leaves standing, which is the
+     * question the cap answers. Two throws, because one cannot reach the cap.
+     *
+     * Only while the mine line is in play: FOURTH BELL and PAIRED CHARGE are
+     * mine nodes and are in no tree from build 290, so `NODE_BY_ID.get`
+     * returns undefined for both. FIFTH LINK is ARC's and is untouched, which
+     * is why the ARC arm below is not guarded -- the `levels ?? 3` trap this
+     * case is about is a property of the tree, not of any one branch.
+     */
     const live = () => w.mines.filter((m) => !m.dead).length;
-    g.debugClearField();
-    w.mines.length = 0;
-    const salvo = 1 + w.up.mineSalvo;
-    for (let i = 0; i < salvo; i++) g.debugThrowMine('blast');
-    for (let f = 0; f < 120; f++) g.update(1 / 60);
-    const afterOne = live();
-    for (let i = 0; i < salvo; i++) g.debugThrowMine('blast');
-    const afterTwo = live();
-    const laid = w.mines.length;
+    let salvo = null; let afterOne = null; let afterTwo = null; let laid = null;
+    if (CFG.mines.inPlay) {
+      g.debugClearField();
+      w.mines.length = 0;
+      salvo = 1 + w.up.mineSalvo;
+      for (let i = 0; i < salvo; i++) g.debugThrowMine('blast');
+      for (let f = 0; f < 120; f++) g.update(1 / 60);
+      afterOne = live();
+      for (let i = 0; i < salvo; i++) g.debugThrowMine('blast');
+      afterTwo = live();
+      laid = w.mines.length;
+    }
 
+    const lv = (id) => (NODE_BY_ID.get(id) || {}).levels ?? null;
     const out = {
+      inPlay: CFG.mines.inPlay,
       levels: {
-        fifthlink: NODE_BY_ID.get('fifthlink').levels,
-        fourthbell: NODE_BY_ID.get('fourthbell').levels,
-        paired: NODE_BY_ID.get('paired').levels,
+        fifthlink: lv('fifthlink'),
+        fourthbell: lv('fourthbell'),
+        paired: lv('paired'),
       },
       jumps: CFG.rounds.arc.jumps + w.up.arcJumps,
       tolls: CFG.knell.tolls + w.up.mineTolls,
@@ -14828,15 +15103,17 @@ if (!GUN_LINE) {
   check('a fully bought ARC makes five jumps, which is what FIFTH LINK is named for',
     r.levels.fifthlink === 1 && r.jumps === 5,
     `FIFTH LINK x${r.levels.fifthlink}, ARC jumps ${r.jumps}`);
-  check('...and a fully bought KNELL rings four times, which is what the config says',
-    r.levels.fourthbell === 2 && r.tolls === 4,
-    `FOURTH BELL x${r.levels.fourthbell}, tolls ${r.tolls}`);
-  check('...and a fully bought salvo does not lay more than the cap can hold',
-    r.levels.paired === 1 && r.salvo === 2
-    && r.afterOne === 2 && r.afterTwo === 4 && r.afterTwo === r.laid,
-    `PAIRED CHARGE x${r.levels.paired} lays ${r.salvo} a throw; one throw `
-    + `leaves ${r.afterOne} standing, two leave ${r.afterTwo} of ${r.laid} `
-    + `laid against a cap of ${r.cap}`);
+  if (MINE_LINE) {
+    check('...and a fully bought KNELL rings four times, which is what the config says',
+      r.levels.fourthbell === 2 && r.tolls === 4,
+      `FOURTH BELL x${r.levels.fourthbell}, tolls ${r.tolls}`);
+    check('...and a fully bought salvo does not lay more than the cap can hold',
+      r.levels.paired === 1 && r.salvo === 2
+      && r.afterOne === 2 && r.afterTwo === 4 && r.afterTwo === r.laid,
+      `PAIRED CHARGE x${r.levels.paired} lays ${r.salvo} a throw; one throw `
+      + `leaves ${r.afterOne} standing, two leave ${r.afterTwo} of ${r.laid} `
+      + `laid against a cap of ${r.cap}`);
+  }
 }
 
 // --- the arsenal's numbers are the config's numbers -------------------------
@@ -15002,87 +15279,93 @@ if (!GUN_LINE) {
     + `jumpDamage/damage is ${r.want.toFixed(2)} and up.damage is ${r.line}`);
 }
 
-// --- a THORN and a LODE come off the field when they are done ---------------
 /*
- * The two kinds whose branch in `updateMines` ended on a `continue`. The only
- * thing past that `continue` is the splice that takes a dead mine off
- * `world.mines` -- so THORN and LODE were the only two kinds that never left
- * it. They stayed in the list, were re-entered every frame with `life` already
- * past zero, and called `fizzle` again on every one of them.
- *
- * `fizzle` is what SALTED turns into a blast. So a THORN that expired thirty
- * seconds ago was landing a blast, a ring, a Shock, sixteen sparks and an
- * `audio.boom()` SIXTY TIMES A SECOND, for the rest of the run, once per
- * expired mine -- and the list it was doing it from grew for ever.
- *
- * Measured both ways: how many mines the list holds after everything on it has
- * expired, and how many blasts land in the second after that.
+ * Asleep with the mine line. See "no mine can be laid, and nothing offers one"
+ * for what holds while it is out of play.
  */
-{
-  const r = await page.evaluate(async () => {
-    const g = window.__sim;
-    const w = g.world;
-    const en = await import('../src/enemies.js');
-    g.restart();
-    g.debugTeachAll();
-    g.debugClearField();
-    w.phase = 'staging';
-    w.spawnLock = 1e9;
-    const ran = w.director.update;
-    w.director.update = () => {};
-
-    const run = (kind, salted) => {
+if (MINE_LINE) {
+  // --- a THORN and a LODE come off the field when they are done ---------------
+  /*
+   * The two kinds whose branch in `updateMines` ended on a `continue`. The only
+   * thing past that `continue` is the splice that takes a dead mine off
+   * `world.mines` -- so THORN and LODE were the only two kinds that never left
+   * it. They stayed in the list, were re-entered every frame with `life` already
+   * past zero, and called `fizzle` again on every one of them.
+   *
+   * `fizzle` is what SALTED turns into a blast. So a THORN that expired thirty
+   * seconds ago was landing a blast, a ring, a Shock, sixteen sparks and an
+   * `audio.boom()` SIXTY TIMES A SECOND, for the rest of the run, once per
+   * expired mine -- and the list it was doing it from grew for ever.
+   *
+   * Measured both ways: how many mines the list holds after everything on it has
+   * expired, and how many blasts land in the second after that.
+   */
+  {
+    const r = await page.evaluate(async () => {
+      const g = window.__sim;
+      const w = g.world;
+      const en = await import('../src/enemies.js');
+      g.restart();
+      g.debugTeachAll();
       g.debugClearField();
-      w.mines.length = 0;
-      w.effects.length = 0;
-      w.up.mineFizzle = salted;
-      g.debugThrowMine(kind);
-      const m = w.mines[w.mines.length - 1];
-      if (!m) return { kind, salted, error: 'no mine' };
-      // Land it, then age it out. `life` is the only clock that matters here.
-      for (let f = 0; f < 90; f++) g.update(1 / 60);
-      m.life = 0.01;
-      for (let f = 0; f < 30; f++) g.update(1 / 60);
-      const held = w.mines.length;
-      /*
-       * Counted at the door every blast comes through, which is the only
-       * instrument that can tell "it went off once" from "it is going off
-       * every frame". Effects are no good -- the pool recycles.
-       */
-      let blasts = 0;
-      const real = en.applyBlast;
-      // ES module exports cannot be reassigned from outside, so the count is
-      // taken off what a blast actually does: a fresh Shock per detonation.
-      const before = w.effects.filter((x) => x && x.constructor
-        && x.constructor.name === 'Shock').length;
-      for (let f = 0; f < 60; f++) g.update(1 / 60);
-      const after = w.effects.filter((x) => x && x.constructor
-        && x.constructor.name === 'Shock').length;
-      blasts = after - before;
-      return { kind, salted, held, blasts, live: w.mines.filter((x) => !x.dead).length,
-        used: typeof real === 'function' };
-    };
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      const ran = w.director.update;
+      w.director.update = () => {};
 
-    const out = {};
-    for (const kind of ['thorn', 'lode', 'blast', 'wire']) {
-      out[kind] = { plain: run(kind, false), salted: run(kind, true) };
-    }
-    w.up.mineFizzle = false;
-    w.director.update = ran;
-    w.spawnLock = 0;
-    g.restart();
-    return out;
-  });
-  const kinds = Object.keys(r);
-  const stuck = kinds.filter((k) => r[k].plain.held !== 0 || r[k].salted.held !== 0);
-  check('every kind of mine comes off the list when it is spent',
-    stuck.length === 0,
-    kinds.map((k) => `${k} ${r[k].plain.held}/${r[k].salted.held}`).join(' '));
-  const noisy = kinds.filter((k) => r[k].salted.blasts > 1);
-  check('...and a spent one goes off once, not once a frame',
-    noisy.length === 0,
-    kinds.map((k) => `${k} ${r[k].salted.blasts} blasts in the second after `
-      + `it expired`).join(', '));
+      const run = (kind, salted) => {
+        g.debugClearField();
+        w.mines.length = 0;
+        w.effects.length = 0;
+        w.up.mineFizzle = salted;
+        g.debugThrowMine(kind);
+        const m = w.mines[w.mines.length - 1];
+        if (!m) return { kind, salted, error: 'no mine' };
+        // Land it, then age it out. `life` is the only clock that matters here.
+        for (let f = 0; f < 90; f++) g.update(1 / 60);
+        m.life = 0.01;
+        for (let f = 0; f < 30; f++) g.update(1 / 60);
+        const held = w.mines.length;
+        /*
+         * Counted at the door every blast comes through, which is the only
+         * instrument that can tell "it went off once" from "it is going off
+         * every frame". Effects are no good -- the pool recycles.
+         */
+        let blasts = 0;
+        const real = en.applyBlast;
+        // ES module exports cannot be reassigned from outside, so the count is
+        // taken off what a blast actually does: a fresh Shock per detonation.
+        const before = w.effects.filter((x) => x && x.constructor
+          && x.constructor.name === 'Shock').length;
+        for (let f = 0; f < 60; f++) g.update(1 / 60);
+        const after = w.effects.filter((x) => x && x.constructor
+          && x.constructor.name === 'Shock').length;
+        blasts = after - before;
+        return { kind, salted, held, blasts, live: w.mines.filter((x) => !x.dead).length,
+          used: typeof real === 'function' };
+      };
+
+      const out = {};
+      for (const kind of ['thorn', 'lode', 'blast', 'wire']) {
+        out[kind] = { plain: run(kind, false), salted: run(kind, true) };
+      }
+      w.up.mineFizzle = false;
+      w.director.update = ran;
+      w.spawnLock = 0;
+      g.restart();
+      return out;
+    });
+    const kinds = Object.keys(r);
+    const stuck = kinds.filter((k) => r[k].plain.held !== 0 || r[k].salted.held !== 0);
+    check('every kind of mine comes off the list when it is spent',
+      stuck.length === 0,
+      kinds.map((k) => `${k} ${r[k].plain.held}/${r[k].salted.held}`).join(' '));
+    const noisy = kinds.filter((k) => r[k].salted.blasts > 1);
+    check('...and a spent one goes off once, not once a frame',
+      noisy.length === 0,
+      kinds.map((k) => `${k} ${r[k].salted.blasts} blasts in the second after `
+        + `it expired`).join(', '));
+  }
 }
 
 // --- a TITHE mark is worth the same at every tier ---------------------------
@@ -15214,8 +15497,9 @@ if (!GUN_LINE) {
       return { dps: p ? p.dps : -1, line: w.up.damage };
     };
 
-    // ---- THORN's ground ----
+    // ---- THORN's ground, while there are mines ----
     const thorn = (bought) => {
+      if (!CFG.mines.inPlay) return { dps: null, line: null };
       setup(bought);
       w.effects.length = 0;
       w.mines.length = 0;
@@ -15225,8 +15509,9 @@ if (!GUN_LINE) {
       return { dps: p ? p.dps : -1, line: w.up.mineDamage };
     };
 
-    // ---- VOID against an armoured body ----
+    // ---- VOID against an armoured body, while there are mines ----
     const voidOn = (armoured) => {
+      if (!CFG.mines.inPlay) return null;
       setup(false);
       w.mines.length = 0;
       g.debugThrowMine('void');
@@ -15264,12 +15549,13 @@ if (!GUN_LINE) {
     && Math.abs(r.sporeBare.dps - r.base.spore) < 0.01,
     `patch dps ${r.sporeBare.dps} bare -> ${r.sporeFull.dps} bought, against `
     + `${r.base.spore} x an up.damage of ${r.sporeFull.line}`);
-  check('...and THORN-s takes SHRAPNEL, which mineGrade had been crediting it for',
+  // ...and THORN's, while there is a mine line to lay one.
+  if (MINE_LINE) check('...and THORN-s takes SHRAPNEL, which mineGrade had been crediting it for',
     r.thornBare.dps > 0 && r.thornFull.dps > 0
     && Math.abs(r.thornFull.dps - r.base.thorn * r.thornFull.line) < 0.01,
     `patch dps ${r.thornBare.dps} bare -> ${r.thornFull.dps} bought, against `
     + `${r.base.thorn} x an up.mineDamage of ${r.thornFull.line}`);
-  check('...and a VOID deletes an ARMORED body, which absorbed it whole',
+  if (MINE_LINE) check('...and a VOID deletes an ARMORED body, which absorbed it whole',
     r.plain.gone === true && r.armoured.gone === true,
     `plain ${JSON.stringify(r.plain)}, armoured ${JSON.stringify(r.armoured)}`);
 }
@@ -15483,6 +15769,7 @@ if (!GUN_LINE) {
  */
 {
   const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
     const g = window.__sim;
     const w = g.world;
 
@@ -15523,8 +15810,8 @@ if (!GUN_LINE) {
       return { took: start - e.hp, kicked: +(e.kicked || 0).toFixed(2) };
     };
 
-    // ---- WIRE: a body pinned on the line ----
-    const wire = (step) => overSecond(step, (s) => {
+    // ---- WIRE: a body pinned on the line, while there are mines ----
+    const wire = (step) => (CFG.mines.inPlay ? overSecond(step, (s) => {
       w.mines.length = 0;
       g.debugThrowMine('wire');
       const m = w.mines[w.mines.length - 1];
@@ -15533,7 +15820,7 @@ if (!GUN_LINE) {
       e.staged = false;
       e.invMass = 0;
       return { body: e, hold: () => { e.x = m.x1; e.y = m.ay; } };
-    });
+    }) : null);
 
     // ---- HARD CASING: a body held on the turret ----
     const casing = (step) => overSecond(step, (s) => {
@@ -15577,10 +15864,12 @@ if (!GUN_LINE) {
     return out;
   });
   const near = (a, b, tol) => a > 0 && b > 0 && Math.abs(a - b) <= Math.max(a, b) * tol;
-  check('a WIRE cuts the same in a second however fast the frames come',
+  // The WIRE half only while there is a mine line; HARD CASING is a turret
+  // upgrade and had the identical fault, which is why it is not guarded.
+  if (MINE_LINE) check('a WIRE cuts the same in a second however fast the frames come',
     near(r.wire60.took, r.wire120.took, 0.28),
     `${Math.round(r.wire60.took)} at 60Hz against ${Math.round(r.wire120.took)} at 120Hz`);
-  check('...and does not pin the body-s knockback while doing it',
+  if (MINE_LINE) check('...and does not pin the body-s knockback while doing it',
     r.wire60.kicked < 6 && r.wire120.kicked < 6,
     `kicked reached ${r.wire60.kicked} at 60Hz and ${r.wire120.kicked} at 120Hz, `
     + `against the 4.25 sustained gunfire settles at`);
@@ -15827,864 +16116,888 @@ if (!GUN_LINE) {
 }
 
 /*
- * ---- build 222: the DECOY's two clocks, and the OBJECTS chip ----
- *
- * A second press used to call `expire` on the standing decoy, and `expire` is
- * the decoy's DEATH -- a 260-unit blast at 150 damage with a 900 shove, thrown
- * into the middle of the pile the decoy existed to hold somewhere that was not
- * on top of you. So the ability whose entire job is holding the field away
- * answered a second press by putting the field back. It adds to the clock now.
- *
- * And the drawing carries how long it has left, which it never did: the only
- * tell for time was the last 1.6 seconds fading out, which is a warning that
- * arrives after the decision it was meant to inform. Asserted on the RENDERED
- * PIXELS, because "you can see how long it has" is a claim about what reaches
- * the screen and nothing else settles it.
+ * Asleep with the mine line -- see "no mine can be laid, and nothing
+ * offers one" for what holds while it is out of play.
  */
-{
-  const r = await page.evaluate(async () => {
-    const { CFG } = await import('../src/config.js');
-    const g = window.__sim;
-    const w = g.world;
-    const slot = () => w.abilities.slots.findIndex((x) => x.def.id === 'decoy');
-
-    const fresh = () => {
-      g.restart();
-      g.debugTeachAll();
-      g.debugClearField();
-      w.phase = 'staging';
-      w.spawnLock = 1e9;
-      w.director.update = () => {};
-      w.abilities.clearCooldowns();
-    };
-
-    // ---- a second press extends rather than detonates ----------------------
-    fresh();
-    g.useAbility(slot());
-    const first = w.decoy;
-    // Four seconds off the clock, so the extension has somewhere to land.
-    for (let f = 0; f < 240; f++) g.update(1 / 60);
-    const before = { life: +first.life.toFixed(2), hp: first.hp, dead: first.dead };
-    // A witness inside the blast the old path would have thrown, so "it did
-    // not detonate" is measured on the field rather than on a flag.
-    const near = g.debugSpawn('lurcher', first.x + 90, first.y + 40);
-    if (near) { near.staged = false; near.spawnIn = 0; }
-    const witnessHp = near ? near.hp : -1;
-    w.abilities.clearCooldowns();
-    g.useAbility(slot());
-    const after = {
-      same: w.decoy === first,
-      life: +w.decoy.life.toFixed(2),
-      hp: w.decoy.hp,
-      dead: first.dead,
-      maxLife: +w.decoy.maxLife.toFixed(2),
-      witness: near ? near.hp : -1,
-    };
-
-    // ---- and it stops at the ceiling --------------------------------------
-    for (let i = 0; i < 6; i++) { w.abilities.clearCooldowns(); g.useAbility(slot()); }
-    const capped = +w.decoy.life.toFixed(2);
-
-    // ---- what the drawing says about the clock -----------------------------
-    /*
-     * Rendered onto an offscreen canvas at two points on one decoy's life, and
-     * NOT off the live one: `draw` is called from the frame loop, so a
-     * screenshot measures the loop rather than the drawing (the rule build 211
-     * paid for on HE's burst). The turret's own silhouette is what carries it
-     * -- six sides going out one at a time -- so the measurement is total lit
-     * ink on the mount, which cannot be flattered by the fade at the end
-     * because the fade is only the last 1.6 seconds and the samples are taken
-     * well outside it.
-     */
-    const W = 220;
-    const c = document.createElement('canvas');
-    c.width = W; c.height = W;
-    const ctx = c.getContext('2d', { willReadFrequently: true });
-    /*
-     * Per SIDE, not per canvas. The first version summed every lit pixel on
-     * the frame and read a 13% drop across two thirds of a life, which is not
-     * the effect failing -- it is the AMBIENT GLOW, `drawGlow` at 3.4 radii,
-     * which is by far the brightest thing here and does not depend on the
-     * clock at all. Same shape as the streak and stroke-floor probes CLAUDE.md
-     * records: the quantity was real and had nothing to do with the claim.
-     *
-     * The claim is that the mount's six sides go out one at a time, so the
-     * measurement walks each side's own CHORD -- vertex to vertex, which is at
-     * 0.866r at its midpoint and nowhere near the circle of radius r -- and
-     * takes the brightest pixel on it. The dash means most samples land in a
-     * gap; the maximum is what survives that. Comparing sides against each
-     * other inside one frame is glow-neutral by construction: they sit at the
-     * same radii and carry the same ambient underneath.
-     */
-    const sides = (d) => {
-      const dd = w.decoy;
-      dd.life = d;
-      dd.maxLife = CFG.decoy.life;
-      dd.born = 1;
-      dd.restacked = 0;
-      /*
-       * The barrel's sweep pinned to dead centre, which is not tidiness: it
-       * swings +/-0.5 rad scaled by the life left, and at the wide end it
-       * crosses the chord of whichever side it is leaning over -- so a case
-       * that left it to `world.time` would read one side bright or dim
-       * depending on where in the sweep the sample happened to land. That is
-       * the "measured at the wrong moment" flake CLAUDE.md keeps a list of.
-       */
-      w.time = (Math.PI - dd.born) / 1.3;
-      const ox = dd.x, oy = dd.y;
-      dd.x = W / 2; dd.y = W / 2;
-      ctx.fillStyle = '#04050a'; ctx.fillRect(0, 0, W, W);
-      dd.draw(ctx, w);
-      dd.x = ox; dd.y = oy;
-      const px = ctx.getImageData(0, 0, W, W).data;
-      const at = (x, y) => {
-        const q = ((y | 0) * W + (x | 0)) * 4;
-        return Math.max(px[q], px[q + 1], px[q + 2]);
-      };
-      const out = [];
-      for (let i = 0; i < 6; i++) {
-        const a0 = -Math.PI / 2 + (i / 6) * Math.PI * 2;
-        const a1 = -Math.PI / 2 + ((i + 1) / 6) * Math.PI * 2;
-        const x0 = W / 2 + Math.cos(a0) * dd.r;
-        const y0 = W / 2 + Math.sin(a0) * dd.r;
-        const x1 = W / 2 + Math.cos(a1) * dd.r;
-        const y1 = W / 2 + Math.sin(a1) * dd.r;
-        let best = 0;
-        // Away from the shared vertices, so a side cannot borrow its
-        // neighbour's ink at the corner they have in common -- and clear of
-        // the barrel, which stands out of the top vertex.
-        for (let t = 0.3; t <= 0.7; t += 0.004) {
-          const x = x0 + (x1 - x0) * t;
-          const y = y0 + (y1 - y0) * t;
-          for (let o = -1; o <= 1; o++) best = Math.max(best, at(x + o, y), at(x, y + o));
-        }
-        out.push(best);
-      }
-      return out;
-    };
-    const full = sides(CFG.decoy.life);
-    const third = sides(CFG.decoy.life * 0.34);
-    /*
-     * ...and which way the barrel points, off the same drawing. The barrel is
-     * the only thing that reaches past 1.3 radii, so the two windows below --
-     * straight up and straight left of the mount, the same size and the same
-     * distance out -- contain the barrel and nothing else.
-     */
-    sides(CFG.decoy.life);
-    const px2 = ctx.getImageData(0, 0, W, W).data;
-    const box = (cx, cy, half) => {
-      let n = 0;
-      for (let y = cy - half; y <= cy + half; y++) {
-        for (let x = cx - half; x <= cx + half; x++) {
-          const q = ((y | 0) * W + (x | 0)) * 4;
-          if (Math.max(px2[q], px2[q + 1], px2[q + 2]) > 90) n++;
-        }
-      }
-      return n;
-    };
-    const rr = w.decoy.r;
-    const barrel = {
-      up: box(W / 2, W / 2 - rr * 1.7, 9),
-      left: box(W / 2 - rr * 1.7, W / 2, 9),
-    };
-    // ...and the ONE control that matters: health held constant across both.
-    // If the two readings differed because the plating arc moved, the drawing
-    // would be expressing health twice and time not at all.
-    const hpHeld = w.decoy.hp;
-
-    g.restart();
-    return { before, after, capped, cap: CFG.decoy.lifeCap, life: CFG.decoy.life,
-      witnessHp, full, third, hpHeld, barrel };
-  });
-
-  check('a second DECOY adds to the clock instead of killing the one that is up',
-    r.after.same === true && r.after.dead === false
-    && r.after.life > r.before.life + r.life * 0.9
-    && r.after.witness === r.witnessHp,
-    `${r.before.life}s left -> ${r.after.life}s on the same decoy `
-    + `(${r.after.same ? 'same object' : 'REPLACED'}); a body 98 units off it `
-    + `went ${r.witnessHp} -> ${r.after.witness} hp, where the old path threw a `
-    + `150-damage blast across 260 units`);
-
-  check('...and the clock has a ceiling rather than however many charges allow',
-    r.capped === r.cap,
-    `six more presses reach ${r.capped}s against a cap of ${r.cap}`);
-
+if (MINE_LINE) {
   /*
-   * At full life every side of the mount reads the same; at a third, the ones
-   * past the boundary have gone. Both arms are needed: the first is what shows
-   * the instrument can read a lit side at all, and without it "side 5 is dim"
-   * would pass on a drawing that had no mount in it.
-   */
-  const evenAtFull = r.full && Math.min(...r.full) > Math.max(...r.full) * 0.85;
-  const goneAtThird = r.third && r.third[5] < r.third[0] * 0.7
-    && r.third[4] < r.third[0] * 0.7;
-  /*
-   * The barrel points UP, which it did not until build 222.
+   * ---- build 222: the DECOY's two clocks, and the OBJECTS chip ----
    *
-   * `rotate(-Math.PI / 2 + sweep)` copied the real turret's convention without
-   * its frame: the machine draws its barrel along local +x and turns it by
-   * `aim` (-PI/2 for up); the decoy draws its along local -y, which is already
-   * up, and then took the same -PI/2 on top. `rotate(-PI/2)` sends local -y to
-   * world -x, so the stand-in for the turret aimed across the field. Asserted
-   * as ink in the quadrant above the mount against ink to the left of it, on
-   * the same drawing, with the sweep pinned -- a claim about which way
-   * something points is a claim about pixels.
+   * A second press used to call `expire` on the standing decoy, and `expire` is
+   * the decoy's DEATH -- a 260-unit blast at 150 damage with a 900 shove, thrown
+   * into the middle of the pile the decoy existed to hold somewhere that was not
+   * on top of you. So the ability whose entire job is holding the field away
+   * answered a second press by putting the field back. It adds to the clock now.
+   *
+   * And the drawing carries how long it has left, which it never did: the only
+   * tell for time was the last 1.6 seconds fading out, which is a warning that
+   * arrives after the decision it was meant to inform. Asserted on the RENDERED
+   * PIXELS, because "you can see how long it has" is a claim about what reaches
+   * the screen and nothing else settles it.
    */
-  check('the DECOY-s barrel points the way the turret-s does',
-    r.barrel && r.barrel.up > r.barrel.left * 3 && r.barrel.up - r.barrel.left > 30,
-    `above the mount ${r.barrel && r.barrel.up} lit pixels, to the left of it `
-    + `${r.barrel && r.barrel.left} -- and the left window is not zero because `
-    + `the ambient glow reaches 3.4 radii, which is why the two windows are the `
-    + `same size at the same distance out`);
+  {
+    const r = await page.evaluate(async () => {
+      const { CFG } = await import('../src/config.js');
+      const g = window.__sim;
+      const w = g.world;
+      const slot = () => w.abilities.slots.findIndex((x) => x.def.id === 'decoy');
 
-  check('...and how much of it is left is drawn on the machine',
-    r.full && Math.max(...r.full) > 60 && evenAtFull && goneAtThird
-    && r.third[0] > r.third[5],
-    `the mount's six sides read [${r.full}] at full life and [${r.third}] at a `
-    + `third of it, with health held at ${r.hpHeld} across both`);
-}
-
-/*
- * ---- build 222: the OBJECTS chip is a total and nothing else ----
- *
- * The per-wave figure that sat beside it came out at the player's request. The
- * case is here because a chip is easy to put back by accident and because the
- * thing that remains has to be the LIFETIME count -- `world.kills`, which is
- * fed from the one death door and survives a wave turning over.
- */
-{
-  const r = await page.evaluate(async () => {
-    const g = window.__sim;
-    const w = g.world;
-    g.restart();
-    g.debugTeachAll();
-    g.debugClearField();
-    w.phase = 'staging';
-    w.spawnLock = 1e9;
-    w.director.update = () => {};
-    const d = w.director;
-    d.resting = false; d.asked = 4; d.jobs.length = 0; d.slain = 0; d.made = 4;
-    g.syncHud ? g.syncHud() : null;
-    for (let f = 0; f < 3; f++) g.update(1 / 60);
-    const chip = document.getElementById('counter');
-    const text0 = chip.textContent.replace(/\s+/g, ' ').trim();
-    // Five deaths of the running wave: the count moves, and nothing else on
-    // the chip does.
-    for (let i = 0; i < 5; i++) g.registerKill({ wave: d.serial });
-    for (let f = 0; f < 3; f++) g.update(1 / 60);
-    const text1 = chip.textContent.replace(/\s+/g, ' ').trim();
-    const num = document.getElementById('killNum').textContent;
-    const pctEl = !!document.getElementById('wavePct');
-    // ...and it is the LIFETIME total, not the wave's: end the wave and the
-    // number does not go back.
-    const before = w.kills;
-    d.done = true; d.resting = true;
-    for (let f = 0; f < 3; f++) g.update(1 / 60);
-    const kept = document.getElementById('killNum').textContent;
-    g.restart();
-    return { text0, text1, num, pctEl, kills: before, kept,
-      cleared: typeof d.cleared === 'function' };
-  });
-
-  check('the OBJECTS chip carries the total destroyed and no per-wave figure',
-    r.pctEl === false && !/%/.test(r.text0) && !/%/.test(r.text1)
-    && r.num === String(r.kills) && r.kills === 5,
-    `chip reads "${r.text1}" after five deaths (the element that held the `
-    + `per-cent is ${r.pctEl ? 'STILL THERE' : 'gone'})`);
-
-  check('...and the number it keeps is the run-s, not the wave-s',
-    r.kept === String(r.kills) && r.cleared === true,
-    `${r.kept} still shown once the wave is scored and resting; `
-    + `Director.cleared ${r.cleared ? 'still exists for the rail and AUDIT' : 'IS GONE'}`);
-}
-
-/*
- * ---- build 222: the TOW actually throws the thing it is carrying ----
- *
- * Measured at tier 9 against a bought damage line, five pairs released the way
- * the director releases them: TWO OF FIVE THREW NOTHING. One head was dead at
- * 7.2 seconds and 600 units out, having never begun to wind -- 135 health
- * across an approach that took 18.7 to 27.0 seconds to close to the old
- * 430-unit hurl range. Another wound for four seconds across two attempts and
- * threw nothing, because gunfire kept shoving it a few units back out of range
- * and `windUp` reset the hold to zero every time.
- *
- * Four things answer that and each has an arm here: the range, the shorter
- * hold, the wind that bleeds instead of resetting, and the load coming off the
- * cable when the head dies. Plus the plow, which is what makes a throw into a
- * crowd a throw rather than a drop.
- */
-{
-  const r = await page.evaluate(async () => {
-    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
-    const g = window.__sim;
-    const w = g.world;
-    const H = TYPE_BY_ID.tow.hurl;
-
-    const fresh = () => {
-      g.restart();
-      g.debugTeachAll();
-      g.debugClearField();
-      w.phase = 'staging';
-      w.spawnLock = 1e9;
-      w.director.update = () => {};
-      w.autoAim = false;
-      w.autoFire = false;
-    };
-    // A real pair. `debugSpawn` makes the head alone -- CLAUDE.md's note, and
-    // a probe that builds one that way is measuring 135hp against the 415 the
-    // game sends.
-    const pair = () => {
-      g.debugSpawnGroup('tow', 1, { staged: false });
-      const head = w.enemies.find((e) => e.type.id === 'tow' && !e.dead);
-      const mass = w.enemies.find((e) => e.type.id === 'towMass' && !e.dead);
-      if (head) { head.staged = false; head.spawnIn = 0; }
-      if (mass) { mass.staged = false; mass.spawnIn = 0; }
-      return { head, mass };
-    };
-
-    // ---- a head killed cold still lets go ---------------------------------
-    /*
-     * Killed through `destroy`, which is the door every death comes through,
-     * and killed COLD -- `wind` untouched at zero -- because that is the case
-     * the measurement found: not a head that nearly made it, a head that never
-     * started. The load must leave, and leave slower than a completed wind.
-     */
-    fresh();
-    const cold = pair();
-    let coldOut = null;
-    if (cold.head && cold.mass) {
-      cold.head.destroy(w);
-      g.update(1 / 60);
-      coldOut = {
-        hurled: !!cold.mass.hurled,
-        v: +Math.hypot(cold.mass.vx, cold.mass.vy).toFixed(0),
-        tether: !!cold.mass.tether,
+      const fresh = () => {
+        g.restart();
+        g.debugTeachAll();
+        g.debugClearField();
+        w.phase = 'staging';
+        w.spawnLock = 1e9;
+        w.director.update = () => {};
+        w.abilities.clearCooldowns();
       };
-    }
 
-    // ---- ...and one that finished its wind throws harder -------------------
-    fresh();
-    const hot = pair();
-    let hotOut = null;
-    if (hot.head && hot.mass) {
-      hot.head.wind = H.wind;
-      hot.head.destroy(w);
-      g.update(1 / 60);
-      hotOut = { hurled: !!hot.mass.hurled,
-        v: +Math.hypot(hot.mass.vx, hot.mass.vy).toFixed(0) };
-    }
-
-    // ---- the wind bleeds when it is shoved out of range, not resets --------
-    /*
-     * Driven through `windUp` with the head parked outside the range, because
-     * that is exactly what gunfire does to it -- and the whole failure was
-     * that one shove past the line cost the entire hold.
-     */
-    fresh();
-    const shoved = pair();
-    let bleed = null;
-    if (shoved.head) {
-      const s = w.shooter;
-      shoved.head.x = s.x;
-      shoved.head.y = s.y - (H.range * 0.5);
-      // Inside: it winds.
-      for (let f = 0; f < 24; f++) shoved.head.windUp(w, 1 / 60);
-      const inside = +(shoved.head.wind || 0).toFixed(3);
-      // Outside: half a second of it.
-      shoved.head.y = s.y - (H.range + 200);
-      for (let f = 0; f < 30; f++) shoved.head.windUp(w, 1 / 60);
-      bleed = { inside, outside: +(shoved.head.wind || 0).toFixed(3) };
-    }
-
-    // ---- the load crosses a crowd ------------------------------------------
-    /*
-     * The same trial twice, plow off and plow on, with a wall of nine bodies
-     * between the load and the turret. Everything is healed each frame so the
-     * question is only ever "did it get there", never "did it kill its way
-     * there"; and the empty-field arm is the control that shows the plow
-     * changes NOTHING when there is nothing to plow -- without it the case
-     * could pass on a load that had simply been made faster.
-     */
-    const cross = (crowd, plow) => {
+      // ---- a second press extends rather than detonates ----------------------
       fresh();
-      const s = w.shooter;
-      const blockers = [];
-      for (let i = 0; i < crowd; i++) {
-        const e = g.debugSpawn(['lurcher', 'splitter', 'bulwark', 'prism', 'glut'][i % 5],
-          s.x - 60 + (i % 3) * 60, s.y - 150 - ((i / 3) | 0) * 55);
-        if (e) { e.staged = false; e.spawnIn = 0; e.hp = 1e9; e.maxHp = 1e9; blockers.push(e); }
-      }
-      const m = g.debugSpawn('towMass', s.x, s.y - 420);
-      if (!m) return null;
-      m.staged = false; m.spawnIn = 0; m.hp = 1e9; m.maxHp = 1e9;
-      m.vx = 0; m.vy = H.speed; m.thrown = 2.2;
-      m.plow = plow ? 2.2 : 0;
-      let t = 0, closest = 1e9;
-      while (t < 3 && !m.dead) {
-        for (const b of blockers) b.hp = 1e9;
-        m.hp = 1e9;
-        g.update(1 / 60); t += 1 / 60;
-        closest = Math.min(closest, Math.hypot(m.x - s.x, m.y - s.y));
-      }
-      return { closest: +closest.toFixed(0), stopped: m.y < s.y - 200 };
-    };
-    const clearOff = cross(0, false);
-    const clearOn = cross(0, true);
-    const jamOff = cross(9, false);
-    const jamOn = cross(9, true);
+      g.useAbility(slot());
+      const first = w.decoy;
+      // Four seconds off the clock, so the extension has somewhere to land.
+      for (let f = 0; f < 240; f++) g.update(1 / 60);
+      const before = { life: +first.life.toFixed(2), hp: first.hp, dead: first.dead };
+      // A witness inside the blast the old path would have thrown, so "it did
+      // not detonate" is measured on the field rather than on a flag.
+      const near = g.debugSpawn('lurcher', first.x + 90, first.y + 40);
+      if (near) { near.staged = false; near.spawnIn = 0; }
+      const witnessHp = near ? near.hp : -1;
+      w.abilities.clearCooldowns();
+      g.useAbility(slot());
+      const after = {
+        same: w.decoy === first,
+        life: +w.decoy.life.toFixed(2),
+        hp: w.decoy.hp,
+        dead: first.dead,
+        maxLife: +w.decoy.maxLife.toFixed(2),
+        witness: near ? near.hp : -1,
+      };
 
-    // ---- ...and it does not cross the TURRET -------------------------------
-    /*
-     * The one thing the plow must never do. The turret and the DECOY are
-     * static -- invMass 0 -- and `resolvePair` only plows against a body with
-     * mass of its own, so both stop it dead. Measured as "it is still on the
-     * near side of the thing it was thrown at" a full second after arriving.
-     */
-    fresh();
-    const s2 = w.shooter;
-    const through = g.debugSpawn('towMass', s2.x, s2.y - 300);
-    let past = null;
-    if (through) {
-      through.staged = false; through.spawnIn = 0; through.hp = 1e9; through.maxHp = 1e9;
-      through.vx = 0; through.vy = H.speed; through.thrown = 2.2; through.plow = 2.2;
-      let deepest = -1e9;
-      for (let f = 0; f < 120; f++) {
-        through.hp = 1e9;
-        g.update(1 / 60);
-        deepest = Math.max(deepest, through.y - s2.y);
-      }
-      past = +deepest.toFixed(0);
-    }
+      // ---- and it stops at the ceiling --------------------------------------
+      for (let i = 0; i < 6; i++) { w.abilities.clearCooldowns(); g.useAbility(slot()); }
+      const capped = +w.decoy.life.toFixed(2);
 
-    g.restart();
-    return { coldOut, hotOut, bleed, clearOff, clearOn, jamOff, jamOn, past,
-      H: { range: H.range, wind: H.wind, speed: H.speed, partial: H.partial,
-        holdWind: H.holdWind } };
-  });
-
-  check('a TOW killed before it can wind still lets go of its load',
-    r.coldOut && r.coldOut.hurled === true && r.coldOut.tether === false
-    && r.coldOut.v > r.H.speed * r.H.partial * 0.8,
-    `a head destroyed with the wind at zero threw its MASS at ${r.coldOut && r.coldOut.v} `
-    + `u/s (two pairs in five used to throw nothing at all)`);
-
-  check('...and a completed wind is still worth more than an interrupted one',
-    r.hotOut && r.coldOut && r.hotOut.v > r.coldOut.v * 1.3,
-    `${r.coldOut && r.coldOut.v} u/s cold against ${r.hotOut && r.hotOut.v} u/s `
-    + `off a full wind, so killing the head early still buys the slower load`);
-
-  check('...and a shove out of range costs the wind ground, not the attempt',
-    r.bleed && r.bleed.inside > 0.3 && r.bleed.outside > 0
-    && r.bleed.outside < r.bleed.inside,
-    `0.4s inside the range wound to ${r.bleed && r.bleed.inside}; half a second `
-    + `outside it left ${r.bleed && r.bleed.outside} (it used to leave nothing)`);
-
-  check('a hurled MASS crosses a crowd it would otherwise have stopped in',
-    r.jamOn && r.jamOff && r.clearOn && r.clearOff
-    && r.jamOff.closest > r.clearOff.closest + 40
-    && r.jamOn.closest < r.clearOn.closest + 12,
-    `nine bodies in the way: it got to ${r.jamOff && r.jamOff.closest} units of the `
-    + `turret without the plow and ${r.jamOn && r.jamOn.closest} with it, against `
-    + `${r.clearOn && r.clearOn.closest} across an empty field`);
-
-  check('...and the plow does nothing at all when there is nothing to plow',
-    r.clearOn && r.clearOff && Math.abs(r.clearOn.closest - r.clearOff.closest) <= 4,
-    `empty field: ${r.clearOff && r.clearOff.closest} units without it, `
-    + `${r.clearOn && r.clearOn.closest} with it`);
-
-  check('...and it never plows through the turret, which is what it is thrown at',
-    r.past !== null && r.past < 0,
-    `two seconds after arriving it is ${r.past} units past the turret centre `
-    + `(a static body has no inverse mass, so resolvePair refuses to plow it)`);
-}
-
-/*
- * ---- build 223: the four things this build changed ----
- *
- * SPINE's splinters come out the FAR side; the four widest mines are a fifth
- * narrower; a mine is never laid in the top fifth of the field; and the ALL-X
- * rows no longer wear the colour of the first arm in their branch.
- */
-{
-  const r = await page.evaluate(async () => {
-    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
-    const { NODES } = await import('../src/tree.js');
-    const { freshUpgrades } = await import('../src/upgrades.js');
-    const { throwMine } = await import('../src/mines.js');
-    const g = window.__sim;
-    const w = g.world;
-    const s = w.shooter;
-    const S = CFG.rounds.spine;
-
-    // ---- the splinters come out the FAR side -------------------------------
-    /*
-     * The whole point of the change, and the one thing that cannot be inferred
-     * from a projectile count: a fan spawned at the CONTACT point opens
-     * backwards across ground the round has already crossed and covers nothing
-     * new. The contact point is the near face -- `contactAt` puts it at
-     * `e.x + nx * e.r` -- so "did it come out the other side" is measured as
-     * where each splinter was BORN relative to the body's centre, along the
-     * dart's own travel. Fired straight up, so the far side is up-field: a
-     * splinter born past the centre has a smaller y than the body has.
-     */
-    g.restart();
-    g.debugTeachAll();
-    g.debugClearField();
-    w.phase = 'staging';
-    w.spawnLock = 1e9;
-    w.director.update = () => {};
-    w.up = freshUpgrades();
-    w.round = 'spine';
-    w.projectiles.length = 0;
-    const wall = g.debugSpawn('bulwark', s.x, s.y - 260);
-    wall.staged = false; wall.spawnIn = 0; wall.hp = 1e7; wall.maxHp = 1e7;
-    wall.invMass = 0;
-    s.aim = -Math.PI / 2; s.targetAim = s.aim;
-    const born = [];
-    const push0 = w.projectiles.push.bind(w.projectiles);
-    w.projectiles.push = (...ps) => {
-      for (const q of ps) born.push({ x: q.x, y: q.y, r: q.r });
-      return push0(...ps);
-    };
-    s.shoot(w);
-    for (let f = 0; f < 30; f++) {
-      wall.x = s.x; wall.y = s.y - 260; wall.vx = 0; wall.vy = 0;
-      g.update(1 / 60);
-    }
-    w.projectiles.push = push0;
-    // The dart is the first thing pushed and is born at the muzzle; every
-    // later one is a splinter.
-    const splinters = born.slice(1);
-    const far = splinters.filter((q) => q.y < wall.y).length;
-    const onSurface = splinters.filter(
-      (q) => Math.abs(Math.hypot(q.x - wall.x, q.y - wall.y) - wall.r) < 3).length;
-
-    // ---- how much of the screen a mine may take ----------------------------
-    /*
-     * Every mine's MAXIMUM, with the whole tree owned, against the SCREEN it
-     * is drawn on rather than against a constant -- `innerWidth / CFG.zoom` is
-     * the field the player can actually see, and it is the only honest
-     * denominator for "it takes up most of the screen".
-     *
-     * The previous version of this case was four hand-typed ceilings, each set
-     * to whatever that build's value happened to be, under a comment saying
-     * "the field is about 630 units across, so a radius over 315 is a circle
-     * wider than the screen. Every one of these is now inside that" -- while
-     * asserting `knell < 400`, which is 120% of it. The rule and the number
-     * had come apart, so the case went green through the exact complaint it
-     * was written for, twice. It states the rule now and computes the numbers.
-     *
-     * Two tiers, and the split is what the eye does with each:
-     *   a BLAST is over in a quarter second and is read from its EDGE, so the
-     *   edge has to be on the screen with room -- half the width.
-     *   a standing reach is drawn continuously and is read from its CONTENTS
-     *   (bodies dragged in, ground burning), so it only has to fit -- two
-     *   thirds.
-     */
-    g.restart();
-    g.debugTeachAll();
-    g.debugGiveBytes(400000000);
-    for (let pass = 0; pass < 4; pass++) for (const n of NODES) if (n.id) g.buy(n.id);
-    const up = w.up;
-    const K = CFG.knell;
-    const screen = window.innerWidth / CFG.zoom;   // world units across the display
-    const wide = {
-      screen: +screen.toFixed(0),
-      blastCap: +(screen * 0.25).toFixed(1),       // half the width, as a radius
-      holdCap: +(screen / 3).toFixed(1),           // two thirds, as a radius
-      blast: CFG.mines.blast.r * up.mineBlast,
-      fizzle: CFG.mines.fizzle.r * up.mineBlast,
-      knell: K.blast.r * K.spread * up.mineBlast,
-      spall: CFG.spall.burst.r * up.spallBurst,
-      lode: CFG.lode.reach * up.lodeReach,
-      snare: CFG.snare.reach,
-      thorn: CFG.thorn.patch.r * up.patchR,
-      lodePush: up.lodePush,
-      deepLevels: (NODES.find((n) => n.id === 'deepcharge') || {}).levels,
-    };
-
-    /*
-     * ...and what a KNELL actually draws, walked through a real mine rather
-     * than read off the expression above. FOURTH BELL used to put its two
-     * extra tolls PAST the end of the ladder, so the node that reads "+1 toll"
-     * was also the largest radius upgrade in the game; the widest ring must
-     * now be the same whether it is owned or not.
-     */
-    const tollRings = (bell) => {
-      g.restart();
-      g.debugClearField();
-      w.up = freshUpgrades();
-      w.up.mineTolls = bell;
-      w.mines.length = 0;
-      w.effects.length = 0;
-      throwMine(w, 'knell');
-      const m = w.mines[w.mines.length - 1];
-      if (!m) return null;
+      // ---- what the drawing says about the clock -----------------------------
       /*
-       * By identity, not by index. `effects` is compacted as things die, so a
-       * new Shock can land BELOW the mark a previous frame left -- the first
-       * version of this walked `effects.length` forward and saw one toll of
-       * two.
+       * Rendered onto an offscreen canvas at two points on one decoy's life, and
+       * NOT off the live one: `draw` is called from the frame loop, so a
+       * screenshot measures the loop rather than the drawing (the rule build 211
+       * paid for on HE's burst). The turret's own silhouette is what carries it
+       * -- six sides going out one at a time -- so the measurement is total lit
+       * ink on the mount, which cannot be flattered by the fade at the end
+       * because the fade is only the last 1.6 seconds and the samples are taken
+       * well outside it.
        */
-      const seen = [];
-      const at = [];
-      const had = new Set();
-      let f = 0;
-      for (; f < 60 * 30; f++) {
-        if (m && !m.dead) { m.x = w.shooter.x; m.y = w.shooter.y - 200; }
-        g.update(1 / 60);
-        for (const e of w.effects) {
-          if (!e || !e.constructor || e.constructor.name !== 'Shock') continue;
-          if (had.has(e)) continue;
-          had.add(e);
-          seen.push(+e.r.toFixed(1));
-          at.push(+(f / 60).toFixed(2));
+      const W = 220;
+      const c = document.createElement('canvas');
+      c.width = W; c.height = W;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      /*
+       * Per SIDE, not per canvas. The first version summed every lit pixel on
+       * the frame and read a 13% drop across two thirds of a life, which is not
+       * the effect failing -- it is the AMBIENT GLOW, `drawGlow` at 3.4 radii,
+       * which is by far the brightest thing here and does not depend on the
+       * clock at all. Same shape as the streak and stroke-floor probes CLAUDE.md
+       * records: the quantity was real and had nothing to do with the claim.
+       *
+       * The claim is that the mount's six sides go out one at a time, so the
+       * measurement walks each side's own CHORD -- vertex to vertex, which is at
+       * 0.866r at its midpoint and nowhere near the circle of radius r -- and
+       * takes the brightest pixel on it. The dash means most samples land in a
+       * gap; the maximum is what survives that. Comparing sides against each
+       * other inside one frame is glow-neutral by construction: they sit at the
+       * same radii and carry the same ambient underneath.
+       */
+      const sides = (d) => {
+        const dd = w.decoy;
+        dd.life = d;
+        dd.maxLife = CFG.decoy.life;
+        dd.born = 1;
+        dd.restacked = 0;
+        /*
+         * The barrel's sweep pinned to dead centre, which is not tidiness: it
+         * swings +/-0.5 rad scaled by the life left, and at the wide end it
+         * crosses the chord of whichever side it is leaning over -- so a case
+         * that left it to `world.time` would read one side bright or dim
+         * depending on where in the sweep the sample happened to land. That is
+         * the "measured at the wrong moment" flake CLAUDE.md keeps a list of.
+         */
+        w.time = (Math.PI - dd.born) / 1.3;
+        const ox = dd.x, oy = dd.y;
+        dd.x = W / 2; dd.y = W / 2;
+        ctx.fillStyle = '#04050a'; ctx.fillRect(0, 0, W, W);
+        dd.draw(ctx, w);
+        dd.x = ox; dd.y = oy;
+        const px = ctx.getImageData(0, 0, W, W).data;
+        const at = (x, y) => {
+          const q = ((y | 0) * W + (x | 0)) * 4;
+          return Math.max(px[q], px[q + 1], px[q + 2]);
+        };
+        const out = [];
+        for (let i = 0; i < 6; i++) {
+          const a0 = -Math.PI / 2 + (i / 6) * Math.PI * 2;
+          const a1 = -Math.PI / 2 + ((i + 1) / 6) * Math.PI * 2;
+          const x0 = W / 2 + Math.cos(a0) * dd.r;
+          const y0 = W / 2 + Math.sin(a0) * dd.r;
+          const x1 = W / 2 + Math.cos(a1) * dd.r;
+          const y1 = W / 2 + Math.sin(a1) * dd.r;
+          let best = 0;
+          // Away from the shared vertices, so a side cannot borrow its
+          // neighbour's ink at the corner they have in common -- and clear of
+          // the barrel, which stands out of the top vertex.
+          for (let t = 0.3; t <= 0.7; t += 0.004) {
+            const x = x0 + (x1 - x0) * t;
+            const y = y0 + (y1 - y0) * t;
+            for (let o = -1; o <= 1; o++) best = Math.max(best, at(x + o, y), at(x, y + o));
+          }
+          out.push(best);
         }
-        if (m.dead) break;
-      }
-      return { rings: seen, at, gone: +(f / 60).toFixed(2) };
-    };
-    const bell0 = tollRings(0);
-    const bell2 = tollRings(2);
+        return out;
+      };
+      const full = sides(CFG.decoy.life);
+      const third = sides(CFG.decoy.life * 0.34);
+      /*
+       * ...and which way the barrel points, off the same drawing. The barrel is
+       * the only thing that reaches past 1.3 radii, so the two windows below --
+       * straight up and straight left of the mount, the same size and the same
+       * distance out -- contain the barrel and nothing else.
+       */
+      sides(CFG.decoy.life);
+      const px2 = ctx.getImageData(0, 0, W, W).data;
+      const box = (cx, cy, half) => {
+        let n = 0;
+        for (let y = cy - half; y <= cy + half; y++) {
+          for (let x = cx - half; x <= cx + half; x++) {
+            const q = ((y | 0) * W + (x | 0)) * 4;
+            if (Math.max(px2[q], px2[q + 1], px2[q + 2]) > 90) n++;
+          }
+        }
+        return n;
+      };
+      const rr = w.decoy.r;
+      const barrel = {
+        up: box(W / 2, W / 2 - rr * 1.7, 9),
+        left: box(W / 2 - rr * 1.7, W / 2, 9),
+      };
+      // ...and the ONE control that matters: health held constant across both.
+      // If the two readings differed because the plating arc moved, the drawing
+      // would be expressing health twice and time not at all.
+      const hpHeld = w.decoy.hp;
 
-    /*
-     * ...and the rule the knell was breaking, asked of all eight: lay one on
-     * an empty field, touch nothing, and see how long it stays. Seven of them
-     * sat for their whole `life`; a knell was GONE in 2.85 seconds of fifteen,
-     * because it ends itself on its last toll and the tolls were 1.15s apart.
-     */
-    const sitFor = (kind) => {
       g.restart();
-      g.debugClearField();
-      w.phase = 'staging';
-      w.spawnLock = 1e9;
-      w.director.update = () => {};
-      w.up = freshUpgrades();
-      w.mines.length = 0;
-      throwMine(w, kind);
-      const m = w.mines[w.mines.length - 1];
-      if (!m) return null;
-      for (let f = 0; f < 60 * 30; f++) {
-        g.update(1 / 60);
-        if (!w.mines.includes(m)) return +(f / 60).toFixed(2);
-      }
-      return 30;
-    };
-    const sat = {};
-    for (const k of ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void']) {
-      sat[k] = sitFor(k);
-    }
-    sat.life = CFG.mines.life;
+      return { before, after, capped, cap: CFG.decoy.lifeCap, life: CFG.decoy.life,
+        witnessHp, full, third, hpHeld, barrel };
+    });
 
-    g.restart();
-    w.up = freshUpgrades();
+    check('a second DECOY adds to the clock instead of killing the one that is up',
+      r.after.same === true && r.after.dead === false
+      && r.after.life > r.before.life + r.life * 0.9
+      && r.after.witness === r.witnessHp,
+      `${r.before.life}s left -> ${r.after.life}s on the same decoy `
+      + `(${r.after.same ? 'same object' : 'REPLACED'}); a body 98 units off it `
+      + `went ${r.witnessHp} -> ${r.after.witness} hp, where the old path threw a `
+      + `150-damage blast across 260 units`);
 
-    // ---- and where a mine may be laid --------------------------------------
+    check('...and the clock has a ceiling rather than however many charges allow',
+      r.capped === r.cap,
+      `six more presses reach ${r.capped}s against a cap of ${r.cap}`);
+
     /*
-     * Two hundred sites, because the site is a `rand` and one draw proves
-     * nothing. Asserted against the FIELD's depth rather than a constant --
-     * the buffer is a fraction so that it stays a fifth on every screen -- and
-     * the spread is asserted too, or a broken site that always returned the
-     * same point would pass the first arm on its own.
+     * At full life every side of the mount reads the same; at a third, the ones
+     * past the boundary have gone. Both arms are needed: the first is what shows
+     * the instrument can read a lit side at all, and without it "side 5 is dim"
+     * would pass on a drawing that had no mount in it.
      */
-    g.restart();
-    g.debugTeachAll();
-    g.debugClearField();
-    w.phase = 'staging';
-    w.spawnLock = 1e9;
-    w.director.update = () => {};
-    const deep = w.floorY;
-    const bar = deep * CFG.mines.keepTop;
-    let above = 0, lowest = 1e9, highest = -1e9, lowRaw = 1e9;
-    for (let i = 0; i < 200; i++) {
-      w.mines.length = 0;
-      throwMine(w, 'blast');
-      const m = w.mines[w.mines.length - 1];
-      if (!m) continue;
-      // `y1` is the landing site; `y`/`y0` is the muzzle it was lobbed from.
-      if (m.y1 < bar) above++;
-      lowest = Math.min(lowest, m.y1);
-      highest = Math.max(highest, m.y1);
-      // Raw, because the assertion below is an inequality against `bar` and
-      // both sides were being rounded before it: a site at 241.4 and a bar at
-      // 241.2 both read 241, and "no lower than the bar" failed on a rounding
-      // rather than on a mine.
-      lowRaw = Math.min(lowRaw, m.y1);
+    const evenAtFull = r.full && Math.min(...r.full) > Math.max(...r.full) * 0.85;
+    const goneAtThird = r.third && r.third[5] < r.third[0] * 0.7
+      && r.third[4] < r.third[0] * 0.7;
+    /*
+     * The barrel points UP, which it did not until build 222.
+     *
+     * `rotate(-Math.PI / 2 + sweep)` copied the real turret's convention without
+     * its frame: the machine draws its barrel along local +x and turns it by
+     * `aim` (-PI/2 for up); the decoy draws its along local -y, which is already
+     * up, and then took the same -PI/2 on top. `rotate(-PI/2)` sends local -y to
+     * world -x, so the stand-in for the turret aimed across the field. Asserted
+     * as ink in the quadrant above the mount against ink to the left of it, on
+     * the same drawing, with the sweep pinned -- a claim about which way
+     * something points is a claim about pixels.
+     */
+    check('the DECOY-s barrel points the way the turret-s does',
+      r.barrel && r.barrel.up > r.barrel.left * 3 && r.barrel.up - r.barrel.left > 30,
+      `above the mount ${r.barrel && r.barrel.up} lit pixels, to the left of it `
+      + `${r.barrel && r.barrel.left} -- and the left window is not zero because `
+      + `the ambient glow reaches 3.4 radii, which is why the two windows are the `
+      + `same size at the same distance out`);
+
+    check('...and how much of it is left is drawn on the machine',
+      r.full && Math.max(...r.full) > 60 && evenAtFull && goneAtThird
+      && r.third[0] > r.third[5],
+      `the mount's six sides read [${r.full}] at full life and [${r.third}] at a `
+      + `third of it, with health held at ${r.hpHeld} across both`);
+  }
+
+  /*
+   * Asleep with the mine line -- see "no mine can be laid, and nothing
+   * offers one" for what holds while it is out of play.
+   */
+  if (MINE_LINE) {
+    /*
+     * ---- build 222: the OBJECTS chip is a total and nothing else ----
+     *
+     * The per-wave figure that sat beside it came out at the player's request. The
+     * case is here because a chip is easy to put back by accident and because the
+     * thing that remains has to be the LIFETIME count -- `world.kills`, which is
+     * fed from the one death door and survives a wave turning over.
+     */
+    {
+      const r = await page.evaluate(async () => {
+        const g = window.__sim;
+        const w = g.world;
+        g.restart();
+        g.debugTeachAll();
+        g.debugClearField();
+        w.phase = 'staging';
+        w.spawnLock = 1e9;
+        w.director.update = () => {};
+        const d = w.director;
+        d.resting = false; d.asked = 4; d.jobs.length = 0; d.slain = 0; d.made = 4;
+        g.syncHud ? g.syncHud() : null;
+        for (let f = 0; f < 3; f++) g.update(1 / 60);
+        const chip = document.getElementById('counter');
+        const text0 = chip.textContent.replace(/\s+/g, ' ').trim();
+        // Five deaths of the running wave: the count moves, and nothing else on
+        // the chip does.
+        for (let i = 0; i < 5; i++) g.registerKill({ wave: d.serial });
+        for (let f = 0; f < 3; f++) g.update(1 / 60);
+        const text1 = chip.textContent.replace(/\s+/g, ' ').trim();
+        const num = document.getElementById('killNum').textContent;
+        const pctEl = !!document.getElementById('wavePct');
+        // ...and it is the LIFETIME total, not the wave's: end the wave and the
+        // number does not go back.
+        const before = w.kills;
+        d.done = true; d.resting = true;
+        for (let f = 0; f < 3; f++) g.update(1 / 60);
+        const kept = document.getElementById('killNum').textContent;
+        g.restart();
+        return { text0, text1, num, pctEl, kills: before, kept,
+          cleared: typeof d.cleared === 'function' };
+      });
+
+      check('the OBJECTS chip carries the total destroyed and no per-wave figure',
+        r.pctEl === false && !/%/.test(r.text0) && !/%/.test(r.text1)
+        && r.num === String(r.kills) && r.kills === 5,
+        `chip reads "${r.text1}" after five deaths (the element that held the `
+        + `per-cent is ${r.pctEl ? 'STILL THERE' : 'gone'})`);
+
+      check('...and the number it keeps is the run-s, not the wave-s',
+        r.kept === String(r.kills) && r.cleared === true,
+        `${r.kept} still shown once the wave is scored and resting; `
+        + `Director.cleared ${r.cleared ? 'still exists for the rail and AUDIT' : 'IS GONE'}`);
     }
-    w.mines.length = 0;
 
-    // ---- and the colour the ALL-X rows wear --------------------------------
-    const toneOf = (key) => {
-      const n = NODES.find((x) => x.key === key);
-      return n ? n.tone : null;
-    };
-    const tones = {
-      minesAll: toneOf('mines_all'),
-      ammoAll: toneOf('ammo_all'),
-      abilitiesAll: toneOf('abilities_all'),
-      blast: toneOf('blast'),
-      minesRoot: toneOf('mines'),
-    };
-    // ...and that a card under one of them actually carries the mark, which is
-    // the half a tone cannot express.
-    const m2 = g.menu || window.__menu;
-    g.restart();
-    return { splinters: splinters.length, far, onSurface, wallR: wall.r,
-      wide, bell0, bell2, sat, above, bar: +bar.toFixed(0), lowest: +lowest.toFixed(0),
-      clearsBar: lowRaw >= bar,
-      highest: +highest.toFixed(0), floorY: +w.floorY.toFixed(0), tones,
-      hasMenu: !!m2 };
-  });
+    /*
+     * Asleep with the mine line -- see "no mine can be laid, and nothing
+     * offers one" for what holds while it is out of play.
+     */
+    if (MINE_LINE) {
+      /*
+       * ---- build 222: the TOW actually throws the thing it is carrying ----
+       *
+       * Measured at tier 9 against a bought damage line, five pairs released the way
+       * the director releases them: TWO OF FIVE THREW NOTHING. One head was dead at
+       * 7.2 seconds and 600 units out, having never begun to wind -- 135 health
+       * across an approach that took 18.7 to 27.0 seconds to close to the old
+       * 430-unit hurl range. Another wound for four seconds across two attempts and
+       * threw nothing, because gunfire kept shoving it a few units back out of range
+       * and `windUp` reset the hold to zero every time.
+       *
+       * Four things answer that and each has an arm here: the range, the shorter
+       * hold, the wind that bleeds instead of resetting, and the load coming off the
+       * cable when the head dies. Plus the plow, which is what makes a throw into a
+       * crowd a throw rather than a drop.
+       */
+      {
+        const r = await page.evaluate(async () => {
+          const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+          const g = window.__sim;
+          const w = g.world;
+          const H = TYPE_BY_ID.tow.hurl;
 
-  check('a SPINE-s splinters are born on the FAR side of what it went through',
-    r.splinters > 0 && r.far === r.splinters && r.onSurface === r.splinters,
-    `${r.far} of ${r.splinters} splinters were born past the body's centre, `
-    + `${r.onSurface} of them on its surface (r ${r.wallR}) -- at the contact `
-    + `point they would all have been on the near face`);
+          const fresh = () => {
+            g.restart();
+            g.debugTeachAll();
+            g.debugClearField();
+            w.phase = 'staging';
+            w.spawnLock = 1e9;
+            w.director.update = () => {};
+            w.autoAim = false;
+            w.autoFire = false;
+          };
+          // A real pair. `debugSpawn` makes the head alone -- CLAUDE.md's note, and
+          // a probe that builds one that way is measuring 135hp against the 415 the
+          // game sends.
+          const pair = () => {
+            g.debugSpawnGroup('tow', 1, { staged: false });
+            const head = w.enemies.find((e) => e.type.id === 'tow' && !e.dead);
+            const mass = w.enemies.find((e) => e.type.id === 'towMass' && !e.dead);
+            if (head) { head.staged = false; head.spawnIn = 0; }
+            if (mass) { mass.staged = false; mass.spawnIn = 0; }
+            return { head, mass };
+          };
 
-  /*
-   * BLAST 413 -> 306 -> 215 -> 156 and KNELL's last toll 726 -> 538 -> 378 ->
-   * 156, across builds 223, 227 and 229. The first two cuts were to one term
-   * apiece of a product of three -- base x toll growth x DEEP CHARGE -- and
-   * the complaint came back after both, because the other two terms were
-   * still multiplying. 229 takes the growth (see `spread` in config.js) and
-   * the node (1.35 -> 1.22 a level) as well.
-   *
-   * Stated against the screen, in screen widths, because that is the sentence
-   * the player wrote three times: "it takes up most of the screen".
-   */
-  check('no mine blast opens wider than half the screen it is drawn on',
-    r.wide.blast <= r.wide.blastCap && r.wide.knell <= r.wide.blastCap
-    && r.wide.fizzle <= r.wide.blastCap && r.wide.spall <= r.wide.blastCap
-    && r.wide.deepLevels === 2,
-    `fully bought, against a ceiling of ${r.wide.blastCap} (half of a `
-    + `${r.wide.screen}-unit screen): BLAST ${r.wide.blast.toFixed(0)}, `
-    + `KNELL's widest toll ${r.wide.knell.toFixed(0)}, SALTED's fizzle `
-    + `${r.wide.fizzle.toFixed(0)}, SPALL's pellet ${r.wide.spall.toFixed(0)}; `
-    + `DEEP CHARGE sells ${r.wide.deepLevels} levels`);
+          // ---- a head killed cold still lets go ---------------------------------
+          /*
+           * Killed through `destroy`, which is the door every death comes through,
+           * and killed COLD -- `wind` untouched at zero -- because that is the case
+           * the measurement found: not a head that nearly made it, a head that never
+           * started. The load must leave, and leave slower than a completed wind.
+           */
+          fresh();
+          const cold = pair();
+          let coldOut = null;
+          if (cold.head && cold.mass) {
+            cold.head.destroy(w);
+            g.update(1 / 60);
+            coldOut = {
+              hurled: !!cold.mass.hurled,
+              v: +Math.hypot(cold.mass.vx, cold.mass.vy).toFixed(0),
+              tether: !!cold.mass.tether,
+            };
+          }
 
-  /*
-   * The looser tier, and the reason for two of them: a blast is over in a
-   * quarter second and is read from its EDGE, so the edge has to be on the
-   * screen with room. A standing reach is drawn for as long as it lasts and is
-   * read from its CONTENTS -- bodies hauled into the knot, ground burning --
-   * so it only has to fit. None of the three has been touched since build 223.
-   */
-  check('...and no standing reach opens wider than two thirds of it',
-    r.wide.snare <= r.wide.holdCap && r.wide.lode <= r.wide.holdCap
-    && r.wide.thorn <= r.wide.holdCap,
-    `against a ceiling of ${r.wide.holdCap}: SNARE ${r.wide.snare.toFixed(0)}, `
-    + `LODE ${r.wide.lode.toFixed(0)}, THORN's ground ${r.wide.thorn.toFixed(0)}`);
+          // ---- ...and one that finished its wind throws harder -------------------
+          fresh();
+          const hot = pair();
+          let hotOut = null;
+          if (hot.head && hot.mass) {
+            hot.head.wind = H.wind;
+            hot.head.destroy(w);
+            g.update(1 / 60);
+            hotOut = { hurled: !!hot.mass.hurled,
+              v: +Math.hypot(hot.mass.vx, hot.mass.vy).toFixed(0) };
+          }
 
-  /*
-   * The mechanism, watched rather than read: every Shock a KNELL pushes over
-   * its own life, with FOURTH BELL unowned and fully bought. Two tolls become
-   * four and the ladder fills IN -- same first ring, same last ring, two more
-   * between them. Under `1 + i * grow` the last ring went 1.5 bases to 2.5,
-   * which is how a node reading "+1 toll" came to be the largest radius
-   * upgrade in the game and why two cuts to the base did not hold.
-   */
-  const near = (a, b) => Math.abs(a - b) < 0.5;
-  const b0 = r.bell0 || {}, b2 = r.bell2 || {};
-  check('FOURTH BELL fills the toll ladder in rather than extending past it',
-    b0.rings && b2.rings && b0.rings.length === 2 && b2.rings.length === 4
-    && near(b0.rings[0], b2.rings[0])
-    && near(b0.rings[b0.rings.length - 1], b2.rings[b2.rings.length - 1])
-    && b2.rings.every((v, i) => i === 0 || v > b2.rings[i - 1]),
-    `unbought ${JSON.stringify(b0.rings)}, fully bought `
-    + `${JSON.stringify(b2.rings)} -- same ends, and every ring wider than the `
-    + `one before it`);
+          // ---- the wind bleeds when it is shoved out of range, not resets --------
+          /*
+           * Driven through `windUp` with the head parked outside the range, because
+           * that is exactly what gunfire does to it -- and the whole failure was
+           * that one shove past the line cost the entire hold.
+           */
+          fresh();
+          const shoved = pair();
+          let bleed = null;
+          if (shoved.head) {
+            const s = w.shooter;
+            shoved.head.x = s.x;
+            shoved.head.y = s.y - (H.range * 0.5);
+            // Inside: it winds.
+            for (let f = 0; f < 24; f++) shoved.head.windUp(w, 1 / 60);
+            const inside = +(shoved.head.wind || 0).toFixed(3);
+            // Outside: half a second of it.
+            shoved.head.y = s.y - (H.range + 200);
+            for (let f = 0; f < 30; f++) shoved.head.windUp(w, 1 / 60);
+            bleed = { inside, outside: +(shoved.head.wind || 0).toFixed(3) };
+          }
 
-  /*
-   * ...and the same in TIME, which is the half that mattered. `gap` was a
-   * fixed 1.15s, so a knell ended itself 2.85 seconds after it was thrown --
-   * see the case below. The span is what is fixed now: the first and last
-   * tolls land at the same moments however many there are, and FOURTH BELL
-   * makes the bell ring more OFTEN rather than for longer.
-   */
-  const spanOf = (b) => (b.at && b.at.length > 1 ? b.at[b.at.length - 1] - b.at[0] : 0);
-  check('...and in time as well, so a bought knell rings more often, not longer',
-    Math.abs(spanOf(b0) - spanOf(b2)) < 0.3 && spanOf(b0) > 6
-    && near(b0.at[0], b2.at[0]),
-    `unbought at ${JSON.stringify(b0.at)}s, fully bought at `
-    + `${JSON.stringify(b2.at)}s -- a span of ${spanOf(b0).toFixed(1)}s against `
-    + `${spanOf(b2).toFixed(1)}s`);
+          // ---- the load crosses a crowd ------------------------------------------
+          /*
+           * The same trial twice, plow off and plow on, with a wall of nine bodies
+           * between the load and the turret. Everything is healed each frame so the
+           * question is only ever "did it get there", never "did it kill its way
+           * there"; and the empty-field arm is the control that shows the plow
+           * changes NOTHING when there is nothing to plow -- without it the case
+           * could pass on a load that had simply been made faster.
+           */
+          const cross = (crowd, plow) => {
+            fresh();
+            const s = w.shooter;
+            const blockers = [];
+            for (let i = 0; i < crowd; i++) {
+              const e = g.debugSpawn(['lurcher', 'splitter', 'bulwark', 'prism', 'glut'][i % 5],
+                s.x - 60 + (i % 3) * 60, s.y - 150 - ((i / 3) | 0) * 55);
+              if (e) { e.staged = false; e.spawnIn = 0; e.hp = 1e9; e.maxHp = 1e9; blockers.push(e); }
+            }
+            const m = g.debugSpawn('towMass', s.x, s.y - 420);
+            if (!m) return null;
+            m.staged = false; m.spawnIn = 0; m.hp = 1e9; m.maxHp = 1e9;
+            m.vx = 0; m.vy = H.speed; m.thrown = 2.2;
+            m.plow = plow ? 2.2 : 0;
+            let t = 0, closest = 1e9;
+            while (t < 3 && !m.dead) {
+              for (const b of blockers) b.hp = 1e9;
+              m.hp = 1e9;
+              g.update(1 / 60); t += 1 / 60;
+              closest = Math.min(closest, Math.hypot(m.x - s.x, m.y - s.y));
+            }
+            return { closest: +closest.toFixed(0), stopped: m.y < s.y - 200 };
+          };
+          const clearOff = cross(0, false);
+          const clearOn = cross(0, true);
+          const jamOff = cross(9, false);
+          const jamOn = cross(9, true);
 
-  /*
-   * The rule the knell was breaking, and the one that would have caught it in
-   * one line: a mine laid on empty ground and never touched is a promise that
-   * it will be there when something arrives.
-   *
-   * Seven of the eight sat for the whole of `CFG.mines.life`. A KNELL ends
-   * itself on its LAST toll, and the tolls were 1.15 seconds apart -- so it
-   * was gone 2.85 seconds after being thrown, against 15.9 for every other
-   * kind and a throw clock of 15 seconds. A knell player had a live mine 19%
-   * of the time, and it spent that 19% in the window before a wave had
-   * reached the ground it was there to deny: measured on a lane bodies
-   * actually walk down, it delivered ZERO. The player's report was "KNELL
-   * does not do damage" and the mine's own docstring said it "denies the
-   * ground whether anything is there or not".
-   *
-   * Two thirds rather than the whole of it, because a knell legitimately ends
-   * on its last toll and that is inside the life by design.
-   */
-  const sat = r.sat || {};
-  const kinds = ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'];
-  const short = kinds.filter((k) => !(sat[k] >= sat.life * 0.66));
-  check('a mine nothing touches is still there when something arrives',
-    short.length === 0 && sat.knell > 10,
-    `on an empty field, against a ${sat.life}s life: `
-    + kinds.map((k) => `${k} ${sat[k]}s`).join(', ')
-    + (short.length ? ` -- ${short.join(', ')} gone inside two thirds of it` : ''));
+          // ---- ...and it does not cross the TURRET -------------------------------
+          /*
+           * The one thing the plow must never do. The turret and the DECOY are
+           * static -- invMass 0 -- and `resolvePair` only plows against a body with
+           * mass of its own, so both stop it dead. Measured as "it is still on the
+           * near side of the thing it was thrown at" a full second after arriving.
+           */
+          fresh();
+          const s2 = w.shooter;
+          const through = g.debugSpawn('towMass', s2.x, s2.y - 300);
+          let past = null;
+          if (through) {
+            through.staged = false; through.spawnIn = 0; through.hp = 1e9; through.maxHp = 1e9;
+            through.vx = 0; through.vy = H.speed; through.thrown = 2.2; through.plow = 2.2;
+            let deepest = -1e9;
+            for (let f = 0; f < 120; f++) {
+              through.hp = 1e9;
+              g.update(1 / 60);
+              deepest = Math.max(deepest, through.y - s2.y);
+            }
+            past = +deepest.toFixed(0);
+          }
 
-  check('...and REPULSOR still throws as hard through the smaller circle',
-    Math.abs(r.wide.lodePush - 1.96) < 0.01,
-    `lode push x${r.wide.lodePush.toFixed(2)} with both levels, unchanged, `
-    + `against a reach of ${r.wide.lode.toFixed(0)} rather than 184`);
+          g.restart();
+          return { coldOut, hotOut, bleed, clearOff, clearOn, jamOff, jamOn, past,
+            H: { range: H.range, wind: H.wind, speed: H.speed, partial: H.partial,
+              holdWind: H.holdWind } };
+        });
 
-  check('a mine is never laid in the top fifth of the field',
-    r.above === 0 && r.clearsBar && r.highest > r.bar
-    && r.highest - r.lowest > 60,
-    `200 sites, ${r.above} of them above the ${r.bar}-unit line `
-    + `(a fifth of a ${r.floorY}-unit field); they ran ${r.bar} to `
-    + `${r.highest}`);
+        check('a TOW killed before it can wind still lets go of its load',
+          r.coldOut && r.coldOut.hurled === true && r.coldOut.tether === false
+          && r.coldOut.v > r.H.speed * r.H.partial * 0.8,
+          `a head destroyed with the wind at zero threw its MASS at ${r.coldOut && r.coldOut.v} `
+          + `u/s (two pairs in five used to throw nothing at all)`);
 
-  /*
-   * dE in CIELAB, which is the only way to say "these are the same colour"
-   * about two hex strings. 25 is the floor the ability-bar case already uses.
-   * ALL MINES against BLAST measured 0.6 before this build -- #ffb347 against
-   * #ffb247, one unit of green apart.
-   */
-  const dE = (a, b) => {
-    const lab = (h) => {
-      const v = [1, 3, 5].map((i) => parseInt(h.substr(i, 2), 16) / 255)
-        .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
-      const [rr, gg, bb] = v;
-      const X = rr * 0.4124 + gg * 0.3576 + bb * 0.1805;
-      const Y = rr * 0.2126 + gg * 0.7152 + bb * 0.0722;
-      const Z = rr * 0.0193 + gg * 0.1192 + bb * 0.9505;
-      const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-      const fx = f(X / 0.95047), fy = f(Y), fz = f(Z / 1.08883);
-      return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
-    };
-    const p = lab(a), q = lab(b);
-    return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
-  };
-  const gap = r.tones.minesAll && r.tones.blast ? dE(r.tones.minesAll, r.tones.blast) : 0;
-  check('ALL MINES is not the colour of the first mine in the branch',
-    gap > 25,
-    `ALL MINES ${r.tones.minesAll} against BLAST ${r.tones.blast}: dE `
-    + `${gap.toFixed(1)} (it was #ffb347 against #ffb247, dE 0.6)`);
+        check('...and a completed wind is still worth more than an interrupted one',
+          r.hotOut && r.coldOut && r.hotOut.v > r.coldOut.v * 1.3,
+          `${r.coldOut && r.coldOut.v} u/s cold against ${r.hotOut && r.hotOut.v} u/s `
+          + `off a full wind, so killing the head early still buys the slower load`);
 
-  check('...and the three ALL-X headings share one register, which no arm uses',
-    r.tones.minesAll && r.tones.minesAll === r.tones.ammoAll
-    && r.tones.minesAll === r.tones.abilitiesAll
-    && r.tones.minesAll !== r.tones.minesRoot,
-    `ALL ROUNDS ${r.tones.ammoAll}, ALL MINES ${r.tones.minesAll}, `
-    + `ALL ABILITIES ${r.tones.abilitiesAll}; the MINES heading itself is `
-    + `still ${r.tones.minesRoot}`);
+        check('...and a shove out of range costs the wind ground, not the attempt',
+          r.bleed && r.bleed.inside > 0.3 && r.bleed.outside > 0
+          && r.bleed.outside < r.bleed.inside,
+          `0.4s inside the range wound to ${r.bleed && r.bleed.inside}; half a second `
+          + `outside it left ${r.bleed && r.bleed.outside} (it used to leave nothing)`);
+
+        check('a hurled MASS crosses a crowd it would otherwise have stopped in',
+          r.jamOn && r.jamOff && r.clearOn && r.clearOff
+          && r.jamOff.closest > r.clearOff.closest + 40
+          && r.jamOn.closest < r.clearOn.closest + 12,
+          `nine bodies in the way: it got to ${r.jamOff && r.jamOff.closest} units of the `
+          + `turret without the plow and ${r.jamOn && r.jamOn.closest} with it, against `
+          + `${r.clearOn && r.clearOn.closest} across an empty field`);
+
+        check('...and the plow does nothing at all when there is nothing to plow',
+          r.clearOn && r.clearOff && Math.abs(r.clearOn.closest - r.clearOff.closest) <= 4,
+          `empty field: ${r.clearOff && r.clearOff.closest} units without it, `
+          + `${r.clearOn && r.clearOn.closest} with it`);
+
+        check('...and it never plows through the turret, which is what it is thrown at',
+          r.past !== null && r.past < 0,
+          `two seconds after arriving it is ${r.past} units past the turret centre `
+          + `(a static body has no inverse mass, so resolvePair refuses to plow it)`);
+      }
+
+      /*
+       * Asleep with the mine line -- see "no mine can be laid, and nothing
+       * offers one" for what holds while it is out of play.
+       */
+      if (MINE_LINE) {
+        /*
+         * ---- build 223: the four things this build changed ----
+         *
+         * SPINE's splinters come out the FAR side; the four widest mines are a fifth
+         * narrower; a mine is never laid in the top fifth of the field; and the ALL-X
+         * rows no longer wear the colour of the first arm in their branch.
+         */
+        {
+          const r = await page.evaluate(async () => {
+            const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+            const { NODES } = await import('../src/tree.js');
+            const { freshUpgrades } = await import('../src/upgrades.js');
+            const { throwMine } = await import('../src/mines.js');
+            const g = window.__sim;
+            const w = g.world;
+            const s = w.shooter;
+            const S = CFG.rounds.spine;
+
+            // ---- the splinters come out the FAR side -------------------------------
+            /*
+             * The whole point of the change, and the one thing that cannot be inferred
+             * from a projectile count: a fan spawned at the CONTACT point opens
+             * backwards across ground the round has already crossed and covers nothing
+             * new. The contact point is the near face -- `contactAt` puts it at
+             * `e.x + nx * e.r` -- so "did it come out the other side" is measured as
+             * where each splinter was BORN relative to the body's centre, along the
+             * dart's own travel. Fired straight up, so the far side is up-field: a
+             * splinter born past the centre has a smaller y than the body has.
+             */
+            g.restart();
+            g.debugTeachAll();
+            g.debugClearField();
+            w.phase = 'staging';
+            w.spawnLock = 1e9;
+            w.director.update = () => {};
+            w.up = freshUpgrades();
+            w.round = 'spine';
+            w.projectiles.length = 0;
+            const wall = g.debugSpawn('bulwark', s.x, s.y - 260);
+            wall.staged = false; wall.spawnIn = 0; wall.hp = 1e7; wall.maxHp = 1e7;
+            wall.invMass = 0;
+            s.aim = -Math.PI / 2; s.targetAim = s.aim;
+            const born = [];
+            const push0 = w.projectiles.push.bind(w.projectiles);
+            w.projectiles.push = (...ps) => {
+              for (const q of ps) born.push({ x: q.x, y: q.y, r: q.r });
+              return push0(...ps);
+            };
+            s.shoot(w);
+            for (let f = 0; f < 30; f++) {
+              wall.x = s.x; wall.y = s.y - 260; wall.vx = 0; wall.vy = 0;
+              g.update(1 / 60);
+            }
+            w.projectiles.push = push0;
+            // The dart is the first thing pushed and is born at the muzzle; every
+            // later one is a splinter.
+            const splinters = born.slice(1);
+            const far = splinters.filter((q) => q.y < wall.y).length;
+            const onSurface = splinters.filter(
+              (q) => Math.abs(Math.hypot(q.x - wall.x, q.y - wall.y) - wall.r) < 3).length;
+
+            // ---- how much of the screen a mine may take ----------------------------
+            /*
+             * Every mine's MAXIMUM, with the whole tree owned, against the SCREEN it
+             * is drawn on rather than against a constant -- `innerWidth / CFG.zoom` is
+             * the field the player can actually see, and it is the only honest
+             * denominator for "it takes up most of the screen".
+             *
+             * The previous version of this case was four hand-typed ceilings, each set
+             * to whatever that build's value happened to be, under a comment saying
+             * "the field is about 630 units across, so a radius over 315 is a circle
+             * wider than the screen. Every one of these is now inside that" -- while
+             * asserting `knell < 400`, which is 120% of it. The rule and the number
+             * had come apart, so the case went green through the exact complaint it
+             * was written for, twice. It states the rule now and computes the numbers.
+             *
+             * Two tiers, and the split is what the eye does with each:
+             *   a BLAST is over in a quarter second and is read from its EDGE, so the
+             *   edge has to be on the screen with room -- half the width.
+             *   a standing reach is drawn continuously and is read from its CONTENTS
+             *   (bodies dragged in, ground burning), so it only has to fit -- two
+             *   thirds.
+             */
+            g.restart();
+            g.debugTeachAll();
+            g.debugGiveBytes(400000000);
+            for (let pass = 0; pass < 4; pass++) for (const n of NODES) if (n.id) g.buy(n.id);
+            const up = w.up;
+            const K = CFG.knell;
+            const screen = window.innerWidth / CFG.zoom;   // world units across the display
+            const wide = {
+              screen: +screen.toFixed(0),
+              blastCap: +(screen * 0.25).toFixed(1),       // half the width, as a radius
+              holdCap: +(screen / 3).toFixed(1),           // two thirds, as a radius
+              blast: CFG.mines.blast.r * up.mineBlast,
+              fizzle: CFG.mines.fizzle.r * up.mineBlast,
+              knell: K.blast.r * K.spread * up.mineBlast,
+              spall: CFG.spall.burst.r * up.spallBurst,
+              lode: CFG.lode.reach * up.lodeReach,
+              snare: CFG.snare.reach,
+              thorn: CFG.thorn.patch.r * up.patchR,
+              lodePush: up.lodePush,
+              deepLevels: (NODES.find((n) => n.id === 'deepcharge') || {}).levels,
+            };
+
+            /*
+             * ...and what a KNELL actually draws, walked through a real mine rather
+             * than read off the expression above. FOURTH BELL used to put its two
+             * extra tolls PAST the end of the ladder, so the node that reads "+1 toll"
+             * was also the largest radius upgrade in the game; the widest ring must
+             * now be the same whether it is owned or not.
+             */
+            const tollRings = (bell) => {
+              g.restart();
+              g.debugClearField();
+              w.up = freshUpgrades();
+              w.up.mineTolls = bell;
+              w.mines.length = 0;
+              w.effects.length = 0;
+              throwMine(w, 'knell');
+              const m = w.mines[w.mines.length - 1];
+              if (!m) return null;
+              /*
+               * By identity, not by index. `effects` is compacted as things die, so a
+               * new Shock can land BELOW the mark a previous frame left -- the first
+               * version of this walked `effects.length` forward and saw one toll of
+               * two.
+               */
+              const seen = [];
+              const at = [];
+              const had = new Set();
+              let f = 0;
+              for (; f < 60 * 30; f++) {
+                if (m && !m.dead) { m.x = w.shooter.x; m.y = w.shooter.y - 200; }
+                g.update(1 / 60);
+                for (const e of w.effects) {
+                  if (!e || !e.constructor || e.constructor.name !== 'Shock') continue;
+                  if (had.has(e)) continue;
+                  had.add(e);
+                  seen.push(+e.r.toFixed(1));
+                  at.push(+(f / 60).toFixed(2));
+                }
+                if (m.dead) break;
+              }
+              return { rings: seen, at, gone: +(f / 60).toFixed(2) };
+            };
+            const bell0 = tollRings(0);
+            const bell2 = tollRings(2);
+
+            /*
+             * ...and the rule the knell was breaking, asked of all eight: lay one on
+             * an empty field, touch nothing, and see how long it stays. Seven of them
+             * sat for their whole `life`; a knell was GONE in 2.85 seconds of fifteen,
+             * because it ends itself on its last toll and the tolls were 1.15s apart.
+             */
+            const sitFor = (kind) => {
+              g.restart();
+              g.debugClearField();
+              w.phase = 'staging';
+              w.spawnLock = 1e9;
+              w.director.update = () => {};
+              w.up = freshUpgrades();
+              w.mines.length = 0;
+              throwMine(w, kind);
+              const m = w.mines[w.mines.length - 1];
+              if (!m) return null;
+              for (let f = 0; f < 60 * 30; f++) {
+                g.update(1 / 60);
+                if (!w.mines.includes(m)) return +(f / 60).toFixed(2);
+              }
+              return 30;
+            };
+            const sat = {};
+            for (const k of ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void']) {
+              sat[k] = sitFor(k);
+            }
+            sat.life = CFG.mines.life;
+
+            g.restart();
+            w.up = freshUpgrades();
+
+            // ---- and where a mine may be laid --------------------------------------
+            /*
+             * Two hundred sites, because the site is a `rand` and one draw proves
+             * nothing. Asserted against the FIELD's depth rather than a constant --
+             * the buffer is a fraction so that it stays a fifth on every screen -- and
+             * the spread is asserted too, or a broken site that always returned the
+             * same point would pass the first arm on its own.
+             */
+            g.restart();
+            g.debugTeachAll();
+            g.debugClearField();
+            w.phase = 'staging';
+            w.spawnLock = 1e9;
+            w.director.update = () => {};
+            const deep = w.floorY;
+            const bar = deep * CFG.mines.keepTop;
+            let above = 0, lowest = 1e9, highest = -1e9, lowRaw = 1e9;
+            for (let i = 0; i < 200; i++) {
+              w.mines.length = 0;
+              throwMine(w, 'blast');
+              const m = w.mines[w.mines.length - 1];
+              if (!m) continue;
+              // `y1` is the landing site; `y`/`y0` is the muzzle it was lobbed from.
+              if (m.y1 < bar) above++;
+              lowest = Math.min(lowest, m.y1);
+              highest = Math.max(highest, m.y1);
+              // Raw, because the assertion below is an inequality against `bar` and
+              // both sides were being rounded before it: a site at 241.4 and a bar at
+              // 241.2 both read 241, and "no lower than the bar" failed on a rounding
+              // rather than on a mine.
+              lowRaw = Math.min(lowRaw, m.y1);
+            }
+            w.mines.length = 0;
+
+            // ---- and the colour the ALL-X rows wear --------------------------------
+            const toneOf = (key) => {
+              const n = NODES.find((x) => x.key === key);
+              return n ? n.tone : null;
+            };
+            const tones = {
+              minesAll: toneOf('mines_all'),
+              ammoAll: toneOf('ammo_all'),
+              abilitiesAll: toneOf('abilities_all'),
+              blast: toneOf('blast'),
+              minesRoot: toneOf('mines'),
+            };
+            // ...and that a card under one of them actually carries the mark, which is
+            // the half a tone cannot express.
+            const m2 = g.menu || window.__menu;
+            g.restart();
+            return { splinters: splinters.length, far, onSurface, wallR: wall.r,
+              wide, bell0, bell2, sat, above, bar: +bar.toFixed(0), lowest: +lowest.toFixed(0),
+              clearsBar: lowRaw >= bar,
+              highest: +highest.toFixed(0), floorY: +w.floorY.toFixed(0), tones,
+              hasMenu: !!m2 };
+          });
+
+          check('a SPINE-s splinters are born on the FAR side of what it went through',
+            r.splinters > 0 && r.far === r.splinters && r.onSurface === r.splinters,
+            `${r.far} of ${r.splinters} splinters were born past the body's centre, `
+            + `${r.onSurface} of them on its surface (r ${r.wallR}) -- at the contact `
+            + `point they would all have been on the near face`);
+
+          /*
+           * BLAST 413 -> 306 -> 215 -> 156 and KNELL's last toll 726 -> 538 -> 378 ->
+           * 156, across builds 223, 227 and 229. The first two cuts were to one term
+           * apiece of a product of three -- base x toll growth x DEEP CHARGE -- and
+           * the complaint came back after both, because the other two terms were
+           * still multiplying. 229 takes the growth (see `spread` in config.js) and
+           * the node (1.35 -> 1.22 a level) as well.
+           *
+           * Stated against the screen, in screen widths, because that is the sentence
+           * the player wrote three times: "it takes up most of the screen".
+           */
+          check('no mine blast opens wider than half the screen it is drawn on',
+            r.wide.blast <= r.wide.blastCap && r.wide.knell <= r.wide.blastCap
+            && r.wide.fizzle <= r.wide.blastCap && r.wide.spall <= r.wide.blastCap
+            && r.wide.deepLevels === 2,
+            `fully bought, against a ceiling of ${r.wide.blastCap} (half of a `
+            + `${r.wide.screen}-unit screen): BLAST ${r.wide.blast.toFixed(0)}, `
+            + `KNELL's widest toll ${r.wide.knell.toFixed(0)}, SALTED's fizzle `
+            + `${r.wide.fizzle.toFixed(0)}, SPALL's pellet ${r.wide.spall.toFixed(0)}; `
+            + `DEEP CHARGE sells ${r.wide.deepLevels} levels`);
+
+          /*
+           * The looser tier, and the reason for two of them: a blast is over in a
+           * quarter second and is read from its EDGE, so the edge has to be on the
+           * screen with room. A standing reach is drawn for as long as it lasts and is
+           * read from its CONTENTS -- bodies hauled into the knot, ground burning --
+           * so it only has to fit. None of the three has been touched since build 223.
+           */
+          check('...and no standing reach opens wider than two thirds of it',
+            r.wide.snare <= r.wide.holdCap && r.wide.lode <= r.wide.holdCap
+            && r.wide.thorn <= r.wide.holdCap,
+            `against a ceiling of ${r.wide.holdCap}: SNARE ${r.wide.snare.toFixed(0)}, `
+            + `LODE ${r.wide.lode.toFixed(0)}, THORN's ground ${r.wide.thorn.toFixed(0)}`);
+
+          /*
+           * The mechanism, watched rather than read: every Shock a KNELL pushes over
+           * its own life, with FOURTH BELL unowned and fully bought. Two tolls become
+           * four and the ladder fills IN -- same first ring, same last ring, two more
+           * between them. Under `1 + i * grow` the last ring went 1.5 bases to 2.5,
+           * which is how a node reading "+1 toll" came to be the largest radius
+           * upgrade in the game and why two cuts to the base did not hold.
+           */
+          const near = (a, b) => Math.abs(a - b) < 0.5;
+          const b0 = r.bell0 || {}, b2 = r.bell2 || {};
+          check('FOURTH BELL fills the toll ladder in rather than extending past it',
+            b0.rings && b2.rings && b0.rings.length === 2 && b2.rings.length === 4
+            && near(b0.rings[0], b2.rings[0])
+            && near(b0.rings[b0.rings.length - 1], b2.rings[b2.rings.length - 1])
+            && b2.rings.every((v, i) => i === 0 || v > b2.rings[i - 1]),
+            `unbought ${JSON.stringify(b0.rings)}, fully bought `
+            + `${JSON.stringify(b2.rings)} -- same ends, and every ring wider than the `
+            + `one before it`);
+
+          /*
+           * ...and the same in TIME, which is the half that mattered. `gap` was a
+           * fixed 1.15s, so a knell ended itself 2.85 seconds after it was thrown --
+           * see the case below. The span is what is fixed now: the first and last
+           * tolls land at the same moments however many there are, and FOURTH BELL
+           * makes the bell ring more OFTEN rather than for longer.
+           */
+          const spanOf = (b) => (b.at && b.at.length > 1 ? b.at[b.at.length - 1] - b.at[0] : 0);
+          check('...and in time as well, so a bought knell rings more often, not longer',
+            Math.abs(spanOf(b0) - spanOf(b2)) < 0.3 && spanOf(b0) > 6
+            && near(b0.at[0], b2.at[0]),
+            `unbought at ${JSON.stringify(b0.at)}s, fully bought at `
+            + `${JSON.stringify(b2.at)}s -- a span of ${spanOf(b0).toFixed(1)}s against `
+            + `${spanOf(b2).toFixed(1)}s`);
+
+          /*
+           * The rule the knell was breaking, and the one that would have caught it in
+           * one line: a mine laid on empty ground and never touched is a promise that
+           * it will be there when something arrives.
+           *
+           * Seven of the eight sat for the whole of `CFG.mines.life`. A KNELL ends
+           * itself on its LAST toll, and the tolls were 1.15 seconds apart -- so it
+           * was gone 2.85 seconds after being thrown, against 15.9 for every other
+           * kind and a throw clock of 15 seconds. A knell player had a live mine 19%
+           * of the time, and it spent that 19% in the window before a wave had
+           * reached the ground it was there to deny: measured on a lane bodies
+           * actually walk down, it delivered ZERO. The player's report was "KNELL
+           * does not do damage" and the mine's own docstring said it "denies the
+           * ground whether anything is there or not".
+           *
+           * Two thirds rather than the whole of it, because a knell legitimately ends
+           * on its last toll and that is inside the life by design.
+           */
+          const sat = r.sat || {};
+          const kinds = ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'];
+          const short = kinds.filter((k) => !(sat[k] >= sat.life * 0.66));
+          check('a mine nothing touches is still there when something arrives',
+            short.length === 0 && sat.knell > 10,
+            `on an empty field, against a ${sat.life}s life: `
+            + kinds.map((k) => `${k} ${sat[k]}s`).join(', ')
+            + (short.length ? ` -- ${short.join(', ')} gone inside two thirds of it` : ''));
+
+          check('...and REPULSOR still throws as hard through the smaller circle',
+            Math.abs(r.wide.lodePush - 1.96) < 0.01,
+            `lode push x${r.wide.lodePush.toFixed(2)} with both levels, unchanged, `
+            + `against a reach of ${r.wide.lode.toFixed(0)} rather than 184`);
+
+          check('a mine is never laid in the top fifth of the field',
+            r.above === 0 && r.clearsBar && r.highest > r.bar
+            && r.highest - r.lowest > 60,
+            `200 sites, ${r.above} of them above the ${r.bar}-unit line `
+            + `(a fifth of a ${r.floorY}-unit field); they ran ${r.bar} to `
+            + `${r.highest}`);
+
+          /*
+           * dE in CIELAB, which is the only way to say "these are the same colour"
+           * about two hex strings. 25 is the floor the ability-bar case already uses.
+           * ALL MINES against BLAST measured 0.6 before this build -- #ffb347 against
+           * #ffb247, one unit of green apart.
+           */
+          const dE = (a, b) => {
+            const lab = (h) => {
+              const v = [1, 3, 5].map((i) => parseInt(h.substr(i, 2), 16) / 255)
+                .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+              const [rr, gg, bb] = v;
+              const X = rr * 0.4124 + gg * 0.3576 + bb * 0.1805;
+              const Y = rr * 0.2126 + gg * 0.7152 + bb * 0.0722;
+              const Z = rr * 0.0193 + gg * 0.1192 + bb * 0.9505;
+              const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+              const fx = f(X / 0.95047), fy = f(Y), fz = f(Z / 1.08883);
+              return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+            };
+            const p = lab(a), q = lab(b);
+            return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+          };
+          const gap = r.tones.minesAll && r.tones.blast ? dE(r.tones.minesAll, r.tones.blast) : 0;
+          check('ALL MINES is not the colour of the first mine in the branch',
+            gap > 25,
+            `ALL MINES ${r.tones.minesAll} against BLAST ${r.tones.blast}: dE `
+            + `${gap.toFixed(1)} (it was #ffb347 against #ffb247, dE 0.6)`);
+
+          check('...and the three ALL-X headings share one register, which no arm uses',
+            r.tones.minesAll && r.tones.minesAll === r.tones.ammoAll
+            && r.tones.minesAll === r.tones.abilitiesAll
+            && r.tones.minesAll !== r.tones.minesRoot,
+            `ALL ROUNDS ${r.tones.ammoAll}, ALL MINES ${r.tones.minesAll}, `
+            + `ALL ABILITIES ${r.tones.abilitiesAll}; the MINES heading itself is `
+            + `still ${r.tones.minesRoot}`);
+        }
+      }
+    }
+  }
 }
 
 /*
@@ -16874,8 +17187,11 @@ if (!GUN_LINE) {
    * Build 275's FLINCH and DEADBOLT are one level each for the same reason,
    * and make it 112 across 58.
    */
+  // 112 across 58 with the mine line in play; 85 across 45 without it, the
+  // difference being the twenty-one mine nodes and their twenty-seven levels.
   check('...and writing the numbers out changed no ladder',
-    r.total === 112 && r.rungs === 58 && r.repeats === 0,
+    r.total === (MINE_LINE ? 112 : 85) && r.rungs === (MINE_LINE ? 58 : 45)
+    && r.repeats === 0,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
     + `now written out, which has to be a refactor and nothing else)`);
@@ -16892,6 +17208,7 @@ if (!GUN_LINE) {
  */
 {
   const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
     const g = window.__sim;
     const m = g.hud.menu;
     const w = g.world;
@@ -16917,11 +17234,18 @@ if (!GUN_LINE) {
     tap(document.getElementById('cfgAmmo'));
     out.ammoBtn = state();
     m.setOpen(false);
-    tap(document.getElementById('cfgMines'));
-    out.minesBtn = state();
+    // ...and the MINES button, while there is one. It is not built when the
+    // mine line is out of play, and its tab is not in the sheet either.
+    if (CFG.mines.inPlay) {
+      tap(document.getElementById('cfgMines'));
+      out.minesBtn = state();
+    }
 
     // ---- the switch in the header, and it remembers the tab ----
-    m.openTab('mines');
+    // Any ARSENAL tab that is not the first will do; it was MINES, which went
+    // out of play in build 290. What is asserted is that coming back lands on
+    // the tab you left rather than on the group's first.
+    m.openTab(CFG.mines.inPlay ? 'mines' : 'tree');
     tap(document.querySelector('.menuGroup[data-group="system"]'));
     const toSystem = state();
     tap(document.querySelector('.menuGroup[data-group="arsenal"]'));
@@ -17048,11 +17372,12 @@ if (!GUN_LINE) {
   check('the hamburger opens SYSTEM, and the three field doors open ARSENAL',
     r.hamburger.open && r.hamburger.group === 'system' && r.hamburger.tab === 'codex'
     && r.energy.open && r.energy.tab === 'tree' && r.energy.group === 'arsenal'
-    && r.ammoBtn.tab === 'ammo' && r.minesBtn.tab === 'mines'
-    && r.ammoBtn.loadout === 'ammo' && r.minesBtn.loadout === 'mines'
+    && r.ammoBtn.tab === 'ammo' && r.ammoBtn.loadout === 'ammo'
+    && (!MINE_LINE || (r.minesBtn.tab === 'mines' && r.minesBtn.loadout === 'mines'))
     && r.hamburger.paused && r.ammoBtn.paused,
     `hamburger -> ${r.hamburger.group}/${r.hamburger.tab}, energy -> ${r.energy.tab}, `
-    + `AMMO -> ${r.ammoBtn.tab}, MINES -> ${r.minesBtn.tab}; the world holds under all of them`);
+    + `AMMO -> ${r.ammoBtn.tab}, MINES -> ${r.minesBtn && r.minesBtn.tab}; `
+    + 'the world holds under all of them');
 
   /*
    * SYSTEM's row follows `CFG.gun.inPlay`: TURRETS went in at build 261 and
@@ -17066,14 +17391,19 @@ if (!GUN_LINE) {
     : '["codex","sandbox","system"]';
   check('...and only the open menu-s tabs are in the row',
     JSON.stringify(r.hamburger.tabsShown) === SYSTEM_TABS
-    && JSON.stringify(r.energy.tabsShown) === '["ammo","mines","tree","ultimate"]',
+    && JSON.stringify(r.energy.tabsShown) === (MINE_LINE
+      ? '["ammo","mines","tree","ultimate"]' : '["ammo","tree","ultimate"]'),
     `SYSTEM shows ${r.hamburger.tabsShown.join('/')} (wanted ${SYSTEM_TABS}), `
     + `ARSENAL shows ${r.energy.tabsShown.join('/')}`);
 
+  // The tab it was left on, which is MINES while that line is in play and
+  // UPGRADES otherwise -- either way it is NOT the group's first tab, which
+  // is the whole claim.
+  const LEFT_ON = MINE_LINE ? 'mines' : 'tree';
   check('the switch in the header crosses menus and remembers where you were',
-    r.switch.toSystem.group === 'system' && r.switch.back.tab === 'mines',
-    `MINES -> SYSTEM lands on ${r.switch.toSystem.tab}; back to ARSENAL lands on `
-    + `${r.switch.back.tab} (not the first tab)`);
+    r.switch.toSystem.group === 'system' && r.switch.back.tab === LEFT_ON,
+    `${LEFT_ON.toUpperCase()} -> SYSTEM lands on ${r.switch.toSystem.tab}; back `
+    + `to ARSENAL lands on ${r.switch.back.tab} (not the first tab)`);
 
   /*
    * Eight tabs since build 261, when TURRETS went into SYSTEM between the
@@ -17083,9 +17413,17 @@ if (!GUN_LINE) {
    * ULTIMATE -> OBJECTS without a stop, and the last entry is repeated
    * because the walk stops at the end rather than wrapping.
    */
-  const WALK = GUN_LINE
-    ? ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'sandbox', 'guns', 'system', 'system']
-    : ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'sandbox', 'system', 'system'];
+  /*
+   * The strip in order, built from the two flags rather than written out: the
+   * MINES tab went out of play in build 290 and TURRETS in 289, and a walk
+   * pinned to a literal is a walk that has to be edited to turn either back
+   * on. The last entry repeats because the walk stops at the end.
+   */
+  const WALK = [
+    'ammo', ...(MINE_LINE ? ['mines'] : []), 'tree', 'ultimate',
+    'codex', 'sandbox', ...(GUN_LINE ? ['guns'] : []), 'system',
+  ];
+  WALK.push(WALK[WALK.length - 1]);
   /*
    * The back walk starts where the forward one stopped -- on the last tab --
    * so its first entry is the tab BEFORE that, not the last tab itself. Hence
@@ -17906,6 +18244,7 @@ if (!GUN_LINE) {
  */
 {
   const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
     const g = window.__sim;
     const w = g.world;
     const { ledger } = await import('../src/ledger.js');
@@ -17995,7 +18334,7 @@ if (!GUN_LINE) {
     }
 
     out.mines = [];
-    for (const a of ARSENAL.filter((x) => x.kind === 'mine')) {
+    for (const a of CFG.mines.inPlay ? ARSENAL.filter((x) => x.kind === 'mine') : []) {
       setup();
       const e = wall(320);
       throwMine(w, a.key);
@@ -18090,7 +18429,7 @@ if (!GUN_LINE) {
    * dummy, which would otherwise be the only object on the field able to end
    * a measurement. Its kill is asserted on an ordinary body, three cases up.
    */
-  check('every mine books its damage to its own name, and the two that have none say so',
+  if (MINE_LINE) check('every mine books its damage to its own name, and the two that have none say so',
     bad(mines).length === 0 && mines.length === 6
     && !!snare && snare.booked === 0
     && !!voidRow && voidRow.kills === 0 && voidRow.booked > 0,
@@ -18744,6 +19083,7 @@ if (!GUN_LINE) {
  */
 {
   const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
     const g = window.__sim;
     const w = g.world;
     const out = {};
@@ -18755,13 +19095,15 @@ if (!GUN_LINE) {
     // them cannot pass. CLAUDE.md keeps a note about exactly that case.
     g.debugFillField();
     for (let i = 0; i < 30; i++) g.update(1 / 60);
-    g.debugThrowMine('blast');
+    g.debugThrowMine('blast'); // refused, and no mine, while the line is out
     w.shooter.shoot(w);
     const before = {
       energy: w.bytes, earned: w.earned,
       enemies: w.enemies.length, mines: w.mines.length,
     };
-    out.hadField = before.enemies > 0 && before.mines > 0;
+    // A mine only counts toward "something in every list" while there is a
+    // mine line to put one there.
+    out.hadField = before.enemies > 0 && (!CFG.mines.inPlay || before.mines > 0);
 
     // ...and something attached, because membership and the flag come off
     // together or the grab loop can never take that body back.
@@ -19605,7 +19947,7 @@ if (!GUN_LINE) {
         const a = w.yard;
         const lands = [];
         const peaks = [];
-        for (const k of KINDS) {
+        for (const k of (CFG.mines.inPlay ? KINDS : [])) {
           for (let i = 0; i < 5; i++) {
             w.mines.length = 0;
             throwMine(w, k);
@@ -19727,11 +20069,11 @@ if (!GUN_LINE) {
   const [small, big] = rows;
 
   check('nothing of yours can be put down past the wall',
-    rows.every((r) => r.mineTwo.land >= r.mineTwo.hold - 0.01
+    rows.every((r) => !MINE_LINE || (r.mineTwo.land >= r.mineTwo.hold - 0.01
       && r.mineTwo.peak >= r.mineTwo.wallY - 0.01
       && r.mineTwo.unclamped < r.mineTwo.hold
       && r.mineTwo.consulted
-      && r.mineOne.hold === 0 && r.mineOne.land < r.mineTwo.hold),
+      && r.mineOne.hold === 0 && r.mineOne.land < r.mineTwo.hold)),
     rows.map((r) => `${r.w}: eight kinds land no higher than `
       + `${r.mineTwo.land.toFixed(0)} against a hold of ${r.mineTwo.hold.toFixed(0)} and fly no `
       + `higher than ${r.mineTwo.peak.toFixed(0)} against a wall at `
@@ -20975,182 +21317,188 @@ if (!GUN_LINE) {
     + `lot at ${r.p2.lot} by ${(r.p2.lot - r.p2.painted).toFixed(2)}`);
 }
 
-// --- what a round and a mine are worth on the new field ---------------------
 /*
- * P7. +30% on every round and every mine, era 2 only, applied at
- * `Enemy.applyDamage` -- the one door all seventeen already come through under
- * their own name -- and NOT at the twenty-odd constants, nor at `up.damage`
- * and `up.mineDamage`, which reach ten and six sites between them while WIRE
- * sits outside BOTH on `up.wireDamage` of its own.
- *
- * So the case cannot read the constant. It benches every one of the seventeen
- * on a pinned wall at both eras and compares what the body actually lost.
+ * Asleep with the mine line. See "no mine can be laid, and nothing offers one"
+ * for what holds while it is out of play.
  */
-{
-  const r = await page.evaluate(async () => {
-    const { CFG } = await import('../src/config.js');
-    const { ARSENAL } = await import('../src/arsenal.js');
-    const { NODES } = await import('../src/tree.js');
-    const { freshUpgrades } = await import('../src/upgrades.js');
-    const { ledger } = await import('../src/ledger.js');
-    const { placeDummy } = await import('../src/dummy.js');
-    const { throwMine } = await import('../src/mines.js');
-    const g = window.__sim;
-    const w = g.world;
-
-    const setup = (era) => {
-      g.restart();
-      g.debugTeachAll();
-      g.setEra(era);
-      g.debugClearField();
-      w.phase = 'staging';
-      w.spawnLock = 1e9;
-      w.director.update = () => {};
-      w.up = freshUpgrades();
-      g.debugGiveBytes(400000000);
-      for (let p = 0; p < 4; p++) for (const n of NODES) if (n.id) g.buy(n.id);
-      w.mines.length = 0;
-      w.projectiles.length = 0;
-      w.effects.length = 0;
-      w.drops.length = 0;
-      w.debris.length = 0;
-      ledger.arm(true);
-    };
-    /*
-     * The wall stands at the same distance AND at the same size on the glass.
-     * The rig's own radius is era-1's by ruling, and left at 68 world units it
-     * subtends a smaller angle on a field 1.54x deeper while every blast radius
-     * around it grew -- so a near-miss that fell short at era 1 reaches it at
-     * era 2, and the area sources read high for a reason that is the bench and
-     * not the game. Measured, SPALL came back 1.52 against BOLT's 1.30.
-     */
-    const wall = (dy) => {
-      const e = placeDummy(g, dy);
-      e.armor = 0;
-      e.ward = 0;
-      e.traits = [];
-      e.r *= CFG.scale;
-      return e;
-    };
-    const run = (e, seconds) => {
-      const s = w.shooter;
-      const home = { x: e.x, y: e.y };
-      for (let f = 0; f < 60 * seconds; f++) {
-        e.x = home.x; e.y = home.y; e.vx = 0; e.vy = 0;
-        s.aim = -Math.PI / 2; s.targetAim = s.aim;
-        g.update(1 / 60);
-      }
-      const rows = ledger.table();
-      ledger.arm(false);
-      w.autoAim = false;
-      w.autoFire = false;
-      return rows;
-    };
-    /*
-     * The SOURCE'S OWN ROW, never `ledger.total`. PILE fires on a clock of its
-     * own and lands on the same wall, and so does contact -- measured, the
-     * total credited LODE and VOID with 117.7 each, two mines that do no
-     * damage at all, and moved HE's ratio to 1.83. The row is what the body
-     * lost to the thing under test.
-     */
-    const own = (rows, key) => {
-      const row = rows.find((q) => q.src === key);
-      return row ? +row.total.toFixed(1) : 0;
-    };
-
-    const bench = (era) => {
-      const out = {};
-      for (const a of ARSENAL.filter((x) => x.kind === 'round' || x.kind === 'mine')) {
-        setup(era);
-        /*
-         * The wall stands at the same distance ON THE GLASS, not at the same
-         * distance in world units. Every blast radius is in SCALED, so a
-         * target held at a fixed world offset sits relatively CLOSER to the
-         * centre of an era-2 burst and takes more of it -- measured, HE read
-         * 1.855 instead of 1.30 before this line, which is P3's radius scaling
-         * showing up in the instrument rather than a fault in the damage.
-         */
-        const K = CFG.scale;
-        if (a.kind === 'round') {
-          w.round = a.key;
-          const e = wall(300 * K);
-          w.autoAim = true;
-          w.autoFire = true;
-          /*
-           * Sixteen seconds, not eight. A heavy round fires few enough times
-           * in eight that one round more or less is 8% of the reading, and
-           * SLUG swung 1.14 to 1.31 between runs on it — a band set against a
-           * sample too small to hold it. Tripling the count puts the noise
-           * under 3%.
-           */
-          out[a.key] = own(run(e, 16), a.key);
-        } else {
-          const e = wall(320 * K);
-          throwMine(w, a.key);
-          const m = w.mines[w.mines.length - 1];
-          m.x1 = e.x;
-          m.y1 = e.y + 30 * K;
-          if (a.key === 'wire') { m.ax = e.x - 150 * K; m.bx = e.x + 150 * K; m.ay = e.y; m.by = e.y; }
-          out[a.key] = own(run(e, 20), a.key);
-        }
-      }
-      return out;
-    };
-
-    const one = bench(1);
-    const two = bench(2);
-    // ...and put the director back, or every case after this one starves.
-    delete w.director.update;
-    w.spawnLock = 0;
-    g.setEra(1);
-    g.restart();
-
-    /*
-     * Which sources book nothing is an OUTCOME here, not an assumption. A
-     * build-231 note says SNARE, LODE and VOID are all zero by design; on this
-     * build only SNARE is, and the case asserting the other two were zero was
-     * asserting a stale note rather than the game. Every source that books
-     * anything must book 1.3x more; the silent ones are named in the output so
-     * a change to any of them is visible rather than swallowed.
-     */
-    const rows = ARSENAL.filter((a) => a.kind === 'round' || a.kind === 'mine').map((a) => ({
-      key: a.key, kind: a.kind, one: one[a.key], two: two[a.key],
-      ratio: one[a.key] > 0 ? +(two[a.key] / one[a.key]).toFixed(3) : null,
-    }));
-    const live = rows.filter((x) => x.one > 0);
-    const sorted = live.map((x) => x.ratio).filter((x) => x !== null).sort((p, q) => p - q);
-    return {
-      rows,
-      power: CFG.era2Power,
-      // ...and the bench is not vacuous: most of the seventeen must have hit.
-      enough: live.length >= 14,
-      quiet: rows.filter((x) => x.one === 0).map((x) => x.key),
-      allLive: live.every((x) => x.one > 0 && x.two > 0),
-      // A missed source reads 1.00 and falls outside the band; a round more or
-      // less inside an eight-second window cannot move one from 1.30 to 1.20.
-      banded: live.every((x) => x.ratio >= 1.2 && x.ratio <= 1.42),
-      median: sorted.length ? +sorted[Math.floor(sorted.length / 2)].toFixed(3) : 0,
-      worst: live.reduce((acc, x) => (Math.abs(x.ratio - 1.3) > Math.abs(acc.ratio - 1.3) ? x : acc), live[0]),
-    };
-  });
-
-  check('every round and every mine hits 30% harder on the new field',
-    r.allLive && r.banded && r.enough && Math.abs(r.median - r.power) <= 0.03,
-    `${r.rows.length} sources benched on a pinned wall at both eras: median `
-    + `${r.median} against a configured ${r.power}, worst ${r.worst.key} at `
-    + `${r.worst.ratio} (${r.worst.one} -> ${r.worst.two}); ${r.quiet.length} booked `
-    + `nothing at either era (${r.quiet.join(', ') || 'none'})`);
-
+if (MINE_LINE) {
+  // --- what a round and a mine are worth on the new field ---------------------
   /*
-   * ...and era 1 is untouched, which is the half that matters most: the whole
-   * ladder, every wave and the canonical hash all live there.
+   * P7. +30% on every round and every mine, era 2 only, applied at
+   * `Enemy.applyDamage` -- the one door all seventeen already come through under
+   * their own name -- and NOT at the twenty-odd constants, nor at `up.damage`
+   * and `up.mineDamage`, which reach ten and six sites between them while WIRE
+   * sits outside BOTH on `up.wireDamage` of its own.
+   *
+   * So the case cannot read the constant. It benches every one of the seventeen
+   * on a pinned wall at both eras and compares what the body actually lost.
    */
-  check('...and era 1 is worth exactly what it was',
-    r.rows.every((x) => x.one === x.one) && r.power === 1.3
-    && r.rows.filter((x) => x.kind === 'round').length === 9
-    && r.rows.filter((x) => x.kind === 'mine').length === 8,
-    `nine rounds and eight mines, benched: `
-    + r.rows.map((x) => `${x.key} ${x.one}->${x.two}`).join(', '));
+  {
+    const r = await page.evaluate(async () => {
+      const { CFG } = await import('../src/config.js');
+      const { ARSENAL } = await import('../src/arsenal.js');
+      const { NODES } = await import('../src/tree.js');
+      const { freshUpgrades } = await import('../src/upgrades.js');
+      const { ledger } = await import('../src/ledger.js');
+      const { placeDummy } = await import('../src/dummy.js');
+      const { throwMine } = await import('../src/mines.js');
+      const g = window.__sim;
+      const w = g.world;
+
+      const setup = (era) => {
+        g.restart();
+        g.debugTeachAll();
+        g.setEra(era);
+        g.debugClearField();
+        w.phase = 'staging';
+        w.spawnLock = 1e9;
+        w.director.update = () => {};
+        w.up = freshUpgrades();
+        g.debugGiveBytes(400000000);
+        for (let p = 0; p < 4; p++) for (const n of NODES) if (n.id) g.buy(n.id);
+        w.mines.length = 0;
+        w.projectiles.length = 0;
+        w.effects.length = 0;
+        w.drops.length = 0;
+        w.debris.length = 0;
+        ledger.arm(true);
+      };
+      /*
+       * The wall stands at the same distance AND at the same size on the glass.
+       * The rig's own radius is era-1's by ruling, and left at 68 world units it
+       * subtends a smaller angle on a field 1.54x deeper while every blast radius
+       * around it grew -- so a near-miss that fell short at era 1 reaches it at
+       * era 2, and the area sources read high for a reason that is the bench and
+       * not the game. Measured, SPALL came back 1.52 against BOLT's 1.30.
+       */
+      const wall = (dy) => {
+        const e = placeDummy(g, dy);
+        e.armor = 0;
+        e.ward = 0;
+        e.traits = [];
+        e.r *= CFG.scale;
+        return e;
+      };
+      const run = (e, seconds) => {
+        const s = w.shooter;
+        const home = { x: e.x, y: e.y };
+        for (let f = 0; f < 60 * seconds; f++) {
+          e.x = home.x; e.y = home.y; e.vx = 0; e.vy = 0;
+          s.aim = -Math.PI / 2; s.targetAim = s.aim;
+          g.update(1 / 60);
+        }
+        const rows = ledger.table();
+        ledger.arm(false);
+        w.autoAim = false;
+        w.autoFire = false;
+        return rows;
+      };
+      /*
+       * The SOURCE'S OWN ROW, never `ledger.total`. PILE fires on a clock of its
+       * own and lands on the same wall, and so does contact -- measured, the
+       * total credited LODE and VOID with 117.7 each, two mines that do no
+       * damage at all, and moved HE's ratio to 1.83. The row is what the body
+       * lost to the thing under test.
+       */
+      const own = (rows, key) => {
+        const row = rows.find((q) => q.src === key);
+        return row ? +row.total.toFixed(1) : 0;
+      };
+
+      const bench = (era) => {
+        const out = {};
+        for (const a of ARSENAL.filter((x) => x.kind === 'round' || x.kind === 'mine')) {
+          setup(era);
+          /*
+           * The wall stands at the same distance ON THE GLASS, not at the same
+           * distance in world units. Every blast radius is in SCALED, so a
+           * target held at a fixed world offset sits relatively CLOSER to the
+           * centre of an era-2 burst and takes more of it -- measured, HE read
+           * 1.855 instead of 1.30 before this line, which is P3's radius scaling
+           * showing up in the instrument rather than a fault in the damage.
+           */
+          const K = CFG.scale;
+          if (a.kind === 'round') {
+            w.round = a.key;
+            const e = wall(300 * K);
+            w.autoAim = true;
+            w.autoFire = true;
+            /*
+             * Sixteen seconds, not eight. A heavy round fires few enough times
+             * in eight that one round more or less is 8% of the reading, and
+             * SLUG swung 1.14 to 1.31 between runs on it — a band set against a
+             * sample too small to hold it. Tripling the count puts the noise
+             * under 3%.
+             */
+            out[a.key] = own(run(e, 16), a.key);
+          } else {
+            const e = wall(320 * K);
+            throwMine(w, a.key);
+            const m = w.mines[w.mines.length - 1];
+            m.x1 = e.x;
+            m.y1 = e.y + 30 * K;
+            if (a.key === 'wire') { m.ax = e.x - 150 * K; m.bx = e.x + 150 * K; m.ay = e.y; m.by = e.y; }
+            out[a.key] = own(run(e, 20), a.key);
+          }
+        }
+        return out;
+      };
+
+      const one = bench(1);
+      const two = bench(2);
+      // ...and put the director back, or every case after this one starves.
+      delete w.director.update;
+      w.spawnLock = 0;
+      g.setEra(1);
+      g.restart();
+
+      /*
+       * Which sources book nothing is an OUTCOME here, not an assumption. A
+       * build-231 note says SNARE, LODE and VOID are all zero by design; on this
+       * build only SNARE is, and the case asserting the other two were zero was
+       * asserting a stale note rather than the game. Every source that books
+       * anything must book 1.3x more; the silent ones are named in the output so
+       * a change to any of them is visible rather than swallowed.
+       */
+      const rows = ARSENAL.filter((a) => a.kind === 'round' || a.kind === 'mine').map((a) => ({
+        key: a.key, kind: a.kind, one: one[a.key], two: two[a.key],
+        ratio: one[a.key] > 0 ? +(two[a.key] / one[a.key]).toFixed(3) : null,
+      }));
+      const live = rows.filter((x) => x.one > 0);
+      const sorted = live.map((x) => x.ratio).filter((x) => x !== null).sort((p, q) => p - q);
+      return {
+        rows,
+        power: CFG.era2Power,
+        // ...and the bench is not vacuous: most of the seventeen must have hit.
+        enough: live.length >= 14,
+        quiet: rows.filter((x) => x.one === 0).map((x) => x.key),
+        allLive: live.every((x) => x.one > 0 && x.two > 0),
+        // A missed source reads 1.00 and falls outside the band; a round more or
+        // less inside an eight-second window cannot move one from 1.30 to 1.20.
+        banded: live.every((x) => x.ratio >= 1.2 && x.ratio <= 1.42),
+        median: sorted.length ? +sorted[Math.floor(sorted.length / 2)].toFixed(3) : 0,
+        worst: live.reduce((acc, x) => (Math.abs(x.ratio - 1.3) > Math.abs(acc.ratio - 1.3) ? x : acc), live[0]),
+      };
+    });
+
+    check('every round and every mine hits 30% harder on the new field',
+      r.allLive && r.banded && r.enough && Math.abs(r.median - r.power) <= 0.03,
+      `${r.rows.length} sources benched on a pinned wall at both eras: median `
+      + `${r.median} against a configured ${r.power}, worst ${r.worst.key} at `
+      + `${r.worst.ratio} (${r.worst.one} -> ${r.worst.two}); ${r.quiet.length} booked `
+      + `nothing at either era (${r.quiet.join(', ') || 'none'})`);
+
+    /*
+     * ...and era 1 is untouched, which is the half that matters most: the whole
+     * ladder, every wave and the canonical hash all live there.
+     */
+    check('...and era 1 is worth exactly what it was',
+      r.rows.every((x) => x.one === x.one) && r.power === 1.3
+      && r.rows.filter((x) => x.kind === 'round').length === 9
+      && r.rows.filter((x) => x.kind === 'mine').length === 8,
+      `nine rounds and eight mines, benched: `
+      + r.rows.map((x) => `${x.key} ${x.one}->${x.two}`).join(', '));
+  }
 }
 
 // --- the evolution: thirty seconds that cost nothing ------------------------
@@ -24189,28 +24537,36 @@ if (GUN_LINE) {
     out.eraOneStill = ones.filter((d) => Math.abs(d.vx) < 0.5).length;
 
     // ---- and a mine is smaller at era 2, ON THE GLASS ---------------------
-    const mineR = () => { w.mines.length = 0; throwMine(w, 'blast'); return w.mines[0].r; };
+    // While there is a mine line. `CFG.mines.era2` is still applied where a
+    // mine takes its radius, so the rule is intact; there is just nothing to
+    // lay it on.
+    const mineR = () => {
+      if (!CFG.mines.inPlay) return null;
+      w.mines.length = 0; throwMine(w, 'blast'); return w.mines[0].r;
+    };
     const r1 = mineR();
     const z1 = CFG.zoom;
     arm(2);
     const r2 = mineR();
     const z2 = CFG.zoom;
-    out.r1 = +r1.toFixed(2);
-    out.r2 = +r2.toFixed(2);
-    out.css1 = +(r1 * z1).toFixed(2);
-    out.css2 = +(r2 * z2).toFixed(2);
-    out.shrink = +(out.css2 / out.css1).toFixed(3);
-    out.want = CFG.mines.era2;
-    /*
-     * ...and the TRIGGER reach moved with it, which is the half a factor on
-     * the drawing alone would have left behind: the ring that draws the reach
-     * is computed from the same `m.r`, so the picture cannot come apart from
-     * the rule.
-     */
-    const m = w.mines[0];
-    m.armed = true;
-    out.reach = +(m.r + (m.cfg.trigger || 0) * (w.up.mineTrigger || 1)).toFixed(1);
-    out.reachUsesR = out.reach > m.r;
+    if (r1 !== null && r2 !== null) {
+      out.r1 = +r1.toFixed(2);
+      out.r2 = +r2.toFixed(2);
+      out.css1 = +(r1 * z1).toFixed(2);
+      out.css2 = +(r2 * z2).toFixed(2);
+      out.shrink = +(out.css2 / out.css1).toFixed(3);
+      out.want = CFG.mines.era2;
+      /*
+       * ...and the TRIGGER reach moved with it, which is the half a factor on
+       * the drawing alone would have left behind: the ring that draws the
+       * reach is computed from the same `m.r`, so the picture cannot come
+       * apart from the rule.
+       */
+      const m = w.mines[0];
+      m.armed = true;
+      out.reach = +(m.r + (m.cfg.trigger || 0) * (w.up.mineTrigger || 1)).toFixed(1);
+      out.reachUsesR = out.reach > m.r;
+    }
 
     delete w.director.update;
     w.spawnLock = 0;
@@ -24232,7 +24588,8 @@ if (GUN_LINE) {
     + `unchanged (none of 24 staged: ${!r.eraOneStaged}, mean lateral `
     + `${r.eraOneVx} with ${r.eraOneStill} of them under half a unit)`);
 
-  check('...and a mine is smaller at era 2, on the glass and in its reach',
+  // ...while there is a mine line to lay one. `CFG.mines.era2` is untouched.
+  if (MINE_LINE) check('...and a mine is smaller at era 2, on the glass and in its reach',
     Math.abs(r.shrink - r.want) < 0.02 && r.css2 < r.css1 && r.reachUsesR,
     `a mine is ${r.r1} world units at era 1 and ${r.r2} at era 2, which is `
     + `${r.css1} against ${r.css2} CSS px -- x${r.shrink} on the glass, against `
@@ -24985,142 +25342,148 @@ if (GUN_LINE) {
     + `"${r.leftovers || 'nothing'}" still flying`);
 }
 
-// --- DRIFT springs a mine, because a mine is ground and not a weapon --------
 /*
- * Build 275. `harmless` is the one refusal DRIFT carries, and CLAUDE.md
- * records that it is honoured by FIVE paths: WIRE's cut, a Patch's bite,
- * LANCE's sweep, WARD's arc -- all damage -- and the mine TRIGGER, which is
- * not. The trigger is a chooser, and what it was choosing was a THREAT: "only
- * things that could corrupt the feed can set a mine off". A mine is not aimed
- * at anything. It is ground that goes off when something stands on it, and a
- * DRIFT walking over five of them and nothing happening is the report.
- *
- * Three things have to hold together, and a bare "the mine went off" satisfies
- * none of them on its own -- a mine expires by itself in fifteen seconds and a
- * mine on a busy field is sprung by something else:
- *
- * 1. A DRIFT alone on the field springs it, and springs it EARLY -- inside a
- *    couple of seconds, not at the end of its life, which is what expiry looks
- *    like from outside.
- * 2. A control on the same frames with the field empty does NOT spring it, so
- *    the instrument is reading the body and not the clock.
- * 3. The four refusals that are damage paths are still refusals. This change
- *    is one line in one chooser and must not have leaked into them -- the way
- *    borrowing `harmless` for its side effect leaked five of them onto the
- *    practice dummy in build 232.
+ * Asleep with the mine line. See "no mine can be laid, and nothing offers one"
+ * for what holds while it is out of play.
  */
-{
-  const r = await page.evaluate(async () => {
-    const { CFG } = await import('../src/config.js');
-    const { throwMine } = await import('../src/mines.js');
-    const g = window.__sim;
-    const w = g.world;
-    const out = {};
-
-    const clean = () => {
-      g.restart();
-      // The damage-bench family leaves both of these behind; see the note on
-      // the aperture case above.
-      delete w.director.update;
-      w.spawnLock = 0;
-      w.phase = 'staging';
-      g.debugTeachAll();
-      g.debugGiveBytes(200000000);
-      w.director.update = () => {};
-      g.debugClearField();
-      w.mines.length = 0;
-      w.effects.length = 0;
-      w.autoAim = false;
-      w.autoFire = false;
-    };
-
-    /*
-     * One mine, laid by hand where the body will be, then armed and settled
-     * the way the field does it -- a mine that has not armed cannot be sprung
-     * by anything and would read as the change not working.
-     */
-    const lay = (x, y) => {
-      w.mines.length = 0;
-      throwMine(w, 'blast');
-      const m = w.mines[0];
-      m.x = x; m.y = y;
-      m.landed = true;
-      m.t = 1;
-      m.settle = m.cfg.arm + 1;
-      return m;
-    };
-
-    const watch = (m, secs) => {
-      for (let f = 0; f < 60 * secs; f++) {
-        g.update(1 / 60);
-        if (m.dead || !w.mines.includes(m)) return +(f / 60).toFixed(2);
-      }
-      return null;
-    };
-
-    // ---- 1. a DRIFT springs one ------------------------------------------
-    clean();
-    const s = w.shooter;
-    const at = { x: s.x + 60, y: s.y - 220 };
-    let m = lay(at.x, at.y);
-    out.armed = m.armed;
-    const d = g.debugSpawn('drift', at.x, at.y);
-    d.staged = false;
-    d.spawnIn = 0;
-    out.isHarmless = !!d.harmless;
-    out.driftSprungAt = watch(m, 6);
-    out.driftLost = +(d.type.hp - d.hp).toFixed(1);
-
-    // ---- 2. ...and an empty field does not ------------------------------
-    /*
-     * The control, and it is the arm that makes the number above mean
-     * anything: a mine ends by itself when `life` runs out, so "it is gone"
-     * is true of a working build and of a build where nothing changed. Same
-     * frames, same mine, nothing standing on it.
-     */
-    clean();
-    m = lay(at.x, at.y);
-    out.bareSprungAt = watch(m, 6);
-    out.bareAlive = w.mines.includes(m) && !m.dead;
-
-    // ---- 3. the four damage paths still refuse it ------------------------
-    /*
-     * Read off the source rather than driven, because each of the four is a
-     * different mechanism on a different clock and what is being asserted is
-     * that ONE line moved. A DRIFT held under each in turn would be four more
-     * benches for a claim about a chooser.
-     */
-    const src = await Promise.all(['../src/mines.js', '../src/abilities.js']
-      .map((p) => fetch(p).then((x) => x.text())));
-    const all = src.join('\n');
-    // WIRE's cut and a Patch's bite live in mines.js; LANCE's sweep and
-    // WARD's arc in abilities.js. Every one of them still names `harmless`.
-    out.stillRefusing = (all.match(/e\.harmless|\.harmless\b/g) || []).length;
-    out.triggerLine = /if \(e\.dead \|\| e\.staged \|\| e\.spent\) continue;/.test(src[0]);
-    out.triggerHadHarmless = /e\.dead \|\| e\.harmless \|\| e\.staged \|\| e\.spent/.test(src[0]);
-
-    g.restart();
-    return out;
-  });
-
-  check('a DRIFT springs a mine, and an empty field does not',
-    r.armed && r.isHarmless
-    && r.driftSprungAt !== null && r.driftSprungAt < 2
-    && r.bareSprungAt === null && r.bareAlive,
-    `an armed mine with one DRIFT standing on it went in ${r.driftSprungAt}s `
-    + `(the DRIFT lost ${r.driftLost}); the same mine over the same six `
-    + `seconds with nothing on the field is still there (${r.bareAlive})`);
-
+if (MINE_LINE) {
+  // --- DRIFT springs a mine, because a mine is ground and not a weapon --------
   /*
-   * ...and the change is ONE line in the chooser. `harmless` is still what
-   * WIRE, a Patch, LANCE and WARD refuse, and a sweep that only counted the
-   * trigger would not notice one of those four going with it.
+   * Build 275. `harmless` is the one refusal DRIFT carries, and CLAUDE.md
+   * records that it is honoured by FIVE paths: WIRE's cut, a Patch's bite,
+   * LANCE's sweep, WARD's arc -- all damage -- and the mine TRIGGER, which is
+   * not. The trigger is a chooser, and what it was choosing was a THREAT: "only
+   * things that could corrupt the feed can set a mine off". A mine is not aimed
+   * at anything. It is ground that goes off when something stands on it, and a
+   * DRIFT walking over five of them and nothing happening is the report.
+   *
+   * Three things have to hold together, and a bare "the mine went off" satisfies
+   * none of them on its own -- a mine expires by itself in fifteen seconds and a
+   * mine on a busy field is sprung by something else:
+   *
+   * 1. A DRIFT alone on the field springs it, and springs it EARLY -- inside a
+   *    couple of seconds, not at the end of its life, which is what expiry looks
+   *    like from outside.
+   * 2. A control on the same frames with the field empty does NOT spring it, so
+   *    the instrument is reading the body and not the clock.
+   * 3. The four refusals that are damage paths are still refusals. This change
+   *    is one line in one chooser and must not have leaked into them -- the way
+   *    borrowing `harmless` for its side effect leaked five of them onto the
+   *    practice dummy in build 232.
    */
-  check('...and the four damage paths that refuse scenery still refuse it',
-    r.triggerLine && !r.triggerHadHarmless && r.stillRefusing >= 4,
-    `the trigger no longer names harmless (${!r.triggerHadHarmless}) and reads `
-    + `dead/staged/spent (${r.triggerLine}); ${r.stillRefusing} refusals of it `
-    + `are left across mines.js and abilities.js`);
+  {
+    const r = await page.evaluate(async () => {
+      const { CFG } = await import('../src/config.js');
+      const { throwMine } = await import('../src/mines.js');
+      const g = window.__sim;
+      const w = g.world;
+      const out = {};
+
+      const clean = () => {
+        g.restart();
+        // The damage-bench family leaves both of these behind; see the note on
+        // the aperture case above.
+        delete w.director.update;
+        w.spawnLock = 0;
+        w.phase = 'staging';
+        g.debugTeachAll();
+        g.debugGiveBytes(200000000);
+        w.director.update = () => {};
+        g.debugClearField();
+        w.mines.length = 0;
+        w.effects.length = 0;
+        w.autoAim = false;
+        w.autoFire = false;
+      };
+
+      /*
+       * One mine, laid by hand where the body will be, then armed and settled
+       * the way the field does it -- a mine that has not armed cannot be sprung
+       * by anything and would read as the change not working.
+       */
+      const lay = (x, y) => {
+        w.mines.length = 0;
+        throwMine(w, 'blast');
+        const m = w.mines[0];
+        m.x = x; m.y = y;
+        m.landed = true;
+        m.t = 1;
+        m.settle = m.cfg.arm + 1;
+        return m;
+      };
+
+      const watch = (m, secs) => {
+        for (let f = 0; f < 60 * secs; f++) {
+          g.update(1 / 60);
+          if (m.dead || !w.mines.includes(m)) return +(f / 60).toFixed(2);
+        }
+        return null;
+      };
+
+      // ---- 1. a DRIFT springs one ------------------------------------------
+      clean();
+      const s = w.shooter;
+      const at = { x: s.x + 60, y: s.y - 220 };
+      let m = lay(at.x, at.y);
+      out.armed = m.armed;
+      const d = g.debugSpawn('drift', at.x, at.y);
+      d.staged = false;
+      d.spawnIn = 0;
+      out.isHarmless = !!d.harmless;
+      out.driftSprungAt = watch(m, 6);
+      out.driftLost = +(d.type.hp - d.hp).toFixed(1);
+
+      // ---- 2. ...and an empty field does not ------------------------------
+      /*
+       * The control, and it is the arm that makes the number above mean
+       * anything: a mine ends by itself when `life` runs out, so "it is gone"
+       * is true of a working build and of a build where nothing changed. Same
+       * frames, same mine, nothing standing on it.
+       */
+      clean();
+      m = lay(at.x, at.y);
+      out.bareSprungAt = watch(m, 6);
+      out.bareAlive = w.mines.includes(m) && !m.dead;
+
+      // ---- 3. the four damage paths still refuse it ------------------------
+      /*
+       * Read off the source rather than driven, because each of the four is a
+       * different mechanism on a different clock and what is being asserted is
+       * that ONE line moved. A DRIFT held under each in turn would be four more
+       * benches for a claim about a chooser.
+       */
+      const src = await Promise.all(['../src/mines.js', '../src/abilities.js']
+        .map((p) => fetch(p).then((x) => x.text())));
+      const all = src.join('\n');
+      // WIRE's cut and a Patch's bite live in mines.js; LANCE's sweep and
+      // WARD's arc in abilities.js. Every one of them still names `harmless`.
+      out.stillRefusing = (all.match(/e\.harmless|\.harmless\b/g) || []).length;
+      out.triggerLine = /if \(e\.dead \|\| e\.staged \|\| e\.spent\) continue;/.test(src[0]);
+      out.triggerHadHarmless = /e\.dead \|\| e\.harmless \|\| e\.staged \|\| e\.spent/.test(src[0]);
+
+      g.restart();
+      return out;
+    });
+
+    check('a DRIFT springs a mine, and an empty field does not',
+      r.armed && r.isHarmless
+      && r.driftSprungAt !== null && r.driftSprungAt < 2
+      && r.bareSprungAt === null && r.bareAlive,
+      `an armed mine with one DRIFT standing on it went in ${r.driftSprungAt}s `
+      + `(the DRIFT lost ${r.driftLost}); the same mine over the same six `
+      + `seconds with nothing on the field is still there (${r.bareAlive})`);
+
+    /*
+     * ...and the change is ONE line in the chooser. `harmless` is still what
+     * WIRE, a Patch, LANCE and WARD refuse, and a sweep that only counted the
+     * trigger would not notice one of those four going with it.
+     */
+    check('...and the four damage paths that refuse scenery still refuse it',
+      r.triggerLine && !r.triggerHadHarmless && r.stillRefusing >= 4,
+      `the trigger no longer names harmless (${!r.triggerHadHarmless}) and reads `
+      + `dead/staged/spent (${r.triggerLine}); ${r.stillRefusing} refusals of it `
+      + `are left across mines.js and abilities.js`);
+  }
 }
 
 // --- what FLINCH and DEADBOLT REFUSE, which is the whole of their safety ----

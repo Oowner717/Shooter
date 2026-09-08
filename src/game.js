@@ -858,7 +858,21 @@ export class Game {
     w.gunsOn = d.gunsOn !== false;
     w.unlocked = new Set(d.unlocked);
     for (const k of STARTING) w.unlocked.add(k);
-    w.loadout = { mines: [...d.loadout.mines], ammo: [...d.loadout.ammo] };
+    /*
+     * ...and no mines while the line is out of play. The FILE keeps its
+     * `mines` key -- it is a wire format and a run written before this is
+     * still readable -- but the run comes back carrying none, so a save made
+     * while they were in play cannot bring one onto a field that has no
+     * cadence to lay it and no cell to unpick it with.
+     *
+     * There is no refund to make: a carried mine is a loadout slot rather
+     * than a purchase, and what was PAID for is the ledger entry, which the
+     * tree no longer offers and the replay already skips.
+     */
+    w.loadout = {
+      mines: CFG.mines.inPlay ? [...d.loadout.mines] : [],
+      ammo: [...d.loadout.ammo],
+    };
 
     w.kills = d.kills;
     w.released = d.released;
@@ -2235,6 +2249,11 @@ export class Game {
    */
   toggleMine(kind) {
     const w = this.world;
+    // Nothing to pick while the line is out of play. There is no cell that
+    // calls this -- the strip's mine stack is not filled -- so this is the
+    // backstop, and it keeps `w.mine` at null rather than letting a probe or
+    // a stale handler load a kind the cadence will never lay.
+    if (!CFG.mines.inPlay) return;
     w.mine = w.mine === kind ? null : kind;
     for (const k of MINE_KEYS) this.hud.setToggle(k, w.mine === k);
     /*
@@ -2682,10 +2701,12 @@ export class Game {
     if (steps === CFG.maxSubsteps) this.acc = 0;
 
     updateProjectiles(w, dt);
-    this.mineTimer = mineCadence(w, this.mineTimer, dt);
+    // The mine line, when there is one. `world.mines` is empty either way;
+    // this is about not driving a system that is out of play.
+    if (CFG.mines.inPlay) this.mineTimer = mineCadence(w, this.mineTimer, dt);
     collectData(w, dt);
     this.runUpgrades(dt);
-    updateMines(w, dt);
+    if (CFG.mines.inPlay) updateMines(w, dt);
     if (CFG.gun.inPlay) updateGuns(w, dt);
     updateYard(w, dt);
     this.resolveBlasts();
@@ -3759,7 +3780,7 @@ export class Game {
     if (w.boss) w.boss.draw(ctx, w);
 
     this.ours(ctx, () => {
-      drawMines(ctx, w);
+      if (CFG.mines.inPlay) drawMines(ctx, w);
       // The emplacements: structure, drawn with the mines rather than with the
       // machine, because that is what they are -- fixtures on the ground, over
       // the yard and under the effects. Inside `ours` like everything of ours,
@@ -4338,6 +4359,9 @@ export class Game {
   }
 
   debugThrowMine(kind = 'blast') {
+    // Nothing to throw while the line is out of play, and the two cells that
+    // called this are not built either -- this is the backstop.
+    if (!CFG.mines.inPlay) return;
     throwMine(this.world, kind);
   }
 

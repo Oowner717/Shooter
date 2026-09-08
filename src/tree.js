@@ -382,6 +382,24 @@ function commons(root) {
  * arm or a leaf under one, which is what makes ABILITIES a peer of AMMO rather
  * than a list hanging off PULSE.
  */
+const ROOTS = ['turret', 'ammo', 'mines', 'abilities'];
+
+/*
+ * One root, built. Pulled out of the TREE literal so that the MINES root can
+ * be built WITHOUT being placed -- which is how `coverage()` learns the exact
+ * set of ids the mine line takes with it when it goes out of play. Deriving
+ * that set from the root itself rather than writing it out is the difference
+ * between a list that follows the tree and a list somebody has to remember to
+ * update; this repo has paid for the second shape four times.
+ */
+const rootNode = (root) => node({
+  kind: 'root', key: root, name: ROOT_NAME[root], free: true,
+  tone: ROOT_TONE[root], line: ROOT_LINE[root],
+  children: [
+    ...commons(root),
+    ...(BRANCH[root] || []).map((k) => arm(k, KIND[root])),
+  ],
+});
 /*
  * The whole thing, and RECAST sits above all of it.
  *
@@ -426,14 +444,7 @@ export const TREE = [
    * because it is still what the bosses leave rather than an upgrade to
    * anything.
    */
-  ...['turret', 'ammo', 'mines', 'abilities'].map((root) => node({
-    kind: 'root', key: root, name: ROOT_NAME[root], free: true,
-    tone: ROOT_TONE[root], line: ROOT_LINE[root],
-    children: [
-      ...commons(root),
-      ...(BRANCH[root] || []).map((k) => arm(k, KIND[root])),
-    ],
-  })),
+  ...ROOTS.filter((root) => root !== 'mines' || CFG.mines.inPlay).map(rootNode),
 ];
 
 /** Every node, flat, parent first. */
@@ -514,7 +525,24 @@ export const NODE_BY_ID = new Map(
  * Listed by id rather than by axis so that adding a seventh GUN node without
  * deciding where it lives still fails the build.
  */
-export const ELSEWHERE = new Map(ELSEWHERE_IDS.map((id) => [id, 'the TURRETS tab']));
+/*
+ * ...and the mine line, when it is out of play. Everything the MINES root
+ * would have offered -- the six ALL MINES leaves, the eight ways in, and the
+ * seven upgrades hanging off individual kinds -- is still authored in
+ * `upgrades.js` and is in no branch, so `coverage()` would call all twenty-one
+ * content nobody can buy. They are excused instead, and the excuse is
+ * DERIVED: the root is built here and thrown away, and its own ids are the
+ * list. A hand-written one would be wrong the first time a mine upgrade is
+ * added.
+ */
+const MINE_IDS = CFG.mines.inPlay
+  ? []
+  : flatten([rootNode('mines')]).filter((n) => n.id).map((n) => n.id);
+
+export const ELSEWHERE = new Map([
+  ...ELSEWHERE_IDS.map((id) => [id, 'the TURRETS tab']),
+  ...MINE_IDS.map((id) => [id, 'out of play with the mine line']),
+]);
 
 export function coverage() {
   const placed = [...NODES.filter((n) => n.id).map((n) => n.id), ...ELSEWHERE.keys()];

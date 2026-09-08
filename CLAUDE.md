@@ -2267,4 +2267,29 @@ came from before believing the other one covers it.
   `ON_WORKS`, which names emplacements in as many words. The lot is scenery
   now, and the half of the old case that still matters -- the press still aims
   and still fires -- is the half that was always the point.
+- **When a whole branch leaves the tree, DERIVE the list that excuses it.**
+  `coverage()` fails the build for an id that is authored and in no branch, and
+  `ELSEWHERE` is the escape hatch -- but a hand-written list of the mine line's
+  twenty-one ids is wrong the first time a mine upgrade is added. The MINES
+  root is BUILT and thrown away, and its own ids are the list. Same shape as
+  the boss sweeps asking `ANOMALIES.length`: ask the structure, never restate
+  it.
+- **Taking a system out of play breaks every hand-kept list that named it, and
+  they CRASH rather than fail.** Build 290 found five in one pass -- the shop
+  floor walked eight tab names (`createTreeWalker(null)` throws), the
+  arm-heading case listed three branches, the panel case six tabs, the tab
+  walk was a literal, and the strip's contrast sweep had a vacuity floor of
+  `seen >= 20` that started reporting the strip as missing once four cells
+  went. Every one of them should have asked the DOM or the config. A removal
+  is the cheapest way to find out which of your lists were really assumptions.
+- **A panel with no tab is not a shut door, it is a door frame.** Build 289
+  took TURRETS out of `GROUPS` and left `buildGuns()` running, so the panel sat
+  in the DOM reachable by nothing -- found only because a case reads the sheet's
+  tabs off its panels. Whatever builds the content has to be gated with
+  whatever offers it.
+- **`#quickBar` is `space-between`, so an emptied band is not the same as a
+  removed one.** The mine stack's two bands are still created and simply not
+  filled: dropping them lets the middle group -- AIM and FIRE, the cells placed
+  where the thumb rests -- walk to the left edge. Assert it as geometry, not as
+  a class.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

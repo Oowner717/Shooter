@@ -105,7 +105,13 @@ const RIG_LEVELS = NODES
 const GROUPS = [
   { id: 'arsenal', label: 'ARSENAL', tabs: [
     { id: 'ammo', label: 'AMMO' },
-    { id: 'mines', label: 'MINES' },
+    /*
+     * ...and MINES only while the line is in play. Out of the table rather
+     * than sealed: a padlocked tab promises something, and there is nothing
+     * behind this one to promise. ARSENAL is three tabs then, which is what
+     * it was before the loadout sheet was folded into the menu at build 226.
+     */
+    ...(CFG.mines.inPlay ? [{ id: 'mines', label: 'MINES' }] : []),
     { id: 'tree', label: 'UPGRADES' },
     { id: 'ultimate', label: 'ULTIMATE', sealed: true },
   ] },
@@ -171,11 +177,19 @@ export class Menu {
 
     this.buildTabs();
     this.buildLoadout('ammo');
-    this.buildLoadout('mines');
+    // ...and the mine sheet only when there is a tab to put it in.
+    if (CFG.mines.inPlay) this.buildLoadout('mines');
     this.buildTree();
     this.buildUltimate();
     this.buildSandbox();
-    this.buildGuns();
+    /*
+     * ...and the TURRETS panel only when there is a tab to show it in. Build
+     * 289 took the tab out of `GROUPS` and left this, so the panel stayed in
+     * the DOM with nothing able to reach it -- which is dead markup, and it
+     * fooled a case that asks the sheet which tabs it has by reading the
+     * panels. A panel with no tab is not a shut door, it is a door frame.
+     */
+    if (CFG.gun.inPlay) this.buildGuns();
     this.buildCodex();
     this.buildSystem();
     this.show('tree');

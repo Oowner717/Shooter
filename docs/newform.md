@@ -4355,3 +4355,73 @@ already record, on the same arm. It takes the LAST sample at the peak now: a
 body has not turned round until it has stopped going out.
 
 623 green.
+
+## Build 290 — the mine line is out of play
+
+The same treatment as the emplacements in build 289, on a much larger system:
+take the mines out of the game without taking them out of the code.
+
+So **`mines.js` is untouched**, all eight kinds are still in `arsenal.js`, the
+twenty-one upgrades are still in `upgrades.js`, and the MINES tab, its loadout
+sheet and the strip's own stack are all still written. What is gone is every
+**door**, and `CFG.mines.inPlay` is the one thing that shuts them.
+
+| file | what the flag shuts |
+|---|---|
+| `tree.js` | the MINES root is not built, so its 21 ids are in no branch, no `NODE_BY_ID` and no ledger replay |
+| `menu.js` | the MINES tab is not in `GROUPS` and its loadout sheet is not built |
+| `hud.js` | the strip's mine stack, its fold and its MINES button are not filled; the debug panel's THROW cells go too |
+| `game.js` | `mineCadence`, `updateMines` and `drawMines` are not called, `pickMine` and `debugThrowMine` refuse, and a restore comes back carrying none |
+
+### The excused list is derived, not written out
+
+Taking the root out would make all 21 ids "content nobody can buy", which is
+exactly what `coverage()` exists to catch. `ELSEWHERE` is the escape hatch the
+emplacement line already used — but a hand-written list of 21 would be wrong the
+first time a mine upgrade is added. So the MINES root is **built and thrown
+away**, and its own ids are the list:
+
+```js
+const MINE_IDS = CFG.mines.inPlay
+  ? []
+  : flatten([rootNode('mines')]).filter((n) => n.id).map((n) => n.id);
+```
+
+Coverage stays exact at 94/94 with nothing missing and nothing extra.
+
+### The two strip bands stay, empty
+
+`#quickBar` is `justify-content: space-between`. Dropping the mine stack and its
+config band would let the middle group — AIM and FIRE, the two cells placed
+where the thumb rests — walk off to the left edge. The bands are still created
+and simply not filled; an empty `.q_mines` holds its 70px column and the row is
+unchanged. The case asserts that as **geometry**, not as a class.
+
+### What it cost the suite, and what that says
+
+The blast radius was 33 sections and 20 that would actually misbehave — far
+larger than the emplacements. Working through them turned up **five hand-kept
+lists that were already maintenance traps**, each of which crashed rather than
+failed:
+
+- the shop-floor sweep walked a written-out list of eight tab names, two of
+  which no longer exist — `createTreeWalker(null)` throws. It asks the DOM now.
+- the arm-heading case listed three branch names by hand.
+- the menu-panel case listed six tabs.
+- the tab-strip walk and the SYSTEM/ARSENAL tab lists were literals.
+- the strip's contrast sweep had a vacuity floor of `seen >= 20` — a count of
+  words, sized for a strip with four more cells on it, so a guard whose whole
+  job was "the sweep found the strip" started reporting the strip as missing.
+  It is a share of the cells found now.
+
+And one real defect from build 289: **the TURRETS panel was still being built
+into the DOM** after its tab was removed. Dead markup, reachable by nothing —
+found only because a case that asks the sheet which tabs it has by reading the
+panels saw a panel with no tab.
+
+### Both ways, proved
+
+**627 green with the mine line on, 578 with it off.** The forty-nine that come
+and go are the mine cases, asleep behind the same flag rather than deleted, and
+the mirrored arms of the door case. Turning the line back on is one line and
+brings its own tests with it.

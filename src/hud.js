@@ -368,13 +368,24 @@ export class Hud {
      * them grandchildren, folding silently stops hiding anything, and nothing
      * flips a property a test could read back.
      */
-    // Stacks read bottom-up on screen, so slot 0 is the bottom cell.
-    this.fillStack(mines, w, 'mines');
+    /*
+     * Stacks read bottom-up on screen, so slot 0 is the bottom cell.
+     *
+     * The mine stack, its fold and its MINES button are filled only while the
+     * mine line is in play. The two BANDS are still created either way, and
+     * that is deliberate: `#quickBar` is `justify-content: space-between`, so
+     * dropping them would let the middle group -- AIM and FIRE, the two cells
+     * placed where the thumb rests -- walk off to the left edge. An empty
+     * `.q_mines` holds its 70px column and the row is unchanged.
+     */
+    if (CFG.mines.inPlay) {
+      this.fillStack(mines, w, 'mines');
+      mines.appendChild(this.stackFold('mines'));
+      cfgMines.appendChild(this.configButton('mines'));
+    }
     this.fillStack(ammo, w, 'ammo');
-    mines.appendChild(this.stackFold('mines'));
     ammo.appendChild(this.stackFold('ammo'));
     this.syncFolds();
-    cfgMines.appendChild(this.configButton('mines'));
     cfgAmmo.appendChild(this.configButton('ammo'));
     /*
      * The two that run on their own, and the row AUTO AIM opens above them.
@@ -1716,13 +1727,18 @@ export class Hud {
        * two cells and none of them is privileged. `MINE_KEYS` comes off the
        * arsenal, so a ninth kind is covered by existing.
        */
-      ['THE RACK', 'head'],
-      [() => `THROW ${MINE_KEYS[this.dbgMine].toUpperCase()}`,
-        () => g.debugThrowMine(MINE_KEYS[this.dbgMine])],
-      ['MINE →', () => {
-        this.dbgMine = (this.dbgMine + 1) % MINE_KEYS.length;
-        this.syncDebug();
-      }, null, true],
+      // ...and both of them go with the line while it is out of play, along
+      // with the heading, which would otherwise be a section with nothing
+      // under it.
+      ...(CFG.mines.inPlay ? [
+        ['THE RACK', 'head'],
+        [() => `THROW ${MINE_KEYS[this.dbgMine].toUpperCase()}`,
+          () => g.debugThrowMine(MINE_KEYS[this.dbgMine])],
+        ['MINE →', () => {
+          this.dbgMine = (this.dbgMine + 1) % MINE_KEYS.length;
+          this.syncDebug();
+        }, null, true],
+      ] : []),
 
       ['THE RUN', 'head'],
       ['BOSS FIGHT…', () => this.showScreen('boss'), 'wide', true],
