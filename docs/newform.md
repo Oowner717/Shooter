@@ -4076,3 +4076,45 @@ direction that looks free.
 
 624 green. The ORDINAL hash was not run: no currency VALUE moved in this build,
 only its rendering.
+
+## Build 286 — the store is called what it is
+
+Phase 2b of `docs/bytes.md`, held back from build 284 on purpose: **a rename
+and a rescale fail differently and should not fail together.** The rescale was
+a change of value that arithmetic catches; this is a change of name whose
+failure mode is a silent `undefined` at a site nobody swept. Shipped in one
+build a red case could have meant either, and the one useful property of a pure
+rename — that green means nothing but names moved — is exactly what mixing them
+destroys.
+
+`world.energy` is `world.bytes`. A body's own worth is `e.bytes`, and what a
+graft inherits is `graftBaseBytes`. `Hud.setEnergy` is `setBytes`,
+`debugGiveEnergy` is `debugGiveBytes`, and the chip is `#bytesChip` /
+`#bytesNum` / `#bytesBuys` in the markup, the stylesheet and the suite. About
+250 sites.
+
+### Three names deliberately did not move
+
+- **The save file's `energy` key.** It is what is on a player's phone.
+  `readSlot` refuses a file it cannot read that field out of, so renaming the
+  key throws away every open run for a change that moves no value at all. The
+  names inside the program are ours; the names in the file are not.
+  `captureRun` writes `energy: world.bytes` and the note is beside it.
+- **`CFG.energy`.** It is not the currency — four of its seven fields are not
+  amounts at all — it is the salvage system, `CFG.bytes` is already the
+  formatter's own table, and two of its leaves are named in `SCALED` by path
+  string, where a renamed leaf stops being scaled in silence. That fault has
+  shipped here once already.
+- **`world.earned`.** Lifetime banked, and the word is about the earning rather
+  than about the unit.
+
+### The hash is the right instrument for a rename
+
+A pure rename must leave `fight.mjs` reporting the same number, and it did:
+**`-1765830468`, unchanged.** That is what "nothing but names moved" looks like
+when it is measured instead of asserted — 9,000 frames of ORDINAL, thirty
+samples over every body, the boss and the purse.
+
+624 green. One run failed "ORDINAL can be fought on the assists alone" and
+passed on the next; that is the case build 226 already ran down as a
+one-in-fifteen, noted rather than chased.

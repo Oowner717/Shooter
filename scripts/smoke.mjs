@@ -109,7 +109,7 @@ for (let round = 0; round < 6; round++) {
   await page.evaluate(() => {
     const g = window.__sim;
     g.debugAddKills(30);
-    g.debugGiveEnergy(4000 * 1000); // bytes: 4,000 points
+    g.debugGiveBytes(4000 * 1000); // bytes: 4,000 points
     g.debugFillField();
   });
   for (let a = 0; a < 5; a++) {
@@ -216,7 +216,7 @@ await page.screenshot({ path: `${SHOTS}/10-restart.png` });
 // apart -- eighteen sockets in ledger order, and a bare turret sheds nothing.
 await page.evaluate(() => {
   const g = window.__sim;
-  g.debugGiveEnergy(400000 * 1000); // bytes: 400,000 points
+  g.debugGiveBytes(400000 * 1000); // bytes: 400,000 points
   g.debugBuyAll();
   g.debugEvolve();
 });

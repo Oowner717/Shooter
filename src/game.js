@@ -221,7 +221,7 @@ export class Game {
       autoFire: false,
       mine: null, // the one kind of mine being laid, or none
 
-      energy: 0, // banked; nothing carries across a reset
+      bytes: 0, // banked; nothing carries across a reset
       /*
        * ...and every energy ever banked this run, which only ever goes up.
        *
@@ -612,7 +612,7 @@ export class Game {
      * that can re-enable it.
      */
     w.nextStoryAt = CFG.storyEvery;
-    w.energy = 0;
+    w.bytes = 0;
     w.earned = 0;
     w.up = freshUpgrades();
     w.ledger.length = 0;
@@ -694,7 +694,7 @@ export class Game {
     this.resetShown = false;
     this.hud.clearAlerts();
     this.hud.setKills(0);
-    this.hud.setEnergy(0);
+    this.hud.setBytes(0);
     background.setDread(0);
     this.hud.syncAbilities(w.abilities);
   }
@@ -849,7 +849,9 @@ export class Game {
     w.kills = d.kills;
     w.released = d.released;
     w.time = d.time || 0;
-    w.energy = d.energy;
+    // `d.energy` is the FILE's key, which does not follow the field -- see
+    // the note in save.js's captureRun.
+    w.bytes = d.energy;
     /*
      * A save from before the unlock clock has no `earned` at all, and seeding
      * it at zero would take TOW back off a run that had already been fighting
@@ -905,7 +907,7 @@ export class Game {
     this.hud.setAim(w);
     this.hud.setToggle('autoFire', w.autoFire);
     this.hud.setKills(w.kills);
-    this.hud.setEnergy(w.energy);
+    this.hud.setBytes(w.bytes);
     this.hud.syncAbilities(w.abilities);
     /*
      * ...except on the way into the testbed, which goes through `resume()`
@@ -1650,7 +1652,7 @@ export class Game {
           '#cfe0f2', rand(0.2, 0.45), 1.8);
       }
       audio.amend();
-      this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
+      this.hud.setBytes(w.bytes, intakeRate(w), dividend(w));
       /*
        * ...and SAY what it cost. The purse falls by 2600 on this frame and
        * the chip that shows it is one line of digits among several -- so the
@@ -1713,19 +1715,19 @@ export class Game {
      * so there is one purchase path and one place a price is checked, rather
      * than a second buy button that could drift out of step with this one.
      */
-    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
+    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.bytes;
     if (purse < price) return 'poor';
 
     const def = BY_ID.get(id);
     if (!def) return 'locked';
     if (n.currency === 'remainder') w.remainder -= price;
-    else w.energy -= price;
+    else w.bytes -= price;
     // Stat upgrades only touch world.up; unlocks and charges need the world.
     def.apply(w.up, w);
     w.ledger.push(id);
 
     audio.amend();
-    this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
+    this.hud.setBytes(w.bytes, intakeRate(w), dividend(w));
     this.hud.buildStrip();
     this.hud.syncLoadout(w);
     this.hud.syncAbilities(w.abilities);
@@ -3568,7 +3570,7 @@ export class Game {
      * which is what "waves do not show on continuing" was.
      */
     this.hud.syncRail(w);
-    this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
+    this.hud.setBytes(w.bytes, intakeRate(w), dividend(w));
     this.hud.syncAbilities(w.abilities);
     this.hud.syncLoadout(w);
     this.hud.syncSeals();
@@ -4349,9 +4351,9 @@ export class Game {
    */
   // The amount is BYTES from the byte migration, so the ten thousand this
   // granted for its whole life is MB(10) -- the same purchasing power.
-  debugGiveEnergy(n = MB(10)) {
+  debugGiveBytes(n = MB(10)) {
     const w = this.world;
-    w.energy += n;
+    w.bytes += n;
     /*
      * ...and the lifetime counter with it. The object types are gated on
      * `earned` since build 180, so energy handed over without it opens the
@@ -4360,10 +4362,10 @@ export class Game {
      * "as though the run had earned it", which is both halves.
      */
     w.earned += n;
-    this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
+    this.hud.setBytes(w.bytes, intakeRate(w), dividend(w));
     this.hud.menu.syncTree();
     this.hud.alert(`+${fmtBytes(n)}`, 'info', 1.4);
-    return w.energy;
+    return w.bytes;
   }
 
 
@@ -4406,14 +4408,14 @@ export class Game {
        * machine and is not what this button means. Stated as the rule rather
        * than as `n.id !== 'recast'`, so the next one is covered by existing.
        */
-      if (n.needs || (n.currency && n.currency !== 'energy')) continue;
+      if (n.needs || (n.currency && n.currency !== 'bytes')) continue;
       for (let have = this.owned(n.id); have < (n.levels || 1); have++) {
         def.apply(w.up, w);
         w.ledger.push(n.id);
         bought++;
       }
     }
-    this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
+    this.hud.setBytes(w.bytes, intakeRate(w), dividend(w));
     this.hud.buildStrip();
     this.hud.syncLoadout(w);
     this.hud.syncAbilities(w.abilities);

@@ -244,7 +244,17 @@ export function captureRun(world, game) {
      * `toBytes` recognises it.
      */
     unit: 'B',
-    energy: world.energy,
+    /*
+     * ---- the KEY is a wire format and does not follow the field ----------
+     *
+     * `world.energy` became `world.bytes` in build 286 and this key stayed
+     * `energy`, deliberately. It is what is on a player's phone: renaming it
+     * makes every file already written unreadable at exactly the field
+     * `readSlot` refuses a run for being unable to parse, so every open run
+     * would be thrown away by a change that moves no value at all. The names
+     * inside the program are ours to change; the names in the file are not.
+     */
+    energy: world.bytes,
     // Lifetime, not the purse: what the object types are gated behind.
     earned: world.earned,
     nextStoryAt: world.nextStoryAt,

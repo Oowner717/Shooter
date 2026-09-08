@@ -1089,7 +1089,7 @@ export class Menu {
     const full = !n.repeat && have >= max;
     const open = g.available(n) && !n.dormant;
     const price = full ? 0 : priceOf(n, have);
-    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
+    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.bytes;
     const afford = !full && purse >= price;
     const armed = card === this.armed;
 
@@ -1405,7 +1405,7 @@ export class Menu {
     const max = n.repeat ? Infinity : (n.levels || 1);
     if (have >= max) return false;
     if (!g.available(n)) return false;
-    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
+    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.bytes;
     return purse >= priceOf(n, have);
   }
 
@@ -1490,7 +1490,7 @@ export class Menu {
     if (!this.items) return;
     const g = this.game;
     const w = g.world;
-    this.rollBank(Math.floor(w.energy));
+    this.rollBank(Math.floor(w.bytes));
     // The other purse, shown only once there is something in it — a currency
     // reading "0" for the first hour is a promise nobody asked for.
     const souls = this.el.treeSouls;
@@ -1527,7 +1527,7 @@ export class Menu {
     const full = !n.repeat && have >= max;
     const open = g.available(n) && !n.dormant;
     const price = full ? 0 : priceOf(n, have);
-    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.energy;
+    const purse = n.currency === 'remainder' ? (w.remainder || 0) : w.bytes;
     return { open, full, price, have, max, afford: !full && purse >= price };
   }
 
@@ -1932,7 +1932,7 @@ export class Menu {
      * exactly the point in a run where the numbers are biggest. REMAINDER is a
      * count of seven and keeps its cast.
      */
-    const purse = `${Math.floor(world.energy)}:${world.remainder | 0}:${world.ledger.length}`;
+    const purse = `${Math.floor(world.bytes)}:${world.remainder | 0}:${world.ledger.length}`;
     if (purse !== this.lastPurse) {
       this.lastPurse = purse;
       this.game.hud.setBuys(this.reachCount(world));

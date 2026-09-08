@@ -79,10 +79,10 @@ export class Hud {
       railNodes: $('railNodes'),
       railAuto: $('railAuto'),
       alerts: $('alerts'),
-      energy: $('energyNum'),
-      energyChip: $('energyChip'),
+      bytes: $('bytesNum'),
+      bytesChip: $('bytesChip'),
       counter: $('counter'),
-      energyBuys: $('energyBuys'),
+      bytesBuys: $('bytesBuys'),
       offer: $('offer'),
       counterLabel: document.querySelector('#counter em'),
       abilities: $('abilities'),
@@ -288,7 +288,7 @@ export class Hud {
      * within reach right now — the one figure that decides whether opening it
      * is worth the tap.
      */
-    this.el.energyChip.addEventListener('click', () => this.menu.openTab('tree'));
+    this.el.bytesChip.addEventListener('click', () => this.menu.openTab('tree'));
 
     /*
      * The banner is a list now, one row per boss whose way in is held, so
@@ -1026,7 +1026,7 @@ export class Hud {
     /*
      * Guarded on what is actually in the chips, because the measuring is not
      * free: reading scrollWidth after a class change forces a synchronous
-     * layout, and setEnergy runs on every frame that energy lands -- which is
+     * layout, and setBytes runs on every frame that energy lands -- which is
      * every frame of a PULSE. Three forced reflows a frame on a phone that
      * already has a quality governor is not a fix, it is a different bug.
      *
@@ -1045,7 +1045,7 @@ export class Hud {
      * the badge are still bare integers and keep their digit counts.
      */
     const digits = (v) => String(Math.max(0, Math.floor(v || 0))).length;
-    const sig = `${(this.energyText || '').length}|${digits(this.lastBuys)}`
+    const sig = `${(this.bytesText || '').length}|${digits(this.lastBuys)}`
       + `|${digits(this.lastKills)}|${window.innerWidth}`;
     if (sig === this.barSig) return;
     this.barSig = sig;
@@ -1058,13 +1058,13 @@ export class Hud {
     bar.classList.add('tighter');
   }
 
-  setEnergy(n, rate = 1, div = 1) {
+  setBytes(n, rate = 1, div = 1) {
     const v = Math.floor(n);
-    if (v !== this.lastEnergy) {
+    if (v !== this.lastBytes) {
       // The far end of the collection animation. The streaks go into the
       // turret; this is where they come out, so the two read as one motion.
-      const up = v > this.lastEnergy;
-      this.lastEnergy = v;
+      const up = v > this.lastBytes;
+      this.lastBytes = v;
       /*
        * The unit lives in the FIGURE and not in the label beside it. Two
        * reasons, and the second is the one that settles it: the label slot
@@ -1078,10 +1078,10 @@ export class Hud {
        * points, where a six-digit purse became a seven-character string.
        * Coming from raw BYTES it is ten characters down to seven.
        */
-      this.energyText = fmtBytes(n);
-      this.el.energy.textContent = this.energyText;
+      this.bytesText = fmtBytes(n);
+      this.el.bytes.textContent = this.bytesText;
       if (up) {
-        const chip = this.el.energyChip;
+        const chip = this.el.bytesChip;
         chip.classList.remove('took');
         void chip.offsetWidth;
         chip.classList.add('took');
@@ -1090,7 +1090,7 @@ export class Hud {
     const choked = rate < 0.999;
     if (choked !== this.lastChoked) {
       this.lastChoked = choked;
-      this.el.energyChip.classList.toggle('choked', choked);
+      this.el.bytesChip.classList.toggle('choked', choked);
     }
     /*
      * The depth dividend, in the label's own slot.
@@ -1109,15 +1109,15 @@ export class Hud {
      * second thing saying the same thing. `plain` is what empties it: the em
      * is a flex item with a 5px gap in front of it, so leaving it empty
      * leaves the gap. Its rule is written with the id AND the class, because
-     * `#barChips.tighter #energyChip em` already sets `display` on this
+     * `#barChips.tighter #bytesChip em` already sets `display` on this
      * element and a bare-class rule would lose to it.
      */
     const word = rich ? `\u00d7${div.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}` : '';
-    if (word !== this.lastEnergyWord) {
-      this.lastEnergyWord = word;
-      this.el.energyChip.querySelector('em').textContent = word;
-      this.el.energyChip.classList.toggle('rich', rich);
-      this.el.energyChip.classList.toggle('plain', !rich);
+    if (word !== this.lastBytesWord) {
+      this.lastBytesWord = word;
+      this.el.bytesChip.querySelector('em').textContent = word;
+      this.el.bytesChip.classList.toggle('rich', rich);
+      this.el.bytesChip.classList.toggle('plain', !rich);
     }
     this.fitBar();
   }
@@ -1132,10 +1132,10 @@ export class Hud {
   setBuys(n) {
     if (n === this.lastBuys) return;
     this.lastBuys = n;
-    const el = this.el.energyBuys;
+    const el = this.el.bytesBuys;
     el.textContent = n > 0 ? String(n) : '';
     el.classList.toggle('on', n > 0);
-    this.el.energyChip.classList.toggle('canBuy', n > 0);
+    this.el.bytesChip.classList.toggle('canBuy', n > 0);
     // The badge is what pushed the chip past the edge in the first place.
     this.fitBar();
   }
@@ -1726,7 +1726,7 @@ export class Hud {
 
       ['THE RUN', 'head'],
       ['BOSS FIGHT…', () => this.showScreen('boss'), 'wide', true],
-      [`+${fmtBytes(MB(10))}`, () => g.debugGiveEnergy(MB(10))],
+      [`+${fmtBytes(MB(10))}`, () => g.debugGiveBytes(MB(10))],
       ['+50 KILLS', () => g.debugAddKills(50)],
       ['MAX UPGRADES', () => g.debugBuyAll()],
       ['UNLOCK ALL', () => g.debugUnlockAll()],

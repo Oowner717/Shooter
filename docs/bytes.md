@@ -279,6 +279,16 @@ Each phase ends green, with the suite run and the build pushed.
 
 Phase 1 is worth doing on its own and is safe to stop after.
 
+**Phase 2b shipped in build 286.** `world.energy` -> `world.bytes`,
+`e.energy` -> `e.bytes`, `setEnergy` -> `setBytes`, `debugGiveEnergy` ->
+`debugGiveBytes`, and the chip's three ids. Three names stayed and each has a
+note beside it: the save file's `energy` KEY (a wire format -- renaming it
+throws away every open run), `CFG.energy` (not the currency, and two of its
+leaves are `SCALED` path strings), and `world.earned`.
+
+The ORDINAL hash is the instrument for a rename and it came back unchanged at
+`-1765830468`, which is what "nothing but names moved" looks like measured.
+
 **Phase 3 shipped in build 285.** Every amount the player reads goes through
 `fmtBytes`, and the unit lives in the FIGURE rather than in the label beside
 it, which is what §6 concluded. `fitBar` is re-keyed on the rendered string.

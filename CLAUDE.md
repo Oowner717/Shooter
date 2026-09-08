@@ -2185,4 +2185,18 @@ came from before believing the other one covers it.
   it is a flex item with a 5px gap in front of it, so it needs `display: none`
   written with the id AND a class, because `#barChips.tighter #energyChip em`
   already sets `display` on the same element.
+- **A save file's KEY is a wire format and does not follow the field it came
+  from.** `world.energy` became `world.bytes` in build 286 and the file still
+  writes `energy`, because `readSlot` refuses a file it cannot read that field
+  out of -- so renaming the key throws away every open run for a change that
+  moves no value at all. The names inside the program are ours to change; the
+  names in the file are not. `CFG.energy` stayed for a different reason worth
+  knowing: it is the salvage system rather than the money, `CFG.bytes` is
+  already the formatter's table, and two of its leaves are `SCALED` path
+  strings where a rename stops the scaling in silence.
+- **The ORDINAL hash is the right instrument for a RENAME, and the expected
+  result is that it does not move.** Build 286 renamed about 250 sites and the
+  hash came back identical -- which is what "nothing but names moved" looks
+  like measured instead of asserted. A rename that moves it has done something
+  else as well.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

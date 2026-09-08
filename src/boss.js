@@ -726,7 +726,7 @@ export class Boss {
       const sp = rand(220, 520);
       world.drops.push(new Enemy(T, this.x, this.y, {
         drop: true, r: rand(3.4, 5.8), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-        energy: C.pay / 30,
+        bytes: C.pay / 30,
       }));
     }
     world.remainderFrom = this.n;
@@ -1689,7 +1689,7 @@ export class Ordinal extends Boss {
       const sp = rand(220, 520);
       world.drops.push(new Enemy(TYPE_BY_ID.ordinal, this.x, this.y, {
         drop: true, r: rand(3.4, 5.8), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-        energy: C.pay / 30,
+        bytes: C.pay / 30,
       }));
     }
     /*

@@ -92,7 +92,7 @@ async function fight(page) {
      */
     w.autoAim = true;
     w.autoFire = true;
-    w.energy = 0;
+    w.bytes = 0;
 
     /*
      * The recorder. It rides the boss rather than the frame: every figure
@@ -234,7 +234,7 @@ async function hashRun(page, frames) {
        * channel CLAUDE.md's "run it on any build that touches energy" rule
        * exists for would have quietly lost its resolution.
        */
-      mix(w.energy / 1000); mix(w.shock); mix(w.timeScale); mix(w.remainder);
+      mix(w.bytes / 1000); mix(w.shock); mix(w.timeScale); mix(w.remainder);
       if (boss) {
         mix(boss.stage); mix(boss.coreFrac); mix(boss.arriving);
         mix(boss.x); mix(boss.y); mix(boss.parked.length);

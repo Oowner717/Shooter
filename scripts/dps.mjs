@@ -86,7 +86,7 @@ for (let r = 0; r < RUNS; r++) {
     g.debugTeachAll();
     w.autoAim = true;
     w.autoFire = true;
-    w.energy = 0;
+    w.bytes = 0;
     w.apertures[n] = 1;
     g.openBoss(n);
 

@@ -167,7 +167,7 @@ export function syncGuns(world) {
   const bad = owned.filter((i) => !a.lots[i] || a.lots[i].kind !== 'gun');
   if (bad.length) {
     world.guns = owned.filter((i) => !bad.includes(i));
-    world.energy = (world.energy || 0) + bad.length * lotPrice();
+    world.bytes = (world.bytes || 0) + bad.length * lotPrice();
   }
   for (const i of world.guns || []) {
     const l = a.lots[i];
@@ -234,8 +234,8 @@ export function buildGun(world, i) {
   const owned = world.guns || (world.guns = []);
   if (owned.includes(i)) return 'built';
   const price = lotPrice();
-  if (world.energy < price) return 'poor';
-  world.energy -= price;
+  if (world.bytes < price) return 'poor';
+  world.bytes -= price;
   owned.push(i);
   owned.sort((p, q) => p - q);
   syncGuns(world);

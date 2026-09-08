@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '285';
+export const BUILD = '286';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '285';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'd9d7261';
+export const REV = '5a7e6a6';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1850,6 +1850,18 @@ export const CFG = {
     accel: 300,
   },
 
+  /*
+   * ---- this block keeps its name, and it is not an oversight --------------
+   *
+   * The currency became BYTES and `world.energy` became `world.bytes`, but
+   * this is not the currency: four of its seven fields are not amounts at all
+   * (`pulse` is a radius, `pull` a speed, `tax`/`taxFloor`/`taxCap` are
+   * multipliers), it is the SALVAGE system rather than the money, and
+   * `CFG.bytes` is already taken by the formatter's own table. Two entries
+   * here are also named in `SCALED` by path string, and a renamed leaf there
+   * stops being scaled in silence -- which is a fault this repo has already
+   * shipped once.
+   */
   energy: {
     // How far PULSE reaches to take energy in. Its blast is 340; this is a
     // little wider, because a shockwave that damages a body ought to be able

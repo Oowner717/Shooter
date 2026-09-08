@@ -331,7 +331,7 @@ export class Enemy {
     this.graftSpin = 0;
     this.graftBaseR = 0; // what the body was before any of them
     this.graftBaseHp = 0;
-    this.graftBaseEnergy = 0;
+    this.graftBaseBytes = 0;
     this.tether = null; // the other half of a TOW, if any
     this.traits = null; // the wave's rules, if it was released by a traited one
     this.plateT = 0; // ARMORED: until the plate turns another hit away
@@ -365,7 +365,7 @@ export class Enemy {
     this.ttl = 0;
     // Set when it is made, from the parent's mass. Banked whichever way it
     // goes: reaching the turret, or being destroyed.
-    this.energy = opts.energy || 0;
+    this.bytes = opts.bytes || 0;
     // Marks left on a body by the rounds that do not simply hurt it.
     this.chill = 0; // RIME: seconds of being dragged to a crawl
     this.bounty = 1; // TITHE: what its energy is worth when it goes
@@ -447,7 +447,7 @@ export class Enemy {
     const frac = this.maxHp > 0 ? clamp(this.hp / this.maxHp, 0, 1) : 1;
     this.maxHp = Math.max(1, Math.round(this.graftBaseHp * (1 + G.tough * n)));
     this.hp = Math.max(1, Math.min(this.maxHp, this.maxHp * frac));
-    this.energy = this.graftBaseEnergy * (1 + G.tough * n);
+    this.bytes = this.graftBaseBytes * (1 + G.tough * n);
   }
 
   // ------------------------------------------------------------- behaviour
@@ -1543,7 +1543,7 @@ export class Enemy {
     this.dead = true;
     const t = this.type;
     // Destroying a fragment is a way of collecting it, not a way of losing it.
-    if (this.energy) bank(world, this.energy * this.bounty, this.x, this.y);
+    if (this.bytes) bank(world, this.bytes * this.bounty, this.x, this.y);
     // The harmless ones pay too. It is the one income the tally never sees.
     else if (this.harmless) bank(world, CFG.energy.drift * this.bounty, this.x, this.y);
     explode(this.x, this.y, this.r, t.color, t.glow, this.isDrop ? 0.55 : 1);
@@ -1706,7 +1706,7 @@ export class Enemy {
         hp: 8 + dr,
         vx: this.vx * 0.4 + Math.cos(a) * sp,
         vy: this.vy * 0.4 + Math.sin(a) * sp,
-        energy: each,
+        bytes: each,
       }));
       // TITHE marks the body, but the salvage rides on what the body leaves —
       // so the mark has to come with it or the round pays nothing at all.
@@ -3577,7 +3577,7 @@ function bank(world, amount, x, y) {
   // run, so it is the one place that has to say so.
   if (world.sandbox) return;
   const got = amount * intakeRate(world) * dividend(world);
-  world.energy += got;
+  world.bytes += got;
   // The one place energy enters a run, so the one place the lifetime counter
   // can be kept honest. Net of the corruption tax on purpose: what was taken
   // off you at the intake was never earned.
@@ -3631,7 +3631,7 @@ export function drawIn(world, radius) {
   const r2 = radius * radius;
   let took = 0;
   for (const e of world.drops) {
-    if (e.dead || !e.energy) continue;
+    if (e.dead || !e.bytes) continue;
     if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 > r2) continue;
     absorb(world, e, true);
     took++;
@@ -3641,9 +3641,9 @@ export function drawIn(world, radius) {
 
 /** One mote taken in. */
 export function absorb(world, e, streak = false) {
-  if (e.dead || !e.energy) return;
+  if (e.dead || !e.bytes) return;
   /*
-   * WITH the mark, the way `Enemy.destroy` pays it (`this.energy *
+   * WITH the mark, the way `Enemy.destroy` pays it (`this.bytes *
    * this.bounty`). This is the only collector PULSE's drawIn and INTAKE go
    * through, and it banked the raw energy -- so taking a mote in paid the
    * authored number while shooting the same mote paid the tier's compounding
@@ -3659,14 +3659,14 @@ export function absorb(world, e, streak = false) {
    * The mark is put on the mote deliberately at the site that makes it (see
    * the note there); nothing was reading it back.
    */
-  bank(world, e.energy * (e.bounty || 1), e.x, e.y);
+  bank(world, e.bytes * (e.bounty || 1), e.x, e.y);
   // Drawn in from a distance rather than walked into: show it arriving, or
   // a PULSE that empties the floor is a number in the corner going up.
   if (streak) {
     const s = world.shooter;
     haul(e.x, e.y, s.x, s.y, '#9fe8ff', 0.42, 2.6);
   }
-  e.energy = 0;
+  e.bytes = 0;
   e.dead = true;
   e.dissolved = true;
 }
@@ -3678,7 +3678,7 @@ export function collectEnergy(world, dt) {
   const auto = world.up.intake;
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i];
-    if (e.dead || !e.energy) continue;
+    if (e.dead || !e.bytes) continue;
     const dx = s.x - e.x;
     const dy = s.y - e.y;
     const d2 = dx * dx + dy * dy;
@@ -4439,9 +4439,9 @@ export class Director {
      */
     let margin = 0;
     if (verdict === 'surge' && this.take > 0) {
-      const before = world.energy;
+      const before = world.bytes;
       bank(world, this.take * (T.margin - 1), world.shooter.x, world.shooter.y);
-      margin = Math.round(world.energy - before);
+      margin = Math.round(world.bytes - before);
     }
     this.contact = 0;
     this.hitPatience = false;
@@ -5170,7 +5170,7 @@ export function graft(world, host) {
     host.grafts = [];
     host.graftBaseR = host.r;
     host.graftBaseHp = host.maxHp;
-    host.graftBaseEnergy = host.energy || 0;
+    host.graftBaseBytes = host.bytes || 0;
     host.graftSpin = rand(0.7, 1.3) * (Math.random() < 0.5 ? -1 : 1) * G.spin;
   }
 

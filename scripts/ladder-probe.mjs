@@ -86,7 +86,7 @@ if (PROFILE === 'mid') {
     for (let i = 0; i < 20; i++) {
       const c = NODES.filter((n) => n.id && !n.dormant && !/aperture/.test(n.id) && n.currency !== 'remainder' && g.available(n))
         .map((n) => ({ n, have: g.owned(n.id) })).filter(({ n, have }) => n.repeat || have < (n.levels || 1))
-        .map((x) => ({ ...x, price: priceOf(x.n, x.have) })).filter((x) => x.price <= w.energy).sort((a, b) => a.price - b.price)[0];
+        .map((x) => ({ ...x, price: priceOf(x.n, x.have) })).filter((x) => x.price <= w.bytes).sort((a, b) => a.price - b.price)[0];
       if (!c || g.buy(c.n.id) !== 'ok') break;
     }
   });
@@ -107,7 +107,7 @@ const read = () => page.evaluate(() => {
     rect: { left: r.left, top: r.top }, scale: w.scale, shooter: { x: s.x, y: s.y, r: s.r },
     enemies: w.enemies.filter((e) => !e.dead).map((e) => ({ x: e.x, y: e.y, harmless: !!e.harmless, id: e.type?.id || '?' })),
     hostile: w.enemies.filter((e) => !e.dead && !e.harmless).length,
-    kills: w.kills, energy: Math.round(w.energy), earned: Math.round(w.earned), phase: w.phase, boss: !!w.boss,
+    kills: w.kills, energy: Math.round(w.bytes), earned: Math.round(w.earned), phase: w.phase, boss: !!w.boss,
     dividend: +(g.__dividend ? g.__dividend(w) : 1),
     gated: d.heldBy ? d.heldBy(w) : 0,
     reconciled: [...(w.reconciled || [])],

@@ -289,7 +289,7 @@ for (let r = 0; r < RUNS; r++) {
       // and a wave landing on top of it would be measuring a fight.
       w.director.update = () => {};
 
-      w.energy = spend;
+      w.bytes = spend;
       const bought = [];
       /*
        * In order, stopping at the first thing the budget cannot reach -- not
@@ -440,7 +440,7 @@ for (let r = 0; r < RUNS; r++) {
          */
         let hp = 0;
         for (const e of w.enemies) if (!e.harmless) hp += e.maxHp || 0;
-        const purse0 = w.energy;
+        const purse0 = w.bytes;
 
         w.autoAim = true;
         w.autoFire = true;
@@ -454,8 +454,8 @@ for (let r = 0; r < RUNS; r++) {
         let t = 0;
         while (t < cap2 && live() > 0) { g.update(S); t += S; }
         // Banked, plus everything still lying on the floor unpaid for.
-        let pay = w.energy - purse0;
-        for (const e of w.drops) if (!e.dead && e.energy) pay += e.energy * (e.bounty || 1);
+        let pay = w.bytes - purse0;
+        for (const e of w.drops) if (!e.dead && e.bytes) pay += e.bytes * (e.bounty || 1);
         return {
           asked, pay, hp, secs: t, cleared: live() === 0, left: live(),
           // If anything is still marching when the clock starts, part of what
