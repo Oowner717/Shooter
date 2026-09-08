@@ -2217,4 +2217,21 @@ came from before believing the other one covers it.
   the NUMBER of motes it sheds rather than what they are worth. Two fresh
   numbers would rot the same way; "worth more than twice a MOTE" is what the
   sentence was always about and it follows the config.
+- **A differential across a change needs BOTH builds served in one container,
+  and `--url` is what makes that possible.** Phase 5 of the byte migration ran
+  `tiers.mjs` against build 283 on :8098 and build 287 on :8099 -- a git
+  worktree at the old commit plus a second `http-server` -- because the
+  recorded tables in `docs/pacing.md` are from another container and are not
+  comparable, the same rule the ORDINAL hash already carries. What it proved is
+  the thing the hash cannot see: the hash is one fight at tier 1 with no tree,
+  and the ladder's AFFORDABILITY is a different claim. `buys` identical at all
+  twenty rungs, and the tier-20 loadout identical to the id, is what "the same
+  purchases are still affordable at the same tiers" looks like measured.
+- **A column width is a unit-bearing constant too.** `tiers.mjs` padded `spend`
+  to 9 characters and `pay` to 6, both sized for point-magnitude figures, so at
+  byte magnitudes the band ran into the spend and the pay into the pay/s --
+  while the probe went on exiting 0 with a table nobody could parse. Anything
+  that pads or truncates a figure owes the same question a threshold does: what
+  is the widest value this can now hold? The fix is to format rather than to
+  widen, so the bench prints what the game prints.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

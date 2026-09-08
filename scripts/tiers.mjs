@@ -62,7 +62,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { WAVES, ENEMY_TYPES, CFG, kB } from '../src/config.js';
+import { WAVES, ENEMY_TYPES, CFG, kB, fmtBytes, fmtRate } from '../src/config.js';
 import { NODES, priceOf } from '../src/tree.js';
 
 const require = createRequire(import.meta.url);
@@ -620,12 +620,11 @@ const med = (xs) => {
   return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
 };
 const pad = (s, n) => String(s).padStart(n);
-const num = (n) => (Number.isFinite(n) ? n.toLocaleString('en-US') : '-');
 
 console.log(`\nTHE LADDER — tiers ${FROM}-${TO}, ${RUNS} run${RUNS > 1 ? 's' : ''} each,`
   + ' BOLT and the damage line');
-console.log(`  spend: ${FIXED !== null ? `${num(FIXED)} flat` : "docs/pacing.md's earned-by-tier targets"}`
-  + `, capped at the whole tree (${num(TREE_TOTAL)})`);
+console.log(`  spend: ${FIXED !== null ? `${fmtBytes(FIXED)} flat` : "docs/pacing.md's earned-by-tier targets"}`
+  + `, capped at the whole tree (${fmtBytes(TREE_TOTAL)})`);
 console.log(`  slopes: pop +${CFG.waves.tier.pop * 100}%/tier (cap x${CFG.waves.tier.popCap})`
   + ` · hp x${CFG.waves.tier.hpStep}^(n-1) · bounty x${CFG.waves.tier.bountyStep}^(n-1)`);
 const atRange = [...results.values()].flat()
@@ -633,7 +632,22 @@ const atRange = [...results.values()].flat()
 console.log(`  one body HELD at ${RANGE} units straight up (measured ${med(atRange) || RANGE}),`
   + ` cap ${CAP}s\n`);
 
-console.log('  tier band    spend  buys  rnd/s     dps  worst   wave  clear   pay  pay/s  |  time to kill');
+/*
+ * ---- the currency columns are FORMATTED, and that is not decoration -------
+ *
+ * `spend` was `pad(num(spend), 9)` and `pay` `pad(Math.round(perWave), 6)`,
+ * both sized for point-magnitude figures. In bytes they overflow: measured on
+ * build 287 the band ran into the spend (`22,333,333` is band 2 and 2,333,333)
+ * and the pay ran into the pay/s (`11180712612.9` is 111,807 and 12,612.9).
+ * A table nobody can parse is a table that stopped being an instrument, and it
+ * exits 0 either way -- which is the failure mode this repo keeps paying for.
+ *
+ * Formatted rather than merely widened, because the figures are the game's
+ * currency and the game prints them this way from build 285: a column that
+ * reads `500 kB` against a card that reads `500 kB` is one fewer conversion
+ * between the bench and the thing it is benching.
+ */
+console.log('  tier band     spend  buys  rnd/s     dps  worst   wave  clear       pay      pay/s  |  time to kill');
 const worst = new Map();
 const clears = new Map();
 const pays = new Map();
@@ -683,12 +697,12 @@ for (const tier of tiers) {
   const perSec = med(runs.map((r) => r.wave.pay / Math.max(0.1, r.wave.secs)));
   pays.set(tier, perSec);
 
-  console.log(`  ${pad(tier, 4)}${pad(band, 5)}${pad(num(spend), 9)}${pad(Math.round(buys), 6)}`
+  console.log(`  ${pad(tier, 4)}${pad(band, 5)}${pad(fmtBytes(spend), 10)}${pad(Math.round(buys), 6)}`
     + `${pad(rps.toFixed(1), 7)}${pad(dps.toFixed(0), 8)}`
     + `${pad(Number.isFinite(top) ? `${top.toFixed(1)}s` : `>${CAP}s`, 7)}`
     + `${pad(Math.round(asked), 7)}`
     + `${pad(stuck ? `>${WAVECAP}s` : `${clear.toFixed(0)}s${spread > 2 ? '~' : ''}`, 7)}`
-    + `${pad(Math.round(perWave), 6)}${pad(perSec.toFixed(1), 7)}  |  ${cells.join('   ')}`);
+    + `${pad(fmtBytes(perWave), 10)}${pad(fmtRate(perSec), 11)}  |  ${cells.join('   ')}`);
 }
 
 /*
@@ -718,14 +732,14 @@ for (const tier of shown) {
   for (const id of r.bought) count[id] = (count[id] || 0) + 1;
   const list = Object.entries(count)
     .map(([id, n]) => (n > 1 ? `${id}x${n}` : id)).join(' ');
-  console.log(`    tier ${String(tier).padEnd(3)} ${num(r.spend).padStart(7)}  ${list}`);
+  console.log(`    tier ${String(tier).padEnd(3)} ${fmtBytes(r.spend).padStart(9)}  ${list}`);
 }
 
 console.log(`\n  rnd/s    projectiles a second, counted at the muzzle, against a wall for ${BENCH}s`);
 console.log('  dps      ...and what landed on it, a second — armour already paid for');
 console.log('  worst    the slowest member of the band: what the tier is bounded by');
 console.log('  wave     bodies in the band\'s heaviest authored wave, at this tier\'s size');
-console.log('  pay      energy the wave offers, banked plus still on the floor');
+console.log('  pay      bytes the wave offers, banked plus still on the floor');
 console.log('  pay/s    ...over the seconds it took.');
 console.log('           NOT a run\'s income. This is the band\'s HEAVIEST wave, alone, with');
 console.log('           no rest between waves and the floor counted as collected — about');

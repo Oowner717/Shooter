@@ -279,6 +279,18 @@ Each phase ends green, with the suite run and the build pushed.
 
 Phase 1 is worth doing on its own and is safe to stop after.
 
+**Phase 5 is done and the claim holds.** `tiers.mjs` was run as a differential
+in one container -- build 283 on one port against 287 on another, tiers 1-20,
+two runs each. `buys` is identical at all twenty rungs and the tier-20 loadout
+matches to the id; `dps` and `rnd/s` take the same two values in both tables;
+`worst` tracks within the bench's own +/-10%; `pay` is x1000 within the
+run-to-run spread of a measured wave. The migration is a unit change.
+
+It also found the bench's own readout broken -- `spend` padded to 9 characters
+and `pay` to 6, both sized for points, so at byte magnitudes the columns ran
+together while the probe went on exiting 0. The currency columns are formatted
+now.
+
 **Phase 4 shipped in build 287.** Every player-facing string moved to the §5
 vocabulary, and the "no bare integer" sweep that proves it is finished went in
 with it -- three cases (the string tables by shape, the rendered chrome, and

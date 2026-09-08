@@ -4177,3 +4177,63 @@ things and its notes still say testbed. What is swept is what a player can
 read. The one exception was `debris.js`'s header, which does not describe
 history but *defines* the distinction it is drawing, and was therefore simply
 false.
+
+## Phase 5 — the income curve, measured either side of the change
+
+`docs/bytes.md` §1's whole claim is that ×1000 is a unit change and not a
+rebalance: every ratio preserved to the digit. The ORDINAL hash proved that for
+one fight at tier 1. What it cannot see is the **ladder** — whether the same
+purchases are still affordable at the same tiers, which is what `tiers.mjs`
+measures and what a unit change could silently break by scaling prices and
+budgets by different amounts.
+
+So it was run as a differential, in one container, on two servers: build **283**
+(the formatter exists, nothing calls it — the pre-migration economy) on :8098
+against build **287** on :8099, tiers 1–20, two runs each.
+
+### `buys` is identical at every tier
+
+The count of nodes the tier's budget affords, in a fixed damage-line order,
+breaking on the first refusal:
+
+```
+tier   1  2  3  4  5  6   7   8   9  10  11  12  13  14  15   16   17   18   19   20
+283    1  2  3  5  5  8  12  16  25  33  15  24  38  58  82  111  141  141  141  141
+287    1  2  3  5  5  8  12  16  25  33  15  24  38  58  82  111  141  141  141  141
+```
+
+An integer, exact, at all twenty rungs. And **the tier-20 loadout is identical
+to the id** — the same 141 entries in the same order, from `hollowpointx5` to
+`heave deadbolt`. That is the affordability relationship, unmoved.
+
+### Everything else is the same shape or exactly ×1000
+
+- `dps` alternates between **485 and 502 in both tables**, at different tiers in
+  each — a two-valued measurement, so the difference is the bench's own noise
+  and not a shift. `rnd/s` likewise (4.7/4.8).
+- `worst` (the slowest body in the band) tracks within the bench's ±10%: 0.2s at
+  tier 1, ~3s at 3, ~1s at 5–6, ~4s at 9, ~9.5s at 20, in both. Same curve.
+- `pay` is ×1000 to within the run-to-run spread of a measured wave — 36 →
+  36.0 kB, 1,190 → 1.19 MB, 3,221 → 3.22 MB.
+- `pay/s` rises from ~3/s at tier 1 to ~48/s at the top in both, which is the
+  income shape CLAUDE.md already records.
+
+The claim holds.
+
+### ...and the instrument's readout had broken, silently
+
+`spend` was padded to 9 characters and `pay` to 6, both sized for
+point-magnitude figures. In bytes they overflow, and the build-287 table came
+out with its columns run together: `22,333,333` is band 2 followed by a spend
+of 2,333,333, and `11180712612.9` is a pay of 111,807 followed by 12,612.9 a
+second. The probe exits 0 either way — a table nobody can parse is a table that
+has stopped being an instrument, and this is the same shape as the readouts
+build 227 found rotting.
+
+Fixed by **formatting** rather than widening: the currency columns run through
+`fmtBytes`/`fmtRate` now, so the bench prints `500 kB` against a card that
+prints `500 kB` and there is one fewer conversion between the bench and the
+thing it benches. `num()`, the thousands-separator helper, had no callers left
+and came out with it.
+
+No build number: nothing served changed, so nothing installed needs to reload.

@@ -1,5 +1,13 @@
 # The three clocks — v3
 
+> **UNITS.** Every currency figure in this document is in the ORIGINAL POINTS.
+> The game counts in BYTES from build 284, at exactly **one old point = one
+> kilobyte** -- so a "500" here is `kB(500)` and reads as `500 kB` on the
+> glass. Nothing in the tables below moved when the unit did; that was the
+> whole claim of `docs/bytes.md` §1, and the ORDINAL hash coming back to the
+> bit is what proved it. Multiply by a thousand to compare a figure here
+> against one the game prints.
+
 Wave pacing, damage pacing, energy pacing. v1 was the proposal; the six open
 questions came back answered; v2 folded them in; this is v3, after a review
 pass over v2 found five holes. Still a plan — nothing implemented.
