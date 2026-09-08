@@ -2234,4 +2234,17 @@ came from before believing the other one covers it.
   that pads or truncates a figure owes the same question a threshold does: what
   is the widest value this can now hold? The fix is to format rather than to
   widen, so the bench prints what the game prints.
+- **A THROW in the draw path reads as a freeze, and nothing in this suite could
+  see one.** `Axiom.draw` passed `this.t` where `Boss.drawHole(ctx, C, T,
+  arriving)` wants the TYPE, so `rgba(undefined, ...)` threw on `.slice` every
+  frame of the arrival; a throw inside the rAF loop kills the loop, the last
+  painted frame stays on the glass, and the report is "boss screen freezes".
+  TESSERA had the identical line. Both shipped in builds 273-274 and the two
+  fights were unreachable for fourteen builds, because **no boss case in the
+  suite ever called `g.draw()`** -- six hundred cases drive `g.update` and none
+  of them paints, so a fault living entirely in a draw path is invisible to all
+  of them. Two further doors were open on the same bug: both boss sweeps were
+  bounded `n <= 7`, written when there were seven, and every boss case sets
+  `b.arriving = 0`, which is the one window `drawHole` runs in. When a report
+  says "freezes", look for a throw before looking for a loop.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

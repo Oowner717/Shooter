@@ -6086,19 +6086,27 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  * never as kills. `counts = false` could not be the mark on its own: it is set
  * on drift and on everything an APERTURE clears off the field as well.
  *
- * This walks all seven, because the mark has to be applied at every spawn site
- * in seven files and a missed one is invisible until someone watches an outro.
- * ORDINAL had exactly that: it keeps its own copy of the death sequence, so
- * the fix to the base class did nothing for it and its garrison flew on.
+ * This walks EVERY anomaly, because the mark has to be applied at every spawn
+ * site in nine files and a missed one is invisible until somebody watches an
+ * outro. ORDINAL had exactly that: it keeps its own copy of the death
+ * sequence, so the fix to the base class did nothing for it and its garrison
+ * flew on.
+ *
+ * The bound is `ANOMALIES.length` and not a literal. It was `n <= 7`, written
+ * when there were seven -- so AXIOM and TESSERA, built afterwards, were
+ * outside the two sweeps that exist to watch a boss through its own ending,
+ * and stayed outside them for fourteen builds. A count of the roster is a
+ * maintenance trap; ask the roster. (The same literal was in the sweep below
+ * it, for the same reason.)
  */
 {
   const r = await page.evaluate(async () => {
     const g = window.__sim;
     const w = g.world;
     const { CFG } = await import('../src/config.js');
-    const { dressOf } = await import('../src/anomaly.js');
+    const { dressOf, ANOMALIES } = await import('../src/anomaly.js');
     const out = [];
-    for (let n = 1; n <= 7; n++) {
+    for (let n = 1; n <= ANOMALIES.length; n++) {
       g.restart();
       w.phase = 'staging';
       w.director.timer = 1e9; w.director.driftTimer = 1e9;
@@ -6140,13 +6148,14 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const made = r.filter((x) => x.held > 0);
   const clean = r.filter((x) => x.after === 0 && x.peak === 0);
   check('nothing a boss made is still flying during its own outro',
-    clean.length === 7 && made.length >= 5,
-    `${made.length} of 7 had minions out during the fight (most at once: `
+    clean.length === r.length && made.length >= 5,
+    `${made.length} of ${r.length} had minions out during the fight (most at once: `
     + `${r.map((x) => x.held).join('/')}); left on the field once it died: `
     + `${r.map((x) => x.after).join('/')}; arriving during the outro: `
     + `${r.map((x) => x.peak).join('/')}`);
-  check('...and every one of the seven reaches the end of its ending',
-    r.every((x) => x.ended), `ran out: ${r.filter((x) => x.ended).length} of 7`);
+  check('...and every one of them reaches the end of its ending',
+    r.length > 0 && r.every((x) => x.ended),
+    `ran out: ${r.filter((x) => x.ended).length} of ${r.length}`);
 }
 
 // --- ...and nothing is left to shoot at while it happens ---------------------
@@ -6172,9 +6181,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const g = window.__sim;
     const w = g.world;
     const { CFG } = await import('../src/config.js');
-    const { dressOf } = await import('../src/anomaly.js');
+    const { dressOf, ANOMALIES } = await import('../src/anomaly.js');
     const out = [];
-    for (let n = 1; n <= 7; n++) {
+    for (let n = 1; n <= ANOMALIES.length; n++) {
       g.restart();
       w.phase = 'staging';
       w.director.timer = 1e9; w.director.driftTimer = 1e9;
@@ -6212,6 +6221,97 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `of ${r.map((x) => x.frames).join('/')}; peak corruption `
     + `${r.map((x) => x.shock).join('/')}; bodies still drawn through it `
     + `${r.map((x) => x.drawn).join('/')}`);
+}
+
+// --- every anomaly can be DRAWN, arriving and dying -------------------------
+/*
+ * Reported from a phone as "boss screen freezes", with a screenshot of AXIOM
+ * mid-arrival and the whole game stopped dead. It was not a hang: `Axiom.draw`
+ * threw on the first frame of the arrival, every frame, and a throw inside the
+ * rAF loop kills the loop -- so the last painted frame stays on the glass and
+ * nothing moves again. A crash and a freeze look identical from outside.
+ *
+ * The cause was an argument in the wrong place. `Boss.drawHole(ctx, C, T,
+ * arriving)` takes the TYPE third, for `T.glow`; AXIOM and TESSERA both passed
+ * `this.t`, their own clock, so `rgba(undefined, ...)` threw on `.slice`. The
+ * other seven pass `T`. Both were written in the same session and both shipped
+ * -- the eighth and ninth fights have been unreachable since they went in.
+ *
+ * NOTHING IN THE SUITE COULD SEE IT, for three separate reasons, and the third
+ * is the one worth keeping:
+ *
+ *   1. the two boss sweeps were bounded `n <= 7`, written when there were
+ *      seven (fixed above -- they ask the roster now);
+ *   2. every boss case sets `b.arriving = 0` to skip the wait, and `drawHole`
+ *      returns immediately unless the boss is arriving or dying;
+ *   3. **no boss case ever called `g.draw()`.** Six hundred cases drive
+ *      `g.update` and none of them paints, so a fault that lives entirely in
+ *      a draw path is invisible to all of them however many bosses they walk.
+ *
+ * So this one paints. It is deliberately not a picture test -- what it asserts
+ * is that the frame can be produced at all -- and it covers both windows,
+ * because `drawHole` is the same call for the arrival and for the ending.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    const { dressOf, ANOMALIES } = await import('../src/anomaly.js');
+    const out = [];
+    for (let n = 1; n <= ANOMALIES.length; n++) {
+      const row = { n, name: dressOf(n).name, arriving: 0, dying: 0, threw: null };
+      try {
+        g.restart();
+        w.phase = 'staging';
+        w.director.timer = 1e9; w.director.driftTimer = 1e9;
+        for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+        w.apertures[n] = 1;
+        g.openBoss(n);
+        const b = w.boss;
+        // The ARRIVAL, painted -- which is the window the report came from and
+        // the one every other boss case skips.
+        for (let i = 0; i < 90 && w.boss && b.arriving > 0; i++) {
+          g.update(1 / 60);
+          g.draw();
+          row.arriving++;
+        }
+        // ...and the ENDING, through the boss's own death rather than a
+        // shortcut, because three of them trigger on something other than the
+        // core's body.
+        b.arriving = 0;
+        b.settle(w);
+        g.update(1 / 60);
+        b.die(w, CFG[dressOf(n).name.toLowerCase()]);
+        for (let i = 0; i < 240 && w.boss; i++) {
+          g.update(1 / 60);
+          g.draw();
+          row.dying++;
+        }
+      } catch (e) {
+        row.threw = `${e.message}`;
+      }
+      out.push(row);
+    }
+    g.restart();
+    return out;
+  });
+
+  const broke = r.filter((x) => x.threw);
+  check('every anomaly can be drawn, through its arrival and through its ending',
+    broke.length === 0 && r.length >= 9,
+    broke.length
+      ? broke.map((x) => `${x.name}: ${x.threw}`).join(' | ')
+      : `${r.length} walked; frames painted arriving `
+        + `${r.map((x) => x.arriving).join('/')} and dying `
+        + `${r.map((x) => x.dying).join('/')}`);
+
+  // ...and the arrival window is real. Every one of them has to have painted
+  // frames while `arriving > 0`, or the case is walking past the very state it
+  // was written for -- which is how it stayed invisible the first time.
+  check('...and every one of them actually painted an arrival, not a settled boss',
+    r.every((x) => x.arriving > 0),
+    `frames while arriving: ${r.map((x) => `${x.name} ${x.arriving}`).join(', ')}`);
 }
 
 // --- TALLY, the one heal in the back half ------------------------------------

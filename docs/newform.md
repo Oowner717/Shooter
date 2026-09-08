@@ -4237,3 +4237,57 @@ thing it benches. `num()`, the thousands-separator helper, had no callers left
 and came out with it.
 
 No build number: nothing served changed, so nothing installed needs to reload.
+
+## Build 288 — the last two fights could not be drawn
+
+Reported from a phone as **"boss screen freezes"**, with a screenshot of AXIOM
+mid-arrival and the whole game stopped dead.
+
+It was not a hang. `Axiom.draw` threw on the first frame of the arrival and on
+every frame after it, and a throw inside the rAF loop kills the loop — so the
+last painted frame stays on the glass and nothing moves again. **A crash and a
+freeze look identical from outside**, which is why the report says freeze.
+
+### One argument in the wrong place
+
+`Boss.drawHole(ctx, C, T, arriving)` takes the TYPE third, for `T.glow`.
+
+```js
+src/axiom.js:403     this.drawHole(ctx, C, this.t, arriving);   // the boss's own clock
+src/tessera.js:386   this.drawHole(ctx, C, this.t, arriving);
+```
+
+The other seven pass `T`. So `rgba(undefined, ...)` threw on `.slice`, in both
+— written in the same session, shipped in builds 273 and 274, and **the eighth
+and ninth fights have been unreachable ever since**. Nothing else was wrong
+with either boss; the fix is two identifiers.
+
+### Three reasons the suite could not see it, and the third is the lesson
+
+1. **Both boss sweeps were bounded `n <= 7`** — written when there were seven.
+   AXIOM and TESSERA were built afterwards and were never added, so for
+   fourteen builds the two cases that exist to walk a boss through its own
+   ending walked past them. That is the maintenance trap CLAUDE.md already
+   names for the roster: they ask `ANOMALIES.length` now, and extending them
+   found nothing else wrong — the minion marks and the `spent` marks in both
+   new fights were correct all along.
+2. **Every boss case sets `b.arriving = 0`** to skip the wait, and `drawHole`
+   returns immediately unless the boss is arriving or dying. The one window
+   the fault lives in is the one they all skip.
+3. **No boss case ever called `g.draw()`.** Six hundred cases drive `g.update`
+   and not one of them paints, so a fault living entirely in a draw path is
+   invisible to all of them however many bosses they walk.
+
+### The case
+
+`every anomaly can be drawn, through its arrival and through its ending` walks
+the whole roster, paints frames while `arriving > 0`, then kills each boss
+through its own death and paints its outro. It asserts only that the frame can
+be produced — it is not a picture test — and it carries a vacuity arm requiring
+every anomaly to have painted a real arrival, because walking past the state
+is exactly how this stayed hidden.
+
+Proved rather than argued: with the two-line fix stashed, both arms fail and
+everything else stays green.
+
+629 green.

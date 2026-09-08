@@ -383,7 +383,7 @@ export class Tessera extends Boss {
     const k = CFG.hairline;
 
     ctx.save();
-    this.drawHole(ctx, C, this.t, arriving);
+    this.drawHole(ctx, C, TY, arriving);
 
     /*
      * The SURVEY: a hairline box round every berth, laid or not. It is what

@@ -400,7 +400,7 @@ export class Axiom extends Boss {
     const k = CFG.hairline;
 
     ctx.save();
-    this.drawHole(ctx, C, this.t, arriving);
+    this.drawHole(ctx, C, T, arriving);
 
     /*
      * The ARGUMENT: a line from the core to every clause still standing. It is
