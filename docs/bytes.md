@@ -270,6 +270,24 @@ Each phase ends green, with the suite run and the build pushed.
 
 Phase 1 is worth doing on its own and is safe to stop after.
 
+**Phase 2 shipped in build 284**, with one deliberate departure from the
+phase list above: **the `world.energy` -> `world.bytes` rename is NOT in it.**
+The store now holds bytes, every price is authored through a helper, and the
+save migrates -- but the field is still called `energy`.
+
+The reason is that a rename and a rescale fail differently and should not fail
+together. The rescale is a change of VALUE that the suite can catch by
+arithmetic; the rename is a change of NAME whose failure mode is a silent
+`undefined` at a site nobody swept, and it reaches about 250 places (40 in
+`src/`, the rest in `regress.mjs`). Shipped in one build, a red case could mean
+either, and the useful property of a pure rename -- that green means nothing
+but names moved -- is exactly what mixing them destroys. It is phase 2b and it
+is worth doing on its own.
+
+Everything else in phase 2 is done, plus one thing the phase list did not name:
+the nine dead `cost` fields in the anomaly configs were **deleted** rather than
+rescaled, which is what §6 recommended.
+
 **Phase 1 shipped in build 283.** `CFG.bytes`, `fmtBytes`, `fmtRate` and the
 four helpers are in `src/config.js` with four cases behind them; the ruling on
 the base is decimal (1 kB is 1000 B). Nothing calls any of it yet, so the game

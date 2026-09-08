@@ -6,7 +6,7 @@ import { swipeToDismiss } from './swipe.js';
 import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
 import { pref, setPref } from './settings.js';
-import { BUILD, REV, CFG, ENEMY_TYPES, TYPE_BY_ID } from './config.js';
+import { BUILD, REV, CFG, ENEMY_TYPES, TYPE_BY_ID, kB, MB } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
 
 import { CODEX, FIELD_ENTRIES, ANOMALY_ENTRIES, codex, markLine, forgetPlayer } from './codex.js';
@@ -1695,7 +1695,7 @@ export class Hud {
 
       ['THE RUN', 'head'],
       ['BOSS FIGHT…', () => this.showScreen('boss'), 'wide', true],
-      ['+10000 ENERGY', () => g.debugGiveEnergy(10000)],
+      ['+10000000 ENERGY', () => g.debugGiveEnergy(MB(10))],
       ['+50 KILLS', () => g.debugAddKills(50)],
       ['MAX UPGRADES', () => g.debugBuyAll()],
       ['UNLOCK ALL', () => g.debugUnlockAll()],
@@ -2333,7 +2333,9 @@ export class Hud {
     b.textContent = 'CONTINUE';
     const bits = [];
     if (Number.isFinite(d.kills)) bits.push(`${d.kills} OBJECTS`);
-    if (Number.isFinite(d.energy) && d.energy >= 1) bits.push(`${Math.floor(d.energy)} ENERGY`);
+    // At least a kilobyte, which is what "at least one point" meant before
+    // the byte migration. One BYTE would be met by every save ever written.
+    if (Number.isFinite(d.energy) && d.energy >= kB(1)) bits.push(`${Math.floor(d.energy)} ENERGY`);
     if (d.remainder > 0) bits.push(`${d.remainder}◆ REMAINDER`);
     const ago = ageOf(d.at);
     if (ago) bits.push(ago);

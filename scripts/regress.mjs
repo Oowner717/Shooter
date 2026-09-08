@@ -157,7 +157,7 @@ await page.waitForTimeout(900);
     const was = g.world.phase;
     g.world.phase = 'staging';
     g.world.kills = 348;
-    g.world.energy = 2140;
+    g.world.energy = 2140000;
     codex.record('mote');
     codex.record('ordinal');
     saveRun(g.world, g);
@@ -259,7 +259,7 @@ const drive = async (name, fn, wait = 300) => {
 
 let subsystems = true;
 subsystems = (await drive('teach', () => window.__sim.debugTeachAll())) && subsystems;
-subsystems = (await drive('energy', () => window.__sim.debugGiveEnergy(200000))) && subsystems;
+subsystems = (await drive('energy', () => window.__sim.debugGiveEnergy(200000000))) && subsystems;
 subsystems = (await drive('buy all', () => window.__sim.debugBuyAll(), 700)) && subsystems;
 subsystems = (await drive('fill', () => window.__sim.debugFillField(), 700)) && subsystems;
 
@@ -309,7 +309,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const g = window.__sim;
     const save = await import('../src/save.js');
     g.debugAddKills(20);
-    g.debugGiveEnergy(3000);
+    g.debugGiveEnergy(3000000);
     g.buy('rate');
     if (g.saveNow) g.saveNow();
     const raw = JSON.parse(localStorage.getItem('sim7749-run') || 'null');
@@ -372,7 +372,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 {
   const r = await page.evaluate(() => {
     const g = window.__sim;
-    g.debugGiveEnergy(3000);
+    g.debugGiveEnergy(3000000);
     g.hud.menu.setOpen(true);
     g.hud.menu.show('tree');
     document.querySelectorAll('.branchRow')[1].click();
@@ -407,7 +407,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * open half of the room is the half that gets measured -- the shut half
      * is one heading and two lines and was the only part visible before.
      */
-    g.world.energy = 999999;
+    g.world.energy = 999999000;
     g.buy('sandbox');
     g.hud.menu.syncSandbox();
     const panels = [];
@@ -546,12 +546,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         drawn: cv ? cv.width > 0 && cv.height > 0 : false,
       };
     };
-    g.debugGiveEnergy(9000);
+    g.debugGiveEnergy(9000000);
     m.drawHero(1000);
     const bare = read();
 
     g.debugBuyAll();
-    g.debugGiveEnergy(90000);
+    g.debugGiveEnergy(90000000);
     m.drawHero(2000);
     const full = read();
     m.setOpen(false);
@@ -650,7 +650,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   const r = await page.evaluate(async () => {
     const g = window.__sim;
     const m = g.hud.menu;
-    g.debugGiveEnergy(90000);
+    g.debugGiveEnergy(90000000);
     m.setOpen(true);
     m.show('tree');
     const out = { arms: [], clipped: [], mods: 0, headed: 0 };
@@ -776,7 +776,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 {
   const r = await page.evaluate(() => {
     const m = window.__sim.hud.menu;
-    window.__sim.debugGiveEnergy(9000);
+    window.__sim.debugGiveEnergy(9000000);
     m.setOpen(true);
     m.show('tree');
     /*
@@ -827,7 +827,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const m = g.hud.menu;
     g.restart();
     g.world.phase = 'staging';
-    g.debugGiveEnergy(9000);
+    g.debugGiveEnergy(9000000);
     m.setOpen(true);
     m.show('tree');
     m.syncTree();
@@ -968,7 +968,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     d.shuffle(w);           // a rotation decided when almost nothing is unlocked
     const before = d.order.length;
     const missing = WAVES.map((wv, i) => i).filter((i) => !WAVES[i].teach && !d.order.includes(i));
-    w.earned = 999999;      // everything is open now, mid-rotation
+    w.earned = 999999000;      // everything is open now, mid-rotation
     d.begin(w);
     const after = d.order.length;
     /*
@@ -1248,7 +1248,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.restart();
     w.director.timer = 1e9; w.director.driftTimer = 1e9;
     g.debugClearField();
-    g.debugGiveEnergy(200000);
+    g.debugGiveEnergy(200000000);
     const bought = { heavy: 0, sledge: 0 };
     for (let i = 0; i < 6; i++) {
       if (g.buy('heavy') === 'ok') bought.heavy++;
@@ -1372,7 +1372,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       g.debugTeachAll();
       w.director.update = () => {};
       w.director.timer = 1e9; w.director.driftTimer = 1e9;
-      g.debugGiveEnergy(400000);
+      g.debugGiveEnergy(400000000);
       g.debugBuyAll();
       w.director.setTier(20);
       for (const e of [...w.enemies]) e.dead = true;
@@ -1729,7 +1729,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const w = g.world;
     g.restart();
     w.phase = 'staging';
-    g.debugGiveEnergy(5000);
+    g.debugGiveEnergy(5000000);
     // Handed rather than bought from build 227. Two of them, because what
     // this is about is that opening one spends one and a reload does not put
     // it back -- and the ledger no longer carries an `aperture` id at all.
@@ -1770,7 +1770,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.phase = 'staging';
     w.director.timer = 1e9; w.director.driftTimer = 1e9;
     for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
-    g.debugGiveEnergy(9000);
+    g.debugGiveEnergy(9000000);
     w.aperture = 1;
     g.openBoss();
     const bo = w.boss;
@@ -2091,7 +2091,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const tapNodes = [...NODE_BY_ID.keys()].filter((k) => /tap$/.test(k));
 
     // Everything, then fire at nothing for four seconds and count the muzzle.
-    g.debugGiveEnergy(200000);
+    g.debugGiveEnergy(200000000);
     g.debugBuyAll();
     g.toggleRound('spine');
     w.autoAim = false;
@@ -2193,7 +2193,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * counter that was working: 28 banked, 2,000 granted, 2,028 lifetime, and
      * an assertion that had not been told about the second number.
      */
-    g.debugGiveEnergy(2000);
+    g.debugGiveEnergy(2000000);
     const afterGrant = w.earned;
     const purseBefore = w.energy;
     g.buy('hollowpoint');
@@ -2208,12 +2208,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const openAtThreshold = d().eligible(w, towWave);
     // ...and it is the earned clock, not the purse.
     w.earned = 0;
-    w.energy = 999999;
+    w.energy = 999999000;
     const purseDoesNotOpen = d().eligible(w, towWave);
     w.energy = 0;
 
     // ---- a save that predates the clock ----
-    w.earned = 4321;
+    w.earned = 4321000;
     w.phase = 'staging';
     const file = captureRun(w, g);
     const wrote = file && file.earned;
@@ -2249,12 +2249,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `with a full purse and nothing earned: ${r.purseDoesNotOpen}`);
 
   /*
-   * 240 kills x 12 is the rate the thresholds were pitched from, so a veteran
-   * comes back holding everything they had. Seeding at 0 would have re-locked
-   * nine of the ten types on every run open when this shipped.
+   * 240 kills at twelve KILOBYTES each is the rate the thresholds were pitched
+   * from, so a veteran comes back holding everything they had. Seeding at 0
+   * would have re-locked nine of the ten types on every run open when this
+   * shipped. The rate is `kills * kB(12)` from the byte migration and the
+   * gates moved by the same thousand, so what this proves is unchanged --
+   * `check-build.mjs` holds the other half of it against the frozen kill
+   * gates.
    */
   check('a save from before the clock is migrated rather than reset',
-    r.wrote === 4321 && r.migrated === 2880,
+    r.wrote === 4_321_000 && r.migrated === 2_880_000,
     `wrote ${r.wrote}; a pre-clock save at 240 kills came back at ${r.migrated} earned`);
 }
 
@@ -2450,7 +2454,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const ranD = w.director.update;
     w.director.update = () => {};
     w.enemies.length = 0;
-    g.debugGiveEnergy(200000);
+    g.debugGiveEnergy(200000000);
     g.debugBuyAll();
 
     // Two of them, on the mount, which is what REFLEX keyed on.
@@ -2794,7 +2798,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.debugTeachAll();
     const ranD = w.director.update;
     w.director.update = () => {};
-    g.debugGiveEnergy(9000);
+    g.debugGiveEnergy(9000000);
     g.buy('driftaim');
     g.buy('driftaim');
 
@@ -3102,7 +3106,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.debugTeachAll();
     const ranD = w.director.update;
     w.director.update = () => {};
-    g.debugGiveEnergy(9000);
+    g.debugGiveEnergy(9000000);
     g.buy('driftaim');
     g.buy('driftaim');
     await new Promise((res) => setTimeout(res, 120));
@@ -3341,7 +3345,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      */
     g.restart();
     g.debugTeachAll();
-    g.debugGiveEnergy(200000);
+    g.debugGiveEnergy(200000000);
     g.debugBuyAll();
     for (let n = 1; n <= 7; n++) if (!w.reconciled.includes(n)) w.reconciled.push(n);
     w.autoAim = true; w.autoFire = true;
@@ -6089,7 +6093,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.director.timer = 1e9; w.director.driftTimer = 1e9;
     for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
     for (const d of [...w.drops]) d.dead = true; w.drops.length = 0;
-    g.debugGiveEnergy(9000);
+    g.debugGiveEnergy(9000000);
     g.debugFillField();
     for (let i = 0; i < 12; i++) en.spawnDrift(w, { x: 60 + i * 40, y: 320 + (i % 4) * 130 });
     for (const e of w.enemies) { e.staged = false; e.spawnIn = 0; }
@@ -6143,7 +6147,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.restart();
     w.phase = 'staging';
     g.debugTeachAll();
-    g.debugGiveEnergy(9000);
+    g.debugGiveEnergy(9000000);
     const d = w.director;
     // run on until a wave is genuinely mid-release
     let guard = 0;
@@ -6202,7 +6206,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const { ANOMALIES } = await import('../src/anomaly.js');
     g.restart();
     w.phase = 'staging';
-    g.debugGiveEnergy(9000);
+    g.debugGiveEnergy(9000000);
     w.remainder = 2;
     const first = TREE[0];
 
@@ -6318,7 +6322,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const w = g.world;
     g.restart();
     w.phase = 'staging';
-    g.debugGiveEnergy(2600);
+    g.debugGiveEnergy(2600000);
     g.hud.menu.setOpen(false);
     g.hud.menu.lastPurse = null;
     g.hud.menu.sync(w);
@@ -6359,7 +6363,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const { readRun } = await import('../src/save.js');
     g.restart();
     g.world.phase = 'staging';
-    g.debugGiveEnergy(700);
+    g.debugGiveEnergy(700000);
     g.world.kills = 41;
     g.checkpoint();          // a good file, and a backup of the one before
     g.world.kills = 88;
@@ -6426,7 +6430,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.hud.showRecord();
     const cold = { start: box('startBtn'), resume: box('resumeBtn'), record: box('bootRecord') };
     // ...and with a run on disk, which is the state CONTINUE exists in.
-    g.debugGiveEnergy(50);
+    g.debugGiveEnergy(50000);
     g.world.kills = 41;
     g.checkpoint();
     g.hud.offerResume();
@@ -6454,7 +6458,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    */
   const label = await page.evaluate(() => {
     const g = window.__sim;
-    g.debugGiveEnergy(50);
+    g.debugGiveEnergy(50000);
     g.world.kills = 137;
     g.checkpoint();
     g.hud.offerResume();
@@ -6643,7 +6647,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    */
   await page.evaluate(() => {
     const g = window.__sim;
-    g.debugGiveEnergy(2600);
+    g.debugGiveEnergy(2600000);
     g.hud.menu.setOpen(true);
     g.hud.menu.show('tree');
     // Open one, so there are cards in every state to look at.
@@ -6750,7 +6754,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    */
   const read = async (group) => {
     await page.evaluate((g) => {
-      window.__sim.debugGiveEnergy(4000);
+      window.__sim.debugGiveEnergy(4000000);
       window.__sim.hud.menu.setOpen(false);
       window.__sim.openLoadout(g);
     }, group);
@@ -9227,7 +9231,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // still locked. A run that has not opened band 4 cannot play band 4.
     g.restart();
     w.phase = 'staging';
-    w.earned = 999999;
+    w.earned = 999999000;
     d.setTier(20);
     d.shuffle(w);
     const [lo, hi] = d.bandsFor(20);
@@ -9284,7 +9288,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * says. At tier 30 the multiplier is hpStep^29, about 25x.
      */
     d.reset();
-    w.earned = 999999;
+    w.earned = 999999000;
     d.setTier(30);
     const teach = WAVES.find((x) => x.teach && x.of.length);
     const plain = WAVES.find((x) => !x.teach && x.of.length);
@@ -10072,7 +10076,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.inTree = nodes.length;
     out.rungs = nodes.map((n) => n.rung);
     g.restart();
-    g.debugGiveEnergy(500000);
+    g.debugGiveEnergy(500000000);
     d.setTier(1); d.peak = 1;
     out.sealedLow = nodes.every((n) => !g.available(n));
     d.setTier(T.sheetRung); d.peak = T.sheetRung;
@@ -10388,7 +10392,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     // ---- dirty every new field with a value nothing defaults to ----
     g.restart();
-    g.debugGiveEnergy(500000);
+    g.debugGiveEnergy(500000000);
     d.setTier(14); d.peak = 19;
     g.buy('recall'); g.buy('overclock');   // sealed until rung 10; peak is 19
     out.bought = { recall: d.recall.max, overclock: d.overclock.max };
@@ -12398,7 +12402,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       g.restart();
       w.phase = 'staging';
       w.autoAim = true; w.autoFire = true;
-      if (buy) { g.debugGiveEnergy(400000); g.debugBuyAll(); }
+      if (buy) { g.debugGiveEnergy(400000000); g.debugBuyAll(); }
       if (n === 1) w.aperture = 1; else w.apertures[n] = 1;
       g.openBoss(n);
       /*
@@ -12430,7 +12434,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.up = freshUpgrades();
     w.autoAim = true; w.autoFire = true;
     out.stockScale = +gunScale(w).toFixed(4);
-    g.debugGiveEnergy(400000); g.debugBuyAll();
+    g.debugGiveEnergy(400000000); g.debugBuyAll();
     out.boughtScale = +gunScale(w).toFixed(3);
     // ...and SIGHT is worth nothing to a player aiming by hand, which is how
     // the shot itself gates it.
@@ -12729,7 +12733,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     // ---- and no charge is spent, ever ------------------------------------
     bare(); own(3);
-    g.debugGiveEnergy(400000); g.debugBuyAll();
+    g.debugGiveEnergy(400000000); g.debugBuyAll();
     const charges = () => w.abilities.slots.map((x) => x.charges).join(',');
     const c0 = charges();
     for (let f = 0; f < 60 * 12; f++) g.update(1 / 60);
@@ -13634,7 +13638,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.director.update = () => {};
 
     // ---- 1. the cooldown ladder, as one number ----
-    g.debugGiveEnergy(400000);
+    g.debugGiveEnergy(400000000);
     g.debugBuyAll();
     const cooldown = w.up.cooldown;
     const standingLevels = NODE_BY_ID.get('standing').levels;
@@ -14131,7 +14135,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.spawnLock = 1e9;
     const ran = w.director.update;
     w.director.update = () => {};
-    g.debugGiveEnergy(500000);
+    g.debugGiveEnergy(500000000);
     g.debugBuyAll();
 
     // ...and what a fully bought salvo actually leaves standing, which is the
@@ -14288,7 +14292,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.phase = 'staging';
       w.spawnLock = 1e9;
       w.director.update = () => {};
-      if (bought) { g.debugGiveEnergy(500000); g.debugBuyAll(); }
+      if (bought) { g.debugGiveEnergy(500000000); g.debugBuyAll(); }
       g.toggleRound('arc');
       const s = w.shooter;
       const roster = [];
@@ -14526,7 +14530,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.phase = 'staging';
       w.spawnLock = 1e9;
       w.director.update = () => {};
-      if (bought) { g.debugGiveEnergy(500000); g.debugBuyAll(); }
+      if (bought) { g.debugGiveEnergy(500000000); g.debugBuyAll(); }
     };
     const findPatch = () => w.effects.find((x) => x && typeof x.dps === 'number');
 
@@ -14642,7 +14646,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.spawnLock = 1e9;
     const ran = w.director.update;
     w.director.update = () => {};
-    g.debugGiveEnergy(400000);
+    g.debugGiveEnergy(400000000);
     /*
      * SLIVER and its way in, and nothing else that touches the round.
      * `buy` refuses a node whose parents are unowned, so the chain has to be
@@ -14874,7 +14878,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     // ---- HARD CASING: a body held on the turret ----
     const casing = (step) => overSecond(step, (s) => {
-      g.debugGiveEnergy(300000);
+      g.debugGiveEnergy(300000000);
       /*
        * Its way in, and then ONE level of SPINES.
        *
@@ -15033,7 +15037,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 1e9;
       w.director.update = () => {};
       if (buy) {
-        g.debugGiveEnergy(400000);
+        g.debugGiveEnergy(400000000);
         const chain = [];
         for (let n = NODE_BY_ID.get('heave'); n; n = n.parent) if (n.id) chain.unshift(n.id);
         for (const id of chain) for (let i = 0; i < 4; i++) g.buy(id);
@@ -15722,7 +15726,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      */
     g.restart();
     g.debugTeachAll();
-    g.debugGiveEnergy(400000);
+    g.debugGiveEnergy(400000000);
     for (let pass = 0; pass < 4; pass++) for (const n of NODES) if (n.id) g.buy(n.id);
     const up = w.up;
     const K = CFG.knell;
@@ -16623,7 +16627,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.hud.menu.syncSandbox();
     out.shutTab = !!tab() && tab().classList.contains('sealed');
     out.refused = g.enterSandbox();
-    g.debugGiveEnergy(60000);
+    g.debugGiveEnergy(60000000);
     out.bought = g.buy('sandbox');
     g.hud.menu.syncSandbox();
     out.openTab = !tab().classList.contains('sealed') && tab().classList.contains('unlocked');
@@ -16631,7 +16635,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     // ---- in, and what is not there --------------------------------------
     g.restart();
-    g.debugGiveEnergy(60000);
+    g.debugGiveEnergy(60000000);
     g.buy('sandbox');
     out.entered = g.enterSandbox();
     out.flag = w.sandbox;
@@ -16755,7 +16759,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.phase = 'staging';
     w.spawnLock = 1e9;
     w.director.update = () => {};
-    g.debugGiveEnergy(60000);
+    g.debugGiveEnergy(60000000);
     g.buy('sandbox');
     g.enterSandbox();
     g.sandbox.dummy();
@@ -16859,7 +16863,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(400000);
+      g.debugGiveEnergy(400000000);
       g.debugBuyAll();
       /*
        * ...and the NEW FORM is OWNED, which era 2's room is gated on from
@@ -17056,7 +17060,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.spawnLock = 0;
     w.phase = 'staging';
     g.debugTeachAll();
-    g.debugGiveEnergy(400000);
+    g.debugGiveEnergy(400000000);
     g.debugBuyAll();
     /*
      * ...and the NEW FORM is OWNED, because era 2's room is gated on it from
@@ -17237,7 +17241,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 1e9;
       w.director.update = () => {};
       w.up = freshUpgrades();
-      g.debugGiveEnergy(400000);
+      g.debugGiveEnergy(400000000);
       for (let p = 0; p < 4; p++) for (const n of NODES) if (n.id) g.buy(n.id);
       w.mines.length = 0;
       w.projectiles.length = 0;
@@ -17473,7 +17477,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     // ---- the bar does not redraw every frame ------------------------------
     g.restart();
-    g.debugGiveEnergy(60000);
+    g.debugGiveEnergy(60000000);
     g.buy('sandbox');
     g.enterSandbox();
     const sb = g.sandbox;
@@ -17524,7 +17528,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.director.update = () => {};
       w.up = freshUpgrades();
       if (buy) {
-        g.debugGiveEnergy(400000);
+        g.debugGiveEnergy(400000000);
         for (let p = 0; p < 4; p++) for (const n of NODES) if (n.id) g.buy(n.id);
       }
       w.sandbox = true;
@@ -17967,7 +17971,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       const { soak } = await import('../src/ledger.js');
       const g = window.__sim;
       g.start();
-      g.world.energy = 999999;
+      g.world.energy = 999999000;
       g.buy('sandbox');
       // A four-digit record and a running clock: the widest the panel gets.
       const heldTotal = soak.total;
@@ -18242,7 +18246,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * Entering from era 2 therefore lands in the era-2 room, and the era-1
      * tab takes the same visit back to era 1's scale without leaving.
      */
-    g.world.energy = 999999;
+    g.world.energy = 999999000;
     g.buy('sandbox');
     g.setEra(2);
     const inTwo = CFG.zoom;
@@ -18657,7 +18661,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // false, and a case that never got through the door reads the field it
     // never left.
     said.length = 0;
-    w.energy = 999999;
+    w.energy = 999999000;
     g.buy('sandbox');
     out.entered = g.enterSandbox();
     out.bench = g.skyName();
@@ -18746,7 +18750,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(60000);
+      g.debugGiveEnergy(60000000);
       if (era === 2) g.setEra(2);
       w.director.setTier(8);
       const seen = new Set();
@@ -18889,7 +18893,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         w.spawnLock = 0;
         w.phase = 'staging';
         g.debugTeachAll();
-        g.debugGiveEnergy(200000);
+        g.debugGiveEnergy(200000000);
         if (era === 2) g.setEra(2);
         w.director.update = () => {};
         g.debugClearField();
@@ -19112,7 +19116,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(200000);
+      g.debugGiveEnergy(200000000);
       g.setEra(era);
       w.director.update = () => {};
       g.debugClearField();
@@ -19395,7 +19399,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         w.spawnLock = 0;
         w.phase = 'staging';
         g.debugTeachAll();
-        g.debugGiveEnergy(300000);
+        g.debugGiveEnergy(300000000);
         g.setEra(era);
         w.director.update = () => {};
         g.debugClearField();
@@ -19661,7 +19665,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(300000);
+      g.debugGiveEnergy(300000000);
       g.setEra(2);
       w.director.update = () => {};
       g.debugClearField();
@@ -19786,7 +19790,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
        * measures the smallest version of the thing it is protecting will pass
        * with the machine inside a lot.
        */
-      w.energy = 500000;
+      w.energy = 500000000;
       g.debugTeachAll();
       g.debugBuyAll();
       g.setEra(2);
@@ -19969,7 +19973,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     g.restart();
     out.bare = paint();
-    w.energy = 500000;
+    w.energy = 500000000;
     g.debugTeachAll();
     g.debugBuyAll();
     out.full = paint();
@@ -20096,7 +20100,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * unconditionally and only the first of those four was true.
      */
     g.restart();
-    w.energy = 999999; g.buy('sandbox');
+    w.energy = 999999000; g.buy('sandbox');
     out.one = at(() => {});
     out.benchOne = at(() => g.enterSandbox());
     out.backOne = at(() => g.exitSandbox());
@@ -20118,7 +20122,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      */
     const frame = (era) => {
       g.restart();
-      w.energy = 500000;
+      w.energy = 500000000;
       g.debugTeachAll();
       g.debugBuyAll();
       g.setEra(era);
@@ -20162,7 +20166,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // ---- ...and the envelope still covers what it paints, at era 2 --------
     const paint = (era) => {
       g.restart();
-      w.energy = 500000;
+      w.energy = 500000000;
       g.debugTeachAll();
       g.debugBuyAll();
       g.setEra(era);
@@ -20282,7 +20286,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 1e9;
       w.director.update = () => {};
       w.up = freshUpgrades();
-      g.debugGiveEnergy(400000);
+      g.debugGiveEnergy(400000000);
       for (let p = 0; p < 4; p++) for (const n of NODES) if (n.id) g.buy(n.id);
       w.mines.length = 0;
       w.projectiles.length = 0;
@@ -20448,7 +20452,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(50000);
+      g.debugGiveEnergy(50000000);
       w.director.setTier(9);
       /*
        * A field with things on it, a purse, and salvage on the floor. Twenty
@@ -20584,7 +20588,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.spawnLock = 0;
     w.phase = 'staging';
     g.debugTeachAll();
-    g.debugGiveEnergy(400000);
+    g.debugGiveEnergy(400000000);
     g.debugBuyAll();
     const sockets = new Set(UNDER.turret);
     const built = w.ledger.filter((id) => sockets.has(id));
@@ -20675,7 +20679,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.spawnLock = 0;
     w.phase = 'staging';
     g.debugTeachAll();
-    g.debugGiveEnergy(400000);
+    g.debugGiveEnergy(400000000);
     g.debugBuyAll();
     said.length = 0;
     g.beginEvolve();
@@ -20916,7 +20920,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.spawnLock = 0;
     w.phase = 'staging';
     g.debugTeachAll();
-    g.debugGiveEnergy(400000);
+    g.debugGiveEnergy(400000000);
     g.debugBuyAll();
     w.director.update = () => {};
 
@@ -21139,7 +21143,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(400000);
+      g.debugGiveEnergy(400000000);
       g.setEra(era);
       w.director.update = () => {};
       g.debugClearField();
@@ -21363,7 +21367,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(400000);
+      g.debugGiveEnergy(400000000);
       g.setEra(era);
       w.director.update = () => {};
       g.debugClearField();
@@ -21771,7 +21775,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.spawnLock = 0;
     w.phase = 'staging';
     g.debugTeachAll();
-    g.debugGiveEnergy(400000);
+    g.debugGiveEnergy(400000000);
     g.setEra(2);
     w.director.update = () => {};
     g.debugClearField();
@@ -21958,7 +21962,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.spawnLock = 0;
     w.phase = 'staging';
     g.debugTeachAll();
-    g.debugGiveEnergy(400000);
+    g.debugGiveEnergy(400000000);
     g.setEra(2);
     w.director.update = () => {};
     g.debugClearField();
@@ -22056,7 +22060,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(400000);
+      g.debugGiveEnergy(400000000);
     };
 
     // ---- nothing, then each half of the gate on its own -------------------
@@ -22421,7 +22425,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      */
     const air = (buy, type, dist, mates) => {
       const s = clean();
-      g.debugGiveEnergy(400000);
+      g.debugGiveEnergy(400000000);
       const bought = buy ? g.buy('airburst') : 'skipped';
       const bodies = [];
       for (let k = 0; k < mates; k++) {
@@ -22485,7 +22489,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const bench = (buy) => {
       g.restart();
       g.debugTeachAll();
-      g.debugGiveEnergy(900000);
+      g.debugGiveEnergy(900000000);
       w.phase = 'staging';
       g.buy('sandbox');
       if (buy) g.buy('airburst');
@@ -22681,7 +22685,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(400000);
+      g.debugGiveEnergy(400000000);
       g.buy('sandbox');
       /*
        * NEW FORM owned unless the arm is about not owning it. Written the way
@@ -22913,7 +22917,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       delete w.director.update;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(400000);
+      g.debugGiveEnergy(400000000);
       g.buy('sandbox');
       m.setOpen(true);
       m.openTab('sandbox');
@@ -22985,7 +22989,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(900000);
+      g.debugGiveEnergy(900000000);
       g.buy('sandbox');
       // as a purchase leaves it -- the id is `recast`, and it is the LEDGER
       // that survives the resume `enterSandbox` does.
@@ -23114,7 +23118,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const press = (id, armored, dist, node) => {
       clean();
       if (node) {
-        g.debugGiveEnergy(400000);
+        g.debugGiveEnergy(400000000);
         // Through the PARENTS, the way the existing HEAVE case does it: a
         // bare `g.buy('heave')` is refused while WARD is unowned.
         const chain = [];
@@ -23286,7 +23290,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 1e9;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(900000);
+      g.debugGiveEnergy(900000000);
       if (!w.ledger.includes('recast')) w.ledger.push('recast');
       w.newForm = 'armed';
       g.setEra(era);
@@ -23492,7 +23496,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 1e9;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(400000);
+      g.debugGiveEnergy(400000000);
       w.director.update = () => {};
       // every anomaly answered, which is the state the ceiling is about
       w.reconciled = CFG.waves.tier.gates.map((_, i) => i + 1);
@@ -23706,7 +23710,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     g.start();
     g.debugTeachAll();
-    g.debugGiveEnergy(900000);
+    g.debugGiveEnergy(900000000);
     g.debugBuyAll();
     w.phase = 'staging';
     w.apertures = w.apertures || [];
@@ -23780,7 +23784,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      */
     g.restart();
     g.debugTeachAll();
-    g.debugGiveEnergy(900000);
+    g.debugGiveEnergy(900000000);
     g.debugBuyAll();
     w.phase = 'staging';
     w.apertures[8] = 1;
@@ -23805,7 +23809,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const byDoor = (name, act) => {
       g.restart();
       g.debugTeachAll();
-      g.debugGiveEnergy(200000);
+      g.debugGiveEnergy(200000000);
       g.debugUnlockAll();
       w.phase = 'staging';
       w.apertures = w.apertures || [];
@@ -23840,7 +23844,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      */
     const owning = (ids) => {
       g.restart();
-      g.debugGiveEnergy(900000);
+      g.debugGiveEnergy(900000000);
       w.phase = 'staging';
       w.unlocked.clear();
       for (const k of ids) w.unlocked.add(k);
@@ -23942,7 +23946,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     g.start();
     g.debugTeachAll();
-    g.debugGiveEnergy(900000);
+    g.debugGiveEnergy(900000000);
     g.debugBuyAll();
     w.phase = 'staging';
     w.apertures = w.apertures || [];
@@ -24226,7 +24230,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
-      g.debugGiveEnergy(200000);
+      g.debugGiveEnergy(200000000);
       w.director.update = () => {};
       g.debugClearField();
       w.mines.length = 0;
@@ -24370,7 +24374,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.spawnLock = 0;
       w.director.update = () => {};
       g.debugTeachAll();
-      g.debugGiveEnergy(200000);
+      g.debugGiveEnergy(200000000);
       w.enemies.length = 0;
       w.effects.length = 0;
       w.attackers.clear();
@@ -24533,7 +24537,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.fromBoot = g.debugBoss(1);
     g.start();
     g.debugTeachAll();
-    g.debugGiveEnergy(200000);
+    g.debugGiveEnergy(200000000);
     w.phase = 'staging';
     delete w.director.update;
     w.spawnLock = 0;
@@ -24628,7 +24632,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     if (w.boss) { w.boss.clear(w); w.boss = null; w.bossN = 0; w.bossStage = 0; }
     g.restart();
     g.debugTeachAll();
-    g.debugGiveEnergy(200000);
+    g.debugGiveEnergy(200000000);
     w.phase = 'staging';
     g.buy('sandbox');
     g.enterSandbox(1);
@@ -24817,7 +24821,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
     g.restart();
     g.debugTeachAll();
-    g.debugGiveEnergy(200000);
+    g.debugGiveEnergy(200000000);
     w.phase = 'staging';
 
     // ---- 1. the picker: field first, and everything still reachable -----
@@ -25034,6 +25038,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.offSeen = off.seen;
     out.paidPerRetire = on.earned - off.earned;
     out.retired = on.seen - off.seen;
+    // What ONE drifter is worth if it is cashed in, which is the scale the
+    // leak above is measured against.
+    out.driftWorth = CFG.energy.drift;
 
     // ---- and the link line, in all three states it can be in -----------
     const linkNow = () => g.hud.el.bootLink.textContent.trim();
@@ -25133,14 +25140,31 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * `retired > 0` is the vacuity guard: with the turnover held off the same
    * window must see FEWER distinct bodies, or the A/B is comparing two
    * identical runs and a difference of zero means nothing.
+   *
+   * ---- and why the bound is PER RETIREMENT rather than zero ----
+   *
+   * An A/B cancels a RATE. The leak build 282 found and could not clear --
+   * something in the world six hundred cases upstream killing one drifter --
+   * is a single EVENT, so it lands in whichever of the two windows happens to
+   * catch it and cancels in neither. Measured: 6,060 banked in the ON window
+   * against 0 in the OFF one, which is `CFG.energy.drift` once, times the
+   * depth dividend, to the digit -- one body, not eight.
+   *
+   * So the claim is stated the way it is meant: putting a body through the
+   * field does not pay a body's bounty. Eight extra retirements banked 757
+   * each against the 6,060 one cashed-in body is worth, an eight-fold margin,
+   * and if retirements paid at all the two numbers would be equal.
    */
+  const perRetire = r.retired > 0 ? r.paidPerRetire / r.retired : Infinity;
   check('...and the field it counts turns over without paying for it',
     r.peak <= r.hold && r.standing >= r.hold - 2
-    && r.retired > 0 && r.paidPerRetire === 0,
+    && r.retired > 0 && perRetire < r.driftWorth,
     `held at ${r.hold}, peaked at ${r.peak}, standing at ${r.standing}; over the `
     + `same thirty seconds the turnover put ${r.retired} more bodies through the `
     + `field (${r.onSeen} against ${r.offSeen}) and banked ${r.paidPerRetire} `
-    + `more for them (${r.onEarned} against ${r.offEarned})`);
+    + `more for them (${r.onEarned} against ${r.offEarned}) -- `
+    + `${perRetire.toFixed(0)} a body against the ${r.driftWorth} a cashed-in `
+    + `one is worth`);
 }
 
 // --- the currency reads in bytes, on the base-10 ladder --------------------

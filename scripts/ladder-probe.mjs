@@ -6,8 +6,8 @@
 //   tier     rung to jump the ladder to before play    (default 1)
 //   profile  bare | mid | max                          (default bare)
 //            bare: nothing bought
-//            mid:  +10000 ENERGY, then the 20 cheapest non-aperture nodes
-//            max:  UNLOCK ALL, MAX UPGRADES, +10000 ENERGY (opens every type)
+//            mid:  +10000000 ENERGY, then the 20 cheapest non-aperture nodes
+//            max:  UNLOCK ALL, MAX UPGRADES, +10000000 ENERGY (opens every type)
 //   baseUrl  where index.html is served               (default http://127.0.0.1:8099/index.html)
 //
 // Serve the repo first, e.g. `python3 -m http.server 8099`. Output: a JSON summary on
@@ -64,7 +64,7 @@ const dbg = async (label) => page.evaluate((t) => {
   b.click();
   panel.hidden = true;
 }, label);
-const buttons = { bare: [], mid: ['+10000 ENERGY'], max: ['UNLOCK ALL', 'MAX UPGRADES', '+10000 ENERGY'] }[PROFILE] || [];
+const buttons = { bare: [], mid: ['+10000000 ENERGY'], max: ['UNLOCK ALL', 'MAX UPGRADES', '+10000000 ENERGY'] }[PROFILE] || [];
 if (buttons.length) {
   await page.click('#menuBtn');
   await sleep(250);

@@ -2,7 +2,7 @@
 // and a hand-drawn look. Nothing here knows about the rest of the game beyond
 // the `world` handle it is given.
 
-import { CFG, WAVES, TYPE_BY_ID, ROUTES, massOf } from './config.js';
+import { CFG, WAVES, TYPE_BY_ID, ROUTES, massOf, kB } from './config.js';
 import { traitsFor, traitAt, has as hasTrait, TRAIT_BY_ID } from './traits.js';
 import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
 import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul, edgeHit } from './fx.js';
@@ -3569,7 +3569,16 @@ function bank(world, amount, x, y) {
    */
   const d = world.director;
   if (d && !d.resting) d.take += amount;
-  if (got >= 1) dot(x, y, 0, -60, '#9fe8ff', 0.5, 3);
+  /*
+   * ...and a mote to say so, for anything worth a kilobyte or more.
+   *
+   * `got >= 1` before the byte migration, which was one whole point -- the
+   * smallest amount the purse can take is `minValue * taxFloor`, three tenths
+   * of one, so the threshold was doing real work. Left at 1 it would be one
+   * BYTE, met by every bank there has ever been, and a threshold that is
+   * always true is a threshold that has quietly been deleted.
+   */
+  if (got >= kB(1)) dot(x, y, 0, -60, '#9fe8ff', 0.5, 3);
 }
 
 /**

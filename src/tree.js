@@ -27,6 +27,7 @@
  * what stops the two drifting.
  */
 
+import { kB } from './config.js';
 import { ALL_UPGRADES, UNLOCKS, CHARGES } from './upgrades.js';
 import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
@@ -36,12 +37,12 @@ import { ABILITIES } from './abilities.js';
  * is for yet — the shape is. One number to move when it is.
  */
 const COST = {
-  round: 900, // a new round or mine
-  mine: 900,
-  ability: 1100,
-  charge: 1400, // a second use of one
-  upgrade: 500, // a leaf, at its first level
-  step: 350, // ...and this much more for every level after the first
+  round: kB(900), // a new round or mine
+  mine: kB(900),
+  ability: kB(1100),
+  charge: kB(1400), // a second use of one
+  upgrade: kB(500), // a leaf, at its first level
+  step: kB(350), // ...and this much more for every level after the first
 };
 
 /**

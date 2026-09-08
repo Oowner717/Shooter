@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '283';
+export const BUILD = '284';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,29 @@ export const BUILD = '283';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '4c4b607';
+export const REV = '0cea4f6';
+
+/*
+ * ---- prices are AUTHORED in the unit they are read in --------------------
+ *
+ * `cost: kB(500)` rather than `cost: 500000`. Amounts are stored in bytes so
+ * that the number in the source and the number on the glass are the same
+ * number -- this repo has been bitten four times by a value that is one thing
+ * in the code and another one layer down -- and these keep the source
+ * readable at that scale. `cost: 500` said nothing about what 500 was.
+ *
+ * They live ABOVE `CFG` because `CFG` is one object literal four thousand
+ * lines long and its prices are written with them. A `const` arrow declared
+ * below that literal is in its temporal dead zone while the literal is being
+ * evaluated, so `cost: kB(500)` five hundred lines up would throw on the
+ * module's first line of work -- which is to say the game would not boot, and
+ * `CFG.bytes` itself can stay below because nothing reads it until something
+ * is formatted.
+ */
+export const B = (n) => Math.round(n);
+export const kB = (n) => Math.round(n * 1e3);
+export const MB = (n) => Math.round(n * 1e6);
+export const GB = (n) => Math.round(n * 1e9);
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -1063,7 +1085,6 @@ export const CFG = {
    * it is "do not keep a mechanism nothing drives". This drives one.
    */
   axiom: {
-    cost: 250,
     standoff: 400,
     arrive: 14.4,
     coreR: 40,
@@ -1098,7 +1119,7 @@ export const CFG = {
     infall: 1.1,
     endFor: 13.4,
     pull: 900,
-    pay: 900,
+    pay: kB(900),
   },
 
   /*
@@ -1127,7 +1148,6 @@ export const CFG = {
    * interest in coming to you, which is a shape the physics already supports.
    */
   tessera: {
-    cost: 250,
     standoff: 420,
     arrive: 14.4,
     beats: [0.14, 0.36, 0.6, 1],
@@ -1193,7 +1213,7 @@ export const CFG = {
     infall: 1.1,
     endFor: 13.4,
     pull: 900,
-    pay: 900,
+    pay: kB(900),
   },
 
   /*
@@ -1838,10 +1858,10 @@ export const CFG = {
     // A whole object's worth, from its mass, split across the motes it
     // leaves. Taken from the parent rather than the chip: a chip's own mass is
     // small enough that every fragment in the game rounded to the same 1.
-    perMass: 3.6,
-    minValue: 1,
+    perMass: kB(3.6),
+    minValue: kB(1),
 
-    drift: 6, // flat, for the harmless ones — income the tally never sees
+    drift: kB(6), // flat, for the harmless ones — income the tally never sees
     // No collection radius. Build 59 took it out: wreckage drifts the whole
     // way in and lands on the turret, and banking it means destroying it --
     // unless INTAKE has been taken, which collects anything that touches.
@@ -1967,7 +1987,6 @@ export const CFG = {
    * it leaves, and from then on it is an object like any other.
    */
   ordinal: {
-    cost: 100, // APERTURE, flat, always available
     standoff: 380, // world units above the turret, dead centre
     /*
      * The arrival, as a scene rather than a spawn.
@@ -2121,7 +2140,7 @@ export const CFG = {
      */
     endFor: 13.4,
     pull: 900, // how hard the infall drags loose bodies
-    pay: 900, // energy on the floor when it lets go
+    pay: kB(900), // bytes on the floor when it lets go
     recast: 7, // REMAINDERs a NEW FORM costs -- one per anomaly, so the price IS the ladder
   },
 
@@ -2138,7 +2157,6 @@ export const CFG = {
    * clock. Everything else here is a consequence of that one idea.
    */
   gnomon: {
-    cost: 140,
     standoff: 380,
     arrive: 14.6,
     // sky, hole, through, unfold -- the same staging as ORDINAL, because it
@@ -2244,7 +2262,7 @@ export const CFG = {
     plantPulse: 2.8, // seconds between the rings it throws
     endFor: 13.6,
     pull: 900,
-    pay: 900,
+    pay: kB(900),
   },
 
   /*
@@ -2262,7 +2280,6 @@ export const CFG = {
    * did not arrive with, which is what keeps it legible.
    */
   fractal: {
-    cost: 190,
     standoff: 380,
     arrive: 14.4,
     beats: [0.14, 0.36, 0.6, 1],
@@ -2359,7 +2376,7 @@ export const CFG = {
     spin: [1, 1.5, 2.0, 2.3],
     endFor: 13.4,
     pull: 900,
-    pay: 900,
+    pay: kB(900),
   },
 
   /*
@@ -2376,7 +2393,6 @@ export const CFG = {
    * as it loses, which is the opposite of every other fight in the game.
    */
   amplitude: {
-    cost: 250,
     standoff: 380,
     arrive: 14.4,
     beats: [0.14, 0.36, 0.6, 1],
@@ -2486,7 +2502,7 @@ export const CFG = {
     flingOf: 2,
     endFor: 13.6,
     pull: 900,
-    pay: 900,
+    pay: kB(900),
   },
 
   /*
@@ -2507,7 +2523,6 @@ export const CFG = {
    * react to it.
    */
   dynamo: {
-    cost: 320,
     /*
      * Nearer than the others, and that is law 2 being paid for.
      *
@@ -2688,7 +2703,7 @@ export const CFG = {
     darkFor: 0.5,
     endFor: 13.8,
     pull: 900,
-    pay: 900,
+    pay: kB(900),
   },
 
   /*
@@ -2711,7 +2726,6 @@ export const CFG = {
    *   picture. That is what the generosity is paying for.
    */
   parity: {
-    cost: 400,
     /*
      * Nearer than most, because the crescents orbit: the far one sits at
      * standoff + orbit, and it is the orbit that carries every part of it
@@ -2810,7 +2824,7 @@ export const CFG = {
     echoEvery: [16, 14, 12, 10],
     endFor: 13.6,
     pull: 900,
-    pay: 900,
+    pay: kB(900),
   },
   /*
    * ---- TERMINUS. Anomaly VII, crimson. The capstone. ----
@@ -2833,7 +2847,6 @@ export const CFG = {
    * one whose whole subject is distance.
    */
   terminus: {
-    cost: 500,
     /*
      * It materialises out past aim range and comes in during the arrival --
      * the threat legible before the fight is, law 2 restored the moment
@@ -3134,7 +3147,7 @@ export const CFG = {
     arrest: 1.6,
     infall: 1.8,
     pull: 1100,
-    pay: 1400,
+    pay: kB(1400),
   },
 
   /*
@@ -3388,7 +3401,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'lurcher',
-    opens: 200,
+    opens: kB(200),
     name: 'LURCHER',
     shape: 'hex',
     r: 24,
@@ -3407,7 +3420,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'splitter',
-    opens: 500,
+    opens: kB(500),
     name: 'SPLITTER',
     shape: 'blob',
     r: 29,
@@ -3426,7 +3439,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'bloom',
-    opens: 700,
+    opens: kB(700),
     name: 'BLOOM',
     shape: 'bloom',
     r: 33,
@@ -3446,7 +3459,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'bulwark',
-    opens: 2800,
+    opens: kB(2800),
     name: 'BULWARK',
     shape: 'plated',
     r: 45,
@@ -3469,7 +3482,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'warden',
-    opens: 1700,
+    opens: kB(1700),
     name: 'WARDEN',
     shape: 'warden',
     r: 22,
@@ -3534,7 +3547,7 @@ export const ENEMY_TYPES = [
      * them and you fight something you made.
      */
     id: 'scion',
-    opens: 2000,
+    opens: kB(2000),
     name: 'SCION',
     shape: 'scion',
     r: 34,
@@ -3609,7 +3622,7 @@ export const ENEMY_TYPES = [
     // is doing: threads out to whatever it is covering, and a shell on each of
     // them. Shoot the beacon, not the escort.
     id: 'herald',
-    opens: 1400,
+    opens: kB(1400),
     name: 'HERALD',
     shape: 'herald',
     r: 19,
@@ -3630,7 +3643,7 @@ export const ENEMY_TYPES = [
     // harder, so a littered field is its food supply — kill it early or clear
     // the floor. It is the only object whose threat you control.
     id: 'glut',
-    opens: 1100,
+    opens: kB(1100),
     name: 'GLUT',
     shape: 'glut',
     r: 16,
@@ -3651,7 +3664,7 @@ export const ENEMY_TYPES = [
     // and shoves everything it catches; both halves are real bodies and both
     // count, so a TOW is two of the five hundred.
     id: 'tow',
-    opens: 3400,
+    opens: kB(3400),
     name: 'TOW',
     shape: 'tow',
     r: 18,
@@ -4449,7 +4462,7 @@ export const ENEMY_TYPES = [
   },
   {
     id: 'prism',
-    opens: 900,
+    opens: kB(900),
     name: 'PRISM',
     shape: 'prism',
     r: 20,
@@ -4733,20 +4746,6 @@ CFG.bytes = {
   units: ['B', 'kB', 'MB', 'GB', 'TB', 'PB'],
   sig: 3, // significant figures, never more
 };
-
-/*
- * ---- prices are AUTHORED in the unit they are read in --------------------
- *
- * `cost: kB(500)` rather than `cost: 500000`. Amounts are stored in bytes so
- * that the number in the source and the number on the glass are the same
- * number -- this repo has been bitten four times by a value that is one thing
- * in the code and another one layer down -- and these keep the source
- * readable at that scale. `cost: 500` said nothing about what 500 was.
- */
-export const B = (n) => Math.round(n);
-export const kB = (n) => Math.round(n * 1e3);
-export const MB = (n) => Math.round(n * 1e6);
-export const GB = (n) => Math.round(n * 1e9);
 
 /**
  * An amount of bytes, as the player reads it.
@@ -5039,7 +5038,7 @@ CFG.gun = {
   life: 1.2,
   slew: 3.4, // radians a second the little barrel comes round at
   spread: 0.055, // VOLLEY's fan, per extra round
-  cost: 2600, // flat, per lot -- see lotPrice
+  cost: MB(2.6), // flat, per lot -- see lotPrice
   /*
    * How long a gap in the shooting is a PAUSE rather than the end of it.
    *

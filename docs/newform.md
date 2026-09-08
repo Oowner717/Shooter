@@ -3841,3 +3841,141 @@ same disease.
   20 of 255.
 
 612 green.
+
+## Build 284 — the economy is counted in bytes
+
+Phase 2 of `docs/bytes.md`. **One old ENERGY point is exactly one kilobyte**,
+which is the ruling that makes this a unit change and not a rebalance: every
+amount is multiplied by a thousand, every ratio is preserved to the digit, and
+nothing about the game's pacing moves. Measured rather than asserted —
+everything buyable totals **174,400,000 bytes = 174 MB**, against the 174,400
+points of build 283, to the digit.
+
+Displays still print the raw figure. Routing them through `fmtBytes` is phase 3
+and is deliberately not in this build: a number that is 1000x bigger and a
+number that is formatted differently are two changes, and a suite failure
+should only ever be able to mean one of them.
+
+### What is currency, and what only looks like it
+
+The whole risk of this change is in that distinction, and `CFG.energy` is where
+it bites: of its seven fields, **three are amounts** (`perMass`, `minValue`,
+`drift`) and four are not — `pulse` is a RADIUS, `pull` is a SPEED, and
+`tax`/`taxFloor`/`taxCap` are MULTIPLIERS. A blanket multiply over that object
+corrupts four values that are not money, and two of them are named in `SCALED`.
+
+Scaled: those three, the ten object-type `opens` gates, the tree's whole `COST`
+table, the six emplacement upgrades, the ASSAY, `CFG.gun.cost`, and every
+anomaly's `pay` (which is read as `pay / 30` per mote a boss sheds).
+
+Not scaled, on purpose: `bounty` and `bountyStep` (multipliers), a type's
+`drops` (the NUMBER of motes it sheds, not their worth), `T.margin` (a
+multiplier on what a wave was worth), and **`CFG.ordinal.recast`**, which is
+seven REMAINDERs — a count of tokens, not a quantity of storage, and NEW FORM
+is priced in it deliberately.
+
+### The nine prices that were deleted rather than rescaled
+
+Every anomaly config carried a `cost`. ORDINAL's was checked against the tree's
+ANOMALY branch; build 227 removed that branch, and for fifty-six builds nine
+numbers have sat in the config with **no reader at all** while a comment in
+`check-build.mjs` promised to check them. Rescaling a dead field is work that
+looks like coverage, so they came out.
+
+### Three thresholds that would have gone quiet
+
+Each of these is a literal compared against an amount, and each meant something
+different once the amount was a thousand times bigger:
+
+- `bank()` drew its little mote for anything worth `>= 1`. The smallest amount
+  the purse can take is `minValue * taxFloor`, three tenths of a point, so the
+  threshold was doing real work; left at 1 it would be one BYTE, met by every
+  bank there has ever been. It is `kB(1)`.
+- `rollBank`'s `from - to > 100000` refuses to animate a drop too big to be a
+  purchase. Left alone it would have been a hundred kilobytes — less than the
+  cheapest node in the tree — and **nothing in the game would ever have rolled
+  again**.
+- The title screen's resume note printed the purse only at `>= 1`.
+
+And one 32-bit cast: `menu.js`'s badge diff key was `world.energy | 0`, which
+was invisible while the purse was in the hundreds of thousands. In bytes a long
+run reaches billions and `2147483648 | 0` is **negative**, so the key would wrap
+onto one it had already seen and the badge would stop being recomputed at
+exactly the point in a run where the numbers are biggest. It is `Math.floor`.
+REMAINDER keeps its cast: it is a count of seven.
+
+### The save migrates without a VERSION bump
+
+`readSlot` refuses a file whose `v` it does not know, so bumping VERSION throws
+away every run currently open — and the migration written to rescue those runs
+would never execute, because the file is discarded before the restore sees it.
+That is the trap `save.js` has carried a comment about since build 180 and it
+applies exactly here: the restore CAN read its own past, it just has to
+multiply.
+
+So a file now carries `unit: 'B'`, and `toBytes` multiplies anything without it.
+Three things make that safe and each is load-bearing:
+
+- **It is in `readSlot`, not in the restore.** Both slots — the current file and
+  the backup behind it — come through that one door, so a backup written from
+  an old file migrates on the read that finds it. And the title screen's resume
+  note reads this object directly, so a migration in `Game.restore` would have
+  left CONTINUE quoting a purse a thousandth of the one the run came back with.
+- **Only two fields are amounts.** Everything else in the file is a decision, an
+  id, a count or a clock, and the tree's prices are replayed from this build's
+  own tables. There is one multiply, on two fields, at one door — a
+  half-migrated file is not a state that can exist.
+- **`unit` is a marker, not a version.** A file this build writes says `'B'` and
+  is taken as it stands; anything else — absent, or a unit some future build
+  introduces — is read as the old points.
+
+The pre-180 fallback moved with it: a save with no `earned` at all converts the
+kill count it does carry, and that rate is `kills * kB(12)` now.
+`check-build.mjs`'s frozen `KILL_GATES` sweep is what proves no object type
+re-locks across that, and its `RATE` moved to `12e3` in the same commit — both
+sides of the comparison scaled by a thousand, so what it proves is unchanged.
+
+### The helpers had to move above CFG
+
+`cost: kB(500)` is written inside a four-thousand-line object literal, and a
+`const` arrow declared *below* that literal is in its temporal dead zone while
+the literal is being evaluated. So the game would not have booted — the four
+authoring helpers are above `CFG` now, with the reason written next to them.
+`CFG.bytes` itself stays below, because nothing reads it until something is
+formatted.
+
+### The ORDINAL hash moved, and that was the prediction
+
+`-1765830468` before, `-1730800834` after, taken in the same container an hour
+apart. `fight.mjs` mixes `w.energy` every 300 frames and the probe starts the
+purse at zero, so a fight that banks a thousand times more moves the hash **by
+construction** -- this is the one shape of currency change where a move is the
+expected result and a stationary hash would have been the finding.
+
+The corroboration that it is only the purse: the body count at all six samples
+is identical across the two runs (6, 8, 6, 7, 6, 7). The fight is the same
+fight; what changed is the number it was paid.
+
+### Two cases the rescale caught, and one it did not
+
+`a save from before the clock is migrated rather than reset` had its
+expectations written out as `4321` and `2880`. Both are amounts and both moved.
+That is the ordinary case of the change and there was exactly one of it, because
+almost every other currency assertion in the suite is a DIFFERENCE -- a purse
+before against a purse after -- and a difference of scaled numbers needs no
+edit.
+
+The other failure was **not** the rescale, and diagnosing it that way would have
+been the mistake. `...and the field it counts turns over without paying for it`
+is build 282's own A/B, and it asserted `paidPerRetire === 0`. **An A/B cancels
+a RATE.** The leak it was written for -- something six hundred cases upstream
+killing one drifter -- is a single EVENT, so it lands in whichever of the two
+windows catches it and cancels in neither: measured, 6,060 banked in the ON
+window against 0 in the OFF one, which is `CFG.energy.drift` once times the
+depth dividend, to the digit. One body, not eight. The claim is stated per
+retirement now, which is what it always meant: putting a body through the field
+does not pay a body's bounty. Eight extra retirements banked 757 each against
+the 6,060 a cashed-in body is worth, and if retirements paid at all the two
+numbers would be equal.
+
+612 green.

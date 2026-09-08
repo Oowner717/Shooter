@@ -109,10 +109,56 @@ function readSlot(key) {
     // Shapes the restore indexes into directly rather than reading defensively.
     if (!d.loadout || !Array.isArray(d.loadout.mines) || !Array.isArray(d.loadout.ammo)) return null;
     if (!Array.isArray(d.taken) || !Array.isArray(d.unlocked)) return null;
-    return d;
+    return toBytes(d);
   } catch {
     return null;
   }
+}
+
+/*
+ * ---- the currency, in the unit this build counts in ----------------------
+ *
+ * One old ENERGY point is exactly one kilobyte, so a file written before the
+ * change carries figures a thousand times too small and a run restored from
+ * one would come back unable to afford anything it had already earned. It is
+ * multiplied here rather than in the restore, for two reasons: `readSlot` is
+ * the ONE door both slots come through, so the current file and the backup
+ * behind it are migrated by the same line; and the title screen's resume note
+ * reads this object directly, so a migration living in `Game.restore` would
+ * leave CONTINUE quoting a purse a thousand times under the one the run comes
+ * back with.
+ *
+ * The VERSION is deliberately NOT bumped. `readSlot` refuses a file whose `v`
+ * it does not know, so a bump throws away every run currently open -- the
+ * migration written to rescue those runs would never execute, because the
+ * file is discarded before it is seen. That is the trap `save.js` has carried
+ * a comment about since build 180 and it applies exactly here: the restore CAN
+ * read its own past, it just has to multiply.
+ *
+ * `unit` is what tells the two apart, and it is a MARKER rather than a
+ * version: a file this build writes says `'B'` and is taken as it stands, and
+ * anything else -- absent, or a unit a future build introduces and this one
+ * has never heard of -- is treated as the old points. That is the safe way
+ * round for the only two files that exist today.
+ *
+ * Only `energy` and `earned` are amounts. Everything else in the file is a
+ * decision, an id, a count or a clock: `remainder` is seven tokens and not a
+ * quantity of storage, `taken` is a list of what was bought rather than what
+ * it cost, and the tree's prices are replayed from THIS build's tables. So a
+ * half-migrated file is not a state that can exist -- there is one multiply,
+ * on two fields, at one door.
+ */
+const UNIT = 'B';
+const PER_POINT = 1000; // one old ENERGY point is one kilobyte
+
+function toBytes(d) {
+  if (d.unit === UNIT) return d;
+  d.energy = d.energy * PER_POINT;
+  // Absent on anything written before build 180, and `Game.restore` has a
+  // fallback for that -- so it is scaled only when it is actually there.
+  if (Number.isFinite(d.earned)) d.earned = d.earned * PER_POINT;
+  d.unit = UNIT;
+  return d;
 }
 
 /**
@@ -174,6 +220,13 @@ export function captureRun(world, game) {
     kills: world.kills,
     released: world.released,
     time: world.time,
+    /*
+     * Bytes, and `unit` is what says so. Additive, and the VERSION does not
+     * move: a file this build writes is still the shape a build before it can
+     * read, and one written before this has no `unit`, which is exactly how
+     * `toBytes` recognises it.
+     */
+    unit: 'B',
     energy: world.energy,
     // Lifetime, not the purse: what the object types are gated behind.
     earned: world.earned,

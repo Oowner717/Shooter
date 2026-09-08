@@ -2046,4 +2046,61 @@ came from before believing the other one covers it.
   characters against the raw number's 6, and `Hud.fitBar` is keyed on digit
   COUNTS -- a formatter that could produce nine characters silently re-shapes
   the top of the screen.
+- **A threshold compared against a currency literal is a unit-bearing constant,
+  and rescaling the currency without it deletes the threshold in silence.**
+  Three of them in build 284's byte migration, and each failed in a different
+  direction: `bank()` drew its little mote for anything worth `>= 1`, which was
+  real work (the smallest bankable amount is `minValue * taxFloor`, three
+  tenths of a point) and would have become one BYTE, true of every bank there
+  has ever been; `rollBank`'s `from - to > 100000` refuses to animate a drop
+  too big to be a purchase, and at a hundred thousand BYTES -- less than the
+  cheapest node in the tree -- nothing in the game would ever have rolled
+  again; the title screen's resume note printed the purse only at `>= 1`. The
+  tell is a bare number on the other side of a comparison from an amount. Grep
+  for the comparison, not for the word.
+- **`CFG.energy` is not all currency, and four of its seven fields are not.**
+  `pulse` is a RADIUS (400), `pull` a SPEED (26), and `tax`/`taxFloor`/`taxCap`
+  are MULTIPLIERS; only `perMass`, `minValue` and `drift` are amounts. A
+  blanket multiply over that object corrupts four values that are not money,
+  two of which are named in `SCALED`. The same trap one level out: a type's
+  `drops: 4` is the NUMBER of motes it sheds and `bounty: 3.5` is a multiplier
+  on their worth, so neither moves when the currency does.
+- **A currency migration belongs at the one door every file comes through.**
+  `readSlot` is that door in `save.js` -- the current file and the backup
+  behind it both pass through it -- so `toBytes` there migrates a backup
+  written from an old file on the read that finds it, and the title screen's
+  resume note, which reads that object directly, quotes the same purse the run
+  will come back with. In `Game.restore` it would have covered neither. And
+  `unit: 'B'` is a MARKER rather than a version bump: `readSlot` refuses a file
+  whose `v` it does not know, so bumping VERSION throws away the very runs the
+  migration was written to rescue, which is the trap `save.js` has carried a
+  comment about since build 180.
+- **A `const` arrow cannot be called from inside the `CFG` literal.** `CFG` is
+  one object literal four thousand lines long, so a helper declared below it is
+  in its temporal dead zone while it is being evaluated -- `cost: kB(500)` five
+  hundred lines up throws on the module's first line of work and the game does
+  not boot. The authoring helpers live above `CFG`; `CFG.bytes` can stay below,
+  because nothing reads it until something is formatted.
+- **Rescaling a dead field is work that looks like coverage.** Every anomaly
+  config carried a `cost`, ORDINAL's checked against the tree's ANOMALY branch
+  -- and build 227 removed that branch, so for fifty-six builds nine numbers
+  sat there with no reader while `check-build.mjs` carried a comment promising
+  to check them. They were deleted in the byte migration rather than
+  multiplied. When a sweep reaches a value nothing reads, the edit is `git rm`,
+  not `x1000`.
+- **Do not ship a rename and a rescale in the same build.** `world.energy` ->
+  `world.bytes` reaches about 250 sites and its failure mode is a silent
+  `undefined`; the x1000 is a change of value the suite catches by arithmetic.
+  Together, a red case could mean either, and the one useful property of a pure
+  rename -- that green means nothing but names moved -- is exactly what mixing
+  them destroys.
+- **An A/B cancels a RATE, not an EVENT.** Build 282's "a title-screen
+  retirement banks nothing" was made an A/B because something six hundred cases
+  upstream was banking one drifter's worth; it failed again in 284 at 6,060
+  against 0 -- `CFG.energy.drift` once, times the depth dividend, to the digit.
+  A single stray death lands in whichever of the two windows catches it and
+  cancels in neither. The fix is to state the claim per unit of the thing being
+  measured: a retirement does not pay a body's bounty, 757 a body against the
+  6,060 a cashed-in one is worth, which is an eight-fold margin and equal
+  numbers if the mechanism were broken.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

@@ -9,7 +9,7 @@
 // adding an upgrade is an entry plus one place that reads it.
 
 /** Defaults. Anything not listed is off. */
-import { CFG } from './config.js';
+import { CFG, kB, MB } from './config.js';
 import { svgMark } from './util.js';
 import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
@@ -757,19 +757,19 @@ export const UPGRADES = {
      * tree's own shape: a round number, and a round number more each level.
      * The whole line, six lots and every level, is about 40k.
      */
-    { id: 'gundamage', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'CALIBRE', levels: 3, cost: 900, step: 500,
+    { id: 'gundamage', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'CALIBRE', levels: 3, cost: kB(900), step: kB(500),
       line: '+35% damage from every emplacement, standing or not yet built.',
       apply: scale('gunDamage', 1.35), icon: MARK.hollowpoint },
-    { id: 'gunrate', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'CADENCE', levels: 3, cost: 900, step: 500,
+    { id: 'gunrate', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'CADENCE', levels: 3, cost: kB(900), step: kB(500),
       line: '-16% between rounds, on the whole line.',
       apply: quicken('gunRate', 0.84), icon: MARK.rate },
-    { id: 'gunrange', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'SIGHTLINE', levels: 2, cost: 1100, step: 700,
+    { id: 'gunrange', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'SIGHTLINE', levels: 2, cost: kB(1100), step: kB(700),
       line: '+30% reach. An emplacement holds more of the ground it stands on.',
       apply: scale('gunRange', 1.3), icon: MARK.aimrange },
-    { id: 'gunslew', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'TRAVERSE', levels: 2, cost: 900, step: 600,
+    { id: 'gunslew', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'TRAVERSE', levels: 2, cost: kB(900), step: kB(600),
       line: '+40% traverse. Less of the cadence is spent coming round.',
       apply: scale('gunSlew', 1.4), icon: MARK.slew },
-    { id: 'gunsalvo', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'VOLLEY', levels: 2, cost: 1600, step: 1200,
+    { id: 'gunsalvo', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'VOLLEY', levels: 2, cost: kB(1600), step: kB(1200),
       line: 'One more round a shot, fanned. More metal, not less accuracy.',
       apply: bump('gunSalvo', 1), icon: MARK.salvo },
     /*
@@ -779,7 +779,7 @@ export const UPGRADES = {
      * every standing gun wears the round's own colour, so "it applies to all
      * of them" is seen and not believed.
      */
-    { id: 'gunammo', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'MUNITION', levels: 2, cost: 2200, step: 1800,
+    { id: 'gunammo', needs: (g) => (g.world.guns || []).length > 0, tone: GUN_TONE, name: 'MUNITION', levels: 2, cost: kB(2200), step: kB(1800),
       line: 'The whole line re-arms: SABOT, and then FERRITE.',
       tiers: [null, { name: 'MUNITION · FERRITE',
         line: 'And again: twice the issued damage, and it carries through the '
@@ -996,7 +996,7 @@ export const UPGRADES = {
      * into `world.ledger`, so renaming this one takes a 20,000-energy node
      * away from everyone who has already bought it.
      */
-    { id: 'sandbox', name: 'ASSAY', levels: 1, cost: 20000, step: 0,
+    { id: 'sandbox', name: 'ASSAY', levels: 1, cost: MB(20), step: 0,
       line: 'An instrumented dummy and a counter, and nothing else on the field. Read exactly what every round, mine and ability is delivering, and the rig keeps a record of everything you ever put into it.',
       apply: set('sandbox', true), tone: '#8fb8d8', icon: MARK.sandbox },
   ],

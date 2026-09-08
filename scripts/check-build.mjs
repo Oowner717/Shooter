@@ -353,7 +353,11 @@ const KILL_GATES = {
   lurcher: 18, splitter: 45, bloom: 85, herald: 125, prism: 165,
   warden: 205, scion: 245, bulwark: 285, glut: 330, tow: 380,
 };
-const RATE = 12; // must match the conversion in Game.restore
+// Must match the conversion in Game.restore, which is `kills * kB(12)` from
+// the byte migration -- twelve KILOBYTES a kill, the same rate it always
+// was in the unit the gates are now written in. Both sides of the
+// comparison moved by a thousand, so what it proves is unchanged.
+const RATE = 12e3;
 const relock = gates.filter((g) => (KILL_GATES[g.id] || 0) * RATE < g.opens);
 if (relock.length) {
   console.error('these gates sit above their old kill gate x'
@@ -406,13 +410,16 @@ if (leaky.length) {
   process.exit(1);
 }
 /*
- * Every anomaly has a slot in the tree, its own colour, and -- once it is
- * built -- a price that agrees with its own config.
+ * Every anomaly has a slot in the tree and its own colour.
  *
- * The price was checked for ORDINAL alone, against CFG.ordinal.cost. Six more
- * slots exist now and each will grow a cost; this checks whichever of them
- * claim to be built, and checks the parts that are true of all seven whether
- * they are built or not.
+ * There is no price to check. Each config carried a `cost` -- ORDINAL's was
+ * asserted against the tree's ANOMALY branch, and the other eight were
+ * written to match a branch that build 227 removed, so for fifty-six builds
+ * nine numbers sat in the config with no reader and this comment promised a
+ * check of them. They came out with the byte migration rather than being
+ * rescaled, because rescaling a dead field is work that LOOKS like coverage.
+ * The way in is `CFG.waves.tier.gates` and `Game.syncGate`, which cost
+ * nothing; if a price ever comes back it is a tree node like any other.
  */
 const dupTone = ANOMALIES.map((a) => a.tone)
   .filter((t, i, all) => all.indexOf(t) !== i);

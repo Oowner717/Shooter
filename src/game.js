@@ -1,6 +1,6 @@
 // World state, phase machine, physics stepping and the render pipeline.
 
-import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID, setHairline, setZoom } from './config.js';
+import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID, setHairline, setZoom, kB, MB } from './config.js';
 import { Ordinal, openAperture, anomalyEra } from './boss.js';
 // Imported for the side effect: a boss module registers its constructor
 // with anomaly.js on load, and nothing else references it by name.
@@ -856,7 +856,7 @@ export class Game {
      * them. The kill counts the gates used to be are converted at the rate the
      * new thresholds were pitched from, so nothing a run has met re-locks.
      */
-    w.earned = Math.max(d.earned || 0, (d.kills || 0) * 12);
+    w.earned = Math.max(d.earned || 0, (d.kills || 0) * kB(12));
     w.nextStoryAt = d.nextStoryAt;
     // A loaded round with no cell on the strip is a broken state — the turret
     // is meant always to have a round it can actually see. The save cannot
@@ -4347,7 +4347,9 @@ export class Game {
    * everything outright, this one lets you buy it the way a player would and
    * watch the rows change state as you go.
    */
-  debugGiveEnergy(n = 10000) {
+  // The amount is BYTES from the byte migration, so the ten thousand this
+  // granted for its whole life is MB(10) -- the same purchasing power.
+  debugGiveEnergy(n = MB(10)) {
     const w = this.world;
     w.energy += n;
     /*

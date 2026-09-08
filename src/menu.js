@@ -18,7 +18,7 @@ import { ABILITIES } from './abilities.js';
 import { gunAmmo } from './turrets.js';
 import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
-import { CFG, BUILD, REV } from './config.js';
+import { CFG, BUILD, REV, kB } from './config.js';
 import { swipeToDismiss, swipeTabs } from './swipe.js';
 import { lastSession, lifetime, LOCK, ERA_TABS, eraCell, eraShut, refuseEra,
   syncEraRow } from './sandbox.js';
@@ -1335,7 +1335,15 @@ export class Menu {
     if (from === to) { el.textContent = to; return; }
     // Only a spend rolls. Energy arriving is the field's business and it has
     // its own animation on the chip outside.
-    if (to > from || from - to > 100000) { el.textContent = to; return; }
+    /*
+     * A drop bigger than this is not a purchase -- it is a restore, a debug
+     * grant taken back, or a new run -- and tweening it reads as the figure
+     * being wrong rather than as money being spent. In bytes the gate is a
+     * hundred thousand KILOBYTES: left at 100000 it would be a hundred
+     * kilobytes, less than the cheapest node in the tree, and nothing in the
+     * game would ever roll again.
+     */
+    if (to > from || from - to > kB(100000)) { el.textContent = to; return; }
     cancelAnimationFrame(this.bankRaf || 0);
     const t0 = performance.now();
     const step = (now) => {
@@ -1902,7 +1910,15 @@ export class Menu {
   sync(world) {
     // The badge on the energy chip. Only recomputed when a purse actually
     // moves — energy ticks up constantly, so this is the diff that matters.
-    const purse = `${world.energy | 0}:${world.remainder | 0}:${world.ledger.length}`;
+    /*
+     * `Math.floor`, not `| 0`. A 32-bit cast was invisible while the purse was
+     * in the hundreds of thousands; in bytes a long run reaches billions, and
+     * `2147483648 | 0` is NEGATIVE -- so the key would wrap, collide with a
+     * key it had already seen, and the badge would stop being recomputed at
+     * exactly the point in a run where the numbers are biggest. REMAINDER is a
+     * count of seven and keeps its cast.
+     */
+    const purse = `${Math.floor(world.energy)}:${world.remainder | 0}:${world.ledger.length}`;
     if (purse !== this.lastPurse) {
       this.lastPurse = purse;
       this.game.hud.setBuys(this.reachCount(world));
