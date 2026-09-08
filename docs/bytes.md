@@ -270,6 +270,11 @@ Each phase ends green, with the suite run and the build pushed.
 
 Phase 1 is worth doing on its own and is safe to stop after.
 
+**Phase 1 shipped in build 283.** `CFG.bytes`, `fmtBytes`, `fmtRate` and the
+four helpers are in `src/config.js` with four cases behind them; the ruling on
+the base is decimal (1 kB is 1000 B). Nothing calls any of it yet, so the game
+is unchanged to the digit. Phase 2 is next and is the one that moves numbers.
+
 ---
 
 ## 8. What this deliberately does not do

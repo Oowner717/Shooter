@@ -2018,4 +2018,32 @@ came from before believing the other one covers it.
   docstring said twice that the glossary survives a reset, which stopped being
   true in build 238. The tiles it destroys are two hundred pixels above the
   field where the word is typed.
+- **A ratio against a baseline that can reach zero is not a bound.** The
+  corruption-feed case measured the glitched frame's near-white against the
+  clean frame's, and the clean frame is whatever six hundred cases upstream
+  left on the field: over six field states it runs 0% to 0.35%, so the ratio
+  runs 1.65x to INFINITY -- an empty field is 0% near-white and any feed at all
+  divides by zero. The absolute it replaced was no better, having been set
+  BELOW its own baseline (`worst < 2.5` while the clean frame measured 2.95),
+  so the case asked the glitched frame to be dimmer than the un-glitched one.
+  What holds still is the thing the claim is actually about: the feed's OWN
+  contribution, 0.01 to 0.39 points of near-white and 9.5 to 11.1 of mean
+  whatever it is drawn over. **Bound the delta, and set the ceiling at a
+  multiple of the worst you MEASURED** -- not at the day's value, and not at a
+  ratio whose denominator is inherited state.
+- **A ratio between two single random draws is a coin toss with extra steps.**
+  The DRIFT march case compared one held body's lateral against one hostile's
+  at 1.5x and lost about one run in eight to the draw (20 against 13). Sample a
+  population on both sides and compare the means; the claim was always about
+  the two behaviours, never about two bodies.
+- **A currency has ONE formatter and the store has no unit.** `CFG.bytes` is
+  base-10 by ruling (1 kB is 1000 B, per SI and per the box a disk comes in),
+  `fmtBytes` is the only thing that turns a number into a string, and
+  `B/kB/MB/GB` are how a price is AUTHORED -- `MB(20)` stored as `20000000`.
+  A unit field on the stored value is a second source of truth that can get out
+  of step with the number beside it. And the formatter's WIDEST output is a
+  measured constraint, not a taste one: three significant figures tops out at 7
+  characters against the raw number's 6, and `Hud.fitBar` is keyed on digit
+  COUNTS -- a formatter that could produce nine characters silently re-shapes
+  the top of the screen.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

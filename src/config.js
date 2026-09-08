@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '282';
+export const BUILD = '283';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '282';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'bb82895';
+export const REV = '4c4b607';
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -4695,6 +4695,104 @@ export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));
  * CSS pixels: a shade over one, so a line does not fall between pixel centres
  * and disappear into the antialiasing.
  */
+/*
+ * ============================ THE CURRENCY ================================
+ *
+ * What a run banks is measured in BYTES, and it is written and read with the
+ * base-10 SI storage prefixes: 1 kB is 1000 B, 1 MB is 1000 kB, and so on up.
+ * Decimal, not binary -- kB and not KiB, by ruling.
+ *
+ * ---- one point of the old ENERGY is one KILOBYTE, exactly -----------------
+ *
+ * That is the whole conversion and it is chosen so this is a change of UNIT
+ * and not of balance: every ratio in the economy is preserved to the digit, so
+ * every measured number this repo has written down -- tiers.mjs's income
+ * curve, plan C's affordability table, docs/pacing.md -- stays true. Only the
+ * notation moves. See docs/bytes.md.
+ *
+ * The alternative was one point to one BYTE, and it is refused for a reason
+ * worth keeping: it would put the whole game between 1 B and 174 kB, which is
+ * two prefixes, and the ladder would never climb.
+ *
+ * ---- and the BYTE is a live unit, not a formality ------------------------
+ *
+ * `bank()` does not round -- what lands is `amount * intakeRate * dividend` --
+ * so sub-kilobyte amounts already existed and were simply invisible. Measured
+ * against this config: the smallest amount that can enter the purse is
+ * `minValue * taxFloor`, which is 0.3 of a point and therefore 300 B. So B, kB
+ * and MB are all reachable without one balance number moving, and GB arrives
+ * on a long run's lifetime total.
+ */
+CFG.bytes = {
+  step: 1000, // decimal, by ruling: 1 kB is 1000 B and not 1024
+  /*
+   * The whole ladder, in order. It runs past anything this game can reach on
+   * purpose: a readout that falls off the end of its own unit table is a
+   * readout that prints a raw number, and the top of it costs nothing.
+   */
+  units: ['B', 'kB', 'MB', 'GB', 'TB', 'PB'],
+  sig: 3, // significant figures, never more
+};
+
+/*
+ * ---- prices are AUTHORED in the unit they are read in --------------------
+ *
+ * `cost: kB(500)` rather than `cost: 500000`. Amounts are stored in bytes so
+ * that the number in the source and the number on the glass are the same
+ * number -- this repo has been bitten four times by a value that is one thing
+ * in the code and another one layer down -- and these keep the source
+ * readable at that scale. `cost: 500` said nothing about what 500 was.
+ */
+export const B = (n) => Math.round(n);
+export const kB = (n) => Math.round(n * 1e3);
+export const MB = (n) => Math.round(n * 1e6);
+export const GB = (n) => Math.round(n * 1e9);
+
+/**
+ * An amount of bytes, as the player reads it.
+ *
+ * The ONE place in the game allowed to turn an amount into text. There was no
+ * number formatter of any kind in this repo before it: every figure was
+ * `String(n)`, `Math.floor(n)` or `Math.round(n)` interpolated into a
+ * template, in eleven places.
+ *
+ * Three significant figures and never more -- `948 B`, `1.00 kB`, `21.7 MB`,
+ * `1.08 GB` -- because the figure is read at a glance and a fourth digit is a
+ * digit nobody uses. Below a kilobyte there is no fractional byte, so it is a
+ * plain integer: `948 B`, not `948.0 B`.
+ *
+ * The widest string it can produce is seven characters (`1.08 GB`), against
+ * the six of the widest raw figure it replaces. That one character is what
+ * makes this a layout adjustment rather than a redesign -- see `Hud.fitBar`,
+ * which has to be re-keyed because its digit-count signature gets SMALLER as
+ * the string it stands for gets WIDER.
+ */
+export function fmtBytes(n) {
+  const C = CFG.bytes;
+  const v = Number.isFinite(n) ? n : 0;
+  const sign = v < 0 ? '-' : '';
+  let a = Math.abs(v);
+  // Under one of the next unit, in the unit we are in. `i` stops at the top of
+  // the table rather than running off it.
+  let i = 0;
+  while (a >= C.step && i < C.units.length - 1) { a /= C.step; i++; }
+  const unit = C.units[i];
+  if (i === 0) return `${sign}${Math.round(a)} ${unit}`;
+  /*
+   * Three significant figures. `9.995` rounds to `10.0` and not to `9.99`,
+   * which is why the decimal count is taken AFTER the rounding rather than
+   * from the raw value -- the naive version prints "10.00 kB", four figures,
+   * on exactly the values that cross a decade.
+   */
+  const dp = a < 9.995 ? 2 : a < 99.95 ? 1 : 0;
+  return `${sign}${a.toFixed(dp)} ${unit}`;
+}
+
+/** ...and the same thing per second, which is what a throughput reads as. */
+export function fmtRate(n) {
+  return `${fmtBytes(n)}/s`;
+}
+
 export function setHairline(dpr) {
   CFG.hairline = 1.25 / (Math.max(dpr, 0.1) * CFG.zoom);
 }

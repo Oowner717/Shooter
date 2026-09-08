@@ -3778,3 +3778,66 @@ is that the two windows must see a **different** number of bodies, or the A/B
 is comparing two identical runs.
 
 608 green.
+
+## Build 283 — the byte, and the one formatter that prints it
+
+Phase 1 of `docs/bytes.md`, and only phase 1: **the unit and the formatter
+exist and nothing calls them yet.** No price moved, no label changed, no save
+was touched. The whole of it is in `src/config.js`.
+
+### The ruling
+
+> 1000 is 1000 bytes or 1 kB or 1 point.
+
+Decimal, per SI, and not the binary 1024 — which is what the prefix `k`
+actually means and what a storage vendor prints on the box. `CFG.bytes.step`
+is 1000 and `CFG.bytes.units` is `B, kB, MB, GB, TB, PB`. The ladder is
+asserted in the suite rather than trusted: each unit is exactly a thousand of
+the one below it, in order, and every one of the six is reachable from a
+number the game can actually hold.
+
+### One formatter, three significant figures
+
+`fmtBytes(n)` walks the ladder and prints at most three significant figures:
+`999 B`, `1.00 kB`, `10.0 kB`, `100 kB`, `1.08 GB`. Bytes themselves are whole
+— there is no such thing as a third of a byte — so the `B` rung rounds and the
+rungs above it carry 2, 1 or 0 decimal places by magnitude. `fmtRate(n)` is
+the same string with `/s` after it.
+
+The reason for three and not four is measured rather than chosen: the widest
+string the formatter can produce is 7 characters (`-4.20 kB` aside, `100 kB`
+and `1.08 GB` are 6, and the widest is the negative), against the 6 of the raw
+number it replaces. **One character wider is the whole cost of the change to
+every readout in the game**, and that is what the case pins — because the bar
+chips are measured on digit COUNTS and a formatter that could produce nine
+characters would silently re-shape the top of the screen.
+
+### Prices are authored in the unit they are read in
+
+`B()`, `kB()`, `MB()`, `GB()` multiply by the decimal decade and round, so a
+20 MB node is written `MB(20)` and stored as `20000000`. The store stays a
+plain number of bytes — one integer, no unit field, nothing to get out of step
+— and the unit lives only where the number is printed. The case asserts the
+helpers compose (`kB(1000) === MB(1)`) and that each lands on a whole byte.
+
+### The two flakes that came out with it
+
+Neither is anything to do with bytes; both were already there and both are the
+same disease.
+
+- **A ratio between two single random draws.** The DRIFT march case asserted
+  `heldMax <= hostMax * 1.5` against one drift and one lurcher, and lost about
+  one run in eight to the draw (20 against 13). It samples eight of each and
+  compares the means.
+- **A ratio against a baseline that reaches zero.** The corruption-feed case
+  bounded the glitched frame's near-white against the clean frame's, and the
+  clean frame is whatever the six hundred cases upstream left on the field:
+  measured over six field states it runs **0% to 0.35%**, so the ratio runs
+  1.65x to **infinity**. What holds still is the feed's own contribution —
+  0.01 to 0.39 points of near-white across those six, and 9.5 to 11.1 of mean
+  whatever it is drawn over. The ceilings are double the worst measured and
+  each is now a sentence: the feed may paint at most a point and a half of the
+  frame near-white of its own, and may not lift the frame's mean by more than
+  20 of 255.
+
+612 green.

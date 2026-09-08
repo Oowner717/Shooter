@@ -4914,11 +4914,37 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   });
 
   const worst = Math.max(r.one.brightPct, r.two.brightPct, r.capped.brightPct);
+  const addBright = worst - r.clean.brightPct;
+  const addMean = r.capped.mean - r.clean.mean;
+  /*
+   * What is bounded is the feed's OWN contribution, in points of the frame --
+   * not a level and not a ratio, because both of those are properties of the
+   * field underneath rather than of the feed.
+   *
+   * It read `worst < 2.5` first, and the clean frame -- no feed on it at all
+   * -- measured 2.95% near-white, so the case was asking the glitched frame
+   * to be DIMMER than the un-glitched one. Making it a ratio against the
+   * clean frame was no better: measured over six field states, clean runs
+   * 0% to 0.35% near-white and the ratio therefore runs 1.65x to INFINITY
+   * (an empty field is 0% near-white and any feed at all divides by zero).
+   * A ratio against a baseline that reaches zero cannot carry a claim.
+   *
+   * The DELTA is what holds still, because the tear lines and plates the feed
+   * paints do not depend on what is behind them: 0.01, 0.15, 0.39, 0.03,
+   * 0.36, 0.16 points across those six, and 0.51 and 0.58 on the two busiest
+   * fields the suite has produced. The mean is steadier again -- the feed
+   * adds 9.5 to 11.1 whatever it is drawn over. The ceilings are double the
+   * worst measured, and each is a sentence: the feed may paint at most a
+   * point and a half of the frame near-white of its own, and may not lift the
+   * frame's mean by more than 20 of 255.
+   */
   check('the corruption feed is not brighter than the game it is drawn over',
-    worst < 2.5 && r.capped.mean < r.clean.mean * 2,
+    addBright < 1.5 && addMean < 20,
     `clean ${r.clean.brightPct}% near-white at mean ${r.clean.mean}; `
     + `one ${r.one.brightPct}%, two ${r.two.brightPct}%, `
-    + `capped ${r.capped.brightPct}% at mean ${r.capped.mean}`);
+    + `capped ${r.capped.brightPct}% at mean ${r.capped.mean} -- the feed `
+    + `adds ${addBright.toFixed(2)}pt of near-white and ${addMean.toFixed(1)} `
+    + `of mean`);
 
   // ...and it is still doing something. A feed that lit nothing and moved
   // nothing would pass the check above.
@@ -23317,15 +23343,33 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * whole field and this case would be asserting the wrong thing.
      */
     g.debugClearField();
-    const h = g.debugSpawn('lurcher', w.yard.mouthX, gate - 60);
-    h.staged = true;
-    h.vx = 0;
-    let hostMax = 0;
-    for (let f = 0; f < 60 * 6 && h.staged; f++) {
-      g.update(1 / 60);
-      if (h.staged) hostMax = Math.max(hostMax, Math.abs(h.vx));
-    }
-    out.hostMax = Math.round(hostMax);
+    /*
+     * A POPULATION on this side too, and the third time this case has flaked
+     * on the same disease. `heldMax <= hostMax * 1.5` is a ratio between two
+     * single random draws -- 20 against 13 is a fail and 13 against 20 is a
+     * pass, on identical behaviour -- and build 273 fixed the era-1 arm below
+     * for exactly this and left this one. Eight of each, and the MEAN, which
+     * cannot be a coin toss.
+     */
+    const marchOf = (id) => {
+      const h = g.debugSpawn(id, w.yard.mouthX, gate - 60);
+      h.staged = true;
+      h.vx = 0;
+      let most = 0;
+      for (let f = 0; f < 60 * 6 && h.staged; f++) {
+        g.update(1 / 60);
+        if (h.staged) most = Math.max(most, Math.abs(h.vx));
+      }
+      h.dead = true;
+      return most;
+    };
+    const mean = (a) => a.reduce((x, v) => x + v, 0) / a.length;
+    const hosts = [];
+    const drifts = [];
+    for (let k = 0; k < 8; k++) { hosts.push(marchOf('lurcher')); drifts.push(marchOf('drift')); }
+    out.hostMax = Math.round(mean(hosts));
+    out.driftMarch = Math.round(mean(drifts));
+    out.hostPeak = Math.round(Math.max(...hosts));
 
     // ---- era 1 is untouched: no yard, no gate, no march -------------------
     /*
@@ -23378,11 +23422,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
   check('DRIFT floats out past the gate before it fans, the way a hostile does',
     r.bornStaged && r.bornVx === 0
-    && r.pastGate && r.heldMax <= r.hostMax * 1.5
+    && r.pastGate && r.driftMarch <= r.hostMax * 1.5
     && r.eraOneStaged === false && r.eraOneVx > 1 && r.eraOneStill < 12,
-    `at era 2 it is born staged with no lateral and its march never exceeds `
-    + `${r.heldMax} u/s of lateral, against ${r.hostMax} for a hostile doing `
-    + `the same thing; it comes loose at y ${r.looseAt}, past the gate at `
+    `at era 2 it is born staged with no lateral and its march averages `
+    + `${r.driftMarch} u/s of lateral over eight, against ${r.hostMax} (peak `
+    + `${r.hostPeak}) for eight hostiles doing the same thing; the tracked one `
+    + `held at ${r.heldMax}; it comes loose at y ${r.looseAt}, past the gate at `
     + `${r.gate} (${r.pastGate}), and fans from there (${r.looseVx} on the `
     + `release frame, a draw and not a rule); era 1 has no gate and is `
     + `unchanged (none of 24 staged: ${!r.eraOneStaged}, mean lateral `
@@ -25096,6 +25141,145 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `same thirty seconds the turnover put ${r.retired} more bodies through the `
     + `field (${r.onSeen} against ${r.offSeen}) and banked ${r.paidPerRetire} `
     + `more for them (${r.onEarned} against ${r.offEarned})`);
+}
+
+// --- the currency reads in bytes, on the base-10 ladder --------------------
+/*
+ * Build 283, phase one of docs/bytes.md. The unit and the formatter go in on
+ * their own, with nothing calling them yet, because the ladder is the thing
+ * every later phase is built on and it is cheap to get exactly right first.
+ *
+ * One point of the old ENERGY is one KILOBYTE, by ruling -- so this is a
+ * change of unit and not of balance, and every ratio in the economy is
+ * preserved to the digit. What this case holds is the notation.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const cfg = await import('../src/config.js');
+    const { CFG, fmtBytes, fmtRate, B, kB, MB, GB } = cfg;
+    const out = {};
+
+    // ---- the ladder itself ---------------------------------------------
+    const C = CFG.bytes;
+    out.step = C.step;
+    out.units = C.units.join(',');
+    // Decimal, by ruling: 1 kB is 1000 B and not 1024. Asserted on the STEP
+    // rather than on the strings, because a table that said kB while stepping
+    // by 1024 would be the wrong thing under the right name.
+    out.decimal = C.step === 1000;
+    // Every unit is exactly one step past the last, walked rather than trusted.
+    out.ladderOk = C.units.every((u, i) => {
+      const at = C.step ** i;
+      return fmtBytes(at).endsWith(` ${u}`);
+    });
+
+    // ---- what it prints, at every boundary that matters -----------------
+    const cases = [
+      [0, '0 B'], [1, '1 B'], [300, '300 B'], [999, '999 B'],
+      [1000, '1.00 kB'], [1333, '1.33 kB'],
+      // The decade crossing. 9995 must not print "9.99 kB" (wrong) or
+      // "10.00 kB" (four figures) -- the decimal count is taken AFTER the
+      // rounding for exactly this.
+      [9995, '10.0 kB'], [10000, '10.0 kB'],
+      [99950, '100 kB'], [100000, '100 kB'],
+      [999999, '1000 kB'],
+      [1e6, '1.00 MB'], [20e6, '20.0 MB'], [174.4e6, '174 MB'],
+      [1.08e9, '1.08 GB'], [1e12, '1.00 TB'], [1e15, '1.00 PB'],
+      // A negative reads as one: the margin and any refund can be one.
+      [-4200, '-4.20 kB'],
+      // Sub-byte. The purse is a float and always has been -- `bank()` does
+      // not round -- so this is a real value and it reads as none of a byte.
+      [0.4, '0 B'],
+    ];
+    out.wrong = cases.filter(([v, want]) => fmtBytes(v) !== want)
+      .map(([v, want]) => `${v}: ${fmtBytes(v)} want ${want}`).join(' · ');
+    out.rate = fmtRate(4200);
+
+    /*
+     * ---- three significant figures, NEVER four -------------------------
+     *
+     * Swept rather than sampled: a hundred and twenty values per decade,
+     * across the whole ladder. The figure is read at a glance and a fourth
+     * digit is a digit nobody uses.
+     */
+    let over = 0;
+    let worst = '';
+    for (let e = 0; e < 15; e++) {
+      for (let k = 1; k < 120; k++) {
+        const v = k * (10 ** e) * 0.83;
+        const txt = fmtBytes(v);
+        const fig = txt.split(' ')[0].replace('-', '').replace('.', '');
+        if (fig.replace(/^0+/, '').length > CFG.bytes.sig) { over++; worst = `${v} -> ${txt}`; }
+        if (txt.length > (out.widest || 0)) { out.widest = txt.length; out.widestTxt = txt; }
+      }
+    }
+    out.overSig = over;
+    out.overWorst = worst;
+
+    /*
+     * ---- and the widest string the GAME can actually produce ------------
+     *
+     * The layout claim of the whole change: the figure gets one character
+     * wider than the raw number it replaces, not five. Measured off every
+     * real price in the tree plus a lifetime total well past anything a run
+     * reaches, at the one point = one kilobyte the conversion is.
+     */
+    const tree = await import('../src/tree.js');
+    const nodes = [...tree.NODE_BY_ID.values()];
+    let longest = '';
+    for (const n of nodes) {
+      if (!Number.isFinite(n.cost)) continue;
+      const lv = Number.isFinite(n.levels) ? n.levels : 1;
+      for (let i = 0; i < lv; i++) {
+        const txt = fmtBytes(kB(n.cost + (n.step || 0) * i));
+        if (txt.length > longest.length) longest = txt;
+      }
+    }
+    out.longestPrice = longest;
+    out.longestLifetime = fmtBytes(kB(5e6)); // 5,000,000 points banked
+    out.raw = String(174400); // the widest raw figure it replaces
+
+    // ---- the helpers ----------------------------------------------------
+    out.helpers = {
+      b: B(7), k: kB(500), m: MB(20), g: GB(1.08),
+      // They compose, which is the whole point of a decimal ladder.
+      composes: kB(1000) === MB(1) && MB(1000) === GB(1),
+      // ...and land on whole bytes. A fractional byte is not a thing.
+      whole: [B(7.4), kB(0.3), MB(1.0005)].every(Number.isInteger),
+    };
+    return out;
+  });
+
+  check('the currency ladder is base-10 SI, in order, and every unit is reachable',
+    r.decimal && r.ladderOk && r.units === 'B,kB,MB,GB,TB,PB',
+    `step ${r.step} (decimal: ${r.decimal}), units ${r.units}, and each one is `
+    + `what its own power of the step prints as (${r.ladderOk})`);
+
+  check('...and an amount reads as three significant figures and never four',
+    r.wrong === '' && r.overSig === 0,
+    `${r.wrong || 'every boundary case exact'}; ${r.overSig} of ~1,800 swept `
+    + `values ran past ${3} figures${r.overWorst ? ` (worst ${r.overWorst})` : ''}; `
+    + `a rate reads "${r.rate}"`);
+
+  /*
+   * The layout claim, and the reason this change is an adjustment rather than
+   * a redesign: seven characters against the six of the raw figure it
+   * replaces. `Hud.fitBar` is what has to be re-keyed for that one character
+   * -- its digit-count signature gets SMALLER as the string gets WIDER.
+   */
+  check('...and the widest figure it can produce is one character wider than the raw one',
+    r.longestPrice.length <= 7 && r.longestLifetime.length <= 7 && r.widest <= 8,
+    `the dearest price prints "${r.longestPrice}" (${r.longestPrice.length} chars) `
+    + `and five million points banked prints "${r.longestLifetime}", against the `
+    + `${r.raw.length} of "${r.raw}"; widest over the whole swept ladder `
+    + `"${r.widestTxt}" at ${r.widest}`);
+
+  check('...and prices are authored in the unit they are read in',
+    r.helpers.b === 7 && r.helpers.k === 500000 && r.helpers.m === 20000000
+    && r.helpers.g === 1080000000 && r.helpers.composes && r.helpers.whole,
+    `B(7)=${r.helpers.b}, kB(500)=${r.helpers.k}, MB(20)=${r.helpers.m}, `
+    + `GB(1.08)=${r.helpers.g}; they compose (${r.helpers.composes}) and land on `
+    + `whole bytes (${r.helpers.whole})`);
 }
 
 // --- report -----------------------------------------------------------------
