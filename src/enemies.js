@@ -3975,6 +3975,14 @@ export class Director {
      */
     this.held = 0;
     this.glitch = 0;
+    /*
+     * The other half of what the fuse reads: how long the release has been
+     * held because the field is still full, and the ceiling it is held
+     * against. `-1` means no wave has ended yet, so the first one is not
+     * gated on a threshold nothing has set.
+     */
+    this.holdFor = 0;
+    this.lastThin = -1;
     this.lastRelease = 0; // world.time of the last object let out
     this.take = 0; // raw bytes this wave has been worth, for the margin
     this.traits = []; // the rules this wave is carrying; see traits.js
@@ -4155,15 +4163,35 @@ export class Director {
       this.glitch = 0;
       return null;
     }
-    if (world.attackers.size > 0) {
+    /*
+     * Two ways to fill it, and they are the same statement made twice: the
+     * turret is being taken apart, or the run has stopped moving.
+     *
+     * Contact is the acute one and fills at the full rate. A HELD RELEASE --
+     * the next wave refusing to start because the field is still full of the
+     * last one -- fills at `crowd` of it, and it is the half that was
+     * missing: FLINCH and DEADBOLT exist to break contact, so a run carrying
+     * them sat below the contact signal indefinitely while drowning. Measured
+     * over seven minutes on one tier with one gun, the two upgrades took the
+     * fuse from six discharges to one and pinned the ladder where it was.
+     *
+     * A frame can do both, and only the larger is taken rather than the sum:
+     * being gripped WHILE drowning is one emergency, and adding the two would
+     * make the fuse run at 1.5x for the state it is most about.
+     */
+    const gripped = world.attackers.size > 0;
+    if (gripped) {
       this.held += dt;
-      // Armed only after `arm` seconds, so a body that clips the mount on its
-      // way past never lights it. `held` is unbroken time and resets below.
-      if (this.held >= G.arm) this.glitch = Math.min(1, this.glitch + dt / G.fuse);
     } else {
+      // Armed only after `arm` seconds, so a body that clips the mount on its
+      // way past never lights it. `held` is unbroken time.
       this.held = 0;
-      this.glitch = Math.max(0, this.glitch - (dt * G.recover) / G.fuse);
     }
+    const byContact = gripped && this.held >= G.arm ? 1 : 0;
+    const byCrowd = this.holdFor > 0 ? G.crowd : 0;
+    const rate = Math.max(byContact, byCrowd);
+    if (rate > 0) this.glitch = Math.min(1, this.glitch + (dt * rate) / G.fuse);
+    else this.glitch = Math.max(0, this.glitch - (dt * G.recover) / G.fuse);
     return this.glitch >= 1 ? this.glitchOut(world) : null;
   }
 
@@ -4214,6 +4242,9 @@ export class Director {
     this.laneOffer = null;
     this.held = 0;
     this.glitch = 0;
+    // ...and the hold, because the field it was held against has just gone.
+    this.holdFor = 0;
+    this.lastThin = -1;
   }
 
   glitchOut(world) {
@@ -4944,6 +4975,10 @@ export class Director {
     this.hitPatience = false;
     this.held = 0;
     this.glitch = 0;
+    this.holdFor = 0;
+    // A restore puts the wave back to the top against an empty field, so
+    // there is nothing for the gate to hold against and no threshold yet.
+    this.lastThin = -1;
     this.lastRelease = world.time || 0;
     this.resting = true;
     this.timer = 1.5; // a beat to look at the field before it starts again
@@ -4970,6 +5005,9 @@ export class Director {
   douse() {
     this.held = 0;
     this.glitch = 0;
+    // ...and the hold with them. An anomaly takes the field, so a wave that
+    // was being held against a full one is being held against nothing.
+    this.holdFor = 0;
   }
 
   update(world, dt) {
@@ -5013,6 +5051,35 @@ export class Director {
 
     if (this.resting) {
       if (this.timer > 0) return;
+      /*
+       * ---- and the next wave waits for the FIELD, not just for the clock --
+       *
+       * A wave ENDS on its own bodies thinning, which is right and is not
+       * what this is: `standing()` counts the wave that just ran, so a wave
+       * is judged on what it did rather than on the mess it inherited. But
+       * nothing counted the mess. Each wave is allowed to leave a quarter of
+       * itself standing (`thinAt`) or to time out at `patience` leaving
+       * whatever it likes, and the next one then arrived on top -- so the
+       * leftovers compounded with no ceiling at all. Measured on a run that
+       * had climbed past its gun: ten to twenty-nine hostiles standing
+       * permanently, wave after wave, none of them ever cleared.
+       *
+       * So the release waits until the field is as thin as the last wave was
+       * required to leave it. A player who cleared their wave is already
+       * under it and nothing changes; a player who is drowning stops being
+       * sent more. It is the one bound the ladder never had, and it is the
+       * whole of "pressure is what you can get through".
+       *
+       * `holdFor` is what the fuse reads. There is deliberately NO cap on the
+       * wait: an uncapped hold would be a deadlock if nothing else moved, and
+       * something else does -- the fuse fills from this, blows, fizzles the
+       * field and releases the hold. The loop closes.
+       */
+      if (this.lastThin >= 0 && hostileCount(world) > this.lastThin) {
+        this.holdFor += dt;
+        return;
+      }
+      this.holdFor = 0;
       this.begin(world);
       return;
     }
@@ -5048,6 +5115,13 @@ export class Director {
     // Reaching patience means the field never came back. That is the wave
     // telling you it was too much, in the one number that already knew.
     if (this.wait >= CFG.waves.patience) this.hitPatience = true;
+    /*
+     * ...and what it was allowed to leave, kept for the release gate above.
+     * The threshold the wave was held to is the right ceiling for the field
+     * the next one opens against: anything more than that is somebody else's
+     * leftovers, and sending another wave into them is what compounds.
+     */
+    this.lastThin = thinAt;
     const teach = this.wave && this.wave.teach;
     const rest = teach ? CFG.waves.teachRest : CFG.waves.rest;
     this.resting = true;

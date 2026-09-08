@@ -7021,6 +7021,14 @@ if (!GUN_LINE) {
     g.debugTeachAll();
     g.debugGiveBytes(9000000);
     const d = w.director;
+    /*
+     * ...and the turret actually shoots. From build 291 the next wave waits
+     * for the FIELD to thin, so a run where nothing is firing is a run where
+     * the release is held and no wave ever gets mid-flight -- which is the
+     * new rule working, and nothing to do with what this case is about.
+     */
+    w.autoAim = true;
+    w.autoFire = true;
     // run on until a wave is genuinely mid-release
     let guard = 0;
     while (guard++ < 30000 && !(d.jobs.length >= 3 && !d.resting)) g.update(1 / 60);
@@ -7725,6 +7733,141 @@ if (!GUN_LINE) {
   check('a branch count is a part of the tree count, and the parts are the whole',
     rest.sum === rest.total && rest.total > 0,
     `${JSON.stringify(rest.parts)} sums to ${rest.sum}, tree says ${rest.total}`);
+}
+
+// --- the next wave waits for the field, and the fuse reads the wait ---------
+/*
+ * Reported as: enemies surround the turret and stay there, PULSE and WARD are
+ * cast over and over, the wave system steps back, and the situation does not
+ * get better.
+ *
+ * Two faults, and measuring them apart is what found them.
+ *
+ * THE FIELD HAD NO CEILING. A wave ENDS on its own bodies thinning -- 25% of
+ * what it asked for, or `patience` seconds regardless -- and that is correct
+ * and deliberate: `standing()` counts the wave that ran, so a wave is judged
+ * on what it did rather than on the mess it inherited. But nothing counted the
+ * mess. Each wave was allowed to leave a quarter of itself and the next
+ * arrived on top, so leftovers compounded with no bound at all. Measured on a
+ * run that had climbed past its gun: ten to twenty-nine hostiles standing
+ * permanently, wave after wave, none ever cleared.
+ *
+ * THE FUSE COULD NOT SEE IT. It read one signal -- unbroken contact -- and
+ * FLINCH and DEADBOLT exist to break contact. Measured either side of those
+ * two upgrades, same tier, same gun, seven minutes each: without them the
+ * mount was gripped 22.3% of the time, the fuse blew SIX times and the ladder
+ * walked 20 down to 14. With them, gripped 10.2%, the fuse blew ONCE, and the
+ * run stayed pinned at 20 with the field permanently full. The automation was
+ * holding the player just above the threshold that would have rescued them.
+ *
+ * So the release waits for the field, and a held release fills the same fuse
+ * at `crowd` of the contact rate. The loop closes: field full -> release held
+ * -> fuse fills -> fuse blows -> field fizzles -> release resumes. That is why
+ * there is no cap on the hold; an uncapped wait would deadlock only if nothing
+ * else moved, and the fuse is what moves.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, WAVES } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = { crowd: CFG.waves.glitch.crowd };
+
+    /*
+     * ---- the reported configuration, and it has to be that one ----------
+     *
+     * A weak gun on a high rung with FLINCH and DEADBOLT owned. The first
+     * version of this case turned the turret off instead, which is a
+     * scenario the gate is not needed in: with nothing shooting, bodies grip
+     * the mount, CONTACT fills the fuse every fourteen seconds, and each
+     * discharge disarms the gate before it can engage. Measured that way, the
+     * field peaked at 21 with the gate on and 21 with it off -- a clean pass
+     * for a mechanism that had not run.
+     *
+     * What the gate is FOR is the state the report describes: the automation
+     * breaking contact often enough that the contact term never fills, while
+     * the field goes on growing. That is the run below.
+     */
+    const play = (gated) => {
+      g.restart();
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugClearField();
+      g.debugGiveBytes(500000000);
+      for (const id of ['hollowpoint', 'hollowpoint', 'rate', 'open_ward', 'flinch', 'deadbolt']) g.buy(id);
+      w.autoAim = true;
+      w.autoFire = true;
+      const d = w.director;
+      d.setTier(20);
+      const peak = [];
+      let heldFrames = 0;
+      let fired = 0;
+      let last = 0;
+      for (let f = 0; f < 60 * 240; f++) {
+        if (!gated) { d.lastThin = -1; d.holdFor = 0; }
+        g.update(1 / 60);
+        if (d.holdFor > 0) heldFrames++;
+        if (last > 0.9 && d.glitch === 0) fired++;
+        last = d.glitch;
+        if (f % 60 === 0) {
+          peak.push(w.enemies.filter((e) => !e.dead && !e.harmless && !e.fizzle).length);
+        }
+      }
+      return { max: Math.max(...peak), held: +(heldFrames / 60).toFixed(1),
+        fired, tier: d.tier, auto: !!w.up.flinch && !!w.up.deadbolt };
+    };
+    out.drowning = play(true);
+    out.loose = play(false);
+
+    /*
+     * ---- and a run that IS clearing is not held --------------------------
+     * The other half, and the one that would make this a nuisance rather than
+     * a rescue: a player who kills what arrives must not notice the gate.
+     */
+    const coping = () => {
+      g.restart();
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugClearField();
+      g.debugGiveBytes(500000000);
+      g.debugBuyAll();
+      w.autoAim = true;
+      w.autoFire = true;
+      const d = w.director;
+      d.setTier(10);
+      let heldFrames = 0;
+      let waves = 0;
+      let at = d.at;
+      for (let f = 0; f < 60 * 150; f++) {
+        g.update(1 / 60);
+        if (d.holdFor > 0) heldFrames++;
+        if (d.at !== at) { waves++; at = d.at; }
+      }
+      return { held: +(heldFrames / 60).toFixed(1), share: +(heldFrames / (60 * 150)).toFixed(3),
+        waves, fired: d.lastVerdict === 'glitch' };
+    };
+    out.coping = coping();
+    g.restart();
+    return out;
+  });
+
+  check('a run that cannot clear the field is not sent another wave',
+    r.drowning.auto && r.drowning.held > 10
+    && r.drowning.max < r.loose.max && r.loose.max >= 20,
+    `with FLINCH and DEADBOLT owned (${r.drowning.auto}) the release was held `
+    + `${r.drowning.held}s of 240 and the field peaked at ${r.drowning.max}, `
+    + `against ${r.loose.max} on the same run with the gate off`);
+
+  check('...and the fuse fills from the wait, so the run is stepped back rather than pinned',
+    r.drowning.fired > r.loose.fired && r.drowning.tier < r.loose.tier,
+    `the fuse blew ${r.drowning.fired} times and the ladder ended at tier `
+    + `${r.drowning.tier}; with the gate off it blew ${r.loose.fired} and ended `
+    + `at ${r.loose.tier} -- the crowd term is ${r.crowd} of the contact rate`);
+
+  check('...and a run that is clearing does not notice the gate',
+    r.coping.share < 0.1 && r.coping.waves >= 6,
+    `${r.coping.held}s held of 150 (${(r.coping.share * 100).toFixed(1)}%) across `
+    + `${r.coping.waves} waves, with the fuse ${r.coping.fired ? 'BLOWN' : 'unlit'}`);
 }
 
 // --- the boss engine holds seven, not one -----------------------------------

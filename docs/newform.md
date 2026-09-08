@@ -4425,3 +4425,90 @@ panels saw a panel with no tab.
 and go are the mine cases, asleep behind the same flag rather than deleted, and
 the mirrored arms of the door case. Turning the line back on is one line and
 brings its own tests with it.
+
+## Build 291 — the field has a ceiling, and the fuse can see it
+
+Reported as: enemies surround the turret and stay there, PULSE and WARD are
+cast over and over, the wave system steps back, and **the situation does not
+get better**.
+
+Two faults, and separating them is what found them. The first guess — that the
+fuse's discharge doesn't clear the field — was wrong: `glitchOut` has always
+fizzled every hostile on the board. It just wasn't running.
+
+### The field had no ceiling
+
+A wave **ends** when its own bodies thin to 25%, or when `patience` runs out at
+26 seconds regardless. That is correct and deliberate — `standing()` counts the
+wave that ran, so a wave is judged on what it did rather than on the mess it
+inherited.
+
+But nothing counted the mess. Each wave was allowed to leave a quarter of
+itself, the next arrived on top, and the leftovers compounded with no bound at
+all. Measured on a run that had climbed past its gun: **ten to twenty-nine
+hostiles standing permanently**, wave after wave, none of them ever cleared.
+
+So the release now waits until the field is as thin as the last wave was
+*required* to leave it. Two different questions, kept apart: "is this wave
+over?" reads the wave's own bodies, and "may the next one start?" reads the
+whole field.
+
+### The fuse could not see it, and the player's own upgrades were why
+
+The fuse read one signal — unbroken contact — and **FLINCH and DEADBOLT exist
+to break contact**. Measured either side of those two upgrades, same tier, same
+gun, seven minutes each:
+
+| | mount gripped | fuse fired | tier after 7 min | hostiles standing |
+|---|---|---|---|---|
+| without the auto-casters | 22.3% | **6×** | 20 → **14** | — |
+| with them | 10.2% | **1×** | 20 → **20** | **10–29** |
+
+The automation was holding the player just above the threshold that would have
+rescued them. It did its job and starved the safety net by doing it — which is
+exactly what the report said: *"it doesn't necessarily reset, because of the
+auto features which keep enemies off, but the situation doesn't actually get
+better."*
+
+So a **held release fills the same fuse**, at `crowd` (0.5) of the contact
+rate. One clock, one ring, one verdict — there is still exactly one involuntary
+way down. Half, because the two are not the same emergency: something on the
+mount is taking the turret apart now, a full field is a run that has stopped
+moving. A frame that is both takes the larger rather than the sum.
+
+### The loop closes
+
+Field full → release held → fuse fills → fuse blows → field fizzles → release
+resumes. That is why there is **no cap** on the hold: an uncapped wait would
+deadlock only if nothing else moved, and the fuse is what moves.
+
+Re-measured, same configuration as the pinned run above: the fuse blows **3×**
+instead of once, the ladder walks 20 → **18**, the field holds **6–19** instead
+of 10–29, and contact falls to 4.7%.
+
+### ...and it is invisible to a player who is coping
+
+The control, four minutes each with a bought turret:
+
+| | waves/min | release held | fuse | tier |
+|---|---|---|---|---|
+| tier 4 | 4.3 | **0s** | unlit | 4 → 6 ↑ |
+| tier 10 | 3.3 | 4.5% | unlit | 10 → 12 ↑ |
+| tier 20 | 2.3 | **0.3%** | unlit | 20 → 22 ↑ |
+| tier 20, weak gun | 1.5 | 12.5% | blew 3× | 20 → 18 ↓ |
+
+Held near zero and still climbing when you are winning; load-bearing when you
+are not.
+
+### The case had to be the reported configuration
+
+Its first version turned the turret off instead — and that is a scenario the
+gate is not needed in: with nothing shooting, bodies grip the mount, contact
+fills the fuse every fourteen seconds, and each discharge disarms the gate
+before it can engage. Measured that way the field peaked at 21 with the gate on
+and 21 with it off — **a clean pass for a mechanism that had not run**. The
+case carries the weak gun and both auto-casters now, and its control is the
+same run with the gate pinned off.
+
+581 green. The ORDINAL hash is unchanged at `-1765830468`: the director does
+not run while an anomaly is up, so a change to the wave system cannot move it.

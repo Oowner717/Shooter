@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '290';
+export const BUILD = '291';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '290';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '62ec394';
+export const REV = '16e4422';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -523,6 +523,32 @@ export const CFG = {
       recover: 0.6, // fraction of the burn rate it comes back at, once clear
       fizzle: 0.9, // seconds a body takes to dissolve when it goes
       warn: 5, // seconds left when the ring starts reading as urgent
+      /*
+       * ---- and it fills while the next wave is HELD, at this rate ---------
+       *
+       * The fuse read one signal -- is anything on the turret right now --
+       * and a run that had fallen behind could sit outside it indefinitely.
+       * Measured either side of FLINCH and DEADBOLT, on the same tier with
+       * the same gun over seven minutes: without them the mount was gripped
+       * 22.3% of the time, the fuse blew SIX times and the ladder walked 20
+       * down to 14. With them it was gripped 10.2%, the fuse blew ONCE, and
+       * the run stayed pinned at 20 with between ten and twenty-nine hostiles
+       * standing on the field the whole time.
+       *
+       * That is the automation doing its job and starving the rescue by doing
+       * it: the two upgrades exist to break contact, and unbroken contact was
+       * the only thing the fuse could see. So it reads the other half now --
+       * `holdFor`, the seconds the director has spent unable to start a wave
+       * because the field is still full -- and being drowned fills the same
+       * clock as being gripped, at half the rate. One clock, one ring, one
+       * verdict; there is still exactly one involuntary way down.
+       *
+       * Half, because the two are not the same emergency: something on the
+       * mount is taking the turret apart now, a full field is a run that has
+       * stopped moving. Twenty-eight seconds of a wave that cannot start says
+       * the same thing fourteen seconds of contact does.
+       */
+      crowd: 0.5,
     },
   },
 

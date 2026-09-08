@@ -2292,4 +2292,30 @@ came from before believing the other one covers it.
   filled: dropping them lets the middle group -- AIM and FIRE, the cells placed
   where the thumb rests -- walk to the left edge. Assert it as geometry, not as
   a class.
+- **A wave ENDS on its own bodies; whether the next one may START is a
+  question about the FIELD.** `standing()` counts the wave that ran, which is
+  right -- a wave is judged on what it did rather than on the mess it
+  inherited -- but until build 291 nothing counted the mess. Each wave was
+  allowed to leave a quarter of itself (`thinAt`) or to time out at `patience`
+  leaving whatever it liked, and the next arrived on top, so leftovers
+  compounded with no bound: measured, ten to twenty-nine hostiles standing
+  permanently on a run that had climbed past its gun. The release waits for
+  the field to be as thin as the last wave was required to leave it. Keep the
+  two questions apart or the old bug -- a wave flattered by a messy field --
+  comes back.
+- **AUTOMATION THAT BREAKS CONTACT STARVES ANYTHING THAT MEASURES CONTACT.**
+  The glitch fuse read unbroken grip, and FLINCH and DEADBOLT exist to break
+  grip. Measured either side of those two upgrades, same tier and gun over
+  seven minutes: without them the mount was gripped 22.3% of the time, the
+  fuse blew SIX times and the ladder walked 20 down to 14; with them, 10.2%,
+  ONE discharge, and the run pinned at 20 with the field permanently full. The
+  safety net was being held just out of reach by the player's own defences.
+  Anything that rescues a losing position has to read a signal the game's own
+  mitigation does not suppress.
+- **A case for a rescue mechanism has to be set up in the state that needs
+  it.** The first version of the release-gate case turned the turret off -- and
+  with nothing shooting, contact fills the fuse every fourteen seconds and each
+  discharge disarms the gate before it engages. The field peaked at 21 with the
+  gate on and 21 with it off: a clean pass for a mechanism that had not run.
+  Reproduce the REPORT, not a simpler thing near it.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
