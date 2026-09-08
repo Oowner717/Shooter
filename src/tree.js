@@ -27,7 +27,7 @@
  * what stops the two drifting.
  */
 
-import { kB } from './config.js';
+import { CFG, kB } from './config.js';
 import { ALL_UPGRADES, UNLOCKS, CHARGES } from './upgrades.js';
 import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
@@ -478,7 +478,19 @@ export function priceOf(n, have = 0) {
  * predicate -- and they are in `NODE_BY_ID`, which is what `Game.buy` gates
  * on. They are simply not in `TREE`, so no branch draws them.
  */
-export const DETACHED = ELSEWHERE_IDS.map(leaf);
+/*
+ * ...and none of them while the emplacement line is out of play. Empty here
+ * means the six are in no tree, in no `NODE_BY_ID`, and skipped by a ledger
+ * replay -- `Game.restore` walks `taken` through `BY_ID.get(id)` and a miss
+ * simply continues -- so a run that bought them comes back without them and
+ * cannot buy them again.
+ *
+ * `ELSEWHERE` below is deliberately NOT gated with it. It is what tells
+ * `check-build.mjs` that these six ids live outside the tree on purpose, and
+ * that is still true: they are authored, they are in `ALL_UPGRADES`, and they
+ * are not content nobody can buy -- they are content nothing currently opens.
+ */
+export const DETACHED = CFG.gun.inPlay ? ELSEWHERE_IDS.map(leaf) : [];
 
 /**
  * Every node that can be BOUGHT, wherever it is offered from. `Game.buy` gates

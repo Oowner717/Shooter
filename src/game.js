@@ -841,6 +841,20 @@ export class Game {
     w.guns = Array.isArray(d.guns)
       ? [...new Set(d.guns.filter((n) => Number.isInteger(n) && n >= 0 && n < 6))].sort((p2, q) => p2 - q)
       : [];
+    /*
+     * ...and with the line out of play, whatever was standing is REFUNDED and
+     * the list emptied. `syncGuns` has done exactly this for a lot that stopped
+     * being buildable since build 275 and the rule it wrote down is the one
+     * that applies here: a purchase the game can no longer deliver is a refund
+     * rather than a quiet deletion. It is not left to `syncGuns` because that
+     * is one of the doors this change shuts, and a list that is persisted and
+     * counted has to be pruned rather than skipped.
+     *
+     * Credited below, once `w.bytes` has been read out of the file -- doing it
+     * here would be overwritten by the purse a dozen lines down.
+     */
+    const refundLots = CFG.gun.inPlay ? 0 : w.guns.length;
+    if (!CFG.gun.inPlay) w.guns = [];
     w.gunsOn = d.gunsOn !== false;
     w.unlocked = new Set(d.unlocked);
     for (const k of STARTING) w.unlocked.add(k);
@@ -852,6 +866,9 @@ export class Game {
     // `d.energy` is the FILE's key, which does not follow the field -- see
     // the note in save.js's captureRun.
     w.bytes = d.energy;
+    // ...plus anything handed back for an emplacement that can no longer be
+    // built. See the note beside `refundLots` above.
+    if (refundLots) w.bytes += refundLots * CFG.gun.cost;
     /*
      * A save from before the unlock clock has no `earned` at all, and seeding
      * it at zero would take TOW back off a run that had already been fighting
@@ -1635,6 +1652,16 @@ export class Game {
   pressLot(i) {
     const w = this.world;
     if (i < 0) return false;
+    /*
+     * ...and nothing at all while the emplacement line is out of play. Before
+     * the refusal and before the teaching line, because both of them talk
+     * ABOUT emplacements -- ON_WORKS says in as many words which lots are
+     * yours to build a gun on -- and a press that explains a system the game
+     * no longer has is worse than a press that does nothing. The two works
+     * ghosts are scenery now; a press still aims and still fires through
+     * them, which is what `lotAt`'s own note asks for.
+     */
+    if (!CFG.gun.inPlay) return false;
     const had = gunCount(w);
     const r = buildGun(w, i);
     if (r === 'ok') {
@@ -1890,7 +1917,9 @@ export class Game {
     syncYard(world, ENTRY_Y);
     // ...and the emplacements follow the ground they are bolted to. After the
     // yard, always: a gun's place IS its lot's place.
-    syncGuns(world);
+    // The emplacement line, when there is one. Off, `world.gunAt` is left as
+    // it was -- `reset()` puts it at [] and nothing else writes it.
+    if (CFG.gun.inPlay) syncGuns(world);
 
     this.grid.resize(world.width, world.height + STAGE_HEIGHT, GRID_CELL);
     background.resize(world.width, world.height, world.width / 2, ENTRY_Y);
@@ -2657,7 +2686,7 @@ export class Game {
     collectData(w, dt);
     this.runUpgrades(dt);
     updateMines(w, dt);
-    updateGuns(w, dt);
+    if (CFG.gun.inPlay) updateGuns(w, dt);
     updateYard(w, dt);
     this.resolveBlasts();
     this.checkContact();
@@ -3685,7 +3714,9 @@ export class Game {
 
     // The yard, straight onto the substrate: behind every body, every drop and
     // every piece of wreckage, which is what scenery has to mean here.
-    drawYard(ctx, w, background.mood, lotPrice());
+    // No price when nothing is for sale. `drawYard` draws the plate only on
+    // a `gun` lot and there are none, so this is belt as well as braces.
+    drawYard(ctx, w, background.mood, CFG.gun.inPlay ? lotPrice() : 0);
 
     /*
      * Ground first: anything in effects that declares itself ground (the
@@ -3733,7 +3764,7 @@ export class Game {
       // machine, because that is what they are -- fixtures on the ground, over
       // the yard and under the effects. Inside `ours` like everything of ours,
       // though a lot cannot be past the wall in the first place.
-      drawGuns(ctx, w);
+      if (CFG.gun.inPlay) drawGuns(ctx, w);
       for (const e of w.effects) if (!e.ground) e.draw(ctx, w);
     });
 
@@ -3808,7 +3839,7 @@ export class Game {
       drawProjectiles(ctx, w);
       // ...and their muzzles, with the effects: a shot is an event and the
       // gun is furniture, so the two are drawn in different passes.
-      gunGlow(ctx, w);
+      if (CFG.gun.inPlay) gunGlow(ctx, w);
       drawFx(ctx);
     });
     this.drawTouchAid(ctx);

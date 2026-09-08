@@ -228,6 +228,14 @@ export function lotPrice() {
  * one of its callers.
  */
 export function buildGun(world, i) {
+  /*
+   * The backstop, not the gate. With `CFG.gun.inPlay` false there are no `gun`
+   * lots for `lotAt` to find and `pressLot` returns before it reaches this, so
+   * nothing in the playable game can arrive here -- but this is the one
+   * function that takes money, and a door that takes money says no for itself
+   * rather than trusting the four in front of it.
+   */
+  if (!CFG.gun.inPlay) return 'no';
   const a = world.yard;
   if (!a || i < 0 || !a.lots[i]) return 'no';
   if (a.lots[i].kind !== 'gun') return 'kind';

@@ -132,7 +132,16 @@ const GROUPS = [
      * `locked` names the thing that opens it rather than being a flag,
      * because there are two locked tabs now and they open on different facts.
      */
-    { id: 'guns', label: 'TURRETS', locked: 'guns' },
+    /*
+     * ...and TURRETS, only while the emplacement line is in play. Out of the
+     * table rather than permanently sealed: a padlocked tab is a promise, and
+     * a tab promising something the game does not have is worse than no tab.
+     * It takes the `gunsOn` switch with it, which lives in that panel and
+     * nowhere else. SYSTEM is back to three tabs, which is what it was before
+     * build 261 -- and the strip's own note about label widths is written for
+     * four, so three is inside it.
+     */
+    ...(CFG.gun.inPlay ? [{ id: 'guns', label: 'TURRETS', locked: 'guns' }] : []),
     { id: 'system', label: 'SETTINGS' },
   ] },
 ];

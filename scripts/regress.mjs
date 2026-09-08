@@ -260,6 +260,15 @@ const drive = async (name, fn, wait = 300) => {
 let subsystems = true;
 subsystems = (await drive('teach', () => window.__sim.debugTeachAll())) && subsystems;
 subsystems = (await drive('energy', () => window.__sim.debugGiveBytes(200000000))) && subsystems;
+
+/*
+ * Whether the emplacement line is in play, read from the config rather than
+ * assumed. It is false from build 289 -- the mini turrets are out of the game
+ * and their code is not -- and the block of cases about them is guarded on
+ * this so that turning `CFG.gun.inPlay` back on brings its own tests with it.
+ */
+const GUN_LINE = await page.evaluate(async () =>
+  (await import('../src/config.js')).CFG.gun.inPlay);
 subsystems = (await drive('buy all', () => window.__sim.debugBuyAll(), 700)) && subsystems;
 subsystems = (await drive('fill', () => window.__sim.debugFillField(), 700)) && subsystems;
 
@@ -6312,6 +6321,216 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('...and every one of them actually painted an arrival, not a settled boss',
     r.every((x) => x.arriving > 0),
     `frames while arriving: ${r.map((x) => `${x.name} ${x.arriving}`).join(', ')}`);
+}
+
+// --- the emplacement line is out of play, at every door ---------------------
+/*
+ * Asked for directly: take the mini turrets out of the game without taking
+ * them out of the code. So `turrets.js` is untouched and every DOOR into it is
+ * shut behind one flag, `CFG.gun.inPlay`.
+ *
+ * The reason this needs a case and not just a flag is that the system had
+ * FIVE entrances into the playable game and they are in five different files.
+ * Shutting four of them is a system that is still reachable, and the one left
+ * open would be found by a player rather than by the suite -- which is the
+ * shape of nearly everything in this file. So the whole list is asserted, and
+ * asserted at the surfaces a player actually touches: the ground, the press,
+ * the tab, the tree, and the money.
+ *
+ * It is written to hold in BOTH directions. Set `inPlay` true and every arm
+ * here flips with it, so the case is also the description of what turning it
+ * back on restores.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG } = await import('../src/config.js');
+    const { gunLots, lotAt } = await import('../src/yard.js');
+    const { gunCount, buildGun } = await import('../src/turrets.js');
+    const { DETACHED, NODE_BY_ID, ELSEWHERE } = await import('../src/tree.js');
+    const { ALL_UPGRADES } = await import('../src/upgrades.js');
+    const out = { inPlay: CFG.gun.inPlay };
+
+    // ---- the GROUND: no lot on the field is emplacement ground -----------
+    g.restart();
+    w.phase = 'staging';
+    g.debugStepEra ? g.setEra(2) : null;
+    if (w.era !== 2) { w.newForm = 'done'; g.setEra(2); }
+    out.era = w.era;
+    const lots = (w.yard && w.yard.lots) || [];
+    out.lots = lots.length;
+    out.gunLots = lots.filter((l) => l.kind === 'gun').length;
+    out.gunLotsSays = gunLots();
+    // ...and the works pair is still there and still where it was, because
+    // they are a different feature and were not asked about.
+    out.worksLots = lots.filter((l) => l.kind === 'works').length;
+
+    // ---- the PRESS: pressing anywhere on the field builds nothing --------
+    const purse0 = w.bytes;
+    let pressed = 0;
+    for (let i = 0; i < lots.length; i++) {
+      w.bytes = 9e9;
+      if (g.pressLot(i)) pressed++;
+    }
+    // ...including through the canvas path, at each lot's own point.
+    for (const l of lots) {
+      w.bytes = 9e9;
+      if (g.pressLot(lotAt(w, l.x, l.y))) pressed++;
+    }
+    out.pressBuilt = pressed;
+    out.gunsAfter = gunCount(w);
+    // ...and the one function that takes money refuses for itself.
+    w.bytes = 9e9;
+    out.buildGunSays = buildGun(w, 0);
+    out.spentOnGuns = 9e9 - w.bytes;
+    w.bytes = purse0;
+
+    // ---- the TAB: TURRETS is not in the sheet at all ---------------------
+    g.hud.menu.setOpen(true);
+    out.tabs = [...document.querySelectorAll('#menuTabs .menuTab')].map((t) => t.textContent.trim());
+    out.tabIds = (await import('../src/menu.js')).GROUPS
+      ? null : null; // GROUPS is module-private; the strip is the surface
+    g.hud.menu.setOpen(false);
+
+    // ---- the TREE: the six upgrades are in no tree and no ledger ---------
+    out.detached = DETACHED.length;
+    out.inTree = ['gundamage', 'gunrate', 'gunrange', 'gunslew', 'gunsalvo', 'gunammo']
+      .filter((id) => NODE_BY_ID.has(id));
+    // ...but they are still AUTHORED, which is the whole point of the ask:
+    // the code stays, only the doors shut.
+    out.authored = ['gundamage', 'gunrate', 'gunrange', 'gunslew', 'gunsalvo', 'gunammo']
+      .filter((id) => ALL_UPGRADES.some((u) => u.id === id)).length;
+    out.excused = ['gundamage', 'gunrate', 'gunrange', 'gunslew', 'gunsalvo', 'gunammo']
+      .filter((id) => ELSEWHERE.has(id)).length;
+    // ...and a ledger that names one is replayed without it rather than
+    // throwing, which is how a save from before this comes back.
+    let replayThrew = null;
+    try {
+      w.ledger.push('gundamage');
+      g.hud.menu.syncTree();
+    } catch (e) { replayThrew = e.message; }
+    w.ledger.pop();
+    out.replayThrew = replayThrew;
+
+    // ---- the MONEY: a restore hands back what was paid -------------------
+    g.restart();
+    return out;
+  });
+
+  /*
+   * Both directions, off `r.inPlay` -- which is read from the config inside
+   * the page rather than assumed. Written only for the OFF side this would be
+   * a case that has to be edited to turn the line back on, and an edit is
+   * exactly what a guard should not need: the point of the flag is that one
+   * line moves and the suite says whether the doors moved with it.
+   */
+  const off = !r.inPlay;
+  check(off
+    ? 'no lot on the field is emplacement ground, and pressing one builds nothing'
+    : 'the emplacement line is in play: the ground is there and a press buys one',
+    off
+      ? (r.gunLots === 0 && r.gunLotsSays === 0 && r.pressBuilt === 0
+        && r.gunsAfter === 0 && r.spentOnGuns === 0 && r.buildGunSays === 'no')
+      : (r.gunLots === 2 && r.gunLotsSays === 2 && r.pressBuilt > 0
+        && r.gunsAfter > 0),
+    `era ${r.era}: ${r.lots} lots, ${r.gunLots} of them gun (gunLots() says `
+    + `${r.gunLotsSays}), ${r.worksLots} works; ${r.pressBuilt} presses built `
+    + `something, ${r.gunsAfter} standing, ${r.spentOnGuns} spent; buildGun `
+    + `says "${r.buildGunSays}"`);
+
+  // ...and the works pair is untouched either way. It is a different feature
+  // and was not part of the ask, so it is asserted rather than assumed.
+  check('...and the two works lots beside the machine are left alone',
+    r.worksLots === 2, `${r.worksLots} works lots of ${r.lots}`);
+
+  check(off ? '...and TURRETS is not a tab, sealed or otherwise'
+    : '...and TURRETS is a tab again',
+    off ? !r.tabs.some((t) => /turret/i.test(t))
+      : r.tabs.some((t) => /turret/i.test(t)),
+    `the strip shows ${r.tabs.join(' / ')}`);
+
+  check(off ? '...and the six upgrades are in no tree, while staying in the code'
+    : '...and the six upgrades are back in the tree',
+    (off ? (r.detached === 0 && r.inTree.length === 0)
+      : (r.detached === 6 && r.inTree.length === 6))
+    && r.authored === 6 && r.excused === 6 && !r.replayThrew,
+    `DETACHED ${r.detached}, in NODE_BY_ID ${r.inTree.length}, still authored `
+    + `${r.authored}/6, still excused by ELSEWHERE ${r.excused}/6; a ledger `
+    + `naming one replays ${r.replayThrew ? `and throws: ${r.replayThrew}` : 'cleanly'}`);
+}
+
+/*
+ * ...and only while the line is out of play, because a refund is what taking
+ * it out of play MEANS. With `CFG.gun.inPlay` true a run keeps what it bought
+ * and this case has nothing to say -- so it is behind the flag rather than
+ * passing for free, which would be a green arm asserting nothing.
+ */
+if (!GUN_LINE) {
+  // --- ...and a run that had bought one gets its money back -------------------
+  /*
+   * `syncGuns` has refunded a lot that stopped being buildable since build 275,
+   * and the rule it wrote down is the one that applies to the whole line going
+   * out of play: a purchase the game can no longer deliver is a refund rather
+   * than a quiet deletion. It is done in `Game.restore` rather than left to
+   * `syncGuns`, because `syncGuns` is one of the doors this change shuts.
+   *
+   * The control is the same file with no guns in it: without one, "the purse
+   * went up" would be true of any restore that banked anything on the way.
+   */
+  {
+    const r = await page.evaluate(async () => {
+      const { CFG } = await import('../src/config.js');
+      const save = await import('../src/save.js');
+      const g = window.__sim;
+      const w = g.world;
+
+      /*
+       * Through the real door: a file on disk and `Game.resume`, which is the
+       * only way a run is ever stood back up. Writing the object straight into
+       * the restore would skip `readSlot`, which is where the byte migration
+       * lives and where a file is refused.
+       */
+      const held = localStorage.getItem('sim7749-run');
+      const fileWith = (guns) => {
+        g.restart();
+        w.phase = 'staging';
+        w.bytes = CFG.gun.cost * 10;
+        w.era = 2;
+        const d = save.captureRun(w, g);
+        d.guns = guns;
+        d.era = 2;
+        return d;
+      };
+      /*
+       * `restart()` FIRST and the file second: `Game.restart` calls `forgetRun`,
+       * which removes both slots -- so writing the file before it wipes the very
+       * file `resume()` is about to look for, and both sides come back at zero.
+       */
+      const purseOf = (d) => {
+        g.restart();
+        localStorage.setItem('sim7749-run', JSON.stringify(d));
+        g.resume();
+        return { bytes: Math.round(w.bytes), guns: (w.guns || []).length };
+      };
+      const two = fileWith([2, 3]);
+      const none = fileWith([]);
+      const wrote = two.energy;
+      const back = purseOf(two);
+      const control = purseOf(none);
+      if (held === null) localStorage.removeItem('sim7749-run');
+      else localStorage.setItem('sim7749-run', held);
+      g.restart();
+      return { wrote, back, control, cost: CFG.gun.cost };
+    });
+
+    check('a run that had emplacements standing is paid back for them',
+      r.back.guns === 0 && r.control.guns === 0
+      && r.back.bytes === r.control.bytes + 2 * r.cost,
+      `a file with two came back at ${r.back.bytes} against ${r.control.bytes} `
+      + `for the same file with none -- a difference of `
+      + `${r.back.bytes - r.control.bytes} against a price of ${r.cost} each`);
+  }
 }
 
 // --- TALLY, the one heal in the back half ------------------------------------
@@ -16835,24 +17054,51 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `hamburger -> ${r.hamburger.group}/${r.hamburger.tab}, energy -> ${r.energy.tab}, `
     + `AMMO -> ${r.ammoBtn.tab}, MINES -> ${r.minesBtn.tab}; the world holds under all of them`);
 
+  /*
+   * SYSTEM's row follows `CFG.gun.inPlay`: TURRETS went in at build 261 and
+   * came out at 289 with the emplacement line, so the tab list is derived
+   * here rather than written out. Both shapes are named, so this arm holds
+   * whichever way the flag is set -- and a tab appearing that is in neither
+   * list still fails it.
+   */
+  const SYSTEM_TABS = GUN_LINE
+    ? '["codex","sandbox","guns","system"]'
+    : '["codex","sandbox","system"]';
   check('...and only the open menu-s tabs are in the row',
-    JSON.stringify(r.hamburger.tabsShown) === '["codex","sandbox","guns","system"]'
+    JSON.stringify(r.hamburger.tabsShown) === SYSTEM_TABS
     && JSON.stringify(r.energy.tabsShown) === '["ammo","mines","tree","ultimate"]',
-    `SYSTEM shows ${r.hamburger.tabsShown.join('/')}, ARSENAL shows ${r.energy.tabsShown.join('/')}`);
+    `SYSTEM shows ${r.hamburger.tabsShown.join('/')} (wanted ${SYSTEM_TABS}), `
+    + `ARSENAL shows ${r.energy.tabsShown.join('/')}`);
 
   check('the switch in the header crosses menus and remembers where you were',
     r.switch.toSystem.group === 'system' && r.switch.back.tab === 'mines',
     `MINES -> SYSTEM lands on ${r.switch.toSystem.tab}; back to ARSENAL lands on `
     + `${r.switch.back.tab} (not the first tab)`);
 
-  // Eight since build 261, when TURRETS went into SYSTEM between TESTBED and
-  // SETTINGS -- seven since 232, when SANDBOX did the same. The walk is what
-  // proves the strip is one list and not two: it crosses from ARSENAL into
-  // SYSTEM at ULTIMATE -> OBJECTS without a stop.
+  /*
+   * Eight tabs since build 261, when TURRETS went into SYSTEM between the
+   * ASSAY and SETTINGS -- seven again from 289, which took the emplacement
+   * line out of play and its tab with it. The walk is what proves the strip
+   * is ONE list and not two: it crosses from ARSENAL into SYSTEM at
+   * ULTIMATE -> OBJECTS without a stop, and the last entry is repeated
+   * because the walk stops at the end rather than wrapping.
+   */
+  const WALK = GUN_LINE
+    ? ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'sandbox', 'guns', 'system', 'system']
+    : ['ammo', 'mines', 'tree', 'ultimate', 'codex', 'sandbox', 'system', 'system'];
+  /*
+   * The back walk starts where the forward one stopped -- on the last tab --
+   * so its first entry is the tab BEFORE that, not the last tab itself. Hence
+   * the reverse with its head dropped, and the first tab repeated at the end
+   * because it stops rather than wrapping.
+   */
+  const ORDER = WALK.slice(0, -1);
+  const BACK = ORDER.slice().reverse().slice(1).concat(ORDER[0]);
   check('the tabs are one strip, walked in either direction and stopping at the ends',
-    JSON.stringify(r.walk) === '["ammo","mines","tree","ultimate","codex","sandbox","guns","system","system"]'
-    && JSON.stringify(r.walkBack) === '["guns","sandbox","codex","ultimate","tree","mines","ammo","ammo"]',
-    `forward ${r.walk.join(' ')}; back ${r.walkBack.join(' ')}`);
+    JSON.stringify(r.walk) === JSON.stringify(WALK)
+    && JSON.stringify(r.walkBack) === JSON.stringify(BACK),
+    `forward ${r.walk.join(' ')} (wanted ${WALK.join(' ')}); `
+    + `back ${r.walkBack.join(' ')} (wanted ${BACK.join(' ')})`);
 
   check('a sideways drag on the panel moves one tab, and a downward one does not',
     r.swipeLeft.tab === 'ultimate' && r.swipeLeft.inline === '' && r.swipeLeft.open
@@ -20311,7 +20557,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.bytes = 0;
       const c = document.querySelector('canvas');
       const box = c.getBoundingClientRect();
-      const gun = a.lots[3];
+      out.inPlay = CFG.gun.inPlay;
+      // The last lot, whichever it is: the two ahead while the emplacement
+      // line is in play, and otherwise the second of the works pair -- which
+      // is the one this arm is really about, because both works lots sit
+      // exactly where the thumb goes to shoot.
+      const gun = a.lots[a.lots.length - 1];
       const before = { energy: w.bytes, bought: w.ledger.length, shots: w.projectiles.length };
       w.projectiles.length = 0;
       c.dispatchEvent(new PointerEvent('pointerdown', {
@@ -20341,11 +20592,23 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   }
   await page.setViewportSize(held);
 
-  check('four lots stand on the era-2 field and nowhere else',
-    rows.every((r) => r.eraOne === null && r.n === 4
-      && r.kinds === 'works,works,gun,gun' && r.inField),
+  /*
+   * The count follows `CFG.gun.inPlay` rather than being written out. It was
+   * `r.n === 4 && r.kinds === 'works,works,gun,gun'`, and build 289 took the
+   * emplacement line out of play -- so the two `gun` lots are not laid and
+   * the works pair, which is a different feature and was not asked about, is
+   * what is left. Both shapes are named here, so this arm holds whichever way
+   * the flag is set.
+   */
+  const WANT = GUN_LINE
+    ? { n: 4, kinds: 'works,works,gun,gun' }
+    : { n: 2, kinds: 'works,works' };
+  check('the lots stand on the era-2 field and nowhere else',
+    rows.every((r) => r.eraOne === null && r.n === WANT.n
+      && r.kinds === WANT.kinds && r.inField),
     rows.map((r) => `${r.w}: era 1 ${r.eraOne}, era 2 ${r.n} lots (${r.kinds}), `
-      + `all inside the field below the wall ${r.inField}`).join('; '));
+      + `all inside the field below the wall ${r.inField}`).join('; ')
+    + ` — wanted ${WANT.n} (${WANT.kinds})`);
 
   /*
    * Against the interface's own rects, and there are enough of them to be sure
@@ -20359,18 +20622,25 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       + `${r.n} lots clash with ${r.rects} interface rects`).join('; '));
 
   /*
-   * ...and the press. A lot REFUSES: it says so and it buys nothing, and the
-   * same press still aims and fires -- two of the four sit exactly where the
-   * thumb goes to shoot, so a lot that swallowed the press would cost a shot
-   * every time you defended the ground it stands on.
+   * ...and the press, which is the half that matters most and is the same
+   * claim either way: **the press still aims and fires.** Both works lots sit
+   * exactly where the thumb goes to shoot, so a lot that swallowed the press
+   * would cost a shot every time you defended the ground it stands on.
+   *
+   * What differs is the flare. In play, a lot REFUSES -- it says so and buys
+   * nothing. Out of play it is scenery: `pressLot` returns before it can
+   * refuse or teach, because the line it would refuse ON no longer exists and
+   * ON_WORKS names emplacements in as many words.
    */
-  check('...and pressing one it cannot afford refuses, and still fires',
-    rows.every((r) => r.press.refused > 0 && r.press.energy && r.press.bought
-      && r.press.fired && r.miss.refused === 0 && r.miss.fired),
+  check('...and pressing a lot never eats the shot',
+    rows.every((r) => r.press.energy && r.press.bought && r.press.fired
+      && r.miss.refused === 0 && r.miss.fired
+      && (GUN_LINE ? r.press.refused > 0 : r.press.refused === 0)),
     rows.map((r) => `${r.w}: pressed a lot on an empty purse — refused `
-      + `${r.press.refused.toFixed(2)}, purse held ${r.press.energy}, nothing `
-      + `bought ${r.press.bought}, still fired ${r.press.fired}; pressed beside `
-      + `it — refused ${r.miss.refused}, fired ${r.miss.fired}`).join('; '));
+      + `${r.press.refused.toFixed(2)} (wanted ${GUN_LINE ? '> 0' : '0'}), purse `
+      + `held ${r.press.energy}, nothing bought ${r.press.bought}, still fired `
+      + `${r.press.fired}; pressed beside it — refused ${r.miss.refused}, fired `
+      + `${r.miss.fired}`).join('; '));
 }
 
 // --- the machine, measured rather than described ----------------------------
@@ -21792,34 +22062,455 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.struckThrown} and the one below ${r.openThrown}`);
 }
 
-// --- the emplacements: four lots, two guns, one line ------------------------
 /*
- * The build lots have stood empty since build 245 -- ground reserved, drawn,
- * and refusing every press. This is what they were for.
+ * ---- the emplacement cases sleep with the line they are about -----------
  *
- * The three things worth pinning are the three that could each ship broken on
- * their own: that a lot is a PURCHASE and still not a swallowed shot, that the
- * upgrades reach every gun whether it was standing when they were bought or
- * not, and that the tab they live in cannot be reached until one is.
+ * Five cases about a system that is out of play from build 289: the lots,
+ * the purchase, the refusal on a works lot, the price plate, the tab and
+ * its switch. They are not deleted, for the same reason the system is not.
+ * `CFG.gun.inPlay` is one line, and turning it back on has to bring its
+ * guards with it or the line comes back untested.
+ *
+ * What holds while they sleep is the case above, "no lot on the field is
+ * emplacement ground", which walks every door and asserts each one shut.
  */
-{
-  const r = await page.evaluate(async () => {
-    const { CFG } = await import('../src/config.js');
-    const { gunStats, gunAmmo, gunCount, GUN_AMMO, buildGun, syncGuns } = await import('../src/turrets.js');
-    const { DETACHED, NODE_BY_ID, coverage } = await import('../src/tree.js');
-    const { shielded } = await import('../src/yard.js');
-    const g = window.__sim;
-    const w = g.world;
-    const out = {};
+if (GUN_LINE) {
+  // --- the emplacements: four lots, two guns, one line ------------------------
+  /*
+   * The build lots have stood empty since build 245 -- ground reserved, drawn,
+   * and refusing every press. This is what they were for.
+   *
+   * The three things worth pinning are the three that could each ship broken on
+   * their own: that a lot is a PURCHASE and still not a swallowed shot, that the
+   * upgrades reach every gun whether it was standing when they were bought or
+   * not, and that the tab they live in cannot be reached until one is.
+   */
+  {
+    const r = await page.evaluate(async () => {
+      const { CFG } = await import('../src/config.js');
+      const { gunStats, gunAmmo, gunCount, GUN_AMMO, buildGun, syncGuns } = await import('../src/turrets.js');
+      const { DETACHED, NODE_BY_ID, coverage } = await import('../src/tree.js');
+      const { shielded } = await import('../src/yard.js');
+      const g = window.__sim;
+      const w = g.world;
+      const out = {};
 
-    const clean = (era) => {
+      const clean = (era) => {
+        g.restart();
+        delete w.director.update;
+        w.spawnLock = 0;
+        w.phase = 'staging';
+        g.debugTeachAll();
+        g.debugGiveBytes(400000000);
+        g.setEra(era);
+        w.director.update = () => {};
+        g.debugClearField();
+        w.mines.length = 0;
+        w.projectiles.length = 0;
+        w.effects.length = 0;
+        w.autoAim = false;
+        w.autoFire = false;
+      };
+
+      // ---- era 1 has no lots and no guns -----------------------------------
+      clean(1);
+      out.eraOneYard = !w.yard;
+      out.eraOnePress = g.pressLot(0);
+      out.eraOneGuns = w.gunAt.length;
+
+      // ---- a lot is a purchase, and it does not eat the shot ----------------
+      clean(2);
+      const a = w.yard;
+      out.lots = a.lots.length;
+      /*
+       * SPREAD, measured, and LEVEL from build 263.
+       *
+       * There were four ahead until build 275 and there are two. They were one
+       * row at `lotStep` 70, which put the inner pair 54 units either side of
+       * the turret's own column -- two guns up one lane. Build 261 answered that
+       * twice: the step went to 96 (the nearest pair 144 apart) AND `lotStagger`
+       * dropped the inner two into a shallow V. The step is what fixed the lane;
+       * the V just made four fixtures sit crooked, and it went in 263. `depths`
+       * is 1 and asserted as 1 -- it was asserted as 2, which is the old rule
+       * written down as a fact.
+       *
+       * So 144 is the FLOOR here and it is build 261's own number, not the
+       * current value: the survivors stand at 288 because they keep the outer
+       * pair's column, and the arithmetic that would have failed this --
+       * `(i - 0.5) * lotStep`, the obvious way to centre two -- gives 96 and is
+       * back inside the lane overlap that row was widened to fix.
+       */
+      const ahead = a.lots.filter((l) => l.kind === 'gun');
+      out.gap = +Math.min(...ahead.slice(1).map((l, i) => Math.abs(l.x - ahead[i].x))).toFixed(0);
+      out.depths = new Set(ahead.map((l) => Math.round(l.y))).size;
+      // ...and no two lots overlap, which a wider spread could have broken.
+      out.overlap = a.lots.some((l, i) => a.lots.some((m, j) => j > i
+        && Math.abs(l.x - m.x) < l.hw + m.hw && Math.abs(l.y - m.y) < l.hh + m.hh));
+      /*
+       * ---- the two beside the machine are WORKS, and refuse a gun ----------
+       *
+       * They have carried `kind: 'works'` since build 245 and the field has
+       * ghosted a squat block on them the whole time, while `buildGun` read the
+       * index and not the kind -- so a press put an emplacement on a slot drawn
+       * as a building. Both halves are asserted: the MODEL refuses (`buildGun`
+       * is reachable from a restore and from the debug panel, and a control
+       * that refuses is not the same as a rule that holds), and the PRESS
+       * refuses without eating the shot.
+       */
+      out.kinds = a.lots.map((l) => l.kind).join(',');
+      out.worksRefused = [0, 1].map((i) => buildGun(w, i));
+
+      const purse0 = w.bytes;
+      const c = document.querySelector('canvas');
+      const box = c.getBoundingClientRect();
+      const z = CFG.zoom;
+      const lot = a.lots[3];
+      w.projectiles.length = 0;
+      c.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, cancelable: true, pointerId: 71, isPrimary: true,
+        clientX: box.left + lot.x * z, clientY: box.top + lot.y * z,
+      }));
+      out.pressBuilt = gunCount(w) === 1 && (w.guns || []).includes(3);
+      out.pressPaid = purse0 - w.bytes === CFG.gun.cost;
+      // ...the whole reason the lots have never swallowed a press: four of the
+      // six sit exactly where the thumb goes to shoot.
+      out.pressFired = w.projectiles.length > 0;
+      // ...and a second press on the same lot buys nothing and still fires.
+      const purse1 = w.bytes;
+      w.projectiles.length = 0;
+      c.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, cancelable: true, pointerId: 72, isPrimary: true,
+        clientX: box.left + lot.x * z, clientY: box.top + lot.y * z,
+      }));
+      out.twiceCount = gunCount(w);
+      out.twicePaid = w.bytes === purse1;
+      out.twiceFired = w.projectiles.length > 0;
+
+      /*
+       * ...and the same press on a WORKS lot builds nothing, spends nothing and
+       * still fires. Through the HANDLER and not through `pressLot`, because
+       * `pressLot` is not what fires the gun -- the pointerdown listener calls
+       * it and then shoots, and a case that calls the method tests the logic
+       * and not the control. The first version of this arm did exactly that and
+       * reported "still fired: false" on a working build.
+       */
+      const worksPurse = w.bytes;
+      const worksGuns = gunCount(w);
+      w.projectiles.length = 0;
+      c.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, cancelable: true, pointerId: 73, isPrimary: true,
+        clientX: box.left + a.lots[0].x * z, clientY: box.top + a.lots[0].y * z,
+      }));
+      out.worksPaid = w.bytes === worksPurse;
+      out.worksGuns = gunCount(w) - worksGuns;
+      out.worksFired = w.projectiles.length > 0;
+      out.worksRefusedPulse = a.lots[0].refused > 0;
+
+      // ---- it shoots, and it shoots everything -----------------------------
+      clean(2);
+      const a2 = w.yard;
+      g.pressLot(3);
+      const gun = w.gunAt[0];
+      /*
+       * Held within a SLACK of where it was put, the way `tiers.mjs` holds a
+       * body -- and for the reason recorded there. The claim is about what the
+       * emplacement CHOOSES to shoot, not about whether it can chase; a MOTE and
+       * a DRIFT both wander, and measured in isolation the DRIFT died at 7.5s
+       * having drifted to 406 units, which is the far edge of the reach. So the
+       * window was set near the truth rather than clear of it and the case
+       * failed about one run in three, on the wander rather than on the rule.
+       * The velocity is never touched -- it is still an ordinary body the gun
+       * has to track -- only the distance it is allowed to get to.
+       */
+      const SLACK = 80;
+      const kill = (id, dx, dy) => {
+        const e = g.debugSpawn(id, gun.x + dx, gun.y + dy);
+        e.staged = false;
+        e.traits = null;
+        const hp0 = e.hp;
+        const hx = e.x;
+        const hy = e.y;
+        let f = 0;
+        let far = 0;
+        while (!e.dead && f < 60 * 20) {
+          g.update(1 / 60);
+          f++;
+          const d = Math.hypot(e.x - hx, e.y - hy);
+          if (d > far) far = d;
+          if (d > SLACK) {
+            e.x = hx + ((e.x - hx) / d) * SLACK;
+            e.y = hy + ((e.y - hy) / d) * SLACK;
+          }
+        }
+        return {
+          dead: e.dead, took: +(hp0 - e.hp).toFixed(1), s: +(f / 60).toFixed(2),
+          far: Math.round(far),
+        };
+      };
+      out.mote = kill('mote', 0, -120);
+      // "auto shoot all objects": grey is not skipped, which is the one place
+      // this differs from the machine's own assist.
+      out.drift = kill('drift', 30, -140);
+      // ...and nothing behind the wall, which nothing of ours may touch.
+      const behind = g.debugSpawn('lurcher', gun.x, a2.wallY - 24 - 20);
+      behind.staged = false;
+      out.behindShielded = shielded(w, behind);
+      const bh = behind.hp;
+      for (let i = 0; i < 60 * 6; i++) g.update(1 / 60);
+      out.behindSafe = behind.hp === bh;
+
+      // ---- the six upgrades reach every gun, standing or not ---------------
+      clean(2);
+      out.detached = DETACHED.length;
+      out.inBuyMap = DETACHED.every((n) => NODE_BY_ID.get(n.id) === n);
+      out.covered = coverage().missing.length === 0 && coverage().extra.length === 0;
+      // ...and none of them can be bought before one is standing. The TAB is
+      // locked, but a control that refuses is not the same as a rule that holds.
+      out.shutBuys = DETACHED.map((n) => g.buy(n.id));
+      g.pressLot(2);
+      const base = gunStats(w);
+      out.openBuys = DETACHED.map((n) => g.buy(n.id));
+      const one = gunStats(w);
+      out.moved = {
+        damage: one.damage > base.damage,
+        interval: one.interval < base.interval,
+        range: one.range > base.range,
+        slew: one.slew > base.slew,
+        salvo: one.salvo > base.salvo,
+        ammo: one.ammo.key !== base.ammo.key,
+      };
+      /*
+       * The load-bearing one: a gun built AFTER the six is identical to the one
+       * that was standing when they were bought. Every scalar is global and read
+       * at the point of use, so there is nothing to migrate -- and the failure
+       * this rules out is the LAST lot being worth less than the first.
+       *
+       * Lot 3, which is the second and last emplacement from build 275. It was
+       * 5, of four gun lots at 2..5.
+       */
+      g.pressLot(3);
+      const late = w.gunAt.find((x) => x.lot === 3);
+      out.lateBuilt = !!late;
+      out.lateSame = JSON.stringify(gunStats(w)) === JSON.stringify(one);
+      out.bothFire = w.gunAt.length === 2;
+
+      // ---- the switch stops the firing and not the gun ---------------------
+      clean(2);
+      g.pressLot(3);
+      const g2 = w.gunAt[0];
+      const t1 = g.debugSpawn('mote', g2.x, g2.y - 120);
+      t1.staged = false;
+      w.gunsOn = false;
+      const h1 = t1.hp;
+      for (let i = 0; i < 60 * 5; i++) g.update(1 / 60);
+      out.offTook = +(h1 - t1.hp).toFixed(1);
+      out.offStanding = w.gunAt.length;
+      w.gunsOn = true;
+      for (let i = 0; i < 60 * 5; i++) g.update(1 / 60);
+      out.onTook = +(h1 - t1.hp).toFixed(1);
+
+      /*
+       * ---- and it survives a reload ---------------------------------------
+       *
+       * `reset()` and not `restart()`: `restart` calls `forgetRun`, which
+       * deletes the file this is about to read. The first version of this arm
+       * did exactly that and reported a resume that brought back nothing --
+       * which was the case throwing the save away, not the save losing it.
+       */
+      clean(2);
+      // 2 and 3, which are the two gun lots. It was 1 and 4 before build 263,
+      // where lot 1 is a WORKS slot and refuses a gun, and 2 and 4 until 275,
+      // which took the row of four emplacements down to two.
+      g.pressLot(2);
+      g.pressLot(3);
+      g.buy('gunammo');
+      w.gunsOn = false;
+      g.checkpoint();
+      g.reset();
+      out.gone = gunCount(w);
+      g.resume();
+      out.backGuns = [...(w.guns || [])];
+      out.backOn = w.gunsOn;
+      out.backAmmo = gunAmmo(w).key;
+      out.backStanding = w.gunAt.length;
+      out.ammoCount = GUN_AMMO.length;
+
+      /*
+       * ---- ...and a save written before 263 does not stand one on a works ---
+       *
+       * `world.guns` is four bits of lot indices and nothing else, so a run saved
+       * while the kinds were unenforced can legitimately carry a 0 or a 1 in it.
+       * `syncGuns` is the one place every gun in the run passes through on its
+       * way to being drawn, and it is where that is refused -- the alternative
+       * is a migration, which throws away a gun the player did buy on a lot that
+       * is still legal.
+       */
+      const purse = w.bytes;
+      w.guns = [0, 1, 3];
+      syncGuns(w);
+      out.legacyStanding = w.gunAt.map((x) => x.lot).join(',');
+      /*
+       * ...and PRUNED and refunded, not merely skipped. Skipping alone leaves
+       * the index in `world.guns`, which is written back out by every save
+       * after it and is what `gunCount` and the TURRETS tab's lock read -- so
+       * the run would go on counting two emplacements that do not exist and
+       * can never be built, for ever. Found by review, and the arm that would
+       * have caught it is the LIST and the purse, not the standing guns.
+       */
+      out.legacyList = [...(w.guns || [])].join(',');
+      out.legacyRefund = w.bytes - purse;
+      out.legacyWant = 2 * CFG.gun.cost;
+      // ...and it is self-limiting: a second pass finds nothing and pays nothing.
+      const purse2 = w.bytes;
+      syncGuns(w);
+      out.legacyAgain = w.bytes === purse2 && [...(w.guns || [])].join(',') === '3';
+
+      /*
+       * ---- ...and a save written before 275 does not stand one on NOTHING ---
+       *
+       * The row of four emplacements became two, so lot indices 4 and 5 name no
+       * lot at all in a run that carries them. That is the same fault as a gun
+       * on a works lot and it is caught by the same guard -- `!a.lots[i]` was
+       * the first term of the prune from the day it was written -- but "it is
+       * covered by an existing guard" is a claim, and an unasserted claim about
+       * a save format is how a run silently counts an emplacement it can never
+       * build. Asserted here rather than argued: pruned from the LIST, which is
+       * what `gunCount` and the TURRETS tab's lock read, and paid back.
+       */
+      const purse3 = w.bytes;
+      w.guns = [3, 4, 5];
+      syncGuns(w);
+      out.shrunkStanding = w.gunAt.map((x) => x.lot).join(',');
+      out.shrunkList = [...(w.guns || [])].join(',');
+      out.shrunkRefund = w.bytes - purse3;
+      out.shrunkWant = 2 * CFG.gun.cost;
+      out.shrunkCount = gunCount(w);
+
+      delete w.director.update;
+      g.setEra(1);
+      g.restart();
+      return out;
+    });
+
+    check('a build lot buys one emplacement, and never eats the shot',
+      r.eraOneYard && r.eraOnePress === false && r.eraOneGuns === 0
+      && r.lots === 4 && r.gap >= 144 && r.depths === 1 && !r.overlap
+      && r.pressBuilt && r.pressPaid && r.pressFired
+      && r.twiceCount === 1 && r.twicePaid && r.twiceFired,
+      `era 1 has no yard (${r.eraOneYard}) and refuses the press (${r.eraOnePress}); `
+      + `at era 2 the two ahead are ${r.gap} apart on ${r.depths} line with `
+      + `no overlap (${!r.overlap}); one press built it (${r.pressBuilt}), paid `
+      + `(${r.pressPaid}) and still fired (${r.pressFired}); a second bought `
+      + `nothing (${r.twicePaid}) and still fired (${r.twiceFired})`);
+
+    /*
+     * The two beside the machine were never emplacement ground: they carry
+     * `kind: 'works'` and the field has ghosted a building on them since build
+     * 245, while `buildGun` read the index and not the kind. Both halves --
+     * the model and the control -- because `buildGun` is reachable from a
+     * restore and from the debug panel.
+     */
+    check('...and the two works slots beside the machine are not for guns',
+      r.kinds === 'works,works,gun,gun'
+      && r.worksRefused.every((x) => x === 'kind')
+      && r.worksPaid && r.worksGuns === 0 && r.worksFired && r.worksRefusedPulse,
+      `the four are ${r.kinds}; buildGun answers ${r.worksRefused.join('/')} on the `
+      + `two works lots; a thumb on one built nothing (+${r.worksGuns}), spent `
+      + `nothing (${r.worksPaid}), pulsed the lot (${r.worksRefusedPulse}) and `
+      + `still fired (${r.worksFired})`);
+
+    check('...and it shoots every object in reach, and nothing behind the wall',
+      r.mote.dead && r.drift.dead && r.behindShielded && r.behindSafe,
+      `a MOTE died in ${r.mote.s}s taking ${r.mote.took}, DRIFT in ${r.drift.s}s `
+      + `(grey is not skipped -- "all objects" is the whole rule); each held `
+      + `within ${r.mote.far}/${r.drift.far} units of where it was put; a body `
+      + `behind the wall took nothing (${r.behindSafe})`);
+
+    /*
+     * `lateSame` is the one that matters. Every scalar is global and read at the
+     * point of use, so a gun built after the line was upgraded arrives with all
+     * of it -- the failure this rules out is the LAST lot being worth less than
+     * the first, which would be a trap rather than a decision.
+     */
+    check('six upgrades, and they reach guns that do not exist yet',
+      r.detached === 6 && r.inBuyMap && r.covered
+      && r.shutBuys.every((x) => x === 'locked')
+      && r.openBuys.every((x) => x === 'ok')
+      && Object.values(r.moved).every(Boolean)
+      && r.lateBuilt && r.lateSame && r.bothFire,
+      `${r.detached} nodes, all in the buy map (${r.inBuyMap}) and all accounted `
+      + `for by the tree's coverage (${r.covered}); with nothing standing they `
+      + `read ${[...new Set(r.shutBuys)].join('/')} and with one standing `
+      + `${[...new Set(r.openBuys)].join('/')}; every stat moved `
+      + `(${JSON.stringify(r.moved)}); a gun built afterwards is identical `
+      + `(${r.lateSame})`);
+
+    check('...and the switch stops the firing, not the gun',
+      r.offTook === 0 && r.offStanding === 1 && r.onTook > 0,
+      `stood down it delivered ${r.offTook} over five seconds with `
+      + `${r.offStanding} still standing; brought up, ${r.onTook}`);
+
+    check('...and the line comes back with the run',
+      r.gone === 0 && JSON.stringify(r.backGuns) === '[2,3]' && r.backOn === false
+      && r.backAmmo === 'sabot' && r.backStanding === 2 && r.ammoCount === 3
+      && r.legacyStanding === '3' && r.legacyList === '3'
+      && r.legacyRefund === r.legacyWant && r.legacyAgain,
+      `a restart left ${r.gone}; the resume brought back `
+      + `${JSON.stringify(r.backGuns)} standing ${r.backStanding}, stood down `
+      + `(${r.backOn === false}), carrying ${r.backAmmo} of ${r.ammoCount}; a `
+      + `pre-263 save carrying [0,1,3] stands only ${r.legacyStanding}, is pruned `
+      + `to [${r.legacyList}] with ${r.legacyRefund} handed back, and a second `
+      + `pass changes nothing (${r.legacyAgain})`);
+
+    /*
+     * The 275 half of the same guard. Two lots went; a run that had bought them
+     * is holding indices that name nothing, and what has to come back is the
+     * ENERGY and the COUNT -- `gunCount` is what unlocks the TURRETS tab, so a
+     * stale index is a tab that stays open onto emplacements nobody can place.
+     */
+    check('...and a save from when there were four emplacements is refunded down to two',
+      r.shrunkStanding === '3' && r.shrunkList === '3' && r.shrunkCount === 1
+      && r.shrunkRefund === r.shrunkWant,
+      `a pre-275 save carrying [3,4,5] stands only ${r.shrunkStanding}, is pruned `
+      + `to [${r.shrunkList}] (count ${r.shrunkCount}) with ${r.shrunkRefund} of `
+      + `${r.shrunkWant} handed back for the two lots that no longer exist`);
+  }
+
+  // --- what a lot costs, and where a gun points with nothing to shoot ---------
+  /*
+   * Three things build 263 straightened, and each shipped wrong on its own.
+   *
+   * The PRICE was charged in silence: 2600 left the purse and the only time the
+   * number was ever spoken was in the refusal you got for being too poor to pay
+   * it, so a player who could afford one was told the price precisely never.
+   *
+   * The REST BEARING did not exist. `updateGuns` writes `aim` only when it has a
+   * target, so a gun kept whatever angle the last thing it shot at left it on,
+   * for ever. Four of them, each frozen on a different dead body, is what
+   * "straighten out the four mini turrets" was about.
+   *
+   * The PAD was sized off the gun's own radius -- `R * 3` by `R * 2.3`, 48 by
+   * 36.8, against a lot box of 46 by 40 -- so the thing that reads as bolted to
+   * the ground overhung its own dashed outline sideways and fell short of it
+   * top and bottom.
+   */
+  {
+    const r = await page.evaluate(async () => {
+      const { CFG } = await import('../src/config.js');
+      const { lotPrice, gunCount, drawGuns } = await import('../src/turrets.js');
+      const { drawYard } = await import('../src/yard.js');
+      const { background } = await import('../src/background.js');
+      const g = window.__sim;
+      const w = g.world;
+      const out = {};
+
       g.restart();
       delete w.director.update;
       w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(400000000);
-      g.setEra(era);
+      g.setEra(2);
       w.director.update = () => {};
       g.debugClearField();
       w.mines.length = 0;
@@ -21827,702 +22518,295 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       w.effects.length = 0;
       w.autoAim = false;
       w.autoFire = false;
-    };
 
-    // ---- era 1 has no lots and no guns -----------------------------------
-    clean(1);
-    out.eraOneYard = !w.yard;
-    out.eraOnePress = g.pressLot(0);
-    out.eraOneGuns = w.gunAt.length;
+      const a = w.yard;
+      const lot = a.lots[3];
 
-    // ---- a lot is a purchase, and it does not eat the shot ----------------
-    clean(2);
-    const a = w.yard;
-    out.lots = a.lots.length;
-    /*
-     * SPREAD, measured, and LEVEL from build 263.
-     *
-     * There were four ahead until build 275 and there are two. They were one
-     * row at `lotStep` 70, which put the inner pair 54 units either side of
-     * the turret's own column -- two guns up one lane. Build 261 answered that
-     * twice: the step went to 96 (the nearest pair 144 apart) AND `lotStagger`
-     * dropped the inner two into a shallow V. The step is what fixed the lane;
-     * the V just made four fixtures sit crooked, and it went in 263. `depths`
-     * is 1 and asserted as 1 -- it was asserted as 2, which is the old rule
-     * written down as a fact.
-     *
-     * So 144 is the FLOOR here and it is build 261's own number, not the
-     * current value: the survivors stand at 288 because they keep the outer
-     * pair's column, and the arithmetic that would have failed this --
-     * `(i - 0.5) * lotStep`, the obvious way to centre two -- gives 96 and is
-     * back inside the lane overlap that row was widened to fix.
-     */
-    const ahead = a.lots.filter((l) => l.kind === 'gun');
-    out.gap = +Math.min(...ahead.slice(1).map((l, i) => Math.abs(l.x - ahead[i].x))).toFixed(0);
-    out.depths = new Set(ahead.map((l) => Math.round(l.y))).size;
-    // ...and no two lots overlap, which a wider spread could have broken.
-    out.overlap = a.lots.some((l, i) => a.lots.some((m, j) => j > i
-      && Math.abs(l.x - m.x) < l.hw + m.hw && Math.abs(l.y - m.y) < l.hh + m.hh));
-    /*
-     * ---- the two beside the machine are WORKS, and refuse a gun ----------
-     *
-     * They have carried `kind: 'works'` since build 245 and the field has
-     * ghosted a squat block on them the whole time, while `buildGun` read the
-     * index and not the kind -- so a press put an emplacement on a slot drawn
-     * as a building. Both halves are asserted: the MODEL refuses (`buildGun`
-     * is reachable from a restore and from the debug panel, and a control
-     * that refuses is not the same as a rule that holds), and the PRESS
-     * refuses without eating the shot.
-     */
-    out.kinds = a.lots.map((l) => l.kind).join(',');
-    out.worksRefused = [0, 1].map((i) => buildGun(w, i));
-
-    const purse0 = w.bytes;
-    const c = document.querySelector('canvas');
-    const box = c.getBoundingClientRect();
-    const z = CFG.zoom;
-    const lot = a.lots[3];
-    w.projectiles.length = 0;
-    c.dispatchEvent(new PointerEvent('pointerdown', {
-      bubbles: true, cancelable: true, pointerId: 71, isPrimary: true,
-      clientX: box.left + lot.x * z, clientY: box.top + lot.y * z,
-    }));
-    out.pressBuilt = gunCount(w) === 1 && (w.guns || []).includes(3);
-    out.pressPaid = purse0 - w.bytes === CFG.gun.cost;
-    // ...the whole reason the lots have never swallowed a press: four of the
-    // six sit exactly where the thumb goes to shoot.
-    out.pressFired = w.projectiles.length > 0;
-    // ...and a second press on the same lot buys nothing and still fires.
-    const purse1 = w.bytes;
-    w.projectiles.length = 0;
-    c.dispatchEvent(new PointerEvent('pointerdown', {
-      bubbles: true, cancelable: true, pointerId: 72, isPrimary: true,
-      clientX: box.left + lot.x * z, clientY: box.top + lot.y * z,
-    }));
-    out.twiceCount = gunCount(w);
-    out.twicePaid = w.bytes === purse1;
-    out.twiceFired = w.projectiles.length > 0;
-
-    /*
-     * ...and the same press on a WORKS lot builds nothing, spends nothing and
-     * still fires. Through the HANDLER and not through `pressLot`, because
-     * `pressLot` is not what fires the gun -- the pointerdown listener calls
-     * it and then shoots, and a case that calls the method tests the logic
-     * and not the control. The first version of this arm did exactly that and
-     * reported "still fired: false" on a working build.
-     */
-    const worksPurse = w.bytes;
-    const worksGuns = gunCount(w);
-    w.projectiles.length = 0;
-    c.dispatchEvent(new PointerEvent('pointerdown', {
-      bubbles: true, cancelable: true, pointerId: 73, isPrimary: true,
-      clientX: box.left + a.lots[0].x * z, clientY: box.top + a.lots[0].y * z,
-    }));
-    out.worksPaid = w.bytes === worksPurse;
-    out.worksGuns = gunCount(w) - worksGuns;
-    out.worksFired = w.projectiles.length > 0;
-    out.worksRefusedPulse = a.lots[0].refused > 0;
-
-    // ---- it shoots, and it shoots everything -----------------------------
-    clean(2);
-    const a2 = w.yard;
-    g.pressLot(3);
-    const gun = w.gunAt[0];
-    /*
-     * Held within a SLACK of where it was put, the way `tiers.mjs` holds a
-     * body -- and for the reason recorded there. The claim is about what the
-     * emplacement CHOOSES to shoot, not about whether it can chase; a MOTE and
-     * a DRIFT both wander, and measured in isolation the DRIFT died at 7.5s
-     * having drifted to 406 units, which is the far edge of the reach. So the
-     * window was set near the truth rather than clear of it and the case
-     * failed about one run in three, on the wander rather than on the rule.
-     * The velocity is never touched -- it is still an ordinary body the gun
-     * has to track -- only the distance it is allowed to get to.
-     */
-    const SLACK = 80;
-    const kill = (id, dx, dy) => {
-      const e = g.debugSpawn(id, gun.x + dx, gun.y + dy);
-      e.staged = false;
-      e.traits = null;
-      const hp0 = e.hp;
-      const hx = e.x;
-      const hy = e.y;
-      let f = 0;
-      let far = 0;
-      while (!e.dead && f < 60 * 20) {
-        g.update(1 / 60);
-        f++;
-        const d = Math.hypot(e.x - hx, e.y - hy);
-        if (d > far) far = d;
-        if (d > SLACK) {
-          e.x = hx + ((e.x - hx) / d) * SLACK;
-          e.y = hy + ((e.y - hy) / d) * SLACK;
-        }
-      }
-      return {
-        dead: e.dead, took: +(hp0 - e.hp).toFixed(1), s: +(f / 60).toFixed(2),
-        far: Math.round(far),
-      };
-    };
-    out.mote = kill('mote', 0, -120);
-    // "auto shoot all objects": grey is not skipped, which is the one place
-    // this differs from the machine's own assist.
-    out.drift = kill('drift', 30, -140);
-    // ...and nothing behind the wall, which nothing of ours may touch.
-    const behind = g.debugSpawn('lurcher', gun.x, a2.wallY - 24 - 20);
-    behind.staged = false;
-    out.behindShielded = shielded(w, behind);
-    const bh = behind.hp;
-    for (let i = 0; i < 60 * 6; i++) g.update(1 / 60);
-    out.behindSafe = behind.hp === bh;
-
-    // ---- the six upgrades reach every gun, standing or not ---------------
-    clean(2);
-    out.detached = DETACHED.length;
-    out.inBuyMap = DETACHED.every((n) => NODE_BY_ID.get(n.id) === n);
-    out.covered = coverage().missing.length === 0 && coverage().extra.length === 0;
-    // ...and none of them can be bought before one is standing. The TAB is
-    // locked, but a control that refuses is not the same as a rule that holds.
-    out.shutBuys = DETACHED.map((n) => g.buy(n.id));
-    g.pressLot(2);
-    const base = gunStats(w);
-    out.openBuys = DETACHED.map((n) => g.buy(n.id));
-    const one = gunStats(w);
-    out.moved = {
-      damage: one.damage > base.damage,
-      interval: one.interval < base.interval,
-      range: one.range > base.range,
-      slew: one.slew > base.slew,
-      salvo: one.salvo > base.salvo,
-      ammo: one.ammo.key !== base.ammo.key,
-    };
-    /*
-     * The load-bearing one: a gun built AFTER the six is identical to the one
-     * that was standing when they were bought. Every scalar is global and read
-     * at the point of use, so there is nothing to migrate -- and the failure
-     * this rules out is the LAST lot being worth less than the first.
-     *
-     * Lot 3, which is the second and last emplacement from build 275. It was
-     * 5, of four gun lots at 2..5.
-     */
-    g.pressLot(3);
-    const late = w.gunAt.find((x) => x.lot === 3);
-    out.lateBuilt = !!late;
-    out.lateSame = JSON.stringify(gunStats(w)) === JSON.stringify(one);
-    out.bothFire = w.gunAt.length === 2;
-
-    // ---- the switch stops the firing and not the gun ---------------------
-    clean(2);
-    g.pressLot(3);
-    const g2 = w.gunAt[0];
-    const t1 = g.debugSpawn('mote', g2.x, g2.y - 120);
-    t1.staged = false;
-    w.gunsOn = false;
-    const h1 = t1.hp;
-    for (let i = 0; i < 60 * 5; i++) g.update(1 / 60);
-    out.offTook = +(h1 - t1.hp).toFixed(1);
-    out.offStanding = w.gunAt.length;
-    w.gunsOn = true;
-    for (let i = 0; i < 60 * 5; i++) g.update(1 / 60);
-    out.onTook = +(h1 - t1.hp).toFixed(1);
-
-    /*
-     * ---- and it survives a reload ---------------------------------------
-     *
-     * `reset()` and not `restart()`: `restart` calls `forgetRun`, which
-     * deletes the file this is about to read. The first version of this arm
-     * did exactly that and reported a resume that brought back nothing --
-     * which was the case throwing the save away, not the save losing it.
-     */
-    clean(2);
-    // 2 and 3, which are the two gun lots. It was 1 and 4 before build 263,
-    // where lot 1 is a WORKS slot and refuses a gun, and 2 and 4 until 275,
-    // which took the row of four emplacements down to two.
-    g.pressLot(2);
-    g.pressLot(3);
-    g.buy('gunammo');
-    w.gunsOn = false;
-    g.checkpoint();
-    g.reset();
-    out.gone = gunCount(w);
-    g.resume();
-    out.backGuns = [...(w.guns || [])];
-    out.backOn = w.gunsOn;
-    out.backAmmo = gunAmmo(w).key;
-    out.backStanding = w.gunAt.length;
-    out.ammoCount = GUN_AMMO.length;
-
-    /*
-     * ---- ...and a save written before 263 does not stand one on a works ---
-     *
-     * `world.guns` is four bits of lot indices and nothing else, so a run saved
-     * while the kinds were unenforced can legitimately carry a 0 or a 1 in it.
-     * `syncGuns` is the one place every gun in the run passes through on its
-     * way to being drawn, and it is where that is refused -- the alternative
-     * is a migration, which throws away a gun the player did buy on a lot that
-     * is still legal.
-     */
-    const purse = w.bytes;
-    w.guns = [0, 1, 3];
-    syncGuns(w);
-    out.legacyStanding = w.gunAt.map((x) => x.lot).join(',');
-    /*
-     * ...and PRUNED and refunded, not merely skipped. Skipping alone leaves
-     * the index in `world.guns`, which is written back out by every save
-     * after it and is what `gunCount` and the TURRETS tab's lock read -- so
-     * the run would go on counting two emplacements that do not exist and
-     * can never be built, for ever. Found by review, and the arm that would
-     * have caught it is the LIST and the purse, not the standing guns.
-     */
-    out.legacyList = [...(w.guns || [])].join(',');
-    out.legacyRefund = w.bytes - purse;
-    out.legacyWant = 2 * CFG.gun.cost;
-    // ...and it is self-limiting: a second pass finds nothing and pays nothing.
-    const purse2 = w.bytes;
-    syncGuns(w);
-    out.legacyAgain = w.bytes === purse2 && [...(w.guns || [])].join(',') === '3';
-
-    /*
-     * ---- ...and a save written before 275 does not stand one on NOTHING ---
-     *
-     * The row of four emplacements became two, so lot indices 4 and 5 name no
-     * lot at all in a run that carries them. That is the same fault as a gun
-     * on a works lot and it is caught by the same guard -- `!a.lots[i]` was
-     * the first term of the prune from the day it was written -- but "it is
-     * covered by an existing guard" is a claim, and an unasserted claim about
-     * a save format is how a run silently counts an emplacement it can never
-     * build. Asserted here rather than argued: pruned from the LIST, which is
-     * what `gunCount` and the TURRETS tab's lock read, and paid back.
-     */
-    const purse3 = w.bytes;
-    w.guns = [3, 4, 5];
-    syncGuns(w);
-    out.shrunkStanding = w.gunAt.map((x) => x.lot).join(',');
-    out.shrunkList = [...(w.guns || [])].join(',');
-    out.shrunkRefund = w.bytes - purse3;
-    out.shrunkWant = 2 * CFG.gun.cost;
-    out.shrunkCount = gunCount(w);
-
-    delete w.director.update;
-    g.setEra(1);
-    g.restart();
-    return out;
-  });
-
-  check('a build lot buys one emplacement, and never eats the shot',
-    r.eraOneYard && r.eraOnePress === false && r.eraOneGuns === 0
-    && r.lots === 4 && r.gap >= 144 && r.depths === 1 && !r.overlap
-    && r.pressBuilt && r.pressPaid && r.pressFired
-    && r.twiceCount === 1 && r.twicePaid && r.twiceFired,
-    `era 1 has no yard (${r.eraOneYard}) and refuses the press (${r.eraOnePress}); `
-    + `at era 2 the two ahead are ${r.gap} apart on ${r.depths} line with `
-    + `no overlap (${!r.overlap}); one press built it (${r.pressBuilt}), paid `
-    + `(${r.pressPaid}) and still fired (${r.pressFired}); a second bought `
-    + `nothing (${r.twicePaid}) and still fired (${r.twiceFired})`);
-
-  /*
-   * The two beside the machine were never emplacement ground: they carry
-   * `kind: 'works'` and the field has ghosted a building on them since build
-   * 245, while `buildGun` read the index and not the kind. Both halves --
-   * the model and the control -- because `buildGun` is reachable from a
-   * restore and from the debug panel.
-   */
-  check('...and the two works slots beside the machine are not for guns',
-    r.kinds === 'works,works,gun,gun'
-    && r.worksRefused.every((x) => x === 'kind')
-    && r.worksPaid && r.worksGuns === 0 && r.worksFired && r.worksRefusedPulse,
-    `the four are ${r.kinds}; buildGun answers ${r.worksRefused.join('/')} on the `
-    + `two works lots; a thumb on one built nothing (+${r.worksGuns}), spent `
-    + `nothing (${r.worksPaid}), pulsed the lot (${r.worksRefusedPulse}) and `
-    + `still fired (${r.worksFired})`);
-
-  check('...and it shoots every object in reach, and nothing behind the wall',
-    r.mote.dead && r.drift.dead && r.behindShielded && r.behindSafe,
-    `a MOTE died in ${r.mote.s}s taking ${r.mote.took}, DRIFT in ${r.drift.s}s `
-    + `(grey is not skipped -- "all objects" is the whole rule); each held `
-    + `within ${r.mote.far}/${r.drift.far} units of where it was put; a body `
-    + `behind the wall took nothing (${r.behindSafe})`);
-
-  /*
-   * `lateSame` is the one that matters. Every scalar is global and read at the
-   * point of use, so a gun built after the line was upgraded arrives with all
-   * of it -- the failure this rules out is the LAST lot being worth less than
-   * the first, which would be a trap rather than a decision.
-   */
-  check('six upgrades, and they reach guns that do not exist yet',
-    r.detached === 6 && r.inBuyMap && r.covered
-    && r.shutBuys.every((x) => x === 'locked')
-    && r.openBuys.every((x) => x === 'ok')
-    && Object.values(r.moved).every(Boolean)
-    && r.lateBuilt && r.lateSame && r.bothFire,
-    `${r.detached} nodes, all in the buy map (${r.inBuyMap}) and all accounted `
-    + `for by the tree's coverage (${r.covered}); with nothing standing they `
-    + `read ${[...new Set(r.shutBuys)].join('/')} and with one standing `
-    + `${[...new Set(r.openBuys)].join('/')}; every stat moved `
-    + `(${JSON.stringify(r.moved)}); a gun built afterwards is identical `
-    + `(${r.lateSame})`);
-
-  check('...and the switch stops the firing, not the gun',
-    r.offTook === 0 && r.offStanding === 1 && r.onTook > 0,
-    `stood down it delivered ${r.offTook} over five seconds with `
-    + `${r.offStanding} still standing; brought up, ${r.onTook}`);
-
-  check('...and the line comes back with the run',
-    r.gone === 0 && JSON.stringify(r.backGuns) === '[2,3]' && r.backOn === false
-    && r.backAmmo === 'sabot' && r.backStanding === 2 && r.ammoCount === 3
-    && r.legacyStanding === '3' && r.legacyList === '3'
-    && r.legacyRefund === r.legacyWant && r.legacyAgain,
-    `a restart left ${r.gone}; the resume brought back `
-    + `${JSON.stringify(r.backGuns)} standing ${r.backStanding}, stood down `
-    + `(${r.backOn === false}), carrying ${r.backAmmo} of ${r.ammoCount}; a `
-    + `pre-263 save carrying [0,1,3] stands only ${r.legacyStanding}, is pruned `
-    + `to [${r.legacyList}] with ${r.legacyRefund} handed back, and a second `
-    + `pass changes nothing (${r.legacyAgain})`);
-
-  /*
-   * The 275 half of the same guard. Two lots went; a run that had bought them
-   * is holding indices that name nothing, and what has to come back is the
-   * ENERGY and the COUNT -- `gunCount` is what unlocks the TURRETS tab, so a
-   * stale index is a tab that stays open onto emplacements nobody can place.
-   */
-  check('...and a save from when there were four emplacements is refunded down to two',
-    r.shrunkStanding === '3' && r.shrunkList === '3' && r.shrunkCount === 1
-    && r.shrunkRefund === r.shrunkWant,
-    `a pre-275 save carrying [3,4,5] stands only ${r.shrunkStanding}, is pruned `
-    + `to [${r.shrunkList}] (count ${r.shrunkCount}) with ${r.shrunkRefund} of `
-    + `${r.shrunkWant} handed back for the two lots that no longer exist`);
-}
-
-// --- what a lot costs, and where a gun points with nothing to shoot ---------
-/*
- * Three things build 263 straightened, and each shipped wrong on its own.
- *
- * The PRICE was charged in silence: 2600 left the purse and the only time the
- * number was ever spoken was in the refusal you got for being too poor to pay
- * it, so a player who could afford one was told the price precisely never.
- *
- * The REST BEARING did not exist. `updateGuns` writes `aim` only when it has a
- * target, so a gun kept whatever angle the last thing it shot at left it on,
- * for ever. Four of them, each frozen on a different dead body, is what
- * "straighten out the four mini turrets" was about.
- *
- * The PAD was sized off the gun's own radius -- `R * 3` by `R * 2.3`, 48 by
- * 36.8, against a lot box of 46 by 40 -- so the thing that reads as bolted to
- * the ground overhung its own dashed outline sideways and fell short of it
- * top and bottom.
- */
-{
-  const r = await page.evaluate(async () => {
-    const { CFG } = await import('../src/config.js');
-    const { lotPrice, gunCount, drawGuns } = await import('../src/turrets.js');
-    const { drawYard } = await import('../src/yard.js');
-    const { background } = await import('../src/background.js');
-    const g = window.__sim;
-    const w = g.world;
-    const out = {};
-
-    g.restart();
-    delete w.director.update;
-    w.spawnLock = 0;
-    w.phase = 'staging';
-    g.debugTeachAll();
-    g.debugGiveBytes(400000000);
-    g.setEra(2);
-    w.director.update = () => {};
-    g.debugClearField();
-    w.mines.length = 0;
-    w.projectiles.length = 0;
-    w.effects.length = 0;
-    w.autoAim = false;
-    w.autoFire = false;
-
-    const a = w.yard;
-    const lot = a.lots[3];
-
-    /*
-     * ---- the price is DRAWN on an empty gun lot -------------------------
-     *
-     * Rendered rather than asserted off a property, and the control is the
-     * same yard drawn with the price switched off: what is left is the digits
-     * and nothing else. Counting lit pixels in the lot's lower band and NOT
-     * over the whole canvas, for the reason the wall case records -- a
-     * whole-frame diff reports every unrelated thing that moved.
-     */
-    const band = (price) => {
-      const S = 220;
-      const c = document.createElement('canvas');
-      c.width = S; c.height = S;
-      const x = c.getContext('2d');
-      // the lot's own lower half, where the plate sits, centred in the frame
-      x.translate(S / 2 - lot.x, S / 2 - (lot.y + lot.hh * 0.5));
-      drawYard(x, w, background.mood, price);
       /*
-       * Counted inside the LOT'S OWN BOX and not over the whole frame. The
-       * lots were 96 apart and the window is 220 wide, so a neighbour's price
-       * sits in it -- which did not matter while the text was 3.2 CSS px and
-       * did the moment build 267 made it legible: the "gone once built" arm
-       * read 1190 against 850 and failed, on a build where lot 3's own price
-       * had correctly gone. Measure the thing you are claiming.
+       * ---- the price is DRAWN on an empty gun lot -------------------------
+       *
+       * Rendered rather than asserted off a property, and the control is the
+       * same yard drawn with the price switched off: what is left is the digits
+       * and nothing else. Counting lit pixels in the lot's lower band and NOT
+       * over the whole canvas, for the reason the wall case records -- a
+       * whole-frame diff reports every unrelated thing that moved.
        */
-      const d = x.getImageData(0, 0, S, S).data;
-      const cx = S / 2;
-      const hw = lot.hw;
-      let lit = 0;
-      for (let py = 0; py < S; py++) {
-        for (let px2 = 0; px2 < S; px2++) {
-          if (Math.abs(px2 - cx) > hw) continue;
-          if (d[(py * S + px2) * 4 + 3] > 24) lit++;
-        }
-      }
-      return lit;
-    };
-    out.priceOff = band(0);
-    out.priceOn = band(lotPrice());
-    out.price = Math.round(lotPrice());
-
-    /*
-     * ---- and the plate FITS the lot it labels ---------------------------
-     *
-     * The case above is a lit-pixel count with no width bound, so it could
-     * not see the plate double. It did: the byte migration took the label
-     * from "2600" to "2600000", and at a flat 11 CSS px the plate measured
-     * 87 world units against a lot 46 wide. Measured off the painted pixels
-     * rather than off the arithmetic, in the lot's own row -- and formatting
-     * will not rescue it in a later phase, because "2.60 MB" is seven
-     * characters too.
-     */
-    const plateHalf = (price) => {
-      const S = 220;
-      const c = document.createElement('canvas');
-      c.width = S; c.height = S;
-      const x = c.getContext('2d');
-      x.translate(S / 2 - lot.x, S / 2 - (lot.y + lot.hh * 0.5));
-      drawYard(x, w, background.mood, price);
-      const d = x.getImageData(0, 0, S, S).data;
-      // The plate's own row: the widest opaque run anywhere in the lower band
-      // where it sits, which is the plate because nothing else there is solid.
-      let widest = 0;
-      for (let py = 0; py < S; py++) {
-        let lo = -1; let hi = -1;
-        for (let px2 = 0; px2 < S; px2++) {
-          if (d[(py * S + px2) * 4 + 3] > 200) { if (lo < 0) lo = px2; hi = px2; }
-        }
-        if (lo >= 0) widest = Math.max(widest, hi - lo + 1);
-      }
-      return widest / 2;
-    };
-    out.plateHalf = plateHalf(lotPrice());
-    out.lotHalf = lot.hw;
-    out.plateRatio = +(out.plateHalf / lot.hw).toFixed(2);
-    out.plateFit = CFG.yard.plateFit;
-
-    // ...and it goes the moment the lot is built on, because the decision has
-    // been taken. Same frame, same everything, one gun standing.
-    g.pressLot(3);
-    out.built = gunCount(w) === 1;
-    out.priceBuilt = band(lotPrice());
-    out.priceGone = out.priceBuilt <= out.priceOff + 2;
-
-    /*
-     * ---- the pad is the LOT's box, not a multiple of the gun's radius ----
-     *
-     * The second arm is the revert-and-fail built in: the old expressions are
-     * evaluated here, and if a change ever puts them back the equality below
-     * cannot hold while this stays false.
-     */
-    const gun = w.gunAt[0];
-    out.padW = gun.hw === lot.hw && gun.hh === lot.hh;
-    /*
-     * ...and RENDERED, because two fields on the model is not a pad. Reverting
-     * the geometry to `R * 3` by `R * 2.3` would leave the two fields alone
-     * and keep this green, which is the hole review found in it.
-     *
-     * `drawGuns` is drawn into a frame centred on the lot and the painted
-     * extent is measured against the lot's own box: the pad has to reach the
-     * box's width and no further sideways. The barrel legitimately runs past
-     * it vertically -- it is a barrel -- so only the horizontal reach is
-     * asserted, which is the axis the old expression was wrong on.
-     */
-    {
-      const S = 200;
-      const paintHalf = () => {
-        const c2 = document.createElement('canvas');
-        c2.width = S; c2.height = S;
-        const x2 = c2.getContext('2d');
-        x2.translate(S / 2 - gun.x, S / 2 - gun.y);
-        drawGuns(x2, w);
-        const d2 = x2.getImageData(0, 0, S, S).data;
-        let far = 0;
+      const band = (price) => {
+        const S = 220;
+        const c = document.createElement('canvas');
+        c.width = S; c.height = S;
+        const x = c.getContext('2d');
+        // the lot's own lower half, where the plate sits, centred in the frame
+        x.translate(S / 2 - lot.x, S / 2 - (lot.y + lot.hh * 0.5));
+        drawYard(x, w, background.mood, price);
+        /*
+         * Counted inside the LOT'S OWN BOX and not over the whole frame. The
+         * lots were 96 apart and the window is 220 wide, so a neighbour's price
+         * sits in it -- which did not matter while the text was 3.2 CSS px and
+         * did the moment build 267 made it legible: the "gone once built" arm
+         * read 1190 against 850 and failed, on a build where lot 3's own price
+         * had correctly gone. Measure the thing you are claiming.
+         */
+        const d = x.getImageData(0, 0, S, S).data;
+        const cx = S / 2;
+        const hw = lot.hw;
+        let lit = 0;
         for (let py = 0; py < S; py++) {
           for (let px2 = 0; px2 < S; px2++) {
-            if (d2[(py * S + px2) * 4 + 3] < 24) continue;
-            const dx = Math.abs(px2 - S / 2);
-            if (dx > far) far = dx;
+            if (Math.abs(px2 - cx) > hw) continue;
+            if (d[(py * S + px2) * 4 + 3] > 24) lit++;
           }
         }
-        return +far.toFixed(1);
+        return lit;
       };
+      out.priceOff = band(0);
+      out.priceOn = band(lotPrice());
+      out.price = Math.round(lotPrice());
+
       /*
-       * A DIFFERENTIAL against the old geometry, and the first version of this
-       * was not one. It measured the painted half-width and required it within
-       * 2 of the lot's 35.38 -- but the expression it exists to rule out,
-       * `R * 1.5`, is 36.92, and a stroke is centred on its path so the paint
-       * runs about 2.6 past whichever of them is in force. Two candidates 1.5
-       * apart cannot be told apart by a measurement with 2.6 of bleed: it read
-       * 38 for both. So `drawGuns` is run twice -- once as shipped, once with
-       * `hw`/`hh` deleted, which is exactly what makes it fall back to
-       * `R * 1.5` -- and the two pictures must differ, with the shipped one
-       * the narrower. Revert the geometry and the two runs become identical.
+       * ---- and the plate FITS the lot it labels ---------------------------
+       *
+       * The case above is a lit-pixel count with no width bound, so it could
+       * not see the plate double. It did: the byte migration took the label
+       * from "2600" to "2600000", and at a flat 11 CSS px the plate measured
+       * 87 world units against a lot 46 wide. Measured off the painted pixels
+       * rather than off the arithmetic, in the lot's own row -- and formatting
+       * will not rescue it in a later phase, because "2.60 MB" is seven
+       * characters too.
        */
-      out.paintedHalf = paintHalf();
-      const hw = gun.hw; const hh = gun.hh;
-      delete gun.hw; delete gun.hh;
-      out.paintedOld = paintHalf();
-      gun.hw = hw; gun.hh = hh;
-      out.padPainted = out.paintedOld > out.paintedHalf;
-    }
-    out.padWas = +(CFG.gun.r * 1.5).toFixed(2);
-    out.padIs = +lot.hw.toFixed(2);
-    out.padDiffered = Math.abs(CFG.gun.r * 1.5 - lot.hw) > 0.5
-      || Math.abs(CFG.gun.r * 1.15 - lot.hh) > 0.5;
+      const plateHalf = (price) => {
+        const S = 220;
+        const c = document.createElement('canvas');
+        c.width = S; c.height = S;
+        const x = c.getContext('2d');
+        x.translate(S / 2 - lot.x, S / 2 - (lot.y + lot.hh * 0.5));
+        drawYard(x, w, background.mood, price);
+        const d = x.getImageData(0, 0, S, S).data;
+        // The plate's own row: the widest opaque run anywhere in the lower band
+        // where it sits, which is the plate because nothing else there is solid.
+        let widest = 0;
+        for (let py = 0; py < S; py++) {
+          let lo = -1; let hi = -1;
+          for (let px2 = 0; px2 < S; px2++) {
+            if (d[(py * S + px2) * 4 + 3] > 200) { if (lo < 0) lo = px2; hi = px2; }
+          }
+          if (lo >= 0) widest = Math.max(widest, hi - lo + 1);
+        }
+        return widest / 2;
+      };
+      out.plateHalf = plateHalf(lotPrice());
+      out.lotHalf = lot.hw;
+      out.plateRatio = +(out.plateHalf / lot.hw).toFixed(2);
+      out.plateFit = CFG.yard.plateFit;
+
+      // ...and it goes the moment the lot is built on, because the decision has
+      // been taken. Same frame, same everything, one gun standing.
+      g.pressLot(3);
+      out.built = gunCount(w) === 1;
+      out.priceBuilt = band(lotPrice());
+      out.priceGone = out.priceBuilt <= out.priceOff + 2;
+
+      /*
+       * ---- the pad is the LOT's box, not a multiple of the gun's radius ----
+       *
+       * The second arm is the revert-and-fail built in: the old expressions are
+       * evaluated here, and if a change ever puts them back the equality below
+       * cannot hold while this stays false.
+       */
+      const gun = w.gunAt[0];
+      out.padW = gun.hw === lot.hw && gun.hh === lot.hh;
+      /*
+       * ...and RENDERED, because two fields on the model is not a pad. Reverting
+       * the geometry to `R * 3` by `R * 2.3` would leave the two fields alone
+       * and keep this green, which is the hole review found in it.
+       *
+       * `drawGuns` is drawn into a frame centred on the lot and the painted
+       * extent is measured against the lot's own box: the pad has to reach the
+       * box's width and no further sideways. The barrel legitimately runs past
+       * it vertically -- it is a barrel -- so only the horizontal reach is
+       * asserted, which is the axis the old expression was wrong on.
+       */
+      {
+        const S = 200;
+        const paintHalf = () => {
+          const c2 = document.createElement('canvas');
+          c2.width = S; c2.height = S;
+          const x2 = c2.getContext('2d');
+          x2.translate(S / 2 - gun.x, S / 2 - gun.y);
+          drawGuns(x2, w);
+          const d2 = x2.getImageData(0, 0, S, S).data;
+          let far = 0;
+          for (let py = 0; py < S; py++) {
+            for (let px2 = 0; px2 < S; px2++) {
+              if (d2[(py * S + px2) * 4 + 3] < 24) continue;
+              const dx = Math.abs(px2 - S / 2);
+              if (dx > far) far = dx;
+            }
+          }
+          return +far.toFixed(1);
+        };
+        /*
+         * A DIFFERENTIAL against the old geometry, and the first version of this
+         * was not one. It measured the painted half-width and required it within
+         * 2 of the lot's 35.38 -- but the expression it exists to rule out,
+         * `R * 1.5`, is 36.92, and a stroke is centred on its path so the paint
+         * runs about 2.6 past whichever of them is in force. Two candidates 1.5
+         * apart cannot be told apart by a measurement with 2.6 of bleed: it read
+         * 38 for both. So `drawGuns` is run twice -- once as shipped, once with
+         * `hw`/`hh` deleted, which is exactly what makes it fall back to
+         * `R * 1.5` -- and the two pictures must differ, with the shipped one
+         * the narrower. Revert the geometry and the two runs become identical.
+         */
+        out.paintedHalf = paintHalf();
+        const hw = gun.hw; const hh = gun.hh;
+        delete gun.hw; delete gun.hh;
+        out.paintedOld = paintHalf();
+        gun.hw = hw; gun.hh = hh;
+        out.padPainted = out.paintedOld > out.paintedHalf;
+      }
+      out.padWas = +(CFG.gun.r * 1.5).toFixed(2);
+      out.padIs = +lot.hw.toFixed(2);
+      out.padDiffered = Math.abs(CFG.gun.r * 1.5 - lot.hw) > 0.5
+        || Math.abs(CFG.gun.r * 1.15 - lot.hh) > 0.5;
+
+      /*
+       * ---- and with nothing to shoot it comes home ------------------------
+       *
+       * A body put off to one side, tracked until the aim has plainly left
+       * rest, then removed -- and the question is whether the aim comes back.
+       * The first arm is the control: a gun with a live target must NOT be at
+       * rest, or "it came home" is a sentence about a gun that never left.
+       */
+      const REST = -Math.PI / 2;
+      const off = (aim) => {
+        let d = aim - REST;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        return +Math.abs(d).toFixed(3);
+      };
+      const e = g.debugSpawn('mote', gun.x + 220, gun.y - 40);
+      e.staged = false;
+      e.hp = 1e9;
+      for (let i = 0; i < 60 * 2; i++) { e.hp = 1e9; g.update(1 / 60); }
+      out.tracking = off(gun.aim);
+      e.dead = true;
+      w.enemies.length = 0;
+      for (let i = 0; i < 60 * 3; i++) g.update(1 / 60);
+      out.rested = off(gun.aim);
+
+      delete w.director.update;
+      g.setEra(1);
+      g.restart();
+      return out;
+    });
+
+    check('a lot says what it costs, and a gun with nothing to shoot comes home',
+      r.priceOn > r.priceOff && r.built && r.priceGone
+      && r.padW && r.padDiffered && r.padPainted
+      && r.tracking > 0.35 && r.rested < 0.02,
+      `the empty lot lights ${r.priceOn} pixels against ${r.priceOff} with the `
+      + `price switched off -- ${r.price} energy, drawn where the thumb already `
+      + `is -- and once built it is back to ${r.priceBuilt}; the pad paints out to `
+      + `${r.paintedHalf} against ${r.paintedOld} on the geometry it replaced `
+      + `(${r.padPainted}); it is the lot's `
+      + `own ${r.padIs} and not the gun's ${r.padWas} (${r.padDiffered} that `
+      + `those differ); the aim left rest by ${r.tracking} rad on a target and `
+      + `came back to ${r.rested}`);
 
     /*
-     * ---- and with nothing to shoot it comes home ------------------------
-     *
-     * A body put off to one side, tracked until the aim has plainly left
-     * rest, then removed -- and the question is whether the aim comes back.
-     * The first arm is the control: a gun with a live target must NOT be at
-     * rest, or "it came home" is a sentence about a gun that never left.
+     * The bound the case above could not see. A tolerance over `plateFit`,
+     * because the cap sizes the TYPE and the plate is then measured off the
+     * painted glyphs plus a padding, so it lands near the cap rather than on
+     * it -- and a lit-pixel count is not the instrument for a width.
      */
-    const REST = -Math.PI / 2;
-    const off = (aim) => {
-      let d = aim - REST;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      return +Math.abs(d).toFixed(3);
-    };
-    const e = g.debugSpawn('mote', gun.x + 220, gun.y - 40);
-    e.staged = false;
-    e.hp = 1e9;
-    for (let i = 0; i < 60 * 2; i++) { e.hp = 1e9; g.update(1 / 60); }
-    out.tracking = off(gun.aim);
-    e.dead = true;
-    w.enemies.length = 0;
-    for (let i = 0; i < 60 * 3; i++) g.update(1 / 60);
-    out.rested = off(gun.aim);
+    check('...and the price plate fits the lot it is labelling',
+      r.plateHalf > 0 && r.plateRatio <= r.plateFit * 1.12,
+      `"${r.price}" plates out to ${r.plateHalf.toFixed(1)} against a lot half `
+      + `of ${r.lotHalf} -- ${r.plateRatio}x, against a cap of ${r.plateFit}`);
+  }
 
-    delete w.director.update;
-    g.setEra(1);
-    g.restart();
-    return out;
-  });
-
-  check('a lot says what it costs, and a gun with nothing to shoot comes home',
-    r.priceOn > r.priceOff && r.built && r.priceGone
-    && r.padW && r.padDiffered && r.padPainted
-    && r.tracking > 0.35 && r.rested < 0.02,
-    `the empty lot lights ${r.priceOn} pixels against ${r.priceOff} with the `
-    + `price switched off -- ${r.price} energy, drawn where the thumb already `
-    + `is -- and once built it is back to ${r.priceBuilt}; the pad paints out to `
-    + `${r.paintedHalf} against ${r.paintedOld} on the geometry it replaced `
-    + `(${r.padPainted}); it is the lot's `
-    + `own ${r.padIs} and not the gun's ${r.padWas} (${r.padDiffered} that `
-    + `those differ); the aim left rest by ${r.tracking} rad on a target and `
-    + `came back to ${r.rested}`);
-
+  // --- the TURRETS tab is shut until one is standing --------------------------
   /*
-   * The bound the case above could not see. A tolerance over `plateFit`,
-   * because the cap sizes the TYPE and the plate is then measured off the
-   * painted glyphs plus a padding, so it lands near the cap rather than on
-   * it -- and a lit-pixel count is not the instrument for a width.
+   * The lock is the whole reason those six live outside the tree: they are not
+   * offered to a run with nothing to apply them to. Asserted off the RENDERED
+   * BOX and the panel's own two states, never off `hidden` -- `.gunRoom` gives
+   * itself a `display`, which beats the user agent's `[hidden]` rule, and that
+   * is the trap this repo has paid for twice.
    */
-  check('...and the price plate fits the lot it is labelling',
-    r.plateHalf > 0 && r.plateRatio <= r.plateFit * 1.12,
-    `"${r.price}" plates out to ${r.plateHalf.toFixed(1)} against a lot half `
-    + `of ${r.lotHalf} -- ${r.plateRatio}x, against a cap of ${r.plateFit}`);
-}
+  {
+    const r = await page.evaluate(async () => {
+      const g = window.__sim;
+      const w = g.world;
+      const out = {};
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveBytes(400000000);
+      g.setEra(2);
+      w.director.update = () => {};
+      g.debugClearField();
 
-// --- the TURRETS tab is shut until one is standing --------------------------
-/*
- * The lock is the whole reason those six live outside the tree: they are not
- * offered to a run with nothing to apply them to. Asserted off the RENDERED
- * BOX and the panel's own two states, never off `hidden` -- `.gunRoom` gives
- * itself a `display`, which beats the user agent's `[hidden]` rule, and that
- * is the trap this repo has paid for twice.
- */
-{
-  const r = await page.evaluate(async () => {
-    const g = window.__sim;
-    const w = g.world;
-    const out = {};
-    g.restart();
-    delete w.director.update;
-    w.spawnLock = 0;
-    w.phase = 'staging';
-    g.debugTeachAll();
-    g.debugGiveBytes(400000000);
-    g.setEra(2);
-    w.director.update = () => {};
-    g.debugClearField();
+      const tab = document.querySelector('.menuTab[data-tab="guns"]');
+      const box = (el) => (el ? el.getBoundingClientRect().height > 0 : null);
+      g.hud.menu.setOpen(true);
+      g.hud.menu.openTab('guns');
+      const room = g.hud.menu.gunRoom;
 
-    const tab = document.querySelector('.menuTab[data-tab="guns"]');
-    const box = (el) => (el ? el.getBoundingClientRect().height > 0 : null);
-    g.hud.menu.setOpen(true);
-    g.hud.menu.openTab('guns');
-    const room = g.hud.menu.gunRoom;
+      out.label = tab && tab.textContent.trim();
+      out.shutSealed = tab.classList.contains('sealed');
+      out.shutDoor = box(room.shut);
+      out.shutRows = box(room.open);
+      out.rows = room.open.querySelectorAll('.shopCard').length;
 
-    out.label = tab && tab.textContent.trim();
-    out.shutSealed = tab.classList.contains('sealed');
-    out.shutDoor = box(room.shut);
-    out.shutRows = box(room.open);
-    out.rows = room.open.querySelectorAll('.shopCard').length;
+      // ...and building one on the field opens it, with the sheet SHUT, which
+      // is where a player will be when they buy.
+      g.hud.menu.setOpen(false);
+      g.pressLot(2);
+      g.hud.menu.setOpen(true);
+      g.hud.menu.openTab('guns');
+      out.openSealed = tab.classList.contains('sealed');
+      out.openDoor = box(room.shut);
+      out.openRows = box(room.open);
+      out.state = room.state.textContent;
 
-    // ...and building one on the field opens it, with the sheet SHUT, which
-    // is where a player will be when they buy.
-    g.hud.menu.setOpen(false);
-    g.pressLot(2);
-    g.hud.menu.setOpen(true);
-    g.hud.menu.openTab('guns');
-    out.openSealed = tab.classList.contains('sealed');
-    out.openDoor = box(room.shut);
-    out.openRows = box(room.open);
-    out.state = room.state.textContent;
+      // ...and the switch is a control, pressed through its handler.
+      const was = w.gunsOn;
+      room.sw.click();
+      out.flipped = w.gunsOn !== was;
+      out.switchSays = room.sw.textContent;
+      room.sw.click();
+      out.flippedBack = w.gunsOn === was;
 
-    // ...and the switch is a control, pressed through its handler.
-    const was = w.gunsOn;
-    room.sw.click();
-    out.flipped = w.gunsOn !== was;
-    out.switchSays = room.sw.textContent;
-    room.sw.click();
-    out.flippedBack = w.gunsOn === was;
+      // ...and the strip of tabs still fits: four in SYSTEM, none of them
+      // wrapping past what ARSENAL's four already do.
+      const strip = document.getElementById('menuTabs');
+      const up = [...strip.children].filter((b) => !b.hidden);
+      out.tabs = up.length;
+      out.clipped = up.some((b) => b.scrollWidth > b.clientWidth + 1);
+      g.hud.menu.setOpen(false);
 
-    // ...and the strip of tabs still fits: four in SYSTEM, none of them
-    // wrapping past what ARSENAL's four already do.
-    const strip = document.getElementById('menuTabs');
-    const up = [...strip.children].filter((b) => !b.hidden);
-    out.tabs = up.length;
-    out.clipped = up.some((b) => b.scrollWidth > b.clientWidth + 1);
-    g.hud.menu.setOpen(false);
+      delete w.director.update;
+      g.setEra(1);
+      g.restart();
+      return out;
+    });
 
-    delete w.director.update;
-    g.setEra(1);
-    g.restart();
-    return out;
-  });
+    check('the TURRETS tab is shut until an emplacement stands',
+      r.label === 'TURRETS' && r.shutSealed && r.shutDoor === true && r.shutRows === false
+      && r.openSealed === false && r.openDoor === false && r.openRows === true
+      && r.rows === 6 && r.tabs === 4 && !r.clipped,
+      `shut: sealed ${r.shutSealed}, the door is up (${r.shutDoor}) and the six `
+      + `rows are not (${r.shutRows}); after one is built: sealed ${r.openSealed}, `
+      + `door ${r.openDoor}, rows ${r.openRows} (${r.rows} of them) reading `
+      + `"${r.state}"; ${r.tabs} tabs in SYSTEM, none clipped (${!r.clipped})`);
 
-  check('the TURRETS tab is shut until an emplacement stands',
-    r.label === 'TURRETS' && r.shutSealed && r.shutDoor === true && r.shutRows === false
-    && r.openSealed === false && r.openDoor === false && r.openRows === true
-    && r.rows === 6 && r.tabs === 4 && !r.clipped,
-    `shut: sealed ${r.shutSealed}, the door is up (${r.shutDoor}) and the six `
-    + `rows are not (${r.shutRows}); after one is built: sealed ${r.openSealed}, `
-    + `door ${r.openDoor}, rows ${r.openRows} (${r.rows} of them) reading `
-    + `"${r.state}"; ${r.tabs} tabs in SYSTEM, none clipped (${!r.clipped})`);
-
-  check('...and its switch is a control that flips the line',
-    r.flipped && r.flippedBack && /LINE/.test(r.switchSays),
-    `pressed, it flipped (${r.flipped}) and said "${r.switchSays}"; pressed `
-    + `again it came back (${r.flippedBack})`);
+    check('...and its switch is a control that flips the line',
+      r.flipped && r.flippedBack && /LINE/.test(r.switchSays),
+      `pressed, it flipped (${r.flipped}) and said "${r.switchSays}"; pressed `
+      + `again it came back (${r.flippedBack})`);
+  }
 }
 
 // --- the door: what NEW FORM costs and what it needs ------------------------
@@ -23068,7 +23352,20 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * this case was written.
    */
   const peak = Math.max(...r.near.trail);
-  const peakAt = r.near.trail.indexOf(peak);
+  /*
+   * The LAST sample at the furthest distance, not the first. A body thrown by
+   * a pellet fan coasts, and the samples are a second apart -- so its furthest
+   * point is routinely a plateau, `477 -> 477 -> 435`, and taking the FIRST of
+   * those as the turn asks the second sample to be closing while the body is
+   * still going out. Measured: it fails about one run in five that way, and
+   * the trail underneath it is a textbook recovery.
+   *
+   * That is the same fault the three notes above record, for the fourth time,
+   * and on the same arm: a window set at the truth rather than clear of it.
+   * The claim is the ground coming back, and a body has not turned round
+   * until it has stopped going out.
+   */
+  const peakAt = r.near.trail.lastIndexOf(peak);
   const back = (peak - Math.min(...r.near.trail.slice(peakAt))) / (peak - r.near.start);
   /*
    * ...and the closing is only asserted UNTIL IT IS HOME. Past that the body

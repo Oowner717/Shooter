@@ -4291,3 +4291,67 @@ Proved rather than argued: with the two-line fix stashed, both arms fail and
 everything else stays green.
 
 629 green.
+
+## Build 289 — the emplacement line is out of play
+
+Asked for directly: take the mini turrets out of the game without taking them
+out of the code.
+
+So **`turrets.js` is untouched** — all 500 lines of it, the two `gun` lots in
+`yard.js`, the TURRETS tab in `menu.js`, the six upgrades in `upgrades.js`, the
+`gun*` keys in `world.up`, the `guns`/`gunsOn` fields in the save. What is gone
+is every **door** into it, and one flag shuts them: `CFG.gun.inPlay`.
+
+| file | what the flag shuts |
+|---|---|
+| `yard.js` | the two `gun` lots are not laid, so `gunLots()` is 0, `lotAt` can never return one, and the price plate has nothing to draw on |
+| `game.js` | `syncGuns`, `updateGuns`, `drawGuns` and `gunGlow` are not called at all; `pressLot` returns before it can refuse or teach |
+| `menu.js` | the TURRETS tab is not in `GROUPS`, so it cannot be reached or unlocked — and the `gunsOn` switch goes with it |
+| `tree.js` | `DETACHED` is empty, so the six upgrades are in no tree, no `NODE_BY_ID` and no ledger replay |
+| `turrets.js` | `buildGun` refuses at its first line — the backstop, not the gate |
+
+### A press does nothing at all, and that is deliberate
+
+`pressLot` returns before `refuseLot` and before the teaching line. Both of
+those talk *about* emplacements — `ON_WORKS` says in as many words which lots
+are yours to build a gun on — and a press that explains a system the game no
+longer has is worse than a press that does nothing. The two `works` ghosts are
+scenery now; a press still aims and still fires through them, which is what
+`lotAt`'s own note asks for and what the case still holds.
+
+The works pair is left alone on purpose: it is a different feature, it was not
+part of the ask, and its placement never depended on how many gun lots there
+were.
+
+### A purchase that can no longer be delivered is a refund
+
+`syncGuns` has refunded a lot that stopped being buildable since build 275, and
+that rule is exactly what taking the whole line out of play means. So
+`Game.restore` hands back `CFG.gun.cost` for every emplacement a saved run had
+standing and empties the list — done there rather than in `syncGuns`, because
+`syncGuns` is one of the doors this change shuts.
+
+### The suite says which way the flag is set
+
+Three arms walk every door, and they are **written to hold in both
+directions** — proved rather than claimed: with `inPlay` true the suite is
+**633 green**, with it false **623 green**. The ten that come and go are the
+five emplacement cases, which sleep behind the same flag rather than being
+deleted, and the mirrored arms. Turning the line back on is one line and brings
+its own tests with it.
+
+Three existing cases were made flag-aware rather than pinned to the day's
+shape: the lot geometry (`4` and `works,works,gun,gun` were written out), and
+the two menu-strip cases, which listed the tabs by name.
+
+### ...and a fourth instance of an old fault, found in passing
+
+The HAIL recovery case failed once with a textbook trail — `477 -> 477 -> 435
+-> ...`. It took the FIRST sample at the furthest distance as the turn, and a
+body thrown by a pellet fan coasts, so its peak is routinely a plateau and the
+arm asked the second sample to be closing while the body was still going out.
+That is the same window-set-at-the-truth fault the three notes above that case
+already record, on the same arm. It takes the LAST sample at the peak now: a
+body has not turned round until it has stopped going out.
+
+623 green.

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '288';
+export const BUILD = '289';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '288';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'c5e12e3';
+export const REV = 'd51d7af';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -5074,6 +5074,32 @@ CFG.gun = {
   life: 1.2,
   slew: 3.4, // radians a second the little barrel comes round at
   spread: 0.055, // VOLLEY's fan, per extra round
+  /*
+   * ---- THE EMPLACEMENT LINE IS OUT OF PLAY -----------------------------
+   *
+   * Every line of it is still here -- `turrets.js` entire, the two `gun` lots
+   * in `yard.js`, the TURRETS tab in `menu.js`, the six upgrades in
+   * `upgrades.js`, the `gun*` keys in `world.up`, the `guns`/`gunsOn` fields
+   * in the save. What is gone is every DOOR into it, and this flag is the one
+   * thing that shuts them:
+   *
+   *   yard.js    the two `gun` lots are not laid, so `gunLots()` is 0, `lotAt`
+   *              can never return one and the price plate has nothing to draw
+   *   game.js    `syncGuns`, `updateGuns`, `drawGuns` and `gunGlow` are not
+   *              called at all, `pressLot` returns before it can refuse or
+   *              teach, and a restore refunds anything already standing
+   *   menu.js    the TURRETS tab is not in `GROUPS`, so it cannot be reached
+   *              or unlocked, and the `gunsOn` switch goes with it
+   *   tree.js    `DETACHED` is empty, so the six upgrades are in no tree, no
+   *              `NODE_BY_ID` and no ledger replay
+   *   turrets.js `buildGun` refuses at its first line, which nothing can now
+   *              reach -- it is the backstop, not the gate
+   *
+   * Set it true and every one of those comes back with no other edit. The
+   * suite asserts the whole list, so a door left open is a red case rather
+   * than something a player finds.
+   */
+  inPlay: false,
   cost: MB(2.6), // flat, per lot -- see lotPrice
   /*
    * How long a gap in the shooting is a PAUSE rather than the end of it.

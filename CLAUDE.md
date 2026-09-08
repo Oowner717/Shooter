@@ -2247,4 +2247,24 @@ came from before believing the other one covers it.
   bounded `n <= 7`, written when there were seven, and every boss case sets
   `b.arriving = 0`, which is the one window `drawHole` runs in. When a report
   says "freezes", look for a throw before looking for a loop.
+- **Taking a system out of play is shutting its DOORS, not deleting it, and
+  the doors are never all in one file.** The emplacement line had five --
+  `yard.js` lays the ground, `game.js` presses it and steps and draws the
+  guns, `menu.js` carries the tab and its switch, `tree.js` places the six
+  upgrades, `turrets.js` takes the money -- and shutting four of them leaves a
+  system that is still reachable by the fifth. `CFG.gun.inPlay` is the one
+  flag; the case that walks every door is what makes it one flag rather than
+  five hopes. Write that case to hold in BOTH directions and prove it by
+  running the suite with the flag set each way (633 green on, 623 off), or
+  turning the thing back on is an edit to the guards as well as to the code.
+- **A case about a switched-off system sleeps behind the same flag; it is not
+  deleted and it is not left passing for free.** `if (GUN_LINE) { ... }` round
+  the block, and no consolation `check(..., true, ...)` in the else -- a green
+  arm that asserts nothing is worse than a missing one, because it is counted.
+  What holds while they sleep is the door case, which is a different claim.
+- **A press that explains a system the game no longer has is worse than a
+  press that does nothing.** `pressLot` returns before `refuseLot` and before
+  `ON_WORKS`, which names emplacements in as many words. The lot is scenery
+  now, and the half of the old case that still matters -- the press still aims
+  and still fires -- is the half that was always the point.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

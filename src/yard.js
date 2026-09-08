@@ -42,7 +42,12 @@ import { clamp, rgba, mixHex } from './util.js';
  */
 const LOTS = [
   { kind: 'works' }, { kind: 'works' },
-  { kind: 'gun' }, { kind: 'gun' },
+  // ...and the emplacement ground, which is only laid when the line is in
+  // play. With `CFG.gun.inPlay` false these two are simply not here, so
+  // `gunLots()` is 0, `lotAt` can never return one, and the price plate below
+  // -- which draws on `l.kind === 'gun'` -- has nothing to draw on. The works
+  // pair's own placement does not depend on the count, so they do not move.
+  ...(CFG.gun.inPlay ? [{ kind: 'gun' }, { kind: 'gun' }] : []),
 ];
 const WORKS_LOTS = LOTS.filter((l) => l.kind === 'works').length;
 const GUN_LOTS = LOTS.filter((l) => l.kind === 'gun').length;
