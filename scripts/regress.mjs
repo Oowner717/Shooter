@@ -2957,6 +2957,186 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     `${r.restored} of the roomy widths dropped no label with an empty purse`);
 }
 
+// --- the figure carries its own unit ----------------------------------------
+/*
+ * Build 285 routed every amount the player reads through `fmtBytes`, and
+ * shipped it with the suite green -- which meant nothing at all was asserting
+ * the strings. A readout that prints a number and has no case behind it is a
+ * readout that rots, and this one had three ways to be quietly wrong.
+ *
+ * The unit lives in the FIGURE and not in the label beside it, for a reason
+ * that is measured rather than aesthetic: the label slot already carries the
+ * depth dividend when there is one, and `styles.css:3161` drops that slot
+ * entirely below 372px -- so a unit living in the label is a unit a narrow
+ * phone never sees. With the unit in the figure the word ENERGY beside it is
+ * the second thing saying the same thing, so it goes.
+ *
+ * The label's disappearance is asserted on the RENDERED BOX and not on the
+ * text, because this repo has already shipped "the element is hidden and the
+ * property agrees and it is still on the screen" twice.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { fmtBytes, kB, MB } = await import('../src/config.js');
+    const out = {};
+    const chip = g.hud.el.energyChip;
+    const em = chip.querySelector('em');
+    const num = document.getElementById('energyNum');
+
+    // ---- the figure, at four magnitudes the game actually produces --------
+    const shown = [];
+    for (const n of [0, kB(1), kB(148), MB(20), MB(2400)]) {
+      g.hud.setEnergy(n, 1, 1);
+      shown.push([n, num.textContent]);
+    }
+    out.shown = shown;
+    out.formatted = shown.every(([n, t]) => t === fmtBytes(n));
+    // ...and it is not the raw number any more, which is what a half-done
+    // migration would leave behind.
+    out.notRaw = shown.every(([n, t]) => t !== String(Math.floor(n)));
+
+    // ---- the label slot, measured as a box -------------------------------
+    g.hud.setEnergy(MB(20), 1, 1);
+    const plainBox = em.getBoundingClientRect();
+    out.plainWord = em.textContent;
+    out.plainGone = plainBox.width === 0 && plainBox.height === 0;
+    // ...and it comes back for the dividend, which is the slot's other job.
+    g.hud.setEnergy(MB(20), 1, 1.24);
+    const richBox = em.getBoundingClientRect();
+    out.richWord = em.textContent;
+    out.richShown = richBox.width > 0 && richBox.height > 0;
+    g.hud.setEnergy(w.energy, 1, 1);
+    return out;
+  });
+
+  check('the purse reads as bytes, at every magnitude a run reaches',
+    r.formatted && r.notRaw,
+    r.shown.map(([n, t]) => `${n} -> "${t}"`).join(', '));
+
+  check('...and the word beside it goes, because the figure now says it',
+    r.plainWord === '' && r.plainGone && r.richWord === '\u00d71.24' && r.richShown,
+    `with no dividend the slot is "${r.plainWord}" and takes no space `
+    + `(${r.plainGone}); with one it says "${r.richWord}" and does (${r.richShown})`);
+}
+
+// --- ...and the tree's figure does not flicker its prefix as it rolls -------
+/*
+ * `rollBank` tweens a spend over 260ms. Formatted per frame on its own
+ * magnitude the prefix flickers as the figure crosses a decade -- 1.05 MB,
+ * 1.02 MB, 999 kB, 1.00 MB, 950 kB -- which reads as the readout being broken
+ * rather than as money being spent. The unit is picked ONCE from where the
+ * roll is going and held for the whole tween.
+ *
+ * Driven frame by frame rather than watched on the real clock: a rAF tween
+ * sampled by a screenshot loop measures the frame loop, which is a lesson this
+ * repo has already paid for twice.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { fmtBytes, unitOf, kB, MB } = await import('../src/config.js');
+    const out = {};
+    // A spend that crosses a decade: 1.05 MB down to 900 kB.
+    const from = kB(1050);
+    const to = kB(900);
+    const at = unitOf(to);
+    const units = new Set();
+    const frames = [];
+    for (let k = 0; k <= 20; k++) {
+      const p = k / 20;
+      const e = 1 - (1 - p) * (1 - p);
+      const txt = fmtBytes(Math.round(from + (to - from) * e), at);
+      frames.push(txt);
+      units.add(txt.split(' ')[1]);
+    }
+    out.units = [...units];
+    out.oneUnit = units.size === 1;
+    out.lands = frames[frames.length - 1] === fmtBytes(to);
+    out.first = frames[0];
+    out.last = frames[frames.length - 1];
+    // The control: the same roll formatted per frame on its own magnitude,
+    // which is what the naive version does. If this does NOT flicker the case
+    // above is vacuous -- the spend chosen does not cross a decade at all.
+    const loose = new Set();
+    for (let k = 0; k <= 20; k++) {
+      const p = k / 20;
+      const e = 1 - (1 - p) * (1 - p);
+      loose.add(fmtBytes(Math.round(from + (to - from) * e)).split(' ')[1]);
+    }
+    out.looseUnits = [...loose];
+
+    // ...and the real control does it too, through the menu.
+    const g = window.__sim;
+    const el = g.hud.menu.el.treeBank;
+    g.hud.menu.bankShown = undefined;
+    g.hud.menu.rollBank(MB(20));
+    out.direct = el.textContent;
+    return out;
+  });
+
+  check('a spend rolls in one unit and lands on the figure it will sit at',
+    r.oneUnit && r.lands,
+    `${r.first} -> ${r.last} in [${r.units.join(', ')}]`);
+
+  check('...and the naive form it replaces would have flickered, so this is not vacuous',
+    r.looseUnits.length > 1,
+    `formatted per frame the same roll shows [${r.looseUnits.join(', ')}]`);
+
+  check("...and the tree's own figure is written the same way",
+    r.direct === '20.0 MB', `treeBank reads "${r.direct}"`);
+}
+
+// --- ...and the price slot knows which currency it is printing --------------
+/*
+ * `.shopPrice` is one slot shared by two currencies, and the plan for this
+ * change named it as the place a careless sweep goes wrong: NEW FORM costs
+ * SEVEN REMAINDER, which is a count of tokens and not a quantity of storage,
+ * and run through the byte formatter it reads "7.00 B" -- a price that is
+ * both wrong and, at three orders under the cheapest thing in the game,
+ * wrong in the direction that looks free.
+ *
+ * Read off the cards themselves rather than off `priceOf`, because what is
+ * being asserted is the STRING in the slot.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { fmtBytes, CFG } = await import('../src/config.js');
+    const out = {};
+    g.hud.menu.setOpen(true);
+    g.hud.menu.openTab('tree');
+    g.hud.menu.syncTree();
+
+    const priceOn = (id) => {
+      const it = g.hud.menu.items.find((x) => x.n.id === id);
+      if (!it) return null;
+      return { tag: it.card.querySelector('.shopName').dataset.price,
+        currency: it.n.currency || null };
+    };
+    // A node priced in bytes, and the dearest one in the game.
+    out.assay = priceOn('sandbox');
+    out.round = priceOn('open_explosive');
+    // ...and the one priced in what a boss leaves behind.
+    out.recast = priceOn('recast');
+    out.recastWant = `${CFG.ordinal.recast}\u25c6`;
+    // The ASSAY's price, from the tree rather than typed out, so the arm below
+    // is about the FORMATTING and does not also pin the price.
+    const assayNode = g.hud.menu.items.find((x) => x.n.id === 'sandbox');
+    out.assayWant = assayNode ? fmtBytes(assayNode.n.cost) : null;
+    g.hud.menu.setOpen(false);
+    return out;
+  });
+
+  check('a price reads in the currency it is charged in, and REMAINDER is not bytes',
+    r.assay && r.assay.tag === r.assayWant && /\s(kB|MB|GB)$/.test(r.assay.tag)
+    && r.round && /\s(kB|MB|GB)$/.test(r.round.tag)
+    && r.recast && r.recast.tag === r.recastWant,
+    `ASSAY "${r.assay && r.assay.tag}", a round "${r.round && r.round.tag}", `
+    + `NEW FORM "${r.recast && r.recast.tag}" (wanted ${r.recastWant})`);
+}
+
 // --- the assist says where it stops, and what it will take ------------------
 /*
  * Three things that are all one idea: the player can see what the assist is

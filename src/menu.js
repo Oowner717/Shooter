@@ -18,7 +18,7 @@ import { ABILITIES } from './abilities.js';
 import { gunAmmo } from './turrets.js';
 import { PREFS, pref, cyclePref, prefWord } from './settings.js';
 import { VOLUME_STEPS } from './audio.js';
-import { CFG, BUILD, REV, kB } from './config.js';
+import { CFG, BUILD, REV, kB, fmtBytes, unitOf } from './config.js';
 import { swipeToDismiss, swipeTabs } from './swipe.js';
 import { lastSession, lifetime, LOCK, ERA_TABS, eraCell, eraShut, refuseEra,
   syncEraRow } from './sandbox.js';
@@ -1112,7 +1112,12 @@ export class Menu {
     const nm = card.querySelector('.shopName');
     this.fillCard(card, n, n.tiers && n.tiers[at] ? n.tiers[at].name : n.name);
 
-    const tag = n.currency === 'remainder' ? `${price}\u25c6` : String(price);
+    /*
+     * REMAINDER keeps its diamond and its bare count -- it is seven tokens,
+     * not a quantity of storage, and running it through the byte formatter
+     * would price NEW FORM at "7.00 B".
+     */
+    const tag = n.currency === 'remainder' ? `${price}\u25c6` : fmtBytes(price);
     nm.dataset.price = tag;
     const say = armed ? 'BUY' : full ? '\u2713' : !open ? '\u00b7' : tag;
     const pr = card.querySelector('.shopPrice');
@@ -1332,7 +1337,7 @@ export class Menu {
     if (!el) return;
     const from = this.bankShown === undefined ? to : this.bankShown;
     this.bankShown = to;
-    if (from === to) { el.textContent = to; return; }
+    if (from === to) { el.textContent = fmtBytes(to); return; }
     // Only a spend rolls. Energy arriving is the field's business and it has
     // its own animation on the chip outside.
     /*
@@ -1343,13 +1348,22 @@ export class Menu {
      * kilobytes, less than the cheapest node in the tree, and nothing in the
      * game would ever roll again.
      */
-    if (to > from || from - to > kB(100000)) { el.textContent = to; return; }
+    if (to > from || from - to > kB(100000)) { el.textContent = fmtBytes(to); return; }
     cancelAnimationFrame(this.bankRaf || 0);
     const t0 = performance.now();
+    /*
+     * The NUMBER is rolled and the unit is held, picked once from where the
+     * roll is GOING. Formatting each frame on its own magnitude flickers the
+     * prefix as the figure crosses a decade -- 1.05 MB, 1.02 MB, 999 kB,
+     * 1.00 MB, 950 kB -- which reads as the readout being broken rather than
+     * as money being spent. Held at the destination's unit the last frame is
+     * exactly `fmtBytes(to)`, so it lands on the figure it will sit at.
+     */
+    const at = unitOf(to);
     const step = (now) => {
       const p = Math.min((now - t0) / 260, 1);
       const e = 1 - (1 - p) * (1 - p);
-      el.textContent = Math.round(from + (to - from) * e);
+      el.textContent = fmtBytes(Math.round(from + (to - from) * e), at);
       if (p < 1) this.bankRaf = requestAnimationFrame(step);
     };
     this.bankRaf = requestAnimationFrame(step);

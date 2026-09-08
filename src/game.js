@@ -1,6 +1,6 @@
 // World state, phase machine, physics stepping and the render pipeline.
 
-import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID, setHairline, setZoom, kB, MB } from './config.js';
+import { CFG, BUILD, REV, ENEMY_TYPES, GRID_CELL, TYPE_BY_ID, setHairline, setZoom, kB, MB, fmtBytes } from './config.js';
 import { Ordinal, openAperture, anomalyEra } from './boss.js';
 // Imported for the side effect: a boss module registers its constructor
 // with anomaly.js on load, and nothing else references it by name.
@@ -456,7 +456,7 @@ export class Game {
             trial === 'proven' ? 'good' : 'remainder', 4.5);
           return;
         }
-        if (margin > 0) self.hud.alert(`MARGIN +${margin}`, 'good', 3);
+        if (margin > 0) self.hud.alert(`MARGIN +${fmtBytes(margin)}`, 'good', 3);
         /*
          * ---- every move says why ----
          *
@@ -1658,7 +1658,7 @@ export class Game {
        * moment they are told. The price is on the lot as well; this is the
        * receipt for it.
        */
-      this.hud.alert(`EMPLACEMENT · -${Math.round(lotPrice())} ENERGY`, 'info', 2);
+      this.hud.alert(`EMPLACEMENT · -${fmtBytes(lotPrice())}`, 'info', 2);
       /*
        * The first one opens the tab, so the menu has to be told. `syncSeals`
        * is not enough -- the lock is on a TAB and not on a strip cell -- and
@@ -1673,7 +1673,7 @@ export class Game {
     }
     refuseLot(w, i);
     if (r === 'poor' && this.hintsAllowed) {
-      this.hud.alert(`EMPLACEMENT · ${Math.round(lotPrice())} ENERGY`, 'info', 2.2);
+      this.hud.alert(`EMPLACEMENT · ${fmtBytes(lotPrice())}`, 'info', 2.2);
     }
     /*
      * The two beside the machine are not emplacement ground and never were --
@@ -4362,7 +4362,7 @@ export class Game {
     w.earned += n;
     this.hud.setEnergy(w.energy, intakeRate(w), dividend(w));
     this.hud.menu.syncTree();
-    this.hud.alert(`+${n} ENERGY`, 'info', 1.4);
+    this.hud.alert(`+${fmtBytes(n)}`, 'info', 1.4);
     return w.energy;
   }
 

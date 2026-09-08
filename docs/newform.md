@@ -4003,3 +4003,76 @@ the 6,060 a cashed-in body is worth, and if retirements paid at all the two
 numbers would be equal.
 
 612 green.
+
+## Build 285 — the figure carries its own unit
+
+Phase 3 of `docs/bytes.md`: every amount the player reads goes through
+`fmtBytes`. The purse on the chip, the tree's own figure, every card price, the
+lot plate on the canvas, the margin, the emplacement alerts, the resume note
+and the debug grant. Nothing about the economy moved — this build is purely
+what the numbers look like.
+
+### The unit goes in the figure, not in the label
+
+`21.7 MB`, not `21.7 MB ENERGY` and not `ENERGY 21.7 MB`. The chip's label slot
+already has a job — it carries the depth dividend when there is one — and the
+`@media (max-width: 372px)` rule drops that slot entirely, so a unit living in
+the label is a unit the smallest screens never see. With the unit in the figure
+the word beside it is the second thing saying the same thing, so it goes: the
+slot is empty unless a dividend is live.
+
+Empty is not enough, though. The em is a flex item with a 5px gap in front of
+it, so an empty one leaves the gap — it needs `display: none`, and its rule is
+written with the id *and* the class because the `tighter` rule below it also
+sets `display` on that element. The case asserts the **rendered box**, not the
+text: this repo has twice shipped "the element is hidden and the property
+agrees and it is still on the screen".
+
+### `fitBar` is keyed on the string now, and the plan had this backwards
+
+`fitBar`'s signature was digit counts, and the plan's §6 warned that this fails
+in the direction that clips: `12500` is 5 digits and 5 characters, `12.5 MB` is
+3 digits and 7 — the string gets *wider* as the key gets *smaller*, so the
+guard stops re-measuring exactly when it needs to, into a group that is
+`overflow: hidden`. It is keyed on the length of the rendered string now.
+
+**But the layout worry was aimed at the wrong baseline.** §6 reasoned from the
+old points, where a six-digit purse becomes a seven-character string. Coming
+from phase 2's raw bytes it is `2400000000` down to `2.40 GB` — **ten
+characters to seven**. The chip gets narrower, not wider. What that costs is
+one rung of give: `tighter` used to drop the word ENERGY, and there is no word
+to drop any more unless a dividend is up. Recorded in the stylesheet beside the
+rule rather than left to be rediscovered.
+
+### The roll holds one unit
+
+`rollBank` tweens a spend over 260ms. Formatted per frame on its own magnitude
+the prefix flickers as the figure crosses a decade — 1.05 MB, 1.02 MB, 999 kB,
+1.00 MB, 950 kB — which reads as the readout being broken rather than as money
+being spent. The unit is picked **once, from where the roll is going**, and
+held: `fmtBytes(n, at)` takes an optional unit index for exactly this one
+caller. Holding it can print four significant figures on the way down
+(`1050 kB` → `900 kB`), which is the cost of not flickering and is bounded to
+the length of a spend.
+
+The case drives the tween frame by frame rather than watching the real clock —
+a rAF tween sampled by a screenshot loop measures the frame loop, which this
+repo has paid for twice — and it carries its own control: **the same roll
+formatted the naive way must show more than one unit**, or the spend chosen
+does not cross a decade and the case is proving nothing.
+
+### Six cases, because phase 3 was green before any of them existed
+
+The whole display change passed the suite on its first run with nothing
+asserting a single string. That is the shape CLAUDE.md already names: if a panel
+prints a number, either assert it or expect it to rot. The six are the purse at
+five magnitudes, the label's rendered box (with the dividend as its control),
+the held unit, its naive-form control, the tree's figure, and the price slot.
+
+That last one is the hazard `docs/bytes.md` §6 named: `.shopPrice` is one slot
+shared by two currencies, and NEW FORM costs seven REMAINDER. Run through the
+byte formatter it reads **"7.00 B"** — a price that is wrong, and wrong in the
+direction that looks free.
+
+624 green. The ORDINAL hash was not run: no currency VALUE moved in this build,
+only its rendering.

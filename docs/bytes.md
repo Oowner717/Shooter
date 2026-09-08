@@ -279,6 +279,20 @@ Each phase ends green, with the suite run and the build pushed.
 
 Phase 1 is worth doing on its own and is safe to stop after.
 
+**Phase 3 shipped in build 285.** Every amount the player reads goes through
+`fmtBytes`, and the unit lives in the FIGURE rather than in the label beside
+it, which is what §6 concluded. `fitBar` is re-keyed on the rendered string.
+
+One thing §6 got backwards and it is worth recording: the layout worry was
+reasoned from the OLD POINTS, where a six-digit purse becomes a
+seven-character string. Coming from phase 2's raw bytes it is `2400000000`
+down to `2.40 GB` -- ten characters to seven, so the chip gets NARROWER. What
+it costs is a rung of give (`tighter` had nothing left to drop), not width.
+
+`fmtBytes` gained an optional unit index for one caller: a tweened figure has
+to be formatted in a single unit for the length of the tween or it flickers its
+prefix as it crosses a decade.
+
 **Phase 2 shipped in build 284**, with one deliberate departure from the
 phase list above: **the `world.energy` -> `world.bytes` rename is NOT in it.**
 The store now holds bytes, every price is authored through a helper, and the

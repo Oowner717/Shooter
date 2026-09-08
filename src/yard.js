@@ -21,7 +21,7 @@
 // walk, and it shipped a dead page for fifty-three builds the last time the
 // module graph was not what it thought.
 
-import { CFG } from './config.js';
+import { CFG, fmtBytes } from './config.js';
 import { clamp, rgba, mixHex } from './util.js';
 
 /*
@@ -588,7 +588,7 @@ export function drawYard(ctx, world, mood, price = 0) {
        * nobody can read is the silence this was written to end, and one that
        * covers the field is a different kind of silence.
        */
-      const label = String(Math.round(price));
+      const label = fmtBytes(price);
       const fit = (l.hw * CFG.yard.plateFit * 2) / (label.length * 0.6 + 0.72);
       const px = Math.max(9, Math.min(11 / CFG.zoom, fit));
       ctx.font = `${px}px ui-monospace, "SF Mono", Menlo, monospace`;

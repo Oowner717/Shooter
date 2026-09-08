@@ -6,7 +6,7 @@ import { swipeToDismiss } from './swipe.js';
 import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
 import { pref, setPref } from './settings.js';
-import { BUILD, REV, CFG, ENEMY_TYPES, TYPE_BY_ID, kB, MB } from './config.js';
+import { BUILD, REV, CFG, ENEMY_TYPES, TYPE_BY_ID, kB, MB, fmtBytes } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
 
 import { CODEX, FIELD_ENTRIES, ANOMALY_ENTRIES, codex, markLine, forgetPlayer } from './codex.js';
@@ -1030,15 +1030,22 @@ export class Hud {
      * every frame of a PULSE. Three forced reflows a frame on a phone that
      * already has a quality governor is not a fix, it is a different bug.
      *
-     * The signature is how many DIGITS are in each number, not the numbers
-     * themselves. What decides whether a label still fits is the width of the
-     * chips, and a purse going from 1,204 to 1,207 does not change that --
-     * keyed on the values it re-measured on every frame energy landed, which
-     * is every frame of a PULSE and 874 forced layouts in ten seconds. Keyed
-     * on digits it fires a handful of times in a whole run.
+     * The signature is how WIDE each number is, not the number itself. What
+     * decides whether a label still fits is the width of the chips, and a
+     * purse going from 1,204 to 1,207 does not change that -- keyed on the
+     * values it re-measured on every frame energy landed, which is every
+     * frame of a PULSE and 874 forced layouts in ten seconds.
+     *
+     * The purse's term is the LENGTH OF THE RENDERED STRING and no longer a
+     * digit count, and that is not a tidy-up. `12500` is 5 digits and 5
+     * characters; `12.5 MB` is 3 digits and 7 characters. The string gets
+     * WIDER as the key gets SMALLER, so a digit key stops re-measuring
+     * exactly when it needs to -- into a group that is `overflow: hidden`,
+     * which is a clip with no property for a test to read back. The kills and
+     * the badge are still bare integers and keep their digit counts.
      */
     const digits = (v) => String(Math.max(0, Math.floor(v || 0))).length;
-    const sig = `${digits(this.lastEnergy)}|${digits(this.lastBuys)}`
+    const sig = `${(this.energyText || '').length}|${digits(this.lastBuys)}`
       + `|${digits(this.lastKills)}|${window.innerWidth}`;
     if (sig === this.barSig) return;
     this.barSig = sig;
@@ -1058,7 +1065,21 @@ export class Hud {
       // turret; this is where they come out, so the two read as one motion.
       const up = v > this.lastEnergy;
       this.lastEnergy = v;
-      this.el.energy.textContent = v;
+      /*
+       * The unit lives in the FIGURE and not in the label beside it. Two
+       * reasons, and the second is the one that settles it: the label slot
+       * already has a job (it carries the depth dividend), and the
+       * `@media (max-width: 372px)` rule in styles.css drops that slot
+       * entirely -- so a unit living in the label is a unit the smallest
+       * screens never see.
+       *
+       * It also makes the chip NARROWER rather than wider, which is the
+       * opposite of what the plan expected: it was reasoning from the old
+       * points, where a six-digit purse became a seven-character string.
+       * Coming from raw BYTES it is ten characters down to seven.
+       */
+      this.energyText = fmtBytes(n);
+      this.el.energy.textContent = this.energyText;
       if (up) {
         const chip = this.el.energyChip;
         chip.classList.remove('took');
@@ -1082,11 +1103,21 @@ export class Hud {
      * and running them together makes a third thing that is neither.
      */
     const rich = div > 1.001;
-    const word = rich ? `\u00d7${div.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}` : 'ENERGY';
+    /*
+     * ...and when there is no dividend the slot says NOTHING, because the
+     * figure now ends in kB or MB and the word ENERGY beside it would be the
+     * second thing saying the same thing. `plain` is what empties it: the em
+     * is a flex item with a 5px gap in front of it, so leaving it empty
+     * leaves the gap. Its rule is written with the id AND the class, because
+     * `#barChips.tighter #energyChip em` already sets `display` on this
+     * element and a bare-class rule would lose to it.
+     */
+    const word = rich ? `\u00d7${div.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}` : '';
     if (word !== this.lastEnergyWord) {
       this.lastEnergyWord = word;
       this.el.energyChip.querySelector('em').textContent = word;
       this.el.energyChip.classList.toggle('rich', rich);
+      this.el.energyChip.classList.toggle('plain', !rich);
     }
     this.fitBar();
   }
@@ -1695,7 +1726,7 @@ export class Hud {
 
       ['THE RUN', 'head'],
       ['BOSS FIGHT…', () => this.showScreen('boss'), 'wide', true],
-      ['+10000000 ENERGY', () => g.debugGiveEnergy(MB(10))],
+      [`+${fmtBytes(MB(10))}`, () => g.debugGiveEnergy(MB(10))],
       ['+50 KILLS', () => g.debugAddKills(50)],
       ['MAX UPGRADES', () => g.debugBuyAll()],
       ['UNLOCK ALL', () => g.debugUnlockAll()],
@@ -2335,7 +2366,7 @@ export class Hud {
     if (Number.isFinite(d.kills)) bits.push(`${d.kills} OBJECTS`);
     // At least a kilobyte, which is what "at least one point" meant before
     // the byte migration. One BYTE would be met by every save ever written.
-    if (Number.isFinite(d.energy) && d.energy >= kB(1)) bits.push(`${Math.floor(d.energy)} ENERGY`);
+    if (Number.isFinite(d.energy) && d.energy >= kB(1)) bits.push(fmtBytes(d.energy));
     if (d.remainder > 0) bits.push(`${d.remainder}◆ REMAINDER`);
     const ago = ageOf(d.at);
     if (ago) bits.push(ago);

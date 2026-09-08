@@ -2162,4 +2162,27 @@ came from before believing the other one covers it.
   Get the salvage quantisation wrong by one byte on one body and the number is
   different. When a change claims to preserve a ratio, find the instrument that
   would notice a single digit and make it agree.
+- **A tweened figure has to be formatted in ONE unit for the length of the
+  tween.** `rollBank` runs a spend over 260ms, and formatted per frame on its
+  own magnitude the prefix flickers across a decade -- 1.05 MB, 1.02 MB, 999
+  kB, 1.00 MB, 950 kB -- which reads as the readout being broken rather than as
+  money being spent. The unit is picked once from where the roll is GOING, so
+  the last frame is exactly `fmtBytes(to)`. Holding it can print four
+  significant figures on the way down, which is the cost of not flickering.
+  And the case for it needs a control: the same roll formatted the naive way
+  must show more than one unit, or the spend chosen never crossed a decade and
+  the case is proving nothing.
+- **A whole display change can pass a 618-case suite because nothing asserts a
+  string.** Build 285 routed every amount in the game through `fmtBytes` and
+  was green on its first run with no case reading a single figure. If a panel
+  prints a number, either assert it or expect it to rot -- and assert the
+  RENDERED BOX for anything that is meant to disappear, never the text or the
+  property.
+- **The chip's unit belongs in the FIGURE, not in the label slot beside it.**
+  That slot already carries the depth dividend, and the
+  `@media (max-width: 372px)` rule drops it entirely -- so a unit living there
+  is a unit the smallest screens never see. Emptying it is not enough either:
+  it is a flex item with a 5px gap in front of it, so it needs `display: none`
+  written with the id AND a class, because `#barChips.tighter #energyChip em`
+  already sets `display` on the same element.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

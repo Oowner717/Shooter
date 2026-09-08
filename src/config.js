@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '284';
+export const BUILD = '285';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '284';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'f58c76a';
+export const REV = 'd9d7261';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -4766,15 +4766,39 @@ CFG.bytes = {
  * which has to be re-keyed because its digit-count signature gets SMALLER as
  * the string it stands for gets WIDER.
  */
-export function fmtBytes(n) {
+/**
+ * Which rung of the ladder an amount reads on. Exported for one caller: a
+ * figure being TWEENED has to be formatted in a single unit for the length of
+ * the tween, or it flickers its prefix as it crosses a decade -- see
+ * `Menu.rollBank`, which picks the unit once from where the roll is going and
+ * holds it.
+ */
+export function unitOf(n) {
+  const C = CFG.bytes;
+  let a = Math.abs(Number.isFinite(n) ? n : 0);
+  let i = 0;
+  while (a >= C.step && i < C.units.length - 1) { a /= C.step; i++; }
+  return i;
+}
+
+export function fmtBytes(n, at) {
   const C = CFG.bytes;
   const v = Number.isFinite(n) ? n : 0;
   const sign = v < 0 ? '-' : '';
   let a = Math.abs(v);
-  // Under one of the next unit, in the unit we are in. `i` stops at the top of
-  // the table rather than running off it.
+  /*
+   * Under one of the next unit, in the unit we are in -- unless a unit is
+   * NAMED, in which case that one is used whatever the magnitude. A held unit
+   * can legitimately print more than three significant figures ("1050 kB"
+   * on the way down to "900 kB"), which is the cost of not flickering; it is
+   * bounded because the only caller holds it for 260ms of a spend.
+   */
   let i = 0;
-  while (a >= C.step && i < C.units.length - 1) { a /= C.step; i++; }
+  if (Number.isInteger(at) && at >= 0 && at < C.units.length) {
+    for (; i < at; i++) a /= C.step;
+  } else {
+    while (a >= C.step && i < C.units.length - 1) { a /= C.step; i++; }
+  }
   const unit = C.units[i];
   if (i === 0) return `${sign}${Math.round(a)} ${unit}`;
   /*
