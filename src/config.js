@@ -14,7 +14,7 @@ export const BUILD = '284';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '53eb9a4';
+export const REV = 'f58c76a';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -5126,6 +5126,15 @@ CFG.yard = {
    * nothing to check.
    */
   lotAhead: 134, lotSpread: 144, gunW: 23, gunH: 20,
+  /*
+   * How much of a lot's half width the price plate may take. The type shrinks
+   * to fit rather than the plate growing: at a flat size the byte price
+   * ("2600000", seven characters where "2600" was four) plated out to 87
+   * world units against a lot 46 wide. A fraction of the lot rather than a
+   * character count, because what has to hold is that the label fits the
+   * thing it labels, whatever the currency does next.
+   */
+  plateFit: 1.5,
 };
 
 const SCALED = [

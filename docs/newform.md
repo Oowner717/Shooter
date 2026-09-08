@@ -3952,17 +3952,33 @@ authoring helpers are above `CFG` now, with the reason written next to them.
 `CFG.bytes` itself stays below, because nothing reads it until something is
 formatted.
 
-### The ORDINAL hash moved, and that was the prediction
+### The ORDINAL hash moved, then came back, and that is the proof
 
-`-1765830468` before, `-1730800834` after, taken in the same container an hour
-apart. `fight.mjs` mixes `w.energy` every 300 frames and the probe starts the
-purse at zero, so a fight that banks a thousand times more moves the hash **by
-construction** -- this is the one shape of currency change where a move is the
-expected result and a stationary hash would have been the finding.
+`-1765830468` before the migration and `-1730800834` after, taken in the same
+container. That move was the prediction: `fight.mjs` mixes `w.energy` every 300
+frames from a purse that starts at zero, so a fight that banks a thousand times
+more moves the hash by construction.
 
-The corroboration that it is only the purse: the body count at all six samples
-is identical across the two runs (6, 8, 6, 7, 6, 7). The fight is the same
-fight; what changed is the number it was paid.
+Then the review found that `mix` is `Math.round(v * 64) | 0`, which overflows
+past 33,554,432 -- a magnitude a 9,000-frame fight now reaches easily, so the
+purse channel had quietly started aliasing mod 2^32 and two runs differing by
+exactly 67,108,864 B would mix identically. The one channel CLAUDE.md's "run
+it on any build that touches energy" rule exists for was the one that had lost
+its resolution. It mixes `w.energy / 1000` now -- points, the unit every hash
+in the history below was taken in, and a magnitude the cast survives.
+
+**And the hash came back to `-1765830468`, to the bit.**
+
+That is not housekeeping, it is the strongest thing in this build. Thirty
+samples over 9,000 frames of ORDINAL mix the field, the projectiles, the
+debris, the boss's stage and core fraction and position, and the purse -- and
+the purse divided by a thousand hashes **identically** to the run taken before
+any of this. Every body's payout, every toll, every dividend, across a whole
+fight, is exactly one thousandth of what it was. The salvage quantisation is
+in that: get it wrong by a byte on one body and this number is different.
+
+A unit change that is genuinely only a unit change has a signature, and this
+is it.
 
 ### Two cases the rescale caught, and one it did not
 

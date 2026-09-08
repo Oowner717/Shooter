@@ -1800,11 +1800,25 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const waited = !!w.bossLine;
     const bought = g.buy('recast');
     const spent = w.remainder;
-    const again = g.buy('recast');
     // ...and the price is a REMAINDER, not energy.
+    /*
+     * EQUALITY, and taken on the line before the purchase rather than against
+     * the grant. It was `energyAfter >= 9000` against a grant of 9,000 -- the
+     * same number, so the arm was exact. The byte migration scaled the grant
+     * to 9,000,000 and left the threshold, which then permitted 8,991,000 of
+     * it to be drained; and ORDINAL's own death banks `pay` (900,000) on top,
+     * so the arm was satisfied by the payout alone and would have gone on
+     * printing "energy untouched true" with the two-currencies-one-path
+     * regression it exists to catch put straight back in.
+     *
+     * A threshold pinned to a grant has to be DERIVED from it, or the next
+     * unit change separates them again.
+     */
+    const purseBefore = Math.round(w.energy);
+    const again = g.buy('recast');
     const energyAfter = Math.round(w.energy);
     const out = { before, cantYet, held, said, waited, bought, spent, again,
-      energyKept: energyAfter >= 9000, boss: !!w.boss };
+      purseBefore, energyAfter, energyKept: energyAfter === purseBefore, boss: !!w.boss };
     g.restart();
     return out;
   });
@@ -1819,7 +1833,8 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     && r.bought === 'locked' && r.spent === 1 && r.again === 'locked' && r.energyKept,
     `before ${r.before} (buy: ${r.cantYet}), after the death ${r.held} held of the `
     + `seven it takes, buy: ${r.bought} -> ${r.spent} still held, again: `
-    + `${r.again}, energy untouched ${r.energyKept}; said "${r.said}"`);
+    + `${r.again}, energy untouched ${r.energyKept} (${r.purseBefore} -> `
+    + `${r.energyAfter}); said "${r.said}"`);
 }
 
 // --- what ORDINAL leaves behind ---------------------------------------------
@@ -2902,7 +2917,16 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // directly -- which is the same thing as far as the fit is concerned.
     for (const width of [200, 220, 250, 300, 340]) {
       bar.style.maxWidth = `${width}px`;
-      for (const [energy, buys] of [[0, 0], [12345, 12], [148000, 85]]) {
+      /*
+       * In BYTES, and with a lifetime magnitude on the end. These were 0,
+       * 12,345 and 148,000 -- points, and after the migration three purses
+       * smaller than the cheapest node in the tree, so the one guard on the
+       * top bar's clipping was sweeping figures the game cannot produce and
+       * never seeing the nine-digit one `setEnergy` actually writes.
+       * `fitBar`'s signature is digit COUNTS, so the row that matters is the
+       * one with the most of them.
+       */
+      for (const [energy, buys] of [[0, 0], [12345e3, 12], [148000e3, 85], [2400000e3, 135]]) {
         g.hud.setEnergy(energy, 1);
         g.hud.setBuys(buys);
         g.hud.barSig = ''; // the guard is keyed on digits; the width moved too
@@ -18853,11 +18877,22 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.twoWorst > 0 ? r.twoWorst : 0} units`);
 
   check('...and the same probe reads a one at era 1, where nothing is routed',
-    // A margin set clear of the truth, not near it: the director's output over
-    // forty seconds swings 13-22 bodies run to run, and the first version of
-    // this asked for 20 and then 15 — both inside the swing. The arm exists to
-    // show the instrument can read a one at all, and six does that.
-    r.oneTotal >= 6 && r.oneSpan > 0.6 && r.oneAbove,
+    /*
+     * A margin set clear of the truth, not near it: the director's output over
+     * forty seconds swings 13-22 bodies run to run, and the first version of
+     * this asked for 20 and then 15 — both inside the swing. The arm exists to
+     * show the instrument can read a one at all, and six does that.
+     *
+     * The SPAN arm was left at 0.6 when the count arm was fixed, and it is the
+     * same fault: where the bodies happen to land is a draw, and a run that
+     * put sixteen of them across 59% of the field failed a threshold set one
+     * point above it. What the arm is actually about is that era 1 has no
+     * DOOR -- era 2's mouth is `mouthHalf` 130 either side of an 817-wide
+     * field, about a third of it -- so anything comfortably past a third
+     * distinguishes a field from a doorway, and 0.45 is clear of the swing in
+     * both directions.
+     */
+    r.oneTotal >= 6 && r.oneSpan > 0.45 && r.oneAbove,
     `era 1 put ${r.oneTotal} bodies across ${(r.oneSpan * 100).toFixed(0)}% of the `
     + `field width, from above the entry line ${r.oneAbove} — without this arm the `
     + `case above passes on a build that released nothing`);
@@ -21832,6 +21867,42 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     out.priceOn = band(lotPrice());
     out.price = Math.round(lotPrice());
 
+    /*
+     * ---- and the plate FITS the lot it labels ---------------------------
+     *
+     * The case above is a lit-pixel count with no width bound, so it could
+     * not see the plate double. It did: the byte migration took the label
+     * from "2600" to "2600000", and at a flat 11 CSS px the plate measured
+     * 87 world units against a lot 46 wide. Measured off the painted pixels
+     * rather than off the arithmetic, in the lot's own row -- and formatting
+     * will not rescue it in a later phase, because "2.60 MB" is seven
+     * characters too.
+     */
+    const plateHalf = (price) => {
+      const S = 220;
+      const c = document.createElement('canvas');
+      c.width = S; c.height = S;
+      const x = c.getContext('2d');
+      x.translate(S / 2 - lot.x, S / 2 - (lot.y + lot.hh * 0.5));
+      drawYard(x, w, background.mood, price);
+      const d = x.getImageData(0, 0, S, S).data;
+      // The plate's own row: the widest opaque run anywhere in the lower band
+      // where it sits, which is the plate because nothing else there is solid.
+      let widest = 0;
+      for (let py = 0; py < S; py++) {
+        let lo = -1; let hi = -1;
+        for (let px2 = 0; px2 < S; px2++) {
+          if (d[(py * S + px2) * 4 + 3] > 200) { if (lo < 0) lo = px2; hi = px2; }
+        }
+        if (lo >= 0) widest = Math.max(widest, hi - lo + 1);
+      }
+      return widest / 2;
+    };
+    out.plateHalf = plateHalf(lotPrice());
+    out.lotHalf = lot.hw;
+    out.plateRatio = +(out.plateHalf / lot.hw).toFixed(2);
+    out.plateFit = CFG.yard.plateFit;
+
     // ...and it goes the moment the lot is built on, because the decision has
     // been taken. Same frame, same everything, one gun standing.
     g.pressLot(3);
@@ -21945,6 +22016,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `own ${r.padIs} and not the gun's ${r.padWas} (${r.padDiffered} that `
     + `those differ); the aim left rest by ${r.tracking} rad on a target and `
     + `came back to ${r.rested}`);
+
+  /*
+   * The bound the case above could not see. A tolerance over `plateFit`,
+   * because the cap sizes the TYPE and the plate is then measured off the
+   * painted glyphs plus a padding, so it lands near the cap rather than on
+   * it -- and a lit-pixel count is not the instrument for a width.
+   */
+  check('...and the price plate fits the lot it is labelling',
+    r.plateHalf > 0 && r.plateRatio <= r.plateFit * 1.12,
+    `"${r.price}" plates out to ${r.plateHalf.toFixed(1)} against a lot half `
+    + `of ${r.lotHalf} -- ${r.plateRatio}x, against a cap of ${r.plateFit}`);
 }
 
 // --- the TURRETS tab is shut until one is standing --------------------------

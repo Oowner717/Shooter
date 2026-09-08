@@ -574,8 +574,23 @@ export function drawYard(ctx, world, mood, price = 0) {
        * was written to end. `Game.drawGlitch` is the pattern: pick the CSS
        * size, divide by the zoom, floor in the same units.
        */
-      const px = Math.max(9, 11 / CFG.zoom);
+      /*
+       * ...and it is sized to the LOT as well as to the screen, from build
+       * 284. The price was `2600` and is `2600000` -- seven characters where
+       * there were four -- and at a flat 11 CSS px that plate measured 87.3
+       * world units against a lot 46 wide: a black slab nearly twice the
+       * ghost it labels. Formatting does not rescue it either, which is the
+       * reason the cap is here and not left for the phase that adds the unit:
+       * `fmtBytes(2600000)` is "2.60 MB", seven characters again.
+       *
+       * So the type shrinks until the plate fits inside `plateFit` of the
+       * lot's own half width, with the same 9-unit floor as before -- a price
+       * nobody can read is the silence this was written to end, and one that
+       * covers the field is a different kind of silence.
+       */
       const label = String(Math.round(price));
+      const fit = (l.hw * CFG.yard.plateFit * 2) / (label.length * 0.6 + 0.72);
+      const px = Math.max(9, Math.min(11 / CFG.zoom, fit));
       ctx.font = `${px}px ui-monospace, "SF Mono", Menlo, monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';

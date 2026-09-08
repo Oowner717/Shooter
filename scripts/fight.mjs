@@ -224,7 +224,17 @@ async function hashRun(page, frames) {
       if (k % 300 !== 299) continue;
       const boss = w.boss;
       mix(w.enemies.length); mix(w.projectiles.length); mix(w.debris.length);
-      mix(w.energy); mix(w.shock); mix(w.timeScale); mix(w.remainder);
+      /*
+       * The purse in POINTS, which is the unit every hash in CLAUDE.md's
+       * history was taken in -- and, more to the point, a magnitude `mix`
+       * survives. `mix` is `Math.round(v * 64) | 0`, so a value past
+       * 33,554,432 overflows the cast and aliases mod 2^32: at byte scale a
+       * 9,000-frame fight banks well past that, so two runs whose purses
+       * differ by exactly 67,108,864 B would mix identically and the one
+       * channel CLAUDE.md's "run it on any build that touches energy" rule
+       * exists for would have quietly lost its resolution.
+       */
+      mix(w.energy / 1000); mix(w.shock); mix(w.timeScale); mix(w.remainder);
       if (boss) {
         mix(boss.stage); mix(boss.coreFrac); mix(boss.arriving);
         mix(boss.x); mix(boss.y); mix(boss.parked.length);

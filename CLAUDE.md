@@ -2145,4 +2145,21 @@ came from before believing the other one covers it.
   table -- and the first time it got as far as a commit message. A number in a
   doc that says how many of something there are should be derived, and a claim
   in a commit message is worth the one command it takes to check.
+- **The ORDINAL hash's own `mix` is `Math.round(v * 64) | 0`, so any channel
+  that passes 33,554,432 aliases mod 2^32.** The byte migration took the purse
+  straight past that -- the one channel the "run it on any build that touches
+  energy" rule exists for -- and it would have gone on producing a
+  deterministic number with a third of its resolution gone. `fight.mjs` mixes
+  `w.energy / 1000` now, which is both the unit the recorded history was taken
+  in and a magnitude the cast survives. Anything else added to that mix owes
+  the same question: can this value exceed 33 million?
+- **...and a unit change that is genuinely only a unit change has a signature:
+  the hash comes back.** Build 284 moved it to `-1730800834` and the divide put
+  it back to `-1765830468` TO THE BIT. Thirty samples over 9,000 frames mix
+  every body, the boss's stage, core fraction and position, and the purse --
+  so a purse that hashes identically at a thousandth means every payout, toll
+  and dividend across a whole fight is exactly one thousandth of what it was.
+  Get the salvage quantisation wrong by one byte on one body and the number is
+  different. When a change claims to preserve a ratio, find the instrument that
+  would notice a single digit and make it agree.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
