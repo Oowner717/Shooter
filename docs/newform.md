@@ -3847,9 +3847,17 @@ same disease.
 Phase 2 of `docs/bytes.md`. **One old ENERGY point is exactly one kilobyte**,
 which is the ruling that makes this a unit change and not a rebalance: every
 amount is multiplied by a thousand, every ratio is preserved to the digit, and
-nothing about the game's pacing moves. Measured rather than asserted —
-everything buyable totals **174,400,000 bytes = 174 MB**, against the 174,400
-points of build 283, to the digit.
+nothing about the game's pacing moves. Measured rather than asserted — the tree
+totals **158,800,000 bytes** against build 283's 158,800 points, to the digit,
+and everything buyable is **164,000,000 = 164 MB**.
+
+That second figure is a correction. The commit for this build said 174 MB, and
+so did `docs/bytes.md` — both adding **six** emplacements at `CFG.gun.cost`
+when there are **two**: `LOTS` in `yard.js` has been `works, works, gun, gun`
+since build 275 and `gunLots()` returns 2. The x1000 itself is exact either
+way; what was wrong was a count written out by hand rather than asked of the
+thing that owns it, which is the `world.apertures` fault of build 275 again in
+a document instead of an array.
 
 Displays still print the raw figure. Routing them through `fmtBytes` is phase 3
 and is deliberately not in this build: a number that is 1000x bigger and a

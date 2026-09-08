@@ -1666,8 +1666,28 @@ export class Enemy {
      * Refused at the source rather than at `bank`, so nothing is made either.
      */
     const n = world.sandbox ? 0 : (t.drops || 0);
-    const worth = Math.max(n, Math.round(massOf(t, this.r) * CFG.energy.perMass));
-    const each = Math.max(CFG.energy.minValue, Math.round(worth / Math.max(1, n)));
+    /*
+     * ---- and the salvage is QUANTISED, which the byte migration exposed ----
+     *
+     * Both roundings here used to land on whole POINTS, because a point was
+     * the unit: a mote came out worth 1, 2, 3, 5 or 8 and never 6.24. Under
+     * a straight x1000 they land on whole BYTES instead, which quantises a
+     * thousand times finer -- and that is not the same number scaled, it is
+     * the old rounding error REMOVED. Measured against an exact x1000 of what
+     * each type used to pay: HERALD -22%, MITE -27%, PLATE -15%, and the
+     * other way TOW +12%, LEMMA +17.6%. A unit change that moves what a body
+     * pays by a quarter is a balance change, which this one is explicitly not.
+     *
+     * So the quantum is written down instead of being an accident of the unit.
+     * It is `minValue` -- the smallest a mote may be worth -- and rounding to
+     * a multiple of it reproduces the old payout for all 126 (type, radius)
+     * pairs to the byte. De-quantising is arguably the better number and it is
+     * available whenever somebody wants it; it is a decision with a table
+     * behind it, not a side effect.
+     */
+    const q = CFG.energy.minValue;
+    const worth = Math.max(n * q, Math.round(massOf(t, this.r) * CFG.energy.perMass / q) * q);
+    const each = Math.max(q, Math.round(worth / Math.max(1, n) / q) * q);
     for (let i = 0; i < n; i++) {
       if (world.drops.length >= CFG.maxDrops) break;
       const a = rand(0, TAU);

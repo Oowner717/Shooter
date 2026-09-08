@@ -62,7 +62,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { WAVES, ENEMY_TYPES, CFG } from '../src/config.js';
+import { WAVES, ENEMY_TYPES, CFG, kB } from '../src/config.js';
 import { NODES, priceOf } from '../src/tree.js';
 
 const require = createRequire(import.meta.url);
@@ -94,7 +94,10 @@ const SLACK = Number(flag('slack', 80));
 const BENCH = Number(flag('bench', 6));
 /** ...and the longest a whole wave is given to clear before it is called uncleared. */
 const WAVECAP = Number(flag('wavecap', 120));
-const FIXED = flag('spend', null) === null ? null : Number(flag('spend', 0));
+// `--spend` is given in POINTS, the unit docs/pacing.md is written in, and
+// converted here -- a flag whose unit differs from the doc it is read
+// beside is a flag nobody can use.
+const FIXED = flag('spend', null) === null ? null : kB(Number(flag('spend', 0)));
 const URL = flag('url', 'http://127.0.0.1:8099/index.html');
 
 // ---- the money ------------------------------------------------------------
@@ -111,10 +114,19 @@ const TREE_TOTAL = NODES
     return sum + s;
   }, 0);
 
-/** docs/pacing.md's earned-by-tier targets, as anchors to interpolate between. */
-const EARNED = [[0, 0], [2, 1000], [5, 5000], [8, 15000], [12, 40000]];
+/*
+ * docs/pacing.md's earned-by-tier targets, as anchors to interpolate between.
+ *
+ * In BYTES from build 284, which is what the tree is priced in -- the doc
+ * records them as points and one point is one kilobyte. Left in points the
+ * budget at tier 12 would have been 40,000 B against a cheapest node of
+ * 500,000, the buy loop would break on the first `poor` at every tier, and
+ * the probe would measure a BARE turret in all twenty rows while exiting 0
+ * and printing a plausible table.
+ */
+const EARNED = [[0, 0], [2, kB(1000)], [5, kB(5000)], [8, kB(15000)], [12, kB(40000)]];
 /** Past the last anchor, the 8->12 growth carries on: (40/15)^(1/4) a tier. */
-const TAIL = (40000 / 15000) ** 0.25;
+const TAIL = (40000 / 15000) ** 0.25; // a ratio, so it does not move
 
 function spendAt(tier) {
   if (FIXED !== null) return FIXED;

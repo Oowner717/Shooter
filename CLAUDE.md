@@ -2103,4 +2103,46 @@ came from before believing the other one covers it.
   measured: a retirement does not pay a body's bounty, 757 a body against the
   6,060 a cashed-in one is worth, which is an eight-fold margin and equal
   numbers if the mechanism were broken.
+- **A save migration keyed on a marker protects the FORWARD direction only,
+  and build 284 cannot be reverted with a plain `git revert`.** A file this
+  build writes still satisfies build 283's `readSlot` -- same `v`, same fields,
+  and 283 has never heard of `unit` -- so it reads 500,000,000 bytes as
+  500,000,000 POINTS and hands the player the whole tree; then its next
+  checkpoint writes the file back unmarked at byte magnitude, and coming
+  forward multiplies it again. Inherent to migrating without a VERSION bump,
+  and the bump is definitely worse (it throws away the very runs the migration
+  rescues), so it is written down in `save.js` rather than defended against.
+  Reverting past a unit change needs a companion fix in the build being
+  reverted TO.
+- **A preview of a conversion has to be deleted on the build that performs
+  it.** Build 283's widest-figure case wrapped every tree price in `kB()`,
+  correctly, because prices were still points and it was showing what they
+  WOULD read as. Build 284 made them bytes and the wrapper became a second
+  conversion: the ASSAY measured as 20.0 GB, the raw baseline was still
+  written out as six characters for a game whose widest figure is nine, and
+  **the case went on passing** -- measuring a magnitude the game cannot
+  produce, as the guard a later phase's layout claim was meant to rest on. A
+  green case against a preview is worse than a red one.
+- **A unit change makes every ROUNDING a thousand times finer, and that is a
+  balance change wearing a unit change's clothes.** `shed()` rounds a body's
+  worth and each mote's share, and in points those landed on 1, 2, 3, 5, 8.
+  Under a straight x1000 they land on whole BYTES -- which is not the old
+  number scaled, it is the old rounding error REMOVED: measured against an
+  exact x1000, HERALD -22%, MITE -27%, PLATE -15%, TOW +12%, LEMMA +17.6%. The
+  quantum is written down now (`CFG.energy.minValue`) and rounding to a
+  multiple of it reproduces the old payout for all 126 (type, radius) pairs to
+  the byte. Anywhere a `Math.round`, a `Math.floor`, a `toFixed` or an integer
+  cast sits on a value whose unit is changing, ask what it was quantising to
+  and say so explicitly -- and measure the before against the after per type,
+  because an aggregate hides a swing that cancels.
+- **A count written out by hand instead of asked of the thing that owns it,
+  again -- this time in a document.** `docs/bytes.md` put everything buyable at
+  174,400 by adding SIX emplacements at `CFG.gun.cost`. There are TWO: `LOTS`
+  in `yard.js` has been `works, works, gun, gun` since build 275 and
+  `gunLots()` returns 2. The real figure is 164,000. That is the third time
+  this exact shape has cost something -- `world.apertures` sized 8 against 9
+  anomalies, the lot count written out in four places before 275 made it a
+  table -- and the first time it got as far as a commit message. A number in a
+  doc that says how many of something there are should be derived, and a claim
+  in a commit message is worth the one command it takes to check.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

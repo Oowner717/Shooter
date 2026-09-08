@@ -2236,6 +2236,9 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
       banked, spent, afterSpend, afterGrant, from,
       lockedAtZero, openAtThreshold, purseDoesNotOpen,
       wrote, migrated, towOpens: TYPE_BY_ID.tow.opens,
+      // Derived rather than written out, so the next unit change cannot leave
+      // a literal behind in the one case that guards the kill fallback.
+      setEarned: 4321 * 1000, killRate: 12 * 1000,
     };
   });
 
@@ -2258,7 +2261,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * gates.
    */
   check('a save from before the clock is migrated rather than reset',
-    r.wrote === 4_321_000 && r.migrated === 2_880_000,
+    r.wrote === r.setEarned && r.migrated === 240 * r.killRate,
     `wrote ${r.wrote}; a pre-clock save at 240 kills came back at ${r.migrated} earned`);
 }
 
@@ -25167,6 +25170,176 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `one is worth`);
 }
 
+// --- what a body pays is the same number it always paid --------------------
+/*
+ * Build 284. The whole claim of the byte migration is that it is a UNIT change
+ * and not a rebalance, and `shed()` is where that was nearly untrue: it rounds
+ * a body's worth and each mote's share, and in points those roundings landed
+ * on whole points. A straight x1000 makes them land on whole BYTES, which
+ * quantises a thousand times finer and therefore REMOVES the old rounding
+ * error rather than reproducing it -- measured, HERALD -22%, MITE -27%, TOW
+ * +12%, LEMMA +17.6% against an exact x1000.
+ *
+ * So the case computes what each type paid in the old unit, from the old
+ * arithmetic, and requires the byte figure to be exactly a thousand times it.
+ * Not to a tolerance: EXACTLY, because "no balance change" is an exact claim
+ * and a percentage tolerance is how a quarter of a body's worth goes missing.
+ * Three radii a type, because `massOf` is radius-dependent and a body that has
+ * been grafted is a different mass from its base.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, TYPE_BY_ID, massOf } = await import('../src/config.js');
+    const P = CFG.energy.perMass;
+    const q = CFG.energy.minValue;
+    const out = { pairs: 0, bad: [], quantum: q, perMass: P };
+    for (const t of Object.values(TYPE_BY_ID)) {
+      const n = t.drops || 0;
+      if (!n) continue;
+      for (const r2 of [t.r || 20, (t.r || 20) * 1.5, (t.r || 20) * 0.7]) {
+        // What the game pays now, straight out of shed()'s arithmetic.
+        const worth = Math.max(n * q, Math.round(massOf(t, r2) * P / q) * q);
+        const each = Math.max(q, Math.round(worth / Math.max(1, n) / q) * q);
+        // What it paid in points, times a thousand.
+        const wasWorth = Math.max(n, Math.round(massOf(t, r2) * (P / q)));
+        const was = Math.max(1, Math.round(wasWorth / Math.max(1, n))) * q;
+        out.pairs++;
+        if (each !== was && out.bad.length < 6) out.bad.push(`${t.id} r${r2.toFixed(0)}: ${each} not ${was}`);
+        else if (each !== was) out.pairs = out.pairs; // counted below
+      }
+    }
+    // The vacuity guard: the naive x1000 -- rounding at byte granularity --
+    // must DISAGREE with the old payout, or the case is passing because the
+    // two arithmetics are the same rather than because the quantum works.
+    let naiveDiffers = 0;
+    for (const t of Object.values(TYPE_BY_ID)) {
+      const n = t.drops || 0;
+      if (!n) continue;
+      const r2 = t.r || 20;
+      const naive = Math.max(q, Math.round(Math.max(n, Math.round(massOf(t, r2) * P)) / Math.max(1, n)));
+      const was = Math.max(1, Math.round(Math.max(n, Math.round(massOf(t, r2) * (P / q))) / Math.max(1, n))) * q;
+      if (naive !== was) naiveDiffers++;
+    }
+    out.naiveDiffers = naiveDiffers;
+    return out;
+  });
+
+  check('what a body pays is exactly a thousand times what it paid in points',
+    r.bad.length === 0 && r.pairs >= 90,
+    `${r.pairs} (type, radius) pairs, quantised at ${r.quantum} B`
+    + `${r.bad.length ? `; ${r.bad.join(', ')}` : ', none off by a byte'}`);
+
+  /*
+   * ...and the instrument has been shown to read a one. A case that only
+   * asserts the equality would pass on a build with no quantum at all if the
+   * two arithmetics happened to agree; this says they do not.
+   */
+  check('...and rounding at byte granularity instead would have moved it',
+    r.naiveDiffers >= 8,
+    `the naive x1000 disagrees with the old payout on ${r.naiveDiffers} types`);
+}
+
+// --- a run written in points comes back in bytes ---------------------------
+/*
+ * Build 284. `toBytes` in save.js runs exactly ONCE per existing player and
+ * decides whether their run survives the update, and it shipped with no case
+ * reaching its multiplying branch at all -- because every "an old file"
+ * arrangement in this suite builds its file from `captureRun`, which now
+ * stamps `unit: 'B'`, so all of them take the early return. Delete the two
+ * multiply lines and the suite stays green while every install that updates
+ * comes back with a purse a thousandth of the tree.
+ *
+ * That is the shape CLAUDE.md already names twice: a zero means nothing until
+ * the instrument has been shown to read a one, and a case whose setup gives
+ * the mechanism no choice cannot see the choice. So the arms are:
+ *
+ *   1. a file with NO `unit` -- what every phone on build 283 has on it --
+ *      comes back multiplied,
+ *   2. the same file WITH `unit: 'B'` comes back untouched, which is the
+ *      control: without it the case passes against an unconditional multiply,
+ *      which would double every purse on every load,
+ *   3. the BACKUP slot migrates too, which is the "one door, both slots"
+ *      claim -- the migration is in `readSlot` and not in the restore
+ *      precisely so that a backup written from an old file is covered,
+ *   4. and the gates move WITH `earned`, so nothing a run had re-locks. That
+ *      is the half of it a player would actually notice.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const save = await import('../src/save.js');
+    const { TYPE_BY_ID } = await import('../src/config.js');
+    const out = {};
+
+    g.restart();
+    g.start();
+    const file = save.captureRun(w, g);
+    out.stamped = file.unit;
+
+    // A file as build 283 wrote it: the same run, in points, with no marker.
+    const points = { ...file, energy: 2431, earned: 5678 };
+    delete points.unit;
+
+    const read = (slot, data) => {
+      localStorage.removeItem('sim7749-run');
+      localStorage.removeItem('sim7749-run-prev');
+      if (data) localStorage.setItem(slot, JSON.stringify(data));
+      return save.readRun();
+    };
+
+    const old = read('sim7749-run', points);
+    out.oldEnergy = old && old.energy;
+    out.oldEarned = old && old.earned;
+    out.oldMarked = old && old.unit;
+
+    // The control. Same figures, marked -- so a build that multiplied
+    // unconditionally would fail here and pass everything else.
+    const marked = read('sim7749-run', { ...points, unit: 'B' });
+    out.newEnergy = marked && marked.energy;
+    out.newEarned = marked && marked.earned;
+
+    // The backup slot, reached by making the current file unreadable. Both
+    // come through `readSlot`, so both migrate.
+    localStorage.removeItem('sim7749-run');
+    localStorage.setItem('sim7749-run-prev', JSON.stringify(points));
+    localStorage.setItem('sim7749-run', 'not json at all');
+    const backup = save.readRun();
+    out.backupEnergy = backup && backup.energy;
+
+    // ...and what the player would notice: a run that had earned enough for
+    // a type still has it. 3,400 points is TOW's gate in the old unit.
+    const veteran = { ...points, energy: 10, earned: 3400 };
+    delete veteran.unit;
+    read('sim7749-run', veteran);
+    g.resume();
+    out.towOpens = TYPE_BY_ID.tow.opens;
+    out.earnedAfter = w.earned;
+    out.towOpen = w.earned >= TYPE_BY_ID.tow.opens;
+
+    localStorage.removeItem('sim7749-run');
+    localStorage.removeItem('sim7749-run-prev');
+    g.restart();
+    return out;
+  });
+
+  check('a run written in points comes back in bytes, and one already in bytes does not move',
+    r.stamped === 'B' && r.oldEnergy === 2431000 && r.oldEarned === 5678000
+    && r.oldMarked === 'B' && r.newEnergy === 2431 && r.newEarned === 5678,
+    `captureRun stamps "${r.stamped}"; an unmarked 2431/5678 came back `
+    + `${r.oldEnergy}/${r.oldEarned} marked "${r.oldMarked}", and a marked one `
+    + `came back ${r.newEnergy}/${r.newEarned}`);
+
+  check('...and the backup slot migrates too, because both come through one door',
+    r.backupEnergy === 2431000,
+    `with the current file unreadable, the backup came back ${r.backupEnergy}`);
+
+  check('...and a type the run had earned does not re-lock across the migration',
+    r.earnedAfter === 3400000 && r.towOpens === 3400000 && r.towOpen,
+    `3,400 points earned came back as ${r.earnedAfter} against TOW's gate of `
+    + `${r.towOpens}: open ${r.towOpen}`);
+}
+
 // --- the currency reads in bytes, on the base-10 ladder --------------------
 /*
  * Build 283, phase one of docs/bytes.md. The unit and the formatter go in on
@@ -25243,25 +25416,40 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     /*
      * ---- and the widest string the GAME can actually produce ------------
      *
-     * The layout claim of the whole change: the figure gets one character
-     * wider than the raw number it replaces, not five. Measured off every
-     * real price in the tree plus a lifetime total well past anything a run
-     * reaches, at the one point = one kilobyte the conversion is.
+     * The layout claim of the whole change: the figure is no wider than the
+     * raw number it replaces. Measured off every real price in the tree plus
+     * a lifetime total well past anything a run reaches.
+     *
+     * Build 283 wrapped each price in `kB()` here, because prices were still
+     * points then and the case was previewing what they WOULD read as. Build
+     * 284 made them bytes, so the wrapper became a second conversion: the
+     * ASSAY measured as 20.0 GB and the raw baseline was written out as
+     * `174400`, six characters, for a game whose widest figure is now nine.
+     * The case went on passing while measuring a magnitude the game cannot
+     * produce -- which is worse than failing, because it is the guard phase
+     * 3's layout claim is meant to rest on. A preview of a conversion has to
+     * be deleted on the build that performs it.
      */
     const tree = await import('../src/tree.js');
     const nodes = [...tree.NODE_BY_ID.values()];
     let longest = '';
+    let widestRaw = 0;
     for (const n of nodes) {
-      if (!Number.isFinite(n.cost)) continue;
+      if (!Number.isFinite(n.cost) || n.currency === 'remainder') continue;
       const lv = Number.isFinite(n.levels) ? n.levels : 1;
       for (let i = 0; i < lv; i++) {
-        const txt = fmtBytes(kB(n.cost + (n.step || 0) * i));
+        const price = n.cost + (n.step || 0) * i;
+        const txt = fmtBytes(price);
         if (txt.length > longest.length) longest = txt;
+        widestRaw = Math.max(widestRaw, price);
       }
     }
     out.longestPrice = longest;
-    out.longestLifetime = fmtBytes(kB(5e6)); // 5,000,000 points banked
-    out.raw = String(174400); // the widest raw figure it replaces
+    out.longestLifetime = fmtBytes(kB(5e6)); // five million kilobytes banked
+    // The widest figure the game prints TODAY, which is what the formatted
+    // string has to be measured against -- everything buyable, in bytes.
+    out.raw = String(174_400_000);
+    out.widestPrice = widestRaw;
 
     // ---- the helpers ----------------------------------------------------
     out.helpers = {
@@ -25287,16 +25475,22 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
   /*
    * The layout claim, and the reason this change is an adjustment rather than
-   * a redesign: seven characters against the six of the raw figure it
-   * replaces. `Hud.fitBar` is what has to be re-keyed for that one character
-   * -- its digit-count signature gets SMALLER as the string gets WIDER.
+   * a redesign: seven characters at the very worst, against the NINE of the
+   * raw figure the game prints today. It was stated the other way round in
+   * build 283 -- one character WIDER -- because prices were still points then
+   * and the widest raw figure was six. Phase 2 made the stored number a
+   * thousand times bigger, so formatting is now the thing that makes a
+   * readout NARROWER, and that is the direction `Hud.fitBar` has to be
+   * re-keyed for in phase 3: its digit-count signature moves the opposite way
+   * to the string it stands for.
    */
-  check('...and the widest figure it can produce is one character wider than the raw one',
-    r.longestPrice.length <= 7 && r.longestLifetime.length <= 7 && r.widest <= 8,
-    `the dearest price prints "${r.longestPrice}" (${r.longestPrice.length} chars) `
-    + `and five million points banked prints "${r.longestLifetime}", against the `
-    + `${r.raw.length} of "${r.raw}"; widest over the whole swept ladder `
-    + `"${r.widestTxt}" at ${r.widest}`);
+  check('...and the widest figure it can produce is narrower than the raw one',
+    r.longestPrice.length <= 7 && r.longestLifetime.length <= 7 && r.widest <= 8
+    && r.longestPrice.length < r.raw.length,
+    `the dearest price is ${r.widestPrice} and prints "${r.longestPrice}" `
+    + `(${r.longestPrice.length} chars); five million kilobytes banked prints `
+    + `"${r.longestLifetime}", against the ${r.raw.length} of "${r.raw}"; widest `
+    + `over the whole swept ladder "${r.widestTxt}" at ${r.widest}`);
 
   check('...and prices are authored in the unit they are read in',
     r.helpers.b === 7 && r.helpers.k === 500000 && r.helpers.m === 20000000

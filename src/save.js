@@ -148,6 +148,23 @@ function readSlot(key) {
  * half-migrated file is not a state that can exist -- there is one multiply,
  * on two fields, at one door.
  */
+/*
+ * ---- and the marker only protects the direction it is read in -----------
+ *
+ * A file this build writes still satisfies build 283's `readSlot` -- the `v`
+ * matches, the fields it checks are all there, and 283 has never heard of
+ * `unit`, so it would read 500,000,000 BYTES as 500,000,000 points and hand
+ * the player the whole tree. Worse, that build's next checkpoint writes the
+ * file back with no `unit` and a byte-magnitude `energy`, and coming forward
+ * again multiplies it a second time.
+ *
+ * This is inherent to migrating without a VERSION bump, and the bump is the
+ * one thing that is definitely worse: it throws away every run currently
+ * open, including the ones this migration exists to rescue. So it is recorded
+ * rather than defended against: **reverting past build 284 after it has been
+ * deployed needs a companion fix in the build being reverted to**, not a
+ * plain `git revert`. Nothing in the forward direction can prevent it.
+ */
 const UNIT = 'B';
 const PER_POINT = 1000; // one old ENERGY point is one kilobyte
 

@@ -14,7 +14,7 @@ export const BUILD = '284';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '0cea4f6';
+export const REV = '53eb9a4';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------

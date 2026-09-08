@@ -32,7 +32,7 @@ Measured against the current config, at 1 point = 1 kB:
 | an ability | 1,100 | 1.10 MB |
 | an emplacement lot | 2,600 | 2.60 MB |
 | the ASSAY (dearest single price) | 20,000 | **20.0 MB** |
-| everything buyable | 174,400 | **174 MB** |
+| everything buyable | 164,000 | **164 MB** |
 | lifetime banked, long run | ~500,000+ | **500 MB → low GB** |
 
 `bank()` does not round — `got = amount * intakeRate * dividend` — so
@@ -41,11 +41,20 @@ Under the intake tax they become the thing the **B** unit is for. B, kB and MB
 are all reachable without touching a single balance number; GB arrives on a
 long run's lifetime total.
 
-> **Corrected after the inventory.** My first pass put the total at 158,807 by
-> walking the tree. That misses the six emplacements, which are bought on the
-> FIELD at `CFG.gun.cost` 2,600 each and are not tree nodes: 158,800 across 155
-> levels plus 15,600 is **174,400**. It is the kind of miss this whole document
-> exists to prevent, and it is recorded rather than quietly fixed.
+> **Corrected twice, and the second correction is the instructive one.** My
+> first pass put the total at 158,807 by walking the tree, which misses the
+> emplacements — they are bought on the FIELD at `CFG.gun.cost` and are not
+> tree nodes. The second pass said 174,400, adding **six** of them. There are
+> **two**: `LOTS` in `src/yard.js` has been `works, works, gun, gun` since
+> build 275, `gunLots()` returns 2, and `buildGun` refuses a works lot. So it
+> is 158,800 across 155 levels plus 5,200, which is **164,000**.
+>
+> Both misses are the same shape and it is the one this repo keeps paying for:
+> **a count written out by hand instead of asked of the thing that owns it.**
+> `world.apertures` was eight slots for nine anomalies; the lot count itself
+> was written out in four places before build 275 made it a table. The figure
+> is derived from `gunLots()` now, and any number in this document that says
+> how many of something there are should be.
 
 ---
 
