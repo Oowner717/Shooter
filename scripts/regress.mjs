@@ -7909,6 +7909,222 @@ if (!GUN_LINE) {
     + `${r.coping.waves} waves, with the fuse ${r.coping.fired ? 'BLOWN' : 'unlit'}`);
 }
 
+// --- the ring has two causes, and it names the one that is happening -------
+/*
+ * Build 293, and it is a caption bug rather than a mechanism one -- which is
+ * exactly why nothing could see it.
+ *
+ * Build 291 gave the glitch fuse a second signal: the release being held
+ * because the field is still full of the last wave. It fills at half the
+ * contact rate and it is the state a run actually drowns in, because FLINCH
+ * and DEADBOLT exist to break contact and so keep the acute signal quiet.
+ *
+ * But `ON_GLITCH` -- "Clear the turret before it closes, or it steps back" --
+ * remained the ONLY sentence in the game that ever explained the ring, and it
+ * fired on `director.glitch > 0`, which is true of both causes. So a player
+ * drowning in a full field with a CLEAR MOUNT got a closing countdown over an
+ * instruction to clear the mount, and the discharge that followed said "THE
+ * FEED GAVE OUT" either way. Nothing else names the held release at all: no
+ * alert, no rail state, no counter.
+ *
+ * `Director.burnFrom` records which term is filling it and the caption is
+ * keyed on that. The two arms below are each other's control: an arm that
+ * only showed the crowd line in the crowd state would pass against a build
+ * that had simply swapped one hard-coded line for another.
+ *
+ * Both arms switch the OTHER channel off by its own mechanism rather than by
+ * stubbing the director -- `lastThin = -1` is what the code itself uses to
+ * mean "no wave has ended, nothing to gate on", and a crowd that is nowhere
+ * near the turret cannot grip it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { forgetLines } = await import('../src/codex.js');
+    const { ON_GLITCH, ON_CROWD } = await import('../src/tutorial.js');
+    const g = window.__sim;
+    const w = g.world;
+    const heldLines = localStorage.getItem('sim7749-lines');
+    const heldTeaching = g.teaching;
+
+    /*
+     * `burn()` refuses a teach wave outright, and `this.wave` between waves is
+     * whichever one last ran -- on a fresh restart that is the opening, which
+     * is taught. Nulling it is what the fuse's own guard reads (`wv && wv.teach`).
+     */
+    const setup = () => {
+      g.restart();
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugClearField();
+      // The damage-bench family leaves both of these behind and `restart()` is
+      // not a reset of everything a case can leave; see CLAUDE.md.
+      delete w.director.update;
+      w.spawnLock = 0;
+      const d = w.director;
+      d.douse();
+      d.wave = null;
+      d.resting = true;
+      d.timer = 0;
+      forgetLines();
+      g.teaching = false;
+      g.hud.clearHint();
+      g.hud.voiceHeld.length = 0;
+      return d;
+    };
+
+    /*
+     * Sampled ACROSS the window, never off its last frame. The contact arm
+     * read `burnFrom` null with an empty mount at the end of thirty seconds
+     * because the turret had killed what was standing on it and the fuse had
+     * drained -- the mechanism having worked perfectly in between. See the
+     * CLAUDE.md note about a verdict sampled at the end of a window.
+     */
+    const watch = (d, frames, each) => {
+      const said = new Set();
+      const froms = new Set();
+      let peak = 0;
+      let grip = 0;
+      let hold = 0;
+      for (let f = 0; f < frames; f++) {
+        each(f);
+        g.update(1 / 60);
+        if (d.burnFrom) froms.add(d.burnFrom);
+        peak = Math.max(peak, d.glitch);
+        grip = Math.max(grip, w.attackers.size);
+        hold = Math.max(hold, d.holdFor);
+        if (g.hud.hintTimer > 0) said.add(g.hud.el.hint.textContent.trim());
+      }
+      return { said: [...said], froms: [...froms], peak: +peak.toFixed(3),
+        grip, hold: +hold.toFixed(1) };
+    };
+
+    // ---- the crowd cause: a full field, and nothing on the mount ----------
+    const d1 = setup();
+    d1.lastThin = 0; // a wave has ended and left a ceiling of nothing
+    const s = w.shooter;
+    // Well up the field: they hold the gate and cannot reach the turret.
+    for (let i = 0; i < 6; i++) {
+      const e = g.debugSpawn('lurcher', s.x - 240 + i * 96, s.y - 620);
+      e.spawnIn = 0; e.staged = false; e.vx = 0; e.vy = 0;
+    }
+    const crowd = watch(d1, 60 * 12, () => {
+      for (const e of w.enemies) { e.vx = 0; e.vy = 0; e.hp = e.maxHp; }
+    });
+
+    // ---- the contact cause: the mount gripped, the gate switched off ------
+    const d2 = setup();
+    d2.lastThin = -1; // no ceiling, so the crowd term can never arm
+    for (let i = 0; i < 2; i++) {
+      const e = g.debugSpawn('lurcher', s.x + (i ? -6 : 4), s.y - 6);
+      e.spawnIn = 0; e.vx = 0; e.vy = 0;
+    }
+    /*
+     * The rest timer is pinned so the director never reaches `begin()`.
+     * Without it the crowd arm's gate is what was keeping a wave from loading,
+     * and this arm loaded the OPENING -- which is a teach wave, which `burn()`
+     * refuses on its first line, so the fuse read 0 through twelve seconds of
+     * a gripped mount. `burn` runs above the timer branch, so pinning it
+     * changes nothing about what is being measured.
+     *
+     * Thirty seconds, not twelve: a body on the mount fires ON_CONTACT and the
+     * intake-tax line first, the band shows one line at a time, and three of
+     * these take about seventeen seconds to read.
+     */
+    const contact = watch(d2, 60 * 30, () => {
+      d2.timer = 1e9;
+      /*
+       * Topped up rather than merely healed. A body pinned against the turret
+       * is billed `impactDamage` every frame by the pair solver as well as
+       * being shot, and healing once at the top of the frame does not outrun
+       * that -- measured, the mount was empty by the end.
+       */
+      let n = 0;
+      for (const e of w.enemies) {
+        if (e.dead) continue;
+        e.x = s.x + (n ? -6 : 4); e.y = s.y - 6; e.vx = 0; e.vy = 0;
+        e.hp = e.maxHp; n++;
+      }
+      for (; n < 2; n++) {
+        const e = g.debugSpawn('lurcher', s.x + (n ? -6 : 4), s.y - 6);
+        e.spawnIn = 0; e.vx = 0; e.vy = 0;
+      }
+    });
+
+    /*
+     * ---- and the discharge names it too --------------------------------
+     * Driven at the boundary rather than by waiting out 28 seconds of hold:
+     * `burnFrom` is written by `burn` on the frame it blows, and the reason is
+     * read from it before `abandonWave` clears it. That the fuse FILLS from
+     * each cause is the two arms above; this one is only about what the
+     * discharge then says.
+     *
+     * `glitch = 1` rather than 0.999, which is a knife edge: one frame of the
+     * crowd term is 0.000595 of the fuse and left it at 0.9996, so this arm
+     * read null for the crowd cause and passed the contact one -- an arm that
+     * could only ever fail in one direction.
+     */
+    const blow = (arm) => {
+      const d = setup();
+      d.setTier(9);
+      d.glitch = 1;
+      if (arm === 'crowd') { d.holdFor = 1; w.attackers.clear(); } else {
+        const e = g.debugSpawn('lurcher', s.x + 4, s.y - 6);
+        e.spawnIn = 0;
+        w.attackers.add(e);
+        d.held = 99;
+        d.holdFor = 0;
+        d.lastThin = -1;
+      }
+      const out = d.burn(w, 1 / 60);
+      return out ? { reason: out.reason, cause: out.cause, moved: out.moved } : null;
+    };
+    const blown = { crowd: blow('crowd'), contact: blow('contact') };
+
+    g.teaching = heldTeaching;
+    if (heldLines === null) localStorage.removeItem('sim7749-lines');
+    else localStorage.setItem('sim7749-lines', heldLines);
+    g.restart();
+    return {
+      crowd, contact, blown,
+      crowdText: ON_CROWD.text.trim(), glitchText: ON_GLITCH.text.trim(),
+      distinct: ON_CROWD.id !== ON_GLITCH.id,
+    };
+  });
+
+  const saidCrowd = (a) => a.said.includes(r.crowdText);
+  const saidGlitch = (a) => a.said.includes(r.glitchText);
+
+  const first = (a) => a.said.map((t) => JSON.stringify(t.split('\n')[0])).join(', ');
+
+  check('a fuse filling from a FULL FIELD says so, and does not blame the mount',
+    r.crowd.froms.join() === 'crowd' && r.crowd.grip === 0 && r.crowd.peak > 0
+    && saidCrowd(r.crowd) && !saidGlitch(r.crowd),
+    `${r.crowd.hold}s of held release with ${r.crowd.grip} on the mount took the `
+    + `fuse to ${r.crowd.peak} from [${r.crowd.froms.join('/') || 'nothing'}]; `
+    + `the band said [${first(r.crowd)}]`);
+
+  /*
+   * ...and the control, which is what stops the arm above passing against a
+   * build that swapped one hard-coded line for another. Contact is the larger
+   * term, so a frame that is both is still contact -- being taken apart is
+   * what to answer first.
+   */
+  check('...and one filling from the MOUNT still says the thing about the mount',
+    r.contact.froms.join() === 'contact' && r.contact.grip > 0 && r.contact.peak > 0
+    && saidGlitch(r.contact) && !saidCrowd(r.contact) && r.distinct,
+    `${r.contact.grip} on the mount with the gate off took the fuse to `
+    + `${r.contact.peak} from [${r.contact.froms.join('/') || 'nothing'}]; `
+    + `the band said [${first(r.contact)}]`);
+
+  check('...and the step back it ends in says which of the two it was',
+    r.blown.crowd && r.blown.contact
+    && r.blown.crowd.reason !== r.blown.contact.reason
+    && r.blown.crowd.cause === 'crowd' && r.blown.contact.cause === 'contact'
+    && r.blown.crowd.moved === -1 && r.blown.contact.moved === -1,
+    `a full field posts "${r.blown.crowd && r.blown.crowd.reason}" and a gripped `
+    + `mount "${r.blown.contact && r.blown.contact.reason}", both a rung`);
+}
+
 // --- the boss engine holds seven, not one -----------------------------------
 /*
  * Phase 0: ORDINAL stopped being *the* boss and became boss I of seven.

@@ -2363,4 +2363,38 @@ came from before believing the other one covers it.
   still up with a long caption in it and the cap is the gap ABOVE that band.
   Pin the band, the boss caption and the alerts column, or the number is about
   the suite rather than about the layout.
+- **A signal with TWO causes needs a field saying which**, or the one sentence
+  that explains it names whichever cause was there first. The glitch ring got
+  its second cause in build 291 (a held release) and `ON_GLITCH` went on saying
+  "clear the turret" for both, so a run drowning with a CLEAR MOUNT was told to
+  clear the mount and the discharge posted THE FEED GAVE OUT either way.
+  `Director.burnFrom` is the cause, taken off the same comparison that already
+  picks the rate, and it is null while the fuse drains so a caption keyed on it
+  speaks only while something is happening. Adding a channel to a mechanism is
+  half the change; the other half is every readout that described the old one.
+- **A teaching line is held to its PARTNER's width, and the band already
+  wraps.** `#abilityHint` is `pre-line` in a 300px band at 320, so every line
+  in it wraps there and always has -- the thing to match is the line box COUNT
+  of the line it pairs with. Build 293's first draft was five characters over
+  and took a fourth box at 390 where its pair takes three. Measure a one-line
+  twin of the longest half against the band's own width.
+- **`burn()` refuses a teach wave on its first line, and `restart()` puts the
+  run back on the opening -- which IS one.** So any case that wants the fuse to
+  fill has to stop the director reaching `begin()`, or the fuse reads 0 through
+  a window that looks otherwise perfect. Build 293's crowd arm only worked
+  because its own gate was holding `begin()` off; the contact arm, which
+  switches that gate off deliberately, loaded the opening and measured nothing.
+  Pinning `timer` is enough -- `burn` runs above the timer branch in `update`.
+- **A body pinned against the turret does not survive being healed once a
+  frame.** The pair solver bills `impactDamage` every frame on top of whatever
+  is shooting it, so a mount held for thirty seconds is empty by the end.
+  Top the mount UP to the count you want rather than healing what is on it --
+  and sample the window rather than its last frame, or the reading is "the
+  turret won", which is the end-of-window trap again.
+- **A boundary arm set one frame short of the boundary can only fail in one
+  direction.** Build 293's discharge test set `glitch = 0.999` and stepped one
+  frame: that is 0.00119 of the fuse from contact and 0.000595 from crowd, so
+  it blew for one cause and returned null for the other, and the null read as
+  the feature being broken. Sit ON the boundary (`glitch = 1`) when the arm is
+  about what happens after it, not about reaching it.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

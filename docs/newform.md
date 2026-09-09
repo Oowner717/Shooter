@@ -4619,3 +4619,88 @@ the loose run drowns there on its own and there is no contrast left to measure.
   legitimately takes the room; what is being asserted is the room.
 
 587 green.
+
+---
+
+## Build 293 — the ring has two causes and named one
+
+Reported as a question about the wave system, and the answer turned up a
+caption pointing at something that was not happening.
+
+Build 291 gave the glitch fuse a second signal: the release being held because
+the field is still full of the last wave. It fills at `crowd` (0.5) of the
+contact rate and it is the state a run actually drowns in — FLINCH and DEADBOLT
+exist to break contact, so the acute signal stays quiet exactly when the run is
+losing.
+
+**But `ON_GLITCH` was still the only sentence in the game that ever explained
+the ring**, and it fired on `director.glitch > 0`, which is true of both causes:
+
+> GLITCH. The ring is the simulation losing its grip.
+> Clear the turret before it closes, or it steps back.
+
+So a player drowning in a full field with a **clear mount** got a closing
+countdown over an instruction to clear the mount — and the discharge that
+followed posted `THE FEED GAVE OUT` either way. Nothing else names the held
+release at all: no alert, no rail state, no counter.
+
+### What changed
+
+`Director.burnFrom` records which term is filling the fuse — `'contact'`,
+`'crowd'`, or `null` while it drains. It comes off the same comparison that
+already picks the rate, so contact wins a frame that is both (it is the larger
+term and the acute one). Cleared wherever `glitch` is: `abandonWave`, `douse`,
+the teach-wave guard.
+
+Three readers:
+
+- the caption is keyed on `burnFrom` rather than on `glitch > 0`, so the line
+  that arrives describes what is happening — and, being null while the fuse
+  drains, it speaks only while it is actually filling;
+- `ON_CROWD` is the new line, its own id, so a device is taught each cause once
+  and only when it meets it;
+- `glitchOut`'s reason is `THE FIELD OVERRAN` for the crowd cause. Read beside
+  `ran`, because `abandonWave` clears `burnFrom` before the return.
+
+> GLITCH. Too much is standing to send the next wave.
+> Thin the field before it closes, or it steps back.
+
+Both open on GLITCH — either can be the first ring a player ever sees — and
+both close on the same clause, so the pair reads as two answers to one ring.
+Held to its partner's width: the first draft was five characters over and took
+a fourth line box at 390 where its pair takes three. (Every line in this band
+already wraps at 320 and always has.)
+
+### The case, and the two faults in it
+
+Three arms, and the first two are each other's control — an arm that only
+showed the crowd line in the crowd state would pass against a build that had
+simply swapped one hard-coded line for another. Each arm switches the other
+channel off by its own mechanism rather than by stubbing the director:
+`lastThin = -1` is what the code itself means by "no wave has ended, nothing to
+gate on", and a crowd spawned 620 units up the field cannot grip the turret.
+
+Both faults were in the instrument:
+
+- **The contact arm let `begin()` load a wave, and the first one is the
+  opening — which is a teach wave, which `burn()` refuses on its first line.**
+  The fuse read 0 through twelve seconds of a gripped mount. It reads 0 in the
+  crowd arm's *setup* too and did not there, only because the gate happened to
+  be holding `begin()` off. The rest timer is pinned now.
+- **`burnFrom` sampled at the end of the window was `null` with an empty
+  mount**, because the turret had killed what was standing on it and the fuse
+  had drained — the mechanism having worked perfectly in between. Sampled
+  across the window now. The bodies are topped up rather than healed, too: a
+  body pinned against the turret is billed `impactDamage` every frame by the
+  pair solver as well as being shot, and one heal at the top of the frame does
+  not outrun that.
+
+A third would have shipped a half-arm: the discharge test set `glitch = 0.999`
+and stepped one frame, which is 0.00119 of the fuse from contact and 0.000595
+from crowd — so it blew for contact and returned `null` for crowd. An arm that
+can only fail in one direction. `glitch = 1`.
+
+No revert-and-fail proof, and none is owed: the old behaviour is exactly what
+arm 1 forbids.
+
+590 green.

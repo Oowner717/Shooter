@@ -151,6 +151,34 @@ export const ON_GLITCH = (() => {
 })();
 
 /*
+ * ...and the OTHER way the same ring closes, which had no sentence at all.
+ *
+ * Build 291 gave the fuse a second signal: the next wave refusing to start
+ * because the field is still full of the last one. It fills at half the
+ * contact rate and it is the state a run drowns in, because FLINCH and
+ * DEADBOLT exist to break contact and so keep the acute signal quiet. But the
+ * line above was still the only thing that ever explained the ring -- so a
+ * player watching a countdown over a CLEAR mount was told to clear the mount.
+ * A caption that names something that is not happening is worse than none.
+ *
+ * `Director.burnFrom` says which one is filling it, and the two lines are
+ * separate ids, so a device is taught each cause once and only when it meets
+ * it. Both open on GLITCH: either can be the first ring a player ever sees,
+ * and whichever arrives first has to introduce it. And both close on the same
+ * clause -- "Clear the turret before it closes" against "Thin the field before
+ * it closes" -- so the pair reads as two answers to one ring rather than as
+ * two unrelated warnings.
+ *
+ * Held to the longer line's own width, measured: the first draft was five
+ * characters over and took a fourth line box at 390 where its pair takes
+ * three. Every line in this band already wraps at 320 and always has.
+ */
+export const ON_CROWD = (() => {
+  const text = 'GLITCH. Too much is standing to send the next wave.\nThin the field before it closes, or it steps back.';
+  return { id: idOf(text), text, hold: holdFor(text) };
+})();
+
+/*
  * The wall across the field, which is the one rule in this game with nowhere to
  * be looked up.
  *

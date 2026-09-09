@@ -34,7 +34,7 @@ import { NODES, NODE_BY_ID, priceOf, UNDER, levelsOf } from './tree.js';
 
 /** The turret branch, for the fitting announcements and the completion one. */
 const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
-import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_WALL, ON_LOTS, ON_WORKS, ON_CEILING, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_CROWD, ON_WALL, ON_LOTS, ON_WORKS, ON_CEILING, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
@@ -3173,8 +3173,16 @@ export class Game {
      * eight teach waves, where the fuse is guarded off and pinned at zero, so
      * the one sentence about the ring was being spent, once per device and for
      * ever, at the only point in a run where there is nothing to see.
+     *
+     * Keyed on `burnFrom` rather than on `glitch > 0` from build 293, because
+     * the ring has TWO causes and this named one of them. `burnFrom` is the
+     * one filling it this frame and is null while it drains, so the line that
+     * arrives describes what is actually happening -- a run drowning with a
+     * clear mount used to be told to clear the mount. Each cause is its own
+     * id, so a device is taught both, once each, when it meets each.
      */
-    if (w.director && w.director.glitch > 0 && this.hintsAllowed) this.sayOnce([ON_GLITCH]);
+    const burn = w.director && w.director.burnFrom;
+    if (burn && this.hintsAllowed) this.sayOnce([burn === 'crowd' ? ON_CROWD : ON_GLITCH]);
     // ...and the wall, the first time anything is put down under it. Keyed off
     // the rule being CONSULTED rather than off arriving in era 2: a sentence
     // about where your things stop is worth reading when you have just put one

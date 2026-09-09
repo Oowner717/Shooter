@@ -3976,6 +3976,16 @@ export class Director {
     this.held = 0;
     this.glitch = 0;
     /*
+     * ...and WHICH of the two signals is filling it this frame: 'contact',
+     * 'crowd', or null while it is draining. The ring means one thing and the
+     * cause is two, and until build 293 nothing recorded the difference -- so
+     * the one sentence explaining the ring named contact, and a run drowning
+     * with a clear mount got a closing countdown over an explanation of
+     * something that was not happening. Written by `burn` and read by the
+     * caption and by the alert the discharge posts.
+     */
+    this.burnFrom = null;
+    /*
      * The other half of what the fuse reads: how long the release has been
      * held because the field is still full, and the ceiling it is held
      * against. `-1` means no wave has ended yet, so the first one is not
@@ -4161,6 +4171,7 @@ export class Director {
     if (wv && wv.teach) {
       this.held = 0;
       this.glitch = 0;
+      this.burnFrom = null;
       return null;
     }
     /*
@@ -4190,6 +4201,14 @@ export class Director {
     const byContact = gripped && this.held >= G.arm ? 1 : 0;
     const byCrowd = this.holdFor > 0 ? G.crowd : 0;
     const rate = Math.max(byContact, byCrowd);
+    /*
+     * ...and the same comparison names the cause, so the interface can say
+     * which of the two it is looking at. Contact wins a frame that is both,
+     * because it is the larger term and the acute one -- being taken apart is
+     * what to answer first. Null while the fuse drains, so a caption keyed on
+     * this speaks only while it is actually filling.
+     */
+    this.burnFrom = rate === 0 ? null : (byContact >= byCrowd ? 'contact' : 'crowd');
     if (rate > 0) this.glitch = Math.min(1, this.glitch + (dt * rate) / G.fuse);
     else this.glitch = Math.max(0, this.glitch - (dt * G.recover) / G.fuse);
     return this.glitch >= 1 ? this.glitchOut(world) : null;
@@ -4242,6 +4261,7 @@ export class Director {
     this.laneOffer = null;
     this.held = 0;
     this.glitch = 0;
+    this.burnFrom = null;
     // ...and the hold, because the field it was held against has just gone.
     this.holdFor = 0;
     this.lastThin = -1;
@@ -4259,6 +4279,13 @@ export class Director {
      * before `resting` is written below, because this method sets it.
      */
     const ran = !this.resting;
+    /*
+     * ...and which signal blew it, read HERE because `abandonWave` below
+     * clears it. The alert this reason ends up in is the only account the
+     * player gets of what just happened, and "THE FEED GAVE OUT" was printed
+     * for both causes.
+     */
+    const cause = this.burnFrom;
 
     /*
      * The field dissolves. Marked rather than destroyed: `destroy()` is what
@@ -4318,8 +4345,12 @@ export class Director {
     this.grace = 1;
     this.lastVerdict = 'glitch';
     return {
-      verdict: 'glitch', moved, tier: this.tier, from, fizzled,
-      reason: 'THE FEED GAVE OUT', margin: 0,
+      verdict: 'glitch', moved, tier: this.tier, from, fizzled, cause,
+      // Deliberately not the 'THE FIELD NEVER THINNED' `score()` posts on a
+      // patience timeout: that one is a wave ending untidily and costs
+      // nothing, this one is a rung.
+      reason: cause === 'crowd' ? 'THE FIELD OVERRAN' : 'THE FEED GAVE OUT',
+      margin: 0,
     };
   }
 
@@ -5005,6 +5036,7 @@ export class Director {
   douse() {
     this.held = 0;
     this.glitch = 0;
+    this.burnFrom = null;
     // ...and the hold with them. An anomaly takes the field, so a wave that
     // was being held against a full one is being held against nothing.
     this.holdFor = 0;
