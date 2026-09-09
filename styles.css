@@ -18,12 +18,12 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
-  --bar-h: 74px;
+  --bar-h: 64px;
   /*
    * The ladder's band. `--rail-t` is the top bar's own top plus its 44 of
-   * height and 6 of air -- the bar is as tall as the menu button in it, and
+   * height and 4 of air -- the bar is as tall as the menu button in it, and
    * the rail was written against the 32 the chips used to be, which put it
-   * 12px inside the button. `--rail-h` is 44 of row and 8 of air under it.
+   * 12px inside the button. `--rail-h` is 38 of row and 6 of air under it.
    * Everything that used to be measured from the top bar is measured from
    * the bottom of this.
    *
@@ -33,9 +33,29 @@
    * on a 568 screen for even one pill. Both are conditional now: the rail is
    * not up during a fight and the reservation is not made outside one, so
    * the column below has the same room it always had, either way.
+   *
+   * ---- build 292: every one of these is smaller ------------------------
+   *
+   * Measured at 320x568 before the change, which is the size the furniture
+   * actually competes for room at: the field -- the band of canvas between
+   * the bottom of the rail and the top of the tallest column in the strip --
+   * was 167px of 568, TWENTY-NINE PER CENT of the screen. The rest was
+   * furniture over a game whose whole subject is what is on the field.
+   *
+   * `--bar-h` 74 -> 64 gives ten of that back twice over: the ability bar is
+   * shorter AND `world.floorY` is derived from the same three numbers, so
+   * the floor line drops with it.
+   *
+   * The rail keeps its 44px row and gives up its SLACK. `--rail-h` is a
+   * reservation and the band is content-driven, so the two are separate
+   * numbers and only one of them was measured: 52 reserved over a band of 44,
+   * eight pixels of nothing. It is 48 now, and the gap above it 6 -> 3. The
+   * first cut of this took the row itself to 38 and that was wrong -- the
+   * suite has asserted a 44px seat on every rail control since the rail went
+   * in, and 4px of field is not worth a tap target.
    */
-  --rail-t: calc(var(--hud-t) + 58px);
-  --rail-h: 52px;
+  --rail-t: calc(var(--hud-t) + 55px);
+  --rail-h: 48px;
   --boss-h: 0px;
   --under-rail: calc(var(--rail-t) + var(--rail-h));
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -1805,7 +1825,10 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
   transition: transform 0.07s ease, border-color 0.2s;
 }
 
-.ab svg { width: 24px; height: 24px; display: block; }
+/* 22 from build 292, with the bar at 64 rather than 74. The label under it
+   is unchanged: the icon is what carries the button and the word is what
+   names it, so the word is the last thing that should shrink. */
+.ab svg { width: 22px; height: 22px; display: block; }
 .ab .lbl { font-size: 11px; letter-spacing: 0.02em; color: #9fb8d2; white-space: nowrap; }
 
 .ab .fill {
@@ -2740,7 +2763,11 @@ body.bossUp #waveRail { display: none; }
 /*
  * The two that move it. Everything else in this band is a readout, so these
  * are the whole control surface and they are sized for a thumb: 44 tall, and
- * wide enough that the arrow is not the target -- the plate is.
+ * wide enough that the arrow is not the target -- the plate is. Build 292
+ * took them to 38 while looking for field height and put them back: the seat
+ * is asserted, the four pixels were worth less than the promise, and what the
+ * rail actually had spare was the eight of `--rail-h` reserved over a band
+ * that has always measured 44.
  */
 .railStep {
   -webkit-appearance: none;
@@ -3202,7 +3229,7 @@ body.booting #quickBar {
   .qc svg { width: 13px; height: 13px; }
   .qc .qLbl { font-size: 9px; letter-spacing: 0; }
 
-  .ab svg { width: 20px; height: 20px; }
+  .ab svg { width: 18px; height: 18px; }
   .ab .lbl { font-size: 9px; letter-spacing: 0.03em; }
 
   /* The title screen scrolls rather than clipping, but the one button on it
@@ -4023,8 +4050,16 @@ body.booting #quickBar {
 .qc.fold.off .foldArrow { transform: rotate(135deg) translate(1px, -1px); }
 .qc.fold:active { border-color: rgba(120, 190, 255, 0.4); }
 
-/* Folded: the slots go, the fold stays. */
-.qGroup.folded > .qc:not(.fold) { display: none; }
+/*
+ * Folded: the slots go, the fold stays -- and so does the door.
+ *
+ * `.cfg` is the button that opens the group's tab in the sheet, and from
+ * build 292 it lives at the FOOT of the ammunition column rather than in a
+ * band of its own (see buildStrip: two equal columns and two empty bands is
+ * what puts AIM and FIRE in the middle of a `space-between` strip). A door
+ * folded away with the slots is a tab reachable only by unfolding first.
+ */
+.qGroup.folded > .qc:not(.fold):not(.cfg) { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .foldArrow { transition: none; }

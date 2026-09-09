@@ -371,22 +371,86 @@ export class Hud {
     /*
      * Stacks read bottom-up on screen, so slot 0 is the bottom cell.
      *
-     * The mine stack, its fold and its MINES button are filled only while the
-     * mine line is in play. The two BANDS are still created either way, and
-     * that is deliberate: `#quickBar` is `justify-content: space-between`, so
-     * dropping them would let the middle group -- AIM and FIRE, the two cells
-     * placed where the thumb rests -- walk off to the left edge. An empty
-     * `.q_mines` holds its 70px column and the row is unchanged.
+     * ---- and from build 292 the ammunition is TWO columns ---------------
+     *
+     * The mine line went out of play in 290 and its two bands have been
+     * standing empty since -- created but not filled, because `#quickBar` is
+     * `justify-content: space-between` and dropping them lets the middle
+     * group (AIM and FIRE, the cells placed where the thumb rests) walk off
+     * to the left edge. So the band held 70px of nothing while the ammunition
+     * stack, alone on the right, was the tallest thing on the screen: at
+     * 320x568 it measured 183px, more than the ability bar, and the field
+     * between the rail and the top of it was 167 of 568.
+     *
+     * Split across both edges it is half as tall and the strip is symmetric,
+     * which is what the empty column was always going to be worth. The
+     * bottom half stays on the right where it has always been -- slot 0 is
+     * the cell nearest the thumb and it does not move -- and the top half
+     * goes left.
+     *
+     * THE FOLD IS A ROW, and it is what makes the split uneven. Counted in
+     * rows rather than in cells, a near column holding ceil(n/2) slots plus
+     * the chevron is two rows taller than the far one at five rounds:
+     * measured 121px against 59 at 320x568, and it is the TALLER column that
+     * sets where the field ends. With the chevron moved to the foot of the
+     * far column the two are 87 and 87, which is 34px of field given back --
+     * six per cent of a 568-tall screen for a control that had to sit
+     * somewhere. Off by at most one row for every n: near ceil(n/2), far
+     * floor(n/2) + 1.
+     *
+     * ...and the AMMO DOOR goes to the foot of the near column, which is what
+     * finally centres AIM and FIRE. `#quickBar` is `space-between` over five
+     * bands, so the middle one sits in the middle only when the two on each
+     * side of it weigh the same. They never have: measured at 320x568 the
+     * middle group's centre was 49px left of the strip's at build 291 and 22
+     * after the split, because the mine line's config band is empty and the
+     * ammunition's is 44 wide. Emptying that one too makes the strip
+     * [column, 0, AIM/FIRE, 0, column] and the offset is zero.
+     *
+     * It costs one row -- the tallest column goes three to four -- and it is
+     * the right row to spend, because the door belongs with the ammunition it
+     * opens and the foot of the stack is where the thumb already is. It sits
+     * level with the chevron at the foot of the far column for the same
+     * reason. `.qGroup.folded` has to spare it, or folding the stack takes
+     * the tab away with it; see the selector in styles.css.
+     *
+     * With the mine line back on, both stacks go back to where they were:
+     * mines left, all of the ammunition right, chevron at the foot of the
+     * ammunition column and both doors in their own bands. Nothing here is a
+     * second layout to maintain, it is the same one with a different split.
      */
+    const twoColumn = !CFG.mines.inPlay;
     if (CFG.mines.inPlay) {
       this.fillStack(mines, w, 'mines');
       mines.appendChild(this.stackFold('mines'));
       cfgMines.appendChild(this.configButton('mines'));
     }
-    this.fillStack(ammo, w, 'ammo');
-    ammo.appendChild(this.stackFold('ammo'));
+    if (twoColumn) {
+      mines.classList.remove('q_mines');
+      mines.classList.add('q_ammo', 'q_ammo_far');
+      const keys = w.loadout.ammo;
+      /*
+       * The near column carries the door and the far one the chevron, so the
+       * near one takes the SMALLER half of the slots: a door is 38 tall
+       * against a slot's 28, and putting it on the larger half measured
+       * 131px against 90 where the other way round is 100 against 121. It is
+       * the taller column that decides where the field ends, so the split is
+       * by the height of what is in each column, not by the count.
+       */
+      const half = Math.floor(keys.length / 2);
+      // The FAR column takes the upper slots and the near one the lower, so
+      // the reading order down the two columns is unchanged: slot 0 is still
+      // the bottom cell of the right-hand stack.
+      this.fillStack(ammo, w, 'ammo', 0, half);
+      this.fillStack(mines, w, 'ammo', half, keys.length);
+      mines.appendChild(this.stackFold('ammo'));
+      ammo.appendChild(this.configButton('ammo'));
+    } else {
+      this.fillStack(ammo, w, 'ammo');
+      ammo.appendChild(this.stackFold('ammo'));
+      cfgAmmo.appendChild(this.configButton('ammo'));
+    }
     this.syncFolds();
-    cfgAmmo.appendChild(this.configButton('ammo'));
     /*
      * The two that run on their own, and the row AUTO AIM opens above them.
      *
@@ -517,8 +581,12 @@ export class Hud {
   syncFolds() {
     for (const [group, key] of [['mines', 'showMines'], ['ammo', 'showAmmo']]) {
       const on = !!pref(key);
-      const band = this.el.quickBar.querySelector(`.q_${group}`);
-      if (band) band.classList.toggle('folded', !on);
+      // ALL of them: from build 292 the ammunition is two columns when the
+      // mine line is out of play, and `querySelector` folded whichever came
+      // first in the DOM and left the other standing.
+      for (const band of this.el.quickBar.querySelectorAll(`.q_${group}`)) {
+        band.classList.toggle('folded', !on);
+      }
       const btn = this.el.quickBar.querySelector(`.q_fold_${group}`);
       if (!btn) continue;
       btn.classList.toggle('off', !on);
@@ -532,11 +600,12 @@ export class Hud {
   }
 
   /** One stack of slots, filled from the loadout and padded with empties. */
-  fillStack(host, world, group) {
+  fillStack(host, world, group, from = 0, to = null) {
     const keys = world.loadout[group];
+    const end = to === null ? keys.length : to;
     // Column-reverse would put slot 0 at the bottom without this, but it also
     // reverses the tab order; laying them out backwards keeps both honest.
-    for (let i = keys.length - 1; i >= 0; i--) {
+    for (let i = end - 1; i >= from; i--) {
       const key = keys[i];
       const a = key && ARSENAL.find((x) => x.key === key);
       host.appendChild(a ? this.cell(a) : this.emptySlot(group, i));

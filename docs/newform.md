@@ -4512,3 +4512,110 @@ same run with the gate pinned off.
 
 581 green. The ORDINAL hash is unchanged at `-1765830468`: the director does
 not run while an anomaly is up, so a change to the wave system cannot move it.
+
+---
+
+## Build 292 — the field is half the phone
+
+*"Make abilities icons a tiny bit shorter and compress wave timeline and other
+top bars thinner. Reorganize auto and ammo buttons. I Maximize view of playing
+field."*
+
+Measured before anything moved, at 320×568, the field — the band of canvas
+between the bottom of the wave rail and the top of the tallest column of the
+strip — was **167px of 568, 29.4%**. Less than a third of the phone was the
+game. At 390×844 it was 47.7%.
+
+Three things were paying for that and not one of them was a design decision.
+They were values nobody had re-measured since the thing around them changed.
+
+### The ability bar: a height, and a floor line hanging off it
+
+`#abilities` is `height: var(--bar-h)`, and `--bar-h` was 74 over 38px of
+content. It is **64**, and the icons go 24 → 22 (18 at ≤372px). `world.floorY`
+is derived from the same three numbers as the strip's bottom, so the floor line
+drops with the bar: the field grows at both ends from one number.
+
+### The rail: a reservation nobody had measured against the band
+
+`--rail-h` is what `--under-rail` is derived from, so the aperture bar, the boss
+bar and the alerts column all start at `--rail-t + --rail-h` **whatever the rail
+actually measures**. Two numbers, and only one of them had ever been checked:
+52 reserved over a band that measures 44. It is **48** now, and the gap above it
+6 → 3.
+
+The first cut of this took the *row* to 38 to save four more pixels, and put it
+back. The suite has asserted a 44px seat on every rail control since the rail
+went in, and four pixels of field are not worth a tap target. **Air was what the
+rail had spare, not height.**
+
+### The strip: an empty column, and a chevron that costs a row
+
+The mine line went out of play in build 290 and left **two empty bands
+standing** — created but not filled, because `#quickBar` is `space-between` and
+dropping them lets AIM and FIRE walk off to the left edge. So one band held 54px
+of nothing while the ammunition stack, alone on the right, was **183px**: taller
+than the ability bar, and it is the tallest column that decides where the field
+ends.
+
+Split across both edges it is two columns — and then the chevron turned out to
+cost a whole row on whichever side carried it, so the first split measured
+**121 against 59**. Two corrections, both counted in rows rather than in cells:
+
+- the chevron goes to the foot of the **far** column, the AMMO door to the foot
+  of the **near** one;
+- and the near column takes the **smaller** half of the slots, because a door is
+  38 tall against a slot's 28. Measured the other way round it is 131 against
+  90; this way it is 121 against 100.
+
+### ...and that is what finally centred AIM and FIRE
+
+`#quickBar` is `space-between` over five bands, so the middle one sits in the
+middle only when the bands on each side of it weigh the same. **They never
+have.** Measured at 320×568, the centre of AIM and FIRE was **49px left** of the
+strip's at build 291 and 22 after the split, because the mine line's config band
+is empty and the ammunition's was 44 wide. Moving the AMMO door into the column
+empties that band too, which makes the strip `[column, 0, AIM/FIRE, 0, column]`
+and the offset **0**.
+
+The door belongs with the ammunition it opens and the foot of the stack is where
+the thumb already is — but `.qGroup.folded > .qc:not(.fold)` would have folded it
+away with the slots, which is a tab reachable only by unfolding first. The
+selector spares `.cfg` now: the fold hides slots, not doors.
+
+### Measured after
+
+| | build 291 | build 292 |
+|---|---|---|
+| 320×568 | 167px, 29.4% | **242px, 42.6%** |
+| 390×844 | 403px, 47.7% | **494px, 58.5%** |
+| 414×896 | 455px, 50.8% | **546px, 60.9%** |
+| AIM/FIRE off centre @320 | −49px | **0px** |
+| `pillCap()` @320 | 1 | **2** |
+
+### A layout change moved a balance measurement
+
+Build 291's release-gate case failed on this build, at tier 20, and the cause is
+`--bar-h`. Sixteen more world units of field means every body takes longer to
+arrive, so tier 20 became survivable: the fuse peaked at **0.87 of 1** and never
+blew, where before it did. The discharge count could not say by how much — 0.87
+and 0.2 are both "0 blows" — so the **peak is recorded now**, and the case runs
+at tier 24, where the report reproduces with room to spare: held 75s of 240,
+fuse full, two discharges, the ladder walked 24 → **22**, against a loose run
+that holds 0s, peaks at 0.11 and stays at 24. Tier 28 is past the useful window;
+the loose run drowns there on its own and there is no contrast left to measure.
+
+### Three hand-kept lists, again
+
+- The AUTO AIM case compared `['q_mines', 'q_ammo']` against the literal
+  `'auto,auto'`. The mine stack went in 290 and the ammunition became **two**
+  bands in 292, so it saw one of two and compared it with a pair. It asks the
+  strip now: every band that holds slots, however many there are.
+- The folding case counted `.qc` flat, so the spared door read as a slot that
+  would not fold. Slots and controls are counted apart.
+- `pillCap()` read **0** in the suite and **2** on a page of its own, because
+  `#abilityHint` was still up with a long caption in it six hundred cases later
+  and the cap is the gap *above* that band. The case pins it. A caption
+  legitimately takes the room; what is being asserted is the room.
+
+587 green.

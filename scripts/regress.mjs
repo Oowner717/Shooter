@@ -3553,13 +3553,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * the two stacks set none, so later-in-the-DOM is all they have.
      */
     const lift = getComputedStyle(row).zIndex;
-    // The stacks that are actually there. It was a written-out pair, and the
-    // mine stack went out of play in build 290 -- `querySelector` returned
-    // null and `getComputedStyle(null)` throws.
-    const stacks = ['q_mines', 'q_ammo']
-      .map((c) => document.querySelector(`.${c}`))
-      .filter(Boolean)
-      .map((el) => getComputedStyle(el).zIndex).join(',');
+    /*
+     * The stacks that are actually there. This was a written-out pair and has
+     * now cost two builds: the mine stack went out of play in 290 and
+     * `querySelector` returned null with `getComputedStyle(null)` throwing,
+     * and build 292 split the ammunition across BOTH edge bands, so a list
+     * naming `q_ammo` once saw one of the two and the pair it compared
+     * against was a literal. Ask the strip: every band that holds slots, in
+     * DOM order, however many of them there are.
+     */
+    const stacks = [...document.querySelectorAll('#quickBar .qGroup')]
+      .filter((el) => el.querySelector('.qc:not(.fold):not(.cfg)'))
+      .map((el) => getComputedStyle(el).zIndex);
 
     // ...and pressing the cell again takes it off the screen, not just out of
     // a property.
@@ -3609,11 +3614,13 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
   check('every position it offers is thumb-sized and nothing is on top of it',
     r.seats.length === 4 && !r.small.length && !r.buried.length
-    && Number(r.lift) > 0 && r.stacks === 'auto,auto',
+    && Number(r.lift) > 0
+    && r.stacks.length >= 2 && r.stacks.every((z) => z === 'auto'),
     `${r.seats.length} offered, ${r.seats.map((s) => `${s.mode} ${s.w}x${s.h}`).join(' · ')}`
     + `${r.small.length ? ` | under 44px: ${r.small.join(', ')}` : ''}`
     + `${r.buried.length ? ` | buried: ${r.buried.join(', ')}` : ''}`
-    + ` | band z-index ${r.lift} over stacks at ${r.stacks}`);
+    + ` | band z-index ${r.lift} over ${r.stacks.length} stacks at `
+    + `${r.stacks.join(',')}`);
 
   check('a position that has not been bought is not on the screen',
     r.bare === 'off,field',
@@ -6057,9 +6064,18 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     };
     const both = () => { if (mineLine) press('foldMines'); press('foldAmmo'); };
     const out = { open: {}, shut: {}, back: {}, stack: k };
+    /*
+     * Slots and CONTROLS are counted apart from build 292. The fold hides
+     * slots; the chevron has always been spared, and the AMMO door is spared
+     * too now that it lives at the foot of the ammunition column rather than
+     * in a band of its own -- a door folded away with the slots is a tab
+     * reachable only by unfolding first. Counting `.qc` flat made the door
+     * read as a slot that would not fold.
+     */
     const read = (into) => {
-      into.mines = shown(`.q_${k} .qc`);
-      into.ammo = shown('.q_ammo .qc');
+      into.mines = shown(`.q_${k} .qc:not(.cfg)`);
+      into.ammo = shown('.q_ammo .qc:not(.cfg)');
+      into.doors = shown('.q_ammo .qc.cfg');
       into.foldMines = shown(`#fold${K}`);
       into.label = document.querySelector(`#fold${K} .qLbl`).textContent;
     };
@@ -6111,10 +6127,12 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
   check('folding a stack puts it away and leaves the way back',
     r.shut.mines === 1 && r.shut.ammo === 1 && r.shut.foldMines === 1
     && r.open.mines > 1 && r.back.mines === r.open.mines
+    && r.shut.doors === r.open.doors
     && r.shut.label === r.stack.toUpperCase() && r.open.label === '',
-    `the ${r.stack} stack: open ${r.open.mines}, folded ${r.shut.mines} `
+    `the ${r.stack} stack: open ${r.open.mines} slots, folded ${r.shut.mines} `
     + `(button still there: ${r.shut.foldMines}, says "${r.shut.label}"), `
-    + `unfolded ${r.back.mines}`);
+    + `unfolded ${r.back.mines}; the door survives the fold `
+    + `(${r.open.doors} open, ${r.shut.doors} shut)`);
 
   /*
    * ---- and it does not move (build 210) ----
@@ -7787,6 +7805,22 @@ if (!GUN_LINE) {
      * What the gate is FOR is the state the report describes: the automation
      * breaking contact often enough that the contact term never fills, while
      * the field goes on growing. That is the run below.
+     *
+     * THE RUNG MOVED IN BUILD 292 and the reason is worth knowing: that build
+     * took `--bar-h` 74 -> 64, and `world.floorY` is derived from the same
+     * three numbers as the strip's bottom -- so shrinking the ability bar
+     * lengthened the field by sixteen world units and every body now takes
+     * longer to arrive. Tier 20 became survivable: measured after, the fuse
+     * peaked at 0.87 of 1 and never blew, where before it did. A LAYOUT
+     * CHANGE MOVED A BALANCE MEASUREMENT, and the discharge count could not
+     * say by how much -- 0.87 and 0.2 are both "0 blows". The peak is
+     * recorded now for exactly that reason.
+     *
+     * At tier 24 the report reproduces with room to spare: held 75s of 240,
+     * fuse full, two discharges, ladder walked 24 -> 22, against a loose run
+     * that holds 0s, peaks at 0.11 and stays at 24. Tier 28 is past the
+     * useful window -- the loose run is drowning there on its own and blows
+     * its own fuse, so there is no contrast left to measure.
      */
     const play = (gated) => {
       g.restart();
@@ -7798,15 +7832,17 @@ if (!GUN_LINE) {
       w.autoAim = true;
       w.autoFire = true;
       const d = w.director;
-      d.setTier(20);
+      d.setTier(24);
       const peak = [];
       let heldFrames = 0;
       let fired = 0;
       let last = 0;
+      let gPeak = 0;
       for (let f = 0; f < 60 * 240; f++) {
         if (!gated) { d.lastThin = -1; d.holdFor = 0; }
         g.update(1 / 60);
         if (d.holdFor > 0) heldFrames++;
+        if (d.glitch > gPeak) gPeak = d.glitch;
         if (last > 0.9 && d.glitch === 0) fired++;
         last = d.glitch;
         if (f % 60 === 0) {
@@ -7814,7 +7850,8 @@ if (!GUN_LINE) {
         }
       }
       return { max: Math.max(...peak), held: +(heldFrames / 60).toFixed(1),
-        fired, tier: d.tier, auto: !!w.up.flinch && !!w.up.deadbolt };
+        fired, gPeak: +gPeak.toFixed(2), tier: d.tier,
+        auto: !!w.up.flinch && !!w.up.deadbolt };
     };
     out.drowning = play(true);
     out.loose = play(false);
@@ -7859,10 +7896,12 @@ if (!GUN_LINE) {
     + `against ${r.loose.max} on the same run with the gate off`);
 
   check('...and the fuse fills from the wait, so the run is stepped back rather than pinned',
-    r.drowning.fired > r.loose.fired && r.drowning.tier < r.loose.tier,
-    `the fuse blew ${r.drowning.fired} times and the ladder ended at tier `
-    + `${r.drowning.tier}; with the gate off it blew ${r.loose.fired} and ended `
-    + `at ${r.loose.tier} -- the crowd term is ${r.crowd} of the contact rate`);
+    r.drowning.fired > r.loose.fired && r.drowning.tier < r.loose.tier
+    && r.drowning.gPeak > r.loose.gPeak,
+    `the fuse reached ${r.drowning.gPeak} and blew ${r.drowning.fired} times, and `
+    + `the ladder ended at tier ${r.drowning.tier}; with the gate off it reached `
+    + `${r.loose.gPeak}, blew ${r.loose.fired} and ended at ${r.loose.tier} -- the `
+    + `crowd term is ${r.crowd} of the contact rate`);
 
   check('...and a run that is clearing does not notice the gate',
     r.coping.share < 0.1 && r.coping.waves >= 6,
@@ -26796,6 +26835,218 @@ if (MINE_LINE) {
     `B(7)=${r.helpers.b}, kB(500)=${r.helpers.k}, MB(20)=${r.helpers.m}, `
     + `GB(1.08)=${r.helpers.g}; they compose (${r.helpers.composes}) and land on `
     + `whole bytes (${r.helpers.whole})`);
+}
+
+// --- the field is the biggest thing on the screen ---------------------------
+/*
+ * Build 292. The report was "maximize view of playing field", and measured
+ * before anything moved it, the field -- the gap between the bottom of the
+ * wave rail and the top of the tallest column of the strip -- was **167px of
+ * a 568-tall screen, 29.4%**. Less than a third of the phone was the game.
+ *
+ * Three things were paying for that and none of them was a design decision,
+ * they were all values nobody had re-measured:
+ *
+ *   the ability bar   `--bar-h` 74, and `#abilities` is `height: var(--bar-h)`
+ *                     with 38px of content in it. Now 64, icons 24 -> 22.
+ *   the rail          `--rail-h` 52 RESERVED over a band that measures 44 --
+ *                     eight pixels of nothing, because the reservation and
+ *                     the band are separate numbers and only one had been
+ *                     measured. Now 48, and the gap above it 6 -> 3.
+ *   the strip         the mine line went out of play in 290 and left TWO
+ *                     empty bands standing, while the ammunition stack alone
+ *                     on the right was 183px -- taller than the ability bar,
+ *                     and the tallest column is what sets where the field
+ *                     ends. Split across both edges it is 121 and 100.
+ *
+ * Measured after: 242 of 568 (42.6%) and 494 of 844 (58.5%).
+ *
+ * The floors below are set between the two so the case can fail in both
+ * directions -- a floor under 29.4% would pass on the build this was written
+ * to change, which is a floor that cannot see anything.
+ */
+{
+  const held = page.viewportSize();
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    await page.waitForTimeout(120);
+    rows.push(await page.evaluate((vw) => {
+      const g = window.__sim;
+      /*
+       * `pillCap()` is the gap between the alerts column and the teaching
+       * band, less the boss caption when one is up -- so it is a measurement
+       * of what six hundred cases upstream happen to have left on the screen,
+       * and it read 0 here while reading 2 on a page of its own. Set what the
+       * question depends on: no run in progress, no pills, no caption.
+       */
+      g.restart();
+      g.hud.clearAlerts();
+      g.hud.menu.setOpen(false);
+      document.getElementById('bossCaption').classList.remove('show');
+      /*
+       * ...and the teaching band, which is the other half of the measurement
+       * and the half that was actually left over: the suite read 0 here while
+       * a page of its own read 2, because `#abilityHint` was still up with a
+       * long caption in it and the cap is the gap ABOVE that band. A caption
+       * legitimately takes the room; what is being asserted is the room.
+       */
+      g.hud.el.hint.classList.remove('show', 'tutorial');
+      g.hud.el.hint.textContent = '';
+      const rail = document.querySelector('#waveRail').getBoundingClientRect();
+      const bands = [...document.querySelectorAll('#quickBar .qGroup')]
+        .map((e) => e.getBoundingClientRect()).filter((r) => r.height > 0);
+      const top = Math.min(...bands.map((r) => r.top));
+      const railH = parseFloat(getComputedStyle(document.documentElement)
+        .getPropertyValue('--rail-h'));
+      return {
+        w: vw, vh: innerHeight,
+        field: +(top - rail.bottom).toFixed(1),
+        share: +(100 * (top - rail.bottom) / innerHeight).toFixed(1),
+        rail: +rail.height.toFixed(1),
+        railH,
+        cap: g.hud.pillCap(),
+        alertsTop: +document.querySelector('#alerts').getBoundingClientRect().top.toFixed(1),
+        hintTop: +g.hud.el.hint.getBoundingClientRect().top.toFixed(1),
+      };
+    }, size.width));
+  }
+  await page.setViewportSize(held);
+  await page.waitForTimeout(120);
+
+  const small = rows[0];
+  const big = rows[1];
+  check('the field is half the phone, and the furniture over and under it is not',
+    small.share >= 40 && big.share >= 56,
+    rows.map((x) => `${x.w}x${x.vh}: ${x.field}px of field, ${x.share}% of the `
+      + `screen`).join('; ') + ' (29.4% and 47.7% before build 292)');
+
+  /*
+   * `--rail-h` is what `--under-rail` is derived from, so everything below the
+   * rail -- the aperture bar, the boss bar, the alerts column -- starts at
+   * `--rail-t + --rail-h` whatever the rail actually measures. The band is
+   * content-driven and the reservation is a constant, so the two are two
+   * numbers and only one of them had ever been measured: 52 reserved over a
+   * band of 44.
+   *
+   * The first cut of this took the ROW to 38 to save four more, and put it
+   * back: the case above this one has asserted a 44px seat on every rail
+   * control since the rail went in, and a tap target is worth more than four
+   * pixels. Air is what the rail had spare, not height.
+   */
+  check('...and the rail still fits inside the room reserved for it',
+    rows.every((x) => x.rail <= x.railH - 3 && x.rail >= 30),
+    rows.map((x) => `${x.w}: band ${x.rail}px inside a reservation of `
+      + `${x.railH}px, ${(x.railH - x.rail).toFixed(1)} of air`).join('; '));
+
+  /*
+   * `Hud.pillCap()` measures the gap between the alerts column and the
+   * teaching band and can legitimately return 0, at which point every pill
+   * queues and none is ever shown. CLAUDE.md's standing note is that a
+   * 568-tall screen has room for exactly one; taking 6px off `--rail-t` and
+   * 8 off `--rail-h` makes it two, which is the direction this pass wanted
+   * and is asserted so a later change cannot quietly spend it.
+   */
+  check('...and a teaching pill still has somewhere to go on the smallest screen',
+    small.cap >= 2 && big.cap >= 2,
+    rows.map((x) => `${x.w}: pillCap ${x.cap} in the ${(x.hintTop - x.alertsTop)
+      .toFixed(0)}px between the alerts column at ${x.alertsTop} and the `
+      + `teaching band at ${x.hintTop}`).join('; ')
+    + ' -- it was 1 at 320 before build 292');
+}
+
+// --- the ammunition reads down two columns, and they are the same height ----
+/*
+ * The split is only worth anything if it is EVEN. The chevron is a row like
+ * any other, and a near column holding ceil(n/2) slots plus the chevron is two
+ * rows taller than the far one at five rounds -- measured 121px against 59 at
+ * 320x568, which is exactly the shape the split was meant to remove: the
+ * TALLER column is what sets where the field ends, so an uneven split gives
+ * back half of what it could. The chevron sits at the foot of the far column
+ * for that reason and the two are 90 and 90.
+ *
+ * Three arms, because three separate things can silently undo it:
+ *
+ *   the balance    off by at most one row, whatever the run owns.
+ *   the fold       `.qGroup.folded > .qc:not(.fold)` is a DIRECT-child
+ *                  selector and `syncFolds` has to reach BOTH bands -- it
+ *                  walked one for as long as there was one. A fold that
+ *                  collapses half the stack is worse than no fold.
+ *   the centre     `#quickBar` is `space-between`, so what keeps AIM and FIRE
+ *                  under the thumb is the two edge columns being the same
+ *                  WIDTH. That is build 290's promise and filling the empty
+ *                  band puts weight back on it.
+ */
+{
+  const held = page.viewportSize();
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.waitForTimeout(120);
+  const r = await page.evaluate(() => {
+    const g = window.__sim;
+    g.debugGiveBytes(200000000);
+    g.debugBuyAll();
+    g.hud.buildStrip(g.world);
+    const box = (sel) => [...document.querySelectorAll(sel)]
+      .map((e) => e.getBoundingClientRect());
+    const read = () => {
+      const cols = box('#quickBar .q_ammo');
+      const mid = document.querySelector('#quickBar .q_auto').getBoundingClientRect();
+      const bar = document.querySelector('#quickBar').getBoundingClientRect();
+      return {
+        cols: cols.map((c) => +c.height.toFixed(1)),
+        widths: cols.map((c) => +c.width.toFixed(1)),
+        midOff: +((mid.left + mid.right) / 2 - (bar.left + bar.right) / 2).toFixed(1),
+      };
+    };
+    const open = read();
+    document.querySelector('#quickBar .q_ammo .fold')
+      .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    const shut = read();
+    document.querySelector('#quickBar .q_ammo .fold')
+      .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    const cell = document.querySelector('#quickBar .q_ammo .qc')
+      .getBoundingClientRect().height;
+    return { open, shut, cell: +cell.toFixed(1), rounds: g.world.loadout.ammo.length };
+  });
+  await page.setViewportSize(held);
+  await page.waitForTimeout(120);
+
+  const spread = Math.max(...r.open.cols) - Math.min(...r.open.cols);
+  check('the ammunition is two columns of the same height, not one tall one',
+    r.open.cols.length === 2 && spread <= r.cell + 1,
+    `${r.rounds} rounds over columns of ${r.open.cols.join(' and ')}px at 320 `
+    + `(a cell is ${r.cell}), a spread of ${spread.toFixed(1)}; it was 183 in one `
+    + `column at build 291 and 121/59 on the first cut of the split`);
+
+  /*
+   * ...and what survives the fold is one row per column: the chevron on the
+   * far side and the AMMO door on the near one. `.qGroup.folded > .qc` is a
+   * DIRECT-child selector and `syncFolds` walked ONE band for as long as
+   * there was one to walk, so a fold that collapses half a split stack is the
+   * first thing this change could get wrong. The door is spared on purpose --
+   * folded away with the slots it is a tab reachable only by unfolding first.
+   */
+  check('...and the chevron folds BOTH of them, sparing only the two controls',
+    r.shut.cols.length === 2
+    && Math.max(...r.shut.cols) <= r.cell * 1.6
+    && Math.min(...r.open.cols) > r.cell * 1.6,
+    `open ${r.open.cols.join('/')}px, shut ${r.shut.cols.join('/')}px -- a slot `
+    + `row is ${r.cell} and one control row is all that may survive`);
+
+  /*
+   * `#quickBar` is `space-between`, so the middle band sits in the middle only
+   * when the bands on each side of it weigh the same. They never have:
+   * measured at 320x568 the centre of AIM and FIRE was FORTY-NINE pixels left
+   * of the strip's at build 291 and 22 after the split, because the mine
+   * line's config band is empty and the ammunition's was 44 wide. The AMMO
+   * door moved to the foot of the near column and both config bands are empty,
+   * which makes the strip [column, 0, AIM/FIRE, 0, column] and the offset 0.
+   */
+  check('...and AIM and FIRE are in the MIDDLE, which is what the edges are for',
+    Math.abs(r.open.midOff) <= 4 && Math.abs(r.shut.midOff) <= 4,
+    `the middle group's centre is ${r.open.midOff}px off the strip's with the `
+    + `stack open and ${r.shut.midOff}px with it shut, against -49 at build `
+    + `291; the two edge columns measure ${r.open.widths.join(' and ')}px`);
 }
 
 // --- report -----------------------------------------------------------------

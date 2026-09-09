@@ -2318,4 +2318,49 @@ came from before believing the other one covers it.
   discharge disarms the gate before it engages. The field peaked at 21 with the
   gate on and 21 with it off: a clean pass for a mechanism that had not run.
   Reproduce the REPORT, not a simpler thing near it.
+- **A RESERVATION and the thing it reserves for are two numbers, and only one
+  of them tends to get measured.** `--rail-h` is what `--under-rail` is derived
+  from, so everything below the rail starts at `--rail-t + --rail-h` whatever
+  the rail actually measures -- and it reserved 52 over a band of 44 for as
+  long as the rail has existed. That is where the slack was; the ROW was not,
+  and taking it to 38 to save four more pixels broke a 44px tap target the
+  suite has asserted since the rail went in. Measure the band before shaving
+  the control.
+- **`#quickBar` is `space-between`, so the middle band is centred only when the
+  bands on each side of it weigh the same.** They never did: measured at
+  320x568 the centre of AIM and FIRE was **49px left** of the strip's, and 22
+  after the ammunition was split across the two edge bands, because the mine
+  line's config band is empty and the ammunition's was 44 wide. Emptying that
+  one too -- the AMMO door moved to the foot of the near column -- makes the
+  strip `[column, 0, AIM/FIRE, 0, column]` and the offset 0. Nothing flips a
+  property for a test to read; assert the offset from the strip's own centre.
+- **A CONTROL in a stack costs a whole ROW, and which side carries it is the
+  measurement.** The chevron on the same side as the larger half of the slots
+  made the split 121 against 59, which is most of what splitting the stack was
+  worth. Counted in rows, and by height rather than by count -- a door is 38
+  tall against a slot's 28 -- the chevron goes on the far column and the door
+  on the near one with the SMALLER half: 121 against 100. It is the taller
+  column that decides where the field ends.
+- **`.qGroup.folded > .qc:not(.fold)` folds every cell that is not the
+  chevron**, so a door that moves into a stack becomes a tab reachable only by
+  unfolding first. The selector spares `.cfg` from build 292: the fold hides
+  slots, not doors. And a case that counts `.qc` flat then reads the door as a
+  slot that will not fold -- count slots and controls apart.
+- **A LAYOUT change can move a BALANCE measurement, and the ORDINAL hash will
+  not see it.** `world.floorY` is derived from the same three numbers as the
+  strip's bottom, so build 292's `--bar-h` 74 -> 64 lengthened the field by
+  sixteen world units and every body now takes longer to arrive. Build 291's
+  release-gate case failed at tier 20 on a build that changed no gameplay
+  number at all: the fuse peaked at **0.87 of 1** and never blew, where before
+  it did. Anything that moves the floor line owes the wave cases a re-run.
+- **A discharge count cannot report a near miss.** 0.87 of a fuse and 0.2 of a
+  fuse are both "0 blows", so the case that failed above could not say whether
+  the mechanism was broken or the scenario had gone soft. Record the PEAK of
+  anything that fills, beside the count of times it filled.
+- **`Hud.pillCap()` is a measurement of what the screen happens to be showing**,
+  so a case that reads it inherits six hundred cases' worth of leftovers: it
+  read 0 in the suite and 2 on a page of its own, because `#abilityHint` was
+  still up with a long caption in it and the cap is the gap ABOVE that band.
+  Pin the band, the boss caption and the alerts column, or the number is about
+  the suite rather than about the layout.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
