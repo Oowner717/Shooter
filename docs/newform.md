@@ -4704,3 +4704,119 @@ No revert-and-fail proof, and none is owed: the old behaviour is exactly what
 arm 1 forbids.
 
 590 green.
+
+---
+
+## Build 294 — the strip is one row (play-screen pass, phase 1 of 2)
+
+*"Review play screen UI. Consolidate the top bars, the wave system, energy and
+energy multiplier, and object counter into slimmer bar to save vertical play
+space. Move bottom ammo and auto bars into a design that actually makes sense."*
+
+### The review, measured at 320×568
+
+| | y | h | holds |
+|---|---|---|---|
+| header | 28..72 | 44 | OBJECTS 103px, BYTES 70, MENU 46 — 299 of 304 used |
+| waveRail | 75..119 | 44 | 5 nodes 183px, 2 arrows, AUTO 41 — full width |
+| quickBar | 361..482 | **121** | two ammo columns (121 and 100); AIM/FIRE only **38** |
+| abilities | 496..560 | 64 | 8 cells, 35×64 |
+
+Field: 242px, 42.6%. Top furniture 119px (21%), bottom 199px (35%).
+
+**The bottom was the bigger offender by 80px, and the decisive fact is that
+`world.floorY = (sh - (safeBottom + barH + 22)) / z` does not include the quick
+bar.** The floor line is at y 482 and the strip spanned 361..482 — all 121px of
+it sitting on playable ground. That is the same complaint the `recede`
+machinery exists for ("PRISM's burst is 25/54/54% behind a control").
+
+And it was spending them on a choice made about once a wave: nine rounds, one
+loaded, the rest a column you read past.
+
+### Phase 1: one row
+
+```
+        [ BOLT | HE | SPRAY | ARC | SPINE ]    <- #ammoRow, opens on press
+  [ BOLT ]   [ AIM ] [ FIRE ]   [ AMMO ]       <- one row, 38px at 320
+  [PULSE][HAIL][LANCE][WELL][PRISM][STASIS][DECOY][WARD]
+```
+
+`#ammoRow` is `#aimModes`' pattern exactly — absolutely positioned, spanning
+the bar, lifted out of flow, `z-index: 2`, its own `[hidden]` guard, swipe-down
+to dismiss. The assist has opened a spanning row from a cell in this bar since
+build 185; a second pattern for the same gesture would be a second thing to
+learn. It closes on a pick, on the cell again, on reaching for anything else on
+the strip, on touching the field, and on the menu opening — every door the mode
+row already used.
+
+The slots are built through `cell()`, so every id, tone, icon and `this.strip`
+registration is the one the rest of the interface already looks up: the lit
+state, the sealed refusal and the loadout sync all work on them without knowing
+they moved.
+
+**The round cell is deliberately not in `this.strip`.** That list is things
+which can be ON, diffed per frame against world state; this is a readout of
+*which* of them is. It carries the loaded round's own icon, label and tone, so
+the bar says what is in the barrel rather than which of nine cells is lit.
+
+**Three bands, and the two edges are the same width by construction.** Build 292
+centred AIM and FIRE by emptying a 44px band to match an empty one — arithmetic,
+which any later edit can break by putting something in a band. The round cell
+and the AMMO door are both `.qc.wide`, so `space-between` centres the middle
+without anything having to be measured.
+
+### Measured after
+
+| | 292 | 294 |
+|---|---|---|
+| strip height @320 | 121px | **38px** |
+| field @320×568 | 242px, 42.6% | **325px, 57.2%** |
+| field @390×844 | 494px, 58.5% | **599px, 71.0%** |
+| AIM/FIRE off centre | 0px | **0px** (by construction) |
+
+With `CFG.mines.inPlay` true the five-band layout and both stacks come back
+unchanged. Nothing here is a second layout to maintain.
+
+### Three guards broke, and each in a different way
+
+- **The fold case now sleeps behind `MINE_LINE`.** The fold is a *stack*
+  mechanism and the ammunition has no stack. Sleeping rather than deleted, and
+  with no consolation arm in the else — a green arm that asserts nothing is
+  worse than a missing one because it is counted.
+- **`r.bands === 5` was a written-out count.** It asks the config now
+  (`MINE_LINE ? 5 : 3`), the same shape as the boss sweeps asking
+  `ANOMALIES.length`.
+- **The AUTO AIM case's stack list, for the third time.** It was a literal pair
+  (broken by 290), then a derivation keyed on "holds slots" (broken by 294,
+  which left the only slot-holder outside the bands). The claim was never about
+  stacks: it is that the band carrying the row is lifted above *every other
+  band*, so that is what it asks.
+
+### ...and the contrast sweep's denominator, twice in five builds
+
+It was `seen >= 20`, sized for a strip with the mine stack on it, and 290 made
+it report the strip as missing. The replacement counted every cell the *query*
+found — and 294 moved nine slots into a row that is `display: none` while shut,
+so eleven words over seventeen cells failed a guard wanting fifteen while the
+loop had skipped six on purpose. It opens the row and counts what it
+**measured**. The slots are nine labels a player reads over a boss sky while
+choosing, so they are exactly what that sweep is for.
+
+### And one that was a real bug, found by a case
+
+`syncRound` ran only from `syncLoadout`, which is per frame — so the cell was
+blank in the frame it was built and stale in the frame a round was picked. Both
+are visible. It is filled at the end of `buildStrip` and re-written from
+`toggleRound`, on the same pass as the `setToggle` loop that gives the slot
+cells their immediate feedback.
+
+### Phase 2, not in this build
+
+The top is 119px in two bands and merging them needs 299 of 304 available
+pixels, so something has to leave the bar: OBJECTS (103px) and AUTO (41px), both
+into the wave sheet — a lifetime stat and a set-and-forget switch, behind the
+door that is already about the ladder. **The 5-node rail stays**: it replaced a
+"TIER 6" chip deliberately, because a number with no context around it was
+worse, and compressing it back would undo that.
+
+587 green.

@@ -2397,4 +2397,51 @@ came from before believing the other one covers it.
   it blew for one cause and returned null for the other, and the null read as
   the feature being broken. Sit ON the boundary (`glitch = 1`) when the arm is
   about what happens after it, not about reaching it.
+- **`world.floorY` does not include `#quickBar`, so every pixel of that band
+  sits on playable ground.** `floorY = (sh - (safeBottom + barH + 22)) / z`
+  reads `--bar-h`, which is the ABILITY bar; the strip above it is pure
+  overlay. Measured at 320x568 the floor line is y 482 and the strip spanned
+  361..482 -- 121px of buttons over field, to display a choice made about once
+  a wave. Shrinking the strip does not move the arena, it UNCOVERS it, and
+  that is the metric to quote: 242px of visible field to 325.
+- **A permanent column showing a set-once choice is the thing to look for
+  first.** Nine rounds, one loaded, eight read past. It is one cell naming the
+  loaded round now, with the slots in a spanning row it opens -- `#aimModes`'
+  pattern, which this bar has used for the assist since build 185. Reach for
+  the interaction the interface already has before inventing a second one for
+  the same gesture.
+- **A READOUT does not belong in `this.strip`.** That list is things which can
+  be ON, diffed per frame against world state; the round cell is a statement
+  of which of them is. Nothing else was going to keep it honest, which is why
+  it shipped blank for one frame and stale for another: `syncRound` ran only
+  from `syncLoadout`. It is filled at the end of `buildStrip` AND written from
+  `toggleRound`, on the same pass as the `setToggle` loop that gives the cells
+  beside it their immediate feedback. A readout written only by the frame loop
+  is a readout that is wrong on the frame that matters.
+- **Equal edge bands beat a measured centring.** `#quickBar` is
+  `space-between`, so the middle band is centred only while the bands either
+  side weigh the same. Build 292 achieved that by emptying a 44px band to
+  match an empty one -- arithmetic any later edit breaks by putting something
+  in a band. 294's two edges are both `.qc.wide`, so the widths are equal BY
+  CONSTRUCTION and the case asserts the offset is 0 rather than under a
+  tolerance.
+- **A band count written out is the hand-kept-list trap in three characters.**
+  `r.bands === 5` failed the moment the strip went to three bands with no
+  geometry changing. Ask the config (`MINE_LINE ? 5 : 3`), the same way the
+  boss sweeps ask `ANOMALIES.length`.
+- **A vacuity denominator has to count what was MEASURED, not what was
+  found.** The strip's contrast sweep has now been broken twice in five
+  builds: `seen >= 20` was sized for a strip with the mine stack on it (290
+  took four cells and it reported the strip as missing), and its replacement
+  counted every cell the QUERY returned -- so when 294 moved nine slots into a
+  row that is `display: none` while shut, eleven words over seventeen cells
+  failed a guard wanting fifteen, with the loop having skipped six on purpose.
+  Count the cells the loop did not `continue` past. And where the hidden thing
+  is a real control, OPEN it and sweep it: the slots are nine labels read over
+  a boss sky while choosing.
+- **A case about a mechanism whose subject has gone sleeps behind the flag.**
+  The fold is a STACK mechanism and from 294 the ammunition has no stack, so
+  the fold case is `if (MINE_LINE) { ... }` with nothing in the else -- the
+  same rule the gun line's cases already follow. What holds in its place is
+  the round-cell case, which is a different claim.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

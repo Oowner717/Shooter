@@ -1640,6 +1640,72 @@ body.sheetOpen #waveSheet button { pointer-events: auto; opacity: 1; }
   z-index: 2;
 }
 /*
+ * THE SLOTS, and they are the same band one level across.
+ *
+ * Build 294. The ammunition was a permanent vertical column on both edges of
+ * the strip -- 121px at 320x568 over field the floor line puts at y 482, so
+ * all of it on playable ground, to display a choice made about once a wave.
+ * It is one cell now (`.roundCell`, the loaded round) and these are what it
+ * opens: exactly `#aimModes` above, because the assist has opened a spanning
+ * row from a cell in this bar since build 185 and a second pattern for the
+ * same gesture would be a second thing to learn.
+ *
+ * Nine columns rather than four, so the cells are narrow -- but a round's
+ * name is its whole label and `.qc` already centres one. At 320 that is 29px
+ * a cell against the 44 a `.qc.wide` gets, which is a READOUT you are picking
+ * from with the row open and under your thumb, not a control you hunt for
+ * mid-fight; the thing you press mid-fight is the one cell that opened it.
+ */
+#ammoRow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Directly over the row it belongs to: one .qc.wide (40px) and the group's
+     own 4px gap. Same seat as #aimModes, which opens from the band beside it. */
+  bottom: calc(40px + 4px);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  /* It spans the bar, so its end columns lie over the round cell and the AMMO
+     door -- both of which come later in the DOM and would paint over it. */
+  z-index: 2;
+}
+/* The same guard #aimModes needs, for the same reason: the rule above is
+   written on an id and beats the user agent's `[hidden]`. Without this the
+   property flips, every test agrees the row is shut, and it goes on painting
+   over the field and taking the taps aimed at it. */
+#ammoRow[hidden] { display: none; }
+#ammoRow .qc { width: auto; height: 40px; }
+
+/*
+ * The cell that opens them: what is in the barrel, in that round's own colour.
+ *
+ * Always `.on`, because it is not a toggle -- there is always a round loaded,
+ * and the tone is how the bar says which. The label is the round's `short`,
+ * which is what the slot cells have always shown.
+ */
+.roundCell { width: 50px; }
+.roundCell[aria-expanded='true'] {
+  border-color: color-mix(in srgb, var(--tone, var(--accent)) 80%, transparent);
+}
+
+/*
+ * While the slots are up, the rest of the strip is not what you are doing --
+ * and more to the point a miss must not land on AIM, FIRE or the door under
+ * the band. The same pair of rules `body.aimOpen` needs, and the second one
+ * has to name an id: `#ui button { pointer-events: auto }` carries one, so
+ * nothing built out of classes can turn a control back off.
+ */
+body.ammoOpen .q_auto,
+body.ammoOpen .q_cfg { opacity: 0.22; }
+body.ammoOpen #quickBar .q_auto button,
+body.ammoOpen #quickBar .q_cfg button { pointer-events: none; }
+/* ...and the aim row's dim reaches the new band too. */
+body.aimOpen .q_round { opacity: 0.22; }
+body.aimOpen #quickBar .q_round button { pointer-events: none; }
+
+/*
  * ...and what puts it away. This is the whole of the bug that was reported
  * three times as "the menu will not collapse".
  *
@@ -3226,6 +3292,11 @@ body.booting #quickBar {
   .q_mines, .q_ammo { width: 54px; }
   .qc { height: 28px; gap: 3px; padding: 0 4px; }
   .qc.wide { height: 38px; width: 44px; }
+  /* The round cell is a `.qc.wide` and takes that width; the slots in the
+     row it opens are grid tracks and size themselves. */
+  .roundCell { width: 44px; }
+  #ammoRow { bottom: calc(38px + 4px); }
+  #ammoRow .qc { height: 38px; }
   .qc svg { width: 13px; height: 13px; }
   .qc .qLbl { font-size: 9px; letter-spacing: 0; }
 

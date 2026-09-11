@@ -3559,11 +3559,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
      * `querySelector` returned null with `getComputedStyle(null)` throwing,
      * and build 292 split the ammunition across BOTH edge bands, so a list
      * naming `q_ammo` once saw one of the two and the pair it compared
-     * against was a literal. Ask the strip: every band that holds slots, in
-     * DOM order, however many of them there are.
+     * against was a literal. Then 294 took the stacks away entirely and a
+     * derivation keyed on "holds slots" found nothing, because the only thing
+     * holding slots is the row `#ammoRow` and that is not a band.
+     *
+     * The claim was never about stacks. It is that the band carrying the row
+     * is lifted above EVERY OTHER BAND in the strip, and that none of those
+     * sets a z-index of its own -- so that is what is asked, in DOM order,
+     * however many there are and whatever is in them.
      */
     const stacks = [...document.querySelectorAll('#quickBar .qGroup')]
-      .filter((el) => el.querySelector('.qc:not(.fold):not(.cfg)'))
+      .filter((el) => !el.contains(row))
       .map((el) => getComputedStyle(el).zIndex);
 
     // ...and pressing the cell again takes it off the screen, not just out of
@@ -5851,10 +5857,21 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     window.__sim.debugTeachAll();
     setPref('showMines', 1); setPref('showAmmo', 1);
     window.__sim.hud.syncFolds();
+    /*
+     * ...and the slots are OPENED, because from build 294 they live in a row
+     * the round cell fans out and a shut row is `display: none`. They are
+     * nine labels a player reads over a boss sky while choosing, so they are
+     * exactly what this sweep is for -- left shut they were found by the
+     * query, skipped by the loop for having no box, and still counted in the
+     * denominator, which is what failed the guard.
+     */
+    window.__sim.hud.openAmmoRow?.(true);
     const cells = [...document.querySelectorAll('.qc, #abilities .ab')];
+    let shown = 0;
     for (const el of cells) {
       const q = el.getBoundingClientRect();
       if (!(q.height > 0)) continue;
+      shown++;
       // The button's own painted panel, composited onto that sky.
       let bg = ground;
       for (const e of [el]) {
@@ -5879,21 +5896,27 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
         if (size < 11 || ratio < 4.5) bad.push(`${txt.slice(0, 10)}@${size}px:${ratio.toFixed(2)}`);
       }
     }
+    window.__sim.hud.openAmmoRow?.(false);
     return { seen, bad, ground: `rgb(${Math.round(ground.r)},${Math.round(ground.g)},${Math.round(ground.b)})`,
-      skies: skies.length, cells: cells.length };
+      skies: skies.length, cells: cells.length, shown };
   });
   /*
-   * The vacuity guard is a SHARE of the cells the sweep found, not a count of
-   * words. It was `seen >= 20`, sized for a strip with the mine stack on it --
-   * and the mine line went out of play in build 290, taking four cells with
-   * it, so a floor whose whole job was "the sweep found the strip" started
-   * reporting the strip as missing. A count of the roster rots when the roster
-   * changes; what has to hold is that nearly every cell yielded a word.
+   * The vacuity guard is a SHARE of the cells the sweep MEASURED, not a count
+   * of words and not a share of the cells it found.
+   *
+   * It was `seen >= 20`, sized for a strip with the mine stack on it -- and
+   * the mine line went out of play in build 290, taking four cells with it,
+   * so a floor whose whole job was "the sweep found the strip" started
+   * reporting the strip as missing. Build 294 then broke the replacement a
+   * second way: the denominator was every cell the QUERY found, and the nine
+   * slots had moved into a row that is `display: none` while shut, so eleven
+   * words over seventeen cells failed a guard that wanted fifteen. The loop
+   * had skipped six of them on purpose. Count what was measured.
    */
   check('every word on the strip and the ability bar clears 11px and 4.5:1 on the worst sky',
-    r.bad.length === 0 && r.cells >= 12 && r.seen >= r.cells - 2,
+    r.bad.length === 0 && r.shown >= 12 && r.seen >= r.shown - 2,
     `${r.seen} read over ${r.ground} (brightest of ${r.skies} boss skies); failing: ${r.bad.slice(0, 6)}`
-    + ` | ${r.seen} words across ${r.cells} cells`);
+    + ` | ${r.seen} words across ${r.shown} measured cells of ${r.cells} found`);
 }
 
 // --- ...and the furniture gets out of the way on the beats, not on a press --
@@ -6042,8 +6065,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
  * press. The fold is the answer, and it has one rule that is easy to get
  * wrong: the button that folds a stack cannot be inside the part that folds,
  * or putting the stack away takes the way back with it.
+ *
+ * BEHIND THE MINE FLAG from build 294. The fold is a STACK mechanism, and the
+ * ammunition has no stack any more -- one cell showing the loaded round, and
+ * the slots in a row it opens. The mechanism is unchanged and so is every
+ * line of it; there is simply nothing in the running game with a stack in it
+ * while the mine line is out of play. Sleeping rather than deleted, and with
+ * no consolation arm in the else: a green arm that asserts nothing is worse
+ * than a missing one because it is counted. What holds in its place is the
+ * round-cell case further down, which is a different claim.
  */
-{
+if (MINE_LINE) {
   const r = await page.evaluate((mineLine) => {
     const g = window.__sim;
     /*
@@ -6680,14 +6712,19 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     + `${r.stackCells} stack cells, MINES button ${r.cfgButton}`);
 
   /*
-   * ...and the strip did not move. The two bands are still created with the
-   * stack empty, because `#quickBar` is `justify-content: space-between`:
-   * dropping them would let the middle group -- AIM and FIRE, the two cells
-   * placed where the thumb rests -- walk off to the left edge. Asserted as
-   * geometry, because that is the thing that would actually be wrong.
+   * ...and the strip did not move. `#quickBar` is `space-between`, so the
+   * middle band sits in the middle only when the bands either side weigh the
+   * same -- which is why the count is asked of the config rather than written
+   * out. FIVE with the mine line in (two stacks, two doors, the middle) and
+   * THREE without (the round cell, the middle, the ammunition door), the two
+   * edges being `.qc.wide` and therefore the same width by construction.
+   * Build 292 kept two EMPTY bands to get the same effect by arithmetic and
+   * 294 replaced them with two real ones. Asserted as geometry either way,
+   * because that is the thing that would actually be wrong.
    */
   check('...and AIM and FIRE are still in the middle of the bar',
-    r.bands === 5 && Math.abs(r.aimMid - r.barMid) < r.barMid * 0.25,
+    r.bands === (MINE_LINE ? 5 : 3)
+    && Math.abs(r.aimMid - r.barMid) < r.barMid * 0.25,
     `${r.bands} bands; AIM sits at ${r.aimMid} against a bar midpoint of ${r.barMid}`);
 }
 
@@ -27075,11 +27112,17 @@ if (MINE_LINE) {
  *                     and the tallest column is what sets where the field
  *                     ends. Split across both edges it is 121 and 100.
  *
- * Measured after: 242 of 568 (42.6%) and 494 of 844 (58.5%).
+ * Measured after 292: 242 of 568 (42.6%) and 494 of 844 (58.5%).
  *
- * The floors below are set between the two so the case can fail in both
- * directions -- a floor under 29.4% would pass on the build this was written
- * to change, which is a floor that cannot see anything.
+ * BUILD 294 took the strip from 121px to one 38px row -- the ammunition was a
+ * permanent column displaying a choice made once a wave, and `world.floorY`
+ * comes off `--bar-h` and does not include that band, so all 121 of it sat on
+ * playable ground. Measured after: 325 of 568 (57.2%) and 599 of 844 (71.0%).
+ *
+ * The floors below are set between each pair, so the case can fail in both
+ * directions -- a floor under the previous build's figure would pass on the
+ * build the change was written against, which is a floor that cannot see
+ * anything.
  */
 {
   const held = page.viewportSize();
@@ -27132,8 +27175,8 @@ if (MINE_LINE) {
 
   const small = rows[0];
   const big = rows[1];
-  check('the field is half the phone, and the furniture over and under it is not',
-    small.share >= 40 && big.share >= 56,
+  check('the field is most of the phone, and the furniture over and under it is not',
+    small.share >= 54 && big.share >= 68,
     rows.map((x) => `${x.w}x${x.vh}: ${x.field}px of field, ${x.share}% of the `
       + `screen`).join('; ') + ' (29.4% and 47.7% before build 292)');
 
@@ -27171,27 +27214,37 @@ if (MINE_LINE) {
     + ' -- it was 1 at 320 before build 292');
 }
 
-// --- the ammunition reads down two columns, and they are the same height ----
+// --- the ammunition is ONE cell, and the slots are behind it ----------------
 /*
- * The split is only worth anything if it is EVEN. The chevron is a row like
- * any other, and a near column holding ceil(n/2) slots plus the chevron is two
- * rows taller than the far one at five rounds -- measured 121px against 59 at
- * 320x568, which is exactly the shape the split was meant to remove: the
- * TALLER column is what sets where the field ends, so an uneven split gives
- * back half of what it could. The chevron sits at the foot of the far column
- * for that reason and the two are 90 and 90.
+ * Build 294, and the number it is about is 121.
  *
- * Three arms, because three separate things can silently undo it:
+ * The mine line went out of play in 290 and left its two bands empty; 292
+ * split the ammunition across them, which halved the tallest column and left
+ * the strip 121px tall at 320x568. `world.floorY` comes off `--bar-h` and
+ * does NOT include this band, so the floor line sits at y 482 and the strip
+ * spanned 361..482 -- every pixel of it over ground you are meant to be
+ * shooting into, which is the complaint the `recede` machinery exists for.
  *
- *   the balance    off by at most one row, whatever the run owns.
- *   the fold       `.qGroup.folded > .qc:not(.fold)` is a DIRECT-child
- *                  selector and `syncFolds` has to reach BOTH bands -- it
- *                  walked one for as long as there was one. A fold that
- *                  collapses half the stack is worse than no fold.
- *   the centre     `#quickBar` is `space-between`, so what keeps AIM and FIRE
- *                  under the thumb is the two edge columns being the same
- *                  WIDTH. That is build 290's promise and filling the empty
- *                  band puts weight back on it.
+ * And it was spending them on a choice made about once a wave: nine rounds,
+ * one loaded, the rest a column you read past. It is one cell now with the
+ * slots in a row it opens -- `#aimModes`' pattern, which this bar has used
+ * for the assist since build 185.
+ *
+ * Four arms, because four separate things can silently undo it:
+ *
+ *   the row      it is ONE row tall. The whole point.
+ *   the readout  the cell says what is loaded, and follows a pick. It is not
+ *                in `this.strip` (which is a list of things that can be ON),
+ *                so nothing else was going to keep it honest.
+ *   the shutting on the RENDERED BOX, never `hidden` -- `#ammoRow`'s own
+ *                rules are written on an id and beat the user agent's
+ *                `[hidden]`, which is the whole of the build-185 "the menu
+ *                will not collapse" bug, reported three times and green every
+ *                time.
+ *   the centre   `#quickBar` is `space-between`, so AIM and FIRE sit in the
+ *                middle only while the two edge bands weigh the same. They
+ *                are both `.qc.wide` now, so that holds by construction --
+ *                but a later edit can put something in either one.
  */
 {
   const held = page.viewportSize();
@@ -27202,67 +27255,89 @@ if (MINE_LINE) {
     g.debugGiveBytes(200000000);
     g.debugBuyAll();
     g.hud.buildStrip(g.world);
-    const box = (sel) => [...document.querySelectorAll(sel)]
-      .map((e) => e.getBoundingClientRect());
+    const cellH = document.querySelector('#quickBar .q_auto .qc')
+      .getBoundingClientRect().height;
     const read = () => {
-      const cols = box('#quickBar .q_ammo');
-      const mid = document.querySelector('#quickBar .q_auto').getBoundingClientRect();
       const bar = document.querySelector('#quickBar').getBoundingClientRect();
+      const mid = document.querySelector('#quickBar .q_auto').getBoundingClientRect();
+      const row = document.querySelector('#ammoRow');
+      const rb = row.getBoundingClientRect();
+      const rc = document.querySelector('#roundCell');
+      const bands = [...document.querySelectorAll('#quickBar .qGroup')]
+        .map((e) => e.getBoundingClientRect());
       return {
-        cols: cols.map((c) => +c.height.toFixed(1)),
-        widths: cols.map((c) => +c.width.toFixed(1)),
+        barH: +bar.height.toFixed(1),
+        bands: bands.length,
+        edges: [+bands[0].width.toFixed(1), +bands[bands.length - 1].width.toFixed(1)],
         midOff: +((mid.left + mid.right) / 2 - (bar.left + bar.right) / 2).toFixed(1),
+        // The BOX, not the property. `hidden` has never once hidden anything
+        // the stylesheet gives a display to.
+        rowH: +rb.height.toFixed(1),
+        rowW: +rb.width.toFixed(1),
+        rowHidden: row.hidden,
+        cells: row.children.length,
+        says: (rc.textContent || '').trim(),
+        expanded: rc.getAttribute('aria-expanded'),
+        dim: document.body.classList.contains('ammoOpen'),
       };
     };
-    const open = read();
-    document.querySelector('#quickBar .q_ammo .fold')
-      .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    const press = (el) => el.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+
     const shut = read();
-    document.querySelector('#quickBar .q_ammo .fold')
-      .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-    const cell = document.querySelector('#quickBar .q_ammo .qc')
-      .getBoundingClientRect().height;
-    return { open, shut, cell: +cell.toFixed(1), rounds: g.world.loadout.ammo.length };
+    press(document.querySelector('#roundCell'));
+    const open = read();
+    /*
+     * A pick through the SLOT's own handler, on the element -- the control,
+     * not the method it calls. And the third slot rather than the first,
+     * because the first is the round already loaded and a case that picks it
+     * cannot tell a working swap from a no-op.
+     */
+    const was = g.world.round;
+    press(document.querySelectorAll('#ammoRow .qc')[2]);
+    const after = read();
+    const now = g.world.round;
+    // ...and pressing the cell twice puts the row away again, which is the
+    // half of the AUTO AIM row that shipped broken in build 185.
+    press(document.querySelector('#roundCell'));
+    const reopened = read();
+    press(document.querySelector('#roundCell'));
+    const closed = read();
+    return { shut, open, after, closed, reopened, was, now, cellH: +cellH.toFixed(1) };
   });
   await page.setViewportSize(held);
   await page.waitForTimeout(120);
 
-  const spread = Math.max(...r.open.cols) - Math.min(...r.open.cols);
-  check('the ammunition is two columns of the same height, not one tall one',
-    r.open.cols.length === 2 && spread <= r.cell + 1,
-    `${r.rounds} rounds over columns of ${r.open.cols.join(' and ')}px at 320 `
-    + `(a cell is ${r.cell}), a spread of ${spread.toFixed(1)}; it was 183 in one `
-    + `column at build 291 and 121/59 on the first cut of the split`);
+  check('the ammunition is one row, not a column down the side of the field',
+    r.shut.barH <= r.cellH + 2 && r.shut.bands === 3,
+    `the strip is ${r.shut.barH}px at 320x568 over ${r.shut.bands} bands, against `
+    + `a cell of ${r.cellH} -- it was 121 in two columns at build 292 and 183 in `
+    + `one at 291`);
 
-  /*
-   * ...and what survives the fold is one row per column: the chevron on the
-   * far side and the AMMO door on the near one. `.qGroup.folded > .qc` is a
-   * DIRECT-child selector and `syncFolds` walked ONE band for as long as
-   * there was one to walk, so a fold that collapses half a split stack is the
-   * first thing this change could get wrong. The door is spared on purpose --
-   * folded away with the slots it is a tab reachable only by unfolding first.
-   */
-  check('...and the chevron folds BOTH of them, sparing only the two controls',
-    r.shut.cols.length === 2
-    && Math.max(...r.shut.cols) <= r.cell * 1.6
-    && Math.min(...r.open.cols) > r.cell * 1.6,
-    `open ${r.open.cols.join('/')}px, shut ${r.shut.cols.join('/')}px -- a slot `
-    + `row is ${r.cell} and one control row is all that may survive`);
+  check('...and the one cell says what is loaded, and follows a pick',
+    r.shut.says && r.open.cells >= 3 && r.was !== r.now
+    && r.after.says !== r.shut.says && r.after.says.length > 0,
+    `it read "${r.shut.says}", opened ${r.open.cells} slots, and picking the third `
+    + `took the round ${r.was} -> ${r.now} with the cell now reading `
+    + `"${r.after.says}"`);
 
-  /*
-   * `#quickBar` is `space-between`, so the middle band sits in the middle only
-   * when the bands on each side of it weigh the same. They never have:
-   * measured at 320x568 the centre of AIM and FIRE was FORTY-NINE pixels left
-   * of the strip's at build 291 and 22 after the split, because the mine
-   * line's config band is empty and the ammunition's was 44 wide. The AMMO
-   * door moved to the foot of the near column and both config bands are empty,
-   * which makes the strip [column, 0, AIM/FIRE, 0, column] and the offset 0.
-   */
+  check('...and the slots LEAVE THE SCREEN when they are put away',
+    r.shut.rowH === 0 && r.open.rowH > 0 && r.after.rowH === 0
+    && r.reopened.rowH > 0 && r.closed.rowH === 0
+    && r.shut.rowHidden && !r.open.rowHidden
+    && r.open.dim && !r.closed.dim
+    && r.open.expanded === 'true' && r.closed.expanded === 'false',
+    `rendered height shut ${r.shut.rowH}, open ${r.open.rowH} across ${r.open.rowW}px `
+    + `of bar, ${r.after.rowH} after a pick, ${r.reopened.rowH} reopened, `
+    + `${r.closed.rowH} shut again; the rest of the strip is dimmed only while `
+    + `it is up (${r.open.dim} / ${r.closed.dim})`);
+
   check('...and AIM and FIRE are in the MIDDLE, which is what the edges are for',
-    Math.abs(r.open.midOff) <= 4 && Math.abs(r.shut.midOff) <= 4,
-    `the middle group's centre is ${r.open.midOff}px off the strip's with the `
-    + `stack open and ${r.shut.midOff}px with it shut, against -49 at build `
-    + `291; the two edge columns measure ${r.open.widths.join(' and ')}px`);
+    Math.abs(r.shut.midOff) <= 2 && Math.abs(r.open.midOff) <= 2
+    && r.shut.edges[0] === r.shut.edges[1],
+    `the middle group's centre is ${r.shut.midOff}px off the strip's shut and `
+    + `${r.open.midOff}px open, against -49 at build 291 and -22 at 292; the two `
+    + `edge bands measure ${r.shut.edges.join(' and ')}px`);
 }
 
 // --- report -----------------------------------------------------------------

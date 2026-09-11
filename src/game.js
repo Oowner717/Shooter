@@ -2003,6 +2003,7 @@ export class Game {
       this.hud.dismissHint();
       // ...and a row left open is never in the way of playing.
       this.hud.openAimRow(false);
+      this.hud.openAmmoRow(false);
 
       /*
        * A build lot BUILDS, and the press still goes on to aim and fire.
@@ -2236,6 +2237,7 @@ export class Game {
     w.autoAim = mode !== 'off';
     this.hud.setAim(w);
     this.hud.openAimRow(false);
+    this.hud.openAmmoRow(false);
     // Each position says its own thing the first time it is reached.
     const key = !w.autoAim ? 'autoAim' : { drift: 'aimDrift', all: 'aimAll' }[mode] || 'autoAim';
     this.announceToggle(key, w.autoAim);
@@ -2286,6 +2288,13 @@ export class Game {
     w.round = kind;
     // STANDARD is a chip too, so it lights on the same pass as the rest.
     for (const k of ['standard', ...ROUND_KEYS]) this.hud.setToggle(k, w.round === k);
+    /*
+     * ...and the one cell that SAYS which, on the same pass and for the same
+     * reason: it is the readout the press was about, and `syncLoadout` would
+     * not re-assert it until the next frame. Diffed inside, so re-picking the
+     * loaded round writes nothing.
+     */
+    this.hud.syncRound(w);
     // Re-picking the loaded round is a no-op, so it does not get a caption
     // either — a first-use line is about the change, and nothing changed.
     this.announceToggle(kind, w.round === kind, changed);

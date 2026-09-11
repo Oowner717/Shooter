@@ -234,7 +234,10 @@ export class Menu {
     if (this.open === on) return;
     // The mode row is play-screen furniture; a sheet over the whole screen is
     // not the place to leave it standing.
-    if (on && this.game.hud) this.game.hud.openAimRow(false);
+    if (on && this.game.hud) {
+      this.game.hud.openAimRow(false);
+      this.game.hud.openAmmoRow(false);
+    }
     this.open = on;
     this.el.root.classList.toggle('open', on);
     this.el.scrim.classList.toggle('on', on);

@@ -341,11 +341,32 @@ export class Hud {
       this.el.quickBar.appendChild(d);
       return d;
     };
-    const mines = band('qGroup q_mines');
-    const cfgMines = band('qGroup q_cfg');
+    /*
+     * THREE bands with the mine line out of play, five with it in.
+     *
+     * Build 292 split the ammunition across both edges and kept the two empty
+     * config bands standing, because `#quickBar` is `space-between` and the
+     * middle band sits in the middle only when the bands either side of it
+     * weigh the same. That bought a strip 121px tall over a field it covers
+     * entirely -- `world.floorY` is derived from `--bar-h` and does NOT
+     * include this band, so every pixel of it sits on playable ground. The
+     * stack was a permanent column displaying a choice made once a wave.
+     *
+     * It is one row now: the loaded round on the left, AIM and FIRE in the
+     * middle where the thumb rests, the AMMO door on the right. Pressing the
+     * round fans the slots out across the bar -- the same `#aimModes` pattern
+     * the assist has used since build 185, lifted out of flow and spanning
+     * the strip. The round cell and the door are both `.qc.wide`, so the two
+     * edges are the same width BY CONSTRUCTION rather than by arithmetic and
+     * 292's centring rule cannot be broken by what is in them.
+     */
+    const mineLine = CFG.mines.inPlay;
+    const mines = mineLine ? band('qGroup q_mines') : null;
+    const cfgMines = mineLine ? band('qGroup q_cfg') : null;
+    const roundBand = mineLine ? null : band('qGroup q_round');
     const auto = band('qGroup q_auto');
     const cfgAmmo = band('qGroup q_cfg');
-    const ammo = band('qGroup q_ammo');
+    const ammo = mineLine ? band('qGroup q_ammo') : null;
 
     /*
      * A fold at the FOOT of each stack. Four mine slots and four ammunition
@@ -369,87 +390,71 @@ export class Hud {
      * flips a property a test could read back.
      */
     /*
-     * Stacks read bottom-up on screen, so slot 0 is the bottom cell.
+     * Stacks read bottom-up on screen, so slot 0 is the bottom cell -- which
+     * is the mine line's form, and from build 294 the only one that has a
+     * stack in it at all.
      *
-     * ---- and from build 292 the ammunition is TWO columns ---------------
+     * ---- what the ammunition was, and why it stopped ------------------
      *
-     * The mine line went out of play in 290 and its two bands have been
-     * standing empty since -- created but not filled, because `#quickBar` is
-     * `justify-content: space-between` and dropping them lets the middle
-     * group (AIM and FIRE, the cells placed where the thumb rests) walk off
-     * to the left edge. So the band held 70px of nothing while the ammunition
-     * stack, alone on the right, was the tallest thing on the screen: at
-     * 320x568 it measured 183px, more than the ability bar, and the field
-     * between the rail and the top of it was 167 of 568.
+     * The mine line went out of play in 290 and left its two bands standing
+     * empty. 292 split the ammunition across them, which halved the tallest
+     * column and centred nothing: the strip was still 121px at 320x568, and
+     * `world.floorY` is derived from `--bar-h` and does NOT include this
+     * band, so the whole of it sat on playable ground. Measured, the floor
+     * line is at y 482 and the strip spanned 361..482 -- a hundred and
+     * twenty-one pixels of buttons over field you are meant to be shooting
+     * into, which is the same complaint the `recede` machinery exists for
+     * ("PRISM's burst is 25/54/54% behind a control").
      *
-     * Split across both edges it is half as tall and the strip is symmetric,
-     * which is what the empty column was always going to be worth. The
-     * bottom half stays on the right where it has always been -- slot 0 is
-     * the cell nearest the thumb and it does not move -- and the top half
-     * goes left.
+     * And what it was spending them on is a choice made about once a wave.
+     * Nine rounds, one loaded, the rest a column you read past.
      *
-     * THE FOLD IS A ROW, and it is what makes the split uneven. Counted in
-     * rows rather than in cells, a near column holding ceil(n/2) slots plus
-     * the chevron is two rows taller than the far one at five rounds:
-     * measured 121px against 59 at 320x568, and it is the TALLER column that
-     * sets where the field ends. With the chevron moved to the foot of the
-     * far column the two are 87 and 87, which is 34px of field given back --
-     * six per cent of a 568-tall screen for a control that had to sit
-     * somewhere. Off by at most one row for every n: near ceil(n/2), far
-     * floor(n/2) + 1.
+     * So: ONE cell showing what is loaded, and the slots fan out across the
+     * bar when it is pressed. That is `#aimModes`' pattern exactly -- the
+     * assist has opened a spanning row from a cell in this band since build
+     * 185 and it is the interaction the player already knows. The strip is
+     * 44px and the field gets the other 77 back.
      *
-     * ...and the AMMO DOOR goes to the foot of the near column, which is what
-     * finally centres AIM and FIRE. `#quickBar` is `space-between` over five
-     * bands, so the middle one sits in the middle only when the two on each
-     * side of it weigh the same. They never have: measured at 320x568 the
-     * middle group's centre was 49px left of the strip's at build 291 and 22
-     * after the split, because the mine line's config band is empty and the
-     * ammunition's is 44 wide. Emptying that one too makes the strip
-     * [column, 0, AIM/FIRE, 0, column] and the offset is zero.
-     *
-     * It costs one row -- the tallest column goes three to four -- and it is
-     * the right row to spend, because the door belongs with the ammunition it
-     * opens and the foot of the stack is where the thumb already is. It sits
-     * level with the chevron at the foot of the far column for the same
-     * reason. `.qGroup.folded` has to spare it, or folding the stack takes
-     * the tab away with it; see the selector in styles.css.
-     *
-     * With the mine line back on, both stacks go back to where they were:
-     * mines left, all of the ammunition right, chevron at the foot of the
-     * ammunition column and both doors in their own bands. Nothing here is a
-     * second layout to maintain, it is the same one with a different split.
+     * The two edge bands are the round cell and the AMMO door, both
+     * `.qc.wide`: equal widths by construction, so `space-between` centres
+     * AIM and FIRE without anything having to be measured. 292 got there by
+     * arithmetic -- emptying a 44px band to match an empty one -- and that is
+     * a centring any later edit can break by putting something in a band.
      */
-    const twoColumn = !CFG.mines.inPlay;
-    if (CFG.mines.inPlay) {
+    if (mineLine) {
       this.fillStack(mines, w, 'mines');
       mines.appendChild(this.stackFold('mines'));
       cfgMines.appendChild(this.configButton('mines'));
-    }
-    if (twoColumn) {
-      mines.classList.remove('q_mines');
-      mines.classList.add('q_ammo', 'q_ammo_far');
-      const keys = w.loadout.ammo;
-      /*
-       * The near column carries the door and the far one the chevron, so the
-       * near one takes the SMALLER half of the slots: a door is 38 tall
-       * against a slot's 28, and putting it on the larger half measured
-       * 131px against 90 where the other way round is 100 against 121. It is
-       * the taller column that decides where the field ends, so the split is
-       * by the height of what is in each column, not by the count.
-       */
-      const half = Math.floor(keys.length / 2);
-      // The FAR column takes the upper slots and the near one the lower, so
-      // the reading order down the two columns is unchanged: slot 0 is still
-      // the bottom cell of the right-hand stack.
-      this.fillStack(ammo, w, 'ammo', 0, half);
-      this.fillStack(mines, w, 'ammo', half, keys.length);
-      mines.appendChild(this.stackFold('ammo'));
-      ammo.appendChild(this.configButton('ammo'));
-    } else {
       this.fillStack(ammo, w, 'ammo');
       ammo.appendChild(this.stackFold('ammo'));
-      cfgAmmo.appendChild(this.configButton('ammo'));
+    } else {
+      /*
+       * The row goes in FIRST and the cell after it, so the cell is the later
+       * sibling and paints over the row's own end column. Same reason
+       * `#aimModes` carries a z-index: the row spans the whole bar and its
+       * ends lie over the two edge bands.
+       */
+      const row = document.createElement('div');
+      row.id = 'ammoRow';
+      row.hidden = true;
+      roundBand.appendChild(row);
+      this.el.ammoRow = row;
+      // A rebuilt strip has a shut row, so the dim it puts on the rest of the
+      // bar comes off with it -- buildStrip runs on every purchase, and one
+      // left on would grey out AIM, FIRE and the door for the rest of the run.
+      document.body.classList.remove('ammoOpen');
+      roundBand.appendChild(this.roundCell());
+      this.buildAmmoRow(w);
+      /*
+       * ...and filled HERE rather than left to the next frame's syncLoadout.
+       * `buildStrip` runs on every purchase, and a cell that is blank until
+       * the frame loop comes round is a blank cell in every screenshot, every
+       * probe and every case that builds the strip and reads it -- which is
+       * how this was found.
+       */
+      this.syncRound(w);
     }
+    cfgAmmo.appendChild(this.configButton('ammo'));
     this.syncFolds();
     /*
      * The two that run on their own, and the row AUTO AIM opens above them.
@@ -556,6 +561,115 @@ export class Hud {
     // What says which control the row belongs to, and what stops a miss
     // landing on the cell underneath it. See body.aimOpen in styles.css.
     document.body.classList.toggle('aimOpen', !!open);
+    return true;
+  }
+
+  /**
+   * The loaded round, as one cell, with the slots behind it.
+   *
+   * Not a `.qc` and deliberately not in `this.strip`: the strip is a list of
+   * things that can be ON, diffed every frame against world state, and this
+   * cell is a READOUT of which of them is. It carries the loaded round's own
+   * icon, label and tone, so at a glance the bar says what is in the barrel
+   * rather than which of nine cells happens to be lit.
+   *
+   * Pressing it fans the slots out. Pressing it again puts them away, and so
+   * does picking one, reaching for anything else on the strip, touching the
+   * field, or opening the menu -- every door the mode row already uses.
+   */
+  roundCell() {
+    const b = document.createElement('button');
+    b.className = 'qc wide roundCell on';
+    b.id = 'roundCell';
+    b.setAttribute('aria-haspopup', 'true');
+    b.setAttribute('aria-expanded', 'false');
+    b.innerHTML = '<span class="qLbl"></span>';
+    const press = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      // One row at a time: two spanning bands over each other is two rows of
+      // buttons over the field and no way to tell which owns the cell.
+      this.openAimRow(false);
+      this.openAmmoRow(!this.ammoRowOpen());
+    };
+    b.addEventListener('pointerdown', press);
+    b.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    // pointerdown alone is right for a thumb and wrong for everything else.
+    b.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      press(ev);
+    });
+    this.el.roundCell = b;
+    this._roundAt = null;
+    return b;
+  }
+
+  /**
+   * What the cell says, from world state and nothing else.
+   *
+   * Diffed on the key, because this is called every frame from syncLoadout
+   * and the write is an innerHTML. A round is swapped a few times a run.
+   */
+  syncRound(world) {
+    const b = this.el.roundCell;
+    if (!b || this._roundAt === world.round) return;
+    this._roundAt = world.round;
+    const a = ARSENAL.find((x) => x.key === world.round);
+    b.innerHTML = `${a ? a.icon : ''}<span class="qLbl">${a ? (a.short || a.label) : '\u2014'}</span>`;
+    b.style.setProperty('--tone', (a && a.tone) || 'var(--accent)');
+    b.setAttribute('aria-label', a ? `Ammunition: ${a.label}. Choose another` : 'Ammunition');
+  }
+
+  /**
+   * The slots, across the bar. Built through `cell()` so every id, tone, icon
+   * and `this.strip` registration is the one the rest of the interface has
+   * always looked up -- the lit state, the sealed refusal and the loadout
+   * sync all work on these without knowing they moved.
+   *
+   * Forward order, unlike `fillStack`: a row reads left to right, so slot 0
+   * is the first cell rather than the last.
+   */
+  buildAmmoRow(world) {
+    const row = this.el.ammoRow;
+    if (!row) return;
+    const keys = world.loadout.ammo;
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      const a = key && ARSENAL.find((x) => x.key === key);
+      row.appendChild(a ? this.cell(a) : this.emptySlot('ammo', i));
+    }
+    /*
+     * Down, because the row sits directly over the cell it opened from. Bound
+     * on a FRESH element every time -- `buildStrip` empties `#quickBar` and
+     * this row is created in it, so nothing stacks the way it would if the
+     * element survived a rebuild.
+     */
+    swipeToDismiss(row, {
+      dir: 'down',
+      canStart: (ev) => !ev.target.closest('button'),
+      onClose: () => this.openAmmoRow(false),
+    });
+  }
+
+  /** Are the slots showing? */
+  ammoRowOpen() {
+    return !!this.el.ammoRow && !this.el.ammoRow.hidden;
+  }
+
+  /**
+   * Open or shut them.
+   *
+   * `hidden` is set AND `#ammoRow[hidden]` carries a `display: none` of its
+   * own in styles.css, because the two rules above it are written on an id --
+   * the user agent's `[hidden]` loses to both, which is the whole of the
+   * build-185 "the menu will not collapse" bug. Assert the rendered box.
+   */
+  openAmmoRow(open) {
+    const row = this.el.ammoRow;
+    if (!row) return false;
+    row.hidden = !open;
+    document.body.classList.toggle('ammoOpen', !!open);
+    if (this.el.roundCell) this.el.roundCell.setAttribute('aria-expanded', String(!!open));
     return true;
   }
 
@@ -2507,6 +2621,9 @@ export class Hud {
      * is excluded: that press is the toggle.
      */
     if (a.key !== 'autoAim') this.openAimRow(false);
+    // ...and the slots, unconditionally: picking a round is done with them,
+    // and reaching past them for anything else is a decision not to.
+    this.openAmmoRow(false);
     if (this.game.isSealed(a.key)) return this.refuse(this.el.toggles[a.key]);
     if (a.kind === 'round') this.game.toggleRound(a.key);
     else if (a.kind === 'mine') this.game.toggleMine(a.key);
@@ -2888,6 +3005,7 @@ export class Hud {
 
   /** Lights the strip to match what is actually loaded and running. */
   syncLoadout(world) {
+    this.syncRound(world);
     // World state is the only truth here: a round is lit when it is loaded, a
     // mine or an assist when it is running. Every write is diffed.
     for (const q of this.strip) {
