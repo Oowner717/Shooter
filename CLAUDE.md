@@ -2444,4 +2444,51 @@ came from before believing the other one covers it.
   the fold case is `if (MINE_LINE) { ... }` with nothing in the else -- the
   same rule the gun line's cases already follow. What holds in its place is
   the round-cell case, which is a different claim.
+- **THE TOP IS ONE BAR from build 295, and the numbers are why.** At 320 there
+  are 304 points: MENU 46, the purse 44 rising to 79 at the widest figure
+  `fmtBytes` can make, OBJECTS 103, and the rail 300 on its own. All of it is
+  528 against 304, so a merge is not a layout question, it is a question of
+  what leaves. What left is the rail's CONTROL SURFACE -- the two arrows, the
+  skip and the AUTO switch, into `#waveSheet` beside RECALL and OVERCLOCK --
+  plus the OBJECTS counter, which AUDIT already prints. The rail's own
+  docstring had said which half to move since it was written: "the nodes are a
+  readout and not a control... the three buttons are the control surface and
+  they are sized for the hand." What is left is 169 for five nodes, 30.6px
+  each against 33.3. `--rail-h` is 0 and `--rail-t` is the bar's own bottom;
+  both names are kept because `--under-rail` is derived from them and five
+  things read it.
+  Field across the four builds, 320x568: 167px (29.4%) at 291, 242 at 292,
+  325 at 294, **372 (65.5%)** at 295. `pillCap()` 1 -> 3.
+- **The bar's GROWING element must not be the flexible one.** `#barChips` was
+  `flex: 1 1 auto` when it was the only readout; with the rail sharing the row
+  that would let a climbing purse squeeze the nodes. The rail takes the slack
+  (`1 1 auto`) and the purse sizes to content (`0 1 auto`) -- it can still
+  shrink from the inside, which is what `tight`/`tighter` do, but it cannot
+  claim room the ladder needs.
+- **A control moved into a sheet is measured WITH THE SHEET OPEN.**
+  `getBoundingClientRect()` on a `display: none` subtree is all zeros, so the
+  rail's four seats read `0px hit=false` the moment they moved -- the same trap
+  the ASSAY door paid for in build 240, on a different element. And a
+  containment claim replaces a separation one: "sits clear of the bar above it"
+  became "rides IN the bar", with the overflow measured against the PURSE's own
+  left edge rather than a constant, because the purse is the thing that grows.
+- **A geometry case that compares two elements breaks silently when they become
+  the same element.** "A fight takes the slot back" asserted the boss bar's top
+  equals the rail's top; once the rail was the bar those are 28 and 76. Assert
+  against the derived LINE (`--under-rail`, read off a probe element) that the
+  thing is actually positioned from, not against a sibling that happens to
+  share it.
+- **A rule whose selector stops matching reads as a rule that holds.**
+  `body.sheetOpen #waveRail button { pointer-events: none }` was correct while
+  the arrows sat in a band outside the sheet, and after 295 it matches nothing
+  -- while its case asserted `none` and would have gone on asserting it. Worse,
+  the behaviour it described is now backwards: the arrows ARE the sheet's
+  controls and must stay live. Delete the rule and restate the claim; a dead
+  selector does not announce itself.
+- **`fitBar`'s signature owes every term a chip in the box.** It was keyed on
+  the purse string, the buys and the KILL COUNT -- and 295 moved the OBJECTS
+  chip out of `#barChips`, so that term forces a re-measure for a number no
+  longer in the group. Build 222 hit the same fault from the other side: three
+  terms, no caller for the kill count, re-run by accident through a sibling
+  that had been deleted. Check the terms against the box whenever a chip moves.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

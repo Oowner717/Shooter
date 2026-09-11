@@ -46,16 +46,19 @@
    * shorter AND `world.floorY` is derived from the same three numbers, so
    * the floor line drops with it.
    *
-   * The rail keeps its 44px row and gives up its SLACK. `--rail-h` is a
-   * reservation and the band is content-driven, so the two are separate
-   * numbers and only one of them was measured: 52 reserved over a band of 44,
-   * eight pixels of nothing. It is 48 now, and the gap above it 6 -> 3. The
-   * first cut of this took the row itself to 38 and that was wrong -- the
-   * suite has asserted a 44px seat on every rail control since the rail went
-   * in, and 4px of field is not worth a tap target.
+   * Build 292 took the rail's own band from 52 reserved over 44 measured down
+   * to 48, which was the slack; the ROW was not, and shaving it to 38 broke a
+   * tap target the suite has asserted since the rail went in.
+   *
+   * BUILD 295 REMOVED THE BAND. The rail's readout is in the top bar and its
+   * controls are in the wave sheet, so there is no second row: `--rail-t` is
+   * the top bar's own bottom -- its 8px inset plus 44 of row plus 4 of air --
+   * and `--rail-h` is zero. Both names are kept because `--under-rail` is
+   * derived from them and five things below read it; renaming would be churn
+   * in six files for no change of value.
    */
-  --rail-t: calc(var(--hud-t) + 55px);
-  --rail-h: 48px;
+  --rail-t: calc(var(--hud-t) + 56px);
+  --rail-h: 0px;
   --boss-h: 0px;
   --under-rail: calc(var(--rail-t) + var(--rail-h));
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -153,7 +156,11 @@ html, body {
  * least of the three -- instead of being pushed onto the menu button.
  */
 #barChips {
-  flex: 1 1 auto;
+  /* Content-sized from build 295: the RAIL is what grows to fill this row now,
+     and a purse taking the slack would squeeze the nodes as it climbed. It may
+     still shrink -- `tight`/`tighter` drop labels from the inside -- but it no
+     longer claims room the ladder needs. */
+  flex: 0 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -1418,6 +1425,9 @@ button.loadSlot:active .slotOff { color: var(--tone, var(--accent)); }
  */
 body.sheetOpen #abilities,
 body.sheetOpen #quickBar,
+/* The nodes only -- the rail is inside the top bar from build 295, so the
+   purse and the door beside them stay lit. It is a readout being dimmed while
+   the sheet that explains it is up, which is the same thing it always was. */
 body.sheetOpen #waveRail { pointer-events: none; opacity: 0.25; }
 body.sheetOpen #alerts { opacity: 0.25; transition: opacity 0.2s ease; }
 /* ...and the sheet itself is the one thing that still takes input. */
@@ -1793,7 +1803,12 @@ body.sheetOpen #abilities button,
    the scrim's geometry was stopping a real thumb. Same shape as the
    #quickBar note above it. */
 body.menuOpen #abilities button,
-body.sheetOpen #waveRail button,
+/* `body.sheetOpen #waveRail button` was here and came out in build 295. The
+   rail's arrows and switch ARE the sheet's controls now, so disabling them
+   while the sheet is up would disable the thing the sheet is for -- and the
+   readout that is left in the top bar has no buttons in it to disable. A rule
+   matching nothing does not announce itself; this one would have read as a
+   rule that holds. */
 body.aimOpen #quickBar .q_mines button,
 body.aimOpen #quickBar .q_ammo button,
 body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
@@ -2795,16 +2810,26 @@ body.aimOpen #quickBar .q_cfg button { pointer-events: none; }
  * and a rail is far too wide to be a passenger there -- so it takes its own
  * band, and #apertureBar, #bossBar and #alerts each start below it.
  */
+/*
+ * IN THE TOP BAR from build 295, and it takes whatever the purse and the door
+ * leave. Measured at 320 with the widest figure the formatter can produce:
+ * 304 available, MENU 46, the purse 79, two 5px gaps -- 169 for five nodes,
+ * 30.6px each against the 33.3 they had in a band of their own.
+ *
+ * What made that band 300px wide was the two arrows and the switch, and those
+ * are in the sheet this rail opens -- a tap anywhere on the standing rung is
+ * what opens it, so the control surface is one tap from the thing it moves.
+ * The nodes were always a readout; its own docstring has said so since the
+ * rail went in.
+ */
 #waveRail {
-  position: absolute;
-  top: var(--rail-t);
-  left: calc(var(--safe-l) + 10px);
-  right: calc(var(--safe-r) + 10px);
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: stretch;
   display: flex;
   align-items: stretch;
   gap: 4px;
-  /* The band is furniture; only the three controls in it take input. */
-  pointer-events: none;
+  pointer-events: auto;
 }
 #waveRail[hidden] { display: none; }
 
@@ -3023,6 +3048,35 @@ body.bossUp #waveRail { display: none; }
 .sheetMeter u i { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
 .sheetMeter b { font-size: 10px; color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; }
 .sheetMeter.hot u i { background: var(--warn); }
+/*
+ * The ladder's control surface, in the sheet from build 295.
+ *
+ * It is the same three buttons the rail band carried -- ids unchanged -- and
+ * they keep the 44px seat the suite has asserted since the rail went in. In
+ * here they can have it without costing the field a row: the sheet is opened
+ * from the standing rung and holds the world while it is up.
+ *
+ * The arrows are fixed and the switch takes the rest, because the switch is
+ * the one that carries a word ("AUTO PROGRESS ON" against "AUTO") and the
+ * arrows are glyphs that do not grow.
+ */
+#sheetLadder {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+#sheetLadder .railStep { flex: 0 0 auto; width: 44px; }
+#sheetLadder #railAuto { flex: 1 1 auto; min-width: 0; }
+/* The counter reads in here now rather than taking a third of the top bar,
+   and it is a full row of its own: nothing else in this sheet is a chip, so
+   it takes the sheet's own type instead of the bar's cramped one. */
+#waveSheet #counter {
+  width: 100%;
+  justify-content: space-between;
+  background: rgba(6, 12, 22, 0.6);
+}
+#waveSheet #counter em { display: inline; }
+
 .sheetActs { display: grid; gap: 6px; }
 .sheetAct {
   display: grid;

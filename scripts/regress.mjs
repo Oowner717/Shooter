@@ -4035,16 +4035,34 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     g.hud.syncRail(w);
     const bar = box('topbar');
     const rail = box('waveRail');
-    const clearsBar = rail.t >= bar.b;
+    // The rail is a child of the bar from build 295, so what is asserted is
+    // containment rather than separation.
+    const railInBar = rail.t >= bar.t - 1 && rail.b <= bar.b + 1;
 
     /* ---- and every control is reachable ---- */
     d.setTier(9); d.reach(6); // so the skip is on the bar to be measured
     g.hud.syncRail(w);
+    /*
+     * MEASURED WITH THE SHEET OPEN from build 295, because that is where the
+     * controls are. `getBoundingClientRect()` on a `display: none` subtree is
+     * all zeros, so read shut they report 0px and hit=false -- which is what
+     * this case did on the first run of 295 and is the same trap the ASSAY
+     * door paid for: the thing has to be measured in the state it is used in.
+     */
+    g.openSheet(true);
     const seats = { down: seat('railDown'), up: seat('railUp'),
       skip: seat('railSkip'), auto: seat('railAuto') };
-    // ...and the band still fits, with four controls on it now.
-    const overflow = Math.round(document.getElementById('railAuto').getBoundingClientRect().right)
-      > Math.round(document.getElementById('waveRail').getBoundingClientRect().right) + 1;
+    g.openSheet(false);
+    /*
+     * ...and the READOUT fits in the bar it now shares. The rail takes what
+     * the purse and the door leave, so what would actually be wrong is its
+     * nodes running under the purse -- measured against the purse's own left
+     * edge rather than against a constant, because the purse is the thing
+     * that grows.
+     */
+    const railBox = document.getElementById('waveRail').getBoundingClientRect();
+    const purseBox = document.getElementById('barChips').getBoundingClientRect();
+    const overflow = Math.round(railBox.right) > Math.round(purseBox.left) + 1;
 
     /* ---- the window is centred, and clamped at the floor ---- */
     d.setTier(9); d.setTier(7); d.hold = false; // been to 9, standing on 7
@@ -4205,22 +4223,40 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     quiet();
     const inFight = { rail: box('waveRail').h, alerts: box('alerts').t, cap: g.hud.pillCap(),
       boss: box('bossBar').t, cls: document.body.classList.contains('bossUp') };
+    // The line everything under the bar is derived from, read as a number.
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;top:var(--under-rail);height:0';
+    document.getElementById('ui').appendChild(probe);
+    const underRail = Math.round(probe.getBoundingClientRect().top);
+    probe.remove();
 
     w.director.update = ranD;
     g.restart();
     await new Promise((res) => setTimeout(res, 200));
     const afterFight = document.body.classList.contains('bossUp');
-    return { bar, rail, clearsBar, seats, overflow, shut, midUp, skipped, held, back, forced,
+    return { bar, rail, railInBar, seats, overflow, shut, midUp, skipped, held, back, forced,
       mid, floor, floorLocked, runningLabel,
       up, down, released, peakBefore, peakBack, peakOld, wrote, noOrder,
-      painted, beforeFight, inFight, afterFight, onTrial, lost, afterLost,
+      painted, beforeFight, inFight, underRail, afterFight, onTrial, lost, afterLost,
       vh: window.innerHeight };
   });
 
-  check('the rail sits clear of the bar above it and every control is thumb-sized',
-    r.clearsBar && r.rail.h > 0 && !r.overflow
+  /*
+   * Build 295 merged the two bands, so "sits clear of the bar above it" is a
+   * claim about a band that no longer exists. What is left of it, and what
+   * still matters:
+   *
+   *   the readout is INSIDE the bar, not under it, and does not run under the
+   *   purse it shares the row with;
+   *   and every one of its four controls is still a 44px seat a thumb can
+   *   land on -- which is the promise the band was kept 44 tall for, now kept
+   *   in the sheet where it costs the field nothing.
+   */
+  check('the rail rides IN the bar, and every control is still thumb-sized',
+    r.railInBar && r.rail.h > 0 && !r.overflow
     && Object.values(r.seats).every((s) => s.h >= 44 && s.mine),
-    `bar ends ${r.bar.b}, rail ${r.rail.t}..${r.rail.b}, overflows ${r.overflow}; `
+    `bar ${r.bar.t}..${r.bar.b}, rail ${r.rail.t}..${r.rail.b} inside it `
+    + `(${r.railInBar}), runs under the purse ${r.overflow}; `
     + Object.entries(r.seats).map(([k, s]) => `${k} ${s.h}px hit=${s.mine}`).join(' · '));
 
   check('the window centres on the run and stops at the floor',
@@ -4341,9 +4377,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * screen its only pill slot; one row and a reservation that is only made
    * during a fight keep it, in both states.
    */
-  check('a fight takes the slot back, and the column below keeps its room',
+  /*
+   * Against `--under-rail` rather than against the rail's own top, because
+   * build 295 put the rail INSIDE the top bar: hiding it during a fight frees
+   * the bar's width, not a band, and the boss bar has always sat at the
+   * derived line below the bar whether the rail is there or not. Comparing to
+   * `rail.t` was comparing to the bar's top once the two became the same
+   * element, which is 28 against the 76 the boss bar correctly uses.
+   */
+  check('a fight takes the rail out of the bar, and the column below keeps its room',
     r.beforeFight.rail > 0 && r.inFight.rail === 0 && r.inFight.cls
-    && r.inFight.boss === r.rail.t
+    && r.inFight.boss === r.underRail
     && r.beforeFight.cap >= 1 && r.inFight.cap >= 1 && !r.afterFight,
     `${r.vh}px tall · quiet: rail ${r.beforeFight.rail}px, alerts ${r.beforeFight.alerts}, `
     + `cap ${r.beforeFight.cap} | fight: rail ${r.inFight.rail}px, boss at ${r.inFight.boss}, `
@@ -11657,12 +11701,22 @@ if (!GUN_LINE) {
     return out;
   });
 
-  check('the sheet takes the strip, the abilities and the rail out of play',
+  /*
+   * ...and the RAIL's arrows are live, because from build 295 they are the
+   * sheet's own controls rather than play-screen furniture outside it. The
+   * old rule (`body.sheetOpen #waveRail button`) disabled them while the
+   * sheet was up, which was right when they sat in a band of their own and is
+   * exactly backwards now -- stepping a tier from the sheet that opens on the
+   * rung you are standing on is the whole point of moving them there. The
+   * rail's readout has no buttons left to disable.
+   */
+  check('the sheet takes the strip and the abilities out of play, and keeps its own',
     r.closed.strip === 'auto' && r.open.strip === 'none'
-    && r.open.abil === 'none' && r.open.rail === 'none' && r.open.sheet === 'auto'
+    && r.open.abil === 'none' && r.open.rail === 'auto' && r.open.sheet === 'auto'
     && r.open.box > 0,
     `strip pointer-events ${r.closed.strip} -> ${r.open.strip}, abilities ${r.open.abil}, `
-    + `rail ${r.open.rail}, the sheet itself ${r.open.sheet}; sheet ${r.open.box}px tall`);
+    + `the ladder's own arrows ${r.open.rail}, the sheet itself ${r.open.sheet}; `
+    + `sheet ${r.open.box}px tall`);
   check('...and it never outlives its opener',
     !r.afterRestart.open && !r.afterRestart.cls && !r.afterBoss,
     `after a restart ${r.afterRestart.open} (class ${r.afterRestart.cls}); `
@@ -27119,6 +27173,11 @@ if (MINE_LINE) {
  * comes off `--bar-h` and does not include that band, so all 121 of it sat on
  * playable ground. Measured after: 325 of 568 (57.2%) and 599 of 844 (71.0%).
  *
+ * BUILD 295 merged the two top bands. The rail's readout is in the top bar
+ * and its controls are in the wave sheet, so 91px of furniture (44 + 3 + 44)
+ * became 44. Measured after: 372 of 568 (65.5%) and 626 of 844 (74.2%) --
+ * against the 167 and 29.4% this case was first written about.
+ *
  * The floors below are set between each pair, so the case can fail in both
  * directions -- a floor under the previous build's figure would pass on the
  * build the change was written against, which is a floor that cannot see
@@ -27164,6 +27223,15 @@ if (MINE_LINE) {
         share: +(100 * (top - rail.bottom) / innerHeight).toFixed(1),
         rail: +rail.height.toFixed(1),
         railH,
+        barBottom: Math.round(document.querySelector('#topbar').getBoundingClientRect().bottom),
+        underRail: (() => {
+          const probe = document.createElement('div');
+          probe.style.cssText = 'position:absolute;top:var(--under-rail);height:0';
+          document.getElementById('ui').appendChild(probe);
+          const t = Math.round(probe.getBoundingClientRect().top);
+          probe.remove();
+          return t;
+        })(),
         cap: g.hud.pillCap(),
         alertsTop: +document.querySelector('#alerts').getBoundingClientRect().top.toFixed(1),
         hintTop: +g.hud.el.hint.getBoundingClientRect().top.toFixed(1),
@@ -27176,27 +27244,30 @@ if (MINE_LINE) {
   const small = rows[0];
   const big = rows[1];
   check('the field is most of the phone, and the furniture over and under it is not',
-    small.share >= 54 && big.share >= 68,
+    small.share >= 62 && big.share >= 73,
     rows.map((x) => `${x.w}x${x.vh}: ${x.field}px of field, ${x.share}% of the `
       + `screen`).join('; ') + ' (29.4% and 47.7% before build 292)');
 
   /*
-   * `--rail-h` is what `--under-rail` is derived from, so everything below the
-   * rail -- the aperture bar, the boss bar, the alerts column -- starts at
-   * `--rail-t + --rail-h` whatever the rail actually measures. The band is
-   * content-driven and the reservation is a constant, so the two are two
-   * numbers and only one of them had ever been measured: 52 reserved over a
-   * band of 44.
+   * `--rail-h` was a RESERVATION and the band was content-driven, so the two
+   * were two numbers and only one had ever been measured: 52 reserved over a
+   * band of 44 for as long as the rail existed. Build 292 took the slack (the
+   * ROW was not slack -- shaving it to 38 broke a 44px tap target) and build
+   * 295 removed the band outright: the readout is in the top bar and the
+   * controls are in the wave sheet.
    *
-   * The first cut of this took the ROW to 38 to save four more, and put it
-   * back: the case above this one has asserted a 44px seat on every rail
-   * control since the rail went in, and a tap target is worth more than four
-   * pixels. Air is what the rail had spare, not height.
+   * So the claim now is that the reservation is GONE rather than merely
+   * right -- `--rail-h` zero, and the derived line that everything below the
+   * bar hangs off landing at the bar's own bottom plus air. A non-zero
+   * reservation here would be a band nothing occupies, which is the 8px this
+   * pair of builds existed to find.
    */
-  check('...and the rail still fits inside the room reserved for it',
-    rows.every((x) => x.rail <= x.railH - 3 && x.rail >= 30),
-    rows.map((x) => `${x.w}: band ${x.rail}px inside a reservation of `
-      + `${x.railH}px, ${(x.railH - x.rail).toFixed(1)} of air`).join('; '));
+  check('...and there is no band under the bar for the rail any more',
+    rows.every((x) => x.railH === 0 && x.rail >= 30
+      && x.underRail >= x.barBottom && x.underRail <= x.barBottom + 8),
+    rows.map((x) => `${x.w}: reservation ${x.railH}px, the rail ${x.rail}px inside `
+      + `a bar ending at ${x.barBottom}, and everything under it starts at `
+      + `${x.underRail}`).join('; '));
 
   /*
    * `Hud.pillCap()` measures the gap between the alerts column and the

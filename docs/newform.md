@@ -4820,3 +4820,86 @@ door that is already about the ladder. **The 5-node rail stays**: it replaced a
 worse, and compressing it back would undo that.
 
 587 green.
+
+---
+
+## Build 295 — one top bar (play-screen pass, phase 2 of 2)
+
+The rail had its own band under the top bar: header 44, a 3px gap, rail 44 —
+**91px of furniture**, over a field that build 294 had just taken to 57% of a
+320-tall screen.
+
+### The measurement that forced the design
+
+At 320, 304 available, 5px gaps:
+
+| piece | width |
+|---|---|
+| MENU | 46 |
+| purse `×1.01 9.99 GB` | 44 → **79** worst case |
+| OBJECTS | 103 |
+| rail (2×32 arrows + 183 nodes + 41 switch + gaps) | **300** |
+
+All of it on one band is **528 against 304**. Something had to move, and the
+rail's own docstring had already said which: *"the nodes are a readout and not
+a control… the three buttons are the control surface and they are sized for
+the hand."* A 44px band cannot hold both. The sheet the rail already opens can
+hold the buttons at full size.
+
+So the **arrows, the skip and the AUTO switch** went into `#waveSheet` beside
+RECALL and OVERCLOCK, and the **OBJECTS counter** went with them — a lifetime
+stat AUDIT already prints, for a third of the bar. What is left fits with room:
+`304 − 46 − 79 − 10 = 169` for five nodes, **30.6px each against 33.3**, at the
+widest figure `fmtBytes` can produce. Five at every width, so the window is not
+width-dependent and the run's own rung cannot be clamped off the end of it.
+
+`#barChips` is `flex: 0 1 auto` now and the rail is `1 1 auto` — the ladder
+grows into the row, not the purse, or a climbing purse would squeeze the nodes.
+
+### Measured after
+
+| | 291 | 292 | 294 | 295 |
+|---|---|---|---|---|
+| field @320×568 | 167px, 29.4% | 242px, 42.6% | 325px, 57.2% | **372px, 65.5%** |
+| field @390×844 | 403px, 47.7% | 494px, 58.5% | 599px, 71.0% | **646px, 76.5%** |
+| top furniture | 130px | 119px | 119px | **72px** |
+| `pillCap()` @320 | 1 | 2 | 2 | **3** |
+
+A tier is now stepped with the field stopped, because the sheet holds the world
+while it is up. That is a change and it is the right way round: stepping a
+rung is a deliberate, rare act, and it is one tap from the readout.
+
+### Four guards broke, all the same shape
+
+Every one was a claim about a band that no longer exists — and none of them
+could be weakened, only restated:
+
+- **"the rail sits clear of the bar above it"** → *rides IN the bar*. The seats
+  read `0px hit=false` because `getBoundingClientRect()` on a `display: none`
+  subtree is all zeros and the controls are in a shut sheet. It opens the sheet
+  and measures them there — the same trap the ASSAY door paid for in build 240.
+  And `overflow` is measured against the **purse's own left edge** rather than a
+  constant, because the purse is the thing that grows.
+- **"a fight takes the slot back"** compared the boss bar's top to the rail's
+  own top. Those became the same element, so it compared 28 against the 76 the
+  boss bar correctly uses. It reads `--under-rail` off a probe element now,
+  which is the line the boss bar is actually positioned from.
+- **"the sheet takes… the rail out of play"** is now exactly backwards: the
+  arrows *are* the sheet's controls. The rule behind it
+  (`body.sheetOpen #waveRail button`) came out — a selector matching nothing
+  reads as a rule that holds.
+- **the 292 air arm** asserted the band fitted inside its reservation. The
+  claim is that the reservation is **gone**: `--rail-h` zero, and everything
+  below the bar starting at the bar's own bottom plus air. A non-zero
+  reservation there would be a band nothing occupies, which is the 8px builds
+  292 and 295 existed to find.
+
+### ...and one dead key, which CLAUDE.md had already named
+
+`fitBar`'s signature was keyed on the bytes string, the buys and **the kill
+count** — and the OBJECTS chip just left the box it measures. Build 222 hit the
+same fault from the other side: `fitBar` was keyed on three numbers and had no
+caller for the kill count, having been re-run by accident through a sibling
+that had been deleted. A signature term owes the box a chip.
+
+587 green.

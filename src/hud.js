@@ -1238,9 +1238,18 @@ export class Hud {
      * which is a clip with no property for a test to read back. The kills and
      * the badge are still bare integers and keep their digit counts.
      */
+    /*
+     * The kill count came OUT of this signature in build 295, because the
+     * OBJECTS chip left this group for the wave sheet and a term keyed on a
+     * number that is no longer in the box is a term that forces a re-measure
+     * for nothing. That is the same fault from the other side as build 222's:
+     * `fitBar` was keyed on three numbers and had NO caller for the kill
+     * count, having been re-run by accident through a sibling that had been
+     * deleted. A signature term owes the box a chip.
+     */
     const digits = (v) => String(Math.max(0, Math.floor(v || 0))).length;
     const sig = `${(this.bytesText || '').length}|${digits(this.lastBuys)}`
-      + `|${digits(this.lastKills)}|${window.innerWidth}`;
+      + `|${window.innerWidth}`;
     if (sig === this.barSig) return;
     this.barSig = sig;
     // Widest first: measuring with the labels back on is the only way to know

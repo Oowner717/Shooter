@@ -39,7 +39,7 @@
  * enforces it. sw.js derives its own from the registration URL.
  */
 (function () {
-  var BUILD = '294';
+  var BUILD = '295';
   var KEY = 'sim7749-build';
   try {
     if (localStorage.getItem(KEY) === BUILD) return;
@@ -92,15 +92,35 @@
         from build 285 and the label slot beside it is empty unless the depth
         dividend is live, so the chip is narrower than either of those.
       -->
+      <!--
+        ============ THE LADDER, IN THE BAR ============
+
+        Build 295. The rail had its own band under this one: header 44, a 3px
+        gap, rail 44 -- 91px of furniture over a field that was 57% of a
+        320-tall screen after build 294 took the strip to one row.
+
+        Measured before merging, at 320 (304 available, 5px gaps): MENU 46,
+        the purse 44 rising to 79 at 9.99 GB with a dividend, OBJECTS 103, and
+        the rail 300 on its own (two 32px arrows, 183 of nodes, a 41px switch
+        and three gaps). All of it on one band is 528 against 304.
+
+        What moved is the rail's CONTROL SURFACE, which is the reading its own
+        docstring has always given: "the nodes are a readout and not a
+        control... the three buttons are the control surface and they are
+        sized for the hand." A 44px band cannot hold both, and the sheet the
+        rail already opens can hold the buttons at full size. So the arrows,
+        the skip and the AUTO switch are in #waveSheet, beside RECALL and
+        OVERCLOCK, and the OBJECTS counter went with them -- a lifetime stat
+        that AUDIT already prints, and 103px is a third of this bar.
+
+        What is left fits with room: 304 - 46 - 79 - 10 = 169 for the nodes,
+        which is 30.6px each against 33.3 before, at the worst purse the
+        formatter can produce. Five at every width, so the window is not
+        width-dependent and the run's own rung cannot be clamped off the end
+        of it.
+      -->
+      <div id="waveRail"><div id="railNodes"></div></div>
       <div id="barChips">
-      <div id="counter" class="chip">
-        <!-- Every object this run has destroyed, and nothing else. The
-             per-wave figure that used to sit beside it went in build 222:
-             two numbers about different things on one chip, and the one
-             about the wave is on the rail and in AUDIT already. -->
-        <span id="killNum">0</span>
-        <em>OBJECTS</em>
-      </div>
       <!--
         The way into the tree. Bytes are what upgrades cost, so the number is
         the button: tapping what you have opens what it buys. It used to live
@@ -158,18 +178,20 @@
       </div>
       <div id="sheetRoster" class="sheetRow"></div>
       <div id="sheetMeters"></div>
-      <div class="sheetActs">
-        <button id="sheetRecall" class="sheetAct" type="button">
-          <b>RECALL</b><span>END IT AND TAKE WHAT IS CLEARED</span><i></i>
-        </button>
-        <button id="sheetOver" class="sheetAct" type="button">
-          <b>OVERCLOCK</b><span>THE NEXT ONE, TWICE AS FAST, PAID DOUBLE</span><i></i>
-        </button>
-      </div>
-    </section>
-    <div id="waveRail">
+      <!--
+        The ladder's control surface, moved here in build 295 from the band
+        that used to sit under the top bar. The rail in the bar is the readout
+        and this is what moves it: the arrows, the skip, and the switch that
+        decides whether anything has to be moved by hand at all.
+
+        One tap from the readout, because tapping the rung the run is standing
+        on is what opens this sheet -- and the sheet holds the world while it
+        is up, so a tier is now stepped with the field stopped rather than
+        mid-wave. Every control keeps its id, so nothing that looks one up by
+        name had to change.
+      -->
+      <div id="sheetLadder">
       <button id="railDown" class="railStep" aria-label="Step back a tier">&#8249;</button>
-      <div id="railNodes"></div>
       <button id="railUp" class="railStep" aria-label="Step up a tier">&#8250;</button>
       <!-- Straight to the highest rung the run has climbed. Present only when
            there is somewhere to skip to, so the rail is exactly as it was
@@ -183,7 +205,27 @@
       <button id="railAuto" aria-label="Automatic progression">
         <span class="rLong"></span><span class="rShort"></span>
       </button>
-    </div>
+      </div>
+      <!-- Every object this run has destroyed. It was a third of the top bar
+           (103px of 304) for a number that decides nothing and that AUDIT
+           prints already; it reads here, beside the wave it belongs to. -->
+      <div id="counter" class="chip">
+        <!-- Every object this run has destroyed, and nothing else. The
+             per-wave figure that used to sit beside it went in build 222:
+             two numbers about different things on one chip, and the one
+             about the wave is on the rail and in AUDIT already. -->
+        <span id="killNum">0</span>
+        <em>OBJECTS</em>
+      </div>
+      <div class="sheetActs">
+        <button id="sheetRecall" class="sheetAct" type="button">
+          <b>RECALL</b><span>END IT AND TAKE WHAT IS CLEARED</span><i></i>
+        </button>
+        <button id="sheetOver" class="sheetAct" type="button">
+          <b>OVERCLOCK</b><span>THE NEXT ONE, TWICE AS FAST, PAID DOUBLE</span><i></i>
+        </button>
+      </div>
+    </section>
 
     <!-- What is running on a clock right now. Empty and out of the layout
          unless something timed is up; see Hud.syncEffects(). -->
