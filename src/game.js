@@ -416,7 +416,6 @@ export class Game {
        * happened, not a number that quietly changed.
        */
       onTier: ({ verdict, moved, tier, from, reason, trial, margin = 0 }) => {
-        void from;
         self.hud.syncRail(self.world);
         /*
          * ---- the glitch, first, because it is the one that is not a score ----
@@ -442,6 +441,24 @@ export class Game {
           audio.glitchOn();
           shake(22);
           flash(0.34, '#ff2d55');
+          /*
+           * ...and the LADDER says it too, which it did not until build 296.
+           * Everything above is the event -- the screen, the sound, the field
+           * dissolving -- and the readout that actually changed went from one
+           * state to the next between two frames: measured, ninety frames
+           * through a discharge gave one distinct rail state, the same as
+           * ninety frames of nothing happening.
+           *
+           * `from` is what this needs and it was being discarded on the line
+           * above (`void from;`). `syncRail` has already repainted, so the
+           * rung that was lost cannot be read back off the DOM.
+           *
+           * Only on a real step. At rung 1 `moved` is 0 -- there is nothing
+           * below to land on and the wave resets instead -- and marking a
+           * rung as lost there would be the readout claiming something that
+           * did not happen.
+           */
+          if (moved < 0) self.hud.markStep(from, tier);
           self.hud.alert(moved < 0 ? `STEPPED BACK · ${reason} · TIER ${tier}`
             : `WAVE RESET · ${reason}`, 'breach', 5);
           return;

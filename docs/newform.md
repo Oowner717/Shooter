@@ -4903,3 +4903,105 @@ caller for the kill count, having been re-run by accident through a sibling
 that had been deleted. A signature term owes the box a chip.
 
 587 green.
+
+---
+
+## Build 296 — a step back is something you see on the ladder
+
+*"Review and improve the quick animation of the simulation (wave system)
+stepping back one."*
+
+### The review
+
+Everything about the glitch discharge was loud except the part that changed:
+
+| | |
+|---|---|
+| the screen | `shake(22)`, `flash(0.34, '#ff2d55')` |
+| the sound | `audio.glitchOn()` |
+| the words | a narrator line, and a 5s `STEPPED BACK · reason · TIER n` alert |
+| the field | dissolves over `CFG.waves.glitch.fizzle` = 0.9s |
+| **the ladder** | **nothing** |
+
+Measured before the change: **ninety frames sampled through a discharge gave
+ONE distinct rail state** — the same count as ninety frames of nothing
+happening at all. `#waveRail` carries no transition and no keyframe, while the
+tree has had `treeLanded` for a purchase since it was built. And `onTier` had
+the number it needed and threw it away: `void from;` on its first line.
+
+### Three marks, three channels
+
+A state that lives only in a hue is a state a colourblind player never
+receives, so the three are brightness, geometry and position:
+
+- **the rung lost** — pulsed in the warn register, lifted and shrunk 6%, and
+  landing on the *ahead* outline: dashed, unfilled, dim. That is what the rung
+  now is, so the animation is the handing over rather than a flourish over the
+  old paint.
+- **the rung landed** — a ring closing inward, in warn and resolving to the
+  accent. Deliberately quieter: arriving here is not an achievement, and `.at`
+  is already painted underneath by the time it runs.
+- **the band** — knocked one node's width and settling, which is the motion the
+  words describe. A `transform`, so it cannot push the purse it shares the top
+  bar with since build 295 — and the distance is **measured**, not guessed:
+  the nodes are `1fr` of whatever the purse leaves, so one node is ~30px at 320
+  and ~43 at 414, capped at 24.
+
+0.55s against a 0.9s field dissolve and a 5s alert. `prefers-reduced-motion`
+keeps the two rung changes (they are the information) and drops the travel.
+`markStep` clears all three classes on a 700ms timer so none can outlive its
+own animation, and retriggers them the way `refuse()` does — remove, force one
+reflow, add — so a second discharge inside the window replays.
+
+Only on `moved < 0`. At rung 1 there is nothing below to land on and the wave
+resets instead; marking a rung lost there would be the readout claiming
+something that did not happen.
+
+**Measured after: 19 distinct states over 720ms, settling to `transform: none`
+with no classes left.**
+
+### Two instrument faults, both mine, both worth writing down
+
+**`g.update(1/60)` does not advance CSS animation time.** The first
+measurement stepped ninety synthetic frames and read one state on a *working*
+build, because the browser's animation clock is wall time and the game's is
+not. That is the build-211 screenshot trap from the other side: there, real
+time aged an effect the probe meant to freeze; here, frozen time hid an
+animation the probe meant to watch.
+
+**And asserting animation NAMES would be build 210's ring case again** — a spy
+that records call names passed against four wrong implementations. So the case
+finds the animations by name and then **seeks** them (`anim.currentTime = t`),
+asserting the computed style at three points each. Deterministic, needs no
+clock, and fails if the keyframes stop saying anything.
+
+The control's order was wrong too: it armed a rung-1 discharge straight after
+the seeks and counted **three** marks, because the rung-9 classes were still on
+the DOM — `markStep` clears them on a timer and `syncRail` does not touch them.
+It was reading the leftovers and calling them the floor's. The 700ms is waited
+out first now, which is both the "nothing sticks" check and the clean slate the
+control needs.
+
+### ...and the run found a real flake in build 291's gate case
+
+It failed on this build reporting the **gated** field peaking at 51 against the
+loose run's 36 — backwards, on a build whose only change was a CSS animation.
+The case reduced 240 samples of the standing field to `Math.max` and compared
+one draw against one draw, which is the coin-toss shape CLAUDE.md already
+records for the DRIFT march case.
+
+Measured, three runs each:
+
+| | gated | loose | separates |
+|---|---|---|---|
+| max | 47, 24, 46 | 44, 40, 55 | **no** |
+| mean | 13.3, 11.2, 15.6 | 23.3, 21.4, 22.4 | yes |
+| median | 13, 12, 14 | 27, 23, 21 | yes |
+
+The population was already being collected and thrown away. It asserts the
+**mean** now, at a ceiling of 0.85 against a measured worst separation of 0.73
+— which still fails at 1.0, where equal means would put it if the gate stopped
+holding anything. The claim was always that the gate keeps the field thinner,
+never that it lowers its worst second.
+
+590 green.

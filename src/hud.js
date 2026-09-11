@@ -77,6 +77,8 @@ export class Hud {
       counter: $('counter'),
       rail: $('waveRail'),
       railNodes: $('railNodes'),
+      // The band itself, for the knock a step back gives it. See markStep.
+      waveRail: $('waveRail'),
       railAuto: $('railAuto'),
       alerts: $('alerts'),
       bytes: $('bytesNum'),
@@ -654,6 +656,76 @@ export class Hud {
   /** Are the slots showing? */
   ammoRowOpen() {
     return !!this.el.ammoRow && !this.el.ammoRow.hidden;
+  }
+
+  /**
+   * A STEP BACK, on the rail, for half a second.
+   *
+   * The glitch discharge is the only involuntary way down this game has, and
+   * it arrives with a shake, a red flash, a narrator line, an alert and a
+   * field that dissolves -- while the LADDER, which is the thing that
+   * actually changed, went from one state to the next between two frames with
+   * nothing marking it. Measured before this: ninety frames sampled through a
+   * discharge gave ONE distinct rail state, the same count as ninety frames
+   * of nothing happening at all. The window and the lit rung simply snapped.
+   *
+   * Three marks, and they are three because a state that lives only in a hue
+   * is a state a colourblind player never receives:
+   *
+   *   the RUNG LOST   the rung the run was standing on, pulsed in the warn
+   *                   register and handed back -- it is drawn as an outline
+   *                   again when the animation ends, which is what it now is.
+   *   the RUNG LANDED the one below it, taking the lit mark.
+   *   the BAND        knocked back one node's width and settling, which is
+   *                   the motion the words "stepped back" describe. A
+   *                   `transform`, so it cannot push the purse beside it.
+   *
+   * `from` is what makes this possible and it was being thrown away --
+   * `onTier` destructured it and immediately `void`ed it. `syncRail` has
+   * already repainted by the time the glitch branch runs, so the old rung
+   * cannot be read off the DOM; it has to come from the payload.
+   *
+   * Retriggered the way `refuse()` does it -- remove, force a reflow, add --
+   * because a second discharge inside the window would otherwise not replay,
+   * and cleared on a timer so a class cannot outlive its animation and sit on
+   * a rung for the rest of the run.
+   */
+  markStep(from, to) {
+    const rail = this.el.railNodes;
+    if (!rail || !this.railCells) return false;
+    const cellAt = (t) => this.railCells.find((c) => c.at === t) || null;
+    const lost = cellAt(from);
+    const landed = cellAt(to);
+    const band = this.el.waveRail || rail;
+    clearTimeout(this._stepT);
+    for (const el of [lost && lost.el, landed && landed.el, band]) {
+      if (!el) continue;
+      el.classList.remove('lostRung', 'landedRung', 'knocked');
+    }
+    /*
+     * The knock is ONE NODE'S WIDTH, measured rather than guessed: the nodes
+     * are `1fr` of whatever the purse and the door leave in the top bar, so
+     * the figure runs about 30px at 320 and 43 at 414. A constant would be
+     * right on one phone. Capped, because a wide screen does not want a
+     * bigger lurch than the thing is worth.
+     *
+     * Read BEFORE the reflow below, which is the one forced layout this
+     * method pays for.
+     */
+    const nodeW = landed ? landed.el.getBoundingClientRect().width
+      : (lost ? lost.el.getBoundingClientRect().width : 0);
+    band.style.setProperty('--rail-knock', `${Math.min(24, Math.round(nodeW)) || 14}px`);
+    // One reflow for the lot, not one each: the classes go on after it.
+    void rail.offsetWidth;
+    if (lost) lost.el.classList.add('lostRung');
+    if (landed) landed.el.classList.add('landedRung');
+    band.classList.add('knocked');
+    this._stepT = setTimeout(() => {
+      if (lost) lost.el.classList.remove('lostRung');
+      if (landed) landed.el.classList.remove('landedRung');
+      band.classList.remove('knocked');
+    }, 700);
+    return !!(lost || landed);
   }
 
   /**

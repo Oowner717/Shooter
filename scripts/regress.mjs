@@ -7930,7 +7930,22 @@ if (!GUN_LINE) {
           peak.push(w.enemies.filter((e) => !e.dead && !e.harmless && !e.fizzle).length);
         }
       }
-      return { max: Math.max(...peak), held: +(heldFrames / 60).toFixed(1),
+      /*
+       * THE MEAN, not the max. `peak` is 240 samples of the standing field,
+       * one a second, and the first version of this case reduced all of them
+       * to `Math.max` -- which is a comparison of two single random draws,
+       * the shape CLAUDE.md already records for the DRIFT march case. It
+       * failed on build 296 reporting the GATED field peaking at 51 against
+       * the loose run's 36, on a build whose change was a CSS animation.
+       *
+       * Measured over three runs each: max is gated [47, 24, 46] against
+       * loose [44, 40, 55] -- overlapping, so the arm was a coin toss. The
+       * mean is gated [13.3, 11.2, 15.6] against loose [23.3, 21.4, 22.4],
+       * which does not overlap and is what the claim was always about: the
+       * gate keeps the field THINNER, not its worst second lower.
+       */
+      const mean = +(peak.reduce((a, b) => a + b, 0) / peak.length).toFixed(1);
+      return { max: Math.max(...peak), mean, held: +(heldFrames / 60).toFixed(1),
         fired, gPeak: +gPeak.toFixed(2), tier: d.tier,
         auto: !!w.up.flinch && !!w.up.deadbolt };
     };
@@ -7969,12 +7984,20 @@ if (!GUN_LINE) {
     return out;
   });
 
+  /*
+   * The ceiling is a MULTIPLE of the worst separation measured, not the day's
+   * value: worst gated mean 15.6 against best loose 21.4 is 0.73, so 0.85
+   * has headroom and still fails on 1.0, which is what equal means would be
+   * if the gate stopped holding anything.
+   */
   check('a run that cannot clear the field is not sent another wave',
     r.drowning.auto && r.drowning.held > 10
-    && r.drowning.max < r.loose.max && r.loose.max >= 20,
+    && r.drowning.mean < r.loose.mean * 0.85 && r.loose.mean >= 12,
     `with FLINCH and DEADBOLT owned (${r.drowning.auto}) the release was held `
-    + `${r.drowning.held}s of 240 and the field peaked at ${r.drowning.max}, `
-    + `against ${r.loose.max} on the same run with the gate off`);
+    + `${r.drowning.held}s of 240 and the field averaged ${r.drowning.mean} `
+    + `standing against ${r.loose.mean} on the same run with the gate off `
+    + `(peaks ${r.drowning.max} and ${r.loose.max}, which overlap run to run `
+    + `and are why this is a mean)`);
 
   check('...and the fuse fills from the wait, so the run is stepped back rather than pinned',
     r.drowning.fired > r.loose.fired && r.drowning.tier < r.loose.tier
@@ -27409,6 +27432,185 @@ if (MINE_LINE) {
     `the middle group's centre is ${r.shut.midOff}px off the strip's shut and `
     + `${r.open.midOff}px open, against -49 at build 291 and -22 at 292; the two `
     + `edge bands measure ${r.shut.edges.join(' and ')}px`);
+}
+
+// --- a step back is something you SEE on the ladder -------------------------
+/*
+ * Build 296. The glitch discharge is the only involuntary way down this game
+ * has, and everything about it was loud except the part that changed: a shake,
+ * a red flash, a narrator line, a five-second alert and a field dissolving
+ * over 0.9s -- and the RAIL went from one state to the next between two
+ * frames.
+ *
+ * Measured before the change, ninety frames sampled through a discharge gave
+ * ONE distinct rail state, which is the same count as ninety frames of
+ * nothing happening at all. `onTier` even had the number it needed and threw
+ * it away: `void from;` on its first line.
+ *
+ * Three marks now, and three channels rather than three shades of one, because
+ * a state that lives only in a hue is a state a colourblind player never
+ * receives: the rung LOST is pulsed and handed back to the ahead-outline, the
+ * rung LANDED takes a ring closing inward, and the band is knocked one node's
+ * width and settles.
+ *
+ * ---- the instrument ----
+ *
+ * `g.update(1/60)` does NOT advance CSS animation time -- the first version of
+ * this measurement stepped ninety synthetic frames and read one state on a
+ * working build, because the browser's animation clock is wall time and the
+ * game's is not. That is the build-211 screenshot trap from the other side.
+ *
+ * And asserting the animation NAMES would be build 210's ring case all over
+ * again: a spy that records call names passed against four implementations
+ * including a ring that never closed. So the animations are SOUGHT by name to
+ * find them and then SEEKED -- `anim.currentTime = t` -- and what is asserted
+ * is the computed style at each point. That is deterministic, needs no clock,
+ * and fails if the keyframes stop saying anything.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const d = w.director;
+
+    const arm = (tier) => {
+      g.restart();
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugClearField();
+      // The bench family leaves both behind and `restart()` is not a reset of
+      // everything a case can leave; see CLAUDE.md.
+      delete w.director.update;
+      w.spawnLock = 0;
+      d.douse();
+      d.wave = null;          // `burn` refuses a teach wave on its first line
+      d.setTier(tier);
+      d.hold = false;
+      g.hud.syncRail(w);
+      /*
+       * The crowd term armed so the fuse HOLDS at 1. `burn` drains before it
+       * tests the boundary, so a fuse set to 1 with rate 0 reads 0.99928 on
+       * the next frame and never discharges -- measured, and the same trap
+       * build 293's discharge arm paid for.
+       */
+      d.lastThin = 0;
+      d.holdFor = 1;
+      d.glitch = 1;
+      const from = d.tier;
+      // Through `g.update`, because `Director.update` is only reached on the
+      // non-boss side of that if/else and `onTier` is what marks the rail.
+      g.update(1 / 60);
+      return { from, to: d.tier, verdict: d.lastVerdict };
+    };
+
+    const read = (el) => {
+      const cs = getComputedStyle(el);
+      return { border: cs.borderColor, style: cs.borderStyle, bg: cs.backgroundColor,
+        ink: cs.color, shadow: cs.boxShadow, tf: cs.transform };
+    };
+    const anims = () => {
+      const band = document.getElementById('waveRail');
+      const all = [...band.getAnimations(),
+        ...[...document.querySelectorAll('.railNode')].flatMap((e) => e.getAnimations())];
+      return all.map((a) => ({ name: a.animationName, a,
+        ms: Math.round(a.effect.getTiming().duration),
+        el: a.effect.target }));
+    };
+
+    // ---- a real step, from rung 9 -------------------------------------
+    const step = arm(9);
+    const live = anims();
+    const byName = (n) => live.find((x) => x.name === n) || null;
+    const lostA = byName('railLost');
+    const landedA = byName('railLanded');
+    const knockA = byName('railKnock');
+
+    const cellFor = (t) => (g.hud.railCells.find((c) => c.at === t) || {}).el || null;
+    const onRightNodes = !!lostA && !!landedA && !!knockA
+      && lostA.el === cellFor(step.from)
+      && landedA.el === cellFor(step.to)
+      && knockA.el === document.getElementById('waveRail');
+
+    /*
+     * Seeked rather than watched. Three points on each: the opening, the
+     * middle, and the end -- and what is asserted is that the rendered style
+     * MOVES between them and lands where the design says it lands.
+     */
+    const at = (entry, ms) => { entry.a.currentTime = ms; return read(entry.el); };
+    const lost = [at(lostA, 0), at(lostA, 190), at(lostA, lostA.ms)];
+    const landed = [at(landedA, 0), at(landedA, 300), at(landedA, landedA.ms)];
+    const knock = [at(knockA, 0), at(knockA, 240), at(knockA, knockA.ms)];
+
+    const distinct = (rows, key) => new Set(rows.map((x) => x[key])).size;
+    // The band travels: a non-zero translateX that ends at identity.
+    const tx = (s) => { const m = /matrix\(1, 0, 0, 1, (-?[\d.]+), 0\)/.exec(s || '');
+      return m ? Math.abs(Number(m[1])) : (s === 'none' ? 0 : NaN); };
+
+    /*
+     * ---- nothing outlives its own animation, FIRST ---------------------
+     *
+     * The order matters and the first version got it wrong: it armed the
+     * rung-1 control immediately after the seeks and counted THREE, because
+     * the rung-9 marks were still on the DOM -- `markStep` clears them on a
+     * 700ms timer and `syncRail` does not touch them. It read the leftovers
+     * and called them the floor's. So the timer is waited out here and the
+     * clean DOM is asserted, which is both the "nothing sticks" check and the
+     * clean slate the control below needs.
+     */
+    await new Promise((res) => setTimeout(res, 800));
+    const leftOver = anims().length;
+    const stuck = [...document.querySelectorAll('.lostRung, .landedRung, #waveRail.knocked')].length;
+
+    // ---- and the CONTROL: at rung 1 there is nothing to lose -----------
+    const floor = arm(1);
+    const floorAnims = anims().length;
+
+    g.restart();
+    return {
+      step, floor, floorAnims, leftOver, stuck, onRightNodes,
+      names: live.map((x) => `${x.name}@${x.ms}`).sort(),
+      lostMoves: distinct(lost, 'border') + distinct(lost, 'bg') - 1,
+      lostEndsDashed: lost[2].style === 'dashed',
+      landedMoves: distinct(landed, 'shadow'),
+      knockFrom: tx(knock[0].tf), knockMid: tx(knock[1].tf), knockEnd: tx(knock[2].tf),
+    };
+  });
+
+  check('a step back is MARKED on the ladder, on the two rungs it is about',
+    r.step.verdict === 'glitch' && r.step.to === r.step.from - 1
+    && r.onRightNodes
+    && JSON.stringify(r.names) === JSON.stringify(['railKnock@500', 'railLanded@550', 'railLost@550']),
+    `rung ${r.step.from} -> ${r.step.to} (${r.step.verdict}); ${r.names.join(', ')}, `
+    + `each on the element it is about (${r.onRightNodes})`);
+
+  /*
+   * ...and the marks DRAW something, which is the half a name check cannot
+   * reach. Seeked to three points each: the lost rung's border and fill both
+   * move and it ends on the dashed ahead-outline, because that is what the
+   * rung now IS; the landed rung's ring closes; and the band travels a real
+   * distance and returns to identity.
+   */
+  check('...and each mark actually moves, and lands where the design says',
+    r.lostMoves >= 3 && r.lostEndsDashed && r.landedMoves === 3
+    && r.knockFrom >= 8 && r.knockMid > 0 && r.knockMid < r.knockFrom
+    && r.knockEnd === 0,
+    `the lost rung changes on ${r.lostMoves} of its channels and ends dashed `
+    + `(${r.lostEndsDashed}); the landed ring takes ${r.landedMoves} distinct `
+    + `shadows; the band travels ${r.knockFrom}px -> ${r.knockMid} -> ${r.knockEnd}`);
+
+  /*
+   * The vacuity guard, and the reason it is a rung-1 discharge rather than a
+   * quiet window: at the floor `moved` is 0, the wave resets and there is no
+   * rung to hand back -- so marking one would be the readout claiming
+   * something that did not happen. A zero means nothing until the instrument
+   * has been shown to read a three, which the arms above do.
+   */
+  check('...and nothing sticks, and nothing is marked at the floor',
+    r.leftOver === 0 && r.stuck === 0
+    && r.floor.to === 1 && r.floorAnims === 0,
+    `800ms after a real step ${r.leftOver} animations and ${r.stuck} classes remain; `
+    + `a discharge from rung 1 then stays at ${r.floor.to} and marks `
+    + `${r.floorAnims} rungs`);
 }
 
 // --- report -----------------------------------------------------------------

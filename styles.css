@@ -2991,6 +2991,111 @@ body.bossUp #waveRail { display: none; }
   animation: laneBreathe 1.8s ease-in-out infinite;
 }
 @keyframes laneBreathe { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+/*
+ * ============ A STEP BACK, ON THE RAIL ============
+ *
+ * Build 296. The glitch discharge is the only involuntary way down this game
+ * has, and it arrived with a shake, a red flash, a narrator line, an alert and
+ * a dissolving field -- while the ladder, the thing that actually changed,
+ * snapped. Measured: ninety frames sampled through a discharge gave ONE
+ * distinct rail state, the same count as ninety frames of nothing happening.
+ *
+ * Three marks rather than one colour, because a state that lives only in a hue
+ * is a state a colourblind player never receives. The rung LOST pulses and
+ * hands itself back; the rung LANDED takes the lit mark; and the band is
+ * knocked and settles, which is the motion the words describe. Each is a
+ * different channel: brightness, geometry, position.
+ *
+ * ~0.55s, against a 0.9s field dissolve and a 5s alert: quick enough to be
+ * part of the same event rather than a thing that outlives it. `markStep`
+ * clears the classes at 700ms so none can outlive its own animation.
+ */
+
+/*
+ * The rung handed back. It ends on the AHEAD look -- an outline with nothing
+ * in it, dashed like every other "not yours" in this interface -- because
+ * that is what the rung now is, and the animation is the handing over rather
+ * than a flourish laid on top of the old paint.
+ */
+.railNode.lostRung {
+  animation: railLost 0.55s ease-out both;
+}
+@keyframes railLost {
+  0% {
+    border-color: color-mix(in srgb, var(--warn) 85%, transparent);
+    background: color-mix(in srgb, var(--warn) 26%, rgba(6, 12, 22, 0.8));
+    color: var(--warn);
+    box-shadow: 0 0 14px -2px color-mix(in srgb, var(--warn) 60%, transparent);
+    transform: translateY(0) scale(1);
+  }
+  35% {
+    border-color: color-mix(in srgb, var(--warn) 70%, transparent);
+    background: color-mix(in srgb, var(--warn) 14%, rgba(6, 12, 22, 0.8));
+    color: var(--warn);
+    /* Lifted and shrinking: the rung is being taken off, not merely recoloured. */
+    transform: translateY(-2px) scale(0.94);
+  }
+  100% {
+    border-color: var(--line);
+    border-style: dashed;
+    background: rgba(6, 12, 22, 0.4);
+    color: color-mix(in srgb, var(--dim) 55%, transparent);
+    box-shadow: 0 0 0 0 transparent;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/*
+ * ...and the one it fell onto. Deliberately quieter than the rung it lost:
+ * arriving here is not an achievement, and `.at`'s own accent is already
+ * painted underneath by the time this runs. What this adds is the ARRIVAL --
+ * a ring closing inward -- so the eye is taken from the rung above to this
+ * one rather than being left to notice a different cell is lit.
+ */
+.railNode.landedRung {
+  animation: railLanded 0.55s ease-out both;
+}
+@keyframes railLanded {
+  0% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--warn) 34%, transparent);
+    border-color: color-mix(in srgb, var(--warn) 70%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--warn) 18%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 18%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 72%, transparent);
+  }
+}
+
+/*
+ * The band, knocked back and settling. A `transform`, so nothing in the top
+ * bar moves: the rail shares that row with the purse and the door from build
+ * 295, and a change that reflowed the row would shove both of them.
+ *
+ * One node's width is the honest distance -- that is what a rung IS here --
+ * and `--rail-knock` is set from it rather than guessed, because the node
+ * width is `1fr` of whatever the purse leaves and runs 30 to 43px.
+ */
+#waveRail.knocked {
+  animation: railKnock 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+@keyframes railKnock {
+  0% { transform: translateX(var(--rail-knock, 14px)); }
+  100% { transform: translateX(0); }
+}
+
+/*
+ * Reduced motion keeps the STATEMENT and drops the travel. The two rungs still
+ * change -- that is the information -- and the band does not slide.
+ */
+@media (prefers-reduced-motion: reduce) {
+  #waveRail.knocked { animation: none; }
+  .railNode.lostRung { animation-duration: 0.01s; }
+  .railNode.landedRung { animation-duration: 0.01s; }
+}
 @media (prefers-reduced-motion: reduce) {
   .railNode.offering .rTraits { animation: none; opacity: 0.9; }
 }

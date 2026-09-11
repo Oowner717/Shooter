@@ -2491,4 +2491,57 @@ came from before believing the other one covers it.
   longer in the group. Build 222 hit the same fault from the other side: three
   terms, no caller for the kill count, re-run by accident through a sibling
   that had been deleted. Check the terms against the box whenever a chip moves.
+- **`g.update(1/60)` DOES NOT ADVANCE CSS ANIMATION TIME.** The browser's
+  animation clock is wall time and the game's is a synthetic `dt`, so a probe
+  that steps ninety frames and samples computed styles reads ONE state on a
+  working build. Build 296's first measurement did exactly that. It is the
+  build-211 screenshot trap from the other side: there real time aged a canvas
+  effect the probe meant to freeze, here frozen time hid a CSS animation the
+  probe meant to watch. For a DOM animation the instruments are
+  `getAnimations()` and `anim.currentTime = t` -- SEEK it and read the computed
+  style at each point, which is deterministic and needs no clock at all.
+- **...and asserting the animation NAME is build 210's spy test again.** A
+  name check proves a class was added, not that anything is drawn differently
+  -- the ring case counted arcs and passed against four wrong implementations.
+  Find the animation by name, then seek it and assert the RENDERED style moves
+  between points and lands where the design says. Build 296 asserts the lost
+  rung ends `border-style: dashed` on the ahead-outline and the band's
+  translateX returns to identity, both read off `getComputedStyle`.
+- **A class cleared on a TIMER is still on the DOM when the next arm runs.**
+  Build 296's floor control armed a rung-1 discharge straight after the real
+  step's seeks and counted THREE marks -- the rung-9 classes, which
+  `markStep` clears at 700ms and which `syncRail` does not touch. It was
+  reading the leftovers and calling them the floor's. Wait the timer out
+  first; that wait is both the "nothing sticks" assertion and the clean slate
+  the control needs, so the order is free.
+- **THE GLITCH DISCHARGE IS THE ONE INVOLUNTARY WAY DOWN, and until build 296
+  the ladder said nothing about it.** Shake, red flash, `audio.glitchOn()`, a
+  narrator line, a 5s alert and a 0.9s field dissolve -- and the rail went from
+  one state to the next between two frames, measured at one distinct state over
+  ninety frames. `onTier` even had the rung it came from and discarded it
+  (`void from;`); `syncRail` has already repainted by the time the glitch
+  branch runs, so the old rung cannot be read back off the DOM and has to come
+  from the payload. `Hud.markStep(from, to)` marks the rung lost, the rung
+  landed and the band, in three channels rather than three shades of one.
+  Only on `moved < 0`: at rung 1 the wave resets and there is no rung to hand
+  back, so marking one would be the readout claiming something that did not
+  happen.
+- **A `transform` is the only safe way to move something that shares a flex
+  row.** The rail's knock is `translateX`, because from build 295 it sits in
+  the top bar beside the purse and the door and anything that reflowed the row
+  would shove both. And the distance is MEASURED: the nodes are `1fr` of what
+  the purse leaves, so one node is about 30px at 320 and 43 at 414 -- a
+  constant would be right on one phone.
+- **A MAX over one run against a MAX over one run is a coin toss, even when
+  the probe already holds the whole population.** Build 291's release-gate case
+  reduced 240 one-a-second samples of the standing field to `Math.max` and
+  failed on build 296 -- whose only change was a CSS animation -- reporting the
+  GATED field peaking at 51 against the loose run's 36. Measured three runs
+  each: max is gated [47, 24, 46] against loose [44, 40, 55] and overlaps,
+  while the MEAN is gated [13.3, 11.2, 15.6] against loose [23.3, 21.4, 22.4]
+  and does not. The claim was always that the gate keeps the field THINNER,
+  never that it lowers its worst second. Ceiling set at 0.85 against a measured
+  worst separation of 0.73, which still fails at the 1.0 equal means would
+  give. When a case reduces a sample to one number, ask whether the claim is
+  about that number.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
