@@ -18659,11 +18659,30 @@ if (MINE_LINE) {
       for (let i = 0; i < (n.levels || 1); i++) whole += n.cost + (n.step || 0) * i;
     }
 
+    /*
+     * The hidden prerequisite: every TURRET level is required by `rigDone()`,
+     * which gates NEW FORM, which gates CORE. Read off the tree rather than
+     * off the table, and PRICED, because the claim is about affordability.
+     */
+    const { UNDER, levelsOf } = await import('../src/tree.js');
+    const rig = (UNDER.turret || []).map((id) => {
+      const n = NODES.find((x) => x.id === id);
+      let c = 0;
+      for (let i = 0; i < levelsOf(n); i++) c += n.cost + (n.step || 0) * i;
+      return { id, band: bandOf(id), cost: c };
+    });
+    const rigCost = rig.reduce((a, x) => a + x.cost, 0);
+    const rigPast = rig.filter((x) => x.band > bandOf('core')).map((x) => `${x.id} b${x.band}`);
+    const coreN = NODES.find((x) => x.id === 'core');
+    let coreCost = 0;
+    for (let i = 0; i < levelsOf(coreN); i++) coreCost += coreN.cost + (coreN.step || 0) * i;
+
     return { want: want.length, silent, refused, good, scratch, offCurve,
       used, bands: Object.keys(used).length, spread: +spread.toFixed(0),
       moved, withParent, whole,
+      rig, rigCost, rigPast, coreBand: bandOf('core'), coreCost,
       missing: b.missing, extra: b.extra, range: b.range, parentBad: b.parentBad,
-      rising: b.rising };
+      gateBad: b.gateBad, rising: b.rising };
   });
 
   check('every node priced in bytes says which band it is priced for',
@@ -18697,6 +18716,33 @@ if (MINE_LINE) {
    * rather than a parent's band copied down the tree. Floors rather than
    * figures, so tuning one node does not turn this red.
    */
+  /*
+   * ...and the one prerequisite that is NOT a tree edge, which is the bug
+   * build 303 shipped with a green suite.
+   *
+   * `rigDone()` requires every level of every node under the `turret` root,
+   * `recast` gates on `rigDone()` and `core` gates on owning `recast` -- so
+   * the whole machine has to be bought before CORE, and a machine node priced
+   * in a LATER band than CORE is a node bought before something cheaper than
+   * it. 303 had `insulation` at band 7 and `pile` at 6 against a CORE at 5,
+   * which put the branch at 27.88 MB against the 15.20 MB a run has banked by
+   * rung 28 on the plan's own income model -- and `parentBad` passed 66 of 66,
+   * because the turret nodes hang off a root with no band and the chain runs
+   * through two `needs` predicates rather than through `children`.
+   *
+   * The band arm is the rule; the COST arm is what the rule is for, and it is
+   * asserted against CORE's OWN price rather than against a figure, so tuning
+   * either band moves both sides together.
+   */
+  check('...and nothing the machine needs is priced past what the machine unlocks',
+    r.rigPast.length === 0 && r.gateBad.length === 0 && r.rig.length === 8
+    && r.rigCost < r.coreCost * 2,
+    `the eight TURRET nodes cost ${(r.rigCost / 1e6).toFixed(2)} MB across bands `
+    + `${r.rig.map((x) => x.band).join('/')} against CORE at band ${r.coreBand} `
+    + `(${(r.coreCost / 1e6).toFixed(2)} MB), which rigDone() -> NEW FORM -> CORE `
+    + `makes a prerequisite of`
+    + `${r.rigPast.length ? `; PRICED PAST IT: ${r.rigPast.join(' ')}` : ''}`);
+
   check('...and the bands say something a flat price could not',
     r.bands >= 5 && r.spread >= 100 && r.moved >= 8 && r.parentBad.length === 0,
     `${r.bands} of 7 bands used across ${Object.entries(r.used)

@@ -198,8 +198,23 @@ export const UNDER = {
  * Grouped the way `UNDER` is grouped, so the two tables read side by side.
  */
 const BAND = {
+  /*
+   * ---- the machine, and NONE of it may be priced past CORE's band ----
+   *
+   * `rigDone()` requires EVERY LEVEL of every node under this root; `recast`
+   * (NEW FORM) needs `rigDone()`; and `core` needs `recast`. So the whole of
+   * this group is a transitive prerequisite of the damage line's second half,
+   * and it is the one gate in the game that is not a tree edge -- `bands()`'s
+   * parent rule passed 66 of 66 on the build that got this wrong.
+   *
+   * Build 303 shipped `pile` at 6 and `insulation` at 7, which put the branch
+   * at 27.88 MB against the 15.20 MB a run has banked by rung 28 on the plan's
+   * own income model -- 218% with CORE counted, so NEW FORM and CORE were both
+   * behind a price the run could not meet at the rung the plan offers them at.
+   * Both are 4 now and the branch is 3.40 MB. `bands()` holds the rule.
+   */
   // ---- the machine ----
-  rate: 1, slew: 2, aimrange: 2, driftaim: 4, pile: 6, casing: 2, insulation: 7,
+  rate: 1, slew: 2, aimrange: 2, driftaim: 4, pile: 4, casing: 2, insulation: 4,
   intake: 1,
   // ---- the rack, whole ----
   hollowpoint: 3, core: 5, tracer: 1, ricochet: 1, heavy: 2, salvo: 1,
@@ -727,7 +742,33 @@ export function bands() {
     }
   }
   const rising = BAND_PRICE.slice(2).every((v, i) => v > BAND_PRICE[i + 1]);
-  return { want: want.length, missing, extra, range, parentBad, rising, BAND, BAND_PRICE, BAND_STEP };
+  /*
+   * ...and the one prerequisite that is NOT a tree edge.
+   *
+   * `rigDone()` in game.js requires every level of every node under the
+   * `turret` root. `recast` gates on `rigDone()`, and `core` gates on owning
+   * `recast` -- so the whole machine is a transitive prerequisite of CORE, and
+   * a machine node priced LATER than CORE is a node that has to be bought
+   * before a thing that is cheaper than it. `parentBad` cannot see this: the
+   * turret nodes' parent is the root, which has no band, and the chain runs
+   * through two `needs` predicates rather than through `children`.
+   *
+   * Build 303 shipped `insulation` at band 7 and `pile` at band 6 against a
+   * CORE at band 5 and had a green suite, because nothing asked. Derived from
+   * `UNDER.turret` and from `core`'s band rather than written out, so a ninth
+   * turret socket is covered by existing.
+   */
+  const gateBad = [];
+  const coreBand = BAND.core;
+  for (const id of UNDER.turret || []) {
+    if (BAND[id] === undefined || coreBand === undefined) continue;
+    if (BAND[id] > coreBand) {
+      gateBad.push(`${id} (band ${BAND[id]}) is required by rigDone() -> NEW FORM `
+        + `-> CORE (band ${coreBand})`);
+    }
+  }
+  return { want: want.length, missing, extra, range, parentBad, gateBad, rising,
+    BAND, BAND_PRICE, BAND_STEP };
 }
 
 export function coverage() {

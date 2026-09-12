@@ -2985,4 +2985,58 @@ came from before believing the other one covers it.
   the number inflated by the same factor. What wants watching is that the early
   rungs did get materially stronger, because what was one 500 kB node is now a
   dozen at 9 to 23 kB.
+- **A PREREQUISITE THAT IS NOT A TREE EDGE IS A PREREQUISITE NO STRUCTURAL
+  GUARD CAN SEE, and build 303 shipped one with a green suite.** `rigDone()`
+  requires every LEVEL of every node under the `turret` root; `recast` (NEW
+  FORM) gates on `rigDone()`; `core` gates on owning `recast`. So the whole
+  machine is a transitive prerequisite of the damage line's second half -- and
+  303 priced `insulation` at band 7 (19.20 MB) and `pile` at band 6 (7.68 MB),
+  putting the branch at **27.88 MB against the 15.20 MB a run has banked by
+  rung 28** on the plan's own income model, 218% with CORE counted. NEW FORM
+  and CORE were both behind a price the run could not meet at the rung the plan
+  offers them at. `bands()`'s parent rule passed **66 of 66**, because the
+  turret nodes hang off a root with no band and the chain runs through two
+  `needs` predicates rather than through `children`. Both are band 4 now, the
+  branch is 3.40 MB, and `bands().gateBad` holds the rule -- derived from
+  `UNDER.turret` and CORE's own band rather than written out, so a ninth turret
+  socket is covered by existing. **Fixing it also fixed the overshoot**: the
+  tree is 113.1 MB against the plan's 116, where 303 was 137.6.
+- **Anything gated on a PREDICATE rather than on a parent owes the price table
+  the same question.** There is exactly one such chain in the game today and it
+  cost a build to find. The tell is a `needs` that calls a function which
+  iterates `NODES` -- `rigDone()` is the only one -- and the rule it implies is
+  that everything the function counts must be priced no later than the thing
+  the gate opens. Grep `needs:` for a call rather than a field before pricing
+  anything.
+- **A fan-out converging on a finding is not the same as the fan-out having
+  measured it.** All five review lenses named `pile` at band 6 and FOUR OF FIVE
+  missed that `insulation` at band 7 was the larger half of the identical fault
+  -- 19.20 MB against 7.68. The convergence was right and the arithmetic
+  incomplete, and the full extent came from computing the branch cost here
+  rather than reading it off the findings. Treat a unanimous verdict as a
+  pointer to the right file, not as the measurement.
+- **...and they were reviewing a table that never shipped.** The lenses were
+  handed the workflow's adjudicated merge (99.7 MB, band 7 at 6 nodes/8 levels
+  against the plan's 9/13) while what shipped was the three-way MAJORITY
+  (137.6 MB, and by one lens's own reckoning a level-count deviation of 7
+  against the adjudicated table's 21). So their band-7-is-empty and
+  tree-is-too-cheap findings were about the wrong artefact, and only the
+  `rigDone()` one carried over -- more severely, because they had costed
+  `insulation` at the band their own adjudication had already moved it to.
+  **If a review is run against a candidate, say which candidate shipped.**
+- **The additive curve spreads ONE node across bands, which is the answer to
+  "one price cannot hold a three-band spread".** HOLLOWPOINT at band 3 is
+  82 kB at level 1 -- affordable inside band 1 -- and 492 kB at level 8, which
+  is a band-5 purchase. That is the mechanism the plan means when it says a
+  flat price cannot express when a thing is for, and it is why a node whose
+  levels the plan names in two different bands can still take one band: the
+  ladder does the rest. The corroborating figure is the plan's own sizing note,
+  that ORDINAL at rung 7 is met "against a turret that has bought perhaps nine
+  levels" -- which an 8-level band-1 HOLLOWPOINT (223 kB of band 1's 441 kB
+  income) breaks outright by handing the whole x6.35 line over before the first
+  boss.
+- Two pacing findings recorded and deliberately NOT acted on, because a
+  judgement does not belong in a bug fix: `compound` is the dearest node in the
+  tree at 19.2 MB for a three-level dial on TITHE, and TITHE's subtree is about
+  31 MB -- a third of the tree -- behind one optional arm.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

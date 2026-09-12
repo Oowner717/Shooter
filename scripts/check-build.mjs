@@ -113,7 +113,7 @@ console.log(`tree places all ${cov.want} buyable things exactly once`);
 const treeMod = await import(new URL('../src/tree.js', import.meta.url));
 const bnd = treeMod.bands();
 if (bnd.missing.length || bnd.extra.length || bnd.range.length
-  || bnd.parentBad.length || !bnd.rising) {
+  || bnd.parentBad.length || bnd.gateBad.length || !bnd.rising) {
   if (bnd.missing.length) {
     console.error(`${bnd.missing.length} node(s) declare no band: ${bnd.missing.join(' ')}.`
       + ' Write the band out -- there is no default, deliberately; see BAND in tree.js');
@@ -123,6 +123,10 @@ if (bnd.missing.length || bnd.extra.length || bnd.range.length
   if (bnd.parentBad.length) {
     console.error('a leaf priced for an earlier band than its parent cannot be '
       + `bought when it is priced for: ${bnd.parentBad.join('; ')}`);
+  }
+  if (bnd.gateBad.length) {
+    console.error('a node the machine cannot be finished without, priced past the '
+      + `thing it unlocks: ${bnd.gateBad.join('; ')}`);
   }
   if (!bnd.rising) console.error('BAND_PRICE is not strictly increasing');
   process.exit(1);
