@@ -165,9 +165,10 @@
   <header class="mast">
     <div class="eyebrow">Simulation 7749 &nbsp;·&nbsp; rebalance &nbsp;·&nbsp; plan only, nothing built</div>
     <h1>Seven Bands of Seven <span class="thin">a rebalance to level 49</span></h1>
-    <p class="standfirst">A boss every seventh level, seven bands, and a hard stop at 49. Enemy
-      pressure arrives as more bodies rather than tougher ones, the stream never stops, and the
-      turret is meant to be winning almost all of the time.</p>
+    <p class="standfirst">Seven bands of seven levels, a boss closing each one, and a hard stop
+      at 49. Enemy pressure arrives as more bodies rather than tougher ones, the stream never
+      stops, and the turret is meant to be winning almost all of the time. AXIOM and TESSERA are
+      not in it; they are the two the ladder is built to accept later.</p>
   </header>
 
   <div class="sections">
@@ -215,22 +216,49 @@
           upgrade price, which objects appear — is authored per band rather than per level. Bands
           are the unit because bosses are, and because a seven-level block is the smallest thing a
           player can feel the shape of.</p>
-        <p><strong>The boss slot table is data, not code.</strong> One list maps level to anomaly:
-          <code>7 → ordinal, 14 → gnomon, 21 → fractal, 28 → amplitude, 35 → dynamo, 42 → parity,
-          49 → terminus</code>. A slot with no anomaly in it plays a <strong>DRIFT SURGE</strong>
-          instead: a full level of nothing but grey, worth real salvage, no threat, and a visible
-          banner saying the aperture is dark. That is what makes adding the eighth and ninth bosses
-          a one-line change, and it is also the honest answer for any slot whose boss is pulled or
-          unfinished.</p>
+        <p><strong>A boss level is a rung the ladder is HELD on, not a wave that is replaced.</strong>
+          That is what <code>climbTo</code> already does and it is better than what this plan first
+          described. It walks a rung at a time and tests the gate <em>on the rung it is standing
+          on</em>, so arriving at 7 lights ORDINAL's aperture and the ladder stops there until the
+          anomaly is reconciled — while the ordinary band-1 stream keeps flowing at rung 7 the
+          whole time. The aperture is a door you choose to walk through, and being held in front of
+          it is farming time rather than a stop. Three things fall out of that walk, all of them
+          checked rather than assumed:</p>
+        <ul style="max-width:64ch;padding-left:1.15em;display:flex;flex-direction:column;gap:9px">
+          <li><strong>A surge cannot skip a boss.</strong> A clean wave climbs one rung and a surge
+            climbs two, so a surge at rung 6 asks for 8 — and the walk stops at 7 because 7 is the
+            rung with the gate on it. No guard needs writing; the walk is the guard.</li>
+          <li><strong>A step-back cannot re-fight one.</strong> A glitch discharge from rung 8 lands
+            on 7, whose gate is answered, so <code>heldBy</code> returns nothing and the aperture
+            does not relight. The rung-7 wave plays again and that is all.</li>
+          <li><strong>The gates table is the whole mechanism.</strong>
+            <code>CFG.waves.tier.gates</code> becomes <code>[7, 14, 21, 28, 35, 42, 49]</code>, and
+            <code>gateAt</code> returns the index into <code>ANOMALIES</code> — so a seven-entry
+            table leaves the eighth and ninth anomalies with no door and nothing else has to
+            change.</li>
+        </ul>
+        <p><strong>And the DRIFT SURGE is the filler for a rung with no anomaly behind it.</strong>
+          <code>heldBy</code> returns 0 for a rung that is not in the gates table, so the ladder
+          simply walks past — which would make a slot that is waiting for its boss indistinguishable
+          from an ordinary level. A rung marked as a slot but holding no anomaly plays a level of
+          nothing but grey instead: real salvage, no threat, and a banner saying the aperture is
+          dark. Nothing in this plan uses it, because all seven slots are filled. It exists so that
+          appending <code>56</code> and <code>63</code> to that table is the entire cost of the
+          eighth and ninth bosses, and so that a boss pulled for any reason leaves a playable
+          level behind rather than a hole.</p>
       </div>
-      <div class="note">
-        <b>One decision this plan cannot make for you</b>
-        <p>There are <strong>nine</strong> anomalies built and only seven slots at or below 49.
-          AXIOM and TESSERA have nowhere to go. The default here is that they take slots 56 and 63,
-          dark until the ceiling moves — and that they are reachable in the meantime through the
-          aperture as optional trials, which <code>Director.arm</code> already supports. The
-          alternative is bands of six, which fits eight bosses by 48 and still leaves one over.
-          Seven is what you asked for, so seven is what this is built on.</p>
+      <div class="note ok">
+        <b>AXIOM and TESSERA are deferred, and that is cheap</b>
+        <p>Seven slots, seven anomalies, and the eighth and ninth left out on purpose. Four things
+          were checked so that leaving them out costs nothing and putting them in later costs one
+          line. The gates table is truncated to seven, so no aperture ever lights for them and no
+          run can reach them. The save restore loop is bounded by the anomaly roster rather than by
+          the gates table, so an aperture stored for either one by an older file is inert rather
+          than a way in. RECAST's requirement drops from seven reconciled to four, and the menu row
+          that prints it reads <code>4 of 4</code> off the same number. And their glossary entries
+          stay exactly where they are, unlit — the two that have not been cut yet, which is both
+          honest and an advertisement. Adding them is <code>gates.push(56, 63)</code> and a ceiling
+          move.</p>
       </div>
     </section>
 
@@ -257,6 +285,16 @@
           kill, and the purse climbs with the stream rather than with the clock.</p>
       </div>
       <div class="scroll" id="flow"></div>
+      <div class="prose">
+        <p><strong>The standing column is an estimate and the release interval is the only thing
+          actually authored.</strong> How many bodies stand on the field at once is emergent: it is
+          the arrival rate times how long a body lives, and how long a body lives depends on the
+          margin, on which round is loaded and on whether the assist is pointed the right way.
+          Nothing in this plan can predict it, which is why phase 3 measures it and why
+          <code>CFG.maxEnemies</code> at 57 is a guard rather than a target. Drift is capped
+          separately (<code>maxDrift</code>, <code>driftCap</code> 26) and is not counted by
+          <code>hostileCount</code>, so the mortar cannot crowd out the stream.</p>
+      </div>
     </section>
 
     <section>
@@ -280,6 +318,51 @@
     </section>
 
     <section>
+      <h2>Inside a band</h2>
+      <div class="prose">
+        <p>Six ordinary levels and then the rung the boss holds. The six share one roster and one
+          release rate and differ only in how much they spend of it: the band's <em>wave budget</em>
+          in threat points, walked from 0.72× to 1.28× across the six, so a band opens gently and
+          ends on its own heaviest set-piece. <code>perBand</code> stops meaning "two rungs" and
+          starts meaning "seven".</p>
+      </div>
+      <div class="scroll" id="within"></div>
+      <div class="prose">
+        <p><strong>Threat is the one number a new body needs.</strong> Roughly its health over
+          thirty plus what its mechanism is worth: a MOTE is 1, a LURCHER 4, a BLOOM 7, a TOW 10,
+          a SCION 12, a BULWARK 20, and anything harmless is 0 — DRIFT included, which is why the
+          mortar can flow without touching the budget. Of the twenty new objects the extremes are
+          SHOAL at 0.5 and ANVIL at 34. A wave is filled from its band's roster until the budget is
+          met, so length follows strength by construction and nobody authors a body count again.</p>
+        <p><strong>Band 1 is the teach band.</strong> The eight authored teach beats compress into
+          levels 1 to 4, two beats a level, and they keep their exemptions: no tier multiplier, no
+          traits, their own gaps, and the release arc stays off them because they are authored
+          beats and the arc fights them. Levels 5 and 6 are ordinary band-1 waves at budget, and
+          rung 7 is where ORDINAL's aperture lights — against a turret that has bought perhaps
+          nine levels, which is why that fight is the smallest in the table by a factor of five.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>What opens, and when</h2>
+      <div class="prose">
+        <p>Nine rounds and eight abilities are all priced the same today and all available at once,
+          which means the arsenal has no relationship to the run. Under the band pricing each one
+          becomes affordable in the band whose problem it answers.</p>
+      </div>
+      <div class="scroll" id="opens"></div>
+      <div class="prose">
+        <p>The automation column is the important one. <strong>It completes at band 5 and the
+          stream becomes unplayable by hand at band 6</strong>, in that order and deliberately: by
+          the time a body arrives every quarter second the machine has to be the thing aiming, and
+          a player who bought the ladder in order will not notice the handover because it already
+          happened. Nine of the tree's 107 levels are automation and they should be the nine most
+          wanted. Nothing is taken away — a thumb still out-aims the assist against CHAFF, which is
+          why CHAFF is in band 4 and not band 6.</p>
+      </div>
+    </section>
+
+    <section>
       <h2>Where the twenty objects arrive</h2>
       <div class="prose">
         <p>The twenty in the <a href="https://claude.ai/code/artifact/ee768159-b0e1-4fb4-9a2a-a8eb6e4b3c2e">object
@@ -296,6 +379,29 @@
           is the first object that costs you something for ignoring it, which is what teaches that
           the field has a clock. <strong>ANVIL</strong> (band 7) is the one body that refuses every
           impulse in the game, which is what makes the last band about damage.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Three of the seven happen on the new field</h2>
+      <div class="prose">
+        <p>RECAST moving to level 28 moves era 2 with it, so DYNAMO, PARITY and TERMINUS are fought
+          on the wider field with the wall and the yard on it. That is reachable today — gates at
+          48 and 54 sit above <code>eraGate</code> 42 — but it has almost certainly never been
+          played, and <code>wallLine</code>'s own docstring calls the boss-versus-wall case a guard
+          against a version of the game that is not true yet. Under this plan it is true three
+          times out of seven, so it needs a case: every boss standoff is 340–380 unscaled and four
+          cores place above the wall line, and the wall is suspended for the whole fight by
+          <code>!world.boss</code>. That suspension is the thing to assert.</p>
+        <p><strong>And the era-2 field is deeper without being faster.</strong>
+          <code>entryDepth</code> and <code>entrySpeed</code> both scale, so the hidden march takes
+          the same 100 units of time at either era — the suite asserts that. A body's own
+          <code>speed</code> does not scale, and the loose field is <span class="num">1.54</span>×
+          deeper: 962 world units from the entry line to the machine at era 1, 1,481 at era 2. So
+          anything that survives the crossing lives half again as long, and at an unchanged release
+          rate the standing crowd rises with it. <strong>Author the crowd, derive the rate</strong>
+          — a release interval that holds forty bodies on the era-1 field holds sixty on the era-2
+          one, and sixty is past <code>CFG.maxEnemies</code>.</p>
       </div>
     </section>
 
@@ -415,6 +521,29 @@
     </section>
 
     <section>
+      <h2>The number that goes up</h2>
+      <div class="prose">
+        <p>An idle-shaped run needs a figure the player can watch climb, and this game already has
+          four. None of them needs building; what they need is to be the right four.</p>
+        <ul>
+          <li><strong>The purse</strong>, in the top bar, formatted by <code>fmtBytes</code> and
+            rolling on every spend. Under this plan it crosses from bytes to kilobytes in band 1,
+            to megabytes in band 4 and reaches nine figures by 49 — four unit changes across a run,
+            each one a small event. <code>Hud.fitBar</code> is keyed on digit counts and already
+            handles the widest figure the formatter can make.</li>
+          <li><strong>The rung</strong>, on the rail, 1 to 49. Rung 49 wants drawing as a
+            <em>closed end</em> rather than as a rung with nothing after it, so the ceiling is
+            legible long before it is reached.</li>
+          <li><strong>AUDIT</strong>, which already prints cleared and earned and is the only place
+            a lifetime figure lives inside a run.</li>
+          <li><strong>The ASSAY's odometer</strong>, which is device-level and takes thirteen hours
+            of a fully bought turret to fill. It is the one number that survives a reset, and under
+            a plan that ends at 49 it is the thing a finished player still moves.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
       <h2>The ceiling at 49</h2>
       <div class="prose">
         <p>Level 49 is the end. The ladder refuses to climb past it, the verdict still lands and
@@ -491,15 +620,17 @@
         <ul>
           <li><strong>AXIOM and TESSERA.</strong> Above the ceiling by default. See the note under
             the spine.</li>
-          <li><strong>Trait pressure.</strong> <code>traitFrom</code> 10 and
-            <code>traitPair</code> 25 put ARMORED, SWARM, MENDING, TETHERED and EBB on bodies from
-            rung 10 and pairs from 25. Under the new scaling those rungs are mid-band-2 and
-            mid-band-4; they probably want to be band boundaries, but traits interact with the
-            twenty new objects in ways worth measuring before deciding.</li>
-          <li><strong>Era 2's field.</strong> RECAST moves from level 42 to 28, which means the
-            wider field, the wall and the yard arrive fourteen rungs earlier than they do now. The
-            wall changes what the assist can reach and the field is 1.22× deeper; band 5's flow
-            numbers here assume the era-1 field and will need re-measuring on the era-2 one.</li>
+          <li><strong>Whether traits want their own band step.</strong> The proposal is
+            <code>traitFrom</code> 10 → 15 and <code>traitPair</code> 25 → 29, which puts single
+            traits at the start of band 3 and pairs at the start of band 5 — the first band with
+            something to shoot and the first band with the new turret. What is unmeasured is how
+            SWARM's half-health interacts with a stream carried by quantity: it may be the single
+            cheapest way to add bodies, or it may double the count of the thing the frame budget
+            is already worried about.</li>
+          <li><strong>Which of the 38 authored waves survive as set-pieces.</strong> This plan
+            fills waves from a budget; the hand-authored ones become templates for the teach band
+            and for named beats. Which ones earn that is a taste call nobody should make before the
+            filler exists.</li>
           <li><strong>Wave templates versus the budget.</strong> This plan fills waves from a
             strength budget. The 38 authored waves become templates for the teach band and for
             named set-pieces; which of them survive as set-pieces is a taste call nobody should
@@ -515,7 +646,7 @@
   <footer>
     <span>Simulation 7749</span>
     <span>Drafted against build 298</span>
-    <span>49 levels · 7 bands · 7 bosses · 20 new objects</span>
+    <span>49 levels · 7 bands · 7 bosses · 2 deferred · 20 new objects</span>
     <span>Nothing here is implemented</span>
   </footer>
 </div>
@@ -531,18 +662,25 @@
   var BOUNTY_STEP = 1.045;      // was 1.075
   var BANDS = [
     { b: 1, from: 1,  to: 7,  secs: 50,  flow: 0.9, worth: 1400,  dps: 120,  boss: 'ORDINAL',   fight: 70,  price: 9000,    nodes: 9,  levels: 15,
+      threat: 1.0, rounds: 'BOLT', abilities: 'PULSE', auto: 'AUTO AIM · AUTO FIRE',
       objects: ['SHOAL', 'EMBER', 'FILAMENT'], teaches: 'the stream exists, and not everything in it is coming for you' },
     { b: 2, from: 8,  to: 14, secs: 70,  flow: 1.4, worth: 2000,  dps: 210,  boss: 'GNOMON',    fight: 80,  price: 27000,   nodes: 11, levels: 18,
+      threat: 2.2, rounds: 'SCATTER', abilities: 'HAIL', auto: 'ARRAY · SLEW I',
       objects: ['HUSK', 'SHRIKE', 'BELL'], teaches: 'things arrive from unexpected directions, and some are worth chasing' },
     { b: 3, from: 15, to: 21, secs: 95,  flow: 2.0, worth: 2900,  dps: 340,  boss: 'FRACTAL',   fight: 95,  price: 82000,   nodes: 10, levels: 17,
+      threat: 3.5, rounds: 'HE · RIME', abilities: 'LANCE · STASIS · WARD', auto: 'DEEP ARRAY · FLINCH',
       objects: ['SPINDLE', 'FLINT', 'LATCH'], teaches: 'where and when you shoot starts to matter; FLINCH becomes affordable' },
     { b: 4, from: 22, to: 28, secs: 120, flow: 2.7, worth: 4200,  dps: 540,  boss: 'AMPLITUDE', fight: 110, price: 250000,  nodes: 10, levels: 16,
+      threat: 5.0, rounds: 'ARC · SPINE', abilities: 'DECOY', auto: 'OPEN SIEVE · DEADBOLT · STANDING ORDER I',
       objects: ['QUARRY', 'CHAFF', 'LANTERN'], teaches: 'the assist can be fooled and the field has a clock. RECAST is offered at 28' },
     { b: 5, from: 29, to: 35, secs: 110, flow: 3.4, worth: 6600,  dps: 1450, boss: 'DYNAMO',    fight: 105, price: 700000,  nodes: 9,  levels: 14,
+      threat: 6.0, rounds: 'TITHE · SLUG', abilities: 'WELL · PRISM', auto: 'STANDING ORDER II · SLEW II–III',
       objects: ['YOKE', 'REMNANT', 'GYRE'], teaches: 'the new turret, against three objects built to show it off' },
     { b: 6, from: 36, to: 42, secs: 150, flow: 4.2, worth: 10800, dps: 2300, boss: 'PARITY',    fight: 130, price: 1600000, nodes: 9,  levels: 14,
+      threat: 7.5, rounds: 'SPORE', abilities: '—', auto: 'complete',
       objects: ['VEIL', 'LOOM', 'MIRE'], teaches: 'the field itself is contested: cover, occlusion, denied ground' },
     { b: 7, from: 43, to: 49, secs: 190, flow: 5.0, worth: 18000, dps: 3500, boss: 'TERMINUS',  fight: 165, price: 4000000, nodes: 9,  levels: 13,
+      threat: 9.0, rounds: '—', abilities: '—', auto: 'complete',
       objects: ['ANVIL', 'KITE'], teaches: 'nothing left but the gun, and one body that refuses every button' }
   ];
 
@@ -586,6 +724,7 @@
     var per = Math.ceil(x.levels / x.nodes);
     for (var k = 0; k < x.levels; k++) x.spend += x.price * (1 + (k % per) * 0.6);
     x.bossHp = Math.round(x.dps * x.fight * 0.62 / 100) * 100;
+    x.budget = Math.round(x.bodies * x.threat / 5) * 5;
   });
   var cumE = 0, cumS = 0;
   BANDS.forEach(function (x) { cumE += x.earns; cumS += x.spend; x.cumE = cumE; x.cumS = cumS; });
@@ -615,12 +754,27 @@
     }));
 
   table('flow', 'the stream, per band',
-    ['Band', 'A body every', 'On the field', 'Bodies a wave', 'Health ×', 'Arriving', 'Turret', 'Margin'],
+    ['Band', 'A body every', 'On the field, est.', 'Bodies a wave', 'Mean threat', 'Wave budget', 'Health ×', 'Arriving', 'Turret, target', 'Margin'],
     BANDS.map(function (x) {
       return { cls: x.b === 5 ? 'band5' : '',
         cells: ['Band ' + x.b, (1 / x.flow).toFixed(2) + 's', '~' + Math.round(x.flow * 8), x.bodies,
-          '×' + x.hp.toFixed(2), Math.round(x.incoming) + ' hp/s', x.dps + ' dps',
-          '×' + (x.dps / x.incoming).toFixed(1)] };
+          x.threat.toFixed(1), x.budget, '×' + x.hp.toFixed(2), Math.round(x.incoming) + ' hp/s',
+          x.dps + ' dps', '×' + (x.dps / x.incoming).toFixed(1)] };
+    }));
+
+  var CURVE = [0.72, 0.82, 0.92, 1.0, 1.12, 1.28];
+  table('within', 'the six levels of a band, in threat points, then the rung the boss holds',
+    ['Band'].concat(CURVE.map(function (k, i) { return 'lv ' + (i + 1) + ' · ×' + k.toFixed(2); })),
+    BANDS.map(function (x) {
+      return { cls: x.b === 5 ? 'band5' : '',
+        cells: ['Band ' + x.b].concat(CURVE.map(function (k) { return Math.round(x.budget * k / 5) * 5; })) };
+    }));
+
+  table('opens', 'the arsenal, by the band that needs it',
+    ['Band', 'Levels', 'Rounds', 'Abilities', 'Automation'],
+    BANDS.map(function (x) {
+      return { cls: x.b === 5 ? 'band5' : '', classes: [null, null, 'k', null, null],
+        cells: ['Band ' + x.b, x.from + '–' + x.to, x.rounds, x.abilities, x.auto] };
     }));
 
   table('objects', 'the twenty, placed',
