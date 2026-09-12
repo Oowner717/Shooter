@@ -1,0 +1,919 @@
+<title>Seven Bands of Seven</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* ---------------------------------------------------------------------
+   * SIMULATION 7749 -- the rebalance to level 49. Same one-theme document
+   * system as the object guide: the game's own near-black ground and its
+   * own palette, painted explicitly so the page holds on either host
+   * ground. The charts use three of the game's hues with direct labels and
+   * distinct stroke patterns, so identity never rests on colour alone.
+   * ------------------------------------------------------------------- */
+  :root {
+    color-scheme: dark;
+    --ground: #070b12;
+    --inset: #04070c;
+    --rule: #19242f;
+    --rule-soft: #111a24;
+    --ink: #cbd9e8;
+    --dim: #8497ab;
+    --faint: #5a6b7d;
+    --accent: #59e0ff;
+    --warm: #ff5d8f;
+    --gold: #ffd166;
+    --good: #7cffb2;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --serif: Spectral, Georgia, "Times New Roman", serif;
+  }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 72px; }
+  p, ul, ol { margin: 0; }
+  .prose { max-width: 64ch; display: flex; flex-direction: column; gap: 14px; }
+  .prose ul, .prose ol { padding-left: 1.15em; display: flex; flex-direction: column; gap: 9px; }
+  li::marker { color: var(--faint); }
+  strong { font-weight: 600; color: #e6f0fa; }
+  em { font-style: italic; color: #dce8f4; }
+  code, .num {
+    font-family: var(--mono); font-size: 0.86em;
+    font-variant-numeric: tabular-nums; color: var(--accent);
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--faint);
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 600;
+    font-size: clamp(30px, 6.4vw, 46px); line-height: 1.08;
+    letter-spacing: -0.015em; margin: 0; text-wrap: balance;
+  }
+  h1 .thin { font-weight: 300; font-style: italic; color: var(--dim); }
+  .standfirst { font-size: 19px; color: var(--dim); max-width: 58ch; }
+  h2 {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); margin: 0;
+  }
+  h3 { font-family: var(--serif); font-weight: 600; font-size: 22px; line-height: 1.22; margin: 0; text-wrap: balance; }
+  .mast { display: flex; flex-direction: column; gap: 10px; }
+  section { display: flex; flex-direction: column; gap: 18px; }
+  .sections { display: flex; flex-direction: column; gap: 56px; margin-top: 52px; }
+
+  /* ---- the four numbers ---- */
+  .four { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); background: var(--rule-soft); border: 1px solid var(--rule); }
+  .four > div { background: var(--inset); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 5px; }
+  .four b {
+    font-family: var(--mono); font-size: 26px; font-weight: 600;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--warm);
+  }
+  .four span {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--faint);
+  }
+  .four p { font-size: 14.5px; color: var(--dim); line-height: 1.45; }
+
+  /* ---- charts ---- */
+  figure { margin: 0; border: 1px solid var(--rule); background: var(--inset); display: flex; flex-direction: column; }
+  figure canvas { display: block; width: 100%; height: auto; }
+  figcaption {
+    border-top: 1px solid var(--rule-soft); padding: 9px 14px 11px;
+    font-size: 14px; color: var(--dim); line-height: 1.45;
+  }
+  figcaption b {
+    font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--faint); margin-right: 8px;
+  }
+
+  /* ---- tables ---- */
+  .scroll { overflow-x: auto; border: 1px solid var(--rule); }
+  table { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12px; }
+  caption {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--faint); text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--rule);
+  }
+  th, td { text-align: right; padding: 7px 12px; border-bottom: 1px solid var(--rule-soft); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th {
+    font-weight: 600; font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--faint); border-bottom: 1px solid var(--rule);
+  }
+  td { color: var(--dim); font-variant-numeric: tabular-nums; }
+  td.k { color: var(--ink); font-weight: 500; letter-spacing: 0.06em; }
+  td.boss { color: var(--warm); }
+  td.wide { text-align: left; white-space: normal; min-width: 24ch; font-family: var(--serif); font-size: 14px; line-height: 1.45; }
+  tr.band5 td { background: rgba(89, 224, 255, 0.045); }
+
+  /* ---- steps ---- */
+  .steps { display: flex; flex-direction: column; }
+  .step { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 18px; padding-block: 17px; border-top: 1px solid var(--rule-soft); }
+  .step .n { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--faint); padding-top: 4px; }
+  .step .b { display: flex; flex-direction: column; gap: 8px; max-width: 66ch; }
+  .step h4 { font-family: var(--serif); font-weight: 600; font-size: 18px; margin: 0; }
+  .step p { font-size: 15.5px; color: var(--dim); }
+
+  .note { border-left: 2px solid var(--warm); padding-left: 16px; display: flex; flex-direction: column; gap: 10px; max-width: 64ch; }
+  .note.ok { border-left-color: var(--good); }
+  .note b {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--warm);
+  }
+  .note.ok b { color: var(--good); }
+  .note p { font-size: 15.5px; color: var(--dim); }
+
+  /* ---- the error screen mock ---- */
+  .mock {
+    border: 1px solid var(--rule); background: var(--inset); padding: 26px 22px;
+    display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center;
+  }
+  .mock .tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--warm); border: 1px solid var(--warm); padding: 4px 9px;
+  }
+  .mock h5 {
+    font-family: var(--mono); font-size: clamp(15px, 4vw, 20px); font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase; margin: 0; color: var(--ink);
+  }
+  .mock p { font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--dim); max-width: 46ch; }
+  .mock .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .mock .row span {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    border: 1px solid var(--rule); color: var(--dim); padding: 7px 13px;
+  }
+
+  footer {
+    margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--rule);
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--faint);
+    display: flex; flex-wrap: wrap; gap: 6px 22px;
+  }
+  a { color: var(--accent); }
+  @media (max-width: 700px) {
+    body { font-size: 16px; }
+    .standfirst { font-size: 17px; }
+    .step { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <div class="eyebrow">Simulation 7749 &nbsp;·&nbsp; rebalance &nbsp;·&nbsp; plan only, nothing built</div>
+    <h1>Seven Bands of Seven <span class="thin">a rebalance to level 49</span></h1>
+    <p class="standfirst">A boss every seventh level, seven bands, and a hard stop at 49. Enemy
+      pressure arrives as more bodies rather than tougher ones, the stream never stops, and the
+      turret is meant to be winning almost all of the time.</p>
+  </header>
+
+  <div class="sections">
+    <section>
+      <h2>What is wrong, measured</h2>
+      <div class="four" id="four"></div>
+      <div class="prose">
+        <p>Those four numbers are the whole brief. The ladder asks the turret to cover a
+          two-hundred-fold increase in what arrives while selling it a four-fold increase in what
+          it can do; it runs out of authored waves at rung nine and pads the remaining forty rungs
+          with health; and because every node in the tree costs the same, there is no order to buy
+          them in and no such thing as an early upgrade or a late one.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>The sawtooth</h2>
+      <figure>
+        <canvas id="saw" aria-label="Chart: incoming health per second steps up at each boss level while turret damage climbs continuously, crossing above it inside every band"></canvas>
+        <figcaption><b>Read</b>Incoming strength is a staircase that steps only at boss levels.
+          Turret damage is a ramp that climbs whenever anything is bought. The turret is never
+          behind — that is the brief — but the <em>margin</em> is: it narrows to about ×1.5 on the
+          level a boss steps the stair up, and widens to ×5 or ×6 by the end of the band. RECAST
+          at level 28 is the biggest single step the player ever takes, which is what makes levels
+          29 to 34 the overpowered window. The gold line is what the tree buys today: flat by rung
+          20, and then nothing for twenty-nine rungs.</figcaption>
+      </figure>
+      <div class="prose">
+        <p><strong>This is the shape everything else serves.</strong> Difficulty is not a curve
+          the player chases; it is seven steps that a rising ramp swallows seven times. The feeling
+          asked for — constant progress, numbers going up, minimal difficulty — is what that looks
+          like from the inside: you are always winning, and the only question is by how much. The
+          margin is never allowed below about ×1.4, because a player who is losing has to grind,
+          and never above about ×7, because a player who cannot lose stops buying. Both ends of
+          that range are assertions rather than hopes; see <em>what proves it</em>.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>The spine: seven bands, seven levels each</h2>
+      <div class="scroll" id="spine"></div>
+      <div class="prose">
+        <p>Every seventh level is a boss and nothing else is. A band is the six ordinary levels
+          plus the boss that closes it, and every quantity in this plan — flow, health, salvage,
+          upgrade price, which objects appear — is authored per band rather than per level. Bands
+          are the unit because bosses are, and because a seven-level block is the smallest thing a
+          player can feel the shape of.</p>
+        <p><strong>The boss slot table is data, not code.</strong> One list maps level to anomaly:
+          <code>7 → ordinal, 14 → gnomon, 21 → fractal, 28 → amplitude, 35 → dynamo, 42 → parity,
+          49 → terminus</code>. A slot with no anomaly in it plays a <strong>DRIFT SURGE</strong>
+          instead: a full level of nothing but grey, worth real salvage, no threat, and a visible
+          banner saying the aperture is dark. That is what makes adding the eighth and ninth bosses
+          a one-line change, and it is also the honest answer for any slot whose boss is pulled or
+          unfinished.</p>
+      </div>
+      <div class="note">
+        <b>One decision this plan cannot make for you</b>
+        <p>There are <strong>nine</strong> anomalies built and only seven slots at or below 49.
+          AXIOM and TESSERA have nowhere to go. The default here is that they take slots 56 and 63,
+          dark until the ceiling moves — and that they are reachable in the meantime through the
+          aperture as optional trials, which <code>Director.arm</code> already supports. The
+          alternative is bands of six, which fits eight bosses by 48 and still leaves one over.
+          Seven is what you asked for, so seven is what this is built on.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Quantity, not health</h2>
+      <figure>
+        <canvas id="qty" aria-label="Chart: proposed body count per wave rises twenty-one fold while per-body health rises under four fold, against today's fifty-fold health inflation"></canvas>
+        <figcaption><b>Read</b>Everything is expressed as a multiple of level 1. Today's health
+          curve is the dashed line: fifty times by level 49, with the population multiplier capped
+          at four from rung 31 onward, so the last eighteen rungs are pure health. The plan
+          inverts it — bodies per wave carry the pressure and per-body health barely moves.</figcaption>
+      </figure>
+      <div class="prose">
+        <p><strong>Quantity has a hard ceiling and throughput does not.</strong>
+          <code>CFG.maxEnemies</code> is 57 and a phone has a frame budget, so "more enemies"
+          cannot mean more on the screen at once past about forty. It means <em>more arriving per
+          second</em>: the field holds a roughly constant crowd while the stream through it gets
+          faster and the wave gets longer. Band 1 releases a body every <span class="num">1.11</span>s
+          and puts about seven on the field; band 7 releases one every <span class="num">0.20</span>s
+          and holds about forty. The wave goes from forty-five bodies to nine hundred and fifty.</p>
+        <p>Health does move, just gently: <code>hpStep</code> <span class="num">1.085</span> →
+          <span class="num">1.028</span> a level, which is ×3.8 by level 49 instead of ×50. Salvage
+          per body rises faster than health does, so a body is always worth more than it costs to
+          kill, and the purse climbs with the stream rather than with the clock.</p>
+      </div>
+      <div class="scroll" id="flow"></div>
+    </section>
+
+    <section>
+      <h2>The wave engine, rebuilt</h2>
+      <div class="prose">
+        <p>The present engine authors 38 waves by hand, runs out of them at rung 9, and separates
+          every wave from the next with a <span class="num">2.6</span>–<span class="num">4.2</span>s
+          rest. Four changes make it a stream instead.</p>
+      </div>
+      <div class="steps" id="engine"></div>
+      <div class="note ok">
+        <b>What does not change</b>
+        <p>The verdict rules stay exactly as they are: a wave is judged on <em>its own</em> bodies,
+          surge climbs two rungs, clean climbs one, stall holds, and the glitch discharge is still
+          the only involuntary way down. Build 291's release gate stays too — a wave still waits
+          for the field to be as thin as the last one was required to leave it — because without it
+          the faster stream compounds leftovers, which is the bug that gate exists for. What
+          changes is that the <em>gate is rarely the thing that is waiting</em>, because the turret
+          is meant to be ahead.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Where the twenty objects arrive</h2>
+      <div class="prose">
+        <p>The twenty in the <a href="https://claude.ai/code/artifact/ee768159-b0e1-4fb4-9a2a-a8eb6e4b3c2e">object
+          guide</a>, placed by what they teach rather than by what they weigh. Two or three a band,
+          each one arriving in the band whose flow makes its gait legible: SHOAL needs a stream
+          thick enough for a school to read as a school, and ANVIL needs a gun big enough that
+          twenty-six seconds of walking is a decision rather than a wall.</p>
+      </div>
+      <div class="scroll" id="objects"></div>
+      <div class="prose">
+        <p>Three of them are load-bearing for other parts of this plan and should not be moved.
+          <strong>CHAFF</strong> (band 4) is the first object that makes the assist worse than a
+          thumb, which is what earns DEEP ARRAY and OPEN SIEVE. <strong>LANTERN</strong> (band 4)
+          is the first object that costs you something for ignoring it, which is what teaches that
+          the field has a clock. <strong>ANVIL</strong> (band 7) is the one body that refuses every
+          impulse in the game, which is what makes the last band about damage.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>The turret has to reach twenty-one</h2>
+      <div class="prose">
+        <p>Incoming strength scales ×21 from band 1 to band 7. The whole tree is currently worth
+          <strong>×4.45</strong> on BOLT damage a second — the damage line is exactly ×4.00 and
+          cadence is ×1.11 — so the tree has to become about five times deeper without adding a
+          single cadence node, because cadence has been removed three times for good reasons and
+          reopening it is how this game gets a nineteen-fold damage line by accident.</p>
+      </div>
+      <div class="scroll" id="dmg"></div>
+      <div class="prose">
+        <p><strong>Two changes, both multiplicative, both on ALL ROUNDS.</strong> HOLLOWPOINT goes
+          from five levels at <span class="num">1.32</span> to eight at <span class="num">1.26</span>
+          — the same shape as build 229's change, arriving further up the ladder — and a new node,
+          <strong>CORE</strong>, sits dormant until RECAST is owned and then sells four levels at
+          <span class="num">1.35</span>. That is ×6.35 from the old line and ×3.32 from the new one:
+          ×21.1 on damage, ×30.4 once cadence and <code>era2Power</code> are counted. The turret
+          ends the run comfortably ahead, which is the brief.</p>
+        <p>CORE is where the overpowered window comes from. RECAST is offered when the fourth
+          anomaly is reconciled, at level 28; the four levels of CORE are priced for band 5 and
+          affordable inside it; and the boss at 35 is the first thing authored to survive them. So
+          levels 29 to 34 are played by a turret that has just tripled while the field has not
+          moved — and the guard is not a nerf, it is the next step of the staircase.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>The glitch, and why automation is the answer to it</h2>
+      <div class="prose">
+        <p>With difficulty this gentle, the discharge is the only hazard left in the game — and it
+          is the right one, because it is the only mechanism that can take a level away. The plan
+          keeps it exactly as punishing as it is (one rung, a field dissolve, a shake) and changes
+          only how often the player meets it.</p>
+        <ul>
+          <li><strong>Early, it teaches.</strong> Bands 1 and 2 have a thin enough stream that a
+            grab is an event. The fuse fills, the ring shows, the caption names the cause, and
+            nothing is lost the first time — <em>the first discharge of a run is free</em>, a
+            step-back that is announced and then refunded, once.</li>
+          <li><strong>Late, it is structural.</strong> The crowd term is half the contact rate, so
+            a band-7 field of forty bodies fills the fuse on its own without anything ever reaching
+            the mount. At that flow a thumb cannot keep the mount clear, and the fuse is the
+            scoreboard for that.</li>
+          <li><strong>The answer is already in the tree.</strong> FLINCH fires PULSE when something
+            takes hold; DEADBOLT stands a WARD. Measured at build 291, the pair took the mount from
+            22.3% gripped to 10.2% and discharges from six to one over seven minutes. They are the
+            two nodes that convert "keep clearing the mount yourself" into "the machine does it",
+            and this plan prices them as the cheapest nodes in bands 3 and 4 — the first real
+            automation a player can afford, arriving in the band where the fuse starts filling
+            on its own.</li>
+        </ul>
+        <p><strong>Manual play should become obsolete on purpose.</strong> The ladder from here is
+          AUTO AIM, then DEEP ARRAY and OPEN SIEVE so it covers the field and sorts grey from
+          hostile, then SLEW so the barrel keeps up with a target switch, then STANDING ORDER so
+          every clock on the bar runs a third faster, then FLINCH and DEADBOLT so the mount clears
+          itself. Nine of the tree's 107 levels are automation; they should be the nine a player
+          most wants, and a band-7 field is the argument for them. Nothing is taken away — a thumb
+          still works, and still out-aims the assist against CHAFF — but by band 6 the run should
+          be watchable rather than played.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>What things cost</h2>
+      <figure>
+        <canvas id="econ" aria-label="Chart: cumulative salvage earned across a run against cumulative cost of the upgrade tree, tree ending at about 58 percent of earnings"></canvas>
+        <figcaption><b>Read</b>Both lines are cumulative bytes on a log scale. The tree lands at
+          about 58% of what a full run to 49 pays out, and the gap is widest in bands 5 and 6 —
+          which is where a player should feel rich — and narrowest in band 7, which is the long
+          grind.</figcaption>
+      </figure>
+      <div class="prose">
+        <p>Today every node is priced <code>500 kB + 350 kB</code> a level, whatever it does and
+          whenever it is meant to be bought. The replacement is one formula and one number per
+          band: <strong>a node's price is set by the band it is meant for</strong>, and each level
+          of it costs 60% more than the last.</p>
+      </div>
+      <div class="scroll" id="prices"></div>
+      <div class="prose">
+        <p>That tripling per band is what makes early upgrades feel free and late ones feel earned,
+          and it is what makes "which band is this node for?" a real authoring decision — the thing
+          a flat price cannot express. The whole tree comes to about <strong>116 MB</strong> across
+          the same 107 levels, against 107.5 MB today, so the totals are close; what changes is the
+          distribution. Two thirds of the spend is in the last two bands.</p>
+        <p>Income follows the stream rather than the clock, so it needs no separate curve: more
+          bodies arriving is more salvage per second by construction. <code>bountyStep</code> comes
+          down from <span class="num">1.075</span> to <span class="num">1.045</span> a level (×8.4
+          by 49 instead of ×32) precisely because quantity is now doing that work, and the two
+          together give the income column in the table above.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>The bosses</h2>
+      <div class="scroll" id="bosses"></div>
+      <div class="prose">
+        <p>Boss health is <strong>authored per slot, not scaled by tier</strong>. Each anomaly is
+          met exactly once, at a known level, against a turret whose damage at that level is known
+          from the table above — so there is no reason to run it through <code>scaleToTier</code>
+          and every reason not to. The target is a fight between seventy seconds and just under
+          three minutes, with about 62% of the window spent on the boss itself and the rest on
+          what it puts on the field.</p>
+        <p>The seventh slot is the ceiling, and TERMINUS should be the hardest thing in the
+          simulation by a clear margin: <span class="num">358k</span> of core and structure against
+          a fully bought era-2 turret. It is the only fight in the plan that is allowed to be
+          genuinely difficult, because it is the last one.</p>
+      </div>
+      <div class="note">
+        <b>The patience clock needs a look</b>
+        <p><code>CFG.boss.patience</code> is 150 seconds and two of these targets are at or past
+          it. A boss that withdraws because the clock ran out reads as a bug when the fight was
+          going fine — and build 279 found TESSERA withdrawing at 164s with its core untouched.
+          Patience should be authored per slot alongside health, at about 2.2× the target.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>The ceiling at 49</h2>
+      <div class="prose">
+        <p>Level 49 is the end. The ladder refuses to climb past it, the verdict still lands and
+          still pays, and the run continues at 49 for as long as the player wants — the stream does
+          not stop, salvage does not stop, and the tree can still be finished. What stops is the
+          number.</p>
+      </div>
+      <div class="mock">
+        <div class="tag">Simulation halted</div>
+        <h5>Depth 49 · no further descent</h5>
+        <p>THE SIMULATION CANNOT CONTINUE. NO SEVENTH APERTURE LIES BEYOND THIS DEPTH.
+          THE FIELD WILL HOLD AT 49 AND THE FEED WILL KEEP PAYING.</p>
+        <div class="row"><span>Hold the field</span><span>Audit</span></div>
+      </div>
+      <div class="prose">
+        <p>Three things this has to get right. It has to arrive <strong>once</strong>, on the
+          verdict that would have moved 49 to 50, and not on every wave after it — the same
+          once-per-target guard the rail's step-back mark already uses. It has to be a
+          <strong>statement rather than a failure</strong>: the run is not over, and the copy says
+          so in its second line. And the rail has to show it — rung 49 drawn as a closed end rather
+          than as a rung with nothing after it, so the ceiling is legible before it is reached.</p>
+        <p>Mechanically it is the era ceiling that already exists. <code>eraHeld</code> holds the
+          ladder at rung 42 until NEW FORM is owned; the same shape, at 49, with nothing that
+          lifts it. Both doors have to carry it — <code>climbTo</code> refuses the climb and
+          <code>setTier</code> is the machinery's setter and does not gate, which is how build 272
+          walked straight over its own ceiling.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Order of work</h2>
+      <div class="steps" id="phases"></div>
+    </section>
+
+    <section>
+      <h2>What proves it</h2>
+      <div class="prose">
+        <ul>
+          <li><strong>The flow, per band, off the real director.</strong> Arrivals a second,
+            standing field, bodies per wave and wave length, sampled at levels 4, 11, 18, 25, 32,
+            39 and 46. The claim is the table in this plan; the probe is
+            <code>tiers.mjs</code> extended to report arrivals rather than only clears.</li>
+          <li><strong>The sawtooth, as a margin.</strong> For each band, the turret's damage a
+            second divided by the field's incoming health a second, with only the purchases that
+            band's income affords. The margin must stay inside <span class="num">1.4</span> to
+            <span class="num">7.0</span> at every level from 1 to 49 — measured at the start of a
+            band, which is its worst point, and at the level before its boss, which is its best.
+            Outside that range in either direction is a failure: below it the player grinds, above
+            it they stop buying.</li>
+          <li><strong>The ceiling, in both doors.</strong> A case that climbs to 49 through
+            <code>climbTo</code> and is refused, and a second that tries <code>setTier(50)</code>
+            and is refused, and a third asserting the message paints once across twenty further
+            waves.</li>
+          <li><strong>The glitch, per band.</strong> Peak fuse and discharge count over seven
+            minutes at bands 2, 5 and 7, with and without FLINCH and DEADBOLT. The claim is that
+            the pair is the difference between a fuse that blows and one that does not at band 7 —
+            and record the peak beside the count, because 0.87 of a fuse and 0.2 of a fuse are
+            both zero discharges.</li>
+          <li><strong>The economy, end to end.</strong> One headless run to 49 recording earnings
+            and the affordable purchase set at every rung. The assertion is that the tree finishes
+            between 55% and 70% of run earnings, and that no band's purchase set costs more than
+            that band pays.</li>
+          <li><strong>The ORDINAL hash will move, and by a lot.</strong> Every number in this plan
+            is in the mix — payout, positions, what the turret does. Take it on HEAD first, expect
+            the move, record the cause. It stops being a regression instrument for the duration
+            and becomes one again on the first build after the numbers settle.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Left open</h2>
+      <div class="prose">
+        <ul>
+          <li><strong>AXIOM and TESSERA.</strong> Above the ceiling by default. See the note under
+            the spine.</li>
+          <li><strong>Trait pressure.</strong> <code>traitFrom</code> 10 and
+            <code>traitPair</code> 25 put ARMORED, SWARM, MENDING, TETHERED and EBB on bodies from
+            rung 10 and pairs from 25. Under the new scaling those rungs are mid-band-2 and
+            mid-band-4; they probably want to be band boundaries, but traits interact with the
+            twenty new objects in ways worth measuring before deciding.</li>
+          <li><strong>Era 2's field.</strong> RECAST moves from level 42 to 28, which means the
+            wider field, the wall and the yard arrive fourteen rungs earlier than they do now. The
+            wall changes what the assist can reach and the field is 1.22× deeper; band 5's flow
+            numbers here assume the era-1 field and will need re-measuring on the era-2 one.</li>
+          <li><strong>Wave templates versus the budget.</strong> This plan fills waves from a
+            strength budget. The 38 authored waves become templates for the teach band and for
+            named set-pieces; which of them survive as set-pieces is a taste call nobody should
+            make before the budget filler exists.</li>
+          <li><strong>Overclock and Recall.</strong> Both are rung-10 nodes priced for a flat tree.
+            Under the new curve they are band-2 nodes, and OVERCLOCK's double pay against a stream
+            that is already continuous may be worth more than it was. Unmeasured.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <span>Simulation 7749</span>
+    <span>Drafted against build 298</span>
+    <span>49 levels · 7 bands · 7 bosses · 20 new objects</span>
+    <span>Nothing here is implemented</span>
+  </footer>
+</div>
+
+<script>
+/* =====================================================================
+ * Every number on this page comes from the table below, so the prose,
+ * the tables and the three charts cannot disagree. Nothing here is game
+ * code; it is a document that draws its own arithmetic.
+ * ================================================================== */
+(function () {
+  var HP_STEP = 1.028;          // was 1.085
+  var BOUNTY_STEP = 1.045;      // was 1.075
+  var BANDS = [
+    { b: 1, from: 1,  to: 7,  secs: 50,  flow: 0.9, worth: 1400,  dps: 120,  boss: 'ORDINAL',   fight: 70,  price: 9000,    nodes: 9,  levels: 15,
+      objects: ['SHOAL', 'EMBER', 'FILAMENT'], teaches: 'the stream exists, and not everything in it is coming for you' },
+    { b: 2, from: 8,  to: 14, secs: 70,  flow: 1.4, worth: 2000,  dps: 210,  boss: 'GNOMON',    fight: 80,  price: 27000,   nodes: 11, levels: 18,
+      objects: ['HUSK', 'SHRIKE', 'BELL'], teaches: 'things arrive from unexpected directions, and some are worth chasing' },
+    { b: 3, from: 15, to: 21, secs: 95,  flow: 2.0, worth: 2900,  dps: 340,  boss: 'FRACTAL',   fight: 95,  price: 82000,   nodes: 10, levels: 17,
+      objects: ['SPINDLE', 'FLINT', 'LATCH'], teaches: 'where and when you shoot starts to matter; FLINCH becomes affordable' },
+    { b: 4, from: 22, to: 28, secs: 120, flow: 2.7, worth: 4200,  dps: 540,  boss: 'AMPLITUDE', fight: 110, price: 250000,  nodes: 10, levels: 16,
+      objects: ['QUARRY', 'CHAFF', 'LANTERN'], teaches: 'the assist can be fooled and the field has a clock. RECAST is offered at 28' },
+    { b: 5, from: 29, to: 35, secs: 110, flow: 3.4, worth: 6600,  dps: 1450, boss: 'DYNAMO',    fight: 105, price: 700000,  nodes: 9,  levels: 14,
+      objects: ['YOKE', 'REMNANT', 'GYRE'], teaches: 'the new turret, against three objects built to show it off' },
+    { b: 6, from: 36, to: 42, secs: 150, flow: 4.2, worth: 10800, dps: 2300, boss: 'PARITY',    fight: 130, price: 1600000, nodes: 9,  levels: 14,
+      objects: ['VEIL', 'LOOM', 'MIRE'], teaches: 'the field itself is contested: cover, occlusion, denied ground' },
+    { b: 7, from: 43, to: 49, secs: 190, flow: 5.0, worth: 18000, dps: 3500, boss: 'TERMINUS',  fight: 165, price: 4000000, nodes: 9,  levels: 13,
+      objects: ['ANVIL', 'KITE'], teaches: 'nothing left but the gun, and one body that refuses every button' }
+  ];
+
+  /* ---- one formatter, base 10, the same ruling the game uses ---------- */
+  var U = ['B', 'kB', 'MB', 'GB'];
+  function fmt(n) {
+    var i = 0, v = n;
+    while (v >= 1000 && i < 3) { v /= 1000; i++; }
+    return (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)) + ' ' + U[i];
+  }
+  function el(tag, cls, html) {
+    var d = document.createElement(tag);
+    if (cls) d.className = cls;
+    if (html !== undefined) d.innerHTML = html;
+    return d;
+  }
+  function table(host, cap, head, rows) {
+    var t = el('table');
+    t.innerHTML = '<caption>' + cap + '</caption><thead><tr>'
+      + head.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead>';
+    var tb = el('tbody');
+    rows.forEach(function (r) {
+      var tr = el('tr', r.cls || '');
+      tr.innerHTML = r.cells.map(function (c, i) {
+        return '<td class="' + (r.classes && r.classes[i] ? r.classes[i] : (i === 0 ? 'k' : '')) + '">' + c + '</td>';
+      }).join('');
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    document.getElementById(host).appendChild(t);
+  }
+
+  /* ---- derived series -------------------------------------------------- */
+  BANDS.forEach(function (x) {
+    x.hp = Math.pow(HP_STEP, x.to - 1);
+    x.bodies = Math.round(x.flow * x.secs);
+    x.incoming = x.flow * 30 * x.hp;            // 30 is the mean base health of a band-1 body
+    x.income = x.flow * x.worth;
+    x.earns = x.income * x.secs * 7;
+    x.spend = 0;
+    var per = Math.ceil(x.levels / x.nodes);
+    for (var k = 0; k < x.levels; k++) x.spend += x.price * (1 + (k % per) * 0.6);
+    x.bossHp = Math.round(x.dps * x.fight * 0.62 / 100) * 100;
+  });
+  var cumE = 0, cumS = 0;
+  BANDS.forEach(function (x) { cumE += x.earns; cumS += x.spend; x.cumE = cumE; x.cumS = cumS; });
+  var TREE = cumS, RUN = cumE;
+  var RUN_MIN = BANDS.reduce(function (a, x) { return a + x.secs * 7; }, 0) / 60;
+
+  /* ---- the four numbers ------------------------------------------------ */
+  [
+    ['×4.45', 'what the whole tree buys', 'BOLT damage a second, stock to fully bought. The damage line is exactly ×4.00 and cadence is ×1.11. 107 levels, 107.5 MB.'],
+    ['×201', 'what the ladder asks for', 'Health ×50.2 by rung 49 times a population multiplier that caps at ×4.0. The turret is being asked to cover forty-five times more than it can buy.'],
+    ['rung 9', 'where the authored waves run out', '38 waves across 5 bands at two rungs a band. From rung 9 to rung 49 the same nine band-5 waves replay with bigger numbers on them.'],
+    ['1 price', 'for every node in the tree', 'Every one of the 67 nodes costs 500 kB with +350 kB a level, whatever it does. There is no early upgrade and no late one.']
+  ].forEach(function (r) {
+    var d = el('div');
+    d.appendChild(el('b', '', r[0]));
+    d.appendChild(el('span', '', r[1]));
+    d.appendChild(el('p', '', r[2]));
+    document.getElementById('four').appendChild(d);
+  });
+
+  /* ---- tables ---------------------------------------------------------- */
+  table('spine', 'the spine — seven bands, and what closes each one',
+    ['Band', 'Levels', 'Boss at', 'Anomaly', 'Level takes', 'Band takes', 'What the band is for'],
+    BANDS.map(function (x) {
+      return { cls: x.b === 5 ? 'band5' : '', classes: [null, null, 'boss', 'boss', null, null, 'wide'],
+        cells: ['Band ' + x.b, x.from + '–' + x.to, x.to, x.boss, '~' + x.secs + 's', '~' + Math.round(x.secs * 7 / 60) + ' min', x.teaches] };
+    }));
+
+  table('flow', 'the stream, per band',
+    ['Band', 'A body every', 'On the field', 'Bodies a wave', 'Health ×', 'Arriving', 'Turret', 'Margin'],
+    BANDS.map(function (x) {
+      return { cls: x.b === 5 ? 'band5' : '',
+        cells: ['Band ' + x.b, (1 / x.flow).toFixed(2) + 's', '~' + Math.round(x.flow * 8), x.bodies,
+          '×' + x.hp.toFixed(2), Math.round(x.incoming) + ' hp/s', x.dps + ' dps',
+          '×' + (x.dps / x.incoming).toFixed(1)] };
+    }));
+
+  table('objects', 'the twenty, placed',
+    ['Band', 'Levels', 'Arriving', 'Flow it needs', 'Why here'],
+    BANDS.map(function (x) {
+      return { cls: x.b === 5 ? 'band5' : '', classes: [null, null, 'k', null, 'wide'],
+        cells: ['Band ' + x.b, x.from + '–' + x.to, x.objects.join(' · '),
+          (1 / x.flow).toFixed(2) + 's/body', x.teaches] };
+    }));
+
+  table('dmg', 'the damage ladder, and what it has to cover',
+    ['Layer', 'Levels', 'Each', 'Worth', 'Running total'],
+    (function () {
+      var rows = [
+        ['HOLLOWPOINT, today', '5', '×1.32', '×4.00', '×4.00'],
+        ['cadence, today (FEED)', '1', '×0.90', '×1.11', '×4.45'],
+        ['HOLLOWPOINT, proposed', '8', '×1.26', '×6.35', '×6.35'],
+        ['CORE — dormant until RECAST', '4', '×1.35', '×3.32', '×21.1'],
+        ['cadence — unchanged, deliberately', '1', '×0.90', '×1.11', '×23.4'],
+        ['era2Power, on RECAST', '—', '×1.30', '×1.30', '×30.4']
+      ];
+      return rows.map(function (r, i) {
+        return { classes: [null, null, null, null, i >= 2 ? 'boss' : null], cells: r };
+      });
+    })());
+
+  table('prices', 'what a node costs, by the band it is meant for',
+    ['Band', 'Level 1', 'Level 2', 'Level 3', 'Nodes', 'Levels', 'Band spend', 'Band earns', 'Spent of earned'],
+    BANDS.map(function (x) {
+      return { cls: x.b === 5 ? 'band5' : '',
+        cells: ['Band ' + x.b, fmt(x.price), fmt(Math.round(x.price * 1.6)), fmt(Math.round(x.price * 2.2)),
+          x.nodes, x.levels, fmt(Math.round(x.spend)), fmt(Math.round(x.earns)),
+          Math.round(x.cumS / x.cumE * 100) + '%'] };
+    }).concat([{ classes: ['k', null, null, null, null, null, 'boss', 'boss', 'boss'],
+      cells: ['Whole tree', '', '', '', BANDS.reduce(function (a, x) { return a + x.nodes; }, 0),
+        BANDS.reduce(function (a, x) { return a + x.levels; }, 0),
+        fmt(Math.round(TREE)), fmt(Math.round(RUN)), Math.round(TREE / RUN * 100) + '%'] }]));
+
+  table('bosses', 'the seven slots',
+    ['Level', 'Anomaly', 'Turret then', 'Target fight', 'Core + structure', 'Patience', 'Today'],
+    BANDS.map(function (x, i) {
+      var today = [1900, 1500, 7400, 3400, 4200, 7600, 8000][i];
+      return { cls: x.b === 5 ? 'band5' : '', classes: ['k', 'boss', null, null, 'boss', null, null],
+        cells: [x.to, x.boss, x.dps + ' dps', x.fight + 's', x.bossHp.toLocaleString('en-US'),
+          Math.round(x.fight * 2.2) + 's', today.toLocaleString('en-US') + ' core'] };
+    }));
+
+  /* ---- the engine changes and the phase list --------------------------- */
+  [
+    ['Rest → 0', 'The gap between waves closes',
+      '<code>rest</code> goes from <span class="num">2.6</span>–<span class="num">4.2</span>s to <span class="num">0.4</span>–<span class="num">1.1</span>s, and the next wave starts releasing as soon as the running one has sent its last body rather than when the field is clear. The verdict still lands on the wave that earned it. What the player sees is one stream with a rung counter ticking over inside it.'],
+    ['Drift as mortar', 'Nothing is ever the only thing on the field',
+      'DRIFT is released continuously at a rate tied to the band — <span class="num">1</span> every <span class="num">6</span>s in band 1 down to <span class="num">1</span> every <span class="num">1.4</span>s in band 7 — and is not counted by any verdict. It is what fills a seam, it is what a boss slot with no boss is made of, and from build 298 it hovers in a band across the middle of the field instead of walking at you, so it reads as weather rather than as threat.'],
+    ['Waves from a budget', 'Length follows strength, by construction',
+      'A wave is authored as a <em>strength budget</em> in threat points, not as a list of bodies. The filler draws from the band\'s roster until the budget is met, so a wave of SHOALs is long and a wave with two ANVILs in it is short, and both are worth the same. This is also what makes adding the twenty objects a data change: a new body gets a threat value and a band, and every wave in that band can contain it.'],
+    ['Bands, not rungs', 'Six ordinary levels that differ, then a boss',
+      'The six levels inside a band share one roster and one flow but differ in composition: level 1 of a band is that band\'s roster at its gentlest, level 6 is its heaviest authored set-piece. <code>perBand</code> stops meaning "two rungs" and starts meaning "seven".']
+  ].forEach(function (s) {
+    var d = el('div', 'step');
+    d.innerHTML = '<div class="n">' + s[0] + '</div><div class="b"><h4>' + s[1] + '</h4><p>' + s[2] + '</p></div>';
+    document.getElementById('engine').appendChild(d);
+  });
+
+  [
+    ['Phase 1', 'The spine, with today\'s numbers',
+      'Boss slots at every seventh level, the slot table, the DRIFT SURGE filler, and the ceiling at 49 with its message. No balance numbers move. This phase is worth shipping alone because it is the part that changes the shape of the run, and because the ceiling has to exist before anything is balanced against it.'],
+    ['Phase 2', 'Scaling, in one commit',
+      '<code>hpStep</code>, <code>bountyStep</code>, the population curve and the flow staircase together, because they are one equation and a half-applied version of it is a game nobody should measure. The ORDINAL hash moves here; take it before.'],
+    ['Phase 3', 'The wave engine',
+      'The budget filler, the closed gap, drift as mortar, bands of seven. The release gate and every verdict rule stay untouched. This is where <code>tiers.mjs</code> has to grow an arrivals column, because nothing existing can see what this phase changes.'],
+    ['Phase 4', 'The tree re-priced',
+      'One price per band and the 60%-a-level curve, HOLLOWPOINT to eight levels, CORE added dormant behind RECAST. A save written before this carries node ids and level counts, not prices, so an open run survives — but it will be suddenly rich or suddenly poor, and that is worth a one-time reconciliation rather than a silent change.'],
+    ['Phase 5', 'RECAST to level 28',
+      'The reconciled count RECAST needs comes down from seven to four, and <code>eraGate</code> moves from 42 to 28. Band 5 then wants re-measuring on the era-2 field, which is wider and deeper than the numbers in this plan assume.'],
+    ['Phase 6', 'The twenty, two or three a band',
+      'In the order the object guide gives: the harmless ones first, then the ones whose gait is the whole design, then the six that teach a rule. Each one needs its threat value and its band, and nothing else.'],
+    ['Phase 7', 'Boss health, authored per slot',
+      'Seven numbers and seven patience clocks, measured against the turret each slot actually meets. Last, because every number it depends on is set by the six phases above it.']
+  ].forEach(function (s) {
+    var d = el('div', 'step');
+    d.innerHTML = '<div class="n">' + s[0] + '</div><div class="b"><h4>' + s[1] + '</h4><p>' + s[2] + '</p></div>';
+    document.getElementById('phases').appendChild(d);
+  });
+
+  /* ---- charts ----------------------------------------------------------
+   * Canvas, one axis each, log where the span demands it. Three of the
+   * game's hues, each series directly labelled and given its own stroke
+   * pattern, so identity never rests on colour. (The palette validator
+   * flags these three as lighter than its dark-mode band wants; they are
+   * the project's own hues and every other check passes with margin --
+   * CVD separation 16.7, normal-vision 28.5, contrast over 3:1.)
+   */
+  var INK = '#cbd9e8', DIM = '#8497ab', FAINT = '#5a6b7d', GRID = '#16212c';
+  var CY = '#59e0ff', RO = '#ff5d8f', GO = '#ffd166';
+
+  function chart(id, h, draw) {
+    var cv = document.getElementById(id);
+    var host = cv.parentNode;
+    var w = 1040;
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    cv.style.width = '100%'; cv.style.aspectRatio = w + ' / ' + h;
+    var c = cv.getContext('2d');
+    c.scale(dpr, dpr);
+    c.clearRect(0, 0, w, h);
+    draw(c, w, h);
+    return { cv: cv, host: host };
+  }
+  function axes(c, box, opts) {
+    c.save();
+    c.strokeStyle = GRID; c.lineWidth = 1;
+    (opts.yTicks || []).forEach(function (t) {
+      var y = box.y(t.v);
+      c.beginPath(); c.moveTo(box.l, y); c.lineTo(box.r, y); c.stroke();
+    });
+    c.restore();
+    c.save();
+    c.font = '500 10px "IBM Plex Mono", monospace';
+    c.fillStyle = FAINT; c.textAlign = 'right'; c.textBaseline = 'middle';
+    (opts.yTicks || []).forEach(function (t) { c.fillText(t.label, box.l - 8, box.y(t.v)); });
+    c.textAlign = 'center'; c.textBaseline = 'top';
+    (opts.xTicks || []).forEach(function (t) { c.fillText(t.label, box.x(t.v), box.b + 8); });
+    c.restore();
+  }
+  function line(c, box, pts, col, dash, width) {
+    c.save();
+    c.strokeStyle = col; c.lineWidth = width || 2; c.lineJoin = 'round'; c.lineCap = 'round';
+    if (dash) c.setLineDash(dash);
+    c.beginPath();
+    pts.forEach(function (p, i) { (i ? c.lineTo(box.x(p[0]), box.y(p[1])) : c.moveTo(box.x(p[0]), box.y(p[1]))); });
+    c.stroke();
+    c.restore();
+  }
+  function label(c, box, at, text, col, align, dy) {
+    c.save();
+    c.font = '600 11px "IBM Plex Mono", monospace';
+    c.fillStyle = col; c.textAlign = align || 'left'; c.textBaseline = 'middle';
+    var m = c.measureText(text).width;
+    var x = box.x(at[0]) + (align === 'right' ? -7 : 7);
+    var y = box.y(at[1]) + (dy || 0);
+    c.fillStyle = 'rgba(4,7,12,0.86)';
+    c.fillRect(align === 'right' ? x - m - 3 : x - 3, y - 8, m + 6, 16);
+    c.fillStyle = col;
+    c.fillText(text, x, y);
+    c.restore();
+  }
+
+  /* -- 1. the sawtooth -- */
+  chart('saw', 400, function (c, w, h) {
+    var L = 58, R = w - 130, T = 26, B = h - 34;
+    var lo = 20, hi = 4200;
+    var box = {
+      l: L, r: R, t: T, b: B,
+      x: function (v) { return L + ((v - 1) / 48) * (R - L); },
+      y: function (v) { return B - (Math.log(v / lo) / Math.log(hi / lo)) * (B - T); }
+    };
+    axes(c, box, {
+      yTicks: [{ v: 30, label: '30' }, { v: 100, label: '100' }, { v: 300, label: '300' },
+        { v: 1000, label: '1k' }, { v: 3000, label: '3k' }],
+      xTicks: BANDS.map(function (x) { return { v: x.to, label: String(x.to) }; })
+    });
+    // boss levels, as verticals
+    c.save();
+    BANDS.forEach(function (x) {
+      c.strokeStyle = 'rgba(255,93,143,0.34)'; c.lineWidth = 1; c.setLineDash([3, 4]);
+      c.beginPath(); c.moveTo(box.x(x.to), T); c.lineTo(box.x(x.to), B); c.stroke();
+    });
+    c.restore();
+    // incoming: a staircase that steps at each boss
+    var stair = [];
+    BANDS.forEach(function (x, i) {
+      var prev = i ? BANDS[i - 1] : null;
+      var from = prev ? prev.to : 1;
+      stair.push([from, x.incoming]);
+      stair.push([x.to, x.incoming]);
+    });
+    line(c, box, stair, RO, null, 2.4);
+    // the turret: a ramp with a step at RECAST
+    var ramp = [];
+    for (var lv = 1; lv <= 49; lv++) {
+      var bi = Math.min(6, Math.floor((lv - 1) / 7));
+      var x0 = BANDS[bi], within = (lv - x0.from) / 6;
+      var prevDps = bi ? BANDS[bi - 1].dps : 95;
+      var d = prevDps + (x0.dps - prevDps) * Math.pow(within, 0.72);
+      ramp.push([lv, d]);
+    }
+    line(c, box, ramp, CY, null, 2.4);
+    // and what it would be without the tree getting deeper
+    var flat = [];
+    for (var l2 = 1; l2 <= 49; l2++) flat.push([l2, 95 + (402 - 95) * Math.min(1, (l2 - 1) / 20)]);
+    line(c, box, flat, GO, [5, 5], 1.8);
+
+    label(c, box, [49, ramp[48][1]], 'TURRET', CY, 'left');
+    label(c, box, [49, stair[stair.length - 1][1]], 'ARRIVING', RO, 'left');
+    label(c, box, [49, flat[48][1]], "TODAY'S TREE", GO, 'left', 13);
+    // the OP window
+    c.save();
+    c.fillStyle = 'rgba(89,224,255,0.07)';
+    c.fillRect(box.x(29), T, box.x(35) - box.x(29), B - T);
+    c.font = '600 10px "IBM Plex Mono", monospace';
+    c.fillStyle = CY; c.textAlign = 'center'; c.textBaseline = 'top';
+    c.fillText('RECAST · 29–34', (box.x(29) + box.x(35)) / 2, T + 4);
+    c.restore();
+    c.save();
+    c.font = '500 10px "IBM Plex Mono", monospace';
+    c.fillStyle = FAINT; c.textAlign = 'left'; c.textBaseline = 'middle';
+    c.fillText('health a second', 12, T + 6);
+    c.textAlign = 'center';
+    c.fillText('level · dashed verticals are boss levels', (L + R) / 2, B + 22);
+    c.restore();
+  });
+
+  /* -- 2. quantity, not health -- */
+  chart('qty', 330, function (c, w, h) {
+    var L = 58, R = w - 150, T = 26, B = h - 34;
+    var lo = 0.8, hi = 60;
+    var box = {
+      l: L, r: R, t: T, b: B,
+      x: function (v) { return L + ((v - 1) / 48) * (R - L); },
+      y: function (v) { return B - (Math.log(v / lo) / Math.log(hi / lo)) * (B - T); }
+    };
+    axes(c, box, {
+      yTicks: [{ v: 1, label: '×1' }, { v: 2, label: '×2' }, { v: 5, label: '×5' },
+        { v: 10, label: '×10' }, { v: 25, label: '×25' }, { v: 50, label: '×50' }],
+      xTicks: BANDS.map(function (x) { return { v: x.to, label: String(x.to) }; })
+    });
+    // today: health, and the capped population
+    var oldHp = [], oldPop = [];
+    for (var lv = 1; lv <= 49; lv++) {
+      oldHp.push([lv, Math.pow(1.085, lv - 1)]);
+      oldPop.push([lv, 1 + Math.min(3, (lv - 1) * 0.1)]);
+    }
+    line(c, box, oldHp, GO, [5, 5], 1.8);
+    line(c, box, oldPop, FAINT, [2, 4], 1.6);
+    // proposed: bodies a wave, and health
+    var newN = [], newHp = [];
+    BANDS.forEach(function (x, i) {
+      var prev = i ? BANDS[i - 1] : null;
+      newN.push([prev ? prev.to : 1, x.bodies / BANDS[0].bodies]);
+      newN.push([x.to, x.bodies / BANDS[0].bodies]);
+    });
+    for (var l3 = 1; l3 <= 49; l3++) newHp.push([l3, Math.pow(HP_STEP, l3 - 1)]);
+    line(c, box, newN, CY, null, 2.4);
+    line(c, box, newHp, RO, null, 2.4);
+    label(c, box, [49, newN[newN.length - 1][1]], 'BODIES A WAVE', CY, 'left');
+    label(c, box, [49, oldHp[48][1]], "TODAY'S HEALTH", GO, 'left', -12);
+    label(c, box, [49, newHp[48][1]], 'HEALTH', RO, 'left');
+    label(c, box, [49, oldPop[48][1]], "TODAY'S COUNT", FAINT, 'left', 12);
+    c.save();
+    c.font = '500 10px "IBM Plex Mono", monospace';
+    c.fillStyle = FAINT; c.textAlign = 'left'; c.textBaseline = 'middle';
+    c.fillText('× level 1', 12, T + 6);
+    c.textAlign = 'center';
+    c.fillText('level', (L + R) / 2, B + 22);
+    c.restore();
+  });
+
+  /* -- 3. the economy -- */
+  chart('econ', 330, function (c, w, h) {
+    var L = 62, R = w - 132, T = 26, B = h - 34;
+    var lo = 100000, hi = 300000000;
+    var box = {
+      l: L, r: R, t: T, b: B,
+      x: function (v) { return L + ((v - 1) / 48) * (R - L); },
+      y: function (v) { return B - (Math.log(v / lo) / Math.log(hi / lo)) * (B - T); }
+    };
+    axes(c, box, {
+      yTicks: [{ v: 100000, label: '100 kB' }, { v: 1000000, label: '1 MB' },
+        { v: 10000000, label: '10 MB' }, { v: 100000000, label: '100 MB' }],
+      xTicks: BANDS.map(function (x) { return { v: x.to, label: String(x.to) }; })
+    });
+    var earn = [[1, 100000]], spend = [[1, 100000]];
+    BANDS.forEach(function (x) { earn.push([x.to, x.cumE]); spend.push([x.to, x.cumS]); });
+    // the gap, filled: what the player is carrying
+    c.save();
+    c.beginPath();
+    earn.forEach(function (p, i) { (i ? c.lineTo(box.x(p[0]), box.y(p[1])) : c.moveTo(box.x(p[0]), box.y(p[1]))); });
+    for (var i = spend.length - 1; i >= 0; i--) c.lineTo(box.x(spend[i][0]), box.y(spend[i][1]));
+    c.closePath();
+    c.fillStyle = 'rgba(124,255,178,0.09)';
+    c.fill();
+    c.restore();
+    line(c, box, earn, CY, null, 2.4);
+    line(c, box, spend, RO, [7, 4], 2.2);
+    label(c, box, [49, RUN], 'EARNED', CY, 'left');
+    label(c, box, [49, TREE], 'TREE SPENT', RO, 'left', 12);
+    c.save();
+    c.font = '500 10px "IBM Plex Mono", monospace';
+    c.fillStyle = FAINT; c.textAlign = 'left'; c.textBaseline = 'middle';
+    c.fillText('cumulative', 12, T + 6);
+    c.textAlign = 'center';
+    c.fillText('level', (L + R) / 2, B + 22);
+    c.restore();
+  });
+})();
+</script>

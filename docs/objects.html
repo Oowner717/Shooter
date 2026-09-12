@@ -359,8 +359,18 @@
         <p>Four frames each: the body at rest, the body doing the thing it does, its size against
           the machine and a MOTE, and its gait traced on the field. Health and speed are tier-one
           base values, the numbers the existing table is written in; <code>scaleToTier</code>
-          multiplies them the same way it does everything else. Wave economy, weights and gates are
-          deliberately not decided here.</p>
+          multiplies them the same way it does everything else.</p>
+        <p><strong>Two fields were added after the rebalance plan.</strong> <em>Arrives</em> is the
+          band of seven levels a body belongs to, from
+          <a href="https://claude.ai/code/artifact/aa368dc2-8aaf-48fc-9abe-5687a1dd10cd">Seven Bands of Seven</a> — two or three
+          new objects a band, placed by what they teach rather than by what they weigh.
+          <em>Threat</em> is its weight in the budget a wave is filled from: roughly a body's
+          health over thirty plus what its mechanism is worth, with a MOTE at
+          <span class="num">1</span>, a LURCHER at <span class="num">4</span>, a BULWARK at
+          <span class="num">20</span>, and anything harmless at <span class="num">0</span>. A wave
+          is authored as a budget rather than as a list, so a wave of SHOALs is long and a wave
+          with two ANVILs in it is short, and a new body needs only those two numbers to join every
+          wave in its band.</p>
       </div>
       <div class="plates" id="plates"></div>
     </section>
@@ -704,7 +714,7 @@
   }
 
   var NEW = [
-    { name: 'SHOAL', fam: 'swarm', r: 7, hp: 14, speed: 96, accel: 300, armor: 0, drops: 1,
+    { name: 'SHOAL', band: 1, levels: '1–7', threat: 0.5, fam: 'swarm', r: 7, hp: 14, speed: 96, accel: 300, armor: 0, drops: 1,
       gait: 'flock', count: '14 at a time',
       what: 'A school of fourteen, arriving as one body and turning as one. There is no leader and no ability: the flock <em>is</em> the mechanic. A bolt takes one; anything with a radius takes the school.',
       counter: 'PULSE, SCATTER, any blast. Aimed fire is the wrong tool and the school is what teaches that.',
@@ -726,7 +736,7 @@
         }
       } },
 
-    { name: 'CHAFF', fam: 'swarm', r: 13, hp: 60, speed: 70, accel: 260, armor: 0, drops: 2,
+    { name: 'CHAFF', band: 4, levels: '22–28', threat: 4, fam: 'swarm', r: 13, hp: 60, speed: 70, accel: 260, armor: 0, drops: 2,
       gait: 'hop', count: 'two or three',
       what: 'It moves in jumps and leaves a copy of itself behind at every one. The copies are not bodies — nothing can be shot off them — but the assist reads them as targets and locks on, for the second and a half each one lasts.',
       counter: 'Aim it yourself. The one thing on the field that makes AUTO AIM worse than a thumb.',
@@ -760,7 +770,7 @@
         unit(1);
       } },
 
-    { name: 'SHRIKE', fam: 'edge', r: 14, hp: 70, speed: 40, accel: 340, armor: 0, drops: 3,
+    { name: 'SHRIKE', band: 2, levels: '8–14', threat: 3, fam: 'edge', r: 14, hp: 70, speed: 40, accel: 340, armor: 0, drops: 3,
       gait: 'dive', count: 'one or two',
       what: 'Holds height across the top of the field, then runs straight down through the machine at <span class="num">210</span> u/s — three times its own cruise — does its damage on the pass, overshoots to the floor, and climbs back round for another.',
       counter: 'It is only fast on the dive. Kill it in the climb, or stand a mine on the line it is going to use.',
@@ -782,7 +792,7 @@
         dot(c, 0, R * 1.05, R * 0.22, W, act ? 1 : 0.7);
       } },
 
-    { name: 'FLINT', fam: 'edge', r: 16, hp: 120, speed: 44, accel: 150, armor: 0.55, drops: 3,
+    { name: 'FLINT', band: 3, levels: '15–21', threat: 5, fam: 'edge', r: 16, hp: 120, speed: 44, accel: 150, armor: 0.55, drops: 3,
       gait: 'march', mods: 'face', count: 'three or four',
       what: 'Armour <span class="num">0.55</span> on its front face and nothing anywhere else, and it turns to keep that face toward the barrel. Shot from in front it is the hardest small body in the game; shot from the side it is paper.',
       counter: 'A mine it walks over, a blast behind it, a PRISM ricochet, or an emplacement standing off to one side. The first body that makes the field have sides.',
@@ -813,7 +823,7 @@
         }
       } },
 
-    { name: 'ANVIL', fam: 'heavy', r: 56, hp: 1400, speed: 18, accel: 40, armor: 0.3, drops: 18,
+    { name: 'ANVIL', band: 7, levels: '43–49', threat: 34, fam: 'heavy', r: 56, hp: 1400, speed: 18, accel: 40, armor: 0.3, drops: 18,
       gait: 'creep', mods: 'planted', count: 'one',
       what: 'The heaviest thing that has ever walked down this field, and the only one that cannot be moved. It does not steer, it cannot be turned, and every impulse in the game — PULSE, PILE, HEAVE, a hurled MASS — is refused. It simply arrives at <span class="num">18</span> u/s.',
       counter: 'Damage, and the twenty-six seconds it takes to cross. Nothing else works, which is the point: the answer to ANVIL is a gun, not a button.',
@@ -846,7 +856,7 @@
         }
       } },
 
-    { name: 'VEIL', fam: 'heavy', r: 52, hp: 240, speed: 26, accel: 90, armor: 0, drops: 6,
+    { name: 'VEIL', band: 6, levels: '36–42', threat: 9, fam: 'heavy', r: 52, hp: 240, speed: 26, accel: 90, armor: 0, drops: 6,
       gait: 'spread', count: 'one or two',
       what: 'A membrane <span class="num">104</span> units across and twelve deep that goes wide before it comes down. Nothing behind it can be chosen by the assist: it occludes, the way a boss\'s structure does, but by geometry rather than by a mark. Weak, and it changes the whole field while it stands.',
       counter: 'It has <span class="num">240</span> health and no armour. Shoot the sheet, not what is behind it — which is exactly the decision it exists to force.',
@@ -880,7 +890,7 @@
         c.globalAlpha = 1;
       } },
 
-    { name: 'GYRE', fam: 'kinetic', r: 22, hp: 200, speed: 44, accel: 160, armor: 0.1, drops: 5,
+    { name: 'GYRE', band: 5, levels: '29–35', threat: 7, fam: 'kinetic', r: 22, hp: 200, speed: 44, accel: 160, armor: 0.1, drops: 5,
       gait: 'orbit', count: 'one or two',
       what: 'Closes to <span class="num">300</span> units of the machine and circles it, swinging a weighted arm. The arm does not damage you — it <em>moves your things</em>: a mine it passes is dragged out of its lane, a DECOY is shoved off its mark.',
       counter: 'It holds one radius, so it crosses the same arc every time. Lay for it, or take it before it settles.',
@@ -912,7 +922,7 @@
         }
       } },
 
-    { name: 'SPINDLE', fam: 'kinetic', r: 30, hp: 180, speed: 40, accel: 130, armor: 0.15, drops: 5,
+    { name: 'SPINDLE', band: 3, levels: '15–21', threat: 6, fam: 'kinetic', r: 30, hp: 180, speed: 40, accel: 130, armor: 0.15, drops: 5,
       gait: 'cartwheel', count: 'two or three',
       what: 'A bar <span class="num">96</span> long and <span class="num">11</span> wide, turning end over end at two thirds of a revolution a second as it comes. Broadside it is the widest target on the field; edge-on it is thinner than a NEEDLE. Nothing else in the game changes its own hit profile.',
       counter: 'Time it. Auto-fire will spend half its rounds on the edge; a thumb will not.',
@@ -938,7 +948,7 @@
         if (act) { dot(c, 0, 0, R * 0.1, W, 0.9); }
       } },
 
-    { name: 'YOKE', fam: 'strange', r: 26, hp: 150, speed: 42, accel: 150, armor: 0, drops: 5,
+    { name: 'YOKE', band: 5, levels: '29–35', threat: 7, fam: 'strange', r: 26, hp: 150, speed: 42, accel: 150, armor: 0, drops: 5,
       gait: 'paired', count: 'a pair, always',
       what: 'Two bodies on a rigid beam, rotating about their midpoint while the midpoint advances. They share one pool of <span class="num">150</span> health. Kill one and the beam breaks — and the survivor keeps the <em>whole remaining pool</em> and runs at <span class="num">1.9×</span> speed.',
       counter: 'Take them together with something that reaches both, or accept the survivor and be ready for it. Focusing one half is the trap.',
@@ -976,7 +986,7 @@
         }
       } },
 
-    { name: 'REMNANT', fam: 'strange', r: 30, hp: 300, speed: 36, accel: 120, armor: 0.12, drops: 6,
+    { name: 'REMNANT', band: 5, levels: '29–35', threat: 11, fam: 'strange', r: 30, hp: 300, speed: 36, accel: 120, armor: 0.12, drops: 6,
       gait: 'march', count: 'one or two',
       what: 'Destroyed, it drops nothing and leaves a mark. Six seconds later it re-forms at the portal at half health and <span class="num">1.4×</span> speed, once, and that second body pays for both. A kill that is not a kill until the second one.',
       counter: 'Nothing, the first time. The second arrival is the one to be standing ready for — and it comes out of the portal, so a mine in the lane answers it.',
@@ -1003,7 +1013,7 @@
         dot(c, 0, 0, R * 0.2, W, act ? 1 : 0.8);
       } },
 
-    { name: 'LATCH', fam: 'strange', r: 9, hp: 40, speed: 160, accel: 320, armor: 0, drops: 1,
+    { name: 'LATCH', band: 3, levels: '15–21', threat: 4, fam: 'strange', r: 9, hp: 40, speed: 160, accel: 320, armor: 0, drops: 1,
       gait: 'ride', count: 'three or four',
       what: 'Ignores the machine entirely: it runs at the largest body on the field and rides it. While it is aboard the host takes <span class="num">0.2</span> more armour and closes <span class="num">14</span> health a second. Three of them on a BULWARK is a different fight.',
       counter: 'Shoot the tick, not the host — and it is nine units wide on the flank of a body forty-five across. SPINE\'s splinters and any blast take it off.',
@@ -1034,7 +1044,7 @@
         dot(c, 0, 0, R * 0.34, W, 0.9);
       } },
 
-    { name: 'QUARRY', fam: 'multiply', r: 40, hp: 420, speed: 30, accel: 100, armor: 0.22, drops: 8,
+    { name: 'QUARRY', band: 4, levels: '22–28', threat: 18, fam: 'multiply', r: 40, hp: 420, speed: 30, accel: 100, armor: 0.22, drops: 8,
       gait: 'tumble', count: 'one',
       what: 'Breaks into three at <span class="num">24</span>, and each of those into three at <span class="num">13</span>: nine bodies out of one, each tier faster and less armoured than its parent. The fracture lines are drawn on it from the moment it arrives, so you can see what it is going to become.',
       counter: 'Where you break it decides where the nine go. Break it high and they have the whole field to spread in; break it low and they are already on you.',
@@ -1071,7 +1081,7 @@
         }
       } },
 
-    { name: 'LOOM', fam: 'multiply', r: 20, hp: 110, speed: 34, accel: 120, armor: 0, drops: 3,
+    { name: 'LOOM', band: 6, levels: '36–42', threat: 10, fam: 'multiply', r: 20, hp: 110, speed: 34, accel: 120, armor: 0, drops: 3,
       gait: 'paired', count: 'a pair, always',
       what: 'A pair that walks <em>apart</em>, stringing a bright thread between them. Our rounds stop on the thread the way they stop on the era-two wall. It is the enemy building cover, and it gets wider the longer it lives.',
       counter: 'Either end drops it. They separate slowly, so the first four seconds are free — and a blast or a mine reaches under the thread, which rounds do not.',
@@ -1109,7 +1119,7 @@
         }
       } },
 
-    { name: 'MIRE', fam: 'volatile', r: 24, hp: 160, speed: 30, accel: 100, armor: 0, drops: 4,
+    { name: 'MIRE', band: 6, levels: '36–42', threat: 7, fam: 'volatile', r: 24, hp: 160, speed: 30, accel: 100, armor: 0, drops: 4,
       gait: 'serpent', count: 'one or two',
       what: 'Weaves down the field painting corrupted ground behind it, wider the closer it gets. Standing in it, a mine takes twice as long to arm, a DECOY decays, and the intake pulls at half rate. It does no damage at all.',
       counter: 'Kill it early and the trail is short. The ground it has already laid fades on its own clock, so the mistake is chasing the stain instead of the source.',
@@ -1144,7 +1154,7 @@
         dot(c, R * 0.3, -R * 0.3, R * 0.1, W, 0.55);
       } },
 
-    { name: 'KITE', fam: 'volatile', r: 20, hp: 130, speed: 36, accel: 140, armor: 0, drops: 4,
+    { name: 'KITE', band: 7, levels: '43–49', threat: 8, fam: 'volatile', r: 20, hp: 130, speed: 36, accel: 140, armor: 0, drops: 4,
       gait: 'standoff', count: 'two or three',
       what: 'Holds <span class="num">420</span> units and never comes closer. Every <span class="num">3.2</span>s it lobs one slow arcing bolt at the machine — the first body in the game that attacks from outside contact range, and the first reason to push up-field instead of waiting.',
       counter: 'The bolt is slow and visible and can be shot out of the air. Or close the distance: it has no answer to something already inside its range.',
@@ -1176,7 +1186,7 @@
         }
       } },
 
-    { name: 'EMBER', fam: 'inert', r: 7, hp: 12, speed: 40, accel: 90, armor: 0, drops: 1, harmless: true,
+    { name: 'EMBER', band: 1, levels: '1–7', threat: 0, fam: 'inert', r: 7, hp: 12, speed: 40, accel: 90, armor: 0, drops: 1, harmless: true,
       gait: 'rise', count: 'four or five',
       what: 'Sparks that come up off the floor instead of down out of the portal, climbing toward the rim. Each carries a little salvage. Reach the rim and they are gone with it — an inverted DRIFT, and the only thing on the field that starts where you are.',
       counter: 'Free salvage if you are quick and nothing at all if you are not. Worth a round about as often as it is not.',
@@ -1205,7 +1215,7 @@
         } else spark(0, 0, 1, 1);
       } },
 
-    { name: 'HUSK', fam: 'inert', r: 38, hp: 90, speed: 44, accel: 30, armor: 0, drops: 12, harmless: true,
+    { name: 'HUSK', band: 2, levels: '8–14', threat: 0, fam: 'inert', r: 38, hp: 90, speed: 44, accel: 30, armor: 0, drops: 12, harmless: true,
       gait: 'tumble', count: 'one',
       what: 'A wreck of something the simulation ran before. It is thrown rather than steered: an arc across the field, end over end, off the far side and gone. Worth twelve motes to whoever takes it apart in the eleven seconds it is on screen.',
       counter: 'It is harmless and it is leaving. The only cost of ignoring it is the salvage, which is the largest single payout on the field.',
@@ -1236,7 +1246,7 @@
         }
       } },
 
-    { name: 'BELL', fam: 'inert', r: 15, hp: 60, speed: 30, accel: 100, armor: 0, drops: 2, harmless: true,
+    { name: 'BELL', band: 2, levels: '8–14', threat: 0, fam: 'inert', r: 15, hp: 60, speed: 30, accel: 100, armor: 0, drops: 2, harmless: true,
       gait: 'hover', count: 'one or two',
       what: 'Hangs in the middle band and bobs. Shoot it and it <em>rings</em>: two seconds in which every body on the field carries a bearing tick, through a VEIL, through a MIRE\'s dimming, through the corruption shader. A free instrument, for one round and one harmless kill.',
       counter: 'Nothing to counter. The decision is whether the round is worth more in the bell than in the thing behind it.',
@@ -1270,7 +1280,7 @@
         c.restore();
       } },
 
-    { name: 'FILAMENT', fam: 'inert', r: 9, hp: 22, speed: 58, accel: 180, armor: 0, drops: 1, harmless: true,
+    { name: 'FILAMENT', band: 1, levels: '1–7', threat: 0, fam: 'inert', r: 9, hp: 22, speed: 58, accel: 180, armor: 0, drops: 1, harmless: true,
       gait: 'chain', count: 'seven beads',
       what: 'Seven beads nose to tail, each steering at the one ahead, snaking across the field. Shoot a bead in the middle and you get two shorter snakes, each with its own new leader, both still going. Shoot the leader and the second bead takes over.',
       counter: 'It wants nothing and blocks nothing. It is there to be cut, and the shape of what is left is different every time.',
@@ -1310,7 +1320,7 @@
         }
       } },
 
-    { name: 'LANTERN', fam: 'inert', r: 20, hp: 150, speed: 26, accel: 80, armor: 0, drops: 16, harmless: true,
+    { name: 'LANTERN', band: 4, levels: '22–28', threat: 0, fam: 'inert', r: 20, hp: 150, speed: 26, accel: 80, armor: 0, drops: 16, harmless: true,
       gait: 'rise', count: 'one',
       what: 'Rises slowly toward the rim with sixteen motes\' worth of salvage caged inside it, and if it reaches the portal it takes the lot back through. Harmless in every sense that matters and the only object in the game that <em>costs</em> you something for being ignored.',
       counter: 'A timer you are allowed to answer or not: about nine seconds of climb, <span class="num">150</span> health, no armour. It is the one harmless body worth a full magazine.',
@@ -1608,9 +1618,10 @@
       var rows = [['radius', s.r + ' u'], ['health', s.hp], ['speed', s.speed + ' u/s'],
         ['accel', s.accel], ['armour', s.armor ? s.armor.toFixed(2) : '—'],
         ['salvage', s.drops + ' motes'], ['gait', g.name.toLowerCase()],
-        ['modifiers', s.mods || '—'], ['sent', s.count]];
+        ['modifiers', s.mods || '—'], ['sent', s.count],
+        ['arrives', 'band ' + s.band + ' · ' + s.levels], ['threat', s.threat || '—']];
       rows.forEach(function (r) {
-        dl.innerHTML += '<dt>' + r[0] + '</dt><dd' + (r[0] === 'gait' ? ' class="g"' : '') + '>' + r[1] + '</dd>';
+        dl.innerHTML += '<dt>' + r[0] + '</dt><dd' + (r[0] === 'gait' || r[0] === 'arrives' ? ' class="g"' : '') + '>' + r[1] + '</dd>';
       });
       plate.appendChild(dl);
     });
