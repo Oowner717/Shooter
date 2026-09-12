@@ -1907,13 +1907,23 @@ export class Ordinal extends Boss {
  * gate table is `CFG.waves.tier.gates` and build 227 nearly shipped a second
  * copy of it). `CFG.waves.tier.eraGate` is where the first form's ladder
  * ends, so anything gated past it is a fight the first form was never built
- * to reach: 1-7 at rungs 6..42 are era 1, AXIOM at 48 and TESSERA at 54 are
- * era 2. One table decides both facts and they cannot come apart.
+ * to reach. One table decides both facts and they cannot come apart.
+ *
+ * ...and an anomaly with NO RUNG is era 2 (build 299). The gate table is
+ * seven entries to a ceiling of 49 and the roster is nine, so AXIOM and
+ * TESSERA are gated nowhere -- and `undefined > eraGate` is false, which
+ * would have quietly answered "era 1" for the two fights that have never been
+ * looked at on an era-1 field. `debugBoss` is the only way to reach either and
+ * it SETS the era off this, so the wrong answer here is an era-2 fight put on
+ * an era-1 field at an era-1 scale with the first machine standing in it --
+ * which is the exact thing that function's own docstring says nothing else
+ * enforces. A fight nothing can climb to is past the ceiling by construction,
+ * and the ceiling is past `eraGate`.
  */
 export function anomalyEra(n) {
   const T = CFG.waves.tier;
   const rung = (T.gates || [])[n - 1];
-  return rung > T.eraGate ? 2 : 1;
+  return (rung === undefined || rung > T.eraGate) ? 2 : 1;
 }
 
 /**

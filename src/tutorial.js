@@ -238,6 +238,38 @@ export const ON_WORKS = (() => {
  * broken. Everything else keeps working, which the second line says outright:
  * the waves still come and still pay, and what has stopped is the climb.
  */
+/*
+ * ...and the one hold that nothing lifts (build 299).
+ *
+ * The era ceiling below is a state with a way out of it, and its line says
+ * where the way out is. This one has none: `depthHeld` consults nothing,
+ * because there is nothing it could consult. So this line's job is a
+ * different one -- not "here is what to do next" but "this is the end, and it
+ * is an end rather than a fault". The second half is the load-bearing half,
+ * and it is the same sentence the era ceiling makes: the waves still come,
+ * they still pay, the tree can still be finished. What has stopped is the
+ * number.
+ *
+ * No figure in it. The depth is a config constant and a number quoted in
+ * prose rots -- DRIFT's glossary entry said "worth 10 ENERGY" for years
+ * against a config that had said 6 since before anyone looked. The PILL
+ * carries the rung, read out of `CFG.waves.tier.ceiling` where it is
+ * authored.
+ *
+ * Held to ON_CEILING's width, which is the line it pairs with -- and held by
+ * the measurement that matters, which is LINE BOXES and not characters:
+ * `#abilityHint` is `pre-line` in a 300px band at 320, so every line in it
+ * wraps there and build 293's first draft was five characters over its pair
+ * and took a fourth box at 390 where the pair took three. Measured in a
+ * 300px band, this takes 7 boxes against ON_CEILING's 9, and at the suite's
+ * own width 6 against 7. `regress.mjs` counts both off `Range.getClientRects`
+ * and requires this one to be no worse than its partner.
+ */
+export const ON_DEPTH = (() => {
+  const text = 'The floor of the simulation. No eighth aperture lies beyond it.\nThe field holds here and the feed keeps paying. Nothing has stopped but the number.';
+  return { id: idOf(text), text, hold: holdFor(text) };
+})();
+
 export const ON_CEILING = (() => {
   const text = 'Seven answered. The ladder is cut for a shape you have outgrown.\nWaves still come and still pay here — but nothing above this rung was built for this machine. NEW FORM is in the tree.';
   return { id: idOf(text), text, hold: holdFor(text) };

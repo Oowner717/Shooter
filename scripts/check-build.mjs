@@ -439,9 +439,60 @@ if (dupTone.length) {
  * comes after it.
  */
 const gateRungs = CFG.waves.tier.gates;
-if (gateRungs.length !== ANOMALIES.length) {
-  console.error(`${ANOMALIES.length} anomalies against ${gateRungs.length} gate rungs `
-    + `(${gateRungs.join(', ')}); index i is anomaly i + 1, so every one needs its own`);
+/*
+ * ...and from build 299 the table is DERIVED and the roster is LONGER.
+ *
+ * The equal-lengths check this replaces was right while every anomaly had a
+ * door. The ladder is now a spacing and a depth -- one slot every `bossEvery`
+ * rungs to `ceiling` -- so the table is seven entries against a roster of
+ * nine, and AXIOM and TESSERA are deferred by having no rung at all. What has
+ * to hold is therefore not "one gate each" but three things:
+ *
+ *   - the table IS the derivation. Written out it would be a hand-kept list,
+ *     which is the shape that has cost this repo `world.apertures` sized 8
+ *     against 9 anomalies, a lot count restated in four places, and a case
+ *     pinning `gates.length === 9`. `rungsEvery` is imported rather than
+ *     re-implemented here, or the guard is a second copy of the thing it is
+ *     checking.
+ *   - no gate names an anomaly that does not exist. A table LONGER than the
+ *     roster is a rung the ladder holds for a fight nothing can open, which
+ *     is a run that cannot continue -- the one direction that is fatal.
+ *   - the ceiling is the last gate. A rung of empty ladder above the last
+ *     anomaly reads as the game having run out rather than as an end, and a
+ *     ceiling BELOW the last gate is the deadlock build 299 was written to
+ *     remove: an anomaly on the far side of a hold nothing can lift.
+ */
+const TIER = CFG.waves.tier;
+const wantGates = CFGMOD.rungsEvery(TIER.bossEvery, TIER.ceiling);
+if (wantGates.length !== gateRungs.length || wantGates.some((r, i) => r !== gateRungs[i])) {
+  console.error(`the gate rungs are not one every ${TIER.bossEvery} to ${TIER.ceiling}: `
+    + `${gateRungs.join(', ')} against ${wantGates.join(', ')} -- derive it, do not type it`);
+  process.exit(1);
+}
+if (gateRungs.length > ANOMALIES.length) {
+  console.error(`${gateRungs.length} gate rungs against ${ANOMALIES.length} anomalies `
+    + `(${gateRungs.join(', ')}); a gate with no anomaly behind it is a rung nothing can open`);
+  process.exit(1);
+}
+if (gateRungs[gateRungs.length - 1] !== TIER.ceiling) {
+  console.error(`the last gate is rung ${gateRungs[gateRungs.length - 1]} and the ceiling is `
+    + `${TIER.ceiling}; the ladder must end ON its last anomaly, not above or below it`);
+  process.exit(1);
+}
+/*
+ * ...and the price of a NEW FORM is the count of gates under the era hold.
+ *
+ * `CFG.ordinal.recast` is both the REMAINDERs the node costs and the
+ * reconciled count it asks for, and `eraHeld` stops the ladder at `eraGate`
+ * -- so a requirement above the number of gates at or below that rung is a
+ * DEADLOCK and not a price: the run is held, and the way through the hold
+ * needs an anomaly the hold has made unreachable. Exactly what shipping the
+ * derived table with `recast: 7` would have been.
+ */
+const underHold = gateRungs.filter((r) => r <= TIER.eraGate).length;
+if (CFG.ordinal.recast > underHold) {
+  console.error(`NEW FORM asks for ${CFG.ordinal.recast} reconciled and only ${underHold} gates `
+    + `sit at or below eraGate ${TIER.eraGate} -- the run would be held with no way through`);
   process.exit(1);
 }
 const badGate = gateRungs.filter((t, i) => !(t > 0) || t !== Math.round(t)
@@ -554,7 +605,7 @@ if (badGate.length) {
 const built = ANOMALIES.filter((a) => a.built);
 const panels = CFG.ordinal.rings.reduce((n, r) => n + r.per * 4, 0);
 console.log(`${built.length} of ${ANOMALIES.length} anomalies built, each standing on its own rung (`
-  + `${built.map((a) => `${a.name} ${CFG.waves.tier.gates[a.n - 1]}`).join(', ')})`);
+  + `${built.map((a) => `${a.name} ${CFG.waves.tier.gates[a.n - 1] ?? 'deferred'}`).join(', ')})`);
 console.log(`ORDINAL: ${panels} segments in ${CFG.ordinal.rings.length} closed frames`);
 
 // ---- REV: what these bytes actually are ------------------------------------

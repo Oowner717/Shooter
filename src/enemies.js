@@ -4174,6 +4174,25 @@ export class Director {
   }
 
   /**
+   * Is the ladder held here by the FLOOR OF THE SIMULATION?
+   *
+   * `CFG.waves.tier.ceiling` is the last rung there is. Unlike the two holds
+   * above it there is nothing that lifts this one -- an anomaly is answered by
+   * fighting and the era by becoming, and this one is answered by nothing,
+   * which is why it takes no world: there is no state it could consult.
+   *
+   * Takes the rung rather than reading `this.tier`, for the same reason
+   * `gateAt` and `eraHeld` do: `climbTo` walks a rung at a time and has to be
+   * able to ask about each one on the way.
+   *
+   * @returns the rung it is held at, or 0
+   */
+  depthHeld(tier = this.tier) {
+    const at = CFG.waves.tier.ceiling;
+    return (at && tier >= at) ? at : 0;
+  }
+
+  /**
    * The highest rung a climb from here may actually reach.
    *
    * Walks up one rung at a time and stops at the first gate whose anomaly is
@@ -4188,6 +4207,8 @@ export class Director {
       if (n && !(world.reconciled || []).includes(n)) return at;
       // ...and the one gate that is not an anomaly. See `eraHeld`.
       if (this.eraHeld(world, at)) return at;
+      // ...and the one that nothing opens. See `depthHeld`.
+      if (this.depthHeld(at)) return at;
       at++;
     }
     return want;
@@ -4657,9 +4678,18 @@ export class Director {
    * does not gate, because every one of those already knows where it wants
    * the run to be -- and it raises `peak`, because being put on a rung is
    * having stood on it.
+   *
+   * It DOES clamp to `ceiling`, which is the one thing above that is not a
+   * gate: a rung past the last one is not a rung this run has not earned yet,
+   * it is a rung that does not exist, and there is nothing for a wave to draw
+   * from there. This is the second door -- build 272 wrote the era ceiling
+   * into `climbTo` alone and `endBoss` stepped over it with this setter on the
+   * very next line, so a ceiling honoured in one place is a ceiling with a
+   * door standing open.
    */
   setTier(n) {
-    this.tier = Math.max(1, Math.round(n));
+    const cap = CFG.waves.tier.ceiling || Infinity;
+    this.tier = Math.min(cap, Math.max(1, Math.round(n)));
     this.peak = Math.max(this.peak, this.tier);
     return this.tier;
   }
@@ -5053,15 +5083,32 @@ export class Director {
      * floors the ceiling at where it is standing, which is the original rule
      * for saves written before build 188 that carry no peak at all.
      */
-    this.peak = Math.max(1, Math.round(d.peak || 0));
+    /*
+     * ...and clamped to `ceiling`, which is the THIRD door. `climbTo` refuses
+     * and `setTier` clamps, and the restore writes both fields by hand and
+     * goes through neither -- so a file written by a build with a deeper
+     * ladder, or none, would put a run above a rung that does not exist and
+     * nothing would ever bring it back down. The ceiling is read before the
+     * probe for the same reason the original does: a trial stands the run on
+     * its rung without raising anything.
+     */
+    const cap = CFG.waves.tier.ceiling || Infinity;
+    this.peak = Math.min(cap, Math.max(1, Math.round(d.peak || 0)));
     const pr = d.probe;
-    this.probe = pr && Number.isFinite(pr.from) && Number.isFinite(pr.to) && pr.to > this.peak
+    /*
+     * ...and a stored trial ABOVE the ceiling is not a trial, it is a rung
+     * that does not exist -- so it is refused rather than clamped, because
+     * clamping it would leave `probe.to` and `tier` disagreeing about the
+     * question being asked and `settle` would answer the wrong one.
+     */
+    this.probe = pr && Number.isFinite(pr.from) && Number.isFinite(pr.to)
+      && pr.to > this.peak && pr.to <= cap
       ? { from: Math.max(1, Math.round(pr.from)), to: Math.round(pr.to) }
       : null;
     if (this.probe) {
       this.tier = this.probe.to;
     } else {
-      this.tier = Math.max(1, Math.round(d.tier ?? (1 + (world.kills || 0) / 40)));
+      this.tier = Math.min(cap, Math.max(1, Math.round(d.tier ?? (1 + (world.kills || 0) / 40))));
       // Where the run is standing is the least it can have stood on, so the
       // ticks are right even for a save that predates `peak`.
       this.peak = Math.max(this.peak, this.tier);

@@ -1633,7 +1633,17 @@ export class Hud {
        * off the floor rather than showing tiers that do not exist: at tier 1
        * the window is 1..5, not -1..3.
        */
-      const first = Math.max(1, n - Math.floor(RAIL_SEEN / 2));
+      /*
+       * ...and pulled off the CEILING the same way, from build 299. At rung
+       * 49 an unclamped window is 47..51 and rungs 50 and 51 do not exist --
+       * two cells drawn `locked`, which is the mark for "never reached" and
+       * reads as somewhere the run may yet go. Clamped, the window is 45..49
+       * and the ladder ends where it ends, which is the same argument as the
+       * floor clamp one line up: show rungs, not the space past them.
+       */
+      const cap = CFG.waves.tier.ceiling || Infinity;
+      const first = Math.min(Math.max(1, n - Math.floor(RAIL_SEEN / 2)),
+        Math.max(1, cap - RAIL_SEEN + 1));
       for (let i = 0; i < this.railCells.length; i++) {
         const c = this.railCells[i];
         const t = first + i;
@@ -1653,6 +1663,13 @@ export class Hud {
         c.el.classList.toggle('seen', t > n && t <= peak);
         // ...and never reached. Drawn shut, and the arrow will not go there.
         c.el.classList.toggle('locked', t > peak && t !== trial);
+        /*
+         * The last rung there is. A closed end rather than a rung with
+         * nothing after it, so the ceiling is legible before it is reached --
+         * the window is clamped to it, so the cell sits at the right-hand
+         * edge of the rail for the last five rungs of a run.
+         */
+        c.el.classList.toggle('end', t === cap);
         // The rung being tried: standing on it, not having earned it.
         c.el.classList.toggle('trial', t === trial);
         c.tick.textContent = t < n ? '\u2713' : '';
@@ -2411,7 +2428,14 @@ export class Hud {
       name.textContent = a.name;
       const at = document.createElement('span');
       at.className = 'dbgBossAt';
-      at.textContent = `RUNG ${CFG.waves.tier.gates[a.n - 1]}`;
+      /*
+       * An anomaly with no rung prints that rather than `RUNG undefined`. The
+       * gate table is seven entries to the ceiling and the roster is nine, so
+       * two of these rows are for fights nothing can climb to -- which is
+       * exactly what this panel is for, and is worth saying on the row.
+       */
+      const rung = CFG.waves.tier.gates[a.n - 1];
+      at.textContent = rung === undefined ? 'NO RUNG' : `RUNG ${rung}`;
       const eraEl = document.createElement('span');
       eraEl.className = 'dbgBossEra';
       eraEl.textContent = `ERA ${era}`;

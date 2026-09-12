@@ -2611,4 +2611,81 @@ came from before believing the other one covers it.
   (`CFG.drift.band`/`bandHalf`), which reverses build 78's ruling against a
   band by request; the hash moved (1299530142 to 1831189433) for the drift's walk
   and the surface brake, both expected.
+- **The ladder is a SPACING and a DEPTH from build 299, and the gate table is
+  derived from them.** `CFG.waves.tier.bossEvery` (7) and `ceiling` (49) are
+  authored; `gates` is `rungsEvery(bossEvery, ceiling)` = 7, 14, 21, 28, 35,
+  42, 49. Written out it was a hand-kept list, which is the shape that has
+  already cost this repo `world.apertures` sized 8 against 9 anomalies, the
+  emplacement lot count restated in four places, and a case pinning
+  `gates.length === 9` that failed the moment the table was truncated without
+  one rung moving. `check-build.mjs` asserts the derivation, that no gate
+  names an anomaly that does not exist, and that the last gate IS the ceiling.
+- **SEVEN gates against NINE anomalies is how AXIOM and TESSERA are deferred,
+  and the deferral is the table alone.** Nothing declares a rung on itself, so
+  an anomaly with no entry has no door: `gateAt` returns 0 on every rung, no
+  banner ever lights, and `load()` bounds its aperture restore by the roster
+  rather than by the table, so an aperture stored by an older file is inert.
+  `regress.mjs` stands on every rung from 1 to the ceiling and asserts neither
+  lights. Putting them back is a deeper `ceiling` and nothing else.
+  **`anomalyEra` had to learn about it**: `undefined > eraGate` is false, so an
+  ungated anomaly answered ERA 1 -- and `debugBoss` is the only way to reach
+  either and SETS the era off that answer, which would have put an era-2 fight
+  on an era-1 field with the first machine standing in it, the exact thing that
+  function's docstring says nothing else enforces. A fight nothing can climb to
+  is past a ceiling that is itself past `eraGate`.
+- **A CEILING NEEDS ALL THREE DOORS, not the two build 272 found.** `climbTo`
+  refuses, `setTier` clamps -- and `Director.restore` writes `tier` and `peak`
+  by hand and goes through neither, so a file written by a build with a deeper
+  ladder puts a run above a rung that does not exist and nothing brings it back
+  down. A stored TRIAL above the ceiling is refused rather than clamped:
+  clamping leaves `probe.to` and `tier` disagreeing about the question and
+  `settle` then answers the wrong one. The fourth path is `endBoss`, which
+  steps past the gate it has just answered with `setTier` -- and the last gate
+  IS the ceiling, so that is the one place in ordinary play where the two rules
+  meet. Driven through `openBoss`/`endBoss` in the case, because the step is
+  not a control.
+- **`recast` was one ruling with two writers, and the derived table turned that
+  into a deadlock.** `CFG.ordinal.recast` was the REMAINDER price and
+  `upgrades.js` held a separate literal `7` for the reconciled count. Seven
+  slots to a ceiling of 49 puts only SIX gates under `eraGate` 42, so the run
+  is held at 42 having answered six and the way through the hold needed the
+  seventh -- which stands at 49, on the far side of the hold. Both halves read
+  the constant now and it is 4; `check-build.mjs` fails the build if it ever
+  exceeds the number of gates at or below `eraGate`, which is the arithmetic
+  nobody does by hand.
+- **`sayOnce` DROPS what it cannot say, so a case about a line has to free the
+  BAND and not just the record.** `forgetLines()` un-marks the OPENING too, and
+  the opening then owns the band: measured, thirty seconds of game time and the
+  script had said six lines about the grip and not finished. Mark every line
+  said EXCEPT the one under test -- walking `tutorial.js` by SHAPE (a string
+  `id` beside a string `text`), never by name, because that file exports
+  several tables and there will be another.
+- **A teaching line is held to LINE BOXES, not characters, and the band is
+  300px at 320 where the suite does not run.** Counted off
+  `Range.getClientRects()` on the real element with its width forced to 300,
+  with the partner's own count as the vacuity guard -- two lines both
+  measuring 1 box means the element was not laid out at all.
+- **The rail's window is clamped at BOTH ends.** Unclamped at rung 49 it is
+  47..51 and two of those rungs do not exist, drawn `locked` -- which is the
+  mark for "never reached" and reads as somewhere the run may yet go. The
+  ceiling cell wears `end`: a trebled solid right edge, structure rather than a
+  shade so it survives a player who receives no hue, asserted off
+  `getComputedStyle(...).borderRightWidth` because a class going on is not a
+  picture changing.
+- **What a hold SAYS is as much of it as what it refuses, and the three holds
+  say different things.** An aperture is answered by fighting, the era by
+  becoming, and the floor by nothing -- so the floor's line is not an
+  instruction, it is the run being told this is an end and not a fault. The
+  load-bearing half is the second one: the field holds, the feed keeps paying,
+  the tree can still be finished. The pill carries the rung READ OUT OF THE
+  CONFIG and the band carries no figure at all, because a number quoted in
+  prose rots. Fired on ARRIVAL and not on the verdict that would have climbed:
+  `railUp` goes dead the instant the run stands on the ceiling, so a message
+  waiting for the next wave leaves a dead control unexplained for the whole of
+  it -- which is the complaint `syncEraCap` was written to answer.
+- **A once-per-arrival pill has to be counted at the CALL, not on the screen.**
+  `Hud.alert` refreshes an identical line instead of appending one, so a
+  second, third and twentieth call are all invisible to anything reading the
+  column. The case spies `hud.alert`, scores twenty further waves, and asserts
+  the count is still one.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

@@ -34,7 +34,7 @@ import { NODES, NODE_BY_ID, priceOf, UNDER, levelsOf } from './tree.js';
 
 /** The turret branch, for the fitting announcements and the completion one. */
 const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
-import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_CROWD, ON_WALL, ON_LOTS, ON_WORKS, ON_CEILING, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_CROWD, ON_WALL, ON_LOTS, ON_WORKS, ON_CEILING, ON_DEPTH, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
@@ -3335,6 +3335,50 @@ export class Game {
   }
 
   /**
+   * ...and the hold that nothing opens.
+   *
+   * `CFG.waves.tier.ceiling` is the last rung there is. The two holds above
+   * are states with a way out of them and each says where: an aperture is
+   * answered by fighting and the era by becoming. This one is answered by
+   * nothing, so the message is not an instruction -- it is the run being told
+   * that it has arrived at the end of the simulation and that the end is not
+   * a failure. Everything else goes on: waves arrive, they pay, the tree
+   * fills.
+   *
+   * ON ARRIVAL, not on the verdict that would have climbed past it. The plan
+   * asked for the verdict and the arrow is the reason it is the arrival
+   * instead: `railUp` goes dead the instant the run stands on the ceiling, so
+   * a message that waits for the next wave to score leaves a dead control
+   * unexplained for the whole of that wave -- which is the exact complaint
+   * `syncEraCap` was written to answer, and this is that function's shape
+   * with one line changed.
+   *
+   * Once per arrival, guarded on `haltLit` the way the era ceiling is guarded
+   * on `capLit`, and it CLEARS when the hold lifts. Nothing lifts this hold in
+   * ordinary play -- but the debug panel steps the ladder and `Game.restart`
+   * puts it back to rung 1, and a run told once and then moved is a run that
+   * would never be told again.
+   */
+  syncDepthCap() {
+    const w = this.world;
+    const d = w.director;
+    if (!d || w.boss || w.phase !== 'staging') return;
+    const at = d.depthHeld();
+    if (!at) { this.haltLit = 0; return; }
+    if (this.haltLit !== at) {
+      this.haltLit = at;
+      // The rung is read out of the config rather than written into the
+      // string: a figure quoted in a sentence rots, and this one is a
+      // constant two files away that the whole phase is built around.
+      this.hud.alert(`SIMULATION HALTED \u00b7 DEPTH ${at} IS THE FLOOR`, 'halt', 6);
+    }
+    // Offered every frame until it PAINTS, for the reason written out in
+    // `syncEraCap`: `sayOnce` drops a line it cannot say and arriving anywhere
+    // interesting is a busy moment, a wave having just been scored.
+    if (this.hintsAllowed && !lineSeen(ON_DEPTH.id)) this.sayOnce([ON_DEPTH]);
+  }
+
+  /**
    * The anomaly stops counting.
    *
    * A gate that cannot be passed is a run that cannot continue, so a boss that
@@ -3436,6 +3480,7 @@ export class Game {
     // ...and the ceiling's, beside it and for the same reason: a fresh run has
     // not been told anything yet.
     this.capLit = 0;
+    this.haltLit = 0;
     /*
      * ...and the step past the gate you just answered is refused if the rung
      * above is held by the FORM.
@@ -3447,7 +3492,7 @@ export class Game {
      * reconciling TERMINUS at rung 42 walked the run straight to 43 and over
      * the ceiling that exists to stop exactly that.
      */
-    if (d.gateAt(d.tier) === n && !d.eraHeld(w, d.tier)) {
+    if (d.gateAt(d.tier) === n && !d.eraHeld(w, d.tier) && !d.depthHeld(d.tier)) {
       d.setTier(d.tier + 1);
       // ...and the anomaly leaves a choice behind it. Two rules, on the rail,
       // taken by tapping one. Nothing is held and nothing is asked.
@@ -3663,6 +3708,7 @@ export class Game {
     // which of the six ways onto a gate rung the run took to get here.
     this.syncGate();
     this.syncEraCap();
+    this.syncDepthCap();
     const w = this.world;
     this.hud.setKills(w.kills);
     /*

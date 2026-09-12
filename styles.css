@@ -632,6 +632,23 @@ html, body {
   animation: alertIn 0.18s ease-out;
 }
 .alert.breach { color: var(--warn); }
+/*
+ * The simulation halted. The one thing in the game that is an END rather than
+ * an event, so it is allowed the weight of a REMAINDER and the colour of a
+ * warning -- and it is the same `--warn` the breach pill already wears rather
+ * than a new hue, because that colour is measured and a fresh one would be a
+ * fresh contrast claim. Composited, `#ff4d6d` on this plate over the field is
+ * about 5.4:1, which the suite's own sweep re-measures.
+ */
+.alert.halt {
+  color: var(--warn);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  padding: 8px 17px;
+  background: rgba(22, 5, 10, 0.92);
+  box-shadow: 0 0 26px -4px currentColor, inset 0 0 18px -8px currentColor;
+  animation: alertIn 0.18s ease-out, rigDone 1.2s ease-out;
+}
 .alert.power { color: #ffcf5c; }
 .alert.info { color: var(--accent); }
 /*
@@ -3267,6 +3284,29 @@ body.bossUp #waveRail { display: none; }
   border-color: color-mix(in srgb, var(--warn, var(--accent)) 78%, transparent);
   color: color-mix(in srgb, var(--warn, var(--accent)) 88%, var(--dim));
   box-shadow: 0 0 10px color-mix(in srgb, var(--warn, var(--accent)) 20%, transparent);
+}
+
+/*
+ * The last rung there is, drawn as a closed end.
+ *
+ * STRUCTURE and not a shade: the right edge is trebled and solid where every
+ * other edge on the rail is a hairline, so the ladder reads as walled off at
+ * arm's length and to a player who receives no hue at all -- the same rule
+ * the dummy's five bands follow. `border-box` is global and the nodes are
+ * `1fr`, so a thicker edge moves nothing.
+ *
+ * It keeps whatever else the node is -- `.at`, `.gate`, `.done`, a trial --
+ * because the ceiling is a property of the RUNG and those are properties of
+ * the run, and two different facts about one cell must not overwrite each
+ * other. Written with the rail's id so it wins the right edge even under
+ * `#waveRail.held .railNode.at`, which sets `border-color` as a shorthand.
+ */
+#waveRail .railNode.end {
+  border-right-width: 3px;
+  border-right-style: solid;
+  border-right-color: color-mix(in srgb, var(--dim) 80%, transparent);
+  border-top-right-radius: 1px;
+  border-bottom-right-radius: 1px;
 }
 
 /*

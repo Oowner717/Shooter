@@ -960,12 +960,25 @@ export const UPGRADES = {
     { id: 'recast', name: 'NEW FORM', levels: 1,
       currency: 'remainder', cost: CFG.ordinal.recast, step: 0,
       /*
-       * Seven REMAINDERs and no energy, by ruling. One per anomaly, so the
-       * price IS the ladder: it cannot be farmed, cannot be saved up early,
-       * and cannot be paid in the currency everything else takes.
+       * REMAINDERs and no energy, by ruling. One per anomaly under the hold,
+       * so the price IS the ladder: it cannot be farmed, cannot be saved up
+       * early, and cannot be paid in the currency everything else takes.
+       *
+       * `CFG.ordinal.recast` for BOTH halves, from build 299. The price above
+       * already read it and the requirement here was a literal `7` -- one
+       * ruling with two writers, which is the shape that has cost this repo a
+       * node sold three times and a lot count restated in four places. It
+       * mattered the moment the ladder changed: seven slots to a ceiling of
+       * 49 puts the seventh anomaly at rung 49 and only six under `eraGate`,
+       * so a requirement of seven was a deadlock -- held at 42 with six
+       * answered, and the way through the hold needed the one anomaly the
+       * hold made unreachable.
        */
-      needs: (g) => g.rigDone() && g.world.reconciled.length >= 7,
-      needsLine: 'Needs every anomaly reconciled, and the machine finished.',
+      needs: (g) => g.rigDone() && g.world.reconciled.length >= CFG.ordinal.recast,
+      // Not "every anomaly": there are nine, the ladder offers seven, and this
+      // asks for the four that stand under the hold it is the way out of. The
+      // count comes off the one constant rather than being written out again.
+      needsLine: `Needs ${CFG.ordinal.recast} anomalies reconciled, and the machine finished.`,
       line: 'A new form for the turret, and a field to put it on.',
       // (up, world), like every other apply in this file. Buying it ARMS the
       // banner; it does not run the cinematic. "After purchase, a banner; when

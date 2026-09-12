@@ -3758,10 +3758,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // ---- the climb: a fully-bought turret on the assists ----
     /*
      * With the anomalies answered, so this measures the LADDER. Build 203 put
-     * seven gates on it and the first is rung 6: without this the run climbs
-     * to 6, is held there by ORDINAL exactly as intended, and a case about
-     * how fast a good turret climbs fails on the gate doing its job. That the
-     * gate holds is asserted on its own, further down.
+     * seven gates on it and build 299 made them one every seventh rung, so
+     * the first is `gates[0]`: without this the run climbs to it, is held
+     * there by ORDINAL exactly as intended, and a case about how fast a good
+     * turret climbs fails on the gate doing its job. That the gate holds is
+     * asserted on its own, further down.
      */
     g.restart();
     g.debugTeachAll();
@@ -7233,6 +7234,16 @@ if (!GUN_LINE) {
       slots: NODES.filter((n) => n.id && /^aperture/.test(n.id)).length,
       roots: NODES.filter((n) => n.kind === 'root').map((n) => n.key),
       builtCount: ANOMALIES.filter((a) => a.built).length,
+      /*
+       * How many anomalies HAVE a rung, which is not how many are built --
+       * the table is seven entries to the ceiling and the roster is nine.
+       * Asserted against the table's own length rather than the roster's, and
+       * with the two deferred ones named, because "an anomaly with no rung
+       * has no door at all" is the whole of how they are deferred.
+       */
+      gatedCount: gates.length,
+      deferredLit: ANOMALIES.filter((a) => gates[a.n - 1] === undefined
+        && lit[a.name] !== undefined).map((a) => a.name),
       gates, lit, early, relit, afterDone,
     };
     w.reconciled.length = 0;
@@ -7249,9 +7260,22 @@ if (!GUN_LINE) {
     + `first row is ${r.firstIsRecast ? 'RECAST' : 'NOT recast'}`);
 
   check('every way in lights on its own gate rung, and none before it',
-    r.early.length === 0 && Object.keys(r.lit).length === r.builtCount,
+    r.early.length === 0 && Object.keys(r.lit).length === r.gatedCount,
     `${r.early.join('; ') || 'each lit on its own rung'} — `
     + `${JSON.stringify(r.lit)} against gates ${r.gates.join(',')}`);
+
+  /*
+   * ...and the deferral is a table with two fewer entries in it and nothing
+   * else. This was `Object.keys(lit).length === builtCount` above, which was
+   * the same claim while every anomaly had a door; from build 299 two are
+   * built, drawn in the glossary and reachable by nothing, so the absence is
+   * what has to be asserted -- the sweep stands on every rung from 1 to the
+   * ceiling and neither of them ever lights.
+   */
+  check('...and an anomaly with no rung has no door: nothing lights for it',
+    r.deferredLit.length === 0 && r.gatedCount < r.builtCount,
+    `${r.gatedCount} gate rungs against ${r.builtCount} built anomalies; `
+    + `${r.deferredLit.join('/') || 'neither deferred one'} lit on any rung`);
 
   check('...and the gate stays lit at one, and goes out once its boss is down',
     r.relit === 1 && r.afterDone === 0,
@@ -10788,6 +10812,16 @@ if (!GUN_LINE) {
     const pose = ({ t, k, left, asked = 10, tier = 20, hold = false, grace = 0 }) => {
       g.debugClearField();
       for (let i = 0; i < left; i++) g.debugSpawn('mote', 60 + i * 12, 120);
+      /*
+       * Every anomaly answered, so the only thing deciding what this wave is
+       * worth is the VERDICT TABLE. Build 299 put a slot on every seventh
+       * rung and rung 21 is now a gate, so a surge posed at 20 asked for 22
+       * and `climbTo` correctly stopped it at 21 -- the surge arm read
+       * `surge+1` and failed on the gate doing its job. That gates hold is
+       * asserted on its own, further down; here they must not be in the way
+       * whatever the spacing is.
+       */
+      w.reconciled = CFG.waves.tier.gates.map((_, i) => i + 1);
       d.probe = null;
       d.setTier(tier);
       d.peak = tier;
@@ -10843,6 +10877,14 @@ if (!GUN_LINE) {
     res.sweepOf = 6 * 7 * 4;
     res.cfg = { surgeWithin: T.surgeWithin, cleanWithin: T.cleanWithin,
       failContact: T.failContact, routBelow: T.routBelow };
+    /*
+     * ...and `pose` answered every anomaly to keep the gates out of the way,
+     * so it puts them back. `restart()` keeps `world.reconciled` -- it is not
+     * a reset of everything a case can leave behind -- and seven anomalies
+     * left standing would hand every later case a depth dividend and an open
+     * ladder, which is the director-stub fault on a different field.
+     */
+    w.reconciled.length = 0;
     g.restart();
     return res;
   });
@@ -11054,7 +11096,8 @@ if (!GUN_LINE) {
     const w = g.world;
     const d = w.director;
     const gates = CFG.waves.tier.gates;
-    const out = { gates };
+    const out = { gates, bossEvery: CFG.waves.tier.bossEvery,
+      ceiling: CFG.waves.tier.ceiling };
     const real = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
 
     // ---- a gate stops a climb, and a surge does not step over one ----
@@ -11070,11 +11113,15 @@ if (!GUN_LINE) {
       const res = d.score(w);
       return { from: tier, to: d.tier, verdict: res.verdict };
     };
-    const gate = gates[0];                       // 6, ORDINAL
-    out.intoGate = climbFrom(gate - 1, 'clean'); // 5 -> 6, allowed
-    out.atGate = climbFrom(gate, 'clean');       // 6 -> 6, held
-    out.surgeOver = climbFrom(gate - 1, 'surge');// 5 -> 6, NOT 7
-    out.surgeBelow = climbFrom(gate - 3, 'surge');// 3 -> 5, nothing in the way
+    // ORDINAL's own rung, read off the table rather than typed: the spacing
+    // moved from six to seven in build 299 and every literal in this case
+    // would have had to move with it.
+    const gate = gates[0];
+    out.gate = gate;
+    out.intoGate = climbFrom(gate - 1, 'clean');  // one below -> on it, allowed
+    out.atGate = climbFrom(gate, 'clean');        // on it -> held
+    out.surgeOver = climbFrom(gate - 1, 'surge'); // a surge lands ON, not over
+    out.surgeBelow = climbFrom(gate - 3, 'surge');// ...and climbs two elsewhere
 
     // ...and once it is reconciled the same wave climbs straight through
     g.restart(); w.reconciled.length = 0; w.reconciled.push(1);
@@ -11154,17 +11201,31 @@ if (!GUN_LINE) {
     return out;
   });
 
-  check('every anomaly stands on its own rung of the ladder',
-    r.gates.length === 9 && r.gates.every((x, i) => i === 0 || x > r.gates[i - 1]),
-    `gates at ${r.gates.join(', ')}`);
+  /*
+   * The rungs are DERIVED, from build 299: one slot every `bossEvery` to the
+   * `ceiling`. This was `gates.length === 9`, a count of the roster, and it
+   * failed the moment the table was truncated to the seven that are in play
+   * without one rung moving -- the hand-kept-list trap in three characters.
+   * Asserted as the rule the config states, so a table that happens to agree
+   * today cannot satisfy it.
+   */
+  check('the boss slots are one every seventh rung, to the last rung there is',
+    r.bossEvery > 0 && r.ceiling > 0
+    && r.gates.length === Math.floor(r.ceiling / r.bossEvery)
+    && r.gates.every((x, i) => x === r.bossEvery * (i + 1))
+    && r.gates[r.gates.length - 1] === r.ceiling,
+    `gates at ${r.gates.join(', ')} for one every ${r.bossEvery} to ${r.ceiling}`);
   check('a gate rung can be climbed to, and not past',
-    r.intoGate.to === 6 && r.atGate.to === 6,
-    `5 -> ${r.intoGate.to}, then 6 -> ${r.atGate.to} on a clean wave`);
+    r.intoGate.to === r.gate && r.atGate.to === r.gate,
+    `${r.gate - 1} -> ${r.intoGate.to}, then ${r.gate} -> ${r.atGate.to} on a clean wave`);
   check('...and a surge steps ON to a gate rather than over it',
-    r.surgeOver.to === 6 && r.surgeOver.verdict === 'surge' && r.surgeBelow.to === 5,
-    `surge from 5 lands on ${r.surgeOver.to}; the same surge from 3 lands on ${r.surgeBelow.to}`);
+    r.surgeOver.to === r.gate && r.surgeOver.verdict === 'surge'
+    && r.surgeBelow.to === r.gate - 1,
+    `surge from ${r.gate - 1} lands on ${r.surgeOver.to}; the same surge from `
+    + `${r.gate - 3} lands on ${r.surgeBelow.to}`);
   check('...and once the anomaly is reconciled the rung opens',
-    r.past === 7, `at 6 with ORDINAL reconciled, a clean wave goes to ${r.past}`);
+    r.past === r.gate + 1,
+    `at ${r.gate} with ORDINAL reconciled, a clean wave goes to ${r.past}`);
   check('a gate holds the climb and never the fall',
     r.routed === -1, `a glitch at the gate moved ${r.routed}`);
   check('a trial cannot be used to vault a gate',
@@ -11178,10 +11239,10 @@ if (!GUN_LINE) {
     r.stood && r.gone && r.withdrewAfter >= r.patience && r.withdrewAfter < r.patience * 1.5,
     `stood up ${r.stood}, went after ${r.withdrewAfter}s against a patience of ${r.patience}s`);
   check('...leaving nothing reconciled, the gate lit and the rung where it was',
-    r.notReconciled && r.stillLit && r.tierKept === 6,
+    r.notReconciled && r.stillLit && r.tierKept === r.gate,
     `reconciled ${!r.notReconciled}, still lit ${r.stillLit}, standing on ${r.tierKept}`);
   check('and beating one hands over the rung it was standing in front of',
-    r.afterWin.reconciled.includes(1) && r.afterWin.tier === 7,
+    r.afterWin.reconciled.includes(1) && r.afterWin.tier === r.gate + 1,
     `reconciled ${JSON.stringify(r.afterWin.reconciled)}, now on rung ${r.afterWin.tier}`);
 }
 
@@ -11661,7 +11722,14 @@ if (!GUN_LINE) {
     g.restart();
     out.afterRestart = { open: g.sheetOpen, cls: document.body.classList.contains('sheetOpen') };
     w.phase = 'staging';
-    d.setTier(6); d.peak = 6;
+    /*
+     * ON the gate, off the table: `syncGate` only hands out an aperture on
+     * the rung the anomaly stands on, and `openBoss` refuses without one --
+     * so a literal 6 here stopped standing the boss up at all in build 299
+     * and the arm read "the sheet is still open" for a boss that never came.
+     */
+    const g0 = CFG.waves.tier.gates[0];
+    d.setTier(g0); d.peak = g0;
     w.reconciled.length = 0;
     g.syncGate();
     g.openSheet(true);
@@ -11711,20 +11779,29 @@ if (!GUN_LINE) {
     out.hiddenBetween = cellAt().querySelector('.rBars').getBoundingClientRect().height === 0;
 
     // ---- a gate is honest at a distance ----
+    /*
+     * Standing two rungs BELOW the first gate, so the window (n-2 .. n+2)
+     * carries it and the rung under it. The rungs were written out as 4, 5
+     * and 6 and the spacing moved from six to seven in build 299 -- at tier 4
+     * the window is 2..6 and the gate is outside it, so the arm read `null`
+     * for the cell it was asking about. Off the table now.
+     */
+    const g1 = CFG.waves.tier.gates[0];
+    out.gateRung = g1;
     d.resting = false;
-    d.setTier(4); d.peak = 12;
+    d.setTier(g1 - 2); d.peak = g1 + 5;
     w.reconciled.length = 0;
     g.hud.syncRail(w);
     const nodes = [...document.querySelectorAll('.railNode')].map((el) => ({
       n: Number(el.querySelector('b').textContent),
       gate: el.classList.contains('gate'), shut: el.classList.contains('shut'),
     }));
-    out.gateAhead = nodes.find((x) => x.n === 6) || null;
-    out.plainRung = nodes.find((x) => x.n === 5) || null;
+    out.gateAhead = nodes.find((x) => x.n === g1) || null;
+    out.plainRung = nodes.find((x) => x.n === g1 - 1) || null;
     w.reconciled.push(1);
     g.hud.syncRail(w);
     out.gateOpened = [...document.querySelectorAll('.railNode')]
-      .some((el) => Number(el.querySelector('b').textContent) === 6
+      .some((el) => Number(el.querySelector('b').textContent) === g1
         && el.classList.contains('gate') && !el.classList.contains('shut'));
 
     g.debugClearField();
@@ -11762,8 +11839,10 @@ if (!GUN_LINE) {
   check('a gate is marked on the rung it stands on, from any distance',
     r.gateAhead && r.gateAhead.gate && r.gateAhead.shut
     && r.plainRung && !r.plainRung.gate && r.gateOpened,
-    `standing on 4: rung 6 gate ${r.gateAhead && r.gateAhead.gate} shut `
-    + `${r.gateAhead && r.gateAhead.shut}, rung 5 gate ${r.plainRung && r.plainRung.gate}; `
+    `standing on ${r.gateRung - 2}: rung ${r.gateRung} gate `
+    + `${r.gateAhead && r.gateAhead.gate} shut `
+    + `${r.gateAhead && r.gateAhead.shut}, rung ${r.gateRung - 1} gate `
+    + `${r.plainRung && r.plainRung.gate}; `
     + `once reconciled it is marked and open: ${r.gateOpened}`);
 }
 
@@ -17828,7 +17907,16 @@ if (MINE_LINE) {
       doorShown: (() => {
         const b = document.querySelector('[data-panel="ultimate"] .ufEnter');
         return !!b && !!(b.offsetWidth || b.offsetHeight);
-      })() };
+      })(),
+      /*
+       * What the anomaly counter is ASKING for, off the one constant rather
+       * than typed into the assertion. It was written out as `0 of 7` and
+       * the count moved to four in build 299 -- a number in a case that says
+       * how many of something there are is the same maintenance trap as a
+       * number in a doc, and this one broke on a build that changed nothing
+       * about the room.
+       */
+      need: CFG.ordinal.recast };
 
     return out;
   });
@@ -17975,7 +18063,9 @@ if (MINE_LINE) {
     && r.ultimate.room && /NEW FORM/.test(r.ultimate.says) && r.ultimate.cards === 0
     && r.ultimate.needs.length === 2
     && /THE MACHINE FINISHED . 0 of 18/.test(r.ultimate.needs[0])
-    && /EVERY ANOMALY RECONCILED . 0 of 7/.test(r.ultimate.needs[1])
+    && r.ultimate.need > 0
+    && new RegExp(`${r.ultimate.need} ANOMALIES RECONCILED . 0 of ${r.ultimate.need}`)
+      .test(r.ultimate.needs[1])
     && r.ultimate.met === 0 && r.ultimate.door && !r.ultimate.doorShown,
     `tab sealed ${r.ultimate.sealedTab}, lock ${r.ultimate.lockOnTab}, room `
     + `"${r.ultimate.says}", ${r.ultimate.cards} cards; it counts `
@@ -20504,6 +20594,15 @@ if (MINE_LINE) {
 
     // ---- the surface is one-way, and only for what came through it -------
     clean();
+    /*
+     * The rung PINNED, because how far the free body gets is a property of
+     * its own cruise and accel, and both are tier-scaled -- so the control
+     * measured whatever rung a hundred cases upstream had left on the
+     * director. Measured 24 units in on one suite run against a threshold of
+     * 30 fitted to another, which is a window set near the truth rather than
+     * clear of it. Rung 1 is the one every body in the game is authored at.
+     */
+    w.director.setTier(1);
     const Pc = w.portal;
     const thrown = g.debugSpawn('lurcher', Pc.x + 20, Pc.rim + 60);
     thrown.staged = false; thrown.born = true; thrown.bornFor = 5; thrown.vx = 0; thrown.vy = -420;
@@ -20548,13 +20647,31 @@ if (MINE_LINE) {
     return out;
   });
 
+  /*
+   * The control is read as a RATIO to its own cruise and compared with the
+   * portal arm's ratio, not against a fitted multiple.
+   *
+   * `CFG.entrySpeed` is 2.6 but `drive` blends velocity toward its target at
+   * a time constant near two seconds, so a march that is nominally 2.6x
+   * CROSSES at about 1.75x -- and the threshold was set at 1.8, a hair above
+   * the truth. Measured 71.5 against a cruise of 40.9 on one suite run,
+   * failing by three per cent on a build that changed nothing about the
+   * portal. The two arms also measure slightly different cruises, which a
+   * ratio makes irrelevant and an absolute does not. What the case is about
+   * is the GAP: 0.73x through the surface against 1.75x without it, which is
+   * a factor of 2.4.
+   */
   check('a body slows through the surface and comes out at its own cruise',
     r.ramp.bornAt > 0 && r.ramp.hiddenMax >= r.ramp.cruise * 1.8 && r.ramp.atRim <= r.ramp.cruise * 1.2
     && r.ramp.born === true && r.ramp.bornFor < 1
-    && r.loose.bornAt > 0 && r.loose.atRim >= r.loose.cruise * 1.8 && r.portalBack,
+    && r.loose.bornAt > 0 && r.loose.atRim >= r.loose.cruise * 1.5
+    && r.loose.atRim / r.loose.cruise >= (r.ramp.atRim / r.ramp.cruise) * 1.8
+    && r.portalBack,
     `hidden it reached ${r.ramp.hiddenMax} u/s against a cruise of ${r.ramp.cruise}, and crossed the `
-    + `rim at ${r.ramp.atRim} (born ${r.ramp.born}, born for ${r.ramp.bornFor}s); with no surface the same `
-    + `march crossed the line at ${r.loose.atRim} against ${r.loose.cruise} -- which is the old `
+    + `rim at ${r.ramp.atRim} -- ${(r.ramp.atRim / r.ramp.cruise).toFixed(2)}x its own cruise `
+    + `(born ${r.ramp.born}, born for ${r.ramp.bornFor}s); with no surface the same `
+    + `march crossed the line at ${r.loose.atRim} against ${r.loose.cruise}, `
+    + `${(r.loose.atRim / r.loose.cruise).toFixed(2)}x -- which is the old `
     + `spat-out crossing, and the instrument reading it; portal back ${r.portalBack}`);
 
   check('...and it is marked on the BODY, the mark follows it, and goes when it goes',
@@ -20564,12 +20681,22 @@ if (MINE_LINE) {
     + `where it moved to and ${r.litAtOld} round where it was (${r.litFar} far away); gone with the `
     + `body ${r.markGone}`);
 
+  /*
+   * The control is a DIFFERENTIAL and not a distance. "The free body gets 30
+   * units in" is a claim about a LURCHER's cruise at whatever rung the
+   * director happened to be left on, and it failed at 24 on a build that
+   * changed nothing about the portal; what the case is actually about is that
+   * one of these two bodies is refused by the surface and the other is not.
+   * So: the born one never meaningfully clears the rim and comes back under
+   * its own push, the free one clears it, and the gap between them is wide.
+   */
   check('...and the surface is one-way for what came through it, and open to what did not',
     r.oneWay.thrownMin > -8 && r.oneWay.backAt > 0 && r.oneWay.backAt < 40 && r.oneWay.endVy >= 0
-    && r.oneWay.freeMin < -30,
+    && r.oneWay.freeMin < -10 && r.oneWay.freeMin < r.oneWay.thrownMin - 15,
     `a born body thrown up at 420 u/s got ${r.oneWay.thrownMin} units past the rim and was back `
     + `on frame ${r.oneWay.backAt}, ending ${r.oneWay.endTop} below it at ${r.oneWay.endVy} u/s; `
-    + `a body that never came through went ${-r.oneWay.freeMin} units in`);
+    + `a body that never came through went ${-r.oneWay.freeMin} units in, `
+    + `${(r.oneWay.thrownMin - r.oneWay.freeMin).toFixed(1)} further`);
 
   check('DRIFT floats to the middle band, hovers there, and never goes back through',
     r.drift.staged === 0 && r.drift.reenter === 0 && r.drift.share >= 0.6
@@ -24218,22 +24345,32 @@ if (GUN_LINE) {
     out.rigDoneFull = g.rigDone();
     out.machineOnly = g.buy('recast');             // machine finished, no anomalies
 
+    /*
+     * What the node asks for, off the one constant. It was written out as
+     * seven -- the price AND the reconciled count -- and build 299 took it to
+     * four, so three arms here were asserting a threshold the game no longer
+     * has and one of them ("six is not enough") had become true.
+     */
+    const need = CFG.ordinal.recast;
+    const enough = Array.from({ length: need }, (_, i) => i + 1);
+    const oneFewer = enough.slice(0, need - 1);
+    out.need = need;
     arm();
     w.remainder = 99;
-    w.reconciled = [1, 2, 3, 4, 5, 6, 7];
+    w.reconciled = [...enough];
     out.anomaliesOnly = g.buy('recast');           // anomalies, no machine
 
-    // ...and six anomalies is not seven.
+    // ...and one short of the count is not the count.
     arm();
     w.remainder = 99;
     g.debugBuyAll();
-    w.reconciled = [1, 2, 3, 4, 5, 6];
-    out.sixOfSeven = g.buy('recast');
+    w.reconciled = [...oneFewer];
+    out.oneFewerAnomaly = g.buy('recast');
 
     // ---- both halves, and the right currency ------------------------------
     arm();
     g.debugBuyAll();
-    w.reconciled = [1, 2, 3, 4, 5, 6, 7];
+    w.reconciled = [...enough];
     w.remainder = CFG.ordinal.recast - 1;
     const purse = w.bytes;
     out.oneShort = g.buy('recast');                // gate met, price not
@@ -24250,15 +24387,24 @@ if (GUN_LINE) {
     return out;
   });
 
-  check('NEW FORM keeps its id, costs seven REMAINDERs and no energy',
+  /*
+   * The price is `CFG.ordinal.recast`, which is also the reconciled count it
+   * asks for -- ONE constant, and the assertion reads it rather than naming
+   * a number. It was pinned at seven and build 299 took it to four, because
+   * with a slot every seventh rung to a ceiling of 49 only six gates sit
+   * under `eraGate` and a requirement of seven was a deadlock rather than a
+   * price.
+   */
+  check('NEW FORM keeps its id, costs REMAINDERs off one constant and no energy',
     r.id === 'recast' && r.name === 'NEW FORM' && r.levels === 1 && r.repeat === false
-    && r.currency === 'remainder' && r.cost === 7 && r.hasGate
+    && r.currency === 'remainder' && r.cost === r.need && r.need > 0 && r.hasGate
     && r.oneShort === 'poor' && r.bought === 'ok' && r.paidRemainders === 0
     && r.energyUntouched && r.owned === 1 && r.again === 'maxed',
     `id ${r.id} (never renamed), shown as ${r.name}, ${r.levels} level, repeat `
-    + `${r.repeat}, ${r.cost} ${r.currency}s; six is ${r.oneShort}, seven is `
-    + `${r.bought} leaving ${r.paidRemainders}, the purse untouched `
-    + `${r.energyUntouched}, and a second buy is ${r.again}`);
+    + `${r.repeat}, ${r.cost} ${r.currency}s against a required ${r.need}; one `
+    + `short is ${r.oneShort}, the price is ${r.bought} leaving `
+    + `${r.paidRemainders}, the purse untouched ${r.energyUntouched}, and a `
+    + `second buy is ${r.again}`);
 
   /*
    * ...and the gate, both halves, each shown to refuse ON ITS OWN. A gate that
@@ -24266,10 +24412,10 @@ if (GUN_LINE) {
    */
   check('...and it cannot be reached early, by either half alone',
     r.bare === 'locked' && r.machineOnly === 'locked' && r.anomaliesOnly === 'locked'
-    && r.sixOfSeven === 'locked' && r.rigDoneBare === false && r.rigDoneFull === true,
+    && r.oneFewerAnomaly === 'locked' && r.rigDoneBare === false && r.rigDoneFull === true,
     `nothing: ${r.bare}; the machine finished but no anomalies: ${r.machineOnly}; `
-    + `all seven anomalies but a bare machine: ${r.anomaliesOnly}; six of seven `
-    + `with the machine done: ${r.sixOfSeven}`);
+    + `${r.need} anomalies but a bare machine: ${r.anomaliesOnly}; `
+    + `${r.need - 1} of ${r.need} with the machine done: ${r.oneFewerAnomaly}`);
 
   check('...and buying it arms the banner rather than starting the animation',
     r.armed === 'armed',
@@ -25662,7 +25808,18 @@ if (GUN_LINE) {
      * eighth anomaly went in above it and made that a claim about how many
      * bosses exist rather than about where the first form's ladder ends.
      */
-    out.isLastGate = CFG.waves.tier.gates[6] === CAP;
+    /*
+     * ...and from build 299 it is the SIXTH's, because the ladder is seven
+     * slots to a ceiling of 49 and the seventh stands on the ceiling itself.
+     * What still has to hold is the thing the index was standing in for: the
+     * era hold sits ON a gate rung, so there is never a rung of empty ladder
+     * between the last fight the first form can reach and the wall. Asked of
+     * the table rather than by index, which is what made this brittle twice.
+     */
+    out.isGateRung = CFG.waves.tier.gates.includes(CAP);
+    // Which anomaly stands on the ceiling's rung -- the one `endBoss` is
+    // answering in the second-door arm below. It was typed as the seventh.
+    out.capN = CFG.waves.tier.gates.indexOf(CAP) + 1;
 
     const arm = (form) => {
       g.restart();
@@ -25708,8 +25865,8 @@ if (GUN_LINE) {
     arm(null);
     w.director.setTier(CAP);
     w.apertures = w.apertures || [];
-    w.apertures[7] = 1;
-    g.openBoss(7);
+    w.apertures[out.capN] = 1;
+    g.openBoss(out.capN);
     out.opened = !!w.boss;
     if (w.boss) {
       w.boss.hp = 0;
@@ -25721,8 +25878,8 @@ if (GUN_LINE) {
     // ...and with the form taken, the same path DOES step.
     arm('done');
     w.director.setTier(CAP);
-    w.apertures[7] = 1;
-    g.openBoss(7);
+    w.apertures[out.capN] = 1;
+    g.openBoss(out.capN);
     if (w.boss) { w.boss.hp = 0; w.boss.dead = true; g.endBoss(); }
     out.tierAfterBossDone = w.director.tier;
 
@@ -25821,13 +25978,13 @@ if (GUN_LINE) {
   });
 
   check('the ladder ends where the first form does, and only the FORM opens it',
-    r.isLastGate
+    r.isGateRung
     && r.climbNone === r.cap && r.heldNone === r.cap
     && r.climbArmed === r.cap
     && r.climbDone > r.cap && r.heldDone === 0
     && r.climbUpTo === r.cap,
-    `the ceiling is rung ${r.cap}, which is the seventh anomaly's own gate `
-    + `(${r.isLastGate}); a climb from it reaches ${r.climbNone} with no NEW `
+    `the ceiling is rung ${r.cap}, which is anomaly ${r.capN}'s own gate `
+    + `(${r.isGateRung}); a climb from it reaches ${r.climbNone} with no NEW `
     + `FORM and ${r.climbArmed} with it merely BOUGHT -- the banner is not the `
     + `field -- and ${r.climbDone} once it has been taken; from three rungs `
     + `below it still climbs up to ${r.climbUpTo}`);
@@ -25837,9 +25994,9 @@ if (GUN_LINE) {
    * this is a second door and it was open. Driven through `openBoss`/`endBoss`
    * rather than by calling the step, because the step is not a control.
    */
-  check('...and answering the seventh does not step over the ceiling either',
+  check('...and answering the one standing on it does not step over it either',
     r.opened && r.tierAfterBoss === r.cap && r.tierAfterBossDone === r.cap + 1,
-    `reconciling the seventh at ${r.cap} leaves the run at ${r.tierAfterBoss} `
+    `reconciling anomaly ${r.capN} at ${r.cap} leaves the run at ${r.tierAfterBoss} `
     + `without the new form and steps it to ${r.tierAfterBossDone} with it`);
 
   /*
@@ -25859,6 +26016,389 @@ if (GUN_LINE) {
     `forty seconds at the ceiling released up to ${r.released} bodies at once `
     + `and banked ${r.earnedBy} energy (${r.stillPays}), and the rung never `
     + `left ${r.cap}`);
+}
+
+// --- the floor of the simulation: rung 49 and nothing past it --------------
+/*
+ * The one hold that nothing lifts (build 299).
+ *
+ * The two above it are states with a way out and each says where: an aperture
+ * is answered by fighting, the era by becoming. This one is answered by
+ * nothing, which is what makes it an END rather than a wall -- and an end is
+ * exactly the shape a game gets wrong quietly. Five things have to be true
+ * together or it is a different feature:
+ *
+ *   - every DOOR is shut. `climbTo` refuses, `setTier` clamps and the restore
+ *     clamps, and those are three separate writers of the same field: build
+ *     272 wrote the era ceiling into `climbTo` alone and `endBoss` stepped
+ *     over it with the machinery's setter on the very next line. Each is
+ *     driven on its own here, and the game's own path -- a boss answered on
+ *     the last rung -- is driven through `openBoss`/`endBoss` rather than by
+ *     calling the step, because the step is not a control.
+ *   - the run is NOT over. Waves arrive at 49, they pay, and the rung does
+ *     not move. Asserted off `world.earned`, which only `bank()` writes.
+ *   - the player is TOLD, once. On arrival and not on every wave after it, so
+ *     the arm scores twenty further waves and counts the pill again -- and it
+ *     counts CALLS through a spy rather than pills on the screen, because
+ *     `Hud.alert` refreshes an identical line instead of appending one and a
+ *     second call would have been invisible.
+ *   - the message is a statement and not a failure. The band's second half
+ *     says the field holds and the feed keeps paying, which is the half that
+ *     makes it an end rather than a fault, and it is asserted by its words.
+ *   - the RAIL shows it. Rung 49 as a closed end, and no cell drawn for a
+ *     rung that does not exist -- read off the rendered box, because a class
+ *     flipping is build 210's spy test again.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, WAVES } = await import('../src/config.js');
+    const { forgetLines, markLine } = await import('../src/codex.js');
+    const TUT = await import('../src/tutorial.js');
+    const g = window.__sim;
+    const w = g.world;
+    const d = w.director;
+    const out = {};
+    const CAP = CFG.waves.tier.ceiling;
+    /*
+     * Every teaching line in the game marked said EXCEPT the one under test.
+     *
+     * `debugTeachAll` marks the lot, which would leave nothing to measure;
+     * `forgetLines` alone un-marks the OPENING, and the opening then owns the
+     * band for the whole window -- `sayOnce` refuses while another line is
+     * still being read and DROPS what it was given, so the first version of
+     * this arm measured six lines about the grip and none about the ceiling,
+     * on a build that says both. Measured: 30 seconds of game time and the
+     * script had not finished.
+     *
+     * The tables are walked by SHAPE and not by name, because `tutorial.js`
+     * exports several of them and there will be another: anything carrying a
+     * string `id` beside a string `text` is a line.
+     */
+    const quietExcept = (keep) => {
+      forgetLines();
+      const ids = new Set();
+      const walk = (v) => {
+        if (!v || typeof v !== 'object') return;
+        if (Array.isArray(v)) { v.forEach(walk); return; }
+        if (typeof v.id === 'string' && typeof v.text === 'string') { ids.add(v.id); return; }
+        Object.values(v).forEach(walk);
+      };
+      Object.values(TUT).forEach(walk);
+      ids.delete(keep);
+      for (const id of ids) markLine(id);
+      return ids.size;
+    };
+    const gates = CFG.waves.tier.gates;
+    out.cap = CAP;
+    out.eraGate = CFG.waves.tier.eraGate;
+    const real = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
+
+    /*
+     * Every rung reachable, which is what being at the ceiling means: past
+     * the era hold and with every anomaly answered, so nothing BUT the floor
+     * can be what refuses the climb. A case that left one gate shut would be
+     * measuring that gate.
+     */
+    const arm = () => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 1e9;
+      w.phase = 'staging';
+      w.director.update = () => {};
+      w.reconciled = gates.map((_, i) => i + 1);
+      w.newForm = 'done';
+      d.hold = false; d.grace = 0; d.probe = null; d.probeLock = 0;
+      return d;
+    };
+
+    // ---- door one: the climb ------------------------------------------
+    arm();
+    d.setTier(CAP - 2);
+    out.climbUpTo = d.climbTo(w, CAP + 5);
+    out.climbFromIt = (d.setTier(CAP), d.climbTo(w, CAP + 1));
+    out.heldAt = d.depthHeld(CAP);
+    out.freeBelow = d.depthHeld(CAP - 1);
+
+    // ---- door two: the machinery's own setter -------------------------
+    arm();
+    out.setPast = d.setTier(CAP + 11);
+    out.peakPast = d.peak;
+
+    // ---- door three: the restore, which writes both fields by hand ----
+    arm();
+    d.restore(w, { tier: CAP + 9, peak: CAP + 9, probe: { from: CAP, to: CAP + 9 } });
+    out.loadTier = d.tier;
+    out.loadPeak = d.peak;
+    out.loadProbe = d.probe;
+
+    /*
+     * ---- and the game's own path: a boss answered ON the last rung -----
+     *
+     * `endBoss` steps past the gate it has just answered with `setTier`, and
+     * the last gate IS the ceiling -- so this is the one place in ordinary
+     * play where the two rules meet, and it is where build 272's era ceiling
+     * was walked over.
+     */
+    arm();
+    d.setTier(CAP);
+    w.reconciled.length = 0;
+    for (let i = 1; i <= gates.length; i++) w.reconciled.push(i);
+    w.reconciled.pop(); // ...all but the one standing on the ceiling
+    w.apertures = w.apertures || [];
+    const lastN = gates.length;
+    w.apertures[lastN] = 1;
+    g.openBoss(lastN);
+    out.opened = !!w.boss;
+    if (w.boss) { w.boss.hp = 0; w.boss.dead = true; g.endBoss(); }
+    out.tierAfterLast = d.tier;
+    out.reconciledLast = (w.reconciled || []).includes(lastN);
+
+    /*
+     * ---- the run is not over: a wave still scores, and still pays ------
+     *
+     * Twenty of them, which is also the once-per-arrival arm's control: each
+     * is a verdict that would have climbed a rung anywhere else.
+     */
+    g.start();
+    out.quieted = quietExcept(TUT.ON_DEPTH.id);
+    delete w.director.update;
+    w.spawnLock = 1e9;
+    w.phase = 'staging';
+    w.director.update = () => {};
+    w.reconciled = gates.map((_, i) => i + 1);
+    w.newForm = 'done';
+    d.hold = false; d.grace = 0; d.probe = null; d.probeLock = 0;
+    /*
+     * ...and it ARRIVES at the ceiling rather than starting on it. `haltLit`
+     * guards the pill to once per arrival and clears on any frame the hold is
+     * off, so a case that set the rung before its first update would inherit
+     * the flag from an arm above and measure a build that had already spoken.
+     */
+    d.setTier(CAP - 1);
+    for (let f = 0; f < 30; f++) g.update(1 / 60);
+    out.clearedBelow = g.haltLit;
+
+    const pills = [];
+    const realAlert = g.hud.alert.bind(g.hud);
+    g.hud.alert = (t, k, d2, tone) => { pills.push(String(t)); return realAlert(t, k, d2, tone); };
+    const said = [];
+    const realHint = g.hud.showHint.bind(g.hud);
+    g.hud.showHint = (t, once) => { said.push(String(t)); return realHint(t, once); };
+
+    d.setTier(CAP);
+    for (let f = 0; f < 60 * 6; f++) g.update(1 / 60);
+    out.onArrival = pills.filter((t) => /HALTED/.test(t)).length;
+    out.pill = pills.find((t) => /HALTED/.test(t)) || '';
+    out.said = said.find((t) => /floor of the simulation/i.test(t)) || '';
+    out.haltLit = g.haltLit;
+
+    const scoreOne = () => {
+      d.order = [real]; d.at = 0;
+      d.asked = 10; d.contact = 0; d.hitPatience = false; d.take = 0;
+      w.time += 20;
+      d.lastRelease = w.time - 8;
+      d.grace = 0;
+      return d.score(w);
+    };
+    let moved = 0;
+    const earned0 = w.earned;
+    for (let i = 0; i < 20; i++) {
+      moved += Math.abs(scoreOne().moved);
+      for (let f = 0; f < 12; f++) g.update(1 / 60);
+    }
+    out.afterTwenty = pills.filter((t) => /HALTED/.test(t)).length;
+    out.movedOver = moved;
+    out.tierHeld = d.tier;
+    out.scoredVerdict = d.lastVerdict;
+
+    g.hud.alert = realAlert;
+    g.hud.showHint = realHint;
+
+    // ...and the field still pays there, with the gun actually firing -- energy
+    // enters a run only through `bank()` and nothing banks if nothing dies.
+    delete w.director.update;
+    w.spawnLock = 0;
+    g.debugClearField();
+    g.debugBuyAll();
+    w.autoAim = true;
+    w.autoFire = true;
+    const earnedA = w.earned;
+    let seen = 0;
+    for (let f = 0; f < 60 * 25; f++) {
+      g.update(1 / 60);
+      seen = Math.max(seen, w.enemies.length);
+    }
+    out.released = seen;
+    out.earnedBy = Math.round(w.earned - earnedA);
+    out.stillPays = w.earned > earnedA;
+    out.tierThrough = d.tier;
+    void earned0;
+
+    /*
+     * ---- the rail, read off the rendered box ---------------------------
+     *
+     * The window is clamped to the ceiling, so the last five rungs of a run
+     * show 45..49 and never a cell for a rung that does not exist. The mark
+     * is a trebled right edge -- structure and not a shade, so it survives a
+     * player who receives no hue -- and it is measured with
+     * `getComputedStyle`, because a class going on is not a picture changing.
+     */
+    delete w.director.update;
+    w.spawnLock = 1e9;
+    w.director.update = () => {};
+    const railRead = (tier) => {
+      d.setTier(tier);
+      g.hud.syncRail(w);
+      const cells = [...document.querySelectorAll('#railNodes .railNode')];
+      return {
+        rungs: cells.map((c) => c.querySelector('b').textContent).join(','),
+        edges: cells.map((c) => getComputedStyle(c).borderRightWidth).join(','),
+        up: cells.filter((c) => c.getBoundingClientRect().height > 0).length,
+      };
+    };
+    out.railTop = railRead(CAP);
+    out.railMid = railRead(CAP - 20);
+    out.railFloor = railRead(1);
+
+    /*
+     * ---- and NEW FORM is affordable under the hold that needs it -------
+     *
+     * The arithmetic and the behaviour. `CFG.ordinal.recast` is one constant
+     * read by the node's price, by its requirement, by the menu row and by
+     * the pill -- and the requirement was a literal `7` until build 299,
+     * which with seven slots to a ceiling of 49 was a DEADLOCK: held at the
+     * era gate having answered six, with the seventh standing above the hold.
+     * The one-fewer arm is the vacuity guard: a requirement nothing can fail
+     * is not a requirement.
+     */
+    const { NODES } = await import('../src/tree.js');
+    out.need = CFG.ordinal.recast;
+    out.underHold = gates.filter((x) => x <= CFG.waves.tier.eraGate).length;
+    const recast = NODES.find((n) => n.id === 'recast');
+    out.recastPrice = recast ? recast.cost : -1;
+    g.restart();
+    g.debugGiveBytes(400000000);
+    g.debugBuyAll();
+    out.rigDone = g.rigDone();
+    w.reconciled = gates.filter((x) => x <= CFG.waves.tier.eraGate).map((_, i) => i + 1);
+    out.metAtHold = !!(recast && recast.needs(g));
+    w.reconciled = w.reconciled.slice(0, CFG.ordinal.recast - 1);
+    out.notMetBelow = !!(recast && recast.needs(g));
+
+    /*
+     * ---- and the band has room for it ---------------------------------
+     *
+     * `#abilityHint` is `pre-line` in a 300px band at 320, so every line in
+     * it wraps there and the thing to hold a new line to is the LINE BOX
+     * COUNT of the line it PAIRS with -- build 293's first draft was five
+     * characters over and took a fourth box at 390 where its pair took
+     * three. Counted off `Range.getClientRects()` on the real element, at
+     * the width it has here and again at the 300 the smallest screen gives
+     * it, because the suite does not run at 320.
+     */
+    const hint = g.hud.el.hint;
+    const wasShown = hint.classList.contains('show');
+    const wasText = hint.textContent;
+    const wasWidth = hint.style.width;
+    hint.classList.add('show');
+    const boxesOf = (text, width) => {
+      hint.style.width = width ? `${width}px` : wasWidth;
+      hint.textContent = text;
+      const rng = document.createRange();
+      rng.selectNodeContents(hint);
+      return [...rng.getClientRects()].filter((x) => x.height > 0).length;
+    };
+    out.boxDepth = boxesOf(TUT.ON_DEPTH.text, 0);
+    out.boxCeiling = boxesOf(TUT.ON_CEILING.text, 0);
+    out.boxDepth300 = boxesOf(TUT.ON_DEPTH.text, 300);
+    out.boxCeiling300 = boxesOf(TUT.ON_CEILING.text, 300);
+    hint.style.width = wasWidth;
+    hint.textContent = wasText;
+    if (!wasShown) hint.classList.remove('show');
+
+    w.reconciled.length = 0;
+    delete w.director.update;
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+
+  check('the ladder will not climb past the last rung there is, by any door',
+    r.climbUpTo === r.cap && r.climbFromIt === r.cap
+    && r.heldAt === r.cap && r.freeBelow === 0
+    && r.setPast === r.cap && r.peakPast === r.cap
+    && r.loadTier === r.cap && r.loadPeak === r.cap && r.loadProbe === null,
+    `the floor is rung ${r.cap}: a climb from two below reaches ${r.climbUpTo} `
+    + `and from it ${r.climbFromIt}; setTier(${r.cap + 11}) gives `
+    + `${r.setPast} with peak ${r.peakPast}; a save carrying ${r.cap + 9} `
+    + `restores to ${r.loadTier}/${r.loadPeak} and its trial is `
+    + `${r.loadProbe ? 'kept' : 'refused'}`);
+
+  check('...and answering the anomaly standing ON it does not step over it',
+    r.opened && r.reconciledLast && r.tierAfterLast === r.cap,
+    `the last gate is the ceiling; beating its anomaly (${r.reconciledLast}) `
+    + `leaves the run at ${r.tierAfterLast}, not ${r.cap + 1}`);
+
+  check('...and what stops is the NUMBER: twenty more waves score, and pay',
+    r.movedOver === 0 && r.tierHeld === r.cap && r.scoredVerdict
+    && r.released > 0 && r.stillPays && r.tierThrough === r.cap,
+    `twenty clean waves at ${r.cap} moved the rung ${r.movedOver} and left it `
+    + `at ${r.tierHeld} with a ${r.scoredVerdict} verdict; twenty-five seconds `
+    + `of field released up to ${r.released} bodies and banked ${r.earnedBy} `
+    + `(${r.stillPays})`);
+
+  check('...and the run is TOLD, once on arrival and not once a wave',
+    r.clearedBelow === 0 && r.haltLit === r.cap
+    && r.onArrival === 1 && r.afterTwenty === 1
+    && new RegExp(`DEPTH ${r.cap}`).test(r.pill),
+    `below it the flag is ${r.clearedBelow}; arriving raised the pill `
+    + `${r.onArrival} time and twenty further waves left it at `
+    + `${r.afterTwenty}: "${r.pill}"`);
+
+  /*
+   * ...and it is an END and not a FAULT. The first half says there is nothing
+   * below; the second is the load-bearing half and is the same sentence the
+   * era ceiling makes -- the field holds, the feed keeps paying. A message
+   * that said only the first half would be describing a broken game.
+   */
+  check('...and the line says the field holds and the feed keeps paying',
+    r.quieted > 6
+    && /no eighth aperture/i.test(r.said)
+    && /holds/i.test(r.said) && /pay/i.test(r.said),
+    `${r.quieted} other lines marked said so the band is free; it said `
+    + `"${r.said}"`);
+
+  /*
+   * ...and it fits where its partner fits. Not a character count: a line is
+   * held to the line boxes it takes in a 300px band, which is what the
+   * smallest screen gives `#abilityHint`, and the vacuity guard is that the
+   * partner itself takes more than one box -- a measurement returning 1 for
+   * both would mean the element was not laid out at all.
+   */
+  check('...and it fits the teaching band no worse than the line it pairs with',
+    r.boxCeiling > 1 && r.boxCeiling300 > 1
+    && r.boxDepth <= r.boxCeiling && r.boxDepth300 <= r.boxCeiling300,
+    `the ceiling line takes ${r.boxCeiling} boxes here and ${r.boxCeiling300} `
+    + `at 300; this one takes ${r.boxDepth} and ${r.boxDepth300}`);
+
+  check('...and the rail draws rung 49 as a closed end, with nothing past it',
+    r.railTop.rungs === [4, 3, 2, 1, 0].map((k) => r.cap - k).join(',')
+    && r.railTop.up === 5 && r.railMid.up === 5 && r.railFloor.up === 5
+    && r.railTop.edges.split(',').filter((x) => parseFloat(x) >= 3).length === 1
+    && r.railTop.edges.split(',').pop() === r.railTop.edges.split(',')
+      .filter((x) => parseFloat(x) >= 3)[0]
+    && r.railMid.edges.split(',').every((x) => parseFloat(x) < 3)
+    && r.railFloor.edges.split(',').every((x) => parseFloat(x) < 3),
+    `at the ceiling the window is ${r.railTop.rungs} with right edges `
+    + `${r.railTop.edges}; twenty rungs down it is ${r.railMid.rungs} at `
+    + `${r.railMid.edges}`);
+
+  check('...and NEW FORM is affordable under the hold it is the way out of',
+    r.need > 0 && r.need <= r.underHold && r.recastPrice === r.need
+    && r.rigDone && r.metAtHold && !r.notMetBelow,
+    `it asks for ${r.need} reconciled and ${r.underHold} gates sit at or below `
+    + `eraGate ${r.eraGate}; at that count it is offered (${r.metAtHold}) and `
+    + `one short it is not (${r.notMetBelow}), priced at ${r.recastPrice}`);
 }
 
 // --- AXIOM: it takes your buttons, and gives them back one at a time --------
@@ -26700,9 +27240,14 @@ if (MINE_LINE) {
      * hand-kept list that happens to agree today.
      */
     const T = CFG.waves.tier;
-    out.eraRule = ANOMALIES.every((a) => (
-      anomalyEra(a.n) === (T.gates[a.n - 1] > T.eraGate ? 2 : 1)
-    ));
+    out.eraRule = ANOMALIES.every((a) => {
+      const rung = T.gates[a.n - 1];
+      // ...and an anomaly with NO rung is era 2, from build 299: it lies past
+      // a ceiling that is itself past the era hold, and `undefined > eraGate`
+      // is false -- which would have answered era 1 for the two fights that
+      // have never been looked at on an era-1 field.
+      return anomalyEra(a.n) === ((rung === undefined || rung > T.eraGate) ? 2 : 1);
+    });
     out.eras = ANOMALIES.map((a) => anomalyEra(a.n)).join('');
     out.gates = T.gates.join(',');
 
@@ -26745,7 +27290,10 @@ if (MINE_LINE) {
     out.names = rows.map((b) => b.querySelector('.dbgBossName').textContent).join(',');
     out.wantNames = ANOMALIES.map((a) => a.name).join(',');
     out.rungs = rows.map((b) => b.querySelector('.dbgBossAt').textContent).join(',');
-    out.wantRungs = ANOMALIES.map((a) => `RUNG ${T.gates[a.n - 1]}`).join(',');
+    out.wantRungs = ANOMALIES.map((a) => {
+      const rung = T.gates[a.n - 1];
+      return rung === undefined ? 'NO RUNG' : `RUNG ${rung}`;
+    }).join(',');
 
     const tier0 = w.director.tier;
     const peak0 = w.director.peak;
@@ -26792,8 +27340,18 @@ if (MINE_LINE) {
     const now = [...document.querySelectorAll('.dbgBossRow')];
     out.marked = now.filter((b) => b.classList.contains('on')).length;
     out.markedIs = now.findIndex((b) => b.classList.contains('on')) + 1;
-    // At era 1, the two era-2 rows are the ones that would move you.
+    /*
+     * The rows that would move you: the ones whose fight is in the OTHER era.
+     * It was written out as two, which was AXIOM and TESSERA -- and build 299
+     * put TERMINUS's gate on rung 49, above `eraGate` 42, so there are three
+     * and the count moved without one mark changing. Asked of `anomalyEra`,
+     * which is the same function the rows are built from, so this cannot be
+     * satisfied by a build that stops marking them at all -- the mark count
+     * has to equal it and the number has to be non-zero.
+     */
     out.away = now.filter((b) => b.classList.contains('away')).length;
+    out.wantAway = ANOMALIES.filter((a) => anomalyEra(a.n) !== w.era).length;
+    out.eraNow = w.era;
 
     // ...and BACK returns to the grid rather than leaving both up.
     document.querySelector('#dbgBoss .spawnBack').click();
@@ -26829,7 +27387,7 @@ if (MINE_LINE) {
   check('the debug panel lists every anomaly, with the rung and era it is met at',
     r.rows === 9 && r.rowsUp === 9 && r.gridDown
     && r.names === r.wantNames && r.rungs === r.wantRungs
-    && r.eraRule && r.eras === '111111122',
+    && r.eraRule && r.eras === '111111222',
     `${r.rows} rows, ${r.rowsUp} of them actually rendered with the grid down `
     + `(${r.gridDown}): ${r.names}; at ${r.rungs}; eras ${r.eras}, each derived `
     + `from gates ${r.gates} against the era ceiling rather than typed out `
@@ -26867,10 +27425,12 @@ if (MINE_LINE) {
     r.tierHeld,
     `tier/peak ${r.tierWas} before three teleports, ${r.tierNow} after`);
 
-  check('...and the two rows it cannot take you to say so, and the live one is marked',
-    r.marked === 1 && r.markedIs === 3 && r.away === 2 && r.backToGrid,
-    `${r.marked} row marked live (row ${r.markedIs}), ${r.away} marked as being `
-    + `in the other era, and BACK returns to the grid (${r.backToGrid})`);
+  check('...and the rows it cannot take you to say so, and the live one is marked',
+    r.marked === 1 && r.markedIs === 3
+    && r.wantAway > 0 && r.away === r.wantAway && r.backToGrid,
+    `${r.marked} row marked live (row ${r.markedIs}), ${r.away} of an expected `
+    + `${r.wantAway} marked as being in the other era from era ${r.eraNow}, and `
+    + `BACK returns to the grid (${r.backToGrid})`);
 
   /*
    * ...and every refusal has its own answer. A debug control that does nothing

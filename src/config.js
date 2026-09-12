@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '298';
+export const BUILD = '299';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '298';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '996918d';
+export const REV = '79f3293';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -37,6 +37,32 @@ export const B = (n) => Math.round(n);
 export const kB = (n) => Math.round(n * 1e3);
 export const MB = (n) => Math.round(n * 1e6);
 export const GB = (n) => Math.round(n * 1e9);
+
+/*
+ * ---- the shape of the ladder, authored once ------------------------------
+ *
+ * One boss slot every `BOSS_EVERY` rungs, and `DEPTH_CEILING` is the last
+ * rung there is. Both are read back out of `CFG.waves.tier`, where they are
+ * written down with the reasons; they live here because the gate table is
+ * DERIVED from them inside the literal, and a `const` arrow below `CFG` is in
+ * that literal's temporal dead zone while it is being evaluated -- the same
+ * reason `kB` is up here.
+ *
+ * Derived rather than transcribed because a transcription is a hand-kept list,
+ * and this repo has paid for three: `world.apertures` written out as eight
+ * zeroes against nine anomalies, the emplacement lot count restated in four
+ * places, and a case pinning `gates.length === 9` that failed the moment the
+ * roster grew without one gate moving. Ask the structure, never restate it.
+ */
+const BOSS_EVERY = 7;
+const DEPTH_CEILING = 49;
+
+/** Every rung that is a multiple of `every`, up to and including `ceiling`. */
+export const rungsEvery = (every, ceiling) => {
+  const out = [];
+  for (let r = every; r <= ceiling; r += every) out.push(r);
+  return out;
+};
 
 export const CFG = {
   // ---- run structure -------------------------------------------------
@@ -404,8 +430,41 @@ export const CFG = {
        * gate, because going back was never the thing that had to be earned.
        *
        * Index i is anomaly n = i + 1; see ANOMALIES in anomaly.js.
+       *
+       * ---- and it is DERIVED, from build 299 ----------------------------
+       *
+       * One slot every `bossEvery` rungs to `ceiling`. That sentence is the
+       * ruling; the table is the sentence rather than a copy of it, for the
+       * reason written out beside `BOSS_EVERY` at the top of this file.
+       * `check-build.mjs` asserts the derivation against the real roster.
+       *
+       * SEVEN entries against NINE anomalies, on purpose. AXIOM and TESSERA
+       * are deferred, and an anomaly with no rung has no door at all: nothing
+       * declares a rung on itself (see the header in anomaly.js), so `gateAt`
+       * returns 0 for every rung, no banner ever lights, and `load()` bounds
+       * its aperture restore by the roster rather than by this table -- an
+       * aperture stored for either one by an older file is inert. Putting
+       * them back is a deeper `ceiling` and nothing else.
        */
-      gates: [6, 12, 18, 24, 30, 36, 42, 48, 54],
+      bossEvery: BOSS_EVERY,
+      /*
+       * ---- the last rung there is (build 299) ---------------------------
+       *
+       * The ladder will not climb past it, through BOTH doors -- `climbTo`
+       * refuses and `setTier` clamps -- because `setTier` is the machinery's
+       * setter and does not gate, which is how build 272's era ceiling had a
+       * second door standing open. Everything else goes on working: waves
+       * arrive at the capped rung, they still pay, the tree still fills. What
+       * stops is the number, and the run is told so in as many words.
+       *
+       * Deliberately a gate rung rather than one above the last one, the same
+       * ruling `eraGate` carries: standing on 49 having reconciled the
+       * seventh is the exact moment there is nothing left to be sent against,
+       * and a rung of empty ladder above it would read as the game having
+       * simply run out rather than as an end.
+       */
+      ceiling: DEPTH_CEILING,
+      gates: rungsEvery(BOSS_EVERY, DEPTH_CEILING),
       /*
        * ---- and the one gate that is not an anomaly (build 272) ----------
        *
@@ -2213,7 +2272,23 @@ export const CFG = {
     endFor: 13.4,
     pull: 900, // how hard the infall drags loose bodies
     pay: kB(900), // bytes on the floor when it lets go
-    recast: 7, // REMAINDERs a NEW FORM costs -- one per anomaly, so the price IS the ladder
+    /*
+     * REMAINDERs a NEW FORM costs, and the reconciled count it asks for --
+     * ONE constant, read by the node's `cost`, by its `needs`, by the menu row
+     * that prints the requirement and by the pill that counts them in. It was
+     * the price here and a literal `7` in `upgrades.js` until build 299, which
+     * is a defaulted-value shape: two writers for one ruling.
+     *
+     * FOUR from build 299, down from seven, because the ladder is seven slots
+     * to a ceiling of 49 and only six of them sit under `eraGate`. At seven it
+     * was a deadlock rather than a price: the run is held at rung 42 having
+     * reconciled six, the seventh anomaly stands at 49 on the far side of that
+     * hold, and the only way through the hold needed the one thing the hold
+     * made unreachable. Four is the count standing on rung 28, which is where
+     * the form change is going (see the plan's phase 5) and is under the hold
+     * wherever `eraGate` ends up.
+     */
+    recast: 4,
   },
 
   /*

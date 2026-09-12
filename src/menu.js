@@ -786,7 +786,16 @@ export class Menu {
     const need = CFG.ordinal.recast;
     r.need.textContent = `THE MACHINE FINISHED \u00b7 ${have} of ${want}`;
     r.need.classList.toggle('ufMet', want > 0 && have >= want);
-    r.need2.textContent = `EVERY ANOMALY RECONCILED \u00b7 ${Math.min(anom, need)} of ${need}`;
+    /*
+     * "EVERY ANOMALY" until build 299, which was true while the price was
+     * seven and there were seven. There are nine on the roster and the ladder
+     * offers seven of them, only four under the era hold this node is the way
+     * out of -- so the row has to say the COUNT it is asking for rather than
+     * a claim about the roster it can no longer make. The number is
+     * `CFG.ordinal.recast`, which is the same constant the price and the
+     * requirement read; nothing here restates it.
+     */
+    r.need2.textContent = `${need} ANOMALIES RECONCILED \u00b7 ${Math.min(anom, need)} of ${need}`;
     r.need2.classList.toggle('ufMet', anom >= need);
   }
 
