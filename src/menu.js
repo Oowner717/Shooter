@@ -415,7 +415,7 @@ export class Menu {
       is in the run. Leave whenever you like &mdash; the run is written down
       before you go in and handed back when you come out.</span>
       <span class="sealedLine">Three rooms, one per era: the old field with
-      DUMMY on it, the new field &mdash; no building, no wall &mdash; with the
+      DUMMY on it, the new field &mdash; no portal, no wall &mdash; with the
       second form and D2 on it, and a third that is not built yet. Each keeps
       its own numbers and its own record, and resetting one resets only
       that one.</span>`;

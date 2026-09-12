@@ -16,13 +16,18 @@
 // all seven lists on its way in. A building in `world.enemies` would be deleted
 // by the very switch that creates it.
 //
-// It imports config and util and NOTHING else -- in particular not enemies.js,
-// which imports from here. `scripts/bundle.mjs` orders modules by an acyclic
-// walk, and it shipped a dead page for fifty-three builds the last time the
-// module graph was not what it thought.
+// It imports config, util and portal.js and NOTHING else -- in particular not
+// enemies.js, which imports from here. `scripts/bundle.mjs` orders modules by
+// an acyclic walk, and it shipped a dead page for fifty-three builds the last
+// time the module graph was not what it thought.
+//
+// From build 297 the BUILDING is gone from here: the thing everything comes
+// out of is the portal (portal.js), at both eras. What the yard still owns is
+// era 2's -- the wall, and the lots below it.
 
 import { CFG, fmtBytes } from './config.js';
-import { clamp, rgba, mixHex } from './util.js';
+import { clamp, rgba } from './util.js';
+import { entryLine } from './portal.js';
 
 /*
  * ---- the lots, as ONE table -------------------------------------------
@@ -78,27 +83,20 @@ export function syncYard(world, entryY) {
   const Y = CFG.yard;
   const a = world.yard || { lit: null, flare: 0, flareX: 0, consulted: false };
   /*
-   * The mouth sits exactly ON the entry line, and that is the one placement
-   * that costs nothing. `ENTRY_Y + CFG.entryDepth` is already three things: the
-   * bottom of the interface (measured 402 world units at era 2, against a mouth
-   * at 400), the line a body clears `staged` on, and the end of the fast march
-   * `CFG.entrySpeed` exists for. Putting the door there makes "a body walks out"
-   * and "a body becomes live" the same visible event for free -- no spawn y
-   * moves, and `entrySpeed` keeps its only reader. A mouth anywhere BELOW the
-   * line would quietly retire that constant at era 2, which is the shape of
-   * `world.endless`: a value still threaded and no longer reachable.
+   * The mouth IS the portal's rim, which is the entry line -- `entryLine`
+   * says so in one place -- and the wall hangs `gap` below it. That was the
+   * placement that cost nothing when the mouth was a door: the line a body
+   * clears `staged` on and the end of the fast march `CFG.entrySpeed` exists
+   * for are the same line, so "a body comes through" and "a body becomes
+   * live" are one visible event. `syncPortal` runs before this in
+   * `Game.resize`, so the rim is already where the chrome lets it be.
    */
-  a.mouthY = entryY + CFG.entryDepth;
+  a.mouthY = entryLine(world, entryY);
   a.mouthX = world.width / 2;
-  a.mouthHalf = Y.mouthHalf;
-  a.faceHalf = Y.faceHalf;
   a.wallY = a.mouthY + Y.gap;
   // The top of the player's ground: the wall plus a body's worth of clearance,
   // so nothing is placed sitting ON the line it is not allowed past.
   a.hold = a.wallY + Y.clear;
-  // The mass recedes off the top of the field. It is bigger than what fits,
-  // deliberately: the enemy's side does not end where the screen does.
-  a.top = entryY - 260;
   const teeth = Math.max(8, Math.round(world.width / Y.tooth));
   if (!a.lit || a.lit.length !== teeth) a.lit = new Float32Array(teeth);
 
@@ -261,54 +259,11 @@ export function wallLine(world) {
   return a && !world.boss ? a.wallY : null;
 }
 
-/**
- * Map a field-wide x into the door. Identity at era 1.
- *
- * Load-bearing: it draws NO random on either branch, so era 1 keeps not merely
- * its values but its exact `Math.random` call ORDER -- which is what ORDINAL's
- * canonical hash mixes, and what a reordered roll would silently re-baseline.
+/*
+ * `throughMouth` and `mouthSlots` lived here while the mouth was a door in a
+ * building. They are the portal's now -- portal.js -- and they route at BOTH
+ * eras.
  */
-export function throughMouth(world, x, r) {
-  const a = world.yard;
-  if (!a) return x;
-  const half = Math.max(8, a.mouthHalf - r - 4);
-  const k = half / (world.width / 2);
-  return clamp(a.mouthX + (x - world.width / 2) * k, a.mouthX - half, a.mouthX + half);
-}
-
-/**
- * Where a formation's bodies stand so the WHOLE of it comes out of the door:
- * rows across the mouth, stacked upward, centred on it. Absolute x, relative y.
- * Null at era 1, where `formationOffset`'s six shapes keep the sky they were
- * authored for.
- *
- * Rows rather than the authored shapes, and that is arithmetic rather than
- * taste. At the population ceiling the widest authored job is BLOOM x12, whose
- * `line` spans 995 world units against a 968-wide field -- no door can pass
- * that with its spacing intact. Clamping the offsets stacks bodies on the two
- * door edges and the pair solver blows them apart on the next frame; scaling
- * them crushes `gap`, which is the thing that exists to stop overlap, to a
- * seventh of what the body needs. `pitch` is `2r + 8`, so overlap is
- * impossible by construction.
- *
- * It also SHORTENS the worst spawn column rather than lengthening it: three
- * rows of BULWARK reach 331 units above the door where the authored `column`
- * of eight reaches 903.
- */
-export function mouthSlots(world, r, gap, count) {
-  const a = world.yard;
-  if (!a) return null;
-  const half = Math.max(8, a.mouthHalf - r - 4);
-  const pitch = r * 2 + 8;
-  const per = Math.max(1, Math.floor((half * 2) / pitch));
-  const out = [];
-  for (let i = 0; i < count; i++) {
-    const row = Math.floor(i / per);
-    const n = Math.min(per, count - row * per);
-    out.push([a.mouthX + ((i % per) - (n - 1) / 2) * pitch, -row * gap]);
-  }
-  return out;
-}
 
 /**
  * The wall lights where something crosses it, for the whole run -- so the rule
@@ -338,106 +293,22 @@ export function updateYard(world, dt) {
  * before the ground effects -- so it is behind every body, every drop and
  * every piece of wreckage, which is what "scenery" has to mean on this canvas.
  *
- * Told apart from the thirty-seven bodies by REGISTER and not by hue, because
- * every saturated tone in this game is already spoken for: it is LARGE, it is
- * STATIC (nothing else on the field is), it is STRAIGHT AND RIBBED (no body in
- * the table is architectural), and it is UNLIT -- no glow sprite, no hit flash,
- * no wobble, no outline ladder. A colourblind player receives all four.
+ * The wall and the lots. The building that stood above the wall until build
+ * 296 is gone -- the portal stands there now and draws itself -- and so is
+ * the doorway's spill, which is the portal's too and runs to the wall.
+ *
+ * Told apart from the bodies by REGISTER and not by hue, because every
+ * saturated tone in this game is already spoken for: it is STRAIGHT (no body
+ * in the table is architectural), it is STATIC, and it is UNLIT -- no glow
+ * sprite, no hit flash, no wobble, no outline ladder.
  */
 export function drawYard(ctx, world, mood, price = 0) {
   const a = world.yard;
   if (!a) return;
   const hl = CFG.hairline;
   const k = CFG.scale;
-  const L = a.mouthX - a.faceHalf;
-  const R = a.mouthX + a.faceHalf;
-  const dl = a.mouthX - a.mouthHalf;
-  const dr = a.mouthX + a.mouthHalf;
 
   ctx.save();
-
-  /* ---- the doorway's spill, first, so the structure is drawn over it ------
-   * The one lit thing up there, and the only reason the yard band reads as a
-   * place rather than as empty sky. It is drawn as a widening wedge rather
-   * than a disc because a disc says "a lamp" and a wedge says "a way out".
-   */
-  const spill = ctx.createLinearGradient(0, a.mouthY, 0, a.wallY + 40 * k);
-  spill.addColorStop(0, rgba(mood.accent, 0.22));
-  spill.addColorStop(0.55, rgba(mood.accent, 0.07));
-  spill.addColorStop(1, rgba(mood.accent, 0));
-  ctx.fillStyle = spill;
-  ctx.beginPath();
-  ctx.moveTo(dl, a.mouthY);
-  ctx.lineTo(dr, a.mouthY);
-  ctx.lineTo(dr + 46 * k, a.wallY + 40 * k);
-  ctx.lineTo(dl - 46 * k, a.wallY + 40 * k);
-  ctx.closePath();
-  ctx.fill();
-
-  /* ---- the mass -----------------------------------------------------------
-   * A SILHOUETTE, not a slab. The first version filled it with the sky mixed
-   * a fifth of the way toward the lattice colour, which on measurement is
-   * within a few units of the sky itself -- the building was drawn, correctly
-   * placed, and invisible, with only the doorway carrying it. A structure this
-   * size against a dark sky reads as a hole punched in the sky with lit detail
-   * on it, which is also what it is: something standing between you and the
-   * substrate every ray in this game converges on.
-   *
-   * It fades in downward rather than starting on an edge, because an edge at
-   * the top of the screen reads as the drawing running out, and this thing is
-   * meant to be bigger than the frame.
-   */
-  const face = ctx.createLinearGradient(0, a.top, 0, a.mouthY);
-  face.addColorStop(0, rgba('#000000', 0));
-  face.addColorStop(0.45, rgba('#000000', 0.62));
-  face.addColorStop(1, rgba('#000000', 0.78));
-  ctx.fillStyle = face;
-  ctx.fillRect(L, a.top, R - L, a.mouthY - a.top);
-
-  // Ribs, spaced by the same tooth the wall is, so the two read as one build.
-  const rib = CFG.yard.tooth * k;
-  const lit0 = mixHex(mood.low, mood.line, 0.55);
-  ctx.strokeStyle = rgba(lit0, 0.3);
-  ctx.lineWidth = hl;
-  ctx.beginPath();
-  for (let y = a.mouthY - rib; y > a.top + rib; y -= rib) {
-    const t = clamp((y - a.top) / (a.mouthY - a.top), 0, 1);
-    const inset = (1 - t) * 30 * k;
-    ctx.moveTo(L + inset, y);
-    ctx.lineTo(R - inset, y);
-  }
-  ctx.stroke();
-
-  // Two columns the whole height of the face, on the door's own edges, so the
-  // opening reads as a shaft up through the building rather than a notch in
-  // the bottom of it.
-  ctx.strokeStyle = rgba(lit0, 0.5);
-  ctx.lineWidth = hl * 1.6;
-  ctx.beginPath();
-  ctx.moveTo(dl, a.mouthY); ctx.lineTo(dl, a.top + (a.mouthY - a.top) * 0.2);
-  ctx.moveTo(dr, a.mouthY); ctx.lineTo(dr, a.top + (a.mouthY - a.top) * 0.2);
-  ctx.stroke();
-
-  // The throat behind the door, darker than the face it is cut into.
-  ctx.fillStyle = rgba('#000000', 0.72);
-  ctx.fillRect(dl, a.mouthY - 96 * k, dr - dl, 96 * k);
-
-  // The underside of the building, either side of the door: this is the edge
-  // that says how far the mass reaches, and without it the face has no bottom.
-  ctx.strokeStyle = rgba(lit0, 0.62);
-  ctx.lineWidth = hl * 2;
-  ctx.beginPath();
-  ctx.moveTo(L, a.mouthY); ctx.lineTo(dl, a.mouthY);
-  ctx.moveTo(dr, a.mouthY); ctx.lineTo(R, a.mouthY);
-  ctx.stroke();
-
-  // The sill: the one bright line in the yard, across the door only.
-  ctx.strokeStyle = rgba(mood.accent, 0.62);
-  ctx.lineWidth = hl * 2.6;
-  ctx.beginPath();
-  ctx.moveTo(dl, a.mouthY);
-  ctx.lineTo(dr, a.mouthY);
-  ctx.stroke();
 
   /* ---- the wall -----------------------------------------------------------
    * A quiet baseline the whole width of the field, carrying short DOWNWARD

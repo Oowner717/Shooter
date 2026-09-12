@@ -20056,13 +20056,14 @@ if (MINE_LINE) {
       out.two = a && {
         // in CSS px, which is the quantity that must not move between screens
         depth: +((a.wallY - a.mouthY) * CFG.zoom).toFixed(2),
-        mouth: +(2 * a.mouthHalf * CFG.zoom).toFixed(2),
-        face: +(2 * a.faceHalf * CFG.zoom).toFixed(2),
         mouthY: +(a.mouthY * CFG.zoom).toFixed(1),
         wallY: +(a.wallY * CFG.zoom).toFixed(1),
+        // The mouth is the portal's rim, from build 297 -- and at these
+        // viewports, where the chrome is short, the rim is the old line.
+        onRim: !!w.portal && Math.abs(a.mouthY - w.portal.rim) < 1e-9,
         onEntryLine: Math.abs(a.mouthY - CFG.entryDepth) < 1e-9,
         centred: Math.abs(a.mouthX - w.width / 2) < 1e-9,
-        onScreen: a.faceHalf < w.width / 2,
+        noBuilding: a.faceHalf === undefined && a.top === undefined && a.mouthHalf === undefined,
         teeth: a.lit.length,
       };
       // ...it survives the switch that creates it, which every design putting
@@ -20100,31 +20101,290 @@ if (MINE_LINE) {
    * 1.22x between these two screens -- and the CSS arms diverge. This is
    * P3b's picture-versus-machine rule turned into a guard.
    */
-  check('...and it holds its size on the glass, and fits on the narrow screen',
+  check('...and it holds its size on the glass, and the building is gone from it',
     small.two && big.two
     && Math.abs(small.two.depth - big.two.depth) < 0.5
-    && Math.abs(small.two.mouth - big.two.mouth) < 0.5
-    && Math.abs(small.two.face - big.two.face) < 0.5
-    && rows.every((r) => r.two.onEntryLine && r.two.centred && r.two.onScreen
+    && rows.every((r) => r.two.onEntryLine && r.two.centred && r.two.noBuilding
       && r.two.wallY > 162 && r.two.teeth >= 8),
-    `320: ${small.two && small.two.depth}px of enemy yard, a ${small.two && small.two.mouth}px `
-    + `door in a ${small.two && small.two.face}px face; 390: ${big.two && big.two.depth} / `
-    + `${big.two && big.two.mouth} / ${big.two && big.two.face} — and the wall sits at `
-    + `${small.two && small.two.wallY}px, clear of the 162px chrome`);
+    `320: ${small.two && small.two.depth}px between the mouth and the wall; 390: `
+    + `${big.two && big.two.depth} — the wall sits at ${small.two && small.two.wallY}px, `
+    + `clear of the 162px chrome; no face, no top, no door width on the yard`);
 
   /*
-   * The mouth is ON the entry line, and that is the placement that costs
-   * nothing: the line is already where `staged` clears and where the fast
-   * march ends, so "a body walks out of the door" and "a body becomes live"
-   * are the same event. A mouth anywhere below it retires `CFG.entrySpeed`
-   * at era 2 -- a constant still threaded and no longer reachable, which is
-   * the `world.endless` shape.
+   * The mouth is the PORTAL'S RIM, from build 297, and the rim is the entry
+   * line: where `staged` clears and where the fast march ends, so "a body
+   * comes through" and "a body becomes live" are the same event. At these
+   * viewports the chrome is short and the rim is the old line exactly, so
+   * `CFG.entrySpeed` keeps its reader and the march is what it was.
    */
-  check('...and the door is the entry line itself, so entrySpeed keeps its reader',
-    rows.every((r) => r.two.onEntryLine)
+  check('...and the mouth is the portal\'s rim, which here is the entry line itself',
+    rows.every((r) => r.two.onRim && r.two.onEntryLine)
     && Math.abs(small.two.mouthY - big.two.mouthY) < 0.5,
-    `the mouth is at ${small.two.mouthY} CSS px on both screens, which is `
-    + `ENTRY_Y + CFG.entryDepth exactly`);
+    `the mouth is at ${small.two.mouthY} CSS px on both screens, which is the `
+    + `rim and is ENTRY_Y + CFG.entryDepth exactly`);
+}
+
+// --- the portal ---------------------------------------------------------------
+/*
+ * Build 297. The thing everything comes through, at both eras, and the thing
+ * that hides the march in: a `staged` body is drawn nowhere above the portal's
+ * centre line, ghosted through the surface, and whole only once its leading
+ * edge is past the rim. The first arm is structure (the yard's tripwire, the
+ * same shape); the second is the rim's placement against the chrome, which is
+ * the one thing that decides whether the portal can be SEEN; the third
+ * renders the three passes and reads pixels, because the passes are clips and
+ * a clip flips no property.
+ */
+{
+  const held = page.viewportSize();
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    rows.push(await page.evaluate(async (vw) => {
+      const { CFG } = await import('../src/config.js');
+      const { syncPortal, entryLine } = await import('../src/portal.js');
+      const g = window.__sim;
+      const w = g.world;
+      g.restart();
+      const out = { w: vw };
+      const read = (P) => P && {
+        rxPx: +(P.rx * CFG.zoom).toFixed(2),
+        ryPx: +(P.ry * CFG.zoom).toFixed(2),
+        topPx: +(P.top * CFG.zoom).toFixed(1),
+        rimPx: +(P.rim * CFG.zoom).toFixed(1),
+        onLine: Math.abs(P.rim - CFG.entryDepth) < 1e-9,
+        centred: Math.abs(P.x - w.width / 2) < 1e-9,
+        fits: P.rx < w.width / 2,
+      };
+      // The chrome's end, off the same probe `resize` reads.
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;top:var(--under-rail);left:0;width:1px;height:1px;';
+      document.body.appendChild(probe);
+      out.chromePx = probe.getBoundingClientRect().top;
+      probe.remove();
+
+      out.one = read(w.portal);
+      g.setEra(2);
+      out.two = read(w.portal);
+      const P = w.portal;
+      const lists = ['enemies', 'drops', 'debris', 'effects', 'mines', 'projectiles'];
+      out.inNoList = lists.every((k) => !(w[k] || []).includes(P));
+      out.notABody = P.hp === undefined && P.applyDamage === undefined
+        && P.invMass === undefined && P.type === undefined && P.r === undefined;
+      out.survives = !!w.portal && w.enemies.length === 0;
+      // ...and the yard's mouth is its rim.
+      out.yardOnRim = !!w.yard && Math.abs(w.yard.mouthY - P.rim) < 1e-9;
+
+      /*
+       * ---- the notch: the rim gives way to the chrome, and the line follows
+       * A chrome twice as deep as this headless one, fed straight to the one
+       * writer: the rim has to drop by exactly what it takes to keep the
+       * whole ellipse below it, and `entryLine` -- what `staged` clears on --
+       * has to say the same number. Then `resize()` puts it back.
+       */
+      const deep = out.chromePx * 2 / CFG.zoom;
+      syncPortal(w, 0, deep);
+      out.notch = {
+        rim: +w.portal.rim.toFixed(1),
+        want: +(deep + CFG.portal.pad + 2 * CFG.portal.ry).toFixed(1),
+        line: +entryLine(w, 0).toFixed(1),
+        topClear: +(w.portal.top - deep).toFixed(1),
+        pad: +CFG.portal.pad.toFixed(1),
+      };
+      g.resize();
+      out.restored = Math.abs(w.portal.rim - CFG.entryDepth) < 1e-9;
+
+      // ---- and none of it in the assay ----------------------------------
+      // The door refuses a run that does not own the room, so buy it first:
+      // a refused door leaves the LIVE portal on the world, which is what
+      // this arm read on its first run.
+      g.setEra(1);
+      g.restart();
+      out.back = read(w.portal);
+      g.debugGiveBytes(60000000);
+      out.bought = g.buy('sandbox');
+      out.entered = g.enterSandbox(1);
+      out.bench = w.portal;
+      g.exitSandbox();
+      out.afterBench = !!w.portal;
+      g.restart();
+      return out;
+    }, size.width));
+  }
+  await page.setViewportSize(held);
+  const [small, big] = rows;
+
+  check('the portal is derived, stands at both eras, and is in nothing',
+    rows.every((r) => r.one && r.two && r.inNoList && r.notABody && r.survives
+      && r.yardOnRim && r.back && r.entered === true && r.bench === null && r.afterBench),
+    rows.map((r) => `${r.w}: era 1 ${r.one ? 'built' : 'MISSING'}, era 2 ${r.two ? 'built' : 'MISSING'}, `
+      + `in no list ${r.inNoList}, not a body ${r.notABody}, survives the switch ${r.survives}, `
+      + `the yard's mouth on its rim ${r.yardOnRim}; assay entered ${r.entered}: ${r.bench}, `
+      + `back after ${r.afterBench}`)
+      .join('; '));
+
+  check('...and it holds its size on the glass, centred, whole, and clear of the chrome',
+    Math.abs(small.one.rxPx - big.one.rxPx) < 0.5 && Math.abs(small.one.rxPx - small.two.rxPx) < 0.5
+    && Math.abs(small.one.ryPx - big.two.ryPx) < 0.5
+    && rows.every((r) => [r.one, r.two].every((p) => p.centred && p.fits && p.onLine
+      && p.topPx >= r.chromePx + 4)),
+    `${small.one.rxPx * 2}x${small.one.ryPx * 2} CSS px at both eras and both screens; the top `
+    + `sits at ${small.one.topPx}px against a chrome ending at ${small.chromePx}px, and the rim `
+    + `is the entry line (${small.one.rimPx}px)`);
+
+  check('...and under a deeper chrome the rim gives way and the entry line follows it',
+    rows.every((r) => Math.abs(r.notch.rim - r.notch.want) < 0.01
+      && Math.abs(r.notch.line - r.notch.rim) < 0.01
+      && Math.abs(r.notch.topClear - r.notch.pad) < 0.01 && r.restored),
+    rows.map((r) => `${r.w}: rim ${r.notch.rim} for a want of ${r.notch.want}, entryLine `
+      + `${r.notch.line}, ${r.notch.topClear} clear of the chrome; resize put it back ${r.restored}`)
+      .join('; '));
+
+  /*
+   * ---- the three passes, rendered ------------------------------------------
+   * An offscreen canvas, the real `drawPortal`, and a stub body draw that
+   * paints a white disc -- so what is measured is where the portal LETS a
+   * body be painted, against a baseline of the portal with nothing in it.
+   */
+  const rr = await page.evaluate(async () => {
+    const { drawPortal, portalBirth } = await import('../src/portal.js');
+    const { background } = await import('../src/background.js');
+    const { TYPE_BY_ID } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.director.update = () => {};
+    const P = w.portal;
+    const kk = 0.5;
+    const oc = document.createElement('canvas');
+    oc.width = Math.ceil(w.width * kk);
+    oc.height = Math.ceil((P.rim + 200) * kk);
+    const oct = oc.getContext('2d', { willReadFrequently: true });
+    const disc = (e) => {
+      oct.fillStyle = '#ffffff';
+      oct.beginPath();
+      oct.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+      oct.fill();
+    };
+    const paint = (bodies) => {
+      oct.setTransform(1, 0, 0, 1, 0, 0);
+      oct.clearRect(0, 0, oc.width, oc.height);
+      oct.setTransform(kk, 0, 0, kk, 0, 0);
+      drawPortal(oct, w, background.mood, bodies, disc);
+      oct.setTransform(1, 0, 0, 1, 0, 0);
+      return oct.getImageData(0, 0, oc.width, oc.height).data;
+    };
+    const base = paint([]);
+    // Pixels that changed between two paints, inside a world-unit box.
+    const changed = (d, x0, y0, x1, y1) => {
+      let n = 0;
+      let peak = 0;
+      for (let y = Math.max(0, Math.floor(y0 * kk)); y < Math.min(oc.height, y1 * kk); y++) {
+        for (let x = Math.max(0, Math.floor(x0 * kk)); x < Math.min(oc.width, x1 * kk); x++) {
+          const i = (y * oc.width + x) * 4;
+          const dd = Math.abs(d[i] - base[i]) + Math.abs(d[i + 1] - base[i + 1]) + Math.abs(d[i + 2] - base[i + 2]);
+          if (dd > 24) { n++; peak = Math.max(peak, dd); }
+        }
+      }
+      return { n, peak };
+    };
+    const r = 30;
+    const out = {};
+    // Above the centre line and outside the surface: nowhere.
+    const hidden = { x: P.x - 60, y: P.top - r - 20, r, staged: true };
+    out.hidden = changed(paint([hidden]), 0, 0, w.width, P.rim + 200);
+    // Inside the surface: ghosted, and only inside it.
+    const ghost = { x: P.x + 50, y: P.y - 4, r, staged: true };
+    const gd = paint([ghost]);
+    out.ghostIn = changed(gd, ghost.x - r, ghost.y - r, ghost.x + r, ghost.y + r);
+    out.ghostOut = changed(gd, 0, P.rim + 2, w.width, P.rim + 200);
+    // Straddling the rim: whole below it, and brighter than the ghost.
+    const born = { x: P.x, y: P.rim - 10, r, staged: true };
+    const bd = paint([born]);
+    out.bornBelow = changed(bd, born.x - r, P.rim + 2, born.x + r, P.rim + r + 2);
+    out.bornAbove = changed(bd, born.x - r, P.y - 2 * r, born.x + r, P.y - 1);
+    // The part of the disc below the rim is a circular SEGMENT -- the centre
+    // is 10 above the chord -- and the first version of this asked for a
+    // rectangle's worth (240) of a segment that measures 206 exactly.
+    const dd = 10;
+    out.discBelow = Math.round((r * r * Math.acos(dd / r) - dd * Math.sqrt(r * r - dd * dd)) * kk * kk * 0.85);
+
+    /*
+     * ---- a birth is marked on the rim, from the one place `staged` comes off
+     * A real body, released staged above the rim and marched down through
+     * it by the game -- not placed. The flare and the ring have to appear on
+     * the frame it clears the rim, and be gone within a second.
+     */
+    g.debugClearField();
+    P.births.length = 0;
+    P.flare = 0;
+    const e = g.debugSpawn('lurcher', P.x + 10, P.top - 20);
+    e.staged = true;
+    let bornAt = -1;
+    let flareAt = 0;
+    let ringsAt = 0;
+    for (let i = 0; i < 600 && bornAt < 0; i++) {
+      g.update(1 / 60);
+      if (!e.staged) { bornAt = i; flareAt = P.flare; ringsAt = P.births.length; }
+    }
+    out.bornAt = bornAt;
+    out.flareAt = +flareAt.toFixed(2);
+    out.ringsAt = ringsAt;
+    out.ringX = ringsAt ? +P.births[0].x.toFixed(0) : null;
+    out.bodyX = +e.x.toFixed(0);
+    out.pastRim = e.y - e.r > P.rim;
+    for (let i = 0; i < 70; i++) g.update(1 / 60);
+    out.ringsLater = P.births.length;
+    // ...and a body put down on the field is not a birth.
+    const placed = { x: w.width - 30, y: P.rim - 5, r: 10 };
+    out.placedBirth = portalBirth(w, placed);
+    out.ringsAfterPlaced = P.births.length;
+
+    /*
+     * ---- and `Game.draw` paints every body exactly once ------------------
+     * The plain loop skips what the portal draws; a body must not be painted
+     * twice, nor missed. Counted per body across one frame with a staged
+     * body in the throat and a loose one on the field.
+     */
+    g.debugClearField();
+    const inThroat = g.debugSpawn('lurcher', P.x, P.y);
+    inThroat.staged = true;
+    const loose = g.debugSpawn('lurcher', P.x, P.rim + 200);
+    loose.staged = false;
+    const counts = new Map();
+    const proto = Object.getPrototypeOf(inThroat);
+    const realDraw = proto.draw;
+    proto.draw = function (...args) { counts.set(this, (counts.get(this) || 0) + 1); return realDraw.apply(this, args); };
+    g.draw();
+    proto.draw = realDraw;
+    out.drawThroat = counts.get(inThroat) || 0;
+    out.drawLoose = counts.get(loose) || 0;
+    g.debugClearField();
+    delete w.director.update;
+    g.restart();
+    return out;
+  });
+
+  check('a staged body is drawn nowhere above the portal, ghosted inside it, and whole once through',
+    rr.hidden.n === 0
+    && rr.ghostIn.n > 40 && rr.ghostOut.n === 0 && rr.ghostIn.peak < 500
+    && rr.bornBelow.n >= rr.discBelow && rr.bornBelow.peak > rr.ghostIn.peak && rr.bornAbove.n === 0,
+    `above the top: ${rr.hidden.n} pixels changed; inside: ${rr.ghostIn.n} changed at peak `
+    + `${rr.ghostIn.peak} of 765, ${rr.ghostOut.n} below the rim; straddling: ${rr.bornBelow.n} `
+    + `below the rim (at least ${rr.discBelow} for the disc) at peak ${rr.bornBelow.peak}, `
+    + `${rr.bornAbove.n} above the centre line`);
+
+  check('...and a birth is marked on the rim on the frame the body clears it, and is gone in a second',
+    rr.bornAt > 0 && rr.pastRim && rr.ringsAt === 1 && rr.flareAt > 0.9
+    && Math.abs(rr.ringX - rr.bodyX) < 60 && rr.ringsLater === 0
+    && rr.placedBirth === false && rr.ringsAfterPlaced === 0,
+    `born on frame ${rr.bornAt}, past the rim ${rr.pastRim}: ${rr.ringsAt} ring at x ${rr.ringX} `
+    + `(body at ${rr.bodyX}), flare ${rr.flareAt}; ${rr.ringsLater} left 70 frames on; a body `
+    + `placed outside the mouth is a birth: ${rr.placedBirth}`);
+
+  check('...and Game.draw paints every body exactly once, in the throat or out of it',
+    rr.drawThroat === 1 && rr.drawLoose === 1,
+    `the staged body was painted ${rr.drawThroat} times and the loose one ${rr.drawLoose}`);
 }
 
 // --- the sky and the bed that go with the field ------------------------------
@@ -20255,13 +20515,18 @@ if (MINE_LINE) {
     + `era 2 ${JSON.stringify(r.twoDrone)}`);
 }
 
-// --- the aperture: everything comes out of the building ---------------------
+// --- the portal: everything comes through it, at both eras --------------------
 /*
- * P4b. Three doors reach the field in a run -- the director's single release,
- * its formation release, and the ambient drift -- and at era 2 all three go
- * through the mouth. Splits, blooms and seeded hosts are exempt by decision:
- * they come off a parent already standing on the field, so the case counts a
- * birth only ABOVE the door and says so.
+ * P4b, widened by build 297. Three doors reach the field in a run -- the
+ * director's single release, its formation release, and the ambient drift --
+ * and all three go through the mouth, which from 297 is the portal's rim at
+ * EITHER era. Splits, blooms and seeded hosts are exempt by decision: they
+ * come off a parent already standing on the field, so the case counts a birth
+ * only ABOVE the rim and says so.
+ *
+ * The vacuity arm used to be era 1, where nothing was routed; era 1 is routed
+ * now, so the control is the same probe with the portal taken off the world,
+ * where `throughMouth` is the identity and births span the field.
  */
 {
   const r = await page.evaluate(async () => {
@@ -20308,32 +20573,64 @@ if (MINE_LINE) {
     };
 
     const out = {};
-    const two = run(2, 40);
-    const a = w.yard;
-    out.mouth = { x: +a.mouthX.toFixed(1), half: +a.mouthHalf.toFixed(1), y: +a.mouthY.toFixed(1) };
-    // Only births above the door: anything born below it came off a parent.
-    const doors = two.filter((b) => b.y < a.mouthY);
-    out.twoTotal = two.length;
-    out.twoDoors = doors.length;
-    // The towed MASS rides its head out with a `spread(30)` of its own, which
-    // is a deliberate exemption and is why the bound carries it.
-    out.twoWorst = doors.length
-      ? +Math.max(...doors.map((b) => Math.abs(b.x - a.mouthX) - a.mouthHalf - 40 - b.r)).toFixed(1)
-      : 999;
-    out.twoKinds = [...new Set(doors.map((b) => b.id))].length;
-    out.sawDrift = doors.some((b) => b.id === 'drift');
+    const mouthOf = (era, born) => {
+      const P = w.portal;
+      const half = P.rx * CFG.portal.mouth;
+      // Only births above the rim: anything born below it came off a parent.
+      const doors = born.filter((b) => b.y < P.rim);
+      return {
+        era,
+        total: born.length,
+        doors: doors.length,
+        // The towed MASS rides its head out with a `spread(30)` of its own,
+        // which is a deliberate exemption and is why the bound carries it.
+        worst: doors.length
+          ? +Math.max(...doors.map((b) => Math.abs(b.x - P.x) - half - 40 - b.r)).toFixed(1)
+          : 999,
+        kinds: [...new Set(doors.map((b) => b.id))].length,
+        drift: doors.some((b) => b.id === 'drift'),
+        rim: +P.rim.toFixed(1),
+      };
+    };
+    out.two = mouthOf(2, run(2, 40));
+    g.setEra(1);
+    out.one = mouthOf(1, run(1, 40));
 
     /*
-     * ...and the same probe at era 1, which is the arm without which the one
-     * above passes on a build where the director released nothing. A zero
-     * means nothing until the instrument has been shown to read a one.
+     * ...and the control: the same probe with no portal on the world, which
+     * is the arm without which the two above pass on a build where the
+     * director released nothing. A zero means nothing until the instrument
+     * has been shown to read a one. `resize()` is the one writer and puts
+     * the portal back; nothing else is touched.
      */
-    g.setEra(1);
-    const one = run(1, 40);
-    out.oneTotal = one.length;
-    const xs = one.map((b) => b.x);
-    out.oneSpan = xs.length ? +((Math.max(...xs) - Math.min(...xs)) / w.width).toFixed(2) : 0;
-    out.oneAbove = one.some((b) => b.y < 0);
+    const runLoose = (secs) => {
+      const born = [];
+      const seen = new Set();
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugGiveBytes(60000000);
+      w.director.setTier(8);
+      w.portal = null;
+      for (let i = 0; i < 60 * secs; i++) {
+        g.update(1 / 60);
+        for (const e of w.enemies) {
+          if (seen.has(e)) continue;
+          seen.add(e);
+          born.push({ x: e.x, y: e.y });
+        }
+      }
+      g.resize();
+      return born;
+    };
+    const loose = runLoose(40);
+    out.looseTotal = loose.length;
+    const xs = loose.map((b) => b.x);
+    out.looseSpan = xs.length ? +((Math.max(...xs) - Math.min(...xs)) / w.width).toFixed(2) : 0;
+    out.looseAbove = loose.some((b) => b.y < 0);
+    out.portalBack = !!w.portal;
 
     /*
      * A formation has to come out of the door WITHOUT landing on itself. The
@@ -20357,8 +20654,8 @@ if (MINE_LINE) {
       w.enemies.length = 0;
       w.director.update = () => {};
       const made = spawnFormation(w, [t], n);
-      const yd = w.yard;
-      const outside = made.filter((e) => Math.abs(e.x - yd.mouthX) > yd.mouthHalf + 2).length;
+      const P = w.portal;
+      const outside = made.filter((e) => Math.abs(e.x - P.x) > P.rx * CFG.portal.mouth + 2).length;
       let closest = Infinity;
       for (let i = 0; i < made.length; i++) {
         for (let j = i + 1; j < made.length; j++) {
@@ -20381,34 +20678,36 @@ if (MINE_LINE) {
     return out;
   });
 
-  check('everything a wave sends comes out of the building',
-    // Clear of the truth, not near it: forty seconds of director output swings
-    // 13-30 births run to run, and this asked for 20 and then 15.
-    r.twoDoors >= 8 && r.twoKinds >= 2 && r.sawDrift && r.twoWorst <= 0,
-    `${r.twoDoors} of ${r.twoTotal} births were at the door (${r.twoKinds} kinds, `
-    + `drift among them ${r.sawDrift}); the worst overshot the door by `
-    + `${r.twoWorst > 0 ? r.twoWorst : 0} units`);
+  // Clear of the truth, not near it: forty seconds of director output swings
+  // 13-30 births run to run, and this asked for 20 and then 15.
+  const mouthOk = (m) => m.doors >= 8 && m.kinds >= 2 && m.drift && m.worst <= 0;
+  const mouthLine = (m) => `era ${m.era}: ${m.doors} of ${m.total} births were at the mouth `
+    + `(${m.kinds} kinds, drift among them ${m.drift}); the worst overshot it by `
+    + `${m.worst > 0 ? m.worst : 0} units, rim at ${m.rim}`;
+  check('everything a wave sends comes through the portal, at era 2',
+    mouthOk(r.two), mouthLine(r.two));
 
-  check('...and the same probe reads a one at era 1, where nothing is routed',
+  check('...and at era 1, which used to drop everything in from the sky',
+    mouthOk(r.one), mouthLine(r.one));
+
+  check('...and the same probe with no portal reads the whole field, so it can read a one',
     /*
      * A margin set clear of the truth, not near it: the director's output over
      * forty seconds swings 13-22 bodies run to run, and the first version of
      * this asked for 20 and then 15 — both inside the swing. The arm exists to
      * show the instrument can read a one at all, and six does that.
      *
-     * The SPAN arm was left at 0.6 when the count arm was fixed, and it is the
-     * same fault: where the bodies happen to land is a draw, and a run that
-     * put sixteen of them across 59% of the field failed a threshold set one
-     * point above it. What the arm is actually about is that era 1 has no
-     * DOOR -- era 2's mouth is `mouthHalf` 130 either side of an 817-wide
-     * field, about a third of it -- so anything comfortably past a third
-     * distinguishes a field from a doorway, and 0.45 is clear of the swing in
-     * both directions.
+     * The SPAN arm is about the difference between a field and a mouth: the
+     * mouth is `rx * mouth` = 105 either side of a 516-wide field at 320, about
+     * two fifths of it, and a run put sixteen bodies across 59% of the field
+     * once -- so 0.45 is the line that tells a field from a mouth and is clear
+     * of the swing in both directions.
      */
-    r.oneTotal >= 6 && r.oneSpan > 0.45 && r.oneAbove,
-    `era 1 put ${r.oneTotal} bodies across ${(r.oneSpan * 100).toFixed(0)}% of the `
-    + `field width, from above the entry line ${r.oneAbove} — without this arm the `
-    + `case above passes on a build that released nothing`);
+    r.looseTotal >= 6 && r.looseSpan > 0.45 && r.looseAbove && r.portalBack,
+    `no portal: ${r.looseTotal} bodies across ${(r.looseSpan * 100).toFixed(0)}% of the `
+    + `field width, from above the line ${r.looseAbove}; the portal came back with `
+    + `resize ${r.portalBack} — without this arm the cases above pass on a build `
+    + `that released nothing`);
 
   check('...and a formation fits through it without landing on itself',
     r.packs.every((p) => p.outside === 0 && p.gapMin >= 7 && p.moved < 6),
@@ -25030,7 +25329,7 @@ if (GUN_LINE) {
     out.driftMarch = Math.round(mean(drifts));
     out.hostPeak = Math.round(Math.max(...hosts));
 
-    // ---- era 1 is untouched: no yard, no gate, no march -------------------
+    // ---- without a portal there is no gate, and the drift is loose --------
     /*
      * A POPULATION, not one spawn. This was a single `spawnDrift` with
      * `Math.round(Math.abs(d1.vx)) > 0` asserted on it -- and the lateral is a
@@ -25038,15 +25337,24 @@ if (GUN_LINE) {
      * fails on the die rather than on the rule. Build 273's notes record the
      * same disease in the same case, on its hostile control, and it was fixed
      * only there. Twenty-four of them and the MEAN, which cannot be a coin
-     * toss, plus the claim that says what "unchanged" means: not one of them
-     * is staged, because there is no gate at era 1 to be held behind.
+     * toss, plus the claim that says what the control means: not one of them
+     * is staged, because with no portal there is no gate to be held behind.
+     *
+     * This was the era-1 arm until build 297, when era 1 got the portal too.
+     * The control is the same field with the portal taken off it, which is
+     * the assay's state and what `throughMouth` and `spawnDrift` fall back
+     * to; `resize()` is the one writer and puts it back.
      */
     arm(1);
+    w.portal = null;
     const ones = [];
     for (let k = 0; k < 24; k++) ones.push(spawnDrift(w, {}));
     out.eraOneStaged = ones.some((d) => d.staged);
     out.eraOneVx = +(ones.reduce((a, d) => a + Math.abs(d.vx), 0) / ones.length).toFixed(1);
     out.eraOneStill = ones.filter((d) => Math.abs(d.vx) < 0.5).length;
+    for (const d of ones) d.dead = true;
+    g.resize();
+    out.portalBack = !!w.portal;
 
     // ---- and a mine is smaller at era 2, ON THE GLASS ---------------------
     // While there is a mine line. `CFG.mines.era2` is still applied where a
@@ -25090,15 +25398,15 @@ if (GUN_LINE) {
   check('DRIFT floats out past the gate before it fans, the way a hostile does',
     r.bornStaged && r.bornVx === 0
     && r.pastGate && r.driftMarch <= r.hostMax * 1.5
-    && r.eraOneStaged === false && r.eraOneVx > 1 && r.eraOneStill < 12,
+    && r.eraOneStaged === false && r.eraOneVx > 1 && r.eraOneStill < 12 && r.portalBack,
     `at era 2 it is born staged with no lateral and its march averages `
     + `${r.driftMarch} u/s of lateral over eight, against ${r.hostMax} (peak `
     + `${r.hostPeak}) for eight hostiles doing the same thing; the tracked one `
     + `held at ${r.heldMax}; it comes loose at y ${r.looseAt}, past the gate at `
     + `${r.gate} (${r.pastGate}), and fans from there (${r.looseVx} on the `
-    + `release frame, a draw and not a rule); era 1 has no gate and is `
-    + `unchanged (none of 24 staged: ${!r.eraOneStaged}, mean lateral `
-    + `${r.eraOneVx} with ${r.eraOneStill} of them under half a unit)`);
+    + `release frame, a draw and not a rule); with no portal there is no gate `
+    + `(none of 24 staged: ${!r.eraOneStaged}, mean lateral ${r.eraOneVx} with `
+    + `${r.eraOneStill} of them under half a unit; portal back ${r.portalBack})`);
 
   // ...while there is a mine line to lay one. `CFG.mines.era2` is untouched.
   if (MINE_LINE) check('...and a mine is smaller at era 2, on the glass and in its reach',

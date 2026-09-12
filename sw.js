@@ -64,6 +64,7 @@ const ASSETS = [
   './src/sandbox.js',
   './src/dummy.js',
   './src/yard.js',
+  './src/portal.js',
   './src/turrets.js',
   './src/d2.js',
 ];

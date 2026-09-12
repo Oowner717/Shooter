@@ -11,7 +11,8 @@ import { shed } from './debris.js';
 import { contactAt } from './physics.js';
 import { ledger } from './ledger.js';
 import { drawDummy, dummyHit } from './dummy.js';
-import { throughMouth, mouthSlots, shielded } from './yard.js';
+import { shielded } from './yard.js';
+import { throughMouth, mouthSlots, entryLine, portalBirth } from './portal.js';
 import { ARSENAL } from './arsenal.js';
 
 /*
@@ -838,7 +839,7 @@ export class Enemy {
       // line rather than on it, or a body eases to a halt just short of the
       // line it is supposed to cross.
       tx = this.x + Math.sin(t * 0.6 + this.phase) * 40;
-      ty = ENTRY_Y + CFG.entryDepth + 60;
+      ty = entryLine(world, ENTRY_Y) + 60;
     } else {
       tx = world.shooter.x;
       ty = world.shooter.y;
@@ -1087,11 +1088,12 @@ export class Enemy {
       this.stagedFor += dt;
       if (this.stagedFor > 14) this.vy += 130 * dt;
       // Past the entry line: it is loose in the arena now, and somewhere the
-      // player can actually watch it be dealt with. At era 2 that line IS the
-      // mouth -- `ENTRY_Y + entryDepth` and `yard.mouthY` are both 400 -- so
-      // this is the frame a body clears the gate on.
-      if (this.y - this.r > ENTRY_Y + CFG.entryDepth) {
+      // player can actually watch it be dealt with. The line is the portal's
+      // lower rim (`entryLine`), so this is the frame a body is BORN on --
+      // the whole of it is through the surface -- and the rim is told so.
+      if (this.y - this.r > entryLine(world, ENTRY_Y)) {
         this.staged = false;
+        portalBirth(world, this);
         // ...and only NOW does it fan. See `fan` in the constructor.
         if (this.fan) { this.vx += this.fan; this.fan = 0; }
       }
@@ -2963,7 +2965,7 @@ function drawSecond(ctx, r, phase, t) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineWidth = Math.max(CFG.hairline, r * 0.14);
-  ctx.globalAlpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 6 + phase));
+  ctx.globalAlpha *= 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 6 + phase));
   ctx.beginPath();
   ctx.moveTo(0, -h * 0.5);
   ctx.lineTo(0, h * 0.3);
@@ -2986,7 +2988,7 @@ function drawDigit(ctx, r, phase, t) {
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineWidth = Math.max(CFG.hairline, r * 0.13);
   const beat = 0.5 + 0.5 * Math.sin(t * 5 + phase);
-  ctx.globalAlpha = 0.4 + 0.6 * beat;
+  ctx.globalAlpha *= 0.4 + 0.6 * beat;
   ctx.beginPath();
   ctx.moveTo(-w * 0.45, 0);
   ctx.lineTo(w * 0.6, 0);
@@ -3821,7 +3823,7 @@ export function spawnGroup(world, id, count, opts = {}) {
   const cx = clamp(opts.x ?? world.width / 2 + spread(world.width * 0.4), half, world.width - half);
   // On the field, somewhere with room to be watched: below the entry line so
   // nothing is still marching, and clear of the floor so nothing lands on it.
-  const lo = ENTRY_Y + CFG.entryDepth + 90;
+  const lo = entryLine(world, ENTRY_Y) + 90;
   const hi = Math.max(lo + 40, world.floorY - 220);
   const cy = onField ? clamp(opts.y ?? rand(lo, hi), lo, hi) : -60;
   const made = [];
@@ -3864,34 +3866,35 @@ export function spawnDrift(world, opts = {}) {
     type.r + 6, world.width - type.r - 6);
   let y = opts.y ?? ENTRY_Y + rand(10, 40);
   /*
-   * Drift is not `staged`, so unlike everything else it has no march to hide
-   * behind the interface -- it appears exactly where it is put. Left alone at
-   * era 2 it would go on arriving from the top of the field while every other
-   * object walked out of the door, which is the one thing the requirement
-   * names by name. It is laid inside the THROAT instead, keeping whatever
-   * stagger its caller asked for as an offset and clamped to the depth of the
-   * opening. `here` is the escape for a caller placing something deliberately.
+   * Drift used not to be `staged`, so unlike everything else it had no march
+   * to hide behind the interface -- it appeared exactly where it was put,
+   * which from build 297 would be in open sky above the portal. It is laid
+   * INSIDE the portal instead, in the upper half of the surface where nothing
+   * is drawn, keeping whatever stagger its caller asked for as an offset, and
+   * it comes through the rim the way everything else does. `here` is the
+   * escape for a caller placing something deliberately, and the assay -- no
+   * portal -- keeps the loose spawn it always had.
    */
-  const a = opts.here ? null : world.yard;
+  const a = opts.here ? null : world.portal;
   if (a) {
     x = throughMouth(world, x, type.r);
-    y = clamp(a.mouthY - 30 * CFG.scale - (ENTRY_Y + 40 - y),
-      a.mouthY - 88 * CFG.scale, a.mouthY - 12 * CFG.scale);
+    y = clamp(a.y - 6 * CFG.scale - (ENTRY_Y + 40 - y),
+      a.top - type.r, a.y - 2 * CFG.scale);
   }
   /*
-   * ...and at era 2 it MARCHES OUT before it fans, which is what everything
-   * else does and what DRIFT alone did not.
+   * ...and it MARCHES OUT before it fans, which is what everything else does
+   * and what DRIFT alone did not.
    *
-   * It was laid in the throat and handed `vx: spread(30)` on the same frame,
-   * so it opened up sideways while it was still inside the doorway -- measured
-   * at spawn, y 334 against a gate at 400 with a lateral already on it, where
-   * a hostile at the same depth runs straight until it is past 400 and only
-   * then steers. Reported as exactly that.
+   * At era 2 it was laid in the throat and handed `vx: spread(30)` on the
+   * same frame, so it opened up sideways while it was still inside the
+   * doorway -- measured at spawn, y 334 against a gate at 400 with a lateral
+   * already on it, where a hostile at the same depth runs straight until it
+   * is past 400 and only then steers. Reported as exactly that.
    *
    * `staged` is the mechanism the rest of the field uses and the release line
    * is already the gate, so the drift is held on `fan` and applied on the
-   * frame the body comes loose. Era 1 has no yard, no throat and no gate, and
-   * is untouched: it keeps the immediate lateral it has always had.
+   * frame the body comes loose. Without a portal there is no gate, and it
+   * keeps the immediate lateral it has always had.
    */
   const lateral = spread(30);
   const e = new Enemy(type, x, y, a
@@ -5235,15 +5238,15 @@ export class Director {
     // read as one event rather than two decisions.
     if (t.id === 'scion') x = scionLane(world, t, x);
     /*
-     * ...and at era 2 everything comes out of the building. Applied to the
-     * ANSWER rather than replacing the roll, so era 1 draws exactly the
-     * randoms it always did, in the order it always did.
+     * ...and everything comes through the portal, at both eras. Applied to
+     * the ANSWER rather than replacing the roll, so every spawn site draws
+     * exactly the randoms it always did, in the order it always did.
      *
      * The y is deliberately untouched. A released body is `staged` from -50
-     * down to `ENTRY_Y + entryDepth`, which IS the mouth -- and the interface
-     * covers the field to within 36 CSS px of it, so the only part of that
-     * march anyone sees is the last stretch, inside the doorway, drawn over
-     * the throat. The chrome does the occlusion for free.
+     * down to the rim, and `drawPortal` draws nothing above the portal's
+     * centre line, ghosts what is inside the surface and paints only what
+     * has pushed through it -- so the march is hidden by the drawing rather
+     * than by the chrome, which from build 295 is too short to hide it.
      */
     x = throughMouth(world, x, t.r);
     release(world, t, x, -50 - rand(0, 40));

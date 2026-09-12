@@ -97,6 +97,11 @@ html, body {
   height: 0;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* ...and where the chrome ENDS, resolved the same way: `Game.resize` reads
+     this margin to stand the portal clear of the top bar. A calc() of var()s
+     is not readable as a variable, and #topbar's own box is all zeros while
+     the title screen is up, which is when the constructor first asks. */
+  margin-top: var(--under-rail);
   visibility: hidden;
   pointer-events: none;
 }

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '296';
+export const BUILD = '297';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '296';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '0befd05';
+export const REV = '806cdae';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -5193,8 +5193,29 @@ CFG.title = {
   every: 4.5, // ...and how often the oldest of them is retired
 };
 
+/*
+ * ---- the portal ----------------------------------------------------------
+ *
+ * Where everything the simulation sends comes through, at BOTH eras from
+ * build 297. A rift lying in the far end of the field, drawn in the same
+ * perspective the grid is: `rx` by `ry` world units, an ellipse foreshortened
+ * about 2.2 to 1, with its lower rim ON the entry line -- see
+ * `syncPortal` in portal.js for the one case where the line moves down to
+ * keep the whole of it below the chrome.
+ *
+ * `rx`, `ry` and `pad` are in SCALED, so the picture is the same size on the
+ * glass at either era: 159 x 72 CSS px on a 320-wide screen. `mouth` is the
+ * fraction of `rx` births are spread across -- the outer fifth of an ellipse
+ * is nearly level with its centre line, and a body born there is out of the
+ * surface long before it clears the line. `spill` is how far the light pools
+ * down the field at era 1; at era 2 it runs to the wall.
+ */
+CFG.portal = {
+  rx: 128, ry: 58, pad: 16, mouth: 0.82, spill: 150,
+};
+
 CFG.yard = {
-  gap: 105, mouthHalf: 130, faceHalf: 175, tooth: 34, clear: 24,
+  gap: 105, tooth: 34, clear: 24,
   // The four lots. Two works beside the machine and two emplacements in front
   // of it, measured off the turret so they hold their place on the glass at
   // either screen -- the field is 1.22x deeper at 390x844 and the interface
@@ -5314,8 +5335,9 @@ const SCALED = [
   // the bar
   'decoy.r', 'decoy.ahead', 'decoy.blast.r',
   'pile.r0', 'pile.r', 'ward.r', 'ward.heaveR', 'prism.r', 'prism.beamLen',
-  // the yard, which is a picture and keeps its size on the glass
-  'yard.gap', 'yard.mouthHalf', 'yard.faceHalf', 'yard.tooth', 'yard.clear',
+  // the portal and the yard, which are pictures and keep their size on the glass
+  'portal.rx', 'portal.ry', 'portal.pad', 'portal.spill',
+  'yard.gap', 'yard.tooth', 'yard.clear',
   // The emplacements, for the same reason everything turret-owned is here:
   // they stand on a field 1.54x deeper and have to cover the same fraction of
   // it. `interval`, `slew` and `spread` are NOT scaled -- a cadence and an

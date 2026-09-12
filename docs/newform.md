@@ -5005,3 +5005,107 @@ holding anything. The claim was always that the gate keeps the field thinner,
 never that it lowers its worst second.
 
 590 green.
+
+## Build 297 — the portal
+
+"Change the enemy building to be a wow-factor, screenshot-worthy portal where
+enemies spawn. I don't want them coming out from the top of the screen anymore,
+but rather from this portal."
+
+### What it is
+
+A rift lying in the far end of the field, at **both** eras, drawn in the same
+perspective the grid is: an ellipse `CFG.portal.rx` by `ry` world units (128 by
+58 at era 1, in `SCALED`, so 159 x 72 CSS px on a 320-wide screen at either
+era), with a hole punched in the sky inside it, a vortex of four arms feeding
+a lit eye, a rim drawn toward white with fourteen motes riding it, and a wedge
+of the sky's own accent spilling down the field from it — to the wall at
+era 2, `spill` units at era 1. `src/portal.js` owns all of it. Like the yard it
+is one derived plain object at `world.portal`, in no list anything walks, so
+every damage source misses it by construction; `syncPortal` is the one writer
+and `Game.resize` calls it before `syncYard`, because the yard's mouth is now
+the portal's rim.
+
+The era-2 building is gone: the face, the ribs, the columns, the throat and
+the sill came out of `drawYard`, and so did `yard.mouthHalf`, `faceHalf` and
+`top`. `throughMouth` and `mouthSlots` moved to portal.js and route at both
+eras. What the yard still owns is era 2's — the wall and the lots.
+
+### How a body is born
+
+Nothing about the march changed: a released body is `staged` from about -50
+down to the entry line at `entrySpeed` times its cruise, in rows through the
+mouth for a formation. What changed is that the **drawing hides it**. From
+build 295 the chrome is 76 CSS px and could no longer cover a march that used
+to end 36 px under it, so `Game.draw` hands every staged body in the throat to
+`drawPortal`, which paints it in three passes:
+
+- above the portal's centre line — **nowhere**;
+- inside the ellipse — **ghosted**, clipped to the surface, fading in from
+  nothing at the top rim to half at the bottom one;
+- below the centre line and outside the ellipse, and only once its leading
+  edge is past the rim under it — **whole**, before the rim is drawn, so the
+  rim reads as the hoop it is coming through.
+
+The clip for the last is a rect below the centre line with the ellipse cut
+out of it (`evenodd`). While a body straddles the rim a short bright arc
+stretches on the rim under it, widest when it is half way out, and on the
+frame `staged` comes off — the one place, in `Enemy.update` — `portalBirth`
+puts a ring on the rim that is gone in 0.8s and flares the whole rim. The
+plain loop in `Game.draw` skips exactly the set the portal drew, so a body is
+painted once; the suite counts that per body.
+
+Two absolute alpha assignments in `Enemy.draw`'s helpers became multiplies
+on the way, because the ghost pass is the first thing in the game to draw a
+body at less than full alpha and both would have ignored it. CLAUDE.md's
+rule on canvas alpha, again.
+
+### Where it stands, and why the entry line moved to follow it
+
+The rim **is** the entry line. But the portal has to be seen whole, and the
+chrome above the field is 76 CSS px on a phone with no notch and up to 135
+on one with a notch — at era 1 the line is 260 world units and the chrome
+ends at 123 on the small screen and about 215 under a notch, so a portal
+pinned to the line would be half under the bar on every current iPhone.
+
+So `rim = max(entryY + entryDepth, chrome + pad + 2 ry)`: exactly the old
+line wherever the whole ellipse fits above it (the suite's viewports, an SE),
+and lower by the notch where it does not. The chrome's end is read in
+`Game.resize` off the safe probe's `margin-top`, which is `--under-rail`
+resolved to pixels — the top bar's own box is all zeros while the title
+screen is up, which is when the constructor first asks. `entryLine(world)`
+is the one reader of that number; the staged march's target, the frame
+`staged` clears on, the debug picker's on-field floor and the yard's mouth
+all go through it, and without a portal (the assay) it is the old sum to the
+digit. `world.floorY` has always been derived from the chrome at the bottom
+the same way; this is the top catching up.
+
+### The hash moved, and here is why
+
+Taken in this container on HEAD before the change and again after:
+
+| | hash |
+|---|---|
+| build 296, this container | 1849733424 |
+| build 297 | 1299530142 |
+
+Expected. `throughMouth` was the identity at era 1 and is not any more, so
+every x the director rolls lands somewhere else, and drift is `staged` through
+the portal now rather than loose. The call ORDER of every `Math.random` is
+untouched — the mapping is applied to the answer — so the move is the answers
+and nothing else.
+
+### Verified
+
+Two suite runs, `check-build --stamp`, the bundle booted over http. The first
+run was 594 of 597 and all three were the new cases' own instruments, not the
+game: the assay arm called `enterSandbox` on a run that did not own the room,
+so the door refused and the arm read the live portal; the render arm asked
+for a rectangle's worth of a disc below the rim (240) where the part of a
+disc below a chord ten units under its centre is a circular segment of 206
+exactly; and the DRIFT case's era-1 control asserted that era 1 has no gate,
+which stopped being true on this build -- its control is a world with the
+portal taken off it now, which is the assay's state. Skipped, per the working
+agreement: smoke, tiers, dps, variance, contact. The alert pills still float
+over the top of the field, which is now the top of the portal; they are
+transient and this build leaves them where they were.

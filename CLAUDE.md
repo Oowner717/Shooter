@@ -2544,4 +2544,29 @@ came from before believing the other one covers it.
   worst separation of 0.73, which still fails at the 1.0 equal means would
   give. When a case reduces a sample to one number, ask whether the claim is
   about that number.
+- **The entry line is the PORTAL'S RIM from build 297, and it is derived.**
+  `entryLine(world, ENTRY_Y)` in portal.js is the one reader: the rim is
+  `max(ENTRY_Y + entryDepth, chrome + pad + 2 ry)`, so it is the old 260/400
+  wherever the whole ellipse fits under the top bar (the suite's viewports)
+  and lower by the notch where it does not. Anything that used to add
+  `ENTRY_Y + CFG.entryDepth` goes through it -- the staged march, the frame
+  `staged` clears on, the debug picker's floor, the yard's mouth. The chrome's
+  end comes off `#safeProbe`'s `margin-top` (`--under-rail` resolved), because
+  `#topbar`'s box is all zeros while the title screen is up, which is when
+  the constructor first resizes. A layout change at the top of the screen can
+  now move a balance quantity, the way `--bar-h` already could at the bottom.
+- **A staged body is the portal's to draw, and `Game.draw` paints it once.**
+  `drawPortal` takes the throat's bodies and paints each in three clipped
+  passes -- nowhere above the centre line, ghosted inside the ellipse, whole
+  below it once its leading edge is past the rim -- and the plain loop skips
+  that set. A new draw of a body belongs in `Enemy.draw`, which both paths
+  call; a second loop over `world.enemies` in `Game.draw` paints the throat
+  twice. And the ghost pass is the first thing in the game to draw a body at
+  less than full alpha, which is how two `ctx.globalAlpha = ...` assignments
+  in the body helpers were found: multiply in, always.
+- **The ORDINAL hash moved on 297 and was expected to:** 1849733424 to
+  1299530142 in this container. `throughMouth` is no longer the identity at
+  era 1 and drift is staged through the portal, so every spawn x lands
+  somewhere else; the `Math.random` call order is untouched. Both numbers
+  were taken in one session, per the differential rule above.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

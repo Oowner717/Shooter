@@ -42,6 +42,7 @@ import { Sandbox, eraShut } from './sandbox.js';
 import { ledger, soak } from './ledger.js';
 import { updateDummy } from './dummy.js';
 import { syncYard, updateYard, drawYard, lotAt, refuseLot, shielded, wallLine } from './yard.js';
+import { syncPortal, updatePortal, drawPortal } from './portal.js';
 import { syncGuns, updateGuns, drawGuns, gunGlow, buildGun, lotPrice, gunCount } from './turrets.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
@@ -1942,6 +1943,14 @@ export class Game {
      * stale-scale guard in `reset` -- and it has already called `setZoom`.
      */
     world.shooter.r = CFG.shooter.r;
+    /*
+     * The portal FIRST, because the yard's mouth is its rim. Where the chrome
+     * ends is read off the safe probe's margin, which is `--under-rail`
+     * resolved to pixels -- the top bar's own box is all zeros while the
+     * title screen is up, and that is when the constructor first comes
+     * through here. In world units, like everything else below this line.
+     */
+    syncPortal(world, ENTRY_Y, num(probe.marginTop, 76) / z);
     // The yard is a function of the era and the screen and is stored nowhere,
     // so a rotation re-derives it and a reload cannot strand a stale one. THE
     // ONE WRITER.
@@ -2734,6 +2743,7 @@ export class Game {
     this.runUpgrades(dt);
     if (CFG.mines.inPlay) updateMines(w, dt);
     if (CFG.gun.inPlay) updateGuns(w, dt);
+    updatePortal(w, dt);
     updateYard(w, dt);
     this.resolveBlasts();
     this.checkContact();
@@ -3774,6 +3784,25 @@ export class Game {
     drawYard(ctx, w, background.mood, CFG.gun.inPlay ? lotPrice() : 0);
 
     /*
+     * ---- the portal, and everything still inside it -------------------------
+     *
+     * A `staged` body in the throat is the portal's to draw: nowhere above
+     * the centre line, ghosted through the surface, whole once through --
+     * see `drawPortal`. The plain loop below skips exactly that set, so a
+     * body is painted once. `staged` alone is the test, plus an x band for
+     * the one thing that can be staged outside the mouth, a debug group
+     * queued 'entry' straight down the sky.
+     */
+    const P = w.portal;
+    const throat = new Set();
+    if (P) {
+      for (const e of w.enemies) {
+        if (e.staged && !e.dead && Math.abs(e.x - P.x) < P.rx + e.r) throat.add(e);
+      }
+    }
+    drawPortal(ctx, w, background.mood, [...throat], (e) => e.draw(ctx, w));
+
+    /*
      * Ground first: anything in effects that declares itself ground (the
      * SPORE and THORN patches) is part of the floor and draws under every
      * body, not over them. The rest of the effects stay where they were,
@@ -3790,11 +3819,15 @@ export class Game {
     if (!w.bossLine) w.narrator.draw(
       ctx,
       W / 2,
-      // ...and clear of the yard, which at era 2 the 0.46 lands on: the story
-      // band would otherwise sit on the building's sill, behind the chrome.
-      w.yard
-        ? Math.max(ENTRY_Y + (w.shooter.y - ENTRY_Y) * 0.46, w.yard.wallY + 130 * CFG.scale)
-        : ENTRY_Y + (w.shooter.y - ENTRY_Y) * 0.46,
+      // ...and clear of the wall at era 2, which the 0.46 lands on: the story
+      // band would otherwise sit on the enemy's side of it.
+      // ...and clear of the portal at era 1, whose rim the 0.46 lands on at
+      // 320x568 (261 against a rim at 260).
+      Math.max(
+        ENTRY_Y + (w.shooter.y - ENTRY_Y) * 0.46,
+        w.yard ? w.yard.wallY + 130 * CFG.scale : 0,
+        w.portal ? w.portal.rim + 70 * CFG.scale : 0,
+      ),
       // A SCREEN width in world units: 470 is 291 CSS px at era 1 and would be
       // 189 at era 2, so every story line would re-wrap to half again as many
       // lines, into a band `pillCap()` already measures at zero headroom on a
@@ -3808,7 +3841,7 @@ export class Game {
     // never sit on top of something you are meant to be aiming at.
     for (const c of w.debris) c.draw(ctx);
     for (const e of w.drops) e.draw(ctx, w);
-    for (const e of w.enemies) e.draw(ctx, w);
+    for (const e of w.enemies) if (!throat.has(e)) e.draw(ctx, w);
     // Over its own bodies: the frame's cables, the repair beams and the halo
     // belong on top of the segments they run between.
     if (w.boss) w.boss.draw(ctx, w);
