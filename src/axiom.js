@@ -1,8 +1,9 @@
 /*
  * ============================== AXIOM (VIII) ===============================
  *
- * The eighth anomaly, and the first that only exists past the change: its gate
- * is rung 48, above the era ceiling at 42, so the first form can never meet it.
+ * The eighth anomaly, and the first that only exists past the change. It has
+ * NO gate at all from build 299 -- the derived table is seven rungs and the
+ * roster is nine -- so `debugBoss` is the only way to reach it.
  *
  * ---- what it does that the seven do not ----
  *

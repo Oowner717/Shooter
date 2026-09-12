@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '304';
+export const BUILD = '305';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '304';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '7d6c7c5';
+export const REV = '1a3eb52';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -647,10 +647,9 @@ export const CFG = {
        * ---- and the one gate that is not an anomaly (build 272) ----------
        *
        * The seven above are opened by ANSWERING something. This one is opened
-       * by BECOMING something: past rung 42 -- TERMINUS's own gate, and the
-       * last thing the first form was ever built to meet -- the ladder will
-       * not climb until the field has actually turned over. Not until NEW FORM
-       * is bought, which is only half of it, but until it has been TAKEN:
+       * by BECOMING something: past this rung the ladder will not climb until
+       * the field has actually turned over. Not until NEW FORM is bought,
+       * which is only half of it, but until it has been TAKEN:
        * `world.newForm === 'done'`, which `endEvolve` writes and which a
        * restore at era 2 writes for a run that did it in a previous session.
        *
@@ -659,13 +658,39 @@ export const CFG = {
        * CLIMB, which is the one thing on the other side of the change. A run
        * that is stuck here is a run that is being told what to spend on.
        *
-       * It is deliberately the same number as the last anomaly gate rather
-       * than one above it: standing on 42 having reconciled TERMINUS is the
-       * exact moment the first form has nothing left to be sent against, and
-       * a rung of empty ladder between the two would read as the game having
-       * simply run out.
+       * It is deliberately a gate rung rather than one above it: standing on
+       * the rung having reconciled the anomaly there is the exact moment the
+       * first form has nothing left to be sent against, and a rung of empty
+       * ladder between the two would read as the game having simply run out.
+       *
+       * ---- 42 -> 28, build 305 (phase 5) --------------------------------
+       *
+       * It was 42 from build 272 to 304, which is six of the seven gates and
+       * five sixths of the ladder spent as the first machine. The change is
+       * the middle of the game rather than its last act now: the run becomes
+       * something else at 28, having answered four anomalies, and meets three
+       * on the far side.
+       *
+       * THE RUNG ON THE HOLD IS STILL FIGHTABLE, and that is what makes this
+       * work rather than deadlock. AMPLITUDE's gate IS 28, and NEW FORM asks
+       * for four reconciled -- so if the hold refused the fourth aperture
+       * there would be no way through, which is build 299's `recast: 7`
+       * deadlock arriving again through a different door. It does not:
+       * `syncGate` lights off `heldBy`, which reads the ANOMALY gate alone,
+       * while `eraHeld` refuses only the CLIMB. The two are different
+       * questions and the code already kept them apart. `check-build.mjs`
+       * counts gates at or BELOW this rung for exactly that reason, and
+       * `regress.mjs` asserts the pair, because this is a claim that reads as
+       * obviously-broken-or-obviously-fine depending on which function you
+       * happen to look at first.
+       *
+       * What it MOVES is two fights: DYNAMO (35) and PARITY (42) were era-1
+       * fights and are era-2 fights now, on a field where a loose crossing is
+       * 1481 world units against era 1's 962 and a body's own speed does not
+       * scale with it. `anomalyEra` derives that from this number, so nothing
+       * had to be re-declared -- and measured either side, see the notes.
        */
-      eraGate: 42,
+      eraGate: 28,
       /*
        * ---- traits (build 204) ----
        *
@@ -1349,9 +1374,11 @@ export const CFG = {
   /*
    * ---- axiom -------------------------------------------------------------
    *
-   * The eighth anomaly, and the first that only exists past the change: its
-   * gate is rung 48, above the era ceiling at 42, so nothing on the first
-   * field can ever meet it.
+   * The eighth anomaly, and the first that only exists past the change. It
+   * has NO gate at all from build 299 -- the derived table is seven rungs and
+   * the roster is nine, which is how this one and TESSERA are deferred -- so
+   * `debugBoss` is the only way to reach it. It was authored against a rung
+   * 48 that the ladder no longer has.
    *
    * ---- what it does that the seven do not ----
    *

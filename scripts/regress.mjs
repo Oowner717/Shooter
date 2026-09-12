@@ -8222,12 +8222,35 @@ if (!GUN_LINE) {
    * The count and the rungs are still reported, because what they cannot do
    * is carry an assertion.
    */
+  /*
+   * ---- and the PEAK SATURATES, which is what made this flake -------------
+   *
+   * Build 305 failed it at 0.31 and the cause was not the change (the hold
+   * moved to 28, which is this arm's rung, and it looked causal). Measured
+   * two runs each at rungs 24/28/32: the gated peak is 1.0, 1.0, 1.0, 0.46,
+   * 1.0, 1.0 -- bimodal at EVERY rung, not at 28 -- and the one low run held
+   * the release 23.8s against 38.6 to 48.5 for the others. The fuse is
+   * CENSORED at 1: a run that holds 40 seconds hits the ceiling and one that
+   * holds 24 cannot, so an absolute floor of 0.5 was a number fitted to runs
+   * where the hold happened to be long, and `held` is the noisy half by this
+   * case's own note (9.3s to 120.3s across nine runs).
+   *
+   * What is not censored is the RATE: fuse risen per second of hold reads
+   * 0.019, 0.021, 0.024, 0.024, 0.026 and 0.034 over the same six runs -- a
+   * 1.8x band where the peak is a coin toss. Floor at 0.012, which is 1.6x
+   * under the worst measured, and the GAP arm (the gated peak against the
+   * loose one) is kept because it is the claim's own comparison and survived
+   * all six at 0.27 to 1.00.
+   */
   check('...and the wait FILLS THE FUSE, which is the thing that rescues the run',
-    r.fuseOn.gPeak > 0.5 && r.fuseOn.gPeak > r.fuseOff.gPeak + 0.15,
-    `at rung ${r.fuseRung}, held ${r.fuseOn.held}s of 150, the fuse reached ${r.fuseOn.gPeak} and blew `
-    + `${r.fuseOn.fired} times, ladder ${r.fuseOn.tier}; with the gate off it `
-    + `reached ${r.fuseOff.gPeak}, blew ${r.fuseOff.fired} and ended at `
-    + `${r.fuseOff.tier} -- the crowd term is ${r.crowd} of the contact rate`);
+    r.fuseOn.gPeak / Math.max(1, r.fuseOn.held) > 0.012
+    && r.fuseOn.gPeak > r.fuseOff.gPeak + 0.15,
+    `at rung ${r.fuseRung}, held ${r.fuseOn.held}s of 150, the fuse reached ${r.fuseOn.gPeak} `
+    + `(${(r.fuseOn.gPeak / Math.max(1, r.fuseOn.held)).toFixed(3)} a second held, `
+    + `which is the uncensored half) and blew ${r.fuseOn.fired} times, ladder `
+    + `${r.fuseOn.tier}; with the gate off it reached ${r.fuseOff.gPeak}, blew `
+    + `${r.fuseOff.fired} and ended at ${r.fuseOff.tier} -- the crowd term is `
+    + `${r.crowd} of the contact rate`);
 
   check('...and a run that is clearing does not notice the gate',
     r.coping.share < 0.1 && r.coping.waves >= 6,
@@ -26850,6 +26873,41 @@ if (GUN_LINE) {
     out.climbUpTo = d4.climbTo(w, CAP + 4);
 
     /*
+     * ---- ...and THE ANOMALY STANDING ON THE HOLD IS STILL FIGHTABLE -------
+     *
+     * The claim build 305 turned on, and the one a reader gets wrong: the
+     * hold sits ON a gate rung, so if it refused that rung's aperture as well
+     * as the climb there would be no way through it. NEW FORM asks for
+     * `CFG.ordinal.recast` reconciled and the hold moved to 28, where the
+     * FOURTH gate stands -- so the fourth aperture has to light while held or
+     * the run is stuck with the way out needing an anomaly the hold has made
+     * unreachable, which is build 299's `recast: 7` deadlock arriving through
+     * a different door.
+     *
+     * It does not, and the reason is that the two are different questions
+     * asked by different functions: `syncGate` lights off `heldBy`, which
+     * reads the ANOMALY gate alone, and `eraHeld` refuses only the CLIMB.
+     * `check-build.mjs` counts gates at or BELOW the hold rung on exactly
+     * that basis. Asserted here because the arm above this one reconciles
+     * EVERY anomaly and therefore cannot see it, and because reading either
+     * function on its own gives the wrong answer with equal confidence.
+     */
+    const d5 = arm(null);
+    // Everything below the hold answered, and the one ON it not.
+    w.reconciled = CFG.waves.tier.gates.filter((r) => r < CAP).map((_, i) => i + 1);
+    d5.setTier(CAP);
+    out.onHoldN = d5.heldBy(w);          // the aperture syncGate would light
+    out.onHoldStillHeld = d5.eraHeld(w); // ...while the climb is still refused
+    out.reconciledBelow = w.reconciled.length;
+    // ...and the control: reconcile it and the banner goes out, so a `heldBy`
+    // that returned the gate whatever the state could not pass this.
+    w.reconciled = [...w.reconciled, out.capN];
+    out.onHoldAnswered = d5.heldBy(w);
+    // ...and THAT is the count NEW FORM asks for, which is the way through.
+    out.recastNeeds = CFG.ordinal.recast;
+    out.reconciledAfter = w.reconciled.length;
+
+    /*
      * ---- the other way past, which the first fix did not close ------------
      *
      * Through `endBoss`, which is the game's own path and not a method call:
@@ -26992,6 +27050,27 @@ if (GUN_LINE) {
     r.opened && r.tierAfterBoss === r.cap && r.tierAfterBossDone === r.cap + 1,
     `reconciling anomaly ${r.capN} at ${r.cap} leaves the run at ${r.tierAfterBoss} `
     + `without the new form and steps it to ${r.tierAfterBossDone} with it`);
+
+  /*
+   * ...and the one that makes the hold passable rather than a deadlock.
+   *
+   * Build 305 moved the hold to 28, where the FOURTH gate stands, and NEW
+   * FORM asks for four reconciled -- so the fourth aperture MUST light while
+   * the run is held or the way out needs an anomaly the hold has made
+   * unreachable. `heldBy` reads the anomaly gate and `eraHeld` refuses the
+   * climb: two questions, two functions, and reading either one alone gives
+   * the wrong answer with equal confidence. The control is the second read,
+   * with that anomaly answered, because a `heldBy` that returned the gate
+   * whatever the state would pass the first half on its own.
+   */
+  check('...and the aperture ON the hold rung still lights, or there is no way through',
+    r.onHoldN === r.capN && r.onHoldStillHeld === r.cap
+    && r.onHoldAnswered === 0 && r.reconciledAfter >= r.recastNeeds,
+    `held at ${r.cap} with ${r.reconciledBelow} below it answered, the banner `
+    + `offers anomaly ${r.onHoldN} (wanted ${r.capN}) while the climb is still `
+    + `refused at ${r.onHoldStillHeld}; answering it takes the banner to `
+    + `${r.onHoldAnswered} and the count to ${r.reconciledAfter}, against the `
+    + `${r.recastNeeds} NEW FORM asks for`);
 
   /*
    * A rule the player cannot name is a game that looks broken, and this one is
@@ -28244,6 +28323,21 @@ if (MINE_LINE) {
     });
     out.eras = ANOMALIES.map((a) => anomalyEra(a.n)).join('');
     out.gates = T.gates.join(',');
+    /*
+     * ...and the RELATION rather than the string, because the string is a
+     * literal that moves whenever `eraGate` does and says nothing about the
+     * rule. It was '111111122' until build 299 truncated the gate table and
+     * '111111222' until 305 moved the hold to 28 -- pinned three times, red
+     * three times, and never once because an era was actually wrong.
+     *
+     * What holds for any hold rung: exactly the anomalies whose gate is at or
+     * below it are the first form's, and the ones past it are the second's --
+     * so the count matches and the string is a run of 1s followed by a run of
+     * 2s. A single 1 above a 2 would be a fight the first form can reach past
+     * the rung its ladder ends on.
+     */
+    out.underHold = T.gates.filter((r) => r <= T.eraGate).length;
+    out.eraOnes = (out.eras.match(/1/g) || []).length;
 
     // ---- refusals, and they are SPOKEN --------------------------------
     /*
@@ -28381,11 +28475,12 @@ if (MINE_LINE) {
   check('the debug panel lists every anomaly, with the rung and era it is met at',
     r.rows === 9 && r.rowsUp === 9 && r.gridDown
     && r.names === r.wantNames && r.rungs === r.wantRungs
-    && r.eraRule && r.eras === '111111222',
+    && r.eraRule && r.eraOnes === r.underHold && /^1*2*$/.test(r.eras),
     `${r.rows} rows, ${r.rowsUp} of them actually rendered with the grid down `
     + `(${r.gridDown}): ${r.names}; at ${r.rungs}; eras ${r.eras}, each derived `
     + `from gates ${r.gates} against the era ceiling rather than typed out `
-    + `(${r.eraRule})`);
+    + `(${r.eraRule}) -- ${r.eraOnes} met by the first form against `
+    + `${r.underHold} gates at or below the hold`);
 
   /*
    * The one that matters. Nothing but this stops an era-2 fight being opened

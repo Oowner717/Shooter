@@ -3039,4 +3039,64 @@ came from before believing the other one covers it.
   judgement does not belong in a bug fix: `compound` is the dearest node in the
   tree at 19.2 MB for a three-level dial on TITHE, and TITHE's subtree is about
   31 MB -- a third of the tree -- behind one optional arm.
+- **THE CHANGE IS THE MIDDLE OF THE GAME FROM BUILD 305, NOT ITS LAST ACT.**
+  `eraGate` 42 -> 28. It was 42 from build 272, which is six of the seven
+  gates and five sixths of the ladder spent as the first machine; the run
+  becomes something else at 28 now, having answered four anomalies, and meets
+  three on the far side. One constant, and `anomalyEra` derives the rest.
+- **THE ANOMALY STANDING ON THE HOLD RUNG IS STILL FIGHTABLE, and that is the
+  whole reason this is not a deadlock.** AMPLITUDE's gate IS 28 and NEW FORM
+  asks for four reconciled, so if the hold refused that rung's aperture as
+  well as the climb there would be no way through -- build 299's `recast: 7`
+  deadlock arriving through a different door. It does not, because the two are
+  different questions asked by different functions: `syncGate` lights off
+  `heldBy`, which reads the ANOMALY gate alone, while `eraHeld` refuses only
+  the CLIMB. **I read `eraHeld` first and concluded the opposite**, wrote an
+  arithmetic probe on that assumption, and it "confirmed" a deadlock that does
+  not exist -- a probe built on the wrong reader agrees with itself. Reading
+  `heldBy` is what settled it. `check-build.mjs` counts gates at or BELOW the
+  hold on exactly that basis and its `<=` is correct; `regress.mjs` asserts
+  the pair now, with the anomaly answered as the control, because the existing
+  era-hold case arms with EVERY anomaly reconciled and therefore could not see
+  it.
+- **DYNAMO and PARITY are era-2 fights now, and both got SHORTER.** Measured
+  either side in one container, assists only: DYNAMO 275.8s -> 252.1s and
+  PARITY 242.1s -> 237.9s, stage shapes unchanged to a couple of points, both
+  still reconciled. The cause is `era2Power` 1.3 on the gun against two bosses
+  whose health was authored for era 1 -- so the era move is a 2-9% discount on
+  the two fights it relocates, which is phase 7's business (boss health
+  authored per slot) and not a fault. Worth knowing that a real run meets them
+  with a BOUGHT tree as well as the 1.3, so the discount in play is larger
+  than the probe's.
+- **A literal pinning a derived string has now been red three times and never
+  once because the thing it describes was wrong.** The debug panel's era
+  string was `'111111122'` until build 299 truncated the gate table,
+  `'111111222'` until 305 moved the hold, and it sat one line below an arm
+  already asserting that every entry is DERIVED from the gates. The rule that
+  holds for any hold rung: exactly the anomalies gated at or below it are the
+  first form's, so the COUNT matches `gates.filter(r => r <= eraGate).length`
+  and the string is `/^1*2*$/` -- a 1 above a 2 would be a fight the first
+  form can reach past the rung its ladder ends on. Assert the relation; the
+  string was never the claim.
+- **A SATURATED reading cannot carry an absolute floor, and that is what made
+  the fuse arm flake.** It failed 305 at 0.31 against a floor of 0.5, and the
+  hold had just moved to 28 -- which is that arm's own rung, so it read as
+  causal. It is not: measured two runs each at rungs 24/28/32 the gated peak
+  is 1.0, 1.0, 1.0, 0.46, 1.0, 1.0 -- bimodal at EVERY rung -- and the one low
+  run held the release 23.8s against 38.6 to 48.5. The fuse is CENSORED at 1,
+  so a run that holds 40 seconds hits the ceiling and one that holds 24 cannot,
+  and `held` is the noisy half by this case's own note (9.3s to 120.3s across
+  nine runs). The uncensored quantity is the RATE: fuse risen per second of
+  hold reads 0.019 to 0.034 over the same six runs, a 1.8x band where the peak
+  is a coin toss. **When a reading has a ceiling, divide by the thing that
+  drives it before setting a floor** -- and check the neighbouring rungs before
+  believing a failure that lands on the rung you just changed.
+- **Four docstrings named rung 42 or 48 and three were ALREADY stale.** Build
+  299 deferred AXIOM and TESSERA by truncating the gate table, so they have no
+  gate at all -- but `axiom.js`, `config.js`'s axiom block and `anomaly.js` all
+  still said "its gate is rung 48, above the era ceiling at 42", and
+  `config.js`'s own `eraGate` docstring called 42 "TERMINUS's own gate" when
+  TERMINUS stands at 49 and PARITY at 42. A constant that moves is the moment
+  to grep for its old value in PROSE as well as in code: the numbers were
+  wrong for six builds and nothing could fail for it.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
