@@ -4231,16 +4231,57 @@ export class Director {
   scaleAt(tier) {
     const T = CFG.waves.tier;
     return {
-      pop: Math.min(1 + T.pop * tier, T.popCap),
-      // Compounding, and off tier 1 rather than off zero -- so tier 1 is the
-      // table exactly as authored and every step after it is a ratio on the
-      // one before. See CFG.waves.tier.hpStep for why it is not a slope.
+      /*
+       * All four compound off TIER 1 rather than off zero, so tier 1 is the
+       * table exactly as authored and every step after it is a ratio on the
+       * one before. See CFG.waves.tier.hpStep for why none of them is a
+       * slope, and `popStep` for why `pop` joined them in build 300 -- it was
+       * `1 + pop * tier`, which made tier 1 itself 1.1x the table.
+       */
+      pop: T.popStep ** (tier - 1),
       hp: T.hpStep ** (tier - 1),
-      // Compounding, like health and a little slower than it. See bountyStep.
       // ...and OVERCLOCK pays double for the wave it is armed on.
       bounty: T.bountyStep ** (tier - 1)
         * (this.overclock && this.overclock.armed ? T.overclockBounty : 1),
+      /*
+       * How much faster than rung 1 the stream runs. A MULTIPLIER and not a
+       * rate, so `emit` divides its gap by it and rung 1 is exactly 1 -- the
+       * opening arrives at the tempo it always did, to the bit. `pop` and
+       * this one have to move together: `pop` alone is a wave four times as
+       * long at the same tempo, and this one alone is the same wave over in a
+       * fifth of the time.
+       */
+      flow: Director.flowAt(tier) / Director.flowAt(1),
     };
+  }
+
+  /**
+   * Releases a second at a rung, off `CFG.waves.tier.flow`.
+   *
+   * The table holds ONE ANCHOR PER BOSS BAND, sitting on that band's middle
+   * rung, and this interpolates between them -- so the stream accelerates
+   * smoothly rather than stepping at a band edge. A cliff in the arrival rate
+   * is the one thing a ladder climbed a rung at a time would meet as a wall
+   * instead of a slope, and the band edges are exactly where a boss already
+   * stands.
+   *
+   * Flat outside the anchors rather than extrapolated: rungs 1-3 sit below
+   * the first anchor and rungs 47-49 above the last, and a line run past its
+   * own data is a number nobody authored. Static because `Game.resize` and
+   * the probes want it without a director, and because it depends on nothing
+   * but the rung.
+   */
+  static flowAt(tier) {
+    const T = CFG.waves.tier;
+    const F = T.flow;
+    if (!F || !F.length) return 1;
+    const w = T.bossEvery;
+    // 0 at the first band's middle rung, 1 at the second's, and so on.
+    const x = (tier - (w + 1) / 2) / w;
+    const i = Math.floor(x);
+    if (i < 0) return F[0];
+    if (i >= F.length - 1) return F[F.length - 1];
+    return F[i] + (F[i + 1] - F[i]) * (x - i);
   }
 
   /**
@@ -5350,7 +5391,21 @@ export class Director {
     const press = teach ? 1 : P.open + (P.close - P.open) * clamp(done, 0, 1);
     // OVERCLOCK halves the gap: the same wave, arriving at twice the rate.
     const squeeze = this.overclock.armed ? CFG.waves.tier.overclockGap : 1;
-    this.timer = rand(gap[0], gap[1]) * press * squeeze;
+    /*
+     * ---- and the stream RUNS FASTER with depth (build 300) ----
+     *
+     * `scaleAt().flow` is how many times rung 1's rate this rung asks for, so
+     * the gap is divided by it: x1 at rung 1 and x5.56 by rung 49, which
+     * takes the mean interval from about 1.27s to 0.23s. It is the other half
+     * of `popStep` -- the wave asks for x21 the bodies, and without this it
+     * would simply take twenty-one times as long at one tempo.
+     *
+     * Teach waves are exempt, the same exemption `press` above takes and for
+     * the same reason. And the division is applied to the SAME roll, in the
+     * same order, so rung 1 draws exactly the randoms it always did.
+     */
+    const stream = teach ? 1 : this.scaleAt(this.tier).flow;
+    this.timer = rand(gap[0], gap[1]) * press * squeeze / stream;
 
     // The field cap is a hard ceiling on top of the wave. Hold the job rather
     // than dropping it: a wave is a group, and losing half of it to a cap the

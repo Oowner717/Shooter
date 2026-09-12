@@ -2688,4 +2688,71 @@ came from before believing the other one covers it.
   second, third and twentieth call are all invisible to anything reading the
   column. The case spies `hud.alert`, scores twenty further waves, and asserts
   the count is still one.
+- **QUANTITY CARRIES THE CLIMB FROM BUILD 300, AND FOUR SLOPES MOVED AS ONE.**
+  `hpStep` 1.085 -> 1.028 (x50.2 at rung 49 -> x3.83), `bountyStep` 1.075 ->
+  1.045, `pop` replaced by `popStep` 1.0655 (x21.0) and `flow`, a table of
+  releases-a-second read by `Director.flowAt` (x5.56). Health is now the
+  GENTLEST of the three that climb, which is the whole of the phase stated as
+  a comparison -- and the case asserts that comparison rather than the three
+  constants, because a case pinning 3.83/21.0/8.27 goes red the first time any
+  of them is tuned while still saying nothing about the shape. A half-applied
+  version of it is a game nobody should measure: health alone is a late game
+  that collapses, population alone is a wave twenty-one times as long at one
+  tempo, rate alone is the same wave over in a fifth of the time.
+- **`pop` now compounds off rung 1 like the other three, and that is a fix as
+  well as a rescale.** It was `1 + pop * tier`, so tier 1 was itself 1.1x the
+  authored table -- a slope that starts by moving the thing it is measured
+  against, in the one place (`hpStep`'s own docstring) the repo promises "tier
+  1 is the table exactly as authored". All four are `x^(n-1)` now and the case
+  asserts all four are EXACTLY 1 at rung 1, not within a tolerance.
+- **`popCap` is GONE rather than raised.** It capped population at x3, reached
+  at rung 20, so the last thirty rungs were pure health. With `popStep` at
+  1.0655 and the ladder's `ceiling` at 49 the curve tops out at x21.0 by
+  construction, so any cap at or above that is a bound nothing can reach --
+  the `world.endless` shape build 186 spent a pass removing. What bounds the
+  FIELD is not a cap on the ask: `emit` refuses to release while
+  `hostileCount >= maxEnemies` and HOLDS the job rather than dropping it, so
+  the wave lengthens and the screen does not fill.
+- **...so `check-build`'s field guard had to be turned round.** It refused a
+  wave whose ask exceeded `maxEnemies`, under a comment reading "the field cap
+  must never be the thing doing the balancing" -- and the field cap IS what
+  holds the crowd down now, with an ask of 231 against a field of 57 as the
+  design. What replaced it is the pair of claims that can still go wrong: the
+  two slopes move together (bodies over arrivals-a-second is the wave's LENGTH
+  IN SECONDS, x3.8 and bounded at x8), and a release can never land inside two
+  frames (the tightest, with OVERCLOCK armed at the ceiling, is 46ms).
+- **A slope table is AUTHORED when every smooth fit misses its own anchors.**
+  `flow` is seven numbers, one per boss band at that band's middle rung, and
+  `Director.flowAt` interpolates. A geometric ramp with the same endpoints
+  sags 21% under the middle anchors and a straight line overshoots them by
+  13% -- a fit that misses by a fifth is a different game wearing the plan's
+  numbers. Interpolated rather than stepped because a cliff in the arrival
+  rate lands on a band edge, which is exactly where a boss already stands, and
+  the case asserts the worst one-rung step against the mean.
+- **An ORDERING is a proxy, and a proxy says the wrong thing the moment the
+  thing it stood for stops being true.** `bounty < hp` held from build 202
+  under a comment about a rung staying "harder than the one below it"; salvage
+  is FASTER than health from 300, because a rung is harder for sending x21 the
+  bodies rather than tougher ones. What build 202 actually cared about --
+  energy per point of damage must not FALL as you climb -- is asserted
+  directly now and rises x2.2 by rung 49. The companion arm comparing against
+  the retired LINEAR bounty was deleted rather than retuned: with health
+  nearly flat the linear scheme would also rise (x2.03), so the arm reported
+  compounding as slightly worse than the thing it replaced. A comparison
+  against a scheme nobody runs is worth keeping only while it separates them.
+- **`Director.wave` IS A GETTER off `order[at]`, so `d.wave = WAVES[i]` is a
+  silent no-op.** The assignment takes, the read-back disagrees, nothing
+  throws. Build 300's teach-exemption arm did exactly that and measured the
+  AMBIENT wave: 0.14s against the 3.4s it was asking about, which looks
+  exactly like a missing exemption on a build that has one. Select a wave the
+  way every other case does -- `d.order = [i]; d.at = 0;` -- and carry an arm
+  asserting the two waves really are a teach and a non-teach, or the case is
+  comparing one wave with itself. Same family as the `[hidden]` trap and the
+  `export let` snapshot.
+- **`load`'s `asked` includes SWARM, which is a TRAIT and not a slope.** It
+  doubles the body count and traits are seeded from `traitFrom` 10 up, so a
+  rung-49 against rung-1 ratio read x39.8 where the swell is x19.9 -- exactly
+  twice, half of it a rule the rung happened to roll. Divide it out and say
+  so. Worth recording on its own: a SWARM wave at the ceiling queues 438
+  bodies against a field of 57.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

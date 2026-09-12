@@ -625,8 +625,29 @@ console.log(`\nTHE LADDER — tiers ${FROM}-${TO}, ${RUNS} run${RUNS > 1 ? 's' :
   + ' BOLT and the damage line');
 console.log(`  spend: ${FIXED !== null ? `${fmtBytes(FIXED)} flat` : "docs/pacing.md's earned-by-tier targets"}`
   + `, capped at the whole tree (${fmtBytes(TREE_TOTAL)})`);
-console.log(`  slopes: pop +${CFG.waves.tier.pop * 100}%/tier (cap x${CFG.waves.tier.popCap})`
-  + ` · hp x${CFG.waves.tier.hpStep}^(n-1) · bounty x${CFG.waves.tier.bountyStep}^(n-1)`);
+/*
+ * All four slopes compound off rung 1 from build 300 -- `pop` was
+ * `1 + pop * tier` with a `popCap`, and both fields are gone, so this line
+ * printed `undefined` for two of the three numbers it exists to show. A
+ * readout with no assertion behind it rots; this one is printed beside the
+ * table it explains, so it has to follow the config rather than restate it.
+ */
+{
+  const T = CFG.waves.tier;
+  const F = T.flow; const bw = T.bossEvery;
+  const flowAt = (t) => {
+    const x = (t - (bw + 1) / 2) / bw; const i = Math.floor(x);
+    if (i < 0) return F[0];
+    if (i >= F.length - 1) return F[F.length - 1];
+    return F[i] + (F[i + 1] - F[i]) * (x - i);
+  };
+  const top = T.ceiling;
+  console.log(`  slopes, all x^(n-1) off rung 1: pop x${T.popStep} (x${(T.popStep ** (top - 1)).toFixed(1)} `
+    + `at ${top}) · hp x${T.hpStep} (x${(T.hpStep ** (top - 1)).toFixed(2)}) · bounty x${T.bountyStep} `
+    + `(x${(T.bountyStep ** (top - 1)).toFixed(2)})`);
+  console.log(`  stream: ${flowAt(1).toFixed(2)} releases a second at rung 1 rising to `
+    + `${flowAt(top).toFixed(2)} at ${top} (x${(flowAt(top) / flowAt(1)).toFixed(2)})`);
+}
 const atRange = [...results.values()].flat()
   .flatMap((r) => r.marks.map((m) => m.at)).filter(Number.isFinite);
 console.log(`  one body HELD at ${RANGE} units straight up (measured ${med(atRange) || RANGE}),`

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '299';
+export const BUILD = '300';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '299';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '79f3293';
+export const REV = '010d8fd';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -272,7 +272,56 @@ export const CFG = {
       // on: two tiers per band, so a band is met and then met again heavier
       // before anything new arrives.
       perBand: 2,
-      pop: 0.1, // authored count x (1 + pop*n)
+      /*
+       * ---- how many bodies a wave asks for (build 300) ------------------
+       *
+       * `popStep ** (tier - 1)`, which is the same shape health and bounty
+       * already use and for the same reason: tier 1 is the authored table
+       * EXACTLY, and every rung after it is a ratio on the one below. It was
+       * `1 + pop * tier` at 0.1 a rung, which made tier 1 itself 1.1x the
+       * table -- a slope that starts by moving the thing it is measured
+       * against.
+       *
+       * 1.0655 is x21.0 at rung 49, and that number is the whole of phase 2:
+       * the plan inverts which of the two slopes carries the climb. Health
+       * was x50 by 49 against a population ceiling of x3 reached at rung 20,
+       * so the last thirty rungs were pure health against a gun that stops
+       * improving -- and `hpStep` below is now x3.83 while this is x21.
+       * Quantity carries the pressure and a body barely gets tougher.
+       *
+       * It asks for more bodies; it does NOT put more on the screen. `emit`
+       * hard-gates on `CFG.maxEnemies` and HOLDS the job rather than dropping
+       * it, so a deeper rung is a LONGER wave arriving FASTER through a field
+       * of roughly constant size -- which is what `flow` below is for, and
+       * why the two have to move together. Raising this alone would make a
+       * wave that takes four times as long at the same tempo.
+       */
+      popStep: 1.0655,
+      /*
+       * ---- and how fast they arrive (build 300) -------------------------
+       *
+       * Releases a second, ONE ANCHOR PER BOSS BAND, at that band's middle
+       * rung -- `bossEvery` is the width, so anchor i sits on rung
+       * `i * bossEvery + (bossEvery + 1) / 2`. `Director.flowAt` reads it and
+       * interpolates between anchors, so the stream accelerates smoothly
+       * instead of stepping at a band edge: a cliff in the arrival rate is
+       * the one thing a ladder climbed one rung at a time would feel as a
+       * wall rather than as a slope.
+       *
+       * Authored as a table rather than fitted to a curve because it IS the
+       * design. The seven numbers are the plan's, and every smooth function
+       * tried against them is wrong somewhere: a geometric ramp with the same
+       * endpoints sags 21% under the middle anchors, and a straight line
+       * overshoots them by 13%. A fit that misses its own anchors by a fifth
+       * is a different game wearing the plan's numbers.
+       *
+       * Rung 1 is the divisor, so the multiplier there is exactly 1 and the
+       * opening arrives at the tempo it always did, to the bit. The teach
+       * waves are exempt on top of that, for the same reason the press arc
+       * exempts them: they are authored beats and a tutorial that speeds up
+       * is a tutorial that stops teaching.
+       */
+      flow: [0.9, 1.4, 2.0, 2.7, 3.4, 4.2, 5.0],
       /*
        * Health is the one slope that compounds: type health x hpStep^(n-1),
        * so tier 1 is the table as authored and each rung is 12% on the one
@@ -323,7 +372,30 @@ export const CFG = {
        * at tier 20 is about x6.9, and 6.9^(1/19) is 1.105. Swept against
        * tiers.mjs afterwards; see the table in docs/pacing.md.
        */
-      hpStep: 1.085,
+      /*
+       * ---- 1.028 from build 300, and it is the INVERSION ----------------
+       *
+       * Every note above is the history of one argument: the cadence tree
+       * was cut three times, the plateau fell 1,438 dps to 423, and this
+       * slope came down each time to keep the wall in the same place. It was
+       * always the same instrument answering the same question -- how tough
+       * is one body -- and the answer was x50.2 by rung 49.
+       *
+       * The question changed in phase 2. Pressure is carried by HOW MANY and
+       * HOW FAST (`popStep` x21.0 and `flow` x5.56 above), so a body only has
+       * to stay worth shooting rather than become a wall on its own: x3.83 at
+       * rung 49, x1.03 at 2, x1.30 at 10, x1.75 at 21, x2.32 at 31.
+       *
+       * The two readings this replaces, kept because they are what the change
+       * was measured against: at 1.085 the worst body in a band was 4.0s at
+       * tier 9 and 10.3s at 20; the design brief asks for 2-4s through about
+       * rung 10 and past 6s by about 14. At 1.028 a body's health is no
+       * longer what produces either number -- the crowd is -- so the bench
+       * that reads single-body TTK (`tiers.mjs`) is measuring the wrong wall
+       * again, which is the finding build 177 published and build 227
+       * reversed. Phase 3 is where the right one gets an instrument.
+       */
+      hpStep: 1.028,
       /*
        * ---- what a rung pays (build 202) ----
        *
@@ -335,7 +407,30 @@ export const CFG = {
        * Compounding too, and a little slower than health, so a rung is still
        * harder than the one below it -- just no longer poorer.
        */
-      bountyStep: 1.075, // energy x bountyStep^(tier-1), against hpStep 1.085
+      /*
+       * ---- 1.045 from build 300, and it is now FASTER than health -------
+       *
+       * The paragraph above says "a little slower than health, so a rung is
+       * still harder than the one below it -- just no longer poorer". That
+       * ruling was about the PER-BODY trade, and phase 2 moved where "harder"
+       * lives: a rung is harder because it sends x21 the bodies at x5.6 the
+       * rate, not because each one is tougher. Per body, a deep rung is now
+       * deliberately EASIER (x3.83 health) and better paying (x8.4 salvage).
+       *
+       * Held slower than health it would have had to be about 1.02, and a
+       * purse that moves x2.6 across forty-nine rungs cannot pay for a tree
+       * whose deepest band prices a node in the millions. What has to hold is
+       * the thing build 202's rule was protecting -- energy per point of
+       * damage must not fall as you climb -- and 1.045 against 1.028 makes it
+       * RISE, x2.2 by rung 49, which is the same direction that rule wanted
+       * and further along it.
+       *
+       * `regress.mjs` asserts the ratio rather than the ordering now. An
+       * ordering (`bounty < hp`) was only ever a proxy for it, and it is a
+       * proxy that says the wrong thing the moment health stops being the
+       * thing that climbs.
+       */
+      bountyStep: 1.045, // salvage x bountyStep^(tier-1), against hpStep 1.028
       /*
        * A surge pays half again on what that wave was worth, banked in one
        * lump at the turret. The ladder's own reward for the thing it most
@@ -355,11 +450,23 @@ export const CFG = {
       dividendPeak: 0.01, // per rung ever stood on
       dividendAnomaly: 0.05, // per anomaly reconciled
       /*
-       * The ceiling on population growth. The field caps at CFG.maxEnemies
-       * anyway, so past this the climb is carried by health and bounty alone
-       * -- which is where plan B wants the wall to form.
+       * ---- `popCap` is GONE (build 300) --------------------------------
+       *
+       * It was the ceiling on population growth, at x3, reached at rung 20 --
+       * so the last thirty rungs were carried by health alone, which is the
+       * shape phase 2 inverts. Deleted rather than raised, because with
+       * `popStep` at 1.0655 and the ladder's own `ceiling` at rung 49 the
+       * curve tops out at x21.0 by construction: any cap at or above that is
+       * a bound nothing can reach, which is the `world.endless` shape build
+       * 186 spent a pass removing -- a constant threaded through readers that
+       * can never take their other branch.
+       *
+       * What actually bounds the FIELD is not a cap on the ask. `emit`
+       * refuses to release at all while `hostileCount(world) >= maxEnemies`
+       * and HOLDS the job rather than dropping it, so the wave gets longer
+       * instead of the screen getting fuller. That is a runtime gate on the
+       * real number, where the old cap was a static guess at it.
        */
-      popCap: 3,
       /*
        * What counts as a wave going badly. All three are read off
        * instruments that already ran every frame before the ladder existed:

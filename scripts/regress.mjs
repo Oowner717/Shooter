@@ -3866,12 +3866,23 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
 
   check('the ladder\'s health compounds, and tier 1 is the table as written',
     Math.abs(r.hp1 - 1) < 1e-9 && r.compounds
-    // No ceiling: tier 20 is still exactly the exponent, not a clamp. This
-    // was `> 12` and that was the slope of the day rather than the rule --
-    // build 194 took hpStep from 1.17 to 1.12 to pay for the cadence nerfs,
-    // tier 20 went x19.7 to x8.6, and a case about the SHAPE of the slope
-    // failed on its size.
-    && Math.abs(r.hpAt[2] - r.step ** 19) < 1e-9 && r.hpAt[2] > r.hpAt[0] * 2,
+    /*
+     * No ceiling: tier 20 is still exactly the exponent, not a clamp. This
+     * was `> 12` and that was the slope of the day rather than the rule --
+     * build 194 took hpStep from 1.17 to 1.12 to pay for the cadence nerfs,
+     * tier 20 went x19.7 to x8.6, and a case about the SHAPE of the slope
+     * failed on its size.
+     *
+     * ...and the second half of that arm was the SAME MISTAKE one level down.
+     * `hpAt[2] > hpAt[0] * 2` -- tier 20 at least twice tier 10 -- is a
+     * factor, and a factor is a size. Build 300 took the slope to 1.028 and
+     * tier 20 is 1.32 of tier 10, so a case whose own comment warns against
+     * pinning the size failed on the size. What the arm was reaching for is
+     * that the slope actually RISES and is not clamped, and both halves of
+     * that are said exactly: equal to the exponent, and monotone.
+     */
+    && Math.abs(r.hpAt[2] - r.step ** 19) < 1e-9
+    && r.hpAt[2] > r.hpAt[1] && r.hpAt[1] > r.hpAt[0],
     `tier 1 x${r.hp1}, every rung x${r.step}; tier 10/14/20 = `
     + r.hpAt.map((x) => `x${x.toFixed(1)}`).join(' / ')
     + `, and tier 20 is x${(r.step ** 19).toFixed(1)} by the formula`);
@@ -7934,8 +7945,29 @@ if (!GUN_LINE) {
      * (loose 0.19, tier 24), 25 blew 2 (loose 0.24, tier 25), 26 blew 2 but
      * the loose run climbed to 30 on its own (peak 0.56). 25 keeps the
      * contrast and moves the gated run off the edge.
+     *
+     * ---- and it moved AGAIN in build 300, twice over ------------------
+     *
+     * That build put the pressure into quantity and rate: at rung 25 a body
+     * now has x1.94 the health of rung 1 rather than x7.16, so this build
+     * clears what arrives and the gate has nothing to hold -- measured, the
+     * gated field averaged 25.1 against 28.1 loose (0.89 against a ceiling
+     * of 0.85) and neither arm blew. The rung where the gate is the thing
+     * that matters moved DOWN, which is not obvious: swept 28/35/42/49, the
+     * separation is 0.435 at 28 and then 0.798, 0.981, 0.928 -- past 35 BOTH
+     * arms sit near `maxEnemies` and the FIELD CAP is doing the work the gate
+     * used to, so there is no contrast left to measure. 28 it is.
+     *
+     * ...and the field measurement is taken with THE FUSE PINNED OUT, in both
+     * arms, which is the other half of the fix. Three runs at 28 with it live
+     * gave ratios of 0.86, 1.02 and 0.49 -- one of them with the gated mean
+     * ABOVE the loose one -- because a discharge RESETS THE WAVE and empties
+     * the field, so the arm was measuring two mechanisms and reporting
+     * whichever fired. Pinned, the same three runs give 0.666, 0.672, 0.677.
+     * The fuse gets its own arm below, where its filling is the signal rather
+     * than the noise.
      */
-    const play = (gated) => {
+    const play = (gated, pinFuse = false, secs = 240) => {
       g.restart();
       w.phase = 'staging';
       g.debugTeachAll();
@@ -7945,14 +7977,18 @@ if (!GUN_LINE) {
       w.autoAim = true;
       w.autoFire = true;
       const d = w.director;
-      d.setTier(25);
+      // 28 from build 300; see the note above for the sweep that chose it.
+      d.setTier(28);
       const peak = [];
       let heldFrames = 0;
       let fired = 0;
       let last = 0;
       let gPeak = 0;
-      for (let f = 0; f < 60 * 240; f++) {
+      for (let f = 0; f < 60 * secs; f++) {
         if (!gated) { d.lastThin = -1; d.holdFor = 0; }
+        // See the note above: a discharge empties the field, so the thinness
+        // arms hold it out and the fuse arms let it run.
+        if (pinFuse) { d.glitch = 0; d.held = 0; }
         g.update(1 / 60);
         if (d.holdFor > 0) heldFrames++;
         if (d.glitch > gPeak) gPeak = d.glitch;
@@ -7981,8 +8017,13 @@ if (!GUN_LINE) {
         fired, gPeak: +gPeak.toFixed(2), tier: d.tier,
         auto: !!w.up.flinch && !!w.up.deadbolt };
     };
-    out.drowning = play(true);
-    out.loose = play(false);
+    // The field, with the fuse held out of it.
+    out.drowning = play(true, true);
+    out.loose = play(false, true);
+    // ...and the fuse, with it let run. Shorter, because what is being read
+    // is a peak rather than a mean and it is reached early.
+    out.fuseOn = play(true, false, 150);
+    out.fuseOff = play(false, false, 150);
 
     /*
      * ---- and a run that IS clearing is not held --------------------------
@@ -8018,26 +8059,46 @@ if (!GUN_LINE) {
 
   /*
    * The ceiling is a MULTIPLE of the worst separation measured, not the day's
-   * value: worst gated mean 15.6 against best loose 21.4 is 0.73, so 0.85
-   * has headroom and still fails on 1.0, which is what equal means would be
-   * if the gate stopped holding anything.
+   * value. Re-measured on build 300 with the fuse pinned out of both arms,
+   * three runs each: gated [19.5, 23.2, 19.3] against loose [29.3, 34.5,
+   * 28.5], so the worst separation is 23.2/28.5 = 0.814 and a ceiling of 0.90
+   * has headroom while still failing at 1.0 -- which is what equal means
+   * would be if the gate stopped holding anything.
+   *
+   * The `held` floor came down from 10s to 3s for the same reason: with the
+   * fuse pinned the hold measured 9.3s, 104.9s and 120.3s across those three
+   * runs, so a floor of 10 was inside the spread. It is a liveness guard
+   * rather than the claim -- the claim is the ratio beside it.
    */
   check('a run that cannot clear the field is not sent another wave',
-    r.drowning.auto && r.drowning.held > 10
-    && r.drowning.mean < r.loose.mean * 0.85 && r.loose.mean >= 12,
+    r.drowning.auto && r.drowning.held > 3
+    && r.drowning.mean < r.loose.mean * 0.90 && r.loose.mean >= 12,
     `with FLINCH and DEADBOLT owned (${r.drowning.auto}) the release was held `
     + `${r.drowning.held}s of 240 and the field averaged ${r.drowning.mean} `
     + `standing against ${r.loose.mean} on the same run with the gate off `
     + `(peaks ${r.drowning.max} and ${r.loose.max}, which overlap run to run `
     + `and are why this is a mean)`);
 
-  check('...and the fuse fills from the wait, so the run is stepped back rather than pinned',
-    r.drowning.fired > r.loose.fired && r.drowning.tier < r.loose.tier
-    && r.drowning.gPeak > r.loose.gPeak,
-    `the fuse reached ${r.drowning.gPeak} and blew ${r.drowning.fired} times, and `
-    + `the ladder ended at tier ${r.drowning.tier}; with the gate off it reached `
-    + `${r.loose.gPeak}, blew ${r.loose.fired} and ended at ${r.loose.tier} -- the `
-    + `crowd term is ${r.crowd} of the contact rate`);
+  /*
+   * ...and the fuse, on its own arms with it let run.
+   *
+   * Asserted on the PEAK and not on the discharge count, which is the rule
+   * this case already carries one paragraph up ("0.87 and 0.2 are both 0
+   * blows") and did not follow: `fired > loose.fired` and `tier < loose.tier`
+   * are both CONSEQUENCES of a discharge, so both inherit its coin flip.
+   * Measured at 28 over three runs the gated peak was 1, 0.62 and 1 against a
+   * loose 0.2, 0 and 0.44 -- a worst gap of 0.56, so a required 0.15 is
+   * nearly four times under it, and a gated floor of 0.5 says the fuse
+   * actually got most of the way rather than merely further than nothing.
+   * The count and the rungs are still reported, because what they cannot do
+   * is carry an assertion.
+   */
+  check('...and the wait FILLS THE FUSE, which is the thing that rescues the run',
+    r.fuseOn.gPeak > 0.5 && r.fuseOn.gPeak > r.fuseOff.gPeak + 0.15,
+    `held ${r.fuseOn.held}s of 150, the fuse reached ${r.fuseOn.gPeak} and blew `
+    + `${r.fuseOn.fired} times, ladder ${r.fuseOn.tier}; with the gate off it `
+    + `reached ${r.fuseOff.gPeak}, blew ${r.fuseOff.fired} and ended at `
+    + `${r.fuseOff.tier} -- the crowd term is ${r.crowd} of the contact rate`);
 
   check('...and a run that is clearing does not notice the gate',
     r.coping.share < 0.1 && r.coping.waves >= 6,
@@ -10964,9 +11025,10 @@ if (!GUN_LINE) {
     const d = w.director;
     const out = {};
 
-    // ---- bounty compounds, and slower than health ----
+    // ---- bounty compounds, and FASTER than health from build 300 ----
     out.bountyStep = T.bountyStep;
     out.hpStep = T.hpStep;
+    out.popStep = T.popStep;
     out.b1 = d.scaleAt(1).bounty;
     out.b40 = d.scaleAt(40).bounty;
     out.h40 = d.scaleAt(40).hp;
@@ -11032,30 +11094,57 @@ if (!GUN_LINE) {
     return out;
   });
 
-  check('bounty compounds, and a shade slower than health',
-    r.bountyStep > 1 && r.bountyStep < r.hpStep && Math.abs(r.b1 - 1) < 1e-9,
-    `bounty x${r.bountyStep}^(n-1) against hp x${r.hpStep}^(n-1); rung 1 pays x${r.b1.toFixed(3)}, `
-    + `rung 40 pays x${r.b40.toFixed(1)} against x${r.h40.toFixed(1)} health`);
   /*
-   * Per point of damage a deep rung still pays less -- bounty is deliberately
-   * a shade under health, so a rung stays harder than the one below it. What
-   * changed is the SHAPE: rung 40 pays 0.70 of rung 1 rather than 0.08.
-   * The run-level answer is the probe's, and it is the opposite sign: energy
-   * per second RISES with the rung, because the wave grows too.
+   * ...and from build 300 it is faster than health, which is an INVERSION and
+   * not a drift.
    *
-   * The ABSOLUTE figure is what is pinned, not the ratio against the retired
-   * linear bounty. That ratio moves with `hpStep` -- build 229 took health
-   * from 1.12 to 1.085 a rung, which makes the linear scheme less ruinous as
-   * well, so a threshold written against it drifts every time the health
-   * slope is touched and stops describing the thing it is named for. Rung 40
-   * keeping over half of rung 1's rate is the promise; being clear of the
-   * linear scheme is the second arm and no longer carries the case.
+   * The rule this replaces was `bounty < hp`, under a comment reading "a
+   * little slower than health, so a rung is still harder than the one below
+   * it -- just no longer poorer". That was a claim about the PER-BODY trade,
+   * and phase 2 moved where "harder" lives: a rung is harder because it sends
+   * x21 the bodies at x5.6 the rate (`popStep` and `flow`), not because each
+   * one is tougher. Per body a deep rung is deliberately easier and better
+   * paying.
+   *
+   * An ORDERING was only ever a proxy for the thing build 202 cared about --
+   * energy per point of damage must not fall as you climb -- and it is a
+   * proxy that says the wrong thing the moment health stops being what
+   * climbs. All three slopes are asserted to compound off exactly 1 at rung
+   * 1, which is the property every one of them shares and the one that makes
+   * rung 1 the authored table.
    */
-  check('...so a deep rung is no longer the pay cut it was',
-    r.payPerHp > 0.5 && r.payPerHp < 1 && r.payPerHp / r.payPerHpOld > 2,
-    `energy per point of damage at rung 40, against rung 1: `
-    + `${r.payPerHp.toFixed(3)} now against ${r.payPerHpOld.toFixed(3)} under the linear bounty `
-    + `— ${(r.payPerHp / r.payPerHpOld).toFixed(1)}x better`);
+  check('all three slopes compound off rung 1, and salvage now outruns health',
+    r.bountyStep > 1 && r.hpStep > 1 && r.popStep > 1
+    && r.bountyStep > r.hpStep && Math.abs(r.b1 - 1) < 1e-9,
+    `bounty x${r.bountyStep}^(n-1) against hp x${r.hpStep}^(n-1) and pop `
+    + `x${r.popStep}^(n-1); rung 1 pays x${r.b1.toFixed(3)}, rung 40 pays `
+    + `x${r.b40.toFixed(1)} against x${r.h40.toFixed(1)} health`);
+  /*
+   * Per point of damage a deep rung now pays MORE: rung 40 is x1.90 of rung
+   * 1, where it was 0.70 at build 299 and 0.08 under the linear bounty build
+   * 201 retired. That is the same direction build 202's rule wanted and
+   * further along it -- what it was protecting against is the rate FALLING as
+   * you climb, and the ordering it used to say so is gone (see above).
+   *
+   * The ABSOLUTE figure is what is pinned, and the comparison against the
+   * retired LINEAR bounty is gone. That arm asked for "twice as good as
+   * linear", and it drifts with `hpStep` every time the health slope moves --
+   * which the note here already said. Build 300 made it actively misleading:
+   * with health at 1.028 the linear scheme would ALSO have risen, to x2.03,
+   * so the arm now reports compounding as slightly worse than the thing it
+   * replaced. A comparison against a scheme nobody runs is worth keeping only
+   * while it separates them.
+   *
+   * Bounded at both ends, because the failure this can have now is the
+   * opposite of the one it was written for: health is nearly flat, so a
+   * bounty slope set too steep makes a deep rung pay so much per point that
+   * the tree is bought in one band. x1.5 to x4 is the window.
+   */
+  check('...so a deep rung now pays BETTER per point of damage, within reason',
+    r.payPerHp > 1.5 && r.payPerHp < 4,
+    `energy per point of damage at rung 40, against rung 1: x${r.payPerHp.toFixed(2)} `
+    + `(the retired linear bounty would now give x${r.payPerHpOld.toFixed(2)}, which is why `
+    + 'that comparison no longer separates them)');
   check('the depth dividend rises with the peak and with anomalies, and is capped',
     Math.abs(r.divBase - 1.01) < 1e-9 && r.divAt20 > r.divBase
     && r.divWithTwo > r.divAt20 && Math.abs(r.divCap - r.cap) < 1e-9,
@@ -11244,6 +11333,268 @@ if (!GUN_LINE) {
   check('and beating one hands over the rung it was standing in front of',
     r.afterWin.reconciled.includes(1) && r.afterWin.tier === r.gate + 1,
     `reconciled ${JSON.stringify(r.afterWin.reconciled)}, now on rung ${r.afterWin.tier}`);
+}
+
+// --- the stream: quantity and rate carry the climb, not per-body health ----
+/*
+ * Build 300, and the whole of phase 2 in one place.
+ *
+ * Four slopes were re-authored together because they are one equation: health
+ * came down from x50.2 at rung 49 to x3.83, and the pressure it used to carry
+ * moved into HOW MANY bodies a wave asks for (`popStep`, x21.0) and HOW FAST
+ * they arrive (`flow`, x5.56). A half-applied version of that is a game
+ * nobody should measure -- health alone is a late game that collapses,
+ * population alone is a wave twenty-one times as long at one tempo, rate
+ * alone is the same wave over in a fifth of the time.
+ *
+ * So the arms are about the RELATIONS and not the constants:
+ *
+ *   - the flow table is hit on every authored anchor, monotonic, and flat
+ *     outside its own data. Interpolated rather than stepped, because a cliff
+ *     in the arrival rate lands on a band edge, which is exactly where a boss
+ *     already stands.
+ *   - rung 1 is UNCHANGED. All four slopes are `x^(n-1)` off rung 1 and the
+ *     flow multiplier is normalised to it, so the opening arrives at the
+ *     tempo it always did -- asserted as exactly 1, not as a tolerance.
+ *   - the gap really does shrink, MEASURED off `emit`'s own arithmetic rather
+ *     than off the formula. `press` is pinned identical at both rungs (a
+ *     one-job wave puts `done` at 1 for both) so the only thing moving is the
+ *     stream, and 400 samples average out the roll.
+ *   - the wave really does get LONGER, measured off `load`'s own `asked`.
+ *   - and the FIELD does not grow with it. That is the claim the old
+ *     `check-build` guard made the other way round -- it refused a wave that
+ *     asked for more than the field holds -- and `emit`'s hard gate on
+ *     `maxEnemies` is what makes the inversion safe: it holds the job instead
+ *     of dropping it, so the wave lengthens and the screen does not fill.
+ *   - the teach waves are exempt, the same exemption the press arc takes.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { CFG, WAVES } = await import('../src/config.js');
+    const { Director, hostileCount } = await import('../src/enemies.js');
+    const w = g.world;
+    const d = w.director;
+    const T = CFG.waves.tier;
+    const out = {};
+    const top = T.ceiling;
+    out.top = top;
+
+    // ---- the table is hit on its own anchors, and is flat outside them ----
+    const bw = T.bossEvery;
+    out.anchors = T.flow.map((v, i) => {
+      const rung = i * bw + (bw + 1) / 2;
+      return +(Director.flowAt(rung) - v).toFixed(9);
+    });
+    out.anchorsHit = out.anchors.every((diff) => diff === 0);
+    const curve = [];
+    for (let t = 1; t <= top; t++) curve.push(Director.flowAt(t));
+    out.monotonic = curve.every((v, i) => i === 0 || v >= curve[i - 1] - 1e-12);
+    // Flat below the first anchor and above the last: a line run past its own
+    // data is a number nobody authored.
+    out.flatLow = Director.flowAt(1) === T.flow[0];
+    out.flatHigh = Director.flowAt(top) === T.flow[T.flow.length - 1];
+    out.flowX = Director.flowAt(top) / Director.flowAt(1);
+    // ...and no step at a band edge bigger than one rung's worth of slope.
+    let worstStep = 0;
+    for (let i = 1; i < curve.length; i++) worstStep = Math.max(worstStep, curve[i] - curve[i - 1]);
+    out.worstStep = +worstStep.toFixed(4);
+    out.meanStep = +((curve[curve.length - 1] - curve[0]) / (curve.length - 1)).toFixed(4);
+
+    // ---- rung 1 is exactly 1 on all four ----
+    const s1 = d.scaleAt(1);
+    out.one = { pop: s1.pop, hp: s1.hp, bounty: s1.bounty, flow: s1.flow };
+    out.oneIsOne = [s1.pop, s1.hp, s1.bounty, s1.flow].every((v) => v === 1);
+    const sTop = d.scaleAt(top);
+    out.deep = { pop: +sTop.pop.toFixed(2), hp: +sTop.hp.toFixed(2),
+      bounty: +sTop.bounty.toFixed(2), flow: +sTop.flow.toFixed(2) };
+    // Health is now the SMALLEST of the three that climb, which is the
+    // inversion stated as a comparison rather than as three numbers.
+    out.healthIsGentlest = sTop.hp < sTop.bounty && sTop.hp < sTop.pop;
+
+    /*
+     * ---- the gap, measured off `emit` ---------------------------------
+     *
+     * `emit` sets `this.timer` on its first statement, above the field gate,
+     * so nothing has to be on the field for this. A one-job wave pins
+     * `done` at 1 and therefore `press` at `press.close` for both rungs, so
+     * the stream is the only thing that differs -- and the roll is uniform
+     * over `gap`, so 400 samples put the mean inside a per-cent.
+     */
+    const real = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
+    const teachIdx = WAVES.findIndex((x) => x.teach);
+    delete w.director.update;
+    w.spawnLock = 1e9;
+    /*
+     * `Director.wave` is a GETTER off `order[at]`, so a wave is selected by
+     * setting those two -- which is how every other case in this suite does
+     * it. The first version of this arm wrote `d.wave = WAVES[i]`, and on a
+     * getter-only property that is a silent no-op: the assignment took, the
+     * read-back disagreed, nothing threw, and the teach arm measured the
+     * ambient wave instead. It reported 0.14s against the 3.4s it was asking
+     * about, which looks exactly like a missing exemption. Same family as the
+     * `[hidden]` trap and the `export let` snapshot: a thing set, and
+     * silently not applied one layer down.
+     */
+    const meanTimer = (tier, idx, n = 400) => {
+      d.setTier(tier);
+      d.order = [idx]; d.at = 0;
+      d.overclock.armed = false;
+      let sum = 0;
+      for (let i = 0; i < n; i++) {
+        d.jobsAt = 1; d.jobs = [];
+        d.emit(w);
+        sum += d.timer;
+      }
+      return sum / n;
+    };
+    // ...and the two waves really are one of each, or the arm below is
+    // comparing a non-teach wave with itself.
+    out.isTeach = { real: !!WAVES[real].teach, teach: !!WAVES[teachIdx].teach };
+    out.gapAt1 = +meanTimer(1, real).toFixed(4);
+    out.gapAtTop = +meanTimer(top, real).toFixed(4);
+    out.gapRatio = +(out.gapAt1 / out.gapAtTop).toFixed(3);
+    // ...and a teach wave is exempt: at the deepest rung it still arrives at
+    // its own authored gap, undivided.
+    out.teachAtTop = +meanTimer(top, teachIdx).toFixed(4);
+    out.teachGapMean = +((CFG.waves.teachGap[0] + CFG.waves.teachGap[1]) / 2).toFixed(4);
+
+    /*
+     * ---- the wave gets LONGER, off `load`'s own count ------------------
+     *
+     * `asked` is what the wave actually queued, through the real job builder
+     * and the real `swell`, not through the formula this case is about.
+     */
+    /*
+     * ...and SWARM is divided out, because it is a TRAIT and not a slope.
+     * `load` doubles the count when the wave carries it and traits are seeded
+     * from `traitFrom` 10 upward, so the raw ratio read 39.8 -- exactly twice
+     * the swell, half of it a rule the rung happened to roll. Recorded either
+     * way, because a SWARM wave at the ceiling queuing 438 bodies against a
+     * field of 57 is worth knowing.
+     */
+    const askedAt = (tier) => {
+      d.setTier(tier);
+      d.load(w, WAVES[real]);
+      const swarm = (d.traits || []).some((t) => t && t.id === 'swarm');
+      return { raw: d.asked, swarm, swell: swarm ? d.asked / 2 : d.asked };
+    };
+    const a1 = askedAt(1);
+    const aTop = askedAt(top);
+    out.askedAt1 = a1.swell;
+    out.askedAtTop = aTop.swell;
+    out.askedRaw = { one: a1.raw, top: aTop.raw, swarm1: a1.swarm, swarmTop: aTop.swarm };
+    out.askRatio = +(out.askedAtTop / out.askedAt1).toFixed(2);
+
+    /*
+     * ---- ...and the FIELD does not ------------------------------------
+     *
+     * Nothing shooting, so every body released stays. The field runs up to
+     * `maxEnemies` and stops there because `emit` refuses to release past it
+     * and HOLDS the job -- which is what makes a wave of 231 safe on a field
+     * of 57. Read as a peak, because the claim is about a ceiling.
+     */
+    const fieldPeak = (tier) => {
+      g.debugClearField();
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      w.autoAim = false; w.autoFire = false;
+      w.reconciled = T.gates.map((_, i) => i + 1);
+      w.newForm = 'done';
+      d.setTier(tier); d.hold = true; d.grace = 0; d.probe = null;
+      d.timer = 0; d.resting = false;
+      d.load(w, WAVES[real]);
+      let peak = 0;
+      for (let f = 0; f < 60 * 90; f++) {
+        /*
+         * The fuse pinned out, for TWO reasons. A discharge RESETS THE WAVE,
+         * which would empty the field in the middle of the one measurement
+         * this arm exists to take -- and nothing is shooting here, so with a
+         * full field the crowd term fills it in half a minute. It also calls
+         * `onTier`, and `Hud.markStep` then leaves `lostRung` on a cell for
+         * 700ms: leaked forward, that is a fourth animation in the rail's own
+         * mark case six thousand cases downstream, which is exactly how this
+         * was found. `restart()` is not a reset of everything a case can
+         * leave behind.
+         */
+        d.glitch = 0; d.holdFor = 0; d.held = 0;
+        g.update(1 / 60);
+        peak = Math.max(peak, hostileCount(w));
+      }
+      return peak;
+    };
+    out.peakAtTop = fieldPeak(top);
+    out.cap = CFG.maxEnemies;
+
+    g.debugClearField();
+    w.reconciled.length = 0;
+    delete w.director.update;
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+
+  check('the flow table is hit on every anchor, rises, and is flat outside it',
+    r.anchorsHit && r.monotonic && r.flatLow && r.flatHigh
+    && r.flowX > 5 && r.flowX < 6
+    && r.worstStep < r.meanStep * 2.5,
+    `anchors off by ${JSON.stringify(r.anchors)}; rung 1 to ${r.top} is x${r.flowX.toFixed(2)}, `
+    + `monotonic ${r.monotonic}, worst one-rung step ${r.worstStep} against a mean of `
+    + `${r.meanStep} (interpolated, so no cliff at a band edge)`);
+
+  check('...and rung 1 is EXACTLY the authored table on all four slopes',
+    r.oneIsOne,
+    `rung 1: pop x${r.one.pop}, hp x${r.one.hp}, bounty x${r.one.bounty}, flow x${r.one.flow}`);
+
+  /*
+   * The inversion, as a comparison rather than as three constants. Health is
+   * now the gentlest of the three that climb -- that sentence is the whole of
+   * phase 2, and a case that pinned 3.83/21.0/8.27 would go red the first
+   * time any of them was tuned while still saying nothing about the shape.
+   */
+  check('...and health is the GENTLEST slope now: quantity and salvage outrun it',
+    r.healthIsGentlest,
+    `at rung ${r.top}: pop x${r.deep.pop}, salvage x${r.deep.bounty}, health x${r.deep.hp}, `
+    + `rate x${r.deep.flow}`);
+
+  check('the release gap really shrinks with depth, measured off emit',
+    r.gapRatio > r.flowX * 0.95 && r.gapRatio < r.flowX * 1.05,
+    `mean gap ${r.gapAt1}s at rung 1 against ${r.gapAtTop}s at ${r.top} — x${r.gapRatio} `
+    + `against a flow multiplier of x${r.flowX.toFixed(2)}`);
+
+  /*
+   * ...and the opening is exempt, which is the same exemption `press` takes:
+   * they are authored beats and a tutorial that speeds up is a tutorial that
+   * stops teaching. Asserted at the DEEPEST rung, where the divisor is
+   * largest and a missing exemption would be a fivefold error.
+   */
+  check('...and a teach wave is exempt from it, at any depth',
+    r.isTeach.teach && !r.isTeach.real
+    && Math.abs(r.teachAtTop - r.teachGapMean) < r.teachGapMean * 0.1,
+    `at rung ${r.top} a teach wave still arrives every ${r.teachAtTop}s against its own `
+    + `authored mean of ${r.teachGapMean}s; the two waves are a teach and a `
+    + `non-teach (${JSON.stringify(r.isTeach)})`);
+
+  check("a deep wave asks for many more bodies, off load's own count",
+    r.askRatio > 15 && r.askRatio < 30
+    && r.askedAtTop > r.cap * 2,
+    `the same wave queues ${r.askedAt1} bodies at rung 1 and ${r.askedAtTop} at ${r.top} `
+    + `(x${r.askRatio}) with SWARM divided out; raw ${r.askedRaw.one} and `
+    + `${r.askedRaw.top}, swarm rolled ${r.askedRaw.swarm1}/${r.askedRaw.swarmTop}`);
+
+  /*
+   * The one that makes the inversion safe, and the one the old `check-build`
+   * guard made backwards. It refused a wave that asked for more than the
+   * field holds; the ask is now four times the field and what holds the crowd
+   * down is `emit`'s runtime gate. Nothing is shooting in this arm, so every
+   * body released stays -- if the gate were missing the field would run to
+   * the ask.
+   */
+  check('...and the FIELD still does not: the wave lengthens, the screen does not fill',
+    r.peakAtTop > 0 && r.peakAtTop <= r.cap,
+    `ninety seconds at rung ${r.top} with nothing shooting peaked at ${r.peakAtTop} bodies `
+    + `against a cap of ${r.cap}, for a wave that asked for ${r.askedAtTop}`);
 }
 
 // --- the waves start asking a different question ----------------------------
@@ -14830,6 +15181,10 @@ if (MINE_LINE) {
     };
     out.low = income(1);
     out.high = income(20);
+    // The ladder's own product over the nineteen rungs between them, read
+    // from the config rather than written out -- the message used to print a
+    // `bountyStep` retired in build 202.
+    out.want = CFG.waves.tier.bountyStep ** 19;
 
     g.debugClearField();
     w.spawnLock = 0;
@@ -14864,12 +15219,23 @@ if (MINE_LINE) {
     + `with SHOCKFRONT (x${(r.bought.raw / Math.max(1, r.plain.raw)).toFixed(2)}), `
     + `which the cap used to eat entirely`);
 
+  /*
+   * Against the config's OWN product, not a factor. It was `> low * 3`, which
+   * was a size again -- and the message printed `1.1 ** 19`, a bountyStep
+   * retired in build 202, so the number the reader was invited to compare
+   * against had been wrong for a hundred builds. Build 300 took the slope to
+   * 1.045 and x2.31 is the honest figure. Bounded both ways round the
+   * compounding, because the claim is that the body is worth what the LADDER
+   * says rather than what the table says -- a measurement well over the
+   * product means something else is multiplying too.
+   */
   check('...and it banks what the wreckage is worth, not what it was authored at',
-    r.low.gained > 0 && r.high.gained > r.low.gained * 3,
+    r.low.gained > 0 && r.high.gained > r.low.gained * r.want * 0.8
+    && r.high.gained < r.low.gained * r.want * 1.35,
     `the same body's salvage taken in by PULSE: ${r.low.gained} at tier 1 from `
     + `${r.low.drops} motes, ${r.high.gained} at tier 20 from ${r.high.drops} `
-    + `(x${(r.high.gained / Math.max(1, r.low.gained)).toFixed(1)}, and the `
-    + `tier's own compounding over 19 rungs is x${(1.1 ** 19).toFixed(1)})`);
+    + `(x${(r.high.gained / Math.max(1, r.low.gained)).toFixed(2)}, against the `
+    + `ladder's own x${r.want.toFixed(2)} over 19 rungs)`);
 }
 
 // --- SPINE is worth loading, and SLIVER is what it does to a line -----------

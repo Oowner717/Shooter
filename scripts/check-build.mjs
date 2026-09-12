@@ -274,19 +274,61 @@ if (crowded.length) {
   process.exit(1);
 }
 /*
- * The heaviest wave at the ladder's population ceiling. It was checked
- * against `swell[1]`, the old kill-driven ramp; the ladder's growth is capped
- * by `tier.popCap` instead, and past that the climb is carried by health and
- * bounty. Same guarantee either way: the field cap must never be the thing
- * doing the balancing.
+ * ---- the stream, and what actually bounds the field (build 300) -----------
+ *
+ * This asserted that the heaviest wave at `tier.popCap` still FIT inside
+ * `maxEnemies`, under a comment saying the field cap must never be the thing
+ * doing the balancing. Build 300 inverts that premise deliberately: the wave
+ * asks for x21.0 the authored count by rung 49 and the field cap IS what
+ * holds the crowd down, because `emit` refuses to release while
+ * `hostileCount(world) >= maxEnemies` and HOLDS the job rather than dropping
+ * it. So a deep rung is a longer wave arriving faster through a field of
+ * roughly constant size, and an ask of 231 bodies against a cap of 57 is the
+ * design rather than a fault.
+ *
+ * What replaces it is the claim that CAN go wrong. Two things:
+ *
+ *   - the two slopes move TOGETHER. `popStep` alone is a wave twenty-one
+ *     times as long at one tempo; `flow` alone is the same wave over in a
+ *     fifth of the time. Asserted as the ratio, because that is the quantity
+ *     the design is about -- bodies per wave over arrivals a second is the
+ *     wave's LENGTH IN SECONDS, and it is meant to grow, not explode.
+ *   - a release can never land every frame. The tightest single gap is the
+ *     low end of `gap`, times the tightest `press`, times OVERCLOCK's
+ *     squeeze, divided by the deepest `flow`. Under a frame or two that is
+ *     not a stream, it is a spawn storm the pair solver pays for.
  */
-const peak = Math.max(...regular.map((w) => Math.round(bodiesOf(w) * CFG.waves.tier.popCap)));
-if (peak > CFG.maxEnemies) {
-  console.error(`the heaviest wave asks for ${peak} bodies at the ladder's population `
-    + `ceiling (x${CFG.waves.tier.popCap}) against a field cap of ${CFG.maxEnemies}; `
-    + 'the cap would be doing the balancing');
+const TIER = CFG.waves.tier;
+const flowAt = (t) => {
+  const F = TIER.flow; const w = TIER.bossEvery;
+  const x = (t - (w + 1) / 2) / w; const i = Math.floor(x);
+  if (i < 0) return F[0];
+  if (i >= F.length - 1) return F[F.length - 1];
+  return F[i] + (F[i + 1] - F[i]) * (x - i);
+};
+const deep = TIER.ceiling;
+const popX = TIER.popStep ** (deep - 1);
+const flowX = flowAt(deep) / flowAt(1);
+const peak = Math.max(...regular.map((w) => Math.round(bodiesOf(w) * popX)));
+// Bodies over arrivals-a-second is the wave's own length. x21.0 of the bodies
+// at x5.56 the rate is a wave x3.8 as long, which is the plan's 50s -> 190s.
+const longer = popX / flowX;
+if (!(longer > 1) || longer > 8) {
+  console.error(`rung ${deep} asks for x${popX.toFixed(1)} the bodies at x${flowX.toFixed(2)} `
+    + `the rate, which is a wave x${longer.toFixed(1)} as long; popStep and flow have to move `
+    + 'together -- one without the other is a wave nobody can sit through, or one that is over');
   process.exit(1);
 }
+const tightest = CFG.waves.gap[0] * Math.min(TIER.overclockGap, 1)
+  * Math.min(CFG.waves.press.open, CFG.waves.press.close) / flowX;
+if (tightest < 1 / 30) {
+  console.error(`the tightest release at rung ${deep} is ${(tightest * 1000).toFixed(0)}ms, which is `
+    + 'inside two frames; that is a spawn storm and not a stream');
+  process.exit(1);
+}
+console.log(`stream: rung ${deep} asks x${popX.toFixed(1)} the bodies at x${flowX.toFixed(2)} the rate `
+  + `(a wave x${longer.toFixed(1)} as long), heaviest ask ${peak} through a field of `
+  + `${CFG.maxEnemies}; tightest release ${(tightest * 1000).toFixed(0)}ms`);
 /*
  * Every regular wave carries a band, and every band has waves in it.
  *
@@ -368,7 +410,8 @@ if (relock.length) {
 console.log(`  ...and none re-locks on a pre-180 save (all under kills x${RATE})`);
 
 console.log(`ladder: ${regular.length} waves across 5 bands `
-  + `(${[1, 2, 3, 4, 5].map((b) => byBand[b]).join('/')}), heaviest ${peak} of ${CFG.maxEnemies}`);
+  + `(${[1, 2, 3, 4, 5].map((b) => byBand[b]).join('/')}), heaviest ask ${peak} `
+  + `through a field of ${CFG.maxEnemies}`);
 /*
  * Types that are only ever produced by another type, never released directly.
  *
@@ -389,8 +432,8 @@ if (unplaced.length) {
   process.exit(1);
 }
 console.log(`${regular.length} regular waves, all 2-3 types, up to ${Math.max(...regular.map(bodiesOf))} `
-  + `bodies at population ${CFG.waves.population} (${peak} at full swell, cap ${CFG.maxEnemies}); `
-  + `${placed.size} types released, ${DERIVED.size} produced by others`);
+  + `bodies at population ${CFG.waves.population} (${peak} asked for at rung ${deep}, field `
+  + `${CFG.maxEnemies}); ${placed.size} types released, ${DERIVED.size} produced by others`);
 
 /*
  * ORDINAL's frames are solid, and the way in costs what it says it costs.
@@ -462,7 +505,6 @@ const gateRungs = CFG.waves.tier.gates;
  *     ceiling BELOW the last gate is the deadlock build 299 was written to
  *     remove: an anomaly on the far side of a hold nothing can lift.
  */
-const TIER = CFG.waves.tier;
 const wantGates = CFGMOD.rungsEvery(TIER.bossEvery, TIER.ceiling);
 if (wantGates.length !== gateRungs.length || wantGates.some((r, i) => r !== gateRungs[i])) {
   console.error(`the gate rungs are not one every ${TIER.bossEvery} to ${TIER.ceiling}: `

@@ -268,8 +268,11 @@
         <canvas id="qty" aria-label="Chart: proposed body count per wave rises twenty-one fold while per-body health rises under four fold, against today's fifty-fold health inflation"></canvas>
         <figcaption><b>Read</b>Everything is expressed as a multiple of level 1. Today's health
           curve is the dashed line: fifty times by level 49, with the population multiplier capped
-          at four from rung 31 onward, so the last eighteen rungs are pure health. The plan
-          inverts it — bodies per wave carry the pressure and per-body health barely moves.</figcaption>
+          at <em>three</em> from rung <em>20</em> onward, so the last thirty rungs are pure health.
+          (This paragraph said "four from rung 31" before build 300 read the code:
+          <code>pop</code> was <code>1 + 0.1 &times; tier</code>, which reaches 3 at rung 20 and is
+          capped there.) The plan inverts it — bodies per wave carry the pressure and per-body
+          health barely moves.</figcaption>
       </figure>
       <div class="prose">
         <p><strong>Quantity has a hard ceiling and throughput does not.</strong>
@@ -280,7 +283,8 @@
           and puts about seven on the field; band 7 releases one every <span class="num">0.20</span>s
           and holds about forty. The wave goes from forty-five bodies to nine hundred and fifty.</p>
         <p>Health does move, just gently: <code>hpStep</code> <span class="num">1.085</span> →
-          <span class="num">1.028</span> a level, which is ×3.8 by level 49 instead of ×50. Salvage
+          <span class="num">1.028</span> a level, which is ×3.8 by level 49 instead of ×50 &mdash;
+          measured on build 300 at ×3.76. Salvage
           per body rises faster than health does, so a body is always worth more than it costs to
           kill, and the purse climbs with the stream rather than with the clock.</p>
       </div>
@@ -841,8 +845,8 @@
   [
     ['Phase 1', 'The spine, with today\'s numbers &nbsp;&middot;&nbsp; <b>shipped, build 299</b>',
       'Boss slots at every seventh level and the ceiling at 49 with its message. No balance numbers move &mdash; the ORDINAL hash came back to the bit. <code>gates</code> is derived from <code>bossEvery</code> and <code>ceiling</code> rather than typed, so it is seven entries against a roster of nine and the deferral of AXIOM and TESSERA is that table alone. Two things moved out of phase 5 because they are prerequisites and not successors: RECAST\'s reconciled count, 7 to 4, and the single constant both halves of it now read. At 7 the derived table was a <em>deadlock</em> &mdash; six gates sit under <code>eraGate</code> 42 and the seventh stands at 49, on the far side of the hold the seventh was needed to lift. <code>eraGate</code> itself stays at 42 until phase 5. The DRIFT SURGE filler was NOT built: seven slots, seven anomalies, and no rung can trigger it, so it would be a branch nothing can take.'],
-    ['Phase 2', 'Scaling, in one commit',
-      '<code>hpStep</code>, <code>bountyStep</code>, the population curve and the flow staircase together, because they are one equation and a half-applied version of it is a game nobody should measure. The ORDINAL hash moves here; take it before.'],
+    ['Phase 2', 'Scaling, in one commit &nbsp;&middot;&nbsp; <b>shipped, build 300</b>',
+      '<code>hpStep</code> 1.085&rarr;1.028, <code>bountyStep</code> 1.075&rarr;1.045, <code>pop</code> replaced by <code>popStep</code> 1.0655 (&times;21.0 by rung 49) and <code>flow</code>, the release-rate table (&times;5.56). Health is now the <em>gentlest</em> of the three that climb. Two corrections to this row: <code>popCap</code> was <em>deleted</em> rather than raised &mdash; with the ladder capped at 49 any cap at or above &times;21 is a bound nothing can reach &mdash; and <b>the ORDINAL hash does not move</b>, which was predictable and is written down in CLAUDE.md under build 229: all four slopes are <code>x^(n-1)</code> and therefore exactly 1 at rung 1, and <code>fight.mjs</code> is one fight at rung 1 with the director never releasing. Run it anyway; knowing it did not move is the point. The instrument that <em>can</em> see this phase is <code>tiers.mjs</code> across rungs, which is phase 3\'s audit.'],
     ['Phase 3', 'The wave engine',
       'The budget filler, the closed gap, drift as mortar, bands of seven. The release gate and every verdict rule stay untouched. This is where <code>tiers.mjs</code> has to grow an arrivals column, because nothing existing can see what this phase changes.'],
     ['Phase 4', 'The tree re-priced',
