@@ -18502,6 +18502,173 @@ if (MINE_LINE) {
 }
 
 /*
+ * ---- build 303: and every one of them says WHICH BAND it is priced for ----
+ *
+ * The same rule as the case above, on the second mandatory field, and it is
+ * here rather than anywhere else because the failure mode is identical: a
+ * defaulted value indistinguishable from a chosen one. `levels` was
+ * `u.levels ?? 3` and eight nodes shipped sold three times; a band has a worse
+ * blast radius, because an omitted band reads as band 1 and band 1 is 9 kB
+ * against band 7's 4 MB -- a 444x spread, so a missing band is a node handed
+ * to the player rather than sold.
+ *
+ * Four claims, and the middle two are the ones that would have caught a
+ * half-applied version of this build:
+ *  - every buyable node declares one, including the twenty-one of the mine
+ *    line, which are priced while out of play so that turning the line back on
+ *    is a config flip and not a pricing exercise;
+ *  - the refusal is REAL -- `bandOf` throws, which is the half a count cannot
+ *    show, and is exactly the arm build 220 left out;
+ *  - the price is the band's price and 60% of it a level, asserted as an
+ *    ARITHMETIC IDENTITY off `bandPrice` per node rather than against typed
+ *    figures, because a ceiling written to fit the current number is not a
+ *    ceiling (build 230);
+ *  - the table SAYS something: a band assignment where every node landed in
+ *    its parent's band has expressed nothing, which is the whole reason a flat
+ *    price was not good enough.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { ALL_UPGRADES, UNLOCKS, CHARGES } = await import('../src/upgrades.js');
+    const { NODES, DETACHED, bandOf, bandPrice, bands } = await import('../src/tree.js');
+
+    // Every id priced in BYTES. The eight that price themselves are out: the
+    // six emplacement upgrades, RECAST (bought in REMAINDERs) and the ASSAY.
+    const want = [...ALL_UPGRADES.filter((u) => u.cost === undefined).map((u) => u.id),
+      ...UNLOCKS.map((u) => u.id), ...CHARGES.map((u) => u.id)];
+    const silent = [];
+    for (const id of want) {
+      try { bandOf(id); } catch (e) { silent.push(id); }
+    }
+
+    /*
+     * ...and that the refusal is REAL, which is the half a count cannot show.
+     *
+     * Five malformed shapes, and four of them have to be WRITTEN INTO the
+     * table to be tested at all -- an id simply absent exercises one branch of
+     * `bandOf` and a case that calls it five times with five absent ids is
+     * build 210's spy test again, five tries that prove one thing. `bands()`
+     * hands back the table itself, so the probe writes a scratch id, reads the
+     * refusal off the real code path, and takes it out again; the `extra`
+     * arm below is what proves it was taken out, because a scratch id left in
+     * the table is an id the tree does not offer.
+     */
+    const TABLE = bands().BAND;
+    const tries = [['absent', undefined], ['zero', 0], ['negative', -2],
+      ['a fraction', 2.5], ['past band 7', 8]];
+    const refused = tries.map(([what, v]) => {
+      if (v === undefined) delete TABLE.__probe__; else TABLE.__probe__ = v;
+      try { return { what, threw: false, got: bandOf('__probe__') }; }
+      catch (e) { return { what, threw: true }; }
+    });
+    // ...and the control: a scratch id with a LEGAL band comes back with it, so
+    // a `bandOf` that threw on everything could not pass this.
+    TABLE.__probe__ = 3;
+    let scratch = null;
+    try { scratch = bandOf('__probe__'); } catch (e) { scratch = 'threw'; }
+    delete TABLE.__probe__;
+    let good = null;
+    try { good = bandOf('hollowpoint'); } catch (e) { good = 'threw'; }
+
+    /*
+     * The curve, per node, off the band rather than off a table of figures.
+     * `priceOf` is `cost + step * have`, so the two things to pin are that
+     * level 1 IS the band price and that each level after it adds 60% of it.
+     */
+    const priced = [...NODES, ...DETACHED].filter((n) => n.id && !n.currency
+      && n.cost !== undefined);
+    const offCurve = [];
+    for (const n of priced) {
+      let b = 0;
+      try { b = bandOf(n.id); } catch (e) { continue; } // self-priced; not this rule
+      const p = bandPrice(b);
+      if (n.cost !== p || n.step !== Math.round(p * 0.6)) {
+        offCurve.push(`${n.id} b${b}: ${n.cost}/${n.step} against ${p}/${Math.round(p * 0.6)}`);
+      }
+    }
+
+    // What the table actually says, so "it expressed nothing" is measurable.
+    const used = {};
+    const placed = [...NODES, ...DETACHED].filter((n) => n.id);
+    for (const n of placed) {
+      let b = 0;
+      try { b = bandOf(n.id); } catch (e) { continue; }
+      used[b] = (used[b] || 0) + 1;
+    }
+    const inPlay = placed.filter((n) => {
+      try { bandOf(n.id); return true; } catch (e) { return false; }
+    });
+    const costs = inPlay.map((n) => n.cost);
+    const spread = Math.max(...costs) / Math.min(...costs);
+    // ...and how much of the tree sits in a band OTHER than its parent's: the
+    // direct measure of whether the authoring decision was taken.
+    let moved = 0;
+    let withParent = 0;
+    for (const n of inPlay) {
+      let p = n.parent;
+      while (p && !p.id) p = p.parent;
+      if (!p) continue;
+      withParent++;
+      let pb = 0;
+      try { pb = bandOf(p.id); } catch (e) { continue; }
+      if (bandOf(n.id) !== pb) moved++;
+    }
+
+    const b = bands();
+    let whole = 0;
+    for (const n of [...NODES, ...DETACHED]) {
+      if (!n.id || n.currency === 'remainder') continue;
+      for (let i = 0; i < (n.levels || 1); i++) whole += n.cost + (n.step || 0) * i;
+    }
+
+    return { want: want.length, silent, refused, good, scratch, offCurve,
+      used, bands: Object.keys(used).length, spread: +spread.toFixed(0),
+      moved, withParent, whole,
+      missing: b.missing, extra: b.extra, range: b.range, parentBad: b.parentBad,
+      rising: b.rising };
+  });
+
+  check('every node priced in bytes says which band it is priced for',
+    r.silent.length === 0 && r.missing.length === 0 && r.extra.length === 0
+    && r.range.length === 0 && r.want > 80,
+    `${r.want} band-priced ids, ${r.silent.length} of them silent`
+    + `${r.silent.length ? ` (${r.silent.join(' ')})` : ''}`
+    + `${r.extra.length ? `; BAND prices ids the tree does not offer: ${r.extra.join(' ')}` : ''}`
+    + `${r.range.length ? `; out of range: ${r.range.join(' ')}` : ''}`);
+
+  check('...and the tree refuses one that does not, rather than guessing band 1',
+    r.refused && r.refused.every((x) => x.threw) && r.scratch === 3
+    && r.good >= 1 && r.good <= 7,
+    `${r.refused.filter((x) => x.threw).length}/${r.refused.length} malformed `
+    + `declarations refused (${r.refused.filter((x) => !x.threw)
+      .map((x) => `${x.what} -> ${x.got}`).join(', ') || 'none slipped through'}); `
+    + `a scratch id written as band 3 still comes back ${r.scratch}, and `
+    + `HOLLOWPOINT band ${r.good}`);
+
+  check('...and every price on it is its band, +60% of its band a level',
+    r.offCurve.length === 0 && r.rising,
+    `${r.offCurve.length} node(s) off the curve`
+    + `${r.offCurve.length ? `: ${r.offCurve.slice(0, 4).join('; ')}` : ''}`
+    + `; the seven prices ${r.rising ? 'rise' : 'DO NOT rise'} monotonically`);
+
+  /*
+   * The claim a coverage count cannot make. A band is only worth having if
+   * different things landed in different ones: the spread is what a flat price
+   * could not express, and `moved` is the count of leaves priced for a band
+   * other than the arm they hang off -- the authoring decision actually taken,
+   * rather than a parent's band copied down the tree. Floors rather than
+   * figures, so tuning one node does not turn this red.
+   */
+  check('...and the bands say something a flat price could not',
+    r.bands >= 5 && r.spread >= 100 && r.moved >= 8 && r.parentBad.length === 0,
+    `${r.bands} of 7 bands used across ${Object.entries(r.used)
+      .map(([b, n]) => `b${b}:${n}`).join(' ')}, dearest level x${r.spread} the `
+    + `cheapest, ${r.moved} of ${r.withParent} leaves priced for a band other `
+    + `than their parent's, ${r.parentBad.length} priced EARLIER than their `
+    + `parent; whole tree ${(r.whole / 1e6).toFixed(1)} MB`);
+}
+
+/*
  * ---- build 226: two menus in one sheet, and the doors onto them ----
  *
  * ARSENAL (AMMO, MINES, UPGRADES, ULTIMATE) and SYSTEM (OBJECTS, SETTINGS).

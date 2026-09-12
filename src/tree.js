@@ -33,17 +33,37 @@ import { ARSENAL } from './arsenal.js';
 import { ABILITIES } from './abilities.js';
 
 /*
- * Prices. Flat per depth rather than per node, because pacing is not what this
- * is for yet — the shape is. One number to move when it is.
+ * Prices, BY BAND, from build 303.
+ *
+ * A node's band is the band of the ladder it is MEANT to be bought in -- rungs
+ * 1-7 are band 1, 8-14 band 2, and so on to band 7 at the ceiling. Level 1
+ * costs the band's price and every level after it costs `BAND_STEP` of that
+ * price MORE than the last, so `priceOf` is untouched: it is still
+ * `cost + step * have`.
+ *
+ * It was flat per depth until 303 -- every leaf `500 kB + 350 kB`, every round
+ * or mine 900 kB, every ability 1.1 MB, every second charge 1.4 MB -- under a
+ * comment saying pacing "is not what this is for yet". The cost of that was
+ * measured rather than argued: `tiers.mjs` on build 302 bought the WHOLE tree
+ * by rung 17 of 49 and the damage plateaued there, because a flat price cannot
+ * say "this is an early thing" and so nothing in the tree is late. The spread
+ * here is 444x from band 1 to band 7, which is what makes "which band is this
+ * node for?" a real authoring decision. See docs/rebalance.html, phase 4.
+ *
+ * Index 0 is unused so that a band reads as its own number.
  */
-const COST = {
-  round: kB(900), // a new round or mine
-  mine: kB(900),
-  ability: kB(1100),
-  charge: kB(1400), // a second use of one
-  upgrade: kB(500), // a leaf, at its first level
-  step: kB(350), // ...and this much more for every level after the first
-};
+const BAND_PRICE = [0, kB(9), kB(27), kB(82), kB(250), kB(700), kB(1600), kB(4000)];
+
+/**
+ * What each level after the first adds, as a share of the band's price.
+ *
+ * ADDITIVE and not compounding: level n is `price * (1 + BAND_STEP * (n - 1))`,
+ * so an 8-level node costs 24.8 band-prices rather than 1.6^7 = 27 of them.
+ * The plan's own price table is drawn from the additive form (its level-3
+ * column is 2.2x and not 2.56x), and the additive form is what `priceOf`
+ * already computes.
+ */
+const BAND_STEP = 0.6;
 
 /**
  * Where every leaf hangs. Ids are upgrade ids; the key is the parent node.
@@ -123,6 +143,103 @@ export const UNDER = {
   // to sell where an instant has one.
   ward: ['standoff', 'edged', 'fork', 'heave', 'deadbolt'],
 };
+
+/*
+ * ...and WHEN each of them is meant to be bought.
+ *
+ * `UNDER` says where a thing sits; this says which band of the ladder it is
+ * FOR, and that sets its price off `BAND_PRICE` above. The two tables are
+ * siblings and this file's whole job is to be the one place both are written.
+ *
+ * There is NO DEFAULT, deliberately, and that is the build-224 lesson applied
+ * to a second field: `levels` was `u.levels ?? 3` for forty-six builds and
+ * eight nodes shipped sold three times because a node relying on the default
+ * and a node deliberately capped at three were the same text. A band has the
+ * same failure mode and a worse blast radius -- an omitted band would read as
+ * band 1, which is 9 kB, which is a node the player is handed. `bandOf` throws
+ * for a missing id and `check-build.mjs` fails the build for one, in both
+ * directions: an id here that the tree does not place is as much a mistake as
+ * a node placed with no band.
+ *
+ * The mine line and its eight ways in are here even though `CFG.mines.inPlay`
+ * is false, for two reasons. `rootNode('mines')` is still BUILT and thrown
+ * away to derive `ELSEWHERE` (see MINE_IDS below), so `leaf()` runs for all
+ * twenty-one of them and would throw; and the gun line's lesson from build 289
+ * is that turning a system back on should be a config flip rather than an edit
+ * to the guards. The six emplacement upgrades are the exception and are absent
+ * on purpose: they price themselves, as do RECAST (which is not bought in
+ * bytes at all) and the ASSAY (a deliberate one-off).
+ *
+ * Grouped the way `UNDER` is grouped, so the two tables read side by side.
+ */
+const BAND = {
+  // ---- the machine ----
+  rate: 1, slew: 2, aimrange: 2, driftaim: 4, pile: 6, casing: 2, insulation: 7,
+  intake: 1,
+  // ---- the rack, whole ----
+  hollowpoint: 3, core: 5, tracer: 1, ricochet: 1, heavy: 2, salvo: 1,
+  // ---- BOLT ----
+  overstuffed: 1,
+  // ---- the eight bought rounds, and their own ----
+  open_explosive: 3, overpressure: 4, cluster: 3, open_shotgun: 2, doubleo: 2,
+  longshot: 2, open_arc: 4, fifthlink: 4, superconductor: 7, longlead: 7,
+  open_spine: 4, throughandthrough: 4, sliver: 7, annealed: 7, railed: 7,
+  open_slug: 5, sledge: 5, open_rime: 3, deepfreeze: 7, open_spore: 6, bloomout: 6,
+  secondgrowth: 6, open_tithe: 5, compound: 7, levy: 7, lien: 5,
+  // ---- the bar, whole ----
+  standing: 4,
+  // ---- the two free buttons ----
+  charge_pulse: 1, shockfront: 1, flinch: 3, charge_fan: 2, airburst: 2,
+  // ---- the six bought abilities, and their own ----
+  open_lance: 3, charge_lance: 3, open_well: 5, charge_well: 5, open_prism: 5,
+  charge_prism: 5, open_stasis: 3, charge_stasis: 6, open_decoy: 4, charge_decoy: 4,
+  open_ward: 3, charge_ward: 3, standoff: 6, edged: 6, fork: 6, heave: 6,
+  deadbolt: 4,
+  // ---- the wave ----
+  recall: 2, overclock: 2,
+  // ---- the mine line, out of play (CFG.mines.inPlay) but priced ----
+  // Unmeasured, and says so: nothing has benched a mine since build 289 shut
+  // the line. The shape is the AMMUNITION line's -- eight ways in spread up
+  // the ladder, the whole-line multipliers early enough to be worth owning,
+  // the per-kind knobs beside their kind -- so that turning `inPlay` back on
+  // is a config flip and not a pricing exercise. What it must NOT be is
+  // absent: `rootNode('mines')` is still built and thrown away to derive
+  // ELSEWHERE, so `leaf()` runs for all twenty-one of these.
+  open_blast: 2, open_snare: 3, open_wire: 3, open_knell: 4,
+  open_thorn: 4, open_lode: 5, open_spall: 5, open_void: 6,
+  paired: 3, quicklay: 3, widemouth: 4, salted: 4, deepcharge: 5, shrapnel: 4,
+  deadweight: 4, hotwire: 4, fourthbell: 5, repulsor: 5,
+  buckshot: 5, splinter: 5, eventhorizon: 6,
+};
+
+/**
+ * The band a node is priced for. THROWS for an id that declares none.
+ *
+ * A throw at module load is the point: it is a page that does not boot, which
+ * is loud, where a default would be a node quietly sold at a thousandth of its
+ * price. `check-build.mjs` makes the same statement at build time.
+ */
+export function bandOf(id) {
+  const b = BAND[id];
+  if (!Number.isInteger(b) || b < 1 || b >= BAND_PRICE.length) {
+    throw new Error(`${id}: no band. Every node priced in bytes declares the band `
+      + 'of the ladder it is meant to be bought in; there is no default. See BAND '
+      + 'in tree.js.');
+  }
+  return b;
+}
+
+/** ...and what that band charges: the first level, and each one after it. */
+function bandCost(id) {
+  const price = BAND_PRICE[bandOf(id)];
+  return { cost: price, step: Math.round(price * BAND_STEP) };
+}
+
+/** Every band-priced id, for the guard. Exported for `check-build.mjs`. */
+export const BAND_IDS = () => Object.keys(BAND);
+
+/** Exported so a probe can price a hypothetical without rebuilding the tree. */
+export const bandPrice = (b) => BAND_PRICE[b];
 
 /** Which arms hang off which category, in the order they are shown. */
 const BRANCH = {
@@ -312,7 +429,8 @@ function leaf(id) {
     tone: u.tone || '#9fb3c8',
     // An upgrade may price itself. Only APERTURE does: it is not a step on a
     // ladder, it is the same purchase every time, and it costs what it costs.
-    cost: u.cost ?? COST.upgrade, step: u.step ?? COST.step, tiers: u.tiers || null,
+    ...(u.cost === undefined ? bandCost(id) : { cost: u.cost, step: u.step || 0 }),
+    tiers: u.tiers || null,
   });
 }
 
@@ -323,7 +441,7 @@ function chargeOf(key) {
     // Named rather than "it": eight of these sit in one branch and the line
     // was word-for-word identical on all eight.
     line: `A second ${armLabel(key)}, ready before the wait is over.`,
-    icon: armIcon(key), tone: armTone(key), cost: COST.charge,
+    icon: armIcon(key), tone: armTone(key), ...bandCost(`charge_${key}`),
   });
 }
 
@@ -335,7 +453,7 @@ function arm(key, kind) {
   return node({
     kind: 'arm', id: free ? null : `open_${key}`, key, free,
     name: armLabel(key), line: armLine(key), icon: armIcon(key), tone: armTone(key),
-    cost: free ? 0 : (kind === 'ability' ? COST.ability : COST[kind]),
+    ...(free ? { cost: 0 } : bandCost(`open_${key}`)),
     children: kids,
   });
 }
@@ -547,6 +665,45 @@ export const ELSEWHERE = new Map([
   ...ELSEWHERE_IDS.map((id) => [id, 'the TURRETS tab']),
   ...MINE_IDS.map((id) => [id, 'out of play with the mine line']),
 ]);
+
+/**
+ * The same statement for BANDS: every id priced in bytes declares one, and the
+ * table declares nothing the tree does not offer.
+ *
+ * `coverage()` catches a node that was written and never placed. This catches
+ * the two ways the price table can drift from the tree it prices: a node with
+ * no band (which `bandOf` would throw for, but only once something asked --
+ * and nothing asks for the mine line while it is out of play), and a band left
+ * behind for an id that has been deleted or renamed, which reads as coverage
+ * and is not.
+ *
+ * `parentBad` is the one RULE rather than a coverage claim: a leaf cannot be
+ * priced for an earlier band than the arm it hangs off, because the band is
+ * when the thing is meant to be bought and a leaf cannot be bought before its
+ * parent is owned. Equal is fine and common -- an arm and its own leaves are
+ * usually the same purchase decision.
+ */
+export function bands() {
+  const want = [...ALL_UPGRADES.filter((u) => u.cost === undefined).map((u) => u.id),
+    ...UNLOCKS.map((u) => u.id), ...CHARGES.map((u) => u.id)];
+  const have = Object.keys(BAND);
+  const missing = want.filter((id) => !have.includes(id));
+  const extra = have.filter((id) => !want.includes(id));
+  const range = have.filter((id) => !Number.isInteger(BAND[id])
+    || BAND[id] < 1 || BAND[id] >= BAND_PRICE.length);
+  const parentBad = [];
+  for (const n of NODES) {
+    if (!n.id || !BAND[n.id]) continue;
+    for (let p = n.parent; p; p = p.parent) {
+      if (p.id && BAND[p.id] && BAND[n.id] < BAND[p.id]) {
+        parentBad.push(`${n.id} (band ${BAND[n.id]}) under ${p.id} (band ${BAND[p.id]})`);
+        break;
+      }
+    }
+  }
+  const rising = BAND_PRICE.slice(2).every((v, i) => v > BAND_PRICE[i + 1]);
+  return { want: want.length, missing, extra, range, parentBad, rising, BAND, BAND_PRICE, BAND_STEP };
+}
 
 export function coverage() {
   const placed = [...NODES.filter((n) => n.id).map((n) => n.id), ...ELSEWHERE.keys()];

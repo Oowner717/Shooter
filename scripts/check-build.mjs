@@ -97,6 +97,64 @@ if (cov.missing.length || cov.extra.length || cov.dupes.length) {
 console.log(`tree places all ${cov.want} buyable things exactly once`);
 
 /*
+ * ...and every one of them says WHICH BAND it is priced for.
+ *
+ * The build-224 statement, applied to the second mandatory field. `levels` was
+ * `u.levels ?? 3` and eight nodes shipped sold three times because a defaulted
+ * value and a chosen one were the same text; a band has the same failure mode
+ * and a worse blast radius, because an omitted band reads as band 1 and band 1
+ * is 9 kB against band 7's 4 MB. `bandOf` throws at page load for a missing
+ * one, and this is the same statement at build time -- which is where it
+ * catches the ids nothing currently ASKS for, the twenty-one of the mine line
+ * being out of play.
+ *
+ * Checked in both directions plus the one ordering rule: see `bands()`.
+ */
+const treeMod = await import(new URL('../src/tree.js', import.meta.url));
+const bnd = treeMod.bands();
+if (bnd.missing.length || bnd.extra.length || bnd.range.length
+  || bnd.parentBad.length || !bnd.rising) {
+  if (bnd.missing.length) {
+    console.error(`${bnd.missing.length} node(s) declare no band: ${bnd.missing.join(' ')}.`
+      + ' Write the band out -- there is no default, deliberately; see BAND in tree.js');
+  }
+  if (bnd.extra.length) console.error(`BAND prices ids the tree does not offer: ${bnd.extra.join(' ')}`);
+  if (bnd.range.length) console.error(`band out of range 1-7: ${bnd.range.join(' ')}`);
+  if (bnd.parentBad.length) {
+    console.error('a leaf priced for an earlier band than its parent cannot be '
+      + `bought when it is priced for: ${bnd.parentBad.join('; ')}`);
+  }
+  if (!bnd.rising) console.error('BAND_PRICE is not strictly increasing');
+  process.exit(1);
+}
+/*
+ * ...and the price table is printed rather than asserted, because what it
+ * should SAY is a design decision and not a bound. What is worth reading off
+ * it: band 1 has to be cheap enough that a rung-1 run can start spending, and
+ * the whole tree has to be dear enough that rung 49 still has something left
+ * -- build 302 bought all of it by rung 17 of 49, which is the fault this
+ * table exists to fix. The plan's own target is about 116 MB.
+ */
+{
+  const per = new Map();
+  for (const n of [...treeMod.NODES, ...treeMod.DETACHED]) {
+    if (!n.id || n.currency === 'remainder') continue;
+    const b = bnd.BAND[n.id] || 0;
+    const lv = n.levels || 1;
+    let spend = 0;
+    for (let i = 0; i < lv; i++) spend += n.cost + (n.step || 0) * i;
+    const at = per.get(b) || { nodes: 0, levels: 0, spend: 0 };
+    per.set(b, { nodes: at.nodes + 1, levels: at.levels + lv, spend: at.spend + spend });
+  }
+  const fmt = (v) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)} MB` : `${Math.round(v / 1e3)} kB`);
+  const shown = [...per.entries()].sort((a, z) => a[0] - z[0])
+    .map(([b, v]) => `${b || 'self'}:${v.nodes}n/${v.levels}L/${fmt(v.spend)}`);
+  const whole = [...per.values()].reduce((a, v) => a + v.spend, 0);
+  console.log(`bands: ${bnd.want} nodes priced 9 kB to 4 MB a level, +${bnd.BAND_STEP * 100}% a level `
+    + `-- ${shown.join(' ')}; whole tree ${fmt(whole)}`);
+}
+
+/*
  * ...and the machine knows how many parts it has.
  *
  * `RIG_MAX` in shooter.js is every level of every TURRET node added up, and it
