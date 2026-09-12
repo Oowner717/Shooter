@@ -1,0 +1,1650 @@
+<title>Field Guide to the Twenty</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* ---------------------------------------------------------------------
+   * SIMULATION 7749 -- object guide. Deliberately ONE theme: every
+   * specimen is a glowing vector on the game's own near-black field and
+   * cannot be redrawn on white without becoming a different design. So the
+   * ground and every colour are painted explicitly and the page holds on
+   * either host ground. The palette is not invented -- it is the game's,
+   * measured: eight family anchors, 30 to 142 dE apart in CIELAB.
+   * ------------------------------------------------------------------- */
+  :root {
+    color-scheme: dark;
+    --ground: #070b12;
+    --panel: #0b1119;
+    --inset: #04070c;
+    --rule: #19242f;
+    --rule-soft: #111a24;
+    --ink: #cbd9e8;
+    --dim: #8497ab;
+    --faint: #5a6b7d;
+    --accent: #59e0ff;
+
+    --swarm: #7ef9ff;
+    --edge: #ffd166;
+    --heavy: #5d9cff;
+    --kinetic: #c9e84a;
+    --strange: #b98cff;
+    --multiply: #7cffb2;
+    --volatile: #ff5d8f;
+    --inert: #8fa9c4;
+
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --serif: Spectral, Georgia, "Times New Roman", serif;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 40px 72px;
+  }
+
+  p, ul, ol { margin: 0; }
+  .prose { max-width: 64ch; display: flex; flex-direction: column; gap: 14px; }
+  .prose ul { padding-left: 1.1em; display: flex; flex-direction: column; gap: 8px; }
+  li::marker { color: var(--faint); }
+  strong { font-weight: 600; color: #e6f0fa; }
+  em { font-style: italic; color: #dce8f4; }
+  a { color: var(--accent); }
+
+  code, .num {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+  }
+
+  /* ---- masthead ---- */
+  .mast { display: flex; flex-direction: column; gap: 10px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(30px, 6.4vw, 46px);
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h1 .thin { font-weight: 300; font-style: italic; color: var(--dim); }
+  .standfirst { font-size: 19px; color: var(--dim); max-width: 56ch; }
+
+  h2 {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+  h3 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 23px;
+    line-height: 1.2;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  section { display: flex; flex-direction: column; gap: 18px; }
+  .sections { display: flex; flex-direction: column; gap: 56px; margin-top: 52px; }
+  .hr { height: 1px; background: var(--rule); }
+
+  /* ---- the field, up top ---- */
+  .field {
+    border: 1px solid var(--rule);
+    background: var(--inset);
+    display: flex;
+    flex-direction: column;
+  }
+  .field canvas { display: block; width: 100%; height: auto; }
+  .legend {
+    border-top: 1px solid var(--rule-soft);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 0;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .legend span {
+    flex: 1 1 auto;
+    padding: 7px 10px;
+    color: var(--dim);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+  }
+  .legend i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+
+  /* ---- findings ---- */
+  .find { display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+  .find > div { display: flex; flex-direction: column; gap: 9px; }
+  .find h4 {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin: 0;
+    padding-top: 11px;
+    border-top: 2px solid var(--accent);
+  }
+  .find p { font-size: 15.5px; color: var(--dim); }
+
+  /* ---- tables ---- */
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12px; }
+  th, td { text-align: left; padding: 7px 12px 7px 0; border-bottom: 1px solid var(--rule-soft); white-space: nowrap; }
+  th {
+    font-weight: 600; font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--rule);
+  }
+  td { color: var(--dim); font-variant-numeric: tabular-nums; }
+  td.name { color: var(--ink); font-weight: 500; letter-spacing: 0.08em; }
+  td.was { color: var(--faint); }
+  td.wide { white-space: normal; min-width: 20ch; font-family: var(--serif); font-size: 14px; line-height: 1.45; }
+
+  /* ---- gait catalogue ---- */
+  .gaits { display: grid; gap: 1px; grid-template-columns: repeat(auto-fill, minmax(152px, 1fr)); background: var(--rule-soft); border: 1px solid var(--rule); }
+  .gait { background: var(--inset); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .gait canvas { display: block; width: 100%; height: auto; }
+  .gait b {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink);
+  }
+  .gait p { font-size: 13.5px; line-height: 1.42; color: var(--dim); font-family: var(--serif); }
+  .gait .who { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--faint); }
+
+  /* ---- specimen plates ---- */
+  .plates { display: flex; flex-direction: column; }
+  .plate {
+    border-top: 1px solid var(--rule);
+    padding-block: 26px;
+    display: grid;
+    gap: 20px 26px;
+    grid-template-columns: minmax(0, 1fr) minmax(230px, 268px);
+    align-items: start;
+  }
+  .plate:last-child { border-bottom: 1px solid var(--rule); }
+  .phead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .pno { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; color: var(--faint); }
+  .pname {
+    font-family: var(--mono); font-size: 19px; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .fam {
+    font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.14em;
+    text-transform: uppercase; padding: 3px 7px; border: 1px solid currentColor; opacity: 0.9;
+  }
+  .left { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .frames {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+    background: var(--rule-soft); border: 1px solid var(--rule);
+  }
+  .frame { background: var(--inset); display: flex; flex-direction: column; }
+  .frame canvas { display: block; width: 100%; height: auto; }
+  .frame span {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--faint); padding: 5px 7px 7px; border-top: 1px solid var(--rule-soft);
+  }
+  .blurb { font-size: 15.5px; max-width: 62ch; display: flex; flex-direction: column; gap: 10px; }
+  .blurb .counter { color: var(--dim); }
+  .blurb .counter b {
+    font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--faint); margin-right: 7px;
+  }
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0; font-family: var(--mono); font-size: 11.5px; }
+  dl dt {
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); font-size: 10px;
+    padding: 6px 14px 6px 0; border-bottom: 1px solid var(--rule-soft);
+  }
+  dl dd {
+    margin: 0; padding: 6px 0; border-bottom: 1px solid var(--rule-soft);
+    color: var(--ink); font-variant-numeric: tabular-nums; text-align: right;
+  }
+  dl dd.g { color: var(--accent); letter-spacing: 0.08em; }
+
+  /* ---- the build-out ---- */
+  .steps { display: flex; flex-direction: column; gap: 0; }
+  .step { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 18px; padding-block: 18px; border-top: 1px solid var(--rule-soft); }
+  .step .n { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--faint); padding-top: 4px; }
+  .step .b { display: flex; flex-direction: column; gap: 8px; max-width: 66ch; }
+  .step h4 { font-family: var(--serif); font-weight: 600; font-size: 18px; margin: 0; }
+  .step p { font-size: 15.5px; color: var(--dim); }
+  .warn { border-left: 2px solid var(--volatile); padding-left: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .warn b { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--volatile); }
+
+  footer {
+    margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--rule);
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--faint);
+    display: flex; flex-wrap: wrap; gap: 6px 22px;
+  }
+
+  @media (max-width: 860px) {
+    .plate { grid-template-columns: minmax(0, 1fr); }
+    .frames { grid-template-columns: repeat(2, 1fr); }
+    body { font-size: 16px; }
+    .standfirst { font-size: 17px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <div class="eyebrow">Simulation 7749 &nbsp;·&nbsp; object guide &nbsp;·&nbsp; not scheduled</div>
+    <h1>Field Guide to the Twenty <span class="thin">and how everything moves</span></h1>
+    <p class="standfirst">Twenty new objects for the field, and a gait for every object already on it.
+      Thirty-six field bodies currently draw their approach from the same six routes, which is why
+      they all read as one crowd walking slowly downhill.</p>
+  </header>
+
+  <div class="sections">
+    <section>
+      <h2>The field, with eight gaits on it</h2>
+      <div class="field">
+        <canvas id="hero" width="1040" height="420" aria-label="A schematic of the playing field with eight objects each arriving by a different gait"></canvas>
+        <div class="legend" id="heroLegend"></div>
+      </div>
+      <div class="prose">
+        <p>One portal at the top, one machine at the bottom, and eight bodies in the space between.
+          None of them is taking the route the game currently gives all of them. That is the whole
+          proposal in one picture.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Two things the roster already says</h2>
+      <div class="find">
+        <div>
+          <h4>Movement is drawn per BODY, not per TYPE</h4>
+          <p><code>this.route = opts.route || weightedPick(ROUTES)</code> sits in the
+            <code>Enemy</code> constructor, so a <span class="num">45</span>-unit BULWARK and a
+            <span class="num">10</span>-unit NEEDLE draw from the same six routes with the same
+            weights. The routes differ only in how wide the approach bows and how fast the bow
+            folds in. Two types in forty-three own any motion of their own: LURCHER, which pulses
+            its accelerator, and DRIFT, which wanders. Everything else is the same walk at a
+            different speed.</p>
+        </div>
+        <div>
+          <h4>The palette already encodes eight families</h4>
+          <p>Measured in CIELAB across all sixteen field types: every one lands within
+            <span class="num">31</span> dE of one of eight anchors, and the anchors are
+            <span class="num">30</span> to <span class="num">142</span> dE apart. Nobody wrote that
+            down, and it is the only room left in a palette where, per the working notes, every
+            saturated hue is spoken for. So the twenty below take family hues rather than new ones:
+            <strong>hue says what it does to you, shape says which one it is, gait says how it
+            arrives.</strong></p>
+        </div>
+      </div>
+      <div class="scroll">
+        <table id="famTable"></table>
+      </div>
+      <div class="prose">
+        <p>The two anchors worth watching are STRANGE against HEAVY at <span class="num">30</span>
+          dE — violet and azure, the closest pair in the set — and INERT against SWARM at
+          <span class="num">38</span>. A new body in either pair has to carry its distinction in
+          silhouette, because the hue will not do it alone.</p>
+        <p>One rule constrains the harmless newcomers and is worth stating before it gets broken:
+          <code>check-build.mjs</code> enforces <em>grey means harmless</em> in one direction only —
+          the single grey <code>#8fa9c4</code> may only sit on a harmless type, and every other type
+          must carry at least <span class="num">0.28</span> chroma. Harmless bodies may be coloured;
+          SEED is violet. Five of the six drift-like objects below wear the grey and are told apart
+          by shape and gait alone. LANTERN is the exception and it is deliberate: it is the one
+          harmless object that costs you something, so it is allowed a colour.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>The gait catalogue</h2>
+      <div class="prose">
+        <p>A <strong>gait</strong> answers one question: what is this body doing when nothing has
+          happened to it yet. It is a property of the type, not a roll at spawn. Twenty-two of them,
+          each a few lines of steering, and every body in the game gets exactly one — plus any of
+          four modifiers stacked on top.</p>
+      </div>
+      <div class="gaits" id="gaitGrid"></div>
+      <div class="prose">
+        <p><strong>Modifiers.</strong> <code>face</code> turns the body to keep its front toward the
+          barrel, so armour can live on one side. <code>wobble</code> is the heading noise that
+          already exists. <code>planted</code> refuses both steering-authority loss and the
+          repeated-shove fade, so the body cannot be turned or pushed. <code>band</code> holds a
+          depth band instead of closing, which is what DRIFT was given in build 298.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Every object in the game, re-gaited</h2>
+      <div class="prose">
+        <p>Sixteen field types, and what each one should be doing instead. Eleven of the sixteen
+          change. The twenty-seven bodies an anomaly puts on the field are out of scope: a boss
+          choreographs its own pieces frame by frame and its minions already have distinct
+          launches.</p>
+      </div>
+      <div class="scroll">
+        <table id="oldTable"></table>
+      </div>
+    </section>
+
+    <section>
+      <h2>The twenty</h2>
+      <div class="prose">
+        <p>Four frames each: the body at rest, the body doing the thing it does, its size against
+          the machine and a MOTE, and its gait traced on the field. Health and speed are tier-one
+          base values, the numbers the existing table is written in; <code>scaleToTier</code>
+          multiplies them the same way it does everything else. Wave economy, weights and gates are
+          deliberately not decided here.</p>
+      </div>
+      <div class="plates" id="plates"></div>
+    </section>
+
+    <section>
+      <h2>Building it</h2>
+      <div class="steps" id="steps"></div>
+      <div class="warn">
+        <b>Before any of it</b>
+        <p>Steering is the one thing ORDINAL's hash is most sensitive to, and the probe runs a
+          tier-one fight with the era-one field. Take the hash on HEAD, in the same container,
+          before the first edit — and expect a move on any phase that touches
+          <code>drive</code>, because that is what these phases are. Record the delta and its cause;
+          a phase that adds a gait nothing in that fight uses should come back identical, and a
+          surprise there is the bug the hash exists to catch.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Left open, on purpose</h2>
+      <div class="prose">
+        <ul>
+          <li><strong>Wave economy.</strong> No weights, no <code>opens</code> thresholds, no
+            authored waves. Twenty bodies arriving on the ladder is its own measurement pass with
+            <code>tiers.mjs</code>, and it cannot be done honestly until the gaits exist to measure.</li>
+          <li><strong>Salvage.</strong> <code>drops</code> counts are sketched from mass and nothing
+            more. The two harmless objects that can leave the field with their salvage — EMBER and
+            LANTERN — are an economy question, not a gait question.</li>
+          <li><strong>Which of the twenty ship together.</strong> Six of them (LOOM's thread, VEIL's
+            occlusion, MIRE's ground, KITE's lob, CHAFF's ghosts, ANVIL's immunity) each add a rule
+            the player has to be taught. They should not arrive in one build.</li>
+          <li><strong>Names.</strong> Field objects are plain nouns and anomaly pieces are
+            mathematical terms; all twenty follow the first convention. SHARD, ECHO, MITE, PLATE,
+            SEED, CREST, BOUND and TILE are already taken by anomaly pieces and are avoided.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <span>Simulation 7749</span>
+    <span>Guide drafted against build 298</span>
+    <span>43 types on the roster · 16 on the field · 20 proposed</span>
+    <span>Nothing here is implemented</span>
+  </footer>
+</div>
+
+<script>
+/* =====================================================================
+ * The guide draws its own specimens. Everything below is a drawing or a
+ * table; nothing here is game code and nothing here is imported by the
+ * game. Shapes are authored in world units and scaled per frame, so the
+ * size comparisons are true.
+ * ================================================================== */
+(function () {
+  var TAU = Math.PI * 2;
+  var HL = 1.6;                       // the game's own hairline, near enough
+  var MONO = null;                    // set while drawing a silhouette
+
+  function rgba(hex, a) {
+    var n = parseInt(hex.slice(1), 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  function mix(a, b, k) {
+    var x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16);
+    var r = Math.round((((x >> 16) & 255)) * (1 - k) + (((y >> 16) & 255)) * k);
+    var g = Math.round((((x >> 8) & 255)) * (1 - k) + (((y >> 8) & 255)) * k);
+    var bb = Math.round((x & 255) * (1 - k) + (y & 255) * k);
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + bb).toString(16).slice(1);
+  }
+  function ln(c, w, col) {
+    c.lineWidth = w;
+    c.strokeStyle = MONO || col;
+    c.shadowColor = MONO ? 'transparent' : col;
+    c.shadowBlur = MONO ? 0 : w * 3.4;
+  }
+  function fl(c, col, a) { c.fillStyle = rgba(MONO || col, a); c.shadowBlur = 0; }
+  function arc(c, x, y, r, a, b) { c.beginPath(); c.arc(x, y, r, a === undefined ? 0 : a, b === undefined ? TAU : b); }
+  function pth(c, pts, close) {
+    c.beginPath();
+    for (var i = 0; i < pts.length; i += 2) (i ? c.lineTo(pts[i], pts[i + 1]) : c.moveTo(pts[i], pts[i + 1]));
+    if (close) c.closePath();
+  }
+  function poly(c, n, r, rot, x, y) {
+    c.beginPath();
+    for (var i = 0; i < n; i++) {
+      var a = (i / n) * TAU + (rot || 0);
+      var px = (x || 0) + Math.cos(a) * r, py = (y || 0) + Math.sin(a) * r;
+      (i ? c.lineTo(px, py) : c.moveTo(px, py));
+    }
+    c.closePath();
+  }
+  function shell(c, col, fill) {
+    fl(c, col, fill === undefined ? 0.12 : fill); c.fill();
+    ln(c, HL * 1.5, col); c.stroke();
+  }
+  function dot(c, x, y, r, col, a) { fl(c, col, a === undefined ? 0.95 : a); arc(c, x, y, r); c.fill(); }
+  function halo(c, x, y, r, col, a) {
+    var g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgba(col, a)); g.addColorStop(1, rgba(col, 0));
+    c.fillStyle = g; c.shadowBlur = 0; arc(c, x, y, r); c.fill();
+  }
+
+  /* ---- 1. the gait catalogue ------------------------------------------
+   * Each path returns a point in a normalised field: x across, y from the
+   * portal's rim (0) to the machine (0.9). `n` is how many bodies the gait
+   * needs to read at all; `bar` draws a rotating body instead of a dot.
+   */
+  function pw(t, stops) {
+    for (var i = 1; i < stops.length; i++) {
+      if (t <= stops[i][0]) {
+        var a = stops[i - 1], b = stops[i];
+        var k = (t - a[0]) / (b[0] - a[0] || 1);
+        return a[1] + (b[1] - a[1]) * k;
+      }
+    }
+    return stops[stops.length - 1][1];
+  }
+  function fold(t, w, side, commit) { return 0.5 + w * Math.pow(1 - t, commit) * (side || 1); }
+  function wall(x) { var m = ((x % 2) + 2) % 2; return m > 1 ? 2 - m : m; }
+  var WALK = (function () {          // one seeded walk, so WANDER is stable
+    var s = 20260824, pts = [];
+    var x = 0.5, y = 0.08;
+    for (var i = 0; i < 80; i++) {
+      s = (s * 1103515245 + 12345) & 0x7fffffff;
+      x += ((s / 0x7fffffff) - 0.5) * 0.1;
+      y += 0.009 + ((s % 97) / 97) * 0.004;
+      pts.push([Math.max(0.06, Math.min(0.94, x)), Math.min(0.9, y)]);
+    }
+    return pts;
+  })();
+
+  var GAITS = [
+    { id: 'march', name: 'March', who: 'the present default', n: 1,
+      note: 'Steer at the machine with a sideways offset that folds in as it closes. Six route variants, one drawn per body at spawn.',
+      paths: [
+        function (t) { return { x: fold(t, 0, 1, 1), y: t * 0.9 }; },
+        function (t) { return { x: fold(t, 0.3, 1, 0.55), y: t * 0.9 }; },
+        function (t) { return { x: fold(t, 0.44, -1, 0.35), y: t * 0.9 }; },
+        function (t) { return { x: fold(t, 0.24, 1, 0.7) + 0.1 * Math.pow(1 - t, 0.7) * Math.sin(t * 7), y: t * 0.9 }; },
+        function (t) { return { x: fold(t, 0.42, -1, 1.9), y: t * 0.9 }; },
+        function (t) { var y = pw(t, [[0, 0], [0.3, 0.34], [0.62, 0.44], [1, 0.9]]); return { x: fold(t, 0.18, 1, 0.5), y: y }; }
+      ] },
+    { id: 'straight', name: 'Straight', who: 'NEEDLE, SEED', n: 1, trail: 0.16,
+      note: 'One line, chosen at the rim and never revised. No lateral, no wobble, fast.',
+      path: function (t) { return { x: 0.28 + t * 0.34, y: t * 0.9 }; } },
+    { id: 'creep', name: 'Creep', who: 'BULWARK, ANVIL, BLOOM', n: 1,
+      note: 'Constant speed, dead ahead, no steering authority to lose. Cannot be turned and barely shoved.',
+      path: function (t) { return { x: 0.5, y: t * 0.9 }; } },
+    { id: 'lurch', name: 'Lurch', who: 'LURCHER', n: 1,
+      note: 'Coasts, then throws itself forward for a fifth of a second. Already in the game and the only gait that is.',
+      path: function (t) { return { x: 0.5 + 0.04 * Math.sin(t * 6), y: 0.9 * pw(t, [[0, 0], [0.12, 0.16], [0.32, 0.2], [0.44, 0.38], [0.64, 0.42], [0.76, 0.62], [0.9, 0.66], [1, 1]]) }; } },
+    { id: 'dive', name: 'Dive', who: 'SHRIKE', n: 1, trail: 0.1,
+      note: 'Holds height, then runs straight through the machine at three times cruise, overshoots, and climbs back round for another pass.',
+      path: function (t) {
+        var u = t % 1;
+        if (u < 0.34) return { x: 0.5 + 0.1 * Math.sin(u * 12), y: 0.2 };
+        if (u < 0.56) { var k = (u - 0.34) / 0.22; return { x: 0.5, y: 0.2 + k * 0.82 }; }
+        var k2 = (u - 0.56) / 0.44;
+        return { x: 0.5 + Math.sin(k2 * Math.PI) * 0.33, y: 1.02 - k2 * 0.82 };
+      } },
+    { id: 'orbit', name: 'Orbit', who: 'GYRE', n: 1,
+      note: 'Closes to a set radius of the machine and circles it. Never arrives, never leaves.',
+      path: function (t) {
+        if (t < 0.3) return { x: 0.5, y: (t / 0.3) * 0.64 };
+        var a = (t - 0.3) / 0.7 * TAU - Math.PI / 2;
+        return { x: 0.5 + Math.cos(a) * 0.3, y: 0.79 + Math.sin(a) * 0.15 };
+      } },
+    { id: 'standoff', name: 'Standoff', who: 'KITE, HERALD, TOW', n: 1,
+      note: 'Closes to its own range and holds it, sliding sideways. Anything it does to you, it does from there.',
+      path: function (t) {
+        if (t < 0.34) return { x: 0.5, y: (t / 0.34) * 0.46 };
+        return { x: 0.5 + Math.sin((t - 0.34) * 7) * 0.26, y: 0.46 + 0.02 * Math.sin(t * 11) };
+      } },
+    { id: 'cartwheel', name: 'Cartwheel', who: 'SPINDLE, PRISM', n: 1, bar: true,
+      note: 'Turns end over end as it advances, so its profile against the barrel changes continuously. When you fire decides whether you hit.',
+      path: function (t) { return { x: 0.5 + 0.06 * Math.sin(t * 4), y: t * 0.9, rot: t * 11 }; } },
+    { id: 'tumble', name: 'Tumble', who: 'QUARRY, HUSK, PLATE, MASS', n: 1, bar: true,
+      note: 'Thrown rather than steered: an arc, a spin, and a bounce off the side wall. No opinion about the machine at all.',
+      path: function (t) { return { x: 0.08 + wall(t * 1.8) * 0.84, y: t * 0.86 + 0.06 * Math.sin(t * 5), rot: t * 7 }; } },
+    { id: 'flock', name: 'Flock', who: 'SHOAL, MOTE', n: 6,
+      note: 'Each body steers at the group mean and away from its nearest neighbour. The school turns as one thing and parts around fire.',
+      path: function (t, i) {
+        var a = t * 3 + i * 1.05;
+        var s = 0.1 * (1 - t * 0.5);
+        return { x: 0.5 + Math.sin(t * 2.4) * 0.2 + Math.cos(a) * s, y: t * 0.9 + Math.sin(a) * s * 0.7 };
+      } },
+    { id: 'chain', name: 'Chain', who: 'FILAMENT', n: 7,
+      note: 'Follow the leader. Each segment steers at the one ahead, so the whole body snakes and a cut leaves two shorter snakes.',
+      path: function (t, i) {
+        var u = Math.max(0, t - i * 0.055);
+        return { x: 0.5 + Math.sin(u * 6) * 0.28, y: u * 0.9 };
+      } },
+    { id: 'hop', name: 'Hop', who: 'CHAFF', n: 1,
+      note: 'Quantised: sits still, then crosses a fixed distance in three frames. Nothing in the game moves discontinuously yet.',
+      path: function (t) {
+        var step = Math.floor(t * 7), f = Math.min(1, (t * 7 - step) * 4);
+        var jx = function (s) { return 0.5 + Math.sin(s * 2.7) * 0.22; };
+        return { x: jx(step) + (jx(step + 1) - jx(step)) * f, y: (step + f) / 7 * 0.9 };
+      } },
+    { id: 'paired', name: 'Paired', who: 'YOKE, LOOM', n: 2,
+      note: 'Two bodies hold a separation and rotate about their midpoint while the midpoint advances. Killing one changes what the other does.',
+      path: function (t, i) {
+        var a = t * 4 + i * Math.PI;
+        return { x: 0.5 + Math.cos(a) * 0.17, y: t * 0.9 + Math.sin(a) * 0.08 };
+      } },
+    { id: 'spread', name: 'Spread', who: 'VEIL', n: 1,
+      note: 'Goes wide before it comes down, taking the widest lane it can find. It is trying to cover ground, not reach you.',
+      path: function (t) {
+        var x = 0.5 + pw(t, [[0, 0], [0.4, 0.34], [1, 0.3]]);
+        return { x: x, y: pw(t, [[0, 0], [0.4, 0.2], [1, 0.9]]) };
+      } },
+    { id: 'rise', name: 'Rise', who: 'EMBER, LANTERN', n: 1,
+      note: 'Up-field, away from the machine, toward the rim. Ignore it and it leaves — with whatever it was carrying.',
+      path: function (t) { return { x: 0.5 + Math.sin(t * 3) * 0.1, y: 0.9 - t * 0.88 }; } },
+    { id: 'hover', name: 'Hover', who: 'DRIFT, BELL', n: 1,
+      note: 'Comes down to a band across the middle of the field and bobs there. Build 298 gave this to DRIFT; it is a gait, not a special case.',
+      path: function (t) {
+        return { x: 0.5 + Math.sin(t * 1.6) * 0.22, y: pw(t, [[0, 0], [0.34, 0.45], [1, 0.45]]) + 0.03 * Math.sin(t * 9) };
+      } },
+    { id: 'forage', name: 'Forage', who: 'GLUT', n: 1,
+      note: 'Steers at the nearest wreckage rather than at the machine. It only comes for you once the floor is clean.',
+      path: function (t) {
+        var w = [[0.5, 0.05], [0.24, 0.3], [0.72, 0.44], [0.42, 0.66], [0.5, 0.9]];
+        var k = Math.min(0.999, t) * (w.length - 1), i = Math.floor(k), f = k - i;
+        return { x: w[i][0] + (w[i + 1][0] - w[i][0]) * f, y: w[i][1] + (w[i + 1][1] - w[i][1]) * f };
+      } },
+    { id: 'ride', name: 'Ride', who: 'LATCH, SEED', n: 2,
+      note: 'Beelines to the biggest body on the field and then matches it. The thing to shoot is no longer the thing in front.',
+      path: function (t, i) {
+        var host = { x: 0.62, y: t * 0.9 };
+        if (i === 0) return host;
+        if (t < 0.4) { var k = t / 0.4; return { x: 0.2 + (host.x - 0.2) * k, y: 0.05 + (host.y - 0.05) * k }; }
+        return { x: host.x - 0.04, y: host.y - 0.03 };
+      } },
+    { id: 'drag', name: 'Drag', who: 'TOW', n: 2,
+      note: 'Two bodies on one tether, the load behind the head. Already in the game, and the only gait with a second body that is not a copy.',
+      path: function (t, i) {
+        var u = Math.max(0, t - i * 0.1);
+        return { x: 0.5 + Math.sin(u * 2.2) * 0.16, y: u * 0.9 };
+      } },
+    { id: 'thrown', name: 'Thrown', who: 'MASS, and every knockback', n: 1, trail: 0.14,
+      note: 'No steering at all while the impulse lasts, and the speed ceiling lifted to carry it. Every shove in the game is already this; MASS is the only body that arrives this way.',
+      path: function (t) { return { x: 0.5 - 0.34 * Math.pow(t, 0.7), y: 0.9 * Math.pow(t, 0.55) }; } },
+    { id: 'serpent', name: 'Serpent', who: 'MIRE', n: 1, trail: 0.4,
+      note: 'A weave whose amplitude grows with depth, so the trail it paints gets wider the closer it gets.',
+      path: function (t) { return { x: 0.5 + 0.32 * t * Math.sin(t * 7), y: t * 0.9 }; } },
+    { id: 'wander', name: 'Wander', who: 'nothing, now', n: 1, trail: 0.5,
+      note: 'An aimless walk with no destination. DRIFT owned it until build 298; it is kept for the assay and for anything scenic.',
+      path: function (t) {
+        var k = Math.min(0.999, t) * (WALK.length - 1), i = Math.floor(k), f = k - i;
+        var a = WALK[i], b = WALK[i + 1] || a;
+        return { x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f };
+      } }
+  ];
+  var GAIT_BY_ID = {};
+  GAITS.forEach(function (g) { GAIT_BY_ID[g.id] = g; });
+
+  /* ---- 2. a field to trace a gait on --------------------------------- */
+  function drawField(c, w, h, opts) {
+    var pad = opts.pad || 10;
+    var x0 = pad, x1 = w - pad, y0 = pad + (opts.top || 0), y1 = h - pad - (opts.bottom || 0);
+    c.clearRect(0, 0, w, h);
+    // the portal's rim, and the machine
+    var px = (x0 + x1) / 2, prx = (x1 - x0) * 0.22, pry = prx * 0.3;
+    c.save();
+    ln(c, 1, '#59e0ff'); c.globalAlpha = 0.5;
+    c.beginPath(); c.ellipse(px, y0 + pry, prx, pry, 0, 0, TAU); c.stroke();
+    c.globalAlpha = 0.16;
+    c.beginPath(); c.moveTo(px - prx * 0.7, y0 + pry); c.lineTo(px + prx * 0.7, y0 + pry);
+    c.lineTo(px + prx, y1); c.lineTo(px - prx, y1); c.closePath();
+    fl(c, '#59e0ff', 0.05); c.fill();
+    c.restore();
+    c.save();
+    ln(c, 1, '#59e0ff'); c.globalAlpha = 0.55;
+    var mr = Math.max(5, (x1 - x0) * 0.028);
+    poly(c, 6, mr, Math.PI / 6, px, y1); c.stroke();
+    c.beginPath(); c.moveTo(px, y1 - mr * 0.4); c.lineTo(px, y1 - mr * 2.1); c.stroke();
+    c.restore();
+    return { x0: x0, x1: x1, y0: y0 + pry, y1: y1, map: function (p) {
+      return { x: x0 + p.x * (x1 - x0), y: (y0 + pry) + (p.y / 0.9) * (y1 - (y0 + pry)) };
+    } };
+  }
+
+  function traceGait(c, w, h, gait, col, t) {
+    var F = drawField(c, w, h, { pad: 9 });
+    var paths = gait.paths || [gait.path];
+    var n = gait.n || 1;
+    for (var pi = 0; pi < paths.length; pi++) {
+      var path = paths[pi];
+      for (var i = 0; i < n; i++) {
+        // the whole path, as a hairline: the picture at rest
+        c.save();
+        ln(c, 1, col); c.globalAlpha = paths.length > 1 ? 0.2 : 0.26;
+        c.beginPath();
+        for (var s = 0; s <= 60; s++) {
+          var q = F.map(path(s / 60, i));
+          (s ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y));
+        }
+        c.stroke();
+        c.restore();
+        if (paths.length > 1 && pi !== 1) continue;   // one live body on MARCH
+        // the trail, and the body
+        var tr = gait.trail || 0.07;
+        c.save();
+        ln(c, 2, col); c.globalAlpha = 0.6; c.lineCap = 'round';
+        c.beginPath();
+        for (var k = 0; k <= 10; k++) {
+          var u = Math.max(0, Math.min(1, t - tr + (tr * k) / 10));
+          var r = F.map(path(u, i));
+          (k ? c.lineTo(r.x, r.y) : c.moveTo(r.x, r.y));
+        }
+        c.stroke();
+        c.restore();
+        var p = path(Math.min(1, t), i);
+        var m = F.map(p);
+        var br = Math.max(2.6, (F.x1 - F.x0) * 0.021);
+        halo(c, m.x, m.y, br * 4, col, 0.3);
+        if (gait.bar) {
+          c.save();
+          c.translate(m.x, m.y); c.rotate((p.rot || 0));
+          ln(c, 2.4, col); c.lineCap = 'round';
+          c.beginPath(); c.moveTo(-br * 2, 0); c.lineTo(br * 2, 0); c.stroke();
+          c.restore();
+        } else {
+          dot(c, m.x, m.y, br, col, 0.95);
+        }
+      }
+    }
+  }
+
+  /* ---- 3. the twenty ---------------------------------------------------
+   * Each `draw` works in world units with the origin at the body's centre;
+   * the frame scales it. `act` is the second frame: the thing it does.
+   */
+  var W = '#ffffff';
+  function dart(c, x, y, r, a) {
+    c.save(); c.translate(x, y); c.rotate(a);
+    pth(c, [0, r, -r * 0.62, -r * 0.8, 0, -r * 0.35, r * 0.62, -r * 0.8], true);
+    c.restore();
+  }
+
+  var NEW = [
+    { name: 'SHOAL', fam: 'swarm', r: 7, hp: 14, speed: 96, accel: 300, armor: 0, drops: 1,
+      gait: 'flock', count: '14 at a time',
+      what: 'A school of fourteen, arriving as one body and turning as one. There is no leader and no ability: the flock <em>is</em> the mechanic. A bolt takes one; anything with a radius takes the school.',
+      counter: 'PULSE, SCATTER, any blast. Aimed fire is the wrong tool and the school is what teaches that.',
+      view: 34,
+      draw: function (c, R, t, act) {
+        var gap = act ? 16 : 0;
+        var pos = [[0, -14], [-11, -5], [11, -5], [-20, 6], [0, 4], [20, 6], [-9, 15], [9, 15], [0, 24]];
+        for (var i = 0; i < pos.length; i++) {
+          var x = pos[i][0], y = pos[i][1];
+          var s = x < 0 ? -1 : (x > 0 ? 1 : (i % 2 ? 1 : -1));
+          x += act ? s * gap * 0.5 : 0;
+          y += Math.sin(t * 3 + i) * 1.2;
+          dart(c, x, y, R, Math.PI + (act ? s * 0.35 : 0) + Math.sin(t * 2 + i) * 0.06);
+          shell(c, '#7ef9ff', 0.16);
+        }
+        if (act) {
+          c.save(); ln(c, 2.4, W); c.globalAlpha = 0.9; c.lineCap = 'round';
+          c.beginPath(); c.moveTo(0, 30); c.lineTo(0, -22); c.stroke(); c.restore();
+        }
+      } },
+
+    { name: 'CHAFF', fam: 'swarm', r: 13, hp: 60, speed: 70, accel: 260, armor: 0, drops: 2,
+      gait: 'hop', count: 'two or three',
+      what: 'It moves in jumps and leaves a copy of itself behind at every one. The copies are not bodies — nothing can be shot off them — but the assist reads them as targets and locks on, for the second and a half each one lasts.',
+      counter: 'Aim it yourself. The one thing on the field that makes AUTO AIM worse than a thumb.',
+      view: 30, viewAct: 46,
+      draw: function (c, R, t, act) {
+        function unit(alpha) {
+          c.save(); c.globalAlpha = alpha;
+          arc(c, 0, 0, R, 0.5, Math.PI * 1.35); shell(c, '#7ef9ff', 0.1);
+          arc(c, 0, 0, R, Math.PI * 1.55, 0.2); ln(c, HL * 1.5, '#7ef9ff'); c.stroke();
+          for (var i = 0; i < 3; i++) {
+            var a = i * 2.1 + 0.4;
+            pth(c, [Math.cos(a) * R * 0.4, Math.sin(a) * R * 0.4, Math.cos(a) * R * 1.5, Math.sin(a) * R * 1.5]);
+            ln(c, HL * 1.2, '#7ef9ff'); c.stroke();
+          }
+          dot(c, 0, 0, R * 0.3, W, 0.8);
+          c.restore();
+        }
+        if (act) {
+          for (var g = 3; g >= 1; g--) {
+            c.save(); c.translate(-g * 13, -g * 8); unit(0.13 * (4 - g)); c.restore();
+          }
+          c.save(); c.translate(-39, -24);
+          ln(c, 1.6, '#ffd166'); c.globalAlpha = 0.85;
+          var b = R * 1.5;
+          [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (s) {
+            pth(c, [s[0] * b - s[0] * b * 0.45, s[1] * b, s[0] * b, s[1] * b, s[0] * b, s[1] * b - s[1] * b * 0.45]);
+            c.stroke();
+          });
+          c.restore();
+        }
+        unit(1);
+      } },
+
+    { name: 'SHRIKE', fam: 'edge', r: 14, hp: 70, speed: 40, accel: 340, armor: 0, drops: 3,
+      gait: 'dive', count: 'one or two',
+      what: 'Holds height across the top of the field, then runs straight down through the machine at <span class="num">210</span> u/s — three times its own cruise — does its damage on the pass, overshoots to the floor, and climbs back round for another.',
+      counter: 'It is only fast on the dive. Kill it in the climb, or stand a mine on the line it is going to use.',
+      view: 30, viewAct: 44,
+      draw: function (c, R, t, act) {
+        if (act) {
+          c.save(); c.lineCap = 'round';
+          for (var i = 0; i < 5; i++) {
+            var x = (i - 2) * R * 0.5;
+            ln(c, 2.2 - Math.abs(i - 2) * 0.4, '#ffd166'); c.globalAlpha = 0.5 - Math.abs(i - 2) * 0.1;
+            pth(c, [x, -R * 1.4, x, -R * 1.4 - (26 - Math.abs(i - 2) * 6)]); c.stroke();
+          }
+          c.restore();
+        }
+        pth(c, [0, R * 1.5, -R * 1.15, -R * 0.5, -R * 0.3, -R * 0.9, 0, -R * 1.5,
+          R * 0.3, -R * 0.9, R * 1.15, -R * 0.5], true);
+        shell(c, '#ffd166', act ? 0.3 : 0.14);
+        pth(c, [0, R * 1.5, 0, -R * 1.2]); ln(c, HL, '#ffd166'); c.stroke();
+        dot(c, 0, R * 1.05, R * 0.22, W, act ? 1 : 0.7);
+      } },
+
+    { name: 'FLINT', fam: 'edge', r: 16, hp: 120, speed: 44, accel: 150, armor: 0.55, drops: 3,
+      gait: 'march', mods: 'face', count: 'three or four',
+      what: 'Armour <span class="num">0.55</span> on its front face and nothing anywhere else, and it turns to keep that face toward the barrel. Shot from in front it is the hardest small body in the game; shot from the side it is paper.',
+      counter: 'A mine it walks over, a blast behind it, a PRISM ricochet, or an emplacement standing off to one side. The first body that makes the field have sides.',
+      view: 30,
+      draw: function (c, R, t, act) {
+        c.save();
+        if (act) c.rotate(2.5);
+        pth(c, [0, -R * 1.1, R, R * 0.5, -R, R * 0.5], true);
+        shell(c, '#ffd166', 0.1);
+        // the plate, on the leading face only
+        for (var i = 0; i < 3; i++) {
+          arc(c, 0, R * 0.7, R * (1.05 + i * 0.13), -2.5, -0.64);
+          ln(c, HL * (2.6 - i * 0.7), '#ffd166'); c.globalAlpha = 1 - i * 0.28; c.stroke();
+        }
+        c.globalAlpha = 1;
+        pth(c, [-R * 0.5, R * 0.5, 0, -R * 0.2, R * 0.5, R * 0.5]);
+        ln(c, HL, '#ffd166'); c.stroke();
+        c.restore();
+        if (act) {
+          var hx = R * 1.1, hy = -R * 0.7;
+          halo(c, hx, hy, R * 1.1, '#ff5d8f', 0.5);
+          c.save(); ln(c, 2, W); c.lineCap = 'round';
+          for (var k = 0; k < 5; k++) {
+            var a = k * 1.3 + 0.4;
+            pth(c, [hx, hy, hx + Math.cos(a) * R * 0.9, hy + Math.sin(a) * R * 0.9]); c.stroke();
+          }
+          c.restore();
+        }
+      } },
+
+    { name: 'ANVIL', fam: 'heavy', r: 56, hp: 1400, speed: 18, accel: 40, armor: 0.3, drops: 18,
+      gait: 'creep', mods: 'planted', count: 'one',
+      what: 'The heaviest thing that has ever walked down this field, and the only one that cannot be moved. It does not steer, it cannot be turned, and every impulse in the game — PULSE, PILE, HEAVE, a hurled MASS — is refused. It simply arrives at <span class="num">18</span> u/s.',
+      counter: 'Damage, and the twenty-six seconds it takes to cross. Nothing else works, which is the point: the answer to ANVIL is a gun, not a button.',
+      view: 74,
+      draw: function (c, R, t, act) {
+        if (act) {
+          c.save();
+          var rr = R * (1 + 0.5 * ((t * 0.6) % 1));
+          ln(c, 3, '#59e0ff'); c.globalAlpha = 0.8 * (1 - ((t * 0.6) % 1));
+          arc(c, 0, 0, rr); c.stroke();
+          c.restore();
+        }
+        pth(c, [-R, R * 0.62, -R * 0.72, -R * 0.58, R * 0.72, -R * 0.58, R, R * 0.62], true);
+        shell(c, '#5d9cff', 0.16);
+        pth(c, [-R * 0.86, R * 0.2, R * 0.86, R * 0.2]); ln(c, HL * 1.2, '#5d9cff'); c.stroke();
+        pth(c, [-R * 1.02, R * 0.62, R * 1.02, R * 0.62]); ln(c, HL * 3, '#5d9cff'); c.stroke();
+        for (var i = -2; i <= 2; i++) dot(c, i * R * 0.3, -R * 0.3, R * 0.06, W, 0.75);
+        for (var j = -1; j <= 1; j += 2) {
+          pth(c, [j * R * 0.5, R * 0.2, j * R * 0.62, R * 0.62]); ln(c, HL * 1.6, '#5d9cff'); c.stroke();
+        }
+        if (act) {
+          c.save(); ln(c, 2.4, '#ff5d8f'); c.lineCap = 'round'; c.globalAlpha = 0.95;
+          [-1, 1].forEach(function (s) {
+            var x = s * R * 1.3;
+            pth(c, [x - s * 9, -R * 0.1, x + s * 9, -R * 0.1]); c.stroke();
+            pth(c, [x - 7, -R * 0.1 - 7, x + 7, -R * 0.1 + 7]); c.stroke();
+            pth(c, [x - 7, -R * 0.1 + 7, x + 7, -R * 0.1 - 7]); c.stroke();
+          });
+          c.restore();
+        }
+      } },
+
+    { name: 'VEIL', fam: 'heavy', r: 52, hp: 240, speed: 26, accel: 90, armor: 0, drops: 6,
+      gait: 'spread', count: 'one or two',
+      what: 'A membrane <span class="num">104</span> units across and twelve deep that goes wide before it comes down. Nothing behind it can be chosen by the assist: it occludes, the way a boss\'s structure does, but by geometry rather than by a mark. Weak, and it changes the whole field while it stands.',
+      counter: 'It has <span class="num">240</span> health and no armour. Shoot the sheet, not what is behind it — which is exactly the decision it exists to force.',
+      view: 66,
+      draw: function (c, R, t, act) {
+        if (act) {
+          c.save(); c.globalAlpha = 0.3;
+          [[-R * 0.4, -R * 0.5, 13], [R * 0.35, -R * 0.62, 18]].forEach(function (b) {
+            poly(c, 6, b[2], 0.3, b[0], b[1]); ln(c, HL, '#8fa9c4'); c.stroke();
+          });
+          c.restore();
+          c.save(); c.globalAlpha = 0.55; c.setLineDash([4, 5]);
+          ln(c, 1.6, '#ffd166');
+          poly(c, 4, 24, Math.PI / 4, 0, -R * 0.56); c.stroke();
+          c.restore();
+        }
+        c.save();
+        var sag = Math.sin(t * 1.4) * R * 0.03;
+        c.beginPath();
+        c.moveTo(-R, 0);
+        c.bezierCurveTo(-R * 0.4, -R * 0.3 + sag, R * 0.4, -R * 0.3 - sag, R, 0);
+        c.bezierCurveTo(R * 0.4, R * 0.26 - sag, -R * 0.4, R * 0.26 + sag, -R, 0);
+        shell(c, '#5d9cff', 0.1);
+        c.restore();
+        for (var i = -6; i <= 6; i++) {
+          var x = (i / 6) * R * 0.94;
+          var d = R * 0.2 * (1 - Math.abs(i) / 8) + 3;
+          pth(c, [x, R * 0.1, x, R * 0.1 + d]);
+          ln(c, HL * 1.1, '#5d9cff'); c.globalAlpha = 0.7; c.stroke();
+        }
+        c.globalAlpha = 1;
+      } },
+
+    { name: 'GYRE', fam: 'kinetic', r: 22, hp: 200, speed: 44, accel: 160, armor: 0.1, drops: 5,
+      gait: 'orbit', count: 'one or two',
+      what: 'Closes to <span class="num">300</span> units of the machine and circles it, swinging a weighted arm. The arm does not damage you — it <em>moves your things</em>: a mine it passes is dragged out of its lane, a DECOY is shoved off its mark.',
+      counter: 'It holds one radius, so it crosses the same arc every time. Lay for it, or take it before it settles.',
+      view: 46, viewAct: 56,
+      draw: function (c, R, t, act) {
+        var a = act ? -0.5 : t * 1.1;
+        if (act) {
+          c.save(); ln(c, 3, '#c9e84a'); c.globalAlpha = 0.3;
+          arc(c, 0, 0, R * 1.9, -2.5, -0.5); c.stroke(); c.restore();
+        }
+        c.save(); c.rotate(a);
+        pth(c, [0, 0, R * 1.9, 0]); ln(c, HL * 2.4, '#c9e84a'); c.stroke();
+        poly(c, 3, R * 0.5, 0, R * 1.9, 0); shell(c, '#c9e84a', 0.3);
+        c.restore();
+        arc(c, 0, 0, R); shell(c, '#c9e84a', 0.14);
+        arc(c, 0, 0, R * 0.52); ln(c, HL * 1.4, '#c9e84a'); c.stroke();
+        for (var i = 0; i < 6; i++) {
+          var b = i * TAU / 6 + a * 0.4;
+          pth(c, [Math.cos(b) * R * 0.52, Math.sin(b) * R * 0.52, Math.cos(b) * R, Math.sin(b) * R]);
+          ln(c, HL, '#c9e84a'); c.stroke();
+        }
+        if (act) {
+          c.save();
+          poly(c, 6, 9, 0, R * 1.2, R * 1.5); ln(c, HL * 1.4, '#ffb347'); c.globalAlpha = 0.9; c.stroke();
+          ln(c, 2, W); c.lineCap = 'round';
+          pth(c, [R * 0.5, R * 1.2, R * 1.05, R * 1.42]); c.stroke();
+          pth(c, [R * 0.9, R * 1.16, R * 1.05, R * 1.42, R * 0.78, R * 1.44]); c.stroke();
+          c.restore();
+        }
+      } },
+
+    { name: 'SPINDLE', fam: 'kinetic', r: 30, hp: 180, speed: 40, accel: 130, armor: 0.15, drops: 5,
+      gait: 'cartwheel', count: 'two or three',
+      what: 'A bar <span class="num">96</span> long and <span class="num">11</span> wide, turning end over end at two thirds of a revolution a second as it comes. Broadside it is the widest target on the field; edge-on it is thinner than a NEEDLE. Nothing else in the game changes its own hit profile.',
+      counter: 'Time it. Auto-fire will spend half its rounds on the edge; a thumb will not.',
+      view: 58,
+      draw: function (c, R, t, act) {
+        var a = act ? Math.PI / 2 : 0.28 + Math.sin(t * 0.9) * 0.1;
+        c.save(); c.rotate(a);
+        var L = R * 1.6, H = R * 0.19;
+        c.beginPath();
+        if (c.roundRect) c.roundRect(-L, -H, L * 2, H * 2, H);
+        else c.rect(-L, -H, L * 2, H * 2);
+        shell(c, '#c9e84a', act ? 0.35 : 0.14);
+        pth(c, [-L * 0.88, 0, L * 0.88, 0]); ln(c, HL, '#c9e84a'); c.stroke();
+        [-1, 1].forEach(function (s) {
+          poly(c, 4, H * 1.9, Math.PI / 4, s * L * 0.86, 0);
+          shell(c, '#c9e84a', 0.28);
+        });
+        c.restore();
+        c.save();
+        ln(c, 1, '#c9e84a'); c.globalAlpha = 0.25; c.setLineDash([3, 4]);
+        arc(c, 0, 0, R * 1.62); c.stroke();
+        c.restore();
+        if (act) { dot(c, 0, 0, R * 0.1, W, 0.9); }
+      } },
+
+    { name: 'YOKE', fam: 'strange', r: 26, hp: 150, speed: 42, accel: 150, armor: 0, drops: 5,
+      gait: 'paired', count: 'a pair, always',
+      what: 'Two bodies on a rigid beam, rotating about their midpoint while the midpoint advances. They share one pool of <span class="num">150</span> health. Kill one and the beam breaks — and the survivor keeps the <em>whole remaining pool</em> and runs at <span class="num">1.9×</span> speed.',
+      counter: 'Take them together with something that reaches both, or accept the survivor and be ready for it. Focusing one half is the trap.',
+      view: 60,
+      draw: function (c, R, t, act) {
+        var a = act ? 0.5 : t * 1.2;
+        var d = R * 1.15;
+        var x1 = Math.cos(a) * d, y1 = Math.sin(a) * d * 0.55;
+        var x2 = -x1, y2 = -y1;
+        if (!act) { pth(c, [x1, y1, x2, y2]); ln(c, HL * 2, '#b98cff'); c.stroke(); }
+        else {
+          c.save(); c.setLineDash([5, 6]); ln(c, HL * 1.4, '#b98cff'); c.globalAlpha = 0.4;
+          pth(c, [x1, y1, x2, y2]); c.stroke(); c.restore();
+        }
+        function half(x, y, dead, k) {
+          c.save(); c.translate(x, y);
+          poly(c, 5, R * 0.62, k);
+          if (dead) {
+            c.save(); c.setLineDash([4, 5]); ln(c, HL * 1.3, '#b98cff'); c.globalAlpha = 0.45; c.stroke(); c.restore();
+          } else {
+            shell(c, '#b98cff', act ? 0.3 : 0.14);
+            arc(c, 0, 0, R * 0.26); ln(c, HL * 1.2, '#b98cff'); c.stroke();
+            dot(c, 0, 0, R * 0.1, W, 0.85);
+          }
+          c.restore();
+        }
+        half(x1, y1, false, a);
+        half(x2, y2, act, -a);
+        if (act) {
+          c.save(); ln(c, 2, '#b98cff'); c.lineCap = 'round'; c.globalAlpha = 0.7;
+          for (var i = 0; i < 3; i++) {
+            pth(c, [x1 - 14 - i * 9, y1 - 10 + i * 10, x1 - 30 - i * 9, y1 - 10 + i * 10]); c.stroke();
+          }
+          c.restore();
+        }
+      } },
+
+    { name: 'REMNANT', fam: 'strange', r: 30, hp: 300, speed: 36, accel: 120, armor: 0.12, drops: 6,
+      gait: 'march', count: 'one or two',
+      what: 'Destroyed, it drops nothing and leaves a mark. Six seconds later it re-forms at the portal at half health and <span class="num">1.4×</span> speed, once, and that second body pays for both. A kill that is not a kill until the second one.',
+      counter: 'Nothing, the first time. The second arrival is the one to be standing ready for — and it comes out of the portal, so a mine in the lane answers it.',
+      view: 42,
+      draw: function (c, R, t, act) {
+        var seg = 5;
+        for (var i = 0; i < seg; i++) {
+          var a0 = (i / seg) * TAU + 0.1, a1 = a0 + TAU / seg - 0.24;
+          var gone = act && i > 1;
+          c.save();
+          arc(c, 0, 0, R * 0.8, a0, a1);
+          c.lineTo(Math.cos(a1) * R * 0.34, Math.sin(a1) * R * 0.34);
+          c.arc(0, 0, R * 0.34, a1, a0, true);
+          c.closePath();
+          if (gone) { c.setLineDash([3, 5]); ln(c, HL * 1.2, '#b98cff'); c.globalAlpha = 0.4; c.stroke(); }
+          else shell(c, '#b98cff', 0.16);
+          c.restore();
+        }
+        if (act) {
+          halo(c, 0, 0, R * 0.7, '#b98cff', 0.45);
+          c.save(); ln(c, 1.4, '#b98cff'); c.globalAlpha = 0.7; c.setLineDash([2, 4]);
+          arc(c, 0, 0, R * 1.05); c.stroke(); c.restore();
+        }
+        dot(c, 0, 0, R * 0.2, W, act ? 1 : 0.8);
+      } },
+
+    { name: 'LATCH', fam: 'strange', r: 9, hp: 40, speed: 160, accel: 320, armor: 0, drops: 1,
+      gait: 'ride', count: 'three or four',
+      what: 'Ignores the machine entirely: it runs at the largest body on the field and rides it. While it is aboard the host takes <span class="num">0.2</span> more armour and closes <span class="num">14</span> health a second. Three of them on a BULWARK is a different fight.',
+      counter: 'Shoot the tick, not the host — and it is nine units wide on the flank of a body forty-five across. SPINE\'s splinters and any blast take it off.',
+      view: 20, viewAct: 62,
+      draw: function (c, R, t, act) {
+        if (act) {
+          c.save(); c.globalAlpha = 0.4;
+          arc(c, 6, 14, 34); ln(c, HL * 1.6, '#5d9cff'); c.stroke();
+          c.globalAlpha = 0.7; ln(c, HL * 2.6, '#b98cff');
+          arc(c, 6, 14, 37, -2.4, -0.6); c.stroke();
+          c.restore();
+          c.save(); ln(c, 2, '#7cffb2'); c.lineCap = 'round'; c.globalAlpha = 0.9;
+          pth(c, [26, 30, 26, 20]); c.stroke(); pth(c, [21, 25, 31, 25]); c.stroke();
+          c.restore();
+          c.translate(-14, -12);
+        }
+        arc(c, 0, 0, R); shell(c, '#b98cff', 0.2);
+        c.save(); ln(c, HL * 1.8, '#b98cff'); c.lineCap = 'round';
+        for (var i = 0; i < 4; i++) {
+          var a = i * TAU / 4 + 0.6;
+          c.beginPath();
+          c.moveTo(Math.cos(a) * R * 0.8, Math.sin(a) * R * 0.8);
+          c.quadraticCurveTo(Math.cos(a) * R * 2.1, Math.sin(a) * R * 1.5,
+            Math.cos(a + 0.7) * R * 2.2, Math.sin(a + 0.7) * R * 2.2);
+          c.stroke();
+        }
+        c.restore();
+        dot(c, 0, 0, R * 0.34, W, 0.9);
+      } },
+
+    { name: 'QUARRY', fam: 'multiply', r: 40, hp: 420, speed: 30, accel: 100, armor: 0.22, drops: 8,
+      gait: 'tumble', count: 'one',
+      what: 'Breaks into three at <span class="num">24</span>, and each of those into three at <span class="num">13</span>: nine bodies out of one, each tier faster and less armoured than its parent. The fracture lines are drawn on it from the moment it arrives, so you can see what it is going to become.',
+      counter: 'Where you break it decides where the nine go. Break it high and they have the whole field to spread in; break it low and they are already on you.',
+      view: 50,
+      draw: function (c, R, t, act) {
+        var cuts = [[-0.2, -1, 0.1, 0.25], [0.1, 0.25, 0.95, 0.45], [0.1, 0.25, -0.6, 0.8]];
+        var shape = [[-0.62, -0.78], [0.2, -1], [0.95, -0.3], [0.8, 0.6], [0, 1], [-0.85, 0.45]];
+        function rock(ox, oy, s, alpha) {
+          c.save(); c.translate(ox, oy); c.scale(s, s); c.globalAlpha = alpha;
+          c.beginPath();
+          shape.forEach(function (p, i) { (i ? c.lineTo(p[0] * R, p[1] * R) : c.moveTo(p[0] * R, p[1] * R)); });
+          c.closePath();
+          shell(c, '#7cffb2', 0.12);
+          cuts.forEach(function (q) {
+            pth(c, [q[0] * R, q[1] * R, q[2] * R, q[3] * R]);
+            ln(c, HL * 1.3, '#7cffb2'); c.globalAlpha = alpha * 0.75; c.stroke();
+            c.globalAlpha = alpha;
+          });
+          c.restore();
+        }
+        if (act) {
+          rock(-R * 0.62, -R * 0.5, 0.52, 1);
+          rock(R * 0.66, -R * 0.28, 0.52, 1);
+          rock(-R * 0.05, R * 0.62, 0.52, 1);
+          c.save(); ln(c, 1.4, '#7cffb2'); c.globalAlpha = 0.35; c.setLineDash([3, 5]);
+          c.beginPath();
+          shape.forEach(function (p, i) { (i ? c.lineTo(p[0] * R, p[1] * R) : c.moveTo(p[0] * R, p[1] * R)); });
+          c.closePath(); c.stroke(); c.restore();
+        } else {
+          rock(0, 0, 1, 1);
+          c.save(); c.rotate(0.4); c.globalAlpha = 0.6;
+          for (var i = 0; i < 3; i++) dot(c, (i - 1) * R * 0.34, -R * 0.15, R * 0.05, W, 0.5);
+          c.restore();
+        }
+      } },
+
+    { name: 'LOOM', fam: 'multiply', r: 20, hp: 110, speed: 34, accel: 120, armor: 0, drops: 3,
+      gait: 'paired', count: 'a pair, always',
+      what: 'A pair that walks <em>apart</em>, stringing a bright thread between them. Our rounds stop on the thread the way they stop on the era-two wall. It is the enemy building cover, and it gets wider the longer it lives.',
+      counter: 'Either end drops it. They separate slowly, so the first four seconds are free — and a blast or a mine reaches under the thread, which rounds do not.',
+      view: 44, viewAct: 66,
+      draw: function (c, R, t, act) {
+        var d = act ? 52 : 22 + Math.sin(t) * 3;
+        function spool(x) {
+          c.save(); c.translate(x, 0);
+          arc(c, 0, 0, R * 0.8); shell(c, '#7cffb2', 0.14);
+          arc(c, 0, 0, R * 0.34); ln(c, HL * 1.4, '#7cffb2'); c.stroke();
+          [0, 1].forEach(function (k) {
+            var a = k * Math.PI / 2 + t * 0.6;
+            pth(c, [Math.cos(a) * R * 0.8, Math.sin(a) * R * 0.8, -Math.cos(a) * R * 0.8, -Math.sin(a) * R * 0.8]);
+            ln(c, HL * 1.1, '#7cffb2'); c.stroke();
+          });
+          c.restore();
+        }
+        c.save();
+        ln(c, act ? 3 : 1.6, '#7cffb2'); c.globalAlpha = act ? 1 : 0.45;
+        c.beginPath();
+        c.moveTo(-d, 0);
+        if (act) c.lineTo(d, 0); else c.quadraticCurveTo(0, 12, d, 0);
+        c.stroke();
+        c.restore();
+        spool(-d); spool(d);
+        if (act) {
+          halo(c, 8, 0, 16, W, 0.5);
+          c.save(); ln(c, 2.2, '#ffd166'); c.lineCap = 'round'; c.globalAlpha = 0.95;
+          pth(c, [8, -34, 8, -9]); c.stroke();
+          for (var i = 0; i < 5; i++) {
+            var a = -Math.PI / 2 + (i - 2) * 0.5;
+            pth(c, [8, -2, 8 + Math.cos(a) * 13, -2 + Math.sin(a) * 13]); c.stroke();
+          }
+          c.restore();
+        }
+      } },
+
+    { name: 'MIRE', fam: 'volatile', r: 24, hp: 160, speed: 30, accel: 100, armor: 0, drops: 4,
+      gait: 'serpent', count: 'one or two',
+      what: 'Weaves down the field painting corrupted ground behind it, wider the closer it gets. Standing in it, a mine takes twice as long to arm, a DECOY decays, and the intake pulls at half rate. It does no damage at all.',
+      counter: 'Kill it early and the trail is short. The ground it has already laid fades on its own clock, so the mistake is chasing the stain instead of the source.',
+      view: 40, viewAct: 76,
+      draw: function (c, R, t, act) {
+        if (act) {
+          c.save();
+          for (var i = 0; i < 46; i++) {
+            var u = i / 46;
+            var ty = -18 - u * 46;
+            var tx = Math.sin(u * 5 + 1) * 26 * (1 - u * 0.4);
+            var w = 22 * (1 - u * 0.6);
+            fl(c, '#ff5d8f', 0.16 * (1 - u * 0.7));
+            arc(c, tx + Math.sin(i * 2.3) * w * 0.7, ty, 5 + (i % 3)); c.fill();
+          }
+          c.restore();
+        }
+        c.save();
+        c.beginPath();
+        c.moveTo(-R * 0.9, -R * 0.2);
+        c.bezierCurveTo(-R * 0.95, -R * 1.1, R * 0.95, -R * 1.1, R * 0.9, -R * 0.2);
+        c.bezierCurveTo(R * 0.8, R * 0.8, -R * 0.8, R * 0.8, -R * 0.9, -R * 0.2);
+        shell(c, '#ff5d8f', 0.16);
+        c.restore();
+        for (var k = -1; k <= 1; k++) {
+          var x = k * R * 0.42;
+          var drip = R * (0.75 + 0.25 * Math.sin(t * 2 + k));
+          pth(c, [x, R * 0.5, x, drip]); ln(c, HL * 1.6, '#ff5d8f'); c.stroke();
+          dot(c, x, drip, R * 0.11, '#ff5d8f', 0.9);
+        }
+        dot(c, -R * 0.26, -R * 0.34, R * 0.13, W, 0.7);
+        dot(c, R * 0.3, -R * 0.3, R * 0.1, W, 0.55);
+      } },
+
+    { name: 'KITE', fam: 'volatile', r: 20, hp: 130, speed: 36, accel: 140, armor: 0, drops: 4,
+      gait: 'standoff', count: 'two or three',
+      what: 'Holds <span class="num">420</span> units and never comes closer. Every <span class="num">3.2</span>s it lobs one slow arcing bolt at the machine — the first body in the game that attacks from outside contact range, and the first reason to push up-field instead of waiting.',
+      counter: 'The bolt is slow and visible and can be shot out of the air. Or close the distance: it has no answer to something already inside its range.',
+      view: 36, viewAct: 64,
+      draw: function (c, R, t, act) {
+        c.save();
+        c.rotate(act ? 0.2 : Math.sin(t * 0.8) * 0.12);
+        pth(c, [0, -R * 1.15, R * 0.78, 0, 0, R * 1.15, -R * 0.78, 0], true);
+        shell(c, '#ff5d8f', 0.12);
+        pth(c, [0, -R * 1.15, 0, R * 1.15]); ln(c, HL, '#ff5d8f'); c.stroke();
+        pth(c, [-R * 0.78, 0, R * 0.78, 0]); ln(c, HL, '#ff5d8f'); c.stroke();
+        dot(c, 0, 0, R * 0.2, W, act ? 1 : 0.7);
+        for (var i = 1; i <= 3; i++) {
+          var y = R * (1.15 + i * 0.36);
+          var x = Math.sin(t * 3 - i * 0.8) * R * 0.3;
+          pth(c, [x * 0.5, y - R * 0.36, x, y]); ln(c, HL, '#ff5d8f'); c.globalAlpha = 1 - i * 0.24; c.stroke();
+        }
+        c.restore();
+        if (act) {
+          c.save();
+          ln(c, 1.6, '#ff5d8f'); c.globalAlpha = 0.5; c.setLineDash([4, 5]);
+          c.beginPath();
+          c.moveTo(R * 0.4, -R * 0.4);
+          c.quadraticCurveTo(R * 1.9, R * 0.5, R * 1.5, R * 2.1);
+          c.stroke();
+          c.restore();
+          halo(c, R * 1.5, R * 2.1, R * 0.7, '#ff5d8f', 0.7);
+          dot(c, R * 1.5, R * 2.1, R * 0.22, W, 1);
+        }
+      } },
+
+    { name: 'EMBER', fam: 'inert', r: 7, hp: 12, speed: 40, accel: 90, armor: 0, drops: 1, harmless: true,
+      gait: 'rise', count: 'four or five',
+      what: 'Sparks that come up off the floor instead of down out of the portal, climbing toward the rim. Each carries a little salvage. Reach the rim and they are gone with it — an inverted DRIFT, and the only thing on the field that starts where you are.',
+      counter: 'Free salvage if you are quick and nothing at all if you are not. Worth a round about as often as it is not.',
+      view: 18, viewAct: 44,
+      draw: function (c, R, t, act) {
+        function spark(x, y, s, a) {
+          c.save(); c.translate(x, y); c.scale(s, s); c.globalAlpha = a;
+          halo(c, 0, 0, R * 2.4, '#8fa9c4', 0.35);
+          ln(c, HL * 1.5, '#8fa9c4'); c.lineCap = 'round';
+          for (var i = 0; i < 4; i++) {
+            var ang = i * TAU / 4 + 0.3;
+            pth(c, [Math.cos(ang) * R * 0.2, Math.sin(ang) * R * 0.2,
+              Math.cos(ang) * R * 1.3, Math.sin(ang) * R * 1.3]);
+            c.stroke();
+          }
+          dot(c, 0, 0, R * 0.42, W, 0.9);
+          c.restore();
+        }
+        if (act) {
+          c.save(); ln(c, 1, '#8fa9c4'); c.globalAlpha = 0.3;
+          [[-16, 8], [4, -4], [18, 14]].forEach(function (p) {
+            pth(c, [p[0], p[1] + 12, p[0] - 3, p[1] + 34]); c.stroke();
+          });
+          c.restore();
+          spark(-16, 8, 0.85, 0.9); spark(4, -6, 1, 1); spark(18, 14, 0.7, 0.75);
+        } else spark(0, 0, 1, 1);
+      } },
+
+    { name: 'HUSK', fam: 'inert', r: 38, hp: 90, speed: 44, accel: 30, armor: 0, drops: 12, harmless: true,
+      gait: 'tumble', count: 'one',
+      what: 'A wreck of something the simulation ran before. It is thrown rather than steered: an arc across the field, end over end, off the far side and gone. Worth twelve motes to whoever takes it apart in the eleven seconds it is on screen.',
+      counter: 'It is harmless and it is leaving. The only cost of ignoring it is the salvage, which is the largest single payout on the field.',
+      view: 50,
+      draw: function (c, R, t, act) {
+        c.save();
+        c.rotate(act ? 0.7 : 0.18 + Math.sin(t * 0.6) * 0.06);
+        c.beginPath();
+        c.arc(0, 0, R * 0.92, -0.5, Math.PI * 1.2);
+        c.lineTo(Math.cos(Math.PI * 1.2) * R * 0.4, Math.sin(Math.PI * 1.2) * R * 0.4);
+        c.arc(0, 0, R * 0.44, Math.PI * 1.2, -0.5, true);
+        c.closePath();
+        shell(c, '#8fa9c4', 0.1);
+        for (var i = 0; i < 5; i++) {
+          var a = -0.4 + i * 0.62;
+          pth(c, [Math.cos(a) * R * 0.46, Math.sin(a) * R * 0.46, Math.cos(a) * R * 0.9, Math.sin(a) * R * 0.9]);
+          ln(c, HL * 1.2, '#8fa9c4'); c.globalAlpha = 0.8; c.stroke();
+        }
+        c.globalAlpha = 1;
+        pth(c, [-R * 0.2, -R * 0.8, R * 0.2, -R * 0.45, -R * 0.1, -R * 0.2]);
+        ln(c, HL, '#8fa9c4'); c.stroke();
+        c.restore();
+        if (act) {
+          [[R * 0.9, R * 0.5], [R * 1.15, -R * 0.1], [R * 0.6, R * 0.95]].forEach(function (p, i) {
+            halo(c, p[0], p[1], 9, '#7ef9ff', 0.4);
+            dot(c, p[0], p[1], 3.4, '#7ef9ff', 0.95);
+          });
+        }
+      } },
+
+    { name: 'BELL', fam: 'inert', r: 15, hp: 60, speed: 30, accel: 100, armor: 0, drops: 2, harmless: true,
+      gait: 'hover', count: 'one or two',
+      what: 'Hangs in the middle band and bobs. Shoot it and it <em>rings</em>: two seconds in which every body on the field carries a bearing tick, through a VEIL, through a MIRE\'s dimming, through the corruption shader. A free instrument, for one round and one harmless kill.',
+      counter: 'Nothing to counter. The decision is whether the round is worth more in the bell than in the thing behind it.',
+      view: 34, viewAct: 52,
+      draw: function (c, R, t, act) {
+        if (act) {
+          for (var i = 0; i < 3; i++) {
+            var u = ((t * 0.8 + i / 3) % 1);
+            c.save(); ln(c, 2.4 * (1 - u), '#8fa9c4'); c.globalAlpha = 0.75 * (1 - u);
+            arc(c, 0, 0, R * (1.2 + u * 2.2)); c.stroke(); c.restore();
+          }
+          c.save(); ln(c, 2, '#7ef9ff'); c.lineCap = 'round'; c.globalAlpha = 0.8;
+          for (var k = 0; k < 8; k++) {
+            var a = k * TAU / 8 + 0.2;
+            pth(c, [Math.cos(a) * R * 3.1, Math.sin(a) * R * 3.1,
+              Math.cos(a) * R * 3.6, Math.sin(a) * R * 3.6]);
+            c.stroke();
+          }
+          c.restore();
+        }
+        var bob = Math.sin(t * 2.2) * R * 0.06;
+        c.save(); c.translate(0, bob);
+        pth(c, [0, -R * 1.5, 0, -R * 0.95]); ln(c, HL * 1.2, '#8fa9c4'); c.stroke();
+        c.beginPath();
+        c.moveTo(-R * 0.95, R * 0.7);
+        c.bezierCurveTo(-R * 0.95, -R * 0.9, R * 0.95, -R * 0.9, R * 0.95, R * 0.7);
+        c.closePath();
+        shell(c, '#8fa9c4', 0.13);
+        pth(c, [-R * 1.05, R * 0.7, R * 1.05, R * 0.7]); ln(c, HL * 2, '#8fa9c4'); c.stroke();
+        dot(c, 0, R * 0.42 + Math.sin(t * 4) * R * 0.14, R * 0.19, W, act ? 1 : 0.75);
+        c.restore();
+      } },
+
+    { name: 'FILAMENT', fam: 'inert', r: 9, hp: 22, speed: 58, accel: 180, armor: 0, drops: 1, harmless: true,
+      gait: 'chain', count: 'seven beads',
+      what: 'Seven beads nose to tail, each steering at the one ahead, snaking across the field. Shoot a bead in the middle and you get two shorter snakes, each with its own new leader, both still going. Shoot the leader and the second bead takes over.',
+      counter: 'It wants nothing and blocks nothing. It is there to be cut, and the shape of what is left is different every time.',
+      view: 40, viewAct: 52,
+      draw: function (c, R, t, act) {
+        var n = 7;
+        var pts = [];
+        for (var i = 0; i < n; i++) {
+          var u = (i - (n - 1) / 2) * 0.5;
+          pts.push([u * 11, Math.sin(u * 1.2 + t * 0.8) * 13]);
+        }
+        var cut = 3;
+        for (var k = 0; k < n - 1; k++) {
+          if (act && k === cut - 1) continue;
+          if (act && k === cut) continue;
+          pth(c, [pts[k][0], pts[k][1], pts[k + 1][0], pts[k + 1][1]]);
+          ln(c, HL * 1.6, '#8fa9c4'); c.globalAlpha = 0.85; c.stroke();
+        }
+        c.globalAlpha = 1;
+        for (var j = 0; j < n; j++) {
+          if (act && j === cut) {
+            halo(c, pts[j][0], pts[j][1], R * 2.2, W, 0.5);
+            c.save(); ln(c, 2, W); c.lineCap = 'round'; c.globalAlpha = 0.9;
+            for (var q = 0; q < 4; q++) {
+              var a = q * TAU / 4 + 0.5;
+              pth(c, [pts[j][0] + Math.cos(a) * R * 0.6, pts[j][1] + Math.sin(a) * R * 0.6,
+                pts[j][0] + Math.cos(a) * R * 1.7, pts[j][1] + Math.sin(a) * R * 1.7]);
+              c.stroke();
+            }
+            c.restore();
+            continue;
+          }
+          var lead = (j === 0) || (act && j === cut + 1);
+          arc(c, pts[j][0], pts[j][1], R * (lead ? 0.9 : 0.68));
+          shell(c, '#8fa9c4', lead ? 0.24 : 0.12);
+          if (lead) dot(c, pts[j][0], pts[j][1], R * 0.26, W, 0.9);
+        }
+      } },
+
+    { name: 'LANTERN', fam: 'inert', r: 20, hp: 150, speed: 26, accel: 80, armor: 0, drops: 16, harmless: true,
+      gait: 'rise', count: 'one',
+      what: 'Rises slowly toward the rim with sixteen motes\' worth of salvage caged inside it, and if it reaches the portal it takes the lot back through. Harmless in every sense that matters and the only object in the game that <em>costs</em> you something for being ignored.',
+      counter: 'A timer you are allowed to answer or not: about nine seconds of climb, <span class="num">150</span> health, no armour. It is the one harmless body worth a full magazine.',
+      view: 40, viewAct: 56,
+      draw: function (c, R, t, act) {
+        if (act) {
+          c.save(); ln(c, 1.6, '#59e0ff'); c.globalAlpha = 0.5;
+          pth(c, [-R * 1.8, -R * 2.1, R * 1.8, -R * 2.1]); c.stroke(); c.restore();
+          for (var i = 0; i < 4; i++) {
+            var u = ((t * 0.5 + i / 4) % 1);
+            var y = -R * 0.6 - u * R * 1.6;
+            dot(c, (i - 1.5) * R * 0.4, y, R * 0.12, '#ffd166', 0.85 * (1 - u * 0.6));
+          }
+        }
+        var bob = Math.sin(t * 1.6) * R * 0.05;
+        c.save(); c.translate(0, bob);
+        halo(c, 0, 0, R * 1.5, '#ffd166', act ? 0.5 : 0.34);
+        arc(c, 0, 0, R * 0.4); fl(c, '#ffd166', 0.9); c.fill();
+        for (var k = 0; k < 3; k++) {
+          var a = k * Math.PI / 3 + 0.2;
+          c.beginPath();
+          c.ellipse(0, 0, R * 0.86, R * 0.86, a, 0, TAU);
+          ln(c, HL * 1.3, '#8fa9c4'); c.globalAlpha = 0.8; c.stroke();
+        }
+        c.globalAlpha = 1;
+        arc(c, 0, 0, R * 0.9); ln(c, HL * 2, '#8fa9c4'); c.stroke();
+        pth(c, [0, -R * 0.9, 0, -R * 1.35]); ln(c, HL * 1.4, '#8fa9c4'); c.stroke();
+        arc(c, 0, -R * 1.45, R * 0.14); ln(c, HL * 1.2, '#8fa9c4'); c.stroke();
+        c.restore();
+      } }
+  ];
+
+  /* ---- 4. the existing roster ---------------------------------------- */
+  var FAMS = [
+    { id: 'swarm', name: 'Swarm', hex: '#7ef9ff', has: 'MOTE', means: 'many, cheap, and only a problem in numbers' },
+    { id: 'edge', name: 'Edge', hex: '#ffd166', has: 'NEEDLE · GLUT · WARDEN · PLATE', means: 'fast or sharp; armour is part of the argument' },
+    { id: 'heavy', name: 'Heavy', hex: '#5d9cff', has: 'BULWARK', means: 'slow, massive, hard to move' },
+    { id: 'kinetic', name: 'Kinetic', hex: '#c9e84a', has: 'TOW · MASS', means: 'it throws, drags or swings something' },
+    { id: 'strange', name: 'Strange', hex: '#b98cff', has: 'LURCHER · SCION · SEED · PRISM', means: 'it changes, links or comes back' },
+    { id: 'multiply', name: 'Multiply', hex: '#7cffb2', has: 'SPLITTER · HERALD', means: 'one becomes more, or makes others worse' },
+    { id: 'volatile', name: 'Volatile', hex: '#ff5d8f', has: 'BLOOM', means: 'it goes off, or leaves something behind' },
+    { id: 'inert', name: 'Inert', hex: '#8fa9c4', has: 'DRIFT', means: 'harmless; salvage and texture' }
+  ];
+
+  var OLD = [
+    ['MOTE', 12, 31, 56, 'swarm', 'march + wobble 2.1', 'flock', 'Arrives as a cloud that shares a heading instead of eight bodies on eight routes.'],
+    ['NEEDLE', 10, 26, 104, 'edge', 'march + wobble 0.8', 'straight', 'Commits to one line at the rim. It is the fast one; it should not also wander.'],
+    ['PLATE', 11, 44, 62, 'edge', 'march', 'tumble', 'Shed wreckage, so it is thrown rather than steered — and keeps coming.'],
+    ['SEED', 8, 18, 150, 'strange', 'ride (already)', 'ride', 'Unchanged. The gait it has is the gait it needs.'],
+    ['DRIFT', 17, 39, 34, 'inert', 'hover (build 298)', 'hover', 'Unchanged. Build 298 already made this a band and a bob.'],
+    ['PRISM', 20, 88, 50, 'strange', 'march + wobble 2.2', 'cartwheel', 'Its reflection depends on the angle a round meets its face. Turning the body makes the mechanic visible.'],
+    ['LURCHER', 24, 185, 38, 'strange', 'lurch (already)', 'lurch', 'Unchanged, and the only type that already owned its motion.'],
+    ['SPLITTER', 29, 159, 46, 'multiply', 'march', 'march · wide', 'One route, not six: it comes in from the flank, and its four MOTEs inherit a flock.'],
+    ['BLOOM', 33, 247, 33, 'volatile', 'march + wobble 1.4', 'creep', 'It detonates on death. It should read as inevitable, not as wandering.'],
+    ['WARDEN', 22, 153, 41, 'edge', 'march', 'march · hook', 'Comes round the side shedding plates, which is what a hook is for.'],
+    ['HERALD', 19, 99, 44, 'multiply', 'march', 'standoff', 'It wards the bodies in front of it. It should be behind them, not leading the wave.'],
+    ['GLUT', 16, 117, 30, 'edge', 'march', 'forage', 'It eats wreckage to grow. Steer it at the nearest debris and it only comes for you once the floor is clean.'],
+    ['SCION', 34, 390, 26, 'strange', 'march', 'march · loiter', 'Solo and deliberate: it hangs back at mid range before committing, which its three seeds already imply.'],
+    ['BULWARK', 45, 676, 23, 'heavy', 'march + wobble 0.9', 'creep · planted', 'A 2.7-density body should not have a lateral or a wobble. It arrives.'],
+    ['TOW', 18, 135, 52, 'kinetic', 'drag + winds at range', 'standoff · drag', 'Formalises what it does: hold hurl range, wind, throw. The gait it has by hand becomes the gait it declares.'],
+    ['MASS', 27, 280, 26, 'kinetic', 'towed, then hurled', 'drag → tumble', 'Once thrown it is ballistic, which is what tumble is. Two gaits in one life, and the only body with a handover.']
+  ];
+
+  var STEPS = [
+    ['Phase 1', 'A gait field and a table, with MARCH doing everything',
+      'One new field on the type and one <code>GAITS</code> table keyed by id, each entry a function with the signature <code>drive</code> already has. Every type declares <code>gait: \'march\'</code>, and <code>march</code> is the present code moved verbatim. Nothing changes: the suite is green and the ORDINAL hash comes back identical, and that is the whole test of the phase.'],
+    ['Phase 2', 'The five gaits that are already in the code, named',
+      'LURCH, DRAG, RIDE, HOVER and WANDER exist as special cases inside <code>drive</code>, <code>wander</code> and the TOW code. Lifting them into the table is a refactor that should not move a number, so it gets the same treatment as phase 1: the hash is the assertion, and per the working notes a refactor that only reorders arithmetic is still a change.'],
+    ['Phase 3', 'A route allow-list per type',
+      'A type names which march routes it may draw from, instead of every body rolling all six. This is the smallest change with a visible effect — a BULWARK stops serpentining, a NEEDLE stops bowing — and it is the one that will move the hash for a real reason.'],
+    ['Phase 4', 'The eleven re-gaitings',
+      'The table above, in order of risk: STRAIGHT, TUMBLE and CREEP first (they remove behaviour and cannot surprise), then FLOCK, FORAGE and STANDOFF, which each add a steering target that was not there. GLUT\'s forage and HERALD\'s standoff change what those two bodies are for, so each wants a measured before and after of how long a wave takes to clear.'],
+    ['Phase 5', 'The twenty, in family order',
+      'The five inert ones first: they are harmless, so a mistake in them costs a picture rather than a run, and three of the five (EMBER, HUSK, FILAMENT) need no new rule at all. Then the ones whose gait is the whole design — SHOAL, SPINDLE, YOKE, QUARRY — and last the six that teach a rule: ANVIL, VEIL, LOOM, MIRE, KITE, CHAFF.'],
+    ['Cases', 'What each gait owes the suite',
+      'One case per gait asserting the thing its name claims, with a control that reads the opposite on a body that does not have it: a DIVE body crosses the machine\'s line and comes back, an ORBIT body\'s distance holds while its bearing turns, a CREEP body\'s lateral is exactly zero and its speed is constant to the digit, a FLOCK\'s spread stays inside a bound while its centre advances, a PAIRED pair\'s separation holds. Measure the population, never one draw — and for anything with a mean, assert the mean.']
+  ];
+
+  /* ---- 5. render ------------------------------------------------------ */
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var LIVE = [];
+
+  function mk(parent, w, h, anim, draw) {
+    var cv = document.createElement('canvas');
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    cv.style.width = '100%'; cv.style.aspectRatio = w + ' / ' + h;
+    parent.appendChild(cv);
+    var ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+    var rec = { cv: cv, ctx: ctx, w: w, h: h, draw: draw, anim: anim && !reduce, vis: false };
+    rec.paint = function (t) { ctx.save(); draw(ctx, w, h, t); ctx.restore(); };
+    rec.paint(reduce ? 0.55 : 0);
+    if (rec.anim) LIVE.push(rec);
+    return rec;
+  }
+
+  function bodyFrame(spec, act) {
+    var view = (act && spec.viewAct) || spec.view || spec.r * 1.7;
+    return function (c, w, h, t) {
+      c.clearRect(0, 0, w, h);
+      var k = Math.min(w, h) / (view * 2);
+      c.save();
+      c.translate(w / 2, h / 2); c.scale(k, k);
+      c.lineJoin = 'round';
+      spec.draw(c, spec.r, t, act);
+      c.restore();
+    };
+  }
+
+  function scaleFrame(spec) {
+    var ext = Math.max(spec.view || spec.r * 1.6, 34) * 1.1;
+    return function (c, w, h, t) {
+      c.clearRect(0, 0, w, h);
+      var k = Math.min(w, h) / (ext * 2);
+      c.save();
+      c.translate(w / 2, h / 2); c.scale(k, k);
+      c.lineJoin = 'round';
+      // The machine is a DASHED hexagon and a MOTE a filled dot: two hairline
+      // circles in one small frame are two of the same thing.
+      c.setLineDash([6 / k, 5 / k]);
+      c.globalAlpha = 0.55; c.lineWidth = 1.6 / k;
+      poly(c, 6, 26, Math.PI / 6);
+      c.strokeStyle = '#59e0ff'; c.shadowBlur = 0; c.stroke();
+      c.setLineDash([]);
+      c.globalAlpha = 0.5; arc(c, 0, 0, 12); c.fillStyle = '#8497ab'; c.fill();
+      c.globalAlpha = 1;
+      MONO = FAM_HEX[spec.fam];
+      spec.draw(c, spec.r, 0, false);
+      MONO = null;
+      c.restore();
+    };
+  }
+
+  var FAM_HEX = {};
+  FAMS.forEach(function (f) { FAM_HEX[f.id] = f.hex; });
+
+  // -- hero
+  var HERO_GAITS = ['dive', 'orbit', 'standoff', 'flock', 'tumble', 'paired', 'rise', 'creep'];
+  var HERO_COL = ['#ffd166', '#c9e84a', '#ff5d8f', '#7ef9ff', '#c9e84a', '#b98cff', '#8fa9c4', '#5d9cff'];
+  var FREE = { tumble: 1, rise: 1 };   // the two that are not coming for you
+  var heroEl = document.getElementById('hero');
+  heroEl.removeAttribute('width'); heroEl.removeAttribute('height');
+  (function () {
+    var holder = heroEl.parentNode;
+    holder.removeChild(heroEl);
+    mk(holder, 1040, 400, true, function (c, w, h, t) {
+      var F = drawField(c, w, h, { pad: 18 });
+      HERO_GAITS.forEach(function (gid, i) {
+        var g = GAIT_BY_ID[gid];
+        var col = HERO_COL[i];
+        var path = g.paths ? g.paths[1] : g.path;
+        var n = g.n || 1;
+        var lane = (i + 0.5) / HERO_GAITS.length;
+        var shift = (lane - 0.5) * 0.78;
+        function at(u, k) {
+          var p = path(u, k);
+          // A body coming for the machine arrives AT the machine: the lane it
+          // was born in decays out of its x as it closes. The two that are
+          // going somewhere else keep their lane the whole way down.
+          var conv = FREE[gid] ? 1 : Math.pow(1 - Math.min(1, p.y / 0.9), 0.75);
+          return { x: Math.max(0.03, Math.min(0.97, 0.5 + (p.x - 0.5) * 0.5 + shift * conv)), y: p.y, rot: p.rot };
+        }
+        c.save(); ln(c, 1, col); c.globalAlpha = 0.1;
+        c.beginPath();
+        for (var s = 0; s <= 70; s++) { var q = F.map(at(s / 70, 0)); (s ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y)); }
+        c.stroke(); c.restore();
+        var u0 = (t * 0.09 + i * 0.13) % 1;
+        c.save();
+        ln(c, 2.4, col); c.globalAlpha = 0.7; c.lineCap = 'round';
+        c.beginPath();
+        for (var s2 = 0; s2 <= 12; s2++) {
+          var uu = Math.max(0, u0 - 0.14 + (0.14 * s2) / 12);
+          var q2 = F.map(at(uu, 0));
+          (s2 ? c.lineTo(q2.x, q2.y) : c.moveTo(q2.x, q2.y));
+        }
+        c.stroke(); c.restore();
+        for (var k2 = 0; k2 < n; k2++) {
+          var p2 = at(u0, k2), m = F.map(p2);
+          halo(c, m.x, m.y, 13, col, 0.3);
+          if (g.bar) {
+            c.save(); c.translate(m.x, m.y); c.rotate(p2.rot || 0);
+            ln(c, 2.6, col); c.lineCap = 'round';
+            c.beginPath(); c.moveTo(-8, 0); c.lineTo(8, 0); c.stroke(); c.restore();
+          } else dot(c, m.x, m.y, n > 2 ? 2.6 : 3.6, col, 0.95);
+        }
+      });
+    });
+  })();
+  var hl = document.getElementById('heroLegend');
+  HERO_GAITS.forEach(function (gid, i) {
+    var s = document.createElement('span');
+    s.innerHTML = '<i style="background:' + HERO_COL[i] + '"></i>' + GAIT_BY_ID[gid].name;
+    hl.appendChild(s);
+  });
+
+  // -- family table
+  (function () {
+    var t = document.getElementById('famTable');
+    t.innerHTML = '<thead><tr><th>Family</th><th>Anchor</th><th>On the field now</th><th>What the hue promises</th></tr></thead>';
+    var tb = document.createElement('tbody');
+    FAMS.forEach(function (f) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td class="name" style="color:' + f.hex + '">' + f.name.toUpperCase() + '</td>'
+        + '<td>' + f.hex + '</td><td>' + f.has + '</td><td class="wide">' + f.means + '</td>';
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+  })();
+
+  // -- gait catalogue
+  (function () {
+    var grid = document.getElementById('gaitGrid');
+    GAITS.forEach(function (g) {
+      var d = document.createElement('div');
+      d.className = 'gait';
+      grid.appendChild(d);
+      var holder = document.createElement('div');
+      d.appendChild(holder);
+      mk(holder, 156, 112, true, function (c, w, h, t) {
+        traceGait(c, w, h, g, '#59e0ff', (t * 0.13) % 1);
+      });
+      var b = document.createElement('b'); b.textContent = g.name; d.appendChild(b);
+      var p = document.createElement('p'); p.innerHTML = g.note; d.appendChild(p);
+      var who = document.createElement('div'); who.className = 'who'; who.textContent = g.who; d.appendChild(who);
+    });
+  })();
+
+  // -- existing roster
+  (function () {
+    var t = document.getElementById('oldTable');
+    t.innerHTML = '<thead><tr><th>Type</th><th>r</th><th>hp</th><th>u/s</th><th>Family</th>'
+      + '<th>Moves like this now</th><th>Gait</th><th>What changes</th></tr></thead>';
+    var tb = document.createElement('tbody');
+    OLD.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var same = r[6] === r[5] || r[7].indexOf('Unchanged') === 0;
+      tr.innerHTML = '<td class="name" style="color:' + FAM_HEX[r[4]] + '">' + r[0] + '</td>'
+        + '<td>' + r[1] + '</td><td>' + r[2] + '</td><td>' + r[3] + '</td>'
+        + '<td style="color:' + FAM_HEX[r[4]] + ';opacity:.75">' + r[4] + '</td>'
+        + '<td class="was">' + r[5] + '</td>'
+        + '<td style="color:' + (same ? 'var(--faint)' : 'var(--accent)') + '">' + r[6] + '</td>'
+        + '<td class="wide">' + r[7] + '</td>';
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+  })();
+
+  // -- the plates
+  (function () {
+    var host = document.getElementById('plates');
+    NEW.forEach(function (s, i) {
+      var hex = FAM_HEX[s.fam];
+      var plate = document.createElement('div');
+      plate.className = 'plate';
+      host.appendChild(plate);
+
+      var left = document.createElement('div');
+      left.className = 'left';
+      plate.appendChild(left);
+
+      var head = document.createElement('div');
+      head.className = 'phead';
+      head.innerHTML = '<span class="pno">Plate ' + (i < 9 ? '0' : '') + (i + 1) + '</span>'
+        + '<span class="pname" style="color:' + hex + '">' + s.name + '</span>'
+        + '<span class="fam" style="color:' + hex + '">' + s.fam + (s.harmless ? ' · harmless' : '') + '</span>';
+      left.appendChild(head);
+
+      var frames = document.createElement('div');
+      frames.className = 'frames';
+      left.appendChild(frames);
+      var g = GAIT_BY_ID[s.gait];
+      [['Form', bodyFrame(s, false), false],
+        ['Acting', bodyFrame(s, true), true],
+        ['Scale · vs machine, mote', scaleFrame(s), false],
+        ['Gait · ' + g.name, function (c, w, h, t) { traceGait(c, w, h, g, hex, (t * 0.12) % 1); }, true]
+      ].forEach(function (f) {
+        var cell = document.createElement('div');
+        cell.className = 'frame';
+        frames.appendChild(cell);
+        var holder = document.createElement('div');
+        cell.appendChild(holder);
+        mk(holder, 168, 150, f[2], f[1]);
+        var lab = document.createElement('span');
+        lab.textContent = f[0];
+        cell.appendChild(lab);
+      });
+
+      var blurb = document.createElement('div');
+      blurb.className = 'blurb';
+      blurb.innerHTML = '<p>' + s.what + '</p><p class="counter"><b>Answer</b>' + s.counter + '</p>';
+      left.appendChild(blurb);
+
+      var dl = document.createElement('dl');
+      var rows = [['radius', s.r + ' u'], ['health', s.hp], ['speed', s.speed + ' u/s'],
+        ['accel', s.accel], ['armour', s.armor ? s.armor.toFixed(2) : '—'],
+        ['salvage', s.drops + ' motes'], ['gait', g.name.toLowerCase()],
+        ['modifiers', s.mods || '—'], ['sent', s.count]];
+      rows.forEach(function (r) {
+        dl.innerHTML += '<dt>' + r[0] + '</dt><dd' + (r[0] === 'gait' ? ' class="g"' : '') + '>' + r[1] + '</dd>';
+      });
+      plate.appendChild(dl);
+    });
+  })();
+
+  // -- build-out
+  (function () {
+    var host = document.getElementById('steps');
+    STEPS.forEach(function (s) {
+      var d = document.createElement('div');
+      d.className = 'step';
+      d.innerHTML = '<div class="n">' + s[0] + '</div><div class="b"><h4>' + s[1] + '</h4><p>' + s[2] + '</p></div>';
+      host.appendChild(d);
+    });
+  })();
+
+  /* ---- 6. one loop, only for what is on screen ----------------------- */
+  if (LIVE.length && !reduce) {
+    if (window.IntersectionObserver) {
+      var io = new IntersectionObserver(function (es) {
+        es.forEach(function (e) {
+          for (var i = 0; i < LIVE.length; i++) if (LIVE[i].cv === e.target) LIVE[i].vis = e.isIntersecting;
+        });
+      }, { rootMargin: '120px' });
+      LIVE.forEach(function (r) { io.observe(r.cv); });
+    } else LIVE.forEach(function (r) { r.vis = true; });
+    var last = 0;
+    (function frame(now) {
+      requestAnimationFrame(frame);
+      if (now - last < 32) return;
+      last = now;
+      var t = now / 1000;
+      for (var i = 0; i < LIVE.length; i++) if (LIVE[i].vis) LIVE[i].paint(t);
+    })(0);
+  }
+})();
+</script>
