@@ -659,7 +659,11 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     // rather than derived from the tree, because the whole point of this
     // figure is that it is a hand-checked history: a total taken from the
     // tree would agree with the tree whatever the tree did.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === (MINE_LINE ? 139 : 104)
+    // 142 / 107 from build 302: HOLLOWPOINT 5 -> 8 levels is +3, and CORE's
+    // four are NOT counted because `debugBuyAll` skips a gated node -- which
+    // is this readout confirming the new node really is dormant until NEW
+    // FORM, from the one place in the interface that counts the whole tree.
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === (MINE_LINE ? 142 : 107)
     && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
@@ -8015,7 +8019,22 @@ if (!GUN_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       g.debugGiveBytes(500000000);
-      for (const id of ['hollowpoint', 'hollowpoint', 'rate', 'open_ward', 'flinch', 'deadbolt']) g.buy(id);
+        /*
+       * ---- and the DAMAGE LINE is not bought, from build 302 ----------
+       *
+       * It was `hollowpoint x2` plus this list, calibrated when the line was
+       * x1.32 over five levels. Build 302 took HOLLOWPOINT to eight levels of
+       * 1.26 and added CORE, and the scenario stopped reproducing the REPORT:
+       * measured at rungs 10/13/16/19/22 the gate held between 0.1 and 16
+       * seconds of a hundred, because the run was clearing what arrived.
+       * A rescue mechanism cannot be shown by a run that does not need it.
+       *
+       * So the build is the automation the claim is ABOUT -- FLINCH and
+       * DEADBOLT, the two that break contact and therefore starve the fuse --
+       * and nothing that makes the gun hit harder. What is under test is the
+       * gate, not the tree.
+       */
+      for (const id of ['rate', 'open_ward', 'flinch', 'deadbolt']) g.buy(id);
       w.autoAim = true;
       w.autoFire = true;
       const d = w.director;
@@ -8036,7 +8055,7 @@ if (!GUN_LINE) {
         if (d.glitch > gPeak) gPeak = d.glitch;
         if (last > 0.9 && d.glitch === 0) fired++;
         last = d.glitch;
-        if (f % 60 === 0) {
+        if (f % 30 === 0) {
           peak.push(w.enemies.filter((e) => !e.dead && !e.harmless && !e.fizzle).length);
         }
       }
@@ -8055,13 +8074,26 @@ if (!GUN_LINE) {
        * gate keeps the field THINNER, not its worst second lower.
        */
       const mean = +(peak.reduce((a, b) => a + b, 0) / peak.length).toFixed(1);
-      return { max: Math.max(...peak), mean, held: +(heldFrames / 60).toFixed(1),
+      /*
+       * ...and a SECOND channel, because the mean alone is truncated by the
+       * thing it is measuring. `emit` refuses to release at `maxEnemies`, so
+       * once both arms spend time at the cap their means converge and the
+       * SIGN of the difference becomes a coin toss -- measured at rung 20
+       * over three full runs, 1.164, 0.792 and 0.726, one of them with the
+       * gated field FULLER. The share of samples at or near the cap is not
+       * truncated the same way: it is bounded 0 to 1 by construction and it
+       * says the thing the claim is actually about, which is that the gate
+       * stops the field PINNING there.
+       */
+      const pinned = +(peak.filter((x) => x >= CFG.maxEnemies * 0.9).length
+        / Math.max(1, peak.length)).toFixed(3);
+      return { max: Math.max(...peak), mean, pinned, held: +(heldFrames / 60).toFixed(1),
         fired, gPeak: +gPeak.toFixed(2), tier: d.tier,
         auto: !!w.up.flinch && !!w.up.deadbolt };
     };
-    // The field, with the fuse held out of it, at the rung where the gate is
-    // the thing thinning it rather than the cap.
-    out.fieldRung = 24;
+    // The field, with the fuse held out of it, at the rung where this build
+    // is genuinely behind -- see the note on `play` for the sweeps.
+    out.fieldRung = 32;
     out.drowning = play(true, true, 240, out.fieldRung);
     out.loose = play(false, true, 240, out.fieldRung);
     // ...and the fuse, with it let run. Shorter, because what is being read
@@ -8103,27 +8135,40 @@ if (!GUN_LINE) {
   });
 
   /*
-   * The ceiling is a MULTIPLE of the worst separation measured, not the day's
-   * value. Build 300 measured it at rung 28 with the fuse pinned out of both
-   * arms -- gated [19.5, 23.2, 19.3] against loose [29.3, 34.5, 28.5], worst
-   * 0.814 -- and build 301 re-measured at rung 24, three full runs: gated
-   * [23.6, 20.8, 18.5] against loose [30.3, 27.4, 42.6], worst separation
-   * 23.6/27.4 = 0.861. So 0.93 has headroom and still fails at 1.0, which is
-   * what equal means would be if the gate stopped holding anything.
+   * TWO CHANNELS, and the ceiling of each is a multiple of the worst
+   * separation measured rather than the day's value.
+   *
+   * The mean alone has been re-sited on four consecutive builds and the
+   * reason is structural: `emit` refuses to release at `maxEnemies`, so once
+   * both arms spend time at the cap the means converge and the sign of the
+   * difference is a coin toss. Measured at rung 20 over three full runs it
+   * read 1.164, 0.792, 0.726 -- one of them with the gated field FULLER --
+   * and the share-of-samples-at-the-cap statistic read 2.16, 1.394, 0.43 on
+   * the same runs, so neither channel separated where the run was not
+   * actually behind.
+   *
+   * At rung 32 with the damage line unbought, BOTH separate on every run:
+   * mean 0.741 / 0.742 / 0.888 and pinned share 0.685 / 0.328 / 0.634, with
+   * the gate holding 53 to 101 seconds of 240. So the mean gets 0.95 (worst
+   * 0.888) and the pinned share 0.85 (worst 0.685), and both have to hold --
+   * two channels agreeing is what a single tight margin cannot give.
    *
    * The `held` floor is 3s rather than 10 because the hold itself is the
-   * noisy half: with the fuse pinned it measured 9.3s to 120.3s across six
-   * runs. It is a liveness guard and not the claim -- the claim is the ratio
-   * beside it.
+   * noisy half: with the fuse pinned it measured 9.3s to 120.3s across nine
+   * runs. It is a liveness guard and not the claim.
    */
   check('a run that cannot clear the field is not sent another wave',
     r.drowning.auto && r.drowning.held > 3
-    && r.drowning.mean < r.loose.mean * 0.93 && r.loose.mean >= 12,
+    && r.drowning.mean < r.loose.mean * 0.95
+    && r.drowning.pinned < r.loose.pinned * 0.85
+    && r.loose.mean >= 12 && r.loose.pinned > 0.1,
     `at rung ${r.fieldRung} with FLINCH and DEADBOLT owned (${r.drowning.auto}) the `
     + `release was held ${r.drowning.held}s of 240 and the field averaged ${r.drowning.mean} `
-    + `standing against ${r.loose.mean} on the same run with the gate off `
-    + `(peaks ${r.drowning.max} and ${r.loose.max}, which overlap run to run `
-    + `and are why this is a mean)`);
+    + `standing against ${r.loose.mean} on the same run with the gate off, and `
+    + `spent ${(r.drowning.pinned * 100).toFixed(0)}% of its samples at the cap `
+    + `against ${(r.loose.pinned * 100).toFixed(0)}% (peaks ${r.drowning.max} and `
+    + `${r.loose.max}, which overlap run to run, which is why neither channel `
+    + `is a peak)`);
 
   /*
    * ...and the fuse, on its own arms with it let run.
@@ -14482,6 +14527,57 @@ if (MINE_LINE) {
     out.byHandScale = +gunScale(w).toFixed(3);
     w.autoAim = true; w.autoFire = true;
 
+    /*
+     * ---- and CORE, which a bought turret does not have (build 302) -----
+     *
+     * Driven through `g.buy` -- the door -- and not by reading `needs`, for
+     * the reason that predicate's own docstring gives: it was undefined on
+     * the node for a whole build because `leafOf` copies an explicit field
+     * list, and NEW FORM was buyable with one REMAINDER out of seven while
+     * every test of the predicate agreed it should not be.
+     */
+    {
+      const { NODE_BY_ID, NODES } = await import('../src/tree.js');
+      const node = NODE_BY_ID.get('core');
+      g.restart();
+      w.up = freshUpgrades();
+      w.phase = 'staging';
+      g.debugGiveBytes(900000000);
+      // Everything buyable, WITHOUT the form. CORE must refuse.
+      for (let pass = 0; pass < 40; pass++) {
+        let any = false;
+        for (const n of NODES) if (n.id && n.id !== 'core' && g.buy(n.id) === 'ok') any = true;
+        if (!any) break;
+      }
+      const lineBefore = w.up.damage;
+      const beforeBuy = g.buy('core');
+      const beforeOwned = g.owned('core');
+      /*
+       * ...and then the form, written the way the run writes it: the LEDGER
+       * plus the flag, because `recast` is what survives a checkpoint and
+       * `world.newForm` is a different thing with a different name (there is
+       * no `newform` id -- a probe that pushed one had it silently dropped by
+       * the restore).
+       */
+      w.ledger.push('recast');
+      w.newForm = 'done';
+      const afterBuy = g.buy('core');
+      for (let i = 0; i < 8; i++) g.buy('core');
+      out.core = {
+        levels: node ? node.levels : -1,
+        isDormant: !!(node && node.dormant),
+        beforeBuy,
+        beforeOwned,
+        afterBuy,
+        afterOwned: g.owned('core'),
+        lineBefore,
+        lineAfter: w.up.damage,
+      };
+      g.restart();
+      w.up = freshUpgrades();
+      w.autoAim = true; w.autoFire = true;
+    }
+
     // ---- stock is an EXACT identity, which is what keeps the hash still --
     /*
      * The multiply is on the health the CONSTRUCTOR produced, not a recompute
@@ -14565,7 +14661,15 @@ if (MINE_LINE) {
   // when it was replaced by PILE -- which is deliberately not counted: it is
   // a fixed 26 in a ring round the machine and is worth nothing against a
   // boss met at range.
-  const want = 1.32 ** 5 * 1.25 / 0.9;
+  /*
+   * 1.26^8 from build 302, up from 1.32^5. CORE is deliberately NOT in this
+   * product: `debugBuyAll` skips anything gated and CORE needs NEW FORM, so a
+   * "fully bought" turret that has not transformed does not have it. That
+   * absence is asserted on its own below rather than left as a silent gap
+   * here -- a number that quietly excludes a node is a number nobody can
+   * check against the tree.
+   */
+  const want = 1.26 ** 8 * 1.25 / 0.9;
 
   check('what the tree did to the gun is one number, and it is 1 at stock',
     r.stockScale === 1 && Math.abs(r.boughtScale - want) < 0.02
@@ -14573,6 +14677,42 @@ if (MINE_LINE) {
     `stock ${r.stockScale}, fully bought ${r.boughtScale} (the product of `
     + `HOLLOWPOINT, SALVO and FEED is ${want.toFixed(3)}); nothing in it is `
     + `conditional on how the turret is aimed any more (${r.byHandScale})`);
+
+  /*
+   * ---- CORE is DORMANT until NEW FORM, and that is the whole window ------
+   *
+   * Build 302. The tree's second multiplier on the rack is four levels of
+   * 1.35 and it does not exist until RECAST is owned -- which is what makes
+   * the rungs after the fourth anomaly an overpowered window by design rather
+   * than by accident: the turret triples while the field has not moved, and
+   * the anomaly at 35 is the first thing authored to survive it.
+   *
+   * Three things have to hold together or it is a different feature, and none
+   * of them is visible at runtime:
+   *
+   *   - a fully bought turret WITHOUT the form does not have it. `available()`
+   *     has to consult `needs`, and it silently did not for a whole build --
+   *     `n.needs` was undefined on the node because `leafOf` copies an
+   *     explicit field list, and NEW FORM was buyable with one REMAINDER out
+   *     of seven. So this is asserted through `g.buy`, the door, rather than
+   *     by reading the predicate.
+   *   - it is `needs` and NOT `dormant`. `dormant` returns 'locked' whatever
+   *     the run owns, which is right for an unbuilt anomaly slot and would
+   *     make this node unbuyable for ever.
+   *   - and once the form IS owned it opens, to its full four levels, and the
+   *     damage line reaches the x21.1 the whole phase is for.
+   */
+  check('CORE is shut until the NEW FORM, and opens to its full depth after it',
+    r.core && r.core.levels === 4 && !r.core.isDormant
+    && r.core.beforeBuy === 'locked' && r.core.beforeOwned === 0
+    && r.core.afterBuy === 'ok' && r.core.afterOwned === 4
+    && Math.abs(r.core.lineAfter / r.core.lineBefore - 1.35 ** 4) < 0.01,
+    `CORE has ${r.core && r.core.levels} levels and dormant is `
+    + `${r.core && r.core.isDormant}; without the form a buy is `
+    + `"${r.core && r.core.beforeBuy}" and ${r.core && r.core.beforeOwned} are owned, `
+    + `with it "${r.core && r.core.afterBuy}" and ${r.core && r.core.afterOwned}; `
+    + `the damage line goes x${r.core && r.core.lineBefore.toFixed(2)} -> `
+    + `x${r.core && r.core.lineAfter.toFixed(2)}`);
 
   check('an anomaly opened by a stock turret is the anomaly as authored',
     r.stockHard === 1 && r.stockCoreBand < 0.11,
@@ -18342,10 +18482,19 @@ if (MINE_LINE) {
    * Build 275's FLINCH and DEADBOLT are one level each for the same reason,
    * and make it 112 across 58.
    */
-  // 112 across 58 with the mine line in play; 85 across 45 without it, the
-  // difference being the twenty-one mine nodes and their twenty-seven levels.
+  /*
+   * 116 across 59 with the mine line in play; 92 across 46 without it, the
+   * difference being the twenty-one mine nodes and their twenty-seven levels.
+   *
+   * Build 302 moved it by exactly seven levels and one node: HOLLOWPOINT 5 ->
+   * 8, and CORE at four -- the tree's second and last multiplier on the whole
+   * rack, and the only node in it dormant until NEW FORM is owned. Both are
+   * the answer to a MEASUREMENT rather than to a feel: `tiers.mjs` read the
+   * authored arrival rate as undeliverable past about rung 18 because the
+   * tree was worth x4.45 on rounds a second against an incoming x21.
+   */
   check('...and writing the numbers out changed no ladder',
-    r.total === (MINE_LINE ? 112 : 85) && r.rungs === (MINE_LINE ? 58 : 45)
+    r.total === (MINE_LINE ? 116 : 92) && r.rungs === (MINE_LINE ? 59 : 46)
     && r.repeats === 0,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
@@ -19433,7 +19582,20 @@ if (MINE_LINE) {
       w.director.update = () => {};
       w.up = freshUpgrades();
       g.debugGiveBytes(400000000);
-      for (let p = 0; p < 4; p++) for (const n of NODES) if (n.id) g.buy(n.id);
+      /*
+       * Until nothing more can be bought, not FOUR PASSES. A pass count is a
+       * hand-set number that has to be at least as deep as the deepest ladder,
+       * and build 302 took HOLLOWPOINT to eight levels -- so four passes bought
+       * half a damage line and called it "fully bought". It measured x1.26^4
+       * where the tree sells x1.26^8, which is WEAKER than the x1.32^4 it used
+       * to get, and the dummy arm downstream read band 2 for a turret that
+       * reaches 3. Bounded at 40 only so it cannot spin.
+       */
+      for (let p = 0; p < 40; p++) {
+        let any = false;
+        for (const n of NODES) if (n.id && g.buy(n.id) === 'ok') any = true;
+        if (!any) break;
+      }
       w.mines.length = 0;
       w.projectiles.length = 0;
       w.effects.length = 0;
@@ -19720,7 +19882,13 @@ if (MINE_LINE) {
       w.up = freshUpgrades();
       if (buy) {
         g.debugGiveBytes(400000000);
-        for (let p = 0; p < 4; p++) for (const n of NODES) if (n.id) g.buy(n.id);
+        // Until nothing more can be bought; see the note on the same loop further
+        // up this file. A pass count is a hand-set depth.
+        for (let p = 0; p < 40; p++) {
+          let any = false;
+          for (const n of NODES) if (n.id && g.buy(n.id) === 'ok') any = true;
+          if (!any) break;
+        }
       }
       w.sandbox = true;
       ledger.arm(true);
@@ -23064,7 +23232,13 @@ if (MINE_LINE) {
         w.director.update = () => {};
         w.up = freshUpgrades();
         g.debugGiveBytes(400000000);
-        for (let p = 0; p < 4; p++) for (const n of NODES) if (n.id) g.buy(n.id);
+        // Until nothing more can be bought; see the note on the same loop further
+        // up this file. A pass count is a hand-set depth.
+        for (let p = 0; p < 40; p++) {
+          let any = false;
+          for (const n of NODES) if (n.id && g.buy(n.id) === 'ok') any = true;
+          if (!any) break;
+        }
         w.mines.length = 0;
         w.projectiles.length = 0;
         w.effects.length = 0;

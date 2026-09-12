@@ -60,7 +60,11 @@ export const UNDER = {
   // Whole-rack upgrades sit on the category; BOLT keeps only its own two.
   // HOT LOAD sat here until build 193. It was the whole cadence ladder on its
   // own -- see docs/pacing.md -- and what is left of the ladder is FEED.
-  ammo: ['hollowpoint', 'tracer', 'ricochet', 'heavy', 'salvo'],
+  // CORE sits beside HOLLOWPOINT because they are the same kind of thing --
+  // the only two multipliers on the whole rack -- and a player looking for
+  // "more damage" should find both in one place. It is gated by `needs` and
+  // not by position: see its note in upgrades.js.
+  ammo: ['hollowpoint', 'core', 'tracer', 'ricochet', 'heavy', 'salvo'],
   bolt: ['overstuffed'],
   explosive: ['overpressure', 'cluster'],
   shotgun: ['doubleo', 'longshot'],

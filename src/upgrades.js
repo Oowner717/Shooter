@@ -153,6 +153,16 @@ const GUN_TONE = '#8fb8e8';
 const MARK = {
   // --- ammo ---
   hollowpoint: g('<path d="M12 21V9"/><path d="M12 3 7.5 9.5h9z" fill="currentColor" stroke="none"/><path d="M18 18h4M20 16v4"/>'),
+  /*
+   * CORE reads as the round's centre rather than as its point: a filled hub
+   * inside a shell, with the shell broken where the hub shows through. It has
+   * to be distinguishable from HOLLOWPOINT at 24x24 -- they sit beside each
+   * other in one branch and are the only two multipliers on the whole rack --
+   * so one is a projectile and one is a cross-section, which is a difference
+   * in KIND rather than in detail. `contact.mjs` draws every mark on one page;
+   * that sheet is how to check it.
+   */
+  core: g('<circle cx="12" cy="12" r="3.4" fill="currentColor" stroke="none"/><path d="M12 3.2a8.8 8.8 0 0 1 0 17.6" opacity=".85"/><path d="M12 3.2a8.8 8.8 0 0 0 0 17.6" opacity=".35"/><path d="M12 6.6v1.6M12 15.8v1.6"/>'),
   tracer: g('<path d="M3 12h9"/><path d="M12.5 7.5 20 12l-7.5 4.5z" fill="currentColor" stroke="none"/><path d="M4 7.5h5M4 16.5h5" opacity=".5"/>'),
   ricochet: g('<path d="M3 3v18M21 3v18" opacity=".45"/><path d="M4 7l16 6-16 5"/>'),
   heavy: g('<rect x="13" y="8" width="8" height="8" rx="1"/><path d="M2 12h8"/><path d="M7 8.5 10.5 12 7 15.5"/>'),
@@ -413,7 +423,61 @@ export const UPGRADES = {
      * gentler and the late game is where the difference lands -- which is the
      * shape the plateau needed and the opposite of what a flat buff does.
      */
-    { id: 'hollowpoint', name: 'HOLLOWPOINT', levels: 5, line: '+32% damage.', apply: scale('damage', 1.32) , icon: MARK.hollowpoint },
+    /*
+     * ---- eight levels of 1.26 from build 302, and WHY ----------------
+     *
+     * The same move again, one turn further round, and this time it is
+     * answering a measurement rather than a feel. Builds 300-301 put the
+     * ladder's pressure into quantity: incoming strength scales about x21
+     * from band 1 to band 7. The whole tree was worth x4.45 on rounds a
+     * second -- x4.00 of damage and x1.11 of cadence -- so the gun was being
+     * asked to cover five times more than it could buy, and `tiers.mjs`
+     * measured exactly that: the authored arrival rate is not delivered past
+     * about rung 18 because the best turret the tree sells cannot clear
+     * 30-58 bodies fast enough, and the field cap rather than the design was
+     * setting the standing crowd.
+     *
+     * x1.26^8 is x6.35, against x1.32^5's x4.00 -- the same shape as build
+     * 229's change: a level worth less, arriving three cost steps further up
+     * the ladder, so the tree goes on converting income into damage for
+     * longer. It is half the answer; `core` below is the other half, and
+     * neither reopens CADENCE, which has been removed three times for good
+     * reasons and is how this game got a nineteen-fold damage line by
+     * accident in the first place.
+     */
+    { id: 'hollowpoint', name: 'HOLLOWPOINT', levels: 8, line: '+26% damage.', apply: scale('damage', 1.26) , icon: MARK.hollowpoint },
+    /*
+     * ---- CORE: the second multiplier, and the only DORMANT one --------
+     *
+     * Four levels of 1.35 -- x3.32 -- and it does not exist until NEW FORM is
+     * owned. With HOLLOWPOINT's x6.35 that is x21.1 on damage, x30.4 once
+     * cadence and `era2Power` are counted, against an incoming x21: the
+     * turret ends the run comfortably ahead, which is the brief.
+     *
+     * Where the OVERPOWERED WINDOW comes from, and it is deliberate. RECAST
+     * is offered when the fourth anomaly is reconciled; CORE's four levels
+     * are affordable inside the band after it; and the anomaly at rung 35 is
+     * the first thing authored to survive them. So the rungs between are
+     * played by a turret that has just tripled while the field has not moved
+     * -- and what follows is not a nerf, it is the next step of the
+     * staircase.
+     *
+     * `needs` and NOT `dormant`. `dormant` is a hard refusal for a slot that
+     * is never buyable (`available()` returns 'locked' for one whatever the
+     * run owns), which is right for an unbuilt anomaly and wrong here: this
+     * node has to OPEN mid-run, on the frame NEW FORM is bought, which is
+     * what a `needs` predicate is for -- the same one RECAST itself carries.
+     *
+     * On `damage`, so it reaches whatever is loaded. That also means it
+     * reaches the three rounds whose damage does not come out of the muzzle:
+     * ARC's chain, SPORE's ground and THORN's mine all multiply `up.damage`
+     * at their own sites from build 220 onward, which is the note in
+     * CLAUDE.md about a `CFG` number read where the multiplier never reaches.
+     */
+    { id: 'core', name: 'CORE', levels: 4, line: '+35% damage, on every round.',
+      needs: (g) => g.owned('recast') > 0,
+      needsLine: 'Needs the NEW FORM.',
+      apply: scale('damage', 1.35), icon: MARK.core },
     // Two levels, not the default three. tree.js reads `u.levels ?? 3`, so an
     // uncapped node is sold three times whatever the author intended.
     { id: 'tracer', name: 'TRACER', levels: 2, line: '+35% round speed.', apply: scale('speed', 1.35) , icon: MARK.tracer },

@@ -2848,4 +2848,39 @@ came from before believing the other one covers it.
   hash will move, and by a lot" for phase 3; it cannot. Run it anyway -- an
   unchanged hash is the proof that a wave-engine change did not reach the
   physics -- but the instrument for these phases is `tiers.mjs` across rungs.
+- **THE DAMAGE LINE IS DEEPER FROM BUILD 302, AND THE PER-LEVEL STEP IS
+  SMALLER.** HOLLOWPOINT 5 levels at 1.32 (x4.00) -> 8 at 1.26 (x6.353), and
+  a new CORE, 4 levels at 1.35, dormant behind `needs: (g) =>
+  g.owned('recast') > 0` -- so the whole product is x21.101, x23.42 with the
+  cadence and x30.45 with `era2Power`. The shape is the one build 229 already
+  reached for and stopped short of: the same ladder arriving further up, so a
+  rung above the old plateau still has something to buy. It is the direct
+  answer to build 301's measurement that the authored flow is not delivered
+  past about rung 18 because the best turret the tree sold could not clear
+  30-58 bodies.
+- **A HAND-WRITTEN PASS COUNT IS THE HAND-KEPT-LIST TRAP WEARING A LOOP'S
+  CLOTHES.** Three cases bought the tree with `for (let p = 0; p < 4; p++)`,
+  which is enough passes for a five-level node and not for an eight-level one:
+  the dummy-band case measured x2.52 on build 302 against x3.04 on 301, so
+  **deepening the damage line made a fully-bought turret read WEAKER**, and
+  the failure named a band rather than a ladder. Loop until a pass buys
+  nothing (`let any = false; ... if (!any) break;`), the same way the boss
+  sweeps ask `ANOMALIES.length` instead of counting to seven. And a dormant
+  node moves the BUILT readout, so the two pinned counts (142/107 nodes,
+  116/59 and 92/46 levels) are what catch a node arriving without its gate.
+- **A RESCUE MECHANISM'S CASE CANNOT BE SITED BY RUNG, BECAUSE THE THING IT
+  RESCUES FROM IS THE GUN.** The release-gate case has now failed on four
+  consecutive builds and the rung was never the parameter: 302's stronger line
+  means the old scenario simply does not drown any more (measured, the mount
+  gripped 0.1-16s of 100 where it used to be held continuously). What holds
+  across a tree change is a build that deliberately OWNS none of the damage
+  line -- `['rate', 'open_ward', 'flinch', 'deadbolt']` -- at a rung where the
+  run is genuinely behind, and TWO channels, because `emit`'s `maxEnemies`
+  gate truncates the mean: the standing field's mean and the SHARE of samples
+  pinned at 90% of the cap. Measured at rung 20 the mean read 1.164/0.792
+  /0.726 and the pinned share 2.16/1.394/0.43 -- neither separated; at rung 32
+  mean 0.741/0.742/0.888 and pinned 0.685/0.328/0.634, both separated on every
+  run. **A case whose scenario is re-sited every build is a case measuring the
+  wrong quantity**, and the quantity here is how far behind the gun is, not
+  which rung the run stands on.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
