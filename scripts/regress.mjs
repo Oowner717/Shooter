@@ -1116,16 +1116,43 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
        * so the money opens the gate and then a rotation's worth of loads has to
        * go by before the run is called finished.
        */
+      /*
+       * ---- and it has to CLIMB, from build 301 -------------------------
+       *
+       * Which band a rung draws from is `ceil(tier / perBand)`, and `perBand`
+       * went 2 -> 7: the five authored bands used to cover rungs 1-10 and now
+       * cover 1-35, so band 5's roster does not play until rung 29. This run
+       * banked its way past every energy gate and then never left the bottom
+       * of the ladder, so it reported bloom, prism, glut, herald, warden,
+       * scion, bulwark and tow all at 0% -- eight live types called
+       * unreachable by a case that had simply stopped visiting them.
+       *
+       * So the money opens the gates and then the run WALKS the ladder, one
+       * rung inside each band, with a rotation's worth of loads at each. The
+       * claim is unchanged -- every type in the table is met by a run that
+       * plays the ladder -- and it is now measured where the types live. The
+       * rungs are derived from `perBand`, not written out, or this breaks
+       * again the next time a band changes width.
+       */
       const NEED = Math.max(...Object.values(TYPE_BY_ID).map((t) => t.opens || 0));
-      let gateAt = -1;
-      while ((gateAt < 0 || loads - gateAt < 30) && guard++ < 200000) {
-        if (gateAt < 0 && w.earned >= NEED) gateAt = loads;
+      const BANDS = 5;                 // the authored bands; 6-7 draw band 5
+      const rungs = [];
+      for (let b = 1; b <= BANDS; b++) rungs.push((b - 1) * CFG.waves.tier.perBand + 1);
+      const step = () => {
         d.update(w, 0.7);
         for (const e of [...w.enemies]) if (!e.dead) e.destroy(w);
         w.enemies.length = 0;
         for (const dr of [...w.drops]) if (!dr.dead) dr.destroy(w);
         w.drops.length = 0;
         w.kills = w.released;
+      };
+      // First the money, at the bottom, so the gates land the way a run's do.
+      while (w.earned < NEED && guard++ < 200000) step();
+      // ...then a rotation inside each band.
+      for (const rung of rungs) {
+        d.setTier(rung);
+        const from = loads;
+        while (loads - from < 14 && guard++ < 200000) step();
       }
       d.load = realLoad;
       for (const i of played) for (const [id] of WAVES[i].of) seen[id] = (seen[id] || 0) + 1;
@@ -1135,7 +1162,7 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     return { runs: RUNS, rate: Object.fromEntries(types.map((t) => [t, (seen[t] || 0) / RUNS])) };
   }, RUNS);
   const thin = Object.entries(r.rate).filter(([, v]) => v < FLOOR);
-  check(`every type in the wave table is met in over ${FLOOR * 100}% of runs`,
+  check(`every type in the wave table is met in over ${FLOOR * 100}% of runs that climb`,
     thin.length === 0,
     `${thin.length ? `thin: ${thin.map(([t, v]) => `${t} ${Math.round(v * 100)}%`).join(', ')} — ` : ''}`
     + Object.entries(r.rate).map(([t, v]) => `${t} ${Math.round(v * 100)}%`).join(', '));
@@ -7967,7 +7994,22 @@ if (!GUN_LINE) {
      * The fuse gets its own arm below, where its filling is the signal rather
      * than the noise.
      */
-    const play = (gated, pinFuse = false, secs = 240) => {
+    /*
+     * ---- and the two claims get their own RUNGS, from build 301 --------
+     *
+     * They are different scenarios and they stopped wanting the same rung.
+     * The FIELD arm needs a rung where the gate visibly thins the field, and
+     * the FUSE arm needs one where the fuse actually fills; build 301's
+     * engine -- a closed seam, a budget-driven wave length and a faster
+     * mortar -- pushed rung 28 into saturation for the first, where both
+     * arms sit near `maxEnemies` and the FIELD CAP does the gate's work.
+     * Measured, fuse pinned, 150s: the separation is 0.87, 0.883, 0.874,
+     * 0.871 at rungs 14/18/21/24 -- four draws inside a 1.4% band -- and
+     * 0.626 at 28, which then read 1.01 in the suite. Re-measured at 24 over
+     * three full 240s runs: 0.779, 0.759, 0.434, worst separation 0.861. So
+     * the field arms run at 24 and the fuse arms stay at 28.
+     */
+    const play = (gated, pinFuse = false, secs = 240, tier = 28) => {
       g.restart();
       w.phase = 'staging';
       g.debugTeachAll();
@@ -7977,8 +8019,8 @@ if (!GUN_LINE) {
       w.autoAim = true;
       w.autoFire = true;
       const d = w.director;
-      // 28 from build 300; see the note above for the sweep that chose it.
-      d.setTier(28);
+      // The rung is the caller's; see the note above `play` for the sweeps.
+      d.setTier(tier);
       const peak = [];
       let heldFrames = 0;
       let fired = 0;
@@ -8017,13 +8059,16 @@ if (!GUN_LINE) {
         fired, gPeak: +gPeak.toFixed(2), tier: d.tier,
         auto: !!w.up.flinch && !!w.up.deadbolt };
     };
-    // The field, with the fuse held out of it.
-    out.drowning = play(true, true);
-    out.loose = play(false, true);
+    // The field, with the fuse held out of it, at the rung where the gate is
+    // the thing thinning it rather than the cap.
+    out.fieldRung = 24;
+    out.drowning = play(true, true, 240, out.fieldRung);
+    out.loose = play(false, true, 240, out.fieldRung);
     // ...and the fuse, with it let run. Shorter, because what is being read
     // is a peak rather than a mean and it is reached early.
-    out.fuseOn = play(true, false, 150);
-    out.fuseOff = play(false, false, 150);
+    out.fuseRung = 28;
+    out.fuseOn = play(true, false, 150, out.fuseRung);
+    out.fuseOff = play(false, false, 150, out.fuseRung);
 
     /*
      * ---- and a run that IS clearing is not held --------------------------
@@ -8059,22 +8104,23 @@ if (!GUN_LINE) {
 
   /*
    * The ceiling is a MULTIPLE of the worst separation measured, not the day's
-   * value. Re-measured on build 300 with the fuse pinned out of both arms,
-   * three runs each: gated [19.5, 23.2, 19.3] against loose [29.3, 34.5,
-   * 28.5], so the worst separation is 23.2/28.5 = 0.814 and a ceiling of 0.90
-   * has headroom while still failing at 1.0 -- which is what equal means
-   * would be if the gate stopped holding anything.
+   * value. Build 300 measured it at rung 28 with the fuse pinned out of both
+   * arms -- gated [19.5, 23.2, 19.3] against loose [29.3, 34.5, 28.5], worst
+   * 0.814 -- and build 301 re-measured at rung 24, three full runs: gated
+   * [23.6, 20.8, 18.5] against loose [30.3, 27.4, 42.6], worst separation
+   * 23.6/27.4 = 0.861. So 0.93 has headroom and still fails at 1.0, which is
+   * what equal means would be if the gate stopped holding anything.
    *
-   * The `held` floor came down from 10s to 3s for the same reason: with the
-   * fuse pinned the hold measured 9.3s, 104.9s and 120.3s across those three
-   * runs, so a floor of 10 was inside the spread. It is a liveness guard
-   * rather than the claim -- the claim is the ratio beside it.
+   * The `held` floor is 3s rather than 10 because the hold itself is the
+   * noisy half: with the fuse pinned it measured 9.3s to 120.3s across six
+   * runs. It is a liveness guard and not the claim -- the claim is the ratio
+   * beside it.
    */
   check('a run that cannot clear the field is not sent another wave',
     r.drowning.auto && r.drowning.held > 3
-    && r.drowning.mean < r.loose.mean * 0.90 && r.loose.mean >= 12,
-    `with FLINCH and DEADBOLT owned (${r.drowning.auto}) the release was held `
-    + `${r.drowning.held}s of 240 and the field averaged ${r.drowning.mean} `
+    && r.drowning.mean < r.loose.mean * 0.93 && r.loose.mean >= 12,
+    `at rung ${r.fieldRung} with FLINCH and DEADBOLT owned (${r.drowning.auto}) the `
+    + `release was held ${r.drowning.held}s of 240 and the field averaged ${r.drowning.mean} `
     + `standing against ${r.loose.mean} on the same run with the gate off `
     + `(peaks ${r.drowning.max} and ${r.loose.max}, which overlap run to run `
     + `and are why this is a mean)`);
@@ -8095,7 +8141,7 @@ if (!GUN_LINE) {
    */
   check('...and the wait FILLS THE FUSE, which is the thing that rescues the run',
     r.fuseOn.gPeak > 0.5 && r.fuseOn.gPeak > r.fuseOff.gPeak + 0.15,
-    `held ${r.fuseOn.held}s of 150, the fuse reached ${r.fuseOn.gPeak} and blew `
+    `at rung ${r.fuseRung}, held ${r.fuseOn.held}s of 150, the fuse reached ${r.fuseOn.gPeak} and blew `
     + `${r.fuseOn.fired} times, ladder ${r.fuseOn.tier}; with the gate off it `
     + `reached ${r.fuseOff.gPeak}, blew ${r.fuseOff.fired} and ended at `
     + `${r.fuseOff.tier} -- the crowd term is ${r.crowd} of the contact rate`);
@@ -11371,8 +11417,8 @@ if (!GUN_LINE) {
 {
   const r = await page.evaluate(async () => {
     const g = window.__sim;
-    const { CFG, WAVES } = await import('../src/config.js');
-    const { Director, hostileCount } = await import('../src/enemies.js');
+    const { CFG, WAVES, ENEMY_TYPES, TYPE_BY_ID } = await import('../src/config.js');
+    const { Director, hostileCount, threatOf, threatOfWave } = await import('../src/enemies.js');
     const w = g.world;
     const d = w.director;
     const T = CFG.waves.tier;
@@ -11485,6 +11531,17 @@ if (!GUN_LINE) {
     out.askedAtTop = aTop.swell;
     out.askedRaw = { one: a1.raw, top: aTop.raw, swarm1: a1.swarm, swarmTop: aTop.swarm };
     out.askRatio = +(out.askedAtTop / out.askedAt1).toFixed(2);
+    /*
+     * ...against the BUDGET's own ratio from build 301, not a window. The
+     * count is no longer `authored x popStep`: a wave is scaled until its
+     * threat meets `Director.budgetAt`, so what the ask has to track is that
+     * budget -- `popStep^48` times the walk's own span, since rung 1 sits at
+     * `budget.open` of its band and rung 49 at `budget.close` of its. A
+     * hand-set window of 15-30 was the size of the day and would have gone
+     * red on the build that introduced the walk.
+     */
+    const wb = WAVES[real].band || 1;
+    out.budgetRatio = +(Director.budgetAt(top, wb) / Director.budgetAt(1, wb)).toFixed(2);
 
     /*
      * ---- ...and the FIELD does not ------------------------------------
@@ -11526,6 +11583,64 @@ if (!GUN_LINE) {
     };
     out.peakAtTop = fieldPeak(top);
     out.cap = CFG.maxEnemies;
+
+    /*
+     * ---- and what a wave WEIGHS, from build 301 ----------------------
+     *
+     * The counts in `WAVES` are proportions now: `load` scales a wave until
+     * its threat meets the budget. Three things have to hold or it is a
+     * different mechanism -- threat is priced for everything that costs and
+     * nothing that does not, the budget follows the BAND's own roster, and
+     * the walk across a band redistributes rather than rescales.
+     */
+    out.threat = {
+      mote: +threatOf(TYPE_BY_ID.mote).toFixed(2),
+      bulwark: +threatOf(TYPE_BY_ID.bulwark).toFixed(2),
+      drift: threatOf(TYPE_BY_ID.drift),
+      // A TOW is the PAIR, because `release` makes both -- the head alone is
+      // the instrument fault a build-192 note published as a finding.
+      tow: +threatOf(TYPE_BY_ID.tow).toFixed(2),
+      towHead: TYPE_BY_ID.tow.hp / CFG.waves.threatPerHp,
+    };
+    out.freeHostile = ENEMY_TYPES.filter((t) => !t.harmless && !(threatOf(t) > 0)).map((t) => t.id);
+    out.paidHarmless = ENEMY_TYPES.filter((t) => t.harmless && threatOf(t) !== 0).map((t) => t.id);
+    // The walk, across a band's six ordinary rungs. It has to AVERAGE 1: a
+    // walk that does not is a change to how heavy a band is wearing a
+    // distribution's clothes.
+    /*
+     * `popStep` DIVIDED OUT, because `budgetAt` multiplies both and the walk
+     * is the only one this arm is about. The first version read the raw ratio
+     * and reported a walk of 0.72 -> 1.758 averaging 1.203 -- the walk's own
+     * 1.78x span times six rungs of the population slope. `check-build`
+     * asserts the same rule off the plain arithmetic and read 1.00, which is
+     * how the contamination was found: two instruments on one claim, and the
+     * one going through the real function was the one that was wrong.
+     */
+    const walk = [];
+    for (let rw = 0; rw < T.bossEvery - 1; rw++) {
+      walk.push(Director.budgetAt(1 + rw, 1) / (T.popStep ** rw)
+        / Director.budgetAt(1, 1) * T.budget.open);
+    }
+    out.walk = walk.map((v) => +v.toFixed(3));
+    out.walkMean = +(walk.slice(0, T.bossEvery - 1).reduce((a, x) => a + x, 0)
+      / (T.bossEvery - 1)).toFixed(4);
+    out.walkRises = walk.every((v, i) => i === 0 || v >= walk[i - 1] - 1e-9);
+    // ...and a band is one boss slot wide, which is what gives the walk six
+    // rungs to cross. `perBand` was 2 and the authored table ran out at 9.
+    out.perBand = T.perBand;
+    out.bandAt = [1, 7, 8, 14, 15, 35].map((t) => d.bandsFor(t)[1]);
+    /*
+     * ...and a wave with no hostiles is scaled by NOTHING. The bonus wave is
+     * 22 drifters and `of: []`, so a budget divided by its threat is a
+     * divide by zero -- and its drift count is not the budget's business.
+     */
+    const bonus = WAVES.findIndex((x) => !x.teach && x.of && !x.of.length && x.drift > 0);
+    out.bonus = bonus >= 0 ? { drift: WAVES[bonus].drift, threat: threatOfWave(WAVES[bonus]) } : null;
+    if (bonus >= 0) {
+      d.setTier(top);
+      d.load(w, WAVES[bonus]);
+      out.bonusAsked = d.asked;
+    }
 
     g.debugClearField();
     w.reconciled.length = 0;
@@ -11576,12 +11691,66 @@ if (!GUN_LINE) {
     + `authored mean of ${r.teachGapMean}s; the two waves are a teach and a `
     + `non-teach (${JSON.stringify(r.isTeach)})`);
 
+  /*
+   * Build 301. Threat is what a body costs a wave's budget, and it is DERIVED
+   * from health -- so a new type is priced by existing rather than by being
+   * added to a table of 43 numbers. Two failures are possible and neither is
+   * visible at runtime: a released body that weighs nothing is a wave that
+   * can never meet its budget (`load` would scale it until the field cap
+   * stopped it), and a HARMLESS body that weighs something breaks the mortar,
+   * which only thickens a field for free while it is free.
+   */
+  check('threat is priced for everything that costs, and nothing that does not',
+    r.freeHostile.length === 0 && r.paidHarmless.length === 0
+    && r.threat.drift === 0 && r.threat.mote > 0
+    && r.threat.tow > r.threat.towHead * 1.5,
+    `${r.freeHostile.join('/') || 'no free hostile'}; ${r.paidHarmless.join('/') || 'no paid harmless'}; `
+    + `MOTE ${r.threat.mote}, BULWARK ${r.threat.bulwark}, DRIFT ${r.threat.drift}, and a TOW is `
+    + `${r.threat.tow} because release makes the PAIR (the head alone is ${r.threat.towHead.toFixed(2)})`);
+
+  /*
+   * ...and a band is one boss slot wide, which is the change that gives the
+   * walk six rungs to cross. `perBand` was 2, so the five authored bands ran
+   * out at rung 9 and forty rungs drew band 4-5 with bigger numbers on them.
+   */
+  check('a band is one boss slot wide, and the budget walk redistributes it',
+    r.perBand === r.top / 7 || r.perBand === 7,
+    `perBand ${r.perBand}; rungs 1/7/8/14/15/35 draw bands ${r.bandAt.join('/')}`);
+
+  /*
+   * The walk AVERAGES 1 across a band's ordinary rungs, and that is the whole
+   * difference between a distribution and a rescale: the band's middle rung
+   * is the band as it was authored, and the two ends are spread either side
+   * of it. A walk averaging anything else is a global nerf or buff wearing a
+   * distribution's clothes -- and `check-build` fails the build for one,
+   * because it is arithmetic and does not need a browser.
+   */
+  check('...and the walk averages exactly 1, so a band is redistributed not rescaled',
+    Math.abs(r.walkMean - 1) < 1e-6 && r.walkRises
+    && r.walk[0] < 1 && r.walk[r.walk.length - 1] > 1,
+    `the walk runs ${r.walk.join(' -> ')} across a band and averages ${r.walkMean}`);
+
+  /*
+   * ...and the wave with no hostiles in it is scaled by NOTHING. Its threat
+   * is zero, so a budget divided by it is a divide by zero -- and its 22
+   * drifters are `wave.drift`, which the budget never touched. The arm is a
+   * real load at the DEEPEST rung, where a missing guard would be a NaN
+   * count rather than a merely wrong one.
+   */
+  check('...and a wave with no hostiles is not scaled at all',
+    !!r.bonus && r.bonus.threat === 0 && r.bonus.drift > 0
+    && r.bonusAsked === 0,
+    `the bonus wave carries ${r.bonus && r.bonus.drift} drifters at threat `
+    + `${r.bonus && r.bonus.threat}; loaded at rung ${r.top} it queues `
+    + `${r.bonusAsked} hostiles`);
+
   check("a deep wave asks for many more bodies, off load's own count",
-    r.askRatio > 15 && r.askRatio < 30
+    r.askRatio > r.budgetRatio * 0.85 && r.askRatio < r.budgetRatio * 1.15
     && r.askedAtTop > r.cap * 2,
     `the same wave queues ${r.askedAt1} bodies at rung 1 and ${r.askedAtTop} at ${r.top} `
-    + `(x${r.askRatio}) with SWARM divided out; raw ${r.askedRaw.one} and `
-    + `${r.askedRaw.top}, swarm rolled ${r.askedRaw.swarm1}/${r.askedRaw.swarmTop}`);
+    + `(x${r.askRatio}) with SWARM divided out, against the budget's own `
+    + `x${r.budgetRatio}; raw ${r.askedRaw.one} and ${r.askedRaw.top}, swarm `
+    + `rolled ${r.askedRaw.swarm1}/${r.askedRaw.swarmTop}`);
 
   /*
    * The one that makes the inversion safe, and the one the old `check-build`
@@ -12824,8 +12993,27 @@ if (!GUN_LINE) {
     // A blast landing on one of them during its second must not cash it in.
     const victim = w.enemies.find((e) => e.fizzle > 0);
     if (victim) victim.destroy(w);
-    // ...and a second later there is nothing of them left.
+    /*
+     * ...and a second later there is nothing of them left.
+     *
+     * THE WINDOW IS PINNED SHUT FIRST, and it was not before. `bare()` sets
+     * `director.timer = 1e9` to keep new waves out, and `glitchOut` RE-ARMS
+     * that timer from `CFG.waves.rest` -- it is a writer of the very field
+     * the setup pinned. That was harmless while the seam was 2.6-4.2s,
+     * comfortably longer than this arm's own 1.3s of observation; build 301
+     * closed it to 0.4-1.1s and the next wave began INSIDE the window, so
+     * `gone` counted four bodies that had just arrived rather than four that
+     * had failed to dissolve. The arm was resting on an accidental guarantee.
+     *
+     * Pinned again, and the absence of releases is now ASSERTED rather than
+     * assumed -- `world.released` is the count the director increments, so a
+     * window that is meant to be quiet can say that it was.
+     */
+    d.timer = 1e9;
+    d.driftTimer = 1e9;
+    const releasedBefore = w.released;
     for (let i = 0; i < Math.round((G.fizzle + 0.4) * 60); i++) g.update(1 / 60);
+    out.noNewWave = w.released === releasedBefore;
     out.gone = w.enemies.filter((e) => !e.dead && e.type.id !== 'drift').length;
     out.paid = Math.round(w.bytes) - energyBefore;
     out.counted = w.kills - killsBefore;
@@ -13090,11 +13278,13 @@ if (!GUN_LINE) {
    */
   check('the field fizzles out, pays nothing, and counts for nothing',
     r.fizzled === r.hostiles && r.hostiles > 0 && r.marks && r.targetsNone
+    && r.noNewWave
     && r.gone === 0 && r.paid === 0 && r.counted === 0
     && r.dropsKept && r.greyKept && r.seeds > 0 && r.seedsTaken === r.seeds
     && r.targetsBefore,
     `${r.fizzled} of ${r.hostiles} marked (flags ok ${r.marks}, assist had a lock `
-    + `${r.targetsBefore} and now sees none ${r.targetsNone}); `
+    + `${r.targetsBefore} and now sees none ${r.targetsNone}); the window stayed `
+    + `quiet ${r.noNewWave}; `
     + `${r.seedsTaken}/${r.seeds} SEEDs taken; after `
     + `${r.cfg.fizzle}s ${r.gone} left, paid ${r.paid}, counted ${r.counted}, `
     + `energy on the floor kept ${r.dropsKept}, grey kept ${r.greyKept}`);
@@ -20904,7 +21094,20 @@ if (MINE_LINE) {
         g.update(1 / 60);
         const v = Math.hypot(e.vx, e.vy);
         if (e.staged && e.y + e.r < top - 20) hiddenMax = Math.max(hiddenMax, v);
-        if (!e.staged) { bornAt = i; atRim = v; }
+        /*
+         * The crossing speed is the LAST BRAKED frame, not the first free
+         * one. `drive`'s brake is inside `if (this.staged)` and `Enemy.update`
+         * clears `staged` on the frame the body passes the entry line -- so
+         * sampling on the frame `staged` goes false reads the speed one frame
+         * PAST the thing being measured, and whether that frame is braked
+         * depends on the order the two ran in. Measured, it read 2.25x the
+         * body's own cruise on one suite run and under 1.2x on the next, with
+         * nothing about the portal changed. Every frame the body is inside
+         * the surface is a frame the brake governs; the last of them is what
+         * "comes out at its own cruise" means.
+         */
+        if (e.staged && e.y + e.r >= top) atRim = v;
+        if (!e.staged) bornAt = i;
       }
       const res = { cruise: +e.cruise.toFixed(1), hiddenMax: +hiddenMax.toFixed(1), atRim: atRim === null ? null : +atRim.toFixed(1),
         bornAt, born: e.born, bornFor: +e.bornFor.toFixed(2) };

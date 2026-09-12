@@ -299,17 +299,77 @@ if (crowded.length) {
  *     not a stream, it is a spawn storm the pair solver pays for.
  */
 const TIER = CFG.waves.tier;
-const flowAt = (t) => {
-  const F = TIER.flow; const w = TIER.bossEvery;
-  const x = (t - (w + 1) / 2) / w; const i = Math.floor(x);
-  if (i < 0) return F[0];
-  if (i >= F.length - 1) return F[F.length - 1];
-  return F[i] + (F[i + 1] - F[i]) * (x - i);
-};
+/*
+ * The real arithmetic, imported rather than restated. `enemies.js` loads
+ * clean in node -- it touches no DOM at module scope -- so `flowAt`, the
+ * threat of a type and the budget of a wave all come from the code that runs
+ * in the game. This file kept a five-line copy of `flowAt` for one build and
+ * that was one build too many: a guard that re-implements the thing it is
+ * checking agrees with itself.
+ */
+const { Director, threatOf, threatOfWave } = await import(new URL('../src/enemies.js', import.meta.url));
+const flowAt = (t) => Director.flowAt(t);
 const deep = TIER.ceiling;
 const popX = TIER.popStep ** (deep - 1);
 const flowX = flowAt(deep) / flowAt(1);
-const peak = Math.max(...regular.map((w) => Math.round(bodiesOf(w) * popX)));
+/*
+ * ---- and the ask is BUDGET-driven from build 301 ---------------------
+ *
+ * It was `bodiesOf(w) * popX`, which was true while the authored numbers
+ * were counts. They are proportions now: a wave is scaled until its threat
+ * meets `Director.budgetAt`, so the ask is the scaled count and the heaviest
+ * wave is no longer the one with the most bodies written in it.
+ */
+const askAt = (w, tier) => {
+  const T = threatOfWave(w);
+  if (!(T > 0)) return bodiesOf(w);
+  const scale = Director.budgetAt(tier, w.band || 1) / T;
+  return w.of.reduce((n, [, c]) => n + Math.max(1, Math.round(c * scale)), 0);
+};
+const peak = Math.max(...regular.map((w) => askAt(w, deep)));
+/*
+ * ---- threat is priced for every type, and only for the ones that cost --
+ *
+ * A released type with no threat is a body a wave can be filled with for
+ * free -- the budget would never be met and `load` would scale the wave
+ * until the field cap stopped it. A HARMLESS type with threat is the
+ * opposite fault and breaks the mortar: drift is what thickens a field
+ * without spending a wave's budget, and that only works while it weighs
+ * nothing.
+ */
+const freeHostile = ENEMY_TYPES.filter((t) => !t.harmless && !(threatOf(t) > 0)).map((t) => t.id);
+const paidHarmless = ENEMY_TYPES.filter((t) => t.harmless && threatOf(t) !== 0).map((t) => t.id);
+if (freeHostile.length || paidHarmless.length) {
+  console.error(`threat is mispriced: ${freeHostile.join(', ') || 'no free hostiles'} weigh nothing; `
+    + `${paidHarmless.join(', ') || 'no harmless body'} weighs something -- a free hostile is a wave `
+    + 'that can never meet its budget, and a harmless body with weight is the mortar spending it');
+  process.exit(1);
+}
+/*
+ * ...and every band that has waves has a budget, and the WALK across a band
+ * averages exactly 1 -- so a band's middle rung is the band as it was
+ * authored and the two ends are spread either side of it. Without that the
+ * walk is a global nerf or a global buff wearing a distribution's clothes.
+ */
+const bandsWith = [...new Set(regular.filter((w) => threatOfWave(w) > 0).map((w) => w.band || 1))];
+const noBudget = bandsWith.filter((b) => !(Director.budgetAt(1, b) > 0));
+if (noBudget.length) {
+  console.error(`band(s) ${noBudget.join(', ')} have waves and no budget`);
+  process.exit(1);
+}
+const walkOf = (rw) => {
+  const B = TIER.budget; const span = Math.max(1, TIER.bossEvery - 2);
+  return B.open + (B.close - B.open) * Math.min(rw, span) / span;
+};
+const ordinary = [];
+for (let rw = 0; rw <= TIER.bossEvery - 2; rw++) ordinary.push(walkOf(rw));
+const meanWalk = ordinary.reduce((a, x) => a + x, 0) / ordinary.length;
+if (Math.abs(meanWalk - 1) > 1e-9) {
+  console.error(`the budget walk averages ${meanWalk.toFixed(4)} across a band's `
+    + `${ordinary.length} ordinary rungs, not 1 -- ${TIER.budget.open}..${TIER.budget.close} is a `
+    + 'change to how heavy a band is, not to how it is distributed');
+  process.exit(1);
+}
 // Bodies over arrivals-a-second is the wave's own length. x21.0 of the bodies
 // at x5.56 the rate is a wave x3.8 as long, which is the plan's 50s -> 190s.
 const longer = popX / flowX;
@@ -329,6 +389,11 @@ if (tightest < 1 / 30) {
 console.log(`stream: rung ${deep} asks x${popX.toFixed(1)} the bodies at x${flowX.toFixed(2)} the rate `
   + `(a wave x${longer.toFixed(1)} as long), heaviest ask ${peak} through a field of `
   + `${CFG.maxEnemies}; tightest release ${(tightest * 1000).toFixed(0)}ms`);
+console.log(`budget: ${bandsWith.length} bands priced off their own rosters `
+  + `(${bandsWith.sort().map((b) => `${b}:${Director.budgetAt(1, b).toFixed(1)}`).join(' ')}), `
+  + `walked ${TIER.budget.open}-${TIER.budget.close} across ${ordinary.length} ordinary rungs `
+  + `(mean ${meanWalk.toFixed(2)}); rung 1 asks ${Math.max(...regular.map((w) => askAt(w, 1)))} at most, `
+  + `rung ${deep} ${peak}`);
 /*
  * Every regular wave carries a band, and every band has waves in it.
  *
@@ -409,7 +474,7 @@ if (relock.length) {
 }
 console.log(`  ...and none re-locks on a pre-180 save (all under kills x${RATE})`);
 
-console.log(`ladder: ${regular.length} waves across 5 bands `
+console.log(`ladder: ${regular.length} waves across 5 bands, ${TIER.perBand} rungs each `
   + `(${[1, 2, 3, 4, 5].map((b) => byBand[b]).join('/')}), heaviest ask ${peak} `
   + `through a field of ${CFG.maxEnemies}`);
 /*

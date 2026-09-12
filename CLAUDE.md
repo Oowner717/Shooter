@@ -2755,4 +2755,97 @@ came from before believing the other one covers it.
   twice, half of it a rule the rung happened to roll. Divide it out and say
   so. Worth recording on its own: a SWARM wave at the ceiling queues 438
   bodies against a field of 57.
+- **A WAVE'S COUNTS ARE A BUDGET FROM BUILD 301, AND THE AUTHORED NUMBERS ARE
+  PROPORTIONS.** `load` scales a wave until its total threat meets
+  `Director.budgetAt(tier, band)` = the band's own mean threat x
+  `popStep^(tier-1)` x `population` x a walk across the band. So a wave of
+  three BULWARKs and one of twelve MOTEs weigh the same at the same rung and
+  length follows strength by construction. Two exemptions, each otherwise a
+  divide by zero or a tutorial that speeds up: a TEACH wave is scaled by
+  nothing, and a wave with no HOSTILES weighs zero (the bonus wave is 22
+  drifters and `of: []`).
+- **`threatOf` is DERIVED from health and nothing else**, `hp / threatPerHp`,
+  because a per-mechanism term is 43 hand-authored numbers -- the shape that
+  has already cost this repo `world.apertures` sized 8 against 9 anomalies and
+  a lot count restated in four places. Measured against the plan's anchors it
+  is close (MOTE 1.03 against 1, BLOOM 8.2 against 7, SCION 13.0 against 12,
+  BULWARK 22.5 against 20); LURCHER derives 6.2 against a rough 4 and is left
+  diverging. Two rules make it honest: `harmless` weighs ZERO, which is what
+  lets the drift mortar thicken a field without spending a budget, and a body
+  that TOWS counts what it drags, because `release` makes the pair.
+- **A BAND'S BUDGET IS DERIVED FROM ITS OWN ROSTER**, the mean threat of its
+  authored waves, so adding a wave re-prices that band by existing. The MEAN
+  and not the max, because the walk averages exactly 1 -- the band's middle
+  rung is the band as authored and the ends are spread either side of it.
+  `check-build.mjs` fails the build if the walk's mean is not 1, because a
+  walk that averages anything else is a global nerf or buff wearing a
+  distribution's clothes.
+- **`perBand` 2 -> 7, and the authored table stops running out at rung 9.**
+  The five bands now cover rungs 1-35 against 1-10, and rungs 36-49 still draw
+  band 4-5 because bands 6-7 want the twenty objects of phase 6. It also gives
+  `budget.open`/`close` six rungs to walk across: a ramp over two rungs is a
+  step.
+- **`admit()`'s starvation branch was reachable, and `begin()`'s call order is
+  why.** `begin` runs `admit` BEFORE the spent check, so on the very frame the
+  order runs out with every in-band wave already in it, the fallback spliced
+  the out-of-band ones in and the reshuffle never happened -- exactly the fault
+  build 199 fixed, arriving again through a different door, under a comment
+  reading "this should be unreachable". Latent at `perBand: 2` (a sixteen-wave
+  window at rung 20); at `perBand: 7` the window is ten and the case measured
+  37 of 82 waves still to play out of band. Deleted rather than guarded,
+  because `shuffle` already carries that fallback properly: two fallbacks for
+  one rule is how they disagree. The out-of-band list it collected went with
+  it -- written and never read is how `mineScale` survived two builds.
+- **THE SEAM IS CLOSED (`rest` 2.6-4.2 -> 0.4-1.1, `restCap` 2.6 -> 1.4), and
+  a case was resting on the old length.** The fizzle case pins
+  `director.timer = 1e9` in its setup and `glitchOut` RE-ARMS that timer from
+  `CFG.waves.rest` -- harmless while the seam was longer than the case's own
+  1.3s observation window, and not once it was shorter: the next wave began
+  inside the window and the arm counted four bodies that had just arrived as
+  four that had failed to dissolve. **Anything that closes a gap owes every
+  case whose window is shorter than the old gap a re-read**, and the fix is to
+  assert the quiet rather than assume it (`world.released` did not move).
+- **A speed sampled on the frame a state CLEARS is sampled one frame past the
+  thing being measured.** `drive`'s portal brake is inside `if (this.staged)`
+  and `Enemy.update` clears `staged` on the frame the body passes the entry
+  line, so the crossing-speed arm read whichever order the two ran in: 2.25x
+  the body's own cruise on one suite run and under 1.2x on the next, with
+  nothing about the portal changed. Sample the LAST frame the state held, not
+  the first frame after it.
+- **The release-gate scenario has now been re-sited on three consecutive
+  builds, and its two claims want different rungs.** The FIELD arm needs a
+  rung where the gate thins the field and the FUSE arm one where the fuse
+  fills; build 301's engine pushed 28 into saturation for the first, where both
+  arms sit near `maxEnemies` and the CAP does the gate's work. Measured with
+  the fuse pinned, 150s: separations of 0.87/0.883/0.874/0.871 at rungs
+  14/18/21/24 -- four draws inside a 1.4% band -- against 0.626 at 28, which
+  then read 1.01 in the suite. Field arm at 24 (three full runs: 0.779, 0.759,
+  0.434, worst separation 0.861, ceiling 0.93), fuse arm at 28. **Two claims in
+  one scenario is one scenario too few.**
+- **`tiers.mjs` grew THE STREAM table, and the first version measured the field
+  cap.** With the gun cold the field fills to `maxEnemies` in seconds,
+  `emit`'s gate refuses every release, and the arrival rate collapses to
+  `maxEnemies / window` -- 0.12 to 0.76 a second against an authored 0.9 to
+  5.0, with ONE wave started in 120s at six of seven rungs. That is a
+  measurement of a constant. A fully bought turret is what makes the field
+  turn over, and it is the honest FLOOR on the standing column.
+- **...and the finding it produced is that the authored flow is not delivered
+  past about rung 18.** Measured, fully bought, 120s a rung: arrivals 1.04 /
+  2.55 / 2.42 / 1.98 / 2.37 / 2.74 / 0.82 a second at rungs 4/11/18/25/32/39
+  /46, against an authored 0.9 / 1.4 / 2.0 / 2.7 / 3.4 / 4.2 / 5.0. Rung 4
+  tracks; from 25 the stream is throttled by the field cap and the release
+  gate because the best turret the tree can buy cannot clear 30-58 bodies fast
+  enough. The standing field still climbs 2.7 -> 34 (x11.3) and the wave
+  lengthens x12, so the DESIGN reads through -- but `CFG.maxEnemies` at 57 is
+  a target from rung 25 on and not the guard the plan calls it. The answer is
+  the turret, which is phase 4's re-priced tree, not a bigger cap.
+- **The ORDINAL hash is STRUCTURALLY BLIND to the wave engine, and that is now
+  twice.** It did not move for build 300's four slopes (all `x^(n-1)`, so all
+  1 at rung 1) and did not move for 301's budget, seam, band width or mortar
+  either -- `fight.mjs` is one fight at rung 1 opened from `openBoss`, and
+  `Game.update` is `if (w.boss) {...} else { director.update() }`, so the
+  director never releases and none of the engine runs. The plan predicted "the
+  hash will move, and by a lot" for phase 3; it cannot. Run it anyway -- an
+  unchanged hash is the proof that a wave-engine change did not reach the
+  physics -- but the instrument for these phases is `tiers.mjs` across rungs.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

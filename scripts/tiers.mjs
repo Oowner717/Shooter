@@ -186,7 +186,10 @@ for (const w of WAVES) {
   const held = HEAVIEST.get(w.band);
   if (!held || weight > held.weight) HEAVIEST.set(w.band, { of: w.of, weight });
 }
-for (const [b, v] of HEAVIEST) HEAVIEST.set(b, v.of);
+// The BAND travels with it from build 301: a wave's size comes off
+// `Director.budgetAt(tier, band)` now, so the bench cannot price one without
+// knowing which band's budget it is spending.
+for (const [b, v] of HEAVIEST) HEAVIEST.set(b, { of: v.of, band: b });
 
 // ---- the loadout ----------------------------------------------------------
 
@@ -239,6 +242,17 @@ for (let t = FROM; t <= TO; t++) tiers.push(t);
 /** tier -> run -> { spend, bought, marks: [{id, ttk, rounds, dmg, hp, killed}] } */
 const results = new Map(tiers.map((t) => [t, []]));
 const errs = [];
+/*
+ * The rungs the plan's own table states, which are the middle rung of each
+ * boss band -- `i * bossEvery + (bossEvery + 1) / 2`, the same anchors
+ * `CFG.waves.tier.flow` is authored on. Derived from `bossEvery` rather than
+ * written out as 4/11/18/25/32/39/46, and clipped to whatever range the run
+ * was asked for so `--to 20` does not measure rung 46.
+ */
+const STREAM_RUNGS = CFG.waves.tier.flow
+  .map((_, i) => i * CFG.waves.tier.bossEvery + (CFG.waves.tier.bossEvery + 1) / 2)
+  .filter((t) => t >= FROM && t <= TO);
+const STREAM = [];
 
 for (let r = 0; r < RUNS; r++) {
   const ctx = await browser.newContext({
@@ -269,6 +283,9 @@ for (let r = 0; r < RUNS; r++) {
       tier, spend, line, cap, range, slack, benchFor, waveCap, ids, waveOf,
     }) => {
       const { CFG } = await import('../src/config.js');
+      // Imported, not restated: `budgetAt` and `threatOfWave` are what `load`
+      // itself uses, so the bench prices a wave the way the game does.
+      const { Director, threatOfWave } = await import('../src/enemies.js');
       const g = window.__sim;
       const S = 1 / 60;
 
@@ -410,11 +427,25 @@ for (let r = 0; r < RUNS; r++) {
        * march-in is run with the gun cold so the clock measures the killing
        * and not the walking.
        */
-      const waveClear = (of, cap2) => {
+      const waveClear = (of, cap2, band) => {
         clear();
         w.autoAim = false;
         w.autoFire = false;
-        const swell = w.director.scaleAt(w.director.tier).pop * CFG.waves.population;
+        /*
+         * ---- the size comes off the BUDGET from build 301 ---------------
+         *
+         * This restated `scaleAt(tier).pop * population`, which was the
+         * arithmetic `load` used while the authored numbers were counts. They
+         * are PROPORTIONS now: a wave is scaled until its threat meets
+         * `Director.budgetAt(tier, band)`. A bench that keeps its own copy of
+         * a formula reports the game it used to be -- measured, this one
+         * would have built a band-5 wave at rung 35 from the old swell and
+         * called the result a clear time for the new engine.
+         */
+        const T = threatOfWave({ of });
+        const swell = T > 0
+          ? Director.budgetAt(w.director.tier, band || 1) / T
+          : 1;
         let asked = 0;
         for (const [id, base] of of) {
           const n = Math.max(1, Math.round(base * swell));
@@ -598,15 +629,25 @@ for (let r = 0; r < RUNS; r++) {
         marks.push({ id, ttk: t, rounds, dmg, hp: hp0, at, killed: alive() === 0 });
       }
 
-      const wave = waveClear(waveOf, waveCap);
+      const wave = waveClear(waveOf.of, waveCap, waveOf.band);
       return { tier, spend, bought, gun, marks, wave };
     }, {
       tier, spend: spendAt(tier), line: LINE, cap: CAP, range: RANGE, slack: SLACK,
       benchFor: BENCH, waveCap: WAVECAP, ids: BANDS.get(bandOf(tier)) || [],
-      waveOf: HEAVIEST.get(bandOf(tier)) || [],
+      waveOf: (HEAVIEST.get(bandOf(tier)) || { of: [], band: 1 }),
     });
 
     results.get(tier).push(out);
+  }
+  /*
+   * ...and the stream, ON THE FIRST RUN ONLY. It is 120 seconds of real
+   * frames per rung against a cold gun, which is the most expensive thing in
+   * this script -- and unlike the columns above it is not a calibration
+   * surface that wants averaging. What it reports is the shape of the
+   * arrivals, and the shape does not need three draws to be read.
+   */
+  if (r === 0) {
+    for (const rung of STREAM_RUNGS) STREAM.push(await streamAt(page, rung));
   }
   await ctx.close();
 }
@@ -620,6 +661,103 @@ const med = (xs) => {
   return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
 };
 const pad = (s, n) => String(s).padStart(n);
+
+/*
+ * ---- THE STREAM, off the real director (build 301) -----------------------
+ *
+ * The one measurement nothing in this repo could make. Builds 300 and 301
+ * moved the pressure out of per-body health and into how many bodies arrive
+ * and how fast -- and every instrument here watched a single body's time to
+ * die or one authored wave's time to clear, which is why the plan's audit
+ * asks for this column by name.
+ *
+ * Four numbers a rung, all of them emergent rather than authored: ARRIVALS a
+ * second (what `emit` actually released, divided by the window), the mean
+ * STANDING field, the bodies a whole WAVE asked for, and the wave's LENGTH in
+ * seconds. The last two are the pair the plan's table states and the first
+ * two are the pair only a run can answer -- how many stand at once is arrival
+ * rate times how long a body lives, and how long a body lives depends on the
+ * margin, the round and where the assist is pointed.
+ *
+ * Driven with the turret FULLY BOUGHT and the assists on, and the reason is
+ * that the first version was not and measured the wrong thing entirely. With
+ * the gun cold the field fills to `CFG.maxEnemies` in the first few seconds,
+ * `emit`'s hard gate then refuses every release, and the arrival rate
+ * collapses to `maxEnemies / window` -- measured 0.12 to 0.76 a second
+ * against an authored 0.9 to 5.0, with ONE wave started in 120 seconds at
+ * six of the seven rungs. That is a measurement of the cap, which is a
+ * constant, and not of the rung.
+ *
+ * So the gun has to be able to clear, or nothing turns over and there is no
+ * stream to see. A fully bought turret is the FLOOR on the standing field --
+ * the most gun the tree can buy against this rung's wave -- which is the
+ * honest bound to state beside the authored rate. What a given rung's own
+ * income affords is the columns above; this one is about the shape of the
+ * arrivals.
+ */
+async function streamAt(page, rung) {
+  return page.evaluate(async (tier) => {
+    const { CFG } = await import('../src/config.js');
+    const { Director, hostileCount, threatOfWave } = await import('../src/enemies.js');
+    const g = window.__sim;
+    const w = g.world;
+    const S = 1 / 60;
+    g.restart();
+    w.phase = 'staging';
+    g.debugTeachAll();
+    g.debugClearField();
+    g.debugGiveBytes(900000000);
+    w.earned = 999999000;            // every type open, so the roster is the band's
+    g.debugBuyAll();                 // see the note above: a cold gun measures the cap
+    w.autoAim = true;
+    w.autoFire = true;
+    const d = w.director;
+    delete d.update;
+    w.spawnLock = 0;
+    d.setTier(tier);
+    d.hold = true;                   // the rung is the question; do not climb off it
+    d.probe = null; d.grace = 0;
+    const SECS = 120;
+    let released0 = w.released;
+    const standing = [];
+    /*
+     * The first wave's length counts too. It was pushed only on the SECOND
+     * transition (`if (waves > 0)`), so a window that saw one wave reported a
+     * mean length of 0.0 -- a zero from an instrument that had never been
+     * shown to read anything else.
+     */
+    let waves = 0, at = d.at, waveStart = -1, lengths = [], asked = [];
+    for (let f = 0; f < 60 * SECS; f++) {
+      // The fuse pinned out: a discharge resets the wave and empties the
+      // field, which is a second mechanism inside the one being measured.
+      d.glitch = 0; d.held = 0; d.holdFor = 0;
+      g.update(S);
+      if (d.at !== at) {
+        at = d.at;
+        if (waveStart >= 0) lengths.push((f - waveStart) / 60);
+        asked.push(d.asked);
+        waveStart = f;
+        waves++;
+      }
+      if (f % 30 === 0) standing.push(hostileCount(w));
+    }
+    const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+    const band = d.bandsFor(tier)[1];
+    return {
+      tier,
+      band,
+      arrivals: (w.released - released0) / SECS,
+      standing: mean(standing),
+      peak: Math.max(0, ...standing),
+      asked: mean(asked),
+      length: mean(lengths),
+      waves,
+      budget: Director.budgetAt(tier, band),
+      flow: Director.flowAt(tier),
+      void: threatOfWave({ of: [] }),
+    };
+  }, rung);
+}
 
 console.log(`\nTHE LADDER — tiers ${FROM}-${TO}, ${RUNS} run${RUNS > 1 ? 's' : ''} each,`
   + ' BOLT and the damage line');
@@ -786,5 +924,35 @@ if (loose.length) {
 }
 console.log('  buys     tree levels owned: the damage line first, then whatever');
 console.log('           the budget could still reach in tree order');
+
+if (STREAM.length) {
+  console.log('\nTHE STREAM — off the real director, turret fully bought, assists on');
+  console.log('  rung band  arr/s  standing  peak   asked   wave s  waves   budget  flow/s');
+  for (const x of STREAM) {
+    console.log('  ' + pad(x.tier, 4) + pad(x.band, 5) + pad(x.arrivals.toFixed(2), 7)
+      + pad(x.standing.toFixed(1), 10) + pad(x.peak, 6) + pad(x.asked.toFixed(0), 8)
+      + pad(x.length.toFixed(1), 9) + pad(x.waves, 7)
+      + pad(x.budget.toFixed(0), 9) + pad(x.flow.toFixed(2), 8));
+  }
+  const f = STREAM[0]; const l = STREAM[STREAM.length - 1];
+  console.log(`  rung ${f.tier} to ${l.tier}: arrivals x${(l.arrivals / Math.max(0.01, f.arrivals)).toFixed(2)}, `
+    + `standing x${(l.standing / Math.max(0.1, f.standing)).toFixed(2)}, `
+    + `asked x${(l.asked / Math.max(1, f.asked)).toFixed(1)}, `
+    + `wave length x${(l.length / Math.max(0.1, f.length)).toFixed(2)}`);
+  console.log('  arr/s    what emit() actually released, over 120s. The authored rate is');
+  console.log('           CFG.waves.tier.flow; this is what survives the release gate,');
+  console.log('           the field cap and the wave seams.');
+  console.log('  standing the mean hostile count. EMERGENT: arrivals times how long a');
+  console.log('           body lives, and nothing in the plan can predict it. Against a');
+  console.log('           FULLY BOUGHT turret it is the floor -- the thinnest this field');
+  console.log('           gets for any purchase set. A cold gun measures maxEnemies');
+  console.log('           instead: the field saturates and emit() stops releasing.');
+  console.log('  asked    bodies a whole wave queued, off Director.load. Proportions x');
+  console.log('           the band budget from build 301, not an authored count.');
+  console.log('  THE FUSE IS PINNED OUT. A glitch discharge resets the wave and');
+  console.log('           empties the field, which is a second mechanism inside the');
+  console.log('           one being measured -- the same fix build 300 made to the');
+  console.log('           release-gate case after three runs read 0.86, 1.02 and 0.49.');
+}
 
 if (errs.length) console.log('\n  ERRORS', errs.slice(0, 3));

@@ -3416,6 +3416,70 @@ const FORMATIONS = ['line', 'wedge', 'column', 'arc', 'cluster', 'ring'];
  * Objects that actually count against the spawn budget. Harmless drift is
  * tracked separately so raising its population can never slow the run down.
  */
+/**
+ * What one body of this type WEIGHS, in threat points. (Build 301.)
+ *
+ * Health over `CFG.waves.threatPerHp`, and nothing else -- see that field for
+ * why there is no per-mechanism term and how the derived numbers measure
+ * against the plan's anchors. Two rules make it honest:
+ *
+ *   - `harmless` is ZERO. Drift is the mortar: it thickens a field without
+ *     spending any of a wave's budget, which is the whole reason the stream
+ *     and the scenery can be tuned apart.
+ *   - a body that TOWS counts what it drags. `release()` makes the PAIR --
+ *     `debugSpawn` makes only the head, which is an instrument fault a
+ *     build-192 note published as a finding -- so a TOW weighs 135 + 280
+ *     rather than 135, and derives 13.8 against the plan's rough 10.
+ */
+export function threatOf(type) {
+  if (!type || type.harmless) return 0;
+  const towed = type.tows && TYPE_BY_ID[type.tows.type];
+  return (type.hp + (towed ? towed.hp : 0)) / CFG.waves.threatPerHp;
+}
+
+/** ...and what a whole authored wave weighs, at the proportions it is written at. */
+export function threatOfWave(wave) {
+  let T = 0;
+  for (const [id, n] of (wave && wave.of) || []) {
+    const t = TYPE_BY_ID[id];
+    if (t) T += threatOf(t) * n;
+  }
+  return T;
+}
+
+/**
+ * What a band's wave is allowed to weigh, before the tier and the walk.
+ *
+ * DERIVED from that band's own authored waves -- their mean threat -- rather
+ * than written down as a second table. So the budget follows the roster:
+ * adding a wave to a band re-prices that band by existing, which is the rule
+ * this repo keeps paying to re-learn (`world.apertures` sized 8 against 9
+ * anomalies, the lot count in four places, a gate table typed out).
+ *
+ * The MEAN and not the max, because the walk in `CFG.waves.tier.budget`
+ * averages exactly 1 across a band: the band's middle rung is the band as it
+ * was authored and the ends are spread either side of it.
+ *
+ * A wave with no hostiles contributes nothing and is skipped -- the bonus
+ * wave is 22 drifters and `of: []`, so it would otherwise drag band 1's
+ * budget down by a quarter and, worse, be handed a scale of `budget / 0`.
+ */
+const BAND_BUDGET = (() => {
+  const sums = {};
+  for (const w of WAVES) {
+    if (w.teach) continue;
+    const T = threatOfWave(w);
+    if (!(T > 0)) continue;
+    const b = w.band || 1;
+    (sums[b] = sums[b] || []).push(T);
+  }
+  const out = {};
+  for (const b of Object.keys(sums)) {
+    out[b] = sums[b].reduce((a, x) => a + x, 0) / sums[b].length;
+  }
+  return out;
+})();
+
 export function hostileCount(world) {
   let n = 0;
   // A body on its way out is not something the next wave has to wait for --
@@ -4216,10 +4280,18 @@ export class Director {
 
   /** Which authored band a tier draws from, and the one below it. */
   bandsFor(tier) {
-    // Clamped at BOTH ends. Unclamped, tier 64 asked for bands 31..5 -- a
-    // range matching nothing, which only worked because the empty-band
-    // fallback caught it. Past band 5 every tier is band 4-5 and the climb is
-    // carried by population, health and bounty, which is the intent.
+    /*
+     * Clamped at BOTH ends. Unclamped, tier 64 asked for bands 31..5 -- a
+     * range matching nothing, which only worked because the empty-band
+     * fallback caught it.
+     *
+     * `perBand` is SEVEN from build 301, so the five authored bands cover
+     * rungs 1 to 35 and rungs 36-49 still draw band 4-5. That is the part of
+     * the plan this build does not deliver: bands 6 and 7 want rosters of
+     * their own and those are the twenty objects of phase 6. It is a far
+     * shorter tail than the forty rungs `perBand: 2` left, and it is stated
+     * rather than hidden.
+     */
     const hi = Math.min(5, Math.max(1, Math.ceil(tier / CFG.waves.tier.perBand)));
     return [Math.max(1, hi - 1), hi];
   }
@@ -4253,6 +4325,35 @@ export class Director {
        */
       flow: Director.flowAt(tier) / Director.flowAt(1),
     };
+  }
+
+  /**
+   * What a wave at this rung and band is allowed to weigh, in threat points.
+   *
+   * Three factors and each answers a different question: the BAND says what
+   * kind of wave this is (derived from its own roster -- see `BAND_BUDGET`),
+   * `popStep` says how much deeper the run has got, and the WALK says where
+   * inside its band this rung sits. The walk runs across the band's six
+   * ordinary rungs and the seventh -- the one the anomaly holds -- takes the
+   * closing value rather than a step past it, because its ordinary waves are
+   * the band at its heaviest and that is what the aperture stands in front of.
+   *
+   * `population` is folded in here rather than left in `load`, so there is
+   * ONE expression that says what a wave weighs. It was two multipliers in
+   * two places, which is how a swell and a cap end up disagreeing.
+   *
+   * Static for the same reasons `flowAt` is: it depends on nothing but the
+   * rung and the band, and the probes want it without a director.
+   */
+  static budgetAt(tier, band = 1) {
+    const T = CFG.waves.tier;
+    const B = T.budget;
+    const base = BAND_BUDGET[band] || BAND_BUDGET[1] || 1;
+    // 0 on a band's first rung, 5 on its last ordinary one, 6 on the boss's.
+    const rw = (tier - 1) % T.bossEvery;
+    const span = Math.max(1, T.bossEvery - 2);
+    const walk = B.open + (B.close - B.open) * Math.min(rw, span) / span;
+    return base * (T.popStep ** (tier - 1)) * CFG.waves.population * walk;
   }
 
   /**
@@ -4832,7 +4933,31 @@ export class Director {
      * played rather than of where you had chosen to stand, and could only
      * ever go one way.
      */
-    const swell = wave.teach ? 1 : this.scaleAt(this.tier).pop * W.population;
+    /*
+     * ---- the count comes off a BUDGET now (build 301) ----------------
+     *
+     * It was `pop * population` applied to each authored count, so the
+     * numbers in `WAVES` were bodies and the tier was a volume knob on top.
+     * They are PROPORTIONS from here on: a wave is scaled until its total
+     * threat meets `Director.budgetAt`, so a wave of three BULWARKs and one
+     * of twelve MOTEs weigh the same at the same rung, and LENGTH FOLLOWS
+     * STRENGTH by construction rather than by an authored body count.
+     *
+     * Two exemptions, each of which would otherwise be a divide by zero or a
+     * tutorial that speeds up:
+     *
+     *   - a TEACH wave is authored at exactly the size it should be and is
+     *     scaled by nothing, which is the same exemption it already holds
+     *     against the release arc and the flow staircase.
+     *   - a wave with no HOSTILES weighs zero, so there is nothing to scale
+     *     and no denominator to scale by. The bonus wave is 22 drifters and
+     *     `of: []`; drift weighs zero by design (see `threatOf`) and its
+     *     count is `wave.drift`, which this never touched.
+     */
+    const authored = wave.teach ? 0 : threatOfWave(wave);
+    const swell = authored > 0
+      ? Director.budgetAt(this.tier, wave.band || 1) / authored
+      : 1;
     /*
      * What this wave is carrying, decided before a single body is made so
      * that SWARM can double the count on the way past. Seeded rather than
@@ -4941,22 +5066,44 @@ export class Director {
     if (this.wave && this.wave.teach) return 0;
     const already = new Set(this.order);
     const [lo, hi] = this.bandsFor(this.tier);
+    /*
+     * In-band only. The out-of-band list went with the starvation branch
+     * below -- collecting it and never reading it is the shape `mineScale`
+     * was in for two builds and `bundle.mjs` will ship without complaint.
+     */
     const inBand = [];
-    const rest = [];
     WAVES.forEach((wv, i) => {
       if (wv.teach || already.has(i) || !this.eligible(world, wv)) return;
       const b = wv.band || 1;
-      (b >= lo && b <= hi ? inBand : rest).push(i);
+      if (b >= lo && b <= hi) inBand.push(i);
     });
     /*
-     * Out-of-band waves are not admitted -- they are what the next shuffle()
-     * is for. The one exception is starvation: if the window has nothing to
-     * offer AND there is nothing left to play, take anything rather than stand
-     * the run in front of an empty field. begin() calls shuffle() when the
-     * order is spent, so this should be unreachable; it is here because a
-     * director with nothing to play stalls the run dead.
+     * Out-of-band waves are NEVER admitted -- they are what the next
+     * shuffle() is for, and that is now true without an exception.
+     *
+     * There used to be one, for starvation: `inBand.length || this.at + 1 <
+     * this.order.length ? inBand : rest`, under a comment saying "begin()
+     * calls shuffle() when the order is spent, so this should be
+     * unreachable". IT WAS REACHABLE, and the reason is the call order in
+     * `begin`: `admit` runs BEFORE the spent check, so on the very frame the
+     * order runs out with every in-band wave already in it, the fallback
+     * fired, spliced the out-of-band ones in, and the spent check then saw a
+     * non-empty tail and never reshuffled at all.
+     *
+     * Latent until build 301 made a band one boss slot wide. At `perBand: 2`
+     * the window at rung 20 was bands 4-5, sixteen waves, and running the
+     * pool dry on the same frame the order ended was rare; at `perBand: 7` it
+     * is bands 2-3, ten waves, and the case measured 37 of 82 waves still to
+     * play out of band. Exactly the shape the comment above describes and the
+     * fix build 199 was for, arriving a second time through a different door.
+     *
+     * Deleted rather than guarded, because `shuffle` ALREADY carries this
+     * fallback and carries it properly: if the window has nothing eligible it
+     * plays everything eligible instead. Two fallbacks for one rule is how
+     * they disagree -- and if nothing at all is eligible, `begin` leaves the
+     * order empty and sets a one-second timer, which is the real floor.
      */
-    const take = inBand.length || this.at + 1 < this.order.length ? inBand : rest;
+    const take = inBand;
     let added = 0;
     for (const i of take) {
       const room = this.order.length - this.at;
@@ -5243,10 +5390,27 @@ export class Director {
       if (c.cd === 0) c.held = Math.min(c.max, c.held + 1);
     }
 
-    // A slow trickle of aimless matter, all run, independent of the waves.
+    /*
+     * ---- the trickle of aimless matter, as MORTAR (build 301) ----------
+     *
+     * All run and independent of the waves, and from build 301 it follows
+     * the flow staircase the way `emit`'s gap does: divided by
+     * `scaleAt().flow`, so grey arrives about five and a half times faster at
+     * the ceiling than at rung 1. At a flat 4.5-8s against a band-7 field of
+     * forty hostiles it was invisible, and the mortar's point is that the
+     * field is never EMPTY -- between waves, or while the release gate waits
+     * for one to thin.
+     *
+     * It cannot crowd the stream out, and that is structural rather than
+     * lucky: drift weighs zero in the wave budget (`threatOf`), is not
+     * counted by `hostileCount`, and has its own ceiling in `CFG.maxDrift`.
+     * So the two are tuned apart, and a thick field of scenery never
+     * flatters a wave's verdict or holds the release gate shut.
+     */
     this.driftTimer -= dt;
     if (this.driftTimer <= 0) {
-      this.driftTimer = rand(CFG.waves.drift[0], CFG.waves.drift[1]);
+      this.driftTimer = rand(CFG.waves.drift[0], CFG.waves.drift[1])
+        / this.scaleAt(this.tier).flow;
       if (driftCount(world) < CFG.maxDrift) spawnDrift(world);
     }
 

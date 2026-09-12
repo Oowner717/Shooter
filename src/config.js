@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '300';
+export const BUILD = '301';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '300';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '010d8fd';
+export const REV = '13837ec';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -184,7 +184,21 @@ export const CFG = {
   // arriving later.
   maxEnemies: 57,
   maxDrops: 128,
-  maxDrift: 10, // aimless, harmless bodies alive at once
+  /*
+   * Aimless, harmless bodies alive at once -- the AMBIENT trickle's ceiling.
+   *
+   * 18 from build 301, up from 10, because drift is the MORTAR: it weighs
+   * zero in the wave budget (`threatPerHp`'s note) and is not counted by
+   * `hostileCount`, so it can thicken a field without crowding the stream or
+   * flattering a wave's verdict. At ten against a band-7 field of forty it
+   * was invisible; the trickle's interval follows the flow staircase now
+   * (see `Director.update`), so grey arrives about five times faster at the
+   * ceiling than at rung 1 and the field is never empty between waves.
+   *
+   * `waves.driftCap` 26 is the separate, higher ceiling for a wave that
+   * places drift ON PURPOSE -- the bonus wave is 22 at once.
+   */
+  maxDrift: 18,
   maxParticles: 620,
 
   // ---- waves -----------------------------------------------------------
@@ -211,7 +225,28 @@ export const CFG = {
     // matter how fast the field clears. Only the opening uses it.
     patience: 26, // ...and the longest it will ever wait for that
     gap: [0.85, 1.7], // seconds between releases inside a regular wave
-    rest: [2.6, 4.2], // quiet between two regular waves, before `press.restPer`
+    /*
+     * ---- the seam, CLOSED (build 301) ----------------------------------
+     *
+     * 2.6-4.2s until build 301, and with `press.restPer`/`restCap` on top a
+     * long wave's seam reached 6.8s. That was the only pacing the game had
+     * before the release arc and the flow staircase existed, and with both
+     * of those in place it is a hole in a stream: the field empties, the
+     * player waits, and the next wave starts from nothing.
+     *
+     * What paces the run now is the RELEASE GATE -- a wave waits for the
+     * field to be as thin as the last one was required to leave it -- which
+     * is a measurement of the player's position rather than a constant. The
+     * plan's words are that the gate should rarely be the thing waiting,
+     * because the turret is meant to be ahead; closing the seam is what
+     * makes the gate the thing that decides when it is not.
+     *
+     * `restPer` and `restCap` stay, because a long wave earning a breath is
+     * a real thing build 229 put in deliberately -- `restCap` comes down
+     * 2.6 -> 1.4 so the breath is a beat and not a lull. Worst seam goes
+     * 6.8s to 2.5s and the ordinary one 3.4s to 0.75s.
+     */
+    rest: [0.4, 1.1], // quiet between two regular waves, before `press.restPer`
     /*
      * ---- the shape of a wave, and the beat after it (build 229) ----
      *
@@ -232,7 +267,7 @@ export const CFG = {
      * `restCap` is what stops the swell at the top of the ladder turning that
      * beat into a wait. A wave of six earns 1.1s, one of thirty earns the cap.
      */
-    press: { open: 1.45, close: 0.6, restPer: 0.18, restCap: 2.6 },
+    press: { open: 1.45, close: 0.6, restPer: 0.18, restCap: 1.4 },
     // The opening is much slower on both counts. Objects join one at a time
     // with a long beat between them, because the whole point of the tutorial
     // waves is that there is time to look at each new thing.
@@ -268,10 +303,24 @@ export const CFG = {
      * scripts/tiers.mjs is what calibrates them.
      */
     tier: {
-      // Which band a tier draws from. Tier 1-2 is band 1, 3-4 band 2, and so
-      // on: two tiers per band, so a band is met and then met again heavier
-      // before anything new arrives.
-      perBand: 2,
+      /*
+       * Which band a tier draws from: `ceil(tier / perBand)`, clamped to the
+       * authored bands. SEVEN from build 301, so a band is one boss slot
+       * wide and `bossEvery` and this are the same number by design -- six
+       * ordinary rungs and then the rung the anomaly holds.
+       *
+       * It was TWO, which meant the authored table ran out at rung 9: past
+       * that every rung drew band 4-5 with bigger numbers on it, and the
+       * ladder introduced nothing new for forty rungs. At seven the five
+       * authored bands cover rungs 1 to 35 and bands 6-7 still draw band 5,
+       * because their own rosters are the twenty objects of phase 6. That is
+       * a known limit of this build rather than the shape it is aiming at.
+       *
+       * What it also does is give `budget.open`/`close` below something to
+       * walk ACROSS. A ramp over two rungs is a step; over six it is a band
+       * that opens gently and ends on its own heaviest set-piece.
+       */
+      perBand: 7,
       /*
        * ---- how many bodies a wave asks for (build 300) ------------------
        *
@@ -322,6 +371,28 @@ export const CFG = {
        * is a tutorial that stops teaching.
        */
       flow: [0.9, 1.4, 2.0, 2.7, 3.4, 4.2, 5.0],
+      /*
+       * ---- what a wave is allowed to WEIGH (build 301) ------------------
+       *
+       * The walk across a band's six ordinary rungs, as a fraction of that
+       * band's own budget. A wave is filled from its roster until the budget
+       * is met, so LENGTH FOLLOWS STRENGTH by construction and nobody
+       * authors a body count again -- the numbers in `WAVES` are proportions
+       * from here on, not counts. See `Director.budgetAt`.
+       *
+       * The two ends average exactly 1, so a band's MEAN wave is the same
+       * weight it was authored at and what changed is the distribution: rung
+       * 1 of a band is its gentlest and rung 6 its heaviest. That matters
+       * because build 300 made "rung 1 is the table exactly as authored" an
+       * asserted invariant for the three SLOPES, and this is deliberately
+       * not that -- the slopes are still 1 at rung 1 and the walk is a
+       * separate authored shape on top.
+       *
+       * The boss rung takes `close`, not a seventh step: it is the rung the
+       * anomaly holds and its ordinary waves are the band at its heaviest,
+       * which is what the aperture is standing in front of.
+       */
+      budget: { open: 0.72, close: 1.28 },
       /*
        * Health is the one slope that compounds: type health x hpStep^(n-1),
        * so tier 1 is the table as authored and each rung is 12% on the one
@@ -640,6 +711,30 @@ export const CFG = {
      * number here. 1.3 as of build 111.
      */
     population: 1.3,
+    /*
+     * ---- how much a body WEIGHS, in threat points (build 301) ----------
+     *
+     * Health divided by this, and nothing else. The plan asks for "roughly
+     * its health over thirty plus what its mechanism is worth", and the
+     * first half of that is DERIVED while the second is not written at all
+     * -- because a mechanism bonus is 43 hand-authored numbers, which is the
+     * shape that has cost this repo `world.apertures` sized 8 against 9
+     * anomalies and a lot count restated in four places. A new type is
+     * priced by existing.
+     *
+     * Measured against the plan's own anchors, health alone is close: MOTE
+     * 1.03 against 1, BLOOM 8.2 against 7, SCION 13.0 against 12, BULWARK
+     * 22.5 against 20. LURCHER derives 6.2 against a rough 4, which is the
+     * one that diverges and is left diverging: a per-type bonus is a tuning
+     * decision that wants the audit in phase 3c, not a guess now.
+     *
+     * TWO rules make it honest. `harmless` weighs ZERO -- which is why the
+     * drift mortar can thicken the field without touching the budget -- and
+     * a body that TOWS counts what it drags, because `release` makes the
+     * pair and a probe that priced the head alone would be measuring 135
+     * against the 415 the game actually sends.
+     */
+    threatPerHp: 30,
     // The next wave is allowed in once the field has thinned to a quarter of
     // what this one let out, floored at `clearTo`. Proportional rather than
     // fixed, or a fourteen-object wave would sit at the end of its patience
