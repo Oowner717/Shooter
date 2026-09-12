@@ -5109,3 +5109,115 @@ portal taken off it now, which is the assay's state. Skipped, per the working
 agreement: smoke, tiers, dps, variance, contact. The alert pills still float
 over the top of the field, which is now the top of the portal; they are
 transient and this build leaves them where they were.
+
+## Build 298 — coming through
+
+"Objects need to emerge from the portal seamlessly, smoother, naturally.
+Maybe change the animation of the spawn point from portal to something more
+simulation related. Drift floats upward, but it shouldn't. Have it float
+toward the middle band of the field and hover around there. Objects that
+leave the portal shouldn't turn around and go back through it, which Drift
+sometimes does."
+
+### Through the surface
+
+Three things made the emergence read as a body being spat out, and each has
+one fix:
+
+- **It arrived too fast.** The staged march runs at `entrySpeed` times the
+  body's cruise so the hidden depth costs the wave no time, and 297 hid the
+  march but not its speed: a LURCHER crossed the rim at 88 u/s against a
+  cruise of 40 and braked on our side of it. The target speed now eases from
+  `entrySpeed` at the top of the surface to 1 at the rim, by `portalDepth`
+  (the leading edge's depth into the ellipse, 0 to 1) — and because the
+  steering blend's time constant is close to two seconds for a LURCHER, the
+  ramp alone did nothing: measured, still 88 at the rim. So inside the
+  surface the brake is a wall: a staged body cannot be going faster than the
+  ramp says. Measured, hidden 65-99 u/s, 31 at the rim.
+- **It swayed sideways as it came out.** The march's 40-unit sway dies with
+  the same depth, so what pushes through the rim pushes straight.
+- **It kinked onto its arc on the frame it was born.** The route lateral
+  arrived whole the frame `staged` came off — a WIDE route is a 293-unit
+  sideways offset between two frames. `bornFor` is the seconds since birth
+  and the lateral blends in over `CFG.portal.settle` (0.9 s). Bodies that
+  were never born start with `bornFor` at 99 and never enter that branch,
+  so their arithmetic is untouched. It was `loose` for one suite run, which
+  crashed GNOMON: its arc pieces already carry `p.loose`, null and then an
+  object, and a counter of that name on every body turned the null into a
+  number the boss then wrote a property on. See CLAUDE.md.
+
+And the ghost pass brightens with depth on a curve that reaches nearly full
+at the bottom rim (`0.92 * depth ** 1.6`) instead of a flat half, so there is
+no step where the emerged pass takes over.
+
+### Instantiated, not flared
+
+The birth mark moved off the rim and onto the body, in the interface's own
+language: four bracket corners closing on the body — the shape the assist
+draws when it takes a target — and a scan line sweeping it top to bottom with
+a raster of hairlines below the line for the part not yet resolved. Drawn
+after the bodies by `drawInstantiate`, so it sits on top of the thing it
+marks and follows it, for `CFG.portal.instantiate` (0.6 s); the rim keeps a
+short flash where it happened. Nothing is a ring or a burst, because a birth
+is not an impact.
+
+**The first version was drawn and invisible.** One CSS pixel of half-covered
+stroke at 84% alpha, measured off the live buffer at (147, 208, 224) — there,
+and not something the eye finds against the portal's glow. And every live
+screenshot caught the tail of it: the headless rAF loop free-runs at about
+three times wall time, so an 80 ms wait after a birth is a quarter of a
+second of game. Three hairlines, a glow under the scan line, and the frames
+in this build's notes were taken with `world.timeScale = 0` and `g.draw()`.
+
+### The surface is one-way
+
+A born body whose top edge comes back within `skin` of the rim under it is
+pushed out again, harder the further in it is — a velocity floor in
+`edgeEase`, beside the side and floor eases, not a position clamp, so a body
+thrown into the surface by a PULSE sinks a little way in and comes back over
+a few frames. Keyed on `born`, which `portalBirth` is the one writer of: a
+boss's minion, a debug placement and a field spawn never came through and
+stand wherever they stand. Measured, a LURCHER thrown up at 420 u/s got 3
+units past the rim and was back in 8 frames; the same throw on a body that
+never came through went 79 in.
+
+### Drift lives in the middle band
+
+Build 78's taper — "a drift is always still coming down, just less and less
+urgently" — is gone, and so is its ruling against a band. `CFG.drift` is a
+band now: `band` of the way from the rim to the machine, `bandHalf` of that
+span either side. Above it a drift comes down at `fall` (the arrival out of
+the portal, quick); below it, knocked there, it climbs back at `climb`;
+inside it nothing pulls and the walk is a HOVER — its vertical component is
+`hover` (0.45) of its lateral one. The pull ramps over `taper` so the band
+has a soft edge. Measured over a minute with ten drift: 85% of samples inside
+the band plus twenty units, mean 15 units off its centre, none back through
+the rim.
+
+### Verified
+
+Hash before (build 297, this container) 1299530142, after 1831189433 — the
+drift's walk and the staged march both changed, so it was expected to move.
+Re-run after the ceiling change and identical, which is what "no staged body
+in that fight ever queues above the stage" looks like measured. Three suite
+runs: the first died in a GNOMON case on the `loose` clash above, before a
+single line of output, which is what a throw in `update` looks like from the
+suite; the second was 599 of 601 and found the stage ceiling above and the
+fuse case at its margin (tier 24 to 25, sweep recorded in the case); the
+third is the green one. `check-build --stamp`, the bundle booted over http.
+Skipped, per the working agreement: smoke, tiers, dps, variance, contact.
+
+### ...and the suite's second run found a 297 defect the jitter had hidden
+
+"A formation fits through it without landing on itself" failed with eight
+BULWARKs, one of them 62 units sideways after two frames. Reproduced per
+body: the top row had been snapped **200 units down** onto the row below it.
+`mouthSlots` stacks a formation upward from the mouth, and eight BULWARKs two
+abreast reach 445 above the field — eight abreast of one, which is era 1's
+mouth, reach 900 — against `STAGE_HEIGHT` 320, so the arena's ceiling clamped
+the top row into the third and the pair solver blew the pair apart. Shipped
+in 297; the row jitter of up to 30 units decided whether the overlap was
+deep enough to shove sideways, and on 297's run it was not. A staged body
+has no ceiling now (the broadphase clamps its cell indices, so a body above
+the stage costs nothing), and the arm reads the snap itself — units DOWN in
+two frames — beside the sideways shove it was written for.

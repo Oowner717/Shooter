@@ -7902,6 +7902,14 @@ if (!GUN_LINE) {
      * that holds 0s, peaks at 0.11 and stays at 24. Tier 28 is past the
      * useful window -- the loose run is drowning there on its own and blows
      * its own fuse, so there is no contrast left to measure.
+     *
+     * Tier 25 from build 298, which slowed every body's last two radii of
+     * march to its own cruise: at 24 one suite run peaked at 0.93 with no
+     * discharge while a probe run of the same tier blew twice -- the wave
+     * draw decides, at the margin. Swept 24-27 gated and loose: 24 blew 2
+     * (loose 0.19, tier 24), 25 blew 2 (loose 0.24, tier 25), 26 blew 2 but
+     * the loose run climbed to 30 on its own (peak 0.56). 25 keeps the
+     * contrast and moves the gated run off the edge.
      */
     const play = (gated) => {
       g.restart();
@@ -7913,7 +7921,7 @@ if (!GUN_LINE) {
       w.autoAim = true;
       w.autoFire = true;
       const d = w.director;
-      d.setTier(24);
+      d.setTier(25);
       const peak = [];
       let heldFrames = 0;
       let fired = 0;
@@ -20303,6 +20311,11 @@ if (MINE_LINE) {
     const bd = paint([born]);
     out.bornBelow = changed(bd, born.x - r, P.rim + 2, born.x + r, P.rim + r + 2);
     out.bornAbove = changed(bd, born.x - r, P.y - 2 * r, born.x + r, P.y - 1);
+    // ...and the emerged part is painted at FULL alpha: read as a pixel, not
+    // as a peak difference, because the ground under the rim is the rim's own
+    // glow and a white disc over a bright ground is a small difference.
+    const bi = (Math.round((P.rim + 14) * kk) * oc.width + Math.round(born.x * kk)) * 4;
+    out.bornPx = bd[bi] + bd[bi + 1] + bd[bi + 2];
     // The part of the disc below the rim is a circular SEGMENT -- the centre
     // is 10 above the chord -- and the first version of this asked for a
     // rectangle's worth (240) of a segment that measures 206 exactly.
@@ -20368,10 +20381,10 @@ if (MINE_LINE) {
   check('a staged body is drawn nowhere above the portal, ghosted inside it, and whole once through',
     rr.hidden.n === 0
     && rr.ghostIn.n > 40 && rr.ghostOut.n === 0 && rr.ghostIn.peak < 500
-    && rr.bornBelow.n >= rr.discBelow && rr.bornBelow.peak > rr.ghostIn.peak && rr.bornAbove.n === 0,
+    && rr.bornBelow.n >= rr.discBelow && rr.bornPx >= 720 && rr.bornAbove.n === 0,
     `above the top: ${rr.hidden.n} pixels changed; inside: ${rr.ghostIn.n} changed at peak `
     + `${rr.ghostIn.peak} of 765, ${rr.ghostOut.n} below the rim; straddling: ${rr.bornBelow.n} `
-    + `below the rim (at least ${rr.discBelow} for the disc) at peak ${rr.bornBelow.peak}, `
+    + `below the rim (at least ${rr.discBelow} for the disc), painted at ${rr.bornPx} of 765, `
     + `${rr.bornAbove.n} above the centre line`);
 
   check('...and a birth is marked on the rim on the frame the body clears it, and is gone in a second',
@@ -20385,6 +20398,186 @@ if (MINE_LINE) {
   check('...and Game.draw paints every body exactly once, in the throat or out of it',
     rr.drawThroat === 1 && rr.drawLoose === 1,
     `the staged body was painted ${rr.drawThroat} times and the loose one ${rr.drawLoose}`);
+}
+
+// --- coming through, from build 298 ------------------------------------------
+/*
+ * Three things a body owes the surface it comes through, and one the drift
+ * owes the field. It SLOWS through the surface and leaves at its own cruise,
+ * because a body arriving at 2.6 times its cruise and braking on our side of
+ * the rim reads as spat out -- and the brake has to be a wall, not a blend,
+ * because a LURCHER's steering time constant is close to two seconds. It is
+ * MARKED on the body, not on the rim, and the mark follows it. It never goes
+ * BACK: the surface is one-way for anything born through it, and for nothing
+ * else. And DRIFT lives in the middle band of the field and hovers there,
+ * which is what "it floats upward but shouldn't" asked for.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { release, spawnDrift } = await import('../src/enemies.js');
+    const { drawInstantiate } = await import('../src/portal.js');
+    const { background } = await import('../src/background.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    const clean = () => {
+      g.restart();
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugClearField();
+      w.director.timer = 1e9;
+      w.director.driftTimer = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+    };
+
+    // ---- the ramp: fast while hidden, its own cruise at the rim --------------
+    const march = () => {
+      const P = w.portal;
+      const line = P ? P.rim : CFG.entryDepth;
+      const top = P ? P.top : line - 2 * CFG.portal.ry;
+      const [e] = release(w, TYPE_BY_ID.lurcher, w.width / 2, top - 200);
+      e.vx = 0; e.vy = 0;
+      let hiddenMax = 0;
+      let atRim = null;
+      let bornAt = -1;
+      for (let i = 0; i < 60 * 15 && bornAt < 0; i++) {
+        g.update(1 / 60);
+        const v = Math.hypot(e.vx, e.vy);
+        if (e.staged && e.y + e.r < top - 20) hiddenMax = Math.max(hiddenMax, v);
+        if (!e.staged) { bornAt = i; atRim = v; }
+      }
+      const res = { cruise: +e.cruise.toFixed(1), hiddenMax: +hiddenMax.toFixed(1), atRim: atRim === null ? null : +atRim.toFixed(1),
+        bornAt, born: e.born, bornFor: +e.bornFor.toFixed(2) };
+      e.dead = true;
+      return res;
+    };
+    clean();
+    out.ramp = march();
+    // ...and the control: with no surface there is nothing to slow in, and
+    // the line is crossed at the old march speed -- which is the instrument
+    // reading a fast crossing at all.
+    clean();
+    w.portal = null;
+    out.loose = march();
+    g.resize();
+    out.portalBack = !!w.portal;
+
+    // ---- the mark is on the body, and follows it ----------------------------
+    clean();
+    const P = w.portal;
+    const [m] = release(w, TYPE_BY_ID.lurcher, P.x + 20, P.top - 60);
+    m.vx = 0;
+    for (let i = 0; i < 60 * 12 && m.staged; i++) g.update(1 / 60);
+    out.markOn = P.births.length === 1 && P.births[0].e === m;
+    const oc = document.createElement('canvas');
+    oc.width = Math.ceil(w.width);
+    oc.height = Math.ceil(w.floorY);
+    const oct = oc.getContext('2d', { willReadFrequently: true });
+    const litNear = (x, y, reach) => {
+      oct.setTransform(1, 0, 0, 1, 0, 0);
+      oct.clearRect(0, 0, oc.width, oc.height);
+      drawInstantiate(oct, w, background.mood);
+      const d = oct.getImageData(0, 0, oc.width, oc.height).data;
+      let n = 0;
+      for (let yy = Math.max(0, Math.floor(y - reach)); yy < Math.min(oc.height, y + reach); yy++) {
+        for (let xx = Math.max(0, Math.floor(x - reach)); xx < Math.min(oc.width, x + reach); xx++) {
+          if (d[(yy * oc.width + xx) * 4 + 3] > 8) n++;
+        }
+      }
+      return n;
+    };
+    const x0 = m.x; const y0 = m.y;
+    out.litAtBody = litNear(x0, y0, m.r * 2.4);
+    // Move the body well clear and hold the clock, so the mark has not aged.
+    m.x = x0 + 40; m.y = y0 + 170;
+    out.litAtOld = litNear(x0, y0, m.r * 2.4);
+    out.litAtNew = litNear(m.x, m.y, m.r * 2.4);
+    out.litFar = litNear(x0 - 300, y0 + 400, m.r * 2.4);
+    // ...and it is gone once the body is.
+    m.dead = true;
+    g.update(1 / 60);
+    out.markGone = P.births.length === 0;
+
+    // ---- the surface is one-way, and only for what came through it -------
+    clean();
+    const Pc = w.portal;
+    const thrown = g.debugSpawn('lurcher', Pc.x + 20, Pc.rim + 60);
+    thrown.staged = false; thrown.born = true; thrown.bornFor = 5; thrown.vx = 0; thrown.vy = -420;
+    const free = g.debugSpawn('lurcher', Pc.x - 120, Pc.rim + 60);
+    free.staged = false; free.born = false; free.vx = 0; free.vy = -420;
+    let thrownMin = 1e9; let freeMin = 1e9; let backAt = -1;
+    for (let i = 0; i < 90; i++) {
+      g.update(1 / 60);
+      thrownMin = Math.min(thrownMin, thrown.y - thrown.r - Pc.rim);
+      freeMin = Math.min(freeMin, free.y - free.r - Pc.rim);
+      if (backAt < 0 && i > 5 && thrown.y - thrown.r >= Pc.rim - 2 && thrown.vy >= 0) backAt = i;
+    }
+    out.oneWay = { thrownMin: +thrownMin.toFixed(1), freeMin: +freeMin.toFixed(1), backAt,
+      endTop: +(thrown.y - thrown.r - Pc.rim).toFixed(1), endVy: +thrown.vy.toFixed(1) };
+
+    // ---- DRIFT lives in the middle band --------------------------------------
+    clean();
+    const drifts = [];
+    for (let k = 0; k < 10; k++) drifts.push(spawnDrift(w, {}));
+    const rim = w.portal.rim;
+    const span = w.shooter.y - rim;
+    const home = rim + span * CFG.drift.band;
+    const half = span * CFG.drift.bandHalf;
+    let reenter = 0; let inBand = 0; let samples = 0; const ys = [];
+    for (let i = 0; i < 60 * 60; i++) {
+      g.update(1 / 60);
+      for (const d of drifts) {
+        if (d.dead || d.staged || !d.born || d.bornFor < 1) continue;
+        if (d.y - d.r < rim - 2) reenter++;
+        if (i >= 60 * 20 && i % 30 === 0) { samples++; ys.push(d.y); if (Math.abs(d.y - home) <= half + 20) inBand++; }
+      }
+    }
+    out.drift = { alive: drifts.filter((d) => !d.dead).length, staged: drifts.filter((d) => d.staged).length,
+      reenter, share: +(inBand / Math.max(1, samples)).toFixed(2),
+      meanOff: +((ys.reduce((a, b) => a + b, 0) / Math.max(1, ys.length)) - home).toFixed(0),
+      half: +half.toFixed(0), spread: +(Math.max(...ys) - Math.min(...ys)).toFixed(0), samples };
+    for (const d of drifts) d.dead = true;
+
+    delete w.director.update;
+    w.spawnLock = 0;
+    g.restart();
+    return out;
+  });
+
+  check('a body slows through the surface and comes out at its own cruise',
+    r.ramp.bornAt > 0 && r.ramp.hiddenMax >= r.ramp.cruise * 1.8 && r.ramp.atRim <= r.ramp.cruise * 1.2
+    && r.ramp.born === true && r.ramp.bornFor < 1
+    && r.loose.bornAt > 0 && r.loose.atRim >= r.loose.cruise * 1.8 && r.portalBack,
+    `hidden it reached ${r.ramp.hiddenMax} u/s against a cruise of ${r.ramp.cruise}, and crossed the `
+    + `rim at ${r.ramp.atRim} (born ${r.ramp.born}, born for ${r.ramp.bornFor}s); with no surface the same `
+    + `march crossed the line at ${r.loose.atRim} against ${r.loose.cruise} -- which is the old `
+    + `spat-out crossing, and the instrument reading it; portal back ${r.portalBack}`);
+
+  check('...and it is marked on the BODY, the mark follows it, and goes when it goes',
+    r.markOn && r.litAtBody > 200 && r.litAtNew > 200 && r.litAtOld < r.litAtBody * 0.1
+    && r.litFar === 0 && r.markGone,
+    `the birth holds the body ${r.markOn}; ${r.litAtBody} pixels lit round it, ${r.litAtNew} round `
+    + `where it moved to and ${r.litAtOld} round where it was (${r.litFar} far away); gone with the `
+    + `body ${r.markGone}`);
+
+  check('...and the surface is one-way for what came through it, and open to what did not',
+    r.oneWay.thrownMin > -8 && r.oneWay.backAt > 0 && r.oneWay.backAt < 40 && r.oneWay.endVy >= 0
+    && r.oneWay.freeMin < -30,
+    `a born body thrown up at 420 u/s got ${r.oneWay.thrownMin} units past the rim and was back `
+    + `on frame ${r.oneWay.backAt}, ending ${r.oneWay.endTop} below it at ${r.oneWay.endVy} u/s; `
+    + `a body that never came through went ${-r.oneWay.freeMin} units in`);
+
+  check('DRIFT floats to the middle band, hovers there, and never goes back through',
+    r.drift.staged === 0 && r.drift.reenter === 0 && r.drift.share >= 0.6
+    && Math.abs(r.drift.meanOff) <= r.drift.half && r.drift.spread > 50 && r.drift.samples >= 100,
+    `${r.drift.alive} of 10 alive and ${r.drift.staged} still staged after a minute; ${r.drift.reenter} `
+    + `frames with one back through the rim; ${(r.drift.share * 100).toFixed(0)}% of ${r.drift.samples} `
+    + `samples inside the band (mean ${r.drift.meanOff} from its centre, half height ${r.drift.half}), `
+    + `spread ${r.drift.spread} -- so they move`);
 }
 
 // --- the sky and the bed that go with the field ------------------------------
@@ -20665,10 +20858,19 @@ if (MINE_LINE) {
         }
       }
       const before = made.map((e) => e.x);
+      const beforeY = made.map((e) => e.y);
       for (let i = 0; i < 2; i++) g.update(1 / 60);
       const moved = Math.max(...made.map((e, i) => Math.abs(e.x - before[i])));
+      /*
+       * ...and DOWN, which is the snap itself: the stage ceiling clamped the
+       * top row of eight BULWARKs 200 units onto the row below it, and the
+       * sideways shove this arm was written for followed only when the row
+       * jitter happened to offset the pair. Two frames of march is a few
+       * units; a clamp is a couple of hundred.
+       */
+      const dropped = Math.max(...made.map((e, i) => e.y - beforeY[i]));
       rows.push({ id, n: made.length, outside, gapMin: +(closest === Infinity ? 99 : closest).toFixed(1),
-        moved: +moved.toFixed(2) });
+        moved: +moved.toFixed(2), dropped: +dropped.toFixed(1) });
     }
     out.packs = rows;
     // ...and put the director back, or every case after this one starves.
@@ -20709,10 +20911,10 @@ if (MINE_LINE) {
     + `resize ${r.portalBack} — without this arm the cases above pass on a build `
     + `that released nothing`);
 
-  check('...and a formation fits through it without landing on itself',
-    r.packs.every((p) => p.outside === 0 && p.gapMin >= 7 && p.moved < 6),
+  check('...and a formation fits through it without landing on itself, or on the stage ceiling',
+    r.packs.every((p) => p.outside === 0 && p.gapMin >= 7 && p.moved < 6 && p.dropped < 30),
     r.packs.map((p) => `${p.id}x${p.n}: ${p.outside} outside, closest pair `
-      + `${p.gapMin} apart, frame 2 moved ${p.moved}`).join('; '));
+      + `${p.gapMin} apart, frame 2 moved ${p.moved} across and ${p.dropped} down`).join('; '));
 }
 
 // --- the wall is one-way, and the one way is theirs ------------------------

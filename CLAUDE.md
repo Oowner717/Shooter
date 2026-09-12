@@ -2569,4 +2569,46 @@ came from before believing the other one covers it.
   era 1 and drift is staged through the portal, so every spawn x lands
   somewhere else; the `Math.random` call order is untouched. Both numbers
   were taken in one session, per the differential rule above.
+- **The headless rAF loop free-runs at about three times wall time, so a
+  live screenshot of a sub-second effect is a screenshot of its tail.**
+  Build 298's birth mark lasts 0.6 s; an 80 ms wait after the birth was a
+  quarter second of game and every frame captured showed it nearly faded.
+  Hold `world.timeScale = 0`, call `g.draw()`, then shoot. And a mark can be
+  THERE and invisible: read off the live buffer the first version's stroke
+  was (147, 208, 224) at the corner -- a half-covered CSS pixel -- while a
+  bright-pixel threshold of 600 reported zero. Measure the pixel, then ask
+  whether an eye would.
+- **A speed ramp on the steering TARGET is not a speed ramp on the body.**
+  `drive` blends velocity toward `dx * cruise` at `k = accel / 100`, a time
+  constant near two seconds for a LURCHER, so easing the target from 2.6x
+  to 1x across the portal's 116 units changed nothing measurable: 88 u/s at
+  the rim before and after. Inside the surface the brake is a wall (the
+  velocity is scaled down to the ramp's cruise), and the case asserts the
+  crossing speed against the body's own cruise with a no-portal control that
+  still reads the fast one.
+- **A new field on `Enemy` has to be grepped against the BOSS modules
+  first.** They write their own fields onto the bodies they make, and
+  `Enemy.update` runs on those bodies too. Build 298's seconds-since-birth
+  counter was named `loose` for one suite run; GNOMON keeps `p.loose` on its
+  arc pieces (null, then an object), `null < 10` is true, `null + dt` is a
+  number, and the boss threw on `p.loose.a` -- the suite died at the first
+  GNOMON case with no case output at all. `grep -n "\.NAME\b" src/*.js`
+  before declaring; the field is `bornFor` now.
+- **The stage ceiling is for what is LOOSE; a formation queued through the
+  mouth is a stack and it can be tall.** `mouthSlots` builds rows upward
+  from the mouth, and eight BULWARKs two abreast reach 445 above the field
+  (900 at era 1's one-wide mouth) against `STAGE_HEIGHT` 320 -- so the
+  arena clamp snapped the top row 200 units onto the row below and the pair
+  solver shoved the pair sideways, out of the mouth. Shipped in 297 and hidden
+  by the row jitter until one run of 298's suite. A staged body skips the
+  ceiling now. And a case for a stack that "fits" has to read the SNAP --
+  units down in two frames -- not only the shove it may or may not cause.
+- **The portal's surface is one-way, and `born` is the key.** `portalBirth`
+  is the one writer of `born` and `bornFor`; `edgeEase` pushes a born body
+  back out of the rim it came through, and nothing else is refused -- a
+  boss's minion, a debug placement and a field spawn never came through.
+  DRIFT lives in a band across the middle of the field from 298
+  (`CFG.drift.band`/`bandHalf`), which reverses build 78's ruling against a
+  band by request; the hash moved (1299530142 to 1831189433) for the drift's walk
+  and the surface brake, both expected.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

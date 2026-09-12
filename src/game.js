@@ -42,7 +42,7 @@ import { Sandbox, eraShut } from './sandbox.js';
 import { ledger, soak } from './ledger.js';
 import { updateDummy } from './dummy.js';
 import { syncYard, updateYard, drawYard, lotAt, refuseLot, shielded, wallLine } from './yard.js';
-import { syncPortal, updatePortal, drawPortal } from './portal.js';
+import { syncPortal, updatePortal, drawPortal, drawInstantiate } from './portal.js';
 import { syncGuns, updateGuns, drawGuns, gunGlow, buildGun, lotPrice, gunCount } from './turrets.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
@@ -2893,7 +2893,19 @@ export class Game {
        * away, which is the whole geometric premise of that fight.
        */
       if (b.pinned) continue;
-      const impact = clampToArena(b, w.width, STAGE_HEIGHT, w.floorY);
+      /*
+       * No ceiling on a STAGED body. The stage is how far above the screen
+       * a loose body may be thrown; a body queued for the portal is not
+       * loose, it is in a stack that `mouthSlots` builds upward from the
+       * mouth, and eight BULWARKs two abreast reach 445 above the field
+       * against a stage of 320 -- so the top row was snapped down onto the
+       * row below it and the pair solver blew the pair apart, sideways, out
+       * of the mouth. Shipped in 297 and hidden by the row jitter until one
+       * suite run; the formation case reads the snap directly now. The
+       * broadphase clamps its cell indices, so a body above the stage is
+       * binned in the top row and costs nothing.
+       */
+      const impact = clampToArena(b, w.width, b.staged ? Infinity : STAGE_HEIGHT, w.floorY);
       if (impact > 240) {
         spark(b.x, b.y, spread(impact), spread(impact), b.type.glow, 0.18, 1.8);
       }
@@ -3842,6 +3854,8 @@ export class Game {
     for (const c of w.debris) c.draw(ctx);
     for (const e of w.drops) e.draw(ctx, w);
     for (const e of w.enemies) if (!throat.has(e)) e.draw(ctx, w);
+    // The mark on a body just born, on top of the body it marks.
+    drawInstantiate(ctx, w, background.mood);
     // Over its own bodies: the frame's cables, the repair beams and the halo
     // belong on top of the segments they run between.
     if (w.boss) w.boss.draw(ctx, w);

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '297';
+export const BUILD = '298';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '297';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '806cdae';
+export const REV = '996918d';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -645,23 +645,28 @@ export const CFG = {
   // and they stop sinking here.
   drift: {
     /*
-     * How the grey objects come down.
+     * Where the grey objects LIVE, from build 298: a band across the middle
+     * of the field, `band` of the way from the portal's rim to the machine
+     * and `bandHalf` of that span either side of it. A drift born through
+     * the portal comes down to it at `fall`, a drift knocked below it comes
+     * back up at `climb`, and inside it the walk is a HOVER -- the random
+     * walk's vertical component is `hover` of its lateral one, so it bobs
+     * where it is rather than wandering off. The pull outside the band ramps
+     * to full over `taper` units and overrules `sink` of the walk at full.
      *
-     * Not a band. Builds 78 tried holding them in one a quarter of the way
-     * down, pulled back from both sides, and a two-sided pull is a wall
-     * however softly it is written — they could not get past it, and the
-     * bottom two thirds of the field had no grey in it at all.
-     *
-     * It is a taper instead. The descent is quick at the top and eases off
-     * with depth, and `crawl` is the fraction of it that never goes away: a
-     * drift is always still coming down, just less and less urgently the
-     * lower it gets. Nothing stops it, nothing sends it back, and it will
-     * reach the turret eventually if it is left alone.
+     * A band was tried at build 78 and rejected because "the bottom two
+     * thirds of the field had no grey in it". That is the design now, asked
+     * for by name: drift floats to the middle and hovers there, and it never
+     * goes back up through the portal -- which is the surface's rule, not
+     * the walk's; see `edgeEase`.
      */
-    fall: 300, // downward speed at the very top of the screen
-    taper: 420, // world units over which that eases off
-    crawl: 0.05, // ...and what is always left of it, however deep
-    sink: 0.95, // how much of the wander the descent overrules at full urge
+    band: 0.5, // the band's centre, as a fraction of rim-to-machine
+    bandHalf: 0.16, // ...and its half height, as a fraction of the same
+    fall: 300, // speed of the descent into it out of the portal
+    climb: 90, // ...and of the climb back up when knocked below it
+    taper: 110, // world units outside the band over which the pull reaches full
+    hover: 0.45, // the walk's vertical share inside the band
+    sink: 0.95, // how much of the walk the pull overrules at full
   },
 
   // ---- shooter --------------------------------------------------------
@@ -5212,6 +5217,16 @@ CFG.title = {
  */
 CFG.portal = {
   rx: 128, ry: 58, pad: 16, mouth: 0.82, spill: 150,
+  /*
+   * ---- how a body comes THROUGH, from build 298 ----
+   * `settle` is the seconds after birth over which a body's route lateral
+   * blends in, so it leaves the rim on the heading it arrived with and
+   * curves onto its own arc rather than turning on the frame it is born.
+   * `instantiate` is how long the birth mark stays on the body. `skin` and
+   * `refuse` are the one-way surface: a born body whose top edge comes back
+   * within `skin` of the rim is pushed out at `refuse` u/s per unit it is in.
+   */
+  settle: 0.9, instantiate: 0.6, skin: 4, refuse: 4,
 };
 
 CFG.yard = {

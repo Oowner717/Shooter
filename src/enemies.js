@@ -4,7 +4,7 @@
 
 import { CFG, WAVES, TYPE_BY_ID, ROUTES, massOf, kB } from './config.js';
 import { traitsFor, traitAt, has as hasTrait, TRAIT_BY_ID } from './traits.js';
-import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow } from './util.js';
+import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow, smoothstep } from './util.js';
 import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul, edgeHit } from './fx.js';
 import { audio } from './audio.js';
 import { shed } from './debris.js';
@@ -12,7 +12,7 @@ import { contactAt } from './physics.js';
 import { ledger } from './ledger.js';
 import { drawDummy, dummyHit } from './dummy.js';
 import { shielded } from './yard.js';
-import { throughMouth, mouthSlots, entryLine, portalBirth } from './portal.js';
+import { throughMouth, mouthSlots, entryLine, portalBirth, portalDepth, rimUnder } from './portal.js';
 import { ARSENAL } from './arsenal.js';
 
 /*
@@ -359,6 +359,24 @@ export class Enemy {
      * existence at the spawn site, for the reason `placed` and `fizzle` are.
      */
     this.fan = 0;
+    /*
+     * Whether this body came through the portal, and how long it has been
+     * loose since. `born` is what the one-way surface keys on (`edgeEase`):
+     * a boss's minion, a debug placement and a field spawn never came
+     * through and may stand wherever they stand. `bornFor` is the seconds
+     * since birth and blends the route lateral in (`drive`), so a body
+     * leaves the rim on the heading it arrived with; it starts large on
+     * everything that was never born, so those get their arc at once, and
+     * `portalBirth` is the one writer of both.
+     *
+     * NOT `loose`, which it was for one suite run: GNOMON keeps `p.loose` on
+     * its arc pieces -- null, then an object -- and a counter of the same
+     * name on every body turned that null into 0.0167 and the boss threw on
+     * `p.loose.a`. A new field on Enemy has to be grepped against the boss
+     * modules, which write their own fields onto bodies they make.
+     */
+    this.born = false;
+    this.bornFor = 99;
     // Debris used to expire after 22-30s. It does not any more: a fragment
     // carries salvage, and salvage that rots is a clock the player is losing
     // to. The floor drains by being collected instead — pulled into the
@@ -477,31 +495,41 @@ export class Enemy {
       this.wanderAngle += spread(1.9);
     }
     const slow = this.frozen(world) ? 0.12 : 1;
-    let cruise = this.cruise * slow;
     const k = (this.accel / 100) * slow * 0.9;
-    let dx = Math.cos(this.wanderAngle);
-    let dy = Math.sin(this.wanderAngle);
-
-    // Quick in at the top, easing off with depth, and never stopped. There
-    // is no band and no floor: `crawl` is the fraction of the descent that
-    // always remains, so a drift is forever still coming down — just less and
-    // less urgently — and will reach the turret if it is left alone.
-    //
-    // Build 78 held them in a band and pulled them back from below, which is a
-    // wall however gently it is written: the bottom two thirds of the field
-    // had no grey in it at all.
     const D = CFG.drift;
-    const ease = D.crawl + (1 - D.crawl) * Math.exp(-Math.max(this.y, 0) / D.taper);
-    const urge = D.sink * ease;
+    // A HOVER: the walk is mostly sideways, so a drift that has arrived bobs
+    // where it is rather than wandering up out of the band it lives in.
+    let dx = Math.cos(this.wanderAngle);
+    let dy = Math.sin(this.wanderAngle) * D.hover;
+
+    /*
+     * Where it lives: a band across the middle of the field, measured from
+     * the portal's rim to the machine so it is the same PLACE on every
+     * screen and at either era. Above the band it comes down at `fall` --
+     * this is the arrival out of the portal, and it should be quick; below
+     * it, knocked there by a shove or a shot, it climbs back at `climb`.
+     * Inside, nothing pulls, and the walk is the whole of the motion. The
+     * pull ramps over `taper` so the band has a soft edge rather than a
+     * wall -- which is what build 78's band was, and why it was taken out.
+     * Never back UP through the portal, but that is not this method's rule:
+     * the surface is one-way for everything born through it, in `edgeEase`.
+     */
+    const rim = entryLine(world, ENTRY_Y);
+    const span = Math.max(1, world.shooter.y - rim);
+    const home = rim + span * D.band;
+    const half = span * D.bandHalf;
+    const off = this.y - home;
+    let pull = 0;
+    if (off < -half) pull = clamp((-half - off) / D.taper, 0, 1);
+    else if (off > half) pull = -clamp((off - half) / D.taper, 0, 1);
+    const urge = Math.abs(pull) * D.sink;
     dx *= 1 - urge;
-    dy = dy * (1 - urge) + urge;
+    dy = dy * (1 - urge) + pull * D.sink;
     const n = Math.hypot(dx, dy) || 1;
     dx /= n;
     dy /= n;
-    // ...and it comes down at a pace worth watching. At wander speed the first
-    // one reached the field a good ten seconds after the first hostile, which
-    // is not what "the safe thing arrives first" means.
-    cruise = (this.cruise + (D.fall - this.cruise) * ease) * slow;
+    const pace = pull > 0 ? D.fall : D.climb;
+    const cruise = (this.cruise + (pace - this.cruise) * Math.abs(pull)) * slow;
 
     this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);
     this.vy += (dy * cruise - this.vy) * clamp(k * dt, 0, 1);
@@ -552,6 +580,23 @@ export class Enemy {
     if (below < E.floorEase) {
       const urge = (1 - Math.max(below, 0) / E.floorEase) ** 2;
       this.vy -= E.edgePush * urge * slow * dt;
+    }
+    /*
+     * ---- and the surface is ONE-WAY, from build 298 ----
+     * A body that came through the portal does not go back through it. A
+     * drift's walk used to send it up out of the rim it had just come out
+     * of, and a PULSE can throw anything that way. A born body whose top
+     * edge comes back within `skin` of the rim under it is pushed out again,
+     * harder the further in it is -- a velocity floor and not a position
+     * clamp, so a body shoved hard into the surface sinks a little way in
+     * and comes back out over a few frames rather than snapping. Keyed on
+     * `born`: a boss's minion, a debug placement and a field spawn never
+     * came through and may stand wherever they stand.
+     */
+    if (this.born && !this.staged && world.portal) {
+      const C = CFG.portal;
+      const into = rimUnder(world, this.x) + this.r + C.skin - this.y;
+      if (into > 0) this.vy = Math.max(this.vy, Math.min(into, 60) * C.refuse);
     }
   }
 
@@ -838,7 +883,9 @@ export class Enemy {
       // down, drifting a little as it falls. The target sits below the entry
       // line rather than on it, or a body eases to a halt just short of the
       // line it is supposed to cross.
-      tx = this.x + Math.sin(t * 0.6 + this.phase) * 40;
+      // ...and the sway dies away as the body enters the surface, so what
+      // pushes through the rim pushes straight rather than sliding along it.
+      tx = this.x + Math.sin(t * 0.6 + this.phase) * 40 * (1 - portalDepth(world, this));
       ty = entryLine(world, ENTRY_Y) + 60;
     } else {
       tx = world.shooter.x;
@@ -898,6 +945,15 @@ export class Enemy {
        */
       let lateral = routeLateral(r, d, this.routeScale, this.routeSide);
       if (r.weave) lateral *= Math.sin(t * r.weave + this.phase);
+      /*
+       * A body just born curves ONTO its arc rather than turning onto it. The
+       * lateral used to arrive whole on the frame `staged` came off, which on
+       * a WIDE route is a 293-unit sideways offset appearing between two
+       * frames -- the body visibly kinked at the rim. Blended in over
+       * `settle`; a body that was never born has `bornFor` at 99 and never
+       * enters this branch, so its arithmetic is untouched.
+       */
+      if (this.bornFor < CFG.portal.settle) lateral *= this.bornFor / CFG.portal.settle;
       tx += -dy * lateral;
       ty += dx * lateral;
       dx = tx - this.x;
@@ -921,7 +977,20 @@ export class Enemy {
     // object crossing it at its own cruise would spend five seconds getting
     // there — the point of the depth is where things are engaged, not how long
     // the run takes to hand them over.
-    if (this.staged) cruise *= CFG.entrySpeed;
+    /*
+     * ...and it SLOWS THROUGH THE SURFACE. The march is hidden above the
+     * portal's centre line, so there is nothing to see it be fast; what is
+     * seen is the last two radii of it, and a body arriving at 2.6 times
+     * its own cruise and braking on our side of the rim read as spat out.
+     * The multiplier eases from `entrySpeed` at the top of the surface to 1
+     * at the rim, so a body comes through at the speed it will go on at.
+     * Zero depth -- above the surface, or no portal at all -- keeps the
+     * one-line arithmetic this had before, to the bit.
+     */
+    if (this.staged) {
+      const depth = portalDepth(world, this);
+      cruise *= depth > 0 ? 1 + (CFG.entrySpeed - 1) * (1 - smoothstep(depth)) : CFG.entrySpeed;
+    }
     // loiterers hang back at mid range before making their run
     if (this.route.dawdle && !this.staged) {
       /*
@@ -966,6 +1035,23 @@ export class Enemy {
 
     this.vx += (dx * cruise - this.vx) * clamp(k * dt, 0, 1);
     this.vy += (dy * cruise - this.vy) * clamp(k * dt, 0, 1);
+    /*
+     * ...and INSIDE THE SURFACE the brake is a wall, not a blend. The target
+     * speed above eases to the body's own cruise at the rim, but `k` is the
+     * body's accel over its cruise -- a LURCHER's time constant is close to
+     * two seconds -- so the body was still at 88 u/s against a cruise of 40
+     * on the frame it came through: the ramp was written and the velocity
+     * had not heard. The surface is viscous: a staged body in it cannot be
+     * going faster than the ramp says. Above the surface `depth` is 0 and
+     * nothing here runs, so the hidden march is what it was.
+     */
+    if (this.staged) {
+      const sp = Math.hypot(this.vx, this.vy);
+      if (sp > cruise && portalDepth(world, this) > 0) {
+        this.vx *= cruise / sp;
+        this.vy *= cruise / sp;
+      }
+    }
 
     if (this.frozen(world)) {
       const f = Math.exp(-1.6 * dt);
@@ -999,6 +1085,7 @@ export class Enemy {
       return;
     }
     if (this.spawnIn > 0) this.spawnIn = Math.max(0, this.spawnIn - dt * 2.2);
+    if (this.bornFor < 10) this.bornFor += dt;
     this.flash = Math.max(0, this.flash - dt * 4.5);
     if (this.slugged > 0) this.slugged = Math.max(0, this.slugged - dt);
     if (this.plow > 0) this.plow = Math.max(0, this.plow - dt);

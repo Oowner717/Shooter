@@ -115,7 +115,11 @@ export function throughMouth(world, x, r) {
  * against a 968-wide field, and no mouth passes that with its spacing intact.
  * `pitch` is `2r + 8`, so overlap is impossible by construction, and the
  * stack is hidden -- everything above the portal's centre line is drawn
- * nowhere, see `drawPortal`.
+ * nowhere, see `drawPortal`. It may be TALL: eight BULWARKs two abreast
+ * reach 445 above the field and eight abreast of one (era 1) reach 900,
+ * against a stage of 320, and the arena's ceiling used to snap the top of
+ * the stack onto the row below. A staged body has no ceiling from build
+ * 298 (`Game.update`, at the clamp).
  */
 export function mouthSlots(world, r, gap, count) {
   const P = world.portal;
@@ -138,16 +142,40 @@ function rimAt(P, x) {
   return P.y + P.ry * Math.sqrt(1 - u * u);
 }
 
+/** The same, for callers outside this file. `-Infinity` without a portal. */
+export function rimUnder(world, x) {
+  const P = world.portal;
+  return P ? rimAt(P, x) : -Infinity;
+}
+
+/**
+ * How far a body's LEADING edge is into the surface: 0 above the portal's
+ * top rim (or with no portal at all), 1 at the bottom one. What the march
+ * slows by, what the sway dies by, and what the ghost pass fades by -- one
+ * number, so the three cannot disagree about where the surface is.
+ */
+export function portalDepth(world, e) {
+  const P = world.portal;
+  if (!P) return 0;
+  return clamp((e.y + e.r - P.top) / (2 * P.ry), 0, 1);
+}
+
 /**
  * A body has cleared the rim. Called from the one place `staged` comes off,
  * for a body that came through the mouth -- something put down on the field
- * by the debug picker is not a birth and gets no flare.
+ * by the debug picker is not a birth and gets no mark.
+ *
+ * The ONE writer of `born` and `bornFor`. `born` is what the one-way surface
+ * keys on and `bornFor` is what the route lateral blends in over; both are
+ * declared in the constructor.
  */
 export function portalBirth(world, e) {
   const P = world.portal;
   if (!P || Math.abs(e.x - P.x) > P.rx + e.r) return false;
+  e.born = true;
+  e.bornFor = 0;
   if (P.births.length >= 24) P.births.shift();
-  P.births.push({ x: e.x, r: e.r, t: 0, life: 0.8 });
+  P.births.push({ e, x: e.x, r: e.r, t: 0, life: CFG.portal.instantiate });
   P.flare = 1;
   return true;
 }
@@ -161,7 +189,8 @@ export function updatePortal(world, dt) {
   for (let i = P.births.length - 1; i >= 0; i--) {
     const b = P.births[i];
     b.t += dt;
-    if (b.t >= b.life) P.births.splice(i, 1);
+    // A mark on a body that has already gone is a mark on nothing.
+    if (b.t >= b.life || (b.e && b.e.dead)) P.births.splice(i, 1);
   }
 }
 
@@ -337,10 +366,18 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
     ctx.beginPath();
     ctx.ellipse(P.x, P.y, P.rx, P.ry, 0, 0, TAU);
     ctx.clip();
+    /*
+     * The ghost brightens with depth on a curve that reaches nearly full at
+     * the bottom rim, so the frame the emerged pass takes over there is no
+     * step in it: the first version went 0 to a flat half and the body
+     * jumped to full on the frame it crossed. Seen through the surface at
+     * the top, all but there at the bottom, and the rim drawn over it is
+     * what still says "inside".
+     */
     const was = ctx.globalAlpha;
     for (const e of bodies) {
       const depth = clamp((e.y - P.top) / (2 * P.ry), 0, 1);
-      ctx.globalAlpha = was * 0.5 * depth;
+      ctx.globalAlpha = was * 0.92 * depth ** 1.6;
       drawBody(e);
     }
     ctx.globalAlpha = was;
@@ -403,20 +440,16 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
       ctx.stroke();
     }
 
-    /* ---- the births: a ring off the rim, gone in under a second --------- */
+    /* ---- the births: the rim remembers where, briefly -------------------
+     * The mark on the BODY is `drawInstantiate`, drawn after the bodies so
+     * it sits on top of the thing it marks; this is the rim's half of it.
+     */
     for (const b of P.births) {
       const u = b.t / b.life;
-      const yr = rimAt(P, b.x);
-      const rr = b.r * (0.7 + 2.2 * u);
-      ctx.strokeStyle = rgba(bright, (1 - u) * 0.75);
-      ctx.lineWidth = hl * (1 + 3 * (1 - u));
-      ctx.beginPath();
-      ctx.ellipse(b.x, yr, rr, rr * 0.55, 0, 0, TAU);
-      ctx.stroke();
       const phi = Math.acos(clamp((b.x - P.x) / P.rx, -1, 1));
-      const half = Math.min(1.2, (b.r * 2) / P.rx) * (1 + u);
-      ctx.strokeStyle = rgba('#ffffff', (1 - u) * 0.8);
-      ctx.lineWidth = hl * 3 * (1 - u);
+      const half = Math.min(1.2, (b.r * 1.8) / P.rx) * (1 + 0.6 * u);
+      ctx.strokeStyle = rgba('#ffffff', (1 - u) * 0.7);
+      ctx.lineWidth = hl * (1 + 2.4 * (1 - u));
       ctx.beginPath();
       ctx.ellipse(P.x, P.y, P.rx, P.ry, 0, phi - half, phi + half);
       ctx.stroke();
@@ -443,5 +476,94 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
     }
   }
 
+  ctx.restore();
+}
+
+/**
+ * A body being INSTANTIATED: the simulation's mark on something it has just
+ * put on the field. Drawn from `Game.draw` AFTER the bodies -- it sits on the
+ * body, and follows it -- for `CFG.portal.instantiate` seconds from birth.
+ *
+ * Two elements, both in the interface's own language rather than the
+ * portal's: four bracket corners closing on the body, the shape the assist
+ * draws when it takes a target, and a scan line sweeping it top to bottom
+ * with the part below the line still hazy -- the object resolving. Nothing
+ * here is a ring or a burst, because a birth is not an impact; and it is on
+ * the body and not on the rim, because the thing worth watching has left the
+ * rim by the time it is legible.
+ */
+export function drawInstantiate(ctx, world, mood) {
+  const P = world.portal;
+  if (!P || !P.births.length || world.boss) return;
+  const hl = CFG.hairline;
+  const k = CFG.scale;
+  const bright = mixHex(mood.accent, '#ffffff', 0.55);
+  ctx.save();
+  ctx.lineCap = 'butt';
+  for (const b of P.births) {
+    const e = b.e;
+    if (!e || e.dead) continue;
+    const u = clamp(b.t / b.life, 0, 1);
+    const R = e.r;
+
+    /*
+     * The brackets: a square two radii out that closes to 1.4 in the first
+     * third and fades over the rest. BOLD -- the first version was one CSS
+     * pixel of half-covered stroke and, measured off the live buffer, was
+     * there and invisible: a mark the eye has to find is not a mark. Three
+     * hairlines, and the arms are a third of the side so the corner reads as
+     * a corner at a body's own size.
+     */
+    const s = R * (2.1 - 0.7 * Math.min(1, u * 2.4));
+    const arm = s * 0.42;
+    ctx.strokeStyle = rgba(bright, Math.min(1, 1.1 * (1 - u)));
+    ctx.lineWidth = hl * 3.2;
+    ctx.beginPath();
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const cx = e.x + sx * s;
+      const cy = e.y + sy * s;
+      ctx.moveTo(cx - sx * arm, cy);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx, cy - sy * arm);
+    }
+    ctx.stroke();
+
+    /*
+     * The scan: a line down the body, and below it the part not yet resolved
+     * -- a RASTER of hairlines rather than a flat haze, because a flat haze
+     * over a blue body is a slightly lighter blue body and a raster is a
+     * thing being drawn line by line, which is what the object is.
+     */
+    const sweep = Math.min(1, u * 1.3);
+    const sy = e.y - R + 2 * R * sweep;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, R * 1.06, 0, TAU);
+    ctx.clip();
+    if (sweep < 1) {
+      ctx.strokeStyle = rgba(bright, 0.55 * (1 - u));
+      ctx.lineWidth = hl * 1.2;
+      ctx.beginPath();
+      const step = 4.5 * k;
+      for (let yy = sy + step; yy < e.y + R * 1.1; yy += step) {
+        ctx.moveTo(e.x - R * 1.1, yy);
+        ctx.lineTo(e.x + R * 1.1, yy);
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = rgba(bright, 0.35 * (1 - u * u));
+    ctx.lineWidth = hl * 8;
+    ctx.beginPath();
+    ctx.moveTo(e.x - R * 1.1, sy);
+    ctx.lineTo(e.x + R * 1.1, sy);
+    ctx.stroke();
+    ctx.strokeStyle = rgba('#ffffff', 0.95 * (1 - u * u));
+    ctx.lineWidth = hl * 2.4;
+    ctx.beginPath();
+    ctx.moveTo(e.x - R * 1.1, sy);
+    ctx.lineTo(e.x + R * 1.1, sy);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.restore();
 }
