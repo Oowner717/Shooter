@@ -2883,4 +2883,106 @@ came from before believing the other one covers it.
   run. **A case whose scenario is re-sited every build is a case measuring the
   wrong quantity**, and the quantity here is how far behind the gun is, not
   which rung the run stands on.
+- **PRICE IS A BAND FROM BUILD 303, AND THE FLAT PRICE WAS MEASURED RATHER
+  THAN ARGUED TO BE THE FAULT.** `BAND_PRICE` is 9 kB at band 1 rising to
+  4 MB at band 7 and each level after the first costs 60% of the band price
+  MORE than the last, so `priceOf` is untouched -- it already computes
+  `cost + step * have`. The evidence for the change: `tiers.mjs` on build 302
+  bought the WHOLE tree by rung 17 of 49, with `buys` pinned at 109, spend
+  capped at 119 MB and dps flat at 741 from rung 17 to 20. A flat price
+  (`500 kB + 350 kB` a leaf, whatever it did and whenever it was meant to be
+  bought, under a comment saying pacing "is not what this is for yet") cannot
+  say "this is an early thing", so nothing in the tree was late. The spread is
+  now 444x and band 7 alone carries 56% of the tree.
+- **The curve is ADDITIVE and the plan's own table says so in a digit.** Its
+  level-3 column is 2.2x and not 2.56x, and its spend formula is
+  `price * (1 + (k % per) * 0.6)`. "Each level costs 60% more than the last"
+  reads as compounding and is not: 1.6^7 is 27 band-prices for an 8-level node
+  against the additive 24.8. Reading it the other way would have wanted a new
+  function as well as a different game -- and the tell was one cell of the
+  plan's own arithmetic, not its prose.
+- **`bandOf` THROWS and there is no default, which is build 224's rule applied
+  to a second mandatory field.** `levels` was `u.levels ?? 3` for forty-six
+  builds and eight nodes shipped sold three times because a node relying on the
+  default and a node deliberately capped at three were the same text. A band
+  has the same failure mode and a worse blast radius: an omitted band reads as
+  band 1, and band 1 is 9 kB against band 7's 4 MB, so the node is handed over
+  rather than sold. `bands()` checks the table in BOTH directions -- a node
+  with no band, and a band left behind for an id the tree does not offer, which
+  reads as coverage and is not -- plus the one ordering rule, that a leaf may
+  not be priced for an earlier band than the arm it hangs off.
+- **A system out of play still needs its prices.** The mine line's twenty-one
+  ids are banded although `CFG.mines.inPlay` is false, for two reasons:
+  `rootNode('mines')` is still BUILT and thrown away to derive `ELSEWHERE`, so
+  `leaf()` runs for all of them and `bandOf` would throw at module load; and
+  build 289's lesson is that turning a system back on should be a config flip
+  rather than an edit to the guards. They are unmeasured and say so.
+- **Three angles, and the aggregation is the finding.** The table was made
+  three times independently -- the plan's named roster read as law, each node's
+  mechanism read off its own `line`, and the affordability arithmetic worked
+  forwards from the prices -- and the shipped table is their majority: 31 of 66
+  unanimous, 31 by two of three, 4 the median where all three differed. **No
+  parent violation had to be repaired**, which is the part worth trusting:
+  three angles that never spoke to each other never once priced a leaf for an
+  earlier band than its arm. Whole tree 137.6 MB against the plan's 116 MB;
+  the gap is the plan modelling 107 levels where the real tree has 112, and
+  five extra levels in the dear bands cost about 20 MB.
+- **The plan's band table is not all of the plan.** CORE's band is named in
+  PROSE only -- "the four levels of CORE are priced for band 5 and affordable
+  inside it" -- as are RECALL's and OVERCLOCK's ("under the new curve they are
+  band-2 nodes"), and none of the three appears in the `BANDS` array every
+  other assignment was read off. A document that draws its own arithmetic still
+  keeps decisions in its sentences; grep the prose as well as the table.
+- **HOLLOWPOINT's band is the largest single entry in the table** -- eight
+  levels, so it moves 223 kB to 2.03 MB -- and it is band 3. Measured against
+  the plan's own income model: band 1 finishes the whole x6.35 damage spine by
+  rung 4 to 10, which is build 177's plateau rebuilt; band 2 by rungs 9 to 16;
+  band 3 at 15 to 23, which leaves CORE's x3.32 to land at 28 to 35. Two spaced
+  steps across forty-nine rungs rather than one early one. Band 2 was the
+  instinct and two of the three angles said 3.
+- **`tiers.mjs`'s asserted earned curve CANNOT SEE this phase, and the
+  arithmetic says by how much.** Bands 1-3 together cost 1-2% of what that
+  curve says the run holds by the rung they end on, and the curve reaches the
+  whole tree at rung 17 of 49 -- so past 17 it measures a fully bought turret
+  whatever the prices are. Its own docstring already calls the targets "about
+  four times too rich"; against the plan's income model (441 kB banked by rung
+  7, 200 MB over a whole run) it is nearer twenty-five times at rung 7. What it
+  can still show is the loadout over rungs 1-16. Re-anchoring that curve is its
+  own piece of work and would move every row of the historical table.
+- **THE RELEASE-GATE CASE WAS COMPARING RUNGS, NOT THE GATE, AND THAT IS WHY
+  IT HAD BEEN RE-SITED ON FIVE CONSECUTIVE BUILDS.** The gate changes how many
+  waves are SCORED -- measured, 5 against 19 over the same 240 seconds -- and a
+  scored wave is what walks the ladder, so the two arms ended up at different
+  rungs while the rung is what sets the field's SIZE. On one run the loose arm
+  spent its window at a mean tier of 34.3 against the gated arm's 32.1, a
+  harder rung with a thicker field, which flatters the gate; on a run that tips
+  the other way it INVERTS, which is what build 303's suite caught at 1.06 on a
+  build whose only change was a price table -- and the case's own scenario buys
+  four fixed ids from a 500 MB purse, so it cannot depend on a price at all.
+  With the rung pinned through `setTier` the same two channels read mean 0.542
+  and 0.329 against 0.841 and 0.786 unpinned, and the pinned share 0.01 and
+  0.079 against 0.634 and 0.68. **The margins were tight because a confound was
+  eating the signal**, and five builds of re-siting were five builds of tuning
+  a number instead of finding it. The ceilings are deliberately NOT tightened
+  onto the new figures -- headroom is worth more than sensitivity on a case
+  with this history -- and the rung is asserted, so the arms can never silently
+  compare rungs again.
+- **A case that passes alone and fails in the suite is not always inherited
+  state.** That is the reading CLAUDE.md already records and it was the wrong
+  one here: the gate case separated cleanly three times out of three in
+  isolation (0.714, 0.766, 0.719) and read 1.06 in the suite, which is the
+  classic signature -- and the cause was a confound present in BOTH, bistable
+  either way, that the suite's timing happened to tip. Before clearing state,
+  check whether the two arms of an A/B are still measuring the same thing.
+- **The differential, same asserted curve, rungs 1 to 20:** `buys` goes 1 to 7
+  at rung 1, 3 to 25 at rung 3, 5 to 38 at rung 5 and 12 to 39 at rung 7, and
+  dps at rung 5 goes 251 to 796. At rung 1 a player buys `hollowpointx3 rate
+  slewx2 aimrange` where a flat tree bought one level of one node. Past rung 17
+  nothing moves -- 109 buys either way, one rung later -- which is the curve and
+  not the prices. **The magnitude of the early figures is the curve's too**: at
+  rung 1 the probe hands over 500 kB where the plan's income model says a run
+  has banked about 63 kB, so "7 buys" is the direction measured honestly and
+  the number inflated by the same factor. What wants watching is that the early
+  rungs did get materially stronger, because what was one 500 kB node is now a
+  dozen at 9 to 23 kB.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

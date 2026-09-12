@@ -8045,12 +8045,36 @@ if (!GUN_LINE) {
       let fired = 0;
       let last = 0;
       let gPeak = 0;
+      let waves = 0;
+      let at = d.at;
+      let drifted = 0;
       for (let f = 0; f < 60 * secs; f++) {
         if (!gated) { d.lastThin = -1; d.holdFor = 0; }
         // See the note above: a discharge empties the field, so the thinness
         // arms hold it out and the fuse arms let it run.
         if (pinFuse) { d.glitch = 0; d.held = 0; }
+        /*
+         * ---- AND THE RUNG IS PINNED, from build 303 ------------------------
+         *
+         * The confound that had this case re-sited on five consecutive builds.
+         * The gate changes how many waves are SCORED -- measured, 5 against 19
+         * over the same 240 seconds -- and a scored wave is what walks the
+         * ladder. So the two arms ended up at different rungs, and the rung is
+         * what sets the field's SIZE: on one run the loose arm spent its
+         * window at a mean tier of 34.3 against the gated arm's 32.1, a harder
+         * rung with a thicker field, which flatters the gate. On a run that
+         * tips the other way it INVERTS, which is what build 303's suite
+         * caught at 1.06 on a build whose only change was a price table.
+         *
+         * `setTier` is the machinery's setter and does not gate, which is what
+         * makes it the right tool here. Pinned, the separation stops being
+         * marginal: mean 0.542 and 0.329 against 0.841 and 0.786 unpinned, and
+         * the pinned share 0.01 and 0.079 against 0.634 and 0.68. The signal
+         * was always there -- it was under a tier difference.
+         */
+        if (d.tier !== tier) { d.setTier(tier); drifted++; }
         g.update(1 / 60);
+        if (d.at !== at) { waves++; at = d.at; }
         if (d.holdFor > 0) heldFrames++;
         if (d.glitch > gPeak) gPeak = d.glitch;
         if (last > 0.9 && d.glitch === 0) fired++;
@@ -8088,7 +8112,7 @@ if (!GUN_LINE) {
       const pinned = +(peak.filter((x) => x >= CFG.maxEnemies * 0.9).length
         / Math.max(1, peak.length)).toFixed(3);
       return { max: Math.max(...peak), mean, pinned, held: +(heldFrames / 60).toFixed(1),
-        fired, gPeak: +gPeak.toFixed(2), tier: d.tier,
+        fired, gPeak: +gPeak.toFixed(2), tier: d.tier, waves, drifted,
         auto: !!w.up.flinch && !!w.up.deadbolt };
     };
     // The field, with the fuse held out of it, at the rung where this build
@@ -8153,12 +8177,23 @@ if (!GUN_LINE) {
    * 0.888) and the pinned share 0.85 (worst 0.685), and both have to hold --
    * two channels agreeing is what a single tight margin cannot give.
    *
+   * ...and build 303 found why those margins were as tight as 1.07x at all:
+   * THE RUNG WAS NOT HELD. See the note in `play`. With it pinned the same
+   * two channels read mean 0.542 / 0.329 and pinned 0.01 / 0.079, so the
+   * ceilings above are now 1.8x to 2.9x clear of the worst measured rather
+   * than 7% clear of it. They are deliberately NOT tightened onto the new
+   * numbers: this case has been re-sited on five consecutive builds and
+   * headroom is worth more here than sensitivity, with the `held` floor and
+   * the wave counts guarding against a vacuous pass. The rung is asserted
+   * too, so the two arms can never silently compare rungs again.
+   *
    * The `held` floor is 3s rather than 10 because the hold itself is the
    * noisy half: with the fuse pinned it measured 9.3s to 120.3s across nine
    * runs. It is a liveness guard and not the claim.
    */
   check('a run that cannot clear the field is not sent another wave',
     r.drowning.auto && r.drowning.held > 3
+    && r.drowning.tier === r.fieldRung && r.loose.tier === r.fieldRung
     && r.drowning.mean < r.loose.mean * 0.95
     && r.drowning.pinned < r.loose.pinned * 0.85
     && r.loose.mean >= 12 && r.loose.pinned > 0.1,
@@ -8168,7 +8203,10 @@ if (!GUN_LINE) {
     + `spent ${(r.drowning.pinned * 100).toFixed(0)}% of its samples at the cap `
     + `against ${(r.loose.pinned * 100).toFixed(0)}% (peaks ${r.drowning.max} and `
     + `${r.loose.max}, which overlap run to run, which is why neither channel `
-    + `is a peak)`);
+    + `is a peak). ${r.drowning.waves} waves scored against ${r.loose.waves}, `
+    + `which is the gate's own effect and was the confound: the rung was held `
+    + `at ${r.drowning.tier}/${r.loose.tier} against ${r.drowning.drifted}/`
+    + `${r.loose.drifted} corrections`);
 
   /*
    * ...and the fuse, on its own arms with it let run.

@@ -170,6 +170,31 @@ export const UNDER = {
  * on purpose: they price themselves, as do RECAST (which is not bought in
  * bytes at all) and the ASSAY (a deliberate one-off).
  *
+ * HOW THIS TABLE WAS ARRIVED AT, because a band is a judgement and the reason
+ * matters more than the number. Three independent whole-tree assignments were
+ * made from three different angles -- the plan's named roster read as law, the
+ * mechanism of each node read off its own `line`, and the affordability
+ * arithmetic worked forwards from the band prices -- and this is their
+ * majority: 31 of the 66 unanimous, 31 by two of three, 4 the median where all
+ * three differed. No parent violation had to be repaired, which is the useful
+ * part: three angles that never spoke to each other did not once price a leaf
+ * for an earlier band than its arm.
+ *
+ * The two decisions worth recording because they were CLOSE:
+ *
+ * HOLLOWPOINT is the largest single entry in the table -- eight levels, so its
+ * band moves 223 kB to 2.03 MB -- and it is band 3. Band 1 hands the whole
+ * x6.35 damage spine over by rung 4 to 10 on the plan's own income model,
+ * which is build 177's plateau rebuilt; band 3 finishes it at rungs 15 to 23
+ * and leaves CORE's x3.32 to land at 28 to 35, so the gun's power arrives in
+ * two spaced steps across forty-nine rungs instead of one early one.
+ *
+ * CORE is band 5 because the plan says so in PROSE rather than in its band
+ * table -- "the four levels of CORE are priced for band 5 and affordable
+ * inside it" -- and the arithmetic agrees: 5.32 MB against the 15.2 MB the run
+ * has banked by rung 28, which is the rung RECAST's gate opens on. RECALL and
+ * OVERCLOCK are band 2 from the same paragraph.
+ *
  * Grouped the way `UNDER` is grouped, so the two tables read side by side.
  */
 const BAND = {
@@ -181,11 +206,11 @@ const BAND = {
   // ---- BOLT ----
   overstuffed: 1,
   // ---- the eight bought rounds, and their own ----
-  open_explosive: 3, overpressure: 4, cluster: 3, open_shotgun: 2, doubleo: 2,
-  longshot: 2, open_arc: 4, fifthlink: 4, superconductor: 7, longlead: 7,
-  open_spine: 4, throughandthrough: 4, sliver: 7, annealed: 7, railed: 7,
+  open_explosive: 3, overpressure: 4, cluster: 4, open_shotgun: 2, doubleo: 2,
+  longshot: 2, open_arc: 4, fifthlink: 5, superconductor: 7, longlead: 7,
+  open_spine: 4, throughandthrough: 4, sliver: 6, annealed: 7, railed: 7,
   open_slug: 5, sledge: 5, open_rime: 3, deepfreeze: 7, open_spore: 6, bloomout: 6,
-  secondgrowth: 6, open_tithe: 5, compound: 7, levy: 7, lien: 5,
+  secondgrowth: 6, open_tithe: 5, compound: 7, levy: 6, lien: 7,
   // ---- the bar, whole ----
   standing: 4,
   // ---- the two free buttons ----
@@ -193,7 +218,7 @@ const BAND = {
   // ---- the six bought abilities, and their own ----
   open_lance: 3, charge_lance: 3, open_well: 5, charge_well: 5, open_prism: 5,
   charge_prism: 5, open_stasis: 3, charge_stasis: 6, open_decoy: 4, charge_decoy: 4,
-  open_ward: 3, charge_ward: 3, standoff: 6, edged: 6, fork: 6, heave: 6,
+  open_ward: 3, charge_ward: 3, standoff: 5, edged: 6, fork: 6, heave: 6,
   deadbolt: 4,
   // ---- the wave ----
   recall: 2, overclock: 2,
