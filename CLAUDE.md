@@ -3146,4 +3146,148 @@ came from before believing the other one covers it.
   the next phase has to beat: three of band 5's seven rungs do not clear their
   heaviest authored wave inside 120 seconds, and the run's income halves
   exactly where the tree's dearest bands begin.
+- **THE FIRST TWO OF THE TWENTY ARE IN FROM BUILD 307, AND BOTH OF THEM
+  LEAVE.** Phase 6a: EMBER (band 1, `rise`) and HUSK (band 2, `tumble`), the
+  two objects `docs/objects.html` says need no new rule. Every body in this
+  game until now either reached the machine or was destroyed; these two have a
+  way off the field of their own, through `fizzle` + `dissolved` -- the
+  dissolve `Enemy.destroy` refuses to cash in -- so leaving pays nothing and
+  counts nothing, which is what "gone with whatever it was carrying" has to
+  mean. Eighteen of the twenty are NOT in: the object guide's own phases 1-4
+  (a full `GAITS` table with march as one row of it, and the eleven
+  re-gaitings) are not shipped either, and that guide's subtitle still reads
+  "not scheduled".
+- **A `gait` is the TYPE's, a `route` is the BODY's, and that distinction is
+  the whole of why the field reads as one crowd.** `this.route =
+  opts.route || weightedPick(ROUTES)` is in the constructor, so a 45-unit
+  BULWARK and a 10-unit NEEDLE draw from the same six routes with the same
+  weights. `GAITS` in config.js is the vocabulary a type declares from instead, and
+  `check-build.mjs` holds it in BOTH directions: a type naming a gait nothing
+  implements gets the march it was trying not to take (the `shape`-with-no-
+  case fault verbatim, which shipped five times over fourteen builds), and an
+  entry in the table with no reader is a promise the table is making and the
+  code is not keeping (`kind: 'works'`, eighteen builds). The second half is a
+  source read for the quoted id, which is why `hover` is written out as the
+  default arm of the dispatch rather than left implied.
+- **MORTAR is exempt from three bounds at once, so it needs one of its own.**
+  A harmless entry in a wave's `of` weighs nothing (`threatOf`), is skipped by
+  `standing`, refused by `tagBody`, and invisible to `hostileCount` -- which
+  is what `maxEnemies` gates the release on. So it cannot take the budget's
+  MULTIPLIER either: four EMBERs authored in a band-1 wave would be forty at a
+  deep rung, scenery scaled by a difficulty it does not pay into. Nor does it
+  count toward `asked`, which is the verdict's denominator and the guard that
+  keeps the drift-only bonus wave from being scored, nor toward `cleared()`'s
+  queued total, where it would have put bodies in the denominator that can
+  never come out of it. Drift was already outside all of this by living in
+  `wave.drift` rather than in `of` at all; `CFG.waves.mortarCap` is the bound
+  for everything else, and `check-build.mjs` also had to learn that the
+  two-or-three rule and the eleven-body ceiling are about HOSTILE types -- the
+  first is about the problem being a combination and the second about that
+  combination not becoming a crowd.
+- **Adding a harmless body to an EXISTING wave moves no band's budget by a
+  byte**, which is what made this phase measurable. `budgetAt` is the mean
+  threat of a band's own authored waves, so adding a WAVE re-prices that band
+  by existing -- but adding a body worth zero to a wave already in the roster
+  changes neither the roster nor the mean. Four existing waves, four numbers
+  in the config, and nothing else in the ladder moved.
+- **`driftCount` counted every harmless body and both its callers are about
+  one type.** They gate `spawnDrift` -- the ambient trickle against `maxDrift`
+  and a wave's own placement against `driftCap` -- so it was already wrong for
+  SEED (a SCION's three quietly suppressed the grey) and would have been wrong
+  again for every one of the twenty: five EMBERs on the floor would have
+  stopped drift arriving at all. Branched on the id now, the same correction
+  build 275 made to `spawnGroup`.
+- **A spin handed over at a spawn site DECAYS.** `integrate` damps angular
+  velocity on every substep (`CFG.physics.angularDamping`), so HUSK's "end
+  over end" measured **0.27 of a turn over eleven seconds** against the 2.6
+  its rate asks for -- a body that stopped turning a second in. `tumble`
+  holds it as a FLOOR rather than writing it, so a round's own impact spin
+  (build 211's impact parameter) still adds on top instead of being
+  overwritten sixty times a second, and the direction comes off the way the
+  body is travelling so one that comes off a wall rolls back the other way.
+  One owner for the number: the spawn site sets no `av` at all.
+- **A state entered ONCE has to say so, because `steer` runs from
+  `physicsStep` and not from `update`.** Both new gaits end by setting
+  `fizzle`, and both conditions stay true afterwards -- so the first version
+  re-armed the dissolve clock sixty times a second and the body dissolved for
+  ever. `if (this.fizzle > 0) return;` at the top of each. Build 210's lesson
+  from the other side: a state that stops a body moving has to be honoured in
+  both.
+- **"It went UP" cannot tell a gait that LEAVES from one that arrives
+  somewhere, and the first version of the EMBER case lost about one run in two
+  to it.** A DRIFT laid on the floor legitimately climbs to its own band at
+  `CFG.drift.climb` -- measured, 496 to 548 units against the ember's 1008 to
+  1013, so a 2x margin straddles the truth. What separates them is the RIM and
+  the dissolve, and both are absolute: eight of eight past the rim and gone
+  against zero of eight. Same disease as the DRIFT-march case's 1.5x ratio
+  between two single draws.
+- **The guide's authored speed for EMBER was never measured against the field
+  it climbs.** `docs/objects.html` gives it 40 u/s, and era 1's column from
+  the floor to the portal's rim is 962 world units -- a TWENTY-FOUR SECOND
+  climb for the one object whose whole promise is "free salvage if you are
+  quick". At 90 it is about eleven seconds, which is the clock that same page
+  gives LANTERN for a climb it calls a timer you may answer or not, and still
+  slower than the NEEDLE that is meant to be the fast one. A number authored
+  in a design document is a proposal; the field it lands in is the
+  measurement.
+- **The ORDINAL hash came back identical (`1831189433`) and that is the
+  result this phase wanted.** The object guide says to expect a move on any
+  phase that touches `drive` -- and this one touches `drive` only by NAMING
+  what it already did, so an unchanged hash is the proof that naming it moved
+  nothing. Two new bodies cannot reach a rung-1 boss fight either: `fight.mjs`
+  opens from `openBoss` and `Game.update` is `if (w.boss) {...} else {
+  director.update() }`, which is the structural blindness builds 300 and 301
+  already recorded.
+- **THE FUSE ARM'S "GAP" WAS THE HOLD DURATION IN DISGUISE, AND THAT IS THREE
+  BUILDS OF FALSE CAUSATION.** Build 305 correctly replaced its censored floor
+  with the RATE and then kept `gatedPeak > loosePeak + 0.15`, calling that
+  "the claim's own comparison". It is the same censored quantity: below the
+  ceiling the peak is just `rate * held`, and measured across nine runs either
+  side of build 307 the rate is 0.018 to 0.034 (a 1.9x band) while `held` is
+  1.4, 13.6, 15.7, 29.1, 37.5, 39.4, 42.5, 50.8 and 54.3 seconds. So the arm
+  needed a hold of about twenty-five seconds to clear 0.15 and failed on the
+  three shortest draws -- on builds whose change was a price table (303), an
+  era ceiling (305) and two harmless bodies (307). **Every one of those looked
+  causal and none was.**
+  What replaced it was available from build 293 and this case had never read
+  it: `Director.burnFrom`, added under the note that a signal with two causes
+  needs a field saying which -- in the one case whose entire subject is the
+  second cause. Four arms now: it RAN (a liveness floor on the hold, which the
+  old arm had none of, which is why a 1.4-second hold read as the mechanism
+  failing rather than as the window missing it); the ARITHMETIC; the CAUSE,
+  that most of the filling is the WAIT and not contact, which is not vacuous
+  because the original report is a run fed by contact alone that never got
+  there; and the CONTROL, that contact alone does not get there (gate-off peak
+  0.03 to 0.19 over seven runs, ceiling 0.5). The gate-off run's own crowd
+  count is zero BY CONSTRUCTION -- `play` writes `holdFor = 0` every frame
+  when the gate is off -- so it is reported and deliberately NOT asserted. The
+  window also went 150s to 300s, so the liveness floor is clear of the draw
+  rather than near it.
+- **...and the RATE was the same censoring one level down, which the longer
+  window then exposed.** `gPeak / held` is only a rate while the fuse never
+  saturates: `glitch` is clamped at 1 and zeroed by every discharge, so the
+  first 300-second run read **1/84 = 0.0119** against a floor of 0.012 for a
+  fuse that had risen more than twice over -- a perfect run of the mechanism,
+  failing. What holds is the gross rise summed frame by frame against what
+  those seconds are WORTH: a crowd frame rises `crowd / fuse` a second and a
+  contact frame `1 / fuse`, so `rose === (crowdS * crowd + contactS) / fuse`
+  is an IDENTITY taken off the config, not a floor fitted to a measurement.
+  **A peak is not a quantity when the thing that fills it has a ceiling and a
+  noisy duration**, and dividing a censored numerator by a noisy denominator
+  is not a fix -- ask what the number is a product of, then assert the
+  product.
+- **AN EMBER SPRINGS A MINE, WHICH IS WHY A NEW-OBJECT CASE HAS TO CLEAR THE
+  WHOLE FIELD.** Build 275 took `harmless` out of the mine trigger -- ground
+  goes off when something stands on it -- so the eight harmless bodies this
+  case puts on the floor can be caught by whatever six hundred cases upstream
+  left lying there. Measured: 7 of 8 in the suite against 8 of 8 three times
+  in isolation, which is the inherited-state signature exactly. It clears
+  `enemies`, `drops`, `debris`, `projectiles`, `mines` and `effects`, and puts
+  `timeScale` and `stasis` back -- the same list build 226's note says the
+  half-clearing version of an earlier case got wrong. And the eight are laid
+  SPREAD across the width rather than rolled, so eight bodies of radius 7
+  cannot touch: the claim is that each takes the gait its type declares, and
+  eight independent climbs say that where eight bodies shoving each other off
+  the floor say something about the pair solver. With both, 8 of 8 in 15 to
+  16 seconds, three runs out of three, on a field deliberately dirtied first.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

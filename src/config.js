@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '306';
+export const BUILD = '307';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '306';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '78025b6';
+export const REV = 'e49ab38';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -737,6 +737,20 @@ export const CFG = {
      */
     population: 1.3,
     /*
+     * How much MORTAR one wave may author, from build 307: the total count of
+     * HARMLESS entries in its `of`.
+     *
+     * Mortar is exempt from three bounds at once and so needs one of its own.
+     * It weighs nothing in the budget (`threatOf`), it does not swell with it
+     * (`Director.load`), and `hostileCount` -- which is what `maxEnemies`
+     * gates the release on -- does not see it either. Drift has always been
+     * outside all three and was bounded by `driftCap` instead; this is the
+     * same bound for every other harmless type, asserted at the table by
+     * check-build.mjs rather than clamped at runtime, because a count that
+     * never swells is the number the author wrote.
+     */
+    mortarCap: 8,
+    /*
      * ---- how much a body WEIGHS, in threat points (build 301) ----------
      *
      * Health divided by this, and nothing else. The plan asks for "roughly
@@ -953,6 +967,39 @@ export const CFG = {
     taper: 110, // world units outside the band over which the pull reaches full
     hover: 0.45, // the walk's vertical share inside the band
     sink: 0.95, // how much of the walk the pull overrules at full
+  },
+
+  /*
+   * EMBER's climb, from build 307. It starts on the floor and steers for the
+   * portal's rim, and `gone` is how far ABOVE that rim it has to get before
+   * it dissolves -- a margin rather than the rim itself, so the thing that
+   * takes it off the screen is the same one-way surface every body else
+   * meets, seen from the other side.
+   *
+   * It leaves through `fizzle`, which is the dissolve `Enemy.destroy` refuses
+   * to cash in: an EMBER that reaches the rim pays nothing and counts
+   * nothing, which is what "gone with whatever it was carrying" has to mean.
+   */
+  ember: {
+    gone: 30, // world units past the rim before it dissolves
+    sway: 26, // the lateral wander on the way up, in units a second
+    fizzle: 0.5, // how long the dissolve takes once it is away
+  },
+  /*
+   * HUSK's arc. It takes no steering at all -- the whole gait is the throw --
+   * so these are the throw and the clock that ends it.
+   *
+   * `life` is the eleven seconds docs/objects.html promises it is on screen
+   * for; the departure is that clock and not the far wall, because
+   * `edgeEase` exists to stop anything reaching a wall and a gait that
+   * fought it would be a gait arguing with the arena.
+   */
+  husk: {
+    life: 11, // seconds on screen before it dissolves
+    cross: 150, // the sideways throw it arrives with, in units a second
+    fall: 60, // ...and the downward component of the same throw
+    spin: 1.5, // radians a second, end over end
+    fizzle: 0.7, // how long the dissolve takes once its clock is out
   },
 
   // ---- shooter --------------------------------------------------------
@@ -3978,6 +4025,10 @@ export const ENEMY_TYPES = [
     name: 'DRIFT',
     shape: 'drift',
     harmless: true,
+    // What it does when nothing has happened to it yet. See GAITS below: the
+    // band-and-bob build 298 gave this type is a gait and not a special case,
+    // and naming it is what lets a second harmless body take a different one.
+    gait: 'hover',
     r: 17,
     hp: 39,
     density: 0.55,
@@ -3992,6 +4043,78 @@ export const ENEMY_TYPES = [
     glow: '#4f6f92',
     weight: 0, // never chosen by the ordinary spawn roll
     drops: 2, // energy it leaves when it comes apart
+  },
+  /*
+   * ---- the first two of the twenty (docs/objects.html), build 307 ---------
+   *
+   * Both are HARMLESS, both are grey, and both LEAVE -- which is the thing
+   * neither of them shares with anything already on the field. Every body in
+   * the game until now either reached the machine or was destroyed; these two
+   * have a way off the field of their own, and taking them apart before they
+   * take it is the whole of what they ask.
+   *
+   * Harmless is not decoration here, it is the budget: `threatOf` weighs a
+   * harmless type at ZERO, so neither of them spends any of a wave's threat
+   * budget and neither of them SWELLS with it (see Director.load). They are
+   * mortar in exactly the sense drift already was -- which is why adding them
+   * to four existing waves moves no band's budget by a byte.
+   */
+  {
+    // Sparks off the floor, climbing for the rim with a little salvage each.
+    // An inverted DRIFT, and the only thing on the field that starts where
+    // you are.
+    id: 'ember',
+    // 0, like DRIFT and SEED: a harmless body is gated by the BAND of the
+    // waves that name it, not by lifetime energy. EMBER's waves are band 1,
+    // so there is nothing to hold back.
+    opens: 0,
+    name: 'EMBER',
+    shape: 'ember',
+    harmless: true,
+    gait: 'rise',
+    r: 7,
+    hp: 12,
+    density: 0.4,
+    /*
+     * docs/objects.html authors this at 40 u/s, and 40 is not "quick": era
+     * 1's column from the floor to the portal's rim is 962 world units, so
+     * the climb the whole object is about would take TWENTY-FOUR SECONDS,
+     * and half a minute of a spark drifting up the screen is scenery rather
+     * than an opportunity. Measured at 90 it is about eleven seconds, which
+     * is the same clock that page gives LANTERN for a climb it calls a timer
+     * you are allowed to answer or not. Still slower than a NEEDLE at 104,
+     * which is meant to be the fast one.
+     */
+    speed: 90,
+    accel: 220,
+    restitution: 0.6,
+    wobble: 0,
+    color: CFG.debris.grey,
+    glow: '#7d9bb8',
+    weight: 0, // never chosen by the ordinary spawn roll
+    drops: 1, // energy it leaves when it comes apart
+  },
+  {
+    // A wreck of something the simulation ran before: thrown rather than
+    // steered, end over end across the field, and gone on its own clock. The
+    // largest single payout on the field, for the eleven seconds it is there.
+    id: 'husk',
+    opens: 0,
+    name: 'HUSK',
+    shape: 'husk',
+    harmless: true,
+    gait: 'tumble',
+    r: 38,
+    hp: 90,
+    density: 0.45,
+    speed: 44,
+    accel: 30,
+    restitution: 0.85,
+    wobble: 0,
+    color: CFG.debris.grey,
+    glow: '#41597a',
+    weight: 0, // never chosen by the ordinary spawn roll
+    drops: 12, // energy it leaves when it comes apart
   },
   {
     // Hardens everything near it while it lives, and shows you exactly what it
@@ -4970,11 +5093,21 @@ export const WAVES = [
    * MOTE and NEEDLE in different proportions -- before kill 18 there is
    * nothing else to combine them with.
    */
-  { of: [['mote', 5], ['needle', 3]], band: 1 },
-  { of: [['needle', 5], ['mote', 3]], band: 1 },
+  /*
+   * EMBER and HUSK ride along in `of` rather than in a channel of their own,
+   * because a wave names what arrives on it. They are harmless, so they
+   * weigh nothing in the budget, do not swell with it, and are not part of
+   * the COMBINATION the two-or-three rule is about -- all three of which
+   * check-build.mjs states directly. Four existing waves, so no band's
+   * budget moves: the mean threat of a band's roster is what prices it, and
+   * adding a body worth zero to a wave already in the roster changes neither
+   * the roster nor the mean.
+   */
+  { of: [['mote', 5], ['needle', 3], ['ember', 4]], band: 1 },
+  { of: [['needle', 5], ['mote', 3], ['ember', 5]], band: 1 },
   { of: [['mote', 4], ['needle', 4]], band: 1 },
-  { of: [['lurcher', 3], ['needle', 3]], band: 2 },
-  { of: [['lurcher', 2], ['mote', 4]], band: 2 },
+  { of: [['lurcher', 3], ['needle', 3], ['husk', 1]], band: 2 },
+  { of: [['lurcher', 2], ['mote', 4], ['husk', 1]], band: 2 },
   { of: [['splitter', 2], ['lurcher', 1], ['mote', 3]], band: 2 },
   { of: [['splitter', 2], ['needle', 4]], band: 2 },
   { of: [['bloom', 2], ['mote', 4]], band: 3 },
@@ -5048,6 +5181,32 @@ export const WAVES = [
    */
   { of: [], drift: 22, dwell: 8, band: 1 },
 ];
+
+/*
+ * ---- what a body does when nothing has happened to it yet ---------------
+ *
+ * A GAIT, in the sense docs/objects.html means it: a property of the TYPE and
+ * not a roll at spawn. Thirty-six field bodies currently draw their approach
+ * from the same six march routes, which is why they all read as one crowd
+ * walking downhill; this is the vocabulary that lets a type say otherwise.
+ *
+ * Only the ones with a live reader are in here. An entry with no reader is a
+ * promise the table is making and the code is not keeping -- which is the
+ * `kind: 'works'` fault verbatim -- so `scripts/check-build.mjs` requires
+ * every id below to be read by name in src/enemies.js, and requires every
+ * `gait` declared on a type to be one of these.
+ *
+ * MARCH is the absence of a declaration rather than an entry: it is what
+ * `drive` does for everything that does not say otherwise, and the full
+ * table the object guide proposes -- with march as one row of it and eleven
+ * re-gaitings on top -- is NOT shipped. These three are the three the field
+ * can currently express.
+ */
+export const GAITS = {
+  hover: 'comes down to a band across the middle of the field and bobs there',
+  rise: 'up-field, away from the machine, toward the rim -- ignore it and it leaves',
+  tumble: 'thrown rather than steered: an arc, a spin, and no opinion about the machine',
+};
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));
 

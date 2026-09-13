@@ -225,6 +225,19 @@ export const CODEX = [
     line: 'No heading, no destination, no threat. It is not counted, and AUTO AIM will not take it — a DRIFT is only ever shot on purpose. It is worth more than twice a MOTE, which is the reason to bother.',
   },
   {
+    id: 'ember',
+    name: 'EMBER',
+    // The ratio, not a figure: `drops` and what a mote is worth both come off
+    // the config, and DRIFT's line cost a build for quoting two numbers that
+    // had gone stale. What the sentence is about is that it is leaving.
+    line: 'Comes up off the floor instead of down out of the portal, and climbs for the rim with a little salvage in it. Not counted, not a threat, and gone in a few seconds with whatever it was carrying.',
+  },
+  {
+    id: 'husk',
+    name: 'HUSK',
+    line: 'A wreck of something this simulation ran before, thrown across the field end over end. It wants nothing and it is leaving. The largest single payout on the floor, for as long as it is there.',
+  },
+  {
     id: 'axiom',
     name: 'AXIOM',
     line: 'It states a rule and holds you to it. Nothing you carry is yours while its clauses stand.',

@@ -177,6 +177,8 @@ export function drawSpecimen(ctx, id, r) {
     }
     case 'mass': drawTowMass(ctx, r * 0.9, 1); break;
     case 'drift': drawDrift(ctx, r, 0); break;
+    case 'ember': drawEmber(ctx, r, 0, 0); break;
+    case 'husk': drawHusk(ctx, r, 0, 0); break;
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
@@ -350,6 +352,16 @@ export class Enemy {
     this.wanderAngle = rand(0, TAU);
     this.wanderTimer = 0;
     this.stagedFor = 0;
+    /*
+     * How long this body has been doing its gait, for the two gaits that end
+     * on a clock rather than on arriving anywhere. Declared here rather than
+     * sprung into existence in `tumble`, for the reason `fan`, `placed` and
+     * `fizzle` are. Grepped against the boss modules before being declared,
+     * which is build 298's rule: they write their own fields onto the bodies
+     * they make and `Enemy.update` runs on those bodies too, so `loose` --
+     * the obvious name for a field of this shape -- is GNOMON's.
+     */
+    this.gaitFor = 0;
     /*
      * A lateral held back until the body is loose. DRIFT is the only thing
      * that uses it: at era 2 it is laid inside the throat, and it used to be
@@ -537,6 +549,102 @@ export class Enemy {
       const f = Math.exp(-1.6 * dt);
       this.vx *= f;
       this.vy *= f;
+    }
+  }
+
+  /**
+   * RISE: up-field, away from the machine, toward the rim.
+   *
+   * The first gait in this game that is not an approach. An EMBER comes up
+   * off the floor -- the only thing on the field that starts where you are --
+   * sways as it climbs, and is gone once it is clear of the portal's rim.
+   *
+   * It leaves through `fizzle`, which is the dissolve `Enemy.destroy` refuses
+   * to cash in, so it pays nothing and counts nothing on the way out. That is
+   * what "gone with whatever it was carrying" has to mean: a body that banked
+   * its salvage as it left would be free energy on a timer.
+   *
+   * The one-way surface does NOT refuse it. `edgeEase` keys that on `born`,
+   * and an EMBER never came through the portal -- so the rim it is climbing
+   * to is a rim it is allowed to pass, which is the same escape a boss's
+   * minion and a debug placement already had.
+   */
+  rise(world, dt) {
+    const E = CFG.ember;
+    /*
+     * Already going. `steer` runs from `physicsStep` and not from `update`,
+     * so a dissolving body still reaches its gait every frame -- and the
+     * condition below is still true once it has been met, so without this
+     * the fizzle clock would be re-armed sixty times a second and the EMBER
+     * would dissolve for ever. Build 210's lesson from the other side: a
+     * state that stops a body moving has to be honoured in both, and a state
+     * that is entered ONCE has to say so.
+     */
+    if (this.fizzle > 0) return;
+    if (this.y + this.r < entryLine(world, ENTRY_Y) - E.gone * CFG.scale) {
+      this.fizzle = E.fizzle;
+      this.dissolved = true;
+      return;
+    }
+    const slow = this.frozen(world) ? 0.12 : 1;
+    const k = (this.accel / 100) * slow;
+    const sway = Math.sin((world.time || 0) * 1.1 + this.phase) * E.sway * slow;
+    const cruise = this.cruise * slow;
+    this.vx += (sway - this.vx) * clamp(k * dt, 0, 1);
+    this.vy += (-cruise - this.vy) * clamp(k * dt, 0, 1);
+    if (this.frozen(world)) {
+      const f = Math.exp(-1.6 * dt);
+      this.vx *= f;
+      this.vy *= f;
+    }
+  }
+
+  /**
+   * TUMBLE: thrown rather than steered, and no opinion about the machine.
+   *
+   * There is no steering here at all -- the throw IS the gait, handed over at
+   * the spawn site (`spawnByGait`) and spent by physics from there. What this
+   * method owns is the clock that ends it and the hold under a STASIS, which
+   * every term that moves a body owes: "objects freeze" is a hint the game
+   * makes, and a spin that kept turning through it would be a third term
+   * quietly exempt.
+   *
+   * The departure is the CLOCK and not the far wall. `edgeEase` exists to
+   * stop anything reaching a wall, so a gait that left by crossing one would
+   * be a gait arguing with the arena -- and eleven seconds is what
+   * docs/objects.html promises a HUSK is on screen for.
+   */
+  tumble(world, dt) {
+    const H = CFG.husk;
+    if (this.fizzle > 0) return;   // see rise(): entered once, not per frame
+    this.gaitFor += dt;
+    if (this.gaitFor >= H.life) {
+      this.fizzle = H.fizzle;
+      this.dissolved = true;
+      return;
+    }
+    /*
+     * The spin is HELD, not set once. `integrate` damps angular velocity on
+     * every substep (`CFG.physics.angularDamping`), so a spin handed over at
+     * the spawn site decays: measured, 0.27 of a turn over eleven seconds
+     * against the 2.6 the rate asks for -- a HUSK that stopped turning over
+     * a second in, which is the one thing "end over end" cannot mean.
+     *
+     * Held as a FLOOR rather than written, so a round's own impact spin
+     * (build 211's impact parameter) still adds on top instead of being
+     * overwritten sixty times a second. And the direction is the way it is
+     * TRAVELLING, so a HUSK that comes off a wall rolls back the other way:
+     * canvas y runs down, so a body moving right rolls clockwise, which is a
+     * positive `av`.
+     */
+    const slow = this.frozen(world) ? 0.12 : 1;
+    const want = H.spin * slow;
+    if (Math.abs(this.av) < want) this.av = (this.vx < 0 ? -want : want);
+    if (this.frozen(world)) {
+      const f = Math.exp(-1.6 * dt);
+      this.vx *= f;
+      this.vy *= f;
+      this.av *= f;
     }
   }
 
@@ -870,7 +978,28 @@ export class Enemy {
      * up on the frame it comes loose.
      */
     if (this.harmless && !this.isDrop && !this.staged) {
-      this.wander(world, dt);
+      /*
+       * ...and WHICH walk is the TYPE's, from build 307. `hover` is the
+       * band-and-bob `wander` has been since build 298 and is what anything
+       * harmless with no declared gait still gets; `rise` and `tumble` are
+       * the two that leave the field. See GAITS in config.js -- the gait is a
+       * property of the type and never a roll at spawn, which is the whole
+       * distinction from `route`.
+       */
+      switch (this.type.gait) {
+        case 'rise': this.rise(world, dt); break;
+        case 'tumble': this.tumble(world, dt); break;
+        /*
+         * `hover` IS the default arm, written out rather than implied: it is
+         * what DRIFT has done since build 298 and what anything harmless
+         * that has not declared a gait still gets. Named because
+         * check-build.mjs requires every word in the vocabulary to be read
+         * by name -- an entry with no reader is a promise the table is
+         * making and the code is not keeping.
+         */
+        case 'hover':
+        default: this.wander(world, dt); break;
+      }
       return;
     }
 
@@ -1995,6 +2124,8 @@ export class Enemy {
       case 'tow': drawTowHead(ctx, this.r); break;
       case 'mass': drawTowMass(ctx, this.r, hpFrac); break;
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
+      case 'ember': drawEmber(ctx, this.r, this.phase, world.time); break;
+      case 'husk': drawHusk(ctx, this.r, this.phase, world.time); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
@@ -3316,6 +3447,102 @@ function drawPrism(ctx, r) {
 }
 
 /** Soft, dashed and unhurried — legibly not a threat. */
+/*
+ * ---- the two harmless newcomers, build 307 -----------------------------
+ *
+ * Both wear the one grey, which `check-build.mjs` allows only on a harmless
+ * type -- so neither can be told from a DRIFT by hue and both have to be told
+ * apart by SILHOUETTE. A DRIFT is a dashed circle with three orbiting dots; an
+ * EMBER is a four-pointed spark with a trail under it, and a HUSK is an
+ * angular broken hull with nothing round about it at all.
+ *
+ * `regress.mjs` renders every declared shape against `drawChip` and requires
+ * a different picture, because a `shape` with no case in the switch is a
+ * silent fallback rather than an error -- five of them shipped that way in
+ * builds 273-274.
+ */
+
+/** A spark on its way up: four points, a hot core, and the trail below it. */
+function drawEmber(ctx, r, phase, time) {
+  const beat = 0.72 + 0.28 * Math.sin(time * 3.4 + phase);
+  // The four points, long on the vertical because it is climbing.
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 1.5);
+  ctx.lineTo(r * 0.52, 0);
+  ctx.lineTo(0, r * 1.5);
+  ctx.lineTo(-r * 0.52, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // ...and the core, which is what beats.
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.42 * beat, 0, TAU);
+  ctx.fill();
+  /*
+   * The trail: two ticks BELOW it, which is the ground it has left. Drawn
+   * downward whatever the body's heading, because the gait only ever goes one
+   * way and a trail that turned with the sway would read as a fin.
+   */
+  for (let i = 0; i < 2; i++) {
+    const y = r * (1.9 + i * 0.75);
+    const w = r * (0.3 - i * 0.12);
+    ctx.beginPath();
+    ctx.moveTo(-w, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+}
+
+/**
+ * A wreck of something the simulation ran before: an angular hull with a bite
+ * out of it, two ribs across the gap, and a loose piece still attached.
+ *
+ * Nothing in it is a circle. The one thing a HUSK must never read as is a big
+ * DRIFT, and at r 38 against DRIFT's 17 size alone will not do it -- a body
+ * reads almost entirely as its outline (see the hairline note in CLAUDE.md).
+ */
+function drawHusk(ctx, r, phase, time) {
+  const sway = Math.sin(time * 0.5 + phase) * 0.06;
+  ctx.save();
+  ctx.rotate(sway);
+  // The hull: seven sides, and the eighth torn open.
+  const pts = [
+    [-0.96, -0.24], [-0.52, -0.86], [0.3, -0.92], [0.9, -0.34],
+    [0.84, 0.46], [0.26, 0.94], [-0.62, 0.72],
+  ];
+  ctx.beginPath();
+  pts.forEach(([px, py], i) => {
+    if (i === 0) ctx.moveTo(px * r, py * r);
+    else ctx.lineTo(px * r, py * r);
+  });
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // The bite: a wedge cut back into the hull from the torn side.
+  ctx.beginPath();
+  ctx.moveTo(-0.62 * r, 0.72 * r);
+  ctx.lineTo(-0.18 * r, 0.16 * r);
+  ctx.lineTo(-0.96 * r, -0.24 * r);
+  ctx.stroke();
+  // Two ribs across it, which is the structure the wedge exposed.
+  for (let i = 0; i < 2; i++) {
+    const t2 = 0.24 + i * 0.34;
+    ctx.beginPath();
+    ctx.moveTo((-0.62 + t2 * 0.44) * r, (0.72 - t2 * 0.56) * r);
+    ctx.lineTo((-0.96 + t2 * 0.78) * r, (-0.24 + t2 * 0.4) * r);
+    ctx.stroke();
+  }
+  // A loose piece, still hanging off the leading corner.
+  ctx.beginPath();
+  ctx.moveTo(0.3 * r, -0.92 * r);
+  ctx.lineTo(0.62 * r, -1.24 * r);
+  ctx.lineTo(0.86 * r, -0.9 * r);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawDrift(ctx, r, phase, time) {
   ctx.setLineDash([r * 0.5, r * 0.42]);
   ctx.beginPath();
@@ -3489,9 +3716,22 @@ export function hostileCount(world) {
   return n;
 }
 
+/*
+ * How much DRIFT is on the field, which is not the same as how much harmless
+ * matter is on it.
+ *
+ * Both callers gate `spawnDrift` -- the ambient trickle against `maxDrift`
+ * and a wave's own placement against `driftCap` -- so the question is about
+ * one type. It read `e.harmless`, which was already wrong for SEED (a
+ * SCION's three quietly suppressed the ambient trickle) and would be wrong
+ * again for every one of the twenty harmless objects: five EMBERs on the
+ * floor would have stopped the grey arriving. Branched on the id, because
+ * the branch is about one type -- the same correction build 275 made to
+ * `spawnGroup`.
+ */
 export function driftCount(world) {
   let n = 0;
-  for (const e of world.enemies) if (!e.dead && e.harmless) n++;
+  for (const e of world.enemies) if (!e.dead && e.type.id === 'drift') n++;
   return n;
 }
 
@@ -4667,7 +4907,17 @@ export class Director {
     // A TOW is a job and two bodies -- the head plus the MASS it drags, both
     // hostile, both counted by the kill tally. Counting the job would make
     // the denominator jump the moment one is released.
-    for (const j of this.jobs) queued += j.n * (j.type.tows ? 2 : 1);
+    /*
+     * A HARMLESS job is not in the denominator. `tagBody` refuses to stamp
+     * one, `standing` skips it and `counts` is false on it, so a released
+     * EMBER never reaches `made` or `slain` -- counting the queued ones would
+     * put bodies in the total that can never come out of it, and the bar
+     * would read short for as long as any were still waiting.
+     */
+    for (const j of this.jobs) {
+      if (j.type.harmless) continue;
+      queued += j.n * (j.type.tows ? 2 : 1);
+    }
     const total = this.made + queued;
     return total > 0 ? Math.min(1, this.slain / total) : 0;
   }
@@ -4981,8 +5231,31 @@ export class Director {
       if (!type) continue;
       // SWARM: twice as many, half the health. The halving is stamped on the
       // body in spawnOne, where the tier's own multiplier is applied.
-      const n = Math.max(1, Math.round(base * swell)) * (swarm ? 2 : 1);
-      asked += n;
+      /*
+       * ---- MORTAR does not swell, and is not asked for (build 307) ------
+       *
+       * A harmless entry weighs nothing in the budget (`threatOf`), so it
+       * cannot take the budget's multiplier either: four EMBERs authored in a
+       * band-1 wave would be forty at a deep rung -- scenery scaled by a
+       * difficulty it does not pay into. Drift has always worked this way,
+       * `wave.drift` being a flat count this never touched; this states the
+       * same rule once for every harmless type.
+       *
+       * Nor does it count toward `asked`, which is what the wave VERDICT is
+       * measured against and the guard that keeps the drift-only bonus wave
+       * from being scored. A body `standing` skips and `tagBody` refuses to
+       * stamp is not part of the verdict.
+       */
+      /*
+       * Tested on what it PAYS rather than on the `harmless` flag, because
+       * paying nothing is the actual reason it may not take the multiplier.
+       * The two cannot diverge: check-build.mjs fails the build for a
+       * hostile that weighs nothing and for a harmless type that weighs
+       * something, in both directions.
+       */
+      const mortar = threatOf(type) === 0;
+      const n = Math.max(1, Math.round(base * (mortar ? 1 : swell))) * (swarm ? 2 : 1);
+      if (!mortar) asked += n;
       if (!wave.teach && n >= W.formAt) jobs.push({ type, n });
       else for (let i = 0; i < n; i++) jobs.push({ type, n: 1 });
     }
@@ -5601,10 +5874,67 @@ export class Director {
      * has pushed through it -- so the march is hidden by the drawing rather
      * than by the chrome, which from build 295 is too short to hide it.
      */
+    /*
+     * ...unless its gait says it does not come through the portal at all.
+     * Tested on the ANSWER the roll above already produced, the way
+     * `throughMouth` is, so every other spawn site draws exactly the randoms
+     * it always did in the order it always did.
+     */
+    if (spawnByGait(world, t, x)) { this.lastRelease = world.time || 0; return; }
     x = throughMouth(world, x, t.r);
     release(world, t, x, -50 - rand(0, 40));
     this.lastRelease = world.time || 0;
   }
+}
+
+/**
+ * The two gaits that do not arrive through the portal, from build 307.
+ *
+ * A RISE body starts on the FLOOR and climbs; a TUMBLE body is thrown in from
+ * one side. Neither is `staged` -- staging is the hidden march down the
+ * portal's throat and there is no throat on either of these paths -- and
+ * neither is `born`, so the one-way surface lets an EMBER out through the rim
+ * it never came in by.
+ *
+ * The `x` already rolled by the caller is what places a RISE body and what
+ * picks a TUMBLE body's SIDE, so this adds no draw of its own beyond the two
+ * each throw needs. Returns true when it has placed the body, so the ordinary
+ * portal release is skipped.
+ *
+ * `spawnGroup` deliberately does NOT come through here: a debug placement or
+ * an assay body is put where the caller asked and picks its gait up from
+ * wherever it stands, which is the same escape `spawnDrift`'s `here` is.
+ */
+export function spawnByGait(world, type, x) {
+  const g = type.gait;
+  if (g !== 'rise' && g !== 'tumble') return false;
+  if (g === 'rise') {
+    // Off the floor, a little way up from it so nothing is born inside the
+    // band `edgeEase` pushes out of.
+    const fx = clamp(x, type.r + 6, world.width - type.r - 6);
+    spawnOne(world, type, fx, world.floorY - type.r - rand(2, 30), {
+      staged: false,
+      spawnIn: 0.6,
+      vx: spread(CFG.ember.sway),
+      vy: -rand(10, 40),
+    });
+    return true;
+  }
+  const H = CFG.husk;
+  // Whichever half of the field the roll landed in is the side it comes from,
+  // so the throw crosses the whole arena rather than half of it.
+  const side = x < world.width / 2 ? -1 : 1;
+  const sx = side < 0 ? type.r + 4 : world.width - type.r - 4;
+  // The spin is `tumble`'s, and only `tumble`'s: it has to be held against
+  // the angular damping every frame anyway, so setting it here as well would
+  // be two owners for one number.
+  spawnOne(world, type, sx, entryLine(world, ENTRY_Y) + rand(40, 140), {
+    staged: false,
+    spawnIn: 0.6,
+    vx: -side * H.cross,
+    vy: H.fall * rand(0.6, 1.3),
+  });
+  return true;
 }
 
 /** Area damage + shove, used by blooms, mines and PULSE. */

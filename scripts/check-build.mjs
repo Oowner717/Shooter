@@ -220,7 +220,7 @@ console.log(`all ${ALL_UPGRADES.length - repeats.length} capped upgrades write t
  * little of it there is. The grey itself sits at 0.21, so 0.28 leaves room
  * either side of the line.
  */
-const { ENEMY_TYPES, CFG, TYPE_BY_ID } = await import(new URL('../src/config.js', import.meta.url));
+const { ENEMY_TYPES, CFG, TYPE_BY_ID, GAITS } = await import(new URL('../src/config.js', import.meta.url));
 const chroma = (hex) => {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255;
@@ -228,6 +228,35 @@ const chroma = (hex) => {
   const b = n & 255;
   return (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
 };
+/*
+ * ---- a GAIT is declared from a vocabulary, and every word in it is read ---
+ *
+ * Two directions, because each fails differently and silently.
+ *
+ * A type naming a gait nothing implements gets the march it was trying not to
+ * take: `drive`'s dispatch falls through to `wander` or to the route, nothing
+ * throws, and the body simply walks downhill like everything else. That is
+ * the `shape` fault verbatim -- five shapes with no case in the draw switch
+ * fell through to `drawChip` for fourteen builds.
+ *
+ * And an entry in GAITS with no reader is a promise the table is making and
+ * the code is not keeping, which is `kind: 'works'` verbatim: the six build
+ * lots carried that field for eighteen builds while `buildGun` checked only
+ * that a lot existed. So each id has to appear BY NAME in src/enemies.js.
+ */
+const gaitSrc = readFileSync(new URL('../src/enemies.js', import.meta.url), 'utf8');
+const gaitWords = Object.keys(GAITS);
+const badGait = ENEMY_TYPES.filter((t) => t.gait && !gaitWords.includes(t.gait))
+  .map((t) => `${t.id} declares gait '${t.gait}', which is not in GAITS`);
+const mute = gaitWords.filter((g) => !new RegExp(`'${g}'`).test(gaitSrc))
+  .map((g) => `GAITS.${g} is read by nothing in src/enemies.js`);
+if (badGait.length || mute.length) {
+  for (const line of [...badGait, ...mute]) console.error(`gaits: ${line}`);
+  process.exit(1);
+}
+console.log(`gaits: ${gaitWords.length} in the vocabulary (${gaitWords.join(' ')}), all read; `
+  + `${ENEMY_TYPES.filter((t) => t.gait).length} types declare one, the rest march`);
+
 const GREY = CFG.debris.grey;
 const greyFails = ENEMY_TYPES.filter((t) => t.color === GREY && !t.harmless)
   .map((t) => `${t.id} wears the grey but is not harmless`);
@@ -315,23 +344,53 @@ console.log(`ward shell floor ${smallestShell.toFixed(0)} is ${(smallestShell / 
  */
 const { WAVES } = await import(new URL('../src/config.js', import.meta.url));
 const regular = WAVES.filter((w) => !w.teach && w.of.length);
-const soloWaves = regular.filter((w) => w.of.length < 2 || w.of.length > 3);
+/*
+ * ---- MORTAR is not part of the combination (build 307) ------------------
+ *
+ * A harmless entry in `of` is scenery laid alongside the wave: it weighs
+ * nothing in the budget, does not swell with it, is skipped by `standing`,
+ * refused by `tagBody` and invisible to `hostileCount`. So neither of the two
+ * rules below is about it -- the two-or-three rule is about the PROBLEM being
+ * a combination, and the body ceiling is about that combination not becoming
+ * a crowd. Drift was already outside both, by living in `wave.drift` rather
+ * than in `of` at all; EMBER and HUSK are in `of` because a wave names what
+ * arrives on it, so the exemption has to be said rather than arranged.
+ *
+ * What bounds mortar instead is `mortarCap`, asserted below: exempt from
+ * three ceilings is not the same as unbounded.
+ */
+const hostilesOf = (w) => w.of.filter(([id]) => !TYPE_BY_ID[id].harmless);
+const mortarOf = (w) => w.of.filter(([id]) => TYPE_BY_ID[id].harmless);
+const soloWaves = regular.filter((w) => hostilesOf(w).length < 2 || hostilesOf(w).length > 3);
 if (soloWaves.length) {
-  console.error(`${soloWaves.length} regular wave(s) do not name two or three types: `
+  console.error(`${soloWaves.length} regular wave(s) do not name two or three hostile types: `
     + soloWaves.map((w) => JSON.stringify(w.of)).join(' '));
   process.exit(1);
 }
+const MORTAR_CAP = CFG.waves.mortarCap;
+const overMortar = regular
+  .map((w) => [w.of, mortarOf(w).reduce((n, [, c]) => n + c, 0)])
+  .filter(([, n]) => n > MORTAR_CAP);
+if (overMortar.length) {
+  console.error(`${overMortar.length} wave(s) author more than ${MORTAR_CAP} harmless bodies, `
+    + 'which nothing else bounds: ' + overMortar.map(([of, n]) => `${JSON.stringify(of)}=${n}`).join(' '));
+  process.exit(1);
+}
+const mortarWaves = regular.filter((w) => mortarOf(w).length);
+console.log(`mortar: ${mortarWaves.length} wave(s) carry harmless bodies, at most `
+  + `${Math.max(0, ...regular.map((w) => mortarOf(w).reduce((n, [, c]) => n + c, 0)))} `
+  + `of a cap of ${MORTAR_CAP}, and none of them counts toward the combination`);
 /*
  * Bodies per wave as released, which is the authored count times the flat
  * population multiplier -- the swell is on top of both and is meant to be.
  * A TOW counts two, because it is two.
  */
 const WAVE_BODIES = 11;
-const bodiesOf = (w) => Math.round(w.of
+const bodiesOf = (w) => Math.round(hostilesOf(w)
   .reduce((n, [id, c]) => n + Math.max(1, Math.round(c * CFG.waves.population)) * (TYPE_BY_ID[id].tows ? 2 : 1), 0));
 const crowded = regular.map((w) => [w.of, bodiesOf(w)]).filter(([, n]) => n > WAVE_BODIES);
 if (crowded.length) {
-  console.error(`${crowded.length} wave(s) over ${WAVE_BODIES} bodies at population `
+  console.error(`${crowded.length} wave(s) over ${WAVE_BODIES} hostile bodies at population `
     + `${CFG.waves.population}: ` + crowded.map(([of, n]) => `${JSON.stringify(of)}=${n}`).join(' '));
   process.exit(1);
 }
@@ -386,7 +445,9 @@ const askAt = (w, tier) => {
   const T = threatOfWave(w);
   if (!(T > 0)) return bodiesOf(w);
   const scale = Director.budgetAt(tier, w.band || 1) / T;
-  return w.of.reduce((n, [, c]) => n + Math.max(1, Math.round(c * scale)), 0);
+  // Hostiles only, and for the same reason `load` scales only those: mortar
+  // pays nothing into the budget and cannot take the budget's multiplier.
+  return hostilesOf(w).reduce((n, [, c]) => n + Math.max(1, Math.round(c * scale)), 0);
 };
 const peak = Math.max(...regular.map((w) => askAt(w, deep)));
 /*

@@ -7936,7 +7936,7 @@ if (!GUN_LINE) {
     const { CFG, WAVES } = await import('../src/config.js');
     const g = window.__sim;
     const w = g.world;
-    const out = { crowd: CFG.waves.glitch.crowd };
+    const out = { crowd: CFG.waves.glitch.crowd, fuse: CFG.waves.glitch.fuse };
 
     /*
      * ---- the reported configuration, and it has to be that one ----------
@@ -8046,6 +8046,28 @@ if (!GUN_LINE) {
       let last = 0;
       let gPeak = 0;
       let waves = 0;
+      /*
+       * WHICH CAUSE filled the fuse, counted in frames. `Director.burnFrom`
+       * is build 293's answer to "a signal with TWO causes needs a field
+       * saying which", and this case -- the one whose whole subject is the
+       * second cause -- had never read it: it compared the fuse's PEAK
+       * between the two arms instead, which is censored at 1 and, below the
+       * ceiling, is just the hold duration times a fixed rate. See the note
+       * on the fuse arm below.
+       */
+      let crowdFrames = 0;
+      let contactFrames = 0;
+      /*
+       * The fuse's GROSS RISE, summed frame by frame. `gPeak` cannot carry a
+       * rate: it is clamped at 1 and zeroed by every discharge, so on a run
+       * that blew twice `gPeak / held` reads 1/84 = 0.0119 for a fuse that
+       * actually rose more than twice over. That is the censoring fault one
+       * level down from where build 305 found it -- it fixed the floor by
+       * dividing a CENSORED numerator by the noisy denominator, which works
+       * only while the fuse never saturates, and a longer window guarantees
+       * it does.
+       */
+      let rose = 0;
       let at = d.at;
       let drifted = 0;
       for (let f = 0; f < 60 * secs; f++) {
@@ -8076,8 +8098,11 @@ if (!GUN_LINE) {
         g.update(1 / 60);
         if (d.at !== at) { waves++; at = d.at; }
         if (d.holdFor > 0) heldFrames++;
+        if (d.burnFrom === 'crowd') crowdFrames++;
+        else if (d.burnFrom === 'contact') contactFrames++;
         if (d.glitch > gPeak) gPeak = d.glitch;
         if (last > 0.9 && d.glitch === 0) fired++;
+        if (d.glitch > last) rose += d.glitch - last;
         last = d.glitch;
         if (f % 30 === 0) {
           peak.push(w.enemies.filter((e) => !e.dead && !e.harmless && !e.fizzle).length);
@@ -8113,6 +8138,8 @@ if (!GUN_LINE) {
         / Math.max(1, peak.length)).toFixed(3);
       return { max: Math.max(...peak), mean, pinned, held: +(heldFrames / 60).toFixed(1),
         fired, gPeak: +gPeak.toFixed(2), tier: d.tier, waves, drifted,
+        crowdS: +(crowdFrames / 60).toFixed(1), contactS: +(contactFrames / 60).toFixed(1),
+        rose: +rose.toFixed(3),
         auto: !!w.up.flinch && !!w.up.deadbolt };
     };
     // The field, with the fuse held out of it, at the rung where this build
@@ -8120,11 +8147,25 @@ if (!GUN_LINE) {
     out.fieldRung = 32;
     out.drowning = play(true, true, 240, out.fieldRung);
     out.loose = play(false, true, 240, out.fieldRung);
-    // ...and the fuse, with it let run. Shorter, because what is being read
-    // is a peak rather than a mean and it is reached early.
+    /*
+     * ...and the fuse, with it let run.
+     *
+     * FIVE MINUTES and not the 150 seconds this had. The hold is the noisy
+     * input -- 9.3s to 120.3s across nine runs by this case's own note -- and
+     * at 150 it drew a 1.4s hold once in seven: a window in which the
+     * mechanism never ran, which is a liveness failure and not a finding.
+     * Doubled, so the liveness floor below is clear of the draw rather than
+     * near it, which is the rule the LURCHER window paid for in build 226.
+     */
     out.fuseRung = 28;
-    out.fuseOn = play(true, false, 150, out.fuseRung);
-    out.fuseOff = play(false, false, 150, out.fuseRung);
+    out.fuseSecs = 300;
+    out.fuseOn = play(true, false, out.fuseSecs, out.fuseRung);
+    out.fuseOff = play(false, false, out.fuseSecs, out.fuseRung);
+    // What those seconds are WORTH, off the config rather than off a
+    // measurement: a crowd frame is `crowd / fuse` a second and a contact
+    // frame `1 / fuse`, so this is the rise the mechanism owes.
+    out.want = (out.fuseOn.crowdS * out.crowd + out.fuseOn.contactS)
+      / CFG.waves.glitch.fuse;
 
     /*
      * ---- and a run that IS clearing is not held --------------------------
@@ -8235,22 +8276,64 @@ if (!GUN_LINE) {
    * where the hold happened to be long, and `held` is the noisy half by this
    * case's own note (9.3s to 120.3s across nine runs).
    *
-   * What is not censored is the RATE: fuse risen per second of hold reads
-   * 0.019, 0.021, 0.024, 0.024, 0.026 and 0.034 over the same six runs -- a
-   * 1.8x band where the peak is a coin toss. Floor at 0.012, which is 1.6x
-   * under the worst measured, and the GAP arm (the gated peak against the
-   * loose one) is kept because it is the claim's own comparison and survived
-   * all six at 0.27 to 1.00.
+   * ---- ...and the GAP is the same quantity, which is what 307 found -----
+   *
+   * Build 305 replaced the floor with the RATE and kept `gatedPeak >
+   * loosePeak + 0.15`, calling it "the claim's own comparison". It is not: it
+   * is the hold duration again. Below the ceiling the peak is simply
+   * `rate * held`, and the rate is the stable half -- measured across seven
+   * runs either side of build 307 it is 0.018 to 0.034, a 1.9x band, while
+   * `held` is 1.4, 13.6, 15.7, 29.1, 37.5, 39.4, 42.5, 50.8, 54.3 seconds.
+   * So the peak arm needed a hold of about 25 seconds to clear 0.15 and
+   * failed for the three shortest draws, on builds whose change was a price
+   * table (303), an era ceiling (305) and two harmless bodies (307). Three
+   * builds' worth of "it looked causal" for one arm about a coin toss.
+   *
+   * What replaces it is the CAUSE, which is categorical and has been
+   * available since build 293 -- `Director.burnFrom`, added under the note
+   * that a signal with two causes needs a field saying which. This is the
+   * case whose entire subject is the second cause and it had never read it.
+   *
+   *   - liveness: the scenario RAN (the hold is real, waves were scored).
+   *     The arm this replaces had no liveness guard at all, which is why a
+   *     1.4-second hold read as the mechanism failing rather than as the
+   *     window missing it. Its sibling arm above has carried one since 303.
+   *   - the ARITHMETIC, which is what the rate should always have been. A
+   *     crowd frame rises `crowd / fuse` a second and a contact frame
+   *     `1 / fuse`, so the gross rise is `(crowdS * crowd + contactS) /
+   *     fuse` exactly -- an identity, not a fitted floor, and it is stated
+   *     against the config rather than against a measured number. Summed
+   *     frame by frame, because `gPeak` is clamped at 1 and zeroed by every
+   *     discharge: on the first 300-second run it read 1/84 = 0.0119 for a
+   *     fuse that had actually risen more than twice over, and failed a
+   *     floor of 0.012 while the mechanism was working perfectly.
+   *   - the CAUSE: most of the filling is the WAIT and not contact. Not
+   *     vacuous -- the REPORT is a run whose fuse was fed by contact alone
+   *     and never got there, which is exactly `crowdS < contactS`.
+   *   - the control: contact alone does NOT get there. Measured over seven
+   *     runs the gate-off peak is 0.03 to 0.19, so a ceiling of 0.5 is 2.6x
+   *     clear of the worst. The gate-off arm's own crowd count is zero BY
+   *     CONSTRUCTION (`play` writes `holdFor = 0` every frame when the gate
+   *     is off) and is therefore reported and NOT asserted: a setup that
+   *     gives the mechanism no choice cannot see the choice.
    */
   check('...and the wait FILLS THE FUSE, which is the thing that rescues the run',
-    r.fuseOn.gPeak / Math.max(1, r.fuseOn.held) > 0.012
-    && r.fuseOn.gPeak > r.fuseOff.gPeak + 0.15,
-    `at rung ${r.fuseRung}, held ${r.fuseOn.held}s of 150, the fuse reached ${r.fuseOn.gPeak} `
-    + `(${(r.fuseOn.gPeak / Math.max(1, r.fuseOn.held)).toFixed(3)} a second held, `
-    + `which is the uncensored half) and blew ${r.fuseOn.fired} times, ladder `
-    + `${r.fuseOn.tier}; with the gate off it reached ${r.fuseOff.gPeak}, blew `
-    + `${r.fuseOff.fired} and ended at ${r.fuseOff.tier} -- the crowd term is `
-    + `${r.crowd} of the contact rate`);
+    // it ran at all...
+    r.fuseOn.held > 10 && r.fuseOn.waves >= 2
+    // ...the fuse rose by exactly what those seconds are worth...
+    && Math.abs(r.fuseOn.rose - r.want) < r.want * 0.1
+    // ...mostly BECAUSE of the wait, which is the half the report denied...
+    && r.fuseOn.crowdS > r.fuseOn.contactS
+    // ...and contact on its own does not get there.
+    && r.fuseOff.gPeak < 0.5,
+    `at rung ${r.fuseRung}, held ${r.fuseOn.held}s of ${r.fuseSecs}: the fuse rose `
+    + `${r.fuseOn.rose} against the ${r.want.toFixed(3)} that ${r.fuseOn.crowdS}s of WAIT `
+    + `and ${r.fuseOn.contactS}s of contact are worth at crowd ${r.crowd} over a fuse of `
+    + `${r.fuse}, peaked at ${r.fuseOn.gPeak} and blew ${r.fuseOn.fired} times over `
+    + `${r.fuseOn.waves} waves, ladder ${r.fuseOn.tier}; with the gate off it rose `
+    + `${r.fuseOff.rose} to a peak of ${r.fuseOff.gPeak} on ${r.fuseOff.contactS}s of `
+    + `contact (and ${r.fuseOff.crowdS}s of wait, which is zero by construction), blew `
+    + `${r.fuseOff.fired}, ending at ${r.fuseOff.tier}`);
 
   check('...and a run that is clearing does not notice the gate',
     r.coping.share < 0.1 && r.coping.waves >= 6,
@@ -28622,6 +28705,291 @@ if (MINE_LINE) {
     flat.length === 0 && empty.length === 0 && r.selfZero === 0,
     five.map((k) => `${k} ${r.vsChip[k]} from a chip (ink ${r.ink[k]})`).join(' · ')
     + `; the same shape twice differs by ${r.selfZero}`);
+}
+
+// --- the first two of the twenty arrive, and both of them LEAVE -------------
+/*
+ * Build 307, phase 6a of docs/rebalance.html against docs/objects.html.
+ *
+ * EMBER and HUSK are the first bodies in this game with a way off the field of
+ * their own: every one before them either reached the machine or was
+ * destroyed. So the claim is not "it moves" -- everything moves -- it is that
+ * each one moves the way its TYPE says and then goes, and that going costs
+ * the run nothing.
+ *
+ * Four arms, and each carries a control that reads the opposite on a body
+ * without the gait, because "it went up" and "it went away" are both true of
+ * a working build and of one where the gait dispatch fell through to the
+ * march. A gait is a property of the type and not a roll at spawn, so the
+ * first two arms measure a POPULATION of eight and assert the mean -- one
+ * draw of one body cannot tell a rule from a route.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const S = w.shooter;
+    const { TYPE_BY_ID, CFG, WAVES } = await import('../src/config.js');
+    const { spawnByGait, drawSpecimen, threatOf, ENTRY_Y } = await import('../src/enemies.js');
+    const { entryLine } = await import('../src/portal.js');
+    g.restart();
+    /*
+     * Quiet, and from a known machine. `restart()` is not a reset of
+     * everything a case can leave behind -- six hundred cases run before this
+     * one -- so the director is pinned, the assists are off and the field is
+     * emptied explicitly. `director.update` is deliberately NOT stubbed: the
+     * damage-bench family upstream stubs it and never puts it back, and a
+     * case that stubs it again would be adding to that rather than being
+     * honest about it. Pinning the timer is enough.
+     */
+    w.director.timer = 1e9;
+    w.director.driftTimer = 1e9;
+    w.autoAim = false;
+    w.autoFire = false;
+    /*
+     * EVERY list, not the two that look relevant. Build 275 took `harmless`
+     * out of the mine trigger, so an EMBER springs a mine -- and six hundred
+     * cases upstream leave mines, patches, rounds and wreckage lying about.
+     * Measured: this arm read 7 of 8 in the suite and 8 of 8 three times in
+     * isolation, which is the inherited-state signature CLAUDE.md records,
+     * and `restart()` is not a reset of everything a case can leave behind.
+     */
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+    };
+    const put = (id, x) => {
+      const n = w.enemies.length;
+      // Through the REAL spawn site, which is the half of a gait that decides
+      // where it starts from. A case that placed the body by hand would be
+      // testing the steering and not the object.
+      const made = spawnByGait(w, TYPE_BY_ID[id], x);
+      return made ? w.enemies[n] : null;
+    };
+    const out = {};
+
+    // ---- 1. EMBER climbs for the rim and is gone, DRIFT does neither ----
+    const climb = (make, secs) => {
+      clear();
+      const bodies = [];
+      /*
+       * Spread across the width rather than rolled, so eight bodies of radius
+       * 7 cannot touch each other. The claim is that each one takes the gait
+       * its TYPE declares, and eight independent climbs say that; eight
+       * bodies shoving each other off the floor say something about the pair
+       * solver.
+       */
+      for (let i = 0; i < 8; i++) {
+        const e = make((w.width * (i + 0.5)) / 8);
+        if (e) bodies.push(e);
+      }
+      const y0 = bodies.map((e) => e.y);
+      const rim = entryLine(w, ENTRY_Y);
+      let away = null;
+      const top = bodies.map((e) => e.y);
+      for (let s = 0; s < secs * 30; s++) {
+        g.update(1 / 30);
+        bodies.forEach((e, i) => { top[i] = Math.min(top[i], e.y); });
+        if (away === null && bodies.every((e) => e.dissolved)) away = +(s / 30).toFixed(1);
+      }
+      const mean = (a) => a.reduce((n, v) => n + v, 0) / Math.max(1, a.length);
+      return {
+        n: bodies.length,
+        // Every one of them, not the best of them: a gait is the type's.
+        gone: bodies.filter((e) => e.dissolved).length,
+        // How far up the field it got, in units, meaned over the population.
+        rose: Math.round(mean(bodies.map((e, i) => y0[i] - top[i]))),
+        // ...and whether any of them reached above the rim at all.
+        pastRim: bodies.filter((e, i) => top[i] < rim).length,
+        away,
+        start: Math.round(mean(y0)),
+        floor: Math.round(w.floorY),
+      };
+    };
+    out.ember = climb((x) => put('ember', x), 30);
+    out.drift = climb((x) => {
+      // The same place an EMBER starts from, and loose: a staged DRIFT takes
+      // the staged march in `drive` rather than its own gait at all, so a
+      // control left staged would be a control of nothing.
+      const e = g.debugSpawn('drift', x, w.floorY - 40);
+      e.staged = false;
+      e.spawnIn = 0;
+      return e;
+    }, 30);
+
+    // ---- 2. HUSK crosses the field, turns over, and leaves on its clock --
+    const cross = (id, secs) => {
+      clear();
+      const e = id === 'husk'
+        ? put('husk', w.width * 0.25)
+        : g.debugSpawn(id, w.width / 2, entryLine(w, ENTRY_Y) + 80);
+      if (id !== 'husk') { e.staged = false; e.spawnIn = 0; }
+      const x0 = e.x;
+      const a0 = e.angle;
+      const d0 = Math.hypot(e.x - S.x, e.y - S.y);
+      let far = 0;
+      let turned = 0;
+      let prev = e.angle;
+      let near = d0;
+      let away = null;
+      for (let st = 0; st < secs * 30; st++) {
+        g.update(1 / 30);
+        far = Math.max(far, Math.abs(e.x - x0));
+        turned += Math.abs(e.angle - prev);
+        prev = e.angle;
+        near = Math.min(near, Math.hypot(e.x - S.x, e.y - S.y));
+        if (away === null && e.dissolved) away = +(st / 30).toFixed(1);
+      }
+      return {
+        // How far across the arena it got, as a share of the arena's width.
+        crossed: +(far / w.width).toFixed(2),
+        // Turns, not radians: "end over end" is a number a reader can picture.
+        turns: +(turned / (Math.PI * 2)).toFixed(2),
+        // What it gave up of its own distance to the machine. A body with an
+        // opinion about the machine closes on it; this one has none.
+        closedBy: +(1 - near / d0).toFixed(2),
+        away,
+      };
+    };
+    out.husk = cross('husk', 14);
+    out.mote = cross('mote', 14);
+    out.life = CFG.husk.life;
+
+    // ---- 3. mortar does not swell, and is not asked for -----------------
+    /*
+     * `Director.wave` is a GETTER off `order[at]`, so `d.wave = WAVES[i]` is a
+     * silent no-op that reads back as the ambient wave -- build 300 measured
+     * 0.14s against 3.4 that way. Selected the way every other case does it.
+     */
+    clear();
+    const d = w.director;
+    const at = WAVES.findIndex((v) => !v.teach && (v.of || []).some(([id]) => id === 'ember'));
+    const authored = Object.fromEntries((WAVES[at].of || []));
+    const askAt = (tier) => {
+      d.setTier(tier);
+      d.order = [at];
+      d.at = 0;
+      d.load(w, d.wave);
+      const by = {};
+      for (const j of d.jobs) by[j.type.id] = (by[j.type.id] || 0) + j.n;
+      // SWARM doubles every count in the wave, mortar included, so it is
+      // divided out rather than avoided -- a case that hoped for no trait
+      // would be a case that passed for the wrong reason most runs.
+      const sw = d.traits.some((t) => t.id === 'swarm') ? 2 : 1;
+      const host = Object.entries(by)
+        .filter(([id]) => !TYPE_BY_ID[id].harmless)
+        .reduce((n, [, v]) => n + v, 0);
+      return {
+        ember: (by.ember || 0) / sw,
+        host: host / sw,
+        hostRaw: host,
+        asked: d.asked,
+        sw,
+        tier: d.tier,
+        ids: Object.keys(by).join(','),
+      };
+    };
+    const lo = askAt(1);
+    const hi = askAt(30);
+    out.swell = {
+      at,
+      authored,
+      lo,
+      hi,
+      threat: threatOf(TYPE_BY_ID.ember) + threatOf(TYPE_BY_ID.husk),
+    };
+    d.order = null;
+    clear();
+    g.restart();
+
+    // ---- 4. ...and each of the two draws a picture of its own ------------
+    const SZ = 96;
+    const shot = (id) => {
+      const c = document.createElement('canvas');
+      c.width = SZ; c.height = SZ;
+      const x = c.getContext('2d');
+      x.translate(SZ / 2, SZ / 2);
+      drawSpecimen(x, id, 22);
+      const px = x.getImageData(0, 0, SZ, SZ).data;
+      const a = new Uint8Array(SZ * SZ);
+      let ink = 0;
+      for (let i = 0; i < SZ * SZ; i++) { a[i] = px[i * 4 + 3]; ink += px[i * 4 + 3]; }
+      return { a, ink: Math.round(ink / 1000) };
+    };
+    const diff = (p, q) => {
+      let sum = 0;
+      for (let i = 0; i < p.a.length; i++) sum += Math.abs(p.a[i] - q.a[i]);
+      return Math.round(sum / 1000);
+    };
+    // Two controls: the generic chip a fallen-through shape would draw, and
+    // DRIFT -- because these two wear DRIFT's grey by the colour rule and
+    // have nothing but silhouette to tell them apart by.
+    const chip = shot('mote');
+    const grey = shot('drift');
+    out.draw = {};
+    for (const id of ['ember', 'husk']) {
+      const p = shot(id);
+      out.draw[id] = { chip: diff(p, chip), drift: diff(p, grey), ink: p.ink };
+    }
+    out.selfZero = diff(shot('husk'), shot('husk'));
+    return out;
+  });
+
+  const E = r.ember;
+  const D = r.drift;
+  check('an EMBER comes up off the floor, climbs past the rim and is gone',
+    E.n === 8 && E.gone === 8 && E.pastRim === 8 && E.away !== null
+    // ...and the control, over the same window, does neither.
+    /*
+     * "It went UP" is NOT the discriminator, and the first version of this
+     * arm used it and lost about one run in two: a DRIFT laid on the floor
+     * legitimately climbs to its own band at `CFG.drift.climb` -- measured,
+     * 496 to 548 units against the ember's 1008 to 1013, so a 2x margin
+     * straddles the truth. What separates a gait that LEAVES from one that
+     * arrives somewhere is the rim and the dissolve, and both are absolute.
+     */
+    && D.n === 8 && D.gone === 0 && D.pastRim === 0,
+    `${E.gone}/${E.n} embers dissolved by ${E.away}s having risen ${E.rose} units `
+    + `(${E.pastRim} past the rim, from y ${E.start} of a floor at ${E.floor}); `
+    + `control ${D.gone}/${D.n} drifts gone, ${D.pastRim} past the rim, rose ${D.rose}`);
+
+  const H = r.husk;
+  const M = r.mote;
+  check('...and a HUSK is thrown across it end over end, with no opinion about the machine',
+    H.crossed > 0.5 && H.turns > 1.5 && H.away !== null
+    && Math.abs(H.away - r.life) < 1.5
+    // The control: a MOTE has an opinion, closes on the machine, and stays.
+    && M.closedBy > 0.5 && H.closedBy < M.closedBy && M.away === null && M.turns < H.turns,
+    `husk crossed ${H.crossed} of the arena in ${H.turns} turns, closed ${H.closedBy} of its `
+    + `distance to the machine, gone at ${H.away}s of a ${r.life}s life; `
+    + `control mote closed ${M.closedBy} in ${M.turns} turns and was still there`);
+
+  const S2 = r.swell;
+  check('mortar weighs nothing, swells with nothing, and is not what a wave is judged on',
+    S2.threat === 0
+    // The case arrived where it said it did: `setTier` is the machinery's
+    // setter and clamps, so a rung past the ceiling would be measured at the
+    // ceiling and read as the two rungs agreeing.
+    && S2.lo.tier === 1 && S2.hi.tier === 30
+    && S2.lo.ember === S2.authored.ember && S2.hi.ember === S2.authored.ember
+    && S2.hi.host > S2.lo.host * 2
+    && S2.lo.asked === S2.lo.hostRaw && S2.hi.asked === S2.hi.hostRaw,
+    `wave ${S2.at} (${JSON.stringify(S2.authored)}): embers ${S2.lo.ember} at rung `
+    + `${S2.lo.tier} and ${S2.hi.ember} at rung ${S2.hi.tier} against hostiles `
+    + `${S2.lo.host} -> ${S2.hi.host}; asked ${S2.lo.asked}/${S2.lo.hostRaw} -> `
+    + `${S2.hi.asked}/${S2.hi.hostRaw}, jobs from ${S2.hi.ids}`);
+
+  const two = Object.keys(r.draw);
+  check('...and neither of the two greys is the generic chip, or the other grey',
+    two.every((k) => r.draw[k].chip > 40 && r.draw[k].drift > 40 && r.draw[k].ink > 20)
+    && r.selfZero === 0,
+    two.map((k) => `${k} ${r.draw[k].chip} from a chip and ${r.draw[k].drift} from a DRIFT `
+      + `(ink ${r.draw[k].ink})`).join(' · ') + `; the same shape twice differs by ${r.selfZero}`);
 }
 
 // --- the debug panel's three quieter faults ---------------------------------
