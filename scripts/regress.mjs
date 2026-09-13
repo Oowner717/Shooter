@@ -14878,6 +14878,17 @@ if (MINE_LINE) {
     + `the damage line goes x${r.core && r.core.lineBefore.toFixed(2)} -> `
     + `x${r.core && r.core.lineAfter.toFixed(2)}`);
 
+  /*
+   * 0.11 is a HARD bound and not a fitted one, which is worth saying because
+   * it reads like the latter. `Enemy`'s constructor is
+   * `maxHp = round(hp * rand(0.92, 1.1))`, so `|core / O.hp - 1|` is
+   * supported on [0, 0.100] and NOTHING can put it at 0.11 -- the margin sits
+   * just above the jitter's own maximum rather than above the largest value
+   * somebody happened to see. Measured over three runs it drew 1.4%, 5.3% and
+   * 0.6%, which would look like a margin fitted to a draw if the support were
+   * not already known. Widening `rand`'s range is the one edit that would
+   * make this number wrong.
+   */
   check('an anomaly opened by a stock turret is the anomaly as authored',
     r.stockHard === 1 && r.stockCoreBand < 0.11,
     `hard ${r.stockHard}, core ${r.stockCore} against an authored 1900 `
@@ -24713,14 +24724,46 @@ if (MINE_LINE) {
     `the hardest mark paints ${r.mark && r.mark.w} x ${r.mark && r.mark.h} world `
     + `units, ${r.mark && r.mark.above} of it above the line`);
 
+  /*
+   * ---- the STASIS half was a margin 6% from its own worst draw ----------
+   *
+   * `safeSpeed > cruise * 0.6` measured, over three runs of one build:
+   * 0.910, 0.970 and **0.636** of the body's own cruise. So the floor sat
+   * inside the distribution with 6% to spare -- the shape build 319 paid for
+   * three times, found here by dumping every case's figures (`--json`) across
+   * three runs rather than by waiting for it to fail.
+   *
+   * The two bodies are measured in ONE run, under ONE press, at the same
+   * cruise: the shielded one behind the wall and the exposed one below it.
+   * So the claim -- the wall's shadow keeps STASIS off what is behind it --
+   * is their SEPARATION, and that is overwhelming where the absolute is
+   * marginal: **79x to 207x** over six runs of this build, against about 1x
+   * for either way of breaking it (the shield ignored and both are held;
+   * STASIS not applied and both run free). A bound of 20 is 4.0x clear of the
+   * worst draw and 20x clear of broken -- a threshold in the gap, which is
+   * where build 319's AIRBURST repair had to put one too.
+   *
+   * The raw ratio spans 0.633 to 1.44 of cruise across those six runs -- it
+   * can exceed the cruise, because `drive` is still accelerating the body
+   * when the window closes -- so the old 0.6 floor drew 0.636 and 0.633 in
+   * two of six. The fault was live and recurring, not a one-off.
+   *
+   * The absolutes are kept and LOOSENED to sanity floors, because they say
+   * something the ratio cannot: that the shielded body is genuinely moving
+   * and the exposed one is genuinely stopped, rather than both drifting at
+   * some speed whose ratio happens to be 20.
+   */
   check('...and STASIS, ARC and PILE all stop at it too',
     r.safeShielded && r.nearOpen && r.stasisOn
-    && r.safeSpeed > r.cruise * 0.6 && r.nearSpeed < r.cruise * 0.3
+    && r.safeSpeed > r.nearSpeed * 20
+    && r.safeSpeed > r.cruise * 0.3 && r.nearSpeed < r.cruise * 0.1
     && r.arcShot && r.legalHit === 'arc' && r.hiddenHit === null && r.arcsOver === 0
     && r.hiddenShielded && r.hiddenNear
     && r.pileReach > r.pileToWall && r.struckThrown === 0 && r.openThrown > 0,
     `under STASIS a body behind the wall runs at ${r.safeSpeed} of ${r.cruise} `
-    + `while one below it is held at ${r.nearSpeed}; ARC earthed the body it hit `
+    + `while one below it is held at ${r.nearSpeed} -- a separation of `
+    + `${r.nearSpeed ? (r.safeSpeed / r.nearSpeed).toFixed(0) : 'inf'}x, which is the claim `
+    + `(measured 79-207x over six runs against about 1x broken either way); ARC earthed the body it hit `
     + `(${r.legalHit}) and not the one behind the wall (${r.hiddenHit}), with `
     + `${r.arcsOver} arcs drawn over it; PILE's front reaches ${r.pileReach} `
     + `against a wall ${r.pileToWall} out and marked the body behind it `
@@ -25979,7 +26022,19 @@ if (GUN_LINE) {
       w.autoFire = false;
       ledger.reset();
       ledger.on = true;
-      for (let k = 0; k < 8; k++) {
+      /*
+       * SIXTEEN presses, and eight is what this arm's own note describes
+       * failing at 1.13. Its bound has to fit a gap only 14% wide -- broken
+       * reads 0.98 to 1.03 (the burst too small to reach the rig's centre)
+       * and working read 1.17 to 1.29 over three runs of build 320 -- so
+       * 1.10 is correctly PLACED and the distributions were simply too wide
+       * for it. Build 319's sibling arm took the same medicine and its
+       * spread fell 0.19 to 0.077 going four presses to ten; more presses
+       * tightens BOTH ends here and widens the gap the bound sits in, which
+       * is the honest direction when a threshold is already in the right
+       * place. Costs about twenty seconds of synthetic time.
+       */
+      for (let k = 0; k < 16; k++) {
         w.abilities.clearCooldowns();
         g.useAbility(slot());
         for (let f = 0; f < 80; f++) g.update(1 / 60);
@@ -33538,5 +33593,33 @@ for (const r of results) {
 }
 console.log(`\n${results.length - failed}/${results.length} passed, ${errors.length} console/page errors`);
 for (const e of errors.slice(0, 8)) console.log(`  ! ${e}`);
+
+/*
+ * ---- `--json FILE` DUMPS EVERY DETAIL, INCLUDING THE PASSING ONES --------
+ *
+ * The printer above emits `r.detail` only when a case FAILS, so this suite
+ * measures several hundred numbers a run and throws away all but the handful
+ * that happened to break. That is why every threshold fault in this file's
+ * history has cost a forensic investigation: to ask "is this margin near its
+ * own distribution?" you had to find the case, write a standalone probe,
+ * replicate its setup and sample it by hand -- builds 303, 305, 307, 309,
+ * 310, 315 and 319 each paid that, and 319 paid it three times in one build.
+ *
+ * The figures were always there. Two runs of this flag and a diff say which
+ * cases measure something that MOVES, which is the whole population a
+ * fitted margin can be wrong about, and it costs one file write.
+ *
+ * Deliberately NOT printed to stdout by default: the human report is a list
+ * of names you scan for the word FAIL, and putting a paragraph under each of
+ * six hundred passing lines would bury exactly that. Off unless asked, and
+ * it writes the array as it stands so a reader can diff, group or plot it
+ * without re-deriving anything.
+ */
+const argJson = process.argv.indexOf('--json');
+if (argJson > 0 && process.argv[argJson + 1]) {
+  require('fs').writeFileSync(process.argv[argJson + 1],
+    JSON.stringify(results.map((r, i) => ({ i, pass: r.pass, name: r.name, detail: r.detail || '' })), null, 1));
+  console.log(`  wrote ${results.length} results to ${process.argv[argJson + 1]}`);
+}
 await browser.close();
 process.exit(failed || errors.length ? 1 : 0);

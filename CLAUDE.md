@@ -4649,4 +4649,89 @@ came from before believing the other one covers it.
   same shape as `undefined > eraGate` answering ERA 1: a comparison against a
   missing value is a comparison that succeeds quietly.
 
+- **THE SUITE MEASURED SEVERAL HUNDRED FIGURES A RUN AND THREW AWAY ALL BUT
+  THE ONES THAT BROKE, WHICH IS WHY EVERY THRESHOLD FAULT COST AN
+  INVESTIGATION.** `check()` stores `r.detail` for every case and the printer
+  emitted it only on FAILURE. So to ask "is this margin near its own
+  distribution?" you had to find the case, write a standalone probe, replicate
+  its setup and sample it by hand -- builds 303, 305, 307, 309, 310, 315 and
+  319 each paid that, and 319 paid it three times in one build. The figures
+  were always there. `--json FILE` (build 320) writes the results array as it
+  stands; off unless asked, because the human report is a list of names you
+  scan for the word FAIL and a paragraph under each of six hundred passing
+  lines would bury exactly that.
+  **Two runs and a diff now answer the question.** Over three runs of one
+  build, 694 arms partition: **562 byte-identical** (deterministic -- no
+  fitted margin on one of those can ever flake), **123 whose figures move**
+  (the entire population a margin can be wrong about) and **7 whose text
+  SHAPE changes**. Of 665 assertion sites, 143 compare against a fitted
+  decimal literal; intersected with the movers that is **52 arms** to rank,
+  which is a reading list rather than a research project.
+- **A MARGIN 6% FROM ITS OWN WORST DRAW, FOUND BY DUMPING THE FIGURES RATHER
+  THAN BY WAITING FOR IT TO FAIL.** The yard wall's STASIS arm asserted
+  `safeSpeed > cruise * 0.6` and the ratio drew 0.910, 0.970, 0.636 -- then
+  0.633 on a later run, so two of six were within 6% of failing. The two
+  bodies are measured in ONE run under ONE press at the same cruise, so the
+  claim is their SEPARATION: **79x to 207x** over six runs against about 1x
+  for either way of breaking it (shield ignored and both held; STASIS absent
+  and both free). Bound 20 -- 4.0x clear of the worst draw and 20x clear of
+  broken. The absolutes are KEPT and loosened to sanity floors, because they
+  say what a ratio cannot: that one body is genuinely moving and the other
+  genuinely stopped, rather than both drifting at a ratio of 20.
+  Note the raw ratio can EXCEED 1 (1.44 measured) because `drive` is still
+  accelerating the body when the window closes -- which is the tell that a
+  floor expressed as a share of cruise was measuring the sampling moment.
+- **WHEN A THRESHOLD IS CORRECTLY PLACED AND STILL FAILS, TIGHTEN THE
+  DISTRIBUTION AND NOT THE NUMBER.** The ASSAY's AIRBURST bench has to fit a
+  gap only 14% wide -- broken 0.98 to 1.03 (the burst too small to reach the
+  rig's centre) against working 1.17 to 1.29 -- and its own note records it
+  failing at 1.13. So 1.10 was in the right place and eight presses were too
+  few. Sixteen: spread 0.12 -> 0.08, worst draw 1.17 -> 1.20, headroom above
+  the bound 6% -> 9%, for about twenty seconds of synthetic time. Build 319's
+  sibling arm took the same medicine (four presses to ten, spread 0.19 ->
+  0.077). **Moving a threshold that is already in the gap makes it worse at
+  one end.**
+- **TWO MARGINS THAT READ AS FITTED ARE NOT, AND SAYING SO IS THE FIX.** The
+  fuse arm's `|rose - want| < want * 0.1` is an IDENTITY taken off the config:
+  the two track to 0.002 while their own absolutes swing 23%. And
+  `stockCoreBand < 0.11` is a HARD bound -- `maxHp = round(hp * rand(0.92,
+  1.1))` supports the deviation on [0, 0.100], so nothing can reach 0.11;
+  widening `rand`'s range is the one edit that would make it wrong. Both now
+  carry the derivation, because a correct bound that looks fitted is a bound
+  the next reader "fixes".
+- **AND ONE WAS LEFT ALONE ON PURPOSE.** The release gate's two ratios sit 9%
+  and 19% from their bounds, which is the same signature -- but the effect
+  size is proportional to a hold that swung **48.5s to 154.4s** across three
+  runs, with the weakest separation on the shortest hold. That case has been
+  re-sited on five consecutive builds and this file's own note says headroom
+  beats sensitivity on it. Three samples is not a mandate to re-tune the one
+  case with the worst history; recording the numbers is.
+- **THE FAN-OUT SCORED ONE OF THREE, AND THE MEASUREMENT IS WHAT SAID SO.**
+  Six read-only lenses over the 143 flagged margins returned three AT_RISK.
+  One was the ASSAY bench -- independent agreement with a fault already found
+  here, which is the useful kind. One claimed the banked-wreckage arm varies
+  because "every input varies and nothing cancels", and six runs of
+  BYTE-IDENTICAL detail refute it. And one flagged a SPALL/SPLINTER margin in
+  a case that **does not run at all**: it sleeps behind `MINE_LINE`, because
+  `CFG.mines.inPlay` is false. Plausible mechanism reasoning, wrong about
+  whether it reaches the measured figure -- the rule this file already
+  carries, now with an instrument to settle it in one query.
+- **THIS INSTRUMENT ONLY SEES CASES THAT RUN, WHICH IS ITS BLIND SPOT.** The
+  mine line's and the gun line's cases sleep behind their `inPlay` flags, so
+  every margin inside them is UNMEASURED by a figure dump -- and would arrive
+  unvalidated on the build that flips either flag back on. Build 289's note
+  says turning a system back on should be a config flip rather than an edit to
+  the guards; add to that, it is also a build whose thresholds have never been
+  sampled. Run the dump with the flag on before believing that suite run.
+- **A RELATIVE-SPREAD METRIC EXPLODES ON A QUANTITY THAT CROSSES ZERO.** The
+  widest "mover" in the whole sweep was PULSE-against-ARMORED at 174%, which
+  is `gunPlated` drawing -3.23 to 2.39 -- a range of 5.6 either side of zero,
+  against a bound of 6.38 it has 2.7x of headroom on. Ranking by
+  `(hi - lo) / max|value|` puts a perfectly safe arm at the top of the list.
+  The ranking is a reading aid and the pairing of a literal to a figure in
+  prose is fuzzy: it matched `0.3` in the STASIS case (enormous headroom)
+  while the fault was on `0.6` in the same condition, and it matched HUSK's
+  `0.5` against a number that is the mote control's own minimum quoted in the
+  message. **Rank with the script, decide with your eyes.**
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
