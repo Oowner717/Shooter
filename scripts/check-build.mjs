@@ -337,7 +337,8 @@ if (noClock.length || drifted.length) {
 /*
  * A type that is more than one body says so in a field `release()` dispatches
  * on, and everything that counts bodies per authored entry has to read it.
- * Three such fields today -- `tows` (2), `beads` (7) and `school` (14) -- and
+ * Four such fields today -- `tows` (2), `beads` (7), `school` (14) and
+ * `pair` (2) -- and
  * the guard is that each numeric one is a whole number above one, so
  * `beads: 1` (a chain of one, and a dispatch for nothing) cannot be written.
  *
@@ -356,7 +357,7 @@ const relSrc = readFileSync(new URL('../src/enemies.js', import.meta.url), 'utf8
 const relBody = relSrc.slice(relSrc.indexOf('export function release('));
 const dispatched = [...relBody.slice(0, relBody.indexOf('\n}')).matchAll(/if \(type\.(\w+)\) return/g)]
   .map((m) => m[1]);
-const MULTI = ['tows', 'beads', 'school'];
+const MULTI = ['tows', 'beads', 'school', 'pair'];
 const missedDispatch = MULTI.filter((f) => !dispatched.includes(f));
 const extraDispatch = dispatched.filter((f) => !MULTI.includes(f));
 const unclaimed = dispatched.filter((f) => !ENEMY_TYPES.some((t) => t[f] !== undefined));
@@ -390,12 +391,13 @@ if (tight.length) {
 }
 console.log(`multiplicity: ${multi.length + 1} type(s) are more than one body, off release()'s own `
   + `dispatch on ${dispatched.join('/')} (`
-  + `${[...multi.map((t) => `${t.id} ${t.beads || t.school}`), 'tow 2'].join(', ')})`);
+  + `${[...multi.map((t) => `${t.id} `
+    + `${dispatched.map((f) => t[f]).find((v) => typeof v === 'number')}`), 'tow 2'].join(', ')})`);
 
 console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => `${t.id} ${t.climb}s`).join(' ')}), `
   + `nominal speeds agree on a column of ${lo}-${hi}`);
 
-const { fractureDepth, fractureFactor, barOf } = await import(new URL('../src/enemies.js', import.meta.url));
+const { fractureDepth, fractureFactor, barOf, pairOf } = await import(new URL('../src/enemies.js', import.meta.url));
 
 /*
  * ---- A FRACTURE HAS TO TERMINATE, and nothing else would say so ----------
@@ -545,6 +547,37 @@ console.log(`bar: ${bars.length} type(s) are tested as a capsule (`
 
 
 /*
+ * ---- A PAIR IS ONE POOL, AND THE BEAM HAS TO CLEAR THE PAIR SOLVER ------
+ *
+ * `pairOf` throws for a `pair` that is not exactly 2, for a `snap` outside
+ * (0, 1) and for an `alone` at or under 1 -- the fourth mandatory-field rule
+ * after `levels` (224), `band` (303) and `beads`/`climb`, and for the same
+ * measured reason: a defaulted value indistinguishable from a chosen one is
+ * the shape this repo keeps paying for. Called here so a bad table fails the
+ * BUILD rather than the first release, because a throw inside `release` is a
+ * throw in the rAF loop and build 288 records that reading as a freeze.
+ *
+ * It also refuses a beam shorter than two radii, which is the pair solver's
+ * floor: `resolvePair` corrects any overlap and exempts nothing, so a beam
+ * inside `2r + slop` is two halves grinding against a constraint that is
+ * holding them together -- the chain's measured fault, on an axis the rigid
+ * tether cannot give ground on.
+ */
+const pairs = ENEMY_TYPES.filter((t) => t.pair).map((t) => ({ id: t.id, r: t.r, ...pairOf(t) }));
+const tightBeam = pairs
+  .filter((y) => y.len <= y.r * 2 + CFG.physics.slop)
+  .map((y) => `${y.id}'s beam of ${y.len} is inside the pair solver's floor of `
+    + `${(y.r * 2 + CFG.physics.slop).toFixed(1)}`);
+if (tightBeam.length) {
+  for (const line of tightBeam) console.error(`pair: ${line}`);
+  process.exit(1);
+}
+console.log(`pair: ${pairs.length} type(s) share one pool across a rigid beam (`
+  + `${pairs.map((y) => `${y.id} 2x r${y.r} at ${y.len} (${(y.len / y.r).toFixed(2)}r), snap `
+    + `${y.snap}, survivor x${y.alone}`).join('; ') || 'none'})`);
+
+
+/*
  * A covered body must not read as an energy mote.
  *
  * Energy is drawn in the colour of whatever dropped it, so a MOTE's energy is
@@ -615,12 +648,13 @@ if (soloWaves.length) {
  */
 const MORTAR_CAP = CFG.waves.mortarCap;
 /*
- * True bodies per authored entry, off the same three fields `release`
- * dispatches on. The mortar cap counts THESE, because nothing else bounds
+ * True bodies per authored entry, off the same four fields `release`
+ * dispatches on -- and `pair` IS the count, the way `school` and `beads` are,
+ * so only `tows` needs its 2 written out. The mortar cap counts THESE, because nothing else bounds
  * mortar at all -- `hostileCount` cannot see it, so `maxEnemies` has nothing
  * to say about it either.
  */
-const bodiesPer = (t) => t.school || t.beads || (t.tows ? 2 : 1);
+const bodiesPer = (t) => t.school || t.beads || t.pair || (t.tows ? 2 : 1);
 const mortarBodies = (w) => mortarOf(w).reduce((n, [id, c]) => n + c * bodiesPer(TYPE_BY_ID[id]), 0);
 const overMortar = regular
   .map((w) => [w.of, mortarBodies(w)])
@@ -649,6 +683,17 @@ console.log(`mortar: ${mortarWaves.length} wave(s) carry harmless bodies, at mos
  * would be to double the allowance for every wave in the game or to ship a
  * school of six, which is not the object.
  *
+ * ---- ...AND SO DOES A PAIR, for a stronger version of the same reason ---
+ *
+ * A YOKE is two bodies of ONE pool, and the school's fourteen have fourteen
+ * pools. There is no state in which a pair is two simultaneous problems: it
+ * arrives as one object, damage anywhere drains the same number, and the
+ * counter is about reaching BOTH. The snap does not make it two either --
+ * the half that comes off is gone, so what is left is one survivor, which
+ * is one problem again. Counted as two, band 5's wave is 17 against a
+ * ceiling of 11 and the choice would be three pairs, which is not the
+ * object.
+ *
  * So the ceiling counts PROBLEMS, the school is bounded separately (below,
  * at one per wave, the way `mortarCap` bounds the thing three ceilings are
  * blind to), and what bounds the bodies is `maxEnemies` -- which build 300
@@ -658,7 +703,7 @@ console.log(`mortar: ${mortarWaves.length} wave(s) carry harmless bodies, at mos
  * `undefined > eraGate` shape, and the number is printed now.
  */
 const WAVE_BODIES = 11;
-const problemsPer = (t) => (t.school ? 1 : bodiesPer(t));
+const problemsPer = (t) => (t.school || t.pair ? 1 : bodiesPer(t));
 const swelled = (c) => Math.max(1, Math.round(c * CFG.waves.population));
 const bodiesOf = (w) => Math.round(hostilesOf(w)
   .reduce((n, [id, c]) => n + swelled(c) * problemsPer(TYPE_BY_ID[id]), 0));
@@ -690,6 +735,10 @@ console.log(`schools: ${schoolWaves.length} wave(s) carry one, at `
   + `${ENEMY_TYPES.filter((t) => t.school).map((t) => `${t.id} ${t.school}`).join(', ') || 'none'} `
   + `bodies each -- counted as ONE problem against the ${WAVE_BODIES}-body ceiling and as `
   + `${Math.max(0, ...schoolWaves.map(realBodiesOf))} real bodies, which maxEnemies bounds`);
+const pairWaves = regular.filter((w) => w.of.some(([id]) => TYPE_BY_ID[id].pair));
+console.log(`pairs: ${pairWaves.length} wave(s) carry them -- counted as ONE problem each against `
+  + `the ${WAVE_BODIES}-body ceiling (worst ${Math.max(0, ...pairWaves.map(bodiesOf))}) and as `
+  + `${Math.max(0, ...pairWaves.map(realBodiesOf))} real bodies, which maxEnemies bounds`);
 /*
  * ---- the stream, and what actually bounds the field (build 300) -----------
  *

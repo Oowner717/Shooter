@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '315';
+export const BUILD = '316';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '315';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'b0d922b';
+export const REV = 'ec288ff';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1184,6 +1184,51 @@ export const CFG = {
     // ...and where it turns is NOT here: it is `CFG.physics.edgeEase`, which
     // already forbids a body to reach a side wall. See Enemy.rollOn.
     spin: 2, // radians a second, held as a floor -- see Enemy.rollOn
+  },
+
+  /*
+   * ---- PAIRED: two bodies, one beam, and ONE POOL OF HEALTH -------------
+   *
+   * YOKE is the first thing in this game whose health is not a property of a
+   * body. The two halves share a pool: damage to either drains the same
+   * number, so focusing one half does not kill it any faster -- and that is
+   * the whole object, because WHERE the damage lands still decides what you
+   * are left with.
+   *
+   * `snap` is the share of the pool that, landed on ONE half, takes that half
+   * off the beam. At 0.5: spread your fire and the pool empties with neither
+   * half having absorbed half of it, so both go at once; put half the pool
+   * into one and it snaps off with the other half still standing -- in a
+   * single body, unencumbered, at `alone` times its speed. The total damage
+   * to destroy a pair is the same either way. What differs is whether you
+   * finish facing nothing or facing something fast.
+   *
+   * ---- ...and this is a reading of the guide, not a transcription -------
+   *
+   * `docs/objects.html` says "they share one pool of 150 health. Kill one and
+   * the beam breaks -- and the survivor keeps the whole remaining pool". Read
+   * literally those cannot both hold: if every point of damage drains one
+   * shared pool then draining it kills both, and there is no "remaining pool"
+   * for a survivor to keep. The `snap` share is what makes every sentence of
+   * that paragraph true at once, including the counter ("take them together
+   * with something that reaches both... focusing one half is the trap").
+   * Recorded here because the next reader will have the guide open.
+   */
+  yoke: {
+    len: 60, // the beam, centre to centre -- 2.3r, the guide's own spacing
+    /*
+     * Radians a second about the midpoint, and it is COMPENSATED rather than
+     * held: `grip` blends the tangential velocity toward this, and both
+     * `linearDamping` and `drive`'s own accel term pull it back every frame,
+     * which delivers 0.59 of a raw target -- measured 0.692 rad/s against
+     * this 1.2 before `pairOn` grossed the ask up by those two terms.
+     * Delivered 1.143-1.172 over three runs. See `Enemy.pairOn`: a target
+     * rate is not a rate, which this repo has now paid for three times.
+     */
+    spin: 1.2,
+    grip: 3, // how hard the pair is held at that rate, per second
+    snap: 0.5, // the share of the pool that, on ONE half, breaks the beam
+    alone: 1.9, // ...and what the survivor's speed is multiplied by
   },
 
   /*
@@ -4548,6 +4593,47 @@ export const ENEMY_TYPES = [
      * rather than taken, so it is written down here.
      */
     /*
+     * YOKE: two bodies, one beam, one pool -- and where you aim decides what
+     * you are left holding.
+     *
+     * `pair` is the fourth multiplicity `release()` dispatches on, after
+     * `tows` (2), `beads` (7) and `school` (14) -- and the first one that is
+     * NOT more health. A TOW is two bodies with two pools, so `threatOf`
+     * counts the head plus what it drags; a chain and a school are N bodies
+     * of N times the health. A yoke is two bodies of ONE 150, so it weighs
+     * exactly 150 -- five points, not ten. Nothing in `threatOf` had to
+     * change for that, which is the tell that the field is the right shape:
+     * `many` reads `school || beads || 1` and a pair is one.
+     */
+    id: 'yoke',
+    opens: 0,
+    name: 'YOKE',
+    shape: 'yoke',
+    gait: 'paired',
+    pair: 2,
+    r: 26,
+    hp: 150,
+    density: 0.95,
+    speed: 42,
+    accel: 150,
+    restitution: 0.4,
+    wobble: 0.5,
+    /*
+     * The strange family's colour, which is LURCHER's at dE 0.0 -- the third
+     * of these in three builds (SHOAL against MOTE, SPINDLE against TOW) and
+     * the same ruling, which is written out at SHOAL: the palette has no
+     * well-separated region left, the family is what the colour means, and
+     * the silhouette carries the distinction. A pair on a beam turning about
+     * its own midpoint is not a picture anybody confuses with a LURCHER.
+     * The GLOW is separated at 21.6, the widest gap the violet band has.
+     */
+    color: '#b98cff',
+    glow: '#5a2fb0',
+    weight: 0, // never chosen by the ordinary spawn roll -- it is authored
+    drops: 5, // energy it leaves when it comes apart
+  },
+  {
+    /*
      * SPINDLE: the only body in this game that is not a circle to a round.
      *
      * A bar 96 long and 11 thick, turning end over end at two thirds of a
@@ -5701,6 +5787,13 @@ export const WAVES = [
   // together: each head winds on its own approach.
   { of: [['tow', 3], ['needle', 2]], band: 5 },
   { of: [['tow', 2], ['glut', 2], ['mote', 1]], band: 5 },
+  /*
+   * ...and the YOKE wave. Six pairs and one GLUT weighs 33.9 against band
+   * 5's own mean of 35.39, so it re-prices the band by -0.4% -- build 315's
+   * lever used deliberately: a wave authored at its band's mean adds a
+   * problem without lengthening every other wave in that band.
+   */
+  { of: [['yoke', 6], ['glut', 1]], band: 5 },
 
   /*
    * The bonus. Grey and nothing else: no hostiles, no risk, no cost to the
@@ -5750,6 +5843,7 @@ export const GAITS = {
   roll: 'takes no lane at all: across the field, off the side walls, spinning as it comes',
   flock: 'no leader: each body steers at the school\'s own mean and off its nearest neighbour',
   cartwheel: 'comes down an ordinary lane end over end, so its profile against the barrel turns with it',
+  paired: 'two bodies on a rigid beam, turning about their midpoint while the midpoint advances',
 };
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

@@ -31285,6 +31285,394 @@ if (MINE_LINE) {
     + `NEEDLE/MOTE/SHOAL (ink ${D.ink}, the same shape twice ${D.selfZero})`);
 }
 
+// --- a YOKE is two bodies and ONE pool, and where you aim decides what is left
+/*
+ * Build 316, phase 6i. The first type in this game whose health is not a
+ * property of a body: two halves on a rigid beam share one 150, so damage to
+ * either drains the same number and focusing one half does not kill it any
+ * faster. What focusing DOES buy is the `snap` -- half the pool landed on one
+ * half takes that half off the beam, and the other keeps every point that is
+ * left, unencumbered and `alone` times as fast. The total damage is the same
+ * either way; what differs is whether you finish facing nothing or facing
+ * something quick.
+ *
+ * Five claims, and three of them carry their own control:
+ *
+ *   1. `emit` releases a PAIR and not a formation of singles. This is the
+ *      build-309 fault's exact shape -- `spawnFormation` lays slots at
+ *      `r * 2 + 8` = 60 and a pair spans 112 -- and the control is the same
+ *      wave's OTHER entry, which does form up, so the arm is shown able to
+ *      tell the two spawn paths apart before it is believed about either.
+ *   2. the beam holds its length, against a non-rigid tether that does not.
+ *   3. the pair turns at the rate `CFG.yoke` authors, which is a claim about
+ *      a DELIVERED rate and not about the expression that asks for it.
+ *   4. focused fire leaves a survivor; spread fire over the same pool leaves
+ *      none. Each is the other's control: same bodies, same total, different
+ *      distribution.
+ *   5. ...and that total is the same either way.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG, TYPE_BY_ID, WAVES } = await import('../src/config.js');
+    const { release, pairOf, drawSpecimen } = await import('../src/enemies.js');
+    const out = {};
+    const T = TYPE_BY_ID.yoke;
+    out.cfg = pairOf(T);
+    out.spin = CFG.yoke.spin;
+    g.restart();
+    /*
+     * Eighteen cases in the damage-bench family leave `director.update`
+     * stubbed and `spawnLock` pinned and nothing puts either back, and this
+     * case NEEDS the director for arm 1. `restart()` is not a reset of
+     * everything a case can leave behind.
+     */
+    delete w.director.update;
+    w.spawnLock = 0;
+    const d = w.director;
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+    };
+    clear();
+
+    // ---- 1. one release is one PAIR, and the GLUT beside it forms up -----
+    {
+      const at = WAVES.findIndex((v) => (v.of || []).some(([id]) => id === 'yoke'));
+      if (at < 0) throw new Error('no YOKE wave authored');
+      d.setTier(32);
+      const per = {};
+      for (let k = 0; k < 60; k++) {
+        clear();
+        if (!d.jobs.length) d.load(w, WAVES[at]);
+        d.lastRelease = -1e9;
+        d.emit(w);
+        const made = w.enemies.slice();
+        if (!made.length) continue;
+        const id = made[0].type.id;
+        const rec = per[id] || (per[id] = { releases: 0, lo: 99, hi: 0, beamed: 0, bad: 0, over: 0 });
+        rec.releases++;
+        rec.lo = Math.min(rec.lo, made.length);
+        rec.hi = Math.max(rec.hi, made.length);
+        if (id !== 'yoke') continue;
+        for (const e of made) {
+          const o = e.tether && e.tether.other;
+          if (e.beam && o && o !== e && made.includes(o)) rec.beamed++;
+          if (!o || Math.abs(Math.hypot(o.x - e.x, o.y - e.y) - CFG.yoke.len) > 0.05) rec.bad++;
+        }
+        for (let i = 0; i < made.length; i++) {
+          for (let j = i + 1; j < made.length; j++) {
+            if (made[i].tether && made[i].tether.other === made[j]) continue;
+            rec.over = Math.max(rec.over, made[i].r + made[j].r
+              - Math.hypot(made[j].x - made[i].x, made[j].y - made[i].y));
+          }
+        }
+      }
+      out.per = per;
+      out.slotGap = T.r * 2 + 8;
+      out.span = T.r * 2 + CFG.yoke.len;
+    }
+
+    /*
+     * A loose pair on an empty field, out of the door the game uses.
+     *
+     * `d.traits` is CLEARED, and the first version of this case did not do
+     * it: arm 1 loads the real wave at rung 32 and `load` seeds that wave's
+     * traits, so every later `release` was still carrying whatever it rolled
+     * -- SWARM halves `maxHp`, and the pool read 79 and 74 against the
+     * authored 150. The arms are all ratios of the pool so they passed
+     * anyway, which is the worse outcome: a case measuring a body the wave
+     * engine handed it rather than the one the type declares.
+     */
+    d.setTier(1);
+    d.traits = [];
+    d.update = () => {};
+    w.spawnLock = 1e9;
+    const lay = () => {
+      clear();
+      const made = release(w, T, w.width * 0.5, 300);
+      for (const e of made) { e.staged = false; e.spawnIn = 0; e.born = true; }
+      return made;
+    };
+    const step = (n) => { for (let i = 0; i < n; i++) g.update(1 / 60); };
+    const span = (a, o) => Math.hypot(o.x - a.x, o.y - a.y);
+
+    // ---- 2/3. the beam holds its length, and the pair turns --------------
+    {
+      const [a, o] = lay();
+      const lens = [];
+      let prev = Math.atan2(o.y - a.y, o.x - a.x);
+      let total = 0;
+      for (let i = 0; i < 240; i++) {
+        step(1);
+        if (a.dead || o.dead) break;
+        lens.push(span(a, o));
+        const now = Math.atan2(o.y - a.y, o.x - a.x);
+        let dd = now - prev;
+        while (dd > Math.PI) dd -= 2 * Math.PI;
+        while (dd < -Math.PI) dd += 2 * Math.PI;
+        total += dd;
+        prev = now;
+      }
+      out.beam = {
+        lo: Math.min(...lens), hi: Math.max(...lens), n: lens.length,
+        rate: Math.abs(total) / (lens.length / 60),
+      };
+    }
+    /*
+     * ...and the CONTROL for `rigid`, which is a PRESS and not a shove.
+     *
+     * A pure rotation cannot compress a beam, so with the flag on or off the
+     * length holds -- a flag whose other branch is never taken, which is the
+     * `world.endless` shape. What takes it is compression, and the first
+     * version of this arm delivered that as an inward KICK of 400: the two
+     * halves met at contact with a relative speed far over
+     * `collisionThreshold`, `resolvePair` billed `impactDamage` to both, and
+     * they destroyed each other inside ONE FRAME. `Math.min` over the empty
+     * window then reported the rope collapsing "to Infinity". Healing every
+     * frame does not save them either -- one frame's bill is over the whole
+     * pool -- so the kick cannot be the instrument.
+     *
+     * The press is: put the halves closer than the beam, at rest, and let
+     * the constraint answer. No velocities, no contact, nothing dies
+     * (asserted, as `hurt`), and what is measured is the thing the flag is
+     * about -- whether the link pushes back out. A rope's `err` is negative
+     * and it `continue`s; the only thing that separates a rope pair is the
+     * pair solver's own overlap floor, which is 2r + slop and well under the
+     * beam.
+     */
+    const press = (rigid, start) => {
+      const [a, o] = lay();
+      a.cruise = 0; o.cruise = 0;
+      if (!rigid) { delete a.tether.rigid; delete o.tether.rigid; }
+      const mx = (a.x + o.x) / 2;
+      const my = (a.y + o.y) / 2;
+      let nx = o.x - a.x; let ny = o.y - a.y;
+      const dd = Math.hypot(nx, ny) || 1;
+      nx /= dd; ny /= dd;
+      a.x = mx - (nx * start) / 2; a.y = my - (ny * start) / 2;
+      o.x = mx + (nx * start) / 2; o.y = my + (ny * start) / 2;
+      a.vx = 0; a.vy = 0; o.vx = 0; o.vy = 0;
+      const seq = [];
+      for (let i = 0; i < 20; i++) {
+        step(1);
+        seq.push(span(a, o));
+        if (a.dead || o.dead) break;
+      }
+      return { n: seq.length, back: seq[seq.length - 1], hurt: 1 - a.hp / a.maxHp };
+    };
+    out.floor = T.r * 2 + CFG.physics.slop;
+    out.rigid = press(true, 45);
+    out.rope = press(false, 45);
+
+    // ---- 4. focus one half, against spreading the same pool -------------
+    const bench = (focus) => {
+      const [a, o] = lay();
+      a.cruise = 0; o.cruise = 0; // clear of the mount: contact would book damage
+      const pool = a.maxHp;
+      let landed = 0;
+      let snapAt = null;
+      let kept = null;
+      for (let i = 0; i < 4000; i++) {
+        const want = focus ? a : (i % 2 === 0 ? a : o);
+        const pick = want.dead ? [a, o].find((e) => !e.dead) : want;
+        if (pick) {
+          const before = pick.hp;
+          pick.applyDamage(w, 1, { x: pick.x, y: pick.y });
+          landed += Math.max(0, before - pick.hp);
+        }
+        step(1);
+        const live = [a, o].filter((e) => !e.dead);
+        /*
+         * What is LEFT STANDING the moment the pair becomes one body is the
+         * whole distinction, and a survivor count cannot carry it: this
+         * bench goes on firing at whatever is alive, so it finishes at zero
+         * either way. Focused, a half comes off with half the pool behind
+         * it; spread, the pool empties and the second half dies a frame
+         * after the first. Same count, opposite events.
+         */
+        if (snapAt === null && live.length === 1) { snapAt = landed; kept = live[0].hp; }
+        if (!live.length) break;
+      }
+      return { pool, landed, snapAt, kept };
+    };
+    // the survivor's own gain, measured on the body rather than on the type
+    const gain = () => {
+      const [a, o] = lay();
+      // The type's own speed rather than the spawn roll's, so the ratio the
+      // arm reads is exact: `alone` multiplies whatever `cruise` is.
+      a.cruise = T.speed; o.cruise = T.speed;
+      const before = a.cruise;
+      let guard = 0;
+      while (!o.dead && guard++ < 4000) {
+        o.applyDamage(w, 1, { x: o.x, y: o.y });
+        step(1);
+      }
+      step(2);
+      return {
+        died: o.dead, aliveBeam: a.beam, before, after: a.cruise,
+        kept: a.hp / a.maxHp, pool: a.maxHp,
+      };
+    };
+    out.focus = bench(true);
+    out.spread = bench(false);
+    out.gain = gain();
+
+    /*
+     * ---- 6. a rigid beam is drawn ONCE, and not in the harmless grey -----
+     *
+     * `Enemy.draw` is the only tether reader in the DRAW path and it drew a
+     * TOW's cable for any tether at all, so the beam was painted twice --
+     * once by the half that carries it and once as a slack cable in
+     * `#8fa9c4`, the game's ONE grey, which the colour rule promises means
+     * harmless. Found by rendering the pair and looking at it; nothing else
+     * was going to.
+     *
+     * Counted by that grey's own signature -- its green channel is exactly
+     * the mean of its red and blue, which the violet's is not -- with the
+     * flag removed as one control and a TOW, which must KEEP its cable, as
+     * the other. A zero means nothing until the instrument has read a one.
+     */
+    const GREY = (px) => {
+      let n = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        const rr = px[i]; const gg = px[i + 1]; const bb = px[i + 2];
+        if (px[i + 3] < 40 || rr < 30) continue;
+        if (bb - rr >= 20 && Math.abs(gg - (rr + bb) / 2) <= 6) n++;
+      }
+      return n;
+    };
+    const cable = (id, rigid) => {
+      clear();
+      const made = release(w, TYPE_BY_ID[id], w.width * 0.5, 300);
+      for (const e of made) { e.staged = false; e.spawnIn = 0; e.born = true; }
+      for (let i = 0; i < 20; i++) g.update(1 / 60);
+      if (!rigid) for (const e of made) if (e.tether) delete e.tether.rigid;
+      const CS = 220;
+      const mx = made.reduce((n, e) => n + e.x, 0) / made.length;
+      const my = made.reduce((n, e) => n + e.y, 0) / made.length;
+      const c = new OffscreenCanvas(CS, CS);
+      const x = c.getContext('2d');
+      x.clearRect(0, 0, CS, CS);
+      x.translate(CS / 2 - mx, CS / 2 - my);
+      for (const e of made) if (!e.dead) e.draw(x, w);
+      return GREY(x.getImageData(0, 0, CS, CS).data);
+    };
+    out.cable = { rigid: cable('yoke', true), rope: cable('yoke', false), tow: cable('tow', true) };
+
+    // ---- 7. the picture, against the body it shares a colour with -------
+    const SZ = 96;
+    const shotPx = (id) => {
+      const c = new OffscreenCanvas(SZ, SZ);
+      const x = c.getContext('2d');
+      x.clearRect(0, 0, SZ, SZ);
+      x.translate(SZ / 2, SZ / 2);
+      drawSpecimen(x, id, 22);
+      const px = x.getImageData(0, 0, SZ, SZ).data;
+      const a = new Uint8Array(SZ * SZ);
+      let ink = 0;
+      for (let i = 0; i < SZ * SZ; i++) { a[i] = px[i * 4 + 3]; ink += px[i * 4 + 3]; }
+      return { a, ink: Math.round(ink / 1000) };
+    };
+    const diff = (a, b) => {
+      let sum = 0;
+      for (let i = 0; i < a.a.length; i++) sum += Math.abs(a.a[i] - b.a[i]);
+      return Math.round(sum / 1000);
+    };
+    const me = shotPx('yoke');
+    out.draw = { ink: me.ink, selfZero: diff(shotPx('yoke'), shotPx('yoke')) };
+    for (const id of ['lurcher', 'glut', 'tow']) out.draw[id] = diff(me, shotPx(id));
+
+    // ...and put the director back. Eighteen cases in the damage-bench family
+    // leave it stubbed; this one does not add a nineteenth.
+    delete d.update;
+    w.spawnLock = 0;
+    g.restart();
+    clear();
+    return out;
+  });
+
+  const Y = r.per.yoke || {};
+  const other = Object.entries(r.per).find(([id]) => id !== 'yoke');
+  check('a YOKE arrives as a PAIR, and the wave beside it still forms up',
+    Y.releases >= 20 && Y.lo === 2 && Y.hi === 2
+    && Y.beamed === Y.releases * 2 && Y.bad === 0 && Y.over === 0
+    && !!other && other[1].lo > 2,
+    `${Y.releases} releases through Director.emit, every one of them ${Y.lo}-${Y.hi} bodies, `
+    + `${Y.beamed} of ${Y.releases * 2} halves beamed to a partner that arrived with them, `
+    + `${Y.bad} beams off ${r.cfg.len} and a worst overlap of ${Y.over}. The same wave's `
+    + `${other ? other[0].toUpperCase() : '?'} job forms up ${other ? other[1].lo : '?'}-`
+    + `${other ? other[1].hi : '?'} at a time, which is what this arm can tell apart: a `
+    + `formation lays slots ${r.slotGap} apart and a pair spans ${r.span}`);
+
+  const held = r.beam.hi - r.beam.lo;
+  check('...on a beam that holds its length, which a rope would not',
+    held < 0.1 && Math.abs(r.beam.lo - r.cfg.len) < 0.1
+    && r.rigid.n === 20 && r.rope.n === 20 && r.rigid.hurt === 0
+    && r.rigid.back > r.cfg.len * 0.99 && r.rope.back < r.cfg.len * 0.92,
+    `${r.beam.n} frames of turning and the beam measured ${r.beam.lo.toFixed(2)}-`
+    + `${r.beam.hi.toFixed(2)} against an authored ${r.cfg.len}. Pressed to 45 apart and let go, `
+    + `the beam is back to ${r.rigid.back.toFixed(2)} within twenty frames and nothing is hurt; `
+    + `with \`rigid\` off the same press leaves them at ${r.rope.back.toFixed(2)}, which is the `
+    + `pair solver's own overlap floor of ${r.floor.toFixed(1)} rather than anything the link did`);
+
+  check('...and turns at the rate CFG.yoke authors, which is a DELIVERED rate',
+    r.beam.rate > r.spin * 0.9 && r.beam.rate < r.spin * 1.05,
+    `${r.beam.rate.toFixed(3)} rad/s against an authored ${r.spin} `
+    + `(${((r.beam.rate / r.spin) * 100).toFixed(1)}%). The blend is fought by linearDamping and `
+    + `by drive's own accel term, which together deliver 0.59 of a raw target -- measured 0.692 `
+    + `before the compensation went in -- so the ask is grossed up by those two terms and this `
+    + `arm is on what came out`);
+
+  const f = r.focus;
+  const s = r.spread;
+  const fKept = f.kept / f.pool;
+  const sKept = s.kept / s.pool;
+  check('a focused half SNAPS OFF at half the pool; the same pool spread kills both',
+    Math.abs(f.snapAt / f.pool - r.cfg.snap) < 0.03
+    && Math.abs(fKept - (1 - r.cfg.snap)) < 0.05 && sKept < 0.05
+    && r.gain.died && r.gain.aliveBeam === false
+    && Math.abs(r.gain.after / r.gain.before - r.cfg.alone) < 0.01,
+    `focused, the aimed half came off after ${f.snapAt} of a pool of ${f.pool} `
+    + `(${(f.snapAt / f.pool).toFixed(3)} against an authored ${r.cfg.snap}) with `
+    + `${fKept.toFixed(3)} of the pool still standing in the other; the same damage alternated `
+    + `left ${sKept.toFixed(3)} of ${s.pool} standing when the pair became one body, which is `
+    + `the pool emptying rather than a half coming off. The survivor's beam is `
+    + `${r.gain.aliveBeam}, it keeps ${(r.gain.kept * 100).toFixed(0)}% of the pool and its `
+    + `cruise went ${r.gain.before.toFixed(1)} -> ${r.gain.after.toFixed(1)} (x`
+    + `${(r.gain.after / r.gain.before).toFixed(3)} against an authored ${r.cfg.alone})`);
+
+  const C = r.cable;
+  check('...and the beam is painted ONCE, not strung with a TOW\'s harmless-grey cable',
+    C.rigid === 0 && C.rope > 40 && C.tow > 40,
+    `counted on the cable grey's own signature, a live pair shows ${C.rigid} such pixels. Take `
+    + `\`rigid\` off the same tether and the cable comes back at ${C.rope}; a TOW, which must `
+    + `keep its cable, reads ${C.tow} -- so the instrument has been shown to read a one`);
+
+  const D = r.draw;
+  check('...and a pair on a beam is not a picture anybody confuses with a LURCHER',
+    D.lurcher > 40 && D.glut > 40 && D.tow > 40 && D.ink > 20 && D.selfZero === 0,
+    `on the alpha channel alone -- so this is shape and nothing else -- YOKE is ${D.lurcher} `
+    + `from a LURCHER, which wears the same violet at dE 0.0, and ${D.glut}/${D.tow} from a `
+    + `GLUT/TOW (ink ${D.ink}, the same shape twice ${D.selfZero})`);
+
+  const fShare = f.landed / f.pool;
+  const sShare = s.landed / s.pool;
+  check('...and the total damage to clear the pair is the same either way',
+    Math.abs(fShare - 1) < 0.05 && Math.abs(sShare - 1) < 0.05,
+    `${f.landed} of ${f.pool} focused (${fShare.toFixed(4)}) against ${s.landed} of ${s.pool} `
+    + `spread (${sShare.toFixed(4)}). One pool, so where it lands buys you what you are left `
+    + `facing and never a shorter fight`);
+}
+
 // --- the debug panel's three quieter faults ---------------------------------
 /*
  * Build 279, all three found by review and none of them able to fail anything.

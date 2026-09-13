@@ -4037,4 +4037,136 @@ came from before believing the other one covers it.
   capsule against a head on a cable, measured on the alpha channel alone. The
   GLOW is separated instead (13.4 from TOW's), which is the half that was
   free.
+- **A YOKE IS TWO BODIES AND ONE POOL FROM BUILD 316, WHICH IS A FIRST: HEALTH
+  THAT IS NOT A PROPERTY OF A BODY.** Phase 6i, band 5, gait `paired`, `pair: 2`
+  -- the fourth multiplicity `release()` dispatches on and the first that is
+  NOT more health. A TOW is two bodies with two pools so `threatOf` counts the
+  head plus what it drags; a chain and a school are N bodies of N times the
+  health. A pair is two bodies of ONE 150, so it weighs 5 and not 10, and
+  nothing in `threatOf` had to change for that -- `many` reads
+  `school || beads || 1` and a pair is one. The band-5 wave is authored at
+  33.9 against that band's own mean of 35.39, so it re-prices the band by
+  **-0.4%**, which is build 315's lever used deliberately.
+- **THE GUIDE'S THREE SENTENCES CANNOT ALL HOLD LITERALLY, AND `snap` IS THE
+  READING THAT MAKES THEM.** `docs/objects.html` says they "share one pool of
+  150 health. Kill one and the beam breaks -- and the survivor keeps the whole
+  remaining pool". If every point drains one shared pool then draining it kills
+  both and there is no remaining pool for anyone to keep. `CFG.yoke.snap` (0.5)
+  is the share of the pool that, landed on ONE half, takes that half off the
+  beam: spread your fire and the pool empties with neither half having absorbed
+  that share, so both go together; put half into one and it comes off with the
+  rest standing in a single body at `alone` (1.9x) speed. Measured, the total
+  damage to clear the pair is **0.993 to 1.006 of the pool either way** -- what
+  focusing buys is what you are left facing, never a shorter fight.
+  The knife edge falls the right way by one guard: `pourPool` tests
+  `this.hp > 0` before snapping, so perfectly even fire -- where each half
+  absorbs exactly the share on the hit that empties the pool -- kills both.
+- **A TARGET RATE IS NOT A RATE, FOR THE THIRD TIME.** Build 298 (the portal
+  ramp) and 308 (the rise clock) are already in here and the number was handed
+  over raw again anyway. `grip` blends the tangential velocity toward `spin`
+  and TWO terms pull it back every frame: `integrate`'s `linearDamping`, and
+  `drive`'s own blend, which steers both halves at nearly the same march target
+  and therefore erases the part of the velocity that DIFFERS between them.
+  Steady state is `want * grip / (grip + damping + accel/100)` = 0.59, measured
+  **0.692 rad/s against an authored 1.2**. Grossed up by those two terms rather
+  than by a fitted constant -- the correct dependency as well as the honest
+  one, since a heavier `accel` fights the rotation harder -- and delivered
+  1.143 to 1.172 over three runs. `drive`'s `authority` clamp can only reduce
+  its term, so the compensation is an upper bound and the rate lands at or
+  just under the ask. **The case is on the delivered rate, never on the
+  expression that asks for it.**
+- **...and `cur` has to be measured RELATIVE TO THE MIDPOINT or it is not a
+  rotation rate at all.** The pair's march is a translation both halves share,
+  and counting it as rotation reads the beam as turning fastest whenever it
+  happens to lie across the field.
+- **`emit` REACHES FOR A FORMATION BEFORE IT ASKS THE TYPE, AND A PAIR IS
+  BUILD 309'S FAULT IN NEW ARITHMETIC.** `spawnFormation` lays its slots at
+  `r * 2 + 8` -- 60 for an r-26 half -- and a pair spans `r + len + r` = 112,
+  so the slots are pitched for one body and each pair is nearly two of them
+  wide. Measured through the real director on the real wave at rung 32: 114
+  bodies, every beam intact at exactly 60, and a worst overlap between halves
+  of DIFFERENT pairs of **51.9 of a possible 52** -- two bodies with their
+  centres a tenth of a unit apart. A formation of pairs is a lattice, not a
+  shape. The exclusion is written beside `tows`, whose own comment has said
+  "a shape made of towed pairs is a traffic jam rather than a formation, they
+  file in" since it was written. `beads` and `school` reach that branch too
+  once the budget swells their count, and neither was touched here.
+- **The control for that arm is the wave's OTHER entry.** 60 releases through
+  `Director.emit`, every one of them exactly 2 bodies with both halves beamed
+  to a partner that arrived with them, 0 beams off 60 and 0 overlap -- against
+  the same wave's GLUT job, which forms up 20 at a time. A spawn-path claim
+  needs a probe shown able to tell the two paths apart before it is believed
+  about either.
+- **...and an overlap measured with the CADENCE BYPASSED is the probe's own
+  pile-up.** Forcing `lastRelease = -1e9` and emitting eight times in one
+  frame put eight pairs through the mouth at once and read a worst overlap of
+  48 on the fixed build. The gap between releases is what separates them; the
+  overlap claim belongs to ONE release.
+- **`rigid` is load-bearing and the rotation alone cannot show it.** A pure
+  rotation does not compress a beam, so with or without the flag the length
+  held 60.00-60.01 for four seconds -- a flag with a reader whose other branch
+  is never taken, which is the `world.endless` shape. Before believing a
+  constraint flag, find the force that would violate it.
+- **...and THE FORCE CANNOT BE A SHOVE, because two bodies driven into contact
+  destroy each other inside one frame.** The first version kicked the halves
+  inward at 400 six times over: they met at a relative speed far over
+  `collisionThreshold`, `resolvePair` billed `impactDamage` to both, and the
+  window was EMPTY -- `Math.min` over no samples is `Infinity`, which the case
+  duly reported as the rope "collapsing to Infinity". Healing every frame does
+  not save them: one frame's bill is more than the whole pool. And the
+  standalone run of the same arm had read "52.15, and it stays there" off a
+  window of exactly ONE sample, with `lo === hi === mean` as the tell -- a
+  number I wrote into these notes as a behaviour. **A min and a max that agree
+  to the digit are a sample size of one until proven otherwise.**
+  What works is a PRESS: put the halves closer than the beam, at rest, and let
+  the constraint answer. No velocities, no contact, `hurt` asserted at zero.
+  Pressed to 45 of 60 the beam is back to **60.00 within twenty frames** and
+  the rope is still at **52.43**, which is the pair solver's own overlap floor
+  of 52.4 rather than anything the link did. Isolate the mechanism instead of
+  overwhelming it.
+- **A damage bench on a pair has to keep it clear of the mount.** The first
+  run read a survivor at 64.87 of a pool of 141 against an expected 66, and
+  non-integer damage on a bench firing integers is the tell: the pair had
+  marched into the turret and `resolvePair` was billing `impactDamage` on top
+  of the probe's own hits. The totals arm zeroes `cruise`; the snap arm stops
+  on the frame the beam breaks. The turret is off too (`autoAim`/`autoFire`),
+  which is worth 5 of 150 on its own.
+- **A pool compared across two `lay()` calls is two different pools.** The
+  constructor rolls `maxHp` at `rand(0.92, 1.1)`, so the focused and spread
+  runs are 140 and 164 on the same build -- the two-single-draws trap, on a
+  quantity that looks like a constant. Both arms divide by their own pool.
+- **`Enemy.draw` IS THE ONLY TETHER READER IN THE DRAW PATH, AND IT DREW A
+  TOW'S CABLE FOR ANY TETHER AT ALL.** So a YOKE's beam was painted twice --
+  once by the half that carries it, and once as a slack cable in `#8fa9c4`,
+  **the game's ONE grey, which the colour rule promises means harmless**. A
+  hostile pair strung together in the harmless colour is the palette's only
+  promise broken by a draw call, and `check-build`'s colour guard reads TYPE
+  colours and cannot see it. `rigid` is the distinction and already existed: a
+  cable is slack and is drawn as a link between two bodies, a beam holds its
+  length and is part of each half's own picture. Counted on that grey's own
+  signature -- its green channel is exactly the mean of its red and blue,
+  which the violet's is not -- the fixed build reads **0**, the flag removed
+  reads **80**, and a TOW, which must keep its cable, reads **154**.
+  **Nothing but rendering it and looking was going to find this**, which is
+  the rule this repo already has about area effects and about the DECOY's
+  barrel: a new body inherits every draw path that keys on a field it happens
+  to declare, and a tether is a field.
+- **A case that loads a real wave has that wave's TRAITS for the rest of its
+  life.** `Director.load` seeds `d.traits` and nothing clears it, so the YOKE
+  case's arm 1 -- which loads the band-5 wave at rung 32 to measure what
+  `emit` releases -- left SWARM rolled on, and SWARM halves `maxHp`: every
+  later `release` in the case made a pool of 79 and 74 against the authored
+  150. **Every arm was a ratio of the pool, so they all passed**, which is
+  the worse outcome -- a case measuring a body the wave engine handed it
+  rather than the one the type declares. `d.traits = []` beside the
+  `setTier`, and the arms print the pool.
+- **A SURVIVOR COUNT CANNOT TELL THE TWO DEATHS APART, and a bench that goes
+  on firing finishes at zero either way.** The first version of the snap arm
+  asserted "focused leaves 1 standing, spread leaves 0" against a bench whose
+  whole job is to land the WHOLE pool -- so it kept firing at the survivor and
+  read 0 for both. What distinguishes them is what is LEFT STANDING on the
+  frame the pair becomes one body: focused, half the pool behind the half that
+  came off; spread, nothing, because the pool emptied. Same count, opposite
+  events. Measure the state at the event, not the state at the end -- which is
+  the end-of-window trap in a third costume.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

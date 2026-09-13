@@ -185,6 +185,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'quarry': drawQuarry(ctx, r, 0, 0); break;
     case 'dart': drawDart(ctx, r, 0, 0); break;
     case 'bar': drawBar(ctx, r, 0, 0); break;
+    case 'yoke': drawYoke(ctx, r, 0, 0, true); break;
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
@@ -384,6 +385,27 @@ export class Enemy {
      * dynamo.js and projectiles.js. `.link` has no other reader in src.
      */
     this.link = null;
+    /*
+     * The beam, and the share of the pool this half has absorbed.
+     *
+     * `beam` is true while this body is half of a YOKE and the beam is
+     * intact; the SURVIVOR clears it itself, which is build 310's rule --
+     * `Enemy.destroy` is the one door every DAMAGE death comes through and
+     * NOT the one door every `dead = true` comes through (six places set it
+     * directly), so a partner taken by a fizzle, a boss teardown or the
+     * glitch dissolve would leave a beam nobody broke.
+     *
+     * `took` is what makes WHERE the damage lands matter: the pool is
+     * shared, so both halves read the same health, and this is the only
+     * record of which of them absorbed it. Declared here rather than sprung
+     * into existence at the spawn site, and grepped against the boss modules
+     * first (build 298): `.beam` and `.took` have no other reader in src,
+     * and `.freed` -- the obvious name for the survivor's flag -- is AXIOM's
+     * method and one of FRACTAL's minion fields, which is exactly the
+     * collision that cost a suite run.
+     */
+    this.beam = false;
+    this.took = 0;
     /*
      * Which school this body belongs to, or 0 for anything that is not in
      * one. A serial rather than a roster: `spawnSchool` stamps the same
@@ -936,6 +958,132 @@ export class Enemy {
   }
 
   /**
+   * PAIRED: two halves turning about their own midpoint, and one pool.
+   *
+   * ---- THE BREAK IS A PULL, for build 310's reason -------------------
+   *
+   * The survivor notices its partner is gone and takes the beam off itself.
+   * A hook at the death site would have been the obvious place and would
+   * have been wrong: `Enemy.destroy` is the one door every DAMAGE death
+   * comes through and NOT the one door every `dead = true` comes through --
+   * six places set it directly, so a partner taken by a fizzle, a boss
+   * teardown, the glitch dissolve or `Game.sweep` would leave a beam nobody
+   * broke and a survivor that never got its speed. `solveTethers` clears the
+   * tether records on its own; this is what clears the FLAG and pays the
+   * survivor.
+   *
+   * @param {object} world
+   * @param {number} dt
+   */
+  pairOn(world, dt) {
+    const Y = CFG.yoke;
+    const o = this.tether && this.tether.other;
+    if (this.beam && (!o || o.dead || o.fizzle > 0)) {
+      this.beam = false;
+      this.tether = null;
+      this.cruise *= Y.alone;
+      // Its own share starts again, or a survivor that had absorbed the pool
+      // up to the snap would snap a second time off its next hit.
+      this.took = 0;
+      return;
+    }
+    if (!this.beam || !o) return;
+    /*
+     * ONE POOL, held every frame and not only on the damage path. Anything
+     * else that writes `hp` -- MENDING's regen, a graft's, a debug heal --
+     * would otherwise desync the two halves, and the pool is the lower of
+     * them because a pool is what is left rather than the best of two
+     * readings.
+     */
+    if (o.hp !== this.hp) {
+      const low = Math.min(o.hp, this.hp);
+      o.hp = low;
+      this.hp = low;
+    }
+    const slow = this.frozen(world) ? 0.12 : 1;
+    const mx = (this.x + o.x) / 2;
+    const my = (this.y + o.y) / 2;
+    let ax = this.x - mx;
+    let ay = this.y - my;
+    const d = Math.hypot(ax, ay) || 1;
+    ax /= d;
+    ay /= d;
+    /*
+     * The tangent about the midpoint, and the same rotational sense for both
+     * halves: `(-ay, ax)` is anticlockwise from wherever each body stands, so
+     * one shared `routeSide` turns the pair rather than tearing at it. HELD
+     * toward the rate rather than written, for `tumble`'s reason -- the
+     * damping would otherwise take the rotation out inside two seconds -- and
+     * blended so the beam's own constraint is not fighting a velocity that
+     * appeared between two frames.
+     */
+    const tx = -ay * this.routeSide;
+    const ty = ax * this.routeSide;
+    /*
+     * ---- A TARGET RATE IS NOT A RATE, AND THIS REPO HAS PAID FOR IT TWICE
+     *
+     * Build 298 (the portal's ramp) and build 308 (the rise clock) both
+     * handed a target to a blend and measured what actually came out. The
+     * same arithmetic applies here and the same way: `grip` blends the
+     * tangential velocity toward `want`, and TWO other terms are pulling it
+     * back every frame -- `integrate`'s `linearDamping`, and `drive`'s own
+     * blend below, which steers both halves at nearly the same march target
+     * and therefore erases the part of the velocity that DIFFERS between
+     * them. Steady state is `want * grip / (grip + damping + accel/100)`,
+     * which is 0.59 of the authored rate: measured 0.692 rad/s against the
+     * 1.2 in `CFG.yoke`.
+     *
+     * So the target is grossed up by those two terms rather than by a fitted
+     * constant -- which is the correct dependency as well as the honest one:
+     * a heavier `accel` fights the rotation harder and needs more asking
+     * for. `drive`'s `authority` clamp can only reduce its term, so this is
+     * an upper bound on the fight and the delivered rate lands at or a
+     * little under `spin`; the CASE is on the delivered rate, never on this
+     * expression.
+     *
+     * ...and `cur` is measured RELATIVE TO THE MIDPOINT, which is what makes
+     * it a rotation rate at all: the pair's own march is a translation both
+     * halves share, and counting it as rotation would read the beam as
+     * turning fastest whenever it happened to lie across the field.
+     */
+    const fight = CFG.physics.linearDamping + this.accel / 100;
+    const want = Y.spin * d * slow * ((Y.grip + fight) / Y.grip);
+    const mvx = (this.vx + o.vx) / 2;
+    const mvy = (this.vy + o.vy) / 2;
+    const cur = (this.vx - mvx) * tx + (this.vy - mvy) * ty;
+    const k = clamp(Y.grip * dt, 0, 1);
+    this.vx += tx * (want - cur) * k;
+    this.vy += ty * (want - cur) * k;
+    // The picture points ALONG the beam, so `drawYoke` can draw its half in
+    // the body's own frame -- the same reason the dart's facing is the
+    // gait's business and not a field on the type.
+    this.angle = Math.atan2(o.y - this.y, o.x - this.x);
+    this.av = 0;
+  }
+
+  /**
+   * One pool, and the record of which half absorbed it.
+   *
+   * Called from `applyDamage` after the hit has landed, so what it books is
+   * what the body actually lost -- past ARMORED's discard, past the plate,
+   * past a HERALD's ward and past the `Math.max(1, ...)` floor, which is the
+   * rule `ledger.note` already follows.
+   *
+   * `snap` is the share of the pool that, landed on ONE half, takes that
+   * half off the beam. Spread your fire and the pool empties with neither
+   * half having absorbed that share, so both go together; put the share into
+   * one and it comes off with the rest of the pool standing in the other --
+   * unencumbered, and faster. The total damage is the same either way.
+   */
+  pourPool(world, real) {
+    const o = this.tether && this.tether.other;
+    if (!o || o.dead) return;
+    o.hp = this.hp;
+    this.took += real;
+    if (this.hp > 0 && this.took >= this.maxHp * CFG.yoke.snap) this.destroy(world);
+  }
+
+  /**
    * CHAIN: follow the leader, and a cut leaves two snakes.
    *
    * Each bead steers at the one AHEAD, holding `CFG.chain.gap`; the head has
@@ -1469,6 +1617,10 @@ export class Enemy {
      * a coin flip taken at spawn -- a second field would be a second roll for
      * the same decision, and a body that arcs left cartwheels left.
      */
+    // PAIRED holds a rotation about the midpoint and notices a lost partner;
+    // like the cartwheel it does not replace the route, it sits above it.
+    if (this.type.gait === 'paired' && !this.isDrop && !this.staged) this.pairOn(world, dt);
+
     if (this.type.gait === 'cartwheel' && !this.isDrop && !this.staged) {
       const want = CFG.cartwheel.spin * (this.frozen(world) ? 0.12 : 1);
       if (this.av * this.routeSide < want) this.av = this.routeSide * want;
@@ -2207,6 +2359,9 @@ export class Enemy {
       o.flash = this.flash;
       if (o.hp <= 0) o.destroy(world);
     }
+    // A YOKE's two halves read one number, and which of them absorbed it is
+    // what decides whether the beam breaks. See `pourPool`.
+    if (this.beam) this.pourPool(world, real);
     if (this.hp <= 0) this.destroy(world);
   }
 
@@ -2671,6 +2826,7 @@ export class Enemy {
       case 'quarry': drawQuarry(ctx, this.r, this.phase, world.time); break;
       case 'dart': drawDart(ctx, this.r, this.phase, world.time); break;
       case 'bar': drawBar(ctx, this.r, this.phase, world.time); break;
+      case 'yoke': drawYoke(ctx, this.r, this.phase, world.time, this.beam); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
@@ -2755,10 +2911,27 @@ export class Enemy {
       }
     }
 
-    // The cable to the other half of a TOW pair, and the shell/threads of a
-    // HERALD's cover. Both are drawn in world space so they read as links
-    // between bodies rather than decoration on one.
-    if (this.tether && !this.tether.other.dead) {
+    /*
+     * The cable to the other half of a TOW pair, and the shell/threads of a
+     * HERALD's cover. Both are drawn in world space so they read as links
+     * between bodies rather than decoration on one.
+     *
+     * ---- ...BUT A RIGID BEAM IS DRAWN BY THE BODY THAT CARRIES IT -------
+     *
+     * This was `if (this.tether)` and it is the only tether reader in the
+     * DRAW path, so build 316's YOKE got a TOW's cable laid over its own
+     * beam -- rendered and looked at, which is the only way this was ever
+     * going to be found: two paintings of one link, and the cable is
+     * `#8fa9c4`, the game's ONE grey, which the colour rule promises means
+     * harmless. A hostile pair strung together in the harmless colour is a
+     * promise broken by a draw call, and `check-build`'s colour guard reads
+     * type colours and cannot see it.
+     *
+     * `rigid` is the distinction and it already existed: a cable is slack
+     * and is drawn as a link between two bodies; a beam holds its length
+     * and is part of each half's own picture.
+     */
+    if (this.tether && !this.tether.rigid && !this.tether.other.dead) {
       const o = this.tether.other;
       ctx.strokeStyle = rgba('#8fa9c4', 0.75);
       ctx.lineWidth = CFG.hairline * 2;
@@ -4236,6 +4409,93 @@ function drawQuarry(ctx, r, phase, time) {
 }
 
 /**
+ * A yoke half: a shield with a socket, and its half of the beam.
+ *
+ * ---- THE PICTURE IS DRAWN ALONG LOCAL +x, TOWARD THE PARTNER ----------
+ *
+ * `pairOn` writes `this.angle = atan2(o.y - this.y, o.x - this.x)` every
+ * frame, so local +x points at the other half and the two shields face each
+ * other across the beam by construction rather than by agreement. That is
+ * the same convention `drawDart` takes from the flock and the DECOY got
+ * wrong for sixty builds: a rotation copied without its frame turns the
+ * drawing ninety degrees.
+ *
+ * ---- THE BEAM SHOWS THE POOL, WHICH IS THE WHOLE OBJECT ---------------
+ *
+ * Two bodies of one 150 is the thing a player has to be able to see before
+ * they choose where to aim, and it is not visible in either half. So a tick
+ * runs along the beam toward the partner -- the pool moving between them --
+ * and it is the one feature here that could not be inferred from a still
+ * frame. Off the moment `beam` goes false, with the stub torn short: a
+ * survivor has to read as having been snapped off rather than as a body
+ * that came this way.
+ *
+ * `beam` is passed IN rather than read off the body, because `drawIcon`
+ * draws this shape with no body at all -- and the glossary wants the half
+ * that is still attached, since that is what a YOKE is.
+ */
+function drawYoke(ctx, r, phase, time, beam) {
+  const half = CFG.yoke.len / 2;
+  const th = r * 0.17;
+  const face = r * 0.68; // where the shield's flat side is
+  /*
+   * The beam first, so the shield is painted OVER the end of it and the two
+   * read as one piece rather than as a bar with a lid on each end. Torn
+   * short when it is broken, with the tear drawn as a step rather than as a
+   * shorter bar -- a shorter bar is a smaller yoke.
+   */
+  const reach = beam ? half : r * 0.95;
+  ctx.beginPath();
+  ctx.moveTo(face * 0.5, -th);
+  ctx.lineTo(reach, -th);
+  if (beam) {
+    ctx.lineTo(reach, th);
+  } else {
+    ctx.lineTo(reach - th * 0.5, -th * 0.25);
+    ctx.lineTo(reach, th * 0.3);
+    ctx.lineTo(reach - th * 0.7, th);
+  }
+  ctx.lineTo(face * 0.5, th);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // The shield: flat toward the partner, rounded away from it.
+  ctx.beginPath();
+  ctx.moveTo(face, -r * 0.8);
+  ctx.lineTo(-r * 0.45, -r * 0.95);
+  ctx.lineTo(-r * 0.98, 0);
+  ctx.lineTo(-r * 0.45, r * 0.95);
+  ctx.lineTo(face, r * 0.8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // The socket the beam sits in, and the two lashings that hold it there.
+  ctx.beginPath();
+  ctx.moveTo(face, -th * 1.9);
+  ctx.lineTo(face * 0.34, -th * 1.9);
+  ctx.lineTo(face * 0.34, th * 1.9);
+  ctx.lineTo(face, th * 1.9);
+  ctx.stroke();
+  /*
+   * The pool running along the beam. A tick rather than a glow, and it moves
+   * OUTWARD toward the partner, because what it is saying is that the number
+   * is shared -- and `phase` is the spawn roll, so the two halves are not
+   * lit in step, which is what stops the pair reading as one blinking body.
+   */
+  if (beam) {
+    const run = (time * 0.8 + phase) % 1;
+    const at = face * 0.6 + (reach - face * 0.6) * run;
+    ctx.save();
+    ctx.globalAlpha *= 0.55 + 0.45 * Math.sin(run * Math.PI);
+    ctx.beginPath();
+    ctx.moveTo(at, -th * 1.5);
+    ctx.lineTo(at, th * 1.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/**
  * A bell: an open shell with a clapper swinging inside it.
  *
  * Six greys share one colour now, so the silhouette carries all of it. This is
@@ -4669,6 +4929,7 @@ export function release(world, type, x, y, opts) {
   if (type.tows) return spawnTow(world, x, y, opts);
   if (type.beads) return spawnChain(world, type, x, y, opts);
   if (type.school) return spawnSchool(world, type, x, y, opts);
+  if (type.pair) return spawnPair(world, type, x, y, opts);
   const made = [spawnOne(world, type, x, y, opts)];
   /*
    * TETHERED: the wave arrives in pairs sharing one pool of health.
@@ -4850,6 +5111,67 @@ export function schoolOf(type) {
   return n;
 }
 
+/**
+ * The two halves of a YOKE. Mandatory and no default, the rule `levelsOf`,
+ * `bandOf`, `climbOf`, `beadsOf`, `schoolOf` and `barOf` all carry -- and
+ * pinned at exactly two, because the beam is rigid and a rigid constraint
+ * between three bodies is a different solver.
+ */
+export function pairOf(type) {
+  const n = type && type.pair;
+  if (n !== 2) throw new Error(`${type && type.id}: pair must be exactly 2, got ${n}`);
+  const Y = CFG.yoke;
+  if (!(Y.len > type.r * 2)) throw new Error(`yoke.len ${Y.len} must clear two radii (${type.r * 2})`);
+  if (!(Y.snap > 0 && Y.snap < 1)) throw new Error(`yoke.snap ${Y.snap} must be a share of the pool`);
+  if (!(Y.alone > 1)) throw new Error(`yoke.alone ${Y.alone} must be a speed a survivor GAINS`);
+  return { n, len: Y.len, snap: Y.snap, alone: Y.alone };
+}
+
+/**
+ * A pair on a rigid beam, sharing one pool.
+ *
+ * Modelled on `spawnTow`, which is this repo's one mechanism for a type that
+ * is more than one body -- two `spawnOne` pushes, one entry each in
+ * `world.enemies`, and the array back for the callers that count. The
+ * difference is in the tether: `rigid` makes `solveTethers` correct
+ * compression as well as extension, so the beam holds its length instead of
+ * going slack, and `beam` is what the gait and the damage path read.
+ *
+ * Laid across the field rather than up it, because the pair turns about its
+ * own midpoint and a vertical pair would spend its first second sweeping one
+ * half through the other's lane. `route` is shared, the way a chain's and a
+ * tow's are, or the two halves take different arcs in and the beam fights
+ * the march.
+ */
+function spawnPair(world, type, x, y, opts = {}) {
+  const P = pairOf(type);
+  const half = P.len / 2;
+  const lo = type.r + 4;
+  const hi = world.width - type.r - 4;
+  const a = spawnOne(world, type, clamp(x - half, lo, hi), y, opts);
+  const b = spawnOne(world, type, clamp(x + half, lo, hi), y, { ...opts, route: a.route });
+  a.tether = { other: b, len: P.len, rigid: true };
+  b.tether = { other: a, len: P.len, rigid: true };
+  a.beam = true;
+  b.beam = true;
+  /*
+   * ONE POOL means one ceiling: the constructor rolls `maxHp` per body at
+   * `rand(0.92, 1.1)`, so without this the two halves would disagree about
+   * what the pool's full is and `snap` -- a share of `maxHp` -- would be a
+   * different number on each of them.
+   */
+  b.maxHp = a.maxHp;
+  b.hp = a.hp;
+  /*
+   * ...and one turning SENSE. `routeSide` is a coin flip taken per body in
+   * the constructor, and `pairOn` reads it to decide which way round the
+   * midpoint the pair goes -- so two halves that rolled differently would
+   * hold opposite tangents and fight through the beam for the whole run.
+   */
+  b.routeSide = a.routeSide;
+  return [a, b];
+}
+
 /** A serial per school, so fourteen bodies can find each other with no roster. */
 let shoalSeq = 0;
 
@@ -4918,7 +5240,16 @@ export function solveTethers(world) {
     const d = Math.hypot(dx, dy);
     if (d < 1e-4) continue;
     const err = d - t.len;
-    if (err <= 0) continue; // a cable pulls, it does not push
+    /*
+     * A cable pulls and does not push; a BEAM does both. `rigid` is what
+     * YOKE's pair carries, and without this arm the two halves would drift
+     * together under the pair solver and the march and the beam would read
+     * as a slack rope -- the one thing the object cannot look like. The
+     * arithmetic below already handles a negative `err`: `push` comes out
+     * negative and each body is moved AWAY from the other, which is the
+     * correction a compressed beam wants.
+     */
+    if (err <= 0 && !t.rigid) continue;
     dx /= d;
     dy /= d;
     const inv = e.invMass + o.invMass;
@@ -4931,7 +5262,9 @@ export function solveTethers(world) {
     o.x -= dx * push * (o.invMass / inv);
     o.y -= dy * push * (o.invMass / inv);
     const rel = (o.vx - e.vx) * dx + (o.vy - e.vy) * dy;
-    if (rel > 0) {
+    // ...and the velocity half of the same rule: a cable only has to stop the
+    // pair separating, a beam has to stop it closing as well.
+    if (rel > 0 || (t.rigid && rel < 0)) {
       const j = rel / inv;
       e.vx += dx * j * e.invMass;
       e.vy += dy * j * e.invMass;
@@ -6921,9 +7254,25 @@ export class Director {
       return;
     }
 
-    // A shape made of towed pairs is a traffic jam rather than a formation.
-    // They file in.
-    if (job.n > 1 && !t.tows) {
+    /*
+     * A shape made of towed pairs is a traffic jam rather than a formation.
+     * They file in.
+     *
+     * ...and so does a YOKE, for the same reason made of different
+     * arithmetic. `spawnFormation` lays its slots at `r * 2 + 8` -- 60 for
+     * an r-26 half -- and a pair spans `r + len + r` = 112 across the field,
+     * so the slots are pitched for one body and each pair is nearly two
+     * slots wide. Measured through the real director on the real wave at
+     * rung 32: 114 bodies, every beam intact at exactly 60, and a worst
+     * overlap between halves of DIFFERENT pairs of 51.9 of a possible 52 --
+     * two bodies with their centres a tenth of a unit apart. A formation of
+     * pairs is a lattice, not a shape.
+     *
+     * `beads` and `school` reach this branch too once the budget swells
+     * their count, and both were measured on the builds that shipped them;
+     * neither is touched here.
+     */
+    if (job.n > 1 && !t.tows && !t.pair) {
       const room = Math.min(job.n, CFG.maxEnemies - hostileCount(world));
       if (room >= 2) { spawnFormation(world, [t], room); this.lastRelease = world.time || 0; return; }
     }

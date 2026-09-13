@@ -276,6 +276,11 @@ export const CODEX = [
     line: 'Fourteen at once, with no leader and nothing to break. They steer at each other and at you, so the school turns as one thing and closes whatever gap you make in it. A bolt takes one of fourteen; anything with a radius takes the school. It is the field telling you that aiming is not always the answer.',
   },
   {
+    id: 'yoke',
+    name: 'YOKE',
+    line: 'Two halves on a rigid beam, sharing one pool of health between them. Damage anywhere drains the same number, so focusing one half buys you nothing -- but land half the pool on one and it comes off the beam, and the other keeps every point that is left, unencumbered and half again as fast. Take them together with something that reaches both.',
+  },
+  {
     id: 'quarry',
     name: 'QUARRY',
     line: 'One body that is nine, and the lines it will break along are already drawn on it. Each generation is smaller, faster and thinner-plated than the one it came out of, and nothing it does is aimed at you -- it takes no lane, crosses the field, turns off the walls and spins the whole way. Where you break it is the decision: high and the pieces have the field to spread in, low and they are already on the mount.',
