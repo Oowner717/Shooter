@@ -21786,10 +21786,35 @@ if (MINE_LINE) {
    * is the GAP: 0.73x through the surface against 1.75x without it, which is
    * a factor of 2.4.
    */
+  /*
+   * ---- the HIDDEN floor was an ABSOLUTE, and the suite depresses it ------
+   *
+   * It was `hiddenMax >= cruise * 1.8` and drew **1.755** on build 319, whose
+   * changes cannot reach a LURCHER. Measured standalone over twelve releases
+   * the same ratio is **2.727 to 4.043** -- nowhere near the suite's reading,
+   * so the suite is depressing the absolute speed through something in five
+   * hundred cases of inherited state, and coarse sampling is only part of it:
+   * driving the same probe three and six frames per sample takes it 3.13-3.90
+   * to 2.72-3.30, which is the right direction and not the whole distance.
+   *
+   * So the claim stops being an absolute. `hiddenMax` and `atRim` come off
+   * the SAME body on the SAME run through the same sampling, and their ratio
+   * IS the arm's own name -- it slowed through the surface. Measured, that
+   * ratio is 3.05 to 5.55 standalone at every sampling rate tried, and
+   * **2.47** on the suite run that failed here, against about 1.0 for a
+   * surface that did not brake at all. The floor is 1.6, which is 54% under
+   * the worst reading taken and 60% over the broken one.
+   *
+   * `atRim !== null` is new and closes a vacuity hole: `null <= cruise * 1.2`
+   * is TRUE in JavaScript, so a body that never recorded a rim crossing
+   * passed the very conjunct that is about the rim.
+   */
   check('a body slows through the surface and comes out at its own cruise',
-    r.ramp.bornAt > 0 && r.ramp.hiddenMax >= r.ramp.cruise * 1.8 && r.ramp.atRim <= r.ramp.cruise * 1.2
+    r.ramp.bornAt > 0 && r.ramp.atRim !== null
+    && r.ramp.hiddenMax >= r.ramp.atRim * 1.6 && r.ramp.atRim <= r.ramp.cruise * 1.2
     && r.ramp.born === true && r.ramp.bornFor < 1
-    && r.loose.bornAt > 0 && r.loose.atRim >= r.loose.cruise * 1.5
+    && r.loose.bornAt > 0 && r.loose.atRim !== null
+    && r.loose.atRim >= r.loose.cruise * 1.5
     /*
      * ---- the RATIO-OF-RATIOS clause is gone (build 310) -----------------
      *
@@ -21809,7 +21834,9 @@ if (MINE_LINE) {
      * detail line for a reader who wants it.
      */
     && r.portalBack,
-    `hidden it reached ${r.ramp.hiddenMax} u/s against a cruise of ${r.ramp.cruise}, and crossed the `
+    `hidden it reached ${r.ramp.hiddenMax} u/s -- x`
+    + `${(r.ramp.hiddenMax / r.ramp.atRim).toFixed(2)} what it crossed the rim at, which is the `
+    + `slowing -- against a cruise of ${r.ramp.cruise}, and crossed the `
     + `rim at ${r.ramp.atRim} -- ${(r.ramp.atRim / r.ramp.cruise).toFixed(2)}x its own cruise `
     + `(born ${r.ramp.born}, born for ${r.ramp.bornFor}s); with no surface the same `
     + `march crossed the line at ${r.loose.atRim} against ${r.loose.cruise}, `
@@ -25875,15 +25902,26 @@ if (GUN_LINE) {
       ledger.reset();
       ledger.on = true;
       /*
-       * FOUR presses and not one. Which pellets land is not fixed -- 34 of
-       * them across 1.85 rad with a per-pellet jitter, against a body that
-       * subtends about 0.27 -- so a single fan lands four pellets on one run
-       * and six on the next, and a ratio taken off one press swings 1.15 to
-       * 1.53. That is a window set near the truth rather than clear of it,
-       * which is this suite's most repeated flake. Four presses average it
-       * down to where the threshold has room.
+       * TEN presses, and four was not enough. Which pellets land is not fixed
+       * -- 34 of them across 1.85 rad with a per-pellet jitter, against a
+       * body that subtends about 0.27 -- so a single fan lands four pellets
+       * on one run and six on the next, and a ratio taken off one press
+       * swings 1.15 to 1.53.
+       *
+       * Measured over eight trials at each count, the SEPARATION this arm
+       * asserts reads 1.24 to 1.429 at four presses and 1.314 to 1.392 at
+       * ten: the spread falls 0.19 to 0.077, which is the 1/sqrt(n) the
+       * averaging is there for. Four presses left the old 1.3 threshold
+       * inside the distribution and it duly drew 1.291 on build 319, whose
+       * changes cannot reach a pellet.
+       *
+       * Worth knowing WHICH half is noisy, because it is not the one the arm
+       * is named for: the crowd ratio is 2.025 to 2.038 across all sixteen
+       * trials, and every bit of the movement is the single-body denominator
+       * (1.417 to 1.644 at four presses). CLAUDE.md's note on the node said
+       * the single-body gain is small and variable before this arm existed.
        */
-      for (let press = 0; press < 4; press++) {
+      for (let press = 0; press < 10; press++) {
         w.abilities.clearCooldowns();
         g.useAbility(slot());
         // Pinned, so what is measured is the fan and not the crowd grinding.
@@ -26103,15 +26141,36 @@ if (GUN_LINE) {
    * assay), so a 30% floor on it was a margin straddling the draw.
    *
    * The claim in this arm's NAME is the crowd, so the crowd carries it: the
-   * three-abreast ratio must beat the single-body one by 30%, which is the
-   * node's actual subject and is a comparison of two numbers from the same
-   * run rather than a threshold on one. The single body only has to gain
-   * something at all.
+   * three-abreast ratio must beat the single-body one, which is the node's
+   * actual subject and is a comparison of two numbers from the same run
+   * rather than a threshold on one.
+   *
+   * ---- and 1.3 was STILL the edge of the working distribution -----------
+   *
+   * Build 315 replaced a single-body floor that straddled its draw with a
+   * separation that straddled its draw, and it failed again on 319 at 1.291.
+   * A threshold belongs in the GAP between working and broken, which is the
+   * shape the ASSAY arm above already uses -- so both ends were measured.
+   * Gutting the burst radius (`CFG.hail.burst.r`, set AFTER `clean()`'s
+   * restart, because it is a SCALED entry and a resize rewrites it from
+   * BASE) the same arm reads **0.942 to 1.032** over three trials, against
+   * **1.314 to 1.427** working. 1.15 sits 11% above the worst broken reading
+   * and 14% below the worst working one; 1.3 had 1.2% of headroom on the
+   * working side and 27% on the broken side, which is a threshold measuring
+   * the draw rather than the mechanism.
+   *
+   * NOTE the `* 1.05` single-body conjunct below does NOT discriminate: a
+   * gutted burst drew 1.062 on one of those three trials, so it can pass on
+   * a build where the node does nothing. It is kept as a cheap liveness
+   * floor -- the ledger rows and the radius arm are what say the burst
+   * exists -- and the separation is what carries this arm's claim. A
+   * conjunct that cannot fail for the reason the case is about is worth
+   * naming rather than trusting.
    */
   check('AIRBURST goes off where the pellets land, and the crowd pays for it',
     r.oneAir.armed && r.one.armed === false
     && r.oneAir.took > r.one.took * 1.05
-    && (r.threeAir.took / r.three.took) > (r.oneAir.took / r.one.took) * 1.3
+    && (r.threeAir.took / r.three.took) > (r.oneAir.took / r.one.took) * 1.15
     && r.one.ok && r.threeAir.ok,
     `one body ${r.one.took} -> ${r.oneAir.took} (x`
     + `${(r.oneAir.took / r.one.took).toFixed(2)}); three abreast `
@@ -30816,8 +30875,22 @@ if (MINE_LINE) {
     const left = alive();
     const cx = left.reduce((a, e) => a + e.x, 0) / left.length;
     const cy = left.reduce((a, e) => a + e.y, 0) / left.length;
+    /*
+     * `held` is the claim and `far` is only reported, which is build 310's
+     * correction to the chain arm applied here: a school finds its members by
+     * SERIAL with no roster and no owner, so what a cut must not do is orphan
+     * anybody or leave a corpse in the set. Counted off the field itself --
+     * every body carrying this school's serial, and the count each survivor
+     * would find scanning for schoolmates. A roster implementation that left
+     * a hole reads 12 or 14 here; find-by-serial reads 13 and 12.
+     */
+    const mates = left.map((e) => w.enemies.filter(
+      (o) => o !== e && !o.dead && o.shoal === e.shoal).length);
     out.cut = {
       n: left.length,
+      held: w.enemies.filter((e) => e.shoal === 88 && !e.dead).length,
+      mates: Math.min(...mates),
+      corpse: w.enemies.filter((e) => e.shoal === 88 && e.dead).length,
       far: +Math.max(...left.map((e) => Math.hypot(e.x - cx, e.y - cy))).toFixed(0),
       moving: left.filter((e) => Math.hypot(e.vx, e.vy) > 5).length,
     };
@@ -30943,10 +31016,38 @@ if (MINE_LINE) {
     + `over the same window, is ${r.moteAim} -- a spawn roll plus a spin, which is what every `
     + 'other body draws');
 
+  /*
+   * ---- the radius here is REPORTED, and the reason is measured -----------
+   *
+   * This asserted `far < 200` and drew 201 in the suite on build 319, whose
+   * changes cannot reach a dart: the quantity is the cloud's radius after
+   * five seconds of marching, and a probe's synthetic steps ride on the
+   * page's own rAF loop, so it is a distance-travelled reading under load.
+   * Measured standalone over eight trials it runs **87 to 187** -- a 2.1x
+   * spread with the old ceiling 7% above its worst draw, which is the
+   * margin-near-the-truth fault this file records four times over.
+   *
+   * It is also not DISCRIMINATING, which is the better reason to stop
+   * asserting it: build 315's note measured fourteen strangers at 152 to 227
+   * on the same quantity, because every body is steering at the same mount
+   * whether it flocks or not. Cohesion is asserted by the arm above this one,
+   * against `flockOn`'s own arithmetic.
+   *
+   * So the claim is carried by the four ABSOLUTES -- thirteen alive, thirteen
+   * held by the serial, every one of them finding the other twelve, no corpse
+   * left in the set -- and `far` is a RUNAWAY bound at about twice the worst
+   * reading, which a cloud that had genuinely stopped holding together would
+   * cross and no draw measured here comes near.
+   */
   check('...and a bolt takes one of fourteen, and the thirteen close up',
-    r.cut.n === 13 && r.cut.moving === 13 && r.cut.far < 200,
-    `one destroyed leaves ${r.cut.n} still flocking, ${r.cut.moving} of them moving, inside `
-    + `${r.cut.far} units of their own centre -- no leader to lose and no reference to drop`);
+    r.cut.n === 13 && r.cut.moving === 13 && r.cut.held === 13
+    && r.cut.mates === 12 && r.cut.corpse === 0 && r.cut.far < 420,
+    `one destroyed leaves ${r.cut.n} alive and ${r.cut.held} still carrying the school's `
+    + `serial, ${r.cut.moving} of them moving, every one finding ${r.cut.mates} schoolmates `
+    + `with ${r.cut.corpse} corpses left in the set -- no leader to lose and no reference to `
+    + `drop. Their cloud is ${r.cut.far} units across (reported, not asserted tightly: 87-187 `
+    + `standalone against 152-227 for strangers, so it separates nothing; the 420 is a `
+    + `runaway bound)`);
 
   check('a SHOAL weighs all fourteen, and only band 1 paid for it',
     Math.abs(r.threat - r.oneRaw * r.want) < 1e-9 && r.threat > 6
@@ -31927,14 +32028,20 @@ if (MINE_LINE) {
     + `is dead at frame ${r.column.died} and never gets past it at all`);
 
   /*
-   * A POPULATION, because one body is one route/speedScale/phase roll and the
-   * grip is bimodal: the corridor is `grabPad` = 2 units wide against a
-   * lateral error of one to three, so a pass grips about four times in five.
-   * Measured over eighteen bodies in thirteen trials, 15 gripped and 3 did
-   * not, the misses reading a closest approach of 43.6 against a band of 42.
-   * Asserted on ONE body this arm flakes about one run in six -- which is the
-   * single-draw trap this file records four times over, and the fourth time
-   * it caught me inside one build.
+   * A POPULATION, because one body is one route/speedScale/phase roll.
+   *
+   * It was bimodal and is not any more, and the fix was in the BODY rather
+   * than in this threshold: the corridor is `grabPad` = 2 units wide, so
+   * `wobble` is what decides whether a pass lands. At 0.12 and 0.06 the rate
+   * was 15 of 18 bodies, the misses reading a closest approach of 42.5-43.5
+   * against a band of 42; at 0.03 it is 18 of 18, every approach inside the
+   * band. Asserted at 2 of 3 rather than 3 of 3 deliberately -- headroom over
+   * sensitivity on a quantity this file has already been burned by twice --
+   * and the rate is printed.
+   *
+   * Build 319's suite is what caught the old threshold: it asked for 2 of 3
+   * against a measured per-body rate of 0.83, which fails about one run in
+   * twelve. A bound set from a measurement still has to be set clear of it.
    *
    * The climb and the hold are asserted at ZERO for every body, and that is
    * the only thing in the repo that gives `CFG.shrike.swing` a way to fail.
@@ -32002,6 +32109,276 @@ if (MINE_LINE) {
     `on the alpha channel alone -- so this is shape and nothing else -- SHRIKE is ${D.needle} `
     + `from a NEEDLE and ${D.glut} from a GLUT, both of which wear #ffd166 exactly, and `
     + `${D.mote} from a MOTE (ink ${D.ink}, the same shape twice ${D.selfZero})`);
+}
+
+// --- a FLINT carries its armour on one face, and keeps it pointed at you ---
+/*
+ * Build 319, phase 6k. `armor` 0.55 on the FRONT FACE and nothing anywhere
+ * else, and the body turns to keep that face toward the barrel.
+ * `docs/objects.html` calls it "the first body that makes the field have
+ * sides".
+ *
+ * `applyDamage(world, dmg, nx, ny, ...)` already takes the direction the
+ * damage travels, so the plate needs no new argument: `-(n . facing)` is +1
+ * dead ahead, 0 across, -1 from behind. Fourteen sites in `src/` call it --
+ * eight pass a direction and six pass a literal `0, 0` -- and the plate is
+ * gated on `type.plated`, so the `plate` expression is unchanged to the bit
+ * for every other body in the game, which is what the ORDINAL hash is run to
+ * check on a build that touches the damage path.
+ *
+ * ---- what actually answers it, measured rather than reasoned ------------
+ *
+ * The turret is static, so the gun can never find the side, and the first
+ * draft of this case named the wrong three counters. Arm 4 is the
+ * measurement: a 111-point blast on the body's TURRET-SIDE face delivers
+ * 49.9 and the same blast laid off to one side delivers 111. So "ground it
+ * walks over" is the worst answer available -- a mine triggers at
+ * `m.r + trigger + e.r`, 55 units, which is always while the body is still
+ * up-field of it and therefore always on the plate. And a blast genuinely
+ * behind the body is full damage but cannot be AIMED there: HE and AIRBURST
+ * burst at the contact on the near face, PULSE is radial from the machine,
+ * DECOY's blast sits between the two, and WELL -- the only one that can land
+ * up-field -- is sited at `densestPoint` rather than by the player.
+ *
+ * What is left, and what the codex line now promises: a mine laid OFF the
+ * line, the five directionless sources (contact, ARC's chain, a Patch's
+ * bite, HARD CASING, TITHE, all of which pass `0, 0` and meet no plate at
+ * all), and SPINE's shred, which zeroes the plate before the gate is
+ * reached. The guide's counter also names an emplacement off to one side,
+ * which this game has not had since build 289 -- the codex line does not
+ * promise it either.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { fire } = await import('../src/projectiles.js');
+    const out = {};
+    const T = TYPE_BY_ID.flint;
+    out.cfg = { front: CFG.flint.front, turn: CFG.flint.turn, armor: T.armor };
+    out.deg = (Math.acos(CFG.flint.front) * 180) / Math.PI;
+    g.restart();
+    delete w.director.update;
+    w.spawnLock = 0;
+    const d = w.director;
+    d.update = () => {};
+    w.spawnLock = 1e9;
+    d.traits = [];
+    d.setTier(1);
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+    };
+    const put = (id, angle) => {
+      clear();
+      const e = g.debugSpawn(id, w.width * 0.5, 500);
+      if (!e) throw new Error(`no ${id}`);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.born = true;
+      e.hp = 1e6;
+      e.maxHp = 1e6;
+      e.angle = angle;
+      e.av = 0;
+      return e;
+    };
+    // ---- 1. the same hit from four directions, and the arc's own boundary
+    const hit = (nx, ny) => {
+      const e = put('flint', Math.PI / 2); // facing +y is facing the mount
+      const before = e.hp;
+      e.applyDamage(w, 100, nx, ny, 0, 0, 0, false, 'probe');
+      const got = before - e.hp;
+      e.dead = true;
+      return got;
+    };
+    const half = Math.acos(CFG.flint.front);
+    out.unit = {
+      head: hit(0, -1),
+      side: hit(1, 0),
+      behind: hit(0, 1),
+      none: hit(0, 0),
+      inside: hit(Math.sin(half - 0.05), -Math.cos(half - 0.05)),
+      outside: hit(Math.sin(half + 0.05), -Math.cos(half + 0.05)),
+    };
+    /*
+     * ---- 2. a REAL round, head on and side on -------------------------
+     *
+     * The control that discriminates is the SAME body held side on. The first
+     * version used a BULWARK given FLINT's armour, so both bodies were plated
+     * and both read 11.7 -- which proves only that two plated bodies are
+     * plated.
+     */
+    const shoot = (id, angle) => {
+      const e = put(id, angle);
+      const before = e.hp;
+      fire(w, e.x, e.y + 300, -Math.PI / 2, {});
+      for (let i = 0; i < 40; i++) {
+        e.x = w.width * 0.5;
+        e.y = 500;
+        e.vx = 0;
+        e.vy = 0;
+        e.angle = angle;
+        e.av = 0;
+        g.update(1 / 60);
+        if (e.hp < before) break;
+      }
+      const got = before - e.hp;
+      e.dead = true;
+      return got;
+    };
+    out.shot = {
+      head: shoot('flint', Math.PI / 2),
+      side: shoot('flint', 0),
+      bare: shoot('mote', 0),
+    };
+    // ---- 3. the face tracks the MACHINE, and slowly enough to be flanked
+    {
+      clear();
+      const e = g.debugSpawn('flint', w.width * 0.22, 400);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.born = true;
+      e.hp = 1e6;
+      e.maxHp = 1e6;
+      e.angle = -Math.PI / 2; // pointing away
+      const err = () => {
+        const d2 = Math.atan2(w.shooter.y - e.y, w.shooter.x - e.x) - e.angle;
+        return Math.abs(Math.atan2(Math.sin(d2), Math.cos(d2)));
+      };
+      const start = err();
+      let settled = null;
+      for (let i = 0; i < 60 * 8; i++) {
+        e.x = w.width * 0.22;
+        e.y = 400;
+        e.vx = 0;
+        e.vy = 0;
+        g.update(1 / 60);
+        if (settled === null && err() < 0.05) settled = i / 60;
+      }
+      out.facing = { start, settled, final: err(), want: start / CFG.flint.turn };
+      e.dead = true;
+    }
+    /*
+     * ---- 4. WHERE a blast sits decides whether it meets the plate -------
+     *
+     * The arm that would have caught the codex line promising the opposite
+     * of the truth. `applyBlast` passes the direction from its own centre to
+     * the body, so a blast between the body and the machine is a FRONTAL
+     * hit -- which is every blast the arsenal can aim, and a mine walked
+     * over besides. Read at four positions round one body, all at the same
+     * range so the falloff term is identical and only the direction differs;
+     * the on-centre reading is the `m < 1e-6` hole, where there is no
+     * direction to take and the falloff is zero as well.
+     */
+    {
+      const { applyBlast } = await import('../src/enemies.js');
+      const at = (dx, dy) => {
+        const e = put('flint', Math.PI / 2);
+        for (let i = 0; i < 6; i++) g.update(1 / 60);
+        e.angle = Math.PI / 2;
+        e.av = 0;
+        e.hp = 1e6;
+        applyBlast(w, {
+          x: e.x + dx, y: e.y + dy, r: 150, damage: 150, impulse: 0, source: 'probe',
+        });
+        const lost = 1e6 - e.hp;
+        e.dead = true;
+        return lost;
+      };
+      out.blast = {
+        near: at(0, 60),    // between body and machine: a mine walked over
+        far: at(0, -60),    // up-field, behind it
+        beside: at(60, 0),  // off to one side: a mine laid off the line
+        centre: at(0, 0),   // no direction at all
+      };
+    }
+    // ---- 5. an ORDINARY armoured body is untouched by any of it ---------
+    {
+      const bull = TYPE_BY_ID.bulwark;
+      const e = put('bulwark', Math.PI / 2);
+      const one = (nx, ny) => {
+        e.hp = 1e6;
+        e.applyDamage(w, 100, nx, ny, 0, 0, 0, false, 'probe');
+        return 1e6 - e.hp;
+      };
+      out.plain = { armor: bull.armor, head: one(0, -1), side: one(1, 0), behind: one(0, 1) };
+      e.dead = true;
+    }
+    delete d.update;
+    w.spawnLock = 0;
+    g.restart();
+    clear();
+    return out;
+  });
+
+  const U = r.unit;
+  const open = 100 * (1 - r.cfg.armor);
+  check('a FLINT is plated on its FRONT FACE and bare everywhere else',
+    Math.abs(U.head - open) < 0.6 && Math.abs(U.inside - open) < 0.6
+    && Math.abs(U.side - 100) < 0.6 && Math.abs(U.behind - 100) < 0.6
+    && Math.abs(U.outside - 100) < 0.6,
+    `the same 100 damage delivers ${U.head.toFixed(1)} dead ahead against an armour of `
+    + `${r.cfg.armor} (so ${open.toFixed(0)} is the whole plate), ${U.side.toFixed(1)} across `
+    + `and ${U.behind.toFixed(1)} from behind. The arc is +-${r.deg.toFixed(1)} degrees and the `
+    + `boundary is where the config says: ${U.inside.toFixed(1)} a twentieth of a radian inside `
+    + `it, ${U.outside.toFixed(1)} the same distance outside`);
+
+  check('...and a hit with no DIRECTION meets no plate, which five sources are',
+    Math.abs(U.none - 100) < 0.6,
+    `a directionless hit delivers ${U.none.toFixed(1)} of 100 -- contact, ARC's chain, a `
+    + `Patch's bite, HARD CASING and TITHE's bonus all pass \`0, 0\`, and a hit with no `
+    + `direction cannot be asked which face it landed on. These five are the reachable `
+    + `answer to the object and are what the codex line now names, the first draft having `
+    + `named a mine walked over, which arm 4 measures as the worst answer available`);
+
+  const S = r.shot;
+  check('...and a REAL round meets the plate head on and misses it from the side',
+    S.head > 0 && Math.abs(S.head / S.bare - (1 - r.cfg.armor)) < 0.03
+    && Math.abs(S.side - S.bare) < 0.6,
+    `one bolt up the field delivers ${S.head.toFixed(1)} to a FLINT facing the barrel against `
+    + `${S.side.toFixed(1)} to the same body held side on and ${S.bare.toFixed(1)} to a body `
+    + `with no armour at all -- so head on it is ${(S.head / S.bare).toFixed(3)} of the round `
+    + `and from the side the plate is not there. The side-on body is the control that `
+    + `discriminates; an armoured body of another type is not`);
+
+  const F = r.facing;
+  check('...and it turns to hold that face on the barrel, at the rate CFG.flint authors',
+    F.settled !== null && Math.abs(F.settled - F.want) < 0.15 && F.final < 0.05,
+    `pointed ${F.start.toFixed(2)} rad away it came round in ${F.settled.toFixed(2)}s against `
+    + `an arithmetic ${F.want.toFixed(2)} at ${r.cfg.turn} rad/s, ending ${F.final.toFixed(3)} `
+    + `off. What that rate really governs is the ARRIVAL, not a body under fire: \`face\` `
+    + `writes \`av = 0\` every frame one call above \`integrate\`, so build 211's impact spin `
+    + `never reaches \`angle\` and a bolt at maximum lever turns a flint 0.0000 rad. The `
+    + `window is the random \`angle\` the constructor rolls, spent outside \`aimRange\``);
+
+  const B = r.blast;
+  check('...and a blast between it and the machine meets the plate, so a mine it walks over is the WORST answer',
+    B.near > 0 && Math.abs(B.near / B.far - (1 - r.cfg.armor)) < 0.03
+    && Math.abs(B.beside - B.far) < 0.6 && B.centre > B.far,
+    `the same 150-point blast at 60 units delivers ${B.near.toFixed(1)} sitting between the `
+    + `body and the machine against ${B.far.toFixed(1)} up-field and ${B.beside.toFixed(1)} off `
+    + `to one side -- so the near face takes ${(B.near / B.far).toFixed(3)} of it, which is the `
+    + `plate. A mine triggers at \`m.r + trigger + e.r\` = 55 units, always while the body is `
+    + `still up-field of it, so ground it walks squarely over is HALF of the same ground laid `
+    + `aside; and every blast the arsenal can aim is sited toward the machine. On its centre `
+    + `there is no direction to take at all: ${B.centre.toFixed(1)}`);
+
+  const P = r.plain;
+  check('...and an ORDINARY armoured body is not directional at all',
+    P.armor > 0 && Math.abs(P.head - P.side) < 0.6 && Math.abs(P.head - P.behind) < 0.6
+    && Math.abs(P.head - 100 * (1 - P.armor)) < 0.6,
+    `a BULWARK at armour ${P.armor} takes ${P.head.toFixed(1)}/${P.side.toFixed(1)}/`
+    + `${P.behind.toFixed(1)} from the three directions -- identical, and equal to its own flat `
+    + `plate. The directional branch is gated on \`type.plated\`, so every other body's `
+    + `expression is unchanged to the bit, which is what the hash is run to confirm`);
 }
 
 // --- the debug panel's three quieter faults ---------------------------------

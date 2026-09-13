@@ -4424,4 +4424,229 @@ came from before believing the other one covers it.
   sometimes misses. The arm asserts 2 of 3 bodies over one window rather than
   one body over one window, because on one body it flakes about one run in
   six.
+- **A FLINT IS PLATED ON ONE FACE FROM BUILD 319, AND THE CODEX LINE I WROTE
+  FOR IT NAMED THE WORST ANSWER AVAILABLE AS THE ANSWER.** `armor` 0.55 across
+  a +-53.1 degree arc that the body slews to keep on the barrel, so the gun --
+  which is static -- can never find a side. The line then told the player to
+  "take it with ground it walks over, something that goes off behind it, or a
+  round that arrives bent", and **two of those three are false**, both for the
+  same reason and both measurable in one probe. `applyBlast` passes the
+  direction from its own centre to the body, so anything sited between the
+  body and the machine is a FRONTAL hit. Measured, a 111-point blast at 60
+  units: **49.9 on the near face, 111 up-field, 111 off to one side, 149.3 on
+  the centre** (where there is no direction to take and no falloff either).
+  - A mine triggers at `m.r + trigger + e.r` -- 55 units -- so it ALWAYS goes
+    off while the body is still up-field of it. Ground it walks squarely over
+    is worth about half of the same ground laid aside: the counter is
+    inverted, and the more squarely it walks over the mine the less the mine
+    does.
+  - A blast genuinely behind it is full damage and **cannot be aimed there**.
+    HE and AIRBURST burst at the contact on the near face, PULSE is radial
+    from the machine, DECOY's parting blast sits between the two, and WELL --
+    the only one that can land up-field -- is sited at `densestPoint`, which
+    the player does not choose.
+  What is left, and what the line names now: a mine laid OFF the line, the
+  five directionless sources (contact, ARC's chain, a Patch's bite, HARD
+  CASING, TITHE -- all pass `0, 0`, both verified in source), and SPINE's
+  shred, which zeroes the plate before the gate is reached. **A counter named
+  in prose is a promise, and this one had never been measured.**
+- **A DIRECTIONAL MECHANISM MAKES EVERY EXISTING DAMAGE SOURCE'S GEOMETRY
+  LOAD-BEARING, AND THE SUITE CANNOT SEE THAT.** 693 of 693 green on code
+  whose player-facing promise was backwards, because every arm measured the
+  PLATE -- the same hit from four directions -- and not one of them measured a
+  SOURCE. The arm that would have caught it is the one that asks where a real
+  blast actually sits, and it is four lines. When a change makes direction
+  matter, the cases to write are about the things that deliver damage, not
+  about the thing that receives it.
+- **NOTHING IN THIS GAME CAN SPIN A PLATED BODY, so the window the config sold
+  does not exist.** `CFG.flint.turn`'s docstring said the window left "after
+  something spins or shoves it is the only way the gun ever sees a side".
+  `Enemy.face` writes `av = 0` for a plated body on every frame, one call
+  above `integrate` in the same loop, so build 211's impact spin never reaches
+  `angle` at all -- a bolt at maximum lever moved a flint **0.0000 radians**.
+  Nor does a shove open one: PULSE's impulse is radial from the machine, which
+  changes the range and not the bearing. And the tracking a marching body
+  demands is `v_perp / d`, at most **0.21 rad/s** at the 210-unit standoff
+  against an authored 1.6 -- seven times what the job costs. What the number
+  really governs is the ARRIVAL: the constructor rolls a random `angle`, so a
+  loose flint takes up to `PI / turn` = 1.96s to come round, spent at the top
+  of the field outside `aimRange`. **A docstring that names a window owes it
+  the same measurement a threshold owes its floor.**
+- **`Enemy.face`'s plated branch ignored `frozen`, alone among every rotation
+  in the file.** Three others (`:826`, `:889`, `:1832`) scale by 0.12 under
+  STASIS and this one did not, so the ability held the body and not the plate:
+  0.8 rad in half a second against 0.096. A new rotation inherits none of the
+  rules the old ones learned; grep the file for the state before writing one.
+- **A CLOSED RING IS A CLAIM ABOUT THE WHOLE BODY.** `materialOf(t).plate` is
+  `!!t.armor`, and the armour liner -- whose own docstring says it exists
+  because "armour is the one property that changes how you fight a body" and
+  it "was invisible" -- drew a **complete circle** at `r * 0.7` for the one
+  body in the game whose entire identity is armour on ONE face, underneath its
+  own directional arcs. The marker said the opposite of the truth about the
+  only body it is the whole point of, and nothing could fail for it: the ring
+  is drawn, the arcs are drawn, both are the right colour. A type that says
+  which WAY its armour faces draws its own; the general ring is for armour
+  that really is all round.
+- **A DRAWN ARC THAT IS NOT THE DAMAGE ARC IS A READOUT OF NOTHING.**
+  `drawFlint`'s plate arcs were centred at `-0.7r` rather than on the body, so
+  they subtended **+-94.8 / 89.5 / 85.3 degrees** against a rule of +-53.1 --
+  the player reads which way the plate points off the picture, and the picture
+  was nearly twice as wide as the mechanism. Centred on the body the drawn arc
+  IS the damage arc. Same family as the DECOY's barrel and the HITBOXES
+  overlay below: a shape that stands for a rule has to be derived from that
+  rule.
+- **`drawHitboxes` IS THE ONLY PLACE THE HIT PROFILE CAN BE SEEN, AND IT DREW
+  A CIRCLE FOR EVERYTHING.** The one overlay that exists to show what a round
+  actually meets could not show the build-315 capsule or the 319 plate. It
+  draws both now, the physics disc behind the true profile -- both, because
+  for those bodies the disc is the fiction.
+- **A SECOND `plated` TYPE WOULD WEAR FLINT'S NUMBERS IN SILENCE.** Both
+  readers are hard-wired to one block -- `frontal` reads `CFG.flint.front` and
+  `face` reads `CFG.flint.turn` -- so a new type declaring the flag gets a
+  53-degree arc slewing at 1.6 rad/s whatever its own design said, with no
+  field to set and nothing to fail. `check-build` refuses a second one and
+  names what has to move. Exactly `levels` defaulting to 3 (eight nodes sold
+  three times) and an omitted `band` reading as band 1: **a value inherited in
+  silence is indistinguishable from a value that was chosen.**
+- **The FLINT specimen pointed sideways, under the comment explaining why
+  SHRIKE's does not.** `case 'flint'` was added directly beneath the block
+  written two builds earlier to explain the `+PI/2` correction for this exact
+  fault, without the correction and splitting that comment off its own case.
+  Second time in three builds; `drawFlint` and `drawShrike` both draw along
+  local +x and every other specimen is upright.
+- **A CONTROL THE LIVE GAME CANNOT PRODUCE IS STILL THE RIGHT CONTROL, BUT ONLY
+  FOR THE CLAIM IT DISCRIMINATES.** The plate arm holds a flint side-on by
+  rewriting `angle` every frame, which `face` would never allow -- and that is
+  correct for "the plate is directional", because the same body at two angles
+  is the only pair that divides the geometry out. It is NOT evidence about
+  what a player can do, and reading it as such is how the codex line survived.
+  Say which of the two a control is for.
+- **`threatOf` IS HEALTH-ONLY, SO THE BUDGET CANNOT SEE ARMOUR -- AND FLINT IS
+  THE LARGEST INSTANCE OF THAT GAP.** Weighting each body by `1 / (1 - armor)`
+  ranks `flint x3 + prism x3` at **x1.705**, the top of the whole roster --
+  ahead of `bulwark + herald` at x1.480 and `bulwark + needle` at x1.446, both
+  band 5, and `quarry + needle` at x1.251 in band 4. Armour
+  has never been counted for anyone, so this is not a new rule broken; it is
+  the biggest case of an old one, and the only body whose armoured face is
+  always the face the gun sees. Recorded, NOT acted on: weighting threat by
+  armour re-prices every band in the game and belongs in a pacing pass.
+  Note `docs/objects.html` also authors `threat: 5` for FLINT where its own
+  hp/30 convention gives 4, and nothing compares the guide against the
+  derivation. Measured: at the derived 4 the wave weighs 20.80 against band
+  3's mean of 20.9571, which is 0.75% under it and moves the band's budget
+  -0.094%; at the guide's 5 it would weigh 23.80, 13.6% OVER the mean. Those
+  are two different ratios and it is easy to quote one for the other.
+- **It clears comfortably, which is the arm of a review worth having most.**
+  Front-effective health is `120 / 0.45` = 266.7, so 10.3 stock bolts at
+  0.286s = 2.93s a body; `thinAt` is 2 of 6, so the worst case is 4 kills =
+  **9.8s of on-target fire against `patience` 26** -- and HOLLOWPOINT's eight
+  band-3 levels land at the wave's own rungs, so real damage there is x1.26 to
+  x6.35 of that. A stall is bounded and self-clearing anyway (`hitPatience`,
+  the 291 release gate, the crowd term lighting the fuse, `glitchOut`
+  fizzling the field). A body that reads as brutal on paper is worth costing
+  before tuning it.
+
+- **THE SHOAL CUT ARM ASSERTED A CLOUD RADIUS AT 200 AND DREW 201, ON A BUILD
+  WHOSE CHANGES CANNOT REACH A DART.** 319's remediation is six draw-path and
+  string edits plus a `frozen` factor on plated bodies; none of them touches
+  SHOAL, the random stream or any physics. The quantity is the survivors'
+  cloud radius after five seconds of MARCHING, so it is a distance-travelled
+  reading, and a probe's synthetic steps ride on the page's own rAF loop --
+  the instability build 310 and 314 both recorded, on this same quantity.
+  Measured standalone, 22 trials: **68 to 191**, a 2.8x spread with the old
+  ceiling 5% above its worst draw.
+  **And it was not DISCRIMINATING either, which is the better reason to stop
+  asserting it**: build 315's note measured fourteen STRANGERS at 152 to 227
+  on the same reading, because every body steers at the same mount whether it
+  flocks or not. So the ceiling straddled the draw AND the two populations
+  overlap -- a bound that can neither hold still nor separate anything.
+  What carries the claim instead is four ABSOLUTES, and the arm had been
+  missing the two that matter: it printed "13 still flocking" while computing
+  `left.length`, which is only "13 ALIVE". A school finds its members by
+  SERIAL with no roster and no owner, so what a cut must not do is orphan
+  anybody or leave a corpse in the set -- `held` (bodies on the field carrying
+  the serial) and `mates` (what each survivor finds scanning) say that
+  directly, and both read 13/12 in 6 of 6 runs while `far` swung 85 to 180 in
+  those same six. `far` is a RUNAWAY bound at 420, about 2.2x the worst
+  reading, and is reported rather than asserted tightly.
+  **Proven to read a one, twice**, because a zero from an instrument that has
+  never caught anything means nothing: push the destroyed body back into
+  `world.enemies` and `corpse` reads 1; clear one survivor's serial and
+  `held` reads 12 with `mates` at 0. The clean trial beside them reads
+  13/12/0.
+- **A CASE THAT PRINTS ONE QUANTITY AND ASSERTS ANOTHER IS A CASE NOBODY CAN
+  READ.** That message said "still flocking" for a count of the living, so the
+  arm looked like it was checking membership and was checking a death. The
+  same shape as `kind: 'works'` and the `dive` dwell clock: **the declared
+  meaning of a field and the quantity it measures are two different things**,
+  and a detail string is a declaration.
+- **AND `tail -45` ON A SUITE RUN THROWS AWAY THE ONE LINE YOU NEED.** The
+  runner prints each case as it goes and the summary last, so piping through
+  `tail` keeps the count and loses the FAIL. That cost a full 13-minute re-run
+  to recover a single line. Redirect the whole run to a file and grep it;
+  the count is worthless without the name beside it.
+
+- **A THRESHOLD BELONGS IN THE GAP BETWEEN WORKING AND BROKEN, AND AIRBURST'S
+  HAS NOW STRADDLED ITS OWN DRAW TWICE.** Build 315 replaced a single-body
+  floor that straddled the draw (`oneAir > one * 1.3`, read 1.26) with a
+  SEPARATION that straddled the draw (`crowd/single > 1.3`), and it failed
+  again on 319 at **1.291** -- on a build whose changes cannot reach a pellet.
+  Both ends measured this time, ten presses, three trials each: **working
+  1.314 to 1.427** against **broken 0.942 to 1.032**, broken being the same
+  arm with the burst radius gutted. The old 1.3 had 1.2% of headroom on the
+  working side and 27% on the broken side, which is a threshold measuring the
+  draw. 1.15 is 11% above the worst broken reading and 14% below the worst
+  working one. **Measure the broken end too -- a ceiling fitted to the working
+  distribution is fitted to the day's value, however honestly it was derived.**
+- **...AND IT IS WORTH KNOWING WHICH HALF OF A RATIO IS THE NOISY ONE.** Over
+  sixteen trials the CROWD ratio -- the thing the arm is named for -- reads
+  2.025 to 2.038, and every bit of the movement is the single-body
+  DENOMINATOR (1.417 to 1.644 at four presses). So a separation built to
+  escape the noisy single-body reading put that same reading underneath it as
+  a divisor. Four presses to ten takes the separation's spread from 0.19 to
+  0.077, the 1/sqrt(n) the averaging exists for. **When a ratio flakes, ask
+  which term is moving before averaging both.**
+- **A CONJUNCT THAT CANNOT FAIL FOR THE REASON THE CASE IS ABOUT IS WORTH
+  NAMING RATHER THAN TRUSTING.** That arm's `oneAir.took > one.took * 1.05`
+  is documented as "the single body only has to gain something at all" -- and
+  a gutted burst drew **1.062** on one of three trials, so it passes on a
+  build where the node does nothing. Not the failing conjunct and not
+  removed, because it is a cheap liveness floor; but the comment now says it
+  does not discriminate, which is the difference between a belt and a belt
+  somebody thinks is a brace. Same family as build 318's
+  `dive * naive / dive` tautology, one degree less severe.
+- **TWO MARGIN FAULTS IN ONE SUITE RUN, AND NEITHER WAS THE BUILD.** 319's
+  content is a FLINT and a batch of draw-path corrections; the two cases it
+  turned red were a SHOAL cloud radius and an AIRBURST separation, both set
+  at the edge of their own distributions by earlier builds. That is what a
+  change with no gameplay reach is FOR -- it is the one condition under which
+  a red case is unambiguously the case's fault -- so the right response is to
+  fix the margins properly rather than re-run for a green draw. Both were
+  measured against their own broken readings before the thresholds moved.
+
+- **THE PORTAL-BRAKE ARM'S HIDDEN FLOOR WAS AN ABSOLUTE, AND THE SUITE
+  DEPRESSES IT BY MORE THAN SAMPLING EXPLAINS.** `hiddenMax >= cruise * 1.8`
+  drew **1.755** on build 319, whose changes cannot reach a LURCHER; measured
+  standalone over twelve releases the same ratio is **2.727 to 4.043**. That
+  gap is too big to be the draw, so it was tested: driving the identical probe
+  three and six frames per sample takes it 3.13-3.90 to 2.72-3.30, the right
+  direction and not the whole distance. Something in five hundred cases of
+  inherited state is slowing the spit-out and it was NOT run down.
+  What made that unnecessary is dropping the absolute. `hiddenMax` and
+  `atRim` come off the SAME body on the SAME run through the same sampling,
+  and their ratio IS the arm's own name -- it slowed through the surface.
+  Measured 3.05 to 5.55 standalone at every sampling rate tried and **2.47**
+  on the suite run that failed, against about 1.0 for a surface that does not
+  brake. **A within-body ratio survives whatever is scaling both terms; an
+  absolute has to be right about the whole environment.** Third margin of
+  this build's suite runs and the third one an earlier build had set at the
+  edge of its own distribution.
+- **`null <= x` IS TRUE IN JAVASCRIPT, so the conjunct about the rim passed
+  for a body that never reached it.** `atRim` is initialised `null` and the
+  arm read `atRim <= cruise * 1.2`, which `null` coerces to `0 <= 50` and
+  satisfies -- so a release that never recorded a rim crossing passed the one
+  test that is about the crossing. Both arms carry `atRim !== null` now. The
+  same shape as `undefined > eraGate` answering ERA 1: a comparison against a
+  missing value is a comparison that succeeds quietly.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

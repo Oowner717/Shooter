@@ -203,6 +203,20 @@ export function drawSpecimen(ctx, id, r) {
       ctx.restore();
       break;
     }
+    /*
+     * ...and FLINT the same way, for the same reason: `drawFlint` draws along
+     * local +x because `Enemy.face` points a plated body at the machine, and
+     * an icon has no machine to point at. Build 319 shipped it unrotated --
+     * the exact fault build 318 fixed one build earlier, reintroduced by
+     * copying the draw helper's frame and not its call site.
+     */
+    case 'flint': {
+      ctx.save();
+      ctx.rotate(Math.PI / 2);
+      drawFlint(ctx, r, 0, 0);
+      ctx.restore();
+      break;
+    }
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
@@ -1495,7 +1509,7 @@ export class Enemy {
     this.shoveFade(dt);
     this.drive(world, dt);
     if (this.type.hurl && this.tether) this.windUp(world, dt);
-    this.face(dt);
+    this.face(dt, world);
   }
 
   /**
@@ -1508,8 +1522,76 @@ export class Enemy {
    * rotated. Below walking pace it keeps whatever heading it had -- a needle
    * sitting still has no "forward" to point at.
    */
-  face(dt) {
-    if (!this.type.point || this.isDrop) return;
+  /**
+   * Did this hit land on the plated face?
+   *
+   * `nx, ny` is the direction the damage is travelling, so a hit on the front
+   * comes in roughly OPPOSITE to where the body is pointing. A zero vector is
+   * not frontal: a hit with no direction has no face.
+   *
+   * Counted rather than guessed: there are FOURTEEN `Enemy.applyDamage` call
+   * sites in `src/`, of which eight pass a direction and six pass a literal
+   * `0, 0` (contact is two sites of one source) -- plus one conditional zero
+   * in WIRE's cut when the body's centre lies on the wire. An earlier draft
+   * of this said "seventeen callers, two of them scale it": the seventeen
+   * counted two unrelated `applyDamage` definitions and the Enemy one, and
+   * NO caller scales the direction -- what is scaled at two sites is the
+   * impulse beside it. The normalise is kept because a unit vector is a
+   * precondition this function should not have to trust, but its cost is
+   * real and the reason given for it was not.
+   *
+   * @param {number} nx
+   * @param {number} ny
+   * @returns {boolean}
+   */
+  frontal(nx, ny) {
+    const m = Math.hypot(nx, ny);
+    if (m < 1e-6) return false;
+    const dot = -(nx * Math.cos(this.angle) + ny * Math.sin(this.angle)) / m;
+    return dot >= CFG.flint.front;
+  }
+
+  face(dt, world) {
+    if (this.isDrop) return;
+    /*
+     * A PLATED body turns to keep its face on the BARREL, not on its own
+     * heading, and slowly. Handled here rather than in a fourth site: this
+     * method is already where bodies are turned, and `steer` already calls it
+     * once a frame.
+     *
+     * ---- AND NOTHING CAN SPIN IT, which an earlier draft claimed otherwise
+     *
+     * This zeroes `av`, and `steer` runs before `integrate` in the same
+     * substep -- so every source of angular velocity in the game writes
+     * OUTSIDE that window and is discarded unapplied: a round's own lever
+     * spin, the pair solver's friction, a wall bounce, the WELL. Measured,
+     * `av` set to 20 moved the angle 0.0000 rad against the 0.333 it would
+     * have. So the plate cannot be knocked off axis, and the only thing that
+     * moves it is the body's own POSITION changing -- a shove alters the
+     * bearing to the mount, and the slew rate is what decides how long that
+     * is worth. The rate is a rate; note `point`'s 11 below is NOT one, it
+     * is a proportional gain (`k = dt * 11`), so the two are not comparable.
+     *
+     * Note this repo now has TWO conventions for a facing and they disagree.
+     * `point` below turns to the heading along local -y at 11 rad/s; the
+     * `FACES_TRAVEL` set added at build 317 turns to the heading along local
+     * +x and snaps. FLINT is drawn along +x with the rest of that group.
+     * Unifying the two is a change to what several existing bodies look
+     * like, so it is recorded rather than done here.
+     */
+    if (this.type.plated && !this.staged && world) {
+      const s = world.shooter;
+      let d = Math.atan2(s.y - this.y, s.x - this.x) - this.angle;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      // Held by a freeze, like every other steering path in this file --
+      // measured, without it a frozen FLINT turned the full 0.8 rad in half
+      // a second against the 0.096 everything else is slowed to.
+      const step = CFG.flint.turn * dt * (this.frozen(world) ? 0.12 : 1);
+      this.angle += clamp(d, -step, step);
+      this.av = 0;
+      return;
+    }
+    if (!this.type.point) return;
     const sp = Math.hypot(this.vx, this.vy);
     if (sp < 10) return;
     let d = Math.atan2(this.vy, this.vx) + Math.PI / 2 - this.angle;
@@ -2435,7 +2517,20 @@ export class Enemy {
     const ward = this.wardT > 0 ? (this.ward || 0) : 0;
     // RAILED lets a SPINE through the plate rather than into it: `shred` is
     // the fraction of this body's armour the round simply does not meet.
-    const plate = this.armor * (1 - shred);
+    let plate = this.armor * (1 - shred);
+    /*
+     * ...and a PLATED body carries it on one FACE. Gated on the type, so the
+     * expression above is unchanged to the bit for every other body in the
+     * game -- which is the claim the ORDINAL hash is run to check.
+     *
+     * `nx, ny` is the direction the damage travels and every caller already
+     * passes it, so `-(n . facing)` is the frontness: +1 dead ahead, 0 from
+     * the side, -1 from behind. The five callers that pass `0, 0` -- contact,
+     * ARC's chain, a Patch's bite, HARD CASING and TITHE's bonus -- read 0
+     * and meet no plate, because a hit with no direction cannot be asked
+     * which face it landed on. See CFG.flint.
+     */
+    if (plate > 0 && this.type.plated) plate = this.frontal(nx, ny) ? plate : 0;
     const real = Math.max(1, dmg * (1 - plate) * (1 - ward));
     /*
      * Booked HERE, and this is the only honest place for it: past ARMORED's
@@ -2953,8 +3048,19 @@ export class Enemy {
      * shape and inside it, so it reads as a liner rather than as a halo, and
      * it fades with health like everything else: a plated thing coming apart
      * loses its plate first.
+     *
+     * ---- and a CLOSED ring is a claim about the whole body ----------------
+     *
+     * `materialOf(t).plate` is `!!t.armor`, so this drew a complete circle
+     * for FLINT -- the one body in the game whose entire identity is armour
+     * on ONE face -- underneath its own directional arcs. A marker whose
+     * stated job is making armour legible, saying the opposite of the truth
+     * about the only body it is the whole point of. Nothing could fail for
+     * it: the ring is drawn, the arcs are drawn, and both are the right
+     * colour. A type that says which WAY its armour faces draws its own, and
+     * the general ring is for armour that really is all round.
      */
-    if (materialOf(t).plate && !this.isDrop) {
+    if (materialOf(t).plate && !t.plated && !this.isDrop) {
       ctx.save();
       ctx.strokeStyle = rgba(t.color, 0.3 + 0.34 * dim);
       ctx.lineWidth = Math.max(CFG.hairline, this.r * 0.05);
@@ -3014,6 +3120,7 @@ export class Enemy {
       case 'dart': drawDart(ctx, this.r, this.phase, world.time); break;
       case 'bar': drawBar(ctx, this.r, this.phase, world.time); break;
       case 'yoke': drawYoke(ctx, this.r, this.phase, world.time, this.beam); break;
+      case 'flint': drawFlint(ctx, this.r, this.phase, world.time); break;
       case 'shrike': drawShrike(ctx, this.r, this.phase, world.time,
         this.divePhase === 'dive' && !(this.fizzle > 0)); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
@@ -4682,6 +4789,67 @@ function drawYoke(ctx, r, phase, time, beam) {
     ctx.stroke();
     ctx.restore();
   }
+}
+
+/**
+ * A flint: a wedge with a plate across its leading face.
+ *
+ * ---- THE PICTURE DERIVES ITS ARC FROM THE RULE -----------------------
+ *
+ * The plate is drawn from `-acos(CFG.flint.front)` to `+acos(...)` rather
+ * than from the two literals `docs/objects.html` sweeps (-2.5 to -0.64
+ * radians), because those ARE that arc once the frame is corrected: +-0.93
+ * radians is +-53 degrees, and `cos 53` is the 0.6 the damage path compares
+ * against. One owner, so the thing a player can see and the thing that
+ * reduces damage cannot drift apart -- which is the fault `CFG.mines.era2`
+ * is shaped to avoid and the one `s.r * 2.4` paid for three times.
+ *
+ * Drawn along local +x: `Enemy.face` turns a plated body so `angle` points at
+ * the machine, and the plate belongs on that side. The guide authors this
+ * shape nose-UP, which is the frame that page draws everything in -- its
+ * points are turned a quarter here rather than at the call site, for the
+ * reason build 268's DECOY records.
+ */
+function drawFlint(ctx, r, phase, time) {
+  // The wedge: nose forward, two corners trailing.
+  ctx.beginPath();
+  ctx.moveTo(r * 1.1, 0);
+  ctx.lineTo(-r * 0.5, r);
+  ctx.lineTo(-r * 0.5, -r);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  /*
+   * The plate: three arcs standing off the leading face, the outermost
+   * faintest. Alpha multiplied IN and put back by save/restore rather than
+   * assigned and reset to 1, which is build 210's fade.
+   */
+  const half = Math.acos(clamp(CFG.flint.front, -1, 1));
+  const beat = 0.85 + 0.15 * Math.sin(time * 2.2 + phase);
+  for (let i = 0; i < 3; i++) {
+    ctx.save();
+    ctx.globalAlpha *= (1 - i * 0.28) * beat;
+    ctx.lineWidth = CFG.hairline * (2.6 - i * 0.7);
+    ctx.beginPath();
+    /*
+     * Centred on the BODY's own centre, which is the only frame `frontal`
+     * has. The first version swept the right angle about a centre 0.7r
+     * behind the body -- so the sweep was +-53.1 degrees and the arc a
+     * player actually sees subtended +-94.8, 89.5 and 85.3 from the centre,
+     * nearly twice the rule, while the docstring claimed the two could not
+     * drift apart. Deriving a number from the right constant is not the same
+     * as drawing the right thing.
+     */
+    ctx.arc(0, 0, r * (1.05 + i * 0.13), -half, half);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // ...and the rib, which gives the wedge a front from behind as well.
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.5, -r * 0.5);
+  ctx.lineTo(r * 0.2, 0);
+  ctx.lineTo(-r * 0.5, r * 0.5);
+  ctx.stroke();
 }
 
 /**

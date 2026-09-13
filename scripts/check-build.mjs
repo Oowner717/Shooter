@@ -547,6 +547,61 @@ console.log(`bar: ${bars.length} type(s) are tested as a capsule (`
 
 
 /*
+ * ---- A PLATE ON ONE FACE IS A MECHANISM WITH TWO WAYS TO BE VACUOUS -----
+ *
+ * `CFG.flint.front` is the cosine of the plate's half-arc, and both ends of
+ * its range delete the object rather than tune it: at 0 the plate covers
+ * every direction that is not behind, which is ordinary armour with extra
+ * arithmetic, and at 1 it covers a single ray and nothing ever meets it. The
+ * guide's arc is +-53 degrees, so the value is about 0.6 and the degrees are
+ * printed because a cosine is not readable.
+ *
+ * ...and a `plated` type with no `armor` is the whole mechanism doing
+ * nothing: `applyDamage` reaches the directional branch only when `plate` is
+ * already above zero, so an author who sets the flag and forgets the armour
+ * gets silence rather than an error.
+ *
+ * ...and a SECOND plated type would silently wear FLINT's numbers. Both
+ * readers are hard-wired to this one block -- `Enemy.frontal` reads
+ * `CFG.flint.front` and `Enemy.face` reads `CFG.flint.turn` -- so a new type
+ * declaring `plated` gets a 53-degree arc slewing at 1.6 rad/s whatever its
+ * own design said, with no field to set and nothing to fail. The same shape
+ * as `levels` defaulting to 3 (eight nodes sold three times) and a `band`
+ * reading as band 1: a value that is inherited in silence is
+ * indistinguishable from a value that was chosen. The build stops here and
+ * says what has to move, rather than letting the arc be decided by which
+ * body happened to be authored first.
+ */
+const plated = ENEMY_TYPES.filter((t) => t.plated);
+if (plated.length) {
+  const F = CFG.flint;
+  const bad = [];
+  if (!(F.front > 0 && F.front < 1)) {
+    bad.push(`front ${F.front} must be inside (0, 1): 0 is ordinary armour and 1 is a plate `
+      + 'nothing can hit');
+  }
+  if (!(F.turn > 0)) bad.push(`turn ${F.turn} must be positive, or the face never tracks`);
+  for (const t of plated) {
+    if (!(t.armor > 0)) bad.push(`${t.id} is plated and carries no armor, so the plate does nothing`);
+  }
+  if (plated.length > 1) {
+    bad.push(`${plated.length} types are plated (${plated.map((t) => t.id).join(', ')}) and `
+      + '`front`/`turn` live in CFG.flint, so all but the first would inherit FLINT\'s arc and '
+      + 'slew in silence. Move both onto the type before adding another.');
+  }
+  if (bad.length) {
+    for (const line of bad) console.error(`plate: ${line}`);
+    process.exit(1);
+  }
+  const deg = (Math.acos(F.front) * 180) / Math.PI;
+  console.log(`plate: ${plated.length} type(s) carry armour on one face (`
+    + `${plated.map((t) => `${t.id} ${t.armor}`).join('; ')}) across `
+    + `+-${deg.toFixed(1)} degrees, slewing ${F.turn} rad/s to hold it on the barrel; `
+    + 'five directionless damage sources meet no plate at all');
+}
+
+
+/*
  * ---- A DIVE NEEDS A CORRIDOR, AND ITS LANE HAS TO BE INSIDE IT ----------
  *
  * `diveLane` puts a diving body between two radii it does not choose: the

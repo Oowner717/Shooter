@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '318';
+export const BUILD = '319';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '318';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a740598';
+export const REV = '93c87a2';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1229,6 +1229,75 @@ export const CFG = {
     grip: 3, // how hard the pair is held at that rate, per second
     snap: 0.5, // the share of the pool that, on ONE half, breaks the beam
     alone: 1.9, // ...and what the survivor's speed is multiplied by
+  },
+
+  /*
+   * ---- A PLATE ON ONE FACE, AND A BODY THAT KEEPS IT POINTED AT YOU -----
+   *
+   * FLINT carries `armor` 0.55 on its FRONT FACE and nothing anywhere else,
+   * and it turns to keep that face toward the barrel. `docs/objects.html`
+   * calls it "the first body that makes the field have sides".
+   *
+   * ---- WHICH FACE WAS HIT IS ALREADY THREADED EVERYWHERE ---------------
+   *
+   * `applyDamage(world, dmg, nx, ny, ...)` takes the direction the damage is
+   * TRAVELLING, and all seventeen callers already pass it -- a round's own
+   * heading from `takeHit`, the outward normal from `applyBlast`, the beam
+   * direction from PRISM and LANCE, the cut from WIRE. So the plate needs no
+   * new argument and no new geometry: `-(n . facing)` is +1 for a hit dead on
+   * the front, 0 from the side and -1 from behind.
+   *
+   * FIVE callers pass `0, 0` and therefore meet no plate at all: contact,
+   * ARC's chain, a `Patch`'s bite, HARD CASING and TITHE's bonus. That is a
+   * consequence and not an oversight -- a hit with no direction cannot be
+   * asked which face it landed on, and the code must not invent one. It also
+   * reads correctly against the guide's counter, which is mines, blasts from
+   * behind and ricochets.
+   *
+   * ---- ...AND THE TURRET IS STATIC, WHICH IS THE WHOLE DESIGN ----------
+   *
+   * A body that turns to face the barrel presents its plate to GUNFIRE
+   * always: there is no angle for the gun to find, because the gun cannot
+   * move. So the answers are the ones the guide lists -- ground it walks
+   * over, a blast up-field of it, a PRISM ricochet -- and 0.55 is a
+   * reduction rather than a refusal, so the gun is slowed and not stopped.
+   * Note the guide's counter also names "an emplacement standing off to one
+   * side", which this game has not had since `CFG.gun.inPlay` went false at
+   * build 289; the codex line does not promise it.
+   */
+  flint: {
+    /*
+     * The cosine of the plate's half-arc. 0.6 is about 53 degrees either
+     * side of dead ahead, which is the arc the guide's own drawing sweeps
+     * (-2.5 to -0.64 radians about the leading face). Authored as the cosine
+     * because `applyDamage` runs tens of thousands of times in a boss fight
+     * and the alternative is a `Math.acos` on that path; `check-build` prints
+     * the degrees so the number is readable.
+     */
+    front: 0.6,
+    /*
+     * Radians a second it slews to keep the plate on the barrel.
+     *
+     * The first draft of this docstring said the window this leaves "after
+     * something spins or shoves it is the only way the gun ever sees a side",
+     * and MEASURED there is no such window. `Enemy.face` writes `av = 0` for
+     * a plated body on every frame, one call above `integrate`, so build
+     * 211's impact spin never reaches `angle` at all -- a bolt at maximum
+     * lever moved a flint 0.0000 radians. Nor can a shove open one: PULSE's
+     * impulse is radial from the machine, which changes the range and not the
+     * bearing. And the tracking error a marching body demands is
+     * `v_perp / d` -- at most 0.21 rad/s at the 210-unit standoff -- so 1.6
+     * is seven times what holding the plate on the barrel actually costs.
+     *
+     * What the number really governs is the ARRIVAL: the constructor rolls a
+     * random `angle`, so a flint takes up to `PI / turn` = 1.96s to come
+     * round once it is loose, which is the one genuine window and is spent at
+     * the top of the field outside `aimRange`. Slowing it further is the
+     * lever if that window ever wants to be worth something; it is NOT a
+     * lever on the side of a body under fire, because nothing in the game can
+     * turn one.
+     */
+    turn: 1.6,
   },
 
   /*
@@ -4814,6 +4883,43 @@ export const ENEMY_TYPES = [
   },
   {
     /*
+     * FLINT: a plate on one face, and it keeps that face toward you.
+     *
+     * `plated` is the mechanism and `CFG.flint` carries the arithmetic,
+     * including why the plate is bypassed by the five directionless damage
+     * sources and why a static turret can never find its side.
+     *
+     * ---- THE FOURTH TYPE IN THIS GOLD, AND THAT IS NOW WORTH ASKING -----
+     *
+     * `docs/objects.html` puts it in the `edge` family, which is `#ffd166` --
+     * NEEDLE's body colour, GLUT's, and SHRIKE's since build 317. Four types
+     * in one hex is past where the silhouette ruling was meant to stretch,
+     * and CLAUDE.md is explicit that picking a new category colour is a
+     * decision to be ASKED about rather than taken, so the tone is kept and
+     * the question is recorded. What is done in the meantime is the half that
+     * needs no permission: its wave pairs it with PRISM, so none of the other
+     * three golds is ever on the field beside it.
+     */
+    id: 'flint',
+    opens: 0,
+    name: 'FLINT',
+    shape: 'flint',
+    plated: true, // see CFG.flint -- the armour is on the front face only
+    r: 16,
+    hp: 120,
+    density: 1,
+    speed: 44,
+    accel: 150,
+    restitution: 0.4,
+    wobble: 0.8,
+    armor: 0.55,
+    color: '#ffd166',
+    glow: '#c8811a',
+    weight: 0, // never chosen by the ordinary spawn roll -- it is authored
+    drops: 3, // energy it leaves when it comes apart
+  },
+  {
+    /*
      * SHRIKE: fast on the run, slow on the way back.
      *
      * The `dive` gait is the whole object and `CFG.shrike` carries the
@@ -4843,13 +4949,20 @@ export const ENEMY_TYPES = [
     accel: 340,
     restitution: 0.5,
     /*
-     * Nearly none, which is a decision and not a default. `wobble` is the
-     * clumsy wander `drive` adds around the true bearing, and a dart on a
-     * committed run does not wander -- measured, at 0.7 the lane drifted far
-     * enough that the pass never entered the machine's grip band at all and
-     * the body delivered nothing.
+     * Nearly none, which is a decision and not a default, and the number is
+     * set by the PAYLOAD rather than by taste. `wobble` is the clumsy wander
+     * `drive` adds around the true bearing, and the grip this object exists
+     * to deliver depends on holding a corridor `CFG.shooter.grabPad` = 2
+     * units wide -- so the wander is the thing that decides whether a pass
+     * lands at all. Measured over eighteen bodies per setting: at 0.7 the
+     * lane drifted so far the pass never entered the band; at 0.12 and at
+     * 0.06 five passes in six landed, with the misses reading a closest
+     * approach of 42.5 to 43.5 against a band of 42; at 0.03 **eighteen of
+     * eighteen** landed, every closest approach inside the band, and the
+     * scrape fell to 0-1 of 70 health. A precise flyer is also what a
+     * diving dart should be.
      */
-    wobble: 0.12,
+    wobble: 0.03,
     color: '#ffd166',
     glow: '#ff7a1c',
     weight: 0, // never chosen by the ordinary spawn roll -- it is authored
@@ -5931,6 +6044,14 @@ export const WAVES = [
   // together: each head winds on its own approach.
   { of: [['tow', 3], ['needle', 2]], band: 5 },
   { of: [['tow', 2], ['glut', 2], ['mote', 1]], band: 5 },
+  /*
+   * ...and the FLINT wave. Three flints and three PRISMs weighs 20.80 against
+   * band 3's own mean of 20.9571, so it re-prices the band by -0.08% -- build
+   * 315's lever. PRISM rather than the NEEDLE or GLUT that would price the
+   * same, because both of those wear FLINT's exact gold.
+   */
+  { of: [['flint', 3], ['prism', 3]], band: 3 },
+
   /*
    * ...and the SHRIKE wave. Two shrikes, two LURCHERs and a MOTE weighs 18.03
    * against band 2's own mean of 17.875, so it re-prices the band by +0.18%

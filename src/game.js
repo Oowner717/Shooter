@@ -4411,6 +4411,28 @@ export class Game {
       ctx.moveTo(e.x + e.r, e.y);
       ctx.arc(e.x, e.y, e.r, 0, TAU);
     }
+    /*
+     * ...and a PLATED body's profile is directional, which a circle cannot
+     * say either. Drawn in its own colour because it is not the hit boundary
+     * -- a round still lands anywhere on the disc -- it is the arc across
+     * which the landing is discounted, and `CFG.flint.front` is its cosine,
+     * so the arc here is derived from the same number `Enemy.frontal` tests
+     * and cannot drift from it.
+     */
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,170,60,0.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (const e of w.enemies) {
+      if (!e.type.plated || e.isDrop) continue;
+      const half = Math.acos(CFG.flint.front);
+      ctx.moveTo(e.x + Math.cos(e.angle - half) * e.r, e.y + Math.sin(e.angle - half) * e.r);
+      ctx.arc(e.x, e.y, e.r, e.angle - half, e.angle + half);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,255,120,0.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
     ctx.moveTo(w.shooter.x + w.shooter.r, w.shooter.y);
     ctx.arc(w.shooter.x, w.shooter.y, w.shooter.r, 0, TAU);
     ctx.stroke();

@@ -276,6 +276,38 @@ export const CODEX = [
     line: 'Fourteen at once, with no leader and nothing to break. They steer at each other and at you, so the school turns as one thing and closes whatever gap you make in it. A bolt takes one of fourteen; anything with a radius takes the school. It is the field telling you that aiming is not always the answer.',
   },
   {
+    id: 'flint',
+    name: 'FLINT',
+    /*
+     * Every counter here is MEASURED, against a 111-point blast and a
+     * 100-point round on a flint facing the turret: a blast on the near face
+     * 49.9, laid off to one side 111, a round head on 45, across the flank
+     * 100, with no direction at all 100, and SPINE's shred 100.
+     *
+     * The first draft of this line named "ground it walks over" and
+     * "something that goes off behind it", and both were wrong in the same
+     * way. A mine is triggered at `m.r + trigger + e.r` -- 55 units -- so it
+     * always goes off while the body is still up-field of it, which is to say
+     * ON the plate: the more squarely the body walks over it, the less it
+     * does. And a blast genuinely behind the body is full damage but cannot
+     * be AIMED there, because every blast in the arsenal is sited toward the
+     * turret -- HE and AIRBURST burst at the contact on the near face, PULSE
+     * is radial from the machine, DECOY's parting blast sits between the two.
+     * WELL is the only one that can land up-field and the player does not
+     * choose where it goes.
+     *
+     * So the line names the three that a player can actually reach, and says
+     * the mine thing as the trap it is rather than as the answer.
+     *
+     * Also deliberately does NOT name an emplacement off to one side, which
+     * is the fourth answer `docs/objects.html` gives: this game has had no
+     * emplacements since CFG.gun.inPlay went false at build 289, and a codex
+     * line that names a system the player cannot reach is worse than a
+     * shorter one. See the FLINT block in config.js.
+     */
+    line: 'A wedge with a plate across one face, and it turns to keep that face toward the barrel. Head on it is the hardest small thing you will meet; from any other angle it is nothing at all. Which means anything arriving from where the gun stands arrives on the plate -- a mine it walks squarely over included, worth about half of what the same mine does laid off to one side. What ignores the plate outright is a chain that jumps to it, ground already burning under it, and SPINE.',
+  },
+  {
     id: 'shrike',
     name: 'SHRIKE',
     line: 'Holds height across the top, picks a line, and runs down the edge of the machine far faster than it walks -- then overshoots to the floor and climbs back out to do it again. It is only quick on the way down. Kill it on the climb, or put a mine on the line it has already shown you.',
