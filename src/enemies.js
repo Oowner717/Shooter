@@ -186,6 +186,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'dart': drawDart(ctx, r, 0, 0); break;
     case 'bar': drawBar(ctx, r, 0, 0); break;
     case 'yoke': drawYoke(ctx, r, 0, 0, true); break;
+    case 'shrike': drawShrike(ctx, r, 0, 0, false); break;
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
@@ -426,6 +427,24 @@ export class Enemy {
      * are -- and grepped against the boss modules first, per build 298.
      */
     this.rollSide = 0;
+    /*
+     * Where a `dive` body is in its own cycle, which lane it has committed
+     * to, and how long it has been in the phase. A state machine belongs on
+     * the BODY and declared here, for the reason `fan`, `placed` and
+     * `rollSide` are -- and all four names were grepped against the boss
+     * modules first, per build 298's `loose`/`p.loose` collision, which took
+     * a whole suite run down with no case output at all.
+     *
+     * `baseCruise` is the body's OWN rolled cruise, kept because the gait
+     * writes `this.cruise` per phase: the dive is five times the walk and the
+     * climb is three quarters of it, so the authored speed has to survive
+     * somewhere. Zero until the first frame of the gait.
+     */
+    this.divePhase = '';
+    this.diveX = 0;
+    this.diveT = 0;
+    this.diveSide = 0;
+    this.baseCruise = 0;
     /*
      * A lateral held back until the body is loose. DRIFT is the only thing
      * that uses it: at era 2 it is laid inside the throat, and it used to be
@@ -1062,6 +1081,97 @@ export class Enemy {
   }
 
   /**
+   * DIVE: fast on the run, slow on the way back.
+   *
+   * Three phases and the transitions are one-way within a cycle: HOLD across
+   * the top until it has settled into a lane and waited `dwell`, DIVE down
+   * that lane at `CFG.shrike.dive`, then CLIMB back out of it at a fraction
+   * of its own walk. The asymmetry is the object -- `docs/objects.html`'s
+   * counter is that it is only fast on the dive.
+   *
+   * ---- THE LANE IS DERIVED, AND IT GOES PAST THE MACHINE ---------------
+   *
+   * See `CFG.shrike` for the measurement: a 70-health body driven down the
+   * turret's own column at 210 u/s is dead at frame 83 and never gets past,
+   * because `impactDamage`'s reduced mass against a static body is the body's
+   * whole mass and the result clamps at 300. `laneFor` is the one place the
+   * lane is computed, off the overlap it must not enter and the grip band it
+   * must reach.
+   *
+   * The SIDE is chosen once, on the first frame of the gait, from whichever
+   * side of the machine the body arrived on -- a second roll would be a
+   * second decision for one fact, which is the `rollSide` rule.
+   *
+   * @param {object} world
+   * @param {number} dt
+   * @param {number} tx the steering target the route would have used
+   * @param {number} ty
+   * @returns {number[]} the target this gait steers at instead
+   */
+  diveOn(world, dt, tx, ty) {
+    const S = CFG.shrike;
+    const s = world.shooter;
+    if (!this.baseCruise) this.baseCruise = this.cruise;
+    if (!this.diveSide) this.diveSide = this.x < s.x ? -1 : 1;
+    if (!this.divePhase) this.divePhase = 'hold';
+    this.diveT += dt;
+    const holdY = entryLine(world, ENTRY_Y) + S.hold;
+    const lane = laneFor(world, this);
+    /*
+     * The dive's speed is DELIVERED and not asked for. `drive` blends the
+     * velocity toward `dx * cruise` at `accel / 100` while `integrate` damps
+     * every substep at `linearDamping`, so the steady state is
+     * `target * k / (k + damping)` -- a raw 210 arrives as 181. Grossed up by
+     * those two terms rather than by a fitted constant, which is the correct
+     * dependency: a heavier `accel` needs less asking for. Fourth time in
+     * this repo; see build 298, 308 and 316.
+     */
+    const k = this.accel / 100;
+    const gross = (k + CFG.physics.linearDamping) / k;
+    if (this.divePhase === 'hold') {
+      this.cruise = this.baseCruise;
+      /*
+       * Slide across the top INTO the lane, so the line can be read -- and be
+       * mined -- before it is used. The tolerance is `grabPad` and not `r`:
+       * at `r` it committed up to fourteen units wide, the dive never
+       * converged (a target straight down the lane corrects laterally more
+       * weakly the closer it gets), and the pass missed the grip band
+       * entirely -- measured, a closest approach of 59.5 against a band of
+       * 42 and ZERO frames of grip. The pad is the width of the thing the
+       * lane exists to reach, so it is the width the commitment is worth.
+       */
+      if (Math.abs(this.x - lane) < CFG.shooter.grabPad && this.diveT > S.dwell) {
+        this.divePhase = 'dive';
+        this.diveX = lane;
+        this.diveT = 0;
+      }
+      return [lane, holdY];
+    }
+    if (this.divePhase === 'dive') {
+      this.cruise = S.dive * gross;
+      // Past the machine and on to the floor, which is the overshoot.
+      if (this.y > world.floorY - this.r * 2) {
+        this.divePhase = 'climb';
+        this.diveT = 0;
+      }
+      return [this.diveX, world.floorY + this.r];
+    }
+    // CLIMB: out of the lane and back up, slowly. This is the vulnerable half,
+    // and it is grossed up by the same two terms as the dive -- one rule for
+    // both, or the phase whose number nobody compensated is the one that
+    // quietly runs at 0.86 of what the config says.
+    this.cruise = S.climb * gross;
+    if (this.y < holdY + this.r) {
+      this.divePhase = 'hold';
+      this.diveT = 0;
+    }
+    const out = clamp(this.diveX + this.diveSide * S.swing,
+      this.r + 8, world.width - this.r - 8);
+    void tx; void ty;
+    return [out, holdY];
+  }
+
+  /**
    * One pool, and the record of which half absorbed it.
    *
    * Called from `applyDamage` after the hit has landed, so what it books is
@@ -1644,6 +1754,21 @@ export class Enemy {
       const nd = Math.hypot(dx, dy) || 1;
       dx /= nd;
       dy /= nd;
+    } else if (!this.staged && this.type.gait === 'dive' && !this.isDrop) {
+      /*
+       * DIVE owns the steering outright rather than offsetting the route: the
+       * whole gait is WHERE it is going, and a route's fold-in would pull the
+       * lane back onto the machine -- measured, a lane offset by 40 is eaten
+       * by the steering down to 35.3 and the body dies on the mount.
+       */
+      const [px, py] = this.diveOn(world, dt, tx, ty);
+      tx = px;
+      ty = py;
+      dx = tx - this.x;
+      dy = ty - this.y;
+      const nd = Math.hypot(dx, dy) || 1;
+      dx /= nd;
+      dy /= nd;
     } else if (!this.staged && this.type.gait === 'flock' && !this.isDrop) {
       /*
        * FLOCK, in the route's place for `roll`'s reason -- see `flockOn`. A
@@ -1830,7 +1955,17 @@ export class Enemy {
      * about a picture oriented to the WORLD, and this is a picture oriented
      * to the body's own travel.
      */
-    if (this.type.gait === 'flock' && !this.isDrop) {
+    /*
+     * A FACING is the gait's business, not the type's. `upright` means "this
+     * picture is oriented to the world"; these two are oriented to their own
+     * travel, which is a different claim and cannot be a flag on the type --
+     * a SHRIKE points down on the run and up on the climb.
+     *
+     * Here rather than in the gait itself, because neither gait's branch runs
+     * for a STAGED body: a school would march in pointing wherever fourteen
+     * spawn rolls left it, which is build 310's EMBER-trail fault.
+     */
+    if (FACES_TRAVEL.has(this.type.gait) && !this.isDrop) {
       const sp = Math.hypot(this.vx, this.vy);
       if (sp > 1) {
         this.angle = Math.atan2(this.vy, this.vx);
@@ -2827,6 +2962,7 @@ export class Enemy {
       case 'dart': drawDart(ctx, this.r, this.phase, world.time); break;
       case 'bar': drawBar(ctx, this.r, this.phase, world.time); break;
       case 'yoke': drawYoke(ctx, this.r, this.phase, world.time, this.beam); break;
+      case 'shrike': drawShrike(ctx, this.r, this.phase, world.time, this.divePhase === 'dive'); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
@@ -4496,6 +4632,75 @@ function drawYoke(ctx, r, phase, time, beam) {
 }
 
 /**
+ * A shrike: a swept dart on a long spine, and a streak when it is running.
+ *
+ * ---- DRAWN ALONG LOCAL +x, WHICH IS NOT THE FRAME THE GUIDE USES --------
+ *
+ * `docs/objects.html` authors this shape nose-DOWN, at `(0, R * 1.5)`, which
+ * is the frame that page draws every object in. `Enemy.update` writes
+ * `angle = atan2(vy, vx)` for a `dive` body, so local +x is the direction of
+ * travel and the nose belongs at `(R * 1.5, 0)` -- the guide's points turned
+ * a quarter, written out here in the frame they are actually used in rather
+ * than rotated at the call site. Build 268's DECOY drew its barrel in the
+ * frame it was copied from and aimed across the field for sixty builds: a
+ * rotation convention copied without its frame turns the drawing ninety
+ * degrees.
+ *
+ * The streaks are the DIVE and nothing else, which is the whole reading of
+ * this body -- fast on the run, slow on the way back. They are passed IN
+ * because `drawSpecimen` has no body to ask, and the glossary shows the
+ * clean silhouette: three golds share this tone and the shape is what tells
+ * them apart, so the icon should not have anything laid over it.
+ */
+function drawShrike(ctx, r, phase, time, diving) {
+  if (diving) {
+    /*
+     * Behind the nose, so they read as what it is leaving rather than as
+     * something it is firing -- and multiplied into the caller's alpha and
+     * put back by save/restore, never assigned and reset to 1 (build 210).
+     */
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 5; i++) {
+      const off = (i - 2) * r * 0.5;
+      ctx.save();
+      ctx.globalAlpha *= 0.5 - Math.abs(i - 2) * 0.1;
+      ctx.lineWidth = CFG.hairline * (2.2 - Math.abs(i - 2) * 0.4);
+      ctx.beginPath();
+      ctx.moveTo(-r * 1.4, off);
+      ctx.lineTo(-r * 1.4 - (26 - Math.abs(i - 2) * 6), off);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  ctx.beginPath();
+  ctx.moveTo(r * 1.5, 0);
+  ctx.lineTo(-r * 0.5, r * 1.15);
+  ctx.lineTo(-r * 0.9, r * 0.3);
+  ctx.lineTo(-r * 1.5, 0);
+  ctx.lineTo(-r * 0.9, -r * 0.3);
+  ctx.lineTo(-r * 0.5, -r * 1.15);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // The spine, which is what makes it a dart rather than an arrowhead --
+  // NEEDLE and GLUT wear this exact gold.
+  ctx.beginPath();
+  ctx.moveTo(r * 1.5, 0);
+  ctx.lineTo(-r * 1.2, 0);
+  ctx.stroke();
+  // ...and the eye, forward of centre, which gives the silhouette a front.
+  const beat = 0.7 + 0.3 * Math.sin(time * 3 + phase);
+  ctx.save();
+  ctx.globalAlpha *= diving ? 1 : beat;
+  ctx.beginPath();
+  ctx.arc(r * 1.05, 0, r * 0.22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
  * A bell: an open shell with a clapper swinging inside it.
  *
  * Six greys share one colour now, so the silhouette carries all of it. This is
@@ -5117,6 +5322,34 @@ export function schoolOf(type) {
  * pinned at exactly two, because the beam is rigid and a rigid constraint
  * between three bodies is a different solver.
  */
+/**
+ * The one lane a `dive` body may use, off the two rules it would otherwise
+ * fight.
+ *
+ * A dive cannot go THROUGH the machine -- see `CFG.shrike` for the
+ * measurement -- so the lane is the nearest column that grips it without
+ * entering its overlap: `e.r + s.r` is the boundary `resolvePair` separates
+ * at and bills `impactDamage` across, and `CFG.shooter.grabPad` past it is
+ * where `checkContact` still takes hold. Measured across lanes 0 to 56, a
+ * lane at the grip band grips for six frames, delivers its corruption, takes
+ * nothing at all, passes the machine and reaches the floor; a lane on the
+ * column is dead at frame 83 and a lane four units wider never grips.
+ *
+ * Derived rather than authored for `CFG.mines.era2`'s reason: the two radii
+ * and the pad are the only inputs, so a dive body of another size is covered
+ * by existing.
+ *
+ * @param {object} world
+ * @param {object} e the diving body
+ * @returns {number} the world x of its lane, on the side it is already on
+ */
+export function laneFor(world, e) {
+  const s = world.shooter;
+  const side = e.diveSide || (e.x < s.x ? -1 : 1);
+  const gap = e.r + s.r + CFG.shooter.grabPad;
+  return clamp(s.x + side * gap, e.r + 4, world.width - e.r - 4);
+}
+
 export function pairOf(type) {
   const n = type && type.pair;
   if (n !== 2) throw new Error(`${type && type.id}: pair must be exactly 2, got ${n}`);
@@ -7345,6 +7578,13 @@ export function climbOf(type) {
  * vocabulary guard, and a second copy is a second thing to forget.
  */
 export const OWN_SPAWN = new Set(['rise', 'tumble']);
+
+/**
+ * The gaits whose PICTURE points along the body's own travel rather than at
+ * the world. See the facing block in `Enemy.update` for why it is a gait
+ * property and not a type flag.
+ */
+const FACES_TRAVEL = new Set(['flock', 'dive']);
 
 /**
  * How many bodies a chain is, and there is no default.

@@ -31673,6 +31673,238 @@ if (MINE_LINE) {
     + `facing and never a shorter fight`);
 }
 
+// --- a SHRIKE is fast on the run and slow on the way back ------------------
+/*
+ * Build 317, phase 6j. Three phases: hold height across the top, run down a
+ * lane at `CFG.shrike.dive`, overshoot to the floor, climb back out. The
+ * object is the asymmetry -- `docs/objects.html`'s counter is "it is only
+ * fast on the dive. Kill it in the climb, or stand a mine on the line it is
+ * going to use" -- so the lane is chosen where it can be seen being chosen
+ * and kept for the life of the body.
+ *
+ * Five claims, and three carry their own control:
+ *
+ *   1. it goes PAST the machine and lives, where the machine's own column
+ *      kills it. The guide says "through"; nothing in this engine can, and
+ *      the control is the same body driven down that column.
+ *   2. it still GRIPS on the pass, against a lane widened past the band.
+ *   3. both phase speeds are DELIVERED and not asked for -- asserted against
+ *      the authored figure AND against what an uncompensated blend would
+ *      have given, so the arm can tell one from the other.
+ *   4. the cycle repeats, and the climb is the long half of it.
+ *   5. the picture is not either of the two golds it shares a tone with.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { release, laneFor, drawSpecimen } = await import('../src/enemies.js');
+    const out = {};
+    const s = w.shooter;
+    const T = TYPE_BY_ID.shrike;
+    out.cfg = { dive: CFG.shrike.dive, climb: CFG.shrike.climb, swing: CFG.shrike.swing };
+    out.overlap = T.r + s.r;
+    out.band = T.r + s.r + CFG.shooter.grabPad;
+    /*
+     * The damage-bench family leaves `director.update` stubbed and
+     * `spawnLock` pinned and nothing puts either back; this case drives real
+     * frames, so it sets both itself and puts them back at the end.
+     */
+    g.restart();
+    delete w.director.update;
+    w.spawnLock = 0;
+    const d = w.director;
+    d.update = () => {};
+    w.spawnLock = 1e9;
+    d.traits = [];
+    d.setTier(1);
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+      w.shock = 0;
+    };
+    const lay = (x) => {
+      clear();
+      const made = release(w, T, x, 120);
+      const e = made[0];
+      e.staged = false;
+      e.spawnIn = 0;
+      e.born = true;
+      return e;
+    };
+
+    // ---- 1/2/3/4. one body, one long window, the whole cycle -------------
+    {
+      const e = lay(w.width * 0.28);
+      const phases = [];
+      const dive = [];
+      const climb = [];
+      let grip = 0;
+      let minGap = 1e9;
+      let lowest = 0;
+      let last = '';
+      let dives = 0;
+      let climbS = 0;
+      let diveS = 0;
+      for (let i = 0; i < 60 * 40; i++) {
+        g.update(1 / 60);
+        if (e.dead) { phases.push('died'); break; }
+        if (e.divePhase !== last) {
+          last = e.divePhase;
+          phases.push(last);
+          if (last === 'dive') dives++;
+        }
+        const sp = Math.hypot(e.vx, e.vy);
+        // sampled ACROSS the machine's own level, which is what the claim is
+        // about -- a mean over the whole phase would include the turn-in.
+        if (e.divePhase === 'dive') {
+          diveS += 1 / 60;
+          if (e.y > s.y - 260 && e.y < s.y - 40) dive.push(sp);
+        }
+        if (e.divePhase === 'climb') {
+          climbS += 1 / 60;
+          if (e.y < s.y - 60) climb.push(sp);
+        }
+        if (w.attackers.has(e)) grip++;
+        minGap = Math.min(minGap, Math.hypot(e.x - s.x, e.y - s.y));
+        lowest = Math.max(lowest, e.y);
+      }
+      const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+      out.run = {
+        phases: phases.slice(0, 8), dives, grip, alive: !e.dead,
+        minGap, lowest, past: lowest > s.y, floor: lowest > w.floorY - 60,
+        dive: mean(dive), climb: mean(climb), diveN: dive.length, climbN: climb.length,
+        diveS, climbS, lost: e.maxHp - e.hp, pool: e.maxHp,
+        lane: laneFor(w, e), turretX: s.x, turretY: s.y, floorY: w.floorY,
+      };
+    }
+
+    /*
+     * ---- CONTROL A: the machine's own column, which is what "through" is --
+     *
+     * `impactDamage`'s reduced mass against a static body is the body's WHOLE
+     * mass and the result clamps at 300, so any pass over the 62 threshold is
+     * fatal to a 70-health body. Driven by hand because the gait will not do
+     * it -- `laneFor` is the one place the lane is computed and it never
+     * returns the column.
+     */
+    {
+      const e = lay(s.x);
+      const lockX = e.x;
+      let died = null;
+      let lowest = e.y;
+      for (let i = 0; i < 300; i++) {
+        e.x = lockX;
+        e.vx = 0;
+        e.vy = Math.max(e.vy, CFG.shrike.dive);
+        g.update(1 / 60);
+        if (e.dead) { died = i; break; }
+        lowest = Math.max(lowest, e.y);
+      }
+      out.column = { died, past: lowest > s.y };
+    }
+
+    // ---- CONTROL B: a lane past the grip band grips nothing --------------
+    {
+      const e = lay(s.x);
+      const wide = s.x + out.band + 6;
+      let grip = 0;
+      let lowest = e.y;
+      for (let i = 0; i < 300; i++) {
+        e.x = wide;
+        e.vx = 0;
+        e.vy = Math.max(e.vy, CFG.shrike.dive);
+        g.update(1 / 60);
+        if (e.dead) break;
+        if (w.attackers.has(e)) grip++;
+        lowest = Math.max(lowest, e.y);
+        if (e.y > w.floorY - 40) break;
+      }
+      out.wide = { grip, past: lowest > s.y, alive: !e.dead };
+    }
+
+    // ---- 5. the picture, against the two golds it shares a tone with -----
+    const SZ = 96;
+    const shotPx = (id) => {
+      const c = new OffscreenCanvas(SZ, SZ);
+      const x = c.getContext('2d');
+      x.clearRect(0, 0, SZ, SZ);
+      x.translate(SZ / 2, SZ / 2);
+      drawSpecimen(x, id, 22);
+      const px = x.getImageData(0, 0, SZ, SZ).data;
+      const a = new Uint8Array(SZ * SZ);
+      let ink = 0;
+      for (let i = 0; i < SZ * SZ; i++) { a[i] = px[i * 4 + 3]; ink += px[i * 4 + 3]; }
+      return { a, ink: Math.round(ink / 1000) };
+    };
+    const diff = (a, b) => {
+      let sum = 0;
+      for (let i = 0; i < a.a.length; i++) sum += Math.abs(a.a[i] - b.a[i]);
+      return Math.round(sum / 1000);
+    };
+    const me = shotPx('shrike');
+    out.draw = { ink: me.ink, selfZero: diff(shotPx('shrike'), shotPx('shrike')) };
+    for (const id of ['needle', 'glut', 'mote']) out.draw[id] = diff(me, shotPx(id));
+
+    delete d.update;
+    w.spawnLock = 0;
+    g.restart();
+    clear();
+    return out;
+  });
+
+  const R = r.run;
+  check('a SHRIKE runs PAST the machine and lives, where its own column kills it',
+    R.alive && R.past && R.floor && R.minGap > r.overlap && R.minGap < r.band + 4
+    && r.column.died !== null && !r.column.past,
+    `the gait took it down to ${R.lowest.toFixed(0)}, past a turret at ${R.turretY.toFixed(0)} `
+    + `and onto a floor at ${R.floorY.toFixed(0)}, `
+    + `at a closest approach of ${R.minGap.toFixed(1)}, which sits between the overlap it must `
+    + `not enter (${r.overlap}) and the grip band it must reach (${r.band}). Driven down the `
+    + `machine's own column instead, the same body is dead at frame ${r.column.died} and never `
+    + `gets past it at all`);
+
+  check('...and it still grips on the pass, which a wider lane does not',
+    R.grip > 4 && r.wide.grip === 0 && r.wide.alive && r.wide.past,
+    `${R.grip} frames of grip over ${R.dives} run(s) -- so the pass delivers its corruption -- `
+    + `against ${r.wide.grip} for a lane six units past the band, which still passes the machine `
+    + `(${r.wide.past}) and still lives (${r.wide.alive}) and simply never takes hold. The `
+    + `corridor is grabPad wide, so a pass also scrapes: ${R.lost.toFixed(1)} of ${R.pool}`);
+
+  const naive = 0.861; // k / (k + damping) for this body: what a raw target gives
+  check('...and both phase speeds are DELIVERED, not asked for',
+    Math.abs(R.dive / r.cfg.dive - 1) < 0.03 && Math.abs(R.climb / r.cfg.climb - 1) < 0.03
+    && R.diveN > 20 && R.climbN > 20
+    && Math.abs(r.cfg.dive * naive / r.cfg.dive - 1) > 0.03,
+    `across the machine's own level the dive measured ${R.dive.toFixed(1)} against an authored `
+    + `${r.cfg.dive} and the climb ${R.climb.toFixed(1)} against ${r.cfg.climb} `
+    + `(${R.diveN}/${R.climbN} samples). An uncompensated blend delivers ${naive} of its target `
+    + `-- ${(r.cfg.dive * naive).toFixed(1)} and ${(r.cfg.climb * naive).toFixed(1)} -- which is `
+    + `outside this tolerance, so the arm can tell a compensated target from a raw one`);
+
+  check('...and the cycle repeats, with the climb as the long half of it',
+    R.dives >= 2 && R.climbS > R.diveS * 1.8
+    && R.phases[0] === 'hold' && R.phases.includes('dive') && R.phases.includes('climb'),
+    `${R.dives} dives in forty seconds, phases ${R.phases.join(' -> ')}. It spent `
+    + `${R.diveS.toFixed(1)}s diving against ${R.climbS.toFixed(1)}s climbing `
+    + `(x${(R.climbS / R.diveS).toFixed(1)}), which is the window the counter promises`);
+
+  const D = r.draw;
+  check('...and it is not either of the two golds it shares a tone with',
+    D.needle > 40 && D.glut > 40 && D.mote > 40 && D.ink > 20 && D.selfZero === 0,
+    `on the alpha channel alone -- so this is shape and nothing else -- SHRIKE is ${D.needle} `
+    + `from a NEEDLE and ${D.glut} from a GLUT, both of which wear #ffd166 exactly, and `
+    + `${D.mote} from a MOTE (ink ${D.ink}, the same shape twice ${D.selfZero})`);
+}
+
 // --- the debug panel's three quieter faults ---------------------------------
 /*
  * Build 279, all three found by review and none of them able to fail anything.

@@ -4169,4 +4169,91 @@ came from before believing the other one covers it.
   came off; spread, nothing, because the pool emptied. Same count, opposite
   events. Measure the state at the event, not the state at the end -- which is
   the end-of-window trap in a third costume.
+- **SHRIKE IS IN FROM BUILD 317, AND THE GUIDE'S "THROUGH THE MACHINE" IS
+  PHYSICALLY IMPOSSIBLE IN THIS ENGINE.** Phase 6j, band 2, gait `dive`: hold
+  height across the top, pick a lane, run down it at 210, overshoot to the
+  floor, climb back out. `docs/objects.html` says it "runs straight down
+  THROUGH the machine" and nothing can: the turret is static with `invMass` 0,
+  so `resolvePair` separates positionally and `impactDamage`'s reduced mass
+  against a static body is `1 / invSum` = the body's WHOLE mass, with the
+  result clamped at 300. That is death for anything under 300 health at any
+  speed over the 62 threshold. Measured, a 70-health body driven down the
+  turret's own column at 210: **dead at frame 83**, every time, and never past
+  the mount. `plow` does not help and says so in its own guards, which name
+  the turret as one of the two things it must never pass through. Slowed under
+  the threshold it survives and is **stopped dead 36 units above the mount** --
+  so there is no speed at which the literal reading works.
+- **...SO THE LANE IS DERIVED FROM THE TWO RULES IT WOULD OTHERWISE FIGHT.**
+  `laneFor` is the one place it is computed: the overlap `e.r + s.r` it must
+  not enter, plus `CFG.shooter.grabPad`, where `checkContact` still takes
+  hold. Swept across lanes 0/38/40/41/42/44/48/56 with the body's x held: 0
+  dies, **38 to 42 grip and lose nothing**, and 44 and out pass the machine
+  and never grip at all. So the dive goes PAST the machine at the edge of its
+  own grip band, which is the only column where both rules are satisfied, and
+  a dive body of another size is covered by existing. Same shape as build
+  312's roll turning at `edgeEase`'s band: before adding a rule about where a
+  body may go, find the one that already says where it may not.
+- **A LANE IS NOT HELD BY BEING AIMED AT ONCE.** The first version committed
+  when the body was within `r` (14) of the lane, and a target straight down
+  the lane corrects laterally more weakly the closer it gets -- so it dived up
+  to fourteen units wide, closest approach **59.5 against a band of 42, and
+  ZERO frames of grip**. The object's entire payload ("does its damage on the
+  pass") was not delivered, on a build whose dive speed and survival both
+  measured perfectly. Two fixes, both derived: commit within `grabPad` rather
+  than within `r` -- the pad is the width of the thing the lane exists to
+  reach, so it is the width the commitment is worth -- and `wobble` 0.7 ->
+  0.12, because `drive`'s clumsy heading wander is ±10 degrees and a dart on a
+  committed run does not wander. Then 19 frames of grip at a closest approach
+  of 40.4.
+- **...and the corridor is `grabPad` = TWO UNITS WIDE, so a pass scrapes.**
+  Recorded rather than guarded: a real body cannot hold two units to the unit,
+  minGap lands at 40.4 against an overlap of 40, and each pass costs a
+  measured **11 of 70 health** -- six passes' worth, against a cycle the
+  player has about eleven seconds of to answer. It is a consequence of the
+  geometry rather than a balance choice, and it means a SHRIKE left alone
+  eventually pays for its own runs.
+- **A TARGET RATE IS NOT A RATE, FOR THE FOURTH TIME -- AND THE SECOND PHASE
+  IS THE ONE THAT GETS MISSED.** The dive was compensated from the start
+  (`(k + damping) / k`, k = `accel / 100`) and measured **209.9 against an
+  authored 210** on the first run. The CLIMB was authored as a share of cruise
+  and handed over raw, and measured **26.6 against a wanted 30.9** -- 0.861,
+  which is `k / (k + damping)` exactly. One rule now covers both phases, and
+  the climb measures 80.0 against 80. **When a mechanism has two speeds,
+  compensate both or neither**; the one nobody thought about is the one that
+  quietly runs at six-sevenths of what the config says.
+- **A CYCLE HAS TO BE FAST ENOUGH TO BE A THREAT, AND THE ARITHMETIC IS THE
+  COLUMN.** `climb` as 0.75 of a 41 u/s walk is 26.6 delivered against an
+  858-unit column from the floor to the hold band: a **thirty-second climb**,
+  ONE dive in forty seconds, and a body that is very nearly scenery. Authored
+  as an absolute 80 instead it is about eleven seconds against a four-second
+  dive -- x2.6, two dives in forty seconds, and most of the cycle spent in the
+  phase the counter says to kill it in. The two speeds are independent
+  quantities and the object is the RATIO, so expressing one as a share of the
+  other's walk hid the thing being designed.
+- **A FACING IS THE GAIT'S BUSINESS, and now there are two gaits that need
+  one.** `upright` means "this picture is oriented to the world"; a dart and a
+  shrike are oriented to their own TRAVEL, which is a different claim and
+  cannot be a type flag -- a SHRIKE points down on the run and up on the
+  climb. `FACES_TRAVEL` is the set, read in `Enemy.update` rather than in
+  either gait, because neither gait's branch runs for a STAGED body and a
+  school marching in pointing wherever fourteen spawn rolls left it is build
+  310's EMBER-trail fault.
+- **THE THIRD TYPE IN ONE GOLD, and the answer is the wave and not the hue.**
+  `#ffd166` is NEEDLE's body colour AND GLUT's, so SHRIKE is the third -- the
+  same collision SHOAL had with MOTE and SPINDLE with TOW, and the same ruling
+  (the family is what the colour means, the palette has nothing
+  well-separated left, the silhouette carries it). What is new is that the
+  obvious band-2 partner WAS one of the other two: the wave is
+  `[shrike 2, lurcher 2, mote 1]` at 18.03 against band 2's own mean of
+  17.875, **+0.18%**, rather than the `needle` pairing that priced identically
+  and would have put two of the three golds on the field together. When a hue
+  is shared, check the wave as well as the shape.
+- **A NEW GAIT'S CONFIG NEEDS A GUARD FOR THE CORRIDOR EXISTING AT ALL.**
+  `grabPad` is a shooter constant with nothing to do with SHRIKE, and at zero
+  or below there is no lane that grips without overlapping -- the gait would
+  either kill the body or deliver nothing, with no third option and nothing
+  failing. `check-build` asserts the pad is positive, that the dive is faster
+  than the climb (equal numbers are a body with three phases and one speed),
+  and that `swing` clears the pad, because a climb back up the dive lane would
+  spend the one vulnerable phase gripping the machine.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

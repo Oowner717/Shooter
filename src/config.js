@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '316';
+export const BUILD = '317';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '316';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'ec288ff';
+export const REV = '8f9beba';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1229,6 +1229,70 @@ export const CFG = {
     grip: 3, // how hard the pair is held at that rate, per second
     snap: 0.5, // the share of the pool that, on ONE half, breaks the beam
     alone: 1.9, // ...and what the survivor's speed is multiplied by
+  },
+
+  /*
+   * ---- DIVE: fast on the run, slow on the way back ---------------------
+   *
+   * SHRIKE holds height across the top of the field, picks a lane, runs down
+   * it at `dive`, passes the machine, overshoots to the floor and climbs back
+   * for another. The object is the ASYMMETRY: `docs/objects.html`'s counter
+   * is "it is only fast on the dive -- kill it in the climb, or stand a mine
+   * on the line it is going to use", so the lane is chosen where it can be
+   * seen being chosen and is KEPT for the life of the body.
+   *
+   * ---- ...AND IT GOES PAST THE MACHINE, NOT THROUGH IT ------------------
+   *
+   * The guide says "runs straight down THROUGH the machine". Nothing in this
+   * engine can: the turret is static with `invMass` 0, so `resolvePair`
+   * separates positionally and `impactDamage`'s reduced mass against a static
+   * body is the body's FULL mass, clamped at 300 -- which is death for
+   * anything under 300 health at any speed over the 62 threshold. Measured,
+   * driving a 70-health body down the turret's own column at 210 u/s:
+   * **dead at frame 83**, every time, and never past the machine. `plow`
+   * does not save it and says so in its own guards, which name the turret as
+   * one of the two things it must never pass through. Slowed under the
+   * threshold it survives and is stopped dead 36 units above the mount.
+   *
+   * So the lane is DERIVED from the two rules it would otherwise fight: the
+   * overlap it must not enter (`e.r + s.r`) and the grip band it must reach
+   * (`+ CFG.shooter.grabPad`). At the grip band exactly it grips for six
+   * frames, takes nothing at all, passes the machine and reaches the floor --
+   * measured across lanes 0/38/40/41/42/44/48/56, where 0 dies, 38 to 42
+   * grip and lose nothing, and 44 and out never grip. There is no constant
+   * here for that reason; see `Enemy.laneFor`.
+   */
+  shrike: {
+    /*
+     * DELIVERED units a second down the lane, not a target. `drive` blends
+     * toward its target while `linearDamping` and the blend's own accel term
+     * pull back, so a raw 210 arrives as 181 -- the fault this repo has now
+     * paid for four times (the portal ramp at 298, the rise clock at 308,
+     * the yoke's spin at 316). `diveOn` grosses it up by those two terms and
+     * the CASE is on what came out.
+     */
+    dive: 210,
+    /*
+     * ...and the way back, in DELIVERED units a second too -- an absolute and
+     * not a share of its walk, because the two are independent quantities and
+     * the object is the RATIO between them. Measured as a share it was 0.75
+     * of a 41 u/s walk, which is 26.6 delivered against an 858-unit column:
+     * a THIRTY-SECOND climb, one dive in forty seconds, and a body that is
+     * very nearly scenery. At 80 the climb is about eleven seconds against a
+     * four-second dive, so the asymmetry the counter promises is 2.6x and the
+     * window to answer it is most of the cycle.
+     */
+    climb: 80,
+    hold: 90, // how far below the portal's rim it patrols between runs
+    dwell: 1.4, // seconds it holds a chosen lane before committing to it
+    /*
+     * How far OUT of the lane it climbs. It cannot come back up the lane it
+     * dived down: the lane is the grip band by construction, and the climb is
+     * the slow half, so a body returning up it would grip the machine for the
+     * whole of its one vulnerable phase. "Climbs back ROUND for another" is
+     * the guide's own word for this.
+     */
+    swing: 150
   },
 
   /*
@@ -4712,6 +4776,49 @@ export const ENEMY_TYPES = [
     drops: 1, // energy it leaves when it comes apart
   },
   {
+    /*
+     * SHRIKE: fast on the run, slow on the way back.
+     *
+     * The `dive` gait is the whole object and `CFG.shrike` carries the
+     * arithmetic, including why it passes the machine rather than through it.
+     *
+     * ---- THE THIRD TYPE IN THIS GOLD, AND THE RULING IS BUILD 314'S ------
+     *
+     * `docs/objects.html` gives the `edge` family `#ffd166`, which is
+     * NEEDLE's body colour and GLUT's. That is the same collision SHOAL had
+     * with MOTE and SPINDLE with TOW, and the same answer: the family is what
+     * the colour means, the palette has no well-separated region left, and
+     * the SILHOUETTE carries the distinction -- a swept dart on a long spine
+     * against a sliver and against a fat disc. What is NOT done is put two
+     * of the three golds in one wave: the band-2 entry pairs it with LURCHER
+     * and MOTE rather than with the NEEDLE that wears its exact tone.
+     * The GLOW is separated instead, which is the half that was free.
+     */
+    id: 'shrike',
+    opens: 0,
+    name: 'SHRIKE',
+    shape: 'shrike',
+    gait: 'dive',
+    r: 14,
+    hp: 70,
+    density: 0.7,
+    speed: 40,
+    accel: 340,
+    restitution: 0.5,
+    /*
+     * Nearly none, which is a decision and not a default. `wobble` is the
+     * clumsy wander `drive` adds around the true bearing, and a dart on a
+     * committed run does not wander -- measured, at 0.7 the lane drifted far
+     * enough that the pass never entered the machine's grip band at all and
+     * the body delivered nothing.
+     */
+    wobble: 0.12,
+    color: '#ffd166',
+    glow: '#ff7a1c',
+    weight: 0, // never chosen by the ordinary spawn roll -- it is authored
+    drops: 3, // energy it leaves when it comes apart
+  },
+  {
     id: 'quarry',
     opens: 0,
     name: 'QUARRY',
@@ -5788,6 +5895,15 @@ export const WAVES = [
   { of: [['tow', 3], ['needle', 2]], band: 5 },
   { of: [['tow', 2], ['glut', 2], ['mote', 1]], band: 5 },
   /*
+   * ...and the SHRIKE wave. Two shrikes, two LURCHERs and a MOTE weighs 18.03
+   * against band 2's own mean of 17.875, so it re-prices the band by +0.18%
+   * -- build 315's lever. Deliberately NOT paired with the NEEDLE that wears
+   * SHRIKE's exact gold: three types share `#ffd166` and two of them in one
+   * wave is the collision the silhouette should not have to carry.
+   */
+  { of: [['shrike', 2], ['lurcher', 2], ['mote', 1]], band: 2 },
+
+  /*
    * ...and the YOKE wave. Six pairs and one GLUT weighs 33.9 against band
    * 5's own mean of 35.39, so it re-prices the band by -0.4% -- build 315's
    * lever used deliberately: a wave authored at its band's mean adds a
@@ -5844,6 +5960,7 @@ export const GAITS = {
   flock: 'no leader: each body steers at the school\'s own mean and off its nearest neighbour',
   cartwheel: 'comes down an ordinary lane end over end, so its profile against the barrel turns with it',
   paired: 'two bodies on a rigid beam, turning about their midpoint while the midpoint advances',
+  dive: 'holds height across the top, then runs down the edge of the machine and climbs back for another',
 };
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

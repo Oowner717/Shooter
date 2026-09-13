@@ -547,6 +547,55 @@ console.log(`bar: ${bars.length} type(s) are tested as a capsule (`
 
 
 /*
+ * ---- A DIVE NEEDS A CORRIDOR TO EXIST AT ALL ----------------------------
+ *
+ * `laneFor` puts a diving body between two radii it does not choose: the
+ * overlap `e.r + s.r`, which `resolvePair` separates at and bills
+ * `impactDamage` across, and `CFG.shooter.grabPad` past it, where
+ * `checkContact` still takes hold. The gait only works because those two are
+ * in that order -- a non-positive pad is a lane that either grips nothing or
+ * kills the body, and there is no third option. Asserted here because the
+ * pad is a shooter constant that has nothing to do with SHRIKE and could be
+ * tuned by somebody who has never read this file.
+ *
+ * The corridor is TIGHT and that is recorded rather than guarded: at
+ * grabPad 2 a real body cannot hold it to the unit, and a pass costs a
+ * measured ~11 of 70 health. Six passes' worth, against a cycle the player
+ * has about eleven seconds of to answer.
+ *
+ * ...and the asymmetry is the whole object, so the dive must be faster than
+ * the climb. Equal numbers would be a body with three phases and one speed.
+ */
+const SHOOTER_R = CFG.shooter.r;
+const divers = ENEMY_TYPES.filter((t) => t.gait === 'dive');
+if (divers.length) {
+  const D = CFG.shrike;
+  const bad = [];
+  if (!(CFG.shooter.grabPad > 0)) {
+    bad.push(`grabPad is ${CFG.shooter.grabPad}, so there is no lane that grips without overlapping`);
+  }
+  if (!(D.dive > D.climb)) bad.push(`dive ${D.dive} is not faster than the climb ${D.climb}`);
+  if (!(D.hold > 0) || !(D.dwell > 0) || !(D.swing > 0)) {
+    bad.push(`hold/dwell/swing must all be positive, got ${D.hold}/${D.dwell}/${D.swing}`);
+  }
+  for (const t of divers) {
+    if (!(D.swing > CFG.shooter.grabPad)) {
+      bad.push(`${t.id} would climb back up its own dive lane (swing ${D.swing})`);
+    }
+  }
+  if (bad.length) {
+    for (const line of bad) console.error(`dive: ${line}`);
+    process.exit(1);
+  }
+  console.log(`dive: ${divers.length} type(s) run a lane (`
+    + `${divers.map((t) => `${t.id} r${t.r} at ${t.r + SHOOTER_R}-`
+      + `${t.r + SHOOTER_R + CFG.shooter.grabPad} from the mount`).join('; ')}), `
+    + `${D.dive} down against ${D.climb} back up (x${(D.dive / D.climb).toFixed(1)}), `
+    + `swinging ${D.swing} clear to climb`);
+}
+
+
+/*
  * ---- A PAIR IS ONE POOL, AND THE BEAM HAS TO CLEAR THE PAIR SOLVER ------
  *
  * `pairOf` throws for a `pair` that is not exactly 2, for a `snap` outside
