@@ -400,6 +400,42 @@ if (badFrac.length) {
   for (const line of badFrac) console.error(`fracture: ${line}`);
   process.exit(1);
 }
+/*
+ * ---- EVERY FIELD A TYPE DECLARES HAS TO HAVE A READER -------------------
+ *
+ * This is the third dead field on a config object to be found by hand, and
+ * the first two each shipped for eighteen and fifty-six builds: `kind:
+ * 'works'` on the build lots, and a `cost` on all nine anomalies whose only
+ * reader left with build 227's ANOMALY branch. On the roster it was TWO --
+ * `large: true` on fifteen types, under a comment claiming it made a body
+ * "released more slowly, and worth more when it lands", and `solo: true` on
+ * SCION, which was not decoration at all: it named a measured bug and
+ * nothing read it.
+ *
+ * So the sweep is the guard, and it is cheap: the union of every key any
+ * ENEMY_TYPE declares, each one required to appear as `.key` or as a quoted
+ * string somewhere in src/ OUTSIDE config.js. Declaring a field is not
+ * reading it, which is the whole distinction.
+ *
+ * It errs toward passing -- a short name like `r` or `hp` matches something
+ * unrelated in a thousand places -- and that is the right direction: this
+ * cannot be the instrument that tells you a field is LIVE, only the one that
+ * tells you a field is definitely dead. A dead field is `git rm`, or, if its
+ * comment names a rule, the rule.
+ */
+const typeSrc = src.filter((f) => f !== 'config.js')
+  .map((f) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8')).join('\n');
+const declaredKeys = [...new Set(ENEMY_TYPES.flatMap((t) => Object.keys(t)))].sort();
+const unread = declaredKeys.filter((k) => !new RegExp(`\\.${k}\\b|['"\`]${k}['"\`]`).test(typeSrc));
+if (unread.length) {
+  for (const k of unread) {
+    console.error(`dead field: every type field needs a reader in src/ and \`${k}\` has none `
+      + `(declared by ${ENEMY_TYPES.filter((t) => k in t).map((t) => t.id).join(', ')})`);
+  }
+  process.exit(1);
+}
+console.log(`type fields: all ${declaredKeys.length} keys the roster declares are read in src/`);
+
 console.log(`fracture: ${frac.length} type(s) break into their own kind (`
   + `${frac.map((f) => `${f.id} r ${f.radii.join('->')}, ${f.last} of ${f.made} bodies, x${f.hp.toFixed(2)} health`).join('; ')})`);
 

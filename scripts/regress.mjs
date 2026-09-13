@@ -30373,6 +30373,160 @@ if (MINE_LINE) {
     + `the same shape twice differs by ${D.selfZero}`);
 }
 
+// --- a SCION is never one of a crowd, and `solo` is why -------------------
+/*
+ * Build 313. `solo: true` has been on SCION since it was written, under a
+ * comment reading "Never part of a formation. The cap is two on the field,
+ * and a formation releases three to six of one type in one go -- which is
+ * how five of them ended up on the screen at once the first time this was
+ * measured." NOTHING READ IT. It was found by a sweep for type fields with
+ * no reader in src/ -- the same sweep that took `large: true` off fifteen
+ * types in this build -- and it is the more interesting of the two, because
+ * a dead field that names a measured bug is that bug, shipped.
+ *
+ * Build 301 then made it worse than when it was written: a wave's counts are
+ * a budget now, so `['scion', 1]` SWELLS with the rung and anything from
+ * `formAt` up was grouped. Measured either side in one container, one wave,
+ * one release: 3 scions at rung 22, SIXTEEN at rung 28 and 12 at rung 35
+ * arriving in a single formation, against 3, 8 and 12 releases of exactly
+ * one each after.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { WAVES, TYPE_BY_ID, CFG } = await import('../src/config.js');
+    const { spawnFormation } = await import('../src/enemies.js');
+    const out = {};
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+    };
+    out.solo = !!TYPE_BY_ID.scion.solo;
+    out.formAt = CFG.waves.formAt;
+
+    /*
+     * ---- through the real door: load, then drain emit ------------------
+     *
+     * `Director.update` reshuffles `order`, so a pinned wave does not stay
+     * pinned (build 310) -- the wave is loaded and `emit` driven by hand,
+     * which is still the door the grouping decision is read at. The field
+     * cap is lifted for the drain, or what is being measured is
+     * `maxEnemies` rather than the formation.
+     */
+    const drain = (id) => {
+      const at = WAVES.findIndex((v) => !v.teach && (v.of || []).some(([k]) => k === id));
+      if (at < 0) throw new Error(`no regular wave carries ${id}`);
+      g.restart();
+      g.debugTeachAll();
+      clear();
+      const d = w.director;
+      d.setTier(28);
+      d.update = () => {};
+      w.spawnLock = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+      d.load(w, WAVES[at]);
+      const asked = d.jobs.filter((j) => j.type.id === id).reduce((s, j) => s + j.n, 0);
+      const grouped = d.jobs.filter((j) => j.type.id === id && j.n > 1).map((j) => j.n);
+      const held = CFG.maxEnemies;
+      CFG.maxEnemies = 9999;
+      const per = [];
+      let guard = 0;
+      while (d.jobs.length && guard++ < 500) {
+        const was = w.enemies.filter((e) => e.type.id === id).length;
+        d.emit(w);
+        const made = w.enemies.filter((e) => e.type.id === id).length - was;
+        if (made > 0) per.push(made);
+      }
+      CFG.maxEnemies = held;
+      clear();
+      return {
+        asked, grouped, releases: per.length,
+        worst: per.length ? Math.max(...per) : 0,
+        multi: per.filter((n) => n > 1).length,
+        total: per.reduce((s, n) => s + n, 0),
+      };
+    };
+    out.scion = drain('scion');
+    /*
+     * The CONTROL, and it is the whole of what makes the arm mean anything:
+     * a type WITHOUT the flag, asked for in the same numbers at the same
+     * rung, still forms up. Without it the arm passes on a build where the
+     * formation branch is broken, or gone, or never reached.
+     */
+    out.control = drain('bloom');
+
+    // ---- ...and the ROLL refuses one too -------------------------------
+    /*
+     * `spawnFormation` picks its own type out of a list, which is the other
+     * half of the rule and the one the director does not go through. The
+     * filter it lives in already dropped TOWs for the same reason.
+     *
+     * Note the deliberate fallback: handed a list of ONE solo kind there is
+     * nothing to fall back to and it puts that kind up anyway -- the comment
+     * in the source calls it the belt to a pair of braces. What stops the
+     * director ever making that call is `load`'s half, which is the arm
+     * above. Asserted here so the fallback is a recorded decision rather
+     * than a hole somebody finds later.
+     */
+    const rolls = (kinds, n) => {
+      g.restart();
+      clear();
+      const w2 = w.director;
+      w2.update = () => {};
+      w.spawnLock = 1e9;
+      const seen = {};
+      for (let i = 0; i < n; i++) {
+        clear();
+        const made = spawnFormation(w, kinds.map((k) => TYPE_BY_ID[k]), 3);
+        const id = made.length ? made[0].type.id : 'none';
+        seen[id] = (seen[id] || 0) + 1;
+      }
+      clear();
+      return seen;
+    };
+    out.mixed = rolls(['scion', 'lurcher'], 24);
+    out.both = rolls(['bloom', 'lurcher'], 24);
+    out.only = rolls(['scion'], 6);
+
+    const d = w.director;
+    delete d.update;
+    w.spawnLock = 0;
+    g.restart();
+    clear();
+    return out;
+  });
+
+  const S = r.scion;
+  const C = r.control;
+  check('a SCION is released one at a time, where an ordinary body forms up',
+    r.solo === true
+    && S.grouped.length === 0 && S.worst === 1 && S.multi === 0
+    && S.releases === S.asked && S.total === S.asked
+    && C.grouped.length > 0 && C.worst >= r.formAt && C.multi > 0,
+    `at rung 28 the wave asks for ${S.asked} scions and they arrive in ${S.releases} releases of at `
+    + `most ${S.worst} (${S.multi} with more than one, ${S.total} on the field); the same wave's `
+    + `${C.asked} BLOOMs are grouped ${JSON.stringify(C.grouped)} and arrive in ${C.releases} `
+    + `releases of up to ${C.worst}. Measured before the fix: one release of 16 at this rung`);
+
+  const M = r.mixed;
+  const B = r.both;
+  check('...and a formation that rolls its own type will not roll a solo one',
+    !M.scion && M.lurcher === 24
+    && B.bloom > 0 && B.lurcher > 0
+    && r.only.scion === 6,
+    `over 24 rolls of [SCION, LURCHER] the formation was LURCHER ${M.lurcher} times and SCION `
+    + `${M.scion || 0}; the control [BLOOM, LURCHER] rolled ${B.bloom} and ${B.lurcher}, so the `
+    + `picker is not simply pinned. Handed [SCION] alone it still makes one ${r.only.scion} of 6 `
+    + 'times, which is the documented fallback -- the director never makes that call');
+}
+
 // --- the debug panel's three quieter faults ---------------------------------
 /*
  * Build 279, all three found by review and none of them able to fail anything.

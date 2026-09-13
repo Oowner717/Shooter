@@ -3747,4 +3747,49 @@ came from before believing the other one covers it.
   build -- a dead field is `git rm`, and a removal sweep does not belong in a
   build whose measurement is a band's budget. Same shape as `kind: 'works'`
   (eighteen builds) and the anomaly `cost` fields (fifty-six).
+- **THE DEAD-FIELD SWEEP IS A GUARD FROM BUILD 313, AND IT FOUND TWO.** Every
+  key any `ENEMY_TYPE` declares has to appear as `.key` or as a quoted string
+  somewhere in `src/` outside config.js -- declaring a field is not reading
+  it. `large: true` on fifteen types went (a comment claiming it made a body
+  "released more slowly, and worth more when it lands"), and `solo: true` on
+  SCION turned out not to be decoration at all. This is the third and fourth
+  instance of the same shape: `kind: 'works'` shipped dead for eighteen
+  builds and nine anomaly `cost` fields for fifty-six, and both were found by
+  hand. Proved by planting `zzzdead: true` on a type: the build exits 1 and
+  names the type. **The sweep errs toward PASSING** -- a short key like `r` or
+  `hp` matches something unrelated in a hundred places -- and that is the
+  right direction: it can tell you a field is definitely dead, never that one
+  is live.
+- **A DEAD FIELD WHOSE COMMENT NAMES A RULE IS THAT BUG, SHIPPED.** SCION's
+  `solo` carried "never part of a formation... a formation releases three to
+  six of one type in one go -- which is how five of them ended up on the
+  screen at once the first time this was measured", and nothing read it. So
+  the fix for a dead field is `git rm` OR the rule, and which one it is comes
+  off the comment beside it. **And build 301 made it three times worse than
+  when it was written**: a wave's counts are a budget now, so the authored
+  `['scion', 1]` swells with the rung and anything from `formAt` up was
+  grouped. Measured either side in one container, one wave, one release: 3
+  scions at rung 22, **SIXTEEN at rung 28** and 12 at rung 35 in a single
+  formation, against 3, 8 and 12 releases of exactly one each after. A
+  phase-3 change re-opened a fault whose own comment recorded it, because the
+  number the comment was about stopped being the number in play.
+- **...and THE SECOND DOOR WAS THE WRONG PLACE TO PUT THE GUARD**, which is a
+  twist on the rule this file already carries. `emit`'s formation branch is
+  where the crowd is made and it looks like the site: it is not, because that
+  branch has already `shift`ed the job and returns -- skipping the formation
+  falls through to ONE release and silently drops the other n-1 bodies, which
+  is a worse bug than the one being fixed. `Director.load` is where the
+  GROUPING decision is taken, so refusing to group there keeps the count (n
+  singles). The other half of the rule is in `spawnFormation`, which rolls its
+  own type out of a list and already dropped TOWs on the same line. Two sites,
+  one rule, and they cannot disagree: a caller that NAMES the type goes
+  through `load`'s half and a caller that hands over a LIST goes through the
+  roll's. **Ask what each door actually does with a refusal before adding
+  one.**
+- **`spawnFormation`'s single-kind fallback is deliberate and is now
+  asserted.** `kinds.filter(...)` then `weightedPick(single.length ? single :
+  kinds)` means a list of one solo kind still puts that kind up -- the source
+  calls it the belt to a pair of braces. What stops the director ever making
+  that call is `load`'s half, so the case asserts the fallback as a recorded
+  decision rather than leaving it as a hole for somebody to find.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

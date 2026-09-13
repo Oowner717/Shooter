@@ -4760,7 +4760,16 @@ export function spawnFormation(world, kinds, count) {
   const cx = clamp(world.width / 2 + spread(world.width * 0.5), half, world.width - half);
   // A formation is one type in a shape; a shape made of towed pairs is not a
   // formation, it is a traffic jam, and it would cost double the allotment.
-  const single = kinds.filter((k) => !k.tows);
+  /*
+   * ...and `solo` is the same refusal for a different reason: a SCION seeds
+   * whatever it lands near, so three to six arriving together is one event
+   * where the object's whole design is a decision per body. This is the
+   * ROLL's half of the rule; the other half is in `Director.load`, which
+   * refuses to GROUP one. Both are needed and they cannot disagree -- a
+   * caller that names the type (the director, the debug picker) goes through
+   * load's half, and a caller that hands over a list goes through this one.
+   */
+  const single = kinds.filter((k) => !k.tows && !k.solo);
   const type = weightedPick(single.length ? single : kinds);
   const gap = type.r * 2.5 + 8;
   /*
@@ -5864,7 +5873,29 @@ export class Director {
       const mortar = threatOf(type) === 0;
       const n = Math.max(1, Math.round(base * (mortar ? 1 : swell))) * (swarm ? 2 : 1);
       if (!mortar) asked += n;
-      if (!wave.teach && n >= W.formAt) jobs.push({ type, n });
+      /*
+       * ---- `solo` IS READ HERE, and this is the only place it can be ------
+       *
+       * SCION has carried `solo: true` since it was written, under a comment
+       * saying "never part of a formation... a formation releases three to
+       * six of one type in one go -- which is how five of them ended up on
+       * the screen at once the first time this was measured". NOTHING read
+       * it: a field with no reader is a promise the field is making and the
+       * code is not keeping, and this one named a measured bug. Build 301
+       * then made it reachable again from a single authored entry, because
+       * the budget SWELLS the count -- `['scion', 2]` at a deep rung is a
+       * dozen, and anything from three up was grouped.
+       *
+       * The guard is in `load` and NOT in `emit`'s formation branch, which is
+       * where it looks like it belongs. That branch `shift`s the job and
+       * returns; skipping the formation there falls through to a single
+       * release and DROPS the other n-1 bodies, silently, which is a worse
+       * bug than the one being fixed. `load` is where the grouping decision
+       * is taken, so refusing to group keeps the count: n singles instead.
+       * The other half of the rule is in `spawnFormation`, which ROLLS its
+       * own type from a list -- the same line that already drops TOWs.
+       */
+      if (!wave.teach && !type.solo && n >= W.formAt) jobs.push({ type, n });
       else for (let i = 0; i < n; i++) jobs.push({ type, n: 1 });
     }
     this.asked = asked;

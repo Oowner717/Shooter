@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '312';
+export const BUILD = '313';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '312';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a54f4f5';
+export const REV = 'cef8508';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -4024,7 +4024,6 @@ export const ENEMY_TYPES = [
     shape: 'hex',
     r: 24,
     hp: 185,
-    large: true, // released more slowly, and worth more when it lands
     density: 1.35,
     speed: 38,
     accel: 120,
@@ -4043,7 +4042,6 @@ export const ENEMY_TYPES = [
     shape: 'blob',
     r: 29,
     hp: 159,
-    large: true, // released more slowly, and worth more when it lands
     density: 1.0,
     speed: 46,
     accel: 150,
@@ -4062,7 +4060,6 @@ export const ENEMY_TYPES = [
     shape: 'bloom',
     r: 33,
     hp: 247,
-    large: true, // released more slowly, and worth more when it lands
     density: 1.05,
     speed: 33,
     accel: 110,
@@ -4082,7 +4079,6 @@ export const ENEMY_TYPES = [
     shape: 'plated',
     r: 45,
     hp: 676,
-    large: true, // released more slowly, and worth more when it lands
     density: 2.7,
     speed: 23,
     accel: 90,
@@ -4170,7 +4166,6 @@ export const ENEMY_TYPES = [
     shape: 'scion',
     r: 34,
     hp: 390,
-    large: true,
     density: 1.15,
     speed: 26,
     accel: 70,
@@ -4602,7 +4597,6 @@ export const ENEMY_TYPES = [
     shape: 'mass',
     r: 27,
     hp: 280,
-    large: true, // released more slowly, and worth more when it lands
     density: 2.4,
     speed: 26,
     accel: 60,
@@ -4671,7 +4665,6 @@ export const ENEMY_TYPES = [
     shape: 'ordinal',
     r: 40,
     hp: 1900,
-    large: true,
     fixed: true,
     density: 9,
     speed: 0,
@@ -4745,7 +4738,6 @@ export const ENEMY_TYPES = [
     // shadow already takes a third of the turret's output off the table:
     // measured, the core absorbed under 6 damage a second through stage III.
     hp: 1500,
-    large: true,
     fixed: true,
     density: 9,
     speed: 0,
@@ -4839,7 +4831,6 @@ export const ENEMY_TYPES = [
     shape: 'fractal',
     r: 64,
     hp: 7400,
-    large: true,
     fixed: true,
     density: 9,
     speed: 0,
@@ -4892,7 +4883,6 @@ export const ENEMY_TYPES = [
     shape: 'amplitude',
     r: 34,
     hp: 3400,
-    large: true,
     fixed: true,
     density: 9,
     speed: 0,
@@ -4979,7 +4969,6 @@ export const ENEMY_TYPES = [
     shape: 'dynamo',
     r: 36,
     hp: 4200,
-    large: true,
     fixed: true,
     density: 9,
     speed: 0,
@@ -5050,7 +5039,6 @@ export const ENEMY_TYPES = [
     shape: 'parity',
     r: 38,
     hp: 7600,
-    large: true,
     fixed: true,
     density: 9,
     speed: 0,
@@ -5134,7 +5122,6 @@ export const ENEMY_TYPES = [
      * clock and withdraw a boss that was being beaten.
      */
     hp: 5600,
-    large: true,
     fixed: true,
     density: 10,
     speed: 0,
@@ -5203,7 +5190,6 @@ export const ENEMY_TYPES = [
     shape: 'axiom',
     r: 40,
     hp: 7400,
-    large: true,
     fixed: true,
     density: 10,
     speed: 0,
@@ -5277,7 +5263,6 @@ export const ENEMY_TYPES = [
     shape: 'terminus',
     r: 40,
     hp: 8000,
-    large: true,
     fixed: true,
     density: 10,
     speed: 0,

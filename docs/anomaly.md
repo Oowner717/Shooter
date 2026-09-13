@@ -452,8 +452,8 @@ design. Fight-length targets: II–VI **200–260s**, VII **~420s** (assists
 plus mid-tier upgrades, measured by `fight.mjs`, tuned like ORDINAL was:
 196s shipped).
 
-Shared cast pattern (ORDINAL's, kept): one **core** (`fixed`, large, the
-health bar), one **structure** type (`fixed` segments the boss places every
+Shared cast pattern (ORDINAL's, kept): one **core** (`fixed`, the biggest
+body in the cast, the health bar), one **structure** type (`fixed` segments the boss places every
 frame), one **minion** type (sovereign once released — the parked-garrison
 mechanism is reused everywhere something waits inside something else).
 
