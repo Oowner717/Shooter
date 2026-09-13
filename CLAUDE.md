@@ -5042,4 +5042,267 @@ came from before believing the other one covers it.
   threshold's entire headroom. When an A/B flakes, enumerate what the two
   arms do NOT share.
 
+- **CHAFF IS IN FROM BUILD 323, AND A COPY IS CHOOSABLE AND UNSHOOTABLE --
+  WHICH NO MARK IN THIS GAME SAYS.** Phase 6m, band 4: it sits still, crosses
+  a hundred units sideways in six substeps, and leaves a copy of itself
+  standing where it was for a second and a half. That pair is the exact
+  INVERSE of `staged` -- shootable but not choosable, and config.js says in as
+  many words that it never gated projectile collision -- and a cousin of
+  `spent`, which is drawn, unchoosable and has rounds pass through it. There
+  is no combination of this game's existing marks that expresses it, because
+  every mark it has takes a body out of the CHOOSER and the DAMAGE PATHS
+  together.
+  So a copy is not a body: `world.ghosts` is the eighth list. What
+  `world.enemies` membership would have bought it, in one census -- the
+  projectile sweep, `applyBlast` (HE, AIRBURST, PULSE, DECOY, PILE, WELL, two
+  mines, a BLOOM's detonate), the mine trigger, WIRE, LANCE, WARD, a `Patch`,
+  `checkContact` and `world.attackers`, the whole physics stack,
+  `Enemy.update`, `Game.sweep` (which books the CODEX and the KILL),
+  `hostileCount` and therefore the field cap and the release gate,
+  `Director.standing` and therefore the wave verdict, `tagBody`, the STASIS
+  brackets, `drawHitboxes` and the BELL's tick -- is a guard per entry, to be
+  written and then maintained. Out of the list, none of them is: **the object
+  is correct BY OMISSION**, and the one place in `src/` that reads the list
+  for a decision is the second pass in `Game.autoTarget`. Measured, blast 0
+  against 992.8 on a MOTE in the same place, a round 939 units past it for 0
+  damage against stopping 74 short of a BULWARK for 17.2, every wave count 0
+  and `Game.sweep` booking 0 kills.
+- **THE OBJECT AS `docs/objects.html` SPECIFIES IT DOES NOTHING AT ALL, AND
+  THAT WAS MEASURED BEFORE A LINE OF IT WAS WRITTEN.** The guide says the
+  copies are read as targets and the assist "locks on, for the second and a
+  half each one lasts". It does not: `autoTarget` scores
+  `dist * (attacking ? 0.25 : 1)`, and a copy dropped where a CLOSING body
+  used to be is strictly FURTHER from the machine than the body that dropped
+  it -- over thousands of samples a copy was nearer than its own owner ZERO
+  times, closest ratio 1.005. And the hysteresis makes it worse rather than
+  better: `aimStick` protects the thing the gun is already on, which is the
+  body that has just hopped AWAY (measured over 45 (offset, hop) arrangements
+  in the real sequence, the copy took the lock in 3 of 45, all three on hops
+  both strongly outward and flat, which a descending body does not make).
+  So the copy INHERITS the lock at the instant of the leap, in the CHOOSER --
+  `enemies.js` has no business knowing what the assist is holding, and each
+  copy is offered it exactly once, on the first frame the assist looks. The
+  A/B is that one line and it is as clean a switch as this repo has: same
+  gait, same places, same clock, same `consider`, only `fresh` differs.
+  Measured over six runs, 3 chaff and 3 LURCHERs, 330 frames: **0.280-0.358
+  of locked frames and 0.250-0.375 of rounds at a copy, against EXACTLY ZERO
+  with the inheritance off** and the copy population identical to within 7%.
+  The control is an absolute zero rather than a margin: it is not that copies
+  rarely win on distance, it is that they cannot.
+- **...AND THE END-TO-END COST IS NOT DEMONSTRABLE, WHICH IS THE OTHER HALF OF
+  THE FINDING.** The same six-body field cleared in 583.6 frames with the
+  inheritance on and 570.8 with it off, twelve runs each, ranges 539-676
+  against 466-683 -- +2.2% of means, straddling completely. The copies are
+  only up during the hop phase and a whole clear is dominated by everything
+  else, so a case asserting the clear time would be a threshold fitted to a
+  draw. **The mechanism is unambiguous at the point of CHOICE and buried at
+  the level of a clear**, and both halves of that are worth writing down
+  rather than quoting the half that flatters the object.
+- **A RADIAL HOP IS INVISIBLE TO THE GUN, so the slant is the object.**
+  Measured, 100 rounds an arm, three trials, against a MARCH control moving at
+  the hop's own mean speed: with the hop straight DOWN the field the miss
+  share is **0.000 at 200, 300 and 450 units -- identical to the control** --
+  because a quantised body's lead error then lies ALONG the line of fire and
+  `resolveSegment` sweeps the round's whole step. Only the LATERAL component
+  costs anything: at a lateral-to-drop slant of 0.6 the miss share is 0.107 at
+  300 and 0.620 at 450, at 1.2 it is 0.240 and 0.797, at 2.0 it is 0.263 and
+  0.770 and saturated. Hence `leap` is twice `drop`, and `check-build` refuses
+  a slant under 1 with that measurement in its heading -- a gait the gun does
+  not notice is not this object.
+- **A CLOCK THAT MUST EXPIRE AFTER A FIXED NUMBER OF STEPS CANNOT BE A FLOAT.**
+  `hopFor` counted down `leapT` seconds and every leap came out **130.44 units
+  against an authored 111.80 -- exactly 7/6** -- because `0.05 - 6 * (1/120)`
+  is 6.9e-18 rather than zero, so the burst lived a seventh substep. It counts
+  SUBSTEPS as an integer now and the delivered displacement is `|dx|` 100.00
+  and `dy` 50.00 on every leap at two update sizes. Two rules came out of it.
+  The compensation has to be the **exact DISCRETE sum** -- `integrate` moves
+  then damps, so a burst live for N substeps covers
+  `v dt (1 - r^N) / (1 - r)`, and the continuous integral the other five
+  compensations in this repo use is 0.23% out here, which would have been
+  invisible. And the REST may stay a float, because half a substep of standing
+  still costs half a substep; the distinction is measured, not stylistic.
+  ("A target speed is not a speed" is now builds 298, 308, 316, 317, 318 and
+  323, and the sixth is the first whose answer was an integral.)
+- **A GUARD PLACED ABOVE A STATE MACHINE'S OWN EXIT IS A STATE ABANDONED.**
+  The walk guard -- which refuses to start a leap near the machine, because a
+  landing inside the overlap is fatal -- sat ABOVE the mid-leap branch. So a
+  leap that crossed INTO the radius was abandoned rather than finished:
+  `hopFor` stopped counting down, the raised cruise was never given back and
+  the burst velocity was never zeroed, so the body coasted in at two thousand
+  units a second under a speed cap of 2,268. Measured on the very first trace,
+  **dead at frame 210 with `hopFor` frozen at 0.05 and `cruise` frozen at
+  378** -- and the hand-back path had the same fault one field along, marching
+  the body in at six times its own speed. Finish the leap first; the guard
+  refuses to START one and its radius carries a whole leap's reach, so a leap
+  that was legal to begin is legal to land.
+- **A REVERT THAT DOES NOT REPRODUCE THE FAULT IS NOT A REVERT PROOF.**
+  Cutting `walkPad` to minus one leap -- the guard reduced to the bare overlap
+  -- leaves the body ALIVE, because the leap is twice as wide as it is deep and
+  a body closing on the machine hops PAST it rather than onto it. The fault it
+  was found by is in the ordering and cannot be reached from the config. What
+  the case asserts instead is three absolutes (no leap STARTED inside the
+  radius, no landing inside the overlap, the cruise handed back) plus the
+  HAZARD measured on its own: a chaff put on the mount at the burst speed
+  **dies in one frame** and the same body put there at its own 70 **lives on
+  64 health**, which is the pair that says the speed is what kills it.
+- **TWO CODEX LINES OFFERED A COUNTER OUT OF A SYSTEM WITH NO DOOR, AND ONE OF
+  THEM WAS WRITTEN BY THE BUILD THAT WROTE THE RULE.** `CFG.mines.inPlay` has
+  been false since build 289. SHRIKE's line (317) said "put a mine on the line
+  it has already shown you" and FLINT's (319) said "a mine it walks squarely
+  over included" -- and FLINT's own comment carries a paragraph refusing to
+  name an emplacement for exactly that reason, one sentence above the mine.
+  **A rule written down is not a rule applied**: the reasoning was on the
+  screen and did not reach the two words beside it. Both corrected here, the
+  measured finding behind FLINT's (a mine triggers up-field of the body and so
+  always lands on the plate) kept in the comment rather than offered as an
+  answer, and CHAFF's line names PULSE instead -- radial from the machine, so
+  it never picks a target at all.
+- **MEASURE THE LAST FRAME THE STATE HELD -- fourth time, fourth quantity.**
+  The staged arm read ONE copy on a build where the guard works, because the
+  loop exits on the frame `staged` went false, `Enemy.update` clears it before
+  `physicsStep` runs `steer`, and the body's first loose hop had already
+  happened. Sampled inside the window it is 0 copies and neither hop field
+  written, with the same body once loose as the control.
+- **A DETAIL STRING IS A DECLARATION.** The round arm asked whether the
+  projectile vanished within 60 units of the target's CENTRE -- and a bolt
+  stops on the near SURFACE of a 45-unit BULWARK a whole step out, so it read
+  74 and the message printed "CROSSED" for a round that had just taken 17.2
+  health off it. Test the DAMAGE and the minimum y reached. Same family as
+  build 319's "still flocking" printing a count of the living.
+- **THE HASH DID NOT MOVE AND THAT WAS THE PREDICTION**: `1213474222` either
+  side, both taken in this container. It is the right instrument here and not
+  a formality -- `Game.autoTarget` was refactored so the cone, the reach and
+  the weight are one `consider` applied to two lists, and that runs on
+  `fight.mjs`'s own hot path with the assists on. An unchanged hash is what
+  "bodies are unchanged to the operation" looks like measured. The band-4 wave
+  is invisible to it for build 318's corrected reason.
+- **The wave costs band 4 nothing, deliberately.** Three chaff and three
+  LURCHERs weighs 24.50 against that band's own mean of 24.8925, so the budget
+  moves **-0.175%** -- build 315's lever used on purpose. LURCHER is the
+  partner rather than the MOTE that prices identically, for two reasons: MOTE
+  wears CHAFF's exact family colour (the guide's `#7ef9ff`, dE 0.0), and a
+  LURCHER closes and GRIPS, so the thing filling the glitch fuse is walking on
+  while the assist spends itself on copies. And `threatOf` is health-only, so
+  it prices a chaff at 2.00 where the guide authors 4: what CHAFF costs is the
+  ASSIST, which the budget can no more see than it can see FLINT's armour or
+  what a LATCH gives its host. Recorded, not fixed.
+- **The cyan family had ROOM, which is the rider build 322 added to the
+  shared-hue ruling.** `docs/objects.html` gives the swarm family `#7ef9ff` --
+  MOTE's body colour and SHOAL's, dE 0.0 against both. Swept across the cyan
+  band against every field tone: `#00b0e6` is 15.8 off the nearest (MOTE's and
+  SHOAL's GLOW), 14.8 off MOTE's body and 22.1 off LANTERN's glow, inside the
+  15-23 this repo documents as working. The silhouette carries the rest,
+  measured on the alpha channel alone: **121 from a MOTE, 135 from a SHOAL
+  dart, 172 from a NEEDLE**. A family is a region and only one point in it was
+  taken -- ask before accepting a dE-0.0 collision.
+- **A COMPLETENESS COMMENT INVENTED A READER AND CREATED FOUR DEAD FIELDS IN
+  THE SAME BREATH.** The copy object carried `hp`, `maxHp`, `angle` and
+  `fizzle` under a paragraph calling the fields "deliberately complete" and
+  naming `drawBearings` as the reader that would draw a non-finite path
+  without `vx`/`vy`. **`drawBearings` iterates `world.enemies` and cannot see
+  `world.ghosts` at all**, and nothing read the other four either. So that is
+  `kind: 'works'` (eighteen builds) and `large: true` (fifteen types) arriving
+  in brand-new code with an inaccurate comment on top -- and build 313's dead
+  field sweep cannot see it, because that sweep is over `ENEMY_TYPES`. The fix
+  is the rule this repo already has: enumerate the readers, delete what has
+  none, and name each reader in the comment. What actually reads a copy is
+  `consider` in `autoTarget`, `Game.aimLead` (through `target.vx || 0`),
+  `Game.drawAutoLock` -- the reticle landing on a copy, which is the object
+  made visible -- `updateGhosts`/`drawGhosts`, and the inheritance's own two
+  fields. **Defensive completeness on a new kind of thing is how a dead field
+  is born**, and it reads as care.
+- **...and a copy has no health, so "it took zero damage" is not the
+  assertion available.** The stronger one is: a 1000-point blast with 3,000 of
+  impulse, centred ON a copy, leaves it identical in every field it has and
+  still in the list, while the same blast kills a MOTE in the same place. A
+  test written against a field that does not exist reads `undefined - undefined`
+  and asserts `NaN === 0`.
+- **RENDER IT AND LOOK -- and the first two renders showed NO COPIES on a
+  working build.** Both ran a fixed number of frames and then screenshotted,
+  and a chaff stops hopping when it reaches the walk radius: at 200 and 400
+  frames the body was already walking and every copy had expired, so the
+  probe reported the feature missing. Break on the CONDITION (`ghosts.length
+  >= 2`), never on a frame count, when the thing you want on screen has a
+  window. Same family as the end-of-window trap, on a screenshot.
+  What the sheet then showed is that the picture is fine, measured off a
+  offscreen canvas at the field's own scale: a copy peaks at **154 of 255 at
+  birth, 129 / 99 / 67 / 39 at a quarter, a half, three quarters and 0.95 of
+  its life, against the body's 230** -- visible, clearly the same shape, and
+  clearly the fainter thing. The cluster of one real and three copies reads
+  exactly as the object's sentence. A first crop read as "barely visible" and
+  was a MOTE and the lock reticle sitting on top of the chaff.
+- **A CONJUNCT AT A HARD BOUNDARY IS WORSE THAN ONE WITH A TIGHT MARGIN, AND
+  THE ORDINAL ASSISTS CASE CARRIED ONE.** `r.inner < 1` requires the fight to
+  have got past the outer frame and started on the SECOND one inside 85
+  seconds -- and `shellFrac(1)` is exactly 1.00 until something touches that
+  frame, so the reading is a boundary and not a margin. Measured standalone
+  over six runs: **0.50 / 0.56 / 0.75 / 0.81 / 0.81 / 0.88, never 1**; in the
+  suite it drew 0.75 on one run and **1.00 on the next**, on two builds whose
+  only difference was two comments. The case's own docstring already records
+  removing the identical fault from the CORE -- "asserting on the core here
+  was asserting on the length of the fight by accident" -- so this is that
+  paragraph's own lesson, one frame along, surviving beside it. What carries
+  the claim is the outer frame (0.08-0.17 against a 0.4 ceiling, 2.4x), stage
+  II being reached, and the garrison getting out 12 of 12; the inner frame and
+  the core are reported.
+  **The channel is not established and the fix does not need it.** Build 315's
+  note says adding a wave re-rolls the whole suite's randoms and `restart()`
+  here goes through `shuffle`, which is the likely cause -- but that is
+  inference, and the suite's own rAF loop riding on top of synthetic steps is
+  the other candidate (build 310 and 314). Either way a length claim does not
+  belong in a progress case. **When a conjunct's quantity has a floor or a
+  ceiling it can sit exactly on, it is not a threshold to tune -- ask what
+  claim it is really making.**
+- **A CEILING INSIDE THE WORKING DISTRIBUTION, AND WORSE, ONE THAT CANNOT TELL
+  WORKING FROM BROKEN.** The FILAMENT station arm bounded the worst follow gap
+  at five times the follow distance -- 150 units, set at build 310 against a
+  worst of 95.6 over twelve standalone runs and called 1.57x clear. Build 323
+  drew **153.7** in the suite, and sampling it properly says the tail is
+  BIMODAL rather than merely wider: eleven readings across the suite and eight
+  standalone runs are 41.4, 44.4, 47.7, 48.4, 49.1, 49.5, 50.0, 59.0 and then
+  **134.8, 137.3, 153.7** -- three draws in eleven in a high mode that twelve
+  runs happened to miss. Build 321's finding verbatim, on a different case.
+  **And the serious half is that it did not discriminate.** Measured with
+  `CFG.chain.grip` at 0 -- the correction cap off, the nearest thing to this
+  controller broken that the config can express -- gapMax reads **83.3, 104.2,
+  75.5, 96.4, i.e. BELOW the working build's own high mode**. So the bound
+  could never have told the two apart, and the reason is mechanical:
+  **velocity matching alone very nearly keeps station**, and the correction
+  closes the last of it rather than holding the line. That is worth knowing
+  about the mechanism and it is only visible from the broken end.
+  Derived from the FIELD now, which is the scale the word "runaway" is about:
+  a third of `world.floorY` is 408 against a worst working draw of 152-154,
+  2.6x clear, while a follower that had stopped following crosses the whole
+  963-unit column. Five trials green with the high mode present in the sample.
+  It is NAMED as a sanity ceiling rather than trusted as a discriminator --
+  build 319's rule about a conjunct that cannot fail for the reason the case
+  is about -- and what carries the claim is the two absolutes beside it: no
+  bead lost to the formation, and the health reading shown able to move.
+  **Measure the broken end. A bound whose two populations you have never
+  compared is a bound you do not know the meaning of**, however honestly the
+  working side was sampled.
+- **THREE PRE-EXISTING MARGINS FELL OUT OF THREE SUITE RUNS OF ONE BUILD, AND
+  ALL THREE WERE SINGLE-DRAW QUANTITIES WHOSE OWN COMMENTS ALREADY RECORDED A
+  RANGE.** The third was the ORDINAL salvage arm: it spawned ONE drop of each
+  type and asserted it closed more than 45 units in a second and a half, and a
+  drop is born with an outward velocity it has to shed first -- one random
+  roll. Four runs read the mote at 139, 75, 124 and then **41**. The comment
+  above it had already written the range down as "59 to 155" and lowered the
+  floor from 60 to 45 in response, which is a population being described as a
+  measurement and then answered by moving the number. Six of each and the
+  MEAN: six trials read ordinal 109-122, tally 104-134, mote 105-123 against
+  the same 45, with the per-drop spread (56-157) printed so the next reader can
+  see why one was not enough. Build 309's HUSK control is the identical fix.
+  **The pattern is the finding.** A build whose gameplay reach is a new body in
+  band 4 turned up three arms on their own boundaries in three runs, one per
+  run, each passing in the other three -- because adding a wave re-rolls every
+  `Math.random` downstream of `shuffle` (build 315) and a single-draw arm is a
+  coin toss the moment its stream moves. The tell they share is not a tight
+  threshold: it is a claim about a BEHAVIOUR resting on ONE sample. Grep for an
+  arm that spawns one body and asserts a distance, a speed or a share.
+  Ranked the four runs' figure dumps afterwards: **147 of 706 arms move**, and
+  going further than the three that actually failed is a margin-hardening pass
+  rather than this build's business -- recorded so the next audit starts from
+  the dumps rather than from a blind re-run.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

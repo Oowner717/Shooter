@@ -304,13 +304,32 @@ export const CODEX = [
      * emplacements since CFG.gun.inPlay went false at build 289, and a codex
      * line that names a system the player cannot reach is worse than a
      * shorter one. See the FLINT block in config.js.
+     *
+     * ...AND IT THEN NAMED ONE, IN THE SAME SENTENCE, ONE PARAGRAPH LATER.
+     * `CFG.mines.inPlay` has been false since build 289 as well, so "a mine
+     * it walks squarely over" was a counter out of a system with no door --
+     * and the measured finding behind it, that a mine is triggered up-field
+     * of the body and therefore always lands on the plate, is worth keeping
+     * HERE and not in a line offering it as an answer. Corrected in build
+     * 323, together with SHRIKE's, which was the same fault from build 317.
+     * A rule written down is not a rule applied: the paragraph above was the
+     * whole of the reasoning and it did not reach the two words beside it.
      */
-    line: 'A wedge with a plate across one face, and it turns to keep that face toward the barrel. Head on it is the hardest small thing you will meet; from any other angle it is nothing at all. Which means anything arriving from where the gun stands arrives on the plate -- a mine it walks squarely over included, worth about half of what the same mine does laid off to one side. What ignores the plate outright is a chain that jumps to it, ground already burning under it, and SPINE.',
+    line: 'A wedge with a plate across one face, and it turns to keep that face toward the barrel. Head on it is the hardest small thing you will meet; from any other angle it is nothing at all. Which means anything arriving from where the gun stands arrives on the plate, whatever it is. What ignores the plate outright is a chain that jumps to it, ground already burning under it, and SPINE.',
   },
   {
     id: 'shrike',
     name: 'SHRIKE',
-    line: 'Holds height across the top, picks a line, and runs down the edge of the machine far faster than it walks -- then overshoots to the floor and climbs back out to do it again. It is only quick on the way down. Kill it on the climb, or put a mine on the line it has already shown you.',
+    /*
+     * The mine is gone from this line and the reason is FLINT's, above:
+     * `CFG.mines.inPlay` has been false since build 289, so the one counter
+     * this sentence offered came out of a system with no door. What replaces
+     * it is the telegraph itself, which is real and measured -- build 318's
+     * `diveHeld` is seconds spent IN the lane before committing, and it
+     * bleeds rather than resetting precisely so that the hold is long enough
+     * to be read.
+     */
+    line: 'Holds height across the top, picks a line, and runs down the edge of the machine far faster than it walks -- then overshoots to the floor and climbs back out to do it again. It is only quick on the way down. Kill it on the climb: it holds on the line it means to use long enough to show you which one it is.',
   },
   {
     id: 'yoke',
@@ -355,6 +374,45 @@ export const CODEX = [
      * needed when both of its numbers turned out to be wrong.
      */
     line: 'It is not coming for you. It runs at the biggest body on the field and rides it, and while it is aboard that body turns away more of every hit and closes its wounds half again as fast as a SEED does -- three at once and you are shooting something that mends faster than you are breaking it. The ring is the cheap target, and rounds meant for the body cross it on the way in, so ordinary fire does clear it; one blast takes the whole ring at once. What will not touch it is a chain: ARC jumps between bodies, and a ball is not one.',
+  },
+  {
+    id: 'chaff',
+    name: 'CHAFF',
+    /*
+     * Every counter here is MEASURED, which is build 319's rule -- and this
+     * line is where that rule caught something in the two lines above it.
+     *
+     * The counters, in the order the sentence names them:
+     *
+     *  - A round PASSES THROUGH a copy. Measured: fired at one it went 939
+     *    units past it for 0 damage, where the same shot at a BULWARK stopped
+     *    74 units short of its centre for 17.2. A copy is not in
+     *    `world.enemies` and `updateProjectiles` is the only thing that can
+     *    stop a round.
+     *  - A BLAST does not find one. Measured: a 1000-point blast at 90 units
+     *    delivered 0 to a copy and 992.8 to a MOTE in the same place.
+     *    `applyBlast` walks the body list too, which is what makes PULSE the
+     *    honest answer: it is radial from the machine, so it never picks a
+     *    target at all.
+     *  - AUTO AIM off cannot be fooled, and that is not a threshold:
+     *    `Game.autoTarget` is the ONLY place in src/ that reads the copies,
+     *    called from one site behind `w.autoAim`. Measured, 0 locked frames
+     *    of 300 with copies standing on all 300 of them.
+     *
+     * The figure the line does quote is a SHARE and it is conditioned on the
+     * count, because that is what it depends on: three chaff and three
+     * LURCHERs over 330 frames, six runs, gave 0.280-0.358 of locked frames
+     * and 0.250-0.375 of rounds fired, against EXACTLY ZERO with the lock
+     * inheritance switched off. It would move if `CFG.shooter.aimStick` or
+     * `CFG.chaff.ghost` moved, which is a narrower exposure than a figure off
+     * a config constant and is the reason it is a third rather than 0.32.
+     *
+     * What the line deliberately does NOT name is a mine -- `CFG.mines.inPlay`
+     * has been false since build 289, and build 319 wrote a whole paragraph
+     * about not naming a system the player cannot reach and then named one.
+     * See FLINT's and SHRIKE's lines, both corrected in this build.
+     */
+    line: 'It does not walk. It sits still, then crosses a hundred units sideways faster than anything else on the field -- and every jump leaves a copy of itself standing where it was for a second and a half. The copies are nothing: rounds pass straight through them and a blast does not find them. AUTO AIM cannot tell, and hands the lock to the copy at the moment of the jump -- with three of them up it spends about a third of its rounds on things that are not there. Aim it yourself, or answer it with something that never picks a target: PULSE goes off in a circle round the machine and there is nothing there to fool.',
   },
   {
     id: 'quarry',

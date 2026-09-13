@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '322';
+export const BUILD = '323';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '322';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a1e8d90';
+export const REV = '1b1c5d9';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1175,6 +1175,107 @@ export const CFG = {
    * What the player sees is the guide's picture -- a rock crossing the field
    * end over end, taking no lane -- and the wave can still end.
    */
+  // ---- chaff ----------------------------------------------------------
+  /*
+   * CHAFF, and the whole object is two measurements that were taken before a
+   * line of it was written.
+   *
+   * ---- 1. THE OBJECT AS docs/objects.html SPECIFIES IT DOES NOTHING -------
+   *
+   * The guide says the copies are read as targets and the assist "locks on,
+   * for the second and a half each one lasts". It does not, and the reason is
+   * arithmetic rather than a bug: `autoTarget` scores `dist * (attacking ?
+   * 0.25 : 1)`, and a copy dropped where a CLOSING body used to be is
+   * strictly FURTHER from the machine than the body that dropped it.
+   *
+   * Measured on a stand-in before any of this existed -- thousands of samples
+   * over one chaff -- a ghost was nearer than its own owner ZERO times, the
+   * closest ratio being 1.005. With the counts the game actually sends (3 and
+   * 8 chaff, 12-14 concurrent copies, 900-1200 frames, three trials each) the
+   * assist locked a copy for ZERO frames in every run whose owners lived; with
+   * mortal chaff it locked one 5.8-10.2% of the time and every one of those
+   * frames was a frame the copy's owner was ALREADY DEAD. So the face-value
+   * object is a reticle lagging a second and a half behind a corpse.
+   *
+   * And the hysteresis makes it worse rather than better. `aimStick` 1.15
+   * means a held target keeps the lock until something is 1/1.15 = 0.8696 of
+   * its distance -- measured by bisection, kept at 0.87 and switched at 0.86 --
+   * so the thing it protects is the body that just hopped AWAY. Measured over
+   * 45 (offset, hop) arrangements in the real sequence (locked on the chaff,
+   * chaff hops, ask again): the copy took the lock in 3 of 45, and all three
+   * were hops both strongly outward and flat, which a descending body does not
+   * make.
+   *
+   * So the copy INHERITS the lock at the instant of the leap -- see
+   * `Game.autoTarget`, which is the one place in the game a ghost is visible.
+   * That is also the honest reading of the fiction: the assist was aimed at a
+   * point, the thing at that point is now the copy, and `aimStick` then holds
+   * it there instead of fighting it.
+   *
+   * ---- 2. A RADIAL HOP IS INVISIBLE TO THE GUN ---------------------------
+   *
+   * Measured, 100 rounds an arm, three trials, against a MARCH control moving
+   * at the hop's own mean speed: with the hop straight down the field the miss
+   * share is 0.000 at 200, 300 AND 450 units -- identical to the control. A
+   * quantised body's lead error lies ALONG the line of fire and
+   * `resolveSegment` sweeps the round's whole step, so it costs nothing at
+   * all. Only the LATERAL component costs anything: at a lateral-to-drop
+   * slant of 0.6 the miss share is 0.107 at 300 and 0.620 at 450; at 1.2,
+   * 0.240 and 0.797; at 2.0, 0.263 and 0.770, saturated. The control read
+   * 0.000 in all twelve arms, so the miss is the quantisation and nothing
+   * else.
+   *
+   * Hence `leap` is twice `drop`: a slant of 2.0, in the saturated region,
+   * because the object's counter is "aim it yourself" and a gait the gun does
+   * not notice is not that object.
+   */
+  chaff: {
+    leap: 100, // units ACROSS the field a hop covers
+    drop: 50, // ...and units DOWN, so the slant is 2.0 -- see above
+    /*
+     * Seconds a leap takes. The guide says "three frames" and this game has
+     * no such unit: `CFG.fixedStep` is 1/120 and `steer` runs per substep, so
+     * a frame-counted hop runs twice per frame at 60Hz and once at 120. It is
+     * a DURATION with the speed derived from it, which is build 308's rule for
+     * a `rise` clock applied to a leap.
+     */
+    leapT: 0.05,
+    /*
+     * Seconds a copy is left standing. The guide's number, and it is the one
+     * figure of the object a player can feel: the reticle sits on a thing that
+     * is not there for this long.
+     */
+    ghost: 1.5,
+    /*
+     * How near the machine it stops hopping and simply walks.
+     *
+     * Derived, not chosen, and it is SHRIKE's lesson from build 317: the
+     * turret is static, so `impactDamage`'s reduced mass against it is the
+     * body's WHOLE mass clamped at 300, which kills anything under that at any
+     * relative speed over the threshold. A leap covers 111.8 units at about
+     * 2,200 u/s, so a landing anywhere inside the overlap is a death sentence
+     * -- and the exit from a hop is a clock rather than a position, so nothing
+     * else would have caught it. The guard is the overlap it must not enter
+     * plus the reach of one whole leap, so a hop can never land inside it.
+     */
+    walkPad: 8, // added to (e.r + s.r + grabPad) + one leap
+    /*
+     * How bright a copy is at the instant it is left, fading to nothing over
+     * its life. Low on purpose: the object guide's own art draws its three
+     * ghosts at 0.39, 0.26 and 0.13, and the thing a player has to be able to
+     * tell apart is the REAL body -- a copy as bright as its owner is not a
+     * decoy, it is four bodies.
+     *
+     * Rendered and measured rather than eyeballed, off an offscreen canvas at
+     * the field's own scale: a copy peaks at 154 of 255 at birth and 129 / 99
+     * / 67 / 39 at a quarter, a half, three quarters and 0.95 of its life,
+     * against the body's own 230. So it is two thirds of the body at birth
+     * and a sixth at the end -- visible, clearly the same shape, and clearly
+     * the fainter thing, which is the three properties the object needs.
+     */
+    ghostAlpha: 0.42,
+  },
+
   roll: {
     /*
      * ---- the lateral is a tangent on the REMAINING DEPTH -----------------
@@ -5127,6 +5228,72 @@ export const ENEMY_TYPES = [
     },
   },
   {
+    /*
+     * CHAFF: the one thing on the field that makes AUTO AIM worse than a
+     * thumb.
+     *
+     * `CFG.chaff` carries the arithmetic and the two measurements the whole
+     * object rests on -- that the guide's version of it does nothing, and
+     * that a radial hop is invisible to the gun. Read that block first; this
+     * one is only the body.
+     *
+     * ---- THE THIRD TYPE IN THIS CYAN, AND THE FAMILY HAD ROOM -----------
+     *
+     * `docs/objects.html` gives the `swarm` family `#7ef9ff`, which is MOTE's
+     * body colour and SHOAL's -- dE 0.0 in CIELAB against both, the same
+     * collision SHOAL had with MOTE, SPINDLE with TOW, SHRIKE with NEEDLE and
+     * LATCH with LURCHER. The standing ruling is that the family is what the
+     * colour means and the silhouette carries the distinction; the rider build
+     * 322 added to it is to ask whether the family has ROOM before accepting a
+     * dE-0.0 collision, because a family is a region and only one point in it
+     * was taken.
+     *
+     * It has. Swept across the cyan band against every field tone in the
+     * roster: `#00b0e6` is 15.8 off the nearest (MOTE's and SHOAL's GLOW, a
+     * halo rather than a silhouette), 22.1 off LANTERN's glow and 14.8 off
+     * MOTE's own body, which is inside the 15-23 this repo documents as a
+     * working separation. The glow is 20.3 clear. For the record the
+     * best-separated point anywhere in that band is `#33997c` at 40.1 and it
+     * is refused for being a desaturated teal -- green means energy -- and
+     * every other saturated cyan sits 1.7 to 5.2 from MOTE's glow.
+     *
+     * And the wave keeps both sharers out: see the CHAFF entry in WAVES, which
+     * pairs it with LURCHER rather than with the MOTE that prices identically.
+     */
+    id: 'chaff',
+    opens: 0,
+    name: 'CHAFF',
+    shape: 'chaff',
+    gait: 'hop',
+    /*
+     * The picture is oriented to the WORLD: two arcs with their gaps at fixed
+     * bearings, which is what the object guide draws. Without this
+     * `Enemy.draw` rotates by `this.angle` -- a random spawn roll with a
+     * random `av` on top -- which is the fault build 310 found in EMBER's
+     * trail and LANTERN's bail, both of whose docstrings claimed an
+     * orientation the drawing did not have.
+     */
+    upright: true,
+    r: 13,
+    hp: 60,
+    density: 0.6,
+    speed: 70,
+    accel: 260,
+    restitution: 0.5,
+    /*
+     * None. `wobble` is the clumsy heading wander `drive` adds around a true
+     * bearing, and it is a property of MARCHING: this body does not march, it
+     * sits still and then crosses a hundred units in three frames. Written
+     * out at 0 rather than omitted so the value is a statement and not an
+     * absence, the same reason SHRIKE's and LATCH's are.
+     */
+    wobble: 0,
+    color: '#00b0e6',
+    glow: '#0096c7',
+    weight: 0, // never chosen by the ordinary spawn roll -- it is authored
+    drops: 2, // energy it leaves when it comes apart
+  },
+  {
     id: 'quarry',
     opens: 0,
     name: 'QUARRY',
@@ -6274,6 +6441,33 @@ export const WAVES = [
   { of: [['latch', 3], ['bloom', 2]], band: 3 },
 
   /*
+   * ...and the CHAFF wave.
+   *
+   * Three chaff and three LURCHERs weighs 24.50 against band 4's own mean of
+   * 24.8925, so it re-prices the band by -0.175% -- build 315's lever. Note
+   * `threatOf` is health-only and so sees 2.00 a chaff where the object guide
+   * authors 4: what CHAFF costs is the ASSIST, and the budget cannot see that
+   * any more than it can see FLINT's armour or what a LATCH gives its host.
+   * Recorded rather than fixed, for build 319's reason.
+   *
+   * LURCHER is the partner and it is chosen rather than priced in. Two
+   * reasons, and the second is the object.
+   *
+   *  - MOTE prices almost identically and wears CHAFF's exact family colour
+   *    (dE 0.0 against the guide's `#7ef9ff`), so pairing them would put two
+   *    cyans on the field together -- build 317's ruling, that when a hue is
+   *    shared you check the WAVE as well as the shape. SPLITTER prices closer
+   *    still and is refused for the same reason one step removed: its four
+   *    children are MOTEs, so its death paints the field cyan.
+   *  - A LURCHER closes and GRIPS. So while the assist is spending itself on
+   *    copies that cannot be shot, the thing that fills the glitch fuse is
+   *    walking onto the mount -- which is the tension the object exists for.
+   *    A wave of chaff alone is a curiosity; a wave of chaff and something
+   *    arriving is the reason its counter is "aim it yourself".
+   */
+  { of: [['chaff', 3], ['lurcher', 3]], band: 4 },
+
+  /*
    * The bonus. Grey and nothing else: no hostiles, no risk, no cost to the
    * allotment, and about 220 ENERGY lying on the field if you take it.
    *
@@ -6324,6 +6518,7 @@ export const GAITS = {
   paired: 'two bodies on a rigid beam, turning about their midpoint while the midpoint advances',
   dive: 'holds height across the top, then runs down the edge of the machine and climbs back for another',
   ride: 'beelines at the biggest body on the field and rides it -- the thing to shoot is no longer the thing in front',
+  hop: 'quantised: sits still, then crosses a hundred units sideways in three frames, leaving a copy of itself where it was',
 };
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

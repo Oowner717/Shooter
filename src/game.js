@@ -20,7 +20,7 @@ import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, sha
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, release, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectData, drawIn, intakeRate, ENTRY_Y, dividend } from './enemies.js';
+import { Director, spawnOne, release, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectData, drawIn, intakeRate, ENTRY_Y, dividend, updateGhosts, drawGhosts } from './enemies.js';
 import { Shooter, Front } from './shooter.js';
 import { Abilities, wardStanding } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
@@ -186,6 +186,16 @@ export class Game {
       sandbox: false,
 
       enemies: [],
+      /*
+       * CHAFF's copies. NOT bodies, and the eighth list rather than a mark on
+       * a body, because every mark this game has removes a thing from the
+       * chooser and the damage paths TOGETHER and a copy has to be choosable
+       * and unshootable at once. See `leaveGhost` in enemies.js for the census
+       * of what `enemies` membership would have bought it, and note that the
+       * only place in src/ that reads this list for a decision is the second
+       * pass in `Game.autoTarget`.
+       */
+      ghosts: [],
       drops: [], // data on the floor, waiting to be taken in
       debris: [], // inert wreckage, on its way off the field
       projectiles: [],
@@ -530,6 +540,7 @@ export class Game {
   reset() {
     const w = this.world;
     w.enemies.length = 0;
+    w.ghosts.length = 0;
     w.drops.length = 0;
     w.debris.length = 0;
     w.projectiles.length = 0;
@@ -1021,6 +1032,7 @@ export class Game {
      * comment about needing a clean field is CLAUDE.md's own scar. Blasts are
      * drained LAST, because a body coming apart pushes one on its way out.
      */
+    w.ghosts.length = 0;
     w.drops.length = 0;
     w.debris.length = 0;
     w.projectiles.length = 0;
@@ -2400,7 +2412,49 @@ export class Game {
     // note below: `dead` is not the test, because half this game's bosses hide
     // a body by taking it out of world.enemies without killing it.
     let heldLive = false;
-    const held = this.autoLock;
+    /*
+     * ---- A COPY INHERITS THE LOCK AT THE INSTANT OF THE LEAP ------------
+     *
+     * This one line is the whole of CHAFF, and without it the object does
+     * nothing at all. Measured on stand-ins before any of it was written:
+     * `autoTarget` scores by DISTANCE, and a copy dropped where a closing
+     * body used to be is strictly further from the machine than the body that
+     * dropped it -- over thousands of samples a copy was nearer than its own
+     * owner ZERO times, closest ratio 1.005. With the counts the game sends
+     * (3 and 8 chaff, 12-14 concurrent copies, three trials each) the assist
+     * locked a copy for ZERO frames in every run whose owners lived, and with
+     * mortal chaff the only frames it locked one were frames the owner was
+     * already dead. The face-value object is a reticle lagging a second and a
+     * half behind a corpse.
+     *
+     * And the hysteresis below makes it worse, not better: `aimStick` protects
+     * the thing it is already shooting, which is the body that just hopped
+     * AWAY. Measured over 45 (offset, hop) arrangements in the real sequence,
+     * the copy took the lock in 3 of 45, and all three were hops both strongly
+     * outward and flat -- which a descending body does not make.
+     *
+     * So the transfer is explicit and it is HERE, in the chooser, rather than
+     * at the leap: `enemies.js` has no business knowing what the assist is
+     * holding, and a copy that knew would be a body that reads the interface.
+     * Each copy is offered the lock exactly once, on the first frame the
+     * assist looks after it was left -- `fresh` is cleared for every copy
+     * whether it inherits or not, so an old one can never take a lock later.
+     * With AUTO AIM off this never runs and `autoLock` is null anyway, so
+     * nothing can inherit from nothing.
+     *
+     * The hysteresis then does the work it was built for in build 137: it
+     * holds the copy until something is 1/`aimStick` = 0.8696 of its distance,
+     * measured by bisection at 0.87 kept and 0.86 switched. The object's own
+     * sentence -- "locks on, for the second and a half each one lasts" -- is
+     * that hold, and it is bounded by the copy's clock at one end and by
+     * anything closer at the other.
+     */
+    let held = this.autoLock;
+    for (const gh of w.ghosts) {
+      if (!gh.fresh) continue;
+      gh.fresh = false;
+      if (gh.from === held) held = gh;
+    }
     /*
      * ---- what may be shot at, in ONE place ----
      *
@@ -2435,25 +2489,49 @@ export class Game {
      * False at era 1, where there is no wall, at the cost of one property read.
      */
     const legal = (e) => !e.dead && !e.staged && !e.spent && !shielded(w, e);
-    for (const e of w.enemies) {
-      if (e === held) heldLive = true;
-      /*
-       * `harmless` is the DRIFT rule, and SIEVE is the one thing that lifts
-       * it. DRIFT lifts it the other way round -- grey and NOTHING else, so a
-       * player sweeping salvage is not also being defended -- and ALL lifts it
-       * in both directions at once. See Game.aimModes.
-       */
-      if (!legal(e)) continue;
-      if (mode === 'field' && e.harmless) continue;
-      if (mode === 'drift' && !e.harmless) continue;
+    /*
+     * ...and the scoring is a FUNCTION, for the reason the note above gives
+     * about the predicate: from build 323 there are two lists to score and
+     * writing the cone, the reach and the weight out twice is writing a rule
+     * that will be applied once. Bodies are unchanged to the operation --
+     * same tests, same order, same arithmetic -- which is what the ORDINAL
+     * hash is run to check.
+     *
+     * `harmless` is the DRIFT rule, and SIEVE is the one thing that lifts
+     * it. DRIFT lifts it the other way round -- grey and NOTHING else, so a
+     * player sweeping salvage is not also being defended -- and ALL lifts it
+     * in both directions at once. See Game.aimModes. A copy is NOT harmless,
+     * so the DRIFT position is immune to CHAFF and the other two are not,
+     * which is a property of the object rather than an accident.
+     */
+    const consider = (e) => {
+      if (!legal(e)) return;
+      if (mode === 'field' && e.harmless) return;
+      if (mode === 'drift' && !e.harmless) return;
       const dx = e.x - s.x;
       const dy = e.y - s.y;
-      if (Math.abs(angleDelta(-Math.PI / 2, Math.atan2(dy, dx))) > limit) continue;
+      if (Math.abs(angleDelta(-Math.PI / 2, Math.atan2(dy, dx))) > limit) return;
       const dist = Math.hypot(dx, dy);
-      if (dist - (e.r || 0) > reach) continue;
+      if (dist - (e.r || 0) > reach) return;
       // a marked breacher outranks anything four times closer
       const score = dist * (e.attacking ? 0.25 : 1);
       if (score < bestScore) { bestScore = score; best = e; }
+    };
+    for (const e of w.enemies) {
+      if (e === held) heldLive = true;
+      consider(e);
+    }
+    /*
+     * The copies, and this is the ONLY place in src/ that reads that list for
+     * a decision. `heldLive` has to be satisfiable from here or the
+     * hysteresis drops every inherited lock on the very next frame -- it is
+     * `heldLive` rather than `!held.dead` precisely because a held thing has
+     * to be shown to still be somewhere, and for a copy that somewhere is
+     * `world.ghosts`.
+     */
+    for (const gh of w.ghosts) {
+      if (gh === held) heldLive = true;
+      consider(gh);
     }
     /*
      * ...and the thing it is already shooting keeps the lock unless something
@@ -2749,6 +2827,14 @@ export class Game {
     if (CFG.gun.inPlay) updateGuns(w, dt);
     updatePortal(w, dt);
     updateYard(w, dt);
+    /*
+     * The copies' clock. HERE, outside the `if (w.boss) {...} else {
+     * director.update() }` above, because a copy left standing when an
+     * aperture opens has to expire like any other -- build 210 put the glitch
+     * timer's douse on the director's side of that if/else and it never ran
+     * for a 224-second fight.
+     */
+    updateGhosts(w, dt);
     this.resolveBlasts();
     this.checkContact();
     this.sweep(w.enemies);
@@ -3914,6 +4000,21 @@ export class Game {
     // never sit on top of something you are meant to be aiming at.
     for (const c of w.debris) c.draw(ctx);
     for (const e of w.drops) e.draw(ctx, w);
+    /*
+     * The copies, over the scenery and UNDER the bodies.
+     *
+     * Under, so a real body always paints over a fake one and the thing you
+     * can actually kill is never the one that is hidden. Over the wreckage
+     * and the salvage, for the reason the comment above gives: a copy is
+     * something the assist will aim at, so it is not scenery.
+     *
+     * And OUTSIDE `this.ours`, which is deliberate and is checked: `ours`
+     * clips to below the era-2 wall and is for things that are OURS -- mines,
+     * effects, rounds, fx. A copy is theirs. `regress.mjs` counts `clip`
+     * calls per frame and requires era 2 to make exactly three more than era
+     * 1, so a fourth scope here would fail that case as well as being wrong.
+     */
+    drawGhosts(ctx, w);
     for (const e of w.enemies) if (!throat.has(e)) e.draw(ctx, w);
     // The mark on a body just born, on top of the body it marks.
     drawInstantiate(ctx, w, background.mood);
@@ -4606,6 +4707,14 @@ export class Game {
       for (const e of live) e.destroy(w);
     }
     w.debris.length = 0;
+    /*
+     * ...and the copies, which are not bodies and so are not destroyed by any
+     * of the above. This helper is called from 134 sites in `regress.mjs`, and
+     * a copy left standing is a decoy the assist will lock onto in whatever
+     * case runs next -- the EMBER inherited-state signature exactly, and the
+     * reason build 307's case had to clear six lists by hand.
+     */
+    w.ghosts.length = 0;
   }
 
   debugThrowMine(kind = 'blast') {

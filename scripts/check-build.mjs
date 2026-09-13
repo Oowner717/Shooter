@@ -754,6 +754,95 @@ if (divers.length) {
 
 
 /*
+ * ---- A HOP HAS TO BE A HOP, AND ITS LANDING HAS TO CLEAR THE MOUNT ------
+ *
+ * Five things about `CFG.chaff` are load-bearing and every one of them fails
+ * silently, which is why they are here rather than in a comment.
+ *
+ * THE SLANT. Measured before a line of the object was written: 100 rounds an
+ * arm, three trials, against a march control moving at the hop's own mean
+ * speed. With the hop straight DOWN the field the miss share is 0.000 at 200,
+ * 300 and 450 units -- identical to the control -- because a quantised body's
+ * lead error then lies ALONG the line of fire and `resolveSegment` sweeps the
+ * round's whole step. Only the LATERAL component costs the gun anything: at a
+ * lateral-to-drop slant of 0.6 the miss share is 0.107 at 300 and 0.620 at
+ * 450, at 1.2 it is 0.240 and 0.797, at 2.0 it is 0.263 and 0.770 and
+ * saturated. So a hop that is not mostly sideways is a body the gun does not
+ * notice, which is not this object at all.
+ *
+ * THE DURATION. `CFG.fixedStep` is 1/120 and `steer` runs once per substep,
+ * so `leapT` has to be at least one substep and land on a whole number of
+ * them: `hopFor` counts substeps as an INTEGER, because as a float countdown
+ * `0.05 - 6 * (1/120)` is 6.9e-18 rather than zero and every leap came out
+ * exactly 7/6 too far. A `leapT` that is not a multiple of the substep is an
+ * authored duration the gait cannot deliver.
+ *
+ * THE REST. The cadence is `drop / cruise` seconds of which `leapT` is the
+ * leap, so `drop / speed` has to EXCEED `leapT` or the body never sits still
+ * -- and sitting still is the half of the gait the copies come from.
+ *
+ * THE LANDING. This is build 317's SHRIKE finding on a different gait: the
+ * turret is static, so `impactDamage`'s reduced mass against it is the body's
+ * WHOLE mass clamped at 300, which kills anything under that at any relative
+ * speed over the threshold. Measured, a chaff put on the mount at the burst
+ * speed dies in ONE frame while the same body at its own 70 lives on 64
+ * health. A leap is refused within `walk` of the machine and `walk` carries a
+ * whole leap's reach, so the nearest possible landing is
+ * `r + shooter.r + grabPad + walkPad` -- which has to be strictly outside the
+ * overlap `r + shooter.r`, i.e. `grabPad + walkPad > 0`. Nothing else in the
+ * repo ties the shooter's grab pad to this gait.
+ *
+ * THE COPY'S LIFE. `ghost` has to outlast the gap between leaps or the object
+ * loses its own sentence -- "a copy of itself standing where it was" is a
+ * thing there has to be one of when you look.
+ */
+const hoppers = ENEMY_TYPES.filter((t) => t.gait === 'hop');
+if (hoppers.length) {
+  const H = CFG.chaff;
+  const sr = CFG.shooter.r;
+  const pad = CFG.shooter.grabPad;
+  const subs = H.leapT / CFG.fixedStep;
+  const bad = [];
+  if (!(H.leap > 0) || !(H.drop > 0)) {
+    bad.push(`leap/drop must both be positive, got ${H.leap}/${H.drop}`);
+  } else if (!(H.leap / H.drop >= 1)) {
+    bad.push(`a slant of ${(H.leap / H.drop).toFixed(2)} is mostly radial, and a radial `
+      + `hop costs the gun nothing (measured 0.000 miss share at 200, 300 and 450)`);
+  }
+  if (!(subs >= 1)) bad.push(`leapT ${H.leapT} is under one substep of ${CFG.fixedStep}`);
+  if (Math.abs(subs - Math.round(subs)) > 1e-9) {
+    bad.push(`leapT ${H.leapT} is ${subs.toFixed(3)} substeps, not a whole number of them`);
+  }
+  if (!(H.ghost > 0)) bad.push(`a copy's life is ${H.ghost}`);
+  if (!(pad + H.walkPad > 0)) {
+    bad.push(`grabPad ${pad} + walkPad ${H.walkPad} is ${pad + H.walkPad}: the nearest `
+      + `landing is inside the overlap, and a landing on the mount is fatal`);
+  }
+  for (const t of hoppers) {
+    const rest = t.speed > 0 ? H.drop / t.speed - H.leapT : -1;
+    if (!(rest > 0)) {
+      bad.push(`${t.id} at speed ${t.speed} never sits still: drop/speed is `
+        + `${(H.drop / t.speed).toFixed(3)}s against a leap of ${H.leapT}`);
+    } else if (!(H.ghost > rest + H.leapT)) {
+      bad.push(`${t.id}'s copy lives ${H.ghost}s against a cadence of `
+        + `${(rest + H.leapT).toFixed(3)}s, so there is nothing standing between leaps`);
+    }
+    if (t.harmless) bad.push(`${t.id} is harmless, so the budget prices it at nothing`);
+  }
+  if (bad.length) {
+    for (const line of bad) console.error(`hop: ${line}`);
+    process.exit(1);
+  }
+  const span = Math.hypot(H.leap, H.drop);
+  console.log(`hop: ${hoppers.length} type(s) cross ${H.leap} across by ${H.drop} down `
+    + `(slant ${(H.leap / H.drop).toFixed(2)}, span ${span.toFixed(1)}) over `
+    + `${Math.round(subs)} substeps, leaving a copy for ${H.ghost}s against a cadence of `
+    + `${hoppers.map((t) => `${t.id} ${(H.drop / t.speed).toFixed(2)}s`).join(', ')}; `
+    + `nearest landing ${(pad + H.walkPad).toFixed(0)} clear of the mount`);
+}
+
+
+/*
  * ---- A PAIR IS ONE POOL, AND THE BEAM HAS TO CLEAR THE PAIR SOLVER ------
  *
  * `pairOf` throws for a `pair` that is not exactly 2, for a `snap` outside

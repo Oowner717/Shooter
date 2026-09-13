@@ -1748,9 +1748,27 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
    * still sealed *and should be*: it cannot be touched until the frames are
    * open, and opening them is the first two stages. Asserting on the core
    * here was asserting on the length of the fight by accident.
+   *
+   * ...AND `inner < 1` WAS THE SAME FAULT ONE FRAME ALONG, which build 323
+   * found. It requires the fight to have got PAST the outer frame and started
+   * on the second one inside 85 seconds -- a length claim wearing a progress
+   * claim's clothes, and one whose reading is a hard boundary rather than a
+   * margin: `shellFrac(1)` is exactly 1.00 until something touches that
+   * frame. Measured standalone over six runs it reads 0.50 / 0.56 / 0.75 /
+   * 0.81 / 0.81 / 0.88 and never 1; in the suite it drew 0.75 on one run and
+   * **1.00 on the next**, on builds whose only difference was two comments.
+   * The likely channel is the random stream -- build 315's note that adding a
+   * wave re-rolls the whole suite's randoms, and `restart()` here goes
+   * through `shuffle` -- but that is INFERENCE and the suite's own rAF loop
+   * riding on top of these synthetic steps is the other candidate. The fix
+   * does not depend on which: the conjunct is a claim about how long the
+   * fight takes, and this case is about whether the assists make progress.
+   * What carries that is the outer frame (0.08-0.17 measured against a 0.4
+   * ceiling, a 2.4x margin), stage II being reached, and the garrison getting
+   * out 12 of 12. The inner frame and the core are REPORTED.
    */
   check('ORDINAL can be fought on the assists alone, and its garrison gets out',
-    r.stages.includes(2) && r.outer < 0.4 && r.inner < 1 && r.released > 0,
+    r.stages.includes(2) && r.outer < 0.4 && r.released > 0,
     `85s on auto: stages ${r.stages.join('+')}, outer ${r.outer}, inner ${r.inner}, `
     + `core ${r.core}, ${r.released}/${r.parked0} DIGITs released`);
 }
@@ -1953,15 +1971,37 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     w.debris.length = 0;
     const s = w.shooter;
 
-    // ---- salvage off a fixed type has to come to you ----
+    /*
+     * ---- salvage off a fixed type has to come to you -------------------
+     *
+     * SIX of each and the MEAN, because a drop is born with an outward
+     * velocity it has to shed first and that velocity is ONE RANDOM DRAW.
+     * The first version measured one mote per type and this file's own note
+     * on it recorded the range as 59-155 -- which is a population of draws
+     * described as a measurement. Across four suite runs it read 139, 75,
+     * 124 and then **41** against a floor of 45, so the arm was a coin toss
+     * on the low tail. Build 309's HUSK control is the same fix for the same
+     * reason, and CLAUDE.md has now said "measure a population, not a draw"
+     * five times.
+     *
+     * All six are laid at the SAME POINT, so the geometry is identical and
+     * the only thing that differs between them is the roll. The per-drop
+     * spread is reported, so the next reader can see why one was not enough.
+     */
     const moved = {};
+    const spread = {};
     for (const id of ['ordinal', 'tally', 'mote']) {
       for (const d of [...w.drops]) d.dead = true; w.drops.length = 0;
-      const d = new Enemy(TYPE_BY_ID[id], s.x + 120, s.y - 300, { drop: true, r: 4, energy: 5 });
-      w.drops.push(d);
-      const was = Math.hypot(d.x - s.x, d.y - s.y);
+      const ds = [];
+      for (let n = 0; n < 6; n++) {
+        const d = new Enemy(TYPE_BY_ID[id], s.x + 120, s.y - 300, { drop: true, r: 4, energy: 5 });
+        w.drops.push(d);
+        ds.push({ d, was: Math.hypot(d.x - s.x, d.y - s.y) });
+      }
       for (let k = 0; k < 90; k++) g.update(1 / 60);
-      moved[id] = Math.round(was - Math.hypot(d.x - s.x, d.y - s.y));
+      const each = ds.map((x) => Math.round(x.was - Math.hypot(x.d.x - s.x, x.d.y - s.y)));
+      moved[id] = Math.round(each.reduce((a, v) => a + v, 0) / each.length);
+      spread[id] = [Math.min(...each), Math.max(...each)];
     }
     for (const d of [...w.drops]) d.dead = true; w.drops.length = 0;
 
@@ -1977,21 +2017,25 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     const wait = Math.ceil(CFG.debris.life * 2 + 4);
     for (let k = 0; k < 60 * wait; k++) g.update(1 / 60);
     const later = w.debris.filter((c) => !c.dead && c.keep).length;
-    const out = { moved, justAfter, later, wait, chunkLife: CFG.debris.life };
+    const out = { moved, spread, justAfter, later, wait, chunkLife: CFG.debris.life };
     g.restart();
     return out;
   });
   /*
-   * 45, not 60. What is being asked is "does salvage come to you", and a mote
-   * spawned with an outward velocity spends part of the window shedding it --
-   * measured, they close between 59 and 155 units in the same second and a
-   * half. At 60 the case failed about one run in four on the low end, which is
-   * a threshold reporting noise rather than a defect.
+   * 45 on the MEAN of six, not on one draw. What is being asked is "does
+   * salvage come to you", and a drop spends part of the window shedding the
+   * outward velocity it was born with -- so one drop is one roll of that
+   * velocity, and the range this comment used to quote (59-155) was a
+   * population being reported as a measurement. Four suite runs read the
+   * single mote at 139, 75, 124 and 41 against the same floor of 45.
+   * Averaging six removes the tail without moving the claim, which is what
+   * the claim was always about.
    */
   check("ORDINAL's salvage comes to you and its wreck stays where it fell",
     r.moved.ordinal > 45 && r.moved.tally > 45 && r.moved.mote > 45
     && r.justAfter > 20 && r.later >= r.justAfter * 0.9,
-    `closed in 1.5s: ${Object.entries(r.moved).map(([k, v]) => `${k} ${v}`).join(', ')} units; `
+    `closed in 1.5s, mean of six each: `
+    + `${Object.entries(r.moved).map(([k, v]) => `${k} ${v} (${r.spread[k].join('-')})`).join(', ')} units; `
     + `wreck ${r.justAfter} pieces, still ${r.later} after ${r.wait}s `
     + `(a chunk lives ${r.chunkLife}s)`);
 }
@@ -21437,7 +21481,7 @@ if (MINE_LINE) {
       out.survives = !!w.yard && w.enemies.length === 0 && w.effects.length === 0;
 
       // ---- and it is in none of the lists anything walks -------------------
-      const lists = ['enemies', 'drops', 'debris', 'effects', 'mines', 'projectiles'];
+      const lists = ['enemies', 'drops', 'debris', 'effects', 'mines', 'projectiles', 'ghosts'];
       out.inNoList = lists.every((k) => !(w[k] || []).includes(a))
         && !(w.attackers && w.attackers.has && w.attackers.has(a));
       out.notABody = a.hp === undefined && a.applyDamage === undefined
@@ -21533,7 +21577,7 @@ if (MINE_LINE) {
       g.setEra(2);
       out.two = read(w.portal);
       const P = w.portal;
-      const lists = ['enemies', 'drops', 'debris', 'effects', 'mines', 'projectiles'];
+      const lists = ['enemies', 'drops', 'debris', 'effects', 'mines', 'projectiles', 'ghosts'];
       out.inNoList = lists.every((k) => !(w[k] || []).includes(P));
       out.notABody = P.hp === undefined && P.applyDamage === undefined
         && P.invMass === undefined && P.type === undefined && P.r === undefined;
@@ -24032,7 +24076,9 @@ if (MINE_LINE) {
     for (let f = 0; f < 60 * 5; f++) g.update(1 / 60);
     out.tookField = w.enemies.length === 0 && w.drops.length === 0
       && w.mines.length === 0 && w.effects.length === 0 && w.debris.length === 0
-      && w.projectiles.length === 0 && w.pendingBlasts.length === 0;
+      && w.projectiles.length === 0 && w.pendingBlasts.length === 0
+      // ...and CHAFF's copies, the eighth list, which build 323 added
+      && w.ghosts.length === 0;
     out.paidNothing = w.bytes === before.energy && w.earned === before.earned
       && w.kills === before.kills;
 
@@ -29920,6 +29966,13 @@ if (MINE_LINE) {
     out.gapMin = +Math.min(...gaps).toFixed(1);
     out.gapMax = +Math.max(...gaps).toFixed(1);
     out.samples = gaps.length;
+    /*
+     * The FIELD, because that is the scale the runaway claim is about -- see
+     * the note on the check below. A follower that has stopped following is
+     * one further from its lead than a third of the ground the snake crosses;
+     * five times the follow distance is INSIDE the working distribution.
+     */
+    out.depth = Math.round(w.floorY);
     out.minHp = +minHp.toFixed(3);
     out.aliveAfter = bead().length;
     /*
@@ -30059,21 +30112,50 @@ if (MINE_LINE) {
    * arm failed four runs in six with nothing about the chain changed.
    *
    * What a broken controller actually produces is a tail that streams away
-   * without limit, and that is bound-checkable however much time passed. Five
-   * times the derived gap is 150 units against a measured worst of 95.6 over
-   * twelve runs -- 1.57x clear -- while a follower that had stopped following
-   * would cross the field's whole 963-unit depth. Four times (120) was tried
-   * first and left only 1.25x, which is not a margin on a quantity with this
-   * much spread. The mean is reported, not asserted.
+   * without limit, and that is bound-checkable however much time passed. The
+   * mean is reported, not asserted.
+   *
+   * ---- ...AND THE CEILING WAS INSIDE THE WORKING DISTRIBUTION ----------
+   *
+   * Build 310 set it at five times the follow distance -- 150 units against
+   * a worst of 95.6 over twelve standalone runs, called 1.57x clear. Build
+   * 323 drew **153.7** in the suite, and sampling it properly says the tail
+   * is BIMODAL rather than merely wider: eleven readings across the suite and
+   * eight standalone runs are 41.4, 44.4, 47.7, 48.4, 49.1, 49.5, 50.0, 59.0
+   * and then **134.8, 137.3, 153.7** -- three draws in eleven in a high mode
+   * that twelve runs happened to miss. That is build 321's finding verbatim:
+   * a handful of runs cannot see a regime that happens one run in four, and a
+   * ceiling fitted to what they saw is fitted to the day's value.
+   *
+   * **AND IT DOES NOT DISCRIMINATE, WHICH IS THE MORE SERIOUS HALF.**
+   * Measured with `CFG.chain.grip` at 0 -- the correction cap off, which is
+   * the nearest thing to this controller broken that the config can express
+   * -- gapMax reads **83.3, 104.2, 75.5, 96.4**, i.e. BELOW the working
+   * build's high mode. So the old bound could not have told the two apart,
+   * and the reason is that velocity matching alone very nearly keeps station:
+   * the correction is what closes the last of it, not what holds the line.
+   * A lever that produces a real runaway is not reachable from config, so
+   * this is named as a SANITY ceiling rather than trusted as a discriminator
+   * -- build 319's rule about a conjunct that cannot fail for the reason the
+   * case is about.
+   *
+   * It is derived from the FIELD now, which is the scale the word "runaway"
+   * is about: a third of `world.floorY` is about 407 units against a worst
+   * working draw of 153.7 (2.6x clear), and a follower that had stopped
+   * following crosses the whole 963-unit column. What carries the claim
+   * instead are the two ABSOLUTES beside it -- no bead lost to the formation,
+   * and the health reading shown able to move.
    */
   check('...and it holds its station without grinding itself down',
-    r.gapMax < r.gap * 5 && r.samples > 500
+    r.gapMax < r.depth / 3 && r.samples > 500
     // ...and no bead is LOST to it, which is the absolute. The health
     // fraction is reported with the reading shown able to move, so a future
     // reader can see whether the touching ever starts to cost something.
     && r.aliveAfter === r.want && r.canRead < 1,
     `gap derived at ${r.gap}; over ${r.samples} samples it ran ${r.gapMin} to ${r.gapMax} `
-    + `(mean ${r.gapMean}) against a runaway ceiling of ${r.gap * 5}, and a pair-solver floor `
+    + `(mean ${r.gapMean}) against a runaway ceiling of ${Math.round(r.depth / 3)} -- a third of `
+    + `the ${r.depth}-unit field, because five times the gap was inside the working spread -- `
+    + `and a pair-solver floor `
     + `of ${r.floor} that costs nothing to touch below a relative 62; all ${r.aliveAfter} of `
     + `${r.want} beads survived it at worst ${r.minHp} of their health, and the same reading `
     + `sees a 5-point hit as ${r.canRead}`);
@@ -34416,6 +34498,649 @@ if (MINE_LINE) {
       + `${x.ridden.hp}/${x.ridden.armor}/r${x.ridden.r}, ${x.n} children at `
       + `${x.hp[0]}/${x.armor[0]}/r${x.r[0]} against its own share `
       + `${x.wantHp}/${x.wantArmor}/r${x.wantR}`).join('; '));
+}
+
+
+/*
+ * ---- A COPY IS CHOOSABLE AND UNSHOOTABLE, WHICH NO MARK IN THIS GAME SAYS -
+ *
+ * Build 323. CHAFF is the thirteenth of the twenty objects and the first
+ * thing in this game that is on the field without being a body: it sits
+ * still, crosses a hundred units sideways in three frames, and leaves a copy
+ * of itself standing where it was for a second and a half. The assist reads
+ * the copy as a target; nothing can be shot off it.
+ *
+ * That pair is the exact INVERSE of `staged` -- shootable but not choosable,
+ * and config.js says in as many words that it never gated projectile
+ * collision -- and a cousin of `spent`, which is drawn, unchoosable, and has
+ * rounds pass through it. There is no combination of this game's existing
+ * marks that expresses it, because every mark it has takes a body out of the
+ * CHOOSER and the DAMAGE PATHS together. So a copy is not a body and does
+ * not live in `world.enemies`: it is `world.ghosts`, the eighth list, and the
+ * object is correct BY OMISSION. Arm 2 is the census that says so.
+ *
+ * ---- AND THE OBJECT AS THE GUIDE SPECIFIES IT DOES NOTHING AT ALL --------
+ *
+ * `docs/objects.html` says the copies are read as targets and the assist
+ * "locks on, for the second and a half each one lasts". Measured on
+ * stand-ins before a line of it was written, it does not: `autoTarget`
+ * scores `dist * (attacking ? 0.25 : 1)`, and a copy dropped where a CLOSING
+ * body used to be is strictly further from the machine than the body that
+ * dropped it. Over thousands of samples a copy was nearer than its own owner
+ * ZERO times, closest ratio 1.005 -- and the hysteresis makes it worse
+ * rather than better, because `aimStick` protects the thing the gun is
+ * already on, which is the body that has just hopped AWAY.
+ *
+ * So the copy INHERITS the lock at the instant of the leap, in the chooser,
+ * and arm 3 is that one line's A/B. It is the load-bearing arm of the case:
+ * with the inheritance off the copies still exist, still expire, still get
+ * scored -- and the assist picks one ZERO times.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const E = await import('../src/enemies.js');
+    const { applyBlast, hostileCount, drawSpecimen, leaveGhost, updateGhosts } = E;
+    const { CFG, TYPE_BY_ID, WAVES } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    const T = TYPE_BY_ID.chaff;
+    const C = CFG.chaff;
+    const span = Math.hypot(C.leap, C.drop);
+
+    /*
+     * Everything, and the ghosts too. A CHAFF springs a mine, a stray round
+     * is inside any one-frame reading, and six hundred cases run before this
+     * one -- and a COPY left standing by an earlier arm of this same case is
+     * a decoy the assist will lock onto, which is the one leftover no
+     * existing `clean` in this file knew about. `restart()` is not a reset of
+     * everything a case can leave behind.
+     */
+    const clean = () => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      g.debugClearField();
+      for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts']) {
+        if (w[k]) w[k].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+      g.autoLock = null;
+      if (w.attackers) w.attackers.clear();
+    };
+    const pin = () => { w.director.update = () => {}; w.spawnLock = 1e9; };
+    const body = (id, x, y) => {
+      const e = g.debugSpawn(id, x, y);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.vx = 0;
+      e.vy = 0;
+      return e;
+    };
+
+    // ---- 1. the leap is exactly what it is authored as, at any rate ------
+    /*
+     * A TARGET SPEED IS NOT A SPEED -- builds 298, 308, 316, 317, 318 -- and
+     * a leap is the first one in this file whose compensation has to be the
+     * EXACT DISCRETE sum rather than a steady state or a continuous
+     * integral. `integrate` moves then damps, so a burst v live for N
+     * substeps covers `v dt (1 - r^N) / (1 - r)`; the continuous form the
+     * other five use is 0.23% out here.
+     *
+     * What was NOT 0.23% out is the substep COUNT. `hopFor` was a float
+     * countdown of `leapT` seconds and every leap came out 130.44 units
+     * against a span of 111.80 -- exactly 7/6 -- because `0.05 - 6 * (1/120)`
+     * is 6.9e-18 and not zero, so the burst lived a seventh substep. It
+     * counts substeps as an integer now, and this arm asserts the DELIVERED
+     * displacement to a tenth of a unit rather than the expression, which is
+     * the only reading that could have caught it.
+     *
+     * And at TWO update sizes, because "three frames" is not a unit this game
+     * has: `CFG.fixedStep` is 1/120 and `steer` runs per substep, so a
+     * frame-counted hop would cross twice the ground on a 60Hz phone as on a
+     * 120Hz one. The leap is the same DURATION either way and this arm is
+     * what says so.
+     */
+    const leapArm = (dt) => {
+      clean();
+      pin();
+      const e = body('chaff', w.width * 0.5, w.floorY - 700);
+      const leaps = [];
+      let launch = null;
+      let first = null;
+      let last = null;
+      let f = 0;
+      const steps = Math.round(1 / dt);
+      for (; f < steps * 12; f++) {
+        const pre = { x: e.x, y: e.y, hf: e.hopFor };
+        g.update(dt);
+        if (pre.hf <= 0 && e.hopFor > 0) launch = pre;
+        if (launch && e.hopFor <= 0 && pre.hf > 0) {
+          leaps.push({ dx: +Math.abs(e.x - launch.x).toFixed(2), dy: +(e.y - launch.y).toFixed(2) });
+          if (first === null) first = { t: f / steps, y: e.y };
+          last = { t: f / steps, y: e.y };
+          launch = null;
+        }
+        if (e.dead) break;
+      }
+      /*
+       * The closing speed over the HOPPING PHASE ONLY, and both marks are
+       * taken POST-leap. Measured over the whole window it read 45.3 against
+       * a cruise of 63.5, because the window ends with the body resting on
+       * the mount; measured with the first mark pre-leap it read 1.134x the
+       * cruise, because the span covered eight leaps and the clock seven
+       * cycles. Twice the instrument, twice a plausible number.
+       */
+      return { dt, n: leaps.length,
+        dx: leaps.map((l) => l.dx), dy: leaps.map((l) => l.dy),
+        cruise: +e.baseCruise.toFixed(2),
+        closing: first && last && last.t > first.t
+          ? +((last.y - first.y) / (last.t - first.t)).toFixed(2) : null };
+    };
+    out.leap = [leapArm(1 / 60), leapArm(1 / 30)];
+    out.want = { leap: C.leap, drop: C.drop, span: +span.toFixed(2),
+      substeps: Math.round(C.leapT / CFG.fixedStep) };
+
+    // ---- 2. ...and NOTHING but the assist can see the copy ---------------
+    /*
+     * The census, and it is the whole reason a copy is the eighth list rather
+     * than a ninth mark on a body. `world.enemies` membership buys, in one
+     * sweep: the projectile sweep, `applyBlast` (HE, AIRBURST, PULSE, DECOY,
+     * PILE, WELL, two mines, a BLOOM's detonate), the mine trigger, WIRE,
+     * LANCE, WARD, a `Patch`, `checkContact` and `world.attackers`, the whole
+     * physics stack, `Enemy.update`, `Game.sweep` -- which books the CODEX
+     * and the KILL -- `hostileCount` and therefore the field cap and the
+     * release gate, `Director.standing` and therefore the wave verdict,
+     * `tagBody`, the STASIS brackets and `drawHitboxes`.
+     *
+     * Each is asserted against a REAL BODY in the same place as the control,
+     * because "nothing happened" is true of a build where nothing works: the
+     * blast that delivers zero to a copy has to be shown to kill the body,
+     * and the round that crosses a copy has to be shown to stop on one.
+     */
+    {
+      clean();
+      pin();
+      const e = body('chaff', w.width * 0.5, w.floorY - 600);
+      /*
+       * One copy, laid by the gait itself rather than by hand -- and the
+       * sentence being checked is that it stands WHERE THE BODY WAS, so the
+       * body's position is sampled on every frame and compared against the
+       * copy that appears. Read off the copy's own `from` it would be a
+       * tautology; read after the update it would be the body's post-leap
+       * position, 112 units away.
+       */
+      let guard = 0;
+      let was = { x: e.x, y: e.y };
+      let gh = null;
+      while (!gh && guard++ < 400) {
+        const pre = { x: e.x, y: e.y };
+        g.update(1 / 60);
+        if (w.ghosts.length) { gh = w.ghosts[0]; was = pre; }
+      }
+      const census = { laid: !!gh,
+        offBy: gh ? +Math.hypot(gh.x - was.x, gh.y - was.y).toFixed(2) : null,
+        ownedBy: gh ? gh.from === e : false,
+        r: gh ? gh.r : null, bodyR: e.r };
+      /*
+       * ...the blast. A copy has NO health -- every field on one has a reader
+       * and `hp` had none, so it was deleted -- which means "it took zero
+       * damage" is not the assertion available here. What is, and is the
+       * stronger claim anyway: a 1000-point blast centred ON a copy leaves it
+       * untouched in every field it has, still in the list, while the same
+       * blast kills a real body in the same place.
+       */
+      const snap = (x) => ({ x: +x.x.toFixed(3), y: +x.y.toFixed(3), t: +x.t.toFixed(4),
+        r: x.r, inList: w.ghosts.includes(x) });
+      const before = gh ? snap(gh) : null;
+      if (gh) {
+        applyBlast(w, { x: gh.x, y: gh.y, r: 90, damage: 1000, impulse: 3000, source: 'probe' });
+      }
+      const ghostBlast = gh ? snap(gh) : null;
+      const ctl = body('mote', gh ? gh.x : w.width / 2, gh ? gh.y : 400);
+      const hp0 = ctl.hp;
+      applyBlast(w, { x: ctl.x, y: ctl.y, r: 90, damage: 1000, impulse: 3000, source: 'probe' });
+      const bodyBlast = { took: +(hp0 - ctl.hp).toFixed(1), dead: !!ctl.dead };
+      /*
+       * ...the round, and the test is DAMAGE and the MINIMUM y it reached --
+       * not how near the target it was when it vanished. The first version
+       * asked whether the projectile disappeared within 60 units of the
+       * target's CENTRE, and a bolt stops on the near SURFACE of a 45-unit
+       * BULWARK a whole step out: it read 74 and reported the round as having
+       * crossed a body it had just taken 17.2 health off. Worse, the detail
+       * string said "CROSSED" for a reading that only meant "not registered
+       * as stopped" -- a message is a declaration, and this one was wrong on
+       * a working build.
+       */
+      const shootThrough = (target) => {
+        w.projectiles.length = 0;
+        const s = w.shooter;
+        s.cd = 0;
+        s.aimAt(target.x, target.y, false);
+        const ok = s.shoot(w) !== false;
+        const hp0 = target.hp === undefined ? null : target.hp;
+        let minY = 1e9;
+        for (let i = 0; i < 90 && w.projectiles.length; i++) {
+          for (const p of w.projectiles) minY = Math.min(minY, p.y);
+          g.update(1 / 60);
+        }
+        return { ok, minY: Math.round(minY),
+          took: hp0 === null ? 0 : +(hp0 - target.hp).toFixed(1),
+          past: Math.round(target.y - minY) };
+      };
+      clean();
+      pin();
+      const e2 = body('chaff', w.width * 0.5, w.floorY - 600);
+      let g2 = 0;
+      while (!w.ghosts.length && g2++ < 400) g.update(1 / 60);
+      const copy = w.ghosts[0];
+      // hold the field: only the copy is on the round's line
+      if (copy) { e2.x = 40; e2.y = 40; e2.vx = 0; e2.vy = 0; }
+      const throughCopy = copy ? shootThrough(copy) : null;
+      clean();
+      pin();
+      const wall = body('bulwark', w.width * 0.5, w.floorY - 600);
+      wall.vx = 0; wall.vy = 0; wall.cruise = 0;
+      const throughBody = shootThrough(wall);
+      // ...and the counts. A copy is worth nothing to any of them.
+      clean();
+      pin();
+      const beforeCounts = { hostiles: hostileCount(w), standing: w.director.standing(w),
+        attackers: w.attackers ? w.attackers.size : -1 };
+      const e3 = body('chaff', w.width * 0.5, w.floorY - 600);
+      const withBody = { hostiles: hostileCount(w) };
+      let g3 = 0;
+      while (w.ghosts.length < 2 && g3++ < 400) g.update(1 / 60);
+      const held = w.ghosts.length;
+      e3.x = 40; e3.y = 40;
+      e3.dead = true;
+      w.enemies.length = 0;
+      const afterCounts = { hostiles: hostileCount(w), standing: w.director.standing(w),
+        attackers: w.attackers ? w.attackers.size : -1, copies: w.ghosts.length };
+      // `Game.sweep` is what pays and counts, and it is handed the body list
+      const kills0 = w.kills || 0;
+      g.sweep(w.enemies);
+      out.census = { ...census, before, ghostBlast, bodyBlast,
+        throughCopy, throughBody,
+        beforeCounts, withBody, afterCounts, held,
+        kills: (w.kills || 0) - kills0 };
+    }
+
+    // ---- 3. THE COPY INHERITS THE LOCK, and that one line is the object --
+    /*
+     * The A/B is the inheritance itself, which is as clean a switch as this
+     * file has: the copies are made by the same gait, stand in the same
+     * places, expire on the same clock and are scored by the same `consider`
+     * in both arms. Only `fresh` differs -- the control clears it on the way
+     * into the list, so a copy can never be offered a lock and has to win on
+     * DISTANCE, which is the thing that was measured to be impossible.
+     *
+     * TWO channels, because a share of frames is not a share of rounds: the
+     * assist can hold a copy through a window in which the cadence fires
+     * nothing. Measured over nine runs at 1, 3 and 8 concurrent chaff:
+     *
+     *   1 chaff   frames 0.339-0.414   rounds 0.267-0.357   (off: 0.000)
+     *   3 chaff   frames 0.465-0.511   rounds 0.368-0.438   (off: 0.000)
+     *   8 chaff   frames 0.277-0.321   rounds 0.210-0.313   (off: 0.000)
+     *
+     * -- with the copy population identical in both arms to within 10%. The
+     * floor is 0.15, well under the worst working draw, and the control is an
+     * ABSOLUTE ZERO rather than a margin: it is not that the copies rarely
+     * win on distance, it is that they cannot.
+     *
+     * What is NOT asserted, and is recorded instead: the end-to-end cost. The
+     * same six-body field cleared in 583.6 frames with the inheritance on and
+     * 570.8 with it off over twelve runs each, ranges 539-676 against
+     * 466-683 -- +2.2% of means, straddling completely. The copies are only
+     * up during the hop phase and a whole clear is dominated by everything
+     * else, so a case asserting the clear time would be a margin fitted to a
+     * draw. The mechanism is unambiguous at the point of CHOICE and buried at
+     * the level of a clear, and both halves of that are worth writing down.
+     */
+    {
+      const arm = (inherit) => {
+        clean();
+        pin();
+        w.autoAim = true;
+        w.aimMode = 'field';
+        w.autoFire = true;
+        const real = w.ghosts.push.bind(w.ghosts);
+        if (!inherit) w.ghosts.push = (gh) => { gh.fresh = false; return real(gh); };
+        const all = [];
+        for (let i = 0; i < 3; i++) all.push(body('chaff', w.width * (0.3 + i * 0.2), w.floorY - 700));
+        for (let i = 0; i < 3; i++) all.push(body('lurcher', w.width * (0.35 + i * 0.15), w.floorY - 740));
+        let ghF = 0;
+        let lockF = 0;
+        let ghR = 0;
+        let R = 0;
+        let sumGh = 0;
+        let n = w.projectiles.length;
+        const frames = 330;
+        for (let f = 0; f < frames; f++) {
+          // immortal on both sides: this arm is about CHOICE, not about a kill
+          for (const e of all) e.hp = e.maxHp;
+          g.update(1 / 60);
+          const onGh = w.ghosts.includes(g.autoLock);
+          if (g.autoLock) lockF++;
+          if (onGh) ghF++;
+          const m = w.projectiles.length;
+          const fired = Math.max(0, m - n);
+          n = m;
+          R += fired;
+          if (onGh) ghR += fired;
+          sumGh += w.ghosts.length;
+        }
+        w.ghosts.push = real;
+        return { inherit, lockF, ghF, R, ghR,
+          shareF: +(ghF / Math.max(1, lockF)).toFixed(4),
+          shareR: +(ghR / Math.max(1, R)).toFixed(4),
+          copies: +(sumGh / frames).toFixed(2) };
+      };
+      out.lock = [arm(true), arm(false)];
+    }
+
+    // ---- 4. a copy expires on its own clock, with the frame before it ----
+    /*
+     * "The copy is gone" is true of a working build and of one where the list
+     * was never filled, so the control is the same copy read just short of
+     * its own life. And expiring is NOT a death: `updateGhosts` is the
+     * clock and `Game.sweep` is what pays and counts, so a copy running out
+     * must not book a kill or a glossary entry for a thing that was never
+     * destroyed.
+     */
+    {
+      clean();
+      pin();
+      const gh = leaveGhost(w, body('chaff', w.width * 0.5, 400));
+      const at = (t) => { updateGhosts(w, t); return w.ghosts.length; };
+      const early = at(C.ghost * 0.9);
+      const late = at(C.ghost * 0.2);
+      out.clock = { life: C.ghost, early, late, madeOne: !!gh };
+    }
+
+    // ---- 5. it WALKS the last stretch, and a landing on the mount is fatal
+    /*
+     * The turret is static, so `impactDamage`'s reduced mass against it is
+     * the body's WHOLE mass clamped at 300 -- death for anything under that
+     * at any relative speed over the threshold, which is build 317's SHRIKE
+     * finding. A leap crosses 112 units at 2,261 u/s, so a landing anywhere
+     * inside the overlap is fatal, and the exit from a leap is a CLOCK rather
+     * than a position: nothing else would have caught it.
+     *
+     * Three claims, and the third is what makes the first two worth making:
+     * no leap is STARTED inside the walk radius, no leap LANDS inside the
+     * overlap, and a body put on the mount at the burst speed DIES while the
+     * same body put there at its walking speed does not. The hazard arm is
+     * the control the guard needs, and `walkPad` is deliberately not the
+     * lever -- cutting the radius to the bare overlap does NOT reproduce the
+     * death, because the leap is twice as wide as it is deep and a body
+     * closing on the machine hops PAST it rather than onto it. A revert that
+     * does not reproduce the fault is not a revert proof.
+     *
+     * The fault it was actually found by is in the ORDERING and cannot be
+     * reached from the config: the guard sat ABOVE the mid-leap branch, so a
+     * leap that crossed INTO the radius was abandoned rather than finished --
+     * `hopFor` stopped counting, the raised cruise was never given back and
+     * the burst velocity was never zeroed. Measured, dead at frame 210 with
+     * `hopFor` frozen at 0.05 and `cruise` frozen at 378. What guards the
+     * ordering here is that the cruise is asserted back at its base and that
+     * no landing is inside the overlap, both of which that build failed.
+     */
+    {
+      clean();
+      pin();
+      const e = body('chaff', w.width * 0.5, w.floorY - 700);
+      const walk = e.r + w.shooter.r + CFG.shooter.grabPad + C.walkPad + span;
+      const overlap = e.r + w.shooter.r;
+      const dist = () => Math.hypot(e.x - w.shooter.x, e.y - w.shooter.y);
+      let f = 0;
+      let started = 0;
+      let inside = 0;
+      let land = 1e9;
+      let minD = 1e9;
+      for (; f < 60 * 30 && !e.dead; f++) {
+        const d0 = dist();
+        const pre = e.hopFor;
+        g.update(1 / 60);
+        minD = Math.min(minD, dist());
+        if (pre <= 0 && e.hopFor > 0) { started++; if (d0 <= walk) inside++; }
+        // the landing: the frame the burst is given back
+        if (pre > 0 && e.hopFor <= 0) land = Math.min(land, dist());
+      }
+      out.walk = { dead: e.dead, seconds: +(f / 60).toFixed(2),
+        started, inside, land: Math.round(land), minD: Math.round(minD),
+        walk: Math.round(walk), overlap: Math.round(overlap),
+        cruise: +e.cruise.toFixed(1), base: +e.baseCruise.toFixed(1) };
+
+      /*
+       * ...and the hazard itself, which is why the guard is derived from the
+       * overlap rather than picked. Same body, same place, two speeds -- so
+       * what is being measured is the SPEED and not the geometry.
+       */
+      const hazard = (speed) => {
+        clean();
+        pin();
+        const s = w.shooter;
+        const b = body('chaff', s.x, s.y - (13 + s.r) - 8);
+        b.cruise = Math.max(b.cruise, speed / CFG.physics.maxSpeedFactor);
+        b.vx = 0;
+        b.vy = speed;
+        let k = 0;
+        for (; k < 20 && !b.dead; k++) g.update(1 / 60);
+        return { speed: Math.round(speed), dead: b.dead, frames: k,
+          hp: Math.max(0, Math.round(b.hp)) };
+      };
+      const r0 = Math.exp(-CFG.physics.linearDamping * CFG.fixedStep);
+      const burst = (span * (1 - r0)) / (CFG.fixedStep * (1 - r0 ** Math.round(C.leapT / CFG.fixedStep)));
+      out.hazard = [hazard(burst), hazard(TYPE_BY_ID.chaff.speed)];
+    }
+
+    // ---- 6. a staged chaff comes down the portal like everything else ----
+    /*
+     * `drive`'s early returns are ORDERED. Without the `!this.staged` guard a
+     * chaff would cut sideways out of the mouth at 2,261 u/s from the frame it
+     * appeared -- build 307's DRIFT finding, build 322's rider finding, and
+     * now a third costume. ONE body in TWO phases rather than two bodies,
+     * because a staged body comes loose on the frame it passes the entry line
+     * and the same chaff then hops: while it is staged the copy count is
+     * EXACTLY zero and neither hop field has been written, and neither half
+     * needs a margin.
+     */
+    {
+      clean();
+      pin();
+      const e = body('chaff', w.width * 0.5, -60);
+      e.staged = true;
+      /*
+       * Counted over frames that were staged at BOTH ends. Read after the
+       * loop it said ONE copy on a build where the guard works: the loop
+       * exits on the frame `staged` went false, `Enemy.update` clears it
+       * before `physicsStep` runs `steer`, and the body's first loose hop had
+       * already happened. Sample the last frame the state HELD -- which this
+       * repo has now paid for four times, on four different quantities.
+       */
+      let f = 0;
+      let worst = 0;
+      let fields = 0;
+      while (e.staged && f < 60 * 20) {
+        g.update(1 / 60);
+        if (!e.staged) break;
+        worst = Math.max(worst, w.ghosts.length);
+        if (e.hopFor !== 0 || e.hopSide !== 0) fields++;
+        f++;
+      }
+      const staged = { seconds: +(f / 60).toFixed(2), copies: worst, fields };
+      let f2 = 0;
+      while (!w.ghosts.length && f2 < 60 * 10 && !e.dead) { g.update(1 / 60); f2++; }
+      out.staged = { staged, loose: { copies: w.ghosts.length, seconds: +(f2 / 60).toFixed(2) } };
+    }
+
+    // ---- 7. AUTO AIM off is the counter, and the silhouette is the tell --
+    /*
+     * The object's answer is "aim it yourself", and that is not a claim about
+     * a threshold -- `Game.autoTarget` is the ONLY place in src/ that reads
+     * the copies at all and it is called from one site, `w.autoAim ?
+     * this.autoTarget() : null`. So with the assist off the lock is null
+     * through a window in which copies are standing, and the arm asserts the
+     * copies really were there or it is about nothing.
+     *
+     * And the silhouette, because CHAFF is the third type in the swarm
+     * family's cyan: `docs/objects.html` gives the family `#7ef9ff`, which is
+     * MOTE's body colour and SHOAL's at dE 0.0. The standing ruling is that
+     * the family is what the colour means and the shape carries the
+     * distinction -- so the shape has to, measured on the ALPHA channel alone
+     * with the tone divided out by construction.
+     */
+    {
+      clean();
+      pin();
+      w.autoAim = false;
+      w.autoFire = true;
+      const e = body('chaff', w.width * 0.5, w.floorY - 600);
+      let lock = 0;
+      let sawCopies = 0;
+      for (let f = 0; f < 300; f++) {
+        e.hp = e.maxHp;
+        g.update(1 / 60);
+        if (g.autoLock) lock++;
+        if (w.ghosts.length) sawCopies++;
+      }
+      out.blind = { lock, sawCopies };
+
+      const SZ = 96;
+      const shot = (id) => {
+        const c = document.createElement('canvas');
+        c.width = SZ;
+        c.height = SZ;
+        const x = c.getContext('2d');
+        x.translate(SZ / 2, SZ / 2);
+        drawSpecimen(x, id, 22);
+        const px = x.getImageData(0, 0, SZ, SZ).data;
+        const a = new Uint8Array(SZ * SZ);
+        let ink = 0;
+        for (let i = 0; i < SZ * SZ; i++) { a[i] = px[i * 4 + 3]; ink += px[i * 4 + 3]; }
+        return { a, ink: Math.round(ink / 1000) };
+      };
+      const diff = (p, q) => {
+        let sum = 0;
+        for (let i = 0; i < p.a.length; i++) sum += Math.abs(p.a[i] - q.a[i]);
+        return Math.round(sum / 1000);
+      };
+      const me = shot('chaff');
+      out.draw = { ink: me.ink, selfZero: diff(shot('chaff'), shot('chaff')) };
+      for (const id of ['mote', 'shoal', 'needle', 'drift']) out.draw[id] = diff(me, shot(id));
+    }
+
+    // ---- 8. the wave brings them, and the type is authored ---------------
+    {
+      const at = WAVES.findIndex((x) => (x.of || []).some((o) => o[0] === 'chaff'));
+      if (at < 0) throw new Error('no wave authors a chaff');
+      out.wave = { at, band: WAVES[at].band, of: WAVES[at].of,
+        gait: T.gait, upright: !!T.upright, weight: T.weight || 0,
+        harmless: !!T.harmless };
+    }
+
+    clean();
+    return out;
+  });
+
+  const lp = r.leap;
+  const wt = r.want;
+  const exact = lp.every((a) => a.n >= 4
+    && a.dx.every((v) => Math.abs(v - wt.leap) < 0.1)
+    && a.dy.every((v) => Math.abs(v - wt.drop) < 0.1));
+  check('a hop crosses exactly what it is authored to cross, at any frame rate',
+    exact
+    && lp.every((a) => a.closing !== null
+      && Math.abs(a.closing - a.cruise) < a.cruise * 0.04),
+    lp.map((a) => `at dt 1/${Math.round(1 / a.dt)}: ${a.n} leaps, |dx| `
+      + `${[...new Set(a.dx)].join('/')} and dy ${[...new Set(a.dy)].join('/')} against an `
+      + `authored ${wt.leap} and ${wt.drop} (span ${wt.span} over ${wt.substeps} substeps), `
+      + `closing ${a.closing} against its own cruise ${a.cruise}`).join('; '));
+
+  const cs = r.census;
+  check('...and nothing but the assist can see a copy',
+    cs.laid && cs.offBy < 0.5 && cs.ownedBy && cs.r === cs.bodyR
+    // a blast leaves a copy identical in every field it has, and kills the body
+    && cs.ghostBlast && JSON.stringify(cs.ghostBlast) === JSON.stringify(cs.before)
+    && cs.ghostBlast.inList
+    && cs.bodyBlast.took > 0 && cs.bodyBlast.dead
+    // a round crosses a copy and stops on a body
+    && cs.throughCopy && cs.throughCopy.ok && cs.throughCopy.past > 40 && cs.throughCopy.took === 0
+    && cs.throughBody.ok && cs.throughBody.took > 0 && cs.throughBody.past < 0
+    // ...and every count that decides a wave is blind to them
+    && cs.withBody.hostiles === cs.beforeCounts.hostiles + 1
+    && cs.held >= 2
+    && cs.afterCounts.copies >= 2
+    && cs.afterCounts.hostiles === 0 && cs.afterCounts.standing === 0
+    && cs.afterCounts.attackers === 0 && cs.kills === 0,
+    `the copy stood ${cs.offBy} from where the body was when it left, at the same radius `
+    + `${cs.r}. A 1000-point blast with 3000 of impulse, centred on a copy, left it `
+    + `${JSON.stringify(cs.ghostBlast) === JSON.stringify(cs.before) ? 'identical in every field' : 'CHANGED'} `
+    + `and killed a MOTE in the same place for ${cs.bodyBlast.took}; a round fired at a copy went `
+    + `${cs.throughCopy && cs.throughCopy.past} units past it for ${cs.throughCopy && cs.throughCopy.took} `
+    + `damage, and the same shot at a BULWARK stopped ${-cs.throughBody.past} units short of its `
+    + `centre for ${cs.throughBody.took}. `
+    + `With ${cs.held} copies standing and the body gone: hostiles `
+    + `${cs.afterCounts.hostiles}, standing ${cs.afterCounts.standing}, attackers `
+    + `${cs.afterCounts.attackers}, and Game.sweep booked ${cs.kills} kills`);
+
+  const lk = r.lock;
+  const on = lk[0];
+  const off = lk[1];
+  check('a copy inherits the lock at the instant of the leap, and without that it never wins',
+    on.shareF > 0.15 && on.shareR > 0.10
+    // ...and the control is an absolute zero, not a margin
+    && off.ghF === 0 && off.ghR === 0
+    // the two arms really did carry the same copies, or it is not an A/B
+    && Math.abs(on.copies - off.copies) < Math.max(on.copies, off.copies) * 0.25
+    && on.lockF > 150 && off.lockF > 150 && on.R > 8 && off.R > 8,
+    `3 chaff and 3 LURCHERs over 330 frames: with the inheritance the assist held a copy `
+    + `${on.ghF}/${on.lockF} = ${on.shareF} of its locked frames and fired `
+    + `${on.ghR}/${on.R} = ${on.shareR} of its rounds at one; with it off, `
+    + `${off.ghF}/${off.lockF} and ${off.ghR}/${off.R} -- the copies standing `
+    + `${on.copies} against ${off.copies} either way, so the only thing that moved is `
+    + `whether a copy may be handed a lock it cannot win on distance`);
+
+  const ck = r.clock;
+  const wk = r.walk;
+  const hz = r.hazard;
+  check('a copy runs out on its own clock, and the body walks in rather than leaping onto the mount',
+    ck.madeOne && ck.early === 1 && ck.late === 0
+    // the guard: nothing started inside the radius, nothing landed inside the overlap
+    && !wk.dead && wk.started >= 4 && wk.inside === 0
+    && wk.land >= wk.overlap && wk.minD >= wk.overlap - 1
+    // ...and the cruise is handed back, which the first ordering did not do
+    && wk.cruise === wk.base
+    // the hazard the guard exists for, with its own speed as the control
+    && hz[0].dead && !hz[1].dead,
+    `a copy is still there at ${(ck.life * 0.9).toFixed(2)}s of ${ck.life} and gone at `
+    + `${(ck.life * 1.1).toFixed(2)}s. A chaff started ${wk.started} leaps, ${wk.inside} of them `
+    + `inside the ${wk.walk}-unit walk radius, the nearest landing ${wk.land} against an overlap `
+    + `of ${wk.overlap}; it walked to ${wk.minD} in ${wk.seconds}s with the cruise handed back at `
+    + `${wk.cruise}. Put ON the mount at the burst speed ${hz[0].speed} it ${hz[0].dead ? 'died in '
+      + hz[0].frames + ' frames' : 'LIVED'}, and at its own ${hz[1].speed} it `
+    + `${hz[1].dead ? 'DIED' : 'lived on ' + hz[1].hp + ' health'}`);
+
+  const st = r.staged;
+  const bl = r.blind;
+  const D = r.draw;
+  const wv = r.wave;
+  check('it comes down the portal, the assist off cannot be fooled, and the shape is not a MOTE',
+    st.staged.copies === 0 && st.staged.fields === 0
+    && st.staged.seconds > 0.3 && st.loose.copies >= 1
+    && bl.lock === 0 && bl.sawCopies > 100
+    && D.selfZero === 0 && D.mote > 40 && D.shoal > 40 && D.needle > 40 && D.drift > 40
+    && wv.gait === 'hop' && wv.upright && wv.weight === 0 && !wv.harmless,
+    `staged for ${st.staged.seconds}s it left ${st.staged.copies} copies and wrote neither hop `
+    + `field; loose it left ${st.loose.copies} within ${st.loose.seconds}s. With AUTO AIM off `
+    + `the lock was null for all 300 frames while copies stood on ${bl.sawCopies} of them. `
+    + `On the alpha channel alone -- so this is shape and nothing else -- CHAFF is ${D.mote} `
+    + `from a MOTE, ${D.shoal} from a SHOAL dart, ${D.needle} from a NEEDLE and ${D.drift} `
+    + `from a DRIFT, against ${D.selfZero} from itself; wave ${wv.at} in band ${wv.band}`);
 }
 
 // --- report -----------------------------------------------------------------

@@ -220,6 +220,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     case 'latch': drawLatch(ctx, r, 0, 0); break;
+    case 'chaff': drawChaff(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
   }
   ctx.restore();
@@ -411,6 +412,27 @@ export class Enemy {
     this.rides = type.gait === 'ride' && !this.isDrop;
     this.rideT = this.rides ? ridesOf(type).life : 0;
     this.host = null;
+    /*
+     * The hop's three pieces of state, declared here rather than sprung into
+     * existence inside the gait, for the reason `placed`, `fizzle`, `ignoreT`
+     * and `bornFor` are: a field that only exists on bodies that have met the
+     * one thing that writes it is a field you have to grep the repo to find
+     * out about.
+     *
+     * `hopT` is SECONDS to the next leap and `hopFor` is SUBSTEPS left of the
+     * leap in progress, and the difference is measured rather than stylistic:
+     * a leap has to end after a fixed number of steps or it does not cover
+     * the distance it claims, and `0.05 - 6 * (1/120)` is 6.9e-18 rather than
+     * zero, so as a float countdown the burst lived a seventh substep and
+     * every leap came out a seventh too far. A rest may be a float; a fixed
+     * count may not.
+     *
+     * `hopSide` is which way across the field it is going -- reversed at
+     * `edgeEase`'s band rather than at the wall, which is build 312's rule.
+     */
+    this.hopT = 0;
+    this.hopFor = 0;
+    this.hopSide = 0;
     /*
      * Balls riding this body. A seed that reaches a host used to dissolve into
      * it: the host silently became bigger and started healing, and there was
@@ -1230,6 +1252,184 @@ export class Enemy {
    * @param {number} ty
    * @returns {number[]} the target this gait steers at instead
    */
+  /*
+   * CHAFF's hop, and the copy it leaves behind.
+   *
+   * Returns true when it owns the body this frame and false when it has handed
+   * it back to the ordinary march, which is the one thing this gait does that
+   * none of the others do -- see the `walk` guard below.
+   *
+   * ---- IT WRITES THE VELOCITY AND THEN STOPS IT -------------------------
+   *
+   * Every other gait in this game steers: it hands `drive` a target and the
+   * blend gets there when it gets there. A hop cannot, because the whole
+   * object is that it is DISCONTINUOUS -- "sits still, then crosses a fixed
+   * distance in three frames" -- and a blend at `accel / 100` is a two-second
+   * time constant. So the leap is a velocity burst held for `leapT` and then
+   * zeroed, which is also why the body genuinely SITS between leaps rather
+   * than creeping: `vx` and `vy` are written to zero on every idle frame.
+   *
+   * ...and the burst is grossed up for the damping EXACTLY, because
+   * `integrate` damps every substep: a burst v over a time T covers
+   * `v (1 - e^-lT) / l` and not `vT`. Measured, a naive `leap / leapT` of
+   * 1200 u/s delivers 59.18 of the 60 units it is asking for. The closed form
+   * is `span * l / (1 - e^-lT)`, which is the fifth time this repo has had to
+   * write down that a target speed is not a speed (builds 298, 308, 316, 317)
+   * and the first time the answer has been an exact integral rather than a
+   * steady state.
+   *
+   * ---- AND THE SPEED CLAMP WOULD OTHERWISE EAT IT ENTIRELY -------------
+   *
+   * `integrate` clips to `cruise * maxSpeedFactor` -- for CHAFF about 420,
+   * which allows TWENTY-ONE units in three frames against a leap of 112. Even
+   * `thrownSpeed` 720 allows only 36. So the gait raises `this.cruise` for the
+   * duration of its own leap and puts it back, which is `diveOn`'s precedent
+   * (SHRIKE writes a cruise per phase) rather than a third speed regime in
+   * `physics.js`. Note the route's `dawdle` cannot reach any of this: `drive`
+   * multiplies a LOCAL copy of the cruise and this gait reads `baseCruise`,
+   * so unlike `dive` the hop needs no `OWN_SPEED` exemption -- and the WALK
+   * deliberately keeps the dawdle, because a slower final approach is a
+   * balance detail rather than a broken claim.
+   */
+  hopOn(world, dt) {
+    const C = CFG.chaff;
+    const P = CFG.physics;
+    const s = world.shooter;
+    if (!(this.baseCruise > 0)) this.baseCruise = this.cruise;
+    const span = Math.hypot(C.leap, C.drop);
+    /*
+     * How many PHYSICS SUBSTEPS a leap lasts. `CFG.fixedStep` is 1/120 and
+     * `steer` runs once per substep, so this is six -- three frames at 60Hz
+     * and six at 120, which is the same DURATION either way. That is why the
+     * object guide's "three frames" is authored as `leapT` seconds: a
+     * frame-counted hop would cross twice as much ground on a 60Hz phone as
+     * on a 120Hz one.
+     */
+    const N = Math.max(1, Math.round(C.leapT / CFG.fixedStep));
+    /*
+     * ---- a leap in the air is FINISHED, wherever it has got to ----------
+     *
+     * This branch is above the walk guard and the order is the whole of why
+     * the object does not kill itself. Written the other way round -- guard
+     * first -- a leap that crossed INTO the guard's radius was abandoned
+     * rather than finished: `hopFor` stopped counting down, the raised cruise
+     * was never given back, and the burst velocity was never zeroed, so the
+     * body coasted in at two thousand units a second under a speed cap of
+     * 2,268 and died on the mount. Measured on the first trace: dead at
+     * frame 210 with `hopFor` frozen at 0.05 and `cruise` frozen at 378.
+     *
+     * The guard below refuses to START a leap inside its radius and that
+     * radius carries a whole leap's reach, so a leap that was legal to begin
+     * is legal to land -- which is what makes finishing it safe rather than
+     * merely tidier. A state machine's exit has to be reachable from every
+     * state it can be in; a guard placed above one is a state abandoned.
+     */
+    if (this.hopFor > 0) {
+      this.hopFor -= 1;
+      if (this.hopFor <= 0) {
+        this.vx = 0;
+        this.vy = 0;
+        this.cruise = this.baseCruise;
+      }
+      return true;
+    }
+    /*
+     * ---- it WALKS the last stretch, and the distance is derived ---------
+     *
+     * The turret is static, so `impactDamage`'s reduced mass against it is
+     * this body's WHOLE mass clamped at 300 -- death for anything under that
+     * at any relative speed over the threshold, which is build 317's SHRIKE
+     * finding. A leap crosses 112 units at about 2,200 u/s, so a landing
+     * anywhere inside the overlap is fatal, and the exit from a leap is a
+     * CLOCK rather than a position, so nothing else would have caught it.
+     *
+     * So the ground a hop may not land in is the overlap plus the grab pad
+     * plus one whole leap: inside that the body hands itself back to the
+     * march and simply walks in. Derived from the two rules it would
+     * otherwise fight, which is the same shape as `diveLane` and as `roll`
+     * turning at `edgeEase`'s band.
+     *
+     * And it gives the cruise back on the way out. A hand-back that left the
+     * leap's raised cruise standing would march the body in at six times the
+     * speed its type declares -- the same fault as abandoning the leap, one
+     * field along, and equally silent.
+     */
+    const walk = this.r + s.r + CFG.shooter.grabPad + C.walkPad + span;
+    if ((this.x - s.x) ** 2 + (this.y - s.y) ** 2 <= walk * walk) {
+      this.cruise = this.baseCruise;
+      return false;
+    }
+
+    // Between leaps it is STILL. Not slowing: still.
+    this.vx = 0;
+    this.vy = 0;
+    /*
+     * The rest between leaps is DERIVED from the body's own cruise, so the
+     * average closing speed of a hopping body is the `speed` its type
+     * declares -- `drop / baseCruise` seconds a leap, dropping `drop` units.
+     * Authored the other way round it would be a second number for the same
+     * fact, which is what `speed * climb` is pinned by for a `rise` type.
+     */
+    this.hopT -= dt;
+    if (this.hopT > 0) return true;
+    /*
+     * The rest between leaps, so that the AVERAGE closing speed of a hopping
+     * body is exactly the `speed` its type declares: a cycle drops `drop`
+     * units and lasts `drop / cruise` seconds, of which the leap itself is
+     * `leapT`, so the sitting still is the remainder. Authored as a rest
+     * instead it would be a second number for the same fact, which is what a
+     * `rise` type's `speed * climb` is pinned by -- and subtracting the leap
+     * is not a detail: without it the delivered rate is 7% under the declared
+     * one, which is a body advertised at 70 arriving at 65.
+     *
+     * A float countdown here is fine and is NOT fine for the leap below --
+     * see the note on `hopFor`. A rest that runs half a substep long costs
+     * half a substep of standing still; a leap that runs one substep long is
+     * one seventh further than it says.
+     */
+    this.hopT = Math.max(0, C.drop / this.baseCruise - N * CFG.fixedStep);
+
+    /*
+     * Which way across. It keeps its side until the landing would enter the
+     * band `edgeEase` pushes bodies out of -- so the turn is derived from the
+     * rule it would otherwise fight rather than from the wall, which is build
+     * 312's finding: a turn point measured off the wall is a branch nothing
+     * can take, because nothing is ever allowed within 96 units of it.
+     */
+    if (!this.hopSide) this.hopSide = this.x < s.x ? 1 : -1;
+    const band = P.edgeEase + this.r;
+    const land = this.x + this.hopSide * C.leap;
+    if (land < band || land > world.width - band) this.hopSide = -this.hopSide;
+
+    // The copy stands where the body was, and the body leaves.
+    leaveGhost(world, this);
+
+    /*
+     * ---- the burst, and it is the EXACT DISCRETE sum ---------------------
+     *
+     * `integrate` moves then damps, so a burst v live for N substeps covers
+     * `v dt (1 - r^N) / (1 - r)` with `r = exp(-damping dt)` -- and inverting
+     * that is what makes the leap land on `span` rather than near it. The
+     * continuous integral `span l / (1 - e^-lT)` is the form the other four
+     * compensations in this file use and it is 0.23% out here, which would
+     * have been invisible; what was NOT invisible is the substep count.
+     *
+     * `hopFor` counts SUBSTEPS as an integer. It was a float countdown of
+     * `leapT` seconds and the leap came out 130.44 units against a span of
+     * 111.80 -- exactly 7/6 -- because `0.05 - 6 * (1/120)` is 6.9e-18 and
+     * not zero, so the burst lived a seventh substep. A clock that has to
+     * expire after a FIXED NUMBER of steps cannot be a float: measure the
+     * delivered distance, not the expression.
+     */
+    const r = Math.exp(-P.linearDamping * CFG.fixedStep);
+    const v = (span * (1 - r)) / (CFG.fixedStep * (1 - r ** N));
+    this.cruise = Math.max(this.baseCruise, v / P.maxSpeedFactor);
+    this.vx = (this.hopSide * C.leap / span) * v;
+    this.vy = (C.drop / span) * v;
+    this.hopFor = N;
+    return true;
+  }
+
   diveOn(world, dt) {
     const S = CFG.shrike;
     const s = world.shooter;
@@ -1847,6 +2047,31 @@ export class Enemy {
      */
     if (this.rides && !this.staged) {
       this.hunt(world, dt);
+      return;
+    }
+    /*
+     * ---- CHAFF hops, and the branch is ORDERED for three reasons --------
+     *
+     * BELOW `thrown`, so a PULSE, a PILE, a HEAVE or a HAIL suspends the hop
+     * and lands its shove for free -- a body that starts leaping again on the
+     * frame after a deliberate clear has not been cleared, and the coast is
+     * what `thrown` is for.
+     *
+     * BELOW `staged`, guarded, so a chaff comes down the portal like
+     * everything else and starts hopping on the frame it is loose. Without
+     * that guard it would cut sideways out of the mouth at 2,200 u/s, which
+     * is build 307's DRIFT fault and build 322's rider fault in a third
+     * costume.
+     *
+     * And it owns the VELOCITY rather than offering a target, so it returns
+     * here instead of joining the `tx`/`ty` chain below -- except when
+     * `hopOn` hands the body back, which it does for the last stretch in
+     * front of the machine. That is the one gait in the game that stops being
+     * itself: see the `walk` guard, which is derived from the fact that
+     * landing a 2,200 u/s leap on a static turret is fatal.
+     */
+    if (this.type.gait === 'hop' && !this.staged && !this.isDrop
+      && this.hopOn(world, dt)) {
       return;
     }
     /*
@@ -3264,6 +3489,7 @@ export class Enemy {
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'latch': drawLatch(ctx, this.r, this.phase, world.time); break;
+      case 'chaff': drawChaff(ctx, this.r, this.phase, world.time); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
       default: drawChip(ctx, this.r, this.phase);
     }
@@ -5272,6 +5498,50 @@ function drawScion(ctx, r, phase, time) {
     ctx.fill();
     ctx.stroke();
   }
+}
+
+/**
+ * CHAFF: a broken ring with three spokes, and the gaps are the point.
+ *
+ * The type declares `upright`, so the gaps sit at fixed bearings in the world
+ * instead of wherever `rand(0, TAU)` put the body -- which matters more here
+ * than for anything else in the roster, because the whole object is that
+ * several of these are on the screen at once and only one of them is real.
+ * A picture that rotates per body would make the copies and their owner
+ * distinguishable by accident, and a picture that rotates per FRAME would
+ * make them indistinguishable from each other in a way the fiction does not
+ * intend.
+ *
+ * The three spokes reach 1.5r, which is the object guide's own figure and is
+ * the one thing on it that reads at r 13 on a phone.
+ */
+function drawChaff(ctx, r, phase, time) {
+  // The shell, in two arcs with two gaps.
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0.5, Math.PI * 1.35);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, r, Math.PI * 1.55, 0.2);
+  ctx.stroke();
+  const lw = ctx.lineWidth;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = lw * 0.8;
+  for (let i = 0; i < 3; i++) {
+    const a = i * 2.1 + 0.4;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 0.4, Math.sin(a) * r * 0.4);
+    ctx.lineTo(Math.cos(a) * r * 1.5, Math.sin(a) * r * 1.5);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // The core, which is the only part that moves: it is what says the thing is
+  // about to leap, and a copy's is frozen at the phase it was left on.
+  const beat = 0.62 + 0.38 * Math.sin(time * 7 + phase);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.3 * beat, 0, TAU);
+  ctx.fill();
 }
 
 /**
@@ -8242,6 +8512,168 @@ export function spawnByGait(world, type, x) {
  * health, and shooting one off takes its whole share back — which is the way
  * out of a body that is otherwise healing faster than you can hurt it.
  */
+/*
+ * ---- A COPY IS NOT A BODY, AND world.ghosts IS THE WHOLE OF WHY ---------
+ *
+ * CHAFF leaves a copy of itself at every leap. The assist reads it as a
+ * target; nothing can be shot off it. That pair is the exact INVERSE of
+ * `staged` (shootable but not choosable, and `config.js` says in as many
+ * words that it never gated projectile collision) and a cousin of `spent`
+ * (drawn, not choosable, rounds pass through) -- so there is no combination of
+ * this game's existing marks that expresses it, because every mark it has
+ * removes a body from the CHOOSER and the damage paths together.
+ *
+ * So a copy is not a body and does not live in `world.enemies`. That list's
+ * membership buys, in one census: the projectile sweep, `applyBlast` (HE,
+ * AIRBURST, PULSE, DECOY, PILE, WELL, two mines, a BLOOM's detonate), the
+ * mine trigger, WIRE, LANCE, WARD, a `Patch`, `checkContact` and
+ * `world.attackers`, the whole physics stack (`steer`, `integrate`, the
+ * arena clamp, `resolvePair` and `impactDamage`), `Enemy.update`,
+ * `Game.sweep` -- which books the CODEX and the KILL -- `hostileCount` and
+ * therefore the field cap and the release gate, `Director.standing` and
+ * therefore the wave verdict, `tagBody`, the STASIS brackets, the touch
+ * ring, `drawHitboxes` and the BELL's bearing tick.
+ *
+ * Every one of those is a guard that would have had to be written and then
+ * maintained. Out of the list, none of them is: the object is correct BY
+ * OMISSION, and the one place in `src/` a ghost is visible at all is the
+ * second pass in `Game.autoTarget`. That is the property worth having and it
+ * is what `regress.mjs` sweeps.
+ *
+ * ---- EVERY FIELD ON HERE HAS A READER, AND THE FIRST DRAFT'S DID NOT -----
+ *
+ * The first version carried `hp`, `maxHp`, `angle` and `fizzle` as well,
+ * under a comment claiming the fields were "deliberately complete" and
+ * naming `drawBearings` as the reader that would produce a non-finite path
+ * without `vx`/`vy`. **`drawBearings` iterates `world.enemies` and cannot see
+ * this list at all**, and nothing read the other four either -- so a
+ * paragraph written to justify completeness had invented a mechanism and
+ * created four dead fields in the same breath. That is `kind: 'works'`
+ * (eighteen builds) and `large: true` (fifteen types) arriving in brand new
+ * code, with an inaccurate comment on top, and build 313's sweep cannot see
+ * it because that sweep is over `ENEMY_TYPES`.
+ *
+ * What actually reads a copy, enumerated rather than assumed:
+ *
+ *   - `consider` in `Game.autoTarget` -- `dead`, `staged`, `spent`,
+ *     `shielded` (which reads `y` and `r`), `harmless`, `x`, `y`, `r`,
+ *     `attacking`. `attacking` is NEVER true, and it is the one field here
+ *     that could break the assist rather than a picture: the score is
+ *     `dist * (attacking ? 0.25 : 1)`, so a copy that was ever marked would
+ *     outrank a real body four times closer.
+ *   - `Game.aimLead` -- `vx`/`vy`, through `(target.vx || 0)`. A copy does
+ *     not move, so zero is the right answer and the `|| 0` makes writing it
+ *     belt-and-braces rather than load-bearing.
+ *   - `Game.drawAutoLock` -- `dead`, `x`, `y`, `r`. This is the reticle
+ *     landing on a copy, which is the whole object made visible.
+ *   - `updateGhosts` and `drawGhosts` -- `t`, `life`, `type`, `phase`,
+ *     `time`, `x`, `y`, `r`.
+ *   - the inheritance -- `from` and `fresh`, and nothing else ever.
+ */
+export function leaveGhost(world, e) {
+  const list = world.ghosts;
+  if (!list) return null;
+  /*
+   * Never more copies than the field can hold bodies, oldest first. Derived
+   * from `maxEnemies` rather than written down, because a hand-picked ceiling
+   * on a list whose length is `chaff x ghost / every` is a number that stops
+   * being right the first time any of those three moves. `P.births` in
+   * portal.js is the precedent for the shape and for the fault: a side list
+   * of body references gets missed.
+   */
+  while (list.length >= CFG.maxEnemies) list.shift();
+  const gh = {
+    type: e.type,
+    from: e, // the body that left it -- read ONLY by the lock inheritance
+    fresh: true, // ...and only until the assist has been offered it once
+    x: e.x,
+    y: e.y,
+    r: e.r,
+    phase: e.phase,
+    vx: 0,
+    vy: 0, // a copy does not move, and `aimLead` leads it by this
+    dead: false,
+    staged: false,
+    spent: false,
+    harmless: false,
+    /*
+     * NEVER true, and it is the one field on here that could break the
+     * assist rather than a picture: `autoTarget` scores
+     * `dist * (attacking ? 0.25 : 1)`, so a copy that was ever marked would
+     * outrank a real body four times closer. Measured on a stand-in -- two
+     * bare ghosts, the nearer one wins with both clean and the FARTHER one
+     * wins the moment it is marked.
+     */
+    attacking: false,
+    t: 0,
+    life: CFG.chaff.ghost,
+    /*
+     * The moment it was left, so `drawChaff`'s beating core is FROZEN on a
+     * copy rather than beating in step with the owner it came off. Copied
+     * `phase` alone would have kept them synchronised -- `world.time` moves
+     * and `phase` does not -- and the comment in `drawChaff` claimed the
+     * opposite of what that does, which is the thing this repo keeps paying
+     * for. A still picture is also the honest reading: the copy is where the
+     * body WAS, at the instant it left.
+     */
+    time: world.time,
+  };
+  list.push(gh);
+  return gh;
+}
+
+/**
+ * The copies' own clock, and nothing else.
+ *
+ * Not `Game.sweep`, which is what pays and counts -- it calls
+ * `noteDestroyed` (a CHAFF entry in the glossary for a thing that was never
+ * destroyed) and `registerKill` (the tally, the ladder). A copy expiring is
+ * not a kill and not a death; it is a clock running out, the way a `Shock` or
+ * a `Patch` ends.
+ */
+export function updateGhosts(world, dt) {
+  const list = world.ghosts;
+  if (!list || !list.length) return;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const gh = list[i];
+    gh.t += dt;
+    if (gh.t < gh.life) continue;
+    list[i] = list[list.length - 1];
+    list.pop();
+  }
+}
+
+/**
+ * The copies, drawn as what they are: the same picture, fading.
+ *
+ * The alpha is MULTIPLIED IN and put back by `restore`, never assigned --
+ * which every one of the six existing reduced-alpha body draws in this game
+ * gets wrong (the DECOY, a boss's arrival ghost, four boss modules). They do
+ * not leak because each is inside its own `save`/`restore`, but the pattern
+ * is the one build 210 spent a pass on.
+ *
+ * And it does NOT go through `Enemy.draw`, which is the other half of the
+ * decision: that path carries an ambient `drawGlow` at `lighter` over 2.1
+ * radii, and a copy every 0.7 seconds with a 1.5 second life means two or
+ * three stacked at once -- additive blooms where the object wants faint
+ * outlines. The guide's own art has them at 0.39 / 0.26 / 0.13.
+ */
+export function drawGhosts(ctx, world) {
+  const list = world.ghosts;
+  if (!list || !list.length) return;
+  for (const gh of list) {
+    const k = 1 - gh.t / gh.life;
+    ctx.save();
+    ctx.globalAlpha *= CFG.chaff.ghostAlpha * k;
+    ctx.translate(gh.x, gh.y);
+    ctx.fillStyle = rgba(gh.type.color, 0.14);
+    ctx.strokeStyle = rgba(gh.type.color, 0.9);
+    ctx.lineWidth = Math.max(CFG.hairline, gh.r * 0.1);
+    drawChaff(ctx, gh.r, gh.phase, gh.time);
+    ctx.restore();
+  }
+}
+
 export function graft(world, host, rider) {
   const G = CFG.graft;
   /*
