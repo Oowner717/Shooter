@@ -301,6 +301,40 @@ for (let r = 0; r < RUNS; r++) {
       if (w.ledger.length) throw new Error(`restart left ${w.ledger.length} purchases behind`);
       for (let i = 0; i < 90; i++) g.update(S);
       g.debugTeachAll();
+      /*
+       * ---- AND THE ERA THE RUNG IS ACTUALLY PLAYED AT, build 306 ---------
+       *
+       * This probe never touched the era, and until build 305 that was very
+       * nearly right: `eraGate` was 42, so nineteen of its twenty rows were
+       * era-1 rows anyway. 305 moved the hold to 28 and the whole of band 5
+       * -- rungs 29 to 35 -- became era-2 territory, so every row past 28 was
+       * measuring band 5 on a field the game no longer sends it to. A loose
+       * crossing is 1481 world units at era 2 against 962 at era 1 and a
+       * body's own speed does not scale with it, so that is not a rounding
+       * difference: it is a third more ground to cover.
+       *
+       * DERIVED from `eraGate` rather than written out, so this follows the
+       * next time the hold moves.
+       *
+       * The switch is FORCED rather than requested. `setEra` refuses a switch
+       * to the era it is already in, and `reset()` writes `w.era = 1` -- so
+       * after an era-2 row the next `restart()` leaves the flag at 1 and
+       * `setEra(1)` is a no-op that runs neither `takeField` nor the sky.
+       * Writing the opposite era first makes the switch real. (The GEOMETRY
+       * is safe either way: `reset()` re-derives it by comparing `CFG.zoom`
+       * against `CFG.ZOOMS[era]` and resizing if they disagree, which was
+       * checked rather than assumed -- the first version of this note claimed
+       * a resize bug that is not there.) It still has to happen BEFORE
+       * anything the probe sets that a resize would overwrite, because the
+       * resize rewrites every `SCALED` value from `BASE`.
+       *
+       * `newForm` moves with it because the era and that flag are one state:
+       * up sets 'done', down sets 'armed'.
+       */
+      const era = tier > CFG.waves.tier.eraGate ? 2 : 1;
+      w.era = era === 2 ? 1 : 2;
+      w.newForm = era === 2 ? 'done' : 'armed';
+      g.setEra(era);
       w.director.setTier(tier);
       // The director is silenced rather than paused: this measures one body,
       // and a wave landing on top of it would be measuring a fight.
@@ -630,7 +664,7 @@ for (let r = 0; r < RUNS; r++) {
       }
 
       const wave = waveClear(waveOf.of, waveCap, waveOf.band);
-      return { tier, spend, bought, gun, marks, wave };
+      return { tier, spend, bought, gun, marks, wave, era: w.era };
     }, {
       tier, spend: spendAt(tier), line: LINE, cap: CAP, range: RANGE, slack: SLACK,
       benchFor: BENCH, waveCap: WAVECAP, ids: BANDS.get(bandOf(tier)) || [],
@@ -705,6 +739,15 @@ async function streamAt(page, rung) {
     g.restart();
     w.phase = 'staging';
     g.debugTeachAll();
+    // ...and the era this rung is played at. See the long note in the loadout
+    // pass: derived from `eraGate`, and forced because `reset()` clears the
+    // flag without resizing.
+    {
+      const era = tier > CFG.waves.tier.eraGate ? 2 : 1;
+      w.era = era === 2 ? 1 : 2;
+      w.newForm = era === 2 ? 'done' : 'armed';
+      g.setEra(era);
+    }
     g.debugClearField();
     g.debugGiveBytes(900000000);
     w.earned = 999999000;            // every type open, so the roster is the band's
@@ -806,7 +849,7 @@ console.log(`  one body HELD at ${RANGE} units straight up (measured ${med(atRan
  * reads `500 kB` against a card that reads `500 kB` is one fewer conversion
  * between the bench and the thing it is benching.
  */
-console.log('  tier band     spend  buys  rnd/s     dps  worst   wave  clear       pay      pay/s  |  time to kill');
+console.log('  tier band era     spend  buys  rnd/s     dps  worst   wave  clear       pay      pay/s  |  time to kill');
 const worst = new Map();
 const clears = new Map();
 const pays = new Map();
@@ -856,7 +899,7 @@ for (const tier of tiers) {
   const perSec = med(runs.map((r) => r.wave.pay / Math.max(0.1, r.wave.secs)));
   pays.set(tier, perSec);
 
-  console.log(`  ${pad(tier, 4)}${pad(band, 5)}${pad(fmtBytes(spend), 10)}${pad(Math.round(buys), 6)}`
+  console.log(`  ${pad(tier, 4)}${pad(band, 5)}${pad(runs[0].era, 4)}${pad(fmtBytes(spend), 10)}${pad(Math.round(buys), 6)}`
     + `${pad(rps.toFixed(1), 7)}${pad(dps.toFixed(0), 8)}`
     + `${pad(Number.isFinite(top) ? `${top.toFixed(1)}s` : `>${CAP}s`, 7)}`
     + `${pad(Math.round(asked), 7)}`

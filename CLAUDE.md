@@ -3099,4 +3099,51 @@ came from before believing the other one covers it.
   TERMINUS stands at 49 and PARITY at 42. A constant that moves is the moment
   to grep for its old value in PROSE as well as in code: the numbers were
   wrong for six builds and nothing could fail for it.
+- **`tiers.mjs` NEVER SET THE ERA, and build 305 turned that from almost-right
+  into wrong for every row past rung 28.** The probe called `g.restart()` and
+  measured on whatever field that left -- era 1, always. While `eraGate` was 42
+  that was nineteen of its twenty rows correct by accident; 305 moved the hold
+  to 28, and since `perBand` is 7 the whole of band 5 (rungs 29-35) became
+  era-2 territory. So the one instrument pointed at the ordinary field was
+  measuring band 5 on a field the game no longer sends it to. It derives the
+  era from `eraGate` now and PRINTS it as a column, because a table that does
+  not say which field a row was measured on cannot be read six builds later.
+- **The switch has to be FORCED, and the reason is the flag and not the
+  geometry.** `setEra` refuses a switch to the era it is already in and
+  `reset()` writes `w.era = 1`, so after an era-2 row the next `restart()`
+  leaves the flag at 1 and `setEra(1)` is a no-op that runs neither
+  `takeField` nor the sky. Writing the opposite era first makes it real. **The
+  first version of that note claimed a resize bug that is not there** --
+  `reset()` re-derives the geometry by comparing `CFG.zoom` against
+  `CFG.ZOOMS[era]` and resizing if they disagree (game.js, inside `reset`).
+  Checked rather than asserted, and the note corrected before it shipped: an
+  inaccurate comment is the thing this repo keeps paying for.
+- **BAND 5 IS 2-3x LONGER TO CLEAR ON THE ERA-2 FIELD, AND THE GUN IS NOT THE
+  REASON.** Measured either side in one container, same rungs, same asserted
+  spend, `eraGate` temporarily at 49 for the era-1 half. Clear times 23 -> 52,
+  20 -> 63, 45 -> 59, 34 -> >120, 34 -> 73, 42 -> >120, >120 -> >120 at rungs
+  29 to 35: cap failures go from ONE of seven to THREE of seven. And the gun
+  got BETTER over the same rows -- dps 741-796 to 968-1039 on `era2Power`, and
+  the worst body in the band falls 2.5-3.8s to 1.9-2.4s -- so the extra time
+  is not spent killing anything. Income per second follows the clock down to
+  **0.27 to 0.77 of era 1** (median about 0.48): the same `pay` spread over two
+  to three times the seconds.
+- **...and depth alone does not account for it, which is worth saying rather
+  than rounding off.** A loose crossing is 1481 world units at era 2 against
+  962 at era 1, a factor of 1.54, while the clears moved 1.31x, 2.15x, 2.26x,
+  3.15x and twice past the cap. The reading -- inference beyond the
+  measurement, and labelled as such -- is that travel and the release gate
+  compound: `emit` refuses to release while the field is at `maxEnemies`, and
+  bodies that are in transit for half again as long keep it there for half
+  again as long, so the wave stretches by more than the ground does. Build
+  301's finding was the same mechanism seen from the other end.
+- **This is phase 6 and 7's input, and it is deliberately NOT tuned here.**
+  Nothing about band 5's authored waves changed in 305 or 306; what changed is
+  the field they are played on, and the answer the plan already has for it is
+  the twenty objects (phase 6) and boss health per slot (phase 7). Inventing a
+  balance fix in a build whose whole content is an instrument correction is the
+  mistake build 304 deliberately did not make. What IS recorded is the number
+  the next phase has to beat: three of band 5's seven rungs do not clear their
+  heaviest authored wave inside 120 seconds, and the run's income halves
+  exactly where the tree's dearest bands begin.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
