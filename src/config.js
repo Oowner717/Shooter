@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '309';
+export const BUILD = '310';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '309';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '0067028';
+export const REV = '807925f';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1037,6 +1037,51 @@ export const CFG = {
    */
   lantern: {
     cage: 5, // beads drawn inside it, the picture of what it is carrying
+  },
+  /*
+   * ---- the CHAIN gait, build 310 ----------------------------------------
+   *
+   * Seven beads nose to tail, each steering at the one AHEAD. The snake is
+   * not an object with seven parts -- there is no owner and no roster -- it is
+   * seven ordinary bodies each holding one reference, which is what lets a cut
+   * in the middle leave two shorter snakes with no bookkeeping at all.
+   *
+   * The follow distance is DERIVED from the bead's own radius (`chainGap` in
+   * enemies.js), not authored: `resolvePair` corrects any overlap with no
+   * `harmless` exemption, so the hard floor is `2r + physics.slop` and a
+   * constant that suited r 9 would stop suiting the first bead of another
+   * size. `clear` is the headroom above `2r`, and it is measured rather than
+   * picked -- the follower's proportional controller undershoots by about 8
+   * units when its lead decelerates, so at `2r + 8` the gap touched 18.0
+   * against a floor of 18.4 and the snake bumped itself. 12 puts the worst
+   * measured gap clear of it.
+   *
+   * `mouthSlots` uses `r * 2 + 8` too, and that is NOT the same quantity: its
+   * pitch is LATERAL, between bodies abreast in a row. Same form, different
+   * axis; do not tie them together.
+   */
+  chain: {
+    clear: 12, // headroom above 2r for the follow distance -- see chainGap
+    life: 18, // seconds on the field before a bead dissolves
+    fizzle: 0.6, // how long the dissolve takes once its clock is out
+    weave: 0.9, // the head's lateral oscillation, radians a second
+    sway: 150, // ...and how far it reaches for, in world units
+    ahead: 220, // how far down the field the head aims
+    // How hard a follower closes its own gap, per unit of error.
+    grip: 1.4,
+    /*
+     * ...and the CEILING on what a bead may ask for, as a share of its own
+     * cruise. This is not tuning, it is what keeps the snake from hurting
+     * itself: `impactDamage` bites above a relative
+     * `CFG.physics.collisionThreshold` of 62, and the correction used to be
+     * capped at `cruise * grip` ON TOP of the lead's velocity -- so a bead
+     * catching up could ask for about 125 u/s against a cruise of 58 and
+     * clear the threshold against the floor or against another bead.
+     * Measured with it uncapped, beads on an otherwise empty field dropped to
+     * 0.957 and 0.595 of their health. At 1.0 the ceiling is the cruise
+     * itself, so 62 is unreachable by construction rather than by margin.
+     */
+    catch: 1,
   },
   /*
    * HUSK's arc. It takes no steering at all -- the whole gait is the throw --
@@ -4125,6 +4170,9 @@ export const ENEMY_TYPES = [
     shape: 'ember',
     harmless: true,
     gait: 'rise',
+    // Its picture is oriented to the WORLD and not to the body -- a spark
+    // rises, a cage hangs. See Enemy.draw.
+    upright: true,
     r: 7,
     hp: 12,
     density: 0.4,
@@ -4196,6 +4244,9 @@ export const ENEMY_TYPES = [
     shape: 'lantern',
     harmless: true,
     gait: 'rise',
+    // Its picture is oriented to the WORLD and not to the body -- a spark
+    // rises, a cage hangs. See Enemy.draw.
+    upright: true,
     // Nine seconds, which is the clock docs/objects.html's own counter names
     // ("a timer you are allowed to answer or not: about nine seconds of
     // climb"). Its authored 26 u/s would have been 37s at era 1 and 57s at
@@ -4212,6 +4263,43 @@ export const ENEMY_TYPES = [
     glow: '#8fb4d6',
     weight: 0, // never chosen by the ordinary spawn roll
     drops: 16, // energy it leaves when it comes apart -- and takes if it does not
+  },
+  {
+    /*
+     * Seven beads nose to tail, snaking across the field. It wants nothing and
+     * blocks nothing: it is there to be CUT, and the shape of what is left is
+     * different every time -- a bead taken out of the middle leaves two
+     * shorter snakes, each with its own new leader, because a follower whose
+     * lead is gone simply becomes a lead.
+     *
+     * `beads` is the multiplicity, and it is the field `release()` dispatches
+     * on -- exactly the shape `tows` already has. Anything that counts bodies
+     * per authored entry reads it: a wave writes ONE snake and seven arrive.
+     */
+    id: 'filament',
+    opens: 0,
+    name: 'FILAMENT',
+    /*
+     * `bead` and NOT `chain`. The shape guard harvests every `case 'x':` label
+     * across the whole of enemies.js into ONE flat set, so a shape sharing a
+     * name with a gait would read as covered by the gait switch's own case
+     * while drawing nothing -- which is the build-273 silent fallback again.
+     */
+    shape: 'bead',
+    harmless: true,
+    gait: 'chain',
+    beads: 7,
+    r: 9,
+    hp: 22,
+    density: 0.4,
+    speed: 58,
+    accel: 180,
+    restitution: 0.8,
+    wobble: 0,
+    color: CFG.debris.grey,
+    glow: '#6f8da9',
+    weight: 0, // never chosen by the ordinary spawn roll
+    drops: 1, // energy it leaves when it comes apart
   },
   {
     // Hardens everything near it while it lives, and shows you exactly what it
@@ -5202,7 +5290,7 @@ export const WAVES = [
    */
   { of: [['mote', 5], ['needle', 3], ['ember', 4]], band: 1 },
   { of: [['needle', 5], ['mote', 3], ['ember', 5]], band: 1 },
-  { of: [['mote', 4], ['needle', 4]], band: 1 },
+  { of: [['mote', 4], ['needle', 4], ['filament', 1]], band: 1 },
   { of: [['lurcher', 3], ['needle', 3], ['husk', 1]], band: 2 },
   { of: [['lurcher', 2], ['mote', 4], ['husk', 1]], band: 2 },
   { of: [['splitter', 2], ['lurcher', 1], ['mote', 3]], band: 2 },
@@ -5303,6 +5391,7 @@ export const GAITS = {
   hover: 'comes down to a band across the middle of the field and bobs there',
   rise: 'up-field, away from the machine, toward the rim -- ignore it and it leaves',
   tumble: 'thrown rather than steered: an arc, a spin, and no opinion about the machine',
+  chain: 'follow the leader -- each body steers at the one ahead, so a cut leaves two snakes',
 };
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

@@ -14205,7 +14205,7 @@ if (!GUN_LINE) {
  */
 {
   const r = await page.evaluate(async () => {
-    const { WAVES } = await import('../src/config.js');
+    const { WAVES, TYPE_BY_ID } = await import('../src/config.js');
     const g = window.__sim;
     const w = g.world;
     const d = w.director;
@@ -14218,6 +14218,16 @@ if (!GUN_LINE) {
       w.phase = 'staging';
       w.autoAim = false; w.autoFire = false;
       const i = WAVES.findIndex(pick);
+      /*
+       * A case that navigates has to check that it arrived. `findIndex`
+       * returns -1 and `WAVES[-1]` is undefined, which `Director.load` reads
+       * `.teach` off and throws on -- and a throw inside `page.evaluate`
+       * takes the WHOLE SUITE down with no case output at all, which is how
+       * build 310 found out. It was a predicate for a wave of nothing but
+       * MOTEs and NEEDLEs, and build 310 added a harmless FILAMENT to the one
+       * wave that matched.
+       */
+      if (i < 0) throw new Error('pose: no wave matches that predicate');
       d.order = [i]; d.at = 0;
       d.resting = false;
       d.load(w, WAVES[i]);
@@ -14236,7 +14246,17 @@ if (!GUN_LINE) {
     const up = () => w.enemies.filter((e) => !e.dead && !e.harmless && !e.fizzle).length;
 
     // ---- it opens at nothing, and stays there for the whole arrival -------
-    const plain = pose((x) => !x.teach && x.of.length && x.of.every(([id]) => id === 'mote' || id === 'needle'));
+    /*
+     * HOSTILE types only. A harmless entry is mortar laid alongside the wave
+     * and is not part of the combination -- the distinction build 307 taught
+     * check-build's own two-or-three rule and eleven-body ceiling. Without it
+     * this predicate went vacuous the moment a FILAMENT joined the one wave
+     * that matched.
+     */
+    const simple = (x) => !x.teach && x.of.length
+      && x.of.filter(([id]) => !TYPE_BY_ID[id].harmless)
+        .every(([id]) => id === 'mote' || id === 'needle');
+    const plain = pose(simple);
     out.wave = plain >= 0;
     out.opening = pct();
     // Seeded with the opening reading, so the reported maximum is over the
@@ -14270,7 +14290,7 @@ if (!GUN_LINE) {
      * the field telling the truth. So this walks a wave with no splitter in
      * it, and the splitter is its own case below.
      */
-    pose((x) => !x.teach && x.of.length && x.of.every(([id]) => id === 'mote' || id === 'needle'));
+    pose(simple);
     w.autoAim = true; w.autoFire = true;
     let back = 0; let worst = 0; let last = pct(); let peak = 0;
     for (let f = 0; f < 60 * 90 && !d.resting; f++) {
@@ -21759,14 +21779,33 @@ if (MINE_LINE) {
     r.ramp.bornAt > 0 && r.ramp.hiddenMax >= r.ramp.cruise * 1.8 && r.ramp.atRim <= r.ramp.cruise * 1.2
     && r.ramp.born === true && r.ramp.bornFor < 1
     && r.loose.bornAt > 0 && r.loose.atRim >= r.loose.cruise * 1.5
-    && r.loose.atRim / r.loose.cruise >= (r.ramp.atRim / r.ramp.cruise) * 1.8
+    /*
+     * ---- the RATIO-OF-RATIOS clause is gone (build 310) -----------------
+     *
+     * It demanded the loose crossing be 1.8x the braked one, and the two are
+     * DIFFERENT BODIES each with its own `route` roll and `speedScale` -- a
+     * ratio between two single random draws, which is the shape CLAUDE.md
+     * already records twice. Measured in isolation the separation is 2.1 to
+     * 5.0; in the suite it drew 0.99 braked against 1.77 loose, a separation
+     * of 1.79, and failed by 0.7%.
+     *
+     * The claim is carried by the two ABSOLUTES either side of it, which is
+     * how build 298's own note states it: the braked crossing is at or under
+     * the body's own cruise, and the no-portal control still reads the fast
+     * one. They guarantee a 1.25x separation rather than 1.8x, and both sit
+     * clear of every draw measured -- 0.68 to 0.99 against a 1.2 ceiling,
+     * 1.77 to 3.53 against a 1.5 floor. The measured separation is in the
+     * detail line for a reader who wants it.
+     */
     && r.portalBack,
     `hidden it reached ${r.ramp.hiddenMax} u/s against a cruise of ${r.ramp.cruise}, and crossed the `
     + `rim at ${r.ramp.atRim} -- ${(r.ramp.atRim / r.ramp.cruise).toFixed(2)}x its own cruise `
     + `(born ${r.ramp.born}, born for ${r.ramp.bornFor}s); with no surface the same `
     + `march crossed the line at ${r.loose.atRim} against ${r.loose.cruise}, `
     + `${(r.loose.atRim / r.loose.cruise).toFixed(2)}x -- which is the old `
-    + `spat-out crossing, and the instrument reading it; portal back ${r.portalBack}`);
+    + `spat-out crossing, and the instrument reading it (a separation of `
+    + `${((r.loose.atRim / r.loose.cruise) / (r.ramp.atRim / r.ramp.cruise)).toFixed(2)}x, `
+    + `reported and not asserted); portal back ${r.portalBack}`);
 
   check('...and it is marked on the BODY, the mark follows it, and goes when it goes',
     r.markOn && r.litAtBody > 200 && r.litAtNew > 200 && r.litAtOld < r.litAtBody * 0.1
@@ -29291,24 +29330,41 @@ if (MINE_LINE) {
      * it is a silent no-op that reads back as the ambient wave.
      */
     const at = WAVES.findIndex((v) => !v.teach
-      && (v.of || []).some(([id]) => id === 'ember' && true)
+      && (v.of || []).some(([id]) => id === 'ember')
       && (v.of || []).find(([id]) => id === 'ember')[1] > 1);
     g.restart();
     g.debugTeachAll();
     clear();
     const d = w.director;
     d.setTier(1);
-    d.order = [at];
-    d.at = 0;
     w.autoAim = false;
     w.autoFire = false;
-    d.load(w, d.wave);
-    d.timer = 0;
-    out.authored = (WAVES[at].of.find(([id]) => id === 'ember') || [])[1];
+    /*
+     * ---- THE WAVE IS LOADED BY HAND (build 310) -------------------------
+     *
+     * `d.order = [at]; d.at = 0;` is a race the probe loses: `Director.update`
+     * reshuffles `order` on its own schedule, so build 309's version was
+     * overwritten on the first frame and measured whichever ember wave the
+     * rotation picked -- which is why it reported "authored 4" while FIVE
+     * embers arrived. `Director.wave` being a getter is only half that trap;
+     * the other half is that the thing you pinned does not stay pinned.
+     *
+     * `emit` is the door under test -- the formation-branch ordering lives
+     * there -- so the wave is loaded directly and emitted until its jobs
+     * drain, which is deterministic and cannot drift onto another wave. The
+     * authored count is read off the SAME object that was loaded.
+     */
+    const wave = WAVES[at];
+    d.load(w, wave);
+    out.authored = (wave.of.find(([id]) => id === 'ember') || [])[1];
+    let guard = 0;
+    while (d.jobs.length && guard++ < 40) d.emit(w);
+    out.emits = guard;
     // First sight of every body, so a staged march cannot be mistaken for a
     // floor spawn once it has travelled.
     const born = new Map();
-    for (let s = 0; s < 60 * 90; s++) {
+    for (const e of w.enemies) born.set(e, { id: e.type.id, y: e.y, staged: !!e.staged, cruise: e.cruise });
+    for (let s = 0; s < 60 * 30; s++) {
       g.update(1 / 60);
       for (const e of w.enemies) {
         if (born.has(e)) continue;
@@ -29415,13 +29471,13 @@ if (MINE_LINE) {
   const E = r.ember;
   const C = r.control;
   check('an EMBER comes off the floor when the DIRECTOR sends it, not through the portal',
-    E.n >= 2 && E.offFloor === E.n
+    E.n === r.authored && E.offFloor === E.n
     // ...carrying the clock the spawn site derives, not the type's nominal...
     && E.meanCruise > E.nominal * 1.1
     // ...and the control out of the same wave comes through the portal, which
     // is what proves the case can tell the two paths apart at all.
     && C.n >= 2 && C.throughPortal === C.n,
-    `${E.offFloor}/${E.n} embers authored ${r.authored} to a wave started at a mean y of `
+    `${E.offFloor}/${E.n} embers, ${r.authored} authored and released over ${r.emits} emits, started at a mean y of `
     + `${E.meanY} (floor ${r.floorY}) at a cruise of ${E.meanCruise} against a nominal `
     + `${E.nominal}; control ${C.throughPortal}/${C.n} hostiles came through the portal at a `
     + `mean y of ${C.meanY}`);
@@ -29430,6 +29486,318 @@ if (MINE_LINE) {
     r.nan.length === 0 && r.selfTest === 2 && r.shapes > 40,
     `${r.shapes} shapes swept, ${r.nan.length ? `NaN in ${r.nan.join(' ')}` : 'none non-finite'}; `
     + `the recorder catches ${r.selfTest} of 2 planted NaNs`);
+}
+
+// --- a FILAMENT is seven bodies and one reference each ----------------------
+/*
+ * Build 310, phase 6d. Seven beads nose to tail, each steering at the one
+ * AHEAD -- and the point of the object is that it gets CUT: a bead taken out
+ * of the middle leaves two shorter snakes, each with its own new leader, both
+ * still going.
+ *
+ * THE PROMOTION IS A PULL. A follower whose lead is gone finds that out itself
+ * on the next frame and drops the reference; nothing is written at the death
+ * site. That is not tidiness -- `Enemy.destroy` is the one door every DAMAGE
+ * death comes through and NOT the one door every `dead = true` comes through
+ * (six places set it directly), so a hook there would be missed by a fizzle
+ * running out, a boss teardown, the glitch dissolve and `Game.sweep`, and the
+ * bug would be a snake following a corpse.
+ *
+ * There is no roster, because a field chain has no owner to prune one --
+ * tessera.js is the measured record of that, at 53 entries for 15 berths. So
+ * the arms below count ENTRIES in `world.enemies` rather than bodies, which is
+ * what the damage paths iterate and what a double push would show up in.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG, WAVES, TYPE_BY_ID } = await import('../src/config.js');
+    const { beadsOf, chainGap, drawSpecimen } = await import('../src/enemies.js');
+    const out = {};
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+    };
+    const T = TYPE_BY_ID.filament;
+    out.want = beadsOf(T);
+    out.gap = chainGap(T);
+    out.floor = T.r * 2 + CFG.physics.slop;
+
+    // ---- the snake arrives whole, through emit ---------------------------
+    /*
+     * Loaded and emitted by hand for the reason the EMBER case above records:
+     * `Director.update` reshuffles `order`, so a pinned wave does not stay
+     * pinned. `emit` is the door -- `release` dispatches on `type.beads` there.
+     */
+    const at = WAVES.findIndex((v) => !v.teach && (v.of || []).some(([id]) => id === 'filament'));
+    g.restart();
+    g.debugTeachAll();
+    clear();
+    const d = w.director;
+    d.setTier(1);
+    w.autoAim = false;
+    w.autoFire = false;
+    d.load(w, WAVES[at]);
+    out.authored = (WAVES[at].of.find(([id]) => id === 'filament') || [])[1];
+    let guard = 0;
+    while (d.jobs.length && guard++ < 40) d.emit(w);
+    const bead = () => w.enemies.filter((e) => e.type.id === 'filament' && !e.dead);
+    out.made = bead().length;
+    // ENTRIES, not bodies: fifteen tiles pushed twice is what tessera paid for.
+    out.entries = Math.max(0, ...bead().map((e) => w.enemies.filter((x) => x === e).length));
+
+    // ...and it comes loose as one thing
+    let loose = null;
+    for (let s = 0; s < 60 * 40; s++) {
+      g.update(1 / 60);
+      const bs = bead();
+      if (bs.length >= out.want && bs.every((e) => !e.staged)) { loose = +(s / 60).toFixed(1); break; }
+    }
+    out.loose = loose;
+    // Threaded: walk the links from the one head and require every bead on it.
+    const thread = () => {
+      const seen = new Set();
+      let h = bead().find((e) => !e.link);
+      while (h && !seen.has(h)) { seen.add(h); h = bead().find((e) => e.link === h); }
+      return [...seen];
+    };
+    out.threaded = thread().length;
+    out.heads = bead().filter((e) => !e.link).length;
+
+    // ---- the formation holds ---------------------------------------------
+    /*
+     * ---- WHAT THE FORMATION IS FOR, not how tight it is ------------------
+     *
+     * The first version asserted the worst gap cleared `2r + physics.slop`,
+     * on the reasoning that `resolvePair` corrects any overlap with no
+     * `harmless` exemption. Measured over six runs the worst gap is 18.0,
+     * 18.1, 18.4, 18.8, 18.8 and 22.3 against a floor of 18.4 -- a coin toss,
+     * and the arm failed two runs in six.
+     *
+     * The floor was a PROXY, so the next version asserted the thing it stood
+     * for -- that no bead loses health to the formation -- and THAT failed
+     * four runs in six at 0.885 to 0.957. Chasing it found two instrument
+     * faults and one real behaviour, in that order: the field still had the
+     * wave's four MOTEs and four NEEDLEs on it (a NEEDLE at 104 into a bead
+     * at 44 clears the threshold easily), and the controller's correction was
+     * capped at `cruise * grip` ON TOP of the lead's velocity, so a bead
+     * could ask for about twice its cruise. Both fixed. What remains is real
+     * and harmless: when the head REVERSES its weave the bead behind it is
+     * still going the old way, so their relative speed crosses 62 and the
+     * pair solver bills a point or two. Measured at 4 to 11% of 22 health
+     * over five seconds, against an eighteen-second life -- it kills nothing.
+     *
+     * So the claim is what actually matters and is absolute: the station holds
+     * (the mean gap, stable at 31.9 to 37.6 across six runs) and the snake
+     * does not lose a bead to its own formation. The health FRACTION is
+     * reported and deliberately not asserted, because a margin nobody can
+     * defend is worse than the absolute it was standing in for.
+     */
+    /*
+     * ...and the field is emptied of everything BUT the snake first. The wave
+     * that carries it also carries four MOTEs and four NEEDLEs, and a NEEDLE
+     * at 104 u/s into a bead at 44 clears the 62 threshold easily -- measured,
+     * beads dropped to 0.87 and 0.955 of their health with the hostiles left
+     * in, which is a hostile hitting the snake and not the snake grinding
+     * itself. It also halves the spread on the mean gap (30.2-42.1 with them
+     * on the field), because they jostle the formation as they pass.
+     */
+    const keep = w.enemies.filter((e) => e.type.id === 'filament');
+    for (const e of w.enemies) if (e.type.id !== 'filament') e.dead = true;
+    // In place, not reassigned: eight call sites pass `world.enemies` as an
+    // argument and none stores it, so either is correct today -- and
+    // `length = 0` plus a push back is the idiom every other case uses.
+    w.enemies.length = 0;
+    for (const e of keep) w.enemies.push(e);
+    const gaps = [];
+    let minHp = Infinity;
+    for (let s = 0; s < 60 * 5; s++) {
+      g.update(1 / 60);
+      for (const e of bead()) {
+        if (e.link && !e.link.dead) gaps.push(Math.hypot(e.x - e.link.x, e.y - e.link.y));
+        minHp = Math.min(minHp, e.hp / e.maxHp);
+      }
+    }
+    out.gapMean = +(gaps.reduce((a, v) => a + v, 0) / Math.max(1, gaps.length)).toFixed(1);
+    out.gapMin = +Math.min(...gaps).toFixed(1);
+    out.gapMax = +Math.max(...gaps).toFixed(1);
+    out.samples = gaps.length;
+    out.minHp = +minHp.toFixed(3);
+    out.aliveAfter = bead().length;
+    /*
+     * ...and the reading is shown able to move, because "nothing lost any
+     * health" from an instrument that cannot see health is not a measurement.
+     */
+    const victim = bead()[0];
+    if (victim) victim.applyDamage(w, 5, { x: victim.x, y: victim.y });
+    out.canRead = victim ? +(victim.hp / victim.maxHp).toFixed(3) : 1;
+
+    // ---- cut the middle: two snakes, both going --------------------------
+    const order = thread();
+    const mid = order[Math.floor(order.length / 2)];
+    out.cutAt = order.indexOf(mid);
+    if (mid) mid.destroy(w);
+    for (let s = 0; s < 60 * 2; s++) g.update(1 / 60);
+    const after = bead();
+    out.afterN = after.length;
+    out.afterHeads = after.filter((e) => !e.link).length;
+    // Nobody is following a corpse, and nobody is HOLDING one either.
+    out.holdsCorpse = after.filter((e) => e.link && (e.link.dead || e.link.fizzle > 0)).length;
+    const y0 = after.map((e) => e.y);
+    for (let s = 0; s < 60 * 3; s++) g.update(1 / 60);
+    out.bothMoving = after.filter((e, i) => !e.dead && Math.abs(e.y - y0[i]) > 8).length;
+
+    // ---- beads is mandatory ----------------------------------------------
+    const scratch = TYPE_BY_ID.drift;
+    const shapes = [undefined, 0, 1, -2, 2.5, '7'];
+    out.refused = 0;
+    for (const v of shapes) {
+      if (v === undefined) delete scratch.beads;
+      else scratch.beads = v;
+      try { beadsOf(scratch); } catch (err) { out.refused++; }
+    }
+    scratch.beads = 3;
+    out.legal = beadsOf(scratch);
+    delete scratch.beads;
+    out.shapes = shapes.length;
+    out.cleaned = scratch.beads === undefined;
+
+    // ---- the bead's silhouette, and the upright register -----------------
+    const SZ = 96;
+    const shot = (id) => {
+      const c = document.createElement('canvas');
+      c.width = SZ; c.height = SZ;
+      const x = c.getContext('2d');
+      x.translate(SZ / 2, SZ / 2);
+      drawSpecimen(x, id, 22);
+      const px = x.getImageData(0, 0, SZ, SZ).data;
+      const a = new Uint8Array(SZ * SZ);
+      let ink = 0;
+      for (let i = 0; i < SZ * SZ; i++) { a[i] = px[i * 4 + 3]; ink += px[i * 4 + 3]; }
+      return { a, ink: Math.round(ink / 1000) };
+    };
+    const diff = (p, q) => {
+      let sum = 0;
+      for (let i = 0; i < p.a.length; i++) sum += Math.abs(p.a[i] - q.a[i]);
+      return Math.round(sum / 1000);
+    };
+    const me = shot('bead');
+    out.draw = { ink: me.ink, selfZero: diff(shot('bead'), shot('bead')) };
+    for (const id of ['mote', 'drift', 'ember', 'husk', 'lantern']) out.draw[id] = diff(me, shot(id));
+
+    /*
+     * ---- and an UPRIGHT type's picture does not turn with the body -------
+     *
+     * `Enemy.draw` rotated by `this.angle` unconditionally, and `angle` is a
+     * random roll with a random `av` on top -- so EMBER's trail ("below it")
+     * and LANTERN's bail ("over the top") pointed wherever the spawn put them
+     * and rotated as the body drifted, for builds 307 to 310, with both
+     * docstrings claiming otherwise. Rendered at two angles: an upright type
+     * must be IDENTICAL and a tumbling one must differ, which is the control
+     * -- without it the arm passes on a build that stopped rotating anything.
+     */
+    /*
+     * ONE body rendered twice, not two bodies rendered once. The first
+     * version called `debugSpawn` for each angle, which is two `phase` rolls
+     * -- and `drawLantern`'s own `lift` and the positions of its five beads
+     * are both functions of `phase`, so it reported LANTERN differing by 61
+     * at two angles on a build where `upright` was working perfectly. The
+     * world clock is pinned for the same reason.
+     */
+    const atAngle = (e, ang) => {
+      const c = document.createElement('canvas');
+      c.width = SZ; c.height = SZ;
+      const x = c.getContext('2d');
+      e.angle = ang;
+      x.translate(SZ / 2, SZ / 2);
+      e.draw(x, w);
+      const px = x.getImageData(0, 0, SZ, SZ).data;
+      const a = new Uint8Array(SZ * SZ);
+      for (let i = 0; i < SZ * SZ; i++) a[i] = px[i * 4 + 3];
+      return { a, ink: 1 };
+    };
+    out.turn = {};
+    const heldTime = w.time;
+    for (const id of ['ember', 'lantern', 'husk']) {
+      const e = g.debugSpawn(id, SZ, SZ);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.x = 0;
+      e.y = 0;
+      w.time = heldTime;
+      out.turn[id] = diff(atAngle(e, 0), atAngle(e, 1.2));
+      e.dead = true;
+    }
+    w.time = heldTime;
+    g.restart();
+    clear();
+    return out;
+  });
+
+  check('a FILAMENT arrives as seven bodies on one thread, pushed once each',
+    r.made === r.want && r.authored === 1 && r.entries === 1
+    && r.threaded === r.want && r.heads === 1 && r.loose !== null,
+    `one authored entry made ${r.made} of ${r.want} beads, ${r.entries} entry each in `
+    + `world.enemies, ${r.heads} head with all ${r.threaded} on its thread, loose at ${r.loose}s`);
+
+  /*
+   * ...and the STATION is asserted as a BOUND, not as a mean near the target.
+   *
+   * The mean is not timing-independent: the head's weave runs off
+   * `world.time`, and the page's own rAF loop adds updates on top of a
+   * probe's synthetic ones -- CLAUDE.md's free-running-loop trap. Measured
+   * with the suite running alongside, the mean went 32-37 to 41-49 and the
+   * arm failed four runs in six with nothing about the chain changed.
+   *
+   * What a broken controller actually produces is a tail that streams away
+   * without limit, and that is bound-checkable however much time passed. Five
+   * times the derived gap is 150 units against a measured worst of 95.6 over
+   * twelve runs -- 1.57x clear -- while a follower that had stopped following
+   * would cross the field's whole 963-unit depth. Four times (120) was tried
+   * first and left only 1.25x, which is not a margin on a quantity with this
+   * much spread. The mean is reported, not asserted.
+   */
+  check('...and it holds its station without grinding itself down',
+    r.gapMax < r.gap * 5 && r.samples > 500
+    // ...and no bead is LOST to it, which is the absolute. The health
+    // fraction is reported with the reading shown able to move, so a future
+    // reader can see whether the touching ever starts to cost something.
+    && r.aliveAfter === r.want && r.canRead < 1,
+    `gap derived at ${r.gap}; over ${r.samples} samples it ran ${r.gapMin} to ${r.gapMax} `
+    + `(mean ${r.gapMean}) against a runaway ceiling of ${r.gap * 5}, and a pair-solver floor `
+    + `of ${r.floor} that costs nothing to touch below a relative 62; all ${r.aliveAfter} of `
+    + `${r.want} beads survived it at worst ${r.minHp} of their health, and the same reading `
+    + `sees a 5-point hit as ${r.canRead}`);
+
+  check('cut a FILAMENT in the middle and both halves keep going',
+    r.afterN === r.want - 1 && r.afterHeads === 2 && r.holdsCorpse === 0
+    && r.bothMoving === r.afterN,
+    `cut bead ${r.cutAt} of ${r.want}: ${r.afterN} left under ${r.afterHeads} heads, `
+    + `${r.holdsCorpse} following a corpse, ${r.bothMoving}/${r.afterN} still moving three `
+    + 'seconds on');
+
+  check('a chain must say how many bodies it is, and there is no default',
+    r.refused === r.shapes && r.legal === 3 && r.cleaned,
+    `${r.refused} of ${r.shapes} malformed counts refused (absent, 0, 1, -2, 2.5, "7"), a legal `
+    + `one reads back as ${r.legal}, scratch field removed: ${r.cleaned}`);
+
+  const D = r.draw;
+  const others = ['drift', 'ember', 'husk', 'lantern'];
+  check('...and the fifth grey is none of the other four, or the generic chip',
+    D.mote > 40 && others.every((k) => D[k] > 40) && D.ink > 20 && D.selfZero === 0,
+    `bead is ${D.mote} from a chip and ${others.map((k) => `${D[k]} from ${k.toUpperCase()}`).join(', ')} `
+    + `(ink ${D.ink}); the same shape twice differs by ${D.selfZero}`);
+
+  check('an upright object\'s picture does not turn with the body, and a tumbling one does',
+    r.turn.ember === 0 && r.turn.lantern === 0 && r.turn.husk > 40,
+    `rendered at 0 and 1.2 rad: EMBER differs by ${r.turn.ember}, LANTERN ${r.turn.lantern}, `
+    + `and the control HUSK -- which is meant to go end over end -- by ${r.turn.husk}`);
 }
 
 // --- the debug panel's three quieter faults ---------------------------------

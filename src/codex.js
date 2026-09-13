@@ -256,6 +256,11 @@ export const CODEX = [
     line: 'Caged salvage on its way back out through the portal, climbing for the rim on a clock you can watch. It will not touch you and it does not have to: reach the rim and it takes the lot with it. The one harmless body worth a magazine.',
   },
   {
+    id: 'filament',
+    name: 'FILAMENT',
+    line: 'Seven beads nose to tail, each following the one in front. It wants nothing from you and blocks nothing. Cut it anywhere and you have two shorter snakes, both still going, and the shape of what is left is different every time.',
+  },
+  {
     id: 'axiom',
     name: 'AXIOM',
     line: 'It states a rule and holds you to it. Nothing you carry is yours while its clauses stand.',

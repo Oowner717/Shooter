@@ -180,6 +180,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'ember': drawEmber(ctx, r, 0, 0); break;
     case 'husk': drawHusk(ctx, r, 0, 0); break;
     case 'lantern': drawLantern(ctx, r, 0, 0); break;
+    case 'bead': drawBead(ctx, r, 0, 0); break;
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
@@ -363,6 +364,15 @@ export class Enemy {
      * the obvious name for a field of this shape -- is GNOMON's.
      */
     this.gaitFor = 0;
+    /*
+     * The bead AHEAD of this one in a chain, or null for a head. Declared
+     * here rather than sprung into existence at the spawn site, for the same
+     * reason `fan`, `placed` and `gaitFor` are -- and named `link` because
+     * build 298's rule is to grep the boss modules first and `.lead` is
+     * taken by src/sandbox.js while `.next` and `.chain` are taken by
+     * dynamo.js and projectiles.js. `.link` has no other reader in src.
+     */
+    this.link = null;
     /*
      * A lateral held back until the body is loose. DRIFT is the only thing
      * that uses it: at era 2 it is laid inside the throat, and it used to be
@@ -657,6 +667,112 @@ export class Enemy {
       this.vx *= f;
       this.vy *= f;
       this.av *= f;
+    }
+  }
+
+  /**
+   * CHAIN: follow the leader, and a cut leaves two snakes.
+   *
+   * Each bead steers at the one AHEAD, holding `CFG.chain.gap`; the head has
+   * nothing ahead of it and weaves down the field instead. So the snake's
+   * shape is not authored anywhere -- it is what seven followers do to one
+   * head's path, which is why the thing left after a cut is different every
+   * time.
+   *
+   * ---- THE PROMOTION IS A PULL, NOT A PUSH -----------------------------
+   *
+   * A follower whose lead is gone becomes a head, and it finds that out
+   * ITSELF on the next frame. Nothing is written at the death site, and that
+   * is deliberate: `Enemy.destroy` is the one door every DAMAGE death comes
+   * through but NOT the one door every `dead = true` comes through -- six
+   * places set it directly (the seed's timer, a fizzle running out, a boss's
+   * teardown, the glitch dissolve, `Game.sweep`, the debug wipe). A hook in
+   * `destroy` would be missed by every one of them, and the bug would be a
+   * snake following a corpse.
+   *
+   * It tests `fizzle` as well as `dead`, because a dissolving bead is leaving
+   * and `Game.physicsStep` skips `steer` for one while `integrate` goes on
+   * moving it -- so a lead that is merely fizzling is still a lead for as
+   * long as `dead` alone is consulted.
+   *
+   * There is NO roster. A chain has no owner the way a boss owns its pieces,
+   * so nothing would prune one -- and tessera.js is the measured record of
+   * what that costs: `this.tiles` reached 53 entries for 15 berths before a
+   * prune was added. Seven references, each dropped by the body holding it.
+   */
+  chain(world, dt) {
+    const C = CFG.chain;
+    if (this.fizzle > 0) return;   // see rise(): entered once, not per frame
+    this.gaitFor += dt;
+    if (this.gaitFor >= C.life) {
+      this.fizzle = C.fizzle;
+      this.dissolved = true;
+      return;
+    }
+    // The promotion. Dropped rather than kept, so nothing holds a dead body.
+    if (this.link && (this.link.dead || this.link.fizzle > 0)) this.link = null;
+
+    const slow = this.frozen(world) ? 0.12 : 1;
+    const k = (this.accel / 100) * slow;
+    let vtx;
+    let vty;
+    if (this.link) {
+      /*
+       * ---- THE STATION IS A POINT AND THE SPEED IS AN ERROR --------------
+       *
+       * The target is the point `gap` BEHIND the bead ahead, and what this
+       * bead aims for is the lead's OWN velocity plus a correction toward
+       * that point. That is the whole of the controller, and it matters that
+       * the correction is SIGNED: standing off the station in either
+       * direction pushes it back, so a follower carried too close by its own
+       * momentum is pushed out rather than merely slowed.
+       *
+       * The first version scaled a cruise by `d / gap` -- distance to the
+       * LEAD -- with a floor of 0.15, so every term pointed at the lead and
+       * the only thing resisting a close-up was a smaller speed toward it.
+       * Measured over five seconds the gap touched **17.9 against the pair
+       * solver's floor of 18.4**, which is the snake grinding against itself:
+       * `resolvePair` corrects any overlap and exempts nothing for being
+       * harmless. Matching the lead's velocity makes the station an
+       * equilibrium instead of a limit, so the floor holds by construction
+       * rather than by margin.
+       */
+      const dx = this.link.x - this.x;
+      const dy = this.link.y - this.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const gap = chainGap(this.type);
+      const ex = (this.link.x - (dx / d) * gap) - this.x;
+      const ey = (this.link.y - (dy / d) * gap) - this.y;
+      const err = Math.hypot(ex, ey) || 1;
+      const fix = err * C.grip * slow;
+      vtx = this.link.vx + (ex / err) * fix;
+      vty = this.link.vy + (ey / err) * fix;
+      /*
+       * The CEILING is on the whole ask, not on the correction, because the
+       * correction rides on top of the lead's own velocity -- capping only
+       * the correction left a bead able to ask for about twice its cruise.
+       * See CFG.chain.catch: above a relative 62 the pair solver starts
+       * billing `impactDamage`, and a snake that hurts itself is not a snake.
+       */
+      const ceil = this.cruise * C.catch * slow;
+      const ask = Math.hypot(vtx, vty);
+      if (ask > ceil) { vtx *= ceil / ask; vty *= ceil / ask; }
+    } else {
+      // The head: a weave down the field. Nothing steers at the machine --
+      // "it wants nothing and blocks nothing" is the whole object.
+      const tx = this.x + Math.sin((world.time || 0) * C.weave + this.phase) * C.sway;
+      const ty = this.y + C.ahead;
+      const d = Math.hypot(tx - this.x, ty - this.y) || 1;
+      const want = this.cruise * slow;
+      vtx = ((tx - this.x) / d) * want;
+      vty = ((ty - this.y) / d) * want;
+    }
+    this.vx += (vtx - this.vx) * clamp(k * dt, 0, 1);
+    this.vy += (vty - this.vy) * clamp(k * dt, 0, 1);
+    if (this.frozen(world)) {
+      const f = Math.exp(-1.6 * dt);
+      this.vx *= f;
+      this.vy *= f;
     }
   }
 
@@ -1001,6 +1117,7 @@ export class Enemy {
       switch (this.type.gait) {
         case 'rise': this.rise(world, dt); break;
         case 'tumble': this.tumble(world, dt); break;
+        case 'chain': this.chain(world, dt); break;
         /*
          * `hover` IS the default arm, written out rather than implied: it is
          * what DRIFT has done since build 298 and what anything harmless
@@ -1969,7 +2086,25 @@ export class Enemy {
 
     ctx.save();
     ctx.translate(this.x, this.y);
-    ctx.rotate(this.angle);
+    /*
+     * ---- SOME PICTURES ARE WORLD-UP (build 310) --------------------------
+     *
+     * `angle` is `rand(0, TAU)` in the constructor and every body also gets a
+     * random `av`, so a shape helper drawing "below" or "over the top" is
+     * drawing in a frame that is rotated by a random amount and slowly
+     * turning. Two of the objects this rig shipped in 307 and 308 did exactly
+     * that and their own docstrings claimed otherwise: EMBER's trail is "two
+     * ticks BELOW it, which is the ground it has left" and LANTERN's bail is
+     * "a hook over the top" -- and both pointed wherever the spawn roll put
+     * them and rotated as the body drifted.
+     *
+     * `upright` is the type saying its picture is oriented to the WORLD and
+     * not to the body: a spark rises and a cage hangs. HUSK deliberately does
+     * NOT carry it, because "end over end" is the whole of that object.
+     * `point` is the neighbouring idea for a body whose heading follows its
+     * travel (see `Enemy.face`).
+     */
+    if (!t.upright) ctx.rotate(this.angle);
     if (s !== 1) ctx.scale(s, s);
     if (gone !== 1) ctx.globalAlpha *= gone * gone;
 
@@ -2139,6 +2274,7 @@ export class Enemy {
       case 'ember': drawEmber(ctx, this.r, this.phase, world.time); break;
       case 'husk': drawHusk(ctx, this.r, this.phase, world.time); break;
       case 'lantern': drawLantern(ctx, this.r, this.phase, world.time); break;
+      case 'bead': drawBead(ctx, this.r, this.phase, world.time); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
@@ -3495,6 +3631,11 @@ function drawEmber(ctx, r, phase, time) {
    * The trail: two ticks BELOW it, which is the ground it has left. Drawn
    * downward whatever the body's heading, because the gait only ever goes one
    * way and a trail that turned with the sway would read as a fin.
+   *
+   * That claim was FALSE from build 307 to 310: `Enemy.draw` rotated by the
+   * body's own random `angle` before calling this, so "below" was wherever
+   * the spawn roll put it. The type carries `upright` now and `draw` skips
+   * the rotate for it.
    */
   for (let i = 0; i < 2; i++) {
     const y = r * (1.9 + i * 0.75);
@@ -3557,6 +3698,44 @@ function drawHusk(ctx, r, phase, time) {
 }
 
 /**
+ * One bead of a chain: a thick ring with a hole through it.
+ *
+ * RADIALLY SYMMETRIC on purpose, and that is a constraint rather than a
+ * preference. At r 9 nothing interior is legible -- `CFG.hairline` puts the
+ * stroke at 1.25 device pixels, which is 2.02 world units, so a 0.2r feature
+ * is narrower than its own outline and merges into it. And a bead cannot say
+ * which way the snake runs from inside the shape helper anyway: `angle` is a
+ * random roll, so seven lozenges all pointing differently would read as
+ * debris rather than as a chain. What says "chain" is the FORMATION, which is
+ * the gait's job.
+ *
+ * The hole is what separates it from a DRIFT (a dashed circle with three dots
+ * orbiting outside it) and from a MOTE's generic chip at this size.
+ */
+function drawBead(ctx, r, phase, time) {
+  const beat = 0.86 + 0.14 * Math.sin(time * 2.2 + phase);
+  // The ring: filled and stroked at full radius...
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  // ...with the hole punched through it, stroked so it reads as an edge
+  // rather than as a gap in the fill.
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.44 * beat, 0, TAU);
+  ctx.stroke();
+  // Four short nicks on the rim, which is the only interior mark wide enough
+  // to survive the stroke at this radius.
+  for (let i = 0; i < 4; i++) {
+    const a = phase * 0.3 + (i / 4) * TAU;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 0.62, Math.sin(a) * r * 0.62);
+    ctx.lineTo(Math.cos(a) * r * 1.02, Math.sin(a) * r * 1.02);
+    ctx.stroke();
+  }
+}
+
+/**
  * A cage of salvage on its way out: a barred frame with beads inside it and a
  * bail on top, which is the half that reads as BEING LIFTED.
  *
@@ -3613,7 +3792,9 @@ function drawLantern(ctx, r, phase, time) {
     ctx.arc(Math.cos(a) * w * 0.42, Math.sin(a) * h * 0.3, r * 0.11 * beat, 0, TAU);
     ctx.fill();
   }
-  // The bail: a hook over the top, which is the mark nothing else has.
+  // The bail: a hook over the top, which is the mark nothing else has -- and
+  // it is over the top only because the type carries `upright`; before build
+  // 310 it pointed wherever the spawn roll had left `angle`.
   ctx.beginPath();
   ctx.arc(0, -h, r * 0.3, Math.PI * 1.08, Math.PI * 1.92);
   ctx.stroke();
@@ -3845,6 +4026,7 @@ function scionLane(world, type, x) {
  */
 export function release(world, type, x, y, opts) {
   if (type.tows) return spawnTow(world, x, y, opts);
+  if (type.beads) return spawnChain(world, type, x, y, opts);
   const made = [spawnOne(world, type, x, y, opts)];
   /*
    * TETHERED: the wave arrives in pairs sharing one pool of health.
@@ -3974,6 +4156,39 @@ function spawnTow(world, x, y, opts = {}) {
   a.tether = { other: b, len };
   b.tether = { other: a, len };
   return [a, b];
+}
+
+/**
+ * A chain: `type.beads` bodies in a column, each linked to the one ahead.
+ *
+ * Modelled on `spawnTow` because that is the repo's one mechanism for a type
+ * that is more than one body -- `release()` dispatches on a TYPE FIELD, each
+ * body is pushed to `world.enemies` exactly once by `spawnOne`, and the array
+ * that comes back is what callers that count read. A boss's roster is the
+ * wrong model: `Boss.body()` makes its pieces `fixed` with `invMass` 0 and
+ * `drive()` returns on its first line for those, and a bead has to be STEERED.
+ *
+ * The beads are laid UP-FIELD of the release point, a gap apart, so the column
+ * queues through the portal's throat nose-first and comes out as a line. Each
+ * carries the one ahead of it; the head carries null, which is what `chain`
+ * reads to know it is a head.
+ *
+ * `route` is shared with the head, the way `spawnTow` shares it with its load:
+ * the beads take the same staged march in, or the column fans out inside the
+ * doorway before the gait has ever run.
+ */
+function spawnChain(world, type, x, y, opts = {}) {
+  const n = beadsOf(type);
+  const gap = chainGap(type);
+  const made = [];
+  let ahead = null;
+  for (let i = 0; i < n; i++) {
+    const e = spawnOne(world, type, x, y - i * gap, i === 0 ? opts : { ...opts, route: made[0].route });
+    e.link = ahead;
+    ahead = e;
+    made.push(e);
+  }
+  return made;
 }
 
 /** Distance constraints, resolved after the contact solver. */
@@ -6039,6 +6254,38 @@ export function climbOf(type) {
  * vocabulary guard, and a second copy is a second thing to forget.
  */
 export const OWN_SPAWN = new Set(['rise', 'tumble']);
+
+/**
+ * How many bodies a chain is, and there is no default.
+ *
+ * The third mandatory field after `levels` (build 224) and `band` (303), and
+ * for the same reason both of those threw in the end: a defaulted value is
+ * indistinguishable in a diff from a chosen one. `beads` is also what
+ * `release()` dispatches on and what everything counting bodies per authored
+ * entry reads, so a silent 1 would be a dispatch for nothing and a mortar cap
+ * under-counting sevenfold.
+ */
+export function beadsOf(type) {
+  const n = type && type.beads;
+  if (!(Number.isInteger(n) && n > 1)) {
+    throw new Error(`${type && type.id}: a chain must declare beads, a whole number above one. `
+      + 'There is no default -- see CFG.chain.');
+  }
+  return n;
+}
+
+/**
+ * The follow distance, derived from the bead's own radius.
+ *
+ * `resolvePair` corrects any overlap and has no `harmless` exemption, so the
+ * floor is `2r + CFG.physics.slop`; `CFG.chain.clear` is the measured headroom
+ * above `2r` for the follower's own undershoot. Derived rather than authored
+ * so a bead of another size moves the picture and the rule together -- the
+ * `m.r` lesson.
+ */
+export function chainGap(type) {
+  return type.r * 2 + CFG.chain.clear;
+}
 
 export function spawnByGait(world, type, x) {
   const g = type.gait;

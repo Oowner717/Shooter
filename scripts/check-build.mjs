@@ -334,6 +334,38 @@ if (noClock.length || drifted.length) {
   for (const line of [...noClock, ...drifted]) console.error(`rise: ${line}`);
   process.exit(1);
 }
+/*
+ * A type that is more than one body says so in a field `release()` dispatches
+ * on, and everything that counts bodies per authored entry has to read it.
+ * Two such fields today (`tows` 2, `beads` 7); the guard is that each is a
+ * whole number above one, so `beads: 1` -- which would be a chain of one and
+ * a dispatch for nothing -- cannot be written.
+ */
+const multi = ENEMY_TYPES.filter((t) => t.beads !== undefined);
+const badMulti = multi.filter((t) => !(Number.isInteger(t.beads) && t.beads > 1))
+  .map((t) => `${t.id} declares beads: ${t.beads}, which is not a whole number above one`);
+if (badMulti.length) {
+  for (const line of badMulti) console.error(`multiplicity: ${line}`);
+  process.exit(1);
+}
+/*
+ * ...and a chain's derived follow distance has to clear the floor the pair
+ * solver imposes. `resolvePair` corrects any overlap and exempts nothing for
+ * being harmless, so a gap under `2r + slop` is a snake grinding against
+ * itself -- measured at `2r + 8`, the worst gap touched 18.0 against a floor
+ * of 18.4.
+ */
+const tight = multi
+  .map((t) => ({ id: t.id, gap: t.r * 2 + CFG.chain.clear, floor: t.r * 2 + CFG.physics.slop }))
+  .filter((c) => c.gap <= c.floor)
+  .map((c) => `${c.id}'s gap ${c.gap} is inside the pair solver's floor of ${c.floor}`);
+if (tight.length) {
+  for (const line of tight) console.error(`chain: ${line}`);
+  process.exit(1);
+}
+console.log(`multiplicity: ${multi.length + 1} type(s) are more than one body `
+  + `(${[...multi.map((t) => `${t.id} ${t.beads} at a gap of ${t.r * 2 + CFG.chain.clear}`), 'tow 2'].join(', ')})`);
+
 console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => `${t.id} ${t.climb}s`).join(' ')}), `
   + `nominal speeds agree on a column of ${lo}-${hi}`);
 
@@ -447,9 +479,20 @@ if (soloWaves.length) {
     + soloWaves.map((w) => JSON.stringify(w.of)).join(' '));
   process.exit(1);
 }
+/*
+ * ...counted in BODIES and not in entries, because one authored entry is not
+ * one body. `type.beads` is the multiplicity `release()` dispatches on -- the
+ * same shape `tows` already has, which `bodiesOf` below has always doubled for
+ * -- so a FILAMENT written `['filament', 1]` is SEVEN harmless bodies against
+ * the cap. Authored entries would have under-counted it sevenfold, and mortar
+ * is the one thing on the field that nothing else bounds: `hostileCount`
+ * cannot see it, so `maxEnemies` has nothing to say about it either.
+ */
 const MORTAR_CAP = CFG.waves.mortarCap;
+const mortarBodies = (w) => mortarOf(w)
+  .reduce((n, [id, c]) => n + c * (TYPE_BY_ID[id].beads || (TYPE_BY_ID[id].tows ? 2 : 1)), 0);
 const overMortar = regular
-  .map((w) => [w.of, mortarOf(w).reduce((n, [, c]) => n + c, 0)])
+  .map((w) => [w.of, mortarBodies(w)])
   .filter(([, n]) => n > MORTAR_CAP);
 if (overMortar.length) {
   console.error(`${overMortar.length} wave(s) author more than ${MORTAR_CAP} harmless bodies, `
@@ -458,7 +501,7 @@ if (overMortar.length) {
 }
 const mortarWaves = regular.filter((w) => mortarOf(w).length);
 console.log(`mortar: ${mortarWaves.length} wave(s) carry harmless bodies, at most `
-  + `${Math.max(0, ...regular.map((w) => mortarOf(w).reduce((n, [, c]) => n + c, 0)))} `
+  + `${Math.max(0, ...regular.map(mortarBodies))} BODIES `
   + `of a cap of ${MORTAR_CAP}, and none of them counts toward the combination`);
 /*
  * Bodies per wave as released, which is the authored count times the flat
@@ -467,7 +510,8 @@ console.log(`mortar: ${mortarWaves.length} wave(s) carry harmless bodies, at mos
  */
 const WAVE_BODIES = 11;
 const bodiesOf = (w) => Math.round(hostilesOf(w)
-  .reduce((n, [id, c]) => n + Math.max(1, Math.round(c * CFG.waves.population)) * (TYPE_BY_ID[id].tows ? 2 : 1), 0));
+  .reduce((n, [id, c]) => n + Math.max(1, Math.round(c * CFG.waves.population))
+    * (TYPE_BY_ID[id].beads || (TYPE_BY_ID[id].tows ? 2 : 1)), 0));
 const crowded = regular.map((w) => [w.of, bodiesOf(w)]).filter(([, n]) => n > WAVE_BODIES);
 if (crowded.length) {
   console.error(`${crowded.length} wave(s) over ${WAVE_BODIES} hostile bodies at population `

@@ -3450,4 +3450,137 @@ came from before believing the other one covers it.
   which is the tell that the control had been crippling the measurement
   rather than flattering it: ember 113 -> 117, husk 93 -> 102, lantern
   118 -> 124 against the same ceiling of 40.
+- **FILAMENT IS IN FROM BUILD 310, AND A CHAIN IS SEVEN BODIES WITH ONE
+  REFERENCE EACH.** `release()` dispatches on a TYPE FIELD -- `if (type.beads)
+  return spawnChain(...)`, one line above the `tows` it is modelled on, which
+  is this repo's only mechanism for "a type that is more than one body". Seven
+  `spawnOne` pushes, one entry each in `world.enemies` (counted as ENTRIES,
+  because fifteen tiles pushed twice is what tessera.js paid for), and an
+  array back for the callers that count.
+- **THE PROMOTION IS A PULL, NOT A PUSH, AND THAT IS WHY IT CANNOT BE MISSED.**
+  A follower whose lead is gone notices on its own next frame and drops the
+  reference. A hook in `Enemy.destroy` would have been the obvious place and
+  would have been wrong: `destroy` is the one door every DAMAGE death comes
+  through and NOT the one door every `dead = true` comes through -- six places
+  set it directly, so a fizzle running out, a boss teardown, the glitch
+  dissolve and `Game.sweep` would all have left a snake following a corpse. It
+  tests `fizzle` as well as `dead`, because `physicsStep` skips `steer` for a
+  dissolving body while `integrate` keeps moving it. And there is NO roster:
+  a field chain has no owner to prune one, which is the 53-entries-for-15-berths
+  fault. Measured: cut the middle bead and it is 6 bodies under 2 heads, 0
+  following a corpse, all 6 still moving three seconds on.
+  **A `while` walk past the corpse would have been the wrong fix**, and the
+  scout's plan recommended one: re-linking to the bead two ahead heals the
+  snake, and the whole object is that a cut SPLITS it. A promotion rule and a
+  repair rule look identical in code and are opposite designs.
+- **`beads` throws and the shape is not called `chain`.** `beadsOf` refuses an
+  absent, zero, one, negative, fractional or string count -- the third
+  mandatory field after `levels` (224) and `band` (303). And the shape id is
+  `bead`, because the shape guard harvests every `case 'x':` label across the
+  WHOLE of enemies.js into one flat set: a `shape: 'chain'` would have been
+  read as covered by the GAIT switch's own `case 'chain':` while drawing
+  nothing, which is build 273's silent fallback with a new door.
+- **THE FOLLOW DISTANCE IS DERIVED AND THE CEILING IS ON THE WHOLE ASK.**
+  `chainGap(type) = 2r + CFG.chain.clear`, because `resolvePair` corrects any
+  overlap with no `harmless` exemption and a constant that suited r 9 would
+  stop suiting the first bead of another size. And the controller matches the
+  LEAD'S VELOCITY plus a signed correction toward a station `gap` behind it --
+  the first version scaled a cruise by distance-to-the-lead with a positive
+  floor, so every term pointed at the lead and nothing pushed a bead that had
+  closed up back out. (`mouthSlots` also uses `r * 2 + 8`; that is the LATERAL
+  pitch between bodies abreast. Same form, different axis -- do not tie them.)
+- **CHASING ONE FLAKY ARM FOUND TWO INSTRUMENT FAULTS AND ONE HARMLESS
+  BEHAVIOUR, IN THAT ORDER, AND THE ARM WAS WRONG TO EXIST.** It began as
+  "the worst gap clears `2r + slop`" and failed two runs in six (worst gap
+  18.0, 18.1, 18.4, 18.8, 18.8, 22.3 against a floor of 18.4). The floor was
+  a PROXY: `impactDamage` returns 0 below a relative
+  `CFG.physics.collisionThreshold` of 62, so touching costs nothing. Asserting
+  the cost instead failed four in six -- and the causes were (1) the wave's
+  own four MOTEs and four NEEDLEs still on the field, and a NEEDLE at 104 into
+  a bead at 44 clears 62 easily; (2) the correction capped at `cruise * grip`
+  ON TOP of the lead's velocity, letting a bead ask for about twice its
+  cruise. Both instrument-side. What is left is real and harmless: when the
+  head REVERSES its weave the bead behind is still going the old way, so their
+  relative speed crosses 62 and the solver bills a point or two -- 4 to 11% of
+  22 health over five seconds, against an eighteen-second life. So the arm
+  asserts the ABSOLUTE (no bead is lost to the formation) and the stable mean,
+  and reports the health fraction without asserting it. **Three margins in a
+  row could not be defended; the absolute could.**
+- **AN UPRIGHT PICTURE IS A TYPE PROPERTY, AND TWO OF MINE CLAIMED IT WITHOUT
+  IT.** `Enemy.draw` rotated by `this.angle` unconditionally, and `angle` is
+  `rand(0, TAU)` with a random `av` on top -- so EMBER's trail ("two ticks
+  BELOW it") and LANTERN's bail ("a hook over the top") pointed wherever the
+  spawn roll left them and turned as the body drifted, for builds 307 to 310,
+  with both docstrings asserting the opposite in as many words. `upright` on
+  the type is what `draw` now checks; HUSK deliberately does not carry it,
+  because "end over end" is the whole of that object. The case renders ONE
+  body at two angles and requires an upright type to be identical and HUSK to
+  differ -- and the first version of THAT called `debugSpawn` per angle, so it
+  compared two different `phase` rolls and reported LANTERN differing by 61 on
+  a build where the flag worked. **One body rendered twice, not two bodies
+  rendered once.**
+- **A PINNED WAVE DOES NOT STAY PINNED.** `d.order = [at]; d.at = 0;` is a race
+  the probe loses: `Director.update` reshuffles `order` on its own schedule, so
+  build 309's ember case was overwritten on its first frame and measured
+  whichever ember wave the rotation picked -- which is why it reported
+  "authored 4" while FIVE embers arrived, and nobody noticed because both
+  numbers looked plausible. `Director.wave` being a getter is only half that
+  trap; the other half is that the thing you pinned does not stay pinned. Load
+  the wave and drive `emit` until its jobs drain -- deterministic, still the
+  door under test, and the authored count read off the same object that was
+  loaded. It reads 4 of 4 now.
+- **A harmless body pays `drops * minValue` plus the flat `energy.drift`, so
+  seven beads are 49 kB -- and that is UNREMARKABLE.** A bead is 7 kB, the
+  same as an EMBER and less than a DRIFT's 10; a snake is 5.4 band-1 levels
+  against the bonus wave's twenty-two drifters at 220 kB, or 24.4 levels, which
+  has shipped for years. The scout that found the 49 kB called it "the richest
+  ignorable thing in the game" and it is not close -- **a number without the
+  comparison it belongs in is half a finding**, and acting on that one would
+  have added a `bounty` divisor nothing needed. Note also that no ENEMY_TYPE
+  declares a `bounty` and the constructor hard-codes `this.bounty = 1`, so a
+  type-level bounty would have been a field with no reader.
+- **A CASE THAT PREDICATES ON THE ROSTER ROTS WHEN THE ROSTER CHANGES, AND
+  THIS ONE TOOK THE WHOLE SUITE DOWN.** The wave-progress case's `pose` helper
+  looked for a regular wave whose types are ALL mote or needle -- and build
+  310 added a harmless FILAMENT to the one wave that matched. `findIndex`
+  returned -1, `WAVES[-1]` is `undefined`, and `Director.load` read `.teach`
+  off it: **a throw inside `page.evaluate` kills the runner with no case output
+  at all**, so the suite reported a stack trace instead of 638 results. Two
+  fixes, and the second is the durable one: the predicate filters to HOSTILE
+  types (the distinction build 307 taught check-build's own two-or-three rule),
+  and `pose` THROWS on a missing wave rather than passing `undefined` down --
+  a case that navigates has to check that it arrived, which CLAUDE.md already
+  records from the D2 rig.
+- **A PROBE'S SYNTHETIC STEPS RIDE ON TOP OF THE PAGE'S OWN rAF LOOP, so a
+  timing-dependent quantity is not reproducible under load.** The FILAMENT
+  station arm asserted the mean gap within 35% of the derived one: it read
+  32-37 alone and **41-49 with the suite running alongside**, failing four runs
+  in six with nothing about the chain changed. The head's weave runs off
+  `world.time`, and extra updates of unknown size advance it. What a broken
+  follower actually does is stream away without limit, and that is
+  bound-checkable however much time passed -- `gapMax < gap * 5` is 150 units
+  against a measured worst of 95.6 over twelve runs, while a stopped follower
+  would cross the field's whole 963-unit depth. Four times (120) was tried
+  first and left 1.25x, which is not a margin on a quantity with this spread.
+  **Assert the runaway, report the mean.**
+- **`pkill -f` matches the shell running it, and that cost two restarts.**
+  `pkill -f "scripts/regress.mjs"` kills the bash process whose own command
+  line contains the pattern -- exit 144, and the command after the `&&` never
+  runs. CLAUDE.md already records the read-only half of this (`pgrep -f`
+  matching its own shell and looking like a respawning process); the
+  destructive half ends the turn's command. Resolve to a PID first.
+- **THE PORTAL-BRAKE CASE CARRIED A RATIO BETWEEN TWO SINGLE DRAWS TOO, and
+  build 310 tripped it.** `loose.atRim / loose.cruise >= (ramp.atRim /
+  ramp.cruise) * 1.8` compares two DIFFERENT BODIES, each with its own `route`
+  roll and `speedScale`. In isolation the separation is 2.1 to 5.0; the suite
+  drew 0.99 braked against 1.77 loose -- a separation of 1.79, failing by
+  0.7%. The clause is gone and the claim is carried by the two ABSOLUTES
+  either side of it, which is how build 298's own note states it: the braked
+  crossing is at or under the body's own cruise, and the no-portal control
+  still reads the fast one. They guarantee 1.25x rather than 1.8x and both sit
+  clear of every draw measured (0.68-0.99 against a 1.2 ceiling, 1.77-3.53
+  against a 1.5 floor), with the separation reported in the detail. **That is
+  the third margin this session that could not be defended and the fourth
+  single-draw ratio in the file's history** -- when a case compares two rolled
+  bodies, the comparison is the roll.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
