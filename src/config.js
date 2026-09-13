@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '313';
+export const BUILD = '314';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '313';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'cef8508';
+export const REV = 'a4ac280';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1184,6 +1184,45 @@ export const CFG = {
     // ...and where it turns is NOT here: it is `CFG.physics.edgeEase`, which
     // already forbids a body to reach a side wall. See Enemy.rollOn.
     spin: 2, // radians a second, held as a floor -- see Enemy.rollOn
+  },
+
+  /*
+   * ---- FLOCK: the gait, and every term is a multiple of the body's own r --
+   *
+   * A school has no leader and no roster. Each body reads the mean position
+   * of the bodies sharing its `shoal` serial and steers a fraction of the way
+   * toward it, and pushes off whichever one is nearest -- so the shape of the
+   * school is not authored anywhere, which is the same reason a FILAMENT's
+   * snake is not (build 310). The cohesion offset is added to the aim point
+   * the way a route's lateral is, so the closing march is untouched: a
+   * hostile has to arrive, which is the rule `roll` already paid for.
+   *
+   * The two distances are MULTIPLES OF `r` rather than units, so a second
+   * flocking type of another size is covered by existing -- the same reason
+   * `chainGap` is `2r + clear` and `CFG.mines.era2` is applied where a mine
+   * takes its radius.
+   */
+  flock: {
+    cohere: 0.55, // how much of the way to the school's mean the aim point moves
+    apart: 5, // x r: inside this a body is pushed off its nearest neighbour
+    /*
+     * ...in units a second squared, because separation is a NUDGE ON THE
+     * VELOCITY and not a tilt on the aim -- see `flockOn`, where the first
+     * version was a tilt and eighteen combinations of these three factors
+     * all measured the closest pair at `2r - slop`, the distance the pair
+     * solver parks two touching bodies at.
+     *
+     * Chosen off the sweep that replaced it, measured in TRANSIT (the first
+     * window included the school arriving at the mount, where what is
+     * measured is a pile against the turret). Mean nearest-neighbour
+     * distance and the cloud's radius, at apart 5r: push 120 gives 17.1 and
+     * 132, 300 gives 20.4 and 153, 700 gives 25.7 and 91. The last is 1.8
+     * body diameters apart in a cloud 29% of the field wide, which is a
+     * school a player can see fourteen bodies in -- and seeing fourteen is
+     * the whole object, because a blob reads as one thing to shoot.
+     */
+    push: 700,
+    spread: 6.5, // x r: the radius the school is laid down in at the mouth
   },
 
   /*
@@ -4442,6 +4481,56 @@ export const ENEMY_TYPES = [
      * is worth more than the digit, and `check-build.mjs` asserts the chain
      * terminates rather than asserting the radii.
      */
+    /*
+     * SHOAL: fourteen at a time, and the school IS the mechanic.
+     *
+     * There is no leader and no ability. A bolt takes one of fourteen and the
+     * other thirteen close the gap; anything with a radius takes the school.
+     * That is the whole object, and it is the first thing in this game that
+     * teaches aimed fire is the wrong tool -- which is why it is band 1.
+     *
+     * `school` is the multiplicity `release()` dispatches on, the third such
+     * field after `tows` (2) and `beads` (7). One authored entry is fourteen
+     * bodies, so `threatOf` counts fourteen, the mortar cap counts bodies and
+     * the combination ceiling counts the school as ONE PROBLEM -- see
+     * check-build.mjs, which states that ruling rather than leaving it.
+     *
+     * ---- the colour is MOTE's, measured, and it is a decision ------------
+     *
+     * `docs/objects.html` gives the swarm family `#7ef9ff`, which is MOTE's
+     * body colour at **dE 0.0 in CIELAB** -- the same collision build 223
+     * had to fix between ALL MINES and BLAST. It is kept, for two measured
+     * reasons. The palette is full: a search of the whole HSL grid against
+     * all 75 tones in the roster found the best-separated colour left is a
+     * pure magenta at dE 37.7 and nothing else clears 31, while the working
+     * separation this game documents is 15-23. And the two ARE the same
+     * family of problem -- many small fast things -- which is what the
+     * guide's family colours mean. What separates them is the register the
+     * repo already trusts for six greys: the silhouette (an aligned dart
+     * against a tumbling shard), the size (r 7 against 12) and the count.
+     * The nearest alternative inside the family is `#00b0e6` at dE 15.8;
+     * changing category colours is explicitly a decision to be asked about
+     * rather than taken, so it is written down here.
+     */
+    id: 'shoal',
+    opens: 0,
+    name: 'SHOAL',
+    shape: 'dart',
+    gait: 'flock',
+    school: 14,
+    r: 7,
+    hp: 14,
+    density: 0.6,
+    speed: 96,
+    accel: 300,
+    restitution: 0.7,
+    wobble: 0.6,
+    color: '#7ef9ff',
+    glow: '#00d4ff',
+    weight: 0, // never chosen by the ordinary spawn roll -- it is authored
+    drops: 1, // energy it leaves when it comes apart
+  },
+  {
     id: 'quarry',
     opens: 0,
     name: 'QUARRY',
@@ -5441,6 +5530,16 @@ export const WAVES = [
   { of: [['mote', 5], ['needle', 3], ['ember', 4]], band: 1 },
   { of: [['needle', 5], ['mote', 3], ['ember', 5]], band: 1 },
   { of: [['mote', 4], ['needle', 4], ['filament', 1]], band: 1 },
+  /*
+   * ...and the SHOAL wave, which is the first thing in the game that cannot
+   * be answered a body at a time. Paired with NEEDLEs rather than MOTEs on
+   * purpose: MOTE wears the same cyan at dE 0.0 (see the type), and the
+   * school should read as one thing the first time it is met rather than as
+   * an unusual number of motes. A wave of one school plus three needles is
+   * two hostile types, five PROBLEMS against the eleven-body ceiling, and
+   * seventeen bodies -- which is the ruling check-build.mjs states.
+   */
+  { of: [['shoal', 1], ['needle', 3]], band: 1 },
   { of: [['lurcher', 3], ['needle', 3], ['husk', 1]], band: 2 },
   { of: [['lurcher', 2], ['mote', 4], ['husk', 1]], band: 2 },
   // ...and a BELL among the first bodies worth aiming past.
@@ -5545,6 +5644,7 @@ export const GAITS = {
   tumble: 'thrown rather than steered: an arc, a spin, and no opinion about the machine',
   chain: 'follow the leader -- each body steers at the one ahead, so a cut leaves two snakes',
   roll: 'takes no lane at all: across the field, off the side walls, spinning as it comes',
+  flock: 'no leader: each body steers at the school\'s own mean and off its nearest neighbour',
 };
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

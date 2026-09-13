@@ -183,6 +183,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'bead': drawBead(ctx, r, 0, 0); break;
     case 'bell': drawBell(ctx, r, 0, 0); break;
     case 'quarry': drawQuarry(ctx, r, 0, 0); break;
+    case 'dart': drawDart(ctx, r, 0, 0); break;
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
@@ -375,6 +376,18 @@ export class Enemy {
      * dynamo.js and projectiles.js. `.link` has no other reader in src.
      */
     this.link = null;
+    /*
+     * Which school this body belongs to, or 0 for anything that is not in
+     * one. A serial rather than a roster: `spawnSchool` stamps the same
+     * number on the fourteen it makes and every one of them finds its own
+     * schoolmates by reading it, so nothing owns the school and nothing has
+     * to prune it when a body dies -- which is build 310's chain rule, and
+     * tessera.js's 53 entries for 15 berths is why it matters. Declared here
+     * rather than sprung into existence at the spawn site, and grepped
+     * against the boss modules first (build 298): `.shoal` has no other
+     * reader in src.
+     */
+    this.shoal = 0;
     /*
      * Which way a `roll` is crossing the field, flipped when it reaches a
      * side wall. Zero until the first frame of the gait, which picks the
@@ -761,6 +774,85 @@ export class Enemy {
      * which is what makes the wall tests and the spin above read as written.
      */
     return this.rollSide * Math.max(0, ty - this.y) * R.slant * slow;
+  }
+
+  /**
+   * FLOCK: steer at the school's own mean, and off whatever is nearest.
+   *
+   * Called from `drive` in the ROUTE's place, the same way `rollOn` is and
+   * for the same reason: a flocker is a hostile and still has to arrive, so
+   * the closing march is untouched and only the lane is replaced. Returns
+   * the offset to add to the aim point, in world units.
+   *
+   * ONE PASS over the field per body, which is O(N^2) across a school -- 14
+   * bodies against a field capped at 57 is about 800 distance tests a frame
+   * and 4,000 with five schools up, against a pair solver that does far more.
+   * The alternative is a cached centroid keyed on the frame, and that is a
+   * second source of truth for a number this reads directly.
+   *
+   * The FACING is not written here -- it is in `Enemy.update`, so a school
+   * points down-field through the march in as well, which this branch never
+   * sees (a staged body takes the ordinary march and only starts flocking on
+   * the frame it comes loose).
+   *
+   * @param {object} world
+   * @param {number} dt
+   * @returns {number[]} [ox, oy], the displacement of the aim point
+   */
+  flockOn(world, dt) {
+    const F = CFG.flock;
+    const slow = this.frozen(world) ? 0.12 : 1;
+    let cx = 0;
+    let cy = 0;
+    let n = 0;
+    let nx = 0;
+    let ny = 0;
+    let nd = Infinity;
+    for (const e of world.enemies) {
+      if (e === this || e.dead || e.shoal !== this.shoal || e.fizzle > 0) continue;
+      const ex = e.x - this.x;
+      const ey = e.y - this.y;
+      const d = Math.hypot(ex, ey);
+      cx += ex;
+      cy += ey;
+      n++;
+      if (d < nd) { nd = d; nx = ex; ny = ey; }
+    }
+    if (!n) return [0, 0];
+    // Cohesion: a fraction of the way to the mean of the rest of the school.
+    const ox = (cx / n) * F.cohere * slow;
+    const oy = (cy / n) * F.cohere * slow;
+    /*
+     * ---- SEPARATION IS A NUDGE ON THE VELOCITY, NOT A TILT ON THE AIM ----
+     *
+     * Written as an aim-point offset it did nothing at all, and the sweep is
+     * what said so: over eighteen combinations of the three factors the
+     * closest pair in the school sat at 13.2 to 14.2 units in EVERY ONE --
+     * which is `r1 + r2 - slop`, the distance `resolvePair` parks two
+     * touching bodies at. A factor the picture does not respond to is a
+     * factor on the wrong term (build 312).
+     *
+     * The reason is that every body in the school is steering at the SAME
+     * mount, so a tilt away from a neighbour is spent long before contact:
+     * two bodies converging on one point arrive together whatever their
+     * headings did on the way. Cohesion can be a heading -- it is about
+     * where the body is going -- and separation cannot.
+     *
+     * So it is `edgeEase`'s idiom instead, whose own docstring says why: "a
+     * nudge on the velocity rather than a change of heading: the object keeps
+     * doing whatever it was doing and simply stops being able to reach the
+     * edge". `push` is an acceleration in units a second squared, squared off
+     * with distance so it is nothing at `apart` and firm at contact, and
+     * applied before `drive`'s own blend, which at this accel erases 5% of it
+     * a frame.
+     */
+    const apart = this.r * F.apart;
+    if (nd < apart && nd > 0.01) {
+      const urge = (1 - nd / apart) ** 2 * F.push * slow * dt;
+      this.vx -= (nx / nd) * urge;
+      this.vy -= (ny / nd) * urge;
+    }
+    return [ox, oy];
   }
 
   /**
@@ -1299,6 +1391,20 @@ export class Enemy {
       const nd = Math.hypot(dx, dy) || 1;
       dx /= nd;
       dy /= nd;
+    } else if (!this.staged && this.type.gait === 'flock' && !this.isDrop) {
+      /*
+       * FLOCK, in the route's place for `roll`'s reason -- see `flockOn`. A
+       * staged body takes the ordinary march in, so a school arrives through
+       * the mouth as a group and only starts flocking once it is loose.
+       */
+      const [ox, oy] = this.flockOn(world, dt);
+      tx += ox;
+      ty += oy;
+      dx = tx - this.x;
+      dy = ty - this.y;
+      const nd = Math.hypot(dx, dy) || 1;
+      dx /= nd;
+      dy /= nd;
     } else if (!this.staged) {
       // Route offset: swing wide of the true bearing at long range and fold in
       // as the object closes, so each one arrives by its own arc.
@@ -1459,6 +1565,25 @@ export class Enemy {
     if (this.slugged > 0) this.slugged = Math.max(0, this.slugged - dt);
     if (this.plow > 0) this.plow = Math.max(0, this.plow - dt);
     if (this.plateT > 0) this.plateT = Math.max(0, this.plateT - dt);
+    /*
+     * A DART POINTS WHERE IT IS GOING, and this is the one owner of that.
+     *
+     * `Enemy.draw` rotates by `angle`, which for every other body is a spawn
+     * roll plus a spin -- and a body whose picture is a nose and a tail has
+     * to be drawn along its heading or it reads as debris. Written here
+     * rather than in `flockOn` so the march IN points too, and `av` is
+     * zeroed so `integrate` has nothing to fight it with. It is not a field
+     * on the type, because a facing is the gait's business: `upright` is
+     * about a picture oriented to the WORLD, and this is a picture oriented
+     * to the body's own travel.
+     */
+    if (this.type.gait === 'flock' && !this.isDrop) {
+      const sp = Math.hypot(this.vx, this.vy);
+      if (sp > 1) {
+        this.angle = Math.atan2(this.vy, this.vx);
+        this.av = 0;
+      }
+    }
     /*
      * MENDING: it closes unless you keep hitting it.
      *
@@ -2443,6 +2568,7 @@ export class Enemy {
       case 'bead': drawBead(ctx, this.r, this.phase, world.time); break;
       case 'bell': drawBell(ctx, this.r, this.phase, world.time); break;
       case 'quarry': drawQuarry(ctx, this.r, this.phase, world.time); break;
+      case 'dart': drawDart(ctx, this.r, this.phase, world.time); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
@@ -3866,6 +3992,48 @@ function drawHusk(ctx, r, phase, time) {
 }
 
 /**
+ * A dart: a nose, two swept barbs and a tail that beats.
+ *
+ * Drawn along local +x, because `Enemy.draw` rotates by `angle` and the flock
+ * writes that angle to the body's own heading -- so +x is forward, the way the
+ * turret's barrel is. Build 268's DECOY drew its barrel along local -y and
+ * then applied the turret's own `-PI/2` on top, which sent it across the
+ * field for sixty builds: a rotation convention copied without its frame
+ * turns the drawing ninety degrees.
+ *
+ * The shape carries the whole distinction from a MOTE, which wears the same
+ * cyan at dE 0.0 by measured decision -- see the SHOAL block in config.js. A
+ * tumbling twelve-unit shard against fourteen aligned seven-unit darts is the
+ * same register the six greys are told apart by.
+ */
+function drawDart(ctx, r, phase, time) {
+  const beat = Math.sin(time * 9 + phase) * 0.3;
+  /*
+   * A SLENDER SPINDLE and not a delta, which is a measured choice: MOTE
+   * wears this exact cyan and MOTE's icon is a broad triangle, so a dart
+   * built as an arrowhead was two cyan deltas at two sizes. Rendered side by
+   * side before this was settled -- the silhouette is carrying the whole
+   * distinction here and it has to survive being four CSS pixels long.
+   */
+  ctx.beginPath();
+  ctx.moveTo(r * 1.4, 0);
+  ctx.lineTo(r * 0.1, r * 0.34);
+  ctx.lineTo(-r * 0.6, r * 0.18);
+  ctx.lineTo(-r * 0.6, -r * 0.18);
+  ctx.lineTo(r * 0.1, -r * 0.34);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // The forked tail, beating off the back of the spindle.
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.6, 0);
+  ctx.lineTo(-r * 1.3, (0.45 + beat) * r);
+  ctx.moveTo(-r * 0.6, 0);
+  ctx.lineTo(-r * 1.3, (-0.45 + beat) * r);
+  ctx.stroke();
+}
+
+/**
  * A quarry: a boulder with its own fracture lines already on it.
  *
  * The three cuts meet at one point inside the hull, which is what makes the
@@ -4192,7 +4360,16 @@ const FORMATIONS = ['line', 'wedge', 'column', 'arc', 'cluster', 'ring'];
 export function threatOf(type) {
   if (!type || type.harmless) return 0;
   const towed = type.tows && TYPE_BY_ID[type.tows.type];
-  return (type.hp * fractureFactor(type) + (towed ? towed.hp : 0)) / CFG.waves.threatPerHp;
+  /*
+   * ...and a type that is MANY OF ITSELF counts all of them. One authored
+   * SHOAL entry is fourteen bodies of fourteen health, so it weighs 6.5 and
+   * not 0.47 -- the same claim as the TOW's, which counts what it drags
+   * because `release` makes the pair. `beads` is in here for the same
+   * reason and is inert today, FILAMENT being harmless: a hostile chain
+   * would need no change.
+   */
+  const many = type.school || type.beads || 1;
+  return (type.hp * fractureFactor(type) * many + (towed ? towed.hp : 0)) / CFG.waves.threatPerHp;
 }
 
 /**
@@ -4343,6 +4520,7 @@ function scionLane(world, type, x) {
 export function release(world, type, x, y, opts) {
   if (type.tows) return spawnTow(world, x, y, opts);
   if (type.beads) return spawnChain(world, type, x, y, opts);
+  if (type.school) return spawnSchool(world, type, x, y, opts);
   const made = [spawnOne(world, type, x, y, opts)];
   /*
    * TETHERED: the wave arrives in pairs sharing one pool of health.
@@ -4493,6 +4671,55 @@ function spawnTow(world, x, y, opts = {}) {
  * the beads take the same staged march in, or the column fans out inside the
  * doorway before the gait has ever run.
  */
+/**
+ * How many bodies one authored SHOAL entry makes. Mandatory and no default,
+ * the same rule `levelsOf`, `bandOf`, `climbOf` and `beadsOf` carry -- a
+ * `school` of one is a school of nothing and a dispatch for no reason.
+ */
+export function schoolOf(type) {
+  const n = type && type.school;
+  if (!Number.isInteger(n) || n < 2) throw new Error(`${type && type.id}: school must be a whole number above one, got ${n}`);
+  return n;
+}
+
+/** A serial per school, so fourteen bodies can find each other with no roster. */
+let shoalSeq = 0;
+
+/**
+ * A school: `school` bodies of one type, laid in a blob and stamped with one
+ * serial.
+ *
+ * Private and not exported, for the same reason the counter above is: a
+ * reassigned `export let` is a live binding in a module and a SNAPSHOT in the
+ * bundle, which is the fault build 199 measured and `bundle.mjs` now fails
+ * the build for. Nothing outside this file needs either.
+ *
+ * They share the leader's `route`, the way a chain's beads do, so the march
+ * IN is one group arriving rather than fourteen independent arcs -- the flock
+ * takes over on the frame `staged` clears.
+ */
+function spawnSchool(world, type, x, y, opts = {}) {
+  const n = schoolOf(type);
+  const spread = type.r * CFG.flock.spread;
+  const made = [];
+  shoalSeq += 1;
+  for (let i = 0; i < n; i++) {
+    // A blob rather than a shape: a school has no formation, and a ring or a
+    // wedge of fourteen would read as one.
+    const a = rand(0, TAU);
+    const d = Math.sqrt(Math.random()) * spread;
+    const e = spawnOne(
+      world, type,
+      clamp(x + Math.cos(a) * d, type.r + 4, world.width - type.r - 4),
+      y + Math.sin(a) * d * 0.7,
+      i === 0 ? opts : { ...opts, route: made[0].route },
+    );
+    e.shoal = shoalSeq;
+    made.push(e);
+  }
+  return made;
+}
+
 function spawnChain(world, type, x, y, opts = {}) {
   const n = beadsOf(type);
   const gap = chainGap(type);

@@ -337,13 +337,38 @@ if (noClock.length || drifted.length) {
 /*
  * A type that is more than one body says so in a field `release()` dispatches
  * on, and everything that counts bodies per authored entry has to read it.
- * Two such fields today (`tows` 2, `beads` 7); the guard is that each is a
- * whole number above one, so `beads: 1` -- which would be a chain of one and
- * a dispatch for nothing -- cannot be written.
+ * Three such fields today -- `tows` (2), `beads` (7) and `school` (14) -- and
+ * the guard is that each numeric one is a whole number above one, so
+ * `beads: 1` (a chain of one, and a dispatch for nothing) cannot be written.
+ *
+ * ---- and the LIST is read out of `release` rather than written here ------
+ *
+ * `if (type.X) return` is the dispatch, so the source is the roster of
+ * multiplicity fields and this cannot fall behind it -- which a hand-kept
+ * list of two would have done the moment `school` was added, silently,
+ * because every assertion in it is about the fields it happens to name. Held
+ * in BOTH directions, the shape the gait vocabulary already uses: a field
+ * `release` dispatches on that no type declares is a branch nothing can
+ * take, and a type declaring a multiplicity `release` does not dispatch on is
+ * one authored entry silently becoming one body.
  */
-const multi = ENEMY_TYPES.filter((t) => t.beads !== undefined);
-const badMulti = multi.filter((t) => !(Number.isInteger(t.beads) && t.beads > 1))
-  .map((t) => `${t.id} declares beads: ${t.beads}, which is not a whole number above one`);
+const relSrc = readFileSync(new URL('../src/enemies.js', import.meta.url), 'utf8');
+const relBody = relSrc.slice(relSrc.indexOf('export function release('));
+const dispatched = [...relBody.slice(0, relBody.indexOf('\n}')).matchAll(/if \(type\.(\w+)\) return/g)]
+  .map((m) => m[1]);
+const MULTI = ['tows', 'beads', 'school'];
+const missedDispatch = MULTI.filter((f) => !dispatched.includes(f));
+const extraDispatch = dispatched.filter((f) => !MULTI.includes(f));
+const unclaimed = dispatched.filter((f) => !ENEMY_TYPES.some((t) => t[f] !== undefined));
+const multi = ENEMY_TYPES.filter((t) => dispatched.some((f) => typeof t[f] === 'number'));
+const badMulti = [
+  ...missedDispatch.map((f) => `release() no longer dispatches on \`${f}\`, which this guard counts`),
+  ...extraDispatch.map((f) => `release() dispatches on \`${f}\`, which nothing here counts as a multiplicity`),
+  ...unclaimed.map((f) => `release() dispatches on \`${f}\` and no type declares it`),
+  ...multi.flatMap((t) => dispatched.filter((f) => typeof t[f] === 'number')
+    .filter((f) => !(Number.isInteger(t[f]) && t[f] > 1))
+    .map((f) => `${t.id} declares ${f}: ${t[f]}, which is not a whole number above one`)),
+];
 if (badMulti.length) {
   for (const line of badMulti) console.error(`multiplicity: ${line}`);
   process.exit(1);
@@ -355,7 +380,7 @@ if (badMulti.length) {
  * itself -- measured at `2r + 8`, the worst gap touched 18.0 against a floor
  * of 18.4.
  */
-const tight = multi
+const tight = multi.filter((t) => typeof t.beads === 'number')
   .map((t) => ({ id: t.id, gap: t.r * 2 + CFG.chain.clear, floor: t.r * 2 + CFG.physics.slop }))
   .filter((c) => c.gap <= c.floor)
   .map((c) => `${c.id}'s gap ${c.gap} is inside the pair solver's floor of ${c.floor}`);
@@ -363,8 +388,9 @@ if (tight.length) {
   for (const line of tight) console.error(`chain: ${line}`);
   process.exit(1);
 }
-console.log(`multiplicity: ${multi.length + 1} type(s) are more than one body `
-  + `(${[...multi.map((t) => `${t.id} ${t.beads} at a gap of ${t.r * 2 + CFG.chain.clear}`), 'tow 2'].join(', ')})`);
+console.log(`multiplicity: ${multi.length + 1} type(s) are more than one body, off release()'s own `
+  + `dispatch on ${dispatched.join('/')} (`
+  + `${[...multi.map((t) => `${t.id} ${t.beads || t.school}`), 'tow 2'].join(', ')})`);
 
 console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => `${t.id} ${t.climb}s`).join(' ')}), `
   + `nominal speeds agree on a column of ${lo}-${hi}`);
@@ -559,8 +585,14 @@ if (soloWaves.length) {
  * cannot see it, so `maxEnemies` has nothing to say about it either.
  */
 const MORTAR_CAP = CFG.waves.mortarCap;
-const mortarBodies = (w) => mortarOf(w)
-  .reduce((n, [id, c]) => n + c * (TYPE_BY_ID[id].beads || (TYPE_BY_ID[id].tows ? 2 : 1)), 0);
+/*
+ * True bodies per authored entry, off the same three fields `release`
+ * dispatches on. The mortar cap counts THESE, because nothing else bounds
+ * mortar at all -- `hostileCount` cannot see it, so `maxEnemies` has nothing
+ * to say about it either.
+ */
+const bodiesPer = (t) => t.school || t.beads || (t.tows ? 2 : 1);
+const mortarBodies = (w) => mortarOf(w).reduce((n, [id, c]) => n + c * bodiesPer(TYPE_BY_ID[id]), 0);
 const overMortar = regular
   .map((w) => [w.of, mortarBodies(w)])
   .filter(([, n]) => n > MORTAR_CAP);
@@ -577,17 +609,58 @@ console.log(`mortar: ${mortarWaves.length} wave(s) carry harmless bodies, at mos
  * Bodies per wave as released, which is the authored count times the flat
  * population multiplier -- the swell is on top of both and is meant to be.
  * A TOW counts two, because it is two.
+ *
+ * ---- ...and A SCHOOL COUNTS ONE, which is a RULING and not an oversight --
+ *
+ * This ceiling is "a combination must not become a crowd", and it was written
+ * when every hostile entry was independent bodies. A SHOAL is fourteen bodies
+ * and ONE problem: there is no leader to take out and no answer that is about
+ * any single one of them, which is the entire object. Counted as fourteen,
+ * band 1's school wave is 22 against a ceiling of 11 and the honest choices
+ * would be to double the allowance for every wave in the game or to ship a
+ * school of six, which is not the object.
+ *
+ * So the ceiling counts PROBLEMS, the school is bounded separately (below,
+ * at one per wave, the way `mortarCap` bounds the thing three ceilings are
+ * blind to), and what bounds the bodies is `maxEnemies` -- which build 300
+ * deliberately made the thing that holds the crowd down. Note this guard
+ * ALREADY PASSED before the ruling was written, because `school` was a field
+ * it did not read: a guard that passes for a reason nobody chose is the
+ * `undefined > eraGate` shape, and the number is printed now.
  */
 const WAVE_BODIES = 11;
+const problemsPer = (t) => (t.school ? 1 : bodiesPer(t));
+const swelled = (c) => Math.max(1, Math.round(c * CFG.waves.population));
 const bodiesOf = (w) => Math.round(hostilesOf(w)
-  .reduce((n, [id, c]) => n + Math.max(1, Math.round(c * CFG.waves.population))
-    * (TYPE_BY_ID[id].beads || (TYPE_BY_ID[id].tows ? 2 : 1)), 0));
+  .reduce((n, [id, c]) => n + swelled(c) * problemsPer(TYPE_BY_ID[id]), 0));
+const realBodiesOf = (w) => Math.round(hostilesOf(w)
+  .reduce((n, [id, c]) => n + swelled(c) * bodiesPer(TYPE_BY_ID[id]), 0));
 const crowded = regular.map((w) => [w.of, bodiesOf(w)]).filter(([, n]) => n > WAVE_BODIES);
 if (crowded.length) {
   console.error(`${crowded.length} wave(s) over ${WAVE_BODIES} hostile bodies at population `
     + `${CFG.waves.population}: ` + crowded.map(([of, n]) => `${JSON.stringify(of)}=${n}`).join(' '));
   process.exit(1);
 }
+/*
+ * ...and the school's own bound, since the ceiling above lets it through as
+ * one. One school to a wave: two would be twenty-eight bodies arriving as two
+ * groups with nothing to tell them apart, which is a crowd by any reading.
+ * The BUDGET is what decides how many arrive at a deep rung, and the field
+ * cap is what holds that down.
+ */
+const schoolsOf = (w) => w.of.filter(([id]) => TYPE_BY_ID[id].school)
+  .reduce((n, [, c]) => n + c, 0);
+const overSchool = regular.map((w) => [w.of, schoolsOf(w)]).filter(([, n]) => n > 1);
+if (overSchool.length) {
+  console.error(`${overSchool.length} wave(s) author more than one school: `
+    + overSchool.map(([of, n]) => `${JSON.stringify(of)}=${n}`).join(' '));
+  process.exit(1);
+}
+const schoolWaves = regular.filter((w) => schoolsOf(w));
+console.log(`schools: ${schoolWaves.length} wave(s) carry one, at `
+  + `${ENEMY_TYPES.filter((t) => t.school).map((t) => `${t.id} ${t.school}`).join(', ') || 'none'} `
+  + `bodies each -- counted as ONE problem against the ${WAVE_BODIES}-body ceiling and as `
+  + `${Math.max(0, ...schoolWaves.map(realBodiesOf))} real bodies, which maxEnemies bounds`);
 /*
  * ---- the stream, and what actually bounds the field (build 300) -----------
  *

@@ -29698,8 +29698,19 @@ if (MINE_LINE) {
       for (let i = 0; i < p.a.length; i++) sum += Math.abs(p.a[i] - q.a[i]);
       return Math.round(sum / 1000);
     };
-    const me = shot('bead');
-    out.draw = { ink: me.ink, selfZero: diff(shot('bead'), shot('bead')) };
+    /*
+     * ---- `drawSpecimen` takes a TYPE ID and 'bead' is a SHAPE ------------
+     *
+     * This read `shot('bead')` from build 310 to 313, and `TYPE_BY_ID.bead`
+     * is undefined -- so it rendered `drawSpecimen`'s unknown-id FALLBACK, a
+     * spiky ringed disc, and compared that against five real specimens. The
+     * arm passed every run and had never once measured `drawBead`. Found by
+     * rendering the sheet by hand while drawing SHOAL's dart, which is the
+     * same way build 309's NaN DRIFT was found: a broken control reads as a
+     * passing case. The type's id is `filament`.
+     */
+    const me = shot('filament');
+    out.draw = { ink: me.ink, selfZero: diff(shot('filament'), shot('filament')) };
     for (const id of ['mote', 'drift', 'ember', 'husk', 'lantern']) out.draw[id] = diff(me, shot(id));
 
     /*
@@ -29802,7 +29813,7 @@ if (MINE_LINE) {
   const others = ['drift', 'ember', 'husk', 'lantern'];
   check('...and the fifth grey is none of the other four, or the generic chip',
     D.mote > 40 && others.every((k) => D[k] > 40) && D.ink > 20 && D.selfZero === 0,
-    `bead is ${D.mote} from a chip and ${others.map((k) => `${D[k]} from ${k.toUpperCase()}`).join(', ')} `
+    `FILAMENT's bead is ${D.mote} from a MOTE and ${others.map((k) => `${D[k]} from ${k.toUpperCase()}`).join(', ')} `
     + `(ink ${D.ink}); the same shape twice differs by ${D.selfZero}`);
 
   check('an upright object\'s picture does not turn with the body, and a tumbling one does',
@@ -30525,6 +30536,369 @@ if (MINE_LINE) {
     + `${M.scion || 0}; the control [BLOOM, LURCHER] rolled ${B.bloom} and ${B.lurcher}, so the `
     + `picker is not simply pinned. Handed [SCION] alone it still makes one ${r.only.scion} of 6 `
     + 'times, which is the documented fallback -- the director never makes that call');
+}
+
+// --- a SHOAL is fourteen bodies and no leader ------------------------------
+/*
+ * Build 314, phase 6g. The first object whose whole mechanic is that it
+ * cannot be answered a body at a time: fourteen darts with no leader, no
+ * ability and nothing to break. A bolt takes one of fourteen; anything with a
+ * radius takes the school. It is band 1 because that is the earliest the
+ * field can say "aiming is not always the answer".
+ *
+ * `school` is the third multiplicity field `release()` dispatches on, after
+ * `tows` (2) and `beads` (7), and there is no roster: `spawnSchool` stamps
+ * one serial on the fourteen it makes and each body finds its schoolmates by
+ * reading it, which is build 310's chain rule -- nothing owns the school, so
+ * nothing has to prune it when a body dies.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { WAVES, TYPE_BY_ID, CFG } = await import('../src/config.js');
+    const { Director, threatOf, schoolOf, drawSpecimen } = await import('../src/enemies.js');
+    const out = {};
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+    };
+    const T = TYPE_BY_ID.shoal;
+    out.want = schoolOf(T);
+    out.apart = +(T.r * CFG.flock.apart).toFixed(1);
+    out.touch = T.r * 2;
+
+    // ---- one authored entry, fourteen bodies, through the real door ------
+    /*
+     * Loaded and drained by hand for build 310's reason: `Director.update`
+     * reshuffles `order`, so a pinned wave does not stay pinned. `emit` is
+     * still the door -- `release` dispatches on `type.school` beyond it.
+     */
+    const at = WAVES.findIndex((v) => !v.teach && (v.of || []).some(([id]) => id === 'shoal'));
+    if (at < 0) throw new Error('no regular wave carries a shoal');
+    g.restart();
+    g.debugTeachAll();
+    clear();
+    const d = w.director;
+    d.setTier(1);
+    d.update = () => {};
+    w.spawnLock = 1e9;
+    w.autoAim = false;
+    w.autoFire = false;
+    d.load(w, WAVES[at]);
+    out.authored = (WAVES[at].of.find(([id]) => id === 'shoal') || [])[1];
+    let guard = 0;
+    while (d.jobs.length && guard++ < 80) d.emit(w);
+    const fish = () => w.enemies.filter((e) => e.type.id === 'shoal' && !e.dead);
+    out.made = fish().length;
+    out.entries = Math.max(0, ...fish().map((e) => w.enemies.filter((x) => x === e).length));
+    out.serials = [...new Set(fish().map((e) => e.shoal))].length;
+    let loose = null;
+    for (let k = 0; k < 60 * 30 && loose === null; k++) {
+      g.update(1 / 60);
+      const f = fish();
+      if (f.length >= out.want && f.every((e) => !e.staged)) loose = +(k / 60).toFixed(1);
+    }
+    out.loose = loose;
+    // ...and it arrives, which is the rule `roll` paid for in build 312: a
+    // hostile that cannot be reached is a run that can never climb again.
+    let arrive = null;
+    for (let k = 0; k < 60 * 60 && arrive === null; k++) {
+      g.update(1 / 60);
+      if (fish().some((e) => e.attacking)) arrive = +(k / 60).toFixed(1);
+    }
+    out.arrive = arrive;
+
+    /*
+     * ---- the A/B is the SERIAL, which is the whole of the mechanism ------
+     *
+     * The same fourteen bodies either way: sharing one serial they are a
+     * school, and given fourteen distinct ones each is a school of one and
+     * `flockOn` finds nothing. So nothing else about the run differs -- not
+     * the type, not the count, not the gait, not the field -- and whatever
+     * separates is the flock.
+     *
+     * Measured in TRANSIT and not to the end: fourteen bodies that have
+     * reached the mount are a pile against the turret, and a pile is 13.5
+     * apart however they got there. The first version of this measured
+     * through the arrival and read the flock collapsing, which was the
+     * instrument watching the wrong four seconds.
+     */
+    const swim = (together, wide, co) => {
+      if (co !== undefined) CFG.flock.cohere = co;
+      clear();
+      const en = [];
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * Math.PI * 2;
+        const rad = wide ? 150 : 45;
+        const e = g.debugSpawn('shoal', w.width * 0.5 + Math.cos(a) * rad, 200 + Math.sin(a) * rad * 0.6);
+        e.staged = false;
+        e.spawnIn = 0;
+        e.hp = 1e9;
+        e.maxHp = 1e9;
+        e.shoal = together ? 77 : 100 + i;
+        en.push(e);
+      }
+      const stat = () => {
+        const f = en.filter((e) => !e.dead);
+        const cx = f.reduce((a, e) => a + e.x, 0) / f.length;
+        const cy = f.reduce((a, e) => a + e.y, 0) / f.length;
+        let far = 0;
+        let minD = Infinity;
+        let dot = 0;
+        let n = 0;
+        for (const e of f) {
+          far = Math.max(far, Math.hypot(e.x - cx, e.y - cy));
+          for (const o of f) {
+            if (o !== e) minD = Math.min(minD, Math.hypot(e.x - o.x, e.y - o.y));
+          }
+          const sp = Math.hypot(e.vx, e.vy);
+          if (sp > 1) { dot += Math.cos(e.angle - Math.atan2(e.vy, e.vx)); n++; }
+        }
+        return { far, minD, aim: n ? dot / n : 0 };
+      };
+      /*
+       * ---- SAMPLED BY DEPTH, NOT BY FRAME COUNT -----------------------
+       *
+       * The cloud's radius depends on how far the school has travelled, and
+       * a probe's synthetic steps ride on TOP of the page's own rAF loop --
+       * so a window counted in frames covers a different distance under load
+       * than it does alone. Measured by frame the first version read the
+       * school closing to 112 and strangers spreading to 227 on a page of
+       * its own, and 219 against 188 -- INVERTED -- inside the suite, because
+       * fourteen bodies that have reached the mount are a pile and a pile is
+       * whatever the turret makes of it. Build 310's chain case paid for this
+       * exact lesson on the same quantity.
+       *
+       * Depth is the honest clock here: both arms are compared at the same
+       * five distances fallen, so extra frames only make the run finish
+       * sooner in wall time.
+       */
+      const first = stat();
+      const y0 = en.reduce((a, e) => a + e.y, 0) / en.length;
+      const seen = [];
+      const marks = [50, 100, 150, 200, 250];
+      let next = 0;
+      for (let k = 0; k < 60 * 40 && next < marks.length; k++) {
+        g.update(1 / 60);
+        const f = en.filter((e) => !e.dead);
+        const cy = f.reduce((a, e) => a + e.y, 0) / f.length;
+        if (cy - y0 >= marks[next]) { seen.push(stat()); next++; }
+      }
+      for (const e of en) e.dead = true;
+      const mean = (a) => a.reduce((x, v) => x + v, 0) / a.length;
+      if (!seen.length) return { far0: 0, far: 0, farMax: 0, minD: 0, minWorst: 0, aim: 0, depths: 0 };
+      return {
+        far0: +first.far.toFixed(0),
+        far: +mean(seen.map((x) => x.far)).toFixed(0),
+        farMax: +Math.max(...seen.map((x) => x.far)).toFixed(0),
+        minD: +mean(seen.map((x) => x.minD)).toFixed(1),
+        minWorst: +Math.min(...seen.map((x) => x.minD)).toFixed(1),
+        aim: +mean(seen.map((x) => x.aim)).toFixed(3),
+        depths: seen.length,
+      };
+    };
+    out.tight = swim(true, false);
+    out.solo = swim(false, false);
+    /*
+     * ---- AND COHESION IS MEASURED BY VARYING ITS OWN TERM ---------------
+     *
+     * The serial A/B above cannot see it, and that is worth knowing rather
+     * than working around: fourteen distinct serials switch BOTH halves of
+     * the flock off at once, and the two have OPPOSITE effects on the
+     * cloud's radius -- cohesion draws it in, separation pushes it out -- so
+     * the difference is their sum and it reads as nothing. Measured by
+     * serial, one school laid 150 wide came in to 167 against strangers'
+     * 157, which is the wrong way round on a build where cohesion works.
+     *
+     * With the serial shared and `cohere` alone taken to zero, the same five
+     * depths read a cloud of 72 (worst 84) against 107 (worst 152). **An A/B
+     * that switches off two terms with opposite effects measures neither.**
+     */
+    const heldCohere = CFG.flock.cohere;
+    out.cohereOn = swim(true, false, heldCohere);
+    out.cohereOff = swim(true, false, 0);
+    CFG.flock.cohere = heldCohere;
+    out.cohere = heldCohere;
+
+    // ---- a bolt takes one of fourteen ------------------------------------
+    clear();
+    const school = [];
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const e = g.debugSpawn('shoal', w.width * 0.5 + Math.cos(a) * 45, 240 + Math.sin(a) * 28);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.hp = 1e9;
+      e.maxHp = 1e9;
+      e.shoal = 88;
+      school.push(e);
+    }
+    for (let k = 0; k < 120; k++) g.update(1 / 60);
+    const alive = () => school.filter((e) => !e.dead);
+    school[0].destroy(w);
+    for (let k = 0; k < 60 * 3; k++) g.update(1 / 60);
+    const left = alive();
+    const cx = left.reduce((a, e) => a + e.x, 0) / left.length;
+    const cy = left.reduce((a, e) => a + e.y, 0) / left.length;
+    out.cut = {
+      n: left.length,
+      far: +Math.max(...left.map((e) => Math.hypot(e.x - cx, e.y - cy))).toFixed(0),
+      moving: left.filter((e) => Math.hypot(e.vx, e.vy) > 5).length,
+    };
+    for (const e of school) e.dead = true;
+    clear();
+
+    // ---- what it weighs, and whose budget moved --------------------------
+    out.threat = threatOf(T);
+    out.oneRaw = T.hp / CFG.waves.threatPerHp;
+    out.one = +out.oneRaw.toFixed(2);
+    out.budget = {};
+    for (let b = 1; b <= 5; b++) out.budget[b] = +Director.budgetAt(1, b).toFixed(2);
+    out.inBands = [...new Set(WAVES.filter((v) => (v.of || []).some(([id]) => id === 'shoal'))
+      .map((v) => v.band || 1))];
+
+    // ---- school is mandatory ---------------------------------------------
+    const scratch = TYPE_BY_ID.drift;
+    const bad = [undefined, 0, 1, -2, 2.5, '14'];
+    out.refused = 0;
+    for (const v of bad) {
+      if (v === undefined) delete scratch.school;
+      else scratch.school = v;
+      try { schoolOf(scratch); } catch (err) { out.refused++; }
+    }
+    scratch.school = 5;
+    out.legal = schoolOf(scratch);
+    delete scratch.school;
+    out.tried = bad.length;
+    out.cleaned = scratch.school === undefined;
+
+    // ---- the silhouette, with the colour divided out ---------------------
+    /*
+     * The diff is on the ALPHA channel alone, so it is a measurement of the
+     * shape and nothing else -- which is the point here, because SHOAL wears
+     * MOTE's cyan at dE 0.0 by measured decision (see the type). If the two
+     * silhouettes were close, that decision would be indefensible.
+     */
+    const SZ = 96;
+    const shot = (id) => {
+      const c = document.createElement('canvas');
+      c.width = SZ;
+      c.height = SZ;
+      const x = c.getContext('2d');
+      x.translate(SZ / 2, SZ / 2);
+      drawSpecimen(x, id, 22);
+      const px = x.getImageData(0, 0, SZ, SZ).data;
+      const a = new Uint8Array(SZ * SZ);
+      let ink = 0;
+      for (let i = 0; i < SZ * SZ; i++) { a[i] = px[i * 4 + 3]; ink += px[i * 4 + 3]; }
+      return { a, ink: Math.round(ink / 1000) };
+    };
+    const diff = (p, q) => {
+      let sum = 0;
+      for (let i = 0; i < p.a.length; i++) sum += Math.abs(p.a[i] - q.a[i]);
+      return Math.round(sum / 1000);
+    };
+    const me = shot('shoal');
+    out.draw = { ink: me.ink, selfZero: diff(shot('shoal'), shot('shoal')) };
+    for (const id of ['mote', 'needle', 'filament', 'drift']) out.draw[id] = diff(me, shot(id));
+
+    // ...and a MOTE's angle has nothing to do with its heading, which is the
+    // control for the dart pointing where it is going.
+    clear();
+    const motes = [];
+    for (let i = 0; i < 6; i++) {
+      const e = g.debugSpawn('mote', 120 + i * 60, 260);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.hp = 1e9;
+      e.maxHp = 1e9;
+      motes.push(e);
+    }
+    let dot = 0;
+    let n = 0;
+    for (let k = 0; k < 60 * 5; k++) {
+      g.update(1 / 60);
+      if (k % 20 === 0) {
+        for (const e of motes) {
+          const sp = Math.hypot(e.vx, e.vy);
+          if (sp > 1) { dot += Math.cos(e.angle - Math.atan2(e.vy, e.vx)); n++; }
+        }
+      }
+    }
+    out.moteAim = +(dot / Math.max(1, n)).toFixed(3);
+
+    delete d.update;
+    w.spawnLock = 0;
+    g.restart();
+    clear();
+    return out;
+  });
+
+  check('one authored SHOAL is fourteen bodies on one serial, and they arrive',
+    r.made === r.want && r.authored === 1 && r.entries === 1 && r.serials === 1
+    && r.loose !== null && r.arrive !== null,
+    `one authored entry made ${r.made} of ${r.want} darts, ${r.entries} entry each in world.enemies, `
+    + `${r.serials} serial between them; loose at ${r.loose}s and on the mount at ${r.arrive}s`);
+
+  check('...and the school keeps its bodies APART, where fourteen strangers pile up',
+    r.tight.minD > 20 && r.tight.minWorst > r.touch
+    && r.solo.minD < 16 && r.tight.minD > r.solo.minD * 1.5,
+    `sharing one serial the closest pair sits at ${r.tight.minD} units (worst ${r.tight.minWorst}) `
+    + `against a body diameter of ${r.touch} and a separation reach of ${r.apart}; with fourteen `
+    + `distinct serials -- the same bodies, the same gait, nothing else changed -- it is `
+    + `${r.solo.minD} (worst ${r.solo.minWorst}), which is where the pair solver parks two `
+    + 'things that are touching');
+
+  check('...and it holds together, which is the cohesion term and nothing else',
+    r.cohereOn.depths === 5 && r.cohereOff.depths === 5
+    && r.cohereOn.farMax < r.cohereOff.farMax * 0.75
+    && r.cohereOn.far < r.cohereOff.far && r.cohere > 0,
+    `read at the same five depths fallen (50 to 250, not at the same frame counts -- see the `
+    + `note), a school with cohere ${r.cohere} holds a cloud of ${r.cohereOn.far} (worst `
+    + `${r.cohereOn.farMax}) where the same bodies at cohere 0 spread to ${r.cohereOff.far} `
+    + `(worst ${r.cohereOff.farMax})`);
+
+  check('...and a dart points where it is going, which nothing else does',
+    r.tight.aim > 0.98 && r.solo.aim > 0.98 && r.moteAim < 0.8,
+    `the mean cosine between a dart's drawn angle and its heading is ${r.tight.aim}; a MOTE's, `
+    + `over the same window, is ${r.moteAim} -- a spawn roll plus a spin, which is what every `
+    + 'other body draws');
+
+  check('...and a bolt takes one of fourteen, and the thirteen close up',
+    r.cut.n === 13 && r.cut.moving === 13 && r.cut.far < 200,
+    `one destroyed leaves ${r.cut.n} still flocking, ${r.cut.moving} of them moving, inside `
+    + `${r.cut.far} units of their own centre -- no leader to lose and no reference to drop`);
+
+  check('a SHOAL weighs all fourteen, and only band 1 paid for it',
+    Math.abs(r.threat - r.oneRaw * r.want) < 1e-9 && r.threat > 6
+    && r.inBands.length === 1 && r.inBands[0] === 1
+    && r.budget[1] > 7.2,
+    `one body is ${r.one} and the entry is ${r.threat.toFixed(2)}, which is fourteen of them -- so band 1's `
+    + `budget is ${r.budget[1]} against the 7.11 it was before this build (+5.1%), measured in one `
+    + `container. It is authored into band ${r.inBands.join('/')} only, which is what says the other `
+    + `four cannot have moved: ${[2, 3, 4, 5].map((b) => `${b}:${r.budget[b]}`).join(' ')}. `
+    + 'Their figures are reported and deliberately not pinned -- a literal pinning a derived '
+    + 'number has been red three times in this file and never once because the thing it '
+    + 'describes was wrong');
+
+  check('a school must say how many bodies it is, and there is no default',
+    r.refused === r.tried && r.legal === 5 && r.cleaned,
+    `${r.refused} of ${r.tried} malformed counts refused (absent, 0, 1, -2, 2.5, "14"), a legal `
+    + `one reads back as ${r.legal}, scratch field removed: ${r.cleaned}`);
+
+  const D = r.draw;
+  check('...and the dart is not a MOTE, with the colour divided out',
+    D.mote > 60 && D.needle > 60 && D.filament > 60 && D.drift > 60
+    && D.ink > 20 && D.selfZero === 0,
+    `on the alpha channel alone -- so this is shape and nothing else -- SHOAL is ${D.mote} from a `
+    + `MOTE, which wears the same cyan at dE 0.0, and ${D.needle}/${D.filament}/${D.drift} from a `
+    + `NEEDLE/bead/DRIFT (ink ${D.ink}, the same shape twice ${D.selfZero})`);
 }
 
 // --- the debug panel's three quieter faults ---------------------------------

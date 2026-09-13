@@ -3792,4 +3792,138 @@ came from before believing the other one covers it.
   calls it the belt to a pair of braces. What stops the director ever making
   that call is `load`'s half, so the case asserts the fallback as a recorded
   decision rather than leaving it as a hole for somebody to find.
+- **SHOAL IS IN FROM BUILD 314, AND A SCHOOL IS ONE SERIAL AND NO ROSTER.**
+  Fourteen darts, band 1, `gait: 'flock'`, and `school` is the third
+  multiplicity field `release()` dispatches on after `tows` (2) and `beads`
+  (7). `spawnSchool` stamps one serial on the fourteen it makes and every
+  body finds its schoolmates by reading it -- so nothing owns the school and
+  nothing has to prune it when a body dies, which is build 310's chain rule
+  and tessera.js's 53 entries for 15 berths is why it matters. Band 1's
+  budget moved **7.11 -> 7.47 (+5.1%)**, measured in one container, and the
+  other four bands cannot have moved because the type is authored into band 1
+  only.
+- **SEPARATION CANNOT BE A HEADING WHEN EVERYTHING CONVERGES ON ONE POINT.**
+  The flock was built the way `roll` is -- an offset to the aim point -- and
+  the cohesion half works that way. The separation half did nothing at all,
+  and the SWEEP is what said so: over eighteen combinations of the three
+  factors the closest pair in the school measured 13.2 to 14.2 units in EVERY
+  cell, which is `2r - slop`, the distance `resolvePair` parks two touching
+  bodies at. **A factor the picture does not respond to is a factor on the
+  wrong term** (build 312, again). The reason is geometric: every body is
+  steering at the same mount, so a tilt away from a neighbour is spent long
+  before contact -- two bodies converging on one point arrive together
+  whatever their headings did on the way. It is `edgeEase`'s idiom instead,
+  whose own docstring says why ("a nudge on the velocity rather than a change
+  of heading"), and the same sweep then reads 13.9 to 25.7 monotonically.
+- **THE A/B IS THE SERIAL, WHICH IS AS CLEAN AS AN A/B GETS.** The same
+  fourteen bodies either way: sharing one serial they are a school, given
+  fourteen distinct ones each is a school of one and `flockOn` finds nothing.
+  Not the type, not the count, not the gait, not the field -- nothing else
+  differs. Separation reads 25.5 against 13.8; cohesion, laid 150 units wide,
+  reads a cloud closing to 112 against strangers spreading to 227. Reach for
+  the switch that is inside the mechanism before building a scenario around
+  it.
+- **AN A/B THAT SWITCHES OFF TWO TERMS WITH OPPOSITE EFFECTS MEASURES
+  NEITHER.** The serial A/B is the cleanest switch in the mechanism and it
+  cannot see cohesion: fourteen distinct serials disable BOTH halves of the
+  flock at once, and cohesion draws the cloud in while separation pushes it
+  out, so the difference is their sum and reads as nothing -- measured, one
+  school laid 150 wide came in to 167 against strangers' 157, the wrong way
+  round on a build where cohesion demonstrably works. With the serial shared
+  and `cohere` alone taken to zero, the same five depths read 72 (worst 84)
+  against 107 (worst 152). **Vary the TERM, not the switch that happens to
+  disable everything.** And a term that cannot be shown to do anything is a
+  term to delete, which is what this arm was written to decide.
+- **A WINDOW COUNTED IN FRAMES IS NOT A WINDOW when the quantity depends on
+  distance travelled.** The cohesion reading was sampled over seven seconds
+  of synthetic steps, and a probe's steps ride on TOP of the page's own rAF
+  loop -- so inside the suite the school had reached the mount inside the
+  window and what was measured was a pile against the turret. It read 112
+  against 227 alone and 219 against 188 in the suite, inverted, on identical
+  code. Sampled at five DEPTHS FALLEN instead, both arms are compared at the
+  same five distances and extra frames only make the run finish sooner.
+  Build 310's chain case paid for this on the same quantity; this is the
+  second time.
+- **MEASURE A FLOCK IN TRANSIT: a school at the mount is a pile.** The first
+  reading watched twelve seconds and reported the school collapsing -- 27.7
+  apart falling to 13.5 -- which is fourteen bodies all trying to occupy the
+  mount, and 13.5 is what any fourteen bodies do there. The window is the
+  crossing now. Same shape as the HEAVE arm's one-frame reading and build
+  305's censored fuse: ask what the number is a property of before believing
+  it moved.
+- **THE GUIDE'S SWARM COLOUR IS MOTE'S, AT dE 0.0, AND THE PALETTE IS FULL.**
+  `docs/objects.html` gives the swarm family `#7ef9ff`, which is MOTE's body
+  colour exactly -- the collision build 223 had to fix between ALL MINES and
+  BLAST. Searched rather than guessed: over the whole HSL grid against all 75
+  tones in the roster the best-separated colour left in the game is a pure
+  magenta at **dE 37.7** and nothing else clears 31, against a working
+  separation this repo documents at 15-23. It is KEPT, because the two are
+  the same family of problem and because changing a category colour is
+  explicitly a decision to ask about rather than take -- and what carries the
+  distinction instead is the register the six greys already rely on. Measured
+  on the ALPHA channel alone, so colour is divided out by construction:
+  SHOAL's silhouette is **104** from a MOTE's. The nearest alternative inside
+  the family is `#00b0e6` at dE 15.8 and it is written down in the type.
+- **...and the drawing had to be re-drawn once for the same reason.** A dart
+  built as an arrowhead is a cyan DELTA, and MOTE's icon is a cyan triangle:
+  two sizes of the same picture. Rendered side by side before it shipped and
+  replaced with a slender spindle and a forked tail. When a hue is shared the
+  silhouette is load-bearing, and the only way to know is to render it and
+  look.
+- **`drawSpecimen` TAKES A TYPE ID, AND 'bead' IS A SHAPE.** Build 310's
+  FILAMENT arm read `shot('bead')` for four builds; `TYPE_BY_ID.bead` is
+  undefined, so it rendered the unknown-id FALLBACK -- a spiky ringed disc --
+  and compared that against five real specimens. It passed every run and had
+  never measured `drawBead` once. Found by rendering the sheet by hand while
+  drawing the dart, which is exactly how build 309's NaN DRIFT was found: **a
+  broken control reads as a passing case.** The type's id is `filament`; with
+  it the closest pair is bead against DRIFT at 60, so the arm's own threshold
+  of 40 still holds.
+- **THE ORDINAL HASH MOVED FOR A WAVE IN BAND 1, AND THAT IS WHY BAND 4 DID
+  NOT.** 314 took it 1831189433 -> **1213474222**, which was not expected --
+  `fight.mjs` is one rung-1 boss fight opened from `openBoss` and the
+  director never releases, which is the structural blindness builds 300, 301
+  and 307 all recorded. Proved rather than argued: with ONLY the new wave
+  removed and everything else in the build left alone, the hash comes back to
+  `1831189433` to the bit. The channel is `Director.shuffle`, which draws
+  randoms in proportion to the CURRENT BAND's roster -- so inserting a wave
+  into band 1 shifts every `Math.random()` in the fight that follows, and the
+  positions of every body in it. Build 312 added a wave to BAND 4 and the
+  hash did not move, for the same reason: at rung 1 the shuffle never sees
+  band 4. **So the rule for phase 6 is: a wave added to band 1 moves it and a
+  wave added to any other band does not**, and neither is a behavioural
+  change -- it is build 241's re-association fault wearing a table's clothes.
+- **A SCHOOL COUNTS AS ONE PROBLEM AGAINST THE ELEVEN-BODY CEILING, AND THAT
+  IS A RULING.** The ceiling is "a combination must not become a crowd" and
+  it was written when every hostile entry was independent bodies. Counted as
+  fourteen, band 1's school wave is 22 against 11 and the honest choices are
+  to double the allowance for every wave in the game or to ship a school of
+  six, which is not the object. So the ceiling counts PROBLEMS, a school is
+  bounded separately at one per wave (the way `mortarCap` bounds the thing
+  three ceilings are blind to), and what bounds the bodies is `maxEnemies` --
+  which build 300 deliberately made the thing that holds the crowd down.
+  **Note the guard ALREADY PASSED before the ruling was written**, because
+  `school` was a field it did not read: a guard that passes for a reason
+  nobody chose is the `undefined > eraGate` shape, so the body count is
+  printed now beside the problem count.
+- **...and the rounded-ratio rule was broken by the build that wrote it.**
+  Build 313 recorded "round for the message, divide the raw" about a budget
+  arm, and 314's threat arm then asserted `threat === one * 14` with `one`
+  rounded to two places -- 0.47 x 14 is 6.58 against a true 6.53, failing by
+  0.05 on a correct build. A rule written down is not a rule applied; when an
+  arm multiplies a reported figure, check which copy it took.
+- **A FACING is the GAIT's business, not the type's.** `upright` means "this
+  picture is oriented to the world" and a dart's is oriented to its own
+  travel, so SHOAL declares no drawing field at all: `Enemy.update` writes
+  `angle` from the velocity for a `flock` type and zeroes `av` so `integrate`
+  has nothing to fight it with. It is in `update` rather than in `flockOn`
+  because the flock branch never runs for a STAGED body -- a school would
+  have marched in pointing wherever fourteen spawn rolls left it, which is
+  build 310's EMBER-trail fault with a different picture.
+- **The multiplicity list is read out of `release`'s own source.** `if
+  (type.X) return` is the dispatch, so the roster of multiplicity fields is
+  the code rather than a list beside it -- which a hand-kept list of two
+  would have fallen behind the moment `school` was added, silently, because
+  every assertion in that guard is about the fields it happens to name. Held
+  in both directions, the shape the gait vocabulary already uses.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

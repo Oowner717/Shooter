@@ -266,6 +266,11 @@ export const CODEX = [
     line: 'Hangs in the middle band and bobs, and wants nothing. Break it and for a couple of seconds every object on the field shows you where it is going -- through a corrupted feed, which is exactly when you need it. One round, one harmless kill, and the only shot you take to see better rather than to break something.',
   },
   {
+    id: 'shoal',
+    name: 'SHOAL',
+    line: 'Fourteen at once, with no leader and nothing to break. They steer at each other and at you, so the school turns as one thing and closes whatever gap you make in it. A bolt takes one of fourteen; anything with a radius takes the school. It is the field telling you that aiming is not always the answer.',
+  },
+  {
     id: 'quarry',
     name: 'QUARRY',
     line: 'One body that is nine, and the lines it will break along are already drawn on it. Each generation is smaller, faster and thinner-plated than the one it came out of, and nothing it does is aimed at you -- it takes no lane, crosses the field, turns off the walls and spins the whole way. Where you break it is the decision: high and the pieces have the field to spread in, low and they are already on the mount.',
