@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '311';
+export const BUILD = '312';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '311';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '8634710';
+export const REV = 'a54f4f5';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1122,6 +1122,79 @@ export const CFG = {
     fall: 60, // ...and the downward component of the same throw
     spin: 1.5, // radians a second, end over end
     fizzle: 0.7, // how long the dissolve takes once its clock is out
+  },
+
+  /*
+   * ---- ROLL: the gait, and why it is not `tumble` (build 312) ----------
+   *
+   * `docs/objects.html` gives QUARRY the same `tumble` HUSK has, and a
+   * hostile cannot take it. HUSK's tumble is BALLISTIC -- thrown from a side
+   * wall with no propulsion at all -- and two things follow from that which
+   * are fine for scenery and fatal for something you have to destroy:
+   *
+   *   - `CFG.physics.linearDamping` is 0.55, so the throw is 11% of itself
+   *     four seconds in. A HUSK is allowed to coast to a halt because it
+   *     dissolves at `life`; a hostile that coasts to a halt never arrives.
+   *   - where it stops is wherever it stopped. A body resting at floor level
+   *     out to one side is outside `autoTarget`'s 78-degree cone for ever,
+   *     and from build 291 the release gate waits for the field to thin --
+   *     so one unreachable hostile is a run that cannot climb again.
+   *
+   * So `roll` keeps the closing march every hostile takes and replaces the
+   * ROUTE with it: no lane, a lateral that reverses at the side walls, and
+   * the spin held against the angular damping the way `tumble` holds HUSK's.
+   * What the player sees is the guide's picture -- a rock crossing the field
+   * end over end, taking no lane -- and the wave can still end.
+   */
+  roll: {
+    /*
+     * ---- the lateral is a tangent on the REMAINING DEPTH -----------------
+     *
+     * `routeLateral` hands `drive` a perpendicular OFFSET to the aim point,
+     * so what this number multiplies decides the shape of the whole gait,
+     * and two of the three candidates were measured and thrown away:
+     *
+     *   - a CONSTANT offset is a bearing tilt of `atan(offset / d)`, which
+     *     grows without limit as the body closes -- 25 degrees at 400 units
+     *     out and 62 at 100. That is a body that orbits the machine rather
+     *     than arriving at it, and it is why every route folds its own
+     *     offset off across the last stretch.
+     *   - scaled by `d`, the DISTANCE to the machine, the tilt is constant
+     *     and the path is a logarithmic spiral: measured, the body swings out
+     *     187 units from the middle of a 629-wide field and then converges,
+     *     from three different starting columns, and never reached a wall at
+     *     all. The bounce would have been a branch nothing could take.
+     *   - scaled by the remaining DEPTH it is both. High up the tilt is 36.9
+     *     degrees off the bearing and the bearing is itself diagonal from out
+     *     to one side, so the two add and the body crosses hard and turns off
+     *     the walls; at the floor line the term is zero and it converges on
+     *     the machine, which is the fold routes already do.
+     */
+    /*
+     * 1.3, chosen off the sweep above rather than by eye: it is the number of
+     * TURNS that the factor buys, and the cost is the arrival. Measured from
+     * the rim at two starting columns -- 0.75 gives 0 to 1 turn and arrives
+     * in 42-44s, 1.1 gives 1 and 55s, 1.3 gives 1 to 2 and 61-68s, 2.0 gives
+     * 3 and 76-94s. The guide's picture is about 1.8 crossings; 1.3 is the
+     * cheapest factor that always turns at least once. It is scale-invariant
+     * across the two eras by construction, because the displacement goes with
+     * the column and the field's width goes with the same zoom.
+     */
+    slant: 1.3,
+    // ...and where it turns is NOT here: it is `CFG.physics.edgeEase`, which
+    // already forbids a body to reach a side wall. See Enemy.rollOn.
+    spin: 2, // radians a second, held as a floor -- see Enemy.rollOn
+  },
+
+  /*
+   * QUARRY: one body that becomes nine. See `splits` on the type -- the
+   * fracture is the SAME type at a smaller radius, twice over, which is why
+   * there is one codex entry and one drawing rather than three of each.
+   */
+  quarry: {
+    hpAt: 0.3, // a child's share of its parent's health...
+    speedAt: 1.35, // ...and how much faster it is for being smaller
+    armorAt: 0.55, // ...and how much less of the plate it kept
   },
 
   // ---- shooter --------------------------------------------------------
@@ -4355,6 +4428,45 @@ export const ENEMY_TYPES = [
     drops: 2, // energy it leaves when it comes apart
   },
   {
+    /*
+     * QUARRY: nine bodies out of one, and you can see it coming.
+     *
+     * The first HOSTILE of the twenty, which is what makes it different from
+     * the five before it: it weighs something. A harmless body is zero in
+     * `threatOf`, so EMBER through BELL could be dropped into waves already
+     * in the roster without moving a band's budget by a byte. This one moves
+     * band 4's, and the fracture is most of the move -- see `threatOf`, which
+     * counts what a QUARRY BECOMES the same way it already counts what a TOW
+     * drags.
+     *
+     * `splits` names its OWN id, which is the whole economy of it: one type,
+     * one drawing, one codex entry, and the generation is the body's RADIUS
+     * rather than a field. r 40 breaks into three at 24, each of those into
+     * three at 14.4, and 14.4 is under `floor` so that is where it stops.
+     * The guide asks for a last generation at 13; one factor with one owner
+     * is worth more than the digit, and `check-build.mjs` asserts the chain
+     * terminates rather than asserting the radii.
+     */
+    id: 'quarry',
+    opens: 0,
+    name: 'QUARRY',
+    shape: 'quarry',
+    gait: 'roll',
+    r: 40,
+    hp: 420,
+    density: 1.1,
+    speed: 30,
+    accel: 100,
+    restitution: 0.7,
+    wobble: 1.2,
+    armor: 0.22,
+    color: '#7cffb2',
+    glow: '#22d37a',
+    weight: 0, // never chosen by the ordinary spawn roll -- it is authored
+    drops: 8, // energy it leaves when it comes apart
+    splits: { type: 'quarry', count: 3, scale: 0.6, floor: 20 },
+  },
+  {
     // Hardens everything near it while it lives, and shows you exactly what it
     // is doing: threads out to whatever it is covering, and a shell on each of
     // them. Shoot the beacon, not the escort.
@@ -5364,6 +5476,7 @@ export const WAVES = [
   // Seeds and something worth landing on. A WARDEN already carries plating;
   // a grafted one is the clearest read there is on what a SEED does.
   { of: [['scion', 1], ['warden', 2], ['needle', 3]], band: 4 },
+  { of: [['quarry', 1], ['needle', 2]], band: 4 },
   { of: [['bulwark', 1], ['needle', 4]], band: 5 },
   { of: [['bulwark', 2], ['herald', 1]], band: 5 },
   { of: [['glut', 3], ['mote', 4]], band: 3 },
@@ -5446,6 +5559,7 @@ export const GAITS = {
   rise: 'up-field, away from the machine, toward the rim -- ignore it and it leaves',
   tumble: 'thrown rather than steered: an arc, a spin, and no opinion about the machine',
   chain: 'follow the leader -- each body steers at the one ahead, so a cut leaves two snakes',
+  roll: 'takes no lane at all: across the field, off the side walls, spinning as it comes',
 };
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

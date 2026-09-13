@@ -369,6 +369,40 @@ console.log(`multiplicity: ${multi.length + 1} type(s) are more than one body `
 console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => `${t.id} ${t.climb}s`).join(' ')}), `
   + `nominal speeds agree on a column of ${lo}-${hi}`);
 
+/*
+ * ---- A FRACTURE HAS TO TERMINATE, and nothing else would say so ----------
+ *
+ * `splits.type` naming the parent's own id makes the chain recursive, and the
+ * thing that ends it is arithmetic: the radius falls by `scale` a generation
+ * until it is under `floor`. So a `scale` at or above 1 is not a balance
+ * mistake, it is `threatOf` looping for ever -- and `threatOf` is called from
+ * `Director.load`, from this file, and from the tree's own price sweep, so
+ * the failure is the game not booting rather than a wave being wrong.
+ *
+ * `fractureDepth` throws for one; this calls it for every type so an
+ * unreachable fracture cannot be authored and left to be discovered on the
+ * rung its band starts at. The reported numbers are DERIVED from the same
+ * three fields the behaviour is, which is the rule the gate table and the
+ * lot count both had to learn: ask the structure, never restate it.
+ */
+const { fractureDepth, fractureFactor } = await import(new URL('../src/enemies.js', import.meta.url));
+const frac = ENEMY_TYPES.filter((t) => fractureDepth(t) > 0).map((t) => {
+  const d = fractureDepth(t);
+  const radii = Array.from({ length: d + 1 }, (_, i) => +(t.r * t.splits.scale ** i).toFixed(1));
+  const last = t.splits.count ** d;
+  let made = 0;
+  for (let i = 0; i <= d; i++) made += t.splits.count ** i;
+  return { id: t.id, d, radii, last, made, hp: fractureFactor(t) };
+});
+const badFrac = frac.filter((f) => f.radii[f.d] >= ENEMY_TYPES.find((t) => t.id === f.id).splits.floor)
+  .map((f) => `${f.id}'s last generation at r ${f.radii[f.d]} is still above its own floor`);
+if (badFrac.length) {
+  for (const line of badFrac) console.error(`fracture: ${line}`);
+  process.exit(1);
+}
+console.log(`fracture: ${frac.length} type(s) break into their own kind (`
+  + `${frac.map((f) => `${f.id} r ${f.radii.join('->')}, ${f.last} of ${f.made} bodies, x${f.hp.toFixed(2)} health`).join('; ')})`);
+
 const GREY = CFG.debris.grey;
 const greyFails = ENEMY_TYPES.filter((t) => t.color === GREY && !t.harmless)
   .map((t) => `${t.id} wears the grey but is not harmless`);

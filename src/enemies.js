@@ -182,6 +182,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'lantern': drawLantern(ctx, r, 0, 0); break;
     case 'bead': drawBead(ctx, r, 0, 0); break;
     case 'bell': drawBell(ctx, r, 0, 0); break;
+    case 'quarry': drawQuarry(ctx, r, 0, 0); break;
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
@@ -374,6 +375,14 @@ export class Enemy {
      * dynamo.js and projectiles.js. `.link` has no other reader in src.
      */
     this.link = null;
+    /*
+     * Which way a `roll` is crossing the field, flipped when it reaches a
+     * side wall. Zero until the first frame of the gait, which picks the
+     * side the body has the most room on. Declared here rather than sprung
+     * into existence in `rollOn`, for the reason `fan`, `link` and `gaitFor`
+     * are -- and grepped against the boss modules first, per build 298.
+     */
+    this.rollSide = 0;
     /*
      * A lateral held back until the body is loose. DRIFT is the only thing
      * that uses it: at era 2 it is laid inside the throat, and it used to be
@@ -669,6 +678,89 @@ export class Enemy {
       this.vy *= f;
       this.av *= f;
     }
+  }
+
+  /**
+   * ROLL: across the field, off the side walls, spinning as it comes.
+   *
+   * Called from `drive` in the ROUTE's place rather than from the harmless
+   * switch, because a roller is a hostile and still has to arrive -- see
+   * CFG.roll for the two reasons HUSK's ballistic `tumble` cannot be reused
+   * for one. Returns a displacement in WORLD X for the caller to add to its
+   * own aim point; the side and the spin are this function's.
+   *
+   * @param {object} world
+   * @param {number} dt
+   * @param {number} ty the y the body is steering at, for the depth term
+   * @returns {number} how far to one side of the aim point to steer instead
+   */
+  rollOn(world, dt, ty) {
+    const R = CFG.roll;
+    const slow = this.frozen(world) ? 0.12 : 1;
+    /*
+     * ---- IT TURNS AT `edgeEase`'s BAND, NOT AT THE WALL ------------------
+     *
+     * There is a global rule against a body reaching a side wall at all, and
+     * it was written for exactly the thing a roller does: `edgeEase` pushes
+     * anything within `CFG.physics.edgeEase` of an edge back toward the
+     * middle at 300 u/s^2, under a docstring saying it covers "every one of
+     * which could otherwise end up rolling along a wall". That band is 96
+     * units of a 629-wide arena, so a turn point measured off the wall is a
+     * branch nothing can ever take -- measured, a roller's reachable column
+     * is 106 to 522 and a turn at `r + 14` sits at 54, a hundred units
+     * outside anywhere the body can be. THAT is what the slant sweep was
+     * really reporting, at zero wall turns for every factor from 0.75 to 2.0.
+     *
+     * So the turn is derived from the rule it would otherwise fight: the body
+     * turns as it enters the band that would turn it anyway, and the two
+     * agree rather than arguing. One owner for the number, which is why there
+     * is no `CFG.roll.pad` of its own.
+     */
+    const pad = this.r + CFG.physics.edgeEase;
+    // The first frame of the gait picks the side with the most room, so a
+    // body that came down near one wall does not spend the gait against it.
+    if (!this.rollSide) this.rollSide = this.x < world.width / 2 ? 1 : -1;
+    else if (this.x <= pad) this.rollSide = 1;
+    else if (this.x >= world.width - pad) this.rollSide = -1;
+    /*
+     * The spin is HELD, for `tumble`'s reason: `integrate` damps angular
+     * velocity on every substep, so a spin written once decays to nothing
+     * inside a second or two. Held as a SIGNED floor -- the spin in the
+     * direction of travel must be at least `spin` -- which does two things a
+     * `Math.abs` floor does not: a round's own impact spin still adds on top
+     * rather than being overwritten sixty times a second, and a body that has
+     * just turned off a wall rolls back the other way at once instead of
+     * waiting for the damping to bring the old spin under the floor. Canvas y
+     * runs down, so a body moving right rolls clockwise, which is positive.
+     */
+    const want = R.spin * slow;
+    if (this.av * this.rollSide < want) this.av = this.rollSide * want;
+    this.gaitFor += dt;
+    /*
+     * ---- IT IS AN AIM POINT TO ONE SIDE, not an offset to the bearing ----
+     *
+     * The route idiom adds its lateral along `(-dy, dx)` -- perpendicular to
+     * the bearing at the machine -- and TWO versions of this gait were built
+     * that way and measured before the geometry was believed. Perpendicular
+     * to the bearing is TANGENTIAL, and a tangential heading holds the
+     * body's distance from the machine rather than crossing the field: the
+     * path wraps round the mount instead of zig-zagging over it. Measured,
+     * sweeping the factor 0.75 -> 1.1 -> 1.3 -> 1.6 -> 2.0 moved the crossing
+     * 187, 200, 202, 207, 205 units of a 629-wide field and produced ZERO
+     * wall turns at every one of them -- the saturation is the tell, and a
+     * factor the picture does not respond to is a factor multiplying the
+     * wrong term.
+     *
+     * So the body steers at a point displaced in WORLD X from whatever it was
+     * aiming at, by the remaining depth times `slant`. High up that point is
+     * 562 units to one side of a mount 261 from the wall, so the body really
+     * does drive at the wall and really does turn off it; as it comes down
+     * the displacement shrinks with the depth and the aim point slides back
+     * onto the machine, which is the fold every route already does across its
+     * last stretch. `rollSide` is the direction of travel in x, +1 for right,
+     * which is what makes the wall tests and the spin above read as written.
+     */
+    return this.rollSide * Math.max(0, ty - this.y) * R.slant * slow;
   }
 
   /**
@@ -1189,9 +1281,27 @@ export class Enemy {
     dx /= d;
     dy /= d;
 
-    // Route offset: swing wide of the true bearing at long range and fold in
-    // as the object closes, so each one arrives by its own arc.
-    if (!this.staged) {
+    /*
+     * ---- ROLL takes the route's place, and only once the body is loose ----
+     *
+     * A roller marches in on the same sway every hostile does -- the staged
+     * branch above owns that, and this one is `!this.staged` -- and then
+     * takes no lane at all. The lateral is a constant that reverses at the
+     * side walls instead of an arc that folds in as it closes, so the body
+     * crosses the field rather than approaching along one, and the spin is
+     * held in `rollOn`. It is still CLOSING: see CFG.roll for why a hostile
+     * cannot take HUSK's ballistic tumble.
+     */
+    if (!this.staged && this.type.gait === 'roll' && !this.isDrop) {
+      tx += this.rollOn(world, dt, ty);
+      dx = tx - this.x;
+      dy = ty - this.y;
+      const nd = Math.hypot(dx, dy) || 1;
+      dx /= nd;
+      dy /= nd;
+    } else if (!this.staged) {
+      // Route offset: swing wide of the true bearing at long range and fold in
+      // as the object closes, so each one arrives by its own arc.
       const r = this.route;
       /*
        * `commit` is an exponent, so a low one folds in very slowly: WIDE
@@ -1976,8 +2086,31 @@ export class Enemy {
     }
 
     // Splitter: children keep the parent's momentum.
-    if (t.splits) {
+    /*
+     * ---- ...and a QUARRY's children are its OWN type (build 312) ---------
+     *
+     * `splits.type` naming the parent's own id is the whole of the fracture:
+     * one type, one drawing, one codex entry, and the GENERATION is the
+     * body's radius rather than a field on it. A body splits only while its
+     * radius is above `splits.floor`, so r 40 breaks into three at 24, each
+     * of those into three at 14.4, and 14.4 stops -- nine bodies out of one,
+     * with the recursion terminated by arithmetic rather than by a counter
+     * that every one of the six places that set `dead` would have to carry.
+     *
+     * The children's health, plate and speed come off the PARENT's, not off
+     * the type's, for two reasons. `scaleToTier` has already multiplied the
+     * parent's `maxHp` by the rung, so deriving from the type and scaling
+     * again would apply the rung twice -- which is the shape of fault build
+     * 231's note about instruments is: a tautology that reads as a result.
+     * And a body that has been shot down from 420 to 30 and then breaks
+     * should not hand out three children at full health.
+     */
+    const sameKind = t.splits && t.splits.type === t.id;
+    const bigEnough = !sameKind || this.r >= t.splits.floor;
+    if (t.splits && bigEnough) {
       const child = TYPE_BY_ID[t.splits.type];
+      const Q = CFG.quarry;
+      const kidR = sameKind ? this.r * t.splits.scale : child.r;
       // A body carrying shards releases only the ones still on it: shoot the
       // plates off a WARDEN and there are fewer left to come at you when the
       // core finally goes.
@@ -1993,6 +2126,7 @@ export class Enemy {
           vy: this.vy * 0.5 + Math.sin(a) * sp,
           staged: this.staged,
           spawnIn: 0.6,
+          r: kidR,
         });
         // The tier, which this used to miss entirely. It is made HERE and
         // not released, so it never passes through `spawnOne` -- and the
@@ -2000,6 +2134,14 @@ export class Enemy {
         // was the one door. Most of a SPLITTER's and a WARDEN's mass was
         // arriving at tier-1 health and paying tier-1 energy.
         scaleToTier(world, kid, child);
+        // ...and then the parent's, for a fracture. AFTER `scaleToTier`, or
+        // the rung is applied to a figure that already carries it.
+        if (sameKind) {
+          kid.maxHp = Math.max(1, Math.round(this.maxHp * Q.hpAt));
+          kid.hp = kid.maxHp;
+          kid.armor = this.armor * Q.armorAt;
+          kid.cruise = this.cruise * Q.speedAt;
+        }
         world.enemies.push(kid);
         world.released++;
         // Made HERE rather than released, so it never goes through spawnOne:
@@ -2022,7 +2164,21 @@ export class Enemy {
      * and the intake's own animation on a screen that is deliberately quiet.
      * Refused at the source rather than at `bank`, so nothing is made either.
      */
-    const n = world.sandbox ? 0 : (t.drops || 0);
+    /*
+     * ---- a fracture pays through its PIECES, not twice (build 312) -------
+     *
+     * `shed` values a mote off the body's own MASS, and three children at
+     * 0.6 of the radius carry 3 * 0.36 = 1.08 of their parent's area -- so
+     * the mass is conserved across a fracture and paying at every generation
+     * would pay for the same rock three times over. A body that broke into
+     * its own kind sheds nothing; the nine that cannot break pay for all of
+     * it. Their COUNT comes off the radius too, which is the generation:
+     * (14.4 / 40)^2 of QUARRY's eight is one mote each, nine in total.
+     */
+    const fractured = sameKind && bigEnough;
+    const share = sameKind ? (this.r / t.r) ** 2 : 1;
+    const paid = t.drops ? Math.max(1, Math.round(t.drops * share)) : 0;
+    const n = world.sandbox || fractured ? 0 : paid;
     /*
      * ---- and the salvage is QUANTISED, which the byte migration exposed ----
      *
@@ -2286,6 +2442,7 @@ export class Enemy {
       case 'lantern': drawLantern(ctx, this.r, this.phase, world.time); break;
       case 'bead': drawBead(ctx, this.r, this.phase, world.time); break;
       case 'bell': drawBell(ctx, this.r, this.phase, world.time); break;
+      case 'quarry': drawQuarry(ctx, this.r, this.phase, world.time); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
@@ -3709,6 +3866,60 @@ function drawHusk(ctx, r, phase, time) {
 }
 
 /**
+ * A quarry: a boulder with its own fracture lines already on it.
+ *
+ * The three cuts meet at one point inside the hull, which is what makes the
+ * picture a promise rather than a texture -- it is a Y, and a Y divides a
+ * solid into the three the body breaks into. `docs/objects.html` draws it
+ * this way and the counter text is why: "where you break it decides where the
+ * nine go", which you can only plan for if the nine are visible in advance.
+ *
+ * The cuts are drawn at a fraction of the caller's alpha, and that fraction
+ * is multiplied IN and put back by save/restore rather than assigned and
+ * reset to 1 -- build 210's fade, where four separate helpers each forced the
+ * alpha back and every body dissolved at full opacity.
+ */
+function drawQuarry(ctx, r, phase, time) {
+  const grind = Math.sin(time * 0.7 + phase) * 0.03;
+  const hull = [
+    [-0.62, -0.78], [0.2, -1], [0.95, -0.3], [0.8, 0.6], [0, 1], [-0.85, 0.45],
+  ];
+  const outline = () => {
+    ctx.beginPath();
+    hull.forEach(([px, py], i) => {
+      if (i === 0) ctx.moveTo(px * r, py * r);
+      else ctx.lineTo(px * r, py * r);
+    });
+    ctx.closePath();
+  };
+  ctx.save();
+  ctx.rotate(grind);
+  outline();
+  ctx.fill();
+  ctx.stroke();
+  /*
+   * The three cuts, meeting at the point the rock comes apart around -- and
+   * CLIPPED to the hull, because their far ends are authored past the
+   * outline on purpose so that each one reaches its own edge whatever the
+   * hull is. Rendered without the clip they hang off the silhouette, which
+   * reads as a broken drawing rather than as a fracture.
+   */
+  ctx.save();
+  outline();
+  ctx.clip();
+  ctx.globalAlpha *= 0.7;
+  const hub = [0.1, 0.25];
+  [[-0.2, -1], [0.95, 0.45], [-0.6, 0.8]].forEach(([px, py]) => {
+    ctx.beginPath();
+    ctx.moveTo(hub[0] * r, hub[1] * r);
+    ctx.lineTo(px * r, py * r);
+    ctx.stroke();
+  });
+  ctx.restore();
+  ctx.restore();
+}
+
+/**
  * A bell: an open shell with a clapper swinging inside it.
  *
  * Six greys share one colour now, so the silhouette carries all of it. This is
@@ -3970,11 +4181,61 @@ const FORMATIONS = ['line', 'wedge', 'column', 'arc', 'cluster', 'ring'];
  *     `debugSpawn` makes only the head, which is an instrument fault a
  *     build-192 note published as a finding -- so a TOW weighs 135 + 280
  *     rather than 135, and derives 13.8 against the plan's rough 10.
+ *   - a body that FRACTURES into its own kind counts what it BECOMES, which
+ *     is the same claim one rung along. A QUARRY is 420 and then three at
+ *     `hpAt` of that and nine at `hpAt` of those: 1138 rather than 420, so
+ *     it derives 37.9 and not 14. Counted here rather than left to the
+ *     author, because the alternative is a second source of truth for the
+ *     same number -- and an under-counted body is a wave the budget thinks
+ *     it can afford three of.
  */
 export function threatOf(type) {
   if (!type || type.harmless) return 0;
   const towed = type.tows && TYPE_BY_ID[type.tows.type];
-  return (type.hp + (towed ? towed.hp : 0)) / CFG.waves.threatPerHp;
+  return (type.hp * fractureFactor(type) + (towed ? towed.hp : 0)) / CFG.waves.threatPerHp;
+}
+
+/**
+ * How much health one body of a self-splitting type is worth in total, as a
+ * multiple of its own.
+ *
+ * DERIVED from the same three fields the fracture itself runs on, and the
+ * depth comes off the radius exactly the way `Enemy.destroy` decides whether
+ * to split at all -- so a change to `scale` or `floor` moves the budget and
+ * the behaviour together. A type that does not split into its own kind is 1.
+ */
+export function fractureDepth(type) {
+  const sp = type && type.splits;
+  if (!sp || sp.type !== type.id) return 0;
+  /*
+   * THROWS rather than defaulting, and the reason is that the loop below is
+   * the fracture's own termination test: a `scale` at or above 1 is a chain
+   * that never reaches the floor, which is not a balance mistake, it is the
+   * game hanging on `threatOf` at module load. `levelsOf` and `bandOf` are
+   * both written this way for the smaller version of the same problem --
+   * a value that is indistinguishable from a chosen one.
+   */
+  if (!(sp.scale > 0 && sp.scale < 1)) throw new Error(`${type.id}: splits.scale must be above 0 and below 1, got ${sp.scale}`);
+  if (!(sp.floor > 0)) throw new Error(`${type.id}: splits.floor must be above 0, got ${sp.floor}`);
+  let n = 0;
+  // The same test `Enemy.destroy` makes: a body splits while its own radius
+  // is at or above the floor, and its children are `scale` of it.
+  for (let r = type.r; r >= sp.floor; r *= sp.scale) n++;
+  return n;
+}
+
+/**
+ * What one body of a self-splitting type is worth in TOTAL health, as a
+ * multiple of its own -- `1 + p + p^2 + ...` for `p = count * hpAt`, one
+ * term per generation. A type that does not fracture is 1.
+ */
+export function fractureFactor(type) {
+  const depth = fractureDepth(type);
+  if (!depth) return 1;
+  const per = type.splits.count * (CFG.quarry.hpAt || 0);
+  let total = 0;
+  for (let i = 0; i <= depth; i++) total += per ** i;
+  return total;
 }
 
 /** ...and what a whole authored wave weighs, at the proportions it is written at. */

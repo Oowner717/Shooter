@@ -4545,10 +4545,25 @@ export class Game {
 
   debugClearField() {
     const w = this.world;
-    // Snapshot first: destroying an object appends its fragments to w.drops,
-    // and a live for..of would walk straight into them and kill those too.
-    for (const e of [...w.enemies]) if (!e.dead) e.destroy(w);
-    for (const e of [...w.drops]) if (!e.dead) e.destroy(w);
+    /*
+     * Snapshot first: destroying an object appends its fragments to w.drops,
+     * and a live for..of would walk straight into them and kill those too.
+     *
+     * ...and REPEATED, because a destroy can make BODIES and not only drops:
+     * a SPLITTER's four motes, a WARDEN's plates, a SCION's seeds and a
+     * QUARRY's three all arrive in the list this is walking, after the
+     * snapshot was taken. So one pass left a whole generation standing, and
+     * the thing that clears the field for a case did not clear the field --
+     * found when the HEAVE arm read a body leaving a shell at 76.5 u/s with
+     * the node unbought, against 0.6-0.8 in six runs on a page of its own.
+     * The loop ends on its own because every one of those chains
+     * terminates; the bound is a backstop, not the mechanism.
+     */
+    for (let pass = 0; pass < 6; pass++) {
+      const live = [...w.enemies, ...w.drops].filter((e) => !e.dead);
+      if (!live.length) break;
+      for (const e of live) e.destroy(w);
+    }
     w.debris.length = 0;
   }
 

@@ -3620,4 +3620,123 @@ came from before believing the other one covers it.
   an absolute: with every velocity zeroed a ringing bell lights zero extra
   pixels. Without it the tick could be an arbitrary mark drawn at an arbitrary
   angle and the case could not tell.
+- **THE FIRST HOSTILE OF THE TWENTY WEIGHS SOMETHING, WHICH IS A DIFFERENCE
+  IN KIND.** Builds 307-311 could drop EMBER, HUSK, LANTERN, FILAMENT and
+  BELL into waves already in the roster and move no band's budget by a byte,
+  because `threatOf` returns 0 on its first line for `harmless`. QUARRY
+  (build 312, band 4) cannot: `budgetAt` is the mean threat of a band's own
+  waves, so a hostile re-prices the whole band by existing. Measured across
+  both builds in ONE container, per the differential rule: band 4 **21.32 ->
+  23.30, +9.3%**, and bands 1, 2, 3 and 5 identical to the digit. That number
+  is the deliverable of the change as much as the body is -- every other
+  band-4 wave is 9.3% longer now.
+- **A body that FRACTURES counts what it becomes, the way a TOW counts what
+  it drags.** `splits.type` naming the parent's own id makes the generation
+  the body's RADIUS instead of a field on it: r 40 -> three at 24 -> nine at
+  14.4, stopped by `splits.floor`, out of one type, one drawing, one codex
+  entry and one band entry. So the health a player actually shoots is
+  `hp * (1 + p + p^2)` for `p = count * hpAt` -- x2.71, i.e. 37.9 threat
+  against the 14 its own `hp` alone would say. Left to the author that is a
+  second source of truth for the same number, and the failure mode is a band
+  that thinks it can afford three of them.
+- **A recursive field needs its termination checked, because the failure is
+  the game not booting.** `fractureDepth` throws on a `scale` at or above 1
+  (or a floor at or below 0) rather than defaulting, for `levelsOf`'s and
+  `bandOf`'s reason -- and proved rather than argued: with `scale: 1.2` the
+  build dies inside the module graph at `check-build.mjs`'s FIRST import,
+  because `threatOf` is reached from the tree's own price sweep at load.
+- **The children's numbers come off the PARENT and AFTER `scaleToTier`, or
+  the rung is applied twice.** A kid made with `opts.hp = parent.maxHp * 0.3`
+  would then be multiplied by `k.hp` again inside `spawnOne`'s scaler --
+  parent's `maxHp` already carries it. The arm that can see this has to run
+  at a rung where `k.hp` is not 1: at rung 22 it is 1.786, so the fault reads
+  0.54 where the authored share is 0.30. At rung 1 the case cannot fail.
+- **A fracture is paid for ONCE, by the pieces that cannot break.** `shed`
+  values a mote off the body's own MASS and three children at 0.6 of the
+  radius carry `3 * 0.36 = 1.08` of their parent's area, so the mass is
+  conserved across a generation and paying at each one pays for the same rock
+  three times. A body that broke into its own kind sheds nothing; the nine
+  that cannot shed one mote each, their COUNT derived from the radius --
+  `(14.4 / 40)^2` of eight is 1. Measured 0, 0 and 9 motes across the three
+  generations.
+- **THE GUIDE'S `tumble` CANNOT BE GIVEN TO A HOSTILE, and the reason is two
+  rules meeting.** HUSK's tumble is ballistic -- thrown from a side wall with
+  no propulsion -- and `CFG.physics.linearDamping` 0.55 makes the throw 11%
+  of itself four seconds in. Scenery may coast to a halt because it dissolves
+  at `life`; a hostile that coasts to a halt comes to rest wherever it
+  stopped, and a body at floor level out to one side is outside
+  `autoTarget`'s 78-degree cone FOR EVER -- which, with build 291's release
+  gate waiting for the field to thin, is a run that can never climb again.
+  `roll` is the gait that keeps the closing march and replaces the ROUTE, and
+  it is a fifth word in `GAITS` rather than a second meaning for `tumble`,
+  because `OWN_SPAWN` is keyed on the gait and a hostile has to come through
+  the portal like everything else.
+- **A crossing gait cannot be built out of the route idiom, and the factor
+  saturating is the tell.** `routeLateral` hands `drive` a perpendicular
+  offset to the bearing AT THE MACHINE, and perpendicular to that bearing is
+  TANGENTIAL -- a tangential heading holds the body's distance from the mount
+  and wraps round it rather than crossing the field. Measured, sweeping the
+  factor 0.75 / 1.1 / 1.3 / 1.6 / 2.0 moved the crossing 187, 200, 202, 207,
+  205 units of a 629-wide field. **A factor the picture does not respond to
+  is a factor on the wrong term.** What works is steering at a point
+  displaced in WORLD X from whatever the body was aiming at, by the remaining
+  depth times the factor: high up that point is outside the field, so the
+  body really drives at the wall; at the floor line the term is zero and it
+  converges on the machine, which is the fold every route already does across
+  its last stretch.
+- **...and it turns at `edgeEase`'s BAND, not at the wall, which is why the
+  first two versions turned nowhere.** There is already a global rule against
+  a body reaching a side wall -- `CFG.physics.edgeEase` pushes anything within
+  96 units of an edge back at 300 u/s^2, under a docstring naming the very
+  thing a roller does ("could otherwise end up rolling along a wall"). So a
+  roller's reachable column is 106 to 522 of 629 and a turn point at
+  `r + 14` = 54 is a hundred units outside anywhere the body can be: a branch
+  nothing can take, which is the `world.endless` shape again. Derived from the
+  rule it would otherwise fight, the two agree and the turn fires at exactly
+  136 and 493. **Before adding a rule about where a body may go, find the one
+  that already says where it may not.**
+- **A new gait's cost is measured in TURNS against ARRIVAL.** `CFG.roll.slant`
+  was chosen off the sweep, not by eye: 0.75 gives 0-1 turns and arrives in
+  42-44s, 1.1 gives 1 and 55s, 1.3 gives 1-2 and 61-68s, 2.0 gives 3 and
+  76-94s. It is scale-invariant across the two eras by construction, because
+  the displacement goes with the column and the field's width goes with the
+  same zoom -- so the zig-zag count is the same at era 2 and only the clock
+  stretches, x1.54, like every other body's.
+- **A CLEAR THAT SNAPSHOTS DOES NOT CLEAR ANYTHING WHOSE DEATH MAKES
+  BODIES.** `debugClearField` took `[...w.enemies]` and destroyed what was in
+  it, with a comment explaining that the snapshot is needed because a destroy
+  appends DROPS -- and four things append BODIES: a SPLITTER's four motes, a
+  WARDEN's plates, a SCION's seeds and now a QUARRY's three. They land after
+  the snapshot, so the helper every case uses to get a clean field left a
+  whole generation standing on it, and has since SPLITTER existed. Found from
+  the other end: the HEAVE arm read a body leaving the shell at 76.5 u/s with
+  the node unbought, against a ceiling of a fifth of 183.3 -- and 0.6 to 0.8
+  over six runs on a page of its own, which is the inherited-state signature
+  exactly. It repeats until the field is empty now (bounded as a backstop,
+  since every one of those chains terminates), and the case carries the
+  one-pass version as its control at 3 bodies.
+- **A one-frame velocity reading depends on everything that can deliver an
+  impulse, not only on bodies.** The same HEAVE arm calls `debugClearField`,
+  which takes bodies and salvage and nothing else -- so a mine, a projectile
+  or an effect left by any of six hundred arms upstream is inside its
+  measurement. It clears all three itself now. `restart()` is not a reset of
+  everything a case can leave behind, and neither is a field clear.
+- **A ratio between a ROUNDED number and a full-precision one is not the
+  ratio.** The budget arm compared `budgetAt / mean` across bands to pin the
+  walk without hard-coding it, and read the budgets off a `toFixed(2)` copy
+  kept for the message: two bands disagreed at 2e-4 on a build where they
+  agree to the bit. Round for the message, divide the raw.
+- **`budgetAt` is the band's mean times the WALK, and comparing it against a
+  raw mean understates a change.** The first version of the budget arm read
+  band 4 rising 2.3% where the differential across the two builds in one
+  container was 9.3%: 0.936 is the walk at rung 1 and it was being counted as
+  part of the rise. The arm takes the walk off ANOTHER band at the same rung
+  rather than writing 0.936 down, so it ties the budget to the roster without
+  pinning a constant a tuning pass would move.
+- **`large: true` is on fifteen types and NOTHING reads it**, under a comment
+  claiming it makes a body "released more slowly, and worth more when it
+  lands". Found while authoring QUARRY, deliberately NOT acted on in the same
+  build -- a dead field is `git rm`, and a removal sweep does not belong in a
+  build whose measurement is a band's budget. Same shape as `kind: 'works'`
+  (eighteen builds) and the anomaly `cost` fields (fifty-six).
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

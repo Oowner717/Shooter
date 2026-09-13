@@ -17440,6 +17440,17 @@ if (MINE_LINE) {
       g.restart();
       g.debugTeachAll();
       g.debugClearField();
+      /*
+       * ...and everything else that can deliver an impulse, because this
+       * measures ONE frame of one body's velocity. `debugClearField` takes
+       * the bodies and the salvage and nothing else, and the arm failed in
+       * the suite at 76.5 u/s against 0.6-0.8 in six runs on a page of its
+       * own -- which is the inherited-state signature, from a case six
+       * hundred arms upstream. Set what the question depends on.
+       */
+      for (const list of ['projectiles', 'mines', 'effects']) {
+        if (w[list]) w[list].length = 0;
+      }
       w.phase = 'staging';
       w.spawnLock = 1e9;
       w.director.update = () => {};
@@ -30028,6 +30039,338 @@ if (MINE_LINE) {
     D.mote > 40 && others.every((k) => D[k] > 40) && D.ink > 20 && D.selfZero === 0,
     `bell is ${D.mote} from a chip and ${others.map((k) => `${D[k]} from ${k.toUpperCase()}`).join(', ')} `
     + `(ink ${D.ink}); the same shape twice differs by ${D.selfZero}`);
+}
+
+// --- a QUARRY is nine bodies, and it takes no lane -------------------------
+/*
+ * Build 312, phase 6f. The first HOSTILE of the twenty, which is what makes
+ * it different in kind from EMBER through BELL: it WEIGHS something. A
+ * harmless body is zero in `threatOf`, so the five before it went into waves
+ * already in the roster without moving a band's budget by a byte. This one
+ * moves band 4's, and most of the move is the fracture rather than the body
+ * -- `threatOf` counts what a QUARRY BECOMES, the way it has counted what a
+ * TOW drags since build 301.
+ *
+ * `splits.type` names the parent's OWN id, so the generation is the body's
+ * radius and not a field on it: one type, one drawing, one codex entry, and
+ * a chain terminated by arithmetic rather than by a counter that all six
+ * places which set `dead` would have to maintain.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG, TYPE_BY_ID, WAVES } = await import('../src/config.js');
+    const { fractureDepth, fractureFactor, threatOf, Director, drawSpecimen } = await import('../src/enemies.js');
+    const out = {};
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+    };
+    const Q = TYPE_BY_ID.quarry;
+    const qs = () => w.enemies.filter((e) => e.type.id === 'quarry' && !e.dead);
+    out.depth = fractureDepth(Q);
+    out.factor = +fractureFactor(Q).toFixed(4);
+    out.want = { hpAt: CFG.quarry.hpAt, armorAt: CFG.quarry.armorAt, speedAt: CFG.quarry.speedAt, count: Q.splits.count, scale: Q.splits.scale, floor: Q.splits.floor };
+    // Walked here rather than read off the helper, so the case and the helper
+    // are two independent statements of the same arithmetic.
+    out.byHand = 0;
+    for (let i = 0, p = Q.splits.count * CFG.quarry.hpAt; i <= out.depth; i++) out.byHand += p ** i;
+    out.byHand = +out.byHand.toFixed(4);
+
+    /*
+     * ---- the fracture, generation by generation -------------------------
+     *
+     * At rung 22, which is where band 4 starts, and NOT at rung 1 -- the
+     * children's health comes off the PARENT's `maxHp` and that figure
+     * already carries the rung, so the arm below is the only thing that can
+     * see the rung applied twice. It would read `hpAt * k` = 0.54 rather than
+     * 0.30 at this rung's 1.786.
+     *
+     * `director.update` is stubbed and `spawnLock` pinned, and BOTH are put
+     * back at the end: eighteen cases in the damage-bench family leave them
+     * set and `reset()` keeps the same Director object.
+     */
+    g.restart();
+    g.debugTeachAll();
+    clear();
+    const d = w.director;
+    d.setTier(22);
+    d.update = () => {};
+    w.spawnLock = 1e9;
+    w.autoAim = false;
+    w.autoFire = false;
+    out.tierK = +d.scaleAt(22).hp.toFixed(3);
+    const first = g.debugSpawn('quarry', w.width * 0.5, 300);
+    first.staged = false;
+    first.spawnIn = 0;
+    out.parent = { hp: first.maxHp, armor: +first.armor.toFixed(4), cruise: +first.cruise.toFixed(2), r: first.r };
+    out.gen = [];
+    let living = [first];
+    for (let k = 0; k < 4 && living.length; k++) {
+      const paid = w.drops.length;
+      const was = { hp: living[0].maxHp, armor: living[0].armor, cruise: living[0].cruise };
+      const bodies = living.length;
+      for (const e of living) e.destroy(w);
+      g.update(1 / 60);
+      living = qs();
+      // ENTRIES, not bodies: TESSERA pushed fifteen tiles twice and every
+      // damage path iterates the list.
+      const entries = Math.max(0, ...living.map((e) => w.enemies.filter((x) => x === e).length));
+      out.gen.push({
+        from: bodies,
+        n: living.length,
+        entries,
+        r: living.length ? +living[0].r.toFixed(1) : null,
+        hpOf: living.length ? +(living[0].maxHp / was.hp).toFixed(3) : null,
+        armorOf: living.length ? +(living[0].armor / was.armor).toFixed(3) : null,
+        cruiseOf: living.length ? +(living[0].cruise / was.cruise).toFixed(3) : null,
+        motes: w.drops.length - paid,
+      });
+    }
+
+    /*
+     * ---- ...and clearing the field clears what a fracture MAKES ---------
+     *
+     * `debugClearField` snapshotted the list and destroyed what was in it,
+     * which is correct for salvage (a destroy appends drops) and wrong for
+     * anything whose death makes BODIES -- a SPLITTER's motes, a WARDEN's
+     * plates, a SCION's seeds, a QUARRY's three. They land in the list after
+     * the snapshot, so the helper that gives a case a clean field left a
+     * whole generation standing on it. The control is the one-pass version.
+     */
+    clear();
+    const lone = g.debugSpawn('quarry', w.width * 0.5, 300);
+    lone.staged = false;
+    lone.spawnIn = 0;
+    for (const e of [...w.enemies].filter((x) => !x.dead)) e.destroy(w);
+    out.onePass = qs().length;
+    clear();
+    const again = g.debugSpawn('quarry', w.width * 0.5, 300);
+    again.staged = false;
+    again.spawnIn = 0;
+    g.debugClearField();
+    out.cleared = w.enemies.filter((e) => !e.dead).length;
+
+    /*
+     * ---- the roll: it turns, and it still ARRIVES -----------------------
+     *
+     * The arrival is the load-bearing half. `docs/objects.html` gives QUARRY
+     * the ballistic `tumble` HUSK has, and a hostile cannot take it: with no
+     * propulsion the throw is 11% of itself four seconds in, and a body at
+     * rest at floor level out to one side is outside `autoTarget`'s cone for
+     * ever -- which, with build 291's release gate waiting for the field to
+     * thin, is a run that can never climb again. So `roll` keeps the closing
+     * march and replaces the ROUTE.
+     */
+    const walk = (id, x0, secs) => {
+      clear();
+      const e = g.debugSpawn(id, x0, 260);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.hp = 1e9;
+      e.maxHp = 1e9;
+      let flips = 0;
+      let prev = 0;
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minAv = Infinity;
+      let arrive = null;
+      const turns = [];
+      for (let s = 0; s < 60 * secs; s++) {
+        g.update(1 / 60);
+        if (prev !== 0 && e.rollSide !== prev) { flips++; turns.push(+e.x.toFixed(0)); }
+        prev = e.rollSide;
+        minX = Math.min(minX, e.x);
+        maxX = Math.max(maxX, e.x);
+        if (s > 90) minAv = Math.min(minAv, Math.abs(e.av));
+        if (arrive === null && e.attacking) { arrive = +(s / 60).toFixed(1); break; }
+      }
+      return { flips, turns, crossed: +(maxX - minX).toFixed(0), minAv: +minAv.toFixed(3), arrive };
+    };
+    out.band = +(Q.r + CFG.physics.edgeEase).toFixed(0);
+    out.width = +w.width.toFixed(0);
+    out.mid = walk('quarry', w.width * 0.5, 110);
+    out.side = walk('quarry', w.width * 0.18, 110);
+    // The control for the held spin: an ordinary body's own `av` is damped to
+    // nothing, so a floor of 1.8 on one and 0.5 on the other is the same
+    // instrument reading a one and a zero.
+    out.plain = walk('lurcher', w.width * 0.5, 110);
+
+    // ---- an endless chain is refused -------------------------------------
+    /*
+     * `scale` at or above 1 is a fracture that never reaches its floor, and
+     * `threatOf` is called from `Director.load` -- so it is the game not
+     * booting rather than a wave being wrong. Written onto the real type and
+     * put back, which is build 307's rule: a refusal arm against ids that do
+     * not exist proves nothing.
+     */
+    const held = Q.splits;
+    out.refused = 0;
+    const bad = [{ type: 'quarry', count: 3, scale: 1, floor: 20 }, { type: 'quarry', count: 3, scale: 1.4, floor: 20 },
+      { type: 'quarry', count: 3, scale: 0, floor: 20 }, { type: 'quarry', count: 3, scale: 0.6, floor: 0 }];
+    for (const v of bad) {
+      Q.splits = v;
+      try { fractureDepth(Q); } catch (err) { out.refused++; }
+    }
+    Q.splits = held;
+    out.tried = bad.length;
+    out.restored = fractureDepth(Q) === out.depth;
+
+    // ---- what it weighs, and whose budget moved --------------------------
+    out.threat = +threatOf(Q).toFixed(2);
+    out.naive = +(Q.hp / CFG.waves.threatPerHp).toFixed(2);
+    out.budget = {};
+    for (let b = 1; b <= 5; b++) out.budget[b] = +Director.budgetAt(1, b).toFixed(2);
+    out.inBands = [...new Set(WAVES.filter((v) => (v.of || []).some(([id]) => id === 'quarry')).map((v) => v.band || 1))];
+    /*
+     * The band's own mean, computed here off the roster, is what `budgetAt`
+     * has to agree with -- the budget is DERIVED from the waves, so a wave
+     * added to a band re-prices that band by existing.
+     *
+     * ...and it agrees TIMES THE WALK, which the first version of this arm
+     * forgot: `budgetAt` is the mean times `budget.open`-to-`close` across
+     * the band's own rungs, 0.936 at rung 1, so comparing a budget against a
+     * raw mean reported band 4 rising 2.3% where the real differential across
+     * the two builds was 9.3%. The walk is taken off ANOTHER band at the same
+     * rung rather than written down, so the arm ties the budget to the roster
+     * without pinning a constant that a tuning pass would move.
+     */
+    const wt = (v) => (v.of || []).reduce((sum, [id, n]) => sum + threatOf(TYPE_BY_ID[id]) * n, 0);
+    const meanOf = (b) => {
+      const ws = WAVES.filter((v) => (v.band || 1) === b && !v.teach);
+      return ws.reduce((sum, v) => sum + wt(v), 0) / ws.length;
+    };
+    out.mean = {};
+    for (let b = 1; b <= 5; b++) out.mean[b] = +meanOf(b).toFixed(3);
+    // Off the UNROUNDED budget: `out.budget` is rounded to two places for
+    // the message, and dividing that by a full-precision mean made two bands
+    // disagree at 2e-4 on a build where they agree to the bit.
+    out.walk = {};
+    for (let b = 1; b <= 5; b++) out.walk[b] = Director.budgetAt(1, b) / meanOf(b);
+    const b4 = WAVES.filter((v) => (v.band || 1) === 4 && !v.teach);
+    const rest = b4.filter((v) => !(v.of || []).some(([id]) => id === 'quarry'));
+    out.mean4 = +meanOf(4).toFixed(2);
+    out.without4 = +(rest.reduce((sum, v) => sum + wt(v), 0) / rest.length).toFixed(2);
+    out.waves4 = b4.length;
+
+    // ---- the picture, and its own fracture lines -------------------------
+    const SZ = 96;
+    const shot = (id) => {
+      const c = document.createElement('canvas');
+      c.width = SZ;
+      c.height = SZ;
+      const x = c.getContext('2d');
+      x.translate(SZ / 2, SZ / 2);
+      drawSpecimen(x, id, 22);
+      const px = x.getImageData(0, 0, SZ, SZ).data;
+      const a = new Uint8Array(SZ * SZ);
+      let ink = 0;
+      for (let i = 0; i < SZ * SZ; i++) { a[i] = px[i * 4 + 3]; ink += px[i * 4 + 3]; }
+      return { a, ink: Math.round(ink / 1000) };
+    };
+    const diff = (p, q) => {
+      let sum = 0;
+      for (let i = 0; i < p.a.length; i++) sum += Math.abs(p.a[i] - q.a[i]);
+      return Math.round(sum / 1000);
+    };
+    const me = shot('quarry');
+    out.draw = { ink: me.ink, selfZero: diff(shot('quarry'), shot('quarry')) };
+    for (const id of ['mote', 'splitter', 'husk', 'bulwark', 'bloom']) out.draw[id] = diff(me, shot(id));
+
+    delete d.update;
+    w.spawnLock = 0;
+    g.restart();
+    clear();
+    return out;
+  });
+
+  const G = r.gen;
+  check('a QUARRY breaks into three and then into nine, and the chain stops there',
+    r.depth === 2 && G.length === 3
+    && G[0].from === 1 && G[0].n === 3 && G[0].r === 24
+    && G[1].from === 3 && G[1].n === 9 && G[1].r === 14.4
+    && G[2].from === 9 && G[2].n === 0
+    && G[0].entries === 1 && G[1].entries === 1,
+    `${G.map((x) => `${x.from} at r ${x.r === null ? '-' : x.r} -> ${x.n}`).join(', ')} `
+    + `(one entry each in world.enemies), depth ${r.depth} from a floor of ${r.want.floor}`);
+
+  check('...and a child is weaker than its parent, with the rung applied once',
+    Math.abs(G[0].hpOf - r.want.hpAt) < 0.02 && Math.abs(G[1].hpOf - r.want.hpAt) < 0.02
+    && Math.abs(G[0].armorOf - r.want.armorAt) < 0.01 && Math.abs(G[0].cruiseOf - r.want.speedAt) < 0.01
+    && r.tierK > 1.5,
+    `at rung 22 (health x${r.tierK}) a parent of ${r.parent.hp} hands out ${G[0].hpOf} and then ${G[1].hpOf} `
+    + `of its own health against an authored ${r.want.hpAt} -- the rung twice would read `
+    + `${+(r.want.hpAt * r.tierK).toFixed(2)} -- with armour x${G[0].armorOf} and speed x${G[0].cruiseOf}`);
+
+  check('...and the rock is paid for once, by the pieces that cannot break',
+    G[0].motes === 0 && G[1].motes === 0 && G[2].motes === 9,
+    `the ${G[0].from} that fractured shed ${G[0].motes} motes and the ${G[1].from} shed ${G[1].motes}; `
+    + `the ${G[2].from} that could not shed ${G[2].motes}, which is what carries a mass 3 x 0.6^2 = 1.08 `
+    + 'of the parent\'s per generation');
+
+  check('...and clearing the field clears what the fracture made',
+    r.onePass === 3 && r.cleared === 0,
+    `one snapshot pass over world.enemies leaves ${r.onePass} bodies standing, which is what the `
+    + `helper used to do; debugClearField leaves ${r.cleared}`);
+
+  /*
+   * ---- the turn is asserted at the BAND, which is where it can happen ----
+   *
+   * `edgeEase` pushes anything within 96 units of a side back toward the
+   * middle at 300 u/s^2, expressly so nothing ends up "rolling along a wall".
+   * So a turn point measured off the WALL is a branch nothing can take: the
+   * first version turned at `r + 14` and measured ZERO turns while sweeping
+   * the slant 0.75 -> 2.0 and moving the crossing 187, 200, 202, 207, 205 of
+   * a 629-wide field. A factor the picture does not respond to is a factor on
+   * the wrong term, and the saturation was the tell.
+   */
+  check('...and it takes no lane: it turns where the arena turns anything, and still arrives',
+    r.mid.flips >= 1 && r.side.flips >= 1
+    && r.mid.turns.every((x) => x <= r.band + 20 || x >= r.width - r.band - 20)
+    && r.side.turns.every((x) => x <= r.band + 20 || x >= r.width - r.band - 20)
+    && r.mid.arrive !== null && r.side.arrive !== null
+    && r.mid.crossed > 250 && r.plain.flips === 0,
+    `from the middle it turned ${r.mid.flips} time(s) at x ${r.mid.turns.join(', ')} and arrived at `
+    + `${r.mid.arrive}s having crossed ${r.mid.crossed} of ${r.width}; from a side, ${r.side.flips} at `
+    + `${r.side.turns.join(', ')} and ${r.side.arrive}s over ${r.side.crossed}. The band is `
+    + `${r.band} in from each edge; a LURCHER turned ${r.plain.flips} times`);
+
+  check('...and the spin is held against the damping, which nothing else is',
+    r.mid.minAv > 1.8 && r.side.minAv > 1.8 && r.plain.minAv < 0.5,
+    `the worst |av| over the whole descent is ${r.mid.minAv} and ${r.side.minAv} against a floor of 2, `
+    + `where a LURCHER's own spin decays to ${r.plain.minAv}`);
+
+  check('...and an endless fracture is refused rather than hung on',
+    r.refused === r.tried && r.restored,
+    `${r.refused} of ${r.tried} impossible chains threw (scale 1, 1.4, 0 and a floor of 0), `
+    + `and the type was put back (depth ${r.depth} again: ${r.restored})`);
+
+  const rise = ((r.mean4 / r.without4) - 1) * 100;
+  check('a QUARRY weighs what it BECOMES, and only band 4 paid for it',
+    Math.abs(r.factor - r.byHand) < 1e-9 && r.factor > 2.7 && r.factor < 2.72
+    && Math.abs(r.threat - r.naive * r.factor) < 0.02
+    && r.inBands.length === 1 && r.inBands[0] === 4
+    && Math.abs(r.walk[4] - r.walk[5]) < 1e-9 && Math.abs(r.walk[4] - r.walk[3]) < 1e-9
+    && rise > 8 && rise < 11,
+    `1 + p + p^2 is x${r.factor} of its own health (${r.byHand} walked by hand), so it weighs `
+    + `${r.threat} against the ${r.naive} its own hp alone would say. It is authored into band `
+    + `${r.inBands.join('/')} only, whose mean threat is ${r.mean4} over ${r.waves4} waves against `
+    + `${r.without4} without it (+${rise.toFixed(1)}%, measured 21.32 -> 23.30 across the two builds `
+    + `in one container); budgetAt is that mean times the band's own walk, ${r.walk[4]} here against `
+    + `${r.walk[3].toFixed(6)} and ${r.walk[5].toFixed(6)} at the same rung`);
+
+  const D = r.draw;
+  const others = ['mote', 'splitter', 'husk', 'bulwark', 'bloom'];
+  check('...and the rock is drawn as itself, with the cuts it will come apart along',
+    others.every((k) => D[k] > 40) && D.ink > 20 && D.selfZero === 0,
+    `quarry is ${others.map((k) => `${D[k]} from ${k.toUpperCase()}`).join(', ')} (ink ${D.ink}); `
+    + `the same shape twice differs by ${D.selfZero}`);
 }
 
 // --- the debug panel's three quieter faults ---------------------------------
