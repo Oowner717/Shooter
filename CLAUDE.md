@@ -3893,6 +3893,22 @@ came from before believing the other one covers it.
   band 4. **So the rule for phase 6 is: a wave added to band 1 moves it and a
   wave added to any other band does not**, and neither is a behavioural
   change -- it is build 241's re-association fault wearing a table's clothes.
+  **THAT MECHANISM IS WRONG AND THE RULE DOES NOT HOLD -- corrected at build
+  318.** Measured at 317 with controls: `Director.shuffle` and `Director.load`
+  are called **zero** times across the whole 9000-frame fight, `order.length`
+  stays 0 and `world.earned` stays 0, because `fight.mjs` never calls
+  `restart()` -- it sets the assist flags and calls `openBoss(1)`, and
+  `Game.update` is `if (w.boss) {...} else { director.update() }`. The shuffle
+  channel is SHUT, so the hash is blind to the wave table in EVERY band and
+  not merely outside band 1. Proved rather than argued: a guaranteed-eligible
+  band-1 wave (`[['mote', 5]]`, `opens` 0) does not move it either -- and
+  moving SHRIKE's own wave into band 1 is not even a valid control, because
+  `shuffle` filters on `eligible()` first and that wave carries a LURCHER at
+  `opens: kB(200)`, ineligible at `earned` 0 in any band. Build 314's wave WAS
+  the cause of its move (that half was proved by revert); the MECHANISM
+  attributed to it was inference and is not there. **Do not cite the band
+  rule** -- for a wave-table change the honest expectation is no move at all,
+  and the instrument to reach for is `tiers.mjs`.
 - **A SCHOOL COUNTS AS ONE PROBLEM AGAINST THE ELEVEN-BODY CEILING, AND THAT
   IS A RULING.** The ceiling is "a combination must not become a crowd" and
   it was written when every hostile entry was independent bodies. Counted as
@@ -4256,4 +4272,156 @@ came from before believing the other one covers it.
   than the climb (equal numbers are a body with three phases and one speed),
   and that `swing` clears the pad, because a climb back up the dive lane would
   spend the one vulnerable phase gripping the machine.
+- **BUILD 318 IS 317'S OBJECT AFTER A REVIEW PASS, AND FIVE GREEN ARMS WERE
+  HAPPY WITH FOUR FAULTS.** The fan-out was asked for and earned its keep far
+  more decisively than build 308's: three read-only lenses (state-machine
+  lifecycle, geometry and interaction, dead code and test vacuity) over one
+  commit. **And the rule about fan-outs held again**: all three converged on
+  "two shrikes fight for one lane and neither commits", which is NOT what
+  happens -- measured, both commit and both die in the corridor. A fan-out's
+  finding is a pointer to the right file; the mechanism is still yours to
+  measure.
+- **A LANE ON THE WALL OF ITS CORRIDOR IS A PAYLOAD DECIDED BY WOBBLE.**
+  `checkContact` grips on `dist <= e.r + s.r + grabPad`, so a lane at exactly
+  that offset passes the test at ONE point and the body's own heading wander
+  decides whether the pass delivers anything. Measured over one 40-second run:
+  **18 grip frames at `wobble` 0.12 and 439 at `wobble` 0** -- a
+  twenty-four-fold swing on a term with nothing to do with the mechanism,
+  which is the tell that the payload was luck. Half a pad inside
+  (`grabPad / 2`) the corridor has a unit either side: 9 frames at 0.12 and 85
+  at 0, both non-zero, so the grip is earned by the derivation instead of by
+  the noise. `check-build` asserts the offset is strictly inside the corridor
+  now, which is the claim its own heading was already making.
+- **A TWO-UNIT CORRIDOR HAS NO ROOM FOR A PER-BODY OFFSET, SO THE SEPARATION
+  HAS TO BE IN TIME.** Every body on a side derives the SAME lane by
+  construction. Measured on the shipped wave, which authors two: both dived,
+  met in the corridor at a relative 300 u/s, and **both were dead at 27.8
+  seconds** at 3.3 and 23.1 of 70 health. `laneBusy` makes the DIVE exclusive
+  per side -- holding and climbing are outside the lane by construction and
+  must not block each other -- and the same wave then reads **2 of 2 alive,
+  dives 3 and 2, health floors 46.3 and 65.6**, visibly taking turns (one
+  commits on the frame the other's dive ends). Three bodies: 3 of 3 alive
+  against 1 of 3. `scionLane` exists one rung down for the same reason.
+- **...and the case laid ONE body, so the shipped configuration was the
+  untested one.** A case that lays fewer bodies than the wave it is about is
+  a case about a different wave.
+- **A CLOCK THAT COUNTS TIME IN THE PHASE IS NOT A CLOCK THAT COUNTS TIME IN
+  THE LANE.** `dwell` claims to be "seconds it holds a chosen lane before
+  committing"; `diveT` counted seconds in the HOLD PHASE, and the body arrives
+  from the climb 150 units away, so the traverse alone is about 4.8 seconds
+  against a 1.4-second dwell. Measured at the commit frame: **4.84 and 4.94**.
+  The position term always bound, the clock decided nothing, `check-build`
+  guarded a value with no effect, and the telegraph the counter depends on
+  ("stand a mine on the line it is going to use") did not exist. `diveHeld`
+  counts time inside the lane instead. **The declared meaning of a field and
+  the quantity it measures are two different things to check.**
+- **MY OWN PROBE READ THE POST-RESET VALUE AND PROVED NOTHING.** The first
+  attempt logged `diveT` at the hold->dive transition -- after the branch that
+  zeroes it -- and read 0.00/0.01 on every dive, which looks exactly like a
+  dwell that is working. Sample the frame BEFORE a transition when the
+  quantity is what the transition consumes.
+- **AN ARM THAT ASSERTS SOMETHING ITS OWN RUN DISPROVES.** 317 asserted
+  `minGap > overlap` -- that the body never enters the radius the pair solver
+  bills across -- while the same case measured 11 of 70 health lost, which can
+  ONLY come from `impactDamage`, which only fires inside that radius. And
+  `minGap` is sampled after `g.update`, i.e. after the positional correction,
+  so it could never have seen the entry. Two units cannot be held to the unit;
+  the honest claim is that the scrape is BOUNDED, and that is what is asserted.
+- **A GRIP COUNTER WITH NO PHASE GUARD LEFT `swing` WITH NO FAILING TEST
+  ANYWHERE.** Set it to 3: `check-build` passed (`> 0`), the climb returned up
+  inside the grip band, the grip count went UP, and the arm passed more
+  easily -- while the climb's entire justification is that it delivers
+  nothing. Counted per phase now, with the climb AND the hold asserted at
+  zero, which is the only thing that gives that constant a way to fail.
+- **A CONJUNCT WHOSE VARIABLE CANCELS IS A TAUTOLOGY, AND IT WAS NAMED AS A
+  CONTROL IN THE COMMIT MESSAGE.** `Math.abs(dive * naive / dive - 1) > 0.03`
+  reduces to `0.139 > 0.03` -- true on every build, including one with
+  `diveOn` deleted. What replaced it compares the measurements against each
+  other: each delivered figure must be at least three times closer to the
+  authored number than to the uncompensated prediction, with that prediction
+  computed from `accel` and `linearDamping` rather than carried as the literal
+  0.861 the first version hard-coded.
+- **Two conjuncts that were true by construction.** `phases[0] === 'hold'`
+  cannot be otherwise (`diveOn` writes 'hold' whenever the field is falsy) and
+  `includes('dive')` is implied by the dive count beside it. Both gone.
+- **A DIVIDE WITH NO FLOOR ON A FIELD WITH NO DEFAULT.** `gross` divides by
+  `accel / 100` and `accel` has no default on a type, so a dive body authored
+  without one gets a NaN cruise and is lost for the run without throwing. The
+  rise clock's copy of the same arithmetic already carried that floor; this one
+  did not. Three literal copies of `(k + damping) / k` now exist and are
+  deliberately NOT extracted: the callers form the product in different orders
+  and build 241 records what re-associating one costs.
+- **THE DECOY IS THE FIELD'S OTHER STATIC BODY AND IT CLEARED BY
+  COINCIDENCE.** It stands at exactly `shooter.x` with `r` 24, against a lane
+  at 41 and a sum of radii of 38 -- three units, held only by
+  `decoy.r < shooter.r`. Raise it past `shooter.r + grabPad / 2` and every
+  diving body dies on it ABOVE the mount, in a phase whose exit is
+  position-only and which therefore never ends. `check-build` ties those two
+  numbers together now; nothing else in the repo did.
+- **Four faults are RECORDED AND NOT FIXED, each with its reason.** (1) At era
+  2 the hold band is behind the yard wall (`holdY + r` = rim + 104 against a
+  wall at rim + 161), so a held body is unshootable, unminable and
+  un-STASIS-able -- LATENT only, because SHRIKE is band 2 and `eraGate` is 28,
+  so its wave is always era 1. (2) On a viewport under about 443 tall the hold
+  band lands at or below the turret and the object delivers nothing at all;
+  `sh` is floored at 420, so a short window reaches it. (3) Writing `cruise`
+  per phase inverts `thrown`'s documented purpose -- during a dive the
+  ordinary ceiling is 1465 against `thrownSpeed` 720, so a PULSE HALVES a
+  diving body's cap. (4) `checkContact` sets `attacking` and `drive` then
+  multiplies cruise by 1.3, so the grip frames run about 30% faster than the
+  authored dive; the delivered-speed samples are taken clear of the mount and
+  the claim is stated that way rather than silently averaged. Each wants its
+  own measurement and none is a fault in what the object does at the rungs it
+  is actually played on.
+- **A GAIT THAT REPLACES THE ROUTE'S STEERING STILL INHERITS THE ROUTE'S
+  SPEED, AND THAT MADE AN AUTHORED SPEED DEPEND ON A SPAWN ROLL.** `drive`
+  applies `route.dawdle` to any loose body beyond 260 units, and `dive` sets
+  `this.cruise` per phase -- so the object whose whole claim is "210 units a
+  second" delivered **209.9 on a body that rolled a direct route and 185.9 on
+  one that rolled a dawdling one**, with the climb 80.0 against 51.6. Nothing
+  about the geometry differed: era, width, floor, both radii, `grabPad`, the
+  lane and `accel` were identical in both runs. `OWN_SPEED` is the exemption
+  and it names `dive` only -- `roll` and `flock` replace the steering too and
+  still inherit the dawdle, which for them is a slower approach rather than a
+  broken claim, so changing it is a balance decision and not this build's.
+- **...AND IT WAS `g.restart()` THAT FOUND IT, NOT THE SUITE.** The case
+  failed in the suite and passed in three standalone probes, which is the
+  classic inherited-state signature -- and it was not that. The only
+  difference that mattered was the case calling `g.restart()`, which moves the
+  random stream and therefore re-rolls the body's route. Reproduced in one
+  minute by running the same window with and without the restart: 185.9/51.6
+  against 209.9/80.0, the suite's figures to the decimal. **Before clearing
+  state, check whether the two runs are drawing the same randoms** -- build
+  303 recorded the same correction about an A/B and this is its single-run
+  cousin.
+- **A HOLD THAT RESETS ON LEAVING ITS RANGE IS A HOLD THAT NEVER COMPLETES,
+  for the second time in this repo.** The in-lane clock zeroed on every
+  excursion, and `drive`'s heading wobble carries the body across a two-unit
+  gate constantly: measured, both bodies of the shipped wave recorded ZERO
+  dives in sixty seconds. The TOW's `holdWind` note records this exact fault
+  and its fix, and the fix is the same -- the clock BLEEDS, so leaving the
+  lane costs ground rather than the attempt.
+- **A COMMIT TOLERANCE IS A STEERING QUANTITY, NOT A GEOMETRIC ONE.**
+  `grabPad` was used because it is the corridor's width, and a body whose
+  heading wobbles cannot hold two units for `dwell` even with the clock
+  bleeding. `CFG.shrike.gate` is a share of the body's own radius instead,
+  and what makes the loose gate safe is the other half: **the dive aims at a
+  point AHEAD on the lane rather than at the far floor.** Aiming at the floor
+  makes `dx/|d|` vanishingly small and lateral error is never corrected --
+  build 317 committed within 14 units and the pass measured an error of 17,
+  i.e. it diverged. With `look` at 150 the body has real lateral authority for
+  the whole 660 units above the mount.
+- **MEASURE A POPULATION, NOT A DRAW -- and this is the fourth time this file
+  has said it and the first time it caught me mid-build.** Three consecutive
+  "fixes" each looked right on one body and then read differently on the next
+  roll: dives [2] then [0,0] then [2,3,3] on the same code. Eight independent
+  solo trials and five pair trials settle it: **209.9/80.0 in 13 of 13**,
+  dives 2 and 3+3 in 13 of 13, every body alive, scrape 0-9 of 70.
+- **...and the GRIP is bimodal at about four passes in five.** 15 of 18 bodies
+  gripped; the three that did not read a closest approach of 43.6 against a
+  band of 42. The corridor is `grabPad` = 2 units against a lateral error of
+  one to three, so this is the geometry and not a bug -- a pass grazes, and
+  sometimes misses. The arm asserts 2 of 3 bodies over one window rather than
+  one body over one window, because on one body it flakes about one run in
+  six.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

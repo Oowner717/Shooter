@@ -547,40 +547,53 @@ console.log(`bar: ${bars.length} type(s) are tested as a capsule (`
 
 
 /*
- * ---- A DIVE NEEDS A CORRIDOR TO EXIST AT ALL ----------------------------
+ * ---- A DIVE NEEDS A CORRIDOR, AND ITS LANE HAS TO BE INSIDE IT ----------
  *
- * `laneFor` puts a diving body between two radii it does not choose: the
+ * `diveLane` puts a diving body between two radii it does not choose: the
  * overlap `e.r + s.r`, which `resolvePair` separates at and bills
  * `impactDamage` across, and `CFG.shooter.grabPad` past it, where
  * `checkContact` still takes hold. The gait only works because those two are
- * in that order -- a non-positive pad is a lane that either grips nothing or
- * kills the body, and there is no third option. Asserted here because the
- * pad is a shooter constant that has nothing to do with SHRIKE and could be
- * tuned by somebody who has never read this file.
+ * in that order, and because the lane sits strictly BETWEEN them -- build
+ * 317 put it on the outer wall and the payload became a coin flip on the
+ * body's own heading wobble (18 grip frames at wobble 0.12 against 439 at 0).
  *
- * The corridor is TIGHT and that is recorded rather than guarded: at
- * grabPad 2 a real body cannot hold it to the unit, and a pass costs a
- * measured ~11 of 70 health. Six passes' worth, against a cycle the player
- * has about eleven seconds of to answer.
+ * The lane cannot be computed here -- `diveLane` needs a live world for
+ * `shooter.x` and `width` -- so what is asserted is its ARITHMETIC: the
+ * offset the function uses must fall strictly inside the corridor for every
+ * diving type. That is the claim this heading makes and the 317 guard did
+ * not check.
  *
- * ...and the asymmetry is the whole object, so the dive must be faster than
- * the climb. Equal numbers would be a body with three phases and one speed.
+ * Bounded at BOTH ends, because the prose asserts an ordering and 317 checked
+ * only the low one: a pad wider than the body is a berth rather than a graze,
+ * and the pass stops being a pass.
+ *
+ * ...and the DECOY is the field's OTHER static body, standing at exactly
+ * `shooter.x` with its own radius. It clears today only because
+ * `decoy.r < shooter.r`; raise it past the lane and every diving body dies on
+ * it above the mount, in a phase whose exit is position-only. Nothing else
+ * in the repo ties those two numbers together.
  */
-const SHOOTER_R = CFG.shooter.r;
 const divers = ENEMY_TYPES.filter((t) => t.gait === 'dive');
 if (divers.length) {
   const D = CFG.shrike;
+  const pad = CFG.shooter.grabPad;
+  const sr = CFG.shooter.r;
   const bad = [];
-  if (!(CFG.shooter.grabPad > 0)) {
-    bad.push(`grabPad is ${CFG.shooter.grabPad}, so there is no lane that grips without overlapping`);
-  }
+  if (!(pad > 0)) bad.push(`grabPad is ${pad}: no lane grips without overlapping`);
   if (!(D.dive > D.climb)) bad.push(`dive ${D.dive} is not faster than the climb ${D.climb}`);
-  if (!(D.hold > 0) || !(D.dwell > 0) || !(D.swing > 0)) {
-    bad.push(`hold/dwell/swing must all be positive, got ${D.hold}/${D.dwell}/${D.swing}`);
-  }
+  if (!(D.hold > 0) || !(D.dwell > 0)) bad.push(`hold/dwell must be positive, got ${D.hold}/${D.dwell}`);
   for (const t of divers) {
-    if (!(D.swing > CFG.shooter.grabPad)) {
-      bad.push(`${t.id} would climb back up its own dive lane (swing ${D.swing})`);
+    const lane = t.r + sr + pad / 2;
+    if (!(lane > t.r + sr && lane < t.r + sr + pad)) {
+      bad.push(`${t.id}'s lane ${lane} is not strictly inside its corridor `
+        + `(${t.r + sr}, ${t.r + sr + pad})`);
+    }
+    if (!(pad < t.r)) bad.push(`grabPad ${pad} is not narrower than ${t.id}'s own radius ${t.r}`);
+    // the climb has to leave the band it dived through, by a body at least
+    if (!(D.swing > t.r)) bad.push(`${t.id} climbs ${D.swing} out, inside its own radius ${t.r}`);
+    if (!(CFG.decoy.r < sr + pad / 2)) {
+      bad.push(`a DECOY of radius ${CFG.decoy.r} reaches ${t.id}'s lane `
+        + `(clear only while under ${sr + pad / 2})`);
     }
   }
   if (bad.length) {
@@ -588,10 +601,10 @@ if (divers.length) {
     process.exit(1);
   }
   console.log(`dive: ${divers.length} type(s) run a lane (`
-    + `${divers.map((t) => `${t.id} r${t.r} at ${t.r + SHOOTER_R}-`
-      + `${t.r + SHOOTER_R + CFG.shooter.grabPad} from the mount`).join('; ')}), `
+    + `${divers.map((t) => `${t.id} r${t.r} at ${t.r + sr + pad / 2} of a corridor `
+      + `${t.r + sr}-${t.r + sr + pad}`).join('; ')}), `
     + `${D.dive} down against ${D.climb} back up (x${(D.dive / D.climb).toFixed(1)}), `
-    + `swinging ${D.swing} clear to climb`);
+    + `swinging ${D.swing} clear to climb; a DECOY reaches ${CFG.decoy.r} of ${sr + pad / 2}`);
 }
 
 

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '317';
+export const BUILD = '318';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '317';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '8f9beba';
+export const REV = 'a740598';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1256,11 +1256,29 @@ export const CFG = {
    *
    * So the lane is DERIVED from the two rules it would otherwise fight: the
    * overlap it must not enter (`e.r + s.r`) and the grip band it must reach
-   * (`+ CFG.shooter.grabPad`). At the grip band exactly it grips for six
-   * frames, takes nothing at all, passes the machine and reaches the floor --
-   * measured across lanes 0/38/40/41/42/44/48/56, where 0 dies, 38 to 42
-   * grip and lose nothing, and 44 and out never grip. There is no constant
-   * here for that reason; see `Enemy.laneFor`.
+   * (`+ CFG.shooter.grabPad`). Measured across lanes 0/38/40/41/42/44/48/56
+   * with the body's x PINNED: 0 dies, 38 to 42 grip and lose nothing, 44 and
+   * out never grip. There is no constant here for that reason; see
+   * `diveLane`.
+   *
+   * ---- ...AND IT SITS IN THE MIDDLE OF THAT CORRIDOR, NOT ON ITS WALL ---
+   *
+   * The first version put the lane at the grip band EXACTLY, which is the
+   * wall: `checkContact` grips on `dist <= band`, so at a horizontal offset
+   * of exactly `band` the test passes at a single point and a real body's
+   * drift decides whether the pass delivers anything. Measured, grip frames
+   * over one 40-second run: 18 at `wobble` 0.12 and 439 at `wobble` 0 -- a
+   * twenty-four-fold swing on a term that has nothing to do with the
+   * mechanism, which is the tell that the payload was luck and not geometry.
+   * Half a pad inside it, the corridor has a unit either side and the grip
+   * is earned by the derivation.
+   *
+   * The corridor is `grabPad` = 2 units wide and a real body cannot hold two
+   * units to the unit, so a pass ALSO scrapes the overlap: about 11 of 70
+   * health, six passes' worth. Both facts are consequences of the same two
+   * units and the assertions state both -- an earlier draft of this block
+   * claimed the lane "takes nothing at all", which was the pinned sweep's
+   * figure being quoted for a body that moves.
    */
   shrike: {
     /*
@@ -1292,7 +1310,26 @@ export const CFG = {
      * whole of its one vulnerable phase. "Climbs back ROUND for another" is
      * the guide's own word for this.
      */
-    swing: 150
+    swing: 150,
+    /*
+     * How far AHEAD along the lane the dive steers. Aiming at the far floor
+     * makes `dx/|d|` vanishingly small, so lateral error is never corrected:
+     * build 317 committed within 14 units of the lane and the pass measured
+     * an error of 17 -- it diverged. A point a fixed distance ahead keeps
+     * real lateral authority the whole way down, which is what lets the
+     * commit tolerance be a steering tolerance rather than the corridor's
+     * own width.
+     */
+    look: 150,
+    /*
+     * ...and the tolerance the commit uses, as a share of the body's radius.
+     * `grabPad` was tried and is the wrong quantity: two units is a
+     * GEOMETRIC width and a body whose heading wobbles cannot hold it for
+     * `dwell` even with the clock bleeding -- measured, both bodies of the
+     * shipped wave recorded zero dives. The dive's own aim-ahead is what
+     * brings it onto the lane over the 660 units above the mount.
+     */
+    gate: 0.5
   },
 
   /*
