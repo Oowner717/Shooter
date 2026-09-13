@@ -4734,4 +4734,58 @@ came from before believing the other one covers it.
   `0.5` against a number that is the mote control's own minimum quoted in the
   message. **Rank with the script, decide with your eyes.**
 
+- **THREE RUNS OF A SUITE CANNOT SEE A REGIME THAT HAPPENS ONE RUN IN TEN, SO
+  THE FIGURE DUMP RANKS BY THE WRONG THING.** Build 320's instrument ranks a
+  margin by how few OBSERVED spread-widths separate it from its literal -- and
+  observed is three draws. YOKE's delivered-rate arm was ranked **46 of 52**
+  with 36 spread-widths of apparent headroom, because all three of its draws
+  came from the same regime (probability 0.9^3 = 73%) and the spread looked
+  like 3%. Measured properly, 20 releases: the rate spans **93.6% to 104.3%**
+  of the authored spin against a window of [90, 105], and one draw in twenty
+  came **0.7 points** from failing. So the dump narrows 143 candidates to 52
+  and finds margins whose TYPICAL variation is near the bound; it is blind to
+  the ones whose RARE regime crosses it. A targeted probe sampling the
+  mechanism many times is the complement, not a luxury -- and the two together
+  are what found this.
+- **A GAIT THAT REPLACES THE ROUTE'S STEERING STILL INHERITS THE ROUTE'S
+  SPEED, AND FOR A PAIR THAT MOVES AN AUTHORED ROTATION RATE.** `loiter` is
+  the one route of six with a `dawdle` (0.55, weight 10 of 100) and `drive`
+  applies it to its own local cruise past 260 units -- which lowers `flying`,
+  lowers `authority`, and shrinks the `accel / 100` half of the `fight` term
+  `pairOn`'s compensation treats as constant. Less fight than assumed is MORE
+  delivered rotation: the two `loiter` draws of twenty were the top two, at
+  99.8% and 104.3%. Build 318 recorded this shape for `dive` and put `dive`
+  alone in `OWN_SPEED`, noting that `roll` and `flock` inherit it too but for
+  them it is "a slower approach rather than a broken claim". For `paired` it
+  is BOTH -- a slower approach, which is fine, and a perturbed rotation, which
+  is an authored constant depending on a spawn roll.
+  **Recorded and NOT acted on**, because the two fixes have different blast
+  radii: adding `paired` to `OWN_SPEED` also makes the pair close faster
+  (a balance change), and the mechanism-level fix is for `pairOn` to compute
+  its `fight` from the cruise actually in play rather than assuming
+  `accel / 100`. What the CASE does instead is pin the roll at the source.
+- **PINNING `cruise` DOES NOT PIN THE DAWDLE, AND THAT WAS MEASURED RATHER
+  THAN ASSUMED.** The obvious fix -- do what the three sibling arms do and set
+  `cruise` on both halves -- reads 94.2% to 101.5% with `loiter` still the top
+  draw, because `drive` multiplies its OWN copy of the cruise and never reads
+  the field back. The roll has to be removed at the source
+  (`release(..., { route })`), which reads 95.1% to 98.2% over 20 with the
+  regime gone and the spread 10.7 points down to 3.1.
+  **And the other obvious fix makes it worse.** Starting the window after the
+  spin-up transient -- the reviewer's own second suggestion, and sound
+  reasoning, since the 240-frame mean includes the rise from rest and biases
+  low -- pushes the rate UP: 97.0% to 109.5% raw, i.e. straight through the
+  105% ceiling. Two plausible remedies, both refuted by measuring them.
+- **THE FAN-OUT EARNED ITS KEEP AND WAS WRONG ABOUT BOTH REMEDIES, WHICH IS
+  THE RULE WORKING EXACTLY AS WRITTEN.** Six read-only lenses over 143 flagged
+  margins returned three AT_RISK; an adversarial verifier then refuted two of
+  them with real work (one modelled SPALL's pellet geometry closely enough to
+  reproduce the recorded 35 and 62 to the unit) and could not refute the
+  third, which it measured over 234 trials. That third is real and I had
+  buried it at rank 46. But its named mechanism was the CRUISE roll and the
+  driver is the ROUTE roll, and both of its proposed fixes fail when measured.
+  **A fan-out's finding is a pointer to the right file; the mechanism and the
+  remedy are still yours to measure** -- this is the clearest instance yet,
+  because the finding was right, well-evidenced, and its remedies were wrong.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

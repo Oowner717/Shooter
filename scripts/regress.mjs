@@ -31471,7 +31471,7 @@ if (MINE_LINE) {
   const r = await page.evaluate(async () => {
     const g = window.__sim;
     const w = g.world;
-    const { CFG, TYPE_BY_ID, WAVES } = await import('../src/config.js');
+    const { CFG, TYPE_BY_ID, WAVES, ROUTES } = await import('../src/config.js');
     const { release, pairOf, drawSpecimen } = await import('../src/enemies.js');
     const out = {};
     const T = TYPE_BY_ID.yoke;
@@ -31552,9 +31552,46 @@ if (MINE_LINE) {
     d.traits = [];
     d.update = () => {};
     w.spawnLock = 1e9;
+    /*
+     * ---- the ROUTE is pinned, and the rate arm is why ---------------------
+     *
+     * `loiter` is the one route of six carrying a `dawdle` (0.55, weight 10 of
+     * 100), and `drive` applies it to its OWN local cruise beyond 260 units --
+     * which lowers `flying`, which lowers `authority`, which shrinks the
+     * accel/100 half of the `fight` term `pairOn`'s compensation treats as a
+     * constant. Less fight than assumed means MORE delivered rotation.
+     *
+     * Measured, 20 releases each: unpinned the delivered rate spans
+     * **93.6% to 104.3%** of the authored spin and the two `loiter` draws are
+     * the top two (99.8 and 104.3) -- one of twenty came within **0.7 points**
+     * of failing the arm's own 105% ceiling. Pinned to a route with no
+     * dawdle: **95.1% to 98.2%** over 20, spread 10.7 points down to 3.1.
+     *
+     * So the arm was measuring a spawn roll about one run in ten. Pinning it
+     * is what the three sibling arms in this case already do one layer down
+     * -- `press` and `bench` zero `cruise`, and `gain` sets it to `T.speed`
+     * under a comment reading "the type's own speed rather than the spawn
+     * roll's, so the ratio the arm reads is exact". Pinning `cruise` does NOT
+     * work here and was measured not working (94.2-101.5%, loiter still top):
+     * `drive` multiplies its own copy, so the roll has to go at the source.
+     *
+     * The window stays [0.9, 1.05]. With the distribution collapsed it has
+     * 5.1 points below and 6.8 above, and this case's family has already
+     * taught that headroom beats sensitivity.
+     *
+     * RECORDED AND NOT ACTED ON: a pair that rolls `loiter` really does
+     * deliver about 104% of the spin `CFG.yoke` authors, so an authored
+     * constant depends on a spawn roll in play as well as in the probe.
+     * Exempting `paired` in `OWN_SPEED` would fix the rotation AND make the
+     * pair close faster, which is a balance change -- the same reason
+     * CLAUDE.md gives for leaving `roll` and `flock` inheriting it. The
+     * mechanism-level fix is for `pairOn` to compute its `fight` term from
+     * the cruise actually in play rather than assuming `accel / 100`.
+     */
+    const STEADY = ROUTES.find((rt) => !rt.dawdle);
     const lay = () => {
       clear();
-      const made = release(w, T, w.width * 0.5, 300);
+      const made = release(w, T, w.width * 0.5, 300, { route: STEADY });
       for (const e of made) { e.staged = false; e.spawnIn = 0; e.born = true; }
       return made;
     };
@@ -31782,7 +31819,9 @@ if (MINE_LINE) {
 
   check('...and turns at the rate CFG.yoke authors, which is a DELIVERED rate',
     r.beam.rate > r.spin * 0.9 && r.beam.rate < r.spin * 1.05,
-    `${r.beam.rate.toFixed(3)} rad/s against an authored ${r.spin} `
+    `${r.beam.rate.toFixed(3)} rad/s against an authored ${r.spin} on a route with no `
+    + `dawdle (pinned: unpinned it reads 93.6-104.3% and one draw in twenty came 0.7 points `
+    + `off this arm's ceiling) `
     + `(${((r.beam.rate / r.spin) * 100).toFixed(1)}%). The blend is fought by linearDamping and `
     + `by drive's own accel term, which together deliver 0.59 of a raw target -- measured 0.692 `
     + `before the compensation went in -- so the ask is grossed up by those two terms and this `
