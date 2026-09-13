@@ -3733,6 +3733,14 @@ came from before believing the other one covers it.
   part of the rise. The arm takes the walk off ANOTHER band at the same rung
   rather than writing 0.936 down, so it ties the budget to the roster without
   pinning a constant a tuning pass would move.
+- **The ORDINAL hash was worth running for this one, because the SALVAGE
+  expression moved.** `destroy`'s drop count went from `t.drops || 0` to a
+  quantised share that a fracture suppresses, and that reduces to the
+  identity for every type in the game that does not break into its own kind
+  -- by inspection, which is exactly the argument this repo does not accept.
+  Measured instead, both builds in one container: `1831189433` either side,
+  to the bit. An unchanged hash is the proof that an expression rewritten on
+  the energy path did not reach anything that was already using it.
 - **`large: true` is on fifteen types and NOTHING reads it**, under a comment
   claiming it makes a body "released more slowly, and worth more when it
   lands". Found while authoring QUARRY, deliberately NOT acted on in the same
