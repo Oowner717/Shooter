@@ -261,6 +261,11 @@ export const CODEX = [
     line: 'Seven beads nose to tail, each following the one in front. It wants nothing from you and blocks nothing. Cut it anywhere and you have two shorter snakes, both still going, and the shape of what is left is different every time.',
   },
   {
+    id: 'bell',
+    name: 'BELL',
+    line: 'Hangs in the middle band and bobs, and wants nothing. Break it and for a couple of seconds every object on the field shows you where it is going -- through a corrupted feed, which is exactly when you need it. One round, one harmless kill, and the only shot you take to see better rather than to break something.',
+  },
+  {
     id: 'axiom',
     name: 'AXIOM',
     line: 'It states a rule and holds you to it. Nothing you carry is yours while its clauses stand.',

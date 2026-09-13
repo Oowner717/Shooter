@@ -3583,4 +3583,41 @@ came from before believing the other one covers it.
   the third margin this session that could not be defended and the fourth
   single-draw ratio in the file's history** -- when a case compares two rolled
   bodies, the comparison is the roll.
+- **BELL IS IN FROM BUILD 311, AND ITS WHOLE TECHNICAL CONTENT IS WHERE IT IS
+  DRAWN.** Shoot one and for `CFG.bell.ring` seconds every moving body carries
+  a bearing tick -- a short line out of it along its own travel. It completes
+  the object guide's inert five (EMBER, HUSK, LANTERN, FILAMENT, BELL).
+  **Everything in `Game.draw` goes into `this.buffer`, which `glitch.present`
+  copies to the glass while tearing it** -- a base pass jittered up to 4.5
+  device pixels sideways plus up to twenty displaced slices -- so a readout
+  drawn with the field is torn exactly when the field is hardest to read. That
+  is the fault CLAUDE.md already records about the glitch counter, and this
+  object's promise is that it works "through the corruption shader". So
+  `drawBearings` paints onto the REAL canvas after `present`, and the world
+  matrix is **captured** off the context that drew the bodies
+  (`ctx.getTransform()`, shake included) rather than recomputed from `dpr`,
+  `scale` and `camera` -- a second derivation would drift the first time the
+  camera moved. Measured by revert: the tick holds **0.991** of its pixels
+  under the shader drawn after it and **0.665** drawn into the buffer.
+- **A POSITIONAL CLAIM NEEDS A THIN CONTROL.** The tick's pixels are found by
+  DIFFERENCE -- lit with the bell ringing, dark without it, on a world held at
+  `timeScale = 0` so two draws of one frame differ by nothing else -- and then
+  those exact pixels are re-checked with the shader at full. The first control
+  was the field's lit pixels generally and held 0.879, because a four-pixel
+  jitter leaves a SOLID REGION still lit: it would have read as a passing
+  control for a shader doing nothing. The control is thin pixels now (lit,
+  with two of four neighbours dark), which is the same kind of feature as a
+  tick and the kind a shift actually moves. And the arm requires the control
+  to LOSE some (`fieldHold < 0.95`), or the comparison is empty.
+- **`rings` is a capability on the type and `destroy` is the right door.** A
+  hover body never leaves the field, so being shot is the only way a BELL ever
+  goes -- and `destroy`'s own `fizzle` guard means one taken by the glitch
+  dissolve rings for nobody, which is correct: nobody shot it. Both controls
+  are in the case, because "it rings" is otherwise satisfied by a build that
+  rings on any death at all. Topped up rather than added to, so two bells are
+  two seconds of instrument and not four -- the same invariant `syncGate` has.
+- **A bearing is a DIRECTION, so a body going nowhere has none.** Asserted as
+  an absolute: with every velocity zeroed a ringing bell lights zero extra
+  pixels. Without it the tick could be an arbitrary mark drawn at an arbitrary
+  angle and the case could not tell.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

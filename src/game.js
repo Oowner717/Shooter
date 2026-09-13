@@ -618,6 +618,7 @@ export class Game {
     w.kills = 0;
     w.released = 0;
     w.stasis = 0;
+    w.bell = 0;
     w.decoy = null;
     /*
      * Nothing on the bar owns the barrel any more, so there is no third thing
@@ -1035,6 +1036,7 @@ export class Game {
     // The standing kit that is of the field rather than of the run.
     w.decoy = null;
     w.stasis = 0;
+    w.bell = 0;
     w.shock = 0;
     w.pileT = 0;
     w.flinchT = 0;
@@ -2671,6 +2673,8 @@ export class Game {
 
     // ---- status timers ----
     w.stasis = Math.max(0, w.stasis - dt);
+    // The BELL's instrument. See CFG.bell and drawBearings.
+    w.bell = Math.max(0, (w.bell || 0) - dt);
 
     this.updateFiring(dt);
 
@@ -3832,6 +3836,17 @@ export class Game {
 
     ctx.save();
     ctx.translate(fx.shakeX, fx.shakeY);
+    /*
+     * The world's matrix, CAPTURED rather than recomputed.
+     *
+     * `drawBearings` paints onto the real canvas after the corruption shader
+     * has copied the buffer across, so it needs this exact mapping -- and
+     * working `k`, `tx` and `ty` out a second time would be a second source
+     * of truth that drifts the first time the camera changes. Taken off the
+     * context that drew the bodies, including the shake, so the ticks cannot
+     * land anywhere but on them.
+     */
+    const worldT = ctx.getTransform();
 
     background.draw(ctx, W, H);
 
@@ -4007,6 +4022,58 @@ export class Game {
     } else {
       dst.drawImage(this.buffer, 0, 0);
     }
+    /*
+     * ---- and the BELL's instrument goes on AFTER the shader --------------
+     *
+     * Everything above is drawn into `this.buffer`, which `present` then
+     * copies to the glass while tearing it. A readout drawn with the field is
+     * therefore torn exactly when the field is hardest to read, which is the
+     * fault CLAUDE.md records about the glitch counter -- and the whole point
+     * of this object is that it works "through the corruption shader".
+     *
+     * So it is painted here, onto the real canvas, through the matrix the
+     * world draw itself used.
+     */
+    if (w.bell > 0) {
+      dst.save();
+      dst.setTransform(worldT);
+      this.drawBearings(dst, w);
+      dst.restore();
+    }
+  }
+
+  /**
+   * Where everything on the field is going, for as long as a BELL is ringing.
+   *
+   * One short line out of each body along its own travel -- the bearing, which
+   * is the thing a crowded field hides and the thing the corruption shader
+   * takes away first. Length is the body's own radius so a MOTE and a BULWARK
+   * both read, with a floor for the small ones.
+   *
+   * A body with no velocity gets no tick rather than an arbitrary one: a
+   * bearing is a direction, and a thing that is not going anywhere has none.
+   */
+  drawBearings(ctx, w) {
+    const B = CFG.bell;
+    // Fades over the last share of the window, so it goes out rather than off.
+    const left = w.bell / B.ring;
+    const a = left > B.fade ? 1 : left / B.fade;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(CFG.hairline, 1.1);
+    for (const e of w.enemies) {
+      if (e.dead || e.fizzle > 0) continue;
+      const sp = Math.hypot(e.vx, e.vy);
+      if (sp < 1) continue;
+      const ux = e.vx / sp;
+      const uy = e.vy / sp;
+      const len = Math.max(B.min, e.r * B.tick);
+      ctx.strokeStyle = rgba(e.type.glow, 0.85 * a);
+      ctx.beginPath();
+      ctx.moveTo(e.x + ux * e.r, e.y + uy * e.r);
+      ctx.lineTo(e.x + ux * len, e.y + uy * len);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
   }
 
   /**

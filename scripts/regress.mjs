@@ -29800,6 +29800,236 @@ if (MINE_LINE) {
     + `and the control HUSK -- which is meant to go end over end -- by ${r.turn.husk}`);
 }
 
+// --- a BELL is an instrument, and it works through the shader ---------------
+/*
+ * Build 311, phase 6e, and the last of the object guide's inert five. Shoot a
+ * BELL and for two seconds every body on the field carries a bearing tick.
+ *
+ * THE WHOLE TECHNICAL CONTENT IS WHERE IT IS DRAWN. Everything in `Game.draw`
+ * goes into `this.buffer`, and `glitch.present` then copies that to the glass
+ * while tearing it -- a base pass jittered up to 4.5 device pixels sideways
+ * plus up to twenty displaced slices. So a readout drawn with the field is
+ * torn exactly when the field is hardest to read, which is the fault
+ * CLAUDE.md records about the glitch counter; and this object's whole promise
+ * is that it works "through the corruption shader". `drawBearings` paints onto
+ * the real canvas AFTER `present`, through the world matrix captured from the
+ * same frame rather than recomputed.
+ *
+ * The arm for that is positional, because position is what the shader breaks.
+ * The tick's pixels are found by DIFFERENCE -- lit with the bell ringing and
+ * dark without it, on a held world so the two frames differ by nothing else --
+ * and then those exact pixels are re-checked with the shader at full. The
+ * control is the field's own THIN pixels (lit, with two of four neighbours
+ * dark), which is the same kind of feature and the kind a shift actually
+ * moves: a solid region survives a four-pixel jitter and would have read as a
+ * passing control for nothing.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { glitch } = await import('../src/glitch.js');
+    const { spawnByGait, drawSpecimen } = await import('../src/enemies.js');
+    const out = { ring: CFG.bell.ring };
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+      w.bell = 0;
+    };
+    g.restart();
+    g.debugTeachAll();
+    clear();
+    w.director.timer = 1e9;
+    w.director.driftTimer = 1e9;
+    w.autoAim = false;
+    w.autoFire = false;
+
+    // ---- 1. shot, it rings; dissolved, it does not -----------------------
+    const put = () => {
+      const e = g.debugSpawn('bell', w.width * 0.4, w.floorY - 400);
+      e.staged = false;
+      e.spawnIn = 0;
+      return e;
+    };
+    let e = put();
+    e.destroy(w);
+    out.shot = +(w.bell || 0).toFixed(2);
+    /*
+     * ...and the window runs DOWN, which is the half a "set a flag" build
+     * would pass without. Stepped with the director pinned so nothing else
+     * arrives to ring it again.
+     */
+    for (let s = 0; s < 60 * 1; s++) g.update(1 / 60);
+    out.after1s = +(w.bell || 0).toFixed(2);
+    for (let s = 0; s < 60 * 2; s++) g.update(1 / 60);
+    out.after3s = +(w.bell || 0).toFixed(2);
+    /*
+     * The control: a bell that DISSOLVES rings for nobody, because nobody shot
+     * it -- `destroy`'s first guard returns for a fizzling body. Without this
+     * arm "it rings" is satisfied by a build that rings on any death at all.
+     */
+    clear();
+    e = put();
+    e.fizzle = 0.6;
+    e.dissolved = true;
+    e.destroy(w);
+    out.dissolved = +(w.bell || 0).toFixed(2);
+    // ...and a body that is not a bell does not ring either.
+    clear();
+    const mote = g.debugSpawn('mote', w.width * 0.5, w.floorY - 400);
+    mote.staged = false;
+    mote.destroy(w);
+    out.notABell = +(w.bell || 0).toFixed(2);
+
+    // ---- 2. the tick is drawn AFTER the shader ---------------------------
+    clear();
+    // The world is HELD, so two draws of the same frame differ by the tick
+    // and by nothing else -- no animation clock, no physics, no shake.
+    w.timeScale = 0;
+    const made = [];
+    for (let i = 0; i < 8; i++) {
+      const b = g.debugSpawn('lurcher', 90 + (i % 4) * 140, 330 + Math.floor(i / 4) * 150);
+      b.staged = false;
+      b.spawnIn = 0;
+      b.hp = 1e9;
+      b.maxHp = 1e9;
+      b.vx = 40 - (i % 4) * 26;
+      b.vy = 70;
+      made.push(b);
+    }
+    const C = g.canvas;
+    const X = g.ctx;
+    const shot = () => {
+      g.draw();
+      const d = X.getImageData(0, 0, C.width, C.height).data;
+      const lit = new Uint8Array(C.width * C.height);
+      for (let i = 0; i < lit.length; i++) {
+        lit[i] = (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) > 90 ? 1 : 0;
+      }
+      return lit;
+    };
+    glitch.level = 0;
+    w.bell = 0;
+    const A = shot();
+    w.bell = CFG.bell.ring;
+    const B = shot();
+    const Wd = C.width;
+    // A THIN pixel: lit, with at least two of four neighbours dark. A solid
+    // region survives the shader's jitter and would be a vacuous control.
+    const thin = (arr, i) => {
+      let dark = 0;
+      for (const d of [-1, 1, -Wd, Wd]) {
+        const j = i + d;
+        if (j < 0 || j >= arr.length || !arr[j]) dark++;
+      }
+      return dark >= 2;
+    };
+    const tick = [];
+    const field = [];
+    for (let i = 0; i < A.length; i++) {
+      if (B[i] && !A[i]) tick.push(i);
+      else if (A[i] && thin(A, i)) field.push(i);
+    }
+    const step = Math.max(1, Math.floor(field.length / Math.max(1, tick.length)));
+    const fieldS = field.filter((x, i) => i % step === 0).slice(0, tick.length);
+    glitch.level = 1;
+    out.glitchOn = glitch.active;
+    out.frames = 8;
+    let tickHeld = 0;
+    let fieldHeld = 0;
+    for (let f = 0; f < out.frames; f++) {
+      const G = shot();
+      for (const i of tick) if (G[i]) tickHeld++;
+      for (const i of fieldS) if (G[i]) fieldHeld++;
+    }
+    out.tickPx = tick.length;
+    out.tickHold = +(tickHeld / Math.max(1, tick.length * out.frames)).toFixed(3);
+    out.fieldHold = +(fieldHeld / Math.max(1, fieldS.length * out.frames)).toFixed(3);
+
+    // ---- 3. a moving body carries one, a still one does not --------------
+    glitch.level = 0;
+    w.bell = 0;
+    const still = shot();
+    for (const b of made) { b.vx = 0; b.vy = 0; }
+    w.bell = CFG.bell.ring;
+    const none = shot();
+    let extra = 0;
+    for (let i = 0; i < still.length; i++) if (none[i] && !still[i]) extra++;
+    out.stillExtra = extra;
+
+    glitch.level = 0;
+    w.bell = 0;
+    w.timeScale = 1;
+    for (const b of made) b.dead = true;
+
+    // ---- 4. the sixth grey ----------------------------------------------
+    const SZ = 96;
+    const pic = (id) => {
+      const c = document.createElement('canvas');
+      c.width = SZ; c.height = SZ;
+      const x = c.getContext('2d');
+      x.translate(SZ / 2, SZ / 2);
+      drawSpecimen(x, id, 22);
+      const px = x.getImageData(0, 0, SZ, SZ).data;
+      const a = new Uint8Array(SZ * SZ);
+      let ink = 0;
+      for (let i = 0; i < SZ * SZ; i++) { a[i] = px[i * 4 + 3]; ink += px[i * 4 + 3]; }
+      return { a, ink: Math.round(ink / 1000) };
+    };
+    const diff = (p, q) => {
+      let sum = 0;
+      for (let i = 0; i < p.a.length; i++) sum += Math.abs(p.a[i] - q.a[i]);
+      return Math.round(sum / 1000);
+    };
+    const me = pic('bell');
+    out.draw = { ink: me.ink, selfZero: diff(pic('bell'), pic('bell')) };
+    for (const id of ['mote', 'drift', 'ember', 'husk', 'lantern', 'bead']) {
+      out.draw[id] = diff(me, pic(id));
+    }
+    g.restart();
+    clear();
+    return out;
+  });
+
+  check('a BELL rings when it is SHOT, and the window runs down',
+    r.shot === r.ring && r.after1s > 0.8 && r.after1s < r.ring
+    && r.after3s === 0
+    // The two controls: a bell nobody shot does not ring, and neither does
+    // anything that is not a bell.
+    && r.dissolved === 0 && r.notABell === 0,
+    `shot it rings for ${r.shot}s, ${r.after1s}s left after one second and ${r.after3s} after `
+    + `three; a DISSOLVING bell rings ${r.dissolved} and a MOTE ${r.notABell}`);
+
+  check('...and the tick is drawn AFTER the corruption shader, not into it',
+    r.glitchOn && r.tickPx > 100
+    // The tick's own pixels hold where they were put...
+    && r.tickHold > 0.97
+    // ...while the field's thin pixels, drawn into the torn buffer, do not --
+    // and the control must actually LOSE some, or the shader did nothing and
+    // the comparison is empty.
+    && r.fieldHold < 0.95 && r.tickHold > r.fieldHold + 0.05,
+    `with the shader at full over ${r.frames} frames, ${r.tickPx} tick pixels held `
+    + `${r.tickHold} of their places against ${r.fieldHold} for the same number of the field's `
+    + `own thin pixels -- which are drawn into the buffer the shader tears`);
+
+  check('...and a bearing is a DIRECTION, so a body going nowhere has none',
+    r.stillExtra === 0,
+    `with every body's velocity zeroed, a ringing bell lit ${r.stillExtra} extra pixels`);
+
+  const D = r.draw;
+  const others = ['drift', 'ember', 'husk', 'lantern', 'bead'];
+  check('...and the sixth grey is none of the other five, or the generic chip',
+    D.mote > 40 && others.every((k) => D[k] > 40) && D.ink > 20 && D.selfZero === 0,
+    `bell is ${D.mote} from a chip and ${others.map((k) => `${D[k]} from ${k.toUpperCase()}`).join(', ')} `
+    + `(ink ${D.ink}); the same shape twice differs by ${D.selfZero}`);
+}
+
 // --- the debug panel's three quieter faults ---------------------------------
 /*
  * Build 279, all three found by review and none of them able to fail anything.

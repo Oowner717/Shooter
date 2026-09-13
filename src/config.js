@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '310';
+export const BUILD = '311';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '310';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '807925f';
+export const REV = '8634710';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1037,6 +1037,30 @@ export const CFG = {
    */
   lantern: {
     cage: 5, // beads drawn inside it, the picture of what it is carrying
+  },
+  /*
+   * ---- the BELL's ring, build 311 ---------------------------------------
+   *
+   * Shoot a BELL and for `ring` seconds every body on the field carries a
+   * bearing tick: a short line out of it along its own travel, so what the
+   * field is DOING is readable at a glance. A free instrument for one round
+   * and one harmless kill, and the only thing in the game you spend
+   * ammunition on to see better rather than to break.
+   *
+   * The tick is drawn AFTER the corruption shader and that is the whole
+   * technical content of the object. Everything else in `Game.draw` goes into
+   * `this.buffer`, which `glitch.present` then copies to the glass while
+   * tearing it -- so a readout drawn with the field is torn exactly when the
+   * field is worst to read, which CLAUDE.md already records about the glitch
+   * counter. The tick is painted onto the real canvas instead, through the
+   * world transform CAPTURED from the same frame rather than recomputed, so
+   * it cannot drift from where the bodies were drawn.
+   */
+  bell: {
+    ring: 2, // seconds the field stays legible after one is broken
+    tick: 2.1, // the tick's length, as a multiple of the body's radius
+    fade: 0.5, // the share of the ring spent fading out
+    min: 9, // ...and a floor on its length in world units, for the small ones
   },
   /*
    * ---- the CHAIN gait, build 310 ----------------------------------------
@@ -4302,6 +4326,35 @@ export const ENEMY_TYPES = [
     drops: 1, // energy it leaves when it comes apart
   },
   {
+    /*
+     * Hangs in the middle band and bobs. Shoot it and it RINGS: see CFG.bell.
+     *
+     * `rings` is the capability, declared on the type the way `tows`, `beads`
+     * and `upright` are, so `Enemy.destroy` does not have to name an id. It
+     * only ever goes by being shot -- a hover body never leaves the field --
+     * and `destroy`'s own `fizzle` guard means a bell taken by the glitch
+     * dissolve rings for nobody, which is right: nobody shot it.
+     */
+    id: 'bell',
+    opens: 0,
+    name: 'BELL',
+    shape: 'bell',
+    harmless: true,
+    gait: 'hover',
+    rings: true,
+    r: 15,
+    hp: 60,
+    density: 0.5,
+    speed: 30,
+    accel: 100,
+    restitution: 0.75,
+    wobble: 0,
+    color: CFG.debris.grey,
+    glow: '#9ec0dd',
+    weight: 0, // never chosen by the ordinary spawn roll
+    drops: 2, // energy it leaves when it comes apart
+  },
+  {
     // Hardens everything near it while it lives, and shows you exactly what it
     // is doing: threads out to whatever it is covering, and a shell on each of
     // them. Shoot the beacon, not the escort.
@@ -5293,8 +5346,9 @@ export const WAVES = [
   { of: [['mote', 4], ['needle', 4], ['filament', 1]], band: 1 },
   { of: [['lurcher', 3], ['needle', 3], ['husk', 1]], band: 2 },
   { of: [['lurcher', 2], ['mote', 4], ['husk', 1]], band: 2 },
+  // ...and a BELL among the first bodies worth aiming past.
+  { of: [['splitter', 2], ['needle', 4], ['bell', 1]], band: 2 },
   { of: [['splitter', 2], ['lurcher', 1], ['mote', 3]], band: 2 },
-  { of: [['splitter', 2], ['needle', 4]], band: 2 },
   { of: [['bloom', 2], ['mote', 4]], band: 3 },
   { of: [['bloom', 3], ['lurcher', 2]], band: 3 },
   // A beacon and the escort it exists to cover: the pairing the type was

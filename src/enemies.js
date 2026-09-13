@@ -181,6 +181,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'husk': drawHusk(ctx, r, 0, 0); break;
     case 'lantern': drawLantern(ctx, r, 0, 0); break;
     case 'bead': drawBead(ctx, r, 0, 0); break;
+    case 'bell': drawBell(ctx, r, 0, 0); break;
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
@@ -1889,6 +1890,15 @@ export class Enemy {
     if (this.fizzle > 0) { this.dead = true; return; }
     this.dead = true;
     const t = this.type;
+    /*
+     * The BELL rings. Set here rather than anywhere else because `destroy` is
+     * the door a DAMAGE death comes through, which is the only way a hover
+     * body ever leaves -- and the `fizzle` guard above means a bell taken by
+     * the glitch dissolve rings for nobody, which is right: nobody shot it.
+     * Topped up to the full window rather than added to, so two bells are two
+     * seconds of instrument and not four.
+     */
+    if (t.rings) world.bell = Math.max(world.bell || 0, CFG.bell.ring);
     // Destroying a fragment is a way of collecting it, not a way of losing it.
     if (this.bytes) bank(world, this.bytes * this.bounty, this.x, this.y);
     // The harmless ones pay too. It is the one income the tally never sees.
@@ -2275,6 +2285,7 @@ export class Enemy {
       case 'husk': drawHusk(ctx, this.r, this.phase, world.time); break;
       case 'lantern': drawLantern(ctx, this.r, this.phase, world.time); break;
       case 'bead': drawBead(ctx, this.r, this.phase, world.time); break;
+      case 'bell': drawBell(ctx, this.r, this.phase, world.time); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
@@ -3695,6 +3706,50 @@ function drawHusk(ctx, r, phase, time) {
   ctx.fill();
   ctx.stroke();
   ctx.restore();
+}
+
+/**
+ * A bell: an open shell with a clapper swinging inside it.
+ *
+ * Six greys share one colour now, so the silhouette carries all of it. This is
+ * the only one that is OPEN at the bottom -- a DRIFT is a closed dashed
+ * circle, a LANTERN a closed cage, a bead a closed ring, an EMBER a spark and
+ * a HUSK an angular hull. The mouth is the mark.
+ *
+ * Not `upright`, deliberately: a bell that has been hit should swing, and its
+ * own shape is symmetric enough that a slow roll reads as swinging rather
+ * than as a mistake. The clapper is what makes the rotation legible.
+ */
+function drawBell(ctx, r, phase, time) {
+  const swing = Math.sin(time * 2.4 + phase) * 0.16;
+  // The shell: a shoulder that flares to an open mouth.
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.28, -r * 0.92);
+  ctx.quadraticCurveTo(-r * 0.86, -r * 0.5, -r * 0.9, r * 0.62);
+  ctx.lineTo(r * 0.9, r * 0.62);
+  ctx.quadraticCurveTo(r * 0.86, -r * 0.5, r * 0.28, -r * 0.92);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // The mouth, struck across the open end so the shell reads as hollow.
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.9, r * 0.62);
+  ctx.lineTo(r * 0.9, r * 0.62);
+  ctx.stroke();
+  // The crown on top, which is what it would hang from.
+  ctx.beginPath();
+  ctx.arc(0, -r * 0.92, r * 0.22, Math.PI * 1.05, Math.PI * 1.95);
+  ctx.stroke();
+  // ...and the clapper, swinging inside the mouth. It is the one part that
+  // moves against the shell, which is what makes a roll read as a swing.
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.3);
+  ctx.lineTo(Math.sin(swing * 3) * r * 0.5, r * 0.42);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(Math.sin(swing * 3) * r * 0.5, r * 0.42, r * 0.17, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
 }
 
 /**
