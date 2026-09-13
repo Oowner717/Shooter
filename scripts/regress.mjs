@@ -28992,6 +28992,227 @@ if (MINE_LINE) {
       + `(ink ${r.draw[k].ink})`).join(' · ') + `; the same shape twice differs by ${r.selfZero}`);
 }
 
+// --- a rise is a CLOCK, and LANTERN is the bill for ignoring one ------------
+/*
+ * Build 308, phase 6b. LANTERN joins EMBER on the `rise` gait, and what the
+ * two of them author is the CLOCK: `climb` in seconds, with the cruise derived
+ * at the spawn site from the column the body is actually on.
+ *
+ * Four arms, and the first is the one the phase exists for.
+ *
+ * THE CLOCK HOLDS AT EITHER ERA. Build 307 authored the SPEED, so the climb
+ * stretched with the field: measured, EMBER took 12.3s at era 1 and 20.3s at
+ * era 2, because the floor-to-rim column is 963 units against 1481. The
+ * control is that ratio -- the case asserts the two columns really do differ
+ * by about half again, so a build that went back to a fixed speed cannot pass
+ * by accident.
+ *
+ * A TARGET SPEED IS NOT A SPEED, which CLAUDE.md already recorded from build
+ * 298 and which this phase walked into anyway. `rise` blends toward its target
+ * at `k = accel / 100` while `integrate` damps at `CFG.physics.linearDamping`,
+ * so the steady state is `target * k / (k + damping)`: handed the clock raw,
+ * EMBER wanted 11s and took 13.47 (k 2.2, ratio 0.80, predicted 13.4) and
+ * LANTERN wanted 9 and took 18.9 (k 0.8, ratio 0.59). The spawn site grosses
+ * the target up by `(k + damping) / k`, derived from the two terms rather than
+ * fitted, which is why a case on the DURATION and not on the cruise is the
+ * honest one.
+ *
+ * AND THE PROBE'S OWN FAULT IS WORTH THE COMMENT: the first version spawned
+ * at `width * 0.5`, which is the machine's own x, so an r-20 LANTERN started
+ * inside the turret and the pair solver charged it two seconds. It reads
+ * exactly like the compensation being wrong. Spawn clear of the mount.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { spawnByGait, climbOf, drawSpecimen, ENTRY_Y } = await import('../src/enemies.js');
+    const { entryLine } = await import('../src/portal.js');
+    const out = {};
+
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+    };
+    /*
+     * `setEra` refuses a switch to the era it is already in and `reset()`
+     * writes era 1, so the opposite is written first to make the switch real
+     * -- the correction `tiers.mjs` needed in build 306.
+     */
+    const era = (n) => {
+      g.restart();
+      w.era = n === 2 ? 1 : 2;
+      w.newForm = n === 2 ? 'done' : 'armed';
+      g.setEra(n);
+      w.director.timer = 1e9;
+      w.director.driftTimer = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+      clear();
+    };
+    // Clear of the mount, for the reason in the note above.
+    const put = (id) => {
+      const n = w.enemies.length;
+      return spawnByGait(w, TYPE_BY_ID[id], w.width * 0.22) ? w.enemies[n] : null;
+    };
+
+    // ---- 1. the clock is the clock, at either era ------------------------
+    const climbRun = (n, id) => {
+      era(n);
+      const e = put(id);
+      if (!e) return null;
+      let gone = null;
+      for (let s = 0; s < 60 * 80; s++) {
+        g.update(1 / 60);
+        if (e.dissolved) { gone = +(s / 60).toFixed(2); break; }
+      }
+      return {
+        era: w.era,
+        column: Math.round(w.floorY - entryLine(w, ENTRY_Y)),
+        want: climbOf(TYPE_BY_ID[id]),
+        gone,
+      };
+    };
+    out.clock = {};
+    for (const id of ['ember', 'lantern']) {
+      out.clock[id] = { e1: climbRun(1, id), e2: climbRun(2, id) };
+    }
+
+    // ---- 2. reaching the rim takes the lot -------------------------------
+    /*
+     * An A/B and not an absolute, because "banked nothing" is a claim about
+     * six hundred cases' leftovers as much as about this body -- build 282
+     * paid for that. The destroyed arm is the vacuity guard: if it banks
+     * nothing either, the case is measuring a dead salvage path.
+     *
+     * The motes are swept in by hand. INTAKE's pull is 26 u/s from the far
+     * end of the field, so waiting for them would be waiting out the window.
+     */
+    const bill = (kill) => {
+      era(1);
+      w.bytes = 0;
+      w.earned = 0;
+      const kills0 = w.kills || 0;
+      const e = put('lantern');
+      if (kill) { for (let s = 0; s < 30; s++) g.update(1 / 60); e.destroy(w); }
+      for (let s = 0; s < 60 * 40; s++) {
+        g.update(1 / 60);
+        if (e.dead && (!kill || w.drops.length === 0)) break;
+      }
+      for (const d of [...w.drops]) d.destroy(w);
+      for (let s = 0; s < 60; s++) g.update(1 / 60);
+      return {
+        bytes: Math.round(w.bytes),
+        earned: Math.round(w.earned),
+        kills: (w.kills || 0) - kills0,
+        // A harmless body is never counted, either way -- stated so the arm
+        // below is not the only thing saying it.
+        left: !kill,
+      };
+    };
+    out.killed = bill(true);
+    out.leftAlone = bill(false);
+
+    // ---- 3. a rise type must declare its clock ---------------------------
+    /*
+     * The refusal proved against the REAL table rather than against five
+     * absent ids, which is build 210's spy-test trap: five absent ids all hit
+     * one branch. A scratch field is written onto a real type, the four
+     * malformed shapes are tested, a legal value is confirmed to read back,
+     * and the field is removed.
+     */
+    const scratch = TYPE_BY_ID.drift;
+    const shapes = [undefined, 0, -3, Number.NaN, '9'];
+    out.refused = 0;
+    for (const v of shapes) {
+      if (v === undefined) delete scratch.climb;
+      else scratch.climb = v;
+      try { climbOf(scratch); } catch (err) { out.refused++; }
+    }
+    scratch.climb = 4;
+    out.legal = climbOf(scratch);
+    delete scratch.climb;
+    out.cleaned = scratch.climb === undefined;
+    out.shapes = shapes.length;
+
+    // ---- 4. ...and it draws a picture of its own -------------------------
+    const SZ = 96;
+    const shot = (id) => {
+      const c = document.createElement('canvas');
+      c.width = SZ; c.height = SZ;
+      const x = c.getContext('2d');
+      x.translate(SZ / 2, SZ / 2);
+      drawSpecimen(x, id, 22);
+      const px = x.getImageData(0, 0, SZ, SZ).data;
+      const a = new Uint8Array(SZ * SZ);
+      let ink = 0;
+      for (let i = 0; i < SZ * SZ; i++) { a[i] = px[i * 4 + 3]; ink += px[i * 4 + 3]; }
+      return { a, ink: Math.round(ink / 1000) };
+    };
+    const diff = (p, q) => {
+      let sum = 0;
+      for (let i = 0; i < p.a.length; i++) sum += Math.abs(p.a[i] - q.a[i]);
+      return Math.round(sum / 1000);
+    };
+    // Every grey it has to be told apart from, plus the generic chip a shape
+    // with no case in the switch would silently fall through to.
+    const lantern = shot('lantern');
+    out.draw = { ink: lantern.ink, selfZero: diff(shot('lantern'), shot('lantern')) };
+    for (const id of ['mote', 'drift', 'ember', 'husk']) out.draw[id] = diff(lantern, shot(id));
+
+    g.restart();
+    clear();
+    return out;
+  });
+
+  const C = r.clock;
+  const ok = Object.entries(C).every(([, v]) => v.e1 && v.e2 && v.e1.gone !== null && v.e2.gone !== null
+    // the clock it authored, within a tenth...
+    && Math.abs(v.e1.gone - v.e1.want) < v.e1.want * 0.1
+    && Math.abs(v.e2.gone - v.e2.want) < v.e2.want * 0.1
+    // ...and the SAME clock at the other era, within a twentieth
+    && Math.abs(v.e1.gone - v.e2.gone) < v.e1.want * 0.05);
+  // The control: the two eras are genuinely different fields. Without this the
+  // arm above is satisfied by a build where setEra did nothing.
+  const deeper = C.ember && C.ember.e2.column > C.ember.e1.column * 1.4;
+  check('a rise climbs on its own CLOCK, and the same one on the deeper field',
+    ok && deeper,
+    Object.entries(C).map(([k, v]) => `${k} wants ${v.e1.want}s, took ${v.e1.gone}s over `
+      + `${v.e1.column} units at era 1 and ${v.e2.gone}s over ${v.e2.column} at era 2`).join(' · ')
+    + `; the column is x${(C.ember.e2.column / C.ember.e1.column).toFixed(2)} deeper, which a `
+    + 'fixed speed would have charged for');
+
+  check('...and a LANTERN that reaches the rim takes the lot with it',
+    // Left alone it banks nothing and counts nothing...
+    r.leftAlone.bytes === 0 && r.leftAlone.earned === 0 && r.leftAlone.kills === 0
+    // ...and the same body destroyed banks real salvage, which is the vacuity
+    // guard: a dead salvage path would read as the theft working.
+    && r.killed.bytes > 10000 && r.killed.earned > 10000
+    // A harmless body is never a kill, whichever way it goes.
+    && r.killed.kills === 0,
+    `destroyed it banks ${r.killed.bytes} B (earned ${r.killed.earned}); left to climb it banks `
+    + `${r.leftAlone.bytes} B (earned ${r.leftAlone.earned}), and neither is counted as a kill `
+    + `(${r.killed.kills}/${r.leftAlone.kills})`);
+
+  check('a rise type must say how long its climb is, and there is no default',
+    r.refused === r.shapes && r.legal === 4 && r.cleaned,
+    `${r.refused} of ${r.shapes} malformed clocks refused, a legal one reads back as `
+    + `${r.legal}, scratch field removed: ${r.cleaned}`);
+
+  const D = r.draw;
+  const greys = ['drift', 'ember', 'husk'];
+  check('...and the fourth grey is not any of the other three, or the generic chip',
+    D.mote > 40 && greys.every((k) => D[k] > 40) && D.ink > 20 && D.selfZero === 0,
+    `lantern is ${D.mote} from a chip and ${greys.map((k) => `${D[k]} from a ${k.toUpperCase()}`).join(', ')} `
+    + `(ink ${D.ink}); the same shape twice differs by ${D.selfZero}`);
+}
+
 // --- the debug panel's three quieter faults ---------------------------------
 /*
  * Build 279, all three found by review and none of them able to fail anything.

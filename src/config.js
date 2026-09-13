@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '307';
+export const BUILD = '308';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '307';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e49ab38';
+export const REV = '6639617';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -980,10 +980,63 @@ export const CFG = {
    * to cash in: an EMBER that reaches the rim pays nothing and counts
    * nothing, which is what "gone with whatever it was carrying" has to mean.
    */
-  ember: {
+  /*
+   * ---- the RISE gait's clock, build 308 ---------------------------------
+   *
+   * A rise body is a TIMER the player may answer or not, so what is authored
+   * is the CLOCK and the speed is derived from it -- the type's `climb`, in
+   * seconds, against the column the body actually has to cross.
+   *
+   * Build 307 authored the SPEED instead and it was measured wrong twice over.
+   * EMBER at 40 u/s (docs/objects.html's own number) is a twenty-four second
+   * climb up era 1's 963-unit column; raised to 90 it measured **12.3s at era
+   * 1 and 20.3s at era 2**, because the column is 1481 units there and a fixed
+   * speed stretches by 1.54x with the field. So the one object whose whole
+   * promise is "free salvage if you are quick" took twice as long on the new
+   * field, silently, and LANTERN -- whose counter reads "about nine seconds of
+   * climb" -- would have taken 37s at era 1 and 57s at era 2 at its own
+   * authored 26.
+   *
+   * Derived, the clock is the clock at either era. `check-build.mjs` fails the
+   * build for a `rise` type that declares no `climb`, because a defaulted
+   * value indistinguishable from a chosen one is the shape that has already
+   * cost this repo `levels` and `band`.
+   */
+  rise: {
+    /*
+     * The body is handed its climb speed at SPAWN rather than accelerating
+     * into it, or the clock is a lie by however long the acceleration takes:
+     * `accel / 100` is a rate, so LANTERN's 80 is a 1.25-second time constant
+     * and two seconds of a nine-second climb would be spent getting going.
+     */
+    launch: true,
     gone: 30, // world units past the rim before it dissolves
-    sway: 26, // the lateral wander on the way up, in units a second
     fizzle: 0.5, // how long the dissolve takes once it is away
+    // Shared, and deliberately not per type: it has ONE reader and a second
+    // number for the same look would be a table with two rows and no rule.
+    sway: 26, // the lateral wander on the way up, in units a second
+  },
+  /*
+   * LANTERN: a cage of salvage on its way back out through the portal, and the
+   * one object in the game that costs you something for being ignored.
+   *
+   * The cost is `drops` motes plus the flat harmless bank. MEASURED, by
+   * destroying one and reading the purse: **22,220 B**, against 0 for one
+   * left to reach the rim. That is 16 motes at the `minValue` floor plus the
+   * 6 kB `energy.drift` pays for any harmless body, through the intake tax --
+   * about 9% of a band-4 level's 250 kB.
+   *
+   * Two things that arithmetic alone got wrong here, both caught by measuring
+   * instead. The rung does NOT scale it: `scaleToTier` returns early on
+   * `e.harmless`, so a harmless body's `bounty` stays 1 for ever and the
+   * first estimate of 72 kB at rung 28 was three times too high. And the
+   * DENSITY does not move it either: `shed` takes
+   * `max(n * minValue, mass * perMass quantised)` and a 20-unit cage is far
+   * under the mass of 4.44 where the second term wins, so `drops` is the only
+   * dial this object has.
+   */
+  lantern: {
+    cage: 5, // beads drawn inside it, the picture of what it is carrying
   },
   /*
    * HUSK's arc. It takes no steering at all -- the whole gait is the throw --
@@ -4076,16 +4129,23 @@ export const ENEMY_TYPES = [
     hp: 12,
     density: 0.4,
     /*
-     * docs/objects.html authors this at 40 u/s, and 40 is not "quick": era
-     * 1's column from the floor to the portal's rim is 962 world units, so
-     * the climb the whole object is about would take TWENTY-FOUR SECONDS,
-     * and half a minute of a spark drifting up the screen is scenery rather
-     * than an opportunity. Measured at 90 it is about eleven seconds, which
-     * is the same clock that page gives LANTERN for a climb it calls a timer
-     * you are allowed to answer or not. Still slower than a NEEDLE at 104,
-     * which is meant to be the fast one.
+     * ---- the CLOCK is authored and the speed is derived (build 308) ------
+     *
+     * `climb` is how long this body takes to cross the column it is actually
+     * on, so it is the same eleven seconds at either era; `rise` derives the
+     * cruise from it at spawn. See CFG.rise for why build 307's authored
+     * speed was wrong twice: docs/objects.html's own 40 u/s is a
+     * twenty-four-second climb at era 1, and the 90 that replaced it measured
+     * 12.3s at era 1 and 20.3s at era 2 -- the field got deeper and the one
+     * object about being quick got slower.
+     *
+     * `speed` is kept because `scaleToTier` reads it and every other reader
+     * of a type expects it; it is the era-1 equivalent of the clock and is
+     * NOT what the body climbs at. `check-build.mjs` asserts the two agree at
+     * era 1, so they cannot drift apart in silence.
      */
-    speed: 90,
+    climb: 11,
+    speed: 88, // 88 x 11 = 968, which is era 1's column -- see the guard
     accel: 220,
     restitution: 0.6,
     wobble: 0,
@@ -4115,6 +4175,43 @@ export const ENEMY_TYPES = [
     glow: '#41597a',
     weight: 0, // never chosen by the ordinary spawn roll
     drops: 12, // energy it leaves when it comes apart
+  },
+  {
+    /*
+     * A cage of salvage on its way back out through the portal. Harmless in
+     * every sense that matters, and the only object in the game that costs
+     * you something for being IGNORED: EMBER and HUSK leaving are an
+     * opportunity you did not take, and this one is a bill.
+     *
+     * It is a rise body, so it leaves through `fizzle` + `dissolved` like the
+     * other two, and `Enemy.destroy`'s first guard refuses to cash a
+     * dissolving body in -- which is exactly what makes the theft a theft.
+     * What it is carrying is `drops`, and the arithmetic is in CFG.lantern.
+     */
+    id: 'lantern',
+    // 0, like every harmless body: the BAND of the waves that name it is the
+    // gate, and its waves are band 4.
+    opens: 0,
+    name: 'LANTERN',
+    shape: 'lantern',
+    harmless: true,
+    gait: 'rise',
+    // Nine seconds, which is the clock docs/objects.html's own counter names
+    // ("a timer you are allowed to answer or not: about nine seconds of
+    // climb"). Its authored 26 u/s would have been 37s at era 1 and 57s at
+    // era 2 -- see CFG.rise.
+    climb: 9,
+    r: 20,
+    hp: 150,
+    density: 0.55,
+    speed: 107, // the era-1 equivalent of `climb`; `rise` derives the real one
+    accel: 80,
+    restitution: 0.7,
+    wobble: 0,
+    color: CFG.debris.grey,
+    glow: '#8fb4d6',
+    weight: 0, // never chosen by the ordinary spawn roll
+    drops: 16, // energy it leaves when it comes apart -- and takes if it does not
   },
   {
     // Hardens everything near it while it lives, and shows you exactly what it
@@ -5118,9 +5215,9 @@ export const WAVES = [
   { of: [['herald', 2], ['splitter', 2]], band: 4 },
   { of: [['prism', 3], ['needle', 3]], band: 3 },
   { of: [['prism', 2], ['bloom', 2]], band: 3 },
-  { of: [['warden', 2], ['mote', 3]], band: 4 },
+  { of: [['warden', 2], ['mote', 3], ['lantern', 1]], band: 4 },
   { of: [['warden', 1], ['prism', 2], ['needle', 3]], band: 4 },
-  { of: [['scion', 1], ['bloom', 2]], band: 4 },
+  { of: [['scion', 1], ['bloom', 2], ['lantern', 1]], band: 4 },
   { of: [['scion', 2], ['lurcher', 2]], band: 4 },
   // Seeds and something worth landing on. A WARDEN already carries plating;
   // a grafted one is the clearest read there is on what a SEED does.

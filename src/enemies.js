@@ -179,6 +179,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'drift': drawDrift(ctx, r, 0); break;
     case 'ember': drawEmber(ctx, r, 0, 0); break;
     case 'husk': drawHusk(ctx, r, 0, 0); break;
+    case 'lantern': drawLantern(ctx, r, 0, 0); break;
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
@@ -568,9 +569,20 @@ export class Enemy {
    * and an EMBER never came through the portal -- so the rim it is climbing
    * to is a rim it is allowed to pass, which is the same escape a boss's
    * minion and a debug placement already had.
+   *
+   * ---- and the CLOCK is what is authored, from build 308 ----------------
+   *
+   * The cruise is DERIVED at the spawn site from the type's `climb` against
+   * the column this body actually has to cross, so a rise takes the same
+   * number of seconds at either era. Build 307 authored the speed and it was
+   * measured wrong twice: docs/objects.html's 40 u/s is a twenty-four second
+   * climb at era 1, and the 90 that replaced it measured 12.3s at era 1 and
+   * **20.3s at era 2**, because the column is 963 units against 1481 and a
+   * fixed speed stretches with the field. Nothing in this method knows about
+   * that -- it steers at `this.cruise` as it always did.
    */
   rise(world, dt) {
-    const E = CFG.ember;
+    const E = CFG.rise;
     /*
      * Already going. `steer` runs from `physicsStep` and not from `update`,
      * so a dissolving body still reaches its gait every frame -- and the
@@ -2126,6 +2138,7 @@ export class Enemy {
       case 'drift': drawDrift(ctx, this.r, this.phase, world.time); break;
       case 'ember': drawEmber(ctx, this.r, this.phase, world.time); break;
       case 'husk': drawHusk(ctx, this.r, this.phase, world.time); break;
+      case 'lantern': drawLantern(ctx, this.r, this.phase, world.time); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
@@ -3539,6 +3552,70 @@ function drawHusk(ctx, r, phase, time) {
   ctx.lineTo(0.86 * r, -0.9 * r);
   ctx.closePath();
   ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * A cage of salvage on its way out: a barred frame with beads inside it and a
+ * bail on top, which is the half that reads as BEING LIFTED.
+ *
+ * Four greys now share one colour, so the silhouette is the whole of telling
+ * them apart. A DRIFT is a dashed circle with three dots orbiting OUTSIDE its
+ * own radius; an EMBER is a four-pointed spark with a trail beneath it; a HUSK
+ * is an angular hull with a bite out of one side. This is the only one that is
+ * a closed frame with something held INSIDE it -- the idiom drawGlut's `fed`
+ * count already uses, which is why the beads are drawn at a fixed radius in a
+ * ring rather than stippled: a count you can read is the point.
+ */
+function drawLantern(ctx, r, phase, time) {
+  const lift = Math.sin(time * 1.6 + phase) * 0.05;
+  ctx.save();
+  ctx.rotate(lift);
+  // The frame: a tall six-sided cage, flat top and bottom.
+  const w = r * 0.72;
+  const h = r * 0.98;
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.62, -h);
+  ctx.lineTo(w * 0.62, -h);
+  ctx.lineTo(w, -h * 0.42);
+  ctx.lineTo(w, h * 0.42);
+  ctx.lineTo(w * 0.62, h);
+  ctx.lineTo(-w * 0.62, h);
+  ctx.lineTo(-w, h * 0.42);
+  ctx.lineTo(-w, -h * 0.42);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // The bars. Three of them, so the frame reads as a cage rather than a box
+  // -- and vertical, because the thing inside is being carried upward.
+  for (let i = -1; i <= 1; i++) {
+    const bx = i * w * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(bx, -h * 0.78);
+    ctx.lineTo(bx, h * 0.78);
+    ctx.stroke();
+  }
+  // ...and its two rails, which close the bars off top and bottom.
+  for (const sy of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.78, sy * h * 0.5);
+    ctx.lineTo(w * 0.78, sy * h * 0.5);
+    ctx.stroke();
+  }
+  // What it is carrying: a ring of beads, breathing together. Inside the
+  // frame by construction, so the cage always reads as full.
+  const n = CFG.lantern.cage;
+  const beat = 0.7 + 0.3 * Math.sin(time * 2.6 + phase);
+  for (let i = 0; i < n; i++) {
+    const a = phase + (i / n) * TAU;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * w * 0.42, Math.sin(a) * h * 0.3, r * 0.11 * beat, 0, TAU);
+    ctx.fill();
+  }
+  // The bail: a hook over the top, which is the mark nothing else has.
+  ctx.beginPath();
+  ctx.arc(0, -h, r * 0.3, Math.PI * 1.08, Math.PI * 1.92);
   ctx.stroke();
   ctx.restore();
 }
@@ -5905,19 +5982,82 @@ export class Director {
  * an assay body is put where the caller asked and picks its gait up from
  * wherever it stands, which is the same escape `spawnDrift`'s `here` is.
  */
+/**
+ * How many seconds a RISE type's climb takes, and there is no default.
+ *
+ * Build 224 removed `levels ?? 3` and build 303 made `band` throw for the
+ * same reason: a defaulted value indistinguishable from a chosen one is
+ * invisible in a diff, and eight nodes shipped sold three times before that
+ * lesson took. A rise type with no clock would silently take whatever
+ * `type.speed` happened to be -- which is the exact fault build 308 exists to
+ * remove -- so it throws here and `check-build.mjs` fails the build for one.
+ */
+export function climbOf(type) {
+  const c = type && type.climb;
+  if (!(typeof c === 'number' && c > 0 && Number.isFinite(c))) {
+    throw new Error(`${type && type.id}: a 'rise' type must declare climb, in seconds. `
+      + 'There is no default -- see CFG.rise.');
+  }
+  return c;
+}
+
 export function spawnByGait(world, type, x) {
   const g = type.gait;
   if (g !== 'rise' && g !== 'tumble') return false;
   if (g === 'rise') {
+    const R = CFG.rise;
     // Off the floor, a little way up from it so nothing is born inside the
     // band `edgeEase` pushes out of.
     const fx = clamp(x, type.r + 6, world.width - type.r - 6);
-    spawnOne(world, type, fx, world.floorY - type.r - rand(2, 30), {
+    const fy = world.floorY - type.r - rand(2, 30);
+    /*
+     * ---- the CLOCK, derived per body (build 308) ------------------------
+     *
+     * `climb` is seconds and the cruise is what those seconds are worth on
+     * the column THIS body has to cross -- measured off its own start and its
+     * own dissolve line rather than off a nominal depth, so the roll above
+     * cannot shorten the clock. The dissolve fires when `y + r` passes
+     * `rim - gone * scale` (see `rise`), so that is the far end.
+     *
+     * Handed the speed at spawn rather than accelerating into it: `accel /
+     * 100` is a rate, so LANTERN's 80 is a 1.25-second time constant and two
+     * seconds of a nine-second climb would otherwise be spent getting going.
+     */
+    const end = entryLine(world, ENTRY_Y) - R.gone * CFG.scale - type.r;
+    const need = Math.max(1, (fy - end) / climbOf(type));
+    /*
+     * ---- A TARGET SPEED IS NOT A SPEED, and this is the second time ------
+     *
+     * `rise` blends the velocity toward its target at `k = accel / 100` while
+     * `integrate` damps it at `CFG.physics.linearDamping` every substep, so
+     * the steady state is `target * k / (k + damping)` and NOT the target.
+     * Measured with the clock handed over raw: EMBER wanted 11s and took
+     * 13.47 (k = 2.2, ratio 0.80, predicted 13.4 -- the arithmetic and the
+     * measurement agree to a hundredth) and LANTERN wanted 9 and took 18.9
+     * (k = 0.8, ratio 0.59).
+     *
+     * CLAUDE.md already records this from build 298, about the portal's own
+     * speed ramp, and it was walked into again. So the compensation is
+     * derived from the two terms that cause it rather than fitted: the target
+     * is what the climb needs, grossed up by `(k + damping) / k`. A slower
+     * `accel` therefore needs a higher target for the same clock, which is
+     * the correct dependency and the one a fitted constant would hide.
+     *
+     * Launched at `need` and not at the target, because `need` is the speed
+     * it will actually hold -- so the clock is exact from the first frame
+     * instead of overshooting and settling back onto it.
+     */
+    const k = Math.max(0.01, type.accel / 100);
+    const cruise = need * ((k + CFG.physics.linearDamping) / k);
+    const e = spawnOne(world, type, fx, fy, {
       staged: false,
       spawnIn: 0.6,
-      vx: spread(CFG.ember.sway),
-      vy: -rand(10, 40),
+      vx: spread(R.sway),
+      vy: R.launch ? -need : -rand(10, 40),
     });
+    // After `spawnOne`, because the constructor sets `cruise` from the type's
+    // own speed and `scaleToTier` runs in there too.
+    e.cruise = cruise;
     return true;
   }
   const H = CFG.husk;

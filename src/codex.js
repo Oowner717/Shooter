@@ -235,7 +235,25 @@ export const CODEX = [
   {
     id: 'husk',
     name: 'HUSK',
-    line: 'A wreck of something this simulation ran before, thrown across the field end over end. It wants nothing and it is leaving. The largest single payout on the floor, for as long as it is there.',
+    /*
+     * ---- "the largest single payout" was FALSE and shipped in build 307 ----
+     *
+     * docs/objects.html says it and this line repeated it. Measured off the
+     * code: a harmless body pays `drops` motes at the `minValue` floor plus
+     * the flat `CFG.energy.drift`, so a HUSK is 12 + 6 = 18 kB -- against a
+     * BULWARK's 112 kB and a boss core's 264 to 792. It is the largest among
+     * the HARMLESS bodies, and only until LANTERN's 22 kB. Same fault as
+     * DRIFT's old "worth 10 ENERGY against a MOTE's 4": a figure quoted in
+     * prose rots, so the sentence states the comparison it was always about.
+     */
+    line: 'A wreck of something this simulation ran before, thrown across the field end over end. It wants nothing and it is leaving. Nothing else you can ignore is worth as much.',
+  },
+  {
+    id: 'lantern',
+    name: 'LANTERN',
+    // No figure: what it is carrying is `drops`, and what that is worth moves
+    // with the config. The sentence is the clock and the bill.
+    line: 'Caged salvage on its way back out through the portal, climbing for the rim on a clock you can watch. It will not touch you and it does not have to: reach the rim and it takes the lot with it. The one harmless body worth a magazine.',
   },
   {
     id: 'axiom',

@@ -257,6 +257,42 @@ if (badGait.length || mute.length) {
 console.log(`gaits: ${gaitWords.length} in the vocabulary (${gaitWords.join(' ')}), all read; `
   + `${ENEMY_TYPES.filter((t) => t.gait).length} types declare one, the rest march`);
 
+/*
+ * ---- a RISE type authors its CLOCK, and the nominal speed has to agree ----
+ *
+ * `climb` is seconds and `rise` derives the cruise from it against the column
+ * the body is actually on, so the climb is the same duration at either era.
+ * Two things can go wrong and neither announces itself.
+ *
+ * A MISSING clock. `climbOf` throws, which is build 224's `levels` rule and
+ * build 303's `band` rule applied to a third mandatory field -- but a throw at
+ * spawn time is a throw in the rAF loop, which build 288 records as reading
+ * like a freeze rather than an error. So it is caught at the table instead.
+ *
+ * A DRIFTED nominal. `type.speed` is still read by `scaleToTier` and by
+ * everything that expects a type to have one, so it is a second number for
+ * the same fact -- exactly the shape this repo keeps paying for. It is pinned
+ * by arithmetic rather than by trust: `speed * climb` is the column the clock
+ * was authored against, so every rise type's product must agree with every
+ * other's. They all cross the same field.
+ */
+const risers = ENEMY_TYPES.filter((t) => t.gait === 'rise');
+const noClock = risers.filter((t) => !(typeof t.climb === 'number' && t.climb > 0))
+  .map((t) => `${t.id} is a 'rise' type and declares no climb`);
+const cols = risers.map((t) => ({ id: t.id, col: t.speed * t.climb }));
+const lo = Math.min(...cols.map((c) => c.col));
+const hi = Math.max(...cols.map((c) => c.col));
+const drifted = risers.length > 1 && hi > lo * 1.03
+  ? [`speed x climb disagrees across the rise types (${cols.map((c) => `${c.id} ${c.col}`).join(', ')})`
+    + ' -- they all cross the same column, so one of the nominals has drifted']
+  : [];
+if (noClock.length || drifted.length) {
+  for (const line of [...noClock, ...drifted]) console.error(`rise: ${line}`);
+  process.exit(1);
+}
+console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => `${t.id} ${t.climb}s`).join(' ')}), `
+  + `nominal speeds agree on a column of ${lo}-${hi}`);
+
 const GREY = CFG.debris.grey;
 const greyFails = ENEMY_TYPES.filter((t) => t.color === GREY && !t.harmless)
   .map((t) => `${t.id} wears the grey but is not harmless`);

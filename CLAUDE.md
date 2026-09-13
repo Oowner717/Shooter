@@ -3290,4 +3290,82 @@ came from before believing the other one covers it.
   eight independent climbs say that where eight bodies shoving each other off
   the floor say something about the pair solver. With both, 8 of 8 in 15 to
   16 seconds, three runs out of three, on a field deliberately dirtied first.
+- **A RISE BODY AUTHORS ITS CLOCK AND THE SPEED IS DERIVED, FROM BUILD 308.**
+  LANTERN joins EMBER on `rise` (band 4, the plan's load-bearing object: the
+  first one that costs you something for ignoring it). `climb` is seconds and
+  `spawnByGait` derives the cruise from the column the body is actually on --
+  measured off its own start and its own dissolve line, so the spawn jitter
+  cannot shorten it. Build 307 authored the SPEED and it was wrong twice over:
+  `docs/objects.html`'s own 40 u/s is a twenty-four-second climb at era 1, and
+  the 90 that replaced it measured **12.3s at era 1 and 20.3s at era 2**,
+  because the floor-to-rim column is 963 units against 1481 and a fixed speed
+  stretches 1.54x with the field. So the one object whose promise is "free
+  salvage if you are quick" got slower on the new field, silently. Derived:
+  **10.83 / 10.85 and 8.62 / 8.78** across the two eras. `climbOf` throws for
+  a `rise` type with no clock (build 224's `levels` rule, build 303's `band`
+  rule, applied to a third mandatory field) and `check-build.mjs` catches it at
+  the TABLE rather than at spawn, because a throw at spawn is a throw in the
+  rAF loop and build 288 records that reading as a freeze rather than an error.
+- **A TARGET SPEED IS NOT A SPEED, AND THIS REPO HAS NOW WALKED INTO IT
+  TWICE.** CLAUDE.md already recorded it from build 298, about the portal's
+  own ramp, and the clock was still handed over raw. `rise` blends toward its
+  target at `k = accel / 100` while `integrate` damps every substep at
+  `CFG.physics.linearDamping` 0.55, so the steady state is
+  `target * k / (k + damping)` and NOT the target: EMBER wanted 11s and took
+  **13.47** (k 2.2, ratio 0.80, predicted 13.4 -- arithmetic and measurement
+  agreeing to a hundredth) and LANTERN wanted 9 and took **18.9** (k 0.8,
+  ratio 0.59). The spawn site grosses the target up by `(k + damping) / k`,
+  derived from the two terms rather than fitted -- so a slower `accel` needs a
+  higher target for the same clock, which is the correct dependency and the
+  one a fitted constant would have hidden. And the CASE is on the DURATION,
+  never on the cruise: the cruise is an implementation of the clock.
+- **`scaleToTier` RETURNS EARLY ON `e.harmless`, so a harmless body's bounty
+  is 1 for ever.** The estimate of what ignoring a LANTERN costs was built on
+  `bountyStep ^ 27` = 3.28x at rung 28 and came out at 72 kB -- **three times
+  too high**, because the line that scales bounty sits below
+  `if (!d || e.harmless || type.fixed || d.wave?.teach) return e;`. Measured
+  instead, by destroying one and reading the purse: **22,220 B at every rung**,
+  against 0 for one left to reach the rim, which is about 9% of a band-4
+  level. Two arithmetic errors in one estimate and both were caught by the
+  cheapest possible instrument -- spawn it, kill it, read the number.
+- **`drops` IS THE ONLY DIAL A LIGHT BODY HAS, and the density is not one.**
+  `shed` takes `max(n * minValue, mass * perMass quantised)`, so for anything
+  under a mass of **4.44** the first term wins and every mote is worth exactly
+  `minValue` -- measured, a LANTERN at r 20 pays 16 kB at densities 0.4, 0.55,
+  0.8 and 1.2 alike, and it would need a density of 1.85 (heavier than a
+  LURCHER) to move at all. So "sixteen motes' worth" IS a true description of
+  `drops: 16`, and a harmless body pays that PLUS the flat `CFG.energy.drift`
+  the `else if (this.harmless)` arm of `destroy` hands over.
+- **...and build 307's HUSK line shipped a figure that was false.** It said
+  "the largest single payout on the floor", copied from the object guide.
+  Measured: a HUSK is 12 + 6 = 18 kB against a BULWARK's **112 kB** and a boss
+  core's 264 to 792. It is the largest among the HARMLESS bodies and only
+  until LANTERN's 22. Corrected to the comparison the sentence was always
+  about, which is the same fix DRIFT's old "worth 10 ENERGY against a MOTE's
+  4" needed. **A figure quoted in prose rots, and one copied out of a design
+  document was never measured in the first place.**
+- **A RISE BODY SPAWNED AT THE MACHINE'S X STARTS INSIDE THE TURRET.** The
+  clock probe put one at `width * 0.5`, which is `world.shooter.x`, so an r-20
+  LANTERN began overlapping a static body and the pair solver charged it two
+  seconds: 11.23s at era 1 and 14.25 at era 2 against an authored 9, with the
+  era spread reading exactly like the compensation being wrong. Spawned at
+  `width * 0.22` the same code gives 8.62 and 8.78. The rule this repo already
+  has -- suspect the instrument before the code -- and the same family as the
+  build-192 note about a body spawned 240 units above the floor dying inside
+  one frame.
+- **`speed` and `climb` are two numbers for one fact, so they are pinned by
+  arithmetic.** `type.speed` is still read by `scaleToTier` and by everything
+  that expects a type to have one, but a rise body does not climb at it. The
+  guard is that `speed * climb` IS the era-1 column, so every rise type's
+  product must agree with every other's to within 3% -- they all cross the
+  same field. Measured, ember 88x11 = 968 and lantern 107x9 = 963. A second
+  source of truth that cannot be deleted can at least be made unable to drift
+  in silence.
+- **Phase 6 is sub-phased and 6b is two objects short of the inert five.**
+  FILAMENT (a seven-bead chain with promotion-on-death) and BELL (a ring that
+  marks every body on the field for two seconds) are each a new MECHANISM
+  rather than a new body, and 6a already blew a session on two objects of
+  which only one needed a new gait. What 6b ships instead is the object that
+  needed no new gait at all plus the correction its clock forced, which also
+  fixed EMBER at era 2. Sixteen of the twenty to go.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
