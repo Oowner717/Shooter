@@ -276,6 +276,50 @@ console.log(`gaits: ${gaitWords.length} in the vocabulary (${gaitWords.join(' ')
  * was authored against, so every rise type's product must agree with every
  * other's. They all cross the same field.
  */
+/*
+ * ---- every shape case supplies its helper's whole signature -------------
+ *
+ * `case 'drift': drawDrift(ctx, r, 0)` against `drawDrift(ctx, r, phase, time)`
+ * shipped for the life of the glossary. `time` was `undefined`, so
+ * `Math.sin(time * 1.3 + phase)` is NaN and the pulse ring's radius and all
+ * three orbiting dots' centres were NaN -- canvas silently draws nothing for a
+ * non-finite path, so DRIFT's icon was its dashed outline and nothing else.
+ * Measured: one NaN radius and three NaN centres of ten path arguments.
+ *
+ * It cost more than an icon. Every grey the suite renders is compared against
+ * that specimen as its CONTROL, so build 308's LANTERN arm was measuring
+ * against a DRIFT missing the two features its own docstring names. A broken
+ * control reads as a passing case.
+ *
+ * Swept rather than fixed, because nothing about the fault announced itself: a
+ * missing argument is legal JavaScript and a NaN path is a legal no-op. One
+ * instance across 45 helpers, which is what makes it worth a guard rather
+ * than a grep.
+ */
+const drawSrc = readFileSync(new URL('../src/enemies.js', import.meta.url), 'utf8');
+const arity = {};
+for (const m of drawSrc.matchAll(/^function (draw[A-Za-z0-9_]+)\(([^)]*)\)/gm)) {
+  arity[m[1]] = m[2].split(',').map((x) => x.trim()).filter(Boolean).length;
+}
+const thin = [];
+for (const m of drawSrc.matchAll(/case '([a-z0-9]+)': (draw[A-Za-z0-9_]+)\(([^;]*?)\); break;/g)) {
+  const [, shape, fn, args] = m;
+  if (!(fn in arity)) continue;
+  let depth = 0;
+  let n = args.trim() ? 1 : 0;
+  for (const ch of args) {
+    if (ch === '(' || ch === '[') depth++;
+    else if (ch === ')' || ch === ']') depth--;
+    else if (ch === ',' && depth === 0) n++;
+  }
+  if (n < arity[fn]) thin.push(`case '${shape}' passes ${n} of ${fn}'s ${arity[fn]} arguments`);
+}
+if (thin.length) {
+  for (const line of thin) console.error(`shape args: ${line}`);
+  process.exit(1);
+}
+console.log(`shape args: every case supplies its helper's whole signature (${Object.keys(arity).length} helpers)`);
+
 const risers = ENEMY_TYPES.filter((t) => t.gait === 'rise');
 const noClock = risers.filter((t) => !(typeof t.climb === 'number' && t.climb > 0))
   .map((t) => `${t.id} is a 'rise' type and declares no climb`);

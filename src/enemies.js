@@ -176,7 +176,7 @@ export function drawSpecimen(ctx, id, r) {
       break;
     }
     case 'mass': drawTowMass(ctx, r * 0.9, 1); break;
-    case 'drift': drawDrift(ctx, r, 0); break;
+    case 'drift': drawDrift(ctx, r, 0, 0); break;
     case 'ember': drawEmber(ctx, r, 0, 0); break;
     case 'husk': drawHusk(ctx, r, 0, 0); break;
     case 'lantern': drawLantern(ctx, r, 0, 0); break;
@@ -5930,6 +5930,40 @@ export class Director {
     if (!job) return;
     const t = job.type;
 
+    /*
+     * ---- A GAIT THAT PLACES ITS OWN BODY GOES FIRST (build 309) ---------
+     *
+     * A formation is a SHAPE COMING THROUGH THE MOUTH, and these do not come
+     * through the mouth at all -- so the branch below is not about them and
+     * must not see them first.
+     *
+     * It did, for two builds. `['ember', 4]` and `['ember', 5]` are jobs of
+     * four and five, `job.n > 1` is true, and `spawnFormation` -> `release`
+     * -> the ordinary portal path RETURNS before `spawnByGait` is ever
+     * reached. Measured through the real director on the real wave: every
+     * EMBER started at y -70 to -77 with `staged` true, against a floor at
+     * 1223. So "the only thing on the field that starts where you are" came
+     * down out of the portal, turned round at the rim and climbed back out --
+     * and got none of build 308's derived clock either, at a measured cruise
+     * of 83-93 against the 110 the clock asks for.
+     *
+     * The suite could not see it, and the reason is the rule the case's own
+     * docstring quoted: it called `spawnByGait` directly. A case that calls
+     * the method the handler calls tests the logic and not the control.
+     *
+     * All of `job.n` goes out at once, because the count is what the object
+     * guide authors ("four or five" sparks) and because these are harmless:
+     * `hostileCount` cannot see them, so the field cap below has nothing to
+     * say about them and `mortarCap` is what bounds them at the table.
+     */
+    if (OWN_SPAWN.has(t.gait)) {
+      for (let i = 0; i < Math.max(1, job.n); i++) {
+        spawnByGait(world, t, rand(t.r + 12, world.width - t.r - 12));
+      }
+      this.lastRelease = world.time || 0;
+      return;
+    }
+
     // A shape made of towed pairs is a traffic jam rather than a formation.
     // They file in.
     if (job.n > 1 && !t.tows) {
@@ -5951,13 +5985,8 @@ export class Director {
      * has pushed through it -- so the march is hidden by the drawing rather
      * than by the chrome, which from build 295 is too short to hide it.
      */
-    /*
-     * ...unless its gait says it does not come through the portal at all.
-     * Tested on the ANSWER the roll above already produced, the way
-     * `throughMouth` is, so every other spawn site draws exactly the randoms
-     * it always did in the order it always did.
-     */
-    if (spawnByGait(world, t, x)) { this.lastRelease = world.time || 0; return; }
+    // The gait dispatch is ABOVE the formation branch from build 309 -- see
+    // the note there. Nothing self-placing reaches this far.
     x = throughMouth(world, x, t.r);
     release(world, t, x, -50 - rand(0, 40));
     this.lastRelease = world.time || 0;
@@ -6001,9 +6030,19 @@ export function climbOf(type) {
   return c;
 }
 
+/**
+ * The gaits that place their own body instead of coming through the mouth.
+ *
+ * Shared with `Director.emit`, which has to know BEFORE it reaches for a
+ * formation -- see the note there. One set rather than two lists, because the
+ * ids also have to appear quoted in this file for check-build's gait
+ * vocabulary guard, and a second copy is a second thing to forget.
+ */
+export const OWN_SPAWN = new Set(['rise', 'tumble']);
+
 export function spawnByGait(world, type, x) {
   const g = type.gait;
-  if (g !== 'rise' && g !== 'tumble') return false;
+  if (!OWN_SPAWN.has(g)) return false;
   if (g === 'rise') {
     const R = CFG.rise;
     // Off the floor, a little way up from it so nothing is born inside the

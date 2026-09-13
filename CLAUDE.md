@@ -3368,4 +3368,86 @@ came from before believing the other one covers it.
   which only one needed a new gait. What 6b ships instead is the object that
   needed no new gait at all plus the correction its clock forced, which also
   fixed EMBER at era 2. Sixteen of the twenty to go.
+- **`Director.emit` REACHES FOR A FORMATION BEFORE IT ASKS THE GAIT, AND THAT
+  HID EMBER FOR TWO BUILDS.** `if (job.n > 1 && !t.tows) { ... spawnFormation;
+  return; }` sits above the `spawnByGait` dispatch, and EMBER is authored
+  `['ember', 4]` and `['ember', 5]` -- so every EMBER in real play came down
+  out of the portal instead of up off the floor. Measured through the real
+  director on the real wave: start y **-70 to -77 with `staged` true**, against
+  a floor at 1223, and a cruise of 83-93 against the 110 build 308's clock
+  derives. The object's entire picture -- "the only thing on the field that
+  starts where you are" -- was a body that arrived from the top, turned round
+  at the rim and climbed back out, and build 308's clock never touched it.
+  A formation is a SHAPE COMING THROUGH THE MOUTH; a self-placing gait does
+  not come through the mouth at all, so it is asked first now, and `OWN_SPAWN`
+  is one set shared by the dispatch and by `emit` rather than two lists.
+  HUSK and LANTERN were authored at 1 and so were never affected -- which is
+  the shape of the thing: a latent fault that fires on a COUNT, invisible in
+  every wave that happens to author one.
+- **...and the case could not see it because it called the dispatch DIRECTLY.**
+  Build 307's arm is `spawnByGait(w, TYPE_BY_ID[id], x)` -- and that case's own
+  docstring quotes the rule it broke: *a case that calls the method the handler
+  calls tests the logic and not the control*. The control here is
+  `Director.emit`, and nothing in the suite went through it. The replacement
+  drives `Director.load` and `Game.update` and reads where the body actually
+  started, with a hostile out of the SAME WAVE as the control -- 5/5 embers off
+  the floor at a mean y of 1197 against 18/18 hostiles through the portal at
+  -74, so the case is shown able to tell the two spawn paths apart before it is
+  believed about either. Proved by revert: the formation branch restored reads
+  **0/5 off the floor, mean y -81, cruise 90**.
+- **A MISSING ARGUMENT IS LEGAL JAVASCRIPT AND A NaN PATH IS A LEGAL NO-OP.**
+  `case 'drift': drawDrift(ctx, r, 0)` against `drawDrift(ctx, r, phase, time)`
+  left `time` undefined for the life of the glossary, so
+  `Math.sin(time * 1.3 + phase)` is NaN and **seven of DRIFT's path arguments
+  were non-finite** -- the pulse ring's radius and both coordinates of all
+  three orbiting dots. Canvas silently draws nothing for a non-finite path, so
+  the icon was its dashed outline and nothing else, and no pixel test could
+  tell that from a design choice.
+  **The expensive part was that it broke a CONTROL.** Every grey the suite
+  renders is compared against that specimen, so build 308's LANTERN arm was
+  measuring against a DRIFT missing the two features `drawLantern`'s own
+  docstring names it by. A broken control reads as a passing case. Swept now
+  over all 45 shapes with a recording context, with the recorder shown to
+  catch 2 of 2 planted NaNs -- because a zero from an instrument that has
+  never caught anything means nothing -- plus a static arity guard in
+  `check-build.mjs`. One instance in 45 helpers, which is exactly why it
+  wanted a sweep rather than a grep.
+- **A recording context needs real ACCESSOR PAIRS, not write-only stubs.**
+  Four helpers (`drawGnomon` and `drawTri`'s three callers) read
+  `ctx.strokeStyle` back and hand it to `rgba(hex, a)`, which calls
+  `hex.slice` -- so a recorder with `set strokeStyle(v) {}` and no getter
+  throws `hex.slice is not a function` and reports four defects that are its
+  own. The style fields are plain data properties on the recorder.
+- **The read-only fan-out earned its keep this time, and it found both of
+  these.** The note under build 308 is that a six-way scout on a four-CPU box
+  is a two-way one with queueing and contributed nothing to that build; the
+  same run's later readers found the formation pre-emption and the NaN
+  specimen, neither of which I would have looked for. **I doubted the first
+  one and the measurement vindicated the scout** -- my own probe's born/floor
+  split was sampled at first sight, where a staged body is not yet `born`, so
+  it read 5 of 5 "from the floor" and refuted a real bug. The reading that
+  settled it was the start Y. Two rules, both already in here: suspect the
+  instrument before the code, and a fan-out's finding is a pointer to the
+  right file rather than the measurement.
+- **The shape guard harvests `case` labels across the WHOLE FILE into one flat
+  set**, so `case 'rise':` in `drive`'s gait switch is in the same set as the
+  draw switches' shape labels. Nothing is affected today because no shape
+  shares a name with a gait -- but a future `shape: 'chain'` beside a
+  `case 'chain':` in the gait switch would read as covered while drawing
+  nothing, which is the build-273 fallback again. Worth knowing before
+  FILAMENT, whose gait is `chain`.
+- **THE HUSK CASE'S CONTROL WAS ONE MOTE, WHICH IS ONE ROUTE DRAW.** It
+  failed on build 309 -- a build that touched neither bodies nor routes -- with
+  the control mote closing 0.38 of its distance against a floor of 0.5.
+  Measured across runs it reads 0.38, 0.48, 0.65, 0.68, 0.71, 0.73, 0.75,
+  0.79, 0.83, because `this.route = weightedPick(ROUTES)` and a wide route
+  with a slow fold-in is still 60% out at fourteen seconds. Six motes and the
+  MEAN now, with the spread printed in the detail so the next reader can see
+  why one was not enough. CLAUDE.md already carried this rule from the DRIFT
+  march case and a case written four builds later repeated it: **the claim was
+  always about the two BEHAVIOURS, never about two bodies.**
+- **...and fixing the DRIFT specimen made every grey's separation WIDER**,
+  which is the tell that the control had been crippling the measurement
+  rather than flattering it: ember 113 -> 117, husk 93 -> 102, lantern
+  118 -> 124 against the same ceiling of 40.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

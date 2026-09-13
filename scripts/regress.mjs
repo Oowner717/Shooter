@@ -28857,7 +28857,28 @@ if (MINE_LINE) {
       };
     };
     out.husk = cross('husk', 14);
-    out.mote = cross('mote', 14);
+    /*
+     * ---- THE CONTROL IS A POPULATION (build 309) ------------------------
+     *
+     * It was ONE mote, and `closedBy` on one mote is one draw from
+     * `weightedPick(ROUTES)`: measured across suite runs it reads 0.38, 0.65,
+     * 0.68, 0.71, 0.73, 0.75 and 0.83, so a floor of 0.5 is inside the spread
+     * and the arm failed on build 309 for a change that touched neither
+     * bodies nor routes. CLAUDE.md's own rule -- a ratio between two single
+     * random draws is a coin toss with extra steps; sample a population and
+     * compare the means. The claim was always about the two BEHAVIOURS.
+     */
+    const motes = [];
+    for (let i = 0; i < 6; i++) motes.push(cross('mote', 14));
+    const mean = (a) => a.reduce((n, v) => n + v, 0) / Math.max(1, a.length);
+    out.mote = {
+      n: motes.length,
+      closedBy: +mean(motes.map((m) => m.closedBy)).toFixed(2),
+      worst: Math.min(...motes.map((m) => m.closedBy)),
+      best: Math.max(...motes.map((m) => m.closedBy)),
+      turns: +mean(motes.map((m) => m.turns)).toFixed(2),
+      away: motes.filter((m) => m.away !== null).length ? 1 : null,
+    };
     out.life = CFG.husk.life;
 
     // ---- 3. mortar does not swell, and is not asked for -----------------
@@ -28966,8 +28987,9 @@ if (MINE_LINE) {
     // The control: a MOTE has an opinion, closes on the machine, and stays.
     && M.closedBy > 0.5 && H.closedBy < M.closedBy && M.away === null && M.turns < H.turns,
     `husk crossed ${H.crossed} of the arena in ${H.turns} turns, closed ${H.closedBy} of its `
-    + `distance to the machine, gone at ${H.away}s of a ${r.life}s life; `
-    + `control mote closed ${M.closedBy} in ${M.turns} turns and was still there`);
+    + `distance to the machine, gone at ${H.away}s of a ${r.life}s life; control is the MEAN of `
+    + `${M.n} motes, which closed ${M.closedBy} (${M.worst} to ${M.best}, which is why one draw `
+    + `was a coin toss) in ${M.turns} turns and were still there`);
 
   const S2 = r.swell;
   check('mortar weighs nothing, swells with nothing, and is not what a wave is judged on',
@@ -29211,6 +29233,203 @@ if (MINE_LINE) {
     D.mote > 40 && greys.every((k) => D[k] > 40) && D.ink > 20 && D.selfZero === 0,
     `lantern is ${D.mote} from a chip and ${greys.map((k) => `${D[k]} from a ${k.toUpperCase()}`).join(', ')} `
     + `(ink ${D.ink}); the same shape twice differs by ${D.selfZero}`);
+}
+
+// --- the director is the door, and two builds never went through it --------
+/*
+ * Build 309, and both arms are for defects builds 307 and 308 shipped green.
+ *
+ * THE FORMATION BRANCH PRE-EMPTED THE GAIT DISPATCH. `Director.emit` reaches
+ * for `spawnFormation` on any job with `n > 1`, and that branch RETURNS -- so
+ * `['ember', 4]` never reached `spawnByGait` and every EMBER in real play came
+ * down out of the portal instead of up off the floor. Measured through the
+ * real director on the real wave: start y -70 to -77 with `staged` true,
+ * against a floor at 1223, and a cruise of 83-93 against the 110 build 308's
+ * clock derives. The object's whole picture -- "the only thing on the field
+ * that starts where you are" -- was a body that came down, turned round at the
+ * rim and climbed back out.
+ *
+ * The suite could not see it because build 307's case called `spawnByGait`
+ * DIRECTLY, which is the rule that case's own docstring quoted: a case that
+ * calls the method the handler calls tests the logic and not the control. So
+ * this arm drives `Director.load` and `Game.update` and reads where the body
+ * actually started, with a MOTE out of the same wave as the control -- if the
+ * case cannot tell the two spawn paths apart it is asserting nothing.
+ *
+ * AND A MISSING ARGUMENT IS A SILENT NO-OP. `case 'drift': drawDrift(ctx, r,
+ * 0)` against a four-parameter helper left `time` undefined, so the pulse
+ * ring's radius and all three orbiting dots' centres were NaN -- and canvas
+ * draws nothing at all for a non-finite path. One NaN radius and three NaN
+ * centres of ten arguments. DRIFT's icon was its outline and nothing else for
+ * the life of the glossary, and worse, every grey the suite renders is
+ * compared against that specimen as its CONTROL, so build 308's LANTERN arm
+ * was measuring against a DRIFT missing the two features drawLantern's own
+ * docstring names it by. check-build.mjs holds the arity statically; this
+ * sweeps what actually reaches the canvas.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { WAVES, TYPE_BY_ID, ENEMY_TYPES, CFG } = await import('../src/config.js');
+    const { drawSpecimen } = await import('../src/enemies.js');
+    const out = {};
+
+    // ---- 1. where a released body actually starts ------------------------
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+    };
+    /*
+     * The wave that authors FOUR embers, selected the way every other case
+     * does it -- `Director.wave` is a getter off `order[at]`, so assigning to
+     * it is a silent no-op that reads back as the ambient wave.
+     */
+    const at = WAVES.findIndex((v) => !v.teach
+      && (v.of || []).some(([id]) => id === 'ember' && true)
+      && (v.of || []).find(([id]) => id === 'ember')[1] > 1);
+    g.restart();
+    g.debugTeachAll();
+    clear();
+    const d = w.director;
+    d.setTier(1);
+    d.order = [at];
+    d.at = 0;
+    w.autoAim = false;
+    w.autoFire = false;
+    d.load(w, d.wave);
+    d.timer = 0;
+    out.authored = (WAVES[at].of.find(([id]) => id === 'ember') || [])[1];
+    // First sight of every body, so a staged march cannot be mistaken for a
+    // floor spawn once it has travelled.
+    const born = new Map();
+    for (let s = 0; s < 60 * 90; s++) {
+      g.update(1 / 60);
+      for (const e of w.enemies) {
+        if (born.has(e)) continue;
+        born.set(e, { id: e.type.id, y: e.y, staged: !!e.staged, cruise: e.cruise });
+      }
+    }
+    const firsts = [...born.values()];
+    const pick = (id) => firsts.filter((v) => v.id === id);
+    const sum = (a) => a.reduce((n, v) => n + v, 0);
+    const emb = pick('ember');
+    const ctl = pick('mote').concat(pick('needle'));
+    out.floorY = Math.round(w.floorY);
+    out.ember = {
+      n: emb.length,
+      // Off the floor: within two body-lengths of it, and NOT staged.
+      offFloor: emb.filter((v) => v.y > w.floorY - 120 && !v.staged).length,
+      meanY: Math.round(sum(emb.map((v) => v.y)) / Math.max(1, emb.length)),
+      // ...and carrying the DERIVED clock rather than the type's nominal.
+      meanCruise: Math.round(sum(emb.map((v) => v.cruise)) / Math.max(1, emb.length)),
+      nominal: TYPE_BY_ID.ember.speed,
+    };
+    out.control = {
+      n: ctl.length,
+      // The control comes through the portal: above the field and staged.
+      throughPortal: ctl.filter((v) => v.y < 0 && v.staged).length,
+      meanY: Math.round(sum(ctl.map((v) => v.y)) / Math.max(1, ctl.length)),
+    };
+
+    // ---- 2. no specimen paints a non-finite path -------------------------
+    /*
+     * A recording context, because the fault is invisible downstream: canvas
+     * silently no-ops a NaN path, so a pixel test reads a missing feature as
+     * a design choice. Every numeric argument of every path call is checked.
+     */
+    const rec = () => {
+      const bad = [];
+      const note = (fn, args) => {
+        for (const v of args) if (typeof v === 'number' && !Number.isFinite(v)) bad.push(fn);
+      };
+      /*
+       * The style fields are real DATA properties and not write-only stubs.
+       * Four helpers (drawGnomon, drawTri's three) read `ctx.strokeStyle`
+       * back and hand it to `rgba(hex, a)`, which calls `hex.slice` -- so a
+       * recorder with setters and no getters throws `hex.slice is not a
+       * function` and reports four defects that are its own.
+       */
+      const c = {
+        bad,
+        fillStyle: '#8fa9c4',
+        strokeStyle: '#8fa9c4',
+        lineWidth: 1.6,
+        globalAlpha: 1,
+        lineCap: 'butt',
+        lineJoin: 'miter',
+        globalCompositeOperation: 'source-over',
+        font: '10px sans-serif',
+        textAlign: 'center',
+        textBaseline: 'middle',
+        shadowBlur: 0,
+        shadowColor: 'transparent',
+        setLineDash: () => {}, beginPath: () => {}, closePath: () => {}, fill: () => {},
+        stroke: () => {}, save: () => {}, restore: () => {}, clip: () => {},
+        arc: (...a) => note('arc', a),
+        arcTo: (...a) => note('arcTo', a),
+        ellipse: (...a) => note('ellipse', a),
+        moveTo: (...a) => note('moveTo', a),
+        lineTo: (...a) => note('lineTo', a),
+        rect: (...a) => note('rect', a),
+        roundRect: (...a) => note('roundRect', a),
+        quadraticCurveTo: (...a) => note('quadraticCurveTo', a),
+        bezierCurveTo: (...a) => note('bezierCurveTo', a),
+        translate: (...a) => note('translate', a),
+        rotate: (...a) => note('rotate', a),
+        scale: (...a) => note('scale', a),
+        createRadialGradient: () => ({ addColorStop: () => {} }),
+        createLinearGradient: () => ({ addColorStop: () => {} }),
+        fillText: () => {}, measureText: () => ({ width: 10 }),
+      };
+      return c;
+    };
+    const shapes = [...new Set(ENEMY_TYPES.map((t) => t.shape).filter(Boolean))];
+    out.shapes = shapes.length;
+    out.nan = [];
+    for (const sh of shapes) {
+      const c = rec();
+      try { drawSpecimen(c, sh, 22); } catch (err) { out.nan.push(`${sh}:threw`); continue; }
+      if (c.bad.length) out.nan.push(`${sh}:${c.bad.length}`);
+    }
+    /*
+     * ...and the recorder is shown to READ A ONE, because a zero means nothing
+     * from an instrument that has never caught anything. Fed a path with a
+     * NaN in it by hand.
+     */
+    const probe = rec();
+    probe.arc(0, 0, Number.NaN, 0, 6.28);
+    probe.moveTo(Number.NaN, 3);
+    out.selfTest = probe.bad.length;
+
+    g.restart();
+    clear();
+    return out;
+  });
+
+  const E = r.ember;
+  const C = r.control;
+  check('an EMBER comes off the floor when the DIRECTOR sends it, not through the portal',
+    E.n >= 2 && E.offFloor === E.n
+    // ...carrying the clock the spawn site derives, not the type's nominal...
+    && E.meanCruise > E.nominal * 1.1
+    // ...and the control out of the same wave comes through the portal, which
+    // is what proves the case can tell the two paths apart at all.
+    && C.n >= 2 && C.throughPortal === C.n,
+    `${E.offFloor}/${E.n} embers authored ${r.authored} to a wave started at a mean y of `
+    + `${E.meanY} (floor ${r.floorY}) at a cruise of ${E.meanCruise} against a nominal `
+    + `${E.nominal}; control ${C.throughPortal}/${C.n} hostiles came through the portal at a `
+    + `mean y of ${C.meanY}`);
+
+  check('...and no object\'s glossary icon paints a non-finite path',
+    r.nan.length === 0 && r.selfTest === 2 && r.shapes > 40,
+    `${r.shapes} shapes swept, ${r.nan.length ? `NaN in ${r.nan.join(' ')}` : 'none non-finite'}; `
+    + `the recorder catches ${r.selfTest} of 2 planted NaNs`);
 }
 
 // --- the debug panel's three quieter faults ---------------------------------
