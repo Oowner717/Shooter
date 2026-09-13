@@ -4,7 +4,7 @@
 
 import { CFG, WAVES, TYPE_BY_ID, ROUTES, massOf, kB } from './config.js';
 import { traitsFor, traitAt, has as hasTrait, TRAIT_BY_ID } from './traits.js';
-import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow, smoothstep } from './util.js';
+import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow, smoothstep, segClosest } from './util.js';
 import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul, edgeHit } from './fx.js';
 import { audio } from './audio.js';
 import { shed } from './debris.js';
@@ -184,6 +184,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'bell': drawBell(ctx, r, 0, 0); break;
     case 'quarry': drawQuarry(ctx, r, 0, 0); break;
     case 'dart': drawDart(ctx, r, 0, 0); break;
+    case 'bar': drawBar(ctx, r, 0, 0); break;
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
@@ -254,6 +255,13 @@ export function materialOf(t) {
   };
   return t._mat;
 }
+
+/*
+ * Scratch for `Enemy.hitCircleAt`, for the reason `HIT` in projectiles.js is
+ * one: a hit resolves thousands of times a fight and this is read on the same
+ * line it is returned. Never stored.
+ */
+const BAR_HIT = { x: 0, y: 0, r: 0 };
 
 export class Enemy {
   constructor(type, x, y, opts = {}) {
@@ -466,6 +474,64 @@ export class Enemy {
     }
   }
 
+  /**
+   * Half the bar's LENGTH, for the one type whose hit profile is a capsule.
+   *
+   * Derived from `r` and `CFG.cartwheel` rather than stored, so a body whose
+   * radius moves (a graft grows one) takes its bar with it -- and so that the
+   * DRAWING, the hit test and `hitReach` are reading one owner. See the note
+   * at CFG.cartwheel.
+   */
+  get barHalf() {
+    return this.r * CFG.cartwheel.long;
+  }
+
+  /** ...and half its thickness, which is the capsule's radius. */
+  get barR() {
+    return this.r * CFG.cartwheel.thin;
+  }
+
+  /**
+   * The CIRCLE a hit at (hx, hy) has its contact geometry on.
+   *
+   * For everything in the game it is the body itself. For a bar it is the
+   * capsule's LOCAL circle: a capsule is the set of circles of radius `barR`
+   * centred along its axis, so the one the round met is centred at the
+   * closest point on that axis -- and every piece of geometry downstream
+   * (the impact parameter, the outward normal, the incidence PRISM reads,
+   * the spin's lever arm, the burst's position, SPINE's chord) then comes out
+   * exact against the real surface with no change of its own.
+   *
+   * ---- THIS IS THE FIFTH DOOR, and it was open -----------------------
+   *
+   * `resolveSegment` records the circle its hit test used and builds the
+   * contact from it; `takeHit` then computed `contactAt(this, ...)` AGAIN,
+   * against the body's own centre and radius. Identical for every round in
+   * the game until a body stopped being a circle, and then quietly wrong:
+   * the sweep would have had the capsule's geometry and the damage path a
+   * disc's. One owner, called from both.
+   *
+   * The two agree BY CONSTRUCTION rather than by arrangement: `segSeg`
+   * returns the mutually-closest pair, so the point on the axis nearest the
+   * round's step is also the point nearest that step's own closest point,
+   * which is what `hx, hy` is.
+   *
+   * Returns a module scratch object, the idiom `HIT` in projectiles.js
+   * already uses for this hot path -- so it is read immediately and never
+   * held. Never returned to anything that stores it.
+   */
+  hitCircleAt(hx, hy) {
+    if (!this.type.bar || this.isDrop) return this;
+    const half = this.barHalf;
+    const ux = Math.cos(this.angle) * half;
+    const uy = Math.sin(this.angle) * half;
+    const s = segClosest(this.x - ux, this.y - uy, this.x + ux, this.y + uy, hx, hy);
+    BAR_HIT.x = s.px;
+    BAR_HIT.y = s.py;
+    BAR_HIT.r = this.barR;
+    return BAR_HIT;
+  }
+
   /** Radius the plates orbit at, and the reach a projectile must clear. */
   get orbitR() {
     return this.r * SHARD_ORBIT;
@@ -490,6 +556,20 @@ export class Enemy {
   }
 
   get hitReach() {
+    /*
+     * A BAR reaches past its own `r`, which is the whole reason this getter
+     * has to know about it: `resolveSegment` rejects a body whose `hitReach`
+     * does not cover the round's step before it ever gets to the capsule
+     * test, so a bar without this line would be unhittable along exactly the
+     * 23 units of itself that stick out -- and hittable in the middle, which
+     * would read as the profile working.
+     *
+     * `isDrop` is checked for the reason the plates block above is: a mote
+     * built from a type carrying a capability inherits the capability, and a
+     * WARDEN's salvage once came out of the constructor with three orbiting
+     * plates and a projectile reach to match.
+     */
+    if (this.type.bar && !this.isDrop) return this.barHalf + this.barR;
     const core = this.shards ? this.orbitR + SHARD_R : this.r;
     return this.graftCount ? Math.max(core, this.graftR + CFG.graft.ball) : core;
   }
@@ -1374,6 +1454,27 @@ export class Enemy {
     dy /= d;
 
     /*
+     * ---- CARTWHEEL holds a spin and takes its route like anything else ----
+     *
+     * The smallest of the six gaits: it adds the TURN and nothing else, and
+     * the turn is the whole of SPINDLE's design because the bar's profile
+     * against the barrel changes with it. So this does not replace the route
+     * the way `roll` and `flock` do -- it sits above them and the ordinary
+     * branch below still runs.
+     *
+     * Held as a SIGNED floor against `integrate`'s angular damping, for
+     * `tumble`'s measured reason (0.27 of a turn in eleven seconds when it is
+     * written once), and per SUBSTEP rather than per frame because the
+     * damping is per substep. The direction is `routeSide`, which is already
+     * a coin flip taken at spawn -- a second field would be a second roll for
+     * the same decision, and a body that arcs left cartwheels left.
+     */
+    if (this.type.gait === 'cartwheel' && !this.isDrop && !this.staged) {
+      const want = CFG.cartwheel.spin * (this.frozen(world) ? 0.12 : 1);
+      if (this.av * this.routeSide < want) this.av = this.routeSide * want;
+    }
+
+    /*
      * ---- ROLL takes the route's place, and only once the body is loose ----
      *
      * A roller marches in on the same sway every hostile does -- the staged
@@ -1830,7 +1931,7 @@ export class Enemy {
      * travel, so only its component ACROSS the travel means anything -- and
      * that component is the exact impact parameter.
      */
-    const c = contactAt(this, hx, hy, dirx, diry, pr);
+    const c = contactAt(this.hitCircleAt(hx, hy), hx, hy, dirx, diry, pr);
 
     /*
      * Prisms bounce glancing bolts; only a square-on hit lands.
@@ -2569,6 +2670,7 @@ export class Enemy {
       case 'bell': drawBell(ctx, this.r, this.phase, world.time); break;
       case 'quarry': drawQuarry(ctx, this.r, this.phase, world.time); break;
       case 'dart': drawDart(ctx, this.r, this.phase, world.time); break;
+      case 'bar': drawBar(ctx, this.r, this.phase, world.time); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
@@ -3992,6 +4094,52 @@ function drawHusk(ctx, r, phase, time) {
 }
 
 /**
+ * A bar: the capsule a round is actually tested against, drawn as itself.
+ *
+ * ---- NOTHING IS DRAWN OUTSIDE THE HIT PROFILE ---------------------------
+ *
+ * `docs/objects.html` puts a diamond on each end at 1.9 times the bar's own
+ * half-thickness -- 10.4 units against a tube of 5.5 -- and that is a part
+ * of the picture a round would visibly pass through, on the one body in this
+ * game whose whole design is which part of it you can hit. The weights are
+ * inside the tube instead, so the silhouette IS the capsule: the ends are
+ * the caps the hit test uses and the cross-bars read as the mass that makes
+ * it turn.
+ *
+ * Drawn along local +x and rotated by the body's own `angle`, which the
+ * cartwheel gait spins -- so the picture turns with the profile by
+ * construction rather than by agreement.
+ */
+function drawBar(ctx, r, phase, time) {
+  const C = CFG.cartwheel;
+  const half = r * C.long;
+  const th = r * C.thin;
+  ctx.beginPath();
+  ctx.arc(-half, 0, th, Math.PI / 2, -Math.PI / 2);
+  ctx.lineTo(half, -th);
+  ctx.arc(half, 0, th, -Math.PI / 2, Math.PI / 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // The spine, and a weight short of each cap: what a bar turns about.
+  ctx.beginPath();
+  ctx.moveTo(-half * 0.9, 0);
+  ctx.lineTo(half * 0.9, 0);
+  ctx.stroke();
+  for (const sgn of [-1, 1]) {
+    const cx = sgn * half * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(cx - th * 0.85, -th * 0.92);
+    ctx.lineTo(cx + th * 0.85, -th * 0.92);
+    ctx.lineTo(cx + th * 0.85, th * 0.92);
+    ctx.lineTo(cx - th * 0.85, th * 0.92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
+/**
  * A dart: a nose, two swept barbs and a tail that beats.
  *
  * Drawn along local +x, because `Enemy.draw` rotates by `angle` and the flock
@@ -4671,6 +4819,26 @@ function spawnTow(world, x, y, opts = {}) {
  * the beads take the same staged march in, or the column fans out inside the
  * doorway before the gait has ever run.
  */
+/**
+ * The bar a capsule hit profile is tested against, in units.
+ *
+ * THROWS on a shape that is not a bar, the rule `levelsOf`, `bandOf`,
+ * `climbOf`, `beadsOf` and `schoolOf` all carry -- a thickness at or above
+ * the length is not a bar, it is a disc with extra arithmetic, and the hit
+ * test would quietly become a slightly wrong circle. Exported so
+ * check-build.mjs can assert the reach against MAX_BODY_R at the table
+ * rather than at the first round fired.
+ */
+export function barOf(type, r) {
+  if (!type || !type.bar) throw new Error(`${type && type.id}: has no bar`);
+  const C = CFG.cartwheel;
+  if (!(C.long > 0 && C.thin > 0 && C.long > C.thin)) {
+    throw new Error(`cartwheel.long ${C.long} / thin ${C.thin}: a bar is longer than it is thick`);
+  }
+  const rad = r ?? type.r;
+  return { half: rad * C.long, thick: rad * C.thin, reach: rad * (C.long + C.thin) };
+}
+
 /**
  * How many bodies one authored SHOAL entry makes. Mandatory and no default,
  * the same rule `levelsOf`, `bandOf`, `climbOf` and `beadsOf` carry -- a

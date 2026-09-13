@@ -4389,6 +4389,25 @@ export class Game {
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (const e of [...w.enemies, ...w.drops]) {
+      /*
+       * A BAR is drawn as the capsule a round is actually tested against.
+       * This overlay is the only place in the game the hit profile can be
+       * SEEN, so drawing SPINDLE's circle here would hide exactly the thing
+       * the overlay exists for -- and it is the physics circle that is the
+       * fiction for that body, not the capsule. Both are shown: the capsule
+       * in the hit colour and the disc the pair solver still uses behind it.
+       */
+      if (e.type.bar && !e.isDrop) {
+        const half = e.barHalf;
+        const ux = Math.cos(e.angle) * half;
+        const uy = Math.sin(e.angle) * half;
+        const th = e.barR;
+        const a = Math.atan2(uy, ux);
+        ctx.moveTo(e.x - ux + Math.cos(a - Math.PI / 2) * th, e.y - uy + Math.sin(a - Math.PI / 2) * th);
+        ctx.arc(e.x - ux, e.y - uy, th, a - Math.PI / 2, a + Math.PI / 2, true);
+        ctx.arc(e.x + ux, e.y + uy, th, a + Math.PI / 2, a - Math.PI / 2, true);
+        ctx.closePath();
+      }
       ctx.moveTo(e.x + e.r, e.y);
       ctx.arc(e.x, e.y, e.r, 0, TAU);
     }

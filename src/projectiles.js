@@ -2,7 +2,7 @@
 // 1500 px/s, earliest-hit resolution so the nearest object always takes it.
 
 import { CFG } from './config.js';
-import { TAU, rand, spread, rgba, drawGlow, segClosest, drawBolt } from './util.js';
+import { TAU, rand, spread, rgba, drawGlow, segClosest, segSeg, drawBolt } from './util.js';
 import { spark, dot, ring, edgeHit } from './fx.js';
 import { SHARD_R } from './enemies.js';
 import { contactAt } from './physics.js';
@@ -491,6 +491,45 @@ function resolveSegment(world, p, ax, ay, bx, by) {
             hitX = gx; hitY = gy; hitR = CFG.graft.ball;
           }
         }
+      }
+
+      /*
+       * ---- A BAR, and it is the only thing in this game that is not a
+       * circle to a round (build 315) -----------------------------------
+       *
+       * SPINDLE's hit profile is a CAPSULE: a segment `2 * barHalf` long
+       * lying along the body's own `angle`, with a radius of `barR`. So the
+       * test is the closest approach of two segments -- the round's one-frame
+       * step against the bar's axis -- and `segSeg` hands back the point on
+       * the AXIS, which is exactly what makes this cost `contactAt` nothing.
+       *
+       * A capsule IS the set of circles of radius `barR` centred along its
+       * axis, so the circle the hit test used is the one centred at that
+       * point: `hitX/hitY/hitR` already exist for precisely this (a round can
+       * stop on a plate or a graft, each with its own centre and radius), and
+       * the impact parameter, the normal, the ricochet and SLIVER's chord all
+       * come out exact against the capsule's real surface with no change to
+       * the geometry code. That is the whole reason to record the circle
+       * rather than the body.
+       *
+       * It is `else` and not a second test: a bar has no disc. `r` is still
+       * the body's radius everywhere else in the game -- the pair solver, the
+       * arena clamp, the mass, every blast and every chooser -- which is the
+       * scope this build deliberately keeps. See the type.
+       */
+      if (e.type.bar && !e.isDrop) {
+        const half = e.barHalf;
+        const ux = Math.cos(e.angle) * half;
+        const uy = Math.sin(e.angle) * half;
+        const br = e.barR + p.r;
+        const cb = segSeg(ax, ay, bx, by, e.x - ux, e.y - uy, e.x + ux, e.y + uy);
+        if (cb.d2 <= br * br && cb.t < bestT) {
+          bestT = cb.t;
+          bestKind = 'enemy';
+          bestTarget = e;
+          hitX = cb.qx; hitY = cb.qy; hitR = e.barR;
+        }
+        continue;
       }
 
       const rr = e.r + p.r;

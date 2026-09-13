@@ -395,6 +395,8 @@ console.log(`multiplicity: ${multi.length + 1} type(s) are more than one body, o
 console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => `${t.id} ${t.climb}s`).join(' ')}), `
   + `nominal speeds agree on a column of ${lo}-${hi}`);
 
+const { fractureDepth, fractureFactor, barOf } = await import(new URL('../src/enemies.js', import.meta.url));
+
 /*
  * ---- A FRACTURE HAS TO TERMINATE, and nothing else would say so ----------
  *
@@ -411,7 +413,6 @@ console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => 
  * three fields the behaviour is, which is the rule the gate table and the
  * lot count both had to learn: ask the structure, never restate it.
  */
-const { fractureDepth, fractureFactor } = await import(new URL('../src/enemies.js', import.meta.url));
 const frac = ENEMY_TYPES.filter((t) => fractureDepth(t) > 0).map((t) => {
   const d = fractureDepth(t);
   const radii = Array.from({ length: d + 1 }, (_, i) => +(t.r * t.splits.scale ** i).toFixed(1));
@@ -514,6 +515,34 @@ if (!readFileSync(new URL('../src/game.js', import.meta.url), 'utf8').includes('
 }
 console.log(`broadphase cell ${GRID_CELL} covers the largest body (${MAX_BODY_R}) and `
   + `the largest static one (${STATIC_R}); worst pair ${MAX_BODY_R + STATIC_R}, needs ${NEED}`);
+
+/*
+ * ---- A BAR IS A HIT PROFILE, SO ITS REACH HAS TO BE DECLARED ------------
+ *
+ * `bar` makes a round test a CAPSULE instead of a circle, and the capsule
+ * reaches `(long + thin) * r` from the centre -- past `r`, which is the point
+ * and also the hazard: `MAX_BODY_R` is what the broadphase cell is sized
+ * against and what every "how big can a body be" claim in this file rests
+ * on. A bar longer than that would be hittable outside the region anything
+ * else in the game reasons about.
+ *
+ * `barOf` throws for a thickness at or above the length; this asserts the
+ * reach at the TABLE, because the alternative is finding out on the first
+ * round fired -- and build 288's note is that a throw in a draw or hit path
+ * reads as a freeze rather than an error.
+ */
+const bars = ENEMY_TYPES.filter((t) => t.bar).map((t) => ({ id: t.id, ...barOf(t) }));
+const overReach = bars.filter((b) => b.reach > MAX_BODY_R)
+  .map((b) => `${b.id}'s bar reaches ${b.reach.toFixed(1)} against a MAX_BODY_R of ${MAX_BODY_R}`);
+if (overReach.length) {
+  for (const line of overReach) console.error(`bar: ${line}`);
+  process.exit(1);
+}
+console.log(`bar: ${bars.length} type(s) are tested as a capsule (`
+  + `${bars.map((b) => `${b.id} ${(b.half * 2).toFixed(0)}x${(b.thick * 2).toFixed(0)}, reach `
+    + `${b.reach.toFixed(1)} of ${MAX_BODY_R}`).join('; ') || 'none'}) at `
+  + `${(CFG.cartwheel.spin / (2 * Math.PI)).toFixed(3)} rev/s`);
+
 
 /*
  * A covered body must not read as an energy mote.

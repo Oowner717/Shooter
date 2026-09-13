@@ -297,12 +297,22 @@ export class Front {
  * throwing.
  */
 function exitPoint(e, p, c, dirx, diry) {
-  const r = e.r || 1;
+  /*
+   * ...and the circle is the BODY's only while a body is a circle. SPINDLE's
+   * hit profile is a capsule, so the chord is through the local circle the
+   * round actually met -- `hitCircleAt` is the one owner of that, and `c.x,
+   * c.y` is a point on the surface, which picks out the same circle. Without
+   * this the chord would be computed on r 30 where the bar is 5.5 thick and
+   * every splinter would be born up to 24 units past the far face, in open
+   * space, on the one body whose whole design is which part of it you hit.
+   */
+  const hc = e.hitCircleAt ? e.hitCircleAt(c ? c.x : e.x, c ? c.y : e.y) : e;
+  const r = hc.r || 1;
   const b = c ? c.b : 0;
   const half = Math.sqrt(Math.max(0, r * r - b * b));
   return {
-    x: e.x + -diry * b + dirx * half,
-    y: e.y + dirx * b + diry * half,
+    x: hc.x + -diry * b + dirx * half,
+    y: hc.y + dirx * b + diry * half,
   };
 }
 

@@ -50,6 +50,51 @@ export function segClosest(ax, ay, bx, by, cx, cy) {
   return { t, d2: ex * ex + ey * ey, px, py };
 }
 
+/**
+ * Closest approach between two SEGMENTS, AB and CD.
+ *
+ * Returns `t` along AB, the squared distance, and the closest point on CD --
+ * which is what a capsule hit test wants: the capsule is the set of circles
+ * of radius H centred along CD, so the point on CD is the centre of the one
+ * the round actually met, and `contactAt` can then derive exact contact
+ * geometry from it with no change of its own. See `resolveSegment`.
+ *
+ * Done as the four point-segment tests plus the crossing case rather than by
+ * solving the 2x2 system: in 2D the closest approach of two non-crossing
+ * segments is always at an endpoint of one of them, so this is exact, and it
+ * has no degenerate branch to get wrong when a segment has zero length or
+ * the two are parallel. `segClosest` is the one primitive.
+ */
+export function segSeg(ax, ay, bx, by, cx, cy, dx, dy) {
+  // Crossing: distance zero, and the parameter along AB is the crossing.
+  const rx = bx - ax;
+  const ry = by - ay;
+  const sx = dx - cx;
+  const sy = dy - cy;
+  const den = rx * sy - ry * sx;
+  if (Math.abs(den) > 1e-9) {
+    const t = ((cx - ax) * sy - (cy - ay) * sx) / den;
+    const u = ((cx - ax) * ry - (cy - ay) * rx) / den;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+      return { t, d2: 0, qx: ax + rx * t, qy: ay + ry * t };
+    }
+  }
+  let best = { t: 0, d2: Infinity, qx: cx, qy: cy };
+  const onAB = (px, py) => {
+    const c = segClosest(ax, ay, bx, by, px, py);
+    if (c.d2 < best.d2) best = { t: c.t, d2: c.d2, qx: px, qy: py };
+  };
+  onAB(cx, cy);
+  onAB(dx, dy);
+  const fromCD = (px, py, t) => {
+    const c = segClosest(cx, cy, dx, dy, px, py);
+    if (c.d2 < best.d2) best = { t, d2: c.d2, qx: c.px, qy: c.py };
+  };
+  fromCD(ax, ay, 0);
+  fromCD(bx, by, 1);
+  return best;
+}
+
 /** rgba() string from a #rrggbb hex plus alpha. Cached — called a lot. */
 const _rgbaCache = new Map();
 export function rgba(hex, a) {

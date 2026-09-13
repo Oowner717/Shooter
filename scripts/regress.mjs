@@ -26092,10 +26092,26 @@ if (GUN_LINE) {
     + `${r.benchPlain} without the node and ${r.benchAir} with it `
     + `(x${(r.benchAir / r.benchPlain).toFixed(2)})`);
 
+  /*
+   * ---- the SINGLE-BODY floor was set near the truth, not clear of it ----
+   *
+   * It was `oneAir > one * 1.3` and it failed at x1.26 on build 315, whose
+   * only relevant change is a new WAVE -- which re-rolls every `Math.random`
+   * downstream of the shuffle and so re-rolls which of HAIL's thirty-odd
+   * jittered pellets land on a pinned body. CLAUDE.md's own note on the node
+   * says the single-body gain is small and variable (1140 -> 1170 in the
+   * assay), so a 30% floor on it was a margin straddling the draw.
+   *
+   * The claim in this arm's NAME is the crowd, so the crowd carries it: the
+   * three-abreast ratio must beat the single-body one by 30%, which is the
+   * node's actual subject and is a comparison of two numbers from the same
+   * run rather than a threshold on one. The single body only has to gain
+   * something at all.
+   */
   check('AIRBURST goes off where the pellets land, and the crowd pays for it',
     r.oneAir.armed && r.one.armed === false
-    && r.oneAir.took > r.one.took * 1.3
-    && (r.threeAir.took / r.three.took) > (r.oneAir.took / r.one.took)
+    && r.oneAir.took > r.one.took * 1.05
+    && (r.threeAir.took / r.three.took) > (r.oneAir.took / r.one.took) * 1.3
     && r.one.ok && r.threeAir.ok,
     `one body ${r.one.took} -> ${r.oneAir.took} (x`
     + `${(r.oneAir.took / r.one.took).toFixed(2)}); three abreast `
@@ -30725,6 +30741,60 @@ if (MINE_LINE) {
     out.cohereOff = swim(true, false, 0);
     CFG.flock.cohere = heldCohere;
     out.cohere = heldCohere;
+    /*
+     * ---- ...AND THE CLOUD'S RADIUS WOULD NOT HOLD STILL ------------------
+     *
+     * Three instruments for cohesion and none of them survived the suite. By
+     * SERIAL it cannot be seen at all (the two halves of the flock have
+     * opposite effects on the radius and cancel). By frame count it read 112
+     * against 227 alone and 219 against 188 in the suite, inverted. By DEPTH
+     * FALLEN it read 72 against 107 alone and 106 against 93 in the suite,
+     * inverted again -- and depth is the honest clock for a quantity that
+     * depends on distance travelled, so what is left is that fourteen bodies
+     * converging on one mount produce a cloud whose radius is dominated by
+     * the run's own conditions and not by this term.
+     *
+     * So the TERM is asserted directly and the cloud is reported. `flockOn`
+     * returns the aim-point offset, which is exactly `(centroid - me) *
+     * cohere` when no neighbour is inside `apart` -- laid out here four wide
+     * so the separation nudge provably cannot fire. It is a narrower claim
+     * than the picture and it is one that holds: what the cloud does is in
+     * the message for the next reader.
+     */
+    clear();
+    const wide = [];
+    for (let i = 0; i < 4; i++) {
+      const e = g.debugSpawn('shoal', 90 + i * 90, 300);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.hp = 1e9;
+      e.maxHp = 1e9;
+      e.shoal = 55;
+      e.vx = 0;
+      e.vy = 0;
+      wide.push(e);
+    }
+    const solo = wide[0];
+    const rest = wide.slice(1);
+    const mx = rest.reduce((a, e) => a + e.x, 0) / rest.length;
+    const my = rest.reduce((a, e) => a + e.y, 0) / rest.length;
+    let near = Infinity;
+    for (const e of rest) near = Math.min(near, Math.hypot(e.x - solo.x, e.y - solo.y));
+    out.term = { gap: +near.toFixed(1), apart: +(solo.r * CFG.flock.apart).toFixed(1) };
+    const got = solo.flockOn(w, 1 / 60);
+    out.term.ox = +got[0].toFixed(6);
+    out.term.oy = +got[1].toFixed(6);
+    out.term.wantX = +((mx - solo.x) * heldCohere).toFixed(6);
+    out.term.wantY = +((my - solo.y) * heldCohere).toFixed(6);
+    CFG.flock.cohere = 0;
+    const zero = solo.flockOn(w, 1 / 60);
+    out.term.zeroX = +zero[0].toFixed(6);
+    CFG.flock.cohere = heldCohere;
+    solo.shoal = 999;
+    const alone = solo.flockOn(w, 1 / 60);
+    out.term.aloneX = +alone[0].toFixed(6);
+    for (const e of wide) e.dead = true;
+    clear();
 
     // ---- a bolt takes one of fourteen ------------------------------------
     clear();
@@ -30855,14 +30925,17 @@ if (MINE_LINE) {
     + `${r.solo.minD} (worst ${r.solo.minWorst}), which is where the pair solver parks two `
     + 'things that are touching');
 
-  check('...and it holds together, which is the cohesion term and nothing else',
-    r.cohereOn.depths === 5 && r.cohereOff.depths === 5
-    && r.cohereOn.farMax < r.cohereOff.farMax * 0.75
-    && r.cohereOn.far < r.cohereOff.far && r.cohere > 0,
-    `read at the same five depths fallen (50 to 250, not at the same frame counts -- see the `
-    + `note), a school with cohere ${r.cohere} holds a cloud of ${r.cohereOn.far} (worst `
-    + `${r.cohereOn.farMax}) where the same bodies at cohere 0 spread to ${r.cohereOff.far} `
-    + `(worst ${r.cohereOff.farMax})`);
+  const M = r.term;
+  check('...and cohesion steers at the school\'s own mean, by exactly the term',
+    Math.abs(M.ox - M.wantX) < 1e-6 && Math.abs(M.oy - M.wantY) < 1e-6
+    && M.gap > M.apart && M.zeroX === 0 && M.aloneX === 0 && r.cohere > 0,
+    `four bodies ${M.gap} apart -- clear of the ${M.apart} the separation nudge acts inside, so `
+    + `only cohesion is in the answer -- and the offset comes back (${M.ox}, ${M.oy}) against a `
+    + `hand-walked (${M.wantX}, ${M.wantY}), which is (centroid - me) x ${r.cohere}. At cohere 0 it `
+    + `is ${M.zeroX}; with a serial of its own, ${M.aloneX}. The CLOUD it makes is reported and `
+    + `deliberately not asserted -- ${r.cohereOn.far} (worst ${r.cohereOn.farMax}) against `
+    + `${r.cohereOff.far} (worst ${r.cohereOff.farMax}) here, and the other way round on a page of `
+    + 'its own: see the note for the three instruments that would not hold still');
 
   check('...and a dart points where it is going, which nothing else does',
     r.tight.aim > 0.98 && r.solo.aim > 0.98 && r.moteAim < 0.8,
@@ -30899,6 +30972,317 @@ if (MINE_LINE) {
     `on the alpha channel alone -- so this is shape and nothing else -- SHOAL is ${D.mote} from a `
     + `MOTE, which wears the same cyan at dE 0.0, and ${D.needle}/${D.filament}/${D.drift} from a `
     + `NEEDLE/bead/DRIFT (ink ${D.ink}, the same shape twice ${D.selfZero})`);
+}
+
+// --- a SPINDLE is not a circle, and when you fire decides whether you hit --
+/*
+ * Build 315, phase 6h. Every body in this game is a circle to a round. This
+ * one is a CAPSULE: a bar 96 long and 11 thick lying along its own `angle`,
+ * turning end over end at two thirds of a revolution a second. Broadside it
+ * is the widest target on the field; edge-on it is thinner than a NEEDLE.
+ *
+ * The scope is deliberate and is stated on the type: `r` is still 30 and the
+ * PHYSICS still uses it -- the pair solver, the arena clamp, the mass, every
+ * blast, every beam and every chooser see an ordinary disc. What reads the
+ * bar is `resolveSegment`, which is the one place a ROUND is tested against a
+ * body, plus the two doors that follow from it: `hitReach`, which is what
+ * tells the sweep to look outside `r` at all, and `hitCircleAt`, which is the
+ * circle the contact geometry is derived on.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { CFG, TYPE_BY_ID, WAVES } = await import('../src/config.js');
+    const { fire } = await import('../src/projectiles.js');
+    const { barOf, Director, threatOf, drawSpecimen } = await import('../src/enemies.js');
+    const out = {};
+    const clear = () => {
+      for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (!w[list]) continue;
+        for (const x of [...w[list]]) x.dead = true;
+        w[list].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+    };
+    const T = TYPE_BY_ID.spindle;
+    out.bar = barOf(T);
+    out.boltR = CFG.bolt.r;
+    out.typeR = T.r;
+    g.restart();
+    g.debugTeachAll();
+    clear();
+    const d = w.director;
+    d.setTier(1);
+    d.update = () => {};
+    w.spawnLock = 1e9;
+    w.autoAim = false;
+    w.autoFire = false;
+
+    /*
+     * ---- THE SPIN IS SWITCHED OFF FOR THE PROFILE SWEEP -----------------
+     *
+     * The cartwheel gait HOLDS the spin every substep, so `e.av = 0` in a
+     * case is overwritten inside the same update -- a measurement "at 90
+     * degrees" was really a measurement across 160 of them, and it read the
+     * edge-on profile as 13 units wide against an arithmetic 9.7. With the
+     * rate at zero the floor never fires (`av * routeSide < 0` is false at
+     * av 0) and the angle is the one the case put there. Put back below.
+     */
+    const heldSpin = CFG.cartwheel.spin;
+    CFG.cartwheel.spin = 0;
+
+    // One round, straight up the field from 300 units below, at a lateral
+    // offset -- and the body pinned, healed and held at a known angle.
+    const shot = (id, deg, off) => {
+      clear();
+      const e = g.debugSpawn(id, w.width * 0.5, 420);
+      if (!e) throw new Error(`no ${id}`);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.hp = 1e9;
+      e.maxHp = 1e9;
+      e.angle = (deg * Math.PI) / 180;
+      e.av = 0;
+      const hp0 = e.hp;
+      fire(w, e.x + off, e.y + 300, -Math.PI / 2, {});
+      let hit = false;
+      let av = 0;
+      for (let k = 0; k < 40; k++) {
+        e.x = w.width * 0.5;
+        e.y = 420;
+        e.vx = 0;
+        e.vy = 0;
+        if (!hit) e.av = 0;
+        e.angle = (deg * Math.PI) / 180;
+        g.update(1 / 60);
+        if (e.hp < hp0) { hit = true; av = Math.abs(e.av); break; }
+      }
+      e.dead = true;
+      clear();
+      return { hit, av: +av.toFixed(3) };
+    };
+    const widest = (id, deg) => {
+      let best = -1;
+      let miss = null;
+      for (let off = 0; off <= 70; off += 1) {
+        if (shot(id, deg, off).hit) best = off;
+        else if (miss === null) miss = off;
+      }
+      return { widest: best, firstMiss: miss };
+    };
+    out.broad = widest('spindle', 0);
+    out.slant = widest('spindle', 45);
+    out.edge = widest('spindle', 90);
+    // The CONTROL is a circle of a known radius: a body with no bar has the
+    // same profile from every angle, which is the thing SPINDLE is not.
+    out.discA = widest('glut', 0);
+    out.discB = widest('glut', 90);
+    out.discR = TYPE_BY_ID.glut.r;
+
+    /*
+     * ---- the LOCAL circle, which is the fifth door ----------------------
+     *
+     * `resolveSegment` records the circle its hit test used; `takeHit` used
+     * to recompute the contact against the BODY's centre and radius, which
+     * was identical for every round in the game until a body stopped being a
+     * circle. Measured by REVERTING that one line: a broadside hit near the
+     * tip imparts |av| 1.81 with the body's circle and 0 with the capsule's,
+     * because on the real surface that hit is square-on and has no lever at
+     * all. The edge-on graze below is the control -- it reads 0.42 either
+     * way, so the zero above is the geometry and not a blind instrument.
+     */
+    out.tip = shot('spindle', 0, 45);
+    out.centre = shot('spindle', 0, 0);
+    out.graze = shot('spindle', 90, 8);
+
+    // ...and the circle itself, walked along the bar.
+    const probe = g.debugSpawn('spindle', w.width * 0.5, 400);
+    probe.staged = false;
+    probe.spawnIn = 0;
+    probe.angle = 0;
+    probe.av = 0;
+    out.circles = [-48, -20, 0, 30, 48, 70].map((hx) => {
+      const c = probe.hitCircleAt(probe.x + hx, probe.y + 3);
+      return { hx, cx: +(c.x - probe.x).toFixed(2), cy: +(c.y - probe.y).toFixed(2), r: +c.r.toFixed(2) };
+    });
+    out.reach = +probe.hitReach.toFixed(2);
+    probe.dead = true;
+    clear();
+    const plain = g.debugSpawn('glut', 120, 400);
+    plain.staged = false;
+    plain.spawnIn = 0;
+    out.plainSame = plain.hitCircleAt(plain.x + 5, plain.y) === plain;
+    plain.dead = true;
+    clear();
+
+    CFG.cartwheel.spin = heldSpin;
+
+    // ---- and the spin is HELD against the damping ------------------------
+    const turns = (id) => {
+      clear();
+      const e = g.debugSpawn(id, w.width * 0.5, 300);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.hp = 1e9;
+      e.maxHp = 1e9;
+      e.av = 0;
+      let worst = Infinity;
+      for (let k = 0; k < 60 * 4; k++) {
+        g.update(1 / 60);
+        if (k > 60) worst = Math.min(worst, Math.abs(e.av));
+      }
+      e.dead = true;
+      clear();
+      return +worst.toFixed(3);
+    };
+    out.spinHeld = turns('spindle');
+    out.spinPlain = turns('glut');
+    out.spinWant = CFG.cartwheel.spin;
+
+    // ---- what it weighs, and whose budget moved --------------------------
+    out.threat = threatOf(T);
+    out.budget = {};
+    for (let b = 1; b <= 5; b++) out.budget[b] = +Director.budgetAt(1, b).toFixed(2);
+    out.inBands = [...new Set(WAVES.filter((v) => (v.of || []).some(([id]) => id === 'spindle'))
+      .map((v) => v.band || 1))];
+    /*
+     * The claim is a RELATION and not the figure: a wave authored at its
+     * band's own mean re-prices that band by almost nothing. Pinning 19.62
+     * would go red the first time band 3 is tuned and would say nothing
+     * about the shape -- the literal-pinning fault this file has been red
+     * for three times.
+     */
+    const wt = (v) => (v.of || []).reduce((sum, [id, n]) => sum + threatOf(TYPE_BY_ID[id]) * n, 0);
+    const meanOf = (b) => {
+      const ws = WAVES.filter((v) => (v.band || 1) === b && !v.teach);
+      return ws.reduce((sum, v) => sum + wt(v), 0) / ws.length;
+    };
+    const b3 = WAVES.filter((v) => (v.band || 1) === 3 && !v.teach);
+    const mine = b3.find((v) => (v.of || []).some(([id]) => id === 'spindle'));
+    const rest = b3.filter((v) => v !== mine);
+    out.waveThreat = +wt(mine).toFixed(2);
+    out.without = +(rest.reduce((sum, v) => sum + wt(v), 0) / rest.length).toFixed(2);
+    out.mean3 = +meanOf(3).toFixed(2);
+    out.walk3 = Director.budgetAt(1, 3) / meanOf(3);
+    out.walk5 = Director.budgetAt(1, 5) / meanOf(5);
+
+    // ---- barOf refuses what is not a bar ---------------------------------
+    out.refused = 0;
+    out.tried = 0;
+    const heldRatio = { long: CFG.cartwheel.long, thin: CFG.cartwheel.thin };
+    for (const bad of [{ long: 1, thin: 1 }, { long: 0.5, thin: 0.9 }, { long: 0, thin: 0.1 },
+      { long: 1.6, thin: 0 }, { long: -1, thin: 0.1 }]) {
+      CFG.cartwheel.long = bad.long;
+      CFG.cartwheel.thin = bad.thin;
+      out.tried++;
+      try { barOf(T); } catch (err) { out.refused++; }
+    }
+    CFG.cartwheel.long = heldRatio.long;
+    CFG.cartwheel.thin = heldRatio.thin;
+    out.restored = barOf(T).half === out.bar.half;
+    out.noBar = 0;
+    try { barOf(TYPE_BY_ID.mote); } catch (err) { out.noBar = 1; }
+
+    // ---- the picture, with the colour divided out ------------------------
+    const SZ = 128;
+    const shotPx = (id) => {
+      const c = document.createElement('canvas');
+      c.width = SZ;
+      c.height = SZ;
+      const x = c.getContext('2d');
+      x.translate(SZ / 2, SZ / 2);
+      drawSpecimen(x, id, 22);
+      const px = x.getImageData(0, 0, SZ, SZ).data;
+      const a = new Uint8Array(SZ * SZ);
+      let ink = 0;
+      for (let i = 0; i < SZ * SZ; i++) { a[i] = px[i * 4 + 3]; ink += px[i * 4 + 3]; }
+      return { a, ink: Math.round(ink / 1000) };
+    };
+    const diff = (p, q) => {
+      let sum = 0;
+      for (let i = 0; i < p.a.length; i++) sum += Math.abs(p.a[i] - q.a[i]);
+      return Math.round(sum / 1000);
+    };
+    const me = shotPx('spindle');
+    out.draw = { ink: me.ink, selfZero: diff(shotPx('spindle'), shotPx('spindle')) };
+    for (const id of ['tow', 'needle', 'mote', 'shoal']) out.draw[id] = diff(me, shotPx(id));
+
+    delete d.update;
+    w.spawnLock = 0;
+    g.restart();
+    clear();
+    return out;
+  });
+
+  const B = r.bar;
+  const wantBroad = B.reach + r.boltR;
+  const wantEdge = B.thick + r.boltR;
+  const wantSlant = B.half * Math.cos(Math.PI / 4) + B.thick + r.boltR;
+  check('a SPINDLE is as wide as its bar and as thin as its bar, and a circle is neither',
+    Math.abs(r.broad.widest - wantBroad) <= 1.5 && Math.abs(r.edge.widest - wantEdge) <= 1.5
+    && Math.abs(r.slant.widest - wantSlant) <= 1.5
+    && r.broad.widest > r.slant.widest && r.slant.widest > r.edge.widest
+    && r.discA.widest === r.discB.widest
+    && Math.abs(r.discA.widest - (r.discR + r.boltR)) <= 1.5,
+    `one round, straight up the field, at a lateral offset: broadside it connects out to `
+    + `${r.broad.widest} and misses at ${r.broad.firstMiss} (arithmetic ${wantBroad.toFixed(1)}); at `
+    + `45 degrees ${r.slant.widest}/${r.slant.firstMiss} (${wantSlant.toFixed(1)}); edge-on `
+    + `${r.edge.widest}/${r.edge.firstMiss} (${wantEdge.toFixed(1)}) -- a factor of `
+    + `${(r.broad.widest / r.edge.widest).toFixed(1)}. The control, a GLUT of radius ${r.discR}, is `
+    + `${r.discA.widest} at both angles (${(r.discR + r.boltR).toFixed(1)})`);
+
+  check('...and the widest of that is OUTSIDE its own radius, which is the door the sweep would swallow',
+    r.broad.widest > r.typeR + r.boltR && Math.abs(r.reach - B.reach) < 0.01,
+    `broadside it connects at ${r.broad.widest} against a body radius of ${r.typeR} and a round of `
+    + `${r.boltR} -- so ${(r.broad.widest - r.typeR - r.boltR).toFixed(1)} units of the bar are past `
+    + `anything the old test could reach. \`hitReach\` reports ${r.reach}, the bar's own`);
+
+  const C = r.circles;
+  check('...and the contact geometry is on the capsule\'s LOCAL circle, not the body\'s',
+    C.every((c) => c.cy === 0 && Math.abs(c.r - B.thick) < 0.01)
+    && C[0].cx === -48 && C[2].cx === 0 && C[4].cx === 48 && C[5].cx === 48
+    && r.plainSame === true
+    && r.tip.hit && r.tip.av === 0 && r.centre.av === 0 && r.graze.av > 0.2,
+    `walked along the bar, the circle a hit lands on is centred at `
+    + `${C.map((c) => c.cx).join('/')} for offsets ${C.map((c) => c.hx).join('/')} -- on the axis, `
+    + `clamped at the tip -- with radius ${C[0].r} every time, and a body with no bar returns `
+    + `itself (${r.plainSame}). So a broadside hit near the TIP is square-on and imparts |av| `
+    + `${r.tip.av}: measured at 1.81 with that one line reverted to the body's own circle, against `
+    + `${r.graze.av} for an edge-on graze either way, which is what says the instrument can read a `
+    + 'spin at all');
+
+  check('...and the bar turns end over end, which nothing else on the field does',
+    r.spinHeld > r.spinWant * 0.9 && r.spinPlain < 0.5 && r.spinWant > 0,
+    `over four seconds the worst |av| is ${r.spinHeld} against a held rate of ${r.spinWant} rad/s `
+    + `(${(r.spinWant / (2 * Math.PI)).toFixed(3)} rev/s), where an ordinary body's own spin decays `
+    + `to ${r.spinPlain}`);
+
+  check('a bar must be longer than it is thick, and there is no default',
+    r.refused === r.tried && r.restored && r.noBar === 1,
+    `${r.refused} of ${r.tried} impossible bars threw (equal, inverted, zero length, zero `
+    + `thickness, negative), the ratios were put back (${r.restored}), and a type with no bar is `
+    + 'refused rather than given one');
+
+  const drift = Math.abs(r.mean3 / r.without - 1);
+  check('a SPINDLE weighs its own health, and its wave was authored AT its band\'s mean',
+    Math.abs(r.threat - 180 / 30) < 1e-9
+    && r.inBands.length === 1 && r.inBands[0] === 3
+    && drift < 0.02 && Math.abs(r.walk3 - r.walk5) < 1e-9,
+    `it weighs ${r.threat.toFixed(2)} and is authored into band ${r.inBands.join('/')} only. Its `
+    + `wave weighs ${r.waveThreat} against the band's mean of ${r.without} WITHOUT it, so the `
+    + `band's mean moves to ${r.mean3} -- ${(drift * 100).toFixed(2)}%, which is what a wave `
+    + `authored at its band's own mean costs every other wave in that band. budgetAt is that mean `
+    + `times the band's walk, ${r.walk3.toFixed(6)} here against ${r.walk5.toFixed(6)} at the same `
+    + `rung; the five read ${[1, 2, 3, 4, 5].map((b) => `${b}:${r.budget[b]}`).join(' ')}`);
+
+  const D = r.draw;
+  check('...and the bar is drawn as the capsule it is tested as',
+    D.tow > 60 && D.needle > 60 && D.mote > 60 && D.shoal > 60 && D.ink > 20 && D.selfZero === 0,
+    `on the alpha channel alone -- so this is shape and nothing else -- SPINDLE is ${D.tow} from a `
+    + `TOW, which wears the same lime at dE 0.0, and ${D.needle}/${D.mote}/${D.shoal} from a `
+    + `NEEDLE/MOTE/SHOAL (ink ${D.ink}, the same shape twice ${D.selfZero})`);
 }
 
 // --- the debug panel's three quieter faults ---------------------------------

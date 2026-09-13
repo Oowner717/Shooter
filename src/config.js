@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '314';
+export const BUILD = '315';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '314';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a4ac280';
+export const REV = 'b0d922b';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1184,6 +1184,41 @@ export const CFG = {
     // ...and where it turns is NOT here: it is `CFG.physics.edgeEase`, which
     // already forbids a body to reach a side wall. See Enemy.rollOn.
     spin: 2, // radians a second, held as a floor -- see Enemy.rollOn
+  },
+
+  /*
+   * CARTWHEEL: the ordinary march, plus a spin that is HELD.
+   *
+   * The gait is the smallest of the six -- it takes its route like anything
+   * else and the only thing it adds is the turn -- and it exists because the
+   * turn is the whole of SPINDLE's design: the bar's profile against the
+   * barrel changes continuously, so when you fire decides whether you hit.
+   * Held as a floor rather than written, for `tumble`'s measured reason:
+   * `integrate` damps angular velocity on every substep, so a spin handed
+   * over at a spawn site is 0.27 of a turn in eleven seconds.
+   *
+   * Two thirds of a revolution a second, which is `docs/objects.html`'s own
+   * figure: 4.19 rad/s, so a broadside comes round every 0.75s.
+   */
+  cartwheel: {
+    spin: 4.19,
+    /*
+     * ---- THE BAR'S SHAPE IS ONE OWNER, AS RATIOS OF `r` ------------------
+     *
+     * `docs/objects.html` gives SPINDLE a bar 96 long and 11 thick at r 30,
+     * which is 1.6r and 0.183r -- and those are the numbers here rather than
+     * the 96 and the 11, because THREE things read this shape: the hit test
+     * in `resolveSegment`, `hitReach` (which is what tells the sweep to look
+     * outside `r` at all), and the DRAWING. Written as absolutes on the type
+     * they would be a second source of truth for the picture, which is how
+     * `s.r * 2.4` came to be restated in three places as "how far the
+     * machine paints" and measured wrong in all of them.
+     *
+     * So the bar is 96 x 11 as a consequence of r 30, and check-build prints
+     * the units it works out to.
+     */
+    long: 1.6, // x r: half the bar's LENGTH
+    thin: 0.183, // x r: half its thickness
   },
 
   /*
@@ -4512,6 +4547,66 @@ export const ENEMY_TYPES = [
      * changing category colours is explicitly a decision to be asked about
      * rather than taken, so it is written down here.
      */
+    /*
+     * SPINDLE: the only body in this game that is not a circle to a round.
+     *
+     * A bar 96 long and 11 thick, turning end over end at two thirds of a
+     * revolution a second. Broadside it is the widest target on the field;
+     * edge-on it is thinner than a NEEDLE. Nothing else changes its own hit
+     * profile, and that is the object: auto-fire spends about half its
+     * rounds on the edge, and a thumb does not have to.
+     *
+     * ---- `bar` IS A HIT PROFILE AND NOT A BODY ---------------------------
+     *
+     * `r` is still 30 and the PHYSICS still uses it: the pair solver, the
+     * arena clamp, the broadphase, every blast, every beam, every chooser
+     * and the mass all see an ordinary 30-unit disc. What reads the bar is
+     * `resolveSegment`, which is the one place a ROUND is tested against a
+     * body -- so the thing that turns is what you have to shoot, and
+     * everything else in the game is unchanged. Making it a capsule
+     * everywhere would be a different build and a different game: the pair
+     * solver alone is `pen = rr - d - slop` in five places.
+     *
+     * The bar reaches 1.6r + 0.183r = 53.5 units from the centre, past `r` --
+     * so a round can legitimately connect outside the body's own radius, and
+     * `hitReach` is what tells the sweep to look. It is inside MAX_BODY_R 72
+     * and inside half the broadphase cell, which check-build asserts.
+     */
+    id: 'spindle',
+    opens: 0,
+    name: 'SPINDLE',
+    shape: 'bar',
+    gait: 'cartwheel',
+    /*
+     * The capability, not the shape: `bar` says a round is tested against a
+     * capsule and the numbers are in `CFG.cartwheel`. Deliberately separate
+     * from the gait, which is about how the body MOVES -- the same split as
+     * `spent` (what may be shot) against `staged` (what may be chosen).
+     */
+    bar: true,
+    r: 30,
+    hp: 180,
+    density: 0.7, // a bar is mostly the space it sweeps
+    speed: 40,
+    accel: 130,
+    restitution: 0.5,
+    wobble: 0.8,
+    armor: 0.15,
+    color: '#c9e84a',
+    /*
+     * The colour is the kinetic family's, which is TOW's at dE 0.0 -- the
+     * same collision SHOAL documented against MOTE one build ago, and kept
+     * for the same two measured reasons: the palette has no well-separated
+     * region left (the best colour in the whole HSL grid is a magenta at dE
+     * 37.7) and the family is the point. The GLOW is separated instead, at
+     * 13.4 from TOW's, and the silhouette does the rest -- a 96-unit bar
+     * against a head on a cable is not a picture anybody confuses.
+     */
+    glow: '#7e9a14',
+    weight: 0, // never chosen by the ordinary spawn roll -- it is authored
+    drops: 5, // energy it leaves when it comes apart
+  },
+  {
     id: 'shoal',
     opens: 0,
     name: 'SHOAL',
@@ -5566,6 +5661,15 @@ export const WAVES = [
   { of: [['glut', 3], ['mote', 4]], band: 3 },
   { of: [['glut', 2], ['splitter', 2]], band: 3 },
   /*
+   * ...and the SPINDLE wave, three of them against three MOTEs. The pairing
+   * is what makes the object a decision: a MOTE is worth picking off one at a
+   * time, so a player who waits for a broadside is choosing to let the small
+   * stuff close. Weighed at 21.1 against band 3's own mean of 20.93, so this
+   * wave re-prices the band by 0.1% -- a wave authored AT its band's mean
+   * adds a problem without making every other wave in the band longer.
+   */
+  { of: [['spindle', 3], ['mote', 3]], band: 3 },
+  /*
    * A TOW is two bodies -- the head and the MASS on its cable -- so these are
    * heavier than they read, and `check-build.mjs` counts them as two when it
    * measures a wave against the eleven-body ceiling.
@@ -5645,6 +5749,7 @@ export const GAITS = {
   chain: 'follow the leader -- each body steers at the one ahead, so a cut leaves two snakes',
   roll: 'takes no lane at all: across the field, off the side walls, spinning as it comes',
   flock: 'no leader: each body steers at the school\'s own mean and off its nearest neighbour',
+  cartwheel: 'comes down an ordinary lane end over end, so its profile against the barrel turns with it',
 };
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

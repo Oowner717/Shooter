@@ -3926,4 +3926,115 @@ came from before believing the other one covers it.
   would have fallen behind the moment `school` was added, silently, because
   every assertion in that guard is about the fields it happens to name. Held
   in both directions, the shape the gait vocabulary already uses.
+- **SPINDLE IS IN FROM BUILD 315, AND IT IS THE ONE BODY THAT IS NOT A CIRCLE
+  TO A ROUND.** A capsule: a bar 96 long and 11 thick lying along its own
+  `angle`, cartwheeling at two thirds of a revolution a second. Measured with
+  one round fired straight up the field at a lateral offset, the spin pinned
+  off and the body held at a known angle, it connects out to **57 broadside,
+  43 at 45 degrees and 9 edge-on** -- against an arithmetic 57.69, 43.63 and
+  9.69, to the unit, a factor of **6.3** -- while the control, a GLUT of
+  radius 16, is 20 at both angles. That table is the object.
+- **THE SCOPE IS THE ROUND, AND SAYING SO IS HALF THE DESIGN.** `r` is still
+  30 and the physics still uses it: the pair solver, the arena clamp, the
+  mass, every blast, every beam, every chooser and `checkContact` all see an
+  ordinary disc. Three doors read the bar and no others -- `resolveSegment`
+  (the one place a ROUND is tested against a body), `hitReach` (which is what
+  tells the sweep to look outside `r` at all) and `hitCircleAt` (the circle
+  the contact geometry is derived on). A capsule everywhere would be a
+  different build: `pen = rr - d - slop` is in five places in the pair solver
+  alone, and `checkContact`'s grab and release band is pinned four units
+  apart with a comment explaining that `s.r` cancels exactly -- a body whose
+  half-extent varied with rotation would flip in and out of
+  `world.attackers` every 0.75s and fire `audio.glitchOn()` each time.
+- **`hitReach` IS THE DOOR THAT WOULD HAVE SWALLOWED THE WHOLE FEATURE.** The
+  sweep rejects a body whose reach does not cover the round's step BEFORE the
+  shape test runs, so a bar with `hitReach` left at `r` is unhittable along
+  exactly the 23.5 units of itself that stick out -- and hittable in the
+  middle, which reads as the profile working. Broadside it now connects at 57
+  against `r + p.r` of 34.2, so 22.8 units of the bar are past anything the
+  old test could reach.
+- **A CAPSULE IS THE SET OF CIRCLES ALONG ITS AXIS, WHICH IS WHY IT COST THE
+  GEOMETRY NOTHING.** `resolveSegment` already records the circle its hit
+  test used (`hitX/hitY/hitR`) because a round can stop on a body, a WARDEN
+  plate or a SCION ball, each with its own centre and radius. For a bar the
+  circle is centred at the closest point on the axis with radius `barR` -- so
+  the impact parameter, the outward normal, the incidence PRISM reads, the
+  spin's lever and SLIVER's chord all come out exact against the real surface
+  with NO change to `contactAt`. `segSeg` returns the mutually-closest pair,
+  so the axis point the sweep records and the one `hitCircleAt` derives from
+  the hit point are the same point by construction rather than by agreement.
+- **...and `takeHit` WAS THE FIFTH DOOR, recomputing the contact against the
+  BODY.** `const c = contactAt(this, hx, hy, ...)` -- identical to the
+  sweep's own derivation for every round in the game, computed twice, and
+  quietly wrong the moment a body stopped being a circle. Proved by revert: a
+  broadside hit near the tip imparts **|av| 1.81** with the body's circle and
+  **0** with the capsule's, because on the real surface that hit is square-on
+  and has no lever at all. The control is an edge-on graze at 0.42 either
+  way, which is what says the zero is the geometry and not a blind
+  instrument. One owner, called from both, and from `exitPoint` -- where the
+  chord would otherwise be computed on r 30 against a 5.5-thick bar and
+  every SPINE splinter born up to 24 units past the far face, in open space.
+- **A DEBUG OVERLAY THAT DRAWS THE WRONG SHAPE CANNOT SHOW THE BUG IT EXISTS
+  FOR.** `drawHitboxes` is the only place in the game the hit profile can be
+  SEEN, and it drew `arc(e.x, e.y, e.r)` for everything. It draws the capsule
+  for a bar now, with the physics disc behind it -- both, because for that
+  body the disc is the fiction and the capsule is what a round meets.
+- **A GAIT THAT HOLDS A SPIN MAKES "at 90 degrees" MEANINGLESS IN A CASE.**
+  The cartwheel holds `av` every substep, so `e.av = 0` in a probe is
+  overwritten inside the same update -- the first profile sweep read the
+  edge-on width as 13 units against an arithmetic 9.7, because the bar had
+  turned 160 degrees during the forty frames it waited for the round.
+  Pinning `CFG.cartwheel.spin = 0` switches the floor off (`av * routeSide <
+  0` is false at av 0) and the angle is then the one the case put there. A
+  held quantity cannot be held still by writing it once.
+- **A WAVE AUTHORED AT ITS BAND'S OWN MEAN RE-PRICES THE BAND BY NOTHING.**
+  `budgetAt` is the mean threat of a band's roster, so the cost of adding a
+  wave is how far it sits from that mean: SPINDLE's weighs 21.10 against band
+  3's 20.93 and the budget moves 19.59 -> 19.62, **+0.15%**. Band 4 paid
+  +9.3% for QUARRY and band 1 +5.1% for SHOAL because those waves were
+  heavier than their bands. It is a real lever for adding a problem without
+  lengthening every other wave, and it is the reason to compute the band's
+  mean before choosing an entry's counts.
+- **THE HASH DID NOT MOVE, AND THAT WAS THE PREDICTION.** 1213474222 either
+  side, in one container. Build 314's finding said a wave added to band 1
+  moves it and a wave added to any other band does not, because
+  `Director.shuffle` draws in proportion to the CURRENT band's roster and
+  `fight.mjs` runs at rung 1 -- this build's wave is band 3, so the rule was
+  a prediction before it was a measurement. The rest of the change is
+  identity for a body that is a circle: `hitCircleAt` returns `this`, so
+  `takeHit`'s contact is unchanged to the bit, `hitReach` is the old
+  expression and the sweep's new branch is skipped. **A collision-model
+  change that provably did not touch any existing body** is the kind of claim
+  only this instrument can make.
+- **A FLOOR SET NEAR THE TRUTH FAILS WHEN THE RANDOM STREAM RE-ROLLS.**
+  AIRBURST's arm asserted the single-body gain at `> 1.3x` and read x1.26 on
+  this build, whose only relevant change is a new wave -- which re-rolls
+  every `Math.random` downstream of the shuffle and so re-rolls which of
+  HAIL's thirty-odd jittered pellets land on a pinned body. CLAUDE.md's own
+  note on the node already said the single-body gain is small and variable
+  (1140 -> 1170 in the assay), so a 30% floor on it was a margin straddling
+  the draw. The claim in the arm's NAME is the crowd, so the crowd carries it
+  now: the three-abreast ratio must beat the single-body one by 30%, which is
+  two numbers from the same run rather than a threshold on one. **Adding a
+  wave is a re-roll of the whole suite's randoms**, so expect the arms with
+  tight margins to be the ones that fail.
+- **THREE INSTRUMENTS FOR COHESION AND NONE OF THEM HELD STILL, so the term
+  is asserted and the picture is reported.** By SERIAL it cannot be seen (the
+  two halves of the flock have opposite effects on the cloud and cancel). By
+  FRAME COUNT it read 112 against 227 alone and 219 against 188 in the suite,
+  inverted. By DEPTH FALLEN -- the honest clock for a quantity that depends
+  on distance travelled -- it read 72 against 107 alone and 106 against 93 in
+  the suite, inverted again. What is left is that fourteen bodies converging
+  on one mount make a cloud whose radius is dominated by the run's own
+  conditions. So the arm asserts `flockOn`'s own arithmetic instead, laid out
+  four wide so the separation nudge provably cannot fire: the offset is
+  `(centroid - me) * cohere` to 1e-6, zero at cohere 0, zero for a body with
+  a serial of its own. **A narrower claim that holds beats a picture that
+  inverts** -- and the cloud figures are in the message for the next reader.
+- **The guide's kinetic colour is TOW's, at dE 0.0, and the ruling is build
+  314's.** Same as SHOAL against MOTE: the family is the point, the palette
+  has nothing well-separated left, and the silhouette carries it -- a 96-unit
+  capsule against a head on a cable, measured on the alpha channel alone. The
+  GLOW is separated instead (13.4 from TOW's), which is the half that was
+  free.
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

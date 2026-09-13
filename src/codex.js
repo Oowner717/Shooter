@@ -266,6 +266,11 @@ export const CODEX = [
     line: 'Hangs in the middle band and bobs, and wants nothing. Break it and for a couple of seconds every object on the field shows you where it is going -- through a corrupted feed, which is exactly when you need it. One round, one harmless kill, and the only shot you take to see better rather than to break something.',
   },
   {
+    id: 'spindle',
+    name: 'SPINDLE',
+    line: 'A bar turning end over end as it comes, and the only thing on the field that is not the same size from every angle. Broadside it is the widest target you will meet; edge-on it is thinner than a NEEDLE, and a round goes past it. Automatic fire will spend about half of itself on the edge. A thumb does not have to.',
+  },
+  {
     id: 'shoal',
     name: 'SHOAL',
     line: 'Fourteen at once, with no leader and nothing to break. They steer at each other and at you, so the school turns as one thing and closes whatever gap you make in it. A bolt takes one of fourteen; anything with a radius takes the school. It is the field telling you that aiming is not always the answer.',
