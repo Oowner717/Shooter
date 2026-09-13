@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '321';
+export const BUILD = '322';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '321';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'f1aa31c';
+export const REV = 'a1e8d90';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -910,25 +910,54 @@ export const CFG = {
   //
   // A seed that reaches a host does not dissolve into it. It rides it, as a
   // ball you can see and shoot, and everything it gives is given per ball and
-  // taken back when the ball goes -- so `grow`, `tough` and `regen` below are
-  // shares added per ball, not the multipliers they used to be.
+  // taken back when the ball goes.
+  //
+  // ---- A NUMBER ABOUT THE RING IS SHARED; A NUMBER ABOUT THE RIDER IS THE
+  // ---- TYPE'S, AND THERE IS NO DEFAULT FOR IT ------------------------------
+  //
+  // Everything below is about the RING: how many may ride one host, where
+  // they ride, how big a ball is and how fast the ring turns. A host has ONE
+  // ring, and from build 322 two different kinds of rider can be on it, so
+  // none of this can belong to either of them.
+  //
+  // What a RIDER is -- how long it has to find a host, how far it looks, and
+  // what the host gets while it is aboard -- lives on the TYPE as `rides`,
+  // and `ridesOf` in enemies.js THROWS for a `gait: 'ride'` type that does
+  // not declare one. `grow`, `tough`, `regen`, `hp`, `life` and `hunt` were
+  // all here until LATCH arrived wanting different numbers from SEED for
+  // five of the six, and a second rider silently wearing the first one's
+  // constants is exactly the fault build 319 needed a check-build guard for
+  // (`plated` hard-wired to `CFG.flint`) and build 224 paid for eight times
+  // over (`levels ?? 3`): a value inherited in silence is indistinguishable
+  // from a value that was chosen.
   graft: {
     cap: 2, // SCIONs on the field at once
     apart: 320, // world units the second is kept from the first
     seeds: 3, // thrown when one is destroyed
     spread: 190, // how hard they are thrown clear before they start hunting
-    life: 13, // seconds a seed has to find a host
-    hunt: 480, // ...and how far it will look
 
-    // ---- per ball, and all of it comes off with the ball ----
-    stack: 3, // most that can ride one host
-    grow: 0.2, // + this share of the host's own radius
-    tough: 0.6, // + this share of its own health, and of its energy
-    regen: 9, // health it closes per second
-    hp: 26, // what the ball itself takes to shoot off
-    orbit: 1.45, // where it rides, as a multiple of the host's radius
-    ball: 9, // its radius
+    // ---- the ring, shared by every kind of rider standing on it ----
+    stack: 3, // most that can ride one host, whatever kind they are
+    orbit: 1.45, // where they ride, as a multiple of the host's radius
+    ball: 9, // a ball's radius, whatever arrived as one
     spin: 0.9, // radians per second the ring turns
+    /*
+     * A fully ridden body still takes a FIFTH of what reaches it.
+     *
+     * `armor` on a rider is a flat addition and `applyDamage` computes
+     * `dmg * (1 - plate)`, so the sum has to be bounded or a ring makes a
+     * body nothing can kill. The number follows from the rule rather than
+     * from the day's arithmetic, and the arithmetic is why the rule is
+     * needed: FLINT is the most armoured loose body in the game at 0.55 and
+     * a LATCH gives 0.2, so a full ring of three reaches 1.15 -- every
+     * frontal hit reduced to `applyDamage`'s `Math.max(1, ...)` floor.
+     *
+     * It is a LIVE clamp and not a guard against nothing: FLINT plus TWO
+     * latches is already 0.95. `check-build.mjs` asserts both halves -- that
+     * the cap is under 1, and that the worst unclamped case is over it, so
+     * this is never quietly a door that cannot be opened (build 198).
+     */
+    armorCap: 0.8,
   },
 
   // ---- drift ----------------------------------------------------------
@@ -4477,6 +4506,7 @@ export const ENEMY_TYPES = [
     opens: 0,
     name: 'SEED',
     shape: 'seed',
+    gait: 'ride',
     harmless: true,
     r: 8,
     hp: 18,
@@ -4485,6 +4515,26 @@ export const ENEMY_TYPES = [
     accel: 200,
     restitution: 0.5,
     wobble: 0,
+    /*
+     * What this rider is. Every number was `CFG.graft.<key>` until build 322
+     * and every one of them is unchanged to the digit, which is the claim the
+     * suite checks -- the split moved where they live and nothing else.
+     *
+     * `hunt` is short and `life` is long because a SEED does not cross the
+     * field to work: a SCION throws it `CFG.graft.spread` = 190 units clear
+     * of its own death, so the hosts it wants are the crowd that SCION was
+     * already standing in. LATCH, released by a wave from the portal, is the
+     * other way round and says so in its own block.
+     */
+    rides: {
+      life: 13, // seconds it has to find a host
+      hunt: 480, // ...and how far it will look
+      grow: 0.2, // + this share of the host's own radius, per ball
+      tough: 0.6, // + this share of its own health, and of its energy
+      armor: 0, // + this much armour, flat
+      regen: 9, // health it closes for the host per second
+      hp: 26, // what the ball itself takes to shoot off
+    },
     // A SEED cannot touch the turret and cannot corrupt the feed, so it is
     // `harmless` in the sense the code means. It is not harmless in the sense
     // the colour rule means: it is on its way to making some other body
@@ -4967,6 +5017,114 @@ export const ENEMY_TYPES = [
     glow: '#ff7a1c',
     weight: 0, // never chosen by the ordinary spawn roll -- it is authored
     drops: 3, // energy it leaves when it comes apart
+  },
+  {
+    /*
+     * LATCH: it is not coming for you.
+     *
+     * The `ride` gait is the whole object, and most of it was already in the
+     * game -- a SEED has hunted the biggest body on the field and ridden it
+     * as a shootable ball since SCION shipped. What LATCH adds is a SECOND
+     * kind of rider with its own numbers, which is why `grow`, `tough`,
+     * `regen`, `hp`, `life` and `hunt` came off `CFG.graft` and onto the
+     * type: see the note there, and `ridesOf` in enemies.js, which throws
+     * for a `ride` type that declares none.
+     *
+     * ---- IT IS A HOSTILE, NOT `harmless`, AND THAT IS A DECISION ----------
+     *
+     * SEED is `harmless` and a LATCH could have been: neither breaches the
+     * turret and neither corrupts the feed. It is not, for three reasons
+     * that all come off rules this repo already wrote down.
+     *
+     *  - `harmless` weighs ZERO in `threatOf`, so the whole band would carry
+     *    a problem it never paid for. Builds 307-311 used that deliberately
+     *    for five pieces of scenery; this is not scenery.
+     *  - `harmless` is a refusal FIVE damage paths honour (build 234): a
+     *    mine will not trigger for one, WIRE will not cut one, a `Patch`
+     *    will not bite one, LANCE's sweep skips it and WARD's arc skips it.
+     *    The counter here is "shoot the tick", so four of the five things
+     *    that could take a tick off before it boards would refuse to.
+     *  - `scaleToTier` returns on its first line for a harmless body, so the
+     *    ball's health would be 40 at rung 15 and 40 at rung 49 against a
+     *    gun the tree has multiplied by six.
+     *
+     * What it costs is that a LATCH with nothing to ride counts against
+     * `standing()` and the build-291 release gate while it wanders. That is
+     * what `rides.life` bounds, and it is the reason the clock is not
+     * optional -- a hostile that comes to rest outside `autoTarget`'s cone
+     * with no way to expire is build 312's `tumble` finding verbatim.
+     *
+     * ---- THE FOURTH VIOLET, AND THE GUIDE'S OWN HEX IS LURCHER'S ---------
+     *
+     * `docs/objects.html` gives the `strange` family `#b98cff`, which is
+     * LURCHER's body colour at dE 0.0 in CIELAB, and YOKE's -- the same
+     * collision SHOAL had with MOTE, SPINDLE with TOW and SHRIKE with
+     * NEEDLE. Here it was avoidable rather than merely survivable, because
+     * the family is a whole region and only one point in it is taken: swept
+     * over the violet band against every field tone in the roster, `#bf5fff`
+     * is 11.8 off the nearest (SEED's GLOW, a halo rather than a
+     * silhouette), 14.8 off LURCHER's and SCION's glow and 29.1 off
+     * LURCHER's body, while reading as plainly violet. The glow is 27.3
+     * clear. For the record the best-separated violet available is `#4000ff`
+     * at 46.0 and it is refused for reading as blue at the lightness a
+     * 9-unit body needs -- a body is mostly its outline (build 199) -- and
+     * the best-separated colour anywhere is a dark green at 43.5, which
+     * means energy. LURCHER is also kept out of LATCH's own wave, which is
+     * build 317's ruling applied where it still bites.
+     */
+    id: 'latch',
+    opens: 0,
+    name: 'LATCH',
+    shape: 'latch',
+    gait: 'ride',
+    r: 9,
+    hp: 40,
+    density: 0.6,
+    speed: 160,
+    accel: 320,
+    restitution: 0.5,
+    /*
+     * None: `hunt` is a beeline and does not read `wobble` at all -- the
+     * clumsy wander `drive` adds around a true bearing is a property of
+     * marching, and this thing does not march. Written out at 0 rather than
+     * omitted so the value is a statement and not an absence, which is the
+     * same reason SHRIKE's is written out above.
+     */
+    wobble: 0,
+    color: '#bf5fff',
+    glow: '#9b2fff',
+    weight: 0, // never chosen by the ordinary spawn roll -- it is authored
+    drops: 1, // energy it leaves when it comes apart
+    /*
+     * What it gives the host, and it is all of what the object does.
+     *
+     * `armor` and `regen` are the guide's two numbers. `grow` and `tough`
+     * are ZERO because the guide names neither: a LATCH does not make its
+     * host bigger and does not raise its ceiling, it holds the ceiling shut
+     * -- the 14 a second is spent closing a wound rather than adding health
+     * that was never there. That also keeps `MAX_BODY_R` where SEED left it.
+     *
+     * `hp` 40 is the body's own health, deliberately: a tick costs the same
+     * to shoot in the air as it does on the flank, so "shoot the tick" is
+     * one price rather than two, and it climbs with the rung like any other
+     * hostile's because this type is not `harmless`.
+     *
+     * `hunt` 900 clears the era-1 column (963 units floor to rim), so a
+     * LATCH released from the portal can see a host anywhere below it rather
+     * than wandering until it happens to come within SEED's 480. `life` 20
+     * is a little over three times the 6.0s crossing at its own cruise, so
+     * a wave that gives it a host leaves it time to reach one and a wave
+     * whose hosts are all dead takes it off the field instead of parking it.
+     */
+    rides: {
+      life: 20,
+      hunt: 900,
+      grow: 0,
+      tough: 0,
+      armor: 0.2,
+      regen: 14,
+      hp: 40,
+    },
   },
   {
     id: 'quarry',
@@ -5879,6 +6037,27 @@ export const ENEMY_TYPES = [
  * seeing the contact at all. `scripts/check-build.mjs` now asserts the cell
  * covers this, so growing an object cannot quietly break it again.
  */
+/**
+ * The most any ONE ball can grow the body it rides, over every type that can
+ * arrive as one.
+ *
+ * Derived rather than written down, because `grow` moved off `CFG.graft` and
+ * onto the rider's own `rides` block in build 322: SEED grows its host by a
+ * fifth of its radius per ball and LATCH grows it by nothing, so a single
+ * constant here would have to be one of the two and would be wrong for the
+ * other the moment a third rider arrives. Asking the roster means a new
+ * rider is covered by existing -- the same rule the boss sweeps follow by
+ * asking `ANOMALIES.length` instead of counting to seven.
+ *
+ * Max and not sum: `CFG.graft.stack` balls of the SAME kind is the worst
+ * case for one host, because `refreshGrafts` adds each ball's own share and
+ * the biggest share repeated is the largest total a full ring can reach.
+ */
+export const MAX_GRAFT_GROW = Math.max(
+  0,
+  ...ENEMY_TYPES.filter((t) => t.rides).map((t) => t.rides.grow),
+);
+
 export const MAX_BODY_R = Math.max(
   /*
    * The graft allowance is only for bodies that can actually carry one.
@@ -5896,7 +6075,7 @@ export const MAX_BODY_R = Math.max(
    * size -- the cell must be at least twice the largest thing on the field
    * whether or not that thing can grow.
    */
-  ...ENEMY_TYPES.map((t) => (t.fixed ? t.r : t.r * (1 + CFG.graft.grow * CFG.graft.stack))),
+  ...ENEMY_TYPES.map((t) => (t.fixed ? t.r : t.r * (1 + MAX_GRAFT_GROW * CFG.graft.stack))),
 );
 
 /**
@@ -6070,6 +6249,31 @@ export const WAVES = [
   { of: [['yoke', 6], ['glut', 1]], band: 5 },
 
   /*
+   * ...and the LATCH wave, which closes band 3.
+   *
+   * Three latches and two BLOOMs weighs 20.47 against band 3's own mean of
+   * 20.9375, so it re-prices the band by -0.25% -- build 315's lever. Note
+   * `threatOf` is health-only and so sees 1.33 a latch where the object
+   * guide authors 4: what a LATCH does is to its HOST, and the budget cannot
+   * see that any more than it can see FLINT's armour. Recorded rather than
+   * fixed, for build 319's reason -- weighting threat by what a body does to
+   * another body re-prices every band in the game and belongs in a pacing
+   * pass, not in the build that adds the body.
+   *
+   * BLOOM is the host and is chosen rather than priced in: it is the biggest
+   * thing band 3 opens (r 33 against SPLITTER's 29 and LURCHER's 24), so it
+   * wins the hunt's `e.r * 1000 - dist` outright, and two of them at equal
+   * radius means the tie goes to the CLOSER -- which fills one ring to
+   * `CFG.graft.stack` = 3 and leaves the other BLOOM clean. That is the
+   * object's own sentence ("three of them on one body is a different
+   * fight") authored into the wave rather than left to chance.
+   *
+   * It is also NOT paired with LURCHER, which is in band 3's roster and
+   * wears the violet the object guide gives LATCH: see the type.
+   */
+  { of: [['latch', 3], ['bloom', 2]], band: 3 },
+
+  /*
    * The bonus. Grey and nothing else: no hostiles, no risk, no cost to the
    * allotment, and about 220 ENERGY lying on the field if you take it.
    *
@@ -6119,6 +6323,7 @@ export const GAITS = {
   cartwheel: 'comes down an ordinary lane end over end, so its profile against the barrel turns with it',
   paired: 'two bodies on a rigid beam, turning about their midpoint while the midpoint advances',
   dive: 'holds height across the top, then runs down the edge of the machine and climbs back for another',
+  ride: 'beelines at the biggest body on the field and rides it -- the thing to shoot is no longer the thing in front',
 };
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

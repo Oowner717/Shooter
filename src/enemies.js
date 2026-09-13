@@ -219,6 +219,7 @@ export function drawSpecimen(ctx, id, r) {
     }
     case 'scion': drawScion(ctx, r, 0, 0); break;
     case 'seed': drawSeed(ctx, r, 0, 0); break;
+    case 'latch': drawLatch(ctx, r, 0, 0); break;
     default: drawShard(ctx, r);
   }
   ctx.restore();
@@ -324,6 +325,21 @@ export class Enemy {
     this.maxHp = Math.round((opts.hp ?? type.hp) * (this.isDrop ? 1 : rand(0.92, 1.1)));
     this.hp = this.maxHp;
     this.armor = type.armor || 0;
+    /*
+     * What the rung multiplied this body's health by, or 1 if nothing did.
+     *
+     * Written by `scaleToTier` and nowhere else, because that function is
+     * where the FOUR conditions live that decide whether a body is scaled at
+     * all (no director, harmless, fixed, a teach wave). Anything else that
+     * needs the factor -- a rider's ball, which has to cost more to shoot
+     * off at rung 21 than at rung 15 -- asks for it here rather than
+     * restating those conditions, which is how two places end up disagreeing
+     * about the same question.
+     *
+     * Declared here rather than sprung into existence at the site that sets
+     * it, for the same reason `fizzle`, `placed` and `ignoreT` are.
+     */
+    this.hpScale = 1;
 
     this.staged = opts.staged || false; // still above the top of the screen
     /*
@@ -365,8 +381,35 @@ export class Enemy {
      * the turret and the DECOY are static and stop it dead.
      */
     this.plow = 0;
-    this.seed = type.id === 'seed';
-    this.seedT = this.seed ? CFG.graft.life : 0;
+    /*
+     * A rider, and it is derived from the GAIT rather than from a second
+     * flag -- `type.gait === 'ride'` is the one statement, and `ridesOf`
+     * then refuses a type that says it rides without saying how. It was
+     * `type.id === 'seed'` until build 322, which is the shape build 275 had
+     * to correct in `spawnGroup` (a flag two types share is not an id) read
+     * the other way round: an id is not a capability either.
+     *
+     * ---- ...AND SALVAGE IS NOT A RIDER, WHICH COST A MEASUREMENT ---------
+     *
+     * `shed` builds every mote with `new Enemy(t, ...)` off the PARENT's
+     * type, so a mote off a rider inherits `gait: 'ride'` -- and a mote is
+     * not `staged`, so it went straight to `hunt`. Measured on a LATCH
+     * killed 160 units under a BLOOM: the mote climbed to it and GRAFTED,
+     * arming and healing the next body for free out of the salvage of the
+     * one you had just killed. `aboard` 1 against 0 for a MOTE's and a
+     * LURCHER's motes, which fall toward the turret as they should.
+     *
+     * Latent for the whole of SEED's life because SEED has `drops: 0` and
+     * has never shed one. It is exactly build 307's finding -- "a mote off a
+     * DRIFT inherited `harmless` and wandered the band it was made in", the
+     * one object whose salvage you had to fetch -- with a far worse payload,
+     * and the harmless branch in `drive` has carried its own `!this.isDrop`
+     * since then for precisely this reason. Carried HERE rather than at the
+     * branch so the capability itself is right: a mote's `rideT` is 0 and it
+     * is not offered as a host either.
+     */
+    this.rides = type.gait === 'ride' && !this.isDrop;
+    this.rideT = this.rides ? ridesOf(type).life : 0;
     this.host = null;
     /*
      * Balls riding this body. A seed that reaches a host used to dissolve into
@@ -380,6 +423,16 @@ export class Enemy {
     this.graftBaseR = 0; // what the body was before any of them
     this.graftBaseHp = 0;
     this.graftBaseBytes = 0;
+    this.graftBaseArmor = 0;
+    /*
+     * Health a second the whole ring closes, summed in `refreshGrafts` and
+     * read once a frame rather than recomputed there. Two riders can be on
+     * one host from build 322 and they heal at different rates, so this is a
+     * sum over the ring and not `regen * count` -- and the sum belongs where
+     * every other consequence of the ring is derived, or it is a second
+     * place that can disagree about what is aboard.
+     */
+    this.graftRegen = 0;
     this.tether = null; // the other half of a TOW, if any
     this.traits = null; // the wave's rules, if it was released by a traited one
     this.plateT = 0; // ARMORED: until the plate turns another hit away
@@ -656,15 +709,53 @@ export class Enemy {
    * gaining one never heals it.
    */
   refreshGrafts() {
-    const G = CFG.graft;
-    const n = this.graftCount;
-    this.r = this.graftBaseR * (1 + G.grow * n);
+    /*
+     * Summed per ball rather than multiplied by the count, because from
+     * build 322 the ring can carry two kinds at once and they do not give
+     * the same things: a SEED grows its host by a fifth of its radius and
+     * heals it 9 a second, a LATCH grows it by nothing and heals it 14 while
+     * adding 0.2 to its armour.
+     *
+     * For a ring of ONE KIND the sum is the old product to the BIT, which is
+     * the claim the suite checks -- n additions of the same double and one
+     * multiply by an integer n both round the same way here (measured at
+     * n = 1, 2 and 3, including the 1.7999999999999998 that 3 x 0.6 gives).
+     * So SEED is unchanged by this split, not merely close to unchanged.
+     */
+    let grow = 0;
+    let tough = 0;
+    let armor = 0;
+    let regen = 0;
+    if (this.grafts) {
+      for (const g of this.grafts) {
+        if (!g.alive) continue;
+        grow += g.grow;
+        tough += g.tough;
+        armor += g.armor;
+        regen += g.regen;
+      }
+    }
+    this.r = this.graftBaseR * (1 + grow);
     this.mass = massOf(this.type, this.r);
     this.invMass = 1 / this.mass;
     const frac = this.maxHp > 0 ? clamp(this.hp / this.maxHp, 0, 1) : 1;
-    this.maxHp = Math.max(1, Math.round(this.graftBaseHp * (1 + G.tough * n)));
+    this.maxHp = Math.max(1, Math.round(this.graftBaseHp * (1 + tough)));
     this.hp = Math.max(1, Math.min(this.maxHp, this.maxHp * frac));
-    this.bytes = this.graftBaseBytes * (1 + G.tough * n);
+    this.bytes = this.graftBaseBytes * (1 + tough);
+    /*
+     * ...and the armour is a FLAT addition with a ceiling.
+     *
+     * `applyDamage` computes `dmg * (1 - plate)`, so armour reaching 1 is a
+     * body no amount of damage can kill -- and `CFG.graft.stack` is 3, so
+     * three riders at 0.2 on a body already at 0.55 would be 1.15. It is
+     * clamped here, at the one place that owns the number, and
+     * `check-build.mjs` asserts the arithmetic can never reach the clamp in
+     * the first place (worst type armour + a full ring of the worst rider),
+     * because a ceiling that is actually being hit is a rule nobody
+     * authored. `CFG.graft.armorCap` is the value.
+     */
+    this.armor = Math.min(CFG.graft.armorCap, this.graftBaseArmor + armor);
+    this.graftRegen = regen;
   }
 
   // ------------------------------------------------------------- behaviour
@@ -1433,8 +1524,9 @@ export class Enemy {
    */
   hunt(world, dt) {
     const G = CFG.graft;
-    this.seedT -= dt;
-    if (this.seedT <= 0) { this.dead = true; return; }
+    const rd = ridesOf(this.type);
+    this.rideT -= dt;
+    if (this.rideT <= 0) { this.dead = true; return; }
 
     let best = null;
     let bestScore = 0;
@@ -1445,7 +1537,7 @@ export class Enemy {
       // give the ability away.
       // Full is full. Below the cap a body can take another, which is what
       // makes a SCION's three land as one problem rather than three.
-      if (e === this || e.dead || e.seed || e.harmless || e.staged) continue;
+      if (e === this || e.dead || e.rides || e.harmless || e.staged) continue;
       // ...nor onto ORDINAL. A graft grows its host and heals it, and the one
       // thing a segment of a frame must not do is change size: the frame is
       // built to close exactly, and a grafted panel would open a hole in it
@@ -1456,7 +1548,7 @@ export class Enemy {
       if (e.graftCount >= G.stack) continue;
       if (e.type.id === 'scion') continue;
       const d2 = (e.x - this.x) ** 2 + (e.y - this.y) ** 2;
-      if (d2 > G.hunt * G.hunt) continue;
+      if (d2 > rd.hunt * rd.hunt) continue;
       // Biggest first, and closer breaks the tie.
       const score = e.r * 1000 - Math.sqrt(d2);
       if (score > bestScore) { bestScore = score; best = e; }
@@ -1471,7 +1563,7 @@ export class Enemy {
     const dy = best.y - this.y;
     const d = Math.hypot(dx, dy) || 1;
     if (d <= best.r + this.r + 2) {
-      graft(world, best);
+      graft(world, best, this);
       this.dead = true;
       this.dissolved = true;
       return;
@@ -1737,7 +1829,23 @@ export class Enemy {
       this.thrown -= dt;
       return;
     }
-    if (this.seed) {
+    /*
+     * A rider goes for its host -- but NOT while it is still marching in.
+     *
+     * `drive`'s early returns are ORDERED and this branch sat above the
+     * staged march, which never mattered while SEED was the only rider: a
+     * SCION places its seeds mid-field and one is never `staged`. A LATCH is
+     * released by a wave and comes down the portal like everything else, so
+     * without the guard it would peel off at a host from the frame it
+     * appeared, inside the throat, and the whole march-in would be a body
+     * cutting sideways out of the mouth. That is build 307's finding
+     * verbatim -- the harmless branch beside this one carries exactly the
+     * same `!this.staged` for exactly the same reason -- and it means the
+     * `rideT` clock does not run while the body is still in the doorway,
+     * which is right: the seconds it has to find a host should not be spent
+     * somewhere it cannot look.
+     */
+    if (this.rides && !this.staged) {
       this.hunt(world, dt);
       return;
     }
@@ -2129,12 +2237,11 @@ export class Enemy {
      * spreading fire around -- and the answer to it is on its surface: shoot
      * the balls off and the healing goes with them.
      */
-    const balls = this.graftCount;
-    if (balls) {
+    if (this.graftCount) {
       const spin = this.frozen(world) ? 0.12 : 1;
       for (const g of this.grafts) g.a += this.graftSpin * dt * spin;
-      if (this.hp < this.maxHp) {
-        this.hp = Math.min(this.maxHp, this.hp + CFG.graft.regen * balls * dt);
+      if (this.hp < this.maxHp && this.graftRegen > 0) {
+        this.hp = Math.min(this.maxHp, this.hp + this.graftRegen * dt);
       }
     }
 
@@ -2773,7 +2880,18 @@ export class Enemy {
     if (t.splits && bigEnough) {
       const child = TYPE_BY_ID[t.splits.type];
       const Q = CFG.quarry;
-      const kidR = sameKind ? this.r * t.splits.scale : child.r;
+      /*
+       * ...and the RADIUS is the parent's own too, for the reason the
+       * ceiling and the plate below are: `this.r` is what the ring has grown
+       * it to. A SEED grows its host by a fifth of its radius per ball, so a
+       * fully ridden QUARRY stands at 64 and its children came out at 38.4
+       * instead of 24 -- which is mass, hit size and salvage, and one more
+       * generation before `splits.floor` stops the cascade. Third face of
+       * one bug; see the `sameKind` block below.
+       */
+      const kidR = sameKind
+        ? (this.grafts ? this.graftBaseR : this.r) * t.splits.scale
+        : child.r;
       // A body carrying shards releases only the ones still on it: shoot the
       // plates off a WARDEN and there are fewer left to come at you when the
       // core finally goes.
@@ -2800,9 +2918,29 @@ export class Enemy {
         // ...and then the parent's, for a fracture. AFTER `scaleToTier`, or
         // the rung is applied to a figure that already carries it.
         if (sameKind) {
-          kid.maxHp = Math.max(1, Math.round(this.maxHp * Q.hpAt));
+          /*
+           * The parent's OWN ceiling and plate, not the RING's.
+           *
+           * `this.maxHp` and `this.armor` are what the balls riding it have
+           * made of it, and the whole promise of a ring is that shooting one
+           * off takes its share back -- so passing the boost to the children
+           * is the share not coming back, permanently, out of a ring that no
+           * longer exists. Measured on a QUARRY with a full ring: a SEED's
+           * three took the parent 459 to 1285 and each child from 118 health
+           * to **386**, and a LATCH's three took the plate 0.22 to 0.8 and
+           * each child from 0.121 to **0.44**.
+           *
+           * The health half is older than the armour half -- it has been
+           * there since QUARRY met a SEED in build 312 -- and both are the
+           * same line, so both are fixed here. `graftBase*` is what the body
+           * was before any ball landed, taken after `scaleToTier`, which is
+           * exactly the figure a child should be a share of.
+           */
+          const ownHp = this.grafts ? this.graftBaseHp : this.maxHp;
+          const ownArmor = this.grafts ? this.graftBaseArmor : this.armor;
+          kid.maxHp = Math.max(1, Math.round(ownHp * Q.hpAt));
           kid.hp = kid.maxHp;
-          kid.armor = this.armor * Q.armorAt;
+          kid.armor = ownArmor * Q.armorAt;
           kid.cruise = this.cruise * Q.speedAt;
         }
         world.enemies.push(kid);
@@ -3125,6 +3263,7 @@ export class Enemy {
         this.divePhase === 'dive' && !(this.fizzle > 0)); break;
       case 'scion': drawScion(ctx, this.r, this.phase, world.time); break;
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
+      case 'latch': drawLatch(ctx, this.r, this.phase, world.time); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
       default: drawChip(ctx, this.r, this.phase);
     }
@@ -3168,7 +3307,18 @@ export class Enemy {
         const gx = this.x + Math.cos(g.a) * orbit;
         const gy = this.y + Math.sin(g.a) * orbit;
         const life = clamp(g.hp / g.maxHp, 0.2, 1);
-        ctx.strokeStyle = rgba('#c9a7ff', 0.3 + 0.25 * life);
+        /*
+         * Each ball in the ring's OWN tone and picture, from build 322.
+         *
+         * It was one hard-coded violet for every ball, which said everything
+         * while SEED was the only rider and says the wrong thing now: a ring
+         * can hold a SEED (which grows the host and heals it 9 a second) and
+         * a LATCH (which armours it and heals it 14) at the same time, and
+         * two balls doing different things cannot be one picture in one
+         * colour. `from` is written by `graft`, which is the only writer.
+         */
+        const rt = TYPE_BY_ID[g.from];
+        ctx.strokeStyle = rgba(rt.color, 0.3 + 0.25 * life);
         ctx.lineWidth = CFG.hairline * 1.6;
         // From the body's edge, not its centre: a line drawn through the
         // middle of a BULWARK reads as damage to it rather than as a thread.
@@ -3179,10 +3329,10 @@ export class Enemy {
         ctx.save();
         ctx.translate(gx, gy);
         ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = rgba('#c9a7ff', 0.2 + 0.3 * life);
-        ctx.strokeStyle = rgba('#d9c2ff', 0.45 + 0.5 * life);
+        ctx.fillStyle = rgba(rt.color, 0.2 + 0.3 * life);
+        ctx.strokeStyle = rgba(rt.color, 0.45 + 0.5 * life);
         ctx.lineWidth = Math.max(CFG.hairline, G.ball * 0.16);
-        drawSeed(ctx, G.ball, g.a * 3, world.time);
+        drawRiderBall(ctx, G.ball, g.a * 3, world.time, rt.shape);
         ctx.restore();
       }
     }
@@ -5124,6 +5274,72 @@ function drawScion(ctx, r, phase, time) {
   }
 }
 
+/**
+ * A LATCH: a small body with four hooks already open.
+ *
+ * Four-fold symmetric on purpose, which is why the type declares no
+ * `upright`: build 310 shipped two objects whose docstrings claimed an
+ * orientation the drawing did not have, because `Enemy.draw` rotates by a
+ * random spawn `angle` unless the type says otherwise. A shape that reads the
+ * same at every quarter turn has no orientation to claim, so there is nothing
+ * to protect and nothing to assert.
+ *
+ * The hooks reach 1.55r rather than the object guide's icon 2.2r. An icon is
+ * drawn into a box and scaled by its own `view`; a body is drawn at its own
+ * radius next to its own hitbox, and paint reaching more than twice the
+ * radius reads as a body twice the size -- which for the one object whose
+ * counter is "it is nine units wide" is the wrong thing to say.
+ */
+function drawLatch(ctx, r, phase, time) {
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.62, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  const grip = 0.72 + 0.28 * Math.sin(time * 3.2 + phase);
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * TAU + 0.6;
+    // Out from the shell, then curled round: a quadratic whose control point
+    // sits off the radial makes a hook rather than a spoke, and the curl
+    // opens and closes a little so it reads as something looking for a hold.
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * r * 0.58, Math.sin(a) * r * 0.58);
+    ctx.quadraticCurveTo(
+      Math.cos(a) * r * 1.5, Math.sin(a) * r * 1.5,
+      Math.cos(a + 0.62 * grip) * r * 1.55, Math.sin(a + 0.62 * grip) * r * 1.55,
+    );
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.26, 0, TAU);
+  ctx.fill();
+}
+
+/**
+ * Which picture a ball on a host wears, by the type that arrived as it.
+ *
+ * A ring can carry two kinds from build 322 and they do different things to
+ * the host, so they must not look the same -- the same reason a SHOAL dart
+ * could not keep MOTE's triangle. Routed through the rider's own `shape` so
+ * the ball is the object it was in the air, which is what makes "shoot them
+ * there instead" occur to anyone at all.
+ *
+ * The `default` arm is a real fallback rather than a throw, because a throw
+ * in a draw path is a frozen frame and not an error (build 288) -- and it is
+ * NOT left as a silent one: `regress.mjs` renders every riding type's ball
+ * and requires each to differ from every other, so a third rider that fell
+ * through to this arm would fail rather than quietly wear SEED's picture.
+ */
+function drawRiderBall(ctx, r, phase, time, shape) {
+  switch (shape) {
+    case 'latch': drawLatch(ctx, r, phase, time); break;
+    case 'seed':
+    default: drawSeed(ctx, r, phase, time); break;
+  }
+}
+
 /** A SEED in flight: small, and pointed at whatever it has chosen. */
 function drawSeed(ctx, r, phase, time) {
   ctx.beginPath();
@@ -5453,6 +5669,7 @@ function scaleToTier(world, e, type) {
   const k = d.scaleAt(d.tier);
   e.maxHp *= k.hp;
   e.hp = e.maxHp;
+  e.hpScale = k.hp;
   e.bounty *= k.bounty;
   /*
    * ...and the wave's rules, on the hostiles only.
@@ -7872,6 +8089,46 @@ const OWN_SPEED = new Set(['dive']);
  * entry reads, so a silent 1 would be a dispatch for nothing and a mortar cap
  * under-counting sevenfold.
  */
+/**
+ * What a RIDER is, and it throws rather than defaulting.
+ *
+ * Fourth of this family after `levelsOf` (224), `bandOf` (303), `beadsOf`
+ * (310) and `climbOf` (308), and it exists for the reason build 319 had to
+ * add a check-build guard refusing a second `plated` type: both readers of
+ * the rider's numbers were hard-wired to ONE block, `CFG.graft`, so the
+ * second rider would have worn SEED's growth, toughening, healing and ball
+ * health in total silence with no field to set and nothing to fail.
+ *
+ * All seven keys are required. `grow`, `tough` and `armor` are legitimately
+ * zero for LATCH, which is exactly why they cannot be optional -- an omitted
+ * key and a deliberate zero are the same text otherwise, and that is the
+ * `levels ?? 3` fault that sold eight nodes three times.
+ *
+ * `check-build.mjs` runs the same rule over the table at build time, so an
+ * authored-but-unreleased rider is caught before the game ever boots one --
+ * a throw in the rAF loop reads as a freeze rather than an error (build 288).
+ */
+export const RIDE_KEYS = ['life', 'hunt', 'grow', 'tough', 'armor', 'regen', 'hp'];
+
+export function ridesOf(type) {
+  const rd = type && type.rides;
+  if (!rd || typeof rd !== 'object') {
+    throw new Error(`${type && type.id}: a 'ride' type must declare rides `
+      + `{${RIDE_KEYS.join(', ')}}. There is no default -- see CFG.graft.`);
+  }
+  for (const k of RIDE_KEYS) {
+    const v = rd[k];
+    if (!Number.isFinite(v) || v < 0) {
+      throw new Error(`${type.id}: rides.${k} must be a number at or above zero, got ${v}`);
+    }
+  }
+  if (rd.life <= 0 || rd.hunt <= 0 || rd.hp <= 0) {
+    throw new Error(`${type.id}: rides.life, .hunt and .hp must be above zero `
+      + '-- a rider with no clock, no reach or no health is not a rider');
+  }
+  return rd;
+}
+
 export function beadsOf(type) {
   const n = type && type.beads;
   if (!(Number.isInteger(n) && n > 1)) {
@@ -7985,8 +8242,26 @@ export function spawnByGait(world, type, x) {
  * health, and shooting one off takes its whole share back — which is the way
  * out of a body that is otherwise healing faster than you can hurt it.
  */
-export function graft(world, host) {
+export function graft(world, host, rider) {
   const G = CFG.graft;
+  /*
+   * The rider is MANDATORY, and it is the BODY rather than the type or an id.
+   *
+   * Two kinds can be on one ring from build 322 and they give different
+   * things, so a ball has to carry which one it was -- and defaulting it to
+   * SEED would be the `CFG.graft` fault moved one level in: the caller that
+   * forgot would silently hand its host somebody else's numbers.
+   *
+   * The body and not the type, because the ball's own health has to climb
+   * with the rung like every other hostile's does. `rides.hp` is what it
+   * costs at rung 1 and `rider.hpScale` is what the ladder made of the body
+   * that arrived as it -- asked of the body, because `scaleToTier` is where
+   * the conditions for scaling anything live. A LATCH's ball is 40 at rung 1
+   * and about 70 at rung 21; a SEED's is exactly 26 at every rung, because
+   * SEED is harmless and `scaleToTier` leaves `hpScale` at 1 for it, which
+   * is why this split leaves SEED unchanged to the digit.
+   */
+  const rd = ridesOf(rider.type);
   if (!host || host.dead || host.graftCount >= G.stack) return false;
 
   // First one: remember what the body was, so every later recount is measured
@@ -7996,17 +8271,28 @@ export function graft(world, host) {
     host.graftBaseR = host.r;
     host.graftBaseHp = host.maxHp;
     host.graftBaseBytes = host.bytes || 0;
+    host.graftBaseArmor = host.armor || 0;
     host.graftSpin = rand(0.7, 1.3) * (Math.random() < 0.5 ? -1 : 1) * G.spin;
   }
 
   // Spaced around the ring by slot, so a second and a third land opposite what
   // is already there instead of stacking into one bright dot.
+  //
+  // The ball keeps its own shares as well as its own health: `refreshGrafts`
+  // sums the ring rather than multiplying a count, so shooting one kind off a
+  // mixed ring takes exactly that kind's share back.
   const slot = host.grafts.length;
+  const ballHp = Math.max(1, Math.round(rd.hp * (rider.hpScale || 1)));
   host.grafts.push({
     a: (slot / G.stack) * TAU + rand(-0.3, 0.3),
     alive: true,
-    hp: G.hp,
-    maxHp: G.hp,
+    hp: ballHp,
+    maxHp: ballHp,
+    from: rider.type.id, // which picture to draw, and which tone
+    grow: rd.grow,
+    tough: rd.tough,
+    armor: rd.armor,
+    regen: rd.regen,
   });
   host.refreshGrafts();
 

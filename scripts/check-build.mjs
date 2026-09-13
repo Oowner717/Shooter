@@ -258,6 +258,96 @@ console.log(`gaits: ${gaitWords.length} in the vocabulary (${gaitWords.join(' ')
   + `${ENEMY_TYPES.filter((t) => t.gait).length} types declare one, the rest march`);
 
 /*
+ * ---- a RIDE type authors what it GIVES, and there is no default ---------
+ *
+ * `CFG.graft.grow` / `.tough` / `.regen` / `.hp` / `.life` / `.hunt` were one
+ * block shared by the only rider in the game for a hundred and fifty builds.
+ * Build 322 added a second with different numbers for five of the six, which
+ * is the fault build 319 needed a guard for from the other direction -- a
+ * second `plated` type would have worn `CFG.flint`'s arc and slew rate in
+ * total silence -- and build 224's `levels ?? 3`, which sold eight nodes three
+ * times. So the numbers live on the type and `ridesOf` throws for a `ride`
+ * type that declares none.
+ *
+ * Caught at the TABLE and not only at the throw, because `ridesOf` runs from
+ * the Enemy constructor: a throw there is a throw inside the rAF loop, which
+ * build 288 records as reading like a frozen screen rather than an error. It
+ * also catches a rider authored but never released -- one the constructor
+ * never sees and so can never throw for.
+ *
+ * Held in BOTH directions. A `rides` block on a type that does not declare
+ * `gait: 'ride'` is a block nothing reads, which is `kind: 'works'` (eighteen
+ * builds) and the nine anomaly `cost` fields (fifty-six).
+ */
+const RIDE_KEYS = ['life', 'hunt', 'grow', 'tough', 'armor', 'regen', 'hp'];
+const rideBad = [];
+for (const t of ENEMY_TYPES) {
+  const isRider = t.gait === 'ride';
+  if (isRider && !t.rides) {
+    rideBad.push(`${t.id} declares gait 'ride' and no rides block`);
+    continue;
+  }
+  if (t.rides && !isRider) {
+    rideBad.push(`${t.id} declares a rides block and is not gait 'ride', so nothing reads it`);
+    continue;
+  }
+  if (!isRider) continue;
+  for (const k of RIDE_KEYS) {
+    const v = t.rides[k];
+    if (!Number.isFinite(v) || v < 0) rideBad.push(`${t.id}: rides.${k} is ${v}`);
+  }
+  for (const k of Object.keys(t.rides)) {
+    if (!RIDE_KEYS.includes(k)) rideBad.push(`${t.id}: rides.${k} is read by nothing`);
+  }
+  if (t.rides.life <= 0 || t.rides.hunt <= 0 || t.rides.hp <= 0) {
+    rideBad.push(`${t.id}: life ${t.rides.life}, hunt ${t.rides.hunt}, hp ${t.rides.hp} `
+      + '-- a rider with no clock, no reach or no health is not a rider');
+  }
+  /*
+   * A rider that cannot cross the field it is released into cannot work, and
+   * nothing would fail for it: it would hunt nothing, wander, and expire.
+   * `life` at its own cruise has to cover the era-1 column with room over,
+   * and `hunt` has to be able to SEE that far -- SEED is exempt from the
+   * second half because a SCION throws it into the crowd it is already
+   * standing in, which is what `weight: 0` plus `harmless` says.
+   */
+  const column = CFG.entryDepth + 700; // a floor-to-rim order of magnitude
+  if (t.rides.life * t.speed < column) {
+    rideBad.push(`${t.id}: life ${t.rides.life}s at speed ${t.speed} covers `
+      + `${(t.rides.life * t.speed) | 0} units, under the ~${column} it may have to cross`);
+  }
+}
+/*
+ * ...and the ARMOUR CEILING is reachable, which is what makes it a rule.
+ *
+ * `applyDamage` computes `dmg * (1 - plate)`, so a ring of riders adding flat
+ * armour can make a body nothing can kill: FLINT is 0.55 and three LATCHes at
+ * 0.2 reach 1.15. `refreshGrafts` clamps at `CFG.graft.armorCap`, and BOTH
+ * halves are asserted -- the cap is under 1, and the worst unclamped case is
+ * over the cap. The second half is the build-198 rule: a threshold nothing can
+ * physically reach is a door that never opens, and a clamp that can never
+ * clamp is a branch whose other arm is dead code.
+ */
+const riders = ENEMY_TYPES.filter((t) => t.gait === 'ride');
+const worstRide = Math.max(0, ...riders.map((t) => t.rides.armor));
+const worstBody = Math.max(0, ...ENEMY_TYPES.filter((t) => !t.fixed && !t.gait).map((t) => t.armor || 0));
+const worstRing = worstBody + worstRide * CFG.graft.stack;
+if (!(CFG.graft.armorCap > 0 && CFG.graft.armorCap < 1)) {
+  rideBad.push(`graft.armorCap ${CFG.graft.armorCap} is not inside (0, 1)`);
+}
+if (worstRide > 0 && !(worstRing > CFG.graft.armorCap)) {
+  rideBad.push(`graft.armorCap ${CFG.graft.armorCap} cannot be reached: the worst ring is `
+    + `${worstRing.toFixed(2)} (body ${worstBody} + ${CFG.graft.stack} x ${worstRide}), `
+    + 'so the clamp is a branch that can never be taken');
+}
+if (rideBad.length) {
+  for (const line of rideBad) console.error(`rides: ${line}`);
+  process.exit(1);
+}
+console.log(`rides: ${riders.length} riders (${riders.map((t) => t.id).join(' ')}), all seven keys; `
+  + `armour caps at ${CFG.graft.armorCap} against a worst ring of ${worstRing.toFixed(2)}`);
+
+/*
  * ---- a RISE type authors its CLOCK, and the nominal speed has to agree ----
  *
  * `climb` is seconds and `rise` derives the cruise from it against the column

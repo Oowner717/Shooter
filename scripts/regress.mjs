@@ -7646,8 +7646,11 @@ if (!GUN_LINE) {
    * were carrying something it cannot be given.
    */
   const graftable = await page.evaluate(async () => {
-    const { ENEMY_TYPES, CFG, MAX_BODY_R, GRID_CELL } = await import('../src/config.js');
-    const grown = 1 + CFG.graft.grow * CFG.graft.stack;
+    const { ENEMY_TYPES, CFG, MAX_BODY_R, GRID_CELL, MAX_GRAFT_GROW } = await import('../src/config.js');
+    // `grow` is the RIDER's from build 322, so the worst case is the largest
+    // one any riding type declares -- asked of the roster rather than
+    // restated, which is what keeps this arm right when a third rider lands.
+    const grown = 1 + MAX_GRAFT_GROW * CFG.graft.stack;
     const fixed = ENEMY_TYPES.filter((t) => t.fixed);
     return {
       cell: GRID_CELL,
@@ -8035,11 +8038,82 @@ if (!GUN_LINE) {
        * gate, not the tree.
        */
       for (const id of ['rate', 'open_ward', 'flinch', 'deadbolt']) g.buy(id);
+      /*
+       * ---- AND THE LOADED ROUND, WHICH WAS THE SIXTH CONFOUND ------------
+       *
+       * This case pinned the tree, the rung, the aim, the trigger and the
+       * fuse, and left the AMMUNITION to whatever the previous six hundred
+       * cases had selected -- and the ammunition is the largest single lever
+       * on whether the run needs rescuing at all. Swept on build 322, same
+       * rung, same tree, same everything, one round at a time:
+       *
+       *   BOLT      held 142.1s of 240, field mean separation 0.484
+       *   SCATTER   held 104.8s, 0.479
+       *   HE        held  81.5s, 0.715
+       *   SPINE     held  64.4s, 0.625
+       *   TITHE     held  56.3s, 0.803
+       *
+       * The suite run that failed read held 53.5s and 0.954, which is off
+       * the TITHE end of that table: a gun that clears what arrives does not
+       * need the gate, so the two arms converge and the ratio walks to 1.
+       * This case's own docstring already said the build must be "the
+       * automation the claim is ABOUT... and nothing that makes the gun hit
+       * harder", and a round is exactly that.
+       *
+       * BOLT is the default the run starts with, so pinning it is not making
+       * the case easier -- it is making it the scenario the case documents.
+       * Set what the question depends on.
+       */
+      w.round = 'standard';
       w.autoAim = true;
       w.autoFire = true;
       const d = w.director;
       // The rung is the caller's; see the note above `play` for the sweeps.
       d.setTier(tier);
+      /*
+       * ---- AND BOTH ARMS PLAY THE SAME WAVES, WHICH THEY DID NOT ---------
+       *
+       * `Director.shuffle` draws its rotation with `Math.random`, so the two
+       * arms of this A/B were each handed a different order out of band 5's
+       * roster -- and band 5's waves differ by a factor of two in what they
+       * weigh (a wave of three TOW pairs against one of six YOKEs and a
+       * GLUT). So the gated arm and the loose arm were not measuring the
+       * same field, and the difference between them carried a draw as well
+       * as the gate. It is the RUNG confound of build 303 one level down:
+       * before clearing state, check whether the two arms are still
+       * measuring the same thing.
+       *
+       * Installed long enough that `begin()` never runs out and reshuffles
+       * -- build 310's rule that a pinned wave does not stay pinned -- and
+       * the ROTATION is returned so the fairness is asserted rather than
+       * trusted.
+       *
+       * The rotation and not what was PLAYED, and the difference cost two
+       * measurements. The arms cannot play the same NUMBER of waves --
+       * holding the release is the gate's whole effect, measured at 4
+       * against 17 -- so requiring the two lists to match failed three
+       * correct runs outright. Requiring the gated arm's to be a PREFIX of
+       * the loose arm's is the right shape and still failed one run in four,
+       * because `begin()` goes through `admit()`, which may splice the order
+       * it is walking. What this case actually needs is that both arms were
+       * HANDED the same waves in the same order, and that is exactly what
+       * installing it here gives and what comparing the installed order
+       * checks. How far each got is a finding, not a precondition.
+       */
+      const band = d.bandsFor(tier)[1];
+      const roster = WAVES.map((wv, i) => (!wv.teach && (wv.band || 1) === band ? i : -1))
+        .filter((i) => i >= 0);
+      d.order = [];
+      for (let k = 0; k < 12; k++) d.order.push(...roster);
+      d.at = -1;
+      d.cycle = 1;
+      // Read HERE and not in the return, because `begin()` goes through
+      // `admit()`, which splices the order it is walking: taken at the end
+      // of a 240-second run the two arms disagree about what they were
+      // handed on four runs in five, which is the order being consumed
+      // rather than the rotation being unfair.
+      const rot = roster.join(',');
+      const played = [];
       const peak = [];
       let heldFrames = 0;
       let fired = 0;
@@ -8096,7 +8170,7 @@ if (!GUN_LINE) {
          */
         if (d.tier !== tier) { d.setTier(tier); drifted++; }
         g.update(1 / 60);
-        if (d.at !== at) { waves++; at = d.at; }
+        if (d.at !== at) { waves++; at = d.at; played.push(d.order[d.at]); }
         if (d.holdFor > 0) heldFrames++;
         if (d.burnFrom === 'crowd') crowdFrames++;
         else if (d.burnFrom === 'contact') contactFrames++;
@@ -8140,13 +8214,47 @@ if (!GUN_LINE) {
         fired, gPeak: +gPeak.toFixed(2), tier: d.tier, waves, drifted,
         crowdS: +(crowdFrames / 60).toFixed(1), contactS: +(contactFrames / 60).toFixed(1),
         rose: +rose.toFixed(3),
+        round: w.round,
+        rot,
+        played: played.length,
         auto: !!w.up.flinch && !!w.up.deadbolt };
     };
-    // The field, with the fuse held out of it, at the rung where this build
-    // is genuinely behind -- see the note on `play` for the sweeps.
+    /*
+     * The field, with the fuse held out of it, at the rung where this build
+     * is genuinely behind -- see the note on `play` for the sweeps.
+     *
+     * ---- AND THREE RUNS AN ARM, POOLED, WHICH IS THE SIXTH REPAIR --------
+     *
+     * With the rung, the tree, the ammunition and the rotation all pinned,
+     * what is left is the fight, and one 240-second run of it is still a
+     * draw: measured five times on build 322 the field-mean separation read
+     * 0.674, 0.749, 0.532, 1.026 and 0.592 -- a mean of 0.715 with a spread
+     * of 0.19 and one run in five over a ceiling of 0.95. That is the rule
+     * this case has been taught twice already, arriving a third time: a
+     * population, not a draw. Three runs an arm takes the standard error of
+     * the ratio to about 0.086, which puts 0.95 nearly three deviations out,
+     * and the per-run figures are printed so the next reader sees the spread
+     * rather than inferring it from a single number.
+     */
     out.fieldRung = 32;
-    out.drowning = play(true, true, 240, out.fieldRung);
-    out.loose = play(false, true, 240, out.fieldRung);
+    const pool = (gated) => {
+      const runs = [];
+      for (let t = 0; t < 3; t++) runs.push(play(gated, true, 240, out.fieldRung));
+      const avg = (k) => +(runs.reduce((a, r) => a + r[k], 0) / runs.length).toFixed(3);
+      return {
+        mean: avg('mean'), pinned: avg('pinned'), held: avg('held'), waves: avg('waves'),
+        max: Math.max(...runs.map((r) => r.max)),
+        means: runs.map((r) => r.mean), pins: runs.map((r) => +(r.pinned * 100).toFixed(0)),
+        tier: runs.every((r) => r.tier === out.fieldRung) ? out.fieldRung : -1,
+        drifted: runs.reduce((a, r) => a + r.drifted, 0),
+        auto: runs.every((r) => r.auto),
+        round: runs.every((r) => r.round === 'standard') ? 'standard' : 'MIXED',
+        rot: runs.every((r) => r.rot === runs[0].rot) ? runs[0].rot : 'MIXED',
+        played: Math.min(...runs.map((r) => r.played)),
+      };
+    };
+    out.drowning = pool(true);
+    out.loose = pool(false);
     /*
      * ...and the fuse, with it let run.
      *
@@ -8179,6 +8287,10 @@ if (!GUN_LINE) {
       g.debugClearField();
       g.debugGiveBytes(500000000);
       g.debugBuyAll();
+      // ...and the round here too, for `play`'s reason. This arm is the one
+      // that is MEANT to clear, so an inherited round only flatters it --
+      // which is exactly why it would never have failed for it.
+      w.round = 'standard';
       w.autoAim = true;
       w.autoFire = true;
       const d = w.director;
@@ -8235,19 +8347,28 @@ if (!GUN_LINE) {
   check('a run that cannot clear the field is not sent another wave',
     r.drowning.auto && r.drowning.held > 3
     && r.drowning.tier === r.fieldRung && r.loose.tier === r.fieldRung
+    // ...on the SAME ammunition and over the SAME waves, or the difference
+    // between the two arms carries two draws as well as the gate
+    && r.drowning.round === 'standard' && r.loose.round === 'standard'
+    && r.drowning.played > 0 && r.loose.played > 0
+    && r.drowning.rot === r.loose.rot && r.drowning.rot.length > 0
     && r.drowning.mean < r.loose.mean * 0.95
     && r.drowning.pinned < r.loose.pinned * 0.85
     && r.loose.mean >= 12 && r.loose.pinned > 0.1,
-    `at rung ${r.fieldRung} with FLINCH and DEADBOLT owned (${r.drowning.auto}) the `
-    + `release was held ${r.drowning.held}s of 240 and the field averaged ${r.drowning.mean} `
-    + `standing against ${r.loose.mean} on the same run with the gate off, and `
-    + `spent ${(r.drowning.pinned * 100).toFixed(0)}% of its samples at the cap `
-    + `against ${(r.loose.pinned * 100).toFixed(0)}% (peaks ${r.drowning.max} and `
-    + `${r.loose.max}, which overlap run to run, which is why neither channel `
-    + `is a peak). ${r.drowning.waves} waves scored against ${r.loose.waves}, `
-    + `which is the gate's own effect and was the confound: the rung was held `
-    + `at ${r.drowning.tier}/${r.loose.tier} against ${r.drowning.drifted}/`
-    + `${r.loose.drifted} corrections`);
+    `at rung ${r.fieldRung} on BOLT with FLINCH and DEADBOLT owned (${r.drowning.auto}), `
+    + `three 240s runs an arm: the release was held ${r.drowning.held}s a run and the `
+    + `field averaged ${r.drowning.mean} standing [${r.drowning.means.join(' ')}] against `
+    + `${r.loose.mean} [${r.loose.means.join(' ')}] with the gate off -- a separation of `
+    + `${(r.drowning.mean / r.loose.mean).toFixed(3)} against a 0.95 ceiling. It spent `
+    + `${(r.drowning.pinned * 100).toFixed(0)}% of its samples at the cap `
+    + `[${r.drowning.pins.join(' ')}%] against ${(r.loose.pinned * 100).toFixed(0)}% `
+    + `[${r.loose.pins.join(' ')}%] (worst peaks ${r.drowning.max} and ${r.loose.max}, `
+    + `which overlap run to run, which is why neither channel is a peak). `
+    + `${r.drowning.waves} waves scored against ${r.loose.waves}, which is the gate's `
+    + `own effect and was the confound: the rung held at ${r.drowning.tier}/`
+    + `${r.loose.tier} against ${r.drowning.drifted}/${r.loose.drifted} corrections, `
+    + `both arms on ${r.drowning.round}/${r.loose.round} ammunition and handed the `
+    + `same rotation [${r.drowning.rot}]`);
 
   /*
    * ...and the fuse, on its own arms with it let run.
@@ -16131,19 +16252,36 @@ if (MINE_LINE) {
     const run = (n) => { for (let i = 0; i < n; i++) g.update(1 / 60); };
 
     // ---- a SEED hunting a host ----
+    /*
+     * A REAL SEED, from build 322, and the reason is that this arm silently
+     * stopped measuring `hunt` for one build before anybody noticed.
+     *
+     * It used to take a MOTE and write `seed.seed = true; seed.seedT = 99`
+     * onto it. Build 322 generalised that capability to two riders and
+     * renamed both fields (`rides` off the type's gait, `rideT`), so the two
+     * writes became no-ops -- and the body under measurement was then an
+     * ordinary mote steering at the turret, which a STASIS also holds, so
+     * the ratio still passed and the arm's whole subject was gone. A case
+     * that fakes a capability by assigning fields is a case that breaks
+     * silently when the capability moves; spawn the body that HAS it.
+     *
+     * `host` and `ran` are the liveness half: without them "it slowed down"
+     * is true of anything at all on a frozen field.
+     */
     const seedSpeed = (freeze) => {
       g.debugClearField();
       const host = g.debugSpawn('bulwark', w.width / 2, 300);
       host.staged = false;
-      const seed = g.debugSpawn('mote', w.width / 2 - 220, 300);
+      const seed = g.debugSpawn('seed', w.width / 2 - 220, 300);
       seed.staged = false;
-      seed.seed = true;
-      seed.seedT = 99;
+      seed.spawnIn = 0;
+      const clock = seed.rideT;
       w.stasis = freeze ? 99 : 0;
       run(30);
       const v = Math.hypot(seed.vx, seed.vy);
       w.stasis = 0;
-      return { v, alive: !seed.dead, host: !!host };
+      return { v, alive: !seed.dead, rides: !!seed.rides,
+        ran: +(clock - seed.rideT).toFixed(3), host: seed.host === host };
     };
 
     // ---- a TOW winding up ----
@@ -16198,8 +16336,15 @@ if (MINE_LINE) {
     return out;
   });
   check('a STASIS holds a SEED, which went through hunt and was never asked',
-    r.seedFree.v > 15 && r.seedHeld.v < r.seedFree.v * 0.25,
-    `seed ${r.seedFree.v.toFixed(1)} u/s free, ${r.seedHeld.v.toFixed(1)} held`);
+    r.seedFree.v > 15 && r.seedHeld.v < r.seedFree.v * 0.25
+    // ...and it really was a rider hunting that BULWARK, in both arms
+    && r.seedFree.rides && r.seedHeld.rides
+    && r.seedFree.host && r.seedHeld.host
+    && r.seedFree.ran > 0 && r.seedHeld.ran > 0,
+    `seed ${r.seedFree.v.toFixed(1)} u/s free, ${r.seedHeld.v.toFixed(1)} held; `
+    + `rider ${r.seedFree.rides}/${r.seedHeld.rides}, locked on its host `
+    + `${r.seedFree.host}/${r.seedHeld.host}, clock spent `
+    + `${r.seedFree.ran}/${r.seedHeld.ran}s`);
   check('...and it stops a TOW winding up, the way it already stopped a lurch',
     r.towFree.wind > 0.2 && r.towHeld.wind === 0 && r.towFree.made === 2,
     `wind ${r.towFree.wind.toFixed(2)}s free, ${r.towHeld.wind.toFixed(2)}s held`);
@@ -23013,7 +23158,8 @@ if (MINE_LINE) {
 {
   const out = await page.evaluate(async () => {
     const { fire } = await import('../src/projectiles.js');
-    const { applyBlast, graft, SHARD_R } = await import('../src/enemies.js');
+    const { applyBlast, graft, SHARD_R, Enemy } = await import('../src/enemies.js');
+    const { TYPE_BY_ID } = await import('../src/config.js');
     const { fx } = await import('../src/fx.js');
     const { shielded } = await import('../src/yard.js');
     const g = window.__sim;
@@ -23089,8 +23235,13 @@ if (MINE_LINE) {
     clean();
     const a4 = w.yard;
     const host = body('lurcher', w.shooter.x, a4.wallY - 90);
-    graft(w, host);
-    graft(w, host);
+    // A RIDER is mandatory from build 322 and it is the BODY, because the
+    // ball's own health comes off `rides.hp` times the rung factor the rider
+    // was scaled by. Built off the field: a SEED pushed onto `world.enemies`
+    // would hunt, and might graft this very host a third time mid-case.
+    const seedOf = () => new Enemy(TYPE_BY_ID.seed, 0, 0, {});
+    graft(w, host, seedOf());
+    graft(w, host, seedOf());
     out.graftBefore = host.graftCount | 0;
     const gh = host.hp;
     applyBlast(w, { x: w.shooter.x, y: a4.wallY + 30, r: 1400, damage: 900,
@@ -33621,6 +33772,650 @@ if (MINE_LINE) {
     `800ms after a real step ${r.leftOver} animations and ${r.stuck} classes remain; `
     + `a discharge from rung 1 then stays at ${r.floor.to} and marks `
     + `${r.floorAnims} rungs`);
+}
+
+/*
+ * ---- A RIDER SAYS WHAT IT GIVES, AND TWO KINDS CAN BE ON ONE RING -------
+ *
+ * Build 322. LATCH is the twelfth of the twenty objects and the second body
+ * in the game with the `ride` gait, which SEED has had since SCION shipped:
+ * it ignores the machine, beelines at the biggest body on the field, and
+ * rides it as a ball you can see and shoot.
+ *
+ * Almost all of the mechanism already existed. What did not is that the
+ * rider's numbers were ONE shared block -- `CFG.graft.grow` / `.tough` /
+ * `.regen` / `.hp` / `.life` / `.hunt` -- so a second rider would have worn
+ * SEED's growth, toughening, healing and ball health in total silence, with
+ * no field to set and nothing to fail. That is build 319's `plated` fault
+ * read forwards (a second plated type would wear `CFG.flint`'s arc) and
+ * build 224's `levels ?? 3` (eight nodes sold three times). They are on the
+ * type now as `rides`, all seven keys mandatory, and `ridesOf` throws.
+ *
+ * So the first thing this case has to establish is that the split is a
+ * no-op: `refreshGrafts` sums each ball's own share where it used to
+ * multiply a count, and for a ring of one kind the sum is the old product to
+ * the BIT. Asserted with `===` and not to two decimal places, which is build
+ * 241's rule -- a refactor that only reorders arithmetic is still a change,
+ * and "to two places" cannot see it.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const E = await import('../src/enemies.js');
+    const { graft, Enemy, applyBlast, ridesOf, drawSpecimen, ENTRY_Y } = E;
+    const { CFG, TYPE_BY_ID, WAVES } = await import('../src/config.js');
+    const { entryLine } = await import('../src/portal.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    /*
+     * Everything, because a LATCH springs a mine (build 275 took `harmless`
+     * out of the trigger and this body is not harmless anyway), a stray
+     * projectile is inside any one-frame reading, and six hundred cases run
+     * before this one. `restart()` is not a reset of everything a case can
+     * leave behind -- and the bench family leaves `director.update` stubbed
+     * and `spawnLock` pinned, neither of which it puts back.
+     */
+    const clean = () => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      g.debugClearField();
+      for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (w[k]) w[k].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+    };
+    const pin = () => { w.director.update = () => {}; w.spawnLock = 1e9; };
+    const body = (id, x, y) => {
+      const e = g.debugSpawn(id, x, y);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.vx = 0;
+      e.vy = 0;
+      return e;
+    };
+    // A rider built OFF the field: one pushed onto `world.enemies` would hunt,
+    // and might graft the very host under measurement a fourth time.
+    const rider = (id) => new Enemy(TYPE_BY_ID[id], 0, 0, {});
+
+    // ---- 1. a SEED's ring is the ring it always was, to the bit ---------
+    {
+      clean();
+      pin();
+      const sd = ridesOf(TYPE_BY_ID.seed);
+      const h = body('lurcher', w.width / 2, 500);
+      const base = { r: h.r, maxHp: h.maxHp, bytes: h.bytes || 0 };
+      const rows = [];
+      for (let n = 1; n <= CFG.graft.stack; n++) {
+        graft(w, h, rider('seed'));
+        rows.push({
+          n,
+          rOk: h.r === base.r * (1 + sd.grow * n),
+          hpOk: h.maxHp === Math.max(1, Math.round(base.maxHp * (1 + sd.tough * n))),
+          byOk: h.bytes === base.bytes * (1 + sd.tough * n),
+          regen: h.graftRegen,
+          regenOk: h.graftRegen === sd.regen * n,
+          ball: h.grafts[n - 1].maxHp,
+          armor: h.armor,
+        });
+      }
+      out.seed = { base, rows, want: sd };
+    }
+
+    // ---- 2. a LATCH arms its host and closes its wounds ------------------
+    /*
+     * Measured as DELIVERED, both halves, which is build 231's rule about
+     * continuous damage read from the other end: the armour is read off the
+     * health a known hit actually took away and the healing off the health
+     * that actually came back, never off `e.armor` and `graftRegen`, because
+     * a field agreeing with itself is not a measurement.
+     */
+    {
+      const arm = (balls) => {
+        clean();
+        pin();
+        const h = body('bloom', w.width / 2, 500);
+        const base = { r: h.r, maxHp: h.maxHp, armor: h.armor };
+        for (let n = 0; n < balls; n++) graft(w, h, rider('latch'));
+        // armour: one directionless hit, which BLOOM is not plated against
+        h.hp = h.maxHp;
+        h.applyDamage(w, 100);
+        const took = h.maxHp - h.hp;
+        // healing: wound it and hold it still for a second
+        h.hp = Math.max(1, h.maxHp * 0.4);
+        const at = h.hp;
+        for (let i = 0; i < 60; i++) { h.x = w.width / 2; h.y = 500; g.update(1 / 60); }
+        return {
+          balls,
+          grew: +(h.r - base.r).toFixed(4),
+          ceiling: h.maxHp - base.maxHp,
+          took: +took.toFixed(2),
+          closed: +(h.hp - at).toFixed(2),
+        };
+      };
+      out.latch = [arm(0), arm(1), arm(2), arm(3)];
+      out.latchWant = ridesOf(TYPE_BY_ID.latch);
+    }
+
+    // ---- 3. ...and the ball takes its own share off with it --------------
+    {
+      clean();
+      pin();
+      const h = body('lurcher', w.width / 2, 500);
+      const base = { r: h.r, maxHp: h.maxHp, armor: h.armor };
+      graft(w, h, rider('seed'));
+      graft(w, h, rider('latch'));
+      const read = () => ({ r: +h.r.toFixed(4), maxHp: h.maxHp,
+        armor: +h.armor.toFixed(6), regen: h.graftRegen, n: h.graftCount });
+      const both = read();
+      const seedBall = h.grafts[0];
+      const latchBall = h.grafts[1];
+      h.hitGraft(latchBall, 1e6, h.x, h.y);
+      const seedOnly = read();
+      h.hitGraft(seedBall, 1e6, h.x, h.y);
+      out.mixed = { base, both, seedOnly, none: read(),
+        from: [seedBall.from, latchBall.from], hp: [seedBall.maxHp, latchBall.maxHp] };
+    }
+
+    // ---- 4. the armour ceiling is a LIVE clamp ---------------------------
+    /*
+     * On a BULWARK and NOT on the FLINT that sets the worst case, which is a
+     * choice about the instrument. FLINT is `plated`, so whether a hit meets
+     * its armour at all depends on the angle between the damage and a face
+     * `Enemy.face` slews toward the machine -- the first version of this arm
+     * read a 1000-point hit delivering 1000 through an armour field of 0.8
+     * and it was measuring the plate's direction, not the clamp. BULWARK is
+     * the most armoured body whose armour is all round (0.34), so what a hit
+     * takes away IS the number. FLINT's sequence is recorded beside it off
+     * the field alone, and `check-build.mjs` is what asserts the worst case
+     * can reach the cap at build time.
+     */
+    {
+      clean();
+      pin();
+      const h = body('bulwark', w.width / 2, 500);
+      const seq = [h.armor];
+      const took = [];
+      /*
+       * A HUNDRED and not a thousand, because `applyDamage` returns on its
+       * first line for a dead body: the first version hit a 676-health
+       * BULWARK for 1000, killed it, and every reading after that was a
+       * no-op on a corpse -- `graft` refuses a dead host, so the armour
+       * column read 0.34 four times and the damage column 660 / 0 / 0 / 0.
+       * A measurement that kills its own witness measures one sample.
+       */
+      const hit = () => { h.hp = h.maxHp; h.applyDamage(w, 100); return +(h.maxHp - h.hp).toFixed(2); };
+      took.push(hit());
+      for (let n = 1; n <= CFG.graft.stack; n++) {
+        graft(w, h, rider('latch'));
+        seq.push(h.armor);
+        took.push(hit());
+      }
+      clean();
+      pin();
+      const f = body('flint', w.width / 2, 500);
+      const fseq = [f.armor];
+      for (let n = 1; n <= CFG.graft.stack; n++) { graft(w, f, rider('latch')); fseq.push(f.armor); }
+      out.clamp = { seq: seq.map((v) => +v.toFixed(4)), took, cap: CFG.graft.armorCap,
+        unclamped: +(seq[0] + ridesOf(TYPE_BY_ID.latch).armor * CFG.graft.stack).toFixed(4),
+        flint: fseq.map((v) => +v.toFixed(4)),
+        flintRaw: +(fseq[0] + ridesOf(TYPE_BY_ID.latch).armor * CFG.graft.stack).toFixed(4) };
+    }
+
+    // ---- 5. the ball's health climbs with the rung, a SEED's does not ----
+    {
+      const rows = [];
+      for (const tier of [1, 15, 21]) {
+        clean();
+        w.director.setTier(tier);
+        w.director.traits = [];
+        const hostA = body('bloom', w.width * 0.3, 500);
+        const hostB = body('bloom', w.width * 0.7, 500);
+        const rl = body('latch', 40, 40);
+        const rs = body('seed', 70, 40);
+        graft(w, hostA, rl);
+        graft(w, hostB, rs);
+        rows.push({ tier, scale: +rl.hpScale.toFixed(4), seedScale: rs.hpScale,
+          latchBall: hostA.grafts[0].maxHp, seedBall: hostB.grafts[0].maxHp,
+          latchBody: Math.round(rl.maxHp) });
+        pin();
+      }
+      out.rungs = rows;
+    }
+
+    // ---- 6. the real wave, through the real release path -----------------
+    /*
+     * A PINNED WAVE DOES NOT STAY PINNED (build 310): `Director.update`
+     * reshuffles its own order on its own schedule, so loading a wave and
+     * then driving `g.update` measures whatever the rotation picked -- the
+     * first run of this arm reported drift, motes and SPINDLEs for a wave of
+     * latches and BLOOMs. The release itself is kept, because `emit` is the
+     * door under test and build 309's EMBER fault lived entirely in it.
+     */
+    {
+      clean();
+      const at = WAVES.findIndex((x) => (x.of || []).some((e) => e[0] === 'latch'));
+      if (at < 0) throw new Error('no wave authors a latch');
+      const d = w.director;
+      d.setTier(15);
+      d.load(w, WAVES[at]);
+      d.traits = [];
+      d.update = function (world) { if (this.jobs && this.jobs.length) this.emit(world); };
+      const seen = new Map();
+      for (let i = 0; i < 60 * 45; i++) {
+        g.update(1 / 60);
+        for (const e of w.enemies) {
+          if (!seen.has(e)) seen.set(e, { id: e.type.id, y0: e.y, staged: e.staged });
+        }
+      }
+      const rows = [...seen.values()];
+      const rim = entryLine(w, ENTRY_Y);
+      const latches = rows.filter((x) => x.id === 'latch');
+      const hosts = rows.filter((x) => x.id === 'bloom');
+      const rings = w.enemies.filter((e) => e.graftCount)
+        .map((e) => e.grafts.filter((x) => x.alive).length);
+      out.wave = {
+        at,
+        latches: latches.length,
+        hosts: hosts.length,
+        // Every one of them came down the portal, like the hosts beside it.
+        overRim: latches.filter((x) => x.y0 < rim).length,
+        stagedIn: latches.filter((x) => x.staged).length,
+        hostsOverRim: hosts.filter((x) => x.y0 < rim).length,
+        rim: Math.round(rim),
+        rings: rings.sort((a, b) => b - a),
+        full: rings.filter((n) => n >= CFG.graft.stack).length,
+        loose: w.enemies.filter((e) => e.type.id === 'latch' && !e.dead).length,
+      };
+      delete d.update;
+    }
+
+    // ---- 7. a STAGED rider does not hunt, and a loose one does ----------
+    /*
+     * `drive`'s early returns are ORDERED and the rider branch sat above the
+     * staged march, which never mattered while SEED was the only rider: a
+     * SCION places its seeds mid-field and one is never `staged`. A LATCH
+     * comes down the portal, so without the guard it would cut sideways out
+     * of the mouth at a host from the frame it appeared -- build 307's DRIFT
+     * finding verbatim.
+     *
+     * Proved by REVERT, because the guard is one `&&` and the arm could pass
+     * without it: with `!this.staged` taken off the branch the same latch
+     * burns 2.0167s off its clock inside the doorway and drifts 58 units
+     * toward a host it should not be able to see, against 0s and -12 of
+     * portal sway with the guard in.
+     */
+    /*
+     * ONE body in TWO phases rather than two bodies, because the state is
+     * not something a case has to arrange: a staged rider comes loose on the
+     * frame it passes the entry line and then hunts. So the same latch
+     * carries both halves of the claim and neither half needs a margin --
+     * while it is staged the clock reads EXACTLY zero and the host has
+     * nothing aboard; once it is loose the clock runs and the host has a
+     * ball. The first version was a two-body A/B over forty frames and
+     * needed a threshold on how far each had closed, which straddled the
+     * standing start: 19.3 units of portal sway against 31.8 units of a
+     * rider accelerating from rest.
+     */
+    {
+      clean();
+      pin();
+      const host = body('bloom', w.width * 0.2, 900);
+      host.cruise = 0;
+      const hold = () => { host.x = w.width * 0.2; host.y = 900; host.vx = 0; host.vy = 0; };
+      const l = body('latch', w.width * 0.8, -60);
+      l.staged = true;
+      const clock = l.rideT;
+      const d0 = Math.abs(l.x - host.x);
+      /*
+       * Counted over frames that were staged at BOTH ends. `Enemy.update`
+       * clears `staged` on the frame the body passes the entry line and
+       * `drive` reads the flag inside the same frame, so the crossing frame
+       * is the first LOOSE frame however the two happen to be ordered -- the
+       * first version read 0.0167s off its clock and that one frame was it.
+       * Build 301's rule: sample the last frame the state held.
+       */
+      let f1 = 0;
+      let ran = 0;
+      while (f1 < 60 * 8) {
+        if (!l.staged) break;
+        const t0 = l.rideT;
+        hold();
+        g.update(1 / 60);
+        f1++;
+        if (!l.staged) break;
+        ran += t0 - l.rideT;
+      }
+      const mid = { ran: +ran.toFixed(4), aboard: host.graftCount,
+        closed: +(d0 - Math.abs(l.x - host.x)).toFixed(1), seconds: +(f1 / 60).toFixed(2) };
+      let f2 = 0;
+      while (!l.dead && f2 < 60 * 12) { hold(); g.update(1 / 60); f2++; }
+      out.order = { staged: mid,
+        loose: { ran: +(clock - l.rideT).toFixed(4), aboard: host.graftCount,
+          seconds: +(f2 / 60).toFixed(2) } };
+    }
+
+    // ---- 8. a rider with nothing to ride leaves the field ---------------
+    /*
+     * The one thing being a HOSTILE costs: a LATCH with no host counts
+     * against `standing()` and the build-291 release gate while it looks.
+     * `rides.life` is what bounds that, and a hostile that comes to rest
+     * with no way to expire is build 312's `tumble` finding -- so the clock
+     * is asserted, with a latch that HAS a host as the control, because
+     * "it went away" is otherwise true of a body that simply boarded.
+     */
+    {
+      const arm = (withHost) => {
+        clean();
+        pin();
+        if (withHost) { const h = body('bloom', w.width / 2, 620); h.cruise = 0; }
+        const l = body('latch', w.width / 2, 400);
+        let frames = 0;
+        while (!l.dead && frames < 60 * 40) { g.update(1 / 60); frames++; }
+        return { withHost, life: l.rideT === 0 ? null : undefined,
+          seconds: +(frames / 60).toFixed(2), gone: l.dead,
+          boarded: w.enemies.some((e) => e.graftCount > 0) };
+      };
+      out.clock = [arm(false), arm(true)];
+      out.life = ridesOf(TYPE_BY_ID.latch).life;
+    }
+
+    // ---- 9. what it DELIVERS is the blend, not the ask ------------------
+    /*
+     * A TARGET SPEED IS NOT A SPEED -- builds 298, 308, 317 and 318, and
+     * this is the fifth. `hunt` blends toward `cruise` at `k = accel / 100`
+     * while `integrate` damps every substep, so the steady state is
+     * `cruise * k / (k + linearDamping)`. It is deliberately NOT compensated
+     * here: `hunt` is shared with SEED, nothing in the object's design is a
+     * clock or a ratio between two speeds, and grossing it up would move an
+     * object that has behaved this way for a hundred and fifty builds. So
+     * the arm RECORDS the arithmetic rather than asserting the ask.
+     */
+    {
+      clean();
+      pin();
+      const host = body('bloom', w.width / 2, 1100);
+      host.cruise = 0;
+      const l = body('latch', w.width / 2, 200);
+      l.cruise = TYPE_BY_ID.latch.speed;
+      let peak = 0;
+      for (let i = 0; i < 120; i++) {
+        host.hp = host.maxHp;
+        host.x = w.width / 2; host.y = 1100; host.vx = 0; host.vy = 0;
+        g.update(1 / 60);
+        if (!l.dead) peak = Math.max(peak, Math.hypot(l.vx, l.vy));
+      }
+      const k = TYPE_BY_ID.latch.accel / 100;
+      out.speed = { ask: TYPE_BY_ID.latch.speed, got: +peak.toFixed(1),
+        blend: +(TYPE_BY_ID.latch.speed * k / (k + CFG.physics.linearDamping)).toFixed(1) };
+    }
+
+    // ---- 10. the ball wears the rider's own picture ----------------------
+    /*
+     * A ring can hold a SEED and a LATCH at once and they do different
+     * things to the host, so they must not look the same -- the reason a
+     * SHOAL dart could not keep MOTE's triangle. `drawRiderBall`'s `default`
+     * arm is a real fallback rather than a throw (a throw in a draw path is
+     * a frozen frame, build 288), so what stops it being a SILENT one is
+     * this: every riding type's ball is rendered and required to differ.
+     *
+     * Measured on the ALPHA channel alone, so the tone is divided out by
+     * construction and what is compared is the silhouette. The self-diff is
+     * the instrument's own control -- a recorder that cannot read zero for
+     * the same picture is not measuring a picture.
+     */
+    {
+      const SZ = 96;
+      const shot = (id) => {
+        const c = document.createElement('canvas');
+        c.width = SZ; c.height = SZ;
+        const x = c.getContext('2d');
+        x.translate(SZ / 2, SZ / 2);
+        drawSpecimen(x, id, 22);
+        const px = x.getImageData(0, 0, SZ, SZ).data;
+        const a = new Uint8Array(SZ * SZ);
+        let ink = 0;
+        for (let i = 0; i < SZ * SZ; i++) { a[i] = px[i * 4 + 3]; ink += px[i * 4 + 3]; }
+        return { a, ink: Math.round(ink / 1000) };
+      };
+      const diff = (p, q) => {
+        let sum = 0;
+        for (let i = 0; i < p.a.length; i++) sum += Math.abs(p.a[i] - q.a[i]);
+        return Math.round(sum / 1000);
+      };
+      const me = shot('latch');
+      out.draw = { ink: me.ink, selfZero: diff(shot('latch'), shot('latch')) };
+      for (const id of ['seed', 'scion', 'lurcher', 'mote', 'prism']) {
+        out.draw[id] = diff(me, shot(id));
+      }
+      out.riders = E.RIDE_KEYS.length;
+    }
+
+    // ---- 11. ...and a malformed rider is refused at the door -------------
+    {
+      const full = { life: 4, hunt: 100, grow: 0, tough: 0, armor: 0, regen: 1, hp: 5 };
+      const bad = [
+        undefined, null, 7, {},
+        ...E.RIDE_KEYS.map((k) => { const o2 = { ...full }; delete o2[k]; return o2; }),
+        ...E.RIDE_KEYS.map((k) => ({ ...full, [k]: -1 })),
+        { ...full, life: 0 }, { ...full, hunt: 0 }, { ...full, hp: 0 },
+        { ...full, regen: 'nine' },
+      ];
+      let refused = 0;
+      for (const v of bad) {
+        try { ridesOf({ id: 'probe', rides: v }); } catch (err) { refused++; }
+      }
+      out.refused = { of: bad.length, n: refused, legal: !!ridesOf({ id: 'probe', rides: full }) };
+    }
+
+    // ---- 12. ...and the salvage a rider leaves is not a rider ------------
+    /*
+     * `shed` builds every mote with `new Enemy(t, ...)` off the PARENT's
+     * type, so a mote off a LATCH inherits `gait: 'ride'` -- and a mote is
+     * not `staged`, so it went straight to `hunt` and, measured, climbed to
+     * a BLOOM 160 units above it and GRAFTED: the salvage of the body you
+     * had just killed arming and healing the next one, for free.
+     *
+     * Latent for the whole of SEED's life because SEED has `drops: 0`. It is
+     * build 307's finding with a worse payload -- "a mote off a DRIFT
+     * inherited `harmless` and wandered the band it was made in" -- and the
+     * harmless branch in `drive` has carried its own `!this.isDrop` since
+     * then for exactly this reason.
+     *
+     * Two CONTROLS, because "nothing grafted" is true of a great many builds:
+     * a MOTE's and a LURCHER's motes, dropped in the same geometry, which
+     * must fall toward the turret. Proved by revert -- with `!this.isDrop`
+     * off the capability the latch's mote reads `aboard` 1 against 0 for
+     * both controls.
+     */
+    {
+      const arm = (id) => {
+        clean();
+        pin();
+        const host = body('bloom', w.width / 2, 300);
+        host.cruise = 0;
+        const e = body(id, w.width / 2, 460);
+        e.destroy(w, 'probe');
+        const m = w.drops[0];
+        if (!m) throw new Error(`${id} shed nothing`);
+        const flags = { rides: !!m.rides, clock: m.rideT, drop: !!m.isDrop,
+          gait: m.type.gait || null };
+        const toGun = Math.hypot(m.x - w.shooter.x, m.y - w.shooter.y);
+        const toHost = Math.hypot(m.x - host.x, m.y - host.y);
+        for (let i = 0; i < 150; i++) {
+          host.x = w.width / 2; host.y = 300; host.vx = 0; host.vy = 0; host.hp = host.maxHp;
+          g.update(1 / 60);
+        }
+        const gone = !w.drops.includes(m);
+        return { id, flags, aboard: host.graftCount, gone,
+          gun: gone ? null : +(toGun - Math.hypot(m.x - w.shooter.x, m.y - w.shooter.y)).toFixed(1),
+          host: gone ? null : +(toHost - Math.hypot(m.x - host.x, m.y - host.y)).toFixed(1) };
+      };
+      out.salvage = [arm('latch'), arm('mote'), arm('lurcher')];
+    }
+
+    // ---- 13. ...and neither is what a ridden body BREAKS INTO ------------
+    /*
+     * `this.maxHp` and `this.armor` are what the ring has made of a body,
+     * and the whole promise of a ring is that shooting one off takes its
+     * share back -- so a QUARRY passing those to the three it fractures into
+     * is the share not coming back, out of a ring that no longer exists.
+     * Measured before the fix, on a full ring: a SEED's three took the
+     * parent 459 to 1285 and each child from 118 health to 386, and a
+     * LATCH's three took the plate 0.22 to 0.8 and each child from 0.121 to
+     * 0.44. The health half is OLDER than this build -- it has been there
+     * since QUARRY met a SEED in 312 -- and both halves are the same line.
+     *
+     * Asserted against the parent's OWN recorded pre-ring figures rather
+     * than against the unridden control, because `maxHp` carries a
+     * per-body 0.92-1.1 roll: the arithmetic is exact that way and the
+     * control is what proves the expression itself.
+     */
+    {
+      const Q = CFG.quarry;
+      const arm = (ride) => {
+        clean();
+        pin();
+        const q = body('quarry', w.width / 2, 500);
+        const own = { hp: q.maxHp, armor: q.armor, r: q.r };
+        if (ride) for (let i = 0; i < CFG.graft.stack; i++) graft(w, q, rider(ride));
+        const ridden = { hp: q.maxHp, armor: +q.armor.toFixed(4), r: +q.r.toFixed(2) };
+        q.destroy(w, 'probe');
+        const kids = w.enemies.filter((e) => e !== q && e.type.id === 'quarry' && !e.dead);
+        return { ride: ride || 'none', own, ridden, n: kids.length,
+          hp: kids.map((e) => Math.round(e.maxHp)),
+          armor: kids.map((e) => +e.armor.toFixed(4)),
+          r: kids.map((e) => +e.r.toFixed(2)),
+          wantHp: Math.max(1, Math.round(own.hp * Q.hpAt)),
+          wantArmor: +(own.armor * Q.armorAt).toFixed(4),
+          wantR: +(own.r * TYPE_BY_ID.quarry.splits.scale).toFixed(2) };
+      };
+      out.kids = [arm(null), arm('seed'), arm('latch')];
+    }
+
+    clean();
+    return out;
+  });
+
+  const sd = r.seed;
+  check('the split moved where a rider\'s numbers live and nothing else',
+    sd.rows.length === 3
+    && sd.rows.every((x) => x.rOk && x.hpOk && x.byOk && x.regenOk)
+    && sd.rows.every((x) => x.ball === sd.want.hp && x.armor === 0),
+    `a SEED ring of 1-3 on a LURCHER r ${sd.base.r} hp ${sd.base.maxHp}: `
+    + sd.rows.map((x) => `${x.n} -> regen ${x.regen}, ball ${x.ball}`).join('; ')
+    + `; radius, ceiling, salvage and healing all === base * (1 + k * n) `
+    + `(${sd.rows.filter((x) => x.rOk && x.hpOk && x.byOk && x.regenOk).length} of 3)`);
+
+  const L = r.latch;
+  const lw = r.latchWant;
+  const plain = L[0];
+  const armOk = L.every((x, i) => Math.abs(x.took - 100 * (1 - Math.min(0.999, i * lw.armor))) < 0.6);
+  const healOk = L.every((x, i) => Math.abs(x.closed - lw.regen * i) < lw.regen * 0.2 + 1);
+  check('a LATCH arms the body it rides and closes its wounds, per ball',
+    armOk && healOk
+    && L.every((x) => x.grew === 0 && x.ceiling === 0)
+    && plain.took === 100 && plain.closed === 0,
+    `balls 0-3 on a BLOOM: a 100-point hit delivered `
+    + `${L.map((x) => x.took).join(' / ')} and a second of standing still closed `
+    + `${L.map((x) => x.closed).join(' / ')} against ${lw.regen} a ball; `
+    + `growth ${L.map((x) => x.grew).join('/')} and ceiling `
+    + `${L.map((x) => x.ceiling).join('/')}, both zero by design`);
+
+  const m = r.mixed;
+  check('...and two kinds on one ring give their own shares, and take their own back',
+    m.both.n === 2 && m.from[0] === 'seed' && m.from[1] === 'latch'
+    && m.both.regen === r.seed.want.regen + r.latchWant.regen
+    && m.both.armor === r.latchWant.armor
+    && m.seedOnly.armor === 0 && m.seedOnly.regen === r.seed.want.regen
+    && m.seedOnly.r === m.both.r && m.seedOnly.maxHp === m.both.maxHp
+    && m.none.r === m.base.r && m.none.maxHp === m.base.maxHp && m.none.regen === 0
+    && r.draw.selfZero === 0 && r.draw.seed > 40 && r.draw.scion > 40
+    && r.draw.lurcher > 40 && r.draw.mote > 40 && r.draw.prism > 40,
+    `a SEED and a LATCH on one LURCHER: r ${m.base.r}->${m.both.r}, ceiling `
+    + `${m.base.maxHp}->${m.both.maxHp}, armour ${m.both.armor}, healing ${m.both.regen}; `
+    + `shooting the LATCH off leaves armour ${m.seedOnly.armor} and healing `
+    + `${m.seedOnly.regen} with the growth still there, and the SEED after it puts `
+    + `r and ceiling back to ${m.none.r}/${m.none.maxHp}. Balls ${m.hp.join(' and ')} `
+    + `health; silhouettes differ by seed ${r.draw.seed} scion ${r.draw.scion} `
+    + `lurcher ${r.draw.lurcher} mote ${r.draw.mote} prism ${r.draw.prism}, self ${r.draw.selfZero}`);
+
+  const c = r.clamp;
+  const ru = r.rungs;
+  const last = c.seq.length - 1;
+  check('the armour ceiling is a clamp that actually clamps, and a ball costs more the deeper you are',
+    c.seq[last] === c.cap && c.unclamped > c.cap && c.seq[last - 1] < c.cap
+    // ...and it is the armour DELIVERED, not the field agreeing with itself
+    && c.took.every((v, i) => Math.abs(v - 100 * (1 - c.seq[i])) < 0.5)
+    && c.flint[c.flint.length - 1] === c.cap && c.flintRaw > c.cap
+    && ru.every((x) => x.seedScale === 1 && x.seedBall === r.seed.want.hp)
+    && ru[0].latchBall === r.latchWant.hp
+    && ru[2].latchBall > ru[1].latchBall && ru[1].latchBall > ru[0].latchBall,
+    `a BULWARK takes latches to ${c.seq.join(' -> ')} against an unclamped `
+    + `${c.unclamped} and a cap of ${c.cap}, and 100-point hits delivered `
+    + `${c.took.join(' / ')}; FLINT, the worst case, goes ${c.flint.join(' -> ')} `
+    + `against a raw ${c.flintRaw}. Ball health by rung `
+    + `${ru.map((x) => `${x.tier}:${x.latchBall}`).join(' ')} `
+    + `(body ${ru.map((x) => x.latchBody).join('/')}), a SEED's `
+    + `${ru.map((x) => x.seedBall).join('/')} at every rung`);
+
+  const wv = r.wave;
+  const od = r.order;
+  const ck = r.clock;
+  check('the wave brings them down the portal and they fill one ring before they spread',
+    wv.latches >= 3 && wv.hosts >= 2
+    && wv.overRim === wv.latches && wv.stagedIn === wv.latches
+    && wv.hostsOverRim === wv.hosts
+    && wv.full >= 1 && wv.loose === 0
+    // the staged guard, and the same body once loose as the control
+    && od.staged.ran === 0 && od.staged.aboard === 0 && od.staged.seconds > 0.3
+    && od.loose.ran > 0 && od.loose.aboard === 1
+    // the clock, against a rider that boards instead
+    && ck[0].gone && Math.abs(ck[0].seconds - r.life) < 1.5 && !ck[0].boarded
+    && ck[1].gone && ck[1].seconds < r.life * 0.5 && ck[1].boarded
+    // ...and what it delivers is the blend rather than the ask
+    && Math.abs(r.speed.got - r.speed.blend) < r.speed.blend * 0.05
+    && r.refused.n === r.refused.of && r.refused.legal,
+    `rung 15, wave ${wv.at}: ${wv.latches} latches and ${wv.hosts} BLOOMs, all `
+    + `${wv.overRim} of them started above the rim at ${wv.rim} and staged, and the `
+    + `rings came out ${wv.rings.join('/')} with ${wv.loose} latches left loose. `
+    + `Staged for ${od.staged.seconds}s it drifted ${od.staged.closed} with `
+    + `${od.staged.ran}s off its clock and ${od.staged.aboard} aboard; loose it took `
+    + `${od.loose.seconds}s more, spent ${od.loose.ran}s and is ${od.loose.aboard} `
+    + `aboard. With no host it left after ${ck[0].seconds}s `
+    + `of ${r.life}, with one it boarded in ${ck[1].seconds}s. Cruise ${r.speed.got} `
+    + `against an authored ${r.speed.ask} and a blend of ${r.speed.blend}. `
+    + `${r.refused.n} of ${r.refused.of} malformed rider blocks refused`);
+
+  const sv = r.salvage;
+  const mine = sv[0];
+  check('...and the salvage a rider leaves behind is not itself a rider',
+    mine.flags.gait === 'ride' && mine.flags.rides === false && mine.flags.clock === 0
+    && sv.every((x) => x.aboard === 0)
+    && sv.every((x) => x.gone || (x.gun > 100 && x.host < 0)),
+    sv.map((x) => `a ${x.id}'s mote: rides ${x.flags.rides}, clock ${x.flags.clock}, `
+      + `${x.gone ? 'banked' : `closed ${x.gun} on the turret and ${x.host} on the host`}`
+      + `, ${x.aboard} aboard`).join('; ')
+    + ` -- and the LATCH mote still carries gait '${mine.flags.gait}' off its parent type`);
+
+  const kd = r.kids;
+  check('...and neither is what a ridden body breaks into',
+    kd.every((x) => x.n === 3
+      && x.hp.every((v) => v === x.wantHp)
+      && x.armor.every((v) => v === x.wantArmor)
+      && x.r.every((v) => v === x.wantR))
+    // the ring really did move all three of them, or the arm is about nothing
+    && kd[1].ridden.hp > kd[1].own.hp * 1.5
+    && kd[1].ridden.r > kd[1].own.r * 1.2
+    && kd[2].ridden.armor > kd[2].own.armor * 2,
+    kd.map((x) => `${x.ride}: parent ${x.own.hp}/${x.own.armor}/r${x.own.r} ridden to `
+      + `${x.ridden.hp}/${x.ridden.armor}/r${x.ridden.r}, ${x.n} children at `
+      + `${x.hp[0]}/${x.armor[0]}/r${x.r[0]} against its own share `
+      + `${x.wantHp}/${x.wantArmor}/r${x.wantR}`).join('; '));
 }
 
 // --- report -----------------------------------------------------------------

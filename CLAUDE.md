@@ -4788,4 +4788,258 @@ came from before believing the other one covers it.
   remedy are still yours to measure** -- this is the clearest instance yet,
   because the finding was right, well-evidenced, and its remedies were wrong.
 
+- **LATCH IS IN FROM BUILD 322, AND ALMOST ALL OF IT ALREADY EXISTED.** Phase
+  6l, band 3, `gait: 'ride'` -- it ignores the machine, beelines at the
+  biggest body on the field and rides it as a ball you can see and shoot.
+  SEED has done exactly that since SCION shipped. What was new is that there
+  are now TWO riders, and the rider's numbers were ONE shared block:
+  `CFG.graft.grow` / `.tough` / `.regen` / `.hp` / `.life` / `.hunt`. So a
+  second rider would have worn SEED's growth, toughening, healing and ball
+  health in total silence, with no field to set and nothing to fail -- which
+  is build 319's `plated` fault read FORWARDS (a second plated type would
+  wear `CFG.flint`'s arc and slew rate) and build 224's `levels ?? 3` (eight
+  nodes sold three times). The rule the split states: **a number about the
+  RING is shared and a number about the RIDER is the type's**, because a host
+  has one ring and two kinds can be standing on it. `ridesOf` throws for a
+  `ride` type declaring none, all seven keys mandatory, and `check-build`
+  holds it in both directions -- a `rides` block on a non-riding type is a
+  field nothing reads, which is `kind: 'works'` again.
+- **THE SPLIT HAD TO BE A NO-OP FOR SEED AND IS, TO THE BIT.**
+  `refreshGrafts` sums each ball's own share where it multiplied a count, and
+  for a ring of ONE KIND the sum is the old product exactly -- measured at
+  n = 1, 2, 3, including the 1.7999999999999998 that `3 x 0.6` gives.
+  Asserted with `===` on radius, ceiling, salvage and healing rather than to
+  two decimal places, which is build 241's rule: a refactor that only
+  reorders arithmetic is still a change and "to two places" cannot see it.
+- **A BALL'S HEALTH HAS TO CLIMB WITH THE RUNG, AND THE FACTOR BELONGS WHERE
+  THE GUARD IS.** `rides.hp` is what a tick costs at rung 1; `scaleToTier` is
+  where the FOUR conditions live that decide whether anything is scaled (no
+  director, harmless, fixed, a teach wave). So it writes `e.hpScale` and
+  `graft` asks the rider BODY for it rather than restating those conditions
+  -- a LATCH's ball is 40 at rung 1, 59 at 15 and 69 at 21 against a body of
+  40/59/68, and a SEED's is exactly 26 at every rung because SEED is
+  `harmless` and never scaled. That last part is why the whole split leaves
+  SEED unchanged: the one number that could have moved cannot.
+- **`drive`'S EARLY RETURNS ARE ORDERED, AND THE RIDER BRANCH SAT ABOVE THE
+  STAGED MARCH.** Build 307's DRIFT finding verbatim, in a new branch, and it
+  never mattered while SEED was the only rider: a SCION places its seeds
+  mid-field and one is never `staged`. A LATCH comes down the portal, so
+  without `&& !this.staged` it peels off at a host from the frame it appears,
+  inside the throat. Proved by revert -- the guard is one `&&` and the arm
+  could pass without it: reverted, a staged latch burns **2.0167s off its
+  clock and drifts 58 units** toward a host it should not be able to see,
+  against 0s and -12 of portal sway with the guard in. The harmless branch
+  beside it has carried the same `!this.staged` since 307.
+- **THE SALVAGE A RIDER LEAVES BEHIND WAS ITSELF A RIDER, AND IT GRAFTED.**
+  `shed` builds every mote with `new Enemy(t, ...)` off the PARENT's type, so
+  a mote off a LATCH inherits `gait: 'ride'` -- and a mote is not `staged`, so
+  it went straight to `hunt`. Measured on a LATCH killed 160 units under a
+  BLOOM: the mote climbed to it and **GRAFTED**, arming and healing the next
+  body for free out of the salvage of the one you had just killed, `aboard` 1
+  against 0 for a MOTE's and a LURCHER's motes dropped in the same geometry.
+  Latent for the whole of SEED's life because SEED has `drops: 0` and has
+  never shed one -- and it is build 307's finding with a far worse payload
+  ("a mote off a DRIFT inherited `harmless` and wandered the band it was made
+  in", the one object whose salvage you had to go and fetch). The harmless
+  branch in `drive` has carried its own `!this.isDrop` since then for exactly
+  this reason. The guard goes on the CAPABILITY (`type.gait === 'ride' &&
+  !this.isDrop`) rather than at the branch, so a mote's clock is 0 and it is
+  not offered as a host either. **Any new capability derived from a type owes
+  the same question: what does a mote off this body inherit?**
+- **A CASE THAT FAKES A CAPABILITY BY ASSIGNING FIELDS BREAKS SILENTLY WHEN
+  THE CAPABILITY MOVES, AND ONE DID IN THIS BUILD.** The STASIS case's seed
+  arm took a MOTE and wrote `seed.seed = true; seed.seedT = 99` onto it. Both
+  fields were renamed here (`rides`, derived from the gait, and `rideT`), so
+  the two writes became no-ops -- and the body under measurement was then an
+  ordinary mote steering at the turret, which a STASIS also holds, so the
+  RATIO still passed and the arm's entire subject was gone. Nothing failed.
+  Spawn the body that HAS the capability (`debugSpawn('seed', ...)`) and
+  assert the liveness beside the ratio: it is a rider, it is locked on the
+  BULWARK it was given, and its own clock ran, in BOTH arms. Measured
+  properly the real seed reads **94.9 u/s free against 1.4 held**, a factor of
+  68 -- which is the "sixty-five times a held body" the note above that case
+  has claimed since it was written, measured for the first time by the case
+  that claims it. Same family as the build-318 grip counter: a proxy cannot
+  see the thing it is a proxy for moving.
+- **...AND NEITHER IS WHAT A RIDDEN BODY BREAKS INTO, WHICH IS OLDER THAN
+  THIS BUILD.** `this.maxHp` and `this.armor` are what the ring has made of a
+  body, and the promise of a ring is that shooting a ball off takes its share
+  back -- so a QUARRY passing those to the three it fractures into is the
+  share not coming back, permanently, out of a ring that no longer exists.
+  Measured on a full ring: a SEED's three took the parent 459 to 1285 and
+  each child from 118 health to **386**; a LATCH's three took the plate 0.22
+  to 0.8 and each child from 0.121 to **0.44**; and the RADIUS is the third
+  face of it -- a SEED-ridden QUARRY stands at 64 and its children came out
+  at **38.4 against 24**, which is mass, hit size, salvage and one more
+  generation before `splits.floor` stops the cascade. Health and radius have
+  been leaking since QUARRY met a SEED in build 312 and the armour arrived
+  with this build; all three are one expression: `graftBase*` is what the body was
+  before any ball landed, taken after `scaleToTier`, which is exactly the
+  figure a child should be a share of. Proved by revert (331 and 0.44 against
+  118 and 0.121), and asserted against the parent's OWN pre-ring figures
+  rather than against the unridden control, because `maxHp` carries a
+  per-body 0.92-1.1 roll -- the arithmetic is exact that way and the control
+  is what proves the expression itself. **A new field that feeds an existing
+  derivation is the shape to sweep for**: this and the mote above are both
+  `this.armor` / `gait` being read by code written before either could mean
+  what it now means.
+- **AN ARMOUR CEILING HAS TO BE REACHABLE OR IT IS A DOOR THAT NEVER OPENS.**
+  `applyDamage` computes `dmg * (1 - plate)`, so flat armour from a ring is
+  bounded or the body becomes unkillable: FLINT is the most armoured loose
+  body at 0.55 and three latches at 0.2 reach **1.15**, every frontal hit cut
+  to the `Math.max(1, ...)` floor. `CFG.graft.armorCap` 0.8 follows a stated
+  rule (a fully ridden body still takes a fifth of what reaches it) rather
+  than the day's arithmetic, and `check-build` asserts BOTH halves -- under 1,
+  and the worst unclamped case over it. Build 198's rule: a clamp that can
+  never clamp is a branch whose other arm is dead code. It bites at the
+  SECOND latch on a FLINT, and measured on a BULWARK the delivered damage
+  goes 66 / 46 / 26 / 20 of 100 across a ring of 0 to 3.
+- **A MEASUREMENT THAT KILLS ITS OWN WITNESS MEASURES ONE SAMPLE.** The clamp
+  arm hit a 676-health BULWARK for 1000 to read the armour off delivered
+  damage. `applyDamage` returns on its first line for a dead body and `graft`
+  refuses a dead host, so the armour column read **0.34 four times** and the
+  damage column **660 / 0 / 0 / 0** -- a clean-looking table in which only
+  the first cell was a measurement. Same family as the build-316 note about
+  two bodies destroying each other inside one frame: isolate the mechanism
+  instead of overwhelming it.
+- **...AND A DIRECTIONAL PLATE IS THE WRONG WITNESS FOR AN OMNIDIRECTIONAL
+  CLAIM.** The same arm was written on FLINT because FLINT sets the worst
+  case, and FLINT is `plated`: whether a hit meets its armour at all depends
+  on the angle between the damage and a face `Enemy.face` slews toward the
+  machine. It read a 1000-point hit delivering **1000** through an armour
+  field of 0.8 and was measuring the plate's direction. BULWARK is the most
+  armoured body whose armour is all round, so what a hit takes away IS the
+  number; FLINT's sequence is recorded off the field alone and `check-build`
+  carries its arithmetic.
+- **SAMPLE THE LAST FRAME THE STATE HELD -- build 301's rule, again.**
+  `Enemy.update` clears `staged` on the frame the body passes the entry line
+  and `drive` reads the flag inside the same frame, so the crossing frame is
+  the first LOOSE frame however the two are ordered. The staged arm read
+  **0.0167s** off the rider's clock -- one frame, on a build where the guard
+  works perfectly -- until it counted only frames that were staged at BOTH
+  ends, at which point it is exactly 0 and needs no tolerance.
+- **A PINNED WAVE DOES NOT STAY PINNED -- build 310's rule, again, and it is
+  now the second case to pay for it.** `Director.update` reshuffles its own
+  order, so loading the LATCH wave and driving `g.update` measured whatever
+  the rotation picked: the arm reported **drift, motes and SPINDLEs** for a
+  wave of latches and BLOOMs, and both numbers looked plausible. The fix
+  keeps the release and nothing else of the director
+  (`d.update = function (w) { if (this.jobs.length) this.emit(w); }`), so the
+  bodies still come through `emit` -> the portal, which is the door build
+  309's EMBER fault lived entirely inside. Measured then: 7 latches and 5
+  BLOOMs at rung 15, all 7 starting above the rim at 260 with `staged` true,
+  rings of **3/3/1**, and no latch left loose.
+- **THE GUIDE'S COUNTER WAS WRONG AGAIN AND THIS TIME IN THE OPPOSITE
+  DIRECTION FROM FLINT'S.** Measured on a full ring of three, six seconds of
+  auto-fire, host healed every frame so only balls can come off, three trials
+  each: **BOLT 3->0, 3->1, 3->0; SCATTER 3->0 thrice; HE 3->0 thrice; one
+  blast 3->0 thrice; SPINE 3->3, 3->1, 3->3; ARC 3->3 thrice.** So
+  `docs/objects.html`'s "SPINE's splinters... take it off" is the one round
+  measured here that does NOT -- its splinters are born at the exit and go
+  outward from there, past a ring the round has already crossed. And my own
+  first draft of the codex line was too PESSIMISTIC: it said the gun would
+  not pick the tick for you, which is true of `autoTarget` and invites the
+  reader to conclude ordinary fire is useless, when a round aimed at the host
+  crosses the ring at 1.45r on the way in and clears it in about six seconds.
+  What genuinely cannot touch a ball is ARC, because a chain jumps between
+  BODIES and `hitGraft` is not on that path -- worth a sentence because it is
+  a trap rather than an absence.
+- **THE GUIDE'S COLOUR WAS LURCHER'S AT dE 0.0 AND THIS TIME IT WAS
+  AVOIDABLE.** `#b98cff` is LURCHER's body colour exactly, and YOKE's. The
+  standing ruling from builds 314, 315 and 317 is that the family is what the
+  colour means and the palette has nothing well-separated left -- true, and
+  it is why SHOAL wears MOTE's cyan and SPINDLE TOW's. But a FAMILY is a
+  whole region and only one point in it was taken: swept over the violet band
+  against every field tone in the roster, **`#bf5fff` is 11.8 off the nearest
+  (SEED's GLOW, a halo rather than a silhouette), 14.8 off LURCHER's and
+  SCION's glow and 29.1 off LURCHER's body**, and reads as plainly violet.
+  Recorded because the sweep is the part worth not repeating: the
+  best-separated violet available is `#4000ff` at 46.0 and is refused for
+  reading as blue at the lightness a 9-unit body needs (a body is mostly its
+  outline, build 199), and the best-separated colour anywhere is a dark green
+  at 43.5, which means energy. **Before accepting a dE-0.0 collision, ask
+  whether the family has room** -- three objects took the collision when at
+  least this one did not have to.
+- **A RENDER OF THE PLAY CANVAS IS THE rAF LOOP'S PICTURE, NOT YOURS.** The
+  first sheet for this object drew bodies, called `g.draw()` and screenshotted
+  the page: it came back with an empty field, because the page's own loop
+  repainted between the draw and the shot. Same family as build 211's
+  screenshot trap and build 298's free-running headless loop. Render into an
+  offscreen canvas and `toDataURL` it, which is what every visual instrument
+  in `scripts/` already does -- and then LOOK at it: the sheet is what said
+  the hooked tick reads as a tick at r 9 and is nothing like SEED's plain
+  disc, which no dE number can tell you.
+- **`threatOf` CANNOT SEE WHAT A BODY DOES TO ANOTHER BODY.** A LATCH derives
+  1.33 (its 40 health over `threatPerHp`) against the object guide's authored
+  4, and the whole object is what it gives its HOST. That is FLINT's armour
+  gap in a second costume and it is recorded rather than fixed, for build
+  319's reason: weighting threat by anything but health re-prices every band
+  in the game and belongs in a pacing pass, not in the build that adds the
+  body. The wave is authored against band 3's own measured mean instead
+  (20.47 against 20.9375, so -0.25%), which is build 315's lever.
+- **A HOSTILE WITH NO TARGET NEEDS A CLOCK, AND THAT IS WHAT BEING A HOSTILE
+  COSTS.** LATCH is deliberately not `harmless` -- `threatOf` weighs harmless
+  at zero, five damage paths refuse a harmless body (so four of the five
+  things that could take a tick off before it boards would refuse to), and
+  `scaleToTier` returns on its first line for one, which would pin the ball
+  at 40 health at every rung. The price is that a latch with nothing to ride
+  counts against `standing()` and the build-291 release gate while it looks,
+  and `wander` can leave it outside `autoTarget`'s cone -- build 312's
+  `tumble` finding. `rides.life` bounds it: measured, 20.02s to expire with
+  no host against 1.5s to board with one, which is the A/B that makes "it
+  went away" mean something.
+- **A TARGET SPEED IS NOT A SPEED, FOR THE FIFTH TIME -- and this one is
+  deliberately NOT compensated.** `hunt` blends toward `cruise` at
+  `k = accel / 100` against `integrate`'s damping, so a LATCH authored at 160
+  delivers **136.4 against an arithmetic 136.5**. Builds 298, 308, 317 and
+  318 all grossed theirs up; this one does not, because `hunt` is shared with
+  SEED, nothing in the object's design is a clock or a ratio between two
+  speeds, and compensating would move a body that has behaved this way for a
+  hundred and fifty builds. The case RECORDS the arithmetic instead of
+  asserting the ask. **The rule is not "always compensate", it is "know which
+  number you are delivering"** -- the fault is a claim resting on a figure
+  nobody measured.
+- **THE RELEASE-GATE CASE HAS NOW BEEN REPAIRED ON SIX BUILDS AND THIS IS THE
+  FIRST TIME THE CONFOUNDS WERE MEASURED RATHER THAN THE RUNG MOVED.** It
+  failed build 322 -- whose content cannot reach it, proved by mechanism:
+  `bandsFor(32)` is `[4, 5]`, `shuffle` replaces its candidate list with the
+  in-band one, and the new wave is band 3, so the rotation and every
+  `Math.random()` in it are untouched. Three things were wrong with the
+  scenario and all three are the same rule.
+  - **THE LOADED ROUND, which nothing set.** The case pinned the tree, the
+    rung, the aim, the trigger and the fuse and left the AMMUNITION to
+    whatever the six hundred cases upstream had selected -- and it is the
+    largest single lever on whether the run needs rescuing at all. Swept, one
+    round at a time, same everything else: **BOLT held 142.1s of 240 at a
+    separation of 0.484, SCATTER 104.8s / 0.479, HE 81.5s / 0.715, SPINE
+    64.4s / 0.625, TITHE 56.3s / 0.803.** The failing suite run read 53.5s
+    and 0.954, which is off the TITHE end of that table: a gun that clears
+    what arrives does not need the gate, the two arms converge, and the ratio
+    walks to 1. The case's own docstring already required a build with
+    "nothing that makes the gun hit harder".
+  - **THE ROTATION, so the two arms played different waves.** `shuffle` draws
+    its order with `Math.random`, and band 5's waves differ by a factor of
+    two in what they weigh, so the A/B's two halves were not measuring the
+    same field. Pinned to one deterministic order and asserted. Two wrong
+    versions of that assertion first: requiring the two PLAYED lists to match
+    fails outright, because playing fewer waves is the gate's whole effect
+    (4 against 17); requiring the gated arm's to be a PREFIX of the loose
+    arm's failed one run in four, because `begin()` goes through `admit()`,
+    which splices the order it is walking. **What is assertable is the order
+    the two arms were HANDED**, read at install time -- read out of `d.order`
+    at the END of a run it disagrees four times in five, which is the
+    rotation being consumed rather than being unfair.
+  - **AND ONE RUN IS STILL A DRAW.** With all four pinned, five trials read
+    0.674, 0.749, 0.532, 1.026 and 0.592 -- one in five over the ceiling.
+    Three runs an arm, pooled, reads **0.530, 0.585, 0.626** over three
+    trials against the same 0.95, and the per-run means are printed so the
+    next reader sees the spread rather than inferring it. That is the rule
+    this case has now been taught three times: measure a population, not a
+    draw.
+  **The general lesson is the diagnosis, not the fix.** Six builds of moving
+  the rung were six builds of tuning a number; one afternoon of asking what
+  the two arms actually differ in found three confounds, each bigger than the
+  threshold's entire headroom. When an A/B flakes, enumerate what the two
+  arms do NOT share.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

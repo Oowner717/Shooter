@@ -318,6 +318,45 @@ export const CODEX = [
     line: 'Two halves on a rigid beam, sharing one pool of health between them. Damage anywhere drains the same number, so focusing one half buys you nothing -- but land half the pool on one and it comes off the beam, and the other keeps every point that is left, unencumbered and half again as fast. Take them together with something that reaches both.',
   },
   {
+    id: 'latch',
+    name: 'LATCH',
+    /*
+     * Every counter here is MEASURED, which is build 319's rule and the
+     * reason that build had to rewrite FLINT's line: a counter named in prose
+     * is a promise, and FLINT's named two answers that were worse than
+     * useless. See the LATCH block in config.js for the rest of the numbers.
+     *
+     * A full ring of three on a BLOOM, six seconds of auto-fire, the host
+     * healed every frame so only the balls can be what came off -- three
+     * trials each:
+     *
+     *   BOLT      3 -> 0, 3 -> 1, 3 -> 0
+     *   SCATTER   3 -> 0 every time
+     *   HE        3 -> 0 every time
+     *   one blast (4 x 110 at r 120)  3 -> 0 every time
+     *   SPINE     3 -> 3, 3 -> 1, 3 -> 3
+     *   ARC       3 -> 3 every time
+     *
+     * So the FIRST draft of this line was wrong in the same direction FLINT's
+     * was. It said the gun would not pick the tick for you -- true of
+     * `autoTarget`, which chooses bodies -- and left the player to infer that
+     * ordinary fire is no use, when a round aimed at the host crosses the
+     * ring at 1.45r on its way in and clears it in about six seconds. And
+     * `docs/objects.html` names "SPINE's splinters" as an answer, which is
+     * the one round measured here that is not: its splinters are born at the
+     * exit and go outward from there, past a ring the round has already
+     * crossed. What genuinely cannot touch a ball is ARC, because a chain
+     * jumps between BODIES and `hitGraft` is not on that path at all -- which
+     * is worth a sentence, because it is a trap rather than an absence.
+     *
+     * The line quotes no figure. "Closes wounds half again as fast as a SEED"
+     * follows `rides.regen` (14 against 9 = 1.56x) and stays true through a
+     * tuning pass; "14 a second" would not, which is the fix DRIFT's line
+     * needed when both of its numbers turned out to be wrong.
+     */
+    line: 'It is not coming for you. It runs at the biggest body on the field and rides it, and while it is aboard that body turns away more of every hit and closes its wounds half again as fast as a SEED does -- three at once and you are shooting something that mends faster than you are breaking it. The ring is the cheap target, and rounds meant for the body cross it on the way in, so ordinary fire does clear it; one blast takes the whole ring at once. What will not touch it is a chain: ARC jumps between bodies, and a ball is not one.',
+  },
+  {
     id: 'quarry',
     name: 'QUARRY',
     line: 'One body that is nine, and the lines it will break along are already drawn on it. Each generation is smaller, faster and thinner-plated than the one it came out of, and nothing it does is aimed at you -- it takes no lane, crosses the field, turns off the walls and spins the whole way. Where you break it is the decision: high and the pieces have the field to spread in, low and they are already on the mount.',
