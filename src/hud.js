@@ -1622,12 +1622,38 @@ export class Hud {
      * does not.
      */
     const done = (world.reconciled || []).length;
+    /*
+     * ...AND WHAT IS ACTUALLY PAINTED ON THE CURRENT RUNG, which is the same
+     * fault `done` above was added to fix, one readout along.
+     *
+     * The glyphs and the `offering` mark are written only inside this block,
+     * so they followed the run's POSITION rather than the thing they show:
+     * measured at build 327, a wave scored without moving the rung left its
+     * two trait glyphs on the cell for the whole rest -- and a wave that DID
+     * move repainted them onto the new rung, which is worse, because they are
+     * then the rules of a wave that has been judged shown against the one
+     * about to be chosen. The docstring on `done` says exactly this about the
+     * gate: "the live path happens to move the tier a line later, which is
+     * exactly the kind of accident that holds until it does not."
+     *
+     * The meters are already honest and are the comparison worth making:
+     * `syncRailBars` runs every frame and empties them on `dir.resting`. Only
+     * the glyphs were keyed on somewhere else.
+     *
+     * Keyed on the STRING rather than on the traits array, because that is
+     * what reaches the DOM -- and the offer's count with it, since the
+     * `offering` class is written on the same line and `railGlyphs` cannot
+     * see it.
+     */
+    const glyphs = this.railGlyphs(dir);
+    const shown = `${glyphs}|${dir.laneOffer ? dir.laneOffer.length : 0}`;
     if (this._railAt !== n || this._railPeak !== peak || this._railTrial !== trial
-        || this._railDone !== done) {
+        || this._railDone !== done || this._railShown !== shown) {
       this._railDone = done;
       this._railAt = n;
       this._railPeak = peak;
       this._railTrial = trial;
+      this._railShown = shown;
       /*
        * Where the window sits. Centred on the run's own position, and pushed
        * off the floor rather than showing tiers that do not exist: at tier 1
@@ -1681,7 +1707,7 @@ export class Hud {
          * that has not been chosen yet. What the rail can honestly say is
          * what is in play now, and what the gate is offering.
          */
-        const want = t === n ? this.railGlyphs(dir) : this.railAhead(dir, t);
+        const want = t === n ? glyphs : this.railAhead(dir, t);
         if (c.glyphs !== want) {
           c.glyphs = want;
           c.traits.textContent = want;

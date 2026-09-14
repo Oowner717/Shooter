@@ -5812,4 +5812,88 @@ came from before believing the other one covers it.
   shipped is the cheapest one there is**, because a red case then is
   unambiguously the case's fault.
 
+- **A WAVE'S RULES BELONGED TO THE DIRECTOR AND NOTHING GAVE THEM BACK.**
+  Build 327. `Director.load` is the ONLY writer of `traits` and `pairing`, and
+  neither `score` nor `abandonWave` nor `recallWave` nor `glitchOut` cleared
+  either -- so from the frame a wave was judged until the next one loaded, the
+  director went on holding the rules of a wave that was over. Four things read
+  that field and three were wrong for the window: the REMNANT return, the
+  TETHERED pairing and the rail's glyphs.
+- **THE RETURN WORE WHATEVER THE DIRECTOR HAPPENED TO BE HOLDING SIX SECONDS
+  LATER.** `respawnBody` goes through `release` -> `spawnOne` ->
+  `scaleToTier`, which stamps `e.traits = d.traits`. Measured with the seed
+  pinned at rung 32, both directions: born under `swarm+mending` with the next
+  wave untraited the return wore **NOTHING**; born untraited with the next wave
+  `swarm+mending` it wore **BOTH** -- MENDING closing the health of a body
+  whose entire design is that it comes back at half. The promise carries them
+  now, which is the ownership `wave`, `hp`, `quick` and `pay` already had.
+- **...AND THE ACCIDENT THAT HID IT IS WHY THE TWO HALVES HAVE TO SHIP
+  TOGETHER.** A return landing in the REST read the right rules, because
+  nothing had overwritten them yet -- so clearing at the wave's end WITHOUT
+  the promise carrying them would have turned a correct case into a wrong one,
+  stripping a return of rules it was entitled to. And stamping without
+  clearing leaves the rail and the tether. Neither half is the fix; the pair
+  is. **When a field has one writer and several readers, ask what each reader
+  wants in the window where the writer is silent** -- two of them wanted
+  opposite things.
+- **A RETURN IN THE REST WAS STRUNG TO THE PREVIOUS WAVE'S ODD BODY.**
+  `spawnGroup`'s TETHERED block pairs a new body with `d.pairing`, guarded
+  only on that body being alive; `load` clears it, so the exposure is exactly
+  the window before the next wave begins -- and the return is the one spawn in
+  ordinary play that reaches it. Measured on the unfixed build: the return
+  tethered to the odd LURCHER of the wave before, `oddNowTethered` true, the
+  two of them sharing one pool across a wave boundary. Not a bounded window
+  either: build 291's release gate holds the next wave until the field thins,
+  which its own measurement says can be tens of seconds.
+- **MY FIRST PROBE FOR THAT CONSUMED THE THING IT WAS MEASURING AND REPORTED
+  THE FAULT ABSENT.** It released the odd LURCHER and then the REMNANT, so the
+  two of them paired with each other, `d.pairing` went null, and the return
+  had nothing to be strung to -- `partnerIsOldWaveBody: false` on a build where
+  the fault is real. Reordering it (the remnant first, dead, and therefore
+  REFUSED as a partner by `!waiting.dead`) leaves the lurcher genuinely odd
+  and the fault reads immediately. **A probe that has to set up a queue can
+  empty it**; check the state you meant to arrange before believing a zero.
+- **THE RAIL'S REPAINT WAS KEYED ON THE RUN'S POSITION AND NOT ON WHAT IT
+  PAINTS -- and the docstring three lines above it already said so about a
+  different field.** `syncRail`'s whole cell loop sits inside
+  `if (this._railAt !== n || this._railPeak !== peak || this._railTrial !==
+  trial || this._railDone !== done)`, and the current rung's trait glyphs are
+  written only in there. So the glyphs followed the rung: measured, a wave
+  scored without moving the rung left its two glyphs up for the whole rest,
+  and a wave that DID move repainted them onto the new rung -- the rules of a
+  judged wave shown against the one about to be chosen. `done` was added to
+  that predicate for the identical reason and its comment reads "the live path
+  happens to move the tier a line later, which is exactly the kind of accident
+  that holds until it does not". The comparison that makes it a fault rather
+  than a quibble is the sibling: `syncRailBars` runs every frame and empties
+  its meters on `dir.resting`. Keyed on the STRING now, plus the offer's count,
+  because that is what reaches the DOM and `railGlyphs` cannot see the offer.
+- **A CLEAR IN `score` GOES ABOVE THE PROBE BRANCH, WHICH RETURNS EARLY.** A
+  trial is scored too and its rules have to go as well, so the two lines sit
+  with `contact`, `hitPatience` and `take` -- the wave-scoped clears that were
+  already on every path -- rather than at the end of the function where the
+  ladder work happens.
+- **A CONJUNCT THAT FAILS FOR THE OTHER HALF OF YOUR OWN BUILD IS A CONJUNCT
+  IN THE WRONG ARM.** The return arm's control originally asserted
+  `alone.holding === '-'`, which is only true because the wave-end clear ran --
+  so reverting the CLEARS failed the arm about the STAMP. Removed with the
+  reason at the site, and the revert matrix is clean: the stamp's revert fails
+  arms 1 and 3, the clears' fails 2 and 3, the rail predicate's fails 2 alone.
+  **Prove each mechanism separately and check the attribution**, or a red arm
+  names the wrong fix.
+- **`restart()` RE-ROLLS `world.runSeed`, SO TRAIT SETS ARE NOT REPRODUCIBLE
+  ACROSS A RESET.** `traitsFor` is seeded off it, and the first two runs of
+  this build's probe drew different sets for the same wave indices -- which
+  reads as the mechanism being unstable. Pinned in the probe and in the case,
+  which is also what lets the case pick two waves whose sets are known to
+  differ. A case that needs two DIFFERENT trait sets and does not pin the seed
+  may be comparing one set with itself.
+- **`laneOffer` is cleared in `Director.restore` now, and it is a belt.**
+  `captureRun` writes eleven wave keys and `laneOffer` is not among them, so
+  there is nothing to restore it FROM and the question is purely about
+  clearing; `restore` is only ever reached through `Game.reset`, which has
+  already built a fresh Director. One line for a door that cannot be opened
+  today and would hand over a free trait lane for `laneFor` rungs if it ever
+  could.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

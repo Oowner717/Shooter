@@ -3217,6 +3217,32 @@ export class Enemy {
         // not a release, so asking it again would answer a different question.
         hp: Math.max(1, Math.round(this.maxHp * rs.hp)),
         quick: rs.quick,
+        /*
+         * ---- AND ITS OWN WAVE'S RULES, CAPTURED HERE ----------------------
+         *
+         * Build 327. `respawnBody` goes through `release` -> `spawnOne` ->
+         * `scaleToTier`, which stamps `e.traits = d.traits` -- the rules the
+         * director is holding AT THE MOMENT THE BODY LANDS, which after six
+         * seconds is very often not this wave's. `load()` is the only writer
+         * of `d.traits` and nothing cleared it, so the return read whatever
+         * had been seeded last.
+         *
+         * Measured, seed pinned, rung 32, both directions: born under
+         * `swarm+mending` and the next wave untraited, the return wore
+         * NOTHING; born untraited and the next wave `swarm+mending`, the
+         * return wore BOTH -- MENDING closing the health of a body whose
+         * entire design is that it comes back at half. The control, with no
+         * second wave loaded, wore `swarm+mending` correctly, which is the
+         * accident that hid it: a return landing in the REST reads its own
+         * wave's rules because they had not been overwritten yet.
+         *
+         * So the promise carries them, which is the same ownership every
+         * other field here already has -- `wave`, `hp`, `quick` and `pay` are
+         * all read off the body that died rather than re-derived. A copy of
+         * the array rather than the reference, because `load` builds a new
+         * one each wave but `lane` reorders the live one in place.
+         */
+        traits: this.traits ? this.traits.slice() : null,
         t: 0,
         life: rs.back,
       });
@@ -7361,6 +7387,11 @@ export class Director {
     this.done = false;
     if (ran) this.overclock.armed = false;
     this.laneOffer = null;
+    // ...and the rules, for `score`'s reason above. This is the door
+    // `glitchOut` and `Game.takeField` come through, and a wave taken away
+    // owes the next window its rules no more than a scored one does.
+    this.traits = [];
+    this.pairing = null;
     this.held = 0;
     this.glitch = 0;
     this.burnFrom = null;
@@ -7683,6 +7714,36 @@ export class Director {
     this.contact = 0;
     this.hitPatience = false;
     this.take = 0;
+    /*
+     * ---- AND THE WAVE'S RULES GO WITH THE WAVE -------------------------
+     *
+     * Build 327. `load()` seeded `traits` and `pairing` and NOTHING cleared
+     * either, so from the frame a wave was scored until the next one loaded
+     * the director went on holding the last one's -- and four things read
+     * them. Two are readouts (`Hud.railGlyphs` on the current rung's cell and
+     * `Hud.syncSheet`'s title), which spent every rest naming the rules of a
+     * wave that had just been judged, directly above a line reading BETWEEN
+     * WAVES. Measured: `tethered+mending` and a rail still printing its two
+     * glyphs after `abandonWave`.
+     *
+     * The other two are spawn paths, and the reachable one is the REMNANT
+     * return -- the only spawn in ordinary play that fires with no wave
+     * running. Its rules now come off the promise (see `respawnBody`), so
+     * clearing here cannot strip it; and `spawnGroup`'s TETHERED block reads
+     * the DIRECTOR, so clearing is what stops a return being strung to a body
+     * from the wave before. Measured on the unfixed build: a return landing
+     * in the rest tethered to the previous wave's odd body, the two of them
+     * sharing one pool across a wave boundary.
+     *
+     * Deliberately ABOVE the probe branch below, which returns early: a trial
+     * is scored too and its rules have to go as well.
+     *
+     * NOT placed in `load` as a pre-clear, which would read as the same fix
+     * and is not one -- the whole fault lives in the window before `load`
+     * runs at all.
+     */
+    this.traits = [];
+    this.pairing = null;
 
     // A trial answers only for itself: it is not a rung of the ladder until it
     // is proven, so it neither climbs nor drops the run that armed it.
@@ -8293,6 +8354,18 @@ export class Director {
     this.lane = d.lane && d.lane.id && Number.isFinite(d.lane.until)
       && d.lane.until > owned ? { id: d.lane.id, until: d.lane.until | 0 } : null;
     this.grace = d.grace | 0;
+    /*
+     * ...and the standing lane OFFER, which `restore` has nothing to restore
+     * it FROM: `captureRun` writes eleven wave keys and `laneOffer` is not
+     * among them, so the question is purely about clearing. It is a belt --
+     * `restore` is only ever reached through `Game.reset`, which has already
+     * built a fresh Director -- but `abandonWave` and `score` are the only
+     * other clears, `restore` runs neither, and `takeLane` tests nothing but
+     * membership before writing a lane good for `laneFor` rungs. One line for
+     * a door that cannot be opened today and would hand over a free trait
+     * lane if it ever could.
+     */
+    this.laneOffer = null;
     this.probeLock = 0;
     this.contact = 0;
     this.hitPatience = false;
@@ -8959,6 +9032,19 @@ export function respawnBody(world, p) {
      * 35 is worth more than one at rung 29 exactly as every other body is.
      */
     e.bounty *= p.pay;
+    /*
+     * ...and the rules ITS OWN WAVE carried, over whatever `scaleToTier`
+     * stamped from the director a moment ago. See the `traits` note on the
+     * promise: this is the one spawn in ordinary play that fires with no wave
+     * running, so it is the one that cannot read the director for them.
+     *
+     * Written unconditionally, including when the promise carries nothing --
+     * a wave with no traits is a real answer and has to overwrite the next
+     * wave's rules rather than leave them standing. SWARM is not re-applied
+     * and never was: its halved health is overwritten by `p.hp` four lines
+     * up, which is the promise's own figure.
+     */
+    e.traits = p.traits && p.traits.length ? p.traits : null;
   }
   return made;
 }

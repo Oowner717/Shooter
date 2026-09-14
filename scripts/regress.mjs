@@ -35820,6 +35820,292 @@ if (MINE_LINE) {
 }
 
 /*
+ * ---- A WAVE'S RULES BELONG TO THE WAVE, AND THE WINDOW AFTER IT HELD THEM --
+ *
+ * Build 327. `Director.load` is the ONLY writer of `traits` and `pairing`, and
+ * nothing cleared either -- so from the frame a wave was scored until the next
+ * one loaded, the director went on holding the rules of a wave that had been
+ * judged. Four things read them, and three of the four were wrong for that
+ * window.
+ *
+ * THE RETURN. `respawnBody` is the one spawn in ordinary play that fires with
+ * no wave running, and it goes through `release` -> `spawnOne` ->
+ * `scaleToTier`, which stamps `e.traits = d.traits` -- whatever is held at the
+ * moment the body lands, six seconds after the death that owed it. Measured,
+ * seed pinned, rung 32: born under `swarm+mending` with the next wave
+ * untraited the return wore NOTHING, and born untraited with the next wave
+ * traited it wore BOTH -- MENDING closing the health of a body whose entire
+ * design is that it comes back at half. The control, with no second wave
+ * loaded, wore its own rules correctly, and that accident is what hid it: a
+ * return landing in the REST read the right thing because nothing had
+ * overwritten it yet. The promise carries them now, which is the ownership
+ * `wave`, `hp`, `quick` and `pay` already had.
+ *
+ * THE TETHER. `spawnGroup`'s TETHERED block reads `d.pairing` -- the odd body
+ * of a tethered wave, waiting for a partner -- guarded only on it being
+ * alive. `load` clears it, so the exposure is exactly the window before the
+ * next wave begins, and the return is what reaches it. Measured on the
+ * unfixed build: a return landing in the rest was strung to the previous
+ * wave's odd LURCHER, the two of them sharing one pool across a wave
+ * boundary.
+ *
+ * THE RAIL. `Hud.railGlyphs` paints the current rung's cell from the same
+ * field, and its own repaint was keyed on the run's POSITION -- so the two
+ * glyphs stayed up for the whole rest after a wave that did not move the
+ * rung, and were repainted onto the NEW rung by one that did. The meters
+ * beside them are the comparison: `syncRailBars` runs every frame and empties
+ * them on `dir.resting`.
+ *
+ * The two halves of the fix have to ship together, and that is the part worth
+ * knowing: clearing alone would STRIP a return landing in the rest of rules it
+ * was entitled to, and stamping alone would leave the rail and the tether.
+ *
+ * ---- WHAT EACH REVERT FAILS, MEASURED ----
+ *
+ * The three mechanisms are separable and were proved separately. Take the
+ * `respawnBody` stamp out and arms 1 and 3 go -- 3 because its last conjunct
+ * is that the return still WEARS `tethered`, which is what says the tether was
+ * refused by the director being empty rather than by the body having lost the
+ * rule on the way. Take the wave-end clears out and 2 and 3 go. Take
+ * `_railShown` out of `syncRail`'s repaint predicate and 2 goes on its
+ * LIVENESS half, reading an empty cell during a live traited wave -- which is
+ * the same fault from the other side and is worth stating rather than
+ * explaining away: with the repaint keyed on position alone, the only glyphs a
+ * cell can ever show are the ones that happened to be in play on the frame the
+ * run arrived at that rung.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { WAVES, TYPE_BY_ID } = await import('../src/config.js');
+    const { release } = await import('../src/enemies.js');
+    const { TRAIT_BY_ID } = await import('../src/traits.js');
+    const ids = (l) => (l || []).map((t) => t.id).join('+') || '-';
+    /*
+     * The trait sets are seeded off `world.runSeed`, and `restart()` rolls a
+     * fresh one -- so the seed is pinned or the two waves this case needs to
+     * differ may not.
+     */
+    const bare = () => {
+      g.restart();
+      w.phase = 'staging';
+      delete w.director.update;
+      w.spawnLock = 0;
+      g.debugClearField();
+      for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts', 'respawns']) {
+        if (w[k]) w[k].length = 0;
+      }
+      w.director.timer = 1e9;
+      w.director.driftTimer = 1e9;
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+      w.timeScale = 1;
+      w.boss = null;
+      w.bossN = 0;
+      w.runSeed = 20260824;
+    };
+    const d = w.director;
+    const out = {};
+    const lay = (id, x, y) => {
+      const e = release(w, TYPE_BY_ID[id], x, y)[0];
+      e.staged = false;
+      e.spawnIn = 0;
+      e.cruise = 0;
+      e.vx = 0;
+      e.vy = 0;
+      return e;
+    };
+
+    // ---- the two trait sets the roster actually produces at this rung ----
+    bare();
+    d.setTier(32);
+    const byTr = new Map();
+    for (let i = 0; i < WAVES.length; i++) {
+      if (WAVES[i].teach) continue;
+      d.load(w, WAVES[i]);
+      const k = ids(d.traits);
+      if (!byTr.has(k)) byTr.set(k, i);
+    }
+    const sets = [...byTr.entries()].map(([tr, i]) => ({ tr, i }));
+    out.sets = sets.map((x) => x.tr);
+
+    // ---- 1. a return wears the rules of ITS OWN wave ---------------------
+    const ret = (ai, bi, second) => {
+      bare();
+      d.setTier(32);
+      d.load(w, WAVES[sets[ai].i]);
+      const e = lay('remnant', w.width * 0.3, 300);
+      const born = ids(e.traits);
+      e.destroy(w);
+      const owed = w.respawns.length;
+      d.abandonWave(true);
+      if (second) d.load(w, WAVES[sets[bi].i]);
+      const holding = ids(d.traits);
+      // the promise's clock is the director's, so let the real one run
+      delete d.update;
+      d.timer = 1e9;
+      d.driftTimer = 1e9;
+      d.resting = true;
+      let f = 0;
+      let back = null;
+      for (; f < 60 * 20; f++) {
+        g.update(1 / 60);
+        const found = w.enemies.find((x) => x.cameBack);
+        if (found) { back = found; break; }
+      }
+      d.update = () => {};
+      return { born, owed, holding, arrived: !!back, wore: back ? ids(back.traits) : '(none)' };
+    };
+    out.alone = ret(0, 1, false);
+    out.lost = ret(0, 1, true);
+    out.gained = ret(1, 0, true);
+
+    // ---- 2. between waves the director carries no rules, and the rail
+    //         follows -- read off the cell's own textContent -------------
+    const look = () => {
+      g.hud.syncRail(w);
+      const cell = (g.hud.railCells || []).find((c) => c.at === d.tier);
+      return { traits: ids(d.traits), pairing: d.pairing ? 'HELD' : 'null',
+        glyphs: g.hud.railGlyphs(d), cell: cell ? (cell.traits.textContent || '') : '(no cell)' };
+    };
+    // a wave begun through the director's own door, so `resting` is false the
+    // way it is in play
+    bare();
+    d.setTier(32);
+    const idx = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
+    d.order = [idx];
+    d.at = 0;
+    d.timer = 0;
+    d.resting = true;
+    d.update = function (world) {
+      if (this.resting && this.timer <= 0) { this.begin(world); return; }
+      if (this.jobs.length) this.emit(world);
+    };
+    for (let f = 0; f < 120 && d.resting; f++) g.update(1 / 60);
+    d.update = () => {};
+    // ...and the rules forced, because which traits a rung rolls is not this
+    // case's subject and a wave with none would make the reading vacuous
+    d.traits = [TRAIT_BY_ID.tethered, TRAIT_BY_ID.mending];
+    d.pairing = lay('lurcher', w.width * 0.5, 280);
+    out.during = look();
+    out.score = (() => { d.score(w, 'clean'); return look(); })();
+    // the other door
+    d.load(w, WAVES[idx]);
+    d.traits = [TRAIT_BY_ID.tethered];
+    d.resting = false;
+    d.pairing = lay('lurcher', w.width * 0.6, 280);
+    out.loaded = look();
+    d.abandonWave(true);
+    out.abandon = look();
+
+    // ---- 3. ...so a return in the rest is not strung to the wave before --
+    {
+      bare();
+      d.setTier(32);
+      d.load(w, WAVES[idx]);
+      d.traits = [TRAIT_BY_ID.tethered];
+      /*
+       * The remnant goes through the TETHERED block first and is refused as a
+       * partner once dead (`!waiting.dead`), so the LURCHER below is the one
+       * left waiting -- which is the arrangement any tethered wave with an
+       * odd count makes.
+       */
+      const rem = lay('remnant', w.width * 0.7, 320);
+      rem.destroy(w);
+      const owed = w.respawns.length;
+      const odd = lay('lurcher', w.width * 0.4, 300);
+      const held = d.pairing === odd;
+      d.abandonWave(true);
+      delete d.update;
+      d.timer = 1e9;
+      d.driftTimer = 1e9;
+      d.resting = true;
+      let f = 0;
+      let back = null;
+      for (; f < 60 * 20; f++) {
+        g.update(1 / 60);
+        const found = w.enemies.find((x) => x.cameBack);
+        if (found) { back = found; break; }
+      }
+      d.update = () => {};
+      out.tether = { owed, held, arrived: !!back,
+        wore: back ? ids(back.traits) : '(none)',
+        tethered: !!(back && back.tether),
+        toOldWave: !!(back && back.tether && back.tether.other === odd),
+        oddTethered: !!odd.tether };
+    }
+
+    // nothing left behind: a pending return holds an old wave serial open
+    for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts', 'respawns']) {
+      if (w[k]) w[k].length = 0;
+    }
+    bare();
+    w.director.update = () => {};
+    return out;
+  });
+
+  const two = r.sets.length >= 2 && r.sets[0] !== r.sets[1];
+  const kept = [r.alone, r.lost, r.gained].every((x) => x.arrived && x.owed === 1 && x.wore === x.born);
+  check('a REMNANT comes back wearing its own wave\'s rules and not whatever the director is holding',
+    // the roster really does produce two different sets, or the two arms
+    // below are the same arm
+    two
+    && kept
+    // ...and the two moved arms were measured against a director holding
+    // something ELSE, which is the whole claim
+    && r.lost.holding !== r.lost.born && r.gained.holding !== r.gained.born
+    /*
+     * Deliberately NOT asserting what the director holds in the control arm.
+     * It reads '-' because the wave-end clear ran, and requiring that here
+     * made this arm fail for the OTHER half of the build -- a conjunct
+     * failing for a reason the case is not about. The control's job is that
+     * a return with nothing loaded after it keeps its rules, which
+     * `wore === born` above already says.
+     */,
+    `born / director holding at landing / worn: alone ${r.alone.born} / `
+    + `${r.alone.holding} / ${r.alone.wore}; next wave untraited ${r.lost.born} / `
+    + `${r.lost.holding} / ${r.lost.wore}; next wave traited ${r.gained.born} / `
+    + `${r.gained.holding} / ${r.gained.wore} -- against '-' and `
+    + `'${r.sets[0]}' worn respectively before the promise carried them`);
+
+  check('a wave that has been judged takes its rules with it, on the rail as well as in the model',
+    // LIVENESS: while a wave is running the model holds rules and the cell
+    // paints them, or the four emptied readings below are about nothing
+    r.during.traits !== '-' && r.during.glyphs !== '' && r.during.cell !== ''
+    && r.loaded.traits !== '-' && r.loaded.cell !== ''
+    && r.during.pairing === 'HELD' && r.loaded.pairing === 'HELD'
+    // THE CLAIM, at both doors: no rules, no held body, and an empty cell
+    && r.score.traits === '-' && r.score.glyphs === '' && r.score.cell === ''
+    && r.score.pairing === 'null'
+    && r.abandon.traits === '-' && r.abandon.glyphs === '' && r.abandon.cell === ''
+    && r.abandon.pairing === 'null',
+    `during a wave ${r.during.traits} with the cell reading '${r.during.cell}' and `
+    + `pairing ${r.during.pairing}; scored, ${r.score.traits} / '${r.score.cell}' / `
+    + `${r.score.pairing}. Loaded again ${r.loaded.traits} / '${r.loaded.cell}'; `
+    + `abandoned, ${r.abandon.traits} / '${r.abandon.cell}' / ${r.abandon.pairing}`);
+
+  const te = r.tether;
+  check('...and a return landing in the rest is not strung to the wave before it',
+    // the wave really did leave an odd body waiting, or there was nothing for
+    // the return to be strung to
+    te.owed === 1 && te.held && te.arrived
+    // THE CLAIM
+    && !te.tethered && !te.toOldWave && !te.oddTethered
+    // ...and it still carries its own wave's rule, which is what says the
+    // tether was refused by the DIRECTOR being empty rather than by the
+    // return having lost TETHERED along the way
+    && te.wore === 'tethered',
+    `one promise owed and the previous wave's odd body held in pairing `
+    + `${te.held}; the return arrived wearing ${te.wore}, tethered ${te.tethered}, `
+    + `to that body ${te.toOldWave}, and the odd body is still single `
+    + `${!te.oddTethered} -- against a measured tether to it, sharing one pool, `
+    + `before the rules were cleared at the wave's end`);
+}
+
+/*
  * ---- A TEARDOWN IS NOT A DESTRUCTION, AND THE GLOSSARY IS WHERE IT SHOWED --
  *
  * Build 325. `Game.sweep` is
