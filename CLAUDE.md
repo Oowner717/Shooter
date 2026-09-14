@@ -5896,4 +5896,130 @@ came from before believing the other one covers it.
   today and would hand over a free trait lane for `laneFor` rungs if it ever
   could.
 
+- **ANVIL IS IN FROM BUILD 328, AND BOTH HALVES OF IT ARE REFUSALS.** Phase
+  6o, the fifteenth of the twenty, band 5. `gait: 'creep'` takes no arc and
+  `planted` takes no impulse, and the object is what they add up to: no button
+  answers it and no angle avoids it. Five to go -- VEIL, GYRE, LOOM, MIRE,
+  KITE.
+- **EVERY SHOVE IN THE GAME ARRIVES THROUGH TWO DOORS, WHICH IS WHY THE
+  REFUSAL IS TWO LINES.** `Enemy.applyDamage` zeroes the `impulse` argument
+  for a planted body -- that is a round's knockback, PULSE, PILE, HEAVE, HAIL,
+  a DECOY's parting blast, WELL's knot and every `applyBlast` caller, because
+  a blast bills its push there too -- and `resolvePair` gives it no share of
+  either correction. Measured with a 3000-impulse hit carrying `throwOff`, the
+  shape a pressed ability takes: **0.00 u/s against a BULWARK's 91.45 and a
+  LURCHER's 643**, with the damage still landing so the zero is a refusal of
+  the SHOVE and not of the hit. The anvil is the heaviest of the three
+  (`invMass` 0.016 against 0.031 and 0.214), so the controls also say the zero
+  is not just mass.
+- **`planted` IS `plow`'S ARITHMETIC WITH THE ROLES SWAPPED, and reusing the
+  expression is the point.** `resolvePair` already had `ia = aPlow ? 0 :
+  a.invMass` -- a body that takes no share of a contact -- so a planted body
+  is the same line, and `invSum <= 0` then covers planted-against-static for
+  free. The other half is the plow's own guard read forwards: `b.invMass > 0`
+  disables a plow against something that cannot be moved, and a planted body
+  is something that cannot be moved, so **a hurled MASS stops on an anvil
+  instead of driving it down the field** -- measured, the anvil moved 0.2
+  units under a 620 u/s plowing body and the MASS ended dead at -102.
+- **THE GUARD GOES ON THE FLAG, FOR THE FOURTH TIME.** Neither reader asks the
+  type anything, so a second `planted` type would inherit the whole of ANVIL's
+  design in silence -- `plated` (319), `rides` (322), `respawn` (324) and
+  `levels ?? 3` (224) are the same shape. `check-build` refuses a second one
+  and holds the pairing (`planted` without `creep` is a body nothing can move
+  that still takes an evasive arc, which is half an object).
+- **AN `opens` ON A NEW TYPE FAILS THE PRE-180 MIGRATION GUARD, AND THE GUARD
+  IS RIGHT.** The first draft carried `opens: MB(4)`; `check-build` requires
+  every gated type's threshold to sit under its own old KILL gate times
+  twelve, and that table is frozen history, so a type that did not exist
+  before build 180 reads as `0 * 12000 < MB(4)` and the build stops. The gate
+  was the mistake and it would have done nothing anyway: **the BAND is the
+  gate for all of the twenty** -- band 5 is only drawn at rungs 29-35, and a
+  run standing there has banked orders of magnitude more than any threshold
+  worth writing. All fifteen shipped objects carry `opens: 0`.
+- **THE GUIDE'S SPEED AND ITS CLOCK COULD NOT BOTH HOLD, FOR THE FOURTH TIME
+  THIS PHASE.** `docs/objects.html` authors `speed: 18` and a counter of "the
+  twenty-six seconds it takes to cross". The column a CLOSING body crosses is
+  the portal's rim to the MOUNT -- 671 units at era 1 and 1202 at era 2 -- so
+  18 u/s is 37 and 67 seconds against a band-5 wave that already has a
+  120-second cap four of its seven rungs miss. The clock is the design, so the
+  speed is derived from it (1202 / 26 = 46.2), and `creep` joins `dive` in
+  `OWN_SPEED` so a dawdling route cannot make an authored clock a spawn roll.
+  Delivered **45.8 u/s, 27.5s at era 2 and 15.8s at era 1**. EMBER's speed
+  (307), LANTERN's clock (308) and SHRIKE's climb (317) were the other three.
+- **...AND THE COLUMN A RISE BODY CROSSES IS NOT THE COLUMN A HOSTILE
+  CROSSES.** Floor-to-rim is 963 and 1481 and is what every `rise` clock is
+  derived from, because a rise body's journey ends at the rim. A hostile's
+  ends ON the machine, 671 and 1202. The first draft of ANVIL's note used the
+  rise figures, and the first version of the crossing probe waited for the
+  floor line and **timed out at 300 seconds with the body sitting on the
+  mount**. Ask where the journey ends before dividing by a column.
+- **A TARGET SPEED IS NOT A SPEED, EIGHTH TIME, AND `accel` 40 MAKES IT THE
+  WORST CASE YET.** The steady state is `cruise * k / (k + damping)` with
+  `k = accel / 100`, so ANVIL's 40 delivers **0.42 of the ask** -- the largest
+  discount of any gait that has met this. Compensated in the gait branch the
+  way `dive` does it, overwriting `cruise` outright rather than scaling what
+  the constructor rolled, because a crossing time quoted as a number cannot be
+  14% either side of itself.
+- **"IT DOES NOT STEER" IS ABOUT THE ARC, NOT ABOUT THE COLUMN, and reading it
+  the other way is build 312's `tumble` fault.** A hostile that stops steering
+  at the machine comes to rest wherever it stopped, and a body at floor level
+  out to one side is outside `autoTarget`'s 78-degree cone for ever -- which
+  with build 291's release gate is a run that can never climb again. So
+  `creep` still closes; what it declines to add is the route's lateral.
+- **MEASURING "STRAIGHT" AGAINST A LINE YOU BUILD YOURSELF MEASURES YOUR
+  LINE.** The first version of that arm asserted zero lateral movement and
+  failed at 69 units on a working build, because a body released off to one
+  side MUST converge on the machine. The second built the start-to-mount line
+  and read 20 units -- mostly the body's slow turn onto its own heading from a
+  standing start -- while a routed BULWARK read 3, i.e. **the control came out
+  straighter than the subject**. What works is intrinsic: path length over
+  chord, which needs no knowledge of where `drive` aims. Anvil **1.0089**
+  against a LURCHER on each of the six routes at 1.085 / 1.102 / 1.190 /
+  1.177 / 1.147 / 1.086 -- and the control is all six rather than one, because
+  `route` is a per-body roll and the six differ by a factor of two in how far
+  they swing.
+- **THE BAND'S BUDGET IS THE OTHER DELIVERABLE, AND IT CANNOT BE TUNED AWAY.**
+  `threatOf` is health over `threatPerHp`, so 1400 health weighs 46.7 against
+  band 5's mean of 33.0 -- there is no wave containing one anvil that lands
+  near that mean, and scaling the health until it does would mean the heaviest
+  body in the game is not. Measured either side in one container: band 5
+  **33.0 -> 34.1, +3.3%**, and the other four bands identical. QUARRY paid
+  +9.3% for band 4 on the same terms at build 312.
+- **...AND A CONJUNCT ON HOW LITTLE A WAVE MOVES ITS BAND IS A CONJUNCT ON THE
+  WHOLE ROSTER.** REMNANT's arm asserted `|moved| < 0.05` %, which was the
+  measured -0.0095% when it was written -- and ANVIL's wave joining band 5 at
+  49.8 against a mean of 35.2 took the mean this wave is compared against to
+  36.6 and its own contribution to **-0.3095%**. One red case for a reason
+  that has nothing to do with REMNANT. The durable claim is that THIS wave was
+  priced at its band's mean (within 10%, build 315's lever) and re-prices the
+  band by under half a per cent; a sibling arriving heavy does not make that
+  false. Count-of-the-roster, wearing a decimal.
+- **MOTE IS THE PARTNER BECAUSE OF WHAT IT IS NOT.** The two-or-three-hostile
+  rule exists because "the problem is a combination", and the combination here
+  is a thing that cannot be moved beside things that are nothing but movement:
+  the press that clears the motes off the mount does nothing at all to the
+  anvil behind them. A heavy partner would just be two walls.
+- **THE CODEX LINE WAS MEASURED BEFORE IT WAS WRITTEN, which is build 319's
+  correction applied in advance.** FLINT's line named two counters that did not
+  work; ANVIL's names the gun and the clock and nothing else, with the clock
+  as a comparison rather than a figure -- the speed is derived and a quoted
+  number would rot. It deliberately does not name a mine
+  (`CFG.mines.inPlay` false since 289) and does not invite the player to look
+  for a face: `armor` here is ordinary all-round armour, not FLINT's plate,
+  and suggesting otherwise would be FLINT's fault in reverse.
+- **THE CONTAINER WAS REPROVISIONED MID-BUILD AND TOOK THE WHOLE WORKING TREE
+  WITH IT, INCLUDING THE SCRATCHPAD.** Build 328 was fully measured and
+  case-green when `/home/user/Shooter` came back with nothing in it but
+  `.git`, itself freshly initialised -- no HEAD, no objects -- and
+  `/tmp/claude-0` gone, so the two `.keep` copies of the edited sources died
+  with it. `git fetch origin <branch>` then `git checkout <branch>` recovered
+  build 327 from the remote and every edit was retyped from the transcript,
+  which cost a session's worth of context for no new knowledge. **Commit the
+  source edits the moment the mechanism measures, before writing the case**:
+  the environment note at the top of every session says anything worth keeping
+  has to be committed and pushed, and a build is at its most expensive to lose
+  exactly when the measuring is done and the writing has not started. A local
+  `.keep` copy is not a backup -- it is in the same container as the thing it
+  is backing up.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

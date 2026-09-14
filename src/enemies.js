@@ -222,6 +222,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'latch': drawLatch(ctx, r, 0, 0); break;
     case 'chaff': drawChaff(ctx, r, 0, 0); break;
     // the glossary shows the FIRST one: a remnant nobody has killed yet
+    case 'anvil': drawAnvil(ctx, r, 0, 0); break;
     case 'remnant': drawRemnant(ctx, r, 0, 0, false); break;
     default: drawShard(ctx, r);
   }
@@ -2297,6 +2298,57 @@ export class Enemy {
       const nd = Math.hypot(dx, dy) || 1;
       dx /= nd;
       dy /= nd;
+    } else if (!this.staged && this.type.gait === 'creep' && !this.isDrop) {
+      /*
+       * ---- CREEP: the straight line, and nothing else ---------------------
+       *
+       * It owns the steering the way `dive` does rather than offsetting the
+       * route, because the whole gait is the ABSENCE of an arc: the target is
+       * the machine and the lateral is zero, so an anvil arrives along the
+       * bearing it was released on. `tx, ty` already hold the machine -- the
+       * route's offset is what the other arms add to it -- so this branch
+       * only has to decline to add one. Measured as path length over chord:
+       * 1.0082, against 1.081 to 1.298 for a LURCHER on each of the six
+       * routes from the same release point.
+       *
+       * It still CLOSES, and that is not a detail. Build 312's `tumble`
+       * finding is that a hostile which stops steering at the machine comes
+       * to rest wherever it stopped, and a body at floor level out to one
+       * side is outside `autoTarget`'s 78-degree cone for ever -- which with
+       * build 291's release gate is a run that can never climb again. "It
+       * does not steer" is about taking no evasive arc, not about walking
+       * down its own column.
+       *
+       * The wobble goes with the arc: `drive`'s heading wander is applied
+       * below off `this.type.wobble`, and the type authors 0.
+       *
+       * ---- AND THE SPEED IS THE CLAIM, SO IT IS COMPENSATED ---------------
+       *
+       * "It simply arrives at N units a second" is the object, and a target
+       * speed is not a speed: `drive` blends toward `dx * cruise` at
+       * `k = accel / 100` while `integrate` damps every substep at
+       * `linearDamping`, so the steady state is `cruise * k / (k + damping)`.
+       * At ANVIL's `accel` 40 that is 0.42 of the ask -- the eighth time this
+       * repo has met that trap and the largest discount of any gait yet.
+       * Delivered 45.8 against an authored 46.
+       *
+       * It overwrites `cruise` outright rather than scaling it, which drops
+       * the constructor's per-body `speedScale` roll: `dive` does the same
+       * and for the same reason. A crossing time quoted as a number cannot
+       * be 14% either side of itself.
+       *
+       * Three literal copies of `(k + damping) / k` now exist and are
+       * deliberately NOT extracted -- build 241's re-association note: the
+       * callers form the product in different orders and a shared helper
+       * would change one of them in the last bit.
+       */
+      const k = Math.max(0.01, this.accel / 100);
+      this.cruise = this.type.speed * ((k + CFG.physics.linearDamping) / k);
+      dx = tx - this.x;
+      dy = ty - this.y;
+      const nd = Math.hypot(dx, dy) || 1;
+      dx /= nd;
+      dy /= nd;
     } else if (!this.staged && this.type.gait === 'flock' && !this.isDrop) {
       /*
        * FLOCK, in the route's place for `roll`'s reason -- see `flockOn`. A
@@ -2853,6 +2905,31 @@ export class Enemy {
       }
       return;
     }
+    /*
+     * ---- PLANTED: every impulse in the game is refused --------------------
+     *
+     * Build 328, and this is the one line that makes ANVIL what it is. Every
+     * shove in the game arrives through this function's `impulse` argument --
+     * a round's knockback, PULSE, PILE, HEAVE, HAIL, a DECOY's parting blast,
+     * WELL's knot and every `applyBlast` caller, because a blast bills its
+     * push here too. Zeroing it at the door is therefore the whole refusal
+     * for all of them, and it cannot be forgotten at a call site the way a
+     * per-source guard could. Measured on a 3000-impulse hit carrying
+     * `throwOff`: 0.00 u/s, against 91.45 for a BULWARK and 643 for a
+     * LURCHER on the identical press.
+     *
+     * ABOVE the ARMORED branch deliberately: that branch keeps a `throwOff`
+     * impulse through its own return (build 234's fix, "ARMORED discards a
+     * HIT and a THROW is not a hit"), so a guard below it would leave PULSE
+     * able to move a plated anvil on exactly the frame the plate was up.
+     *
+     * The DAMAGE is untouched. "The answer to ANVIL is a gun, not a button"
+     * is the design, and a press that did nothing at all would read as the
+     * ability being broken rather than as the body being immovable -- which
+     * is why the ring, the flash and the sound all still happen: `Shock` and
+     * every other effect are spawned by the ability, not here.
+     */
+    if (this.type.planted) impulse = 0;
     /*
      * ARMORED: the first hit each second does nothing.
      *
@@ -3684,6 +3761,7 @@ export class Enemy {
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'latch': drawLatch(ctx, this.r, this.phase, world.time); break;
       case 'chaff': drawChaff(ctx, this.r, this.phase, world.time); break;
+      case 'anvil': drawAnvil(ctx, this.r, this.phase, world.time); break;
       case 'remnant': drawRemnant(ctx, this.r, this.phase, world.time, this.cameBack); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
       default: drawChip(ctx, this.r, this.phase);
@@ -5710,6 +5788,71 @@ function drawScion(ctx, r, phase, time) {
  * the parameter exists at all. `check-build`'s shape-args guard is what makes
  * both call sites supply it.
  */
+/**
+ * ANVIL: a flanged block on two short legs, wider at the base than the top.
+ *
+ * Drawn from `docs/objects.html`'s own figure -- a trapezoid with the wide
+ * edge DOWN, a waist line, a heavy base rail that overhangs both sides, five
+ * rivets across the top and two legs -- because the guide's picture is the
+ * one thing about this object that needed no correction.
+ *
+ * `upright` on the type is what keeps it that way: the flange is the whole
+ * silhouette and a block rotated by a random spawn `angle` reads as rubble.
+ * Build 310's EMBER and LANTERN paid for that lesson; a body whose picture is
+ * oriented to the WORLD declares it.
+ *
+ * The base rail is the heaviest stroke on any body in the game, which is the
+ * one place this drawing argues with the line ladder: `r * m.line` for a
+ * density this high is already the widest the roster produces, and the rail
+ * is drawn at a multiple of it on purpose -- it is the part that says
+ * "planted" before the player has pressed anything at it.
+ */
+function drawAnvil(ctx, r, phase, time) {
+  const lw = ctx.lineWidth;
+  // the block: wide edge down, so it reads as standing rather than falling
+  ctx.beginPath();
+  ctx.moveTo(-r, r * 0.62);
+  ctx.lineTo(-r * 0.72, -r * 0.58);
+  ctx.lineTo(r * 0.72, -r * 0.58);
+  ctx.lineTo(r, r * 0.62);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // the waist
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.86, r * 0.2);
+  ctx.lineTo(r * 0.86, r * 0.2);
+  ctx.stroke();
+  // ...and the two legs under it
+  for (let j = -1; j <= 1; j += 2) {
+    ctx.beginPath();
+    ctx.moveTo(j * r * 0.5, r * 0.2);
+    ctx.lineTo(j * r * 0.62, r * 0.62);
+    ctx.stroke();
+  }
+  // the base rail, overhanging both sides
+  ctx.lineWidth = lw * 2.6;
+  ctx.beginPath();
+  ctx.moveTo(-r * 1.02, r * 0.62);
+  ctx.lineTo(r * 1.02, r * 0.62);
+  ctx.stroke();
+  ctx.lineWidth = lw;
+  /*
+   * The rivets, and the only thing on it that moves: a slow travelling
+   * brightness along the row, so a body that never turns and never flinches
+   * is still alive on the screen. Nothing reads it -- it is phase and time,
+   * the same two arguments every other specimen takes.
+   */
+  for (let i = -2; i <= 2; i++) {
+    const kk = 0.45 + 0.55 * Math.max(0, Math.sin(time * 1.6 + phase + i * 0.9));
+    ctx.globalAlpha *= kk;
+    ctx.beginPath();
+    ctx.arc(i * r * 0.3, -r * 0.3, Math.max(1, r * 0.06), 0, TAU);
+    ctx.fill();
+    ctx.globalAlpha /= kk;
+  }
+}
+
 function drawRemnant(ctx, r, phase, time, back) {
   const seg = 5;
   const gone = back ? 2 : 0;
@@ -8775,12 +8918,17 @@ const FACES_TRAVEL = new Set(['flock', 'dive']);
  * route came out different, which is how the suite found it after three
  * standalone probes agreed with each other.
  *
+ * `creep` is the second, and its claim is the same shape: ANVIL's whole
+ * counter is the time it takes to cross, so a dawdling route would make that
+ * clock a spawn roll. It overwrites `cruise` from the type rather than
+ * scaling what the constructor rolled, for the same reason.
+ *
  * `roll` and `flock` also replace the route's STEERING and still inherit its
  * dawdle. That is left alone deliberately -- neither authors a speed, so for
  * them the modifier is just a slower approach, and changing it is a balance
  * decision rather than a correctness one.
  */
-const OWN_SPEED = new Set(['dive']);
+const OWN_SPEED = new Set(['dive', 'creep']);
 
 /**
  * How many bodies a chain is, and there is no default.

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '327';
+export const BUILD = '328';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '327';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '57b9c1d';
+export const REV = '26af230';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -5517,6 +5517,141 @@ export const ENEMY_TYPES = [
     },
   },
   {
+    /*
+     * ---- ANVIL: the heaviest thing that has ever walked down this field ---
+     *
+     * Build 328, phase 6o, and the fifteenth of the twenty. Two mechanisms,
+     * both refusals, and the object is what they add up to: it takes no arc
+     * (`gait: 'creep'`) and no impulse in the game moves it (`planted`). So
+     * there is no button that answers it and no angle that avoids it -- only
+     * the gun and the time it takes to cross. `docs/objects.html`'s own
+     * counter says exactly that: "the answer to ANVIL is a gun, not a
+     * button".
+     *
+     * ---- WHAT `planted` REFUSES, AND WHERE --------------------------------
+     *
+     * Two sites, both of them doors everything already comes through, which
+     * is why this is two lines rather than a sweep. `Enemy.applyDamage`
+     * zeroes the `impulse` argument -- every round's knockback, PULSE, PILE,
+     * HEAVE, HAIL, a DECOY's parting blast, WELL's knot and every
+     * `applyBlast` caller, because a blast bills its push there too. And
+     * `resolvePair` in physics.js gives it no share of either correction,
+     * reusing `plow`'s own expression with the roles swapped: a hurled MASS
+     * stops on it rather than driving it down the field.
+     *
+     * Measured, one 3000-impulse hit with `throwOff` -- the shape PULSE,
+     * PILE, HEAVE and HAIL all carry: **0.00 u/s, against 91.45 for a BULWARK
+     * and 643 for a LURCHER**, with the damage landing in all three. The
+     * anvil is the heaviest of the three (`invMass` 0.016 against 0.031 and
+     * 0.214), so the controls also say the zero is not merely mass.
+     *
+     * The DAMAGE is untouched, deliberately. A press that did nothing at all
+     * would read as the ability being broken; the ring, the shake and the
+     * sound are the ability's and still happen, and the number still lands.
+     *
+     * ---- THE GUIDE'S 18 u/s AND ITS 26 SECONDS CANNOT BOTH BE TRUE --------
+     *
+     * The guide authors `speed: 18` and a counter of "the twenty-six seconds
+     * it takes to cross". Both cannot hold: the column a CLOSING body crosses
+     * is the portal's rim to the mount, measured 671 world units at era 1 and
+     * 1202 at era 2, so 18 u/s is 37 and 67 seconds -- and band 5 is era-2
+     * territory, where a wave already has a 120-second cap that four of its
+     * seven rungs miss (build 306).
+     *
+     * 26 seconds is the number that IS the design, so the speed is derived
+     * from it the way EMBER's and LANTERN's were at build 308: 1202 / 26 is
+     * 46.2. Measured, the delivered SPEED is **45.8** against the authored 46
+     * -- `creep` is in `OWN_SPEED` and grosses the ask up by
+     * `(k + damping) / k` -- and the crossing is **27.5s at era 2 and 15.8s
+     * at era 1**, the same 1.54x every other body's clock stretches by
+     * between the two fields.
+     *
+     * Those are longer than `column / speed` (26.0 and 14.5) by about a
+     * second and a half, and the reason is worth stating rather than tuning
+     * away: `accel` 40 is the slowest on the roster, so the body spends the
+     * first two seconds getting up to 45.8 from a standing start. The clock
+     * this object promises is the crossing, and the crossing is what was
+     * measured.
+     *
+     * Note which column that is, because the first draft of this note used
+     * the wrong one. Floor-to-rim is 963 and 1481 and is the figure every
+     * RISE body's clock is derived from, since a rise body's journey ends at
+     * the rim; a hostile's ends ON the machine, and a probe that waited for
+     * the floor line timed out at 300 seconds with the body sitting on the
+     * mount.
+     *
+     * That is the fourth guide figure this phase has had to correct against
+     * the field it lands on -- EMBER's speed (307), LANTERN's clock (308),
+     * SHRIKE's climb (317) -- and the rule is the one build 307 wrote down: a
+     * number authored in a design document is a proposal.
+     *
+     * ---- WHAT IT COSTS BAND 5, WHICH IS THE OTHER DELIVERABLE -------------
+     *
+     * `budgetAt` is the mean threat of a band's own authored waves and
+     * `threatOf` is health over `threatPerHp`, so 1400 health weighs 46.7
+     * against band 5's mean of 33.0 -- there is no wave containing one anvil
+     * that lands near that mean, and pretending otherwise would mean scaling
+     * the health until the heaviest body in the game was not. So the band's
+     * budget rises and the number is measured in one container either side
+     * rather than estimated: **33.0 -> 34.1, +3.3%**, with the other four
+     * bands identical. QUARRY paid +9.3% for band 4 on the same terms at
+     * build 312.
+     */
+    id: 'anvil',
+    /*
+     * NO ENERGY GATE, like every other one of the twenty, and the reason is
+     * worth writing down because the first draft carried `MB(4)` and the
+     * build failed for it.
+     *
+     * `check-build`'s pre-180 migration guard requires every gated type's
+     * `opens` to sit at or under its own old KILL gate times twelve, and that
+     * table is frozen history -- a type that did not exist before build 180
+     * is not in it, so `0 * 12000 < MB(4)` and the guard reads a re-lock. The
+     * guard is right about its domain and the gate was the mistake: a pre-180
+     * save never had an ANVIL to lose.
+     *
+     * And the gate would have done nothing anyway. The BAND is the gate for
+     * all of the twenty: this wave is authored into band 5, which is only
+     * drawn at rungs 29-35, and a run standing there has banked orders of
+     * magnitude more than any threshold worth writing.
+     */
+    opens: 0,
+    name: 'ANVIL',
+    shape: 'anvil',
+    gait: 'creep',
+    // The flange is the silhouette, so the picture is oriented to the world
+    // and not to a spawn roll -- see `drawAnvil` and build 310's note.
+    upright: true,
+    /*
+     * The mark itself. A capability read at two doors -- `applyDamage` and
+     * `resolvePair` -- and `check-build` refuses a SECOND type declaring it,
+     * because the two readers are written against this object's design and a
+     * new type would inherit both refusals in silence. That is build 319's
+     * `plated` guard and 322's `rides` guard applied to a third flag.
+     */
+    planted: true,
+    r: 56,
+    hp: 1400,
+    /*
+     * Heavier than anything else on the field by a distance, and it is not
+     * decoration: `mass` is `density * r * r` and the pair solver shares
+     * every correction by inverse mass, so a body that meets an anvil is
+     * moved by almost all of it even before `planted` takes the rest.
+     */
+    density: 3.4,
+    // Derived from the crossing clock above, not authored -- see the note.
+    speed: 46,
+    accel: 40,
+    restitution: 0.18,
+    // No wander: the gait is the straight line, and `drive` reads this.
+    wobble: 0,
+    armor: 0.3,
+    color: '#5d9cff',
+    glow: '#2f6bd8',
+    weight: 0, // authored into one wave, never rolled loose
+    drops: 18,
+  },
+  {
     id: 'quarry',
     opens: 0,
     name: 'QUARRY',
@@ -6715,6 +6850,23 @@ export const WAVES = [
    * needles. See `CFG.remnant`.
    */
   { of: [['remnant', 2], ['needle', 6]], band: 5 },
+  /*
+   * ---- ANVIL, band 5, and the counts are what keep it ONE thing ----------
+   *
+   * `count: 'one'` in the guide, and a wave's counts are a PROPORTION rather
+   * than a number from build 301 -- so an authored 1 against a band-5 swell
+   * of 9.5-10.2x is about ten anvils over the wave, arriving one at a time
+   * down the middle. That is the object: not a crowd, a queue.
+   *
+   * MOTE is the partner, and it is chosen for what it is NOT. The
+   * two-or-three-hostile rule exists because "the problem is a combination",
+   * and the combination here is a thing that cannot be moved beside things
+   * that are nothing but movement -- so the press that clears the motes off
+   * the mount does nothing at all to the anvil behind them, which is the
+   * decision the object exists to force. A heavy partner would just be two
+   * walls.
+   */
+  { of: [['anvil', 1], ['mote', 3]], band: 5 },
 
   /*
    * The bonus. Grey and nothing else: no hostiles, no risk, no cost to the
@@ -6768,6 +6920,7 @@ export const GAITS = {
   dive: 'holds height across the top, then runs down the edge of the machine and climbs back for another',
   ride: 'beelines at the biggest body on the field and rides it -- the thing to shoot is no longer the thing in front',
   hop: 'quantised: sits still, then crosses a hundred units sideways in three frames, leaving a copy of itself where it was',
+  creep: 'the straight line and nothing else: no lane, no wobble, and no impulse in the game turns it',
 };
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

@@ -662,6 +662,47 @@ console.log(`bar: ${bars.length} type(s) are tested as a capsule (`
  * says what has to move, rather than letting the arc be decided by which
  * body happened to be authored first.
  */
+/*
+ * ---- PLANTED is read at two doors, and both are written for ONE object ---
+ *
+ * Build 328. `Enemy.applyDamage` zeroes the impulse argument for a planted
+ * body and `resolvePair` gives it no share of a contact -- between them that
+ * is every shove in the game, which is why the refusal is two lines rather
+ * than a sweep. But neither reader asks the TYPE anything: a second type
+ * declaring the flag inherits the whole of ANVIL's design in silence, which
+ * is exactly build 319's `plated` fault and 322's `rides` fault read
+ * forwards, and 224's `levels ?? 3` before them.
+ *
+ * So one planted type, and the build says what has to move before a second
+ * arrives. It also holds the pairing: `planted` without `creep` is a body
+ * that cannot be moved and still takes an evasive arc, which is not a
+ * contradiction the engine would catch -- `drive` would simply steer it --
+ * but it is not a thing anyone has designed, and the two halves of this
+ * object are meant to be read together.
+ */
+const planted = ENEMY_TYPES.filter((t) => t.planted);
+if (planted.length) {
+  const bad = [];
+  if (planted.length > 1) {
+    bad.push(`${planted.length} types are planted (${planted.map((t) => t.id).join(', ')}) and `
+      + 'both readers -- applyDamage\'s impulse and resolvePair\'s share -- are written '
+      + 'against ANVIL. Give the refusal a per-type shape before adding another.');
+  }
+  for (const t of planted) {
+    if (t.gait !== 'creep') {
+      bad.push(`${t.id} is planted and its gait is '${t.gait}', not 'creep' -- a body nothing `
+        + 'can move that still takes an evasive arc is half an object');
+    }
+  }
+  if (bad.length) {
+    for (const line of bad) console.error(`planted: ${line}`);
+    process.exit(1);
+  }
+  console.log(`planted: ${planted.length} type(s) refuse every impulse `
+    + `(${planted.map((t) => `${t.id} r${t.r} hp${t.hp}`).join(', ')}), at applyDamage's `
+    + 'impulse and resolvePair\'s share, while still walking at their own speed');
+}
+
 const plated = ENEMY_TYPES.filter((t) => t.plated);
 if (plated.length) {
   const F = CFG.flint;

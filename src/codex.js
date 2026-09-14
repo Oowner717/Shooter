@@ -465,6 +465,30 @@ export const CODEX = [
     line: 'Shoot one and nothing comes off it. No salvage, nothing counted against the wave, and a mark left standing where it was for six seconds -- then one body comes back out of the portal, weaker and quicker, once, and that one pays for both. Nothing is lost; it is owed. What it costs you is the clock: a wave cannot end while a return is still owed, and a field that will not thin is the next wave waiting behind it. The body that comes back is the smaller of the two, so it is the first one that is worth answering -- and answering it early is what keeps its six seconds inside the wave instead of after it.',
   },
   {
+    /*
+     * ANVIL's line, and the counter is the one thing about this object that
+     * cannot be got wrong by being vague: there is no button.
+     *
+     * Measured before it was written, which is the rule build 319's FLINT
+     * line was corrected for -- it had named two counters that did not work.
+     * A 3000-unit impulse through `applyDamage` -- the shape PULSE, PILE,
+     * HEAVE and HAIL all take -- moves an anvil by **0.00 u/s**, against
+     * 91.45 for a BULWARK and 643 for a LURCHER on the same press. A hurled
+     * MASS stops on it. So the line names the gun and the clock and nothing
+     * else, and it names the clock as a comparison rather than a figure
+     * (`speed` is derived from the crossing and a quoted number would rot).
+     *
+     * What it does NOT say, deliberately: anything about a mine
+     * (`CFG.mines.inPlay` false since 289), and anything about hitting it
+     * from a particular side -- `armor` here is ordinary all-round armour,
+     * not FLINT's plate, and inviting the player to look for a face would be
+     * FLINT's fault in reverse.
+     */
+    id: 'anvil',
+    name: 'ANVIL',
+    line: 'The heaviest thing that has ever walked down this field, and the only one that cannot be moved. It takes no lane and no evasive arc -- it simply comes, straight, slower than anything else on the field. Every shove in the game is refused: PULSE, PILE, HEAVE, a hurled MASS, the knockback of your own rounds. Nothing pushes it off the mount because nothing pushes it at all. What is left is the gun and the time it has to spend crossing, which is longer than any other body spends -- so it is a problem you answer early or answer with everything, and the things arriving beside it are what make that a choice.',
+  },
+  {
     id: 'quarry',
     name: 'QUARRY',
     line: 'One body that is nine, and the lines it will break along are already drawn on it. Each generation is smaller, faster and thinner-plated than the one it came out of, and nothing it does is aimed at you -- it takes no lane, crosses the field, turns off the walls and spins the whole way. Where you break it is the decision: high and the pieces have the field to spread in, low and they are already on the mount.',

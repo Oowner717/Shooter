@@ -35743,7 +35743,23 @@ if (MINE_LINE) {
     && rf.n === rf.of && rf.legal
     // threatOf counts the return, which is the whole reason a band can afford it
     && Math.abs(wg.threat - wg.want) < 1e-9 && wg.threat > wg.nominal
-    && Math.abs(wg.moved) < 0.05,
+    /*
+     * ...and the wave is authored AT its band's mean rather than above it,
+     * which is build 315's lever -- so it re-prices the band by almost
+     * nothing.
+     *
+     * Both figures are TOLERANCES and not the day's value, because this
+     * conjunct was `Math.abs(wg.moved) < 0.05` and went red on build 328 for
+     * a reason that has nothing to do with REMNANT: ANVIL's wave joined band
+     * 5 at 49.8 against a mean of 35.2, so the mean this wave is measured
+     * against moved to 36.6 and its own contribution went -0.0095% to
+     * -0.3095%. A threshold on how little a wave moves its band is a
+     * threshold on the whole band's ROSTER, which is the count-of-the-roster
+     * trap wearing a decimal -- the claim is that THIS wave was priced at the
+     * mean, and a sibling arriving heavy does not make that false.
+     */
+    && Math.abs(wg.wave / wg.mean - 1) < 0.1
+    && Math.abs(wg.moved) < 0.5,
     `promises left by: a shot remnant ${on.shot}, one dissolving ${on.dissolving}, one that had `
     + `already come back ${on.already}; a discharge took ${on.fuse.before} -> ${on.fuse.after}. `
     + `${rf.n} of ${rf.of} malformed respawn blocks refused. It weighs ${wg.threat} against a `
@@ -36103,6 +36119,251 @@ if (MINE_LINE) {
     + `to that body ${te.toOldWave}, and the odd body is still single `
     + `${!te.oddTethered} -- against a measured tether to it, sharing one pool, `
     + `before the rules were cleared at the wave's end`);
+}
+
+/*
+ * ---- NOTHING IN THE GAME MOVES AN ANVIL, AND IT STILL WALKS --------------
+ *
+ * Build 328, phase 6o. Two refusals make the object: `gait: 'creep'` takes no
+ * arc, and `planted` takes no impulse. The second is the one that needs a
+ * case, because a refusal is a set of zeros and CLAUDE.md's rule is that a
+ * zero from an instrument that has never read a one means nothing.
+ *
+ * So every arm carries its control. The shove is measured against a BULWARK
+ * (the next heaviest body, `invMass` 0.031 against the anvil's 0.016) and a
+ * LURCHER (0.214) on the identical press -- 0.00 against 91.45 and 643. The
+ * walk is what says `planted` is not `static`: the turret and the DECOY have
+ * `invMass` 0 and go nowhere, and an anvil covers its whole column under its
+ * own steering. And the crossing is asserted as a DURATION, because the
+ * duration is what the object promises and the speed is an implementation of
+ * it -- build 308's rule for the rise clock.
+ *
+ * The impulse is applied through `Enemy.applyDamage` with `throwOff` true,
+ * which is the shape PULSE, PILE, HEAVE and HAIL all take, rather than by
+ * pressing one of them: the refusal is at that one door, so the door is what
+ * the arm should drive. What the abilities add on top -- their own rings,
+ * shakes and sounds -- is not refused and is not this case's subject.
+ *
+ * Each revert fails its own arm, which is what says the three mechanisms are
+ * separable: the impulse guard's revert fails arm 1, the pair solver's share
+ * fails arm 2, and the `creep` branch fails arms 3 and 4 -- 4 because the
+ * compensated speed lives in that branch.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { TYPE_BY_ID, ROUTES } = await import('../src/config.js');
+    const { release } = await import('../src/enemies.js');
+    const bare = () => {
+      g.restart();
+      w.phase = 'staging';
+      delete w.director.update;
+      w.spawnLock = 0;
+      g.debugClearField();
+      for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts', 'respawns']) {
+        if (w[k]) w[k].length = 0;
+      }
+      w.director.timer = 1e9;
+      w.director.driftTimer = 1e9;
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+      w.timeScale = 1;
+      w.boss = null;
+      w.bossN = 0;
+    };
+    const clear = () => {
+      for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+        if (w[k]) w[k].length = 0;
+      }
+    };
+    const lay = (id, x, y) => {
+      const e = release(w, TYPE_BY_ID[id], x, y)[0];
+      e.staged = false;
+      e.spawnIn = 0;
+      e.vx = 0;
+      e.vy = 0;
+      return e;
+    };
+    const out = {};
+    bare();
+
+    // ---- 1. the shove, at the door every shove comes through -------------
+    out.shove = ['anvil', 'bulwark', 'lurcher'].map((id) => {
+      clear();
+      const e = lay(id, w.shooter.x + 120, w.shooter.y - 200);
+      e.cruise = 0;
+      const hp0 = e.hp;
+      /*
+       * 3000 of impulse with `throwOff`, which is what a pressed ability
+       * carries -- and a damage of 1, so the body cannot die inside the
+       * measurement. Build 322's note: a measurement that kills its own
+       * witness measures one sample.
+       */
+      e.applyDamage(w, 1, 0, -1, 3000, 0, 0, true, 'pulse');
+      return { id, planted: !!e.type.planted, invMass: +e.invMass.toFixed(4),
+        dv: +Math.hypot(e.vx, e.vy).toFixed(2), took: +(hp0 - e.hp).toFixed(2) };
+    });
+
+    // ---- 2. ...and a hurled MASS stops on it rather than driving it -------
+    {
+      clear();
+      const a = lay('anvil', w.width * 0.5, 600);
+      a.cruise = 0;
+      const m = lay('mote', w.width * 0.5, 480);
+      // `plow` is the mark a hurled MASS carries, and `thrown` is the one
+      // that keeps `integrate` from clipping the struck body back inside it.
+      m.plow = 3;
+      m.thrown = 1;
+      m.vy = 620;
+      m.cruise = 0;
+      const ay0 = a.y;
+      let f = 0;
+      for (; f < 60 * 3; f++) { g.update(1 / 60); if (m.dead) break; }
+      out.plow = { anvilMoved: +(a.y - ay0).toFixed(1),
+        massStopped: Math.abs(m.vy) < 200 || m.dead,
+        massVy: Math.round(m.vy), massDead: !!m.dead };
+    }
+
+    // ---- 3. it walks, and it walks STRAIGHT -------------------------------
+    /*
+     * Two claims in one window. That it moves at all is what says `planted`
+     * is not `static` -- the turret and the DECOY carry `invMass` 0 and go
+     * nowhere. And that it takes no ARC is the gait.
+     *
+     * "Straight" is measured as path length over chord, which needs no
+     * knowledge of where `drive` aims. Two earlier versions did know, and
+     * both were wrong: asserting zero lateral movement failed at 69 units on
+     * a working build (a body released off to one side MUST converge on the
+     * machine), and building the start-to-mount line by hand read 20 units --
+     * mostly the body's slow turn onto its own heading from a standing start
+     * -- while a routed BULWARK read 3, so the control came out straighter
+     * than the subject.
+     */
+    const path = (id, route) => {
+      clear();
+      const e = release(w, TYPE_BY_ID[id], w.width * 0.22, 260, route ? { route } : {})[0];
+      e.staged = false;
+      e.spawnIn = 0;
+      e.vx = 0;
+      e.vy = 0;
+      const x0 = e.x;
+      const y0 = e.y;
+      const stop = w.shooter.y - w.shooter.r - e.r;
+      const rates = [];
+      let prev = e.y;
+      let len = 0;
+      let f = 0;
+      for (; f < 60 * 90; f++) {
+        const px = e.x;
+        const py = e.y;
+        g.update(1 / 60);
+        len += Math.hypot(e.x - px, e.y - py);
+        if (f % 60 === 59) { rates.push(+(e.y - prev).toFixed(1)); prev = e.y; }
+        if (e.y >= stop || e.dead) break;
+      }
+      const chord = Math.hypot(e.x - x0, e.y - y0) || 1;
+      return { id, route: e.route && e.route.id, moved: Math.round(e.y - y0),
+        secs: +(f / 60).toFixed(1), ratio: +(len / chord).toFixed(4), rates,
+        fastest: rates.length ? Math.max(...rates) : 0, authored: TYPE_BY_ID[id].speed };
+    };
+    out.walk = path('anvil');
+    /*
+     * The control is a POPULATION and not a draw: `route` is a per-body roll
+     * and the six differ by a factor of two in how far they swing, so one
+     * routed body is one of this repo's most-repeated mistakes. A LURCHER on
+     * each of the six, and the claim is that the anvil is straighter than the
+     * STRAIGHTEST of them.
+     */
+    out.routed = ROUTES.map((rt) => path('lurcher', rt));
+
+    // ---- 4. the crossing, as a duration, on the field it is played on -----
+    const cross = () => {
+      clear();
+      const e = lay('anvil', w.width * 0.5 + 40, 0);
+      e.y = 260;
+      const y0 = e.y;
+      /*
+       * Rim to the MOUNT. A closing body's journey ends ON the machine, so
+       * the floor line is a y it never reaches -- a first probe that waited
+       * for it timed out at 300 seconds with the body sitting on the mount.
+       * Floor-to-rim is the column every RISE clock is derived from and is
+       * the wrong one here.
+       */
+      const stop = w.shooter.y - w.shooter.r - e.r;
+      let f = 0;
+      for (; f < 60 * 120; f++) { g.update(1 / 60); if (e.y >= stop || e.dead) break; }
+      return { era: w.era, secs: +(f / 60).toFixed(1), col: Math.round(stop - y0),
+        arrived: e.y >= stop, dead: !!e.dead };
+    };
+    bare();
+    out.era1 = cross();
+    bare();
+    if (g.setEra) g.setEra(2);
+    out.era2 = w.era === 2 ? cross() : { skipped: w.era };
+    bare();
+    if (g.setEra && w.era !== 1) g.setEra(1);
+    w.director.update = () => {};
+    return out;
+  });
+
+  const anvil = r.shove.find((x) => x.planted);
+  const loose = r.shove.filter((x) => !x.planted);
+  check('every impulse in the game is refused by an ANVIL, and its neighbours take the same press',
+    // the press landed: the damage went through, so this is a refusal of the
+    // SHOVE and not of the whole hit
+    !!anvil && anvil.took > 0
+    // THE CLAIM
+    && anvil.dv === 0
+    // ...and the instrument reads a one, twice, on bodies of known mass
+    && loose.length === 2 && loose.every((x) => x.dv > 10)
+    // the anvil is the heaviest of the three, so the zero is not mass
+    && loose.every((x) => x.invMass > anvil.invMass),
+    r.shove.map((x) => `${x.id} (invMass ${x.invMass}) took ${x.took} damage and `
+      + `${x.dv} u/s`).join('; ')
+    + ' from one 3000-impulse hit with throwOff -- the shape PULSE, PILE, HEAVE '
+    + 'and HAIL all carry');
+
+  const pl = r.plow;
+  check('...and a hurled MASS stops on one instead of driving it down the field',
+    // it did not move, and the thing that hit it did
+    Math.abs(pl.anvilMoved) < 2 && pl.massStopped,
+    `the anvil moved ${pl.anvilMoved} units under a 620 u/s plowing body, which `
+    + `ended at ${pl.massVy} u/s (dead ${pl.massDead})`);
+
+  const wk = r.walk;
+  const straightest = Math.min(...r.routed.map((x) => x.ratio));
+  check('a planted body is not a static one: it walks, and it walks straight',
+    // LIVENESS: it moved at all, which the turret and the DECOY (invMass 0)
+    // do not
+    wk.moved > 400
+    // ...at the speed the type authors, read off its fastest full second so
+    // the standing start and the arrival are both outside the figure
+    && Math.abs(wk.fastest - wk.authored) < wk.authored * 0.12
+    // THE GAIT: the path it walks is its own chord
+    && wk.ratio < 1.02
+    // ...and straighter than the straightest of the six routes, all six
+    // measured on the same walk in the same run
+    && straightest > 1.03,
+    `anvil ${wk.moved} units in ${wk.secs}s at ${wk.rates.join('/')} u/s (fastest `
+    + `${wk.fastest} against an authored ${wk.authored}), path/chord `
+    + `${wk.ratio.toFixed(4)} -- against `
+    + `${r.routed.map((x) => `${x.route} ${x.ratio.toFixed(3)}`).join(', ')} for a `
+    + 'LURCHER on each of the six routes from the same point');
+
+  const e1 = r.era1;
+  const e2 = r.era2;
+  check('...and the crossing is the clock the object promises, on both fields',
+    e1.arrived && e2.arrived && !e1.dead && !e2.dead
+    // era 2 is where band 5 is played, and 26s is the guide's own figure
+    && Math.abs(e2.secs - 26) < 26 * 0.15
+    // ...and era 1 is the same column scaled, not a different body
+    && Math.abs(e2.secs / e1.secs - e2.col / e1.col) < 0.25,
+    `rim to mount: era 1 ${e1.secs}s over ${e1.col} units, era 2 ${e2.secs}s over `
+    + `${e2.col} -- ${(e2.secs / e1.secs).toFixed(2)}x the clock for `
+    + `${(e2.col / e1.col).toFixed(2)}x the ground, against the guide's 26s`);
 }
 
 /*

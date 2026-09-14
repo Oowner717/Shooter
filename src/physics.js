@@ -174,12 +174,37 @@ export function resolvePair(a, b) {
   const d = Math.sqrt(d2);
   const nx = dx / d;
   const ny = dy / d;
-  // A plowing body is infinitely massive FOR THIS CONTACT, and only against
-  // something that can actually be moved -- see the header.
-  const aPlow = a.plow > 0 && b.invMass > 0;
-  const bPlow = b.plow > 0 && a.invMass > 0;
-  const ia = aPlow ? 0 : a.invMass;
-  const ib = bPlow ? 0 : b.invMass;
+  /*
+   * A plowing body is infinitely massive FOR THIS CONTACT, and only against
+   * something that can actually be moved -- see the header.
+   *
+   * ---- and a PLANTED body is the same arithmetic from the other side -----
+   *
+   * Build 328. ANVIL cannot be moved by anything, so it takes no share of
+   * either correction and the body that met it takes the whole of both --
+   * which is exactly what `plow` already expresses, with the roles swapped.
+   * Reusing the expression rather than adding a second mechanism beside it is
+   * the point: `invSum <= 0` below then covers planted-against-static for
+   * free, and there is one place in the game where a contact decides who
+   * moves.
+   *
+   * A plow does not pass THROUGH one either, for the reason the header gives
+   * about the turret: `b.invMass > 0` disables a plow against something that
+   * cannot be moved, and a planted body is something that cannot be moved.
+   * So a hurled MASS stops on an anvil instead of driving it down the field
+   * -- measured, the anvil moved 0.2 units under a 620 u/s plowing body and
+   * the MASS ended dead at -102.
+   *
+   * Read off the TYPE and not an instance field, the way the projectile sweep
+   * reads `e.type.bar`: it is a property of the kind of thing, and a copy on
+   * the body is a second source of truth that can drift.
+   */
+  const aFixed = !!(a.type && a.type.planted);
+  const bFixed = !!(b.type && b.type.planted);
+  const aPlow = a.plow > 0 && b.invMass > 0 && !bFixed;
+  const bPlow = b.plow > 0 && a.invMass > 0 && !aFixed;
+  const ia = aPlow || aFixed ? 0 : a.invMass;
+  const ib = bPlow || bFixed ? 0 : b.invMass;
   const invSum = ia + ib;
   if (invSum <= 0) return 0;
 
