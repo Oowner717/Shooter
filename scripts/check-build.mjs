@@ -487,7 +487,7 @@ console.log(`multiplicity: ${multi.length + 1} type(s) are more than one body, o
 console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => `${t.id} ${t.climb}s`).join(' ')}), `
   + `nominal speeds agree on a column of ${lo}-${hi}`);
 
-const { fractureDepth, fractureFactor, barOf, pairOf } = await import(new URL('../src/enemies.js', import.meta.url));
+const { fractureDepth, fractureFactor, barOf, pairOf, respawnOf, threatOf } = await import(new URL('../src/enemies.js', import.meta.url));
 
 /*
  * ---- A FRACTURE HAS TO TERMINATE, and nothing else would say so ----------
@@ -843,6 +843,66 @@ if (hoppers.length) {
 
 
 /*
+ * ---- A BODY THAT COMES BACK HAS TO COME BACK ONCE, LATER, AND WEAKER ----
+ *
+ * `respawnOf` throws for a malformed block -- the fourth mandatory-field rule
+ * after `levels` (224), `band` (303) and `beads`/`climb`/`rides` -- and it is
+ * called here so a bad table fails the BUILD rather than the first death,
+ * because a throw inside `destroy` is a throw in the rAF loop and build 288
+ * records that reading as a freeze rather than an error.
+ *
+ * Three things beyond the shape, each of which fails silently:
+ *
+ * THE WAVE HAS TO OUTLAST THE RETURN. `Director.standing` counts a pending
+ * return, so a wave cannot end while one is outstanding -- and `patience` is
+ * what stops that being a stall. A `back` at or over `patience` would make a
+ * remnant killed late in a wave guarantee that wave times out, every time.
+ *
+ * IT HAS TO COME BACK WEAKER. `respawn.hp` under 1 is checked in `respawnOf`;
+ * what is checked here is the pair -- the health it returns with, times the
+ * speed it gains, has to be under what it had, or the first kill is a favour.
+ *
+ * AND `threatOf` HAS TO SEE IT. The health a player shoots is `hp * (1 + the
+ * share it returns with)`, so a band that priced the nominal figure is
+ * underpaying for every wave that carries one. Asserted as the relation
+ * rather than as the number, so a tuning pass cannot quietly break it.
+ */
+const comers = ENEMY_TYPES.filter((t) => t.respawn);
+if (comers.length) {
+  const bad = [];
+  for (const t of comers) {
+    let rs;
+    try { rs = respawnOf(t); } catch (e) { bad.push(e.message); continue; }
+    if (!(rs.back < CFG.waves.patience)) {
+      bad.push(`${t.id} comes back after ${rs.back}s against a wave's patience of `
+        + `${CFG.waves.patience}s: a body killed late in a wave would time that wave out`);
+    }
+    if (!(rs.hp * rs.quick < 1)) {
+      bad.push(`${t.id} comes back at ${rs.hp} health and ${rs.quick}x speed, a product of `
+        + `${(rs.hp * rs.quick).toFixed(2)} -- at or over 1 the first kill is a favour`);
+    }
+    const want = (t.hp * (1 + rs.hp)) / CFG.waves.threatPerHp;
+    const got = threatOf(t);
+    if (Math.abs(got - want) > 1e-9) {
+      bad.push(`${t.id} weighs ${got.toFixed(3)} where the health a player shoots is `
+        + `${t.hp} + ${t.hp * rs.hp} = ${want.toFixed(3)}: threatOf is not counting the return`);
+    }
+  }
+  if (bad.length) {
+    for (const line of bad) console.error(`respawn: ${line}`);
+    process.exit(1);
+  }
+  console.log(`respawn: ${comers.length} type(s) come back once (`
+    + `${comers.map((t) => {
+      const rs = respawnOf(t);
+      return `${t.id} after ${rs.back}s at ${rs.hp} health and ${rs.quick}x speed, `
+        + `weighing ${threatOf(t).toFixed(2)} against a nominal `
+        + `${(t.hp / CFG.waves.threatPerHp).toFixed(2)}`;
+    }).join('; ')}), inside a patience of ${CFG.waves.patience}s`);
+}
+
+
+/*
  * ---- A PAIR IS ONE POOL, AND THE BEAM HAS TO CLEAR THE PAIR SOLVER ------
  *
  * `pairOf` throws for a `pair` that is not exactly 2, for a `snap` outside
@@ -1069,7 +1129,7 @@ const TIER = CFG.waves.tier;
  * that was one build too many: a guard that re-implements the thing it is
  * checking agrees with itself.
  */
-const { Director, threatOf, threatOfWave } = await import(new URL('../src/enemies.js', import.meta.url));
+const { Director, threatOfWave } = await import(new URL('../src/enemies.js', import.meta.url));
 const flowAt = (t) => Director.flowAt(t);
 const deep = TIER.ceiling;
 const popX = TIER.popStep ** (deep - 1);

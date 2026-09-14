@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '323';
+export const BUILD = '324';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '323';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '1b1c5d9';
+export const REV = '5f6384d';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1175,6 +1175,112 @@ export const CFG = {
    * What the player sees is the guide's picture -- a rock crossing the field
    * end over end, taking no lane -- and the wave can still end.
    */
+  // ---- remnant --------------------------------------------------------
+  /*
+   * REMNANT, and everything here is a correction to the object guide rather
+   * than a transcription of it.
+   *
+   * `docs/objects.html` says: "Destroyed, it drops nothing and leaves a mark.
+   * Six seconds later it re-forms at the portal at half health and 1.4x
+   * speed, once, and that second body pays for both. A kill that is not a
+   * kill until the second one." Its counter reads: "Nothing, the first time.
+   * The second arrival is the one to be standing ready for."
+   *
+   * ---- 1. THE SECOND ARRIVAL IS NOT SOMETHING TO BE READY FOR -----------
+   *
+   * Measured before a line of this was written, at the rungs band 5 is
+   * actually played on (29 / 32 / 35) with the whole tree bought -- 109 buys,
+   * which is all of it:
+   *
+   *   a full REMNANT   (300 hp, armour 0.12)   0.70 / 0.80 / 0.75 s to kill
+   *   the re-formed body (150 hp, 1.4x speed)  0.53 / 0.58 / 0.53 s
+   *
+   * A fully bought turret sustains about 4,700 dps, so 170 effective health
+   * is four hundredths of a second of FIRE: the half-second is almost
+   * entirely the round's flight time, and the body dies on the first volley
+   * that reaches it. It arrives with HALF the health of the thing that just
+   * died, onto a field carrying 30-58 bodies at those rungs (build 301's
+   * measurement). So the second arrival is strictly LESS of an event than the
+   * first, and nothing about it needs standing ready for.
+   *
+   * ---- 2. "ONE OR TWO" IS A PROPORTION, NOT A COUNT ---------------------
+   *
+   * The guide authors `count: 'one or two'`. A wave's counts are a BUDGET
+   * from build 301, and measured on band 5's own roster the budget swells an
+   * authored wave 9.5x to 10.2x at rung 32 -- a band-5 wave queues 66 to 97
+   * bodies. So `['remnant', 2]` is about TWENTY remnants in play, and any
+   * reading of this object that depends on there being one of them is a
+   * reading of a wave the game does not send.
+   *
+   * ---- 3. SO WHAT THE OBJECT IS, IS THE ACCOUNTING ----------------------
+   *
+   * What survives measurement is the sentence the guide leads with: a kill
+   * that is not a kill. The first death pays nothing, counts nothing, and
+   * does not let the wave end. That is a TEMPO cost rather than a damage one,
+   * and tempo is what bites in a game whose releases are gated on the field
+   * thinning (build 291). The twenty clocks run CONCURRENTLY, so the wait is
+   * bounded at about one `back` per wave however many remnants are in it --
+   * six seconds against a band-5 wave of 52 to 120 seconds, which is 5-10%.
+   * A CEILING rather than the cost: the clocks start on their own deaths and
+   * the deaths are spread across the wave, so what a wave actually pays is
+   * `back` after the LAST remnant death and usually nothing at all. That is
+   * the honest size of it and the codex line says so.
+   *
+   * ---- 4. AND WHAT IS RECORDED RATHER THAN TUNED ------------------------
+   *
+   * Two pacing figures, both inference on top of measurements rather than
+   * measurements, and both deliberately left for phase 6/7 rather than
+   * answered by re-authoring a number in a build whose content is one body.
+   *
+   * `speed: 36` DELIVERS 21.9 to 28.0 u/s, measured over twelve samples in
+   * two runs, mean about 26 -- against an arithmetic steady state of 24.7,
+   * because `drive` blends toward cruise at `k = accel / 100` against
+   * `integrate`'s `linearDamping` 0.55 and the steady state is
+   * `speed * k / (k + damping)`. (The spread above the arithmetic is the
+   * route's lateral and `wobble`, which add to the speed's magnitude without
+   * adding closing speed; the prediction is for a straight line.) That is
+   * the rule this repo has now walked into seven times, and as with LATCH it
+   * is NOT compensated here: nothing in this object is a clock or a ratio
+   * between two speeds, so what matters is knowing the delivered figure
+   * rather than grossing it up.
+   *
+   * Against era 2's measured 1481-unit column (build 306) that is about 57
+   * seconds for the first body to cross, so modelling a wave's length as
+   * release window plus slowest traverse plus the return tail makes the
+   * remnant wave the LONGEST in band 5 at every rung and over the 120s cap
+   * at all three sampled ones -- inference on top of measurements rather
+   * than a measurement, and labelled as such. Band 5 already misses that cap
+   * at four of seven rungs on the era-2 field (build 306), so this is a
+   * small marginal worsening of a documented plateau; the lever, if it is
+   * ever wanted, is `speed`, because the traverse is about half the modelled
+   * length. Recorded here so the next pacing pass has the number.
+   */
+  remnant: {
+    /*
+     * What is SHARED by anything that comes back, against what belongs to the
+     * body -- the split build 322 had to make for riders. `back`, `hp` and
+     * `quick` are on the TYPE as `respawn` (see REMNANT in ENEMY_TYPES); only
+     * the mark is
+     * here, because a mark is how this game says "a return is pending" and
+     * two types that came back should say it the same way.
+     *
+     * Note `hp` is read in TWO places wherever it lives: the body that comes
+     * back carries it, and `threatOf` counts it -- because the health a
+     * player actually shoots for one remnant is 300 plus 150, and a band that
+     * thinks it is buying 300 is a band paying for two thirds of what it
+     * gets. Same rule as a TOW counting what it drags and a QUARRY counting
+     * what it becomes.
+     */
+    /*
+     * How long the mark it leaves stands, as a share of `back`. One, so the
+     * mark is the clock made visible rather than a decoration that could
+     * drift out of step with it -- there is one object and one owner, and the
+     * player can see how long is left. The mark is NOT where the body comes
+     * back (that is the portal); it is the statement that one is coming.
+     */
+    mark: 1,
+  },
+
   // ---- chaff ----------------------------------------------------------
   /*
    * CHAFF, and the whole object is two measurements that were taken before a
@@ -5294,6 +5400,123 @@ export const ENEMY_TYPES = [
     drops: 2, // energy it leaves when it comes apart
   },
   {
+    /*
+     * REMNANT: a kill that is not a kill until the second one.
+     *
+     * `CFG.remnant` carries the arithmetic and the three measurements this
+     * object rests on -- that the second arrival is not a threat, that "one
+     * or two" is about twenty, and that what survives is the ACCOUNTING.
+     * Read that block first; this one is only the body.
+     *
+     * ---- THE FIRST OBJECT IN FIVE WHOSE COLOUR HAD REAL ROOM -------------
+     *
+     * `docs/objects.html` gives the `strange` family `#b98cff`, which is
+     * LURCHER's body colour and YOKE's -- dE 0.0 against both, the same
+     * collision SHOAL had with MOTE, SPINDLE with TOW, SHRIKE with NEEDLE and
+     * LATCH with LURCHER. Build 322's rider to that ruling is to ask whether
+     * the family has ROOM before accepting it, and LATCH found `#bf5fff` at
+     * 11.8 from its nearest neighbour.
+     *
+     * Swept again, this time against the roster AND every tone the tree and
+     * the ability bar paint -- 99 colours, near-white ink dropped, which is
+     * the sweep build 322's could not do and which build 223's worst
+     * collision (a tree tone) is the reason for. `#f81fff` is **30.1** off
+     * its nearest (LATCH's own body), 34.2 off the ability bar's magenta and
+     * 36.2 off PARITY's glow: two and a half times the separation LATCH
+     * settled for, at the far violet end of the family rather than outside
+     * it. The glow is 22.3 clear and sits 16.9 from the body, so the halo
+     * reads as a deeper version of the same colour the way every other pair
+     * does.
+     *
+     * Refused, with reasons, so the next sweep need not repeat them: a pure
+     * magenta at h300 reaches 33.5 and is the register `#ff6beb` already
+     * holds; and the blue-violet end (`#4000ff`, the best-separated violet
+     * build 322 found) is refused for reading as BLUE, which is that build's
+     * recorded judgement and is only softened here by REMNANT being r 30
+     * rather than r 9.
+     */
+    id: 'remnant',
+    opens: 0,
+    name: 'REMNANT',
+    shape: 'remnant',
+    /*
+     * NO GAIT FIELD, and that is the correct absence rather than an omission.
+     *
+     * REMNANT is the first of the twenty since HUSK that needs no new gait:
+     * the whole object happens at its death and after it, so the body walks
+     * in like anything else. The first draft wrote `gait: 'march'` out on
+     * build 224's reasoning -- that a defaulted value indistinguishable from
+     * a chosen one is the shape this repo keeps paying for -- and
+     * `check-build` correctly refused the build: `GAITS` is the vocabulary of
+     * gaits that REPLACE the march, `march` is not a word in it, and a type
+     * naming a gait nothing implements gets exactly the march it was trying
+     * not to take. Every ordinary body in the roster declares nothing here.
+     * So the rule is narrower than the first draft had it: write out a value
+     * that could have been different, and do not invent a name for the
+     * default.
+     */
+    /*
+     * The picture is a ring with pieces missing, at fixed bearings, so the
+     * gaps mean something -- without this `Enemy.draw` turns it by a random
+     * spawn roll and the "pieces gone" reads as a body that is simply spinning.
+     * Build 310's EMBER-trail fault.
+     */
+    upright: true,
+    r: 30,
+    hp: 300,
+    density: 1.1,
+    speed: 36,
+    accel: 120,
+    armor: 0.12,
+    restitution: 0.4,
+    wobble: 0.5,
+    color: '#f81fff',
+    glow: '#c400d6',
+    weight: 0, // authored into its wave, never rolled by the ordinary spawn
+    drops: 6,
+    /*
+     * ---- what makes it a remnant, and why it is a TYPE FIELD -------------
+     *
+     * Its presence is what `Enemy.destroy` dispatches on, the way `detonate`,
+     * `splits`, `tows`, `beads`, `school` and `pair` already are.
+     *
+     * ---- AND THE NAME IS `respawn` BECAUSE THE BOSSES OWN THE OTHER TWO ---
+     *
+     * The first draft called it `reform`, and `Boss.reform` has existed since
+     * the bosses did (boss.js:585 -- rebuild a shell to a health fraction,
+     * used by AMPLITUDE, DYNAMO and ORDINAL's TALLY), as has `Boss.revive`
+     * (boss.js:401 -- bring one dead segment back). Both mean a version of
+     * "bring it back", so the boss modules own that vocabulary and a type
+     * field sharing a word with it is a reader's trap. Build 298's rule is
+     * the same one a step further along: grep a new field against the boss
+     * modules FIRST.
+     *
+     * It also blinded a guard. `check-build`'s dead-field sweep looks for the
+     * key as `.key` or a quoted string anywhere in `src/` outside config.js,
+     * and `reform` MATCHED -- on `this.reform(world, ...)` inside a boss -- so
+     * a brand-new field that nothing read passed the sweep written to catch
+     * exactly that. A guard that passes for a reason nobody chose, which is
+     * build 314's finding about `school` and the body ceiling. `respawn` has
+     * no other hit in `src/` or `scripts/`, so the sweep can see it.
+     *
+     * And the three NUMBERS are here rather than in `CFG.remnant`, which is
+     * the correction build 322 paid for: a rider's numbers were one shared
+     * block, so a second rider would have worn SEED's growth and healing in
+     * total silence with no field to set and nothing to fail. The same is
+     * true here -- a second type that came back on a different clock, at a
+     * different share, would wear these. So a number about the RULE is
+     * shared (`CFG.remnant.mark`) and a number about THIS BODY's return is
+     * its own, `respawnOf` throws for a malformed block, and `check-build`
+     * holds it in both directions. That is the fourth mandatory-field guard
+     * after `levels` (224), `band` (303) and `beads`/`climb`/`rides`.
+     */
+    respawn: {
+      back: 6, // seconds from the first death to the second arrival
+      hp: 0.5, // ...the share of its health it comes back with
+      quick: 1.4, // ...and the share of its speed it gains
+    },
+  },
+  {
     id: 'quarry',
     opens: 0,
     name: 'QUARRY',
@@ -6466,6 +6689,32 @@ export const WAVES = [
    *    arriving is the reason its counter is "aim it yourself".
    */
   { of: [['chaff', 3], ['lurcher', 3]], band: 4 },
+
+  /*
+   * ...and the REMNANT wave.
+   *
+   * Two remnants and six NEEDLEs weighs 35.20 against band 5's own mean of
+   * 35.2367, so it re-prices the band by **-0.009%** -- the smallest move of
+   * any wave added in phase 6, and build 315's lever used deliberately. The
+   * threat counted is 15.00 a remnant and not 10.00: `threatOf` multiplies by
+   * `1 + respawn.hp` because the health a player shoots is 300 plus 150. The
+   * object guide authors 11, which is neither figure.
+   *
+   * NEEDLE is the partner and it is chosen for a reason that is not price.
+   * Four pairings land inside 1% of the mean (`warden 4`, `mote 5`,
+   * `splitter 1`, `warden 1` are the others), and SPLITTER and WARDEN both DO
+   * SOMETHING WHEN THEY DIE -- four motes, and plates. REMNANT's whole
+   * reading is "that death did not take", so a wave with three different
+   * death behaviours in it is a wave where nobody can tell which body did
+   * what. NEEDLE is a plain fast body: it dies and stays dead. That is build
+   * 317's rule about checking the WAVE and not only the shape, applied to a
+   * mechanism instead of a colour.
+   *
+   * And the counts are a PROPORTION: the budget swells this 9.5-10.2x at
+   * band-5 rungs, so what is actually sent is about twenty remnants and sixty
+   * needles. See `CFG.remnant`.
+   */
+  { of: [['remnant', 2], ['needle', 6]], band: 5 },
 
   /*
    * The bonus. Grey and nothing else: no hostiles, no risk, no cost to the

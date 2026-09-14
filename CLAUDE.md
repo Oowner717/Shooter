@@ -5322,4 +5322,229 @@ came from before believing the other one covers it.
   `aimrange` (ARRAY) and `driftaim` (SIEVE), not ids -- `grep` for the id and
   you find nothing, which is how the wrong note got written.
 
+- **REMNANT IS IN FROM BUILD 324, AND THE OBJECT IS THE ACCOUNTING RATHER THAN
+  THE BODY.** Phase 6n, band 5, and the first of the twenty whose whole
+  content is at its death and after it. Destroyed it pays nothing, counts
+  nothing and leaves a mark where it died; six seconds later ONE body comes
+  back out of the portal at half health and 1.4x speed, once, and that one
+  pays double.
+- **THE GUIDE'S COUNTER IS FALSE AND MEASUREMENT SAID SO BEFORE A LINE WAS
+  WRITTEN.** `docs/objects.html` reads "the second arrival is the one to be
+  standing ready for". Measured at the rungs band 5 is actually played on
+  (29 / 32 / 35) with all 109 buys owned: a full REMNANT dies in
+  **0.70 / 0.80 / 0.75s** and the re-formed body in **0.53 / 0.58 / 0.53** --
+  almost all of which is the round's flight time, since 170 effective health
+  is four hundredths of a second of the 4,700 dps a bought turret sustains.
+  It arrives at HALF a dead body's health onto a field carrying 30-58 bodies
+  (build 301's measurement), so the second arrival is strictly LESS of an
+  event than the first. **And "one or two" is a PROPORTION, not a count**: a
+  wave's counts are a budget from build 301 and band 5's own roster swells an
+  authored entry 9.5x to 10.2x at rung 32, so `['remnant', 2]` is about
+  TWENTY remnants in play -- any reading of this object that depends on there
+  being one of them is a reading of a wave the game does not send. What
+  survives is the sentence the guide leads with, a kill that is not a kill:
+  `Director.standing` counts a pending return as a body still standing, so
+  the wave cannot score while one is owed. That is a TEMPO cost rather than a
+  damage one, and the twenty clocks run CONCURRENTLY, so it is bounded at
+  about one `back` per wave however many are in it -- six seconds against a
+  band-5 wave of 52 to 120, which is 5-10%. **The honest size of a mechanism
+  is part of the mechanism**, and the codex line says it rather than
+  inheriting the guide's sentence.
+- **"PAYS FOR BOTH" IMPLEMENTED BY DOUBLING THE DROP COUNT PAYS EXACTLY
+  1.0000x.** `shed` computes ONE `worth = max(n * q, round(mass * perMass / q)
+  * q)` off the body's own mass and then divides it by `n`, so 6, 12 and 24
+  motes all totalled **24,000 B to the byte**. `bounty` is the dial --
+  `mote.bounty = this.bounty` and `destroy` banks `bytes * bounty` -- and
+  `pay: 2` measures 48,000 B in six motes against a control's 24,000 in six,
+  with 4.0000x at four. The tell is that the obvious implementation moves a
+  COUNT where the quantity is a total; the same shape as `drops` being the
+  only dial a light body has, from the other side.
+- **A FIELD NAMED FOR A METHOD ON ANOTHER CLASS BLINDS THE DEAD-FIELD
+  SWEEP.** The first name was `reform`, and `Boss.reform` and `Boss.revive`
+  both exist -- build 313's sweep looks for `.key` or a quoted string
+  anywhere in `src/` outside config.js, found `this.reform(...)`, and passed
+  the build for a type field nothing read. Renamed `respawn`, which has zero
+  other hits, and the sweep then failed the build correctly. That sweep errs
+  toward PASSING by design, so **the shape to avoid is a field name that is
+  also a method name anywhere in the tree** -- grep the candidate before
+  declaring it, the way build 298's `bornFor` had to be grepped against the
+  boss modules.
+- **THE THREE NUMBERS ARE ON THE TYPE AND NOT IN `CFG.remnant`.** Build 319's
+  `plated` fault and 322's `rides` fault read FORWARDS for once: a second
+  type declaring the flag would have worn REMNANT's clock, health share and
+  speed in total silence, with no field to set and nothing to fail. `back`,
+  `hp` and `quick` are a `respawn` block on the type, `respawnOf` throws for
+  a missing or malformed one (17 of 17 refused), and only the MARK stays
+  shared -- because a mark is how this game says "a return is pending" and
+  two types that came back should say it the same way.
+- **`threatOf` HAD TO LEARN ABOUT IT, AND THAT IS THE THIRD INSTANCE OF ONE
+  RULE.** The health a player actually shoots for one remnant is 300 plus
+  150, so it weighs **15.00 against a nominal 10.00** -- the same rule as a
+  TOW counting what it drags and a QUARRY counting what it becomes. A band
+  that thinks it is buying 300 is a band paying for two thirds of what it
+  gets. The wave is then authored at band 5's own mean (35.20 against
+  35.2367, moving the budget **-0.0095%**), which is build 315's lever used
+  deliberately.
+- **A `const` DECLARED BELOW `threatOf` IS IN ITS TEMPORAL DEAD ZONE.**
+  `RESPAWN_KEYS` went in under `respawnOf` beside the other helpers and the
+  game did not boot: the tree's price sweep calls `threatOf` at MODULE LOAD,
+  so the reference ran before the declaration was initialised. Exactly the
+  trap `CFG`'s authoring helpers carry a note about (`const` arrows below a
+  four-thousand-line object literal), on a different file and a different
+  caller. Anything reached from module load has its dependencies above it.
+- **BUILD 322 BOOKED A LATCH THAT RAN OUT OF CLOCK AS A KILL, AND IT WAS
+  FOUND WHILE LOOKING AT SOMETHING ELSE.** `hunt` set `this.dead = true` when
+  `rideT` expired and did NOT set `dissolved`, so `Game.sweep`'s
+  `if (e.counts && !e.dissolved) registerKill(e)` counted a rider that never
+  found a host -- inflating the kill count and the wave's own cleared share
+  for a body that simply went away. `dissolved` is the mark for "eaten, not
+  destroyed" and the two harmless gaits that leave the field have carried it
+  since build 307. Fixed and measured: **0 kills against 1 for one that was
+  shot and 0 for an EMBER that climbed out**, which is the pair that says the
+  counter can read a one. **Any new way for a body to stop existing owes
+  `Game.sweep` an answer about which of the two it is.**
+- **A PENDING RETURN IS THE WORST THING A CASE CAN LEAVE BEHIND, because it
+  holds an OLD WAVE SERIAL open.** `standing()` counts a promise by `wave`,
+  so a stray entry can leave a later case's wave permanently one body short
+  of ending -- worse than build 307's stray EMBER, which only sprang mines.
+  `debugClearField`, `reset()`, `takeField()` and `glitchOut` all clear
+  `world.respawns`, and the case clears it in its own setup as well. The
+  ninth list on the world is the ninth thing that has to be on that list.
+- **THE HASH DID NOT MOVE AND THAT WAS THE PREDICTION**: `1213474222` either
+  side, both taken in this container. A band-5 wave is invisible to a rung-1
+  fight for build 318's corrected reason, and the `destroy` rewrite is the
+  IDENTITY for every type that does not come back -- `owing` is false, so the
+  drop count is the old expression. An unchanged hash is what "the salvage
+  path was rewritten and no existing body noticed" looks like measured, which
+  is the same claim build 312 made about its own quantised share.
+
+- **THE HOLE TAKING A REMNANT WAS A ROBBERY, AND `openAperture`'S OWN
+  DOCSTRING IS THE THING IT CONTRADICTED.** That function takes everything
+  loose the frame the way opens -- `e.counts = false; e.destroy(world);` --
+  and says why in as many words: "it pays out its salvage exactly as shooting
+  it would have. So it is not a robbery -- opening the way mid-wave banks the
+  wave." Measured with an aperture granted and one body on the field, the hole
+  took a REMNANT for **0 bytes in 0 motes** against a LURCHER's 16,000 in 8
+  and a DRIFT's 4,000 in 2 -- and left a promise behind, which then froze for
+  the whole fight. Revert-proved both ways. **`this.counts` is the clause that
+  tells the two deaths apart**, borrowed for its MEANING rather than for a
+  side effect (build 234's `harmless` distinction): the hole's own comment
+  beside that assignment reads "you did not destroy it, the hole did", which
+  is exactly the question the branch is asking, and the only other writers are
+  boss minions and the practice dummy. Read before the write, or the shed
+  block downstream sees the mutated value.
+  **The general shape: a new death-time effect has to be run past every
+  caller of `destroy` that is not a player shooting something.** There are
+  three -- the glitch dissolve (covered by the existing `fizzle` guard on
+  `destroy`'s first line), `debugClearField`, and the hole -- and only the
+  first two were thought about. A green suite could not see it: nothing in
+  seven hundred cases opens an aperture onto a field it put a body on.
+- **A MOTE OFF A REMNANT INHERITS `type.respawn` AND CANNOT USE IT, AND THAT
+  IS WORTH ASSERTING RATHER THAN REDISCOVERING.** `shed` builds every mote
+  with `new Enemy(t, ...)` off the parent's type, which is build 322's LATCH
+  fault -- so a mote carries `respawn` and `cameBack` false. `destroy` returns
+  for `isDrop` forty-five lines above the branch, so it can never reach it,
+  measured 0 promises from destroying one and from a blast over six of them.
+  **Build 322's answer was a guard; this one is a door that was already
+  shut** -- which is the better outcome and only knowable by checking.
+- **THE SIX SECONDS ARE THE DIRECTOR'S CLOCK, AND THE FREEZE IS THE DESIGN
+  RATHER THAN BUILD 210'S SCAR.** `updateRespawns` is called from
+  `Director.update`, below its `if (world.phase !== 'staging' || world.boss)`
+  guard -- so a promise freezes while a boss is up. Measured through the real
+  door (`g.update` after a real `openBoss`): ten seconds of an ORDINAL fight
+  with the clock at **0.00 of 6** and no body arriving, then the same promise
+  landing **6.02s** after the withdrawal. The pair is what makes it an
+  instrument -- a clock at zero is indistinguishable from a promise that was
+  never going to arrive, so the same promise has to be carried past the
+  withdrawal and land. It is right BECAUSE the promise is the director's and
+  the director is frozen while a boss is up rather than reset, which is the
+  doctrine `Game.openBoss` states about `jobs` and `at`. The alternative
+  placement -- unconditional, beside `updateGhosts` -- re-forms a band-5
+  hostile into an anomaly's field.
+- **`patience` IS A SECOND WAY OUT OF A WAVE AND I WROTE A DOCSTRING THAT
+  DENIED IT IN THE SAME BREATH AS NAMING IT.** `standing()`'s new term said "a
+  return can never land after its own wave is scored, because its wave cannot
+  score while it is pending" and then, two lines later, "`patience` (26s)
+  bounds the wait". Both cannot be true: the wave-end test is
+  `if (this.standing(world) > thinAt && this.wait < CFG.waves.patience)
+  return;`, so at 26 seconds the wave scores WHATEVER is standing -- which is
+  the whole purpose of that clause. Left as it is, and the reason is that
+  build 291's leftover class is about bodies nothing bounds: this one is in
+  `world.enemies`, so `hostileCount` sees it and the release gate holds the
+  next wave exactly as for any other body, and what is actually lost is one
+  `d.slain` credit on a wave already scored. Clearing the promise would be the
+  robbery again; re-tagging the arrival would bill a wave for a body it never
+  asked for, against `tagBody`'s own rule. **A paragraph that names its own
+  bound and then claims the bound is never reached is two claims, and one of
+  them is wrong** -- check a docstring's sentences against each other, not
+  only against the code.
+- **...AND THE SAME PARAGRAPH STATED A CEILING AS A COST.** "The clocks run
+  CONCURRENTLY, so the cost is one `back` per wave however many remnants are
+  in it" -- the clocks are concurrent and they START ON THEIR OWN DEATHS,
+  which are spread across the wave, so what a wave pays is `back` after the
+  LAST remnant death: at most one `back` and usually nothing. The arithmetic
+  was right and the noun was wrong.
+- **REMNANT DELIVERS 21.9 TO 28.0 u/s AGAINST AN AUTHORED 36, and it is
+  deliberately NOT compensated.** Twelve samples over two runs, mean about 26,
+  against an arithmetic steady state of 24.7 from
+  `speed * k / (k + linearDamping)` with `k = accel / 100` -- the spread above
+  the prediction being the route's lateral and `wobble`, which add to the
+  speed's MAGNITUDE without adding closing speed. That is the seventh time
+  this repo has met "a target speed is not a speed", and as with LATCH the
+  answer is to know the delivered figure rather than to gross it up: nothing
+  in this object is a clock or a ratio between two speeds. **The rule is not
+  "always compensate", it is "know which number you are delivering"** -- and
+  the corollary, learned here, is that the arithmetic is a STRAIGHT-LINE
+  prediction and a body with a route and a wobble reads above it.
+- **RECORDED AND NOT TUNED: the remnant wave is the longest in band 5.**
+  Modelling a wave as release window plus slowest traverse plus the return
+  tail -- inference on top of measurements, labelled as such -- the era-2
+  1481-unit column at 26 u/s is about 57 seconds, which puts the wave over the
+  120s cap at all three sampled rungs where the band's next-longest is under
+  it. Band 5 already misses that cap at four of seven rungs on the era-2 field
+  (build 306), so this is a small marginal worsening of a documented plateau
+  and the lever, if it is ever wanted, is `speed`. Authoring a balance answer
+  in the build that adds the body is the mistake build 304 deliberately did
+  not make; the number is in `CFG.remnant` for the pacing pass.
+- **A SCOUT FAN-OUT SCORED TWO REAL BLOCKERS OUT OF FIVE LENSES AND MISSED
+  THE ONE THAT MATTERED MOST.** It called the `threatOf` under-pricing and the
+  clock's placement before a line was written, both correctly and with the
+  arithmetic. It did NOT find the hole -- which is the only one of the three
+  that shipped wrong and the only one a green suite could not see -- and its
+  wave lens asserted the opposite of what the shipped design does (that the
+  wave scores with the second half owed), because it was reading a design that
+  had not been built yet. **A pre-implementation fan-out is a pointer to the
+  right files and a list of doors to check; the doors it does not name are
+  still yours to find.**
+
+- **THE MARK FADED AS THE RETURN CAME DUE, WHICH IS BUILD 211'S HE BURST IN A
+  NEW COSTUME.** `drawRespawns` ran its alpha on `k = 1 - t / life` -- full at
+  the death, gone by the arrival -- so the one moment the mark matters was the
+  faintest frame of it. Rendered on an offscreen canvas at five points of the
+  clock and measured on the ALPHA channel: peak **95 / 133 / 106 / 79 / 58**
+  of 255 and lit area **359 / 782 / 1151 / 1245 / 0** -- at 0.95 of the life
+  NOTHING on it cleared the threshold. Fixed (`due = t / life`, alpha
+  `0.5 + 0.45 * due`, the ground ring's own alpha 0.5 -> 0.72) the same
+  instrument reads **92 / 133 / 157 / 182 / 201** and **357 / 830 / 1318 /
+  1822 / 2226**, monotone in both, and composited over the field's ground the
+  peak goes 92 to 206. Nothing could fail for it -- the ring is drawn, the arc
+  is drawn, both are the right colour -- and **only rendering it and looking
+  finds it**, which is the fourth time in this build a fault lived somewhere
+  seven hundred green cases cannot see.
+- **AN INSTRUMENT THAT DIVIDES OUT THE QUANTITY THE CLAIM IS ABOUT READS THE
+  SAME ON EVERY BUILD.** The arm's first version measured `max(r, g, b)` off a
+  canvas with nothing painted behind it and reported **255 at every point of
+  the clock** -- because a stroke composited against transparency comes back
+  at full colour with low alpha. The claim is an ALPHA ramp and `globalAlpha`
+  scales exactly that channel, so reading the alpha measures the claim and
+  divides the tone out by construction, which is build 314's rule arriving on
+  a new quantity. Either paint the ground you are compositing over or measure
+  the channel that moves.
+- **A DETAIL STRING THAT ASSERTS ITS OWN CONCLUSION CANNOT REPORT A FAILURE.**
+  That arm printed "-- monotone in both" as literal text, so the FAIL line
+  said the sequence was monotone while showing a sequence that was not. It
+  prints the measured flags now. Build 319's "still flocking" printing a count
+  of the living is the same fault; a detail string is a DECLARATION and it has
+  to be derived like any other.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

@@ -415,6 +415,56 @@ export const CODEX = [
     line: 'It does not walk. It sits still, then crosses a hundred units sideways faster than anything else on the field -- and every jump leaves a copy of itself standing where it was for a second and a half. The copies are nothing: rounds pass straight through them and a blast does not find them. AUTO AIM cannot tell, and hands the lock to the copy at the moment of the jump -- with three of them up it spends about a third of its rounds on things that are not there. Aim it yourself, or answer it with something that never picks a target: PULSE goes off in a circle round the machine and there is nothing there to fool.',
   },
   {
+    id: 'remnant',
+    name: 'REMNANT',
+    /*
+     * Every figure in this line is measured or is a config constant, and the
+     * line's whole job is to be the correction to the object guide that
+     * `CFG.remnant` sets out at length. The guide's own counter -- "the second
+     * arrival is the one to be standing ready for" -- is FALSE and is not
+     * repeated here: measured at the rungs band 5 is played on with the whole
+     * tree bought, the first body takes 0.70-0.80s to kill and the re-formed
+     * one 0.53-0.58s, almost all of which is the round's flight time. It
+     * arrives at half a dead body's health onto a field carrying 30-58 bodies.
+     * So the second arrival is strictly LESS of an event than the first, and
+     * the line says which of the two is worth answering.
+     *
+     * The counters, in the order the sentence names them:
+     *
+     *  - THE SALVAGE IS DEFERRED, NOT DENIED. `destroy` sheds nothing on the
+     *    first death and the returning body carries `pay: 2`, so it banks
+     *    exactly twice what an ordinary one does. Measured: 48,000 B in six
+     *    motes against a control remnant's 24,000 B in six -- exactly double.
+     *    Note what this is NOT: doubling the mote COUNT pays 1.0000x, because
+     *    `shed` computes one worth and divides it by the count. The bounty is
+     *    the dial.
+     *  - THE CLOCK IS THE COST. `Director.standing` counts a pending return
+     *    as a body still standing, so the wave cannot score while one is
+     *    owed -- asserted in both directions by the case, because the second
+     *    half is what says a game with no remnants in it counts its waves
+     *    exactly as it did before. And the twenty clocks a real band-5 wave
+     *    starts run CONCURRENTLY, so the cost is bounded at about one `back`
+     *    per wave however many are in it: six seconds against a wave of 52 to
+     *    120 seconds, which is 5-10%.
+     *  - SHOOTING IT EARLY IS WHAT KEEPS THAT COST INSIDE THE WAVE. That is
+     *    arithmetic off the mechanism rather than a measurement: the clock
+     *    starts when the body dies, so a death late in a wave puts its six
+     *    seconds AFTER everything else has been cleared, where they are six
+     *    seconds of nothing happening. It is the one piece of advice this
+     *    object actually supports.
+     *
+     * Exposed to three constants and no others: `respawn.back` (the six
+     * seconds), `respawn.hp` (half the health) and `respawn.quick`, which is
+     * why the speed is named as a direction rather than as a figure -- 1.4x
+     * has no short English form that stays true if it is tuned.
+     *
+     * It deliberately does not name a mine (`CFG.mines.inPlay` has been false
+     * since build 289) and does not name PULSE either: nothing about this
+     * object is answered by the shape of what kills it, only by when.
+     */
+    line: 'Shoot one and nothing comes off it. No salvage, nothing counted against the wave, and a mark left standing where it was for six seconds -- then one body comes back out of the portal, weaker and quicker, once, and that one pays for both. Nothing is lost; it is owed. What it costs you is the clock: a wave cannot end while a return is still owed, and a field that will not thin is the next wave waiting behind it. The body that comes back is the smaller of the two, so it is the first one that is worth answering -- and answering it early is what keeps its six seconds inside the wave instead of after it.',
+  },
+  {
     id: 'quarry',
     name: 'QUARRY',
     line: 'One body that is nine, and the lines it will break along are already drawn on it. Each generation is smaller, faster and thinner-plated than the one it came out of, and nothing it does is aimed at you -- it takes no lane, crosses the field, turns off the walls and spins the whole way. Where you break it is the decision: high and the pieces have the field to spread in, low and they are already on the mount.',

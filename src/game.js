@@ -20,7 +20,7 @@ import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, sha
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, release, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectData, drawIn, intakeRate, ENTRY_Y, dividend, updateGhosts, drawGhosts } from './enemies.js';
+import { Director, spawnOne, release, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectData, drawIn, intakeRate, ENTRY_Y, dividend, updateGhosts, drawGhosts, drawRespawns } from './enemies.js';
 import { Shooter, Front } from './shooter.js';
 import { Abilities, wardStanding } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
@@ -196,6 +196,15 @@ export class Game {
        * pass in `Game.autoTarget`.
        */
       ghosts: [],
+      /*
+       * REMNANT's promises: bodies destroyed once that are coming back. The
+       * ninth list, and NOT bodies -- see `updateRespawns` in enemies.js for
+       * what `enemies` membership would have bought a promise and why every
+       * one of those would be wrong. The only thing in the game that reads it
+       * for a decision is `Director.standing`, which is how a first death
+       * refuses to end its wave.
+       */
+      respawns: [],
       drops: [], // data on the floor, waiting to be taken in
       debris: [], // inert wreckage, on its way off the field
       projectiles: [],
@@ -541,6 +550,7 @@ export class Game {
     const w = this.world;
     w.enemies.length = 0;
     w.ghosts.length = 0;
+    w.respawns.length = 0;
     w.drops.length = 0;
     w.debris.length = 0;
     w.projectiles.length = 0;
@@ -1033,6 +1043,7 @@ export class Game {
      * drained LAST, because a body coming apart pushes one on its way out.
      */
     w.ghosts.length = 0;
+    w.respawns.length = 0;
     w.drops.length = 0;
     w.debris.length = 0;
     w.projectiles.length = 0;
@@ -3999,6 +4010,14 @@ export class Game {
     // Under the energy and the objects both: wreckage is scenery, and it must
     // never sit on top of something you are meant to be aiming at.
     for (const c of w.debris) c.draw(ctx);
+    /*
+     * REMNANT's marks, on the ground rather than among the bodies: over the
+     * wreckage and UNDER the salvage and the bodies, because a mark is a
+     * statement about ground the player has already cleared and must never be
+     * mistaken for something standing on it. Outside `this.ours` for the same
+     * reason the bodies are -- it is theirs.
+     */
+    drawRespawns(ctx, w);
     for (const e of w.drops) e.draw(ctx, w);
     /*
      * The copies, over the scenery and UNDER the bodies.
@@ -4713,8 +4732,14 @@ export class Game {
      * a copy left standing is a decoy the assist will lock onto in whatever
      * case runs next -- the EMBER inherited-state signature exactly, and the
      * reason build 307's case had to clear six lists by hand.
+     *
+     * ...and REMNANT's promises, for a sharper version of the same reason: a
+     * pending return that outlives a case holds an OLD WAVE SERIAL open in
+     * `Director.standing`, so the next case's wave can be one body short of
+     * ending for ever.
      */
     w.ghosts.length = 0;
+    w.respawns.length = 0;
   }
 
   debugThrowMine(kind = 'blast') {

@@ -221,6 +221,8 @@ export function drawSpecimen(ctx, id, r) {
     case 'seed': drawSeed(ctx, r, 0, 0); break;
     case 'latch': drawLatch(ctx, r, 0, 0); break;
     case 'chaff': drawChaff(ctx, r, 0, 0); break;
+    // the glossary shows the FIRST one: a remnant nobody has killed yet
+    case 'remnant': drawRemnant(ctx, r, 0, 0, false); break;
     default: drawShard(ctx, r);
   }
   ctx.restore();
@@ -433,6 +435,15 @@ export class Enemy {
     this.hopT = 0;
     this.hopFor = 0;
     this.hopSide = 0;
+    /*
+     * Whether this body IS the second arrival. Declared here rather than set
+     * only on the one path that writes it, for the reason `placed`, `fizzle`,
+     * `ignoreT`, `bornFor` and the three hop fields are: a field that exists
+     * only on bodies which have met the one thing that writes it is a field
+     * you have to grep the repo to find out about. It is what stops a REMNANT
+     * coming back for ever -- the guide's "once" is this one boolean.
+     */
+    this.cameBack = false;
     /*
      * Balls riding this body. A seed that reaches a host used to dissolve into
      * it: the host silently became bigger and started healing, and there was
@@ -1726,7 +1737,24 @@ export class Enemy {
     const G = CFG.graft;
     const rd = ridesOf(this.type);
     this.rideT -= dt;
-    if (this.rideT <= 0) { this.dead = true; return; }
+    /*
+     * ---- A RIDER THAT RUNS OUT OF CLOCK LEAVES; IT IS NOT A KILL --------
+     *
+     * `dissolved` was missing here and build 322 shipped without it, so a
+     * LATCH that never found a host was booked as a KILL and entered in the
+     * glossary by `Game.sweep` -- measured, +1 kill on a body nobody touched,
+     * against +0 for an EMBER that climbs out and `dissolved` true. The
+     * doctrine is build 307's and it is stated in as many words there:
+     * leaving pays nothing and counts nothing.
+     *
+     * It is a slip rather than a decision, and the proof is thirty lines
+     * below in this same function: the BOARDING path writes `dead` and
+     * `dissolved` together, correctly refusing to score a rider that got
+     * where it was going. Only the expiry forgot. Same instant form as that
+     * path, so `sweep` still throws its four sparks and the body reads as
+     * having gone rather than vanished.
+     */
+    if (this.rideT <= 0) { this.dead = true; this.dissolved = true; return; }
 
     let best = null;
     let bestScore = 0;
@@ -3062,6 +3090,113 @@ export class Enemy {
       });
     }
 
+    /*
+     * ---- REMNANT: the kill that is not a kill -----------------------------
+     *
+     * `destroy` is the right door and that is a decision, not a convenience.
+     * Build 310 records that it is NOT the one door every death comes through
+     * -- six places write `dead = true` directly -- and for this object that
+     * is exactly what is wanted: a REMNANT taken by the glitch dissolve, by a
+     * boss teardown or by `Game.sweep` must NOT come back, because nobody
+     * shot it. `destroy`'s own `fizzle` guard on its first line covers the
+     * dissolve and build 311 made the same argument for the BELL's ring --
+     * but it does NOT cover the hole, which sets no `fizzle` and calls
+     * `destroy` outright, and that took a third clause. See below.
+     *
+     * The promise is a record rather than the body: the body is about to be
+     * swept off `world.enemies` and a dead body cannot hold a clock. It goes
+     * in `world.respawns`, where the MARK and the CLOCK are one object --
+     * `CFG.remnant.mark` says why -- carrying the wave it belonged to, so
+     * `Director.standing` can refuse to let that wave end while a return is
+     * outstanding. That is the whole of the object's cost, and `Director`
+     * owns the clock: frozen while a boss is up, resumed with the wave, which
+     * is the doctrine `Game.openBoss` states in as many words about `jobs`.
+     *
+     * `counts = false` is the existing lever for "not a kill" -- boss.js has
+     * used it for minions since the bosses did ("it is not one of the five
+     * hundred") -- and it deliberately does NOT suppress `noteDestroyed`,
+     * which is gated on `dissolved`: the player did destroy a REMNANT and the
+     * glossary should say so. `dissolved` would have been wrong for both
+     * halves.
+     */
+    /*
+     * ---- ...AND `this.counts` IS THE THIRD CLAUSE, WHICH WAS MEASURED ------
+     *
+     * `openAperture` takes everything loose on the field the frame the way
+     * opens -- `e.counts = false; e.destroy(world);` -- and its docstring
+     * says what that has to mean in as many words: "it pays out its salvage
+     * exactly as shooting it would have. So it is not a robbery -- opening
+     * the way mid-wave banks the wave."
+     *
+     * Without this clause it IS a robbery, measured with an aperture granted
+     * and one body on the field: the hole took a REMNANT for **0 bytes in 0
+     * motes**, against a LURCHER's 16,000 in 8 and a DRIFT's 4,000 in 2 --
+     * and left a promise behind, which then froze for the whole fight,
+     * because `Game.update` is `if (w.boss) {...} else { director.update()
+     * }` and the clock is the director's. A band-5 return landing minutes
+     * later into an anomaly's field is the other half of it.
+     *
+     * `counts` is borrowed for its MEANING and not for a side effect, which
+     * is the distinction build 234 had to make about `harmless`: the hole's
+     * own comment beside that assignment reads "you did not destroy it, the
+     * hole did", and that is exactly the question being asked here. Nothing
+     * else can reach a REMNANT with it false -- the only other writers are
+     * boss minions and the practice dummy. Read BEFORE the write below, or
+     * the shed block downstream sees the mutated value.
+     *
+     * Note a MOTE needs no clause of its own and that was measured too: a
+     * mote off a REMNANT does inherit `type.respawn` -- `shed` builds every
+     * one with `new Enemy(t, ...)` off the parent's type, which is build
+     * 322's LATCH fault -- and `destroy` returns for `isDrop` forty-five
+     * lines above this, so it can never reach here. Asserted rather than
+     * left to be rediscovered.
+     */
+    const owed = !!t.respawn && !this.cameBack && this.counts && !!world.respawns;
+    if (owed) {
+      const rs = respawnOf(t);
+      this.counts = false;
+      world.respawns.push({
+        type: t,
+        x: this.x,
+        y: this.y,
+        r: this.r,
+        wave: this.wave,
+        /*
+         * ---- WHAT THE SECOND BODY IS OWED, AND WHY IT IS NOT A DROP COUNT --
+         *
+         * The first draft doubled `drops` and it paid NOTHING extra. Measured
+         * on a REMNANT's second death: 6 motes total 24,000 B, 12 motes total
+         * 24,000 B, 24 motes total 24,000 B -- **exactly 1.0000x either way**,
+         * because `shed` computes one `worth` off the body's own MASS and
+         * then divides it between however many pieces there are. Doubling the
+         * count cuts the wreckage smaller and pays the same, which is the
+         * FLINT and LATCH fault a third time: a promise in prose that the
+         * arithmetic refuses.
+         *
+         * `bounty` is the dial that does it, and it is the one CLAUDE.md
+         * already names -- "a multiplier on what a body's wreckage is worth".
+         * `shed` copies it onto every mote (`mote.bounty = this.bounty`) and
+         * `destroy` banks `bytes * bounty` when one is collected, so a factor
+         * here is exactly a factor on what the player receives. TITHE's
+         * `tithed` flag is the existing precedent for making it once-only.
+         *
+         * And it is 2 rather than something derived from `hp`: the promise is
+         * about the number of DEATHS -- the one that did not pay, and this
+         * one -- so tying it to how much health the body came back with would
+         * imply a relationship the object does not have. A remnant that came
+         * back at a tenth of its health still pays for both.
+         */
+        pay: 2,
+        // the rung's scaling, captured off the body that died rather than
+        // re-derived: `scaleToTier` has four early returns and a re-form is
+        // not a release, so asking it again would answer a different question.
+        hp: Math.max(1, Math.round(this.maxHp * rs.hp)),
+        quick: rs.quick,
+        t: 0,
+        life: rs.back,
+      });
+    }
+
     // SCION: it throws seeds rather than simply coming apart. They are
     // harmless bodies, so nothing about them is owed to the field cap.
     if (t.id === 'scion') {
@@ -3204,7 +3339,15 @@ export class Enemy {
     const fractured = sameKind && bigEnough;
     const share = sameKind ? (this.r / t.r) ** 2 : 1;
     const paid = t.drops ? Math.max(1, Math.round(t.drops * share)) : 0;
-    const n = world.sandbox || fractured ? 0 : paid;
+    /*
+     * ...and a body that is COMING BACK sheds nothing, for the reason a
+     * fracture sheds nothing: the salvage is paid once, by the last body in
+     * the chain. `owed` is what the second arrival carries, so the player is
+     * paid the same total either way and the first death is genuinely empty.
+     * The guide's sentence -- "it drops nothing... and that second body pays
+     * for both" -- is these two lines and the `owed` term in `respawnBody`.
+     */
+    const n = world.sandbox || fractured || owed ? 0 : paid;
     /*
      * ---- and the salvage is QUANTISED, which the byte migration exposed ----
      *
@@ -3490,6 +3633,7 @@ export class Enemy {
       case 'seed': drawSeed(ctx, this.r, this.phase, world.time); break;
       case 'latch': drawLatch(ctx, this.r, this.phase, world.time); break;
       case 'chaff': drawChaff(ctx, this.r, this.phase, world.time); break;
+      case 'remnant': drawRemnant(ctx, this.r, this.phase, world.time, this.cameBack); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
       default: drawChip(ctx, this.r, this.phase);
     }
@@ -5501,6 +5645,59 @@ function drawScion(ctx, r, phase, time) {
 }
 
 /**
+ * REMNANT: a ring already in pieces, and the SECOND one is missing more.
+ *
+ * Five segments of an annulus with gaps between them, at fixed bearings --
+ * the type declares `upright`, so the gaps mean something instead of being
+ * wherever `rand(0, TAU)` left the body. The object guide draws exactly this.
+ *
+ * `back` is whether this body IS the second arrival, handed in rather than
+ * read off a module-level anything: two of its five segments are gone and the
+ * rest are dashed, so a player can SEE which remnants have already died once
+ * and which have not. That is the one thing about this object a player could
+ * otherwise only infer from the fact that it is still there -- and it is why
+ * the parameter exists at all. `check-build`'s shape-args guard is what makes
+ * both call sites supply it.
+ */
+function drawRemnant(ctx, r, phase, time, back) {
+  const seg = 5;
+  const gone = back ? 2 : 0;
+  const lw = ctx.lineWidth;
+  for (let i = 0; i < seg; i++) {
+    const a0 = (i / seg) * TAU + 0.1;
+    const a1 = a0 + TAU / seg - 0.24;
+    if (i < gone) {
+      // the pieces this one has already lost: an outline of where they were
+      ctx.save();
+      ctx.globalAlpha *= 0.34;
+      ctx.setLineDash([r * 0.16, r * 0.22]);
+      ctx.lineWidth = lw * 0.8;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.8, a0, a1);
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.8, a0, a1);
+    ctx.lineTo(Math.cos(a1) * r * 0.34, Math.sin(a1) * r * 0.34);
+    ctx.arc(0, 0, r * 0.34, a1, a0, true);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  /*
+   * The core, and it is the only part that moves. It beats faster on a body
+   * that has come back -- the same picture saying the same thing twice, which
+   * is the rule a state that lives only in a hue would break.
+   */
+  const beat = 0.66 + 0.34 * Math.sin(time * (back ? 9 : 4.5) + phase);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.2 * beat, 0, TAU);
+  ctx.fill();
+}
+
+/**
  * CHAFF: a broken ring with three spokes, and the gaps are the point.
  *
  * The type declares `upright`, so the gaps sit at fixed bearings in the world
@@ -5664,6 +5861,54 @@ const FORMATIONS = ['line', 'wedge', 'column', 'arc', 'cluster', 'ring'];
  * Objects that actually count against the spawn budget. Harmless drift is
  * tracked separately so raising its population can never slow the run down.
  */
+/*
+ * NOTE ON PLACEMENT: this sits ABOVE `threatOf` and has to.
+ *
+ * `threatOf` is reached at MODULE LOAD -- the tree's own price sweep calls it,
+ * which is what build 312 recorded when `fractureDepth` had to throw from
+ * there -- and a `const` declared further down the file is in its temporal
+ * dead zone at that moment. Declared below, `RESPAWN_KEYS` read as
+ * "Cannot access before initialization" and the game did not boot. Build
+ * 284's rule about a `const` arrow below the `CFG` literal, one file along:
+ * function declarations hoist and const bindings do not, so anything a
+ * load-time path calls has to be above it.
+ */
+/**
+ * What a body that comes back declares, and there is no default.
+ *
+ * The fourth mandatory-field accessor after `levelsOf` (224), `bandOf` (303)
+ * and `beadsOf`/`climbOf`/`ridesOf`, and for the same measured reason: a
+ * value inherited in silence is indistinguishable from a value that was
+ * chosen, and this repo has shipped eight nodes sold three times, five shapes
+ * drawn as blobs and a second rider wearing SEED's numbers on exactly that.
+ *
+ * `back` bounds the wave, `hp` is counted by `threatOf` as well as carried by
+ * the body, and `quick` is a share of the cruise -- so all three have to be
+ * real numbers above zero, and `hp` has to be under one, because a body that
+ * came back at or above full health would be a body the first kill made
+ * stronger.
+ */
+export const RESPAWN_KEYS = ['back', 'hp', 'quick'];
+
+export function respawnOf(type) {
+  const rs = type && type.respawn;
+  if (!rs || typeof rs !== 'object') {
+    throw new Error(`${type && type.id}: a body that comes back must declare respawn `
+      + `{${RESPAWN_KEYS.join(', ')}}. There is no default -- see CFG.remnant.`);
+  }
+  for (const k of RESPAWN_KEYS) {
+    const v = rs[k];
+    if (!Number.isFinite(v) || v <= 0) {
+      throw new Error(`${type.id}: respawn.${k} must be a number above zero, got ${v}`);
+    }
+  }
+  if (rs.hp >= 1) {
+    throw new Error(`${type.id}: respawn.hp is ${rs.hp} -- a body that comes back at or above `
+      + 'full health is a body the first kill made stronger');
+  }
+  return rs;
+}
+
 /**
  * What one body of this type WEIGHS, in threat points. (Build 301.)
  *
@@ -5698,7 +5943,25 @@ export function threatOf(type) {
    * would need no change.
    */
   const many = type.school || type.beads || 1;
-  return (type.hp * fractureFactor(type) * many + (towed ? towed.hp : 0)) / CFG.waves.threatPerHp;
+  /*
+   * ...and what COMES BACK, for the reason a TOW counts what it drags and a
+   * QUARRY counts what it becomes: the health a player actually has to shoot
+   * for one REMNANT is its own 300 plus the 150 the second body arrives with.
+   * A band that priced it at 300 would be paying for two thirds of what it
+   * gets -- and the object guide's authored threat of 11 is neither figure
+   * (300/threatPerHp is 10, 450/threatPerHp is 15).
+   */
+  /*
+   * ...and note `again` multiplies the body's OWN health, its fracture and
+   * its school -- not the `towed` term beside it. A type that both tows and
+   * comes back would not count its load coming back, which is latent and
+   * costs nothing because no type declares both. Written down rather than
+   * left to be discovered, because it is the shape this repo keeps paying
+   * for: an arithmetic a second type wears without choosing it.
+   */
+  const again = type.respawn ? 1 + respawnOf(type).hp : 1;
+  return (type.hp * fractureFactor(type) * many * again
+    + (towed ? towed.hp : 0)) / CFG.waves.threatPerHp;
 }
 
 /**
@@ -7120,6 +7383,16 @@ export class Director {
      * part of the wave, so a withdrawal that spared them handed the
      * replacement wave a set of grafts it never asked for.
      */
+    /*
+     * ...and REMNANT's promises go with the field, which is the same ruling
+     * `destroy`'s own `fizzle` guard makes: a body the fuse took away was not
+     * shot, so nothing about it is owed a return. Leaving them would hold the
+     * dead wave's serial open in `standing` after the run has been set down a
+     * rung -- and the fuse is the one involuntary way down, so the wave it
+     * interrupted is not a wave anybody is going to finish.
+     */
+    if (world.respawns) world.respawns.length = 0;
+
     let fizzled = 0;
     for (const e of world.enemies) {
       if (e.dead || e.isDrop || e.type.id === 'drift' || e.fizzle > 0) continue;
@@ -7207,6 +7480,59 @@ export class Director {
     for (const e of world.enemies) {
       if (e.dead || e.harmless || e.fizzle) continue;
       if (e.wave === this.serial) n++;
+    }
+    /*
+     * ---- ...AND WHAT IS PROMISED BUT NOT YET ON THE FIELD ----------------
+     *
+     * A REMNANT's first death does not end its wave. This is the whole cost
+     * of that object and it is one term, deliberately ADDITIVE and zero
+     * whenever nothing is coming back -- so every wave in a game with no
+     * remnants in it is counted exactly as before, which is what the case
+     * asserts rather than assumes.
+     *
+     * It is here and not a separate question because the alternative is
+     * worse, and it is worse for a reason build 291 measured: if the wave may
+     * score while a return is outstanding, the body arrives into a wave that
+     * has already been judged, carrying a serial that wave never asked for --
+     * and `cleared`'s own docstring says a scored wave's leftovers are
+     * inherited by the FIELD. That is the permanent-leftover class the
+     * release gate exists to prevent, arriving by a new door. Making the wave
+     * wait closes that door for the ORDINARY end of a wave, which is the one
+     * the object is about.
+     *
+     * ---- AND IT IS NOT CLOSED BY CONSTRUCTION, WHICH THIS SAID FIRST -----
+     *
+     * `patience` is the other way out: the test in `update` is
+     * `if (this.standing(world) > thinAt && this.wait < CFG.waves.patience)
+     * return;`, so at 26 seconds the wave scores WHATEVER is standing --
+     * which is the whole purpose of that clause and the reason
+     * `hitPatience` exists two lines below it. Nothing clears
+     * `world.respawns` on a score, so a remnant killed in the last six
+     * seconds of a patience-bounded wave DOES land after its own wave is
+     * judged. The first draft of this paragraph claimed the opposite in the
+     * same breath as naming `patience` as the bound -- two sentences that
+     * cannot both be true.
+     *
+     * It is left that way, and the reason is that the leftover class build
+     * 291 measured is about bodies nothing bounds. This body is in
+     * `world.enemies`, so `hostileCount` sees it and the release gate holds
+     * the next wave until the field thins, exactly as for any other body;
+     * what is actually lost is one `d.slain` credit on a wave already
+     * scored. Clearing the promise instead would be a robbery -- the first
+     * death paid nothing -- and re-tagging the arrival to whatever wave is
+     * running would bill a wave for a body it never asked for, against
+     * `tagBody`'s own rule that a derived body keeps the wave of the body it
+     * came out of.
+     *
+     * The wait's CEILING is `back` and not the sum of it, because the clocks
+     * run concurrently -- but they start on their own deaths and the deaths
+     * are spread across the wave, so what a wave actually pays is `back`
+     * after the LAST remnant death, which is at most one `back` and usually
+     * nothing at all. Stated as a ceiling here because the first version
+     * stated it as the cost.
+     */
+    if (world.respawns) {
+      for (const p of world.respawns) if (p.wave === this.serial) n++;
     }
     return n;
   }
@@ -7997,6 +8323,15 @@ export class Director {
       return;
     }
 
+    /*
+     * REMNANT's returns, beside the sheet's clocks and BELOW the boss guard
+     * above -- so a promise freezes while a boss is up and resumes with the
+     * wave it belongs to, which is the doctrine `Game.openBoss` states about
+     * everything else the director is holding. Above the timer branch,
+     * because a return is due whether or not the wave is still releasing.
+     */
+    updateRespawns(world, dt);
+
     if (this.probeLock > 0) this.probeLock = Math.max(0, this.probeLock - dt);
     // The sheet's two clocks. One charge back per cooldown, and never above
     // what the tree paid for.
@@ -8512,6 +8847,162 @@ export function spawnByGait(world, type, x) {
  * health, and shooting one off takes its whole share back — which is the way
  * out of a body that is otherwise healing faster than you can hurt it.
  */
+/*
+ * ---- WHAT IS PROMISED BUT NOT YET ON THE FIELD -------------------------
+ *
+ * `world.respawns` is the ninth list and it holds one thing: a REMNANT that
+ * has been destroyed once and is coming back. The MARK and the CLOCK are the
+ * same object -- see `CFG.remnant.mark` -- so the player can see how long is
+ * left, and there is no way for a decorative mark and a hidden timer to drift
+ * apart.
+ *
+ * It is NOT bodies. What `world.enemies` membership would have bought a
+ * pending return is everything build 323's census lists for a copy, and every
+ * one of them would be wrong here: a promise cannot be shot, cannot be
+ * blasted, is not in the way, weighs nothing to the physics and must not be
+ * swept. The one thing it IS visible to is `Director.standing`, which is the
+ * object's entire cost.
+ *
+ * The clock is the DIRECTOR's, which is a decision with a citation:
+ * `Director.update` returns on its first line while a boss is up, and
+ * `Game.openBoss`'s own docstring says why that is right for everything the
+ * director holds -- "the director is frozen while a boss is up, not reset...
+ * whatever it had left to release is still sitting in `jobs`". A return is
+ * exactly that: something left to release. So it freezes with the wave and
+ * resumes with it, which is the opposite of `updateGhosts` (build 323, in
+ * `Game.update` outside the if/else) and right for the opposite reason.
+ */
+export function updateRespawns(world, dt) {
+  const list = world.respawns;
+  if (!list || !list.length) return;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const p = list[i];
+    p.t += dt;
+    if (p.t < p.life) continue;
+    list[i] = list[list.length - 1];
+    list.pop();
+    respawnBody(world, p);
+  }
+}
+
+/**
+ * The second arrival, out of the portal like everything else.
+ *
+ * Through `throughMouth` and `release` at the same negative y `Director.emit`
+ * uses, so it comes down the throat and is `staged` on the way in -- build
+ * 307's DRIFT finding and build 309's EMBER finding are both about a body
+ * that skipped that and appeared somewhere it should not have. It keeps the
+ * WAVE of the body it came off, because `standing` has been holding that wave
+ * open for it.
+ *
+ * And it is marked `cameBack`, which is the guide's "once": `destroy`'s branch
+ * refuses to promise a return for a body that is already one.
+ */
+export function respawnBody(world, p) {
+  const t = p.type;
+  const x = throughMouth(world, rand(t.r + 12, world.width - t.r - 12), t.r);
+  const made = release(world, t, x, -50 - rand(0, 40));
+  for (const e of made) {
+    if (!e) continue;
+    e.cameBack = true;
+    e.wave = p.wave;
+    e.maxHp = p.hp;
+    e.hp = p.hp;
+    /*
+     * `quick` multiplies the cruise THIS body was given, after `scaleToTier`
+     * -- a share of the rung's own speed rather than of the authored 36, so
+     * the return is quicker at rung 35 than at rung 29 the way everything
+     * else on that field is.
+     *
+     * Note what it is NOT: `release` rolls a fresh body with its own
+     * `speedScale`, so this is 1.4x its OWN roll and not 1.4x the cruise the
+     * first body happened to have -- those differ by up to a tenth either
+     * way. The measured pair is 31.0 and 43.4, which is 1.4 against the
+     * second body's roll exactly. A comment claiming the other thing was the
+     * first draft's and is the class of inaccuracy this repo keeps paying
+     * for, so it is written out.
+     *
+     * `baseCruise` is left alone: nothing about a marching body reads it, and
+     * the gaits that do are not this one.
+     */
+    e.cruise *= p.quick;
+    /*
+     * ...and it carries the salvage the first death did not pay, as a factor
+     * on its own bounty rather than as extra pieces of wreckage -- see the
+     * `pay` note in `destroy`, which has the measurement that settled it.
+     * Multiplied INTO whatever the rung already gave it, so a return at rung
+     * 35 is worth more than one at rung 29 exactly as every other body is.
+     */
+    e.bounty *= p.pay;
+  }
+  return made;
+}
+
+/**
+ * The mark a first death leaves: a ring closing as the clock runs out.
+ *
+ * Drawn where the body died rather than where it will come back, because that
+ * is what the mark MEANS -- the portal is where it arrives and this is the
+ * statement that one is coming. The alpha is multiplied in and put back by
+ * `restore`, never assigned, which is build 210's rule and the fault four
+ * separate draw sites had.
+ *
+ * ---- AND IT BRIGHTENS AS THE RETURN COMES DUE, WHICH IT DID NOT ----------
+ *
+ * The first version faded the whole mark on `k = 1 - t/life` -- full at the
+ * death and gone by the arrival -- so the one moment the mark matters was
+ * the faintest frame of it. Rendered on an offscreen canvas at five points
+ * of the clock and measured on the ALPHA channel, which is the channel
+ * `globalAlpha` scales: peak read 95 / 133 / 106 / 79 / 58 of 255 and the
+ * lit-pixel count 359 / 782 / 1151 / 1245 / 0 -- at 0.95 of the life,
+ * nothing on it cleared the threshold at all. Fixed, the same instrument
+ * reads 92 / 133 / 157 / 182 / 201 and 357 / 830 / 1318 / 1822 / 2226,
+ * monotone in both; composited over the field's own ground the peak goes
+ * 92 to 206, which is the cross-check.
+ *
+ * (The first instrument read `max(r, g, b)` off a canvas with nothing
+ * painted behind it and returned 255 at every point of the clock, because a
+ * stroke composited against transparency comes back at full colour with low
+ * alpha. An instrument that divides out the one quantity the claim is about
+ * reads the same on every build.)
+ *
+ * That is build 211's HE burst verbatim -- "a ring authored to expand INTO a
+ * radius is at its dimmest and thinnest exactly where that radius is, which
+ * is why the frame the damage landed on was the least conspicuous frame of
+ * the effect" -- and nothing could fail for it, because the ring is drawn,
+ * the arc is drawn and both are the right colour. Only rendering it and
+ * looking finds this.
+ *
+ * So `due` runs 0 at the death to 1 at the arrival, the clock arc SWEEPS
+ * with it (which it always did) and the alpha RISES with it.
+ */
+export function drawRespawns(ctx, world) {
+  const list = world.respawns;
+  if (!list || !list.length) return;
+  for (const p of list) {
+    const due = clamp(p.t / p.life, 0, 1);
+    ctx.save();
+    ctx.globalAlpha *= 0.5 + 0.45 * due;
+    ctx.translate(p.x, p.y);
+    ctx.lineWidth = Math.max(CFG.hairline, p.r * 0.07);
+    // the ground it left, dashed, so it cannot be read as a body
+    ctx.strokeStyle = rgba(p.type.glow, 0.72);
+    ctx.setLineDash([p.r * 0.34, p.r * 0.42]);
+    ctx.beginPath();
+    ctx.arc(0, 0, p.r * 0.78, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // ...and the clock: an arc that closes as the return comes due, which is
+    // the one number on it a player can act on.
+    ctx.strokeStyle = rgba(p.type.color, 0.85);
+    ctx.lineWidth = Math.max(CFG.hairline, p.r * 0.12);
+    ctx.beginPath();
+    ctx.arc(0, 0, p.r * 1.04, -Math.PI / 2, -Math.PI / 2 + TAU * due);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 /*
  * ---- A COPY IS NOT A BODY, AND world.ghosts IS THE WHOLE OF WHY ---------
  *

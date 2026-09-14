@@ -35143,6 +35143,681 @@ if (MINE_LINE) {
     + `from a DRIFT, against ${D.selfZero} from itself; wave ${wv.at} in band ${wv.band}`);
 }
 
+
+
+
+
+/*
+ * ---- A KILL THAT IS NOT A KILL, AND WHAT THAT COSTS THE WAVE ------------
+ *
+ * Build 324. REMNANT is the fourteenth of the twenty objects and the first
+ * since HUSK that needs no new gait: the whole object happens at its death
+ * and after it. Destroyed, it pays nothing, counts nothing and leaves a mark;
+ * six seconds later one body comes back out of the portal at half health and
+ * 1.4x speed, once, and that body pays for both.
+ *
+ * ---- WHAT MEASUREMENT SAID BEFORE A LINE OF IT WAS WRITTEN -------------
+ *
+ * The guide's counter -- "the second arrival is the one to be standing ready
+ * for" -- is false, and the numbers are in `CFG.remnant`: at the rungs band 5
+ * is played on, with the whole tree bought, a full REMNANT dies in 0.70-0.80s
+ * and the re-formed body in 0.53-0.58s, almost all of which is the round's
+ * flight time. It arrives with HALF the health of the thing that just died,
+ * onto a field of 30-58 bodies. So the second arrival is strictly LESS of an
+ * event than the first.
+ *
+ * What survives is the ACCOUNTING, and that is what this case is about: the
+ * first death does not end the wave. Arm 2 is the load-bearing one.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const E = await import('../src/enemies.js');
+    const { respawnOf, updateRespawns, drawRespawns, drawSpecimen, threatOf } = E;
+    const { CFG, TYPE_BY_ID, WAVES } = await import('../src/config.js');
+    const { codex } = await import('../src/codex.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    const T = TYPE_BY_ID.remnant;
+    const RS = respawnOf(T);
+
+    /*
+     * Everything, and `respawns` above all: a pending return holds an OLD
+     * WAVE SERIAL open in `Director.standing`, so one left behind by this
+     * case can leave a later case's wave permanently one body short of
+     * ending. That is worse than build 307's stray EMBER and it is the
+     * reason `debugClearField` clears the list too.
+     */
+    const clean = () => {
+      g.restart();
+      delete w.director.update;
+      w.spawnLock = 0;
+      g.debugClearField();
+      for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts', 'respawns']) {
+        if (w[k]) w[k].length = 0;
+      }
+      w.timeScale = 1;
+      w.stasis = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+    };
+    const body = (id, x, y) => {
+      const e = g.debugSpawn(id, x, y);
+      e.staged = false;
+      e.spawnIn = 0;
+      e.vx = 0;
+      e.vy = 0;
+      return e;
+    };
+    // what the field will PAY, which is the motes' own worth times their own
+    // bounty -- `destroy` banks exactly that when one is collected. Counting
+    // MOTES instead is what made the first draft of this object ship a
+    // falsehood; see arm 4.
+    const worth = () => w.drops.reduce((a, d) => a + (d.bytes || 0) * (d.bounty || 1), 0);
+
+    // ---- 1. the first death pays nothing, counts nothing, leaves a mark ---
+    {
+      clean();
+      const k0 = w.kills;
+      const e0 = w.earned;
+      const one = body('remnant', w.width * 0.5, 500);
+      one.wave = 77;
+      const hp0 = one.maxHp;
+      one.destroy(w, 'probe');
+      g.sweep(w.enemies);
+      const m = w.respawns[0];
+      out.first = {
+        motes: w.drops.length,
+        paid: worth(),
+        kills: w.kills - k0,
+        earned: w.earned - e0,
+        marks: w.respawns.length,
+        counts: one.counts,
+        // ...and the glossary DOES record it, which is a decision: the mark is
+        // gated on `dissolved` and this death is not one, because the player
+        // did destroy a REMNANT and `dissolved` means "eaten, not destroyed".
+        codex: codex.has('remnant'),
+        at: m ? { dx: Math.round(m.x - one.x), dy: Math.round(m.y - one.y) } : null,
+        hp: m ? m.hp : null,
+        want: Math.max(1, Math.round(hp0 * RS.hp)),
+        wave: m ? m.wave : null,
+        life: m ? m.life : null,
+      };
+    }
+
+    // ---- 2. THE WAVE WAITS, and the term is inert without a promise -------
+    /*
+     * The load-bearing arm. `Director.standing` counts what is promised as
+     * well as what is standing, and the whole cost of this object is that one
+     * term -- so it is asserted in BOTH directions: one pending return on an
+     * empty field reads 1, and the same field with the promise taken away
+     * reads 0. The second half is what says every wave in a game with no
+     * remnants in it is counted exactly as it was before.
+     *
+     * Why it has to be this way rather than letting the wave score: a return
+     * landing after its own wave is judged carries a serial that wave never
+     * asked for, and `cleared`'s own docstring says a scored wave's leftovers
+     * are inherited by the FIELD. That is the permanent-leftover class build
+     * 291's release gate exists to prevent. Making the wave wait closes it by
+     * construction -- a return cannot land after its wave is scored, because
+     * its wave cannot score while it is pending -- and `patience` bounds the
+     * wait, which `check-build` asserts against `back`.
+     */
+    {
+      const d = w.director;
+      d.serial = 77;
+      const held = w.respawns.map((x) => x);
+      const withOne = d.standing(w);
+      w.respawns.length = 0;
+      const withNone = d.standing(w);
+      // ...and a promise belonging to ANOTHER wave is not this wave's problem
+      w.respawns.push({ ...held[0], wave: 78 });
+      const other = d.standing(w);
+      w.respawns.length = 0;
+      w.respawns.push(...held);
+      out.waits = { withOne, withNone, other, patience: CFG.waves.patience, back: RS.back };
+    }
+
+    // ---- 3. the return, out of the portal like everything else ------------
+    /*
+     * Through `throughMouth` and `release`, so it is `staged` on the way in
+     * and comes down the throat -- build 307's DRIFT finding and build 309's
+     * EMBER finding are both about a body that skipped that. The wave it
+     * belonged to is preserved, because `standing` has been holding that wave
+     * open for it.
+     */
+    {
+      const before = w.enemies.length;
+      let f = 0;
+      for (; f < 60 * 12 && w.respawns.length; f++) updateRespawns(w, 1 / 60);
+      const back = w.enemies.find((e) => e.type.id === 'remnant' && e.cameBack);
+      out.back = {
+        seconds: +(f / 60).toFixed(2),
+        made: w.enemies.length - before,
+        cameBack: !!back && back.cameBack,
+        hp: back ? back.hp : null,
+        maxHp: back ? back.maxHp : null,
+        staged: back ? back.staged : null,
+        y: back ? Math.round(back.y) : null,
+        wave: back ? back.wave : null,
+        bounty: back ? +back.bounty.toFixed(3) : null,
+        rim: Math.round(E.ENTRY_Y),
+      };
+    }
+
+    // ---- 4. ...and it pays for BOTH, measured in bytes and not in pieces --
+    /*
+     * THE FIRST DRAFT OF THIS OBJECT SHIPPED A FALSEHOOD HERE and the case is
+     * written the way it is because of it. "Pays for both" was implemented by
+     * doubling the drop COUNT, and measured on a REMNANT's second death that
+     * pays **exactly 1.0000x**: 6 motes total 24,000 B, 12 motes total
+     * 24,000 B, 24 motes total 24,000 B. `shed` computes ONE `worth` off the
+     * body's own mass and divides it between however many pieces there are,
+     * so doubling the count cuts the wreckage smaller and pays the same.
+     *
+     * `bounty` is the dial -- CLAUDE.md already calls it "a multiplier on what
+     * a body's wreckage is worth", `shed` copies it onto every mote and
+     * `destroy` banks `bytes * bounty`. Measured: 2.0000x and 4.0000x.
+     *
+     * So the assertion is on the BYTES, against a control REMNANT that never
+     * died before, and the motes are reported beside them -- because a case
+     * that counted pieces is exactly the case that would have passed on the
+     * broken build.
+     */
+    {
+      const back = w.enemies.find((e) => e.type.id === 'remnant' && e.cameBack);
+      const k1 = w.kills;
+      let second = null;
+      if (back) {
+        w.drops.length = 0;
+        back.destroy(w, 'probe');
+        g.sweep(w.enemies);
+        second = { motes: w.drops.length, paid: worth(), kills: w.kills - k1, marks: w.respawns.length };
+      }
+      clean();
+      const ctl = body('remnant', w.width * 0.5, 500);
+      ctl.cameBack = true; // a remnant that has already come back sheds normally
+      w.drops.length = 0;
+      const k2 = w.kills;
+      ctl.destroy(w, 'probe');
+      g.sweep(w.enemies);
+      out.pays = {
+        second,
+        control: { motes: w.drops.length, paid: worth(), kills: w.kills - k2, bounty: +ctl.bounty.toFixed(3) },
+      };
+    }
+
+    // ---- 5. once, and only for a body somebody actually shot --------------
+    /*
+     * `destroy` is the door and that is a decision: build 310 records that it
+     * is NOT the one door every death comes through, and for this object that
+     * is what is wanted -- a REMNANT taken by the glitch dissolve, a boss
+     * teardown or `Game.sweep` must not come back, because nobody shot it.
+     * `destroy`'s own `fizzle` guard already says so, and build 311 made the
+     * same argument for the BELL's ring.
+     */
+    {
+      const arm = (set) => {
+        clean();
+        const e = body('remnant', w.width * 0.5, 500);
+        set(e);
+        e.destroy(w, 'probe');
+        return w.respawns.length;
+      };
+      out.once = {
+        shot: arm(() => {}),
+        dissolving: arm((e) => { e.fizzle = 0.6; }),
+        already: arm((e) => { e.cameBack = true; }),
+      };
+      /*
+       * ...and a discharge takes the promises with the field, which is the
+       * same ruling: the fuse is the one involuntary way down and a body it
+       * took away was not shot.
+       */
+      clean();
+      body('remnant', w.width * 0.5, 500).destroy(w, 'probe');
+      const before = w.respawns.length;
+      w.director.glitchOut(w);
+      out.once.fuse = { before, after: w.respawns.length };
+    }
+
+    // ---- 6. the block is mandatory and `respawnOf` refuses a bad one -----
+    {
+      const full = { back: 4, hp: 0.5, quick: 1.2 };
+      const bad = [
+        undefined, null, 7, {}, 'x',
+        ...E.RESPAWN_KEYS.map((k) => { const o = { ...full }; delete o[k]; return o; }),
+        ...E.RESPAWN_KEYS.map((k) => ({ ...full, [k]: 0 })),
+        ...E.RESPAWN_KEYS.map((k) => ({ ...full, [k]: -1 })),
+        { ...full, hp: 1 }, { ...full, hp: 1.4 }, { ...full, quick: 'fast' },
+      ];
+      let refused = 0;
+      for (const v of bad) {
+        try { respawnOf({ id: 'probe', respawn: v }); } catch (e) { refused++; }
+      }
+      out.refused = { of: bad.length, n: refused, legal: !!respawnOf({ id: 'probe', respawn: full }) };
+    }
+
+    // ---- 7. what it weighs, and what the wave costs its band -------------
+    {
+      const b5 = WAVES.filter((v) => (v.band || 1) === 5 && !v.teach);
+      const mine = b5.find((v) => (v.of || []).some(([id]) => id === 'remnant'));
+      const others = b5.filter((v) => v !== mine);
+      const mean = others.reduce((a, v) => a + E.threatOfWave(v), 0) / others.length;
+      out.weighs = {
+        threat: +threatOf(T).toFixed(4),
+        nominal: +(T.hp / CFG.waves.threatPerHp).toFixed(4),
+        want: +((T.hp * (1 + RS.hp)) / CFG.waves.threatPerHp).toFixed(4),
+        wave: mine ? +E.threatOfWave(mine).toFixed(2) : null,
+        mean: +mean.toFixed(4),
+        moved: mine ? +((((others.reduce((a, v) => a + E.threatOfWave(v), 0) + E.threatOfWave(mine))
+          / b5.length) / mean - 1) * 100).toFixed(4) : null,
+        of: mine ? JSON.stringify(mine.of) : null,
+      };
+    }
+
+    // ---- 8. A RIDER THAT RUNS OUT OF CLOCK IS NOT A KILL -----------------
+    /*
+     * Found while reading the death paths for this object, and it shipped in
+     * build 322: `hunt`'s expiry wrote `dead = true` with no `dissolved`, so a
+     * LATCH that never found a host was booked as a KILL and entered in the
+     * glossary by `Game.sweep` -- a body nobody touched. Measured before the
+     * fix: +1 kill, against +0 for an EMBER that climbs out, which is the
+     * doctrine build 307 states in as many words (leaving pays nothing and
+     * counts nothing).
+     *
+     * A slip rather than a decision, and the proof is in the same function:
+     * the BOARDING path writes `dead` and `dissolved` together. Both controls
+     * are here, because "+0 kills" is satisfied by a build where nothing dies
+     * at all: the shot LATCH must still count, and the EMBER is the precedent.
+     */
+    {
+      const arm = (make) => {
+        clean();
+        const k0 = w.kills;
+        const e = make();
+        let f = 0;
+        for (; f < 60 * 40 && !e.dead; f++) g.update(1 / 60);
+        for (let i = 0; i < 12; i++) g.update(1 / 60);
+        return { seconds: +(f / 60).toFixed(2), kills: w.kills - k0, dissolved: !!e.dissolved, gone: e.dead };
+      };
+      out.riders = {
+        expired: arm(() => body('latch', w.width * 0.5, 400)),
+        ember: arm(() => body('ember', w.width * 0.5, w.floorY - 40)),
+      };
+      clean();
+      const k = w.kills;
+      const shot = body('latch', w.width * 0.5, 400);
+      shot.destroy(w, 'probe');
+      g.sweep(w.enemies);
+      out.riders.shot = { kills: w.kills - k };
+    }
+
+    // ---- 9. the picture: its family, and the one that has already died ----
+    /*
+     * REMNANT is the first object in five whose colour had real room --
+     * `#f81fff` is 30.1 off its nearest neighbour where LATCH settled for
+     * 11.8 -- so unlike SHOAL, SPINDLE, SHRIKE and LATCH the silhouette is
+     * not the only thing keeping it apart. It is still measured, on the ALPHA
+     * channel alone so the tone is divided out by construction.
+     *
+     * And the SECOND arrival draws differently: two of its five segments are
+     * gone. That is the one thing about this object a player could otherwise
+     * only infer, so it is asserted -- ONE body rendered at two states rather
+     * than two bodies rendered once, which is build 310's correction.
+     */
+    {
+      const SZ = 96;
+      const shot = (fn) => {
+        const c = document.createElement('canvas');
+        c.width = SZ;
+        c.height = SZ;
+        const x = c.getContext('2d');
+        x.translate(SZ / 2, SZ / 2);
+        fn(x);
+        const px = x.getImageData(0, 0, SZ, SZ).data;
+        const a = new Uint8Array(SZ * SZ);
+        for (let i = 0; i < SZ * SZ; i++) a[i] = px[i * 4 + 3];
+        return a;
+      };
+      const diff = (p, q) => {
+        let s = 0;
+        for (let i = 0; i < p.length; i++) s += Math.abs(p[i] - q[i]);
+        return Math.round(s / 1000);
+      };
+      const spec = (id) => shot((x) => drawSpecimen(x, id, 22));
+      const me = spec('remnant');
+      out.draw = { selfZero: diff(spec('remnant'), me) };
+      for (const id of ['lurcher', 'latch', 'yoke', 'quarry']) out.draw[id] = diff(me, spec(id));
+      // ...and the same body at its two states, which is what the flag buys
+      clean();
+      const one = body('remnant', w.width * 0.5, 400);
+      one.phase = 0.7;
+      const at = (back) => shot((x) => {
+        one.cameBack = back;
+        const sx = one.x;
+        const sy = one.y;
+        one.x = 0;
+        one.y = 0;
+        one.draw(x, w);
+        one.x = sx;
+        one.y = sy;
+      });
+      out.draw.states = diff(at(false), at(true));
+      out.draw.same = diff(at(false), at(false));
+    }
+
+    // ---- 10. the hole takes one WHOLE, and a mote off one owes nothing ----
+    /*
+     * `openAperture` takes everything loose the frame the way opens, and its
+     * docstring states the invariant: "it pays out its salvage exactly as
+     * shooting it would have. So it is not a robbery -- opening the way
+     * mid-wave banks the wave." A promise is the one thing that can break it,
+     * and it did: measured before the third clause went on the branch, the
+     * hole took a REMNANT for 0 bytes in 0 motes and left a promise behind,
+     * which then FROZE for the whole fight, because `Game.update` is
+     * `if (w.boss) {...} else { director.update() }` and the clock is the
+     * director's. `this.counts` is what tells the two deaths apart, and the
+     * hole writes it false one line above its own `destroy` under a comment
+     * reading "you did not destroy it, the hole did".
+     *
+     * Two controls, because "it paid something" is true of a working build
+     * and of one where the clause is on the wrong term: a LURCHER and a
+     * DRIFT through the same hole, and the ordinary shot from arm 1, which is
+     * the only one of the four that may leave a promise.
+     *
+     * And the MOTE, which needs no clause and is asserted rather than left to
+     * be rediscovered: it DOES inherit `type.respawn`, because `shed` builds
+     * every mote off the parent's type -- build 322's LATCH fault -- and
+     * `destroy` returns for `isDrop` forty-five lines above the branch, so it
+     * can never reach it.
+     */
+    {
+      const through = (id) => {
+        clean();
+        w.boss = null;
+        w.apertures[1] = 1;
+        const e = body(id, w.width * 0.5, 500);
+        e.wave = 43;
+        const opened = g.openBoss(1);
+        const got = {
+          opened,
+          promises: w.respawns.length,
+          paid: worth(),
+          motes: w.drops.length,
+        };
+        if (w.boss) g.withdrawBoss();
+        return got;
+      };
+      out.hole = {
+        remnant: through('remnant'),
+        lurcher: through('lurcher'),
+        drift: through('drift'),
+      };
+      // ...and a mote off one: it carries the field and cannot use it
+      clean();
+      const one = body('remnant', w.width * 0.5, 400);
+      one.cameBack = true;
+      one.destroy(w, 'probe');
+      g.sweep(w.enemies);
+      const mote = w.drops[0];
+      const p0 = w.respawns.length;
+      if (mote) mote.destroy(w);
+      out.mote = {
+        made: w.drops.length,
+        carries: mote ? !!mote.type.respawn : null,
+        isDrop: mote ? mote.isDrop : null,
+        before: p0,
+        after: w.respawns.length,
+      };
+    }
+
+    // ---- 11. the clock is the DIRECTOR'S, so a fight stops it ------------
+    /*
+     * Where the six seconds tick is the whole placement decision and both
+     * alternatives are wrong in a different way. Unconditionally, beside
+     * `updateGhosts` in `Game.draw`'s neighbourhood, a band-5 REMNANT re-forms
+     * out of the portal INTO an anomaly's field. In `Director.update`, which
+     * is what this build does, it freezes -- and build 210's scar says that
+     * is how the glitch timer's douse came to never run for a 224-second
+     * fight, with a green case that called `d.update` directly.
+     *
+     * So it is measured through the real door, and the freeze is the DESIGN
+     * here rather than the fault: the promise is the director's and the
+     * director is frozen while a boss is up, not reset, which is the doctrine
+     * `Game.openBoss` states in as many words about `jobs` and `at`. The
+     * return then lands into the wave it belonged to, which resumes.
+     *
+     * The pair is what makes it an instrument: ten seconds of a fight with
+     * the clock at zero says nothing on its own -- a promise that never
+     * arrives looks identical -- so the same promise is carried past the
+     * withdrawal and has to land.
+     */
+    {
+      clean();
+      // the real director, or this arm is about the stub
+      delete w.director.update;
+      const one = body('remnant', w.width * 0.5, 500);
+      one.wave = w.director.serial;
+      one.destroy(w, 'probe');
+      g.sweep(w.enemies);
+      const promised = w.respawns.length;
+      w.boss = null;
+      w.apertures[1] = 1;
+      const opened = g.openBoss(1);
+      for (let f = 0; f < 60 * 10; f++) g.update(1 / 60);
+      const inFight = {
+        boss: !!w.boss,
+        promises: w.respawns.length,
+        clock: w.respawns[0] ? +w.respawns[0].t.toFixed(2) : null,
+        came: w.enemies.filter((e) => e.type.id === 'remnant').length,
+      };
+      if (w.boss) g.withdrawBoss();
+      let f = 0;
+      for (; f < 60 * 12 && w.respawns.length; f++) g.update(1 / 60);
+      out.freeze = {
+        promised,
+        opened,
+        inFight,
+        after: {
+          seconds: +(f / 60).toFixed(2),
+          promises: w.respawns.length,
+          came: w.enemies.some((e) => e.type.id === 'remnant' && e.cameBack),
+        },
+      };
+      // ...and the stub goes back, or every case downstream is starved
+      clean();
+      w.director.update = () => {};
+    }
+
+    // ---- 12. the mark BRIGHTENS as the return comes due -----------------
+    /*
+     * It faded the other way first, and nothing could fail for it: the ring
+     * is drawn, the arc is drawn, both are the right colour, and the alpha
+     * ran on `1 - t/life` -- full at the death and gone by the arrival, so
+     * the one moment the mark matters was the faintest frame of it. Measured
+     * on the alpha channel at five points of the clock, the peak read
+     * 95 / 133 / 106 / 79 / 58 of 255 and the lit count 359 / 782 / 1151 /
+     * 1245 / **0**: at 0.95 of the life, nothing on it cleared the
+     * threshold. Fixed, the same instrument reads 92 / 133 / 157 / 182 / 201
+     * and 357 / 830 / 1318 / 1822 / 2226. That is build 211's HE burst
+     * verbatim and only rendering it and looking finds it.
+     *
+     * Measured off an OFFSCREEN canvas driven by hand, never the live one:
+     * the page's own rAF loop repaints between a draw and a screenshot, which
+     * is build 211's screenshot trap and build 298's free-running headless
+     * loop. Nothing here touches the world, so the five frames differ by the
+     * clock and by nothing else -- the control is the same frame twice, which
+     * has to be exactly 0.
+     */
+    {
+      const CELL = 150;
+      const FR = [0, 0.25, 0.5, 0.75, 0.95];
+      const frame = (due) => {
+        const c = document.createElement('canvas');
+        c.width = CELL;
+        c.height = CELL;
+        const x = c.getContext('2d');
+        x.translate(CELL / 2, CELL / 2);
+        x.scale(1.6, 1.6);
+        drawRespawns(x, { respawns: [{ type: TYPE_BY_ID.remnant, x: 0, y: 0, r: 30, t: due * 6, life: 6, wave: 1 }] });
+        const px = x.getImageData(0, 0, CELL, CELL).data;
+        let peak = 0;
+        let lit = 0;
+        for (let i = 0; i < CELL * CELL; i++) {
+          // THE ALPHA CHANNEL, and that is the correction rather than a
+          // preference: the first version read max(r, g, b) off a canvas
+          // with nothing painted behind it, and a stroke composited against
+          // transparency comes back at FULL colour with low alpha -- so it
+          // read 255 / 255 / 255 / 255 / 255 on a build whose whole subject
+          // is the alpha. `globalAlpha` scales exactly this channel, so
+          // reading it measures the claim and divides the tone out by
+          // construction, which is build 314's rule on a new quantity.
+          const v = px[i * 4 + 3];
+          if (v > peak) peak = v;
+          if (v > 60) lit++;
+        }
+        return { peak, lit };
+      };
+      const f = FR.map(frame);
+      const twice = frame(0.5);
+      out.mark = {
+        peak: f.map((q) => q.peak),
+        lit: f.map((q) => q.lit),
+        // monotone in BOTH, which is what "brightens as it comes due" means
+        risesPeak: f.every((q, i) => i === 0 || q.peak >= f[i - 1].peak),
+        risesLit: f.every((q, i) => i === 0 || q.lit >= f[i - 1].lit),
+        control: twice.peak === f[2].peak && twice.lit === f[2].lit,
+      };
+    }
+
+    clean();
+    return out;
+  });
+
+  const f = r.first;
+  const wt = r.waits;
+  check('a REMNANT\'s first death pays nothing, counts nothing, and does not end its wave',
+    f.motes === 0 && f.paid === 0 && f.kills === 0 && f.earned === 0
+    && f.counts === false && f.marks === 1
+    // the glossary still records it: a destroyed REMNANT was destroyed
+    && f.codex
+    // ...and the mark stands where the body did, carrying half its health
+    && Math.abs(f.at.dx) < 1 && Math.abs(f.at.dy) < 1 && f.hp === f.want && f.wave === 77
+    // THE LOAD-BEARING PAIR: the wave waits, and the term is inert without one
+    && wt.withOne === 1 && wt.withNone === 0 && wt.other === 0
+    && wt.back < wt.patience,
+    `first death: ${f.motes} motes worth ${f.paid} B, ${f.kills} kills, ${f.earned} earned, `
+    + `counts ${f.counts}, glossary ${f.codex}; the mark stands at (${f.at.dx}, ${f.at.dy}) `
+    + `of where it died carrying ${f.hp} of ${f.want} for ${f.life}s. standing() reads `
+    + `${wt.withOne} with one promise on an empty field, ${wt.withNone} with none and `
+    + `${wt.other} for another wave's -- against a patience of ${wt.patience}s`);
+
+  const bk = r.back;
+  const py = r.pays;
+  check('...and six seconds later ONE comes back out of the portal, weaker and quicker, paying for both',
+    bk.made === 1 && bk.cameBack && Math.abs(bk.seconds - wt.back) < 0.2
+    && bk.hp === f.want && bk.maxHp === f.want && bk.wave === 77
+    // out of the PORTAL: staged, and above the rim
+    && bk.staged === true && bk.y < 0
+    // it pays DOUBLE, in bytes -- counting motes is what shipped a falsehood
+    && py.second && py.second.paid === py.control.paid * 2
+    && py.second.kills === 1 && py.second.marks === 0
+    && py.control.kills === 1 && py.control.paid > 0,
+    `after ${bk.seconds}s one body came back at ${bk.hp}/${bk.maxHp} (half of the `
+    + `${f.want * 2} it had), staged at y ${bk.y}, still wave ${bk.wave}, bounty `
+    + `x${bk.bounty}. Its death paid ${py.second && py.second.paid} B in `
+    + `${py.second && py.second.motes} motes against a control remnant's `
+    + `${py.control.paid} B in ${py.control.motes} at bounty x${py.control.bounty} `
+    + `-- exactly double, where doubling the MOTE COUNT pays 1.0000x`);
+
+  const on = r.once;
+  const rf = r.refused;
+  const wg = r.weighs;
+  check('it comes back once, only for a body somebody shot, and the band pays for what it shoots',
+    on.shot === 1 && on.dissolving === 0 && on.already === 0
+    && on.fuse.before === 1 && on.fuse.after === 0
+    && rf.n === rf.of && rf.legal
+    // threatOf counts the return, which is the whole reason a band can afford it
+    && Math.abs(wg.threat - wg.want) < 1e-9 && wg.threat > wg.nominal
+    && Math.abs(wg.moved) < 0.05,
+    `promises left by: a shot remnant ${on.shot}, one dissolving ${on.dissolving}, one that had `
+    + `already come back ${on.already}; a discharge took ${on.fuse.before} -> ${on.fuse.after}. `
+    + `${rf.n} of ${rf.of} malformed respawn blocks refused. It weighs ${wg.threat} against a `
+    + `nominal ${wg.nominal} (the guide authors 11), so its wave ${wg.of} weighs ${wg.wave} `
+    + `against band 5's own mean of ${wg.mean} and moves it ${wg.moved}%`);
+
+  const rd = r.riders;
+  const dw = r.draw;
+  check('a rider that runs out of clock is not a kill, and a remnant that has died once looks like it',
+    // build 322's fault, found reading the death paths for this object
+    rd.expired.gone && rd.expired.kills === 0 && rd.expired.dissolved
+    // ...with both controls, because "+0 kills" is true of a build where nothing dies
+    && rd.shot.kills === 1
+    && rd.ember.kills === 0 && rd.ember.dissolved
+    // and the picture
+    && dw.selfZero === 0 && dw.same === 0
+    && dw.lurcher > 40 && dw.latch > 40 && dw.yoke > 40 && dw.quarry > 40
+    && dw.states > 40,
+    `a LATCH that never found a host left after ${rd.expired.seconds}s for `
+    + `${rd.expired.kills} kills (dissolved ${rd.expired.dissolved}), against ${rd.shot.kills} `
+    + `for one that was shot and ${rd.ember.kills} for an EMBER that climbed out. `
+    + `On the alpha channel alone -- shape and nothing else -- REMNANT is ${dw.lurcher} from a `
+    + `LURCHER, ${dw.latch} from a LATCH, ${dw.yoke} from a YOKE and ${dw.quarry} from a QUARRY, `
+    + `against ${dw.selfZero} from itself; and the body that has come back differs from the same `
+    + `body before it died by ${dw.states}, against ${dw.same} for two draws of one state`);
+
+  const hl = r.hole;
+  const mo = r.mote;
+  check('the hole takes one whole, and a mote off one owes nothing',
+    hl.remnant.opened && hl.lurcher.opened && hl.drift.opened
+    // no promise from any of the three, and the REMNANT pays like the others
+    && hl.remnant.promises === 0 && hl.lurcher.promises === 0 && hl.drift.promises === 0
+    && hl.remnant.paid > 0 && hl.remnant.motes > 0
+    // ...and the controls pay too, or the arm is about a hole that takes nothing
+    && hl.lurcher.paid > 0 && hl.drift.paid > 0
+    // the mote carries the field, is a drop, and destroying it promises nothing
+    && mo.made > 0 && mo.carries === true && mo.isDrop === true
+    && mo.before === 0 && mo.after === 0,
+    `through the hole: REMNANT ${hl.remnant.paid} B in ${hl.remnant.motes} motes, `
+    + `LURCHER ${hl.lurcher.paid} in ${hl.lurcher.motes}, DRIFT ${hl.drift.paid} in `
+    + `${hl.drift.motes} -- and ${hl.remnant.promises}/${hl.lurcher.promises}/`
+    + `${hl.drift.promises} promises left, against 1 for the same body shot. A mote off `
+    + `one carries respawn ${mo.carries} and isDrop ${mo.isDrop}; destroying it took the `
+    + `promise count ${mo.before} -> ${mo.after}`);
+
+  const fz = r.freeze;
+  check('the six seconds are the director\'s clock, so an anomaly stops them and the withdrawal starts them again',
+    fz.promised === 1 && fz.opened
+    // ten seconds of a fight and the clock has not moved at all
+    && fz.inFight.boss && fz.inFight.promises === 1 && fz.inFight.clock === 0
+    && fz.inFight.came === 0
+    // ...and the SAME promise then lands, which is what says the zero above
+    // is a freeze and not a promise that was never going to arrive
+    && fz.after.promises === 0 && fz.after.came
+    && Math.abs(fz.after.seconds - wt.back) < 0.2,
+    `one promise, then the way opened: after 10s of the fight the clock read `
+    + `${fz.inFight.clock} of ${wt.back} with ${fz.inFight.promises} still owed and `
+    + `${fz.inFight.came} remnants on the field. Withdrawn, the same promise landed in `
+    + `${fz.after.seconds}s`);
+
+  const mk = r.mark;
+  check('the mark a first death leaves brightens as the return comes due',
+    mk.risesPeak && mk.risesLit
+    // legible from the frame it is left, and unmistakable by the time it is due
+    && mk.peak[0] >= 80 && mk.peak[4] >= mk.peak[0] * 2
+    && mk.lit[0] > 0 && mk.lit[4] >= mk.lit[0] * 4
+    // ...and the instrument reads the clock and nothing else
+    && mk.control,
+    `alpha peak ${mk.peak.join(' / ')} of 255 and ${mk.lit.join(' / ')} lit pixels `
+    + `across the clock at 0, 0.25, 0.5, 0.75 and 0.95 of its life -- rising in peak `
+    + `${mk.risesPeak} and in area ${mk.risesLit}, against 95 / 133 / 106 / 79 / 58 and `
+    + `359 / 782 / 1151 / 1245 / 0 on the same instrument when it faded the other way. `
+    + `Two draws of one frame differ by ${mk.control ? 0 : 'MORE THAN 0'}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;
